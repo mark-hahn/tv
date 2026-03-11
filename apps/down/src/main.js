@@ -1428,9 +1428,14 @@ async function main() {
         const fext = dotIdx >= 0 ? fname.slice(dotIdx) : "";
         const nnn = `${season}${String(episode).padStart(2, "0")}`;
         const seStr = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
+        // Case 0: NxN prefix (e.g. "1x1 - The Sofa.avi" → "S01E01 - The Sofa.avi")
+        const nxnPrefixMatch = fbase.match(/^\d{1,2}x\d{1,2}[-_ ]+(.*)/i);
         // Case 1: NNN prefix (e.g. "101-Title.avi" or "101 Title.avi")
         const prefixMatch = fbase.match(new RegExp(`^${nnn}[-_ ]+(.*)`));
-        if (prefixMatch) {
+        if (nxnPrefixMatch) {
+          const rest = nxnPrefixMatch[1].trim();
+          destTitle = rest ? `${seStr} - ${rest}${fext}` : `${seStr}${fext}`;
+        } else if (prefixMatch) {
           const rest = prefixMatch[1].trim();
           destTitle = rest ? `${seStr} - ${rest}${fext}` : `${seStr}${fext}`;
         } else {
@@ -1744,7 +1749,17 @@ async function main() {
       log("------", downloadCount, "/", chkCount, "ALREADY ON DISK:", fname);
       trace("checkFileExists: already on disk", { fname, tvSeasonPath });
       try {
-        tvJson.markFinished(fname, tvLocalDir);
+        tvJson.markFinished({
+          title: fname,
+          localPath: tvLocalDir,
+          usbPath: usbPath,
+          seriesName: seriesName || undefined,
+          season: season || 0,
+          episode: episode || 0,
+          fileSize: usbFileBytes || 0,
+          destTitle: destTitle || undefined,
+          sequence: currentSeq || 0,
+        });
       } catch (e) {}
       if (tvJsonTitles) tvJsonTitles[fname] = { error: false };
       return process.nextTick(checkFile);

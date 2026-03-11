@@ -255,6 +255,15 @@ export function parseFileSeasonEpisode(
     }
   }
 
+  // Step 4b: NxN format at start of filename (e.g. "1x1 - Title.avi", "2x03 - Episode.avi")
+  if (!Number.isInteger(season) || !Number.isInteger(episode)) {
+    const m = fname.match(/^(\d{1,2})x(\d{1,2})(?:\b|[-_ ])/i);
+    if (m) {
+      season = parseInt(m[1], 10);
+      episode = parseInt(m[2], 10);
+    }
+  }
+
   // Step 5: compact NNN (first digit = season, last two = episode; e.g. 101 → S1E01)
   if (!Number.isInteger(season) && !Number.isInteger(episode)) {
     const m = fname.match(/\b([1-9])(\d{2})\b/);
@@ -317,6 +326,12 @@ export function parseTitleFromFilename(fname, folderName, parsedPtt) {
   // If ptt produced a title that starts with a NNN-prefix (e.g. "101-Lets Meet Mike and Euan.")
   // it's an episode title, not a series name — null it out so the folder fallback runs.
   if (title && /^\d{3}[\s\-]/.test(title)) {
+    title = null;
+  }
+
+  // If ptt produced a title starting with NxN (e.g. "1x1 - The Sofa"), discard it
+  // so the folder-name fallback provides the series name instead.
+  if (title && /^\d{1,2}x\d{1,2}\b/.test(title)) {
     title = null;
   }
 

@@ -1146,7 +1146,7 @@ export default {
                     st === "downloading" || st === "waiting" || st === "future"
                   );
                 })
-                .map((it) => toParsedTitle(it?.title))
+                .map((it) => it?.seriesName || toParsedTitle(it?.title))
                 .filter(Boolean)
             : [];
           evtBus.emit("activeDownTitles", downloadingTitles);

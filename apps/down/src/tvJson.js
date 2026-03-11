@@ -1594,25 +1594,55 @@ const deleteErrorRecords = () => {
 
 // Mark a title as finished in the DB without running a worker.
 // Used when the file is already present on disk.
-const markFinished = (title, localPath) => {
+const markFinished = (titleOrEntry, localPath) => {
+  const entry =
+    titleOrEntry && typeof titleOrEntry === "object" ? titleOrEntry : null;
+  const title = entry ? String(entry.title || "") : String(titleOrEntry || "");
   if (!title) return;
-  const t = String(title);
   try {
     openDb();
     const now = Math.floor(Date.now() / 1000);
-    const existing = stmtGetByTitle.get(t);
+    const existing = stmtGetByTitle.get(title);
     if (existing) {
-      db.prepare(
-        "UPDATE tv_entries SET status='finished', inProgress=0, progress=100, dateEnded=? WHERE title=?",
-      ).run(now, t);
+      // Update all known fields when a full entry is provided, otherwise
+      // just flip the status flags.
+      if (entry) {
+        const patch = normalizeEntryForDb({
+          ...rowToEntry(existing),
+          ...entry,
+          status: "finished",
+          inProgress: false,
+          progress: 100,
+          dateEnded: now,
+        });
+        upsertEntry(patch);
+      } else {
+        db.prepare(
+          "UPDATE tv_entries SET status='finished', inProgress=0, progress=100, dateEnded=? WHERE title=?",
+        ).run(now, title);
+      }
     } else {
-      const lp = localPath ? String(localPath) : null;
-      db.prepare(
-        `INSERT INTO tv_entries (title, procId, localPath, status, inProgress, progress, dateEnded, error)
-         VALUES (?, ?, ?, 'finished', 0, 100, ?, 0)`,
-      ).run(t, nextProcId++, lp, now);
+      const lp = entry?.localPath || (localPath ? String(localPath) : null);
+      if (entry) {
+        const patch = normalizeEntryForDb({
+          ...entry,
+          procId: nextProcId++,
+          status: "finished",
+          inProgress: false,
+          progress: 100,
+          dateEnded: now,
+          dateStarted: entry.dateStarted || now,
+          error: false,
+        });
+        upsertEntry(patch);
+      } else {
+        db.prepare(
+          `INSERT INTO tv_entries (title, procId, localPath, status, inProgress, progress, dateEnded, error)
+           VALUES (?, ?, ?, 'finished', 0, 100, ?, 0)`,
+        ).run(title, nextProcId++, lp, now);
+      }
     }
-    removeInProgress(t);
+    removeInProgress(title);
   } catch {
     // non-fatal
   }

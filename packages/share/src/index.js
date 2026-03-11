@@ -13,6 +13,7 @@ function normalizeAggressive(s) {
   }
   out = out.toLowerCase();
   out = out.replace(/\./g, " ");
+  out = out.replace(/&/g, " and ");
   out = out.replace(/[^a-z0-9\s]/g, " ");
   out = out.trim().replace(/\s+/g, " ");
   return out;
@@ -152,6 +153,9 @@ export function smartTitleMatch(title, titleArray, year, forceChoice) {
 
   const m4 = findExact(normalizeAggressive, wantAgg, isSameYear);
   if (m4 != null) return m4;
+
+  const m4b = findExact(normalizeAggressive, wantAgg, isOneMissingYear);
+  if (m4b != null) return m4b;
 
   // If forceChoice is explicity false, we stop here (strict matching).
   if (forceChoice === false) return null;

@@ -1612,10 +1612,15 @@ async function main() {
 
   checkFileExists = () => {
     var e, tvFilePath, tvSeasonPath, usbLongPath, videoPath;
-    const embyFolderName =
-      embyMap && seriesName && embyMap[seriesName]?.Path
-        ? embyMap[seriesName].Path
+    const embyKeyForFolder =
+      embyMap && seriesName
+        ? smartTitleMatch(seriesName, Object.keys(embyMap), null, false) ||
+          seriesName
         : seriesName;
+    const embyFolderName =
+      embyMap && embyKeyForFolder && embyMap[embyKeyForFolder]?.Path
+        ? embyMap[embyKeyForFolder].Path
+        : embyKeyForFolder || seriesName;
     tvSeasonPath = `${tvPath}${embyFolderName}/Season ${season}`;
     tvFilePath = `${tvSeasonPath}/${fname}`;
     videoPath = `files/${usbFilePath}`;
@@ -1682,7 +1687,10 @@ async function main() {
 
     // Emby filter: only download shows that are in Emby.
     if (embyMap && seriesName) {
-      const embyEntry = embyMap[seriesName];
+      const embyKey =
+        smartTitleMatch(seriesName, Object.keys(embyMap), null, false) ||
+        seriesName;
+      const embyEntry = embyMap[embyKey];
       if (!embyEntry || !embyEntry.inEmby) {
         log(
           "------",

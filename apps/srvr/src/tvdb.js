@@ -1816,11 +1816,13 @@ const chkTvdbQueue = () => {
   chkTvdbQueueRunning = true;
   const { ws, id, paramObj, resolve: resolveCb } = newTvdbQueue.pop();
   const showName = paramObj.show?.Name;
-  // log("chkTvdbQueue: processing", {
-  //   id,
-  //   showName,
-  //   queueLength: newTvdbQueue.length,
-  // });
+
+  // Snapshot the old record NOW, before getTvdbData overwrites allTvdb[name].
+  // getTvdbData sets allTvdb[name] = tvdbData before resolving the promise, so
+  // reading allTvdb[keyName] inside .then() would give the new record, making
+  // all change comparisons trivially equal.
+  const prevSnapshot =
+    showName && allTvdb[showName] ? { ...allTvdb[showName] } : null;
 
   if (ws && ws.readyState !== WebSocket.OPEN) {
     log("chkTvdbQueue: skipping closed WebSocket", id);
@@ -1843,7 +1845,11 @@ const chkTvdbQueue = () => {
           finalData = tvdbData;
           if (!paramObj.transient) {
             const keyName = finalData.Name || finalData.name;
-            const prev = allTvdb[keyName];
+            // Use the snapshot taken before getTvdbData ran; fall back to
+            // allTvdb[keyName] only when the show was canonicalized to a
+            // different name (snapshot was taken under the original name).
+            const prev =
+              prevSnapshot ?? (showName !== keyName ? allTvdb[showName] : null);
             const tvdbChanges = [];
             if (prev) {
               if (prev.lastAired !== finalData.lastAired)
@@ -1875,7 +1881,12 @@ const chkTvdbQueue = () => {
                   `rotten:${prev.rottenRatings ?? "none"}->${finalData.rottenRatings ?? "none"}`,
                 );
             } else {
-              tvdbChanges.push(`new record`);
+              const newRecParts = ["new record"];
+              if (finalData.imdbRatings)
+                newRecParts.push(`imdb:${finalData.imdbRatings}`);
+              if (finalData.rottenRatings)
+                newRecParts.push(`rotten:${finalData.rottenRatings}`);
+              tvdbChanges.push(newRecParts.join(" "));
             }
             if (!paramObj.suppressNotify) {
               log(
@@ -2138,9 +2149,6 @@ export const getRemotesCmd = async (params) => {
   const show = params?.show;
   const tvdbRemotes = params?.tvdbRemotes || [];
   const fast = !!params?.fast;
-  // fast: true = use cached data (no Rotten Tomatoes or IMDB scraping)
-  // fast: false = scrape Rotten Tomatoes and IMDB with Playwright for fresh ratings
-  // log("getRemotesCmd: START", { showName: show?.Name, fast });
 
   if (!show) {
     throw new Error("getRemotes: missing show");
@@ -2153,20 +2161,42 @@ export const getRemotesCmd = async (params) => {
       fast,
     );
 
+    const existing = allTvdb?.[show.Name];
+    log(
+      `getRemotesCmd [${show.Name}] fast=${fast}` +
+        ` fetched={imdb:${fetchedUrls.imdbRatings ?? "-"},rotten:${fetchedUrls.rottenRatings ?? "-"}}` +
+        ` existing={imdb:${existing?.imdbRatings ?? "-"},rotten:${existing?.rottenRatings ?? "-"}}` +
+        ` inAllTvdb=${!!existing}`,
+    );
+
     // When fetching fresh data (fast=false), save remotes and flat url props
-    if (!fast && show.Name && allTvdb && allTvdb[show.Name]) {
-      allTvdb[show.Name].remotes = remotes;
-      Object.assign(allTvdb[show.Name], fetchedUrls);
-      // Save to disk asynchronously without blocking response
-      saveTvdbSync().catch((err) => {
-        log("err", "getRemotesCmd: saveTvdbSync failed:", err.message);
-      });
+    if (!fast && show.Name && allTvdb) {
+      if (allTvdb[show.Name]) {
+        const changes = [];
+        if (
+          fetchedUrls.imdbRatings !== undefined &&
+          fetchedUrls.imdbRatings !== existing.imdbRatings
+        )
+          changes.push(
+            `imdb:${existing.imdbRatings ?? "none"}->${fetchedUrls.imdbRatings ?? "none"}`,
+          );
+        if (
+          fetchedUrls.rottenRatings !== undefined &&
+          fetchedUrls.rottenRatings !== existing.rottenRatings
+        )
+          changes.push(
+            `rotten:${existing.rottenRatings ?? "none"}->${fetchedUrls.rottenRatings ?? "none"}`,
+          );
+        existing.remotes = remotes;
+        Object.assign(existing, fetchedUrls);
+        if (changes.length)
+          log(`getRemotes [${show.Name}]: ${changes.join(" ")}`);
+        saveTvdbSync().catch((err) => {
+          log("err", "getRemotesCmd: saveTvdbSync failed:", err.message);
+        });
+      }
     }
 
-    // log("getRemotesCmd: END", {
-    //   showName: show?.Name,
-    //   remotesCount: remotes?.length,
-    // });
     return remotes;
   } catch (err) {
     log("getRemotesCmd: ERROR", { error: err.message });

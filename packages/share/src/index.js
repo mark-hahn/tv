@@ -394,5 +394,17 @@ export function parseTitleFromFilename(fname, folderName, parsedPtt) {
     if (folderClean && folderClean.length >= 2) title = folderClean;
   }
 
+  // Normalize dots used as word separators (e.g. "The.Sketch.Show" → "The Sketch Show").
+  // This occurs when a filename uses a mixed separator style: dots within the
+  // title but a space before the episode marker (e.g. "The.Sketch.Show s01e01.avi").
+  // PTT keeps the dots because it treats the space as the separator.
+  // Only replace dots between multi-character words to preserve acronyms.
+  if (title && title.includes(".")) {
+    title = title
+      .replace(/(?<=\w{2,})\.(?=\w)/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
   return title || null;
 }

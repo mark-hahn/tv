@@ -392,7 +392,9 @@ const tvResync = () => {
         let rows = [];
         try {
           rows = db
-            .prepare("SELECT title, localPath, status, error FROM tv_entries")
+            .prepare(
+              "SELECT title, destTitle, localPath, status, error FROM tv_entries",
+            )
             .all();
         } catch {
           rows = [];
@@ -402,6 +404,7 @@ const tvResync = () => {
         for (const r of rows) {
           if (!r) continue;
           const title = r.title != null ? String(r.title) : "";
+          const destTitle = r.destTitle != null ? String(r.destTitle) : "";
           const localPath = r.localPath != null ? String(r.localPath) : "";
           const status = r.status != null ? String(r.status) : "";
           const error = r.error == null ? 0 : Number(r.error);
@@ -425,7 +428,13 @@ const tvResync = () => {
           }
 
           const filePath = path.resolve(localPath, title);
-          if (!safeExists(filePath)) {
+          const destFilePath = destTitle
+            ? path.resolve(localPath, destTitle)
+            : null;
+          if (
+            !safeExists(filePath) &&
+            !(destFilePath && safeExists(destFilePath))
+          ) {
             toDelete.push(title);
           }
         }
@@ -484,7 +493,7 @@ const hourlyUsbPruneAndTvResync = (existingUsbDirs) => {
     try {
       rows = db
         .prepare(
-          "SELECT title, usbPath, localPath, status, error FROM tv_entries",
+          "SELECT title, destTitle, usbPath, localPath, status, error FROM tv_entries",
         )
         .all();
     } catch {
@@ -518,6 +527,7 @@ const hourlyUsbPruneAndTvResync = (existingUsbDirs) => {
       } catch {}
 
       // Orphan pruning: finished but missing local file.
+      const destTitle = r.destTitle != null ? String(r.destTitle) : "";
       const localPath = r.localPath != null ? String(r.localPath) : "";
       if (!localPath || !path.isAbsolute(localPath)) {
         orphanFinishedTitles.push(title);
@@ -532,7 +542,13 @@ const hourlyUsbPruneAndTvResync = (existingUsbDirs) => {
         continue;
       }
       const filePath = path.resolve(localPath, title);
-      if (!safeExists(filePath)) {
+      const destFilePath = destTitle
+        ? path.resolve(localPath, destTitle)
+        : null;
+      if (
+        !safeExists(filePath) &&
+        !(destFilePath && safeExists(destFilePath))
+      ) {
         orphanFinishedTitles.push(title);
       }
     }

@@ -2982,9 +2982,9 @@ const CHECK_INTERVAL_MS = 60 * 60 * 1000;
 async function runUsbCheck() {
   try {
     await checkFlexgetStatus();
-    // console.log("USB status check passed.");
+    console.log("USB flexget check ok");
   } catch (err) {
-    console.error("USB status check failed:", err.message);
+    console.log("USB flexget check FAILED:", err.message);
     try {
       let emailBody = `USB Status Check Failed:\n${err.message}`;
       if (err.fullOutput) {
@@ -3891,6 +3891,7 @@ async function fetchLastWatchedDate(showId) {
 // NOTE: syncDiskData and runGapCheckBatch periodic timers removed - now handled by tryLocalGetTvdb
 // per-show tick via perShowCallback (disk + gap) and preTvdbTickCallback (Emby sweep)
 
+runUsbCheck();
 setInterval(runUsbCheck, CHECK_INTERVAL_MS);
 
 //////////////////  CHOKIDAR FILE WATCHER  //////////////////

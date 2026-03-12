@@ -4064,6 +4064,7 @@ watcher
 
     const timeout = setTimeout(() => {
       changedShows.delete(showName);
+      console.log(`[tvdb loop] chokidar add debounce fired: enqueuing ${showName}`);
       tvdb.enqueueShowProcess(showName);
     }, DISK_CHANGE_DEBOUNCE_MS);
 
@@ -4086,6 +4087,7 @@ watcher
 
     const timeout = setTimeout(() => {
       changedShows.delete(showName);
+      console.log(`[tvdb loop] chokidar unlink debounce fired: enqueuing ${showName}`);
       tvdb.enqueueShowProcess(showName);
     }, DISK_CHANGE_DEBOUNCE_MS);
 

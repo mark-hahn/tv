@@ -1775,12 +1775,20 @@ export const enqueueShowProcess = (showName, opts = {}) => {
     showName !== currentlyProcessingShow &&
     !showProcessQueue.some((item) => item.name === showName)
   ) {
+    const stack = new Error().stack.split("\n").slice(1, 5).join(" | ");
+    log(`[tvdb loop] enqueue [${showName}] from: ${stack}`);
     const wasEmpty = showProcessQueue.length === 0;
     showProcessQueue.push({ name: showName, skipRotten: !!opts.skipRotten });
     // Only notify on 0→1 transition to avoid flooding clients on bulk enqueues
     if (wasEmpty && enqueueCallback) enqueueCallback(showName);
     // Kick processing immediately (no-op if already busy)
     if (_kickProcessQueue) setTimeout(_kickProcessQueue, 0);
+  } else if (showName) {
+    if (showName === currentlyProcessingShow) {
+      log(`[tvdb loop] enqueue [${showName}] skipped — currently processing`);
+    } else if (showProcessQueue.some((item) => item.name === showName)) {
+      log(`[tvdb loop] enqueue [${showName}] skipped — already queued`);
+    }
   }
 };
 const dequeueShowProcess = () => showProcessQueue.shift() ?? null;

@@ -3490,6 +3490,53 @@ async function runEmbyFullSweep() {
 
       // Update existing record
       tvdbRecord.Id = showId;
+      if (!tvdbRecord.tvdbId && tvdbId) {
+        console.log(
+          `[runEmbyFullSweep] Backfilling missing tvdbId=${tvdbId} for "${name}"`,
+        );
+        // If a duplicate record already owns this tvdbId, merge its TVDB metadata
+        // into this Emby-linked record and delete the duplicate.
+        const duplicate = findByTvdbId(tvdbId);
+        if (duplicate && duplicate.key !== name) {
+          console.log(
+            `[runEmbyFullSweep] Merging duplicate tvdbId=${tvdbId} record "${duplicate.key}" into "${name}"`,
+          );
+          const dup = duplicate.record;
+          const TVDB_META_FIELDS = [
+            "tvdbId",
+            "image",
+            "status",
+            "overview",
+            "firstAired",
+            "lastAired",
+            "nextAired",
+            "averageRuntime",
+            "originalCountry",
+            "originalLanguage",
+            "originalNetwork",
+            "score",
+            "trailers",
+            "characters",
+            "remotes",
+            "imdbUrl",
+            "imdbId",
+            "imdbRatings",
+            "rottenUrl",
+            "rottenRatings",
+            "wikiUrl",
+            "redditUrl",
+            "saved",
+          ];
+          for (const field of TVDB_META_FIELDS) {
+            if (dup[field] !== undefined && !tvdbRecord[field]) {
+              tvdbRecord[field] = dup[field];
+            }
+          }
+          delete allTvdb[duplicate.key];
+        } else {
+          tvdbRecord.tvdbId = tvdbId;
+        }
+      }
       tvdbRecord.Path = embyPath;
       tvdbRecord.Genres = embyShow.Genres || [];
       tvdbRecord.Overview = embyShow.Overview || "";
@@ -4064,7 +4111,9 @@ watcher
 
     const timeout = setTimeout(() => {
       changedShows.delete(showName);
-      console.log(`[tvdb loop] chokidar add debounce fired: enqueuing ${showName}`);
+      console.log(
+        `[tvdb loop] chokidar add debounce fired: enqueuing ${showName}`,
+      );
       tvdb.enqueueShowProcess(showName);
     }, DISK_CHANGE_DEBOUNCE_MS);
 
@@ -4087,7 +4136,9 @@ watcher
 
     const timeout = setTimeout(() => {
       changedShows.delete(showName);
-      console.log(`[tvdb loop] chokidar unlink debounce fired: enqueuing ${showName}`);
+      console.log(
+        `[tvdb loop] chokidar unlink debounce fired: enqueuing ${showName}`,
+      );
       tvdb.enqueueShowProcess(showName);
     }, DISK_CHANGE_DEBOUNCE_MS);
 

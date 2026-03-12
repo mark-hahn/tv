@@ -2652,8 +2652,13 @@ export const setTvdbFields = async (params) => {
     await saveTvdbFiles(allTvdb);
   }
   // Queue a full per-show refresh (disk + gap) for changes that matter
-  if (name && !paramObj.$delTvdb && !paramObj.dontEnqueue)
+  if (name && !paramObj.$delTvdb && !paramObj.dontEnqueue) {
+    const paramKeys = Object.keys(paramObj).filter((k) => k !== "name");
+    log(
+      `[tvdb loop2] setTvdbFields enqueue [${name}] params=${JSON.stringify(paramKeys)} dontSave=${!!paramObj.dontSave} dontEnqueue=${!!paramObj.dontEnqueue}`,
+    );
     enqueueShowProcess(name);
+  }
   return tvdb ?? "ok";
 };
 

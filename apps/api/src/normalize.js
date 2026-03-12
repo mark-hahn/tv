@@ -7,23 +7,27 @@ import parseTorrentTitle from "parse-torrent-title";
  */
 function extractSeasonRange(title) {
   // Match patterns like:
-  // - S01-S02
-  // - (S1-S5)
-  // - (S1-2)
-  // with optional whitespace and case-insensitive "S".
-  const rangePattern = /s(\d{1,2})\s*-\s*(?:s\s*)?(\d{1,2})/i;
-  const match = title.match(rangePattern);
+  // - S01-S02, (S1-S5), (S1-2)
+  // - seasons 1-2, season 1-2
+  // with optional whitespace and case-insensitive.
+  const patterns = [
+    /s(\d{1,2})\s*-\s*(?:s\s*)?(\d{1,2})/i,
+    /seasons?\s+(\d{1,2})\s*-\s*(\d{1,2})/i,
+  ];
 
-  if (match) {
-    const startSeason = parseInt(match[1], 10);
-    const endSeason = parseInt(match[2], 10);
+  for (const pattern of patterns) {
+    const match = title.match(pattern);
+    if (match) {
+      const startSeason = parseInt(match[1], 10);
+      const endSeason = parseInt(match[2], 10);
 
-    return {
-      startSeason,
-      endSeason,
-      fullMatch: match[0],
-      isRange: true,
-    };
+      return {
+        startSeason,
+        endSeason,
+        fullMatch: match[0],
+        isRange: true,
+      };
+    }
   }
 
   return null;

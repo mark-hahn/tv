@@ -1293,7 +1293,7 @@ async function flexgetStatus() {
     return { output: outputLines.join("\n"), tzDiffMs };
   } catch (error) {
     if (error.killed) {
-      throw new Error("Flexget status check timed out after 1 minute");
+      throw new Error("[flexget] status check timed out after 1 minute");
     }
     throw error;
   }
@@ -1356,7 +1356,7 @@ export async function checkFlexgetStatus() {
   for (const name of ["ipt", "tl"]) {
     const info = tasks[name];
     if (!info) {
-      const err = new Error(`Task ${name} missing from status output`);
+      const err = new Error(`[flexget] Task ${name} missing from status output`);
       err.fullOutput = output;
       throw err;
     }

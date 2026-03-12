@@ -2984,15 +2984,15 @@ async function runUsbCheck() {
     await checkFlexgetStatus();
     console.log("[flexget] USB flexget check ok");
   } catch (err) {
-    console.log("USB flexget check FAILED:", err.message);
+    console.log("[flexget] USB flexget check FAILED:", err.message);
     try {
-      let emailBody = `[flexget] USB Status Check Failed:\n${err.message}`;
+      let emailBody = `USB Status Check Failed:\n${err.message}`;
       if (err.fullOutput) {
         emailBody += `\n\nFull flexget status output:\n${err.fullOutput}`;
       }
       await email.sendEmail(emailBody);
     } catch (e) {
-      console.error("Failed to send error email:", e);
+      console.error("[flexget] Failed to send error email:", e);
     }
   }
 }

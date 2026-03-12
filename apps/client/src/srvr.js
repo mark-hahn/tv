@@ -393,7 +393,9 @@ export function handleAsr(params) {
 export function setTvdbFields(params) {
   const keys = Object.keys(params || {}).filter((k) => k !== "name");
   const stack = new Error().stack.split("\n").slice(1, 5).join(" | ");
-  console.log(`[tvdb loop3] setTvdbFields name=${params?.name} keys=[${keys.join(",")}] dontEnqueue=${params?.dontEnqueue} from: ${stack}`);
+  console.log(
+    `[tvdb loop3] setTvdbFields name=${params?.name} keys=[${keys.join(",")}] dontEnqueue=${params?.dontEnqueue} from: ${stack}`,
+  );
   return httpCall("/api/setTvdbFields", params, "POST");
 }
 export function getRemotesCmd(params) {

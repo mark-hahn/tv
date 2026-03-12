@@ -901,7 +901,10 @@ const getRemote = async (id, type, showName) => {
       if (!urlRatings) return null;
       // console.log("getRemote rottenSearch:", urlRatings);
       url = urlRatings.url;
-      ratings = urlRatings.criticsScore + "/" + urlRatings.audienceScore;
+      ratings =
+        urlRatings.criticsScore === 0 && urlRatings.audienceScore === 0
+          ? null
+          : urlRatings.criticsScore + "/" + urlRatings.audienceScore;
       break;
 
     default:

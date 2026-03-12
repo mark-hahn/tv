@@ -2290,6 +2290,7 @@ export default {
         await srvr.setTvdbFields({
           name: show.Name,
           watchedEpis: watchedEpis,
+          dontEnqueue: true,
         });
       }
 

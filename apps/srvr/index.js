@@ -2982,11 +2982,11 @@ const CHECK_INTERVAL_MS = 60 * 60 * 1000;
 async function runUsbCheck() {
   try {
     await checkFlexgetStatus();
-    console.log("USB flexget check ok");
+    console.log("[flexget] USB flexget check ok");
   } catch (err) {
     console.log("USB flexget check FAILED:", err.message);
     try {
-      let emailBody = `USB Status Check Failed:\n${err.message}`;
+      let emailBody = `[flexget] USB Status Check Failed:\n${err.message}`;
       if (err.fullOutput) {
         emailBody += `\n\nFull flexget status output:\n${err.fullOutput}`;
       }

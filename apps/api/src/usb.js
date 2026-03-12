@@ -1246,12 +1246,14 @@ done
 
 /**
  * Runs `~/flexget/bin/flexget status` on the USB server via ssh.
- * Returns raw stdout.
+ * Also measures the timezone difference between local and remote by
+ * running `date` on the USB server and comparing with local parse.
+ * Returns { output, tzDiffMs }.
  */
 async function flexgetStatus() {
   const qbHost = await loadQbHostForSsh();
-  // We use the specific path requested by user: ~/flexget/bin/flexget
-  const cmd = "~/flexget/bin/flexget status";
+  const cmd =
+    "echo \"__DATES__|$(date '+%Y-%m-%d %H:%M:%S')|$(date +%s)\" && ~/flexget/bin/flexget status";
 
   const sshBaseArgs = [
     "-o",
@@ -1267,18 +1269,32 @@ async function flexgetStatus() {
   const args = [...sshBaseArgs, qbHost, cmd];
 
   try {
-    const { stdout, stderr } = await execFileAsync("ssh", args, {
+    const { stdout } = await execFileAsync("ssh", args, {
       timeout: 60000,
     });
-    // flexget status might output warnings to stderr but still succeed.
-    // We strictly return stdout.
-    // If command failed (exit code != 0), execFileAsync naturally throws.
-    return stdout;
+
+    let tzDiffMs = 0;
+    const outputLines = [];
+    for (const line of stdout.split("\n")) {
+      if (line.startsWith("__DATES__|")) {
+        const parts = line.split("|");
+        const remoteLocalStr = parts[1];
+        const remoteEpochSec = parseInt(parts[2], 10);
+        const parsedAsLocal = new Date(remoteLocalStr).getTime();
+        const remoteEpochMs = remoteEpochSec * 1000;
+        if (!isNaN(parsedAsLocal) && Number.isFinite(remoteEpochMs)) {
+          tzDiffMs = parsedAsLocal - remoteEpochMs;
+        }
+      } else {
+        outputLines.push(line);
+      }
+    }
+
+    return { output: outputLines.join("\n"), tzDiffMs };
   } catch (error) {
     if (error.killed) {
       throw new Error("Flexget status check timed out after 1 minute");
     }
-    // If it's an execution error, we throw it so the caller can catch and email.
     throw error;
   }
 }
@@ -1287,7 +1303,7 @@ async function flexgetStatus() {
  * Checks flexget status and throws an error if tasks are stale or failed.
  */
 export async function checkFlexgetStatus() {
-  const output = await flexgetStatus();
+  const { output, tzDiffMs } = await flexgetStatus();
   const lines = output.split("\n");
   const tasks = {};
 
@@ -1336,7 +1352,6 @@ export async function checkFlexgetStatus() {
 
   const now = Date.now();
   const TWENTY_MINS = 20 * 60 * 1000;
-  const NINE_HOURS = 9 * 60 * 60 * 1000;
 
   for (const name of ["ipt", "tl"]) {
     const info = tasks[name];
@@ -1359,8 +1374,7 @@ export async function checkFlexgetStatus() {
         err.fullOutput = output;
         throw err;
       }
-      // Adjust for timezone difference: Remote (PST) vs USB (Europe ~ +9h)
-      const eventTimePst = dt.getTime() - NINE_HOURS;
+      const eventTimePst = dt.getTime() - tzDiffMs;
       const age = now - eventTimePst;
 
       if (age > TWENTY_MINS) {

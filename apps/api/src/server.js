@@ -197,6 +197,16 @@ function appendDownloadsRequestLog(reqBody) {
   }
 }
 
+function appendDownloadsResultLog(payload) {
+  try {
+    const outPath = path.join(getApiMiscDir(), "temp.txt");
+    const entry = { ts: new Date().toISOString(), ...payload };
+    fs.appendFileSync(outPath, JSON.stringify(entry) + "\n", "utf8");
+  } catch {
+    // ignore
+  }
+}
+
 function tvEntryHasError(entry) {
   if (!entry || typeof entry !== "object") return false;
   if (!("error" in entry)) return false;
@@ -887,7 +897,7 @@ async function handleDownloadRequest(req, res) {
     appendDownloadsRequestLog(body);
 
     if (debug) {
-      console.error("[downloads] request", {
+      console.log("[downloads] request", {
         forceDownload,
         provider: torrent?.provider || torrent?.raw?.provider || undefined,
         id: torrent?.raw?.id || torrent?.id || undefined,
@@ -1043,6 +1053,16 @@ async function handleDownloadRequest(req, res) {
         : [];
       const errorTitles = tvEntriesErrorTitles(tvProcResult?.tvEntries);
       if (existingTitles.length > 0 || errorTitles.length > 0) {
+        if (debug)
+          console.log("[downloads] blocked by tv-proc", {
+            existingTitles: existingTitles.length,
+            errorTitles: errorTitles.length,
+          });
+        appendDownloadsResultLog({
+          stage: "tv-proc-blocked",
+          existingTitles,
+          errorTitles,
+        });
         res.json(
           errorTitles.length > 0
             ? { ...tvProcResult, errorTitles }
@@ -1063,10 +1083,15 @@ async function handleDownloadRequest(req, res) {
         });
       } catch (e) {
         if (debug)
-          console.error("[downloads] qbt add threw", {
+          console.log("[downloads] qbt add threw", {
             addTag,
             error: e?.message || String(e),
           });
+        appendDownloadsResultLog({
+          stage: "qbt-add-threw",
+          addTag,
+          error: e?.message || String(e),
+        });
         res.json({
           ...tvProcResult,
           success: false,
@@ -1077,12 +1102,19 @@ async function handleDownloadRequest(req, res) {
       }
 
       if (debug)
-        console.error("[downloads] qbt add response", {
+        console.log("[downloads] qbt add response", {
           addTag,
           ok: addRes.ok,
           status: addRes.status,
           text: addRes.text,
         });
+      appendDownloadsResultLog({
+        stage: "qbt-add-response",
+        addTag,
+        ok: addRes.ok,
+        status: addRes.status,
+        text: addRes.text,
+      });
 
       if (!addRes.ok) {
         // qB sometimes returns "Fails." but still adds the torrent. If we can find a torrent
@@ -1092,7 +1124,7 @@ async function handleDownloadRequest(req, res) {
           const list = Array.isArray(tagged) ? tagged : [];
           if (list.length > 0) {
             if (debug)
-              console.error(
+              console.log(
                 "[downloads] qbt add disambiguated as success via tag",
                 { addTag, count: list.length },
               );
@@ -1140,7 +1172,7 @@ async function handleDownloadRequest(req, res) {
               ).trim();
               const title = existingName || fallbackTitle || infoHash;
               if (debug)
-                console.error(
+                console.log(
                   "[downloads] qbt add disambiguated as duplicate via hash",
                   { addTag, infoHash, title },
                 );
@@ -1178,7 +1210,12 @@ async function handleDownloadRequest(req, res) {
 
       // In this mode, always return the tv-proc wrapper unchanged.
       if (debug) {
-        console.error("[downloads] qbt add success", { addTag });
+        console.log("[downloads] qbt add success", { addTag });
+        appendDownloadsResultLog({
+          stage: "qbt-add-success",
+          addTag,
+          qbAdd: addRes,
+        });
         res.json({
           ...tvProcResult,
           success: true,
@@ -1500,23 +1537,63 @@ app.get("/api/torrent-file", async (req, res) => {
       return res.json({ success: true, filename: "(magnet)", bytes: 0 });
     }
 
+    // If the client sent a direct torrent URL (e.g. Limetorrents link), try to
+    // extract the info hash and use a magnet link (avoids truncated torrent files
+    // from caching services like itorrents.net).
+    const linkUrl = String(req.query.link || "").trim();
+    if (linkUrl.startsWith("http")) {
+      const hashMatch = linkUrl.match(/([0-9a-fA-F]{40})\.torrent/i);
+      if (hashMatch) {
+        const infoHash = hashMatch[1].toUpperCase();
+        const dn = encodeURIComponent(showName);
+        const magnet = `magnet:?xt=urn:btih:${infoHash}&dn=${dn}`;
+        console.log(
+          "[torrent-file] using magnet from link hash for:",
+          showName,
+          infoHash,
+        );
+        const magRes = await addQbtMagnet({ magnetUrl: magnet });
+        if (!magRes.ok)
+          return res
+            .status(500)
+            .json({ error: `Magnet add failed: ${magRes.text}` });
+        return res.json({ success: true, filename: "(magnet)", bytes: 0 });
+      }
+      // No hash in URL — fall through to getTorrentFile search
+      console.log(
+        "[torrent-file] no hash in link URL, falling through to search:",
+        linkUrl,
+      );
+    }
+
     const fileBuffer = await search.getTorrentFile(showName);
     if (!fileBuffer) {
       return res.status(404).json({ error: "No torrent file found for show" });
     }
-    const uploaded = await download.uploadTorrentToWatchFolder(
-      fileBuffer,
+    console.log(
+      "[torrent-file] adding via qbt WebAPI for:",
       showName,
+      "bytes:",
+      fileBuffer.length,
     );
-    if (!uploaded.success) {
+    const addRes = await addQbtTorrent({
+      torrentData: fileBuffer,
+      filename: showName,
+    });
+    console.log("[torrent-file] qbt add result:", {
+      ok: addRes.ok,
+      status: addRes.status,
+      text: addRes.text,
+    });
+    if (!addRes.ok) {
       return res
         .status(500)
-        .json({ error: uploaded.reason || "Upload failed" });
+        .json({ error: `qBittorrent add failed: ${addRes.text || "Fails."}` });
     }
     res.json({
       success: true,
-      filename: uploaded.filename,
-      bytes: uploaded.bytes,
+      filename: showName,
+      bytes: fileBuffer.length,
     });
   } catch (err) {
     console.error("torrent-file error:", err);

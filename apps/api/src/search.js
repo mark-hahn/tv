@@ -1439,7 +1439,8 @@ export async function getTorrentFile(showName) {
         try {
           fs.unlinkSync(outPath);
         } catch {}
-        if (data.length > 0) return data;
+        // Validate it's a real bencoded torrent (starts with 'd')
+        if (data.length > 0 && data[0] === 0x64) return data;
       }
     } catch {
       // try next result

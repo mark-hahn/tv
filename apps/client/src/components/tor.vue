@@ -2485,7 +2485,11 @@ export default {
             typeof magnet === "string" && magnet.startsWith("magnet:")
               ? `&magnet=${encodeURIComponent(magnet)}`
               : "";
-          const url = `${config.torrentsApiUrl}/api/torrent-file?show=${encodeURIComponent(showName)}${magnetParam}`;
+          const linkParam =
+            typeof magnet === "string" && magnet.startsWith("http")
+              ? `&link=${encodeURIComponent(magnet)}`
+              : "";
+          const url = `${config.torrentsApiUrl}/api/torrent-file?show=${encodeURIComponent(showName)}${magnetParam}${linkParam}`;
           const res = await this.fetchWithTimeout(url, {}, 60000);
           if (!res.ok) {
             let detail = "";

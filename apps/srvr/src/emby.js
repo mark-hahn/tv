@@ -293,7 +293,7 @@ const getShowState = async (showId, showName, showMeta) => {
         firstEpisode = false;
         if (!checkedReady && lastWatched && !watched) {
           checkedReady = true;
-          ready = haveFile;
+          ready = haveFile || unaired;
         }
         if (watched) {
           watchedShow = true;

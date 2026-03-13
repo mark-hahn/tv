@@ -204,6 +204,14 @@
             v-html="headerIdsLine"
           ></span>
         </div>
+        <div
+          style="
+            height: 1px;
+            width: 100%;
+            background-color: #000;
+            margin-top: 6px;
+          "
+        ></div>
       </div>
       <div
         id="unaired"

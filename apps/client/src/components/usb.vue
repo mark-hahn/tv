@@ -32,9 +32,6 @@
           "
         >
           <span>USB Files</span>
-          <span style="font-weight: normal; font-size: 14px; color: #666"
-            >{{ usbAvailGb }} GB {{ usbAvailPct }}</span
-          >
         </div>
 
         <input

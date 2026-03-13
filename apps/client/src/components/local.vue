@@ -43,6 +43,13 @@
           >&lt;Loading...&gt;</span
         >
 
+        <input
+          v-model="searchInput"
+          @keyup.enter="searchLocal"
+          placeholder="Search"
+          style="width: 100px; margin-right: 10px"
+        />
+
         <button
           @click="toShow"
           title="Select show matching selected folder"
@@ -508,6 +515,7 @@ export default {
       loading: false,
       error: null,
       hasLoaded: false,
+      searchInput: "",
 
       // Subs pane state
       showSubs: false,
@@ -786,6 +794,38 @@ export default {
         this.$emit("select-show", match.Name);
       } else {
         alert(`No show found matching folder "${folderName}"`);
+      }
+    },
+    searchLocal() {
+      const raw = this.searchInput.trim();
+      if (!raw) return;
+      const norm = raw
+        .replace(/[^a-zA-Z\s]/g, "")
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, " ");
+      if (!norm) return;
+
+      for (const node of this.tree) {
+        const nodeName = (node.name || "")
+          .replace(/[^a-zA-Z\s]/g, "")
+          .toLowerCase()
+          .trim()
+          .replace(/\s+/g, " ");
+        if (!nodeName.includes(norm)) continue;
+
+        this.selectedName = node.name;
+        this.selectedFiles.clear();
+        this.selectionParentPath = null;
+        this.lastSelectedFile = null;
+
+        this.$nextTick(() => {
+          const cmp = this.nodeRefs.get(node.name);
+          if (cmp && cmp.$el) {
+            cmp.$el.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        });
+        return;
       }
     },
     async selectTopLevel() {

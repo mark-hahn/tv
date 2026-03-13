@@ -2121,14 +2121,18 @@ const tryLocalGetTvdb = async () => {
 };
 
 // calls tryLocalGetTvdb every 5s (FAST_UPDATE) or 2 mins, delay from end of one task to beginning of next
+let updateCycleCount = 0;
 const updateTvdbLocal = async () => {
   if (UPDATE_DATA) {
     // Enqueue the stalest show if the queue is empty (so everything goes through the queue)
     if (showProcessQueue.length === 0) {
+      updateCycleCount++;
+      const wantInEmby = updateCycleCount % 10 !== 0;
       let stalest = null;
       let minSaved = Math.min();
       try {
         for (const tvdb of Object.values(allTvdb)) {
+          if (!!tvdb.inEmby !== wantInEmby) continue;
           const saved = tvdb.saved;
           if (saved === undefined) {
             stalest = tvdb;
@@ -2142,7 +2146,9 @@ const updateTvdbLocal = async () => {
       } catch (e) {}
       if (stalest?.Name) {
         enqueueShowProcess(stalest.Name);
-        log(`timer: enqueued stalest [${stalest.Name}]`);
+        log(
+          `timer: enqueued stalest ${wantInEmby ? "emby" : "non-emby"} [${stalest.Name}]`,
+        );
       }
     }
     await tryLocalGetTvdb();

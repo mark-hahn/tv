@@ -192,6 +192,7 @@
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
+              width: '60px',
               backgroundColor: isLoadingNext ? '#d3d3d3' : '',
             }"
           >
@@ -1726,6 +1727,9 @@ export default {
 
       // Ignore clicks in the info pane header area
       if (target.closest("#browseInfo")) return;
+
+      // Ignore clicks in the buttons/description area
+      if (target.closest("#browseDescrButtons")) return;
 
       const name = String(
         galleryTitleLine.value || curTitle.value || "",

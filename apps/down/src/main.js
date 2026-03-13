@@ -722,6 +722,9 @@ async function main() {
                 // Start cycle if not running, or restart if running
                 if (cycleRunning) {
                   cycleRestartNeeded = true;
+                  // Abort the current cycle so forced files get processed immediately
+                  // instead of waiting for all normal USB files to finish.
+                  if (usbFiles) usbFiles.length = 0;
                 } else {
                   if (nextCycleTimer) {
                     clearTimeout(nextCycleTimer);

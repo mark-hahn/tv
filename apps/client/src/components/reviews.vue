@@ -38,7 +38,7 @@
         borderBottom: '1px solid #ddd',
       }"
     >
-      <!-- Top Row: Show Title-->
+      <!-- Top Row: Show Title + Buttons -->
       <div
         style="
           width: 100%;
@@ -65,17 +65,13 @@
         >
           <span>{{ showName }}</span>
         </div>
-      </div>
-      <!-- Second Row: Filter Radio Buttons and Histogram-->
-      <div style="width: 100%; display: flex; align-items: stretch; gap: 8px">
-        <!-- Left side: Buttons and Info-->
         <div
           style="
-            flex: 1;
+            flex: 0 0 auto;
             display: flex;
             align-items: center;
             gap: 8px;
-            margin-left: 10px;
+            margin-right: 10px;
             flex-wrap: wrap;
           "
         >
@@ -111,11 +107,13 @@
             {{ reviews.length }}/{{ stats.numChecked }}
           </div>
         </div>
-        <!-- Right side: Histogram-->
+      </div>
+      <!-- Second Row: Histogram Only-->
+      <div style="width: 100%; display: flex; align-items: stretch">
         <div
           v-if="reviews.length > 0"
           style="
-            flex: 0 0 50%;
+            flex: 1;
             display: flex;
             align-items: flex-end;
             padding: 0 10px;

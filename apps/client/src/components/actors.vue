@@ -224,7 +224,6 @@
           >
             Guests
           </button>
-          <label style="font-size: 14px; margin-left: 10px">Season</label>
           <input
             v-model="seasonNum"
             @click.stop
@@ -232,16 +231,17 @@
             @blur.stop="handleSeasonEpisodeBlur"
             type="text"
             maxlength="2"
+            placeholder="Season"
             style="
-              width: 30px;
+              width: 50px;
               padding: 2px 4px;
               font-size: 14px;
               text-align: center;
               border: 1px solid #ccc;
               border-radius: 3px;
+              margin-left: 10px;
             "
           />
-          <label style="font-size: 14px; margin-left: 5px">Episode</label>
           <input
             v-model="episodeNum"
             @click.stop
@@ -249,13 +249,15 @@
             @blur.stop="handleSeasonEpisodeBlur"
             type="text"
             maxlength="2"
+            placeholder="Episode"
             style="
-              width: 30px;
+              width: 55px;
               padding: 2px 4px;
               font-size: 14px;
               text-align: center;
               border: 1px solid #ccc;
               border-radius: 3px;
+              margin-left: 5px;
             "
           />
         </div>

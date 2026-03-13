@@ -26,7 +26,7 @@
           display: 'flex',
           alignItems: 'center',
           padding: '8px',
-          borderBottom: '1px solid #ddd',
+          borderBottom: '1px solid #000',
           flex: '0 0 auto',
         }"
       >

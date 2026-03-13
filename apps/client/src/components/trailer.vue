@@ -38,6 +38,14 @@
       >
         <span>{{ showName }}</span>
       </div>
+      <div
+        style="
+          height: 1px;
+          width: 100%;
+          background-color: #000;
+          margin-top: 6px;
+        "
+      ></div>
       <!-- content wrapper to allow refresh-->
       <div
         v-if="(!trailers || trailers.length === 0) && !loadingImdb"

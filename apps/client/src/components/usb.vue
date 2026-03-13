@@ -38,10 +38,18 @@
         </div>
 
         <input
+          v-model="searchInput"
+          @keyup.enter="searchUsb"
+          placeholder="Search"
+          style="width: 100px; margin-right: 8px"
+        />
+
+        <input
           v-model="renameInput"
           @focus="onRenameFocus"
           @keyup.enter="renameFile"
-          style="width: 125px; margin-right: 8px"
+          placeholder="Rename"
+          style="width: 100px; margin-right: 8px"
         />
 
         <button
@@ -198,6 +206,7 @@ export default {
       error: null,
       hasLoaded: false,
       renameInput: "",
+      searchInput: "",
       usbAvailGb: "---",
       usbAvailPct: "--%",
       pruneBusy: false,
@@ -416,6 +425,45 @@ export default {
       // Wait, fetchFiles sets loading=true then finally loading=false.
       // If rename works, we await fetchFiles().
       // If fetchFiles fails, it catches its own error and sets this.error.
+    },
+
+    searchUsb() {
+      const raw = this.searchInput.trim();
+      if (!raw) return;
+      const norm = raw
+        .replace(/[^a-zA-Z\s]/g, "")
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, " ");
+      if (!norm) return;
+
+      for (const node of this.tree) {
+        const nodeName = (node.name || "")
+          .replace(/[^a-zA-Z\s]/g, "")
+          .toLowerCase()
+          .trim()
+          .replace(/\s+/g, " ");
+        if (!nodeName.includes(norm)) continue;
+
+        this.selectedName = node.name;
+        this.selectedFiles.clear();
+        this.renameInput = "";
+        this.selectionParentPath = null;
+        this.lastSelectedFile = null;
+
+        this.$nextTick(() => {
+          if (this.$refs.treeNodes) {
+            const comp = this.$refs.treeNodes.find((c) => {
+              const n = c.node || c.$props?.node;
+              return n && n.name === node.name;
+            });
+            if (comp && comp.$el) {
+              comp.$el.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+          }
+        });
+        return;
+      }
     },
 
     highlightShow() {

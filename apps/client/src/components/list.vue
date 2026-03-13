@@ -1811,7 +1811,16 @@ export default {
       if (nm) {
         // Duplicate Detection: forceChoice = false
         const match = util.smartTitleMatch(nm, allShows, null, false);
-        if (match) return match;
+        if (match) {
+          // If both have tvdbIds but they differ, these are different shows
+          if (id) {
+            const matchId = String(
+              match?.TvdbId ?? match?.tvdbId ?? match?.TvdbShowId ?? "",
+            ).trim();
+            if (matchId && matchId !== id) return null;
+          }
+          return match;
+        }
       }
 
       return null;

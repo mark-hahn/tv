@@ -3270,9 +3270,19 @@ export default {
       this.updateActiveShowNames("down", titles);
     });
 
-    // Filter shows by actor (long-press on actor in actors pane)
+    // Filter shows by actor (Shows button in actors pane)
     on("filterByActor", async ({ actorName }) => {
       await this.filterShowsByActor(actorName);
+      // Sort matched actor to top of actors pane on each show selection
+      const normName = (n) =>
+        String(n || "")
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, " ");
+      const targetNorm = normName(actorName);
+      const matchesSearchTerm = (n) => normName(n) === targetNorm;
+      this.actorSearchParams = { searchWords: [], matchesSearchTerm };
+      evtBus.emit("actorSearchActive", { searchWords: [], matchesSearchTerm });
     });
 
     // Clear actorsListMode and actor shows filter when an actor is selected in the actors pane

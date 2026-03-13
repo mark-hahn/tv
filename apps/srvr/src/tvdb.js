@@ -1172,6 +1172,7 @@ async function getTmdbFallback(showName) {
 // create tvdbData object
 // update allTvdb & tvdb.json
 // Calculate waitStr from nextAired and lastAired dates
+// Returns string for future dates, "" for past dates, null if no dates available
 const calculateWaitStr = (nextAired, lastAired) => {
   try {
     // Use the greater of nextAired and lastAired
@@ -1183,10 +1184,10 @@ const calculateWaitStr = (nextAired, lastAired) => {
     // Check if date is in the future
     const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
     if (airDate >= today) {
-      // Format as {MMM DD} or {Mon DD}
       const airDateNoYr = airDate.slice(5).replace(/^0/, " ").trim();
       return `{${airDateNoYr}}`;
     }
+    return ""; // past date — actively clear
   } catch (e) {
     // Silently fail on date calculation errors
   }
@@ -1717,16 +1718,18 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   tvdbData.lastWatched = paramObj.lastWatched || existing.lastWatched || null;
 
   // Calculate waitStr from nextAired and lastAired if available
+  // Returns "{M-DD}" for future, "" for past, null if no dates
   const calculatedWaitStr = calculateWaitStr(
     tvdbData.nextAired,
     tvdbData.lastAired,
   );
-  tvdbData.WaitStr =
-    paramObj.waitStr ||
-    calculatedWaitStr ||
-    existing.WaitStr ||
-    existing.waitStr ||
-    null;
+  if (paramObj.waitStr) {
+    tvdbData.WaitStr = paramObj.waitStr;
+  } else if (calculatedWaitStr !== null) {
+    tvdbData.WaitStr = calculatedWaitStr || null;
+  } else {
+    tvdbData.WaitStr = existing.WaitStr || existing.waitStr || null;
+  }
 
   // Flattened Sync timestamps (no nested object)
   tvdbData.lastEmbySync =

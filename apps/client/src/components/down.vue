@@ -100,7 +100,7 @@
               background-color: whitesmoke;
             "
           >
-            From show
+            From
           </button>
           <button
             @click.stop="startCheck"
@@ -113,7 +113,7 @@
               background-color: whitesmoke;
             "
           >
-            Check Usb Files
+            Cycle
           </button>
           <button
             @click.stop="toggleErrs"
@@ -152,7 +152,20 @@
               background-color: whitesmoke;
             "
           >
-            Bottom
+            Bot
+          </button>
+          <button
+            @click.stop="scrollToActive"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Active
           </button>
           <button
             @click.stop="togglePolling"
@@ -1049,6 +1062,34 @@ export default {
       const el = this.$refs.scroller;
       if (!el) return;
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    },
+
+    scrollToActive() {
+      const scroller = this.$refs.scroller;
+      if (!scroller) return;
+      const items = this.displayedItems;
+      const activeIdx = items.findIndex((it) => {
+        const st = String(it?.status || "")
+          .trim()
+          .toLowerCase();
+        return st === "waiting" || st === "downloading";
+      });
+      if (activeIdx === -1) {
+        scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
+        return;
+      }
+      const allChildren = Array.from(scroller.children);
+      let currentIdx = 0;
+      for (let i = 0; i < allChildren.length; i++) {
+        const el = allChildren[i];
+        if (el.textContent && el.textContent.includes("====")) continue;
+        if (currentIdx === activeIdx) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          return;
+        }
+        currentIdx++;
+      }
+      scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
     },
 
     async trimLog() {

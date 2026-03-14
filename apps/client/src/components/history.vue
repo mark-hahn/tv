@@ -92,6 +92,7 @@ const TYPE_COLORS = {
   errDown: "#e74c3c",
   errorSync: "#c0392b",
   bkgndUpdate: "#bdc3c7",
+  clientUpdate: "#a9b7c6",
   reject: "#e74c3c",
   unreject: "#27ae60",
   pickup: "#2980b9",

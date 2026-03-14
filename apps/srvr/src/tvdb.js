@@ -1784,7 +1784,11 @@ export const enqueueShowProcess = (showName, opts = {}) => {
     const stack = new Error().stack.split("\n").slice(1, 5).join(" | ");
     log(`[tvdb loop] enqueue [${showName}] from: ${stack}`);
     const wasEmpty = showProcessQueue.length === 0;
-    showProcessQueue.push({ name: showName, skipRotten: !!opts.skipRotten });
+    showProcessQueue.push({
+      name: showName,
+      skipRotten: !!opts.skipRotten,
+      isBackground: !!opts.isBackground,
+    });
     // Only notify on 0→1 transition to avoid flooding clients on bulk enqueues
     if (wasEmpty && enqueueCallback) enqueueCallback(showName);
     // Kick processing immediately (no-op if already busy)
@@ -1980,6 +1984,7 @@ const tryLocalGetTvdb = async () => {
   }
   const requestedName = dequeued.name;
   const skipRotten = dequeued.skipRotten;
+  const isBackground = dequeued.isBackground;
   currentlyProcessingShow = requestedName;
 
   const minTvdb = allTvdb[requestedName];
@@ -2054,6 +2059,7 @@ const tryLocalGetTvdb = async () => {
     try {
       const result = await perShowCallback(processRecord.Name, processRecord, {
         suppressNotify: true,
+        isBackground,
       });
       if (result) push2Result = result;
     } catch (e) {
@@ -2145,7 +2151,7 @@ const updateTvdbLocal = async () => {
         }
       } catch (e) {}
       if (stalest?.Name) {
-        enqueueShowProcess(stalest.Name);
+        enqueueShowProcess(stalest.Name, { isBackground: true });
         log(
           `timer: enqueued stalest ${wantInEmby ? "emby" : "non-emby"} [${stalest.Name}]`,
         );

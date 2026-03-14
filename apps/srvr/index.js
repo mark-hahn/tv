@@ -1251,7 +1251,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
       }
     }
     const push2Changes = [...diskChanges, ...lastWatchedChanges, ...gapChanges];
-    // History: bkgndUpdate event
+    // History: bkgndUpdate (timer-selected) or clientUpdate (user-triggered)
     try {
       const tvdbIdVal =
         tvdbRecord.Id && !String(tvdbRecord.Id).startsWith("noemby-")
@@ -1264,7 +1264,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
       history.addEvent({
         tvdbId: tvdbIdVal,
         showName,
-        type: "bkgndUpdate",
+        type: options?.isBackground ? "bkgndUpdate" : "clientUpdate",
         description: descVal,
         fields: fieldsVal,
       });

@@ -75,7 +75,7 @@ const openDb = () => {
 
   stmtDedupFind = db.prepare(`
     SELECT id, fields FROM history
-    WHERE IFNULL(tvdbId, showName) = @key AND type = @type
+    WHERE LOWER(IFNULL(tvdbId, showName)) = LOWER(@key) AND type = @type
     ORDER BY addTime DESC LIMIT 1
   `);
 

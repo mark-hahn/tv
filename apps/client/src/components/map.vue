@@ -498,9 +498,10 @@
       </div>
     </div>
     <History
-      v-if="showHistory && !hideMapBottom"
+      v-show="showHistory && !hideMapBottom"
       :tvdbId="String(mapShow?.tvdbId || tvdbData?.tvdbId || '')"
       :showName="String(mapShow?.Name || '')"
+      :visible="showHistory && !hideMapBottom"
       style="
         flex: 1 1 auto;
         min-height: 0px;

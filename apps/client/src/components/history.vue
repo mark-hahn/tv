@@ -115,6 +115,7 @@ export default {
   props: {
     tvdbId: { type: String, default: "" },
     showName: { type: String, default: "" },
+    visible: { type: Boolean, default: false },
   },
   data() {
     return {
@@ -154,14 +155,28 @@ export default {
   },
   watch: {
     tvdbId() {
-      this.fetchHistory();
+      if (this.visible) this.fetchHistory();
     },
     showName() {
-      this.fetchHistory();
+      if (this.visible) this.fetchHistory();
+    },
+    visible(v) {
+      if (v) {
+        this.fetchHistory();
+        this._startPoll();
+      } else {
+        this._stopPoll();
+      }
     },
   },
   mounted() {
-    this.fetchHistory();
+    if (this.visible) {
+      this.fetchHistory();
+      this._startPoll();
+    }
+  },
+  beforeUnmount() {
+    this._stopPoll();
   },
   methods: {
     badgeColor(type) {
@@ -169,6 +184,16 @@ export default {
     },
     toggle(key) {
       this.expanded = { ...this.expanded, [key]: !this.expanded[key] };
+    },
+    _startPoll() {
+      this._stopPoll();
+      this._pollTimer = setInterval(() => this.fetchHistory(), 5000);
+    },
+    _stopPoll() {
+      if (this._pollTimer) {
+        clearInterval(this._pollTimer);
+        this._pollTimer = null;
+      }
     },
     async fetchHistory() {
       const id = this.tvdbId;

@@ -367,6 +367,16 @@ export function parseTitleFromFilename(fname, folderName, parsedPtt) {
     }
   }
 
+  // PTT may not detect NNN episodes, but the title can still contain an embedded
+  // 3-digit code (e.g. "Jam and Jerusalem 101 (11-24-06)."). Strip it.
+  if (title && /\s\d{3}\b/.test(title)) {
+    const stripped = title
+      .replace(/\s\d{3}\b.*$/, "")
+      .replace(/\s*\.\s*$/, "")
+      .trim();
+    if (stripped && stripped.length >= 2) title = stripped;
+  }
+
   // Space-separated fallback: extract text before episode marker
   if (!title) {
     const noExt = fname.replace(/\.[^.]+$/, "");

@@ -1736,9 +1736,36 @@ export default {
     });
 
     const handleStream = () => {
+      const t = curTvdb.value;
       const name = galleryTitleLine.value;
       if (!name) return;
-      evtBus.emit("showStreamPane", { Name: name });
+
+      // If show exists in list, just emit stream event (App.vue currentShow is already set)
+      const tvdbId = String(t?.tvdbId || t?.tvdb_id || t?.id || "").trim();
+      const exists = (props.allShows || []).some((s) => {
+        const sTvdb = String(s.TvdbId || s.tvdbId || s.tvdb_id || "").trim();
+        if (sTvdb && tvdbId && sTvdb === tvdbId) return true;
+        const sName = String(s.Name || s.name || "")
+          .trim()
+          .toLowerCase();
+        return sName === name.toLowerCase();
+      });
+
+      if (!exists) {
+        // Enter preview mode so this show becomes currentShow
+        const srchChoice = handleLoad();
+        if (srchChoice) {
+          evtBus.emit("reelSearchAction", { srchChoice, action: "preview" });
+        }
+      }
+
+      // Small delay to let preview mode set up the show
+      setTimeout(
+        () => {
+          evtBus.emit("showStreamPane", { Name: name });
+        },
+        exists ? 0 : 300,
+      );
     };
 
     const handleBackgroundClick = (event) => {

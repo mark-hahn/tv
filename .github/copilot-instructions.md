@@ -26,7 +26,7 @@
 - remote /root/dev/apps/tv/ is not a repo or worktree, it is just a raw directory that pm2 uses.
 - every path that starts with /root/dev/apps/tv is on the remote server.
 - every path that starts with /root/apps/tv/ is on the local pc.
-- source development and vite runs in local workspace 
+- source development and vite runs in local workspace
   - all non-vite testing is done on remote server
   - ./srvr releases code to server for testing
   - use ssh to test on remote server

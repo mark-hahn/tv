@@ -633,6 +633,7 @@ export default {
       highlightName: "",
       previewMode: false,
       _pendingSetUpSeriesToken: 0,
+      _mapActionToken: 0,
       allShowsLength: 0,
       currentPane: "info",
       mapShow: null,
@@ -2267,6 +2268,10 @@ export default {
         // If clicking the same show while already on map, keep it as-is
         return;
       }
+
+      // Generation token: newer calls invalidate older in-flight ones
+      const mapToken = ++this._mapActionToken;
+
       if (action == "date") {
         console.log("setting last watched to cur date");
         await emby.setLastWatched(show.Id);
@@ -2285,6 +2290,9 @@ export default {
 
       // Fetch fresh data from Emby/TVDB
       seriesMapIn = await emby.getSeriesMap(show, action == "prune");
+
+      // Bail if a newer seriesMapAction started while we were fetching
+      if (mapToken !== this._mapActionToken) return;
 
       // Persist watchedEpis if we got data from Emby
       if (
@@ -2311,6 +2319,9 @@ export default {
           seriesMapIn = []; // Keep empty for error display
         }
       }
+
+      // Bail if a newer seriesMapAction started during any of the awaits above
+      if (mapToken !== this._mapActionToken) return;
 
       for (const season of seriesMapIn) {
         const [seasonNum, episodes] = season;
@@ -2371,6 +2382,10 @@ export default {
       }
 
       this.hideMapBottom = false;
+
+      // If a newer seriesMapAction started while we were loading, discard this stale result
+      if (mapToken !== this._mapActionToken) return;
+
       // In preview mode, don't overwrite highlightName with the preview show.
       // On refresh, skip saveVisShow entirely — it's just a data update, not a selection change.
       if (!isRefresh) {

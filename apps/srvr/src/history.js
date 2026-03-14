@@ -23,12 +23,12 @@ const nowPST = () => PST_FMT.format(new Date()).replace(", ", "T");
 
 let db;
 let stmtInsert;
-let stmtUpsert;
 let stmtGetByTvdbId;
 let stmtGetByShowName;
 let stmtGetByHash;
 let stmtGetBkgndLast;
-let stmtBkgndDedup;
+let stmtDedupFind;
+let stmtDedupUpdate;
 
 const openDb = () => {
   if (db) return;
@@ -63,29 +63,23 @@ const openDb = () => {
     CREATE INDEX IF NOT EXISTS idx_history_hash ON history(hash);
   `);
 
-  // Partial unique index for simple dedup types.
-  // SQLite doesn't support CREATE UNIQUE INDEX IF NOT EXISTS with WHERE,
-  // so we wrap in try/catch for the already-exists case.
-  try {
-    db.exec(`
-      CREATE UNIQUE INDEX idx_history_dedup ON history(tvdbId, type)
-        WHERE type IN ('chkDown','skipDown','rejDown','browse','preview');
-    `);
-  } catch {}
-
   stmtInsert = db.prepare(`
     INSERT INTO history (tvdbId, showName, addTime, updateTime, updateCount, description, type, hash, fields)
     VALUES (@tvdbId, @showName, @now, @now, 0, @description, @type, @hash, @fields)
   `);
 
-  stmtUpsert = db.prepare(`
-    INSERT INTO history (tvdbId, showName, addTime, updateTime, updateCount, description, type, hash, fields)
-    VALUES (@tvdbId, @showName, @now, @now, 0, @description, @type, @hash, @fields)
-    ON CONFLICT (tvdbId, type) WHERE type IN ('chkDown','skipDown','rejDown','browse','preview')
-    DO UPDATE SET
-      updateTime = excluded.updateTime,
+  stmtDedupFind = db.prepare(`
+    SELECT id, fields FROM history
+    WHERE IFNULL(tvdbId, showName) = @key AND type = @type
+    ORDER BY addTime DESC LIMIT 1
+  `);
+
+  stmtDedupUpdate = db.prepare(`
+    UPDATE history SET
+      updateTime = @now,
       updateCount = updateCount + 1,
-      description = excluded.description
+      description = @description
+    WHERE id = @id
   `);
 
   stmtGetByTvdbId = db.prepare(
@@ -99,18 +93,6 @@ const openDb = () => {
   stmtGetByHash = db.prepare(
     "SELECT * FROM history WHERE hash = ? ORDER BY addTime DESC LIMIT 1",
   );
-
-  stmtGetBkgndLast = db.prepare(
-    "SELECT * FROM history WHERE tvdbId = ? AND type = 'bkgndUpdate' ORDER BY addTime DESC LIMIT 1",
-  );
-
-  stmtBkgndDedup = db.prepare(`
-    UPDATE history SET
-      updateTime = @now,
-      updateCount = updateCount + 1,
-      description = @description
-    WHERE id = @id
-  `);
 };
 
 openDb();
@@ -135,14 +117,25 @@ export const addEvent = ({
   };
 
   if (DEDUP_TYPES.includes(type)) {
-    stmtUpsert.run(params);
+    const key = tvdbId ?? showName ?? "";
+    const last = stmtDedupFind.get({ key, type });
+    if (last) {
+      stmtDedupUpdate.run({
+        now,
+        description: description || null,
+        id: last.id,
+      });
+      return;
+    }
+    stmtInsert.run(params);
     return;
   }
 
   if (type === "bkgndUpdate") {
-    const last = stmtGetBkgndLast.get(tvdbId ?? null);
+    const key = tvdbId ?? showName ?? "";
+    const last = stmtDedupFind.get({ key, type: "bkgndUpdate" });
     if (last && last.fields === (fields || null)) {
-      stmtBkgndDedup.run({
+      stmtDedupUpdate.run({
         now,
         description: description || null,
         id: last.id,

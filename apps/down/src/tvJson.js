@@ -729,7 +729,7 @@ const openDb = () => {
   stmtGetDownloads = db.prepare(
     "SELECT * FROM (SELECT * FROM tv_entries ORDER BY procId DESC LIMIT 200) ORDER BY procId ASC",
   );
-  stmtGetTitles = db.prepare("SELECT title, error FROM tv_entries");
+  stmtGetTitles = db.prepare("SELECT title, error, status FROM tv_entries");
 };
 
 const rowToEntry = (row) => {
@@ -1370,7 +1370,7 @@ const getTitlesMap = () => {
     const out = {};
     for (const r of rows) {
       if (!r || !r.title) continue;
-      out[String(r.title)] = { error: !!r.error };
+      out[String(r.title)] = { error: !!r.error, status: r.status || "waiting" };
     }
     return out;
   } catch {

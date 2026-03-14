@@ -158,7 +158,11 @@ export function getLog(module) {
       (errMsg != null ? errMsg : "") +
       par.join(" ");
 
-    if (errFlag) console.error(line);
+    // Temporary: trace calls that produce empty error lines
+    if (errFlag && par.length === 0) {
+      const stack = new Error().stack.split("\n").slice(1, 6).join(" | ");
+      console.error(line + " [TRACE] " + stack);
+    } else if (errFlag) console.error(line);
     else console.log(line);
   };
 

@@ -650,6 +650,7 @@ export default {
 
   watch: {
     async mapShow(newShow) {
+      this.showHistory = false;
       if (newShow && newShow.Name) {
         this.seasonStates = {}; // Clear season states when show changes
         await this.loadTvdbData();

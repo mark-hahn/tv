@@ -1261,12 +1261,6 @@ async function main() {
         parsedFolder = {};
       }
 
-      postHistory({
-        showName: title || fname,
-        type: "chkDown",
-        description: `usb: ${usbFilePath}, size: ${usbFileSize}`,
-      });
-
       trace("checkFile: filename", { fname, usbFilePath, usbFileBytes });
 
       parts = fname.split(".");
@@ -1312,19 +1306,21 @@ async function main() {
 
       if (!processingForced && tvJsonTitles && tvJsonTitles[fname]) {
         recentCount++;
+        const skipStatus = tvJsonTitles[fname].status === "finished" ? "already downloaded" : "already queued";
         log(
           "------",
           downloadCount,
           "/",
           chkCount,
-          "SKIPPING ALREADY QUEUED:",
+          "SKIPPING",
+          skipStatus.toUpperCase() + ":",
           fname,
         );
-        trace("checkFile: skip already queued", { fname });
+        trace("checkFile: skip " + skipStatus, { fname });
         postHistory({
           showName: title || fname,
           type: "skipDown",
-          description: "skip: already queued",
+          description: "skip: " + skipStatus,
         });
         process.nextTick(checkFile);
         return;
@@ -1527,6 +1523,11 @@ async function main() {
     if (title in tvdbCache) {
       if (tvdbCache[title] === null) {
         // Previously determined this title is not resolvable — skip without hitting TVDB.
+        postHistory({
+          showName: title || fname,
+          type: "skipDown",
+          description: "skip: not resolvable (cached)",
+        });
         return process.nextTick(checkFile);
       }
       seriesName = tvdbCache[title];
@@ -1541,6 +1542,11 @@ async function main() {
     if (folderTitle && folderTitle in tvdbCache) {
       if (tvdbCache[folderTitle] === null) {
         tvdbCache[title] = null;
+        postHistory({
+          showName: title || fname,
+          type: "skipDown",
+          description: "skip: not resolvable (folder cached)",
+        });
         return process.nextTick(checkFile);
       }
       seriesName = tvdbCache[folderTitle];
@@ -1655,6 +1661,11 @@ async function main() {
                   fname,
                   title,
                 });
+                postHistory({
+                  showName: title || fname,
+                  type: "skipDown",
+                  description: "skip: no TVDB match, not in Emby",
+                });
                 // Cache null so remaining episodes from the same folder skip TVDB this cycle.
                 tvdbCache[title] = null;
                 if (titleBeforeRetry && titleBeforeRetry !== title)
@@ -1706,6 +1717,11 @@ async function main() {
               trace("chkTvDB: smartTitleMatch returned null, skipping", {
                 fname,
                 title,
+              });
+              postHistory({
+                showName: title || fname,
+                type: "skipDown",
+                description: "skip: no series match on TVDB",
               });
               // Cache null so remaining episodes from the same folder skip TVDB this cycle.
               tvdbCache[title] = null;
@@ -1786,6 +1802,12 @@ async function main() {
       existsCount++;
       log("------", downloadCount, "/", chkCount, "ALREADY ON DISK:", fname);
       trace("checkFileExists: already on disk", { fname, tvSeasonPath });
+      postHistory({
+        tvdbId: lookupTvdbId(seriesName),
+        showName: seriesName || fname,
+        type: "skipDown",
+        description: `skip: already on disk`,
+      });
       try {
         tvJson.markFinished({
           title: fname,
@@ -1808,13 +1830,26 @@ async function main() {
     if (!processingForced && inProgress && inProgress[fname]) {
       existsCount++;
       trace("checkFileExists: already in-progress", { fname });
+      postHistory({
+        tvdbId: lookupTvdbId(seriesName),
+        showName: seriesName || fname,
+        type: "skipDown",
+        description: "skip: already in-progress",
+      });
       return process.nextTick(checkFile);
     }
 
     // tv.json authority: do not create duplicates for titles already queued.
     if (!processingForced && tvJsonTitles && tvJsonTitles[fname]) {
       existsCount++;
-      trace("checkFileExists: already queued (tv.json)", { fname });
+      const skipStatus = tvJsonTitles[fname].status === "finished" ? "already downloaded" : "already queued";
+      trace("checkFileExists: " + skipStatus + " (tv.json)", { fname });
+      postHistory({
+        tvdbId: lookupTvdbId(seriesName),
+        showName: seriesName || fname,
+        type: "skipDown",
+        description: "skip: " + skipStatus,
+      });
       return process.nextTick(checkFile);
     }
 

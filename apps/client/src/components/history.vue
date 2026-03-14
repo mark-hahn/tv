@@ -84,7 +84,6 @@ const TYPE_COLORS = {
   remQbt: "#d35400",
   qbtFinished: "#27ae60",
   forceDown: "#8e44ad",
-  chkDown: "#7f8c8d",
   skipDown: "#95a5a6",
   rejDown: "#e67e22",
   acceptDown: "#2ecc71",
@@ -202,7 +201,8 @@ export default {
         this.events = [];
         return;
       }
-      this.loading = true;
+      const isInitial = !this.events.length;
+      if (isInitial) this.loading = true;
       try {
         const params = new URLSearchParams();
         if (id) params.set("tvdbId", id);
@@ -211,12 +211,15 @@ export default {
           `${config.tvSrvrUrl}/api/history?${params.toString()}`,
         );
         const data = await resp.json();
-        this.events = Array.isArray(data.events) ? data.events : [];
+        const fresh = Array.isArray(data.events) ? data.events : [];
+        if (JSON.stringify(fresh) !== JSON.stringify(this.events)) {
+          this.events = fresh;
+        }
       } catch (e) {
         console.error("History fetch error:", e);
         this.events = [];
       } finally {
-        this.loading = false;
+        if (isInitial) this.loading = false;
       }
     },
   },

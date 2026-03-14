@@ -90,6 +90,19 @@
             }"
           >
             <button
+              @click="handleStream"
+              :style="{
+                height: '24px',
+                fontSize: '13px',
+                padding: '2px 8px',
+                border: '1px solid black',
+                borderRadius: '3px',
+                cursor: 'pointer',
+              }"
+            >
+              Stream
+            </button>
+            <button
               @click="handleDebugClick"
               :style="{
                 height: '24px',
@@ -1722,6 +1735,12 @@ export default {
       return "";
     });
 
+    const handleStream = () => {
+      const name = galleryTitleLine.value;
+      if (!name) return;
+      evtBus.emit("showStreamPane", { Name: name });
+    };
+
     const handleBackgroundClick = (event) => {
       const target = event?.target;
       if (!(target instanceof Element)) return;
@@ -1939,6 +1958,7 @@ export default {
       handleSearchComplete,
       handleGalleryPreview,
       handleDebugClick,
+      handleStream,
       debugFlash,
       selectTitle,
       handleNext,

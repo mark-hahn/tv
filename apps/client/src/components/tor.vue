@@ -1086,6 +1086,7 @@ export default {
     evtBus.on("showTorrents", this.searchTorrents);
     evtBus.on("resetTorrentsPane", this.resetPane);
     evtBus.on("refreshSpaceAvail", this.onRefreshSpaceAvail);
+    evtBus.on("openStream", this.onOpenStream);
 
     this.loadDownloadedHistory();
 
@@ -1104,6 +1105,7 @@ export default {
     evtBus.off("showTorrents", this.searchTorrents);
     evtBus.off("resetTorrentsPane", this.resetPane);
     evtBus.off("refreshSpaceAvail", this.onRefreshSpaceAvail);
+    evtBus.off("openStream", this.onOpenStream);
   },
 
   methods: {
@@ -1695,6 +1697,11 @@ export default {
     toggleCookieInputs() {
       this.dismissCookieInputs = false;
       this.showCookieInputs = !this.showCookieInputs;
+    },
+
+    onOpenStream(show) {
+      this.currentShow = show;
+      this.showStream = true;
     },
 
     handleMapButton() {

@@ -1773,6 +1773,12 @@ export default {
     evtBus.on("startLibraryRefresh", this.startLibraryRefresh);
     evtBus.on("diskChangeLibraryRefresh", this.handleDiskChangeLibraryRefresh);
 
+    evtBus.on("showStreamPane", (show) => {
+      this.currentPane = "tor";
+      evtBus.emit("paneChanged", this.currentPane);
+      evtBus.emit("openStream", show);
+    });
+
     // Close torrents or actors pane when a different show is selected
     evtBus.on("setUpSeries", (show) => {
       // Keep currentShow synced to the list selection immediately.

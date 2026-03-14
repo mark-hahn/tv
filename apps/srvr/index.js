@@ -1268,7 +1268,13 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         description: descVal,
         fields: fieldsVal,
       });
-    } catch {}
+    } catch (e) {
+      console.error(
+        "[history] bkgndUpdate/clientUpdate error:",
+        showName,
+        e.message,
+      );
+    }
     if (push2Changes.length) {
       await tvdb.saveTvdbSync();
       if (!options?.suppressNotify) {

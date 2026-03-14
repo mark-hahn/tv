@@ -34,12 +34,28 @@
         "
         @click="toggle(card.key)"
       >
-        <div style="font-size: 16px; font-weight: bold; display: flex; gap: 6px; align-items: baseline">
+        <div
+          style="
+            display: flex;
+            align-items: baseline;
+            font-family: monospace;
+            white-space: pre;
+          "
+        >
+          <span style="color: #888; font-size: 12px"
+            >{{ card.countPad }} {{ card.time }}:
+          </span>
           <span
-            :style="{ color: badgeColor(card.type), fontFamily: 'monospace', whiteSpace: 'pre' }"
-          >{{ card.typePad }}</span>
-          <span>{{ card.showName }}</span>
-          <span style="color: #888; margin-left: auto; white-space: nowrap">{{ card.time }}<template v-if="card.updateCount > 0">({{ card.updateCount }})</template></span>
+            :style="{
+              color: badgeColor(card.type),
+              fontWeight: 'bold',
+              fontSize: '14px',
+            }"
+            >{{ card.typePad }}</span
+          >
+          <span style="font-weight: bold; font-size: 14px">{{
+            card.showName
+          }}</span>
         </div>
         <template v-if="expanded[card.key]">
           <div
@@ -118,14 +134,21 @@ export default {
           typePad: ev.type.padEnd(PAD_LEN),
           time: formatPST(uc > 0 ? ev.updateTime : ev.addTime),
           sortMs: uc > 0 ? ev.updateTime : ev.addTime,
+          sortAdd: ev.addTime,
           showName: ev.showName || "",
           description: ev.description || "",
           updateCount: uc,
+          countPad: String(uc).padStart(3),
         });
       }
-      out.sort((a, b) =>
-        b.sortMs > a.sortMs ? 1 : b.sortMs < a.sortMs ? -1 : 0,
-      );
+      out.sort((a, b) => {
+        if (b.sortMs > a.sortMs) return 1;
+        if (b.sortMs < a.sortMs) return -1;
+        // Tiebreaker: original addTime preserves causal order (chkDown before skipDown).
+        if (a.sortAdd > b.sortAdd) return 1;
+        if (a.sortAdd < b.sortAdd) return -1;
+        return 0;
+      });
       return out;
     },
   },

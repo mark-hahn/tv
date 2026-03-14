@@ -156,6 +156,19 @@
               Tabs
             </button>
             <button
+              @click.stop="showStream = !showStream"
+              :style="{
+                fontSize: '13px',
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px',
+                border: '1px solid #bbb',
+                backgroundColor: showStream ? 'lightgray' : 'whitesmoke',
+              }"
+            >
+              Stream
+            </button>
+            <button
               @click.stop="toggleCookieInputs"
               style="
                 font-size: 13px;
@@ -225,6 +238,10 @@
       >
         <div>Show not aired yet</div>
       </div>
+      <Stream
+        :show="currentShow"
+        :visible="showStream"
+      />
       <div
         id="cookie-inputs"
         @click.stop
@@ -786,9 +803,11 @@ import evtBus from "../evtBus.js";
 import * as emby from "../emby.js";
 import * as util from "../util.js";
 import { config } from "../config.js";
+import Stream from "./stream.vue";
 
 export default {
   name: "Torrents",
+  components: { Stream },
 
   props: {
     simpleMode: {
@@ -833,6 +852,7 @@ export default {
       noTorrentsNeeded: false, // Flag when needed array is empty
       showCookieInputs: false, // Manual toggle for cookie input boxes
       dismissCookieInputs: false,
+      showStream: false,
       unaired: false,
 
       lastNeeded: null,

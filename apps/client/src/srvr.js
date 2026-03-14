@@ -448,6 +448,10 @@ export function getTmdb(params) {
   return httpCall("/api/getTmdb", params, "POST");
 }
 
+export function getStreamProviders(params) {
+  return httpCall("/api/getStreamProviders", params, "POST");
+}
+
 // Persistent per-show notes
 export function saveNote(showName, noteText) {
   return httpCall("/api/saveNote", { showName, noteText }, "POST");

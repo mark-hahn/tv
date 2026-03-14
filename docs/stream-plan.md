@@ -11,9 +11,11 @@ Phase 1 (now): **TMDb Watch Providers** only
 - TMDb API endpoint: `GET /tv/{id}/watch/providers`
 - The `moviedb-promise` library already has `moviedb.tvWatchProviders({ id })`
 - Returns per-country results with categories: `flatrate`, `rent`, `buy`, `ads`, `free`
+- We use `flatrate`, `rent`, and `buy` — skip `ads` and `free`
 - Each provider entry has: `provider_id`, `provider_name`, `logo_path`, `display_priority`
 - Also returns a `link` per country — this is a TMDb deeplink to JustWatch
-- We use the US results (`results.US`)
+- We use results for US (`results.US`), UK (`results.GB`), and Australia (`results.AU`)
+- Deduplicate providers across countries (same `provider_id` = same provider)
 
 Future phases (not implemented now):
 
@@ -57,29 +59,35 @@ export async function getStreamProviders(params) {
   if (!match?.id)
     return { providers: [], source: "tmdb", error: "show not found" };
 
-  // Step 2: Get watch providers for US
+  // Step 2: Get watch providers for US, GB, AU
+  const COUNTRIES = ["US", "GB", "AU"];
   const wpRes = await moviedb.tvWatchProviders({ id: match.id });
-  const us = wpRes.results?.US;
-  if (!us) return { providers: [], source: "tmdb", tmdbId: match.id };
+  const allResults = wpRes.results || {};
 
-  // Step 3: Normalize into unified provider list
-  //   Merge flatrate + ads + free (skip rent/buy for now)
-  //   Each entry: { name, logoUrl, type, tmdbLink }
+  // Step 3: Merge flatrate/rent/buy providers across countries, dedupe by provider_id
+  const TYPES = ["flatrate", "rent", "buy"];
   const IMG_BASE = "https://image.tmdb.org/t/p/original";
+  const seen = new Set();
   const providers = [];
-  for (const type of ["flatrate", "ads", "free"]) {
-    for (const p of us[type] || []) {
-      providers.push({
-        name: p.provider_name,
-        logoUrl: p.logo_path ? IMG_BASE + p.logo_path : null,
-        type, // "flatrate" | "ads" | "free"
-        providerId: p.provider_id,
-        source: "tmdb",
-      });
+  for (const cc of COUNTRIES) {
+    for (const type of TYPES) {
+      for (const p of allResults[cc]?.[type] || []) {
+        if (seen.has(p.provider_id)) continue;
+        seen.add(p.provider_id);
+        providers.push({
+          name: p.provider_name,
+          logoUrl: p.logo_path ? IMG_BASE + p.logo_path : null,
+          type,
+          providerId: p.provider_id,
+          source: "tmdb",
+        });
+      }
     }
   }
 
-  return { providers, tmdbLink: us.link, tmdbId: match.id };
+  const tmdbLink =
+    allResults.US?.link || allResults.GB?.link || allResults.AU?.link;
+  return { providers, tmdbLink, tmdbId: match.id };
 }
 ```
 

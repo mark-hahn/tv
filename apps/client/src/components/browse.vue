@@ -96,7 +96,7 @@
                 backgroundColor: debugFlash ? '#4CAF50' : 'white',
                 fontSize: '13px',
                 padding: '2px 8px',
-                border: '1px solid #ccc',
+                border: '1px solid black',
                 borderRadius: '3px',
                 cursor: 'pointer',
                 transition: 'background-color 0.15s ease',
@@ -194,6 +194,7 @@
               justifyContent: 'center',
               width: '60px',
               backgroundColor: isLoadingNext ? '#d3d3d3' : '',
+              border: '1px solid black',
             }"
           >
             Next
@@ -211,6 +212,7 @@
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
+              border: '1px solid black',
             }"
           >
             Preview
@@ -228,6 +230,7 @@
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
+              border: '1px solid black',
             }"
           >
             Get
@@ -251,6 +254,7 @@
               alignItems: 'center',
               justifyContent: 'center',
               backgroundColor: showTvdbInfo ? '#d3d3d3' : '#FFCCCB',
+              border: '1px solid black',
             }"
           >
             Tvdb
@@ -270,6 +274,7 @@
               alignItems: 'center',
               justifyContent: 'center',
               backgroundColor: '#dfd',
+              border: '1px solid black',
             }"
           >
             Select
@@ -303,6 +308,7 @@
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
+              border: '1px solid black',
             }"
           >
             {{ imdbButtonLabel }}
@@ -320,6 +326,7 @@
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
+              border: '1px solid black',
             }"
           >
             {{ rtButtonLabel }}
@@ -337,6 +344,7 @@
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
+              border: '1px solid black',
             }"
           >
             Google
@@ -354,6 +362,7 @@
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
+              border: '1px solid black',
             }"
           >
             Wiki
@@ -371,6 +380,7 @@
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
+              border: '1px solid black',
             }"
           >
             Official</button

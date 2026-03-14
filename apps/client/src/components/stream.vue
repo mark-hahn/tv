@@ -1,0 +1,162 @@
+<template>
+  <div
+    v-if="visible"
+    style="
+      position: sticky;
+      top: 120px;
+      z-index: 110;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      padding: 15px 20px;
+      margin-bottom: 10px;
+      min-height: 60px;
+    "
+  >
+    <div
+      v-if="loading"
+      style="color: #888; font-size: 14px"
+    >
+      Loading providers...
+    </div>
+    <div
+      v-else-if="error"
+      style="color: #c00; font-size: 14px"
+    >
+      {{ error }}
+    </div>
+    <div
+      v-else-if="!providers.length"
+      style="color: #888; font-size: 14px"
+    >
+      No streaming providers found
+    </div>
+    <div v-else>
+      <div
+        v-for="p in providers"
+        :key="p.providerId"
+        @click="openProvider(p)"
+        style="
+          display: flex;
+          align-items: center;
+          padding: 6px 8px;
+          margin-bottom: 4px;
+          cursor: pointer;
+          border-radius: 5px;
+          border: 1px solid #eee;
+        "
+        @mouseenter="$event.currentTarget.style.backgroundColor = '#f0f0f0'"
+        @mouseleave="$event.currentTarget.style.backgroundColor = ''"
+      >
+        <img
+          v-if="p.logoUrl"
+          :src="p.logoUrl"
+          style="
+            width: 32px;
+            height: 32px;
+            border-radius: 4px;
+            margin-right: 10px;
+            object-fit: contain;
+          "
+        />
+        <div
+          v-else
+          style="
+            width: 32px;
+            height: 32px;
+            margin-right: 10px;
+            background: #eee;
+            border-radius: 4px;
+          "
+        ></div>
+        <span style="font-size: 14px; flex: 1">{{ p.name }}</span>
+        <span
+          style="
+            font-size: 11px;
+            color: #888;
+            background: #f5f5f5;
+            border-radius: 3px;
+            padding: 2px 6px;
+          "
+          >{{ p.type }}</span
+        >
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import * as srvr from "../srvr.js";
+
+export default {
+  name: "Stream",
+  props: {
+    show: { type: Object, default: null },
+    visible: { type: Boolean, default: false },
+  },
+  data() {
+    return {
+      providers: [],
+      tmdbLink: null,
+      loading: false,
+      error: null,
+      cache: {},
+    };
+  },
+  watch: {
+    visible(v) {
+      if (v && this.show) this.fetchProviders();
+    },
+    show() {
+      if (this.visible && this.show) this.fetchProviders();
+    },
+  },
+  methods: {
+    async fetchProviders() {
+      const name = this.show?.Name;
+      if (!name) return;
+
+      if (this.cache[name]) {
+        this.providers = this.cache[name].providers;
+        this.tmdbLink = this.cache[name].tmdbLink;
+        this.error = null;
+        return;
+      }
+
+      this.loading = true;
+      this.error = null;
+      this.providers = [];
+      try {
+        const params = { showName: name };
+        if (this.show?.firstAired) {
+          const y = String(this.show.firstAired).slice(0, 4);
+          if (y.length === 4) params.year = y;
+        }
+        const res = await srvr.getStreamProviders(params);
+        this.providers = res.providers || [];
+        this.tmdbLink = res.tmdbLink || null;
+        this.cache[name] = {
+          providers: this.providers,
+          tmdbLink: this.tmdbLink,
+        };
+        if (res.error) this.error = res.error;
+      } catch (e) {
+        this.error = e.message || "Failed to fetch providers";
+      } finally {
+        this.loading = false;
+      }
+    },
+    openProvider(p) {
+      if (this.tmdbLink) {
+        const a = document.createElement("a");
+        a.href = this.tmdbLink;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+    },
+  },
+};
+</script>

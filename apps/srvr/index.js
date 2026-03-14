@@ -2678,6 +2678,7 @@ app.post(
 app.post("/api/getActorPage", apiWrapper(tvdb.getActorPage));
 app.post("/api/searchActorsInNonEmby", apiWrapper(tvdb.searchActorsInNonEmby));
 app.post("/api/getTmdb", apiWrapper(tmdb.getTmdb));
+app.post("/api/getStreamProviders", apiWrapper(tmdb.getStreamProviders));
 app.post("/api/getNote", apiWrapper(getNote));
 app.post("/api/getFile", apiWrapper(getFile));
 app.post("/api/getSubFileIds", apiWrapper(getSubFileIds));

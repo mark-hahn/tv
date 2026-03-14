@@ -97,3 +97,39 @@ export async function getTmdb(params) {
     throw new Error(`getTmdb error: ${error.message}`);
   }
 }
+
+export async function getStreamProviders(params) {
+  const { showName, year } = params;
+
+  const searchRes = await moviedb.searchTv({ query: showName });
+  const match = smartTitleMatch(showName, searchRes.results || [], year, false);
+  if (!match?.id) return { providers: [], error: "show not found" };
+
+  const COUNTRIES = ["US", "GB", "AU"];
+  const wpRes = await moviedb.tvWatchProviders({ id: match.id });
+  const allResults = wpRes.results || {};
+
+  const TYPES = ["flatrate", "rent", "buy"];
+  const IMG_BASE = "https://image.tmdb.org/t/p/original";
+  const seen = new Set();
+  const providers = [];
+  for (const cc of COUNTRIES) {
+    for (const type of TYPES) {
+      for (const p of allResults[cc]?.[type] || []) {
+        if (seen.has(p.provider_id)) continue;
+        seen.add(p.provider_id);
+        providers.push({
+          name: p.provider_name,
+          logoUrl: p.logo_path ? IMG_BASE + p.logo_path : null,
+          type,
+          providerId: p.provider_id,
+          source: "tmdb",
+        });
+      }
+    }
+  }
+
+  const tmdbLink =
+    allResults.US?.link || allResults.GB?.link || allResults.AU?.link;
+  return { providers, tmdbLink, tmdbId: match.id };
+}

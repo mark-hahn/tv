@@ -175,18 +175,8 @@ function migrateRemotesToFlatProps(data) {
 }
 
 async function saveTvdbFiles(data) {
-  // Strip computed runtime prop 'remotes' — rebuilt from flat url props on each refresh
-  const toSave = Object.fromEntries(
-    Object.entries(data).map(([k, v]) => {
-      if (v && typeof v === "object" && !Array.isArray(v) && "remotes" in v) {
-        const { remotes: _, ...rest } = v;
-        return [k, rest];
-      }
-      return [k, v];
-    }),
-  );
-  await util.writeFile(TVDB_PATH, toSave);
-  await util.writeFile(TVDB_BACKUP_PATH, toSave);
+  await util.writeFile(TVDB_PATH, data);
+  await util.writeFile(TVDB_BACKUP_PATH, data);
 }
 
 // Helper functions for watchedEpis format

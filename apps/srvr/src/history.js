@@ -8,6 +8,19 @@ const DB_PATH = path.join(SRVR_DATA_DIR, "history.sqlite");
 
 const DEDUP_TYPES = ["chkDown", "skipDown", "rejDown", "browse", "preview"];
 
+const PST_FMT = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Los_Angeles",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+});
+
+const nowPST = () => PST_FMT.format(new Date()).replace(", ", "T");
+
 let db;
 let stmtInsert;
 let stmtUpsert;
@@ -35,8 +48,8 @@ const openDb = () => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       tvdbId TEXT,
       showName TEXT NOT NULL,
-      addTime INTEGER NOT NULL,
-      updateTime INTEGER NOT NULL,
+      addTime TEXT NOT NULL,
+      updateTime TEXT NOT NULL,
       updateCount INTEGER DEFAULT 0,
       description TEXT,
       type TEXT NOT NULL,
@@ -110,7 +123,7 @@ export const addEvent = ({
   hash,
   fields,
 }) => {
-  const now = Date.now();
+  const now = nowPST();
   const params = {
     tvdbId: tvdbId ?? null,
     showName: showName || "",

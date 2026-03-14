@@ -107,19 +107,11 @@ const TYPE_COLORS = {
   deleteShow: "#c0392b",
 };
 
-const formatPST = (epochMs) => {
-  const d = new Date(epochMs);
-  const opts = {
-    timeZone: "America/Los_Angeles",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  };
-  const parts = new Intl.DateTimeFormat("en-US", opts).formatToParts(d);
-  const get = (t) => (parts.find((p) => p.type === t) || {}).value || "";
-  return `${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
+const formatPST = (iso) => {
+  if (!iso) return "";
+  // iso is like "2026-03-14T10:30:00" already in PST
+  const m = iso.match(/(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  return m ? `${m[1]}-${m[2]} ${m[3]}:${m[4]}` : iso;
 };
 
 export default {
@@ -161,7 +153,9 @@ export default {
           });
         }
       }
-      out.sort((a, b) => b.sortMs - a.sortMs);
+      out.sort((a, b) =>
+        b.sortMs > a.sortMs ? 1 : b.sortMs < a.sortMs ? -1 : 0,
+      );
       return out;
     },
   },

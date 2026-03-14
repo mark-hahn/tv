@@ -2,15 +2,12 @@
   <div
     v-if="visible"
     style="
-      position: sticky;
-      top: 120px;
       z-index: 110;
       background: #fff;
       border: 1px solid #ddd;
       border-radius: 5px;
-      padding: 15px 20px;
-      margin-bottom: 10px;
-      min-height: 60px;
+      padding: 10px 15px;
+      margin-top: 4px;
     "
   >
     <div
@@ -52,8 +49,8 @@
           v-if="p.logoUrl"
           :src="p.logoUrl"
           style="
-            width: 32px;
-            height: 32px;
+            width: 40px;
+            height: 40px;
             border-radius: 4px;
             margin-right: 10px;
             object-fit: contain;
@@ -62,14 +59,14 @@
         <div
           v-else
           style="
-            width: 32px;
-            height: 32px;
+            width: 40px;
+            height: 40px;
             margin-right: 10px;
             background: #eee;
             border-radius: 4px;
           "
         ></div>
-        <span style="font-size: 14px; flex: 1">{{ p.name }}</span>
+        <span style="font-size: 16px; flex: 1">{{ p.name }}</span>
         <span
           style="
             font-size: 11px;

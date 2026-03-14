@@ -63,7 +63,10 @@
             >
             <button
               v-if="selectedTorrent"
-              @click.stop="continueDownload"
+              @click.stop="
+                showStream = false;
+                continueDownload();
+              "
               style="
                 font-size: 13px;
                 cursor: pointer;
@@ -77,7 +80,10 @@
             </button>
             <button
               v-if="selectedTorrent"
-              @click.stop="openDetails"
+              @click.stop="
+                showStream = false;
+                openDetails();
+              "
               style="
                 font-size: 13px;
                 cursor: pointer;
@@ -103,7 +109,10 @@
               "
             />
             <button
-              @click.stop="searchClick"
+              @click.stop="
+                showStream = false;
+                searchClick();
+              "
               style="
                 font-size: 13px;
                 cursor: pointer;
@@ -116,7 +125,10 @@
               Search
             </button>
             <button
-              @click.stop="moreClick"
+              @click.stop="
+                showStream = false;
+                moreClick();
+              "
               :disabled="hasMoreProviders"
               style="
                 font-size: 13px;
@@ -130,7 +142,10 @@
               More
             </button>
             <button
-              @click.stop="forceClick"
+              @click.stop="
+                showStream = false;
+                forceClick();
+              "
               style="
                 font-size: 13px;
                 cursor: pointer;
@@ -143,7 +158,10 @@
               Force
             </button>
             <button
-              @click.stop="openTorTabs"
+              @click.stop="
+                showStream = false;
+                openTorTabs();
+              "
               style="
                 font-size: 13px;
                 cursor: pointer;
@@ -163,13 +181,16 @@
                 borderRadius: '7px',
                 padding: '4px',
                 border: '1px solid #bbb',
-                backgroundColor: showStream ? 'lightgray' : 'whitesmoke',
+                '--btn-bg': showStream ? 'lightgray' : 'whitesmoke',
               }"
             >
               Stream
             </button>
             <button
-              @click.stop="toggleCookieInputs"
+              @click.stop="
+                showStream = false;
+                toggleCookieInputs();
+              "
               style="
                 font-size: 13px;
                 cursor: pointer;
@@ -192,6 +213,7 @@
           "
         ></div>
         <div
+          v-if="!showStream"
           style="
             margin-left: 0;
             margin-right: 20px;
@@ -218,6 +240,7 @@
           ></span>
         </div>
         <div
+          v-if="!showStream"
           style="
             height: 1px;
             width: 100%;
@@ -228,7 +251,7 @@
       </div>
       <div
         id="unaired"
-        v-if="unaired"
+        v-if="!showStream && unaired"
         style="
           text-align: center;
           color: #666;
@@ -245,7 +268,11 @@
       <div
         id="cookie-inputs"
         @click.stop
-        v-if="!loading &amp;&amp; ((isCookieRelatedError &amp;&amp; !dismissCookieInputs) || showCookieInputs)"
+        v-if="
+          !showStream &&
+          !loading &&
+          ((isCookieRelatedError && !dismissCookieInputs) || showCookieInputs)
+        "
         style="
           position: sticky;
           top: 120px;
@@ -457,7 +484,7 @@
       </div>
       <div
         id="no-torrents-needed"
-        v-if="!unaired &amp;&amp; noTorrentsNeeded &amp;&amp; !loading &amp;&amp; !error"
+        v-if="!showStream && !unaired && noTorrentsNeeded && !loading && !error"
         style="
           text-align: center;
           color: #666;
@@ -469,7 +496,12 @@
       </div>
       <div
         id="torrents-list"
-        v-if="!unaired &amp;&amp; (!loading || torrents.length > 0) &amp;&amp; !noTorrentsNeeded"
+        v-if="
+          !showStream &&
+          !unaired &&
+          (!loading || torrents.length > 0) &&
+          !noTorrentsNeeded
+        "
         style="
           padding: 10px;
           font-size: 14px;

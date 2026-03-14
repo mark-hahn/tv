@@ -117,6 +117,7 @@ export async function getStreamProviders(params) {
     for (const type of TYPES) {
       for (const p of allResults[cc]?.[type] || []) {
         if (seen.has(p.provider_id)) continue;
+        if (/\bwith ads\b/i.test(p.provider_name)) continue;
         seen.add(p.provider_id);
         providers.push({
           name: p.provider_name,

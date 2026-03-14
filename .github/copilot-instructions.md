@@ -44,3 +44,12 @@
 - all timestamps for logging and general debugging should be pst la with format MM-DD HH:mm
 - when node is not installed in the local environment fix the problem and continue
 - you do not need my permission to run bash or ssh to remote server if you are not modifying anything
+
+## Button background colors in client panes
+
+- App.vue has a global CSS rule that forces `background-color: var(--btn-bg, whitesmoke) !important` on buttons inside `#tor`, `#info`, `#actors`, `#reviews`, `#qbt`, `#down`, etc.
+- Setting `backgroundColor` via inline style or `:style` binding will NOT work because the `!important` rule wins.
+- To change a button's background color dynamically, set the `--btn-bg` CSS variable on the button element:
+  ```html
+  :style="{ '--btn-bg': isActive ? 'lightgray' : 'whitesmoke' }"
+  ```

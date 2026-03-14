@@ -1306,7 +1306,10 @@ async function main() {
 
       if (!processingForced && tvJsonTitles && tvJsonTitles[fname]) {
         recentCount++;
-        const skipStatus = tvJsonTitles[fname].status === "finished" ? "already downloaded" : "already queued";
+        const skipStatus =
+          tvJsonTitles[fname].status === "finished"
+            ? "already downloaded"
+            : "already queued";
         log(
           "------",
           downloadCount,
@@ -1842,7 +1845,10 @@ async function main() {
     // tv.json authority: do not create duplicates for titles already queued.
     if (!processingForced && tvJsonTitles && tvJsonTitles[fname]) {
       existsCount++;
-      const skipStatus = tvJsonTitles[fname].status === "finished" ? "already downloaded" : "already queued";
+      const skipStatus =
+        tvJsonTitles[fname].status === "finished"
+          ? "already downloaded"
+          : "already queued";
       trace("checkFileExists: " + skipStatus + " (tv.json)", { fname });
       postHistory({
         tvdbId: lookupTvdbId(seriesName),

@@ -1370,7 +1370,10 @@ const getTitlesMap = () => {
     const out = {};
     for (const r of rows) {
       if (!r || !r.title) continue;
-      out[String(r.title)] = { error: !!r.error, status: r.status || "waiting" };
+      out[String(r.title)] = {
+        error: !!r.error,
+        status: r.status || "waiting",
+      };
     }
     return out;
   } catch {

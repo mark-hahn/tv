@@ -379,6 +379,9 @@ export function parseTitleFromFilename(fname, folderName, parsedPtt) {
       const dashIdx = noExt.indexOf(" - ");
       if (dashIdx > 0) title = noExt.slice(0, dashIdx).trim();
     }
+    // Reject episode identifiers (e.g. "2x5", "101") that slipped through as titles.
+    if (title && /^\d{1,2}x\d{1,2}$/i.test(title)) title = null;
+    if (title && /^\d{3}$/.test(title)) title = null;
   }
 
   // Dot-separated fallback: e.g. "Paradise.2025.S02E05.1080p..." → "Paradise"

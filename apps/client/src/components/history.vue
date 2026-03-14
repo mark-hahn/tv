@@ -25,52 +25,30 @@
         v-for="card in cards"
         :key="card.key"
         style="
-          border: 1px solid #ddd;
+          border: 1px solid #444;
           border-radius: 6px;
           padding: 6px 8px;
           margin-bottom: 5px;
           background: #fafafa;
+          cursor: pointer;
         "
+        @click="toggle(card.key)"
       >
-        <div style="display: flex; align-items: center; gap: 6px">
+        <div style="font-size: 16px; font-weight: bold; display: flex; gap: 6px; align-items: baseline">
           <span
-            :style="{
-              display: 'inline-block',
-              padding: '1px 6px',
-              borderRadius: '4px',
-              fontSize: '12px',
-              fontWeight: 'bold',
-              color: 'white',
-              backgroundColor: badgeColor(card.type),
-            }"
+            :style="{ color: badgeColor(card.type), fontFamily: 'monospace', whiteSpace: 'pre' }"
+          >{{ card.typePad }}</span>
+          <span>{{ card.showName }}</span>
+          <span style="color: #888; margin-left: auto; white-space: nowrap">{{ card.time }}<template v-if="card.updateCount > 0">({{ card.updateCount }})</template></span>
+        </div>
+        <template v-if="expanded[card.key]">
+          <div
+            v-if="card.description"
+            style="margin-top: 4px; color: #555; font-size: 13px"
           >
-            {{ card.type }}
-          </span>
-          <span style="color: #888; font-size: 12px">{{ card.time }}</span>
-          <span
-            v-if="card.updated"
-            style="
-              font-size: 11px;
-              color: #666;
-              margin-left: auto;
-              white-space: nowrap;
-            "
-          >
-            ×{{ card.updateCount }}
-          </span>
-        </div>
-        <div
-          v-if="card.showName"
-          style="margin-top: 3px; font-weight: 500"
-        >
-          {{ card.showName }}
-        </div>
-        <div
-          v-if="card.description"
-          style="margin-top: 2px; color: #555; font-size: 13px"
-        >
-          {{ card.description }}
-        </div>
+            {{ card.description }}
+          </div>
+        </template>
       </div>
     </div>
   </div>
@@ -107,10 +85,12 @@ const TYPE_COLORS = {
   deleteShow: "#c0392b",
 };
 
+const PAD_LEN = 11;
+
 const formatPST = (iso) => {
   if (!iso) return "";
-  // iso is like "2026-03-14T10:30:00" already in PST
-  const m = iso.match(/(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  // iso is like "2026-03-14 10:30:00.123" already in PST
+  const m = iso.match(/(\d{2})-(\d{2}) (\d{2}):(\d{2})/);
   return m ? `${m[1]}-${m[2]} ${m[3]}:${m[4]}` : iso;
 };
 
@@ -124,34 +104,24 @@ export default {
     return {
       events: [],
       loading: false,
+      expanded: {},
     };
   },
   computed: {
     cards() {
       const out = [];
       for (const ev of this.events) {
+        const uc = ev.updateCount || 0;
         out.push({
-          key: `${ev.id}-add`,
+          key: String(ev.id),
           type: ev.type,
-          time: formatPST(ev.addTime),
-          sortMs: ev.addTime,
-          showName: ev.showName,
+          typePad: ev.type.padEnd(PAD_LEN),
+          time: formatPST(uc > 0 ? ev.updateTime : ev.addTime),
+          sortMs: uc > 0 ? ev.updateTime : ev.addTime,
+          showName: ev.showName || "",
           description: ev.description || "",
-          updated: false,
-          updateCount: 0,
+          updateCount: uc,
         });
-        if (ev.updateCount > 0 && ev.updateTime !== ev.addTime) {
-          out.push({
-            key: `${ev.id}-upd`,
-            type: ev.type,
-            time: formatPST(ev.updateTime),
-            sortMs: ev.updateTime,
-            showName: ev.showName,
-            description: ev.description || "",
-            updated: true,
-            updateCount: ev.updateCount,
-          });
-        }
       }
       out.sort((a, b) =>
         b.sortMs > a.sortMs ? 1 : b.sortMs < a.sortMs ? -1 : 0,
@@ -173,6 +143,9 @@ export default {
   methods: {
     badgeColor(type) {
       return TYPE_COLORS[type] || "#7f8c8d";
+    },
+    toggle(key) {
+      this.expanded = { ...this.expanded, [key]: !this.expanded[key] };
     },
     async fetchHistory() {
       const id = this.tvdbId;

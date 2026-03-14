@@ -19,7 +19,12 @@ const PST_FMT = new Intl.DateTimeFormat("en-CA", {
   hour12: false,
 });
 
-const nowPST = () => PST_FMT.format(new Date()).replace(", ", "T");
+const nowPST = () => {
+  const d = new Date();
+  const base = PST_FMT.format(d).replace(", ", " ");
+  const ms = String(d.getMilliseconds()).padStart(3, "0");
+  return `${base}.${ms}`;
+};
 
 let db;
 let stmtInsert;

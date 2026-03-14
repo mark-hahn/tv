@@ -1253,10 +1253,21 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
     const push2Changes = [...diskChanges, ...lastWatchedChanges, ...gapChanges];
     // History: bkgndUpdate event
     try {
-      const tvdbIdVal = tvdbRecord.Id && !String(tvdbRecord.Id).startsWith("noemby-") ? tvdbRecord.Id : null;
-      const fieldsVal = push2Changes.length > 0 ? JSON.stringify(push2Changes) : null;
-      const descVal = push2Changes.length > 0 ? push2Changes.join(" ") : "No fields changed";
-      history.addEvent({ tvdbId: tvdbIdVal, showName, type: "bkgndUpdate", description: descVal, fields: fieldsVal });
+      const tvdbIdVal =
+        tvdbRecord.Id && !String(tvdbRecord.Id).startsWith("noemby-")
+          ? tvdbRecord.Id
+          : null;
+      const fieldsVal =
+        push2Changes.length > 0 ? JSON.stringify(push2Changes) : null;
+      const descVal =
+        push2Changes.length > 0 ? push2Changes.join(" ") : "No fields changed";
+      history.addEvent({
+        tvdbId: tvdbIdVal,
+        showName,
+        type: "bkgndUpdate",
+        description: descVal,
+        fields: fieldsVal,
+      });
     } catch {}
     if (push2Changes.length) {
       await tvdb.saveTvdbSync();
@@ -1677,7 +1688,14 @@ const addReject = async (params) => {
   console.log("-- adding reject:", name);
   rejects.push(name);
 
-  try { history.addEvent({ tvdbId: null, showName: name, type: "reject", description: "Added to reject list" }); } catch {}
+  try {
+    history.addEvent({
+      tvdbId: null,
+      showName: name,
+      type: "reject",
+      description: "Added to reject list",
+    });
+  } catch {}
 
   return new Promise((resolve, reject) => {
     saveConfigYml(
@@ -1709,7 +1727,14 @@ const delReject = async (params) => {
     return "delReject not deleted: " + name;
   }
 
-  try { history.addEvent({ tvdbId: null, showName: name, type: "unreject", description: "Removed from reject list" }); } catch {}
+  try {
+    history.addEvent({
+      tvdbId: null,
+      showName: name,
+      type: "unreject",
+      description: "Removed from reject list",
+    });
+  } catch {}
 
   return new Promise((resolve, reject) => {
     saveConfigYml(
@@ -1743,7 +1768,14 @@ const addPickup = async (params) => {
   }
   console.log("-- adding pickup:", name);
   pickups.push(name);
-  try { history.addEvent({ tvdbId: null, showName: name, type: "pickup", description: "Added to pickup list" }); } catch {}
+  try {
+    history.addEvent({
+      tvdbId: null,
+      showName: name,
+      type: "pickup",
+      description: "Added to pickup list",
+    });
+  } catch {}
   await new Promise((resolve, reject) =>
     saveConfigYml(null, "ok", resolve, reject),
   );
@@ -1771,7 +1803,14 @@ const delPickup = async (params) => {
     console.log("pickup not deleted, no match:", name);
     return "delPickup no match: " + name;
   }
-  try { history.addEvent({ tvdbId: null, showName: name, type: "unpickup", description: "Removed from pickup list" }); } catch {}
+  try {
+    history.addEvent({
+      tvdbId: null,
+      showName: name,
+      type: "unpickup",
+      description: "Removed from pickup list",
+    });
+  } catch {}
   await new Promise((resolve, reject) =>
     saveConfigYml(null, "ok", resolve, reject),
   );
@@ -1837,8 +1876,16 @@ const addNoEmby = async (params) => {
   allTvdb[name] = nextRecord;
   await tvdb.saveTvdbSync();
   try {
-    const id = nextRecord.Id && !String(nextRecord.Id).startsWith("noemby-") ? nextRecord.Id : null;
-    history.addEvent({ tvdbId: id, showName: name, type: "addEmby", description: `Added (inEmby=${nextRecord.inEmby})` });
+    const id =
+      nextRecord.Id && !String(nextRecord.Id).startsWith("noemby-")
+        ? nextRecord.Id
+        : null;
+    history.addEvent({
+      tvdbId: id,
+      showName: name,
+      type: "addEmby",
+      description: `Added (inEmby=${nextRecord.inEmby})`,
+    });
   } catch {}
   return "ok";
 };
@@ -1868,7 +1915,14 @@ const delNoEmby = async (params) => {
   console.log("deleting no-emby record:", deleteKey);
   delete allTvdb[deleteKey];
   await tvdb.saveTvdbSync();
-  try { history.addEvent({ tvdbId: null, showName: deleteKey, type: "deleteShow", description: "Deleted non-Emby show" }); } catch {}
+  try {
+    history.addEvent({
+      tvdbId: null,
+      showName: deleteKey,
+      type: "deleteShow",
+      description: "Deleted non-Emby show",
+    });
+  } catch {}
   return "ok";
 };
 
@@ -2035,7 +2089,12 @@ const createShowFolder = async (params) => {
   }
 
   try {
-    history.addEvent({ tvdbId: tvdbId || null, showName: showName, type: "addEmby", description: `Created folder: ${showPath}` });
+    history.addEvent({
+      tvdbId: tvdbId || null,
+      showName: showName,
+      type: "addEmby",
+      description: `Created folder: ${showPath}`,
+    });
   } catch {}
 
   return { ok: true, created: !existed, path: showPath };
@@ -2879,7 +2938,8 @@ app.post("/api/setSharedFilters", apiWrapper(setSharedFilters));
 // History
 app.post("/api/history", (req, res) => {
   try {
-    const { tvdbId, showName, type, description, hash, fields } = req.body || {};
+    const { tvdbId, showName, type, description, hash, fields } =
+      req.body || {};
     if (!showName || !type) {
       res.status(400).json({ error: "showName and type required" });
       return;
@@ -3680,7 +3740,14 @@ async function runEmbyFullSweep() {
         }
         rec.inEmby = false;
         rec.notReady = true;
-        try { history.addEvent({ tvdbId: rec.Id || null, showName: name, type: \"remEmby\", description: \"Disappeared from Emby\" }); } catch {}
+        try {
+          history.addEvent({
+            tvdbId: rec.Id || null,
+            showName: name,
+            type: "remEmby",
+            description: "Disappeared from Emby",
+          });
+        } catch {}
       }
     }
 

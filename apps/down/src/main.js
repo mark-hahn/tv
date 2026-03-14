@@ -1228,8 +1228,41 @@ async function main() {
       parts = usbFilePath.split("/");
       fname = parts[parts.length - 1];
 
+      // Parse title early so all history events can use the real show name.
+      const pathParts2 = usbFilePath.split("/");
+      const folderName2 = pathParts2.length >= 2 ? pathParts2[0] : "";
+      try {
+        var parsed = parseTorrentTitle(fname) || {};
+        var parsedFolder = {};
+        try {
+          if (folderName2) parsedFolder = parseTorrentTitle(folderName2) || {};
+        } catch (e) {}
+        title = parseTitleFromFilename(fname, folderName2, parsed);
+        folderTitle = folderName2
+          ? parseTitleFromFilename(folderName2, "", parsedFolder)
+          : null;
+        if (folderTitle === title) folderTitle = null;
+        const se = parseFileSeasonEpisode(
+          fname,
+          folderName2,
+          parsed,
+          parsedFolder,
+        );
+        season = se && se.season != null ? se.season : undefined;
+        episode = se && se.episode != null ? se.episode : undefined;
+        type = parsed.type || "episode";
+      } catch (e) {
+        title = null;
+        folderTitle = null;
+        season = undefined;
+        episode = undefined;
+        type = "episode";
+        parsed = {};
+        parsedFolder = {};
+      }
+
       postHistory({
-        showName: fname,
+        showName: title || fname,
         type: "chkDown",
         description: `usb: ${usbFilePath}, size: ${usbFileSize}`,
       });
@@ -1252,7 +1285,7 @@ async function main() {
       ) {
         trace("checkFile: skip extension", { fname, fext });
         postHistory({
-          showName: fname,
+          showName: title || fname,
           type: "skipDown",
           description: `skip extension: .${fext}`,
         });
@@ -1269,7 +1302,7 @@ async function main() {
         log("------", downloadCount, "/", chkCount, "SKIPPING *ERROR*:", fname);
         trace("checkFile: skip tvJsonTitles error", { fname });
         postHistory({
-          showName: fname,
+          showName: title || fname,
           type: "skipDown",
           description: "skip: previous error",
         });
@@ -1289,7 +1322,7 @@ async function main() {
         );
         trace("checkFile: skip already queued", { fname });
         postHistory({
-          showName: fname,
+          showName: title || fname,
           type: "skipDown",
           description: "skip: already queued",
         });
@@ -1309,7 +1342,7 @@ async function main() {
         );
         trace("checkFile: skip in-progress", { fname });
         postHistory({
-          showName: fname,
+          showName: title || fname,
           type: "skipDown",
           description: "skip: in-progress",
         });
@@ -1322,7 +1355,7 @@ async function main() {
           log("-- BLOCKED:", { blkName, fname });
           trace("checkFile: blocked", { blkName, fname });
           postHistory({
-            showName: fname,
+            showName: title || fname,
             type: "skipDown",
             description: `skip: blocked by ${blkName}`,
           });
@@ -1335,146 +1368,94 @@ async function main() {
       // file passed all block tests, process it
       currentSeq = ++cycleSeq;
       downloadTime = Date.now();
-      season = 1;
-      episode = 1;
-      try {
-        var parsed = parseTorrentTitle(fname) || {};
 
-        const pathParts2 = usbFilePath.split("/");
-        // Use the topmost folder as the show folder name, regardless of nesting depth.
-        // e.g. "Off Centre (2001)/Season 1/101-Title.avi" → folderName2 = "Off Centre (2001)"
-        const folderName2 = pathParts2.length >= 2 ? pathParts2[0] : "";
-        var parsedFolder = {};
-        try {
-          if (folderName2) parsedFolder = parseTorrentTitle(folderName2) || {};
-        } catch (e) {}
+      trace("checkFile: parsed", { fname, title, season, episode, type });
 
-        // Use shared title extractor
-        title = parseTitleFromFilename(fname, folderName2, parsed);
-        // Also derive a title from the folder alone (fallback for abbreviation filenames)
-        folderTitle = folderName2
-          ? parseTitleFromFilename(folderName2, "", parsedFolder)
-          : null;
-        if (folderTitle === title) folderTitle = null; // no point retrying with the same title
+      // Provide a clear reason when the parser can't produce S/E.
+      if (!title || !Number.isInteger(season) || !Number.isInteger(episode)) {
+        var detailParts = [];
+        if (title) {
+          detailParts.push(`title='${title}'`);
+        }
+        if (Number.isInteger(season)) {
+          detailParts.push(`season=${season}`);
+        }
+        if (Number.isInteger(episode)) {
+          detailParts.push(`episode=${episode}`);
+        }
+        var detail = detailParts.length
+          ? detailParts.join(", ")
+          : "no usable fields";
 
-        // Use shared season/episode extractor
-        const se = parseFileSeasonEpisode(
-          fname,
-          folderName2,
-          parsed,
-          parsedFolder,
-        );
-        season = se && se.season != null ? se.season : undefined;
-        episode = se && se.episode != null ? se.episode : undefined;
-
-        // When parsedPtt had a compact NNN episode (>99) the title from
-        // parseTorrentTitle may contain trailing junk — parseTitleFromFilename
-        // already stripped it, but re-assign season/episode from se (already clean).
-
-        type = parsed.type || "episode";
-
-        trace("checkFile: parsed", { fname, title, season, episode, type });
-
-        // Provide a clear reason when the parser can't produce S/E.
-        if (!title || !Number.isInteger(season) || !Number.isInteger(episode)) {
-          var detailParts = [];
-          if (title) {
-            detailParts.push(`title='${title}'`);
-          }
-          if (Number.isInteger(season)) {
-            detailParts.push(`season=${season}`);
-          }
-          if (Number.isInteger(episode)) {
-            detailParts.push(`episode=${episode}`);
-          }
-          var detail = detailParts.length
-            ? detailParts.join(", ")
-            : "no usable fields";
-
-          // If embyMap is loaded, check whether the parsed title matches a known
-          // show before creating an error entry.  Files that don't resemble any
-          // Emby show (music videos, movies, etc.) are silently skipped so they
-          // don't clutter the UI with error entries.
-          if (!processingForced && embyMap && title) {
-            var embyShowNames = Object.keys(embyMap).filter(
-              (k) => embyMap[k] && embyMap[k].inEmby,
-            );
-            var matchesEmby = smartTitleMatch(
-              title,
+        // If embyMap is loaded, check whether the parsed title matches a known
+        // show before creating an error entry.  Files that don't resemble any
+        // Emby show (music videos, movies, etc.) are silently skipped so they
+        // don't clutter the UI with error entries.
+        if (!processingForced && embyMap && title) {
+          var embyShowNames = Object.keys(embyMap).filter(
+            (k) => embyMap[k] && embyMap[k].inEmby,
+          );
+          var matchesEmby = smartTitleMatch(title, embyShowNames, null, false);
+          if (!matchesEmby && folderTitle) {
+            matchesEmby = smartTitleMatch(
+              folderTitle,
               embyShowNames,
               null,
               false,
             );
-            if (!matchesEmby && folderTitle) {
-              matchesEmby = smartTitleMatch(
-                folderTitle,
-                embyShowNames,
-                null,
-                false,
-              );
-              if (matchesEmby) title = folderTitle;
-            }
-            if (!matchesEmby) {
-              log(
-                "------",
-                downloadCount,
-                "/",
-                chkCount,
-                "NOT A TV SHOW, SKIPPING:",
-                fname,
-              );
-              trace("checkFile: not a tv show, skipping", { fname, title });
-              postHistory({
-                showName: fname,
-                type: "skipDown",
-                description: `skip: not a TV show (title: ${title})`,
-              });
-              return process.nextTick(checkFile);
-            }
+            if (matchesEmby) title = folderTitle;
           }
+          if (!matchesEmby) {
+            log(
+              "------",
+              downloadCount,
+              "/",
+              chkCount,
+              "NOT A TV SHOW, SKIPPING:",
+              fname,
+            );
+            trace("checkFile: not a tv show, skipping", { fname, title });
+            postHistory({
+              showName: title || fname,
+              type: "skipDown",
+              description: `skip: not a TV show (title: ${title})`,
+            });
+            return process.nextTick(checkFile);
+          }
+        }
 
-          if (title && Number.isInteger(season) && !Number.isInteger(episode)) {
-            badFile(
-              `parse-torrent-title: found title+season but no episode (${detail}) → not an episode`,
-            );
-          } else if (
-            title &&
-            !Number.isInteger(season) &&
-            !Number.isInteger(episode)
-          ) {
-            badFile(
-              `parse-torrent-title: found title but no season/episode (${detail}) → not an episode`,
-            );
-          } else {
-            badFile(
-              `parse-torrent-title: missing required fields (${detail}) → not an episode`,
-            );
-          }
-          return;
-        }
-        if (type !== "episode") {
-          log("\nskipping non-episode:", fname);
-          trace("checkFile: skip non-episode", { fname, title, type });
-          badFile("non-episode");
-          return;
-        }
-        if (!Number.isInteger(season)) {
-          err(
-            "\nno season integer for " + usbLine + ", defaulting to season 1",
-            { title, season, type },
+        if (title && Number.isInteger(season) && !Number.isInteger(episode)) {
+          badFile(
+            `parse-torrent-title: found title+season but no episode (${detail}) → not an episode`,
           );
-          season = 1;
+        } else if (
+          title &&
+          !Number.isInteger(season) &&
+          !Number.isInteger(episode)
+        ) {
+          badFile(
+            `parse-torrent-title: found title but no season/episode (${detail}) → not an episode`,
+          );
+        } else {
+          badFile(
+            `parse-torrent-title: missing required fields (${detail}) → not an episode`,
+          );
         }
-      } catch (error1) {
-        err("\nerror parsing:" + fname);
-        trace("checkFile: parse-torrent-title threw", {
-          fname,
-          error: error1 && error1.message ? error1.message : String(error1),
-        });
-        badFile(
-          `parse-torrent-title threw: ${error1 && error1.message ? error1.message : "unknown"}`,
-        );
         return;
+      }
+      if (type !== "episode") {
+        log("\nskipping non-episode:", fname);
+        trace("checkFile: skip non-episode", { fname, title, type });
+        badFile("non-episode");
+        return;
+      }
+      if (!Number.isInteger(season)) {
+        err("\nno season integer for " + usbLine + ", defaulting to season 1", {
+          title,
+          season,
+          type,
+        });
+        season = 1;
       }
       // If file uses compact NNN naming (e.g. 101-Title.avi or Show.101.Title.avi = S01E01),
       // rename to SxxExx format so Emby can match it to the correct episode.

@@ -28,6 +28,7 @@ import { getBrowseShow, getAllBrowse } from "./browse.js";
 import * as reviews from "./reviews.js";
 import { checkFiles as tvProcCheckFiles } from "./tv-proc.js";
 import { getActorCredits } from "./imdb-credits.js";
+import { postHistory } from "@tv/share";
 import {
   getApiCookiesDir,
   getTvprocJsonPath,
@@ -570,6 +571,13 @@ app.get("/api/tvproc/startProc", async (req, res) => {
 app.post("/api/tvproc/forceDown", async (req, res) => {
   try {
     const files = req.body; // already parsed by express.json()
+    postHistory({
+      showName: "forceDown",
+      type: "forceDown",
+      description: Array.isArray(files)
+        ? files.join(", ")
+        : JSON.stringify(files),
+    });
     const response = await fetch("http://127.0.0.1:3003/forceDown", {
       method: "POST",
       body: JSON.stringify(files),
@@ -766,6 +774,8 @@ app.get("/api/search", async (req, res) => {
   if (!showName) {
     return res.status(400).json({ error: "Show name is required" });
   }
+
+  postHistory({ showName, type: "search", description: `search: ${showName}` });
 
   try {
     // If the client doesn't pass cf_clearance values, fall back to the local persisted file.
@@ -1092,6 +1102,17 @@ async function handleDownloadRequest(req, res) {
           addTag,
           error: e?.message || String(e),
         });
+        const errTorTitle = String(
+          torrent?.raw?.title ||
+            torrent?.title ||
+            torrent?.clientTitle ||
+            "unknown",
+        ).trim();
+        postHistory({
+          showName: errTorTitle,
+          type: "errTor",
+          description: `qbt add threw: ${e?.message || String(e)} | ${errTorTitle}`,
+        });
         res.json({
           ...tvProcResult,
           success: false,
@@ -1205,6 +1226,18 @@ async function handleDownloadRequest(req, res) {
           error: `qBittorrent add failed: ${addRes.text || "Fails."}`,
           qbAdd: addRes,
         });
+        const failTorTitle = String(
+          torrent?.raw?.title ||
+            torrent?.title ||
+            torrent?.clientTitle ||
+            "unknown",
+        ).trim();
+        postHistory({
+          showName: failTorTitle,
+          type: "errTor",
+          hash: infoHash || undefined,
+          description: `qbt add failed: ${addRes.text || "Fails."} | ${failTorTitle}`,
+        });
         return;
       }
 
@@ -1215,6 +1248,18 @@ async function handleDownloadRequest(req, res) {
           stage: "qbt-add-success",
           addTag,
           qbAdd: addRes,
+        });
+        const torTitle = String(
+          torrent?.raw?.title ||
+            torrent?.title ||
+            torrent?.clientTitle ||
+            "unknown",
+        ).trim();
+        postHistory({
+          showName: torTitle,
+          type: "torSent",
+          hash: infoHash || undefined,
+          description: `${torTitle} | provider: ${torrent?.raw?.provider || torrent?.provider || "?"} | tag: ${addTag}`,
         });
         res.json({
           ...tvProcResult,

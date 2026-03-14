@@ -138,6 +138,19 @@
               →
             </button>
             <button
+              @click.stop="showHistory = !showHistory"
+              :style="{ '--btn-bg': showHistory ? 'lightgray' : 'whitesmoke' }"
+              style="
+                font-size: 15px;
+                cursor: pointer;
+                margin: 5px;
+                max-height: 24px;
+                border-radius: 7px;
+              "
+            >
+              History
+            </button>
+            <button
               v-if="mapShow?.inEmby !== false"
               @click.stop="$emit('prune', mapShow)"
               style="
@@ -193,6 +206,7 @@
     <div
       id="maptable"
       v-if="!hideMapBottom"
+      v-show="!showHistory"
       style="
         flex: 1 1 auto;
         min-height: 0px;
@@ -483,6 +497,18 @@
         </div>
       </div>
     </div>
+    <History
+      v-if="showHistory && !hideMapBottom"
+      :tvdbId="String(mapShow?.tvdbId || tvdbData?.tvdbId || '')"
+      :showName="String(mapShow?.Name || '')"
+      style="
+        flex: 1 1 auto;
+        min-height: 0px;
+        margin-left: 15px;
+        margin-right: 15px;
+        box-sizing: border-box;
+      "
+    />
   </div>
 </template>
 
@@ -491,12 +517,14 @@ import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
 import * as srvr from "../srvr.js";
 import evtBus from "../evtBus.js";
+import History from "./history.vue";
 
 const MAP_ARROW_PAN_PX_PER_SEC = 400;
 const MAP_PAN_SMOOTH_TAU_SEC = 0.1;
 
 export default {
   name: "Map",
+  components: { History },
 
   props: {
     mapShow: {
@@ -564,6 +592,7 @@ export default {
       mapTouchMovedDist: 0,
       mapTouchSuppressClickUntil: 0,
       mapUpdateKey: 0,
+      showHistory: false,
     };
   },
 

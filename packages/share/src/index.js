@@ -423,3 +423,5 @@ export function parseTitleFromFilename(fname, folderName, parsedPtt) {
 
   return title || null;
 }
+
+export { postHistory } from "./history.js";

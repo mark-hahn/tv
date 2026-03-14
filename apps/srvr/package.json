@@ -24,6 +24,7 @@
   "dependencies": {
     "@tv/share": "workspace:*",
     "base64-js": "^1.5.1",
+    "better-sqlite3": "^11.10.0",
     "chokidar": "^3.5.3",
     "cors": "^2.8.6",
     "date-and-time": "^3.6.0",

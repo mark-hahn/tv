@@ -235,6 +235,7 @@ export default {
       _showLoading: false,
       matchedTitle: null,
       activeOnly: false,
+      _knownHashes: new Set(),
     };
   },
 
@@ -466,6 +467,35 @@ export default {
         const torrents = await this.getQbtInfo({});
         if (Array.isArray(torrents)) {
           const hashOf = (t) => String(t?.hash || "").trim();
+          const nameOf = (t) => String(t?.name || "").trim();
+
+          // Track new and removed hashes for history events.
+          const curHashes = new Set(torrents.map(hashOf).filter(Boolean));
+          const torrentByHash = {};
+          for (const t of torrents) {
+            const h = hashOf(t);
+            if (h) torrentByHash[h] = t;
+          }
+
+          if (this._didLoadOnce) {
+            for (const h of curHashes) {
+              if (!this._knownHashes.has(h)) {
+                const t = torrentByHash[h];
+                this.postQbtHistory(
+                  "addQbt",
+                  nameOf(t),
+                  h,
+                  `new: ${nameOf(t)} state=${t?.state || "?"}`,
+                );
+              }
+            }
+            for (const h of this._knownHashes) {
+              if (!curHashes.has(h)) {
+                this.postQbtHistory("remQbt", h, h, `removed: ${h}`);
+              }
+            }
+          }
+          this._knownHashes = curHashes;
           const downloadingTitles = torrents
             .filter((t) => {
               const st = String(t?.state || "")
@@ -498,6 +528,14 @@ export default {
               console.log("History: download finished, starting tvproc cycle", {
                 finishedHashes: missing,
               });
+              for (const h of missing) {
+                this.postQbtHistory(
+                  "qbtFinished",
+                  h,
+                  h,
+                  `finished downloading: ${h}`,
+                );
+              }
               try {
                 await fetch(`${config.tvDownUrl}/startProc`, {
                   method: "POST",
@@ -534,6 +572,21 @@ export default {
     sep() {
       // Replace spaces around '|' with two non-breaking spaces.
       return "\u00A0\u00A0|\u00A0\u00A0";
+    },
+
+    postQbtHistory(type, showName, hash, description) {
+      try {
+        fetch(`${config.tvSrvrUrl}/api/history`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            showName: showName || "unknown",
+            type,
+            hash: hash || undefined,
+            description,
+          }),
+        }).catch(() => {});
+      } catch {}
     },
 
     toParsedTitle(rawTitle) {

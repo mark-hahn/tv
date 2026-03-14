@@ -15,6 +15,7 @@ import {
   smartTitleMatch,
   parseFileSeasonEpisode,
   parseTitleFromFilename,
+  postHistory,
 } from "@tv/share";
 
 const __filename = urlNode.fileURLToPath(import.meta.url);
@@ -1177,6 +1178,14 @@ async function main() {
     return process.nextTick(checkFile);
   };
 
+  // Look up tvdbId from embyMap for a given series name.
+  const lookupTvdbId = (name) => {
+    if (!embyMap || !name) return null;
+    const key =
+      smartTitleMatch(name, Object.keys(embyMap), null, false) || name;
+    return embyMap[key]?.tvdbId || null;
+  };
+
   checkFile = () => {
     var blkName,
       cmd,
@@ -1219,6 +1228,12 @@ async function main() {
       parts = usbFilePath.split("/");
       fname = parts[parts.length - 1];
 
+      postHistory({
+        showName: fname,
+        type: "chkDown",
+        description: `usb: ${usbFilePath}, size: ${usbFileSize}`,
+      });
+
       trace("checkFile: filename", { fname, usbFilePath, usbFileBytes });
 
       parts = fname.split(".");
@@ -1236,6 +1251,11 @@ async function main() {
         fext === "part"
       ) {
         trace("checkFile: skip extension", { fname, fext });
+        postHistory({
+          showName: fname,
+          type: "skipDown",
+          description: `skip extension: .${fext}`,
+        });
         process.nextTick(checkFile);
         return;
       }
@@ -1248,6 +1268,11 @@ async function main() {
         recentCount++;
         log("------", downloadCount, "/", chkCount, "SKIPPING *ERROR*:", fname);
         trace("checkFile: skip tvJsonTitles error", { fname });
+        postHistory({
+          showName: fname,
+          type: "skipDown",
+          description: "skip: previous error",
+        });
         process.nextTick(checkFile);
         return;
       }
@@ -1263,6 +1288,11 @@ async function main() {
           fname,
         );
         trace("checkFile: skip already queued", { fname });
+        postHistory({
+          showName: fname,
+          type: "skipDown",
+          description: "skip: already queued",
+        });
         process.nextTick(checkFile);
         return;
       }
@@ -1278,6 +1308,11 @@ async function main() {
           fname,
         );
         trace("checkFile: skip in-progress", { fname });
+        postHistory({
+          showName: fname,
+          type: "skipDown",
+          description: "skip: in-progress",
+        });
         process.nextTick(checkFile);
         return;
       }
@@ -1286,6 +1321,11 @@ async function main() {
           blockedCount++;
           log("-- BLOCKED:", { blkName, fname });
           trace("checkFile: blocked", { blkName, fname });
+          postHistory({
+            showName: fname,
+            type: "skipDown",
+            description: `skip: blocked by ${blkName}`,
+          });
           process.nextTick(checkFile);
           return;
         }
@@ -1384,6 +1424,11 @@ async function main() {
                 fname,
               );
               trace("checkFile: not a tv show, skipping", { fname, title });
+              postHistory({
+                showName: fname,
+                type: "skipDown",
+                description: `skip: not a TV show (title: ${title})`,
+              });
               return process.nextTick(checkFile);
             }
           }
@@ -1811,6 +1856,11 @@ async function main() {
           ")",
         );
         trace("checkFileExists: not in emby", { fname, seriesName });
+        postHistory({
+          showName: seriesName || fname,
+          type: "skipDown",
+          description: `skip: not in Emby (${seriesName})`,
+        });
         return process.nextTick(checkFile);
       }
     }
@@ -1852,6 +1902,13 @@ async function main() {
         sequence: currentSeq || 0,
         fileSize: usbFileBytes || 0,
       });
+
+      postHistory({
+        tvdbId: lookupTvdbId(seriesName),
+        showName: seriesName || fname,
+        type: "acceptDown",
+        description: `${fname} S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")} → ${tvLocalDir}`,
+      });
     } catch (e) {
       // keep going
       trace("checkFileExists: addEntry threw", {
@@ -1866,6 +1923,12 @@ async function main() {
   badFile = (reason) => {
     errCount++;
     writeRejectLog(fname, reason);
+    postHistory({
+      tvdbId: lookupTvdbId(seriesName),
+      showName: seriesName || fname,
+      type: "rejDown",
+      description: `${reason || "unknown"} | file: ${fname}`,
+    });
     trace("badFile: marking error", {
       reason: reason || "unknown",
       fname,

@@ -10,6 +10,7 @@ import { Worker } from "node:worker_threads";
 import { execFile } from "node:child_process";
 import Database from "better-sqlite3";
 import chokidar from "chokidar";
+import { postHistory } from "@tv/share";
 
 const LOG_APPS_DOWN_DATA_MISC_TV_LOG = false;
 
@@ -1103,6 +1104,12 @@ const startWorkerForTitle = (title) => {
   // Persist immediately so /downloads reflects the procId.
   upsertEntry(entry);
 
+  postHistory({
+    showName: entry.seriesName || entry.title,
+    type: "startDown",
+    description: `procId=${entry.procId} ${entry.title} → ${entry.localPath}`,
+  });
+
   workerCount++;
 
   const w = new Worker(WORKER_URL, {
@@ -1128,6 +1135,20 @@ const startWorkerForTitle = (title) => {
       replaceByProcId(doneEntry);
       workerCount = Math.max(0, workerCount - 1);
 
+      if (doneEntry.status === "finished") {
+        postHistory({
+          showName: doneEntry.seriesName || doneEntry.title,
+          type: "endDown",
+          description: `${doneEntry.title} → ${doneEntry.localPath}`,
+        });
+      } else {
+        postHistory({
+          showName: doneEntry.seriesName || doneEntry.title,
+          type: "errorSync",
+          description: `${doneEntry.status} | ${doneEntry.title}`,
+        });
+      }
+
       handleFinish(doneEntry);
 
       // Start exactly one oldest waiting (spec: keep the pipeline full).
@@ -1148,6 +1169,11 @@ const startWorkerForTitle = (title) => {
     };
     replaceByProcId(errEntry);
     workerCount = Math.max(0, workerCount - 1);
+    postHistory({
+      showName: errEntry.seriesName || errEntry.title,
+      type: "errorSync",
+      description: `worker error: ${errEntry.status} | ${errEntry.title}`,
+    });
     handleFinish(errEntry);
 
     const nextTitle = findOldestWaitingIndex();
@@ -1165,6 +1191,11 @@ const startWorkerForTitle = (title) => {
     };
     replaceByProcId(errEntry);
     workerCount = Math.max(0, workerCount - 1);
+    postHistory({
+      showName: errEntry.seriesName || errEntry.title,
+      type: "errorSync",
+      description: `${errEntry.status} | ${errEntry.title}`,
+    });
     handleFinish(errEntry);
 
     const nextTitle = findOldestWaitingIndex();

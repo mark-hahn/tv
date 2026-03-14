@@ -45,17 +45,14 @@
           <span style="color: #888; font-size: 12px"
             >{{ card.countPad }} {{ card.time }}:
           </span>
-          <span
-            :style="{
-              color: badgeColor(card.type),
-              fontWeight: 'bold',
-              fontSize: '14px',
-            }"
-            >{{ card.typePad }}</span
-          >
           <span style="font-weight: bold; font-size: 14px">{{
-            card.showName
+            card.typePad
           }}</span>
+          <span
+            v-if="card.showName && card.showName !== showName"
+            style="font-weight: bold; font-size: 14px"
+            >{{ card.showName }}</span
+          >
         </div>
         <template v-if="expanded[card.key]">
           <div
@@ -73,35 +70,7 @@
 <script>
 import { config } from "../config.js";
 
-const TYPE_COLORS = {
-  browse: "#6c63ff",
-  preview: "#9b59b6",
-  addEmby: "#27ae60",
-  remEmby: "#c0392b",
-  torSent: "#2980b9",
-  errTor: "#e74c3c",
-  addQbt: "#16a085",
-  remQbt: "#d35400",
-  qbtFinished: "#27ae60",
-  forceDown: "#8e44ad",
-  skipDown: "#95a5a6",
-  rejDown: "#e67e22",
-  acceptDown: "#2ecc71",
-  startDown: "#3498db",
-  endDown: "#1abc9c",
-  errDown: "#e74c3c",
-  errorSync: "#c0392b",
-  bkgndUpdate: "#bdc3c7",
-  clientUpdate: "#a9b7c6",
-  reject: "#e74c3c",
-  unreject: "#27ae60",
-  pickup: "#2980b9",
-  unpickup: "#e67e22",
-  search: "#8e44ad",
-  deleteShow: "#c0392b",
-};
-
-const PAD_LEN = 11;
+const PAD_LEN = 13;
 
 const formatPST = (iso) => {
   if (!iso) return "";
@@ -179,9 +148,6 @@ export default {
     this._stopPoll();
   },
   methods: {
-    badgeColor(type) {
-      return TYPE_COLORS[type] || "#7f8c8d";
-    },
     toggle(key) {
       this.expanded = { ...this.expanded, [key]: !this.expanded[key] };
     },

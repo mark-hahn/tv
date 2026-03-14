@@ -775,7 +775,11 @@ app.get("/api/search", async (req, res) => {
     return res.status(400).json({ error: "Show name is required" });
   }
 
-  postHistory({ showName, type: "search", description: `search: ${showName}` });
+  postHistory({
+    showName,
+    type: "torSrch",
+    description: `search: ${showName}`,
+  });
 
   try {
     // If the client doesn't pass cf_clearance values, fall back to the local persisted file.

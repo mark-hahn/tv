@@ -126,6 +126,22 @@ async function main() {
   SKIP_DOWNLOAD = false; // Set to false to resume actual downloading
   PROCESS_INTERVAL_MS = FAST_TEST ? 30 * 1000 : 5 * 60 * 1000;
 
+  var cycleTsPST = () => {
+    var d = new Date();
+    var p = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Los_Angeles",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(d);
+    var m = {};
+    for (var i = 0; i < p.length; i++)
+      if (p[i].type !== "literal") m[p[i].type] = p[i].value;
+    return `${m.month}-${m.day} ${m.hour}:${m.minute}`;
+  };
+
   log = (...x) => {
     if (debug) {
       console.log("\nLOG:", ...x);
@@ -374,6 +390,7 @@ async function main() {
       nextCycleTimer = null;
     }
     cycleRunning = true;
+    console.log(`[${cycleTsPST()}] download check cycle started`);
 
     reloadState();
     resetCycleState();
@@ -1498,6 +1515,10 @@ async function main() {
         log("***********************************************************");
       }
       cycleRunning = false;
+      var elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.log(
+        `[${cycleTsPST()}] download check cycle ended (${elapsed}s, chk:${chkCount} dl:${downloadCount} skip:${existsCount} err:${errCount})`,
+      );
 
       // If a startProc request came in during this cycle, finish the cycle first,
       // then restart immediately (do not abort between files).

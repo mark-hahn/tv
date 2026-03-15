@@ -182,11 +182,11 @@ export function normalize(torrent, showName) {
   const parsedVariations = cleanVariations(parsed.title);
   const showNameVariations = cleanVariations(showName);
 
-  // Check if any variation matches
+  // Check if any variation matches (exact or starts-with at word boundary)
   let nameMatch = false;
   for (const parsedVar of parsedVariations) {
     for (const showVar of showNameVariations) {
-      if (parsedVar === showVar) {
+      if (parsedVar === showVar || parsedVar.startsWith(showVar + " ")) {
         nameMatch = true;
         break;
       }
@@ -194,9 +194,14 @@ export function normalize(torrent, showName) {
     if (nameMatch) break;
   }
 
+  // Detect "Complete Series" torrents (no season but covers all seasons)
+  const completeSeries =
+    !parsed.season && /\bcomplete\s+series\b/i.test(trimmedTitle);
+
   return {
     parsed,
     seasonRange,
+    completeSeries,
     group,
     groupSrc,
     nameMatch,

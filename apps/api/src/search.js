@@ -838,7 +838,7 @@ export async function searchTorrents({
   });
 
   // Filter out torrents without season information (movies, etc.)
-  // Allow season-range torrents through even if parsed.season is missing
+  // Allow season-range and "complete series" torrents through
   const tvOnlyStage = filterWithReasons(
     matches,
     (torrent) => {
@@ -846,9 +846,11 @@ export async function searchTorrents({
         torrent?.parsed?.season !== undefined &&
         torrent?.parsed?.season !== null;
       const hasSeasonRange = !!torrent?.seasonRange?.isRange;
-      return hasSeason || hasSeasonRange;
+      const isCompleteSeries = !!torrent?.completeSeries;
+      return hasSeason || hasSeasonRange || isCompleteSeries;
     },
-    () => "missing season info (and not a season-range torrent)",
+    () =>
+      "missing season info (and not a season-range or complete-series torrent)",
   );
   const tvOnly = tvOnlyStage.kept;
   logFilterStage("tv-only", matches.length, tvOnly.length, tvOnlyStage.removed);
@@ -958,7 +960,9 @@ export async function searchTorrents({
   // Add seasonEpisode to all torrents
   filtered2.forEach((torrent) => {
     const { season, episode } = torrent.parsed;
-    if (season !== undefined && season !== null) {
+    if (torrent.completeSeries) {
+      torrent.parsed.seasonEpisode = "ALL";
+    } else if (season !== undefined && season !== null) {
       if (!episode) {
         torrent.parsed.seasonEpisode = `S${String(season).padStart(2, "0")}`;
       } else {
@@ -976,9 +980,14 @@ export async function searchTorrents({
   if (isNoEmby) {
     // For noemby, return all season torrents and episode torrents for seasons without a season torrent
     const seasonsByNumber = {};
+    const completeSeriesTorrents = [];
 
     // Group torrents by season
     filtered2.forEach((torrent) => {
+      if (torrent.completeSeries) {
+        completeSeriesTorrents.push(torrent);
+        return;
+      }
       const season = torrent.parsed.season;
       if (season === undefined || season === null) return;
 
@@ -996,7 +1005,7 @@ export async function searchTorrents({
     });
 
     // Build filtered list: all season torrents, and episode torrents only for seasons without season torrents
-    filtered = [];
+    filtered = [...completeSeriesTorrents];
     Object.keys(seasonsByNumber)
       .sort((a, b) => Number(a) - Number(b))
       .forEach((seasonNum) => {
@@ -1050,9 +1059,14 @@ export async function searchTorrents({
   } else if (isLoadAll) {
     // For loadall, return all season torrents and episode torrents for seasons without a season torrent
     const seasonsByNumber = {};
+    const completeSeriesTorrents = [];
 
     // Group torrents by season
     filtered2.forEach((torrent) => {
+      if (torrent.completeSeries) {
+        completeSeriesTorrents.push(torrent);
+        return;
+      }
       const season = torrent.parsed.season;
       if (season === undefined || season === null) return;
 
@@ -1070,7 +1084,7 @@ export async function searchTorrents({
     });
 
     // Build filtered list: all season torrents, and episode torrents only for seasons without season torrents
-    filtered = [];
+    filtered = [...completeSeriesTorrents];
     Object.keys(seasonsByNumber)
       .sort((a, b) => Number(a) - Number(b))
       .forEach((seasonNum) => {
@@ -1124,6 +1138,14 @@ export async function searchTorrents({
         const range = torrent.seasonRange;
 
         // Do not hard-filter by resolution; client can use warnings.
+
+        // Complete series torrents match any needed season
+        if (torrent.completeSeries) {
+          for (const needStr of needed) {
+            matchedNeeded.add(needStr);
+          }
+          return needed.length > 0;
+        }
 
         // Handle season range torrents: ignore parsed season/episode and match any season in range
         if (range && range.isRange) {
@@ -1227,6 +1249,10 @@ export async function searchTorrents({
     // Highest-priority: sort by the same label shown in the UI (season/episode at left).
     // Ordering: season packs first, then season-range packs, then individual episodes.
     const key = (t) => {
+      if (t.completeSeries) {
+        return { season: 0, kind: -1, episode: 0, endSeason: 9999 };
+      }
+
       const range = t.seasonRange;
       if (range && range.isRange) {
         const startSeason = Number(range.startSeason);

@@ -335,6 +335,7 @@ async function main() {
       } catch (e) {}
 
       appendTvLog(`${prefix}==== tv-down started ${fmt()} ====`);
+      console.log(`[${cycleTsPST()}] tv-down started`);
     } catch (e) {}
   })();
 

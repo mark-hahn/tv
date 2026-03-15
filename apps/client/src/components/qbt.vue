@@ -939,9 +939,12 @@ export default {
         return `${size}${sep}${remaining}${sep}${added}${sep}${seeds}${sep}${prog}%${sep}${eta}${sep}Getting`;
       }
 
+      const seeds = Number.isFinite(Number(t?.num_seeds))
+        ? Number(t?.num_seeds)
+        : 0;
       const elapsed = this.fmtElapsedMmSs(t?.added_on, t?.completion_on);
       const state = this.fmtState(t?.state);
-      return `${size}${sep}${remaining}${sep}${added}${sep}${elapsed}${sep}${state}`;
+      return `${size}${sep}${remaining}${sep}${added}${sep}${seeds}${sep}${elapsed}${sep}${state}`;
     },
 
     forceFile(title) {

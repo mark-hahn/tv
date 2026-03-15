@@ -499,7 +499,9 @@
     </div>
     <History
       v-show="showHistory && !hideMapBottom"
-      :tvdbId="String(mapShow?.tvdbId || tvdbData?.tvdbId || '')"
+      :tvdbId="
+        String(mapShow?.tvdbId || mapShow?.TvdbId || tvdbData?.tvdbId || '')
+      "
       :showName="String(mapShow?.Name || '')"
       :visible="showHistory"
       style="

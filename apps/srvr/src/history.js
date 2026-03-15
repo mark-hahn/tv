@@ -136,9 +136,9 @@ export const addEvent = ({
     return;
   }
 
-  if (type === "bkgndUpdate") {
+  if (type === "bkgndUpdate" || type === "clientUpdate") {
     const key = tvdbId ?? showName ?? "";
-    const last = stmtDedupFind.get({ key, type: "bkgndUpdate" });
+    const last = stmtDedupFind.get({ key, type });
     if (last && last.fields === (fields || null)) {
       stmtDedupUpdate.run({
         now,

@@ -2974,7 +2974,9 @@ app.get("/api/history", (req, res) => {
     } else if (showName) {
       events = history.getEventsByName(showName);
     }
-    events.sort((a, b) => b.updateTime - a.updateTime);
+    events.sort((a, b) =>
+      a.updateTime < b.updateTime ? -1 : a.updateTime > b.updateTime ? 1 : 0,
+    );
     res.json({ events });
   } catch (e) {
     console.error("[history] GET error:", e.message);

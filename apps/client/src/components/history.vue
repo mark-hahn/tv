@@ -112,9 +112,8 @@ export default {
         });
       }
       out.sort((a, b) => {
-        if (b.sortMs > a.sortMs) return 1;
-        if (b.sortMs < a.sortMs) return -1;
-        // Tiebreaker: original addTime preserves causal order (chkDown before skipDown).
+        if (a.sortMs > b.sortMs) return 1;
+        if (a.sortMs < b.sortMs) return -1;
         if (a.sortAdd > b.sortAdd) return 1;
         if (a.sortAdd < b.sortAdd) return -1;
         return 0;

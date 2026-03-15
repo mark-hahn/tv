@@ -157,6 +157,27 @@ export function smartTitleMatch(title, titleArray, year, forceChoice) {
   const m4b = findExact(normalizeAggressive, wantAgg, isOneMissingYear);
   if (m4b != null) return m4b;
 
+  // Prefix match: if the search title starts with a candidate name (aggressive-normalized)
+  // at a word boundary, it's a strong match (e.g. "odd man out complete series" starts with "odd man out")
+  const findPrefix = (predicate) => {
+    for (let i = 0; i < titleArray.length; i += 1) {
+      const item = titleArray[i];
+      if (!predicate(item)) continue;
+      const candTitle = coerceCandidateTitle(item);
+      if (!candTitle) continue;
+      const candAgg = normalizeAggressive(candTitle);
+      if (!candAgg) continue;
+      if (wantAgg.length > candAgg.length && wantAgg.startsWith(candAgg + " "))
+        return item;
+    }
+    return null;
+  };
+
+  const mp1 = findPrefix(isSameYear);
+  if (mp1 != null) return mp1;
+  const mp2 = findPrefix(isOneMissingYear);
+  if (mp2 != null) return mp2;
+
   // If forceChoice is explicity false, we stop here (strict matching).
   if (forceChoice === false) return null;
 
@@ -168,6 +189,9 @@ export function smartTitleMatch(title, titleArray, year, forceChoice) {
 
   const m7 = findExact(normalizeAggressive, wantAgg, isDifferentYear);
   if (m7 != null) return m7;
+
+  const mp3 = findPrefix(isDifferentYear);
+  if (mp3 != null) return mp3;
 
   // If none of the above match, use Levenshtein.
   let bestCand = null;

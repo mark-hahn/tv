@@ -28,7 +28,8 @@ import { getBrowseShow, getAllBrowse } from "./browse.js";
 import * as reviews from "./reviews.js";
 import { checkFiles as tvProcCheckFiles } from "./tv-proc.js";
 import { getActorCredits } from "./imdb-credits.js";
-import { postHistory } from "@tv/share";
+import { postHistory, parseTitleFromFilename } from "@tv/share";
+import parseTorrentTitlePkg from "parse-torrent-title";
 import {
   getApiCookiesDir,
   getTvprocJsonPath,
@@ -571,13 +572,27 @@ app.get("/api/tvproc/startProc", async (req, res) => {
 app.post("/api/tvproc/forceDown", async (req, res) => {
   try {
     const files = req.body; // already parsed by express.json()
-    postHistory({
-      showName: "forceDown",
-      type: "forceDown",
-      description: Array.isArray(files)
-        ? files.join(", ")
-        : JSON.stringify(files),
-    });
+    if (Array.isArray(files)) {
+      for (const fileEntry of files) {
+        const lineParts = fileEntry.split("-");
+        lineParts.pop(); // remove size
+        const filePath = lineParts.join("-").slice(11); // strip YYYY-MM-DD-
+        const pathParts = filePath.split("/");
+        const folderName = pathParts.length >= 2 ? pathParts[0] : "";
+        const fname = pathParts[pathParts.length - 1] || "";
+        let parsed = {};
+        try {
+          parsed = parseTorrentTitlePkg.parse(fname) || {};
+        } catch (_) {}
+        const showName =
+          parseTitleFromFilename(fname, folderName, parsed) || fname;
+        postHistory({
+          showName,
+          type: "forceDown",
+          description: fname,
+        });
+      }
+    }
     const response = await fetch("http://127.0.0.1:3003/forceDown", {
       method: "POST",
       body: JSON.stringify(files),
@@ -756,6 +771,7 @@ app.get("/api/local/files", async (req, res) => {
 
 app.get("/api/search", async (req, res) => {
   const showName = req.query.show;
+  const tvdbId = req.query.tvdbId || null;
   const limit = parseInt(req.query.limit) || 100;
   const iptCfRaw = req.query.ipt_cf;
   const tlCfRaw = req.query.tl_cf;
@@ -776,6 +792,7 @@ app.get("/api/search", async (req, res) => {
   }
 
   postHistory({
+    tvdbId,
     showName,
     type: "torSrch",
     description: `search: ${showName}`,
@@ -905,6 +922,8 @@ async function handleDownloadRequest(req, res) {
         : tlBody
       : body.torrent;
     const forceDownload = body.forceDownload === true;
+    const dlShowName = String(body.showName || "").trim() || null;
+    const dlTvdbId = String(body.tvdbId || "").trim() || null;
     // Temporary: hardwire debug on so we always return/emit extra diagnostics.
     const debug = true;
 
@@ -1113,7 +1132,8 @@ async function handleDownloadRequest(req, res) {
             "unknown",
         ).trim();
         postHistory({
-          showName: errTorTitle,
+          tvdbId: dlTvdbId,
+          showName: dlShowName || errTorTitle,
           type: "errTor",
           description: `qbt add threw: ${e?.message || String(e)} | ${errTorTitle}`,
         });
@@ -1237,7 +1257,8 @@ async function handleDownloadRequest(req, res) {
             "unknown",
         ).trim();
         postHistory({
-          showName: failTorTitle,
+          tvdbId: dlTvdbId,
+          showName: dlShowName || failTorTitle,
           type: "errTor",
           hash: infoHash || undefined,
           description: `qbt add failed: ${addRes.text || "Fails."} | ${failTorTitle}`,
@@ -1260,7 +1281,8 @@ async function handleDownloadRequest(req, res) {
             "unknown",
         ).trim();
         postHistory({
-          showName: torTitle,
+          tvdbId: dlTvdbId,
+          showName: dlShowName || torTitle,
           type: "torSent",
           hash: infoHash || undefined,
           description: `${torTitle} | provider: ${torrent?.raw?.provider || torrent?.provider || "?"} | tag: ${addTag}`,

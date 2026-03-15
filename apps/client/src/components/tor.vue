@@ -2074,6 +2074,10 @@ export default {
         const showNameForSearch = rawShowName.replace(/[?.]+\s*$/g, "").trim();
 
         let url = `${config.torrentsApiUrl}/api/search?show=${encodeURIComponent(showNameForSearch)}&limit=${this.maxResults}`;
+        const showTvdbId = String(
+          this.currentShow.TvdbId || this.currentShow.tvdbId || "",
+        ).trim();
+        if (showTvdbId) url += `&tvdbId=${encodeURIComponent(showTvdbId)}`;
         if (needed.length > 0) {
           url += `&needed=${encodeURIComponent(JSON.stringify(needed))}`;
         }
@@ -2740,13 +2744,24 @@ export default {
         try {
           const downloadsUrl = `${config.torrentsApiUrl}/downloads`;
 
+          const dlShowName = String(this.currentShow?.Name || "").trim();
+          const dlTvdbId = String(
+            this.currentShow?.TvdbId || this.currentShow?.tvdbId || "",
+          ).trim();
           const downloadsPayload =
             provider === "torrentleech"
               ? {
                   tl: { torrent },
                   ...(forceDownload ? { forceDownload: true } : {}),
+                  ...(dlShowName ? { showName: dlShowName } : {}),
+                  ...(dlTvdbId ? { tvdbId: dlTvdbId } : {}),
                 }
-              : { torrent, ...(forceDownload ? { forceDownload: true } : {}) };
+              : {
+                  torrent,
+                  ...(forceDownload ? { forceDownload: true } : {}),
+                  ...(dlShowName ? { showName: dlShowName } : {}),
+                  ...(dlTvdbId ? { tvdbId: dlTvdbId } : {}),
+                };
 
           let downloadsBody = "";
           try {

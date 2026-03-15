@@ -110,6 +110,7 @@ export const addEvent = ({
   hash,
   fields,
 }) => {
+  if (!tvdbId && !showName) return;
   const now = nowPST();
   const params = {
     tvdbId: tvdbId ?? null,

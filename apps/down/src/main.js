@@ -1287,6 +1287,7 @@ async function main() {
       ) {
         trace("checkFile: skip extension", { fname, fext });
         postHistory({
+          tvdbId: lookupTvdbId(title),
           showName: title || fname,
           type: "skipDown",
           description: `skip extension: .${fext}`,
@@ -1304,6 +1305,7 @@ async function main() {
         log("------", downloadCount, "/", chkCount, "SKIPPING *ERROR*:", fname);
         trace("checkFile: skip tvJsonTitles error", { fname });
         postHistory({
+          tvdbId: lookupTvdbId(title),
           showName: title || fname,
           type: "skipDown",
           description: "skip: previous error",
@@ -1329,6 +1331,7 @@ async function main() {
         );
         trace("checkFile: skip " + skipStatus, { fname });
         postHistory({
+          tvdbId: lookupTvdbId(title),
           showName: title || fname,
           type: "skipDown",
           description: "skip: " + skipStatus,
@@ -1349,6 +1352,7 @@ async function main() {
         );
         trace("checkFile: skip in-progress", { fname });
         postHistory({
+          tvdbId: lookupTvdbId(title),
           showName: title || fname,
           type: "skipDown",
           description: "skip: in-progress",
@@ -1362,6 +1366,7 @@ async function main() {
           log("-- BLOCKED:", { blkName, fname });
           trace("checkFile: blocked", { blkName, fname });
           postHistory({
+            tvdbId: lookupTvdbId(title),
             showName: title || fname,
             type: "skipDown",
             description: `skip: blocked by ${blkName}`,
@@ -1423,6 +1428,7 @@ async function main() {
             );
             trace("checkFile: not a tv show, skipping", { fname, title });
             postHistory({
+              tvdbId: lookupTvdbId(title),
               showName: title || fname,
               type: "skipDown",
               description: `skip: not a TV show (title: ${title})`,
@@ -1539,6 +1545,7 @@ async function main() {
       if (tvdbCache[title] === null) {
         // Previously determined this title is not resolvable — skip without hitting TVDB.
         postHistory({
+          tvdbId: lookupTvdbId(title),
           showName: title || fname,
           type: "skipDown",
           description: "skip: not resolvable (cached)",
@@ -1556,6 +1563,7 @@ async function main() {
       if (tvdbCache[folderTitle] === null) {
         tvdbCache[title] = null;
         postHistory({
+          tvdbId: lookupTvdbId(title),
           showName: title || fname,
           type: "skipDown",
           description: "skip: not resolvable (folder cached)",
@@ -1674,6 +1682,7 @@ async function main() {
                   title,
                 });
                 postHistory({
+                  tvdbId: lookupTvdbId(title),
                   showName: title || fname,
                   type: "skipDown",
                   description: "skip: no TVDB match, not in Emby",
@@ -1731,6 +1740,7 @@ async function main() {
                 title,
               });
               postHistory({
+                tvdbId: lookupTvdbId(title),
                 showName: title || fname,
                 type: "skipDown",
                 description: "skip: no series match on TVDB",
@@ -1887,6 +1897,7 @@ async function main() {
         );
         trace("checkFileExists: not in emby", { fname, seriesName });
         postHistory({
+          tvdbId: lookupTvdbId(seriesName),
           showName: seriesName || fname,
           type: "skipDown",
           description: `skip: not in Emby (${seriesName})`,
@@ -1904,6 +1915,7 @@ async function main() {
         title: fname,
         destTitle: destTitle || undefined,
         seriesName: seriesName || undefined,
+        tvdbId: lookupTvdbId(seriesName) || undefined,
         status: "waiting",
         progress: 0,
         eta: null,

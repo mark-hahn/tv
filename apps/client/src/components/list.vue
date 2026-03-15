@@ -509,7 +509,7 @@ export default {
         if (show.inEmby !== false) this.showRemovingFromEmby = true;
         show.Reject = true;
         try {
-          await srvr.addReject(show.Name);
+          await srvr.addReject(show.Name, show.TvdbId || show.tvdbId);
         } catch (err) {
           console.error("addReject error:", err);
           show.Reject = false;
@@ -548,7 +548,7 @@ export default {
 
       show.Reject = false;
       try {
-        await srvr.delReject(show.Name);
+        await srvr.delReject(show.Name, show.TvdbId || show.tvdbId);
       } catch (err) {
         console.error("delReject error:", err);
         show.Reject = true;
@@ -559,12 +559,12 @@ export default {
       this.saveVisShow(show);
       show.Pickup = !show.Pickup;
       if (show.Pickup)
-        srvr.addPickup(show.Name).catch((err) => {
+        srvr.addPickup(show.Name, show.TvdbId || show.tvdbId).catch((err) => {
           console.error("late addPickup:", err);
           //- show.Pickup = !show.Pickup;
         });
       else
-        srvr.delPickup(show.Name).catch((err) => {
+        srvr.delPickup(show.Name, show.TvdbId || show.tvdbId).catch((err) => {
           console.error("late delPickup:", err);
           // show.Pickup = !show.Pickup;
         });

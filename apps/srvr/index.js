@@ -26,6 +26,17 @@ import {
 } from "./src/srvrPaths.js";
 import * as history from "./src/history.js";
 
+const tvdbIdByName = (name) => {
+  if (!name) return null;
+  const all = tvdb.getAllTvdbSync();
+  const rec =
+    all[name] ||
+    Object.values(all).find(
+      (r) => r?.Name?.toLowerCase() === name.toLowerCase(),
+    );
+  return String(rec?.TvdbId || rec?.tvdbId || "").trim() || null;
+};
+
 const dontupload = false;
 
 const CONFIG_DIR = path.join(SRVR_ROOT_DIR, "config");
@@ -1254,9 +1265,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
     // History: bkgndUpdate (timer-selected) or clientUpdate (user-triggered)
     try {
       const tvdbIdVal =
-        tvdbRecord.Id && !String(tvdbRecord.Id).startsWith("noemby-")
-          ? tvdbRecord.Id
-          : null;
+        String(tvdbRecord.TvdbId || tvdbRecord.tvdbId || "").trim() || null;
       const fieldsVal =
         push2Changes.length > 0 ? JSON.stringify(push2Changes) : null;
       const descVal =
@@ -1677,7 +1686,7 @@ const getRejects = async (_param) => {
 };
 
 const addReject = async (params) => {
-  const { name } = params;
+  const { name, tvdbId } = params;
   console.log("addReject", name);
 
   // Update rejects array (config is the authority; tvdb synced in trySaveConfigYml)
@@ -1696,7 +1705,7 @@ const addReject = async (params) => {
 
   try {
     history.addEvent({
-      tvdbId: null,
+      tvdbId: tvdbId || tvdbIdByName(name),
       showName: name,
       type: "reject",
       description: "Added to reject list",
@@ -1714,7 +1723,7 @@ const addReject = async (params) => {
 };
 
 const delReject = async (params) => {
-  const { name } = params;
+  const { name, tvdbId } = params;
   console.log("delReject", name);
   let deletedOne = false;
 
@@ -1735,7 +1744,7 @@ const delReject = async (params) => {
 
   try {
     history.addEvent({
-      tvdbId: null,
+      tvdbId: tvdbId || tvdbIdByName(name),
       showName: name,
       type: "unreject",
       description: "Removed from reject list",
@@ -1758,6 +1767,7 @@ const getPickups = async (_param) => {
 
 const addPickup = async (params) => {
   const name = params?.name;
+  const tvdbId = params?.tvdbId;
   console.log("addPickup", name);
 
   if (!name) {
@@ -1776,7 +1786,7 @@ const addPickup = async (params) => {
   pickups.push(name);
   try {
     history.addEvent({
-      tvdbId: null,
+      tvdbId: tvdbId || tvdbIdByName(name),
       showName: name,
       type: "pickup",
       description: "Added to pickup list",
@@ -1790,6 +1800,7 @@ const addPickup = async (params) => {
 
 const delPickup = async (params) => {
   const name = params?.name;
+  const tvdbId = params?.tvdbId;
   console.log("delPickup", name);
   if (!name) {
     throw new Error("delPickup: missing name");
@@ -1811,7 +1822,7 @@ const delPickup = async (params) => {
   }
   try {
     history.addEvent({
-      tvdbId: null,
+      tvdbId: tvdbId || tvdbIdByName(name),
       showName: name,
       type: "unpickup",
       description: "Removed from pickup list",
@@ -1883,9 +1894,7 @@ const addNoEmby = async (params) => {
   await tvdb.saveTvdbSync();
   try {
     const id =
-      nextRecord.Id && !String(nextRecord.Id).startsWith("noemby-")
-        ? nextRecord.Id
-        : null;
+      String(nextRecord.TvdbId || nextRecord.tvdbId || "").trim() || null;
     history.addEvent({
       tvdbId: id,
       showName: name,
@@ -1918,12 +1927,16 @@ const delNoEmby = async (params) => {
     return "delNoEmby no match:" + name;
   }
 
+  const deletedRecord = allTvdb[deleteKey];
   console.log("deleting no-emby record:", deleteKey);
   delete allTvdb[deleteKey];
   await tvdb.saveTvdbSync();
   try {
+    const delTvdbId =
+      String(deletedRecord?.TvdbId || deletedRecord?.tvdbId || "").trim() ||
+      null;
     history.addEvent({
-      tvdbId: null,
+      tvdbId: delTvdbId,
       showName: deleteKey,
       type: "deleteShow",
       description: "Deleted non-Emby show",
@@ -2944,12 +2957,22 @@ app.post("/api/setSharedFilters", apiWrapper(setSharedFilters));
 // History
 app.post("/api/history", (req, res) => {
   try {
-    const { tvdbId, showName, type, description, hash, fields } =
-      req.body || {};
+    let { tvdbId, showName, type, description, hash, fields } = req.body || {};
     if (!showName || !type) {
       res.status(400).json({ error: "showName and type required" });
       return;
     }
+    // Auto-lookup tvdbId from hash (e.g. qbt events referencing a torSent hash)
+    if (!tvdbId && hash) {
+      const prev = history.getEventsByHash(hash);
+      if (prev) {
+        if (!tvdbId && prev.tvdbId) tvdbId = prev.tvdbId;
+        if ((!showName || showName === hash) && prev.showName)
+          showName = prev.showName;
+      }
+    }
+    // Auto-lookup tvdbId from showName
+    if (!tvdbId && showName) tvdbId = tvdbIdByName(showName);
     history.addEvent({ tvdbId, showName, type, description, hash, fields });
     res.json({ ok: true });
   } catch (e) {
@@ -3750,7 +3773,7 @@ async function runEmbyFullSweep() {
         rec.notReady = true;
         try {
           history.addEvent({
-            tvdbId: rec.Id || null,
+            tvdbId: String(rec.TvdbId || rec.tvdbId || "").trim() || null,
             showName: name,
             type: "remEmby",
             description: "Disappeared from Emby",

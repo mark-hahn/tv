@@ -316,21 +316,21 @@ export function getSubFileIds(showName) {
 export function getRejects() {
   return httpCall("/api/getRejects");
 }
-export function addReject(name) {
-  return httpCall("/api/addReject", { name }, "POST");
+export function addReject(name, tvdbId) {
+  return httpCall("/api/addReject", { name, tvdbId }, "POST");
 }
-export function delReject(name) {
-  return httpCall("/api/delReject", { name }, "POST");
+export function delReject(name, tvdbId) {
+  return httpCall("/api/delReject", { name, tvdbId }, "POST");
 }
 
 export function getPickups() {
   return httpCall("/api/getPickups");
 }
-export function addPickup(name) {
-  return httpCall("/api/addPickup", { name }, "POST");
+export function addPickup(name, tvdbId) {
+  return httpCall("/api/addPickup", { name, tvdbId }, "POST");
 }
-export function delPickup(name) {
-  return httpCall("/api/delPickup", { name }, "POST");
+export function delPickup(name, tvdbId) {
+  return httpCall("/api/delPickup", { name, tvdbId }, "POST");
 }
 
 export function getNoEmbys() {

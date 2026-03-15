@@ -1105,6 +1105,7 @@ const startWorkerForTitle = (title) => {
   upsertEntry(entry);
 
   postHistory({
+    tvdbId: entry.tvdbId || undefined,
     showName: entry.seriesName || entry.title,
     type: "startDown",
     description: `procId=${entry.procId} ${entry.title} → ${entry.localPath}`,
@@ -1137,12 +1138,14 @@ const startWorkerForTitle = (title) => {
 
       if (doneEntry.status === "finished") {
         postHistory({
+          tvdbId: doneEntry.tvdbId || undefined,
           showName: doneEntry.seriesName || doneEntry.title,
           type: "endDown",
           description: `${doneEntry.title} → ${doneEntry.localPath}`,
         });
       } else {
         postHistory({
+          tvdbId: doneEntry.tvdbId || undefined,
           showName: doneEntry.seriesName || doneEntry.title,
           type: "errorSync",
           description: `${doneEntry.status} | ${doneEntry.title}`,
@@ -1170,6 +1173,7 @@ const startWorkerForTitle = (title) => {
     replaceByProcId(errEntry);
     workerCount = Math.max(0, workerCount - 1);
     postHistory({
+      tvdbId: errEntry.tvdbId || undefined,
       showName: errEntry.seriesName || errEntry.title,
       type: "errorSync",
       description: `worker error: ${errEntry.status} | ${errEntry.title}`,
@@ -1192,6 +1196,7 @@ const startWorkerForTitle = (title) => {
     replaceByProcId(errEntry);
     workerCount = Math.max(0, workerCount - 1);
     postHistory({
+      tvdbId: errEntry.tvdbId || undefined,
       showName: errEntry.seriesName || errEntry.title,
       type: "errorSync",
       description: `${errEntry.status} | ${errEntry.title}`,

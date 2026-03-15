@@ -168,7 +168,7 @@ async function main() {
 
   log("starting....");
 
-  rsyncDelay = 1000; // 1 sec (was 3 secs)
+  rsyncDelay = 1000; // only used for TVDB error retry
 
   usbHost = "xobtlu@oracle.usbx.me";
 
@@ -341,6 +341,7 @@ async function main() {
 
   // ---------------------------------------------------------------------------
   exec = childProcess.execSync;
+  var execAsync = utilNode.promisify(childProcess.exec);
   mkdirp = mkdirpPkg;
   request = requestPkg;
   rimraf = rimrafPkg;
@@ -999,57 +1000,44 @@ async function main() {
   //#####################################################
   // delete old files in usb/files
   delOldFiles = () => {
-    var PRUNE_DAYS, PRUNE_INTERVAL_MS, res;
+    var PRUNE_DAYS, PRUNE_INTERVAL_MS;
     PRUNE_INTERVAL_MS = 60 * 60 * 1000;
     if (Date.now() - lastPruneAt >= PRUNE_INTERVAL_MS) {
-      // Inline prune.sh behavior: delete files older than 60 days on the USB host.
-      log(".... deleting old files in usb ~/files ....");
+      // Inline prune.sh behavior: delete files older than 21 days on the USB host.
+      // Run async so it doesn't block the cycle — proceed to checkFiles immediately.
+      log(".... deleting old files in usb ~/files (async) ....");
       PRUNE_DAYS = 21;
-      try {
-        // Wait for remote pruning to finish before scanning dirs/pruning DB,
-        // otherwise we may miss entries whose folders are deleted moments later.
-        // Suppress all output to keep pm2 logs clean.
-        exec(
-          `ssh ${usbHost} "find ~/files -mtime +${PRUNE_DAYS} -exec rm -rf {} \\; >/dev/null 2>&1"`,
-          {
-            timeout: 15 * 60 * 1000,
-          },
-        );
-        res = "prune ok";
-      } catch (e) {
-        // Non-fatal; continue cycle even if prune fails.
-        res = "prune ok";
-      }
-
-      // After the hourly USB prune command completes, prune queued entries whose USB folder no longer exists.
-      // Keep SSH calls small: this is one additional SSH call.
-      try {
-        var dirsOut = exec(
-          `ssh ${usbHost} "find files -ignore_readdir_race -type d -printf '%P\\n' 2>/dev/null"`,
-          {
-            timeout: 300000,
-          },
-        ).toString();
-        var dirs = dirsOut
-          .split("\n")
-          .map((s) => String(s || "").trim())
-          .filter((s) => s.length);
-        var set = new Set(dirs);
-        // Hourly prune: also run tvResync (and combine DB scans when available).
-        if (tvJson.hourlyUsbPruneAndTvResync) {
-          tvJson.hourlyUsbPruneAndTvResync(set);
-        } else {
-          tvJson.pruneMissingUsbDirs(set);
-          if (tvJson.tvResync) tvJson.tvResync();
-        }
-      } catch (e) {
-        // Non-fatal.
-      }
-
       lastPruneAt = Date.now();
-      if (!res.startsWith("prune ok")) {
-        err(`Prune error: ${res}`);
-      }
+      (async () => {
+        try {
+          await execAsync(
+            `ssh ${usbHost} "find ~/files -mtime +${PRUNE_DAYS} -exec rm -rf {} \\; >/dev/null 2>&1"`,
+            { timeout: 15 * 60 * 1000 },
+          );
+        } catch (e) {
+          // Non-fatal.
+        }
+        // After prune completes, scan dirs and prune DB entries.
+        try {
+          var { stdout: dirsOut } = await execAsync(
+            `ssh ${usbHost} "find files -ignore_readdir_race -type d -printf '%P\\n' 2>/dev/null"`,
+            { timeout: 300000 },
+          );
+          var dirs = dirsOut
+            .split("\n")
+            .map((s) => String(s || "").trim())
+            .filter((s) => s.length);
+          var set = new Set(dirs);
+          if (tvJson.hourlyUsbPruneAndTvResync) {
+            tvJson.hourlyUsbPruneAndTvResync(set);
+          } else {
+            tvJson.pruneMissingUsbDirs(set);
+            if (tvJson.tvResync) tvJson.tvResync();
+          }
+        } catch (e) {
+          // Non-fatal.
+        }
+      })();
     }
     return process.nextTick(checkFiles);
   };
@@ -1072,7 +1060,7 @@ async function main() {
   tvDbErrCount = 0;
   skipPaths = null;
 
-  checkFiles = () => {
+  checkFiles = async () => {
     var j, len, usbLine;
 
     if (forcedFiles && forcedFiles.length > 0) {
@@ -1082,11 +1070,13 @@ async function main() {
       forcedFiles = null;
     } else {
       processingForced = false;
-      usbFiles = exec(findUsb, {
-        timeout: 300000,
-      })
-        .toString()
-        .split("\n");
+      try {
+        var { stdout: findOut } = await execAsync(findUsb, { timeout: 300000 });
+        usbFiles = findOut.split("\n");
+      } catch (e) {
+        err("findUsb failed:", e.message || e);
+        usbFiles = [];
+      }
     }
 
     // Trace if the target show appears anywhere in the USB list.
@@ -1557,9 +1547,7 @@ async function main() {
       }
       seriesName = tvdbCache[title];
       trace("chkTvDB: cache hit", { title, seriesName });
-      // process.nextTick checkFileExists
-      setTimeout(checkFileExists, rsyncDelay);
-      return;
+      return process.nextTick(checkFileExists);
     }
 
     // If the episode-specific title isn't cached but the folder title already is,
@@ -1581,8 +1569,7 @@ async function main() {
         folderTitle,
         seriesName,
       });
-      setTimeout(checkFileExists, rsyncDelay);
-      return;
+      return process.nextTick(checkFileExists);
     }
 
     // Remember the title we started with so we can cache it after a folderTitle retry.
@@ -1760,8 +1747,7 @@ async function main() {
             if (titleBeforeRetry && titleBeforeRetry !== title) {
               tvdbCache[titleBeforeRetry] = seriesName;
             }
-            // process.nextTick checkFileExists
-            return setTimeout(checkFileExists, rsyncDelay);
+            return process.nextTick(checkFileExists);
           }
         },
       );

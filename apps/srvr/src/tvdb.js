@@ -9,6 +9,7 @@ import { rottenSearch } from "./rotten.js";
 import * as util from "./util.js";
 const { getPstDate } = util;
 import { SRVR_DATA_DIR } from "./srvrPaths.js";
+import * as history from "./history.js";
 import { MovieDb } from "moviedb-promise";
 const { log, start, end } = util.getLog("tvdb");
 const TVDB_PATH = path.join(SRVR_DATA_DIR, "tvdb.json");
@@ -2577,6 +2578,8 @@ export const setTvdbFields = async (params) => {
         for (const delName of paramObj.$delete) delete tvdb[delName];
       }
 
+      const wasInEmby = tvdb.inEmby;
+
       // Handle nested field updates for Phase 1 new structure
       for (const [key, value] of Object.entries(paramObj)) {
         if (key === "dontSave" || key === "$delete" || key === "name") continue;
@@ -2613,6 +2616,18 @@ export const setTvdbFields = async (params) => {
 
         // Handle direct assignment for top-level fields and nested objects
         tvdb[key] = value;
+      }
+
+      // Record history when a show is removed from Emby
+      if (wasInEmby && tvdb.inEmby === false) {
+        try {
+          history.addEvent({
+            tvdbId: String(tvdb.tvdbId || "").trim() || null,
+            showName: name,
+            type: "delEmby",
+            description: "Deleted from Emby",
+          });
+        } catch {}
       }
 
       // Keep Emby button in sync with final inEmby/Id values (after field updates).

@@ -1939,7 +1939,7 @@ const delNoEmby = async (params) => {
     history.addEvent({
       tvdbId: delTvdbId,
       showName: deleteKey,
-      type: "deleteShow",
+      type: "remEmby",
       description: "Deleted non-Emby show",
     });
   } catch {}

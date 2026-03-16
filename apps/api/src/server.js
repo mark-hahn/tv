@@ -1188,6 +1188,16 @@ async function handleDownloadRequest(req, res) {
         text: addRes.text,
       });
 
+      let infoHash = "";
+      try {
+        const parsed = parseTorrent(fetched.torrentData);
+        infoHash = String(parsed?.infoHash || "")
+          .trim()
+          .toLowerCase();
+      } catch {
+        // ignore
+      }
+
       if (!addRes.ok) {
         // qB sometimes returns "Fails." but still adds the torrent. If we can find a torrent
         // with the unique tag we used for this request, treat it as success.
@@ -1241,15 +1251,6 @@ async function handleDownloadRequest(req, res) {
 
         // qB uses 200 OK with body "Fails." for duplicates and other add failures.
         // Disambiguate by checking whether the torrent exists after the add attempt.
-        let infoHash = "";
-        try {
-          const parsed = parseTorrent(fetched.torrentData);
-          infoHash = String(parsed?.infoHash || "")
-            .trim()
-            .toLowerCase();
-        } catch {
-          // ignore
-        }
 
         if (infoHash) {
           try {
@@ -1316,25 +1317,25 @@ async function handleDownloadRequest(req, res) {
       }
 
       // In this mode, always return the tv-proc wrapper unchanged.
+      const torTitle = String(
+        torrent?.raw?.title ||
+          torrent?.title ||
+          torrent?.clientTitle ||
+          "unknown",
+      ).trim();
+      postHistory({
+        tvdbId: dlTvdbId,
+        showName: dlShowName || torTitle,
+        type: "torSent",
+        hash: infoHash || undefined,
+        description: `${torTitle} | provider: ${torrent?.raw?.provider || torrent?.provider || "?"} | tag: ${addTag}`,
+      });
       if (debug) {
         console.log("[downloads] qbt add success", { addTag });
         appendDownloadsResultLog({
           stage: "qbt-add-success",
           addTag,
           qbAdd: addRes,
-        });
-        const torTitle = String(
-          torrent?.raw?.title ||
-            torrent?.title ||
-            torrent?.clientTitle ||
-            "unknown",
-        ).trim();
-        postHistory({
-          tvdbId: dlTvdbId,
-          showName: dlShowName || torTitle,
-          type: "torSent",
-          hash: infoHash || undefined,
-          description: `${torTitle} | provider: ${torrent?.raw?.provider || torrent?.provider || "?"} | tag: ${addTag}`,
         });
         res.json({
           ...tvProcResult,

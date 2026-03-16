@@ -248,6 +248,13 @@ function validateTorrentData(torrentData) {
       return ok();
     }
 
+    // DVD torrents contain .vob files whose names never have S/E numbers.
+    // qbt-unrar.sh on the USB server generates proper S/E names after download.
+    const hasDvdFiles = allPaths.some((p) => /\.vob$/i.test(String(p || "")));
+    if (hasDvdFiles) {
+      return ok();
+    }
+
     // Prefer video files for validation (avoid NFO/SRT triggering false failures).
     // Also exclude well-known extras/bonus directories so featurettes don't cause failures.
     const videoFiles = allPaths.filter(isVideoFile);
@@ -358,8 +365,11 @@ export function extractTorrentFileTitles(torrentData) {
     .filter(Boolean);
 
   // Prefer video files so tv-proc matching is closer to what's actually downloaded.
-  const videoPaths = allPaths.filter(isVideoFile);
-  const picked = videoPaths.length > 0 ? videoPaths : allPaths;
+  // Exclude DVD files — they have no S/E info and qbt-unrar.sh generates proper names.
+  const dvdRe = /\.(vob|ifo|bup)$/i;
+  const nonDvdPaths = allPaths.filter((p) => !dvdRe.test(p));
+  const videoPaths = nonDvdPaths.filter(isVideoFile);
+  const picked = videoPaths.length > 0 ? videoPaths : nonDvdPaths;
 
   const titles = picked.map((p) => path.basename(p));
 

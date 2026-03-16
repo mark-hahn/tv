@@ -6,7 +6,7 @@ ensureDir(SRVR_DATA_DIR);
 
 const DB_PATH = path.join(SRVR_DATA_DIR, "history.sqlite");
 
-const DEDUP_TYPES = ["skipDown", "rejDown", "browse", "preview"];
+const DEDUP_TYPES = ["skipDown", "rejDown", "browse", "preview", "addQbt"];
 
 const PST_FMT = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Los_Angeles",

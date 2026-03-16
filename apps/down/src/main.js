@@ -797,7 +797,7 @@ async function main() {
     `ssh ${usbHost} \"find files -ignore_readdir_race -type f -printf '%CY-%Cm-%Cd-%P-%s\\\\n' 2>/dev/null\" ` +
     "| grep -Ev .r[0-9]+-[0-9]+$ | grep -Ev .rar-[0-9]+$ " +
     "| grep -Ev screen[0-9]+.png-[0-9]+$" +
-    "| grep -Ev '\\.(srr|sfv|nfo|nzb|jpg|jpeg|png|txt|sub|idx|srt|bup|ifo|vob)-[0-9]+$'";
+    "| grep -Evi '\\.(srr|sfv|nfo|nzb|jpg|jpeg|png|txt|sub|idx|srt|bup|ifo|vob)-[0-9]+$'";
 
   log({ findUsb });
 

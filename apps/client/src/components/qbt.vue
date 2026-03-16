@@ -477,18 +477,18 @@ export default {
             if (h) torrentByHash[h] = t;
           }
 
-          if (this._didLoadOnce) {
-            for (const h of curHashes) {
-              if (!this._knownHashes.has(h)) {
-                const t = torrentByHash[h];
-                this.postQbtHistory(
-                  "addQbt",
-                  nameOf(t),
-                  h,
-                  `new: ${nameOf(t)} state=${t?.state || "?"}`,
-                );
-              }
+          for (const h of curHashes) {
+            if (!this._knownHashes.has(h)) {
+              const t = torrentByHash[h];
+              this.postQbtHistory(
+                "addQbt",
+                nameOf(t),
+                h,
+                `new: ${nameOf(t)} state=${t?.state || "?"}`,
+              );
             }
+          }
+          if (this._didLoadOnce) {
             for (const h of this._knownHashes) {
               if (!curHashes.has(h)) {
                 this.postQbtHistory("remQbt", h, h, `removed: ${h}`);

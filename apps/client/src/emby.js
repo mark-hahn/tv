@@ -641,11 +641,21 @@ async function _oldLoadAllShows() {
         tvdbRecord.PlayCount = embyShow.UserData.PlayCount || 0;
       }
 
-      // Mark show as being in Emby
+      // Mark show as being in Emby — notify server when inEmby actually changes
+      // so the pickup callback fires
+      const wasInEmby = tvdbRecord.inEmby;
       tvdbRecord.inEmby = true;
 
       // Note: gap and note already in tvdb (Phase 5), don't overwrite
       tvdbRecord.lastEmbySync = now;
+
+      if (!wasInEmby) {
+        await srvr.setTvdbFields({
+          name: tvdbKey,
+          inEmby: true,
+          dontEnqueue: true,
+        });
+      }
 
       await ensureEmbyRemoteUrlMatchesRecordId(tvdbKey, tvdbRecord);
     }

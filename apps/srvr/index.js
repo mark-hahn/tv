@@ -1055,7 +1055,7 @@ tvdb.setEnqueueCallback((name) => notifyClients("showUpdating", { name }));
 tvdb.setQueueDrainCallback(() => notifyClients("showQueueEmpty", {}));
 
 // Auto-update pickups when inEmby or status changes on a tvdb record
-tvdb.setPickupChangeCallback((name, inEmby, status) => {
+const handlePickupChange = (name, inEmby, status) => {
   if (inEmby === true && status !== "Ended") {
     // Should be in pickups
     const already = pickups.some((p) => p.toLowerCase() === name.toLowerCase());
@@ -1077,7 +1077,8 @@ tvdb.setPickupChangeCallback((name, inEmby, status) => {
       );
     }
   }
-});
+};
+tvdb.setPickupChangeCallback(handlePickupChange);
 
 // Detect and fix the "compact NNN" mis-indexing: Emby reads a filename like
 // "101-Title.avi" in Season 1 as episode 101 instead of S1E01. This leaves the
@@ -3699,7 +3700,10 @@ async function runEmbyFullSweep() {
       tvdbRecord.InContinue = continueIds.has(showId);
       tvdbRecord.InMark = markIds.has(showId);
       tvdbRecord.InLinda = lindaIds.has(showId);
-      tvdbRecord.inEmby = true;
+      if (!tvdbRecord.inEmby) {
+        tvdbRecord.inEmby = true;
+        handlePickupChange(name, true, tvdbRecord.status);
+      }
       tvdbRecord.lastEmbySync = now;
       // Compute waitStr from nextAired/lastAired (no API call needed)
       const today = new Date().toISOString().slice(0, 10);
@@ -3751,6 +3755,7 @@ async function runEmbyFullSweep() {
         }
         rec.inEmby = false;
         rec.notReady = true;
+        handlePickupChange(name, false, rec.status);
         try {
           history.addEvent({
             tvdbId: String(rec.TvdbId || rec.tvdbId || "").trim() || null,

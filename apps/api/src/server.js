@@ -1173,6 +1173,28 @@ async function handleDownloadRequest(req, res) {
                 "[downloads] qbt add disambiguated as success via tag",
                 { addTag, count: list.length },
               );
+            let tagInfoHash = "";
+            try {
+              const parsed = parseTorrent(fetched.torrentData);
+              tagInfoHash = String(parsed?.infoHash || "")
+                .trim()
+                .toLowerCase();
+            } catch {
+              // ignore
+            }
+            const tagTorTitle = String(
+              torrent?.raw?.title ||
+                torrent?.title ||
+                torrent?.clientTitle ||
+                "unknown",
+            ).trim();
+            postHistory({
+              tvdbId: dlTvdbId,
+              showName: dlShowName || tagTorTitle,
+              type: "torSent",
+              hash: tagInfoHash || undefined,
+              description: `${tagTorTitle} | provider: ${torrent?.raw?.provider || torrent?.provider || "?"} | tag: ${addTag}`,
+            });
             if (debug) {
               res.json({
                 ...tvProcResult,
@@ -1473,6 +1495,19 @@ async function handleDownloadRequest(req, res) {
           } catch {
             // ignore
           }
+          const tagTorTitle = String(
+            torrent?.raw?.title ||
+              torrent?.title ||
+              torrent?.clientTitle ||
+              "unknown",
+          ).trim();
+          postHistory({
+            tvdbId: dlTvdbId,
+            showName: dlShowName || tagTorTitle,
+            type: "torSent",
+            hash: infoHash || undefined,
+            description: `${tagTorTitle} | provider: ${torrent?.raw?.provider || torrent?.provider || "?"} | tag: ${addTag}`,
+          });
 
           res.json({
             ...tvProcResult,

@@ -446,6 +446,16 @@ export function parseTitleFromFilename(fname, folderName, parsedPtt) {
     if (folderClean && folderClean.length >= 2) title = folderClean;
   }
 
+  // Strip "Complete" / "Complete Series" release tags
+  // e.g. "The Norm Show - Complete" → "The Norm Show"
+  if (title) {
+    title = title
+      .replace(/\s*-\s*Complete(?:\s+Series)?\s*$/i, "")
+      .replace(/\s+Complete(?:\s+Series)?\s*$/i, "")
+      .trim();
+    if (!title) title = null;
+  }
+
   // Normalize dots used as word separators (e.g. "The.Sketch.Show" → "The Sketch Show").
   // This occurs when a filename uses a mixed separator style: dots within the
   // title but a space before the episode marker (e.g. "The.Sketch.Show s01e01.avi").

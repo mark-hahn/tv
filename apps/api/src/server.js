@@ -946,7 +946,25 @@ async function handleDownloadRequest(req, res) {
       errorTitles: [],
     };
 
+    const torTitle = () =>
+      String(
+        torrent?.raw?.title ||
+          torrent?.title ||
+          torrent?.clientTitle ||
+          "unknown",
+      ).trim();
+
+    const postErrTor = (stage, errorMsg) => {
+      postHistory({
+        tvdbId: dlTvdbId,
+        showName: dlShowName || torTitle(),
+        type: "errTor",
+        description: `${stage}: ${errorMsg} | ${torTitle()}`,
+      });
+    };
+
     if (!torrent) {
+      postErrTor("validate", "Torrent data is required");
       res.status(400).json({
         ...baseWrapper,
         success: false,
@@ -960,6 +978,7 @@ async function handleDownloadRequest(req, res) {
     if (!forceDownload) {
       const fetched = await download.fetchTorrentFile(torrent);
       if (!fetched || typeof fetched !== "object") {
+        postErrTor("fetch-torrent", "Unexpected fetchTorrentFile result");
         res.json({
           ...baseWrapper,
           success: false,
@@ -969,6 +988,7 @@ async function handleDownloadRequest(req, res) {
         return;
       }
       if (!fetched.success) {
+        postErrTor("fetch-torrent", fetched.error || "fetch failed");
         res.json({ ...baseWrapper, ...fetched });
         return;
       }
@@ -990,6 +1010,7 @@ async function handleDownloadRequest(req, res) {
         } catch (e) {
           console.error("[downloads] failed to save bad torrent file", e);
         }
+        postErrTor("validate", valid.error || "invalid torrent bytes");
         res.json({ ...baseWrapper, ...valid });
         return;
       }
@@ -1016,6 +1037,10 @@ async function handleDownloadRequest(req, res) {
                 torrent?.clientTitle ||
                 "",
             ).trim();
+            postErrTor(
+              "validate-torrent-metadata",
+              `year mismatch (requested ${expectedYear}, torrent says ${actualYear})`,
+            );
             res.json({
               ...baseWrapper,
               success: false,
@@ -1039,6 +1064,7 @@ async function handleDownloadRequest(req, res) {
       try {
         titles = download.extractTorrentFileTitles(fetched.torrentData);
       } catch (e) {
+        postErrTor("parse-torrent", e?.message || String(e));
         res.json({
           ...baseWrapper,
           success: false,
@@ -1071,6 +1097,7 @@ async function handleDownloadRequest(req, res) {
           result: null,
           error: e,
         });
+        postErrTor("tv-proc", e?.message || String(e));
         res.json({
           ...baseWrapper,
           success: false,

@@ -1437,7 +1437,17 @@ export default {
         atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50;
       }
 
-      this.fixLogs += msg;
+      if (msg.startsWith("\r")) {
+        // Replace the last (incomplete) line — everything after the last \n
+        const lastNl = this.fixLogs.lastIndexOf("\n");
+        if (lastNl !== -1) {
+          this.fixLogs = this.fixLogs.slice(0, lastNl + 1) + msg.slice(1);
+        } else {
+          this.fixLogs = msg.slice(1);
+        }
+      } else {
+        this.fixLogs += msg;
+      }
 
       if (msg.includes("[fix] EXIT")) {
         this.fixBusy = false;

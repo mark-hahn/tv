@@ -6,6 +6,66 @@ const MEDIA_ROOT = "/mnt/media/tv";
 const MAX_FIX_WS_CHUNK = 8 * 1024;
 
 let fixProc = null;
+let stderrBuf = "";
+let progressTimer = null;
+let lastProgress = "";
+const PROGRESS_INTERVAL_MS = 250;
+
+function stripAnsi(text) {
+  return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
+}
+
+function flushProgress(ws) {
+  if (lastProgress) {
+    sendFixChunks(ws, "\r" + lastProgress);
+    lastProgress = "";
+  }
+}
+
+function processStderr(ws, raw) {
+  stderrBuf += stripAnsi(raw.toString());
+
+  while (true) {
+    const nIdx = stderrBuf.indexOf("\n");
+    const rIdx = stderrBuf.indexOf("\r");
+
+    if (nIdx === -1 && rIdx === -1) break;
+
+    if (nIdx !== -1 && (rIdx === -1 || nIdx <= rIdx)) {
+      // Newline: commit the line
+      const line = stderrBuf.slice(0, nIdx + 1);
+      stderrBuf = stderrBuf.slice(nIdx + 1);
+      flushProgress(ws);
+      sendFixChunks(ws, line);
+    } else {
+      // Carriage return without newline: ffmpeg progress update
+      const line = stderrBuf.slice(0, rIdx);
+      stderrBuf = stderrBuf.slice(rIdx + 1);
+      if (line.length > 0) {
+        lastProgress = line;
+        if (!progressTimer) {
+          progressTimer = setInterval(() => {
+            if (lastProgress) {
+              flushProgress(ws);
+            } else {
+              clearInterval(progressTimer);
+              progressTimer = null;
+            }
+          }, PROGRESS_INTERVAL_MS);
+        }
+      }
+    }
+  }
+}
+
+function resetStderrState() {
+  stderrBuf = "";
+  lastProgress = "";
+  if (progressTimer) {
+    clearInterval(progressTimer);
+    progressTimer = null;
+  }
+}
 
 function sendFixChunks(ws, text) {
   if (!text) return false;
@@ -122,7 +182,8 @@ function processFiles(ws, files, idx) {
   const dir = path.dirname(inputFile);
   const ext = path.extname(inputFile);
   const base = path.basename(inputFile, ext);
-  const tmpFile = path.join(dir, base + ".fix" + ext);
+  const tmpFile = path.join(dir, base + ".fix-tmp.mkv");
+  const finalFile = path.join(dir, base + ".mkv");
 
   sendFixChunks(
     ws,
@@ -156,24 +217,30 @@ function processFiles(ws, files, idx) {
   });
 
   proc.stderr.on("data", (data) => {
-    sendFixChunks(ws, data.toString());
+    processStderr(ws, data);
   });
 
   proc.on("error", (err) => {
     sendFixChunks(ws, `\n[fix] ERROR: ${err.message}\n`);
+    resetStderrState();
     fixProc = null;
   });
 
   proc.on("close", (code, signal) => {
     if (fixProc !== proc) return; // killed
 
+    flushProgress(ws);
+    resetStderrState();
+
     if (code === 0) {
-      // Replace original with re-encoded file
+      // Keep original as .orig, put re-encoded file as .mkv
       try {
-        fs.renameSync(inputFile, inputFile + ".bak");
-        fs.renameSync(tmpFile, inputFile);
-        fs.unlinkSync(inputFile + ".bak");
-        sendFixChunks(ws, `[fix] Replaced ${path.basename(inputFile)}\n`);
+        fs.renameSync(inputFile, inputFile + ".orig");
+        fs.renameSync(tmpFile, finalFile);
+        sendFixChunks(
+          ws,
+          `[fix] Done ${path.basename(finalFile)} (original saved as .orig)\n`,
+        );
       } catch (e) {
         sendFixChunks(ws, `[fix] Rename error: ${e.message}\n`);
       }
@@ -213,6 +280,7 @@ export function handleFix(ws, id, params) {
     if (fixProc) {
       fixProc.kill("SIGTERM");
       fixProc = null;
+      resetStderrState();
     }
     try {
       ws.send(

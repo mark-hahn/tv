@@ -387,6 +387,25 @@ async function main() {
     if (cycleRunning) {
       return;
     }
+
+    // Guard: abort if the media mount is not accessible.
+    // After a reboot /mnt/media may not be mounted yet; running a cycle in that
+    // state causes every disk-existence check to fail and re-queues hundreds of
+    // already-downloaded files.
+    try {
+      const tvStat = fs.statSync(tvPath);
+      if (!tvStat.isDirectory()) throw new Error("not a directory");
+      // A bare mount-point with nothing in it is also suspicious.
+      const tvEntries = fs.readdirSync(tvPath);
+      if (tvEntries.length === 0) throw new Error("empty directory");
+    } catch (e) {
+      console.log(
+        `[${cycleTsPST()}] download check cycle SKIPPED: tvPath not accessible (${tvPath}): ${e.message}`,
+      );
+      scheduleNextCycle();
+      return;
+    }
+
     if (nextCycleTimer) {
       clearTimeout(nextCycleTimer);
       nextCycleTimer = null;

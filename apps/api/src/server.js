@@ -954,17 +954,17 @@ async function handleDownloadRequest(req, res) {
           "unknown",
       ).trim();
 
-    const postErrTor = (stage, errorMsg) => {
+    const postTorErr = (stage, errorMsg) => {
       postHistory({
         tvdbId: dlTvdbId,
         showName: dlShowName || torTitle(),
-        type: "errTor",
+        type: "torErr",
         description: `${stage}: ${errorMsg} | ${torTitle()}`,
       });
     };
 
     if (!torrent) {
-      postErrTor("validate", "Torrent data is required");
+      postTorErr("validate", "Torrent data is required");
       res.status(400).json({
         ...baseWrapper,
         success: false,
@@ -978,7 +978,7 @@ async function handleDownloadRequest(req, res) {
     if (!forceDownload) {
       const fetched = await download.fetchTorrentFile(torrent);
       if (!fetched || typeof fetched !== "object") {
-        postErrTor("fetch-torrent", "Unexpected fetchTorrentFile result");
+        postTorErr("fetch-torrent", "Unexpected fetchTorrentFile result");
         res.json({
           ...baseWrapper,
           success: false,
@@ -988,7 +988,7 @@ async function handleDownloadRequest(req, res) {
         return;
       }
       if (!fetched.success) {
-        postErrTor("fetch-torrent", fetched.error || "fetch failed");
+        postTorErr("fetch-torrent", fetched.error || "fetch failed");
         res.json({ ...baseWrapper, ...fetched });
         return;
       }
@@ -1010,7 +1010,7 @@ async function handleDownloadRequest(req, res) {
         } catch (e) {
           console.error("[downloads] failed to save bad torrent file", e);
         }
-        postErrTor("validate", valid.error || "invalid torrent bytes");
+        postTorErr("validate", valid.error || "invalid torrent bytes");
         res.json({ ...baseWrapper, ...valid });
         return;
       }
@@ -1037,7 +1037,7 @@ async function handleDownloadRequest(req, res) {
                 torrent?.clientTitle ||
                 "",
             ).trim();
-            postErrTor(
+            postTorErr(
               "validate-torrent-metadata",
               `year mismatch (requested ${expectedYear}, torrent says ${actualYear})`,
             );
@@ -1064,7 +1064,7 @@ async function handleDownloadRequest(req, res) {
       try {
         titles = download.extractTorrentFileTitles(fetched.torrentData);
       } catch (e) {
-        postErrTor("parse-torrent", e?.message || String(e));
+        postTorErr("parse-torrent", e?.message || String(e));
         res.json({
           ...baseWrapper,
           success: false,
@@ -1097,7 +1097,7 @@ async function handleDownloadRequest(req, res) {
           result: null,
           error: e,
         });
-        postErrTor("tv-proc", e?.message || String(e));
+        postTorErr("tv-proc", e?.message || String(e));
         res.json({
           ...baseWrapper,
           success: false,
@@ -1161,7 +1161,7 @@ async function handleDownloadRequest(req, res) {
         postHistory({
           tvdbId: dlTvdbId,
           showName: dlShowName || errTorTitle,
-          type: "errTor",
+          type: "torErr",
           description: `qbt add threw: ${e?.message || String(e)} | ${errTorTitle}`,
         });
         res.json({
@@ -1308,7 +1308,7 @@ async function handleDownloadRequest(req, res) {
         postHistory({
           tvdbId: dlTvdbId,
           showName: dlShowName || failTorTitle,
-          type: "errTor",
+          type: "torErr",
           hash: infoHash || undefined,
           description: `qbt add failed: ${addRes.text || "Fails."} | ${failTorTitle}`,
         });
@@ -1666,7 +1666,7 @@ app.get("/api/torrent-file", async (req, res) => {
       if (!magRes.ok) {
         postHistory({
           showName,
-          type: "errTor",
+          type: "torErr",
           description: `magnet add failed: ${magRes.text} | ${showName}`,
         });
         return res
@@ -1700,7 +1700,7 @@ app.get("/api/torrent-file", async (req, res) => {
         if (!magRes.ok) {
           postHistory({
             showName,
-            type: "errTor",
+            type: "torErr",
             description: `magnet add failed: ${magRes.text} | ${showName}`,
           });
           return res
@@ -1743,7 +1743,7 @@ app.get("/api/torrent-file", async (req, res) => {
     if (!addRes.ok) {
       postHistory({
         showName,
-        type: "errTor",
+        type: "torErr",
         description: `qbt add failed: ${addRes.text || "Fails."} | ${showName}`,
       });
       return res

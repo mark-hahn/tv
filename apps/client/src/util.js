@@ -126,6 +126,7 @@ export function setCondFltr(cond, fltrChoice) {
     case "All":
       tmp.unplayed = 0;
       tmp.gap = 0;
+      tmp.ended = 0;
       tmp.waiting = 0;
       tmp.drama = 0;
       tmp.foreign = 0;
@@ -143,6 +144,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.foreign = 0;
       tmp.unplayed = 1;
       tmp.gap = 0;
+      tmp.ended = 0;
       tmp.waiting = 0;
       tmp.drama = 1;
       tmp.foreign = 0;
@@ -159,6 +161,7 @@ export function setCondFltr(cond, fltrChoice) {
     case "Continue":
       tmp.unplayed = 1;
       tmp.gap = 0;
+      tmp.ended = 0;
       tmp.waiting = 0;
       tmp.drama = 0;
       tmp.foreign = 0;
@@ -175,6 +178,7 @@ export function setCondFltr(cond, fltrChoice) {
     case "Finished":
       tmp.unplayed = 0;
       tmp.gap = 0;
+      tmp.ended = 0;
       tmp.waiting = 0;
       tmp.drama = 0;
       tmp.foreign = 0;

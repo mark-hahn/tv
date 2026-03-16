@@ -1047,33 +1047,37 @@ try {
   }
 } catch {}
 
-// Set up callback for tvdb to add shows to pickup list
-tvdb.setAddToPickupsCallback((showName) => {
-  // Check if already in pickup list
-  const alreadyInPickups = pickups.some(
-    (pickup) => pickup.toLowerCase() === showName.toLowerCase(),
-  );
-  if (!alreadyInPickups) {
-    console.log("Auto-adding to pickups (not in emby):", showName);
-    pickups.push(showName);
-    // Save and upload config asynchronously without blocking
-    (async () => {
-      await trySaveConfigYml(
-        null,
-        null,
-        () => {},
-        () => {},
-      );
-    })();
-  }
-});
-
 // Set up callbacks so tvdb.js can call back into index.js without circular imports
 tvdb.setNotifyCallback((name, record) =>
   notifyClients("tvdbUpdated", { name, record }),
 );
 tvdb.setEnqueueCallback((name) => notifyClients("showUpdating", { name }));
 tvdb.setQueueDrainCallback(() => notifyClients("showQueueEmpty", {}));
+
+// Auto-update pickups when inEmby or status changes on a tvdb record
+tvdb.setPickupChangeCallback((name, inEmby, status) => {
+  if (inEmby === true && status !== "Ended") {
+    // Should be in pickups
+    const already = pickups.some((p) => p.toLowerCase() === name.toLowerCase());
+    if (!already) {
+      console.log("[pickup-auto] adding:", name);
+      addPickup({ name }).catch((err) =>
+        console.error("[pickup-auto] addPickup failed:", err),
+      );
+    }
+  } else {
+    // Should not be in pickups
+    const idx = pickups.findIndex(
+      (p) => p.toLowerCase() === name.toLowerCase(),
+    );
+    if (idx !== -1) {
+      console.log("[pickup-auto] removing:", name);
+      delPickup({ name }).catch((err) =>
+        console.error("[pickup-auto] delPickup failed:", err),
+      );
+    }
+  }
+});
 
 // Detect and fix the "compact NNN" mis-indexing: Emby reads a filename like
 // "101-Title.avi" in Season 1 as episode 101 instead of S1E01. This leaves the
@@ -1575,18 +1579,11 @@ const trySaveConfigYml = async (id, result, resolve, reject) => {
   await util.writeFile(configWritePath("config2-rejects.json"), rejects);
   await util.writeFile(configWritePath("config4-pickups.json"), pickups);
 
-  // Sync tvdb.pickup and tvdb.reject from config arrays (config is the authority)
+  // Sync tvdb.reject from config arrays (config is the authority)
   const allTvdbForSync = tvdb.getAllTvdbSync();
-  const normalizedPickupsSet = new Set(pickups.map((p) => p.toLowerCase()));
   const normalizedRejectsSet = new Set(rejects.map((r) => r.toLowerCase()));
   for (const [recordName, record] of Object.entries(allTvdbForSync)) {
     const norm = recordName.toLowerCase();
-    const isPickup = normalizedPickupsSet.has(norm);
-    if (isPickup) {
-      record.pickup = true;
-    } else if (record.pickup) {
-      record.pickup = false;
-    }
     const isReject = normalizedRejectsSet.has(norm);
     if (isReject) {
       record.reject = true;
@@ -1645,20 +1642,10 @@ const startupConfigSync = () => {
   }
   let changedTvdb = false;
 
-  const normalizedPickups = new Set(pickups.map((p) => p.toLowerCase()));
   const normalizedRejects = new Set(rejects.map((r) => r.toLowerCase()));
 
   for (const [recordName, record] of Object.entries(allTvdb)) {
     const norm = recordName.toLowerCase();
-    const shouldPickup = normalizedPickups.has(norm);
-    if (shouldPickup && !record.pickup) {
-      record.pickup = true;
-      changedTvdb = true;
-    }
-    if (!shouldPickup && record.pickup) {
-      record.pickup = false;
-      changedTvdb = true;
-    }
     const shouldReject = normalizedRejects.has(norm);
     if (shouldReject && (!record.reject || !record.Reject)) {
       record.reject = true;
@@ -1760,10 +1747,6 @@ const delReject = async (params) => {
       ([_, error]) => reject(new Error(error)),
     );
   });
-};
-
-const getPickups = async (_param) => {
-  return pickups;
 };
 
 const addPickup = async (params) => {
@@ -2748,7 +2731,6 @@ app.get(
 );
 app.get("/api/getShowsFromDisk", apiWrapper(getShowsFromDisk));
 app.get("/api/getRejects", apiWrapper(getRejects));
-app.get("/api/getPickups", apiWrapper(getPickups));
 app.get("/api/getGaps", apiWrapper(getGaps));
 app.get("/api/getNoEmbys", apiWrapper(getNoEmbys));
 app.get("/api/getDevices", apiWrapper(emby.getDevices));
@@ -2946,8 +2928,6 @@ app.post(
 // CRUD operations
 app.post("/api/addReject", apiWrapper(addReject));
 app.post("/api/delReject", apiWrapper(delReject));
-app.post("/api/addPickup", apiWrapper(addPickup));
-app.post("/api/delPickup", apiWrapper(delPickup));
 app.post("/api/addNoEmby", apiWrapper(addNoEmby));
 app.post("/api/delNoEmby", apiWrapper(delNoEmby));
 app.post("/api/addGap", apiWrapper(addGap));
@@ -3409,12 +3389,10 @@ async function syncEmbyUserData() {
       // Check if reject/pickup flags changed
       const normName = normShowName(name);
       const newReject = rejects.some((r) => normShowName(r) === normName);
-      const newPickup = pickups.some((p) => normShowName(p) === normName);
 
-      const rejectsPickupsChanged =
-        tvdbRecord.reject !== newReject || tvdbRecord.pickup !== newPickup;
+      const rejectsChanged = tvdbRecord.reject !== newReject;
 
-      if (userDataChanged || collectionsChanged || rejectsPickupsChanged) {
+      if (userDataChanged || collectionsChanged || rejectsChanged) {
         // Update user data
         if (userDataChanged) {
           tvdbRecord.Played = userData.Played || false;
@@ -3435,10 +3413,9 @@ async function syncEmbyUserData() {
           collectionsChangeCount++;
         }
 
-        // Update reject/pickup flags
-        if (rejectsPickupsChanged) {
+        // Update reject flags
+        if (rejectsChanged) {
           tvdbRecord.reject = newReject;
-          tvdbRecord.pickup = newPickup;
           rejectsPickupsChangeCount++;
         }
 

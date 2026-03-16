@@ -433,8 +433,6 @@ async function getSeriesMap(tvdbId, watchedEpis = null) {
 
 const UPDATE_DATA = true;
 
-let addToPickupsCallback = null;
-
 let allTvdb = null;
 try {
   allTvdb = loadTvdbAtStartup();
@@ -1704,9 +1702,6 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   tvdbData.Reject =
     paramObj.reject ?? existing.Reject ?? existing.reject ?? false;
   tvdbData.reject = tvdbData.Reject; // keep lowercase in sync
-  tvdbData.Pickup =
-    paramObj.pickup ?? existing.Pickup ?? existing.pickup ?? false;
-  tvdbData.pickup = tvdbData.Pickup; // keep lowercase in sync
   tvdbData.lastWatched = paramObj.lastWatched || existing.lastWatched || null;
 
   // Calculate waitStr from nextAired and lastAired if available
@@ -1747,6 +1742,14 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
       ).trim();
       if (inputTvdbId && inputTvdbId === String(tvdbId).trim()) {
         delete allTvdb[inputName];
+      }
+    }
+    // Auto-update pickups when inEmby or status changes
+    if (pickupChangeCallback) {
+      const oldInEmby = existing.inEmby;
+      const oldStatus = existing.status;
+      if (oldInEmby !== tvdbData.inEmby || oldStatus !== tvdbData.status) {
+        pickupChangeCallback(name, tvdbData.inEmby, tvdbData.status);
       }
     }
   }
@@ -1799,6 +1802,11 @@ const dequeueShowProcess = () => showProcessQueue.shift() ?? null;
 let notifyCallback = null;
 export const setNotifyCallback = (fn) => {
   notifyCallback = fn;
+};
+
+let pickupChangeCallback = null;
+export const setPickupChangeCallback = (fn) => {
+  pickupChangeCallback = fn;
 };
 
 let enqueueCallback = null;
@@ -2157,9 +2165,6 @@ _kickProcessQueue = tryLocalGetTvdb;
 updateTvdbLocal();
 
 ///////////////////  FUNCTION CALLS FROM CLIENT  ////////////////////
-export const setAddToPickupsCallback = (callback) => {
-  addToPickupsCallback = callback;
-};
 
 // WebSocket endpoint handler: returns remotes for a show.
 // Expects param JSON: { show: { Name, Id? }, tvdbRemotes: [...], fast: boolean }
@@ -2579,6 +2584,7 @@ export const setTvdbFields = async (params) => {
       }
 
       const wasInEmby = tvdb.inEmby;
+      const wasStatus = tvdb.status;
 
       // Handle nested field updates for Phase 1 new structure
       for (const [key, value] of Object.entries(paramObj)) {
@@ -2643,6 +2649,14 @@ export const setTvdbFields = async (params) => {
         }
       } else if (embyIndex >= 0) {
         tvdb.remotes.splice(embyIndex, 1);
+      }
+
+      // Auto-update pickups when inEmby or status changes
+      if (
+        pickupChangeCallback &&
+        (wasInEmby !== tvdb.inEmby || wasStatus !== tvdb.status)
+      ) {
+        pickupChangeCallback(name, tvdb.inEmby, tvdb.status);
       }
 
       setImdbId(tvdb);

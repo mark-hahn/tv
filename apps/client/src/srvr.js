@@ -207,7 +207,6 @@ handleMsg = async (msg) => {
 
 export async function deleteShowFromSrvr(show) {
   await delGap({ gapId: show.Id, save: true });
-  if (show.Pickup) await delPickup(show.Name);
   await delNoEmby(show.Name);
 
   // Delete entire show folder from disk
@@ -327,16 +326,6 @@ export function addReject(name, tvdbId) {
 }
 export function delReject(name, tvdbId) {
   return httpCall("/api/delReject", { name, tvdbId }, "POST");
-}
-
-export function getPickups() {
-  return httpCall("/api/getPickups");
-}
-export function addPickup(name, tvdbId) {
-  return httpCall("/api/addPickup", { name, tvdbId }, "POST");
-}
-export function delPickup(name, tvdbId) {
-  return httpCall("/api/delPickup", { name, tvdbId }, "POST");
 }
 
 export function getNoEmbys() {

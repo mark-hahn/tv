@@ -95,32 +95,18 @@ async function syncCollections(allTvdb) {
   }
 }
 
-// Phase 2: Helper function to sync rejects and pickups into tvdb
-function syncRejectsAndPickups(allTvdb, rejectsIn, pickups) {
-  // Set reject and pickup flags for all shows
+// Phase 2: Helper function to sync rejects into tvdb
+function syncRejects(allTvdb, rejectsIn) {
   for (const tvdb of Object.values(allTvdb)) {
     if (!isTvdbShowRecord(tvdb)) continue;
     const normalizedName = normShowName(tvdb.Name);
     tvdb.reject = (rejectsIn || []).some(
       (r) => normShowName(r) === normalizedName,
     );
-    tvdb.pickup = (pickups || []).some(
-      (p) => normShowName(p) === normalizedName,
-    );
   }
   // Update module-level rejects for isReject()
   rejects = (rejectsIn || []).map(normShowName).filter(Boolean);
   rejectsSet = new Set(rejects);
-  console.log(
-    "[syncRejectsAndPickups] rejectsIn:",
-    (rejectsIn || []).length,
-    "pickups:",
-    (pickups || []).length,
-    "shows with reject=true:",
-    Object.values(allTvdb).filter((t) => t.reject).length,
-    "shows with Reject=true:",
-    Object.values(allTvdb).filter((t) => t.Reject).length,
-  );
 }
 
 // Phase 2: Helper function to set wait strings for shows
@@ -162,7 +148,6 @@ export async function loadAllShows() {
         rec.remotes?.find((r) => r.name?.startsWith("IMDB"))?.ratings ||
         null;
     rec.Reject = !!(rec.reject || rec.Reject);
-    rec.Pickup = !!(rec.pickup || rec.Pickup);
     if (rec.waitStr && !rec.WaitStr) rec.WaitStr = rec.waitStr;
     if (rec.note && !rec.Notes) rec.Notes = rec.note;
     rec.NotReady = rec.inEmby === false;
@@ -344,10 +329,9 @@ async function _oldLoadAllShows() {
   };
 
   // 1. Fetch all data sources in parallel (HTTP is fast now!)
-  const [embyShows, rejectsIn, pickups, allTvdbResult] = await Promise.all([
+  const [embyShows, rejectsIn, allTvdbResult] = await Promise.all([
     axios.get(urls.showListUrl(cred, 0, 10000)),
     srvr.getRejects(),
-    srvr.getPickups(),
     tvdb.getAllTvdb(0), // hasEmby = 0: load all shows
   ]);
 
@@ -785,8 +769,8 @@ async function _oldLoadAllShows() {
   // 6.5. Sync collection flags from Emby
   await syncCollections(allTvdb);
 
-  // 6.6. Sync reject/pickup flags from config arrays (authoritative source)
-  syncRejectsAndPickups(allTvdb, rejectsIn, pickups);
+  // 6.6. Sync reject flags from config arrays (authoritative source)
+  syncRejects(allTvdb, rejectsIn);
 
   // 7. Ensure computed properties are set (since nested objects are now flattened)
   for (const tvdb of Object.values(allTvdb)) {
@@ -819,7 +803,6 @@ async function _oldLoadAllShows() {
         null;
     }
     if (tvdb.reject && !tvdb.Reject) tvdb.Reject = tvdb.reject;
-    if (tvdb.pickup && !tvdb.Pickup) tvdb.Pickup = tvdb.pickup;
     if (tvdb.waitStr && !tvdb.WaitStr) tvdb.WaitStr = tvdb.waitStr;
     if (tvdb.note && !tvdb.Notes) tvdb.Notes = tvdb.note;
 

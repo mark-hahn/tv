@@ -555,21 +555,6 @@ export default {
       }
     };
 
-    const togglePickup = (show) => {
-      this.saveVisShow(show);
-      show.Pickup = !show.Pickup;
-      if (show.Pickup)
-        srvr.addPickup(show.Name, show.TvdbId || show.tvdbId).catch((err) => {
-          console.error("late addPickup:", err);
-          //- show.Pickup = !show.Pickup;
-        });
-      else
-        srvr.delPickup(show.Name, show.TvdbId || show.tvdbId).catch((err) => {
-          console.error("late delPickup:", err);
-          // show.Pickup = !show.Pickup;
-        });
-    };
-
     const deleteShow = async (show) => {
       allTvdb = await tvdb.getAllTvdb();
       const name = show.Name;
@@ -808,18 +793,6 @@ export default {
             await toggleReject(show);
           },
           name: "ban",
-        },
-        {
-          color: "#5ff",
-          filter: 0,
-          icon: ["fas", "arrow-down"],
-          cond(show) {
-            return show.Pickup;
-          },
-          async click(show) {
-            await togglePickup(show);
-          },
-          name: "pickup",
         },
         {
           color: "#a66",

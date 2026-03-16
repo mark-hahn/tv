@@ -546,6 +546,7 @@ if (phase5MigrationNeeded) {
 const IMDB_USER_AGENT =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 let imdbBrowser = null;
+let imdbContext = null;
 
 async function getImdbBrowser() {
   try {
@@ -565,9 +566,28 @@ async function getImdbBrowser() {
   } catch {
     // ignore
   }
+  imdbContext = null;
 
   imdbBrowser = await chromium.launch({ headless: true });
   return imdbBrowser;
+}
+
+async function getImdbContext() {
+  const b = await getImdbBrowser();
+  try {
+    if (imdbContext) {
+      // verify it's still usable by checking browser connection
+      if (b.isConnected()) return imdbContext;
+    }
+  } catch {
+    // ignore
+  }
+  imdbContext = await b.newContext({
+    userAgent: IMDB_USER_AGENT,
+    locale: "en-US",
+    extraHTTPHeaders: { "Accept-Language": "en-US,en;q=0.9" },
+  });
+  return imdbContext;
 }
 
 const extractImdbRating = (html) => {
@@ -617,29 +637,23 @@ const extractImdbVideo = (html) => {
 
 const getUrlAndRatings = async (type, url, name) => {
   if (+type === 2) {
-    let context = null;
     let page = null;
     let resp = null;
     try {
-      const b = await getImdbBrowser();
-      context = await b.newContext({
-        userAgent: IMDB_USER_AGENT,
-        locale: "en-US",
-        extraHTTPHeaders: {
-          "Accept-Language": "en-US,en;q=0.9",
-        },
-      });
-      page = await context.newPage();
+      const ctx = await getImdbContext();
+      page = await ctx.newPage();
       resp = await page.goto(url, {
         waitUntil: "domcontentloaded",
-        timeout: 30000,
+        timeout: 15000,
       });
-      await page.waitForTimeout(500);
     } catch (e) {
       log(
         "err",
         `getUrlAndRatings imdb playwright error: ${url}, ${e.message}`,
       );
+      try {
+        await page?.close();
+      } catch {}
       return { ratings: null, video: null };
     }
 
@@ -647,141 +661,158 @@ const getUrlAndRatings = async (type, url, name) => {
       const status = resp ? resp.status() : null;
       log("err", `getUrlAndRatings imdb fetch error: ${url}, status=${status}`);
       try {
-        await context?.close();
+        await page?.close();
       } catch {}
       return { ratings: null, video: null };
     }
 
     try {
-      await page
-        .waitForLoadState("networkidle", { timeout: 5000 })
-        .catch(() => {});
-      let html = await page
-        .evaluate(() => document.documentElement.outerHTML)
-        .catch(() => null);
-      const compactHtml = (html || "")
-        .replaceAll(/\r?\n/gm, "")
-        .replaceAll(/\s+/gm, " ");
-      const hasChallengeMarkers =
-        /verify you are human|please verify you are a human|enter the characters you see below|type the characters you see/i.test(
-          compactHtml,
-        );
-      const hasRatingEvidence =
-        /ipc-rating-star--rating|"aggregateRating"|"ratingValue"/i.test(
-          compactHtml,
-        );
-      if (hasChallengeMarkers && !hasRatingEvidence) {
-        log("err", `getUrlAndRatings imdb challenge page: ${url}`);
-        try {
-          await context?.close();
-        } catch {}
-        return { ratings: null, video: null };
-      }
-
-      html = compactHtml;
-      let rating = null;
-      const jsonLdRating = await page
+      // Single evaluate: extract rating, video, and challenge detection all at once
+      const result = await page
         .evaluate(() => {
-          const scripts = Array.from(
-            document.querySelectorAll('script[type="application/ld+json"]'),
+          const html = document.documentElement.outerHTML;
+          const compact = html.replace(/\r?\n/gm, "").replace(/\s+/gm, " ");
+
+          const hasChallengeMarkers =
+            /verify you are human|please verify you are a human|enter the characters you see below|type the characters you see/i.test(
+              compact,
+            );
+          const hasRatingEvidence =
+            /ipc-rating-star--rating|"aggregateRating"|"ratingValue"/i.test(
+              compact,
+            );
+
+          if (hasChallengeMarkers && !hasRatingEvidence) {
+            return { challenge: true };
+          }
+
+          // --- Rating extraction ---
+          let rating = null;
+
+          // 1. JSON-LD
+          const scripts = document.querySelectorAll(
+            'script[type="application/ld+json"]',
           );
           const visit = (node) => {
-            if (!node) return null;
+            if (!node || typeof node !== "object") return null;
             if (Array.isArray(node)) {
               for (const item of node) {
-                const found = visit(item);
-                if (found !== null) return found;
+                const f = visit(item);
+                if (f !== null) return f;
               }
               return null;
             }
-            if (typeof node !== "object") return null;
-
             const typeVal = node["@type"];
             const typeList = Array.isArray(typeVal) ? typeVal : [typeVal];
-            const isTitleType = typeList.some((t) =>
-              ["TVSeries", "Movie", "TVMiniSeries", "TVEpisode"].includes(
-                String(t || ""),
-              ),
-            );
             if (
-              isTitleType &&
-              node.aggregateRating?.ratingValue !== undefined
+              typeList.some((t) =>
+                ["TVSeries", "Movie", "TVMiniSeries", "TVEpisode"].includes(
+                  String(t || ""),
+                ),
+              )
             ) {
-              const v = parseFloat(String(node.aggregateRating.ratingValue));
-              if (!Number.isNaN(v) && v >= 0 && v <= 10) return v;
+              if (node.aggregateRating?.ratingValue !== undefined) {
+                const v = parseFloat(String(node.aggregateRating.ratingValue));
+                if (!Number.isNaN(v) && v >= 0 && v <= 10) return v;
+              }
             }
-
             if (node["@graph"]) {
-              const found = visit(node["@graph"]);
-              if (found !== null) return found;
+              const f = visit(node["@graph"]);
+              if (f !== null) return f;
             }
             for (const v of Object.values(node)) {
-              const found = visit(v);
-              if (found !== null) return found;
+              const f = visit(v);
+              if (f !== null) return f;
             }
             return null;
           };
-
           for (const s of scripts) {
             try {
-              const parsed = JSON.parse(s.textContent || "");
-              const found = visit(parsed);
-              if (found !== null) return found;
-            } catch {
-              // ignore malformed JSON-LD blocks
+              const f = visit(JSON.parse(s.textContent || ""));
+              if (f !== null) {
+                rating = String(f);
+                break;
+              }
+            } catch {}
+          }
+
+          // 2. DOM selectors
+          if (!rating) {
+            const selectors = [
+              '[data-testid="hero-rating-bar__aggregate-rating__score"] [data-testid="rating-histogram-star"]',
+              '[data-testid="hero-rating-bar__aggregate-rating"] .ipc-rating-star--rating',
+              ".ipc-rating-star--rating",
+            ];
+            for (const sel of selectors) {
+              const el = document.querySelector(sel);
+              if (el) {
+                const v = parseFloat((el.textContent || "").trim());
+                if (!Number.isNaN(v) && v >= 0 && v <= 10) {
+                  rating = String(v);
+                  break;
+                }
+              }
             }
           }
-          return null;
+
+          // 3. Regex fallbacks on HTML
+          if (!rating) {
+            let m = /aggregate-rating__score.*?>([\d.]+)</i.exec(compact);
+            if (m?.[1]) rating = m[1];
+          }
+          if (!rating) {
+            let m =
+              /"aggregateRating"\s*:\s*\{[^}]*?"ratingValue"\s*:\s*"?([\d.]+)"?/i.exec(
+                compact,
+              );
+            if (m?.[1]) rating = m[1];
+          }
+          if (!rating) {
+            let m = /"ratingValue"\s*:\s*"?([\d.]+)"?/i.exec(compact);
+            if (m?.[1]) rating = m[1];
+          }
+
+          // --- Video extraction ---
+          let video = null;
+          let m =
+            /"url"\s*:\s*"(https:\/\/imdb-video\.media-imdb\.com\/[^"]*\.mp4[^"]*)"/i.exec(
+              compact,
+            );
+          if (m?.[1]) {
+            video = m[1].replace(/\\u0026/g, "&");
+          } else {
+            m =
+              /"url"\s*:\s*"(https:\/\/www\.imdb\.com\/video\/vi\d+\/?)"/.exec(
+                compact,
+              );
+            if (m?.[1]) video = m[1];
+            else {
+              m = /\/video\/(vi\d+)/i.exec(compact);
+              if (m?.[1]) video = "https://www.imdb.com/video/" + m[1] + "/";
+            }
+          }
+
+          return { rating, video };
         })
         .catch(() => null);
-      if (
-        typeof jsonLdRating === "number" &&
-        !Number.isNaN(jsonLdRating) &&
-        jsonLdRating >= 0 &&
-        jsonLdRating <= 10
-      ) {
-        rating = String(jsonLdRating);
-      }
 
-      const ratingSelectors = [
-        '[data-testid="hero-rating-bar__aggregate-rating__score"] [data-testid="rating-histogram-star"]',
-        '[data-testid="hero-rating-bar__aggregate-rating"] [data-testid="rating-histogram-star"]',
-        '[data-testid="hero-rating-bar__aggregate-rating"] .ipc-rating-star--rating',
-        '[data-testid="rating-histogram-star"]',
-        ".ipc-rating-star--rating",
-      ];
-      if (!rating) {
-        for (const selector of ratingSelectors) {
-          const ratingText = await page
-            .locator(selector)
-            .first()
-            .textContent({ timeout: 1500 })
-            .catch(() => null);
-          const ratingVal = parseFloat(String(ratingText || "").trim());
-          if (!Number.isNaN(ratingVal) && ratingVal >= 0 && ratingVal <= 10) {
-            rating = String(ratingVal);
-            break;
-          }
-        }
-      }
-      if (!rating) {
-        rating = extractImdbRating(html);
-      }
-      const video = extractImdbVideo(html);
-      if (!rating && !video) {
-        try {
-          await context?.close();
-        } catch {}
+      try {
+        await page.close();
+      } catch {}
+
+      if (!result || result.challenge) {
+        if (result?.challenge)
+          log("err", `getUrlAndRatings imdb challenge page: ${url}`);
         return { ratings: null, video: null };
       }
-      try {
-        await context?.close();
-      } catch {}
-      return { ratings: rating, video: video };
+
+      if (!result.rating && !result.video)
+        return { ratings: null, video: null };
+      return { ratings: result.rating, video: result.video };
     } catch (e) {
       log("err", `getUrlAndRatings imdb parse error: ${url}, ${e.message}`);
       try {
-        await context?.close();
+        await page?.close();
       } catch {}
       return { ratings: null, video: null };
     }
@@ -958,44 +989,57 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
   const url = `https://www.google.com/search` + `?q=${encoded}%20tv%20show`;
   remotes.push({ name: "Google", url });
 
-  // Wikipedia: use cached flat prop; if missing, fetch and persist it.
+  // Parallelize independent remote fetches (Wikipedia, Reddit, tvdbRemotes, IMDB)
+  const remotesByName = {};
+
+  // Build parallel tasks for uncached remotes
+  const parallelTasks = [];
+
+  // Wikipedia
   const cachedWikiUrl = allTvdb[name]?.wikiUrl;
   if (cachedWikiUrl) {
     remotes.push({ name: "Wikipedia", url: cachedWikiUrl });
   } else {
-    const wikiRemote = await getRemote(null, 18, name);
-    if (wikiRemote?.url) {
-      remotes.push({ name: "Wikipedia", url: wikiRemote.url });
-      flatUrls.wikiUrl = wikiRemote.url;
-    }
+    parallelTasks.push(
+      getRemote(null, 18, name).then((r) => {
+        if (r?.url) {
+          remotes.push({ name: "Wikipedia", url: r.url });
+          flatUrls.wikiUrl = r.url;
+        }
+      }),
+    );
   }
 
-  // Reddit: use cached flat prop; if missing, fetch and persist it.
+  // Reddit
   const cachedRedditUrl = allTvdb[name]?.redditUrl;
   if (cachedRedditUrl) {
     remotes.push({ name: "Reddit", url: cachedRedditUrl });
   } else {
-    const redditRemote = await getRemote(null, 7, name);
-    if (redditRemote?.url) {
-      remotes.push({ name: "Reddit", url: redditRemote.url });
-      flatUrls.redditUrl = redditRemote.url;
-    }
+    parallelTasks.push(
+      getRemote(null, 7, name).then((r) => {
+        if (r?.url) {
+          remotes.push({ name: "Reddit", url: r.url });
+          flatUrls.redditUrl = r.url;
+        }
+      }),
+    );
   }
 
-  const remotesByName = {};
+  // Other tvdbRemotes (excluding Wikipedia/Reddit/IMDB handled separately)
   for (const tvdbRemote of tvdbRemotes) {
     if (tvdbRemote.type == 18) continue;
-    if (tvdbRemote.type == 7) continue; // Reddit handled separately above
-    if (tvdbRemote.type == 2) continue; // IMDB handled separately below
-    const remote = await getRemote(
-      tvdbRemote.id,
-      tvdbRemote.type,
-      tvdbRemote.sourceName,
+    if (tvdbRemote.type == 7) continue;
+    if (tvdbRemote.type == 2) continue;
+    parallelTasks.push(
+      getRemote(tvdbRemote.id, tvdbRemote.type, tvdbRemote.sourceName).then(
+        (remote) => {
+          if (remote && remote.url != "no match") {
+            if (!remote.ratings) delete remote.ratings;
+            remotesByName[remote.name] = remote;
+          }
+        },
+      ),
     );
-    if (remote && remote.url != "no match") {
-      if (!remote.ratings) delete remote.ratings;
-      remotesByName[remote.name] = remote;
-    }
   }
 
   // IMDB:
@@ -1011,28 +1055,70 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
       if (cachedShow.imdbVideo) imdbEntry.video = cachedShow.imdbVideo;
       remotesByName["IMDB"] = imdbEntry;
     } else {
-      // Scrape live: try tvdb remoteId type=2 first
-      const imdbTvdbRemote = tvdbRemotes.find((r) => r.type === 2);
-      if (imdbTvdbRemote) {
-        const remote = await getRemote(
-          imdbTvdbRemote.id,
-          2,
-          imdbTvdbRemote.sourceName,
-        );
-        if (remote && remote.url !== "no match") {
-          if (!remote.ratings) delete remote.ratings;
-          remotesByName["IMDB"] = remote;
-        }
-      }
-      // Fallback: use imdbId from tvdb record
-      if (!remotesByName["IMDB"] && cachedShow?.imdbId) {
-        const fallbackRemote = await getRemote(cachedShow.imdbId, 2, name);
-        if (fallbackRemote) {
-          remotesByName["IMDB"] = fallbackRemote;
-        }
-      }
+      parallelTasks.push(
+        (async () => {
+          const imdbTvdbRemote = tvdbRemotes.find((r) => r.type === 2);
+          if (imdbTvdbRemote) {
+            const remote = await getRemote(
+              imdbTvdbRemote.id,
+              2,
+              imdbTvdbRemote.sourceName,
+            );
+            if (remote && remote.url !== "no match") {
+              if (!remote.ratings) delete remote.ratings;
+              remotesByName["IMDB"] = remote;
+            }
+          }
+          if (!remotesByName["IMDB"] && cachedShow?.imdbId) {
+            const fallbackRemote = await getRemote(cachedShow.imdbId, 2, name);
+            if (fallbackRemote) {
+              remotesByName["IMDB"] = fallbackRemote;
+            }
+          }
+          // Last resort: fetch IMDB ID from TVDB extended API using TvdbId
+          if (!remotesByName["IMDB"] && show.TvdbId) {
+            try {
+              const token = await getToken();
+              const extRes = await fetch(
+                `https://api4.thetvdb.com/v4/series/${show.TvdbId}/extended`,
+                {
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: "Bearer " + token,
+                  },
+                  signal: AbortSignal.timeout(8000),
+                },
+              );
+              if (extRes.ok) {
+                const extData = (await extRes.json())?.data;
+                const imdbRemoteId = (extData?.remoteIds || []).find(
+                  (r) => r.type === 2,
+                );
+                if (imdbRemoteId?.id) {
+                  const remote = await getRemote(
+                    imdbRemoteId.id,
+                    2,
+                    imdbRemoteId.sourceName || name,
+                  );
+                  if (remote && remote.url !== "no match") {
+                    if (!remote.ratings) delete remote.ratings;
+                    remotesByName["IMDB"] = remote;
+                  }
+                }
+              }
+            } catch (e) {
+              log(
+                "err",
+                `getRemotes IMDB tvdb-extended fallback error for ${name}: ${e.message}`,
+              );
+            }
+          }
+        })(),
+      );
     }
   }
+
+  await Promise.all(parallelTasks);
 
   const imdbRemote = remotesByName["IMDB"];
   if (imdbRemote) {

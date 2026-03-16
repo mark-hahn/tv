@@ -1663,10 +1663,21 @@ app.get("/api/torrent-file", async (req, res) => {
     if (magnetUrl.startsWith("magnet:")) {
       console.log("[torrent-file] using provided magnet for:", showName);
       const magRes = await addQbtMagnet({ magnetUrl });
-      if (!magRes.ok)
+      if (!magRes.ok) {
+        postHistory({
+          showName,
+          type: "errTor",
+          description: `magnet add failed: ${magRes.text} | ${showName}`,
+        });
         return res
           .status(500)
           .json({ error: `Magnet add failed: ${magRes.text}` });
+      }
+      postHistory({
+        showName,
+        type: "torSent",
+        description: `magnet | ${showName}`,
+      });
       return res.json({ success: true, filename: "(magnet)", bytes: 0 });
     }
 
@@ -1686,10 +1697,21 @@ app.get("/api/torrent-file", async (req, res) => {
           infoHash,
         );
         const magRes = await addQbtMagnet({ magnetUrl: magnet });
-        if (!magRes.ok)
+        if (!magRes.ok) {
+          postHistory({
+            showName,
+            type: "errTor",
+            description: `magnet add failed: ${magRes.text} | ${showName}`,
+          });
           return res
             .status(500)
             .json({ error: `Magnet add failed: ${magRes.text}` });
+        }
+        postHistory({
+          showName,
+          type: "torSent",
+          description: `magnet from link hash | ${showName}`,
+        });
         return res.json({ success: true, filename: "(magnet)", bytes: 0 });
       }
       // No hash in URL — fall through to getTorrentFile search
@@ -1719,10 +1741,20 @@ app.get("/api/torrent-file", async (req, res) => {
       text: addRes.text,
     });
     if (!addRes.ok) {
+      postHistory({
+        showName,
+        type: "errTor",
+        description: `qbt add failed: ${addRes.text || "Fails."} | ${showName}`,
+      });
       return res
         .status(500)
         .json({ error: `qBittorrent add failed: ${addRes.text || "Fails."}` });
     }
+    postHistory({
+      showName,
+      type: "torSent",
+      description: `torrent file | ${showName}`,
+    });
     res.json({
       success: true,
       filename: showName,

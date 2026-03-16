@@ -160,6 +160,12 @@ handleMsg = async (msg) => {
     return;
   }
 
+  // Handle Fix/ffmpeg logs (server->client push)
+  if (status === "fix-log") {
+    evtBus.emit("fix-log", result);
+    return;
+  }
+
   // Handle server->client notifications (id === 0)
   if (id === 0 && notification) {
     evtBus.emit(notification, result);
@@ -390,6 +396,11 @@ export function getSeriesMapFromTvdb(params) {
 export function handleAsr(params) {
   return fCall("handleAsr", params);
 }
+
+export function handleFix(params) {
+  return fCall("handleFix", params);
+}
+
 export function setTvdbFields(params) {
   const keys = Object.keys(params || {}).filter((k) => k !== "name");
   const stack = new Error().stack.split("\n").slice(1, 5).join(" | ");

@@ -16,8 +16,9 @@
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        flex: showSubs || showAsr ? '0 0 50%' : '1 1 auto',
-        borderBottom: showSubs || showAsr ? '1px solid #ddd' : 'none',
+        flex: showSubs || showAsr || showFix ? '0 0 50%' : '1 1 auto',
+        borderBottom:
+          showSubs || showAsr || showFix ? '1px solid #ddd' : 'none',
       }"
     >
       <!-- Header -->
@@ -62,7 +63,7 @@
             margin-right: 10px;
           "
         >
-          To show
+          To
         </button>
 
         <button
@@ -77,7 +78,7 @@
             margin-right: 10px;
           "
         >
-          From show
+          From
         </button>
 
         <button
@@ -109,6 +110,20 @@
         </button>
 
         <button
+          @click="clickFix"
+          :style="{
+            cursor: 'pointer',
+            borderRadius: '7px',
+            padding: '4px 10px',
+            border: '1px solid #bbb',
+            backgroundColor: showFix ? '#ddd' : 'whitesmoke',
+            marginRight: '10px',
+          }"
+        >
+          Fix
+        </button>
+
+        <button
           @click="deleteSelected"
           :disabled="loading || (!selectedName && selectedFiles.size === 0)"
           title="Delete selected files"
@@ -121,7 +136,7 @@
             margin-right: 10px;
           "
         >
-          Delete
+          Del
         </button>
 
         <button
@@ -135,7 +150,7 @@
             background-color: whitesmoke;
           "
         >
-          Refresh
+          Ref
         </button>
       </div>
 
@@ -252,6 +267,96 @@
         "
       >
         {{ asrLogs }}
+      </div>
+    </div>
+
+    <!-- Fix Pane -->
+    <div
+      id="fixPane"
+      v-show="showFix"
+      :style="{
+        flex: '1 1 50%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        backgroundColor: '#fafafa',
+        color: '#000',
+        fontFamily: 'monospace',
+        padding: '10px',
+        borderLeft: '1px solid #ddd',
+      }"
+    >
+      <div
+        style="
+          flex: 0 0 auto;
+          border-bottom: 1px solid #ddd;
+          padding-bottom: 5px;
+          margin-bottom: 5px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
+        <div>
+          <strong>FFMPEG Output</strong> <span v-if="fixBusy">(Running)</span>
+        </div>
+        <div>
+          <button
+            @click="startFix"
+            :disabled="fixBusy"
+            :style="{
+              cursor: fixBusy ? 'not-allowed' : 'pointer',
+              borderRadius: '4px',
+              padding: '2px 8px',
+              border: '1px solid #bbb',
+              backgroundColor: 'whitesmoke',
+              marginRight: '5px',
+              opacity: fixBusy ? 0.6 : 1,
+            }"
+          >
+            Start
+          </button>
+          <button
+            @click="clearFixLog"
+            :style="{
+              cursor: 'pointer',
+              borderRadius: '4px',
+              padding: '2px 8px',
+              border: '1px solid #bbb',
+              backgroundColor: 'whitesmoke',
+              marginRight: '5px',
+            }"
+          >
+            Clear
+          </button>
+          <button
+            @click="killFix"
+            :disabled="!fixBusy"
+            :style="{
+              cursor: !fixBusy ? 'not-allowed' : 'pointer',
+              borderRadius: '4px',
+              padding: '2px 8px',
+              border: '1px solid #bbb',
+              backgroundColor: 'whitesmoke',
+              opacity: !fixBusy ? 0.6 : 1,
+            }"
+          >
+            Kill
+          </button>
+        </div>
+      </div>
+      <div
+        ref="fixScroll"
+        style="
+          flex: 1 1 auto;
+          overflow: auto;
+          white-space: pre-wrap;
+          background-color: #fff;
+          border: 1px solid #eee;
+          padding: 4px;
+        "
+      >
+        {{ fixLogs }}
       </div>
     </div>
 
@@ -490,6 +595,7 @@ import {
   getSubFileIds,
   offsetSubFiles,
   handleAsr,
+  handleFix,
 } from "../srvr.js";
 import evtBus from "../evtBus.js";
 import * as util from "../util.js";
@@ -542,6 +648,13 @@ export default {
       asrBusy: false,
       activeAsrPath: null,
       ignoreLogs: false,
+
+      // Fix (ffmpeg)
+      showFix: false,
+      fixLogs: "",
+      fixBusy: false,
+      activeFixPath: null,
+      ignoreFixLogs: false,
     };
   },
   created() {
@@ -584,20 +697,46 @@ export default {
         });
       }
     },
+    fixLogs() {
+      const el = this.$refs.fixScroll;
+      if (!el) return;
+      const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50;
+      if (isAtBottom) {
+        this.$nextTick(() => {
+          this.scrollToFixBottom();
+        });
+      }
+    },
+    showFix(val) {
+      if (val) {
+        this.$nextTick(() => {
+          this.scrollToFixBottom();
+        });
+      }
+    },
   },
   mounted() {
     if (this.active && !this.hasLoaded) {
       this.fetchFiles();
     }
     evtBus.on("asr-log", this.onAsrLog);
+    evtBus.on("fix-log", this.onFixLog);
     this.initAsrState();
+    this.initFixState();
   },
   unmounted() {
     evtBus.off("asr-log", this.onAsrLog);
+    evtBus.off("fix-log", this.onFixLog);
   },
   methods: {
     scrollToAsrBottom() {
       const el = this.$refs.asrScroll;
+      if (el) {
+        el.scrollTop = el.scrollHeight;
+      }
+    },
+    scrollToFixBottom() {
+      const el = this.$refs.fixScroll;
       if (el) {
         el.scrollTop = el.scrollHeight;
       }
@@ -1076,7 +1215,10 @@ export default {
     // Subtitles logic
     clickAsr() {
       this.showAsr = !this.showAsr;
-      if (this.showAsr) this.showSubs = false;
+      if (this.showAsr) {
+        this.showSubs = false;
+        this.showFix = false;
+      }
     },
     async clearAsrLog() {
       this.asrLogs = "";
@@ -1219,10 +1361,111 @@ export default {
         console.error("Failed to init Asr State", e);
       }
     },
+    clickFix() {
+      this.showFix = !this.showFix;
+      if (this.showFix) {
+        this.showSubs = false;
+        this.showAsr = false;
+      }
+    },
+    async clearFixLog() {
+      this.fixLogs = "";
+    },
+    async startFix() {
+      if (this.fixBusy) return;
+
+      let startPath = null;
+      if (this.selectedFiles.size === 1) {
+        const relPath = [...this.selectedFiles][0];
+        startPath = relPath;
+      } else if (this.selectedName) {
+        const node = this.tree.find((n) => n.name === this.selectedName);
+        if (node && node.type === "folder") startPath = node.name;
+      }
+
+      if (!startPath) {
+        if (this.activeFixPath) startPath = this.activeFixPath;
+        else {
+          this.fixLogs += "\n[Error] No file or folder selected for ffmpeg.\n";
+          return;
+        }
+      }
+
+      this.fixBusy = true;
+      this.activeFixPath = startPath;
+      this.ignoreFixLogs = true;
+      this.fixLogs = "";
+      this.showFix = true;
+      this.showSubs = false;
+      this.showAsr = false;
+
+      try {
+        this.ignoreFixLogs = false;
+        const res = await handleFix({ action: "start", path: startPath });
+        if (res && res.error) {
+          this.fixLogs += `Start Error: ${res.error}\nStderr: ${res.stderr || ""}\n`;
+          this.fixBusy = false;
+          return;
+        }
+        if (res && res.stdout) {
+          console.log("Fix Start stdout:", res.stdout);
+        }
+      } catch (e) {
+        this.ignoreFixLogs = false;
+        this.fixLogs += `Error starting ffmpeg: ${e.message}\n`;
+        this.fixBusy = false;
+      }
+    },
+    async killFix() {
+      try {
+        const res = await handleFix({ action: "kill" });
+        this.fixLogs += `\n[Kill command sent]\n`;
+        if (res && res.stdout) this.fixLogs += res.stdout;
+        if (res && res.stderr) this.fixLogs += res.stderr;
+      } catch (e) {
+        this.fixLogs += `\nError killing ffmpeg: ${e.message}\n`;
+      }
+      this.fixBusy = false;
+    },
+    onFixLog(msg) {
+      if (this.ignoreFixLogs) return;
+      if (!msg) return;
+
+      const el = this.$refs.fixScroll;
+      let atBottom = true;
+      if (el) {
+        atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50;
+      }
+
+      this.fixLogs += msg;
+
+      if (msg.includes("[fix] EXIT")) {
+        this.fixBusy = false;
+      }
+
+      if (atBottom) {
+        this.$nextTick(() => {
+          if (el) el.scrollTop = el.scrollHeight;
+        });
+      }
+    },
+    async initFixState() {
+      try {
+        const res = await handleFix({ action: "check" });
+        if (res && res.running) {
+          this.fixBusy = true;
+        } else {
+          this.fixBusy = false;
+        }
+      } catch (e) {
+        console.error("Failed to init Fix State", e);
+      }
+    },
     toggleSubs() {
       this.showSubs = !this.showSubs;
       if (this.showSubs) {
         this.showAsr = false;
+        this.showFix = false;
         this.loadSubs();
       }
     },

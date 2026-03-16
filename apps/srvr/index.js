@@ -14,6 +14,7 @@ import * as util from "./src/util.js";
 import * as email from "./src/email.js";
 import * as tmdb from "./src/tmdb.js";
 import { handleAsr } from "./src/asr.js";
+import { handleFix } from "./src/fix.js";
 import { checkFlexgetStatus } from "../api/src/usb.js";
 import fetch from "node-fetch";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
@@ -3118,6 +3119,8 @@ wss.on("connection", (ws) => {
     // Only handleAsr uses WebSocket
     if (fname == "handleAsr") {
       handleAsr(ws, id, param);
+    } else if (fname == "handleFix") {
+      handleFix(ws, id, param);
     } else {
       console.warn("WebSocket function not supported (use HTTP):", fname);
       try {

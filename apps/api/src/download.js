@@ -222,6 +222,15 @@ function isExtrasPath(filePath) {
   return EXTRAS_DIR_RE.test(String(filePath || ""));
 }
 
+function torrentNameHasSeasonRange(name) {
+  const s = String(name || "");
+  return (
+    /s\d{1,2}\s*-\s*(?:s\s*)?\d{1,2}/i.test(s) ||
+    /seasons?\s+\d{1,2}\s*-\s*\d{1,2}/i.test(s) ||
+    /\bcomplete\s+series\b/i.test(s)
+  );
+}
+
 function validateTorrentData(torrentData) {
   try {
     const parsedTorrent = parseTorrent(torrentData);
@@ -231,6 +240,13 @@ function validateTorrentData(torrentData) {
     const allPaths = files
       .map((f) => String(f?.path || f?.name || ""))
       .filter(Boolean);
+
+    // Season-range packs (S01-S03) and complete-series torrents often contain
+    // DVD/ISO files whose names lack episode numbers.  The torrent name itself
+    // is sufficient proof that the content covers whole seasons.
+    if (torrentNameHasSeasonRange(parsedTorrent?.name)) {
+      return ok();
+    }
 
     // Prefer video files for validation (avoid NFO/SRT triggering false failures).
     // Also exclude well-known extras/bonus directories so featurettes don't cause failures.

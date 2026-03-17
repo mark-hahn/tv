@@ -1703,6 +1703,8 @@ const markFinished = (titleOrEntry, localPath) => {
   }
 };
 
+const getWorkerCount = () => workerCount;
+
 export {
   addEntry,
   markFinished,
@@ -1716,4 +1718,5 @@ export {
   deleteProcids,
   retryEntry,
   deleteErrorRecords,
+  getWorkerCount,
 };

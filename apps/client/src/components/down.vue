@@ -813,6 +813,18 @@ export default {
         return { seasonEpisode, rest: parts.join(" | ") };
       }
 
+      if (statusLower === "encoding") {
+        if (Number.isFinite(progress) && progress >= 0 && progress <= 100) {
+          parts.push(`${progress}%`);
+        }
+        const eta = this.fmtEtaRemaining(it?.eta);
+        if (eta) parts.push(eta);
+        const etaTimestamp = this.fmtEtaTimestamp(it?.eta);
+        if (etaTimestamp) parts.push(etaTimestamp);
+        parts.push("Encoding");
+        return { seasonEpisode, rest: parts.join(" | ") };
+      }
+
       if (speed) parts.push(speed);
       if (status) parts.push(status);
       else parts.push("Unknown");
@@ -1215,7 +1227,7 @@ export default {
           const st = String(it?.status || "")
             .trim()
             .toLowerCase();
-          if (st !== "downloading") return false;
+          if (st !== "downloading" && st !== "encoding") return false;
           const ended = Number(it?.dateEnded);
           // Old behavior: treat downloads with no/zero end time as active.
           return !Number.isFinite(ended) || ended === 0;

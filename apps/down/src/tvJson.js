@@ -682,7 +682,7 @@ const openDb = () => {
       eta=excluded.eta,
       speed=excluded.speed,
       sequence=excluded.sequence,
-      fileSize=excluded.fileSize,
+      fileSize=CASE WHEN excluded.fileSize > 0 THEN excluded.fileSize ELSE fileSize END,
       season=excluded.season,
       episode=excluded.episode,
       dateStarted=excluded.dateStarted,
@@ -948,9 +948,16 @@ const loadOnStart = () => {
       "UPDATE tv_entries SET status='waiting' WHERE status='future'",
     ).run();
   } catch {}
+  // DVD entries that were mid-download are stale after restart — remove them.
+  // The DVD pre-pass will recreate them if needed.
   try {
     db.prepare(
-      "UPDATE tv_entries SET inProgress=0, status='waiting', progress=0, eta=NULL, speed=0, dateEnded=NULL WHERE inProgress=1 OR status='downloading'",
+      "DELETE FROM tv_entries WHERE title LIKE 'DVD:%' AND (inProgress=1 OR status='downloading' OR status='waiting')",
+    ).run();
+  } catch {}
+  try {
+    db.prepare(
+      "UPDATE tv_entries SET inProgress=0, status='waiting', progress=0, eta=NULL, speed=0, dateEnded=NULL WHERE (inProgress=1 OR status='downloading') AND title NOT LIKE 'DVD:%'",
     ).run();
   } catch {}
 
@@ -1705,6 +1712,19 @@ const markFinished = (titleOrEntry, localPath) => {
 
 const getWorkerCount = () => workerCount;
 
+// Direct entry upsert without starting a worker. Used by DVD processing
+// to create and update card entries that manage their own lifecycle.
+const upsertDvdEntry = (entry) => {
+  if (!entry || typeof entry !== "object") return;
+  openDb();
+  const e = { ...entry };
+  if (!(typeof e.procId === "number" && Number.isInteger(e.procId))) {
+    e.procId = nextProcId++;
+  }
+  upsertEntry(e);
+  return e.procId;
+};
+
 export {
   addEntry,
   markFinished,
@@ -1719,4 +1739,5 @@ export {
   retryEntry,
   deleteErrorRecords,
   getWorkerCount,
+  upsertDvdEntry,
 };

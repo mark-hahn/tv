@@ -916,12 +916,20 @@ export default {
       }
       if (files.length === 0) return;
 
-      // Validate each file can be parsed (title + season + episode).
+      // Separate DVD files (inside VIDEO_TS folders) from regular files.
+      const extractPath = (fe) =>
+        fe.split("-").slice(0, -1).join("-").slice(11);
+      const dvdFiles = files.filter((fe) =>
+        extractPath(fe).includes("/VIDEO_TS/"),
+      );
+      const regularFiles = files.filter(
+        (fe) => !extractPath(fe).includes("/VIDEO_TS/"),
+      );
+
+      // Validate regular files can be parsed (title + season + episode).
       const parseErrors = [];
-      for (const fileEntry of files) {
-        const parts = fileEntry.split("-");
-        parts.pop(); // remove size
-        const filePath = parts.join("-").slice(11); // strip YYYY-MM-DD-
+      for (const fileEntry of regularFiles) {
+        const filePath = extractPath(fileEntry);
         const pathParts = filePath.split("/");
         const fname = pathParts[pathParts.length - 1];
         const folderName =
@@ -943,10 +951,31 @@ export default {
           .map((s) => s.Name || s.name)
           .filter(Boolean);
         const notInEmby = [];
-        for (const fileEntry of files) {
-          const parts2 = fileEntry.split("-");
-          parts2.pop();
-          const filePath2 = parts2.join("-").slice(11);
+
+        // Check DVD files by top-level folder name (not individual VOBs).
+        const dvdFolders = new Set();
+        for (const fe of dvdFiles) {
+          const topFolder = extractPath(fe).split("/")[0];
+          if (topFolder) dvdFolders.add(topFolder);
+        }
+        for (const folder of dvdFolders) {
+          let parsedPtt = {};
+          try {
+            if (typeof parseTorrentTitle === "function")
+              parsedPtt = parseTorrentTitle(folder) || {};
+            else if (parseTorrentTitle?.parse)
+              parsedPtt = parseTorrentTitle.parse(folder) || {};
+          } catch (e) {}
+          const title = parseTitleFromFilename(folder, "", parsedPtt);
+          if (title) {
+            const match = smartTitleMatch(title, embyShows, null, false);
+            if (!match) notInEmby.push(title);
+          }
+        }
+
+        // Check regular files individually.
+        for (const fileEntry of regularFiles) {
+          const filePath2 = extractPath(fileEntry);
           const pathParts2 = filePath2.split("/");
           const fname2 = pathParts2[pathParts2.length - 1];
           const folderName2 =

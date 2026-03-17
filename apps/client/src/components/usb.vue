@@ -66,7 +66,7 @@
 
         <button
           @click="forceDown"
-          :disabled="loading || (!selectedName && selectedFiles.size === 0)"
+          :disabled="loading || !hasSelection"
           style="
             cursor: pointer;
             border-radius: 7px;
@@ -214,6 +214,11 @@ export default {
     };
   },
   computed: {
+    hasSelection() {
+      const hasName = !!this.selectedName;
+      const hasFiles = this.selectedFiles.size > 0;
+      return hasName || hasFiles;
+    },
     pruneLineText() {
       if (this.pruneBusy) return this.pruneLiveLine || "Pruning...";
       return this.pruneSummaryLine || "";

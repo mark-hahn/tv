@@ -1308,9 +1308,20 @@ async function main() {
       return;
     }
 
+    // Skip jobs whose output MKV already exists — don't create cards or re-process them.
+    const pendingJobs = allJobs.filter((job) => !fs.existsSync(job.outPath));
+    if (pendingJobs.length === 0) {
+      usbFiles = usbFiles.filter((line) => {
+        const noSize = line.split("-").slice(0, -1).join("-");
+        const relPath = noSize.slice(11);
+        return !dvdTorrentFolders.has(relPath.split("/")[0]);
+      });
+      return;
+    }
+
     // Create all cards upfront as "waiting".
     const unixNow = () => Math.floor(Date.now() / 1000);
-    for (const job of allJobs) {
+    for (const job of pendingJobs) {
       tvJson.upsertDvdEntry({
         title: job.outName,
         seriesName: job.showTitle,
@@ -1337,7 +1348,7 @@ async function main() {
     let jobActive = 0;
     const completedFolders = new Set();
     const folderJobsRemaining = new Map();
-    for (const job of allJobs) {
+    for (const job of pendingJobs) {
       folderJobsRemaining.set(
         job.torrentFolder,
         (folderJobsRemaining.get(job.torrentFolder) || 0) + 1,
@@ -1345,7 +1356,7 @@ async function main() {
     }
 
     await new Promise((resolveAll) => {
-      if (allJobs.length === 0) return resolveAll();
+      if (pendingJobs.length === 0) return resolveAll();
 
       const launchNext = () => {
         const regularWorkers = tvJson.getWorkerCount
@@ -1353,8 +1364,8 @@ async function main() {
           : 0;
         const maxDvd = Math.max(0, MAX_TOTAL_WORKERS - regularWorkers);
 
-        while (jobIdx < allJobs.length && jobActive < maxDvd) {
-          const job = allJobs[jobIdx++];
+        while (jobIdx < pendingJobs.length && jobActive < maxDvd) {
+          const job = pendingJobs[jobIdx++];
           jobActive++;
           processDvdJob(job)
             .catch((e) => {
@@ -1389,7 +1400,7 @@ async function main() {
                   `[${cycleTsPST()}] DVD: cleaned up staging for "${job.torrentFolder}"`,
                 );
               }
-              if (jobIdx >= allJobs.length && jobActive === 0) {
+              if (jobIdx >= pendingJobs.length && jobActive === 0) {
                 resolveAll();
               } else {
                 launchNext();
@@ -1397,7 +1408,7 @@ async function main() {
             });
         }
 
-        if (jobIdx >= allJobs.length && jobActive === 0) resolveAll();
+        if (jobIdx >= pendingJobs.length && jobActive === 0) resolveAll();
       };
 
       launchNext();

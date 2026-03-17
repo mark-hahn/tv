@@ -458,9 +458,7 @@
           </button>
           <button
             @click="applySubs"
-            :disabled="
-              applyInProgress || Object.keys(selectedSubKeys).length === 0
-            "
+            :disabled="applyInProgress"
             style="
               cursor: pointer;
               border-radius: 7px;
@@ -494,15 +492,7 @@
             "
             style="height: 1px; background-color: #000; margin: 4px 0"
           ></div>
-          <div
-            @click="handleSubClick($event, item)"
-            :style="getSubCardStyle(item)"
-            @mouseenter="
-              $event.currentTarget.style.boxShadow =
-                '0 2px 8px rgba(0,0,0,0.15)'
-            "
-            @mouseleave="$event.currentTarget.style.boxShadow = 'none'"
-          >
+          <div :style="getSubCardStyle()">
             <div
               style="
                 display: flex;
@@ -629,8 +619,6 @@ export default {
       subsLoading: false,
       subsError: null,
       hasSearchedSubs: false,
-      selectedSubKeys: {},
-      lastClickedSubKey: null,
       applyInProgress: false,
       applyFailures: [],
       showApplyFailuresModal: false,
@@ -1791,44 +1779,14 @@ export default {
 
       return { season: bestSeason, episode: bestEpisode };
     },
-    getSubCardStyle(item) {
-      const isSelected = item.key in this.selectedSubKeys;
+    getSubCardStyle() {
       return {
         padding: "8px",
-        background: isSelected ? "#fffacd" : "#fff",
+        background: "#fff",
         borderRadius: "5px",
         border: "1px solid #ddd",
-        cursor: "pointer",
         marginBottom: "4px",
-        userSelect: "none",
       };
-    },
-    handleSubClick(event, item) {
-      const key = item.key;
-      const isCtrl = !!(event.ctrlKey || event.metaKey);
-      const isShift = !!event.shiftKey;
-
-      if (isShift && this.lastClickedSubKey) {
-        // Range select (simplified: index based)
-        const idx1 = this.subsItems.findIndex(
-          (i) => i.key === this.lastClickedSubKey,
-        );
-        const idx2 = this.subsItems.findIndex((i) => i.key === key);
-        if (idx1 !== -1 && idx2 !== -1) {
-          const s = Math.min(idx1, idx2);
-          const e = Math.max(idx1, idx2);
-          const range = this.subsItems.slice(s, e + 1);
-          range.forEach((i) => (this.selectedSubKeys[i.key] = true));
-        }
-      } else if (isCtrl) {
-        if (key in this.selectedSubKeys) delete this.selectedSubKeys[key];
-        else this.selectedSubKeys[key] = true;
-      } else {
-        this.selectedSubKeys = {};
-        this.selectedSubKeys[key] = true;
-      }
-      this.lastClickedSubKey = key;
-      this.cumulativeTrim = 0;
     },
     async adjustOffset(offset) {
       if (this._trimBusy) return;
@@ -1837,10 +1795,7 @@ export default {
         if (!offset || typeof offset !== "number") return;
         // Build Payload
         const payload = [];
-        for (const key of Object.keys(this.selectedSubKeys)) {
-          const item = this.subsItems.find((i) => i.key === key);
-          if (!item) continue;
-
+        for (const item of this.subsItems) {
           let fileId = item.file_id;
           if (!fileId) {
             const entry = item.raw;
@@ -1926,15 +1881,11 @@ export default {
     },
     async applySubs() {
       if (this.applyInProgress) return;
-      if (Object.keys(this.selectedSubKeys).length === 0) return;
 
       this.applyInProgress = true;
       const payload = [];
 
-      for (const key of Object.keys(this.selectedSubKeys)) {
-        const item = this.subsItems.find((i) => i.key === key);
-        if (!item) continue;
-
+      for (const item of this.subsItems) {
         let fileId = item.file_id;
         if (!fileId) {
           const entry = item.raw;

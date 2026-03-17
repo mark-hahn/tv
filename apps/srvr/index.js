@@ -2479,9 +2479,7 @@ const applySubFiles = async (params) => {
 
       const fileBase = fileName.slice(0, -(ext.length + 1));
 
-      // Find the first candidate that (a) doesn't already exist on disk and
-      // (b) successfully downloads. Only write one new srt per video per call.
-      let wroteOneForThisVideo = false;
+      // Apply all candidates that don't already exist on disk.
       for (const cand of candidates) {
         const srtName = `${fileBase}.${cand.fileIdBase32}.srt`;
         const outPath = path.join(seasonPath, srtName);
@@ -2601,17 +2599,10 @@ const applySubFiles = async (params) => {
         try {
           await fs.promises.writeFile(outPath, srtText, "utf8");
           appliedSet.add(fid);
-          wroteOneForThisVideo = true;
-          break;
         } catch {
-          // If write fails, try next candidate (maybe different season path or name).
+          // If write fails, continue to next candidate.
           continue;
         }
-      }
-
-      if (wroteOneForThisVideo) {
-        // Ensure only one new srt per video per call.
-        continue;
       }
     }
   }

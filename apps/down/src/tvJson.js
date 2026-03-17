@@ -415,6 +415,12 @@ const tvResync = () => {
           if (status !== "finished") continue;
           if (Number.isFinite(error) && error !== 0) continue;
 
+          // DVD:makemkv guard cards and tmp-dvd staging entries must never be
+          // deleted here — same exemption as hourlyUsbPruneAndTvResync.
+          if (title.startsWith("DVD:")) continue;
+          const localPathStr = r.localPath != null ? String(r.localPath) : "";
+          if (localPathStr.includes("tmp-dvd")) continue;
+
           if (!localPath || !path.isAbsolute(localPath)) {
             toDelete.push(title);
             continue;
@@ -518,6 +524,14 @@ const hourlyUsbPruneAndTvResync = (existingUsbDirs) => {
       const error = r.error == null ? 0 : Number(r.error);
       if (status !== "finished") continue;
       if (Number.isFinite(error) && error !== 0) continue;
+
+      // DVD:makemkv cards and per-file DVD staging entries must never be
+      // orphan-pruned — the finished DVD:makemkv card is the guard that
+      // prevents re-running makemkv after staging is cleaned up, and
+      // staged VOB/IFO/BUP files are intentionally deleted after processing.
+      if (title.startsWith("DVD:")) continue;
+      const localPathStr = r.localPath != null ? String(r.localPath) : "";
+      if (localPathStr.includes("tmp-dvd")) continue;
 
       // USB-dir pruning (existing behavior)
       try {
@@ -685,7 +699,7 @@ const openDb = () => {
       fileSize=CASE WHEN excluded.fileSize > 0 THEN excluded.fileSize ELSE fileSize END,
       season=excluded.season,
       episode=excluded.episode,
-      dateStarted=excluded.dateStarted,
+      dateStarted=CASE WHEN excluded.dateStarted > 0 THEN excluded.dateStarted ELSE dateStarted END,
       dateEnded=excluded.dateEnded,
       inProgress=excluded.inProgress,
       error=excluded.error,
@@ -1359,6 +1373,15 @@ const markError = (titleOrEntry, reason) => {
   } catch {}
 };
 
+const getEntryByTitle = (title) => {
+  try {
+    openDb();
+    return rowToEntry(stmtGetByTitle.get(String(title))) || null;
+  } catch {
+    return null;
+  }
+};
+
 const getDownloads = () => {
   try {
     openDb();
@@ -1729,6 +1752,7 @@ export {
   addEntry,
   markFinished,
   getDownloads,
+  getEntryByTitle,
   markError,
   pruneMissingUsbDirs,
   tvResync,

@@ -1079,24 +1079,28 @@ async function main() {
   tvDbErrCount = 0;
   skipPaths = null;
 
-  // DVD staging directory for rsync + ffmpeg processing.
+  // DVD staging directory on local server.
   const DVD_STAGE_DIR = "/mnt/media/tmp-dvd";
 
   // ---------------------------------------------------------------------------
-  // DVD folder processing: for each VTS title set (episode) on USB, rsync its
-  // VOBs directly, convert to MKV with ffmpeg, move to the proper
-  // /mnt/media/tv/<show>/Season N/ path, then clean up.  Each episode runs as
-  // an independent concurrent job (max 8 total shared with regular downloads).
+  // DVD folder processing:
+  //  1. Scan USB for every VOB/IFO/BUP file under VIDEO_TS directories.
+  //  2. Queue each file as an individual download via tvJson.addEntry so the
+  //     existing worker infrastructure handles it (one card per file).
+  //  3. On each cycle, check whether all files for a given VIDEO_TS disc are
+  //     fully staged.  When they are, run makemkvcon on the staged VIDEO_TS
+  //     folder, move the resulting MKVs to the proper Season directory, and
+  //     clean up.
   // ---------------------------------------------------------------------------
   const processDvdFolders = async () => {
-    // Scan USB for all VTS VOBs with sizes.
-    let vobScanLines;
+    // Scan USB for all VOB, IFO, and BUP files inside VIDEO_TS dirs.
+    let dvdFileScanLines;
     try {
       const { stdout } = await execAsync(
-        `ssh ${usbHost} "find files -ignore_readdir_race -type f -iname 'VTS_*_[1-9].VOB' -printf '%P\\t%s\\n' 2>/dev/null | sort"`,
+        `ssh ${usbHost} "find files -ignore_readdir_race -type f \\( -iname '*.VOB' -o -iname '*.IFO' -o -iname '*.BUP' \\) -printf '%P\\t%s\\n' 2>/dev/null | sort"`,
         { timeout: 60000 },
       );
-      vobScanLines = stdout
+      dvdFileScanLines = stdout
         .split("\n")
         .map((s) => s.trim())
         .filter(Boolean);
@@ -1104,13 +1108,14 @@ async function main() {
       return; // SSH failed — skip DVD processing this cycle
     }
 
-    if (vobScanLines.length === 0) return;
+    if (dvdFileScanLines.length === 0) return;
 
-    // Build job map: key = "torrentFolder|vtsDirRelative|vtsTitle"
-    // Each job covers one VTS title set (one episode) on one disc.
-    const jobMap = new Map();
+    // Group files by disc (VIDEO_TS dir) and resolve each torrent folder against Emby.
+    // discMap key = vtsDirRelative (e.g. "The Norm Show - Complete/NORMS1/Disc 1/VIDEO_TS")
+    // value = { torrentFolder, vtsDirRelative, files: [{relPath, fileBytes}], totalSize }
+    const discMap = new Map();
     const torrentFolderOrder = [];
-    for (const line of vobScanLines) {
+    for (const line of dvdFileScanLines) {
       const tabIdx = line.indexOf("\t");
       if (tabIdx < 0) continue;
       const relPath = line.slice(0, tabIdx); // relative to files/
@@ -1118,36 +1123,30 @@ async function main() {
       const parts = relPath.split("/");
       if (parts.length < 2) continue;
       const torrentFolder = parts[0];
-      const fname = parts[parts.length - 1];
-      const vtsDirRelative = parts.slice(0, -1).join("/");
-      const vtsTitleMatch = fname.match(/^(VTS_\d+)_\d+\.VOB$/i);
-      if (!vtsTitleMatch) continue;
-      const vtsTitle = vtsTitleMatch[1].toUpperCase();
+      // Only process files inside a VIDEO_TS directory
+      const videoTsIdx = parts.findIndex((p) => p.toUpperCase() === "VIDEO_TS");
+      if (videoTsIdx < 0) continue;
+      const vtsDirRelative = parts.slice(0, videoTsIdx + 1).join("/");
       if (!torrentFolderOrder.includes(torrentFolder))
         torrentFolderOrder.push(torrentFolder);
-      const jobKey = `${torrentFolder}|${vtsDirRelative}|${vtsTitle}`;
-      if (!jobMap.has(jobKey)) {
-        jobMap.set(jobKey, {
+      if (!discMap.has(vtsDirRelative)) {
+        discMap.set(vtsDirRelative, {
           torrentFolder,
           vtsDirRelative,
-          vtsTitle,
-          vobRelPaths: [],
+          files: [],
           totalSize: 0,
         });
       }
-      const job = jobMap.get(jobKey);
-      job.vobRelPaths.push(relPath);
-      job.totalSize += fileBytes;
+      const disc = discMap.get(vtsDirRelative);
+      disc.files.push({ relPath, fileBytes });
+      disc.totalSize += fileBytes;
     }
 
-    if (jobMap.size === 0) return;
+    if (discMap.size === 0) return;
 
-    console.log(
-      `[${cycleTsPST()}] DVD pre-pass: found ${jobMap.size} VTS job(s) across ${torrentFolderOrder.length} folder(s)`,
-    );
-
-    // Resolve each torrent folder against Emby and build the full job list.
-    const allJobs = [];
+    // Resolve each torrent folder against Emby.
+    // Build a map: torrentFolder -> { showTitle, tvdbId, embyFolderName, showDotName }
+    const torrentMeta = new Map();
     const dvdTorrentFolders = new Set();
     for (const torrentFolder of torrentFolderOrder) {
       if (
@@ -1161,7 +1160,6 @@ async function main() {
         );
         continue;
       }
-
       var parsed2 = {};
       try {
         parsed2 = parseTorrentTitle(torrentFolder) || {};
@@ -1175,7 +1173,6 @@ async function main() {
         );
         continue;
       }
-
       if (!embyMap) {
         console.log(
           `[${cycleTsPST()}] DVD: no embyMap loaded, skipping "${torrentFolder}"`,
@@ -1200,106 +1197,16 @@ async function main() {
         });
         continue;
       }
-
       dvdTorrentFolders.add(torrentFolder);
-      const embyFolderName = embyEntry.Path || embyKey;
-      const tvdbId = embyEntry.tvdbId || null;
-      const showDotName = torrentFolder.replace(/ /g, ".");
-
-      // Collect jobs for this folder and sort for stable episode ordering.
-      const folderJobs = [...jobMap.values()].filter(
-        (j) => j.torrentFolder === torrentFolder,
-      );
-      folderJobs.sort(
-        (a, b) =>
-          a.vtsDirRelative.localeCompare(b.vtsDirRelative) ||
-          a.vtsTitle.localeCompare(b.vtsTitle),
-      );
-
-      // Count VTS titles per vtsDirRelative to decide episode numbering.
-      const vtsCountPerDir = new Map();
-      for (const j of folderJobs) {
-        vtsCountPerDir.set(
-          j.vtsDirRelative,
-          (vtsCountPerDir.get(j.vtsDirRelative) || 0) + 1,
-        );
-      }
-
-      const seasonEpisodeCounters = {};
-      let prevSeasonKey2 = "";
-      for (const j of folderJobs) {
-        // Skip tiny title sets (< 50 MB) — menus/extras.
-        if (j.totalSize < 52428800) {
-          console.log(
-            `[${cycleTsPST()}] DVD: skipping small job ${j.vtsTitle} in ${j.vtsDirRelative} (${sizeStr(j.totalSize, { suffix: "B" })})`,
-          );
-          continue;
-        }
-
-        // Determine season number from path components above VIDEO_TS.
-        const dirParts = j.vtsDirRelative.split("/");
-        let dvdSeason = 1;
-        for (let pidx = 1; pidx < dirParts.length; pidx++) {
-          const sm =
-            dirParts[pidx].match(/[Ss](?:eason)?\s*(\d+)/) ||
-            dirParts[pidx].match(/(\d+)\s*$/);
-          if (sm) {
-            dvdSeason = parseInt(sm[1], 10);
-            break;
-          }
-        }
-
-        const seasonKey2 = String(dvdSeason);
-        if (seasonKey2 !== prevSeasonKey2) {
-          if (!seasonEpisodeCounters[seasonKey2])
-            seasonEpisodeCounters[seasonKey2] = 0;
-          prevSeasonKey2 = seasonKey2;
-        }
-
-        const titleCountForDir = vtsCountPerDir.get(j.vtsDirRelative) || 1;
-        let eNum;
-        if (titleCountForDir > 1) {
-          // Multiple VTS titles on same disc → use VTS number as episode.
-          const vtsNum = parseInt((j.vtsTitle.match(/\d+/) || ["0"])[0], 10);
-          eNum = `E${String(vtsNum).padStart(2, "0")}`;
-        } else {
-          seasonEpisodeCounters[seasonKey2]++;
-          eNum = `E${String(seasonEpisodeCounters[seasonKey2]).padStart(2, "0")}`;
-        }
-
-        const sNum = `S${String(dvdSeason).padStart(2, "0")}`;
-        const outName = `${showDotName}.${sNum}${eNum}.DVDRip.mkv`;
-        const seasonDir = `${tvPath}${embyFolderName}/Season ${dvdSeason}`;
-        const outPath = path.join(seasonDir, outName);
-        const stageDir = path.join(DVD_STAGE_DIR, torrentFolder);
-
-        allJobs.push({
-          torrentFolder,
-          showTitle,
-          tvdbId,
-          embyFolderName,
-          showDotName,
-          vtsTitle: j.vtsTitle,
-          vtsDirRelative: j.vtsDirRelative,
-          vobRelPaths: j.vobRelPaths,
-          totalSize: j.totalSize,
-          dvdSeason,
-          outName,
-          seasonDir,
-          outPath,
-          stageDir,
-        });
-      }
-
-      postHistory({
-        tvdbId,
-        showName: showTitle,
-        type: "dvdProc",
-        description: `DVD download starting: ${torrentFolder}`,
+      torrentMeta.set(torrentFolder, {
+        showTitle,
+        tvdbId: embyEntry.tvdbId || null,
+        embyFolderName: embyEntry.Path || embyKey,
+        showDotName: torrentFolder.replace(/ /g, "."),
       });
     }
 
-    if (allJobs.length === 0) {
+    if (dvdTorrentFolders.size === 0) {
       usbFiles = usbFiles.filter((line) => {
         const noSize = line.split("-").slice(0, -1).join("-");
         const relPath = noSize.slice(11);
@@ -1308,113 +1215,82 @@ async function main() {
       return;
     }
 
-    // Skip jobs whose output MKV already exists — don't create cards or re-process them.
-    const pendingJobs = allJobs.filter((job) => !fs.existsSync(job.outPath));
-    if (pendingJobs.length === 0) {
-      usbFiles = usbFiles.filter((line) => {
-        const noSize = line.split("-").slice(0, -1).join("-");
-        const relPath = noSize.slice(11);
-        return !dvdTorrentFolders.has(relPath.split("/")[0]);
-      });
-      return;
-    }
-
-    // Create all cards upfront as "waiting".
     const unixNow = () => Math.floor(Date.now() / 1000);
-    for (const job of pendingJobs) {
-      tvJson.upsertDvdEntry({
-        title: job.outName,
-        seriesName: job.showTitle,
-        tvdbId: job.tvdbId,
-        status: "waiting",
-        progress: 0,
-        speed: 0,
-        eta: null,
-        dateStarted: unixNow(),
-        dateEnded: null,
-        localPath: job.seasonDir + "/",
-        usbPath: `files/${job.torrentFolder}/`,
-        season: job.dvdSeason,
-        episode: 0,
-        fileSize: job.totalSize,
-        inProgress: true,
-        error: false,
-      });
-    }
 
-    // Run all jobs concurrently, respecting the global 8-worker limit.
-    const MAX_TOTAL_WORKERS = 8;
-    let jobIdx = 0;
-    let jobActive = 0;
-    const completedFolders = new Set();
-    const folderJobsRemaining = new Map();
-    for (const job of pendingJobs) {
-      folderJobsRemaining.set(
-        job.torrentFolder,
-        (folderJobsRemaining.get(job.torrentFolder) || 0) + 1,
-      );
-    }
+    // For each disc, either queue missing files or run makemkv if all staged.
+    for (const [vtsDirRelative, disc] of discMap) {
+      const { torrentFolder } = disc;
+      if (!dvdTorrentFolders.has(torrentFolder)) continue;
+      const meta = torrentMeta.get(torrentFolder);
+      if (!meta) continue;
 
-    await new Promise((resolveAll) => {
-      if (pendingJobs.length === 0) return resolveAll();
+      // If the DVD:makemkv card for this disc is already finished, skip entirely.
+      const makemkvCardTitle = `DVD:makemkv:${vtsDirRelative}`;
+      const makemkvCard = tvJson.getEntryByTitle(makemkvCardTitle);
+      if (makemkvCard && makemkvCard.status === "finished") continue;
 
-      const launchNext = () => {
-        const regularWorkers = tvJson.getWorkerCount
-          ? tvJson.getWorkerCount()
-          : 0;
-        const maxDvd = Math.max(0, MAX_TOTAL_WORKERS - regularWorkers);
+      const localVtsDir = path.join(DVD_STAGE_DIR, vtsDirRelative);
 
-        while (jobIdx < pendingJobs.length && jobActive < maxDvd) {
-          const job = pendingJobs[jobIdx++];
-          jobActive++;
-          processDvdJob(job)
-            .catch((e) => {
-              err(
-                "DVD job failed for",
-                job.outName,
-                ":",
-                e && e.message ? e.message : String(e),
-              );
-              tvJson.upsertDvdEntry({
-                title: job.outName,
-                seriesName: job.showTitle,
-                status: `failed: ${e && e.message ? e.message : String(e)}`,
-                dateEnded: unixNow(),
-                inProgress: false,
-                error: true,
-              });
-            })
-            .finally(async () => {
-              jobActive--;
-              const remaining =
-                (folderJobsRemaining.get(job.torrentFolder) || 1) - 1;
-              folderJobsRemaining.set(job.torrentFolder, remaining);
-              if (remaining === 0 && !completedFolders.has(job.torrentFolder)) {
-                completedFolders.add(job.torrentFolder);
-                try {
-                  await execAsync(`rm -rf "${job.stageDir}"`, {
-                    timeout: 60000,
-                  });
-                } catch (e) {}
-                console.log(
-                  `[${cycleTsPST()}] DVD: cleaned up staging for "${job.torrentFolder}"`,
-                );
-              }
-              if (jobIdx >= pendingJobs.length && jobActive === 0) {
-                resolveAll();
-              } else {
-                launchNext();
-              }
-            });
+      // Check which files are already staged.
+      const missingFiles = disc.files.filter(({ relPath }) => {
+        const localPath = path.join(DVD_STAGE_DIR, relPath);
+        try {
+          return !fs.existsSync(localPath);
+        } catch {
+          return true;
         }
+      });
 
-        if (jobIdx >= pendingJobs.length && jobActive === 0) resolveAll();
-      };
+      if (missingFiles.length > 0) {
+        // Queue missing files as individual download entries.
+        try {
+          fs.mkdirSync(localVtsDir, { recursive: true });
+        } catch (e) {}
 
-      launchNext();
-    });
+        for (const { relPath, fileBytes } of missingFiles) {
+          const fileName = path.basename(relPath);
+          const localDir =
+            path.join(DVD_STAGE_DIR, path.dirname(relPath)) + "/";
+          // Use full relPath as the DB title for uniqueness across discs.
+          // usbPath = "files/" so that usbPath + title = full remote path.
+          const dbTitle = relPath; // e.g. "The Norm Show - Complete/NORMS1/Disc 1/VIDEO_TS/VTS_01_1.VOB"
 
-    // Remove processed DVD folders from the per-file list.
+          // Skip if already in DB and not errored (use precise title lookup, not capped getDownloads).
+          const existing = tvJson.getEntryByTitle(dbTitle);
+          if (existing && !existing.error) continue;
+
+          try {
+            fs.mkdirSync(localDir, { recursive: true });
+          } catch (e) {}
+
+          tvJson.addEntry({
+            usbPath: "files/",
+            localPath: localDir,
+            title: dbTitle,
+            destTitle: fileName,
+            seriesName: meta.showTitle,
+            tvdbId: meta.tvdbId,
+            status: "waiting",
+            progress: 0,
+            eta: null,
+            speed: 0,
+            fileSize: fileBytes,
+            season: 0,
+            episode: 0,
+            dateStarted: 0,
+            dateEnded: null,
+          });
+        }
+        console.log(
+          `[${cycleTsPST()}] DVD: queued missing file(s) for ${vtsDirRelative}`,
+        );
+      } else {
+        // All files staged — run makemkv if not already done.
+        await processDvdDisc(vtsDirRelative, disc, meta);
+      }
+    }
+
+    // Remove DVD torrent folders from the regular per-file list.
     usbFiles = usbFiles.filter((line) => {
       const noSize = line.split("-").slice(0, -1).join("-");
       const relPath = noSize.slice(11);
@@ -1422,400 +1298,382 @@ async function main() {
     });
   };
 
-  const processDvdJob = async (job) => {
-    const {
-      torrentFolder,
-      showTitle,
-      tvdbId,
-      outName,
-      seasonDir,
-      outPath,
-      stageDir,
-      vobRelPaths,
-      totalSize,
-    } = job;
+  // Run makemkvcon on a fully-staged VIDEO_TS disc folder.
+  // Determines the season number from the disc path, then moves output MKVs
+  // to the correct Season directory.
+  const processDvdDisc = async (vtsDirRelative, disc, meta) => {
+    const { torrentFolder } = disc;
+    const { showTitle, tvdbId, embyFolderName, showDotName } = meta;
+    const localVtsDir = path.join(DVD_STAGE_DIR, vtsDirRelative);
     const unixNow = () => Math.floor(Date.now() / 1000);
 
-    // Skip if the MKV already exists at the destination.
-    if (fs.existsSync(outPath)) {
-      console.log(`[${cycleTsPST()}] DVD: already exists: ${outName}`);
+    // Determine season from path components (e.g. NORMS1 → 1, Disc 2 → use parent).
+    const parts = vtsDirRelative.split("/");
+    let dvdSeason = 1;
+    for (let i = 1; i < parts.length; i++) {
+      const sm =
+        parts[i].match(/[Ss](?:eason)?\s*(\d+)/) || parts[i].match(/(\d+)\s*$/);
+      if (sm) {
+        dvdSeason = parseInt(sm[1], 10);
+        break;
+      }
+    }
+
+    const seasonDir = `${tvPath}${embyFolderName}/Season ${dvdSeason}`;
+    const makemkvOutDir = path.join(
+      DVD_STAGE_DIR,
+      torrentFolder,
+      "mkv-out",
+      vtsDirRelative.replace(/\//g, "__"),
+    );
+
+    // Skip if we already ran makemkv for this disc (output dir exists with MKVs).
+    let existingMkvs = [];
+    try {
+      existingMkvs = fs
+        .readdirSync(makemkvOutDir)
+        .filter((f) => f.toLowerCase().endsWith(".mkv"));
+    } catch (e) {}
+    if (existingMkvs.length > 0) {
+      // Move any un-moved MKVs then return.
+      await moveMkvsToSeason(
+        existingMkvs,
+        makemkvOutDir,
+        seasonDir,
+        showDotName,
+        dvdSeason,
+        showTitle,
+        tvdbId,
+        unixNow,
+      );
+      // Write guard card and clean up staging so the cycle doesn't re-encode.
+      const cardTitle = `DVD:makemkv:${vtsDirRelative}`;
       tvJson.upsertDvdEntry({
-        title: outName,
+        title: cardTitle,
         seriesName: showTitle,
+        tvdbId,
         status: "finished",
         progress: 100,
+        dateStarted: unixNow(),
         dateEnded: unixNow(),
+        localPath: seasonDir + "/",
+        usbPath: `files/${torrentFolder}/`,
+        season: dvdSeason,
+        episode: 0,
+        fileSize: disc.totalSize,
         inProgress: false,
         error: false,
       });
+      try {
+        await execAsync(`rm -rf "${localVtsDir}"`, { timeout: 60000 });
+      } catch (e) {}
+      try {
+        await execAsync(`rm -rf "${makemkvOutDir}"`, { timeout: 60000 });
+      } catch (e) {}
       return;
     }
 
-    try {
-      fs.mkdirSync(DVD_STAGE_DIR, { recursive: true });
-    } catch (e) {}
-    try {
-      fs.mkdirSync(stageDir, { recursive: true });
-    } catch (e) {}
-
     console.log(
-      `[${cycleTsPST()}] DVD: rsync ${vobRelPaths.length} VOB(s) for ${outName}`,
-    );
-
-    // rsync only the VOBs for this title set via --files-from stdin.
-    await new Promise((resolve, reject) => {
-      const rsyncArgs = [
-        "-av",
-        "-e",
-        "ssh",
-        "--info=progress2",
-        "--files-from=-",
-        `${usbHost}:files/`,
-        DVD_STAGE_DIR + "/",
-      ];
-      const p = childProcess.spawn("rsync", rsyncArgs, {
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-      p.stdin.write(vobRelPaths.join("\n") + "\n");
-      p.stdin.end();
-
-      let lastBytes = null;
-      let lastBytesTimeMs = null;
-      const speedSamples = [];
-      let lastSpeedUpdateMs = 0;
-      let lastProgress = 0;
-
-      const killTimer = setTimeout(
-        () => {
-          try {
-            p.kill();
-          } catch (_) {}
-          reject(new Error("rsync timeout (60 min)"));
-        },
-        60 * 60 * 1000,
-      );
-
-      p.stdout.on("data", (data) => {
-        const chunk = data.toString();
-        const now = Date.now();
-        const bm = chunk.match(/\s*([\d,]+)\s+(\d+)%/);
-        if (bm) {
-          const bytes = parseInt(bm[1].replace(/,/g, ""), 10);
-          const pct = parseInt(bm[2], 10);
-          if (Number.isFinite(bytes)) {
-            if (
-              lastBytes != null &&
-              lastBytesTimeMs != null &&
-              bytes >= lastBytes
-            ) {
-              const dtSec = (now - lastBytesTimeMs) / 1000;
-              if (dtSec > 0) {
-                const inst = Math.round(((bytes - lastBytes) * 8) / dtSec);
-                speedSamples.push(inst >= 0 ? inst : 0);
-                while (speedSamples.length > 3) speedSamples.shift();
-              }
-            }
-            lastBytes = bytes;
-            lastBytesTimeMs = now;
-            if (now - lastSpeedUpdateMs >= 500) {
-              lastSpeedUpdateMs = now;
-              const upd = {
-                title: outName,
-                seriesName: showTitle,
-                status: "downloading",
-                progress: Number.isFinite(pct) ? pct : lastProgress,
-              };
-              if (speedSamples.length > 0) {
-                upd.speed = Math.round(
-                  speedSamples.reduce((a, b) => a + b, 0) / speedSamples.length,
-                );
-              }
-              if (Number.isFinite(pct) && pct > lastProgress)
-                lastProgress = pct;
-              const em = chunk.match(/(\d+):(\d+)(?::(\d+))?/);
-              if (em) {
-                const etaSec = em[3]
-                  ? parseInt(em[1], 10) * 3600 +
-                    parseInt(em[2], 10) * 60 +
-                    parseInt(em[3], 10)
-                  : parseInt(em[1], 10) * 60 + parseInt(em[2], 10);
-                if (Number.isFinite(etaSec)) upd.eta = unixNow() + etaSec;
-              }
-              tvJson.upsertDvdEntry(upd);
-            }
-          }
-          return;
-        }
-        const pm = chunk.match(/(\d+)%/);
-        if (!pm) return;
-        const pct = parseInt(pm[1], 10);
-        if (!Number.isFinite(pct) || pct <= lastProgress) return;
-        lastProgress = pct;
-        tvJson.upsertDvdEntry({
-          title: outName,
-          seriesName: showTitle,
-          status: "downloading",
-          progress: pct,
-        });
-      });
-
-      let stderrBuf = "";
-      p.stderr.on("data", (d) => {
-        stderrBuf += d.toString();
-        if (stderrBuf.length > 4096) stderrBuf = stderrBuf.slice(-4096);
-      });
-      p.on("close", (code) => {
-        clearTimeout(killTimer);
-        if (code === 0) resolve();
-        else reject(new Error(`rsync exit ${code}: ${stderrBuf.slice(-200)}`));
-      });
-      p.on("error", (e2) => {
-        clearTimeout(killTimer);
-        reject(e2);
-      });
-    });
-
-    console.log(
-      `[${cycleTsPST()}] DVD: rsync done for ${outName}, starting ffmpeg`,
-    );
-
-    // Build VOB file list for ffmpeg concat demuxer.
-    const vobFiles = vobRelPaths
-      .map((rp) => path.join(DVD_STAGE_DIR, rp))
-      .sort();
-    const filelistPath = path.join(
-      DVD_STAGE_DIR,
-      `.ffconcat.${process.pid}.${Date.now()}.txt`,
-    );
-    fs.writeFileSync(
-      filelistPath,
-      vobFiles.map((f) => `file '${f}'`).join("\n"),
+      `[${cycleTsPST()}] DVD: running makemkvcon on ${vtsDirRelative}`,
     );
 
     try {
-      fs.mkdirSync(seasonDir, { recursive: true });
-    } catch (e) {}
-    const tmpOut = path.join(stageDir, outName);
-
-    // Get total input duration so we can report % progress during encoding.
-    let totalDurationSec = 0;
-    try {
-      const { stdout: durOut } = await execAsync(
-        `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 -f concat -safe 0 -i "${filelistPath}"`,
-        { timeout: 30000 },
-      );
-      totalDurationSec = parseFloat(durOut.trim()) || 0;
+      fs.mkdirSync(makemkvOutDir, { recursive: true });
     } catch (e) {}
 
-    // Switch card to encoding phase before ffmpeg starts.
+    // Create a card to show makemkv encoding progress.
+    const cardTitle = `DVD:makemkv:${vtsDirRelative}`;
     tvJson.upsertDvdEntry({
-      title: outName,
+      title: cardTitle,
       seriesName: showTitle,
+      tvdbId,
       status: "encoding",
       progress: 1,
       speed: 0,
       eta: null,
+      dateStarted: unixNow(),
+      dateEnded: null,
+      localPath: makemkvOutDir + "/",
+      usbPath: `files/${torrentFolder}/`,
+      season: dvdSeason,
+      episode: 0,
+      fileSize: disc.totalSize,
+      inProgress: true,
+      error: false,
     });
 
-    // Run ffmpeg as a spawned process so we can parse stderr for time= progress.
-    const spawnFfmpeg = (extraArgs) =>
-      new Promise((resolve, reject) => {
+    const spawnStartMs = Date.now();
+    let makemkvFailed = false;
+    try {
+      await new Promise((resolve, reject) => {
         const args = [
-          "-f",
-          "concat",
-          "-safe",
-          "0",
-          "-fflags",
-          "+genpts",
-          "-i",
-          filelistPath,
-          "-map",
-          "0:v:0",
-          "-map",
-          "0:a:0",
-          ...extraArgs,
-          "-y",
-          tmpOut,
+          "--robot",
+          "mkv",
+          `file:${localVtsDir}`,
+          "all",
+          makemkvOutDir,
         ];
-        const p = childProcess.spawn("ffmpeg", args, {
-          stdio: ["ignore", "ignore", "pipe"],
+        const p = childProcess.spawn("/snap/bin/makemkvcon", args, {
+          stdio: ["ignore", "pipe", "pipe"],
         });
 
-        let stderrBuf = "";
-        let lastFfmpegUpdateMs = 0;
-        const encodeStartMs = Date.now();
+        let combinedBuf = "";
+        let lastUpdateMs = 0;
         const killTimer = setTimeout(
           () => {
             try {
               p.kill();
             } catch (_) {}
-            reject(new Error("ffmpeg timeout (4h)"));
+            reject(new Error("makemkvcon timeout (4h)"));
           },
           4 * 60 * 60 * 1000,
         );
 
-        p.stderr.on("data", (data) => {
-          stderrBuf += data.toString();
-          if (stderrBuf.length > 8192) stderrBuf = stderrBuf.slice(-8192);
+        // makemkvcon --robot outputs PRGV:current,total,max on stdout.
+        // PRGV:current = per-title progress (resets each title)
+        //      total   = cumulative disc-wide progress
+        //      max     = total disc work units
+        const onData = (data) => {
+          combinedBuf += data.toString();
+          if (combinedBuf.length > 32768)
+            combinedBuf = combinedBuf.slice(-32768);
           const now = Date.now();
-          if (now - lastFfmpegUpdateMs < 2000) return;
-          lastFfmpegUpdateMs = now;
-          const tm = stderrBuf.match(/time=(\d+):(\d+):(\d+)/);
-          if (!tm) return;
-          const elapsedSec =
-            parseInt(tm[1], 10) * 3600 +
-            parseInt(tm[2], 10) * 60 +
-            parseInt(tm[3], 10);
-          const pct =
-            totalDurationSec > 0
-              ? Math.min(99, Math.round((elapsedSec / totalDurationSec) * 100))
-              : 1;
-          let encodeEta = null;
-          if (pct > 0 && pct < 100) {
-            const wallElapsedSec = (now - encodeStartMs) / 1000;
-            const totalEstSec = wallElapsedSec / (pct / 100);
-            encodeEta = Math.floor(
-              Date.now() / 1000 + (totalEstSec - wallElapsedSec),
-            );
+          if (now - lastUpdateMs < 2000) return;
+          lastUpdateMs = now;
+          const lines = combinedBuf.split("\n");
+          for (let li = lines.length - 1; li >= 0; li--) {
+            const m = lines[li].match(/^PRGV:(\d+),(\d+),(\d+)/);
+            if (m) {
+              const totalDone = parseInt(m[2], 10);
+              const maxVal = parseInt(m[3], 10);
+              const pct =
+                maxVal > 0
+                  ? Math.min(99, Math.round((totalDone / maxVal) * 100))
+                  : 1;
+              const elapsedSec = (now - spawnStartMs) / 1000;
+              const eta =
+                pct > 1 && elapsedSec > 0
+                  ? Math.floor(Date.now() / 1000) +
+                    Math.round((elapsedSec * (100 - pct)) / pct)
+                  : null;
+              tvJson.upsertDvdEntry({
+                title: cardTitle,
+                seriesName: showTitle,
+                status: "encoding",
+                progress: pct,
+                eta,
+              });
+              break;
+            }
           }
-          tvJson.upsertDvdEntry({
-            title: outName,
-            seriesName: showTitle,
-            status: "encoding",
-            progress: pct,
-            eta: encodeEta,
-          });
-        });
+        };
+        p.stdout.on("data", onData);
+        p.stderr.on("data", onData);
+
+        const stderrChunks = [];
+        // collect stderr separately for error reporting
+        p.stderr.on("data", (d) => stderrChunks.push(d.toString().slice(-200)));
 
         p.on("close", (code) => {
           clearTimeout(killTimer);
-          if (code === 0) resolve();
+          if (code === 0 || code === 1)
+            resolve(); // code 1 = warnings only
           else
-            reject(new Error(`ffmpeg exit ${code}: ${stderrBuf.slice(-200)}`));
+            reject(
+              new Error(
+                `makemkvcon exit ${code}: ${stderrChunks.join("").slice(-200)}`,
+              ),
+            );
         });
         p.on("error", (e2) => {
           clearTimeout(killTimer);
           reject(e2);
         });
       });
-
-    // Try 1: stream copy (fast).
-    try {
-      await spawnFfmpeg(["-c", "copy"]);
-    } catch (e) {}
-
-    let outSize = 0;
-    try {
-      outSize = fs.statSync(tmpOut).size;
-    } catch (e) {}
-
-    if (outSize < 1048576) {
-      // Stream copy failed — re-encode.
-      console.log(
-        `[${cycleTsPST()}] DVD: stream copy failed (${outSize} bytes), re-encoding ${outName}...`,
-      );
-      try {
-        fs.unlinkSync(tmpOut);
-      } catch (e) {}
-      tvJson.upsertDvdEntry({
-        title: outName,
-        seriesName: showTitle,
-        status: "encoding",
-        progress: 1,
-        speed: 0,
-        eta: null,
-      });
-      try {
-        await spawnFfmpeg([
-          "-c:v",
-          "libx264",
-          "-crf",
-          "18",
-          "-preset",
-          "fast",
-          "-c:a",
-          "aac",
-          "-b:a",
-          "192k",
-        ]);
-      } catch (e) {
-        err("DVD re-encode failed:", e && e.message ? e.message : String(e));
-      }
-      outSize = 0;
-      try {
-        outSize = fs.statSync(tmpOut).size;
-      } catch (e) {}
-      if (outSize < 1048576) {
-        console.log(
-          `[${cycleTsPST()}] DVD: re-encode also failed for ${outName} (${outSize} bytes), skipping`,
-        );
-        tvJson.upsertDvdEntry({
-          title: outName,
-          seriesName: showTitle,
-          status: "DVD encode failed",
-          dateEnded: unixNow(),
-          inProgress: false,
-          error: true,
-        });
-        try {
-          fs.unlinkSync(tmpOut);
-        } catch (e) {}
-        try {
-          fs.unlinkSync(filelistPath);
-        } catch (e) {}
-        return;
-      }
-      console.log(
-        `[${cycleTsPST()}] DVD: re-encoded ok: ${outName} (${sizeStr(outSize, { suffix: "B" })})`,
-      );
-    } else {
-      console.log(
-        `[${cycleTsPST()}] DVD: stream copy ok: ${outName} (${sizeStr(outSize, { suffix: "B" })})`,
-      );
-    }
-
-    // Move to final destination.
-    try {
-      fs.renameSync(tmpOut, outPath);
     } catch (e) {
-      try {
-        await execAsync(`mv "${tmpOut}" "${outPath}"`, { timeout: 120000 });
-      } catch (e2) {
-        err("DVD move failed:", e2 && e2.message ? e2.message : String(e2));
-        tvJson.upsertDvdEntry({
-          title: outName,
-          seriesName: showTitle,
-          status: `move failed: ${e2 && e2.message ? e2.message : String(e2)}`,
-          dateEnded: unixNow(),
-          inProgress: false,
-          error: true,
-        });
-        try {
-          fs.unlinkSync(filelistPath);
-        } catch (e) {}
-        return;
-      }
+      err("DVD makemkvcon failed:", e && e.message ? e.message : String(e));
+      tvJson.upsertDvdEntry({
+        title: cardTitle,
+        seriesName: showTitle,
+        status: `makemkv failed: ${e && e.message ? e.message : String(e)}`,
+        dateEnded: unixNow(),
+        inProgress: false,
+        error: true,
+      });
+      makemkvFailed = true;
     }
+
+    if (makemkvFailed) return;
 
     tvJson.upsertDvdEntry({
-      title: outName,
+      title: cardTitle,
       seriesName: showTitle,
       status: "finished",
       progress: 100,
-      fileSize: outSize,
       dateEnded: unixNow(),
       inProgress: false,
       error: false,
     });
+
+    // Collect output MKVs and move them to the season dir.
+    let outputMkvs = [];
+    try {
+      outputMkvs = fs
+        .readdirSync(makemkvOutDir)
+        .filter((f) => f.toLowerCase().endsWith(".mkv"));
+    } catch (e) {}
+
+    if (outputMkvs.length === 0) {
+      console.log(
+        `[${cycleTsPST()}] DVD: makemkvcon produced no MKVs for ${vtsDirRelative}`,
+      );
+      postHistory({
+        tvdbId,
+        showName: showTitle,
+        type: "errorSync",
+        description: `makemkv no output for ${vtsDirRelative}`,
+      });
+      return;
+    }
+
+    await moveMkvsToSeason(
+      outputMkvs,
+      makemkvOutDir,
+      seasonDir,
+      showDotName,
+      dvdSeason,
+      showTitle,
+      tvdbId,
+      unixNow,
+    );
+
+    // Clean up staged disc files now that MKVs are moved.
+    try {
+      await execAsync(`rm -rf "${localVtsDir}"`, { timeout: 60000 });
+    } catch (e) {}
+    try {
+      await execAsync(`rm -rf "${makemkvOutDir}"`, { timeout: 60000 });
+    } catch (e) {}
+
     postHistory({
       tvdbId,
       showName: showTitle,
       type: "dvdProc",
-      description: `${outName} → ${seasonDir}`,
+      description: `${outputMkvs.length} MKV(s) from ${vtsDirRelative} → ${seasonDir}`,
     });
+  };
+
+  const moveMkvsToSeason = async (
+    mkvFiles,
+    srcDir,
+    seasonDir,
+    showDotName,
+    dvdSeason,
+    showTitle,
+    tvdbId,
+    unixNow,
+  ) => {
     try {
-      fs.unlinkSync(filelistPath);
+      fs.mkdirSync(seasonDir, { recursive: true });
     } catch (e) {}
+
+    const sNum = `S${String(dvdSeason).padStart(2, "0")}`;
+
+    // Sort by the _tNN title index embedded in the makemkv filename so that
+    // an alphabetically-earlier compilation title (e.g. A1_t05.mkv) doesn't
+    // displace real episodes.
+    const titleIdx = (n) => {
+      const m = n.match(/_t(\d+)\.mkv$/i);
+      return m ? parseInt(m[1], 10) : 9999;
+    };
+    const byIndex = [...mkvFiles].sort((a, b) => titleIdx(a) - titleIdx(b));
+
+    // Filter out compilation/omnibus titles: any MKV whose size is >= 2x the
+    // median size is assumed to be a concatenated-all-episodes title.
+    const sizes = byIndex.map((f) => {
+      try {
+        return fs.statSync(path.join(srcDir, f)).size;
+      } catch {
+        return 0;
+      }
+    });
+    const sorted = [...sizes].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)] || 1;
+    const sortedMkvs = byIndex.filter((_, i) => sizes[i] < median * 2);
+
+    if (sortedMkvs.length < byIndex.length) {
+      const filtered = byIndex.filter((_, i) => sizes[i] >= median * 2);
+      console.log(
+        `[${cycleTsPST()}] DVD: filtered compilation title(s): ${filtered.join(", ")}`,
+      );
+    }
+
+    // Deduplicate: DVDs sometimes store the same episode multiple times (e.g.
+    // across disc 1 and disc 2). Two MKVs with identical file size are the
+    // same content; keep only the first occurrence of each size.
+    const seenSizes = new Set();
+    const dedupedMkvs = [];
+    const dupMkvs = [];
+    for (let i = 0; i < sortedMkvs.length; i++) {
+      const sz = sizes[byIndex.indexOf(sortedMkvs[i])];
+      if (seenSizes.has(sz)) {
+        dupMkvs.push(sortedMkvs[i]);
+      } else {
+        seenSizes.add(sz);
+        dedupedMkvs.push(sortedMkvs[i]);
+      }
+    }
+    if (dupMkvs.length > 0) {
+      console.log(
+        `[${cycleTsPST()}] DVD: filtered ${dupMkvs.length} duplicate title(s) (same size): ${dupMkvs.join(", ")}`,
+      );
+      // Delete the duplicate MKV files from the staging dir.
+      for (const dup of dupMkvs) {
+        try {
+          fs.unlinkSync(path.join(srcDir, dup));
+        } catch (e) {}
+      }
+    }
+    const finalMkvs = dedupedMkvs;
+
+    // Find next available episode slot (skip slots already filled by earlier discs).
+    let existingEpCount = 0;
+    try {
+      const epRe = new RegExp(`${sNum}E(\\d+)`, "i");
+      const existing = fs.readdirSync(seasonDir).filter((f) => epRe.test(f));
+      existing.forEach((f) => {
+        const m = f.match(epRe);
+        if (m) existingEpCount = Math.max(existingEpCount, parseInt(m[1], 10));
+      });
+    } catch (e) {}
+
+    for (let i = 0; i < finalMkvs.length; i++) {
+      const srcName = finalMkvs[i];
+      const eNum = `E${String(existingEpCount + i + 1).padStart(2, "0")}`;
+      const destName = `${showDotName}.${sNum}${eNum}.DVDRip.mkv`;
+      const srcPath = path.join(srcDir, srcName);
+      const destPath = path.join(seasonDir, destName);
+
+      if (fs.existsSync(destPath)) {
+        console.log(`[${cycleTsPST()}] DVD: already exists: ${destName}`);
+        try {
+          fs.unlinkSync(srcPath);
+        } catch (e) {}
+        continue;
+      }
+
+      try {
+        fs.renameSync(srcPath, destPath);
+      } catch (e) {
+        try {
+          await execAsync(`mv "${srcPath}" "${destPath}"`, { timeout: 120000 });
+        } catch (e2) {
+          err("DVD move failed:", e2 && e2.message ? e2.message : String(e2));
+          continue;
+        }
+      }
+      console.log(`[${cycleTsPST()}] DVD: moved ${destName} → ${seasonDir}`);
+    }
   };
 
   checkFiles = async () => {

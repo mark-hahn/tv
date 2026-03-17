@@ -703,7 +703,7 @@ export default {
 
     fmtElapsedMmSs(seconds) {
       const n = Number(seconds);
-      if (!Number.isFinite(n) || n < 0) return "";
+      if (seconds == null || !Number.isFinite(n) || n <= 0) return "";
       const mins = Math.floor(n / 60);
       const secs = Math.floor(n % 60);
       return `${mins}:${String(secs).padStart(2, "0")}`;
@@ -739,8 +739,11 @@ export default {
 
     elapsedSeconds(it) {
       const started = Number(it?.dateStarted);
-      const ended = Number(it?.dateEnded);
-      if (!Number.isFinite(started) || !Number.isFinite(ended)) return null;
+      if (!Number.isFinite(started) || started === 0) return null;
+      const ended = it?.dateEnded
+        ? Number(it.dateEnded)
+        : Math.floor(Date.now() / 1000);
+      if (!Number.isFinite(ended)) return null;
       return Math.max(0, ended - started);
     },
 
@@ -818,9 +821,16 @@ export default {
           parts.push(`${progress}%`);
         }
         const eta = this.fmtEtaRemaining(it?.eta);
-        if (eta) parts.push(eta);
         const etaTimestamp = this.fmtEtaTimestamp(it?.eta);
-        if (etaTimestamp) parts.push(etaTimestamp);
+        if (eta) {
+          // Write phase: show ETA
+          parts.push(eta);
+          if (etaTimestamp) parts.push(etaTimestamp);
+        } else {
+          // Scan phase (no PRGV yet)
+          const elapsed = this.fmtElapsedMmSs(this.elapsedSeconds(it));
+          parts.push(elapsed ? `Scanning ${elapsed}` : "Scanning");
+        }
         parts.push("Encoding");
         return { seasonEpisode, rest: parts.join(" | ") };
       }

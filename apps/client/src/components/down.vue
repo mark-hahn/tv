@@ -1205,7 +1205,10 @@ export default {
                     .trim()
                     .toLowerCase();
                   return (
-                    st === "downloading" || st === "waiting" || st === "future"
+                    st === "downloading" ||
+                    st === "waiting" ||
+                    st === "future" ||
+                    st === "encoding"
                   );
                 })
                 .map((it) => it?.seriesName || toParsedTitle(it?.title))
@@ -1224,7 +1227,10 @@ export default {
                   .trim()
                   .toLowerCase();
                 return (
-                  st === "downloading" || st === "waiting" || st === "future"
+                  st === "downloading" ||
+                  st === "waiting" ||
+                  st === "future" ||
+                  st === "encoding"
                 );
               })
             : false;

@@ -460,8 +460,10 @@ export default {
     evtBus.on("paneChanged", this.onPaneChanged);
     evtBus.on("cycle-started", this.handleCycleStarted);
 
-    // Poll once at boot so data is ready before the user opens the pane.
+    // Start polling at boot so data is always fresh.
+    this._polling = true;
     void this.loadTvproc();
+    this.scheduleNextPoll(5000);
   },
 
   unmounted() {
@@ -510,7 +512,6 @@ export default {
     },
 
     handleCycleStarted() {
-      if (!this._active) return;
       if (this.pollingStopped) return;
       // Start fast polling when a cycle starts
       this._fastPollStartTime = Date.now();
@@ -545,13 +546,6 @@ export default {
         } else {
           void this.loadTvproc({ isInitialPaneSwitch: true });
         }
-        // Start polling if not already running
-        if (!this.pollingStopped) {
-          this._polling = true;
-          if (!this._pollTimer) {
-            this.scheduleNextPoll(5000);
-          }
-        }
       } else {
         // Clear highlight when leaving pane
         this.matchedTitle = null;
@@ -561,18 +555,15 @@ export default {
         if (el) {
           this._lastScrollTop = el.scrollTop;
         }
-        this.stopPolling();
       }
     },
 
     togglePolling() {
       if (this.pollingStopped) {
         this.pollingStopped = false;
-        if (this._active) {
-          this._polling = true;
-          if (!this._pollTimer) {
-            this.scheduleNextPoll(5000);
-          }
+        this._polling = true;
+        if (!this._pollTimer) {
+          this.scheduleNextPoll(5000);
         }
       } else {
         this.pollingStopped = true;

@@ -428,7 +428,7 @@ const tvResync = () => {
           if (
             path.isAbsolute(title) ||
             title.includes("\0") ||
-            title.includes("..")
+            /(^|[\/\\])\.\.($|[\/\\])/.test(title)
           ) {
             toDelete.push(title);
             continue;
@@ -551,7 +551,7 @@ const hourlyUsbPruneAndTvResync = (existingUsbDirs) => {
       if (
         path.isAbsolute(title) ||
         title.includes("\0") ||
-        title.includes("..")
+        /(^|[\/\\])\.\.($|[\/\\])/.test(title)
       ) {
         orphanFinishedTitles.push(title);
         continue;

@@ -1266,6 +1266,20 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         gapChanges.push(`full:${tvdbRecord.full}->${newFull}`);
         tvdbRecord.full = newFull;
       }
+    } else if (!tvdbRecord.inEmby) {
+      // For shows not in emby, set error fields to known constants
+      const nonEmbyConstants = [
+        ["fileGap", false],
+        ["fileEndError", false],
+        ["full", false],
+        ["notReady", true],
+      ];
+      for (const [f, v] of nonEmbyConstants) {
+        if (tvdbRecord[f] !== v) {
+          gapChanges.push(`${f}:${tvdbRecord[f]}->${v}`);
+          tvdbRecord[f] = v;
+        }
+      }
     }
     const push2Changes = [...diskChanges, ...lastWatchedChanges, ...gapChanges];
     // History: bkgndUpdate (timer-selected) or clientUpdate (user-triggered)
@@ -2870,11 +2884,23 @@ app.post(
     );
     const tvdbRecord = tvdb.getAllTvdbSync()[showName];
     if (tvdbRecord && tvdbRecord.inEmby === false) {
-      if (tvdbRecord.notReady !== true) {
+      const nonEmbyConstants = [
+        ["fileGap", false],
+        ["fileEndError", false],
+        ["full", false],
+        ["notReady", true],
+      ];
+      let changed = false;
+      for (const [f, v] of nonEmbyConstants) {
+        if (tvdbRecord[f] !== v) {
+          tvdbRecord[f] = v;
+          changed = true;
+        }
+      }
+      if (changed) {
         console.log(
-          `[triggerShowGapCheck] ${showName} not in Emby, resetting notReady=true`,
+          `[triggerShowGapCheck] ${showName} not in Emby, setting error constants`,
         );
-        tvdbRecord.notReady = true;
         await tvdb.saveTvdbSync();
       }
       return { success: true };
@@ -3738,11 +3764,23 @@ async function runEmbyFullSweep() {
       }
     }
 
-    // Step 4: Fix any pre-existing inEmby=false records with stale notReady=false
+    // Step 4: Fix any pre-existing inEmby=false records with stale error fields
     for (const [name, rec] of Object.entries(allTvdb)) {
-      if (isTvdbShow(rec) && rec.inEmby === false && rec.notReady === false) {
-        console.log(`[runEmbyFullSweep] Fixing stale notReady for ${name}`);
-        rec.notReady = true;
+      if (isTvdbShow(rec) && rec.inEmby === false) {
+        const nonEmbyConstants = [
+          ["fileGap", false],
+          ["fileEndError", false],
+          ["full", false],
+          ["notReady", true],
+        ];
+        for (const [f, v] of nonEmbyConstants) {
+          if (rec[f] !== v) {
+            console.log(
+              `[runEmbyFullSweep] Fixing stale ${f} for ${name}: ${rec[f]}->${v}`,
+            );
+            rec[f] = v;
+          }
+        }
       }
     }
 

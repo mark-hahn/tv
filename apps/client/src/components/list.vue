@@ -683,11 +683,7 @@ export default {
           filter: 0,
           icon: ["fas", "minus"],
           cond(show) {
-            return (
-              show.FileGap ||
-              show.WatchGap ||
-              (show.inEmby === false && !show.S1E1Unaired)
-            );
+            return show.FileGap || show.WatchGap;
           },
           click() {},
           name: "gap",

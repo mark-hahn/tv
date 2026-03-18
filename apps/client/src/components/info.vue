@@ -17,6 +17,33 @@
     }"
   >
     <div
+      id="tvdbRefreshModal"
+      v-if="showRefreshDialog"
+      @click.stop
+      style="
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        padding: 30px 40px;
+        border: 2px solid black;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        z-index: 10000;
+        text-align: center;
+      "
+    >
+      <div style="font-size: 18px; font-weight: bold">Refreshing Show</div>
+      <div style="margin-top: 8px; font-size: 16px">
+        {{ refreshDialogShowName }}
+      </div>
+      <div style="margin-top: 8px; font-size: 14px">
+        {{ refreshDialogStatus }}
+      </div>
+    </div>
+
+    <div
       id="hdr"
       v-if="showHdr"
       class="pane-header-title"
@@ -203,7 +230,6 @@
                 marginTop: '3px',
                 maxHeight: '24px',
                 borderRadius: '7px',
-                '--btn-bg': refreshBtnBg,
               }"
             >
               Refresh
@@ -600,7 +626,10 @@ export default {
       currentTvdbData: null,
       previewSrchChoice: null,
       refreshing: false,
-      refreshBtnBg: "",
+      refreshPendingShowName: "",
+      showRefreshDialog: false,
+      refreshDialogShowName: "",
+      refreshDialogStatus: "",
       remoteFetchMode: "fast", // 'fast' or 'full'
       settingUpShowName: null, // Track show currently being set up to prevent duplicate calls
     };
@@ -1283,11 +1312,26 @@ export default {
 
     async refreshTvdb() {
       const showName = this.show.Name;
+      if (!showName || this.refreshing) return;
       console.log(`Refresh button clicked for ${showName}`);
-      this.refreshBtnBg = "lightgray";
+      this.refreshing = true;
+      this.refreshPendingShowName = showName;
+      this.showRefreshDialog = true;
+      this.refreshDialogShowName = showName;
+      this.refreshDialogStatus = "Queued...";
       srvr
         .triggerShowGapCheck(this.show.Id || showName, showName)
-        .catch((err) => console.error("triggerShowGapCheck failed:", err));
+        .catch((err) => {
+          this.refreshing = false;
+          this.refreshPendingShowName = "";
+          this.refreshDialogStatus = "Error";
+          setTimeout(() => {
+            this.showRefreshDialog = false;
+            this.refreshDialogShowName = "";
+            this.refreshDialogStatus = "";
+          }, 1200);
+          console.error("triggerShowGapCheck failed:", err);
+        });
     },
 
     setupSeriesForRefresh(show) {
@@ -1614,12 +1658,51 @@ export default {
 
     // Refresh remotes/buttons when server pushes updated tvdb data (push2 or push3).
     this.onTvdbUpdated = async ({ name, record } = {}) => {
-      if (!name || !record || this.show?.Name !== name) return;
+      if (!name) return;
+
+      // Clear refresh state as soon as server confirms an update for the show,
+      // even if payload is partial/missing.
+      const matchesSelected = this.show?.Name === name;
+      const matchesPending = this.refreshPendingShowName === name;
+      if (matchesSelected || matchesPending) {
+        this.refreshDialogStatus = "Finalizing...";
+        this.refreshing = false;
+        this.refreshPendingShowName = "";
+        setTimeout(() => {
+          this.showRefreshDialog = false;
+          this.refreshDialogShowName = "";
+          this.refreshDialogStatus = "";
+        }, 350);
+      }
+
+      if (!record || !matchesSelected) return;
       tvdb.applyTvdbPush(name, record);
-      this.refreshBtnBg = "";
       if (this.seriesReady) void this.setRemotes();
     };
     evtBus.on("tvdbUpdated", this.onTvdbUpdated);
+
+    this.onShowUpdating = ({ name } = {}) => {
+      if (!name || !this.refreshing) return;
+      if (name !== this.refreshPendingShowName) return;
+      this.showRefreshDialog = true;
+      this.refreshDialogShowName = name;
+      this.refreshDialogStatus = "Updating...";
+    };
+    evtBus.on("showUpdating", this.onShowUpdating);
+
+    // Fallback: if queue drains without a usable tvdbUpdated payload, clear state.
+    this.onShowQueueEmpty = () => {
+      if (!this.refreshing) return;
+      this.refreshDialogStatus = "Done";
+      this.refreshing = false;
+      this.refreshPendingShowName = "";
+      setTimeout(() => {
+        this.showRefreshDialog = false;
+        this.refreshDialogShowName = "";
+        this.refreshDialogStatus = "";
+      }, 350);
+    };
+    evtBus.on("showQueueEmpty", this.onShowQueueEmpty);
   },
 
   beforeUnmount() {
@@ -1629,6 +1712,9 @@ export default {
     evtBus.off("addPreviewShowDone", this.onAddPreviewShowDone);
     evtBus.off("seriesMapUpdated", this.onSeriesMapUpdated);
     if (this.onTvdbUpdated) evtBus.off("tvdbUpdated", this.onTvdbUpdated);
+    if (this.onShowUpdating) evtBus.off("showUpdating", this.onShowUpdating);
+    if (this.onShowQueueEmpty)
+      evtBus.off("showQueueEmpty", this.onShowQueueEmpty);
 
     if (this.notePollTimer) {
       clearInterval(this.notePollTimer);

@@ -626,9 +626,9 @@ export default {
             ? `${firstAired} / ${lastAired}`
             : firstAired || lastAired,
         );
-        const rt = this.tvdbData?.averageRuntime;
-        if (rt) parts.push(`${rt} mins`);
       }
+      const rt = this.tvdbData?.averageRuntime;
+      if (rt) parts.push(`${rt} mins`);
 
       const status = this.statusVal;
       if (status) parts.push(status);
@@ -706,15 +706,24 @@ export default {
       this.updateMapPanBounds();
     });
     window.addEventListener("resize", this.updateMapPanBounds);
+    evtBus.on("tvdbDataReady", this.onTvdbDataReady);
   },
 
   beforeUnmount() {
     window.removeEventListener("resize", this.updateMapPanBounds);
+    evtBus.off("tvdbDataReady", this.onTvdbDataReady);
     this.stopArrowPan();
     this.stopMapPanLoop();
   },
 
   methods: {
+    onTvdbDataReady({ show, tvdbData }) {
+      if (!tvdbData || !this.mapShow) return;
+      if (show?.Name === this.mapShow.Name && !this.tvdbData) {
+        this.tvdbData = tvdbData;
+      }
+    },
+
     noop() {},
 
     async handleNotInEmbyClick(event) {

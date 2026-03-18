@@ -2418,11 +2418,6 @@ const applySubFiles = async (params) => {
     entry.fileIdBase32 = encodeFileIdBase32(Number(file_id));
   }
 
-  // Persist the augmented request for inspection (fire and forget - don't wait).
-  util.writeFile("samples/fileIdObjs.json", fileIdObjs).catch((e) => {
-    console.warn(`applySubFiles: debug write failed: ${e.message}`);
-  });
-
   console.log(
     `[applySubFiles] Building lookup map for ${fileIdObjs.length} file(s)`,
   );

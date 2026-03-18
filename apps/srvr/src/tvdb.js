@@ -646,6 +646,17 @@ const getUrlAndRatings = async (type, url, name) => {
         waitUntil: "domcontentloaded",
         timeout: 15000,
       });
+      // IMDB sometimes returns HTTP 202 (deferred/CSR render) with an empty
+      // skeleton. Wait for JSON-LD or <h1> to appear so the rating is present.
+      // For SSR pages (200) this resolves instantly; for deferred pages it waits.
+      await page
+        .waitForFunction(
+          () =>
+            document.querySelectorAll('script[type="application/ld+json"]')
+              .length > 0 || !!document.querySelector("h1"),
+          { timeout: 10000 },
+        )
+        .catch(() => {});
     } catch (e) {
       log(
         "err",

@@ -7,6 +7,7 @@ import * as urls from "./urls.js";
 import * as emby from "./emby.js";
 import { rottenSearch } from "./rotten.js";
 import * as util from "./util.js";
+import { smartTitleMatch } from "@tv/share";
 const { getPstDate } = util;
 import { SRVR_DATA_DIR } from "./srvrPaths.js";
 import * as history from "./history.js";
@@ -1124,7 +1125,7 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
               );
             }
           }
-          // Last resort: look up IMDB ID via TMDB external_ids when TVDB has no IMDB link
+          // Fallback: look up IMDB ID via TMDB external_ids when TVDB has no IMDB link
           if (!remotesByName["IMDB"]) {
             const tmdbRemote = tvdbRemotes.find((r) => r.type === 12);
             if (tmdbRemote?.id) {
@@ -1149,6 +1150,48 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
                   `getRemotes IMDB tmdb fallback error for ${name}: ${e.message}`,
                 );
               }
+            }
+          }
+          // Last resort: IMDB suggestion API search by show name
+          if (!remotesByName["IMDB"]) {
+            try {
+              const slug = name
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "_")
+                .replace(/^_|_$/g, "");
+              const sugRes = await fetch(
+                `https://v2.sg.media-imdb.com/suggestion/t/${encodeURIComponent(slug)}.json`,
+                { signal: AbortSignal.timeout(8000) },
+              );
+              if (sugRes.ok) {
+                const sugData = await sugRes.json();
+                const candidates = (sugData?.d || []).filter(
+                  (r) => r.id?.startsWith("tt") && r.q === "TV series",
+                );
+                // Use smartTitleMatch to verify a candidate actually matches the show name
+                const candidateObjs = candidates.map((r) => ({
+                  name: r.l,
+                  id: r.id,
+                }));
+                const matched = smartTitleMatch(
+                  name,
+                  candidateObjs,
+                  null,
+                  false,
+                );
+                if (matched) {
+                  const remote = await getRemote(matched.id, 2, name);
+                  if (remote && remote.url !== "no match") {
+                    if (!remote.ratings) delete remote.ratings;
+                    remotesByName["IMDB"] = remote;
+                  }
+                }
+              }
+            } catch (e) {
+              log(
+                "err",
+                `getRemotes IMDB suggestion fallback error for ${name}: ${e.message}`,
+              );
             }
           }
         })(),

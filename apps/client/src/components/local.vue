@@ -253,6 +253,21 @@
           >
             Kill
           </button>
+          <button
+            @click="showAsr = false"
+            title="Close"
+            :style="{
+              cursor: 'pointer',
+              borderRadius: '4px',
+              padding: '2px 8px',
+              border: '1px solid #bbb',
+              backgroundColor: 'whitesmoke',
+              fontWeight: 'bold',
+              marginLeft: '5px',
+            }"
+          >
+            ✕
+          </button>
         </div>
       </div>
       <div
@@ -468,6 +483,20 @@
             "
           >
             Apply
+          </button>
+          <button
+            @click="showSubs = false"
+            title="Close"
+            style="
+              cursor: pointer;
+              border-radius: 4px;
+              padding: 2px 8px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+              font-weight: bold;
+            "
+          >
+            ✕
           </button>
         </div>
       </div>

@@ -288,8 +288,9 @@ export default {
   mounted() {
     evtBus.on("paneChanged", this.onPaneChanged);
 
-    // Poll once at boot so data is ready before the user opens the pane.
-    if (!this.useStaticSamples) void this.pollOnce();
+    // Start polling immediately so activeQbtTitles events are emitted
+    // even before the user opens the pane (drives shows-list green highlight).
+    if (!this.useStaticSamples) this.startPolling();
 
     // When the browser tab regains focus, poll immediately.
     // setTimeout is throttled to ~1 minute in background tabs, so without this
@@ -371,10 +372,6 @@ export default {
             this._stickToBottom = true;
           });
         }
-
-        if (!this.useStaticSamples) this.startPolling();
-      } else {
-        this.stopPolling();
       }
     },
 

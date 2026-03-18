@@ -570,6 +570,7 @@ import evtBus from "../evtBus.js";
 import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
 import * as srvr from "../srvr.js";
+import * as util from "../util.js";
 
 let allTvdb = null;
 
@@ -922,7 +923,7 @@ export default {
 
     remoteClick(remote) {
       const url = remote.url;
-      if (url) window.open(url);
+      if (url) util.openExternalPage(url);
     },
 
     setDeleted(tvdbData) {

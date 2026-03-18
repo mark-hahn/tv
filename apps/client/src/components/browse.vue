@@ -682,6 +682,7 @@ import ReelGallery from "./reel-gallery.vue";
 import { config } from "../config.js";
 import evtBus from "../evtBus.js";
 import * as srvr from "../srvr.js";
+import * as util from "../util.js";
 import { getAllTvdb, getRemotes, applyTvdbPush } from "../tvdb.js";
 
 export default {
@@ -733,13 +734,20 @@ export default {
 
     const postBrowseHistory = (type, tvdbObj, extra) => {
       try {
-        const id = String(tvdbObj?.tvdb_id || tvdbObj?.tvdbId || tvdbObj?.id || "");
+        const id = String(
+          tvdbObj?.tvdb_id || tvdbObj?.tvdbId || tvdbObj?.id || "",
+        );
         const name = String(tvdbObj?.name || "");
         if (!name) return;
         fetch(`${config.tvSrvrUrl}/api/history`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tvdbId: id || null, showName: name, type, description: extra || name }),
+          body: JSON.stringify({
+            tvdbId: id || null,
+            showName: name,
+            type,
+            description: extra || name,
+          }),
         }).catch(() => {});
       } catch {}
     };
@@ -1376,7 +1384,7 @@ export default {
       const u = String(url || "").trim();
       if (!u) return;
       try {
-        window.open(u, "_blank");
+        util.openExternalPage(u);
       } catch (e) {
         console.log("openUrl failed:", e?.message || String(e));
       }
@@ -1589,7 +1597,11 @@ export default {
     const handlePreview = () => {
       const srchChoice = handleLoad();
       if (srchChoice) {
-        postBrowseHistory("preview", curTvdb.value, `preview: ${curTvdb.value?.name || ""}`);
+        postBrowseHistory(
+          "preview",
+          curTvdb.value,
+          `preview: ${curTvdb.value?.name || ""}`,
+        );
         evtBus.emit("reelSearchAction", { srchChoice, action: "preview" });
       }
     };

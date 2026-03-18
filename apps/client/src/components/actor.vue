@@ -53,6 +53,7 @@
 
 <script>
 import { Buffer } from "buffer";
+import * as util from "../util.js";
 
 const theMan = Buffer.from("bXJza2lu", "base64").toString();
 
@@ -97,7 +98,7 @@ export default {
 
       if (e?.ctrlKey) {
         const url = `https://${theMan}.com/search/celebs?term=${encodeURIComponent(name)}`;
-        window.open(url, "_blank");
+        util.openExternalPage(url);
         return;
       }
 

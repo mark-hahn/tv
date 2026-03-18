@@ -84,6 +84,7 @@
 
 <script>
 import * as srvr from "../srvr.js";
+import * as util from "../util.js";
 
 export default {
   name: "Stream",
@@ -145,13 +146,7 @@ export default {
     },
     openProvider(p) {
       if (this.tmdbLink) {
-        const a = document.createElement("a");
-        a.href = this.tmdbLink;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        util.openExternalPage(this.tmdbLink);
       }
     },
   },

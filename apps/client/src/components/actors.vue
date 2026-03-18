@@ -617,7 +617,7 @@ export default {
       if (!name) return;
 
       // Open window immediately to avoid popup blocker
-      const win = window.open("", "_blank");
+      const win = util.openExternalPage("about:blank");
 
       // Get actor page URL and open it
       const actorName = a?.personName || a?.name;
@@ -721,7 +721,7 @@ export default {
       if (!name) return;
 
       // Open window immediately to avoid popup blocker
-      const win = window.open("", "_blank");
+      const win = util.openExternalPage("about:blank");
 
       // Get actor page URL and open it
       const actorName = actor?.personName || actor?.name;
@@ -744,7 +744,7 @@ export default {
 
     handleImdbButton() {
       if (!this.actorPageUrl) return;
-      window.open(this.actorPageUrl, "_blank");
+      util.openExternalPage(this.actorPageUrl);
     },
 
     handleDoneButton() {

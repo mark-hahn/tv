@@ -207,3 +207,25 @@ import {
 } from "@tv/share";
 
 export { smartTitleMatch, parseFileSeasonEpisode, parseTitleFromFilename };
+
+const EXTERNAL_TAB_NAME = "tv_external_page";
+
+export function openExternalPage(url) {
+  const targetUrl = String(url || "").trim();
+  if (!targetUrl) return null;
+
+  try {
+    const win = window.open(targetUrl, EXTERNAL_TAB_NAME);
+    if (win) {
+      try {
+        win.opener = null;
+      } catch {}
+      try {
+        win.focus();
+      } catch {}
+    }
+    return win;
+  } catch {
+    return null;
+  }
+}

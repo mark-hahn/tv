@@ -1205,7 +1205,7 @@ export default {
     },
     openDetails() {
       const url = this.selectedTorrent?.detailUrl;
-      if (url) window.open(url, "_blank");
+      if (url) util.openExternalPage(url);
     },
 
     showError(msg) {
@@ -1854,13 +1854,7 @@ export default {
         `https://www.torrentleech.org/torrents/browse/index/query/${searchQ}`,
       ];
       for (const url of urls) {
-        const a = document.createElement("a");
-        a.href = url;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        util.openExternalPage(url);
       }
     },
 
@@ -2316,7 +2310,7 @@ export default {
       }
 
       if (!alreadyClicked && torrent.detailUrl) {
-        window.open(torrent.detailUrl, "_blank");
+        util.openExternalPage(torrent.detailUrl);
       }
     },
 
@@ -2419,8 +2413,7 @@ export default {
       this.downloadStatus = next;
     },
 
-    async fetchWithTimeout(url, options = {}, timeoutMs = 60000) {
-      const ms = Math.max(0, Number(timeoutMs) || 0);
+    async fetchWithTimeout(url, options = {}, ms = 0) {
       if (!ms) return fetch(url, options);
 
       const controller = new AbortController();
@@ -2913,7 +2906,7 @@ export default {
                 let popupBlocked = false;
                 if (detailUrl) {
                   try {
-                    const w = window.open(detailUrl, "_blank");
+                    const w = util.openExternalPage(detailUrl);
                     popupBlocked = !w;
                   } catch {
                     popupBlocked = true;
@@ -3031,7 +3024,7 @@ export default {
             let popupBlocked = false;
             if (detailUrl) {
               try {
-                const w = window.open(detailUrl, "_blank");
+                const w = util.openExternalPage(detailUrl);
                 popupBlocked = !w;
               } catch {
                 popupBlocked = true;

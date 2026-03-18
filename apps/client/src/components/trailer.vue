@@ -100,7 +100,7 @@
           <div v-else>
             <a
               :href="t.url"
-              target="_blank"
+              @click.prevent="openExternalTrailerUrl(t.url)"
               >{{ t.url }}</a
             >
           </div>
@@ -128,6 +128,7 @@
 <script>
 import evtBus from "../evtBus.js";
 import { nextTick } from "vue";
+import * as util from "../util.js";
 
 const IMDB_URL_EXPIRY_SAFETY_MS = 2 * 60 * 1000;
 
@@ -155,6 +156,9 @@ export default {
       savedTimes: new Map(), // key -> seconds
       lastPlayingKey: null, // "yt-idx" or "html-url"
     };
+  },
+  openExternalTrailerUrl(url) {
+    util.openExternalPage(url);
   },
   watch: {
     active(val) {

@@ -626,6 +626,8 @@ export default {
             ? `${firstAired} / ${lastAired}`
             : firstAired || lastAired,
         );
+        const rt = this.tvdbData?.averageRuntime;
+        if (rt) parts.push(`${rt} mins`);
       }
 
       const status = this.statusVal;

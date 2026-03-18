@@ -1086,7 +1086,7 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
               remotesByName["IMDB"] = fallbackRemote;
             }
           }
-          // Last resort: fetch IMDB ID from TVDB extended API using TvdbId
+          // Fallback: fetch IMDB ID from TVDB extended API using TvdbId
           if (!remotesByName["IMDB"] && show.TvdbId) {
             try {
               const token = await getToken();
@@ -1122,6 +1122,33 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
                 "err",
                 `getRemotes IMDB tvdb-extended fallback error for ${name}: ${e.message}`,
               );
+            }
+          }
+          // Last resort: look up IMDB ID via TMDB external_ids when TVDB has no IMDB link
+          if (!remotesByName["IMDB"]) {
+            const tmdbRemote = tvdbRemotes.find((r) => r.type === 12);
+            if (tmdbRemote?.id) {
+              try {
+                const tmdbRes = await fetch(
+                  `https://api.themoviedb.org/3/tv/${tmdbRemote.id}/external_ids?api_key=327192a334da700f65b882c7a69cb927`,
+                  { signal: AbortSignal.timeout(8000) },
+                );
+                if (tmdbRes.ok) {
+                  const tmdbData = await tmdbRes.json();
+                  if (tmdbData?.imdb_id) {
+                    const remote = await getRemote(tmdbData.imdb_id, 2, name);
+                    if (remote && remote.url !== "no match") {
+                      if (!remote.ratings) delete remote.ratings;
+                      remotesByName["IMDB"] = remote;
+                    }
+                  }
+                }
+              } catch (e) {
+                log(
+                  "err",
+                  `getRemotes IMDB tmdb fallback error for ${name}: ${e.message}`,
+                );
+              }
             }
           }
         })(),

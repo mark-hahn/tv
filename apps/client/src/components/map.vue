@@ -841,10 +841,10 @@ export default {
           });
         });
 
-        // Trigger full gap check after creating new show and library refresh completes
+        // Enqueue just the new show for processing
         await srvr
-          .triggerFullGapCheck()
-          .catch((err) => console.error("triggerFullGapCheck failed:", err));
+          .triggerShowSelect(showName)
+          .catch((err) => console.error("triggerShowSelect failed:", err));
       } finally {
         this.mapWorking = false;
         this.mapWorkingTitle = "";

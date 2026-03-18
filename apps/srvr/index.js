@@ -2863,21 +2863,6 @@ app.post(
 );
 
 app.post(
-  "/api/triggerFullGapCheck",
-  apiWrapper(async () => {
-    console.log(
-      "[triggerFullGapCheck] Client requested full gap check after library scan",
-    );
-    // Enqueue all in-Emby shows for per-show processing
-    const allTvdb = tvdb.getAllTvdbSync();
-    for (const [name, rec] of Object.entries(allTvdb)) {
-      if (rec?.inEmby && rec?.Id) tvdb.enqueueShowProcess(name);
-    }
-    return { success: true };
-  }),
-);
-
-app.post(
   "/api/triggerShowGapCheck",
   apiWrapper(async (params) => {
     const { showId, showName } = params;
@@ -3154,7 +3139,7 @@ async function runUsbCheck() {
 // DEPRECATED: syncEmbyUserData is no longer used
 // Collection changes are now handled by immediate triggers from client:
 // - /api/triggerEmbySync (per-show changes)
-// - /api/triggerFullGapCheck (library scan)
+// - /api/triggerShowSelect (single-show processing)
 // This function remains for reference but is not called.
 async function syncEmbyUserData() {
   console.log("[syncEmbyUserData] CALLED - function executing");
@@ -4041,7 +4026,7 @@ async function fetchLastWatchedDate(showId) {
 }
 
 // NOTE: syncEmbyUserData periodic sync removed - now using immediate triggers from client
-// Collections and user data changes are handled by /api/triggerEmbySync and /api/triggerFullGapCheck
+// Collections and user data changes are handled by /api/triggerEmbySync and /api/triggerShowSelect
 // NOTE: syncDiskData and runGapCheckBatch periodic timers removed - now handled by tryLocalGetTvdb
 // per-show tick via perShowCallback (disk + gap) and preTvdbTickCallback (Emby sweep)
 

@@ -860,10 +860,12 @@ export default {
           evtBus.emit("library-refresh-complete");
         }
 
-        // Trigger full gap check after library scan completes
-        srvr
-          .triggerFullGapCheck()
-          .catch((err) => console.error("triggerFullGapCheck failed:", err));
+        // Enqueue just the changed show if known (background timer handles the rest)
+        if (this._diskChangeShowName) {
+          srvr
+            .triggerShowSelect(this._diskChangeShowName)
+            .catch((err) => console.error("triggerShowSelect failed:", err));
+        }
 
         // Debounce clearing to avoid flicker
         setTimeout(() => {

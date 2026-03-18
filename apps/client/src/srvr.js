@@ -350,10 +350,6 @@ export function refreshEmbyItem(showId, showName) {
   return httpCall("/api/refreshEmbyItem", { showId, showName }, "POST");
 }
 
-export function triggerFullGapCheck() {
-  return httpCall("/api/triggerFullGapCheck", {}, "POST");
-}
-
 export function triggerShowGapCheck(showId, showName) {
   return httpCall("/api/triggerShowGapCheck", { showId, showName }, "POST");
 }

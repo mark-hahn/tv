@@ -1568,9 +1568,6 @@ export const refreshLib = async () => {
     const task = tasks.find(isLibraryRefreshTask);
     if (!task?.Id) return { status: "notask" };
 
-    // Note: triggerFullGapCheck should be called by the caller if needed
-    // (not all library refreshes require gap checks)
-
     return { status: "hasTask", taskId: task.Id };
   } catch (e) {
     return { status: e?.message || String(e) };

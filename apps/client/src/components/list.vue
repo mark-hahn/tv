@@ -3173,7 +3173,7 @@ export default {
       await this.episodeClick(e, show, season, episode, setWatched);
     });
 
-    // Listen for season folder deletes from App.vue (ctrl-click season number in Map)
+    // Listen for season content deletes from App.vue (ctrl-click season number in Map)
     on("seasonDelete", async ({ e, show, season }) => {
       if (this.simpleMode) return;
       if (!e?.ctrlKey) return;
@@ -3183,22 +3183,24 @@ export default {
       if (!showPath) return;
 
       const ok = window.confirm(
-        `OK to delete folder Season ${season} for show ${showName} ?`,
+        `OK to delete contents of Season ${season} for show ${showName} ?`,
       );
       if (!ok) return;
 
-      const sep = showPath.includes("\\") ? "\\" : "/";
-      const seasonPath = `${showPath.replace(/[\\/]+$/, "")}${sep}Season ${season}`;
-
       try {
-        await srvr.deletePath(seasonPath);
+        await srvr.delSeasonFiles(showName, showPath, season);
       } catch (err) {
-        console.error("seasonDelete: deletePath failed", { seasonPath, err });
+        console.error("seasonDelete: delSeasonFiles failed", {
+          showName,
+          showPath,
+          season,
+          err,
+        });
         window.alert(err?.message || String(err));
         return;
       }
 
-      // Refresh just this show in Emby so the season folder is removed from its list
+      // Refresh this show in Emby after content deletion.
       this.markShowUpdating(show.Name);
       await srvr
         .refreshEmbyItem(show.Id, show.Name)

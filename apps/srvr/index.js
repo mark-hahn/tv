@@ -2013,34 +2013,84 @@ const delGap = async (params) => {
 
 const delSeasonFiles = async (params) => {
   const showName = params?.showName;
-  const showPath = params?.showPath;
+  const showPathParam = params?.showPath;
   const season = params?.season;
 
-  if (!showName || !showPath || season === undefined || season === null) {
+  if (!showName || !showPathParam || season === undefined || season === null) {
     throw new Error("delSeasonFiles: requires showName, showPath, season");
   }
 
-  const seasonDir = path.join(showPath, `Season ${season}`);
-  console.log(`[delSeasonFiles] ${showName}: ${seasonDir}`);
+  const showPath =
+    showPathParam.includes("/") || showPathParam.includes("\\")
+      ? showPathParam
+      : path.join(tvDir, showPathParam);
 
-  if (!fs.existsSync(seasonDir)) {
-    throw new Error(`no such dir: ${seasonDir}`);
-  }
+  const seasonStr = String(season).trim();
+  const parsedSeason = Number.parseInt(seasonStr, 10);
+  const normalizedSeason = Number.isNaN(parsedSeason)
+    ? null
+    : String(parsedSeason);
+  const wantedNames = new Set([`Season ${seasonStr}`]);
+  if (normalizedSeason !== null) wantedNames.add(`Season ${normalizedSeason}`);
 
-  let entries = [];
-  try {
-    entries = fs.readdirSync(seasonDir);
-  } catch (e) {
-    throw new Error(`delSeasonFiles: readdir failed: ${e.message}`);
-  }
-
-  for (const entry of entries) {
-    const entryPath = path.join(seasonDir, entry);
-    console.log(`[delSeasonFiles] deleting: ${entryPath}`);
+  const directMatches = [];
+  for (const seasonName of wantedNames) {
+    const dir = path.join(showPath, seasonName);
     try {
-      await rimraf(entryPath);
+      const st = await fs.promises.stat(dir);
+      if (st.isDirectory()) directMatches.push(dir);
     } catch (e) {
-      throw new Error(`delSeasonFiles: delete failed: ${e.message}`);
+      if (e?.code !== "ENOENT") {
+        throw new Error(`delSeasonFiles: stat failed for ${dir}: ${e.message}`);
+      }
+    }
+  }
+
+  let seasonDirs = directMatches;
+  if (!seasonDirs.length && normalizedSeason !== null) {
+    let showDirEntries = [];
+    try {
+      showDirEntries = await fs.promises.readdir(showPath, {
+        withFileTypes: true,
+      });
+    } catch (e) {
+      throw new Error(`delSeasonFiles: readdir showPath failed: ${e.message}`);
+    }
+
+    seasonDirs = showDirEntries
+      .filter((entry) => {
+        if (!entry.isDirectory()) return false;
+        const m = /^Season\s+(\d+)$/i.exec(entry.name);
+        if (!m) return false;
+        return String(Number.parseInt(m[1], 10)) === normalizedSeason;
+      })
+      .map((entry) => path.join(showPath, entry.name));
+  }
+
+  if (!seasonDirs.length) {
+    throw new Error(
+      `delSeasonFiles: no season folder found for season ${season} under ${showPath}`,
+    );
+  }
+
+  for (const seasonDir of seasonDirs) {
+    console.log(`[delSeasonFiles] ${showName}: ${seasonDir}`);
+
+    let entries = [];
+    try {
+      entries = await fs.promises.readdir(seasonDir);
+    } catch (e) {
+      throw new Error(`delSeasonFiles: readdir failed: ${e.message}`);
+    }
+
+    for (const entry of entries) {
+      const entryPath = path.join(seasonDir, entry);
+      console.log(`[delSeasonFiles] deleting: ${entryPath}`);
+      try {
+        await rimraf(entryPath);
+      } catch (e) {
+        throw new Error(`delSeasonFiles: delete failed: ${e.message}`);
+      }
     }
   }
 
@@ -2636,7 +2686,7 @@ const deletePath = async (params) => {
 
   // If it's just a folder name (no slashes), construct the full path in tvDir
   // Otherwise use the path as-is (for episode file deletions)
-  const fullPath =
+  let fullPath =
     pathParam.includes("/") || pathParam.includes("\\")
       ? pathParam
       : path.join(tvDir, pathParam);
@@ -2649,8 +2699,48 @@ const deletePath = async (params) => {
     try {
       stats = fs.statSync(fullPath);
     } catch (e) {
-      console.log("deletePath: path doesn't exist");
-      return "ok";
+      if (e?.code !== "ENOENT") throw e;
+
+      // Season folder names may differ by zero-padding (e.g., Season 05 vs Season 5).
+      // If the requested path is missing, try to resolve a same-season sibling dir.
+      const baseName = path.basename(fullPath);
+      const seasonMatch = /^Season\s+(\d+)$/i.exec(baseName);
+      if (seasonMatch) {
+        const parentDir = path.dirname(fullPath);
+        const seasonNum = Number.parseInt(seasonMatch[1], 10);
+        if (!Number.isNaN(seasonNum)) {
+          let parentEntries = [];
+          try {
+            parentEntries = fs.readdirSync(parentDir, { withFileTypes: true });
+          } catch (readErr) {
+            if (readErr?.code !== "ENOENT") throw readErr;
+          }
+
+          const alt = parentEntries
+            .filter((entry) => entry.isDirectory())
+            .find((entry) => {
+              const m = /^Season\s+(\d+)$/i.exec(entry.name);
+              if (!m) return false;
+              return Number.parseInt(m[1], 10) === seasonNum;
+            });
+
+          if (alt) {
+            fullPath = path.join(parentDir, alt.name);
+            stats = fs.statSync(fullPath);
+            console.log(
+              "deletePath: resolved missing season path",
+              pathParam,
+              "->",
+              fullPath,
+            );
+          }
+        }
+      }
+
+      if (!stats) {
+        console.log("deletePath: path doesn't exist");
+        return "ok";
+      }
     }
 
     // Use rm -rf for both files and directories

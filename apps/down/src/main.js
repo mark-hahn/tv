@@ -2407,6 +2407,22 @@ async function main() {
     videoPath = `files/${usbFilePath}`;
     var tvLocalDir = `${tvSeasonPath}/`;
 
+    // 2026-03-18: Canonical rename — if destTitle wasn't already set by the
+    // NNN/NxN handler and the filename doesn't already contain SxxExx, rename
+    // to "<EmbyFolderName> SxxExx<ext>" so Emby reliably matches every episode.
+    // Original filename is preserved in the SQLite `title` column for rollback.
+    if (
+      !destTitle &&
+      Number.isInteger(season) &&
+      Number.isInteger(episode) &&
+      !/S\d{2}E\d{2}/i.test(fname)
+    ) {
+      const dotIdx = fname.lastIndexOf(".");
+      const fext = dotIdx >= 0 ? fname.slice(dotIdx) : "";
+      const seStr = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
+      destTitle = `${embyFolderName} ${seStr}${fext}`;
+    }
+
     trace("checkFileExists: start", {
       fname,
       title,

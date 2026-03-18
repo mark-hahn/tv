@@ -794,7 +794,7 @@ app.get("/api/search", async (req, res) => {
   postHistory({
     tvdbId,
     showName,
-    type: "torSrch",
+    type: more ? "torMore" : "torSrch",
     description: `search: ${showName}`,
   });
 

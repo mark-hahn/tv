@@ -209,38 +209,37 @@ import {
 export { smartTitleMatch, parseFileSeasonEpisode, parseTitleFromFilename };
 
 const EXTERNAL_TAB_NAME = "tv_external_page";
-let externalTabRef = null;
 
 export function openExternalPage(url) {
   const targetUrl = String(url || "").trim();
   if (!targetUrl) return null;
-
-  const navigate = (win) => {
-    if (!win || win.closed) return null;
-    try {
-      win.location.replace(targetUrl);
-    } catch {
-      try {
-        win.location.href = targetUrl;
-      } catch {
-        return null;
-      }
+  try {
+    // Emby SPA ignores hash-only changes when reusing the tab.  Add a
+    // cache-bust query param before the # so the browser does a full load.
+    let navUrl = targetUrl;
+    const hashIdx = targetUrl.indexOf("#");
+    if (hashIdx > 0 && targetUrl.includes("#!/")) {
+      const base = targetUrl.slice(0, hashIdx);
+      const hash = targetUrl.slice(hashIdx);
+      const sep = base.includes("?") ? "&" : "?";
+      navUrl = `${base}${sep}_t=${Date.now()}${hash}`;
     }
+    const win = window.open(navUrl, EXTERNAL_TAB_NAME);
+    if (!win) return null;
     try {
       win.focus();
     } catch {}
     return win;
-  };
+  } catch {
+    return null;
+  }
+}
 
+export function openNewTab(url) {
+  const targetUrl = String(url || "").trim();
+  if (!targetUrl) return null;
   try {
-    const reused = navigate(externalTabRef);
-    if (reused) return reused;
-
-    const namedWin = window.open("about:blank", EXTERNAL_TAB_NAME);
-    if (!namedWin) return null;
-
-    externalTabRef = namedWin;
-    return navigate(namedWin);
+    return window.open(targetUrl, "_blank");
   } catch {
     return null;
   }

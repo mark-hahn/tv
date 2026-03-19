@@ -1854,7 +1854,7 @@ export default {
         `https://www.torrentleech.org/torrents/browse/index/query/${searchQ}`,
       ];
       for (const url of urls) {
-        util.openExternalPage(url);
+        util.openNewTab(url);
       }
     },
 

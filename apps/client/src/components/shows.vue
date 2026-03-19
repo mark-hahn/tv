@@ -29,7 +29,7 @@
       v-slot="{ item: show }"
       :items="shows"
       :item-size="simpleMode ? 40 : 30"
-      key-field="Name"
+      key-field="name"
       :buffer="400"
       class="scroller"
       :item-class="'virtual-item'"

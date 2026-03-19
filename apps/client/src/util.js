@@ -209,22 +209,38 @@ import {
 export { smartTitleMatch, parseFileSeasonEpisode, parseTitleFromFilename };
 
 const EXTERNAL_TAB_NAME = "tv_external_page";
+let externalTabRef = null;
 
 export function openExternalPage(url) {
   const targetUrl = String(url || "").trim();
   if (!targetUrl) return null;
 
-  try {
-    const win = window.open(targetUrl, EXTERNAL_TAB_NAME);
-    if (win) {
+  const navigate = (win) => {
+    if (!win || win.closed) return null;
+    try {
+      win.location.replace(targetUrl);
+    } catch {
       try {
-        win.opener = null;
-      } catch {}
-      try {
-        win.focus();
-      } catch {}
+        win.location.href = targetUrl;
+      } catch {
+        return null;
+      }
     }
+    try {
+      win.focus();
+    } catch {}
     return win;
+  };
+
+  try {
+    const reused = navigate(externalTabRef);
+    if (reused) return reused;
+
+    const namedWin = window.open("about:blank", EXTERNAL_TAB_NAME);
+    if (!namedWin) return null;
+
+    externalTabRef = namedWin;
+    return navigate(namedWin);
   } catch {
     return null;
   }

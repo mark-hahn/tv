@@ -1319,7 +1319,7 @@ export default {
       this.refreshPendingShowName = showName;
       this.showRefreshDialog = true;
       this.refreshDialogShowName = showName;
-      this.refreshDialogStatus = "Queued...";
+      this.refreshDialogStatus = "Updating TVDB...";
       srvr
         .triggerShowGapCheck(this.show.Id || showName, showName)
         .catch((err) => {
@@ -1687,7 +1687,7 @@ export default {
       if (name !== this.refreshPendingShowName) return;
       this.showRefreshDialog = true;
       this.refreshDialogShowName = name;
-      this.refreshDialogStatus = "Updating...";
+      this.refreshDialogStatus = "Updating TVDB...";
     };
     evtBus.on("showUpdating", this.onShowUpdating);
 

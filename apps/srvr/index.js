@@ -1321,7 +1321,13 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
     return { hasChanges: false, changes: [] };
   }
 });
-tvdb.setPreTvdbTickCallback(runEmbyFullSweep);
+let embyFullSweepTickCount = 0;
+tvdb.setPreTvdbTickCallback(async () => {
+  embyFullSweepTickCount++;
+  if (embyFullSweepTickCount % 10 === 1) {
+    await runEmbyFullSweep();
+  }
+});
 
 const videoFileExtensions = [
   "mp4",
@@ -2852,15 +2858,10 @@ app.post("/api/getSubFileIds", apiWrapper(getSubFileIds));
 app.post("/api/accessTvdb", apiWrapper(tvdb.accessTvdb));
 app.post(
   "/api/triggerEmbySync",
-  apiWrapper(async (params) => {
-    const { showId, showName } = params;
-    if (!showId || !showName) {
-      console.error("[triggerEmbySync] Missing showId or showName");
-      return { success: false };
-    }
-    console.log(`[triggerEmbySync] Client changed: ${showName}`);
-    tvdb.enqueueShowProcess(showName, { skipRotten: true });
-    return { success: true };
+  apiWrapper(async () => {
+    console.log("[triggerEmbySync] Running full Emby sweep");
+    await runEmbyFullSweep();
+    return { ok: true };
   }),
 );
 
@@ -3095,6 +3096,7 @@ app.post(
     return { ok: true };
   }),
 );
+// Note: /api/embySync kept for createShowFolderAndRefreshEmby; /api/triggerEmbySync is the primary client trigger
 
 // Subtitles
 app.post("/api/subsSearch", apiWrapper(subsSearch));
@@ -3544,10 +3546,17 @@ async function syncEmbyUserData() {
 }
 
 /**
- * Background Emby sweep: runs every tick to detect new/removed shows,
+ * Background Emby sweep: detect new/removed shows,
  * sync collections, update metadata. Server-side port of client loadAllShows steps 2-5.
  */
+let embyFullSweepRunning = false;
+let embyFullSweepQueued = false;
 async function runEmbyFullSweep() {
+  if (embyFullSweepRunning) {
+    embyFullSweepQueued = true;
+    return;
+  }
+  embyFullSweepRunning = true;
   try {
     const allTvdb = tvdb.getAllTvdbSync();
     if (!allTvdb || Object.keys(allTvdb).length === 0) return;
@@ -3847,6 +3856,12 @@ async function runEmbyFullSweep() {
     await tvdb.saveTvdbSync();
   } catch (err) {
     console.error("[runEmbyFullSweep] error:", err.message);
+  } finally {
+    embyFullSweepRunning = false;
+    if (embyFullSweepQueued) {
+      embyFullSweepQueued = false;
+      runEmbyFullSweep();
+    }
   }
 }
 

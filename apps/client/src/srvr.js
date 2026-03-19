@@ -342,8 +342,8 @@ export function getGaps() {
   return httpCall("/api/getGaps");
 }
 
-export function triggerEmbySync(showId, showName) {
-  return httpCall("/api/triggerEmbySync", { showId, showName }, "POST");
+export function triggerEmbySync() {
+  return httpCall("/api/triggerEmbySync", {}, "POST");
 }
 
 export function refreshEmbyItem(showId, showName) {

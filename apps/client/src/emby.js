@@ -868,9 +868,8 @@ export async function deleteShowFromEmby(show) {
       return;
     }
     console.log("deleted show from emby:", show.name);
-    // Trigger gap check for deleted show
     srvr
-      .triggerEmbySync(show.id, show.name)
+      .triggerEmbySync()
       .catch((err) => console.error("triggerEmbySync failed:", err));
   } catch (error) {
     const errData = error.response?.data || "";
@@ -952,10 +951,9 @@ export const editEpisode = async (
       //               post_res: setDataRes
       //             });
 
-      // Trigger gap check for this show (watched status affects gap calculation)
       if (showName) {
         srvr
-          .triggerEmbySync(seriesId, showName)
+          .triggerEmbySync()
           .catch((err) => console.error("triggerEmbySync failed:", err));
       }
     }
@@ -998,6 +996,9 @@ export const setLastWatched = async (seriesId) => {
       episodeNumber,
       post_res: setDateRes,
     });
+    srvr
+      .triggerEmbySync()
+      .catch((err) => console.error("triggerEmbySync failed:", err));
   }
 };
 
@@ -1282,10 +1283,9 @@ export async function saveToTry(id, inToTry, showName) {
     console.error(err);
     throw new Error(err);
   }
-  // Trigger immediate gap check for this show
   if (showName) {
     srvr
-      .triggerEmbySync(id, showName)
+      .triggerEmbySync()
       .catch((err) => console.error("triggerEmbySync failed:", err));
   }
 }
@@ -1311,10 +1311,9 @@ export async function saveContinue(id, inContinue, showName) {
     console.error(err);
     throw new Error(err);
   }
-  // Trigger immediate gap check for this show
   if (showName) {
     srvr
-      .triggerEmbySync(id, showName)
+      .triggerEmbySync()
       .catch((err) => console.error("triggerEmbySync failed:", err));
   }
 }
@@ -1340,10 +1339,9 @@ export async function saveMark(id, inMark, showName) {
     console.error(err);
     throw new Error(err);
   }
-  // Trigger immediate gap check for this show
   if (showName) {
     srvr
-      .triggerEmbySync(id, showName)
+      .triggerEmbySync()
       .catch((err) => console.error("triggerEmbySync failed:", err));
   }
 }
@@ -1369,10 +1367,9 @@ export async function saveLinda(id, inLinda, showName) {
     console.error(err);
     throw new Error(err);
   }
-  // Trigger immediate gap check for this show
   if (showName) {
     srvr
-      .triggerEmbySync(id, showName)
+      .triggerEmbySync()
       .catch((err) => console.error("triggerEmbySync failed:", err));
   }
 }
@@ -1618,10 +1615,10 @@ export const createShowFolderAndRefreshEmby = async ({
 
   // Run server-side Emby sweep so inEmby status is current before caller reloads
   try {
-    await srvr.embySync();
+    await srvr.triggerEmbySync();
   } catch (e) {
     console.error(
-      "createShowFolderAndRefreshEmby: embySync failed",
+      "createShowFolderAndRefreshEmby: triggerEmbySync failed",
       e?.message || e,
     );
   }

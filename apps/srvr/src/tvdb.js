@@ -1866,19 +1866,13 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   tvdbData.reject = tvdbData.Reject; // keep lowercase in sync
   tvdbData.lastWatched = paramObj.lastWatched || existing.lastWatched || null;
 
-  // Calculate waitStr from nextAired and lastAired if available
-  // Returns "{M-DD}" for future, "" for past, null if no dates
+  // Calculate waitStr from nextAired and lastAired (single source of truth)
   const calculatedWaitStr = calculateWaitStr(
     tvdbData.nextAired,
     tvdbData.lastAired,
   );
-  if (paramObj.waitStr) {
-    tvdbData.WaitStr = paramObj.waitStr;
-  } else if (calculatedWaitStr !== null) {
-    tvdbData.WaitStr = calculatedWaitStr || null;
-  } else {
-    tvdbData.WaitStr = existing.WaitStr || existing.waitStr || null;
-  }
+  tvdbData.WaitStr = calculatedWaitStr || null;
+  delete tvdbData.waitStr;
 
   // Flattened Sync timestamps (no nested object)
   tvdbData.lastEmbySync =

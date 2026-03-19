@@ -3043,8 +3043,7 @@ export default {
           show.Date = record.Date ?? show.Date;
           show.Size = record.Size ?? show.Size;
           show.NoFiles = record.NoFiles ?? show.NoFiles;
-          show.WaitStr = record.waitStr ?? record.WaitStr ?? show.WaitStr;
-          show.waitStr = record.waitStr ?? show.waitStr;
+          show.WaitStr = record.WaitStr ?? show.WaitStr;
         }
 
         // Update allTvdb reference

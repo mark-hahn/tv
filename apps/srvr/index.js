@@ -3781,17 +3781,6 @@ async function runEmbyFullSweep() {
         handlePickupChange(name, true, tvdbRecord.status);
       }
       tvdbRecord.lastEmbySync = now;
-      // Compute waitStr from nextAired/lastAired (no API call needed)
-      const today = new Date().toISOString().slice(0, 10);
-      const airDate =
-        (tvdbRecord.nextAired || "") > (tvdbRecord.lastAired || "")
-          ? tvdbRecord.nextAired
-          : tvdbRecord.lastAired;
-      if (airDate)
-        tvdbRecord.waitStr =
-          airDate >= today
-            ? `{${airDate.slice(5).replace(/^0/, " ").trim()}}`
-            : "";
     }
 
     // Step 3: Detect disappeared shows → mark inEmby=false

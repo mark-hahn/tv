@@ -348,36 +348,6 @@ export const srchTvdbData = async (searchStr) => {
   return data;
 };
 
-//////////// get waitStr //////////////
-
-export async function getWaitStr(show) {
-  let waitStr = "";
-  try {
-    const tvdbData = getTvdbRecordByNameOrId(
-      allTvdb,
-      show?.Name,
-      show?.TvdbId || show?.tvdbId,
-    ).record;
-    if (tvdbData) {
-      // Use the greater of nextAired and lastAired
-      const nextAired = tvdbData.nextAired || "";
-      const lastAired = tvdbData.lastAired || "";
-      const airDate = nextAired > lastAired ? nextAired : lastAired;
-      if (!airDate) return "";
-      const airDateDay = airDate;
-      const airDateNoYr = airDate.slice(5).replace(/^0/, " ").trim();
-      const today = util.fmtDate();
-      if (airDateDay >= today) waitStr = `{${airDateNoYr}}`;
-      // console.log('getWaitStr:', show.Name,
-      //     {waitStr, airDateDay, airDateNoYr, today});
-    }
-  } catch (e) {
-    console.error("getWaitStr, tvdb data error:", show.Name, e);
-    return "";
-  }
-  return waitStr;
-}
-
 //////////// get episode data //////////////
 
 export const getEpisode = async (showName, seasonNum, episodeNum) => {

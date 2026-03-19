@@ -109,21 +109,6 @@ function syncRejects(allTvdb, rejectsIn) {
   rejectsSet = new Set(rejects);
 }
 
-// Phase 2: Helper function to set wait strings for shows
-async function setWaitStrings(allTvdb) {
-  for (const tvdb of Object.values(allTvdb)) {
-    if (!isTvdbShowRecord(tvdb)) continue;
-    if (tvdb.inEmby === false) continue;
-    try {
-      const show = { Name: tvdb.Name, Id: tvdb.Id };
-      const waitStr = await tvdb.getWaitStr(show);
-      if (waitStr) tvdb.waitStr = waitStr;
-    } catch (e) {
-      // Ignore errors
-    }
-  }
-}
-
 // Thin loadAllShows - fetches tvdb from server, applies computed props
 export async function loadAllShows() {
   const loadStart = Date.now();
@@ -148,7 +133,6 @@ export async function loadAllShows() {
         rec.remotes?.find((r) => r.name?.startsWith("IMDB"))?.ratings ||
         null;
     rec.Reject = !!(rec.reject || rec.Reject);
-    if (rec.waitStr && !rec.WaitStr) rec.WaitStr = rec.waitStr;
     if (rec.note && !rec.Notes) rec.Notes = rec.note;
     rec.NotReady = rec.inEmby === false;
     rec.WatchGap = rec.watchGap || false;
@@ -769,10 +753,7 @@ async function _oldLoadAllShows() {
     }
   }
 
-  // 6. Set WaitStr for shows with unaired episodes
-  await setWaitStrings(allTvdb);
-
-  // 6.5. Sync collection flags from Emby
+  // 6. Sync collection flags from Emby
   await syncCollections(allTvdb);
 
   // 6.6. Sync reject flags from config arrays (authoritative source)
@@ -809,7 +790,6 @@ async function _oldLoadAllShows() {
         null;
     }
     if (tvdb.reject && !tvdb.Reject) tvdb.Reject = tvdb.reject;
-    if (tvdb.waitStr && !tvdb.WaitStr) tvdb.WaitStr = tvdb.waitStr;
     if (tvdb.note && !tvdb.Notes) tvdb.Notes = tvdb.note;
 
     // Set NotReady flag

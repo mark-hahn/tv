@@ -2729,6 +2729,16 @@ export const setTvdbFields = async (params) => {
   if (name) {
     if (paramObj.$delTvdb) {
       delete allTvdb[name];
+    } else if (paramObj.$rename) {
+      const newKey = paramObj.$rename;
+      const record = allTvdb[name];
+      if (!record) {
+        log("err", "setTvdbFields $rename no tvdb for", name);
+        return "no tvdb";
+      }
+      delete allTvdb[name];
+      allTvdb[newKey] = record;
+      log("inf", `setTvdbFields renamed "${name}" -> "${newKey}"`);
     } else {
       tvdb = allTvdb[name];
       if (!tvdb) {

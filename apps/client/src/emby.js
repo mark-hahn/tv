@@ -312,6 +312,7 @@ async function _oldLoadAllShows() {
 
   // Diagnostic & Fix: Check for key/Name mismatches and fix them
   const keysToDelete = [];
+  const keysToRename = []; // { oldKey, newKey }
   for (const [key, show] of Object.entries(allTvdb)) {
     if (!isTvdbShowRecord(show)) {
       console.warn(
@@ -345,23 +346,40 @@ async function _oldLoadAllShows() {
           `[loadAllShows] Moving entry from key="${key}" to key="${properName}"`,
         );
         allTvdb[properName] = show;
-        keysToDelete.push(key);
+        keysToRename.push({ oldKey: key, newKey: properName });
       }
     }
   }
 
-  // Delete the mismatched keys
+  // Delete the mismatched keys from client cache
   for (const key of keysToDelete) {
     delete allTvdb[key];
   }
+  for (const { oldKey } of keysToRename) {
+    delete allTvdb[oldKey];
+  }
 
-  if (keysToDelete.length > 0) {
+  if (keysToDelete.length > 0 || keysToRename.length > 0) {
     console.log(
-      `[loadAllShows] Cleaned up ${keysToDelete.length} mismatched keys:`,
-      keysToDelete,
+      `[loadAllShows] Cleaned up ${keysToDelete.length} deleted + ${keysToRename.length} renamed keys`,
     );
 
-    // Persist the cleanup by deleting the bad keys from the server
+    // Persist renames to server (move record from old key to new key)
+    for (const { oldKey, newKey } of keysToRename) {
+      try {
+        await srvr.setTvdbFields({ name: oldKey, $rename: newKey });
+        console.log(
+          `[loadAllShows] Renamed key="${oldKey}" -> "${newKey}" on server`,
+        );
+      } catch (e) {
+        console.error(
+          `[loadAllShows] Failed to rename key="${oldKey}" -> "${newKey}" on server:`,
+          e,
+        );
+      }
+    }
+
+    // Persist deletes to server (true duplicates)
     for (const badKey of keysToDelete) {
       try {
         await srvr.setTvdbFields({ name: badKey, $delTvdb: true });

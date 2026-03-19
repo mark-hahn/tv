@@ -2144,6 +2144,10 @@ const tryLocalGetTvdb = async () => {
     return;
   }
 
+  if (!minTvdb.name) {
+    minTvdb.name = requestedName;
+  }
+
   log("");
   log(`processing [${minTvdb.name}]`);
   // Notify clients which show is being processed

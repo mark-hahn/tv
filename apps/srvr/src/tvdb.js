@@ -2177,6 +2177,9 @@ const tryLocalGetTvdb = async () => {
     log("err", "tryLocalGetTvdb: tvdb update failed:", e?.message);
   }
   const processRecord = updatedRecord || allTvdb[minTvdb.name] || minTvdb;
+  if (!processRecord.name) {
+    processRecord.name = minTvdb.name;
+  }
 
   // Fetch and persist series map data using the fresh record (try Emby first, fallback to TVDB)
   try {

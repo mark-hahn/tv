@@ -3719,6 +3719,17 @@ async function runEmbyFullSweep() {
 
       // Update existing record
       tvdbRecord.id = showId;
+      if (!tvdbRecord.name) {
+        console.log(
+          `[runEmbyFullSweep] Backfilling missing name for tvdbId=${tvdbId}: "${name}"`,
+        );
+        tvdbRecord.name = name;
+        if (tvdbKey !== name) {
+          allTvdb[name] = tvdbRecord;
+          delete allTvdb[tvdbKey];
+          tvdbKey = name;
+        }
+      }
       if (!tvdbRecord.tvdbId && tvdbId) {
         console.log(
           `[runEmbyFullSweep] Backfilling missing tvdbId=${tvdbId} for "${name}"`,

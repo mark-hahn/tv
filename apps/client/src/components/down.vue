@@ -925,7 +925,7 @@ export default {
         return;
       }
 
-      const showName = this.show.Name || this.show.name; // Robustness
+      const showName = this.show.name || this.show.name; // Robustness
       if (!showName) return;
 
       const candidates = [this.show];

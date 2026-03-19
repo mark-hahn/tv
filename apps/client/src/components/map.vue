@@ -89,7 +89,7 @@
             marginLeft: '15px',
           }"
         >
-          {{ mapShow?.Name }}
+          {{ mapShow?.name }}
         </div>
         <div style="display: flex">
           <div
@@ -500,9 +500,9 @@
     <History
       v-show="showHistory && !hideMapBottom"
       :tvdbId="
-        String(mapShow?.tvdbId || mapShow?.TvdbId || tvdbData?.tvdbId || '')
+        String(mapShow?.tvdbId || mapShow?.tvdbId || tvdbData?.tvdbId || '')
       "
-      :showName="String(mapShow?.Name || '')"
+      :showName="String(mapShow?.name || '')"
       :visible="showHistory"
       style="
         flex: 1 1 auto;
@@ -633,10 +633,10 @@ export default {
       const status = this.statusVal;
       if (status) parts.push(status);
 
-      if (this.mapShow?.WatchGap) parts.push("Watch Gap");
-      if (this.mapShow?.FileGap) parts.push("Missing File");
-      if (this.mapShow?.WaitStr?.length)
-        parts.push("Waiting " + this.mapShow.WaitStr);
+      if (this.mapShow?.watchGap) parts.push("Watch Gap");
+      if (this.mapShow?.fileGap) parts.push("Missing File");
+      if (this.mapShow?.waitStr?.length)
+        parts.push("Waiting " + this.mapShow.waitStr);
 
       return parts;
     },
@@ -655,7 +655,7 @@ export default {
   watch: {
     async mapShow(newShow) {
       this.showHistory = false;
-      if (newShow && newShow.Name) {
+      if (newShow && newShow.name) {
         this.seasonStates = {}; // Clear season states when show changes
         await this.loadTvdbData();
         if (!this.mapShow) return;
@@ -698,7 +698,7 @@ export default {
   ],
 
   async mounted() {
-    if (this.mapShow && this.mapShow.Name) {
+    if (this.mapShow && this.mapShow.name) {
       await this.loadTvdbData();
       await this.setNextWatch();
     }
@@ -719,7 +719,7 @@ export default {
   methods: {
     onTvdbDataReady({ show, tvdbData }) {
       if (!tvdbData || !this.mapShow) return;
-      if (show?.Name === this.mapShow.Name && !this.tvdbData) {
+      if (show?.name === this.mapShow.name && !this.tvdbData) {
         this.tvdbData = tvdbData;
       }
     },
@@ -730,9 +730,9 @@ export default {
       // Ctrl-click on "Not In Emby": create the server folder and refresh Emby.
       if (!event?.ctrlKey) return;
 
-      const showName = String(this.mapShow?.Name || "").trim();
+      const showName = String(this.mapShow?.name || "").trim();
       const tvdbId = String(
-        this.mapShow?.TvdbId ||
+        this.mapShow?.tvdbId ||
           this.tvdbData?.tvdbId ||
           this.tvdbData?.tvdb_id ||
           "",
@@ -1114,8 +1114,8 @@ export default {
         if (!this.allTvdb) {
           this.allTvdb = await tvdb.getAllTvdb(0);
         }
-        if (this.mapShow && this.mapShow.Name) {
-          this.tvdbData = this.allTvdb[this.mapShow.Name];
+        if (this.mapShow && this.mapShow.name) {
+          this.tvdbData = this.allTvdb[this.mapShow.name];
         }
       } catch (err) {
         console.error("loadTvdbData error:", err);
@@ -1219,7 +1219,7 @@ export default {
     },
 
     async setNextWatch() {
-      if (!this.mapShow || !this.mapShow.Id) {
+      if (!this.mapShow || !this.mapShow.id) {
         this.nextUpTxt = "";
         return;
       }

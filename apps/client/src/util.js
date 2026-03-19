@@ -61,7 +61,7 @@ export function fmtDate(dateIn, includeYear = true, utcIn = false) {
 
 export function fmtSize(show) {
   if (show.inEmby === false) return "";
-  const size = show.Size;
+  const size = show.size;
   if (size < 1e3) return size;
   if (size < 1e6) return Math.round(size / 1e3) + "K";
   if (size < 1e9) return Math.round(size / 1e6) + "M";

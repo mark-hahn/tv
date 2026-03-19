@@ -274,7 +274,7 @@
           </button>
           <button
             v-if="existingShowMatch && !isLoadingNext && !suppressButtons"
-            @click="handleSelectExisting(existingShowMatch.Name)"
+            @click="handleSelectExisting(existingShowMatch.name)"
             :style="{
               height: '18px',
               margin: '0',
@@ -805,7 +805,7 @@ export default {
       applyTvdbPush(name, record);
       const cur = curTvdb.value;
       if (!cur) return;
-      const curName = String(cur.name || cur.Name || "").trim();
+      const curName = String(cur.name || cur.name || "").trim();
       const curId = String(cur.tvdb_id || cur.tvdbId || cur.id || "").trim();
       const recordId = String(record.tvdbId || record.tvdb_id || "").trim();
       const matches =
@@ -876,7 +876,7 @@ export default {
           if (!s) return "";
           if (typeof s === "string") return s;
           return String(
-            s.Name || s.name || s.title || s.showName || s.seriesName || "",
+            s.name || s.name || s.title || s.showName || s.seriesName || "",
           );
         })
         .map((s) => s.trim())
@@ -1129,14 +1129,14 @@ export default {
 
       const currentTvdbId = String(t.tvdb_id || t.tvdbId || t.id || "").trim();
       const currentName = String(
-        t.name || t.Name || t.seriesName || t.title || "",
+        t.name || t.name || t.seriesName || t.title || "",
       ).trim();
 
       if (!currentTvdbId && !currentName) return null;
 
       const getEntryTvdbId = (entry) =>
         String(
-          entry?.tvdb_id || entry?.tvdbId || entry?.TvdbId || entry?.id || "",
+          entry?.tvdb_id || entry?.tvdbId || entry?.tvdbId || entry?.id || "",
         ).trim();
 
       const isRealTvdbEntry = (entry) => {
@@ -1167,16 +1167,16 @@ export default {
       if (!t) return null;
 
       const tId = String(t.tvdb_id || t.tvdbId || t.id || "").trim();
-      const name = String(t.name || t.Name || t.seriesName || t.title || "")
+      const name = String(t.name || t.name || t.seriesName || t.title || "")
         .trim()
         .toLowerCase();
 
       if (!name && !tId) return null;
 
       return (props.allShows || []).find((s) => {
-        const sTvdb = String(s.TvdbId || s.tvdbId || s.tvdb_id || "").trim();
+        const sTvdb = String(s.tvdbId || s.tvdbId || s.tvdb_id || "").trim();
         if (sTvdb && tId && sTvdb === tId) return true;
-        const sName = String(s.Name || s.name || "")
+        const sName = String(s.name || s.name || "")
           .trim()
           .toLowerCase();
         return sName === name;
@@ -1186,7 +1186,7 @@ export default {
     const toggleTvdbInfo = () => {
       const t = curTvdb.value;
       if (t) {
-        const name = t.name || t.Name || t.seriesName || t.title;
+        const name = t.name || t.name || t.seriesName || t.title;
         if (name) {
           const tvdbId = String(t.tvdb_id || t.tvdbId || t.id || "").trim();
           handleSelectExisting(name, { tvdbId });
@@ -1202,7 +1202,7 @@ export default {
 
       if ((data.episodeCount ?? 0) > 0) {
         let wCount = data.watchedCount ?? 0;
-        if (data.Id && data.inEmby === false) wCount = 0;
+        if (data.id && data.inEmby === false) wCount = 0;
         const total = data.episodeCount;
         if (wCount === total) {
           return `Watched all ${total} episodes`;
@@ -1288,7 +1288,7 @@ export default {
         const local = allTvdbData.value[data.name];
         if (local && (local.episodeCount ?? 0) > 0) {
           let wCount = local.watchedCount ?? 0;
-          if (local.Id && local.inEmby === false) wCount = 0;
+          if (local.id && local.inEmby === false) wCount = 0;
           const total = local.episodeCount;
           if (wCount === total) {
             info.watched = `Watched all ${total} episodes`;
@@ -1301,7 +1301,7 @@ export default {
       const tId = String(tvdb_id || tvdbId || "").trim();
       if (data.name || tId) {
         if (existingShowMatch.value) {
-          info.existingShowName = existingShowMatch.value.Name;
+          info.existingShowName = existingShowMatch.value.name;
         }
       }
 
@@ -1476,9 +1476,9 @@ export default {
         // Try to find matching show in allShows to get inEmby status and Id
         let showContext = null;
         const matchingShow = (props.allShows || []).find((s) => {
-          const sTvdb = String(s.TvdbId || s.tvdbId || s.tvdb_id || "").trim();
+          const sTvdb = String(s.tvdbId || s.tvdbId || s.tvdb_id || "").trim();
           if (sTvdb && tvdbId && sTvdb === tvdbId) return true;
-          const sName = String(s.Name || s.name || "")
+          const sName = String(s.name || s.name || "")
             .trim()
             .toLowerCase();
           return sName === name.toLowerCase();
@@ -1487,7 +1487,7 @@ export default {
         if (matchingShow) {
           showContext = {
             inEmby: matchingShow.inEmby,
-            Id: matchingShow.Id,
+            id: matchingShow.id,
           };
         }
 
@@ -1561,15 +1561,15 @@ export default {
       const t = curTvdb.value;
       if (!t) return;
 
-      const name = String(t.name || t.Name || "").trim();
+      const name = String(t.name || t.name || "").trim();
       if (!name) return;
 
       // Check if show already exists
       const tvdbId = String(t.tvdbId || t.tvdb_id || t.id || "").trim();
       const exists = (props.allShows || []).some((s) => {
-        const sTvdb = String(s.TvdbId || s.tvdbId || s.tvdb_id || "").trim();
+        const sTvdb = String(s.tvdbId || s.tvdbId || s.tvdb_id || "").trim();
         if (sTvdb && tvdbId && sTvdb === tvdbId) return true;
-        const sName = String(s.Name || s.name || "")
+        const sName = String(s.name || s.name || "")
           .trim()
           .toLowerCase();
         return sName === name.toLowerCase();
@@ -1585,7 +1585,7 @@ export default {
         name,
         tvdbId: String(t.tvdbId || t.tvdb_id || t.id || "").trim(),
         overview:
-          t.overview || t.overviewText || t.overview_txt || t.Overview || "",
+          t.overview || t.overviewText || t.overview_txt || t.overview || "",
         image: t.image || t.image_url || t.thumbnail || "",
         year: t.year || "",
         originalCountry: t.originalCountry || t.country || "",
@@ -1751,7 +1751,7 @@ export default {
     const galleryTitleLine = computed(() => {
       const t = curTvdb.value;
       if (t) {
-        return String(t.name || t.Name || t.seriesName || t.title || "").trim();
+        return String(t.name || t.name || t.seriesName || t.title || "").trim();
       }
       if (
         selectedTitleIdx.value >= 0 &&
@@ -1770,9 +1770,9 @@ export default {
       // If show exists in list, just emit stream event (App.vue currentShow is already set)
       const tvdbId = String(t?.tvdbId || t?.tvdb_id || t?.id || "").trim();
       const exists = (props.allShows || []).some((s) => {
-        const sTvdb = String(s.TvdbId || s.tvdbId || s.tvdb_id || "").trim();
+        const sTvdb = String(s.tvdbId || s.tvdbId || s.tvdb_id || "").trim();
         if (sTvdb && tvdbId && sTvdb === tvdbId) return true;
-        const sName = String(s.Name || s.name || "")
+        const sName = String(s.name || s.name || "")
           .trim()
           .toLowerCase();
         return sName === name.toLowerCase();
@@ -1789,7 +1789,7 @@ export default {
       // Small delay to let preview mode set up the show
       setTimeout(
         () => {
-          evtBus.emit("showStreamPane", { Name: name });
+          evtBus.emit("showStreamPane", { name: name });
         },
         exists ? 0 : 300,
       );

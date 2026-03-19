@@ -33,9 +33,9 @@ const tvdbIdByName = (name) => {
   const rec =
     all[name] ||
     Object.values(all).find(
-      (r) => r?.Name?.toLowerCase() === name.toLowerCase(),
+      (r) => r?.name?.toLowerCase() === name.toLowerCase(),
     );
-  return String(rec?.TvdbId || rec?.tvdbId || "").trim() || null;
+  return String(rec?.tvdbId || "").trim() || null;
 };
 
 const dontupload = false;
@@ -988,22 +988,22 @@ function gapEntryHasGap(gap) {
   if (!gap || typeof gap !== "object") return false;
 
   // Boolean flags that indicate a gap condition.
-  if (gap.FileGap === true) return true;
-  if (gap.WatchGap === true) return true;
-  if (gap.NotReady === true) return true;
+  if (gap.fileGap === true) return true;
+  if (gap.watchGap === true) return true;
+  if (gap.notReady === true) return true;
 
   // Explicit season/episode markers (allow 0).
-  if (gap.FileGapSeason !== null && gap.FileGapSeason !== undefined)
+  if (gap.fileGapSeason !== null && gap.fileGapSeason !== undefined)
     return true;
-  if (gap.FileGapEpisode !== null && gap.FileGapEpisode !== undefined)
+  if (gap.fileGapEpisode !== null && gap.fileGapEpisode !== undefined)
     return true;
-  if (gap.WatchGapSeason !== null && gap.WatchGapSeason !== undefined)
+  if (gap.watchGapSeason !== null && gap.watchGapSeason !== undefined)
     return true;
-  if (gap.WatchGapEpisode !== null && gap.WatchGapEpisode !== undefined)
+  if (gap.watchGapEpisode !== null && gap.watchGapEpisode !== undefined)
     return true;
 
   // Non-empty wait string can also indicate a gap state.
-  if (typeof gap.WaitStr === "string" && gap.WaitStr.trim() !== "") return true;
+  if (typeof gap.waitStr === "string" && gap.waitStr.trim() !== "") return true;
 
   return false;
 }
@@ -1188,35 +1188,35 @@ const fixCompactEpisodeNaming = async (showId, showName) => {
 tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
   try {
     // Disk check
-    const embyPath = tvdbRecord.Path || tvdbRecord.emby?.path || showName;
+    const embyPath = tvdbRecord.path || tvdbRecord.emby?.path || showName;
     const pathPart = embyPath.split("/").pop();
     const diskInfo = await getShowDiskInfo(pathPart);
     const diskChanges = [];
     if (diskInfo) {
       const [newDate, newSize] = diskInfo;
-      if (tvdbRecord.Date !== newDate) {
-        diskChanges.push(`Date:${tvdbRecord.Date}->${newDate}`);
-        tvdbRecord.Date = newDate;
+      if (tvdbRecord.date !== newDate) {
+        diskChanges.push(`Date:${tvdbRecord.date}->${newDate}`);
+        tvdbRecord.date = newDate;
       }
-      if (tvdbRecord.Size !== newSize) {
-        diskChanges.push(`Size:${tvdbRecord.Size}->${newSize}`);
-        tvdbRecord.Size = newSize;
+      if (tvdbRecord.size !== newSize) {
+        diskChanges.push(`Size:${tvdbRecord.size}->${newSize}`);
+        tvdbRecord.size = newSize;
       }
-      if (tvdbRecord.NoFiles) {
+      if (tvdbRecord.noFiles) {
         diskChanges.push(`NoFiles:true->false`);
-        tvdbRecord.NoFiles = false;
+        tvdbRecord.noFiles = false;
       }
-    } else if (!tvdbRecord.NoFiles) {
+    } else if (!tvdbRecord.noFiles) {
       diskChanges.push(`NoFiles:false->true`);
-      tvdbRecord.NoFiles = true;
-      tvdbRecord.Date = null;
-      tvdbRecord.Size = 0;
+      tvdbRecord.noFiles = true;
+      tvdbRecord.date = null;
+      tvdbRecord.size = 0;
     }
     // lastWatched
     const lastWatchedChanges = [];
-    if (tvdbRecord.inEmby && tvdbRecord.Id) {
+    if (tvdbRecord.inEmby && tvdbRecord.id) {
       try {
-        const date = await fetchLastWatchedDate(tvdbRecord.Id);
+        const date = await fetchLastWatchedDate(tvdbRecord.id);
         if (date && date !== tvdbRecord.lastWatched) {
           lastWatchedChanges.push(
             `lastWatched:${tvdbRecord.lastWatched}->${date}`,
@@ -1226,14 +1226,14 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
       } catch (e) {}
     }
     // Fix compact-NNN episode mis-indexing (e.g. "101-Title.avi" parsed as E101)
-    if (tvdbRecord.inEmby && tvdbRecord.Id) {
-      await fixCompactEpisodeNaming(tvdbRecord.Id, showName);
+    if (tvdbRecord.inEmby && tvdbRecord.id) {
+      await fixCompactEpisodeNaming(tvdbRecord.id, showName);
     }
     // Gap check
     let gapChanges = [];
-    if (tvdbRecord.inEmby && tvdbRecord.Id) {
+    if (tvdbRecord.inEmby && tvdbRecord.id) {
       const gapData = await emby.gapCheckOne(
-        tvdbRecord.Id,
+        tvdbRecord.id,
         showName,
         tvdbRecord,
       );
@@ -1284,8 +1284,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
     const push2Changes = [...diskChanges, ...lastWatchedChanges, ...gapChanges];
     // History: bkgndUpdate (timer-selected) or clientUpdate (user-triggered)
     try {
-      const tvdbIdVal =
-        String(tvdbRecord.TvdbId || tvdbRecord.tvdbId || "").trim() || null;
+      const tvdbIdVal = String(tvdbRecord.tvdbId || "").trim() || null;
       const fieldsVal =
         push2Changes.length > 0 ? JSON.stringify(push2Changes) : null;
       const descVal =
@@ -1602,10 +1601,8 @@ const trySaveConfigYml = async (id, result, resolve, reject) => {
     const isReject = normalizedRejectsSet.has(norm);
     if (isReject) {
       record.reject = true;
-      record.Reject = true;
-    } else if (record.reject || record.Reject) {
+    } else if (record.reject) {
       record.reject = false;
-      record.Reject = false;
     }
   }
   await tvdb.saveTvdbSync();
@@ -1662,14 +1659,12 @@ const startupConfigSync = () => {
   for (const [recordName, record] of Object.entries(allTvdb)) {
     const norm = recordName.toLowerCase();
     const shouldReject = normalizedRejects.has(norm);
-    if (shouldReject && (!record.reject || !record.Reject)) {
+    if (shouldReject && !record.reject) {
       record.reject = true;
-      record.Reject = true;
       changedTvdb = true;
     }
-    if (!shouldReject && (record.reject || record.Reject)) {
+    if (!shouldReject && record.reject) {
       record.reject = false;
-      record.Reject = false;
       changedTvdb = true;
     }
   }
@@ -1839,7 +1834,7 @@ const getNoEmbys = async (_params) => {
 
   for (const [recordName, record] of Object.entries(allTvdb)) {
     if (record?.inEmby === false) {
-      if (!record.Name) record.Name = recordName;
+      if (!record.name) record.name = recordName;
       out.push(record);
     }
   }
@@ -1849,9 +1844,9 @@ const getNoEmbys = async (_params) => {
 
 const addNoEmby = async (params) => {
   const show = params.show || params;
-  const name = String(show?.Name || show?.name || "").trim();
+  const name = String(show?.name || "").trim();
   console.log("addNoEmby", name);
-  if (!name) throw new Error("addNoEmby: missing show Name");
+  if (!name) throw new Error("addNoEmby: missing show name");
 
   const allTvdb = tvdb.getAllTvdbSync();
   let existingKey = null;
@@ -1871,18 +1866,18 @@ const addNoEmby = async (params) => {
   const nextRecord = {
     ...(existing || {}),
     ...(show || {}),
-    Name: name,
-    Id: show?.Id || existing?.Id || `noemby-${Math.random()}`,
+    name: name,
+    id: show?.id || existing?.id || `noemby-${Math.random()}`,
     inEmby: false,
-    InToTry: show?.InToTry ?? existing?.InToTry ?? false,
-    InContinue: show?.InContinue ?? existing?.InContinue ?? false,
-    InMark: show?.InMark ?? existing?.InMark ?? false,
-    InLinda: show?.InLinda ?? existing?.InLinda ?? false,
-    Reject: show?.Reject ?? existing?.Reject ?? false,
+    inToTry: show?.inToTry ?? existing?.inToTry ?? false,
+    inContinue: show?.inContinue ?? existing?.inContinue ?? false,
+    inMark: show?.inMark ?? existing?.inMark ?? false,
+    inLinda: show?.inLinda ?? existing?.inLinda ?? false,
+    reject: show?.reject ?? existing?.reject ?? false,
   };
 
-  if (rejectFromList && !nextRecord.Reject) {
-    nextRecord.Reject = true;
+  if (rejectFromList && !nextRecord.reject) {
+    nextRecord.reject = true;
     console.log("-- sync: inherited Reject=true from global list:", name);
   }
 
@@ -1892,8 +1887,7 @@ const addNoEmby = async (params) => {
   allTvdb[name] = nextRecord;
   await tvdb.saveTvdbSync();
   try {
-    const id =
-      String(nextRecord.TvdbId || nextRecord.tvdbId || "").trim() || null;
+    const id = String(nextRecord.tvdbId || "").trim() || null;
     history.addEvent({
       tvdbId: id,
       showName: name,
@@ -1931,9 +1925,7 @@ const delNoEmby = async (params) => {
   delete allTvdb[deleteKey];
   await tvdb.saveTvdbSync();
   try {
-    const delTvdbId =
-      String(deletedRecord?.TvdbId || deletedRecord?.tvdbId || "").trim() ||
-      null;
+    const delTvdbId = String(deletedRecord?.tvdbId || "").trim() || null;
     history.addEvent({
       tvdbId: delTvdbId,
       showName: deleteKey,
@@ -1950,8 +1942,8 @@ const getGaps = async (_param) => {
   const gapsFromTvdb = {};
 
   for (const [name, record] of Object.entries(allTvdb)) {
-    if (record.gap && record.Id) {
-      gapsFromTvdb[record.Id] = record.gap;
+    if (record.gap && record.id) {
+      gapsFromTvdb[record.id] = record.gap;
     }
   }
 
@@ -3379,11 +3371,11 @@ async function syncEmbyUserData() {
       const userData = embyShow.UserData || {};
 
       // Check if user data changed (normalize values for comparison)
-      const oldPlayed = !!tvdbRecord.Played;
+      const oldPlayed = !!tvdbRecord.played;
       const newPlayed = !!userData.Played;
-      const oldPlayCount = tvdbRecord.PlayCount || 0;
+      const oldPlayCount = tvdbRecord.playCount || 0;
       const newPlayCount = userData.PlayCount || 0;
-      const oldLastPlayed = tvdbRecord.LastPlayedDate || null;
+      const oldLastPlayed = tvdbRecord.lastPlayedDate || null;
       const newLastPlayed = userData.LastPlayedDate || null;
       const oldUnplayed = tvdbRecord.UnplayedItemCount || 0;
       const newUnplayed = userData.UnplayedItemCount || 0;
@@ -3435,33 +3427,33 @@ async function syncEmbyUserData() {
       const newInLinda = lindaIdSet.has(showId);
 
       const collectionsChanged =
-        tvdbRecord.InToTry !== newInToTry ||
-        tvdbRecord.InContinue !== newInContinue ||
-        tvdbRecord.InMark !== newInMark ||
-        tvdbRecord.InLinda !== newInLinda;
+        tvdbRecord.inToTry !== newInToTry ||
+        tvdbRecord.inContinue !== newInContinue ||
+        tvdbRecord.inMark !== newInMark ||
+        tvdbRecord.inLinda !== newInLinda;
 
       // Debug first collection change
       if (collectionsChanged && collectionsChangeCount === 0) {
         console.log(`[DEBUG first collection change] ${name}:`, {
           toTry: {
-            old: tvdbRecord.InToTry,
+            old: tvdbRecord.inToTry,
             new: newInToTry,
-            changed: tvdbRecord.InToTry !== newInToTry,
+            changed: tvdbRecord.inToTry !== newInToTry,
           },
           continue: {
-            old: tvdbRecord.InContinue,
+            old: tvdbRecord.inContinue,
             new: newInContinue,
-            changed: tvdbRecord.InContinue !== newInContinue,
+            changed: tvdbRecord.inContinue !== newInContinue,
           },
           mark: {
-            old: tvdbRecord.InMark,
+            old: tvdbRecord.inMark,
             new: newInMark,
-            changed: tvdbRecord.InMark !== newInMark,
+            changed: tvdbRecord.inMark !== newInMark,
           },
           linda: {
-            old: tvdbRecord.InLinda,
+            old: tvdbRecord.inLinda,
             new: newInLinda,
-            changed: tvdbRecord.InLinda !== newInLinda,
+            changed: tvdbRecord.inLinda !== newInLinda,
           },
         });
       }
@@ -3475,20 +3467,20 @@ async function syncEmbyUserData() {
       if (userDataChanged || collectionsChanged || rejectsChanged) {
         // Update user data
         if (userDataChanged) {
-          tvdbRecord.Played = userData.Played || false;
-          tvdbRecord.PlayCount = userData.PlayCount || 0;
-          tvdbRecord.LastPlayedDate =
-            userData.LastPlayedDate || tvdbRecord.LastPlayedDate || null;
+          tvdbRecord.played = userData.Played || false;
+          tvdbRecord.playCount = userData.PlayCount || 0;
+          tvdbRecord.lastPlayedDate =
+            userData.LastPlayedDate || tvdbRecord.lastPlayedDate || null;
           tvdbRecord.UnplayedItemCount = userData.UnplayedItemCount || 0;
           userDataChangeCount++;
         }
 
         // Update collection flags
         if (collectionsChanged) {
-          tvdbRecord.InToTry = newInToTry;
-          tvdbRecord.InContinue = newInContinue;
-          tvdbRecord.InMark = newInMark;
-          tvdbRecord.InLinda = newInLinda;
+          tvdbRecord.inToTry = newInToTry;
+          tvdbRecord.inContinue = newInContinue;
+          tvdbRecord.inMark = newInMark;
+          tvdbRecord.inLinda = newInLinda;
           collectionsChangeCount++;
         }
 
@@ -3566,7 +3558,7 @@ async function runEmbyFullSweep() {
         r &&
         typeof r === "object" &&
         !Array.isArray(r) &&
-        String(r.Name || r.name || "").trim()
+        String(r.name || "").trim()
       );
 
     // Fetch Emby show list + 4 collections in parallel
@@ -3635,7 +3627,7 @@ async function runEmbyFullSweep() {
       if (!norm) return null;
       for (const [key, rec] of Object.entries(allTvdb)) {
         if (!isTvdbShow(rec)) continue;
-        const candName = String(rec.Name || rec.name || "").trim();
+        const candName = String(rec.name || "").trim();
         if (!candName || candName === embyName) continue;
         if (normalizeTitle(candName) !== norm) continue;
         return { key, record: rec };
@@ -3646,11 +3638,11 @@ async function runEmbyFullSweep() {
     // Step 1: Key/Name mismatch cleanup
     const keysToDelete = [];
     for (const [key, show] of Object.entries(allTvdb)) {
-      if (!isTvdbShow(show) || !show.Name || key === show.Name) continue;
-      if (allTvdb[show.Name] && allTvdb[show.Name] !== show) {
+      if (!isTvdbShow(show) || !show.name || key === show.name) continue;
+      if (allTvdb[show.name] && allTvdb[show.name] !== show) {
         keysToDelete.push(key);
-      } else if (!allTvdb[show.Name]) {
-        allTvdb[show.Name] = show;
+      } else if (!allTvdb[show.name]) {
+        allTvdb[show.name] = show;
         keysToDelete.push(key);
       }
     }
@@ -3688,7 +3680,7 @@ async function runEmbyFullSweep() {
           continue;
         }
         const param = {
-          show: { Name: name, Id: showId, TvdbId: tvdbId },
+          show: { name: name, id: showId, tvdbId: tvdbId },
           seasonCount: 0,
           episodeCount: 0,
           watchedCount: 0,
@@ -3717,7 +3709,7 @@ async function runEmbyFullSweep() {
       }
 
       // Update existing record
-      tvdbRecord.Id = showId;
+      tvdbRecord.id = showId;
       if (!tvdbRecord.tvdbId && tvdbId) {
         console.log(
           `[runEmbyFullSweep] Backfilling missing tvdbId=${tvdbId} for "${name}"`,
@@ -3765,17 +3757,17 @@ async function runEmbyFullSweep() {
           tvdbRecord.tvdbId = tvdbId;
         }
       }
-      tvdbRecord.Path = embyPath;
-      tvdbRecord.Genres = embyShow.Genres || [];
-      tvdbRecord.Overview = embyShow.Overview || "";
-      tvdbRecord.DateCreated = embyShow.DateCreated?.substring(0, 10);
-      tvdbRecord.PremiereDate = embyShow.PremiereDate?.substring(0, 10);
-      tvdbRecord.Played = embyShow.UserData?.Played || false;
-      tvdbRecord.PlayCount = embyShow.UserData?.PlayCount || 0;
-      tvdbRecord.InToTry = toTryIds.has(showId);
-      tvdbRecord.InContinue = continueIds.has(showId);
-      tvdbRecord.InMark = markIds.has(showId);
-      tvdbRecord.InLinda = lindaIds.has(showId);
+      tvdbRecord.path = embyPath;
+      tvdbRecord.genres = embyShow.Genres || [];
+      tvdbRecord.overview = embyShow.Overview || "";
+      tvdbRecord.dateCreated = embyShow.DateCreated?.substring(0, 10);
+      tvdbRecord.premiereDate = embyShow.PremiereDate?.substring(0, 10);
+      tvdbRecord.played = embyShow.UserData?.Played || false;
+      tvdbRecord.playCount = embyShow.UserData?.PlayCount || 0;
+      tvdbRecord.inToTry = toTryIds.has(showId);
+      tvdbRecord.inContinue = continueIds.has(showId);
+      tvdbRecord.inMark = markIds.has(showId);
+      tvdbRecord.inLinda = lindaIds.has(showId);
       if (!tvdbRecord.inEmby) {
         tvdbRecord.inEmby = true;
         handlePickupChange(name, true, tvdbRecord.status);
@@ -3797,11 +3789,11 @@ async function runEmbyFullSweep() {
         console.log(`[runEmbyFullSweep] Marking ${name} as not in Emby`);
         // Delete show folder from disk so Emby cannot re-add it on next scan
         const folderName =
-          typeof rec.Path === "string" &&
-          rec.Path &&
-          !rec.Path.includes("/") &&
-          !rec.Path.includes("\\")
-            ? rec.Path
+          typeof rec.path === "string" &&
+          rec.path &&
+          !rec.path.includes("/") &&
+          !rec.path.includes("\\")
+            ? rec.path
             : name;
         const folderPath = path.join(tvDir, folderName);
         try {
@@ -3823,7 +3815,7 @@ async function runEmbyFullSweep() {
         handlePickupChange(name, false, rec.status);
         try {
           history.addEvent({
-            tvdbId: String(rec.TvdbId || rec.tvdbId || "").trim() || null,
+            tvdbId: String(rec.tvdbId || "").trim() || null,
             showName: name,
             type: "remEmby",
             description: "Disappeared from Emby",
@@ -3883,7 +3875,7 @@ async function syncDiskData() {
     // Update tvdb records with fresh disk data
     for (const [name, tvdbRecord] of Object.entries(allTvdb)) {
       // Try Path first, fall back to Name for shows without Path set
-      const embyPath = tvdbRecord.Path || tvdbRecord.emby?.path || name;
+      const embyPath = tvdbRecord.path || tvdbRecord.emby?.path || name;
 
       const pathPart = embyPath.split("/").pop();
       const diskInfo = diskShows[pathPart];
@@ -3895,21 +3887,21 @@ async function syncDiskData() {
 
       // Check if disk data changed
       const changed =
-        tvdbRecord.Date !== newDate ||
-        tvdbRecord.Size !== newSize ||
-        tvdbRecord.NoFiles !== newNoFiles;
+        tvdbRecord.date !== newDate ||
+        tvdbRecord.size !== newSize ||
+        tvdbRecord.noFiles !== newNoFiles;
 
       if (changed) {
-        tvdbRecord.Date = newDate;
-        tvdbRecord.Size = newSize;
-        tvdbRecord.NoFiles = newNoFiles;
+        tvdbRecord.date = newDate;
+        tvdbRecord.size = newSize;
+        tvdbRecord.noFiles = newNoFiles;
         tvdbRecord.sync = tvdbRecord.sync || {};
         tvdbRecord.sync.lastDiskCheck = now;
         updatedCount++;
 
         // Track this show for gap checking (disk changes can affect file gaps)
         changedShows.push({
-          showId: tvdbRecord.Id,
+          showId: tvdbRecord.id,
           showName: name,
           tvdbRecord,
         });
@@ -3962,7 +3954,7 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
     if (checkDiskFirst) {
       for (const { showId, showName, tvdbRecord } of shows) {
         // Try Path first, fall back to showName for shows without Path set
-        const embyPath = tvdbRecord.Path || tvdbRecord.emby?.path || showName;
+        const embyPath = tvdbRecord.path || tvdbRecord.emby?.path || showName;
 
         const pathPart = embyPath.split("/").pop();
         const diskInfo = await getShowDiskInfo(pathPart);
@@ -3970,21 +3962,21 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
         if (diskInfo) {
           const [newDate, newSize] = diskInfo;
           const changed =
-            tvdbRecord.Date !== newDate || tvdbRecord.Size !== newSize;
+            tvdbRecord.date !== newDate || tvdbRecord.size !== newSize;
 
           if (changed) {
-            tvdbRecord.Date = newDate;
-            tvdbRecord.Size = newSize;
-            tvdbRecord.NoFiles = false;
+            tvdbRecord.date = newDate;
+            tvdbRecord.size = newSize;
+            tvdbRecord.noFiles = false;
             diskUpdateCount++;
           }
         } else {
           // Folder doesn't exist or empty
-          const changed = tvdbRecord.NoFiles !== true;
+          const changed = tvdbRecord.noFiles !== true;
           if (changed) {
-            tvdbRecord.NoFiles = true;
-            tvdbRecord.Date = null;
-            tvdbRecord.Size = 0;
+            tvdbRecord.noFiles = true;
+            tvdbRecord.date = null;
+            tvdbRecord.size = 0;
             diskUpdateCount++;
           }
         }
@@ -4070,9 +4062,9 @@ async function runGapCheckBatch() {
     if (!allTvdb || Object.keys(allTvdb).length === 0) return;
 
     const showsToCheck = Object.entries(allTvdb)
-      .filter(([_, tvdbRecord]) => tvdbRecord?.inEmby && tvdbRecord?.Id)
+      .filter(([_, tvdbRecord]) => tvdbRecord?.inEmby && tvdbRecord?.id)
       .map(([showName, tvdbRecord]) => ({
-        showId: tvdbRecord.Id,
+        showId: tvdbRecord.id,
         showName,
         tvdbRecord,
       }))
@@ -4178,8 +4170,8 @@ async function handleShowDiskChange(showName) {
       const allTvdb = tvdb.getAllTvdbSync();
       const tvdbRecord = allTvdb[showName];
       if (tvdbRecord) {
-        tvdbRecord.Date = maxDate;
-        tvdbRecord.Size = totalSize;
+        tvdbRecord.date = maxDate;
+        tvdbRecord.size = totalSize;
         await tvdb.saveTvdbSync();
         console.log(
           `[chokidar] Updated disk info for ${showName}: ${totalSize} bytes, ${maxDate}`,
@@ -4276,17 +4268,17 @@ async function handleShowDiskChange(showName) {
     try {
       const allTvdb = tvdb.getAllTvdbSync();
       const tvdbRecord = allTvdb[showName];
-      if (!tvdbRecord?.inEmby || !tvdbRecord?.Id) return;
+      if (!tvdbRecord?.inEmby || !tvdbRecord?.id) return;
 
       // Refresh fileGap, watchGap, etc.
       await runGapCheckForShows(
-        [{ showId: tvdbRecord.Id, showName, tvdbRecord }],
+        [{ showId: tvdbRecord.id, showName, tvdbRecord }],
         false,
       );
       console.log(`[chokidar] Gap check refreshed for ${showName}`);
 
       // Refresh watchedEpis from Emby
-      const show = { Name: showName, Id: tvdbRecord.Id };
+      const show = { name: showName, id: tvdbRecord.id };
       const seriesMap = await emby.getSeriesMap(show);
       if (seriesMap && seriesMap.length > 0) {
         const watchedEpis = tvdb.seriesMapToWatchedEpis(seriesMap);

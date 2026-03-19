@@ -927,7 +927,7 @@ export default {
   computed: {
     headerShowName() {
       const name =
-        this.showName || this.currentShow?.Name || this.activeShow?.Name || "";
+        this.showName || this.currentShow?.name || this.activeShow?.name || "";
       if (!name) return "";
       const hasYear = /\(\d{4}\)/.test(name);
       if (!hasYear) {
@@ -1192,7 +1192,7 @@ export default {
         // Keep space info fresh whenever Tor pane is shown.
         void this.updateSpaceAvail();
         // Auto-search when pane becomes active, but only once per show.
-        const showId = this.activeShow?.Id || this.activeShow?.Name || null;
+        const showId = this.activeShow?.id || this.activeShow?.name || null;
         if (showId && showId !== this.lastAutoSearchedShowId) {
           this.lastAutoSearchedShowId = showId;
           void this.searchTorrents(this.activeShow);
@@ -1713,7 +1713,7 @@ export default {
 
     async searchTorrents(show) {
       // Track this show so onPaneChanged doesn't re-trigger when switching panes.
-      this.lastAutoSearchedShowId = show?.Id || show?.Name || null;
+      this.lastAutoSearchedShowId = show?.id || show?.name || null;
 
       // Reset state when switching shows
       this.torrents = [];
@@ -1735,7 +1735,7 @@ export default {
       if (this.unaired) {
         // Short-circuit: show only the unaired message
         this.currentShow = show;
-        this.showName = show?.Name || "";
+        this.showName = show?.name || "";
         return;
       }
 
@@ -1743,8 +1743,8 @@ export default {
 
       // Store the show for later use with Load button
       this.currentShow = show;
-      if (show && show.Name) {
-        this.showName = show.Name;
+      if (show && show.name) {
+        this.showName = show.name;
       }
 
       // Get series map and calculate needed episodes
@@ -1763,14 +1763,14 @@ export default {
 
     async searchClick() {
       if (
-        (!this.currentShow || !this.currentShow.Name) &&
-        this.activeShow?.Name
+        (!this.currentShow || !this.currentShow.name) &&
+        this.activeShow?.name
       ) {
         this.currentShow = this.activeShow;
-        this.showName = this.activeShow?.Name || this.showName;
+        this.showName = this.activeShow?.name || this.showName;
       }
 
-      if (!this.currentShow || !this.currentShow.Name) {
+      if (!this.currentShow || !this.currentShow.name) {
         this.error = "No show selected";
         return;
       }
@@ -1819,13 +1819,13 @@ export default {
     async moreClick() {
       if (this.hasMoreProviders) return; // already showing all providers
       if (
-        (!this.currentShow || !this.currentShow.Name) &&
-        this.activeShow?.Name
+        (!this.currentShow || !this.currentShow.name) &&
+        this.activeShow?.name
       ) {
         this.currentShow = this.activeShow;
-        this.showName = this.activeShow?.Name || this.showName;
+        this.showName = this.activeShow?.name || this.showName;
       }
-      if (!this.currentShow?.Name) return;
+      if (!this.currentShow?.name) return;
       if (this.unaired) return;
 
       if (!Array.isArray(this.lastNeeded)) {
@@ -1840,7 +1840,7 @@ export default {
     },
 
     openTorTabs() {
-      const name = String(this.currentShow?.Name || "")
+      const name = String(this.currentShow?.name || "")
         .replace(/\([^)]+\)\s*$/, "")
         .replace(/[?.]+\s*$/g, "")
         .trim();
@@ -1860,14 +1860,14 @@ export default {
 
     async forceClick() {
       if (
-        (!this.currentShow || !this.currentShow.Name) &&
-        this.activeShow?.Name
+        (!this.currentShow || !this.currentShow.name) &&
+        this.activeShow?.name
       ) {
         this.currentShow = this.activeShow;
-        this.showName = this.activeShow?.Name || this.showName;
+        this.showName = this.activeShow?.name || this.showName;
       }
 
-      if (!this.currentShow || !this.currentShow.Name) {
+      if (!this.currentShow || !this.currentShow.name) {
         this.error = "No show selected";
         return;
       }
@@ -1885,7 +1885,7 @@ export default {
       const needed = [];
 
       // If not in Emby, return special marker
-      if (!show || !show.Id || show.inEmby === false) {
+      if (!show || !show.id || show.inEmby === false) {
         return ["noemby"];
       }
 
@@ -2036,7 +2036,7 @@ export default {
     },
 
     async loadTorrents(needed = [], more = false) {
-      if (!this.currentShow || !this.currentShow.Name) {
+      if (!this.currentShow || !this.currentShow.name) {
         this.error = "No show selected";
         return;
       }
@@ -2064,12 +2064,12 @@ export default {
       try {
         // Some shows include trailing punctuation (e.g. "Can You Keep a Secret?")
         // that can hurt provider matching. For torrent searching, strip trailing ?/.
-        const rawShowName = String(this.currentShow.Name || "").trim();
+        const rawShowName = String(this.currentShow.name || "").trim();
         const showNameForSearch = rawShowName.replace(/[?.]+\s*$/g, "").trim();
 
         let url = `${config.torrentsApiUrl}/api/search?show=${encodeURIComponent(showNameForSearch)}&limit=${this.maxResults}`;
         const showTvdbId = String(
-          this.currentShow.TvdbId || this.currentShow.tvdbId || "",
+          this.currentShow.tvdbId || this.currentShow.tvdbId || "",
         ).trim();
         if (showTvdbId) url += `&tvdbId=${encodeURIComponent(showTvdbId)}`;
         if (needed.length > 0) {
@@ -2132,7 +2132,7 @@ export default {
         } else if (!more) {
           this.providerStats = null;
         }
-        this.resultsShowId = this.currentShow?.Id || null;
+        this.resultsShowId = this.currentShow?.id || null;
 
         // (debug logging removed)
 
@@ -2539,7 +2539,7 @@ export default {
         ].includes(provider);
         if (isPublicProvider) {
           const showName = String(
-            torrent?.raw?.title || this.currentShow?.Name || "",
+            torrent?.raw?.title || this.currentShow?.name || "",
           ).trim();
           const magnet =
             torrent?.raw?.magnet ||
@@ -2737,9 +2737,9 @@ export default {
         try {
           const downloadsUrl = `${config.torrentsApiUrl}/downloads`;
 
-          const dlShowName = String(this.currentShow?.Name || "").trim();
+          const dlShowName = String(this.currentShow?.name || "").trim();
           const dlTvdbId = String(
-            this.currentShow?.TvdbId || this.currentShow?.tvdbId || "",
+            this.currentShow?.tvdbId || this.currentShow?.tvdbId || "",
           ).trim();
           const downloadsPayload =
             provider === "torrentleech"

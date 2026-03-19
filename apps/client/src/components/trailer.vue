@@ -403,7 +403,7 @@ export default {
     },
     onSetUpSeries(show) {
       this.err = "";
-      this.showName = show?.Name || "";
+      this.showName = show?.name || "";
       this.trailers = [];
       this.failedVideoUrls = new Set();
       this.savedTimes.clear();
@@ -413,7 +413,7 @@ export default {
     },
     async onTvdbDataReady(data) {
       this.err = "";
-      if (this.showName && data?.show?.Name !== this.showName) return;
+      if (this.showName && data?.show?.name !== this.showName) return;
 
       const tvdbData = data?.tvdbData;
       if (tvdbData && Array.isArray(tvdbData.trailers)) {
@@ -430,15 +430,15 @@ export default {
           const srvr = await import("../srvr.js");
           const remotes = await srvr.getRemotesCmd({
             show: {
-              Name: data.show.Name,
-              Id: data.show.Id,
+              name: data.show.name,
+              id: data.show.id,
             },
             tvdbRemotes: tvdbData.remote_ids || [],
             fast: true,
           });
 
           // Bail out if the user switched shows while we were awaiting
-          if (this.showName && data.show.Name !== this.showName) return;
+          if (this.showName && data.show.name !== this.showName) return;
 
           // Find IMDB remote with video
           const imdbRemote = remotes?.find(
@@ -457,7 +457,7 @@ export default {
             // Update tvdb record immediately on server
             if (!this.previewMode) {
               await srvr.setTvdbFields({
-                name: data.show.Name,
+                name: data.show.name,
                 trailers: trailersSnapshot,
               });
             }

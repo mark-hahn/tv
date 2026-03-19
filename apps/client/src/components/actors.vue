@@ -952,7 +952,7 @@ export default {
     prefetchSeriesMapForArrows() {
       const show = this.currentShow;
       if (!show) return;
-      const showKey = show?.Id || show?.Name || null;
+      const showKey = show?.id || show?.name || null;
       if (!showKey) return;
 
       if (
@@ -1117,7 +1117,7 @@ export default {
 
     async getSeriesMapInForArrows(show) {
       if (!show) return [];
-      const showKey = show?.Id || show?.Name || null;
+      const showKey = show?.id || show?.name || null;
 
       // Use cached/prefetched TVDB map for noemby.
       if (
@@ -1405,7 +1405,7 @@ export default {
 
       // Handle both formats: direct data or wrapped in response.data
       const actualData = tvdbData.response?.data || tvdbData;
-      this.showName = actualData?.name || this.currentShow?.Name || "";
+      this.showName = actualData?.name || this.currentShow?.name || "";
 
       const characters = actualData?.characters;
 
@@ -1529,7 +1529,7 @@ export default {
 
       // Persist any TMDB-only actors into the TVDB characters array so that
       // actor-based show filtering (filterShowsByActor) can find them.
-      const showKey = this.currentShow?.Name || this.showName;
+      const showKey = this.currentShow?.name || this.showName;
       if (showKey && tmdbList.length > 0) {
         const existingChars = Array.isArray(characters) ? characters : [];
         const existingNames = new Set(

@@ -83,9 +83,9 @@ export const getDevices = async () => {
 
 // Fetch series map from Emby server
 export const getSeriesMap = async (show) => {
-  if (!show?.Id) return null;
+  if (!show?.id) return null;
 
-  const seriesId = show.Id;
+  const seriesId = show.id;
   const seriesMap = [];
 
   try {

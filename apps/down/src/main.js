@@ -1201,7 +1201,7 @@ async function main() {
       torrentMeta.set(torrentFolder, {
         showTitle,
         tvdbId: embyEntry.tvdbId || null,
-        embyFolderName: embyEntry.Path || embyKey,
+        embyFolderName: embyEntry.path || embyKey,
         showDotName: torrentFolder.replace(/ /g, "."),
       });
     }
@@ -2399,8 +2399,8 @@ async function main() {
           seriesName
         : seriesName;
     const embyFolderName =
-      embyMap && embyKeyForFolder && embyMap[embyKeyForFolder]?.Path
-        ? embyMap[embyKeyForFolder].Path
+      embyMap && embyKeyForFolder && embyMap[embyKeyForFolder]?.path
+        ? embyMap[embyKeyForFolder].path
         : embyKeyForFolder || seriesName;
     tvSeasonPath = `${tvPath}${embyFolderName}/Season ${season}`;
     tvFilePath = `${tvSeasonPath}/${fname}`;

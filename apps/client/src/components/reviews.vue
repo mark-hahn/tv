@@ -470,8 +470,8 @@ export default {
     },
 
     onSetUpSeries(show) {
-      console.log("[reviews] onSetUpSeries", show?.Name);
-      this.showName = show?.Name || "";
+      console.log("[reviews] onSetUpSeries", show?.name);
+      this.showName = show?.name || "";
       this.reviews = [];
       this.stats = null;
       this.rottenUrl = "";

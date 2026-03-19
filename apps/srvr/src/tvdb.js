@@ -955,8 +955,8 @@ const getRemote = async (id, type, showName) => {
 // use tvdb remotes data to find complete remote data
 
 const getRemotes = async (show, tvdbRemotes, fast = false) => {
-  const name = show.Name;
-  const showId = show.Id;
+  const name = show.name;
+  const showId = show.id;
   const remotes = [];
   const flatUrls = {}; // flat url props to persist alongside the computed remotes array
 
@@ -1088,11 +1088,11 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
             }
           }
           // Fallback: fetch IMDB ID from TVDB extended API using TvdbId
-          if (!remotesByName["IMDB"] && show.TvdbId) {
+          if (!remotesByName["IMDB"] && show.tvdbId) {
             try {
               const token = await getToken();
               const extRes = await fetch(
-                `https://api4.thetvdb.com/v4/series/${show.TvdbId}/extended`,
+                `https://api4.thetvdb.com/v4/series/${show.tvdbId}/extended`,
                 {
                   headers: {
                     "Content-Type": "application/json",
@@ -1445,20 +1445,20 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   const { show, seasonCount, episodeCount, watchedCount, fast } = paramObj;
 
   // Defensive check - ensure show object exists
-  if (!show || !show.Name) {
-    log("err", "getTvdbData: Invalid paramObj - missing show.Name", {
+  if (!show || !show.name) {
+    log("err", "getTvdbData: Invalid paramObj - missing show.name", {
       paramObj,
     });
     if (resolve) resolve(null);
     return;
   }
 
-  const inputName = show.Name;
+  const inputName = show.name;
   // log("getTvdbData: START", { name, fast });
   // Use PST for added date
   const added = allTvdb[inputName]?.added ?? getPstDate();
-  const showId = show.Id;
-  const tvdbId = show.TvdbId || show.tvdbId;
+  const showId = show.id;
+  const tvdbId = show.tvdbId;
   if (!tvdbId) {
     log("err", "getTvdbData no tvdbId:", show);
     resolve(inputName);
@@ -1468,11 +1468,9 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   let canonicalName = inputName;
   for (const [existingKey, existingRecord] of Object.entries(allTvdb || {})) {
     if (existingKey === inputName) continue;
-    const existingTvdbId = String(
-      existingRecord?.tvdbId || existingRecord?.TvdbId || "",
-    ).trim();
+    const existingTvdbId = String(existingRecord?.tvdbId || "").trim();
     if (existingTvdbId && String(tvdbId).trim() === existingTvdbId) {
-      canonicalName = existingRecord?.Name || existingKey;
+      canonicalName = existingRecord?.name || existingKey;
       if (canonicalName !== inputName) {
         log(
           "inf",
@@ -1745,7 +1743,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   // Ensure Emby button is correct in fresh remotes based on inEmby status
   const embyBtnIdx = tvdbData.remotes.findIndex((r) => r.name === "Emby");
-  const embyUrl = urls.embyPageUrl(showId || tvdbData.Id);
+  const embyUrl = urls.embyPageUrl(showId || tvdbData.id);
   if (embyBtnIdx >= 0) {
     if (newInEmby) {
       tvdbData.remotes[embyBtnIdx] = { name: "Emby", url: embyUrl };
@@ -1759,47 +1757,47 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   tvdbData.inEmby = newInEmby;
 
   // Flattened Emby-specific data (no nested object)
-  tvdbData.Id = showId || existing.Id || existing.emby?.id || null;
-  tvdbData.Path =
-    paramObj.embyPath || existing.Path || existing.emby?.path || null;
-  tvdbData.DateCreated =
+  tvdbData.id = showId || existing.id || existing.emby?.id || null;
+  tvdbData.path =
+    paramObj.embyPath || existing.path || existing.emby?.path || null;
+  tvdbData.dateCreated =
     paramObj.dateCreated ||
-    existing.DateCreated ||
+    existing.dateCreated ||
     existing.emby?.dateCreated ||
     null;
-  tvdbData.PremiereDate =
+  tvdbData.premiereDate =
     paramObj.premiereDate ||
-    existing.PremiereDate ||
+    existing.premiereDate ||
     existing.emby?.premiereDate ||
     null;
-  tvdbData.InToTry =
-    paramObj.inToTry ?? existing.InToTry ?? existing.emby?.inToTry ?? false;
-  tvdbData.InContinue =
+  tvdbData.inToTry =
+    paramObj.inToTry ?? existing.inToTry ?? existing.emby?.inToTry ?? false;
+  tvdbData.inContinue =
     paramObj.inContinue ??
-    existing.InContinue ??
+    existing.inContinue ??
     existing.emby?.inContinue ??
     false;
-  tvdbData.InMark =
-    paramObj.inMark ?? existing.InMark ?? existing.emby?.inMark ?? false;
-  tvdbData.InLinda =
-    paramObj.inLinda ?? existing.InLinda ?? existing.emby?.inLinda ?? false;
-  tvdbData.Played =
-    paramObj.isPlayed ?? existing.Played ?? existing.emby?.isPlayed ?? false;
-  tvdbData.PlayCount =
-    paramObj.playCount ?? existing.PlayCount ?? existing.emby?.playCount ?? 0;
-  tvdbData.LastPlayedDate =
+  tvdbData.inMark =
+    paramObj.inMark ?? existing.inMark ?? existing.emby?.inMark ?? false;
+  tvdbData.inLinda =
+    paramObj.inLinda ?? existing.inLinda ?? existing.emby?.inLinda ?? false;
+  tvdbData.played =
+    paramObj.isPlayed ?? existing.played ?? existing.emby?.isPlayed ?? false;
+  tvdbData.playCount =
+    paramObj.playCount ?? existing.playCount ?? existing.emby?.playCount ?? 0;
+  tvdbData.lastPlayedDate =
     paramObj.lastPlayedDate ||
-    existing.LastPlayedDate ||
+    existing.lastPlayedDate ||
     existing.emby?.lastPlayedDate ||
     null;
 
   // Flattened Disk/filesystem data (no nested object)
-  tvdbData.Date =
-    paramObj.diskDate || existing.Date || existing.disk?.date || null;
-  tvdbData.Size =
-    paramObj.diskSize ?? existing.Size ?? existing.disk?.size ?? 0;
-  tvdbData.NoFiles =
-    paramObj.noFiles ?? existing.NoFiles ?? existing.disk?.noFiles ?? false;
+  tvdbData.date =
+    paramObj.diskDate || existing.date || existing.disk?.date || null;
+  tvdbData.size =
+    paramObj.diskSize ?? existing.size ?? existing.disk?.size ?? 0;
+  tvdbData.noFiles =
+    paramObj.noFiles ?? existing.noFiles ?? existing.disk?.noFiles ?? false;
 
   // Flattened Download tracking (no nested object)
   tvdbData.downloadStatus =
@@ -1854,16 +1852,14 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   }
 
   // Notes
-  tvdbData.Notes = paramObj.note ?? existing.Notes ?? existing.note ?? "";
+  tvdbData.notes = paramObj.note ?? existing.notes ?? existing.note ?? "";
 
   // leftEmby timestamp (yyyy-mm-dd format) - set when show is removed from Emby
   tvdbData.leftEmby =
     paramObj.leftEmby || existing.leftEmby || existing.emby?.leftEmby || null;
 
   // Additional flags
-  tvdbData.Reject =
-    paramObj.reject ?? existing.Reject ?? existing.reject ?? false;
-  tvdbData.reject = tvdbData.Reject; // keep lowercase in sync
+  tvdbData.reject = paramObj.reject ?? existing.reject ?? false;
   tvdbData.lastWatched = paramObj.lastWatched || existing.lastWatched || null;
 
   // Calculate waitStr from nextAired and lastAired (single source of truth)
@@ -1871,8 +1867,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     tvdbData.nextAired,
     tvdbData.lastAired,
   );
-  tvdbData.WaitStr = calculatedWaitStr || null;
-  delete tvdbData.waitStr;
+  tvdbData.waitStr = calculatedWaitStr || null;
 
   // Flattened Sync timestamps (no nested object)
   tvdbData.lastEmbySync =
@@ -1893,9 +1888,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   if (!paramObj.transient) {
     allTvdb[name] = tvdbData;
     if (inputName !== name && allTvdb[inputName]) {
-      const inputTvdbId = String(
-        allTvdb[inputName]?.tvdbId || allTvdb[inputName]?.TvdbId || "",
-      ).trim();
+      const inputTvdbId = String(allTvdb[inputName]?.tvdbId || "").trim();
       if (inputTvdbId && inputTvdbId === String(tvdbId).trim()) {
         delete allTvdb[inputName];
       }
@@ -1989,7 +1982,7 @@ const chkTvdbQueue = () => {
   if (chkTvdbQueueRunning || newTvdbQueue.length == 0) return;
   chkTvdbQueueRunning = true;
   const { ws, id, paramObj, resolve: resolveCb } = newTvdbQueue.pop();
-  const showName = paramObj.show?.Name;
+  const showName = paramObj.show?.name;
 
   // Snapshot the old record NOW, before getTvdbData overwrites allTvdb[name].
   // getTvdbData sets allTvdb[name] = tvdbData before resolving the promise, so
@@ -2018,7 +2011,7 @@ const chkTvdbQueue = () => {
         if (tvdbData && typeof tvdbData === "object") {
           finalData = tvdbData;
           if (!paramObj.transient) {
-            const keyName = finalData.Name || finalData.name;
+            const keyName = finalData.name;
             // Use the snapshot taken before getTvdbData ran; fall back to
             // allTvdb[keyName] only when the show was canonicalized to a
             // different name (snapshot was taken under the original name).
@@ -2096,8 +2089,8 @@ const chkTvdbQueue = () => {
         });
         // Push updated record to clients only when fields actually changed
         if (!paramObj.suppressNotify) {
-          if (notifyCallback && finalData.Name && finalData._hasChanges)
-            notifyCallback(finalData.Name, finalData);
+          if (notifyCallback && finalData.name && finalData._hasChanges)
+            notifyCallback(finalData.name, finalData);
           delete finalData._hasChanges;
         }
         // When suppressNotify, _hasChanges/_push1Changes are preserved for the caller
@@ -2152,14 +2145,14 @@ const tryLocalGetTvdb = async () => {
   }
 
   log("");
-  log(`processing [${minTvdb.Name}]`);
+  log(`processing [${minTvdb.name}]`);
   // Notify clients which show is being processed
-  if (enqueueCallback) enqueueCallback(minTvdb.Name);
+  if (enqueueCallback) enqueueCallback(minTvdb.name);
   const show = {
-    Name: minTvdb.Name,
-    TvdbId: minTvdb.tvdbId,
+    name: minTvdb.name,
+    tvdbId: minTvdb.tvdbId,
   };
-  if (minTvdb.Id) show.Id = minTvdb.Id;
+  if (minTvdb.id) show.id = minTvdb.id;
   const paramObj = {
     show,
     seasonCount: minTvdb.seasonCount ?? 0,
@@ -2179,18 +2172,18 @@ const tryLocalGetTvdb = async () => {
   } catch (e) {
     log("err", "tryLocalGetTvdb: tvdb update failed:", e?.message);
   }
-  const processRecord = updatedRecord || allTvdb[minTvdb.Name] || minTvdb;
+  const processRecord = updatedRecord || allTvdb[minTvdb.name] || minTvdb;
 
   // Fetch and persist series map data using the fresh record (try Emby first, fallback to TVDB)
   try {
     let seriesMap = null;
 
     // Try Emby if show is in Emby
-    if (processRecord.inEmby && processRecord.Id) {
+    if (processRecord.inEmby && processRecord.id) {
       seriesMap = await emby.getSeriesMap({
-        Name: processRecord.Name,
-        TvdbId: processRecord.tvdbId,
-        Id: processRecord.Id,
+        name: processRecord.name,
+        tvdbId: processRecord.tvdbId,
+        id: processRecord.id,
       });
       if (seriesMap && seriesMap.length > 0) {
         processRecord.watchedEpis = seriesMapToWatchedEpis(seriesMap);
@@ -2213,7 +2206,7 @@ const tryLocalGetTvdb = async () => {
   let push2Result = { hasChanges: false, changes: [] };
   if (perShowCallback) {
     try {
-      const result = await perShowCallback(processRecord.Name, processRecord, {
+      const result = await perShowCallback(processRecord.name, processRecord, {
         suppressNotify: true,
         isBackground,
       });
@@ -2230,21 +2223,21 @@ const tryLocalGetTvdb = async () => {
   delete processRecord._push1Changes;
   const allPushChanges = [...push1Changes, ...push2Result.changes];
   if (push1HasChanges || push2Result.hasChanges) {
-    log(`tvdb push [${processRecord.Name}]: ${allPushChanges.join(" ")}`);
+    log(`tvdb push [${processRecord.name}]: ${allPushChanges.join(" ")}`);
     if (notifyCallback)
-      notifyCallback(processRecord.Name, allTvdb[processRecord.Name]);
+      notifyCallback(processRecord.name, allTvdb[processRecord.name]);
   } else {
-    log(`tvdb push [${processRecord.Name}]: no changes`);
+    log(`tvdb push [${processRecord.name}]: no changes`);
   }
 
   // Push 3: Rotten Tomatoes scrape (slow, runs separately after push1 & push2)
-  if (!skipRotten && processRecord.Name && allTvdb[processRecord.Name]) {
+  if (!skipRotten && processRecord.name && allTvdb[processRecord.name]) {
     try {
-      const rottenRemote = await getRemote(null, 99, processRecord.Name);
+      const rottenRemote = await getRemote(null, 99, processRecord.name);
       if (rottenRemote) {
         if (rottenRemote.ratings)
           rottenRemote.name += " (" + rottenRemote.ratings + ")";
-        const rec = allTvdb[processRecord.Name];
+        const rec = allTvdb[processRecord.name];
         const existingRemotes = Array.isArray(rec.remotes) ? rec.remotes : [];
         // Replace any existing Rotten entry with fresh scraped one
         rec.remotes = [
@@ -2255,11 +2248,11 @@ const tryLocalGetTvdb = async () => {
         rec.rottenRatings = rottenRemote.ratings || null;
         await saveTvdbFiles(allTvdb);
         log(
-          `tvdb push3 [${processRecord.Name}]: Rotten ${rottenRemote.ratings || "no ratings"}`,
+          `tvdb push3 [${processRecord.name}]: Rotten ${rottenRemote.ratings || "no ratings"}`,
         );
-        if (notifyCallback) notifyCallback(processRecord.Name, rec);
+        if (notifyCallback) notifyCallback(processRecord.name, rec);
       } else {
-        log(`tvdb push3 [${processRecord.Name}]: Rotten no result`);
+        log(`tvdb push3 [${processRecord.name}]: Rotten no result`);
       }
     } catch (e) {
       log("err", "tryLocalGetTvdb push3 rotten:", e.message);
@@ -2306,10 +2299,10 @@ const updateTvdbLocal = async () => {
           }
         }
       } catch (e) {}
-      if (stalest?.Name) {
-        enqueueShowProcess(stalest.Name, { isBackground: true });
+      if (stalest?.name) {
+        enqueueShowProcess(stalest.name, { isBackground: true });
         log(
-          `timer: enqueued stalest ${wantInEmby ? "emby" : "non-emby"} [${stalest.Name}]`,
+          `timer: enqueued stalest ${wantInEmby ? "emby" : "non-emby"} [${stalest.name}]`,
         );
       }
     }
@@ -2340,17 +2333,17 @@ export const getRemotesCmd = async (params) => {
       fast,
     );
 
-    const existing = allTvdb?.[show.Name];
+    const existing = allTvdb?.[show.name];
     log(
-      `getRemotesCmd [${show.Name}] fast=${fast}` +
+      `getRemotesCmd [${show.name}] fast=${fast}` +
         ` fetched={imdb:${fetchedUrls.imdbRatings ?? "-"},rotten:${fetchedUrls.rottenRatings ?? "-"}}` +
         ` existing={imdb:${existing?.imdbRatings ?? "-"},rotten:${existing?.rottenRatings ?? "-"}}` +
         ` inAllTvdb=${!!existing}`,
     );
 
     // When fetching fresh data (fast=false), save remotes and flat url props
-    if (!fast && show.Name && allTvdb) {
-      if (allTvdb[show.Name]) {
+    if (!fast && show.name && allTvdb) {
+      if (allTvdb[show.name]) {
         const changes = [];
         if (
           fetchedUrls.imdbRatings !== undefined &&
@@ -2369,7 +2362,7 @@ export const getRemotesCmd = async (params) => {
         existing.remotes = remotes;
         Object.assign(existing, fetchedUrls);
         if (changes.length)
-          log(`getRemotes [${show.Name}]: ${changes.join(" ")}`);
+          log(`getRemotes [${show.name}]: ${changes.join(" ")}`);
         saveTvdbSync().catch((err) => {
           log("err", "getRemotesCmd: saveTvdbSync failed:", err.message);
         });
@@ -2795,7 +2788,7 @@ export const setTvdbFields = async (params) => {
       // Keep Emby button in sync with final inEmby/Id values (after field updates).
       if (!Array.isArray(tvdb.remotes)) tvdb.remotes = [];
       const embyIndex = tvdb.remotes.findIndex((r) => r?.name === "Emby");
-      const embyId = tvdb?.Id == null ? "" : String(tvdb.Id).trim();
+      const embyId = tvdb?.id == null ? "" : String(tvdb.id).trim();
       const freshEmbyUrl = embyId ? urls.embyPageUrl(embyId) : null;
       if (tvdb.inEmby && freshEmbyUrl) {
         if (embyIndex >= 0) {
@@ -2819,10 +2812,10 @@ export const setTvdbFields = async (params) => {
       if (tvdb.saved === 0) {
         // Queue a refresh for this specific request
         const show = {
-          Name: tvdb.Name,
+          name: tvdb.name,
           tvdbId: tvdb.tvdbId,
         };
-        if (tvdb.Id) show.Id = tvdb.Id;
+        if (tvdb.id) show.id = tvdb.id;
         const refreshParamObj = {
           show,
           seasonCount: tvdb.seasonCount ?? 0,
@@ -2943,9 +2936,9 @@ export const updateTvdbWithGapData = async (gapData) => {
   let processedCount = 0;
 
   for (const [showName, tvdbRecord] of Object.entries(allTvdb)) {
-    if (!tvdbRecord?.Id) continue;
+    if (!tvdbRecord?.id) continue;
 
-    const showId = tvdbRecord.Id;
+    const showId = tvdbRecord.id;
     const gaps = gapData[showId];
     if (!gaps) continue;
 

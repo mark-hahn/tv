@@ -74,7 +74,7 @@ export const findTvdbKeyById = (tvdbMap, tvdbId) => {
   const wantedId = normalizeTvdbId(tvdbId);
   if (!wantedId) return null;
   for (const [key, rec] of Object.entries(tvdbMap || {})) {
-    const recId = normalizeTvdbId(rec?.tvdbId || rec?.TvdbId);
+    const recId = normalizeTvdbId(rec?.tvdbId || rec?.tvdbId);
     if (recId && recId === wantedId) return key;
   }
   return null;
@@ -97,8 +97,8 @@ export const getTvdbRecordByNameOrId = (tvdbMap, showName, tvdbId) => {
 export const upsertTvdbCacheRecord = (tvdbMap, tvdbData, preferredKey = "") => {
   if (!tvdbMap || !tvdbData || typeof tvdbData !== "object") return null;
 
-  const recordId = normalizeTvdbId(tvdbData.tvdbId || tvdbData.TvdbId);
-  const nameKey = String(tvdbData.Name || tvdbData.name || "").trim();
+  const recordId = normalizeTvdbId(tvdbData.tvdbId || tvdbData.tvdbId);
+  const nameKey = String(tvdbData.name || tvdbData.name || "").trim();
   const preferred = String(preferredKey || "").trim();
 
   let targetKey = nameKey || preferred;
@@ -126,7 +126,7 @@ export const upsertTvdbCacheRecord = (tvdbMap, tvdbData, preferredKey = "") => {
     for (const key of Object.keys(tvdbMap)) {
       if (key === targetKey) continue;
       const recId = normalizeTvdbId(
-        tvdbMap[key]?.tvdbId || tvdbMap[key]?.TvdbId,
+        tvdbMap[key]?.tvdbId || tvdbMap[key]?.tvdbId,
       );
       if (recId && recId === recordId) {
         delete tvdbMap[key];
@@ -216,8 +216,8 @@ export const getAllTvdb = async (hasEmby = 0) => {
     for (const showData of Object.values(result)) {
       if (showData && typeof showData === "object") {
         // Convert note to Notes
-        if (showData.note && !showData.Notes) {
-          showData.Notes = showData.note;
+        if (showData.note && !showData.notes) {
+          showData.notes = showData.note;
         }
       }
     }
@@ -283,14 +283,14 @@ export const getRemotes = async (
     try {
       const params = {
         show: {
-          Name: showName,
-          TvdbId: tvdbId,
+          name: showName,
+          tvdbId: tvdbId,
           // Include inEmby and Id from showContext if available
           ...(showContext?.inEmby !== undefined && {
             inEmby: showContext.inEmby,
           }),
-          ...(showContext?.Id !== undefined &&
-            showContext.Id !== null && { Id: showContext.Id }),
+          ...(showContext?.id !== undefined &&
+            showContext.id !== null && { id: showContext.id }),
         },
         tvdbRemotes: remoteIds,
         fast: fast,
@@ -503,7 +503,7 @@ function showNamesMatch(tvdbShowName, searchShowName) {
 }
 
 export const getSeriesMap = async (show) => {
-  const showNameStr = show.Name || show.name;
+  const showNameStr = show.name || show.name;
   // Search for the show on tvdb
   const searchResults = await srchTvdbData(showNameStr);
   if (!searchResults || searchResults.length === 0) {

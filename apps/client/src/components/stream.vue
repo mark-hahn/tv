@@ -111,7 +111,7 @@ export default {
   },
   methods: {
     async fetchProviders() {
-      const name = this.show?.Name;
+      const name = this.show?.name;
       if (!name) return;
 
       if (this.cache[name]) {

@@ -428,13 +428,13 @@ export default {
         return;
       }
       this.saveVisShow(show);
-      const originalValue = show.InToTry;
-      show.InToTry = !show.InToTry;
+      const originalValue = show.inToTry;
+      show.inToTry = !show.inToTry;
       try {
-        await emby.saveToTry(show.Id, show.InToTry, show.Name);
+        await emby.saveToTry(show.id, show.inToTry, show.name);
       } catch (err) {
         console.error("toggleToTry error:", err);
-        show.InToTry = originalValue; // Revert on error
+        show.inToTry = originalValue; // Revert on error
       }
     };
 
@@ -444,13 +444,13 @@ export default {
         return;
       }
       this.saveVisShow(show);
-      const originalValue = show.InContinue;
-      show.InContinue = !show.InContinue;
+      const originalValue = show.inContinue;
+      show.inContinue = !show.inContinue;
       try {
-        await emby.saveContinue(show.Id, show.InContinue, show.Name);
+        await emby.saveContinue(show.id, show.inContinue, show.name);
       } catch (err) {
         console.error("toggleContinue error:", err);
-        show.InContinue = originalValue; // Revert on error
+        show.inContinue = originalValue; // Revert on error
       }
     };
 
@@ -460,13 +460,13 @@ export default {
         return;
       }
       this.saveVisShow(show);
-      const originalValue = show.InMark;
-      show.InMark = !show.InMark;
+      const originalValue = show.inMark;
+      show.inMark = !show.inMark;
       try {
-        await emby.saveMark(show.Id, show.InMark, show.Name);
+        await emby.saveMark(show.id, show.inMark, show.name);
       } catch (err) {
         console.error("toggleMark error:", err);
-        show.InMark = originalValue;
+        show.inMark = originalValue;
       }
     };
 
@@ -476,31 +476,31 @@ export default {
         return;
       }
       this.saveVisShow(show);
-      const originalValue = show.InLinda;
-      show.InLinda = !show.InLinda;
+      const originalValue = show.inLinda;
+      show.inLinda = !show.inLinda;
       try {
-        await emby.saveLinda(show.Id, show.InLinda, show.Name);
+        await emby.saveLinda(show.id, show.inLinda, show.name);
       } catch (err) {
         console.error("toggleLinda error:", err);
-        show.InLinda = originalValue; // Revert on error
+        show.inLinda = originalValue; // Revert on error
       }
     };
 
     const toggleReject = async (show) => {
       this.saveVisShow(show);
-      if (!show.Reject) {
+      if (!show.reject) {
         if (
           show.inEmby !== false &&
-          !window.confirm(`Remove ${show.Name} from emby and the disk?`)
+          !window.confirm(`Remove ${show.name} from emby and the disk?`)
         )
           return;
         if (show.inEmby !== false) this.showRemovingFromEmby = true;
-        show.Reject = true;
+        show.reject = true;
         try {
-          await srvr.addReject(show.Name, show.TvdbId || show.tvdbId);
+          await srvr.addReject(show.name, show.tvdbId || show.tvdbId);
         } catch (err) {
           console.error("addReject error:", err);
-          show.Reject = false;
+          show.reject = false;
           this.showRemovingFromEmby = false;
           return;
         }
@@ -508,7 +508,7 @@ export default {
           try {
             // Delete files only — do not call deleteShowFromSrvr which would
             // also call delNoEmby and remove the tvdb record
-            const showFolder = show.Path.split("/").pop();
+            const showFolder = show.path.split("/").pop();
             await srvr.deletePath(showFolder);
             await emby.deleteShowFromEmby(show);
             this.showRemovingFromEmby = false;
@@ -516,14 +516,14 @@ export default {
             console.error("deleteShowFromEmby after reject error:", err);
             this.showRemovingFromEmby = false;
           }
-          const tvdbData = allTvdb[show.Name];
+          const tvdbData = allTvdb[show.name];
           if (tvdbData) {
             const leftEmby = util.getPstDate();
             tvdbData.inEmby = false;
             tvdbData.leftEmby = leftEmby;
             tvdbData.notReady = true;
-            allTvdb[show.Name] = await srvr.setTvdbFields({
-              name: show.Name,
+            allTvdb[show.name] = await srvr.setTvdbFields({
+              name: show.name,
               inEmby: false,
               leftEmby,
               notReady: true,
@@ -534,18 +534,18 @@ export default {
         return;
       }
 
-      show.Reject = false;
+      show.reject = false;
       try {
-        await srvr.delReject(show.Name, show.TvdbId || show.tvdbId);
+        await srvr.delReject(show.name, show.tvdbId || show.tvdbId);
       } catch (err) {
         console.error("delReject error:", err);
-        show.Reject = true;
+        show.reject = true;
       }
     };
 
     const deleteShow = async (show) => {
       allTvdb = await tvdb.getAllTvdb();
-      const name = show.Name;
+      const name = show.name;
       if (show.inEmby !== false) {
         this.saveVisShow(show);
         if (
@@ -571,7 +571,7 @@ export default {
           notReady: true,
         });
         // Capture the next visible show before refilter removes this one from the list.
-        const delIdx = this.shows.findIndex((s) => s.Id == show.Id);
+        const delIdx = this.shows.findIndex((s) => s.id == show.id);
         const nextShow =
           delIdx >= 0
             ? this.shows[delIdx + 1] || this.shows[delIdx - 1] || null
@@ -661,7 +661,7 @@ export default {
           filter: 0,
           icon: ["far", "clock"],
           cond(show) {
-            return !!show.WaitStr?.length;
+            return !!show.waitStr?.length;
           },
           click() {},
           name: "waiting",
@@ -681,7 +681,7 @@ export default {
           filter: 0,
           icon: ["fas", "minus"],
           cond(show) {
-            return show.FileGap || show.WatchGap;
+            return show.fileGap || show.watchGap;
           },
           click() {},
           name: "gap",
@@ -691,7 +691,7 @@ export default {
           filter: 0,
           icon: ["fas", "traffic-light"],
           cond(show) {
-            return show.Ended;
+            return show.ended;
           },
           click() {},
           name: "ended",
@@ -701,7 +701,7 @@ export default {
           filter: 0,
           icon: ["far", "sad-cry"],
           cond(show) {
-            return !show.Genres?.includes("Comedy");
+            return !show.genres?.includes("Comedy");
           },
           click() {},
           name: "drama",
@@ -711,7 +711,7 @@ export default {
           filter: 0,
           icon: ["fas", "globe"],
           cond(show) {
-            return show?.OriginalCountry?.toUpperCase() != "USA";
+            return show?.originalCountry?.toUpperCase() != "USA";
           },
           click() {},
           name: "foreign",
@@ -721,7 +721,7 @@ export default {
           filter: 0,
           icon: ["fas", "question"],
           cond(show) {
-            return show.InToTry;
+            return show.inToTry;
           },
           async click(show) {
             await toggleToTry(show);
@@ -733,7 +733,7 @@ export default {
           filter: 0,
           icon: ["fas", "arrow-right"],
           cond(show) {
-            return show.InContinue;
+            return show.inContinue;
           },
           async click(show) {
             await toggleContinue(show);
@@ -745,7 +745,7 @@ export default {
           filter: 0,
           icon: ["fas", "mars"],
           cond(show) {
-            return show.InMark;
+            return show.inMark;
           },
           async click(show) {
             await toggleMark(show);
@@ -757,7 +757,7 @@ export default {
           filter: 0,
           icon: ["fas", "venus"],
           cond(show) {
-            return show.InLinda;
+            return show.inLinda;
           },
           async click(show) {
             await toggleLinda(show);
@@ -769,7 +769,7 @@ export default {
           filter: -1,
           icon: ["fas", "ban"],
           cond(show) {
-            return show.Reject;
+            return show.reject;
           },
           async click(show) {
             await toggleReject(show);
@@ -889,9 +889,9 @@ export default {
 
       // Add to allShows array, avoiding duplicates
       const additionalShowsArray = Object.values(additionalShows);
-      const existingNames = new Set(allShows.map((s) => s.Name));
+      const existingNames = new Set(allShows.map((s) => s.name));
       const newShows = additionalShowsArray.filter(
-        (s) => !existingNames.has(s.Name),
+        (s) => !existingNames.has(s.name),
       );
       allShows.push(...newShows);
 
@@ -1003,13 +1003,13 @@ export default {
           return;
         }
 
-        const currentShow = allShows.find((s) => s.Name === this.highlightName);
+        const currentShow = allShows.find((s) => s.name === this.highlightName);
         if (!currentShow) {
           console.log("Could not find show:", this.highlightName);
           return;
         }
 
-        const tvdbId = currentShow.TvdbId || currentShow.tvdbId;
+        const tvdbId = currentShow.tvdbId || currentShow.tvdbId;
         if (!tvdbId) {
           console.log("Show has no TvdbId:", this.highlightName);
           return;
@@ -1023,7 +1023,7 @@ export default {
         );
 
         const result = await srvr.debugTvdb({
-          name: currentShow.Name,
+          name: currentShow.name,
           tvdbId: tvdbId,
         });
 
@@ -1201,20 +1201,20 @@ export default {
       switch (this.sortChoice) {
         case "Alpha":
           if (!forSort) return "";
-          return show.Name.replace(/^the\s*/i, "")
+          return show.name.replace(/^the\s*/i, "")
             .replace(/[^a-z0-9\s]/gi, "")
             .toLowerCase();
         case "Added":
-          return show.DateCreated;
+          return show.dateCreated;
         case "Ended":
-          return show.LastAired || "";
+          return show.lastAired || "";
         case "Length":
           return show.averageRuntime || 0;
         case "Size":
-          if (forSort) return show.Size;
+          if (forSort) return show.size;
           return util.fmtSize(show);
         case "Ratings":
-          ratings = show?.Ratings;
+          ratings = show?.ratings;
           if (forSort)
             return ratings !== undefined && ratings !== null && ratings !== 0
               ? +ratings
@@ -1224,11 +1224,11 @@ export default {
             : "";
         case "Notes":
           if (!forSort) return "";
-          return String(show?.Notes ?? "")
+          return String(show?.notes ?? "")
             .trim()
             .toLowerCase();
         case "Viewed":
-          lastViewed = srvr.lastViewedCache[show.Name];
+          lastViewed = srvr.lastViewedCache[show.name];
           if (forSort) return lastViewed || 0;
           if (lastViewed === undefined) return "";
           return util.fmtDate(lastViewed);
@@ -1237,7 +1237,7 @@ export default {
 
     setHighlightAfterDel(id) {
       for (let i = 0; i < this.shows.length; i++) {
-        if (this.shows[i].Id == id) {
+        if (this.shows[i].id == id) {
           let nextShow = this.shows[i + 1];
           if (!nextShow) nextShow = this.shows[i - 1];
           if (!nextShow) nextShow = this.shows[0];
@@ -1251,9 +1251,9 @@ export default {
     addRow(show) {
       if (!show) return;
       const existsById = (arr) =>
-        Array.isArray(arr) && arr.some((s) => s?.Id && s.Id === show.Id);
+        Array.isArray(arr) && arr.some((s) => s?.id && s.id === show.id);
       const existsByName = (arr) =>
-        Array.isArray(arr) && arr.some((s) => s?.Name && s.Name === show.Name);
+        Array.isArray(arr) && arr.some((s) => s?.name && s.name === show.name);
       const alreadyExists =
         existsById(allShows) ||
         existsByName(allShows) ||
@@ -1265,24 +1265,24 @@ export default {
         return;
       }
 
-      console.log("addRow", show.Name);
+      console.log("addRow", show.name);
       this.shows.unshift(show);
       if (allShows !== this.shows) allShows.unshift(show);
       this.saveVisShow(show, true);
     },
 
     removeRow(show) {
-      console.log("removeRow", show.Name);
-      const id = show.Id;
+      console.log("removeRow", show.name);
+      const id = show.id;
       const newShow = this.setHighlightAfterDel(id);
-      this.shows = this.shows.filter((show) => show.Id != id);
+      this.shows = this.shows.filter((show) => show.id != id);
       if (this.shows !== allShows)
-        allShows = allShows.filter((show) => show.Id != id);
+        allShows = allShows.filter((show) => show.id != id);
       if (newShow) this.saveVisShow(newShow, true);
     },
 
     hilite(show) {
-      return this.highlightName == show.Name ? "yellow" : "white";
+      return this.highlightName == show.name ? "yellow" : "white";
     },
 
     async searchAction(payload) {
@@ -1321,8 +1321,8 @@ export default {
         tvdbId,
       });
       if (matchShow && matchShow.inEmby !== false) {
-        console.log(matchShow.Name + " already exists.");
-        if (!this.shows.some((sh) => sh?.Name === matchShow.Name)) {
+        console.log(matchShow.name + " already exists.");
+        if (!this.shows.some((sh) => sh?.name === matchShow.name)) {
           await this.fltrAction("All");
         }
         this.onSelectShow(matchShow, true);
@@ -1356,12 +1356,12 @@ export default {
           ? allShows.find((s) => {
               if (requireInEmby && s?.inEmby === false) return false;
               const sTvdbId = String(
-                s?.TvdbId || s?.tvdbId || s?.tvdb_id || "",
+                s?.tvdbId || s?.tvdbId || s?.tvdb_id || "",
               ).trim();
               if (tvdbId && sTvdbId && sTvdbId === String(tvdbId).trim()) {
                 return true;
               }
-              return s?.Name === name;
+              return s?.name === name;
             })
           : null;
 
@@ -1369,10 +1369,10 @@ export default {
       const reject = emby.isReject(name);
 
       const showSeed = {
-        Name: name,
-        TvdbId: tvdbId,
-        Overview: overview,
-        Reject: reject,
+        name: name,
+        tvdbId: tvdbId,
+        overview: overview,
+        reject: reject,
       };
 
       const paramObj = {
@@ -1470,9 +1470,9 @@ export default {
 
             // Trigger gap check for the newly added show
             const newShow = findShowByTvdbIdOrName({ requireInEmby: true });
-            if (newShow?.Id) {
+            if (newShow?.id) {
               await srvr
-                .triggerShowGapCheck(newShow.Id, name)
+                .triggerShowGapCheck(newShow.id, name)
                 .catch((err) =>
                   console.error("triggerShowGapCheck failed:", err),
                 );
@@ -1495,7 +1495,7 @@ export default {
                 {
                   name,
                   tvdbId,
-                  noEmbyId: noEmbyMatch.Id,
+                  noEmbyId: noEmbyMatch.id,
                 },
               );
             }
@@ -1517,9 +1517,9 @@ export default {
           }
 
           if (show) {
-            show.TvdbId = tvdbId;
-            show.Overview = overview;
-            show.Reject = reject;
+            show.tvdbId = tvdbId;
+            show.overview = overview;
+            show.reject = reject;
           }
         }
 
@@ -1543,7 +1543,7 @@ export default {
               key: "",
               name: "",
               tvdbId: "",
-              Id: "",
+              id: "",
               inEmby: "",
             },
             details: {
@@ -1558,15 +1558,15 @@ export default {
 
         if (tvdbData) {
           delete tvdbData.deleted;
-          tvdb.upsertTvdbCacheRecord(allTvdb, tvdbData, show?.Name || name);
+          tvdb.upsertTvdbCacheRecord(allTvdb, tvdbData, show?.name || name);
           // Clear shared cache so Info/Reviews get fresh data
           tvdb.clearCache();
         }
 
         const alreadyInAllShows =
           Array.isArray(allShows) &&
-          (allShows.some((s) => s?.Id === show?.Id) ||
-            allShows.some((s) => s?.Name === show?.Name));
+          (allShows.some((s) => s?.id === show?.id) ||
+            allShows.some((s) => s?.name === show?.name));
         if (!alreadyInAllShows) {
           this.addRow(show);
         }
@@ -1608,7 +1608,7 @@ export default {
         tvdbId,
       });
       if (existing) {
-        if (!this.shows.some((sh) => sh?.Name === existing.Name)) {
+        if (!this.shows.some((sh) => sh?.name === existing.name)) {
           await this.fltrAction("All");
         }
         this.onSelectShow(existing, true);
@@ -1628,14 +1628,14 @@ export default {
 
       const show = {
         // Mark as no-Emby so Series doesn't try to query Emby counts.
-        Id: `noemby-preview-${String(tvdbId || imdbId || showName).replace(/\s+/g, "-")}`,
+        id: `noemby-preview-${String(tvdbId || imdbId || showName).replace(/\s+/g, "-")}`,
         inEmby: false,
-        Name: showName,
-        TvdbId: tvdbId,
+        name: showName,
+        tvdbId: tvdbId,
         ImdbId: imdbId,
-        Overview: overview,
+        overview: overview,
         imageUrl: imageUrl,
-        Reject: emby.isReject(showName),
+        reject: emby.isReject(showName),
       };
 
       // Update Map pane contents on preview (map will show TVDB data).
@@ -1652,7 +1652,7 @@ export default {
           const incomingShow = data?.show;
           if (!incomingShow) return;
           const sameName =
-            incomingShow?.Name && show?.Name && incomingShow.Name === show.Name;
+            incomingShow?.name && show?.name && incomingShow.name === show.name;
           if (!sameName) return;
 
           evtBus.off("tvdbDataReady", onTvdbDataReady);
@@ -1690,7 +1690,7 @@ export default {
       if (newPtr < 0 || newPtr >= showHistory.length) return;
       showHistoryPtr = newPtr;
       const show = showHistory[showHistoryPtr];
-      const showArr = this.shows.filter((showIn) => showIn.Name == show.Name);
+      const showArr = this.shows.filter((showIn) => showIn.name == show.name);
       if (showArr.length == 0) {
         await this.fltrAction("All");
       }
@@ -1704,7 +1704,7 @@ export default {
     onSelectShow(show, scroll = false) {
       // console.log('List: selected show:', show);
       const wasPreview = !!this.previewMode;
-      const wasAlreadySelected = show?.Name === this.highlightName;
+      const wasAlreadySelected = show?.name === this.highlightName;
 
       if (wasPreview) this.setPreviewMode(false);
       this.saveVisShow(show, scroll);
@@ -1757,7 +1757,7 @@ export default {
 
       if (id) {
         const byId = allShows.find((s) => {
-          const sid = s?.TvdbId ?? s?.TvdbShowId ?? s?.tvdbId ?? null;
+          const sid = s?.tvdbId ?? s?.TvdbShowId ?? s?.tvdbId ?? null;
           if (sid == null || sid === "") return false;
           return String(sid).trim() === id;
         });
@@ -1771,7 +1771,7 @@ export default {
           // If both have tvdbIds but they differ, these are different shows
           if (id) {
             const matchId = String(
-              match?.TvdbId ?? match?.tvdbId ?? match?.TvdbShowId ?? "",
+              match?.tvdbId ?? match?.tvdbId ?? match?.TvdbShowId ?? "",
             ).trim();
             if (matchId && matchId !== id) return null;
           }
@@ -1811,7 +1811,7 @@ export default {
 
       for (const rawTitle of list) {
         const show = this.findShowFromActiveRawTitle(rawTitle);
-        if (show?.Name) names.add(show.Name);
+        if (show?.name) names.add(show.name);
       }
 
       const next = Array.from(names);
@@ -1872,7 +1872,7 @@ export default {
       if (reqTvdbId) {
         match = allShows.find((s) => {
           const sTvdb = String(
-            s?.TvdbId || s?.tvdbId || s?.tvdb_id || "",
+            s?.tvdbId || s?.tvdbId || s?.tvdb_id || "",
           ).trim();
           return sTvdb && sTvdb === reqTvdbId;
         });
@@ -1880,13 +1880,13 @@ export default {
 
       // Then exact name match (important for gallery selections)
       if (!match) {
-        match = allShows.find((s) => s.Name === raw);
+        match = allShows.find((s) => s.name === raw);
       }
 
       if (!match) {
         // Try case-insensitive exact match
         const rawLower = raw.toLowerCase();
-        match = allShows.find((s) => s.Name?.toLowerCase() === rawLower);
+        match = allShows.find((s) => s.name?.toLowerCase() === rawLower);
       }
 
       if (!match && !this.hasLoadedAllShows) {
@@ -1895,7 +1895,7 @@ export default {
         if (!match && reqTvdbId) {
           match = allShows.find((s) => {
             const sTvdb = String(
-              s?.TvdbId || s?.tvdbId || s?.tvdb_id || "",
+              s?.tvdbId || s?.tvdbId || s?.tvdb_id || "",
             ).trim();
             return sTvdb && sTvdb === reqTvdbId;
           });
@@ -1903,11 +1903,11 @@ export default {
 
         // Try exact match again with the complete show list
         if (!match) {
-          match = allShows.find((s) => s.Name === raw);
+          match = allShows.find((s) => s.name === raw);
         }
         if (!match) {
           const rawLower = raw.toLowerCase();
-          match = allShows.find((s) => s.Name?.toLowerCase() === rawLower);
+          match = allShows.find((s) => s.name?.toLowerCase() === rawLower);
         }
       }
 
@@ -1917,7 +1917,7 @@ export default {
       }
 
       if (match) {
-        const isVisible = this.shows.some((sh) => sh?.Name === match.Name);
+        const isVisible = this.shows.some((sh) => sh?.name === match.name);
         if (!isVisible) {
           const hasembyCond = this.conds.find((c) => c?.name === "hasemby");
           const showInEmby = match.inEmby !== false;
@@ -1962,7 +1962,7 @@ export default {
         return;
       }
       const options = opts && typeof opts === "object" ? opts : {};
-      const showName = show.Name;
+      const showName = show.name;
 
       const showChanged = options.forceSetUpSeries
         ? true
@@ -2003,7 +2003,7 @@ export default {
       if (!options.skipHistory) {
         if (
           showHistoryPtr == -1 ||
-          showName != showHistory[showHistoryPtr].Name
+          showName != showHistory[showHistoryPtr].name
         ) {
           // console.log("adding show to history:", showName);
           showHistory.push(show);
@@ -2027,9 +2027,9 @@ export default {
           evtBus.emit("setUpSeries", show);
         });
         // Trigger background processing (no Rotten scrape) for the newly selected show
-        if (show.Name) {
+        if (show.name) {
           srvr
-            .triggerShowSelect(show.Name)
+            .triggerShowSelect(show.name)
             .catch((err) => console.error("triggerShowSelect failed:", err));
         }
       }
@@ -2112,7 +2112,7 @@ export default {
         console.log("scrollToSavedShow: lastVisShow missing, ignoring");
         show = allShows[0];
       } else {
-        show = allShows.find((shw) => shw.Name == name);
+        show = allShows.find((shw) => shw.name == name);
         if (!show) {
           console.log("scrollToSavedShow: show not found", name);
           show = allShows[0];
@@ -2125,16 +2125,16 @@ export default {
 
       // Use RecycleScroller's scrollToItem method
       if (this.$refs.showsComponent && show) {
-        this.$refs.showsComponent.scrollToShow(show.Name);
+        this.$refs.showsComponent.scrollToShow(show.name);
       }
     },
 
     async copyNameToClipboard(show, event) {
-      console.log("copyNameToClipboard", show.Name);
+      console.log("copyNameToClipboard", show.name);
       const ele = event.target;
       const color = ele.style.color;
       ele.style.color = "#f00";
-      await navigator.clipboard.writeText(show.Name);
+      await navigator.clipboard.writeText(show.name);
       this.saveVisShow(show);
       ele.style.color = color;
     },
@@ -2148,7 +2148,7 @@ export default {
         if (!path || noFile) return;
 
         const ok = confirm(
-          `OK to delete file for ${show.Name} S${season}E${episode} ?`,
+          `OK to delete file for ${show.name} S${season}E${episode} ?`,
         );
         if (!ok) return;
 
@@ -2161,9 +2161,9 @@ export default {
         }
 
         // Refresh just this show in Emby so the episode is removed from its list
-        this.markShowUpdating(show.Name);
+        this.markShowUpdating(show.name);
         await srvr
-          .refreshEmbyItem(show.Id, show.Name)
+          .refreshEmbyItem(show.id, show.name)
           .catch((err) => console.error("refreshEmbyItem failed:", err));
 
         // Refresh the Map grid now that Emby has updated.
@@ -2173,12 +2173,12 @@ export default {
 
       // toggle watched or set to specific value
       await emby.editEpisode(
-        show.Id,
+        show.id,
         season,
         episode,
         false,
         setWatched,
-        show.Name,
+        show.name,
       );
       await this.seriesMapAction("", show, null);
     },
@@ -2217,7 +2217,7 @@ export default {
       }
       if (
         action == "open" &&
-        this.mapShow?.Name === show?.Name &&
+        this.mapShow?.name === show?.name &&
         this.currentPane === "map"
       ) {
         // If clicking the same show while already on map, keep it as-is
@@ -2229,7 +2229,7 @@ export default {
 
       if (action == "date") {
         console.log("setting last watched to cur date");
-        await emby.setLastWatched(show.Id);
+        await emby.setLastWatched(show.id);
       }
 
       const isRefresh = action === "refresh";
@@ -2253,14 +2253,14 @@ export default {
       if (
         seriesMapIn &&
         seriesMapIn.length > 0 &&
-        show.Name &&
+        show.name &&
         show.inEmby !== false &&
-        allTvdb?.[show.Name]
+        allTvdb?.[show.name]
       ) {
         const watchedEpis = tvdb.seriesMapToWatchedEpis(seriesMapIn);
-        allTvdb[show.Name].watchedEpis = watchedEpis;
+        allTvdb[show.name].watchedEpis = watchedEpis;
         await srvr.setTvdbFields({
-          name: show.Name,
+          name: show.name,
           watchedEpis: watchedEpis,
           dontEnqueue: true,
         });
@@ -2327,9 +2327,9 @@ export default {
       }
       if (blankCells.length > 0) {
         console.warn("[map-debug] blank map cells", {
-          show: this.mapShow?.Name,
+          show: this.mapShow?.name,
           inEmby: this.mapShow?.inEmby !== false,
-          tvdbId: this.mapShow?.TvdbId || this.mapShow?.tvdbId || null,
+          tvdbId: this.mapShow?.tvdbId || this.mapShow?.tvdbId || null,
           seasons: this.seriesMapSeasons.length,
           episodes: this.seriesMapEpis.length,
           sampleBlankCells: blankCells,
@@ -2392,8 +2392,8 @@ export default {
       if (this.sortChoice === "Notes") {
         this.shows = [...this.shows].sort((a, b) => {
           // Get raw note values, handling null/undefined/non-strings more explicitly
-          const aNoteRaw = (a?.Notes != null ? String(a.Notes) : "").trim();
-          const bNoteRaw = (b?.Notes != null ? String(b.Notes) : "").trim();
+          const aNoteRaw = (a?.notes != null ? String(a.notes) : "").trim();
+          const bNoteRaw = (b?.notes != null ? String(b.notes) : "").trim();
           // Check if notes are truly non-empty (not just whitespace)
           const aHas = aNoteRaw.length > 0;
           const bHas = bNoteRaw.length > 0;
@@ -2406,11 +2406,11 @@ export default {
           if (aKey !== bKey) return aKey > bKey ? 1 : -1;
 
           // Notes are equal - sort by show name as tiebreaker
-          const aName = String(a?.Name ?? "")
+          const aName = String(a?.name ?? "")
             .replace(/^the\s*/i, "")
             .replace(/[^a-z0-9\s]/gi, "")
             .toLowerCase();
-          const bName = String(b?.Name ?? "")
+          const bName = String(b?.name ?? "")
             .replace(/^the\s*/i, "")
             .replace(/[^a-z0-9\s]/gi, "")
             .toLowerCase();
@@ -2456,7 +2456,7 @@ export default {
             allTvdb = await tvdb.getAllTvdb(this.hasLoadedAllShows ? 0 : 1);
 
           const checkShowForActorMatch = (show) => {
-            const tvdbData = allTvdb?.[show.Name];
+            const tvdbData = allTvdb?.[show.name];
             if (!tvdbData) return false;
 
             const actualData = tvdbData.response?.data || tvdbData;
@@ -2477,7 +2477,7 @@ export default {
           // Preserve highlightName selection if possible
           if (this.highlightName && this.shows.length > 0) {
             const matchingShow = this.shows.find(
-              (show) => show.Name === this.highlightName,
+              (show) => show.name === this.highlightName,
             );
             if (matchingShow) {
               // Update localStorage to ensure consistency
@@ -2515,16 +2515,16 @@ export default {
       const filteredShows = [];
       fltrLoop: for (const show of allShows) {
         if (this.fltrChoice === "Finished") {
-          const tvdbData = localAllTvdb?.[show.Name];
+          const tvdbData = localAllTvdb?.[show.name];
           if (!tvdbData) continue;
           const { status, episodeCount, watchedCount } = tvdbData;
           const watchedAll = episodeCount > 0 && watchedCount == episodeCount;
-          const finished = status == "Ended" && watchedAll && !show.Reject;
+          const finished = status == "Ended" && watchedAll && !show.reject;
           if (finished) filteredShows.push(show);
           continue;
         }
-        if (srchStrLc && !show.Name.toLowerCase().includes(srchStrLc)) {
-          const noteLc = String(show?.Notes ?? "").toLowerCase();
+        if (srchStrLc && !show.name.toLowerCase().includes(srchStrLc)) {
+          const noteLc = String(show?.notes ?? "").toLowerCase();
           if (!noteLc.includes(srchStrLc)) continue;
         }
         for (let cond of this.conds) {
@@ -2542,11 +2542,11 @@ export default {
       else if (this.highlightName) {
         // Only update selection if highlightName is already set
         const showArr = this.shows.filter(
-          (show) => show.Name == this.highlightName,
+          (show) => show.name == this.highlightName,
         );
         if (showArr.length == 0) {
           console.log(
-            `[HOPPING] refilter: highlightName "${this.highlightName}" not in filtered shows (${this.shows.length} shows) — falling back to shows[0]="${this.shows[0]?.Name}", fltrChoice=${this.fltrChoice}, filterStr="${this.filterStr}"`,
+            `[HOPPING] refilter: highlightName "${this.highlightName}" not in filtered shows (${this.shows.length} shows) — falling back to shows[0]="${this.shows[0]?.name}", fltrChoice=${this.fltrChoice}, filterStr="${this.filterStr}"`,
           );
           selectFirstAfterSort = true;
         } else {
@@ -2592,7 +2592,7 @@ export default {
       const seen = new Set();
       const actors = [];
       for (const show of allShows) {
-        const tvdbData = allTvdb?.[show.Name];
+        const tvdbData = allTvdb?.[show.name];
         if (!tvdbData) continue;
         const actualData = tvdbData.response?.data || tvdbData;
         const characters = actualData?.characters;
@@ -2668,7 +2668,7 @@ export default {
       if (!allTvdb) allTvdb = await tvdb.getAllTvdb();
 
       const filteredShows = allShows.filter((show) => {
-        const tvdbData = allTvdb?.[show.Name];
+        const tvdbData = allTvdb?.[show.name];
         if (!tvdbData) return false;
 
         // Handle both data formats (like actors.vue does)
@@ -2704,7 +2704,7 @@ export default {
         allTvdb = await tvdb.getAllTvdb(this.hasLoadedAllShows ? 0 : 1);
 
       const checkShowForActorMatch = (show) => {
-        const tvdbData = allTvdb?.[show.Name];
+        const tvdbData = allTvdb?.[show.name];
         if (!tvdbData) return false;
 
         const actualData = tvdbData.response?.data || tvdbData;
@@ -2829,18 +2829,18 @@ export default {
       let name = window.localStorage.getItem("lastVisShow");
       if (!name) {
         const firstShow = this.shows[0] || allShows[0];
-        window.localStorage.setItem("lastVisShow", firstShow.Name);
-        name = firstShow.Name;
+        window.localStorage.setItem("lastVisShow", firstShow.name);
+        name = firstShow.name;
       }
 
       // Keep initial selection on Emby-visible entries for default UX.
-      const savedShow = allShows.find((s) => s.Name === name);
+      const savedShow = allShows.find((s) => s.name === name);
       if (savedShow && savedShow.inEmby === false) {
         console.log(
           "Saved show has inEmby false, selecting first show instead",
         );
         const firstShow = this.shows[0] || allShows[0];
-        name = firstShow.Name;
+        name = firstShow.name;
         window.localStorage.setItem("lastVisShow", name);
       }
 
@@ -2851,7 +2851,7 @@ export default {
 
       // Update series pane infobox with refreshed data
       if (this.highlightName) {
-        const currentShow = allShows.find((s) => s.Name === this.highlightName);
+        const currentShow = allShows.find((s) => s.name === this.highlightName);
         if (currentShow) {
           this.$nextTick(() => {
             evtBus.emit("setUpSeries", currentShow);
@@ -2892,9 +2892,9 @@ export default {
         const updatedTvdb = await tvdb.getAllTvdb(
           this.hasLoadedAllShows ? 0 : 1,
         );
-        const show = allShows.find((s) => s.Name === showName);
+        const show = allShows.find((s) => s.name === showName);
         const showTvdbId = String(
-          show?.TvdbId || show?.tvdbId || show?.tvdb_id || "",
+          show?.tvdbId || show?.tvdbId || show?.tvdb_id || "",
         ).trim();
         const tvdbRecord = tvdb.getTvdbRecordByNameOrId(
           updatedTvdb,
@@ -2932,9 +2932,9 @@ export default {
           show.seasonWatchedThenNofile = tvdbRecord.seasonWatchedThenNofile;
 
           // Update computed fields (uppercase properties)
-          show.WatchGap = show.watchGap;
-          show.FileGap =
-            !(show.notReady === false && show.InToTry) &&
+          show.watchGap = show.watchGap;
+          show.fileGap =
+            !(show.notReady === false && show.inToTry) &&
             (show.fileGap || show.fileEndError || show.seasonWatchedThenNofile);
           show.full = tvdbRecord.full ?? false;
 
@@ -2942,7 +2942,7 @@ export default {
           tvdb.upsertTvdbCacheRecord(allTvdb, tvdbRecord, showName);
 
           // If this show is currently displayed on the map, refresh it
-          if (this.mapShow && this.mapShow.Name === showName) {
+          if (this.mapShow && this.mapShow.name === showName) {
             console.log(
               `[updateShowFromDiskChange] Refreshing map for ${showName}`,
             );
@@ -3011,18 +3011,18 @@ export default {
       );
       try {
         // Apply computed props to the pushed record
-        record.WatchGap = record.watchGap || false;
-        record.WatchGapSeason = record.watchGapSeason;
-        record.WatchGapEpisode = record.watchGapEpisode;
-        record.FileGap =
-          !(record.notReady === false && record.InToTry) &&
+        record.watchGap = record.watchGap || false;
+        record.watchGapSeason = record.watchGapSeason;
+        record.watchGapEpisode = record.watchGapEpisode;
+        record.fileGap =
+          !(record.notReady === false && record.inToTry) &&
           (record.fileGap ||
             record.fileEndError ||
             record.seasonWatchedThenNofile);
-        record.NotReady = record.inEmby === false;
+        record.notReady = record.inEmby === false;
 
         // Merge fields into the existing show in allShows
-        const show = allShows.find((s) => s.Name === name);
+        const show = allShows.find((s) => s.name === name);
         if (show) {
           show.notReady = record.notReady;
           show.anyWatched = record.anyWatched;
@@ -3034,16 +3034,16 @@ export default {
           show.fileGapEpisode = record.fileGapEpisode;
           show.fileEndError = record.fileEndError;
           show.seasonWatchedThenNofile = record.seasonWatchedThenNofile;
-          show.WatchGap = record.WatchGap;
-          show.WatchGapSeason = record.WatchGapSeason;
-          show.WatchGapEpisode = record.WatchGapEpisode;
-          show.FileGap = record.FileGap;
+          show.watchGap = record.watchGap;
+          show.watchGapSeason = record.watchGapSeason;
+          show.watchGapEpisode = record.watchGapEpisode;
+          show.fileGap = record.fileGap;
           show.full = record.full ?? false;
-          show.NotReady = record.NotReady;
-          show.Date = record.Date ?? show.Date;
-          show.Size = record.Size ?? show.Size;
-          show.NoFiles = record.NoFiles ?? show.NoFiles;
-          show.WaitStr = record.WaitStr ?? show.WaitStr;
+          show.notReady = record.notReady;
+          show.date = record.date ?? show.date;
+          show.size = record.size ?? show.size;
+          show.noFiles = record.noFiles ?? show.noFiles;
+          show.waitStr = record.waitStr ?? show.waitStr;
         }
 
         // Update allTvdb reference
@@ -3051,7 +3051,7 @@ export default {
 
         // If this show is currently in the map pane, refetch series map so
         // map cells (noFile/avail/etc.) update after disk/download changes.
-        if (this.mapShow && this.mapShow.Name === name && show) {
+        if (this.mapShow && this.mapShow.name === name && show) {
           await this.seriesMapAction("refresh", show, null);
         }
 
@@ -3129,7 +3129,7 @@ export default {
       // Restore the previously highlighted show into the panes so the UI is consistent.
       const prevName = this.highlightName;
       const prevShow = Array.isArray(allShows)
-        ? allShows.find((s) => s?.Name === prevName)
+        ? allShows.find((s) => s?.name === prevName)
         : null;
       if (prevShow) {
         this.saveVisShow(prevShow, false, {
@@ -3163,8 +3163,8 @@ export default {
       if (this.simpleMode) return;
       if (!e?.ctrlKey) return;
 
-      const showName = show?.Name || "";
-      const showPath = show?.Path || "";
+      const showName = show?.name || "";
+      const showPath = show?.path || "";
       if (!showPath) return;
 
       const ok = window.confirm(
@@ -3186,9 +3186,9 @@ export default {
       }
 
       // Refresh this show in Emby after content deletion.
-      this.markShowUpdating(show.Name);
+      this.markShowUpdating(show.name);
       await srvr
-        .refreshEmbyItem(show.Id, show.Name)
+        .refreshEmbyItem(show.id, show.name)
         .catch((err) => console.error("refreshEmbyItem failed:", err));
       await this.seriesMapAction("refresh", show, null);
     });

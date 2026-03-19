@@ -948,7 +948,7 @@ export default {
       if (Array.isArray(this.allShows) && this.allShows.length > 0) {
         const embyShows = this.allShows
           .filter((s) => s && s.inEmby)
-          .map((s) => s.Name || s.name)
+          .map((s) => s.name || s.name)
           .filter(Boolean);
         const notInEmby = [];
 

@@ -554,7 +554,7 @@ export default {
         return;
       }
 
-      const showName = this.show.Name || this.show.name;
+      const showName = this.show.name || this.show.name;
       if (!showName) return;
 
       const candidates = [this.show];

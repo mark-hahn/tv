@@ -947,7 +947,7 @@ export default {
       );
 
       if (match) {
-        this.$emit("select-show", match.Name);
+        this.$emit("select-show", match.name);
       } else {
         alert(`No show found matching folder "${folderName}"`);
       }
@@ -986,7 +986,7 @@ export default {
     },
     async selectTopLevel() {
       // 1. Get current show name
-      const showName = this.show ? this.show.Name : null;
+      const showName = this.show ? this.show.name : null;
       console.log("Local.vue selectTopLevel", {
         showProp: this.show,
         showName,

@@ -206,17 +206,17 @@ handleMsg = async (msg) => {
 };
 
 export async function deleteShowFromSrvr(show) {
-  await delGap({ gapId: show.Id, save: true });
-  await delNoEmby(show.Name);
+  await delGap({ gapId: show.id, save: true });
+  await delNoEmby(show.name);
 
   // Delete entire show folder from disk
   // Extract just the folder name from the Emby path (e.g., "/tv/ShowName" -> "ShowName")
-  const showFolder = show.Path.split("/").pop();
+  const showFolder = show.path.split("/").pop();
   console.log(
     "deleteShowFromSrvr: deleting folder:",
     showFolder,
     "for show:",
-    show.Name,
+    show.name,
   );
   const result = await deletePath(showFolder);
   console.log("deleteShowFromSrvr: deletePath result:", result);
@@ -228,7 +228,7 @@ export async function deleteShowFromSrvr(show) {
   // don't ever delete from remotes
   // don't ever delete from rejects
   // don't ever delete from tvdb
-  console.log("deleted show from server:", show.Name);
+  console.log("deleted show from server:", show.name);
 }
 
 export const lastViewedCache = {};

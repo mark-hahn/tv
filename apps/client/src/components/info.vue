@@ -76,7 +76,7 @@
             gap: '12px',
           }"
         >
-          <span>{{ show.Name }}</span>
+          <span>{{ show.name }}</span>
         </div>
         <!-- Simple mode: align left edge of Notes with right edge of image (end of poster column)-->
         <div
@@ -145,7 +145,7 @@
             }"
           >
             <div
-              v-if="show?.Reject"
+              v-if="show?.reject"
               style="
                 font-weight: bold;
                 color: red;
@@ -170,7 +170,7 @@
           }"
         >
           <div
-            v-if="show?.Reject"
+            v-if="show?.reject"
             style="
               font-weight: bold;
               color: red;
@@ -560,7 +560,7 @@
       id="bot"
       :style="{ fontSize: sizing.overviewFontSize || '20px', padding: '10px' }"
     >
-      {{ show.Overview }}
+      {{ show.overview }}
     </div>
   </div>
 </template>
@@ -590,7 +590,7 @@ export default {
 
   data() {
     return {
-      show: { Name: "" },
+      show: { name: "" },
       showHdr: false,
       seriesReady: false,
       previewMode: false,
@@ -701,11 +701,11 @@ export default {
 
     onNoteInput() {
       // Auto-save while typing (debounced).
-      const showName = this.show?.Name;
+      const showName = this.show?.name;
       if (!showName) return;
 
       this.noteCacheByShowName[showName] = this.noteText;
-      this.show.Notes = this.noteText;
+      this.show.notes = this.noteText;
 
       if (this.noteSaveTimer) {
         clearTimeout(this.noteSaveTimer);
@@ -718,7 +718,7 @@ export default {
     },
 
     async saveNoteNow(showAlertOnError) {
-      const showName = this.show?.Name;
+      const showName = this.show?.name;
       if (!showName) return;
 
       if (this.noteText === this.lastSavedNoteText) return;
@@ -727,7 +727,7 @@ export default {
         await srvr.saveNote(showName, this.noteText);
         this.lastSavedNoteText = this.noteText;
         this.noteCacheByShowName[showName] = this.noteText;
-        this.show.Notes = this.noteText;
+        this.show.notes = this.noteText;
       } catch (err) {
         console.error("Series: saveNote failed", { showName, err });
         if (showAlertOnError) window.alert(err?.message || String(err));
@@ -735,7 +735,7 @@ export default {
     },
 
     async refreshNoteFromServer() {
-      const showName = this.show?.Name;
+      const showName = this.show?.name;
       if (!showName) return;
       if (this.noteFocused) return;
       if (this.notePollInFlight) return;
@@ -750,10 +750,10 @@ export default {
         this.noteText = next;
         this.lastSavedNoteText = next;
         this.noteCacheByShowName[showName] = next;
-        // Only update show.Notes if we got data, or if show.Notes was empty
+        // Only update show.notes if we got data, or if show.notes was empty
         // This prevents clearing an existing note when server returns empty
-        if (next || !this.show.Notes) {
-          this.show.Notes = next;
+        if (next || !this.show.notes) {
+          this.show.notes = next;
         }
       } catch (err) {
         let msg = "";
@@ -783,9 +783,9 @@ export default {
         const cached = this.noteCacheByShowName[showName];
         this.noteText = String(cached ?? "");
         this.lastSavedNoteText = this.noteText;
-      } else if (this.show && this.show.Notes != null) {
-        // Seed from show.Notes (populated by loadAllShows) before polling refresh.
-        this.noteText = String(this.show.Notes ?? "");
+      } else if (this.show && this.show.notes != null) {
+        // Seed from show.notes (populated by loadAllShows) before polling refresh.
+        this.noteText = String(this.show.notes ?? "");
         this.lastSavedNoteText = this.noteText;
       } else {
         this.noteText = "";
@@ -799,10 +799,10 @@ export default {
         this.noteText = String(text ?? "");
         this.lastSavedNoteText = this.noteText;
         this.noteCacheByShowName[showName] = this.noteText;
-        // Only update show.Notes if we got data, or if show.Notes was empty
+        // Only update show.notes if we got data, or if show.notes was empty
         // This prevents clearing an existing note when server returns empty
-        if (this.noteText || !this.show.Notes) {
-          this.show.Notes = this.noteText;
+        if (this.noteText || !this.show.notes) {
+          this.show.notes = this.noteText;
         }
       } catch (err) {
         console.error("Series: getNote failed", { showName, err });
@@ -811,7 +811,7 @@ export default {
     },
 
     async commitNote() {
-      const showName = this.show?.Name;
+      const showName = this.show?.name;
       if (!showName) return;
 
       if (this.noteSaveTimer) {
@@ -841,7 +841,7 @@ export default {
     async sendEmail() {
       if (!this.emailText.trim() || this.emailText === "Email Sent") return;
 
-      const textToSend = this.show.Name + "~" + this.emailText;
+      const textToSend = this.show.name + "~" + this.emailText;
 
       try {
         await srvr.sendEmail(textToSend);
@@ -898,14 +898,14 @@ export default {
 
     openMap(show) {
       if (this.previewMode) return;
-      if (!show || !show.Name) {
+      if (!show || !show.name) {
         return;
       }
       evtBus.emit("openMap", show);
     },
 
     deleteClick() {
-      console.log("Series, deleteClick:", this.show.Name);
+      console.log("Series, deleteClick:", this.show.name);
       evtBus.emit("deleteShow", this.show);
     },
 
@@ -981,8 +981,8 @@ export default {
           genreArr = tvdbData.genres;
         }
       } else {
-        if (this.show && this.show.Genres) {
-          genreArr = this.show.Genres;
+        if (this.show && this.show.genres) {
+          genreArr = this.show.genres;
         } else if (this.show && this.show.genres) {
           genreArr = this.show.genres;
         } else if (tvdbData && tvdbData.genres) {
@@ -1019,7 +1019,7 @@ export default {
       this.seasonsTxt = "";
       this.watchedValTxt = "";
       const show = this.show;
-      const name = show.Name;
+      const name = show.name;
 
       let epiCounts;
       let watchedCountIsNull = false;
@@ -1056,7 +1056,7 @@ export default {
       tvdb.upsertTvdbCacheRecord(
         allTvdb,
         tvdbData,
-        name || this.show?.Name || "",
+        name || this.show?.name || "",
       );
       let seasonsTxt;
       const { episodeCount, seasonCount, watchedCount } = tvdbData;
@@ -1206,28 +1206,28 @@ export default {
     },
 
     async setRemotes() {
-      this.remoteShowName = this.show.Name;
+      this.remoteShowName = this.show.name;
       this.showRemotes = false;
       this.remotes = [];
 
       try {
         const tvdbId =
           this.show?.ProviderIds?.Tvdb ??
-          this.show?.TvdbId ??
+          this.show?.tvdbId ??
           this.show?.tvdbId ??
           this.show?.tvdb_id;
-        const tvdbData = this.currentTvdbData || allTvdb?.[this.show.Name];
+        const tvdbData = this.currentTvdbData || allTvdb?.[this.show.name];
         const remoteIds = tvdbData?.remote_ids || [];
 
         // Use centralized cache function, passing show context for inEmby/Id
         const showContext = {
           inEmby: this.show.inEmby,
-          Id: this.show.Id,
+          id: this.show.id,
         };
         // Use fast mode by default (can be overridden by passing false)
         const fast = this.remoteFetchMode !== "full";
         const results = await tvdb.getRemotes(
-          this.show.Name,
+          this.show.name,
           tvdbId,
           remoteIds,
           showContext,
@@ -1238,12 +1238,12 @@ export default {
           if (!remote || !remote.name || !remote.name.startsWith("IMDB")) {
             return remote;
           }
-          // Prefer explicit remote rating, then tvdb flat imdbRatings, then show.Ratings.
+          // Prefer explicit remote rating, then tvdb flat imdbRatings, then show.ratings.
           const rating =
             remote.ratings ||
             tvdbData?.imdbRatings ||
-            tvdbData?.Ratings ||
-            this.show?.Ratings ||
+            tvdbData?.ratings ||
+            this.show?.ratings ||
             null;
           if (!rating) return remote;
           if (remote.name.includes("(")) return remote;
@@ -1269,11 +1269,11 @@ export default {
 
     async loadIntoEmby() {
       const show = this.show;
-      const name = String(show?.Name || "").trim();
+      const name = String(show?.name || "").trim();
       if (!name) return;
-      let tvdbId = String(show?.TvdbId || show?.tvdbId || "").trim();
-      if (!tvdbId && show?.Id) {
-        tvdbId = await emby.getTvdbIdFromEmbyItem(show.Id);
+      let tvdbId = String(show?.tvdbId || show?.tvdbId || "").trim();
+      if (!tvdbId && show?.id) {
+        tvdbId = await emby.getTvdbIdFromEmbyItem(show.id);
         if (tvdbId)
           console.log(
             `loadIntoEmby: resolved tvdbId ${tvdbId} from Emby for "${name}"`,
@@ -1303,7 +1303,7 @@ export default {
       const srchChoice = {
         name,
         tvdbId,
-        overview: show?.Overview || show?.overview || "",
+        overview: show?.overview || show?.overview || "",
         image: show?.image || show?.image_url || "",
         year: show?.year || "",
         originalCountry: show?.originalCountry || show?.country || "",
@@ -1312,7 +1312,7 @@ export default {
     },
 
     async refreshTvdb() {
-      const showName = this.show.Name;
+      const showName = this.show.name;
       if (!showName || this.refreshing) return;
       console.log(`Refresh button clicked for ${showName}`);
       this.refreshing = true;
@@ -1321,7 +1321,7 @@ export default {
       this.refreshDialogShowName = showName;
       this.refreshDialogStatus = "Updating TVDB...";
       srvr
-        .triggerShowGapCheck(this.show.Id || showName, showName)
+        .triggerShowGapCheck(this.show.id || showName, showName)
         .catch((err) => {
           this.refreshing = false;
           this.refreshPendingShowName = "";
@@ -1348,12 +1348,12 @@ export default {
 
     onSetUpSeries(show, onComplete = null) {
       // Prevent duplicate calls for the same show while already processing
-      if (this.settingUpShowName === show?.Name) {
+      if (this.settingUpShowName === show?.name) {
         if (onComplete) onComplete();
         return;
       }
 
-      this.settingUpShowName = show?.Name;
+      this.settingUpShowName = show?.name;
       this.emailText = ""; // Clear email text when changing shows
       this.show = show;
       this.showHdr = true;
@@ -1364,7 +1364,7 @@ export default {
       }
 
       // Load persistent note for this show.
-      void this.loadNote(show?.Name);
+      void this.loadNote(show?.name);
 
       // Clear info fields so nothing renders until ready
       const posterEl = document.getElementById("poster");
@@ -1387,27 +1387,27 @@ export default {
 
       // Set collection name(s)
       const collections = [];
-      if (show.InToTry) collections.push("To Try");
-      if (show.InContinue) collections.push("Continue");
-      if (show.InMark) collections.push("Mark");
-      if (show.InLinda) collections.push("Linda");
+      if (show.inToTry) collections.push("To Try");
+      if (show.inContinue) collections.push("Continue");
+      if (show.inMark) collections.push("Mark");
+      if (show.inLinda) collections.push("Linda");
       this.collectionName = collections.join(", ");
       this.collectionCount = collections.length;
 
-      const currentShowName = show.Name;
+      const currentShowName = show.name;
       setTimeout(async () => {
         try {
-          if (this.show.Name !== currentShowName) return;
+          if (this.show.name !== currentShowName) return;
 
           // Force load all shows (including no-emby) by passing hasEmby=0
           // The cache from loadAllShows might only contain emby shows (hasEmby=1)
           allTvdb = await tvdb.getAllTvdb(0);
 
-          if (this.show.Name !== currentShowName) return;
-          let tvdbData = allTvdb[show.Name];
+          if (this.show.name !== currentShowName) return;
+          let tvdbData = allTvdb[show.name];
           const currentTvdbId = String(
             show?.ProviderIds?.Tvdb ??
-              show?.TvdbId ??
+              show?.tvdbId ??
               show?.tvdbId ??
               show?.tvdb_id ??
               "",
@@ -1415,12 +1415,12 @@ export default {
 
           if (!tvdbData && currentTvdbId) {
             for (const [key, rec] of Object.entries(allTvdb || {})) {
-              const recTvdbId = String(rec?.tvdbId || rec?.TvdbId || "").trim();
+              const recTvdbId = String(rec?.tvdbId || rec?.tvdbId || "").trim();
               if (recTvdbId && recTvdbId === currentTvdbId) {
                 tvdbData = rec;
-                if (key !== show.Name) {
+                if (key !== show.name) {
                   console.info(
-                    `Series: resolved tvdbData by tvdbId=${currentTvdbId} key=\"${key}\" for show=\"${show.Name}\"`,
+                    `Series: resolved tvdbData by tvdbId=${currentTvdbId} key=\"${key}\" for show=\"${show.name}\"`,
                   );
                 }
                 break;
@@ -1433,16 +1433,16 @@ export default {
           if (!tvdbData) {
             const tvdbId =
               show?.ProviderIds?.Tvdb ??
-              show?.TvdbId ??
+              show?.tvdbId ??
               show?.tvdbId ??
               show?.tvdb_id;
             if (tvdbId) {
               try {
                 const showSeed = {
-                  Name: show?.Name,
-                  TvdbId: tvdbId,
-                  Overview: show?.Overview,
-                  Reject: !!show?.Reject,
+                  name: show?.name,
+                  tvdbId: tvdbId,
+                  overview: show?.overview,
+                  reject: !!show?.reject,
                 };
                 const paramObj = {
                   show: showSeed,
@@ -1454,11 +1454,11 @@ export default {
                 tvdbData = await srvr.getNewTvdb(paramObj);
                 if (tvdbData) {
                   delete tvdbData.deleted;
-                  tvdb.upsertTvdbCacheRecord(allTvdb, tvdbData, show?.Name);
+                  tvdb.upsertTvdbCacheRecord(allTvdb, tvdbData, show?.name);
                 }
               } catch (e) {
                 console.error("Series: getNewTvdb failed (preview)", {
-                  name: show?.Name,
+                  name: show?.name,
                   tvdbId,
                   err: e?.message || e,
                 });
@@ -1485,13 +1485,13 @@ export default {
                   delete tvdbData.deleted;
                   // Don't cache this in allTvdb since it's not a full record
                   // But update the show with the tvdbId we found
-                  if (tvdbData.tvdbId && !show.TvdbId) {
-                    show.TvdbId = tvdbData.tvdbId;
+                  if (tvdbData.tvdbId && !show.tvdbId) {
+                    show.tvdbId = tvdbData.tvdbId;
                   }
                 }
               } catch (e) {
                 console.error("Series: searchTvdbByImdbId failed", {
-                  name: show?.Name,
+                  name: show?.name,
                   imdbId,
                   err: e?.message || e,
                 });
@@ -1503,7 +1503,7 @@ export default {
           evtBus.emit("tvdbDataReady", { show, tvdbData }); // Send to App.vue
 
           if (!tvdbData) {
-            console.warn("Series: no tvdbData available for", show?.Name);
+            console.warn("Series: no tvdbData available for", show?.name);
             // Still show the infobox even without tvdbData, just with limited info
             // Try to set poster from show.imageUrl if available
             void this.setPoster(null);
@@ -1511,18 +1511,18 @@ export default {
             return;
           }
 
-          // Update show.Overview from tvdbData if available
+          // Update show.overview from tvdbData if available
           if (tvdbData.overview) {
-            this.show.Overview = tvdbData.overview;
+            this.show.overview = tvdbData.overview;
           }
 
           // If tvdbData exists but has no image, force a refresh
-          if (!tvdbData.image && show.TvdbId) {
+          if (!tvdbData.image && show.tvdbId) {
             const showSeed = {
-              Name: show?.Name,
-              TvdbId: show.TvdbId,
-              Overview: show?.Overview,
-              Reject: !!show?.Reject,
+              name: show?.name,
+              tvdbId: show.tvdbId,
+              overview: show?.overview,
+              reject: !!show?.reject,
             };
             const paramObj = {
               show: showSeed,
@@ -1535,7 +1535,7 @@ export default {
               const freshTvdbData = await srvr.getNewTvdb(paramObj);
               if (freshTvdbData) {
                 delete freshTvdbData.deleted;
-                tvdb.upsertTvdbCacheRecord(allTvdb, freshTvdbData, show?.Name);
+                tvdb.upsertTvdbCacheRecord(allTvdb, freshTvdbData, show?.name);
                 tvdbData = freshTvdbData;
                 this.currentTvdbData = freshTvdbData;
               }
@@ -1578,14 +1578,14 @@ export default {
 
     async onSeriesMapUpdated({ show, seriesMap }) {
       if (!show || !seriesMap) return;
-      if (!this.show || this.show.Name !== show.Name) return;
+      if (!this.show || this.show.name !== show.name) return;
       if (this.show.inEmby !== false) return;
 
       const { seasonCount, episodeCount } = this.getMapCounts(seriesMap);
       if (!episodeCount || !seasonCount) return;
 
       // Check if watchedEpis is null (unknown watch status)
-      const tvdbData = allTvdb?.[show.Name];
+      const tvdbData = allTvdb?.[show.name];
       const watchedEpisIsNull = tvdbData?.watchedEpis === null;
 
       // Calculate watchedCount from seriesMap
@@ -1623,7 +1623,7 @@ export default {
       if (tvdbData && !this.previewMode) {
         try {
           await srvr.setTvdbFields({
-            name: show.Name,
+            name: show.name,
             seasonCount,
             episodeCount,
             watchedCount,
@@ -1648,7 +1648,7 @@ export default {
     // (Keeps the notes display in sync with external edits.)
     // this.notePollTimer = setInterval(() => {
     //   if (this.noteFocused) return;
-    //   if (!this.show?.Name) return;
+    //   if (!this.show?.name) return;
     //   void this.refreshNoteFromServer();
     // }, 1000);
 
@@ -1662,7 +1662,7 @@ export default {
 
       // Clear refresh state as soon as server confirms an update for the show,
       // even if payload is partial/missing.
-      const matchesSelected = this.show?.Name === name;
+      const matchesSelected = this.show?.name === name;
       const matchesPending = this.refreshPendingShowName === name;
       if (matchesSelected || matchesPending) {
         this.refreshDialogStatus = "Finalizing...";

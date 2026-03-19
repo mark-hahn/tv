@@ -41,7 +41,7 @@
           cursor: 'default',
           backgroundColor: hilite(show),
         }"
-        :id="nameHash(show.Name)"
+        :id="nameHash(show.name)"
       >
         <div
           v-if="!simpleMode"
@@ -93,7 +93,7 @@
             flexGrow: 1,
             minWidth: 0,
             backgroundColor:
-              highlightName === show.Name ? 'yellow' : 'transparent',
+              highlightName === show.name ? 'yellow' : 'transparent',
           }"
         >
           <div
@@ -118,7 +118,7 @@
               }"
               @click="$emit('select-show', show, false, true)"
             >
-              {{ show.Name }}
+              {{ show.name }}
             </div>
             <div
               style="
@@ -130,7 +130,7 @@
               @click="$emit('select-show', show, false, true)"
             ></div>
             <div
-              v-if="show.Notes &amp;&amp; String(show.Notes).length"
+              v-if="show.notes &amp;&amp; String(show.notes).length"
               :style="{
                 padding: '2px',
                 fontSize: '14px',
@@ -141,10 +141,10 @@
                 textOverflow: 'ellipsis',
               }"
             >
-              {{ String(show.Notes) }}
+              {{ String(show.notes) }}
             </div>
             <div
-              v-if="show.WaitStr?.length"
+              v-if="show.waitStr?.length"
               :style="{
                 padding: '2px',
                 color: '#00f',
@@ -154,7 +154,7 @@
                 textOverflow: 'ellipsis',
               }"
             >
-              {{ show.WaitStr }}
+              {{ show.waitStr }}
             </div>
           </div>
         </div>
@@ -260,7 +260,7 @@ export default {
 
   methods: {
     scrollToShow(showName) {
-      const index = this.shows.findIndex((s) => s.Name === showName);
+      const index = this.shows.findIndex((s) => s.name === showName);
       if (index !== -1 && this.$refs.scroller) {
         const itemSize = this.simpleMode ? 40 : 30;
         const scrollerEl = this.$refs.scroller.$el;
@@ -272,7 +272,7 @@ export default {
     },
 
     hilite(show) {
-      if (this.activeDownloadShowNameSet.has(show?.Name)) return "#dff5df";
+      if (this.activeDownloadShowNameSet.has(show?.name)) return "#dff5df";
       if (!this.simpleMode && show.inEmby === false) return "#fee";
       return "white";
     },

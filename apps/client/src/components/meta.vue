@@ -3,7 +3,7 @@
     id="meta"
     style="height: 95dvh; padding: 0; margin: 0; display: flex"
   >
-    <div style="border: 0.5px solid gray">name: {{ show.Name }}</div>
+    <div style="border: 0.5px solid gray">name: {{ show.name }}</div>
     <div id="poster"></div>
   </div>
 </template>
@@ -17,7 +17,7 @@ export default {
   name: "Meta",
   data() {
     return {
-      show: { Name: "<No Show Selected>" },
+      show: { name: "<No Show Selected>" },
     };
   },
 
@@ -28,7 +28,7 @@ export default {
       const tryImg = () => {
         console.log("Meta: trying img:", images[imgIdx]);
         img.src =
-          "https://hahnca.com/tv/" + encodeURI(this.show.Name) + images[imgIdx];
+          "https://hahnca.com/tv/" + encodeURI(this.show.name) + images[imgIdx];
       };
       tryImg();
       img.onload = () => {
@@ -48,7 +48,7 @@ export default {
 
   mounted() {
     evtBus.on("showSelected", (show) => {
-      console.log("Meta: showSelected:", show.Name);
+      console.log("Meta: showSelected:", show.name);
       this.show = show;
       this.setPoster();
     });

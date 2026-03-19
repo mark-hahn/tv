@@ -955,9 +955,9 @@ export default {
           );
           lines.push("");
           lines.push("Incoming show (from Emby)");
-          lines.push(`- Show name key (show.Name): ${name}`);
-          lines.push(`- Emby show Id (show.Id): ${showId}`);
-          lines.push(`- TVDB series Id on show (show.TvdbId): ${tvdbId}`);
+          lines.push(`- Show name key (show.name): ${name}`);
+          lines.push(`- Emby show Id (show.id): ${showId}`);
+          lines.push(`- TVDB series Id on show (show.tvdbId): ${tvdbId}`);
           lines.push("");
           lines.push("Likely same-show candidate (from server TVDB cache)");
           lines.push(`- Cache key: ${existingKey}`);
@@ -984,9 +984,9 @@ export default {
           );
           lines.push("");
           lines.push("Current show (from Emby)");
-          lines.push(`- Show name key (show.Name): ${name}`);
-          lines.push(`- Emby show Id (show.Id): ${showId}`);
-          lines.push(`- TVDB series Id on show (show.TvdbId): ${tvdbId}`);
+          lines.push(`- Show name key (show.name): ${name}`);
+          lines.push(`- Emby show Id (show.id): ${showId}`);
+          lines.push(`- TVDB series Id on show (show.tvdbId): ${tvdbId}`);
           lines.push("");
           lines.push("Existing cached record");
           lines.push(`- Cache key: ${existingKey}`);
@@ -1527,7 +1527,7 @@ export default {
         evtBus.emit("paneChanged", this.currentPane);
         evtBus.emit("mapAction", { action: "close", show: null });
       } else {
-        const showKey = this.currentShow?.Id || this.currentShow?.Name || null;
+        const showKey = this.currentShow?.id || this.currentShow?.name || null;
         // Switching panes should not reset actors; only reset when show selection changes.
         if (
           this._actorsInitialized &&
@@ -1561,7 +1561,7 @@ export default {
     },
     handleShowTor(show) {
       if (this.simpleMode) return;
-      const showKey = show?.Id || show?.Name || null;
+      const showKey = show?.id || show?.name || null;
 
       // Switching panes should not restart searching; only restart when show selection changes.
       if (
@@ -1814,7 +1814,7 @@ export default {
 
       // If tor pane is visible, start a new search for the new show.
       if (prevPane === "tor") {
-        const showKey = this.currentShow?.Id || this.currentShow?.Name || null;
+        const showKey = this.currentShow?.id || this.currentShow?.name || null;
         evtBus.emit("showTorrents", this.currentShow);
         this._torrentsInitialized = true;
         this._torrentsShowKey = showKey;
@@ -1843,7 +1843,7 @@ export default {
 
         // Immediately show actors with search params for the new show
         // This ensures matching actors are sorted to the top right away
-        const showKey = this.currentShow?.Id || this.currentShow?.Name || null;
+        const showKey = this.currentShow?.id || this.currentShow?.name || null;
         evtBus.emit("showActors", {
           show: this.currentShow,
           tvdbData: this.currentTvdbData,
@@ -1879,14 +1879,14 @@ export default {
     evtBus.on("tvdbDataReady", (data) => {
       const incomingShow = data?.show || null;
       const incomingId =
-        incomingShow?.Id != null ? String(incomingShow.Id) : "";
+        incomingShow?.id != null ? String(incomingShow.id) : "";
       const incomingName =
-        incomingShow?.Name != null ? String(incomingShow.Name) : "";
+        incomingShow?.name != null ? String(incomingShow.name) : "";
 
       const currentId =
-        this.currentShow?.Id != null ? String(this.currentShow.Id) : "";
+        this.currentShow?.id != null ? String(this.currentShow.id) : "";
       const currentName =
-        this.currentShow?.Name != null ? String(this.currentShow.Name) : "";
+        this.currentShow?.name != null ? String(this.currentShow.name) : "";
 
       // Ignore late/stale tvdbDataReady events for a previously selected show.
       // setUpSeries is the source of truth for current selection.
@@ -1906,7 +1906,7 @@ export default {
 
       // If Actors pane is currently showing, refresh it with the newly loaded tvdbData.
       if (this.currentPane === "actors") {
-        const showKey = this.currentShow?.Id || this.currentShow?.Name || null;
+        const showKey = this.currentShow?.id || this.currentShow?.name || null;
         evtBus.emit("showActors", {
           show: this.currentShow,
           tvdbData: this.currentTvdbData,

@@ -1186,8 +1186,13 @@ async function main() {
         smartTitleMatch(showTitle, embyShowNames, null, false) || showTitle;
       const embyEntry = embyMap[embyKey];
       if (!embyEntry || !embyEntry.inEmby) {
-        console.log(
-          `[${cycleTsPST()}] DVD: "${showTitle}" not in Emby, skipping "${torrentFolder}"`,
+        log(
+          "------",
+          "DVD: NOT IN EMBY, SKIPPING:",
+          torrentFolder,
+          "(",
+          showTitle,
+          ")",
         );
         postHistory({
           tvdbId: embyEntry?.tvdbId || null,

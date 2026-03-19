@@ -19,8 +19,8 @@ export function showListUrl(cred, startIdx = 0, limit = 10000) {
     &IncludeItemTypes=Series
     &Recursive=true 
     &Fields= Name              %2c Id                %2c
-             IsFavorite        %2c Played            %2c 
-             UnplayedItemCount %2c DateCreated       %2c 
+             Played            %2c UnplayedItemCount %2c
+             DateCreated       %2c 
              ExternalUrls      %2c Genres            %2c 
              Overview          %2c Path              %2c 
              People            %2c PremiereDate      %2c 
@@ -48,19 +48,6 @@ export function postUserDataUrl(cred, id) {
           / ${cred.markUsrId} / Items / ${id} / UserData
     ? X-Emby-Token=${cred.token}
   `.replace(/\s*/g, "");
-}
-
-export function favoriteUrl(cred, id) {
-  return encodeURI(
-    `https://hahnca.com:8920 / emby / Users 
-          / ${cred.markUsrId} / FavoriteItems / ${id}
-    ?X-Emby-Client=Emby Web
-    &X-Emby-Device-Name=Chrome
-    &X-Emby-Device-Id=f4079adb-6e48-4d54-9185-5d92d3b7176b
-    &X-Emby-Client-Version=1.0.0
-    &X-Emby-Token=${cred.token}
-  `.replace(/\s*/g, ""),
-  );
 }
 
 export function deleteShowUrl(cred, id) {

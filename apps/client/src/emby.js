@@ -161,7 +161,6 @@ export async function loadAllShows() {
     if (rec.InContinue === undefined) rec.InContinue = false;
     if (rec.InMark === undefined) rec.InMark = false;
     if (rec.InLinda === undefined) rec.InLinda = false;
-    if (rec.IsFavorite === undefined) rec.IsFavorite = false;
     if (rec.Played === undefined) rec.Played = false;
     if (rec.PlayCount === undefined) rec.PlayCount = 0;
     if (rec.Date === undefined) rec.Date = "2017-12-05";
@@ -465,7 +464,6 @@ async function _oldLoadAllShows() {
       premiereDate: embyShow.PremiereDate?.substring(0, 10),
       lastEmbySync: now,
       // Include UserData properties for new record creation
-      isFavorite: embyShow.UserData?.IsFavorite || false,
       isPlayed: embyShow.UserData?.Played || false,
       playCount: embyShow.UserData?.PlayCount || 0,
     };
@@ -576,7 +574,6 @@ async function _oldLoadAllShows() {
           DateCreated: updateFields.dateCreated,
           PremiereDate: updateFields.premiereDate,
           lastEmbySync: now,
-          IsFavorite: updateFields.isFavorite,
           Played: updateFields.isPlayed,
           PlayCount: updateFields.playCount,
         });
@@ -636,7 +633,6 @@ async function _oldLoadAllShows() {
 
       // Sync user data from Emby
       if (embyShow.UserData) {
-        tvdbRecord.IsFavorite = embyShow.UserData.IsFavorite || false;
         tvdbRecord.Played = embyShow.UserData.Played || false;
         tvdbRecord.PlayCount = embyShow.UserData.PlayCount || 0;
       }
@@ -832,7 +828,6 @@ async function _oldLoadAllShows() {
     if (tvdb.InContinue === undefined) tvdb.InContinue = false;
     if (tvdb.InMark === undefined) tvdb.InMark = false;
     if (tvdb.InLinda === undefined) tvdb.InLinda = false;
-    if (tvdb.IsFavorite === undefined) tvdb.IsFavorite = false;
     if (tvdb.Played === undefined) tvdb.Played = false;
     if (tvdb.PlayCount === undefined) tvdb.PlayCount = 0;
     if (tvdb.Date === undefined) tvdb.Date = "2017-12-05";
@@ -1305,15 +1300,6 @@ export const getSeriesMap = async (show, prune = false) => {
 
   return seriesMap;
 };
-
-export async function saveFav(id, fav) {
-  const config = {
-    method: fav ? "post" : "delete",
-    url: urls.favoriteUrl(cred, id),
-  };
-  let favRes = await axios(config);
-  if (favRes.status != 200) throw new Error("unable to save favorite");
-}
 
 export async function saveToTry(id, inToTry, showName) {
   const config = {

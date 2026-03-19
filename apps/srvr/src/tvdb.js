@@ -1783,11 +1783,6 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     paramObj.inMark ?? existing.InMark ?? existing.emby?.inMark ?? false;
   tvdbData.InLinda =
     paramObj.inLinda ?? existing.InLinda ?? existing.emby?.inLinda ?? false;
-  tvdbData.IsFavorite =
-    paramObj.isFavorite ??
-    existing.IsFavorite ??
-    existing.emby?.isFavorite ??
-    false;
   tvdbData.Played =
     paramObj.isPlayed ?? existing.Played ?? existing.emby?.isPlayed ?? false;
   tvdbData.PlayCount =
@@ -2757,7 +2752,7 @@ export const setTvdbFields = async (params) => {
       for (const [key, value] of Object.entries(paramObj)) {
         if (key === "dontSave" || key === "$delete" || key === "name") continue;
 
-        // Handle nested emby fields (e.g., inToTry, isFavorite)
+        // Handle nested emby fields (e.g., inToTry)
         if (key.startsWith("emby") && typeof key === "string") {
           const embyField = key.replace(/^emby\.?/, "");
           if (embyField && embyField !== "emby") {

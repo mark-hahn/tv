@@ -61,8 +61,6 @@ for (const show of shows) {
         show.InContinue = embyData.inContinue;
       if (embyData.inMark !== undefined) show.InMark = embyData.inMark;
       if (embyData.inLinda !== undefined) show.InLinda = embyData.inLinda;
-      if (embyData.isFavorite !== undefined)
-        show.IsFavorite = embyData.isFavorite;
       if (embyData.isPlayed !== undefined) show.Played = embyData.isPlayed;
       if (embyData.playCount !== undefined) show.PlayCount = embyData.playCount;
       if (embyData.lastPlayedDate !== undefined)

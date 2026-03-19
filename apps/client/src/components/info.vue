@@ -1391,7 +1391,6 @@ export default {
       if (show.InContinue) collections.push("Continue");
       if (show.InMark) collections.push("Mark");
       if (show.InLinda) collections.push("Linda");
-      if (show.IsFavorite) collections.push("Favorite");
       this.collectionName = collections.join(", ");
       this.collectionCount = collections.length;
 

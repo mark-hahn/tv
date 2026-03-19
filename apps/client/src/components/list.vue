@@ -336,7 +336,6 @@ import { library } from "@fortawesome/fontawesome-svg-core";
 import {
   faLaughBeam,
   faSadCry,
-  faHeart,
   faClock,
 } from "@fortawesome/free-regular-svg-icons";
 import {
@@ -362,7 +361,6 @@ library.add([
   faLaughBeam,
   faSadCry,
   faClock,
-  faHeart,
   faCheck,
   faPlus,
   faGlobe,
@@ -486,16 +484,6 @@ export default {
         console.error("toggleLinda error:", err);
         show.InLinda = originalValue; // Revert on error
       }
-    };
-
-    const toggleFavorite = (show) => {
-      if (show.inEmby === false && !show.IsFavorite) return;
-      this.saveVisShow(show);
-      show.IsFavorite = !show.IsFavorite;
-      emby.saveFav(show.Id, show.IsFavorite).catch((err) => {
-        console.error("late saveFavorite error:", err);
-        //- show.IsFavorite = !show.IsFavorite;
-      });
     };
 
     const toggleReject = async (show) => {
@@ -775,18 +763,6 @@ export default {
             await toggleLinda(show);
           },
           name: "linda",
-        },
-        {
-          color: "red",
-          filter: 0,
-          icon: ["far", "heart"],
-          cond(show) {
-            return show.IsFavorite;
-          },
-          async click(show) {
-            await toggleFavorite(show);
-          },
-          name: "favorite",
         },
         {
           color: "red",

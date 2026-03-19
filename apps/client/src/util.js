@@ -134,7 +134,6 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.continue = 0;
       tmp.mark = 0;
       tmp.linda = 0;
-      tmp.favorite = 0;
       tmp.ban = 0;
       tmp.hasemby = 0; // Show both emby and non-emby shows by default
       tmp.full = 0;
@@ -152,7 +151,6 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.continue = 0;
       tmp.mark = 0;
       tmp.linda = 0;
-      tmp.favorite = 0;
       tmp.ban = -1;
       tmp.hasemby = 1;
       tmp.full = 0;
@@ -169,7 +167,6 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.continue = 1;
       tmp.mark = 0;
       tmp.linda = 0;
-      tmp.favorite = 1;
       tmp.ban = -1;
       tmp.hasemby = 1;
       tmp.full = 0;
@@ -186,7 +183,6 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.continue = 0;
       tmp.mark = 0;
       tmp.linda = 0;
-      tmp.favorite = 0;
       tmp.ban = -1;
       tmp.hasemby = 0;
       tmp.full = 0;

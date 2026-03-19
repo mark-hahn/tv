@@ -3243,7 +3243,7 @@ async function runUsbCheck() {
 /**
  * Phase 3.1: Sync Emby user data and collections into tvdb
  * Runs every 5 minutes to keep user data and collection flags fresh without full reload
- * - Syncs watched status, play counts, favorites
+ * - Syncs watched status, play counts
  * - Syncs collection flags (toTry, continue, mark, linda)
  * - Syncs reject and pickup flags
  */
@@ -3383,8 +3383,6 @@ async function syncEmbyUserData() {
       const newPlayed = !!userData.Played;
       const oldPlayCount = tvdbRecord.PlayCount || 0;
       const newPlayCount = userData.PlayCount || 0;
-      const oldFavorite = !!tvdbRecord.IsFavorite;
-      const newFavorite = !!userData.IsFavorite;
       const oldLastPlayed = tvdbRecord.LastPlayedDate || null;
       const newLastPlayed = userData.LastPlayedDate || null;
       const oldUnplayed = tvdbRecord.UnplayedItemCount || 0;
@@ -3393,11 +3391,10 @@ async function syncEmbyUserData() {
       const userDataChanged =
         oldPlayed !== newPlayed ||
         oldPlayCount !== newPlayCount ||
-        oldFavorite !== newFavorite ||
         oldLastPlayed !== newLastPlayed ||
         oldUnplayed !== newUnplayed;
 
-      // Track watched data changes separately (excludes favorites)
+      // Track watched data changes
       const watchedDataChanged =
         oldPlayed !== newPlayed ||
         oldPlayCount !== newPlayCount ||
@@ -3416,11 +3413,6 @@ async function syncEmbyUserData() {
             old: oldPlayCount,
             new: newPlayCount,
             changed: oldPlayCount !== newPlayCount,
-          },
-          favorite: {
-            old: oldFavorite,
-            new: newFavorite,
-            changed: oldFavorite !== newFavorite,
           },
           lastPlayed: {
             old: oldLastPlayed,
@@ -3485,7 +3477,6 @@ async function syncEmbyUserData() {
         if (userDataChanged) {
           tvdbRecord.Played = userData.Played || false;
           tvdbRecord.PlayCount = userData.PlayCount || 0;
-          tvdbRecord.IsFavorite = userData.IsFavorite || false;
           tvdbRecord.LastPlayedDate =
             userData.LastPlayedDate || tvdbRecord.LastPlayedDate || null;
           tvdbRecord.UnplayedItemCount = userData.UnplayedItemCount || 0;
@@ -3710,7 +3701,6 @@ async function runEmbyFullSweep() {
           dateCreated: embyShow.DateCreated?.substring(0, 10),
           premiereDate: embyShow.PremiereDate?.substring(0, 10),
           lastEmbySync: now,
-          isFavorite: embyShow.UserData?.IsFavorite || false,
           isPlayed: embyShow.UserData?.Played || false,
           playCount: embyShow.UserData?.PlayCount || 0,
         };
@@ -3780,7 +3770,6 @@ async function runEmbyFullSweep() {
       tvdbRecord.Overview = embyShow.Overview || "";
       tvdbRecord.DateCreated = embyShow.DateCreated?.substring(0, 10);
       tvdbRecord.PremiereDate = embyShow.PremiereDate?.substring(0, 10);
-      tvdbRecord.IsFavorite = embyShow.UserData?.IsFavorite || false;
       tvdbRecord.Played = embyShow.UserData?.Played || false;
       tvdbRecord.PlayCount = embyShow.UserData?.PlayCount || 0;
       tvdbRecord.InToTry = toTryIds.has(showId);

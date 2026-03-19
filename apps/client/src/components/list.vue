@@ -669,6 +669,16 @@ export default {
           name: "unplayed",
         },
         {
+          color: "lime",
+          filter: 0,
+          icon: ["far", "clock"],
+          cond(show) {
+            return !!show.WaitStr?.length;
+          },
+          click() {},
+          name: "waiting",
+        },
+        {
           color: "#0cf",
           filter: 0,
           icon: ["fas", "arrow-up"],

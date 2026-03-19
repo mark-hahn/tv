@@ -559,11 +559,15 @@ export default {
         // Now delete from Emby (DELETE /Items/{id} removes it directly, no library scan needed)
         await emby.deleteShowFromEmby(show);
         // Set inEmby to false to mark as deleted and set leftEmby timestamp
-        const tvdbData = allTvdb[name];
-        tvdbData.inEmby = false;
         const leftEmby = util.getPstDate();
-        tvdbData.leftEmby = leftEmby;
-        tvdbData.notReady = true;
+        // Re-fetch allTvdb in case async ops replaced the cached reference
+        allTvdb = await tvdb.getAllTvdb();
+        const tvdbData = allTvdb[name];
+        if (tvdbData) {
+          tvdbData.inEmby = false;
+          tvdbData.leftEmby = leftEmby;
+          tvdbData.notReady = true;
+        }
         allTvdb[name] = await srvr.setTvdbFields({
           name,
           inEmby: false,
@@ -1201,7 +1205,8 @@ export default {
       switch (this.sortChoice) {
         case "Alpha":
           if (!forSort) return "";
-          return show.name.replace(/^the\s*/i, "")
+          return show.name
+            .replace(/^the\s*/i, "")
             .replace(/[^a-z0-9\s]/gi, "")
             .toLowerCase();
         case "Added":

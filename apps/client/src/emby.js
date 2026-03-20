@@ -131,7 +131,7 @@ export async function loadAllShows() {
         null;
     rec.reject = !!rec.reject;
     if (rec.note && !rec.notes) rec.notes = rec.note;
-    rec.notReady = rec.inEmby === false;
+    if (rec.notReady === undefined) rec.notReady = rec.inEmby === false;
     rec.watchGap = rec.watchGap || false;
     rec.fileGap =
       !(rec.notReady === false && rec.inToTry) &&
@@ -792,8 +792,8 @@ async function _oldLoadAllShows() {
     if (tvdb.reject && !tvdb.reject) tvdb.reject = tvdb.reject;
     if (tvdb.note && !tvdb.notes) tvdb.notes = tvdb.note;
 
-    // Set notReady flag
-    tvdb.notReady = tvdb.inEmby === false;
+    // Set notReady flag (preserve server-computed value if present)
+    if (tvdb.notReady === undefined) tvdb.notReady = tvdb.inEmby === false;
 
     // Set computed gap properties
     tvdb.watchGap = tvdb.watchGap || false;

@@ -1639,7 +1639,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   };
 
   let tvdbData = {
-    Name: name,
+    name,
     tvdbId: tvdbId,
     originalNetwork: preserve(
       originalNetwork,
@@ -2028,7 +2028,8 @@ const chkTvdbQueue = () => {
         if (tvdbData && typeof tvdbData === "object") {
           finalData = tvdbData;
           if (!paramObj.transient) {
-            const keyName = finalData.name;
+            const keyName =
+              String(finalData.name || showName || "").trim() || null;
             // Use the snapshot taken before getTvdbData ran; fall back to
             // allTvdb[keyName] only when the show was canonicalized to a
             // different name (snapshot was taken under the original name).

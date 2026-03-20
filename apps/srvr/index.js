@@ -1322,9 +1322,9 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
   }
 });
 let embyFullSweepTickCount = 0;
-tvdb.setPreTvdbTickCallback(async () => {
+tvdb.setPreTvdbTickCallback(async ({ isBackground } = {}) => {
   embyFullSweepTickCount++;
-  if (embyFullSweepTickCount % 10 === 1) {
+  if (!isBackground || embyFullSweepTickCount % 10 === 1) {
     await runEmbyFullSweep();
   }
 });

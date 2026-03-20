@@ -2118,10 +2118,11 @@ const tryLocalGetTvdb = async () => {
   if (showProcessQueue.length === 0) return;
   tryLocalGetTvdbBusy = true;
 
+  const nextItem = showProcessQueue[0];
   // Run pre-tick callback (e.g. full Emby sweep for new/removed shows)
   if (preTvdbTickCallback) {
     try {
-      await preTvdbTickCallback();
+      await preTvdbTickCallback({ isBackground: !!nextItem?.isBackground });
     } catch (e) {
       log("err", "tryLocalGetTvdb preTick:", e.message);
     }

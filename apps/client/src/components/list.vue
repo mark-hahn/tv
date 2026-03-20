@@ -2968,6 +2968,7 @@ export default {
             !(show.notReady === false && show.inToTry) &&
             (show.fileGap || show.fileEndError || show.seasonWatchedThenNofile);
           show.full = tvdbRecord.full ?? false;
+          show.haveSubs = tvdbRecord.haveSubs ?? false;
 
           // Update allTvdb cache
           tvdb.upsertTvdbCacheRecord(allTvdb, tvdbRecord, showName);
@@ -3070,6 +3071,7 @@ export default {
           show.watchGapEpisode = record.watchGapEpisode;
           show.fileGap = record.fileGap;
           show.full = record.full ?? false;
+          show.haveSubs = record.haveSubs ?? false;
           show.notReady = record.notReady;
           show.date = record.date ?? show.date;
           show.size = record.size ?? show.size;

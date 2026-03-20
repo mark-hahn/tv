@@ -1860,6 +1860,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   // Additional flags
   tvdbData.reject = paramObj.reject ?? existing.reject ?? false;
+  tvdbData.haveSubs = paramObj.haveSubs ?? existing.haveSubs ?? false;
   tvdbData.lastWatched = paramObj.lastWatched || existing.lastWatched || null;
 
   // Calculate waitStr from nextAired and lastAired (single source of truth)

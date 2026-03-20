@@ -3051,7 +3051,6 @@ export default {
           (record.fileGap ||
             record.fileEndError ||
             record.seasonWatchedThenNofile);
-        record.notReady = record.inEmby === false;
 
         // Merge fields into the existing show in allShows
         const show = allShows.find((s) => s.name === name);

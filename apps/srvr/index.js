@@ -1890,6 +1890,21 @@ const addNoEmby = async (params) => {
   if (existingKey && existingKey !== name) {
     delete allTvdb[existingKey];
   }
+  if (
+    !name ||
+    String(name).trim() === "undefined" ||
+    String(name).trim() === ""
+  ) {
+    console.error(
+      "[blnk rows] syncEmbyShow: bad allTvdb key about to be written",
+      {
+        name,
+        existingKey,
+        tvdbId: nextRecord?.tvdbId,
+        stack: new Error().stack.split("\n").slice(0, 6).join(" | "),
+      },
+    );
+  }
   allTvdb[name] = nextRecord;
   await tvdb.saveTvdbSync();
   try {

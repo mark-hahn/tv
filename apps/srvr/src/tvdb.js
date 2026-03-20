@@ -1887,6 +1887,22 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   // log('getTvdbData:', tvdbData);
   if (!paramObj.transient) {
+    if (
+      !name ||
+      String(name).trim() === "undefined" ||
+      String(name).trim() === ""
+    ) {
+      log(
+        "err",
+        "[blnk rows] getTvdbData: bad allTvdb key about to be written",
+        {
+          name,
+          inputName,
+          tvdbId,
+          stack: new Error().stack.split("\n").slice(0, 6).join(" | "),
+        },
+      );
+    }
     allTvdb[name] = tvdbData;
     if (inputName !== name && allTvdb[inputName]) {
       const inputTvdbId = String(allTvdb[inputName]?.tvdbId || "").trim();
@@ -2059,6 +2075,22 @@ const chkTvdbQueue = () => {
             if (!paramObj.suppressNotify) {
               log(
                 `tvdb push1 [${keyName}]: ${tvdbChanges.length ? tvdbChanges.join(" ") : "no field changes"}`,
+              );
+            }
+            if (
+              !keyName ||
+              String(keyName).trim() === "undefined" ||
+              String(keyName).trim() === ""
+            ) {
+              log(
+                "err",
+                "[blnk rows] chkTvdbQueue: bad allTvdb key about to be written",
+                {
+                  keyName,
+                  showName,
+                  finalDataName: finalData?.name,
+                  stack: new Error().stack.split("\n").slice(0, 6).join(" | "),
+                },
               );
             }
             allTvdb[keyName] = finalData;
@@ -2739,6 +2771,21 @@ export const setTvdbFields = async (params) => {
         return "no tvdb";
       }
       delete allTvdb[name];
+      if (
+        !newKey ||
+        String(newKey).trim() === "undefined" ||
+        String(newKey).trim() === ""
+      ) {
+        log(
+          "err",
+          "[blnk rows] setTvdbFields $rename: bad newKey about to be written",
+          {
+            name,
+            newKey,
+            stack: new Error().stack.split("\n").slice(0, 6).join(" | "),
+          },
+        );
+      }
       allTvdb[newKey] = record;
       log("inf", `setTvdbFields renamed "${name}" -> "${newKey}"`);
     } else {

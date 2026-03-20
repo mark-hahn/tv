@@ -573,6 +573,20 @@ import * as srvr from "../srvr.js";
 import * as util from "../util.js";
 
 let allTvdb = null;
+const STUCK_REFRESH_LOG_DELAY_MS = 60 * 1000;
+
+const laTimestamp = () => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
+  const get = (type) => parts.find((p) => p.type === type)?.value || "00";
+  return `${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
+};
 
 export default {
   name: "Series",
@@ -631,6 +645,7 @@ export default {
       showRefreshDialog: false,
       refreshDialogShowName: "",
       refreshDialogStatus: "",
+      refreshStuckLogTimerId: null,
       remoteFetchMode: "fast", // 'fast' or 'full'
       settingUpShowName: null, // Track show currently being set up to prevent duplicate calls
     };
@@ -1313,16 +1328,59 @@ export default {
 
     async refreshTvdb() {
       const showName = this.show.name;
-      if (!showName || this.refreshing) return;
-      console.log(`Refresh button clicked for ${showName}`);
+      if (!showName) return;
+      if (this.refreshing) {
+        console.log(
+          `[stuck refresh] ${laTimestamp()} ignored refresh click while already refreshing`,
+          {
+            showName,
+            pending: this.refreshPendingShowName,
+          },
+        );
+        return;
+      }
+      console.log(`[stuck refresh] ${laTimestamp()} refresh start`, {
+        showName,
+        showId: this.show.id || showName,
+      });
+      if (this.refreshStuckLogTimerId) {
+        clearTimeout(this.refreshStuckLogTimerId);
+        this.refreshStuckLogTimerId = null;
+      }
       this.refreshing = true;
       this.refreshPendingShowName = showName;
       this.showRefreshDialog = true;
       this.refreshDialogShowName = showName;
       this.refreshDialogStatus = "Updating TVDB...";
+      this.refreshStuckLogTimerId = setTimeout(() => {
+        if (!this.refreshing) return;
+        console.log(
+          `[stuck refresh] ${laTimestamp()} still refreshing after ${STUCK_REFRESH_LOG_DELAY_MS / 1000}s`,
+          {
+            requestedShow: showName,
+            pendingShow: this.refreshPendingShowName,
+            selectedShow: this.show?.name,
+            dialogStatus: this.refreshDialogStatus,
+            dialogOpen: this.showRefreshDialog,
+          },
+        );
+      }, STUCK_REFRESH_LOG_DELAY_MS);
       srvr
         .triggerShowGapCheck(this.show.id || showName, showName)
+        .then((result) => {
+          console.log(
+            `[stuck refresh] ${laTimestamp()} triggerShowGapCheck ack`,
+            {
+              showName,
+              result,
+            },
+          );
+        })
         .catch((err) => {
+          if (this.refreshStuckLogTimerId) {
+            clearTimeout(this.refreshStuckLogTimerId);
+            this.refreshStuckLogTimerId = null;
+          }
           this.refreshing = false;
           this.refreshPendingShowName = "";
           this.refreshDialogStatus = "Error";
@@ -1331,7 +1389,13 @@ export default {
             this.refreshDialogShowName = "";
             this.refreshDialogStatus = "";
           }, 1200);
-          console.error("triggerShowGapCheck failed:", err);
+          console.error(
+            `[stuck refresh] ${laTimestamp()} triggerShowGapCheck failed`,
+            {
+              showName,
+              err,
+            },
+          );
         });
     },
 
@@ -1658,13 +1722,29 @@ export default {
 
     // Refresh remotes/buttons when server pushes updated tvdb data (push2 or push3).
     this.onTvdbUpdated = async ({ name, record } = {}) => {
-      if (!name) return;
+      if (!name) {
+        console.log(
+          `[stuck refresh] ${laTimestamp()} tvdbUpdated missing name`,
+          { record },
+        );
+        return;
+      }
+      console.log(`[stuck refresh] ${laTimestamp()} tvdbUpdated`, {
+        name,
+        pending: this.refreshPendingShowName,
+        selected: this.show?.name,
+        hasRecord: !!record,
+      });
 
       // Clear refresh state as soon as server confirms an update for the show,
       // even if payload is partial/missing.
       const matchesSelected = this.show?.name === name;
       const matchesPending = this.refreshPendingShowName === name;
       if (matchesSelected || matchesPending) {
+        if (this.refreshStuckLogTimerId) {
+          clearTimeout(this.refreshStuckLogTimerId);
+          this.refreshStuckLogTimerId = null;
+        }
         this.refreshDialogStatus = "Finalizing...";
         this.refreshing = false;
         this.refreshPendingShowName = "";
@@ -1683,7 +1763,17 @@ export default {
 
     this.onShowUpdating = ({ name } = {}) => {
       if (!name || !this.refreshing) return;
-      if (name !== this.refreshPendingShowName) return;
+      if (name !== this.refreshPendingShowName) {
+        console.log(`[stuck refresh] ${laTimestamp()} showUpdating mismatch`, {
+          name,
+          pending: this.refreshPendingShowName,
+          selected: this.show?.name,
+        });
+        return;
+      }
+      console.log(`[stuck refresh] ${laTimestamp()} showUpdating matched`, {
+        name,
+      });
       this.showRefreshDialog = true;
       this.refreshDialogShowName = name;
       this.refreshDialogStatus = "Updating TVDB...";
@@ -1693,6 +1783,14 @@ export default {
     // Fallback: if queue drains without a usable tvdbUpdated payload, clear state.
     this.onShowQueueEmpty = () => {
       if (!this.refreshing) return;
+      console.log(`[stuck refresh] ${laTimestamp()} showQueueEmpty`, {
+        pending: this.refreshPendingShowName,
+        selected: this.show?.name,
+      });
+      if (this.refreshStuckLogTimerId) {
+        clearTimeout(this.refreshStuckLogTimerId);
+        this.refreshStuckLogTimerId = null;
+      }
       this.refreshDialogStatus = "Done";
       this.refreshing = false;
       this.refreshPendingShowName = "";
@@ -1723,6 +1821,10 @@ export default {
     if (this.noteSaveTimer) {
       clearTimeout(this.noteSaveTimer);
       this.noteSaveTimer = null;
+    }
+    if (this.refreshStuckLogTimerId) {
+      clearTimeout(this.refreshStuckLogTimerId);
+      this.refreshStuckLogTimerId = null;
     }
   },
 };

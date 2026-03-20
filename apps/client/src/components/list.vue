@@ -337,6 +337,7 @@ import {
   faLaughBeam,
   faSadCry,
   faClock,
+  faComment,
 } from "@fortawesome/free-regular-svg-icons";
 import {
   faCheck,
@@ -379,6 +380,7 @@ library.add([
   faClock,
   faTrafficLight,
   faTrash,
+  faComment,
 ]);
 
 let allTvdb = null;
@@ -483,6 +485,18 @@ export default {
       } catch (err) {
         console.error("toggleLinda error:", err);
         show.inLinda = originalValue; // Revert on error
+      }
+    };
+
+    const toggleHaveSubs = async (show) => {
+      this.saveVisShow(show);
+      const originalValue = show.haveSubs;
+      show.haveSubs = !show.haveSubs;
+      try {
+        await srvr.setTvdbFields({ name: show.name, haveSubs: show.haveSubs });
+      } catch (err) {
+        console.error("toggleHaveSubs error:", err);
+        show.haveSubs = originalValue;
       }
     };
 
@@ -679,6 +693,18 @@ export default {
           },
           click() {},
           name: "full",
+        },
+        {
+          color: "#0cf",
+          filter: 0,
+          icon: ["far", "comment"],
+          cond(show) {
+            return !!show.haveSubs;
+          },
+          async click(show) {
+            await toggleHaveSubs(show);
+          },
+          name: "haveSubs",
         },
         {
           color: "#f88",

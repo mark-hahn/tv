@@ -195,6 +195,16 @@ export default {
   name: "Shows",
   components: { FontAwesomeIcon, RecycleScroller },
 
+  data() {
+    return {
+      blankRowProbePending: false,
+      blankRowProbeReason: "",
+      lastBlankRowSignature: "",
+      blankRowProbeRafId: 0,
+      blankRowScrollEl: null,
+    };
+  },
+
   props: {
     shows: {
       type: Array,
@@ -258,6 +268,34 @@ export default {
     },
   },
 
+  watch: {
+    shows() {
+      this.queueBlankRowProbe("shows changed");
+    },
+    sortChoice() {
+      this.queueBlankRowProbe("sort changed");
+    },
+    highlightName() {
+      this.queueBlankRowProbe("highlight changed");
+    },
+  },
+
+  mounted() {
+    this.attachBlankRowScrollProbe();
+    this.queueBlankRowProbe("mounted");
+  },
+
+  updated() {
+    this.attachBlankRowScrollProbe();
+    this.queueBlankRowProbe("updated");
+  },
+
+  beforeUnmount() {
+    this.detachBlankRowScrollProbe();
+    if (this.blankRowProbeRafId && typeof window !== "undefined")
+      window.cancelAnimationFrame(this.blankRowProbeRafId);
+  },
+
   methods: {
     scrollToShow(showName) {
       const index = this.shows.findIndex((s) => s.name === showName);
@@ -293,6 +331,141 @@ export default {
     condColor(show, cond) {
       if (cond.cond(show)) return cond.color;
       return "#ddd";
+    },
+
+    attachBlankRowScrollProbe() {
+      const scrollEl = this.$refs.scroller?.$el || null;
+      if (!scrollEl || this.blankRowScrollEl === scrollEl) return;
+      this.detachBlankRowScrollProbe();
+      scrollEl.addEventListener("scroll", this.onBlankRowScroll, {
+        passive: true,
+      });
+      this.blankRowScrollEl = scrollEl;
+    },
+
+    detachBlankRowScrollProbe() {
+      if (!this.blankRowScrollEl) return;
+      this.blankRowScrollEl.removeEventListener(
+        "scroll",
+        this.onBlankRowScroll,
+      );
+      this.blankRowScrollEl = null;
+    },
+
+    onBlankRowScroll() {
+      this.queueBlankRowProbe("scroll");
+    },
+
+    queueBlankRowProbe(reason) {
+      this.blankRowProbeReason = reason;
+      if (this.blankRowProbePending) return;
+      this.blankRowProbePending = true;
+      this.$nextTick(() => {
+        const runProbe = () => {
+          this.blankRowProbePending = false;
+          this.probeBlankRows(this.blankRowProbeReason || reason);
+        };
+        if (typeof window !== "undefined" && window.requestAnimationFrame) {
+          if (this.blankRowProbeRafId)
+            window.cancelAnimationFrame(this.blankRowProbeRafId);
+          this.blankRowProbeRafId = window.requestAnimationFrame(() => {
+            this.blankRowProbeRafId = 0;
+            runProbe();
+          });
+          return;
+        }
+        runProbe();
+      });
+    },
+
+    collectDuplicateEntries(values) {
+      const counts = new Map();
+      for (const v of values) {
+        if (!v) continue;
+        counts.set(v, (counts.get(v) || 0) + 1);
+      }
+      return [...counts.entries()]
+        .filter(([, c]) => c > 1)
+        .map(([value, count]) => ({ value, count }));
+    },
+
+    probeBlankRows(trigger) {
+      const shows = Array.isArray(this.shows) ? this.shows : [];
+
+      const blankDataRows = shows
+        .map((show, index) => ({
+          index,
+          id: String(show?.id || ""),
+          tvdbId: String(show?.tvdbId || show?.TvdbId || ""),
+          rawName: show?.name,
+          rawAltName: show?.Name,
+        }))
+        .filter(
+          (e) => String(e.rawName ?? e.rawAltName ?? "").trim().length === 0,
+        );
+
+      const duplicateIds = this.collectDuplicateEntries(
+        shows.map((s) => String(s?.id || "").trim()),
+      );
+      const duplicateNames = this.collectDuplicateEntries(
+        shows.map((s) => String(s?.name || "").trim()),
+      );
+
+      const visibleBlankRows = [];
+      const scrollerEl = this.$refs.scroller?.$el;
+      if (scrollerEl) {
+        const views = scrollerEl.querySelectorAll(
+          ".vue-recycle-scroller__item-view",
+        );
+        for (const [i, view] of [...views].entries()) {
+          const rowEl = view.querySelector(".show-row");
+          const nameText = String(
+            view.querySelector(".show-name-cell")?.textContent || "",
+          ).trim();
+          const rect = view.getBoundingClientRect();
+          if (!rowEl || (nameText.length === 0 && rect.height > 0)) {
+            visibleBlankRows.push({
+              viewIndex: i,
+              height: Math.round(rect.height),
+              top: Math.round(rect.top),
+              transform: view.style.transform || "",
+              hasRow: !!rowEl,
+              text: nameText,
+              html: String(rowEl?.outerHTML || view.outerHTML).slice(0, 240),
+            });
+          }
+        }
+      }
+
+      const shouldLog =
+        blankDataRows.length > 0 ||
+        duplicateIds.length > 0 ||
+        duplicateNames.length > 0 ||
+        visibleBlankRows.length > 0;
+
+      if (!shouldLog) return;
+
+      const summary = {
+        trigger,
+        shows: shows.length,
+        blankDataRows: blankDataRows.length,
+        duplicateIds: duplicateIds.length,
+        duplicateNames: duplicateNames.length,
+        visibleBlankRows: visibleBlankRows.length,
+        sortChoice: this.sortChoice,
+        simpleMode: this.simpleMode,
+      };
+      const sig = JSON.stringify(summary);
+      if (sig === this.lastBlankRowSignature) return;
+      this.lastBlankRowSignature = sig;
+
+      console.warn("[blnk rows]", {
+        ...summary,
+        blankDataRows: blankDataRows.slice(0, 10),
+        duplicateIds: duplicateIds.slice(0, 10),
+        duplicateNames: duplicateNames.slice(0, 10),
+        visibleBlankRows: visibleBlankRows.slice(0, 10),
+      });
     },
   },
 };

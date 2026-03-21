@@ -2666,7 +2666,7 @@ async function main() {
           reason: reason || "unknown",
           status: "waiting",
           error: 0,
-          seriesName: seriesName || undefined,
+          seriesName: undefined,
           season: season || 0,
           episode: episode || 0,
           fileSize: usbFileBytes || 0,

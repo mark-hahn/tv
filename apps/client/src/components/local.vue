@@ -209,11 +209,7 @@
       >
         <div>
           <strong>ASR Output</strong>
-          <span
-            v-if="currentShowName"
-            style="font-weight: normal; font-size: 0.9em; color: #666"
-            >({{ currentShowName }})</span
-          >
+          <span v-if="currentShowName"> ({{ currentShowName }}) </span>
           <span v-if="asrBusy">(Running)</span>
         </div>
         <div>

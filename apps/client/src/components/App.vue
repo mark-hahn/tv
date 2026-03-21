@@ -851,20 +851,23 @@ export default {
       this._libTaskId = null;
       if (res?.status === "refreshdone") {
         this.libraryProgressText = "100%";
+
+        // Trigger full Emby sync sweep — pushes changed records to all clients
+        srvr
+          .triggerEmbySync()
+          .catch((err) => console.error("triggerEmbySync failed:", err));
+
         if (this._diskChangeShowName) {
           evtBus.emit("library-refresh-complete", {
             diskChangeShowName: this._diskChangeShowName,
           });
-          this._diskChangeShowName = null;
-        } else {
-          evtBus.emit("library-refresh-complete");
-        }
-
-        // Enqueue just the changed show if known (background timer handles the rest)
-        if (this._diskChangeShowName) {
+          // Enqueue just the changed show for background metadata processing
           srvr
             .triggerShowSelect(this._diskChangeShowName)
             .catch((err) => console.error("triggerShowSelect failed:", err));
+          this._diskChangeShowName = null;
+        } else {
+          evtBus.emit("library-refresh-complete");
         }
 
         // Debounce clearing to avoid flicker

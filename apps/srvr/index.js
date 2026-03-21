@@ -3496,6 +3496,19 @@ async function runEmbyFullSweep() {
     const allTvdb = tvdb.getAllTvdbSync();
     if (!allTvdb || Object.keys(allTvdb).length === 0) return;
 
+    // Snapshot records before sweep for change detection
+    const preSnap = new Map();
+    for (const [name, rec] of Object.entries(allTvdb)) {
+      if (
+        rec &&
+        typeof rec === "object" &&
+        !Array.isArray(rec) &&
+        String(rec.name || "").trim()
+      ) {
+        preSnap.set(name, JSON.stringify(rec));
+      }
+    }
+
     const now = Date.now();
     const isTvdbShow = (r) =>
       !!(
@@ -3800,6 +3813,34 @@ async function runEmbyFullSweep() {
     }
 
     await tvdb.saveTvdbSync();
+
+    // Push changed records to clients
+    let pushCount = 0;
+    for (const [name, rec] of Object.entries(allTvdb)) {
+      if (
+        !rec ||
+        typeof rec !== "object" ||
+        Array.isArray(rec) ||
+        !String(rec.name || "").trim()
+      )
+        continue;
+      const prev = preSnap.get(name);
+      if (prev !== JSON.stringify(rec)) {
+        debouncedTvdbPush(name);
+        pushCount++;
+      }
+    }
+    // Also push deletions (records that were in snapshot but no longer exist)
+    for (const name of preSnap.keys()) {
+      if (!allTvdb[name]) {
+        debouncedTvdbPush(name);
+        pushCount++;
+      }
+    }
+    if (pushCount > 0)
+      console.log(
+        `[runEmbyFullSweep] Pushing ${pushCount} changed records to clients`,
+      );
   } catch (err) {
     console.error("[runEmbyFullSweep] error:", err.message);
   } finally {

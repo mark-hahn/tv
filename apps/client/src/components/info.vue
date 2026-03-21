@@ -91,11 +91,10 @@
         >
           <template v-if="!previewMode">
             <textarea
-              :value="show.notes || ''"
+              v-model="show.notes"
               @click.stop
               @keydown.stop
               @keydown.enter.prevent.stop="saveNote"
-              @input="show.notes = $event.target.value"
               rows="1"
               placeholder="Notes"
               :style="{
@@ -161,11 +160,10 @@
           </div>
           <template v-if="!previewMode">
             <textarea
-              :value="show.notes || ''"
+              v-model="show.notes"
               @click.stop
               @keydown.stop
               @keydown.enter.prevent.stop="saveNote"
-              @input="show.notes = $event.target.value"
               rows="1"
               placeholder="Notes"
               :style="{
@@ -673,11 +671,11 @@ export default {
     },
 
     async saveNote(e) {
-      e?.target?.blur?.();
+      e.target.blur();
       const showName = this.show?.name;
       if (!showName) return;
       try {
-        await srvr.saveNote(showName, this.show.notes ?? "");
+        await srvr.saveNote(showName, this.show.notes || "");
       } catch (err) {
         console.error("Series: saveNote failed", { showName, err });
         window.alert(err?.message || String(err));

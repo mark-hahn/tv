@@ -164,50 +164,6 @@ try {
   subsTokenCache = null;
 }
 
-const notesPath = path.join(SRVR_DATA_DIR, "notes.json");
-ensureFile(notesPath, "{}");
-let notesCache = {};
-try {
-  const notesStr = fs.readFileSync(notesPath, "utf8");
-  notesCache = JSON.parse(notesStr || "{}") || {};
-} catch (e) {
-  // First run or corrupt JSON: create/reset to empty.
-  try {
-    ensureDir(path.dirname(notesPath));
-    fs.writeFileSync(notesPath, "{}", "utf8");
-  } catch {}
-  notesCache = {};
-}
-
-// Ensure we never keep/persist empty notes.
-try {
-  let changed = false;
-  const cleaned = {};
-  for (const [rawKey, rawVal] of Object.entries(notesCache ?? {})) {
-    const key = typeof rawKey === "string" ? rawKey.trim() : "";
-    if (!key) {
-      changed = true;
-      continue;
-    }
-
-    const val = rawVal === undefined || rawVal === null ? "" : String(rawVal);
-    if (val.trim() === "") {
-      changed = true;
-      continue;
-    }
-
-    if (key !== rawKey || val !== rawVal) changed = true;
-    cleaned[key] = val;
-  }
-
-  if (changed) {
-    notesCache = cleaned;
-    try {
-      fs.writeFileSync(notesPath, JSON.stringify(notesCache), "utf8");
-    } catch {}
-  }
-} catch {}
-
 let rejects;
 try {
   rejects = JSON.parse(rejectStr);
@@ -233,7 +189,6 @@ try {
   );
   process.exit(1);
 }
-const notes = notesCache;
 
 function encodeFileIdBase32(fileId) {
   // base-32 using RFC4648 alphabet: A-Z then 2-7.
@@ -2203,25 +2158,9 @@ const getNote = async (params) => {
   if (!showName) {
     throw new Error("getNote requires showName");
   }
-  return notesCache[showName] ?? "";
-};
-
-const getAllNotes = async (_params) => {
-  // Phase 5: Read from tvdb instead of separate notesCache
   const allTvdb = tvdb.getAllTvdbSync();
-  const notesFromTvdb = {};
-
-  for (const [name, record] of Object.entries(allTvdb)) {
-    if (
-      record.note &&
-      typeof record.note === "string" &&
-      record.note.trim() !== ""
-    ) {
-      notesFromTvdb[name] = record.note;
-    }
-  }
-
-  return notesFromTvdb;
+  const record = allTvdb[showName];
+  return record?.notes ?? "";
 };
 
 const saveNote = async (params) => {
@@ -2239,7 +2178,6 @@ const saveNote = async (params) => {
     noteText === undefined || noteText === null ? "" : String(noteText);
   const key = showName.trim();
 
-  // Phase 5: Update tvdb.note field
   const allTvdb = tvdb.getAllTvdbSync();
   const tvdbRecord = allTvdb[key];
 
@@ -2249,40 +2187,21 @@ const saveNote = async (params) => {
 
   // Never store empty notes: treat as delete.
   if (noteText.trim() === "") {
-    if (!tvdbRecord.note) {
+    if (!tvdbRecord.notes) {
       return "ok";
     }
-    tvdbRecord.note = "";
+    tvdbRecord.notes = "";
     await tvdb.saveTvdbSync();
-
-    // Backward compat: also update old notesCache
-    if (notesCache[key] !== undefined) {
-      delete notesCache[key];
-      try {
-        await util.writeFile(notesPath, notesCache);
-      } catch (e) {
-        // Ignore write errors for deprecated file
-      }
-    }
     return "ok";
   }
 
-  const prev = tvdbRecord.note;
+  const prev = tvdbRecord.notes;
   if (prev === finalNote) {
     return "ok";
   }
 
-  tvdbRecord.note = finalNote;
-  // Notes are always saved immediately (explicit user action)
+  tvdbRecord.notes = finalNote;
   await tvdb.saveTvdbSync();
-
-  // Backward compat: also update old notesCache
-  notesCache[key] = finalNote;
-  try {
-    await util.writeFile(notesPath, notesCache);
-  } catch (e) {
-    // Ignore write errors for deprecated file
-  }
 
   return "ok";
 };
@@ -2840,7 +2759,6 @@ app.get("/api/getNoEmbys", apiWrapper(getNoEmbys));
 app.get("/api/getDevices", apiWrapper(emby.getDevices));
 app.get("/api/getLastViewed", apiWrapper(view.getLastViewed));
 app.get("/api/getSharedFilters", apiWrapper(getSharedFilters));
-app.get("/api/getAllNotes", apiWrapper(getAllNotes));
 
 // Endpoints with parameters
 app.post("/api/getRemotes", apiWrapper(tvdb.getRemotesCmd));

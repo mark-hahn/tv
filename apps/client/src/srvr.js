@@ -450,9 +450,6 @@ export function saveNote(showName, noteText) {
 export function getNote(showName) {
   return httpCall("/api/getNote", { showName }, "POST");
 }
-export function getAllNotes() {
-  return httpCall("/api/getAllNotes");
-}
 
 // File browser
 export async function getFile(path) {

@@ -2904,6 +2904,7 @@ export const setTvdbFields = async (params) => {
   }
   if (!paramObj.dontSave) {
     await saveTvdbFiles(allTvdb);
+    if (notifyCallback && name && !paramObj.$delTvdb) notifyCallback(name);
   }
   // Queue a full per-show refresh (disk + gap) for changes that matter
   if (name && !paramObj.$delTvdb && !paramObj.dontEnqueue) {

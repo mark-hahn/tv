@@ -1002,10 +1002,25 @@ try {
   }
 } catch {}
 
+// Debounced per-show push so rapid tvdb changes coalesce into one notification
+const PUSH_DEBOUNCE_MS = 500;
+const pendingPushes = new Map();
+
+const debouncedTvdbPush = (name) => {
+  if (!name) return;
+  if (pendingPushes.has(name)) clearTimeout(pendingPushes.get(name));
+  pendingPushes.set(
+    name,
+    setTimeout(() => {
+      pendingPushes.delete(name);
+      const record = tvdb.getAllTvdbSync()[name];
+      if (record) notifyClients("tvdbUpdated", { name, record });
+    }, PUSH_DEBOUNCE_MS),
+  );
+};
+
 // Set up callbacks so tvdb.js can call back into index.js without circular imports
-tvdb.setNotifyCallback((name, record) =>
-  notifyClients("tvdbUpdated", { name, record }),
-);
+tvdb.setNotifyCallback((name) => debouncedTvdbPush(name));
 tvdb.setEnqueueCallback((name) => notifyClients("showUpdating", { name }));
 tvdb.setQueueDrainCallback(() => notifyClients("showQueueEmpty", {}));
 
@@ -1261,9 +1276,8 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
     if (push2Changes.length) {
       await tvdb.saveTvdbSync();
       if (!options?.suppressNotify) {
-        const pushed = tvdb.getAllTvdbSync()[showName];
         console.log(`[perShow push2] ${showName}: ${push2Changes.join(" ")}`);
-        notifyClients("tvdbUpdated", { name: showName, record: pushed });
+        debouncedTvdbPush(showName);
       }
     } else {
       if (!options?.suppressNotify) {
@@ -3980,10 +3994,6 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
     }
     const updatedCount = await tvdb.updateTvdbWithGapData(gapData);
 
-    if (updatedCount > 0) {
-      notifyClients("tvdbUpdated");
-    }
-
     const elapsed = Math.round((Date.now() - startTime) / 1000);
     console.log(`[gap check] finished, ${elapsed} secs, ${shows.length} shows`);
   } catch (err) {
@@ -4234,7 +4244,6 @@ async function handleShowDiskChange(showName) {
         if (freshRecord) {
           freshRecord.watchedEpis = watchedEpis;
           await tvdb.saveTvdbSync();
-          notifyClients("tvdbUpdated");
           console.log(
             `[chokidar] watchedEpis refreshed for ${showName}:`,
             watchedEpis,

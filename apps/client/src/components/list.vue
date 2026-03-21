@@ -3076,6 +3076,7 @@ export default {
           show.size = record.size ?? show.size;
           show.noFiles = record.noFiles ?? show.noFiles;
           show.waitStr = record.waitStr ?? show.waitStr;
+          if ("notes" in record) show.notes = record.notes;
         }
 
         // Update allTvdb reference

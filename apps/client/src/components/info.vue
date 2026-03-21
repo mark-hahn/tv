@@ -112,27 +112,6 @@
                 marginLeft: '0px',
               }"
             ></textarea>
-            <textarea
-              v-model="emailText"
-              @click.stop
-              @keydown.stop
-              @keydown.enter.prevent.stop="onEnterBlur"
-              rows="1"
-              placeholder="Email Mark"
-              :style="{
-                width: '125px',
-                padding: '2px',
-                fontSize: '14px',
-                border: 'none',
-                backgroundColor: '#eee',
-                resize: 'none',
-                height: '14px',
-                lineHeight: '1.2',
-                marginTop: '4px',
-                marginRight: '10px',
-                marginLeft: '0px',
-              }"
-            ></textarea>
           </template>
           <div
             :style="{
@@ -605,7 +584,6 @@ export default {
       seriesReady: false,
       previewMode: false,
       previewAddBusy: false,
-      emailText: "",
       dates: "",
       statusTxt: "",
       remoteShowName: "",
@@ -722,31 +700,7 @@ export default {
       }
     },
 
-    async sendEmail() {
-      if (!this.emailText.trim() || this.emailText === "Email Sent") return;
-
-      const textToSend = this.show.name + "~" + this.emailText;
-
-      try {
-        await srvr.sendEmail(textToSend);
-        console.log("Email sent to server:", textToSend);
-        this.emailText = "Email Sent";
-      } catch (error) {
-        console.error("Failed to send email:", error);
-      }
-    },
-
     async handleBodyClick() {
-      // If there's text in the email box, send it instead of opening map
-      if (
-        this.simpleMode &&
-        this.emailText.trim() &&
-        this.emailText !== "Email Sent"
-      ) {
-        await this.sendEmail();
-        return;
-      }
-
       // In preview mode, do not open/switch to Map.
       if (this.previewMode) return;
 
@@ -758,16 +712,6 @@ export default {
     },
 
     async handleSeriesClick() {
-      // If there's text in the email box, send it instead of opening map
-      if (
-        this.simpleMode &&
-        this.emailText.trim() &&
-        this.emailText !== "Email Sent"
-      ) {
-        await this.sendEmail();
-        return;
-      }
-
       // In preview mode, do not open/switch to Map.
       if (this.previewMode) return;
 
@@ -1287,7 +1231,6 @@ export default {
       }
 
       this.settingUpShowName = show?.name;
-      this.emailText = ""; // Clear email text when changing shows
       this.show = show;
       this.showHdr = true;
       this.seriesReady = false;

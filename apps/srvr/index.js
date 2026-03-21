@@ -2190,22 +2190,21 @@ const saveNote = async (params) => {
   }
 
   // Never store empty notes: treat as delete.
-  if (noteText.trim() === "") {
-    if (!tvdbRecord.notes) {
-      return "ok";
-    }
-    tvdbRecord.notes = "";
-    await tvdb.saveTvdbSync();
+  if (finalNote.trim() === "") {
+    if (!tvdbRecord.notes) return "ok";
+    await tvdb.setTvdbFields({ name: key, notes: "", dontEnqueue: true });
     return "ok";
   }
 
-  const prev = tvdbRecord.notes;
-  if (prev === finalNote) {
-    return "ok";
-  }
+  if (tvdbRecord.notes === finalNote) return "ok";
 
-  tvdbRecord.notes = finalNote;
-  await tvdb.saveTvdbSync();
+  await tvdb.setTvdbFields({ name: key, notes: finalNote, dontEnqueue: true });
+
+  try {
+    await email.sendEmail(`${key}~${finalNote}`);
+  } catch (e) {
+    console.error("saveNote: email failed", e.message);
+  }
 
   return "ok";
 };

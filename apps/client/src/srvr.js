@@ -431,10 +431,6 @@ export function searchActorsInNonEmby(params) {
   return httpCall("/api/searchActorsInNonEmby", params, "POST");
 }
 
-export function sendEmail(emailData) {
-  return httpCall("/api/sendEmail", { body: emailData }, "POST");
-}
-
 export function getTmdb(params) {
   return httpCall("/api/getTmdb", params, "POST");
 }

@@ -12,35 +12,35 @@ Pipeline: **Pre-tick** → **Push 1** (getTvdbData) → **Push 2** (perShowCallb
 
 Fetches TVDB API extended data with TMDB fallback. Sets these fields on the tvdb record:
 
-| Field                | Source                                                     |
-| -------------------- | ---------------------------------------------------------- |
-| `Name`               | Canonical show name from TVDB                              |
-| `tvdbId`             | TVDB series ID                                             |
-| `originalNetwork`    | TVDB extended API `originalNetwork.name`                   |
-| `seasonCount`        | Input > TVDB API count > existing                          |
-| `episodeCount`       | Input > TVDB API count > existing                          |
-| `image`              | TVDB English poster → existing → TMDB fallback             |
-| `score`              | TVDB score → existing → TMDB                               |
-| `overview`           | TVDB → existing → TMDB                                     |
-| `firstAired`         | TVDB → existing → TMDB                                     |
-| `lastAired`          | TVDB `lastAired` or `firstAired` → existing → TMDB         |
-| `nextAired`          | TVDB → existing                                            |
-| `averageRuntime`     | TVDB → existing → TMDB                                     |
-| `originalCountry`    | TVDB → existing → TMDB                                     |
-| `originalLanguage`   | TVDB → existing → TMDB                                     |
-| `status`             | TVDB `status.name` (e.g. "Ended") → existing → TMDB        |
-| `remote_ids`         | Raw `remoteIds` array from TVDB API                        |
-| `characters`         | Actors with character name, image, etc. from TVDB extended |
-| `added`              | PST date, set once on first creation                       |
-| `saved`              | `Date.now()` — updated every refresh                       |
-| `trailers`           | TVDB English trailers + IMDB video appended                |
-| `wikiUrl`            | Cached or fetched from Wikipedia search API                |
-| `redditUrl`          | Cached or fetched from Reddit search API                   |
-| `imdbUrl`            | From IMDB scrape or TVDB remoteId                          |
-| `imdbRatings`        | Scraped from IMDB page (Playwright)                        |
-| `imdbVideo`          | Extracted from IMDB page HTML                              |
-| `imdbId`             | Extracted from `imdbUrl` via regex `tt\d+`                 |
-| `lastMetadataUpdate` | `Date.now()`                                               |
+| Field                | Source                                                                                                                                   |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `Name`               | Canonical show name from TVDB                                                                                                            |
+| `tvdbId`             | TVDB series ID                                                                                                                           |
+| `originalNetwork`    | TVDB extended API `originalNetwork.name`                                                                                                 |
+| `seasonCount`        | Input > TVDB API count > existing                                                                                                        |
+| `episodeCount`       | Input > TVDB API count > existing                                                                                                        |
+| `image`              | TVDB English poster → existing → TMDB fallback                                                                                           |
+| `score`              | TVDB score → existing → TMDB                                                                                                             |
+| `overview`           | TVDB → existing → TMDB                                                                                                                   |
+| `firstAired`         | TVDB → existing → TMDB                                                                                                                   |
+| `lastAired`          | TVDB `lastAired` or `firstAired` → existing → TMDB                                                                                       |
+| `nextAired`          | TVDB → existing                                                                                                                          |
+| `averageRuntime`     | TVDB → existing → TMDB                                                                                                                   |
+| `originalCountry`    | TVDB → existing → TMDB                                                                                                                   |
+| `originalLanguage`   | TVDB → existing → TMDB                                                                                                                   |
+| `status`             | TVDB `status.name` (e.g. "Ended") → existing → TMDB                                                                                      |
+| `remote_ids`         | Raw `remoteIds` array from TVDB API                                                                                                      |
+| `characters`         | Actors with character name, image, etc. from TVDB extended                                                                               |
+| `added`              | PST datetime (YYYY-MM-DD HH:mm:ss), set once on first creation. Display as YYYY-MM-DD; old YYYY-MM-DD values sort as YYYY-MM-DD 00:00:00 |
+| `saved`              | `Date.now()` — updated every refresh                                                                                                     |
+| `trailers`           | TVDB English trailers + IMDB video appended                                                                                              |
+| `wikiUrl`            | Cached or fetched from Wikipedia search API                                                                                              |
+| `redditUrl`          | Cached or fetched from Reddit search API                                                                                                 |
+| `imdbUrl`            | From IMDB scrape or TVDB remoteId                                                                                                        |
+| `imdbRatings`        | Scraped from IMDB page (Playwright)                                                                                                      |
+| `imdbVideo`          | Extracted from IMDB page HTML                                                                                                            |
+| `imdbId`             | Extracted from `imdbUrl` via regex `tt\d+`                                                                                               |
+| `lastMetadataUpdate` | `Date.now()`                                                                                                                             |
 
 TMDB-only fallback fields (set only when TVDB data is missing): `backdrop`, `genres`, `homepage`, `tagline`, `type`, `numberOfSeasons`, `numberOfEpisodes`, `inProduction`, `createdBy`, `productionCompanies`, `spokenLanguages`
 

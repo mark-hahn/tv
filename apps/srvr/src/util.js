@@ -25,13 +25,17 @@ export const jParse = (str, label) => {
   return obj;
 };
 
-// Get current date in PST timezone as YYYY-MM-DD string
+// Get current date/time in PST timezone as YYYY-MM-DD HH:mm:ss string
 export function getPstDate() {
-  return new Date()
-    .toLocaleString("en-CA", {
-      timeZone: "America/Los_Angeles",
-    })
-    .slice(0, 10);
+  const d = new Date();
+  const date = d.toLocaleDateString("en-CA", {
+    timeZone: "America/Los_Angeles",
+  });
+  const time = d.toLocaleTimeString("en-GB", {
+    timeZone: "America/Los_Angeles",
+    hour12: false,
+  });
+  return date + " " + time;
 }
 
 let lastMsg = null;

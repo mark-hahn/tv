@@ -1236,7 +1236,11 @@ export default {
             .replace(/[^a-z0-9\s]/gi, "")
             .toLowerCase();
         case "Added":
-          return show.dateCreated;
+          if (forSort) {
+            const a = show.added || "";
+            return a.length > 10 ? a : a + " 00:00:00";
+          }
+          return (show.added || "").slice(0, 10);
         case "Ended":
           return show.lastAired || "";
         case "Length":

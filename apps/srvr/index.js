@@ -3429,8 +3429,7 @@ async function syncEmbyUserData() {
 
         delete tvdbRecord.emby;
 
-        tvdbRecord.sync = tvdbRecord.sync || {};
-        tvdbRecord.sync.lastEmbySync = now;
+        if (tvdbRecord.sync) delete tvdbRecord.sync.lastEmbySync;
         updatedCount++;
 
         // Track this show for gap checking (only for watched data changes)
@@ -3497,6 +3496,7 @@ async function runEmbyFullSweep() {
     if (!allTvdb || Object.keys(allTvdb).length === 0) return;
 
     // Snapshot records before sweep for change detection
+    const snapRecord = (rec) => JSON.stringify(rec);
     const preSnap = new Map();
     for (const [name, rec] of Object.entries(allTvdb)) {
       if (
@@ -3505,7 +3505,7 @@ async function runEmbyFullSweep() {
         !Array.isArray(rec) &&
         String(rec.name || "").trim()
       ) {
-        preSnap.set(name, JSON.stringify(rec));
+        preSnap.set(name, snapRecord(rec));
       }
     }
 
@@ -3649,7 +3649,7 @@ async function runEmbyFullSweep() {
           "emby.overview": embyShow.Overview || "",
           dateCreated: embyShow.DateCreated?.substring(0, 10),
           premiereDate: embyShow.PremiereDate?.substring(0, 10),
-          lastEmbySync: now,
+          fromEmbySync: true,
           isPlayed: embyShow.UserData?.Played || false,
           playCount: embyShow.UserData?.PlayCount || 0,
         };
@@ -3740,7 +3740,6 @@ async function runEmbyFullSweep() {
         tvdbRecord.inEmby = true;
         handlePickupChange(name, true, tvdbRecord.status);
       }
-      tvdbRecord.lastEmbySync = now;
     }
 
     // Step 3: Detect disappeared shows → mark inEmby=false
@@ -3825,7 +3824,7 @@ async function runEmbyFullSweep() {
       )
         continue;
       const prev = preSnap.get(name);
-      if (prev !== JSON.stringify(rec)) {
+      if (prev !== snapRecord(rec)) {
         debouncedTvdbPush(name);
         pushCount++;
       }

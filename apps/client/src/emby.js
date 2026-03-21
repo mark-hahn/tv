@@ -451,7 +451,7 @@ async function _oldLoadAllShows() {
       "emby.overview": embyShow.Overview || "",
       dateCreated: embyShow.DateCreated?.substring(0, 10),
       premiereDate: embyShow.PremiereDate?.substring(0, 10),
-      lastEmbySync: now,
+      fromEmbySync: true,
       // Include UserData properties for new record creation
       isPlayed: embyShow.UserData?.Played || false,
       playCount: embyShow.UserData?.PlayCount || 0,
@@ -562,7 +562,6 @@ async function _oldLoadAllShows() {
           overview: updateFields["emby.overview"],
           dateCreated: updateFields.dateCreated,
           premiereDate: updateFields.premiereDate,
-          lastEmbySync: now,
           played: updateFields.isPlayed,
           playCount: updateFields.playCount,
         });
@@ -632,8 +631,6 @@ async function _oldLoadAllShows() {
       tvdbRecord.inEmby = true;
 
       // Note: gap and note already in tvdb (Phase 5), don't overwrite
-      tvdbRecord.lastEmbySync = now;
-
       if (!wasInEmby) {
         await srvr.setTvdbFields({
           name: tvdbKey,

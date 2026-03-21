@@ -1734,9 +1734,9 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     tvdbData.trailers = finalTrailers;
 
   // Determine inEmby status:
-  // - If lastEmbySync is present in params, this is an Emby sync, so inEmby = true
+  // - If fromEmbySync is set in params, this is an Emby sync, so inEmby = true
   // - Otherwise, use show.inEmby value or preserve existing value
-  const isSyncingFromEmby = !!paramObj.lastEmbySync;
+  const isSyncingFromEmby = !!paramObj.fromEmbySync;
   const newInEmby = isSyncingFromEmby
     ? true
     : (show.inEmby ?? existing.inEmby ?? false);
@@ -1871,11 +1871,6 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   tvdbData.waitStr = calculatedWaitStr || null;
 
   // Flattened Sync timestamps (no nested object)
-  tvdbData.lastEmbySync =
-    paramObj.lastEmbySync ||
-    existing.lastEmbySync ||
-    existing.sync?.lastEmbySync ||
-    null;
   tvdbData.lastDiskCheck =
     paramObj.lastDiskCheck ||
     existing.lastDiskCheck ||

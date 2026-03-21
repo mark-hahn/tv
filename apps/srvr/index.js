@@ -2153,16 +2153,6 @@ const getSharedFilters = async (_params) => {
   return sharedFilters;
 };
 
-const getNote = async (params) => {
-  const showName = (params?.showName || "").trim();
-  if (!showName) {
-    throw new Error("getNote requires showName");
-  }
-  const allTvdb = tvdb.getAllTvdbSync();
-  const record = allTvdb[showName];
-  return record?.notes ?? "";
-};
-
 const saveNote = async (params) => {
   if (!params) {
     throw new Error("saveNote: missing params");
@@ -2785,7 +2775,6 @@ app.post("/api/getActorPage", apiWrapper(tvdb.getActorPage));
 app.post("/api/searchActorsInNonEmby", apiWrapper(tvdb.searchActorsInNonEmby));
 app.post("/api/getTmdb", apiWrapper(tmdb.getTmdb));
 app.post("/api/getStreamProviders", apiWrapper(tmdb.getStreamProviders));
-app.post("/api/getNote", apiWrapper(getNote));
 app.post("/api/getFile", apiWrapper(getFile));
 app.post("/api/getSubFileIds", apiWrapper(getSubFileIds));
 app.post("/api/accessTvdb", apiWrapper(tvdb.accessTvdb));

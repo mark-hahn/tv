@@ -447,9 +447,6 @@ export function getStreamProviders(params) {
 export function saveNote(showName, noteText) {
   return httpCall("/api/saveNote", { showName, noteText }, "POST");
 }
-export function getNote(showName) {
-  return httpCall("/api/getNote", { showName }, "POST");
-}
 
 // File browser
 export async function getFile(path) {

@@ -91,13 +91,11 @@
         >
           <template v-if="!previewMode">
             <textarea
-              v-model="noteText"
+              :value="show.notes || ''"
               @click.stop
               @keydown.stop
-              @keydown.enter.prevent.stop="onEnterBlur"
-              @input="onNoteInput"
-              @focus="onNoteFocus"
-              @blur="onNoteBlur"
+              @keydown.enter.prevent.stop="saveNote"
+              @input="show.notes = $event.target.value"
               rows="1"
               placeholder="Notes"
               :style="{
@@ -184,13 +182,11 @@
           </div>
           <template v-if="!previewMode">
             <textarea
-              v-model="noteText"
+              :value="show.notes || ''"
               @click.stop
               @keydown.stop
-              @keydown.enter.prevent.stop="onEnterBlur"
-              @input="onNoteInput"
-              @focus="onNoteFocus"
-              @blur="onNoteBlur"
+              @keydown.enter.prevent.stop="saveNote"
+              @input="show.notes = $event.target.value"
               rows="1"
               placeholder="Notes"
               :style="{
@@ -610,13 +606,6 @@ export default {
       previewMode: false,
       previewAddBusy: false,
       emailText: "",
-      noteText: "",
-      lastSavedNoteText: "",
-      noteCacheByShowName: {},
-      noteSaveTimer: null,
-      noteFocused: false,
-      notePollTimer: null,
-      notePollInFlight: false,
       dates: "",
       statusTxt: "",
       remoteShowName: "",
@@ -705,136 +694,16 @@ export default {
       }
     },
 
-    onNoteFocus() {
-      this.noteFocused = true;
-    },
-
-    async onNoteBlur() {
-      this.noteFocused = false;
-      await this.commitNote();
-    },
-
-    onNoteInput() {
-      // Auto-save while typing (debounced).
+    async saveNote(e) {
+      e?.target?.blur?.();
       const showName = this.show?.name;
       if (!showName) return;
-
-      this.noteCacheByShowName[showName] = this.noteText;
-      this.show.notes = this.noteText;
-
-      if (this.noteSaveTimer) {
-        clearTimeout(this.noteSaveTimer);
-        this.noteSaveTimer = null;
-      }
-      this.noteSaveTimer = setTimeout(() => {
-        this.noteSaveTimer = null;
-        void this.saveNoteNow(false);
-      }, 600);
-    },
-
-    async saveNoteNow(showAlertOnError) {
-      const showName = this.show?.name;
-      if (!showName) return;
-
-      if (this.noteText === this.lastSavedNoteText) return;
-
       try {
-        await srvr.saveNote(showName, this.noteText);
-        this.lastSavedNoteText = this.noteText;
-        this.noteCacheByShowName[showName] = this.noteText;
-        this.show.notes = this.noteText;
+        await srvr.saveNote(showName, this.show.notes ?? "");
       } catch (err) {
         console.error("Series: saveNote failed", { showName, err });
-        if (showAlertOnError) window.alert(err?.message || String(err));
+        window.alert(err?.message || String(err));
       }
-    },
-
-    async refreshNoteFromServer() {
-      const showName = this.show?.name;
-      if (!showName) return;
-      if (this.noteFocused) return;
-      if (this.notePollInFlight) return;
-      this.notePollInFlight = true;
-      try {
-        const res = await srvr.getNote(showName);
-        const text =
-          typeof res === "string" ? res : (res?.noteText ?? res?.text ?? "");
-        const next = String(text ?? "");
-        if (this.noteFocused) return;
-        if (next === this.noteText) return;
-        this.noteText = next;
-        this.lastSavedNoteText = next;
-        this.noteCacheByShowName[showName] = next;
-        // Only update show.notes if we got data, or if show.notes was empty
-        // This prevents clearing an existing note when server returns empty
-        if (next || !this.show.notes) {
-          this.show.notes = next;
-        }
-      } catch (err) {
-        let msg = "";
-        try {
-          msg = err?.message || JSON.stringify(err);
-        } catch {
-          msg = String(err);
-        }
-        console.error("Series: refreshNoteFromServer failed", {
-          showName,
-          err,
-          msg,
-        });
-      } finally {
-        this.notePollInFlight = false;
-      }
-    },
-
-    async loadNote(showName) {
-      if (!showName) return;
-
-      // Immediately show cached note (if any) so the input is never blanked
-      // just because the server is slow or temporarily failing.
-      if (
-        Object.prototype.hasOwnProperty.call(this.noteCacheByShowName, showName)
-      ) {
-        const cached = this.noteCacheByShowName[showName];
-        this.noteText = String(cached ?? "");
-        this.lastSavedNoteText = this.noteText;
-      } else if (this.show && this.show.notes != null) {
-        // Seed from show.notes (populated by loadAllShows) before polling refresh.
-        this.noteText = String(this.show.notes ?? "");
-        this.lastSavedNoteText = this.noteText;
-      } else {
-        this.noteText = "";
-        this.lastSavedNoteText = "";
-      }
-
-      try {
-        const res = await srvr.getNote(showName);
-        const text =
-          typeof res === "string" ? res : (res?.noteText ?? res?.text ?? "");
-        this.noteText = String(text ?? "");
-        this.lastSavedNoteText = this.noteText;
-        this.noteCacheByShowName[showName] = this.noteText;
-        // Only update show.notes if we got data, or if show.notes was empty
-        // This prevents clearing an existing note when server returns empty
-        if (this.noteText || !this.show.notes) {
-          this.show.notes = this.noteText;
-        }
-      } catch (err) {
-        console.error("Series: getNote failed", { showName, err });
-        // Keep whatever is currently displayed (cached or user-entered).
-      }
-    },
-
-    async commitNote() {
-      const showName = this.show?.name;
-      if (!showName) return;
-
-      if (this.noteSaveTimer) {
-        clearTimeout(this.noteSaveTimer);
-        this.noteSaveTimer = null;
-      }
-
-      await this.saveNoteNow(true);
     },
 
     getMapCounts(seriesMap) {
@@ -1427,9 +1296,6 @@ export default {
         evtBus.emit("previewPanesLoading", true);
       }
 
-      // Load persistent note for this show.
-      void this.loadNote(show?.name);
-
       // Clear info fields so nothing renders until ready
       const posterEl = document.getElementById("poster");
       if (posterEl) posterEl.replaceChildren();
@@ -1708,14 +1574,6 @@ export default {
     evtBus.on("previewSrchChoice", this.onPreviewSrchChoice);
     evtBus.on("addPreviewShowDone", this.onAddPreviewShowDone);
 
-    // While notes input is NOT focused, refresh note text from server once/sec.
-    // (Keeps the notes display in sync with external edits.)
-    // this.notePollTimer = setInterval(() => {
-    //   if (this.noteFocused) return;
-    //   if (!this.show?.name) return;
-    //   void this.refreshNoteFromServer();
-    // }, 1000);
-
     // Keep the Series infobox totals in sync with the actual Map grid.
     // This matters for noemby shows where tvdb.json counts can be stale / mismatched.
     evtBus.on("seriesMapUpdated", this.onSeriesMapUpdated);
@@ -1814,14 +1672,6 @@ export default {
     if (this.onShowQueueEmpty)
       evtBus.off("showQueueEmpty", this.onShowQueueEmpty);
 
-    if (this.notePollTimer) {
-      clearInterval(this.notePollTimer);
-      this.notePollTimer = null;
-    }
-    if (this.noteSaveTimer) {
-      clearTimeout(this.noteSaveTimer);
-      this.noteSaveTimer = null;
-    }
     if (this.refreshStuckLogTimerId) {
       clearTimeout(this.refreshStuckLogTimerId);
       this.refreshStuckLogTimerId = null;

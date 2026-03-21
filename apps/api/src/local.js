@@ -3,12 +3,13 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
+const TV_ROOT = "/mnt/media/tv";
+const TV_ERRORS_ROOT = "/mnt/media/tv-errors";
+
 /**
  * Returns a file tree of /mnt/media/tv from the local file system.
  */
-export async function getLocalFiles() {
-  const root = "/mnt/media/tv";
-
+export async function getLocalFiles(root = TV_ROOT) {
   // using find with -printf to get type, path, size, and date
   // %y: type (f=file, d=directory)
   // %P: file's name relative to start point

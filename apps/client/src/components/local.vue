@@ -52,43 +52,53 @@
         />
 
         <button
-          @click="toShow"
+          @click="errsMode || toShow()"
+          :disabled="errsMode"
           title="Select show matching selected folder"
-          style="
-            cursor: pointer;
-            border-radius: 7px;
-            padding: 4px 10px;
-            border: 1px solid #bbb;
-            background-color: whitesmoke;
-            margin-right: 10px;
-          "
+          :style="{
+            cursor: errsMode ? 'default' : 'pointer',
+            borderRadius: '7px',
+            padding: '4px 10px',
+            border: '1px solid #bbb',
+            backgroundColor: errsMode ? '#e8e8e8' : 'whitesmoke',
+            color: errsMode ? '#aaa' : 'inherit',
+            marginRight: '10px',
+          }"
         >
           To
         </button>
 
         <button
-          @click="selectTopLevel"
+          @click="errsMode || selectTopLevel()"
+          :disabled="errsMode"
           title="Find folder matching current show"
-          style="
-            cursor: pointer;
-            border-radius: 7px;
-            padding: 4px 10px;
-            border: 1px solid #bbb;
-            background-color: whitesmoke;
-            margin-right: 10px;
-          "
+          :style="{
+            cursor: errsMode ? 'default' : 'pointer',
+            borderRadius: '7px',
+            padding: '4px 10px',
+            border: '1px solid #bbb',
+            backgroundColor: errsMode ? '#e8e8e8' : 'whitesmoke',
+            color: errsMode ? '#aaa' : 'inherit',
+            marginRight: '10px',
+          }"
         >
           From
         </button>
 
         <button
-          @click="toggleSubs"
+          @click="errsMode || toggleSubs()"
+          :disabled="errsMode"
           :style="{
-            cursor: 'pointer',
+            cursor: errsMode ? 'default' : 'pointer',
             borderRadius: '7px',
             padding: '4px 10px',
             border: '1px solid #bbb',
-            backgroundColor: showSubs ? '#ddd' : 'whitesmoke',
+            backgroundColor: errsMode
+              ? '#e8e8e8'
+              : showSubs
+                ? '#ddd'
+                : 'whitesmoke',
+            color: errsMode ? '#aaa' : 'inherit',
             marginRight: '10px',
           }"
         >
@@ -96,13 +106,19 @@
         </button>
 
         <button
-          @click="clickAsr"
+          @click="errsMode || clickAsr()"
+          :disabled="errsMode"
           :style="{
-            cursor: 'pointer',
+            cursor: errsMode ? 'default' : 'pointer',
             borderRadius: '7px',
             padding: '4px 10px',
             border: '1px solid #bbb',
-            backgroundColor: showAsr ? '#ddd' : 'whitesmoke',
+            backgroundColor: errsMode
+              ? '#e8e8e8'
+              : showAsr
+                ? '#ddd'
+                : 'whitesmoke',
+            color: errsMode ? '#aaa' : 'inherit',
             marginRight: '10px',
           }"
         >
@@ -121,6 +137,20 @@
           }"
         >
           Fix
+        </button>
+
+        <button
+          @click="toggleErrs"
+          :style="{
+            cursor: 'pointer',
+            borderRadius: '7px',
+            padding: '4px 10px',
+            border: '1px solid #bbb',
+            backgroundColor: errsMode ? 'lightgray' : 'white',
+            marginRight: '10px',
+          }"
+        >
+          Errs
         </button>
 
         <button
@@ -674,6 +704,9 @@ export default {
       fixBusy: false,
       activeFixPath: null,
       ignoreFixLogs: false,
+
+      // Errs mode
+      errsMode: false,
     };
   },
   created() {
@@ -764,7 +797,10 @@ export default {
       this.loading = true;
       this.error = null;
       try {
-        const url = `${config.torrentsApiUrl}/api/local/files`;
+        const endpoint = this.errsMode
+          ? "/api/local/error-files"
+          : "/api/local/files";
+        const url = `${config.torrentsApiUrl}${endpoint}`;
         const res = await fetch(url);
         if (!res.ok) {
           const txt = await res.text();
@@ -1497,6 +1533,16 @@ export default {
         this.showFix = false;
         this.loadSubs();
       }
+    },
+    toggleErrs() {
+      this.errsMode = !this.errsMode;
+      if (this.errsMode) {
+        this.showSubs = false;
+        this.showAsr = false;
+      }
+      this.selectedName = null;
+      this.selectedFiles = new Set();
+      this.fetchFiles();
     },
     handleSelectionChanged() {
       if (this.showSubs) {

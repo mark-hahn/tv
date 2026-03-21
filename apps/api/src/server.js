@@ -769,6 +769,15 @@ app.get("/api/local/files", async (req, res) => {
   }
 });
 
+app.get("/api/local/error-files", async (req, res) => {
+  try {
+    const tree = await getLocalFiles("/mnt/media/tv-errors");
+    res.json(tree);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get("/api/search", async (req, res) => {
   const showName = req.query.show;
   const tvdbId = req.query.tvdbId || null;

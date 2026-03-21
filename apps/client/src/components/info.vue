@@ -78,11 +78,11 @@
         >
           <span>{{ show.name }}</span>
         </div>
-        <!-- Simple mode: align left edge of Notes with right edge of image (end of poster column)-->
+        <!-- Simple mode: align left edge of Notes with left edge of infobox -->
         <div
           v-if="simpleMode"
           :style="{
-            gridColumn: '3 / span 3',
+            gridColumn: '4 / span 2',
             display: 'flex',
             alignItems: 'center',
             minWidth: '0px',

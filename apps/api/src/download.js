@@ -227,6 +227,7 @@ function torrentNameHasSeasonRange(name) {
   return (
     /s\d{1,2}\s*-\s*(?:s\s*)?\d{1,2}/i.test(s) ||
     /seasons?\s+\d{1,2}\s*-\s*\d{1,2}/i.test(s) ||
+    /seasons?\s+\d{1,2}(?:\s+\d{1,2})+/i.test(s) ||
     /\bcomplete\s+series\b/i.test(s)
   );
 }

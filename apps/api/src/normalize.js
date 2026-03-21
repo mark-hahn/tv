@@ -9,6 +9,7 @@ function extractSeasonRange(title) {
   // Match patterns like:
   // - S01-S02, (S1-S5), (S1-2)
   // - seasons 1-2, season 1-2
+  // - Season 1 2 3 4 5 (space-separated list)
   // with optional whitespace and case-insensitive.
   const patterns = [
     /s(\d{1,2})\s*-\s*(?:s\s*)?(\d{1,2})/i,
@@ -28,6 +29,18 @@ function extractSeasonRange(title) {
         isRange: true,
       };
     }
+  }
+
+  // Match space-separated season lists: "Season 1 2 3 4 5"
+  const listMatch = title.match(/seasons?\s+(\d{1,2}(?:\s+\d{1,2})+)/i);
+  if (listMatch) {
+    const nums = listMatch[1].split(/\s+/).map(Number);
+    return {
+      startSeason: Math.min(...nums),
+      endSeason: Math.max(...nums),
+      fullMatch: listMatch[0],
+      isRange: true,
+    };
   }
 
   return null;

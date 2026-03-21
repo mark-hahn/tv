@@ -1077,6 +1077,16 @@ const handleFinish = (entry) => {
     const tsStr = dateStr(ts);
 
     if (status === "finished") {
+      // If this was an error-download to tv-errors, mark it specially.
+      const lp = entry.localPath ? String(entry.localPath) : "";
+      if (lp.startsWith("/mnt/media/tv-errors")) {
+        try {
+          openDb();
+          db.prepare(
+            "UPDATE tv_entries SET status='error-downloaded' WHERE title=?",
+          ).run(title);
+        } catch {}
+      }
       removeInProgress(title);
       return;
     }

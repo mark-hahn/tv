@@ -768,7 +768,14 @@ export default {
         if (_pttParser) parsedPtt = _pttParser(fname) || {};
       } catch (e) {}
 
-      return parseTitleFromFilename(fname, folderName, parsedPtt) || "";
+      const result = parseTitleFromFilename(fname, folderName, parsedPtt) || "";
+      if (
+        !result &&
+        String(it?.status || "").toLowerCase() === "error-downloaded"
+      ) {
+        return "<unknown show name>";
+      }
+      return result;
     },
     line2(it) {
       const s = Number(it?.season);
@@ -782,6 +789,15 @@ export default {
       const status = String(it?.status || "").trim();
       const statusLower = status.toLowerCase();
       const progress = Number(it?.progress);
+
+      // Error-downloaded: show original error reason + suffix
+      if (statusLower === "error-downloaded") {
+        const reason = String(it?.reason || "error").trim();
+        const parts2 = [];
+        if (size) parts2.push(size);
+        parts2.push(`${reason} (downloaded to tv-errors)`);
+        return { seasonEpisode, rest: parts2.join(" | ") };
+      }
 
       // For waiting status (formerly "future"), only show size
       if (statusLower === "waiting" || statusLower === "future") {

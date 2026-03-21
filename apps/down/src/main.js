@@ -958,6 +958,18 @@ async function main() {
 
   tvPath = "/mnt/media/tv/";
 
+  // --- Error-download: route "worth downloading" error files through normal pipeline ---
+  const TV_ERRORS_PATH = "/mnt/media/tv-errors/";
+
+  const isErrorWorthDownloading = (reason) => {
+    if (!reason) return false;
+    return (
+      reason.startsWith("parse-torrent-title:") ||
+      reason === "non-episode" ||
+      reason === "thetvdb: no series match"
+    );
+  };
+
   escQuotes = function (str) {
     return "'" + str.replace(/\\/g, "\\\\").replace(/'/g, "'\\''") + "'";
   };
@@ -2642,11 +2654,32 @@ async function main() {
       }
       if (usbDir === "." || usbDir === "/") usbDir = "";
       var usbPath = usbDir ? `~/files/${usbDir}/` : "~/files/";
-      tvJson.markError({
-        title: fname,
-        usbPath: usbPath,
-        reason: reason || "unknown",
-      });
+      if (isErrorWorthDownloading(reason)) {
+        // Route through normal worker pipeline — just set localPath to tv-errors.
+        try {
+          fs.mkdirSync(TV_ERRORS_PATH, { recursive: true });
+        } catch {}
+        tvJson.addEntry({
+          title: fname,
+          usbPath: usbPath,
+          localPath: TV_ERRORS_PATH,
+          reason: reason || "unknown",
+          status: "waiting",
+          error: 0,
+          seriesName: seriesName || undefined,
+          season: season || 0,
+          episode: episode || 0,
+          fileSize: usbFileBytes || 0,
+          sequence: currentSeq || 0,
+        });
+        if (tvJsonTitles) tvJsonTitles[fname] = { error: false };
+      } else {
+        tvJson.markError({
+          title: fname,
+          usbPath: usbPath,
+          reason: reason || "unknown",
+        });
+      }
     } catch (e) {}
     return process.nextTick(checkFile);
   };

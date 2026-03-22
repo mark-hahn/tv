@@ -292,7 +292,7 @@ const getShowState = async (showId, showName, showMeta) => {
           ready = true;
         }
         firstEpisode = false;
-        if (!checkedReady && lastWatched && !watched) {
+        if (!checkedReady && lastWatched && !watched && !unaired) {
           checkedReady = true;
           ready = haveFile;
         }
@@ -313,7 +313,7 @@ const getShowState = async (showId, showName, showMeta) => {
         else fileEndCount = 0;
 
         haveFileShow ||= haveFile;
-        if (haveFileShow && !haveFile) noFileAfterFile = true;
+        if (haveFileShow && !haveFile && !unaired) noFileAfterFile = true;
         if (!fileGap && noFileAfterFile && haveFile) {
           if (fileGapSeason === null) {
             fileGapSeason = seasonNumber;

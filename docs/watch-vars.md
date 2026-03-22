@@ -148,26 +148,26 @@ When active (all unaired, future start date, or "upcoming" status), all file-mis
 
 Runs before processing each show. Syncs all Emby shows into tvdb records.
 
-| Field            | Logic                                                 |
-| ---------------- | ----------------------------------------------------- |
-| `Id`             | Emby show ID                                          |
-| `tvdbId`         | Backfilled from Emby ProviderIds                      |
-| `Path`           | Emby path folder name                                 |
-| `Genres`         | Emby genres array                                     |
-| `Overview`       | Emby overview                                         |
-| `DateCreated`    | Emby DateCreated (YYYY-MM-DD)                         |
-| `PremiereDate`   | Emby PremiereDate (YYYY-MM-DD)                        |
-| `IsFavorite`     | Emby UserData                                         |
-| `Played`         | Emby UserData.Played                                  |
-| `PlayCount`      | Emby UserData.PlayCount                               |
-| `LastPlayedDate` | Emby last played date                                 |
-| `InToTry`        | In "To Try" Emby collection                           |
-| `InContinue`     | In "Continue" collection                              |
-| `InMark`         | In "Mark" collection                                  |
-| `InLinda`        | In "Linda" collection                                 |
-| `inEmby`         | `true` for found shows, `false` for disappeared shows |
-| `lastEmbySync`   | `Date.now()`                                          |
-| `WaitStr`        | Formatted upcoming air date e.g. `{3-15}`             |
+| Field            | Logic                                                                                                                |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `Id`             | Emby show ID                                                                                                         |
+| `tvdbId`         | Backfilled from Emby ProviderIds                                                                                     |
+| `Path`           | Emby path folder name                                                                                                |
+| `Genres`         | Emby genres array                                                                                                    |
+| `Overview`       | Emby overview                                                                                                        |
+| `DateCreated`    | Emby DateCreated (YYYY-MM-DD HH:mm:ss PST). Display as YYYY-MM-DD; old YYYY-MM-DD values sort as YYYY-MM-DD 00:00:00 |
+| `PremiereDate`   | Emby PremiereDate (YYYY-MM-DD)                                                                                       |
+| `IsFavorite`     | Emby UserData                                                                                                        |
+| `Played`         | Emby UserData.Played                                                                                                 |
+| `PlayCount`      | Emby UserData.PlayCount                                                                                              |
+| `LastPlayedDate` | Emby last played date                                                                                                |
+| `InToTry`        | In "To Try" Emby collection                                                                                          |
+| `InContinue`     | In "Continue" collection                                                                                             |
+| `InMark`         | In "Mark" collection                                                                                                 |
+| `InLinda`        | In "Linda" collection                                                                                                |
+| `inEmby`         | `true` for found shows, `false` for disappeared shows                                                                |
+| `lastEmbySync`   | `Date.now()`                                                                                                         |
+| `WaitStr`        | Formatted upcoming air date e.g. `{3-15}`                                                                            |
 
 ---
 

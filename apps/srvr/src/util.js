@@ -25,6 +25,21 @@ export const jParse = (str, label) => {
   return obj;
 };
 
+// Convert an ISO/UTC date string to PST YYYY-MM-DD HH:mm:ss
+export function toPstDateTime(isoStr) {
+  if (!isoStr) return null;
+  const d = new Date(isoStr);
+  if (isNaN(d)) return null;
+  const datePart = d.toLocaleDateString("en-CA", {
+    timeZone: "America/Los_Angeles",
+  });
+  const timePart = d.toLocaleTimeString("en-GB", {
+    timeZone: "America/Los_Angeles",
+    hour12: false,
+  });
+  return datePart + " " + timePart;
+}
+
 // Get current date/time in PST timezone as YYYY-MM-DD HH:mm:ss string
 export function getPstDate() {
   const d = new Date();

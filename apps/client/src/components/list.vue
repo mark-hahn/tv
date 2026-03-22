@@ -1237,10 +1237,10 @@ export default {
             .toLowerCase();
         case "Added":
           if (forSort) {
-            const a = show.added || "";
+            const a = show.dateCreated || "";
             return a.length > 10 ? a : a + " 00:00:00";
           }
-          return (show.added || "").slice(0, 10);
+          return (show.dateCreated || "").slice(0, 10);
         case "Ended":
           return show.lastAired || "";
         case "Length":

@@ -3647,7 +3647,7 @@ async function runEmbyFullSweep() {
           embyPath,
           "emby.genres": embyShow.Genres || [],
           "emby.overview": embyShow.Overview || "",
-          dateCreated: embyShow.DateCreated?.substring(0, 10),
+          dateCreated: util.toPstDateTime(embyShow.DateCreated),
           premiereDate: embyShow.PremiereDate?.substring(0, 10),
           fromEmbySync: true,
           isPlayed: embyShow.UserData?.Played || false,
@@ -3728,7 +3728,7 @@ async function runEmbyFullSweep() {
       tvdbRecord.path = embyPath;
       tvdbRecord.genres = embyShow.Genres || [];
       tvdbRecord.overview = embyShow.Overview || "";
-      tvdbRecord.dateCreated = embyShow.DateCreated?.substring(0, 10);
+      tvdbRecord.dateCreated = util.toPstDateTime(embyShow.DateCreated);
       tvdbRecord.premiereDate = embyShow.PremiereDate?.substring(0, 10);
       tvdbRecord.played = embyShow.UserData?.Played || false;
       tvdbRecord.playCount = embyShow.UserData?.PlayCount || 0;

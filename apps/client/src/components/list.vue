@@ -662,7 +662,7 @@ export default {
         "Ended",
         "Length",
       ],
-      fltrChoices: ["All", "Try Drama", "Finished"],
+      fltrChoices: ["All", "Try Drama", "Watching", "Finished"],
       conds: [
         {
           color: "#0cf",

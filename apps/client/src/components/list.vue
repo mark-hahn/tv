@@ -2207,15 +2207,53 @@ export default {
       }
 
       // toggle watched or set to specific value
-      await emby.editEpisode(
-        show.id,
-        season,
-        episode,
-        false,
-        setWatched,
-        show.name,
-      );
-      await this.seriesMapAction("", show, null);
+      if (show.inEmby === false) {
+        // Non-Emby show: toggle played locally and persist watchedEpis
+        const cell = this.seriesMap?.[season]?.[episode];
+        if (!cell) return;
+        cell.played = setWatched !== null ? setWatched : !cell.played;
+
+        // Convert this.seriesMap (object-of-objects) to array format for seriesMapToWatchedEpis
+        const seriesMapArr = [];
+        for (const sNum of Object.keys(this.seriesMap).sort((a, b) => a - b)) {
+          const episodes = [];
+          for (const eNum of Object.keys(this.seriesMap[sNum]).sort(
+            (a, b) => a - b,
+          )) {
+            episodes.push([+eNum, this.seriesMap[sNum][eNum]]);
+          }
+          seriesMapArr.push([+sNum, episodes]);
+        }
+        const watchedEpis = tvdb.seriesMapToWatchedEpis(seriesMapArr);
+        if (allTvdb?.[show.name]) {
+          allTvdb[show.name].watchedEpis = watchedEpis;
+        }
+        await srvr.setTvdbFields({
+          name: show.name,
+          watchedEpis,
+          dontEnqueue: true,
+        });
+        // Re-emit to App.vue so the map prop updates
+        this.$emit("show-map", {
+          mapShow: this.mapShow,
+          hideMapBottom: this.hideMapBottom,
+          seriesMapSeasons: this.seriesMapSeasons,
+          seriesMapEpis: this.seriesMapEpis,
+          seriesMap: this.seriesMap,
+          mapError: "",
+          noSwitch: true,
+        });
+      } else {
+        await emby.editEpisode(
+          show.id,
+          season,
+          episode,
+          false,
+          setWatched,
+          show.name,
+        );
+        await this.seriesMapAction("", show, null);
+      }
     },
 
     async refreshEmbyLibraryWithDialog(timeoutMs = 120000) {

@@ -62,7 +62,7 @@
               >Searching</span
             >
             <button
-              v-if="selectedTorrent"
+              v-if="selectedTorrent && !previewMode"
               @click.stop="
                 showStream = false;
                 continueDownload();
@@ -854,6 +854,10 @@ export default {
       type: Object,
       default: () => ({}),
     },
+    previewMode: {
+      type: Boolean,
+      default: false,
+    },
   },
 
   data() {
@@ -921,6 +925,9 @@ export default {
       hasMoreProviders: false,
       providerStats: null,
       resultsShowId: null,
+
+      // Cache torrent results from preview mode for later use
+      previewTorCache: new Map(),
     };
   },
 
@@ -1747,6 +1754,23 @@ export default {
         this.showName = show.name;
       }
 
+      // Restore cached results from preview mode if available
+      if (!this.previewMode && show?.id && this.previewTorCache.has(show.id)) {
+        const cached = this.previewTorCache.get(show.id);
+        this.previewTorCache.delete(show.id);
+        this.torrents = cached.torrents;
+        this.providerStats = cached.providerStats;
+        this.hasMoreProviders = cached.hasMoreProviders;
+        this.lastNeeded = cached.lastNeeded;
+        this.hasSearched = true;
+        this._didInitialScroll = true;
+        this.$nextTick(() => {
+          const el = this.$refs.scroller;
+          if (el) el.scrollTop = 0;
+        });
+        return;
+      }
+
       // Get series map and calculate needed episodes
       const needed = await this.calculateNeeded(show);
       this.lastNeeded = needed;
@@ -2282,6 +2306,22 @@ export default {
         this.error = errorMessage;
       } finally {
         this.loading = false;
+
+        // Cache results in preview mode for later use
+        if (
+          this.previewMode &&
+          this.currentShow?.id &&
+          this.torrents.length > 0
+        ) {
+          this.previewTorCache.set(this.currentShow.id, {
+            torrents: this.torrents.slice(),
+            providerStats: this.providerStats
+              ? { ...this.providerStats }
+              : null,
+            hasMoreProviders: this.hasMoreProviders,
+            lastNeeded: this.lastNeeded,
+          });
+        }
       }
     },
 
@@ -2291,6 +2331,16 @@ export default {
     },
 
     handleTorrentClick(event, torrent) {
+      // Preview mode: no selection, no ctrl-click, always open browser tab
+      if (this.previewMode) {
+        const isCtrlClick = Boolean(event?.ctrlKey || event?.metaKey);
+        if (isCtrlClick) return;
+        if (torrent.detailUrl) {
+          util.openExternalPage(torrent.detailUrl);
+        }
+        return;
+      }
+
       // Select the card
       this.selectedTorrent = torrent;
 
@@ -2319,7 +2369,7 @@ export default {
     },
 
     getCardStyle(torrent) {
-      const isSelected = this.selectedTorrent === torrent;
+      const isSelected = !this.previewMode && this.selectedTorrent === torrent;
       const isDownloaded = this.isDownloadedNow(torrent);
       const hasWarnings = this.getTorrentWarnings(torrent).length > 0;
       let bgColor = "#fff";

@@ -209,6 +209,7 @@
             :simpleMode="simpleMode"
             :sizing="activeSizing"
             :activeShow="currentShow"
+            :previewMode="previewMode"
           ></Tor>
           <Flex
             v-show="!simpleMode && currentPane === 'flex'"
@@ -1388,14 +1389,7 @@ export default {
 
       // Preview mode: Map is now enabled, but tabs to the right of AI are disabled.
       if (this.previewMode) {
-        const disabledKeys = new Set([
-          "tor",
-          "flex",
-          "qbt",
-          "usb",
-          "down",
-          "local",
-        ]);
+        const disabledKeys = new Set(["flex", "qbt", "usb", "down", "local"]);
         if (disabledKeys.has(k)) {
           return;
         }
@@ -1762,6 +1756,7 @@ export default {
           "reviews",
           "trailer",
           "browse",
+          "tor",
         ]);
         if (!allowed.has(this.currentPane)) {
           this.currentPane = "info";

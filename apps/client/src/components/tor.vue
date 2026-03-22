@@ -2336,6 +2336,7 @@ export default {
         const isCtrlClick = Boolean(event?.ctrlKey || event?.metaKey);
         if (isCtrlClick) return;
         if (torrent.detailUrl) {
+          this.clickedTorrents.add(torrent);
           util.openExternalPage(torrent.detailUrl);
         }
         return;

@@ -3004,6 +3004,86 @@ app.get("/api/history/byHash", (req, res) => {
 });
 app.post("/api/saveNote", apiWrapper(saveNote));
 
+// Video streaming with codec-aware ffmpeg transcoding
+app.get("/api/stream", async (req, res) => {
+  const filePath = req.query.path;
+  if (!filePath) {
+    res.status(400).json({ error: "path required" });
+    return;
+  }
+
+  // Security: path must be within tvDir
+  const resolved = path.resolve(filePath);
+  if (!resolved.startsWith(tvDir + "/") && resolved !== tvDir) {
+    res.status(403).json({ error: "forbidden" });
+    return;
+  }
+  if (!fs.existsSync(resolved)) {
+    res.status(404).json({ error: "file not found" });
+    return;
+  }
+
+  try {
+    const probeOut = cp
+      .execSync(
+        `ffprobe -v quiet -print_format json -show_streams "${resolved.replace(/"/g, '\\"')}"`,
+        { maxBuffer: 2 * 1024 * 1024 },
+      )
+      .toString();
+    const streams = JSON.parse(probeOut).streams || [];
+    const videoCodec = streams.find(
+      (s) => s.codec_type === "video",
+    )?.codec_name;
+    const audioCodec = streams.find(
+      (s) => s.codec_type === "audio",
+    )?.codec_name;
+
+    const vCopy = videoCodec === "h264";
+    const aCopy = audioCodec === "aac";
+
+    const ffmpegArgs = ["-i", resolved];
+    if (vCopy) {
+      ffmpegArgs.push("-c:v", "copy");
+    } else {
+      ffmpegArgs.push("-c:v", "libx264", "-preset", "fast", "-crf", "23");
+    }
+    if (aCopy) {
+      ffmpegArgs.push("-c:a", "copy");
+    } else {
+      ffmpegArgs.push("-c:a", "aac", "-b:a", "128k");
+    }
+    ffmpegArgs.push(
+      "-f",
+      "mp4",
+      "-movflags",
+      "frag_keyframe+empty_moov+default_base_moof",
+      "pipe:1",
+    );
+
+    console.log(
+      `[stream] ${vCopy ? "copy" : "transcode"} video, ${aCopy ? "copy" : "transcode"} audio: ${resolved}`,
+    );
+
+    res.setHeader("Content-Type", "video/mp4");
+    res.setHeader("Cache-Control", "no-cache");
+
+    const ffmpeg = cp.spawn("ffmpeg", ffmpegArgs);
+    ffmpeg.stdout.pipe(res);
+    ffmpeg.stderr.on("data", (d) => {
+      // suppress verbose ffmpeg output; log only errors
+    });
+    req.on("close", () => {
+      ffmpeg.kill("SIGTERM");
+    });
+    ffmpeg.on("exit", () => {
+      if (!res.writableEnded) res.end();
+    });
+  } catch (err) {
+    console.error("[stream] error:", err.message);
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+  }
+});
+
 // File operations
 app.post("/api/deletePath", apiWrapper(deletePath));
 app.post("/api/delSeasonFiles", apiWrapper(delSeasonFiles));

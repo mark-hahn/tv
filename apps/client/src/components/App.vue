@@ -173,6 +173,7 @@
             @close="handleMapAction('close')"
             @show-actors="() => handleShowActors(false)"
             @episode-click="handleEpisodeClick"
+            @play-episode="handlePlayEpisode"
             @season-watched="handleSeasonWatched"
             @season-delete="handleSeasonDelete"
           ></Map>
@@ -276,6 +277,10 @@
       >
       </List>
     </div>
+    <VideoPlayer
+      :path="videoPlayerPath"
+      @close="videoPlayerPath = null"
+    />
     <!-- TVDB mismatch detail modal (OK-only)-->
     <div
       id="tvdbMismatchModal"
@@ -348,6 +353,7 @@ import Actors from "./actors.vue";
 import Reviews from "./reviews.vue";
 import Buttons from "./buttons.vue";
 import Browse from "./browse.vue";
+import VideoPlayer from "./video-player.vue";
 import Tor from "./tor.vue";
 import Flex from "./flex.vue";
 import Qbt from "./qbt.vue";
@@ -384,12 +390,14 @@ export default {
     Local,
     Down,
     Trailer,
+    VideoPlayer,
   },
   data() {
     return {
       evtHandlers: {}, // Initialize evtHandlers
       // Must be known before first render so non-simple panes never mount in simple mode.
       simpleMode: new URLSearchParams(window.location.search).has("simple"),
+      videoPlayerPath: null,
       currentPane: "info", // 'info', 'map', 'actors', 'reviews', 'trailer', 'tor', 'flex', 'qbt', 'down'
       savedPane: null,
       restoringPreviewPane: false,
@@ -1668,6 +1676,12 @@ export default {
     },
     handleEpisodeClick(e, show, season, episode, setWatched = null) {
       evtBus.emit("episodeClick", { e, show, season, episode, setWatched });
+    },
+    handlePlayEpisode(e, show, season, episode) {
+      const cell = this.seriesMap?.[season]?.[episode];
+      if (cell?.path && !cell?.noFile) {
+        this.videoPlayerPath = cell.path;
+      }
     },
     handleSeasonWatched(e, show, season, episodeStates) {
       evtBus.emit("seasonWatched", { e, show, season, episodeStates });

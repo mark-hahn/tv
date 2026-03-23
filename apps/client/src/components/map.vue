@@ -395,7 +395,12 @@
                   :key="mapUpdateKey + '-' + season + '.' + episode"
                   @click="handleEpisodeClick($event, mapShow, season, episode)"
                   :style="{
-                    cursor: simpleMode ? 'default' : 'pointer',
+                    cursor: simpleMode
+                      ? seriesMap[season]?.[episode]?.path &&
+                        !seriesMap[season]?.[episode]?.noFile
+                        ? 'pointer'
+                        : 'default'
+                      : 'pointer',
                     width: '30px',
                     minWidth: '30px',
                     maxWidth: '30px',
@@ -1122,20 +1127,28 @@ export default {
         console.error("loadTvdbData error:", err);
       }
     },
-    handleMapClick(event) {
-      if (Date.now() < (this.mapTouchSuppressClickUntil || 0)) return;
-      // Only toggle back to info pane in simple mode
-      if (!this.simpleMode) return;
-      // Background click returns to Series.
-      // (In simple mode, clicks inside the table bubble up to this handler.)
-      this.$emit("close");
+    handleMapClick() {
+      // No action: click-to-close removed.
     },
     handleEpisodeClick(event, mapShow, season, episode) {
       if (this.simpleMode) {
-        // Let it bubble to handleMapClick (which returns to Series).
+        // In simple mode: click plays the episode if a file exists.
+        const cell = this.seriesMap?.[season]?.[episode];
+        if (cell?.path && !cell?.noFile) {
+          event.stopPropagation();
+          this.$emit("play-episode", event, mapShow, season, episode);
+        }
         return;
       }
-      event.stopPropagation(); // Prevent map click handler from switching tabs
+      event.stopPropagation();
+      // Alt-click plays the episode.
+      if (event?.altKey) {
+        const cell = this.seriesMap?.[season]?.[episode];
+        if (cell?.path && !cell?.noFile) {
+          this.$emit("play-episode", event, mapShow, season, episode);
+          return;
+        }
+      }
       this.$emit("episode-click", event, mapShow, season, episode);
     },
     handleSeasonClick(event, season) {

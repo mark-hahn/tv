@@ -2555,6 +2555,20 @@ export default {
       const showTvdbId = String(show.tvdbId || "").trim();
       if (!showName || !showTvdbId) return true;
 
+      // Save search results so they survive the show reload triggered by addSearchChoice
+      const savedTorrents = this.torrents.slice();
+      const savedSelected = this.selectedTorrent;
+      const savedHasSearched = this.hasSearched;
+      const savedLastNeeded = this.lastNeeded;
+      const savedProviderWarning = this.providerWarning;
+      const savedProviderStats = this.providerStats;
+      const savedClicked = new Set(this.clickedTorrents);
+      const savedDownloaded = new Set(this.downloadedTorrents);
+
+      // Suppress searchTorrents calls during the emby load
+      const origSearchTorrents = this.searchTorrents;
+      this.searchTorrents = () => {};
+
       this.embyLoadingShow = true;
       this.embyLoadingStatus = "Starting...";
 
@@ -2572,6 +2586,9 @@ export default {
 
         if (result?.ok) {
           show.inEmby = true;
+          if (result?.show) {
+            this.currentShow = result.show;
+          }
           this.embyLoadingStatus = "Done";
           await new Promise((r) => setTimeout(r, 800));
           return true;
@@ -2584,6 +2601,19 @@ export default {
         await new Promise((r) => setTimeout(r, 2000));
         return false;
       } finally {
+        // Restore searchTorrents handler
+        this.searchTorrents = origSearchTorrents;
+
+        // Restore search results
+        this.torrents = savedTorrents;
+        this.selectedTorrent = savedSelected;
+        this.hasSearched = savedHasSearched;
+        this.lastNeeded = savedLastNeeded;
+        this.providerWarning = savedProviderWarning;
+        this.providerStats = savedProviderStats;
+        this.clickedTorrents = savedClicked;
+        this.downloadedTorrents = savedDownloaded;
+
         this.embyLoadingShow = false;
         this.embyLoadingStatus = "";
       }

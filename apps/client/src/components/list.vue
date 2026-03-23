@@ -1323,6 +1323,8 @@ export default {
     async searchAction(payload) {
       const srchChoice = payload?.srchChoice ? payload.srchChoice : payload;
       const action = payload?.action || "preview";
+      const onDone = typeof payload?.onDone === "function" ? payload.onDone : null;
+      const onStatus = typeof payload?.onStatus === "function" ? payload.onStatus : null;
       const { name, tvdbId, overview, imageUrl, imdbId } = srchChoice || {};
 
       // Dropdown click now previews by default.
@@ -1334,11 +1336,12 @@ export default {
           imageUrl,
           imdbId,
         });
+        if (onDone) onDone({ ok: true });
         return;
       }
 
       // Fallback: if something explicitly asks to add.
-      await this.addSearchChoice({ name, tvdbId, overview });
+      await this.addSearchChoice({ name, tvdbId, overview }, { onDone, onStatus });
     },
 
     async addSearchChoice({ name, tvdbId, overview }, opts = null) {
@@ -1347,6 +1350,8 @@ export default {
 
       const options = opts && typeof opts === "object" ? opts : {};
       const fromPreview = !!options.fromPreview;
+      const onDone = typeof options.onDone === "function" ? options.onDone : null;
+      const externalOnStatus = typeof options.onStatus === "function" ? options.onStatus : null;
       if (fromPreview) {
         evtBus.emit("addPreviewShowStart", { name, tvdbId, overview });
       }
@@ -1361,6 +1366,7 @@ export default {
           await this.fltrAction("All");
         }
         this.onSelectShow(matchShow, true);
+        if (onDone) onDone({ ok: true, show: matchShow });
         return;
       }
 
@@ -1369,6 +1375,7 @@ export default {
 
       const setWebAddStatus = (txt) => {
         this.setSearchingModalStatus(txt);
+        if (externalOnStatus) externalOnStatus(txt);
       };
       const withTimeout = async (promise, ms, label) => {
         const timeoutMs = Math.max(0, Number(ms) || 0);
@@ -1615,7 +1622,7 @@ export default {
           tvdbId,
           err: e?.message || e,
         });
-        alert(`Web add failed for ${name}`);
+        if (!onDone) alert(`Web add failed for ${name}`);
       } finally {
         this.showSearching = false;
         this.searchingStatus = "";
@@ -1629,6 +1636,7 @@ export default {
           // which would block setUpSeries from switching panes; override that here.
           if (ok) evtBus.emit("showSeriesPane");
         }
+        if (onDone) onDone({ ok, show });
       }
     },
 
@@ -3254,8 +3262,8 @@ export default {
       this.topClick();
     });
 
-    on("reelSearchAction", (srchChoice) => {
-      void this.searchAction(srchChoice);
+    on("reelSearchAction", (payload) => {
+      void this.searchAction(payload);
     });
 
     // Series pane "Add Show" button while in preview mode.

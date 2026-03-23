@@ -827,6 +827,42 @@
         </div>
       </div>
     </div>
+    <div
+      id="emby-loading-modal"
+      v-if="embyLoadingShow"
+      @click.stop
+      style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+      "
+    >
+      <div
+        @click.stop
+        style="
+          background: white;
+          padding: 30px;
+          border-radius: 10px;
+          max-width: 420px;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+          text-align: center;
+        "
+      >
+        <div style="font-size: 16px; font-weight: bold; margin-bottom: 12px">
+          Loading show into Emby
+        </div>
+        <div style="font-size: 14px; color: #555">
+          {{ embyLoadingStatus }}
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -920,6 +956,10 @@ export default {
       downloadQueue: [],
       downloadQueueRunning: false,
       downloadStatus: {},
+
+      // Emby-loading progress dialog
+      embyLoadingShow: false,
+      embyLoadingStatus: "",
 
       // More providers (TPB/LIM/EZT) state
       hasMoreProviders: false,
@@ -2507,11 +2547,70 @@ export default {
       return s;
     },
 
+    async ensureInEmby() {
+      const show = this.currentShow;
+      if (!show || show.inEmby !== false) return true;
+
+      const showName = String(show.name || "").trim();
+      const showTvdbId = String(show.tvdbId || "").trim();
+      if (!showName || !showTvdbId) return true;
+
+      this.embyLoadingShow = true;
+      this.embyLoadingStatus = "Starting...";
+
+      try {
+        const result = await new Promise((resolve) => {
+          evtBus.emit("reelSearchAction", {
+            srchChoice: { name: showName, tvdbId: showTvdbId },
+            action: "add",
+            onDone: (res) => resolve(res),
+            onStatus: (txt) => { this.embyLoadingStatus = String(txt || ""); },
+          });
+        });
+
+        if (result?.ok) {
+          show.inEmby = true;
+          this.embyLoadingStatus = "Done";
+          await new Promise((r) => setTimeout(r, 800));
+          return true;
+        }
+        this.embyLoadingStatus = "Failed to load show into Emby";
+        await new Promise((r) => setTimeout(r, 2000));
+        return false;
+      } catch (e) {
+        this.embyLoadingStatus = e?.message || String(e);
+        await new Promise((r) => setTimeout(r, 2000));
+        return false;
+      } finally {
+        this.embyLoadingShow = false;
+        this.embyLoadingStatus = "";
+      }
+    },
+
     async processDownloadQueue() {
       if (this.downloadQueueRunning) return;
       this.downloadQueueRunning = true;
 
       try {
+        // If current show is not in Emby, load it first before processing any downloads
+        if (this.currentShow?.inEmby === false) {
+          const loaded = await this.ensureInEmby();
+          if (!loaded) {
+            // Fail all queued items
+            while (this.downloadQueue.length > 0) {
+              const item = this.downloadQueue.shift();
+              if (item?.torrent) {
+                this.setDownloadStatus(
+                  item.torrent,
+                  "error",
+                  "Failed to load show into Emby",
+                );
+              }
+            }
+            return;
+          }
+        }
+
         while (this.downloadQueue.length > 0) {
           const item = this.downloadQueue.shift();
           const torrent = item?.torrent;

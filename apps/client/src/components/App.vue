@@ -87,6 +87,22 @@
           >
             {{ t.label }}
           </button>
+          <button
+            v-if="!simpleMode"
+            @click.stop="helpDialogOpen = true"
+            title="Modifier-click help"
+            :style="{
+              fontSize: '13px',
+              cursor: 'pointer',
+              borderRadius: '7px',
+              padding: '4px 8px',
+              marginLeft: '6px',
+              border: '1px solid #bbb',
+              '--btn-bg': 'whitesmoke',
+            }"
+          >
+            ?
+          </button>
           <!-- Preview controls: immediately after the rightmost tab button (before progress)-->
           <template v-if="previewMode">
             <button
@@ -281,6 +297,65 @@
       :path="videoPlayerPath"
       @close="videoPlayerPath = null"
     />
+    <!-- Help dialog -->
+    <div
+      v-if="helpDialogOpen"
+      @click.stop.prevent="helpDialogOpen = false"
+      @pointerdown.stop
+      style="
+        position: fixed;
+        inset: 0;
+        background-color: rgba(0, 0, 0, 0.35);
+        z-index: 2000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <div
+        @click.stop.prevent
+        @pointerdown.stop
+        style="
+          background-color: white;
+          border: 2px solid black;
+          border-radius: 10px;
+          padding: 18px 22px;
+          max-width: 500px;
+          width: calc(100% - 40px);
+          max-height: 85vh;
+          overflow: auto;
+        "
+      >
+        <div
+          v-html="paneHelpHtml"
+          style="
+            margin: 0;
+            font-family: &quot;Courier New&quot;, Courier, serif;
+            font-size: 15px;
+            font-weight: 550;
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.7;
+          "
+        ></div>
+        <div style="display: flex; justify-content: flex-end; margin-top: 12px">
+          <button
+            @click.stop.prevent="helpDialogOpen = false"
+            @pointerdown.stop.prevent
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 12px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
     <!-- TVDB mismatch detail modal (OK-only)-->
     <div
       id="tvdbMismatchModal"
@@ -366,6 +441,7 @@ import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
 import * as srvr from "../srvr.js";
 import { config } from "../config.js";
+import paneHelp from "../paneHelp.js";
 
 // Hardwired split percentages for simple mode.
 // These control the List pane size (and TabArea gets the rest minus divider).
@@ -432,6 +508,8 @@ export default {
       tvdbMismatchOpen: false,
       tvdbMismatchTitle: "TVDB cache mismatch detected",
       tvdbMismatchText: "",
+
+      helpDialogOpen: false,
 
       _downActiveQbt: false,
       _downActiveDown: false,
@@ -725,6 +803,18 @@ export default {
     isMapDisabledInPreview() {
       // Map is now enabled in preview mode (fetches from TVDB API)
       return false;
+    },
+
+    paneHelpHtml() {
+      const raw = (paneHelp[this.currentPane] || "").trim();
+      const escaped = raw
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      return escaped.replace(
+        /\*([^*]+)\*/g,
+        '<b style="font-weight:800">$1</b>',
+      );
     },
   },
   unmounted() {

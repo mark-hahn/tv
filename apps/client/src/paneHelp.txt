@@ -1,0 +1,51 @@
+=========== Info ===========
+Click remote link — open IMDB, RT, etc. in new tab
+Click poster — deselect show
+Enter in notes — save note
+
+=========== Map ===========
+Ctrl+click episode — delete episode file
+Alt+click episode — play the episode
+Ctrl+click season — delete entire season folder
+Ctrl+click "Not in Emby" — create server folder & refresh Emby
+
+=========== Actors ===========
+Ctrl+click actor name — open IMDB search for actor
+
+=========== Reviews ===========
+Click IMDB / Rotten — filter reviews by source
+
+=========== Trailer ===========
+Auto-plays available trailers
+Native video controls for play/pause/seek
+
+=========== Tor ===========
+Alt+click torrent — force-download (bypass already-downloaded checks)
+Ctrl+click torrent — enqueue download
+
+=========== Browse ===========
+Click gallery item — select or preview a show
+Click external link — open IMDB, RT, Google, etc.
+Enter in search — manual search
+
+=========== Flex ===========
+Click card — select the show
+From show — scroll to current show's downloads
+
+=========== Qbt ===========
+Ctrl+click card — delete torrent + files from qBittorrent
+
+=========== Usb ===========
+Alt+click item — copy full path to clipboard
+Ctrl+click folder — deselect top-level folder / toggle selection
+Shift+click file — range-select files
+
+=========== Down ===========
+Click card — select the download
+Retry button — retry a failed download
+Cycle — trigger a download check cycle
+
+=========== Local ===========
+Alt+click item — copy full path to clipboard
+Ctrl+click folder — deselect top-level folder / toggle selection
+Shift+click file — range-select files

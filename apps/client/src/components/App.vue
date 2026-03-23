@@ -313,8 +313,6 @@
       "
     >
       <div
-        @click.stop.prevent
-        @pointerdown.stop
         style="
           background-color: white;
           border: 2px solid black;
@@ -330,30 +328,14 @@
           v-html="paneHelpHtml"
           style="
             margin: 0;
-            font-family: &quot;Courier New&quot;, Courier, serif;
+            font-family: Arial, sans-serif;
             font-size: 15px;
-            font-weight: 550;
+            font-weight: 400;
             white-space: pre-wrap;
             word-break: break-word;
             line-height: 1.7;
           "
         ></div>
-        <div style="display: flex; justify-content: flex-end; margin-top: 12px">
-          <button
-            @click.stop.prevent="helpDialogOpen = false"
-            @pointerdown.stop.prevent
-            style="
-              font-size: 13px;
-              cursor: pointer;
-              border-radius: 7px;
-              padding: 4px 12px;
-              border: 1px solid #bbb;
-              background-color: whitesmoke;
-            "
-          >
-            OK
-          </button>
-        </div>
       </div>
     </div>
     <!-- TVDB mismatch detail modal (OK-only)-->
@@ -813,7 +795,7 @@ export default {
         .replace(/>/g, "&gt;");
       return escaped.replace(
         /\*([^*]+)\*/g,
-        '<b style="font-weight:800">$1</b>',
+        '<b style="font-weight:700">$1</b>',
       );
     },
   },

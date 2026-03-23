@@ -2,8 +2,16 @@ export default {
   info: `
   
 *Info Pane:* 
-  Remote buttons: open IMDB, RT, etc. in new tab
-  Enter in notes: save note`,
+Refresh button:
+  Shows a status modal ("Updating TVDB...")
+POSTs to /api/triggerShowGapCheck on the server
+Server enqueues a priority full-show refresh (disk scan + gap check + TVDB scrape)
+Server sends showUpdating WebSocket message — client keeps modal visible
+Server sends tvdbUpdated with the new record — client updates in-memory TVDB cache, refreshes remote links (IMDB, RT, etc.), dismisses modal
+Server sends showQueueEmpty as a fallback to dismiss the modal if tvdbUpdated didn't clear it
+A 60-second stuck-refresh safety timer logs diagnostics if nothing completes in time
+  
+`,
 
   map: `Ctrl+click episode — delete episode file
 Alt+click episode — play the episode

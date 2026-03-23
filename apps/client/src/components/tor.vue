@@ -2564,7 +2564,9 @@ export default {
             srchChoice: { name: showName, tvdbId: showTvdbId },
             action: "add",
             onDone: (res) => resolve(res),
-            onStatus: (txt) => { this.embyLoadingStatus = String(txt || ""); },
+            onStatus: (txt) => {
+              this.embyLoadingStatus = String(txt || "");
+            },
           });
         });
 

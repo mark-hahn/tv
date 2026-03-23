@@ -1323,8 +1323,10 @@ export default {
     async searchAction(payload) {
       const srchChoice = payload?.srchChoice ? payload.srchChoice : payload;
       const action = payload?.action || "preview";
-      const onDone = typeof payload?.onDone === "function" ? payload.onDone : null;
-      const onStatus = typeof payload?.onStatus === "function" ? payload.onStatus : null;
+      const onDone =
+        typeof payload?.onDone === "function" ? payload.onDone : null;
+      const onStatus =
+        typeof payload?.onStatus === "function" ? payload.onStatus : null;
       const { name, tvdbId, overview, imageUrl, imdbId } = srchChoice || {};
 
       // Dropdown click now previews by default.
@@ -1341,7 +1343,10 @@ export default {
       }
 
       // Fallback: if something explicitly asks to add.
-      await this.addSearchChoice({ name, tvdbId, overview }, { onDone, onStatus });
+      await this.addSearchChoice(
+        { name, tvdbId, overview },
+        { onDone, onStatus },
+      );
     },
 
     async addSearchChoice({ name, tvdbId, overview }, opts = null) {
@@ -1350,8 +1355,10 @@ export default {
 
       const options = opts && typeof opts === "object" ? opts : {};
       const fromPreview = !!options.fromPreview;
-      const onDone = typeof options.onDone === "function" ? options.onDone : null;
-      const externalOnStatus = typeof options.onStatus === "function" ? options.onStatus : null;
+      const onDone =
+        typeof options.onDone === "function" ? options.onDone : null;
+      const externalOnStatus =
+        typeof options.onStatus === "function" ? options.onStatus : null;
       if (fromPreview) {
         evtBus.emit("addPreviewShowStart", { name, tvdbId, overview });
       }

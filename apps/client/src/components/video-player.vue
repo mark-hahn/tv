@@ -33,10 +33,19 @@
       ref="vid"
       controls
       autoplay
+      crossorigin="anonymous"
       :src="streamUrl"
       style="max-width: 100%; max-height: 100%; outline: none; display: block"
       @dblclick="toggleFullscreen"
-    />
+    >
+      <track
+        kind="subtitles"
+        :src="subtitleUrl"
+        srclang="en"
+        label="English"
+        default
+      />
+    </video>
   </div>
 </template>
 
@@ -55,6 +64,10 @@ export default {
     streamUrl() {
       if (!this.path) return "";
       return `${TV_SRVR_URL}/api/stream?path=${encodeURIComponent(this.path)}`;
+    },
+    subtitleUrl() {
+      if (!this.path) return "";
+      return `${TV_SRVR_URL}/api/subtitle?path=${encodeURIComponent(this.path)}`;
     },
   },
   methods: {

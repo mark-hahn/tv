@@ -13,21 +13,49 @@
     @click.self="close"
   >
     <div
-      @click.stop="close"
       style="
         position: absolute;
         top: 10px;
         right: 14px;
         z-index: 5001;
-        color: white;
-        font-size: 28px;
-        line-height: 1;
-        cursor: pointer;
-        user-select: none;
-        text-shadow: 0 0 4px #000;
+        display: flex;
+        align-items: center;
+        gap: 8px;
       "
     >
-      ✕
+      <div
+        v-for="choice in subtitleChoices"
+        :key="choice.id"
+        @click.stop="selectTrack(choice.id)"
+        :style="{
+          padding: '2px 8px',
+          borderRadius: '4px',
+          border:
+            activeTrackId === choice.id ? '2px solid white' : '1px solid #666',
+          color: activeTrackId === choice.id ? 'white' : '#999',
+          fontSize: '13px',
+          cursor: 'pointer',
+          userSelect: 'none',
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          textShadow: '0 0 3px #000',
+          whiteSpace: 'nowrap',
+        }"
+      >
+        {{ choice.label }}
+      </div>
+      <div
+        @click.stop="close"
+        style="
+          color: white;
+          font-size: 28px;
+          line-height: 1;
+          cursor: pointer;
+          user-select: none;
+          text-shadow: 0 0 4px #000;
+        "
+      >
+        ✕
+      </div>
     </div>
     <video
       ref="vid"
@@ -39,10 +67,12 @@
       @dblclick="toggleFullscreen"
     >
       <track
+        v-if="activeTrackUrl"
+        :key="activeTrackUrl"
         kind="subtitles"
-        :src="subtitleUrl"
         srclang="en"
-        label="English"
+        label="subtitles"
+        :src="activeTrackUrl"
         default
       />
     </video>
@@ -60,17 +90,69 @@ export default {
     path: { type: String, default: null },
   },
   emits: ["close"],
+  data() {
+    return {
+      subtitleTracks: [],
+      activeTrackId: null,
+    };
+  },
   computed: {
     streamUrl() {
       if (!this.path) return "";
       return `${TV_SRVR_URL}/api/stream?path=${encodeURIComponent(this.path)}`;
     },
-    subtitleUrl() {
-      if (!this.path) return "";
-      return `${TV_SRVR_URL}/api/subtitle?path=${encodeURIComponent(this.path)}`;
+    activeTrackUrl() {
+      if (!this.activeTrackId || this.activeTrackId === "off" || !this.path)
+        return null;
+      const track = this.subtitleTracks.find(
+        (t) => t.id === this.activeTrackId,
+      );
+      if (!track) return null;
+      const base = `${TV_SRVR_URL}/api/subtitle?path=${encodeURIComponent(this.path)}`;
+      if (track.type === "embedded") return `${base}&index=${track.index}`;
+      if (track.type === "srt")
+        return `${base}&file=${encodeURIComponent(track.file)}`;
+      return null;
+    },
+    subtitleChoices() {
+      if (this.subtitleTracks.length === 0) return [];
+      return [...this.subtitleTracks, { id: "off", label: "off" }];
+    },
+  },
+  watch: {
+    path(newVal) {
+      this.subtitleTracks = [];
+      this.activeTrackId = null;
+      if (newVal) this._fetchSubtitleList(newVal);
     },
   },
   methods: {
+    async _fetchSubtitleList(filePath) {
+      try {
+        const resp = await fetch(
+          `${TV_SRVR_URL}/api/subtitle-list?path=${encodeURIComponent(filePath)}`,
+        );
+        if (!resp.ok) return;
+        const tracks = await resp.json();
+        this.subtitleTracks = tracks;
+        if (tracks.length > 0) this.activeTrackId = tracks[0].id;
+      } catch (e) {
+        console.error("[subtitle-list] fetch error:", e);
+      }
+    },
+    selectTrack(id) {
+      this.activeTrackId = id;
+      if (id === "off") {
+        const vid = this.$refs.vid;
+        if (vid) for (const tt of vid.textTracks) tt.mode = "disabled";
+      } else {
+        // Wait for Vue to (re-)insert the <track> element, then force showing
+        this.$nextTick(() => {
+          const vid = this.$refs.vid;
+          if (vid) for (const tt of vid.textTracks) tt.mode = "showing";
+        });
+      }
+    },
     close() {
       const vid = this.$refs.vid;
       if (vid) {
@@ -100,6 +182,7 @@ export default {
   },
   mounted() {
     window.addEventListener("keydown", this.onKeyDown);
+    if (this.path) this._fetchSubtitleList(this.path);
   },
   beforeUnmount() {
     window.removeEventListener("keydown", this.onKeyDown);

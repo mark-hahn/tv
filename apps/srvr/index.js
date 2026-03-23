@@ -3100,6 +3100,59 @@ app.get("/api/stream", async (req, res) => {
   }
 });
 
+app.get("/api/subtitle-list", async (req, res) => {
+  const filePath = req.query.path;
+  if (!filePath) {
+    res.status(400).json({ error: "path required" });
+    return;
+  }
+  const resolved = path.resolve(filePath);
+  if (!resolved.startsWith(tvDir + "/") && resolved !== tvDir) {
+    res.status(403).json({ error: "forbidden" });
+    return;
+  }
+  if (!fs.existsSync(resolved)) {
+    res.status(404).json({ error: "file not found" });
+    return;
+  }
+  const dir = path.dirname(resolved);
+  const stem = path.basename(resolved).replace(/\.[^.]+$/, "");
+  const tracks = [];
+  try {
+    const probeOut = cp
+      .execSync(
+        `ffprobe -v quiet -print_format json -show_streams "${resolved.replace(/"/g, '\\"')}"`,
+        { maxBuffer: 2 * 1024 * 1024 },
+      )
+      .toString();
+    const streams = JSON.parse(probeOut).streams || [];
+    for (const s of streams.filter((s) => s.codec_type === "subtitle")) {
+      const label = s.tags?.language || s.tags?.title || "sub";
+      tracks.push({
+        id: `emb-${s.index}`,
+        label,
+        type: "embedded",
+        index: s.index,
+      });
+    }
+  } catch (e) {
+    console.error("[subtitle-list] probe error:", e.message);
+  }
+  try {
+    for (const f of fs.readdirSync(dir)) {
+      if (!f.endsWith(".srt") || !f.startsWith(stem)) continue;
+      const suffix = f
+        .slice(stem.length)
+        .replace(/\.srt$/, "")
+        .replace(/^\./, "");
+      tracks.push({ id: `srt-${f}`, label: suffix || f, type: "srt", file: f });
+    }
+  } catch (e) {
+    // ignore readdir errors
+  }
+  res.json(tracks);
+});
+
 app.get("/api/subtitle", async (req, res) => {
   const filePath = req.query.path;
   if (!filePath) {
@@ -3117,6 +3170,50 @@ app.get("/api/subtitle", async (req, res) => {
   }
   const dir = path.dirname(resolved);
   const stem = path.basename(resolved).replace(/\.[^.]+$/, "");
+
+  // Explicit embedded stream by index
+  if (req.query.index !== undefined) {
+    const idx = parseInt(req.query.index, 10);
+    res.setHeader("Content-Type", "text/vtt");
+    res.setHeader("Cache-Control", "no-cache");
+    const ff = cp.spawn("ffmpeg", [
+      "-i",
+      resolved,
+      "-map",
+      `0:${idx}`,
+      "-f",
+      "webvtt",
+      "pipe:1",
+    ]);
+    ff.stdout.pipe(res);
+    ff.stderr.on("data", () => {});
+    req.on("close", () => ff.kill("SIGTERM"));
+    ff.on("exit", () => {
+      if (!res.writableEnded) res.end();
+    });
+    return;
+  }
+
+  // Explicit sidecar .srt by filename
+  if (req.query.file) {
+    const srtFile = path.basename(req.query.file);
+    if (!srtFile.endsWith(".srt")) {
+      res.status(400).json({ error: "invalid file" });
+      return;
+    }
+    try {
+      const srt = fs.readFileSync(path.join(dir, srtFile), "utf8");
+      const vtt =
+        "WEBVTT\n\n" + srt.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, "$1.$2");
+      res.setHeader("Content-Type", "text/vtt");
+      res.setHeader("Cache-Control", "no-cache");
+      res.send(vtt);
+    } catch (e) {
+      console.error("[subtitle] sidecar error:", e.message);
+      if (!res.headersSent) res.status(500).json({ error: e.message });
+    }
+    return;
+  }
 
   // 1. Try embedded subtitle stream first (e.g. subrip inside MKV)
   try {

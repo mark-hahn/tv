@@ -1940,11 +1940,13 @@ export const enqueueShowProcess = (showName, opts = {}) => {
     const stack = new Error().stack.split("\n").slice(1, 5).join(" | ");
     log(`[tvdb loop] enqueue [${showName}] from: ${stack}`);
     const wasEmpty = showProcessQueue.length === 0;
-    showProcessQueue.push({
+    const item = {
       name: showName,
       skipRotten: !!opts.skipRotten,
       isBackground: !!opts.isBackground,
-    });
+    };
+    if (opts.priority) showProcessQueue.unshift(item);
+    else showProcessQueue.push(item);
     // Only notify on 0→1 transition to avoid flooding clients on bulk enqueues
     if (wasEmpty && enqueueCallback) enqueueCallback(showName);
     // Kick processing immediately (no-op if already busy)

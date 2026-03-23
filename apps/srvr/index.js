@@ -2907,30 +2907,7 @@ app.post(
     console.log(
       `[triggerShowGapCheck] Client requested gap check for: ${showName}`,
     );
-    const tvdbRecord = tvdb.getAllTvdbSync()[showName];
-    if (tvdbRecord && tvdbRecord.inEmby === false) {
-      const nonEmbyConstants = [
-        ["fileGap", false],
-        ["fileEndError", false],
-        ["full", false],
-        ["notReady", true],
-      ];
-      let changed = false;
-      for (const [f, v] of nonEmbyConstants) {
-        if (tvdbRecord[f] !== v) {
-          tvdbRecord[f] = v;
-          changed = true;
-        }
-      }
-      if (changed) {
-        console.log(
-          `[triggerShowGapCheck] ${showName} not in Emby, setting error constants`,
-        );
-        await tvdb.saveTvdbSync();
-      }
-      return { success: true };
-    }
-    tvdb.enqueueShowProcess(showName);
+    tvdb.enqueueShowProcess(showName, { priority: true });
     return { success: true };
   }),
 );

@@ -12,6 +12,23 @@
     "
     @click.self="close"
   >
+    <div
+      @click.stop="close"
+      style="
+        position: absolute;
+        top: 10px;
+        right: 14px;
+        z-index: 5001;
+        color: white;
+        font-size: 28px;
+        line-height: 1;
+        cursor: pointer;
+        user-select: none;
+        text-shadow: 0 0 4px #000;
+      "
+    >
+      ✕
+    </div>
     <video
       ref="vid"
       controls

@@ -3313,6 +3313,17 @@ export default {
       await this.seasonWatched(show, season, episodeStates);
     });
 
+    // Listen for play episode requests from info pane
+    on("playEpisode", async ({ show, season, episode }) => {
+      if (this.mapShow?.name !== show?.name || !this.seriesMap?.[season]) {
+        await this.seriesMapAction("refresh", show);
+      }
+      const cell = this.seriesMap?.[season]?.[episode];
+      if (cell?.path && !cell?.noFile) {
+        evtBus.emit("playEpisodePath", cell.path);
+      }
+    });
+
     // Listen for season content deletes from App.vue (ctrl-click season number in Map)
     on("seasonDelete", async ({ e, show, season }) => {
       if (this.simpleMode) return;

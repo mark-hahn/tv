@@ -730,6 +730,7 @@ export default {
   unmounted() {
     evtBus.off("downActivePart", this.handleDownActivePart);
     evtBus.off("tvdb-mismatch", this.handleTvdbMismatch);
+    evtBus.off("playEpisodePath", this._onPlayEpisodePath);
     evtBus.off("previewSrchChoice", this.onPreviewSrchChoice);
     evtBus.off("addPreviewShowDone", this.onAddPreviewShowDone);
     evtBus.off("previewPanesLoading", this.onPreviewPanesLoading);
@@ -1710,6 +1711,10 @@ export default {
     // Derive downActive and schedule deferred Tor restarts.
     evtBus.on("downActivePart", this.handleDownActivePart);
     evtBus.on("tvdb-mismatch", this.handleTvdbMismatch);
+    this._onPlayEpisodePath = (path) => {
+      this.videoPlayerPath = path;
+    };
+    evtBus.on("playEpisodePath", this._onPlayEpisodePath);
     this.startQbtPolling();
 
     // Refresh space display once on app load.

@@ -445,10 +445,30 @@
               "
             >
               <div
-                style="display: flex; column-gap: 8px; justify-content: center"
+                style="
+                  display: flex;
+                  column-gap: 8px;
+                  justify-content: center;
+                  align-items: center;
+                "
               >
                 <div style="white-space: nowrap">Next Up</div>
                 <div style="white-space: nowrap">{{ nextUpValTxt }}</div>
+                <div
+                  v-if="!nextUpSuffixTxt && nextUpSeason !== null"
+                  @click.stop="playNextEpisode()"
+                  style="
+                    white-space: nowrap;
+                    padding: 1px 7px;
+                    border-radius: 5px;
+                    border: 1px solid #888;
+                    font-weight: bold;
+                    cursor: pointer;
+                    user-select: none;
+                  "
+                >
+                  ▶
+                </div>
               </div>
               <div
                 v-if="nextUpSuffixTxt &amp;&amp; String(nextUpSuffixTxt).length &gt; 0"
@@ -597,6 +617,8 @@ export default {
       showRemotes: false,
       nextUpValTxt: "",
       nextUpSuffixTxt: "",
+      nextUpSeason: null,
+      nextUpEpisode: null,
       watchButtonTxtArr: [],
       episodeId: "",
       deletedTxt: "",
@@ -750,6 +772,15 @@ export default {
     remoteClick(remote) {
       const url = remote.url;
       if (url) util.openExternalPage(url);
+    },
+
+    playNextEpisode() {
+      if (this.nextUpSeason === null || this.nextUpEpisode === null) return;
+      evtBus.emit("playEpisode", {
+        show: this.show,
+        season: this.nextUpSeason,
+        episode: this.nextUpEpisode,
+      });
     },
 
     setDeleted(tvdbData) {
@@ -1001,6 +1032,8 @@ export default {
             this.episodeId = episodeId;
             this.nextUpValTxt = seaEpiTxt;
             this.nextUpSuffixTxt = "";
+            this.nextUpSeason = seasonNumber;
+            this.nextUpEpisode = episodeNumber;
           } else {
             const suffix = status === "missing" ? "No File" : "Unaired";
             this.nextUpValTxt = seaEpiTxt;
@@ -1010,6 +1043,8 @@ export default {
       } else {
         this.nextUpValTxt = "";
         this.nextUpSuffixTxt = "";
+        this.nextUpSeason = null;
+        this.nextUpEpisode = null;
       }
       await this.updateWatchButtons(readyToWatch);
     },
@@ -1250,6 +1285,8 @@ export default {
       this.runtimeTxt = "";
       this.nextUpValTxt = "";
       this.nextUpSuffixTxt = "";
+      this.nextUpSeason = null;
+      this.nextUpEpisode = null;
       this.remotes = [];
       this.showRemotes = false;
       this.showSpinner = false;

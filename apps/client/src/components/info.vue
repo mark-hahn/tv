@@ -1498,6 +1498,8 @@ export default {
             seasonCount,
             episodeCount,
             watchedCount,
+            dontEnqueue: true,
+            dontNotify: true,
           });
         } catch (e) {
           // Non-fatal: UI already corrected.

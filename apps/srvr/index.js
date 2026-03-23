@@ -1008,13 +1008,20 @@ const pendingPushes = new Map();
 
 const debouncedTvdbPush = (name) => {
   if (!name) return;
+  const stack = new Error().stack.split("\n").slice(1, 4).join(" | ");
+  console.log(
+    `[LOOP-DBG] debouncedTvdbPush called for "${name}" from: ${stack}`,
+  );
   if (pendingPushes.has(name)) clearTimeout(pendingPushes.get(name));
   pendingPushes.set(
     name,
     setTimeout(() => {
       pendingPushes.delete(name);
       const record = tvdb.getAllTvdbSync()[name];
-      if (record) notifyClients("tvdbUpdated", { name, record });
+      if (record) {
+        console.log(`[LOOP-DBG] sending tvdbUpdated push for "${name}"`);
+        notifyClients("tvdbUpdated", { name, record });
+      }
     }, PUSH_DEBOUNCE_MS),
   );
 };

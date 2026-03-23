@@ -2959,26 +2959,25 @@ export default {
         banCond.filter = -1;
       }
 
+      // If saved show is not in emby, disable the in-emby filter so it's visible
+      const savedName = window.localStorage.getItem("lastVisShow");
+      if (savedName) {
+        const savedShow = allShows.find((s) => s.name === savedName);
+        if (savedShow && savedShow.inEmby === false) {
+          const embyCond = this.conds.find((c) => c.name === "hasemby");
+          if (embyCond) embyCond.filter = 0;
+        }
+      }
+
       this.showAll(true);
       await this.select(); // Apply filters including ban
       this.sortShows();
 
-      let name = window.localStorage.getItem("lastVisShow");
+      let name = savedName;
       if (!name) {
         const firstShow = this.shows[0] || allShows[0];
         window.localStorage.setItem("lastVisShow", firstShow.name);
         name = firstShow.name;
-      }
-
-      // Keep initial selection on Emby-visible entries for default UX.
-      const savedShow = allShows.find((s) => s.name === name);
-      if (savedShow && savedShow.inEmby === false) {
-        console.log(
-          "Saved show has inEmby false, selecting first show instead",
-        );
-        const firstShow = this.shows[0] || allShows[0];
-        name = firstShow.name;
-        window.localStorage.setItem("lastVisShow", name);
       }
 
       // On initial load, restore selection from lastVisShow.

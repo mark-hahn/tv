@@ -173,6 +173,7 @@
             @close="handleMapAction('close')"
             @show-actors="() => handleShowActors(false)"
             @episode-click="handleEpisodeClick"
+            @season-watched="handleSeasonWatched"
             @season-delete="handleSeasonDelete"
           ></Map>
           <Actors
@@ -1667,6 +1668,9 @@ export default {
     },
     handleEpisodeClick(e, show, season, episode, setWatched = null) {
       evtBus.emit("episodeClick", { e, show, season, episode, setWatched });
+    },
+    handleSeasonWatched(e, show, season, episodeStates) {
+      evtBus.emit("seasonWatched", { e, show, season, episodeStates });
     },
     handleSeasonDelete(e, show, season) {
       evtBus.emit("seasonDelete", { e, show, season });

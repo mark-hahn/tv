@@ -693,6 +693,7 @@ export default {
     "set-date",
     "close",
     "episode-click",
+    "season-watched",
     "season-delete",
     "show-actors",
   ],
@@ -1197,25 +1198,40 @@ export default {
 
       state.currentState = targetState;
 
-      // Apply the target state
+      // Build episode states map for the target state
+      const episodeStates = {};
       Object.keys(state.original).forEach((episodeNum) => {
-        let setWatched;
         if (targetState === 0) {
-          setWatched = state.original[episodeNum];
+          episodeStates[episodeNum] = state.original[episodeNum];
         } else if (targetState === 1) {
-          setWatched = true;
+          episodeStates[episodeNum] = true;
         } else {
-          setWatched = false;
+          episodeStates[episodeNum] = false;
         }
+      });
+
+      if (this.mapShow?.inEmby === false) {
+        // Non-Emby: single event with all episode states
         this.$emit(
-          "episode-click",
+          "season-watched",
           event,
           this.mapShow,
           season,
-          parseInt(episodeNum),
-          setWatched,
+          episodeStates,
         );
-      });
+      } else {
+        // Emby: per-episode events (each hits Emby API individually)
+        for (const [episodeNum, setWatched] of Object.entries(episodeStates)) {
+          this.$emit(
+            "episode-click",
+            event,
+            this.mapShow,
+            season,
+            parseInt(episodeNum),
+            setWatched,
+          );
+        }
+      }
     },
 
     async setNextWatch() {

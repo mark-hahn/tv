@@ -2256,6 +2256,69 @@ export default {
       }
     },
 
+    async seasonWatched(show, season, episodeStates) {
+      if (show.inEmby !== false) return;
+      const seasonMap = this.seriesMap?.[season];
+      if (!seasonMap) return;
+
+      console.log(
+        "[seasonWatched] season:",
+        season,
+        "episodeStates:",
+        JSON.stringify(episodeStates),
+      );
+
+      // Apply all episode states at once
+      for (const [episodeNum, watched] of Object.entries(episodeStates)) {
+        const cell = seasonMap[episodeNum];
+        if (cell) cell.played = watched;
+      }
+
+      // Log played state of all seasons
+      for (const sNum of Object.keys(this.seriesMap)) {
+        const eps = this.seriesMap[sNum];
+        const playedEps = Object.entries(eps)
+          .filter(([, c]) => c.played)
+          .map(([e]) => e);
+        console.log(
+          `[seasonWatched] S${sNum} played:`,
+          playedEps.length > 0 ? playedEps.join(",") : "none",
+        );
+      }
+
+      // Convert this.seriesMap to array format and persist once
+      const seriesMapArr = [];
+      for (const sNum of Object.keys(this.seriesMap).sort((a, b) => a - b)) {
+        const episodes = [];
+        for (const eNum of Object.keys(this.seriesMap[sNum]).sort(
+          (a, b) => a - b,
+        )) {
+          episodes.push([+eNum, this.seriesMap[sNum][eNum]]);
+        }
+        seriesMapArr.push([+sNum, episodes]);
+      }
+      const watchedEpis = tvdb.seriesMapToWatchedEpis(seriesMapArr);
+      console.log("[seasonWatched] watchedEpis:", JSON.stringify(watchedEpis));
+      if (allTvdb?.[show.name]) {
+        allTvdb[show.name].watchedEpis = watchedEpis;
+      }
+      await srvr.setTvdbFields({
+        name: show.name,
+        watchedEpis,
+        dontEnqueue: true,
+      });
+      // Re-emit to App.vue so the map prop updates
+      this.$emit("show-map", {
+        mapShow: this.mapShow,
+        hideMapBottom: this.hideMapBottom,
+        seriesMapSeasons: this.seriesMapSeasons,
+        seriesMapEpis: this.seriesMapEpis,
+        seriesMap: this.seriesMap,
+        mapError: "",
+        noSwitch: true,
+      });
+    },
+
     async refreshEmbyLibraryWithDialog(timeoutMs = 120000) {
       const sleep = (ms) =>
         new Promise((resolve) =>
@@ -3231,6 +3294,11 @@ export default {
     // Listen for episode clicks from App.vue
     on("episodeClick", async ({ e, show, season, episode, setWatched }) => {
       await this.episodeClick(e, show, season, episode, setWatched);
+    });
+
+    // Listen for season watched toggle from App.vue (non-Emby shows)
+    on("seasonWatched", async ({ e, show, season, episodeStates }) => {
+      await this.seasonWatched(show, season, episodeStates);
     });
 
     // Listen for season content deletes from App.vue (ctrl-click season number in Map)

@@ -3041,6 +3041,22 @@ app.get("/api/stream", async (req, res) => {
     const vCopy = videoCodec === "h264";
     const aCopy = audioCodec === "aac";
 
+    if (vCopy && aCopy) {
+      // Both streams are already browser-compatible — redirect to nginx which serves
+      // the file with proper Content-Length and range request support, giving the
+      // browser a correct total duration and instant seeking.
+      const relPath = resolved.replace("/mnt/media", "");
+      const url =
+        "https://hahnca.com" +
+        relPath
+          .split("/")
+          .map((seg) => encodeURIComponent(seg))
+          .join("/");
+      console.log(`[stream] redirect to nginx: ${url}`);
+      res.redirect(302, url);
+      return;
+    }
+
     const ffmpegArgs = ["-i", resolved];
     if (vCopy) {
       ffmpegArgs.push("-c:v", "copy");
@@ -3061,7 +3077,7 @@ app.get("/api/stream", async (req, res) => {
     );
 
     console.log(
-      `[stream] ${vCopy ? "copy" : "transcode"} video, ${aCopy ? "copy" : "transcode"} audio: ${resolved}`,
+      `[stream] transcode video=${videoCodec}→h264, audio=${audioCodec}→aac: ${resolved}`,
     );
 
     res.setHeader("Content-Type", "video/mp4");
@@ -3069,8 +3085,8 @@ app.get("/api/stream", async (req, res) => {
 
     const ffmpeg = cp.spawn("ffmpeg", ffmpegArgs);
     ffmpeg.stdout.pipe(res);
-    ffmpeg.stderr.on("data", (d) => {
-      // suppress verbose ffmpeg output; log only errors
+    ffmpeg.stderr.on("data", () => {
+      // suppress verbose ffmpeg output
     });
     req.on("close", () => {
       ffmpeg.kill("SIGTERM");

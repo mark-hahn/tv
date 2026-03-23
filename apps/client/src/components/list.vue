@@ -2399,6 +2399,7 @@ export default {
           name: show.name,
           watchedEpis: watchedEpis,
           dontEnqueue: true,
+          dontNotify: true,
         });
       }
 

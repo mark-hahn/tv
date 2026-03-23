@@ -12,22 +12,113 @@
     "
     @click.self="close"
   >
+    <!-- Top bar -->
     <div
       style="
         position: absolute;
-        top: 10px;
-        right: 14px;
+        top: 0;
+        left: 0;
+        right: 0;
         z-index: 5001;
         display: flex;
         align-items: center;
-        gap: 8px;
+        padding: 6px 14px 6px 0;
+        background: rgba(0, 0, 0, 0.75);
       "
     >
+      <!-- Timing slider (srt tracks only) -->
       <div
-        v-for="choice in subtitleChoices"
+        v-if="showSlider"
+        ref="slider"
+        style="
+          flex: 1;
+          margin: 0 30px;
+          position: relative;
+          height: 44px;
+          cursor: pointer;
+          user-select: none;
+        "
+        @mousedown.stop.prevent="sliderMouseDown"
+        @touchstart.stop.prevent="sliderTouchStart"
+      >
+        <!-- Tick marks and labels -->
+        <template
+          v-for="t in ticks"
+          :key="t.val"
+        >
+          <div
+            :style="{
+              position: 'absolute',
+              left: t.pct + '%',
+              top: '8px',
+              width: '1px',
+              height: '10px',
+              background: 'white',
+              transform: 'translateX(-50%)',
+            }"
+          />
+          <div
+            :style="{
+              position: 'absolute',
+              left: t.pct + '%',
+              top: '30px',
+              fontSize: '12px',
+              color: 'white',
+              transform: 'translateX(-50%)',
+              lineHeight: '1',
+            }"
+          >
+            {{ t.val }}
+          </div>
+        </template>
+        <!-- Line -->
+        <div
+          style="
+            position: absolute;
+            top: 22px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: white;
+          "
+        />
+        <!-- Ball -->
+        <div
+          :style="{
+            position: 'absolute',
+            top: '16px',
+            left: ballPct + '%',
+            width: '14px',
+            height: '14px',
+            borderRadius: '50%',
+            background: 'white',
+            transform: 'translateX(-50%)',
+            boxShadow: '0 0 4px rgba(0,0,0,0.8)',
+          }"
+        />
+      </div>
+      <!-- Offset value -->
+      <div
+        v-if="showSlider"
+        style="
+          color: white;
+          font-size: 13px;
+          min-width: 42px;
+          text-align: right;
+          padding-right: 8px;
+          user-select: none;
+          text-shadow: 0 0 3px #000;
+        "
+      >
+        {{ offsetDisplay }}
+      </div>
+      <!-- Subtitle choice buttons -->
+      <div
+        v-for="(choice, i) in subtitleChoices"
         :key="choice.id"
         @click.stop="selectTrack(choice.id)"
         :style="{
+          marginLeft: i === 0 && !showSlider ? 'auto' : '0',
           padding: '2px 8px',
           borderRadius: '4px',
           border:
@@ -39,10 +130,12 @@
           backgroundColor: 'rgba(0,0,0,0.5)',
           textShadow: '0 0 3px #000',
           whiteSpace: 'nowrap',
+          marginRight: '8px',
         }"
       >
         {{ choice.label }}
       </div>
+      <!-- X close -->
       <div
         @click.stop="close"
         style="
@@ -83,6 +176,7 @@
 import { config } from "../config.js";
 
 const TV_SRVR_URL = config.tvSrvrUrl;
+const offsetCache = new Map(); // in-memory per-file offset
 
 export default {
   name: "VideoPlayer",
@@ -94,6 +188,7 @@ export default {
     return {
       subtitleTracks: [],
       activeTrackId: null,
+      subtitleOffset: 0,
     };
   },
   computed: {
@@ -101,18 +196,38 @@ export default {
       if (!this.path) return "";
       return `${TV_SRVR_URL}/api/stream?path=${encodeURIComponent(this.path)}`;
     },
-    activeTrackUrl() {
-      if (!this.activeTrackId || this.activeTrackId === "off" || !this.path)
-        return null;
-      const track = this.subtitleTracks.find(
-        (t) => t.id === this.activeTrackId,
+    activeTrack() {
+      if (!this.activeTrackId || this.activeTrackId === "off") return null;
+      return (
+        this.subtitleTracks.find((t) => t.id === this.activeTrackId) || null
       );
-      if (!track) return null;
+    },
+    activeTrackUrl() {
+      const track = this.activeTrack;
+      if (!track || !this.path) return null;
       const base = `${TV_SRVR_URL}/api/subtitle?path=${encodeURIComponent(this.path)}`;
       if (track.type === "embedded") return `${base}&index=${track.index}`;
-      if (track.type === "srt")
-        return `${base}&file=${encodeURIComponent(track.file)}`;
+      if (track.type === "srt") {
+        let url = `${base}&file=${encodeURIComponent(track.file)}`;
+        if (this.subtitleOffset !== 0) url += `&offset=${this.subtitleOffset}`;
+        return url;
+      }
       return null;
+    },
+    showSlider() {
+      return this.activeTrack?.type === "srt";
+    },
+    ballPct() {
+      return ((this.subtitleOffset + 3) / 6) * 100;
+    },
+    offsetDisplay() {
+      return this.subtitleOffset.toFixed(2);
+    },
+    ticks() {
+      return [-3, -2, -1, 0, 1, 2, 3].map((v) => ({
+        val: v,
+        pct: ((v + 3) / 6) * 100,
+      }));
     },
     subtitleChoices() {
       if (this.subtitleTracks.length === 0) return [];
@@ -123,7 +238,16 @@ export default {
     path(newVal) {
       this.subtitleTracks = [];
       this.activeTrackId = null;
+      this.subtitleOffset = offsetCache.get(newVal) ?? 0;
       if (newVal) this._fetchSubtitleList(newVal);
+    },
+    activeTrackUrl(newVal) {
+      if (newVal) {
+        this.$nextTick(() => {
+          const vid = this.$refs.vid;
+          if (vid) for (const tt of vid.textTracks) tt.mode = "showing";
+        });
+      }
     },
   },
   methods: {
@@ -145,13 +269,34 @@ export default {
       if (id === "off") {
         const vid = this.$refs.vid;
         if (vid) for (const tt of vid.textTracks) tt.mode = "disabled";
-      } else {
-        // Wait for Vue to (re-)insert the <track> element, then force showing
-        this.$nextTick(() => {
-          const vid = this.$refs.vid;
-          if (vid) for (const tt of vid.textTracks) tt.mode = "showing";
-        });
       }
+    },
+    _setOffsetFromX(clientX) {
+      const rect = this.$refs.slider.getBoundingClientRect();
+      const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
+      const raw = (x / rect.width) * 6 - 3;
+      this.subtitleOffset = Math.round(raw / 0.05) * 0.05;
+      offsetCache.set(this.path, this.subtitleOffset);
+    },
+    sliderMouseDown(e) {
+      this._setOffsetFromX(e.clientX);
+      const onMove = (e) => this._setOffsetFromX(e.clientX);
+      const onUp = () => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    },
+    sliderTouchStart(e) {
+      this._setOffsetFromX(e.touches[0].clientX);
+      const onMove = (e) => this._setOffsetFromX(e.touches[0].clientX);
+      const onEnd = () => {
+        window.removeEventListener("touchmove", onMove);
+        window.removeEventListener("touchend", onEnd);
+      };
+      window.addEventListener("touchmove", onMove, { passive: true });
+      window.addEventListener("touchend", onEnd);
     },
     close() {
       const vid = this.$refs.vid;
@@ -182,6 +327,7 @@ export default {
   },
   mounted() {
     window.addEventListener("keydown", this.onKeyDown);
+    this.subtitleOffset = offsetCache.get(this.path) ?? 0;
     if (this.path) this._fetchSubtitleList(this.path);
   },
   beforeUnmount() {

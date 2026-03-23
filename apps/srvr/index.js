@@ -3100,6 +3100,19 @@ app.get("/api/stream", async (req, res) => {
   }
 });
 
+function shiftVttTimestamp(ts, offsetSec) {
+  const [hms, msStr] = ts.split(".");
+  const [h, m, s] = hms.split(":").map(Number);
+  let totalMs = (h * 3600 + m * 60 + s) * 1000 + parseInt(msStr || "0", 10);
+  totalMs += Math.round(offsetSec * 1000);
+  if (totalMs < 0) totalMs = 0;
+  const oh = Math.floor(totalMs / 3600000);
+  const om = Math.floor((totalMs % 3600000) / 60000);
+  const os = Math.floor((totalMs % 60000) / 1000);
+  const oms = totalMs % 1000;
+  return `${String(oh).padStart(2, "0")}:${String(om).padStart(2, "0")}:${String(os).padStart(2, "0")}.${String(oms).padStart(3, "0")}`;
+}
+
 app.get("/api/subtitle-list", async (req, res) => {
   const filePath = req.query.path;
   if (!filePath) {
@@ -3202,9 +3215,20 @@ app.get("/api/subtitle", async (req, res) => {
       return;
     }
     try {
+      const offsetSec = parseFloat(req.query.offset || "0");
+      const clampedOffset = isNaN(offsetSec)
+        ? 0
+        : Math.max(-10, Math.min(10, offsetSec));
       const srt = fs.readFileSync(path.join(dir, srtFile), "utf8");
-      const vtt =
+      let vtt =
         "WEBVTT\n\n" + srt.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, "$1.$2");
+      if (clampedOffset !== 0) {
+        vtt = vtt.replace(
+          /(\d{2}:\d{2}:\d{2}\.\d{3}) --> (\d{2}:\d{2}:\d{2}\.\d{3})/g,
+          (_, t1, t2) =>
+            `${shiftVttTimestamp(t1, clampedOffset)} --> ${shiftVttTimestamp(t2, clampedOffset)}`,
+        );
+      }
       res.setHeader("Content-Type", "text/vtt");
       res.setHeader("Cache-Control", "no-cache");
       res.send(vtt);

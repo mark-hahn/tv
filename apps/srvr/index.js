@@ -3005,7 +3005,6 @@ app.get("/api/history/byHash", (req, res) => {
 app.post("/api/saveNote", apiWrapper(saveNote));
 
 // Video streaming with codec-aware ffmpeg transcoding
-let activeStreamFfmpeg = null;
 app.get("/api/stream", async (req, res) => {
   const filePath = req.query.path;
   if (!filePath) {
@@ -3055,7 +3054,11 @@ app.get("/api/stream", async (req, res) => {
       return;
     }
 
-    const ffmpegArgs = ["-i", resolved];
+    const startSec = parseInt(req.query.start) || 0;
+    const ffmpegArgs =
+      startSec > 0
+        ? ["-ss", String(startSec), "-i", resolved]
+        : ["-i", resolved];
     if (vCopy) {
       // h264 video in non-MP4 container: copy the stream, ffmpeg will remux into fMP4.
       // No re-encode needed; the source GOP doesn't matter because frag_keyframe
@@ -3094,12 +3097,7 @@ app.get("/api/stream", async (req, res) => {
     res.setHeader("Content-Type", "video/mp4");
     res.setHeader("Cache-Control", "no-cache");
 
-    if (activeStreamFfmpeg && !activeStreamFfmpeg.killed) {
-      activeStreamFfmpeg.kill("SIGKILL");
-    }
-
     const ffmpeg = cp.spawn("ffmpeg", ffmpegArgs);
-    activeStreamFfmpeg = ffmpeg;
     ffmpeg.stdout.pipe(res);
     ffmpeg.stderr.on("data", () => {});
     ffmpeg.on("error", (err) => {
@@ -3112,7 +3110,6 @@ app.get("/api/stream", async (req, res) => {
     req.on("close", killFfmpeg);
     res.on("close", killFfmpeg);
     ffmpeg.on("exit", (code) => {
-      if (activeStreamFfmpeg === ffmpeg) activeStreamFfmpeg = null;
       if (code !== 0 && code !== null)
         console.log(`[stream] ffmpeg exit code ${code}`);
       if (!res.writableEnded) res.end();

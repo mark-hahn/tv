@@ -158,6 +158,7 @@
       :src="streamUrl"
       style="max-width: 100%; max-height: 100%; outline: none; display: block"
       @dblclick="toggleFullscreen"
+      @error="onVideoError"
     >
       <track
         v-if="activeTrackUrl"
@@ -176,7 +177,8 @@
 import { config } from "../config.js";
 
 const TV_SRVR_URL = config.tvSrvrUrl;
-const offsetCache = new Map(); // in-memory per-file offset
+const offsetCache = new Map(); // in-memory per-file subtitle offset
+let resumeCache = { path: null, time: 0 }; // single remembered playback position
 
 export default {
   name: "VideoPlayer",
@@ -189,12 +191,15 @@ export default {
       subtitleTracks: [],
       activeTrackId: null,
       subtitleOffset: 0,
+      streamStart: 0,
     };
   },
   computed: {
     streamUrl() {
       if (!this.path) return "";
-      return `${TV_SRVR_URL}/api/stream?path=${encodeURIComponent(this.path)}`;
+      let url = `${TV_SRVR_URL}/api/stream?path=${encodeURIComponent(this.path)}`;
+      if (this.streamStart > 0) url += `&start=${this.streamStart}`;
+      return url;
     },
     activeTrack() {
       if (!this.activeTrackId || this.activeTrackId === "off") return null;
@@ -238,6 +243,7 @@ export default {
     path(newVal) {
       this.subtitleTracks = [];
       this.activeTrackId = null;
+      this.streamStart = resumeCache.path === newVal ? resumeCache.time : 0;
       this.subtitleOffset = offsetCache.get(newVal) ?? 0;
       if (newVal) this._fetchSubtitleList(newVal);
     },
@@ -298,9 +304,29 @@ export default {
       window.addEventListener("touchmove", onMove, { passive: true });
       window.addEventListener("touchend", onEnd);
     },
+    onVideoError(e) {
+      const vid = this.$refs.vid;
+      if (!vid) return;
+      const err = vid.error;
+      // MEDIA_ERR_NETWORK (2) = stream dropped; try to resume from current position
+      if (err && err.code === MediaError.MEDIA_ERR_NETWORK) {
+        const resumeAt = vid.currentTime;
+        console.log(
+          `[video] network error, resuming from ${resumeAt.toFixed(1)}s`,
+        );
+        setTimeout(() => {
+          const v = this.$refs.vid;
+          if (!v) return;
+          this.streamStart = Math.floor(resumeAt);
+          v.load();
+          v.play().catch(() => {});
+        }, 1000);
+      }
+    },
     close() {
       const vid = this.$refs.vid;
       if (vid) {
+        resumeCache = { path: this.path, time: Math.floor(vid.currentTime) };
         vid.pause();
         vid.src = "";
       }
@@ -327,6 +353,7 @@ export default {
   },
   mounted() {
     window.addEventListener("keydown", this.onKeyDown);
+    this.streamStart = resumeCache.path === this.path ? resumeCache.time : 0;
     this.subtitleOffset = offsetCache.get(this.path) ?? 0;
     if (this.path) this._fetchSubtitleList(this.path);
   },

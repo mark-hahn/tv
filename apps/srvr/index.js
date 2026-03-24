@@ -3042,7 +3042,7 @@ app.get("/api/stream", async (req, res) => {
     const vCopy = videoCodec === "h264";
     const aCopy = audioCodec === "aac";
 
-    if (vCopy && aCopy) {
+    if (vCopy && aCopy && resolved.toLowerCase().endsWith(".mp4")) {
       const relPath = resolved.replace("/mnt/media", "");
       const url =
         "https://hahnca.com" +
@@ -3056,16 +3056,23 @@ app.get("/api/stream", async (req, res) => {
     }
 
     const ffmpegArgs = ["-i", resolved];
-    ffmpegArgs.push(
-      "-c:v",
-      "libx264",
-      "-preset",
-      "ultrafast",
-      "-crf",
-      "23",
-      "-g",
-      "48",
-    );
+    if (vCopy) {
+      // h264 video in non-MP4 container: copy the stream, ffmpeg will remux into fMP4.
+      // No re-encode needed; the source GOP doesn't matter because frag_keyframe
+      // will still fragment at existing keyframe boundaries (typically every 2-5s for web sources).
+      ffmpegArgs.push("-c:v", "copy");
+    } else {
+      ffmpegArgs.push(
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-crf",
+        "23",
+        "-g",
+        "48",
+      );
+    }
     if (aCopy) {
       ffmpegArgs.push("-c:a", "copy");
     } else {

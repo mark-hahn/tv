@@ -883,9 +883,6 @@ export async function deleteShowFromEmby(show) {
       return;
     }
     console.log("deleted show from emby:", show.name);
-    srvr
-      .triggerEmbySync()
-      .catch((err) => console.error("triggerEmbySync failed:", err));
   } catch (error) {
     const errData = error.response?.data || "";
     if (errData.includes("Directory not empty")) {
@@ -965,12 +962,6 @@ export const editEpisode = async (
       //               post_url: url,
       //               post_res: setDataRes
       //             });
-
-      if (showName) {
-        srvr
-          .triggerEmbySync()
-          .catch((err) => console.error("triggerEmbySync failed:", err));
-      }
     }
   }
 };
@@ -1011,9 +1002,6 @@ export const setLastWatched = async (seriesId) => {
       episodeNumber,
       post_res: setDateRes,
     });
-    srvr
-      .triggerEmbySync()
-      .catch((err) => console.error("triggerEmbySync failed:", err));
   }
 };
 
@@ -1298,11 +1286,6 @@ export async function saveToTry(id, inToTry, showName) {
     console.error(err);
     throw new Error(err);
   }
-  if (showName) {
-    srvr
-      .triggerEmbySync()
-      .catch((err) => console.error("triggerEmbySync failed:", err));
-  }
 }
 
 export async function saveContinue(id, inContinue, showName) {
@@ -1325,11 +1308,6 @@ export async function saveContinue(id, inContinue, showName) {
       JSON.stringify(continueRes.data);
     console.error(err);
     throw new Error(err);
-  }
-  if (showName) {
-    srvr
-      .triggerEmbySync()
-      .catch((err) => console.error("triggerEmbySync failed:", err));
   }
 }
 
@@ -1354,11 +1332,6 @@ export async function saveMark(id, inMark, showName) {
     console.error(err);
     throw new Error(err);
   }
-  if (showName) {
-    srvr
-      .triggerEmbySync()
-      .catch((err) => console.error("triggerEmbySync failed:", err));
-  }
 }
 
 export async function saveLinda(id, inLinda, showName) {
@@ -1381,11 +1354,6 @@ export async function saveLinda(id, inLinda, showName) {
       JSON.stringify(lindaRes.data);
     console.error(err);
     throw new Error(err);
-  }
-  if (showName) {
-    srvr
-      .triggerEmbySync()
-      .catch((err) => console.error("triggerEmbySync failed:", err));
   }
 }
 

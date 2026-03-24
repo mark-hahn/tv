@@ -80,28 +80,6 @@
       </div>
     </div>
     <div
-      id="embyRefreshingModal"
-      v-if="showEmbyRefreshing"
-      @click.stop
-      style="
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background-color: white;
-        padding: 30px 40px;
-        border: 2px solid black;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-        z-index: 10000;
-        text-align: center;
-      "
-    >
-      <div style="font-size: 18px; font-weight: bold">
-        Emby is being refreshed.
-      </div>
-    </div>
-    <div
       id="center"
       :style="{
         height: '100%',
@@ -648,7 +626,6 @@ export default {
       searchingStatus: "",
       showReloadingShows: false,
       showRemovingFromEmby: false,
-      showEmbyRefreshing: false,
       isWideLandscape: false,
       actorFilter: null,
       actorSearchParams: null, // Store search params for word-based actor search
@@ -2347,32 +2324,6 @@ export default {
         mapError: "",
         noSwitch: true,
       });
-    },
-
-    async refreshEmbyLibraryWithDialog(timeoutMs = 120000) {
-      const sleep = (ms) =>
-        new Promise((resolve) =>
-          setTimeout(resolve, Math.max(0, Number(ms) || 0)),
-        );
-
-      this.showRemovingFromEmby = false;
-      this.showEmbyRefreshing = true;
-      this.logModalMessage("embyRefreshingModal", "Emby is being refreshed.");
-      try {
-        const res = await emby.refreshLib();
-        if (res?.status === "hasTask" && res?.taskId) {
-          const startMs = Date.now();
-          while (Date.now() - startMs < timeoutMs) {
-            const st = await emby.taskStatus(res.taskId);
-            if (st?.status !== "refreshing") break;
-            await sleep(2000);
-          }
-        }
-      } catch (e) {
-        console.error("refreshEmbyLibraryWithDialog failed", e);
-      } finally {
-        this.showEmbyRefreshing = false;
-      }
     },
 
     async seriesMapAction(action, show, wasDeleted) {

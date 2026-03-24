@@ -3005,6 +3005,7 @@ app.get("/api/history/byHash", (req, res) => {
 app.post("/api/saveNote", apiWrapper(saveNote));
 
 // Video streaming with codec-aware ffmpeg transcoding
+let activeStreamFfmpeg = null;
 app.get("/api/stream", async (req, res) => {
   const filePath = req.query.path;
   if (!filePath) {
@@ -3042,9 +3043,6 @@ app.get("/api/stream", async (req, res) => {
     const aCopy = audioCodec === "aac";
 
     if (vCopy && aCopy) {
-      // Both streams are already browser-compatible — redirect to nginx which serves
-      // the file with proper Content-Length and range request support, giving the
-      // browser a correct total duration and instant seeking.
       const relPath = resolved.replace("/mnt/media", "");
       const url =
         "https://hahnca.com" +
@@ -3057,44 +3055,22 @@ app.get("/api/stream", async (req, res) => {
       return;
     }
 
-    const ffmpegArgs = [
-      "-analyzeduration",
-      "100000",
-      "-probesize",
-      "100000",
-      "-i",
-      resolved,
-    ];
-    if (vCopy) {
-      // Re-encode with ultrafast + forced keyframes every 2s so frag_keyframe
-      // can flush immediately instead of waiting for the original (potentially
-      // very long) GOP interval.
-      ffmpegArgs.push(
-        "-c:v",
-        "libx264",
-        "-preset",
-        "ultrafast",
-        "-crf",
-        "23",
-        "-force_key_frames",
-        "expr:gte(t,n_forced*2)",
-      );
-    } else {
-      ffmpegArgs.push(
-        "-c:v",
-        "libx264",
-        "-preset",
-        "fast",
-        "-crf",
-        "23",
-        "-force_key_frames",
-        "expr:gte(t,n_forced*2)",
-      );
-    }
+    const ffmpegArgs = ["-i", resolved];
+    ffmpegArgs.push(
+      "-c:v",
+      "libx264",
+      "-preset",
+      "ultrafast",
+      "-crf",
+      "23",
+      "-g",
+      "48",
+    );
     if (aCopy) {
       ffmpegArgs.push("-c:a", "copy");
     } else {
-      ffmpegArgs.push("-c:a", "aac", "-b:a", "128k");
+      // -ac 2: downmix 5.1/multichannel to stereo — browsers require stereo AAC
+      ffmpegArgs.push("-c:a", "aac", "-b:a", "128k", "-ac", "2");
     }
     ffmpegArgs.push(
       "-f",
@@ -3111,29 +3087,27 @@ app.get("/api/stream", async (req, res) => {
     res.setHeader("Content-Type", "video/mp4");
     res.setHeader("Cache-Control", "no-cache");
 
+    if (activeStreamFfmpeg && !activeStreamFfmpeg.killed) {
+      activeStreamFfmpeg.kill("SIGKILL");
+    }
+
     const ffmpeg = cp.spawn("ffmpeg", ffmpegArgs);
-    let firstChunk = true;
-    ffmpeg.stdout.on("data", (chunk) => {
-      if (firstChunk) {
-        firstChunk = false;
-        console.log(`[stream] first chunk ${chunk.length} bytes`);
-      }
-    });
+    activeStreamFfmpeg = ffmpeg;
     ffmpeg.stdout.pipe(res);
-    let stderrBuf = "";
-    ffmpeg.stderr.on("data", (d) => {
-      stderrBuf += d.toString();
-    });
+    ffmpeg.stderr.on("data", () => {});
     ffmpeg.on("error", (err) => {
       console.error("[stream] ffmpeg spawn error:", err.message);
     });
-    req.on("close", () => {
-      ffmpeg.kill("SIGTERM");
-    });
+    const killFfmpeg = () => {
+      if (ffmpeg.killed) return;
+      ffmpeg.kill("SIGKILL");
+    };
+    req.on("close", killFfmpeg);
+    res.on("close", killFfmpeg);
     ffmpeg.on("exit", (code) => {
-      if (stderrBuf)
-        console.log(`[stream] ffmpeg stderr: ${stderrBuf.slice(-500)}`);
-      console.log(`[stream] ffmpeg exit code: ${code}`);
+      if (activeStreamFfmpeg === ffmpeg) activeStreamFfmpeg = null;
+      if (code !== 0 && code !== null)
+        console.log(`[stream] ffmpeg exit code ${code}`);
       if (!res.writableEnded) res.end();
     });
   } catch (err) {

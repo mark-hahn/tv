@@ -47,6 +47,8 @@
         :value="filterStr"
         @input="handleFilterInput"
         @keydown="handleFilterKeyDown"
+        @focus="$emit('filter-focus')"
+        @blur="$emit('filter-blur')"
         placeholder="Filter..."
         style="
           width: 100px;
@@ -189,6 +191,8 @@ export default {
     "update:filterStr",
     "watch-click",
     "filter-input",
+    "filter-focus",
+    "filter-blur",
     "send-filters",
     "library-click",
     "all-click",

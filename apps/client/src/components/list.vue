@@ -148,6 +148,8 @@
               :libraryProgressText="libraryProgressText"
               @watch-click="watchClick"
               @filter-input="select"
+              @filter-focus="filterInputFocused = true"
+              @filter-blur="onFilterBlur"
               @send-filters="sendSharedFilters"
               @library-click="libraryClick"
               @all-click="allClick"
@@ -239,6 +241,8 @@
             :libraryProgressText="libraryProgressText"
             @watch-click="watchClick"
             @filter-input="select"
+            @filter-focus="filterInputFocused = true"
+            @filter-blur="onFilterBlur"
             @send-filters="sendSharedFilters"
             @library-click="libraryClick"
             @all-click="allClick"
@@ -617,6 +621,7 @@ export default {
 
     return {
       deleteShow,
+      filterInputFocused: false,
       updatingMsg: "",
       shows: [],
       filterStr: "",
@@ -1734,17 +1739,26 @@ export default {
       this.saveVisShow(this.shows[0], true);
     },
 
+    onFilterBlur() {
+      this.filterInputFocused = false;
+      if (!this.highlightName) return;
+      const show = allShows.find((s) => s.name === this.highlightName);
+      if (!show) return;
+      this.saveVisShow(show, false);
+    },
+
     async prevNextClick(next) {
-      if (showHistory.length == 0) return;
+      if (showHistory.length === 0) return;
       const newPtr = showHistoryPtr + (next ? 1 : -1);
       if (newPtr < 0 || newPtr >= showHistory.length) return;
       showHistoryPtr = newPtr;
-      const show = showHistory[showHistoryPtr];
-      const showArr = this.shows.filter((showIn) => showIn.name == show.name);
-      if (showArr.length == 0) {
+      const showName = showHistory[showHistoryPtr];
+      const show = allShows.find((s) => s.name === showName);
+      if (!show) return;
+      if (!this.shows.some((s) => s.name === showName)) {
         await this.fltrAction("All");
       }
-      this.saveVisShow(show, true);
+      this.saveVisShow(show, true, { skipHistory: true });
     },
 
     async allClick() {
@@ -2050,15 +2064,16 @@ export default {
         await this.refilter(false);
       }
 
-      if (!options.skipHistory) {
-        if (
-          showHistoryPtr == -1 ||
-          showName != showHistory[showHistoryPtr].name
-        ) {
-          // console.log("adding show to history:", showName);
-          showHistory.push(show);
-          showHistoryPtr = showHistory.length - 1;
-          // showHistory = showHistory.slice(0, showHistoryPtr+1);
+      if (!options.skipHistory && !this.filterInputFocused) {
+        showHistory = showHistory.slice(0, showHistoryPtr + 1);
+        showHistory = showHistory.filter((n) => n !== showName);
+        showHistory.push(showName);
+        if (showHistory.length > 100) showHistory = showHistory.slice(-100);
+        showHistoryPtr = showHistory.length - 1;
+        try {
+          localStorage.setItem("showHistory", JSON.stringify(showHistory));
+        } catch {
+          /* ignore storage errors */
         }
       }
 
@@ -2967,6 +2982,18 @@ export default {
         this.sortByNew = true;
         this.sortBySize = false;
         this.sortChoice = "Alpha";
+        try {
+          const saved = localStorage.getItem("showHistory");
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) {
+              showHistory = parsed.filter((n) => typeof n === "string");
+              showHistoryPtr = showHistory.length - 1;
+            }
+          }
+        } catch {
+          /* ignore storage errors */
+        }
       }
 
       const banCond = this.conds.find((c) => c.name === "ban");

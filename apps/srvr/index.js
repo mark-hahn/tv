@@ -3026,7 +3026,7 @@ app.get("/api/stream", async (req, res) => {
   try {
     const probeOut = cp
       .execSync(
-        `ffprobe -v quiet -print_format json -show_streams "${resolved.replace(/"/g, '\\"')}"`,
+        `ffprobe -v quiet -analyzeduration 100000 -probesize 100000 -print_format json -show_streams "${resolved.replace(/"/g, '\\"')}"`,
         { maxBuffer: 2 * 1024 * 1024 },
       )
       .toString();
@@ -3057,11 +3057,39 @@ app.get("/api/stream", async (req, res) => {
       return;
     }
 
-    const ffmpegArgs = ["-i", resolved];
+    const ffmpegArgs = [
+      "-analyzeduration",
+      "100000",
+      "-probesize",
+      "100000",
+      "-i",
+      resolved,
+    ];
     if (vCopy) {
-      ffmpegArgs.push("-c:v", "copy");
+      // Re-encode with ultrafast + forced keyframes every 2s so frag_keyframe
+      // can flush immediately instead of waiting for the original (potentially
+      // very long) GOP interval.
+      ffmpegArgs.push(
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-crf",
+        "23",
+        "-force_key_frames",
+        "expr:gte(t,n_forced*2)",
+      );
     } else {
-      ffmpegArgs.push("-c:v", "libx264", "-preset", "fast", "-crf", "23");
+      ffmpegArgs.push(
+        "-c:v",
+        "libx264",
+        "-preset",
+        "fast",
+        "-crf",
+        "23",
+        "-force_key_frames",
+        "expr:gte(t,n_forced*2)",
+      );
     }
     if (aCopy) {
       ffmpegArgs.push("-c:a", "copy");
@@ -3084,14 +3112,28 @@ app.get("/api/stream", async (req, res) => {
     res.setHeader("Cache-Control", "no-cache");
 
     const ffmpeg = cp.spawn("ffmpeg", ffmpegArgs);
+    let firstChunk = true;
+    ffmpeg.stdout.on("data", (chunk) => {
+      if (firstChunk) {
+        firstChunk = false;
+        console.log(`[stream] first chunk ${chunk.length} bytes`);
+      }
+    });
     ffmpeg.stdout.pipe(res);
-    ffmpeg.stderr.on("data", () => {
-      // suppress verbose ffmpeg output
+    let stderrBuf = "";
+    ffmpeg.stderr.on("data", (d) => {
+      stderrBuf += d.toString();
+    });
+    ffmpeg.on("error", (err) => {
+      console.error("[stream] ffmpeg spawn error:", err.message);
     });
     req.on("close", () => {
       ffmpeg.kill("SIGTERM");
     });
-    ffmpeg.on("exit", () => {
+    ffmpeg.on("exit", (code) => {
+      if (stderrBuf)
+        console.log(`[stream] ffmpeg stderr: ${stderrBuf.slice(-500)}`);
+      console.log(`[stream] ffmpeg exit code: ${code}`);
       if (!res.writableEnded) res.end();
     });
   } catch (err) {
@@ -3140,7 +3182,9 @@ app.get("/api/subtitle-list", async (req, res) => {
       .toString();
     const streams = JSON.parse(probeOut).streams || [];
     for (const s of streams.filter((s) => s.codec_type === "subtitle")) {
-      const label = s.tags?.language || s.tags?.title || "sub";
+      const lang = (s.tags?.language || "").toLowerCase();
+      if (lang && lang !== "eng" && lang !== "en") continue;
+      const label = s.tags?.title || s.tags?.language || "eng";
       tracks.push({
         id: `emb-${s.index}`,
         label,

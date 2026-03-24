@@ -89,9 +89,9 @@ const waitForServer = async () => {
   }
 };
 
-const httpCall = async (endpoint, param, method = "GET") => {
+const httpCall = async (endpoint, param, method = "GET", timeoutMs = 30000) => {
   const url = `${HTTP_URL}${endpoint}`;
-  const TIMEOUT_MS = 30000; // 30 second timeout
+  const TIMEOUT_MS = timeoutMs;
 
   // Wait for server readiness to avoid startup errors if server is restarting
   await waitForServer();
@@ -294,7 +294,7 @@ export function subsSearch(params) {
 // fileIdObjs: [{ file_id:number, showName:string, season:number, episode:number }, ...]
 // Returns: "ok" or { error: string }
 export function applySubFiles(fileIdObjs) {
-  return httpCall("/api/applySubFiles", fileIdObjs, "POST");
+  return httpCall("/api/applySubFiles", fileIdObjs, "POST", 120000);
 }
 
 // Delete previously applied subtitle files on the server.

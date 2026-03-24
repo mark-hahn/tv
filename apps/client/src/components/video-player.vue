@@ -155,7 +155,7 @@
       controls
       autoplay
       crossorigin="anonymous"
-      :src="streamUrl"
+      :src="vidSrc"
       style="max-width: 100%; max-height: 100%; outline: none; display: block"
       @dblclick="toggleFullscreen"
       @error="onVideoError"
@@ -178,7 +178,6 @@ import { config } from "../config.js";
 
 const TV_SRVR_URL = config.tvSrvrUrl;
 const offsetCache = new Map(); // in-memory per-file subtitle offset
-let resumeCache = { path: null, time: 0 }; // single remembered playback position
 
 export default {
   name: "VideoPlayer",
@@ -191,15 +190,13 @@ export default {
       subtitleTracks: [],
       activeTrackId: null,
       subtitleOffset: 0,
-      streamStart: 0,
+      vidSrc: "",
     };
   },
   computed: {
     streamUrl() {
       if (!this.path) return "";
-      let url = `${TV_SRVR_URL}/api/stream?path=${encodeURIComponent(this.path)}`;
-      if (this.streamStart > 0) url += `&start=${this.streamStart}`;
-      return url;
+      return `${TV_SRVR_URL}/api/stream?path=${encodeURIComponent(this.path)}`;
     },
     activeTrack() {
       if (!this.activeTrackId || this.activeTrackId === "off") return null;
@@ -241,9 +238,10 @@ export default {
   },
   watch: {
     path(newVal) {
+      this._mseStop();
       this.subtitleTracks = [];
       this.activeTrackId = null;
-      this.streamStart = resumeCache.path === newVal ? resumeCache.time : 0;
+      this.vidSrc = newVal ? this.streamUrl : "";
       this.subtitleOffset = offsetCache.get(newVal) ?? 0;
       if (newVal) this._fetchSubtitleList(newVal);
     },
@@ -308,25 +306,90 @@ export default {
       const vid = this.$refs.vid;
       if (!vid) return;
       const err = vid.error;
-      // MEDIA_ERR_NETWORK (2) = stream dropped; try to resume from current position
       if (err && err.code === MediaError.MEDIA_ERR_NETWORK) {
         const resumeAt = vid.currentTime;
         console.log(
-          `[video] network error, resuming from ${resumeAt.toFixed(1)}s`,
+          `[video] network error at ${resumeAt.toFixed(1)}s, recovering`,
         );
+        this._mseStop();
         setTimeout(() => {
-          const v = this.$refs.vid;
-          if (!v) return;
-          this.streamStart = Math.floor(resumeAt);
-          v.load();
-          v.play().catch(() => {});
+          if (this.$refs.vid) this._mseRecover(resumeAt);
         }, 1000);
       }
     },
+    _mseStop() {
+      if (this._mseAbort) {
+        this._mseAbort.abort();
+        this._mseAbort = null;
+      }
+    },
+    _mseRecover(startSec) {
+      const vid = this.$refs.vid;
+      if (!vid) return;
+      const url = `${this.streamUrl}&start=${Math.floor(startSec)}`;
+      const mimeType = 'video/mp4; codecs="avc1.640028,mp4a.40.2"';
+      if (!window.MediaSource || !MediaSource.isTypeSupported(mimeType)) {
+        vid.load();
+        vid.play().catch(() => {});
+        return;
+      }
+      const abort = new AbortController();
+      this._mseAbort = abort;
+      const ms = new MediaSource();
+      const blobUrl = URL.createObjectURL(ms);
+      ms.addEventListener(
+        "sourceopen",
+        async () => {
+          URL.revokeObjectURL(blobUrl);
+          let sb;
+          try {
+            sb = ms.addSourceBuffer(mimeType);
+          } catch (e) {
+            if (!abort.signal.aborted) {
+              vid.load();
+              vid.play().catch(() => {});
+            }
+            return;
+          }
+          sb.timestampOffset = startSec;
+          let res;
+          try {
+            res = await fetch(url, { signal: abort.signal });
+            if (!res.ok) throw new Error(String(res.status));
+          } catch (e) {
+            if (!abort.signal.aborted) {
+              vid.load();
+              vid.play().catch(() => {});
+            }
+            return;
+          }
+          const reader = res.body.getReader();
+          try {
+            while (!abort.signal.aborted) {
+              const { done, value } = await reader.read();
+              if (done) {
+                ms.endOfStream();
+                break;
+              }
+              sb.appendBuffer(value);
+              await new Promise((ok, fail) => {
+                sb.addEventListener("updateend", ok, { once: true });
+                sb.addEventListener("error", fail, { once: true });
+              });
+            }
+          } catch (e) {
+            if (!abort.signal.aborted) console.error("[mse]", e);
+          }
+          if (abort.signal.aborted) reader.cancel().catch(() => {});
+        },
+        { once: true },
+      );
+      this.vidSrc = blobUrl;
+    },
     close() {
+      this._mseStop();
       const vid = this.$refs.vid;
       if (vid) {
-        resumeCache = { path: this.path, time: Math.floor(vid.currentTime) };
         vid.pause();
         vid.src = "";
       }
@@ -353,7 +416,7 @@ export default {
   },
   mounted() {
     window.addEventListener("keydown", this.onKeyDown);
-    this.streamStart = resumeCache.path === this.path ? resumeCache.time : 0;
+    this.vidSrc = this.path ? this.streamUrl : "";
     this.subtitleOffset = offsetCache.get(this.path) ?? 0;
     if (this.path) this._fetchSubtitleList(this.path);
   },

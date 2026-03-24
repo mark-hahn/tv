@@ -553,7 +553,10 @@
             "
             style="height: 1px; background-color: #000; margin: 4px 0"
           ></div>
-          <div :style="getSubCardStyle()">
+          <div
+            :style="getSubCardStyle()"
+            @click="applySubsSingle(item)"
+          >
             <div
               style="
                 display: flex;
@@ -1863,6 +1866,7 @@ export default {
         borderRadius: "5px",
         border: "1px solid #ddd",
         marginBottom: "4px",
+        cursor: "pointer",
       };
     },
     async adjustOffset(offset) {
@@ -1984,6 +1988,45 @@ export default {
         this.applyInProgress = false;
         return;
       }
+
+      try {
+        const res = await applySubFiles(payload);
+        if (res && res.error) {
+          alert("Error applying subs: " + res.error);
+        } else {
+          alert("Subs applied successfully");
+          await this.refresh();
+        }
+      } catch (e) {
+        alert("Error applying subs: " + e.message);
+      } finally {
+        this.applyInProgress = false;
+      }
+    },
+    async applySubsSingle(item) {
+      if (this.applyInProgress) return;
+      this.applyInProgress = true;
+
+      let fileId = item.file_id;
+      if (!fileId) {
+        const files = item.raw?.attributes?.files || [];
+        if (files.length) fileId = files[0].file_id;
+      }
+
+      if (!fileId) {
+        alert("No valid file found");
+        this.applyInProgress = false;
+        return;
+      }
+
+      const payload = [
+        {
+          file_id: Number(fileId),
+          showName: this.currentShowName,
+          season: item.season,
+          episode: item.episode,
+        },
+      ];
 
       try {
         const res = await applySubFiles(payload);

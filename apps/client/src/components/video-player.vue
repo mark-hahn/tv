@@ -191,6 +191,7 @@ export default {
       activeTrackId: null,
       subtitleOffset: 0,
       vidSrc: "",
+      errorRetries: 0,
     };
   },
   computed: {
@@ -241,6 +242,7 @@ export default {
       this._mseStop();
       this.subtitleTracks = [];
       this.activeTrackId = null;
+      this.errorRetries = 0;
       this.vidSrc = newVal ? this.streamUrl : "";
       this.subtitleOffset = offsetCache.get(newVal) ?? 0;
       if (newVal) this._fetchSubtitleList(newVal);
@@ -306,16 +308,29 @@ export default {
       const vid = this.$refs.vid;
       if (!vid) return;
       const err = vid.error;
-      if (err && err.code === MediaError.MEDIA_ERR_NETWORK) {
-        const resumeAt = vid.currentTime;
+      if (!err) return;
+      if (this.errorRetries >= 3) {
         console.log(
-          `[video] network error at ${resumeAt.toFixed(1)}s, recovering`,
+          `[video] error code=${err.code}, giving up after ${this.errorRetries} retries`,
         );
-        this._mseStop();
-        setTimeout(() => {
-          if (this.$refs.vid) this._mseRecover(resumeAt);
-        }, 1000);
+        return;
       }
+      this.errorRetries++;
+      const resumeAt = vid.currentTime;
+      console.log(
+        `[video] error code=${err.code} at ${resumeAt.toFixed(1)}s, retry ${this.errorRetries}`,
+      );
+      this._mseStop();
+      setTimeout(() => {
+        const v = this.$refs.vid;
+        if (!v) return;
+        if (resumeAt > 0) {
+          this._mseRecover(resumeAt);
+        } else {
+          v.load();
+          v.play().catch(() => {});
+        }
+      }, 1000);
     },
     _mseStop() {
       if (this._mseAbort) {

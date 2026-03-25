@@ -691,10 +691,42 @@ function writeSRT(segments, outputPath) {
     finalSegs.push({ ...seg });
   }
 
-  // Write SRT from finalSegs using original (prefer first occurrence) text
+  // Split segments that are longer than 12 words into smaller chunks
+  // with linearly interpolated timestamps.
+  const MAX_WORDS = 12;
+  const splitSegs = [];
+  for (const seg of finalSegs) {
+    const words = seg.text.trim().split(/\s+/);
+    if (words.length <= MAX_WORDS) {
+      splitSegs.push(seg);
+      continue;
+    }
+    const totalDur = seg.end - seg.start;
+    const totalWords = words.length;
+    // Distribute words as evenly as possible across the minimum number of chunks
+    const numChunks = Math.ceil(totalWords / MAX_WORDS);
+    const baseSize = Math.floor(totalWords / numChunks);
+    const remainder = totalWords % numChunks;
+    let wordOffset = 0;
+    for (let i = 0; i < numChunks; i++) {
+      const chunkSize = baseSize + (i < remainder ? 1 : 0);
+      const chunkWords = words.slice(wordOffset, wordOffset + chunkSize);
+      const chunkStart = seg.start + (wordOffset / totalWords) * totalDur;
+      const chunkEnd =
+        seg.start + ((wordOffset + chunkSize) / totalWords) * totalDur;
+      splitSegs.push({
+        start: chunkStart,
+        end: chunkEnd,
+        text: chunkWords.join(" "),
+      });
+      wordOffset += chunkSize;
+    }
+  }
+
+  // Write SRT from splitSegs using original (prefer first occurrence) text
   let srtContent = "";
   let index = 0;
-  for (const seg of finalSegs) {
+  for (const seg of splitSegs) {
     const startTime = toSrtTime(seg.start);
     const endTime = toSrtTime(seg.end);
     srtContent += `${++index}\n`;

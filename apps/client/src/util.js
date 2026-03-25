@@ -175,6 +175,23 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.haveSubs = 0;
       break;
 
+    case "Needs Files":
+      tmp.unplayed = -1;
+      tmp.gap = 0;
+      tmp.ended = 0;
+      tmp.waiting = 0;
+      tmp.drama = 0;
+      tmp.foreign = 0;
+      tmp.totry = 0;
+      tmp.continue = 0;
+      tmp.mark = 0;
+      tmp.linda = 0;
+      tmp.ban = -1;
+      tmp.hasemby = 1;
+      tmp.full = -1;
+      tmp.haveSubs = 0;
+      break;
+
     case "Finished":
       tmp.unplayed = 0;
       tmp.gap = 0;

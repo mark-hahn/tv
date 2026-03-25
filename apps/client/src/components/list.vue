@@ -644,7 +644,7 @@ export default {
         "Ended",
         "Length",
       ],
-      fltrChoices: ["All", "Try Drama", "Watching", "Finished"],
+      fltrChoices: ["All", "Try Drama", "Watching", "Needs Files", "Finished"],
       conds: [
         {
           color: "#0cf",
@@ -3116,6 +3116,24 @@ export default {
     };
     document.addEventListener("click", this._actorsListClickOutside, true);
 
+    // Click-outside handler to close sort/filter dropdowns
+    this._popClickOutside = (e) => {
+      if (!this.sortPopped && !this.fltrPopped) return;
+      const sortpop = document.getElementById("sortpop");
+      const fltrpop = document.getElementById("fltrpop");
+      const sortFltr = document.getElementById("sortFltr");
+      if (
+        (sortpop && sortpop.contains(e.target)) ||
+        (fltrpop && fltrpop.contains(e.target)) ||
+        (sortFltr && sortFltr.contains(e.target))
+      ) {
+        return;
+      }
+      this.sortPopped = false;
+      this.fltrPopped = false;
+    };
+    document.addEventListener("click", this._popClickOutside);
+
     // Setup evtBus listeners cleanup
     this.evtHandlers = {};
     const on = (name, fn) => {
@@ -3482,6 +3500,11 @@ export default {
     if (this._actorsListClickOutside) {
       document.removeEventListener("click", this._actorsListClickOutside, true);
       this._actorsListClickOutside = null;
+    }
+
+    if (this._popClickOutside) {
+      document.removeEventListener("click", this._popClickOutside);
+      this._popClickOutside = null;
     }
 
     if (this.evtHandlers) {

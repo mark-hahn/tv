@@ -645,7 +645,13 @@ export default {
         "Ended",
         "Length",
       ],
-      fltrChoices: ["Close", "Try Drama", "Watching", "Needs Files", "Finished"],
+      fltrChoices: [
+        "Close",
+        "Try Drama",
+        "Watching",
+        "Needs Files",
+        "Finished",
+      ],
       conds: [
         {
           color: "#0cf",

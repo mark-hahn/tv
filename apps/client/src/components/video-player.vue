@@ -112,6 +112,26 @@
       >
         {{ offsetDisplay }}
       </div>
+      <!-- Apply button (srt only) -->
+      <div
+        v-if="showSlider"
+        @click.stop="applySliderOffset"
+        style="
+          color: white;
+          font-size: 13px;
+          padding: 2px 8px;
+          border-radius: 4px;
+          border: 1px solid #666;
+          cursor: pointer;
+          user-select: none;
+          background: rgba(0, 0, 0, 0.5);
+          margin-right: 8px;
+          white-space: nowrap;
+          text-shadow: 0 0 3px #000;
+        "
+      >
+        Apply
+      </div>
       <!-- Subtitle choice buttons -->
       <div
         v-for="(choice, i) in subtitleChoices"
@@ -175,6 +195,7 @@
 
 <script>
 import { config } from "../config.js";
+import { applySubOffset } from "../srvr.js";
 
 const TV_SRVR_URL = config.tvSrvrUrl;
 const offsetCache = new Map(); // in-memory per-file subtitle offset
@@ -400,6 +421,22 @@ export default {
         { once: true },
       );
       this.vidSrc = blobUrl;
+    },
+    async applySliderOffset() {
+      const track = this.activeTrack;
+      if (!track || track.type !== "srt" || this.subtitleOffset === 0) return;
+      const offsetMs = Math.round(this.subtitleOffset * 1000);
+      try {
+        await applySubOffset({
+          videoPath: this.path,
+          srtFile: track.file,
+          offsetMs,
+        });
+        offsetCache.set(this.path, 0);
+        this.subtitleOffset = 0;
+      } catch (e) {
+        console.error("[applySliderOffset]", e);
+      }
     },
     close() {
       this._mseStop();

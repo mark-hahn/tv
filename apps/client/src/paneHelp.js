@@ -6,11 +6,11 @@ export default {
     Server enqueues a show refresh 
       disk scan + gap check + TVDB scrape
   Server pushes showUpdating message 
-  Server sends tvdbUpdated with the new record — Client updates in-memory TVDB cache, refreshes remote links (IMDB, RT, etc.), dismisses modal
-Server sends showQueueEmpty as a fallback to dismiss the modal if tvdbUpdated didn't clear it
-A 60-second stuck-refresh safety timer logs diagnostics if nothing completes in time
-  
-`,
+  Server pushes tvdbUpdated with the new record
+    Client updates in-memory TVDB cache, refreshes remote links
+    dismisses modal
+  Server sends showQueueEmpty as a fallback to dismiss the modal if tvdbUpdated didn't clear it
+  A 60-second stuck-refresh safety timer logs diagnostics if nothing completes in time`,
 
   map: `Ctrl+click episode — delete episode file
 Alt+click episode — play the episode

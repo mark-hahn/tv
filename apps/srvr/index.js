@@ -3344,6 +3344,69 @@ app.post("/api/subsSearch", apiWrapper(subsSearch));
 app.post("/api/applySubFiles", apiWrapper(applySubFiles));
 app.post("/api/deleteSubFiles", apiWrapper(deleteSubFiles));
 app.post("/api/offsetSubFiles", apiWrapper(offsetSubFiles));
+app.post("/api/applySubOffset", async (req, res) => {
+  const { videoPath, srtFile, offsetMs } = req.body || {};
+  if (typeof videoPath !== "string" || !videoPath) {
+    res.status(400).json({ error: "videoPath required" });
+    return;
+  }
+  if (
+    typeof srtFile !== "string" ||
+    !srtFile ||
+    !path.basename(srtFile).endsWith(".srt")
+  ) {
+    res.status(400).json({ error: "srtFile required and must be .srt" });
+    return;
+  }
+  if (!Number.isFinite(offsetMs) || offsetMs === 0) {
+    res.json({ ok: true });
+    return;
+  }
+  const resolvedVideo = path.resolve(videoPath);
+  if (!resolvedVideo.startsWith(tvDir + "/")) {
+    res.status(403).json({ error: "forbidden" });
+    return;
+  }
+  const srtPath = path.join(
+    path.dirname(resolvedVideo),
+    path.basename(srtFile),
+  );
+  const resolvedSrt = path.resolve(srtPath);
+  if (!resolvedSrt.startsWith(tvDir + "/") || !resolvedSrt.endsWith(".srt")) {
+    res.status(403).json({ error: "forbidden" });
+    return;
+  }
+  if (!fs.existsSync(resolvedSrt)) {
+    res.status(404).json({ error: "srt file not found" });
+    return;
+  }
+  const timeLineRe =
+    /^([0-9]{2}:[0-9]{2}:[0-9]{2},[0-9]{3})(\s*-->\s*)([0-9]{2}:[0-9]{2}:[0-9]{2},[0-9]{3})(.*)$/;
+  let text;
+  try {
+    text = fs.readFileSync(resolvedSrt, "utf8");
+  } catch (e) {
+    res.status(500).json({ error: "read failed: " + e.message });
+    return;
+  }
+  const lines = String(text).split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const m = timeLineRe.exec(lines[i]);
+    if (!m) continue;
+    const startMs = srtTimeToMs(m[1]);
+    const endMs = srtTimeToMs(m[3]);
+    if (startMs === null || endMs === null) continue;
+    lines[i] =
+      `${msToSrtTime(Math.max(0, startMs + offsetMs))}${m[2]}${msToSrtTime(Math.max(0, endMs + offsetMs))}${m[4] || ""}`;
+  }
+  try {
+    fs.writeFileSync(resolvedSrt, lines.join("\n"), "utf8");
+  } catch (e) {
+    res.status(500).json({ error: "write failed: " + e.message });
+    return;
+  }
+  res.json({ ok: true });
+});
 
 // Email
 app.post("/api/sendEmail", apiWrapper(sendEmailHandler));

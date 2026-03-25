@@ -441,69 +441,6 @@
         </div>
         <div style="display: flex; gap: 8px; align-items: center">
           <button
-            @click="adjustOffset(-500)"
-            title="-500ms"
-            :disabled="_trimBusy"
-            style="
-              cursor: pointer;
-              border-radius: 4px;
-              padding: 2px 6px;
-              border: 1px solid #bbb;
-              background-color: whitesmoke;
-              font-weight: bold;
-            "
-          >
-            ↓
-          </button>
-          <button
-            @click="adjustOffset(-100)"
-            title="-100ms"
-            :disabled="_trimBusy"
-            style="
-              cursor: pointer;
-              border-radius: 4px;
-              padding: 2px 6px;
-              border: 1px solid #bbb;
-              background-color: whitesmoke;
-              font-weight: bold;
-            "
-          >
-            ↓
-          </button>
-          <div style="width: 64px; text-align: center">
-            {{ cumulativeTrim }} ms
-          </div>
-          <button
-            @click="adjustOffset(100)"
-            title="+100ms"
-            :disabled="_trimBusy"
-            style="
-              cursor: pointer;
-              border-radius: 4px;
-              padding: 2px 6px;
-              border: 1px solid #bbb;
-              background-color: whitesmoke;
-              font-weight: bold;
-            "
-          >
-            ↑
-          </button>
-          <button
-            @click="adjustOffset(500)"
-            title="+500ms"
-            :disabled="_trimBusy"
-            style="
-              cursor: pointer;
-              border-radius: 4px;
-              padding: 2px 6px;
-              border: 1px solid #bbb;
-              background-color: whitesmoke;
-              font-weight: bold;
-            "
-          >
-            ↑
-          </button>
-          <button
             @click="applySubs"
             :disabled="applyInProgress"
             style="
@@ -647,7 +584,6 @@ import {
   subsSearch,
   applySubFiles,
   getSubFileIds,
-  offsetSubFiles,
   handleAsr,
   handleFix,
 } from "../srvr.js";
@@ -689,10 +625,6 @@ export default {
       totalSubsCount: 0,
       validSubsCount: 0,
       currentShowName: "",
-
-      // Offset
-      cumulativeTrim: 0,
-      _trimBusy: false,
 
       // Asr
       showAsr: false,
@@ -1868,82 +1800,6 @@ export default {
         marginBottom: "4px",
         cursor: "pointer",
       };
-    },
-    async adjustOffset(offset) {
-      if (this._trimBusy) return;
-      this._trimBusy = true;
-      try {
-        if (!offset || typeof offset !== "number") return;
-        // Build Payload
-        const payload = [];
-        for (const item of this.subsItems) {
-          let fileId = item.file_id;
-          if (!fileId) {
-            const entry = item.raw;
-            const files = entry.attributes?.files || [];
-            if (files.length) fileId = files[0].file_id;
-          }
-          if (!fileId) continue;
-
-          payload.push({
-            file_id: Number(fileId),
-            showName: this.currentShowName,
-            season: item.season,
-            episode: item.episode,
-          });
-        }
-
-        if (!payload.length) {
-          // No alert permitted
-          return;
-        }
-
-        const payloadWithOffset = payload.map((o) => ({ ...o, offset }));
-
-        // Call server
-        const timeoutMs = 120000;
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(
-            () =>
-              reject(
-                new Error(
-                  `offsetSubFiles: timed out after ${timeoutMs / 1000}s`,
-                ),
-              ),
-            timeoutMs,
-          );
-        });
-        const res = await Promise.race([
-          offsetSubFiles(payloadWithOffset),
-          timeoutPromise,
-        ]);
-
-        if (
-          res &&
-          typeof res === "object" &&
-          res.ok &&
-          Array.isArray(res.failures)
-        ) {
-          this.applyFailures = res.failures;
-          this.showApplyFailuresModal = res.failures.length > 0;
-          if (!res.failures.length) {
-            this.cumulativeTrim += offset;
-          }
-        } else if (
-          res &&
-          typeof res === "object" &&
-          typeof res.error === "string"
-        ) {
-          console.error("Error: " + res.error);
-        } else {
-          // String "ok" or object without failures/error.
-          this.cumulativeTrim += offset;
-        }
-      } catch (e) {
-        console.error("Error: " + (e.message || e));
-      } finally {
-        this._trimBusy = false;
-      }
     },
     encodeFileIdBase32(fileId) {
       if (fileId == null) return "";

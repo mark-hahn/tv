@@ -311,6 +311,12 @@ export function offsetSubFiles(fileIdObjs) {
   return httpCall("/api/offsetSubFiles", fileIdObjs, "POST");
 }
 
+// Apply the slider offset to an SRT file in-place.
+// { videoPath:string, srtFile:string, offsetMs:number }
+export function applySubOffset(params) {
+  return httpCall("/api/applySubOffset", params, "POST");
+}
+
 // Scan the show folder for existing subtitle files and return their file-id base32 strings.
 // showName: string
 // Returns: string[] (e.g. ["ASD2H", "IF8JH"])

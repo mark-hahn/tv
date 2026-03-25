@@ -218,32 +218,11 @@ const toPstParts = (ms) => {
   }
 };
 
-const deleteDbEntryForLocalFilePath = (filePath) => {
-  try {
-    const fp = String(filePath || "");
-    if (!fp || !path.isAbsolute(fp)) return;
-
-    // Derive (localPath, title) from the filesystem event.
-    const title = path.basename(fp);
-    const dir = path.dirname(fp);
-    if (!title || !dir) return;
-
-    const localPath1 = dir;
-    const localPath2 = dir.endsWith(path.sep) ? dir : dir + path.sep;
-    const localPath3 = localPath2
-      .replace(/\/+$/g, "/")
-      .replace(/\\+$/g, path.sep);
-
-    openDb();
-
-    // NOTE: requested behavior: delete only finished non-errored rows in tv.sqlite;
-    // do not touch any other datastore.
-    try {
-      db.prepare(
-        "DELETE FROM tv_entries WHERE title=? AND status='finished' AND (error IS NULL OR error=0) AND (localPath=? OR localPath=? OR localPath=?)",
-      ).run(title, localPath1, localPath2, localPath3);
-    } catch {}
-  } catch {}
+const deleteDbEntryForLocalFilePath = (_filePath) => {
+  // Intentionally a no-op: deleting the SQLite record when a local file is
+  // removed causes the down server to re-download intentionally deleted
+  // episodes on its next cycle.  Records are cleaned up by
+  // hourlyUsbPruneAndTvResync once the USB source dir expires.
 };
 
 const walkDirectories = (rootDir) => {
@@ -387,77 +366,11 @@ const tvResync = () => {
 
     setImmediate(() => {
       try {
-        openDb();
-
-        // Only delete finished rows (never delete errored entries).
-        let rows = [];
-        try {
-          rows = db
-            .prepare(
-              "SELECT title, destTitle, localPath, status, error FROM tv_entries",
-            )
-            .all();
-        } catch {
-          rows = [];
-        }
-
-        const toDelete = [];
-        for (const r of rows) {
-          if (!r) continue;
-          const title = r.title != null ? String(r.title) : "";
-          const destTitle = r.destTitle != null ? String(r.destTitle) : "";
-          const localPath = r.localPath != null ? String(r.localPath) : "";
-          const status = r.status != null ? String(r.status) : "";
-          const error = r.error == null ? 0 : Number(r.error);
-          if (!title) continue;
-
-          // Orphan definition for this resync: finished but missing local file.
-          if (status !== "finished") continue;
-          if (Number.isFinite(error) && error !== 0) continue;
-
-          // DVD:makemkv guard cards and tmp-dvd staging entries must never be
-          // deleted here — same exemption as hourlyUsbPruneAndTvResync.
-          if (title.startsWith("DVD:")) continue;
-          const localPathStr = r.localPath != null ? String(r.localPath) : "";
-          if (localPathStr.includes("tmp-dvd")) continue;
-
-          if (!localPath || !path.isAbsolute(localPath)) {
-            toDelete.push(title);
-            continue;
-          }
-          if (
-            path.isAbsolute(title) ||
-            title.includes("\0") ||
-            /(^|[\/\\])\.\.($|[\/\\])/.test(title)
-          ) {
-            toDelete.push(title);
-            continue;
-          }
-
-          const filePath = path.resolve(localPath, title);
-          const destFilePath = destTitle
-            ? path.resolve(localPath, destTitle)
-            : null;
-          if (
-            !safeExists(filePath) &&
-            !(destFilePath && safeExists(destFilePath))
-          ) {
-            toDelete.push(title);
-          }
-        }
-
-        if (toDelete.length) {
-          const tx = db.transaction((titles) => {
-            for (const t of titles) {
-              try {
-                stmtDeleteByTitle.run(t);
-              } catch {}
-            }
-          });
-          tx(toDelete);
-        }
-
         // Pass 2: ensure watchers for all TV_ROOT directories.
+        // Note: orphan-pruning (delete finished rows when local file is missing)
+        // was removed because it caused re-downloads of intentionally deleted
+        // episodes.  Records are now only deleted by hourlyUsbPruneAndTvResync
+        // once the USB source directory expires.
         try {
           ensureTvRootWatchers();
         } catch {}
@@ -500,7 +413,7 @@ const hourlyUsbPruneAndTvResync = (existingUsbDirs) => {
     try {
       rows = db
         .prepare(
-          "SELECT title, destTitle, usbPath, localPath, status, error FROM tv_entries",
+          "SELECT title, usbPath, localPath, status, error FROM tv_entries",
         )
         .all();
     } catch {
@@ -512,7 +425,6 @@ const hourlyUsbPruneAndTvResync = (existingUsbDirs) => {
     }
 
     const missingUsbTitles = [];
-    const orphanFinishedTitles = [];
 
     for (const r of rows) {
       if (!r) continue;
@@ -533,44 +445,16 @@ const hourlyUsbPruneAndTvResync = (existingUsbDirs) => {
       const localPathStr = r.localPath != null ? String(r.localPath) : "";
       if (localPathStr.includes("tmp-dvd")) continue;
 
-      // USB-dir pruning (existing behavior)
+      // USB-dir pruning: remove records whose USB source dir is gone.
       try {
         const usbDir = normalizeUsbDir(r.usbPath);
         if (usbDir && !existingUsbDirs.has(usbDir)) {
           missingUsbTitles.push(title);
         }
       } catch {}
-
-      // Orphan pruning: finished but missing local file.
-      const destTitle = r.destTitle != null ? String(r.destTitle) : "";
-      const localPath = r.localPath != null ? String(r.localPath) : "";
-      if (!localPath || !path.isAbsolute(localPath)) {
-        orphanFinishedTitles.push(title);
-        continue;
-      }
-      if (
-        path.isAbsolute(title) ||
-        title.includes("\0") ||
-        /(^|[\/\\])\.\.($|[\/\\])/.test(title)
-      ) {
-        orphanFinishedTitles.push(title);
-        continue;
-      }
-      const filePath = path.resolve(localPath, title);
-      const destFilePath = destTitle
-        ? path.resolve(localPath, destTitle)
-        : null;
-      if (
-        !safeExists(filePath) &&
-        !(destFilePath && safeExists(destFilePath))
-      ) {
-        orphanFinishedTitles.push(title);
-      }
     }
 
-    const toDelete = Array.from(
-      new Set([...missingUsbTitles, ...orphanFinishedTitles]),
-    );
+    const toDelete = [...missingUsbTitles];
     if (toDelete.length) {
       const tx = db.transaction((titles) => {
         for (const t of titles) {

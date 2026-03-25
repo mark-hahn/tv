@@ -1037,7 +1037,7 @@ async function main() {
       // Inline prune.sh behavior: delete files older than 21 days on the USB host.
       // Run async so it doesn't block the cycle — proceed to checkFiles immediately.
       log(".... deleting old files in usb ~/files (async) ....");
-      PRUNE_DAYS = 21;
+      PRUNE_DAYS = 17;
       lastPruneAt = Date.now();
       (async () => {
         try {

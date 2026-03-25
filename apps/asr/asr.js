@@ -16,6 +16,7 @@ const DUMP_ALL_SEGS = false;
 import fs from "fs";
 import fsp from "fs/promises";
 import path from "path";
+import os from "os";
 import { spawn } from "child_process";
 import { fileURLToPath } from "url";
 import { setTimeout as sleep } from "timers/promises";
@@ -24,7 +25,7 @@ import FormData from "form-data";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const tmpDir = process.env.ASR_TMPDIR
+let tmpDir = process.env.ASR_TMPDIR
   ? process.env.ASR_TMPDIR
   : path.join(__dirname, "tmp");
 
@@ -114,11 +115,13 @@ const AUDIO_CONFIGS = {
 const audioConfig = AUDIO_CONFIGS[audioQuality];
 
 /* ---------------- Input validation ---------------- */
-if (positional.length === 0) {
+const runBackground = switches.has("--background");
+
+if (!runBackground && positional.length === 0) {
   console.error("❌ Error: No input file specified");
   process.exit(1);
 }
-const inputPath = path.resolve(positional[0]);
+const inputPath = runBackground ? "" : path.resolve(positional[0]);
 
 /* ---------------- API Key and setup ---------------- */
 const keyPath = path.resolve("secrets/mistral-asr-key.txt");
@@ -134,6 +137,14 @@ const model = "voxtral-mini-latest";
 const forceLanguage = "en";
 const allowedExt = new Set([".mp4", ".mkv", ".avi", ".mov", ".webm", ".m4v"]);
 const fileLimit = 19 * 1024 * 1024;
+
+/* ---------------- Background processing constants ---------------- */
+const TV_ROOT = "/mnt/media/tv";
+const TVDB_JSON_PATH = "/root/dev/apps/tv/apps/srvr/data/tvdb.json";
+const BKGND_LOG_PATH = path.join(__dirname, "data", "asr-bkgnd.log");
+const BKGND_TMPDIR = "/tmp/asr-bkgnd";
+const CPU_LOAD_MAX = 2;
+const CPU_PAUSE_MS = 10_000;
 
 /* ---------------- format logging timestamp  (HH:MM:SS.t) ---------------- */
 let scriptStart = Date.now();
@@ -478,8 +489,7 @@ async function callApi(uploadInfo) {
       );
       if (body) console.error(JSON.stringify(body));
       if (attempt > MAX_RETRIES) {
-        console.error(`[${ts()}] FATAL: max retries reached`);
-        process.exit(1);
+        throw new Error(`max retries reached after ${attempt} attempts`);
       }
       console.error(`[${ts()}] Retrying...`);
       const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
@@ -514,12 +524,9 @@ function processSegments(segments, chunkInfo) {
       segment.end === undefined ||
       !segment.text?.trim()
     ) {
-      console.error(
-        `Invalid segment (missing start/end/text), chunk ${
-          chunkInfo.chunkIndex
-        }`,
+      throw new Error(
+        `Invalid segment (missing start/end/text), chunk ${chunkInfo.chunkIndex}`,
       );
-      process.exit(1);
     }
     const start = chunkInfo.chunkStart + segment.start;
     const end = chunkInfo.chunkStart + segment.end;
@@ -548,8 +555,7 @@ function toSrtTime(totalSec) {
 /* ---------------- SRT generation ---------------- */
 function writeSRT(segments, outputPath) {
   if (!segments || segments.length === 0) {
-    console.error("Video has no segments to write:", outputPath);
-    process.exit(1);
+    throw new Error(`Video has no segments to write: ${outputPath}`);
   }
   const sortedSegments = segments.sort((a, b) => a.start - b.start);
 
@@ -813,8 +819,7 @@ async function processOneVideo(videoPath) {
       }
     }
     if (allSegments.length === 0) {
-      console.error("No transcription segments found");
-      process.exit(1);
+      throw new Error("No transcription segments found");
     }
     if (DUMP_ALL_SEGS) {
       let lastIdx = -1;
@@ -847,7 +852,7 @@ async function processOneVideo(videoPath) {
         videoPath,
       )}, ${err.message}`,
     );
-    process.exit(1);
+    throw err;
   } finally {
     // Cleanup
     try {
@@ -864,6 +869,173 @@ async function processOneVideo(videoPath) {
   console.log(
     `Elapsed: ${String(eMin).padStart(2, "0")}:${String(eSec).padStart(2, "0")}`,
   );
+}
+
+/* ---------------- Background processing helpers ---------------- */
+
+function deleteLastLogLine(logPath) {
+  if (!fs.existsSync(logPath)) return;
+  const content = fs.readFileSync(logPath, "utf8");
+  const lines = content.split("\n");
+  while (lines.length > 0 && lines[lines.length - 1].trim() === "") lines.pop();
+  if (lines.length === 0) return;
+  lines.pop();
+  fs.writeFileSync(
+    logPath,
+    lines.length > 0 ? lines.join("\n") + "\n" : "",
+    "utf8",
+  );
+}
+
+function loadTvdb() {
+  return JSON.parse(fs.readFileSync(TVDB_JSON_PATH, "utf8"));
+}
+
+function appendBkgndLog(logPath, season, episode, showName) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
+  const get = (type) => parts.find((p) => p.type === type)?.value ?? "00";
+  const stamp = `${get("month")}-${get("day")} ${get("hour")}:${get("minute")}:${get("second")}`;
+  const sxx = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
+  fs.mkdirSync(path.dirname(logPath), { recursive: true });
+  fs.appendFileSync(logPath, `${stamp} ${sxx} ${showName}\n`, "utf8");
+}
+
+async function waitForLowCpu() {
+  while (true) {
+    if (os.loadavg()[0] <= CPU_LOAD_MAX) return;
+    await sleep(CPU_PAUSE_MS);
+  }
+}
+
+async function findCandidateFile(show) {
+  if (!show.path) return null;
+
+  // Determine last watched (season, episode)
+  let lastSeason = 0;
+  let lastEpisode = 0;
+  const we = show.watchedEpis;
+  if (Array.isArray(we) && we.length > 0) {
+    const lastRow = we[we.length - 1];
+    lastSeason = lastRow[0];
+    lastEpisode = lastRow.length > 1 ? Math.max(...lastRow.slice(1)) : 0;
+  }
+
+  const showDir = path.join(TV_ROOT, show.path);
+  if (!fs.existsSync(showDir)) return null;
+
+  let entries;
+  try {
+    entries = fs.readdirSync(showDir);
+  } catch {
+    return null;
+  }
+
+  const tuples = [];
+  for (const entry of entries) {
+    const smatch = entry.match(/^Season\s+(\d+)$/i);
+    if (!smatch) continue;
+    const seasonNum = parseInt(smatch[1], 10);
+    if (seasonNum === 0) continue;
+    const seasonDir = path.join(showDir, entry);
+    let files;
+    try {
+      files = fs.readdirSync(seasonDir);
+    } catch {
+      continue;
+    }
+    for (const file of files) {
+      if (!isVideoFile(file)) continue;
+      const ematch = file.match(/[Ss](\d{1,2})[Ee](\d{1,2})/);
+      if (!ematch) continue;
+      tuples.push({
+        season: parseInt(ematch[1], 10),
+        episode: parseInt(ematch[2], 10),
+        fullPath: path.join(seasonDir, file),
+      });
+    }
+  }
+
+  tuples.sort((a, b) =>
+    a.season !== b.season ? a.season - b.season : a.episode - b.episode,
+  );
+
+  for (const t of tuples) {
+    if (t.season < lastSeason) continue;
+    if (t.season === lastSeason && t.episode <= lastEpisode) continue;
+    if (!(await pathExists(getSrtPath(t.fullPath)))) {
+      return {
+        videoPath: t.fullPath,
+        season: t.season,
+        episode: t.episode,
+        showName: show.name,
+      };
+    }
+  }
+  return null;
+}
+
+async function pickNextFile(inEmbyShows, logPath) {
+  let startIdx = 0;
+  if (fs.existsSync(logPath)) {
+    const content = fs.readFileSync(logPath, "utf8");
+    const lines = content.split("\n").filter((l) => l.trim() !== "");
+    if (lines.length > 0) {
+      const lastLine = lines[lines.length - 1];
+      const match = lastLine.match(
+        /^\d{2}-\d{2} \d{2}:\d{2}:\d{2} S\d+E\d+ (.+)$/,
+      );
+      if (match) {
+        const lastName = match[1];
+        const idx = inEmbyShows.findIndex((s) => s.name === lastName);
+        if (idx !== -1) startIdx = (idx + 1) % inEmbyShows.length;
+      }
+    }
+  }
+
+  for (let i = 0; i < inEmbyShows.length; i++) {
+    const show = inEmbyShows[(startIdx + i) % inEmbyShows.length];
+    const result = await findCandidateFile(show);
+    if (result) return result;
+  }
+  return null;
+}
+
+async function runBackgroundLoop() {
+  tmpDir = BKGND_TMPDIR;
+  fs.mkdirSync(BKGND_TMPDIR, { recursive: true });
+  deleteLastLogLine(BKGND_LOG_PATH);
+  console.log(`[bkgnd] Starting background ASR loop. Log: ${BKGND_LOG_PATH}`);
+
+  while (true) {
+    await waitForLowCpu();
+
+    const allTvdb = loadTvdb();
+    const inEmby = Object.values(allTvdb).filter((s) => s.inEmby);
+
+    const chosen = await pickNextFile(inEmby, BKGND_LOG_PATH);
+    if (!chosen) {
+      console.log(`[bkgnd] No candidate files found, waiting 60s`);
+      await sleep(60_000);
+      continue;
+    }
+
+    const { videoPath, season, episode, showName } = chosen;
+    appendBkgndLog(BKGND_LOG_PATH, season, episode, showName);
+
+    try {
+      await processOneVideo(videoPath);
+    } catch (err) {
+      console.error(`[bkgnd] \u274c ${err.message}`);
+    }
+  }
 }
 
 /* ---------------- Main execution ---------------- */
@@ -951,7 +1123,11 @@ async function main() {
   try {
     await run("ffmpeg", ["-version"]);
     await run("ffprobe", ["-version"]);
-    await main();
+    if (runBackground) {
+      await runBackgroundLoop();
+    } else {
+      await main();
+    }
   } catch (err) {
     console.error(`[${ts()}] 💥��� Error: ${err.message}`);
     process.exit(1);

@@ -635,6 +635,7 @@ export default {
       downActiveShowNames: [],
       hasLoadedAllShows: false,
       sortChoices: [
+        "Close",
         "Alpha",
         "Viewed",
         "Added",
@@ -644,7 +645,7 @@ export default {
         "Ended",
         "Length",
       ],
-      fltrChoices: ["All", "Try Drama", "Watching", "Needs Files", "Finished"],
+      fltrChoices: ["Close", "Try Drama", "Watching", "Needs Files", "Finished"],
       conds: [
         {
           color: "#0cf",
@@ -2107,7 +2108,7 @@ export default {
     },
 
     sortAction(sortChoice) {
-      if (sortChoice != "sortClose") {
+      if (sortChoice != "Close") {
         this.sortChoice = sortChoice;
         this.sortShows();
         setTimeout(() => {
@@ -2127,7 +2128,7 @@ export default {
       this.actorFilter = null; // Clear actor filter when changing filter
       this.actorSearchParams = null;
       evtBus.emit("actorSearchCleared");
-      if (fltrChoice != "fltrClose") {
+      if (fltrChoice != "Close") {
         // Set filters first
         window.localStorage.setItem("fltrChoice", fltrChoice);
         this.fltrChoice = fltrChoice;

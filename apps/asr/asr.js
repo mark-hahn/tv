@@ -891,7 +891,7 @@ function loadTvdb() {
   return JSON.parse(fs.readFileSync(TVDB_JSON_PATH, "utf8"));
 }
 
-function appendBkgndLog(logPath, season, episode, videoPath) {
+function appendBkgndLog(logPath, videoPath) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Los_Angeles",
     month: "2-digit",
@@ -903,10 +903,9 @@ function appendBkgndLog(logPath, season, episode, videoPath) {
   }).formatToParts(new Date());
   const get = (type) => parts.find((p) => p.type === type)?.value ?? "00";
   const stamp = `${get("month")}-${get("day")} ${get("hour")}:${get("minute")}:${get("second")}`;
-  const sxx = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
   fs.mkdirSync(path.dirname(logPath), { recursive: true });
   const relPath = path.relative(TV_ROOT, videoPath);
-  fs.appendFileSync(logPath, `${stamp} ${sxx} ${relPath}\n`, "utf8");
+  fs.appendFileSync(logPath, `${stamp} ${relPath}\n`, "utf8");
 }
 
 async function waitForLowCpu() {
@@ -990,9 +989,7 @@ async function pickNextFile(inEmbyShows, logPath) {
     const lines = content.split("\n").filter((l) => l.trim() !== "");
     if (lines.length > 0) {
       const lastLine = lines[lines.length - 1];
-      const match = lastLine.match(
-        /^\d{2}-\d{2} \d{2}:\d{2}:\d{2} S\d+E\d+ (.+)$/,
-      );
+      const match = lastLine.match(/^\d{2}-\d{2} \d{2}:\d{2}:\d{2} (.+)$/);
       if (match) {
         const relPath = match[1];
         // First path component is the show directory name (same as show.path)
@@ -1030,8 +1027,8 @@ async function runBackgroundLoop() {
       continue;
     }
 
-    const { videoPath, season, episode } = chosen;
-    appendBkgndLog(BKGND_LOG_PATH, season, episode, videoPath);
+    const { videoPath } = chosen;
+    appendBkgndLog(BKGND_LOG_PATH, videoPath);
 
     try {
       await processOneVideo(videoPath);

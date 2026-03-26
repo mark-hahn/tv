@@ -891,7 +891,7 @@ function loadTvdb() {
   return JSON.parse(fs.readFileSync(TVDB_JSON_PATH, "utf8"));
 }
 
-function appendBkgndLog(logPath, season, episode, showName) {
+function appendBkgndLog(logPath, season, episode, videoPath) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Los_Angeles",
     month: "2-digit",
@@ -905,7 +905,8 @@ function appendBkgndLog(logPath, season, episode, showName) {
   const stamp = `${get("month")}-${get("day")} ${get("hour")}:${get("minute")}:${get("second")}`;
   const sxx = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
   fs.mkdirSync(path.dirname(logPath), { recursive: true });
-  fs.appendFileSync(logPath, `${stamp} ${sxx} ${showName}\n`, "utf8");
+  const relPath = path.relative(TV_ROOT, videoPath);
+  fs.appendFileSync(logPath, `${stamp} ${sxx} ${relPath}\n`, "utf8");
 }
 
 async function waitForLowCpu() {
@@ -993,8 +994,10 @@ async function pickNextFile(inEmbyShows, logPath) {
         /^\d{2}-\d{2} \d{2}:\d{2}:\d{2} S\d+E\d+ (.+)$/,
       );
       if (match) {
-        const lastName = match[1];
-        const idx = inEmbyShows.findIndex((s) => s.name === lastName);
+        const relPath = match[1];
+        // First path component is the show directory name (same as show.path)
+        const showDir = relPath.split(path.sep)[0];
+        const idx = inEmbyShows.findIndex((s) => s.path === showDir);
         if (idx !== -1) startIdx = (idx + 1) % inEmbyShows.length;
       }
     }
@@ -1027,8 +1030,8 @@ async function runBackgroundLoop() {
       continue;
     }
 
-    const { videoPath, season, episode, showName } = chosen;
-    appendBkgndLog(BKGND_LOG_PATH, season, episode, showName);
+    const { videoPath, season, episode } = chosen;
+    appendBkgndLog(BKGND_LOG_PATH, season, episode, videoPath);
 
     try {
       await processOneVideo(videoPath);

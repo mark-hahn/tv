@@ -166,3 +166,13 @@ export const getEventsByName = (showName) => {
 export const getEventsByHash = (hash) => {
   return stmtGetByHash.get(hash) || null;
 };
+
+export const trimToLimit = (limit = 10000) => {
+  const count = db.prepare("SELECT COUNT(*) as n FROM history").get().n;
+  if (count <= limit) return 0;
+  const excess = count - limit;
+  db.prepare(
+    "DELETE FROM history WHERE id IN (SELECT id FROM history ORDER BY id ASC LIMIT ?)",
+  ).run(excess);
+  return excess;
+};

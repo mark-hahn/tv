@@ -27,6 +27,17 @@ import {
 } from "./src/srvrPaths.js";
 import * as history from "./src/history.js";
 
+const HISTORY_TRIM_LIMIT = 10000;
+const HISTORY_TRIM_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+const trimHistory = () => {
+  const removed = history.trimToLimit(HISTORY_TRIM_LIMIT);
+  if (removed > 0) console.log(`[history] trimmed ${removed} old entries`);
+};
+
+trimHistory();
+setInterval(trimHistory, HISTORY_TRIM_INTERVAL_MS);
+
 const tvdbIdByName = (name) => {
   if (!name) return null;
   const all = tvdb.getAllTvdbSync();

@@ -4515,7 +4515,7 @@ function asrPendingAppend(showName) {
         .filter(Boolean),
     );
     if (names.has(showName)) return;
-    fs.mkdirSync(require("path").dirname(ASR_PENDING_PATH), {
+    fs.mkdirSync(path.dirname(ASR_PENDING_PATH), {
       recursive: true,
     });
     fs.appendFileSync(ASR_PENDING_PATH, showName + "\n", "utf8");

@@ -1008,6 +1008,10 @@ const pendingPushes = new Map();
 
 const debouncedTvdbPush = (name) => {
   if (!name) return;
+  const stack = new Error().stack.split("\n").slice(1, 4).join(" | ");
+  console.log(
+    `[LOOP-DBG] debouncedTvdbPush called for "${name}" from: ${stack}`,
+  );
   if (pendingPushes.has(name)) clearTimeout(pendingPushes.get(name));
   pendingPushes.set(
     name,
@@ -1015,6 +1019,7 @@ const debouncedTvdbPush = (name) => {
       pendingPushes.delete(name);
       const record = tvdb.getAllTvdbSync()[name];
       if (record) {
+        console.log(`[LOOP-DBG] sending tvdbUpdated push for "${name}"`);
         notifyClients("tvdbUpdated", { name, record });
       }
     }, PUSH_DEBOUNCE_MS),
@@ -1478,8 +1483,8 @@ const getShowDiskInfo = async (showFolderName) => {
       if (videoFileExtensions.includes(sfx)) {
         const date = fmtDateWithTZ(fstat.mtime);
         if (!maxDate || date > maxDate) maxDate = date;
+        totalSize += fstat.size;
       }
-      totalSize += fstat.size;
     } catch (err) {
       errFlg = err;
     }
@@ -4102,10 +4107,7 @@ async function runEmbyFullSweep() {
       }
       tvdbRecord.path = embyPath;
       tvdbRecord.genres = embyShow.Genres || [];
-      if (name === "Amandaland")
-        console.log(
-          `[overview] embyFullSweep: tvdb=${JSON.stringify(tvdbRecord.overview?.substring(0, 80))} emby=${JSON.stringify((embyShow.Overview || "").substring(0, 80))}`,
-        );
+      if (name === "Amandaland") console.log(`[overview] embyFullSweep: tvdb=${JSON.stringify(tvdbRecord.overview?.substring(0, 80))} emby=${JSON.stringify((embyShow.Overview || "").substring(0, 80))}`);
       tvdbRecord.overview = embyShow.Overview || "";
       tvdbRecord.dateCreated = util.toPstDateTime(embyShow.DateCreated);
       tvdbRecord.premiereDate = embyShow.PremiereDate?.substring(0, 10);

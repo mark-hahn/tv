@@ -19,7 +19,16 @@ export async function sshCurlFetch(
   targetUrl,
   { headers = {}, cookieHeader = "" } = {},
 ) {
-  const args = ["-sS", "-L", "--compressed", "--max-time", "60"];
+  // Percent-encode non-ASCII characters (e.g. Cyrillic) in the URL so curl
+  // receives a valid ASCII URL. new URL().href handles this automatically.
+  let safeUrl = targetUrl;
+  try {
+    safeUrl = new URL(targetUrl).href;
+  } catch {
+    // malformed URL — pass as-is and let curl fail
+  }
+
+  const args = ["-sS", "-L", "--globoff", "--compressed", "--max-time", "60"];
 
   for (const [k, v] of Object.entries(headers || {})) {
     if (!k) continue;
@@ -38,7 +47,7 @@ export async function sshCurlFetch(
     args.push("-b", cookieHeader);
   }
 
-  args.push(targetUrl);
+  args.push(safeUrl);
 
   const curlCmd = "curl " + args.map(shellEsc).join(" ");
 

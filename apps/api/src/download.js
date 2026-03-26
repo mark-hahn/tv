@@ -377,6 +377,21 @@ export function extractTorrentFileTitles(torrentData) {
   return Array.from(new Set(titles)).filter(Boolean);
 }
 
+export function extractTorrentFileDetails(torrentData) {
+  const parsed = parseTorrent(torrentData);
+  const files = Array.isArray(parsed?.files) ? parsed.files : [];
+  const dvdRe = /\.(vob|ifo|bup)$/i;
+  return files
+    .filter((f) => {
+      const p = String(f?.path || f?.name || "");
+      return p && !dvdRe.test(p);
+    })
+    .map((f) => ({
+      path: String(f.path || f.name || ""),
+      size: typeof f.length === "number" ? f.length : null,
+    }));
+}
+
 function normalizeProvider(rawProvider, detailUrl) {
   const p = String(rawProvider || "")
     .toLowerCase()
@@ -572,6 +587,138 @@ export async function fetchTorrentFile(torrent) {
 
   if (provider === "torrentleech") {
     return await fetchTorrentFileFromSearchResult(torrent);
+  }
+
+  // Limetorrents: try direct CDN link (raw.link / itorrents.net), then fall
+  // back to scraping the per-torrent detail page (raw.desc).
+  if (provider === "limetorrents") {
+    const directLink = String(torrent?.raw?.link || "").trim();
+    console.log("[lim] directLink:", directLink);
+    if (
+      directLink &&
+      (directLink.startsWith("http://") || directLink.startsWith("https://"))
+    ) {
+      try {
+        const dlOrigin = new URL(directLink).origin;
+        const torHeaders = {
+          "User-Agent": DOWNLOAD_USER_AGENT,
+          Accept: "application/x-bittorrent,application/octet-stream,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.5",
+          Referer: `${dlOrigin}/`,
+        };
+        const dlResp = await sshFetch(directLink, { headers: torHeaders });
+        console.log("[lim] directLink fetch ok:", dlResp.ok);
+        if (dlResp.ok) {
+          const torrentData = Buffer.from(await dlResp.arrayBuffer());
+          const valid = validateTorrentData(torrentData);
+          console.log(
+            "[lim] directLink valid:",
+            valid.success,
+            "bytes:",
+            torrentData.length,
+          );
+          if (valid.success) {
+            appendTorrentBytesLog({
+              provider,
+              method: "direct-link",
+              downloadUrl: directLink,
+              torrentData,
+            });
+            return ok({
+              provider,
+              downloadUrl: directLink,
+              bytes: torrentData.length,
+              torrentData,
+              method: "direct-link",
+            });
+          }
+        }
+      } catch (e) {
+        console.log("[lim] directLink exception:", e?.message);
+        // fall through to detail page
+      }
+    }
+
+    // Fall back to scraping the per-torrent detail page
+    const pageUrl = String(torrent?.raw?.desc || "").trim();
+    console.log("[lim] pageUrl:", pageUrl);
+    if (!pageUrl) {
+      return fail(
+        "validate",
+        "No detail page URL available for limetorrents torrent",
+        { provider },
+      );
+    }
+    const pageHeaders = {
+      "User-Agent": DOWNLOAD_USER_AGENT,
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.5",
+      Referer: `${new URL(pageUrl).origin}/`,
+    };
+    const pageResp = await sshFetch(pageUrl, { headers: pageHeaders });
+    console.log("[lim] pageResp ok:", pageResp.ok);
+    if (!pageResp.ok) {
+      return fail("fetch-detail", "Failed to fetch limetorrents detail page", {
+        provider,
+        detailUrl: pageUrl,
+      });
+    }
+    const pageHtml = await pageResp.text();
+    if (looksLikeCloudflareChallenge(pageHtml)) {
+      return fail(
+        "fetch-detail",
+        "Cloudflare challenge page (Just a moment...)",
+        { provider, detailUrl: pageUrl },
+      );
+    }
+    const torrentLinkMatch = pageHtml.match(
+      /<a[^>]*href="([^"]*\.torrent)"[^>]*>/i,
+    );
+    if (!torrentLinkMatch) {
+      return fail(
+        "parse-detail",
+        "No .torrent download link found in limetorrents detail page",
+        { provider, detailUrl: pageUrl },
+      );
+    }
+    let torrentDlUrl = torrentLinkMatch[1];
+    if (
+      !torrentDlUrl.startsWith("http://") &&
+      !torrentDlUrl.startsWith("https://")
+    ) {
+      const base = new URL(pageUrl);
+      torrentDlUrl = torrentDlUrl.startsWith("/")
+        ? `${base.protocol}//${base.host}${torrentDlUrl}`
+        : `${base.protocol}//${base.host}/${torrentDlUrl}`;
+    }
+    const torHeaders2 = {
+      "User-Agent": DOWNLOAD_USER_AGENT,
+      Accept: "application/x-bittorrent,application/octet-stream,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.5",
+      Referer: `${new URL(pageUrl).origin}/`,
+    };
+    const torResp = await sshFetch(torrentDlUrl, { headers: torHeaders2 });
+    if (!torResp.ok) {
+      return fail(
+        "fetch-torrent",
+        "Failed to download limetorrents torrent from detail page",
+        { provider, downloadUrl: torrentDlUrl },
+      );
+    }
+    const torrentData = Buffer.from(await torResp.arrayBuffer());
+    appendTorrentBytesLog({
+      provider,
+      method: "detail-page",
+      downloadUrl: torrentDlUrl,
+      torrentData,
+    });
+    return ok({
+      provider,
+      downloadUrl: torrentDlUrl,
+      bytes: torrentData.length,
+      torrentData,
+      method: "detail-page",
+    });
   }
 
   if (!detailUrl) {

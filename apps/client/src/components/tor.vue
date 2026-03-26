@@ -968,6 +968,9 @@ export default {
 
       // Cache torrent results from preview mode for later use
       previewTorCache: new Map(),
+
+      // Snapshot of seriesMap JSON from last search (for change detection on pane return)
+      _savedSeriesMapJson: null,
     };
   },
 
@@ -1243,7 +1246,28 @@ export default {
         if (showId && showId !== this.lastAutoSearchedShowId) {
           this.lastAutoSearchedShowId = showId;
           void this.searchTorrents(this.activeShow);
+        } else if (
+          showId &&
+          this._savedSeriesMapJson != null &&
+          (this.hasSearched || this.noTorrentsNeeded)
+        ) {
+          // Re-check seriesMap; redo search if it changed since last search
+          this._checkSeriesMapChanged(this.currentShow || this.activeShow);
         }
+      }
+    },
+
+    async _checkSeriesMapChanged(show) {
+      if (!show || !show.id || show.inEmby === false) return;
+      try {
+        const fresh = await emby.getSeriesMap(show);
+        const freshJson = JSON.stringify(fresh || []);
+        if (freshJson !== this._savedSeriesMapJson) {
+          this.lastAutoSearchedShowId = null; // allow re-search
+          void this.searchTorrents(show);
+        }
+      } catch {
+        /* ignore */
       }
     },
 
@@ -1956,6 +1980,7 @@ export default {
       try {
         // Get series map (same way as list.vue does)
         const seriesMapIn = await emby.getSeriesMap(show);
+        this._savedSeriesMapJson = JSON.stringify(seriesMapIn || []);
         if (!seriesMapIn || seriesMapIn.length === 0) {
           return needed;
         }

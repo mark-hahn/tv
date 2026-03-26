@@ -811,6 +811,14 @@ export default {
     };
   },
 
+  watch: {
+    async highlightName(newName) {
+      if (!newName || this.currentPane !== "map" || !this.mapShow) return;
+      const show = allShows.find((s) => s.name === newName);
+      if (show) await this.seriesMapAction("open", show);
+    },
+  },
+
   computed: {
     displayHighlightName() {
       return this.highlightName;

@@ -4102,7 +4102,10 @@ async function runEmbyFullSweep() {
       }
       tvdbRecord.path = embyPath;
       tvdbRecord.genres = embyShow.Genres || [];
-      if (name === "Amandaland") console.log(`[overview] embyFullSweep: tvdb=${JSON.stringify(tvdbRecord.overview?.substring(0, 80))} emby=${JSON.stringify((embyShow.Overview || "").substring(0, 80))}`);
+      if (name === "Amandaland")
+        console.log(
+          `[overview] embyFullSweep: tvdb=${JSON.stringify(tvdbRecord.overview?.substring(0, 80))} emby=${JSON.stringify((embyShow.Overview || "").substring(0, 80))}`,
+        );
       tvdbRecord.overview = embyShow.Overview || "";
       tvdbRecord.dateCreated = util.toPstDateTime(embyShow.DateCreated);
       tvdbRecord.premiereDate = embyShow.PremiereDate?.substring(0, 10);

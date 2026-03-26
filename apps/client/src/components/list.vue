@@ -1728,7 +1728,7 @@ export default {
       if (!this.highlightName) return;
       const show = allShows.find((s) => s.name === this.highlightName);
       if (!show) return;
-      this.saveVisShow(show, false);
+      this.saveVisShow(show, false, { skipHistory: true });
     },
 
     async prevNextClick(next) {

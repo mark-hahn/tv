@@ -1225,11 +1225,11 @@ export default {
       let startPath = null;
       if (this.selectedName) {
         const node = this.tree.find((n) => n.name === this.selectedName);
-        if (node && node.type === "folder") startPath = node.name;
+        if (node) startPath = node.name;
       } else if (this.selectedFiles.size === 1) {
         const relPath = [...this.selectedFiles][0];
         const node = this.findNodeByPath(relPath);
-        if (node && node.type === "folder") startPath = relPath;
+        if (node) startPath = relPath;
       }
 
       if (!startPath) {

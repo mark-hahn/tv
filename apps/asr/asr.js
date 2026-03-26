@@ -701,20 +701,19 @@ function writeSRT(segments, outputPath) {
     finalSegs.push({ ...seg });
   }
 
-  // Split segments that are longer than 12 words into smaller chunks
+  // Split segments that are longer than 60 chars into smaller chunks
   // with linearly interpolated timestamps.
-  const MAX_WORDS = 12;
+  const MAX_CHARS = 60;
   const splitSegs = [];
   for (const seg of finalSegs) {
-    const words = seg.text.trim().split(/\s+/);
-    if (words.length <= MAX_WORDS) {
+    if (seg.text.length <= MAX_CHARS) {
       splitSegs.push(seg);
       continue;
     }
+    const words = seg.text.trim().split(/\s+/);
     const totalDur = seg.end - seg.start;
     const totalWords = words.length;
-    // Distribute words as evenly as possible across the minimum number of chunks
-    const numChunks = Math.ceil(totalWords / MAX_WORDS);
+    const numChunks = Math.ceil(seg.text.length / MAX_CHARS);
     const baseSize = Math.floor(totalWords / numChunks);
     const remainder = totalWords % numChunks;
     let wordOffset = 0;
@@ -1153,7 +1152,7 @@ async function main() {
       }
       videoFiles.push(inputPath);
     } else if (stat.isDirectory()) {
-      const files = await fsp.readdir(inputPath);
+      const files = (await fsp.readdir(inputPath)).sort();
       for (const file of files) {
         const fullPath = path.join(inputPath, file);
         const fileStat = await fsp.stat(fullPath);

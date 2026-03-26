@@ -2891,8 +2891,9 @@ app.post(
     }
     if (!refreshDone) {
       console.warn(
-        `[refreshEmbyItem] Poll timed out for ${showName}, proceeding anyway`,
+        `[refreshEmbyItem] Poll timed out for ${showName}, skipping enqueue`,
       );
+      return { success: true };
     }
 
     tvdb.enqueueShowProcess(showName);
@@ -4100,6 +4101,9 @@ async function runEmbyFullSweep() {
       }
       tvdbRecord.path = embyPath;
       tvdbRecord.genres = embyShow.Genres || [];
+      console.log(
+        `[overview] embyFullSweep: ${name} tvdb=${JSON.stringify(tvdbRecord.overview?.substring(0, 50))} emby=${JSON.stringify((embyShow.Overview || "").substring(0, 50))}`,
+      );
       tvdbRecord.overview = embyShow.Overview || "";
       tvdbRecord.dateCreated = util.toPstDateTime(embyShow.DateCreated);
       tvdbRecord.premiereDate = embyShow.PremiereDate?.substring(0, 10);

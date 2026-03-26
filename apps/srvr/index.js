@@ -27,17 +27,6 @@ import {
 } from "./src/srvrPaths.js";
 import * as history from "./src/history.js";
 
-const HISTORY_TRIM_LIMIT = 10000;
-const HISTORY_TRIM_INTERVAL_MS = 24 * 60 * 60 * 1000;
-
-const trimHistory = () => {
-  const removed = history.trimToLimit(HISTORY_TRIM_LIMIT);
-  if (removed > 0) console.log(`[history] trimmed ${removed} old entries`);
-};
-
-trimHistory();
-setInterval(trimHistory, HISTORY_TRIM_INTERVAL_MS);
-
 const tvdbIdByName = (name) => {
   if (!name) return null;
   const all = tvdb.getAllTvdbSync();
@@ -2825,15 +2814,17 @@ app.post(
     console.log(
       `[refreshEmbyItem] Refreshing Emby item for ${showName} (${showId})`,
     );
-    // Read DateLastRefreshed before triggering so we can detect when it changes
+    // Read DateLastRefreshed and DateLastSaved before triggering so we can detect when either changes
     let refreshedBefore = null;
+    let savedBefore = null;
     try {
       const beforeRes = await fetch(
-        `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${showId}?Fields=DateLastRefreshed&api_key=${EMBY_API_KEY}`,
+        `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${showId}?Fields=DateLastRefreshed,DateLastSaved&api_key=${EMBY_API_KEY}`,
       );
       if (beforeRes.ok) {
         const beforeData = await beforeRes.json();
         refreshedBefore = beforeData.DateLastRefreshed || null;
+        savedBefore = beforeData.DateLastSaved || null;
       }
     } catch (e) {
       console.error(
@@ -2859,7 +2850,7 @@ app.post(
       );
     }
 
-    // Poll DateLastRefreshed until it advances past triggerTime (max 30s, poll every 1s)
+    // Poll until DateLastRefreshed or DateLastSaved changes (max 30s, poll every 1s)
     const POLL_INTERVAL_MS = 1000;
     const POLL_TIMEOUT_MS = 30 * 1000;
     const pollStart = Date.now();
@@ -2871,18 +2862,23 @@ app.post(
       await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
       try {
         const pollRes = await fetch(
-          `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${showId}?Fields=DateLastRefreshed&api_key=${EMBY_API_KEY}`,
+          `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${showId}?Fields=DateLastRefreshed,DateLastSaved&api_key=${EMBY_API_KEY}`,
         );
         if (pollRes.ok) {
           const pollData = await pollRes.json();
           const refreshedAfter = pollData.DateLastRefreshed || null;
-          if (
+          const savedAfter = pollData.DateLastSaved || null;
+          const refreshedChanged =
             refreshedAfter &&
             refreshedAfter !== refreshedBefore &&
-            new Date(refreshedAfter).getTime() >= triggerTime
-          ) {
+            new Date(refreshedAfter).getTime() >= triggerTime;
+          const savedChanged =
+            savedAfter &&
+            savedAfter !== savedBefore &&
+            new Date(savedAfter).getTime() >= triggerTime;
+          if (refreshedChanged || savedChanged) {
             console.log(
-              `[refreshEmbyItem] Refresh complete for ${showName} (DateLastRefreshed=${refreshedAfter})`,
+              `[refreshEmbyItem] Refresh complete for ${showName} (DateLastRefreshed=${refreshedAfter}, DateLastSaved=${savedAfter})`,
             );
             refreshDone = true;
             break;
@@ -2897,9 +2893,8 @@ app.post(
     }
     if (!refreshDone) {
       console.warn(
-        `[refreshEmbyItem] Poll timed out for ${showName}, skipping enqueue`,
+        `[refreshEmbyItem] Poll timed out for ${showName}, enqueuing anyway`,
       );
-      return { success: true };
     }
 
     tvdb.enqueueShowProcess(showName);
@@ -4107,6 +4102,7 @@ async function runEmbyFullSweep() {
       }
       tvdbRecord.path = embyPath;
       tvdbRecord.genres = embyShow.Genres || [];
+      if (name === "Amandaland") console.log(`[overview] embyFullSweep: tvdb=${JSON.stringify(tvdbRecord.overview?.substring(0, 80))} emby=${JSON.stringify((embyShow.Overview || "").substring(0, 80))}`);
       tvdbRecord.overview = embyShow.Overview || "";
       tvdbRecord.dateCreated = util.toPstDateTime(embyShow.DateCreated);
       tvdbRecord.premiereDate = embyShow.PremiereDate?.substring(0, 10);

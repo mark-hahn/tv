@@ -2333,7 +2333,7 @@ export default {
       });
     },
 
-    async seriesMapAction(action, show, wasDeleted) {
+    async seriesMapAction(action, show) {
       if (action == "close") {
         this.mapShow = null;
         this.$emit("hide-map");
@@ -2410,27 +2410,14 @@ export default {
         seriesMap[seasonNum] = seasonMap;
         for (const episode of episodes) {
           let [episodeNum, epiObj] = episode;
-          const {
-            error,
-            played,
-            avail,
-            noFile,
-            unaired,
-            deleted: epiDeleted,
-            path,
-          } = epiObj;
+          const { error, played, avail, noFile, unaired, path } = epiObj;
           seriesMapEpis[episodeNum] = episodeNum;
-          const deleted =
-            epiDeleted ||
-            (wasDeleted?.season == seasonNum &&
-              wasDeleted?.episode == episodeNum);
           seasonMap[episodeNum] = {
             error,
             played,
             avail,
             noFile,
             unaired,
-            deleted,
             path,
           };
         }
@@ -2490,6 +2477,14 @@ export default {
         mapError: errorMessage,
         noSwitch: isRefresh,
       });
+
+      if (action === "prune") {
+        this.markShowUpdating(show.name);
+        await srvr
+          .refreshEmbyItem(show.id, show.name)
+          .catch((err) => console.error("refreshEmbyItem failed:", err));
+        await this.seriesMapAction("refresh", show);
+      }
     },
 
     async condFltrClick(cond, event) {

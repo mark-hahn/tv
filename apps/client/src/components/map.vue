@@ -436,7 +436,7 @@
                   ><span
                     v-if="seriesMap?.[season]?.[episode]?.unaired &amp;&amp; !seriesMap?.[season]?.[episode]?.played &amp;&amp; seriesMap?.[season]?.[episode]?.noFile"
                     >u</span
-                  ><span v-if="seriesMap?.[season]?.[episode]?.deleted">d</span>
+                  >
                 </td>
               </tr>
             </tbody>
@@ -1172,7 +1172,7 @@ export default {
         const episodeStates = {};
         Object.keys(seasonEpisodes).forEach((episodeNum) => {
           const episode = seasonEpisodes[episodeNum];
-          if (episode && !episode.unaired && !episode.deleted) {
+          if (episode && !episode.unaired) {
             episodeStates[episodeNum] = episode.played || false;
           }
         });

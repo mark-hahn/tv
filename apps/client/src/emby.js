@@ -1135,12 +1135,10 @@ export const getSeriesMap = async (show, prune = false) => {
         continue;
       }
 
-      let deleted = false;
       if (pruning) {
         if (!played && avail) pruning = false;
         else {
           await deleteOneFile(path);
-          deleted = avail; // set even if error
         }
       }
 
@@ -1161,7 +1159,7 @@ export const getSeriesMap = async (show, prune = false) => {
 
       episodes.push([
         episodeNumber,
-        { error, played, avail, noFile: noFileVal, unaired, deleted, path },
+        { error, played, avail, noFile: noFileVal, unaired, path },
       ]);
     }
     if (episodes.length === 0) {

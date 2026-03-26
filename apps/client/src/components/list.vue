@@ -3208,23 +3208,11 @@ export default {
         // If this show is currently in the map pane, refetch series map so
         // map cells (noFile/avail/etc.) update after disk/download changes.
         if (this.mapShow && this.mapShow.name === name && show) {
-          console.log(
-            `[LOOP-DBG] tvdbUpdated calling seriesMapAction("refresh") for "${name}"`,
-          );
           await this.seriesMapAction("refresh", show, null);
-          console.log(
-            `[LOOP-DBG] tvdbUpdated seriesMapAction done for "${name}"`,
-          );
-        } else {
-          console.log(
-            `[LOOP-DBG] tvdbUpdated skipped seriesMapAction: mapShow="${this.mapShow?.name}", name="${name}", hasShow=${!!show}`,
-          );
         }
 
         // Refresh UI
-        console.log(`[LOOP-DBG] tvdbUpdated calling refilter for "${name}"`);
         await this.refilter(false);
-        console.log(`[LOOP-DBG] tvdbUpdated refilter done for "${name}"`);
       } catch (err) {
         console.error("[tvdbUpdated] Failed to handle tvdb push:", err);
       }

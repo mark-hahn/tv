@@ -142,9 +142,13 @@ const fileLimit = 19 * 1024 * 1024;
 const TV_ROOT = "/mnt/media/tv";
 const TVDB_JSON_PATH = "/root/dev/apps/tv/apps/srvr/data/tvdb.json";
 const BKGND_LOG_PATH = path.join(__dirname, "data", "asr-bkgnd.log");
+const PENDING_PATH = path.join(__dirname, "data", "pending.txt");
 const BKGND_TMPDIR = "/tmp/asr-bkgnd";
 const CPU_LOAD_MAX = 2;
 const CPU_PAUSE_MS = 10_000;
+const EMPTY_CYCLE_PAUSE_THRESHOLD = 500;
+const EMPTY_CYCLE_PAUSE_MS = 10 * 60_000;
+const EMPTY_CYCLE_POLL_MS = 15_000;
 
 /* ---------------- format logging timestamp  (HH:MM:SS.t) ---------------- */
 let scriptStart = Date.now();
@@ -891,7 +895,29 @@ function loadTvdb() {
   return JSON.parse(fs.readFileSync(TVDB_JSON_PATH, "utf8"));
 }
 
-function appendBkgndLog(logPath, videoPath) {
+// Atomically consume pending.txt; returns Set of show names (empty Set if no file).
+function consumePending() {
+  const tmp = PENDING_PATH + ".tmp";
+  try {
+    fs.renameSync(PENDING_PATH, tmp);
+  } catch {
+    return new Set();
+  }
+  try {
+    const content = fs.readFileSync(tmp, "utf8");
+    fs.unlinkSync(tmp);
+    return new Set(
+      content
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function appendBkgndLog(logPath, videoPath, fromPending) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Los_Angeles",
     month: "2-digit",
@@ -905,7 +931,8 @@ function appendBkgndLog(logPath, videoPath) {
   const stamp = `${get("month")}-${get("day")} ${get("hour")}:${get("minute")}:${get("second")}`;
   fs.mkdirSync(path.dirname(logPath), { recursive: true });
   const relPath = path.relative(TV_ROOT, videoPath);
-  fs.appendFileSync(logPath, `${stamp} ${relPath}\n`, "utf8");
+  const marker = fromPending ? "* " : "  ";
+  fs.appendFileSync(logPath, `${stamp} ${marker}${relPath}\n`, "utf8");
 }
 
 async function waitForLowCpu() {
@@ -982,14 +1009,24 @@ async function findCandidateFile(show) {
   return null;
 }
 
-async function pickNextFile(inEmbyShows, logPath) {
+async function pickNextFile(inEmbyShows, logPath, pendingNames) {
+  // If any pending shows, check them first
+  if (pendingNames && pendingNames.size > 0) {
+    for (const name of pendingNames) {
+      const show = inEmbyShows.find((s) => s.path === name || s.name === name);
+      if (!show) continue;
+      const result = await findCandidateFile(show);
+      if (result) return { ...result, fromPending: true };
+    }
+  }
+
   let startIdx = 0;
   if (fs.existsSync(logPath)) {
     const content = fs.readFileSync(logPath, "utf8");
     const lines = content.split("\n").filter((l) => l.trim() !== "");
     if (lines.length > 0) {
       const lastLine = lines[lines.length - 1];
-      const match = lastLine.match(/^\d{2}-\d{2} \d{2}:\d{2}:\d{2} (.+)$/);
+      const match = lastLine.match(/^\d{2}-\d{2} \d{2}:\d{2}:\d{2} [* ] (.+)$/);
       if (match) {
         const relPath = match[1];
         // First path component is the show directory name (same as show.path)
@@ -1014,26 +1051,66 @@ async function runBackgroundLoop() {
   deleteLastLogLine(BKGND_LOG_PATH);
   console.log(`[bkgnd] Starting background ASR loop. Log: ${BKGND_LOG_PATH}`);
 
+  let emptyCycles = 0;
+
   while (true) {
     await waitForLowCpu();
+
+    const pending = consumePending();
 
     const allTvdb = loadTvdb();
     const inEmby = Object.values(allTvdb).filter((s) => s.inEmby);
 
-    const chosen = await pickNextFile(inEmby, BKGND_LOG_PATH);
+    const chosen = await pickNextFile(inEmby, BKGND_LOG_PATH, pending);
     if (!chosen) {
-      console.log(`[bkgnd] No candidate files found, waiting 60s`);
-      await sleep(60_000);
+      emptyCycles++;
+      console.log(
+        `[bkgnd] No candidate files found, waiting 60s (empty cycles: ${emptyCycles})`,
+      );
+      if (emptyCycles >= EMPTY_CYCLE_PAUSE_THRESHOLD) {
+        console.log(
+          `[bkgnd] ${EMPTY_CYCLE_PAUSE_THRESHOLD} empty cycles — pausing for up to ${EMPTY_CYCLE_PAUSE_MS / 60000} mins`,
+        );
+        const deadline = Date.now() + EMPTY_CYCLE_PAUSE_MS;
+        while (Date.now() < deadline) {
+          await sleep(EMPTY_CYCLE_POLL_MS);
+          const wakeUp = consumePending();
+          if (wakeUp.size > 0) {
+            console.log(
+              `[bkgnd] pending.txt woke up pause: ${[...wakeUp].join(", ")}`,
+            );
+            // Put them back so the next iteration picks them up
+            fs.mkdirSync(path.dirname(PENDING_PATH), { recursive: true });
+            fs.writeFileSync(
+              PENDING_PATH,
+              [...wakeUp].join("\n") + "\n",
+              "utf8",
+            );
+            break;
+          }
+        }
+        emptyCycles = 0;
+      } else {
+        await sleep(60_000);
+      }
       continue;
     }
 
-    const { videoPath } = chosen;
-    appendBkgndLog(BKGND_LOG_PATH, videoPath);
+    const { videoPath, fromPending } = chosen;
+    appendBkgndLog(BKGND_LOG_PATH, videoPath, fromPending);
 
+    let generated = false;
     try {
       await processOneVideo(videoPath);
+      generated = true;
     } catch (err) {
       console.error(`[bkgnd] \u274c ${err.message}`);
+    }
+
+    if (generated) {
+      emptyCycles = 0;
+    } else {
+      emptyCycles++;
     }
   }
 }

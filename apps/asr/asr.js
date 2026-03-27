@@ -320,19 +320,44 @@ async function extractAudio(inputVideo, outWav) {
 */
 
 const FILTER_CONFIGS = [
-  { name: "baseline",   filter: "highpass=f=80,lowpass=f=8000" },
-  { name: "dynaudnorm", filter: "highpass=f=80,lowpass=f=8000,dynaudnorm=f=150:g=3:m=3:s=8" },
-  { name: "loudnorm",   filter: "highpass=f=80,lowpass=f=8000,loudnorm=I=-16:TP=-1.5:LRA=11" },
-  { name: "gate+comp",  filter: "highpass=f=80,lowpass=f=8000,acompressor=threshold=0.003:ratio=3:attack=30:release=1000,agate=threshold=0.001:ratio=2:attack=10:release=100,loudnorm=I=-16:TP=-1.5:LRA=11" },
-  { name: "afftdn",     filter: "highpass=f=80,lowpass=f=8000,afftdn=nf=-25,loudnorm=I=-16:TP=-1.5:LRA=11" },
+  { name: "baseline", filter: "highpass=f=80,lowpass=f=8000" },
+  {
+    name: "dynaudnorm",
+    filter: "highpass=f=80,lowpass=f=8000,dynaudnorm=f=150:g=3:m=3:s=8",
+  },
+  {
+    name: "loudnorm",
+    filter: "highpass=f=80,lowpass=f=8000,loudnorm=I=-16:TP=-1.5:LRA=11",
+  },
+  {
+    name: "gate+comp",
+    filter:
+      "highpass=f=80,lowpass=f=8000,acompressor=threshold=0.003:ratio=3:attack=30:release=1000,agate=threshold=0.001:ratio=2:attack=10:release=100,loudnorm=I=-16:TP=-1.5:LRA=11",
+  },
+  {
+    name: "afftdn",
+    filter:
+      "highpass=f=80,lowpass=f=8000,afftdn=nf=-25,loudnorm=I=-16:TP=-1.5:LRA=11",
+  },
 ];
 
 const TUNE_PROBE_SEC = 300; // first 5 minutes used for tuning
 
 async function pickBestFilter(rawWav) {
-  console.log(`[${ts()}] Auto-tuning audio filter on ${TUNE_PROBE_SEC}s probe...`);
+  console.log(
+    `[${ts()}] Auto-tuning audio filter on ${TUNE_PROBE_SEC}s probe...`,
+  );
   const probeWav = path.join(tmpDir, "tune_probe_raw.wav");
-  await run("ffmpeg", ["-y", "-i", rawWav, "-t", String(TUNE_PROBE_SEC), "-c:a", "pcm_s16le", probeWav]);
+  await run("ffmpeg", [
+    "-y",
+    "-i",
+    rawWav,
+    "-t",
+    String(TUNE_PROBE_SEC),
+    "-c:a",
+    "pcm_s16le",
+    probeWav,
+  ]);
 
   let bestName = FILTER_CONFIGS[0].name;
   let bestFilter = FILTER_CONFIGS[0].filter;
@@ -341,23 +366,48 @@ async function pickBestFilter(rawWav) {
   for (const cfg of FILTER_CONFIGS) {
     const tuneWav = path.join(tmpDir, "tune_proc.wav");
     try {
-      await run("ffmpeg", ["-y", "-i", probeWav, "-af", cfg.filter, "-ac", "1", "-ar", String(audioConfig.rate), "-b:a", audioConfig.bitrate, "-f", "wav", tuneWav]);
+      await run("ffmpeg", [
+        "-y",
+        "-i",
+        probeWav,
+        "-af",
+        cfg.filter,
+        "-ac",
+        "1",
+        "-ar",
+        String(audioConfig.rate),
+        "-b:a",
+        audioConfig.bitrate,
+        "-f",
+        "wav",
+        tuneWav,
+      ]);
       const tuneFlac = path.join(tmpDir, "tune_proc.flac");
       await run("ffmpeg", ["-y", "-i", tuneWav, "-c:a", "flac", tuneFlac]);
       const stat = await fsp.stat(tuneFlac);
       if (stat.size > fileLimit) {
-        console.log(`[${ts()}]   ${cfg.name}: skipped (probe FLAC too large: ${stat.size} bytes)`);
+        console.log(
+          `[${ts()}]   ${cfg.name}: skipped (probe FLAC too large: ${stat.size} bytes)`,
+        );
         continue;
       }
-      const uploadInfo = { path: tuneFlac, mime: "audio/flac", filename: "tune_probe.flac", size: stat.size };
+      const uploadInfo = {
+        path: tuneFlac,
+        mime: "audio/flac",
+        filename: "tune_probe.flac",
+        size: stat.size,
+      };
       const apiData = await callApi(uploadInfo);
       const segs = apiData.segments || [];
       if (segs.length === 0) {
         console.log(`[${ts()}]   ${cfg.name}: no segments`);
         continue;
       }
-      const score = segs.reduce((sum, s) => sum + (s.avg_logprob ?? 0), 0) / segs.length;
-      console.log(`[${ts()}]   ${cfg.name}: avg_logprob=${score.toFixed(4)} (${segs.length} segs)`);
+      const score =
+        segs.reduce((sum, s) => sum + (s.avg_logprob ?? 0), 0) / segs.length;
+      console.log(
+        `[${ts()}]   ${cfg.name}: avg_logprob=${score.toFixed(4)} (${segs.length} segs)`,
+      );
       if (score > bestScore) {
         bestScore = score;
         bestName = cfg.name;
@@ -368,9 +418,15 @@ async function pickBestFilter(rawWav) {
     }
   }
 
-  try { await fsp.unlink(probeWav); } catch (_) {}
-  try { await fsp.unlink(path.join(tmpDir, "tune_proc.wav")); } catch (_) {}
-  try { await fsp.unlink(path.join(tmpDir, "tune_proc.flac")); } catch (_) {}
+  try {
+    await fsp.unlink(probeWav);
+  } catch (_) {}
+  try {
+    await fsp.unlink(path.join(tmpDir, "tune_proc.wav"));
+  } catch (_) {}
+  try {
+    await fsp.unlink(path.join(tmpDir, "tune_proc.flac"));
+  } catch (_) {}
 
   console.log(`[${ts()}] Selected filter: ${bestName}`);
   return bestFilter;
@@ -1158,7 +1214,9 @@ async function main() {
   console.log(
     `   Audio Quality:     ${audioQuality} (${audioConfig.rate}Hz, ${audioConfig.bitrate})`,
   );
-  console.log(`   Preprocessing:     auto-tune (${FILTER_CONFIGS.length} configs, ${TUNE_PROBE_SEC}s probe)`);
+  console.log(
+    `   Preprocessing:     auto-tune (${FILTER_CONFIGS.length} configs, ${TUNE_PROBE_SEC}s probe)`,
+  );
   console.log(`   API Model:         ${model}`);
   console.log(`   API Language:      ${forceLanguage}`);
   console.log(`   API Temperature:   ${apiTemperature}`);

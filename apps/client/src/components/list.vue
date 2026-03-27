@@ -470,18 +470,6 @@ export default {
       }
     };
 
-    const toggleHaveSubs = async (show) => {
-      this.saveVisShow(show);
-      const originalValue = show.haveSubs;
-      show.haveSubs = !show.haveSubs;
-      try {
-        await srvr.setTvdbFields({ name: show.name, haveSubs: show.haveSubs });
-      } catch (err) {
-        console.error("toggleHaveSubs error:", err);
-        show.haveSubs = originalValue;
-      }
-    };
-
     const toggleReject = async (show) => {
       this.saveVisShow(show);
       if (!show.reject) {
@@ -682,18 +670,6 @@ export default {
           },
           click() {},
           name: "full",
-        },
-        {
-          color: "#0cf",
-          filter: 0,
-          icon: ["far", "comment"],
-          cond(show) {
-            return !!show.haveSubs;
-          },
-          async click(show) {
-            await toggleHaveSubs(show);
-          },
-          name: "haveSubs",
         },
         {
           color: "#f88",
@@ -3076,7 +3052,6 @@ export default {
             !(show.notReady === false && show.inToTry) &&
             (show.fileGap || show.fileEndError || show.seasonWatchedThenNofile);
           show.full = tvdbRecord.full ?? false;
-          show.haveSubs = tvdbRecord.haveSubs ?? false;
 
           // Update allTvdb cache
           tvdb.upsertTvdbCacheRecord(allTvdb, tvdbRecord, showName);
@@ -3196,7 +3171,6 @@ export default {
           show.watchGapEpisode = record.watchGapEpisode;
           show.fileGap = record.fileGap;
           show.full = record.full ?? false;
-          show.haveSubs = record.haveSubs ?? false;
           show.notReady = record.notReady;
           show.date = record.date ?? show.date;
           show.size = record.size ?? show.size;

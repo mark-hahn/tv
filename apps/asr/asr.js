@@ -99,8 +99,7 @@ const testMins = getNum("--test-mins", 0);
 const offsetSec = chunkSec - trimSec - overlapSec - trimSec;
 const minChunkSec = trimSec + overlapSec + trimSec;
 const audioQuality = flagsKVP.get("--audio-quality") || "max";
-const enablePreprocessing = !switches.has("--no-preprocess");
-const enableNoiseReduction = !switches.has("--no-denoise");
+
 const apiTemperature = getNum("--temperature", 0);
 const apiResponseFormat = flagsKVP.get("--response-format") || "verbose_json";
 const apiPrompt = flagsKVP.get("--prompt") || null;
@@ -320,30 +319,64 @@ async function extractAudio(inputVideo, outWav) {
                         
 */
 
-let haveDumpedFFmpeg = false;
+const FILTER_CONFIGS = [
+  { name: "baseline",   filter: "highpass=f=80,lowpass=f=8000" },
+  { name: "dynaudnorm", filter: "highpass=f=80,lowpass=f=8000,dynaudnorm=f=150:g=3:m=3:s=8" },
+  { name: "loudnorm",   filter: "highpass=f=80,lowpass=f=8000,loudnorm=I=-16:TP=-1.5:LRA=11" },
+  { name: "gate+comp",  filter: "highpass=f=80,lowpass=f=8000,acompressor=threshold=0.003:ratio=3:attack=30:release=1000,agate=threshold=0.001:ratio=2:attack=10:release=100,loudnorm=I=-16:TP=-1.5:LRA=11" },
+  { name: "afftdn",     filter: "highpass=f=80,lowpass=f=8000,afftdn=nf=-25,loudnorm=I=-16:TP=-1.5:LRA=11" },
+];
 
-async function preprocessAudio(inputWav, outputWav) {
-  const filters = [];
-  if (enableNoiseReduction) {
-    filters.push(
-      "highpass=f=80",
-      "lowpass=f=8000",
-      "acompressor=threshold=0.003:ratio=3:attack=30:release=1000",
-      "agate=threshold=0.001:ratio=2:attack=10:release=100",
-    );
+const TUNE_PROBE_SEC = 300; // first 5 minutes used for tuning
+
+async function pickBestFilter(rawWav) {
+  console.log(`[${ts()}] Auto-tuning audio filter on ${TUNE_PROBE_SEC}s probe...`);
+  const probeWav = path.join(tmpDir, "tune_probe_raw.wav");
+  await run("ffmpeg", ["-y", "-i", rawWav, "-t", String(TUNE_PROBE_SEC), "-c:a", "pcm_s16le", probeWav]);
+
+  let bestName = FILTER_CONFIGS[0].name;
+  let bestFilter = FILTER_CONFIGS[0].filter;
+  let bestScore = -Infinity;
+
+  for (const cfg of FILTER_CONFIGS) {
+    const tuneWav = path.join(tmpDir, "tune_proc.wav");
+    try {
+      await run("ffmpeg", ["-y", "-i", probeWav, "-af", cfg.filter, "-ac", "1", "-ar", String(audioConfig.rate), "-b:a", audioConfig.bitrate, "-f", "wav", tuneWav]);
+      const tuneFlac = path.join(tmpDir, "tune_proc.flac");
+      await run("ffmpeg", ["-y", "-i", tuneWav, "-c:a", "flac", tuneFlac]);
+      const stat = await fsp.stat(tuneFlac);
+      if (stat.size > fileLimit) {
+        console.log(`[${ts()}]   ${cfg.name}: skipped (probe FLAC too large: ${stat.size} bytes)`);
+        continue;
+      }
+      const uploadInfo = { path: tuneFlac, mime: "audio/flac", filename: "tune_probe.flac", size: stat.size };
+      const apiData = await callApi(uploadInfo);
+      const segs = apiData.segments || [];
+      if (segs.length === 0) {
+        console.log(`[${ts()}]   ${cfg.name}: no segments`);
+        continue;
+      }
+      const score = segs.reduce((sum, s) => sum + (s.avg_logprob ?? 0), 0) / segs.length;
+      console.log(`[${ts()}]   ${cfg.name}: avg_logprob=${score.toFixed(4)} (${segs.length} segs)`);
+      if (score > bestScore) {
+        bestScore = score;
+        bestName = cfg.name;
+        bestFilter = cfg.filter;
+      }
+    } catch (err) {
+      console.log(`[${ts()}]   ${cfg.name}: error — ${err.message}`);
+    }
   }
-  filters.push(
-    "equalizer=f=1000:width_type=h:width=500:g=2",
-    "equalizer=f=3000:width_type=h:width=1000:g=1",
-    "loudnorm=I=-16:TP=-1.5:LRA=11",
-  );
-  let audioFilter = filters.join(",");
 
-  audioFilter = "highpass=f=80,lowpass=f=8000,dynaudnorm=f=150:g=3:m=3:s=8";
+  try { await fsp.unlink(probeWav); } catch (_) {}
+  try { await fsp.unlink(path.join(tmpDir, "tune_proc.wav")); } catch (_) {}
+  try { await fsp.unlink(path.join(tmpDir, "tune_proc.flac")); } catch (_) {}
 
-  // if (!haveDumpedFFmpeg) console.log({ audioFilter });
-  // haveDumpedFFmpeg = true;
+  console.log(`[${ts()}] Selected filter: ${bestName}`);
+  return bestFilter;
+}
 
+async function preprocessAudio(inputWav, outputWav, audioFilter) {
   await run("ffmpeg", [
     "-y",
     "-i",
@@ -760,12 +793,10 @@ async function processOneVideo(videoPath) {
   const processedWavFile = path.join(tmpDir, "audio_processed.wav");
   try {
     await extractAudio(videoPath, rawWavFile);
-    let finalWavFile = rawWavFile;
-    if (enablePreprocessing) {
-      console.log(`[${ts()}] Preprocessing audio...`);
-      await preprocessAudio(rawWavFile, processedWavFile);
-      finalWavFile = processedWavFile;
-    }
+    const audioFilter = await pickBestFilter(rawWavFile);
+    console.log(`[${ts()}] Preprocessing audio...`);
+    await preprocessAudio(rawWavFile, processedWavFile, audioFilter);
+    const finalWavFile = processedWavFile;
     const totalDur = await getDurationSec(finalWavFile);
     const chunks = await getChunks(finalWavFile);
     console.log(
@@ -1127,8 +1158,7 @@ async function main() {
   console.log(
     `   Audio Quality:     ${audioQuality} (${audioConfig.rate}Hz, ${audioConfig.bitrate})`,
   );
-  console.log(`   Preprocessing:     ${enablePreprocessing}`);
-  console.log(`   Noise Reduction:   ${enableNoiseReduction}`);
+  console.log(`   Preprocessing:     auto-tune (${FILTER_CONFIGS.length} configs, ${TUNE_PROBE_SEC}s probe)`);
   console.log(`   API Model:         ${model}`);
   console.log(`   API Language:      ${forceLanguage}`);
   console.log(`   API Temperature:   ${apiTemperature}`);

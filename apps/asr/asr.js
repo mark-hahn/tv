@@ -541,7 +541,7 @@ function processSegments(segments, chunkInfo) {
       text: segment.text.trim(),
       chunk: chunkInfo,
     };
-    if (start > chunkInfo.trimStart && end < chunkInfo.trimEnd)
+    if (start > chunkInfo.trimStart && start < chunkInfo.trimEnd)
       processedSegments.push(processedSegment);
   }
   return processedSegments;

@@ -4,8 +4,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SSH_HOST="hahnca.com"
 
-INCLUDE_ASR=false
-
 TV_REMOTE_BASE="${TV_REMOTE_BASE:-/root/dev/apps/tv}"
 
 if [[ ! -d "$ROOT_DIR/apps" ]]; then
@@ -217,9 +215,7 @@ case "${1:-all}" in
     remote_deploy_one_no_restart srvr
     # Legacy flat deploy mode compabitility (share) - ensures packages are present
     remote_deploy_one_no_restart share
-    if [[ "$INCLUDE_ASR" == "true" ]]; then
-      remote_deploy_one_no_restart asr
-    fi
+    remote_deploy_one_no_restart asr
     
     if ! remote_deploy_one_no_restart down; then
       echo "[warn] down deploy failed; api/srvr already deployed" >&2

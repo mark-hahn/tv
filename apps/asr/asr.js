@@ -617,9 +617,11 @@ function processSegments(segments, chunkInfo) {
       segment.end === undefined ||
       !segment.text?.trim()
     ) {
-      throw new Error(
-        `Invalid segment (missing start/end/text), chunk ${chunkInfo.chunkIndex}`,
+      console.warn(
+        `[warn] skipping invalid segment in chunk ${chunkInfo.chunkIndex}:`,
+        JSON.stringify(segment),
       );
+      continue;
     }
     const start = chunkInfo.chunkStart + segment.start;
     const end = chunkInfo.chunkStart + segment.end;

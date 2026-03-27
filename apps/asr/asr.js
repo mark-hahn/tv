@@ -12,6 +12,8 @@ try {
 // https://console.mistral.ai/usage
 
 const DUMP_ALL_SEGS = false;
+const DUMP_RAW_API = true;
+const DUMP_RAW_PATH = "/root/dev/apps/tv/temp.txt";
 
 import fs from "fs";
 import fsp from "fs/promises";
@@ -103,6 +105,7 @@ const audioQuality = flagsKVP.get("--audio-quality") || "max";
 const apiTemperature = getNum("--temperature", 0);
 const apiResponseFormat = flagsKVP.get("--response-format") || "verbose_json";
 const apiPrompt = flagsKVP.get("--prompt") || null;
+if (DUMP_RAW_API) fs.writeFileSync(DUMP_RAW_PATH, "", "utf8"); // truncate on start
 
 // Audio quality settings
 const AUDIO_CONFIGS = {
@@ -123,7 +126,7 @@ if (!runBackground && positional.length === 0) {
 const inputPath = runBackground ? "" : path.resolve(positional[0]);
 
 /* ---------------- API Key and setup ---------------- */
-const keyPath = path.resolve("secrets/mistral-asr-key.txt");
+const keyPath = path.join(__dirname, "secrets/mistral-asr-key.txt");
 let apiKey;
 try {
   apiKey = fs.readFileSync(keyPath, "utf8").trim();
@@ -319,126 +322,15 @@ async function extractAudio(inputVideo, outWav) {
                         
 */
 
-const FILTER_CONFIGS = [
-  { name: "baseline", filter: "highpass=f=80,lowpass=f=8000" },
-  {
-    name: "dynaudnorm",
-    filter: "highpass=f=80,lowpass=f=8000,dynaudnorm=f=150:g=3:m=3:s=8",
-  },
-  {
-    name: "loudnorm",
-    filter: "highpass=f=80,lowpass=f=8000,loudnorm=I=-16:TP=-1.5:LRA=11",
-  },
-  {
-    name: "gate+comp",
-    filter:
-      "highpass=f=80,lowpass=f=8000,acompressor=threshold=0.003:ratio=3:attack=30:release=1000,agate=threshold=0.001:ratio=2:attack=10:release=100,loudnorm=I=-16:TP=-1.5:LRA=11",
-  },
-  {
-    name: "afftdn",
-    filter:
-      "highpass=f=80,lowpass=f=8000,afftdn=nf=-25,loudnorm=I=-16:TP=-1.5:LRA=11",
-  },
-];
+const AUDIO_FILTER = "highpass=f=80,lowpass=f=8000,loudnorm=I=-16:TP=-1.5:LRA=11";
 
-const TUNE_PROBE_SEC = 300; // first 5 minutes used for tuning
-
-async function pickBestFilter(rawWav) {
-  console.log(
-    `[${ts()}] Auto-tuning audio filter on ${TUNE_PROBE_SEC}s probe...`,
-  );
-  const probeWav = path.join(tmpDir, "tune_probe_raw.wav");
-  await run("ffmpeg", [
-    "-y",
-    "-i",
-    rawWav,
-    "-t",
-    String(TUNE_PROBE_SEC),
-    "-c:a",
-    "pcm_s16le",
-    probeWav,
-  ]);
-
-  let bestName = FILTER_CONFIGS[0].name;
-  let bestFilter = FILTER_CONFIGS[0].filter;
-  let bestScore = -Infinity;
-
-  for (const cfg of FILTER_CONFIGS) {
-    const tuneWav = path.join(tmpDir, "tune_proc.wav");
-    try {
-      await run("ffmpeg", [
-        "-y",
-        "-i",
-        probeWav,
-        "-af",
-        cfg.filter,
-        "-ac",
-        "1",
-        "-ar",
-        String(audioConfig.rate),
-        "-b:a",
-        audioConfig.bitrate,
-        "-f",
-        "wav",
-        tuneWav,
-      ]);
-      const tuneFlac = path.join(tmpDir, "tune_proc.flac");
-      await run("ffmpeg", ["-y", "-i", tuneWav, "-c:a", "flac", tuneFlac]);
-      const stat = await fsp.stat(tuneFlac);
-      if (stat.size > fileLimit) {
-        console.log(
-          `[${ts()}]   ${cfg.name}: skipped (probe FLAC too large: ${stat.size} bytes)`,
-        );
-        continue;
-      }
-      const uploadInfo = {
-        path: tuneFlac,
-        mime: "audio/flac",
-        filename: "tune_probe.flac",
-        size: stat.size,
-      };
-      const apiData = await callApi(uploadInfo);
-      const segs = apiData.segments || [];
-      if (segs.length === 0) {
-        console.log(`[${ts()}]   ${cfg.name}: no segments`);
-        continue;
-      }
-      const score =
-        segs.reduce((sum, s) => sum + (s.avg_logprob ?? 0), 0) / segs.length;
-      console.log(
-        `[${ts()}]   ${cfg.name}: avg_logprob=${score.toFixed(4)} (${segs.length} segs)`,
-      );
-      if (score > bestScore) {
-        bestScore = score;
-        bestName = cfg.name;
-        bestFilter = cfg.filter;
-      }
-    } catch (err) {
-      console.log(`[${ts()}]   ${cfg.name}: error — ${err.message}`);
-    }
-  }
-
-  try {
-    await fsp.unlink(probeWav);
-  } catch (_) {}
-  try {
-    await fsp.unlink(path.join(tmpDir, "tune_proc.wav"));
-  } catch (_) {}
-  try {
-    await fsp.unlink(path.join(tmpDir, "tune_proc.flac"));
-  } catch (_) {}
-
-  console.log(`[${ts()}] Selected filter: ${bestName}`);
-  return bestFilter;
-}
-
-async function preprocessAudio(inputWav, outputWav, audioFilter) {
+async function preprocessAudio(inputWav, outputWav) {
   await run("ffmpeg", [
     "-y",
     "-i",
     inputWav,
     "-af",
-    audioFilter,
+    AUDIO_FILTER,
     "-ac",
     "1",
     "-ar",
@@ -843,7 +735,7 @@ async function processOneVideo(videoPath) {
   console.log(`\n[${ts()}] Processing: ${path.basename(videoPath)}`);
   const videoName = path.basename(videoPath, path.extname(videoPath));
   const srtPath = getSrtPath(videoPath);
-  if (await pathExists(srtPath)) {
+  if (!DUMP_RAW_API && await pathExists(srtPath)) {
     console.log(`\n${videoName}: Enhanced SRT already exists, skipping.`);
     return;
   }
@@ -851,9 +743,8 @@ async function processOneVideo(videoPath) {
   const processedWavFile = path.join(tmpDir, "audio_processed.wav");
   try {
     await extractAudio(videoPath, rawWavFile);
-    const audioFilter = await pickBestFilter(rawWavFile);
     console.log(`[${ts()}] Preprocessing audio...`);
-    await preprocessAudio(rawWavFile, processedWavFile, audioFilter);
+    await preprocessAudio(rawWavFile, processedWavFile);
     const finalWavFile = processedWavFile;
     const totalDur = await getDurationSec(finalWavFile);
     const chunks = await getChunks(finalWavFile);
@@ -865,6 +756,7 @@ async function processOneVideo(videoPath) {
       try {
         const uploadInfo = await getFlac(chunkInfo.wavPath);
         const apiData = await callApi(uploadInfo);
+        if (DUMP_RAW_API) fs.appendFileSync(DUMP_RAW_PATH, JSON.stringify({ chunkIndex: chunkInfo.chunkIndex, chunkStart: chunkInfo.chunkStart, chunkEnd: chunkInfo.chunkEnd, ...apiData }) + "\n", "utf8");
         if (apiData.segments && apiData.segments.length > 0) {
           const processedSegments = processSegments(
             apiData.segments,
@@ -1217,7 +1109,7 @@ async function main() {
     `   Audio Quality:     ${audioQuality} (${audioConfig.rate}Hz, ${audioConfig.bitrate})`,
   );
   console.log(
-    `   Preprocessing:     auto-tune (${FILTER_CONFIGS.length} configs, ${TUNE_PROBE_SEC}s probe)`,
+    `   Preprocessing:     ${AUDIO_FILTER}`,
   );
   console.log(`   API Model:         ${model}`);
   console.log(`   API Language:      ${forceLanguage}`);

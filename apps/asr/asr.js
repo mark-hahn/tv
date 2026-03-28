@@ -114,10 +114,21 @@ const BKGND_LOG_PATH = path.join(__dirname, "data", "asr-bkgnd.log");
 const PENDING_PATH = path.join(__dirname, "data", "pending.txt");
 const BKGND_TMPDIR = "/tmp/asr-bkgnd";
 const CPU_LOAD_MAX = 3;
+// Temporary: limit background processing to these shows only. Set to null to process all.
+const TEST_SHOWS = new Set([
+  "Takin' Over the Asylum",
+  "Not Going Out",
+  "Black Books",
+  "Green Wing",
+  "Grace Under Fire",
+  "Cheers",
+  "Cybill",
+  "The Exes",
+  "The Sketch Show",
+]);
 const CPU_PAUSE_MS = 10_000;
-const EMPTY_CYCLE_PAUSE_THRESHOLD = 500;
-const EMPTY_CYCLE_PAUSE_MS = 10 * 60_000;
-const EMPTY_CYCLE_POLL_MS = 15_000;
+const PAUSE_DURATION_MS = 10 * 60_000;
+const PAUSE_POLL_MS = 15_000;
 
 /* ---------------- format logging timestamp  (HH:MM:SS.t) ---------------- */
 let scriptStart = Date.now();
@@ -1025,57 +1036,72 @@ async function pickNextFile(inEmbyShows, logPath, pendingNames) {
   return null;
 }
 
+async function hasAnyUnwatchedFile() {
+  const allTvdb = loadTvdb();
+  const shows = Object.values(allTvdb).filter((s) => s.inEmby && s.path);
+  for (const show of shows) {
+    const result = await findCandidateFile(show);
+    if (result) return true;
+  }
+  return false;
+}
+
 async function runBackgroundLoop() {
   tmpDir = BKGND_TMPDIR;
   fs.mkdirSync(BKGND_TMPDIR, { recursive: true });
   deleteLastLogLine(BKGND_LOG_PATH);
   console.log(`[bkgnd] Starting background ASR loop. Log: ${BKGND_LOG_PATH}`);
 
-  let emptyCycles = 0;
+  let consecutiveEmpty = 0;
+  let cachedTvdb = null;
+  let pauseLogged = false;
 
   while (true) {
     await waitForLowCpu();
 
     const pending = consumePending();
 
-    const allTvdb = loadTvdb();
-    const inEmby = Object.values(allTvdb).filter((s) => s.inEmby);
+    if (!cachedTvdb) cachedTvdb = loadTvdb();
+    let inEmby = Object.values(cachedTvdb).filter((s) => s.inEmby);
+    if (TEST_SHOWS) inEmby = inEmby.filter((s) => TEST_SHOWS.has(s.path));
 
     const chosen = await pickNextFile(inEmby, BKGND_LOG_PATH, pending);
     if (!chosen) {
-      emptyCycles++;
-      console.log(
-        `[bkgnd] No candidate files found, waiting 60s (empty cycles: ${emptyCycles})`,
-      );
-      if (emptyCycles >= EMPTY_CYCLE_PAUSE_THRESHOLD) {
-        console.log(
-          `[bkgnd] ${EMPTY_CYCLE_PAUSE_THRESHOLD} empty cycles — pausing for up to ${EMPTY_CYCLE_PAUSE_MS / 60000} mins`,
-        );
-        const deadline = Date.now() + EMPTY_CYCLE_PAUSE_MS;
-        while (Date.now() < deadline) {
-          await sleep(EMPTY_CYCLE_POLL_MS);
-          const wakeUp = consumePending();
-          if (wakeUp.size > 0) {
+      consecutiveEmpty++;
+      if (consecutiveEmpty >= 10) {
+        consecutiveEmpty = 0;
+        cachedTvdb = null;
+        if (!(await hasAnyUnwatchedFile())) {
+          if (!pauseLogged) {
             console.log(
-              `[bkgnd] pending.txt woke up pause: ${[...wakeUp].join(", ")}`,
+              `[bkgnd] No unwatched files found — pausing ${PAUSE_DURATION_MS / 60000} mins`,
             );
-            // Put them back so the next iteration picks them up
-            fs.mkdirSync(path.dirname(PENDING_PATH), { recursive: true });
-            fs.writeFileSync(
-              PENDING_PATH,
-              [...wakeUp].join("\n") + "\n",
-              "utf8",
-            );
-            break;
+            pauseLogged = true;
           }
+          const deadline = Date.now() + PAUSE_DURATION_MS;
+          while (Date.now() < deadline) {
+            await sleep(PAUSE_POLL_MS);
+            const wakeUp = consumePending();
+            if (wakeUp.size > 0) {
+              fs.mkdirSync(path.dirname(PENDING_PATH), { recursive: true });
+              fs.writeFileSync(
+                PENDING_PATH,
+                [...wakeUp].join("\n") + "\n",
+                "utf8",
+              );
+              pauseLogged = false;
+              break;
+            }
+          }
+        } else {
+          pauseLogged = false;
         }
-        emptyCycles = 0;
-      } else {
-        await sleep(60_000);
       }
       continue;
     }
 
+    consecutiveEmpty = 0;
+    pauseLogged = false;
     const { videoPath, fromPending } = chosen;
     appendBkgndLog(BKGND_LOG_PATH, videoPath, fromPending);
 
@@ -1084,13 +1110,13 @@ async function runBackgroundLoop() {
       await processOneVideo(videoPath);
       generated = true;
     } catch (err) {
-      console.error(`[bkgnd] \u274c ${err.message}`);
+      console.error(`[bkgnd] ❌ ${err.message}`);
     }
 
     if (generated) {
-      emptyCycles = 0;
+      cachedTvdb = null;
     } else {
-      emptyCycles++;
+      consecutiveEmpty++;
     }
   }
 }

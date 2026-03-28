@@ -179,6 +179,17 @@ remote_pm2_restart_all_silent() {
     && pm2 save >/dev/null 2>&1"
 }
 
+remote_pm2_restart_project() {
+  local project="$1"
+  local pm2_name
+  pm2_name="$(pm2_name_for_project "$project" 2>/dev/null)" || return 0
+  echo "[remote] pm2 reload $pm2_name..."
+  run_ssh "$SSH_HOST" "cd '$TV_REMOTE_BASE' \
+    && pm2 start ecosystem.config.cjs --env production >/dev/null 2>&1 \
+    && pm2 reload '$pm2_name' >/dev/null 2>&1 \
+    && pm2 save >/dev/null 2>&1"
+}
+
 remote_deploy_one_no_restart() {
   local project="$1"
 
@@ -207,7 +218,7 @@ case "${1:-all}" in
       remote_deploy_one_no_restart share
     fi
     remote_deploy_one_no_restart "$1"
-    remote_pm2_restart_all_silent
+    remote_pm2_restart_project "$1"
     ;;
   all|"" )
     sync_monorepo_root

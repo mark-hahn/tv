@@ -998,11 +998,17 @@ async function findCandidateFile(show) {
   return null;
 }
 
-async function pickNextFile(inEmbyShows, logPath, pendingNames) {
-  // If any pending shows, check them first
+async function pickNextFile(
+  inEmbyShows,
+  logPath,
+  pendingNames,
+  allInEmbyShows,
+) {
+  // Pending shows bypass the TEST_SHOWS filter — search all inEmby shows
+  const pendingPool = allInEmbyShows ?? inEmbyShows;
   if (pendingNames && pendingNames.size > 0) {
     for (const name of pendingNames) {
-      const show = inEmbyShows.find((s) => s.path === name || s.name === name);
+      const show = pendingPool.find((s) => s.path === name || s.name === name);
       if (!show) continue;
       const result = await findCandidateFile(show);
       if (result) return { ...result, fromPending: true };
@@ -1060,10 +1066,16 @@ async function runBackgroundLoop() {
     const pending = consumePending();
 
     if (!cachedTvdb) cachedTvdb = loadTvdb();
-    let inEmby = Object.values(cachedTvdb).filter((s) => s.inEmby);
-    if (TEST_SHOWS) inEmby = inEmby.filter((s) => TEST_SHOWS.has(s.path));
+    const allInEmby = Object.values(cachedTvdb).filter((s) => s.inEmby);
+    let inEmby = allInEmby;
+    if (TEST_SHOWS) inEmby = allInEmby.filter((s) => TEST_SHOWS.has(s.path));
 
-    const chosen = await pickNextFile(inEmby, BKGND_LOG_PATH, pending);
+    const chosen = await pickNextFile(
+      inEmby,
+      BKGND_LOG_PATH,
+      pending,
+      allInEmby,
+    );
     if (!chosen) {
       consecutiveEmpty++;
       if (consecutiveEmpty >= 10) {

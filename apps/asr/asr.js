@@ -936,14 +936,13 @@ async function waitForLowCpu() {
 async function findCandidateFile(show) {
   if (!show.path) return null;
 
-  // Determine last watched (season, episode)
-  let lastSeason = 0;
-  let lastEpisode = 0;
-  const we = show.watchedEpis;
-  if (Array.isArray(we) && we.length > 0) {
-    const lastRow = we[we.length - 1];
-    lastSeason = lastRow[0];
-    lastEpisode = lastRow.length > 1 ? Math.max(...lastRow.slice(1)) : 0;
+  // Build set of watched "season:episode" pairs
+  const watched = new Set();
+  if (Array.isArray(show.watchedEpis)) {
+    for (const row of show.watchedEpis) {
+      const season = row[0];
+      for (let i = 1; i < row.length; i++) watched.add(`${season}:${row[i]}`);
+    }
   }
 
   const showDir = path.join(TV_ROOT, show.path);
@@ -986,8 +985,7 @@ async function findCandidateFile(show) {
   );
 
   for (const t of tuples) {
-    if (t.season < lastSeason) continue;
-    if (t.season === lastSeason && t.episode <= lastEpisode) continue;
+    if (watched.has(`${t.season}:${t.episode}`)) continue;
     if (!(await pathExists(getSrtPath(t.fullPath)))) {
       return {
         videoPath: t.fullPath,

@@ -11,10 +11,6 @@ try {
 // https://docs.mistral.ai/capabilities/audio/
 // https://console.mistral.ai/usage
 
-const DUMP_ALL_SEGS = false;
-const DUMP_RAW_API_ENABLED = true;
-const DUMP_RAW_PATH = "/root/dev/apps/tv/temp.txt";
-
 import fs from "fs";
 import fsp from "fs/promises";
 import path from "path";
@@ -31,10 +27,6 @@ let tmpDir = process.env.ASR_TMPDIR
   ? process.env.ASR_TMPDIR
   : path.join(__dirname, "tmp");
 
-/* ---------------- Logging Configuration ---------------- */
-const RUN_ID = Math.floor(Math.random() * 10000);
-/* ----------------------------------------------------- */
-
 // Ensure tmpDir exists
 try {
   if (!fs.existsSync(tmpDir)) {
@@ -47,29 +39,6 @@ try {
     const fallback = path.join("/tmp", "asr-fallback-" + Date.now());
     fs.mkdirSync(fallback, { recursive: true });
   }
-}
-
-// Default install location used by the installer
-const INSTALL_LOG_PATH = path.join(__dirname, "data", "mistral.log");
-// Prefer install path when present, otherwise use runtime directory
-let MISTRAL_LOG = INSTALL_LOG_PATH;
-
-// Ensure the directory and file exist and are writable (best-effort)
-try {
-  const logDir = path.dirname(MISTRAL_LOG);
-  fs.mkdirSync(logDir, { recursive: true });
-  if (!fs.existsSync(MISTRAL_LOG)) {
-    fs.writeFileSync(
-      MISTRAL_LOG,
-      `# mistral.log created ${new Date().toISOString()}\n`,
-      { mode: 0o600 },
-    );
-  }
-} catch (e) {
-  // Non-fatal: continue without crashing
-  console.error(
-    `Could not ensure mistral log file ${MISTRAL_LOG}: ${e.message}`,
-  );
 }
 
 /* ---------------- CLI argument parsing ---------------- */
@@ -92,14 +61,8 @@ function getNum(name, dflt) {
   if (flagsKVP.has(name)) return Number(flagsKVP.get(name));
   return dflt;
 }
-// default 9999 = no cap; adaptive algorithm sizes chunks to fill FILE_LIMIT_BYTES
-const chunkSec = getNum("--chunk-sec", 9999);
-const trimSec = getNum("--trim-sec", 3);
-const overlapSec = getNum("--overlap-sec", 3);
 const timeMatchMgn = getNum("--time-match-mgn", 0.3);
 const testMins = getNum("--test-mins", 0);
-const offsetSec = chunkSec - trimSec - overlapSec - trimSec;
-const minChunkSec = trimSec + overlapSec + trimSec;
 const audioQuality = flagsKVP.get("--audio-quality") || "max";
 
 const apiTemperature = getNum("--temperature", 0);
@@ -107,9 +70,8 @@ const apiResponseFormat = flagsKVP.get("--response-format") || "verbose_json";
 const apiPrompt = flagsKVP.get("--prompt") || null;
 const runBackground = switches.has("--background");
 const dumpRawArg = flagsKVP.get("--dump-raw") || null;
-const DUMP_RAW_API =
-  (DUMP_RAW_API_ENABLED && !runBackground) || dumpRawArg !== null;
-const effectiveDumpPath = dumpRawArg ?? DUMP_RAW_PATH;
+const DUMP_RAW_API = dumpRawArg !== null;
+const effectiveDumpPath = dumpRawArg;
 if (DUMP_RAW_API) fs.writeFileSync(effectiveDumpPath, "", "utf8"); // truncate on start
 
 // Audio quality settings
@@ -139,7 +101,6 @@ try {
 }
 
 const model = "voxtral-mini-latest";
-const forceLanguage = "en";
 const allowedExt = new Set([".mp4", ".mkv", ".avi", ".mov", ".webm", ".m4v"]);
 const FILE_LIMIT_BYTES = 24 * 1024 * 1024;
 // Conservative starting estimate of FLAC bytes/sec for processed speech.
@@ -172,37 +133,6 @@ function ts() {
     ":" +
     String(seconds).padStart(2, "0")
   );
-}
-
-/* ---------- format video timestamp (H:MM:SS.t) ---------- */
-function vs(secs) {
-  // work in deciseconds for clean rounding/carry
-  let ds = Math.round(secs * 10);
-  const neg = ds < 0;
-  ds = Math.abs(ds);
-  let hours = Math.floor(ds / 36000); // 3600s * 10
-  ds %= 36000;
-  let minutes = Math.floor(ds / 600); // 60s * 10
-  ds %= 600;
-  let seconds = Math.floor(ds / 10);
-  let tenths = ds % 10;
-  if (hours > 9) {
-    hours = 9;
-    minutes = 59;
-    seconds = 59;
-    tenths = 9;
-  }
-  const out =
-    "[" +
-    String(hours) +
-    ":" +
-    String(minutes).padStart(2, "0") +
-    ":" +
-    String(seconds).padStart(2, "0") +
-    "." +
-    String(tenths) +
-    "]";
-  return neg ? "-" + out : out;
 }
 
 /* ---------------- Utility functions ---------------- */
@@ -349,72 +279,6 @@ async function preprocessAudio(inputWav, outputWav) {
     "wav",
     outputWav,
   ]);
-}
-// chunkSec=20 trimSec=3 overlapSec=3 offsetSec=11 minChunkSec=6
-// t:trim o:overlap C:exclusive content
-//
-// normal middle chunks ...
-// tttoooCCCCCCCCooottt  tttoooCCCCCCCCooottt
-//            tttoooCCCCCCCCooottt
-
-// first chunk ...
-// CCCCCCCCCCCCCCooottt  tttoooCCCCCCCCooottt
-//            tttoooCCCCCCCCooottt
-
-// min size last chunk ...
-// tttoooCCCCCCCCooottt
-//            tttoooCCC
-
-async function getChunks(inWav) {
-  const totalDuration = await getDurationSec(inWav);
-  let chunkCount = Math.ceil(totalDuration / offsetSec);
-  const chunks = [];
-  for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
-    const chunkStart = chunkIndex * offsetSec;
-    const chunkEnd = Math.min(chunkStart + chunkSec, totalDuration);
-    if (chunkEnd - chunkStart < minChunkSec) break;
-    let trimStart = chunkStart + trimSec;
-    let trimEnd = chunkEnd - trimSec;
-    let overlapStart = trimStart + overlapSec;
-    let overlapEnd = trimEnd - overlapSec;
-    if (chunkIndex == 0) {
-      trimStart = chunkStart;
-      overlapStart = chunkStart;
-    }
-    if (chunkIndex == chunkCount - 1) {
-      overlapEnd = chunkEnd;
-      trimEnd = chunkEnd;
-    }
-    const wavPath = path.join(
-      tmpDir,
-      `chunk-${String(chunkIndex).padStart(3, "0")}.wav`,
-    );
-    await run("ffmpeg", [
-      "-y",
-      "-i",
-      inWav,
-      "-ss",
-      String(chunkStart.toFixed(2)),
-      "-to",
-      String(chunkEnd.toFixed(2)),
-      "-c:a",
-      "pcm_s16le",
-      "-avoid_negative_ts",
-      "make_zero",
-      wavPath,
-    ]);
-    chunks.push({
-      wavPath,
-      chunkIndex,
-      chunkStart,
-      chunkEnd,
-      trimStart,
-      trimEnd,
-      overlapStart,
-      overlapEnd,
-    });
-  }
-  return chunks;
 }
 
 /* ---------------- Transcription ---------------- */
@@ -852,7 +716,7 @@ async function processOneVideo(videoPath) {
   console.log(`\n[${ts()}] Processing: ${path.basename(videoPath)}`);
   const videoName = path.basename(videoPath, path.extname(videoPath));
   const srtPath = getSrtPath(videoPath);
-  if (!DUMP_RAW_API && (await pathExists(srtPath))) {
+  if (await pathExists(srtPath)) {
     console.log(`\n${videoName}: Enhanced SRT already exists, skipping.`);
     return;
   }
@@ -1221,16 +1085,12 @@ async function main() {
   console.log(
     `   Test Mode:        ${testMins > 0 ? `${testMins} minutes` : "OFF"}`,
   );
-  console.log(`   Chunk Duration:    ${chunkSec}s`);
-  console.log(`   Trim Duration:     ${trimSec}s`);
-  console.log(`   Overlap Duration:  ${overlapSec}s`);
   console.log(`   Time Match Margin: ${timeMatchMgn}s`);
   console.log(
     `   Audio Quality:     ${audioQuality} (${audioConfig.rate}Hz, ${audioConfig.bitrate})`,
   );
   console.log(`   Preprocessing:     ${AUDIO_FILTER}`);
   console.log(`   API Model:         ${model}`);
-  console.log(`   API Language:      ${forceLanguage}`);
   console.log(`   API Temperature:   ${apiTemperature}`);
   console.log(`   API Response:      ${apiResponseFormat}`);
   console.log(`   API Prompt:        ${apiPrompt || "None"}`);

@@ -12,7 +12,7 @@ try {
 // https://console.mistral.ai/usage
 
 const DUMP_ALL_SEGS = false;
-const DUMP_RAW_API = true;
+const DUMP_RAW_API_ENABLED = true;
 const DUMP_RAW_PATH = "/root/dev/apps/tv/temp.txt";
 
 import fs from "fs";
@@ -79,8 +79,8 @@ const flagsKVP = new Map(
   rawArgs
     .filter((a) => a.startsWith("--") && a.includes("="))
     .map((a) => {
-      const [k, v] = a.split("=", 2);
-      return [k, v];
+      const eq = a.indexOf("=");
+      return [a.slice(0, eq), a.slice(eq + 1)];
     }),
 );
 const switches = new Set(
@@ -92,8 +92,8 @@ function getNum(name, dflt) {
   if (flagsKVP.has(name)) return Number(flagsKVP.get(name));
   return dflt;
 }
-// 120s -> 5 Mb flac
-const chunkSec = getNum("--chunk-sec", 120);
+// default 9999 = no cap; adaptive algorithm sizes chunks to fill FILE_LIMIT_BYTES
+const chunkSec = getNum("--chunk-sec", 9999);
 const trimSec = getNum("--trim-sec", 3);
 const overlapSec = getNum("--overlap-sec", 3);
 const timeMatchMgn = getNum("--time-match-mgn", 0.3);
@@ -105,7 +105,12 @@ const audioQuality = flagsKVP.get("--audio-quality") || "max";
 const apiTemperature = getNum("--temperature", 0);
 const apiResponseFormat = flagsKVP.get("--response-format") || "verbose_json";
 const apiPrompt = flagsKVP.get("--prompt") || null;
-if (DUMP_RAW_API) fs.writeFileSync(DUMP_RAW_PATH, "", "utf8"); // truncate on start
+const runBackground = switches.has("--background");
+const dumpRawArg = flagsKVP.get("--dump-raw") || null;
+const DUMP_RAW_API =
+  (DUMP_RAW_API_ENABLED && !runBackground) || dumpRawArg !== null;
+const effectiveDumpPath = dumpRawArg ?? DUMP_RAW_PATH;
+if (DUMP_RAW_API) fs.writeFileSync(effectiveDumpPath, "", "utf8"); // truncate on start
 
 // Audio quality settings
 const AUDIO_CONFIGS = {
@@ -117,8 +122,6 @@ const AUDIO_CONFIGS = {
 const audioConfig = AUDIO_CONFIGS[audioQuality];
 
 /* ---------------- Input validation ---------------- */
-const runBackground = switches.has("--background");
-
 if (!runBackground && positional.length === 0) {
   console.error("❌ Error: No input file specified");
   process.exit(1);
@@ -138,7 +141,10 @@ try {
 const model = "voxtral-mini-latest";
 const forceLanguage = "en";
 const allowedExt = new Set([".mp4", ".mkv", ".avi", ".mov", ".webm", ".m4v"]);
-const fileLimit = 19 * 1024 * 1024;
+const FILE_LIMIT_BYTES = 24 * 1024 * 1024;
+// Conservative starting estimate of FLAC bytes/sec for processed speech.
+// Will be updated via EMA as chunks are processed.
+const ADAPTIVE_INITIAL_BPS = 45000;
 
 /* ---------------- Background processing constants ---------------- */
 const TV_ROOT = "/mnt/media/tv";
@@ -322,7 +328,9 @@ async function extractAudio(inputVideo, outWav) {
                         
 */
 
-const AUDIO_FILTER = "highpass=f=80,lowpass=f=8000,loudnorm=I=-16:TP=-1.5:LRA=11";
+const AUDIO_FILTER =
+  flagsKVP.get("--audio-filter") ||
+  "highpass=f=80,lowpass=f=8000,loudnorm=I=-16:TP=-1.5:LRA=11";
 
 async function preprocessAudio(inputWav, outputWav) {
   await run("ffmpeg", [
@@ -414,11 +422,13 @@ async function getFlac(wavPath) {
   const flacPath = path.join(tmpDir, path.basename(wavPath, ".wav") + ".flac");
   await run("ffmpeg", ["-y", "-i", wavPath, "-c:a", "flac", flacPath]);
   const statSize = (await fsp.stat(flacPath)).size;
-  if (statSize > fileLimit) {
-    console.error(
-      `FLAC file too large: ${statSize} bytes > ${fileLimit} bytes`,
+  if (statSize > FILE_LIMIT_BYTES) {
+    const err = new Error(
+      `FLAC too large: ${(statSize / 1e6).toFixed(1)}MB > ${(FILE_LIMIT_BYTES / 1e6).toFixed(0)}MB`,
     );
-    process.exit(1);
+    err.code = "FLAC_TOO_LARGE";
+    err.size = statSize;
+    throw err;
   }
   return {
     path: flacPath,
@@ -426,6 +436,23 @@ async function getFlac(wavPath) {
     filename: path.basename(flacPath),
     size: statSize,
   };
+}
+
+async function extractChunkWav(inWav, start, end, outWav) {
+  await run("ffmpeg", [
+    "-y",
+    "-i",
+    inWav,
+    "-ss",
+    start.toFixed(2),
+    "-to",
+    end.toFixed(2),
+    "-c:a",
+    "pcm_s16le",
+    "-avoid_negative_ts",
+    "make_zero",
+    outWav,
+  ]);
 }
 
 const MAX_RETRIES = 5;
@@ -729,13 +756,103 @@ function writeSRT(segments, outputPath) {
   console.log(`\n[${ts()}] Wrote: ${path.basename(outputPath)}`);
 }
 
+/* ---------------- VAD-based chunking ---------------- */
+async function detectSilences(wavPath, noiseDb, minDur) {
+  // silencedetect output goes to stderr
+  const { err } = await run("ffmpeg", [
+    "-i",
+    wavPath,
+    "-af",
+    `silencedetect=noise=${noiseDb}dB:duration=${minDur}`,
+    "-f",
+    "null",
+    "-",
+  ]);
+  const starts = [];
+  const ends = [];
+  for (const line of err.split("\n")) {
+    let m = line.match(/silence_start:\s*([\d.]+)/);
+    if (m) {
+      starts.push(parseFloat(m[1]));
+      continue;
+    }
+    m = line.match(/silence_end:\s*([\d.]+)/);
+    if (m) ends.push(parseFloat(m[1]));
+  }
+  const midpoints = [];
+  for (let i = 0; i < Math.min(starts.length, ends.length); i++) {
+    midpoints.push((starts[i] + ends[i]) / 2);
+  }
+  return midpoints;
+}
+
+async function vadChunks(wavPath, initBPS, totalDur) {
+  const TARGET = FILE_LIMIT_BYTES * 0.93;
+  const SILENCE_MIN_DUR = 0.3;
+  // Binary search: lo=-50dB (strict, few cuts), hi=-20dB (loose, many cuts)
+  // Find strictest threshold where every speech span fits in TARGET.
+  let lo = -50,
+    hi = -20;
+  let bestMidpoints = null;
+  let bestThreshold = hi;
+  for (let iter = 0; iter < 8; iter++) {
+    const threshold = (lo + hi) / 2;
+    const midpoints = await detectSilences(
+      wavPath,
+      threshold.toFixed(1),
+      SILENCE_MIN_DUR,
+    );
+    const cuts = [0, ...midpoints, totalDur];
+    let maxSpan = 0;
+    for (let i = 1; i < cuts.length; i++)
+      maxSpan = Math.max(maxSpan, cuts[i] - cuts[i - 1]);
+    if (maxSpan * initBPS > TARGET) {
+      // spans still too big — need more cuts — loosen threshold (raise dB)
+      lo = threshold;
+    } else {
+      // fits — try stricter
+      bestMidpoints = midpoints;
+      bestThreshold = threshold;
+      hi = threshold;
+    }
+  }
+  // Fallback: if no threshold worked, use -20dB (maximum looseness)
+  if (!bestMidpoints) {
+    bestMidpoints = await detectSilences(wavPath, "-20", SILENCE_MIN_DUR);
+    bestThreshold = -20;
+  }
+  // Greedy combine: merge consecutive silence-delimited spans into chunks <= TARGET
+  const cuts = [0, ...bestMidpoints, totalDur];
+  const chunks = [];
+  let segStart = cuts[0];
+  let segEst = 0;
+  for (let i = 1; i < cuts.length; i++) {
+    const spanEst = (cuts[i] - cuts[i - 1]) * initBPS;
+    if (segEst + spanEst > TARGET && segEst > 0) {
+      chunks.push({ start: segStart, end: cuts[i - 1] });
+      segStart = cuts[i - 1];
+      segEst = spanEst;
+    } else {
+      segEst += spanEst;
+    }
+  }
+  chunks.push({ start: segStart, end: totalDur });
+  const maxEst = Math.max(...chunks.map((c) => (c.end - c.start) * initBPS));
+  console.log(
+    `[${ts()}] VAD: threshold=${bestThreshold.toFixed(1)}dB, ` +
+      `${bestMidpoints.length} silences → ${chunks.length} chunks ` +
+      `(max est ${(maxEst / 1e6).toFixed(1)}MB)`,
+  );
+  return chunks;
+}
+
 /* ---------------- Main processing function ---------------- */
 async function processOneVideo(videoPath) {
   const fileStart = Date.now();
   console.log(`\n[${ts()}] Processing: ${path.basename(videoPath)}`);
   const videoName = path.basename(videoPath, path.extname(videoPath));
   const srtPath = getSrtPath(videoPath);
-  if (!DUMP_RAW_API && await pathExists(srtPath)) {
+  if (!DUMP_RAW_API && (await pathExists(srtPath))) {
     console.log(`\n${videoName}: Enhanced SRT already exists, skipping.`);
     return;
   }
@@ -747,86 +864,89 @@ async function processOneVideo(videoPath) {
     await preprocessAudio(rawWavFile, processedWavFile);
     const finalWavFile = processedWavFile;
     const totalDur = await getDurationSec(finalWavFile);
-    const chunks = await getChunks(finalWavFile);
-    console.log(
-      `[${ts()}] Duration: ${totalDur.toFixed(0)}s, ${chunks.length} chunks`,
-    );
+    console.log(`[${ts()}] Duration: ${totalDur.toFixed(0)}s, VAD chunking`);
     const allSegments = [];
-    for (const chunkInfo of chunks) {
-      try {
-        const uploadInfo = await getFlac(chunkInfo.wavPath);
-        const apiData = await callApi(uploadInfo);
-        if (DUMP_RAW_API) fs.appendFileSync(DUMP_RAW_PATH, JSON.stringify({ chunkIndex: chunkInfo.chunkIndex, chunkStart: chunkInfo.chunkStart, chunkEnd: chunkInfo.chunkEnd, ...apiData }) + "\n", "utf8");
-        if (apiData.segments && apiData.segments.length > 0) {
-          const processedSegments = processSegments(
-            apiData.segments,
-            chunkInfo,
-          );
-          allSegments.push(...processedSegments);
-          if (DUMP_ALL_SEGS)
-            console.log(
-              `[${ts()}] Chunk ${chunkInfo.chunkIndex
-                .toString()
-                .padStart(3)}/${chunks.length
-                .toString()
-                .padStart(3)} ${chunkInfo.chunkStart
-                .toString()
-                .padStart(4)}s ${chunkInfo.chunkEnd
-                .toString()
-                .padStart(4)}s, Size: ${Math.round(uploadInfo.size / 1e6)
-                .toString()
-                .padStart(2)}Mb, ${processedSegments.length
-                .toString()
-                .padStart(3)} segments, api:${Math.round(apiData.delay / 1000)
-                .toString()
-                .padStart(3)}s`,
-            );
-          continue;
-        } else {
+    let dumpSrtIndex = 0;
+    let adaptiveBPS = ADAPTIVE_INITIAL_BPS;
+    let retryCount = 0;
+    const vadChunkList = await vadChunks(finalWavFile, adaptiveBPS, totalDur);
+    for (let chunkIndex = 0; chunkIndex < vadChunkList.length; chunkIndex++) {
+      const { start: chunkStart, end: chunkEndVad } = vadChunkList[chunkIndex];
+      const wavPath = path.join(
+        tmpDir,
+        `chunk-${String(chunkIndex).padStart(3, "0")}.wav`,
+      );
+      await extractChunkWav(finalWavFile, chunkStart, chunkEndVad, wavPath);
+      let uploadInfo;
+      let chunkEnd = chunkEndVad;
+      // FLAC_TOO_LARGE retry: BPS estimate was off; shrink end and retry
+      while (true) {
+        try {
+          uploadInfo = await getFlac(wavPath);
+          break;
+        } catch (e) {
+          if (e.code !== "FLAC_TOO_LARGE") throw e;
+          retryCount++;
+          const dur = chunkEnd - chunkStart;
+          const measuredBPS = e.size / dur;
+          const newEnd =
+            chunkStart + Math.floor((FILE_LIMIT_BYTES / measuredBPS) * 0.8);
           console.log(
-            `[${ts()}] Chunk ${chunkInfo.chunkIndex
-              .toString()
-              .padStart(3)}: ${chunkInfo.chunkStart
-              .toString()
-              .padStart(4)}s ${chunkInfo.chunkEnd
-              .toString()
-              .padStart(4)}s, Size: ${Math.round(uploadInfo.size / 1e6)
-              .toString()
-              .padStart(2)}Mb, ⚠️ no segments`,
+            `[${ts()}] Chunk ${chunkIndex} oversize: ${(e.size / 1e6).toFixed(2)}MB → retry ${(newEnd - chunkStart).toFixed(0)}s (-20%)`,
           );
-          continue;
+          adaptiveBPS = adaptiveBPS * 0.5 + measuredBPS * 0.5;
+          chunkEnd = Math.min(newEnd, chunkEndVad);
+          await extractChunkWav(finalWavFile, chunkStart, chunkEnd, wavPath);
+        }
+      }
+      const actualDur = chunkEnd - chunkStart;
+      const measuredBPS = uploadInfo.size / actualDur;
+      const prevBPS = adaptiveBPS;
+      adaptiveBPS = adaptiveBPS * 0.5 + measuredBPS * 0.5;
+      console.log(
+        `[${ts()}] Chunk ${chunkIndex}: ${chunkStart.toFixed(0)}s-${chunkEnd.toFixed(0)}s ` +
+          `${(uploadInfo.size / 1e6).toFixed(2)}MB, ${measuredBPS.toFixed(0)}B/s ` +
+          `(est ${prevBPS.toFixed(0)}→${adaptiveBPS.toFixed(0)})`,
+      );
+      // No trim/overlap needed — cuts are at silence midpoints
+      const chunkInfo = {
+        wavPath,
+        chunkIndex,
+        chunkStart,
+        chunkEnd,
+        trimStart: chunkStart - 1,
+        trimEnd: chunkEnd + 1,
+        overlapStart: chunkStart,
+        overlapEnd: chunkEnd,
+      };
+      try {
+        const apiData = await callApi(uploadInfo);
+        if (DUMP_RAW_API) {
+          const segs = apiData.segments || [];
+          let srt = `============ Chunk ${chunkIndex}: ${chunkStart.toFixed(0)}s-${chunkEnd.toFixed(0)}s\n`;
+          for (const seg of segs) {
+            const start = chunkInfo.chunkStart + (seg.start ?? 0);
+            const end = chunkInfo.chunkStart + (seg.end ?? seg.start ?? 0);
+            srt += `${++dumpSrtIndex}\n${toSrtTime(start)} --> ${toSrtTime(end)}\n${seg.text?.trim() ?? ""}\n\n`;
+          }
+          fs.appendFileSync(effectiveDumpPath, srt, "utf8");
+        }
+        if (apiData.segments && apiData.segments.length > 0) {
+          allSegments.push(...processSegments(apiData.segments, chunkInfo));
+        } else {
+          console.log(`[${ts()}] Chunk ${chunkIndex}: ⚠️ no segments`);
         }
       } catch (err) {
         console.log(
-          `[${ts()}] ${path.basename(videoPath)} | Chunk ${chunkInfo.chunkIndex}/${chunks.length}: ${chunkInfo.chunkStart.toFixed(0)}s-${chunkInfo.chunkEnd.toFixed(0)}s ❌ ${err.message}`,
+          `[${ts()}] Chunk ${chunkIndex}: ${chunkStart.toFixed(0)}s-${chunkEnd.toFixed(0)}s ❌ ${err.message}`,
         );
       }
     }
     if (allSegments.length === 0) {
       throw new Error("No transcription segments found");
     }
-    if (DUMP_ALL_SEGS) {
-      let lastIdx = -1;
-      let lastInOverlap = false;
-      for (const segment of allSegments) {
-        const chunkInfo = segment.chunk;
-        const inOverlap =
-          segment.start < chunkInfo.overlapStart ||
-          segment.end > chunkInfo.overlapEnd;
-        if (chunkInfo.chunkIndex != lastIdx) {
-          console.log(
-            `\nChunk ${chunkInfo.chunkIndex}: ${chunkInfo.chunkStart}  ${
-              chunkInfo.trimStart
-            }  ${chunkInfo.overlapStart}  ${chunkInfo.overlapEnd}  ${
-              chunkInfo.trimEnd
-            }  ${chunkInfo.chunkEnd}`,
-          );
-          lastIdx = chunkInfo.chunkIndex;
-        }
-        if (inOverlap != lastInOverlap) console.log();
-        lastInOverlap = inOverlap;
-        console.log(`${vs(segment.start)} ${vs(segment.end)} ${segment.text}`);
-      }
+    if (retryCount > 0) {
+      console.log(`[${ts()}] VAD chunking: ${retryCount} oversize retries`);
     }
     const outputPath = getSrtPath(videoPath);
     writeSRT(allSegments, outputPath);
@@ -1108,16 +1228,14 @@ async function main() {
   console.log(
     `   Audio Quality:     ${audioQuality} (${audioConfig.rate}Hz, ${audioConfig.bitrate})`,
   );
-  console.log(
-    `   Preprocessing:     ${AUDIO_FILTER}`,
-  );
+  console.log(`   Preprocessing:     ${AUDIO_FILTER}`);
   console.log(`   API Model:         ${model}`);
   console.log(`   API Language:      ${forceLanguage}`);
   console.log(`   API Temperature:   ${apiTemperature}`);
   console.log(`   API Response:      ${apiResponseFormat}`);
   console.log(`   API Prompt:        ${apiPrompt || "None"}`);
   console.log(
-    `   File Size Limit:   ${(fileLimit / 1024 / 1024).toFixed(1)}MB`,
+    `   File Size Limit:   ${(FILE_LIMIT_BYTES / 1024 / 1024).toFixed(0)}MB (adaptive)`,
   );
   console.log();
 

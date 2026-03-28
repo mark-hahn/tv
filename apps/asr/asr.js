@@ -606,6 +606,22 @@ function writeSRT(segments, outputPath) {
     }
   }
 
+  // Pad short segments (< 1s) up to 0.5s on each side,
+  // staying at least 0.2s away from neighboring segments.
+  for (let i = 0; i < splitSegs.length; i++) {
+    const seg = splitSegs[i];
+    if (seg.end - seg.start >= 1.0) continue;
+    const prevEnd = i > 0 ? splitSegs[i - 1].end : 0;
+    const nextStart = i < splitSegs.length - 1 ? splitSegs[i + 1].start : null;
+    const leftPad = Math.max(0, Math.min(0.5, seg.start - prevEnd - 0.2));
+    const rightPad = Math.max(
+      0,
+      Math.min(0.5, nextStart !== null ? nextStart - seg.end - 0.2 : 0.5),
+    );
+    seg.start -= leftPad;
+    seg.end += rightPad;
+  }
+
   // Write SRT from splitSegs using original (prefer first occurrence) text
   let srtContent = "";
   let index = 0;

@@ -1731,7 +1731,29 @@ export default {
 
     async allClick() {
       evtBus.emit("clearFilterButtons");
-      await this.fltrAction("All");
+      this.actorFilter = null;
+      this.actorSearchParams = null;
+      evtBus.emit("actorSearchCleared");
+      window.localStorage.setItem("fltrChoice", "All");
+      this.fltrChoice = "All";
+      this.filterStr = "";
+      for (let cond of this.conds) {
+        util.setCondFltr(cond, "All");
+      }
+      // Default hasemby=1 (in-emby only), but if selected show is not in emby use 0
+      const hasembyCond = this.conds.find((c) => c?.name === "hasemby");
+      if (hasembyCond) {
+        const selectedShow = allShows.find(
+          (s) => s.name === this.highlightName,
+        );
+        const selectedInEmby = !selectedShow || selectedShow.inEmby !== false;
+        hasembyCond.filter = selectedInEmby ? 1 : 0;
+      }
+      const banCond = this.conds.find((c) => c?.name === "ban");
+      if (banCond) banCond.filter = -1;
+      await this.select();
+      this.sortPopped = false;
+      this.fltrPopped = false;
     },
     onSelectShow(show, scroll = false) {
       // console.log('List: selected show:', show);

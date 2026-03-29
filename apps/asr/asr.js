@@ -1040,9 +1040,7 @@ async function pickNextFile(
   return null;
 }
 
-async function hasAnyUnwatchedFile() {
-  const allTvdb = loadTvdb();
-  const shows = Object.values(allTvdb).filter((s) => s.inEmby && s.path);
+async function hasAnyUnwatchedFile(shows) {
   for (const show of shows) {
     const result = await findCandidateFile(show);
     if (result) return true;
@@ -1081,7 +1079,11 @@ async function runBackgroundLoop() {
       if (consecutiveEmpty >= 10) {
         consecutiveEmpty = 0;
         cachedTvdb = null;
-        if (!(await hasAnyUnwatchedFile())) {
+        const allInEmby2 = Object.values(loadTvdb()).filter((s) => s.inEmby);
+        let scanShows = allInEmby2;
+        if (TEST_SHOWS)
+          scanShows = allInEmby2.filter((s) => TEST_SHOWS.has(s.path));
+        if (!(await hasAnyUnwatchedFile(scanShows))) {
           if (!pauseLogged) {
             console.log(
               `[bkgnd] No unwatched files found — pausing ${PAUSE_DURATION_MS / 60000} mins`,

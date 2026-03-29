@@ -651,11 +651,11 @@
             :title="getDownloadStatusTooltip(torrent)"
             style="
               position: absolute;
-              top: 8px;
-              right: 30px;
+              bottom: 8px;
+              right: 52px;
               font-size: 11px;
               color: #666;
-              max-width: 70%;
+              max-width: 60%;
               white-space: nowrap;
               overflow: hidden;
               text-overflow: ellipsis;

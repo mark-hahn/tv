@@ -114,18 +114,7 @@ const BKGND_LOG_PATH = path.join(__dirname, "data", "asr-bkgnd.log");
 const PENDING_PATH = path.join(__dirname, "data", "pending.txt");
 const BKGND_TMPDIR = "/tmp/asr-bkgnd";
 const CPU_LOAD_MAX = 3;
-// Temporary: limit background processing to these shows only. Set to null to process all.
-const TEST_SHOWS = new Set([
-  "Takin' Over the Asylum",
-  "Not Going Out",
-  "Black Books",
-  "Green Wing",
-  "Grace Under Fire",
-  "Cheers",
-  "Cybill",
-  "The Exes",
-  "The Sketch Show",
-]);
+const TEST_SHOWS = null;
 const CPU_PAUSE_MS = 10_000;
 const PAUSE_DURATION_MS = 10 * 60_000;
 const PAUSE_POLL_MS = 15_000;
@@ -908,7 +897,7 @@ function consumePending() {
   }
 }
 
-function appendBkgndLog(logPath, videoPath, fromPending) {
+function pstStamp() {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Los_Angeles",
     month: "2-digit",
@@ -919,11 +908,19 @@ function appendBkgndLog(logPath, videoPath, fromPending) {
     hour12: false,
   }).formatToParts(new Date());
   const get = (type) => parts.find((p) => p.type === type)?.value ?? "00";
-  const stamp = `${get("month")}-${get("day")} ${get("hour")}:${get("minute")}:${get("second")}`;
+  return `${get("month")}-${get("day")} ${get("hour")}:${get("minute")}:${get("second")}`;
+}
+
+function appendBkgndLog(logPath, videoPath, fromPending) {
   fs.mkdirSync(path.dirname(logPath), { recursive: true });
   const relPath = path.relative(TV_ROOT, videoPath);
   const marker = fromPending ? "* " : "  ";
-  fs.appendFileSync(logPath, `${stamp} ${marker}${relPath}\n`, "utf8");
+  fs.appendFileSync(logPath, `${pstStamp()} ${marker}${relPath}\n`, "utf8");
+}
+
+function bkgndLogStatus(logPath, msg) {
+  fs.mkdirSync(path.dirname(logPath), { recursive: true });
+  fs.appendFileSync(logPath, `${pstStamp()} # ${msg}\n`, "utf8");
 }
 
 async function waitForLowCpu() {
@@ -1085,9 +1082,9 @@ async function runBackgroundLoop() {
           scanShows = allInEmby2.filter((s) => TEST_SHOWS.has(s.path));
         if (!(await hasAnyUnwatchedFile(scanShows))) {
           if (!pauseLogged) {
-            console.log(
-              `[bkgnd] No unwatched files found — pausing ${PAUSE_DURATION_MS / 60000} mins`,
-            );
+            const msg = `No unwatched files found — pausing ${PAUSE_DURATION_MS / 60000} mins`;
+            console.log(`[bkgnd] ${msg}`);
+            bkgndLogStatus(BKGND_LOG_PATH, msg);
             pauseLogged = true;
           }
           const deadline = Date.now() + PAUSE_DURATION_MS;

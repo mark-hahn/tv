@@ -651,8 +651,8 @@
             :title="getDownloadStatusTooltip(torrent)"
             style="
               position: absolute;
-              bottom: 8px;
-              right: 8px;
+              top: 8px;
+              right: 30px;
               font-size: 11px;
               color: #666;
               max-width: 70%;

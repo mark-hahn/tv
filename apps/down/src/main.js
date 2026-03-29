@@ -2222,6 +2222,28 @@ async function main() {
       return process.nextTick(checkFileExists);
     }
 
+    // If the file title doesn't match any emby show but the folder title does,
+    // swap to the folder title before hitting the TVDB API. This handles files
+    // like "SCTV - S03E01 - ..." inside "Second.City.Television.S03..." where
+    // searching TVDB for "SCTV" could produce a wrong Levenshtein match.
+    if (folderTitle && folderTitle !== title && embyMap) {
+      var embyShowNamesPrecheck = Object.keys(embyMap).filter(
+        (k) => embyMap[k] && embyMap[k].inEmby,
+      );
+      if (
+        embyShowNamesPrecheck.length > 0 &&
+        !smartTitleMatch(title, embyShowNamesPrecheck, null, false) &&
+        smartTitleMatch(folderTitle, embyShowNamesPrecheck, null, false)
+      ) {
+        trace("chkTvDB: swapping to folderTitle (emby precheck)", {
+          title,
+          folderTitle,
+        });
+        title = folderTitle;
+        folderTitle = null;
+      }
+    }
+
     // Remember the title we started with so we can cache it after a folderTitle retry.
     var titleBeforeRetry = title;
 

@@ -66,6 +66,19 @@
             >{{ stoppedCount }} titles stopped.</span
           >
           <button
+            @click.stop="openQbtUI"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Open UI
+          </button>
+          <button
             @click.stop="highlightShow"
             style="
               font-size: 13px;
@@ -807,8 +820,11 @@ export default {
       if (title) evtBus.emit("selectShowFromCardTitle", title);
     },
 
+    openQbtUI() {
+      window.open("https://hahnca.com/tv-srvr/api/qbt-open", "_blank");
+    },
+
     highlightShow() {
-      // Find the card that matches the currently selected show (this.show)
       // and scroll to it.
 
       if (!this.show) {

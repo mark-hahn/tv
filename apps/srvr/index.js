@@ -3011,6 +3011,62 @@ app.get("/api/history/byHash", (req, res) => {
 });
 app.post("/api/saveNote", apiWrapper(saveNote));
 
+// Open qBittorrent web UI — auto-login page served from hahnca.com so the
+// SID cookie is set for hahnca.com (which proxies /qbt/ to qBittorrent).
+app.get("/api/qbt-open", async (req, res) => {
+  const QBT_CRED_PATH = path.join(
+    path.dirname(SRVR_ROOT_DIR),
+    "api",
+    "secrets",
+    "qbt-cred.txt",
+  );
+  const text = await fs.promises.readFile(QBT_CRED_PATH, "utf8");
+  const creds = {};
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const eq = line.indexOf("=");
+    if (eq === -1) continue;
+    creds[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
+  }
+  const qbHost = String(creds.QB_HOST || "");
+  const qbUser = encodeURIComponent(
+    qbHost.includes("@") ? qbHost.split("@")[0] : creds.QB_USER || "",
+  );
+  const qbPass = encodeURIComponent(creds.QB_PASS || "");
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Opening qBittorrent...</title>
+  <style>body{font-family:sans-serif;padding:2em;color:#333}</style>
+</head>
+<body>
+  <p>Logging in to qBittorrent...</p>
+  <script>
+    fetch('/qbt/api/v2/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'username=${qbUser}&password=${qbPass}'
+    })
+    .then(r => r.text())
+    .then(t => {
+      if (t === 'Ok.') {
+        window.location.replace('/qbt/');
+      } else {
+        document.body.textContent = 'Login failed: ' + t;
+      }
+    })
+    .catch(e => {
+      document.body.textContent = 'Error: ' + e.message;
+    });
+  </script>
+</body>
+</html>`;
+  res.setHeader("Content-Type", "text/html");
+  res.send(html);
+});
+
 // Video streaming with codec-aware ffmpeg transcoding
 app.get("/api/stream", async (req, res) => {
   const filePath = req.query.path;

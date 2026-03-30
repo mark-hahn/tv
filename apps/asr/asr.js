@@ -779,6 +779,10 @@ async function processOneVideo(videoPath) {
           await extractChunkWav(finalWavFile, chunkStart, chunkEnd, wavPath);
         }
       }
+      // If this chunk was retried shorter, slide next chunk's start forward to avoid a gap
+      if (chunkEnd < chunkEndVad && chunkIndex + 1 < vadChunkList.length) {
+        vadChunkList[chunkIndex + 1].start = chunkEnd;
+      }
       const actualDur = chunkEnd - chunkStart;
       const measuredBPS = uploadInfo.size / actualDur;
       const prevBPS = adaptiveBPS;
@@ -957,7 +961,6 @@ async function findCandidateFile(show) {
     const smatch = entry.match(/^Season\s+(\d+)$/i);
     if (!smatch) continue;
     const seasonNum = parseInt(smatch[1], 10);
-    if (seasonNum === 0) continue;
     const seasonDir = path.join(showDir, entry);
     let files;
     try {

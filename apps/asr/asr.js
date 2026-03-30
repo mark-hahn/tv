@@ -20,6 +20,7 @@ import { fileURLToPath } from "url";
 import { setTimeout as sleep } from "timers/promises";
 import axios from "axios";
 import FormData from "form-data";
+import { parseFileSeasonEpisode } from "@tv/share";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -879,25 +880,23 @@ function loadTvdb() {
   return JSON.parse(fs.readFileSync(TVDB_JSON_PATH, "utf8"));
 }
 
-// Atomically consume pending.txt; returns Set of show names (empty Set if no file).
+// Atomically consume pending.txt; returns array of full video paths (empty array if no file).
 function consumePending() {
   const tmp = PENDING_PATH + ".tmp";
   try {
     fs.renameSync(PENDING_PATH, tmp);
   } catch {
-    return new Set();
+    return [];
   }
   try {
     const content = fs.readFileSync(tmp, "utf8");
     fs.unlinkSync(tmp);
-    return new Set(
-      content
-        .split("\n")
-        .map((l) => l.trim())
-        .filter(Boolean),
-    );
+    return content
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
   } catch {
-    return new Set();
+    return [];
   }
 }
 
@@ -998,20 +997,41 @@ async function findCandidateFile(show) {
   return null;
 }
 
-async function pickNextFile(
-  inEmbyShows,
-  logPath,
-  pendingNames,
-  allInEmbyShows,
-) {
-  // Pending shows bypass the TEST_SHOWS filter — search all inEmby shows
-  const pendingPool = allInEmbyShows ?? inEmbyShows;
-  if (pendingNames && pendingNames.size > 0) {
-    for (const name of pendingNames) {
-      const show = pendingPool.find((s) => s.path === name || s.name === name);
+async function pickNextFile(inEmbyShows, logPath, pendingPaths) {
+  if (pendingPaths && pendingPaths.length > 0) {
+    for (const videoPath of pendingPaths) {
+      if (!isVideoFile(videoPath)) continue;
+      if (!(await pathExists(videoPath))) continue;
+      if (await pathExists(getSrtPath(videoPath))) continue;
+      const showDir = path.relative(TV_ROOT, videoPath).split(path.sep)[0];
+      const show = inEmbyShows.find((s) => s.path === showDir);
       if (!show) continue;
-      const result = await findCandidateFile(show);
-      if (result) return { ...result, fromPending: true };
+      const basename = path.basename(videoPath);
+      const folderName = path.dirname(videoPath).split(path.sep).pop();
+      const parsed = parseFileSeasonEpisode(basename, folderName);
+      if (
+        parsed &&
+        Number.isInteger(parsed.season) &&
+        Number.isInteger(parsed.episode)
+      ) {
+        const season = parsed.season;
+        const episode = parsed.episode;
+        const watched = new Set();
+        if (Array.isArray(show.watchedEpis)) {
+          for (const row of show.watchedEpis) {
+            const s = row[0];
+            for (let i = 1; i < row.length; i++) watched.add(`${s}:${row[i]}`);
+          }
+        }
+        if (watched.has(`${season}:${episode}`)) continue;
+      }
+      return {
+        videoPath,
+        season: parsed?.season ?? 0,
+        episode: parsed?.episode ?? 0,
+        showName: show.name,
+        fromPending: true,
+      };
     }
   }
 
@@ -1068,12 +1088,7 @@ async function runBackgroundLoop() {
     let inEmby = allInEmby;
     if (TEST_SHOWS) inEmby = allInEmby.filter((s) => TEST_SHOWS.has(s.path));
 
-    const chosen = await pickNextFile(
-      inEmby,
-      BKGND_LOG_PATH,
-      pending,
-      allInEmby,
-    );
+    const chosen = await pickNextFile(inEmby, BKGND_LOG_PATH, pending);
     if (!chosen) {
       consecutiveEmpty++;
       if (consecutiveEmpty >= 10) {
@@ -1094,13 +1109,9 @@ async function runBackgroundLoop() {
           while (Date.now() < deadline) {
             await sleep(PAUSE_POLL_MS);
             const wakeUp = consumePending();
-            if (wakeUp.size > 0) {
+            if (wakeUp.length > 0) {
               fs.mkdirSync(path.dirname(PENDING_PATH), { recursive: true });
-              fs.writeFileSync(
-                PENDING_PATH,
-                [...wakeUp].join("\n") + "\n",
-                "utf8",
-              );
+              fs.writeFileSync(PENDING_PATH, wakeUp.join("\n") + "\n", "utf8");
               pauseLogged = false;
               break;
             }

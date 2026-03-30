@@ -4565,24 +4565,13 @@ const changedShows = new Map(); // showName -> timeout
 const DISK_CHANGE_DEBOUNCE_MS = 3000; // 3 seconds
 const ASR_PENDING_PATH = "/root/dev/apps/tv/apps/asr/data/pending.txt";
 
-function asrPendingAppend(showName) {
+function asrPendingAppend(filePath) {
   try {
-    let existing = "";
-    if (fs.existsSync(ASR_PENDING_PATH)) {
-      existing = fs.readFileSync(ASR_PENDING_PATH, "utf8");
-    }
-    const names = new Set(
-      existing
-        .split("\n")
-        .map((l) => l.trim())
-        .filter(Boolean),
-    );
-    if (names.has(showName)) return;
     fs.mkdirSync(path.dirname(ASR_PENDING_PATH), {
       recursive: true,
     });
-    fs.appendFileSync(ASR_PENDING_PATH, showName + "\n", "utf8");
-    console.log(`[chokidar] asr pending: added ${showName}`);
+    fs.appendFileSync(ASR_PENDING_PATH, filePath + "\n", "utf8");
+    console.log(`[chokidar] asr pending: added ${filePath}`);
   } catch (e) {
     console.error(`[chokidar] asrPendingAppend error: ${e.message}`);
   }
@@ -4803,7 +4792,7 @@ watcher
       console.log(
         `[tvdb loop] chokidar add debounce fired: enqueuing ${showName}`,
       );
-      asrPendingAppend(showName);
+      asrPendingAppend(filePath);
       tvdb.enqueueShowProcess(showName);
     }, DISK_CHANGE_DEBOUNCE_MS);
 

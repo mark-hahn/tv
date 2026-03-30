@@ -66,6 +66,9 @@ importers:
       '@mistralai/mistralai':
         specifier: ^1.10.0
         version: 1.14.0
+      '@tv/share':
+        specifier: workspace:*
+        version: link:../../packages/share
       axios:
         specifier: ^1.11.0
         version: 1.13.2

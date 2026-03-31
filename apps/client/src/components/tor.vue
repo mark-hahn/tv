@@ -1087,6 +1087,9 @@ export default {
       // Cache torrent results from preview mode for later use
       previewTorCache: new Map(),
 
+      // Simple cache: search URL -> result payload
+      torSearchCache: new Map(),
+
       // Snapshot of seriesMap JSON from last search (for change detection on pane return)
       _savedSeriesMapJson: null,
 
@@ -1746,6 +1749,7 @@ export default {
 
       this._didInitialScroll = false;
       this.lastAutoSearchedShowId = null;
+      this.torSearchCache.clear();
     },
 
     handleClose() {
@@ -2325,6 +2329,24 @@ export default {
           ? JSON.stringify(needed)
           : String(needed);
 
+        // Return cached result if available
+        if (this.torSearchCache.has(url)) {
+          const cached = this.torSearchCache.get(url);
+          this.torrents = cached.torrents;
+          this.hasMoreProviders = cached.hasMoreProviders;
+          this.providerStats = cached.providerStats
+            ? { ...cached.providerStats }
+            : null;
+          this.lastNeeded = cached.lastNeeded;
+          this.hasSearched = true;
+          this._didInitialScroll = true;
+          this.$nextTick(() => {
+            const el = this.$refs.scroller;
+            if (el) el.scrollTop = 0;
+          });
+          return;
+        }
+
         const response = await fetch(url);
 
         if (!response.ok) {
@@ -2521,6 +2543,18 @@ export default {
         this.error = errorMessage;
       } finally {
         this.loading = false;
+
+        // Cache results by search URL
+        if (this.torrents.length > 0) {
+          this.torSearchCache.set(url, {
+            torrents: this.torrents.slice(),
+            providerStats: this.providerStats
+              ? { ...this.providerStats }
+              : null,
+            hasMoreProviders: this.hasMoreProviders,
+            lastNeeded: this.lastNeeded,
+          });
+        }
 
         // Cache results in preview mode for later use
         if (

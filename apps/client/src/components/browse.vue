@@ -712,14 +712,68 @@ export default {
       const query = manualSearchQuery.value.trim();
       if (!query) return;
 
-      const nextTitle = query;
-      curTitle.value = nextTitle;
-
       const norm = (s) =>
         String(s || "")
           .trim()
           .replace(/\s+/g, " ")
           .toLowerCase();
+
+      // Search tvmaze.sqlite (includes already-browsed shows)
+      let tvmazeResults = [];
+      try {
+        const res = await fetch(
+          `${config.torrentsApiUrl}/api/browseSearch?q=${encodeURIComponent(query)}`,
+        );
+        if (res.ok) tvmazeResults = await res.json();
+      } catch (e) {
+        // ignore — fall through to TVDB gallery search
+      }
+
+      if (tvmazeResults.length > 0) {
+        const entries = tvmazeResults.map((r) => JSON.stringify(r));
+        const firstTitle = tvmazeResults[0].title;
+
+        // Deduplicate against existing list
+        let current = titleStrings.value.filter((s) => {
+          const t = s.trim().startsWith("{")
+            ? (() => {
+                try {
+                  return JSON.parse(s).title || "";
+                } catch {
+                  return "";
+                }
+              })()
+            : s.split("|")[1] || "";
+          return !entries.some((e) => {
+            try {
+              return norm(JSON.parse(e).title) === norm(t);
+            } catch {
+              return false;
+            }
+          });
+        });
+        titleStrings.value = [...current, ...entries];
+
+        // Select the first result
+        await nextTick();
+        const idx = titleStrings.value.length - entries.length;
+        await selectTitle(idx, true);
+        await nextTick();
+        if (titlesPane.value) {
+          titlesPane.value.scrollTop = titlesPane.value.scrollHeight;
+        }
+
+        // Also trigger gallery search with the title
+        if (norm(firstTitle) !== norm(srchStr.value)) {
+          srchStr.value = firstTitle;
+        }
+        return;
+      }
+
+      // Fallback: search TVDB gallery by name
+      const nextTitle = query;
+      curTitle.value = nextTitle;
+
       if (norm(nextTitle) !== norm(srchStr.value)) {
         srchStr.value = nextTitle;
       } else {

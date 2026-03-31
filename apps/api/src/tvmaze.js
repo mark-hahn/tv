@@ -965,3 +965,31 @@ export function markShowBrowsed(tvmazeId) {
   if (!_db) openDb();
   _db.prepare("UPDATE shows SET browsed = 1 WHERE tvmaze_id = ?").run(tvmazeId);
 }
+
+export function searchShowsByName(query, limit = 20) {
+  if (!_db) openDb();
+  const rows = _db
+    .prepare(
+      `
+    SELECT tvmaze_id, data_json
+    FROM shows
+    WHERE name LIKE ?
+      AND (status IS NULL OR status != 'In Development')
+    ORDER BY premiered DESC
+    LIMIT ?
+  `,
+    )
+    .all(`%${query}%`, limit);
+
+  return rows
+    .map((r) => {
+      try {
+        const d = JSON.parse(r.data_json);
+        d.tvmaze_id = r.tvmaze_id;
+        return d;
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+}

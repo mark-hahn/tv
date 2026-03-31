@@ -9,6 +9,7 @@ import * as search from "./search.js";
 import { searchTorrentsInChild } from "./searchInChild.js";
 import * as download from "./download.js";
 import "./tvmaze.js";
+import { searchShowsByName } from "./tvmaze.js";
 import {
   getQbtInfo,
   delQbtTorrent,
@@ -1836,6 +1837,34 @@ app.get("/api/getAllBrowse", async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error("getAllBrowse error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/browseSearch?q=text — search tvmaze.sqlite by name (ignores browsed status)
+app.get("/api/browseSearch", (req, res) => {
+  try {
+    const q = String(req.query.q || "").trim();
+    if (!q) return res.json([]);
+    const shows = searchShowsByName(q);
+    const results = shows.map((show) => {
+      let title = (show.name || "Unknown").trim();
+      if (show.premiered) {
+        const d = new Date(show.premiered * 1000);
+        const y = d.getUTCFullYear();
+        if (y && !Number.isNaN(y)) title = `${title} (${y})`;
+      }
+      return {
+        status: "ok",
+        title,
+        imdbid: show.externals?.imdb,
+        tvdbid: show.externals?.thetvdb,
+        data: show,
+      };
+    });
+    res.json(results);
+  } catch (error) {
+    console.error("browseSearch error:", error);
     res.status(500).json({ error: error.message });
   }
 });

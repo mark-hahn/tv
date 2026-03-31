@@ -119,7 +119,6 @@ const avoidGenres = [
   "stand-up",
   "travel",
   "war",
-  "western",
   "diy",
   "nature",
   "supernatural",

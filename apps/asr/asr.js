@@ -969,11 +969,10 @@ async function findCandidateFile(show) {
     }
     for (const file of files) {
       if (!isVideoFile(file)) continue;
-      const ematch = file.match(/[Ss](\d{1,2})[Ee](\d{1,2})/);
-      if (!ematch) continue;
+      const parsed = parseFileSeasonEpisode(file, entry);
       tuples.push({
-        season: parseInt(ematch[1], 10),
-        episode: parseInt(ematch[2], 10),
+        season: parsed?.season ?? 0,
+        episode: parsed?.episode ?? 0,
         fullPath: path.join(seasonDir, file),
       });
     }
@@ -984,7 +983,12 @@ async function findCandidateFile(show) {
   );
 
   for (const t of tuples) {
-    if (watched.has(`${t.season}:${t.episode}`)) continue;
+    if (
+      t.season !== 0 &&
+      t.episode !== 0 &&
+      watched.has(`${t.season}:${t.episode}`)
+    )
+      continue;
     if (!(await pathExists(getSrtPath(t.fullPath)))) {
       return {
         videoPath: t.fullPath,

@@ -1749,7 +1749,6 @@ export default {
 
       this._didInitialScroll = false;
       this.lastAutoSearchedShowId = null;
-      this.torSearchCache.clear();
     },
 
     handleClose() {

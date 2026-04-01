@@ -764,9 +764,9 @@ export default {
           titlesPane.value.scrollTop = titlesPane.value.scrollHeight;
         }
 
-        // Also trigger gallery search with the title
-        if (norm(firstTitle) !== norm(srchStr.value)) {
-          srchStr.value = firstTitle;
+        // Also trigger gallery search with the original user query
+        if (norm(query) !== norm(srchStr.value)) {
+          srchStr.value = query;
         }
         return;
       }

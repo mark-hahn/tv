@@ -1642,6 +1642,17 @@ const upsertDvdEntry = (entry) => {
   return e.procId;
 };
 
+// Delete individual DVD file entries (VOB/IFO/BUP) by exact title.
+// Called after makemkv successfully finishes a disc to clean the down pane.
+const deleteDvdFileEntries = (titles) => {
+  if (!Array.isArray(titles) || titles.length === 0) return;
+  openDb();
+  const placeholders = titles.map(() => "?").join(",");
+  db.prepare(`DELETE FROM tv_entries WHERE title IN (${placeholders})`).run(
+    ...titles,
+  );
+};
+
 export {
   addEntry,
   markFinished,
@@ -1658,4 +1669,5 @@ export {
   deleteErrorRecords,
   getWorkerCount,
   upsertDvdEntry,
+  deleteDvdFileEntries,
 };

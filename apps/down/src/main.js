@@ -1381,6 +1381,7 @@ async function main() {
         inProgress: false,
         error: false,
       });
+      tvJson.deleteDvdFileEntries(disc.files.map((f) => f.relPath));
       try {
         await execAsync(`rm -rf "${localVtsDir}"`, { timeout: 60000 });
       } catch (e) {}
@@ -1565,6 +1566,7 @@ async function main() {
     );
 
     // Clean up staged disc files now that MKVs are moved.
+    tvJson.deleteDvdFileEntries(disc.files.map((f) => f.relPath));
     try {
       await execAsync(`rm -rf "${localVtsDir}"`, { timeout: 60000 });
     } catch (e) {}

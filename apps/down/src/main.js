@@ -21,6 +21,34 @@ import {
 const __filename = urlNode.fileURLToPath(import.meta.url);
 const __dirname = pathNode.dirname(__filename);
 
+const TV_BLOCKED = {
+  sample: true,
+  ".sfv": true,
+  ".FLEMISH.": true,
+  ".flemish.": true,
+  "Deleted Scenes": true,
+  Commentary: true,
+  Featurettes: true,
+  Features: true,
+  "Physical - S01E01": true,
+  "Legends.Of.Tomorrow": true,
+  "Last.Man.Standing": true,
+  "Uncle.From.Another.World": true,
+  german: true,
+  "Crash and Burn": true,
+  "Christine Keeler": true,
+  "Love Recipe": true,
+  "Millionaire Hot Seat": true,
+  Hootenanny: true,
+  "bravery-pleaselikeme": true,
+  Blacklist: true,
+  "Breakfast.at.Tiffany": true,
+  "The.Postman.Always.Rings": true,
+  Harlots: true,
+  "Theater.Camp": true,
+  "(Audio)": true,
+};
+
 async function main() {
   // If non-blank, emits targeted trace logs for this show name.
   // If blank, tracing is fully disabled.
@@ -202,7 +230,6 @@ async function main() {
   var TV_LOG_PATH = path.join(MISC_DIR, "tv.log");
   var REJECT_LOG_PATH = dataPath("reject.log");
   var TV_INPROGRESS_PATH = dataPath("tv-inProgress.json");
-  var TV_BLOCKED_PATH = dataPath("tv-blocked.json");
   var TV_MAP_PATH = dataPath("tv-map");
   var TVDB_JSON_PATH = path.join(APP_DIR, "..", "srvr", "data", "tvdb.json");
 
@@ -935,7 +962,7 @@ async function main() {
     var f, j, len, line, mapLines, mapStr, results, t;
     // Do not cache tv-finished.json / tv-inProgress.json here.
     // Those are loaded once per cycle immediately after the USB file list is fetched.
-    blocked = JSON.parse(fs.readFileSync(TV_BLOCKED_PATH, "utf8"));
+    blocked = TV_BLOCKED;
     map = {};
     mapStr = fs.readFileSync(TV_MAP_PATH, "utf8");
     mapLines = mapStr.split("\n");

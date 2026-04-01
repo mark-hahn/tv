@@ -46,7 +46,7 @@ const TV_BLOCKED = {
   "The.Postman.Always.Rings": true,
   Harlots: true,
   "Theater.Camp": true,
-  "(Audio)": true,
+  "Audio": true,
 };
 
 async function main() {

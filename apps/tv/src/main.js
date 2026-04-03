@@ -127,7 +127,9 @@ app.get("/tv/on", (req, res) => {
 });
 
 app.get("/tv/emby", (req, res) => {
-  callService("remote", "turn_on", REMOTE_ENTITY_ID, { activity: "tv.emby.embyatv" });
+  callService("remote", "turn_on", REMOTE_ENTITY_ID, {
+    activity: "tv.emby.embyatv",
+  });
   res.json({ ok: true });
 });
 
@@ -142,8 +144,10 @@ app.get("/tv/key/:key", (req, res) => {
     up: "KEYCODE_DPAD_UP",
     down: "KEYCODE_DPAD_DOWN",
     left: "KEYCODE_DPAD_LEFT",
-    right: "KEYCODE_DPAD_RIGHT",    home:  "KEYCODE_HOME",
-    back:  "KEYCODE_BACK",  };
+    right: "KEYCODE_DPAD_RIGHT",
+    home: "KEYCODE_HOME",
+    back: "KEYCODE_BACK",
+  };
   const command = KEY_MAP[req.params.key];
   if (!command) {
     res.status(400).json({ ok: false, error: "unknown key" });

@@ -126,6 +126,11 @@ app.get("/tv/on", (req, res) => {
   res.json({ ok: true });
 });
 
+app.get("/tv/emby", (req, res) => {
+  callService("remote", "turn_on", REMOTE_ENTITY_ID, { activity: "tv.emby.embyatv" });
+  res.json({ ok: true });
+});
+
 app.get("/tv/off", (req, res) => {
   callService("remote", "turn_off", REMOTE_ENTITY_ID);
   res.json({ ok: true });

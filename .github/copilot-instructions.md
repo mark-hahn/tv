@@ -44,6 +44,7 @@
 - all timestamps for logging and general debugging should be pst la with format MM-DD HH:mm
 - when node is not installed in the local environment fix the problem and continue
 - you do not need my permission to run bash or ssh to remote server if you are not modifying anything
+- When formatting dates always check for an hour of 24 and replace it with 00. an example is change 24:43:49 to 00:43:49.
 
 ## Button background colors in client panes
 
@@ -53,3 +54,4 @@
   ```html
   :style="{ '--btn-bg': isActive ? 'lightgray' : 'whitesmoke' }"
   ```
+

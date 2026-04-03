@@ -9,6 +9,7 @@ const TV_PORT = 3004;
 const TV_ENTITY_ID = "media_player.living_room_tv";
 const CAST_ENTITY_ID = "media_player.living_room_tv_2";
 const REMOTE_ENTITY_ID = "remote.living_room_tv";
+const ROKU_REMOTE_ID = "remote.roku_2";
 
 // PST LA timestamp  MM-DD HH:mm
 function ts() {
@@ -37,6 +38,7 @@ let ws = null;
 let cmdId = 0;
 let authenticated = false;
 let castState = "unknown";
+let tvMode = "google"; // "google" | "roku"
 
 function sendCmd(cmd) {
   setTimeout(() => {
@@ -126,6 +128,17 @@ app.get("/tv/on", (req, res) => {
   res.json({ ok: true });
 });
 
+app.get("/tv/mode/:mode", (req, res) => {
+  const mode = req.params.mode;
+  if (mode !== "google" && mode !== "roku") {
+    res.status(400).json({ ok: false, error: "unknown mode" });
+    return;
+  }
+  tvMode = mode;
+  log(`mode set to ${mode}`);
+  res.json({ ok: true, mode });
+});
+
 app.get("/tv/emby", (req, res) => {
   callService("remote", "turn_on", REMOTE_ENTITY_ID, {
     activity: "tv.emby.embyatv",
@@ -139,7 +152,7 @@ app.get("/tv/off", (req, res) => {
 });
 
 app.get("/tv/key/:key", (req, res) => {
-  const KEY_MAP = {
+  const GOOGLE_KEY_MAP = {
     ok: "KEYCODE_DPAD_CENTER",
     up: "KEYCODE_DPAD_UP",
     down: "KEYCODE_DPAD_DOWN",
@@ -148,7 +161,18 @@ app.get("/tv/key/:key", (req, res) => {
     home: "KEYCODE_HOME",
     back: "KEYCODE_BACK",
   };
-  const command = KEY_MAP[req.params.key];
+  const ROKU_KEY_MAP = {
+    ok: "Select",
+    up: "Up",
+    down: "Down",
+    left: "Left",
+    right: "Right",
+    home: "Home",
+    back: "Back",
+  };
+  const keyMap = tvMode === "roku" ? ROKU_KEY_MAP : GOOGLE_KEY_MAP;
+  const remoteId = tvMode === "roku" ? ROKU_REMOTE_ID : REMOTE_ENTITY_ID;
+  const command = keyMap[req.params.key];
   if (!command) {
     res.status(400).json({ ok: false, error: "unknown key" });
     return;
@@ -157,16 +181,16 @@ app.get("/tv/key/:key", (req, res) => {
     type: "call_service",
     domain: "remote",
     service: "send_command",
-    target: { entity_id: REMOTE_ENTITY_ID },
+    target: { entity_id: remoteId },
     service_data: { command },
   };
   sendCmd(cmd);
-  log(`remote.send_command ${command}`);
-  res.json({ ok: true, command });
+  log(`[${tvMode}] remote.send_command ${command}`);
+  res.json({ ok: true, command, mode: tvMode });
 });
 
 app.get("/tv/status", (req, res) => {
-  res.json({ entity: CAST_ENTITY_ID, state: castState });
+  res.json({ entity: CAST_ENTITY_ID, state: castState, mode: tvMode });
 });
 
 // ─── Start ───────────────────────────────────────────────────────────────────

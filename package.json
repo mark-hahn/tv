@@ -31,5 +31,10 @@
   },
   "dependencies": {
     "franc-min": "^6.2.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "protobufjs"
+    ]
   }
 }

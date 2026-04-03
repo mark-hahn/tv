@@ -79,6 +79,16 @@ module.exports = {
       },
     },
     {
+      name: "tv-tv",
+      cwd: appCwd("tv"),
+      script: "src/main.js",
+      interpreter: nodeInterpreter,
+      time: true,
+      env: {
+        NODE_ENV: "production",
+      },
+    },
+    {
       name: "tv-asr-bkgnd",
       cwd: appCwd("asr"),
       script: "asr.js",

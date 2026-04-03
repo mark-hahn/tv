@@ -133,6 +133,7 @@
               @all-click="allClick"
               :actorsListMode="actorsListMode"
               @actors-click="startActorsListMode"
+              @tv-click="tvClick"
             ></HdrTop>
             <HdrBot
               v-if="!simpleMode"
@@ -226,6 +227,7 @@
             @all-click="allClick"
             :actorsListMode="actorsListMode"
             @actors-click="startActorsListMode"
+            @tv-click="tvClick"
           ></HdrTop>
           <HdrBot
             v-if="!simpleMode"
@@ -306,6 +308,7 @@ import * as emby from "../emby.js";
 import * as tvdb from "../tvdb.js";
 import * as srvr from "../srvr.js";
 import * as util from "../util.js";
+import { config } from "../config.js";
 import parseTorrentTitle from "parse-torrent-title";
 import evtBus from "../evtBus.js";
 import Shows from "./shows.vue";
@@ -2747,6 +2750,12 @@ export default {
       this.actorsListMode = true;
       evtBus.emit("showActorsPane");
       evtBus.emit("clearActorSelection");
+    },
+
+    async tvClick() {
+      const res = await fetch(`${config.tvTvUrl}/tv/on`);
+      const data = await res.json();
+      console.log("[TV] turn-on response:", data);
     },
 
     endActorsListMode() {

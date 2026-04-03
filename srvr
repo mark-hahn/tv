@@ -66,6 +66,7 @@ pm2_name_for_project() {
     api)  printf '%s' "tv-api" ;;
     down) printf '%s' "tv-down" ;;
     srvr) printf '%s' "tv-srvr" ;;
+    tv) printf '%s' "tv-tv" ;;
     client) printf '%s' "tv-client" ;;
     share) printf '%s' "tv-share" ;;
     *) return 1 ;;
@@ -111,7 +112,7 @@ remote_sync_app() {
   remote_dir="$(remote_app_dir_for_project "$project")"
 
   local -a extra_excludes=()
-  if [[ "$project" == "api" || "$project" == "down" || "$project" == "srvr" || "$project" == "asr" ]]; then
+  if [[ "$project" == "api" || "$project" == "down" || "$project" == "srvr" || "$project" == "asr" || "$project" == "tv" ]]; then
     # Runtime state and credentials live here; never overwrite them during deploy.
     extra_excludes+=(--exclude 'data/')
     extra_excludes+=(--exclude 'secrets/')
@@ -175,7 +176,7 @@ remote_pm2_restart_all_silent() {
   echo "[remote] pm2 reload tv apps..."
   run_ssh "$SSH_HOST" "cd '$TV_REMOTE_BASE' \
     && pm2 start ecosystem.config.cjs --env production >/dev/null 2>&1 \
-    && pm2 reload tv-api tv-down tv-srvr >/dev/null 2>&1 \
+    && pm2 reload tv-api tv-down tv-srvr tv-tv >/dev/null 2>&1 \
     && pm2 save >/dev/null 2>&1"
 }
 
@@ -213,11 +214,13 @@ remote_deploy_one_no_restart() {
 SHARE_DEPENDENTS="api down srvr client"
 
 case "${1:-all}" in
-  api|down|srvr|client|share|asr)
+  api|down|srvr|tv|client|share|asr)
     if [[ "$1" != "share" && $SHARE_DEPENDENTS == *"$1"* ]]; then
       remote_deploy_one_no_restart share
     fi
     remote_deploy_one_no_restart "$1"
+    # Sync ecosystem config so new pm2 entries are registered
+    run_rsync -az "$ROOT_DIR/ecosystem.config.cjs" "$SSH_HOST:$TV_REMOTE_BASE/"
     remote_pm2_restart_project "$1"
     ;;
   all|"" )
@@ -227,6 +230,7 @@ case "${1:-all}" in
     # Legacy flat deploy mode compabitility (share) - ensures packages are present
     remote_deploy_one_no_restart share
     remote_deploy_one_no_restart asr
+    remote_deploy_one_no_restart tv
     
     if ! remote_deploy_one_no_restart down; then
       echo "[warn] down deploy failed; api/srvr already deployed" >&2

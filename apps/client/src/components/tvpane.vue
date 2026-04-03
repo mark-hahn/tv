@@ -71,6 +71,11 @@
       </button>
       <div></div>
     </div>
+    <!-- Nav row -->
+    <div style="display: flex; gap: 6px; margin-top: 4px;">
+      <button @click="tvKey('home')" :style="btnStyle">⌂</button>
+      <button @click="tvKey('back')" :style="btnStyle">↩</button>
+    </div>
   </div>
 </template>
 

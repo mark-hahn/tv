@@ -6,6 +6,7 @@ const HA_HOST = "hahnca.com:8123";
 const HA_ACCESS_TOKEN =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIzM2Y2MmI0MWZjYTY0YTE1YWU2MjFlZDg2NGJmM2NmYyIsImlhdCI6MTc3MDc5NjQ0NywiZXhwIjoyMDg2MTU2NDQ3fQ.AoUSLrAjOWEhR2pQVeuuykKYPoXqyrnmecQMQkdrgp8";
 const TV_PORT = 3004;
+const TV_ENTITY_ID = "media_player.living_room_tv";
 const CAST_ENTITY_ID = "media_player.living_room_tv_2";
 const REMOTE_ENTITY_ID = "remote.living_room_tv";
 
@@ -121,12 +122,12 @@ const app = express();
 app.use(cors());
 
 app.get("/tv/on", (req, res) => {
-  callService("remote", "turn_on", REMOTE_ENTITY_ID);
+  callService("media_player", "turn_on", TV_ENTITY_ID);
   res.json({ ok: true });
 });
 
 app.get("/tv/off", (req, res) => {
-  callService("media_player", "turn_off", CAST_ENTITY_ID);
+  callService("remote", "turn_off", REMOTE_ENTITY_ID);
   res.json({ ok: true });
 });
 
@@ -136,8 +137,8 @@ app.get("/tv/key/:key", (req, res) => {
     up: "KEYCODE_DPAD_UP",
     down: "KEYCODE_DPAD_DOWN",
     left: "KEYCODE_DPAD_LEFT",
-    right: "KEYCODE_DPAD_RIGHT",
-  };
+    right: "KEYCODE_DPAD_RIGHT",    home:  "KEYCODE_HOME",
+    back:  "KEYCODE_BACK",  };
   const command = KEY_MAP[req.params.key];
   if (!command) {
     res.status(400).json({ ok: false, error: "unknown key" });

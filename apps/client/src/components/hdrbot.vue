@@ -62,7 +62,7 @@
             fontSize: '15px',
             margin: '4px',
             whiteSpace: 'nowrap',
-            width: '100px',
+            width: '60px',
           }"
         >
           {{ selectedSortNbsp }}
@@ -73,7 +73,7 @@
             fontSize: '15px',
             margin: '4px',
             whiteSpace: 'nowrap',
-            width: '100px',
+            width: '60px',
           }"
         >
           {{ selectedFilterNbsp }}

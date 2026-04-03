@@ -4,10 +4,16 @@ import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
 
+const require = createRequire(import.meta.url);
+const { Client: CastClient } = require("castv2");
+
 const HA_HOST = "hahnca.com:8123";
 const HA_ACCESS_TOKEN =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIzM2Y2MmI0MWZjYTY0YTE1YWU2MjFlZDg2NGJmM2NmYyIsImlhdCI6MTc3MDc5NjQ0NywiZXhwIjoyMDg2MTU2NDQ3fQ.AoUSLrAjOWEhR2pQVeuuykKYPoXqyrnmecQMQkdrgp8";
 const TV_PORT = 3004;
+const CHROMECAST_IP = "192.168.1.42";
+const CHROMECAST_PORT = 8009;
+const DEFAULT_MEDIA_RECEIVER_APP_ID = "CC1AD845";
 
 // PST LA timestamp  MM-DD HH:mm
 function ts() {
@@ -28,6 +34,80 @@ function log(...args) {
 }
 function loge(...args) {
   console.error(`[TV ${ts()}] ERROR`, ...args);
+}
+
+// ─── Direct Chromecast connection (castv2) ───────────────────────────────────
+
+let castClient = null;
+let castRcvChannel = null;
+let castReqId = 1;
+let castReady = false;
+
+function connectCast() {
+  log(`castv2: connecting to ${CHROMECAST_IP}:${CHROMECAST_PORT}...`);
+  castReady = false;
+  castRcvChannel = null;
+
+  const client = new CastClient();
+  castClient = client;
+
+  client.connect({ host: CHROMECAST_IP, port: CHROMECAST_PORT }, () => {
+    const connCh = client.createChannel(
+      "sender-0",
+      "receiver-0",
+      "urn:x-cast:com.google.cast.tp.connection",
+      "JSON",
+    );
+    const hbCh = client.createChannel(
+      "sender-0",
+      "receiver-0",
+      "urn:x-cast:com.google.cast.tp.heartbeat",
+      "JSON",
+    );
+    castRcvChannel = client.createChannel(
+      "sender-0",
+      "receiver-0",
+      "urn:x-cast:com.google.cast.receiver",
+      "JSON",
+    );
+
+    connCh.send({ type: "CONNECT" });
+    const hbTimer = setInterval(() => {
+      if (castReady) hbCh.send({ type: "PING" });
+    }, 5000);
+
+    castReady = true;
+    log("castv2: connected and ready");
+
+    client.on("error", (err) => {
+      clearInterval(hbTimer);
+      castReady = false;
+      log("castv2: error:", err.message, "— reconnecting in 5s");
+      setTimeout(connectCast, 5000);
+    });
+  });
+
+  client.on("error", (err) => {
+    if (!castReady) {
+      log("castv2: connect error:", err.message, "— reconnecting in 10s");
+      setTimeout(connectCast, 10000);
+    }
+  });
+}
+
+function castTurnOn() {
+  if (!castReady || !castRcvChannel) {
+    loge("castv2: not ready, falling back to HA");
+    if (castEntityId) callService("media_player", "turn_on", castEntityId);
+    return;
+  }
+  const reqId = castReqId++;
+  log(`castv2: LAUNCH ${DEFAULT_MEDIA_RECEIVER_APP_ID} reqId=${reqId}`);
+  castRcvChannel.send({
+    type: "LAUNCH",
+    appId: DEFAULT_MEDIA_RECEIVER_APP_ID,
+    requestId: reqId,
+  });
 }
 
 // ─── HA WebSocket ────────────────────────────────────────────────────────────
@@ -156,14 +236,8 @@ const app = express();
 app.use(cors());
 
 app.get("/tv/on", (req, res) => {
-  if (!castEntityId) {
-    res
-      .status(503)
-      .json({ ok: false, error: "cast entity not yet discovered" });
-    return;
-  }
-  callService("media_player", "turn_on", castEntityId);
-  res.json({ ok: true, entity: castEntityId });
+  castTurnOn();
+  res.json({ ok: true, method: castReady ? "castv2" : "ha" });
 });
 
 app.get("/tv/off", (req, res) => {
@@ -184,6 +258,7 @@ app.get("/tv/status", (req, res) => {
 // ─── Start ───────────────────────────────────────────────────────────────────
 
 connectHa();
+connectCast();
 
 app.listen(TV_PORT, () => {
   log(`listening on port ${TV_PORT}`);

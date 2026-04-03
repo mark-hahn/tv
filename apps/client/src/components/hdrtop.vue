@@ -140,19 +140,6 @@
       >
         Actors
       </button>
-      <button
-        @click="$emit('tv-click')"
-        style="
-          height: 24px;
-          background-color: white;
-          font-size: 13px;
-          cursor: pointer;
-          border-radius: 7px;
-          margin: 0 0 0 10px;
-        "
-      >
-        TV
-      </button>
     </div>
   </div>
 </template>
@@ -210,7 +197,6 @@ export default {
     "library-click",
     "all-click",
     "actors-click",
-    "tv-click",
   ],
 
   methods: {

@@ -48,114 +48,151 @@
       >
         <div
           id="tabBar"
-          :style="{
-            display: 'flex',
-            gap: simpleMode ? '30px' : '0px',
-            padding: simpleMode ? '6px 8px' : '6px 0px',
-            alignItems: 'center',
-            borderBottom: '1px solid #ddd',
-            backgroundColor: '#fafafa',
-            flex: '0 0 auto',
-            flexWrap: 'wrap',
-          }"
+          style="
+            display: flex;
+            flex-direction: column;
+            border-bottom: 1px solid #ddd;
+            background-color: #fafafa;
+            flex: 0 0 auto;
+          "
         >
-          <button
-            v-for="t in tabs"
-            :key="t.key"
-            @click.stop="selectTab(t.key)"
-            :disabled="t.key === 'map' && isMapDisabledInPreview"
+          <!-- Top row: always visible in simple and non-simple modes -->
+          <div
+            id="tabBarTop"
             :style="{
-              fontSize: '13px',
-              cursor:
-                t.key === 'map' && isMapDisabledInPreview
-                  ? 'not-allowed'
-                  : 'pointer',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              marginLeft: '4px',
-              border: '1px solid #bbb',
-              backgroundColor:
-                currentPane === t.key
-                  ? '#ddd'
-                  : t.key === 'map' && isMapDisabledInPreview
-                    ? '#e8e8e8'
-                    : 'whitesmoke',
-              color:
-                t.key === 'map' && isMapDisabledInPreview ? '#999' : 'inherit',
-              opacity: t.key === 'map' && isMapDisabledInPreview ? 0.6 : 1,
+              display: 'flex',
+              gap: simpleMode ? '30px' : '0px',
+              padding: simpleMode ? '6px 8px' : '6px 0px',
+              alignItems: 'center',
             }"
           >
-            {{ t.label }}
-          </button>
-          <button
-            v-if="!simpleMode"
-            @click.stop="helpDialogOpen = true"
-            title="Modifier-click help"
-            :style="{
-              fontSize: '13px',
-              cursor: 'pointer',
-              borderRadius: '7px',
-              padding: '4px 8px',
-              marginLeft: '6px',
-              border: '1px solid #bbb',
-              '--btn-bg': 'whitesmoke',
-            }"
-          >
-            ?
-          </button>
-          <!-- Preview controls: immediately after the rightmost tab button (before progress)-->
-          <template v-if="previewMode">
             <button
-              @click.stop="addShowFromPreview"
-              :disabled="previewAddBusy || !previewSrchChoice"
+              v-for="t in topTabs"
+              :key="t.key"
+              @click.stop="selectTab(t.key)"
+              :disabled="t.key === 'map' && isMapDisabledInPreview"
               :style="{
                 fontSize: '13px',
                 cursor:
-                  previewAddBusy || !previewSrchChoice ? 'default' : 'pointer',
+                  t.key === 'map' && isMapDisabledInPreview
+                    ? 'not-allowed'
+                    : 'pointer',
                 borderRadius: '7px',
                 padding: '4px 10px',
-                marginTop: '4px',
-                marginLeft: '20px',
+                marginLeft: '4px',
                 border: '1px solid #bbb',
                 backgroundColor:
-                  previewAddBusy || !previewSrchChoice ? '#eee' : 'whitesmoke',
+                  currentPane === t.key
+                    ? '#ddd'
+                    : t.key === 'map' && isMapDisabledInPreview
+                      ? '#e8e8e8'
+                      : 'whitesmoke',
+                color:
+                  t.key === 'map' && isMapDisabledInPreview
+                    ? '#999'
+                    : 'inherit',
+                opacity: t.key === 'map' && isMapDisabledInPreview ? 0.6 : 1,
               }"
             >
-              Add show to Emby
+              {{ t.label }}
             </button>
+            <!-- Preview controls: in top row -->
+            <template v-if="previewMode">
+              <button
+                @click.stop="addShowFromPreview"
+                :disabled="previewAddBusy || !previewSrchChoice"
+                :style="{
+                  fontSize: '13px',
+                  cursor:
+                    previewAddBusy || !previewSrchChoice
+                      ? 'default'
+                      : 'pointer',
+                  borderRadius: '7px',
+                  padding: '4px 10px',
+                  marginTop: '4px',
+                  marginLeft: '20px',
+                  border: '1px solid #bbb',
+                  backgroundColor:
+                    previewAddBusy || !previewSrchChoice
+                      ? '#eee'
+                      : 'whitesmoke',
+                }"
+              >
+                Add show to Emby
+              </button>
+              <button
+                @click.stop="exitPreview"
+                :style="{
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  borderRadius: '7px',
+                  padding: '4px 10px',
+                  marginTop: '4px',
+                  marginLeft: '4px',
+                  border: '1px solid #bbb',
+                  backgroundColor: 'whitesmoke',
+                }"
+              >
+                Exit Preview
+              </button>
+              <span
+                class="pane-header-title"
+                style="margin-left: 10px"
+                >preview mode</span
+              >
+              <span
+                v-if="previewPanesLoading"
+                :style="{
+                  marginLeft: '10px',
+                  color: '#aaa',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  whiteSpace: 'nowrap',
+                }"
+                >&lt;Loading&gt;</span
+              >
+            </template>
+            <div style="flex: 1"></div>
+          </div>
+          <!-- Bottom row: non-simple mode only -->
+          <div
+            v-if="!simpleMode"
+            id="tabBarBot"
+            style="display: flex; padding: 0 0 6px 0; align-items: center"
+          >
             <button
-              @click.stop="exitPreview"
+              v-for="t in bottomTabs"
+              :key="t.key"
+              @click.stop="selectTab(t.key)"
               :style="{
                 fontSize: '13px',
                 cursor: 'pointer',
                 borderRadius: '7px',
                 padding: '4px 10px',
-                marginTop: '4px',
                 marginLeft: '4px',
                 border: '1px solid #bbb',
-                backgroundColor: 'whitesmoke',
+                backgroundColor: currentPane === t.key ? '#ddd' : 'whitesmoke',
               }"
             >
-              Exit Preview
+              {{ t.label }}
             </button>
-            <span
-              class="pane-header-title"
-              style="margin-left: 10px"
-              >preview mode</span
-            >
-            <span
-              v-if="previewPanesLoading"
+            <div style="flex: 1"></div>
+            <button
+              @click.stop="helpDialogOpen = true"
+              title="Modifier-click help"
               :style="{
-                marginLeft: '10px',
-                color: '#aaa',
-                fontWeight: 'bold',
                 fontSize: '13px',
-                whiteSpace: 'nowrap',
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px 8px',
+                marginRight: '6px',
+                border: '1px solid #bbb',
+                '--btn-bg': 'whitesmoke',
               }"
-              >&lt;Loading&gt;</span
             >
-          </template>
-          <div style="flex: 1"></div>
+              ?
+            </button>
+          </div>
         </div>
         <div
           id="tabBody"
@@ -265,6 +302,10 @@
             :sizing="activeSizing"
             :show="currentShow"
           ></Down>
+          <TvPane
+            v-show="currentPane === 'tv'"
+            style="width: 100%; height: 100%"
+          ></TvPane>
         </div>
       </div>
       <!-- Draggable divider between panes: vertical in landscape, horizontal in portrait.-->
@@ -418,6 +459,7 @@ import Down from "./down.vue";
 import Usb from "./usb.vue";
 import Local from "./local.vue";
 import Trailer from "./trailer.vue";
+import TvPane from "./tvpane.vue";
 import evtBus from "../evtBus.js";
 import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
@@ -448,6 +490,7 @@ export default {
     Local,
     Down,
     Trailer,
+    TvPane,
     VideoPlayer,
   },
   data() {
@@ -761,13 +804,19 @@ export default {
       };
     },
 
-    tabs() {
-      const allTabs = [
+    topTabs() {
+      return [
         { label: "Info", key: "info" },
         { label: "Map", key: "map" },
         { label: "Actors", key: "actors" },
         { label: "Reviews", key: "reviews" },
         { label: "Trailer", key: "trailer" },
+        { label: "TV", key: "tv" },
+      ];
+    },
+
+    bottomTabs() {
+      return [
         { label: "Tor", key: "tor" },
         { label: "Browse", key: "browse" },
         { label: "Flex", key: "flex" },
@@ -776,10 +825,6 @@ export default {
         { label: "Down", key: "down" },
         { label: "Local", key: "local" },
       ];
-
-      if (!this.simpleMode) return allTabs;
-      const allowed = new Set(["info", "map", "actors", "reviews", "trailer"]);
-      return allTabs.filter((t) => allowed.has(t.key));
     },
 
     isMapDisabledInPreview() {
@@ -1480,7 +1525,7 @@ export default {
       // In simple mode, only Series/Map/Actors exist.
       if (
         this.simpleMode &&
-        !["info", "map", "actors", "reviews", "trailer"].includes(k)
+        !["info", "map", "actors", "reviews", "trailer", "tv"].includes(k)
       ) {
         return;
       }
@@ -1512,6 +1557,12 @@ export default {
 
       if (k === "trailer") {
         this.currentPane = "trailer";
+        evtBus.emit("paneChanged", this.currentPane);
+        return;
+      }
+
+      if (k === "tv") {
+        this.currentPane = "tv";
         evtBus.emit("paneChanged", this.currentPane);
         return;
       }

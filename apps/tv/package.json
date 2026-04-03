@@ -12,6 +12,7 @@
     "clean": "node -e \"console.log('clean: @tv/tv (not configured)')\""
   },
   "dependencies": {
+    "castv2": "^0.1.10",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "node-fetch": "^3.3.2",

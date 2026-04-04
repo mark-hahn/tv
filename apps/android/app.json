@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "TV Remote",
+    "slug": "tv-remote",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "platforms": [
+      "android"
+    ],
+    "android": {
+      "package": "com.hahnca.tvremote",
+      "versionCode": 1
+    },
+    "extra": {}
+  }
+}

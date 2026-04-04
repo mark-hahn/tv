@@ -10,6 +10,8 @@ const TV_PORT = 3004;
 const TV_ENTITY_ID = "media_player.living_room_tv";
 const CAST_ENTITY_ID = "media_player.living_room_tv_2";
 const REMOTE_ENTITY_ID = "remote.living_room_tv";
+const IR_REMOTE_ID = "remote.tv_ir";
+const IR_DEVICE = "bdv_n7100w";
 const ROKU_REMOTE_ID = "remote.roku_2";
 const BRAVIA_HOST = "192.168.1.12";
 const BRAVIA_PORT = 2870;
@@ -292,31 +294,22 @@ app.get("/tv/vol/:dir", async (req, res) => {
     res.status(400).json({ ok: false, error: "unknown dir" });
     return;
   }
-  try {
-    const current = await braviaGetVolume();
-    if (current === null) throw new Error("could not get volume");
-    const next = Math.max(0, Math.min(100, current + (dir === "up" ? 2 : -2)));
-    await braviaSetVolume(next);
-    log(`vol ${dir}: ${current} -> ${next}`);
-    res.json({ ok: true, volume: next });
-  } catch (e) {
-    loge("vol error:", e.message);
-    res.status(500).json({ ok: false, error: e.message });
-  }
+  const command = dir === "up" ? "vol_up" : "vol_down";
+  callService("remote", "send_command", IR_REMOTE_ID, {
+    device: IR_DEVICE,
+    command,
+  });
+  log(`vol ${dir}: IR sent`);
+  res.json({ ok: true });
 });
 
-app.get("/tv/mute", async (req, res) => {
-  try {
-    const current = await braviaGetMute();
-    if (current === null) throw new Error("could not get mute state");
-    const next = !current;
-    await braviaSetMute(next);
-    log(`mute: ${current} -> ${next}`);
-    res.json({ ok: true, muted: next });
-  } catch (e) {
-    loge("mute error:", e.message);
-    res.status(500).json({ ok: false, error: e.message });
-  }
+app.get("/tv/mute", (req, res) => {
+  callService("remote", "send_command", IR_REMOTE_ID, {
+    device: IR_DEVICE,
+    command: "mute",
+  });
+  log("mute IR sent");
+  res.json({ ok: true });
 });
 
 app.get("/tv/mutestate", async (req, res) => {

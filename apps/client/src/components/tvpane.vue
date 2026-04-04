@@ -29,8 +29,11 @@
         Roku
       </button>
       <button
-        @click="tvCmd('off')"
-        :style="btnStyle"
+        @click="
+          flash('off');
+          tvCmd('off');
+        "
+        :style="offBtnStyle"
       >
         Off
       </button>
@@ -93,12 +96,6 @@
       >
         ↩
       </button>
-      <button
-        @click="tvCmd('emby')"
-        :style="btnStyle"
-      >
-        Emby
-      </button>
     </div>
     <!-- Volume row -->
     <div style="display: flex; gap: 6px">
@@ -144,12 +141,26 @@ export default {
     return {
       mode: "google",
       muted: false,
+      power: "unknown",
+      flashBtn: null,
     };
   },
 
   computed: {
     btnStyle() {
       return BTN_STYLE;
+    },
+    offBtnStyle() {
+      const isOff = this.power === "off" || this.power === "standby";
+      return {
+        ...BTN_STYLE,
+        "--btn-bg":
+          this.flashBtn === "off"
+            ? "#90ee90"
+            : isOff
+              ? "lightblue"
+              : "whitesmoke",
+      };
     },
     muteBtnStyle() {
       return {
@@ -170,17 +181,44 @@ export default {
 
   methods: {
     modeBtnStyle(m) {
+      const isOff = this.power === "off" || this.power === "standby";
       return {
         ...BTN_STYLE,
         width: "auto",
         padding: "0 8px",
-        "--btn-bg": this.mode === m ? "lightblue" : "whitesmoke",
+        "--btn-bg":
+          this.flashBtn === m
+            ? "#90ee90"
+            : !isOff && this.mode === m
+              ? "lightblue"
+              : "whitesmoke",
       };
     },
 
+    flash(btn) {
+      this.flashBtn = btn;
+      setTimeout(() => {
+        this.flashBtn = null;
+      }, 300);
+    },
+
     async setMode(m) {
+      this.flash(m);
       this.mode = m;
       await fetch(`${config.tvTvUrl}/tv/mode/${m}`);
+      this._startFastPoll();
+    },
+
+    _startFastPoll() {
+      clearInterval(this._muteTimer);
+      const startedAt = Date.now();
+      this._muteTimer = setInterval(() => {
+        this.pollMute();
+        if (Date.now() - startedAt > 30000) {
+          clearInterval(this._muteTimer);
+          this._muteTimer = setInterval(() => this.pollMute(), 3000);
+        }
+      }, 500);
     },
 
     async pollMute() {
@@ -188,7 +226,10 @@ export default {
         const data = await fetch(`${config.tvTvUrl}/tv/mutestate`).then((r) =>
           r.json(),
         );
-        if (data.ok) this.muted = data.muted;
+        if (data.ok) {
+          if (data.muted !== null) this.muted = data.muted;
+          if (data.power) this.power = data.power;
+        }
       } catch (_) {}
     },
 

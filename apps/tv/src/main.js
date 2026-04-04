@@ -1,4 +1,5 @@
 import { WebSocket } from "ws";
+import { exec } from "child_process";
 import express from "express";
 import cors from "cors";
 
@@ -40,6 +41,7 @@ let ws = null;
 let cmdId = 0;
 let authenticated = false;
 let castState = "unknown";
+let tvPowerState = "unknown";
 let tvMode = "google"; // "google" | "roku"
 
 function sendCmd(cmd) {
@@ -91,14 +93,16 @@ function handleMsg(raw) {
     if (Array.isArray(msg.result)) {
       const s = msg.result.find((s) => s.entity_id === CAST_ENTITY_ID);
       if (s) castState = s.state;
+      const tv = msg.result.find((s) => s.entity_id === TV_ENTITY_ID);
+      if (tv) tvPowerState = tv.state;
     }
   } else if (msg.type === "event") {
     const event = msg.event;
-    if (
-      event?.event_type === "state_changed" &&
-      event.data?.new_state?.entity_id === CAST_ENTITY_ID
-    ) {
-      castState = event.data.new_state.state;
+    if (event?.event_type === "state_changed") {
+      const id = event.data?.new_state?.entity_id;
+      const state = event.data?.new_state?.state;
+      if (id === CAST_ENTITY_ID) castState = state;
+      if (id === TV_ENTITY_ID) tvPowerState = state;
     }
   }
 }
@@ -139,22 +143,37 @@ app.get("/tv/mode/:mode", (req, res) => {
   tvMode = mode;
   log(`mode set to ${mode}`);
   if (mode === "roku") {
-    callService("remote", "send_command", ROKU_REMOTE_ID, { command: "Home" });
+    callService("media_player", "turn_on", "media_player.roku_2");
+    callService("media_player", "turn_on", TV_ENTITY_ID);
+    setTimeout(
+      () =>
+        callService("remote", "send_command", ROKU_REMOTE_ID, {
+          command: "Home",
+        }),
+      2000,
+    );
     setTimeout(
       () =>
         callService("media_player", "select_source", "media_player.roku_2", {
           source: "Emby",
         }),
-      3000,
+      5000,
     );
   } else {
     callService("media_player", "turn_on", TV_ENTITY_ID);
     setTimeout(
       () =>
+        callService("remote", "send_command", REMOTE_ENTITY_ID, {
+          command: "KEYCODE_HOME",
+        }),
+      2000,
+    );
+    setTimeout(
+      () =>
         callService("remote", "turn_on", REMOTE_ENTITY_ID, {
           activity: "tv.emby.embyatv",
         }),
-      3000,
+      5000,
     );
   }
   res.json({ ok: true, mode });
@@ -170,6 +189,7 @@ app.get("/tv/emby", (req, res) => {
 app.get("/tv/off", (req, res) => {
   if (tvMode === "roku") {
     callService("media_player", "turn_off", "media_player.roku_2");
+    callService("media_player", "turn_off", TV_ENTITY_ID);
   } else {
     callService("remote", "turn_off", REMOTE_ENTITY_ID);
   }
@@ -216,6 +236,12 @@ app.get("/tv/key/:key", (req, res) => {
 
 // ─── Bravia UPnP ─────────────────────────────────────────────────────────────
 
+function braviaPing() {
+  return new Promise((resolve) => {
+    exec(`ping -c1 -W1 ${BRAVIA_HOST}`, (err) => resolve(!err));
+  });
+}
+
 function braviaFetch(action, body) {
   return fetch(
     `http://${BRAVIA_HOST}:${BRAVIA_PORT}/control/RenderingControl`,
@@ -226,7 +252,7 @@ function braviaFetch(action, body) {
         SOAPAction: `"urn:schemas-upnp-org:service:RenderingControl:1#${action}"`,
       },
       body,
-      signal: AbortSignal.timeout(2000),
+      signal: AbortSignal.timeout(1000),
     },
   );
 }
@@ -294,15 +320,28 @@ app.get("/tv/mute", async (req, res) => {
 });
 
 app.get("/tv/mutestate", async (req, res) => {
-  let muted = null;
-  try {
-    muted = await braviaGetMute();
-  } catch (e) {}
-  res.json({ ok: true, muted });
+  const [muted, pingOk] = await Promise.all([
+    braviaGetMute().catch(() => null),
+    braviaPing(),
+  ]);
+  const haOn =
+    tvPowerState !== "off" &&
+    tvPowerState !== "unavailable" &&
+    tvPowerState !== "unknown";
+  res.json({
+    ok: true,
+    muted,
+    power: muted !== null || pingOk || haOn ? "on" : "off",
+  });
 });
 
 app.get("/tv/status", (req, res) => {
-  res.json({ entity: CAST_ENTITY_ID, state: castState, mode: tvMode });
+  res.json({
+    entity: CAST_ENTITY_ID,
+    state: castState,
+    mode: tvMode,
+    tvPower: tvPowerState,
+  });
 });
 
 // ─── Start ───────────────────────────────────────────────────────────────────

@@ -154,7 +154,11 @@ app.get("/tv/emby", (req, res) => {
 });
 
 app.get("/tv/off", (req, res) => {
-  callService("remote", "turn_off", REMOTE_ENTITY_ID);
+  if (tvMode === "roku") {
+    callService("media_player", "turn_off", "media_player.roku_2");
+  } else {
+    callService("remote", "turn_off", REMOTE_ENTITY_ID);
+  }
   res.json({ ok: true });
 });
 

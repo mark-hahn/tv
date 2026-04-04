@@ -11,6 +11,11 @@
       "package": "com.hahnca.tvremote",
       "versionCode": 1
     },
-    "extra": {}
+    "extra": {
+      "eas": {
+        "projectId": "aa17387b-2be3-4783-99c9-a0a91fb8b4e0"
+      }
+    },
+    "owner": "mark-hahn"
   }
 }

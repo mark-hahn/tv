@@ -138,10 +138,10 @@ app.get("/tv/mode/:mode", (req, res) => {
   log(`mode set to ${mode}`);
   if (mode === "roku") {
     callService("remote", "send_command", ROKU_REMOTE_ID, { command: "Home" });
+    setTimeout(() => callService("media_player", "select_source", "media_player.roku_2", { source: "Emby" }), 3000);
   } else {
-    callService("remote", "send_command", REMOTE_ENTITY_ID, {
-      command: "KEYCODE_HOME",
-    });
+    callService("media_player", "turn_on", TV_ENTITY_ID);
+    setTimeout(() => callService("remote", "turn_on", REMOTE_ENTITY_ID, { activity: "tv.emby.embyatv" }), 3000);
   }
   res.json({ ok: true, mode });
 });

@@ -100,6 +100,27 @@
         Emby
       </button>
     </div>
+    <!-- Volume row -->
+    <div style="display: flex; gap: 6px">
+      <button
+        @click="tvCmd('vol/up')"
+        :style="btnStyle"
+      >
+        Vol+
+      </button>
+      <button
+        @click="tvCmd('vol/down')"
+        :style="btnStyle"
+      >
+        Vol-
+      </button>
+      <button
+        @click="tvCmd('mute')"
+        :style="btnStyle"
+      >
+        Mute
+      </button>
+    </div>
   </div>
 </template>
 

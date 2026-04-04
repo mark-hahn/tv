@@ -10,6 +10,8 @@ const TV_ENTITY_ID = "media_player.living_room_tv";
 const CAST_ENTITY_ID = "media_player.living_room_tv_2";
 const REMOTE_ENTITY_ID = "remote.living_room_tv";
 const ROKU_REMOTE_ID = "remote.roku_2";
+const BRAVIA_HOST = "192.168.1.12";
+const BRAVIA_PORT = 2870;
 
 // PST LA timestamp  MM-DD HH:mm
 function ts() {
@@ -138,10 +140,22 @@ app.get("/tv/mode/:mode", (req, res) => {
   log(`mode set to ${mode}`);
   if (mode === "roku") {
     callService("remote", "send_command", ROKU_REMOTE_ID, { command: "Home" });
-    setTimeout(() => callService("media_player", "select_source", "media_player.roku_2", { source: "Emby" }), 3000);
+    setTimeout(
+      () =>
+        callService("media_player", "select_source", "media_player.roku_2", {
+          source: "Emby",
+        }),
+      3000,
+    );
   } else {
     callService("media_player", "turn_on", TV_ENTITY_ID);
-    setTimeout(() => callService("remote", "turn_on", REMOTE_ENTITY_ID, { activity: "tv.emby.embyatv" }), 3000);
+    setTimeout(
+      () =>
+        callService("remote", "turn_on", REMOTE_ENTITY_ID, {
+          activity: "tv.emby.embyatv",
+        }),
+      3000,
+    );
   }
   res.json({ ok: true, mode });
 });
@@ -198,6 +212,93 @@ app.get("/tv/key/:key", (req, res) => {
   sendCmd(cmd);
   log(`[${tvMode}] remote.send_command ${command}`);
   res.json({ ok: true, command, mode: tvMode });
+});
+
+// ─── Bravia UPnP ─────────────────────────────────────────────────────────────
+
+async function braviaSetVolume(volume) {
+  const body = `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:SetVolume xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID><Channel>Master</Channel><DesiredVolume>${volume}</DesiredVolume></u:SetVolume></s:Body></s:Envelope>`;
+  const res = await fetch(
+    `http://${BRAVIA_HOST}:${BRAVIA_PORT}/control/RenderingControl`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/xml; charset=utf-8",
+        SOAPAction:
+          '"urn:schemas-upnp-org:service:RenderingControl:1#SetVolume"',
+      },
+      body,
+    },
+  );
+  return res.ok;
+}
+
+async function braviaGetVolume() {
+  const body = `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:GetVolume xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID><Channel>Master</Channel></u:GetVolume></s:Body></s:Envelope>`;
+  const res = await fetch(
+    `http://${BRAVIA_HOST}:${BRAVIA_PORT}/control/RenderingControl`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/xml; charset=utf-8",
+        SOAPAction:
+          '"urn:schemas-upnp-org:service:RenderingControl:1#GetVolume"',
+      },
+      body,
+    },
+  );
+  const text = await res.text();
+  const m = text.match(/<CurrentVolume>(\d+)<\/CurrentVolume>/);
+  return m ? parseInt(m[1]) : null;
+}
+
+async function braviaSetMute(muted) {
+  const val = muted ? "1" : "0";
+  const body = `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:SetMute xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID><Channel>Master</Channel><DesiredMute>${val}</DesiredMute></u:SetMute></s:Body></s:Envelope>`;
+  const res = await fetch(
+    `http://${BRAVIA_HOST}:${BRAVIA_PORT}/control/RenderingControl`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/xml; charset=utf-8",
+        SOAPAction: '"urn:schemas-upnp-org:service:RenderingControl:1#SetMute"',
+      },
+      body,
+    },
+  );
+  return res.ok;
+}
+
+app.get("/tv/vol/:dir", async (req, res) => {
+  const dir = req.params.dir;
+  if (dir !== "up" && dir !== "down") {
+    res.status(400).json({ ok: false, error: "unknown dir" });
+    return;
+  }
+  try {
+    const current = await braviaGetVolume();
+    if (current === null) throw new Error("could not get volume");
+    const next = Math.max(0, Math.min(100, current + (dir === "up" ? 2 : -2)));
+    await braviaSetVolume(next);
+    log(`vol ${dir}: ${current} -> ${next}`);
+    res.json({ ok: true, volume: next });
+  } catch (e) {
+    loge("vol error:", e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+let bravMuted = false;
+app.get("/tv/mute", async (req, res) => {
+  try {
+    bravMuted = !bravMuted;
+    await braviaSetMute(bravMuted);
+    log(`mute: ${bravMuted}`);
+    res.json({ ok: true, muted: bravMuted });
+  } catch (e) {
+    loge("mute error:", e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
 });
 
 app.get("/tv/status", (req, res) => {

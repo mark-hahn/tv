@@ -2,6 +2,7 @@
   "name": "tv-android",
   "version": "1.0.0",
   "main": "App.js",
+  "packageManager": "npm@10.9.2",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",

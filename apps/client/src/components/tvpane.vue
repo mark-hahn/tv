@@ -1,122 +1,151 @@
 <template>
   <div
     id="tvPane"
-    style="
-      width: 100%;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      padding: 10px;
-      box-sizing: border-box;
-      gap: 10px;
-    "
+    style="padding: 0; box-sizing: border-box; width: 100%; height: 100%"
   >
-    <!-- Mode row -->
-    <div style="display: flex; gap: 6px; align-items: center">
-      <button
-        @click="setMode('google')"
+    <div
+      style="
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(5, 1fr);
+        border-top: 3px solid #000;
+        border-left: 3px solid #000;
+        height: 100%;
+      "
+    >
+      <!-- Row 1: back, up, home -->
+      <div
+        :style="cellStyle('white', 'back')"
+        @click="
+          flash('back');
+          tvKey('back');
+        "
+      >
+        ↩
+      </div>
+      <div
+        :style="cellStyle('#fffde7', 'up')"
+        @click="
+          flash('up');
+          tvKey('up');
+        "
+      >
+        ▲
+      </div>
+      <div
+        :style="cellStyle('white', 'home')"
+        @click="
+          flash('home');
+          tvKey('home');
+        "
+      >
+        <svg
+          width="1em"
+          height="1em"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+        >
+          <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+        </svg>
+      </div>
+      <!-- Row 2: left, ok, right -->
+      <div
+        :style="cellStyle('#fffde7', 'left')"
+        @click="
+          flash('left');
+          tvKey('left');
+        "
+      >
+        ◀
+      </div>
+      <div
+        :style="cellStyle('#e8f5e9', 'ok')"
+        @click="
+          flash('ok');
+          tvKey('ok');
+        "
+      >
+        OK
+      </div>
+      <div
+        :style="cellStyle('#fffde7', 'right')"
+        @click="
+          flash('right');
+          tvKey('right');
+        "
+      >
+        ▶
+      </div>
+      <!-- Row 3: emby, down, keyboard -->
+      <div
+        :style="cellStyle('white', 'emby')"
+        @click="
+          flash('emby');
+          tvCmd('emby');
+        "
+      >
+        E
+      </div>
+      <div
+        :style="cellStyle('#fffde7', 'down')"
+        @click="
+          flash('down');
+          tvKey('down');
+        "
+      >
+        ▼
+      </div>
+      <div :style="cellStyle('white')">A</div>
+      <!-- Row 4: vol-, vol+, mute -->
+      <div
+        :style="cellStyle('white', 'vold')"
+        @click="
+          flash('vold');
+          tvCmd('vol/down');
+        "
+      >
+        Vol-
+      </div>
+      <div
+        :style="cellStyle('white', 'volu')"
+        @click="
+          flash('volu');
+          tvCmd('vol/up');
+        "
+      >
+        Vol+
+      </div>
+      <div
+        :style="muteCellStyle"
+        @click="
+          flash('mute');
+          tvCmd('mute');
+        "
+      >
+        Mute
+      </div>
+      <!-- Row 5: google, roku, off -->
+      <div
         :style="modeBtnStyle('google')"
-        style="width: auto; padding: 0 8px"
+        @click="setMode('google')"
       >
         Google
-      </button>
-      <button
-        @click="setMode('roku')"
+      </div>
+      <div
         :style="modeBtnStyle('roku')"
-        style="width: auto; padding: 0 8px"
+        @click="setMode('roku')"
       >
         Roku
-      </button>
-      <button
+      </div>
+      <div
+        :style="offBtnStyle"
         @click="
           flash('off');
           tvCmd('off');
         "
-        :style="offBtnStyle"
       >
         Off
-      </button>
-    </div>
-    <!-- D-pad -->
-    <div
-      style="
-        display: grid;
-        grid-template-columns: repeat(3, 36px);
-        grid-template-rows: repeat(3, 36px);
-        gap: 4px;
-      "
-    >
-      <div></div>
-      <button
-        @click="tvKey('up')"
-        :style="btnStyle"
-      >
-        ▲
-      </button>
-      <div></div>
-      <button
-        @click="tvKey('left')"
-        :style="btnStyle"
-      >
-        ◀
-      </button>
-      <button
-        @click="tvKey('ok')"
-        :style="btnStyle"
-      >
-        OK
-      </button>
-      <button
-        @click="tvKey('right')"
-        :style="btnStyle"
-      >
-        ▶
-      </button>
-      <div></div>
-      <button
-        @click="tvKey('down')"
-        :style="btnStyle"
-      >
-        ▼
-      </button>
-      <div></div>
-    </div>
-    <!-- Nav row -->
-    <div style="display: flex; gap: 6px; margin-top: 4px">
-      <button
-        @click="tvKey('home')"
-        :style="btnStyle"
-      >
-        <span style="font-size: 22px; font-weight: bold">⌂</span>
-      </button>
-      <button
-        @click="tvKey('back')"
-        :style="btnStyle"
-      >
-        ↩
-      </button>
-    </div>
-    <!-- Volume row -->
-    <div style="display: flex; gap: 6px">
-      <button
-        @click="tvCmd('vol/up')"
-        :style="btnStyle"
-      >
-        Vol+
-      </button>
-      <button
-        @click="tvCmd('vol/down')"
-        :style="btnStyle"
-      >
-        Vol-
-      </button>
-      <button
-        @click="tvCmd('mute')"
-        :style="muteBtnStyle"
-      >
-        Mute
-      </button>
+      </div>
     </div>
   </div>
 </template>
@@ -124,14 +153,16 @@
 <script>
 import { config } from "../config.js";
 
-const BTN_STYLE = {
-  width: "36px",
-  height: "36px",
-  fontSize: "13px",
+const CELL_BASE = {
+  borderRight: "3px solid #000",
+  borderBottom: "3px solid #000",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
   cursor: "pointer",
-  borderRadius: "7px",
-  padding: "0",
-  border: "1px solid #bbb",
+  fontSize: "42px",
+  fontWeight: "bold",
+  userSelect: "none",
 };
 
 export default {
@@ -147,26 +178,16 @@ export default {
   },
 
   computed: {
-    btnStyle() {
-      return BTN_STYLE;
+    muteCellStyle() {
+      const bg =
+        this.flashBtn === "mute" ? "#90ee90" : this.muted ? "#ffb3b3" : "white";
+      return { ...CELL_BASE, backgroundColor: bg };
     },
     offBtnStyle() {
       const isOff = this.power === "off" || this.power === "standby";
-      return {
-        ...BTN_STYLE,
-        "--btn-bg":
-          this.flashBtn === "off"
-            ? "#90ee90"
-            : isOff
-              ? "lightblue"
-              : "whitesmoke",
-      };
-    },
-    muteBtnStyle() {
-      return {
-        ...BTN_STYLE,
-        "--btn-bg": this.muted ? "#ffb3b3" : "whitesmoke",
-      };
+      const bg =
+        this.flashBtn === "off" ? "#90ee90" : isOff ? "lightblue" : "white";
+      return { ...CELL_BASE, backgroundColor: bg };
     },
   },
 
@@ -182,24 +203,25 @@ export default {
   methods: {
     modeBtnStyle(m) {
       const isOff = this.power === "off" || this.power === "standby";
-      return {
-        ...BTN_STYLE,
-        width: "auto",
-        padding: "0 8px",
-        "--btn-bg":
-          this.flashBtn === m
-            ? "#90ee90"
-            : !isOff && this.mode === m
-              ? "lightblue"
-              : "whitesmoke",
-      };
+      const bg =
+        this.flashBtn === m
+          ? "#90ee90"
+          : !isOff && this.mode === m
+            ? "lightblue"
+            : "white";
+      return { ...CELL_BASE, backgroundColor: bg };
+    },
+
+    cellStyle(bg, key = null) {
+      const flashActive = key && this.flashBtn === key;
+      return { ...CELL_BASE, backgroundColor: flashActive ? "#90ee90" : bg };
     },
 
     flash(btn) {
       this.flashBtn = btn;
       setTimeout(() => {
         this.flashBtn = null;
-      }, 300);
+      }, 150);
     },
 
     async setMode(m) {

@@ -4,8 +4,9 @@
   "main": "App.js",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "build": "eas build -p android --profile preview"
+    "android": "expo run:android",
+    "build": "eas build -p android --profile preview",
+    "ios": "expo run:ios"
   },
   "dependencies": {
     "@babel/runtime": "^7.25.0",

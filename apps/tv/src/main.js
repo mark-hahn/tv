@@ -136,6 +136,13 @@ app.get("/tv/mode/:mode", (req, res) => {
   }
   tvMode = mode;
   log(`mode set to ${mode}`);
+  if (mode === "roku") {
+    callService("remote", "send_command", ROKU_REMOTE_ID, { command: "Home" });
+  } else {
+    callService("remote", "send_command", REMOTE_ENTITY_ID, {
+      command: "KEYCODE_HOME",
+    });
+  }
   res.json({ ok: true, mode });
 });
 

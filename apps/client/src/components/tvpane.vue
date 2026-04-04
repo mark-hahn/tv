@@ -13,18 +13,20 @@
     "
   >
     <!-- Mode row -->
-    <div style="display: flex; gap: 6px; align-items: center;">
-      <button @click="setMode('google')" :style="modeBtnStyle('google')" style="width: auto; padding: 0 8px;">Google</button>
-      <button @click="setMode('roku')" :style="modeBtnStyle('roku')" style="width: auto; padding: 0 8px;">Roku</button>
-      <span style="font-size: 12px; color: #666; margin-left: 4px;">{{ mode }} mode</span>
-    </div>
-    <!-- Power row -->
-    <div style="display: flex; gap: 6px">
+    <div style="display: flex; gap: 6px; align-items: center">
       <button
-        @click="tvCmd('on')"
-        :style="btnStyle"
+        @click="setMode('google')"
+        :style="modeBtnStyle('google')"
+        style="width: auto; padding: 0 8px"
       >
-        On
+        Google
+      </button>
+      <button
+        @click="setMode('roku')"
+        :style="modeBtnStyle('roku')"
+        style="width: auto; padding: 0 8px"
+      >
+        Roku
       </button>
       <button
         @click="tvCmd('off')"
@@ -112,7 +114,6 @@ const BTN_STYLE = {
   borderRadius: "7px",
   padding: "0",
   border: "1px solid #bbb",
-  backgroundColor: "whitesmoke",
 };
 
 export default {
@@ -132,7 +133,12 @@ export default {
 
   methods: {
     modeBtnStyle(m) {
-      return { ...BTN_STYLE, width: "auto", padding: "0 8px", "--btn-bg": this.mode === m ? "lightblue" : "whitesmoke" };
+      return {
+        ...BTN_STYLE,
+        width: "auto",
+        padding: "0 8px",
+        "--btn-bg": this.mode === m ? "lightblue" : "whitesmoke",
+      };
     },
 
     async setMode(m) {

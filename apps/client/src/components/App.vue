@@ -2099,7 +2099,8 @@ body {
 #tor button,
 .torrents-container button,
 #qbt button,
-#down button {
+#down button,
+#tvPane button {
   background-color: var(--btn-bg, whitesmoke) !important;
 }
 

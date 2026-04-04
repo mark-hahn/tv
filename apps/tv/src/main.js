@@ -216,37 +216,30 @@ app.get("/tv/key/:key", (req, res) => {
 
 // ─── Bravia UPnP ─────────────────────────────────────────────────────────────
 
-async function braviaSetVolume(volume) {
-  const body = `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:SetVolume xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID><Channel>Master</Channel><DesiredVolume>${volume}</DesiredVolume></u:SetVolume></s:Body></s:Envelope>`;
-  const res = await fetch(
+function braviaFetch(action, body) {
+  return fetch(
     `http://${BRAVIA_HOST}:${BRAVIA_PORT}/control/RenderingControl`,
     {
       method: "POST",
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
-        SOAPAction:
-          '"urn:schemas-upnp-org:service:RenderingControl:1#SetVolume"',
+        SOAPAction: `"urn:schemas-upnp-org:service:RenderingControl:1#${action}"`,
       },
       body,
+      signal: AbortSignal.timeout(2000),
     },
   );
+}
+
+async function braviaSetVolume(volume) {
+  const body = `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:SetVolume xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID><Channel>Master</Channel><DesiredVolume>${volume}</DesiredVolume></u:SetVolume></s:Body></s:Envelope>`;
+  const res = await braviaFetch("SetVolume", body);
   return res.ok;
 }
 
 async function braviaGetVolume() {
   const body = `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:GetVolume xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID><Channel>Master</Channel></u:GetVolume></s:Body></s:Envelope>`;
-  const res = await fetch(
-    `http://${BRAVIA_HOST}:${BRAVIA_PORT}/control/RenderingControl`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "text/xml; charset=utf-8",
-        SOAPAction:
-          '"urn:schemas-upnp-org:service:RenderingControl:1#GetVolume"',
-      },
-      body,
-    },
-  );
+  const res = await braviaFetch("GetVolume", body);
   const text = await res.text();
   const m = text.match(/<CurrentVolume>(\d+)<\/CurrentVolume>/);
   return m ? parseInt(m[1]) : null;
@@ -255,33 +248,13 @@ async function braviaGetVolume() {
 async function braviaSetMute(muted) {
   const val = muted ? "1" : "0";
   const body = `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:SetMute xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID><Channel>Master</Channel><DesiredMute>${val}</DesiredMute></u:SetMute></s:Body></s:Envelope>`;
-  const res = await fetch(
-    `http://${BRAVIA_HOST}:${BRAVIA_PORT}/control/RenderingControl`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "text/xml; charset=utf-8",
-        SOAPAction: '"urn:schemas-upnp-org:service:RenderingControl:1#SetMute"',
-      },
-      body,
-    },
-  );
+  const res = await braviaFetch("SetMute", body);
   return res.ok;
 }
 
 async function braviaGetMute() {
   const body = `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:GetMute xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID><Channel>Master</Channel></u:GetMute></s:Body></s:Envelope>`;
-  const res = await fetch(
-    `http://${BRAVIA_HOST}:${BRAVIA_PORT}/control/RenderingControl`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "text/xml; charset=utf-8",
-        SOAPAction: '"urn:schemas-upnp-org:service:RenderingControl:1#GetMute"',
-      },
-      body,
-    },
-  );
+  const res = await braviaFetch("GetMute", body);
   const text = await res.text();
   const m = text.match(/<CurrentMute>(\d+)<\/CurrentMute>/);
   return m ? m[1] === "1" : null;
@@ -321,12 +294,11 @@ app.get("/tv/mute", async (req, res) => {
 });
 
 app.get("/tv/mutestate", async (req, res) => {
+  let muted = null;
   try {
-    const muted = await braviaGetMute();
-    res.json({ ok: true, muted });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: e.message });
-  }
+    muted = await braviaGetMute();
+  } catch (e) {}
+  res.json({ ok: true, muted });
 });
 
 app.get("/tv/status", (req, res) => {

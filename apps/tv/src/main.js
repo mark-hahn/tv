@@ -269,6 +269,24 @@ async function braviaSetMute(muted) {
   return res.ok;
 }
 
+async function braviaGetMute() {
+  const body = `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:GetMute xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID><Channel>Master</Channel></u:GetMute></s:Body></s:Envelope>`;
+  const res = await fetch(
+    `http://${BRAVIA_HOST}:${BRAVIA_PORT}/control/RenderingControl`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/xml; charset=utf-8",
+        SOAPAction: '"urn:schemas-upnp-org:service:RenderingControl:1#GetMute"',
+      },
+      body,
+    },
+  );
+  const text = await res.text();
+  const m = text.match(/<CurrentMute>(\d+)<\/CurrentMute>/);
+  return m ? m[1] === "1" : null;
+}
+
 app.get("/tv/vol/:dir", async (req, res) => {
   const dir = req.params.dir;
   if (dir !== "up" && dir !== "down") {
@@ -288,15 +306,25 @@ app.get("/tv/vol/:dir", async (req, res) => {
   }
 });
 
-let bravMuted = false;
 app.get("/tv/mute", async (req, res) => {
   try {
-    bravMuted = !bravMuted;
-    await braviaSetMute(bravMuted);
-    log(`mute: ${bravMuted}`);
-    res.json({ ok: true, muted: bravMuted });
+    const current = await braviaGetMute();
+    if (current === null) throw new Error("could not get mute state");
+    const next = !current;
+    await braviaSetMute(next);
+    log(`mute: ${current} -> ${next}`);
+    res.json({ ok: true, muted: next });
   } catch (e) {
     loge("mute error:", e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+app.get("/tv/mutestate", async (req, res) => {
+  try {
+    const muted = await braviaGetMute();
+    res.json({ ok: true, muted });
+  } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
   }
 });

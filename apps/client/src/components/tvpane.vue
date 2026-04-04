@@ -85,7 +85,7 @@
         @click="tvKey('home')"
         :style="btnStyle"
       >
-        ⌂
+        <span style="font-size: 22px; font-weight: bold">⌂</span>
       </button>
       <button
         @click="tvKey('back')"
@@ -116,7 +116,7 @@
       </button>
       <button
         @click="tvCmd('mute')"
-        :style="btnStyle"
+        :style="muteBtnStyle"
       >
         Mute
       </button>
@@ -143,6 +143,7 @@ export default {
   data() {
     return {
       mode: "google",
+      muted: false,
     };
   },
 
@@ -150,6 +151,21 @@ export default {
     btnStyle() {
       return BTN_STYLE;
     },
+    muteBtnStyle() {
+      return {
+        ...BTN_STYLE,
+        "--btn-bg": this.muted ? "#ffb3b3" : "whitesmoke",
+      };
+    },
+  },
+
+  mounted() {
+    this.pollMute();
+    this._muteTimer = setInterval(() => this.pollMute(), 3000);
+  },
+
+  beforeUnmount() {
+    clearInterval(this._muteTimer);
   },
 
   methods: {
@@ -167,9 +183,19 @@ export default {
       await fetch(`${config.tvTvUrl}/tv/mode/${m}`);
     },
 
+    async pollMute() {
+      try {
+        const data = await fetch(`${config.tvTvUrl}/tv/mutestate`).then((r) =>
+          r.json(),
+        );
+        if (data.ok) this.muted = data.muted;
+      } catch (_) {}
+    },
+
     async tvCmd(cmd) {
       const res = await fetch(`${config.tvTvUrl}/tv/${cmd}`);
       const data = await res.json();
+      if (cmd === "mute" && data.ok) this.muted = data.muted;
       console.log(`[TV] ${cmd} response:`, data);
     },
 

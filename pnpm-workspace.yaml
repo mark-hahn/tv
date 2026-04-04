@@ -1,5 +1,10 @@
 packages:
-  - "apps/*"
+  - "apps/api"
+  - "apps/asr"
+  - "apps/client"
+  - "apps/down"
+  - "apps/srvr"
+  - "apps/tv"
   - "packages/*"
 
 onlyBuiltDependencies:

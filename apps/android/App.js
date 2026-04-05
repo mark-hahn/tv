@@ -33,6 +33,7 @@ export default function App() {
     if (data.muted !== null && data.muted !== undefined) setMuted(data.muted);
     if (data.power) setPower(data.power);
     if (data.activeDevice !== undefined) setActiveDevice(data.activeDevice);
+    if (data.mode) setModeState(data.mode);
   };
 
   const pollMute = async () => {

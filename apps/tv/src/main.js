@@ -240,6 +240,7 @@ app.get("/tv/mode/:mode", (req, res) => {
     );
   }
   res.json({ ok: true, mode });
+  pushMuteState();
 });
 
 app.get("/tv/emby", (req, res) => {
@@ -257,6 +258,16 @@ app.get("/tv/off", (req, res) => {
     callService("remote", "turn_off", REMOTE_ENTITY_ID);
   }
   res.json({ ok: true });
+  fetch(`${SRVR_INTERNAL_URL}/internal/tv-state`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      muted: null,
+      power: "off",
+      activeDevice,
+      mode: tvMode,
+    }),
+  }).catch(() => {});
 });
 
 app.get("/tv/key/:key", (req, res) => {
@@ -386,7 +397,7 @@ async function pushMuteState() {
   await fetch(`${SRVR_INTERNAL_URL}/internal/tv-state`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ muted, power, activeDevice }),
+    body: JSON.stringify({ muted, power, activeDevice, mode: tvMode }),
   }).catch(() => {});
 }
 

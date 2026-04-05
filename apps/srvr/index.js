@@ -3557,7 +3557,9 @@ wss.on("connection", (ws) => {
     }
 
     // Only handleAsr uses WebSocket
-    if (fname == "handleAsr") {
+    if (fname == "register") {
+      // client registration — no response needed
+    } else if (fname == "handleAsr") {
       handleAsr(ws, id, param);
     } else if (fname == "handleFix") {
       handleFix(ws, id, param);

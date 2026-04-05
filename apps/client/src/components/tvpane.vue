@@ -233,6 +233,7 @@ export default {
     async setMode(m) {
       this.flash(m);
       this.mode = m;
+      this.power = "on";
       await fetch(`${config.tvTvUrl}/tv/mode/${m}`);
     },
 

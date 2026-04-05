@@ -47,6 +47,9 @@ export default function App() {
   const connectWs = () => {
     const ws = new WebSocket(TV_SRVR_WS_URL);
     wsRef.current = ws;
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ id: 0, fname: "register" }));
+    };
     ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
@@ -90,6 +93,7 @@ export default function App() {
   const handleSetMode = async (m) => {
     flash(m);
     setModeState(m);
+    setPower("on");
     try {
       await fetch(`${TV_TV_URL}/tv/mode/${m}`);
     } catch (_) {}

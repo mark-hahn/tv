@@ -105,6 +105,7 @@ let castState = "unknown";
 let tvPowerState = "unknown";
 let tvMode = "google"; // "google" | "roku"
 let activeDevice = null; // "google" | "roku"
+let lastOffAt = 0;
 const prevSessions = {};
 
 function sendCmd(cmd) {
@@ -240,7 +241,11 @@ app.get("/tv/mode/:mode", (req, res) => {
     );
   }
   res.json({ ok: true, mode });
-  pushMuteState();
+  fetch(`${SRVR_INTERNAL_URL}/internal/tv-state`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ muted: null, power: "on", activeDevice, mode }),
+  }).catch(() => {});
 });
 
 app.get("/tv/emby", (req, res) => {
@@ -251,12 +256,10 @@ app.get("/tv/emby", (req, res) => {
 });
 
 app.get("/tv/off", (req, res) => {
-  if (tvMode === "roku") {
-    callService("media_player", "turn_off", "media_player.roku_2");
-    callService("media_player", "turn_off", TV_ENTITY_ID);
-  } else {
-    callService("remote", "turn_off", REMOTE_ENTITY_ID);
-  }
+  callService("media_player", "turn_off", "media_player.roku_2");
+  callService("media_player", "turn_off", TV_ENTITY_ID);
+  callService("remote", "turn_off", REMOTE_ENTITY_ID);
+  lastOffAt = Date.now();
   res.json({ ok: true });
   fetch(`${SRVR_INTERNAL_URL}/internal/tv-state`, {
     method: "POST",
@@ -265,7 +268,7 @@ app.get("/tv/off", (req, res) => {
       muted: null,
       power: "off",
       activeDevice,
-      mode: tvMode,
+      mode: null,
     }),
   }).catch(() => {});
 });
@@ -394,10 +397,11 @@ async function pushMuteState() {
     tvPowerState !== "unavailable" &&
     tvPowerState !== "unknown";
   const power = muted !== null || pingOk || haOn ? "on" : "off";
+  const effectivePower = Date.now() - lastOffAt < 5000 ? "off" : power;
   await fetch(`${SRVR_INTERNAL_URL}/internal/tv-state`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ muted, power, activeDevice, mode: tvMode }),
+    body: JSON.stringify({ muted, power: effectivePower, activeDevice }),
   }).catch(() => {});
 }
 

@@ -51,10 +51,11 @@
       <!-- Row 2: left, ok, right -->
       <div
         :style="cellStyle('#fffde7', 'left')"
-        @click="
-          flash('left');
-          tvKey('left');
-        "
+        @mousedown="startRepeat('left')"
+        @mouseup="stopRepeat"
+        @mouseleave="stopRepeat"
+        @touchstart.prevent="startRepeat('left')"
+        @touchend="stopRepeat"
       >
         ◀
       </div>
@@ -69,10 +70,11 @@
       </div>
       <div
         :style="cellStyle('#fffde7', 'right')"
-        @click="
-          flash('right');
-          tvKey('right');
-        "
+        @mousedown="startRepeat('right')"
+        @mouseup="stopRepeat"
+        @mouseleave="stopRepeat"
+        @touchstart.prevent="startRepeat('right')"
+        @touchend="stopRepeat"
       >
         ▶
       </div>
@@ -204,9 +206,23 @@ export default {
 
   beforeUnmount() {
     evtBus.off("tvMuteState", this._onTvMuteState);
+    this.stopRepeat();
   },
 
   methods: {
+    startRepeat(key) {
+      this.flash(key);
+      this.tvKey(key);
+      this._repeatTimer = setInterval(() => {
+        this.flash(key);
+        this.tvKey(key);
+      }, 200);
+    },
+
+    stopRepeat() {
+      clearInterval(this._repeatTimer);
+    },
+
     modeBtnStyle(m) {
       const isOff = this.power === "off" || this.power === "standby";
       const bg =

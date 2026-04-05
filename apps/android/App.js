@@ -27,6 +27,20 @@ export default function App() {
   const [activeDevice, setActiveDevice] = useState(null);
 
   const wsRef = useRef(null);
+  const repeatRef = useRef(null);
+
+  const startRepeat = (key) => {
+    flash(key);
+    tvKey(key);
+    repeatRef.current = setInterval(() => {
+      flash(key);
+      tvKey(key);
+    }, 200);
+  };
+
+  const stopRepeat = () => {
+    clearInterval(repeatRef.current);
+  };
 
   const applyMuteState = (data) => {
     if (!data) return;
@@ -152,10 +166,9 @@ export default function App() {
       key: "left",
       label: "◀",
       bg: () => cellBg("#fffde7", "left"),
-      onPress: () => {
-        flash("left");
-        tvKey("left");
-      },
+      onPress: () => {},
+      onPressIn: () => startRepeat("left"),
+      onPressOut: stopRepeat,
     },
     {
       key: "ok",
@@ -170,10 +183,9 @@ export default function App() {
       key: "right",
       label: "▶",
       bg: () => cellBg("#fffde7", "right"),
-      onPress: () => {
-        flash("right");
-        tvKey("right");
-      },
+      onPress: () => {},
+      onPressIn: () => startRepeat("right"),
+      onPressOut: stopRepeat,
     },
     // Row 3: emby, down, keyboard (A — no action in web version)
     {
@@ -269,6 +281,8 @@ export default function App() {
             key={btn.key}
             style={[styles.cell, { backgroundColor: btn.bg() }]}
             onPress={btn.onPress}
+            onPressIn={btn.onPressIn}
+            onPressOut={btn.onPressOut}
             activeOpacity={1}
           >
             {btn.icon ? (

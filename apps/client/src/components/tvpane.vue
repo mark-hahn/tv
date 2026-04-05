@@ -208,12 +208,10 @@ export default {
   methods: {
     modeBtnStyle(m) {
       const isOff = this.power === "off" || this.power === "standby";
-      const active =
-        this.activeDevice !== null ? this.activeDevice === m : this.mode === m;
       const bg =
         this.flashBtn === m
           ? "#90ee90"
-          : !isOff && active
+          : !isOff && this.mode === m
             ? "lightblue"
             : "white";
       return { ...CELL_BASE, backgroundColor: bg };

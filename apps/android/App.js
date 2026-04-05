@@ -96,8 +96,7 @@ export default function App() {
 
   const modeBg = (m) => {
     if (flashBtn === m) return "#90ee90";
-    const active = activeDevice !== null ? activeDevice === m : mode === m;
-    if (!isOff && active) return "lightblue";
+    if (!isOff && mode === m) return "lightblue";
     return "white";
   };
 

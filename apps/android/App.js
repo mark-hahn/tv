@@ -13,9 +13,10 @@ const TV_TV_URL = "https://hahnca.com/tv-tv";
 
 const COLS = 3;
 const ROWS = 5;
+const BORDER = 3;
 const { width, height } = Dimensions.get("window");
-const CELL_W = width / COLS;
-const CELL_H = height / ROWS;
+const CELL_W = (width - BORDER * (COLS + 1)) / COLS;
+const CELL_H = (height - BORDER * (ROWS + 1)) / ROWS;
 
 export default function App() {
   const [mode, setModeState] = useState("google");
@@ -265,16 +266,13 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     flexWrap: "wrap",
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
-    borderColor: "#000",
+    padding: BORDER,
+    gap: BORDER,
+    backgroundColor: "#000",
   },
   cell: {
     width: CELL_W,
     height: CELL_H,
-    borderRightWidth: 3,
-    borderBottomWidth: 3,
-    borderColor: "#000",
     alignItems: "center",
     justifyContent: "center",
   },

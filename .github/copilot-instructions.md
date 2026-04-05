@@ -54,4 +54,4 @@
   ```html
   :style="{ '--btn-bg': isActive ? 'lightgray' : 'whitesmoke' }"
   ```
-
+- when any change is made to web client tv pane ui or the android app ui then the same change should be made to the other

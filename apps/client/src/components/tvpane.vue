@@ -84,7 +84,7 @@
           tvCmd('emby');
         "
       >
-        E
+        Emby
       </div>
       <div
         :style="cellStyle('#fffde7', 'down')"
@@ -95,10 +95,10 @@
       >
         ▼
       </div>
-      <div :style="cellStyle('white')">A</div>
+      <div :style="cellStyle('white')">ABC</div>
       <!-- Row 4: vol-, vol+, mute -->
       <div
-        :style="cellStyle('white', 'vold')"
+        :style="cellStyle('#e8f5e9', 'vold')"
         @click="
           flash('vold');
           tvCmd('vol/down');
@@ -107,7 +107,7 @@
         Vol-
       </div>
       <div
-        :style="cellStyle('white', 'volu')"
+        :style="cellStyle('#e8f5e9', 'volu')"
         @click="
           flash('volu');
           tvCmd('vol/up');
@@ -181,7 +181,11 @@ export default {
   computed: {
     muteCellStyle() {
       const bg =
-        this.flashBtn === "mute" ? "#90ee90" : this.muted ? "#ffb3b3" : "white";
+        this.flashBtn === "mute"
+          ? "#90ee90"
+          : this.muted
+            ? "#ffb3b3"
+            : "#e8f5e9";
       return { ...CELL_BASE, backgroundColor: bg };
     },
     offBtnStyle() {

@@ -23,6 +23,7 @@ export default function App() {
   const [muted, setMuted] = useState(false);
   const [power, setPower] = useState("unknown");
   const [flashBtn, setFlashBtn] = useState(null);
+  const [activeDevice, setActiveDevice] = useState(null);
 
   const muteTimerRef = useRef(null);
 
@@ -33,6 +34,7 @@ export default function App() {
       if (data.ok) {
         if (data.muted !== null) setMuted(data.muted);
         if (data.power) setPower(data.power);
+        if (data.activeDevice !== undefined) setActiveDevice(data.activeDevice);
       }
     } catch (_) {}
   };
@@ -63,8 +65,7 @@ export default function App() {
   const tvCmd = async (cmd) => {
     try {
       const res = await fetch(`${TV_TV_URL}/tv/${cmd}`);
-      const data = await res.json();
-      if (cmd === "mute" && data.ok) setMuted(data.muted);
+      await res.json();
     } catch (_) {}
   };
 
@@ -95,7 +96,8 @@ export default function App() {
 
   const modeBg = (m) => {
     if (flashBtn === m) return "#90ee90";
-    if (!isOff && mode === m) return "lightblue";
+    const active = activeDevice !== null ? activeDevice === m : mode === m;
+    if (!isOff && active) return "lightblue";
     return "white";
   };
 

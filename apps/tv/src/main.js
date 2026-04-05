@@ -15,6 +15,8 @@ const IR_DEVICE = "bdv_n7100w";
 const ROKU_REMOTE_ID = "remote.roku_2";
 const BRAVIA_HOST = "192.168.1.12";
 const BRAVIA_PORT = 2870;
+const EMBY_HOST = "hahnca.com:8920";
+const EMBY_API_KEY = "1c399bd079d549cba8c916244d3add2b";
 
 // PST LA timestamp  MM-DD HH:mm
 function ts() {
@@ -37,6 +39,62 @@ function loge(...args) {
   console.error(`[TV ${ts()}] ERROR`, ...args);
 }
 
+// ─── Emby WebSocket ─────────────────────────────────────────────────────────
+
+function handleEmbySession(s) {
+  let device = null;
+  if (s.DeviceName === "Living Room TV") device = "google";
+  else if (s.DeviceName === "Roku 2") device = "roku";
+  if (!device) return;
+  const playing = s.NowPlayingItem?.Name ?? null;
+  const remoteCtrl = s.SupportsRemoteControl ?? false;
+  const paused = s.PlayState?.IsPaused ?? null;
+  const prev = prevSessions[device];
+  if (prev) {
+    const changed =
+      (prev.playing === null && playing !== null) ||
+      (!prev.remoteCtrl && remoteCtrl) ||
+      prev.paused !== paused;
+    if (changed) {
+      activeDevice = device;
+      log(`activeDevice: ${device}`);
+    }
+  }
+  prevSessions[device] = { playing, remoteCtrl, paused };
+}
+
+function connectEmby() {
+  const deviceId = "tv-server";
+  const url = `wss://${EMBY_HOST}/embywebsocket?api_key=${EMBY_API_KEY}&deviceId=${deviceId}`;
+  log("connecting to Emby WebSocket...");
+  const embyWs = new WebSocket(url, { rejectUnauthorized: false });
+
+  embyWs.on("open", () => {
+    log("emby ws opened");
+    embyWs.send(
+      JSON.stringify({ MessageType: "SessionsStart", Data: "0,1500" }),
+    );
+  });
+
+  embyWs.on("message", (data) => {
+    let msg;
+    try {
+      msg = JSON.parse(data.toString());
+    } catch (_) {
+      return;
+    }
+    if (msg.MessageType === "Sessions" && Array.isArray(msg.Data)) {
+      for (const s of msg.Data) handleEmbySession(s);
+    }
+  });
+
+  embyWs.on("error", (err) => loge("emby ws error:", err.message));
+  embyWs.on("close", () => {
+    log("emby ws closed, reconnecting in 5s");
+    setTimeout(connectEmby, 5000);
+  });
+}
+
 // ─── HA WebSocket ────────────────────────────────────────────────────────────
 
 let ws = null;
@@ -45,6 +103,8 @@ let authenticated = false;
 let castState = "unknown";
 let tvPowerState = "unknown";
 let tvMode = "google"; // "google" | "roku"
+let activeDevice = null; // "google" | "roku"
+const prevSessions = {};
 
 function sendCmd(cmd) {
   setTimeout(() => {
@@ -325,6 +385,7 @@ app.get("/tv/mutestate", async (req, res) => {
     ok: true,
     muted,
     power: muted !== null || pingOk || haOn ? "on" : "off",
+    activeDevice,
   });
 });
 
@@ -340,6 +401,7 @@ app.get("/tv/status", (req, res) => {
 // ─── Start ───────────────────────────────────────────────────────────────────
 
 connectHa();
+connectEmby();
 
 app.listen(TV_PORT, () => {
   log(`listening on port ${TV_PORT}`);

@@ -174,6 +174,7 @@ export default {
       muted: false,
       power: "unknown",
       flashBtn: null,
+      activeDevice: null,
     };
   },
 
@@ -203,10 +204,12 @@ export default {
   methods: {
     modeBtnStyle(m) {
       const isOff = this.power === "off" || this.power === "standby";
+      const active =
+        this.activeDevice !== null ? this.activeDevice === m : this.mode === m;
       const bg =
         this.flashBtn === m
           ? "#90ee90"
-          : !isOff && this.mode === m
+          : !isOff && active
             ? "lightblue"
             : "white";
       return { ...CELL_BASE, backgroundColor: bg };
@@ -251,6 +254,7 @@ export default {
         if (data.ok) {
           if (data.muted !== null) this.muted = data.muted;
           if (data.power) this.power = data.power;
+          if (data.activeDevice) this.activeDevice = data.activeDevice;
         }
       } catch (_) {}
     },

@@ -249,9 +249,15 @@ app.get("/tv/mode/:mode", (req, res) => {
 });
 
 app.get("/tv/emby", (req, res) => {
-  callService("remote", "turn_on", REMOTE_ENTITY_ID, {
-    activity: "tv.emby.embyatv",
-  });
+  if (tvMode === "roku") {
+    callService("media_player", "select_source", "media_player.roku_2", {
+      source: "Emby",
+    });
+  } else {
+    callService("remote", "turn_on", REMOTE_ENTITY_ID, {
+      activity: "tv.emby.embyatv",
+    });
+  }
   res.json({ ok: true });
 });
 

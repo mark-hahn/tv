@@ -152,6 +152,7 @@
 
 <script>
 import { config } from "../config.js";
+import evtBus from "../evtBus.js";
 
 const CELL_BASE = {
   borderRight: "3px solid #000",
@@ -198,11 +199,11 @@ export default {
 
   mounted() {
     this.pollMute();
-    this._muteTimer = setInterval(() => this.pollMute(), 3000);
+    evtBus.on("tvMuteState", this._onTvMuteState);
   },
 
   beforeUnmount() {
-    clearInterval(this._muteTimer);
+    evtBus.off("tvMuteState", this._onTvMuteState);
   },
 
   methods: {
@@ -233,19 +234,14 @@ export default {
       this.flash(m);
       this.mode = m;
       await fetch(`${config.tvTvUrl}/tv/mode/${m}`);
-      this._startFastPoll();
     },
 
-    _startFastPoll() {
-      clearInterval(this._muteTimer);
-      const startedAt = Date.now();
-      this._muteTimer = setInterval(() => {
-        this.pollMute();
-        if (Date.now() - startedAt > 30000) {
-          clearInterval(this._muteTimer);
-          this._muteTimer = setInterval(() => this.pollMute(), 3000);
-        }
-      }, 500);
+    _onTvMuteState(data) {
+      if (!data) return;
+      if (data.muted !== null) this.muted = data.muted;
+      if (data.power) this.power = data.power;
+      if (data.activeDevice !== undefined)
+        this.activeDevice = data.activeDevice;
     },
 
     async pollMute() {

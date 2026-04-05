@@ -4,6 +4,7 @@ import * as path from "node:path";
 import express from "express";
 import cors from "cors";
 import https from "https";
+import http from "http";
 import WebSocket, { WebSocketServer } from "ws";
 import { rimraf } from "rimraf";
 import * as view from "./src/lastViewed.js";
@@ -3484,6 +3485,7 @@ app.post(
 );
 
 const HTTP_PORT = 8737;
+const SRVR_INTERNAL_PORT = 8739;
 
 // HTTPS options - use same certs as API server (located in api/cookies)
 const CERT_DIR = path.join(path.dirname(SRVR_ROOT_DIR), "api", "cookies");
@@ -3494,6 +3496,15 @@ const httpsOptions = {
 
 https.createServer(httpsOptions, app).listen(HTTP_PORT, () => {
   console.log(`HTTPS API listening on port ${HTTP_PORT}`);
+});
+
+app.post("/internal/tv-state", (req, res) => {
+  notifyClients("tvMuteState", req.body);
+  res.json({ ok: true });
+});
+
+http.createServer(app).listen(SRVR_INTERNAL_PORT, "127.0.0.1", () => {
+  console.log(`Internal HTTP listening on port ${SRVR_INTERNAL_PORT}`);
 });
 
 //////////////////  WEBSOCKET SERVER  //////////////////

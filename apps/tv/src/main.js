@@ -17,6 +17,7 @@ const BRAVIA_HOST = "192.168.1.12";
 const BRAVIA_PORT = 2870;
 const EMBY_HOST = "hahnca.com:8920";
 const EMBY_API_KEY = "1c399bd079d549cba8c916244d3add2b";
+const SRVR_INTERNAL_URL = "http://127.0.0.1:8739";
 
 // PST LA timestamp  MM-DD HH:mm
 function ts() {
@@ -372,6 +373,23 @@ app.get("/tv/mute", (req, res) => {
   res.json({ ok: true });
 });
 
+async function pushMuteState() {
+  const [muted, pingOk] = await Promise.all([
+    braviaGetMute().catch(() => null),
+    braviaPing(),
+  ]);
+  const haOn =
+    tvPowerState !== "off" &&
+    tvPowerState !== "unavailable" &&
+    tvPowerState !== "unknown";
+  const power = muted !== null || pingOk || haOn ? "on" : "off";
+  await fetch(`${SRVR_INTERNAL_URL}/internal/tv-state`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ muted, power, activeDevice }),
+  }).catch(() => {});
+}
+
 app.get("/tv/mutestate", async (req, res) => {
   const [muted, pingOk] = await Promise.all([
     braviaGetMute().catch(() => null),
@@ -406,3 +424,5 @@ connectEmby();
 app.listen(TV_PORT, () => {
   log(`listening on port ${TV_PORT}`);
 });
+
+setInterval(pushMuteState, 2000);

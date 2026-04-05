@@ -10,6 +10,7 @@ import {
 import { MaterialIcons } from "@expo/vector-icons";
 
 const TV_TV_URL = "https://hahnca.com/tv-tv";
+const TV_SRVR_WS_URL = "wss://hahnca.com/tv-srvr";
 
 const COLS = 3;
 const ROWS = 5;
@@ -25,41 +26,51 @@ export default function App() {
   const [flashBtn, setFlashBtn] = useState(null);
   const [activeDevice, setActiveDevice] = useState(null);
 
-  const muteTimerRef = useRef(null);
+  const wsRef = useRef(null);
+
+  const applyMuteState = (data) => {
+    if (!data) return;
+    if (data.muted !== null && data.muted !== undefined) setMuted(data.muted);
+    if (data.power) setPower(data.power);
+    if (data.activeDevice !== undefined) setActiveDevice(data.activeDevice);
+  };
 
   const pollMute = async () => {
     try {
       const res = await fetch(`${TV_TV_URL}/tv/mutestate`);
       const data = await res.json();
-      if (data.ok) {
-        if (data.muted !== null) setMuted(data.muted);
-        if (data.power) setPower(data.power);
-        if (data.activeDevice !== undefined) setActiveDevice(data.activeDevice);
-      }
+      if (data.ok) applyMuteState(data);
     } catch (_) {}
+  };
+
+  const connectWs = () => {
+    const ws = new WebSocket(TV_SRVR_WS_URL);
+    wsRef.current = ws;
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.id === 0 && msg.notification === "tvMuteState") {
+          applyMuteState(msg.data);
+        }
+      } catch (_) {}
+    };
+    ws.onclose = () => {
+      setTimeout(connectWs, 2000);
+    };
   };
 
   useEffect(() => {
     pollMute();
-    muteTimerRef.current = setInterval(pollMute, 3000);
-    return () => clearInterval(muteTimerRef.current);
+    connectWs();
+    return () => {
+      if (wsRef.current) wsRef.current.onclose = null;
+      wsRef.current?.close();
+    };
   }, []);
 
   const flash = (btn) => {
     setFlashBtn(btn);
     setTimeout(() => setFlashBtn(null), 150);
-  };
-
-  const startFastPoll = () => {
-    clearInterval(muteTimerRef.current);
-    const startedAt = Date.now();
-    muteTimerRef.current = setInterval(() => {
-      pollMute();
-      if (Date.now() - startedAt > 30000) {
-        clearInterval(muteTimerRef.current);
-        muteTimerRef.current = setInterval(pollMute, 3000);
-      }
-    }, 500);
   };
 
   const tvCmd = async (cmd) => {
@@ -81,7 +92,6 @@ export default function App() {
     try {
       await fetch(`${TV_TV_URL}/tv/mode/${m}`);
     } catch (_) {}
-    startFastPoll();
   };
 
   const isOff = power === "off" || power === "standby";

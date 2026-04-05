@@ -104,6 +104,7 @@ export default function App() {
     {
       key: "back",
       label: "↩",
+      largeText: true,
       bg: () => cellBg("white", "back"),
       onPress: () => {
         flash("back");
@@ -179,7 +180,7 @@ export default function App() {
     {
       key: "keyboard",
       label: "A",
-      bg: () => cellBg("white", null),
+      bg: () => cellBg("white", "keyboard"),
       onPress: () => {},
     },
     // Row 4: vol-, vol+, mute
@@ -214,18 +215,21 @@ export default function App() {
     {
       key: "google",
       label: "Google",
+      smallText: true,
       bg: () => modeBg("google"),
       onPress: () => handleSetMode("google"),
     },
     {
       key: "roku",
       label: "Roku",
+      smallText: true,
       bg: () => modeBg("roku"),
       onPress: () => handleSetMode("roku"),
     },
     {
       key: "off",
       label: "Off",
+      smallText: true,
       bg: () => offBg,
       onPress: () => {
         flash("off");
@@ -248,7 +252,15 @@ export default function App() {
             {btn.icon ? (
               btn.icon
             ) : (
-              <Text style={styles.cellText}>{btn.label}</Text>
+              <Text
+                style={[
+                  styles.cellText,
+                  btn.smallText && styles.cellTextSmall,
+                  btn.largeText && styles.cellTextLarge,
+                ]}
+              >
+                {btn.label}
+              </Text>
             )}
           </TouchableOpacity>
         ))}
@@ -280,5 +292,11 @@ const styles = StyleSheet.create({
     fontSize: 42,
     fontWeight: "bold",
     color: "#000",
+  },
+  cellTextSmall: {
+    fontSize: 28,
+  },
+  cellTextLarge: {
+    fontSize: 84,
   },
 });

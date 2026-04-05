@@ -88,7 +88,8 @@ export default function App() {
   // Background color helpers (mirror Vue cellStyle / computed props)
   const cellBg = (defaultBg, key) => (flashBtn === key ? "#90ee90" : defaultBg);
 
-  const muteBg = flashBtn === "mute" ? "#90ee90" : muted ? "#ffb3b3" : "white";
+  const muteBg =
+    flashBtn === "mute" ? "#90ee90" : muted ? "#ffb3b3" : "#e8f5e9";
 
   const offBg = flashBtn === "off" ? "#90ee90" : isOff ? "lightblue" : "white";
 
@@ -161,7 +162,8 @@ export default function App() {
     // Row 3: emby, down, keyboard (A — no action in web version)
     {
       key: "emby",
-      label: "E",
+      label: "Emby",
+      smallText: true,
       bg: () => cellBg("white", "emby"),
       onPress: () => {
         flash("emby");
@@ -179,7 +181,8 @@ export default function App() {
     },
     {
       key: "keyboard",
-      label: "A",
+      label: "ABC",
+      smallText: true,
       bg: () => cellBg("white", "keyboard"),
       onPress: () => {},
     },
@@ -187,7 +190,8 @@ export default function App() {
     {
       key: "vold",
       label: "Vol-",
-      bg: () => cellBg("white", "vold"),
+      smallText: true,
+      bg: () => cellBg("#e8f5e9", "vold"),
       onPress: () => {
         flash("vold");
         tvCmd("vol/down");
@@ -196,7 +200,8 @@ export default function App() {
     {
       key: "volu",
       label: "Vol+",
-      bg: () => cellBg("white", "volu"),
+      smallText: true,
+      bg: () => cellBg("#e8f5e9", "volu"),
       onPress: () => {
         flash("volu");
         tvCmd("vol/up");
@@ -205,6 +210,7 @@ export default function App() {
     {
       key: "mute",
       label: "Mute",
+      smallText: true,
       bg: () => muteBg,
       onPress: () => {
         flash("mute");

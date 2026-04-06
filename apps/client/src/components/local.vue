@@ -174,6 +174,25 @@
           </button>
 
           <button
+            @click="moveSelected"
+            :disabled="!errsMode || loading || selectedFiles.size === 0"
+            title="Move selected error file to Trial &amp; Error"
+            :style="{
+              cursor:
+                errsMode && selectedFiles.size > 0 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg':
+                errsMode && selectedFiles.size > 0 ? 'whitesmoke' : '#e8e8e8',
+              color: errsMode && selectedFiles.size > 0 ? 'inherit' : '#aaa',
+              marginRight: '10px',
+            }"
+          >
+            Move
+          </button>
+
+          <button
             @click="deleteSelected"
             :disabled="loading || (!selectedName && selectedFiles.size === 0)"
             title="Delete selected files"
@@ -1558,6 +1577,53 @@ export default {
       this.selectedName = null;
       this.selectedFiles = new Set();
       this.fetchFiles();
+    },
+    async moveSelected() {
+      if (!this.errsMode || this.selectedFiles.size === 0) return;
+      const relPath = Array.from(this.selectedFiles)[0];
+      this.loading = true;
+      try {
+        const url = `${config.torrentsApiUrl}/api/local/move-to-trial`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ relPath }),
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(`HTTP ${res.status}: ${txt}`);
+        }
+        // Exit errs mode and show the destination folder
+        this.errsMode = false;
+        this.selectedName = null;
+        this.selectedFiles = new Set();
+        await this.fetchFiles();
+        // Expand and show Trial & Error/Season 1
+        const trialFolder = this.tree.find((n) => n.name === "Trial & Error");
+        if (trialFolder) {
+          this.selectedName = trialFolder.name;
+          this.$nextTick(() => {
+            this.nodeRefs.forEach((cmp, name) => {
+              if (name !== "Trial & Error") {
+                if (typeof cmp.collapse === "function") cmp.collapse();
+              } else {
+                if (typeof cmp.expand === "function") cmp.expand();
+              }
+            });
+            this.$nextTick(() => {
+              const cmp = this.nodeRefs.get("Trial & Error");
+              if (cmp && cmp.$el) {
+                cmp.$el.scrollIntoView({ behavior: "smooth", block: "start" });
+              }
+            });
+          });
+        }
+      } catch (e) {
+        console.error("Error moving file:", e);
+        alert(`Error moving file: ${e.message}`);
+      } finally {
+        this.loading = false;
+      }
     },
     handleSelectionChanged() {
       if (this.showSubs) {

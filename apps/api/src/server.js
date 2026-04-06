@@ -24,7 +24,7 @@ import {
   pruneUsbFiles,
   renameUsbFile,
 } from "./usb.js";
-import { getLocalFiles, renameLocalFile } from "./local.js";
+import { getLocalFiles, renameLocalFile, moveToTrial } from "./local.js";
 import { getBrowseShow, getAllBrowse } from "./browse.js";
 import * as reviews from "./reviews.js";
 import { checkFiles as tvProcCheckFiles } from "./tv-proc.js";
@@ -789,6 +789,20 @@ app.get("/api/local/error-files", async (req, res) => {
     const tree = await getLocalFiles("/mnt/media/tv-errors");
     res.json(tree);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/local/move-to-trial", async (req, res) => {
+  try {
+    const { relPath } = req.body;
+    if (!relPath) {
+      return res.status(400).json({ error: "Missing relPath" });
+    }
+    const result = await moveToTrial(relPath);
+    res.json(result);
+  } catch (err) {
+    console.error("move-to-trial error:", err);
     res.status(500).json({ error: err.message });
   }
 });

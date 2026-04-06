@@ -1593,7 +1593,9 @@ export default {
           const txt = await res.text();
           throw new Error(`HTTP ${res.status}: ${txt}`);
         }
-        // Exit errs mode and show the destination folder
+        // Select Trial & Error in the shows list first
+        this.$emit("select-show", "Trial & Error");
+        // Exit errs mode and refresh local pane
         this.errsMode = false;
         this.selectedName = null;
         this.selectedFiles = new Set();

@@ -1,5 +1,8 @@
 # TV Remote — deploy to phone
 
+attach windows usb debug to wsl:
+  usbipd attach --wsl --busid 2-6
+
 After `eas build` finishes it prints an APK download URL.
 https://expo.dev/artifacts/eas/uzmNWs4XjWXiVkFn6wdcSA.apk
 

@@ -46,7 +46,7 @@ const TV_BLOCKED = {
   "The.Postman.Always.Rings": true,
   Harlots: true,
   "Theater.Camp": true,
-  "Audio": true,
+  Audio: true,
 };
 
 async function main() {
@@ -146,6 +146,10 @@ async function main() {
 
   forcedFiles = null;
   processingForced = false;
+  // torFilePaths: Set of usbFilePaths registered as coming from the tor pane.
+  // Persists across cycles so non-forced tor files are recognized when the
+  // normal scan picks them up.
+  var torFilePaths = null;
 
   var usbFileBytes = null;
 
@@ -774,7 +778,19 @@ async function main() {
                 });
               }
               try {
-                var files = body ? JSON.parse(body) : [];
+                var parsed0 = body ? JSON.parse(body) : [];
+                var files, fromTorFlag;
+                // Accept either a plain array (legacy) or { files: [...], fromTor: true }.
+                if (Array.isArray(parsed0)) {
+                  files = parsed0;
+                  fromTorFlag = false;
+                } else if (parsed0 && Array.isArray(parsed0.files)) {
+                  files = parsed0.files;
+                  fromTorFlag = parsed0.fromTor === true;
+                } else {
+                  files = [];
+                  fromTorFlag = false;
+                }
                 if (!Array.isArray(files) || files.length === 0) {
                   return json(res, 400, {
                     status: "error",
@@ -782,8 +798,19 @@ async function main() {
                   });
                 }
 
+                if (fromTorFlag) {
+                  if (!torFilePaths) torFilePaths = new Set();
+                  for (var tfi = 0; tfi < files.length; tfi++) {
+                    torFilePaths.add(String(files[tfi]));
+                  }
+                }
+
                 forcedFiles = files;
-                log("Received forced files:", forcedFiles.length);
+                log(
+                  "Received forced files:",
+                  forcedFiles.length,
+                  fromTorFlag ? "(fromTor)" : "",
+                );
 
                 // Start cycle if not running, or restart if running
                 if (cycleRunning) {
@@ -799,6 +826,45 @@ async function main() {
                   runCycle();
                 }
 
+                return json(res, 200, { status: "ok" });
+              } catch (e) {
+                return json(res, 400, {
+                  status: "error",
+                  error: String(e && e.message ? e.message : e),
+                });
+              }
+            });
+          }
+          return json(res, 405, {
+            status: "error",
+            error: "method not allowed",
+          });
+        }
+
+        // Handle /torFiles endpoint — register file paths as from-tor without forcing
+        // POST body: JSON array of USB file paths (same format as /forceDown)
+        if (pathname === "/torFiles") {
+          if (req.method === "POST") {
+            return readBody(req, (err1, body) => {
+              if (err1) {
+                return json(res, 400, {
+                  status: "error",
+                  error: String(err1 && err1.message ? err1.message : err1),
+                });
+              }
+              try {
+                var torFileList = body ? JSON.parse(body) : [];
+                if (!Array.isArray(torFileList) || torFileList.length === 0) {
+                  return json(res, 400, {
+                    status: "error",
+                    error: "body must be a non-empty JSON array of file paths",
+                  });
+                }
+                if (!torFilePaths) torFilePaths = new Set();
+                for (var tfi2 = 0; tfi2 < torFileList.length; tfi2++) {
+                  torFilePaths.add(String(torFileList[tfi2]));
+                }
+                log("Registered tor files:", torFileList.length);
                 return json(res, 200, { status: "ok" });
               } catch (e) {
                 return json(res, 400, {
@@ -2615,6 +2681,98 @@ async function main() {
       }
     }
 
+    // For flex downloads (automatic, not forced, not from tor): block if the
+    // episode already has a file under any name in the season folder, or if the
+    // episode is already watched.
+    var fromTor = !!(torFilePaths && torFilePaths.has(usbFilePath));
+    if (fromTor && torFilePaths) torFilePaths.delete(usbFilePath);
+    var fromFlex = !processingForced && !fromTor;
+    if (
+      fromFlex &&
+      Number.isInteger(season) &&
+      season > 0 &&
+      Number.isInteger(episode) &&
+      episode > 0
+    ) {
+      var flexSeStr = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
+      var flexSeRe = new RegExp(flexSeStr, "i");
+
+      // Check if any file for the same S/E already exists in the season folder.
+      var epFileExists = false;
+      try {
+        var seasonFiles = fs.readdirSync(tvSeasonPath);
+        epFileExists = seasonFiles.some(function (f) {
+          return flexSeRe.test(f);
+        });
+      } catch (e2) {
+        // Season dir doesn't exist yet — no file to find.
+      }
+      if (epFileExists) {
+        existsCount++;
+        log(
+          "------",
+          downloadCount,
+          "/",
+          chkCount,
+          "FLEX SKIP (S/E file exists):",
+          fname,
+          flexSeStr,
+        );
+        trace("checkFileExists: flex skip s/e file exists", {
+          fname,
+          flexSeStr,
+        });
+        postHistory({
+          tvdbId: lookupTvdbId(seriesName),
+          showName: seriesName || fname,
+          type: "skipDown",
+          description: `flex skip: ${flexSeStr} file already exists`,
+        });
+        return process.nextTick(checkFile);
+      }
+
+      // Check if the episode is already watched.
+      var embyEntryForWatched = embyMap && embyMap[embyKeyForFolder];
+      var watchedEpis = embyEntryForWatched && embyEntryForWatched.watchedEpis;
+      var epIsWatched = false;
+      if (Array.isArray(watchedEpis)) {
+        for (var wi = 0; wi < watchedEpis.length; wi++) {
+          var wRow = watchedEpis[wi];
+          if (!Array.isArray(wRow) || wRow[0] !== season) continue;
+          for (var wj = 1; wj < wRow.length; wj++) {
+            if (wRow[wj] === episode) {
+              epIsWatched = true;
+              break;
+            }
+          }
+          if (epIsWatched) break;
+        }
+      }
+      if (epIsWatched) {
+        existsCount++;
+        log(
+          "------",
+          downloadCount,
+          "/",
+          chkCount,
+          "FLEX SKIP (episode watched):",
+          fname,
+          flexSeStr,
+        );
+        trace("checkFileExists: flex skip episode watched", {
+          fname,
+          flexSeStr,
+        });
+        postHistory({
+          tvdbId: lookupTvdbId(seriesName),
+          showName: seriesName || fname,
+          type: "skipDown",
+          description: `flex skip: ${flexSeStr} already watched`,
+        });
+        return process.nextTick(checkFile);
+      }
+    }
+
     mkdirp.sync(tvSeasonPath);
     // Create a new tv.json entry (tvJson.js will assign procId when a worker starts).
     try {
@@ -2636,6 +2794,7 @@ async function main() {
         dateStarted: 0,
         dateEnded: null,
         forced: processingForced,
+        fromFlex: fromFlex,
       });
 
       // Update per-cycle view so later files in the same cycle don't re-queue.

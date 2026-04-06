@@ -1600,6 +1600,8 @@ export default {
         this.selectedName = null;
         this.selectedFiles = new Set();
         await this.fetchFiles();
+        // Switch back to local pane (select-show may have navigated away)
+        evtBus.emit("showLocalPane");
         // Expand and show Trial & Error/Season 1
         const trialFolder = this.tree.find((n) => n.name === "Trial & Error");
         if (trialFolder) {

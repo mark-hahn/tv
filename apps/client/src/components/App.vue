@@ -1871,6 +1871,12 @@ export default {
       this.handleActorsClose();
     });
 
+    evtBus.on("showLocalPane", () => {
+      if (this.simpleMode) return;
+      this.currentPane = "local";
+      evtBus.emit("paneChanged", this.currentPane);
+    });
+
     // Preview mode: driven by ctrl-click in the web search dropdown.
     evtBus.on("previewMode", (active) => {
       this.previewMode = !!active;

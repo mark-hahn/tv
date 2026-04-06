@@ -613,26 +613,26 @@ export async function searchTorrents({
   let rawCombined = [];
   let tpbFailed = false;
   if (!more) {
-    // Normal search: IPT/TL only (explicit provider list; they're enabled via initializeProviders)
+    // Normal search: IPT/TL only — search them in parallel rather than sequentially
     const resultsArrays = await Promise.all(
-      uniqueQueries.map(async (q) => {
-        try {
-          const r = await withTimeout(
-            TorrentSearchApi.search(
-              ["IpTorrents", "TorrentLeech"],
-              q,
-              "TV",
-              limit,
-            ),
-            PROVIDER_TIMEOUT_MS,
-            "IpTorrents/TorrentLeech",
-          );
-          return Array.isArray(r) ? r : [];
-        } catch (e) {
-          console.warn(`[search] IpTorrents/TorrentLeech: ${e.message}`);
+      uniqueQueries.flatMap((q) => [
+        withTimeout(
+          TorrentSearchApi.search(["IpTorrents"], q, "TV", limit),
+          PROVIDER_TIMEOUT_MS,
+          "IpTorrents",
+        ).catch((e) => {
+          console.warn(`[search] IpTorrents: ${e.message}`);
           return [];
-        }
-      }),
+        }),
+        withTimeout(
+          TorrentSearchApi.search(["TorrentLeech"], q, "TV", limit),
+          PROVIDER_TIMEOUT_MS,
+          "TorrentLeech",
+        ).catch((e) => {
+          console.warn(`[search] TorrentLeech: ${e.message}`);
+          return [];
+        }),
+      ]),
     );
     rawCombined = resultsArrays.flat();
   } else {
@@ -673,30 +673,27 @@ export async function searchTorrents({
 
     let tpbLimEztResults;
     if (yearMatch) {
-      // Phase 1: search with year
-      const withYearResults = await searchTpbLimEzt(uniqueQueries);
-      if (withYearResults.length > 20) {
-        // Enough results – skip the no-year search
-        tpbLimEztResults = withYearResults;
-      } else {
-        // Phase 2: also search without year
-        const nameNoYear = baseName
-          .replace(/\s*\(\d{4}\)\s*$/, "")
-          .replace(/\s+\d{4}\s*$/, "")
-          .trim();
-        const sanitizedNoYear = sanitizeForProviderSearch(nameNoYear);
-        const noYearQueries =
-          sanitizedNoYear &&
-          !uniqueQueries.some(
-            (q) => q.toUpperCase() === sanitizedNoYear.toUpperCase(),
-          )
-            ? [sanitizedNoYear]
-            : [];
-        const withoutYearResults = noYearQueries.length
-          ? await searchTpbLimEzt(noYearQueries)
+      // Build no-year queries up front so both phases can run in parallel
+      const nameNoYear = baseName
+        .replace(/\s*\(\d{4}\)\s*$/, "")
+        .replace(/\s+\d{4}\s*$/, "")
+        .trim();
+      const sanitizedNoYear = sanitizeForProviderSearch(nameNoYear);
+      const noYearQueries =
+        sanitizedNoYear &&
+        !uniqueQueries.some(
+          (q) => q.toUpperCase() === sanitizedNoYear.toUpperCase(),
+        )
+          ? [sanitizedNoYear]
           : [];
-        tpbLimEztResults = [...withYearResults, ...withoutYearResults];
-      }
+      // Run year and no-year searches in parallel; dedupe handles overlaps
+      const [withYearResults, withoutYearResults] = await Promise.all([
+        searchTpbLimEzt(uniqueQueries),
+        noYearQueries.length
+          ? searchTpbLimEzt(noYearQueries)
+          : Promise.resolve([]),
+      ]);
+      tpbLimEztResults = [...withYearResults, ...withoutYearResults];
     } else {
       tpbLimEztResults = await searchTpbLimEzt(uniqueQueries);
     }

@@ -25,163 +25,184 @@
       <div
         :style="{
           display: 'flex',
-          alignItems: 'center',
+          flexDirection: 'column',
+          alignItems: 'stretch',
           padding: '8px',
           borderBottom: '1px solid #000',
           flex: '0 0 auto',
         }"
       >
-        <div
-          class="pane-header-title"
-          style="margin-right: auto"
-        >
-          Local files
+        <!-- Row 1: title, loading, search, rename, To, From -->
+        <div style="display: flex; align-items: center">
+          <div
+            class="pane-header-title"
+            style="margin-right: auto"
+          >
+            Local files
+          </div>
+
+          <span
+            v-if="loading"
+            style="color: lightgray; margin-right: 10px; font-weight: bold"
+            >&lt;Loading...&gt;</span
+          >
+
+          <input
+            v-model="searchInput"
+            @keyup.enter="searchLocal"
+            placeholder="Search"
+            style="width: 150px; margin-right: 10px"
+          />
+
+          <input
+            v-model="renameInput"
+            @focus="onRenameFocus"
+            @keyup.enter="renameLocalFile"
+            placeholder="Rename"
+            style="width: 150px; margin-right: 10px"
+          />
+
+          <button
+            @click="errsMode || toShow()"
+            :disabled="errsMode"
+            title="Select show matching selected folder"
+            :style="{
+              cursor: errsMode ? 'default' : 'pointer',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              backgroundColor: errsMode ? '#e8e8e8' : 'whitesmoke',
+              color: errsMode ? '#aaa' : 'inherit',
+              marginRight: '10px',
+            }"
+          >
+            To
+          </button>
+
+          <button
+            @click="errsMode || selectTopLevel()"
+            :disabled="errsMode"
+            title="Find folder matching current show"
+            :style="{
+              cursor: errsMode ? 'default' : 'pointer',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              backgroundColor: errsMode ? '#e8e8e8' : 'whitesmoke',
+              color: errsMode ? '#aaa' : 'inherit',
+            }"
+          >
+            From
+          </button>
         </div>
 
-        <span
-          v-if="loading"
-          style="color: lightgray; margin-right: 10px; font-weight: bold"
-          >&lt;Loading...&gt;</span
-        >
-
-        <input
-          v-model="searchInput"
-          @keyup.enter="searchLocal"
-          placeholder="Search"
-          style="width: 100px; margin-right: 10px"
-        />
-
-        <button
-          @click="errsMode || toShow()"
-          :disabled="errsMode"
-          title="Select show matching selected folder"
-          :style="{
-            cursor: errsMode ? 'default' : 'pointer',
-            borderRadius: '7px',
-            padding: '4px 10px',
-            border: '1px solid #bbb',
-            backgroundColor: errsMode ? '#e8e8e8' : 'whitesmoke',
-            color: errsMode ? '#aaa' : 'inherit',
-            marginRight: '10px',
-          }"
-        >
-          To
-        </button>
-
-        <button
-          @click="errsMode || selectTopLevel()"
-          :disabled="errsMode"
-          title="Find folder matching current show"
-          :style="{
-            cursor: errsMode ? 'default' : 'pointer',
-            borderRadius: '7px',
-            padding: '4px 10px',
-            border: '1px solid #bbb',
-            backgroundColor: errsMode ? '#e8e8e8' : 'whitesmoke',
-            color: errsMode ? '#aaa' : 'inherit',
-            marginRight: '10px',
-          }"
-        >
-          From
-        </button>
-
-        <button
-          @click="errsMode || toggleSubs()"
-          :disabled="errsMode"
-          :style="{
-            cursor: errsMode ? 'default' : 'pointer',
-            borderRadius: '7px',
-            padding: '4px 10px',
-            border: '1px solid #bbb',
-            backgroundColor: errsMode
-              ? '#e8e8e8'
-              : showSubs
-                ? '#ddd'
-                : 'whitesmoke',
-            color: errsMode ? '#aaa' : 'inherit',
-            marginRight: '10px',
-          }"
-        >
-          Subs
-        </button>
-
-        <button
-          @click="errsMode || clickAsr()"
-          :disabled="errsMode"
-          :style="{
-            cursor: errsMode ? 'default' : 'pointer',
-            borderRadius: '7px',
-            padding: '4px 10px',
-            border: '1px solid #bbb',
-            backgroundColor: errsMode
-              ? '#e8e8e8'
-              : showAsr
-                ? '#ddd'
-                : 'whitesmoke',
-            color: errsMode ? '#aaa' : 'inherit',
-            marginRight: '10px',
-          }"
-        >
-          Asr
-        </button>
-
-        <button
-          @click="clickFix"
-          :style="{
-            cursor: 'pointer',
-            borderRadius: '7px',
-            padding: '4px 10px',
-            border: '1px solid #bbb',
-            backgroundColor: showFix ? '#ddd' : 'whitesmoke',
-            marginRight: '10px',
-          }"
-        >
-          Fix
-        </button>
-
-        <button
-          @click="toggleErrs"
-          :style="{
-            cursor: 'pointer',
-            borderRadius: '7px',
-            padding: '4px 10px',
-            border: '1px solid #bbb',
-            backgroundColor: errsMode ? 'lightgray' : 'white',
-            marginRight: '10px',
-          }"
-        >
-          Errs
-        </button>
-
-        <button
-          @click="deleteSelected"
-          :disabled="loading || (!selectedName && selectedFiles.size === 0)"
-          title="Delete selected files"
+        <!-- Row 2: Subs, Asr, Fix, Errs, Del, Ref aligned right -->
+        <div
           style="
-            cursor: pointer;
-            border-radius: 7px;
-            padding: 4px 10px;
-            border: 1px solid #bbb;
-            background-color: whitesmoke;
-            margin-right: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            margin-top: 6px;
           "
         >
-          Del
-        </button>
+          <button
+            @click="errsMode || toggleSubs()"
+            :disabled="errsMode"
+            :style="{
+              cursor: errsMode ? 'default' : 'pointer',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              backgroundColor: errsMode
+                ? '#e8e8e8'
+                : showSubs
+                  ? '#ddd'
+                  : 'whitesmoke',
+              color: errsMode ? '#aaa' : 'inherit',
+              marginRight: '10px',
+            }"
+          >
+            Subs
+          </button>
 
-        <button
-          @click="refresh"
-          :disabled="loading"
-          style="
-            cursor: pointer;
-            border-radius: 7px;
-            padding: 4px 10px;
-            border: 1px solid #bbb;
-            background-color: whitesmoke;
-          "
-        >
-          Ref
-        </button>
+          <button
+            @click="errsMode || clickAsr()"
+            :disabled="errsMode"
+            :style="{
+              cursor: errsMode ? 'default' : 'pointer',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              backgroundColor: errsMode
+                ? '#e8e8e8'
+                : showAsr
+                  ? '#ddd'
+                  : 'whitesmoke',
+              color: errsMode ? '#aaa' : 'inherit',
+              marginRight: '10px',
+            }"
+          >
+            Asr
+          </button>
+
+          <button
+            @click="clickFix"
+            :style="{
+              cursor: 'pointer',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              backgroundColor: showFix ? '#ddd' : 'whitesmoke',
+              marginRight: '10px',
+            }"
+          >
+            Fix
+          </button>
+
+          <button
+            @click="toggleErrs"
+            :style="{
+              cursor: 'pointer',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              backgroundColor: errsMode ? 'lightgray' : 'white',
+              marginRight: '10px',
+            }"
+          >
+            Errs
+          </button>
+
+          <button
+            @click="deleteSelected"
+            :disabled="loading || (!selectedName && selectedFiles.size === 0)"
+            title="Delete selected files"
+            style="
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+              margin-right: 10px;
+            "
+          >
+            Del
+          </button>
+
+          <button
+            @click="refresh"
+            :disabled="loading"
+            style="
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Ref
+          </button>
+        </div>
       </div>
 
       <!-- Tree -->
@@ -389,6 +410,21 @@
             }"
           >
             Kill
+          </button>
+          <button
+            @click="showFix = false"
+            title="Close"
+            :style="{
+              cursor: 'pointer',
+              borderRadius: '4px',
+              padding: '2px 8px',
+              border: '1px solid #bbb',
+              backgroundColor: 'whitesmoke',
+              fontWeight: 'bold',
+              marginLeft: '5px',
+            }"
+          >
+            ✕
           </button>
         </div>
       </div>
@@ -612,6 +648,7 @@ export default {
       error: null,
       hasLoaded: false,
       searchInput: "",
+      renameInput: "",
 
       // Subs pane state
       showSubs: false,
@@ -923,6 +960,49 @@ export default {
         this.$emit("select-show", match.name);
       } else {
         alert(`No show found matching folder "${folderName}"`);
+      }
+    },
+    onRenameFocus() {
+      if (this.renameInput) return;
+      if (this.selectedFiles.size === 1) {
+        const fullPath = Array.from(this.selectedFiles)[0];
+        const parts = fullPath.split("/");
+        const fileName = parts.pop();
+        this.renameInput = fileName;
+      }
+    },
+    async renameLocalFile() {
+      if (!this.renameInput) return;
+      if (this.selectedFiles.size !== 1) return;
+
+      const oldPath = Array.from(this.selectedFiles)[0];
+      const newName = this.renameInput.trim();
+      if (!newName) return;
+
+      const parts = oldPath.split("/");
+      const oldName = parts[parts.length - 1];
+      if (oldName === newName) return;
+
+      this.loading = true;
+      try {
+        const url = `${config.torrentsApiUrl}/api/local/rename`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ oldPath, newName, errsMode: this.errsMode }),
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt);
+        }
+        this.renameInput = "";
+        this.selectedFiles.clear();
+        this.lastSelectedFile = null;
+        await this.fetchFiles();
+      } catch (e) {
+        console.error("Rename failed", e);
+        this.error = e.message || "Rename failed";
+        this.loading = false;
       }
     },
     searchLocal() {

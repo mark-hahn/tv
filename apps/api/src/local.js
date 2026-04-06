@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { rename } from "node:fs/promises";
 
 const execFileAsync = promisify(execFile);
 
@@ -89,4 +90,30 @@ export async function getLocalFiles(root = TV_ROOT) {
     console.error("getLocalFiles failed", e);
     throw new Error(`Failed to list local files: ${e.message}`);
   }
+}
+
+export async function renameLocalFile(oldPath, newName, isErrs = false) {
+  const root = isErrs ? TV_ERRORS_ROOT : TV_ROOT;
+
+  if (
+    oldPath.includes("..") ||
+    newName.includes("..") ||
+    newName.includes("/")
+  ) {
+    throw new Error("Invalid path or name");
+  }
+
+  const parts = oldPath.split("/");
+  const fileName = parts.pop();
+  const dirPath = parts.join("/");
+
+  const fullOldPath = dirPath
+    ? `${root}/${dirPath}/${fileName}`
+    : `${root}/${fileName}`;
+  const fullNewPath = dirPath
+    ? `${root}/${dirPath}/${newName}`
+    : `${root}/${newName}`;
+
+  await rename(fullOldPath, fullNewPath);
+  return { success: true };
 }

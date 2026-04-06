@@ -442,7 +442,6 @@ async function main() {
       nextCycleTimer = null;
     }
     cycleRunning = true;
-    console.log(`[${cycleTsPST()}] download check cycle started`);
 
     reloadState();
     resetCycleState();
@@ -2249,11 +2248,6 @@ async function main() {
         log("***********************************************************");
       }
       cycleRunning = false;
-      var elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-      console.log(
-        `[${cycleTsPST()}] download check cycle ended (${elapsed}s, chk:${chkCount} dl:${downloadCount} skip:${existsCount} err:${errCount})`,
-      );
-
       // If a startProc request came in during this cycle, finish the cycle first,
       // then restart immediately (do not abort between files).
       if (cycleRestartNeeded) {

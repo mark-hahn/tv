@@ -2024,12 +2024,6 @@ export default {
 
       // Update highlightName BEFORE checking filters so refilter() can preserve the new selection
       if (!options.skipHighlight) {
-        if (showName !== this.highlightName) {
-          const caller = new Error().stack?.split("\n")[2]?.trim() || "unknown";
-          console.log(
-            `[HOPPING] saveVisShow: highlightName changing from "${this.highlightName}" to "${showName}" | caller: ${caller}`,
-          );
-        }
         this.highlightName = showName;
       }
 
@@ -2671,9 +2665,6 @@ export default {
           (show) => show.name == this.highlightName,
         );
         if (showArr.length == 0) {
-          console.log(
-            `[HOPPING] refilter: highlightName "${this.highlightName}" not in filtered shows (${this.shows.length} shows) — falling back to shows[0]="${this.shows[0]?.name}", fltrChoice=${this.fltrChoice}, filterStr="${this.filterStr}"`,
-          );
           selectFirstAfterSort = true;
         } else {
           // Show is preserved - update localStorage to match
@@ -3161,9 +3152,6 @@ export default {
         return;
       }
       if (!allTvdb || !allShows) return; // loadAllShows not yet complete, ignore early push
-      console.log(
-        `[HOPPING] tvdbUpdated: received push for "${name}", current highlightName="${this.highlightName}"`,
-      );
       try {
         // Apply computed props to the pushed record
         record.watchGap = record.watchGap || false;

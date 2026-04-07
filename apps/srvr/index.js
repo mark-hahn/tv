@@ -3472,6 +3472,40 @@ app.post("/api/applySubOffset", async (req, res) => {
   res.json({ ok: true });
 });
 
+// ASR chksrt queue endpoints
+app.get("/api/asr/chksrt/list", (req, res) => {
+  res.json(readNeedsSrtChk());
+});
+
+app.post("/api/asr/chksrt/ok", (req, res) => {
+  const { videoPath } = req.body || {};
+  if (!videoPath) {
+    res.status(400).json({ error: "videoPath required" });
+    return;
+  }
+  const paths = readNeedsSrtChk();
+  const idx = paths.indexOf(videoPath);
+  if (idx !== -1) paths.splice(idx, 1);
+  writeNeedsSrtChk(paths);
+  console.log(`[chksrt] ok: removed ${videoPath}`);
+  res.json({ ok: true, next: paths[0] || null });
+});
+
+app.post("/api/asr/chksrt/bad", (req, res) => {
+  const { videoPath } = req.body || {};
+  if (!videoPath) {
+    res.status(400).json({ error: "videoPath required" });
+    return;
+  }
+  const paths = readNeedsSrtChk();
+  const idx = paths.indexOf(videoPath);
+  if (idx !== -1) paths.splice(idx, 1);
+  writeNeedsSrtChk(paths);
+  asrPendingAppend(videoPath);
+  console.log(`[chksrt] bad: moved ${videoPath} to pending`);
+  res.json({ ok: true, next: paths[0] || null });
+});
+
 // Email
 app.post("/api/sendEmail", apiWrapper(sendEmailHandler));
 
@@ -4577,6 +4611,29 @@ setInterval(runUsbCheck, CHECK_INTERVAL_MS);
 const changedShows = new Map(); // showName -> timeout
 const DISK_CHANGE_DEBOUNCE_MS = 3000; // 3 seconds
 const ASR_PENDING_PATH = "/root/dev/apps/tv/apps/asr/data/pending.txt";
+const ASR_NEEDS_SRT_CHK_PATH =
+  "/root/dev/apps/tv/apps/asr/data/needsSrtChk.txt";
+
+function readNeedsSrtChk() {
+  try {
+    const content = fs.readFileSync(ASR_NEEDS_SRT_CHK_PATH, "utf8");
+    return content
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function writeNeedsSrtChk(paths) {
+  fs.mkdirSync(path.dirname(ASR_NEEDS_SRT_CHK_PATH), { recursive: true });
+  fs.writeFileSync(
+    ASR_NEEDS_SRT_CHK_PATH,
+    paths.length > 0 ? paths.join("\n") + "\n" : "",
+    "utf8",
+  );
+}
 
 function asrPendingAppend(filePath) {
   try {
@@ -4805,7 +4862,32 @@ watcher
       console.log(
         `[tvdb loop] chokidar add debounce fired: enqueuing ${showName}`,
       );
-      asrPendingAppend(filePath);
+      let hasEmbedded = false;
+      try {
+        const probeOut = cp
+          .execSync(
+            `ffprobe -v quiet -print_format json -show_streams "${filePath.replace(/"/g, '\\"')}"`,
+            { maxBuffer: 2 * 1024 * 1024 },
+          )
+          .toString();
+        const streams = JSON.parse(probeOut).streams || [];
+        hasEmbedded = streams.some((s) => s.codec_type === "subtitle");
+      } catch (e) {
+        console.error(`[chokidar] ffprobe error for ${filePath}: ${e.message}`);
+      }
+      if (hasEmbedded) {
+        try {
+          fs.mkdirSync(path.dirname(ASR_NEEDS_SRT_CHK_PATH), {
+            recursive: true,
+          });
+          fs.appendFileSync(ASR_NEEDS_SRT_CHK_PATH, filePath + "\n", "utf8");
+          console.log(`[chokidar] needsSrtChk: added ${filePath}`);
+        } catch (e) {
+          console.error(`[chokidar] needsSrtChk append error: ${e.message}`);
+        }
+      } else {
+        asrPendingAppend(filePath);
+      }
       tvdb.enqueueShowProcess(showName);
     }, DISK_CHANGE_DEBOUNCE_MS);
 

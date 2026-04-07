@@ -176,6 +176,22 @@
             >
               {{ t.label }}
             </button>
+            <button
+              v-if="chksrtCount > 0"
+              @click.stop="clickChksrt"
+              :style="{
+                fontSize: '13px',
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                marginLeft: '4px',
+                border: '1px solid #600',
+                '--btn-bg': '#800',
+                color: 'white',
+              }"
+            >
+              Chksrt {{ chksrtCount }}
+            </button>
             <div style="flex: 1"></div>
             <button
               @click.stop="helpDialogOpen = true"
@@ -336,7 +352,9 @@
     </div>
     <VideoPlayer
       :path="videoPlayerPath"
-      @close="videoPlayerPath = null"
+      :mode="videoPlayerMode"
+      @close="handleVideoPlayerClose"
+      @chksrt-next="handleChksrtNext"
     />
     <!-- Help dialog -->
     <div
@@ -499,6 +517,8 @@ export default {
       // Must be known before first render so non-simple panes never mount in simple mode.
       simpleMode: new URLSearchParams(window.location.search).has("simple"),
       videoPlayerPath: null,
+      videoPlayerMode: null,
+      chksrtCount: 0,
       currentPane: "info", // 'info', 'map', 'actors', 'reviews', 'trailer', 'tor', 'flex', 'qbt', 'down'
       savedPane: null,
       restoringPreviewPane: false,
@@ -848,6 +868,7 @@ export default {
     evtBus.off("downActivePart", this.handleDownActivePart);
     evtBus.off("tvdb-mismatch", this.handleTvdbMismatch);
     evtBus.off("playEpisodePath", this._onPlayEpisodePath);
+    evtBus.off("openChksrt", this._onOpenChksrt);
     evtBus.off("previewSrchChoice", this.onPreviewSrchChoice);
     evtBus.off("addPreviewShowDone", this.onAddPreviewShowDone);
     evtBus.off("previewPanesLoading", this.onPreviewPanesLoading);
@@ -858,6 +879,41 @@ export default {
     this.stopLibraryPolling();
   },
   methods: {
+    handleVideoPlayerClose() {
+      this.videoPlayerPath = null;
+      this.videoPlayerMode = null;
+      this.fetchChksrtCount();
+    },
+    handleChksrtNext(nextPath) {
+      this.fetchChksrtCount();
+      if (nextPath) {
+        this.videoPlayerPath = nextPath;
+      } else {
+        this.videoPlayerPath = null;
+        this.videoPlayerMode = null;
+      }
+    },
+    async fetchChksrtCount() {
+      try {
+        const list = await srvr.getChksrtList();
+        this.chksrtCount = Array.isArray(list) ? list.length : 0;
+      } catch (e) {
+        this.chksrtCount = 0;
+      }
+    },
+    async clickChksrt() {
+      if (this.chksrtCount === 0) return;
+      try {
+        const list = await srvr.getChksrtList();
+        this.chksrtCount = Array.isArray(list) ? list.length : 0;
+        if (list && list.length > 0) {
+          this.videoPlayerMode = "chksrt";
+          this.videoPlayerPath = list[0];
+        }
+      } catch (e) {
+        console.error("clickChksrt error:", e);
+      }
+    },
     openTvdbMismatchModal(title, text, payload = null) {
       this.tvdbMismatchTitle = title || "TVDB cache mismatch detected";
       this.tvdbMismatchText = text == null ? "" : String(text);
@@ -1838,6 +1894,12 @@ export default {
       this.videoPlayerPath = path;
     };
     evtBus.on("playEpisodePath", this._onPlayEpisodePath);
+    this._onOpenChksrt = (path) => {
+      this.videoPlayerMode = "chksrt";
+      this.videoPlayerPath = path;
+    };
+    evtBus.on("openChksrt", this._onOpenChksrt);
+    this.fetchChksrtCount();
     this.startQbtPolling();
 
     // Refresh space display once on app load.

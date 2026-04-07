@@ -113,6 +113,7 @@ const TV_ROOT = "/mnt/media/tv";
 const TVDB_JSON_PATH = "/root/dev/apps/tv/apps/srvr/data/tvdb.json";
 const BKGND_LOG_PATH = path.join(__dirname, "data", "asr-bkgnd.log");
 const PENDING_PATH = path.join(__dirname, "data", "pending.txt");
+const NEEDS_SRT_CHK_PATH = path.join(__dirname, "data", "needsSrtChk.txt");
 const BKGND_TMPDIR = "/tmp/asr-bkgnd";
 const CPU_LOAD_MAX = 2;
 const TEST_SHOWS = null;
@@ -172,6 +173,50 @@ function run(cmd, args, opts = {}) {
       }
     });
   });
+}
+
+function loadNeedsSrtChkSet() {
+  try {
+    const content = fs.readFileSync(NEEDS_SRT_CHK_PATH, "utf8");
+    return new Set(
+      content
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function appendNeedsSrtChk(videoPath) {
+  try {
+    fs.mkdirSync(path.dirname(NEEDS_SRT_CHK_PATH), { recursive: true });
+    fs.appendFileSync(NEEDS_SRT_CHK_PATH, videoPath + "\n", "utf8");
+    console.log(`[asr] needsSrtChk: added ${path.basename(videoPath)}`);
+  } catch (e) {
+    console.warn(`Warning: could not append to needsSrtChk: ${e.message}`);
+  }
+}
+
+async function hasEmbeddedSubtitles(videoPath) {
+  try {
+    const { out } = await run("ffprobe", [
+      "-v",
+      "quiet",
+      "-print_format",
+      "json",
+      "-show_streams",
+      videoPath,
+    ]);
+    const streams = JSON.parse(out).streams || [];
+    return streams.some((s) => s.codec_type === "subtitle");
+  } catch (e) {
+    console.warn(
+      `Warning: could not probe ${path.basename(videoPath)} for subtitles: ${e.message}`,
+    );
+    return false;
+  }
 }
 
 async function getDurationSec(file) {
@@ -982,6 +1027,8 @@ async function findCandidateFile(show) {
     a.season !== b.season ? a.season - b.season : a.episode - b.episode,
   );
 
+  const chkPaths = loadNeedsSrtChkSet();
+
   for (const t of tuples) {
     if (
       t.season !== 0 &&
@@ -989,24 +1036,34 @@ async function findCandidateFile(show) {
       watched.has(`${t.season}:${t.episode}`)
     )
       continue;
-    if (!(await pathExists(getSrtPath(t.fullPath)))) {
-      return {
-        videoPath: t.fullPath,
-        season: t.season,
-        episode: t.episode,
-        showName: show.name,
-      };
+    if (await pathExists(getSrtPath(t.fullPath))) continue;
+    if (chkPaths.has(t.fullPath)) continue;
+    if (await hasEmbeddedSubtitles(t.fullPath)) {
+      appendNeedsSrtChk(t.fullPath);
+      continue;
     }
+    return {
+      videoPath: t.fullPath,
+      season: t.season,
+      episode: t.episode,
+      showName: show.name,
+    };
   }
   return null;
 }
 
 async function pickNextFile(inEmbyShows, logPath, pendingPaths) {
+  const chkPaths = loadNeedsSrtChkSet();
   if (pendingPaths && pendingPaths.length > 0) {
     for (const videoPath of pendingPaths) {
       if (!isVideoFile(videoPath)) continue;
       if (!(await pathExists(videoPath))) continue;
       if (await pathExists(getSrtPath(videoPath))) continue;
+      if (chkPaths.has(videoPath)) continue;
+      if (await hasEmbeddedSubtitles(videoPath)) {
+        appendNeedsSrtChk(videoPath);
+        continue;
+      }
       const showDir = path.relative(TV_ROOT, videoPath).split(path.sep)[0];
       const show = inEmbyShows.find((s) => s.path === showDir);
       if (!show) continue;

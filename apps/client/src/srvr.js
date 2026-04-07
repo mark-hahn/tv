@@ -392,6 +392,18 @@ export function handleFix(params) {
   return fCall("handleFix", params);
 }
 
+export function getChksrtList() {
+  return httpCall("/api/asr/chksrt/list");
+}
+
+export function chksrtOk(videoPath) {
+  return httpCall("/api/asr/chksrt/ok", { videoPath }, "POST");
+}
+
+export function chksrtBad(videoPath) {
+  return httpCall("/api/asr/chksrt/bad", { videoPath }, "POST");
+}
+
 export function setTvdbFields(params) {
   return httpCall("/api/setTvdbFields", params, "POST");
 }

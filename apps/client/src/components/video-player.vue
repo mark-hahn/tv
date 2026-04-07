@@ -26,9 +26,26 @@
         background: rgba(0, 0, 0, 0.75);
       "
     >
-      <!-- Timing slider (srt tracks only) -->
+      <!-- Chksrt filename (chksrt mode only) -->
       <div
-        v-if="showSlider"
+        v-if="mode === 'chksrt'"
+        style="
+          flex: 1;
+          color: white;
+          font-size: 13px;
+          padding-left: 14px;
+          user-select: none;
+          text-shadow: 0 0 3px #000;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        "
+      >
+        {{ chksrtFilename }}
+      </div>
+      <!-- Timing slider (srt tracks only, not in chksrt mode) -->
+      <div
+        v-if="showSlider && mode !== 'chksrt'"
         ref="slider"
         style="
           flex: 1;
@@ -99,7 +116,7 @@
       </div>
       <!-- Offset value -->
       <div
-        v-if="showSlider"
+        v-if="showSlider && mode !== 'chksrt'"
         style="
           color: white;
           font-size: 13px;
@@ -112,9 +129,9 @@
       >
         {{ offsetDisplay }}
       </div>
-      <!-- Apply button (srt only) -->
+      <!-- Apply button (srt only, not in chksrt mode) -->
       <div
-        v-if="showSlider"
+        v-if="showSlider && mode !== 'chksrt'"
         @click.stop="applySliderOffset"
         style="
           color: white;
@@ -132,13 +149,53 @@
       >
         Apply
       </div>
+      <!-- Chksrt OK / Bad buttons -->
+      <div
+        v-if="mode === 'chksrt'"
+        @click.stop="clickOk"
+        style="
+          color: white;
+          font-size: 13px;
+          padding: 2px 8px;
+          border-radius: 4px;
+          border: 1px solid #666;
+          cursor: pointer;
+          user-select: none;
+          background: rgba(0, 100, 0, 0.5);
+          margin-right: 8px;
+          white-space: nowrap;
+          text-shadow: 0 0 3px #000;
+        "
+      >
+        OK
+      </div>
+      <div
+        v-if="mode === 'chksrt'"
+        @click.stop="clickBad"
+        style="
+          color: white;
+          font-size: 13px;
+          padding: 2px 8px;
+          border-radius: 4px;
+          border: 1px solid #666;
+          cursor: pointer;
+          user-select: none;
+          background: rgba(120, 0, 0, 0.5);
+          margin-right: 8px;
+          white-space: nowrap;
+          text-shadow: 0 0 3px #000;
+        "
+      >
+        Bad
+      </div>
       <!-- Subtitle choice buttons -->
       <div
         v-for="(choice, i) in subtitleChoices"
         :key="choice.id"
         @click.stop="selectTrack(choice.id)"
         :style="{
-          marginLeft: i === 0 && !showSlider ? 'auto' : '0',
+          marginLeft:
+            i === 0 && !showSlider && mode !== 'chksrt' ? 'auto' : '0',
           padding: '2px 8px',
           borderRadius: '4px',
           border:
@@ -195,7 +252,7 @@
 
 <script>
 import { config } from "../config.js";
-import { applySubOffset } from "../srvr.js";
+import { applySubOffset, chksrtOk, chksrtBad } from "../srvr.js";
 
 const TV_SRVR_URL = config.tvSrvrUrl;
 const offsetCache = new Map(); // in-memory per-file subtitle offset
@@ -204,8 +261,9 @@ export default {
   name: "VideoPlayer",
   props: {
     path: { type: String, default: null },
+    mode: { type: String, default: null },
   },
-  emits: ["close"],
+  emits: ["close", "chksrt-next"],
   data() {
     return {
       subtitleTracks: [],
@@ -256,6 +314,11 @@ export default {
     subtitleChoices() {
       if (this.subtitleTracks.length === 0) return [];
       return [...this.subtitleTracks, { id: "off", label: "off" }];
+    },
+    chksrtFilename() {
+      if (!this.path) return "";
+      const parts = this.path.split("/");
+      return parts[parts.length - 1];
     },
   },
   watch: {
@@ -436,6 +499,28 @@ export default {
         this.subtitleOffset = 0;
       } catch (e) {
         console.error("[applySliderOffset]", e);
+      }
+    },
+    async clickOk() {
+      try {
+        const result = await chksrtOk(this.path);
+        this.$emit("chksrt-next", result?.next || null);
+      } catch (e) {
+        console.error("[chksrt] clickOk error:", e);
+      }
+    },
+    async clickBad() {
+      const embedded = this.subtitleTracks.filter((t) => t.type === "embedded");
+      const currentIdx = embedded.findIndex((t) => t.id === this.activeTrackId);
+      if (currentIdx >= 0 && currentIdx < embedded.length - 1) {
+        this.selectTrack(embedded[currentIdx + 1].id);
+      } else {
+        try {
+          const result = await chksrtBad(this.path);
+          this.$emit("chksrt-next", result?.next || null);
+        } catch (e) {
+          console.error("[chksrt] clickBad error:", e);
+        }
       }
     },
     close() {

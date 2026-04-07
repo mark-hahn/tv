@@ -185,9 +185,9 @@
                 borderRadius: '7px',
                 padding: '4px 10px',
                 marginLeft: '4px',
-                border: '1px solid #600',
-                '--btn-bg': '#800',
-                color: 'white',
+                border: '1px solid #c88',
+                backgroundColor: '#faa',
+                color: 'black',
               }"
             >
               Chksrt {{ chksrtCount }}
@@ -869,6 +869,7 @@ export default {
     evtBus.off("tvdb-mismatch", this.handleTvdbMismatch);
     evtBus.off("playEpisodePath", this._onPlayEpisodePath);
     evtBus.off("openChksrt", this._onOpenChksrt);
+    evtBus.off("chksrt-count", this._onChksrtCount);
     evtBus.off("previewSrchChoice", this.onPreviewSrchChoice);
     evtBus.off("addPreviewShowDone", this.onAddPreviewShowDone);
     evtBus.off("previewPanesLoading", this.onPreviewPanesLoading);
@@ -1899,6 +1900,10 @@ export default {
       this.videoPlayerPath = path;
     };
     evtBus.on("openChksrt", this._onOpenChksrt);
+    this._onChksrtCount = (count) => {
+      this.chksrtCount = Number(count) || 0;
+    };
+    evtBus.on("chksrt-count", this._onChksrtCount);
     this.fetchChksrtCount();
     this.startQbtPolling();
 

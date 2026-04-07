@@ -3483,10 +3483,26 @@ app.post("/api/asr/chksrt/ok", (req, res) => {
     res.status(400).json({ error: "videoPath required" });
     return;
   }
+  const resolved = path.resolve(videoPath);
+  if (!resolved.startsWith(tvDir + "/")) {
+    res.status(403).json({ error: "forbidden" });
+    return;
+  }
   const paths = readNeedsSrtChk();
   const idx = paths.indexOf(videoPath);
   if (idx !== -1) paths.splice(idx, 1);
   writeNeedsSrtChk(paths);
+  // Create empty .enx.srtstub so ASR background loop skips this file permanently
+  const stem = resolved.replace(/\.[^.]+$/, "");
+  const stubPath = stem + ".enx.srtstub";
+  try {
+    if (!fs.existsSync(stubPath)) {
+      fs.writeFileSync(stubPath, "", "utf8");
+      console.log(`[chksrt] ok: created stub ${stubPath}`);
+    }
+  } catch (e) {
+    console.error(`[chksrt] ok: stub write failed: ${e.message}`);
+  }
   console.log(`[chksrt] ok: removed ${videoPath}`);
   res.json({ ok: true, next: paths[0] || null });
 });
@@ -4882,6 +4898,7 @@ watcher
           });
           fs.appendFileSync(ASR_NEEDS_SRT_CHK_PATH, filePath + "\n", "utf8");
           console.log(`[chokidar] needsSrtChk: added ${filePath}`);
+          notifyClients("chksrt-count", readNeedsSrtChk().length);
         } catch (e) {
           console.error(`[chokidar] needsSrtChk append error: ${e.message}`);
         }

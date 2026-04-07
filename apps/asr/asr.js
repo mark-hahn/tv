@@ -153,6 +153,19 @@ function getSrtPath(videoPath) {
   return path.join(dir, `${baseName}.enx.srt`);
 }
 
+function getStubPath(videoPath) {
+  const dir = path.dirname(videoPath);
+  const baseName = path.basename(videoPath, path.extname(videoPath));
+  return path.join(dir, `${baseName}.enx.srtstub`);
+}
+
+async function srtExists(videoPath) {
+  return (
+    (await pathExists(getSrtPath(videoPath))) ||
+    (await pathExists(getStubPath(videoPath)))
+  );
+}
+
 function isVideoFile(p) {
   return allowedExt.has(path.extname(p).toLowerCase());
 }
@@ -778,7 +791,7 @@ async function processOneVideo(videoPath) {
   console.log(`\n[${ts()}] Processing: ${path.basename(videoPath)}`);
   const videoName = path.basename(videoPath, path.extname(videoPath));
   const srtPath = getSrtPath(videoPath);
-  if (await pathExists(srtPath)) {
+  if (await srtExists(videoPath)) {
     console.log(`\n${videoName}: Enhanced SRT already exists, skipping.`);
     return;
   }
@@ -1036,7 +1049,7 @@ async function findCandidateFile(show) {
       watched.has(`${t.season}:${t.episode}`)
     )
       continue;
-    if (await pathExists(getSrtPath(t.fullPath))) continue;
+    if (await srtExists(t.fullPath)) continue;
     if (chkPaths.has(t.fullPath)) continue;
     if (await hasEmbeddedSubtitles(t.fullPath)) {
       appendNeedsSrtChk(t.fullPath);
@@ -1058,7 +1071,7 @@ async function pickNextFile(inEmbyShows, logPath, pendingPaths) {
     for (const videoPath of pendingPaths) {
       if (!isVideoFile(videoPath)) continue;
       if (!(await pathExists(videoPath))) continue;
-      if (await pathExists(getSrtPath(videoPath))) continue;
+      if (await srtExists(videoPath)) continue;
       if (chkPaths.has(videoPath)) continue;
       if (await hasEmbeddedSubtitles(videoPath)) {
         appendNeedsSrtChk(videoPath);

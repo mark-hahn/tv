@@ -67,7 +67,7 @@ pm2_name_for_project() {
     down) printf '%s' "tv-down" ;;
     srvr) printf '%s' "tv-srvr" ;;
     tv) printf '%s' "tv-tv" ;;
-    client) printf '%s' "tv-client" ;;
+
     share) printf '%s' "tv-share" ;;
     *) return 1 ;;
   esac
@@ -214,7 +214,10 @@ remote_deploy_one_no_restart() {
 SHARE_DEPENDENTS="api down srvr client"
 
 case "${1:-all}" in
-  api|down|srvr|tv|client|share|asr)
+  client)
+    remote_deploy_one_no_restart client
+    ;;
+  api|down|srvr|tv|share|asr)
     if [[ "$1" != "share" && $SHARE_DEPENDENTS == *"$1"* ]]; then
       remote_deploy_one_no_restart share
     fi

@@ -16,7 +16,11 @@
       <!-- Row 1: back, up, home -->
       <div
         :style="cellStyle('white', 'back')"
-        @click="
+        @mousedown="
+          flash('back');
+          tvKey('back');
+        "
+        @touchstart.prevent="
           flash('back');
           tvKey('back');
         "
@@ -25,16 +29,21 @@
       </div>
       <div
         :style="cellStyle('#fffde7', 'up')"
-        @click="
-          flash('up');
-          tvKey('up');
-        "
+        @mousedown="startRepeat('up')"
+        @mouseup="stopRepeat"
+        @mouseleave="stopRepeat"
+        @touchstart.prevent="startRepeat('up')"
+        @touchend="stopRepeat"
       >
         ▲
       </div>
       <div
         :style="cellStyle('white', 'home')"
-        @click="
+        @mousedown="
+          flash('home');
+          tvKey('home');
+        "
+        @touchstart.prevent="
           flash('home');
           tvKey('home');
         "
@@ -61,7 +70,11 @@
       </div>
       <div
         :style="cellStyle('#e8f5e9', 'ok')"
-        @click="
+        @mousedown="
+          flash('ok');
+          tvKey('ok');
+        "
+        @touchstart.prevent="
           flash('ok');
           tvKey('ok');
         "
@@ -81,7 +94,11 @@
       <!-- Row 3: emby, down, keyboard -->
       <div
         :style="cellStyle('white', 'emby')"
-        @click="
+        @mousedown="
+          flash('emby');
+          tvCmd('emby');
+        "
+        @touchstart.prevent="
           flash('emby');
           tvCmd('emby');
         "
@@ -90,10 +107,11 @@
       </div>
       <div
         :style="cellStyle('#fffde7', 'down')"
-        @click="
-          flash('down');
-          tvKey('down');
-        "
+        @mousedown="startRepeat('down')"
+        @mouseup="stopRepeat"
+        @mouseleave="stopRepeat"
+        @touchstart.prevent="startRepeat('down')"
+        @touchend="stopRepeat"
       >
         ▼
       </div>
@@ -101,25 +119,31 @@
       <!-- Row 4: vol-, vol+, mute -->
       <div
         :style="cellStyle('#e8f5e9', 'vold')"
-        @click="
-          flash('vold');
-          tvCmd('vol/down');
-        "
+        @mousedown="startRepeatCmd('vold', 'vol/down')"
+        @mouseup="stopRepeat"
+        @mouseleave="stopRepeat"
+        @touchstart.prevent="startRepeatCmd('vold', 'vol/down')"
+        @touchend="stopRepeat"
       >
         Vol-
       </div>
       <div
         :style="cellStyle('#e8f5e9', 'volu')"
-        @click="
-          flash('volu');
-          tvCmd('vol/up');
-        "
+        @mousedown="startRepeatCmd('volu', 'vol/up')"
+        @mouseup="stopRepeat"
+        @mouseleave="stopRepeat"
+        @touchstart.prevent="startRepeatCmd('volu', 'vol/up')"
+        @touchend="stopRepeat"
       >
         Vol+
       </div>
       <div
         :style="muteCellStyle"
-        @click="
+        @mousedown="
+          flash('mute');
+          tvCmd('mute');
+        "
+        @touchstart.prevent="
           flash('mute');
           tvCmd('mute');
         "
@@ -129,22 +153,41 @@
       <!-- Row 5: google, roku, off -->
       <div
         :style="modeBtnStyle('google')"
-        @click="setMode('google')"
+        @mousedown="startHold(() => setMode('google'))"
+        @mouseup="stopHold"
+        @mouseleave="stopHold"
+        @touchstart.prevent="startHold(() => setMode('google'))"
+        @touchend="stopHold"
       >
         Google
       </div>
       <div
         :style="modeBtnStyle('roku')"
-        @click="setMode('roku')"
+        @mousedown="startHold(() => setMode('roku'))"
+        @mouseup="stopHold"
+        @mouseleave="stopHold"
+        @touchstart.prevent="startHold(() => setMode('roku'))"
+        @touchend="stopHold"
       >
         Roku
       </div>
       <div
         :style="offBtnStyle"
-        @click="
-          flash('off');
-          tvCmd('off');
+        @mousedown="
+          startHold(() => {
+            flash('off');
+            tvCmd('off');
+          })
         "
+        @mouseup="stopHold"
+        @mouseleave="stopHold"
+        @touchstart.prevent="
+          startHold(() => {
+            flash('off');
+            tvCmd('off');
+          })
+        "
+        @touchend="stopHold"
       >
         Off
       </div>
@@ -207,20 +250,48 @@ export default {
   beforeUnmount() {
     evtBus.off("tvMuteState", this._onTvMuteState);
     this.stopRepeat();
+    this.stopHold();
   },
 
   methods: {
     startRepeat(key) {
+      if (!this._debounce()) return;
       this.flash(key);
-      this.tvKey(key);
-      this._repeatTimer = setInterval(() => {
-        this.flash(key);
-        this.tvKey(key);
-      }, 200);
+      this._repeatActive = true;
+      fetch(`${config.tvTvUrl}/tv/key/${key}`).catch(() => {});
+      let count = 0;
+      const tick = () => {
+        if (!this._repeatActive) return;
+        fetch(`${config.tvTvUrl}/tv/key/${key}`).catch(() => {});
+        this._repeatTimer = setTimeout(tick, count++ < 4 ? 500 : 100);
+      };
+      this._repeatDelay = setTimeout(tick, 400);
+    },
+
+    startRepeatCmd(flashKey, cmd) {
+      this.flash(flashKey);
+      this._repeatActive = true;
+      fetch(`${config.tvTvUrl}/tv/${cmd}`).catch(() => {});
+      const tick = () => {
+        if (!this._repeatActive) return;
+        fetch(`${config.tvTvUrl}/tv/${cmd}`).catch(() => {});
+        this._repeatTimer = setTimeout(tick, 500);
+      };
+      this._repeatDelay = setTimeout(tick, 400);
     },
 
     stopRepeat() {
-      clearInterval(this._repeatTimer);
+      this._repeatActive = false;
+      clearTimeout(this._repeatDelay);
+      clearTimeout(this._repeatTimer);
+    },
+
+    startHold(action) {
+      this._holdTimer = setTimeout(action, 1500);
+    },
+
+    stopHold() {
+      clearTimeout(this._holdTimer);
     },
 
     modeBtnStyle(m) {
@@ -274,11 +345,25 @@ export default {
       } catch (_) {}
     },
 
+    _debounce() {
+      const now = Date.now();
+      if (now - (this._lastCmd || 0) < 250) return false;
+      this._lastCmd = now;
+      return true;
+    },
+
     async tvCmd(cmd) {
+      if (!this._debounce()) return;
       const res = await fetch(`${config.tvTvUrl}/tv/${cmd}`);
       const data = await res.json();
       if (cmd === "mute" && data.ok) this.muted = data.muted;
       console.log(`[TV] ${cmd} response:`, data);
+    },
+
+    async _tvKeyRaw(key) {
+      const res = await fetch(`${config.tvTvUrl}/tv/key/${key}`);
+      const data = await res.json();
+      console.log(`[TV] key ${key} response:`, data);
     },
 
     async tvKey(key) {

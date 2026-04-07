@@ -1,12 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  StatusBar,
-} from "react-native";
+import { View, Text, StyleSheet, Dimensions, StatusBar } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 
 const TV_TV_URL = "https://hahnca.com/tv-tv";
@@ -27,19 +20,49 @@ export default function App() {
   const [activeDevice, setActiveDevice] = useState(null);
 
   const wsRef = useRef(null);
-  const repeatRef = useRef(null);
+  const repeatDelayRef = useRef(null);
+  const repeatTimeoutRef = useRef(null);
+  const repeatActiveRef = useRef(false);
+  const lastCmdRef = useRef(0);
+  const holdRef = useRef(null);
+
+  const debounce = () => {
+    const now = Date.now();
+    if (now - lastCmdRef.current < 250) return false;
+    lastCmdRef.current = now;
+    return true;
+  };
 
   const startRepeat = (key) => {
+    if (!debounce()) return;
     flash(key);
-    tvKey(key);
-    repeatRef.current = setInterval(() => {
-      flash(key);
-      tvKey(key);
-    }, 200);
+    repeatActiveRef.current = true;
+    fetch(`${TV_TV_URL}/tv/key/${key}`).catch(() => {});
+    let count = 0;
+    const tick = () => {
+      if (!repeatActiveRef.current) return;
+      fetch(`${TV_TV_URL}/tv/key/${key}`).catch(() => {});
+      repeatTimeoutRef.current = setTimeout(tick, count++ < 4 ? 500 : 100);
+    };
+    repeatDelayRef.current = setTimeout(tick, 400);
+  };
+
+  const startRepeatCmd = (flashKey, cmd) => {
+    flash(flashKey);
+    repeatActiveRef.current = true;
+    fetch(`${TV_TV_URL}/tv/${cmd}`).catch(() => {});
+    const tick = () => {
+      if (!repeatActiveRef.current) return;
+      fetch(`${TV_TV_URL}/tv/${cmd}`).catch(() => {});
+      repeatTimeoutRef.current = setTimeout(tick, 500);
+    };
+    repeatDelayRef.current = setTimeout(tick, 400);
   };
 
   const stopRepeat = () => {
-    clearInterval(repeatRef.current);
+    repeatActiveRef.current = false;
+    clearTimeout(repeatDelayRef.current);
+    clearTimeout(repeatTimeoutRef.current);
   };
 
   const applyMuteState = (data) => {
@@ -92,9 +115,16 @@ export default function App() {
   };
 
   const tvCmd = async (cmd) => {
+    if (!debounce()) return;
     try {
       const res = await fetch(`${TV_TV_URL}/tv/${cmd}`);
       await res.json();
+    } catch (_) {}
+  };
+
+  const tvKeyRaw = async (key) => {
+    try {
+      await fetch(`${TV_TV_URL}/tv/key/${key}`);
     } catch (_) {}
   };
 
@@ -102,6 +132,14 @@ export default function App() {
     try {
       await fetch(`${TV_TV_URL}/tv/key/${key}`);
     } catch (_) {}
+  };
+
+  const startHold = (action) => {
+    holdRef.current = setTimeout(action, 1500);
+  };
+
+  const stopHold = () => {
+    clearTimeout(holdRef.current);
   };
 
   const handleSetMode = async (m) => {
@@ -137,7 +175,8 @@ export default function App() {
       label: "↩",
       largeText: true,
       bg: () => cellBg("white", "back"),
-      onPress: () => {
+      onPress: () => {},
+      onPressIn: () => {
         flash("back");
         tvKey("back");
       },
@@ -146,17 +185,17 @@ export default function App() {
       key: "up",
       label: "▲",
       bg: () => cellBg("#fffde7", "up"),
-      onPress: () => {
-        flash("up");
-        tvKey("up");
-      },
+      onPress: () => {},
+      onPressIn: () => startRepeat("up"),
+      onPressOut: stopRepeat,
     },
     {
       key: "home",
       label: null,
       icon: <MaterialIcons name="home" size={42} color="black" />,
       bg: () => cellBg("white", "home"),
-      onPress: () => {
+      onPress: () => {},
+      onPressIn: () => {
         flash("home");
         tvKey("home");
       },
@@ -174,7 +213,8 @@ export default function App() {
       key: "ok",
       label: "OK",
       bg: () => cellBg("#e8f5e9", "ok"),
-      onPress: () => {
+      onPress: () => {},
+      onPressIn: () => {
         flash("ok");
         tvKey("ok");
       },
@@ -193,7 +233,8 @@ export default function App() {
       label: "Emby",
       smallText: true,
       bg: () => cellBg("white", "emby"),
-      onPress: () => {
+      onPress: () => {},
+      onPressIn: () => {
         flash("emby");
         tvCmd("emby");
       },
@@ -202,10 +243,9 @@ export default function App() {
       key: "down",
       label: "▼",
       bg: () => cellBg("#fffde7", "down"),
-      onPress: () => {
-        flash("down");
-        tvKey("down");
-      },
+      onPress: () => {},
+      onPressIn: () => startRepeat("down"),
+      onPressOut: stopRepeat,
     },
     {
       key: "keyboard",
@@ -220,27 +260,24 @@ export default function App() {
       label: "Vol-",
       smallText: true,
       bg: () => cellBg("#e8f5e9", "vold"),
-      onPress: () => {
-        flash("vold");
-        tvCmd("vol/down");
-      },
+      onPressIn: () => startRepeatCmd("vold", "vol/down"),
+      onPressOut: stopRepeat,
     },
     {
       key: "volu",
       label: "Vol+",
       smallText: true,
       bg: () => cellBg("#e8f5e9", "volu"),
-      onPress: () => {
-        flash("volu");
-        tvCmd("vol/up");
-      },
+      onPressIn: () => startRepeatCmd("volu", "vol/up"),
+      onPressOut: stopRepeat,
     },
     {
       key: "mute",
       label: "Mute",
       smallText: true,
       bg: () => muteBg,
-      onPress: () => {
+      onPress: () => {},
+      onPressIn: () => {
         flash("mute");
         tvCmd("mute");
       },
@@ -251,24 +288,31 @@ export default function App() {
       label: "Google",
       smallText: true,
       bg: () => modeBg("google"),
-      onPress: () => handleSetMode("google"),
+      onPress: () => {},
+      onPressIn: () => startHold(() => handleSetMode("google")),
+      onPressOut: stopHold,
     },
     {
       key: "roku",
       label: "Roku",
       smallText: true,
       bg: () => modeBg("roku"),
-      onPress: () => handleSetMode("roku"),
+      onPress: () => {},
+      onPressIn: () => startHold(() => handleSetMode("roku")),
+      onPressOut: stopHold,
     },
     {
       key: "off",
       label: "Off",
       smallText: true,
       bg: () => offBg,
-      onPress: () => {
-        flash("off");
-        tvCmd("off");
-      },
+      onPress: () => {},
+      onPressIn: () =>
+        startHold(() => {
+          flash("off");
+          tvCmd("off");
+        }),
+      onPressOut: stopHold,
     },
   ];
 
@@ -277,13 +321,20 @@ export default function App() {
       <StatusBar hidden />
       <View style={styles.grid}>
         {buttons.map((btn) => (
-          <TouchableOpacity
+          <View
             key={btn.key}
             style={[styles.cell, { backgroundColor: btn.bg() }]}
-            onPress={btn.onPress}
-            onPressIn={btn.onPressIn}
-            onPressOut={btn.onPressOut}
-            activeOpacity={1}
+            onStartShouldSetResponder={() => true}
+            onResponderTerminationRequest={() => false}
+            onResponderGrant={() => {
+              if (btn.onPressIn) btn.onPressIn();
+            }}
+            onResponderRelease={() => {
+              if (btn.onPressOut) btn.onPressOut();
+            }}
+            onResponderTerminate={() => {
+              if (btn.onPressOut) btn.onPressOut();
+            }}
           >
             {btn.icon ? (
               btn.icon
@@ -298,7 +349,7 @@ export default function App() {
                 {btn.label}
               </Text>
             )}
-          </TouchableOpacity>
+          </View>
         ))}
       </View>
     </View>

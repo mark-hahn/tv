@@ -312,7 +312,13 @@ app.get("/tv/key/:key", (req, res) => {
     target: { entity_id: remoteId },
     service_data: { command },
   };
-  sendCmd(cmd);
+  const isArrow = ["up", "down", "left", "right"].includes(req.params.key);
+  if (isArrow) {
+    cmd.id = ++cmdId;
+    if (ws) ws.send(JSON.stringify(cmd));
+  } else {
+    sendCmd(cmd);
+  }
   log(`[${tvMode}] remote.send_command ${command}`);
   res.json({ ok: true, command, mode: tvMode });
 });

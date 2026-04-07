@@ -3587,7 +3587,8 @@ export const notifyClients = (notification, data = null) => {
 };
 
 wss.on("connection", (ws) => {
-  let socketName = "unknown websocket";
+  let socketName = appSocketName;
+  connectedClients.add(ws);
 
   ws.on("message", (data) => {
     const msg = data.toString();
@@ -3600,13 +3601,6 @@ wss.on("connection", (ws) => {
     }
     const { id, fname, param } = parsed;
 
-    if (socketName != appSocketName) {
-      socketName = appSocketName;
-      connectedClients.add(ws);
-      console.log(socketName + " connected");
-    }
-
-    // Only handleAsr uses WebSocket
     if (fname == "register") {
       // client registration — no response needed
     } else if (fname == "handleAsr") {

@@ -878,6 +878,7 @@ export default {
     this.stopQbtPolling();
     this.cancelDownInactiveTimer();
     this.stopLibraryPolling();
+    this.stopChksrtPolling();
   },
   methods: {
     handleVideoPlayerClose() {
@@ -900,6 +901,18 @@ export default {
         this.chksrtCount = Array.isArray(list) ? list.length : 0;
       } catch (e) {
         this.chksrtCount = 0;
+      }
+    },
+    startChksrtPolling() {
+      this.stopChksrtPolling();
+      this._chksrtPollTimer = setInterval(() => {
+        this.fetchChksrtCount();
+      }, 60000);
+    },
+    stopChksrtPolling() {
+      if (this._chksrtPollTimer) {
+        clearInterval(this._chksrtPollTimer);
+        this._chksrtPollTimer = null;
       }
     },
     async clickChksrt() {
@@ -1905,6 +1918,7 @@ export default {
     };
     evtBus.on("chksrt-count", this._onChksrtCount);
     this.fetchChksrtCount();
+    this.startChksrtPolling();
     this.startQbtPolling();
 
     // Refresh space display once on app load.

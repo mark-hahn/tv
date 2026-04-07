@@ -24,6 +24,7 @@ export default function App() {
   const repeatTimeoutRef = useRef(null);
   const repeatActiveRef = useRef(false);
   const lastCmdRef = useRef(0);
+  const lastVolRef = useRef(0);
   const holdRef = useRef(null);
 
   const debounce = () => {
@@ -48,11 +49,24 @@ export default function App() {
   };
 
   const startRepeatCmd = (flashKey, cmd) => {
+    const now = Date.now();
+    if (now - lastVolRef.current < 250) {
+      console.log(`[vol] THROTTLED ${cmd}`);
+      return;
+    }
+    lastVolRef.current = now;
+    console.log(
+      `[vol] startRepeatCmd ${cmd} active=${repeatActiveRef.current}`,
+    );
     flash(flashKey);
     repeatActiveRef.current = true;
     fetch(`${TV_TV_URL}/tv/${cmd}`).catch(() => {});
     const tick = () => {
-      if (!repeatActiveRef.current) return;
+      if (!repeatActiveRef.current) {
+        console.log(`[vol] tick STOPPED ${cmd}`);
+        return;
+      }
+      console.log(`[vol] tick ${cmd}`);
       fetch(`${TV_TV_URL}/tv/${cmd}`).catch(() => {});
       repeatTimeoutRef.current = setTimeout(tick, 500);
     };
@@ -60,6 +74,7 @@ export default function App() {
   };
 
   const stopRepeat = () => {
+    console.log(`[vol] stopRepeat active=${repeatActiveRef.current}`);
     repeatActiveRef.current = false;
     clearTimeout(repeatDelayRef.current);
     clearTimeout(repeatTimeoutRef.current);
@@ -101,6 +116,7 @@ export default function App() {
   };
 
   useEffect(() => {
+    console.log("[vol] APP VERSION v2");
     pollMute();
     connectWs();
     return () => {

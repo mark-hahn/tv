@@ -2,6 +2,7 @@ import { WebSocket } from "ws";
 import { exec } from "child_process";
 import express from "express";
 import cors from "cors";
+import { discover } from "node-broadlink";
 
 const HA_HOST = "hahnca.com:8123";
 const HA_ACCESS_TOKEN =
@@ -15,6 +16,37 @@ const IR_DEVICE = "bdv_n7100w";
 const ROKU_REMOTE_ID = "remote.roku_2";
 const BRAVIA_HOST = "192.168.1.12";
 const BRAVIA_PORT = 2870;
+const BROADLINK_HOST = "192.168.1.23";
+const BROADLINK_CODES = {
+  vol_up:
+    "JgCoAEcUEhYmFBMUEhUnFBIVEhUnFBMUExQSFRIAA2BOFBMUJhUSExUUJhQTFRIVJRUTFBQUExQTAANfTBUSFiYUEhUSFSYVExQTFCcUExQSFRMUEwADX0wWEhUlFRMUExQmFRMUExQnFBIVEhUTFBIAA2BOFREVJhUSFRMUJhUSFRQTJhUUExMUEhUTAANfTRQSFSYVEhUTFCYVExQSFScUEhUTFBMUEgANBQ==",
+  vol_down:
+    "JgCgAkgUJxQmFRMUEhUnFBMVEhQmFBQUEhUTFBMAA0tOFCYUKBMTFBMUJxUSFBMUJxQTFBQTExUTAANKThQnFCYUExQUEyYVExQTFCgUEhQTFBIVEgADTU4TJxQnFRIUExUmFBMUExQmFBQTExUTFREAA0xNFSYUJxQUExQTJhUTFBIWJhQTFBMUExQTAANMTBUnFCYUExUTFCYUExQUFCUVExQTFRIVEwADS04UJhUmFBMUFBMnFBQTExQlFhMUEhYRFRMAA0tOFCUXJBUTFBQTJxQTFBQTJxQTFBMUExQUAANKThQmFSYVFBMTFCcUExQSFSUWEhURFhIVEwADS04UJhQnFBQTExQnFBMUExQoExMUExURFRMAA01LFScUJhYQFhIVJhQSFRQUJhQUExIVExUSAANMTBUmFScUExQSFScUExQTFCUWExQTFREVEgADTU0UJhUmFBMUEhUnFBIVExQoExMUEhUUFBMAA0tOFCYUJxQTFBMUJRYSFRMUJRUVExIVFBMTAANLThQmFSYUExQUFCYUEhUTFCcUExQSFRMUEwADS00VJhUmFBQUEhUlFRIVExUmFBIVFBMUFBIAA0xOFCYUJxQSFRMUJxUSFBMUJhYRFRMUExQTAANLTRUmFSYUFBQSFSUVExUTFCUVExQUExQUEwADS04UJRUnFBMUExQnFBIVExQnFBMUEhUTFBMAA0tNFSYVJRUTFBIVJxQUExMUJhUTFBQTEhUTAANMTRQmFiYVEhQTFCYVExQSFSYUFBQTFBIVEwADTE0UJxQmFBMUExUlFRIVExQnFBMVEhQTFBQAA0xLFScUJhQUFBMUJhQTFBMVJRUTFBMUEhYTAANLTBUnFCcUExQTFCYWEhQSFSYVFBMSFRMUEwANBQ==",
+  mute: "JgCEAkkUFBMUEyYVEhUmFBMVExQnExMUExQUFBMAA19MFREWExUmFBIVJxQSFhIUJhUSFRMUExQSAANgThQTFBMUJxQTFCUVExUSFSYUEhUTFRMUEwADXk0VEhUTFCcUExQnFBIVExQmFBQUFBMTFBIAA2BNFRIVEhUlFRMVJhQSFRMUJxQSFRIVExQTAANfTxMSFRMUJhUSFSYUExQSFiYUExQSFRIWEgADYE0UExQUFCUVEhUmFRMUExQnFBIVEhUUExIAA2BMFhIVExQmFBMUJxQTFBIVJhUTFBMUEhUTAANfTRUTFBMUJxQTFCcVEhQSFSYVExQSFRMUFAADXk0UExQTFCcUExQmFRIVExQnFBIVExQTFBMAA2BNFBQTExQmFRMUJhUSFRIVJxMWEhIVExQTAANeThQTFBIVJxQSFSgTExQTFCgTEhUSFRMUEwADYEwVEhUSFScUEhUmFBIVFBQlFRMUFBMUFBMAA15OFBIVEhUnFBIVJxQTFBIVJhQTFRIVExQSAANgThQUExMUJhUTFCUVExQSFScUEhUTFBIVEwADX04UExQSFSYVFBMlFhEWEhUlFRIVExQTFRIAA2JLFBMUFBQmFBIWJhQVEhIVJxUSFBMUEhUTAANgTBUTFBIVJhUTFCYUExUSFSUVEhUSFhMUFAADXU8TExQTFCYVExQlFhMUEhUmFREWExQSFRIAA2BNFRMUEhUmFBQUJhQTFBIVJxQSFRMUEhUTAANfThQSFRIVJRYTFCYUEhUTFSUVExQTFBMVEwADX0wVEhUTFSYUExQnFBMUExQmFRIWExMTFBMAA19OFBMUExQmFBIWJhQTFBMUJhUSFRMUExQTAA0F",
+};
+
+let broadlinkDev = null;
+async function broadlinkConnect() {
+  try {
+    const devices = await discover(3000);
+    const dev = devices.find((d) => d.host.address === BROADLINK_HOST);
+    if (!dev) {
+      loge("Broadlink device not found at", BROADLINK_HOST);
+      return;
+    }
+    await dev.auth();
+    broadlinkDev = dev;
+    log("Broadlink connected:", dev.TYPE, dev.host.address);
+  } catch (e) {
+    loge("Broadlink connect failed:", e.message);
+  }
+}
+async function broadlinkSend(cmd) {
+  if (!broadlinkDev) await broadlinkConnect();
+  if (!broadlinkDev) throw new Error("Broadlink not available");
+  const bytes = Array.from(Buffer.from(BROADLINK_CODES[cmd], "base64"));
+  await broadlinkDev.sendData(bytes);
+}
 const EMBY_HOST = "hahnca.com:8920";
 const EMBY_API_KEY = "1c399bd079d549cba8c916244d3add2b";
 const SRVR_INTERNAL_URL = "http://127.0.0.1:8739";
@@ -381,21 +413,14 @@ app.get("/tv/vol/:dir", async (req, res) => {
     res.status(400).json({ ok: false, error: "unknown dir" });
     return;
   }
-  const command = dir === "up" ? "vol_up" : "vol_down";
-  callService("remote", "send_command", IR_REMOTE_ID, {
-    device: IR_DEVICE,
-    command,
-  });
-  log(`vol ${dir}: IR sent`);
+  await broadlinkSend(dir === "up" ? "vol_up" : "vol_down");
+  log(`vol ${dir} sent via Broadlink`);
   res.json({ ok: true });
 });
 
-app.get("/tv/mute", (req, res) => {
-  callService("remote", "send_command", IR_REMOTE_ID, {
-    device: IR_DEVICE,
-    command: "mute",
-  });
-  log("mute IR sent");
+app.get("/tv/mute", async (req, res) => {
+  await broadlinkSend("mute");
+  log("mute sent via Broadlink");
   res.json({ ok: true });
 });
 
@@ -447,6 +472,7 @@ app.get("/tv/status", (req, res) => {
 
 connectHa();
 connectEmby();
+broadlinkConnect();
 
 app.listen(TV_PORT, () => {
   log(`listening on port ${TV_PORT}`);

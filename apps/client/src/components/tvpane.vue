@@ -269,6 +269,9 @@ export default {
     },
 
     startRepeatCmd(flashKey, cmd) {
+      const now = Date.now();
+      if (now - (this._lastVol || 0) < 250) return;
+      this._lastVol = now;
       this.flash(flashKey);
       this._repeatActive = true;
       fetch(`${config.tvTvUrl}/tv/${cmd}`).catch(() => {});

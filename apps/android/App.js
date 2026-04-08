@@ -43,7 +43,7 @@ export default function App() {
     const tick = () => {
       if (!repeatActiveRef.current) return;
       fetch(`${TV_TV_URL}/tv/key/${key}`).catch(() => {});
-      repeatTimeoutRef.current = setTimeout(tick, count++ < 4 ? 500 : 100);
+      repeatTimeoutRef.current = setTimeout(tick, count++ < 2 ? 500 : 100);
     };
     repeatDelayRef.current = setTimeout(tick, 400);
   };
@@ -104,12 +104,17 @@ export default function App() {
   };
 
   useEffect(() => {
-    console.log("[vol] APP VERSION v4");
+    console.log("[vol] APP VERSION v9");
     pollMute();
     connectWs();
     return () => {
       if (wsRef.current) wsRef.current.onclose = null;
       wsRef.current?.close();
+      repeatActiveRef.current = false;
+      volActiveRef.current = false;
+      clearTimeout(repeatDelayRef.current);
+      clearTimeout(repeatTimeoutRef.current);
+      clearTimeout(holdRef.current);
     };
   }, []);
 
@@ -139,7 +144,7 @@ export default function App() {
   };
 
   const startHold = (action) => {
-    holdRef.current = setTimeout(action, 1500);
+    holdRef.current = setTimeout(action, 750);
   };
 
   const stopHold = () => {

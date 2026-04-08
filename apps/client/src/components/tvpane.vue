@@ -269,24 +269,18 @@ export default {
     },
 
     startRepeatCmd(flashKey, cmd) {
-      const now = Date.now();
-      if (now - (this._lastVol || 0) < 150) return;
-      this._lastVol = now;
+      if (this._repeatActive) return;
       this.flash(flashKey);
       this._repeatActive = true;
-      fetch(`${config.tvTvUrl}/tv/${cmd}`).catch(() => {});
-      const tick = () => {
-        if (!this._repeatActive) return;
-        fetch(`${config.tvTvUrl}/tv/${cmd}`).catch(() => {});
-        this._repeatTimer = setTimeout(tick, 250);
-      };
-      this._repeatDelay = setTimeout(tick, 250);
+      (async () => {
+        while (this._repeatActive) {
+          await fetch(`${config.tvTvUrl}/tv/${cmd}`).catch(() => {});
+        }
+      })();
     },
 
     stopRepeat() {
       this._repeatActive = false;
-      clearTimeout(this._repeatDelay);
-      clearTimeout(this._repeatTimer);
     },
 
     startHold(action) {

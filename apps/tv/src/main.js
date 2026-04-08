@@ -407,8 +407,9 @@ app.get("/tv/vol/:dir", (req, res) => {
     res.status(400).json({ ok: false, error: "unknown dir" });
     return;
   }
+  log(`vol ${dir} REQ t=${Date.now()}`);
   broadlinkSend(dir === "up" ? "vol_up" : "vol_down");
-  log(`vol ${dir} sent via Broadlink`);
+  log(`vol ${dir} DONE t=${Date.now()}`);
   res.json({ ok: true });
 });
 

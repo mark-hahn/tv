@@ -48,37 +48,31 @@ export default function App() {
     repeatDelayRef.current = setTimeout(tick, 400);
   };
 
+  const volBusyRef = useRef(false);
+
   const startRepeatCmd = (flashKey, cmd) => {
-    const now = Date.now();
-    if (now - lastVolRef.current < 150) {
-      console.log(`[vol] THROTTLED ${cmd}`);
+    if (volBusyRef.current) {
+      console.log(`[vol] BUSY, ignoring ${cmd}`);
       return;
     }
-    lastVolRef.current = now;
-    console.log(
-      `[vol] startRepeatCmd ${cmd} active=${repeatActiveRef.current}`,
-    );
+    volBusyRef.current = true;
+    console.log(`[vol] START ${cmd} t=${Date.now()}`);
     flash(flashKey);
-    repeatActiveRef.current = true;
-    fetch(`${TV_TV_URL}/tv/${cmd}`).catch(() => {});
-    const tick = () => {
-      if (!repeatActiveRef.current) {
-        console.log(`[vol] tick STOPPED ${cmd}`);
-        return;
+    (async () => {
+      for (let i = 0; i < 20; i++) {
+        const t0 = Date.now();
+        console.log(`[vol] send ${i + 1}/20 ${cmd} t=${t0}`);
+        await fetch(`${TV_TV_URL}/tv/${cmd}`).catch((e) =>
+          console.log(`[vol] err ${e.message}`),
+        );
+        console.log(`[vol] ack  ${i + 1}/20 ${cmd} rtt=${Date.now() - t0}ms`);
       }
-      console.log(`[vol] tick ${cmd}`);
-      fetch(`${TV_TV_URL}/tv/${cmd}`).catch(() => {});
-      repeatTimeoutRef.current = setTimeout(tick, 250);
-    };
-    repeatDelayRef.current = setTimeout(tick, 250);
+      console.log(`[vol] DONE ${cmd} t=${Date.now()}`);
+      volBusyRef.current = false;
+    })();
   };
 
-  const stopRepeat = () => {
-    console.log(`[vol] stopRepeat active=${repeatActiveRef.current}`);
-    repeatActiveRef.current = false;
-    clearTimeout(repeatDelayRef.current);
-    clearTimeout(repeatTimeoutRef.current);
-  };
+  const stopRepeat = () => {};
 
   const applyMuteState = (data) => {
     if (!data) return;
@@ -116,7 +110,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    console.log("[vol] APP VERSION v2");
+    console.log("[vol] APP VERSION v3");
     pollMute();
     connectWs();
     return () => {

@@ -1,5 +1,6 @@
 import { WebSocket } from "ws";
 import { exec, spawn } from "child_process";
+import { createInterface } from "readline";
 import express from "express";
 import cors from "cors";
 
@@ -25,21 +26,35 @@ const BROADLINK_CODES = {
 
 const IR_DAEMON_PATH = new URL("./ir-daemon.py", import.meta.url).pathname;
 let irProc = null;
+const irAckQueue = [];
 
 function startIrDaemon() {
   irProc = spawn("python3", ["-u", IR_DAEMON_PATH]);
-  irProc.stdout.on("data", (d) => log("ir-daemon:", d.toString().trim()));
+  const rl = createInterface({ input: irProc.stdout });
+  rl.on("line", (line) => {
+    if (line === "OK") {
+      const resolve = irAckQueue.shift();
+      if (resolve) resolve();
+    } else {
+      log("ir-daemon:", line);
+    }
+  });
   irProc.stderr.on("data", (d) => loge("ir-daemon err:", d.toString().trim()));
   irProc.on("exit", (code) => {
     loge("ir-daemon exited", code);
     irProc = null;
+    // reject all pending acks
+    for (const resolve of irAckQueue.splice(0)) resolve();
   });
 }
 
 function broadlinkSend(cmd) {
   if (!irProc) startIrDaemon();
   const code = BROADLINK_CODES[cmd];
-  irProc.stdin.write(code + "\n");
+  return new Promise((resolve) => {
+    irAckQueue.push(resolve);
+    irProc.stdin.write(code + "\n");
+  });
 }
 const EMBY_HOST = "hahnca.com:8920";
 const EMBY_API_KEY = "1c399bd079d549cba8c916244d3add2b";
@@ -401,15 +416,14 @@ async function braviaGetMute() {
   return m ? m[1] === "1" : null;
 }
 
-app.get("/tv/vol/:dir", (req, res) => {
+app.get("/tv/vol/:dir", async (req, res) => {
   const dir = req.params.dir;
   if (dir !== "up" && dir !== "down") {
     res.status(400).json({ ok: false, error: "unknown dir" });
     return;
   }
-  log(`vol ${dir} REQ t=${Date.now()}`);
-  broadlinkSend(dir === "up" ? "vol_up" : "vol_down");
-  log(`vol ${dir} DONE t=${Date.now()}`);
+  await broadlinkSend(dir === "up" ? "vol_up" : "vol_down");
+  log(`vol ${dir} sent`);
   res.json({ ok: true });
 });
 

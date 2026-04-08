@@ -48,31 +48,25 @@ export default function App() {
     repeatDelayRef.current = setTimeout(tick, 400);
   };
 
-  const volBusyRef = useRef(false);
+  const volActiveRef = useRef(false);
 
   const startRepeatCmd = (flashKey, cmd) => {
-    if (volBusyRef.current) {
-      console.log(`[vol] BUSY, ignoring ${cmd}`);
-      return;
-    }
-    volBusyRef.current = true;
-    console.log(`[vol] START ${cmd} t=${Date.now()}`);
+    if (volActiveRef.current) return;
+    volActiveRef.current = true;
     flash(flashKey);
     (async () => {
-      for (let i = 0; i < 20; i++) {
-        const t0 = Date.now();
-        console.log(`[vol] send ${i + 1}/20 ${cmd} t=${t0}`);
-        await fetch(`${TV_TV_URL}/tv/${cmd}`).catch((e) =>
-          console.log(`[vol] err ${e.message}`),
-        );
-        console.log(`[vol] ack  ${i + 1}/20 ${cmd} rtt=${Date.now() - t0}ms`);
+      while (volActiveRef.current) {
+        await fetch(`${TV_TV_URL}/tv/${cmd}`).catch(() => {});
       }
-      console.log(`[vol] DONE ${cmd} t=${Date.now()}`);
-      volBusyRef.current = false;
     })();
   };
 
-  const stopRepeat = () => {};
+  const stopRepeat = () => {
+    volActiveRef.current = false;
+    repeatActiveRef.current = false;
+    clearTimeout(repeatDelayRef.current);
+    clearTimeout(repeatTimeoutRef.current);
+  };
 
   const applyMuteState = (data) => {
     if (!data) return;
@@ -110,7 +104,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    console.log("[vol] APP VERSION v3");
+    console.log("[vol] APP VERSION v4");
     pollMute();
     connectWs();
     return () => {

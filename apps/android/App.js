@@ -265,7 +265,10 @@ export default function App() {
       smallText: true,
       bg: () => cellBg("#e8f5e9", "vold"),
       onPress: () => {},
-      onPressIn: () => { flash("vold"); fetch(`${TV_TV_URL}/tv/vol/down`).catch(() => {}); },
+      onPressIn: () => {
+        flash("vold");
+        fetch(`${TV_TV_URL}/tv/vol/down`).catch(() => {});
+      },
     },
     {
       key: "volu",
@@ -273,7 +276,10 @@ export default function App() {
       smallText: true,
       bg: () => cellBg("#e8f5e9", "volu"),
       onPress: () => {},
-      onPressIn: () => { flash("volu"); fetch(`${TV_TV_URL}/tv/vol/up`).catch(() => {}); },
+      onPressIn: () => {
+        flash("volu");
+        fetch(`${TV_TV_URL}/tv/vol/up`).catch(() => {});
+      },
     },
     {
       key: "mute",

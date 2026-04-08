@@ -119,21 +119,27 @@
       <!-- Row 4: vol-, vol+, mute -->
       <div
         :style="cellStyle('#e8f5e9', 'vold')"
-        @mousedown="startRepeatCmd('vold', 'vol/down')"
-        @mouseup="stopRepeat"
-        @mouseleave="stopRepeat"
-        @touchstart.prevent="startRepeatCmd('vold', 'vol/down')"
-        @touchend="stopRepeat"
+        @mousedown="
+          flash('vold');
+          tvVolCmd('down');
+        "
+        @touchstart.prevent="
+          flash('vold');
+          tvVolCmd('down');
+        "
       >
         Vol-
       </div>
       <div
         :style="cellStyle('#e8f5e9', 'volu')"
-        @mousedown="startRepeatCmd('volu', 'vol/up')"
-        @mouseup="stopRepeat"
-        @mouseleave="stopRepeat"
-        @touchstart.prevent="startRepeatCmd('volu', 'vol/up')"
-        @touchend="stopRepeat"
+        @mousedown="
+          flash('volu');
+          tvVolCmd('up');
+        "
+        @touchstart.prevent="
+          flash('volu');
+          tvVolCmd('up');
+        "
       >
         Vol+
       </div>
@@ -355,6 +361,10 @@ export default {
       const data = await res.json();
       if (cmd === "mute" && data.ok) this.muted = data.muted;
       console.log(`[TV] ${cmd} response:`, data);
+    },
+
+    async tvVolCmd(dir) {
+      fetch(`${config.tvTvUrl}/tv/vol/${dir}`).catch(() => {});
     },
 
     async _tvKeyRaw(key) {

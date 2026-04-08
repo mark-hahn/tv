@@ -898,7 +898,13 @@ export default {
     async fetchChksrtCount() {
       try {
         const list = await srvr.getChksrtList();
+        const prev = this.chksrtCount;
         this.chksrtCount = Array.isArray(list) ? list.length : 0;
+        if (prev === 0 && this.chksrtCount > 0) {
+          new Notification("Chksrt", {
+            body: `${this.chksrtCount} subtitle(s) ready to check`,
+          });
+        }
       } catch (e) {
         this.chksrtCount = 0;
       }
@@ -1914,7 +1920,13 @@ export default {
     };
     evtBus.on("openChksrt", this._onOpenChksrt);
     this._onChksrtCount = (count) => {
+      const prev = this.chksrtCount;
       this.chksrtCount = Number(count) || 0;
+      if (prev === 0 && this.chksrtCount > 0) {
+        new Notification("Chksrt", {
+          body: `${this.chksrtCount} subtitle(s) ready to check`,
+        });
+      }
     };
     evtBus.on("chksrt-count", this._onChksrtCount);
     this.fetchChksrtCount();

@@ -12,6 +12,7 @@ function normalizeAggressive(s) {
     out = out.slice(0, idx);
   }
   out = out.toLowerCase();
+  out = out.replace(/\b([a-z])\./g, "$1"); // collapse initials: "r.j." -> "rj"
   out = out.replace(/\./g, " ");
   out = out.replace(/&/g, " and ");
   out = out.replace(/[^a-z0-9\s]/g, " ");

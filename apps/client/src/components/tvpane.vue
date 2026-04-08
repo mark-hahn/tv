@@ -270,7 +270,7 @@ export default {
 
     startRepeatCmd(flashKey, cmd) {
       const now = Date.now();
-      if (now - (this._lastVol || 0) < 250) return;
+      if (now - (this._lastVol || 0) < 150) return;
       this._lastVol = now;
       this.flash(flashKey);
       this._repeatActive = true;
@@ -278,9 +278,9 @@ export default {
       const tick = () => {
         if (!this._repeatActive) return;
         fetch(`${config.tvTvUrl}/tv/${cmd}`).catch(() => {});
-        this._repeatTimer = setTimeout(tick, 500);
+        this._repeatTimer = setTimeout(tick, 150);
       };
-      this._repeatDelay = setTimeout(tick, 400);
+      this._repeatDelay = setTimeout(tick, 150);
     },
 
     stopRepeat() {

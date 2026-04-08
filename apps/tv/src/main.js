@@ -1,8 +1,7 @@
 import { WebSocket } from "ws";
-import { exec } from "child_process";
+import { exec, spawn } from "child_process";
 import express from "express";
 import cors from "cors";
-import { discover } from "node-broadlink";
 
 const HA_HOST = "hahnca.com:8123";
 const HA_ACCESS_TOKEN =
@@ -21,31 +20,26 @@ const BROADLINK_CODES = {
   vol_up:
     "JgCoAEcUEhYmFBMUEhUnFBIVEhUnFBMUExQSFRIAA2BOFBMUJhUSExUUJhQTFRIVJRUTFBQUExQTAANfTBUSFiYUEhUSFSYVExQTFCcUExQSFRMUEwADX0wWEhUlFRMUExQmFRMUExQnFBIVEhUTFBIAA2BOFREVJhUSFRMUJhUSFRQTJhUUExMUEhUTAANfTRQSFSYVEhUTFCYVExQSFScUEhUTFBMUEgANBQ==",
   vol_down:
-    "JgCgAkgUJxQmFRMUEhUnFBMVEhQmFBQUEhUTFBMAA0tOFCYUKBMTFBMUJxUSFBMUJxQTFBQTExUTAANKThQnFCYUExQUEyYVExQTFCgUEhQTFBIVEgADTU4TJxQnFRIUExUmFBMUExQmFBQTExUTFREAA0xNFSYUJxQUExQTJhUTFBIWJhQTFBMUExQTAANMTBUnFCYUExUTFCYUExQUFCUVExQTFRIVEwADS04UJhUmFBMUFBMnFBQTExQlFhMUEhYRFRMAA0tOFCUXJBUTFBQTJxQTFBQTJxQTFBMUExQUAANKThQmFSYVFBMTFCcUExQSFSUWEhURFhIVEwADS04UJhQnFBQTExQnFBMUExQoExMUExURFRMAA01LFScUJhYQFhIVJhQSFRQUJhQUExIVExUSAANMTBUmFScUExQSFScUExQTFCUWExQTFREVEgADTU0UJhUmFBMUEhUnFBIVExQoExMUEhUUFBMAA0tOFCYUJxQTFBMUJRYSFRMUJRUVExIVFBMTAANLThQmFSYUExQUFCYUEhUTFCcUExQSFRMUEwADS00VJhUmFBQUEhUlFRIVExUmFBIVFBMUFBIAA0xOFCYUJxQSFRMUJxUSFBMUJhYRFRMUExQTAANLTRUmFSYUFBQSFSUVExUTFCUVExQUExQUEwADS04UJRUnFBMUExQnFBIVExQnFBMUEhUTFBMAA0tNFSYVJRUTFBIVJxQUExMUJhUTFBQTEhUTAANMTRQmFiYVEhQTFCYVExQSFSYUFBQTFBIVEwADTE0UJxQmFBMUExUlFRIVExQnFBMVEhQTFBQAA0xLFScUJhQUFBMUJhQTFBMVJRUTFBMUEhYTAANLTBUnFCcUExQTFCYWEhQSFSYVFBMSFRMUEwANBQ==",
-  mute: "JgCEAkkUFBMUEyYVEhUmFBMVExQnExMUExQUFBMAA19MFREWExUmFBIVJxQSFhIUJhUSFRMUExQSAANgThQTFBMUJxQTFCUVExUSFSYUEhUTFRMUEwADXk0VEhUTFCcUExQnFBIVExQmFBQUFBMTFBIAA2BNFRIVEhUlFRMVJhQSFRMUJxQSFRIVExQTAANfTxMSFRMUJhUSFSYUExQSFiYUExQSFRIWEgADYE0UExQUFCUVEhUmFRMUExQnFBIVEhUUExIAA2BMFhIVExQmFBMUJxQTFBIVJhUTFBMUEhUTAANfTRUTFBMUJxQTFCcVEhQSFSYVExQSFRMUFAADXk0UExQTFCcUExQmFRIVExQnFBIVExQTFBMAA2BNFBQTExQmFRMUJhUSFRIVJxMWEhIVExQTAANeThQTFBIVJxQSFSgTExQTFCgTEhUSFRMUEwADYEwVEhUSFScUEhUmFBIVFBQlFRMUFBMUFBMAA15OFBIVEhUnFBIVJxQTFBIVJhQTFRIVExQSAANgThQUExMUJhUTFCUVExQSFScUEhUTFBIVEwADX04UExQSFSYVFBMlFhEWEhUlFRIVExQTFRIAA2JLFBMUFBQmFBIWJhQVEhIVJxUSFBMUEhUTAANgTBUTFBIVJhUTFCYUExUSFSUVEhUSFhMUFAADXU8TExQTFCYVExQlFhMUEhUmFREWExQSFRIAA2BNFRMUEhUmFBQUJhQTFBIVJxQSFRMUEhUTAANfThQSFRIVJRYTFCYUEhUTFSUVExQTFBMVEwADX0wVEhUTFSYUExQnFBMUExQmFRIWExMTFBMAA19OFBMUExQmFBIWJhQTFBMUJhUSFRMUExQTAA0F",
+    "JgCoAEcUJhYmFBMUEhUnFBIVEhUnFBMUExQSFRIAA2BOFCYUJhUSExUUJhQTFRIVJRUTFBQUExQTAANfTBUmFiYUEhUSFSYVExQTFCcUExQSFRMUEwADX0wWJhUlFRMUExQmFRMUExQnFBIVEhUTFBIAA2BOFSYVJhUSFRMUJhUSFRQTJhUUExMUEhUTAANfTRQmFSYVEhUTFCYVExQSFScUEhUTFBMUEgANBQ==",
 };
 
-let broadlinkDev = null;
-async function broadlinkConnect() {
-  try {
-    const devices = await discover(3000);
-    const dev = devices.find((d) => d.host.address === BROADLINK_HOST);
-    if (!dev) {
-      loge("Broadlink device not found at", BROADLINK_HOST);
-      return;
-    }
-    await dev.auth();
-    broadlinkDev = dev;
-    log("Broadlink connected:", dev.TYPE, dev.host.address);
-  } catch (e) {
-    loge("Broadlink connect failed:", e.message);
-  }
+const IR_DAEMON_PATH = new URL("./ir-daemon.py", import.meta.url).pathname;
+let irProc = null;
+
+function startIrDaemon() {
+  irProc = spawn("python3", ["-u", IR_DAEMON_PATH]);
+  irProc.stdout.on("data", (d) => log("ir-daemon:", d.toString().trim()));
+  irProc.stderr.on("data", (d) => loge("ir-daemon err:", d.toString().trim()));
+  irProc.on("exit", (code) => {
+    loge("ir-daemon exited", code);
+    irProc = null;
+  });
 }
-async function broadlinkSend(cmd) {
-  if (!broadlinkDev) await broadlinkConnect();
-  if (!broadlinkDev) throw new Error("Broadlink not available");
-  const bytes = Array.from(Buffer.from(BROADLINK_CODES[cmd], "base64"));
-  await broadlinkDev.sendData(bytes);
+
+function broadlinkSend(cmd) {
+  if (!irProc) startIrDaemon();
+  const code = BROADLINK_CODES[cmd];
+  irProc.stdin.write(code + "\n");
 }
 const EMBY_HOST = "hahnca.com:8920";
 const EMBY_API_KEY = "1c399bd079d549cba8c916244d3add2b";
@@ -407,20 +401,23 @@ async function braviaGetMute() {
   return m ? m[1] === "1" : null;
 }
 
-app.get("/tv/vol/:dir", async (req, res) => {
+app.get("/tv/vol/:dir", (req, res) => {
   const dir = req.params.dir;
   if (dir !== "up" && dir !== "down") {
     res.status(400).json({ ok: false, error: "unknown dir" });
     return;
   }
-  await broadlinkSend(dir === "up" ? "vol_up" : "vol_down");
+  broadlinkSend(dir === "up" ? "vol_up" : "vol_down");
   log(`vol ${dir} sent via Broadlink`);
   res.json({ ok: true });
 });
 
-app.get("/tv/mute", async (req, res) => {
-  await broadlinkSend("mute");
-  log("mute sent via Broadlink");
+app.get("/tv/mute", (req, res) => {
+  callService("remote", "send_command", IR_REMOTE_ID, {
+    device: IR_DEVICE,
+    command: "mute",
+  });
+  log("mute sent via HA IR");
   res.json({ ok: true });
 });
 
@@ -472,7 +469,7 @@ app.get("/tv/status", (req, res) => {
 
 connectHa();
 connectEmby();
-broadlinkConnect();
+startIrDaemon();
 
 app.listen(TV_PORT, () => {
   log(`listening on port ${TV_PORT}`);

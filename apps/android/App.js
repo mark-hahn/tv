@@ -50,7 +50,7 @@ export default function App() {
 
   const startRepeatCmd = (flashKey, cmd) => {
     const now = Date.now();
-    if (now - lastVolRef.current < 250) {
+    if (now - lastVolRef.current < 150) {
       console.log(`[vol] THROTTLED ${cmd}`);
       return;
     }
@@ -68,9 +68,9 @@ export default function App() {
       }
       console.log(`[vol] tick ${cmd}`);
       fetch(`${TV_TV_URL}/tv/${cmd}`).catch(() => {});
-      repeatTimeoutRef.current = setTimeout(tick, 500);
+      repeatTimeoutRef.current = setTimeout(tick, 150);
     };
-    repeatDelayRef.current = setTimeout(tick, 400);
+    repeatDelayRef.current = setTimeout(tick, 150);
   };
 
   const stopRepeat = () => {

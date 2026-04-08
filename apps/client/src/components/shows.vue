@@ -152,6 +152,7 @@
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
+                flexShrink: 0,
               }"
             >
               {{ show.waitStr }}

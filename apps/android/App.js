@@ -68,9 +68,9 @@ export default function App() {
       }
       console.log(`[vol] tick ${cmd}`);
       fetch(`${TV_TV_URL}/tv/${cmd}`).catch(() => {});
-      repeatTimeoutRef.current = setTimeout(tick, 150);
+      repeatTimeoutRef.current = setTimeout(tick, 250);
     };
-    repeatDelayRef.current = setTimeout(tick, 150);
+    repeatDelayRef.current = setTimeout(tick, 250);
   };
 
   const stopRepeat = () => {

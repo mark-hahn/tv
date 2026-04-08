@@ -278,9 +278,9 @@ export default {
       const tick = () => {
         if (!this._repeatActive) return;
         fetch(`${config.tvTvUrl}/tv/${cmd}`).catch(() => {});
-        this._repeatTimer = setTimeout(tick, 150);
+        this._repeatTimer = setTimeout(tick, 250);
       };
-      this._repeatDelay = setTimeout(tick, 150);
+      this._repeatDelay = setTimeout(tick, 250);
     },
 
     stopRepeat() {

@@ -1127,6 +1127,12 @@ export const getSeriesMap = async (show, prune = false) => {
       // If episode has a file, it can't be unaired (Emby's unaired endpoint is unreliable)
       const unaired = avail && path ? false : !!unairedObj[episodeNumber];
 
+      if (prune) {
+        console.log(
+          `[prune] S${seasonNumber}E${episodeNumber}: played=${played} avail=${avail} locationType=${episodeRec?.LocationType ?? "MISSING"} path=${path ?? "(none)"} pruning=${pruning}`,
+        );
+      }
+
       if (avail && !path) {
         console.error(
           "avail without path",
@@ -1136,9 +1142,23 @@ export const getSeriesMap = async (show, prune = false) => {
       }
 
       if (pruning) {
-        if (!played && avail) pruning = false;
-        else {
-          await deleteOneFile(path);
+        if (!played && avail) {
+          console.log(
+            `[prune] STOP at S${seasonNumber}E${episodeNumber}: not watched, has file`,
+          );
+          pruning = false;
+        } else {
+          console.log(
+            `[prune] deleting S${seasonNumber}E${episodeNumber}: ${path}`,
+          );
+          try {
+            await deleteOneFile(path);
+            console.log(`[prune] deleted ok S${seasonNumber}E${episodeNumber}`);
+          } catch (e) {
+            console.error(
+              `[prune] delete FAILED S${seasonNumber}E${episodeNumber}: ${e?.message ?? e}`,
+            );
+          }
         }
       }
 

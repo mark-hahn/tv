@@ -327,7 +327,6 @@ app.get("/tv/emby", (req, res) => {
 
 app.get("/tv/off", (req, res) => {
   log(`off from ${client(req)}`);
-  callService("media_player", "turn_off", "media_player.roku_2");
   callService("media_player", "turn_off", TV_ENTITY_ID);
   callService("remote", "turn_off", REMOTE_ENTITY_ID);
   lastOffAt = Date.now();

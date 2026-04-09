@@ -16,19 +16,13 @@
       <!-- Row 1: back, up, home -->
       <div
         :style="cellStyle('white', 'back')"
-        @mousedown="
-          flash('back');
-          tvKey('back');
-        "
-        @touchstart.prevent="
-          flash('back');
-          tvKey('back');
-        "
+        @mousedown="tvKey('back')"
+        @touchstart.prevent="tvKey('back')"
       >
         ↩
       </div>
       <div
-        :style="cellStyle('#fffde7', 'up')"
+        :style="cellStyle('#f5e642', 'up')"
         @mousedown="startRepeat('up')"
         @mouseup="stopRepeat"
         @mouseleave="stopRepeat"
@@ -39,14 +33,8 @@
       </div>
       <div
         :style="cellStyle('white', 'home')"
-        @mousedown="
-          flash('home');
-          tvKey('home');
-        "
-        @touchstart.prevent="
-          flash('home');
-          tvKey('home');
-        "
+        @mousedown="tvKey('home')"
+        @touchstart.prevent="tvKey('home')"
       >
         <svg
           width="1em"
@@ -59,7 +47,7 @@
       </div>
       <!-- Row 2: left, ok, right -->
       <div
-        :style="cellStyle('#fffde7', 'left')"
+        :style="cellStyle('#f5e642', 'left')"
         @mousedown="startRepeat('left')"
         @mouseup="stopRepeat"
         @mouseleave="stopRepeat"
@@ -69,20 +57,14 @@
         ◀
       </div>
       <div
-        :style="cellStyle('#e8f5e9', 'ok')"
-        @mousedown="
-          flash('ok');
-          tvKey('ok');
-        "
-        @touchstart.prevent="
-          flash('ok');
-          tvKey('ok');
-        "
+        :style="cellStyle('lightgreen', 'ok')"
+        @mousedown="tvKey('ok')"
+        @touchstart.prevent="tvKey('ok')"
       >
         OK
       </div>
       <div
-        :style="cellStyle('#fffde7', 'right')"
+        :style="cellStyle('#f5e642', 'right')"
         @mousedown="startRepeat('right')"
         @mouseup="stopRepeat"
         @mouseleave="stopRepeat"
@@ -94,19 +76,13 @@
       <!-- Row 3: emby, down, keyboard -->
       <div
         :style="cellStyle('white', 'emby')"
-        @mousedown="
-          flash('emby');
-          tvCmd('emby');
-        "
-        @touchstart.prevent="
-          flash('emby');
-          tvCmd('emby');
-        "
+        @mousedown="tvCmd('emby')"
+        @touchstart.prevent="tvCmd('emby')"
       >
         Emby
       </div>
       <div
-        :style="cellStyle('#fffde7', 'down')"
+        :style="cellStyle('#f5e642', 'down')"
         @mousedown="startRepeat('down')"
         @mouseup="stopRepeat"
         @mouseleave="stopRepeat"
@@ -118,41 +94,23 @@
       <div :style="cellStyle('white')">ABC</div>
       <!-- Row 4: vol-, vol+, mute -->
       <div
-        :style="cellStyle('#e8f5e9', 'vold')"
-        @mousedown="
-          flash('vold');
-          tvVolCmd('down');
-        "
-        @touchstart.prevent="
-          flash('vold');
-          tvVolCmd('down');
-        "
+        :style="cellStyle('lightgreen', 'vold')"
+        @mousedown="tvVolCmd('down')"
+        @touchstart.prevent="tvVolCmd('down')"
       >
         Vol-
       </div>
       <div
-        :style="cellStyle('#e8f5e9', 'volu')"
-        @mousedown="
-          flash('volu');
-          tvVolCmd('up');
-        "
-        @touchstart.prevent="
-          flash('volu');
-          tvVolCmd('up');
-        "
+        :style="cellStyle('lightgreen', 'volu')"
+        @mousedown="tvVolCmd('up')"
+        @touchstart.prevent="tvVolCmd('up')"
       >
         Vol+
       </div>
       <div
         :style="muteCellStyle"
-        @mousedown="
-          flash('mute');
-          tvCmd('mute');
-        "
-        @touchstart.prevent="
-          flash('mute');
-          tvCmd('mute');
-        "
+        @mousedown="tvCmd('mute')"
+        @touchstart.prevent="tvCmd('mute')"
       >
         Mute
       </div>
@@ -234,16 +192,16 @@ export default {
     muteCellStyle() {
       const bg =
         this.flashBtn === "mute"
-          ? "#90ee90"
+          ? "orange"
           : this.muted
             ? "#ffb3b3"
-            : "#e8f5e9";
+            : "lightgreen";
       return { ...CELL_BASE, backgroundColor: bg };
     },
     offBtnStyle() {
       const isOff = this.power === "off" || this.power === "standby";
       const bg =
-        this.flashBtn === "off" ? "#90ee90" : isOff ? "lightblue" : "white";
+        this.flashBtn === "off" ? "orange" : isOff ? "lightblue" : "white";
       return { ...CELL_BASE, backgroundColor: bg };
     },
   },
@@ -261,6 +219,7 @@ export default {
 
   methods: {
     startRepeat(key) {
+      if (this.power === "off" || this.power === "standby") return;
       if (!this._debounce()) return;
       this.flash(key);
       this._repeatActive = true;
@@ -290,7 +249,7 @@ export default {
     },
 
     startHold(action) {
-      this._holdTimer = setTimeout(action, 1500);
+      this._holdTimer = setTimeout(action, 750);
     },
 
     stopHold() {
@@ -301,7 +260,7 @@ export default {
       const isOff = this.power === "off" || this.power === "standby";
       const bg =
         this.flashBtn === m
-          ? "#90ee90"
+          ? "orange"
           : !isOff && this.mode === m
             ? "lightblue"
             : "white";
@@ -310,7 +269,7 @@ export default {
 
     cellStyle(bg, key = null) {
       const flashActive = key && this.flashBtn === key;
-      return { ...CELL_BASE, backgroundColor: flashActive ? "#90ee90" : bg };
+      return { ...CELL_BASE, backgroundColor: flashActive ? "orange" : bg };
     },
 
     flash(btn) {
@@ -356,7 +315,7 @@ export default {
     },
 
     async tvCmd(cmd) {
-      if (!this._debounce()) return;
+      if (this.power === "off" || this.power === "standby") return;      this.flash(cmd);      if (!this._debounce()) return;
       const res = await fetch(`${config.tvTvUrl}/tv/${cmd}`);
       const data = await res.json();
       if (cmd === "mute" && data.ok) this.muted = data.muted;
@@ -364,7 +323,7 @@ export default {
     },
 
     async tvVolCmd(dir) {
-      fetch(`${config.tvTvUrl}/tv/vol/${dir}`).catch(() => {});
+      if (this.power === "off" || this.power === "standby") return;      this.flash(dir === 'down' ? 'vold' : 'volu');      fetch(`${config.tvTvUrl}/tv/vol/${dir}`).catch(() => {});
     },
 
     async _tvKeyRaw(key) {
@@ -374,7 +333,7 @@ export default {
     },
 
     async tvKey(key) {
-      const res = await fetch(`${config.tvTvUrl}/tv/key/${key}`);
+      if (this.power === "off" || this.power === "standby") return;      this.flash(key);      const res = await fetch(`${config.tvTvUrl}/tv/key/${key}`);
       const data = await res.json();
       console.log(`[TV] key ${key} response:`, data);
     },

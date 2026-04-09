@@ -42,6 +42,7 @@ export default function App() {
   };
 
   const startRepeat = (key) => {
+    if (isOff) return;
     if (!debounce()) return;
     flash(key);
     repeatActiveRef.current = true;
@@ -58,6 +59,7 @@ export default function App() {
   const volActiveRef = useRef(false);
 
   const startRepeatCmd = (flashKey, cmd) => {
+    if (isOff) return;
     if (volActiveRef.current) return;
     volActiveRef.current = true;
     flash(flashKey);
@@ -131,6 +133,8 @@ export default function App() {
   };
 
   const tvCmd = async (cmd) => {
+    if (isOff) return;
+    flash(cmd);
     if (!debounce()) return;
     try {
       const res = await fetch(`${TV_TV_URL}/tv/${cmd}`);
@@ -145,6 +149,8 @@ export default function App() {
   };
 
   const tvKey = async (key) => {
+    if (isOff) return;
+    flash(key);
     try {
       await fetch(`${TV_TV_URL}/tv/key/${key}`);
     } catch (_) {}
@@ -192,10 +198,7 @@ export default function App() {
       largeText: true,
       bg: () => cellBg("white", "back"),
       onPress: () => {},
-      onPressIn: () => {
-        flash("back");
-        tvKey("back");
-      },
+      onPressIn: () => tvKey("back"),
     },
     {
       key: "up",
@@ -211,10 +214,7 @@ export default function App() {
       icon: <MaterialIcons name="home" size={42} color="black" />,
       bg: () => cellBg("white", "home"),
       onPress: () => {},
-      onPressIn: () => {
-        flash("home");
-        tvKey("home");
-      },
+      onPressIn: () => tvKey("home"),
     },
     // Row 2: left, ok, right
     {
@@ -230,10 +230,7 @@ export default function App() {
       label: "OK",
       bg: () => cellBg("lightgreen", "ok"),
       onPress: () => {},
-      onPressIn: () => {
-        flash("ok");
-        tvKey("ok");
-      },
+      onPressIn: () => tvKey("ok"),
     },
     {
       key: "right",
@@ -250,10 +247,7 @@ export default function App() {
       smallText: true,
       bg: () => cellBg("white", "emby"),
       onPress: () => {},
-      onPressIn: () => {
-        flash("emby");
-        tvCmd("emby");
-      },
+      onPressIn: () => tvCmd("emby"),
     },
     {
       key: "down",
@@ -278,6 +272,7 @@ export default function App() {
       bg: () => cellBg("lightgreen", "vold"),
       onPress: () => {},
       onPressIn: () => {
+        if (isOff) return;
         flash("vold");
         fetch(`${TV_TV_URL}/tv/vol/down`).catch(() => {});
       },
@@ -289,6 +284,7 @@ export default function App() {
       bg: () => cellBg("lightgreen", "volu"),
       onPress: () => {},
       onPressIn: () => {
+        if (isOff) return;
         flash("volu");
         fetch(`${TV_TV_URL}/tv/vol/up`).catch(() => {});
       },
@@ -299,10 +295,7 @@ export default function App() {
       smallText: true,
       bg: () => muteBg,
       onPress: () => {},
-      onPressIn: () => {
-        flash("mute");
-        tvCmd("mute");
-      },
+      onPressIn: () => tvCmd("mute"),
     },
     // Row 5: google, roku, off
     {

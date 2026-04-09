@@ -81,6 +81,14 @@ function loge(...args) {
   console.error(`[TV ${ts()}] ERROR`, ...args);
 }
 
+function client(req) {
+  const ua = req.headers["user-agent"] ?? "";
+  const ip = req.ip ?? "";
+  if (ua.includes("okhttp")) return `phone(${ip})`;
+  if (ua.includes("Mozilla")) return `web(${ip})`;
+  return `?(${ip}) ua=${ua}`;
+}
+
 // ─── Emby WebSocket ─────────────────────────────────────────────────────────
 
 function handleEmbySession(s) {
@@ -206,8 +214,22 @@ function handleMsg(raw) {
     if (event?.event_type === "state_changed") {
       const id = event.data?.new_state?.entity_id;
       const state = event.data?.new_state?.state;
+      const prev = event.data?.old_state?.state;
+      const WATCHED = new Set([
+        TV_ENTITY_ID,
+        CAST_ENTITY_ID,
+        REMOTE_ENTITY_ID,
+        IR_REMOTE_ID,
+        ROKU_REMOTE_ID,
+        "media_player.roku_2",
+      ]);
+      if (WATCHED.has(id) && state !== prev) {
+        log(`HA state: ${id} ${prev} -> ${state}`);
+      }
       if (id === CAST_ENTITY_ID) castState = state;
-      if (id === TV_ENTITY_ID) tvPowerState = state;
+      if (id === TV_ENTITY_ID && state !== tvPowerState) {
+        tvPowerState = state;
+      }
     }
   }
 }
@@ -235,6 +257,7 @@ const app = express();
 app.use(cors());
 
 app.get("/tv/on", (req, res) => {
+  log(`on from ${client(req)}`);
   callService("media_player", "turn_on", TV_ENTITY_ID);
   res.json({ ok: true });
 });
@@ -246,7 +269,7 @@ app.get("/tv/mode/:mode", (req, res) => {
     return;
   }
   tvMode = mode;
-  log(`mode set to ${mode}`);
+  log(`mode set to ${mode} from ${client(req)}`);
   if (mode === "roku") {
     callService("media_player", "turn_on", "media_player.roku_2");
     callService("media_player", "turn_on", TV_ENTITY_ID);
@@ -303,6 +326,7 @@ app.get("/tv/emby", (req, res) => {
 });
 
 app.get("/tv/off", (req, res) => {
+  log(`off from ${client(req)}`);
   callService("media_player", "turn_off", "media_player.roku_2");
   callService("media_player", "turn_off", TV_ENTITY_ID);
   callService("remote", "turn_off", REMOTE_ENTITY_ID);
@@ -360,7 +384,7 @@ app.get("/tv/key/:key", (req, res) => {
   } else {
     sendCmd(cmd);
   }
-  log(`[${tvMode}] remote.send_command ${command}`);
+  log(`[${tvMode}] remote.send_command ${command} from ${client(req)}`);
   res.json({ ok: true, command, mode: tvMode });
 });
 
@@ -423,7 +447,7 @@ app.get("/tv/vol/:dir", async (req, res) => {
     return;
   }
   await broadlinkSend(dir === "up" ? "vol_up" : "vol_down");
-  log(`vol ${dir} sent`);
+  log(`vol ${dir} sent from ${client(req)}`);
   res.json({ ok: true });
 });
 
@@ -432,20 +456,29 @@ app.get("/tv/mute", (req, res) => {
     device: IR_DEVICE,
     command: "mute",
   });
-  log("mute sent via HA IR");
+  log(`mute sent via HA IR from ${client(req)}`);
   res.json({ ok: true });
 });
 
 async function pushMuteState() {
+  const haOff =
+    tvPowerState === "off" ||
+    tvPowerState === "unavailable" ||
+    tvPowerState === "unknown";
+  const recentlyOff = Date.now() - lastOffAt < 30000;
+  if (haOff || recentlyOff) {
+    await fetch(`${SRVR_INTERNAL_URL}/internal/tv-state`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ muted: null, power: "off", activeDevice }),
+    }).catch(() => {});
+    return;
+  }
   const [muted, pingOk] = await Promise.all([
     braviaGetMute().catch(() => null),
     braviaPing(),
   ]);
-  const haOn =
-    tvPowerState !== "off" &&
-    tvPowerState !== "unavailable" &&
-    tvPowerState !== "unknown";
-  const power = muted !== null || pingOk || haOn ? "on" : "off";
+  const power = muted !== null || pingOk ? "on" : "off";
   const effectivePower = Date.now() - lastOffAt < 5000 ? "off" : power;
   await fetch(`${SRVR_INTERNAL_URL}/internal/tv-state`, {
     method: "POST",

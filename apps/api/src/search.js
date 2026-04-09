@@ -888,7 +888,7 @@ export async function searchTorrents({
   }
 
   // Filter out unwanted torrents by excluded strings in title
-  const excludedStrings = ["2160", "nordic", "mobile"];
+  const excludedStrings = ["nordic", "mobile"];
   const excludedStage = filterWithReasons(
     yearFiltered,
     (torrent) => {

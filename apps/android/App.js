@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, Dimensions, StatusBar } from "react-native";
+import { View, Text, StyleSheet, StatusBar } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 
 const TV_TV_URL = "https://hahnca.com/tv-tv";
@@ -8,13 +8,19 @@ const TV_SRVR_WS_URL = "wss://hahnca.com/tv-srvr";
 const COLS = 3;
 const ROWS = 5;
 const BORDER = 3;
-const { width, height } = Dimensions.get("window");
-const CELL_W = (width - BORDER * (COLS + 1)) / COLS;
-const CELL_H = (height - BORDER * (ROWS + 1)) / ROWS;
+const SCREEN_MARGIN = 30;
 
 export default function App() {
   const [mode, setModeState] = useState("google");
   const [muted, setMuted] = useState(false);
+  const [cellDims, setCellDims] = useState({ w: 0, h: 0 });
+
+  const onGridLayout = ({ nativeEvent: { layout } }) => {
+    setCellDims({
+      w: (layout.width - BORDER * (COLS - 1)) / COLS,
+      h: (layout.height - BORDER * (ROWS - 1)) / ROWS,
+    });
+  };
   const [power, setPower] = useState("unknown");
   const [flashBtn, setFlashBtn] = useState(null);
   const [activeDevice, setActiveDevice] = useState(null);
@@ -104,7 +110,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    console.log("[vol] APP VERSION v9");
+    console.log("[vol] APP VERSION v13");
     pollMute();
     connectWs();
     return () => {
@@ -334,11 +340,18 @@ export default function App() {
   return (
     <View style={styles.container}>
       <StatusBar hidden />
-      <View style={styles.grid}>
+      <View style={styles.grid} onLayout={onGridLayout}>
         {buttons.map((btn) => (
           <View
             key={btn.key}
-            style={[styles.cell, { backgroundColor: btn.bg() }]}
+            style={[
+              styles.cell,
+              {
+                backgroundColor: btn.bg(),
+                width: cellDims.w,
+                height: cellDims.h,
+              },
+            ]}
             onStartShouldSetResponder={() => true}
             onResponderTerminationRequest={() => false}
             onResponderGrant={() => {
@@ -375,18 +388,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#000",
+    paddingHorizontal: SCREEN_MARGIN,
+    paddingVertical: SCREEN_MARGIN * 2,
   },
   grid: {
     flex: 1,
     flexDirection: "row",
     flexWrap: "wrap",
-    padding: BORDER,
-    gap: BORDER,
+    rowGap: BORDER,
+    columnGap: BORDER,
     backgroundColor: "#000",
   },
   cell: {
-    width: CELL_W,
-    height: CELL_H,
+    // width/height set dynamically via cellDims
     alignItems: "center",
     justifyContent: "center",
   },

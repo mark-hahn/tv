@@ -341,6 +341,11 @@ export default {
     },
   },
   methods: {
+    _buildStreamUrl(subIndex = null) {
+      let url = `${TV_SRVR_URL}/api/stream?path=${encodeURIComponent(this.path)}`;
+      if (subIndex !== null) url += `&sub=${subIndex}`;
+      return url;
+    },
     async _fetchSubtitleList(filePath) {
       try {
         const resp = await fetch(
@@ -349,16 +354,30 @@ export default {
         if (!resp.ok) return;
         const tracks = await resp.json();
         this.subtitleTracks = tracks;
-        if (tracks.length > 0) this.activeTrackId = tracks[0].id;
+        if (tracks.length > 0) {
+          this.activeTrackId = tracks[0].id;
+          if (tracks[0].type === "pgs") {
+            this._mseStop();
+            this.vidSrc = this._buildStreamUrl(tracks[0].index);
+          }
+        }
       } catch (e) {
         console.error("[subtitle-list] fetch error:", e);
       }
     },
     selectTrack(id) {
+      const prevTrack = this.activeTrack;
       this.activeTrackId = id;
+      const newTrack = this.subtitleTracks.find((t) => t.id === id) || null;
       if (id === "off") {
         const vid = this.$refs.vid;
         if (vid) for (const tt of vid.textTracks) tt.mode = "disabled";
+      }
+      const prevIsPgs = prevTrack?.type === "pgs";
+      const newIsPgs = newTrack?.type === "pgs";
+      if (prevIsPgs !== newIsPgs || (newIsPgs && prevTrack?.index !== newTrack?.index)) {
+        this._mseStop();
+        this.vidSrc = this._buildStreamUrl(newIsPgs ? newTrack.index : null);
       }
     },
     _setOffsetFromX(clientX) {
@@ -510,7 +529,9 @@ export default {
       }
     },
     async clickBad() {
-      const embedded = this.subtitleTracks.filter((t) => t.type === "embedded");
+      const embedded = this.subtitleTracks.filter(
+        (t) => t.type === "embedded" || t.type === "pgs",
+      );
       const currentIdx = embedded.findIndex((t) => t.id === this.activeTrackId);
       if (currentIdx >= 0 && currentIdx < embedded.length - 1) {
         this.selectTrack(embedded[currentIdx + 1].id);

@@ -3119,15 +3119,36 @@ app.get("/api/stream", async (req, res) => {
     }
 
     const startSec = parseInt(req.query.start) || 0;
+    const rawSub = req.query.sub;
+    const subIdx = rawSub !== undefined ? parseInt(rawSub, 10) : null;
+    const usePgsSub = subIdx !== null && !isNaN(subIdx) && subIdx >= 0 && subIdx <= 50;
+
     const ffmpegArgs =
       startSec > 0
         ? ["-ss", String(startSec), "-i", resolved]
         : ["-i", resolved];
-    if (vCopy) {
+
+    if (usePgsSub) {
+      // Burn PGS bitmap subtitle into video stream via filter_complex overlay
+      ffmpegArgs.push(
+        "-filter_complex", `[0:v][0:${subIdx}]overlay[v]`,
+        "-map", "[v]",
+        "-map", "0:a:0",
+        "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency",
+        "-pix_fmt", "yuv420p", "-crf", "23", "-g", "48",
+        "-c:a", "aac", "-b:a", "128k", "-ac", "2",
+      );
+    } else if (vCopy) {
       // h264 video in non-MP4 container: copy the stream, ffmpeg will remux into fMP4.
       // No re-encode needed; the source GOP doesn't matter because frag_keyframe
       // will still fragment at existing keyframe boundaries (typically every 2-5s for web sources).
       ffmpegArgs.push("-c:v", "copy");
+      if (aCopy) {
+        ffmpegArgs.push("-c:a", "copy");
+      } else {
+        // -ac 2: downmix 5.1/multichannel to stereo — browsers require stereo AAC
+        ffmpegArgs.push("-c:a", "aac", "-b:a", "128k", "-ac", "2");
+      }
     } else {
       ffmpegArgs.push(
         "-c:v",
@@ -3143,12 +3164,12 @@ app.get("/api/stream", async (req, res) => {
         "-g",
         "48",
       );
-    }
-    if (aCopy) {
-      ffmpegArgs.push("-c:a", "copy");
-    } else {
-      // -ac 2: downmix 5.1/multichannel to stereo — browsers require stereo AAC
-      ffmpegArgs.push("-c:a", "aac", "-b:a", "128k", "-ac", "2");
+      if (aCopy) {
+        ffmpegArgs.push("-c:a", "copy");
+      } else {
+        // -ac 2: downmix 5.1/multichannel to stereo — browsers require stereo AAC
+        ffmpegArgs.push("-c:a", "aac", "-b:a", "128k", "-ac", "2");
+      }
     }
     ffmpegArgs.push(
       "-f",
@@ -3159,7 +3180,7 @@ app.get("/api/stream", async (req, res) => {
     );
 
     console.log(
-      `[stream] transcode video=${videoCodec}→h264, audio=${audioCodec}→aac: ${resolved}`,
+      `[stream] transcode video=${videoCodec}→h264, audio=${audioCodec}→aac${usePgsSub ? ` +pgs:${subIdx}` : ""}: ${resolved}`,
     );
 
     res.setHeader("Content-Type", "video/mp4");
@@ -3231,10 +3252,11 @@ app.get("/api/subtitle-list", async (req, res) => {
       const lang = (s.tags?.language || "").toLowerCase();
       if (lang && lang !== "eng" && lang !== "en") continue;
       const label = s.tags?.title || s.tags?.language || "eng";
+      const isPgs = s.codec_name === "hdmv_pgs_subtitle";
       tracks.push({
         id: `emb-${s.index}`,
         label,
-        type: "embedded",
+        type: isPgs ? "pgs" : "embedded",
         index: s.index,
       });
     }

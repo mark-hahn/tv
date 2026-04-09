@@ -7,7 +7,7 @@ const TV_SRVR_WS_URL = "wss://hahnca.com/tv-srvr";
 
 const COLS = 3;
 const ROWS = 5;
-const BORDER = 3;
+const BORDER = 13;
 const SCREEN_MARGIN = 30;
 
 export default function App() {
@@ -16,9 +16,10 @@ export default function App() {
   const [cellDims, setCellDims] = useState({ w: 0, h: 0 });
 
   const onGridLayout = ({ nativeEvent: { layout } }) => {
+    if (layout.width < 10 || layout.height < 10) return;
     setCellDims({
-      w: (layout.width - BORDER * (COLS - 1)) / COLS,
-      h: (layout.height - BORDER * (ROWS - 1)) / ROWS,
+      w: Math.floor((layout.width - BORDER * (COLS - 1)) / COLS),
+      h: Math.floor((layout.height - BORDER * (ROWS - 1)) / ROWS),
     });
   };
   const [power, setPower] = useState("unknown");
@@ -110,7 +111,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    console.log("[vol] APP VERSION v13");
+    console.log("[vol] APP VERSION v22");
     pollMute();
     connectWs();
     return () => {
@@ -169,15 +170,15 @@ export default function App() {
   const isOff = power === "off" || power === "standby";
 
   // Background color helpers (mirror Vue cellStyle / computed props)
-  const cellBg = (defaultBg, key) => (flashBtn === key ? "#90ee90" : defaultBg);
+  const cellBg = (defaultBg, key) => (flashBtn === key ? "orange" : defaultBg);
 
   const muteBg =
-    flashBtn === "mute" ? "#90ee90" : muted ? "#ffb3b3" : "#e8f5e9";
+    flashBtn === "mute" ? "orange" : muted ? "#ffb3b3" : "lightgreen";
 
-  const offBg = flashBtn === "off" ? "#90ee90" : isOff ? "lightblue" : "white";
+  const offBg = flashBtn === "off" ? "orange" : isOff ? "lightblue" : "white";
 
   const modeBg = (m) => {
-    if (flashBtn === m) return "#90ee90";
+    if (flashBtn === m) return "orange";
     if (!isOff && mode === m) return "lightblue";
     return "white";
   };
@@ -199,7 +200,7 @@ export default function App() {
     {
       key: "up",
       label: "▲",
-      bg: () => cellBg("#fffde7", "up"),
+      bg: () => cellBg("#f5e642", "up"),
       onPress: () => {},
       onPressIn: () => startRepeat("up"),
       onPressOut: stopRepeat,
@@ -219,7 +220,7 @@ export default function App() {
     {
       key: "left",
       label: "◀",
-      bg: () => cellBg("#fffde7", "left"),
+      bg: () => cellBg("#f5e642", "left"),
       onPress: () => {},
       onPressIn: () => startRepeat("left"),
       onPressOut: stopRepeat,
@@ -227,7 +228,7 @@ export default function App() {
     {
       key: "ok",
       label: "OK",
-      bg: () => cellBg("#e8f5e9", "ok"),
+      bg: () => cellBg("lightgreen", "ok"),
       onPress: () => {},
       onPressIn: () => {
         flash("ok");
@@ -237,7 +238,7 @@ export default function App() {
     {
       key: "right",
       label: "▶",
-      bg: () => cellBg("#fffde7", "right"),
+      bg: () => cellBg("#f5e642", "right"),
       onPress: () => {},
       onPressIn: () => startRepeat("right"),
       onPressOut: stopRepeat,
@@ -257,7 +258,7 @@ export default function App() {
     {
       key: "down",
       label: "▼",
-      bg: () => cellBg("#fffde7", "down"),
+      bg: () => cellBg("#f5e642", "down"),
       onPress: () => {},
       onPressIn: () => startRepeat("down"),
       onPressOut: stopRepeat,
@@ -274,7 +275,7 @@ export default function App() {
       key: "vold",
       label: "Vol-",
       smallText: true,
-      bg: () => cellBg("#e8f5e9", "vold"),
+      bg: () => cellBg("lightgreen", "vold"),
       onPress: () => {},
       onPressIn: () => {
         flash("vold");
@@ -285,7 +286,7 @@ export default function App() {
       key: "volu",
       label: "Vol+",
       smallText: true,
-      bg: () => cellBg("#e8f5e9", "volu"),
+      bg: () => cellBg("lightgreen", "volu"),
       onPress: () => {},
       onPressIn: () => {
         flash("volu");
@@ -341,44 +342,45 @@ export default function App() {
     <View style={styles.container}>
       <StatusBar hidden />
       <View style={styles.grid} onLayout={onGridLayout}>
-        {buttons.map((btn) => (
-          <View
-            key={btn.key}
-            style={[
-              styles.cell,
-              {
-                backgroundColor: btn.bg(),
-                width: cellDims.w,
-                height: cellDims.h,
-              },
-            ]}
-            onStartShouldSetResponder={() => true}
-            onResponderTerminationRequest={() => false}
-            onResponderGrant={() => {
-              if (btn.onPressIn) btn.onPressIn();
-            }}
-            onResponderRelease={() => {
-              if (btn.onPressOut) btn.onPressOut();
-            }}
-            onResponderTerminate={() => {
-              if (btn.onPressOut) btn.onPressOut();
-            }}
-          >
-            {btn.icon ? (
-              btn.icon
-            ) : (
-              <Text
-                style={[
-                  styles.cellText,
-                  btn.smallText && styles.cellTextSmall,
-                  btn.largeText && styles.cellTextLarge,
-                ]}
-              >
-                {btn.label}
-              </Text>
-            )}
-          </View>
-        ))}
+        {cellDims.w > 0 &&
+          buttons.map((btn) => (
+            <View
+              key={btn.key}
+              style={[
+                styles.cell,
+                {
+                  backgroundColor: btn.bg(),
+                  width: cellDims.w,
+                  height: cellDims.h,
+                },
+              ]}
+              onStartShouldSetResponder={() => true}
+              onResponderTerminationRequest={() => false}
+              onResponderGrant={() => {
+                if (btn.onPressIn) btn.onPressIn();
+              }}
+              onResponderRelease={() => {
+                if (btn.onPressOut) btn.onPressOut();
+              }}
+              onResponderTerminate={() => {
+                if (btn.onPressOut) btn.onPressOut();
+              }}
+            >
+              {btn.icon ? (
+                btn.icon
+              ) : (
+                <Text
+                  style={[
+                    styles.cellText,
+                    btn.smallText && styles.cellTextSmall,
+                    btn.largeText && styles.cellTextLarge,
+                  ]}
+                >
+                  {btn.label}
+                </Text>
+              )}
+            </View>
+          ))}
       </View>
     </View>
   );

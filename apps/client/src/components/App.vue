@@ -841,8 +841,8 @@ export default {
         { label: "Browse", key: "browse" },
         { label: "Flex", key: "flex" },
         { label: "Qbt", key: "qbt" },
-        { label: "Usb", key: "usb" },
         { label: "Down", key: "down" },
+        { label: "Usb", key: "usb" },
         { label: "Local", key: "local" },
       ];
     },

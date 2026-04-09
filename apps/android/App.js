@@ -111,7 +111,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    console.log("[vol] APP VERSION v22");
+    console.log("[vol] APP VERSION v23");
     pollMute();
     connectWs();
     return () => {
@@ -308,7 +308,7 @@ export default function App() {
     {
       key: "google",
       label: "Google",
-      smallText: true,
+      tinyText: true,
       bg: () => modeBg("google"),
       onPress: () => {},
       onPressIn: () => startHold(() => handleSetMode("google")),
@@ -317,7 +317,7 @@ export default function App() {
     {
       key: "roku",
       label: "Roku",
-      smallText: true,
+      tinyText: true,
       bg: () => modeBg("roku"),
       onPress: () => {},
       onPressIn: () => startHold(() => handleSetMode("roku")),
@@ -326,7 +326,7 @@ export default function App() {
     {
       key: "off",
       label: "Off",
-      smallText: true,
+      tinyText: true,
       bg: () => offBg,
       onPress: () => {},
       onPressIn: () =>
@@ -373,6 +373,7 @@ export default function App() {
                   style={[
                     styles.cellText,
                     btn.smallText && styles.cellTextSmall,
+                    btn.tinyText && styles.cellTextTiny,
                     btn.largeText && styles.cellTextLarge,
                   ]}
                 >
@@ -413,6 +414,9 @@ const styles = StyleSheet.create({
   },
   cellTextSmall: {
     fontSize: 28,
+  },
+  cellTextTiny: {
+    fontSize: 20,
   },
   cellTextLarge: {
     fontSize: 84,

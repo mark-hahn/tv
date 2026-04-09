@@ -502,6 +502,17 @@
             >
               Not In Emby
             </div>
+            <div
+              v-if="twoLocalFolders"
+              style="color: red !important"
+              :style="{
+                fontWeight: 'bold',
+                fontSize: sizing.seriesInfoFontSize || '20px',
+                whiteSpace: 'nowrap',
+              }"
+            >
+              Two local folders
+            </div>
           </div>
         </div>
         <!-- Notes input moved to header (simple + non-simple)-->
@@ -566,6 +577,7 @@ import * as srvr from "../srvr.js";
 import * as util from "../util.js";
 
 let allTvdb = null;
+let cachedDiskShows = null;
 const STUCK_REFRESH_LOG_DELAY_MS = 60 * 1000;
 
 const laTimestamp = () => {
@@ -635,6 +647,7 @@ export default {
       refreshStuckLogTimerId: null,
       remoteFetchMode: "fast", // 'fast' or 'full'
       settingUpShowName: null, // Track show currently being set up to prevent duplicate calls
+      twoLocalFolders: false,
     };
   },
 
@@ -1245,6 +1258,24 @@ export default {
         });
     },
 
+    async recheckTwoLocalFolders() {
+      const showName = this.show?.name;
+      if (!showName) {
+        this.twoLocalFolders = false;
+        return;
+      }
+      try {
+        cachedDiskShows = await srvr.getShowsFromDisk();
+        const folderNames = Object.keys(cachedDiskShows || {});
+        const matchCount = folderNames.filter(
+          (fn) => util.smartTitleMatch(showName, [fn], null, false) !== null,
+        ).length;
+        this.twoLocalFolders = matchCount >= 2;
+      } catch (e) {
+        this.twoLocalFolders = false;
+      }
+    },
+
     setupSeriesForRefresh(show) {
       // Wrapper to make onSetUpSeries awaitable for refresh
       return new Promise((resolve) => {
@@ -1292,6 +1323,7 @@ export default {
       this.showSpinner = false;
       this.collectionName = "";
       this.collectionCount = 0;
+      this.twoLocalFolders = false;
 
       // Set collection name(s)
       const collections = [];
@@ -1312,6 +1344,9 @@ export default {
           allTvdb = await tvdb.getAllTvdb(0);
 
           if (this.show.name !== currentShowName) return;
+
+          // Check for two local folders on disk for this show
+          await this.recheckTwoLocalFolders();
           let tvdbData = allTvdb[show.name];
           const currentTvdbId = String(
             show?.ProviderIds?.Tvdb ??
@@ -1639,6 +1674,7 @@ export default {
       }, 350);
     };
     evtBus.on("showQueueEmpty", this.onShowQueueEmpty);
+    evtBus.on("localFoldersChanged", this.recheckTwoLocalFolders);
   },
 
   beforeUnmount() {
@@ -1651,6 +1687,7 @@ export default {
     if (this.onShowUpdating) evtBus.off("showUpdating", this.onShowUpdating);
     if (this.onShowQueueEmpty)
       evtBus.off("showQueueEmpty", this.onShowQueueEmpty);
+    evtBus.off("localFoldersChanged", this.recheckTwoLocalFolders);
 
     if (this.refreshStuckLogTimerId) {
       clearTimeout(this.refreshStuckLogTimerId);

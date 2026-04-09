@@ -1188,6 +1188,7 @@ export default {
         this.selectedName = null; // Clear top level selection too
         this.selectionParentPath = null;
         this.lastSelectedFile = null;
+        evtBus.emit("localFoldersChanged");
         await this.refresh();
       } catch (e) {
         console.error("Error deleting files:", e);

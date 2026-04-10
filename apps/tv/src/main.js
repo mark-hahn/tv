@@ -115,24 +115,58 @@ function handleEmbySession(s) {
   prevSessions[device] = { playing, remoteCtrl, paused };
 }
 
-function updateNowPlaying(sessions) {
-  let showName = null;
-  for (const s of sessions) {
-    const isTracked =
-      s.DeviceName === "Living Room TV" || s.DeviceName === "Roku 2";
-    if (!isTracked) continue;
-    const sn = s.NowPlayingItem?.SeriesName ?? null;
-    if (sn) {
-      showName = sn;
-      break;
-    }
+const DEVICE_PRIORITY = [
+  {
+    match: (s) => s.DeviceName === "Google" && s.Client === "AndroidTv",
+    label: "Google TV",
+    pri: 1,
+  },
+  {
+    match: (s) => s.DeviceName === "Living Room TV",
+    label: "Living Room TV",
+    pri: 2,
+  },
+  {
+    match: (s) => s.Client === "AndroidTv",
+    label: (s) => s.DeviceName,
+    pri: 3,
+  },
+  { match: (s) => s.DeviceName === "Roku 2", label: "Roku", pri: 4 },
+];
+
+function deviceLabel(s) {
+  for (const rule of DEVICE_PRIORITY) {
+    if (rule.match(s))
+      return typeof rule.label === "function" ? rule.label(s) : rule.label;
   }
-  if (showName === currentShowName) return;
-  currentShowName = showName;
+  return s.DeviceName;
+}
+
+function devicePriority(s) {
+  for (const rule of DEVICE_PRIORITY) {
+    if (rule.match(s)) return rule.pri;
+  }
+  return 99;
+}
+
+function updateNowPlaying(sessions) {
+  const playing = sessions
+    .filter((s) => s.NowPlayingItem?.SeriesName)
+    .sort((a, b) => devicePriority(a) - devicePriority(b))
+    .map((s) => ({
+      showName: s.NowPlayingItem.SeriesName,
+      device: deviceLabel(s),
+    }));
+
+  const key = JSON.stringify(playing);
+  if (key === currentShowName) return;
+  currentShowName = key;
+
+  const showName = playing[0]?.showName ?? null;
   fetch(`${SRVR_INTERNAL_URL}/internal/nowPlaying`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ showName }),
+    body: JSON.stringify({ showName, playing }),
   }).catch(() => {});
 }
 

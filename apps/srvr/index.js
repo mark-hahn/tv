@@ -3599,11 +3599,16 @@ app.post("/internal/tv-state", (req, res) => {
 });
 
 let lastNowPlayingShowName = null;
+let lastNowPlayingList = [];
 
 app.post("/internal/nowPlaying", (req, res) => {
-  const { showName } = req.body;
+  const { showName, playing } = req.body;
   lastNowPlayingShowName = showName ?? null;
-  notifyClients("nowPlaying", { showName: lastNowPlayingShowName });
+  lastNowPlayingList = Array.isArray(playing) ? playing : [];
+  notifyClients("nowPlaying", {
+    showName: lastNowPlayingShowName,
+    playing: lastNowPlayingList,
+  });
   view.recordNowPlaying(lastNowPlayingShowName);
   res.json({ ok: true });
 });
@@ -3650,7 +3655,7 @@ wss.on("connection", (ws) => {
       JSON.stringify({
         id: 0,
         notification: "nowPlaying",
-        data: { showName: lastNowPlayingShowName },
+        data: { showName: lastNowPlayingShowName, playing: lastNowPlayingList },
       }),
     );
   }

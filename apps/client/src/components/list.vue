@@ -604,6 +604,7 @@ export default {
       seriesMapEpis: [],
       seriesMap: {},
       watchingName: "---",
+      nowPlayingShowNames: new Set(),
       sortPopped: false,
       sortChoice: "Viewed",
       fltrPopped: false,
@@ -638,6 +639,7 @@ export default {
         "Watching",
         "Needs Files",
         "Finished",
+        "Playing",
       ],
       conds: [
         {
@@ -2624,6 +2626,13 @@ export default {
         localAllTvdb = allTvdb;
       }
 
+      if (this.fltrChoice === "Playing") {
+        const playing = this.nowPlayingShowNames;
+        this.shows = allShows.filter((show) => playing.has(show.name));
+        this.sortShows();
+        if (scroll) this.scrollToSavedShow();
+        return;
+      }
       let srchStrLc;
       if (this.fltrChoice !== "Finished") {
         if (this.filterStr.length > 0) this.fltrChoice = "- - - - -";
@@ -3447,8 +3456,11 @@ export default {
       await this.searchShowsByActor(searchParams);
     });
 
-    on("nowPlaying", ({ showName }) => {
+    on("nowPlaying", ({ showName, playing }) => {
       this.watchingName = showName ?? "---";
+      this.nowPlayingShowNames = new Set(
+        Array.isArray(playing) ? playing.map((p) => p.showName) : [],
+      );
     });
 
     this.keydownHandler = (event) => {

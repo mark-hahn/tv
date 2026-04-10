@@ -513,6 +513,18 @@
             >
               Two local folders
             </div>
+            <div
+              v-for="device in nowPlayingDevices"
+              :key="device"
+              style="
+                white-space: nowrap;
+                font-weight: bold;
+                color: green;
+                margin-top: 4px;
+              "
+            >
+              Now playing on {{ device }}
+            </div>
           </div>
         </div>
         <!-- Notes input moved to header (simple + non-simple)-->
@@ -648,6 +660,7 @@ export default {
       remoteFetchMode: "fast", // 'fast' or 'full'
       settingUpShowName: null, // Track show currently being set up to prevent duplicate calls
       twoLocalFolders: false,
+      nowPlayingDevices: [],
     };
   },
 
@@ -1324,6 +1337,7 @@ export default {
       this.collectionName = "";
       this.collectionCount = 0;
       this.twoLocalFolders = false;
+      this.nowPlayingDevices = [];
 
       // Set collection name(s)
       const collections = [];
@@ -1589,6 +1603,18 @@ export default {
     evtBus.on("previewSrchChoice", this.onPreviewSrchChoice);
     evtBus.on("addPreviewShowDone", this.onAddPreviewShowDone);
 
+    this._onNowPlaying = ({ playing } = {}) => {
+      const name = this.show?.name;
+      if (!name || !Array.isArray(playing)) {
+        this.nowPlayingDevices = [];
+        return;
+      }
+      this.nowPlayingDevices = playing
+        .filter((p) => p.showName === name)
+        .map((p) => p.device);
+    };
+    evtBus.on("nowPlaying", this._onNowPlaying);
+
     // Keep the Series infobox totals in sync with the actual Map grid.
     // This matters for noemby shows where tvdb.json counts can be stale / mismatched.
     evtBus.on("seriesMapUpdated", this.onSeriesMapUpdated);
@@ -1683,6 +1709,7 @@ export default {
     evtBus.off("previewSrchChoice", this.onPreviewSrchChoice);
     evtBus.off("addPreviewShowDone", this.onAddPreviewShowDone);
     evtBus.off("seriesMapUpdated", this.onSeriesMapUpdated);
+    if (this._onNowPlaying) evtBus.off("nowPlaying", this._onNowPlaying);
     if (this.onTvdbUpdated) evtBus.off("tvdbUpdated", this.onTvdbUpdated);
     if (this.onShowUpdating) evtBus.off("showUpdating", this.onShowUpdating);
     if (this.onShowQueueEmpty)

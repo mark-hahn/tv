@@ -628,7 +628,9 @@
                   : 'none',
               color: /^=+$/.test(item.line)
                 ? 'red'
-                : /^Width\s+:/.test(item.line) || /^Bit rate\s+:/.test(item.line) || (/^Duration\s+:/.test(item.line) && item.inVideo)
+                : /^Width\s+:/.test(item.line) ||
+                    /^Bit rate\s+:/.test(item.line) ||
+                    (/^Duration\s+:/.test(item.line) && item.inVideo)
                   ? 'red'
                   : 'inherit',
             }"
@@ -1922,7 +1924,8 @@ export default {
               const raw = durLine[1];
               const hm = raw.match(/(\d+)\s*h/);
               const mm = raw.match(/(\d+)\s*min/);
-              const total = (hm ? parseInt(hm[1]) : 0) * 60 + (mm ? parseInt(mm[1]) : 0);
+              const total =
+                (hm ? parseInt(hm[1]) : 0) * 60 + (mm ? parseInt(mm[1]) : 0);
               if (total > 0) durStr = total + " min";
             }
           }
@@ -1971,14 +1974,18 @@ export default {
                     const raw = durLine[1];
                     const hm = raw.match(/(\d+)\s*h/);
                     const mm = raw.match(/(\d+)\s*min/);
-                    const total = (hm ? parseInt(hm[1]) : 0) * 60 + (mm ? parseInt(mm[1]) : 0);
+                    const total =
+                      (hm ? parseInt(hm[1]) : 0) * 60 +
+                      (mm ? parseInt(mm[1]) : 0);
                     if (total > 0) dStr = total + " min";
                   }
                 }
               }
             } catch (_) {}
           }
-          const meta = [sizeStr, dStr, dateStr, wStr, rStr].filter(Boolean).join(" | ");
+          const meta = [sizeStr, dStr, dateStr, wStr, rStr]
+            .filter(Boolean)
+            .join(" | ");
           entries.push({ name: fileName, meta });
         }
         this.infoMultiFiles = entries;

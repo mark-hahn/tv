@@ -115,6 +115,27 @@ function handleEmbySession(s) {
   prevSessions[device] = { playing, remoteCtrl, paused };
 }
 
+function updateNowPlaying(sessions) {
+  let showName = null;
+  for (const s of sessions) {
+    const isTracked =
+      s.DeviceName === "Living Room TV" || s.DeviceName === "Roku 2";
+    if (!isTracked) continue;
+    const sn = s.NowPlayingItem?.SeriesName ?? null;
+    if (sn) {
+      showName = sn;
+      break;
+    }
+  }
+  if (showName === currentShowName) return;
+  currentShowName = showName;
+  fetch(`${SRVR_INTERNAL_URL}/internal/nowPlaying`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ showName }),
+  }).catch(() => {});
+}
+
 function connectEmby() {
   const deviceId = "tv-server";
   const url = `wss://${EMBY_HOST}/embywebsocket?api_key=${EMBY_API_KEY}&deviceId=${deviceId}`;
@@ -137,6 +158,7 @@ function connectEmby() {
     }
     if (msg.MessageType === "Sessions" && Array.isArray(msg.Data)) {
       for (const s of msg.Data) handleEmbySession(s);
+      updateNowPlaying(msg.Data);
     }
   });
 
@@ -160,6 +182,7 @@ let braviaHaPower = "unknown";
 let tvMode = "google"; // "google" | "fire" | "roku"
 let activeDevice = null; // "google" | "roku"
 let lastOffAt = 0;
+let currentShowName = null;
 const prevSessions = {};
 
 function sendCmd(cmd) {

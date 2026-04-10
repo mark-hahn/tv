@@ -3598,6 +3598,16 @@ app.post("/internal/tv-state", (req, res) => {
   res.json({ ok: true });
 });
 
+let lastNowPlayingShowName = null;
+
+app.post("/internal/nowPlaying", (req, res) => {
+  const { showName } = req.body;
+  lastNowPlayingShowName = showName ?? null;
+  notifyClients("nowPlaying", { showName: lastNowPlayingShowName });
+  view.recordNowPlaying(lastNowPlayingShowName);
+  res.json({ ok: true });
+});
+
 http.createServer(app).listen(SRVR_INTERNAL_PORT, "127.0.0.1", () => {
   console.log(`Internal HTTP listening on port ${SRVR_INTERNAL_PORT}`);
 });
@@ -3634,6 +3644,16 @@ export const notifyClients = (notification, data = null) => {
 wss.on("connection", (ws) => {
   let socketName = appSocketName;
   connectedClients.add(ws);
+
+  if (lastNowPlayingShowName !== null) {
+    ws.send(
+      JSON.stringify({
+        id: 0,
+        notification: "nowPlaying",
+        data: { showName: lastNowPlayingShowName },
+      }),
+    );
+  }
 
   ws.on("message", (data) => {
     const msg = data.toString();

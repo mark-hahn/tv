@@ -1,7 +1,6 @@
 import fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "node:path";
-import * as emby from "./emby.js";
 import { jParse } from "./util.js";
 import { SRVR_DATA_DIR } from "./srvrPaths.js";
 const LAST_VIEWED_PATH = path.join(SRVR_DATA_DIR, "lastViewed.json");
@@ -37,24 +36,11 @@ export const getLastViewed = async (_params) => {
 
 export const getLastViewedSync = () => lastViewed;
 
-let lastShowNameByDeviceName = {};
-const checkWatch = async () => {
-  const onDevices = await emby.getOnDevices();
-  for (const onDevice of onDevices) {
-    if (!onDevice.showName) continue;
-    const { deviceName, showName } = onDevice;
-    const lastShowName = lastShowNameByDeviceName[deviceName];
-    if (showName) lastViewed[showName] = Date.now();
-    if (showName != lastShowName) {
-      await fsp.mkdir(path.dirname(LAST_VIEWED_PATH), { recursive: true });
-      await fsp.writeFile(LAST_VIEWED_PATH, JSON.stringify(lastViewed));
-    }
-    lastShowNameByDeviceName[deviceName] = showName;
-  }
+let lastRecordedShowName = null;
+export const recordNowPlaying = async (showName) => {
+  if (!showName || showName === lastRecordedShowName) return;
+  lastRecordedShowName = showName;
+  lastViewed[showName] = Date.now();
+  await fsp.mkdir(path.dirname(LAST_VIEWED_PATH), { recursive: true });
+  await fsp.writeFile(LAST_VIEWED_PATH, JSON.stringify(lastViewed));
 };
-
-setInterval(async () => {
-  await checkWatch();
-}, 60 * 1000); // 1 minute
-
-setTimeout(checkWatch, 1000);

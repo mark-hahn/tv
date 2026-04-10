@@ -279,6 +279,7 @@ export function accessTvdb(params) {
 export function getDevices() {
   return httpCall("/api/getDevices");
 }
+
 export function getLastViewed() {
   return httpCall("/api/getLastViewed");
 }

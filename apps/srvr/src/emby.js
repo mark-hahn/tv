@@ -8,18 +8,6 @@ const deviceNameByDeviceId = {
   ae3349983dbe45d9aa1d317a7753483e: "tvMaint_chrome",
   aab13fa6d995d7cc: "lindaTab",
 };
-/*
-export const devices = [
-  ["ca632bcd-7279-4fc2-b5b8-6f92ae6ddb08", "mlap2",                      ],
-  [    "ae3349983dbe45d9aa1d317a7753483e", "tvMaint_chrome",             ],
-  [                    "2095c65339b60175", "chromecast",                 ],  
-  ["f4079adb-6e48-4d54-9185-5d92d3b7176b", "embyWeb_chrome",             ],
-  [                    "aab13fa6d995d7cc", "lindaTab",                   ],
-  ["990deeb0-2421-4136-b888-cd8abf09830a", "embyWeb_chromeWindows",      ],
-  ["9f53d43e-e5f7-5161-881a-d91843d0d372", "roku",                       ],
-  ["a20a0d2a-efa0-4da9-a715-29fbc7ccacab", "embyWeb_googleChromeWindows",],
-];
-*/
 
 const deviceIsOn = async (deviceId) => {
   let resp = await fetch(urls.sessionUrl(deviceId));
@@ -60,7 +48,6 @@ export const getOnDevices = async () => {
     const seasonNumber = NowPlayingItem.ParentIndexNumber;
     const episodeNumber = NowPlayingItem.IndexNumber;
     const episodeName = NowPlayingItem.Name;
-    // (13185330000-12584950000) == (60*1000*1000*10), (tick == 100ns)
     const positionTicks = PlayState.PositionTicks;
 
     devicesOn.push({

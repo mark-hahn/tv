@@ -604,7 +604,6 @@ export default {
       seriesMapEpis: [],
       seriesMap: {},
       watchingName: "---",
-      currentPlayingDevice: null,
       sortPopped: false,
       sortChoice: "Viewed",
       fltrPopped: false,
@@ -3448,19 +3447,9 @@ export default {
       await this.searchShowsByActor(searchParams);
     });
 
-    this.devicePollTimer = setInterval(async () => {
-      const devices = await srvr.getDevices();
-      let showName = null;
-      let playingDevice = null;
-      for (const device of devices) {
-        if (!device.showName) continue;
-        showName = device.showName;
-        playingDevice = device;
-        if (device.deviceName == "chromecast") break;
-      }
+    on("nowPlaying", ({ showName }) => {
       this.watchingName = showName ?? "---";
-      this.currentPlayingDevice = playingDevice;
-    }, 10 * 1000);
+    });
 
     this.keydownHandler = (event) => {
       if (event.code == "Escape") {
@@ -3495,11 +3484,6 @@ export default {
         evtBus.off(name, fn);
       }
       this.evtHandlers = null;
-    }
-
-    if (this.devicePollTimer) {
-      clearInterval(this.devicePollTimer);
-      this.devicePollTimer = null;
     }
 
     if (this.keydownHandler) {

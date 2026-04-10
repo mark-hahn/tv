@@ -70,7 +70,7 @@
         font-size: 13px;
         cursor: pointer;
         margin: 8px 5px 0 10px;
-        width: 75px;
+        width: 113px;
         flex-shrink: 0;
         white-space: nowrap;
         overflow: hidden;

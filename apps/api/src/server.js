@@ -826,77 +826,36 @@ app.post("/api/local/mediainfo", async (req, res) => {
     const sections = stdout.split(/\n\n+/);
     const textSections = sections.filter((s) => /^Text(\s|$)/.test(s.trim()));
 
-    let subtitleText = null;
-    if (textSections.length > 0) {
-      subtitleText = textSections.join("\n\n");
-    } else {
-      // Fallback to ffprobe
-      try {
-        const { stdout: fpOut } = await execAsync(
-          "ffprobe",
-          [
-            "-v",
-            "quiet",
-            "-print_format",
-            "json",
-            "-show_streams",
-            "-select_streams",
-            "s",
-            fullPath,
-          ],
-          { maxBuffer: 2 * 1024 * 1024 },
-        );
-        const fpData = JSON.parse(fpOut);
-        const streams = fpData.streams || [];
-        if (streams.length > 0) {
-          subtitleText = streams
-            .map((s) => {
-              const tags = s.tags || {};
-              const disp = s.disposition || {};
-              const lines = [`Stream #${s.index}`];
-              if (s.codec_name)
-                lines.push(
-                  `Format                                   : ${s.codec_name}`,
-                );
-              if (tags.language)
-                lines.push(
-                  `Language                                 : ${tags.language}`,
-                );
-              if (tags.title)
-                lines.push(
-                  `Title                                    : ${tags.title}`,
-                );
-              lines.push(
-                `Default                                  : ${disp.default ? "Yes" : "No"}`,
-              );
-              lines.push(
-                `Forced                                   : ${disp.forced ? "Yes" : "No"}`,
-              );
-              return lines.join("\n");
-            })
-            .join("\n\n");
-        }
-      } catch (_) {
-        // ffprobe failed, no subtitle info available
-      }
-    }
-
-    let output = stdout;
-    if (subtitleText) {
-      // Remove Text sections from the main output to avoid duplication
-      const mainSections = stdout
-        .split(/\n\n+/)
-        .filter((s) => !/^Text(\s|$)/.test(s.trim()));
-      output =
-        subtitleText +
-        "\n\n" +
-        "=".repeat(80) +
-        "\n\n" +
-        mainSections.join("\n\n");
-    }
+    const output = stdout
+      .split("\n")
+      .filter((l) => !/^Encoding settings\s*:/i.test(l))
+      .join("\n");
 
     const fileName = relPath.split("/").pop();
-    res.json({ output, fileName });
+    const isEnglishSection = (s) =>
+      /^Language\s+:\s+(en|eng|english)\s*$/im.test(s);
+    const subsCount = textSections.filter(isEnglishSection).length;
+
+    // Count .srt sidecar files for this specific file (same base name prefix)
+    let srtsCount = 0;
+    try {
+      const { readdir } = await import("node:fs/promises");
+      const dir = path.dirname(fullPath);
+      const baseName = fileName.replace(/\.[^.]+$/, "").toLowerCase();
+      const entries = await readdir(dir);
+      srtsCount = entries.filter((e) => {
+        const el = e.toLowerCase();
+        return (
+          el.startsWith(baseName) &&
+          el.endsWith(".srt") &&
+          !el.endsWith(".srtstub")
+        );
+      }).length;
+    } catch (_) {
+      // ignore read errors
+    }
+
+    res.json({ output, fileName, subsCount, srtsCount });
   } catch (err) {
     console.error("mediainfo error:", err);
     res.status(500).json({ error: err.message });

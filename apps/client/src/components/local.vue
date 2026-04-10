@@ -626,13 +626,7 @@
                 !/^=+$/.test(item.line)
                   ? 'underline'
                   : 'none',
-              color: /^=+$/.test(item.line)
-                ? 'red'
-                : /^Width\s+:/.test(item.line) ||
-                    /^Bit rate\s+:/.test(item.line) ||
-                    (/^Duration\s+:/.test(item.line) && item.inVideo)
-                  ? 'red'
-                  : 'inherit',
+              color: 'inherit',
             }"
           >
             {{ item.line || "\u00a0" }}
@@ -1901,11 +1895,13 @@ export default {
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
           this.infoText = data.output || "";
+          const subsCount = data.subsCount ?? 0;
+          const srtsCount = data.srtsCount ?? 0;
           let widthStr = "";
           let rateStr = "";
           let durStr = "";
           const widthMatch = this.infoText.match(
-            /^Width\s+:\s+(\d[\d\s]*)pixels/m,
+            /^Height\s+:\s+(\d[\d\s]*)pixels/m,
           );
           if (widthMatch) {
             widthStr = widthMatch[1].replace(/\s/g, "") + " px";
@@ -1916,6 +1912,7 @@ export default {
           if (bitrateMatch) {
             rateStr = bitrateMatch[1].replace(/\s(?=\d)/g, "").trim();
           }
+          let bitDepthStr = "";
           const videoSecs = this.infoText.split(/\n\n+/);
           const videoSec = videoSecs.find((s) => /^Video\b/.test(s.trim()));
           if (videoSec) {
@@ -1928,10 +1925,22 @@ export default {
                 (hm ? parseInt(hm[1]) : 0) * 60 + (mm ? parseInt(mm[1]) : 0);
               if (total > 0) durStr = total + " min";
             }
+            const bdLine = videoSec.match(/^Bit depth\s+:\s+(\d+)\s*bits/m);
+            if (bdLine) bitDepthStr = bdLine[1] + " bits";
           }
-          this.infoFileMeta = [sizeStr, durStr, dateStr, widthStr, rateStr]
+          this.infoFileMeta = [
+            sizeStr,
+            durStr,
+            dateStr,
+            widthStr,
+            bitDepthStr,
+            rateStr,
+          ]
             .filter(Boolean)
             .join(" | ");
+          const subsPart = `${subsCount} sub`;
+          const srtsPart = `${srtsCount} srt`;
+          this.infoFileMeta += ` | ${subsPart} | ${srtsPart}`;
         } catch (e) {
           this.infoText = `Error: ${e.message}`;
         } finally {
@@ -1961,8 +1970,11 @@ export default {
                 body: JSON.stringify({ relPath, errsMode: this.errsMode }),
               });
               const data = await res.json();
+              let bdStr = "";
               if (res.ok && data.output) {
-                const wm = data.output.match(/^Width\s+:\s+(\d[\d\s]*)pixels/m);
+                const wm = data.output.match(
+                  /^Height\s+:\s+(\d[\d\s]*)pixels/m,
+                );
                 if (wm) wStr = wm[1].replace(/\s/g, "") + " px";
                 const bm = data.output.match(/^Bit rate\s+:\s+([\d\s]+kb\/s)/m);
                 if (bm) rStr = bm[1].replace(/\s(?=\d)/g, "").trim();
@@ -1979,14 +1991,29 @@ export default {
                       (mm ? parseInt(mm[1]) : 0);
                     if (total > 0) dStr = total + " min";
                   }
+                  const bdLine = vSec.match(/^Bit depth\s+:\s+(\d+)\s*bits/m);
+                  if (bdLine) bdStr = bdLine[1] + " bits";
                 }
               }
-            } catch (_) {}
+              const subsCount = data.subsCount ?? 0;
+              const srtsCount = data.srtsCount ?? 0;
+              const subsPart = `${subsCount} sub`;
+              const srtsPart = `${srtsCount} srt`;
+              const meta =
+                [sizeStr, dStr, dateStr, wStr, bdStr, rStr]
+                  .filter(Boolean)
+                  .join(" | ") + ` | ${subsPart} | ${srtsPart}`;
+              entries.push({ name: fileName, meta });
+            } catch (_) {
+              const meta = [sizeStr, dateStr].filter(Boolean).join(" | ");
+              entries.push({ name: fileName, meta });
+            }
+            continue;
           }
-          const meta = [sizeStr, dStr, dateStr, wStr, rStr]
-            .filter(Boolean)
-            .join(" | ");
-          entries.push({ name: fileName, meta });
+          {
+            const meta = [sizeStr, dateStr].filter(Boolean).join(" | ");
+            entries.push({ name: fileName, meta });
+          }
         }
         this.infoMultiFiles = entries;
         this.infoLoading = false;

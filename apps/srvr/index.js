@@ -1235,17 +1235,14 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         delete tvdbRecord.allAiredHaveFile;
         delete tvdbRecord.allAiredWatched;
       }
-      // Compute full: all aired episodes have a file or have been watched
-      const newFull = !!(
-        tvdbRecord.inEmby &&
-        (gapData.allAiredHaveFile || gapData.allAiredWatched)
-      );
+      // Compute full: every episode is either watched or has a file
+      const newFull = !!(tvdbRecord.inEmby && gapData.allWatchedOrHaveFile);
       if (!!tvdbRecord.full !== newFull) {
         gapChanges.push(`full:${tvdbRecord.full}->${newFull}`);
         tvdbRecord.full = newFull;
       }
       // If every episode is watched or has a file, there's nothing to wait for
-      if (gapData && (gapData.allAiredHaveFile || gapData.allAiredWatched)) {
+      if (gapData && gapData.allWatchedOrHaveFile) {
         if (tvdbRecord.waitStr) {
           gapChanges.push(`waitStr:${tvdbRecord.waitStr}->null`);
           tvdbRecord.waitStr = null;

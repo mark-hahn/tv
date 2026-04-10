@@ -205,6 +205,7 @@ const getShowState = async (showId, showName, showMeta) => {
   let firstEpisodeFileUnwatched = false;
   let anyEpisodeNoFile = false;
   let anyAiredEpisodeNotWatched = false;
+  let anyEpisodeNeitherWatchedNorFile = false;
 
   try {
     const seasonsRes = await safeGet(urls.childrenUrl(showId));
@@ -279,6 +280,7 @@ const getShowState = async (showId, showName, showMeta) => {
 
         if (!haveFile && !unaired) anyEpisodeNoFile = true;
         if (!watched && !unaired) anyAiredEpisodeNotWatched = true;
+        if (!watched && !haveFile) anyEpisodeNeitherWatchedNorFile = true;
 
         // Track the first aired episode that has no file.
         if (!unaired && !haveFile && firstNoFileSeason === null) {
@@ -420,6 +422,7 @@ const getShowState = async (showId, showName, showMeta) => {
     fileGapEpisode,
     allAiredHaveFile: sawAnyEpisode && !anyEpisodeNoFile,
     allAiredWatched: sawAnyEpisode && !anyAiredEpisodeNotWatched,
+    allWatchedOrHaveFile: sawAnyEpisode && !anyEpisodeNeitherWatchedNorFile,
   };
 };
 
@@ -453,6 +456,7 @@ export const gapCheckOne = async (showId, showName, tvdbRecord) => {
     seasonWatchedThenNofile,
     allAiredHaveFile,
     allAiredWatched,
+    allWatchedOrHaveFile,
   } = showState;
 
   return {
@@ -468,6 +472,7 @@ export const gapCheckOne = async (showId, showName, tvdbRecord) => {
     seasonWatchedThenNofile,
     allAiredHaveFile,
     allAiredWatched,
+    allWatchedOrHaveFile,
   };
 };
 

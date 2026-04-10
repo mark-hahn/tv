@@ -1864,10 +1864,10 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   tvdbData.lastWatched = paramObj.lastWatched || existing.lastWatched || null;
 
   // Calculate waitStr from nextAired and lastAired (single source of truth)
-  const calculatedWaitStr = calculateWaitStr(
-    tvdbData.nextAired,
-    tvdbData.lastAired,
-  );
+  // If the show is full (every episode watched or has a file), nothing to wait for
+  const calculatedWaitStr = tvdbData.full
+    ? null
+    : calculateWaitStr(tvdbData.nextAired, tvdbData.lastAired);
   tvdbData.waitStr = calculatedWaitStr || null;
 
   // Flattened Sync timestamps (no nested object)

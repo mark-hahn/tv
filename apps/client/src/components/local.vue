@@ -516,7 +516,6 @@
         <div style="min-width: 0; margin-right: 8px; overflow: hidden">
           <div
             style="
-              font-weight: bold;
               overflow: hidden;
               text-overflow: ellipsis;
               white-space: nowrap;
@@ -527,7 +526,6 @@
           <div
             v-if="infoFileMeta"
             style="
-              font-weight: bold;
               overflow: hidden;
               text-overflow: ellipsis;
               white-space: nowrap;
@@ -611,7 +609,11 @@
                 !/^=+$/.test(line)
                   ? 'underline'
                   : 'none',
-              color: /^=+$/.test(line) ? 'red' : 'inherit',
+              color: /^=+$/.test(line)
+                ? 'red'
+                : /^Width\s+:/.test(line)
+                  ? 'red'
+                  : 'inherit',
             }"
           >
             {{ line || "\u00a0" }}
@@ -1791,7 +1793,7 @@ export default {
       if (node && node.size != null) {
         const sizeStr = this.formatFileSize(node.size);
         const dateStr = node.date || "";
-        this.infoFileMeta = dateStr ? `${sizeStr}  ${dateStr}` : sizeStr;
+        this.infoFileMeta = dateStr ? `${sizeStr} | ${dateStr}` : sizeStr;
       }
 
       // Only run mediainfo for video files
@@ -1829,6 +1831,16 @@ export default {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
         this.infoText = data.output || "";
+        // Extract width from mediainfo output and update header meta
+        const widthMatch = this.infoText.match(
+          /^Width\s+:\s+(\d[\d\s]*)pixels/m,
+        );
+        if (widthMatch) {
+          const width = widthMatch[1].replace(/\s/g, "");
+          const parts = [this.infoFileMeta, width + " px"].filter(Boolean);
+          this.infoFileMeta = parts.join(" | ");
+          // Also reformat existing meta with pipe separators
+        }
       } catch (e) {
         this.infoText = `Error: ${e.message}`;
       } finally {
@@ -1893,6 +1905,21 @@ export default {
           this.loadSubs();
         }, 300);
       }
+      if (this.showInfo) {
+        if (this._infoRefreshTimer) clearTimeout(this._infoRefreshTimer);
+        this._infoRefreshTimer = setTimeout(() => {
+          this.refreshInfo();
+        }, 300);
+      }
+    },
+    async refreshInfo() {
+      if (this.selectedFiles.size !== 1) {
+        this.showInfo = false;
+        return;
+      }
+      // Re-run clickInfo but bypass the toggle-off check
+      this.showInfo = false;
+      await this.clickInfo();
     },
     async loadSubs() {
       this.subsItems = [];

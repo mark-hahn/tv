@@ -718,15 +718,15 @@ const getUrlAndRatings = async (type, url, name) => {
             const typeList = Array.isArray(typeVal) ? typeVal : [typeVal];
             if (
               typeList.some((t) =>
-                ["TVSeries", "Movie", "TVMiniSeries", "TVEpisode"].includes(
-                  String(t || ""),
-                ),
+                ["TVSeries", "Movie", "TVMiniSeries"].includes(String(t || "")),
               )
             ) {
               if (node.aggregateRating?.ratingValue !== undefined) {
                 const v = parseFloat(String(node.aggregateRating.ratingValue));
                 if (!Number.isNaN(v) && v >= 0 && v <= 10) return v;
               }
+              // No aggregateRating on this show node — don't recurse into children
+              return null;
             }
             if (node["@graph"]) {
               const f = visit(node["@graph"]);
@@ -753,7 +753,6 @@ const getUrlAndRatings = async (type, url, name) => {
             const selectors = [
               '[data-testid="hero-rating-bar__aggregate-rating__score"] [data-testid="rating-histogram-star"]',
               '[data-testid="hero-rating-bar__aggregate-rating"] .ipc-rating-star--rating',
-              ".ipc-rating-star--rating",
             ];
             for (const sel of selectors) {
               const el = document.querySelector(sel);
@@ -779,11 +778,6 @@ const getUrlAndRatings = async (type, url, name) => {
               );
             if (m?.[1]) rating = m[1];
           }
-          if (!rating) {
-            let m = /"ratingValue"\s*:\s*"?([\d.]+)"?/i.exec(compact);
-            if (m?.[1]) rating = m[1];
-          }
-
           // --- Video extraction ---
           let video = null;
           let m =

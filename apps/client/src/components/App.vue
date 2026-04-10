@@ -353,6 +353,7 @@
     <VideoPlayer
       :path="videoPlayerPath"
       :mode="videoPlayerMode"
+      :chksrtCount="chksrtCount"
       @close="handleVideoPlayerClose"
       @chksrt-next="handleChksrtNext"
     />

@@ -262,6 +262,7 @@ export default {
   props: {
     path: { type: String, default: null },
     mode: { type: String, default: null },
+    chksrtCount: { type: Number, default: 0 },
   },
   emits: ["close", "chksrt-next"],
   data() {
@@ -318,7 +319,8 @@ export default {
     chksrtFilename() {
       if (!this.path) return "";
       const parts = this.path.split("/");
-      return parts[parts.length - 1];
+      const name = parts[parts.length - 1];
+      return this.chksrtCount > 0 ? `${name} (${this.chksrtCount})` : name;
     },
   },
   watch: {
@@ -375,7 +377,10 @@ export default {
       }
       const prevIsPgs = prevTrack?.type === "pgs";
       const newIsPgs = newTrack?.type === "pgs";
-      if (prevIsPgs !== newIsPgs || (newIsPgs && prevTrack?.index !== newTrack?.index)) {
+      if (
+        prevIsPgs !== newIsPgs ||
+        (newIsPgs && prevTrack?.index !== newTrack?.index)
+      ) {
         this._mseStop();
         this.vidSrc = this._buildStreamUrl(newIsPgs ? newTrack.index : null);
       }

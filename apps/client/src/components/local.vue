@@ -580,6 +580,9 @@
             </div>
           </div>
         </template>
+        <template v-else-if="!infoFileName && infoText">
+          <span style="color: #888">{{ infoText }}</span>
+        </template>
         <template v-else-if="!infoFileName">
           <span style="color: #888">No files selected</span>
         </template>
@@ -1864,6 +1867,12 @@ export default {
 
       if (filePaths.length === 0) {
         // No selection
+        this.infoLoading = false;
+        return;
+      }
+
+      if (this.selectedName) {
+        this.infoText = "Show folders are not supported.";
         this.infoLoading = false;
         return;
       }

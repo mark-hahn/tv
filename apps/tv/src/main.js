@@ -17,8 +17,7 @@ const ROKU_REMOTE_ID = "remote.roku_2";
 const FIRE_TV_ENTITY_ID = "media_player.fire_tv_192_168_1_47";
 const FIRE_TV_REMOTE_ID = "remote.fire_tv_192_168_1_47";
 const FIRE_TV_IP = "192.168.1.47";
-const BRAVIA_HOST = "192.168.1.12";
-const BRAVIA_PORT = 2870;
+const BRAVIA_ENTITY_ID = "media_player.bravia_7"; // TODO: confirm entity ID after adding Sony Bravia HA integration
 const BROADLINK_HOST = "192.168.1.23";
 const BROADLINK_CODES = {
   vol_up:
@@ -156,6 +155,8 @@ let authenticated = false;
 let castState = "unknown";
 let tvPowerState = "unknown";
 let fireTvState = "unknown";
+let braviaHaMuted = null;
+let braviaHaPower = "unknown";
 let tvMode = "google"; // "google" | "fire" | "roku"
 let activeDevice = null; // "google" | "roku"
 let lastOffAt = 0;
@@ -212,6 +213,11 @@ function handleMsg(raw) {
       if (s) castState = s.state;
       const tv = msg.result.find((s) => s.entity_id === TV_ENTITY_ID);
       if (tv) tvPowerState = tv.state;
+      const bravia = msg.result.find((s) => s.entity_id === BRAVIA_ENTITY_ID);
+      if (bravia) {
+        braviaHaPower = bravia.state;
+        braviaHaMuted = bravia.attributes?.is_volume_muted ?? null;
+      }
     }
   } else if (msg.type === "event") {
     const event = msg.event;
@@ -228,6 +234,7 @@ function handleMsg(raw) {
         "media_player.roku_2",
         FIRE_TV_ENTITY_ID,
         FIRE_TV_REMOTE_ID,
+        BRAVIA_ENTITY_ID,
       ]);
       if (WATCHED.has(id) && state !== prev) {
         log(`HA state: ${id} ${prev} -> ${state}`);
@@ -237,6 +244,11 @@ function handleMsg(raw) {
         tvPowerState = state;
       }
       if (id === FIRE_TV_ENTITY_ID) fireTvState = state;
+      if (id === BRAVIA_ENTITY_ID) {
+        braviaHaPower = state;
+        const attrs = event.data?.new_state?.attributes;
+        if (attrs) braviaHaMuted = attrs.is_volume_muted ?? null;
+      }
     }
   }
 }
@@ -433,57 +445,9 @@ app.get("/tv/key/:key", (req, res) => {
   res.json({ ok: true, command, mode: tvMode });
 });
 
-// ─── Bravia UPnP ─────────────────────────────────────────────────────────────
-
-function braviaPing() {
-  return new Promise((resolve) => {
-    exec(`ping -c1 -W1 ${BRAVIA_HOST}`, (err) => resolve(!err));
-  });
-}
-
-function braviaFetch(action, body) {
-  return fetch(
-    `http://${BRAVIA_HOST}:${BRAVIA_PORT}/control/RenderingControl`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "text/xml; charset=utf-8",
-        SOAPAction: `"urn:schemas-upnp-org:service:RenderingControl:1#${action}"`,
-      },
-      body,
-      signal: AbortSignal.timeout(1000),
-    },
-  );
-}
-
-async function braviaSetVolume(volume) {
-  const body = `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:SetVolume xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID><Channel>Master</Channel><DesiredVolume>${volume}</DesiredVolume></u:SetVolume></s:Body></s:Envelope>`;
-  const res = await braviaFetch("SetVolume", body);
-  return res.ok;
-}
-
-async function braviaGetVolume() {
-  const body = `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:GetVolume xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID><Channel>Master</Channel></u:GetVolume></s:Body></s:Envelope>`;
-  const res = await braviaFetch("GetVolume", body);
-  const text = await res.text();
-  const m = text.match(/<CurrentVolume>(\d+)<\/CurrentVolume>/);
-  return m ? parseInt(m[1]) : null;
-}
-
-async function braviaSetMute(muted) {
-  const val = muted ? "1" : "0";
-  const body = `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:SetMute xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID><Channel>Master</Channel><DesiredMute>${val}</DesiredMute></u:SetMute></s:Body></s:Envelope>`;
-  const res = await braviaFetch("SetMute", body);
-  return res.ok;
-}
-
-async function braviaGetMute() {
-  const body = `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:GetMute xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1"><InstanceID>0</InstanceID><Channel>Master</Channel></u:GetMute></s:Body></s:Envelope>`;
-  const res = await braviaFetch("GetMute", body);
-  const text = await res.text();
-  const m = text.match(/<CurrentMute>(\d+)<\/CurrentMute>/);
-  return m ? m[1] === "1" : null;
-}
+// ─── Bravia (via HA Sony Bravia integration) ─────────────────────────────────
+// State is tracked from HA WebSocket in braviaHaMuted / braviaHaPower.
+// Volume/mute control via HA media_player services.
 
 app.get("/tv/vol/:dir", async (req, res) => {
   const dir = req.params.dir;
@@ -526,15 +490,20 @@ async function pushMuteState() {
       fireTvState !== "off" &&
       fireTvState !== "unavailable" &&
       fireTvState !== "unknown";
-    const [muted, pingOk] = await Promise.all([
-      braviaGetMute().catch(() => null),
-      braviaPing(),
-    ]);
-    const power = fireOn || muted !== null || pingOk ? "on" : "off";
+    const braviaOn =
+      braviaHaPower !== "off" &&
+      braviaHaPower !== "unavailable" &&
+      braviaHaPower !== "unknown";
+    const power = fireOn || braviaHaMuted !== null || braviaOn ? "on" : "off";
     await fetch(`${SRVR_INTERNAL_URL}/internal/tv-state`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ muted, power, activeDevice, mode: tvMode }),
+      body: JSON.stringify({
+        muted: braviaHaMuted,
+        power,
+        activeDevice,
+        mode: tvMode,
+      }),
     }).catch(() => {});
     return;
   }
@@ -555,17 +524,17 @@ async function pushMuteState() {
     }).catch(() => {});
     return;
   }
-  const [muted, pingOk] = await Promise.all([
-    braviaGetMute().catch(() => null),
-    braviaPing(),
-  ]);
-  const power = muted !== null || pingOk ? "on" : "off";
+  const braviaOn =
+    braviaHaPower !== "off" &&
+    braviaHaPower !== "unavailable" &&
+    braviaHaPower !== "unknown";
+  const power = braviaHaMuted !== null || braviaOn ? "on" : "off";
   const effectivePower = Date.now() - lastOffAt < 5000 ? "off" : power;
   await fetch(`${SRVR_INTERNAL_URL}/internal/tv-state`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      muted,
+      muted: braviaHaMuted,
       power: effectivePower,
       activeDevice,
       mode: tvMode,
@@ -574,18 +543,17 @@ async function pushMuteState() {
 }
 
 app.get("/tv/mutestate", async (req, res) => {
-  const [muted, pingOk] = await Promise.all([
-    braviaGetMute().catch(() => null),
-    braviaPing(),
-  ]);
   const haOn =
-    tvPowerState !== "off" &&
-    tvPowerState !== "unavailable" &&
-    tvPowerState !== "unknown";
+    (braviaHaPower !== "off" &&
+      braviaHaPower !== "unavailable" &&
+      braviaHaPower !== "unknown") ||
+    (tvPowerState !== "off" &&
+      tvPowerState !== "unavailable" &&
+      tvPowerState !== "unknown");
   res.json({
     ok: true,
-    muted,
-    power: muted !== null || pingOk || haOn ? "on" : "off",
+    muted: braviaHaMuted,
+    power: haOn ? "on" : "off",
     activeDevice,
   });
 });

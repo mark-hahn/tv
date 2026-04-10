@@ -114,62 +114,46 @@
       >
         Mute
       </div>
-      <!-- Row 5: google, fire, roku, off (spans all 3 cols, inner 4-col flex) -->
-      <div style="grid-column: 1 / -1; display: flex">
-        <div
-          :style="modeBtnStyle('google')"
-          style="flex: 1"
-          @mousedown="startHold(() => setMode('google'))"
-          @mouseup="stopHold"
-          @mouseleave="stopHold"
-          @touchstart.prevent="startHold(() => setMode('google'))"
-          @touchend="stopHold"
-        >
-          Google
-        </div>
-        <div
-          :style="modeBtnStyle('fire')"
-          style="flex: 1"
-          @mousedown="startHold(() => setMode('fire'))"
-          @mouseup="stopHold"
-          @mouseleave="stopHold"
-          @touchstart.prevent="startHold(() => setMode('fire'))"
-          @touchend="stopHold"
-        >
-          Fire
-        </div>
-        <div
-          :style="modeBtnStyle('roku')"
-          style="flex: 1"
-          @mousedown="startHold(() => setMode('roku'))"
-          @mouseup="stopHold"
-          @mouseleave="stopHold"
-          @touchstart.prevent="startHold(() => setMode('roku'))"
-          @touchend="stopHold"
-        >
-          Roku
-        </div>
-        <div
-          :style="offBtnStyle"
-          style="flex: 1"
-          @mousedown="
-            startHold(() => {
-              flash('off');
-              tvCmd('off');
-            })
-          "
-          @mouseup="stopHold"
-          @mouseleave="stopHold"
-          @touchstart.prevent="
-            startHold(() => {
-              flash('off');
-              tvCmd('off');
-            })
-          "
-          @touchend="stopHold"
-        >
-          Off
-        </div>
+      <!-- Row 5: google, roku, off -->
+      <div
+        :style="modeBtnStyle('google')"
+        @mousedown="startHold(() => setMode('google'))"
+        @mouseup="stopHold"
+        @mouseleave="stopHold"
+        @touchstart.prevent="startHold(() => setMode('google'))"
+        @touchend="stopHold"
+      >
+        Google
+      </div>
+      <div
+        :style="modeBtnStyle('roku')"
+        @mousedown="startHold(() => setMode('roku'))"
+        @mouseup="stopHold"
+        @mouseleave="stopHold"
+        @touchstart.prevent="startHold(() => setMode('roku'))"
+        @touchend="stopHold"
+      >
+        Roku
+      </div>
+      <div
+        :style="offBtnStyle"
+        @mousedown="
+          startHold(() => {
+            flash('off');
+            tvCmd('off');
+          })
+        "
+        @mouseup="stopHold"
+        @mouseleave="stopHold"
+        @touchstart.prevent="
+          startHold(() => {
+            flash('off');
+            tvCmd('off');
+          })
+        "
+        @touchend="stopHold"
+      >
+        Off
       </div>
     </div>
   </div>
@@ -240,18 +224,6 @@ export default {
       this.flash(key);
       this._repeatActive = true;
       fetch(`${config.tvTvUrl}/tv/key/${key}`).catch(() => {});
-      if (this.mode === "fire") {
-        let count = 0;
-        const tick = () => {
-          if (!this._repeatActive) return;
-          const mult = key === "left" ? 3 : 1;
-          const n = (count++ < 3 ? 1 : 3) * mult;
-          fetch(`${config.tvTvUrl}/tv/key/${key}?n=${n}`).catch(() => {});
-          this._repeatTimer = setTimeout(tick, 600);
-        };
-        this._repeatDelay = setTimeout(tick, 600);
-        return;
-      }
       let count = 0;
       const tick = () => {
         if (!this._repeatActive) return;
@@ -274,8 +246,6 @@ export default {
 
     stopRepeat() {
       this._repeatActive = false;
-      clearTimeout(this._repeatDelay);
-      clearTimeout(this._repeatTimer);
     },
 
     startHold(action) {
@@ -322,7 +292,6 @@ export default {
       if (data.power) this.power = data.power;
       if (data.activeDevice !== undefined)
         this.activeDevice = data.activeDevice;
-      if (data.mode) this.mode = data.mode;
     },
 
     async pollMute() {

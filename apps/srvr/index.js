@@ -1244,6 +1244,13 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         gapChanges.push(`full:${tvdbRecord.full}->${newFull}`);
         tvdbRecord.full = newFull;
       }
+      // If every episode is watched or has a file, there's nothing to wait for
+      if (gapData && (gapData.allAiredHaveFile || gapData.allAiredWatched)) {
+        if (tvdbRecord.waitStr) {
+          gapChanges.push(`waitStr:${tvdbRecord.waitStr}->null`);
+          tvdbRecord.waitStr = null;
+        }
+      }
     } else if (!tvdbRecord.inEmby) {
       // For shows not in emby, set error fields to known constants
       const nonEmbyConstants = [
@@ -3121,7 +3128,8 @@ app.get("/api/stream", async (req, res) => {
     const startSec = parseInt(req.query.start) || 0;
     const rawSub = req.query.sub;
     const subIdx = rawSub !== undefined ? parseInt(rawSub, 10) : null;
-    const usePgsSub = subIdx !== null && !isNaN(subIdx) && subIdx >= 0 && subIdx <= 50;
+    const usePgsSub =
+      subIdx !== null && !isNaN(subIdx) && subIdx >= 0 && subIdx <= 50;
 
     const ffmpegArgs =
       startSec > 0
@@ -3131,12 +3139,30 @@ app.get("/api/stream", async (req, res) => {
     if (usePgsSub) {
       // Burn PGS bitmap subtitle into video stream via filter_complex overlay
       ffmpegArgs.push(
-        "-filter_complex", `[0:v][0:${subIdx}]overlay[v]`,
-        "-map", "[v]",
-        "-map", "0:a:0",
-        "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency",
-        "-pix_fmt", "yuv420p", "-crf", "23", "-g", "48",
-        "-c:a", "aac", "-b:a", "128k", "-ac", "2",
+        "-filter_complex",
+        `[0:v][0:${subIdx}]overlay[v]`,
+        "-map",
+        "[v]",
+        "-map",
+        "0:a:0",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-tune",
+        "zerolatency",
+        "-pix_fmt",
+        "yuv420p",
+        "-crf",
+        "23",
+        "-g",
+        "48",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        "-ac",
+        "2",
       );
     } else if (vCopy) {
       // h264 video in non-MP4 container: copy the stream, ffmpeg will remux into fMP4.

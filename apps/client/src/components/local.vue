@@ -588,15 +588,14 @@
                 line.trim().length > 0
                   ? 'bold'
                   : 'normal',
-              fontFamily:
-                /^=+$/.test(line)
-                  ? 'monospace'
-                  : line &&
-                      !line.includes(':') &&
-                      line.trim() === line &&
-                      line.trim().length > 0
-                    ? 'sans-serif'
-                    : 'inherit',
+              fontFamily: /^=+$/.test(line)
+                ? 'monospace'
+                : line &&
+                    !line.includes(':') &&
+                    line.trim() === line &&
+                    line.trim().length > 0
+                  ? 'sans-serif'
+                  : 'inherit',
               fontSize:
                 line &&
                 !line.includes(':') &&

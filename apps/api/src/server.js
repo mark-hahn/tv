@@ -807,6 +807,102 @@ app.post("/api/local/move-to-trial", async (req, res) => {
   }
 });
 
+app.post("/api/local/mediainfo", async (req, res) => {
+  try {
+    const { relPath, errsMode } = req.body;
+    if (!relPath) {
+      return res.status(400).json({ error: "Missing relPath" });
+    }
+    const root = errsMode ? "/mnt/media/tv-errors" : "/mnt/media/tv";
+    const fullPath = path.join(root, relPath);
+    const { execFile } = await import("node:child_process");
+    const { promisify } = await import("node:util");
+    const execAsync = promisify(execFile);
+    const { stdout } = await execAsync("mediainfo", [fullPath], {
+      maxBuffer: 5 * 1024 * 1024,
+    });
+
+    // Extract subtitle (Text) sections from mediainfo output
+    const sections = stdout.split(/\n\n+/);
+    const textSections = sections.filter((s) => /^Text(\s|$)/.test(s.trim()));
+
+    let subtitleText = null;
+    if (textSections.length > 0) {
+      subtitleText = textSections.join("\n\n");
+    } else {
+      // Fallback to ffprobe
+      try {
+        const { stdout: fpOut } = await execAsync(
+          "ffprobe",
+          [
+            "-v",
+            "quiet",
+            "-print_format",
+            "json",
+            "-show_streams",
+            "-select_streams",
+            "s",
+            fullPath,
+          ],
+          { maxBuffer: 2 * 1024 * 1024 },
+        );
+        const fpData = JSON.parse(fpOut);
+        const streams = fpData.streams || [];
+        if (streams.length > 0) {
+          subtitleText = streams
+            .map((s) => {
+              const tags = s.tags || {};
+              const disp = s.disposition || {};
+              const lines = [`Stream #${s.index}`];
+              if (s.codec_name)
+                lines.push(
+                  `Format                                   : ${s.codec_name}`,
+                );
+              if (tags.language)
+                lines.push(
+                  `Language                                 : ${tags.language}`,
+                );
+              if (tags.title)
+                lines.push(
+                  `Title                                    : ${tags.title}`,
+                );
+              lines.push(
+                `Default                                  : ${disp.default ? "Yes" : "No"}`,
+              );
+              lines.push(
+                `Forced                                   : ${disp.forced ? "Yes" : "No"}`,
+              );
+              return lines.join("\n");
+            })
+            .join("\n\n");
+        }
+      } catch (_) {
+        // ffprobe failed, no subtitle info available
+      }
+    }
+
+    let output = stdout;
+    if (subtitleText) {
+      // Remove Text sections from the main output to avoid duplication
+      const mainSections = stdout
+        .split(/\n\n+/)
+        .filter((s) => !/^Text(\s|$)/.test(s.trim()));
+      output =
+        subtitleText +
+        "\n\n" +
+        "=".repeat(80) +
+        "\n\n" +
+        mainSections.join("\n\n");
+    }
+
+    const fileName = relPath.split("/").pop();
+    res.json({ output, fileName });
+  } catch (err) {
+    console.error("mediainfo error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get("/api/search", async (req, res) => {
   const showName = req.query.show;
   const tvdbId = req.query.tvdbId || null;

@@ -16,9 +16,12 @@
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        flex: showSubs || showAsr || showFix ? '0 0 50%' : '1 1 auto',
+        flex:
+          showSubs || showAsr || showFix || showInfo ? '0 0 50%' : '1 1 auto',
         borderBottom:
-          showSubs || showAsr || showFix ? '1px solid #ddd' : 'none',
+          showSubs || showAsr || showFix || showInfo
+            ? '1px solid #ddd'
+            : 'none',
       }"
     >
       <!-- Header -->
@@ -171,6 +174,27 @@
             }"
           >
             Errs
+          </button>
+
+          <button
+            @click="clickInfo"
+            :disabled="selectedFiles.size !== 1"
+            :style="{
+              cursor: selectedFiles.size === 1 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg':
+                selectedFiles.size === 1
+                  ? showInfo
+                    ? '#ddd'
+                    : 'whitesmoke'
+                  : '#e8e8e8',
+              color: selectedFiles.size === 1 ? 'inherit' : '#aaa',
+              marginRight: '10px',
+            }"
+          >
+            Info
           </button>
 
           <button
@@ -462,6 +486,141 @@
       </div>
     </div>
 
+    <!-- Info Pane -->
+    <div
+      id="infoPane"
+      v-show="showInfo"
+      :style="{
+        flex: '1 1 50%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        backgroundColor: '#fafafa',
+        color: '#000',
+        fontFamily: 'monospace',
+        padding: '10px',
+        borderLeft: '1px solid #ddd',
+      }"
+    >
+      <div
+        style="
+          flex: 0 0 auto;
+          border-bottom: 1px solid #ddd;
+          padding-bottom: 5px;
+          margin-bottom: 5px;
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+        "
+      >
+        <div style="min-width: 0; margin-right: 8px; overflow: hidden">
+          <div
+            style="
+              font-weight: bold;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            "
+          >
+            {{ infoFileName }}
+          </div>
+          <div
+            v-if="infoFileMeta"
+            style="
+              font-weight: bold;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+              margin-top: 2px;
+            "
+          >
+            {{ infoFileMeta }}
+          </div>
+        </div>
+        <button
+          @click="showInfo = false"
+          title="Close"
+          :style="{
+            cursor: 'pointer',
+            borderRadius: '4px',
+            padding: '2px 8px',
+            border: '1px solid #bbb',
+            backgroundColor: 'whitesmoke',
+            fontWeight: 'bold',
+            flexShrink: 0,
+          }"
+        >
+          ✕
+        </button>
+      </div>
+      <div
+        style="
+          flex: 1 1 auto;
+          overflow: auto;
+          background-color: #fff;
+          border: 1px solid #eee;
+          padding: 4px;
+          font-size: 12px;
+        "
+      >
+        <span
+          v-if="infoLoading"
+          style="color: #666"
+          >Loading...</span
+        >
+        <template v-else>
+          <div
+            v-for="(line, idx) in infoLines"
+            :key="idx"
+            @click="infoSelectedLine = idx"
+            :style="{
+              backgroundColor:
+                infoSelectedLine === idx ? '#fffde7' : 'transparent',
+              whiteSpace: 'pre-wrap',
+              lineHeight: '1.5',
+              padding: '0 2px',
+              cursor: 'default',
+              minHeight: '1.5em',
+              fontWeight:
+                line &&
+                !line.includes(':') &&
+                line.trim() === line &&
+                line.trim().length > 0
+                  ? 'bold'
+                  : 'normal',
+              fontFamily:
+                /^=+$/.test(line)
+                  ? 'monospace'
+                  : line &&
+                      !line.includes(':') &&
+                      line.trim() === line &&
+                      line.trim().length > 0
+                    ? 'sans-serif'
+                    : 'inherit',
+              fontSize:
+                line &&
+                !line.includes(':') &&
+                line.trim() === line &&
+                line.trim().length > 0
+                  ? '13px'
+                  : 'inherit',
+              textDecoration:
+                line &&
+                !line.includes(':') &&
+                line.trim() === line &&
+                line.trim().length > 0 &&
+                !/^=+$/.test(line)
+                  ? 'underline'
+                  : 'none',
+              color: /^=+$/.test(line) ? 'red' : 'inherit',
+            }"
+          >
+            {{ line || "\u00a0" }}
+          </div>
+        </template>
+      </div>
+    </div>
+
     <!-- Subs Pane -->
     <div
       id="localSubs"
@@ -698,6 +857,14 @@ export default {
 
       // Errs mode
       errsMode: false,
+
+      // Info pane
+      showInfo: false,
+      infoText: "",
+      infoFileName: "",
+      infoFileMeta: "",
+      infoLoading: false,
+      infoSelectedLine: null,
     };
   },
   created() {
@@ -771,7 +938,22 @@ export default {
     evtBus.off("asr-log", this.onAsrLog);
     evtBus.off("fix-log", this.onFixLog);
   },
+  computed: {
+    infoLines() {
+      if (!this.infoText) return [];
+      return this.infoText.split("\n");
+    },
+  },
   methods: {
+    formatFileSize(bytes) {
+      if (bytes == null) return "";
+      if (bytes >= 1024 * 1024 * 1024)
+        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+      if (bytes >= 1024 * 1024)
+        return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+      if (bytes >= 1024) return (bytes / 1024).toFixed(0) + " KB";
+      return bytes + " B";
+    },
     scrollToAsrBottom() {
       const el = this.$refs.asrScroll;
       if (el) {
@@ -1309,6 +1491,7 @@ export default {
       if (this.showAsr) {
         this.showSubs = false;
         this.showFix = false;
+        this.showInfo = false;
       }
     },
     async clearAsrLog() {
@@ -1347,6 +1530,7 @@ export default {
       this.asrLogs = ""; // clear old text
       this.showAsr = true; // ensure visible
       this.showSubs = false; // close subs
+      this.showInfo = false;
 
       try {
         const res = await handleAsr({ action: "start", path: startPath });
@@ -1457,6 +1641,7 @@ export default {
       if (this.showFix) {
         this.showSubs = false;
         this.showAsr = false;
+        this.showInfo = false;
       }
     },
     async clearFixLog() {
@@ -1489,6 +1674,7 @@ export default {
       this.showFix = true;
       this.showSubs = false;
       this.showAsr = false;
+      this.showInfo = false;
 
       try {
         this.ignoreFixLogs = false;
@@ -1567,6 +1753,7 @@ export default {
       if (this.showSubs) {
         this.showAsr = false;
         this.showFix = false;
+        this.showInfo = false;
         this.loadSubs();
       }
     },
@@ -1575,10 +1762,79 @@ export default {
       if (this.errsMode) {
         this.showSubs = false;
         this.showAsr = false;
+        this.showInfo = false;
       }
       this.selectedName = null;
       this.selectedFiles = new Set();
       this.fetchFiles();
+    },
+    async clickInfo() {
+      if (this.selectedFiles.size !== 1) return;
+      if (this.showInfo) {
+        this.showInfo = false;
+        return;
+      }
+      this.showInfo = true;
+      this.showSubs = false;
+      this.showAsr = false;
+      this.showFix = false;
+      this.infoText = "";
+      this.infoFileName = "";
+      this.infoFileMeta = "";
+      this.infoSelectedLine = null;
+      this.infoLoading = true;
+      const relPath = [...this.selectedFiles][0];
+      const fileName = relPath.split("/").pop();
+      this.infoFileName = fileName;
+
+      // Get size/date from tree node
+      const node = this.findNodeByPath(relPath);
+      if (node && node.size != null) {
+        const sizeStr = this.formatFileSize(node.size);
+        const dateStr = node.date || "";
+        this.infoFileMeta = dateStr ? `${sizeStr}  ${dateStr}` : sizeStr;
+      }
+
+      // Only run mediainfo for video files
+      const VIDEO_EXTS = new Set([
+        "mkv",
+        "avi",
+        "mp4",
+        "m4v",
+        "mov",
+        "wmv",
+        "webm",
+        "mpg",
+        "mpeg",
+        "ts",
+        "m2ts",
+      ]);
+      const ext = fileName.includes(".")
+        ? fileName.split(".").pop().toLowerCase()
+        : "";
+      const isVideo = VIDEO_EXTS.has(ext);
+
+      if (!isVideo) {
+        this.infoText = "";
+        this.infoLoading = false;
+        return;
+      }
+
+      try {
+        const url = `${config.torrentsApiUrl}/api/local/mediainfo`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ relPath, errsMode: this.errsMode }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        this.infoText = data.output || "";
+      } catch (e) {
+        this.infoText = `Error: ${e.message}`;
+      } finally {
+        this.infoLoading = false;
+      }
     },
     async moveSelected() {
       if (!this.errsMode || this.selectedFiles.size === 0) return;

@@ -178,19 +178,12 @@
 
           <button
             @click="clickInfo"
-            :disabled="selectedFiles.size !== 1"
             :style="{
-              cursor: selectedFiles.size === 1 ? 'pointer' : 'default',
+              cursor: 'pointer',
               borderRadius: '7px',
               padding: '4px 10px',
               border: '1px solid #bbb',
-              '--btn-bg':
-                selectedFiles.size === 1
-                  ? showInfo
-                    ? '#ddd'
-                    : 'whitesmoke'
-                  : '#e8e8e8',
-              color: selectedFiles.size === 1 ? 'inherit' : '#aaa',
+              '--btn-bg': showInfo ? '#ddd' : 'whitesmoke',
               marginRight: '10px',
             }"
           >
@@ -566,6 +559,30 @@
           style="color: #666"
           >Loading...</span
         >
+        <template v-else-if="infoMultiFiles.length > 0">
+          <div
+            v-for="(f, idx) in infoMultiFiles"
+            :key="idx"
+            style="
+              padding: 3px 2px;
+              border-bottom: 1px solid #eee;
+              line-height: 1.5;
+            "
+          >
+            <div style="font-family: sans-serif; font-size: 13px">
+              {{ f.name }}
+            </div>
+            <div
+              v-if="f.meta"
+              style="color: #555; font-size: 11px"
+            >
+              {{ f.meta }}
+            </div>
+          </div>
+        </template>
+        <template v-else-if="!infoFileName">
+          <span style="color: #888">No files selected</span>
+        </template>
         <template v-else>
           <div
             v-for="(line, idx) in infoLines"
@@ -866,6 +883,7 @@ export default {
       infoFileMeta: "",
       infoLoading: false,
       infoSelectedLine: null,
+      infoMultiFiles: [], // [{name, meta}] for multi-file display
     };
   },
   created() {
@@ -1770,7 +1788,6 @@ export default {
       this.fetchFiles();
     },
     async clickInfo() {
-      if (this.selectedFiles.size !== 1) return;
       if (this.showInfo) {
         this.showInfo = false;
         return;
@@ -1779,24 +1796,45 @@ export default {
       this.showSubs = false;
       this.showAsr = false;
       this.showFix = false;
+      await this.loadInfo();
+    },
+    // Collect all file paths from a selection (handles folders recursively)
+    collectFilePaths() {
+      const paths = [];
+      const collectNode = (n, prefix) => {
+        const fullPath = prefix ? `${prefix}/${n.name}` : n.name;
+        if (n.type === "file") {
+          paths.push(fullPath);
+        } else if (n.children) {
+          n.children.forEach((c) => collectNode(c, fullPath));
+        }
+      };
+      if (this.selectedName) {
+        const node = this.tree.find((n) => n.name === this.selectedName);
+        if (node) collectNode(node, null);
+      } else {
+        for (const relPath of this.selectedFiles) {
+          const node = this.findNodeByPath(relPath);
+          if (node)
+            collectNode(
+              node,
+              relPath.substring(0, relPath.lastIndexOf("/")) || null,
+            );
+        }
+      }
+      return paths;
+    },
+    async loadInfo() {
       this.infoText = "";
       this.infoFileName = "";
       this.infoFileMeta = "";
+      this.infoMultiFiles = [];
       this.infoSelectedLine = null;
       this.infoLoading = true;
-      const relPath = [...this.selectedFiles][0];
-      const fileName = relPath.split("/").pop();
-      this.infoFileName = fileName;
 
-      // Get size/date from tree node
-      const node = this.findNodeByPath(relPath);
-      if (node && node.size != null) {
-        const sizeStr = this.formatFileSize(node.size);
-        const dateStr = node.date || "";
-        this.infoFileMeta = dateStr ? `${sizeStr} | ${dateStr}` : sizeStr;
-      }
+      // Collect selected file paths
+      const filePaths = this.collectFilePaths();
 
-      // Only run mediainfo for video files
       const VIDEO_EXTS = new Set([
         "mkv",
         "avi",
@@ -1810,40 +1848,87 @@ export default {
         "ts",
         "m2ts",
       ]);
-      const ext = fileName.includes(".")
-        ? fileName.split(".").pop().toLowerCase()
-        : "";
-      const isVideo = VIDEO_EXTS.has(ext);
+      const getExt = (name) => {
+        const i = name.lastIndexOf(".");
+        return i >= 0 ? name.slice(i + 1).toLowerCase() : "";
+      };
 
-      if (!isVideo) {
-        this.infoText = "";
+      if (filePaths.length === 0) {
+        // No selection
         this.infoLoading = false;
         return;
       }
 
-      try {
-        const url = `${config.torrentsApiUrl}/api/local/mediainfo`;
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ relPath, errsMode: this.errsMode }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-        this.infoText = data.output || "";
-        // Extract width from mediainfo output and update header meta
-        const widthMatch = this.infoText.match(
-          /^Width\s+:\s+(\d[\d\s]*)pixels/m,
-        );
-        if (widthMatch) {
-          const width = widthMatch[1].replace(/\s/g, "");
-          const parts = [this.infoFileMeta, width + " px"].filter(Boolean);
-          this.infoFileMeta = parts.join(" | ");
-          // Also reformat existing meta with pipe separators
+      if (filePaths.length === 1) {
+        // Single file — full mediainfo
+        const relPath = filePaths[0];
+        const fileName = relPath.split("/").pop();
+        this.infoFileName = fileName;
+        const node = this.findNodeByPath(relPath);
+        if (node && node.size != null) {
+          const sizeStr = this.formatFileSize(node.size);
+          const dateStr = node.date || "";
+          this.infoFileMeta = dateStr ? `${sizeStr} | ${dateStr}` : sizeStr;
         }
-      } catch (e) {
-        this.infoText = `Error: ${e.message}`;
-      } finally {
+        if (!VIDEO_EXTS.has(getExt(fileName))) {
+          this.infoLoading = false;
+          return;
+        }
+        try {
+          const url = `${config.torrentsApiUrl}/api/local/mediainfo`;
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ relPath, errsMode: this.errsMode }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+          this.infoText = data.output || "";
+          const widthMatch = this.infoText.match(
+            /^Width\s+:\s+(\d[\d\s]*)pixels/m,
+          );
+          if (widthMatch) {
+            const width = widthMatch[1].replace(/\s/g, "");
+            const parts = [this.infoFileMeta, width + " px"].filter(Boolean);
+            this.infoFileMeta = parts.join(" | ");
+          }
+        } catch (e) {
+          this.infoText = `Error: ${e.message}`;
+        } finally {
+          this.infoLoading = false;
+        }
+      } else {
+        // Multiple files — show header list only
+        const entries = [];
+        for (const relPath of filePaths) {
+          const fileName = relPath.split("/").pop();
+          const node = this.findNodeByPath(relPath);
+          let meta = "";
+          if (node && node.size != null) {
+            const sizeStr = this.formatFileSize(node.size);
+            const dateStr = node.date || "";
+            meta = dateStr ? `${sizeStr} | ${dateStr}` : sizeStr;
+          }
+          let width = "";
+          if (VIDEO_EXTS.has(getExt(fileName))) {
+            try {
+              const url = `${config.torrentsApiUrl}/api/local/mediainfo`;
+              const res = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ relPath, errsMode: this.errsMode }),
+              });
+              const data = await res.json();
+              if (res.ok && data.output) {
+                const wm = data.output.match(/^Width\s+:\s+(\d[\d\s]*)pixels/m);
+                if (wm) width = wm[1].replace(/\s/g, "") + " px";
+              }
+            } catch (_) {}
+          }
+          if (width) meta = meta ? `${meta} | ${width}` : width;
+          entries.push({ name: fileName, meta });
+        }
+        this.infoMultiFiles = entries;
         this.infoLoading = false;
       }
     },
@@ -1913,13 +1998,8 @@ export default {
       }
     },
     async refreshInfo() {
-      if (this.selectedFiles.size !== 1) {
-        this.showInfo = false;
-        return;
-      }
-      // Re-run clickInfo but bypass the toggle-off check
-      this.showInfo = false;
-      await this.clickInfo();
+      // Re-run loadInfo without toggling off
+      await this.loadInfo();
     },
     async loadSubs() {
       this.subsItems = [];

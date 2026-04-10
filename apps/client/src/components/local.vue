@@ -585,7 +585,7 @@
         </template>
         <template v-else>
           <div
-            v-for="(line, idx) in infoLines"
+            v-for="(item, idx) in infoLines"
             :key="idx"
             @click="infoSelectedLine = idx"
             :style="{
@@ -597,43 +597,43 @@
               cursor: 'default',
               minHeight: '1.5em',
               fontWeight:
-                line &&
-                !line.includes(':') &&
-                line.trim() === line &&
-                line.trim().length > 0
+                item.line &&
+                !item.line.includes(':') &&
+                item.line.trim() === item.line &&
+                item.line.trim().length > 0
                   ? 'bold'
                   : 'normal',
-              fontFamily: /^=+$/.test(line)
+              fontFamily: /^=+$/.test(item.line)
                 ? 'monospace'
-                : line &&
-                    !line.includes(':') &&
-                    line.trim() === line &&
-                    line.trim().length > 0
+                : item.line &&
+                    !item.line.includes(':') &&
+                    item.line.trim() === item.line &&
+                    item.line.trim().length > 0
                   ? 'sans-serif'
                   : 'inherit',
               fontSize:
-                line &&
-                !line.includes(':') &&
-                line.trim() === line &&
-                line.trim().length > 0
+                item.line &&
+                !item.line.includes(':') &&
+                item.line.trim() === item.line &&
+                item.line.trim().length > 0
                   ? '13px'
                   : 'inherit',
               textDecoration:
-                line &&
-                !line.includes(':') &&
-                line.trim() === line &&
-                line.trim().length > 0 &&
-                !/^=+$/.test(line)
+                item.line &&
+                !item.line.includes(':') &&
+                item.line.trim() === item.line &&
+                item.line.trim().length > 0 &&
+                !/^=+$/.test(item.line)
                   ? 'underline'
                   : 'none',
-              color: /^=+$/.test(line)
+              color: /^=+$/.test(item.line)
                 ? 'red'
-                : /^Width\s+:/.test(line)
+                : /^Width\s+:/.test(item.line) || /^Bit rate\s+:/.test(item.line) || (/^Duration\s+:/.test(item.line) && item.inVideo)
                   ? 'red'
                   : 'inherit',
             }"
           >
-            {{ line || "\u00a0" }}
+            {{ item.line || "\u00a0" }}
           </div>
         </template>
       </div>
@@ -960,7 +960,20 @@ export default {
   computed: {
     infoLines() {
       if (!this.infoText) return [];
-      return this.infoText.split("\n");
+      const lines = this.infoText.split("\n");
+      let inVideo = false;
+      return lines.map((line) => {
+        if (
+          line &&
+          !line.includes(":") &&
+          line.trim() === line &&
+          line.trim().length > 0 &&
+          !/^=+$/.test(line)
+        ) {
+          inVideo = /^Video\b/.test(line.trim());
+        }
+        return { line, inVideo };
+      });
     },
   },
   methods: {
@@ -1865,9 +1878,11 @@ export default {
         const fileName = relPath.split("/").pop();
         this.infoFileName = fileName;
         const node = this.findNodeByPath(relPath);
+        let sizeStr = "";
+        let dateStr = "";
         if (node && node.size != null) {
-          const sizeStr = this.formatFileSize(node.size);
-          const dateStr = node.date || "";
+          sizeStr = this.formatFileSize(node.size);
+          dateStr = node.date || "";
           this.infoFileMeta = dateStr ? `${sizeStr} | ${dateStr}` : sizeStr;
         }
         if (!VIDEO_EXTS.has(getExt(fileName))) {
@@ -1884,14 +1899,36 @@ export default {
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
           this.infoText = data.output || "";
+          let widthStr = "";
+          let rateStr = "";
+          let durStr = "";
           const widthMatch = this.infoText.match(
             /^Width\s+:\s+(\d[\d\s]*)pixels/m,
           );
           if (widthMatch) {
-            const width = widthMatch[1].replace(/\s/g, "");
-            const parts = [this.infoFileMeta, width + " px"].filter(Boolean);
-            this.infoFileMeta = parts.join(" | ");
+            widthStr = widthMatch[1].replace(/\s/g, "") + " px";
           }
+          const bitrateMatch = this.infoText.match(
+            /^Bit rate\s+:\s+([\d\s]+kb\/s)/m,
+          );
+          if (bitrateMatch) {
+            rateStr = bitrateMatch[1].replace(/\s(?=\d)/g, "").trim();
+          }
+          const videoSecs = this.infoText.split(/\n\n+/);
+          const videoSec = videoSecs.find((s) => /^Video\b/.test(s.trim()));
+          if (videoSec) {
+            const durLine = videoSec.match(/^Duration\s+:\s+(.+)/m);
+            if (durLine) {
+              const raw = durLine[1];
+              const hm = raw.match(/(\d+)\s*h/);
+              const mm = raw.match(/(\d+)\s*min/);
+              const total = (hm ? parseInt(hm[1]) : 0) * 60 + (mm ? parseInt(mm[1]) : 0);
+              if (total > 0) durStr = total + " min";
+            }
+          }
+          this.infoFileMeta = [sizeStr, durStr, dateStr, widthStr, rateStr]
+            .filter(Boolean)
+            .join(" | ");
         } catch (e) {
           this.infoText = `Error: ${e.message}`;
         } finally {
@@ -1903,13 +1940,15 @@ export default {
         for (const relPath of filePaths) {
           const fileName = relPath.split("/").pop();
           const node = this.findNodeByPath(relPath);
-          let meta = "";
+          let sizeStr = "";
+          let dateStr = "";
           if (node && node.size != null) {
-            const sizeStr = this.formatFileSize(node.size);
-            const dateStr = node.date || "";
-            meta = dateStr ? `${sizeStr} | ${dateStr}` : sizeStr;
+            sizeStr = this.formatFileSize(node.size);
+            dateStr = node.date || "";
           }
-          let width = "";
+          let wStr = "";
+          let rStr = "";
+          let dStr = "";
           if (VIDEO_EXTS.has(getExt(fileName))) {
             try {
               const url = `${config.torrentsApiUrl}/api/local/mediainfo`;
@@ -1921,11 +1960,25 @@ export default {
               const data = await res.json();
               if (res.ok && data.output) {
                 const wm = data.output.match(/^Width\s+:\s+(\d[\d\s]*)pixels/m);
-                if (wm) width = wm[1].replace(/\s/g, "") + " px";
+                if (wm) wStr = wm[1].replace(/\s/g, "") + " px";
+                const bm = data.output.match(/^Bit rate\s+:\s+([\d\s]+kb\/s)/m);
+                if (bm) rStr = bm[1].replace(/\s(?=\d)/g, "").trim();
+                const vSecs = data.output.split(/\n\n+/);
+                const vSec = vSecs.find((s) => /^Video\b/.test(s.trim()));
+                if (vSec) {
+                  const durLine = vSec.match(/^Duration\s+:\s+(.+)/m);
+                  if (durLine) {
+                    const raw = durLine[1];
+                    const hm = raw.match(/(\d+)\s*h/);
+                    const mm = raw.match(/(\d+)\s*min/);
+                    const total = (hm ? parseInt(hm[1]) : 0) * 60 + (mm ? parseInt(mm[1]) : 0);
+                    if (total > 0) dStr = total + " min";
+                  }
+                }
               }
             } catch (_) {}
           }
-          if (width) meta = meta ? `${meta} | ${width}` : width;
+          const meta = [sizeStr, dStr, dateStr, wStr, rStr].filter(Boolean).join(" | ");
           entries.push({ name: fileName, meta });
         }
         this.infoMultiFiles = entries;

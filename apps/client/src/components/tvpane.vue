@@ -241,9 +241,12 @@ export default {
       this._repeatActive = true;
       fetch(`${config.tvTvUrl}/tv/key/${key}`).catch(() => {});
       if (this.mode === "fire") {
+        let count = 0;
         const tick = () => {
           if (!this._repeatActive) return;
-          fetch(`${config.tvTvUrl}/tv/key/${key}`).catch(() => {});
+          const mult = key === "left" ? 3 : 1;
+          const n = (count++ < 3 ? 1 : 3) * mult;
+          fetch(`${config.tvTvUrl}/tv/key/${key}?n=${n}`).catch(() => {});
           this._repeatTimer = setTimeout(tick, 600);
         };
         this._repeatDelay = setTimeout(tick, 600);

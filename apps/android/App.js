@@ -51,9 +51,12 @@ export default function App() {
     repeatActiveRef.current = true;
     fetch(`${TV_TV_URL}/tv/key/${key}`).catch(() => {});
     if (mode === "fire") {
+      let count = 0;
       const tick = () => {
         if (!repeatActiveRef.current) return;
-        fetch(`${TV_TV_URL}/tv/key/${key}`).catch(() => {});
+        const mult = key === "left" ? 3 : 1;
+        const n = (count++ < 3 ? 1 : 3) * mult;
+        fetch(`${TV_TV_URL}/tv/key/${key}?n=${n}`).catch(() => {});
         repeatTimeoutRef.current = setTimeout(tick, 600);
       };
       repeatDelayRef.current = setTimeout(tick, 600);

@@ -332,9 +332,12 @@ app.get("/tv/emby", (req, res) => {
       source: "Emby",
     });
   } else if (tvMode === "fire") {
-    callService("androidtv", "adb_command", FIRE_TV_ENTITY_ID, {
-      command: "am start -n tv.emby.embyatv/.startup.StartupActivity",
-    });
+    exec(
+      `adb -s ${FIRE_TV_IP}:5555 shell am start -n tv.emby.embyatv/.startup.StartupActivity`,
+      (err) => {
+        if (err) log(`[fire] adb emby error: ${err.message}`);
+      },
+    );
   } else {
     callService("remote", "turn_on", REMOTE_ENTITY_ID, {
       activity: "tv.emby.embyatv",
@@ -403,22 +406,12 @@ app.get("/tv/key/:key", (req, res) => {
   }
 
   if (tvMode === "fire") {
-    // Fire TV uses androidtv.adb_command via media_player entity
-    const cmd = {
-      type: "call_service",
-      domain: "androidtv",
-      service: "adb_command",
-      target: { entity_id: FIRE_TV_ENTITY_ID },
-      service_data: { command: `input keyevent ${command}` },
-    };
-    const isArrow = ["up", "down", "left", "right"].includes(req.params.key);
-    if (isArrow) {
-      cmd.id = ++cmdId;
-      if (ws) ws.send(JSON.stringify(cmd));
-    } else {
-      sendCmd(cmd);
-    }
-    log(`[fire] adb keyevent ${command} from ${client(req)}`);
+    const n = Math.min(parseInt(req.query.n) || 1, 5);
+    const keys = Array(n).fill(command).join(" ");
+    exec(`adb -s ${FIRE_TV_IP}:5555 shell input keyevent ${keys}`, (err) => {
+      if (err) log(`[fire] adb error: ${err.message}`);
+    });
+    log(`[fire] adb keyevent ${keys} from ${client(req)}`);
     res.json({ ok: true, command, mode: tvMode });
     return;
   }

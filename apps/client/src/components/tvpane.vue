@@ -239,6 +239,14 @@ export default {
       if (!this._debounce()) return;
       this.flash(key);
       this._repeatActive = true;
+      if (this.mode === "fire") {
+        (async () => {
+          while (this._repeatActive) {
+            await fetch(`${config.tvTvUrl}/tv/key/${key}`).catch(() => {});
+          }
+        })();
+        return;
+      }
       fetch(`${config.tvTvUrl}/tv/key/${key}`).catch(() => {});
       let count = 0;
       const tick = () => {

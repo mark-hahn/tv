@@ -48,6 +48,14 @@ export default function App() {
     if (!debounce()) return;
     flash(key);
     repeatActiveRef.current = true;
+    if (mode === "fire") {
+      (async () => {
+        while (repeatActiveRef.current) {
+          await fetch(`${TV_TV_URL}/tv/key/${key}`).catch(() => {});
+        }
+      })();
+      return;
+    }
     fetch(`${TV_TV_URL}/tv/key/${key}`).catch(() => {});
     let count = 0;
     const tick = () => {

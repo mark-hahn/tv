@@ -332,8 +332,8 @@ app.get("/tv/emby", (req, res) => {
       source: "Emby",
     });
   } else if (tvMode === "fire") {
-    callService("remote", "send_command", FIRE_TV_REMOTE_ID, {
-      command: "HOME",
+    callService("androidtv", "adb_command", FIRE_TV_ENTITY_ID, {
+      command: "am start -n tv.emby.embyatv/.startup.StartupActivity",
     });
   } else {
     callService("remote", "turn_on", REMOTE_ENTITY_ID, {

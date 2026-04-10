@@ -114,46 +114,62 @@
       >
         Mute
       </div>
-      <!-- Row 5: google, roku, off -->
-      <div
-        :style="modeBtnStyle('google')"
-        @mousedown="startHold(() => setMode('google'))"
-        @mouseup="stopHold"
-        @mouseleave="stopHold"
-        @touchstart.prevent="startHold(() => setMode('google'))"
-        @touchend="stopHold"
-      >
-        Google
-      </div>
-      <div
-        :style="modeBtnStyle('roku')"
-        @mousedown="startHold(() => setMode('roku'))"
-        @mouseup="stopHold"
-        @mouseleave="stopHold"
-        @touchstart.prevent="startHold(() => setMode('roku'))"
-        @touchend="stopHold"
-      >
-        Roku
-      </div>
-      <div
-        :style="offBtnStyle"
-        @mousedown="
-          startHold(() => {
-            flash('off');
-            tvCmd('off');
-          })
-        "
-        @mouseup="stopHold"
-        @mouseleave="stopHold"
-        @touchstart.prevent="
-          startHold(() => {
-            flash('off');
-            tvCmd('off');
-          })
-        "
-        @touchend="stopHold"
-      >
-        Off
+      <!-- Row 5: google, fire, roku, off (spans all 3 cols, inner 4-col flex) -->
+      <div style="grid-column: 1 / -1; display: flex">
+        <div
+          :style="modeBtnStyle('google')"
+          style="flex: 1"
+          @mousedown="startHold(() => setMode('google'))"
+          @mouseup="stopHold"
+          @mouseleave="stopHold"
+          @touchstart.prevent="startHold(() => setMode('google'))"
+          @touchend="stopHold"
+        >
+          Google
+        </div>
+        <div
+          :style="modeBtnStyle('fire')"
+          style="flex: 1"
+          @mousedown="startHold(() => setMode('fire'))"
+          @mouseup="stopHold"
+          @mouseleave="stopHold"
+          @touchstart.prevent="startHold(() => setMode('fire'))"
+          @touchend="stopHold"
+        >
+          Fire
+        </div>
+        <div
+          :style="modeBtnStyle('roku')"
+          style="flex: 1"
+          @mousedown="startHold(() => setMode('roku'))"
+          @mouseup="stopHold"
+          @mouseleave="stopHold"
+          @touchstart.prevent="startHold(() => setMode('roku'))"
+          @touchend="stopHold"
+        >
+          Roku
+        </div>
+        <div
+          :style="offBtnStyle"
+          style="flex: 1"
+          @mousedown="
+            startHold(() => {
+              flash('off');
+              tvCmd('off');
+            })
+          "
+          @mouseup="stopHold"
+          @mouseleave="stopHold"
+          @touchstart.prevent="
+            startHold(() => {
+              flash('off');
+              tvCmd('off');
+            })
+          "
+          @touchend="stopHold"
+        >
+          Off
+        </div>
       </div>
     </div>
   </div>
@@ -292,6 +308,7 @@ export default {
       if (data.power) this.power = data.power;
       if (data.activeDevice !== undefined)
         this.activeDevice = data.activeDevice;
+      if (data.mode) this.mode = data.mode;
     },
 
     async pollMute() {
@@ -315,7 +332,9 @@ export default {
     },
 
     async tvCmd(cmd) {
-      if (this.power === "off" || this.power === "standby") return;      this.flash(cmd);      if (!this._debounce()) return;
+      if (this.power === "off" || this.power === "standby") return;
+      this.flash(cmd);
+      if (!this._debounce()) return;
       const res = await fetch(`${config.tvTvUrl}/tv/${cmd}`);
       const data = await res.json();
       if (cmd === "mute" && data.ok) this.muted = data.muted;
@@ -323,7 +342,9 @@ export default {
     },
 
     async tvVolCmd(dir) {
-      if (this.power === "off" || this.power === "standby") return;      this.flash(dir === 'down' ? 'vold' : 'volu');      fetch(`${config.tvTvUrl}/tv/vol/${dir}`).catch(() => {});
+      if (this.power === "off" || this.power === "standby") return;
+      this.flash(dir === "down" ? "vold" : "volu");
+      fetch(`${config.tvTvUrl}/tv/vol/${dir}`).catch(() => {});
     },
 
     async _tvKeyRaw(key) {
@@ -333,7 +354,9 @@ export default {
     },
 
     async tvKey(key) {
-      if (this.power === "off" || this.power === "standby") return;      this.flash(key);      const res = await fetch(`${config.tvTvUrl}/tv/key/${key}`);
+      if (this.power === "off" || this.power === "standby") return;
+      this.flash(key);
+      const res = await fetch(`${config.tvTvUrl}/tv/key/${key}`);
       const data = await res.json();
       console.log(`[TV] key ${key} response:`, data);
     },

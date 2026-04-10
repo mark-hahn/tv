@@ -14,6 +14,9 @@ const REMOTE_ENTITY_ID = "remote.living_room_tv";
 const IR_REMOTE_ID = "remote.tv_ir";
 const IR_DEVICE = "bdv_n7100w";
 const ROKU_REMOTE_ID = "remote.roku_2";
+const FIRE_TV_ENTITY_ID = "media_player.fire_tv_192_168_1_47";
+const FIRE_TV_REMOTE_ID = "remote.fire_tv_192_168_1_47";
+const FIRE_TV_IP = "192.168.1.47";
 const BRAVIA_HOST = "192.168.1.12";
 const BRAVIA_PORT = 2870;
 const BROADLINK_HOST = "192.168.1.23";
@@ -152,7 +155,8 @@ let cmdId = 0;
 let authenticated = false;
 let castState = "unknown";
 let tvPowerState = "unknown";
-let tvMode = "google"; // "google" | "roku"
+let fireTvState = "unknown";
+let tvMode = "google"; // "google" | "fire" | "roku"
 let activeDevice = null; // "google" | "roku"
 let lastOffAt = 0;
 const prevSessions = {};
@@ -222,6 +226,8 @@ function handleMsg(raw) {
         IR_REMOTE_ID,
         ROKU_REMOTE_ID,
         "media_player.roku_2",
+        FIRE_TV_ENTITY_ID,
+        FIRE_TV_REMOTE_ID,
       ]);
       if (WATCHED.has(id) && state !== prev) {
         log(`HA state: ${id} ${prev} -> ${state}`);
@@ -230,6 +236,7 @@ function handleMsg(raw) {
       if (id === TV_ENTITY_ID && state !== tvPowerState) {
         tvPowerState = state;
       }
+      if (id === FIRE_TV_ENTITY_ID) fireTvState = state;
     }
   }
 }
@@ -264,7 +271,7 @@ app.get("/tv/on", (req, res) => {
 
 app.get("/tv/mode/:mode", (req, res) => {
   const mode = req.params.mode;
-  if (mode !== "google" && mode !== "roku") {
+  if (mode !== "google" && mode !== "fire" && mode !== "roku") {
     res.status(400).json({ ok: false, error: "unknown mode" });
     return;
   }
@@ -287,7 +294,14 @@ app.get("/tv/mode/:mode", (req, res) => {
         }),
       5000,
     );
+  } else if (mode === "fire") {
+    callService("media_player", "turn_on", FIRE_TV_ENTITY_ID);
+    setTimeout(
+      () => callService("media_player", "media_stop", FIRE_TV_ENTITY_ID),
+      2000,
+    );
   } else {
+    // google
     callService("media_player", "turn_on", TV_ENTITY_ID);
     setTimeout(
       () =>
@@ -316,6 +330,10 @@ app.get("/tv/emby", (req, res) => {
   if (tvMode === "roku") {
     callService("media_player", "select_source", "media_player.roku_2", {
       source: "Emby",
+    });
+  } else if (tvMode === "fire") {
+    callService("remote", "send_command", FIRE_TV_REMOTE_ID, {
+      command: "HOME",
     });
   } else {
     callService("remote", "turn_on", REMOTE_ENTITY_ID, {
@@ -362,13 +380,49 @@ app.get("/tv/key/:key", (req, res) => {
     home: "Home",
     back: "Back",
   };
-  const keyMap = tvMode === "roku" ? ROKU_KEY_MAP : GOOGLE_KEY_MAP;
+  const FIRE_KEY_MAP = {
+    ok: "23", // KEYCODE_DPAD_CENTER
+    up: "19", // KEYCODE_DPAD_UP
+    down: "20", // KEYCODE_DPAD_DOWN
+    left: "21", // KEYCODE_DPAD_LEFT
+    right: "22", // KEYCODE_DPAD_RIGHT
+    home: "3", // KEYCODE_HOME
+    back: "4", // KEYCODE_BACK
+  };
+  const keyMap =
+    tvMode === "roku"
+      ? ROKU_KEY_MAP
+      : tvMode === "fire"
+        ? FIRE_KEY_MAP
+        : GOOGLE_KEY_MAP;
   const remoteId = tvMode === "roku" ? ROKU_REMOTE_ID : REMOTE_ENTITY_ID;
   const command = keyMap[req.params.key];
   if (!command) {
     res.status(400).json({ ok: false, error: "unknown key" });
     return;
   }
+
+  if (tvMode === "fire") {
+    // Fire TV uses androidtv.adb_command via media_player entity
+    const cmd = {
+      type: "call_service",
+      domain: "androidtv",
+      service: "adb_command",
+      target: { entity_id: FIRE_TV_ENTITY_ID },
+      service_data: { command: `input keyevent ${command}` },
+    };
+    const isArrow = ["up", "down", "left", "right"].includes(req.params.key);
+    if (isArrow) {
+      cmd.id = ++cmdId;
+      if (ws) ws.send(JSON.stringify(cmd));
+    } else {
+      sendCmd(cmd);
+    }
+    log(`[fire] adb keyevent ${command} from ${client(req)}`);
+    res.json({ ok: true, command, mode: tvMode });
+    return;
+  }
+
   const cmd = {
     type: "call_service",
     domain: "remote",
@@ -460,16 +514,52 @@ app.get("/tv/mute", (req, res) => {
 });
 
 async function pushMuteState() {
+  const recentlyOff = Date.now() - lastOffAt < 30000;
+  if (recentlyOff) {
+    await fetch(`${SRVR_INTERNAL_URL}/internal/tv-state`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        muted: null,
+        power: "off",
+        activeDevice,
+        mode: tvMode,
+      }),
+    }).catch(() => {});
+    return;
+  }
+  // In fire mode, use fire TV state to determine power
+  if (tvMode === "fire") {
+    const fireOn =
+      fireTvState !== "off" &&
+      fireTvState !== "unavailable" &&
+      fireTvState !== "unknown";
+    const [muted, pingOk] = await Promise.all([
+      braviaGetMute().catch(() => null),
+      braviaPing(),
+    ]);
+    const power = fireOn || muted !== null || pingOk ? "on" : "off";
+    await fetch(`${SRVR_INTERNAL_URL}/internal/tv-state`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ muted, power, activeDevice, mode: tvMode }),
+    }).catch(() => {});
+    return;
+  }
   const haOff =
     tvPowerState === "off" ||
     tvPowerState === "unavailable" ||
     tvPowerState === "unknown";
-  const recentlyOff = Date.now() - lastOffAt < 30000;
-  if (haOff || recentlyOff) {
+  if (haOff) {
     await fetch(`${SRVR_INTERNAL_URL}/internal/tv-state`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ muted: null, power: "off", activeDevice }),
+      body: JSON.stringify({
+        muted: null,
+        power: "off",
+        activeDevice,
+        mode: tvMode,
+      }),
     }).catch(() => {});
     return;
   }
@@ -482,7 +572,12 @@ async function pushMuteState() {
   await fetch(`${SRVR_INTERNAL_URL}/internal/tv-state`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ muted, power: effectivePower, activeDevice }),
+    body: JSON.stringify({
+      muted,
+      power: effectivePower,
+      activeDevice,
+      mode: tvMode,
+    }),
   }).catch(() => {});
 }
 

@@ -17,9 +17,11 @@ export default function App() {
 
   const onGridLayout = ({ nativeEvent: { layout } }) => {
     if (layout.width < 10 || layout.height < 10) return;
+    const hMain = Math.floor((layout.height - BORDER * (ROWS - 1)) / 4.5);
     setCellDims({
       w: Math.floor((layout.width - BORDER * (COLS - 1)) / COLS),
-      h: Math.floor((layout.height - BORDER * (ROWS - 1)) / ROWS),
+      h: hMain,
+      h5: Math.floor(hMain / 2),
     });
   };
   const [power, setPower] = useState("unknown");
@@ -297,20 +299,32 @@ export default function App() {
       onPress: () => {},
       onPressIn: () => tvCmd("mute"),
     },
-    // Row 5: google, roku, off
+    // Row 5: google, fire, roku, off (4-col row)
     {
       key: "google",
       label: "Google",
       tinyText: true,
+      row5: true,
       bg: () => modeBg("google"),
       onPress: () => {},
       onPressIn: () => startHold(() => handleSetMode("google")),
       onPressOut: stopHold,
     },
     {
+      key: "fire",
+      label: "Fire",
+      tinyText: true,
+      row5: true,
+      bg: () => modeBg("fire"),
+      onPress: () => {},
+      onPressIn: () => startHold(() => handleSetMode("fire")),
+      onPressOut: stopHold,
+    },
+    {
       key: "roku",
       label: "Roku",
       tinyText: true,
+      row5: true,
       bg: () => modeBg("roku"),
       onPress: () => {},
       onPressIn: () => startHold(() => handleSetMode("roku")),
@@ -320,6 +334,7 @@ export default function App() {
       key: "off",
       label: "Off",
       tinyText: true,
+      row5: true,
       bg: () => offBg,
       onPress: () => {},
       onPressIn: () =>
@@ -331,50 +346,61 @@ export default function App() {
     },
   ];
 
+  const mainButtons = buttons.filter((b) => !b.row5);
+  const row5Buttons = buttons.filter((b) => b.row5);
+
+  const renderBtn = (btn, extraStyle) => (
+    <View
+      key={btn.key}
+      style={[
+        styles.cell,
+        { backgroundColor: btn.bg(), height: cellDims.h },
+        extraStyle,
+      ]}
+      onStartShouldSetResponder={() => true}
+      onResponderTerminationRequest={() => false}
+      onResponderGrant={() => {
+        if (btn.onPressIn) btn.onPressIn();
+      }}
+      onResponderRelease={() => {
+        if (btn.onPressOut) btn.onPressOut();
+      }}
+      onResponderTerminate={() => {
+        if (btn.onPressOut) btn.onPressOut();
+      }}
+    >
+      {btn.icon ? (
+        btn.icon
+      ) : (
+        <Text
+          style={[
+            styles.cellText,
+            btn.smallText && styles.cellTextSmall,
+            btn.tinyText && styles.cellTextTiny,
+            btn.largeText && styles.cellTextLarge,
+          ]}
+        >
+          {btn.label}
+        </Text>
+      )}
+    </View>
+  );
+
   return (
     <View style={styles.container}>
       <StatusBar hidden />
       <View style={styles.grid} onLayout={onGridLayout}>
         {cellDims.w > 0 &&
-          buttons.map((btn) => (
-            <View
-              key={btn.key}
-              style={[
-                styles.cell,
-                {
-                  backgroundColor: btn.bg(),
-                  width: cellDims.w,
-                  height: cellDims.h,
-                },
-              ]}
-              onStartShouldSetResponder={() => true}
-              onResponderTerminationRequest={() => false}
-              onResponderGrant={() => {
-                if (btn.onPressIn) btn.onPressIn();
-              }}
-              onResponderRelease={() => {
-                if (btn.onPressOut) btn.onPressOut();
-              }}
-              onResponderTerminate={() => {
-                if (btn.onPressOut) btn.onPressOut();
-              }}
-            >
-              {btn.icon ? (
-                btn.icon
-              ) : (
-                <Text
-                  style={[
-                    styles.cellText,
-                    btn.smallText && styles.cellTextSmall,
-                    btn.tinyText && styles.cellTextTiny,
-                    btn.largeText && styles.cellTextLarge,
-                  ]}
-                >
-                  {btn.label}
-                </Text>
-              )}
-            </View>
-          ))}
+          mainButtons.map((btn) => renderBtn(btn, { width: cellDims.w }))}
+        {cellDims.w > 0 && (
+          <View
+            style={{ width: "100%", flexDirection: "row", columnGap: BORDER }}
+          >
+            {row5Buttons.map((btn) =>
+              renderBtn(btn, { flex: 1, height: cellDims.h5 }),
+            )}
+          </View>
+        )}
       </View>
     </View>
   );

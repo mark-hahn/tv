@@ -239,15 +239,16 @@ export default {
       if (!this._debounce()) return;
       this.flash(key);
       this._repeatActive = true;
+      fetch(`${config.tvTvUrl}/tv/key/${key}`).catch(() => {});
       if (this.mode === "fire") {
-        (async () => {
-          while (this._repeatActive) {
-            await fetch(`${config.tvTvUrl}/tv/key/${key}`).catch(() => {});
-          }
-        })();
+        const tick = () => {
+          if (!this._repeatActive) return;
+          fetch(`${config.tvTvUrl}/tv/key/${key}`).catch(() => {});
+          this._repeatTimer = setTimeout(tick, 600);
+        };
+        this._repeatDelay = setTimeout(tick, 600);
         return;
       }
-      fetch(`${config.tvTvUrl}/tv/key/${key}`).catch(() => {});
       let count = 0;
       const tick = () => {
         if (!this._repeatActive) return;
@@ -270,6 +271,8 @@ export default {
 
     stopRepeat() {
       this._repeatActive = false;
+      clearTimeout(this._repeatDelay);
+      clearTimeout(this._repeatTimer);
     },
 
     startHold(action) {

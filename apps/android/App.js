@@ -32,6 +32,7 @@ export default function App() {
   const repeatDelayRef = useRef(null);
   const repeatTimeoutRef = useRef(null);
   const repeatActiveRef = useRef(false);
+  const repeatGenRef = useRef(0);
   const lastCmdRef = useRef(0);
   const lastVolRef = useRef(0);
   const holdRef = useRef(null);
@@ -48,15 +49,16 @@ export default function App() {
     if (!debounce()) return;
     flash(key);
     repeatActiveRef.current = true;
+    fetch(`${TV_TV_URL}/tv/key/${key}`).catch(() => {});
     if (mode === "fire") {
-      (async () => {
-        while (repeatActiveRef.current) {
-          await fetch(`${TV_TV_URL}/tv/key/${key}`).catch(() => {});
-        }
-      })();
+      const tick = () => {
+        if (!repeatActiveRef.current) return;
+        fetch(`${TV_TV_URL}/tv/key/${key}`).catch(() => {});
+        repeatTimeoutRef.current = setTimeout(tick, 600);
+      };
+      repeatDelayRef.current = setTimeout(tick, 600);
       return;
     }
-    fetch(`${TV_TV_URL}/tv/key/${key}`).catch(() => {});
     let count = 0;
     const tick = () => {
       if (!repeatActiveRef.current) return;

@@ -278,15 +278,7 @@ app.get("/tv/mode/:mode", (req, res) => {
   tvMode = mode;
   log(`mode set to ${mode} from ${client(req)}`);
   if (mode === "roku") {
-    callService("media_player", "turn_on", "media_player.roku_2");
-    callService("media_player", "turn_on", TV_ENTITY_ID);
-    setTimeout(
-      () =>
-        callService("remote", "send_command", ROKU_REMOTE_ID, {
-          command: "Home",
-        }),
-      2000,
-    );
+    callService("remote", "send_command", ROKU_REMOTE_ID, { command: "Home" });
     setTimeout(
       () =>
         callService("media_player", "select_source", "media_player.roku_2", {
@@ -297,8 +289,14 @@ app.get("/tv/mode/:mode", (req, res) => {
   } else if (mode === "fire") {
     callService("media_player", "turn_on", FIRE_TV_ENTITY_ID);
     setTimeout(
-      () => callService("media_player", "media_stop", FIRE_TV_ENTITY_ID),
-      2000,
+      () =>
+        exec(
+          `adb -s ${FIRE_TV_IP}:5555 shell am start -n tv.emby.embyatv/.startup.StartupActivity`,
+          (err) => {
+            if (err) log(`[fire] adb emby launch error: ${err.message}`);
+          },
+        ),
+      5000,
     );
   } else {
     // google
@@ -308,7 +306,7 @@ app.get("/tv/mode/:mode", (req, res) => {
         callService("remote", "send_command", REMOTE_ENTITY_ID, {
           command: "KEYCODE_HOME",
         }),
-      2000,
+      5000,
     );
     setTimeout(
       () =>
@@ -347,7 +345,8 @@ app.get("/tv/emby", (req, res) => {
 });
 
 app.get("/tv/off", (req, res) => {
-  log(`off from ${client(req)}`);
+  log(`off from ${client(req)} (mode: ${tvMode})`);
+  callService("media_player", "turn_off", "media_player.roku_2");
   callService("media_player", "turn_off", TV_ENTITY_ID);
   callService("remote", "turn_off", REMOTE_ENTITY_ID);
   lastOffAt = Date.now();

@@ -217,6 +217,7 @@ let braviaHaPower = "unknown";
 let tvMode = "google"; // "google" | "fire" | "roku"
 let activeDevice = null; // "google" | "roku"
 let lastOffAt = 0;
+let lastOnAt = 0;
 let currentShowName = null;
 const prevSessions = {};
 
@@ -386,6 +387,7 @@ app.get("/tv/mode/:mode", (req, res) => {
       5000,
     );
   }
+  lastOnAt = Date.now();
   res.json({ ok: true, mode });
   fetch(`${SRVR_INTERNAL_URL}/internal/tv-state`, {
     method: "POST",
@@ -533,6 +535,7 @@ app.get("/tv/mute", (req, res) => {
 });
 
 async function pushMuteState() {
+  const recentlyOn = Date.now() - lastOnAt < 30000;
   const recentlyOff = Date.now() - lastOffAt < 30000;
   if (recentlyOff) {
     await fetch(`${SRVR_INTERNAL_URL}/internal/tv-state`, {
@@ -574,7 +577,7 @@ async function pushMuteState() {
     tvPowerState === "off" ||
     tvPowerState === "unavailable" ||
     tvPowerState === "unknown";
-  if (haOff) {
+  if (haOff && !recentlyOn) {
     await fetch(`${SRVR_INTERNAL_URL}/internal/tv-state`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

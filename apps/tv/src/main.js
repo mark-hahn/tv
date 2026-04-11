@@ -17,7 +17,7 @@ const ROKU_REMOTE_ID = "remote.roku_2";
 const FIRE_TV_ENTITY_ID = "media_player.fire_tv_192_168_1_47";
 const FIRE_TV_REMOTE_ID = "remote.fire_tv_192_168_1_47";
 const FIRE_TV_IP = "192.168.1.47";
-const BRAVIA_ENTITY_ID = "media_player.bravia_7"; // TODO: confirm entity ID after adding Sony Bravia HA integration
+const BRAVIA_ENTITY_ID = "media_player.bravia_k_65xr70";
 const BROADLINK_HOST = "192.168.1.23";
 const BROADLINK_CODES = {
   vol_up:

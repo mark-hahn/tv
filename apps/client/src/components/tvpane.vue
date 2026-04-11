@@ -126,14 +126,14 @@
         Google
       </div>
       <div
-        :style="modeBtnStyle('roku')"
-        @mousedown="startHold(() => setMode('roku'))"
+        :style="modeBtnStyle('fire')"
+        @mousedown="startHold(() => setMode('fire'))"
         @mouseup="stopHold"
         @mouseleave="stopHold"
-        @touchstart.prevent="startHold(() => setMode('roku'))"
+        @touchstart.prevent="startHold(() => setMode('fire'))"
         @touchend="stopHold"
       >
-        Roku
+        Fire
       </div>
       <div
         :style="offBtnStyle"

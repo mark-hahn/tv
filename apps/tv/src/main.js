@@ -8,9 +8,10 @@ const HA_HOST = "hahnca.com:8123";
 const HA_ACCESS_TOKEN =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIzM2Y2MmI0MWZjYTY0YTE1YWU2MjFlZDg2NGJmM2NmYyIsImlhdCI6MTc3MDc5NjQ0NywiZXhwIjoyMDg2MTU2NDQ3fQ.AoUSLrAjOWEhR2pQVeuuykKYPoXqyrnmecQMQkdrgp8";
 const TV_PORT = 3004;
-const TV_ENTITY_ID = "media_player.living_room_tv";
+const TV_ENTITY_ID = "media_player.bravia_k_65xr70";
 const CAST_ENTITY_ID = "media_player.living_room_tv_2";
-const REMOTE_ENTITY_ID = "remote.living_room_tv";
+const REMOTE_ENTITY_ID = "remote.bravia_k_65xr70";
+// TV_ENTITY_ID and BRAVIA_ENTITY_ID are the same device; BRAVIA_ENTITY_ID used for vol/mute
 const IR_REMOTE_ID = "remote.tv_ir";
 const IR_DEVICE = "bdv_n7100w";
 const ROKU_REMOTE_ID = "remote.roku_2";
@@ -406,8 +407,10 @@ app.get("/tv/emby", (req, res) => {
       },
     );
   } else {
-    callService("remote", "turn_on", REMOTE_ENTITY_ID, {
-      activity: "tv.emby.embyatv",
+    callService("media_player", "play_media", TV_ENTITY_ID, {
+      media_content_type: "app",
+      media_content_id:
+        "com.sony.dtv.tv.emby.embyatv.tv.emby.embyatv.startup.StartupActivity",
     });
   }
   res.json({ ok: true });
@@ -434,13 +437,13 @@ app.get("/tv/off", (req, res) => {
 
 app.get("/tv/key/:key", (req, res) => {
   const GOOGLE_KEY_MAP = {
-    ok: "KEYCODE_DPAD_CENTER",
-    up: "KEYCODE_DPAD_UP",
-    down: "KEYCODE_DPAD_DOWN",
-    left: "KEYCODE_DPAD_LEFT",
-    right: "KEYCODE_DPAD_RIGHT",
-    home: "KEYCODE_HOME",
-    back: "KEYCODE_BACK",
+    ok: "Confirm",
+    up: "Up",
+    down: "Down",
+    left: "Left",
+    right: "Right",
+    home: "Home",
+    back: "Return",
   };
   const ROKU_KEY_MAP = {
     ok: "Select",
@@ -506,23 +509,26 @@ app.get("/tv/key/:key", (req, res) => {
 // State is tracked from HA WebSocket in braviaHaMuted / braviaHaPower.
 // Volume/mute control via HA media_player services.
 
-app.get("/tv/vol/:dir", async (req, res) => {
+app.get("/tv/vol/:dir", (req, res) => {
   const dir = req.params.dir;
   if (dir !== "up" && dir !== "down") {
     res.status(400).json({ ok: false, error: "unknown dir" });
     return;
   }
-  await broadlinkSend(dir === "up" ? "vol_up" : "vol_down");
+  callService(
+    "media_player",
+    dir === "up" ? "volume_up" : "volume_down",
+    BRAVIA_ENTITY_ID,
+  );
   log(`vol ${dir} sent from ${client(req)}`);
   res.json({ ok: true });
 });
 
 app.get("/tv/mute", (req, res) => {
-  callService("remote", "send_command", IR_REMOTE_ID, {
-    device: IR_DEVICE,
-    command: "mute",
+  callService("media_player", "volume_mute", BRAVIA_ENTITY_ID, {
+    is_volume_muted: !braviaHaMuted,
   });
-  log(`mute sent via HA IR from ${client(req)}`);
+  log(`mute sent via HA Bravia from ${client(req)}`);
   res.json({ ok: true });
 });
 

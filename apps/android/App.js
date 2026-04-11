@@ -308,12 +308,12 @@ export default function App() {
       onPressOut: stopHold,
     },
     {
-      key: "roku",
-      label: "Roku",
+      key: "fire",
+      label: "Fire",
       tinyText: true,
-      bg: () => modeBg("roku"),
+      bg: () => modeBg("fire"),
       onPress: () => {},
-      onPressIn: () => startHold(() => handleSetMode("roku")),
+      onPressIn: () => startHold(() => handleSetMode("fire")),
       onPressOut: stopHold,
     },
     {

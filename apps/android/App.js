@@ -25,6 +25,8 @@ export default function App() {
   const [power, setPower] = useState("unknown");
   const [flashBtn, setFlashBtn] = useState(null);
   const [activeDevice, setActiveDevice] = useState(null);
+  const [haState, setHaState] = useState(null);
+  const [mediaTitle, setMediaTitle] = useState(null);
 
   const wsRef = useRef(null);
   const repeatDelayRef = useRef(null);
@@ -83,6 +85,8 @@ export default function App() {
     if (data.power) setPower(data.power);
     if (data.activeDevice !== undefined) setActiveDevice(data.activeDevice);
     if (data.mode) setModeState(data.mode);
+    if (data.state !== undefined) setHaState(data.state);
+    if (data.mediaTitle !== undefined) setMediaTitle(data.mediaTitle);
   };
 
   const pollMute = async () => {
@@ -181,12 +185,14 @@ export default function App() {
   const muteBg =
     flashBtn === "mute" ? "orange" : muted ? "#ffb3b3" : "lightgreen";
 
-  const offBg = flashBtn === "off" ? "orange" : isOff ? "lightblue" : "white";
+  const haStateOn = haState && haState !== "off" && haState !== "unavailable" && haState !== "unknown";
+  const offActive = !haState || haState === "off" || haState === "unavailable" || haState === "unknown";
+  const offBg = flashBtn === "off" ? "orange" : offActive ? "lightblue" : "white";
 
   const modeBg = (m) => {
     if (flashBtn === m) return "orange";
-    if (!isOff && mode === m) return "lightblue";
-    return "white";
+    const active = haStateOn && (m === "fire" ? mediaTitle === "Fire TV Stick" : mediaTitle !== "Fire TV Stick");
+    return active ? "lightblue" : "white";
   };
 
   // Button definitions — matches tvpane.vue grid order (row-major, 3 cols x 5 rows)

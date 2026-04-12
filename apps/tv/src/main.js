@@ -252,6 +252,7 @@ function handleMsg(raw) {
           braviaMediaContentType = attrs.media_content_type ?? null;
           braviaMediaTitle = attrs.media_title ?? null;
         }
+        pushTvState().catch(() => {});
       }
     }
   }

@@ -185,6 +185,8 @@ export default {
       power: "unknown",
       flashBtn: null,
       activeDevice: null,
+      haState: null,
+      mediaTitle: null,
     };
   },
 
@@ -199,9 +201,9 @@ export default {
       return { ...CELL_BASE, backgroundColor: bg };
     },
     offBtnStyle() {
-      const isOff = this.power === "off" || this.power === "standby";
+      const active = !this.haState || this.haState === "off" || this.haState === "unavailable" || this.haState === "unknown";
       const bg =
-        this.flashBtn === "off" ? "orange" : isOff ? "lightblue" : "white";
+        this.flashBtn === "off" ? "orange" : active ? "lightblue" : "white";
       return { ...CELL_BASE, backgroundColor: bg };
     },
   },
@@ -257,13 +259,9 @@ export default {
     },
 
     modeBtnStyle(m) {
-      const isOff = this.power === "off" || this.power === "standby";
-      const bg =
-        this.flashBtn === m
-          ? "orange"
-          : !isOff && this.mode === m
-            ? "lightblue"
-            : "white";
+      const on = this.haState && this.haState !== "off" && this.haState !== "unavailable" && this.haState !== "unknown";
+      const active = on && (m === "fire" ? this.mediaTitle === "Fire TV Stick" : this.mediaTitle !== "Fire TV Stick");
+      const bg = this.flashBtn === m ? "orange" : active ? "lightblue" : "white";
       return { ...CELL_BASE, backgroundColor: bg };
     },
 
@@ -290,8 +288,9 @@ export default {
       if (!data) return;
       if (data.muted !== null) this.muted = data.muted;
       if (data.power) this.power = data.power;
-      if (data.activeDevice !== undefined)
-        this.activeDevice = data.activeDevice;
+      if (data.activeDevice !== undefined) this.activeDevice = data.activeDevice;
+      if (data.state !== undefined) this.haState = data.state;
+      if (data.mediaTitle !== undefined) this.mediaTitle = data.mediaTitle;
     },
 
     async pollMute() {

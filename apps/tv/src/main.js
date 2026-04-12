@@ -17,6 +17,9 @@ const EMBY_HOST = "hahnca.com:8920";
 const EMBY_API_KEY = "1c399bd079d549cba8c916244d3add2b";
 const SRVR_INTERNAL_URL = "http://127.0.0.1:8739";
 
+const GOOGLE_HOME_DELAY_MS = 5000; // ms after TV turns on before sending Home key
+const GOOGLE_EMBY_DELAY_MS = 15000; // ms after TV turns on before launching Emby
+
 // PST LA timestamp  MM-DD HH:mm
 function ts() {
   return new Date()
@@ -267,7 +270,7 @@ function handleMsg(raw) {
             callService("remote", "send_command", REMOTE_ENTITY_ID, {
               command: "Home",
             });
-          }, 5000);
+          }, GOOGLE_HOME_DELAY_MS);
           setTimeout(
             () =>
               callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
@@ -275,7 +278,7 @@ function handleMsg(raw) {
                 media_content_id:
                   "com.sony.dtv.tv.emby.embyatv.tv.emby.embyatv.startup.StartupActivity",
               }),
-            15000,
+            GOOGLE_EMBY_DELAY_MS,
           );
         }
         // HDMI 2 selected but no CEC signal → Fire Stick is in standby; wake it
@@ -335,7 +338,7 @@ app.get("/tv/googlebtn", (req, res) => {
         media_content_id:
           "com.sony.dtv.tv.emby.embyatv.tv.emby.embyatv.startup.StartupActivity",
       });
-    }, 10000);
+    }, GOOGLE_EMBY_DELAY_MS);
   } else {
     // TV off — wait for state_changed on transition to "on"
     pendingGoogleHome = true;
@@ -397,7 +400,7 @@ app.get("/tv/mode/:mode", (req, res) => {
         callService("remote", "send_command", REMOTE_ENTITY_ID, {
           command: "Home",
         }),
-      5000,
+      GOOGLE_HOME_DELAY_MS,
     );
     setTimeout(
       () =>
@@ -406,7 +409,7 @@ app.get("/tv/mode/:mode", (req, res) => {
           media_content_id:
             "com.sony.dtv.tv.emby.embyatv.tv.emby.embyatv.startup.StartupActivity",
         }),
-      5000,
+      GOOGLE_EMBY_DELAY_MS,
     );
   }
   lastOnAt = Date.now();

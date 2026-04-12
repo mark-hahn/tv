@@ -972,11 +972,11 @@ function pstStamp() {
   return `${get("month")}-${get("day")} ${get("hour")}:${get("minute")}:${get("second")}`;
 }
 
-function appendBkgndLog(logPath, videoPath, fromPending) {
+function appendBkgndLog(logPath, videoPath, fromPending, stalled = false) {
   fs.mkdirSync(path.dirname(logPath), { recursive: true });
   const relPath = path.relative(TV_ROOT, videoPath);
-  const marker = fromPending ? "* " : "  ";
-  fs.appendFileSync(logPath, `${pstStamp()} ${marker}${relPath}\n`, "utf8");
+  const prefix = stalled ? "S  " : fromPending ? "*  " : "   ";
+  fs.appendFileSync(logPath, `${pstStamp()} ${prefix}${relPath}\n`, "utf8");
 }
 
 function bkgndLogStatus(logPath, msg) {
@@ -1153,9 +1153,11 @@ async function runBackgroundLoop() {
   let pauseLogged = false;
 
   while (true) {
-    await waitForLowCpu();
-
     const pending = consumePending();
+
+    // Pending files are priority: log immediately then wait for CPU.
+    // Regular background files wait for CPU first (so they are never stalled).
+    if (pending.length === 0) await waitForLowCpu();
 
     if (!cachedTvdb) cachedTvdb = loadTvdb();
     const allInEmby = Object.values(cachedTvdb).filter((s) => s.inEmby);
@@ -1200,7 +1202,9 @@ async function runBackgroundLoop() {
     consecutiveEmpty = 0;
     pauseLogged = false;
     const { videoPath, fromPending } = chosen;
-    appendBkgndLog(BKGND_LOG_PATH, videoPath, fromPending);
+    const stalled = fromPending && os.loadavg()[0] > CPU_LOAD_MAX;
+    appendBkgndLog(BKGND_LOG_PATH, videoPath, fromPending, stalled);
+    if (stalled) await waitForLowCpu();
 
     let generated = false;
     try {

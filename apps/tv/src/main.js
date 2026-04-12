@@ -170,6 +170,7 @@ let tvMode = "google"; // "google" | "fire"
 let activeDevice = null;
 let lastOffAt = 0;
 let lastOnAt = 0;
+let pendingGoogleHome = false;
 let currentShowName = null;
 const prevSessions = {};
 
@@ -245,15 +246,45 @@ function handleMsg(raw) {
       }
       if (id === FIRE_TV_ENTITY_ID) fireTvState = state;
       if (id === BRAVIA_ENTITY_ID) {
-        braviaHaPower = state;
         const attrs = event.data?.new_state?.attributes;
+        log(
+          `BRAVIA attrs: title=${attrs?.media_title ?? "null"} mediaType=${attrs?.media_content_type ?? "null"} muted=${attrs?.is_volume_muted ?? "null"} pendingGoogleHome=${pendingGoogleHome}`,
+        );
+        const prevPower = braviaHaPower;
+        braviaHaPower = state;
         if (attrs) {
           braviaHaMuted = attrs.is_volume_muted ?? null;
           braviaMediaContentType = attrs.media_content_type ?? null;
           braviaMediaTitle = attrs.media_title ?? null;
         }
+        // TV just turned on with pendingGoogleHome flag set
+        const wasGooglePending = pendingGoogleHome;
+        if (pendingGoogleHome && prevPower !== "on" && state === "on") {
+          pendingGoogleHome = false;
+          log("googlebtn: TV on — sending Home in 5s");
+          setTimeout(() => {
+            log("googlebtn: sending Home");
+            callService("remote", "send_command", REMOTE_ENTITY_ID, {
+              command: "Home",
+            });
+          }, 5000);
+          setTimeout(
+            () =>
+              callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
+                media_content_type: "app",
+                media_content_id:
+                  "com.sony.dtv.tv.emby.embyatv.tv.emby.embyatv.startup.StartupActivity",
+              }),
+            15000,
+          );
+        }
         // HDMI 2 selected but no CEC signal → Fire Stick is in standby; wake it
-        if (braviaMediaTitle === "HDMI 2" && braviaMediaContentType === null) {
+        // Skip if wasGooglePending — we don't want Fire Stick CEC hijacking the input
+        if (
+          braviaMediaTitle === "HDMI 2" &&
+          braviaMediaContentType === null &&
+          !wasGooglePending
+        ) {
           log("HDMI 2 with no signal — waking Fire Stick");
           tvMode = "fire";
           callService("media_player", "turn_on", FIRE_TV_ENTITY_ID);
@@ -287,18 +318,29 @@ const app = express();
 app.use(cors());
 
 app.get("/tv/googlebtn", (req, res) => {
-  log(`googlebtn from ${client(req)}`);
-  callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
-  callService("remote", "send_command", REMOTE_ENTITY_ID, {
-    command: "KEYCODE_HOME",
-  });
-  setTimeout(
-    () =>
-      callService("remote", "turn_on", REMOTE_ENTITY_ID, {
-        activity: "tv.emby.embyatv",
-      }),
-    10000,
+  log(
+    `googlebtn from ${client(req)} braviaHaPower=${braviaHaPower} mediaTitle=${braviaMediaTitle}`,
   );
+  callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
+  if (braviaHaPower === "on") {
+    // TV already on — send home immediately
+    log("googlebtn: TV already on, sending Home now");
+    callService("remote", "send_command", REMOTE_ENTITY_ID, {
+      command: "Home",
+    });
+    setTimeout(() => {
+      log("googlebtn: +10s launching Emby via play_media");
+      callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
+        media_content_type: "app",
+        media_content_id:
+          "com.sony.dtv.tv.emby.embyatv.tv.emby.embyatv.startup.StartupActivity",
+      });
+    }, 10000);
+  } else {
+    // TV off — wait for state_changed on transition to "on"
+    pendingGoogleHome = true;
+    log(`googlebtn: TV not on (${braviaHaPower}), set pendingGoogleHome=true`);
+  }
   res.json({ ok: true });
 });
 
@@ -353,14 +395,16 @@ app.get("/tv/mode/:mode", (req, res) => {
     setTimeout(
       () =>
         callService("remote", "send_command", REMOTE_ENTITY_ID, {
-          command: "KEYCODE_HOME",
+          command: "Home",
         }),
       5000,
     );
     setTimeout(
       () =>
-        callService("remote", "turn_on", REMOTE_ENTITY_ID, {
-          activity: "tv.emby.embyatv",
+        callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
+          media_content_type: "app",
+          media_content_id:
+            "com.sony.dtv.tv.emby.embyatv.tv.emby.embyatv.startup.StartupActivity",
         }),
       5000,
     );

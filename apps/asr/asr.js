@@ -226,7 +226,8 @@ function appendNeedsSrtChk(videoPath) {
   }
 }
 
-async function hasEmbeddedSubtitles(videoPath) {
+// Returns array of subtitle stream objects, or null on ffprobe error.
+async function getSubtitleStreams(videoPath) {
   try {
     const { out } = await run("ffprobe", [
       "-v",
@@ -237,12 +238,62 @@ async function hasEmbeddedSubtitles(videoPath) {
       videoPath,
     ]);
     const streams = JSON.parse(out).streams || [];
-    return streams.some((s) => s.codec_type === "subtitle");
+    return streams.filter((s) => s.codec_type === "subtitle");
   } catch (e) {
     console.warn(
       `Warning: could not probe ${path.basename(videoPath)} for subtitles: ${e.message}`,
     );
-    return false;
+    return null;
+  }
+}
+
+const TEXT_SUB_CODECS = new Set([
+  "ass",
+  "ssa",
+  "subrip",
+  "webvtt",
+  "mov_text",
+  "text",
+]);
+
+// Extract each text subtitle stream to an emb<n>.srt sidecar, stripping ASS/font tags.
+async function extractTextSubtitles(videoPath, subtitleStreams) {
+  const dir = path.dirname(videoPath);
+  const baseName = path.basename(videoPath, path.extname(videoPath));
+  const textStreams = subtitleStreams.filter((s) =>
+    TEXT_SUB_CODECS.has(s.codec_name),
+  );
+  let n = 1;
+  for (const stream of textStreams) {
+    const srtPath = path.join(dir, `${baseName}.emb${n}.srt`);
+    n++;
+    if (await pathExists(srtPath)) continue;
+    try {
+      await run("ffmpeg", [
+        "-y",
+        "-i",
+        videoPath,
+        "-map",
+        `0:${stream.index}`,
+        "-c:s",
+        "srt",
+        "-f",
+        "srt",
+        srtPath,
+      ]);
+      let text = await fsp.readFile(srtPath, "utf8");
+      text = text.replace(/\{[^}]*\}/g, "");
+      text = text.replace(/<font[^>]*>/gi, "");
+      text = text.replace(/<\/font>/gi, "");
+      await fsp.writeFile(srtPath, text, "utf8");
+      console.log(
+        `[asr] extracted text sub stream ${stream.index} → ${path.basename(srtPath)}`,
+      );
+    } catch (e) {
+      console.warn(
+        `[asr] failed to extract stream ${stream.index} from ${path.basename(videoPath)}: ${e.message}`,
+      );
+    }
   }
 }
 
@@ -1057,15 +1108,23 @@ async function findCandidateFile(show) {
   const chkPaths = loadNeedsSrtChkSet();
 
   for (const t of tuples) {
+    if (await srtExists(t.fullPath)) continue;
+    // Step 3.5: watched check
     if (
       t.season !== 0 &&
       t.episode !== 0 &&
       watched.has(`${t.season}:${t.episode}`)
     )
       continue;
-    if (await srtExists(t.fullPath)) continue;
+    // Step 3.5 continued: probe subs + extract text streams
+    const subtitleStreams = await getSubtitleStreams(t.fullPath);
+    if (subtitleStreams !== null) {
+      await extractTextSubtitles(t.fullPath, subtitleStreams);
+    }
+    // Step 4: needsSrtChk
     if (chkPaths.has(t.fullPath)) continue;
-    if (await hasEmbeddedSubtitles(t.fullPath)) {
+    // Step 5: any subtitle streams → needsSrtChk
+    if (subtitleStreams !== null && subtitleStreams.length > 0) {
       appendNeedsSrtChk(t.fullPath);
       continue;
     }
@@ -1086,11 +1145,7 @@ async function pickNextFile(inEmbyShows, logPath, pendingPaths) {
       if (!isVideoFile(videoPath)) continue;
       if (!(await pathExists(videoPath))) continue;
       if (await srtExists(videoPath)) continue;
-      if (chkPaths.has(videoPath)) continue;
-      if (await hasEmbeddedSubtitles(videoPath)) {
-        appendNeedsSrtChk(videoPath);
-        continue;
-      }
+      // Step 3.5: watched check
       const showDir = path.relative(TV_ROOT, videoPath).split(path.sep)[0];
       const show = inEmbyShows.find((s) => s.path === showDir);
       if (!show) continue;
@@ -1112,6 +1167,18 @@ async function pickNextFile(inEmbyShows, logPath, pendingPaths) {
           }
         }
         if (watched.has(`${season}:${episode}`)) continue;
+      }
+      // Step 3.5 continued: probe subs + extract text streams
+      const subtitleStreams = await getSubtitleStreams(videoPath);
+      if (subtitleStreams !== null) {
+        await extractTextSubtitles(videoPath, subtitleStreams);
+      }
+      // Step 4: needsSrtChk
+      if (chkPaths.has(videoPath)) continue;
+      // Step 5: any subtitle streams → needsSrtChk
+      if (subtitleStreams !== null && subtitleStreams.length > 0) {
+        appendNeedsSrtChk(videoPath);
+        continue;
       }
       return {
         videoPath,

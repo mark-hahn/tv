@@ -185,13 +185,26 @@ export default function App() {
   const muteBg =
     flashBtn === "mute" ? "orange" : muted ? "#ffb3b3" : "lightgreen";
 
-  const haStateOn = haState && haState !== "off" && haState !== "unavailable" && haState !== "unknown";
-  const offActive = !haState || haState === "off" || haState === "unavailable" || haState === "unknown";
-  const offBg = flashBtn === "off" ? "orange" : offActive ? "lightblue" : "white";
+  const haStateOn =
+    haState &&
+    haState !== "off" &&
+    haState !== "unavailable" &&
+    haState !== "unknown";
+  const offActive =
+    !haState ||
+    haState === "off" ||
+    haState === "unavailable" ||
+    haState === "unknown";
+  const offBg =
+    flashBtn === "off" ? "orange" : offActive ? "lightblue" : "white";
 
   const modeBg = (m) => {
     if (flashBtn === m) return "orange";
-    const active = haStateOn && (m === "fire" ? mediaTitle === "Fire TV Stick" : mediaTitle !== "Fire TV Stick");
+    const active =
+      haStateOn &&
+      (m === "fire"
+        ? mediaTitle === "Fire TV Stick"
+        : mediaTitle !== "Fire TV Stick");
     return active ? "lightblue" : "white";
   };
 

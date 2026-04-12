@@ -201,7 +201,11 @@ export default {
       return { ...CELL_BASE, backgroundColor: bg };
     },
     offBtnStyle() {
-      const active = !this.haState || this.haState === "off" || this.haState === "unavailable" || this.haState === "unknown";
+      const active =
+        !this.haState ||
+        this.haState === "off" ||
+        this.haState === "unavailable" ||
+        this.haState === "unknown";
       const bg =
         this.flashBtn === "off" ? "orange" : active ? "lightblue" : "white";
       return { ...CELL_BASE, backgroundColor: bg };
@@ -259,9 +263,18 @@ export default {
     },
 
     modeBtnStyle(m) {
-      const on = this.haState && this.haState !== "off" && this.haState !== "unavailable" && this.haState !== "unknown";
-      const active = on && (m === "fire" ? this.mediaTitle === "Fire TV Stick" : this.mediaTitle !== "Fire TV Stick");
-      const bg = this.flashBtn === m ? "orange" : active ? "lightblue" : "white";
+      const on =
+        this.haState &&
+        this.haState !== "off" &&
+        this.haState !== "unavailable" &&
+        this.haState !== "unknown";
+      const active =
+        on &&
+        (m === "fire"
+          ? this.mediaTitle === "Fire TV Stick"
+          : this.mediaTitle !== "Fire TV Stick");
+      const bg =
+        this.flashBtn === m ? "orange" : active ? "lightblue" : "white";
       return { ...CELL_BASE, backgroundColor: bg };
     },
 
@@ -288,7 +301,8 @@ export default {
       if (!data) return;
       if (data.muted !== null) this.muted = data.muted;
       if (data.power) this.power = data.power;
-      if (data.activeDevice !== undefined) this.activeDevice = data.activeDevice;
+      if (data.activeDevice !== undefined)
+        this.activeDevice = data.activeDevice;
       if (data.state !== undefined) this.haState = data.state;
       if (data.mediaTitle !== undefined) this.mediaTitle = data.mediaTitle;
     },

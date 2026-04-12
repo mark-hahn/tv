@@ -286,6 +286,41 @@ function connectHa() {
 const app = express();
 app.use(cors());
 
+app.get("/tv/googlebtn", (req, res) => {
+  log(`googlebtn from ${client(req)}`);
+  callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
+  callService("remote", "send_command", REMOTE_ENTITY_ID, {
+    command: "KEYCODE_HOME",
+  });
+  setTimeout(
+    () =>
+      callService("remote", "turn_on", REMOTE_ENTITY_ID, {
+        activity: "tv.emby.embyatv",
+      }),
+    10000,
+  );
+  res.json({ ok: true });
+});
+
+app.get("/tv/firebtn", (req, res) => {
+  log(`firebtn from ${client(req)}`);
+  callService("media_player", "turn_on", FIRE_TV_ENTITY_ID);
+  exec(`adb -s ${FIRE_TV_IP}:5555 shell input keyevent 3`, (err) => {
+    if (err) log(`[fire] adb home error: ${err.message}`);
+  });
+  setTimeout(
+    () =>
+      exec(
+        `adb -s ${FIRE_TV_IP}:5555 shell am start -n tv.emby.embyatv/.startup.StartupActivity`,
+        (err) => {
+          if (err) log(`[fire] adb emby launch error: ${err.message}`);
+        },
+      ),
+    10000,
+  );
+  res.json({ ok: true });
+});
+
 app.get("/tv/on", (req, res) => {
   log(`on from ${client(req)}`);
   callService("media_player", "turn_on", BRAVIA_ENTITY_ID);

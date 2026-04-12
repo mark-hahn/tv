@@ -11,7 +11,6 @@ const BORDER = 13;
 const SCREEN_MARGIN = 30;
 
 export default function App() {
-  const [mode, setModeState] = useState("google");
   const [muted, setMuted] = useState(false);
   const [cellDims, setCellDims] = useState({ w: 0, h: 0 });
 
@@ -22,12 +21,9 @@ export default function App() {
       h: Math.floor((layout.height - BORDER * (ROWS - 1)) / ROWS),
     });
   };
-  const [power, setPower] = useState("unknown");
   const [flashBtn, setFlashBtn] = useState(null);
-  const [activeDevice, setActiveDevice] = useState(null);
   const [haState, setHaState] = useState(null);
   const [mediaTitle, setMediaTitle] = useState(null);
-  const [mediaContentType, setMediaContentType] = useState(null);
 
   const wsRef = useRef(null);
   const repeatDelayRef = useRef(null);
@@ -83,13 +79,8 @@ export default function App() {
   const applyMuteState = (data) => {
     if (!data) return;
     if (data.muted !== null && data.muted !== undefined) setMuted(data.muted);
-    if (data.power) setPower(data.power);
-    if (data.activeDevice !== undefined) setActiveDevice(data.activeDevice);
-    if (data.mode) setModeState(data.mode);
     if (data.state !== undefined) setHaState(data.state);
     if (data.mediaTitle !== undefined) setMediaTitle(data.mediaTitle);
-    if (data.mediaContentType !== undefined)
-      setMediaContentType(data.mediaContentType);
   };
 
   const pollMute = async () => {
@@ -164,56 +155,49 @@ export default function App() {
   };
 
   const startHold = (action) => {
-    holdRef.current = setTimeout(action, 750);
+    holdRef.current = setTimeout(action, 500);
   };
 
   const stopHold = () => {
     clearTimeout(holdRef.current);
   };
 
-  const handleSetMode = async (m) => {
-    flash(m);
-    setModeState(m);
-    setPower("on");
-    try {
-      await fetch(`${TV_TV_URL}/tv/mode/${m}`);
-    } catch (_) {}
+  const googleBtn = async () => {
+    flash("google");
+    fetch(`${TV_TV_URL}/tv/googlebtn`).catch(() => {});
   };
 
-  const isOff = power === "off" || power === "standby";
+  const fireBtn = async () => {
+    flash("fire");
+    fetch(`${TV_TV_URL}/tv/firebtn`).catch(() => {});
+  };
 
+  const isOff =
+    !haState ||
+    haState === "off" ||
+    haState === "unavailable" ||
+    haState === "unknown";
+
+  const mode = (() => {
+    if (isOff) return "off";
+    if (mediaTitle === "Smart TV") return "google";
+    if (mediaTitle === "Fire TV Stick" || mediaTitle === "HDMI 2")
+      return "fire";
+    return "other";
+  })();
+
+  const isOther = mode === "other";
   // Background color helpers (mirror Vue cellStyle / computed props)
   const cellBg = (defaultBg, key) => (flashBtn === key ? "orange" : defaultBg);
 
   const muteBg =
     flashBtn === "mute" ? "orange" : muted ? "#ffb3b3" : "lightgreen";
 
-  const haStateOn =
-    haState &&
-    haState !== "off" &&
-    haState !== "unavailable" &&
-    haState !== "unknown";
-  const isOther =
-    haStateOn &&
-    mediaTitle !== "Smart TV" &&
-    mediaTitle !== "Fire TV Stick" &&
-    mediaTitle !== "HDMI 2";
-  const offActive =
-    !haState ||
-    haState === "off" ||
-    haState === "unavailable" ||
-    haState === "unknown";
-  const offBg =
-    flashBtn === "off" ? "orange" : offActive ? "lightblue" : "white";
+  const offBg = flashBtn === "off" ? "orange" : isOff ? "lightblue" : "white";
 
   const modeBg = (m) => {
     if (flashBtn === m) return "orange";
-    const active =
-      haStateOn &&
-      (m === "fire"
-        ? mediaTitle === "Fire TV Stick" || mediaTitle === "HDMI 2"
-        : mediaTitle === "Smart TV");
-    return active ? "lightblue" : "white";
+    return mode === m ? "lightblue" : "white";
   };
 
   // Button definitions — matches tvpane.vue grid order (row-major, 3 cols x 5 rows)
@@ -331,7 +315,7 @@ export default function App() {
       tinyText: true,
       bg: () => modeBg("google"),
       onPress: () => {},
-      onPressIn: () => startHold(() => handleSetMode("google")),
+      onPressIn: () => startHold(() => googleBtn()),
       onPressOut: stopHold,
     },
     {
@@ -340,7 +324,7 @@ export default function App() {
       tinyText: true,
       bg: () => modeBg("fire"),
       onPress: () => {},
-      onPressIn: () => startHold(() => handleSetMode("fire")),
+      onPressIn: () => startHold(() => fireBtn()),
       onPressOut: stopHold,
     },
     {

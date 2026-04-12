@@ -117,20 +117,20 @@
       <!-- Row 5: google, roku, off -->
       <div
         :style="modeBtnStyle('google')"
-        @mousedown="startHold(() => setMode('google'))"
+        @mousedown="startHold(() => googleBtn())"
         @mouseup="stopHold"
         @mouseleave="stopHold"
-        @touchstart.prevent="startHold(() => setMode('google'))"
+        @touchstart.prevent="startHold(() => googleBtn())"
         @touchend="stopHold"
       >
         Google
       </div>
       <div
         :style="modeBtnStyle('fire')"
-        @mousedown="startHold(() => setMode('fire'))"
+        @mousedown="startHold(() => fireBtn())"
         @mouseup="stopHold"
         @mouseleave="stopHold"
-        @touchstart.prevent="startHold(() => setMode('fire'))"
+        @touchstart.prevent="startHold(() => fireBtn())"
         @touchend="stopHold"
       >
         Fire
@@ -182,14 +182,10 @@ export default {
 
   data() {
     return {
-      mode: "google",
       muted: false,
-      power: "unknown",
       flashBtn: null,
-      activeDevice: null,
       haState: null,
       mediaTitle: null,
-      mediaContentType: null,
     };
   },
 
@@ -203,27 +199,27 @@ export default {
             : "lightgreen";
       return { ...CELL_BASE, backgroundColor: bg };
     },
-    isOther() {
+    mode() {
       const on =
         this.haState &&
         this.haState !== "off" &&
         this.haState !== "unavailable" &&
         this.haState !== "unknown";
-      if (!on) return false;
-      return (
-        this.mediaTitle !== "Smart TV" &&
-        this.mediaTitle !== "Fire TV Stick" &&
-        this.mediaTitle !== "HDMI 2"
-      );
+      if (!on) return "off";
+      if (this.mediaTitle === "Smart TV") return "google";
+      if (this.mediaTitle === "Fire TV Stick" || this.mediaTitle === "HDMI 2")
+        return "fire";
+      return "other";
+    },
+    isOff() {
+      return this.mode === "off";
+    },
+    isOther() {
+      return this.mode === "other";
     },
     offBtnStyle() {
-      const active =
-        !this.haState ||
-        this.haState === "off" ||
-        this.haState === "unavailable" ||
-        this.haState === "unknown";
       const bg =
-        this.flashBtn === "off" ? "orange" : active ? "lightblue" : "white";
+        this.flashBtn === "off" ? "orange" : this.isOff ? "lightblue" : "white";
       return { ...CELL_BASE, backgroundColor: bg };
     },
   },
@@ -241,8 +237,7 @@ export default {
 
   methods: {
     startRepeat(key) {
-      if (this.power === "off" || this.power === "standby" || this.isOther)
-        return;
+      if (this.isOff || this.isOther) return;
       if (!this._debounce()) return;
       this.flash(key);
       this._repeatActive = true;
@@ -272,7 +267,7 @@ export default {
     },
 
     startHold(action) {
-      this._holdTimer = setTimeout(action, 750);
+      this._holdTimer = setTimeout(action, 500);
     },
 
     stopHold() {
@@ -280,16 +275,7 @@ export default {
     },
 
     modeBtnStyle(m) {
-      const on =
-        this.haState &&
-        this.haState !== "off" &&
-        this.haState !== "unavailable" &&
-        this.haState !== "unknown";
-      const active =
-        on &&
-        (m === "fire"
-          ? this.mediaTitle === "Fire TV Stick" || this.mediaTitle === "HDMI 2"
-          : this.mediaTitle === "Smart TV");
+      const active = this.mode === m;
       const bg =
         this.flashBtn === m ? "orange" : active ? "lightblue" : "white";
       return { ...CELL_BASE, backgroundColor: bg };
@@ -307,24 +293,26 @@ export default {
       }, 150);
     },
 
+    async googleBtn() {
+      this.flash("google");
+      fetch(`${config.tvTvUrl}/tv/googlebtn`).catch(() => {});
+    },
+
+    async fireBtn() {
+      this.flash("fire");
+      fetch(`${config.tvTvUrl}/tv/firebtn`).catch(() => {});
+    },
+
     async setMode(m) {
       this.flash(m);
-      this.mode = m;
-      this.power = "on";
       await fetch(`${config.tvTvUrl}/tv/mode/${m}`);
     },
 
     _onTvMuteState(data) {
       if (!data) return;
       if (data.muted !== null) this.muted = data.muted;
-      if (data.power) this.power = data.power;
-      if (data.activeDevice !== undefined)
-        this.activeDevice = data.activeDevice;
-      if (data.mode) this.mode = data.mode;
       if (data.state !== undefined) this.haState = data.state;
       if (data.mediaTitle !== undefined) this.mediaTitle = data.mediaTitle;
-      if (data.mediaContentType !== undefined)
-        this.mediaContentType = data.mediaContentType;
     },
 
     async pollMute() {
@@ -334,8 +322,6 @@ export default {
         );
         if (data.ok) {
           if (data.muted !== null) this.muted = data.muted;
-          if (data.power) this.power = data.power;
-          if (data.activeDevice) this.activeDevice = data.activeDevice;
         }
       } catch (_) {}
     },
@@ -348,8 +334,7 @@ export default {
     },
 
     async tvCmd(cmd) {
-      if (this.power === "off" || this.power === "standby" || this.isOther)
-        return;
+      if (this.isOff || this.isOther) return;
       this.flash(cmd);
       if (!this._debounce()) return;
       const res = await fetch(`${config.tvTvUrl}/tv/${cmd}`);
@@ -359,8 +344,7 @@ export default {
     },
 
     async tvVolCmd(dir) {
-      if (this.power === "off" || this.power === "standby" || this.isOther)
-        return;
+      if (this.isOff || this.isOther) return;
       this.flash(dir === "down" ? "vold" : "volu");
       fetch(`${config.tvTvUrl}/tv/vol/${dir}`).catch(() => {});
     },
@@ -372,8 +356,7 @@ export default {
     },
 
     async tvKey(key) {
-      if (this.power === "off" || this.power === "standby" || this.isOther)
-        return;
+      if (this.isOff || this.isOther) return;
       this.flash(key);
       const res = await fetch(`${config.tvTvUrl}/tv/key/${key}`);
       const data = await res.json();

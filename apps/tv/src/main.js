@@ -1,6 +1,5 @@
 import { WebSocket } from "ws";
-import { exec, spawn } from "child_process";
-import { createInterface } from "readline";
+import { exec } from "child_process";
 import express from "express";
 import cors from "cors";
 
@@ -8,57 +7,12 @@ const HA_HOST = "hahnca.com:8123";
 const HA_ACCESS_TOKEN =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIzM2Y2MmI0MWZjYTY0YTE1YWU2MjFlZDg2NGJmM2NmYyIsImlhdCI6MTc3MDc5NjQ0NywiZXhwIjoyMDg2MTU2NDQ3fQ.AoUSLrAjOWEhR2pQVeuuykKYPoXqyrnmecQMQkdrgp8";
 const TV_PORT = 3004;
-const TV_ENTITY_ID = "media_player.bravia_k_65xr70";
-const CAST_ENTITY_ID = "media_player.living_room_tv_2";
+const BRAVIA_ENTITY_ID = "media_player.bravia_k_65xr70";
 const REMOTE_ENTITY_ID = "remote.bravia_k_65xr70";
-// TV_ENTITY_ID and BRAVIA_ENTITY_ID are the same device; BRAVIA_ENTITY_ID used for vol/mute
-const IR_REMOTE_ID = "remote.tv_ir";
-const IR_DEVICE = "bdv_n7100w";
-const ROKU_REMOTE_ID = "remote.roku_2";
 const FIRE_TV_ENTITY_ID = "media_player.fire_tv_192_168_1_47";
 const FIRE_TV_REMOTE_ID = "remote.fire_tv_192_168_1_47";
 const FIRE_TV_IP = "192.168.1.47";
-const BRAVIA_ENTITY_ID = "media_player.bravia_k_65xr70";
-const BROADLINK_HOST = "192.168.1.23";
-const BROADLINK_CODES = {
-  vol_up:
-    "JgBUAEcUEhYmFBMUEhUnFBIVEhUnFBMUExQSFRIAA2BOFBMUJhUSExUUJhQTFRIVJRUTFBQUExQTAANfTBUSFiYUEhUSFSYVExQTFCcUExQSFRMUEwADXw==",
-  vol_down:
-    "JgBUAEcUJhYmFBMUEhUnFBIVEhUnFBMUExQSFRIAA2BOFCYUJhUSExUUJhQTFRIVJRUTFBQUExQTAANfTBUmFiYUEhUSFSYVExQTFCcUExQSFRMUEwADXw==",
-};
 
-const IR_DAEMON_PATH = new URL("./ir-daemon.py", import.meta.url).pathname;
-let irProc = null;
-const irAckQueue = [];
-
-function startIrDaemon() {
-  irProc = spawn("python3", ["-u", IR_DAEMON_PATH]);
-  const rl = createInterface({ input: irProc.stdout });
-  rl.on("line", (line) => {
-    if (line === "OK") {
-      const resolve = irAckQueue.shift();
-      if (resolve) resolve();
-    } else {
-      log("ir-daemon:", line);
-    }
-  });
-  irProc.stderr.on("data", (d) => loge("ir-daemon err:", d.toString().trim()));
-  irProc.on("exit", (code) => {
-    loge("ir-daemon exited", code);
-    irProc = null;
-    // reject all pending acks
-    for (const resolve of irAckQueue.splice(0)) resolve();
-  });
-}
-
-function broadlinkSend(cmd) {
-  if (!irProc) startIrDaemon();
-  const code = BROADLINK_CODES[cmd];
-  return new Promise((resolve) => {
-    irAckQueue.push(resolve);
-    irProc.stdin.write(code + "\n");
-  });
-}
 const EMBY_HOST = "hahnca.com:8920";
 const EMBY_API_KEY = "1c399bd079d549cba8c916244d3add2b";
 const SRVR_INTERNAL_URL = "http://127.0.0.1:8739";
@@ -97,7 +51,6 @@ function client(req) {
 function handleEmbySession(s) {
   let device = null;
   if (s.DeviceName === "Living Room TV") device = "google";
-  else if (s.DeviceName === "Roku 2") device = "roku";
   if (!device) return;
   const playing = s.NowPlayingItem?.Name ?? null;
   const remoteCtrl = s.SupportsRemoteControl ?? false;
@@ -132,7 +85,6 @@ const DEVICE_PRIORITY = [
     label: (s) => s.DeviceName,
     pri: 3,
   },
-  { match: (s) => s.DeviceName === "Roku 2", label: "Roku", pri: 4 },
 ];
 
 function deviceLabel(s) {
@@ -209,13 +161,13 @@ function connectEmby() {
 let ws = null;
 let cmdId = 0;
 let authenticated = false;
-let castState = "unknown";
-let tvPowerState = "unknown";
 let fireTvState = "unknown";
 let braviaHaMuted = null;
 let braviaHaPower = "unknown";
-let tvMode = "google"; // "google" | "fire" | "roku"
-let activeDevice = null; // "google" | "roku"
+let braviaMediaContentType = null;
+let braviaMediaTitle = null;
+let tvMode = "google"; // "google" | "fire"
+let activeDevice = null;
 let lastOffAt = 0;
 let lastOnAt = 0;
 let currentShowName = null;
@@ -268,14 +220,12 @@ function handleMsg(raw) {
       return;
     }
     if (Array.isArray(msg.result)) {
-      const s = msg.result.find((s) => s.entity_id === CAST_ENTITY_ID);
-      if (s) castState = s.state;
-      const tv = msg.result.find((s) => s.entity_id === TV_ENTITY_ID);
-      if (tv) tvPowerState = tv.state;
       const bravia = msg.result.find((s) => s.entity_id === BRAVIA_ENTITY_ID);
       if (bravia) {
         braviaHaPower = bravia.state;
         braviaHaMuted = bravia.attributes?.is_volume_muted ?? null;
+        braviaMediaContentType = bravia.attributes?.media_content_type ?? null;
+        braviaMediaTitle = bravia.attributes?.media_title ?? null;
       }
     }
   } else if (msg.type === "event") {
@@ -285,12 +235,7 @@ function handleMsg(raw) {
       const state = event.data?.new_state?.state;
       const prev = event.data?.old_state?.state;
       const WATCHED = new Set([
-        TV_ENTITY_ID,
-        CAST_ENTITY_ID,
         REMOTE_ENTITY_ID,
-        IR_REMOTE_ID,
-        ROKU_REMOTE_ID,
-        "media_player.roku_2",
         FIRE_TV_ENTITY_ID,
         FIRE_TV_REMOTE_ID,
         BRAVIA_ENTITY_ID,
@@ -298,15 +243,15 @@ function handleMsg(raw) {
       if (WATCHED.has(id) && state !== prev) {
         log(`HA state: ${id} ${prev} -> ${state}`);
       }
-      if (id === CAST_ENTITY_ID) castState = state;
-      if (id === TV_ENTITY_ID && state !== tvPowerState) {
-        tvPowerState = state;
-      }
       if (id === FIRE_TV_ENTITY_ID) fireTvState = state;
       if (id === BRAVIA_ENTITY_ID) {
         braviaHaPower = state;
         const attrs = event.data?.new_state?.attributes;
-        if (attrs) braviaHaMuted = attrs.is_volume_muted ?? null;
+        if (attrs) {
+          braviaHaMuted = attrs.is_volume_muted ?? null;
+          braviaMediaContentType = attrs.media_content_type ?? null;
+          braviaMediaTitle = attrs.media_title ?? null;
+        }
       }
     }
   }
@@ -336,28 +281,19 @@ app.use(cors());
 
 app.get("/tv/on", (req, res) => {
   log(`on from ${client(req)}`);
-  callService("media_player", "turn_on", TV_ENTITY_ID);
+  callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
   res.json({ ok: true });
 });
 
 app.get("/tv/mode/:mode", (req, res) => {
   const mode = req.params.mode;
-  if (mode !== "google" && mode !== "fire" && mode !== "roku") {
+  if (mode !== "google" && mode !== "fire") {
     res.status(400).json({ ok: false, error: "unknown mode" });
     return;
   }
   tvMode = mode;
   log(`mode set to ${mode} from ${client(req)}`);
-  if (mode === "roku") {
-    callService("remote", "send_command", ROKU_REMOTE_ID, { command: "Home" });
-    setTimeout(
-      () =>
-        callService("media_player", "select_source", "media_player.roku_2", {
-          source: "Emby",
-        }),
-      5000,
-    );
-  } else if (mode === "fire") {
+  if (mode === "fire") {
     callService("media_player", "turn_on", FIRE_TV_ENTITY_ID);
     setTimeout(
       () =>
@@ -371,7 +307,7 @@ app.get("/tv/mode/:mode", (req, res) => {
     );
   } else {
     // google
-    callService("media_player", "turn_on", TV_ENTITY_ID);
+    callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
     setTimeout(
       () =>
         callService("remote", "send_command", REMOTE_ENTITY_ID, {
@@ -397,11 +333,7 @@ app.get("/tv/mode/:mode", (req, res) => {
 });
 
 app.get("/tv/emby", (req, res) => {
-  if (tvMode === "roku") {
-    callService("media_player", "select_source", "media_player.roku_2", {
-      source: "Emby",
-    });
-  } else if (tvMode === "fire") {
+  if (tvMode === "fire") {
     exec(
       `adb -s ${FIRE_TV_IP}:5555 shell am start -n tv.emby.embyatv/.startup.StartupActivity`,
       (err) => {
@@ -409,7 +341,7 @@ app.get("/tv/emby", (req, res) => {
       },
     );
   } else {
-    callService("media_player", "play_media", TV_ENTITY_ID, {
+    callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
       media_content_type: "app",
       media_content_id:
         "com.sony.dtv.tv.emby.embyatv.tv.emby.embyatv.startup.StartupActivity",
@@ -420,8 +352,7 @@ app.get("/tv/emby", (req, res) => {
 
 app.get("/tv/off", (req, res) => {
   log(`off from ${client(req)} (mode: ${tvMode})`);
-  callService("media_player", "turn_off", "media_player.roku_2");
-  callService("media_player", "turn_off", TV_ENTITY_ID);
+  callService("media_player", "turn_off", BRAVIA_ENTITY_ID);
   callService("remote", "turn_off", REMOTE_ENTITY_ID);
   lastOffAt = Date.now();
   res.json({ ok: true });
@@ -447,15 +378,6 @@ app.get("/tv/key/:key", (req, res) => {
     home: "Home",
     back: "Return",
   };
-  const ROKU_KEY_MAP = {
-    ok: "Select",
-    up: "Up",
-    down: "Down",
-    left: "Left",
-    right: "Right",
-    home: "Home",
-    back: "Back",
-  };
   const FIRE_KEY_MAP = {
     ok: "23", // KEYCODE_DPAD_CENTER
     up: "19", // KEYCODE_DPAD_UP
@@ -465,13 +387,8 @@ app.get("/tv/key/:key", (req, res) => {
     home: "3", // KEYCODE_HOME
     back: "4", // KEYCODE_BACK
   };
-  const keyMap =
-    tvMode === "roku"
-      ? ROKU_KEY_MAP
-      : tvMode === "fire"
-        ? FIRE_KEY_MAP
-        : GOOGLE_KEY_MAP;
-  const remoteId = tvMode === "roku" ? ROKU_REMOTE_ID : REMOTE_ENTITY_ID;
+  const keyMap = tvMode === "fire" ? FIRE_KEY_MAP : GOOGLE_KEY_MAP;
+  const remoteId = REMOTE_ENTITY_ID;
   const command = keyMap[req.params.key];
   if (!command) {
     res.status(400).json({ ok: false, error: "unknown key" });
@@ -534,24 +451,15 @@ app.get("/tv/mute", (req, res) => {
   res.json({ ok: true });
 });
 
-async function pushMuteState() {
+async function pushTvState() {
   const recentlyOn = Date.now() - lastOnAt < 30000;
   const recentlyOff = Date.now() - lastOffAt < 30000;
-  if (recentlyOff) {
-    await fetch(`${SRVR_INTERNAL_URL}/internal/tv-state`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        muted: null,
-        power: "off",
-        activeDevice,
-        mode: tvMode,
-      }),
-    }).catch(() => {});
-    return;
-  }
-  // In fire mode, use fire TV state to determine power
-  if (tvMode === "fire") {
+  let power;
+  if (recentlyOff && Date.now() - lastOffAt < 5000) {
+    power = "off";
+  } else if (recentlyOff) {
+    power = "off";
+  } else if (tvMode === "fire") {
     const fireOn =
       fireTvState !== "off" &&
       fireTvState !== "unavailable" &&
@@ -560,62 +468,34 @@ async function pushMuteState() {
       braviaHaPower !== "off" &&
       braviaHaPower !== "unavailable" &&
       braviaHaPower !== "unknown";
-    const power = fireOn || braviaHaMuted !== null || braviaOn ? "on" : "off";
-    await fetch(`${SRVR_INTERNAL_URL}/internal/tv-state`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        muted: braviaHaMuted,
-        power,
-        activeDevice,
-        mode: tvMode,
-      }),
-    }).catch(() => {});
-    return;
+    power = fireOn || braviaOn ? "on" : "off";
+  } else {
+    const braviaOn =
+      braviaHaPower !== "off" &&
+      braviaHaPower !== "unavailable" &&
+      braviaHaPower !== "unknown";
+    power = braviaOn || recentlyOn ? "on" : "off";
   }
-  const haOff =
-    tvPowerState === "off" ||
-    tvPowerState === "unavailable" ||
-    tvPowerState === "unknown";
-  if (haOff && !recentlyOn) {
-    await fetch(`${SRVR_INTERNAL_URL}/internal/tv-state`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        muted: null,
-        power: "off",
-        activeDevice,
-        mode: tvMode,
-      }),
-    }).catch(() => {});
-    return;
-  }
-  const braviaOn =
-    braviaHaPower !== "off" &&
-    braviaHaPower !== "unavailable" &&
-    braviaHaPower !== "unknown";
-  const power = braviaHaMuted !== null || braviaOn ? "on" : "off";
-  const effectivePower = Date.now() - lastOffAt < 5000 ? "off" : power;
   await fetch(`${SRVR_INTERNAL_URL}/internal/tv-state`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      muted: braviaHaMuted,
-      power: effectivePower,
-      activeDevice,
+      power,
+      muted: power === "off" ? null : braviaHaMuted,
       mode: tvMode,
+      activeDevice,
+      state: braviaHaPower,
+      mediaContentType: braviaMediaContentType,
+      mediaTitle: braviaMediaTitle,
     }),
   }).catch(() => {});
 }
 
 app.get("/tv/mutestate", async (req, res) => {
   const haOn =
-    (braviaHaPower !== "off" &&
-      braviaHaPower !== "unavailable" &&
-      braviaHaPower !== "unknown") ||
-    (tvPowerState !== "off" &&
-      tvPowerState !== "unavailable" &&
-      tvPowerState !== "unknown");
+    braviaHaPower !== "off" &&
+    braviaHaPower !== "unavailable" &&
+    braviaHaPower !== "unknown";
   res.json({
     ok: true,
     muted: braviaHaMuted,
@@ -626,10 +506,13 @@ app.get("/tv/mutestate", async (req, res) => {
 
 app.get("/tv/status", (req, res) => {
   res.json({
-    entity: CAST_ENTITY_ID,
-    state: castState,
+    entity: BRAVIA_ENTITY_ID,
+    state: braviaHaPower,
     mode: tvMode,
-    tvPower: tvPowerState,
+    muted: braviaHaMuted,
+    mediaContentType: braviaMediaContentType,
+    mediaTitle: braviaMediaTitle,
+    activeDevice,
   });
 });
 
@@ -637,10 +520,9 @@ app.get("/tv/status", (req, res) => {
 
 connectHa();
 connectEmby();
-startIrDaemon();
 
 app.listen(TV_PORT, () => {
   log(`listening on port ${TV_PORT}`);
 });
 
-setInterval(pushMuteState, 2000);
+setInterval(pushTvState, 2000);

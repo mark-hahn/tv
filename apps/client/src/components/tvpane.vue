@@ -241,7 +241,8 @@ export default {
 
   methods: {
     startRepeat(key) {
-      if (this.power === "off" || this.power === "standby" || this.isOther) return;
+      if (this.power === "off" || this.power === "standby" || this.isOther)
+        return;
       if (!this._debounce()) return;
       this.flash(key);
       this._repeatActive = true;
@@ -347,7 +348,8 @@ export default {
     },
 
     async tvCmd(cmd) {
-      if (this.power === "off" || this.power === "standby" || this.isOther) return;
+      if (this.power === "off" || this.power === "standby" || this.isOther)
+        return;
       this.flash(cmd);
       if (!this._debounce()) return;
       const res = await fetch(`${config.tvTvUrl}/tv/${cmd}`);
@@ -357,7 +359,8 @@ export default {
     },
 
     async tvVolCmd(dir) {
-      if (this.power === "off" || this.power === "standby" || this.isOther) return;
+      if (this.power === "off" || this.power === "standby" || this.isOther)
+        return;
       this.flash(dir === "down" ? "vold" : "volu");
       fetch(`${config.tvTvUrl}/tv/vol/${dir}`).catch(() => {});
     },
@@ -369,7 +372,8 @@ export default {
     },
 
     async tvKey(key) {
-      if (this.power === "off" || this.power === "standby" || this.isOther) return;
+      if (this.power === "off" || this.power === "standby" || this.isOther)
+        return;
       this.flash(key);
       const res = await fetch(`${config.tvTvUrl}/tv/key/${key}`);
       const data = await res.json();

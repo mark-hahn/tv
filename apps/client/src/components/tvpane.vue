@@ -241,14 +241,22 @@ export default {
       if (!this._debounce()) return;
       this.flash(key);
       this._repeatActive = true;
-      fetch(`${config.tvTvUrl}/tv/key/${key}`).catch(() => {});
-      let count = 0;
-      const tick = () => {
+      (async () => {
+        await fetch(`${config.tvTvUrl}/tv/key/${key}`).catch(() => {});
         if (!this._repeatActive) return;
-        fetch(`${config.tvTvUrl}/tv/key/${key}`).catch(() => {});
-        this._repeatTimer = setTimeout(tick, count++ < 4 ? 500 : 100);
-      };
-      this._repeatDelay = setTimeout(tick, 400);
+        await new Promise((r) => {
+          this._repeatTimer = setTimeout(r, 400);
+        });
+        let count = 0;
+        while (this._repeatActive) {
+          await fetch(`${config.tvTvUrl}/tv/key/${key}`).catch(() => {});
+          if (!this._repeatActive) break;
+          const delay = count++ < 4 ? 500 : key === "left" ? 10 : 50;
+          await new Promise((r) => {
+            this._repeatTimer = setTimeout(r, delay);
+          });
+        }
+      })();
     },
 
     startRepeatCmd(flashKey, cmd) {
@@ -264,6 +272,7 @@ export default {
 
     stopRepeat() {
       this._repeatActive = false;
+      clearTimeout(this._repeatTimer);
     },
 
     startHold(action) {
@@ -323,9 +332,9 @@ export default {
 
     _debounce() {
       const now = Date.now();
-      if (now - (this._lastCmd || 0) < 250) return false;
+      const ok = now - (this._lastCmd || 0) >= 250;
       this._lastCmd = now;
-      return true;
+      return ok;
     },
 
     async tvCmd(cmd) {

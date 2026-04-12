@@ -303,11 +303,6 @@ export default {
       fetch(`${config.tvTvUrl}/tv/firebtn`).catch(() => {});
     },
 
-    async setMode(m) {
-      this.flash(m);
-      await fetch(`${config.tvTvUrl}/tv/mode/${m}`);
-    },
-
     _onTvMuteState(data) {
       if (!data) return;
       if (data.muted !== null) this.muted = data.muted;

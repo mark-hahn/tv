@@ -19,6 +19,8 @@ const SRVR_INTERNAL_URL = "http://127.0.0.1:8739";
 
 const GOOGLE_HOME_DELAY_MS = 0; // ms after TV turns on before sending Home key
 const GOOGLE_EMBY_DELAY_MS = 100; // ms after TV turns on before launching Emby
+const FIRE_HOME_DELAY_MS = 0; // ms after Fire TV turns on before sending home key
+const FIRE_EMBY_DELAY_MS = 5000; // ms after Fire TV turns on before launching Emby
 
 // PST LA timestamp  MM-DD HH:mm
 function ts() {
@@ -169,7 +171,7 @@ let braviaHaMuted = null;
 let braviaHaPower = "unknown";
 let braviaMediaContentType = null;
 let braviaMediaTitle = null;
-let tvMode = "google"; // "google" | "fire"
+let tvMode = "off"; // "google" | "fire" | "off" | "other" — set only from HA push
 let activeDevice = null;
 let lastOffAt = 0;
 let lastOnAt = 0;
@@ -289,9 +291,18 @@ function handleMsg(raw) {
           !wasGooglePending
         ) {
           log("HDMI 2 with no signal — waking Fire Stick");
-          tvMode = "fire";
           callService("media_player", "turn_on", FIRE_TV_ENTITY_ID);
         }
+        // Keep tvMode in sync with what the TV is actually showing
+        if (state === "off" || state === "unavailable" || state === "unknown")
+          tvMode = "off";
+        else if (braviaMediaTitle === "Smart TV") tvMode = "google";
+        else if (
+          braviaMediaTitle === "Fire TV Stick" ||
+          braviaMediaTitle === "HDMI 2"
+        )
+          tvMode = "fire";
+        else tvMode = "other";
         pushTvState().catch(() => {});
       }
     }
@@ -347,21 +358,39 @@ app.get("/tv/googlebtn", (req, res) => {
   res.json({ ok: true });
 });
 
+function adbExec(cmd, label) {
+  exec(`adb -s ${FIRE_TV_IP}:5555 ${cmd}`, (err, stdout, stderr) => {
+    if (err && stderr.includes("not found")) {
+      log(`[fire] adb ${label}: device not found, connecting...`);
+      exec(`adb connect ${FIRE_TV_IP}:5555`, () => {
+        exec(`adb -s ${FIRE_TV_IP}:5555 ${cmd}`, (err2) => {
+          if (err2)
+            log(`[fire] adb ${label} error after connect: ${err2.message}`);
+          else log(`[fire] adb ${label} ok (after connect)`);
+        });
+      });
+    } else if (err) {
+      log(`[fire] adb ${label} error: ${err.message}`);
+    } else {
+      log(`[fire] adb ${label} ok`);
+    }
+  });
+}
+
 app.get("/tv/firebtn", (req, res) => {
   log(`firebtn from ${client(req)}`);
   callService("media_player", "turn_on", FIRE_TV_ENTITY_ID);
-  exec(`adb -s ${FIRE_TV_IP}:5555 shell input keyevent 3`, (err) => {
-    if (err) log(`[fire] adb home error: ${err.message}`);
-  });
+  setTimeout(
+    () => adbExec("shell input keyevent 3", "home"),
+    FIRE_HOME_DELAY_MS,
+  );
   setTimeout(
     () =>
-      exec(
-        `adb -s ${FIRE_TV_IP}:5555 shell am start -n tv.emby.embyatv/.startup.StartupActivity`,
-        (err) => {
-          if (err) log(`[fire] adb emby launch error: ${err.message}`);
-        },
+      adbExec(
+        "shell am start -n tv.emby.embyatv/.startup.StartupActivity",
+        "emby launch",
       ),
-    10000,
+    FIRE_EMBY_DELAY_MS,
   );
   res.json({ ok: true });
 });
@@ -378,17 +407,14 @@ app.get("/tv/mode/:mode", (req, res) => {
     res.status(400).json({ ok: false, error: "unknown mode" });
     return;
   }
-  tvMode = mode;
-  log(`mode set to ${mode} from ${client(req)}`);
+  log(`mode set to ${mode} from ${client(req)} (legacy route)`);
   if (mode === "fire") {
     callService("media_player", "turn_on", FIRE_TV_ENTITY_ID);
     setTimeout(
       () =>
-        exec(
-          `adb -s ${FIRE_TV_IP}:5555 shell am start -n tv.emby.embyatv/.startup.StartupActivity`,
-          (err) => {
-            if (err) log(`[fire] adb emby launch error: ${err.message}`);
-          },
+        adbExec(
+          "shell am start -n tv.emby.embyatv/.startup.StartupActivity",
+          "emby launch",
         ),
       5000,
     );
@@ -423,18 +449,20 @@ app.get("/tv/mode/:mode", (req, res) => {
 
 app.get("/tv/emby", (req, res) => {
   if (tvMode === "fire") {
-    exec(
-      `adb -s ${FIRE_TV_IP}:5555 shell am start -n tv.emby.embyatv/.startup.StartupActivity`,
-      (err) => {
-        if (err) log(`[fire] adb emby error: ${err.message}`);
-      },
+    adbExec(
+      "shell am start -n tv.emby.embyatv/.startup.StartupActivity",
+      "emby",
     );
-  } else {
+  } else if (tvMode === "google") {
     callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
       media_content_type: "app",
       media_content_id:
         "com.sony.dtv.tv.emby.embyatv.tv.emby.embyatv.startup.StartupActivity",
     });
+  } else {
+    log(`emby ignored — tvMode=${tvMode}`);
+    res.json({ ok: false, error: "wrong mode" });
+    return;
   }
   res.json({ ok: true });
 });
@@ -484,12 +512,16 @@ app.get("/tv/key/:key", (req, res) => {
     return;
   }
 
+  if (tvMode !== "fire" && tvMode !== "google") {
+    log(`key ignored — tvMode=${tvMode}`);
+    res.json({ ok: false, error: "wrong mode" });
+    return;
+  }
+
   if (tvMode === "fire") {
     const n = Math.min(parseInt(req.query.n) || 1, 5);
     const keys = Array(n).fill(command).join(" ");
-    exec(`adb -s ${FIRE_TV_IP}:5555 shell input keyevent ${keys}`, (err) => {
-      if (err) log(`[fire] adb error: ${err.message}`);
-    });
+    adbExec(`shell input keyevent ${keys}`, `keyevent ${keys}`);
     log(`[fire] adb keyevent ${keys} from ${client(req)}`);
     res.json({ ok: true, command, mode: tvMode });
     return;
@@ -523,16 +555,24 @@ app.get("/tv/vol/:dir", (req, res) => {
     res.status(400).json({ ok: false, error: "unknown dir" });
     return;
   }
-  callService(
-    "media_player",
-    dir === "up" ? "volume_up" : "volume_down",
-    BRAVIA_ENTITY_ID,
-  );
+  if (tvMode !== "google" && tvMode !== "fire") {
+    log(`vol ignored — tvMode=${tvMode}`);
+    res.json({ ok: false, error: "wrong mode" });
+    return;
+  }
+  callService("remote", "send_command", REMOTE_ENTITY_ID, {
+    command: dir === "up" ? "VolumeUp" : "VolumeDown",
+  });
   log(`vol ${dir} sent from ${client(req)}`);
   res.json({ ok: true });
 });
 
 app.get("/tv/mute", (req, res) => {
+  if (tvMode !== "google" && tvMode !== "fire") {
+    log(`mute ignored — tvMode=${tvMode}`);
+    res.json({ ok: false, error: "wrong mode" });
+    return;
+  }
   callService("media_player", "volume_mute", BRAVIA_ENTITY_ID, {
     is_volume_muted: !braviaHaMuted,
   });

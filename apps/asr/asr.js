@@ -159,10 +159,24 @@ function getStubPath(videoPath) {
   return path.join(dir, `${baseName}.enx.srtstub`);
 }
 
+function hasEmbSidecar(videoPath) {
+  const dir = path.dirname(videoPath);
+  const baseName = path.basename(videoPath, path.extname(videoPath));
+  const prefix = `${baseName}.emb`;
+  try {
+    return fs
+      .readdirSync(dir)
+      .some((f) => f.startsWith(prefix) && f.endsWith(".srt"));
+  } catch {
+    return false;
+  }
+}
+
 async function srtExists(videoPath) {
   return (
     (await pathExists(getSrtPath(videoPath))) ||
-    (await pathExists(getStubPath(videoPath)))
+    (await pathExists(getStubPath(videoPath))) ||
+    hasEmbSidecar(videoPath)
   );
 }
 

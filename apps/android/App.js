@@ -45,7 +45,7 @@ export default function App() {
   };
 
   const startRepeat = (key) => {
-    if (isOff) return;
+    if (isOff || isOther) return;
     if (!debounce()) return;
     flash(key);
     repeatActiveRef.current = true;
@@ -62,7 +62,7 @@ export default function App() {
   const volActiveRef = useRef(false);
 
   const startRepeatCmd = (flashKey, cmd) => {
-    if (isOff) return;
+    if (isOff || isOther) return;
     if (volActiveRef.current) return;
     volActiveRef.current = true;
     flash(flashKey);
@@ -140,7 +140,7 @@ export default function App() {
   };
 
   const tvCmd = async (cmd) => {
-    if (isOff) return;
+    if (isOff || isOther) return;
     flash(cmd);
     if (!debounce()) return;
     try {
@@ -156,7 +156,7 @@ export default function App() {
   };
 
   const tvKey = async (key) => {
-    if (isOff) return;
+    if (isOff || isOther) return;
     flash(key);
     try {
       await fetch(`${TV_TV_URL}/tv/key/${key}`);
@@ -193,6 +193,11 @@ export default function App() {
     haState !== "off" &&
     haState !== "unavailable" &&
     haState !== "unknown";
+  const isOther =
+    haStateOn &&
+    mediaTitle !== "Smart TV" &&
+    mediaTitle !== "Fire TV Stick" &&
+    mediaTitle !== "HDMI 2";
   const offActive =
     !haState ||
     haState === "off" ||
@@ -294,7 +299,7 @@ export default function App() {
       bg: () => cellBg("lightgreen", "vold"),
       onPress: () => {},
       onPressIn: () => {
-        if (isOff) return;
+        if (isOff || isOther) return;
         flash("vold");
         fetch(`${TV_TV_URL}/tv/vol/down`).catch(() => {});
       },
@@ -306,7 +311,7 @@ export default function App() {
       bg: () => cellBg("lightgreen", "volu"),
       onPress: () => {},
       onPressIn: () => {
-        if (isOff) return;
+        if (isOff || isOther) return;
         flash("volu");
         fetch(`${TV_TV_URL}/tv/vol/up`).catch(() => {});
       },

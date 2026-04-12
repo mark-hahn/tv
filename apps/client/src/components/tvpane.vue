@@ -153,7 +153,9 @@
         "
         @touchend="stopHold"
       >
-        Off
+        Off<span style="font-size: 18px; margin-left: 4px; opacity: 0.6">{{
+          mediaTitle || "null"
+        }}</span>
       </div>
     </div>
   </div>
@@ -187,6 +189,7 @@ export default {
       activeDevice: null,
       haState: null,
       mediaTitle: null,
+      mediaContentType: null,
     };
   },
 
@@ -271,8 +274,8 @@ export default {
       const active =
         on &&
         (m === "fire"
-          ? this.mediaTitle === "Fire TV Stick"
-          : this.mediaTitle !== "Fire TV Stick");
+          ? this.mediaTitle === "Fire TV Stick" || this.mediaTitle === "HDMI 2"
+          : this.mediaTitle === "Smart TV");
       const bg =
         this.flashBtn === m ? "orange" : active ? "lightblue" : "white";
       return { ...CELL_BASE, backgroundColor: bg };
@@ -303,8 +306,11 @@ export default {
       if (data.power) this.power = data.power;
       if (data.activeDevice !== undefined)
         this.activeDevice = data.activeDevice;
+      if (data.mode) this.mode = data.mode;
       if (data.state !== undefined) this.haState = data.state;
       if (data.mediaTitle !== undefined) this.mediaTitle = data.mediaTitle;
+      if (data.mediaContentType !== undefined)
+        this.mediaContentType = data.mediaContentType;
     },
 
     async pollMute() {

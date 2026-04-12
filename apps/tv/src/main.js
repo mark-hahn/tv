@@ -252,6 +252,12 @@ function handleMsg(raw) {
           braviaMediaContentType = attrs.media_content_type ?? null;
           braviaMediaTitle = attrs.media_title ?? null;
         }
+        // HDMI 2 selected but no CEC signal → Fire Stick is in standby; wake it
+        if (braviaMediaTitle === "HDMI 2" && braviaMediaContentType === null) {
+          log("HDMI 2 with no signal — waking Fire Stick");
+          tvMode = "fire";
+          callService("media_player", "turn_on", FIRE_TV_ENTITY_ID);
+        }
         pushTvState().catch(() => {});
       }
     }

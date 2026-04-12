@@ -27,6 +27,7 @@ export default function App() {
   const [activeDevice, setActiveDevice] = useState(null);
   const [haState, setHaState] = useState(null);
   const [mediaTitle, setMediaTitle] = useState(null);
+  const [mediaContentType, setMediaContentType] = useState(null);
 
   const wsRef = useRef(null);
   const repeatDelayRef = useRef(null);
@@ -87,6 +88,8 @@ export default function App() {
     if (data.mode) setModeState(data.mode);
     if (data.state !== undefined) setHaState(data.state);
     if (data.mediaTitle !== undefined) setMediaTitle(data.mediaTitle);
+    if (data.mediaContentType !== undefined)
+      setMediaContentType(data.mediaContentType);
   };
 
   const pollMute = async () => {
@@ -203,8 +206,8 @@ export default function App() {
     const active =
       haStateOn &&
       (m === "fire"
-        ? mediaTitle === "Fire TV Stick"
-        : mediaTitle !== "Fire TV Stick");
+        ? mediaTitle === "Fire TV Stick" || mediaTitle === "HDMI 2"
+        : mediaTitle === "Smart TV");
     return active ? "lightblue" : "white";
   };
 

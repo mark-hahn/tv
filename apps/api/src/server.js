@@ -834,7 +834,9 @@ app.post("/api/local/mediainfo", async (req, res) => {
     const fileName = relPath.split("/").pop();
     const isEnglishSection = (s) =>
       /^Language\s+:\s+(en|eng|english)\s*$/im.test(s);
-    const subsCount = textSections.filter(isEnglishSection).length;
+    const engSections = textSections.filter(isEnglishSection);
+    const subsCount =
+      engSections.length > 0 ? engSections.length : textSections.length;
 
     // Count .srt sidecar files for this specific file (same base name prefix)
     let srtsCount = 0;

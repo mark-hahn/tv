@@ -272,7 +272,9 @@ async function extractTextSubtitles(videoPath, subtitleStreams) {
   );
   let n = 1;
   for (const stream of textStreams) {
-    const srtPath = path.join(dir, `${baseName}.emb${n}.srt`);
+    const streamLang =
+      (stream.tags?.language || "").toLowerCase().trim() || "eng";
+    const srtPath = path.join(dir, `${baseName}.emb${n}.${streamLang}.srt`);
     n++;
     if (await pathExists(srtPath)) continue;
     try {

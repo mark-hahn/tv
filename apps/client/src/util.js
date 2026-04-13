@@ -261,3 +261,30 @@ export function openNewTab(url) {
     return null;
   }
 }
+
+export function wrapFileName(name, maxLen = 79) {
+  if (!name || name.length <= maxLen) return name;
+  const lines = [];
+  let remaining = name;
+  while (remaining.length > maxLen) {
+    // Try whitespace first
+    let idx = remaining.lastIndexOf(" ", maxLen);
+    if (idx > 0) {
+      lines.push(remaining.slice(0, idx));
+      remaining = remaining.slice(idx + 1);
+      continue;
+    }
+    // Try period
+    idx = remaining.lastIndexOf(".", maxLen - 1);
+    if (idx > 0) {
+      lines.push(remaining.slice(0, idx + 1));
+      remaining = remaining.slice(idx + 1);
+      continue;
+    }
+    // Fall back: break anywhere
+    lines.push(remaining.slice(0, maxLen));
+    remaining = remaining.slice(maxLen);
+  }
+  if (remaining) lines.push(remaining);
+  return lines.join("\n");
+}

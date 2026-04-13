@@ -13,14 +13,11 @@
       :style="{
         paddingLeft: depth * 20 + 'px',
         cursor: 'pointer',
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
         backgroundColor: activeBg,
         paddingTop: '2px',
         paddingBottom: '2px',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         userSelect: 'none',
       }"
       @mouseenter="hover = true"
@@ -47,8 +44,12 @@
         >
       </div>
       <span
-        :style="{ fontWeight: node.type === 'folder' ? 'bold' : 'normal' }"
-        >{{ node.name }}</span
+        :style="{
+          fontWeight: node.type === 'folder' ? 'bold' : 'normal',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+        }"
+        >{{ wrapName(node.name) }}</span
       ><span
         v-if="node.parseError"
         style="
@@ -76,6 +77,8 @@
 </template>
 
 <script>
+import * as util from "../util.js";
+
 export default {
   name: "TreeNode",
   props: {
@@ -116,6 +119,9 @@ export default {
     },
   },
   methods: {
+    wrapName(name) {
+      return util.wrapFileName(name);
+    },
     expand() {
       this.expanded = true;
     },

@@ -507,23 +507,12 @@
         "
       >
         <div style="min-width: 0; margin-right: 8px; overflow: hidden">
-          <div
-            style="
-              overflow: hidden;
-              text-overflow: ellipsis;
-              white-space: nowrap;
-            "
-          >
-            {{ infoFileName }}
+          <div style="white-space: pre-wrap; word-break: break-word">
+            {{ wrapFileName(infoFileName) }}
           </div>
           <div
             v-if="infoFileMeta"
-            style="
-              overflow: hidden;
-              text-overflow: ellipsis;
-              white-space: nowrap;
-              margin-top: 2px;
-            "
+            style="margin-top: 2px"
           >
             {{ infoFileMeta }}
           </div>
@@ -569,8 +558,15 @@
               line-height: 1.5;
             "
           >
-            <div style="font-family: sans-serif; font-size: 13px">
-              {{ f.name }}
+            <div
+              style="
+                font-family: sans-serif;
+                font-size: 13px;
+                white-space: pre-wrap;
+                word-break: break-word;
+              "
+            >
+              {{ wrapFileName(f.name) }}
             </div>
             <div
               v-if="f.meta"
@@ -976,6 +972,9 @@ export default {
     },
   },
   methods: {
+    wrapFileName(name) {
+      return util.wrapFileName(name);
+    },
     formatFileSize(bytes) {
       if (bytes == null) return "";
       if (bytes >= 1024 * 1024 * 1024)

@@ -176,8 +176,12 @@
       </div>
       <div
         :style="cellStyle('white', 'stream')"
-        @mousedown="mode === 'google' && (showStreamers = true)"
-        @touchstart.prevent="mode === 'google' && (showStreamers = true)"
+        @mousedown="
+          (mode === 'google' || mode === 'fire') && (showStreamers = true)
+        "
+        @touchstart.prevent="
+          (mode === 'google' || mode === 'fire') && (showStreamers = true)
+        "
       >
         Stream
       </div>
@@ -251,7 +255,7 @@
 <script>
 import { config } from "../config.js";
 import evtBus from "../evtBus.js";
-import services from "../../../tv/services.json";
+import allServices from "../../../tv/services.json";
 
 const CELL_BASE = {
   borderRight: "3px solid #000",
@@ -276,7 +280,6 @@ export default {
       mediaTitle: null,
       showStreamers: false,
       flashSvc: null,
-      services,
     };
   },
 
@@ -301,6 +304,9 @@ export default {
       if (this.mediaTitle === "Fire TV Stick" || this.mediaTitle === "HDMI 2")
         return "fire";
       return "other";
+    },
+    services() {
+      return allServices[this.mode] ?? [];
     },
     isOff() {
       return this.mode === "off";

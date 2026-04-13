@@ -9,7 +9,7 @@ import {
   Image,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import services from "./services.json";
+import allServices from "./services.json";
 
 const TV_TV_URL = "https://hahnca.com/tv-tv";
 const TV_SRVR_WS_URL = "wss://hahnca.com/tv-srvr";
@@ -210,6 +210,7 @@ export default function App() {
   })();
 
   const isOther = mode === "other";
+  const services = allServices[mode] ?? [];
   // Background color helpers (mirror Vue cellStyle / computed props)
   const cellBg = (defaultBg, key) => (flashBtn === key ? "orange" : defaultBg);
 
@@ -299,7 +300,7 @@ export default function App() {
       bg: () => cellBg("white", "stream"),
       onPress: () => {},
       onPressIn: () => {
-        if (mode === "google") setShowStreamers(true);
+        if (mode === "google" || mode === "fire") setShowStreamers(true);
       },
     },
     // Row 4: vol-, vol+, mute

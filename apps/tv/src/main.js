@@ -743,17 +743,21 @@ app.get("/tv/openapp", (req, res) => {
     res.status(400).json({ ok: false, error: "missing uri" });
     return;
   }
-  if (tvMode !== "google") {
+  if (tvMode === "google") {
+    log(`openapp google uri=${uri} from ${client(req)}`);
+    callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
+      media_content_type: "app",
+      media_content_id: uri,
+    });
+    res.json({ ok: true });
+  } else if (tvMode === "fire") {
+    log(`openapp fire uri=${uri} from ${client(req)}`);
+    adbExecP(`shell am start -n ${uri}`, "openapp");
+    res.json({ ok: true });
+  } else {
     log(`openapp ignored — tvMode=${tvMode}`);
     res.json({ ok: false, error: "wrong mode" });
-    return;
   }
-  log(`openapp uri=${uri} from ${client(req)}`);
-  callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
-    media_content_type: "app",
-    media_content_id: uri,
-  });
-  res.json({ ok: true });
 });
 
 app.get("/tv/status", (req, res) => {

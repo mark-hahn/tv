@@ -194,7 +194,7 @@ export default function App() {
   const cellBg = (defaultBg, key) => (flashBtn === key ? "orange" : defaultBg);
 
   const muteBg =
-    flashBtn === "mute" ? "orange" : muted ? "#ffb3b3" : "lightgreen";
+    flashBtn === "mute" ? "orange" : !isOff && muted ? "#ffb3b3" : "lightgreen";
 
   const offBg = flashBtn === "off" ? "orange" : isOff ? "lightblue" : "white";
 

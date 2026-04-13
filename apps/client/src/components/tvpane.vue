@@ -153,9 +153,7 @@
         "
         @touchend="stopHold"
       >
-        Off<span style="font-size: 18px; margin-left: 4px; opacity: 0.6">{{
-          mediaTitle || "null"
-        }}</span>
+        Off
       </div>
     </div>
   </div>
@@ -194,7 +192,7 @@ export default {
       const bg =
         this.flashBtn === "mute"
           ? "orange"
-          : this.muted
+          : !this.isOff && this.muted
             ? "#ffb3b3"
             : "lightgreen";
       return { ...CELL_BASE, backgroundColor: bg };

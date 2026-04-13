@@ -62,39 +62,20 @@
               gap: '6px',
             }"
           >
-            <div
-              :style="{
-                background: '#' + svc.color,
-                width: '40px',
-                height: '40px',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: '0',
-              }"
-            >
-              <svg
-                v-if="svc.icon && getSimpleIcon(svc.icon)"
-                viewBox="0 0 24 24"
-                width="26"
-                height="26"
-              >
-                <path
-                  :d="getSimpleIcon(svc.icon).path"
-                  fill="white"
-                />
-              </svg>
-              <span
-                v-else
-                style="color: #fff; font-size: 18px; font-weight: bold"
-                >{{ svc.name[0] }}</span
-              >
-            </div>
+            <img
+              :src="'logos/' + svc.logo"
+              :alt="svc.name"
+              style="
+                width: 48px;
+                height: 48px;
+                object-fit: contain;
+                border-radius: 6px;
+              "
+            />
             <span
               style="
                 color: #000;
-                font-size: 14px;
+                font-size: 21px;
                 text-align: center;
                 word-break: break-word;
               "
@@ -270,7 +251,6 @@
 <script>
 import { config } from "../config.js";
 import evtBus from "../evtBus.js";
-import * as simpleIcons from "simple-icons";
 import services from "../../../tv/services.json";
 
 const CELL_BASE = {
@@ -458,12 +438,6 @@ export default {
           if (data.muted !== null) this.muted = data.muted;
         }
       } catch (_) {}
-    },
-
-    getSimpleIcon(slug) {
-      if (!slug) return null;
-      const key = "si" + slug.charAt(0).toUpperCase() + slug.slice(1);
-      return simpleIcons[key] ?? null;
     },
 
     async openApp(svc) {

@@ -6,9 +6,9 @@ import {
   StatusBar,
   ScrollView,
   TouchableOpacity,
+  Image,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import * as simpleIcons from "simple-icons";
 import services from "../tv/services.json";
 
 const TV_TV_URL = "https://hahnca.com/tv-tv";
@@ -184,12 +184,6 @@ export default function App() {
   const fireBtn = async () => {
     flash("fire");
     fetch(`${TV_TV_URL}/tv/firebtn`).catch(() => {});
-  };
-
-  const getSimpleIcon = (slug) => {
-    if (!slug) return null;
-    const key = "si" + slug.charAt(0).toUpperCase() + slug.slice(1);
-    return simpleIcons[key] ?? null;
   };
 
   const openApp = async (svc) => {
@@ -389,33 +383,26 @@ export default function App() {
         </View>
         <ScrollView style={streamerStyles.list}>
           <View style={streamerStyles.grid}>
-            {services.map((svc) => {
-              const icon = getSimpleIcon(svc.icon);
-              return (
-                <TouchableOpacity
-                  key={svc.name}
-                  onPressIn={() => {
-                    setFlashSvc(svc.name);
-                    setTimeout(() => setFlashSvc(null), 500);
-                  }}
-                  onPress={() => openApp(svc)}
-                  style={[
-                    streamerStyles.card,
-                    flashSvc === svc.name && { backgroundColor: "lightblue" },
-                  ]}
-                >
-                  <View
-                    style={[
-                      streamerStyles.iconBox,
-                      { backgroundColor: "#" + svc.color },
-                    ]}
-                  >
-                    <Text style={streamerStyles.iconText}>{svc.name[0]}</Text>
-                  </View>
-                  <Text style={streamerStyles.cardName}>{svc.name}</Text>
-                </TouchableOpacity>
-              );
-            })}
+            {services.map((svc) => (
+              <TouchableOpacity
+                key={svc.name}
+                onPressIn={() => {
+                  setFlashSvc(svc.name);
+                  setTimeout(() => setFlashSvc(null), 500);
+                }}
+                onPress={() => openApp(svc)}
+                style={[
+                  streamerStyles.card,
+                  flashSvc === svc.name && { backgroundColor: "lightblue" },
+                ]}
+              >
+                <Image
+                  source={{ uri: `https://hahnca.com/shows/logos/${svc.logo}` }}
+                  style={streamerStyles.logo}
+                />
+                <Text style={streamerStyles.cardName}>{svc.name}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </ScrollView>
       </View>
@@ -550,20 +537,14 @@ const streamerStyles = StyleSheet.create({
     backgroundColor: "#fff",
     gap: 6,
   },
-  iconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  iconText: {
-    color: "#fff",
-    fontSize: 20,
-    fontWeight: "bold",
+  logo: {
+    width: 48,
+    height: 48,
+    borderRadius: 6,
+    resizeMode: "contain",
   },
   cardName: {
     color: "#000",
-    fontSize: 18,
+    fontSize: 27,
   },
 });

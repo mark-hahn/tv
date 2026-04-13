@@ -232,6 +232,19 @@ function handleMsg(raw) {
         braviaHaMuted = bravia.attributes?.is_volume_muted ?? null;
         braviaMediaContentType = bravia.attributes?.media_content_type ?? null;
         braviaMediaTitle = bravia.attributes?.media_title ?? null;
+        const st = braviaHaPower;
+        if (st === "off" || st === "unavailable" || st === "unknown")
+          tvMode = "off";
+        else if (braviaMediaTitle === "Smart TV") tvMode = "google";
+        else if (
+          braviaMediaTitle === "Fire TV Stick" ||
+          braviaMediaTitle === "HDMI 2"
+        )
+          tvMode = "fire";
+        else tvMode = "other";
+        log(
+          `get_states: braviaState=${st} mediaTitle=${braviaMediaTitle} tvMode=${tvMode}`,
+        );
       }
     }
   } else if (msg.type === "event") {

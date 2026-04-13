@@ -159,14 +159,19 @@ function getStubPath(videoPath) {
   return path.join(dir, `${baseName}.enx.srtstub`);
 }
 
-function hasEmbSidecar(videoPath) {
+function hasEnSidecar(videoPath) {
   const dir = path.dirname(videoPath);
   const baseName = path.basename(videoPath, path.extname(videoPath));
-  const prefix = `${baseName}.emb`;
+  const prefix = `${baseName}.en`;
   try {
     return fs
       .readdirSync(dir)
-      .some((f) => f.startsWith(prefix) && f.endsWith(".srt"));
+      .some(
+        (f) =>
+          f.startsWith(prefix) &&
+          f.endsWith(".srt") &&
+          /^\d/.test(f.slice(prefix.length)),
+      );
   } catch {
     return false;
   }
@@ -176,7 +181,7 @@ async function srtExists(videoPath) {
   return (
     (await pathExists(getSrtPath(videoPath))) ||
     (await pathExists(getStubPath(videoPath))) ||
-    hasEmbSidecar(videoPath)
+    hasEnSidecar(videoPath)
   );
 }
 
@@ -263,7 +268,7 @@ const TEXT_SUB_CODECS = new Set([
   "text",
 ]);
 
-// Extract each text subtitle stream to an emb<n>.srt sidecar, stripping ASS/font tags.
+// Extract each text subtitle stream to an en<n>.srt sidecar, stripping ASS/font tags.
 async function extractTextSubtitles(videoPath, subtitleStreams) {
   const dir = path.dirname(videoPath);
   const baseName = path.basename(videoPath, path.extname(videoPath));
@@ -274,7 +279,7 @@ async function extractTextSubtitles(videoPath, subtitleStreams) {
   for (const stream of textStreams) {
     const streamLang =
       (stream.tags?.language || "").toLowerCase().trim() || "eng";
-    const srtPath = path.join(dir, `${baseName}.emb${n}.${streamLang}.srt`);
+    const srtPath = path.join(dir, `${baseName}.en${n}.srt`);
     n++;
     if (await pathExists(srtPath)) continue;
     try {

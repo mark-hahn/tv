@@ -824,7 +824,6 @@ app.post("/api/local/mediainfo", async (req, res) => {
 
     // Extract subtitle (Text) sections from mediainfo output
     const sections = stdout.split(/\n\n+/);
-    const textSections = sections.filter((s) => /^Text(\s|$)/.test(s.trim()));
 
     const output = stdout
       .split("\n")
@@ -832,11 +831,25 @@ app.post("/api/local/mediainfo", async (req, res) => {
       .join("\n");
 
     const fileName = relPath.split("/").pop();
-    const isEnglishSection = (s) =>
-      /^Language\s+:\s+(en|eng|english)\s*$/im.test(s);
-    const engSections = textSections.filter(isEnglishSection);
-    const subsCount =
-      engSections.length > 0 ? engSections.length : textSections.length;
+
+    // Count subtitle streams that are English or have no language tag (mirrors getSubtitleStreams in asr.js).
+    const ENGLISH_LANG_TAGS = new Set(["eng", "en", "english"]);
+    let subsCount = 0;
+    try {
+      const { stdout: fpOut } = await execAsync(
+        "ffprobe",
+        ["-v", "quiet", "-print_format", "json", "-show_streams", fullPath],
+        { maxBuffer: 5 * 1024 * 1024 },
+      );
+      const streams = JSON.parse(fpOut).streams || [];
+      subsCount = streams.filter((s) => {
+        if (s.codec_type !== "subtitle") return false;
+        const lang = (s.tags?.language || "").toLowerCase().trim();
+        return lang === "" || ENGLISH_LANG_TAGS.has(lang);
+      }).length;
+    } catch (_) {
+      // ffprobe unavailable — subsCount stays 0
+    }
 
     // Count .srt sidecar files for this specific file (same base name prefix)
     let srtsCount = 0;

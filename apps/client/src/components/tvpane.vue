@@ -50,7 +50,7 @@
             @click="openApp(svc)"
             :style="{
               '--btn-bg': flashSvc === svc.name ? 'lightblue' : 'white',
-              width: 'calc(25% - 6px)',
+              width: 'calc(33.333% - 6px)',
               boxSizing: 'border-box',
               padding: '10px 8px',
               border: '1px solid #ccc',
@@ -66,8 +66,8 @@
               :src="'logos/' + svc.logo"
               :alt="svc.name"
               style="
-                width: 48px;
-                height: 48px;
+                width: 72px;
+                height: 72px;
                 object-fit: contain;
                 border-radius: 6px;
               "

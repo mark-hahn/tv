@@ -9,7 +9,7 @@ import {
   Image,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import services from "../tv/services.json";
+import services from "./services.json";
 
 const TV_TV_URL = "https://hahnca.com/tv-tv";
 const TV_SRVR_WS_URL = "wss://hahnca.com/tv-srvr";
@@ -42,6 +42,7 @@ export default function App() {
   const repeatActiveRef = useRef(false);
   const lastCmdRef = useRef(0);
   const holdRef = useRef(null);
+  const volActiveRef = useRef(false);
 
   const debounce = () => {
     const now = Date.now();
@@ -293,7 +294,7 @@ export default function App() {
     },
     {
       key: "stream",
-      label: "Stream",
+      label: "App",
       smallText: true,
       bg: () => cellBg("white", "stream"),
       onPress: () => {},
@@ -527,7 +528,7 @@ const streamerStyles = StyleSheet.create({
     gap: 8,
   },
   card: {
-    width: "23%",
+    width: "31%",
     alignItems: "center",
     paddingVertical: 12,
     paddingHorizontal: 8,
@@ -538,13 +539,13 @@ const streamerStyles = StyleSheet.create({
     gap: 6,
   },
   logo: {
-    width: 48,
-    height: 48,
+    width: 72,
+    height: 72,
     borderRadius: 6,
     resizeMode: "contain",
   },
   cardName: {
     color: "#000",
-    fontSize: 27,
+    fontSize: 13,
   },
 });

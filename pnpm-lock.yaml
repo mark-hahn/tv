@@ -126,6 +126,9 @@ importers:
       parse-torrent-title:
         specifier: ^2.1.0
         version: 2.1.0
+      simple-icons:
+        specifier: ^16.16.0
+        version: 16.16.0
       sweetalert2:
         specifier: ^11.14.5
         version: 11.26.17
@@ -2917,6 +2920,10 @@ packages:
 
   simple-get@4.0.1:
     resolution: {integrity: sha512-brv7p5WgH0jmQJr1ZDDfKDOSeWWg+OVypG99A/5vYGPqJ6pxiaHLy8nxtFjBA7oMa01ebA9gfh1uMCFqOuXxvA==}
+
+  simple-icons@16.16.0:
+    resolution: {integrity: sha512-H+Z29a0TrCw6mrG42V2aqHQaKdJCT87x5aojLlPiIXOf1lpMqnKFAR/jP5xkI5hLrVTCBWs33e9sOtyNWqCx1A==}
+    engines: {node: '>=0.12.18'}
 
   simple-sha1@3.1.0:
     resolution: {integrity: sha512-ArTptMRC1v08H8ihPD6l0wesKvMfF9e8XL5rIHPanI7kGOsSsbY514MwVu6X1PITHCTB2F08zB7cyEbfc4wQjg==}
@@ -6091,6 +6098,8 @@ snapshots:
       decompress-response: 6.0.0
       once: 1.4.0
       simple-concat: 1.0.1
+
+  simple-icons@16.16.0: {}
 
   simple-sha1@3.1.0:
     dependencies:

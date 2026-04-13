@@ -1,6 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, StatusBar } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  StatusBar,
+  ScrollView,
+  TouchableOpacity,
+} from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
+import * as simpleIcons from "simple-icons";
+import services from "../tv/services.json";
 
 const TV_TV_URL = "https://hahnca.com/tv-tv";
 const TV_SRVR_WS_URL = "wss://hahnca.com/tv-srvr";
@@ -13,6 +22,8 @@ const SCREEN_MARGIN = 30;
 export default function App() {
   const [muted, setMuted] = useState(false);
   const [cellDims, setCellDims] = useState({ w: 0, h: 0 });
+  const [showStreamers, setShowStreamers] = useState(false);
+  const [flashSvc, setFlashSvc] = useState(null);
 
   const onGridLayout = ({ nativeEvent: { layout } }) => {
     if (layout.width < 10 || layout.height < 10) return;
@@ -175,6 +186,20 @@ export default function App() {
     fetch(`${TV_TV_URL}/tv/firebtn`).catch(() => {});
   };
 
+  const getSimpleIcon = (slug) => {
+    if (!slug) return null;
+    const key = "si" + slug.charAt(0).toUpperCase() + slug.slice(1);
+    return simpleIcons[key] ?? null;
+  };
+
+  const openApp = async (svc) => {
+    if (isOff) return;
+    setTimeout(() => setShowStreamers(false), 1000);
+    try {
+      await fetch(`${TV_TV_URL}/tv/openapp?uri=${encodeURIComponent(svc.uri)}`);
+    } catch (_) {}
+  };
+
   const isOff =
     !haState ||
     haState === "off" ||
@@ -273,11 +298,14 @@ export default function App() {
       onPressIn: () => tvKey("down"),
     },
     {
-      key: "keyboard",
-      label: "ABC",
+      key: "stream",
+      label: "Stream",
       smallText: true,
-      bg: () => cellBg("white", "keyboard"),
+      bg: () => cellBg("white", "stream"),
       onPress: () => {},
+      onPressIn: () => {
+        if (mode === "google") setShowStreamers(true);
+      },
     },
     // Row 4: vol-, vol+, mute
     {
@@ -345,6 +373,54 @@ export default function App() {
       onPressOut: stopHold,
     },
   ];
+
+  if (showStreamers) {
+    return (
+      <View style={styles.container}>
+        <StatusBar hidden />
+        <View style={streamerStyles.header}>
+          <Text style={streamerStyles.headerTitle}>Streaming Services</Text>
+          <TouchableOpacity
+            onPress={() => setShowStreamers(false)}
+            style={streamerStyles.closeBtn}
+          >
+            <Text style={streamerStyles.closeBtnText}>✕</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView style={streamerStyles.list}>
+          <View style={streamerStyles.grid}>
+            {services.map((svc) => {
+              const icon = getSimpleIcon(svc.icon);
+              return (
+                <TouchableOpacity
+                  key={svc.name}
+                  onPressIn={() => {
+                    setFlashSvc(svc.name);
+                    setTimeout(() => setFlashSvc(null), 500);
+                  }}
+                  onPress={() => openApp(svc)}
+                  style={[
+                    streamerStyles.card,
+                    flashSvc === svc.name && { backgroundColor: "lightblue" },
+                  ]}
+                >
+                  <View
+                    style={[
+                      streamerStyles.iconBox,
+                      { backgroundColor: "#" + svc.color },
+                    ]}
+                  >
+                    <Text style={streamerStyles.iconText}>{svc.name[0]}</Text>
+                  </View>
+                  <Text style={streamerStyles.cardName}>{svc.name}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -428,5 +504,66 @@ const styles = StyleSheet.create({
   },
   cellTextLarge: {
     fontSize: 84,
+  },
+});
+
+const streamerStyles = StyleSheet.create({
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 2,
+    borderBottomColor: "#333",
+  },
+  headerTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "bold",
+  },
+  closeBtn: {
+    padding: 8,
+  },
+  closeBtnText: {
+    color: "#fff",
+    fontSize: 28,
+    lineHeight: 32,
+  },
+  list: {
+    flex: 1,
+    padding: 8,
+  },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  card: {
+    width: "23%",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    backgroundColor: "#fff",
+    gap: 6,
+  },
+  iconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconText: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "bold",
+  },
+  cardName: {
+    color: "#000",
+    fontSize: 18,
   },
 });

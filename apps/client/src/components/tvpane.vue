@@ -3,7 +3,109 @@
     id="tvPane"
     style="padding: 0; box-sizing: border-box; width: 100%; height: 100%"
   >
+    <!-- Streamers pane -->
     <div
+      v-if="showStreamers"
+      style="
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        background: #111;
+      "
+    >
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 8px 12px;
+          border-bottom: 2px solid #333;
+        "
+      >
+        <span style="color: #fff; font-size: 20px; font-weight: bold"
+          >Streaming Services</span
+        >
+        <button
+          @mousedown.prevent="showStreamers = false"
+          @touchstart.prevent="showStreamers = false"
+          :style="{
+            '--btn-bg': '#111',
+            border: 'none',
+            color: '#fff',
+            fontSize: '28px',
+            cursor: 'pointer',
+            padding: '4px 8px',
+            lineHeight: '1',
+          }"
+        >
+          ✕
+        </button>
+      </div>
+      <div style="overflow-y: auto; flex: 1; padding: 8px">
+        <div style="display: flex; flex-wrap: wrap; gap: 8px">
+          <button
+            v-for="svc in services"
+            :key="svc.name"
+            @pointerdown="flashSvcName(svc.name)"
+            @click="openApp(svc)"
+            :style="{
+              '--btn-bg': flashSvc === svc.name ? 'lightblue' : 'white',
+              width: 'calc(25% - 6px)',
+              boxSizing: 'border-box',
+              padding: '10px 8px',
+              border: '1px solid #ccc',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '6px',
+            }"
+          >
+            <div
+              :style="{
+                background: '#' + svc.color,
+                width: '40px',
+                height: '40px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: '0',
+              }"
+            >
+              <svg
+                v-if="svc.icon && getSimpleIcon(svc.icon)"
+                viewBox="0 0 24 24"
+                width="26"
+                height="26"
+              >
+                <path
+                  :d="getSimpleIcon(svc.icon).path"
+                  fill="white"
+                />
+              </svg>
+              <span
+                v-else
+                style="color: #fff; font-size: 18px; font-weight: bold"
+                >{{ svc.name[0] }}</span
+              >
+            </div>
+            <span
+              style="
+                color: #000;
+                font-size: 14px;
+                text-align: center;
+                word-break: break-word;
+              "
+              >{{ svc.name }}</span
+            >
+          </button>
+        </div>
+      </div>
+    </div>
+    <div
+      v-else
       style="
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -91,7 +193,13 @@
       >
         ▼
       </div>
-      <div :style="cellStyle('white')">ABC</div>
+      <div
+        :style="cellStyle('white', 'stream')"
+        @mousedown="mode === 'google' && (showStreamers = true)"
+        @touchstart.prevent="mode === 'google' && (showStreamers = true)"
+      >
+        Stream
+      </div>
       <!-- Row 4: vol-, vol+, mute -->
       <div
         :style="cellStyle('lightgreen', 'vold')"
@@ -162,6 +270,8 @@
 <script>
 import { config } from "../config.js";
 import evtBus from "../evtBus.js";
+import * as simpleIcons from "simple-icons";
+import services from "../../../tv/services.json";
 
 const CELL_BASE = {
   borderRight: "3px solid #000",
@@ -184,6 +294,9 @@ export default {
       flashBtn: null,
       haState: null,
       mediaTitle: null,
+      showStreamers: false,
+      flashSvc: null,
+      services,
     };
   },
 
@@ -345,6 +458,31 @@ export default {
           if (data.muted !== null) this.muted = data.muted;
         }
       } catch (_) {}
+    },
+
+    getSimpleIcon(slug) {
+      if (!slug) return null;
+      const key = "si" + slug.charAt(0).toUpperCase() + slug.slice(1);
+      return simpleIcons[key] ?? null;
+    },
+
+    async openApp(svc) {
+      if (this.isOff) return;
+      setTimeout(() => {
+        this.showStreamers = false;
+      }, 1000);
+      try {
+        await fetch(
+          `${config.tvTvUrl}/tv/openapp?uri=${encodeURIComponent(svc.uri)}`,
+        );
+      } catch (_) {}
+    },
+
+    flashSvcName(name) {
+      this.flashSvc = name;
+      setTimeout(() => {
+        this.flashSvc = null;
+      }, 500);
     },
 
     _debounce() {

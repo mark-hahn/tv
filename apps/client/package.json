@@ -29,6 +29,7 @@
     "marked": "^15.0.7",
     "mitt": "^3.0.1",
     "parse-torrent-title": "^2.1.0",
+    "simple-icons": "^16.16.0",
     "sweetalert2": "^11.14.5",
     "vue": "^3.0.0",
     "vue3-virtual-scroller": "^0.2.3"

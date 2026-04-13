@@ -724,6 +724,25 @@ app.get("/tv/mutestate", async (req, res) => {
   });
 });
 
+app.get("/tv/openapp", (req, res) => {
+  const uri = req.query.uri;
+  if (!uri) {
+    res.status(400).json({ ok: false, error: "missing uri" });
+    return;
+  }
+  if (tvMode !== "google") {
+    log(`openapp ignored — tvMode=${tvMode}`);
+    res.json({ ok: false, error: "wrong mode" });
+    return;
+  }
+  log(`openapp uri=${uri} from ${client(req)}`);
+  callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
+    media_content_type: "app",
+    media_content_id: uri,
+  });
+  res.json({ ok: true });
+});
+
 app.get("/tv/status", (req, res) => {
   res.json({
     entity: BRAVIA_ENTITY_ID,

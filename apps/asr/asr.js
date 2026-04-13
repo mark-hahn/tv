@@ -226,7 +226,9 @@ function appendNeedsSrtChk(videoPath) {
   }
 }
 
-// Returns array of subtitle stream objects, or null on ffprobe error.
+const ENGLISH_LANG_TAGS = new Set(["eng", "en", "english"]);
+
+// Returns array of subtitle stream objects (english or unknown language only), or null on ffprobe error.
 async function getSubtitleStreams(videoPath) {
   try {
     const { out } = await run("ffprobe", [
@@ -238,7 +240,12 @@ async function getSubtitleStreams(videoPath) {
       videoPath,
     ]);
     const streams = JSON.parse(out).streams || [];
-    return streams.filter((s) => s.codec_type === "subtitle");
+    return streams.filter((s) => {
+      if (s.codec_type !== "subtitle") return false;
+      const lang = (s.tags?.language || "").toLowerCase().trim();
+      // Keep stream if language is unknown/unset or is English
+      return lang === "" || ENGLISH_LANG_TAGS.has(lang);
+    });
   } catch (e) {
     console.warn(
       `Warning: could not probe ${path.basename(videoPath)} for subtitles: ${e.message}`,

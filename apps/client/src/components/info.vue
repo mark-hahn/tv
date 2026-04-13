@@ -822,6 +822,8 @@ export default {
       const posterEl = document.getElementById("poster");
       if (!posterEl) return;
 
+      const showNameAtStart = this.show?.name;
+
       const img = new Image();
       // Poster column is 25% of pane; fill that column.
       img.style.width = "100%";
@@ -852,6 +854,8 @@ export default {
         img.onerror = () => resolve();
         img.src = src;
       });
+
+      if (this.show?.name !== showNameAtStart) return;
 
       posterEl.replaceChildren(img);
     },

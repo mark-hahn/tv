@@ -294,6 +294,7 @@ async function extractTextSubtitles(videoPath, subtitleStreams) {
       text = text.replace(/\{[^}]*\}/g, "");
       text = text.replace(/<font[^>]*>/gi, "");
       text = text.replace(/<\/font>/gi, "");
+      text = text.replace(/<\/?(b|i|u)>/gi, "");
       await fsp.writeFile(srtPath, text, "utf8");
       console.log(
         `[asr] extracted text sub stream ${stream.index} → ${path.basename(srtPath)}`,

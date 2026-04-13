@@ -1,5 +1,5 @@
 import { WebSocket } from "ws";
-import { exec } from "child_process";
+import { exec, spawn } from "child_process";
 import express from "express";
 import cors from "cors";
 
@@ -358,24 +358,110 @@ app.get("/tv/googlebtn", (req, res) => {
   res.json({ ok: true });
 });
 
-function adbExec(cmd, label) {
-  exec(`adb -s ${FIRE_TV_IP}:5555 ${cmd}`, (err, stdout, stderr) => {
-    if (err && stderr.includes("not found")) {
-      log(`[fire] adb ${label}: device not found, connecting...`);
-      exec(`adb connect ${FIRE_TV_IP}:5555`, () => {
-        exec(`adb -s ${FIRE_TV_IP}:5555 ${cmd}`, (err2) => {
-          if (err2)
-            log(`[fire] adb ${label} error after connect: ${err2.message}`);
-          else log(`[fire] adb ${label} ok (after connect)`);
-        });
-      });
-    } else if (err) {
-      log(`[fire] adb ${label} error: ${err.message}`);
+// ─── Persistent adb shell ────────────────────────────────────────────────────
+let fireShell = null;
+let fireShellReady = false;
+let fireShellStdoutBuf = "";
+let fireShellPending = null; // { marker, resolve } — at most one in-flight
+
+function spawnFireShell() {
+  if (fireShell) {
+    fireShell.removeAllListeners();
+    fireShell.stdin.destroy();
+    fireShell.kill();
+  }
+  fireShellReady = false;
+  fireShell = spawn("adb", ["-s", `${FIRE_TV_IP}:5555`, "shell"]);
+  fireShellStdoutBuf = "";
+  fireShell.stdout.on("data", (chunk) => {
+    fireShellStdoutBuf += chunk.toString();
+    if (
+      fireShellPending &&
+      fireShellStdoutBuf.includes(fireShellPending.marker)
+    ) {
+      const { resolve } = fireShellPending;
+      fireShellPending = null;
+      resolve();
+    }
+  });
+  fireShell.on("spawn", () => {
+    log("[fire] adb shell spawned");
+    fireShellReady = true;
+  });
+  fireShell.on("error", (err) => {
+    log(`[fire] adb shell error: ${err.message}`);
+    fireShellReady = false;
+  });
+  fireShell.on("close", (code) => {
+    log(`[fire] adb shell closed (${code}), reconnecting in 2s...`);
+    fireShellReady = false;
+    fireShell = null;
+    setTimeout(connectFireShell, 2000);
+  });
+}
+
+function connectFireShell() {
+  exec(`adb connect ${FIRE_TV_IP}:5555`, (err, stdout) => {
+    if (err) {
+      log(`[fire] adb connect failed: ${err.message}, retrying in 5s...`);
+      setTimeout(connectFireShell, 5000);
     } else {
-      log(`[fire] adb ${label} ok`);
+      log(`[fire] adb connect: ${stdout.trim()}`);
+      spawnFireShell();
     }
   });
 }
+
+let fireKeySeq = 0;
+function fireKeyevent(keycode) {
+  return new Promise((resolve, reject) => {
+    if (!fireShellReady || !fireShell) {
+      reject(new Error("fire shell not ready"));
+      return;
+    }
+    const marker = `__K${++fireKeySeq}__`;
+    fireShellPending = { marker, resolve };
+    fireShell.stdin.write(
+      `input keyevent ${keycode} && echo ${marker}\n`,
+      (err) => {
+        if (err) {
+          fireShellPending = null;
+          reject(err);
+        }
+      },
+    );
+  });
+}
+
+function adbExecP(cmd, label) {
+  return new Promise((resolve) => {
+    exec(`adb -s ${FIRE_TV_IP}:5555 ${cmd}`, (err, stdout, stderr) => {
+      if (err && stderr && stderr.includes("not found")) {
+        log(`[fire] adb ${label}: device not found, connecting...`);
+        exec(`adb connect ${FIRE_TV_IP}:5555`, () => {
+          exec(`adb -s ${FIRE_TV_IP}:5555 ${cmd}`, (err2) => {
+            if (err2)
+              log(`[fire] adb ${label} error after connect: ${err2.message}`);
+            else log(`[fire] adb ${label} ok (after connect)`);
+            resolve();
+          });
+        });
+      } else if (err) {
+        log(`[fire] adb ${label} error: ${err.message}`);
+        resolve();
+      } else {
+        log(`[fire] adb ${label} ok`);
+        resolve();
+      }
+    });
+  });
+}
+
+function adbExec(cmd, label) {
+  adbExecP(cmd, label);
+}
+
+connectFireShell();
 
 app.get("/tv/firebtn", (req, res) => {
   log(`firebtn from ${client(req)}`);
@@ -485,7 +571,7 @@ app.get("/tv/off", (req, res) => {
   }).catch(() => {});
 });
 
-app.get("/tv/key/:key", (req, res) => {
+app.get("/tv/key/:key", async (req, res) => {
   const GOOGLE_KEY_MAP = {
     ok: "Confirm",
     up: "Up",
@@ -519,10 +605,15 @@ app.get("/tv/key/:key", (req, res) => {
   }
 
   if (tvMode === "fire") {
-    const n = Math.min(parseInt(req.query.n) || 1, 5);
+    const n = Math.min(parseInt(req.query.n) || 1, 20);
     const keys = Array(n).fill(command).join(" ");
-    adbExec(`shell input keyevent ${keys}`, `keyevent ${keys}`);
-    log(`[fire] adb keyevent ${keys} from ${client(req)}`);
+    if (fireShellReady) {
+      await fireKeyevent(keys);
+      log(`[fire] keyevent ${command}×${n} via shell from ${client(req)}`);
+    } else {
+      await adbExecP(`shell input keyevent ${keys}`, `keyevent ${keys}`);
+      log(`[fire] adb keyevent ${keys} from ${client(req)}`);
+    }
     res.json({ ok: true, command, mode: tvMode });
     return;
   }

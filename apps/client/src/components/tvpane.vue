@@ -23,11 +23,8 @@
       </div>
       <div
         :style="cellStyle('#f5e642', 'up')"
-        @mousedown="startRepeat('up')"
-        @mouseup="stopRepeat"
-        @mouseleave="stopRepeat"
-        @touchstart.prevent="startRepeat('up')"
-        @touchend="stopRepeat"
+        @mousedown="tvKey('up')"
+        @touchstart.prevent="tvKey('up')"
       >
         ▲
       </div>
@@ -58,8 +55,14 @@
       </div>
       <div
         :style="cellStyle('lightgreen', 'ok')"
-        @mousedown="tvKey('ok')"
-        @touchstart.prevent="tvKey('ok')"
+        @mousedown="
+          stopRepeat();
+          tvKey('ok');
+        "
+        @touchstart.prevent="
+          stopRepeat();
+          tvKey('ok');
+        "
       >
         OK
       </div>
@@ -83,11 +86,8 @@
       </div>
       <div
         :style="cellStyle('#f5e642', 'down')"
-        @mousedown="startRepeat('down')"
-        @mouseup="stopRepeat"
-        @mouseleave="stopRepeat"
-        @touchstart.prevent="startRepeat('down')"
-        @touchend="stopRepeat"
+        @mousedown="tvKey('down')"
+        @touchstart.prevent="tvKey('down')"
       >
         ▼
       </div>
@@ -249,9 +249,28 @@ export default {
         });
         let count = 0;
         while (this._repeatActive) {
-          await fetch(`${config.tvTvUrl}/tv/key/${key}`).catch(() => {});
+          const isFast = count >= 4;
+          const n =
+            this.mode === "fire" && key === "left"
+              ? isFast
+                ? 9
+                : 1
+              : isFast && this.mode === "fire"
+                ? 3
+                : 1;
+          const url =
+            n > 1
+              ? `${config.tvTvUrl}/tv/key/${key}?n=${n}`
+              : `${config.tvTvUrl}/tv/key/${key}`;
+          await fetch(url).catch(() => {});
           if (!this._repeatActive) break;
-          const delay = count++ < 4 ? 500 : key === "left" ? 10 : 50;
+          const FAST_REPEAT_MS = 100;
+          const delay =
+            this.mode === "fire"
+              ? (count++, 0)
+              : count++ < 4
+                ? 500
+                : FAST_REPEAT_MS;
           await new Promise((r) => {
             this._repeatTimer = setTimeout(r, delay);
           });
@@ -361,6 +380,7 @@ export default {
 
     async tvKey(key) {
       if (this.isOff || this.isOther) return;
+      if (!this._debounce()) return;
       this.flash(key);
       const res = await fetch(`${config.tvTvUrl}/tv/key/${key}`);
       const data = await res.json();

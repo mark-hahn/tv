@@ -30,14 +30,13 @@ export default function App() {
   const repeatTimeoutRef = useRef(null);
   const repeatActiveRef = useRef(false);
   const lastCmdRef = useRef(0);
-  const lastVolRef = useRef(0);
   const holdRef = useRef(null);
 
   const debounce = () => {
     const now = Date.now();
-    if (now - lastCmdRef.current < 250) return false;
+    const ok = now - lastCmdRef.current >= 250;
     lastCmdRef.current = now;
-    return true;
+    return ok;
   };
 
   const startRepeat = (key) => {
@@ -45,32 +44,40 @@ export default function App() {
     if (!debounce()) return;
     flash(key);
     repeatActiveRef.current = true;
-    fetch(`${TV_TV_URL}/tv/key/${key}`).catch(() => {});
-    let count = 0;
-    const tick = () => {
-      if (!repeatActiveRef.current) return;
-      fetch(`${TV_TV_URL}/tv/key/${key}`).catch(() => {});
-      repeatTimeoutRef.current = setTimeout(tick, count++ < 2 ? 500 : 100);
-    };
-    repeatDelayRef.current = setTimeout(tick, 400);
-  };
-
-  const volActiveRef = useRef(false);
-
-  const startRepeatCmd = (flashKey, cmd) => {
-    if (isOff || isOther) return;
-    if (volActiveRef.current) return;
-    volActiveRef.current = true;
-    flash(flashKey);
     (async () => {
-      while (volActiveRef.current) {
-        await fetch(`${TV_TV_URL}/tv/${cmd}`).catch(() => {});
+      await fetch(`${TV_TV_URL}/tv/key/${key}`).catch(() => {});
+      if (!repeatActiveRef.current) return;
+      await new Promise((r) => {
+        repeatDelayRef.current = setTimeout(r, 400);
+      });
+      let count = 0;
+      while (repeatActiveRef.current) {
+        const isFast = count >= 4;
+        const n =
+          mode === "fire" && key === "left"
+            ? isFast
+              ? 9
+              : 1
+            : isFast && mode === "fire"
+              ? 3
+              : 1;
+        const url =
+          n > 1
+            ? `${TV_TV_URL}/tv/key/${key}?n=${n}`
+            : `${TV_TV_URL}/tv/key/${key}`;
+        await fetch(url).catch(() => {});
+        if (!repeatActiveRef.current) break;
+        const FAST_REPEAT_MS = 100;
+        const delay =
+          mode === "fire" ? (count++, 0) : count++ < 4 ? 500 : FAST_REPEAT_MS;
+        await new Promise((r) => {
+          repeatTimeoutRef.current = setTimeout(r, delay);
+        });
       }
     })();
   };
 
   const stopRepeat = () => {
-    volActiveRef.current = false;
     repeatActiveRef.current = false;
     clearTimeout(repeatDelayRef.current);
     clearTimeout(repeatTimeoutRef.current);
@@ -136,18 +143,14 @@ export default function App() {
     if (!debounce()) return;
     try {
       const res = await fetch(`${TV_TV_URL}/tv/${cmd}`);
-      await res.json();
-    } catch (_) {}
-  };
-
-  const tvKeyRaw = async (key) => {
-    try {
-      await fetch(`${TV_TV_URL}/tv/key/${key}`);
+      const data = await res.json();
+      if (cmd === "mute" && data.ok) setMuted(data.muted);
     } catch (_) {}
   };
 
   const tvKey = async (key) => {
     if (isOff || isOther) return;
+    if (!debounce()) return;
     flash(key);
     try {
       await fetch(`${TV_TV_URL}/tv/key/${key}`);
@@ -216,8 +219,7 @@ export default function App() {
       label: "▲",
       bg: () => cellBg("#f5e642", "up"),
       onPress: () => {},
-      onPressIn: () => startRepeat("up"),
-      onPressOut: stopRepeat,
+      onPressIn: () => tvKey("up"),
     },
     {
       key: "home",
@@ -241,7 +243,10 @@ export default function App() {
       label: "OK",
       bg: () => cellBg("lightgreen", "ok"),
       onPress: () => {},
-      onPressIn: () => tvKey("ok"),
+      onPressIn: () => {
+        stopRepeat();
+        tvKey("ok");
+      },
     },
     {
       key: "right",
@@ -265,8 +270,7 @@ export default function App() {
       label: "▼",
       bg: () => cellBg("#f5e642", "down"),
       onPress: () => {},
-      onPressIn: () => startRepeat("down"),
-      onPressOut: stopRepeat,
+      onPressIn: () => tvKey("down"),
     },
     {
       key: "keyboard",

@@ -164,11 +164,15 @@ function getStubPath(videoPath) {
 function hasEmbSidecar(videoPath) {
   const dir = path.dirname(videoPath);
   const baseName = path.basename(videoPath, path.extname(videoPath));
-  const prefix = `${baseName}.emb`;
+  const prefix = `${baseName}.en`;
   try {
     return fs
       .readdirSync(dir)
-      .some((f) => f.startsWith(prefix) && f.endsWith(".srt"));
+      .some(
+        (f) =>
+          f.startsWith(prefix) &&
+          /^en\d+\.srt$/.test(f.slice(baseName.length + 1)),
+      );
   } catch {
     return false;
   }
@@ -274,9 +278,7 @@ async function extractTextSubtitles(videoPath, subtitleStreams) {
   );
   let n = 1;
   for (const stream of textStreams) {
-    const streamLang =
-      (stream.tags?.language || "").toLowerCase().trim() || "eng";
-    const srtPath = path.join(dir, `${baseName}.emb${n}.${streamLang}.srt`);
+    const srtPath = path.join(dir, `${baseName}.en${n}.srt`);
     n++;
     if (await pathExists(srtPath)) continue;
     try {

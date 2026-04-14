@@ -166,6 +166,12 @@ handleMsg = async (msg) => {
     return;
   }
 
+  // Handle Emb logs (server->client push)
+  if (status === "emb-log") {
+    evtBus.emit("emb-log", result);
+    return;
+  }
+
   // Handle server->client notifications (id === 0)
   if (id === 0 && notification) {
     evtBus.emit(notification, result);
@@ -387,6 +393,14 @@ export function getSeriesMapFromTvdb(params) {
 
 export function handleAsr(params) {
   return fCall("handleAsr", params);
+}
+
+export function handleEmb(params) {
+  return fCall("handleEmb", params);
+}
+
+export function embApply(reqPath) {
+  return httpCall("/api/asr/emb/apply", { path: reqPath }, "POST");
 }
 
 export function handleFix(params) {

@@ -114,6 +114,8 @@ const TVDB_JSON_PATH = "/root/dev/apps/tv/apps/srvr/data/tvdb.json";
 const BKGND_LOG_PATH = path.join(__dirname, "data", "asr-bkgnd.log");
 const PENDING_PATH = path.join(__dirname, "data", "pending.txt");
 const NEEDS_SRT_CHK_PATH = path.join(__dirname, "data", "needsSrtChk.txt");
+const EMB_PENDING_PATH = path.join(__dirname, "data", "emb-pending.txt");
+const EMB_LOG_PATH = path.join(__dirname, "data", "emb.log");
 const BKGND_TMPDIR = "/tmp/asr-bkgnd";
 const CPU_LOAD_MAX = 2;
 const TEST_SHOWS = null;
@@ -1013,11 +1015,11 @@ function loadTvdb() {
   return JSON.parse(fs.readFileSync(TVDB_JSON_PATH, "utf8"));
 }
 
-// Atomically consume pending.txt; returns array of full video paths (empty array if no file).
-function consumePending() {
-  const tmp = PENDING_PATH + ".tmp";
+// Atomically consume a queue file; returns array of lines (empty array if no file).
+function consumeQueueFile(queuePath) {
+  const tmp = queuePath + ".tmp";
   try {
-    fs.renameSync(PENDING_PATH, tmp);
+    fs.renameSync(queuePath, tmp);
   } catch {
     return [];
   }
@@ -1031,6 +1033,12 @@ function consumePending() {
   } catch {
     return [];
   }
+}
+
+// Atomically consume pending.txt; returns array of full video paths (empty array if no file).
+function consumePending() {
+  const tmp = PENDING_PATH + ".tmp";
+  return consumeQueueFile(PENDING_PATH);
 }
 
 function pstStamp() {
@@ -1057,6 +1065,40 @@ function appendBkgndLog(logPath, videoPath, fromPending, stalled = false) {
 function bkgndLogStatus(logPath, msg) {
   fs.mkdirSync(path.dirname(logPath), { recursive: true });
   fs.appendFileSync(logPath, `${pstStamp()} # ${msg}\n`, "utf8");
+}
+
+function appendEmbLog(msg) {
+  fs.mkdirSync(path.dirname(EMB_LOG_PATH), { recursive: true });
+  fs.appendFileSync(EMB_LOG_PATH, `${pstStamp()} ${msg}\n`, "utf8");
+}
+
+async function processEmbQueue(embPaths) {
+  for (const videoPath of embPaths) {
+    if (!isVideoFile(videoPath)) {
+      appendEmbLog(`skip (not video): ${videoPath}`);
+      continue;
+    }
+    if (!(await pathExists(videoPath))) {
+      appendEmbLog(`skip (not found): ${videoPath}`);
+      continue;
+    }
+    const subtitleStreams = await getSubtitleStreams(videoPath);
+    if (subtitleStreams === null) {
+      appendEmbLog(`ffprobe error: ${path.basename(videoPath)}`);
+      continue;
+    }
+    const textStreams = subtitleStreams.filter((s) =>
+      TEXT_SUB_CODECS.has(s.codec_name),
+    );
+    if (textStreams.length === 0) {
+      appendEmbLog(`no text subs: ${path.relative(TV_ROOT, videoPath)}`);
+      continue;
+    }
+    await extractTextSubtitles(videoPath, subtitleStreams);
+    appendEmbLog(
+      `extracted ${textStreams.length} stream(s): ${path.relative(TV_ROOT, videoPath)}`,
+    );
+  }
 }
 
 async function waitForLowCpu() {
@@ -1245,6 +1287,12 @@ async function runBackgroundLoop() {
 
   while (true) {
     const pending = consumePending();
+    const embPending = consumeQueueFile(EMB_PENDING_PATH);
+
+    // Process emb-pending before anything else (fast, no CPU gate needed)
+    if (embPending.length > 0) {
+      await processEmbQueue(embPending);
+    }
 
     // Pending files are priority: log immediately then wait for CPU.
     // Regular background files wait for CPU first (so they are never stalled).
@@ -1276,6 +1324,18 @@ async function runBackgroundLoop() {
           while (Date.now() < deadline) {
             await sleep(PAUSE_POLL_MS);
             const wakeUp = consumePending();
+            const embWakeUp = consumeQueueFile(EMB_PENDING_PATH);
+            if (embWakeUp.length > 0) {
+              // put emb back and break to process at top of loop
+              fs.mkdirSync(path.dirname(EMB_PENDING_PATH), { recursive: true });
+              fs.appendFileSync(
+                EMB_PENDING_PATH,
+                embWakeUp.join("\n") + "\n",
+                "utf8",
+              );
+              pauseLogged = false;
+              break;
+            }
             if (wakeUp.length > 0) {
               fs.mkdirSync(path.dirname(PENDING_PATH), { recursive: true });
               fs.writeFileSync(PENDING_PATH, wakeUp.join("\n") + "\n", "utf8");

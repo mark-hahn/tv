@@ -17,9 +17,11 @@
         flexDirection: 'column',
         overflow: 'hidden',
         flex:
-          showSubs || showAsr || showFix || showInfo ? '0 0 50%' : '1 1 auto',
+          showSubs || showAsr || showEmb || showFix || showInfo
+            ? '0 0 50%'
+            : '1 1 auto',
         borderBottom:
-          showSubs || showAsr || showFix || showInfo
+          showSubs || showAsr || showEmb || showFix || showInfo
             ? '1px solid #ddd'
             : 'none',
       }"
@@ -149,6 +151,26 @@
           </button>
 
           <button
+            @click="errsMode || clickEmb()"
+            :disabled="errsMode"
+            :style="{
+              cursor: errsMode ? 'default' : 'pointer',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              backgroundColor: errsMode
+                ? '#e8e8e8'
+                : showEmb
+                  ? '#ddd'
+                  : 'whitesmoke',
+              color: errsMode ? '#aaa' : 'inherit',
+              marginRight: '10px',
+            }"
+          >
+            Emb
+          </button>
+
+          <button
             @click="clickFix"
             :style="{
               cursor: 'pointer',
@@ -264,6 +286,98 @@
           :selected-files="selectedFiles"
           @node-click="handleNodeClick"
         />
+      </div>
+    </div>
+
+    <!-- Emb Pane -->
+    <div
+      id="embPane"
+      v-show="showEmb"
+      :style="{
+        flex: '1 1 50%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        backgroundColor: '#fafafa',
+        color: '#000',
+        fontFamily: 'monospace',
+        padding: '10px',
+        borderLeft: '1px solid #ddd',
+      }"
+    >
+      <div
+        style="
+          flex: 0 0 auto;
+          border-bottom: 1px solid #ddd;
+          padding-bottom: 5px;
+          margin-bottom: 5px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
+        <div>
+          <strong>Emb Output</strong>
+          <span v-if="embBusy">(Running)</span>
+        </div>
+        <div>
+          <button
+            @click="applyEmb"
+            :disabled="embBusy"
+            :style="{
+              cursor: embBusy ? 'not-allowed' : 'pointer',
+              borderRadius: '4px',
+              padding: '2px 8px',
+              border: '1px solid #bbb',
+              backgroundColor: 'whitesmoke',
+              marginRight: '5px',
+              opacity: embBusy ? 0.6 : 1,
+            }"
+          >
+            Apply
+          </button>
+          <button
+            @click="clearEmbLog"
+            :style="{
+              cursor: 'pointer',
+              borderRadius: '4px',
+              padding: '2px 8px',
+              border: '1px solid #bbb',
+              backgroundColor: 'whitesmoke',
+              marginRight: '5px',
+            }"
+          >
+            Clear
+          </button>
+          <button
+            @click="showEmb = false"
+            title="Close"
+            :style="{
+              cursor: 'pointer',
+              borderRadius: '4px',
+              padding: '2px 8px',
+              border: '1px solid #bbb',
+              backgroundColor: 'whitesmoke',
+              fontWeight: 'bold',
+              marginLeft: '5px',
+            }"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+      <div
+        ref="embScroll"
+        style="
+          flex: 1 1 auto;
+          overflow: auto;
+          white-space: pre-wrap;
+          background-color: #fff;
+          border: 1px solid #eee;
+          padding: 4px;
+        "
+      >
+        {{ embLogs }}
       </div>
     </div>
 
@@ -813,6 +927,8 @@ import {
   getSubFileIds,
   handleAsr,
   handleFix,
+  handleEmb,
+  embApply,
 } from "../srvr.js";
 import evtBus from "../evtBus.js";
 import * as util from "../util.js";
@@ -860,6 +976,11 @@ export default {
       asrBusy: false,
       activeAsrPath: null,
       ignoreLogs: false,
+
+      // Emb
+      showEmb: false,
+      embLogs: "",
+      embBusy: false,
 
       // Fix (ffmpeg)
       showFix: false,
@@ -921,6 +1042,24 @@ export default {
         });
       }
     },
+    embLogs() {
+      const el = this.$refs.embScroll;
+      if (!el) return;
+      const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50;
+      if (isAtBottom) {
+        this.$nextTick(() => {
+          if (el) el.scrollTop = el.scrollHeight;
+        });
+      }
+    },
+    showEmb(val) {
+      if (val) {
+        this.$nextTick(() => {
+          if (this.$refs.embScroll)
+            this.$refs.embScroll.scrollTop = this.$refs.embScroll.scrollHeight;
+        });
+      }
+    },
     fixLogs() {
       const el = this.$refs.fixScroll;
       if (!el) return;
@@ -945,12 +1084,15 @@ export default {
     }
     evtBus.on("asr-log", this.onAsrLog);
     evtBus.on("fix-log", this.onFixLog);
+    evtBus.on("emb-log", this.onEmbLog);
     this.initAsrState();
     this.initFixState();
+    this.initEmbState();
   },
   unmounted() {
     evtBus.off("asr-log", this.onAsrLog);
     evtBus.off("fix-log", this.onFixLog);
+    evtBus.off("emb-log", this.onEmbLog);
   },
   computed: {
     infoLines() {
@@ -1778,6 +1920,83 @@ export default {
         console.error("Failed to init Fix State", e);
       }
     },
+    async initEmbState() {
+      try {
+        await handleEmb({ action: "tail" });
+      } catch (e) {
+        console.error("Failed to init Emb state", e);
+      }
+    },
+    clickEmb() {
+      this.showEmb = !this.showEmb;
+      if (this.showEmb) {
+        this.showSubs = false;
+        this.showAsr = false;
+        this.showFix = false;
+        this.showInfo = false;
+      }
+    },
+    async applyEmb() {
+      if (this.embBusy) return;
+
+      let startPath = null;
+      if (this.selectedName) {
+        startPath = this.selectedName;
+      } else if (this.selectedFiles.size === 1) {
+        startPath = [...this.selectedFiles][0];
+      }
+
+      if (!startPath) {
+        this.embLogs += "\n[Error] No folder or file selected.\n";
+        return;
+      }
+
+      this.embBusy = true;
+      this.showEmb = true;
+      this.showSubs = false;
+      this.showAsr = false;
+      this.showFix = false;
+      this.showInfo = false;
+
+      try {
+        const res = await embApply(startPath);
+        if (res && res.ok) {
+          this.embLogs += `[Queued ${res.queued} file(s) for emb extraction]\n`;
+        } else {
+          this.embLogs += `[emb apply error: ${JSON.stringify(res)}]\n`;
+        }
+      } catch (e) {
+        this.embLogs += `[Error: ${e.message}]\n`;
+      }
+
+      this.embBusy = false;
+
+      try {
+        await handleEmb({ action: "tail" });
+      } catch (e) {
+        this.embLogs += `[Tail error: ${e.message}]\n`;
+      }
+    },
+    async clearEmbLog() {
+      this.embLogs = "";
+      try {
+        await handleEmb({ action: "clear" });
+      } catch (e) {
+        console.error("Failed to clear emb log", e);
+      }
+    },
+    onEmbLog(msg) {
+      if (!msg) return;
+      const el = this.$refs.embScroll;
+      const atBottom =
+        !el || el.scrollHeight - el.scrollTop - el.clientHeight < 50;
+      this.embLogs += msg;
+      if (atBottom) {
+        this.$nextTick(() => {
+          if (el) el.scrollTop = el.scrollHeight;
+        });
+      }
+    },
     toggleSubs() {
       this.showSubs = !this.showSubs;
       if (this.showSubs) {
@@ -2458,6 +2677,15 @@ export default {
         const res = await applySubFiles(payload);
         if (res && res.error) {
           alert("Error applying subs: " + res.error);
+        } else if (
+          res &&
+          res.failures &&
+          res.failures.length > 0 &&
+          (!res.applied || res.applied.length === 0)
+        ) {
+          const failure = res.failures[0];
+          const reason = failure?.reason || "unknown error";
+          alert("Subs failed to apply: " + reason);
         } else {
           alert("Subs applied successfully");
           await this.refresh();
@@ -2497,6 +2725,15 @@ export default {
         const res = await applySubFiles(payload);
         if (res && res.error) {
           alert("Error applying subs: " + res.error);
+        } else if (
+          res &&
+          res.failures &&
+          res.failures.length > 0 &&
+          (!res.applied || res.applied.length === 0)
+        ) {
+          const failure = res.failures[0];
+          const reason = failure?.reason || "unknown error";
+          alert("Subs failed to apply: " + reason);
         } else {
           alert("Subs applied successfully");
           await this.refresh();

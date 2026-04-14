@@ -16,6 +16,7 @@ import * as email from "./src/email.js";
 import * as tmdb from "./src/tmdb.js";
 import { handleAsr } from "./src/asr.js";
 import { handleFix } from "./src/fix.js";
+import { handleEmb } from "./src/emb.js";
 import { checkFlexgetStatus } from "../api/src/usb.js";
 import fetch from "node-fetch";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
@@ -164,6 +165,34 @@ try {
 } catch {
   subsTokenCache = null;
 }
+
+function isSubsTokenExpired(token) {
+  if (!token) return true;
+  try {
+    const payload = JSON.parse(
+      Buffer.from(token.split(".")[1], "base64").toString("utf8"),
+    );
+    const exp = payload?.exp;
+    if (!Number.isFinite(exp)) return true;
+    // Refresh if expired or within 24h of expiry
+    return Date.now() / 1000 > exp - 86400;
+  } catch {
+    return true;
+  }
+}
+
+// Proactively refresh token on startup if missing or expired
+setImmediate(async () => {
+  if (!isSubsTokenExpired(subsTokenCache)) return;
+  try {
+    const login = loadSubsLogin();
+    const newToken = await openSubtitlesLogin(login);
+    await persistSubsToken(newToken);
+    console.log("[subs] token refreshed on startup");
+  } catch (e) {
+    console.warn(`[subs] startup token refresh failed: ${e.message}`);
+  }
+});
 
 let rejects;
 try {
@@ -2524,7 +2553,9 @@ const applySubFiles = async (params) => {
               });
               if (
                 !dl?.resp?.ok &&
-                (dl?.resp?.status === 401 || dl?.resp?.status === 403)
+                (dl?.resp?.status === 401 ||
+                  dl?.resp?.status === 403 ||
+                  dl?.resp?.status === 406)
               ) {
                 const newToken = await openSubtitlesLogin(login);
                 await persistSubsToken(newToken);
@@ -2537,11 +2568,9 @@ const applySubFiles = async (params) => {
 
               if (!dl?.resp?.ok) {
                 const status = dl?.resp?.status;
-                if (status === 502 || status === 503 || status === 504) {
-                  console.log(
-                    `[subs] OpenSubtitles /download HTTP ${status} (file_id=${fid})`,
-                  );
-                }
+                console.log(
+                  `[subs] OpenSubtitles /download HTTP ${status} (file_id=${fid})`,
+                );
                 addFailure(cand, "download", status, dl?.body);
                 failedByFileId.set(fid, { stage: "download", status });
                 continue;
@@ -2584,11 +2613,9 @@ const applySubFiles = async (params) => {
             const resp = await fetch(url, { headers: { Accept: "*/*" } });
             if (!resp.ok) {
               const status = resp.status;
-              if (status === 502 || status === 503 || status === 504) {
-                console.log(
-                  `[subs] OpenSubtitles .srt GET HTTP ${status} (file_id=${fid})`,
-                );
-              }
+              console.log(
+                `[subs] OpenSubtitles .srt GET HTTP ${status} (file_id=${fid})`,
+              );
               addFailure(cand, "srt", status);
               failedByFileId.set(fid, { stage: "srt", status });
               continue;
@@ -3552,6 +3579,56 @@ app.post("/api/asr/chksrt/ok", (req, res) => {
   res.json({ ok: true, next: paths[0] || null });
 });
 
+app.post("/api/asr/emb/apply", (req, res) => {
+  const { path: reqPath } = req.body || {};
+  if (!reqPath) {
+    res.status(400).json({ error: "path required" });
+    return;
+  }
+  const resolved = path.resolve(tvDir, reqPath);
+  if (!resolved.startsWith(tvDir + "/") && resolved !== tvDir) {
+    res.status(403).json({ error: "forbidden" });
+    return;
+  }
+  // Collect video files from file or folder
+  const videoExts = new Set([".mp4", ".mkv", ".avi", ".mov", ".webm", ".m4v"]);
+  const videoPaths = [];
+  try {
+    const stat = fs.statSync(resolved);
+    if (stat.isFile()) {
+      if (videoExts.has(path.extname(resolved).toLowerCase()))
+        videoPaths.push(resolved);
+    } else if (stat.isDirectory()) {
+      const walk = (dir) => {
+        for (const entry of fs.readdirSync(dir)) {
+          const full = path.join(dir, entry);
+          const s = fs.statSync(full);
+          if (s.isDirectory()) walk(full);
+          else if (videoExts.has(path.extname(entry).toLowerCase()))
+            videoPaths.push(full);
+        }
+      };
+      walk(resolved);
+    }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+    return;
+  }
+  if (videoPaths.length === 0) {
+    res.status(400).json({ error: "no video files found at path" });
+    return;
+  }
+  try {
+    fs.mkdirSync(path.dirname(EMB_PENDING_PATH), { recursive: true });
+    fs.appendFileSync(EMB_PENDING_PATH, videoPaths.join("\n") + "\n", "utf8");
+    console.log(`[emb] queued ${videoPaths.length} file(s) from ${reqPath}`);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+    return;
+  }
+  res.json({ ok: true, queued: videoPaths.length });
+});
+
 app.post("/api/asr/chksrt/bad", (req, res) => {
   const { videoPath } = req.body || {};
   if (!videoPath) {
@@ -3677,6 +3754,8 @@ wss.on("connection", (ws) => {
       handleAsr(ws, id, param);
     } else if (fname == "handleFix") {
       handleFix(ws, id, param);
+    } else if (fname == "handleEmb") {
+      handleEmb(ws, id, param);
     } else {
       console.warn("WebSocket function not supported (use HTTP):", fname);
       try {
@@ -4691,6 +4770,7 @@ setInterval(runUsbCheck, CHECK_INTERVAL_MS);
 const changedShows = new Map(); // showName -> timeout
 const DISK_CHANGE_DEBOUNCE_MS = 3000; // 3 seconds
 const ASR_PENDING_PATH = "/root/dev/apps/tv/apps/asr/data/pending.txt";
+const EMB_PENDING_PATH = "/root/dev/apps/tv/apps/asr/data/emb-pending.txt";
 const ASR_NEEDS_SRT_CHK_PATH =
   "/root/dev/apps/tv/apps/asr/data/needsSrtChk.txt";
 

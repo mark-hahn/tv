@@ -236,6 +236,7 @@ function handleMsg(raw) {
         if (st === "off" || st === "unavailable" || st === "unknown")
           tvMode = "off";
         else if (braviaMediaTitle === "Smart TV") tvMode = "google";
+        else if (braviaMediaTitle === "TV") tvMode = "tv";
         else if (
           braviaMediaTitle === "Fire TV Stick" ||
           braviaMediaTitle === "HDMI 2"
@@ -310,6 +311,7 @@ function handleMsg(raw) {
         if (state === "off" || state === "unavailable" || state === "unknown")
           tvMode = "off";
         else if (braviaMediaTitle === "Smart TV") tvMode = "google";
+        else if (braviaMediaTitle === "TV") tvMode = "tv";
         else if (
           braviaMediaTitle === "Fire TV Stick" ||
           braviaMediaTitle === "HDMI 2"
@@ -611,7 +613,7 @@ app.get("/tv/key/:key", async (req, res) => {
     return;
   }
 
-  if (tvMode !== "fire" && tvMode !== "google") {
+  if (tvMode !== "fire" && tvMode !== "google" && tvMode !== "tv") {
     log(`key ignored — tvMode=${tvMode}`);
     res.json({ ok: false, error: "wrong mode" });
     return;
@@ -659,7 +661,7 @@ app.get("/tv/vol/:dir", (req, res) => {
     res.status(400).json({ ok: false, error: "unknown dir" });
     return;
   }
-  if (tvMode !== "google" && tvMode !== "fire") {
+  if (tvMode !== "google" && tvMode !== "fire" && tvMode !== "tv") {
     log(`vol ignored — tvMode=${tvMode}`);
     res.json({ ok: false, error: "wrong mode" });
     return;
@@ -672,7 +674,7 @@ app.get("/tv/vol/:dir", (req, res) => {
 });
 
 app.get("/tv/mute", (req, res) => {
-  if (tvMode !== "google" && tvMode !== "fire") {
+  if (tvMode !== "google" && tvMode !== "fire" && tvMode !== "tv") {
     log(`mute ignored — tvMode=${tvMode}`);
     res.json({ ok: false, error: "wrong mode" });
     return;

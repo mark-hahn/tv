@@ -204,6 +204,7 @@ export default function App() {
   const mode = (() => {
     if (isOff) return "off";
     if (mediaTitle === "Smart TV") return "google";
+    if (mediaTitle === "TV") return "tv";
     if (mediaTitle === "Fire TV Stick" || mediaTitle === "HDMI 2")
       return "fire";
     return "other";
@@ -221,6 +222,7 @@ export default function App() {
 
   const modeBg = (m) => {
     if (flashBtn === m) return "orange";
+    if (m === "google" && mode === "tv") return "#ffb3c1";
     return mode === m ? "lightblue" : "white";
   };
 

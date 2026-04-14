@@ -301,6 +301,7 @@ export default {
         this.haState !== "unknown";
       if (!on) return "off";
       if (this.mediaTitle === "Smart TV") return "google";
+      if (this.mediaTitle === "TV") return "tv";
       if (this.mediaTitle === "Fire TV Stick" || this.mediaTitle === "HDMI 2")
         return "fire";
       return "other";
@@ -400,9 +401,11 @@ export default {
     },
 
     modeBtnStyle(m) {
-      const active = this.mode === m;
-      const bg =
-        this.flashBtn === m ? "orange" : active ? "lightblue" : "white";
+      let bg;
+      if (this.flashBtn === m) bg = "orange";
+      else if (this.mode === m) bg = "lightblue";
+      else if (m === "google" && this.mode === "tv") bg = "#ffb3c1";
+      else bg = "white";
       return { ...CELL_BASE, backgroundColor: bg };
     },
 

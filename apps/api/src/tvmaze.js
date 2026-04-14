@@ -23,6 +23,11 @@ const CLEAR_FLAG_ABSPATH =
   "/root/dev/apps/tv/apps/api/data/misc/tvmaze-clear-flag";
 const SUMMARY_DUMP_FILENAME = "tvmaze-sync-summary.json";
 
+const TVDB_APIKEY = "d7fa8c90-36e3-4335-a7c0-6cbb7b0320df";
+const TVDB_PIN = "HXEVSDFF";
+let _tvdbToken = null;
+let _tvdbTokenFetchedAt = 0;
+
 let _db = null;
 let _syncInProgress = false;
 let _dailyTimer = null;
@@ -30,6 +35,62 @@ let _rateTimestamps = [];
 
 function nowMs() {
   return Date.now();
+}
+
+async function getTvdbToken() {
+  const now = Date.now();
+  if (_tvdbToken && now - _tvdbTokenFetchedAt < 20 * 60 * 60 * 1000) return _tvdbToken;
+  const res = await fetch("https://api4.thetvdb.com/v4/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ apikey: TVDB_APIKEY, pin: TVDB_PIN }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(`TVDB login failed: ${res.status}`);
+  _tvdbToken = json?.data?.token;
+  if (!_tvdbToken) throw new Error("TVDB login: missing token");
+  _tvdbTokenFetchedAt = now;
+  return _tvdbToken;
+}
+
+function sanitizeForTvdbMatch(name) {
+  return String(name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+async function fillPremieredFromTvdb(db, tvmazeId, name) {
+  try {
+    const token = await getTvdbToken();
+    const url = `https://api4.thetvdb.com/v4/search?query=${encodeURIComponent(name)}&type=series&limit=5`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return;
+    const json = await res.json();
+    const results = json?.data;
+    if (!results?.length) return;
+    const sanName = sanitizeForTvdbMatch(name);
+    const match =
+      results.find(r => sanitizeForTvdbMatch(r.name) === sanName) ||
+      results.find(r => sanitizeForTvdbMatch(r.name).startsWith(sanName) || sanName.startsWith(sanitizeForTvdbMatch(r.name))) ||
+      results[0];
+    if (sanitizeForTvdbMatch(match.name).slice(0, 3) !== sanName.slice(0, 3)) return;
+    const firstAired = match?.first_air_time;
+    if (!firstAired) return;
+    const fixed = firstAired.replace(/T24:/, "T00:").replace(/^(\d{4}-\d{2}-\d{2})$/, "$1T00:00:00Z");
+    const d = new Date(fixed);
+    if (isNaN(d.getTime())) return;
+    const epoch = Math.floor(d.getTime() / 1000);
+    db.prepare("UPDATE shows SET premiered = ? WHERE tvmaze_id = ? AND premiered IS NULL").run(epoch, tvmazeId);
+  } catch {
+    // ignore TVDB errors — premiered stays null
+  }
+}
+
+async function fillNullPremieredBatch(db, rows) {
+  const CONCURRENCY = 10;
+  for (let i = 0; i < rows.length; i += CONCURRENCY) {
+    await Promise.all(
+      rows.slice(i, i + CONCURRENCY).map(r => fillPremieredFromTvdb(db, r.tvmaze_id, r.name))
+    );
+  }
 }
 
 function sleep(ms) {
@@ -560,6 +621,7 @@ async function syncTvmazeShows(reason = "startup") {
       // loggable items.
 
       const newShows = [];
+      const nullPremieredInserts = [];
       const _perPageTx = db.transaction((rows) => {
         const fetchedAt = Math.floor(Date.now() / 1000);
         for (const show of rows) {
@@ -609,6 +671,7 @@ async function syncTvmazeShows(reason = "startup") {
             );
             inserted++;
             newShows.push({ name: name || "Unknown", id: tvmazeId });
+            if (premiered == null && name) nullPremieredInserts.push({ tvmaze_id: tvmazeId, name });
           } else {
             // Prevent stale page data from overwriting newer local data
             // (e.g. if we fetched an update via /updates/shows which is newer than the page cache)
@@ -658,6 +721,10 @@ async function syncTvmazeShows(reason = "startup") {
       });
 
       _perPageTx(json);
+
+      if (nullPremieredInserts.length > 0) {
+        fillNullPremieredBatch(db, nullPremieredInserts.splice(0)).catch(() => {});
+      }
 
       // Log each new show
       const currentTotal = countShowsInDb(db);
@@ -793,6 +860,9 @@ async function syncTvmazeShows(reason = "startup") {
 
                 // Use a transaction for the single update
                 updateTx([showJson]);
+                if (!showJson.premiered && showJson.name) {
+                  fillPremieredFromTvdb(db, id, showJson.name).catch(() => {});
+                }
 
                 if (!updatesHeaderPrinted) {
                   try {

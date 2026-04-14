@@ -295,7 +295,7 @@ export default function App() {
     },
     {
       key: "stream",
-      label: "App",
+      label: "Apps",
       smallText: true,
       bg: () => cellBg("white", "stream"),
       onPress: () => {},

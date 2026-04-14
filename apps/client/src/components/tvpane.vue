@@ -183,7 +183,7 @@
           (mode === 'google' || mode === 'fire') && (showStreamers = true)
         "
       >
-        App
+        Apps
       </div>
       <!-- Row 4: vol-, vol+, mute -->
       <div

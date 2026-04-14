@@ -106,8 +106,11 @@
       </div>
       <div
         :style="cellStyle('#f5e642', 'up')"
-        @mousedown="tvKey('up')"
-        @touchstart.prevent="tvKey('up')"
+        @mousedown="startRepeat('up')"
+        @mouseup="stopRepeat"
+        @mouseleave="stopRepeat"
+        @touchstart.prevent="startRepeat('up')"
+        @touchend="stopRepeat"
       >
         ▲
       </div>
@@ -169,8 +172,11 @@
       </div>
       <div
         :style="cellStyle('#f5e642', 'down')"
-        @mousedown="tvKey('down')"
-        @touchstart.prevent="tvKey('down')"
+        @mousedown="startRepeat('down')"
+        @mouseup="stopRepeat"
+        @mouseleave="stopRepeat"
+        @touchstart.prevent="startRepeat('down')"
+        @touchend="stopRepeat"
       >
         ▼
       </div>

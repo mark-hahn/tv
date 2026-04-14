@@ -242,7 +242,8 @@ export default function App() {
       label: "▲",
       bg: () => cellBg("#f5e642", "up"),
       onPress: () => {},
-      onPressIn: () => tvKey("up"),
+      onPressIn: () => startRepeat("up"),
+      onPressOut: stopRepeat,
     },
     {
       key: "home",
@@ -293,7 +294,8 @@ export default function App() {
       label: "▼",
       bg: () => cellBg("#f5e642", "down"),
       onPress: () => {},
-      onPressIn: () => tvKey("down"),
+      onPressIn: () => startRepeat("down"),
+      onPressOut: stopRepeat,
     },
     {
       key: "stream",

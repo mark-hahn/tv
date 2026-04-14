@@ -66,13 +66,17 @@ export default function App() {
       while (repeatActiveRef.current) {
         const isFast = count >= 4;
         const n =
-          mode === "fire" && key === "left"
+          mode === "fire" && key === "right"
             ? isFast
-              ? 9
+              ? 18
               : 1
-            : isFast && mode === "fire"
-              ? 3
-              : 1;
+            : mode === "fire" && key === "left"
+              ? isFast
+                ? 6
+                : 1
+              : isFast && mode === "fire"
+                ? 3
+                : 1;
         const url =
           n > 1
             ? `${TV_TV_URL}/tv/key/${key}?n=${n}`

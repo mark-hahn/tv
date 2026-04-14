@@ -224,6 +224,7 @@ export async function getBrowseShow() {
   const candidates = getCandidateShows(100);
 
   let foundNew = false;
+  let pendingBrowsedId = null;
 
   for (const show of candidates) {
     let title = (show.name || "Unknown").trim();
@@ -239,9 +240,6 @@ export async function getBrowseShow() {
     }
 
     const tvmazeId = show.tvmaze_id;
-
-    // Mark as browsed immediately
-    markShowBrowsed(tvmazeId);
 
     // Reject if no poster
     if (!show.image || (!show.image.medium && !show.image.original)) {
@@ -324,6 +322,7 @@ export async function getBrowseShow() {
       }),
     );
     foundNew = true;
+    pendingBrowsedId = tvmazeId;
 
     // "If all checks pass ... return resultTitles"
     // We stop after finding ONE accepted show, or if we exhaust our candidate batch.
@@ -334,9 +333,13 @@ export async function getBrowseShow() {
   }
 
   // If we exhausted candidates loop without finding anything, we just return the current list.
-  return resultTitles;
+  return { titles: resultTitles, pendingBrowsedId };
 }
 
 export async function getAllBrowse() {
   return resultTitles;
+}
+
+export function ackBrowsed(tvmazeId) {
+  if (tvmazeId != null) markShowBrowsed(tvmazeId);
 }

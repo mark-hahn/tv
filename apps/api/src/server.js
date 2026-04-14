@@ -25,7 +25,7 @@ import {
   renameUsbFile,
 } from "./usb.js";
 import { getLocalFiles, renameLocalFile, moveToTrial } from "./local.js";
-import { getBrowseShow, getAllBrowse } from "./browse.js";
+import { getBrowseShow, getAllBrowse, ackBrowsed } from "./browse.js";
 import * as reviews from "./reviews.js";
 import { checkFiles as tvProcCheckFiles } from "./tv-proc.js";
 import { getActorCredits } from "./imdb-credits.js";
@@ -1901,14 +1901,13 @@ app.get("/api/torrent-file", async (req, res) => {
 // GET /api/getBrowseShow
 app.get("/api/getBrowseShow", async (req, res) => {
   try {
-    const result = await getBrowseShow();
+    const { titles, pendingBrowsedId } = await getBrowseShow();
     appendCallsLog({
       endpoint: "/api/getBrowseShow",
       method: "GET",
       ok: true,
-      result,
     });
-    res.json(result);
+    res.json({ titles, pendingBrowsedId });
   } catch (error) {
     console.error("getBrowseShow error:", error);
     appendCallsLog({
@@ -1970,14 +1969,13 @@ app.get("/api/browseSearch", (req, res) => {
 // POST /api/getBrowseShow (for compat if needed, though arguments are ignored now)
 app.post("/api/getBrowseShow", async (req, res) => {
   try {
-    const result = await getBrowseShow();
+    const { titles, pendingBrowsedId } = await getBrowseShow();
     appendCallsLog({
       endpoint: "/api/getBrowseShow",
       method: "POST",
       ok: true,
-      result,
     });
-    res.json(result);
+    res.json({ titles, pendingBrowsedId });
   } catch (error) {
     console.error("getBrowseShow error:", error);
     appendCallsLog({
@@ -1989,6 +1987,15 @@ app.post("/api/getBrowseShow", async (req, res) => {
     });
     res.status(500).json({ error: error.message });
   }
+});
+
+// POST /api/ackBrowsed — client calls this after show is displayed
+app.post("/api/ackBrowsed", (req, res) => {
+  const tvmazeId = Number(req.body?.tvmazeId);
+  if (!Number.isFinite(tvmazeId))
+    return res.status(400).json({ error: "invalid tvmazeId" });
+  ackBrowsed(tvmazeId);
+  res.json({ ok: true });
 });
 
 app.post("/api/getActorPage", async (req, res) => {

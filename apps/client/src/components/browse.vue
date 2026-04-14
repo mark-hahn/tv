@@ -1106,7 +1106,8 @@ export default {
             throw e;
           }
         }
-        const added = toTitleArray(data);
+        const added = toTitleArray(data?.titles ?? data);
+        const pendingBrowsedId = data?.pendingBrowsedId ?? null;
 
         // If we get new entries, remove the "no more" sentinel.
         if (added.length > 0) {
@@ -1134,6 +1135,14 @@ export default {
           });
 
           titleStrings.value = [...titleStrings.value, ...added];
+
+          if (pendingBrowsedId != null) {
+            fetch(`${config.torrentsApiUrl}/api/ackBrowsed`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ tvmazeId: pendingBrowsedId }),
+            }).catch(() => {});
+          }
 
           // Auto-advance if we just loaded items and the resulting selection has no info
           shouldAutoAdvance.value = true;

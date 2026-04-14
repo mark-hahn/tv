@@ -7,16 +7,16 @@
       "logo": "ae.png"
     },
     {
-      "name": "AMC+",
-      "uri": "com.sony.dtv.com.amcplus.amcandroidtv.com.amcplus.tv.MainActivity",
-      "color": "003366",
-      "logo": "amcplus.png"
-    },
-    {
       "name": "Acorn TV",
       "uri": "com.sony.dtv.com.acorntv.androidtv.com.globallogic.acorntv.ui.MainActivity",
       "color": "5C8A32",
       "logo": "acorn-tv.png"
+    },
+    {
+      "name": "AMC+",
+      "uri": "com.sony.dtv.com.amcplus.amcandroidtv.com.amcplus.tv.MainActivity",
+      "color": "003366",
+      "logo": "amcplus.png"
     },
     {
       "name": "Apple TV",
@@ -49,6 +49,12 @@
       "logo": "crunchyroll.png"
     },
     {
+      "name": "The CW",
+      "uri": "com.sony.dtv.com.cw.fullepisodes.android.com.cw.fullepisodes.android.TvActivity",
+      "color": "005CB4",
+      "logo": "the-cw.png"
+    },
+    {
       "name": "Discovery Plus",
       "uri": "com.sony.dtv.com.discovery.discoveryplus.mobile.com.wbd.beam.BeamActivity",
       "color": "2175D9",
@@ -61,16 +67,16 @@
       "logo": "disneyplus.png"
     },
     {
-      "name": "ESPN",
-      "uri": "com.sony.dtv.com.espn.score_center.com.espn.startup.presentation.StartupActivity",
-      "color": "D00",
-      "logo": "espn.png"
-    },
-    {
       "name": "Emby",
       "uri": "com.sony.dtv.tv.emby.embyatv.tv.emby.embyatv.startup.StartupActivity",
       "color": "52B54B",
       "logo": "emby.png"
+    },
+    {
+      "name": "ESPN",
+      "uri": "com.sony.dtv.com.espn.score_center.com.espn.startup.presentation.StartupActivity",
+      "color": "D00",
+      "logo": "espn.png"
     },
     {
       "name": "FOX Sports",
@@ -115,28 +121,28 @@
       "logo": "nbc-sports.png"
     },
     {
-      "name": "NFL",
-      "uri": "com.sony.dtv.com.gotv.nflgamecenter.us.lite.com.nfl.connected.SplashActivity",
-      "color": "D50A0A",
-      "logo": "nfl.png"
-    },
-    {
       "name": "Netflix",
       "uri": "com.sony.dtv.com.netflix.ninja.com.netflix.ninja.MainActivity",
       "color": "E50914",
       "logo": "netflix.png"
     },
     {
-      "name": "PBS",
-      "uri": "com.sony.dtv.com.pbs.video.com.pbs.video.startup.StartupActivity",
-      "color": "2A5B91",
-      "logo": "pbs.png"
+      "name": "NFL",
+      "uri": "com.sony.dtv.com.gotv.nflgamecenter.us.lite.com.nfl.connected.SplashActivity",
+      "color": "D50A0A",
+      "logo": "nfl.png"
     },
     {
       "name": "Paramount+",
       "uri": "com.sony.dtv.com.cbs.ott.com.paramount.android.pplus.features.splash.tv.SplashMediatorActivity",
       "color": "0064FF",
       "logo": "paramountplus.png"
+    },
+    {
+      "name": "PBS",
+      "uri": "com.sony.dtv.com.pbs.video.com.pbs.video.startup.StartupActivity",
+      "color": "2A5B91",
+      "logo": "pbs.png"
     },
     {
       "name": "Peacock TV",
@@ -157,16 +163,16 @@
       "logo": "sony-pictures-core.png"
     },
     {
-      "name": "STARZ",
-      "uri": "com.sony.dtv.com.bydeluxe.d3.android.program.starz.com.starz.amznfiretv.SplashActivity",
-      "color": "082125",
-      "logo": "starz.png"
-    },
-    {
       "name": "Sony Select",
       "uri": "com.sony.dtv.com.sony.dtv.sonyselect.com.sony.dtv.sonyselect.activities.LaunchActivity",
       "color": "003087",
       "logo": "sony-select.png"
+    },
+    {
+      "name": "STARZ",
+      "uri": "com.sony.dtv.com.bydeluxe.d3.android.program.starz.com.starz.amznfiretv.SplashActivity",
+      "color": "082125",
+      "logo": "starz.png"
     },
     {
       "name": "TNT",
@@ -175,16 +181,16 @@
       "logo": "tnt.png"
     },
     {
-      "name": "The CW",
-      "uri": "com.sony.dtv.com.cw.fullepisodes.android.com.cw.fullepisodes.android.TvActivity",
-      "color": "005CB4",
-      "logo": "the-cw.png"
-    },
-    {
       "name": "Tubi",
       "uri": "com.sony.dtv.com.tubitv.com.tubitv.activities.MainActivity",
       "color": "7408FF",
       "logo": "tubi.png"
+    },
+    {
+      "name": "The Weather Channel",
+      "uri": "com.sony.dtv.com.weathergroup.twc.com.weathergroup.twc.MainActivity",
+      "color": "0066CC",
+      "logo": "the-weather-channel.png"
     },
     {
       "name": "YouTube",
@@ -201,16 +207,184 @@
   ],
   "fire": [
     {
+      "name": "Acorn TV",
+      "uri": "com.amazon.rialto.cordova.webapp.webapp03147576921f40378cbc1cc7db4af8b8/com.globallogic.acorntv.ui.MainActivity",
+      "color": "5C8A32",
+      "logo": "acorn-tv.png"
+    },
+    {
+      "name": "AMC+",
+      "uri": "com.amcplus.amcfiretv/com.amcplus.tv.MainActivity",
+      "color": "003366",
+      "logo": "amcplus.png"
+    },
+    {
+      "name": "Apple TV",
+      "uri": "com.apple.atve.amazon.appletv/com.apple.atve.amazon.appletv.MainActivity",
+      "color": "000000",
+      "logo": "apple-tv.png"
+    },
+    {
+      "name": "BritBox",
+      "uri": "com.britbox.us.firetv/axis.androidtv.sdk.app.MainActivity",
+      "color": "1D3D6E",
+      "logo": "britbox.png"
+    },
+    {
+      "name": "CBS",
+      "uri": "com.cbs.tve/com.paramount.android.pplus.features.splash.tv.SplashMediatorActivity",
+      "color": "033963",
+      "logo": "cbs.png"
+    },
+    {
+      "name": "CBS Sports",
+      "uri": "com.handmark.sportcaster/com.cbs.commonui.homepage.HomePageActivity",
+      "color": "033963",
+      "logo": "cbs-sports.png"
+    },
+    {
+      "name": "Crunchyroll",
+      "uri": "com.crunchyroll.crunchyroid/com.crunchyroll.crunchyroid.splash.ui.SplashActivity",
+      "color": "FF5E00",
+      "logo": "crunchyroll.png"
+    },
+    {
+      "name": "The CW",
+      "uri": "com.cw.tv.android/com.cw.fullepisodes.android.TvActivity",
+      "color": "005CB4",
+      "logo": "the-cw.png"
+    },
+    {
+      "name": "Discovery Plus",
+      "uri": "com.discovery.discoveryplus.firetv/com.wbd.beam.BeamActivity",
+      "color": "2175D9",
+      "logo": "discovery-plus.png"
+    },
+    {
+      "name": "Disney+",
+      "uri": "com.disney.disneyplus/com.bamtechmedia.dominguez.main.MainActivity",
+      "color": "113CCF",
+      "logo": "disneyplus.png"
+    },
+    {
       "name": "Emby",
       "uri": "tv.emby.embyatv/.startup.StartupActivity",
       "color": "52B54B",
       "logo": "emby.png"
     },
     {
+      "name": "ESPN",
+      "uri": "com.espn.gtv/com.espn.startup.presentation.StartupActivity",
+      "color": "D00",
+      "logo": "espn.png"
+    },
+    {
+      "name": "FOX Sports",
+      "uri": "com.foxsports.videogo/com.fox.app.MainActivity",
+      "color": "000000",
+      "logo": "fox-sports.png"
+    },
+    {
+      "name": "HBO Max",
+      "uri": "com.hbo.hbonow/com.wbd.beam.BeamActivity",
+      "color": "000000",
+      "logo": "hbo-max.png"
+    },
+    {
+      "name": "Hulu",
+      "uri": "com.hulu.plus/com.hulu.plus.MainActivity",
+      "color": "1CE783",
+      "logo": "hulu.png"
+    },
+    {
+      "name": "MLB",
+      "uri": "com.bamnetworks.mobile.android.gameday.atbat/mlb.atbat.activity.MainActivity",
+      "color": "041E42",
+      "logo": "mlb.png"
+    },
+    {
+      "name": "NBA",
+      "uri": "com.nbaimd.gametime.nba2011.amazon/com.nba.tv.ui.splash.SplashActivity",
+      "color": "253B73",
+      "logo": "nba.png"
+    },
+    {
+      "name": "NBC",
+      "uri": "com.onemainstream.nbcunivers.android/com.nbc.nbctvapp.ui.main.view.MainActivity",
+      "color": "222222",
+      "logo": "nbc.png"
+    },
+    {
+      "name": "NBC Sports",
+      "uri": "com.nbcuni.com.nbcsports.liveextra.firetv/com.nbc.nbctvapp.ui.main.view.MainActivity",
+      "color": "D4000C",
+      "logo": "nbc-sports.png"
+    },
+    {
       "name": "Netflix",
       "uri": "com.netflix.ninja/.MainActivity",
       "color": "E50914",
       "logo": "netflix.png"
+    },
+    {
+      "name": "NFL",
+      "uri": "com.gotv.nflgamecenter.us.lite/com.nfl.connected.SplashActivity",
+      "color": "D50A0A",
+      "logo": "nfl.png"
+    },
+    {
+      "name": "Paramount+",
+      "uri": "com.cbs.ott/com.paramount.android.pplus.features.splash.tv.SplashMediatorActivity",
+      "color": "0064FF",
+      "logo": "paramountplus.png"
+    },
+    {
+      "name": "PBS",
+      "uri": "com.pbs.video/com.pbs.video.startup.StartupActivity",
+      "color": "2A5B91",
+      "logo": "pbs.png"
+    },
+    {
+      "name": "Peacock TV",
+      "uri": "com.peacock.peacockfiretv/com.peacock.peacocktv.AmazonMainActivity",
+      "color": "000000",
+      "logo": "peacock-tv.png"
+    },
+    {
+      "name": "Prime Video",
+      "uri": "com.amazon.firebat/com.amazon.firebatcore.deeplink.DeepLinkRoutingActivity",
+      "color": "00A8E1",
+      "logo": "prime-video.png"
+    },
+    {
+      "name": "STARZ",
+      "uri": "com.starz.starzplay.firetv/com.starz.amznfiretv.SplashActivity",
+      "color": "082125",
+      "logo": "starz.png"
+    },
+    {
+      "name": "TNT",
+      "uri": "com.turner.tbs.android.networkapp/com.wme.app.MainActivityTv",
+      "color": "CC0000",
+      "logo": "tnt.png"
+    },
+    {
+      "name": "Tubi",
+      "uri": "com.tubitv.ott/com.tubitv.activities.FireTVMainActivity",
+      "color": "7408FF",
+      "logo": "tubi.png"
+    },
+    {
+      "name": "YouTube",
+      "uri": "com.amazon.firetv.youtube/dev.cobalt.app.MainActivity",
+      "color": "FF0000",
+      "logo": "youtube.png"
+    },
+    {
+      "name": "YouTube TV",
+      "uri": "com.amazon.firetv.youtube.tv/dev.cobalt.app.MainActivity",
+      "color": "FF0000",
+      "logo": "youtube-tv.png"
     }
   ]
 }

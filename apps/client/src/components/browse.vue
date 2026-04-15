@@ -1945,7 +1945,8 @@ export default {
     const handleSearchComplete = (tvdb) => {
       if (shouldAutoAdvance.value) {
         shouldAutoAdvance.value = false;
-        if (!tvdb) {
+        const lang = (tvdb?.primary_language || "").toLowerCase();
+        if (!tvdb || (lang && lang !== "eng")) {
           void handleNext();
         }
       }

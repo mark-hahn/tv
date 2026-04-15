@@ -32,6 +32,7 @@ const IGNORED_COUNTRIES = new Set(
     "Estonia",
     "Faroe Islands",
     "Finland",
+    "France",
     "French Polynesia",
     "Georgia",
     "Greece",
@@ -243,16 +244,19 @@ export async function getBrowseShow() {
 
     // Reject if no poster
     if (!show.image || (!show.image.medium && !show.image.original)) {
+      markShowBrowsed(tvmazeId);
       continue;
     }
 
     // Check if we've seen this title in our recent resultTitles
     if (resultTitles.some((entry) => parseResultTitle(entry) === title)) {
+      markShowBrowsed(tvmazeId);
       continue;
     }
 
     // Reject if type is in ignore list
     if (show.type && IGNORED_TYPES.has(show.type.toLowerCase())) {
+      markShowBrowsed(tvmazeId);
       continue;
     }
 
@@ -261,6 +265,7 @@ export async function getBrowseShow() {
     if (show.language) {
       const lang = String(show.language).trim().toLowerCase();
       if (lang !== "english") {
+        markShowBrowsed(tvmazeId);
         continue;
       }
     }
@@ -268,11 +273,13 @@ export async function getBrowseShow() {
     // Reject if country is in ignore list
     const countryName = show.webChannel?.country?.name;
     if (countryName && IGNORED_COUNTRIES.has(countryName.toLowerCase())) {
+      markShowBrowsed(tvmazeId);
       continue;
     }
 
     const networkCountry = show.network?.country?.name;
     if (networkCountry && IGNORED_COUNTRIES.has(networkCountry.toLowerCase())) {
+      markShowBrowsed(tvmazeId);
       continue;
     }
 
@@ -284,6 +291,7 @@ export async function getBrowseShow() {
     const rejected = lowerGenres.find((g) => avoidGenres.includes(g));
 
     if (rejected) {
+      markShowBrowsed(tvmazeId);
       if (rejected === "reality") continue;
       // appendResultTitle(`${rejected}|${title}|${JSON.stringify(show)}`);
       appendResultTitle(
@@ -306,6 +314,7 @@ export async function getBrowseShow() {
       const detected = franc(summary);
       // Skip if detected as non-English (and not 'und'etermined, and allow 'sco' as it is often false positive for English)
       if (detected !== "eng" && detected !== "und" && detected !== "sco") {
+        markShowBrowsed(tvmazeId);
         continue;
       }
     }

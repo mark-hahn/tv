@@ -2681,15 +2681,7 @@ export default {
           if (noteLc.includes(srchStrLc)) {
             // matched notes — allow
           } else {
-            const crewArr = Array.isArray(localAllTvdb?.[show.name]?.crew)
-              ? localAllTvdb[show.name].crew
-              : [];
-            const crewMatch = crewArr.some((c) =>
-              String(c?.name ?? "")
-                .toLowerCase()
-                .includes(srchStrLc),
-            );
-            if (!crewMatch) continue;
+            continue;
           }
         }
         for (let cond of this.conds) {

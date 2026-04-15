@@ -2565,8 +2565,13 @@ export default {
         a = this.getValBySortChoice(a, true);
         b = this.getValBySortChoice(b, true);
         if (a == b) return 0;
-        if (["Alpha", "Length"].includes(this.sortChoice))
+        if (["Alpha", "Length", "Creator"].includes(this.sortChoice)) {
+          if (this.sortChoice === "Creator") {
+            if (a === "" && b !== "") return 1;
+            if (b === "" && a !== "") return -1;
+          }
           return a > b ? +1 : -1;
+        }
         return a > b ? -1 : +1;
       });
     },

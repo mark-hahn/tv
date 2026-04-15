@@ -423,19 +423,20 @@
             </div>
             <div
               id="crew"
-              v-if="crewTxt && crewTxt.length > 0"
-              style="
-                min-height: 20px;
-                white-space: normal;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                display: -webkit-box;
-                -webkit-box-orient: vertical;
-                -webkit-line-clamp: 3;
-                line-clamp: 3;
-              "
+              v-if="crewLines && crewLines.length > 0"
             >
-              {{ crewTxt }}
+              <div
+                v-for="line in crewLines"
+                :key="line"
+                style="
+                  min-height: 20px;
+                  white-space: nowrap;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                "
+              >
+                {{ line }}
+              </div>
             </div>
             <div
               id="mins"
@@ -677,7 +678,7 @@ export default {
       settingUpShowName: null, // Track show currently being set up to prevent duplicate calls
       twoLocalFolders: false,
       nowPlayingDevices: [],
-      crewTxt: "",
+      crewLines: [],
     };
   },
 
@@ -878,7 +879,7 @@ export default {
     },
 
     async setCrewTxt(tvdbData) {
-      this.crewTxt = "";
+      this.crewLines = [];
       let crew = null;
       if (Array.isArray(tvdbData?.crew)) {
         crew = tvdbData.crew;
@@ -900,18 +901,13 @@ export default {
         }
       }
       if (!Array.isArray(crew) || crew.length === 0) return;
-      const CREW_ORDER = [
-        "Creator",
-        "Executive Producer",
-        "Producer",
-        "Writer",
-      ];
+      const CREW_PREF = ["Creator", "Producer", "Executive Producer", "Writer"];
       const sorted = [...crew].sort(
-        (a, b) => CREW_ORDER.indexOf(a.type) - CREW_ORDER.indexOf(b.type),
+        (a, b) => CREW_PREF.indexOf(a.type) - CREW_PREF.indexOf(b.type),
       );
-      this.crewTxt = sorted
-        .map((c) => `${c.name} (${c.type})`)
-        .join("  \u00b7  ");
+      const picked = sorted.slice(0, 2);
+      const abbrev = (t) => (t === "Executive Producer" ? "Exec Producer" : t);
+      this.crewLines = picked.map((c) => `${abbrev(c.type)}: ${c.name}`);
     },
 
     setGenresTxt(tvdbData) {

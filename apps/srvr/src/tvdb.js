@@ -1260,6 +1260,7 @@ function getTvdbCrew(extResObj) {
     .map((char) => ({
       name: char.personName,
       type: char.peopleType,
+      image: char.personImgURL || null,
     }));
 }
 

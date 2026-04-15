@@ -712,5 +712,9 @@ export const fetchExtendedForCrew = async (tvdbId) => {
   if (!Array.isArray(chars)) return [];
   return chars
     .filter((c) => CREW_TYPE_ORDER_CLIENT.includes(c.peopleType))
-    .map((c) => ({ name: c.personName, type: c.peopleType }));
+    .map((c) => ({
+      name: c.personName,
+      type: c.peopleType,
+      image: c.personImgURL || null,
+    }));
 };

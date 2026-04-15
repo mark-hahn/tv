@@ -437,11 +437,28 @@
           border-radius: 6px;
           border: 1px solid #ddd;
           text-align: center;
+          cursor: default;
         "
       >
+        <img
+          v-if="member.image"
+          :src="member.image"
+          :alt="member.name"
+          style="
+            width: 100px;
+            height: 130px;
+            object-fit: cover;
+            border-radius: 4px;
+            margin-bottom: 5px;
+          "
+        />
         <div style="font-weight: bold; font-size: 14px">{{ member.name }}</div>
         <div style="font-weight: normal; font-size: 12px">
-          ({{ member.type }})
+          ({{
+            member.type === "Executive Producer"
+              ? "Exec Producer"
+              : member.type
+          }})
         </div>
       </div>
     </div>
@@ -1429,14 +1446,19 @@ export default {
 
     async loadCrew(tvdbData, show) {
       const actualData = tvdbData?.response?.data || tvdbData;
-      // If crew field exists (even empty array), it has already been fetched — use it as-is
+      // If crew field exists AND all entries have images (or it's empty), use as-is
       if (Array.isArray(actualData?.crew)) {
-        this.crew = [...actualData.crew].sort((a, b) => {
-          return (
-            CREW_TYPE_ORDER.indexOf(a.type) - CREW_TYPE_ORDER.indexOf(b.type)
-          );
-        });
-        return;
+        const hasImageGap =
+          actualData.crew.length > 0 &&
+          actualData.crew.some((c) => c.image === undefined);
+        if (!hasImageGap) {
+          this.crew = [...actualData.crew].sort((a, b) => {
+            return (
+              CREW_TYPE_ORDER.indexOf(a.type) - CREW_TYPE_ORDER.indexOf(b.type)
+            );
+          });
+          return;
+        }
       }
       // crew field absent — fetch from TVDB and store back (even if result is empty)
       const tvdbId = show?.tvdbId || actualData?.tvdbId;

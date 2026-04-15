@@ -728,9 +728,51 @@ function writeSRT(segments, outputPath) {
     const numChunks = Math.ceil(seg.text.length / MAX_CHARS);
     const baseSize = Math.floor(totalWords / numChunks);
     const remainder = totalWords % numChunks;
+    const HONORIFICS = new Set([
+      "mr.",
+      "mrs.",
+      "miss",
+      "ms.",
+      "mx.",
+      "dr.",
+      "prof.",
+      "esq.",
+      "rev.",
+      "fr.",
+      "sr.",
+      "br.",
+      "gen.",
+      "col.",
+      "maj.",
+      "capt.",
+      "lt.",
+      "sgt.",
+      "cpl.",
+      "pvt.",
+      "adm.",
+      "gov.",
+      "sen.",
+      "rep.",
+      "pres.",
+      "amb.",
+      "hm",
+      "hrh",
+      "he",
+    ]);
     let wordOffset = 0;
+    let carry = 0; // extra words deferred from a previous honorific adjustment
     for (let i = 0; i < numChunks; i++) {
-      const chunkSize = baseSize + (i < remainder ? 1 : 0);
+      let chunkSize = baseSize + (i < remainder ? 1 : 0) + carry;
+      carry = 0;
+      // Don't break after an honorific — treat the space between an honorific
+      // and the following name as non-breaking.
+      if (i < numChunks - 1 && chunkSize > 1) {
+        const boundaryWord = words[wordOffset + chunkSize - 1];
+        if (HONORIFICS.has(boundaryWord.toLowerCase())) {
+          chunkSize -= 1;
+          carry = 1; // give the dropped word to the next chunk
+        }
+      }
       const chunkWords = words.slice(wordOffset, wordOffset + chunkSize);
       const chunkStart = seg.start + (wordOffset / totalWords) * totalDur;
       const chunkEnd =

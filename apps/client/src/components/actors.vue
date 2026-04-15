@@ -412,6 +412,39 @@
         @actor-click="handleActorClick"
       ></Actor>
     </div>
+
+    <!-- Crew section (Creator, Executive Producer, Producer, Writer) -->
+    <div
+      v-if="!showingCredits && crew.length > 0"
+      id="crew-section"
+      style="
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+        gap: 10px;
+        padding: 5px;
+      "
+    >
+      <div
+        v-for="(member, idx) in crew"
+        :key="member.type + '|' + member.name + '|' + idx"
+        style="
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          margin: 5px;
+          padding: 8px;
+          background-color: #f5f5f5;
+          border-radius: 6px;
+          border: 1px solid #ddd;
+          text-align: center;
+        "
+      >
+        <div style="font-weight: bold; font-size: 14px">{{ member.name }}</div>
+        <div style="font-weight: normal; font-size: 12px">
+          ({{ member.type }})
+        </div>
+      </div>
+    </div>
     <div
       id="no-actors"
       v-if="!errorMessage &amp;&amp; !isGuestMode &amp;&amp; showName &amp;&amp; actors.length === 0 &amp;&amp; showNoCastMessage"
@@ -431,6 +464,8 @@ import * as util from "../util.js";
 import * as srvr from "../srvr.js";
 
 const DEBUG_ACTORS_MERGE_LOG = false;
+
+const CREW_TYPE_ORDER = ["Creator", "Executive Producer", "Producer", "Writer"];
 
 export default {
   name: "Actors",
@@ -478,6 +513,7 @@ export default {
       actorPageUrl: null, // IMDb URL for selected actor
       showNoCastMessage: false, // Controls whether to show "no cast info" message after delay
       noCastMessageTimer: null, // Timer ID for the no cast message delay
+      crew: [], // Crew from TVDB (Creator, Executive Producer, Producer, Writer)
     };
   },
 
@@ -943,6 +979,7 @@ export default {
       this.errorMessage = "";
       this.isGuestMode = false;
       this.showingEpisodeActors = false;
+      this.crew = [];
 
       this._seriesMapInForArrows = null;
       this._seriesMapInForArrowsShowKey = null;
@@ -1390,6 +1427,37 @@ export default {
       }
     },
 
+    async loadCrew(tvdbData, show) {
+      const actualData = tvdbData?.response?.data || tvdbData;
+      // If crew field exists (even empty array), it has already been fetched — use it as-is
+      if (Array.isArray(actualData?.crew)) {
+        this.crew = [...actualData.crew].sort((a, b) => {
+          return (
+            CREW_TYPE_ORDER.indexOf(a.type) - CREW_TYPE_ORDER.indexOf(b.type)
+          );
+        });
+        return;
+      }
+      // crew field absent — fetch from TVDB and store back (even if result is empty)
+      const tvdbId = show?.tvdbId || actualData?.tvdbId;
+      if (!tvdbId) return;
+      try {
+        const res = await tvdb.fetchExtendedForCrew(tvdbId);
+        if (!Array.isArray(res)) return;
+        this.crew = [...res].sort((a, b) => {
+          return (
+            CREW_TYPE_ORDER.indexOf(a.type) - CREW_TYPE_ORDER.indexOf(b.type)
+          );
+        });
+        const showName = actualData?.name || show?.name;
+        if (showName) {
+          await srvr.setTvdbFields({ name: showName, crew: res });
+        }
+      } catch {
+        // silent
+      }
+    },
+
     async updateActors(data) {
       if (!data) {
         this.actors = [];
@@ -1592,6 +1660,9 @@ export default {
       this.seriesActors = [...this.actors];
       this.isGuestMode = false;
       this.showingEpisodeActors = false;
+
+      // Load crew (Creator, Executive Producer, Producer, Writer)
+      void this.loadCrew(tvdbData, this.currentShow);
 
       // Handle "no cast info" message with 2-second delay
       if (this.noCastMessageTimer) {

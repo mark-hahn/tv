@@ -1248,6 +1248,21 @@ function getTvdbCharacters(extResObj) {
     }));
 }
 
+const TVDB_CREW_TYPES = ["Creator", "Executive Producer", "Producer", "Writer"];
+
+function getTvdbCrew(extResObj) {
+  const characters = extResObj?.data?.characters;
+  if (!characters || !Array.isArray(characters)) {
+    return [];
+  }
+  return characters
+    .filter((char) => TVDB_CREW_TYPES.includes(char.peopleType))
+    .map((char) => ({
+      name: char.personName,
+      type: char.peopleType,
+    }));
+}
+
 // Load TMDB field mapping template
 let tvdbTemplate = null;
 try {
@@ -1537,6 +1552,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   } = extResObj.data;
   const image = getTvdbImageUrl(extResObj);
   const characters = getTvdbCharacters(extResObj);
+  const crew = getTvdbCrew(extResObj);
   let lastAired = lastAiredIn ?? firstAired;
   lastAired = lastAired ?? "";
   let nextAired = nextAiredIn ?? "";
@@ -1668,6 +1684,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     remote_ids: remoteIds || [], // Store raw remoteIds from TVDB API
     remotes, // computed display array - not persisted to disk; rebuilt from flat url props
     characters, // Don't preserve arrays - they accumulate
+    crew,
     added,
     saved,
     // Remote URL flat props — persisted so Google/scrape calls are skipped on subsequent refreshes
@@ -2708,6 +2725,7 @@ export const searchTvdbByImdbId = async (params) => {
     // Build a tvdb-like object from the API response
     const image = getTvdbImageUrl(extResObj);
     const characters = getTvdbCharacters(extResObj);
+    const crew = getTvdbCrew(extResObj);
     const firstAired = extData.firstAired || "";
     const lastAired = extData.lastAired || firstAired || "";
     const nextAired = extData.nextAired || "";
@@ -2731,6 +2749,7 @@ export const searchTvdbByImdbId = async (params) => {
       averageRuntime: extData.averageRuntime || null,
       genres: extData.genres?.map((g) => g.name) || [],
       characters: characters,
+      crew: crew,
       remotes: [], // Don't fetch remotes for preview
       inEmby: false,
       WaitStr: calculateWaitStr(nextAired, lastAired),

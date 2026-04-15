@@ -632,6 +632,7 @@ export default {
         "Size",
         "Ended",
         "Length",
+        "Creator",
       ],
       fltrChoices: [
         "Close",
@@ -1236,6 +1237,24 @@ export default {
           return String(show?.notes ?? "")
             .trim()
             .toLowerCase();
+        case "Creator": {
+          const crewArr = Array.isArray(allTvdb?.[show.name]?.crew)
+            ? allTvdb[show.name].crew
+            : [];
+          const CREW_PREF = [
+            "Creator",
+            "Executive Producer",
+            "Producer",
+            "Writer",
+          ];
+          let best = null;
+          for (const type of CREW_PREF) {
+            best = crewArr.find((c) => c.type === type);
+            if (best) break;
+          }
+          const val = best ? best.name : "";
+          return forSort ? val.toLowerCase() : val;
+        }
         case "Viewed":
           lastViewed = srvr.lastViewedCache[show.name];
           if (forSort) return lastViewed || 0;
@@ -2654,7 +2673,19 @@ export default {
         }
         if (srchStrLc && !show.name.toLowerCase().includes(srchStrLc)) {
           const noteLc = String(show?.notes ?? "").toLowerCase();
-          if (!noteLc.includes(srchStrLc)) continue;
+          if (noteLc.includes(srchStrLc)) {
+            // matched notes — allow
+          } else {
+            const crewArr = Array.isArray(localAllTvdb?.[show.name]?.crew)
+              ? localAllTvdb[show.name].crew
+              : [];
+            const crewMatch = crewArr.some((c) =>
+              String(c?.name ?? "")
+                .toLowerCase()
+                .includes(srchStrLc),
+            );
+            if (!crewMatch) continue;
+          }
         }
         for (let cond of this.conds) {
           if (cond.filter === 0) continue;

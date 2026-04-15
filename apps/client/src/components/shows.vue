@@ -144,6 +144,20 @@
               {{ String(show.notes) }}
             </div>
             <div
+              v-if="sortChoice === 'Creator' && getSortDisplayValue(show)"
+              :style="{
+                padding: '2px',
+                fontSize: '14px',
+                color: 'rgba(0,0,0,0.5)',
+                marginRight: '15px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }"
+            >
+              {{ getSortDisplayValue(show) }}
+            </div>
+            <div
               v-if="show.waitStr?.length"
               :style="{
                 padding: '2px',
@@ -256,6 +270,7 @@ export default {
         Size: "25px",
         Ended: "75px",
         Length: "25px",
+        Creator: "0",
       };
       return widths[this.sortChoice] || "75px";
     },

@@ -422,6 +422,22 @@
               {{ genresTxt }}
             </div>
             <div
+              id="crew"
+              v-if="crewTxt && crewTxt.length > 0"
+              style="
+                min-height: 20px;
+                white-space: normal;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                display: -webkit-box;
+                -webkit-box-orient: vertical;
+                -webkit-line-clamp: 3;
+                line-clamp: 3;
+              "
+            >
+              {{ crewTxt }}
+            </div>
+            <div
               id="mins"
               v-if="runtimeTxt.length &gt; 0"
               v-html="runtimeTxt"
@@ -661,6 +677,7 @@ export default {
       settingUpShowName: null, // Track show currently being set up to prevent duplicate calls
       twoLocalFolders: false,
       nowPlayingDevices: [],
+      crewTxt: "",
     };
   },
 
@@ -858,6 +875,43 @@ export default {
       if (this.show?.name !== showNameAtStart) return;
 
       posterEl.replaceChildren(img);
+    },
+
+    async setCrewTxt(tvdbData) {
+      this.crewTxt = "";
+      let crew = null;
+      if (Array.isArray(tvdbData?.crew)) {
+        crew = tvdbData.crew;
+      } else {
+        // crew field absent — fetch from TVDB and store back
+        const tvdbId = tvdbData?.tvdbId || this.show?.tvdbId;
+        if (tvdbId) {
+          try {
+            const res = await tvdb.fetchExtendedForCrew(tvdbId);
+            if (Array.isArray(res)) {
+              crew = res;
+              const showName = tvdbData?.name || this.show?.name;
+              if (showName)
+                await srvr.setTvdbFields({ name: showName, crew: res });
+            }
+          } catch {
+            // silent
+          }
+        }
+      }
+      if (!Array.isArray(crew) || crew.length === 0) return;
+      const CREW_ORDER = [
+        "Creator",
+        "Executive Producer",
+        "Producer",
+        "Writer",
+      ];
+      const sorted = [...crew].sort(
+        (a, b) => CREW_ORDER.indexOf(a.type) - CREW_ORDER.indexOf(b.type),
+      );
+      this.crewTxt = sorted
+        .map((c) => `${c.name} (${c.type})`)
+        .join("  \u00b7  ");
     },
 
     setGenresTxt(tvdbData) {
@@ -1513,6 +1567,7 @@ export default {
           await this.setDates(tvdbData);
 
           this.setGenresTxt(tvdbData);
+          void this.setCrewTxt(tvdbData);
 
           await this.setSeasonsTxt(tvdbData);
 

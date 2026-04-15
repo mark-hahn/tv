@@ -50,7 +50,7 @@
           @click="$emit('copy-name', show, $event)"
         >
           <font-awesome-icon
-            id="cpbrd"
+            class="cpbrd"
             icon="copy"
             style="color: #ccc"
           ></font-awesome-icon>
@@ -86,8 +86,7 @@
           {{ getSortDisplayValue(show) }}
         </div>
         <div
-          id="showLineText"
-          class="show-cell show-name-cell"
+          class="showLineText show-cell show-name-cell"
           :style="{
             padding: '5px',
             flexGrow: 1,
@@ -95,6 +94,7 @@
             backgroundColor:
               highlightName === show.name ? 'yellow' : 'transparent',
           }"
+          @click="$emit('select-show', show, false, true)"
         >
           <div
             style="

@@ -713,9 +713,9 @@ function writeSRT(segments, outputPath) {
     finalSegs.push({ ...seg });
   }
 
-  // Split segments that are longer than 60 chars into smaller chunks
+  // Split segments that are longer than 42 chars into smaller chunks
   // with linearly interpolated timestamps.
-  const MAX_CHARS = 60;
+  const MAX_CHARS = 42;
   const splitSegs = [];
   for (const seg of finalSegs) {
     if (seg.text.length <= MAX_CHARS) {

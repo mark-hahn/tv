@@ -716,6 +716,91 @@ function writeSRT(segments, outputPath) {
   // Split segments that are longer than 42 chars into smaller chunks
   // with linearly interpolated timestamps.
   const MAX_CHARS = 42;
+
+  const HONORIFICS = new Set([
+    "mr.",
+    "mrs.",
+    "miss",
+    "ms.",
+    "mx.",
+    "dr.",
+    "prof.",
+    "esq.",
+    "rev.",
+    "fr.",
+    "sr.",
+    "br.",
+    "gen.",
+    "col.",
+    "maj.",
+    "capt.",
+    "lt.",
+    "sgt.",
+    "cpl.",
+    "pvt.",
+    "adm.",
+    "gov.",
+    "sen.",
+    "rep.",
+    "pres.",
+    "amb.",
+    "hm",
+    "hrh",
+    "he",
+  ]);
+
+  // Split words into n balanced chunks: minimise variance in character lengths
+  // subject to no chunk > MAX_CHARS and no chunk ending on an honorific.
+  // N=2: exhaustive scan of all valid split points.
+  // N≥3: greedy proportional (target = remaining_chars / remaining_lines).
+  function balancedChunks(ws, n) {
+    if (n === 1) return [ws];
+    if (n === 2) {
+      let bestSplit = Math.ceil(ws.length / 2);
+      let bestDiff = Infinity;
+      let cumLen = 0;
+      for (let i = 0; i < ws.length - 1; i++) {
+        cumLen += i === 0 ? ws[i].length : 1 + ws[i].length;
+        const len2 = ws.slice(i + 1).join(" ").length;
+        if (cumLen > MAX_CHARS || len2 > MAX_CHARS) continue;
+        if (HONORIFICS.has(ws[i].toLowerCase())) continue;
+        const diff = Math.abs(cumLen - len2);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          bestSplit = i + 1;
+        }
+      }
+      return [ws.slice(0, bestSplit), ws.slice(bestSplit)];
+    }
+    // N >= 3
+    const result = [];
+    let off = 0;
+    for (let c = 0; c < n; c++) {
+      if (c === n - 1) {
+        result.push(ws.slice(off));
+        break;
+      }
+      const rem = ws.slice(off);
+      const target = rem.join(" ").length / (n - c);
+      let cumLen = 0,
+        bestI = 1,
+        bestDiff = Infinity;
+      for (let i = 0; i < rem.length - 1; i++) {
+        cumLen += i === 0 ? rem[i].length : 1 + rem[i].length;
+        if (cumLen > MAX_CHARS) break;
+        if (HONORIFICS.has(rem[i].toLowerCase())) continue;
+        const diff = Math.abs(cumLen - target);
+        if (diff <= bestDiff) {
+          bestDiff = diff;
+          bestI = i + 1;
+        }
+      }
+      result.push(ws.slice(off, off + bestI));
+      off += bestI;
+    }
+    return result;
+  }
+
   const splitSegs = [];
   for (const seg of finalSegs) {
     if (seg.text.length <= MAX_CHARS) {
@@ -726,54 +811,10 @@ function writeSRT(segments, outputPath) {
     const totalDur = seg.end - seg.start;
     const totalWords = words.length;
     const numChunks = Math.ceil(seg.text.length / MAX_CHARS);
-    const baseSize = Math.floor(totalWords / numChunks);
-    const remainder = totalWords % numChunks;
-    const HONORIFICS = new Set([
-      "mr.",
-      "mrs.",
-      "miss",
-      "ms.",
-      "mx.",
-      "dr.",
-      "prof.",
-      "esq.",
-      "rev.",
-      "fr.",
-      "sr.",
-      "br.",
-      "gen.",
-      "col.",
-      "maj.",
-      "capt.",
-      "lt.",
-      "sgt.",
-      "cpl.",
-      "pvt.",
-      "adm.",
-      "gov.",
-      "sen.",
-      "rep.",
-      "pres.",
-      "amb.",
-      "hm",
-      "hrh",
-      "he",
-    ]);
+    const chunks = balancedChunks(words, numChunks);
     let wordOffset = 0;
-    let carry = 0; // extra words deferred from a previous honorific adjustment
-    for (let i = 0; i < numChunks; i++) {
-      let chunkSize = baseSize + (i < remainder ? 1 : 0) + carry;
-      carry = 0;
-      // Don't break after an honorific — treat the space between an honorific
-      // and the following name as non-breaking.
-      if (i < numChunks - 1 && chunkSize > 1) {
-        const boundaryWord = words[wordOffset + chunkSize - 1];
-        if (HONORIFICS.has(boundaryWord.toLowerCase())) {
-          chunkSize -= 1;
-          carry = 1; // give the dropped word to the next chunk
-        }
-      }
-      const chunkWords = words.slice(wordOffset, wordOffset + chunkSize);
+    for (const chunkWords of chunks) {
+      const chunkSize = chunkWords.length;
       const chunkStart = seg.start + (wordOffset / totalWords) * totalDur;
       const chunkEnd =
         seg.start + ((wordOffset + chunkSize) / totalWords) * totalDur;
@@ -783,6 +824,23 @@ function writeSRT(segments, outputPath) {
         text: chunkWords.join(" "),
       });
       wordOffset += chunkSize;
+    }
+  }
+
+  // Cross-entry honorific fix: if a segment's text ends with an honorific,
+  // move it to the start of the next segment so the honorific stays with the
+  // following name. Iterate backwards to avoid index shifting after splices.
+  for (let i = splitSegs.length - 2; i >= 0; i--) {
+    const seg = splitSegs[i];
+    const words = seg.text.trim().split(/\s+/);
+    const lastWord = words[words.length - 1];
+    if (!HONORIFICS.has(lastWord.toLowerCase())) continue;
+    const next = splitSegs[i + 1];
+    next.text = lastWord + " " + next.text;
+    if (words.length === 1) {
+      splitSegs.splice(i, 1);
+    } else {
+      seg.text = words.slice(0, -1).join(" ");
     }
   }
 

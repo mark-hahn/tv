@@ -497,7 +497,10 @@ function spawnBraviaShell() {
   braviaShellStdoutBuf = "";
   braviaShell.stdout.on("data", (chunk) => {
     braviaShellStdoutBuf += chunk.toString();
-    if (braviaShellPending && braviaShellStdoutBuf.includes(braviaShellPending.marker)) {
+    if (
+      braviaShellPending &&
+      braviaShellStdoutBuf.includes(braviaShellPending.marker)
+    ) {
       const { resolve } = braviaShellPending;
       braviaShellPending = null;
       resolve();
@@ -550,6 +553,27 @@ function braviaShellCmd(cmd) {
 
 connectBraviaShell();
 
+app.get("/tv/keyevent/:code", async (req, res) => {
+  if (tvMode !== "google" && tvMode !== "tv") {
+    log(`keyevent ignored — tvMode=${tvMode}`);
+    res.json({ ok: false, error: "wrong mode" });
+    return;
+  }
+  const code = req.params.code;
+  if (!/^[A-Z0-9_]+$/.test(code)) {
+    res.status(400).json({ ok: false, error: "invalid keycode" });
+    return;
+  }
+  try {
+    await braviaShellCmd(`input keyevent ${code}`);
+    log(`[bravia] keyevent ${code} from ${client(req)}`);
+    res.json({ ok: true });
+  } catch (err) {
+    loge(`[bravia] keyevent failed: ${err.message}`);
+    res.json({ ok: false, error: err.message });
+  }
+});
+
 app.get("/tv/text", async (req, res) => {
   const text = req.query.t;
   if (!text) {
@@ -562,7 +586,7 @@ app.get("/tv/text", async (req, res) => {
     return;
   }
   // Escape text for shell: wrap in single quotes, escape single quotes
-  const escaped = text.replace(/'/g, "'\\''" );
+  const escaped = text.replace(/'/g, "'\\''");
   try {
     await braviaShellCmd(`input text '${escaped}'`);
     log(`[bravia] text '${text}' from ${client(req)}`);

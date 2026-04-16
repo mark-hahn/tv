@@ -17,7 +17,7 @@
         v-model="inputText"
         type="text"
         style="
-          width: 50%;
+          width: 25%;
           padding: 8px;
           font-size: 16px;
           border: 1px solid #bbb;
@@ -44,6 +44,18 @@
         :style="btnStyle"
       >
         Enter
+      </button>
+      <button
+        @click="sendHaKey('back')"
+        :style="btnStyle"
+      >
+        ↩ Back
+      </button>
+      <button
+        @click="sendHaKey('ok')"
+        :style="btnStyle"
+      >
+        OK
       </button>
     </div>
     <!-- History list -->
@@ -116,6 +128,13 @@ export default {
     },
     sendEnter() {
       this.sendKeyevent("KEYCODE_ENTER");
+    },
+    async sendHaKey(key) {
+      try {
+        await fetch(`${config.tvTvUrl}/tv/key/${key}`);
+      } catch (e) {
+        console.error("[keybd] ha key error:", e);
+      }
     },
     recallHistory(item) {
       this.inputText = item;

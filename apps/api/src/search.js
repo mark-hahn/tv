@@ -960,7 +960,7 @@ export async function searchTorrents({
     if (torrent.completeSeries) {
       torrent.parsed.seasonEpisode = "ALL";
     } else if (season !== undefined && season !== null) {
-      if (!episode) {
+      if (episode === undefined || episode === null) {
         torrent.parsed.seasonEpisode = `S${String(season).padStart(2, "0")}`;
       } else {
         torrent.parsed.seasonEpisode = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
@@ -992,7 +992,10 @@ export async function searchTorrents({
         seasonsByNumber[season] = { seasonTorrents: [], episodeTorrents: [] };
       }
 
-      if (!torrent.parsed.episode) {
+      if (
+        torrent.parsed.episode === undefined ||
+        torrent.parsed.episode === null
+      ) {
         // This is a season torrent
         seasonsByNumber[season].seasonTorrents.push(torrent);
       } else {
@@ -1071,7 +1074,10 @@ export async function searchTorrents({
         seasonsByNumber[season] = { seasonTorrents: [], episodeTorrents: [] };
       }
 
-      if (!torrent.parsed.episode) {
+      if (
+        torrent.parsed.episode === undefined ||
+        torrent.parsed.episode === null
+      ) {
         // This is a season torrent
         seasonsByNumber[season].seasonTorrents.push(torrent);
       } else {

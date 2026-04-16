@@ -2514,7 +2514,7 @@ const applySubFiles = async (params) => {
 
       const fileBase = fileName.slice(0, -(ext.length + 1));
 
-      // Apply all candidates that don't already exist on disk.
+      // Apply only the first candidate whose exact hash .srt file doesn't already exist.
       for (const cand of candidates) {
         const srtName = `${fileBase}.${cand.fileIdBase32}.srt`;
         const outPath = path.join(seasonPath, srtName);
@@ -2632,6 +2632,7 @@ const applySubFiles = async (params) => {
         try {
           await fs.promises.writeFile(outPath, srtText, "utf8");
           appliedSet.add(fid);
+          break; // Only write one hash .srt per video file
         } catch {
           // If write fails, continue to next candidate.
           continue;

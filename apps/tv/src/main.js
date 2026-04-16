@@ -12,6 +12,7 @@ const REMOTE_ENTITY_ID = "remote.bravia_k_65xr70";
 const FIRE_TV_ENTITY_ID = "media_player.fire_tv_192_168_1_47";
 const FIRE_TV_REMOTE_ID = "remote.fire_tv_192_168_1_47";
 const FIRE_TV_IP = "192.168.1.47";
+const BRAVIA_TV_IP = "192.168.1.85";
 
 const EMBY_HOST = "hahnca.com:8920";
 const EMBY_API_KEY = "1c399bd079d549cba8c916244d3add2b";
@@ -477,6 +478,100 @@ function adbExec(cmd, label) {
 }
 
 connectFireShell();
+
+// ─── Persistent adb shell for Bravia (text/keyboard input) ──────────────────
+let braviaShell = null;
+let braviaShellReady = false;
+let braviaShellStdoutBuf = "";
+let braviaShellPending = null;
+let braviaKeySeq = 0;
+
+function spawnBraviaShell() {
+  if (braviaShell) {
+    braviaShell.removeAllListeners();
+    braviaShell.stdin.destroy();
+    braviaShell.kill();
+  }
+  braviaShellReady = false;
+  braviaShell = spawn("adb", ["-s", `${BRAVIA_TV_IP}:5555`, "shell"]);
+  braviaShellStdoutBuf = "";
+  braviaShell.stdout.on("data", (chunk) => {
+    braviaShellStdoutBuf += chunk.toString();
+    if (braviaShellPending && braviaShellStdoutBuf.includes(braviaShellPending.marker)) {
+      const { resolve } = braviaShellPending;
+      braviaShellPending = null;
+      resolve();
+    }
+  });
+  braviaShell.on("spawn", () => {
+    log("[bravia] adb shell spawned");
+    braviaShellReady = true;
+  });
+  braviaShell.on("error", (err) => {
+    log(`[bravia] adb shell error: ${err.message}`);
+    braviaShellReady = false;
+  });
+  braviaShell.on("close", (code) => {
+    log(`[bravia] adb shell closed (${code}), reconnecting in 2s...`);
+    braviaShellReady = false;
+    braviaShell = null;
+    setTimeout(connectBraviaShell, 2000);
+  });
+}
+
+function connectBraviaShell() {
+  exec(`adb connect ${BRAVIA_TV_IP}:5555`, (err, stdout) => {
+    if (err) {
+      log(`[bravia] adb connect failed: ${err.message}, retrying in 5s...`);
+      setTimeout(connectBraviaShell, 5000);
+    } else {
+      log(`[bravia] adb connect: ${stdout.trim()}`);
+      spawnBraviaShell();
+    }
+  });
+}
+
+function braviaShellCmd(cmd) {
+  return new Promise((resolve, reject) => {
+    if (!braviaShellReady || !braviaShell) {
+      reject(new Error("bravia shell not ready"));
+      return;
+    }
+    const marker = `__B${++braviaKeySeq}__`;
+    braviaShellPending = { marker, resolve };
+    braviaShell.stdin.write(`${cmd} && echo ${marker}\n`, (err) => {
+      if (err) {
+        braviaShellPending = null;
+        reject(err);
+      }
+    });
+  });
+}
+
+connectBraviaShell();
+
+app.get("/tv/text", async (req, res) => {
+  const text = req.query.t;
+  if (!text) {
+    res.status(400).json({ ok: false, error: "missing t" });
+    return;
+  }
+  if (tvMode !== "google" && tvMode !== "tv") {
+    log(`text ignored — tvMode=${tvMode}`);
+    res.json({ ok: false, error: "wrong mode" });
+    return;
+  }
+  // Escape text for shell: wrap in single quotes, escape single quotes
+  const escaped = text.replace(/'/g, "'\\''" );
+  try {
+    await braviaShellCmd(`input text '${escaped}'`);
+    log(`[bravia] text '${text}' from ${client(req)}`);
+    res.json({ ok: true });
+  } catch (err) {
+    loge(`[bravia] text failed: ${err.message}`);
+    res.json({ ok: false, error: err.message });
+  }
+});
 
 app.get("/tv/firebtn", (req, res) => {
   log(`firebtn from ${client(req)}`);

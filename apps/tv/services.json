@@ -163,12 +163,6 @@
       "logo": "sony-pictures-core.png"
     },
     {
-      "name": "Sony Select",
-      "uri": "com.sony.dtv.com.sony.dtv.sonyselect.com.sony.dtv.sonyselect.activities.LaunchActivity",
-      "color": "003087",
-      "logo": "sony-select.png"
-    },
-    {
       "name": "STARZ",
       "uri": "com.sony.dtv.com.bydeluxe.d3.android.program.starz.com.starz.amznfiretv.SplashActivity",
       "color": "082125",

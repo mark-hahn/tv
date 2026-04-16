@@ -322,6 +322,10 @@
             v-show="currentPane === 'tv'"
             style="width: 100%; height: 100%"
           ></TvPane>
+          <KeyboardPane
+            v-show="currentPane === 'keybd'"
+            style="width: 100%; height: 100%"
+          ></KeyboardPane>
         </div>
       </div>
       <!-- Draggable divider between panes: vertical in landscape, horizontal in portrait.-->
@@ -479,6 +483,7 @@ import Usb from "./usb.vue";
 import Local from "./local.vue";
 import Trailer from "./trailer.vue";
 import TvPane from "./tvpane.vue";
+import KeyboardPane from "./keyboard-pane.vue";
 import evtBus from "../evtBus.js";
 import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
@@ -510,6 +515,7 @@ export default {
     Down,
     Trailer,
     TvPane,
+    KeyboardPane,
     VideoPlayer,
   },
   data() {
@@ -833,6 +839,7 @@ export default {
         { label: "Reviews", key: "reviews" },
         { label: "Trailer", key: "trailer" },
         { label: "TV", key: "tv" },
+        { label: "Keybd", key: "keybd" },
       ];
     },
 
@@ -1640,6 +1647,12 @@ export default {
 
       if (k === "tv") {
         this.currentPane = "tv";
+        evtBus.emit("paneChanged", this.currentPane);
+        return;
+      }
+
+      if (k === "keybd") {
+        this.currentPane = "keybd";
         evtBus.emit("paneChanged", this.currentPane);
         return;
       }

@@ -698,23 +698,8 @@ export const getSeriesMapByTvdbId = async (tvdbId) => {
   return seriesMap;
 };
 
-const CREW_TYPE_ORDER_CLIENT = [
-  "Creator",
-  "Executive Producer",
-  "Producer",
-  "Writer",
-];
-
 export const fetchExtendedForCrew = async (tvdbId) => {
   if (!tvdbId) return [];
-  const res = await tvdbFetch(`series/${tvdbId}/extended`);
-  const chars = res?.json ? (await res.json())?.data?.characters : null;
-  if (!Array.isArray(chars)) return [];
-  return chars
-    .filter((c) => CREW_TYPE_ORDER_CLIENT.includes(c.peopleType))
-    .map((c) => ({
-      name: c.personName,
-      type: c.peopleType,
-      image: c.personImgURL || null,
-    }));
+  const res = await srvr.getTvmazeCrew({ tvdbId });
+  return Array.isArray(res) ? res : [];
 };

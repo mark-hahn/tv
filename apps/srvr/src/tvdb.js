@@ -12,6 +12,7 @@ const { getPstDate } = util;
 import { SRVR_DATA_DIR } from "./srvrPaths.js";
 import * as history from "./history.js";
 import { MovieDb } from "moviedb-promise";
+import { getTvmazeIdByTvdbId } from "../../api/src/tvmaze.js";
 const { log, start, end } = util.getLog("tvdb");
 const TVDB_PATH = path.join(SRVR_DATA_DIR, "tvdb.json");
 const TVDB_BACKUP_PATH = path.join(SRVR_DATA_DIR, "tvdb.json.bak");
@@ -1248,20 +1249,33 @@ function getTvdbCharacters(extResObj) {
     }));
 }
 
-const TVDB_CREW_TYPES = ["Creator", "Executive Producer", "Producer", "Writer"];
+const TVMAZE_CREW_TYPES = [
+  "Creator",
+  "Executive Producer",
+  "Producer",
+  "Writer",
+];
 
-function getTvdbCrew(extResObj) {
-  const characters = extResObj?.data?.characters;
-  if (!characters || !Array.isArray(characters)) {
+async function getTvmazeCrew(tvdbId) {
+  if (!tvdbId) return [];
+  try {
+    const tvmazeId = getTvmazeIdByTvdbId(tvdbId);
+    if (!tvmazeId) return [];
+    const res = await fetch(`https://api.tvmaze.com/shows/${tvmazeId}/crew`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (!Array.isArray(data)) return [];
+    return data
+      .filter((c) => TVMAZE_CREW_TYPES.includes(c.type))
+      .map((c) => ({
+        name: c.person?.name ?? "",
+        type: c.type,
+        image: c.person?.image?.medium ?? c.person?.image?.original ?? null,
+      }))
+      .filter((c) => c.name);
+  } catch {
     return [];
   }
-  return characters
-    .filter((char) => TVDB_CREW_TYPES.includes(char.peopleType))
-    .map((char) => ({
-      name: char.personName,
-      type: char.peopleType,
-      image: char.personImgURL || null,
-    }));
 }
 
 // Load TMDB field mapping template
@@ -1553,7 +1567,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   } = extResObj.data;
   const image = getTvdbImageUrl(extResObj);
   const characters = getTvdbCharacters(extResObj);
-  const crew = getTvdbCrew(extResObj);
+  const crew = await getTvmazeCrew(tvdbId);
   let lastAired = lastAiredIn ?? firstAired;
   lastAired = lastAired ?? "";
   let nextAired = nextAiredIn ?? "";
@@ -2281,6 +2295,27 @@ const tryLocalGetTvdb = async () => {
     log(`tvdb push [${processRecord.name}]: no changes`);
   }
 
+  // Fetch TVmaze crew for shows that don't have it yet (null = not fetched; [] = fetched but none)
+  if (
+    processRecord.name &&
+    processRecord.tvdbId &&
+    allTvdb[processRecord.name]
+  ) {
+    const rec = allTvdb[processRecord.name];
+    if (!Array.isArray(rec.crew)) {
+      try {
+        const tvmazeCrew = await getTvmazeCrew(processRecord.tvdbId);
+        rec.crew = tvmazeCrew;
+        await saveTvdbFiles(allTvdb);
+        log(
+          `tvdb crew [${processRecord.name}]: ${tvmazeCrew.length} from TVmaze`,
+        );
+      } catch (e) {
+        log("err", "tryLocalGetTvdb crew:", e.message);
+      }
+    }
+  }
+
   // Push 3: Rotten Tomatoes scrape (slow, runs separately after push1 & push2)
   if (!skipRotten && processRecord.name && allTvdb[processRecord.name]) {
     try {
@@ -2726,7 +2761,7 @@ export const searchTvdbByImdbId = async (params) => {
     // Build a tvdb-like object from the API response
     const image = getTvdbImageUrl(extResObj);
     const characters = getTvdbCharacters(extResObj);
-    const crew = getTvdbCrew(extResObj);
+    const crew = await getTvmazeCrew(tvdbId);
     const firstAired = extData.firstAired || "";
     const lastAired = extData.lastAired || firstAired || "";
     const nextAired = extData.nextAired || "";
@@ -2927,6 +2962,11 @@ export const setTvdbFields = async (params) => {
     enqueueShowProcess(name);
   }
   return tvdb ?? "ok";
+};
+
+export const getTvmazeCrew_cmd = async (params) => {
+  const tvdbId = params?.tvdbId;
+  return getTvmazeCrew(tvdbId);
 };
 
 export const accessTvdb = async (params) => {

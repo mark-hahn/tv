@@ -39,7 +39,8 @@ function nowMs() {
 
 async function getTvdbToken() {
   const now = Date.now();
-  if (_tvdbToken && now - _tvdbTokenFetchedAt < 20 * 60 * 60 * 1000) return _tvdbToken;
+  if (_tvdbToken && now - _tvdbTokenFetchedAt < 20 * 60 * 60 * 1000)
+    return _tvdbToken;
   const res = await fetch("https://api4.thetvdb.com/v4/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -54,31 +55,44 @@ async function getTvdbToken() {
 }
 
 function sanitizeForTvdbMatch(name) {
-  return String(name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  return String(name || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
 }
 
 async function fillPremieredFromTvdb(db, tvmazeId, name) {
   try {
     const token = await getTvdbToken();
     const url = `https://api4.thetvdb.com/v4/search?query=${encodeURIComponent(name)}&type=series&limit=5`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     if (!res.ok) return;
     const json = await res.json();
     const results = json?.data;
     if (!results?.length) return;
     const sanName = sanitizeForTvdbMatch(name);
     const match =
-      results.find(r => sanitizeForTvdbMatch(r.name) === sanName) ||
-      results.find(r => sanitizeForTvdbMatch(r.name).startsWith(sanName) || sanName.startsWith(sanitizeForTvdbMatch(r.name))) ||
+      results.find((r) => sanitizeForTvdbMatch(r.name) === sanName) ||
+      results.find(
+        (r) =>
+          sanitizeForTvdbMatch(r.name).startsWith(sanName) ||
+          sanName.startsWith(sanitizeForTvdbMatch(r.name)),
+      ) ||
       results[0];
-    if (sanitizeForTvdbMatch(match.name).slice(0, 3) !== sanName.slice(0, 3)) return;
+    if (sanitizeForTvdbMatch(match.name).slice(0, 3) !== sanName.slice(0, 3))
+      return;
     const firstAired = match?.first_air_time;
     if (!firstAired) return;
-    const fixed = firstAired.replace(/T24:/, "T00:").replace(/^(\d{4}-\d{2}-\d{2})$/, "$1T00:00:00Z");
+    const fixed = firstAired
+      .replace(/T24:/, "T00:")
+      .replace(/^(\d{4}-\d{2}-\d{2})$/, "$1T00:00:00Z");
     const d = new Date(fixed);
     if (isNaN(d.getTime())) return;
     const epoch = Math.floor(d.getTime() / 1000);
-    db.prepare("UPDATE shows SET premiered = ? WHERE tvmaze_id = ? AND premiered IS NULL").run(epoch, tvmazeId);
+    db.prepare(
+      "UPDATE shows SET premiered = ? WHERE tvmaze_id = ? AND premiered IS NULL",
+    ).run(epoch, tvmazeId);
   } catch {
     // ignore TVDB errors — premiered stays null
   }
@@ -88,7 +102,9 @@ async function fillNullPremieredBatch(db, rows) {
   const CONCURRENCY = 10;
   for (let i = 0; i < rows.length; i += CONCURRENCY) {
     await Promise.all(
-      rows.slice(i, i + CONCURRENCY).map(r => fillPremieredFromTvdb(db, r.tvmaze_id, r.name))
+      rows
+        .slice(i, i + CONCURRENCY)
+        .map((r) => fillPremieredFromTvdb(db, r.tvmaze_id, r.name)),
     );
   }
 }
@@ -671,7 +687,8 @@ async function syncTvmazeShows(reason = "startup") {
             );
             inserted++;
             newShows.push({ name: name || "Unknown", id: tvmazeId });
-            if (premiered == null && name) nullPremieredInserts.push({ tvmaze_id: tvmazeId, name });
+            if (premiered == null && name)
+              nullPremieredInserts.push({ tvmaze_id: tvmazeId, name });
           } else {
             // Prevent stale page data from overwriting newer local data
             // (e.g. if we fetched an update via /updates/shows which is newer than the page cache)
@@ -723,7 +740,9 @@ async function syncTvmazeShows(reason = "startup") {
       _perPageTx(json);
 
       if (nullPremieredInserts.length > 0) {
-        fillNullPremieredBatch(db, nullPremieredInserts.splice(0)).catch(() => {});
+        fillNullPremieredBatch(db, nullPremieredInserts.splice(0)).catch(
+          () => {},
+        );
       }
 
       // Log each new show
@@ -1034,6 +1053,15 @@ export function getCandidateShows(limit = 100) {
 export function markShowBrowsed(tvmazeId) {
   if (!_db) openDb();
   _db.prepare("UPDATE shows SET browsed = 1 WHERE tvmaze_id = ?").run(tvmazeId);
+}
+
+export function getTvmazeIdByTvdbId(tvdbId) {
+  if (!_db) openDb();
+  if (!tvdbId) return null;
+  const row = _db
+    .prepare("SELECT tvmaze_id FROM shows WHERE tvdb_id = ?")
+    .get(Number(tvdbId));
+  return row?.tvmaze_id ?? null;
 }
 
 export function searchShowsByName(query, limit = 20) {

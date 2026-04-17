@@ -282,6 +282,10 @@ export function accessTvdb(params) {
   return httpCall("/api/accessTvdb", params, "POST");
 }
 
+export function getTvmazeCrew(params) {
+  return httpCall("/api/getTvmazeCrew", params, "POST");
+}
+
 export function getDevices() {
   return httpCall("/api/getDevices");
 }

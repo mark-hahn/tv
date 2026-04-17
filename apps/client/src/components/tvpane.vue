@@ -353,7 +353,7 @@ export default {
         });
         let count = 0;
         while (this._repeatActive) {
-          const isFast = count >= 4;
+          const isFast = count >= 2;
           const n =
             this.mode === "fire" && key === "left"
               ? isFast
@@ -372,7 +372,7 @@ export default {
           const delay =
             this.mode === "fire"
               ? (count++, 0)
-              : count++ < 4
+              : count++ < 2
                 ? 500
                 : FAST_REPEAT_MS;
           await new Promise((r) => {

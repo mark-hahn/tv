@@ -482,7 +482,7 @@ import * as srvr from "../srvr.js";
 
 const DEBUG_ACTORS_MERGE_LOG = false;
 
-const CREW_TYPE_ORDER = ["Creator", "Executive Producer", "Producer", "Writer"];
+const CREW_TYPE_ORDER = ["Creator", "Producer", "Executive Producer", "Writer"];
 
 export default {
   name: "Actors",

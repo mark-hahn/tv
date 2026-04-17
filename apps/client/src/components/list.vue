@@ -1243,8 +1243,8 @@ export default {
             : [];
           const CREW_PREF = [
             "Creator",
-            "Executive Producer",
             "Producer",
+            "Executive Producer",
             "Writer",
           ];
           let best = null;

@@ -87,15 +87,22 @@
             &lt;Loading&gt;
           </div>
           <div
-            v-if="stats &amp;&amp; !simpleMode"
+            v-if="(imdbStats || rottenStats) &amp;&amp; !simpleMode"
             style="
-              font-size: 14px;
+              font-size: 13px;
               color: #555;
               margin-left: 8px;
+              display: flex;
+              gap: 10px;
               white-space: nowrap;
             "
           >
-            {{ reviews.length }}/{{ stats.numChecked }}
+            <span v-if="imdbStats"
+              >Imdb {{ imdbStats.accepted }}/{{ imdbStats.checked }}</span
+            >
+            <span v-if="rottenStats"
+              >Rotten {{ rottenStats.accepted }}/{{ rottenStats.checked }}</span
+            >
           </div>
         </div>
       </div>
@@ -358,6 +365,8 @@ export default {
     return {
       reviews: [],
       stats: null,
+      imdbStats: null,
+      rottenStats: null,
       showName: "",
       rottenUrl: "",
       rottenLabel: "",
@@ -368,6 +377,7 @@ export default {
       previewSrchChoice: null,
       isLoading: false,
       checkedRemotes: false,
+      pendingLoad: false,
       errorMessage: "",
     };
   },
@@ -469,7 +479,12 @@ export default {
 
   methods: {
     onPaneChanged(pane) {
-      if (pane === "reviews") this.scrollReviewPanesToTop();
+      if (pane !== "reviews") return;
+      this.scrollReviewPanesToTop();
+      if (this.pendingLoad) {
+        this.pendingLoad = false;
+        void this.loadAllReviews();
+      }
     },
 
     onSetUpSeries(show) {
@@ -482,6 +497,9 @@ export default {
       this.imdbId = "";
       this.imdbUrl = "";
       this.checkedRemotes = false;
+      this.pendingLoad = false;
+      this.imdbStats = null;
+      this.rottenStats = null;
       this.errorMessage = "";
       this.scrollReviewPanesToTop();
     },
@@ -540,9 +558,9 @@ export default {
           this.imdbId = tvdbData.imdbId;
         }
 
-        // Load reviews from all available sources in parallel
+        // Defer load until the reviews pane is actually visible
         if (this.imdbId || this.rottenUrl) {
-          void this.loadAllReviews();
+          this.pendingLoad = true;
         }
       }
     },
@@ -600,6 +618,8 @@ export default {
     async loadAllReviews() {
       this.reviews = [];
       this.stats = null;
+      this.imdbStats = null;
+      this.rottenStats = null;
       this.errorMessage = "";
       this.isLoading = true;
       try {
@@ -614,11 +634,13 @@ export default {
 
         const errors = [];
         const allReviews = [];
-        let numChecked = 0;
 
         if (imdbResult.status === "fulfilled" && imdbResult.value) {
           const data = imdbResult.value;
-          numChecked += data.numChecked || 0;
+          this.imdbStats = {
+            accepted: (data.reviews || []).length,
+            checked: data.numChecked || 0,
+          };
           for (const r of data.reviews || []) {
             allReviews.push({ ...r, author: r.author + " (i)" });
           }
@@ -628,7 +650,10 @@ export default {
 
         if (rottenResult.status === "fulfilled" && rottenResult.value) {
           const data = rottenResult.value;
-          numChecked += data.numChecked || 0;
+          this.rottenStats = {
+            accepted: (data.reviews || []).length,
+            checked: data.numChecked || 0,
+          };
           for (const r of data.reviews || []) {
             allReviews.push({ ...r, author: r.author + " (r)" });
           }
@@ -638,7 +663,7 @@ export default {
 
         this.errorMessage = errors.join("\n");
         this.reviews = allReviews;
-        this.stats = { numChecked };
+        this.stats = { numChecked: allReviews.length };
         this.scrollReviewPanesToTop();
       } finally {
         this.isLoading = false;

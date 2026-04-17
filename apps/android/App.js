@@ -47,6 +47,7 @@ export default function App() {
   const lastCmdRef = useRef(0);
   const holdRef = useRef(null);
   const volActiveRef = useRef(false);
+  const kybdInputRef = useRef(null);
 
   const debounce = () => {
     const now = Date.now();
@@ -206,10 +207,21 @@ export default function App() {
   const kybdSendText = async () => {
     const text = kybdInput.trim();
     if (!text) return;
+    for (let i = 0; i < 50; i++) {
+      try {
+        await fetch(`${TV_TV_URL}/tv/keyevent/KEYCODE_DEL`);
+      } catch (_) {}
+    }
     try {
       await fetch(`${TV_TV_URL}/tv/text?t=${encodeURIComponent(text)}`);
     } catch (_) {}
-    setKybdHistory((h) => [text, ...h]);
+    try {
+      await fetch(`${TV_TV_URL}/tv/keyevent/KEYCODE_ENTER`);
+    } catch (_) {}
+    setKybdHistory((h) => {
+      const next = [text, ...h.filter((i) => i !== text)];
+      return next;
+    });
     setKybdInput("");
   };
 
@@ -416,14 +428,9 @@ export default function App() {
     return (
       <View style={kybdStyles.container}>
         <StatusBar hidden />
-        <TouchableOpacity
-          onPress={() => setShowKeybd(false)}
-          style={kybdStyles.closeBtn}
-        >
-          <Text style={kybdStyles.closeBtnText}>✕</Text>
-        </TouchableOpacity>
         <View style={kybdStyles.inputRow}>
           <TextInput
+            ref={kybdInputRef}
             style={kybdStyles.textInput}
             value={kybdInput}
             onChangeText={setKybdInput}
@@ -432,38 +439,21 @@ export default function App() {
             returnKeyType="send"
             autoFocus
           />
-        </View>
-        <View style={kybdStyles.buttonsRow}>
-          {[
-            {
-              label: "Backspace",
-              onPress: () => kybdSendKeyevent("KEYCODE_DEL"),
-            },
-            {
-              label: "Search",
-              onPress: () => kybdSendKeyevent("KEYCODE_SEARCH"),
-            },
-            {
-              label: "Enter",
-              onPress: () => kybdSendKeyevent("KEYCODE_ENTER"),
-            },
-            { label: "↩ Back", onPress: () => kybdSendHaKey("back") },
-            { label: "OK", onPress: () => kybdSendHaKey("ok") },
-          ].map((btn) => (
-            <TouchableOpacity
-              key={btn.label}
-              onPress={btn.onPress}
-              style={kybdStyles.kybdBtn}
-            >
-              <Text style={kybdStyles.kybdBtnText}>{btn.label}</Text>
-            </TouchableOpacity>
-          ))}
+          <TouchableOpacity
+            onPress={() => setShowKeybd(false)}
+            style={kybdStyles.closeBtn}
+          >
+            <Text style={kybdStyles.closeBtnText}>✕</Text>
+          </TouchableOpacity>
         </View>
         <ScrollView style={kybdStyles.historyList}>
           {kybdHistory.map((item, idx) => (
             <TouchableOpacity
               key={idx}
-              onPress={() => setKybdInput(item)}
+              onPress={() => {
+                kybdInputRef.current?.focus();
+                setKybdInput(item);
+              }}
               style={[
                 kybdStyles.historyItem,
                 { backgroundColor: idx % 2 === 0 ? "#fafafa" : "#fff" },
@@ -663,50 +653,38 @@ const kybdStyles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
     paddingHorizontal: SCREEN_MARGIN,
-    paddingVertical: SCREEN_MARGIN * 2,
+    paddingTop: SCREEN_MARGIN * 2,
+    paddingBottom: SCREEN_MARGIN,
   },
-  closeBtn: {
-    position: "absolute",
-    top: SCREEN_MARGIN * 2,
-    right: SCREEN_MARGIN,
-    zIndex: 10,
-    padding: 8,
-  },
-  closeBtnText: {
-    fontSize: 28,
-    color: "#000",
-    lineHeight: 32,
-  },
+
   inputRow: {
+    flexDirection: "row",
     alignItems: "center",
-    marginTop: 20,
     marginBottom: 12,
+    gap: 8,
   },
   textInput: {
-    width: "80%",
+    flex: 1,
     padding: 8,
     fontSize: 16,
     borderWidth: 1,
     borderColor: "#bbb",
     borderRadius: 5,
     backgroundColor: "#fff",
+    textAlign: "left",
   },
-  buttonsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-  kybdBtn: {
-    padding: 10,
+  closeBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderWidth: 1,
-    borderColor: "#bbb",
+    borderColor: "#999",
     borderRadius: 5,
-    backgroundColor: "whitesmoke",
   },
-  kybdBtnText: {
-    fontSize: 16,
+  closeBtnText: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#000",
+    lineHeight: 18,
   },
   historyList: {
     flex: 1,

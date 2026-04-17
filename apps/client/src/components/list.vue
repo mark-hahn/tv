@@ -2608,12 +2608,25 @@ export default {
             const actualData = tvdbData.response?.data || tvdbData;
             const characters = actualData?.characters;
 
-            if (!Array.isArray(characters)) return false;
+            if (Array.isArray(characters)) {
+              if (
+                characters.some((char) => {
+                  const actorName = char?.personName || char?.actor || "";
+                  return matchesSearchTerm(actorName, searchWords);
+                })
+              )
+                return true;
+            }
 
-            return characters.some((char) => {
-              const actorName = char?.personName || char?.actor || "";
-              return matchesSearchTerm(actorName, searchWords);
-            });
+            const crew = actualData?.crew;
+            if (Array.isArray(crew)) {
+              if (
+                crew.some((c) => matchesSearchTerm(c?.name || "", searchWords))
+              )
+                return true;
+            }
+
+            return false;
           };
 
           const filteredShows = allShows.filter(checkShowForActorMatch);
@@ -2831,10 +2844,15 @@ export default {
 
         if (!Array.isArray(characters)) return false;
 
-        return characters.some((char) => {
+        const inCharacters = characters.some((char) => {
           const charActorName = normName(char?.personName || char?.actor);
           return charActorName === targetActorName;
         });
+        if (inCharacters) return true;
+
+        const crew = actualData?.crew;
+        if (!Array.isArray(crew)) return false;
+        return crew.some((c) => normName(c?.name) === targetActorName);
       });
 
       console.log(
@@ -2864,12 +2882,23 @@ export default {
         const actualData = tvdbData.response?.data || tvdbData;
         const characters = actualData?.characters;
 
-        if (!Array.isArray(characters)) return false;
+        if (Array.isArray(characters)) {
+          if (
+            characters.some((char) => {
+              const actorName = char?.personName || char?.actor || "";
+              return matchesSearchTerm(actorName, searchWords);
+            })
+          )
+            return true;
+        }
 
-        return characters.some((char) => {
-          const actorName = char?.personName || char?.actor || "";
-          return matchesSearchTerm(actorName, searchWords);
-        });
+        const crew = actualData?.crew;
+        if (Array.isArray(crew)) {
+          if (crew.some((c) => matchesSearchTerm(c?.name || "", searchWords)))
+            return true;
+        }
+
+        return false;
       };
 
       let filteredShows = allShows.filter(checkShowForActorMatch);

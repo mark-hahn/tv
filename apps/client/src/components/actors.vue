@@ -427,18 +427,20 @@
       <div
         v-for="(member, idx) in crew"
         :key="member.type + '|' + member.name + '|' + idx"
-        style="
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          margin: 5px;
-          padding: 8px;
-          background-color: #f5f5f5;
-          border-radius: 6px;
-          border: 1px solid #ddd;
-          text-align: center;
-          cursor: default;
-        "
+        @click.stop="handleCrewClick(member)"
+        :style="{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          margin: '5px',
+          padding: '8px',
+          backgroundColor: selectedActor === member ? 'lightgray' : '#f5f5f5',
+          borderRadius: '6px',
+          border:
+            selectedActor === member ? '2px solid #888' : '1px solid #ddd',
+          textAlign: 'center',
+          cursor: 'pointer',
+        }"
       >
         <img
           v-if="member.image"
@@ -792,6 +794,22 @@ export default {
         }
       } else {
         win?.close();
+      }
+    },
+
+    handleCrewClick(member) {
+      if (this.selectedActor === member) {
+        this.selectedActor = null;
+        this.showingCredits = false;
+        this.credits = [];
+        this.creditsError = null;
+        evtBus.emit("clearActorFilter");
+      } else {
+        this.selectedActor = member;
+        this.showingCredits = false;
+        this.credits = [];
+        this.creditsError = null;
+        evtBus.emit("actorSelected");
       }
     },
 
@@ -1755,8 +1773,11 @@ export default {
     this._onResetActorsPane = this.resetPane;
     evtBus.on("resetActorsPane", this._onResetActorsPane);
 
-    this._onSetUpSeries = () => {
+    this._onSetUpSeries = (show) => {
       // Exit credits mode and deselect actor when show selection changes
+      // But don't deselect if the same show is still selected (e.g. after filterByActor)
+      if (show && this.currentShow && show.name === this.currentShow.name)
+        return;
       if (this.showingCredits || this.selectedActor) {
         this.selectedActor = null;
         this.showingCredits = false;

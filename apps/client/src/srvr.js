@@ -286,6 +286,22 @@ export function getTvmazeCrew(params) {
   return httpCall("/api/getTvmazeCrew", params, "POST");
 }
 
+let _vipCache = null;
+export async function getVipActors() {
+  if (_vipCache) return _vipCache;
+  _vipCache = httpCall("/api/getVipActors", null, "GET")
+    .then((list) => {
+      return Array.isArray(list) ? new Set(list) : new Set();
+    })
+    .catch(() => new Set());
+  return _vipCache;
+}
+
+export async function setVipActors(list) {
+  _vipCache = Promise.resolve(new Set(list));
+  return httpCall("/api/setVipActors", { list }, "POST");
+}
+
 export function getDevices() {
   return httpCall("/api/getDevices");
 }

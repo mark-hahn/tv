@@ -17,6 +17,7 @@ const { log, start, end } = util.getLog("tvdb");
 const TVDB_PATH = path.join(SRVR_DATA_DIR, "tvdb.json");
 const TVDB_BACKUP_PATH = path.join(SRVR_DATA_DIR, "tvdb.json.bak");
 const TVDB_TEMPLATE_PATH = path.join(SRVR_DATA_DIR, "tvdbTemplate.json");
+const VIP_ACTORS_PATH = path.join(SRVR_DATA_DIR, "vip-actors.json");
 
 const FAST_UPDATE = false;
 const TVDB_UPDATE_DELAY_MS = FAST_UPDATE ? 5 * 1000 : 2 * 60 * 1000;
@@ -2969,6 +2970,27 @@ export const setTvdbFields = async (params) => {
 export const getTvmazeCrew_cmd = async (params) => {
   const tvdbId = params?.tvdbId;
   return getTvmazeCrew(tvdbId);
+};
+
+export const getVipActors = async () => {
+  try {
+    if (fs.existsSync(VIP_ACTORS_PATH)) {
+      const text = fs.readFileSync(VIP_ACTORS_PATH, "utf8");
+      const parsed = util.jParse(text);
+      return Array.isArray(parsed) ? parsed : [];
+    }
+  } catch {
+    /* ignore */
+  }
+  return [];
+};
+
+export const setVipActors = async (params) => {
+  const list = params?.list;
+  if (!Array.isArray(list))
+    throw new Error("setVipActors: list must be an array");
+  await util.writeFile(VIP_ACTORS_PATH, list);
+  return { ok: true };
 };
 
 export const accessTvdb = async (params) => {

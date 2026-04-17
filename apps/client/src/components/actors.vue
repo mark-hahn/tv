@@ -164,6 +164,18 @@
               {{ creditsLoading ? "Loading..." : "All Credits" }}
             </button>
             <button
+              @click.stop="handleVipButton"
+              :style="{
+                fontSize: '13px',
+                cursor: 'pointer',
+                borderRadius: '5px',
+                padding: '4px 10px',
+                '--btn-bg': isSelectedActorVip ? 'lightpink' : 'whitesmoke',
+              }"
+            >
+              VIP
+            </button>
+            <button
               v-if="actorPageUrl"
               @click.stop="handleImdbButton"
               style="
@@ -427,7 +439,7 @@
       <div
         v-for="(member, idx) in crew"
         :key="member.type + '|' + member.name + '|' + idx"
-        @click.stop="handleCrewClick(member)"
+        @click.stop="handleCrewClick($event, member)"
         :style="{
           display: 'flex',
           flexDirection: 'column',
@@ -484,7 +496,29 @@ import * as srvr from "../srvr.js";
 
 const DEBUG_ACTORS_MERGE_LOG = false;
 
-const CREW_TYPE_ORDER = ["Creator", "Producer", "Executive Producer", "Writer"];
+const theMan = atob("bXJza2lu");
+
+const CREW_TYPE_ORDER = [
+  "VIP",
+  "Creator",
+  "Producer",
+  "Executive Producer",
+  "Writer",
+];
+
+let _vipActorsLoaded = false;
+
+async function loadVipActors() {
+  return srvr.getVipActors();
+}
+
+async function saveVipActors(set) {
+  try {
+    await srvr.setVipActors([...set]);
+  } catch {
+    /* ignore */
+  }
+}
 
 export default {
   name: "Actors",
@@ -533,10 +567,17 @@ export default {
       showNoCastMessage: false, // Controls whether to show "no cast info" message after delay
       noCastMessageTimer: null, // Timer ID for the no cast message delay
       crew: [], // Crew from TVDB (Creator, Executive Producer, Producer, Writer)
+      vipActors: new Set(),
     };
   },
 
-  computed: {},
+  computed: {
+    isSelectedActorVip() {
+      const name =
+        this.selectedActor?.personName || this.selectedActor?.name || "";
+      return name ? this.vipActors.has(name) : false;
+    },
+  },
 
   methods: {
     unescapeHtml(text) {
@@ -797,7 +838,43 @@ export default {
       }
     },
 
-    handleCrewClick(member) {
+    async handleVipButton() {
+      const name =
+        this.selectedActor?.personName || this.selectedActor?.name || "";
+      if (!name) return;
+      const updated = new Set(this.vipActors);
+      if (updated.has(name)) {
+        updated.delete(name);
+      } else {
+        updated.add(name);
+      }
+      this.vipActors = updated;
+      await saveVipActors(updated);
+      evtBus.emit("vipActorsChanged", updated);
+      // Re-sort crew and actors to reflect VIP status change
+      this.crew = [...this.crew].sort((a, b) => {
+        const aVip = this.vipActors.has(a.name) ? 0 : 1;
+        const bVip = this.vipActors.has(b.name) ? 0 : 1;
+        if (aVip !== bVip) return aVip - bVip;
+        return (
+          CREW_TYPE_ORDER.indexOf(a.type) - CREW_TYPE_ORDER.indexOf(b.type)
+        );
+      });
+      this.actors = [...this.actors].sort((a, b) => {
+        const aName = a.personName || a.name || "";
+        const bName = b.personName || b.name || "";
+        const aVip = this.vipActors.has(aName) ? 0 : 1;
+        const bVip = this.vipActors.has(bName) ? 0 : 1;
+        return aVip - bVip;
+      });
+    },
+
+    handleCrewClick(event, member) {
+      if (event?.ctrlKey) {
+        const name = String(member?.name || "").trim();
+        if (name) util.openExternalPage(`https://${theMan}.com/search/celebs?term=${encodeURIComponent(name)}`);
+        return;
+      }
       if (this.selectedActor === member) {
         this.selectedActor = null;
         this.showingCredits = false;
@@ -949,9 +1026,14 @@ export default {
         }
       }
 
-      // Final sort: Actors with images first (highest priority), then actors without images
-      // Within each image group: TVDB first (sorted by actorSort), then TMDB (sorted by actorEpiCount descending)
+      // Final sort: VIPs first, then actors with images, then by source/sort
       output.sort((a, b) => {
+        const aName = a.personName || a.name || "";
+        const bName = b.personName || b.name || "";
+        const aVip = this.vipActors.has(aName) ? 0 : 1;
+        const bVip = this.vipActors.has(bName) ? 0 : 1;
+        if (aVip !== bVip) return aVip - bVip;
+
         const aSource = a.source || "unknown";
         const bSource = b.source || "unknown";
         const aHasImage = this.hasAnyImage(a);
@@ -1464,17 +1546,21 @@ export default {
 
     async loadCrew(tvdbData, show) {
       const actualData = tvdbData?.response?.data || tvdbData;
+      const crewSort = (a, b) => {
+        const aVip = this.vipActors.has(a.name) ? 0 : 1;
+        const bVip = this.vipActors.has(b.name) ? 0 : 1;
+        if (aVip !== bVip) return aVip - bVip;
+        return (
+          CREW_TYPE_ORDER.indexOf(a.type) - CREW_TYPE_ORDER.indexOf(b.type)
+        );
+      };
       // If crew field exists AND all entries have images (or it's empty), use as-is
       if (Array.isArray(actualData?.crew)) {
         const hasImageGap =
           actualData.crew.length > 0 &&
           actualData.crew.some((c) => c.image === undefined);
         if (!hasImageGap) {
-          this.crew = [...actualData.crew].sort((a, b) => {
-            return (
-              CREW_TYPE_ORDER.indexOf(a.type) - CREW_TYPE_ORDER.indexOf(b.type)
-            );
-          });
+          this.crew = [...actualData.crew].sort(crewSort);
           return;
         }
       }
@@ -1484,11 +1570,7 @@ export default {
       try {
         const res = await tvdb.fetchExtendedForCrew(tvdbId);
         if (!Array.isArray(res)) return;
-        this.crew = [...res].sort((a, b) => {
-          return (
-            CREW_TYPE_ORDER.indexOf(a.type) - CREW_TYPE_ORDER.indexOf(b.type)
-          );
-        });
+        this.crew = [...res].sort(crewSort);
         const showName = actualData?.name || show?.name;
         if (showName) {
           await srvr.setTvdbFields({ name: showName, crew: res });
@@ -1727,6 +1809,12 @@ export default {
   },
 
   mounted() {
+    loadVipActors()
+      .then((set) => {
+        this.vipActors = set;
+      })
+      .catch(() => {});
+
     this._onShowActors = async (data) => {
       await this.updateActors(data);
 

@@ -306,6 +306,14 @@ import * as emby from "../emby.js";
 import * as tvdb from "../tvdb.js";
 import * as srvr from "../srvr.js";
 import * as util from "../util.js";
+
+let _vipSet = new Set();
+srvr
+  .getVipActors()
+  .then((s) => {
+    _vipSet = s;
+  })
+  .catch(() => {});
 import parseTorrentTitle from "parse-torrent-title";
 import evtBus from "../evtBus.js";
 import Shows from "./shows.vue";
@@ -1241,6 +1249,12 @@ export default {
           const crewArr = Array.isArray(allTvdb?.[show.name]?.crew)
             ? allTvdb[show.name].crew
             : [];
+          const vipSet = _vipSet;
+          const vip = crewArr.find((c) => vipSet.has(c.name));
+          if (vip) {
+            const val = vip.name;
+            return forSort ? val.toLowerCase() : val;
+          }
           const CREW_PREF = [
             "Creator",
             "Producer",
@@ -3208,6 +3222,10 @@ export default {
     on("deleteShow", async (show) => {
       if (!show) return;
       await this.deleteShow(show);
+    });
+
+    on("vipActorsChanged", (updatedSet) => {
+      _vipSet = updatedSet instanceof Set ? updatedSet : new Set(updatedSet);
     });
 
     // Listen for server notifications about tvdb updates

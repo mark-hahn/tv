@@ -2832,6 +2832,8 @@ app.post("/api/getFile", apiWrapper(getFile));
 app.post("/api/getSubFileIds", apiWrapper(getSubFileIds));
 app.post("/api/accessTvdb", apiWrapper(tvdb.accessTvdb));
 app.post("/api/getTvmazeCrew", apiWrapper(tvdb.getTvmazeCrew_cmd));
+app.get("/api/getVipActors", apiWrapper(tvdb.getVipActors));
+app.post("/api/setVipActors", apiWrapper(tvdb.setVipActors));
 app.post(
   "/api/triggerEmbySync",
   apiWrapper(async () => {

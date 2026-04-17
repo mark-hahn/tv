@@ -57,3 +57,8 @@
 - when any change is made to web client tv pane ui or the android app ui then the same change should be made to the other
 - when modifying files use local changes and don't replace entire files because another copilot conversation might be changing the same file
 - you only need to check if a change affects android when change is in tv-pane or android
+- when i enter a prompt with the exact text `fix changes` then:
+  - stage changes 
+  - do git add -A
+  - do git commit --amend --no-edit
+  - do git push --force

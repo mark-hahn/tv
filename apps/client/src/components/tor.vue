@@ -1959,6 +1959,12 @@ export default {
         this.providerStats = cached.providerStats;
         this.hasMoreProviders = cached.hasMoreProviders;
         this.lastNeeded = cached.lastNeeded;
+        this.providerWarning = cached.providerWarning || "";
+        this.lastRawProviderCounts = cached.lastRawProviderCounts || null;
+        this.lastReturnedProviderCounts =
+          cached.lastReturnedProviderCounts || null;
+        this.lastApiCount = cached.lastApiCount ?? null;
+        this.lastWarningSummary = cached.lastWarningSummary || null;
         this.hasSearched = true;
         this._didInitialScroll = true;
         this.$nextTick(() => {
@@ -2572,6 +2578,11 @@ export default {
               : null,
             hasMoreProviders: this.hasMoreProviders,
             lastNeeded: this.lastNeeded,
+            providerWarning: this.providerWarning || "",
+            lastRawProviderCounts: this.lastRawProviderCounts || null,
+            lastReturnedProviderCounts: this.lastReturnedProviderCounts || null,
+            lastApiCount: this.lastApiCount ?? null,
+            lastWarningSummary: this.lastWarningSummary || null,
           });
         }
       }

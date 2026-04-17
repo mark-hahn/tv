@@ -2032,6 +2032,10 @@ export default {
     evtBus.on("startLibraryRefresh", this.startLibraryRefresh);
     evtBus.on("diskChangeLibraryRefresh", this.handleDiskChangeLibraryRefresh);
 
+    evtBus.on("tvKeybdBtn", () => {
+      this.selectTab("keybd");
+    });
+
     evtBus.on("showStreamPane", (show) => {
       this.currentPane = "tor";
       evtBus.emit("paneChanged", this.currentPane);

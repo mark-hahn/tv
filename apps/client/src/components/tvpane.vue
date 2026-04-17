@@ -213,16 +213,25 @@
       >
         Mute
       </div>
-      <!-- Row 5: google, roku, off -->
+      <!-- Row 5: keybd, fire, google -->
       <div
-        :style="modeBtnStyle('google')"
-        @mousedown="startHold(() => googleBtn())"
+        :style="cellStyle('white', 'keybd')"
+        @mousedown="startHold(() => keybdBtn())"
         @mouseup="stopHold"
         @mouseleave="stopHold"
-        @touchstart.prevent="startHold(() => googleBtn())"
+        @touchstart.prevent="startHold(() => keybdBtn())"
         @touchend="stopHold"
       >
-        Google
+        <svg
+          width="1.5em"
+          height="1.5em"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+        >
+          <path
+            d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 5H5v-2h2v2zm0-3H5v-2h2v2zm0-3H5V8h2v2zm9 6H8v-2h8v2zm0-3h-2v-2h2v2zm0-3h-2V8h2v2zm3 6h-2v-2h2v2zm0-3h-2v-2h2v2zm0-3h-2V8h2v2z"
+          />
+        </svg>
       </div>
       <div
         :style="modeBtnStyle('fire')"
@@ -235,24 +244,14 @@
         Fire
       </div>
       <div
-        :style="offBtnStyle"
-        @mousedown="
-          startHold(() => {
-            flash('off');
-            tvCmd('off');
-          })
-        "
+        :style="modeBtnStyle('google')"
+        @mousedown="startHold(() => googleBtn())"
         @mouseup="stopHold"
         @mouseleave="stopHold"
-        @touchstart.prevent="
-          startHold(() => {
-            flash('off');
-            tvCmd('off');
-          })
-        "
+        @touchstart.prevent="startHold(() => googleBtn())"
         @touchend="stopHold"
       >
-        Off
+        Google
       </div>
     </div>
   </div>
@@ -428,13 +427,26 @@ export default {
     },
 
     async googleBtn() {
-      this.flash("google");
-      fetch(`${config.tvTvUrl}/tv/googlebtn`).catch(() => {});
+      if (this.mode === "google") {
+        this.tvCmd("off");
+      } else {
+        this.flash("google");
+        fetch(`${config.tvTvUrl}/tv/googlebtn`).catch(() => {});
+      }
     },
 
     async fireBtn() {
-      this.flash("fire");
-      fetch(`${config.tvTvUrl}/tv/firebtn`).catch(() => {});
+      if (this.mode === "fire") {
+        this.tvCmd("off");
+      } else {
+        this.flash("fire");
+        fetch(`${config.tvTvUrl}/tv/firebtn`).catch(() => {});
+      }
+    },
+
+    keybdBtn() {
+      this.flash("keybd");
+      this._keybdTimer = setTimeout(() => evtBus.emit("tvKeybdBtn"), 500);
     },
 
     _onTvMuteState(data) {

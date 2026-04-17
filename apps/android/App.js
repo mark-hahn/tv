@@ -6,6 +6,7 @@ import {
   StatusBar,
   ScrollView,
   TouchableOpacity,
+  TextInput,
   Image,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -24,6 +25,9 @@ export default function App() {
   const [cellDims, setCellDims] = useState({ w: 0, h: 0 });
   const [showStreamers, setShowStreamers] = useState(false);
   const [flashSvc, setFlashSvc] = useState(null);
+  const [showKeybd, setShowKeybd] = useState(false);
+  const [kybdInput, setKybdInput] = useState("");
+  const [kybdHistory, setKybdHistory] = useState([]);
 
   const onGridLayout = ({ nativeEvent: { layout } }) => {
     if (layout.width < 10 || layout.height < 10) return;
@@ -182,13 +186,43 @@ export default function App() {
   };
 
   const googleBtn = async () => {
-    flash("google");
-    fetch(`${TV_TV_URL}/tv/googlebtn`).catch(() => {});
+    if (mode === "google") {
+      tvCmd("off");
+    } else {
+      flash("google");
+      fetch(`${TV_TV_URL}/tv/googlebtn`).catch(() => {});
+    }
   };
 
   const fireBtn = async () => {
-    flash("fire");
-    fetch(`${TV_TV_URL}/tv/firebtn`).catch(() => {});
+    if (mode === "fire") {
+      tvCmd("off");
+    } else {
+      flash("fire");
+      fetch(`${TV_TV_URL}/tv/firebtn`).catch(() => {});
+    }
+  };
+
+  const kybdSendText = async () => {
+    const text = kybdInput.trim();
+    if (!text) return;
+    try {
+      await fetch(`${TV_TV_URL}/tv/text?t=${encodeURIComponent(text)}`);
+    } catch (_) {}
+    setKybdHistory((h) => [text, ...h]);
+    setKybdInput("");
+  };
+
+  const kybdSendKeyevent = async (code) => {
+    try {
+      await fetch(`${TV_TV_URL}/tv/keyevent/${code}`);
+    } catch (_) {}
+  };
+
+  const kybdSendHaKey = async (key) => {
+    try {
+      await fetch(`${TV_TV_URL}/tv/key/${key}`);
+    } catch (_) {}
   };
 
   const openApp = async (svc) => {
@@ -344,15 +378,19 @@ export default function App() {
       onPress: () => {},
       onPressIn: () => tvCmd("mute"),
     },
-    // Row 5: google, roku, off
+    // Row 5: keybd, fire, google
     {
-      key: "google",
-      label: "Google",
-      tinyText: true,
-      bg: () => modeBg("google"),
+      key: "keybd",
+      label: null,
+      icon: <MaterialIcons name="keyboard" size={42} color="black" />,
+      bg: () => cellBg("white", "keybd"),
       onPress: () => {},
-      onPressIn: () => startHold(() => googleBtn()),
-      onPressOut: stopHold,
+      onPressIn: () =>
+        startHold(() => {
+          flash("keybd");
+          setTimeout(() => setShowKeybd(true), 500);
+        }),
+      onPressOut: () => clearTimeout(holdRef.current),
     },
     {
       key: "fire",
@@ -364,19 +402,80 @@ export default function App() {
       onPressOut: stopHold,
     },
     {
-      key: "off",
-      label: "Off",
+      key: "google",
+      label: "Google",
       tinyText: true,
-      bg: () => offBg,
+      bg: () => modeBg("google"),
       onPress: () => {},
-      onPressIn: () =>
-        startHold(() => {
-          flash("off");
-          tvCmd("off");
-        }),
+      onPressIn: () => startHold(() => googleBtn()),
       onPressOut: stopHold,
     },
   ];
+
+  if (showKeybd) {
+    return (
+      <View style={kybdStyles.container}>
+        <StatusBar hidden />
+        <TouchableOpacity
+          onPress={() => setShowKeybd(false)}
+          style={kybdStyles.closeBtn}
+        >
+          <Text style={kybdStyles.closeBtnText}>✕</Text>
+        </TouchableOpacity>
+        <View style={kybdStyles.inputRow}>
+          <TextInput
+            style={kybdStyles.textInput}
+            value={kybdInput}
+            onChangeText={setKybdInput}
+            placeholder="Type here..."
+            onSubmitEditing={kybdSendText}
+            returnKeyType="send"
+            autoFocus
+          />
+        </View>
+        <View style={kybdStyles.buttonsRow}>
+          {[
+            {
+              label: "Backspace",
+              onPress: () => kybdSendKeyevent("KEYCODE_DEL"),
+            },
+            {
+              label: "Search",
+              onPress: () => kybdSendKeyevent("KEYCODE_SEARCH"),
+            },
+            {
+              label: "Enter",
+              onPress: () => kybdSendKeyevent("KEYCODE_ENTER"),
+            },
+            { label: "↩ Back", onPress: () => kybdSendHaKey("back") },
+            { label: "OK", onPress: () => kybdSendHaKey("ok") },
+          ].map((btn) => (
+            <TouchableOpacity
+              key={btn.label}
+              onPress={btn.onPress}
+              style={kybdStyles.kybdBtn}
+            >
+              <Text style={kybdStyles.kybdBtnText}>{btn.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <ScrollView style={kybdStyles.historyList}>
+          {kybdHistory.map((item, idx) => (
+            <TouchableOpacity
+              key={idx}
+              onPress={() => setKybdInput(item)}
+              style={[
+                kybdStyles.historyItem,
+                { backgroundColor: idx % 2 === 0 ? "#fafafa" : "#fff" },
+              ]}
+            >
+              <Text style={kybdStyles.historyItemText}>{item}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  }
 
   if (showStreamers) {
     return (
@@ -556,5 +655,68 @@ const streamerStyles = StyleSheet.create({
   cardName: {
     color: "#000",
     fontSize: 13,
+  },
+});
+
+const kybdStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#fff",
+    paddingHorizontal: SCREEN_MARGIN,
+    paddingVertical: SCREEN_MARGIN * 2,
+  },
+  closeBtn: {
+    position: "absolute",
+    top: SCREEN_MARGIN * 2,
+    right: SCREEN_MARGIN,
+    zIndex: 10,
+    padding: 8,
+  },
+  closeBtnText: {
+    fontSize: 28,
+    color: "#000",
+    lineHeight: 32,
+  },
+  inputRow: {
+    alignItems: "center",
+    marginTop: 20,
+    marginBottom: 12,
+  },
+  textInput: {
+    width: "80%",
+    padding: 8,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: "#bbb",
+    borderRadius: 5,
+    backgroundColor: "#fff",
+  },
+  buttonsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  kybdBtn: {
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#bbb",
+    borderRadius: 5,
+    backgroundColor: "whitesmoke",
+  },
+  kybdBtnText: {
+    fontSize: 16,
+  },
+  historyList: {
+    flex: 1,
+  },
+  historyItem: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  historyItemText: {
+    fontSize: 15,
   },
 });

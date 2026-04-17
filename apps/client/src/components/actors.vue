@@ -872,7 +872,10 @@ export default {
     handleCrewClick(event, member) {
       if (event?.ctrlKey) {
         const name = String(member?.name || "").trim();
-        if (name) util.openExternalPage(`https://${theMan}.com/search/celebs?term=${encodeURIComponent(name)}`);
+        if (name)
+          util.openExternalPage(
+            `https://${theMan}.com/search/celebs?term=${encodeURIComponent(name)}`,
+          );
         return;
       }
       if (this.selectedActor === member) {

@@ -1947,9 +1947,14 @@ export default {
       }
 
       // Restore cached results from preview mode if available
-      if (!this.previewMode && show?.id && this.previewTorCache.has(show.id)) {
-        const cached = this.previewTorCache.get(show.id);
-        this.previewTorCache.delete(show.id);
+      const _torPreviewKey = String(show?.tvdbId || show?.name || "");
+      if (
+        !this.previewMode &&
+        _torPreviewKey &&
+        this.previewTorCache.has(_torPreviewKey)
+      ) {
+        const cached = this.previewTorCache.get(_torPreviewKey);
+        this.previewTorCache.delete(_torPreviewKey);
         this.torrents = cached.torrents;
         this.providerStats = cached.providerStats;
         this.hasMoreProviders = cached.hasMoreProviders;
@@ -2555,13 +2560,12 @@ export default {
           });
         }
 
-        // Cache results in preview mode for later use
-        if (
-          this.previewMode &&
-          this.currentShow?.id &&
-          this.torrents.length > 0
-        ) {
-          this.previewTorCache.set(this.currentShow.id, {
+        // Cache results by show key for later reuse
+        const _previewCacheKey = String(
+          this.currentShow?.tvdbId || this.currentShow?.name || "",
+        );
+        if (_previewCacheKey && this.torrents.length > 0) {
+          this.previewTorCache.set(_previewCacheKey, {
             torrents: this.torrents.slice(),
             providerStats: this.providerStats
               ? { ...this.providerStats }

@@ -38,7 +38,7 @@
         borderBottom: '1px solid #ddd',
       }"
     >
-      <!-- Top Row: Show Title + Buttons -->
+      <!-- Top Row: Show Title + Loading + Stats -->
       <div
         style="
           width: 100%;
@@ -75,15 +75,6 @@
             flex-wrap: wrap;
           "
         >
-          <button
-            v-for="btn in filterButtons"
-            :key="btn.label"
-            @click="handleButtonClick(btn.label)"
-            :style="getButtonStyle(selectedButton === btn.label, btn.label)"
-            :disabled="isButtonDisabled(btn.label)"
-          >
-            {{ btn.label }}
-          </button>
           <div
             v-if="isLoading"
             style="
@@ -107,6 +98,19 @@
             {{ reviews.length }}/{{ stats.numChecked }}
           </div>
         </div>
+      </div>
+      <!-- Error Row -->
+      <div
+        v-if="errorMessage"
+        style="
+          font-size: 13px;
+          color: #c00;
+          padding: 2px 10px;
+          white-space: pre-line;
+          line-height: 1.4;
+        "
+      >
+        {{ errorMessage }}
       </div>
       <!-- Second Row: Histogram Only-->
       <div style="width: 100%; display: flex; align-items: stretch">
@@ -362,10 +366,9 @@ export default {
       previewMode: false,
       previewAddBusy: false,
       previewSrchChoice: null,
-      selectedButton: "Rotten",
       isLoading: false,
       checkedRemotes: false,
-      filterButtons: [{ label: "IMDB" }, { label: "Rotten" }],
+      errorMessage: "",
     };
   },
 
@@ -478,8 +481,8 @@ export default {
       this.rottenLabel = "";
       this.imdbId = "";
       this.imdbUrl = "";
-      this.selectedButton = "Rotten";
       this.checkedRemotes = false;
+      this.errorMessage = "";
       this.scrollReviewPanesToTop();
     },
 
@@ -537,25 +540,9 @@ export default {
           this.imdbId = tvdbData.imdbId;
         }
 
-        // Load initial reviews - prioritize IMDB if available, otherwise Rotten Tomatoes
-        if (this.imdbId) {
-          console.log(
-            "[reviews] onTvdbDataReady -> loadReviews IMDB",
-            this.imdbId,
-          );
-          this.selectedButton = "IMDB";
-          void this.loadReviews(this.imdbId, "IMDB");
-        } else if (this.rottenUrl) {
-          console.log(
-            "[reviews] onTvdbDataReady -> loadReviews Rotten",
-            this.rottenUrl,
-          );
-          this.selectedButton = "Rotten";
-          void this.loadReviews(this.rottenUrl, "Rotten");
-        } else {
-          console.log(
-            "[reviews] onTvdbDataReady -> no imdbId or rottenUrl, showing not-found",
-          );
+        // Load reviews from all available sources in parallel
+        if (this.imdbId || this.rottenUrl) {
+          void this.loadAllReviews();
         }
       }
     },
@@ -591,41 +578,6 @@ export default {
       evtBus.emit("exitPreviewMode");
     },
 
-    getButtonStyle(isSelected, label) {
-      const isDisabled = this.isButtonDisabled(label);
-      return {
-        fontSize: "13px",
-        cursor: isDisabled ? "not-allowed" : "pointer",
-        borderRadius: "5px",
-        padding: "4px 12px",
-        border: "1px solid #bbb",
-        "--btn-bg": isSelected ? "lightgray" : "whitesmoke",
-        color: isDisabled ? "#ccc" : "black",
-        opacity: isDisabled ? 0.5 : 1,
-      };
-    },
-
-    isButtonDisabled(label) {
-      if (label === "IMDB") {
-        return !this.imdbId;
-      } else {
-        return !this.rottenUrl;
-      }
-    },
-
-    handleButtonClick(label) {
-      this.selectedButton = label;
-      if (label === "IMDB") {
-        if (this.imdbId) {
-          void this.loadReviews(this.imdbId, "IMDB");
-        }
-      } else {
-        if (this.rottenUrl) {
-          void this.loadReviews(this.rottenUrl, this.selectedButton);
-        }
-      }
-    },
-
     scrollReviewPanesToTop() {
       this.$nextTick(() => {
         const getPane = (paneRef) => {
@@ -645,44 +597,49 @@ export default {
       });
     },
 
-    async loadReviews(urlOrId, buttonName) {
-      console.log("[reviews] loadReviews START", { urlOrId, buttonName });
+    async loadAllReviews() {
       this.reviews = [];
       this.stats = null;
+      this.errorMessage = "";
       this.isLoading = true;
       try {
-        let data;
-        if (buttonName === "IMDB") {
-          // Call IMDB reviews API
-          data = await srvr.getImdbReviews(urlOrId);
-        } else {
-          // Call Rotten Tomatoes reviews API - map "Rotten" to "Audience"
-          const rtButtonName =
-            buttonName === "Rotten" ? "Audience" : buttonName;
-          data = await srvr.getReviews(urlOrId, rtButtonName);
-        }
-        console.log("[reviews] loadReviews DONE", {
-          reviewCount: data?.reviews?.length,
-          numChecked: data?.numChecked,
-        });
+        const [imdbResult, rottenResult] = await Promise.allSettled([
+          this.imdbId
+            ? srvr.getImdbReviews(this.imdbId)
+            : Promise.resolve(null),
+          this.rottenUrl
+            ? srvr.getReviews(this.rottenUrl, "Audience")
+            : Promise.resolve(null),
+        ]);
 
-        if (data) {
-          if (data.reviews && Array.isArray(data.reviews)) {
-            this.reviews = data.reviews;
-          } else {
-            this.reviews = [];
+        const errors = [];
+        const allReviews = [];
+        let numChecked = 0;
+
+        if (imdbResult.status === "fulfilled" && imdbResult.value) {
+          const data = imdbResult.value;
+          numChecked += data.numChecked || 0;
+          for (const r of data.reviews || []) {
+            allReviews.push({ ...r, author: r.author + " (i)" });
           }
-          this.scrollReviewPanesToTop();
-
-          this.stats = {
-            numChecked: data.numChecked,
-            notEnglishCount: data.notEnglishCount,
-            noReviewCount: data.noReviewCount,
-            smallTextCount: data.smallTextCount,
-          };
+        } else if (imdbResult.status === "rejected" && this.imdbId) {
+          errors.push("IMDB: " + (imdbResult.reason?.message || "failed"));
         }
-      } catch (err) {
-        console.error("Failed to load reviews:", err);
+
+        if (rottenResult.status === "fulfilled" && rottenResult.value) {
+          const data = rottenResult.value;
+          numChecked += data.numChecked || 0;
+          for (const r of data.reviews || []) {
+            allReviews.push({ ...r, author: r.author + " (r)" });
+          }
+        } else if (rottenResult.status === "rejected" && this.rottenUrl) {
+          errors.push("Rotten: " + (rottenResult.reason?.message || "failed"));
+        }
+
+        this.errorMessage = errors.join("\n");
+        this.reviews = allReviews;
+        this.stats = { numChecked };
+        this.scrollReviewPanesToTop();
       } finally {
         this.isLoading = false;
       }

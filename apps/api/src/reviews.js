@@ -337,51 +337,59 @@ export async function getReviews(rottenUrl, buttonName) {
   return finalStats;
 }
 
+const IMDB_GQL_URL = "https://api.graphql.imdb.com/";
+const IMDB_GQL_UA =
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
 export async function getImdbReviews(imdbId) {
   if (!imdbId || typeof imdbId !== "string") {
     throw new Error("Missing imdbId");
   }
 
-  // Clean imdbId (remove "tt" prefix if present, then add it back)
   const cleanId = imdbId.replace(/^tt/, "");
-  const reviewsUrl = `https://www.imdb.com/title/tt${cleanId}/reviews/`;
-  const cacheKey = reviewsUrl;
+  const titleId = `tt${cleanId}`;
+  const cacheKey = titleId;
 
   if (imdbReviewsCache.has(cacheKey)) {
     return imdbReviewsCache.get(cacheKey);
   }
 
-  const b = await getBrowser();
-  const context = await b.newContext({
-    userAgent: DEFAULT_UA,
-    locale: "en-US",
-    extraHTTPHeaders: {
-      "Accept-Language": "en-US,en;q=0.9",
+  const query = `{
+    title(id: "${titleId}") {
+      reviews(first: 50) {
+        edges {
+          node {
+            id
+            author { nickName }
+            text { originalText { plainText } }
+            authorRating
+          }
+        }
+      }
+    }
+  }`;
+
+  const res = await fetch(IMDB_GQL_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "User-Agent": IMDB_GQL_UA,
     },
+    body: JSON.stringify({ query }),
   });
-  const page = await context.newPage();
 
-  // Navigate
-  try {
-    await page.goto(reviewsUrl, {
-      waitUntil: "domcontentloaded",
-      timeout: 15000,
-    });
-
-    // Wait for at least one review card to appear
-    await page
-      .waitForSelector(".ipc-list-card__content", {
-        timeout: 3000,
-      })
-      .catch(() => {});
-  } catch (err) {
-    try {
-      await context.close();
-    } catch {}
-    throw new Error(`Failed to load ${reviewsUrl}: ${err.message}`);
+  if (!res.ok) {
+    throw new Error(`IMDB GraphQL request failed: ${res.status}`);
   }
 
-  let finalStats = {
+  const json = await res.json();
+  if (json.errors?.length) {
+    throw new Error(`IMDB GraphQL error: ${json.errors[0].message}`);
+  }
+
+  const edges = json?.data?.title?.reviews?.edges || [];
+
+  const stats = {
     numChecked: 0,
     notEnglishCount: 0,
     noReviewCount: 0,
@@ -389,139 +397,38 @@ export async function getImdbReviews(imdbId) {
     reviews: [],
   };
 
-  try {
-    // Click "See all" button to load all reviews at once
-    const seeAllBtn = page.locator("button.ipc-see-more__button").first();
+  for (const { node } of edges) {
+    const text = node.text?.originalText?.plainText || "";
+    const author = node.author?.nickName || "Anonymous";
+    const numStarsRaw = node.authorRating ?? -1;
+    const reviewId = node.id || "";
 
-    try {
-      await seeAllBtn.scrollIntoViewIfNeeded({ timeout: 3000 }).catch(() => {});
-      await page.waitForTimeout(300);
-      await seeAllBtn.click({ timeout: 3000, force: true });
-      await page.waitForTimeout(1500);
-    } catch (err) {
-      // Continue with initial reviews if See all button fails
-    }
+    stats.numChecked++;
 
-    // Extract all reviews (now that they're all loaded)
-    const rawReviews = await page.evaluate(() => {
-      const cards = Array.from(
-        document.querySelectorAll(".ipc-list-card__content"),
-      );
-      const results = [];
+    const notEnglish = franc(text) !== "eng";
+    const noReview = numStarsRaw === -1;
+    const smallText = text.length < 100;
 
-      cards.forEach((card) => {
-        let author = "";
-        let text = "";
-        let numStars = -1;
-        let reviewId = "";
+    if (notEnglish) stats.notEnglishCount++;
+    if (noReview) stats.noReviewCount++;
+    if (smallText) stats.smallTextCount++;
 
-        // Extract rating from ipc-rating-star--rating class
-        const ratingEl = card.querySelector(".ipc-rating-star--rating");
-        if (ratingEl) {
-          const rating = parseFloat(ratingEl.textContent.trim());
-          if (!isNaN(rating)) {
-            numStars = rating; // Already 10-point scale
-          }
-        }
-
-        // Extract author from rating star's aria-label
-        // Format: "username's rating: X" or "A_username's rating: X"
-        const ratingStarEl = card.querySelector(".ipc-rating-star[aria-label]");
-        if (ratingStarEl) {
-          const ariaLabel = ratingStarEl.getAttribute("aria-label");
-          if (ariaLabel) {
-            const match = ariaLabel.match(/^(.+?)'s rating:/);
-            if (match) {
-              author = match[1].trim();
-            }
-          }
-        }
-
-        // Extract review text from ipc-html-content-inner-div class
-        const textEl = card.querySelector(".ipc-html-content-inner-div");
-        if (textEl) {
-          text = textEl.textContent.trim();
-        }
-
-        // Extract review ID from Permalink link
-        const linkEl = card.querySelector('a[href*="/review/"]');
-        if (linkEl) {
-          const match = linkEl.href.match(/\/review\/(rw\d+)\//);
-          if (match) {
-            reviewId = match[1];
-          }
-        }
-
-        results.push({
-          author,
-          text,
-          numStars,
-          reviewId,
-        });
+    if (!notEnglish && !smallText) {
+      stats.reviews.push({
+        author,
+        publication: "IMDB User",
+        text,
+        numStars: noReview ? -1 : numStarsRaw / 2, // 10-point to 5-point
+        url: reviewId ? `https://www.imdb.com/review/${reviewId}/` : undefined,
       });
-      return results;
-    });
-
-    // Filter and Stats
-    let currentStats = {
-      numChecked: 0,
-      notEnglishCount: 0,
-      noReviewCount: 0,
-      smallTextCount: 0,
-      reviews: [],
-    };
-
-    for (const r of rawReviews) {
-      currentStats.numChecked++;
-
-      let notEnglish = false;
-      let noReview = false;
-      let smallText = false;
-
-      // Check conditions
-      if (franc(r.text || "") !== "eng") notEnglish = true;
-      if (r.numStars === -1) noReview = true;
-      if ((r.text || "").length < 100) smallText = true;
-
-      // Increment counts
-      if (notEnglish) currentStats.notEnglishCount++;
-      if (noReview) currentStats.noReviewCount++;
-      if (smallText) currentStats.smallTextCount++;
-
-      // Filter
-      if (!notEnglish && !smallText) {
-        currentStats.reviews.push({
-          author: r.author || "Anonymous",
-          publication: "IMDB User",
-          text: r.text,
-          numStars: noReview ? -1 : r.numStars / 2, // Convert 10-point to 5-point scale
-          url: r.reviewId
-            ? `https://www.imdb.com/review/${r.reviewId}/`
-            : undefined,
-        });
-      }
     }
-
-    finalStats = currentStats;
-  } catch (e) {
-    console.error("[imdb reviews] Processing error:", e);
-    try {
-      if (browser) await browser.close();
-    } catch {}
-    browser = null;
-    throw e;
-  } finally {
-    try {
-      await context.close();
-    } catch {}
   }
 
-  // If total reviews is less than 2 return empty list
-  if (finalStats.reviews.length < 2) {
-    finalStats.reviews = [];
+  if (stats.reviews.length < 2) {
+    stats.reviews = [];
   }
 
-  imdbReviewsCache.set(cacheKey, finalStats);
+  imdbReviewsCache.set(cacheKey, stats);
 
-  return finalStats;
+  return stats;
 }

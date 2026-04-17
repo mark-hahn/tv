@@ -2310,6 +2310,8 @@ const tryLocalGetTvdb = async () => {
         log(
           `tvdb crew [${processRecord.name}]: ${tvmazeCrew.length} from TVmaze`,
         );
+        if (notifyCallback)
+          notifyCallback(processRecord.name, allTvdb[processRecord.name]);
       } catch (e) {
         log("err", "tryLocalGetTvdb crew:", e.message);
       }

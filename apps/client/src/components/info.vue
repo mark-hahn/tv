@@ -1712,6 +1712,12 @@ export default {
       if (!record || !matchesSelected) return;
       tvdb.applyTvdbPush(name, record);
       if (this.seriesReady) void this.setRemotes();
+      if (
+        Array.isArray(record.crew) &&
+        record.crew.length > 0 &&
+        this.crewLines.length === 0
+      )
+        void this.setCrewTxt(record);
     };
     evtBus.on("tvdbUpdated", this.onTvdbUpdated);
 

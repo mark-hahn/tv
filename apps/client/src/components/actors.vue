@@ -1781,6 +1781,18 @@ export default {
     evtBus.on("previewMode", this.onPreviewMode);
     evtBus.on("previewSrchChoice", this.onPreviewSrchChoice);
     evtBus.on("addPreviewShowDone", this.onAddPreviewShowDone);
+
+    this._onTvdbUpdated = ({ name, record } = {}) => {
+      if (!name || !record) return;
+      if (name !== this.currentShow?.name) return;
+      if (
+        Array.isArray(record.crew) &&
+        record.crew.length > 0 &&
+        this.crew.length === 0
+      )
+        void this.loadCrew(record, this.currentShow);
+    };
+    evtBus.on("tvdbUpdated", this._onTvdbUpdated);
   },
 
   unmounted() {
@@ -1797,6 +1809,7 @@ export default {
     if (this._onClearActorSelection)
       evtBus.off("clearActorSelection", this._onClearActorSelection);
 
+    if (this._onTvdbUpdated) evtBus.off("tvdbUpdated", this._onTvdbUpdated);
     evtBus.off("previewMode", this.onPreviewMode);
     evtBus.off("previewSrchChoice", this.onPreviewSrchChoice);
     evtBus.off("addPreviewShowDone", this.onAddPreviewShowDone);

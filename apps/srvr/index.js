@@ -3643,8 +3643,13 @@ app.post("/api/asr/chksrt/bad", (req, res) => {
   const idx = paths.indexOf(videoPath);
   if (idx !== -1) paths.splice(idx, 1);
   writeNeedsSrtChk(paths);
-  asrPendingAppend(videoPath);
-  console.log(`[chksrt] bad: moved ${videoPath} to pending`);
+  try {
+    fs.mkdirSync(path.dirname(ASR_FORCED_PENDING_PATH), { recursive: true });
+    fs.appendFileSync(ASR_FORCED_PENDING_PATH, videoPath + "\n", "utf8");
+    console.log(`[chksrt] bad: queued forced ASR for ${videoPath}`);
+  } catch (e) {
+    console.error(`[chksrt] bad: forced-pending write failed: ${e.message}`);
+  }
   res.json({ ok: true, next: paths[0] || null });
 });
 
@@ -4774,6 +4779,8 @@ setInterval(runUsbCheck, CHECK_INTERVAL_MS);
 const changedShows = new Map(); // showName -> timeout
 const DISK_CHANGE_DEBOUNCE_MS = 3000; // 3 seconds
 const ASR_PENDING_PATH = "/root/dev/apps/tv/apps/asr/data/pending.txt";
+const ASR_FORCED_PENDING_PATH =
+  "/root/dev/apps/tv/apps/asr/data/forced-pending.txt";
 const EMB_PENDING_PATH = "/root/dev/apps/tv/apps/asr/data/emb-pending.txt";
 const ASR_NEEDS_SRT_CHK_PATH =
   "/root/dev/apps/tv/apps/asr/data/needsSrtChk.txt";

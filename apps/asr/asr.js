@@ -113,6 +113,7 @@ const TV_ROOT = "/mnt/media/tv";
 const TVDB_JSON_PATH = "/root/dev/apps/tv/apps/srvr/data/tvdb.json";
 const BKGND_LOG_PATH = path.join(__dirname, "data", "asr-bkgnd.log");
 const PENDING_PATH = path.join(__dirname, "data", "pending.txt");
+const FORCED_PENDING_PATH = path.join(__dirname, "data", "forced-pending.txt");
 const NEEDS_SRT_CHK_PATH = path.join(__dirname, "data", "needsSrtChk.txt");
 const EMB_PENDING_PATH = path.join(__dirname, "data", "emb-pending.txt");
 const EMB_LOG_PATH = path.join(__dirname, "data", "emb.log");
@@ -1143,6 +1144,10 @@ function consumePending() {
   return consumeQueueFile(PENDING_PATH);
 }
 
+function consumeForcedPending() {
+  return consumeQueueFile(FORCED_PENDING_PATH);
+}
+
 function pstStamp() {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Los_Angeles",
@@ -1389,11 +1394,29 @@ async function runBackgroundLoop() {
 
   while (true) {
     const pending = consumePending();
+    const forcedPending = consumeForcedPending();
     const embPending = consumeQueueFile(EMB_PENDING_PATH);
 
     // Process emb-pending before anything else (fast, no CPU gate needed)
     if (embPending.length > 0) {
       await processEmbQueue(embPending);
+    }
+
+    // Process forced-pending (user clicked Bad in chksrt): run ASR even if srt already exists
+    for (const videoPath of forcedPending) {
+      if (!isVideoFile(videoPath)) continue;
+      if (!(await pathExists(videoPath))) continue;
+      await waitForLowCpu();
+      if (!cachedTvdb) cachedTvdb = loadTvdb();
+      appendBkgndLog(BKGND_LOG_PATH, videoPath, true);
+      console.log(`[bkgnd] forced ASR: ${path.basename(videoPath)}`);
+      try {
+        await processOneVideo(videoPath);
+      } catch (err) {
+        console.error(`[bkgnd] forced ASR error: ${err.message}`);
+      }
+      consecutiveEmpty = 0;
+      pauseLogged = false;
     }
 
     // Pending files are priority: log immediately then wait for CPU.

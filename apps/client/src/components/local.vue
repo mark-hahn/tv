@@ -1085,6 +1085,7 @@ export default {
     evtBus.on("asr-log", this.onAsrLog);
     evtBus.on("fix-log", this.onFixLog);
     evtBus.on("emb-log", this.onEmbLog);
+    evtBus.on("localOpenSubs", this.onLocalOpenSubs);
     this.initAsrState();
     this.initFixState();
     this.initEmbState();
@@ -1093,6 +1094,7 @@ export default {
     evtBus.off("asr-log", this.onAsrLog);
     evtBus.off("fix-log", this.onFixLog);
     evtBus.off("emb-log", this.onEmbLog);
+    evtBus.off("localOpenSubs", this.onLocalOpenSubs);
   },
   computed: {
     infoLines() {
@@ -1996,6 +1998,42 @@ export default {
           if (el) el.scrollTop = el.scrollHeight;
         });
       }
+    },
+    async onLocalOpenSubs({ folderName }) {
+      if (!folderName) return;
+      // Ensure files are loaded
+      if (!this.hasLoaded) {
+        await this.fetchFiles();
+      }
+      // Find and select the folder in the tree
+      const nodeIndex = this.tree.findIndex((n) => n.name === folderName);
+      if (nodeIndex !== -1) {
+        const node = this.tree[nodeIndex];
+        this.selectedName = node.name;
+        this.selectedFiles.clear();
+        this.selectionParentPath = null;
+        this.lastSelectedFile = null;
+        this.nodeRefs.forEach((cmp, name) => {
+          if (name !== folderName) {
+            if (typeof cmp.collapse === "function") cmp.collapse();
+          } else {
+            if (typeof cmp.expand === "function") cmp.expand();
+          }
+        });
+        this.$nextTick(() => {
+          const cmp = this.nodeRefs.get(folderName);
+          if (cmp && cmp.$el) {
+            cmp.$el.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        });
+      }
+      // Open subs pane
+      this.showAsr = false;
+      this.showFix = false;
+      this.showInfo = false;
+      this.showEmb = false;
+      this.showSubs = true;
+      this.loadSubs();
     },
     toggleSubs() {
       this.showSubs = !this.showSubs;

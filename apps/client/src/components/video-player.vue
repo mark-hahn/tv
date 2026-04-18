@@ -212,6 +212,26 @@
       >
         {{ choice.label }}
       </div>
+      <!-- Subs button (chksrt mode only) -->
+      <div
+        v-if="mode === 'chksrt'"
+        @click.stop="clickSubs"
+        style="
+          color: white;
+          font-size: 13px;
+          padding: 2px 8px;
+          border-radius: 4px;
+          border: 1px solid #666;
+          cursor: pointer;
+          user-select: none;
+          background: rgba(0, 0, 100, 0.5);
+          margin-right: 8px;
+          white-space: nowrap;
+          text-shadow: 0 0 3px #000;
+        "
+      >
+        Subs
+      </div>
       <!-- X close -->
       <div
         @click.stop="close"
@@ -264,7 +284,7 @@ export default {
     mode: { type: String, default: null },
     chksrtCount: { type: Number, default: 0 },
   },
-  emits: ["close", "chksrt-next"],
+  emits: ["close", "chksrt-next", "chksrt-subs"],
   data() {
     return {
       subtitleTracks: [],
@@ -548,6 +568,18 @@ export default {
           console.error("[chksrt] clickBad error:", e);
         }
       }
+    },
+    clickSubs() {
+      this._mseStop();
+      const vid = this.$refs.vid;
+      if (vid) {
+        vid.pause();
+        vid.src = "";
+      }
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+      this.$emit("chksrt-subs", this.path);
     },
     close() {
       this._mseStop();

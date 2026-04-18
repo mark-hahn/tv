@@ -360,6 +360,7 @@
       :chksrtCount="chksrtCount"
       @close="handleVideoPlayerClose"
       @chksrt-next="handleChksrtNext"
+      @chksrt-subs="handleChksrtSubs"
     />
     <!-- Help dialog -->
     <div
@@ -902,6 +903,20 @@ export default {
         this.videoPlayerPath = null;
         this.videoPlayerMode = null;
       }
+    },
+    handleChksrtSubs(path) {
+      this.videoPlayerPath = null;
+      this.videoPlayerMode = null;
+      this.fetchChksrtCount();
+      const TV_ROOT = "/mnt/media/tv/";
+      const idx = path.indexOf(TV_ROOT);
+      const folderName =
+        idx >= 0 ? path.slice(idx + TV_ROOT.length).split("/")[0] : null;
+      if (!folderName) return;
+      evtBus.emit("selectShowFromCardTitle", folderName);
+      this.currentPane = "local";
+      evtBus.emit("paneChanged", this.currentPane);
+      evtBus.emit("localOpenSubs", { folderName });
     },
     async fetchChksrtCount() {
       try {

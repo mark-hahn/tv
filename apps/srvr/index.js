@@ -3811,7 +3811,7 @@ app.post("/api/asr/chksrt/select", (req, res) => {
     if (f.endsWith(".srtstub")) continue;
     const full = path.join(dir, f);
     if (full === selectedSrtPath) continue;
-    if (f.startsWith(basename + ".en")) {
+    if (f.startsWith(basename + ".en") || f.startsWith(basename + ".#")) {
       try {
         fs.unlinkSync(full);
       } catch {}

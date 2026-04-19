@@ -1767,7 +1767,7 @@ export default {
         atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50;
       }
 
-      this.asrLogs += msg;
+      this.asrLogs += msg.endsWith("\n") ? msg : msg + "\n";
 
       // Auto-detect running state from logs if we missed initial state
       if (msg.includes("matches (running)")) {
@@ -1794,11 +1794,7 @@ export default {
     },
     async initAsrState() {
       try {
-        // Check status. response will come via handleAsr return AND potential logs?
-        // Actually handleAsr('check') calls 'status' which prints to stdout.
-        // srvr/src/asr.js:check uses execFile. callback returns stdout.
         const res = await handleAsr({ action: "check" });
-
         if (res && res.running) {
           this.asrBusy = true;
           if (res.stdout) {
@@ -1807,14 +1803,11 @@ export default {
               this.activeAsrPath = match[1].trim();
             }
           }
+          // Only tail if actually running
+          await handleAsr({ action: "tail", path: this.activeAsrPath || "" });
         } else {
           this.asrBusy = false;
         }
-
-        // Always start tailing to get persistent log
-        // This is safe even if not running; it tails the existing log file.
-        // If running, it tails the live log.
-        await handleAsr({ action: "tail", path: this.activeAsrPath || "" });
       } catch (e) {
         console.error("Failed to init Asr State", e);
       }

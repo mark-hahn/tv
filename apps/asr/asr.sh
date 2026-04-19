@@ -209,7 +209,6 @@ fi
 # Use setsid to detach
 setsid bash -c '
   exec >/tmp/asr-background.log 2>&1
-  set -x
   set -euo pipefail
   trap "" HUP INT
   trap "st=\$?; echo \"[asr] EXIT \$st\" | tee -a \"\$LOG_FILE\"; rm -f \"\$ASR_PID_FILE\"; exit \$st" EXIT
@@ -219,14 +218,12 @@ setsid bash -c '
   export TMPDIR="/tmp" TMP="/tmp" TEMP="/tmp"
   cd "'"$RUNTIME_DIR"'"
 
-  { echo "[asr] start $(date)"; echo "Node: $ASR_NODE_BIN"; } >> "$LOG_FILE"
+  { echo "[asr] start $(date)"; } >> "$LOG_FILE"
 
   if [[ "${ASR_HAS_OPTS:-}" = "1" ]]; then
     read -r -a _OPTS <<< "${ASR_OPTS_SERIALIZED:-}"
-    { printf "[asr] exec: "; printf "%q " "$ASR_NODE_BIN" "$ASR_JS_ENTRY" "${_OPTS[@]}" "$ASR_INPUT"; printf "\n"; } | tee -a "$LOG_FILE"
     ( "$ASR_NODE_BIN" "$ASR_JS_ENTRY" "${_OPTS[@]}" "$ASR_INPUT" ) 2>&1 | tee -a "$LOG_FILE"
   else
-    { printf "[asr] exec: "; printf "%q " "$ASR_NODE_BIN" "$ASR_JS_ENTRY" "$ASR_INPUT"; printf "\n"; } | tee -a "$LOG_FILE"
     ( "$ASR_NODE_BIN" "$ASR_JS_ENTRY" "$ASR_INPUT" ) 2>&1 | tee -a "$LOG_FILE"
   fi
 ' &

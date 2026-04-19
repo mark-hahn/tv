@@ -895,13 +895,21 @@ export default {
       this.videoPlayerMode = null;
       this.fetchChksrtCount();
     },
-    handleChksrtNext(nextPath) {
-      this.fetchChksrtCount();
-      if (nextPath) {
-        this.videoPlayerPath = nextPath;
-      } else {
+    async handleChksrtNext() {
+      try {
+        const list = await srvr.getChksrtList();
+        this.chksrtCount = list?.count ?? 0;
+        if (list?.path) {
+          this.videoPlayerMode = "chksrt";
+          this.videoPlayerPath = list.path;
+        } else {
+          this.videoPlayerPath = null;
+          this.videoPlayerMode = null;
+        }
+      } catch (e) {
         this.videoPlayerPath = null;
         this.videoPlayerMode = null;
+        this.fetchChksrtCount();
       }
     },
     handleChksrtSubs(path) {

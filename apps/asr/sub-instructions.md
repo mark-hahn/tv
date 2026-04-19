@@ -148,3 +148,52 @@
 
 - ask about any ambiguous, incomplete, or impossible instructions
 - make no changes, just planning for now
+
+# new instructions
+- At the end of generateEmbSrts() if the video file has any embedded subtitles that were not extracted into base.en<idx>.srt files, like bitmapped subtitles, then add the sidecar file base.enx.srtstub
+
+- In chksrt video pane when a subtitle button is ctrl-clicked then delete all sidecar files except the one clicked, remove the video file from subQueueChkSrt, and move on to next subQueueChkSrt entry
+
+- all queues should be persistant
+
+# instructions for Codebase Not In Plan
+
+1. Chksrt "Ok" button: the OK button should remove the video file from subQueueChkSrt and do nothing else but move on to next subQueueChkSrt entry.
+
+2.remove srtExists guard from processOneVideo -- generateSrtWithAsr should call processOneVideo in appropriate place -- processOneVideo should be located in place with simplest and safest change
+
+3. ASR is not delayed indefinitely since doSubQueueGenSrtNow can interrupt delay -- but we only want delay on high priority files -- add lowPriority var to subQueueGenSrt entry and set it for entries added by tvdb update background task -- when lowPriority entry is considered for processing and cpu load is > 2 then set chkSubQueueDelay to 10_000 and put off processing it until next loop
+
+4. remove all logging to tv.log and asr-bkgnd.log
+
+5. remove CLI script for processOneVideo -- do not run anything in parallel -- all is sync
+
+6. remove browser Notification for fetchChksrtCount
+
+7. keep  60-second startChksrtPolling
+
+8. keep tvdb.enqueueShowProcess(showName) -- it is separate from adding to subQueue
+
+# response to Opinions and Suggestions
+
+- Implement all suggestions except except this one
+
+5. replace # naming with `base.en<id>.srt` everywhere -- `base.en<id>.srt` should be differentiated from `base.en<d>.srt` by length of `en<id>` == 7
+
+# answers to Questions / Ambiguities
+
+Q1: srvr should call asr.js as a child process -- retire pm2 process
+
+Q2: place it inside `perShowCallback` in srvr/index.js where it already has the updated record.
+
+Q3: OK should just pop entry in subQueueChkSrt -- see earlier instruction
+
+Q4: use your suggested solution 4
+
+Q5: processOneVideo should have its guard removed when called from generateSrtWithAsr -- it is not called from any cli
+
+Q6: subQueueChkSrt` should be in-memory and persisted with a file as all queues are
+
+Q7: persist all queues
+
+Q8: remove cli script for asr processing -- retire pm2 process

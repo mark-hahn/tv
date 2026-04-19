@@ -579,17 +579,20 @@ export default {
       }
     },
     onChoiceClick(choice, event) {
-      if (
-        event.ctrlKey &&
-        this.mode === "chksrt" &&
-        choice.type === "srt" &&
-        choice.file
-      ) {
-        const dir = this.path.replace(/\/[^\/]+$/, "");
-        const selectedSrtPath = dir + "/" + choice.file;
-        chksrtSelect(this.path, selectedSrtPath)
-          .then(() => this.$emit("chksrt-next", null))
-          .catch((e) => console.error("[chksrt] select error:", e));
+      if (event.ctrlKey && this.mode === "chksrt") {
+        if (choice.type === "srt" && choice.file) {
+          const dir = this.path.replace(/\/[^\/]+$/, "");
+          const selectedSrtPath = dir + "/" + choice.file;
+          chksrtSelect(this.path, selectedSrtPath)
+            .then(() => this.$emit("chksrt-next", null))
+            .catch((e) => console.error("[chksrt] select error:", e));
+        } else if (choice.type === "embedded" || choice.type === "pgs") {
+          chksrtSelect(this.path, null)
+            .then(() => this.$emit("chksrt-next", null))
+            .catch((e) => console.error("[chksrt] select error:", e));
+        } else {
+          this.selectTrack(choice.id);
+        }
       } else {
         this.selectTrack(choice.id);
       }

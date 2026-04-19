@@ -3752,6 +3752,7 @@ app.post("/api/asr/chksrt/select", (req, res) => {
   const basename = path.basename(base);
   for (const f of entries) {
     if (!/\.srt$/.test(f)) continue;
+    if (f.endsWith(".srtstub")) continue;
     const full = path.join(dir, f);
     if (full === selectedSrtPath) continue;
     if (f.startsWith(basename + ".en")) {

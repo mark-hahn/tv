@@ -762,6 +762,63 @@ function persistSubQueueGenSrt() {
     "utf8",
   );
 }
+function enqueueSubQueue(entry, toFront) {
+  const idx = subQueue.findIndex(
+    (e) => e.videoFilePath === entry.videoFilePath,
+  );
+  if (idx !== -1) {
+    const existing = subQueue[idx];
+    if (!entry.lowPriority && existing.lowPriority) {
+      subQueue.splice(idx, 1);
+      subQueue.unshift({
+        ...existing,
+        lowPriority: false,
+        fromUI: entry.fromUI ?? existing.fromUI,
+      });
+    }
+    return;
+  }
+  if (toFront) subQueue.unshift(entry);
+  else subQueue.push(entry);
+}
+function enqueueSubQueueChkSrt(entry, toFront) {
+  const idx = subQueueChkSrt.findIndex(
+    (e) => e.videoFilePath === entry.videoFilePath,
+  );
+  if (idx !== -1) {
+    const existing = subQueueChkSrt[idx];
+    if (!entry.lowPriority && existing.lowPriority) {
+      subQueueChkSrt.splice(idx, 1);
+      subQueueChkSrt.unshift({
+        ...existing,
+        lowPriority: false,
+        fromUI: entry.fromUI ?? existing.fromUI,
+      });
+    }
+    return;
+  }
+  if (toFront) subQueueChkSrt.unshift(entry);
+  else subQueueChkSrt.push(entry);
+}
+function enqueueSubQueueGenSrt(entry, toFront) {
+  const idx = subQueueGenSrt.findIndex(
+    (e) => e.videoFilePath === entry.videoFilePath,
+  );
+  if (idx !== -1) {
+    const existing = subQueueGenSrt[idx];
+    if (!entry.lowPriority && existing.lowPriority) {
+      subQueueGenSrt.splice(idx, 1);
+      subQueueGenSrt.unshift({
+        ...existing,
+        lowPriority: false,
+        fromUI: entry.fromUI ?? existing.fromUI,
+      });
+    }
+    return;
+  }
+  if (toFront) subQueueGenSrt.unshift(entry);
+  else subQueueGenSrt.push(entry);
+}
 function loadQueues() {
   try {
     subQueue = JSON.parse(fs.readFileSync(SUB_QUEUE_PATH, "utf8"));
@@ -1055,18 +1112,21 @@ async function processSubQueueEntry() {
         /^\.(#[A-Z2-7]+)\.srt$/.test("." + f.slice(basename.length)),
     );
     if (!hasSidecar) {
-      subQueueGenSrt.unshift({
-        videoFilePath: entry.videoFilePath,
-        fromUI: entry.fromUI,
-        lowPriority: entry.lowPriority,
-      });
+      enqueueSubQueueGenSrt(
+        {
+          videoFilePath: entry.videoFilePath,
+          fromUI: entry.fromUI,
+          lowPriority: entry.lowPriority,
+        },
+        true,
+      );
       persistSubQueueGenSrt();
       doSubQueueGenSrtNow();
     } else {
-      subQueueChkSrt.push({
-        videoFilePath: entry.videoFilePath,
-        fromUI: entry.fromUI,
-      });
+      enqueueSubQueueChkSrt(
+        { videoFilePath: entry.videoFilePath, fromUI: entry.fromUI },
+        false,
+      );
       persistSubQueueChkSrt();
       notifyClients("chksrt-count", subQueueChkSrt.length);
     }
@@ -1611,11 +1671,10 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
             if (!videoFileExtensions.includes(f.split(".").pop())) continue;
             const fp = path.join(seasonPath, f);
             if (await fileNeedsSubChecked(fp, showName)) {
-              subQueue.push({
-                videoFilePath: fp,
-                fromUI: false,
-                lowPriority: true,
-              });
+              enqueueSubQueue(
+                { videoFilePath: fp, fromUI: false, lowPriority: true },
+                false,
+              );
             }
           }
         }
@@ -3661,11 +3720,10 @@ app.post("/api/asr/subs/enqueue", (req, res) => {
     return;
   }
   for (const vp of [...videoPaths].reverse()) {
-    subQueue.unshift({
-      videoFilePath: vp,
-      fromUI: !!fromUI,
-      lowPriority: false,
-    });
+    enqueueSubQueue(
+      { videoFilePath: vp, fromUI: !!fromUI, lowPriority: false },
+      true,
+    );
   }
   persistSubQueue();
   doSubQueueNow();
@@ -3679,11 +3737,10 @@ app.post("/api/asr/gensrt/enqueue", (req, res) => {
     return;
   }
   for (const vp of [...videoPaths].reverse()) {
-    subQueueGenSrt.unshift({
-      videoFilePath: vp,
-      fromUI: !!fromUI,
-      lowPriority: false,
-    });
+    enqueueSubQueueGenSrt(
+      { videoFilePath: vp, fromUI: !!fromUI, lowPriority: false },
+      true,
+    );
   }
   persistSubQueueGenSrt();
   doSubQueueGenSrtNow();
@@ -3721,11 +3778,10 @@ app.post("/api/asr/chksrt/ok", (req, res) => {
 app.post("/api/asr/chksrt/gensrt", (req, res) => {
   const entry = subQueueChkSrt.shift();
   if (entry) {
-    subQueueGenSrt.unshift({
-      videoFilePath: entry.videoFilePath,
-      fromUI: false,
-      lowPriority: false,
-    });
+    enqueueSubQueueGenSrt(
+      { videoFilePath: entry.videoFilePath, fromUI: false, lowPriority: false },
+      true,
+    );
     persistSubQueueGenSrt();
     doSubQueueGenSrtNow();
   }
@@ -5113,11 +5169,10 @@ watcher
       const tvdbRec = tvdbAll?.[showName];
       if (tvdbRec && tvdbRec.inEmby) {
         if (await fileNeedsSubChecked(filePath, showName)) {
-          subQueue.unshift({
-            videoFilePath: filePath,
-            fromUI: false,
-            lowPriority: false,
-          });
+          enqueueSubQueue(
+            { videoFilePath: filePath, fromUI: false, lowPriority: false },
+            true,
+          );
           persistSubQueue();
           doSubQueueNow();
         }

@@ -929,6 +929,9 @@ import {
   handleFix,
   handleEmb,
   embApply,
+  enqueueSubs,
+  enqueueGenSrt,
+  generateEmb,
 } from "../srvr.js";
 import evtBus from "../evtBus.js";
 import * as util from "../util.js";
@@ -1661,12 +1664,18 @@ export default {
     },
     // Subtitles logic
     clickAsr() {
-      this.showAsr = !this.showAsr;
-      if (this.showAsr) {
-        this.showSubs = false;
-        this.showFix = false;
-        this.showInfo = false;
-      }
+      const videoPaths = this.collectFilePaths()
+        .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
+        .map((p) => `/mnt/media/tv/${p}`);
+      if (videoPaths.length === 0) return;
+      enqueueGenSrt(videoPaths, true).catch((e) =>
+        console.error("enqueueGenSrt", e),
+      );
+      this.showAsr = true;
+      this.showSubs = false;
+      this.showEmb = false;
+      this.showFix = false;
+      this.showInfo = false;
     },
     async clearAsrLog() {
       this.asrLogs = "";
@@ -1930,13 +1939,25 @@ export default {
       }
     },
     clickEmb() {
-      this.showEmb = !this.showEmb;
-      if (this.showEmb) {
-        this.showSubs = false;
-        this.showAsr = false;
-        this.showFix = false;
-        this.showInfo = false;
+      const videoPaths = this.collectFilePaths()
+        .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
+        .map((p) => `/mnt/media/tv/${p}`);
+      if (videoPaths.length === 0) {
+        this.showEmb = !this.showEmb;
+        if (this.showEmb) {
+          this.showSubs = false;
+          this.showAsr = false;
+          this.showFix = false;
+          this.showInfo = false;
+        }
+        return;
       }
+      generateEmb(videoPaths).catch((e) => console.error("generateEmb", e));
+      this.showEmb = true;
+      this.showSubs = false;
+      this.showAsr = false;
+      this.showFix = false;
+      this.showInfo = false;
     },
     async applyEmb() {
       if (this.embBusy) return;
@@ -2036,13 +2057,27 @@ export default {
       this.loadSubs();
     },
     toggleSubs() {
-      this.showSubs = !this.showSubs;
-      if (this.showSubs) {
-        this.showAsr = false;
-        this.showFix = false;
-        this.showInfo = false;
-        this.loadSubs();
+      const videoPaths = this.collectFilePaths()
+        .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
+        .map((p) => `/mnt/media/tv/${p}`);
+      if (videoPaths.length === 0) {
+        this.showSubs = !this.showSubs;
+        if (this.showSubs) {
+          this.showAsr = false;
+          this.showFix = false;
+          this.showInfo = false;
+          this.loadSubs();
+        }
+        return;
       }
+      enqueueSubs(videoPaths, true).catch((e) =>
+        console.error("enqueueSubs", e),
+      );
+      this.showSubs = false;
+      this.showAsr = false;
+      this.showEmb = false;
+      this.showFix = false;
+      this.showInfo = false;
     },
     toggleErrs() {
       this.errsMode = !this.errsMode;

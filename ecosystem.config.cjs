@@ -88,18 +88,5 @@ module.exports = {
         NODE_ENV: "production",
       },
     },
-    {
-      name: "tv-asr-bkgnd",
-      cwd: appCwd("asr"),
-      script: "asr.js",
-      interpreter: nodeInterpreter,
-      args: "--background",
-      time: true,
-      autorestart: true,
-      restart_delay: 5000,
-      env: {
-        NODE_ENV: "production",
-      },
-    },
   ],
 };

@@ -921,13 +921,7 @@ export default {
     async fetchChksrtCount() {
       try {
         const list = await srvr.getChksrtList();
-        const prev = this.chksrtCount;
-        this.chksrtCount = Array.isArray(list) ? list.length : 0;
-        if (prev === 0 && this.chksrtCount > 0) {
-          new Notification("Chksrt", {
-            body: `${this.chksrtCount} subtitle(s) ready to check`,
-          });
-        }
+        this.chksrtCount = list?.count ?? 0;
       } catch (e) {
         this.chksrtCount = 0;
       }
@@ -948,10 +942,10 @@ export default {
       if (this.chksrtCount === 0) return;
       try {
         const list = await srvr.getChksrtList();
-        this.chksrtCount = Array.isArray(list) ? list.length : 0;
-        if (list && list.length > 0) {
+        this.chksrtCount = list?.count ?? 0;
+        if (list?.path) {
           this.videoPlayerMode = "chksrt";
-          this.videoPlayerPath = list[0];
+          this.videoPlayerPath = list.path;
         }
       } catch (e) {
         console.error("clickChksrt error:", e);

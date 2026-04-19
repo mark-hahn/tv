@@ -1,4 +1,5 @@
 import fs from "fs";
+import os from "os";
 import * as cp from "child_process";
 import * as path from "node:path";
 import express from "express";
@@ -22,6 +23,7 @@ import fetch from "node-fetch";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
 import { parseFileSeasonEpisode } from "@tv/share";
 import chokidar from "chokidar";
+import cron from "node-cron";
 import {
   SRVR_ROOT_DIR,
   SRVR_DATA_DIR,
@@ -87,6 +89,22 @@ ensureDir(CONFIG_DIR);
 
 process.setMaxListeners(50);
 const tvDir = "/mnt/media/tv";
+const SUB_QUEUE_PATH = "/root/dev/apps/tv/apps/asr/data/subQueue.json";
+const SUB_QUEUE_CHKSRT_PATH =
+  "/root/dev/apps/tv/apps/asr/data/subQueueChkSrt.json";
+const SUB_QUEUE_GENSRT_PATH =
+  "/root/dev/apps/tv/apps/asr/data/subQueueGenSrt.json";
+const SUBTITLE_LOG_PATH = "/root/dev/apps/tv/apps/asr/data/subtitle.log";
+const SUBTITLE_LOG_DIR = "/root/dev/apps/tv/apps/asr/data/subtitle-logs/";
+const ASR_JS_PATH = "/root/dev/apps/tv/apps/asr/asr.js";
+let subQueue = [],
+  subQueueChkSrt = [],
+  subQueueGenSrt = [];
+let subQueueBusy = false,
+  chkSubQueueDelay = 10_000,
+  chkGenSrtDelay = 10_000;
+let genSrtRunning = false,
+  subQueuePendingNow = false;
 const exec = utilNode.promisify(cp.exec);
 
 function readTextOr(filePathOrPaths, fallback) {
@@ -727,6 +745,390 @@ function normalizeImdbId(imdbId) {
   return s.replace(/^tt/i, "").replace(/\D/g, "");
 }
 
+function persistSubQueue() {
+  fs.writeFileSync(SUB_QUEUE_PATH, JSON.stringify(subQueue), "utf8");
+}
+function persistSubQueueChkSrt() {
+  fs.writeFileSync(
+    SUB_QUEUE_CHKSRT_PATH,
+    JSON.stringify(subQueueChkSrt),
+    "utf8",
+  );
+}
+function persistSubQueueGenSrt() {
+  fs.writeFileSync(
+    SUB_QUEUE_GENSRT_PATH,
+    JSON.stringify(subQueueGenSrt),
+    "utf8",
+  );
+}
+function loadQueues() {
+  try {
+    subQueue = JSON.parse(fs.readFileSync(SUB_QUEUE_PATH, "utf8"));
+  } catch {
+    subQueue = [];
+  }
+  try {
+    subQueueChkSrt = JSON.parse(fs.readFileSync(SUB_QUEUE_CHKSRT_PATH, "utf8"));
+  } catch {
+    subQueueChkSrt = [];
+  }
+  try {
+    subQueueGenSrt = JSON.parse(fs.readFileSync(SUB_QUEUE_GENSRT_PATH, "utf8"));
+  } catch {
+    subQueueGenSrt = [];
+  }
+}
+function logSubtitle(msg) {
+  const now = new Date().toLocaleString("en-US", {
+    timeZone: "America/Los_Angeles",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const ts = now.replace(/(\d+)\/(\d+),\s*/, "$1-$2 ");
+  fs.appendFileSync(SUBTITLE_LOG_PATH, ts + " " + msg + "\n", "utf8");
+}
+async function fileNeedsSubChecked(videoFilePath, showName) {
+  if (subQueue.some((e) => e.videoFilePath === videoFilePath)) return false;
+  if (subQueueChkSrt.some((e) => e.videoFilePath === videoFilePath))
+    return false;
+  if (subQueueGenSrt.some((e) => e.videoFilePath === videoFilePath))
+    return false;
+  const base = videoFilePath.replace(/\.[^.]+$/, "");
+  const dir = path.dirname(videoFilePath);
+  let entries;
+  try {
+    entries = fs.readdirSync(dir);
+  } catch {
+    return false;
+  }
+  const basename = path.basename(base);
+  if (
+    entries.some(
+      (f) =>
+        f === basename + ".enx.srt" ||
+        f === basename + ".enx.srtstub" ||
+        /^\.en\d+\.srt$/.test("." + f.slice(basename.length)),
+    )
+  )
+    return false;
+  const tvdbAll = tvdb.getAllTvdbSync?.();
+  if (!tvdbAll) return true;
+  const tvdbRec = tvdbAll[showName];
+  if (!tvdbRec) return true;
+  const parsed = parseFileSeasonEpisode(videoFilePath);
+  if (!parsed) return true;
+  const key = `S${String(parsed.season).padStart(2, "0")}E${String(parsed.episode).padStart(2, "0")}`;
+  if (tvdbRec.watchedEpis?.[key]?.watched) return false;
+  if (tvdbRec.seriesMap) {
+    const ep = tvdbRec.seriesMap[key];
+    if (ep && ep.aired && new Date(ep.aired) > new Date()) return false;
+  }
+  return true;
+}
+async function generateEmbSrts(
+  videoFilePath,
+  showname,
+  season,
+  episode,
+  fromUI,
+) {
+  const base = videoFilePath.replace(/\.[^.]+$/, "");
+  let probeStreams = [];
+  await new Promise((resolve) => {
+    cp.execFile(
+      "ffprobe",
+      ["-v", "quiet", "-print_format", "json", "-show_streams", videoFilePath],
+      { maxBuffer: 4 * 1024 * 1024 },
+      (err, stdout) => {
+        if (!err) {
+          try {
+            probeStreams = JSON.parse(stdout).streams || [];
+          } catch {}
+        }
+        resolve();
+      },
+    );
+  });
+  const subStreams = probeStreams.filter((s) => s.codec_type === "subtitle");
+  const textCodecs = [
+    "subrip",
+    "ass",
+    "ssa",
+    "webvtt",
+    "mov_text",
+    "text",
+    "srt",
+  ];
+  const textStreams = subStreams.filter((s) => {
+    const lang = (s.tags?.language || "").toLowerCase();
+    return (
+      (lang === "eng" || lang === "en" || lang === "") &&
+      textCodecs.includes(s.codec_name)
+    );
+  });
+  for (const s of textStreams) {
+    const outPath = `${base}.en${s.index}.srt`;
+    if (fs.existsSync(outPath)) continue;
+    await new Promise((resolve) => {
+      cp.execFile(
+        "ffmpeg",
+        [
+          "-v",
+          "quiet",
+          "-i",
+          videoFilePath,
+          "-map",
+          `0:${s.index}`,
+          "-c:s",
+          "srt",
+          outPath,
+        ],
+        (err) => {
+          if (!err) {
+            logSubtitle(`emb: ${outPath}`);
+            if (fromUI) notifyClients("emb-log", `extracted ${outPath}`);
+          }
+          resolve();
+        },
+      );
+    });
+  }
+  const hasNonText = subStreams.some((s) => !textCodecs.includes(s.codec_name));
+  if (hasNonText && textStreams.length === 0) {
+    const stubPath = `${base}.enx.srtstub`;
+    if (!fs.existsSync(stubPath)) {
+      fs.writeFileSync(stubPath, "", "utf8");
+      logSubtitle(`srtstub: ${stubPath}`);
+    }
+  }
+}
+async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
+  const tvdbAll = tvdb.getAllTvdbSync?.();
+  if (!tvdbAll) return;
+  const tvdbRec = tvdbAll[showname];
+  if (!tvdbRec?.imdb_id) {
+    logSubtitle(`opensubs skip no imdb: ${videoFilePath}`);
+    return;
+  }
+  let results;
+  try {
+    results = await subsSearch({
+      imdb_id: tvdbRec.imdb_id,
+      season,
+      episode,
+      language: "en",
+    });
+  } catch (e) {
+    logSubtitle(`opensubs search err: ${e.message}`);
+    return;
+  }
+  if (!Array.isArray(results) || results.length === 0) return;
+  const base = videoFilePath.replace(/\.[^.]+$/, "");
+  for (const r of results) {
+    const fid = r.file_id || r.attributes?.files?.[0]?.file_id;
+    if (!fid) continue;
+    const tag = "en" + String(fid).padStart(5, "0").slice(0, 5);
+    const outPath = `${base}.${tag}.srt`;
+    if (fs.existsSync(outPath)) continue;
+    try {
+      const login = loadSubsLogin();
+      let dl = await openSubtitlesDownloadWithRetry({
+        apiKey: login.apiKey,
+        token: subsTokenCache,
+        fileId: fid,
+      });
+      if (!dl?.resp?.ok) continue;
+      const url = typeof dl.body?.link === "string" ? dl.body.link.trim() : "";
+      if (!url) continue;
+      const resp = await fetch(url, { headers: { Accept: "*/*" } });
+      if (!resp.ok) continue;
+      const txt = await resp.text();
+      await fs.promises.writeFile(outPath, txt, "utf8");
+      logSubtitle(`opensubs: ${outPath}`);
+    } catch (e) {
+      logSubtitle(`opensubs dl err ${fid}: ${e.message}`);
+    }
+  }
+}
+async function generateSrtWithAsr(videoFilePath, fromUI) {
+  const base = videoFilePath.replace(/\.[^.]+$/, "");
+  const srtPath = base + ".enx.srt";
+  if (fs.existsSync(srtPath)) {
+    logSubtitle(`asr skip exists: ${videoFilePath}`);
+    return;
+  }
+  logSubtitle(`asr start: ${videoFilePath}`);
+  genSrtRunning = true;
+  try {
+    await new Promise((resolve, reject) => {
+      const child = cp.spawn("node", [ASR_JS_PATH, videoFilePath], {
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      child.stdout.on("data", (d) => {
+        const line = d.toString().trimEnd();
+        logSubtitle(line);
+        if (fromUI) notifyClients("asr-log", line);
+      });
+      child.stderr.on("data", (d) => {
+        const line = d.toString().trimEnd();
+        logSubtitle(line);
+        if (fromUI) notifyClients("asr-log", line);
+      });
+      child.on("close", (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`asr.js exited ${code}`));
+      });
+    });
+    logSubtitle(`asr done: ${videoFilePath}`);
+  } catch (e) {
+    logSubtitle(`asr error: ${e.message}`);
+  } finally {
+    genSrtRunning = false;
+  }
+}
+function doSubQueueNow() {
+  chkSubQueueDelay = 500;
+  if (!subQueueBusy) {
+    processSubQueueEntry().catch((e) =>
+      console.error("[subQueue] error:", e.message),
+    );
+  } else if (!subQueuePendingNow) {
+    subQueuePendingNow = true;
+    const poll = () => {
+      if (!subQueueBusy) {
+        subQueuePendingNow = false;
+        processSubQueueEntry().catch((e) =>
+          console.error("[subQueue] error:", e.message),
+        );
+      } else {
+        setTimeout(poll, 1000);
+      }
+    };
+    setTimeout(poll, 1000);
+  }
+}
+function doSubQueueGenSrtNow() {
+  chkGenSrtDelay = 500;
+}
+async function processSubQueueEntry() {
+  if (subQueue.length === 0) return;
+  const entry = subQueue.shift();
+  persistSubQueue();
+  subQueueBusy = true;
+  try {
+    const parsed = parseFileSeasonEpisode(entry.videoFilePath);
+    const showName = entry.videoFilePath.replace(tvDir + "/", "").split("/")[0];
+    await generateEmbSrts(
+      entry.videoFilePath,
+      showName,
+      parsed?.season,
+      parsed?.episode,
+      entry.fromUI,
+    );
+    await sleep(1000);
+    await applyOpenSubSrts(
+      entry.videoFilePath,
+      showName,
+      parsed?.season,
+      parsed?.episode,
+    );
+    await sleep(1000);
+    const base = entry.videoFilePath.replace(/\.[^.]+$/, "");
+    const dir = path.dirname(entry.videoFilePath);
+    const basename = path.basename(base);
+    let dirEntries;
+    try {
+      dirEntries = fs.readdirSync(dir);
+    } catch {
+      dirEntries = [];
+    }
+    const hasSidecar = dirEntries.some(
+      (f) =>
+        f === basename + ".enx.srt" ||
+        f === basename + ".enx.srtstub" ||
+        /^\.en\d+\.srt$/.test("." + f.slice(basename.length)),
+    );
+    if (!hasSidecar) {
+      subQueueGenSrt.unshift({
+        videoFilePath: entry.videoFilePath,
+        fromUI: entry.fromUI,
+        lowPriority: entry.lowPriority,
+      });
+      persistSubQueueGenSrt();
+      doSubQueueGenSrtNow();
+    } else {
+      subQueueChkSrt.push({
+        videoFilePath: entry.videoFilePath,
+        fromUI: entry.fromUI,
+      });
+      persistSubQueueChkSrt();
+      notifyClients("chksrt-count", subQueueChkSrt.length);
+    }
+  } finally {
+    subQueueBusy = false;
+    chkSubQueueDelay = 500;
+  }
+}
+function startSubQueueLoop() {
+  const loop = async () => {
+    if (subQueue.length === 0) {
+      chkSubQueueDelay = 10_000;
+    } else {
+      await processSubQueueEntry().catch((e) =>
+        console.error("[subQueue loop]", e.message),
+      );
+    }
+    setTimeout(loop, chkSubQueueDelay);
+  };
+  setTimeout(loop, chkSubQueueDelay);
+}
+function checkSubQueueGenSrt() {
+  const loop = async () => {
+    if (!genSrtRunning && subQueueGenSrt.length > 0) {
+      const entry = subQueueGenSrt[0];
+      if (entry.lowPriority && os.loadavg()[0] > 2) {
+        chkGenSrtDelay = 10_000;
+      } else {
+        subQueueGenSrt.shift();
+        persistSubQueueGenSrt();
+        generateSrtWithAsr(entry.videoFilePath, entry.fromUI).catch((e) =>
+          console.error("[genSrt loop]", e.message),
+        );
+        chkGenSrtDelay = 500;
+      }
+    }
+    if (subQueueGenSrt.length === 0) chkGenSrtDelay = 10_000;
+    setTimeout(loop, chkGenSrtDelay);
+  };
+  setTimeout(loop, chkGenSrtDelay);
+}
+cron.schedule(
+  "0 5 * * *",
+  () => {
+    const now = new Date().toLocaleString("en-US", {
+      timeZone: "America/Los_Angeles",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const mmdd = now.replace("/", "-").replace(/,.*/, "");
+    const dest = SUBTITLE_LOG_DIR + "subtitle-" + mmdd + ".log";
+    try {
+      fs.mkdirSync(SUBTITLE_LOG_DIR, { recursive: true });
+      if (fs.existsSync(SUBTITLE_LOG_PATH))
+        fs.renameSync(SUBTITLE_LOG_PATH, dest);
+      fs.writeFileSync(SUBTITLE_LOG_PATH, "", "utf8");
+      console.log("[cron] subtitle.log rotated to", dest);
+    } catch (e) {
+      console.error("[cron] log rotate error:", e.message);
+    }
+  },
+  { timezone: "America/Los_Angeles" },
+);
+
 function loadSubsLogin() {
   let loginStr;
   try {
@@ -1190,6 +1592,38 @@ const fixCompactEpisodeNaming = async (showId, showName) => {
 tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
   try {
     delete tvdbRecord.haveSubs;
+    // Subtitle scan for inEmby shows
+    if (tvdbRecord.inEmby) {
+      const showFolder = path.join(tvDir, showName);
+      try {
+        const seasonDirs = fs.readdirSync(showFolder);
+        for (const seasonDir of seasonDirs) {
+          const seasonPath = path.join(showFolder, seasonDir);
+          try {
+            if (!fs.statSync(seasonPath).isDirectory()) continue;
+          } catch {
+            continue;
+          }
+          const files = fs.readdirSync(seasonPath);
+          for (const f of files) {
+            if (!videoFileExtensions.includes(f.split(".").pop())) continue;
+            const fp = path.join(seasonPath, f);
+            if (await fileNeedsSubChecked(fp, showName)) {
+              subQueue.push({
+                videoFilePath: fp,
+                fromUI: false,
+                lowPriority: true,
+              });
+            }
+          }
+        }
+        persistSubQueue();
+      } catch (e) {
+        console.error(
+          `[perShow] subtitle scan error for ${showName}: ${e.message}`,
+        );
+      }
+    }
     // Disk check
     const embyPath = tvdbRecord.path || tvdbRecord.emby?.path || showName;
     const pathPart = embyPath.split("/").pop();
@@ -2323,336 +2757,6 @@ const getFile = async (params) => {
   return out;
 };
 
-const applySubFiles = async (params) => {
-  console.log(
-    `[applySubFiles] Called with ${JSON.stringify(params).slice(0, 200)}`,
-  );
-
-  if (params === undefined || params === null || params === "") {
-    throw new Error("applySubFiles: missing params");
-  }
-
-  const fileIdObjs = params; // Already parsed by Express
-  if (!Array.isArray(fileIdObjs) || fileIdObjs.length === 0) {
-    throw new Error("applySubFiles: expected non-empty array");
-  }
-
-  const showName =
-    typeof fileIdObjs[0]?.showName === "string" ? fileIdObjs[0].showName : "";
-  if (!showName || showName.trim() === "") {
-    throw new Error("applySubFiles: missing showName");
-  }
-  if (showName.includes("/") || showName.includes("\\")) {
-    throw new Error("applySubFiles: invalid showName");
-  }
-  for (const entry of fileIdObjs) {
-    if (typeof entry?.showName !== "string" || entry.showName !== showName) {
-      throw new Error("applySubFiles: all entries must have same showName");
-    }
-  }
-
-  const localShowPath = path.join(tvDir, showName);
-  try {
-    const st = fs.statSync(localShowPath);
-    if (!st.isDirectory()) {
-      throw new Error(`Show directory missing: ${localShowPath} (n/a)`);
-    }
-  } catch {
-    throw new Error(`Show directory missing: ${localShowPath} (n/a)`);
-  }
-
-  let login;
-  try {
-    login = loadSubsLogin();
-  } catch (e) {
-    throw new Error(e.message);
-  }
-
-  const failures = [];
-  const appliedSet = new Set();
-
-  const addFailure = (cand, stage, status, details, error) => {
-    const fid = Number(cand?.file_id);
-    const showName =
-      typeof cand?.showName === "string" ? cand.showName : undefined;
-    const season = cand?.season;
-    const episode = cand?.episode;
-
-    let reason = "";
-    if (status !== undefined && status !== null)
-      reason = `${stage} HTTP ${status}`;
-    else if (error) reason = `${stage}: ${error}`;
-    else reason = stage;
-
-    const rec = {
-      file_id: fid,
-      showName,
-      season,
-      episode,
-      reason,
-      stage,
-      status,
-    };
-    if (details !== undefined) rec.details = details;
-    failures.push(rec);
-  };
-
-  // Step 1-4: update entries with local paths, validate, compute fileIdBase32.
-  // Note: we fetch OpenSubtitles /download links lazily per video file so one bad
-  // file_id (e.g. transient 502) doesn't fail the entire batch.
-  const seasonExistsCache = new Map();
-  for (const entry of fileIdObjs) {
-    const file_id = entry?.file_id;
-    const season = entry?.season;
-    const episode = entry?.episode;
-
-    if (!Number.isFinite(Number(file_id))) {
-      throw new Error("applySubFiles: invalid file_id");
-    }
-    if (!Number.isFinite(Number(season))) {
-      throw new Error(`applySubFiles: invalid season (${file_id})`);
-    }
-    if (!Number.isFinite(Number(episode))) {
-      throw new Error(`applySubFiles: invalid episode (${file_id})`);
-    }
-
-    entry.localShowPath = localShowPath + "/";
-
-    // Verify local show path exists.
-    try {
-      const stShow = fs.statSync(localShowPath);
-      if (!stShow.isDirectory()) {
-        throw new Error(
-          `Show directory missing: ${entry.localShowPath} (${file_id})`,
-        );
-      }
-    } catch {
-      throw new Error(
-        `Show directory missing: ${entry.localShowPath} (${file_id})`,
-      );
-    }
-
-    // If the requested season folder doesn't exist, record a failure but keep going.
-    const seasonNum = Number(season);
-    const expectedSeasonPath = path.join(localShowPath, `Season ${seasonNum}`);
-    let seasonExists = seasonExistsCache.get(seasonNum);
-    if (seasonExists === undefined) {
-      try {
-        seasonExists = fs.statSync(expectedSeasonPath).isDirectory();
-      } catch {
-        seasonExists = false;
-      }
-      seasonExistsCache.set(seasonNum, seasonExists);
-    }
-    if (!seasonExists) {
-      entry._missingSeasonDir = true;
-      addFailure(
-        entry,
-        "localSeason",
-        undefined,
-        { path: expectedSeasonPath },
-        "Season directory missing",
-      );
-    }
-
-    entry.fileIdBase32 = encodeFileIdBase32(Number(file_id));
-  }
-
-  console.log(
-    `[applySubFiles] Building lookup map for ${fileIdObjs.length} file(s)`,
-  );
-
-  // Build lookup by season/episode.
-  const byKey = new Map();
-  for (const entry of fileIdObjs) {
-    const key = `${Number(entry.season)}-${Number(entry.episode)}`;
-    if (!byKey.has(key)) byKey.set(key, []);
-    byKey.get(key).push(entry);
-  }
-
-  const srtCacheByFileId = new Map();
-  const srtUrlCacheByFileId = new Map();
-  const failedByFileId = new Map();
-
-  // For each video file in all season dirs under localShowPath, write a matching srt.
-  let seasonDirents;
-  try {
-    seasonDirents = fs.readdirSync(localShowPath, { withFileTypes: true });
-  } catch (e) {
-    throw new Error(`applySubFiles: readdir failed: ${e.message}`);
-  }
-
-  const foundKeys = new Set();
-
-  for (const dirent of seasonDirents) {
-    if (!dirent.isDirectory()) continue;
-    const seasonPath = path.join(localShowPath, dirent.name);
-
-    let fileDirents;
-    try {
-      fileDirents = fs.readdirSync(seasonPath, { withFileTypes: true });
-    } catch {
-      continue;
-    }
-
-    for (const fd of fileDirents) {
-      if (!fd.isFile()) continue;
-      const fileName = fd.name;
-      const ext = fileName.includes(".")
-        ? fileName.split(".").pop().toLowerCase()
-        : "";
-      if (!videoFileExtensions.includes(ext)) continue;
-
-      const parsed = parseSeasonEpisodeFromFilename(fileName, dirent.name);
-      if (!parsed) continue;
-
-      const key = `${parsed.season}-${parsed.episode}`;
-      const candidates = byKey.get(key);
-      if (!candidates || candidates.length === 0) continue;
-
-      foundKeys.add(key);
-
-      const fileBase = fileName.slice(0, -(ext.length + 1));
-
-      // Apply only the first candidate whose exact hash .srt file doesn't already exist.
-      for (const cand of candidates) {
-        const srtName = `${fileBase}.${cand.fileIdBase32}.srt`;
-        const outPath = path.join(seasonPath, srtName);
-        if (fs.existsSync(outPath)) continue;
-
-        const fid = Number(cand.file_id);
-
-        // Don't create a duplicate if the legacy-tagged subtitle already exists.
-        const legacyTag1 = encodeFileIdBase32Legacy(fid);
-        const legacyPath1 = path.join(
-          seasonPath,
-          `${fileBase}.${legacyTag1}.srt`,
-        );
-        if (fs.existsSync(legacyPath1)) continue;
-
-        const legacyTag2 = encodeFileIdBase32LegacyAZ05(fid);
-        const legacyPath2 = path.join(
-          seasonPath,
-          `${fileBase}.${legacyTag2}.srt`,
-        );
-        if (fs.existsSync(legacyPath2)) continue;
-
-        // If this file_id already failed earlier in this call, skip it.
-        if (failedByFileId.has(fid)) continue;
-
-        let srtText = srtCacheByFileId.get(fid);
-        if (srtText === undefined) {
-          // Resolve (and cache) /download link for this file_id.
-          let url = srtUrlCacheByFileId.get(fid) || null;
-          if (!url) {
-            try {
-              let dl = await openSubtitlesDownloadWithRetry({
-                apiKey: login.apiKey,
-                token: subsTokenCache,
-                fileId: fid,
-              });
-              if (
-                !dl?.resp?.ok &&
-                (dl?.resp?.status === 401 ||
-                  dl?.resp?.status === 403 ||
-                  dl?.resp?.status === 406)
-              ) {
-                const newToken = await openSubtitlesLogin(login);
-                await persistSubsToken(newToken);
-                dl = await openSubtitlesDownloadWithRetry({
-                  apiKey: login.apiKey,
-                  token: subsTokenCache,
-                  fileId: fid,
-                });
-              }
-
-              if (!dl?.resp?.ok) {
-                const status = dl?.resp?.status;
-                console.log(
-                  `[subs] OpenSubtitles /download HTTP ${status} (file_id=${fid})`,
-                );
-                addFailure(cand, "download", status, dl?.body);
-                failedByFileId.set(fid, { stage: "download", status });
-                continue;
-              }
-
-              url =
-                typeof dl.body?.link === "string" ? dl.body.link.trim() : "";
-              if (!url) {
-                addFailure(
-                  cand,
-                  "download",
-                  dl?.resp?.status,
-                  dl?.body,
-                  "missing link",
-                );
-                failedByFileId.set(fid, {
-                  stage: "download",
-                  status: dl?.resp?.status,
-                });
-                continue;
-              }
-              srtUrlCacheByFileId.set(fid, url);
-              cand.srtFileUrl = url;
-            } catch (e) {
-              addFailure(
-                cand,
-                "download",
-                null,
-                undefined,
-                e?.message || String(e),
-              );
-              failedByFileId.set(fid, { stage: "download", status: null });
-              continue;
-            }
-          } else {
-            cand.srtFileUrl = url;
-          }
-
-          try {
-            const resp = await fetch(url, { headers: { Accept: "*/*" } });
-            if (!resp.ok) {
-              const status = resp.status;
-              console.log(
-                `[subs] OpenSubtitles .srt GET HTTP ${status} (file_id=${fid})`,
-              );
-              addFailure(cand, "srt", status);
-              failedByFileId.set(fid, { stage: "srt", status });
-              continue;
-            }
-            srtText = await resp.text();
-            srtCacheByFileId.set(fid, srtText);
-          } catch (e) {
-            addFailure(cand, "srt", null, undefined, e?.message || String(e));
-            failedByFileId.set(fid, { stage: "srt", status: null });
-            continue;
-          }
-        }
-
-        try {
-          await fs.promises.writeFile(outPath, srtText, "utf8");
-          appliedSet.add(fid);
-          break; // Only write one hash .srt per video file
-        } catch {
-          // If write fails, continue to next candidate.
-          continue;
-        }
-      }
-    }
-  }
-
-  // Any requested season/episode with no matching video file should be reported.
-  for (const [key, entries] of byKey.entries()) {
-    if (foundKeys.has(key)) continue;
-    for (const entry of entries) {
-      if (entry?._missingSeasonDir) continue; // already reported a more specific failure
-      addFailure(entry, "match", undefined, { key }, "No matching video file");
-    }
-  }
-
-  return { ok: true, applied: Array.from(appliedSet), failures };
-};
-
 const deletePath = async (params) => {
   const pathParam = params?.path;
   if (!pathParam) {
@@ -3481,7 +3585,6 @@ app.post(
 
 // Subtitles
 app.post("/api/subsSearch", apiWrapper(subsSearch));
-app.post("/api/applySubFiles", apiWrapper(applySubFiles));
 app.post("/api/deleteSubFiles", apiWrapper(deleteSubFiles));
 app.post("/api/offsetSubFiles", apiWrapper(offsetSubFiles));
 app.post("/api/applySubOffset", async (req, res) => {
@@ -3548,109 +3651,118 @@ app.post("/api/applySubOffset", async (req, res) => {
   res.json({ ok: true });
 });
 
-// ASR chksrt queue endpoints
-app.get("/api/asr/chksrt/list", (req, res) => {
-  res.json(readNeedsSrtChk());
-});
-
-app.post("/api/asr/chksrt/ok", (req, res) => {
-  const { videoPath } = req.body || {};
-  if (!videoPath) {
-    res.status(400).json({ error: "videoPath required" });
+// ASR subtitle queue endpoints
+app.post("/api/asr/subs/enqueue", (req, res) => {
+  const { videoPaths, fromUI } = req.body || {};
+  if (!Array.isArray(videoPaths) || videoPaths.length === 0) {
+    res.status(400).json({ error: "videoPaths required" });
     return;
   }
-  const resolved = path.resolve(videoPath);
-  if (!resolved.startsWith(tvDir + "/")) {
-    res.status(403).json({ error: "forbidden" });
-    return;
+  for (const vp of [...videoPaths].reverse()) {
+    subQueue.unshift({
+      videoFilePath: vp,
+      fromUI: !!fromUI,
+      lowPriority: false,
+    });
   }
-  const paths = readNeedsSrtChk();
-  const idx = paths.indexOf(videoPath);
-  if (idx !== -1) paths.splice(idx, 1);
-  writeNeedsSrtChk(paths);
-  // Create empty .enx.srtstub so ASR background loop skips this file permanently
-  const stem = resolved.replace(/\.[^.]+$/, "");
-  const stubPath = stem + ".enx.srtstub";
-  try {
-    if (!fs.existsSync(stubPath)) {
-      fs.writeFileSync(stubPath, "", "utf8");
-      console.log(`[chksrt] ok: created stub ${stubPath}`);
-    }
-  } catch (e) {
-    console.error(`[chksrt] ok: stub write failed: ${e.message}`);
-  }
-  console.log(`[chksrt] ok: removed ${videoPath}`);
-  res.json({ ok: true, next: paths[0] || null });
-});
-
-app.post("/api/asr/emb/apply", (req, res) => {
-  const { path: reqPath } = req.body || {};
-  if (!reqPath) {
-    res.status(400).json({ error: "path required" });
-    return;
-  }
-  const resolved = path.resolve(tvDir, reqPath);
-  if (!resolved.startsWith(tvDir + "/") && resolved !== tvDir) {
-    res.status(403).json({ error: "forbidden" });
-    return;
-  }
-  // Collect video files from file or folder
-  const videoExts = new Set([".mp4", ".mkv", ".avi", ".mov", ".webm", ".m4v"]);
-  const videoPaths = [];
-  try {
-    const stat = fs.statSync(resolved);
-    if (stat.isFile()) {
-      if (videoExts.has(path.extname(resolved).toLowerCase()))
-        videoPaths.push(resolved);
-    } else if (stat.isDirectory()) {
-      const walk = (dir) => {
-        for (const entry of fs.readdirSync(dir)) {
-          const full = path.join(dir, entry);
-          const s = fs.statSync(full);
-          if (s.isDirectory()) walk(full);
-          else if (videoExts.has(path.extname(entry).toLowerCase()))
-            videoPaths.push(full);
-        }
-      };
-      walk(resolved);
-    }
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-    return;
-  }
-  if (videoPaths.length === 0) {
-    res.status(400).json({ error: "no video files found at path" });
-    return;
-  }
-  try {
-    fs.mkdirSync(path.dirname(EMB_PENDING_PATH), { recursive: true });
-    fs.appendFileSync(EMB_PENDING_PATH, videoPaths.join("\n") + "\n", "utf8");
-    console.log(`[emb] queued ${videoPaths.length} file(s) from ${reqPath}`);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-    return;
-  }
+  persistSubQueue();
+  doSubQueueNow();
   res.json({ ok: true, queued: videoPaths.length });
 });
 
-app.post("/api/asr/chksrt/bad", (req, res) => {
-  const { videoPath } = req.body || {};
+app.post("/api/asr/gensrt/enqueue", (req, res) => {
+  const { videoPaths, fromUI } = req.body || {};
+  if (!Array.isArray(videoPaths) || videoPaths.length === 0) {
+    res.status(400).json({ error: "videoPaths required" });
+    return;
+  }
+  for (const vp of [...videoPaths].reverse()) {
+    subQueueGenSrt.unshift({
+      videoFilePath: vp,
+      fromUI: !!fromUI,
+      lowPriority: false,
+    });
+  }
+  persistSubQueueGenSrt();
+  doSubQueueGenSrtNow();
+  res.json({ ok: true, queued: videoPaths.length });
+});
+
+app.post("/api/asr/emb/generate", async (req, res) => {
+  const { videoPaths } = req.body || {};
+  if (!Array.isArray(videoPaths) || videoPaths.length === 0) {
+    res.status(400).json({ error: "videoPaths required" });
+    return;
+  }
+  res.json({ ok: true, queued: videoPaths.length });
+  for (const vp of videoPaths) {
+    await generateEmbSrts(vp, null, null, null, true).catch((e) =>
+      console.error("[emb/generate]", e.message),
+    );
+  }
+});
+
+app.get("/api/asr/chksrt/list", (req, res) => {
+  res.json({
+    count: subQueueChkSrt.length,
+    path: subQueueChkSrt[0]?.videoFilePath,
+  });
+});
+
+app.post("/api/asr/chksrt/ok", (req, res) => {
+  subQueueChkSrt.shift();
+  persistSubQueueChkSrt();
+  notifyClients("chksrt-count", subQueueChkSrt.length);
+  res.json({ ok: true });
+});
+
+app.post("/api/asr/chksrt/gensrt", (req, res) => {
+  const entry = subQueueChkSrt.shift();
+  if (entry) {
+    subQueueGenSrt.unshift({
+      videoFilePath: entry.videoFilePath,
+      fromUI: false,
+      lowPriority: false,
+    });
+    persistSubQueueGenSrt();
+    doSubQueueGenSrtNow();
+  }
+  persistSubQueueChkSrt();
+  notifyClients("chksrt-count", subQueueChkSrt.length);
+  res.json({ ok: true });
+});
+
+app.post("/api/asr/chksrt/select", (req, res) => {
+  const { videoPath, selectedSrtPath } = req.body || {};
   if (!videoPath) {
     res.status(400).json({ error: "videoPath required" });
     return;
   }
-  const paths = readNeedsSrtChk();
-  const idx = paths.indexOf(videoPath);
-  if (idx !== -1) paths.splice(idx, 1);
-  writeNeedsSrtChk(paths);
+  const base = videoPath.replace(/\.[^.]+$/, "");
+  const dir = path.dirname(videoPath);
+  let entries;
   try {
-    fs.mkdirSync(path.dirname(ASR_FORCED_PENDING_PATH), { recursive: true });
-    fs.appendFileSync(ASR_FORCED_PENDING_PATH, videoPath + "\n", "utf8");
-    console.log(`[chksrt] bad: queued forced ASR for ${videoPath}`);
+    entries = fs.readdirSync(dir);
   } catch (e) {
-    console.error(`[chksrt] bad: forced-pending write failed: ${e.message}`);
+    res.status(500).json({ error: e.message });
+    return;
   }
-  res.json({ ok: true, next: paths[0] || null });
+  const basename = path.basename(base);
+  for (const f of entries) {
+    if (!/\.srt$/.test(f)) continue;
+    const full = path.join(dir, f);
+    if (full === selectedSrtPath) continue;
+    if (f.startsWith(basename + ".en")) {
+      try {
+        fs.unlinkSync(full);
+      } catch {}
+    }
+  }
+  const idx = subQueueChkSrt.findIndex((e) => e.videoFilePath === videoPath);
+  if (idx !== -1) subQueueChkSrt.splice(idx, 1);
+  persistSubQueueChkSrt();
+  notifyClients("chksrt-count", subQueueChkSrt.length);
+  res.json({ ok: true });
 });
 
 // Email
@@ -3677,6 +3789,9 @@ const httpsOptions = {
 
 https.createServer(httpsOptions, app).listen(HTTP_PORT, () => {
   console.log(`HTTPS API listening on port ${HTTP_PORT}`);
+  loadQueues();
+  startSubQueueLoop();
+  checkSubQueueGenSrt();
 });
 
 app.post("/internal/tv-state", (req, res) => {
@@ -4778,45 +4893,6 @@ setInterval(runUsbCheck, CHECK_INTERVAL_MS);
 
 const changedShows = new Map(); // showName -> timeout
 const DISK_CHANGE_DEBOUNCE_MS = 3000; // 3 seconds
-const ASR_PENDING_PATH = "/root/dev/apps/tv/apps/asr/data/pending.txt";
-const ASR_FORCED_PENDING_PATH =
-  "/root/dev/apps/tv/apps/asr/data/forced-pending.txt";
-const EMB_PENDING_PATH = "/root/dev/apps/tv/apps/asr/data/emb-pending.txt";
-const ASR_NEEDS_SRT_CHK_PATH =
-  "/root/dev/apps/tv/apps/asr/data/needsSrtChk.txt";
-
-function readNeedsSrtChk() {
-  try {
-    const content = fs.readFileSync(ASR_NEEDS_SRT_CHK_PATH, "utf8");
-    return content
-      .split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
-function writeNeedsSrtChk(paths) {
-  fs.mkdirSync(path.dirname(ASR_NEEDS_SRT_CHK_PATH), { recursive: true });
-  fs.writeFileSync(
-    ASR_NEEDS_SRT_CHK_PATH,
-    paths.length > 0 ? paths.join("\n") + "\n" : "",
-    "utf8",
-  );
-}
-
-function asrPendingAppend(filePath) {
-  try {
-    fs.mkdirSync(path.dirname(ASR_PENDING_PATH), {
-      recursive: true,
-    });
-    fs.appendFileSync(ASR_PENDING_PATH, filePath + "\n", "utf8");
-    console.log(`[chokidar] asr pending: added ${filePath}`);
-  } catch (e) {
-    console.error(`[chokidar] asrPendingAppend error: ${e.message}`);
-  }
-}
 
 /**
  * Extract show name from file path
@@ -5028,37 +5104,20 @@ watcher
       clearTimeout(changedShows.get(showName));
     }
 
-    const timeout = setTimeout(() => {
+    const timeout = setTimeout(async () => {
       changedShows.delete(showName);
-      console.log(
-        `[tvdb loop] chokidar add debounce fired: enqueuing ${showName}`,
-      );
-      let hasEmbedded = false;
-      try {
-        const probeOut = cp
-          .execSync(
-            `ffprobe -v quiet -print_format json -show_streams "${filePath.replace(/"/g, '\\"')}"`,
-            { maxBuffer: 2 * 1024 * 1024 },
-          )
-          .toString();
-        const streams = JSON.parse(probeOut).streams || [];
-        hasEmbedded = streams.some((s) => s.codec_type === "subtitle");
-      } catch (e) {
-        console.error(`[chokidar] ffprobe error for ${filePath}: ${e.message}`);
-      }
-      if (hasEmbedded) {
-        try {
-          fs.mkdirSync(path.dirname(ASR_NEEDS_SRT_CHK_PATH), {
-            recursive: true,
+      const tvdbAll = tvdb.getAllTvdbSync?.();
+      const tvdbRec = tvdbAll?.[showName];
+      if (tvdbRec && tvdbRec.inEmby) {
+        if (await fileNeedsSubChecked(filePath, showName)) {
+          subQueue.unshift({
+            videoFilePath: filePath,
+            fromUI: false,
+            lowPriority: false,
           });
-          fs.appendFileSync(ASR_NEEDS_SRT_CHK_PATH, filePath + "\n", "utf8");
-          console.log(`[chokidar] needsSrtChk: added ${filePath}`);
-          notifyClients("chksrt-count", readNeedsSrtChk().length);
-        } catch (e) {
-          console.error(`[chokidar] needsSrtChk append error: ${e.message}`);
+          persistSubQueue();
+          doSubQueueNow();
         }
-      } else {
-        asrPendingAppend(filePath);
       }
       tvdb.enqueueShowProcess(showName);
     }, DISK_CHANGE_DEBOUNCE_MS);

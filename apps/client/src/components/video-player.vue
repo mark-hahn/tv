@@ -171,7 +171,7 @@
       </div>
       <div
         v-if="mode === 'chksrt'"
-        @click.stop="clickBad"
+        @click.stop="clickGenSrt"
         style="
           color: white;
           font-size: 13px;
@@ -186,13 +186,13 @@
           text-shadow: 0 0 3px #000;
         "
       >
-        Bad
+        GenSrt
       </div>
       <!-- Subtitle choice buttons -->
       <div
         v-for="(choice, i) in subtitleChoices"
         :key="choice.id"
-        @click.stop="selectTrack(choice.id)"
+        @click.stop="onChoiceClick(choice, $event)"
         :style="{
           marginLeft:
             i === 0 && !showSlider && mode !== 'chksrt' ? 'auto' : '0',
@@ -272,7 +272,12 @@
 
 <script>
 import { config } from "../config.js";
-import { applySubOffset, chksrtOk, chksrtBad } from "../srvr.js";
+import {
+  applySubOffset,
+  chksrtOk,
+  chksrtGenSrt,
+  chksrtSelect,
+} from "../srvr.js";
 
 const TV_SRVR_URL = config.tvSrvrUrl;
 const offsetCache = new Map(); // in-memory per-file subtitle offset
@@ -547,13 +552,13 @@ export default {
     },
     async clickOk() {
       try {
-        const result = await chksrtOk(this.path);
-        this.$emit("chksrt-next", result?.next || null);
+        await chksrtOk(this.path);
+        this.$emit("chksrt-next", null);
       } catch (e) {
         console.error("[chksrt] clickOk error:", e);
       }
     },
-    async clickBad() {
+    async clickGenSrt() {
       const embedded = this.subtitleTracks.filter(
         (t) => t.type === "embedded" || t.type === "pgs",
       );
@@ -562,11 +567,27 @@ export default {
         this.selectTrack(embedded[currentIdx + 1].id);
       } else {
         try {
-          const result = await chksrtBad(this.path);
-          this.$emit("chksrt-next", result?.next || null);
+          await chksrtGenSrt(this.path);
+          this.$emit("chksrt-next", null);
         } catch (e) {
-          console.error("[chksrt] clickBad error:", e);
+          console.error("[chksrt] clickGenSrt error:", e);
         }
+      }
+    },
+    onChoiceClick(choice, event) {
+      if (
+        event.ctrlKey &&
+        this.mode === "chksrt" &&
+        choice.type === "srt" &&
+        choice.file
+      ) {
+        const dir = this.path.replace(/\/[^\/]+$/, "");
+        const selectedSrtPath = dir + "/" + choice.file;
+        chksrtSelect(this.path, selectedSrtPath)
+          .then(() => this.$emit("chksrt-next", null))
+          .catch((e) => console.error("[chksrt] select error:", e));
+      } else {
+        this.selectTrack(choice.id);
       }
     },
     clickSubs() {

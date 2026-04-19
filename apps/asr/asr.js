@@ -14,13 +14,11 @@ try {
 import fs from "fs";
 import fsp from "fs/promises";
 import path from "path";
-import os from "os";
 import { spawn } from "child_process";
 import { fileURLToPath } from "url";
 import { setTimeout as sleep } from "timers/promises";
 import axios from "axios";
 import FormData from "form-data";
-import { parseFileSeasonEpisode } from "@tv/share";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,38 +40,10 @@ try {
   }
 }
 
-/* ---------------- CLI argument parsing ---------------- */
-const rawArgs = process.argv.slice(2);
-
-const flagsKVP = new Map(
-  rawArgs
-    .filter((a) => a.startsWith("--") && a.includes("="))
-    .map((a) => {
-      const eq = a.indexOf("=");
-      return [a.slice(0, eq), a.slice(eq + 1)];
-    }),
-);
-const switches = new Set(
-  rawArgs.filter((a) => a.startsWith("--") && !a.includes("=")),
-);
-const positional = rawArgs.filter((a) => !a.startsWith("--"));
-
-function getNum(name, dflt) {
-  if (flagsKVP.has(name)) return Number(flagsKVP.get(name));
-  return dflt;
-}
-const timeMatchMgn = getNum("--time-match-mgn", 0.3);
-const testMins = getNum("--test-mins", 0);
-const audioQuality = flagsKVP.get("--audio-quality") || "max";
-
-const apiTemperature = getNum("--temperature", 0);
-const apiResponseFormat = flagsKVP.get("--response-format") || "verbose_json";
-const apiPrompt = flagsKVP.get("--prompt") || null;
-const runBackground = switches.has("--background");
-const dumpRawArg = flagsKVP.get("--dump-raw") || null;
-const DUMP_RAW_API = dumpRawArg !== null;
-const effectiveDumpPath = dumpRawArg;
-if (DUMP_RAW_API) fs.writeFileSync(effectiveDumpPath, "", "utf8"); // truncate on start
+const timeMatchMgn = 0.3;
+const apiTemperature = 0;
+const apiResponseFormat = "verbose_json";
+const apiPrompt = null;
 
 // Audio quality settings
 const AUDIO_CONFIGS = {
@@ -82,14 +52,7 @@ const AUDIO_CONFIGS = {
   high: { rate: 44100, bitrate: "192k" },
   max: { rate: 48000, bitrate: "256k" },
 };
-const audioConfig = AUDIO_CONFIGS[audioQuality];
-
-/* ---------------- Input validation ---------------- */
-if (!runBackground && positional.length === 0) {
-  console.error("❌ Error: No input file specified");
-  process.exit(1);
-}
-const inputPath = runBackground ? "" : path.resolve(positional[0]);
+const audioConfig = AUDIO_CONFIGS["max"];
 
 /* ---------------- API Key and setup ---------------- */
 const keyPath = path.join(__dirname, "secrets/mistral-asr-key.txt");
@@ -107,22 +70,6 @@ const FILE_LIMIT_BYTES = 24 * 1024 * 1024;
 // Conservative starting estimate of FLAC bytes/sec for processed speech.
 // Will be updated via EMA as chunks are processed.
 const ADAPTIVE_INITIAL_BPS = 45000;
-
-/* ---------------- Background processing constants ---------------- */
-const TV_ROOT = "/mnt/media/tv";
-const TVDB_JSON_PATH = "/root/dev/apps/tv/apps/srvr/data/tvdb.json";
-const BKGND_LOG_PATH = path.join(__dirname, "data", "asr-bkgnd.log");
-const PENDING_PATH = path.join(__dirname, "data", "pending.txt");
-const FORCED_PENDING_PATH = path.join(__dirname, "data", "forced-pending.txt");
-const NEEDS_SRT_CHK_PATH = path.join(__dirname, "data", "needsSrtChk.txt");
-const EMB_PENDING_PATH = path.join(__dirname, "data", "emb-pending.txt");
-const EMB_LOG_PATH = path.join(__dirname, "data", "emb.log");
-const BKGND_TMPDIR = "/tmp/asr-bkgnd";
-const CPU_LOAD_MAX = 2;
-const TEST_SHOWS = null;
-const CPU_PAUSE_MS = 10_000;
-const PAUSE_DURATION_MS = 10 * 60_000;
-const PAUSE_POLL_MS = 15_000;
 
 /* ---------------- format logging timestamp  (HH:MM:SS.t) ---------------- */
 let scriptStart = Date.now();
@@ -179,14 +126,6 @@ function hasEmbSidecar(videoPath) {
   }
 }
 
-async function srtExists(videoPath) {
-  return (
-    (await pathExists(getSrtPath(videoPath))) ||
-    (await pathExists(getStubPath(videoPath))) ||
-    hasEmbSidecar(videoPath)
-  );
-}
-
 function isVideoFile(p) {
   return allowedExt.has(path.extname(p).toLowerCase());
 }
@@ -207,30 +146,6 @@ function run(cmd, args, opts = {}) {
       }
     });
   });
-}
-
-function loadNeedsSrtChkSet() {
-  try {
-    const content = fs.readFileSync(NEEDS_SRT_CHK_PATH, "utf8");
-    return new Set(
-      content
-        .split("\n")
-        .map((l) => l.trim())
-        .filter(Boolean),
-    );
-  } catch {
-    return new Set();
-  }
-}
-
-function appendNeedsSrtChk(videoPath) {
-  try {
-    fs.mkdirSync(path.dirname(NEEDS_SRT_CHK_PATH), { recursive: true });
-    fs.appendFileSync(NEEDS_SRT_CHK_PATH, videoPath + "\n", "utf8");
-    console.log(`[asr] needsSrtChk: added ${path.basename(videoPath)}`);
-  } catch (e) {
-    console.warn(`Warning: could not append to needsSrtChk: ${e.message}`);
-  }
 }
 
 const ENGLISH_LANG_TAGS = new Set(["eng", "en", "english"]);
@@ -345,7 +260,6 @@ async function extractAudio(inputVideo, outWav) {
     audioConfig.bitrate,
     "-vn",
   ];
-  if (testMins > 0) args.push("-t", String(testMins * 60));
   args.push(outWav);
   await run("ffmpeg", args);
 }
@@ -398,7 +312,6 @@ async function extractAudio(inputVideo, outWav) {
 */
 
 const AUDIO_FILTER =
-  flagsKVP.get("--audio-filter") ||
   "highpass=f=80,lowpass=f=8000,loudnorm=I=-16:TP=-1.5:LRA=11";
 
 async function preprocessAudio(inputWav, outputWav) {
@@ -970,11 +883,6 @@ async function processOneVideo(videoPath) {
   const fileStart = Date.now();
   console.log(`\n[${ts()}] Processing: ${path.basename(videoPath)}`);
   const videoName = path.basename(videoPath, path.extname(videoPath));
-  const srtPath = getSrtPath(videoPath);
-  if (await srtExists(videoPath)) {
-    console.log(`\n${videoName}: Enhanced SRT already exists, skipping.`);
-    return;
-  }
   const rawWavFile = path.join(tmpDir, "audio_raw.wav");
   const processedWavFile = path.join(tmpDir, "audio_processed.wav");
   try {
@@ -985,7 +893,6 @@ async function processOneVideo(videoPath) {
     const totalDur = await getDurationSec(finalWavFile);
     console.log(`[${ts()}] Duration: ${totalDur.toFixed(0)}s, VAD chunking`);
     const allSegments = [];
-    let dumpSrtIndex = 0;
     let adaptiveBPS = ADAPTIVE_INITIAL_BPS;
     let retryCount = 0;
     const vadChunkList = await vadChunks(finalWavFile, adaptiveBPS, totalDur);
@@ -1044,16 +951,6 @@ async function processOneVideo(videoPath) {
       };
       try {
         const apiData = await callApi(uploadInfo);
-        if (DUMP_RAW_API) {
-          const segs = apiData.segments || [];
-          let srt = `============ Chunk ${chunkIndex}: ${chunkStart.toFixed(0)}s-${chunkEnd.toFixed(0)}s\n`;
-          for (const seg of segs) {
-            const start = chunkInfo.chunkStart + (seg.start ?? 0);
-            const end = chunkInfo.chunkStart + (seg.end ?? seg.start ?? 0);
-            srt += `${++dumpSrtIndex}\n${toSrtTime(start)} --> ${toSrtTime(end)}\n${seg.text?.trim() ?? ""}\n\n`;
-          }
-          fs.appendFileSync(effectiveDumpPath, srt, "utf8");
-        }
         if (apiData.segments && apiData.segments.length > 0) {
           allSegments.push(...processSegments(apiData.segments, chunkInfo));
         } else {
@@ -1098,493 +995,18 @@ async function processOneVideo(videoPath) {
   );
 }
 
-/* ---------------- Background processing helpers ---------------- */
+/* ---------------- Entry point ---------------- */
 
-function deleteLastLogLine(logPath) {
-  if (!fs.existsSync(logPath)) return;
-  const content = fs.readFileSync(logPath, "utf8");
-  const lines = content.split("\n");
-  while (lines.length > 0 && lines[lines.length - 1].trim() === "") lines.pop();
-  if (lines.length === 0) return;
-  lines.pop();
-  fs.writeFileSync(
-    logPath,
-    lines.length > 0 ? lines.join("\n") + "\n" : "",
-    "utf8",
-  );
+const inputPath = process.argv[2];
+if (!inputPath) {
+  console.error("No input file");
+  process.exit(1);
 }
-
-function loadTvdb() {
-  return JSON.parse(fs.readFileSync(TVDB_JSON_PATH, "utf8"));
-}
-
-// Atomically consume a queue file; returns array of lines (empty array if no file).
-function consumeQueueFile(queuePath) {
-  const tmp = queuePath + ".tmp";
-  try {
-    fs.renameSync(queuePath, tmp);
-  } catch {
-    return [];
-  }
-  try {
-    const content = fs.readFileSync(tmp, "utf8");
-    fs.unlinkSync(tmp);
-    return content
-      .split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
-// Atomically consume pending.txt; returns array of full video paths (empty array if no file).
-function consumePending() {
-  const tmp = PENDING_PATH + ".tmp";
-  return consumeQueueFile(PENDING_PATH);
-}
-
-function consumeForcedPending() {
-  return consumeQueueFile(FORCED_PENDING_PATH);
-}
-
-function pstStamp() {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).formatToParts(new Date());
-  const get = (type) => parts.find((p) => p.type === type)?.value ?? "00";
-  return `${get("month")}-${get("day")} ${get("hour")}:${get("minute")}:${get("second")}`;
-}
-
-function appendBkgndLog(logPath, videoPath, fromPending, stalled = false) {
-  fs.mkdirSync(path.dirname(logPath), { recursive: true });
-  const relPath = path.relative(TV_ROOT, videoPath);
-  const prefix = stalled ? "S  " : fromPending ? "*  " : "   ";
-  fs.appendFileSync(logPath, `${pstStamp()} ${prefix}${relPath}\n`, "utf8");
-}
-
-function bkgndLogStatus(logPath, msg) {
-  fs.mkdirSync(path.dirname(logPath), { recursive: true });
-  fs.appendFileSync(logPath, `${pstStamp()} # ${msg}\n`, "utf8");
-}
-
-function appendEmbLog(msg) {
-  fs.mkdirSync(path.dirname(EMB_LOG_PATH), { recursive: true });
-  fs.appendFileSync(EMB_LOG_PATH, `${pstStamp()} ${msg}\n`, "utf8");
-}
-
-async function processEmbQueue(embPaths) {
-  for (const videoPath of embPaths) {
-    if (!isVideoFile(videoPath)) {
-      appendEmbLog(`skip (not video): ${videoPath}`);
-      continue;
-    }
-    if (!(await pathExists(videoPath))) {
-      appendEmbLog(`skip (not found): ${videoPath}`);
-      continue;
-    }
-    const subtitleStreams = await getSubtitleStreams(videoPath);
-    if (subtitleStreams === null) {
-      appendEmbLog(`ffprobe error: ${path.basename(videoPath)}`);
-      continue;
-    }
-    const textStreams = subtitleStreams.filter((s) =>
-      TEXT_SUB_CODECS.has(s.codec_name),
-    );
-    if (textStreams.length === 0) {
-      appendEmbLog(`no text subs: ${path.relative(TV_ROOT, videoPath)}`);
-      continue;
-    }
-    await extractTextSubtitles(videoPath, subtitleStreams);
-    appendEmbLog(
-      `extracted ${textStreams.length} stream(s): ${path.relative(TV_ROOT, videoPath)}`,
-    );
-  }
-}
-
-async function waitForLowCpu() {
-  while (true) {
-    if (os.loadavg()[0] <= CPU_LOAD_MAX) return;
-    await sleep(CPU_PAUSE_MS);
-  }
-}
-
-async function findCandidateFile(show) {
-  if (!show.path) return null;
-
-  // Build set of watched "season:episode" pairs
-  const watched = new Set();
-  if (Array.isArray(show.watchedEpis)) {
-    for (const row of show.watchedEpis) {
-      const season = row[0];
-      for (let i = 1; i < row.length; i++) watched.add(`${season}:${row[i]}`);
-    }
-  }
-
-  const showDir = path.join(TV_ROOT, show.path);
-  if (!fs.existsSync(showDir)) return null;
-
-  let entries;
-  try {
-    entries = fs.readdirSync(showDir);
-  } catch {
-    return null;
-  }
-
-  const tuples = [];
-  for (const entry of entries) {
-    const smatch = entry.match(/^Season\s+(\d+)$/i);
-    if (!smatch) continue;
-    const seasonNum = parseInt(smatch[1], 10);
-    const seasonDir = path.join(showDir, entry);
-    let files;
-    try {
-      files = fs.readdirSync(seasonDir);
-    } catch {
-      continue;
-    }
-    for (const file of files) {
-      if (!isVideoFile(file)) continue;
-      const parsed = parseFileSeasonEpisode(file, entry);
-      tuples.push({
-        season: parsed?.season ?? 0,
-        episode: parsed?.episode ?? 0,
-        fullPath: path.join(seasonDir, file),
-      });
-    }
-  }
-
-  tuples.sort((a, b) =>
-    a.season !== b.season ? a.season - b.season : a.episode - b.episode,
-  );
-
-  const chkPaths = loadNeedsSrtChkSet();
-
-  for (const t of tuples) {
-    if (await srtExists(t.fullPath)) continue;
-    // Step 3.5: watched check
-    if (
-      t.season !== 0 &&
-      t.episode !== 0 &&
-      watched.has(`${t.season}:${t.episode}`)
-    )
-      continue;
-    // Step 3.5 continued: probe subs + extract text streams
-    const subtitleStreams = await getSubtitleStreams(t.fullPath);
-    if (subtitleStreams !== null) {
-      await extractTextSubtitles(t.fullPath, subtitleStreams);
-    }
-    // Step 4: needsSrtChk
-    if (chkPaths.has(t.fullPath)) continue;
-    // Step 5: any subtitle streams → needsSrtChk
-    if (subtitleStreams !== null && subtitleStreams.length > 0) {
-      appendNeedsSrtChk(t.fullPath);
-      continue;
-    }
-    return {
-      videoPath: t.fullPath,
-      season: t.season,
-      episode: t.episode,
-      showName: show.name,
-    };
-  }
-  return null;
-}
-
-async function pickNextFile(inEmbyShows, logPath, pendingPaths) {
-  const chkPaths = loadNeedsSrtChkSet();
-  if (pendingPaths && pendingPaths.length > 0) {
-    for (const videoPath of pendingPaths) {
-      if (!isVideoFile(videoPath)) continue;
-      if (!(await pathExists(videoPath))) continue;
-      if (await srtExists(videoPath)) continue;
-      // Step 3.5: watched check
-      const showDir = path.relative(TV_ROOT, videoPath).split(path.sep)[0];
-      const show = inEmbyShows.find((s) => s.path === showDir);
-      if (!show) continue;
-      const basename = path.basename(videoPath);
-      const folderName = path.dirname(videoPath).split(path.sep).pop();
-      const parsed = parseFileSeasonEpisode(basename, folderName);
-      if (
-        parsed &&
-        Number.isInteger(parsed.season) &&
-        Number.isInteger(parsed.episode)
-      ) {
-        const season = parsed.season;
-        const episode = parsed.episode;
-        const watched = new Set();
-        if (Array.isArray(show.watchedEpis)) {
-          for (const row of show.watchedEpis) {
-            const s = row[0];
-            for (let i = 1; i < row.length; i++) watched.add(`${s}:${row[i]}`);
-          }
-        }
-        if (watched.has(`${season}:${episode}`)) continue;
-      }
-      // Step 3.5 continued: probe subs + extract text streams
-      const subtitleStreams = await getSubtitleStreams(videoPath);
-      if (subtitleStreams !== null) {
-        await extractTextSubtitles(videoPath, subtitleStreams);
-      }
-      // Step 4: needsSrtChk
-      if (chkPaths.has(videoPath)) continue;
-      // Step 5: any subtitle streams → needsSrtChk
-      if (subtitleStreams !== null && subtitleStreams.length > 0) {
-        appendNeedsSrtChk(videoPath);
-        continue;
-      }
-      return {
-        videoPath,
-        season: parsed?.season ?? 0,
-        episode: parsed?.episode ?? 0,
-        showName: show.name,
-        fromPending: true,
-      };
-    }
-  }
-
-  let startIdx = 0;
-  if (fs.existsSync(logPath)) {
-    const content = fs.readFileSync(logPath, "utf8");
-    const lines = content.split("\n").filter((l) => l.trim() !== "");
-    if (lines.length > 0) {
-      const lastLine = lines[lines.length - 1];
-      const match = lastLine.match(/^\d{2}-\d{2} \d{2}:\d{2}:\d{2} [* ] (.+)$/);
-      if (match) {
-        const relPath = match[1];
-        // First path component is the show directory name (same as show.path)
-        const showDir = relPath.split(path.sep)[0];
-        const idx = inEmbyShows.findIndex((s) => s.path === showDir);
-        if (idx !== -1) startIdx = (idx + 1) % inEmbyShows.length;
-      }
-    }
-  }
-
-  for (let i = 0; i < inEmbyShows.length; i++) {
-    const show = inEmbyShows[(startIdx + i) % inEmbyShows.length];
-    const result = await findCandidateFile(show);
-    if (result) return result;
-  }
-  return null;
-}
-
-async function hasAnyUnwatchedFile(shows) {
-  for (const show of shows) {
-    const result = await findCandidateFile(show);
-    if (result) return true;
-  }
-  return false;
-}
-
-async function runBackgroundLoop() {
-  tmpDir = BKGND_TMPDIR;
-  fs.mkdirSync(BKGND_TMPDIR, { recursive: true });
-  deleteLastLogLine(BKGND_LOG_PATH);
-  console.log(`[bkgnd] Starting background ASR loop. Log: ${BKGND_LOG_PATH}`);
-
-  let consecutiveEmpty = 0;
-  let cachedTvdb = null;
-  let pauseLogged = false;
-
-  while (true) {
-    const pending = consumePending();
-    const forcedPending = consumeForcedPending();
-    const embPending = consumeQueueFile(EMB_PENDING_PATH);
-
-    // Process emb-pending before anything else (fast, no CPU gate needed)
-    if (embPending.length > 0) {
-      await processEmbQueue(embPending);
-    }
-
-    // Process forced-pending (user clicked Bad in chksrt): run ASR even if srt already exists
-    for (const videoPath of forcedPending) {
-      if (!isVideoFile(videoPath)) continue;
-      if (!(await pathExists(videoPath))) continue;
-      await waitForLowCpu();
-      if (!cachedTvdb) cachedTvdb = loadTvdb();
-      appendBkgndLog(BKGND_LOG_PATH, videoPath, true);
-      console.log(`[bkgnd] forced ASR: ${path.basename(videoPath)}`);
-      try {
-        await processOneVideo(videoPath);
-      } catch (err) {
-        console.error(`[bkgnd] forced ASR error: ${err.message}`);
-      }
-      consecutiveEmpty = 0;
-      pauseLogged = false;
-    }
-
-    // Pending files are priority: log immediately then wait for CPU.
-    // Regular background files wait for CPU first (so they are never stalled).
-    if (pending.length === 0) await waitForLowCpu();
-
-    if (!cachedTvdb) cachedTvdb = loadTvdb();
-    const allInEmby = Object.values(cachedTvdb).filter((s) => s.inEmby);
-    let inEmby = allInEmby;
-    if (TEST_SHOWS) inEmby = allInEmby.filter((s) => TEST_SHOWS.has(s.path));
-
-    const chosen = await pickNextFile(inEmby, BKGND_LOG_PATH, pending);
-    if (!chosen) {
-      consecutiveEmpty++;
-      if (consecutiveEmpty >= 10) {
-        consecutiveEmpty = 0;
-        cachedTvdb = null;
-        const allInEmby2 = Object.values(loadTvdb()).filter((s) => s.inEmby);
-        let scanShows = allInEmby2;
-        if (TEST_SHOWS)
-          scanShows = allInEmby2.filter((s) => TEST_SHOWS.has(s.path));
-        if (!(await hasAnyUnwatchedFile(scanShows))) {
-          if (!pauseLogged) {
-            const msg = `No unwatched files found — pausing ${PAUSE_DURATION_MS / 60000} mins`;
-            console.log(`[bkgnd] ${msg}`);
-            bkgndLogStatus(BKGND_LOG_PATH, msg);
-            pauseLogged = true;
-          }
-          const deadline = Date.now() + PAUSE_DURATION_MS;
-          while (Date.now() < deadline) {
-            await sleep(PAUSE_POLL_MS);
-            const wakeUp = consumePending();
-            const embWakeUp = consumeQueueFile(EMB_PENDING_PATH);
-            if (embWakeUp.length > 0) {
-              // put emb back and break to process at top of loop
-              fs.mkdirSync(path.dirname(EMB_PENDING_PATH), { recursive: true });
-              fs.appendFileSync(
-                EMB_PENDING_PATH,
-                embWakeUp.join("\n") + "\n",
-                "utf8",
-              );
-              pauseLogged = false;
-              break;
-            }
-            if (wakeUp.length > 0) {
-              fs.mkdirSync(path.dirname(PENDING_PATH), { recursive: true });
-              fs.writeFileSync(PENDING_PATH, wakeUp.join("\n") + "\n", "utf8");
-              pauseLogged = false;
-              break;
-            }
-          }
-        } else {
-          pauseLogged = false;
-        }
-      }
-      continue;
-    }
-
-    consecutiveEmpty = 0;
-    pauseLogged = false;
-    const { videoPath, fromPending } = chosen;
-    const stalled = fromPending && os.loadavg()[0] > CPU_LOAD_MAX;
-    appendBkgndLog(BKGND_LOG_PATH, videoPath, fromPending, stalled);
-    if (stalled) await waitForLowCpu();
-
-    let generated = false;
-    try {
-      await processOneVideo(videoPath);
-      generated = true;
-    } catch (err) {
-      console.error(`[bkgnd] ❌ ${err.message}`);
-    }
-
-    if (generated) {
-      cachedTvdb = null;
-    } else {
-      consecutiveEmpty++;
-    }
-  }
-}
-
-/* ---------------- Main execution ---------------- */
-async function main() {
-  console.log(`\nConfiguration:`);
-  console.log(
-    `   Test Mode:        ${testMins > 0 ? `${testMins} minutes` : "OFF"}`,
-  );
-  console.log(`   Time Match Margin: ${timeMatchMgn}s`);
-  console.log(
-    `   Audio Quality:     ${audioQuality} (${audioConfig.rate}Hz, ${audioConfig.bitrate})`,
-  );
-  console.log(`   Preprocessing:     ${AUDIO_FILTER}`);
-  console.log(`   API Model:         ${model}`);
-  console.log(`   API Temperature:   ${apiTemperature}`);
-  console.log(`   API Response:      ${apiResponseFormat}`);
-  console.log(`   API Prompt:        ${apiPrompt || "None"}`);
-  console.log(
-    `   File Size Limit:   ${(FILE_LIMIT_BYTES / 1024 / 1024).toFixed(0)}MB (adaptive)`,
-  );
-  console.log();
-
-  try {
-    if (!(await pathExists(inputPath))) {
-      throw new Error(`Input path does not exist: ${inputPath}`);
-    }
-    const stat = await fsp.stat(inputPath);
-    const videoFiles = [];
-
-    if (stat.isFile()) {
-      if (!isVideoFile(inputPath)) {
-        throw new Error(`File is not a supported video format: ${inputPath}`);
-      }
-      videoFiles.push(inputPath);
-    } else if (stat.isDirectory()) {
-      const files = (await fsp.readdir(inputPath)).sort();
-      for (const file of files) {
-        const fullPath = path.join(inputPath, file);
-        const fileStat = await fsp.stat(fullPath);
-        if (fileStat.isFile() && isVideoFile(fullPath)) {
-          videoFiles.push(fullPath);
-        }
-      }
-    } else {
-      throw new Error(`Input is neither file nor directory: ${inputPath}`);
-    }
-    if (videoFiles.length === 0) {
-      throw new Error("No video files found");
-    }
-    console.log(`Found ${videoFiles.length} video file(s) to process`);
-    let processed = 0;
-    let failed = 0;
-    for (const videoFile of videoFiles) {
-      try {
-        await processOneVideo(videoFile);
-        processed++;
-      } catch (err) {
-        console.error(
-          `[${ts()}] ❌ Failed: ${path.basename(videoFile)} - ${err.message}`,
-        );
-        failed++;
-      }
-    }
-    if (failed > 0) {
-      process.exit(1);
-    }
-    console.log();
-  } catch (err) {
-    console.error(`[${ts()}] ❌ Fatal error: ${err.message}`);
-    process.exit(1);
-  } finally {
-    if (typeof closeLogger === "function") {
-      closeLogger();
-    }
-  }
-}
-
-// Check dependencies and run
 (async () => {
-  try {
-    await run("ffmpeg", ["-version"]);
-    await run("ffprobe", ["-version"]);
-    if (runBackground) {
-      await runBackgroundLoop();
-    } else {
-      await main();
-    }
-  } catch (err) {
-    console.error(`[${ts()}] 💥��� Error: ${err.message}`);
-    process.exit(1);
-  }
-})();
+  await run("ffmpeg", ["-version"]);
+  await run("ffprobe", ["-version"]);
+  await processOneVideo(path.resolve(inputPath));
+})().catch((err) => {
+  console.error(err.message);
+  process.exit(1);
+});

@@ -423,6 +423,18 @@ export function embApply(reqPath) {
   return httpCall("/api/asr/emb/apply", { path: reqPath }, "POST");
 }
 
+export function enqueueSubs(videoPaths, fromUI) {
+  return httpCall("/api/asr/subs/enqueue", { videoPaths, fromUI }, "POST");
+}
+
+export function enqueueGenSrt(videoPaths, fromUI) {
+  return httpCall("/api/asr/gensrt/enqueue", { videoPaths, fromUI }, "POST");
+}
+
+export function generateEmb(videoPaths) {
+  return httpCall("/api/asr/emb/generate", { videoPaths }, "POST");
+}
+
 export function handleFix(params) {
   return fCall("handleFix", params);
 }
@@ -435,8 +447,16 @@ export function chksrtOk(videoPath) {
   return httpCall("/api/asr/chksrt/ok", { videoPath }, "POST");
 }
 
-export function chksrtBad(videoPath) {
-  return httpCall("/api/asr/chksrt/bad", { videoPath }, "POST");
+export function chksrtGenSrt(videoPath) {
+  return httpCall("/api/asr/chksrt/gensrt", { videoPath }, "POST");
+}
+
+export function chksrtSelect(videoPath, selectedSrtPath) {
+  return httpCall(
+    "/api/asr/chksrt/select",
+    { videoPath, selectedSrtPath },
+    "POST",
+  );
 }
 
 export function setTvdbFields(params) {

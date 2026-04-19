@@ -811,7 +811,8 @@ async function fileNeedsSubChecked(videoFilePath, showName) {
       (f) =>
         f === basename + ".enx.srt" ||
         f === basename + ".enx.srtstub" ||
-        /^\.en\d+\.srt$/.test("." + f.slice(basename.length)),
+        /^\.en\d+\.srt$/.test("." + f.slice(basename.length)) ||
+        /^\.(#[A-Z2-7]+)\.srt$/.test("." + f.slice(basename.length)),
     )
   )
     return false;
@@ -1050,7 +1051,8 @@ async function processSubQueueEntry() {
       (f) =>
         f === basename + ".enx.srt" ||
         f === basename + ".enx.srtstub" ||
-        /^\.en\d+\.srt$/.test("." + f.slice(basename.length)),
+        /^\.en\d+\.srt$/.test("." + f.slice(basename.length)) ||
+        /^\.(#[A-Z2-7]+)\.srt$/.test("." + f.slice(basename.length)),
     );
     if (!hasSidecar) {
       subQueueGenSrt.unshift({

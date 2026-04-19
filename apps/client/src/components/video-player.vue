@@ -210,7 +210,11 @@
           marginRight: '8px',
         }"
       >
-        {{ choice.label }}
+        {{
+          choice.type && choice.type !== "srt"
+            ? choice.label + " *"
+            : choice.label
+        }}
       </div>
       <!-- Subs button (chksrt mode only) -->
       <div

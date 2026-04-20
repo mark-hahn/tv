@@ -211,9 +211,11 @@
         }"
       >
         {{
-          choice.type && choice.type !== "srt"
-            ? choice.label + " *"
-            : choice.label
+          mode === "chksrt"
+            ? (subtitleLabelMap.get(choice.id) ?? choice.label)
+            : choice.type && choice.type !== "srt"
+              ? choice.label + " *"
+              : choice.label
         }}
       </div>
       <!-- Subs button (chksrt mode only) -->
@@ -345,6 +347,23 @@ export default {
     subtitleChoices() {
       if (this.subtitleTracks.length === 0) return [];
       return [...this.subtitleTracks, { id: "off", label: "off" }];
+    },
+    subtitleLabelMap() {
+      const map = new Map();
+      let n = 1;
+      for (const t of this.subtitleTracks) {
+        let char;
+        if (t.type === "pgs") char = "*";
+        else if (t.type === "embedded") char = "t";
+        else if (/\.asr\.srt$/.test(t.file || "")) char = "+";
+        else if (/\.mb\d+\.srt$/.test(t.file || "")) char = ">";
+        else if (/\.opn[A-Za-z0-9]+\.srt$/.test(t.file || "")) char = "v";
+        else char = "s";
+        map.set(t.id, `${char} ${n}`);
+        n++;
+      }
+      map.set("off", "off");
+      return map;
     },
     chksrtFilename() {
       if (!this.path) return "";

@@ -369,7 +369,7 @@ export default {
       if (!this.path) return "";
       const parts = this.path.split("/");
       const name = parts[parts.length - 1];
-      return this.chksrtCount > 0 ? `${name} (${this.chksrtCount})` : name;
+      return this.chksrtCount > 0 ? `(${this.chksrtCount}) ${name}` : name;
     },
   },
   watch: {

@@ -407,6 +407,9 @@ export default {
         this.subtitleTracks = tracks;
         if (tracks.length > 0) {
           this.activeTrackId = tracks[0].id;
+          if (tracks[0].type === "pgs") {
+            this.vidSrc = this._buildStreamUrl(tracks[0].index);
+          }
         }
       } catch (e) {
         console.error("[subtitle-list] fetch error:", e);
@@ -416,6 +419,13 @@ export default {
       const prevTrack = this.activeTrack;
       this.activeTrackId = id;
       const newTrack = this.subtitleTracks.find((t) => t.id === id) || null;
+      const wasPgs = prevTrack?.type === "pgs";
+      const isPgs = newTrack?.type === "pgs";
+      if (isPgs) {
+        this.vidSrc = this._buildStreamUrl(newTrack.index);
+      } else if (wasPgs) {
+        this.vidSrc = this.streamUrl;
+      }
       if (id === "off") {
         const vid = this.$refs.vid;
         if (vid) for (const tt of vid.textTracks) tt.mode = "disabled";

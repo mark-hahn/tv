@@ -868,8 +868,8 @@ async function fileNeedsSubChecked(videoFilePath, showName) {
       (f) =>
         f === basename + ".asr.srt" ||
         f === basename + ".mb.srtstub" ||
-        /^\.(mb\d+|opn.{5})\.srt$/.test("." + f.slice(basename.length)) ||
-        /^\.(#[A-Z2-7]+)\.srt$/.test("." + f.slice(basename.length)),
+        /^\.(mb\d+|opn.{5})\.srt$/.test(f.slice(basename.length)) ||
+        /^\.(#[A-Z2-7]+)\.srt$/.test(f.slice(basename.length)),
     )
   )
     return false;
@@ -888,7 +888,12 @@ async function fileNeedsSubChecked(videoFilePath, showName) {
   return true;
 }
 function stripSrtFormatting(srt) {
-  return srt.replace(/\{[^}]*\}/g, "").replace(/<[^>]+>/g, "");
+  return srt
+    .replace(/\{[^}]*\}/g, "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\\h/g, " ")
+    .replace(/\\N/g, "\n")
+    .replace(/\\n/g, "\n");
 }
 
 async function generateEmbSrts(
@@ -1135,8 +1140,8 @@ async function processSubQueueEntry() {
       (f) =>
         f === basename + ".asr.srt" ||
         f === basename + ".mb.srtstub" ||
-        /^\.(mb\d+|opn.{5})\.srt$/.test("." + f.slice(basename.length)) ||
-        /^\.(#[A-Z2-7]+)\.srt$/.test("." + f.slice(basename.length)),
+        /^\.(mb\d+|opn.{5})\.srt$/.test(f.slice(basename.length)) ||
+        /^\.(#[A-Z2-7]+)\.srt$/.test(f.slice(basename.length)),
     );
     if (!hasSidecar) {
       enqueueSubQueueGenSrt(

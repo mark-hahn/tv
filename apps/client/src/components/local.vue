@@ -1959,7 +1959,7 @@ export default {
       const el = this.$refs.embScroll;
       const atBottom =
         !el || el.scrollHeight - el.scrollTop - el.clientHeight < 50;
-      this.embLogs += msg;
+      this.embLogs += (msg.endsWith("\n") ? msg : msg + "\n") + "\n";
       if (atBottom) {
         this.$nextTick(() => {
           if (el) el.scrollTop = el.scrollHeight;

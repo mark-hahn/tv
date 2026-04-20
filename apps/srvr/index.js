@@ -887,6 +887,10 @@ async function fileNeedsSubChecked(videoFilePath, showName) {
   }
   return true;
 }
+function stripSrtFormatting(srt) {
+  return srt.replace(/\{[^}]*\}/g, "").replace(/<[^>]+>/g, "");
+}
+
 async function generateEmbSrts(
   videoFilePath,
   showname,
@@ -943,12 +947,19 @@ async function generateEmbSrts(
           `0:${s.index}`,
           "-c:s",
           "srt",
-          outPath,
+          "-f",
+          "srt",
+          "pipe:1",
         ],
-        (err) => {
-          if (!err) {
-            logSubtitle(`emb: ${outPath}`);
-            if (fromUI) notifyClients("emb-log", `extracted ${outPath}`);
+        { maxBuffer: 4 * 1024 * 1024 },
+        (err, stdout) => {
+          if (!err && stdout) {
+            const stripped = stripSrtFormatting(stdout);
+            if (stripped !== stdout) {
+              fs.writeFileSync(outPath, stripped, "utf8");
+              logSubtitle(`emb: ${outPath}`);
+              if (fromUI) notifyClients("emb-log", `extracted ${outPath}`);
+            }
           }
           resolve();
         },

@@ -1081,6 +1081,11 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
       });
     });
     logSubtitle(`asr done: ${videoFilePath}`);
+    if (fromUI)
+      notifyClients("subs-progress", {
+        path: videoFilePath,
+        status: "asr-done",
+      });
   } catch (e) {
     logSubtitle(`asr error: ${e.message}`);
   } finally {
@@ -1168,6 +1173,11 @@ async function processSubQueueEntry() {
       );
       persistSubQueueChkSrt();
       notifyClients("chksrt-count", subQueueChkSrt.length);
+      if (entry.fromUI)
+        notifyClients("subs-progress", {
+          path: entry.videoFilePath,
+          status: "chksrt",
+        });
     }
   } finally {
     subQueueBusy = false;

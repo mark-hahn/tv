@@ -113,7 +113,7 @@
               borderRadius: '7px',
               padding: '4px 10px',
               border: '1px solid #bbb',
-              backgroundColor: 'whitesmoke',
+              '--btn-bg': subsPending.length > 0 ? 'lightgray' : 'whitesmoke',
               marginRight: '10px',
             }"
           >
@@ -798,6 +798,9 @@ export default {
       activeFixPath: null,
       ignoreFixLogs: false,
 
+      // Subs progress tracking
+      subsPending: [],
+
       // Errs mode
       errsMode: false,
 
@@ -894,6 +897,7 @@ export default {
     evtBus.on("asr-log", this.onAsrLog);
     evtBus.on("fix-log", this.onFixLog);
     evtBus.on("emb-log", this.onEmbLog);
+    evtBus.on("subs-progress", this.onSubsProgress);
     this.initAsrState();
     this.initFixState();
     this.initEmbState();
@@ -902,6 +906,7 @@ export default {
     evtBus.off("asr-log", this.onAsrLog);
     evtBus.off("fix-log", this.onFixLog);
     evtBus.off("emb-log", this.onEmbLog);
+    evtBus.off("subs-progress", this.onSubsProgress);
   },
   computed: {
     infoLines() {
@@ -1471,14 +1476,25 @@ export default {
       const videoPaths = this.collectFilePaths()
         .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
         .map((p) => `/mnt/media/tv/${p}`);
-      console.log("[clickSubs] videoPaths:", videoPaths);
       if (videoPaths.length === 0) {
         alert("No video files selected");
         return;
       }
+      for (const p of videoPaths) {
+        if (!this.subsPending.includes(p)) this.subsPending.push(p);
+      }
       enqueueSubs(videoPaths, true).catch((e) =>
         console.error("enqueueSubs", e),
       );
+    },
+    onSubsProgress({ path }) {
+      const idx = this.subsPending.indexOf(path);
+      if (idx !== -1) {
+        this.subsPending.splice(idx, 1);
+        if (this.subsPending.length === 0) {
+          this.fetchFiles();
+        }
+      }
     },
     clickAsr() {
       this.showAsr = !this.showAsr;

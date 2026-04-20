@@ -92,13 +92,22 @@ const chkWriteFile = async () => {
     // fs.rename() on Linux is a single syscall — if the process is killed
     // mid-write the original file is untouched.
     const tmpPath = path + ".tmp";
-    await fsp.writeFile(tmpPath, data);
-    await fsp.rename(tmpPath, path);
-    resolvesByPath[path].forEach((resolve) => resolve());
-    resolvesByPath[path] = [];
-    delete dataByPath[path];
-    anyWritten = true;
-    busyByPath[path] = false;
+    try {
+      await fsp.writeFile(tmpPath, data);
+      await fsp.rename(tmpPath, path);
+      resolvesByPath[path].forEach((resolve) => resolve());
+      resolvesByPath[path] = [];
+      delete dataByPath[path];
+      anyWritten = true;
+    } catch (e) {
+      console.error(`[util] writeFile failed for ${path}: ${e.message}`);
+      fsp.unlink(tmpPath).catch(() => {});
+      resolvesByPath[path].forEach((resolve) => resolve());
+      resolvesByPath[path] = [];
+      delete dataByPath[path];
+    } finally {
+      busyByPath[path] = false;
+    }
   }
   if (anyWritten) await chkWriteFile();
 };

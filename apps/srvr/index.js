@@ -934,7 +934,10 @@ async function generateEmbSrts(
   });
   for (const s of textStreams) {
     const outPath = `${base}.en${s.index}.srt`;
-    if (fs.existsSync(outPath)) continue;
+    if (fs.existsSync(outPath)) {
+      if (fromUI) notifyClients("emb-log", `exists: ${path.basename(outPath)}`);
+      continue;
+    }
     await new Promise((resolve) => {
       cp.execFile(
         "ffmpeg",
@@ -959,6 +962,9 @@ async function generateEmbSrts(
               fs.writeFileSync(outPath, stripped, "utf8");
               logSubtitle(`emb: ${outPath}`);
               if (fromUI) notifyClients("emb-log", `extracted ${outPath}`);
+            } else {
+              const fname = path.basename(outPath);
+              if (fromUI) notifyClients("emb-log", `No formatting: ${fname}`);
             }
           }
           resolve();

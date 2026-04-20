@@ -1895,19 +1895,6 @@ export default {
     },
     async applyEmb() {
       if (this.embBusy) return;
-
-      let startPath = null;
-      if (this.selectedName) {
-        startPath = this.selectedName;
-      } else if (this.selectedFiles.size === 1) {
-        startPath = [...this.selectedFiles][0];
-      }
-
-      if (!startPath) {
-        this.embLogs += "\n[Error] No folder or file selected.\n";
-        return;
-      }
-
       this.embBusy = true;
       this.showEmb = true;
       this.showSubs = false;
@@ -1916,7 +1903,15 @@ export default {
       this.showInfo = false;
 
       try {
-        const res = await embApply(startPath);
+        const videoPaths = this.collectFilePaths()
+          .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
+          .map((p) => `/mnt/media/tv/${p}`);
+        if (videoPaths.length === 0) {
+          this.embLogs += "[Error] No video files selected.\n\n";
+          this.embBusy = false;
+          return;
+        }
+        const res = await generateEmb(videoPaths);
         if (res && res.ok) {
           this.embLogs += `[Queued ${res.queued} file(s) for emb extraction]\n`;
         } else {

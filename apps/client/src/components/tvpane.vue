@@ -3,9 +3,72 @@
     id="tvPane"
     style="padding: 0; box-sizing: border-box; width: 100%; height: 100%"
   >
+    <!-- Keyboard pane -->
+    <div
+      v-if="showKeybd"
+      style="
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding: 12px;
+        box-sizing: border-box;
+        gap: 10px;
+      "
+    >
+      <div style="display: flex; gap: 8px; align-items: center">
+        <input
+          ref="keybdInput"
+          v-model="keybdInput"
+          type="text"
+          style="
+            flex: 1;
+            padding: 8px;
+            font-size: 16px;
+            border: 1px solid #bbb;
+            border-radius: 5px;
+            box-sizing: border-box;
+          "
+          placeholder="Type here..."
+          @keydown.enter="keybdSend"
+        />
+        <button
+          @mousedown.prevent="showKeybd = false"
+          @touchstart.prevent="showKeybd = false"
+          :style="{
+            '--btn-bg': '#111',
+            border: 'none',
+            color: '#fff',
+            fontSize: '20px',
+            cursor: 'pointer',
+            padding: '8px 12px',
+            borderRadius: '8px',
+            lineHeight: '1',
+          }"
+        >
+          ✕
+        </button>
+      </div>
+      <div style="overflow-y: auto; flex: 1">
+        <div
+          v-for="(item, idx) in keybdHistory"
+          :key="item"
+          @click="keybdRecall(item)"
+          :style="{
+            padding: '6px 8px',
+            borderBottom: '1px solid #eee',
+            cursor: 'pointer',
+            fontSize: '15px',
+            userSelect: 'none',
+            backgroundColor: idx % 2 === 0 ? '#fafafa' : '#fff',
+          }"
+        >
+          {{ item }}
+        </div>
+      </div>
+    </div>
     <!-- Streamers pane -->
     <div
-      v-if="showStreamers"
+      v-else-if="showStreamers"
       style="
         display: flex;
         flex-direction: column;
@@ -285,6 +348,9 @@ export default {
       mediaTitle: null,
       showStreamers: false,
       flashSvc: null,
+      showKeybd: false,
+      keybdInput: "",
+      keybdHistory: [],
     };
   },
 
@@ -330,10 +396,12 @@ export default {
   mounted() {
     this.pollMute();
     evtBus.on("tvMuteState", this._onTvMuteState);
+    evtBus.on("paneChanged", this._onPaneChanged);
   },
 
   beforeUnmount() {
     evtBus.off("tvMuteState", this._onTvMuteState);
+    evtBus.off("paneChanged", this._onPaneChanged);
     this.stopRepeat();
     this.stopHold();
   },
@@ -446,7 +514,42 @@ export default {
 
     keybdBtn() {
       this.flash("keybd");
-      this._keybdTimer = setTimeout(() => evtBus.emit("tvKeybdBtn"), 500);
+      this.showKeybd = true;
+      this.$nextTick(() => {
+        if (this.$refs.keybdInput) this.$refs.keybdInput.focus();
+      });
+    },
+
+    async keybdSend() {
+      const text = this.keybdInput.trim();
+      if (!text) return;
+      for (let i = 0; i < 50; i++) {
+        try {
+          await fetch(config.tvTvUrl + "/tv/keyevent/KEYCODE_DEL");
+        } catch (e) {}
+      }
+      try {
+        await fetch(config.tvTvUrl + "/tv/text?t=" + encodeURIComponent(text));
+      } catch (e) {}
+      try {
+        await fetch(config.tvTvUrl + "/tv/keyevent/KEYCODE_ENTER");
+      } catch (e) {}
+      this.keybdHistory = [
+        text,
+        ...this.keybdHistory.filter((i) => i !== text),
+      ];
+      this.keybdInput = "";
+    },
+
+    keybdRecall(item) {
+      this.keybdInput = item;
+      this.$nextTick(() => {
+        if (this.$refs.keybdInput) this.$refs.keybdInput.focus();
+      });
+    },
+
+    _onPaneChanged(pane) {
+      if (pane !== "tv") this.showKeybd = false;
     },
 
     _onTvMuteState(data) {

@@ -1010,7 +1010,9 @@ async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
     `opensubs ${items.length} results: ${path.basename(videoFilePath)}`,
   );
   const base = videoFilePath.replace(/\.[^.]+$/, "");
+  let dlCount = 0;
   for (const r of items) {
+    if (dlCount >= 10) break;
     const fid = r.file_id || r.attributes?.files?.[0]?.file_id;
     if (!fid) continue;
     const tag = "opn" + encodeFileIdBase32(fid).slice(1);
@@ -1029,7 +1031,8 @@ async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
       const resp = await fetch(url, { headers: { Accept: "*/*" } });
       if (!resp.ok) continue;
       const txt = await resp.text();
-      await fs.promises.writeFile(outPath, txt, "utf8");
+      await fs.promises.writeFile(outPath, stripSrtFormatting(txt), "utf8");
+      dlCount++;
       logSubtitle(`opensubs: ${outPath}`);
     } catch (e) {
       logSubtitle(`opensubs dl err ${fid}: ${e.message}`);
@@ -3537,6 +3540,20 @@ app.get("/api/subtitle-list", async (req, res) => {
       lines.push(
         `- old: \`${t.label}\`  new: \`${newLabel}\`  file: \`${filePart}\``,
       );
+      if (/\.opn[A-Z2-7]{5}\.srt$/i.test(t.file || "")) {
+        lines.push(`  head "${path.join(dir, t.file)}"`);
+        const opnTag = (t.file.match(/\.opn([A-Z2-7]{5})\.srt$/i) || [])[1];
+        if (opnTag) {
+          // TEMP: decode base32 tag to decimal file_id
+          const alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+          let fid = 0;
+          for (const ch of opnTag.toUpperCase())
+            fid = fid * 32 + alpha.indexOf(ch);
+          lines.push(
+            `  id: ${fid}  https://www.opensubtitles.com/en/subtitles/${fid}`,
+          );
+        }
+      }
     });
     fs.appendFileSync("/root/dev/apps/tv/temp.md", lines.join("\n") + "\n\n");
   } catch (_) {}

@@ -1885,25 +1885,13 @@ export default {
       }
     },
     clickEmb() {
-      const videoPaths = this.collectFilePaths()
-        .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
-        .map((p) => `/mnt/media/tv/${p}`);
-      if (videoPaths.length === 0) {
-        this.showEmb = !this.showEmb;
-        if (this.showEmb) {
-          this.showSubs = false;
-          this.showAsr = false;
-          this.showFix = false;
-          this.showInfo = false;
-        }
-        return;
+      this.showEmb = !this.showEmb;
+      if (this.showEmb) {
+        this.showSubs = false;
+        this.showAsr = false;
+        this.showFix = false;
+        this.showInfo = false;
       }
-      generateEmb(videoPaths).catch((e) => console.error("generateEmb", e));
-      this.showEmb = true;
-      this.showSubs = false;
-      this.showAsr = false;
-      this.showFix = false;
-      this.showInfo = false;
     },
     async applyEmb() {
       if (this.embBusy) return;

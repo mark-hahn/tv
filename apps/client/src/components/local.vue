@@ -113,7 +113,8 @@
               borderRadius: '7px',
               padding: '4px 10px',
               border: '1px solid #bbb',
-              '--btn-bg': subsPending.length > 0 ? 'lightgray' : 'whitesmoke',
+              backgroundColor:
+                subsPending.length > 0 ? 'lightgray' : 'whitesmoke',
               marginRight: '10px',
             }"
           >
@@ -195,7 +196,7 @@
               borderRadius: '7px',
               padding: '4px 10px',
               border: '1px solid #bbb',
-              '--btn-bg': showInfo ? '#ddd' : 'whitesmoke',
+              backgroundColor: showInfo ? '#ddd' : 'whitesmoke',
               marginRight: '10px',
             }"
           >

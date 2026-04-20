@@ -1040,12 +1040,6 @@ async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
       dlCount++;
       logSubtitle(`opensubs: ${outPath}`);
       // TEMP: log api filename for release matching
-      const apiFileName =
-        r.attributes?.files?.[0]?.file_name || r.attributes?.release || "";
-      if (apiFileName)
-        logSubtitle(
-          `  TEMP api_file: ${path.basename(outPath, ".srt")} = ${apiFileName}`,
-        );
     } catch (e) {
       logSubtitle(`opensubs dl err ${fid}: ${e.message}`);
     }

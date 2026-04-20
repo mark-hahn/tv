@@ -357,7 +357,7 @@ export default {
         else if (t.type === "embedded") char = "t";
         else if (/\.asr\.srt$/.test(t.file || "")) char = "+";
         else if (/\.mb\d+\.srt$/.test(t.file || "")) char = ">";
-        else if (/\.opn[A-Za-z0-9]+\.srt$/.test(t.file || "")) char = "v";
+        else if (/\.opn.{5}\.srt$/.test(t.file || "")) char = "v";
         else char = "s";
         map.set(t.id, `${char} ${n}`);
         n++;

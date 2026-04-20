@@ -868,7 +868,7 @@ async function fileNeedsSubChecked(videoFilePath, showName) {
       (f) =>
         f === basename + ".asr.srt" ||
         f === basename + ".mb.srtstub" ||
-        /^\.(mb\d+|opn\d+)\.srt$/.test("." + f.slice(basename.length)) ||
+        /^\.(mb\d+|opn.{5})\.srt$/.test("." + f.slice(basename.length)) ||
         /^\.(#[A-Z2-7]+)\.srt$/.test("." + f.slice(basename.length)),
     )
   )
@@ -1013,7 +1013,7 @@ async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
   for (const r of items) {
     const fid = r.file_id || r.attributes?.files?.[0]?.file_id;
     if (!fid) continue;
-    const tag = "opn" + String(fid).padStart(5, "0").slice(0, 5);
+    const tag = "opn" + encodeFileIdBase32(fid).slice(1);
     const outPath = `${base}.${tag}.srt`;
     if (fs.existsSync(outPath)) continue;
     try {
@@ -1132,7 +1132,7 @@ async function processSubQueueEntry() {
       (f) =>
         f === basename + ".asr.srt" ||
         f === basename + ".mb.srtstub" ||
-        /^\.(mb\d+|opn\d+)\.srt$/.test("." + f.slice(basename.length)) ||
+        /^\.(mb\d+|opn.{5})\.srt$/.test("." + f.slice(basename.length)) ||
         /^\.(#[A-Z2-7]+)\.srt$/.test("." + f.slice(basename.length)),
     );
     if (!hasSidecar) {
@@ -3518,6 +3518,28 @@ app.get("/api/subtitle-list", async (req, res) => {
   } catch (e) {
     // ignore readdir errors
   }
+  // TEMP: log button details for chksrt debugging
+  try {
+    const charFor = (t) => {
+      if (t.type === "pgs") return "*";
+      if (t.type === "embedded") return "t";
+      if (/\.asr\.srt$/.test(t.file || "")) return "+";
+      if (/\.mb\d+\.srt$/.test(t.file || "")) return ">";
+      if (/\.opn.{5}\.srt$/.test(t.file || "")) return "v";
+      return "s";
+    };
+    const lines = [`## ${path.basename(resolved)}\n`];
+    tracks.forEach((t, i) => {
+      const newLabel = `${charFor(t)} ${i + 1}`;
+      const filePart = t.file
+        ? t.file.slice(stem.length + 1)
+        : `(embedded index ${t.index})`;
+      lines.push(
+        `- old: \`${t.label}\`  new: \`${newLabel}\`  file: \`${filePart}\``,
+      );
+    });
+    fs.appendFileSync("/root/dev/apps/tv/temp.md", lines.join("\n") + "\n\n");
+  } catch (_) {}
   res.json(tracks);
 });
 

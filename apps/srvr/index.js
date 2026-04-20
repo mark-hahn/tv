@@ -3520,6 +3520,7 @@ app.get("/api/subtitle-list", async (req, res) => {
     for (const s of streams.filter((s) => s.codec_type === "subtitle")) {
       const lang = (s.tags?.language || "").toLowerCase();
       if (lang && lang !== "eng" && lang !== "en") continue;
+      if (s.disposition?.forced === 1) continue;
       const label = s.tags?.title || s.tags?.language || "eng";
       const isPgs = s.codec_name === "hdmv_pgs_subtitle";
       tracks.push({

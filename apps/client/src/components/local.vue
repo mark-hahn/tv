@@ -1664,18 +1664,13 @@ export default {
     },
     // Subtitles logic
     clickAsr() {
-      const videoPaths = this.collectFilePaths()
-        .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
-        .map((p) => `/mnt/media/tv/${p}`);
-      if (videoPaths.length === 0) return;
-      enqueueGenSrt(videoPaths, true).catch((e) =>
-        console.error("enqueueGenSrt", e),
-      );
-      this.showAsr = true;
-      this.showSubs = false;
-      this.showEmb = false;
-      this.showFix = false;
-      this.showInfo = false;
+      this.showAsr = !this.showAsr;
+      if (this.showAsr) {
+        this.showSubs = false;
+        this.showEmb = false;
+        this.showFix = false;
+        this.showInfo = false;
+      }
     },
     async clearAsrLog() {
       this.asrLogs = "";
@@ -1687,61 +1682,19 @@ export default {
       }
     },
     async startAsr() {
-      if (this.asrBusy) return;
-
-      let startPath = null;
-      if (this.selectedName) {
-        const node = this.tree.find((n) => n.name === this.selectedName);
-        if (node) startPath = node.name;
-      } else if (this.selectedFiles.size === 1) {
-        const relPath = [...this.selectedFiles][0];
-        const node = this.findNodeByPath(relPath);
-        if (node) startPath = relPath;
+      const videoPaths = this.collectFilePaths()
+        .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
+        .map((p) => `/mnt/media/tv/${p}`);
+      if (videoPaths.length === 0) {
+        this.asrLogs += "[Error] No video files selected.\n";
+        return;
       }
-
-      if (!startPath) {
-        if (this.activeAsrPath) startPath = this.activeAsrPath;
-        else {
-          this.asrLogs += "\n[Error] No folder selected to start ASR.\n";
-          return;
-        }
-      }
-
-      this.asrBusy = true;
-      this.activeAsrPath = startPath;
-      this.ignoreLogs = true;
-      this.asrLogs = ""; // clear old text
-      this.showAsr = true; // ensure visible
-      this.showSubs = false; // close subs
-      this.showInfo = false;
-
+      this.asrLogs = "";
       try {
-        const res = await handleAsr({ action: "start", path: startPath });
-        if (res && res.error) {
-          this.ignoreLogs = false;
-          this.asrLogs += `Start Error: ${res.error}\nStderr: ${res.stderr || ""}\n`;
-          this.asrBusy = false;
-          return;
-        }
-        if (res && res.stdout) {
-          // If we attach tailing immediately, stdout from the 'start' call might duplicate
-          // what the 'tail' command picks up if the process logs quickly.
-          // However, start usually just returns wrapper output.
-          // In the duplicate case seen, it seems we get duplicates of everything?
-          // The issue is likely that 'start' returns stdout which contains the first few lines,
-          // AND 'tail' picks up the same lines from the log file.
-          // Let's NOT append stdout from start command to the logs pane,
-          // because we are tailing the log file anyway which should contain everything.
-          // this.asrLogs += res.stdout + "\n";
-          console.log("ASR Start stdout:", res.stdout);
-        }
-        // Start tailing immediately
-        this.ignoreLogs = false;
-        await handleAsr({ action: "tail", path: startPath });
+        await enqueueGenSrt(videoPaths, true);
+        this.asrLogs += `Queued ${videoPaths.length} file(s) for ASR.\n`;
       } catch (e) {
-        this.ignoreLogs = false;
-        this.asrLogs += `Error starting ASR: ${e.message}\n`;
-        this.asrBusy = false;
+        this.asrLogs += `Error: ${e.message}\n`;
       }
     },
     async killAsr() {

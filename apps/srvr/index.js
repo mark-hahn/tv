@@ -866,9 +866,9 @@ async function fileNeedsSubChecked(videoFilePath, showName) {
   if (
     entries.some(
       (f) =>
-        f === basename + ".enx.srt" ||
-        f === basename + ".enx.srtstub" ||
-        /^\.en\d*\.srt$/.test("." + f.slice(basename.length)) ||
+        f === basename + ".asr.srt" ||
+        f === basename + ".mb.srtstub" ||
+        /^\.(mb\d+|opn\d+)\.srt$/.test("." + f.slice(basename.length)) ||
         /^\.(#[A-Z2-7]+)\.srt$/.test("." + f.slice(basename.length)),
     )
   )
@@ -933,7 +933,7 @@ async function generateEmbSrts(
     );
   });
   for (const s of textStreams) {
-    const outPath = `${base}.en${s.index}.srt`;
+    const outPath = `${base}.mb${s.index}.srt`;
     if (fs.existsSync(outPath)) {
       if (fromUI) notifyClients("emb-log", `exists: ${path.basename(outPath)}`);
       continue;
@@ -974,7 +974,7 @@ async function generateEmbSrts(
   }
   const hasNonText = subStreams.some((s) => !textCodecs.includes(s.codec_name));
   if (hasNonText && textStreams.length === 0) {
-    const stubPath = `${base}.enx.srtstub`;
+    const stubPath = `${base}.mb.srtstub`;
     if (!fs.existsSync(stubPath)) {
       fs.writeFileSync(stubPath, "", "utf8");
       logSubtitle(`srtstub: ${stubPath}`);
@@ -1006,7 +1006,7 @@ async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
   for (const r of results) {
     const fid = r.file_id || r.attributes?.files?.[0]?.file_id;
     if (!fid) continue;
-    const tag = "en" + String(fid).padStart(5, "0").slice(0, 5);
+    const tag = "opn" + String(fid).padStart(5, "0").slice(0, 5);
     const outPath = `${base}.${tag}.srt`;
     if (fs.existsSync(outPath)) continue;
     try {
@@ -1031,7 +1031,7 @@ async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
 }
 async function generateSrtWithAsr(videoFilePath, fromUI) {
   const base = videoFilePath.replace(/\.[^.]+$/, "");
-  const srtPath = base + ".enx.srt";
+  const srtPath = base + ".asr.srt";
   if (fs.existsSync(srtPath)) {
     logSubtitle(`asr skip exists: ${videoFilePath}`);
     return;
@@ -1123,9 +1123,9 @@ async function processSubQueueEntry() {
     }
     const hasSidecar = dirEntries.some(
       (f) =>
-        f === basename + ".enx.srt" ||
-        f === basename + ".enx.srtstub" ||
-        /^\.en\d*\.srt$/.test("." + f.slice(basename.length)) ||
+        f === basename + ".asr.srt" ||
+        f === basename + ".mb.srtstub" ||
+        /^\.(mb\d+|opn\d+)\.srt$/.test("." + f.slice(basename.length)) ||
         /^\.(#[A-Z2-7]+)\.srt$/.test("." + f.slice(basename.length)),
     );
     if (!hasSidecar) {
@@ -3828,7 +3828,12 @@ app.post("/api/asr/chksrt/select", (req, res) => {
     if (f.endsWith(".srtstub")) continue;
     const full = path.join(dir, f);
     if (full === selectedSrtPath) continue;
-    if (f.startsWith(basename + ".en") || f.startsWith(basename + ".#")) {
+    if (
+      f.startsWith(basename + ".mb") ||
+      f.startsWith(basename + ".opn") ||
+      f === basename + ".asr.srt" ||
+      f.startsWith(basename + ".#")
+    ) {
       try {
         fs.unlinkSync(full);
       } catch {}

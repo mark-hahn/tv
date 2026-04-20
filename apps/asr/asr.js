@@ -100,26 +100,26 @@ async function pathExists(p) {
 function getSrtPath(videoPath) {
   const dir = path.dirname(videoPath);
   const baseName = path.basename(videoPath, path.extname(videoPath));
-  return path.join(dir, `${baseName}.enx.srt`);
+  return path.join(dir, `${baseName}.asr.srt`);
 }
 
 function getStubPath(videoPath) {
   const dir = path.dirname(videoPath);
   const baseName = path.basename(videoPath, path.extname(videoPath));
-  return path.join(dir, `${baseName}.enx.srtstub`);
+  return path.join(dir, `${baseName}.mb.srtstub`);
 }
 
 function hasEmbSidecar(videoPath) {
   const dir = path.dirname(videoPath);
   const baseName = path.basename(videoPath, path.extname(videoPath));
-  const prefix = `${baseName}.en`;
+  const prefix = `${baseName}.mb`;
   try {
     return fs
       .readdirSync(dir)
       .some(
         (f) =>
           f.startsWith(prefix) &&
-          /^en\d+\.srt$/.test(f.slice(baseName.length + 1)),
+          /^mb\d+\.srt$/.test(f.slice(baseName.length + 1)),
       );
   } catch {
     return false;
@@ -194,7 +194,7 @@ async function extractTextSubtitles(videoPath, subtitleStreams) {
   );
   let n = 1;
   for (const stream of textStreams) {
-    const srtPath = path.join(dir, `${baseName}.en${n}.srt`);
+    const srtPath = path.join(dir, `${baseName}.mb${n}.srt`);
     n++;
     if (await pathExists(srtPath)) continue;
     try {

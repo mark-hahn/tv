@@ -318,7 +318,8 @@ export default {
       const track = this.activeTrack;
       if (!track || !this.path) return null;
       const base = `${TV_SRVR_URL}/api/subtitle?path=${encodeURIComponent(this.path)}`;
-      if (track.type === "embedded") return `${base}&index=${track.index}`;
+      if (track.type === "embedded" || track.type === "pgs")
+        return `${base}&index=${track.index}`;
       if (track.type === "srt") {
         let url = `${base}&file=${encodeURIComponent(track.file)}`;
         if (this.subtitleOffset !== 0) url += `&offset=${this.subtitleOffset}`;
@@ -387,10 +388,6 @@ export default {
         this.subtitleTracks = tracks;
         if (tracks.length > 0) {
           this.activeTrackId = tracks[0].id;
-          if (tracks[0].type === "pgs") {
-            this._mseStop();
-            this.vidSrc = this._buildStreamUrl(tracks[0].index);
-          }
         }
       } catch (e) {
         console.error("[subtitle-list] fetch error:", e);
@@ -403,15 +400,6 @@ export default {
       if (id === "off") {
         const vid = this.$refs.vid;
         if (vid) for (const tt of vid.textTracks) tt.mode = "disabled";
-      }
-      const prevIsPgs = prevTrack?.type === "pgs";
-      const newIsPgs = newTrack?.type === "pgs";
-      if (
-        prevIsPgs !== newIsPgs ||
-        (newIsPgs && prevTrack?.index !== newTrack?.index)
-      ) {
-        this._mseStop();
-        this.vidSrc = this._buildStreamUrl(newIsPgs ? newTrack.index : null);
       }
     },
     _setOffsetFromX(clientX) {

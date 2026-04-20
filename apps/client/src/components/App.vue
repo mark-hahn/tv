@@ -913,18 +913,9 @@ export default {
       }
     },
     handleChksrtSubs(path) {
-      this.videoPlayerPath = null;
-      this.videoPlayerMode = null;
-      this.fetchChksrtCount();
-      const TV_ROOT = "/mnt/media/tv/";
-      const idx = path.indexOf(TV_ROOT);
-      const folderName =
-        idx >= 0 ? path.slice(idx + TV_ROOT.length).split("/")[0] : null;
-      if (!folderName) return;
-      evtBus.emit("selectShowFromCardTitle", folderName);
-      this.currentPane = "local";
-      evtBus.emit("paneChanged", this.currentPane);
-      evtBus.emit("localOpenSubs", { folderName });
+      srvr
+        .enqueueSubs([path], true)
+        .catch((e) => console.error("enqueueSubs", e));
     },
     async fetchChksrtCount() {
       try {

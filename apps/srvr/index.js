@@ -985,14 +985,14 @@ async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
   const tvdbAll = tvdb.getAllTvdbSync?.();
   if (!tvdbAll) return;
   const tvdbRec = tvdbAll[showname];
-  if (!tvdbRec?.imdb_id) {
+  if (!tvdbRec?.imdbId) {
     logSubtitle(`opensubs skip no imdb: ${videoFilePath}`);
     return;
   }
   let results;
   try {
     results = await subsSearch({
-      imdb_id: tvdbRec.imdb_id,
+      imdb_id: tvdbRec.imdbId,
       season,
       episode,
       language: "en",
@@ -1001,9 +1001,16 @@ async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
     logSubtitle(`opensubs search err: ${e.message}`);
     return;
   }
-  if (!Array.isArray(results) || results.length === 0) return;
+  const items = Array.isArray(results?.data) ? results.data : [];
+  if (items.length === 0) {
+    logSubtitle(`opensubs no results: ${path.basename(videoFilePath)}`);
+    return;
+  }
+  logSubtitle(
+    `opensubs ${items.length} results: ${path.basename(videoFilePath)}`,
+  );
   const base = videoFilePath.replace(/\.[^.]+$/, "");
-  for (const r of results) {
+  for (const r of items) {
     const fid = r.file_id || r.attributes?.files?.[0]?.file_id;
     if (!fid) continue;
     const tag = "opn" + String(fid).padStart(5, "0").slice(0, 5);

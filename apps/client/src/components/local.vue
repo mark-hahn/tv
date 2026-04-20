@@ -17,13 +17,9 @@
         flexDirection: 'column',
         overflow: 'hidden',
         flex:
-          showSubs || showAsr || showEmb || showFix || showInfo
-            ? '0 0 50%'
-            : '1 1 auto',
+          showAsr || showEmb || showFix || showInfo ? '0 0 50%' : '1 1 auto',
         borderBottom:
-          showSubs || showAsr || showEmb || showFix || showInfo
-            ? '1px solid #ddd'
-            : 'none',
+          showAsr || showEmb || showFix || showInfo ? '1px solid #ddd' : 'none',
       }"
     >
       <!-- Header -->
@@ -111,19 +107,13 @@
           "
         >
           <button
-            @click="errsMode || toggleSubs()"
-            :disabled="errsMode"
+            @click="clickSubs()"
             :style="{
-              cursor: errsMode ? 'default' : 'pointer',
+              cursor: 'pointer',
               borderRadius: '7px',
               padding: '4px 10px',
               border: '1px solid #bbb',
-              backgroundColor: errsMode
-                ? '#e8e8e8'
-                : showSubs
-                  ? '#ddd'
-                  : 'whitesmoke',
-              color: errsMode ? '#aaa' : 'inherit',
+              backgroundColor: 'whitesmoke',
               marginRight: '10px',
             }"
           >
@@ -410,7 +400,6 @@
       >
         <div>
           <strong>ASR Output</strong>
-          <span v-if="currentShowName"> ({{ currentShowName }}) </span>
           <span v-if="asrBusy">(Running)</span>
         </div>
         <div>
@@ -747,173 +736,6 @@
         </template>
       </div>
     </div>
-
-    <!-- Subs Pane -->
-    <div
-      id="localSubs"
-      v-if="showSubs"
-      :style="{
-        flex: '1 1 50%',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        backgroundColor: '#fafafa',
-      }"
-    >
-      <div
-        style="
-          display: flex;
-          align-items: center;
-          padding: 8px;
-          border-bottom: 1px solid #ddd;
-          flex: 0 0 auto;
-        "
-      >
-        <div
-          class="pane-header-title"
-          style="margin-right: auto"
-        >
-          Subs files
-          <span
-            v-if="currentShowName"
-            style="font-weight: normal; font-size: 0.9em; color: #666"
-            >({{ currentShowName }})</span
-          >
-        </div>
-        <div style="display: flex; gap: 8px; align-items: center">
-          <button
-            @click="applySubs"
-            :disabled="applyInProgress"
-            style="
-              cursor: pointer;
-              border-radius: 7px;
-              padding: 4px 10px;
-              border: 1px solid #bbb;
-              background-color: whitesmoke;
-            "
-          >
-            Apply
-          </button>
-          <button
-            @click="showSubs = false"
-            title="Close"
-            style="
-              cursor: pointer;
-              border-radius: 4px;
-              padding: 2px 8px;
-              border: 1px solid #bbb;
-              background-color: whitesmoke;
-              font-weight: bold;
-            "
-          >
-            ✕
-          </button>
-        </div>
-      </div>
-
-      <div style="flex: 1 1 auto; overflow: auto; padding: 10px">
-        <div v-if="subsLoading">Loading...</div>
-        <div
-          v-if="subsError"
-          style="color: red"
-        >
-          {{ subsError }}
-        </div>
-        <template
-          v-for="(item, index) in subsItems"
-          :key="item.key"
-        >
-          <div
-            v-if="
-              index > 0 &&
-              (item.season !== subsItems[index - 1].season ||
-                item.episode !== subsItems[index - 1].episode)
-            "
-            style="height: 1px; background-color: #000; margin: 4px 0"
-          ></div>
-          <div
-            :style="getSubCardStyle()"
-            @click="applySubsSingle(item)"
-          >
-            <div
-              style="
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                gap: 10px;
-                color: #000;
-              "
-            >
-              <div
-                :style="{
-                  fontWeight: 'bold',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  minWidth: 0,
-                  color: '#000',
-                }"
-              >
-                {{ item?.line1 || "" }}
-              </div>
-              <div
-                style="
-                  color: #666;
-                  white-space: nowrap;
-                  min-width: 0;
-                  display: flex;
-                  align-items: center;
-                  gap: 6px;
-                  justify-content: flex-end;
-                "
-              >
-                <div
-                  style="
-                    width: 100px;
-                    min-width: 100px;
-                    max-width: 100px;
-                    text-align: center;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    white-space: nowrap;
-                  "
-                >
-                  {{ item?.uploader || "" }}
-                </div>
-                <div
-                  style="
-                    width: 45px;
-                    min-width: 45px;
-                    max-width: 45px;
-                    text-align: right;
-                    font-family: monospace;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    white-space: nowrap;
-                  "
-                >
-                  {{ encodeFileIdBase32(item?.file_id) }}
-                </div>
-              </div>
-            </div>
-            <div
-              v-if="item.line2"
-              style="
-                font-size: 11px;
-                color: #666;
-                margin-top: 2px;
-                white-space: pre-wrap;
-                font-family: monospace;
-                overflow: hidden;
-                text-overflow: ellipsis;
-              "
-            >
-              {{ item.line2 }}
-            </div>
-          </div>
-        </template>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -922,9 +744,6 @@ import TreeNode from "./tree-node.vue";
 import { config } from "../config.js";
 import {
   deletePath,
-  subsSearch,
-  applySubFiles,
-  getSubFileIds,
   handleAsr,
   handleFix,
   handleEmb,
@@ -959,19 +778,6 @@ export default {
       hasLoaded: false,
       searchInput: "",
       renameInput: "",
-
-      // Subs pane state
-      showSubs: false,
-      subsItems: [],
-      subsLoading: false,
-      subsError: null,
-      hasSearchedSubs: false,
-      applyInProgress: false,
-      applyFailures: [],
-      showApplyFailuresModal: false,
-      totalSubsCount: 0,
-      validSubsCount: 0,
-      currentShowName: "",
 
       // Asr
       showAsr: false,
@@ -1088,7 +894,6 @@ export default {
     evtBus.on("asr-log", this.onAsrLog);
     evtBus.on("fix-log", this.onFixLog);
     evtBus.on("emb-log", this.onEmbLog);
-    evtBus.on("localOpenSubs", this.onLocalOpenSubs);
     this.initAsrState();
     this.initFixState();
     this.initEmbState();
@@ -1097,7 +902,6 @@ export default {
     evtBus.off("asr-log", this.onAsrLog);
     evtBus.off("fix-log", this.onFixLog);
     evtBus.off("emb-log", this.onEmbLog);
-    evtBus.off("localOpenSubs", this.onLocalOpenSubs);
   },
   computed: {
     infoLines() {
@@ -1663,10 +1467,22 @@ export default {
       return current.children || [];
     },
     // Subtitles logic
+    clickSubs() {
+      const videoPaths = this.collectFilePaths()
+        .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
+        .map((p) => `/mnt/media/tv/${p}`);
+      console.log("[clickSubs] videoPaths:", videoPaths);
+      if (videoPaths.length === 0) {
+        alert("No video files selected");
+        return;
+      }
+      enqueueSubs(videoPaths, true).catch((e) =>
+        console.error("enqueueSubs", e),
+      );
+    },
     clickAsr() {
       this.showAsr = !this.showAsr;
       if (this.showAsr) {
-        this.showSubs = false;
         this.showEmb = false;
         this.showFix = false;
         this.showInfo = false;
@@ -1768,7 +1584,6 @@ export default {
     clickFix() {
       this.showFix = !this.showFix;
       if (this.showFix) {
-        this.showSubs = false;
         this.showAsr = false;
         this.showInfo = false;
       }
@@ -1801,7 +1616,6 @@ export default {
       this.ignoreFixLogs = true;
       this.fixLogs = "";
       this.showFix = true;
-      this.showSubs = false;
       this.showAsr = false;
       this.showInfo = false;
 
@@ -1887,7 +1701,6 @@ export default {
     clickEmb() {
       this.showEmb = !this.showEmb;
       if (this.showEmb) {
-        this.showSubs = false;
         this.showAsr = false;
         this.showFix = false;
         this.showInfo = false;
@@ -1897,7 +1710,6 @@ export default {
       if (this.embBusy) return;
       this.embBusy = true;
       this.showEmb = true;
-      this.showSubs = false;
       this.showAsr = false;
       this.showFix = false;
       this.showInfo = false;
@@ -1949,69 +1761,9 @@ export default {
         });
       }
     },
-    async onLocalOpenSubs({ folderName }) {
-      if (!folderName) return;
-      // Ensure files are loaded
-      if (!this.hasLoaded) {
-        await this.fetchFiles();
-      }
-      // Find and select the folder in the tree
-      const nodeIndex = this.tree.findIndex((n) => n.name === folderName);
-      if (nodeIndex !== -1) {
-        const node = this.tree[nodeIndex];
-        this.selectedName = node.name;
-        this.selectedFiles.clear();
-        this.selectionParentPath = null;
-        this.lastSelectedFile = null;
-        this.nodeRefs.forEach((cmp, name) => {
-          if (name !== folderName) {
-            if (typeof cmp.collapse === "function") cmp.collapse();
-          } else {
-            if (typeof cmp.expand === "function") cmp.expand();
-          }
-        });
-        this.$nextTick(() => {
-          const cmp = this.nodeRefs.get(folderName);
-          if (cmp && cmp.$el) {
-            cmp.$el.scrollIntoView({ behavior: "smooth", block: "start" });
-          }
-        });
-      }
-      // Open subs pane
-      this.showAsr = false;
-      this.showFix = false;
-      this.showInfo = false;
-      this.showEmb = false;
-      this.showSubs = true;
-      this.loadSubs();
-    },
-    toggleSubs() {
-      const videoPaths = this.collectFilePaths()
-        .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
-        .map((p) => `/mnt/media/tv/${p}`);
-      if (videoPaths.length === 0) {
-        this.showSubs = !this.showSubs;
-        if (this.showSubs) {
-          this.showAsr = false;
-          this.showFix = false;
-          this.showInfo = false;
-          this.loadSubs();
-        }
-        return;
-      }
-      enqueueSubs(videoPaths, true).catch((e) =>
-        console.error("enqueueSubs", e),
-      );
-      this.showSubs = false;
-      this.showAsr = false;
-      this.showEmb = false;
-      this.showFix = false;
-      this.showInfo = false;
-    },
     toggleErrs() {
       this.errsMode = !this.errsMode;
       if (this.errsMode) {
-        this.showSubs = false;
         this.showAsr = false;
         this.showInfo = false;
       }
@@ -2025,7 +1777,6 @@ export default {
         return;
       }
       this.showInfo = true;
-      this.showSubs = false;
       this.showAsr = false;
       this.showFix = false;
       await this.loadInfo();
@@ -2300,12 +2051,6 @@ export default {
       }
     },
     handleSelectionChanged() {
-      if (this.showSubs) {
-        if (this._subsRefreshTimer) clearTimeout(this._subsRefreshTimer);
-        this._subsRefreshTimer = setTimeout(() => {
-          this.loadSubs();
-        }, 300);
-      }
       if (this.showInfo) {
         if (this._infoRefreshTimer) clearTimeout(this._infoRefreshTimer);
         this._infoRefreshTimer = setTimeout(() => {
@@ -2316,435 +2061,6 @@ export default {
     async refreshInfo() {
       // Re-run loadInfo without toggling off
       await this.loadInfo();
-    },
-    async loadSubs() {
-      this.subsItems = [];
-      this.subsError = null; // Don't clear error here? actually we should.
-      this.currentShowName = "";
-
-      let showName = this.selectedName;
-      let targetFiles = [];
-
-      // 1. Collect target files (as full paths so parseFile can use parent folder for season)
-      const collect = (n, pathPrefix) => {
-        const fullPath = pathPrefix ? `${pathPrefix}/${n.name}` : n.name;
-        if (n.type === "file") targetFiles.push(fullPath);
-        if (n.children) n.children.forEach((child) => collect(child, fullPath));
-      };
-
-      if (showName) {
-        // Find the node in tree
-        const node = this.tree.find((n) => n.name === showName);
-        if (node) collect(node, null);
-      } else if (this.selectedFiles.size > 0) {
-        for (const path of this.selectedFiles) {
-          const parts = path.split("/");
-          if (!showName && parts.length > 0) showName = parts[0];
-
-          // Use tree traversal to find files - supports recursive folder select
-          let current = this.tree.find((n) => n.name === parts[0]);
-          for (let i = 1; i < parts.length; i++) {
-            if (current && current.children) {
-              current = current.children.find((n) => n.name === parts[i]);
-            } else {
-              current = null;
-              break;
-            }
-          }
-
-          if (current)
-            collect(current, parts.slice(0, parts.length - 1).join("/"));
-        }
-      }
-
-      // Filter non-video files
-      const VIDEO_EXTS = new Set([
-        "mkv",
-        "avi",
-        "mp4",
-        "m4v",
-        "mov",
-        "wmv",
-        "webm",
-        "mpg",
-        "mpeg",
-        "ts",
-        "m2ts",
-      ]);
-      targetFiles = targetFiles.filter((name) => {
-        const i = name.lastIndexOf(".");
-        if (i < 0) return false;
-        const ext = name.slice(i + 1).toLowerCase();
-        return VIDEO_EXTS.has(ext);
-      });
-
-      this.currentShowName = showName || "";
-
-      if (!showName) {
-        this.subsError = "No show selected.";
-        return;
-      }
-
-      // 2. Determine needed seasons/episodes
-      const needed = new Map(); // "S:E" -> true
-      const neededSeasons = new Set();
-      let hasTargetFiles = targetFiles.length > 0;
-
-      const parseFile = (fullPath) => {
-        const pathParts = fullPath.split("/");
-        const name = pathParts[pathParts.length - 1];
-        const folderName =
-          pathParts.length >= 2 ? pathParts[pathParts.length - 2] : "";
-
-        let parsedPtt = null;
-        let parsedPttFolder = null;
-        try {
-          parsedPtt = parseTorrentTitle.parse(name);
-        } catch (ex) {}
-        try {
-          parsedPttFolder = parseTorrentTitle.parse(folderName);
-        } catch (ex) {}
-
-        const se = util.parseFileSeasonEpisode(
-          name,
-          folderName,
-          parsedPtt,
-          parsedPttFolder,
-        );
-        if (!se) return null;
-        return { s: se.season, e: se.episode };
-      };
-
-      for (const f of targetFiles) {
-        const se = parseFile(f);
-        if (se && se.s != null && se.e != null) {
-          neededSeasons.add(se.s);
-          needed.set(`${se.s}:${se.e}`, true);
-        }
-      }
-
-      if (needed.size === 0) {
-        this.subsError = "No valid SxxExx files found in selection.";
-        return;
-      }
-
-      // 3. Find matching show
-      // Subtitles: forceChoice = false
-      const match = util.smartTitleMatch(
-        showName,
-        this.allShows || [],
-        null,
-        false,
-      );
-
-      if (!match) {
-        this.subsError = `Show "${showName}" not found in library.`;
-        return;
-      }
-
-      const imdb =
-        match.ProviderIds?.Imdb ||
-        match.ProviderIds?.imdb ||
-        match.ProviderIds?.IMDb ||
-        match.ProviderIds?.IMDB ||
-        match.imdbId;
-
-      if (!imdb) {
-        this.subsError = "Show has no IMDb ID.";
-        return;
-      }
-
-      const raw = String(imdb).trim();
-      const digits = raw.toLowerCase().startsWith("tt") ? raw.slice(2) : raw;
-      const imdbIdDigits = digits.replace(/\D/g, "").replace(/^0+/, "");
-
-      this.subsLoading = true;
-      try {
-        const seasonsToFetch =
-          neededSeasons.size > 0 ? Array.from(neededSeasons) : [null];
-
-        const fetchSeason = async (season) => {
-          const results = [];
-          let page = 1;
-          let maxPages = 1;
-
-          // Fetch pages (limit to reasonable max to prevent flooding)
-          while (page <= maxPages) {
-            const params = { imdb_id: imdbIdDigits, page };
-            if (season !== null) params.season = season;
-
-            let res;
-            try {
-              res = await subsSearch(params);
-            } catch (e) {
-              console.warn(
-                `subsSearch failed for season ${season} page ${page}`,
-                e,
-              );
-              break;
-            }
-
-            if (res && Array.isArray(res.data)) {
-              results.push(...res.data);
-            }
-
-            if (res) {
-              const tp = Number(res.total_pages);
-              if (tp > 0) maxPages = tp;
-              if (maxPages > 5) maxPages = 5; // Safety cap
-            } else {
-              break;
-            }
-            if (page >= maxPages) break;
-            page++;
-          }
-          return results;
-        };
-
-        const promises = seasonsToFetch.map((s) => fetchSeason(s));
-        const resultsArray = await Promise.all(promises);
-        const allSubs = resultsArray.flat();
-
-        // Filter
-        const filtered = allSubs.filter((d) => {
-          if (!d || typeof d !== "object") return false;
-          if (d.type !== "subtitle") return false;
-          if (d.attributes?.language !== "en") return false;
-          const ft = d.attributes?.feature_details?.feature_type;
-          return ft === "Tvshow" || ft === "Episode";
-        });
-
-        const seenIds = new Set();
-        const finalItems = [];
-
-        for (const entry of filtered) {
-          if (seenIds.has(entry.id)) continue;
-
-          const { season, episode } = this.parseSeasonEpisodeFromEntry(entry);
-
-          const files = entry.attributes?.files || [];
-          const fileId = files.length > 0 ? files[0].file_id : null;
-
-          // Filtering Logic:
-          // If we have specific needed Episodes (S:E), keep only those.
-          // If we have needed Seasons but no Episodes (full season file?), keep all for that season?
-          // If we had input files but couldn't parse S/E (needed empty), maybe show everything?
-          // Current logic: if needed map is not empty, strict match.
-          // BUT: if I have S01E01 locally, I want S01E01 subs.
-          // What if subs result is a "Full Season" pack? It might not have 'episode' in attributes.
-          // parseSeasonEpisodeFromEntry tries to parse release name.
-          // If episode is null, it's likely a whole season pack or unparseable.
-          // Users usually want per-episode subs.
-          // If strict map is populated:
-          if (needed.size > 0) {
-            if (season != null && episode != null) {
-              if (!needed.has(`${season}:${episode}`)) continue;
-            } else {
-              // Strict mode: skip if we can't identify the episode
-              continue;
-            }
-          }
-
-          seenIds.add(entry.id);
-
-          const release = entry.attributes?.release || "";
-          const uploader = entry.attributes?.uploader?.name || "anonymous";
-          const sStr = season != null ? String(season).padStart(2, "0") : "??";
-          const eStr =
-            episode != null ? String(episode).padStart(2, "0") : "??";
-          const line1 = release
-            ? `S${sStr}E${eStr} | ${release}`
-            : `S${sStr}E${eStr}`;
-
-          finalItems.push({
-            key: entry.id,
-            line1,
-            line2: "",
-            uploader,
-            season,
-            episode,
-            file_id: fileId,
-            raw: entry,
-          });
-        }
-
-        // Sort
-        finalItems.sort((a, b) => {
-          const sa = a.season || 0;
-          const sb = b.season || 0;
-          if (sa !== sb) return sa - sb;
-          const ea = a.episode || 0;
-          const eb = b.episode || 0;
-          if (ea !== eb) return ea - eb;
-          return 0;
-        });
-
-        this.subsItems = finalItems;
-
-        if (!this.subsItems.length) {
-          this.subsError = "No subtitles found";
-        }
-      } catch (e) {
-        this.subsError = e.message || "Error searching subs";
-      } finally {
-        this.subsLoading = false;
-      }
-    },
-    parseSeasonEpisodeFromEntry(entry) {
-      let bestSeason = null;
-      let bestEpisode = null;
-
-      const tryParse = (txt) => {
-        if (!txt) return;
-        try {
-          const p = parseTorrentTitle.parse(txt);
-          if (p.season != null) bestSeason = p.season;
-          if (p.episode != null) bestEpisode = p.episode;
-        } catch (e) {}
-
-        // Fallback regex if library fails or returns nothing useful
-        if (bestSeason == null || bestEpisode == null) {
-          let m = txt.match(/S(\d{1,2})E(\d{1,2})/i);
-          if (m) {
-            if (bestSeason == null) bestSeason = parseInt(m[1]);
-            if (bestEpisode == null) bestEpisode = parseInt(m[2]);
-          }
-        }
-      };
-
-      tryParse(entry.attributes?.release);
-      if (bestSeason == null || bestEpisode == null) {
-        // Try filename if available
-        const files = entry.attributes?.files || [];
-        if (files.length > 0) tryParse(files[0].file_name);
-      }
-
-      return { season: bestSeason, episode: bestEpisode };
-    },
-    getSubCardStyle() {
-      return {
-        padding: "8px",
-        background: "#fff",
-        borderRadius: "5px",
-        border: "1px solid #ddd",
-        marginBottom: "4px",
-        cursor: "pointer",
-      };
-    },
-    encodeFileIdBase32(fileId) {
-      if (fileId == null) return "";
-      const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-      let n = Number(fileId);
-      if (!Number.isFinite(n) || n < 0) n = 0;
-      n = Math.floor(n);
-
-      let base32 = "";
-      do {
-        base32 = alphabet[n % 32] + base32;
-        n = Math.floor(n / 32);
-      } while (n > 0);
-
-      return base32;
-    },
-    async applySubs() {
-      if (this.applyInProgress) return;
-
-      this.applyInProgress = true;
-      const payload = [];
-
-      for (const item of this.subsItems) {
-        let fileId = item.file_id;
-        if (!fileId) {
-          const entry = item.raw;
-          const files = entry.attributes?.files || [];
-          if (files.length) fileId = files[0].file_id;
-        }
-        if (!fileId) continue;
-
-        payload.push({
-          file_id: Number(fileId),
-          showName: this.currentShowName,
-          season: item.season,
-          episode: item.episode,
-        });
-      }
-
-      if (!payload.length) {
-        alert("No valid files found in selection");
-        this.applyInProgress = false;
-        return;
-      }
-
-      try {
-        const res = await applySubFiles(payload);
-        if (res && res.error) {
-          alert("Error applying subs: " + res.error);
-        } else if (
-          res &&
-          res.failures &&
-          res.failures.length > 0 &&
-          (!res.applied || res.applied.length === 0)
-        ) {
-          const failure = res.failures[0];
-          const reason = failure?.reason || "unknown error";
-          alert("Subs failed to apply: " + reason);
-        } else {
-          alert("Subs applied successfully");
-          await this.refresh();
-        }
-      } catch (e) {
-        alert("Error applying subs: " + e.message);
-      } finally {
-        this.applyInProgress = false;
-      }
-    },
-    async applySubsSingle(item) {
-      if (this.applyInProgress) return;
-      this.applyInProgress = true;
-
-      let fileId = item.file_id;
-      if (!fileId) {
-        const files = item.raw?.attributes?.files || [];
-        if (files.length) fileId = files[0].file_id;
-      }
-
-      if (!fileId) {
-        alert("No valid file found");
-        this.applyInProgress = false;
-        return;
-      }
-
-      const payload = [
-        {
-          file_id: Number(fileId),
-          showName: this.currentShowName,
-          season: item.season,
-          episode: item.episode,
-        },
-      ];
-
-      try {
-        const res = await applySubFiles(payload);
-        if (res && res.error) {
-          alert("Error applying subs: " + res.error);
-        } else if (
-          res &&
-          res.failures &&
-          res.failures.length > 0 &&
-          (!res.applied || res.applied.length === 0)
-        ) {
-          const failure = res.failures[0];
-          const reason = failure?.reason || "unknown error";
-          alert("Subs failed to apply: " + reason);
-        } else {
-          alert("Subs applied successfully");
-          await this.refresh();
-        }
-      } catch (e) {
-        alert("Error applying subs: " + e.message);
-      } finally {
-        this.applyInProgress = false;
-      }
     },
   },
 };

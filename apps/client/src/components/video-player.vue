@@ -444,6 +444,7 @@ export default {
     onVideoError(e) {
       const vid = this.$refs.vid;
       if (!vid) return;
+      if (!this.vidSrc) return;
       const err = vid.error;
       if (!err) return;
       if (this.errorRetries >= 3) {
@@ -599,6 +600,7 @@ export default {
     },
     clickSubs() {
       this._mseStop();
+      this.vidSrc = "";
       const vid = this.$refs.vid;
       if (vid) {
         vid.pause();

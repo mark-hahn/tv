@@ -5065,7 +5065,7 @@ setInterval(runUsbCheck, CHECK_INTERVAL_MS);
 
 //////////////////  CHOKIDAR FILE WATCHER  //////////////////
 
-const changedShows = new Map(); // showName -> timeout
+const changedShows = new Map(); // showName -> { timeout, files: Set<string> }
 const DISK_CHANGE_DEBOUNCE_MS = 3000; // 3 seconds
 
 /**
@@ -5273,29 +5273,37 @@ watcher
 
     console.log(`[chokidar] video added: ${showName}`);
 
-    // Debounce: clear existing timeout and set new one
-    if (changedShows.has(showName)) {
-      clearTimeout(changedShows.get(showName));
+    // Debounce: accumulate files per show, clear existing timeout and set new one
+    const existing = changedShows.get(showName);
+    if (existing) {
+      clearTimeout(existing.timeout);
+      existing.files.add(filePath);
+    } else {
+      changedShows.set(showName, { timeout: null, files: new Set([filePath]) });
     }
-
-    const timeout = setTimeout(async () => {
+    const entry = changedShows.get(showName);
+    entry.timeout = setTimeout(async () => {
       changedShows.delete(showName);
       const tvdbAll = tvdb.getAllTvdbSync?.();
       const tvdbRec = tvdbAll?.[showName];
       if (tvdbRec && tvdbRec.inEmby) {
-        if (await fileNeedsSubChecked(filePath, showName)) {
-          enqueueSubQueue(
-            { videoFilePath: filePath, fromUI: false, lowPriority: false },
-            true,
-          );
+        let queued = false;
+        for (const fp of entry.files) {
+          if (await fileNeedsSubChecked(fp, showName)) {
+            enqueueSubQueue(
+              { videoFilePath: fp, fromUI: false, lowPriority: false },
+              false,
+            );
+            queued = true;
+          }
+        }
+        if (queued) {
           persistSubQueue();
           doSubQueueNow();
         }
       }
       tvdb.enqueueShowProcess(showName);
     }, DISK_CHANGE_DEBOUNCE_MS);
-
-    changedShows.set(showName, timeout);
   })
   .on("unlink", (filePath) => {
     console.log(`[chokidar] detected unlink: ${filePath}`);
@@ -5308,11 +5316,10 @@ watcher
     console.log(`[chokidar] video deleted: ${showName}`);
 
     // Debounce: clear existing timeout and set new one
-    if (changedShows.has(showName)) {
-      clearTimeout(changedShows.get(showName));
-    }
+    const unlinkEntry = changedShows.get(showName);
+    if (unlinkEntry) clearTimeout(unlinkEntry.timeout);
 
-    const timeout = setTimeout(() => {
+    const unlinkTimeout = setTimeout(() => {
       changedShows.delete(showName);
       console.log(
         `[tvdb loop] chokidar unlink debounce fired: enqueuing ${showName}`,
@@ -5320,7 +5327,9 @@ watcher
       tvdb.enqueueShowProcess(showName);
     }, DISK_CHANGE_DEBOUNCE_MS);
 
-    changedShows.set(showName, timeout);
+    if (unlinkEntry) unlinkEntry.timeout = unlinkTimeout;
+    else
+      changedShows.set(showName, { timeout: unlinkTimeout, files: new Set() });
   })
   .on("error", (error) => {
     console.error("[chokidar] Watcher error:", error);

@@ -19,7 +19,7 @@ const EMBY_API_KEY = "1c399bd079d549cba8c916244d3add2b";
 const SRVR_INTERNAL_URL = "http://127.0.0.1:8739";
 
 const GOOGLE_HOME_DELAY_MS = 0; // ms after TV turns on before sending Home key
-const GOOGLE_EMBY_DELAY_MS = 100; // ms after TV turns on before launching Emby
+const GOOGLE_EMBY_DELAY_MS = 250; // ms after TV turns on before launching Emby
 const FIRE_HOME_DELAY_MS = 0; // ms after Fire TV turns on before sending home key
 const FIRE_EMBY_DELAY_MS = 5000; // ms after Fire TV turns on before launching Emby
 

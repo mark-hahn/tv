@@ -1214,7 +1214,8 @@ function checkSubQueueGenSrt() {
 cron.schedule(
   "0 5 * * *",
   () => {
-    const now = new Date().toLocaleString("en-US", {
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const now = yesterday.toLocaleString("en-US", {
       timeZone: "America/Los_Angeles",
       month: "2-digit",
       day: "2-digit",

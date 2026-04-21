@@ -397,11 +397,13 @@ export default {
     this.pollMute();
     evtBus.on("tvMuteState", this._onTvMuteState);
     evtBus.on("paneChanged", this._onPaneChanged);
+    evtBus.on("tvCloseKeybd", this._onTvCloseKeybd);
   },
 
   beforeUnmount() {
     evtBus.off("tvMuteState", this._onTvMuteState);
     evtBus.off("paneChanged", this._onPaneChanged);
+    evtBus.off("tvCloseKeybd", this._onTvCloseKeybd);
     this.stopRepeat();
     this.stopHold();
   },
@@ -550,6 +552,10 @@ export default {
 
     _onPaneChanged(pane) {
       if (pane !== "tv") this.showKeybd = false;
+    },
+
+    _onTvCloseKeybd() {
+      this.showKeybd = false;
     },
 
     _onTvMuteState(data) {

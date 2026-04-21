@@ -1649,6 +1649,7 @@ export default {
       if (k === "tv") {
         this.currentPane = "tv";
         evtBus.emit("paneChanged", this.currentPane);
+        evtBus.emit("tvCloseKeybd");
         return;
       }
 

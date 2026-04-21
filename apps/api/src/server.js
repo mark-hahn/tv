@@ -863,7 +863,7 @@ app.post("/api/local/mediainfo", async (req, res) => {
         return (
           el.startsWith(baseName) &&
           el.endsWith(".srt") &&
-          !el.endsWith(".srtstub")
+          !el.endsWith(".chosen")
         );
       }).length;
     } catch (_) {

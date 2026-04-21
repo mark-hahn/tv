@@ -1051,7 +1051,7 @@ export default {
 
           const isVideo = (name) => VIDEO_EXTS.has(getExt(name));
           const isSrt = (name) =>
-            getExt(name) === "srt" || name.toLowerCase().endsWith(".srtstub");
+            getExt(name) === "srt" || name.toLowerCase().endsWith(".chosen");
 
           const getEpisode = (name) => {
             let parsedPtt = null;

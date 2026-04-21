@@ -106,7 +106,7 @@ function getSrtPath(videoPath) {
 function getStubPath(videoPath) {
   const dir = path.dirname(videoPath);
   const baseName = path.basename(videoPath, path.extname(videoPath));
-  return path.join(dir, `${baseName}.mb.srtstub`);
+  return path.join(dir, `${baseName}.mb.chosen`);
 }
 
 function hasEmbSidecar(videoPath) {

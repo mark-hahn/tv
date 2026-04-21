@@ -867,7 +867,7 @@ async function fileNeedsSubChecked(videoFilePath, showName) {
     entries.some(
       (f) =>
         f === basename + ".asr.srt" ||
-        f === basename + ".mb.srtstub" ||
+        f === basename + ".mb.chosen" ||
         /^\.(mb\d+|opn.{5})\.srt$/.test(f.slice(basename.length)) ||
         /^\.(#[A-Z2-7]+)\.srt$/.test(f.slice(basename.length)),
     )
@@ -978,13 +978,8 @@ async function generateEmbSrts(
     });
   }
   const hasNonText = subStreams.some((s) => !textCodecs.includes(s.codec_name));
-  if (hasNonText && textStreams.length === 0) {
-    const stubPath = `${base}.mb.srtstub`;
-    if (!fs.existsSync(stubPath)) {
-      fs.writeFileSync(stubPath, "", "utf8");
-      logSubtitle(`srtstub: ${stubPath}`);
-    }
-  }
+  const pgsOnly = hasNonText && textStreams.length === 0;
+  return { pgsOnly };
 }
 async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
   const tvdbAll = tvdb.getAllTvdbSync?.();
@@ -1118,13 +1113,14 @@ async function processSubQueueEntry() {
   try {
     const parsed = parseFileSeasonEpisode(entry.videoFilePath);
     const showName = entry.videoFilePath.replace(tvDir + "/", "").split("/")[0];
-    await generateEmbSrts(
-      entry.videoFilePath,
-      showName,
-      parsed?.season,
-      parsed?.episode,
-      entry.fromUI,
-    );
+    const { pgsOnly } =
+      (await generateEmbSrts(
+        entry.videoFilePath,
+        showName,
+        parsed?.season,
+        parsed?.episode,
+        entry.fromUI,
+      )) || {};
     await sleep(1000);
     await applyOpenSubSrts(
       entry.videoFilePath,
@@ -1145,11 +1141,11 @@ async function processSubQueueEntry() {
     const hasSidecar = dirEntries.some(
       (f) =>
         f === basename + ".asr.srt" ||
-        f === basename + ".mb.srtstub" ||
+        f === basename + ".mb.chosen" ||
         /^\.(mb\d+|opn.{5})\.srt$/.test(f.slice(basename.length)) ||
         /^\.(#[A-Z2-7]+)\.srt$/.test(f.slice(basename.length)),
     );
-    if (!hasSidecar) {
+    if (!hasSidecar && !pgsOnly) {
       enqueueSubQueueGenSrt(
         {
           videoFilePath: entry.videoFilePath,
@@ -3808,6 +3804,10 @@ app.post("/api/asr/subs/enqueue", (req, res) => {
     return;
   }
   for (const vp of [...videoPaths].reverse()) {
+    const chosenPath = vp.replace(/\.[^.]+$/, "") + ".mb.chosen";
+    try {
+      fs.unlinkSync(chosenPath);
+    } catch {}
     enqueueSubQueue(
       { videoFilePath: vp, fromUI: !!fromUI, lowPriority: false },
       true,
@@ -3857,6 +3857,23 @@ app.get("/api/asr/chksrt/list", (req, res) => {
 });
 
 app.post("/api/asr/chksrt/ok", (req, res) => {
+  const entry = subQueueChkSrt[0];
+  if (entry) {
+    const base = entry.videoFilePath.replace(/\.[^.]+$/, "");
+    const dir = path.dirname(entry.videoFilePath);
+    const basename = path.basename(base);
+    let hasSrt = false;
+    try {
+      hasSrt = fs
+        .readdirSync(dir)
+        .some((f) => f.startsWith(basename) && f.endsWith(".srt"));
+    } catch {}
+    if (!hasSrt) {
+      try {
+        fs.writeFileSync(path.join(dir, basename + ".mb.chosen"), "", "utf8");
+      } catch {}
+    }
+  }
   subQueueChkSrt.shift();
   persistSubQueueChkSrt();
   notifyClients("chksrt-count", subQueueChkSrt.length);
@@ -3896,7 +3913,7 @@ app.post("/api/asr/chksrt/select", (req, res) => {
   const basename = path.basename(base);
   for (const f of entries) {
     if (!/\.srt$/.test(f)) continue;
-    if (f.endsWith(".srtstub")) continue;
+    if (f.endsWith(".chosen")) continue;
     const full = path.join(dir, f);
     if (full === selectedSrtPath) continue;
     if (
@@ -3909,6 +3926,11 @@ app.post("/api/asr/chksrt/select", (req, res) => {
         fs.unlinkSync(full);
       } catch {}
     }
+  }
+  if (!selectedSrtPath) {
+    try {
+      fs.writeFileSync(path.join(dir, basename + ".mb.chosen"), "", "utf8");
+    } catch {}
   }
   const idx = subQueueChkSrt.findIndex((e) => e.videoFilePath === videoPath);
   if (idx !== -1) subQueueChkSrt.splice(idx, 1);

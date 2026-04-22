@@ -898,6 +898,38 @@ app.get("/tv/status", (req, res) => {
 
 // ─── Emby subtitle control ───────────────────────────────────────────────────
 
+function normalizeCodec(codec) {
+  const c = (codec || "").toLowerCase();
+  if (c === "hdmv_pgs_subtitle" || c === "pgssub") return "PGS";
+  if (c === "subrip") return "SRT";
+  if (c === "ass" || c === "ssa") return "ASS";
+  if (c === "webvtt") return "VTT";
+  return (codec || "").toUpperCase();
+}
+
+function subStreamInfo(stream) {
+  const codec = normalizeCodec(stream.Codec || "");
+  if (stream.IsExternal && stream.Path) {
+    const filename = stream.Path.split("/").pop();
+    const noSrt = filename.replace(/\.srt$/i, "");
+    const lastDot = noSrt.lastIndexOf(".");
+    const name = lastDot >= 0 ? noSrt.slice(lastDot + 1) : noSrt;
+    let type;
+    if (/\.asr\.srt$/i.test(filename)) type = "asr";
+    else if (/\.mb\d+\.srt$/i.test(filename)) type = "mbs";
+    else if (/\.opn.{4,5}\.srt$/i.test(filename)) type = "opn";
+    else type = "srt";
+    return { name, type, label: `${name} (${codec})` };
+  }
+  const isPgs =
+    stream.Codec === "hdmv_pgs_subtitle" || stream.Codec === "pgssub";
+  const type = isPgs ? "pgs" : "embedded";
+  // DisplayTitle already includes codec like "English (ASS)" — use it directly
+  const label =
+    stream.DisplayTitle || `${stream.Language || "Unknown"} (${codec})`;
+  return { name: stream.Language || "Unknown", type, label };
+}
+
 app.get("/tv/emby/playing", async (req, res) => {
   try {
     const sessRes = await fetch(
@@ -917,35 +949,42 @@ app.get("/tv/emby/playing", async (req, res) => {
       const deviceName = s.DeviceName ?? s.Client ?? "Unknown";
       const showName = item.SeriesName || item.Name || "Unknown";
       const subtitleStreamIndex = s.PlayState?.SubtitleStreamIndex ?? -1;
+      const seasonNum = item.ParentIndexNumber;
+      const episodeNum = item.IndexNumber;
+      const episodeCode =
+        seasonNum != null && episodeNum != null
+          ? `S${String(seasonNum).padStart(2, "0")}E${String(episodeNum).padStart(2, "0")}`
+          : null;
 
-      let streams = item.MediaSources?.[0]?.MediaStreams;
-      if (!streams || streams.length === 0) {
-        try {
-          const itemRes = await fetch(
-            `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${item.Id}?Fields=MediaSources&api_key=${EMBY_API_KEY}`,
-            { headers: { Accept: "application/json" } },
-          );
-          if (itemRes.ok) {
-            const itemData = await itemRes.json();
-            streams = itemData.MediaSources?.[0]?.MediaStreams;
-          }
-        } catch (_) {}
-      }
+      let streams;
+      try {
+        const itemRes = await fetch(
+          `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${item.Id}?Fields=MediaSources&api_key=${EMBY_API_KEY}`,
+          { headers: { Accept: "application/json" } },
+        );
+        if (itemRes.ok) {
+          const itemData = await itemRes.json();
+          streams = itemData.MediaSources?.[0]?.MediaStreams;
+        }
+      } catch (_) {}
+      if (!streams) streams = item.MediaSources?.[0]?.MediaStreams;
 
       const subtitles = [];
       for (const stream of streams ?? []) {
         if (stream.Type !== "Subtitle") continue;
-        const lang = (stream.Language || "").toLowerCase();
-        if (lang && lang !== "eng" && lang !== "en") continue;
-        const codec = (stream.Codec || "").toUpperCase();
-        const name = stream.DisplayTitle || stream.Language || "Unknown";
-        subtitles.push({ index: stream.Index, label: `${name} (${codec})` });
+        if (!stream.IsExternal) {
+          const lang = (stream.Language || "").toLowerCase();
+          if (lang && lang !== "eng" && lang !== "en") continue;
+        }
+        const { label, type } = subStreamInfo(stream);
+        subtitles.push({ index: stream.Index, label, type });
       }
 
       playing.push({
         sessionId,
         deviceName,
         showName,
+        episodeCode,
         subtitleStreamIndex,
         subtitles,
       });

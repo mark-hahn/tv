@@ -188,9 +188,7 @@
             white-space: nowrap;
           "
         >
-          {{
-            subCurrentPlayer ? subCurrentPlayer.showName : "No video playing"
-          }}
+          {{ subHeaderLabel }}
         </button>
         <span
           v-if="subOffset !== 0"
@@ -271,7 +269,7 @@
             @mousedown="subSelectTrack(sub.index)"
             @touchstart.prevent="subSelectTrack(sub.index)"
           >
-            {{ sub.label }}
+            {{ subTypeChar(sub.type) }}: {{ sub.label }}
           </div>
         </template>
       </div>
@@ -529,6 +527,19 @@ export default {
     subCurrentPlayer() {
       return this.subPlayers[this.subPlayerIdx] ?? null;
     },
+    subHeaderLabel() {
+      const player = this.subCurrentPlayer;
+      if (!player) return "No video playing";
+      let base = player.episodeCode
+        ? `${player.showName} ${player.episodeCode}`
+        : player.showName;
+      if (player.deviceName) base += ` (${player.deviceName})`;
+      const active = player.subtitles.find(
+        (s) => s.index === player.subtitleStreamIndex,
+      );
+      if (!active) return base;
+      return `${this.subTypeChar(active.type)}: ${base}`;
+    },
   },
 
   mounted() {
@@ -547,6 +558,16 @@ export default {
   },
 
   methods: {
+    subTypeChar(type) {
+      if (type === "pgs") return "*";
+      if (type === "embedded") return "T";
+      if (type === "asr") return "+";
+      if (type === "mbs") return ">";
+      if (type === "opn") return "V";
+      if (type === "srt") return "S";
+      return "S";
+    },
+
     startEmbyHold() {
       this._embyHoldFired = false;
       this._embyHoldTimer = setTimeout(() => {

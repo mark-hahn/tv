@@ -238,6 +238,16 @@ export default function App() {
     } catch (_) {}
   };
 
+  const subTypeChar = (type) => {
+    if (type === "pgs") return "*";
+    if (type === "embedded") return "T";
+    if (type === "asr") return "+";
+    if (type === "mbs") return ">";
+    if (type === "opn") return "V";
+    if (type === "srt") return "S";
+    return "S";
+  };
+
   const subCyclePlayer = () => {
     setSubPlayerIdx((i) => (i + 1) % Math.max(subPlayers.length, 1));
     setSubOffset(0);
@@ -514,7 +524,18 @@ export default function App() {
         <View style={subCtrlStyles.headerRow1}>
           <TouchableOpacity onPress={subCyclePlayer} style={{ flex: 1 }}>
             <Text style={subCtrlStyles.showName} numberOfLines={1}>
-              {currentPlayer ? currentPlayer.showName : "No video playing"}
+              {(() => {
+                if (!currentPlayer) return "No video playing";
+                let base = currentPlayer.episodeCode
+                  ? `${currentPlayer.showName} ${currentPlayer.episodeCode}`
+                  : currentPlayer.showName;
+                if (currentPlayer.deviceName)
+                  base += ` (${currentPlayer.deviceName})`;
+                const active = currentPlayer.subtitles.find(
+                  (s) => s.index === currentPlayer.subtitleStreamIndex,
+                );
+                return active ? `${subTypeChar(active.type)}: ${base}` : base;
+              })()}
             </Text>
           </TouchableOpacity>
           {subOffset !== 0 && (
@@ -589,7 +610,7 @@ export default function App() {
                         subCtrlStyles.cardTextSelected,
                     ]}
                   >
-                    {sub.label}
+                    {subTypeChar(sub.type)}: {sub.label}
                   </Text>
                 </TouchableOpacity>
               ))}

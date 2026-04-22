@@ -16,6 +16,8 @@ const BRAVIA_TV_IP = "192.168.1.85";
 
 const EMBY_HOST = "hahnca.com:8920";
 const EMBY_API_KEY = "1c399bd079d549cba8c916244d3add2b";
+const EMBY_USER_ID = "894c752d448f45a3a1260ccaabd0adff";
+const EMBY_BASE_URL = `https://${EMBY_HOST}/emby`;
 const SRVR_INTERNAL_URL = "http://127.0.0.1:8739";
 
 const GOOGLE_HOME_DELAY_MS = 0; // ms after TV turns on before sending Home key
@@ -346,6 +348,7 @@ function connectHa() {
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 
 app.get("/tv/googlebtn", (req, res) => {
   log(
@@ -891,6 +894,123 @@ app.get("/tv/status", (req, res) => {
     mediaTitle: braviaMediaTitle,
     activeDevice,
   });
+});
+
+// ─── Emby subtitle control ───────────────────────────────────────────────────
+
+app.get("/tv/emby/playing", async (req, res) => {
+  try {
+    const sessRes = await fetch(
+      `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
+      { headers: { Accept: "application/json" } },
+    );
+    if (!sessRes.ok) {
+      res.json({ ok: false, error: `sessions ${sessRes.status}` });
+      return;
+    }
+    const sessions = await sessRes.json();
+    const playing = [];
+    for (const s of sessions) {
+      if (!s.NowPlayingItem) continue;
+      const item = s.NowPlayingItem;
+      const sessionId = s.Id;
+      const deviceName = s.DeviceName ?? s.Client ?? "Unknown";
+      const showName = item.SeriesName || item.Name || "Unknown";
+      const subtitleStreamIndex = s.PlayState?.SubtitleStreamIndex ?? -1;
+
+      let streams = item.MediaSources?.[0]?.MediaStreams;
+      if (!streams || streams.length === 0) {
+        try {
+          const itemRes = await fetch(
+            `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${item.Id}?Fields=MediaSources&api_key=${EMBY_API_KEY}`,
+            { headers: { Accept: "application/json" } },
+          );
+          if (itemRes.ok) {
+            const itemData = await itemRes.json();
+            streams = itemData.MediaSources?.[0]?.MediaStreams;
+          }
+        } catch (_) {}
+      }
+
+      const subtitles = [];
+      for (const stream of streams ?? []) {
+        if (stream.Type !== "Subtitle") continue;
+        const lang = (stream.Language || "").toLowerCase();
+        if (lang && lang !== "eng" && lang !== "en") continue;
+        const codec = (stream.Codec || "").toUpperCase();
+        const name = stream.DisplayTitle || stream.Language || "Unknown";
+        subtitles.push({ index: stream.Index, label: `${name} (${codec})` });
+      }
+
+      playing.push({
+        sessionId,
+        deviceName,
+        showName,
+        subtitleStreamIndex,
+        subtitles,
+      });
+    }
+    res.json({ ok: true, playing });
+  } catch (err) {
+    loge("emby/playing error:", err.message);
+    res.json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/tv/emby/subtitle", async (req, res) => {
+  const { sessionId, index } = req.body ?? {};
+  if (!sessionId || index === undefined) {
+    res.status(400).json({ ok: false, error: "missing sessionId or index" });
+    return;
+  }
+  try {
+    const r = await fetch(
+      `${EMBY_BASE_URL}/Sessions/${sessionId}/Command?api_key=${EMBY_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          Name: "SetSubtitleStreamIndex",
+          Arguments: { Index: String(index) },
+        }),
+      },
+    );
+    log(
+      `[emby] SetSubtitleStreamIndex ${index} session=${sessionId} -> ${r.status}`,
+    );
+    res.json({ ok: r.ok });
+  } catch (err) {
+    loge("emby/subtitle error:", err.message);
+    res.json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/tv/emby/subtitle-offset", async (req, res) => {
+  const { sessionId, offsetMs } = req.body ?? {};
+  if (!sessionId || offsetMs === undefined) {
+    res.status(400).json({ ok: false, error: "missing sessionId or offsetMs" });
+    return;
+  }
+  try {
+    const r = await fetch(
+      `${EMBY_BASE_URL}/Sessions/${sessionId}/Command?api_key=${EMBY_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          Name: "SetSubtitleDelay",
+          Arguments: { Delay: String(offsetMs) },
+        }),
+      },
+    );
+    log(
+      `[emby] SetSubtitleDelay ${offsetMs}ms session=${sessionId} -> ${r.status}`,
+    );
+    res.json({ ok: r.ok });
+  } catch (err) {
+    loge("emby/subtitle-offset error:", err.message);
+    res.json({ ok: false, error: err.message });
+  }
 });
 
 // ─── Start ───────────────────────────────────────────────────────────────────

@@ -28,6 +28,10 @@ export default function App() {
   const [showKeybd, setShowKeybd] = useState(false);
   const [kybdInput, setKybdInput] = useState("");
   const [kybdHistory, setKybdHistory] = useState([]);
+  const [showSubCtrl, setShowSubCtrl] = useState(false);
+  const [subPlayers, setSubPlayers] = useState([]);
+  const [subPlayerIdx, setSubPlayerIdx] = useState(0);
+  const [subOffset, setSubOffset] = useState(0);
 
   const onGridLayout = ({ nativeEvent: { layout } }) => {
     if (layout.width < 10 || layout.height < 10) return;
@@ -48,6 +52,8 @@ export default function App() {
   const holdRef = useRef(null);
   const volActiveRef = useRef(false);
   const kybdInputRef = useRef(null);
+  const embyHoldRef = useRef(null);
+  const embyHoldFiredRef = useRef(false);
 
   const debounce = () => {
     const now = Date.now();
@@ -204,6 +210,80 @@ export default function App() {
     }
   };
 
+  const startEmbyHold = () => {
+    embyHoldFiredRef.current = false;
+    embyHoldRef.current = setTimeout(() => {
+      embyHoldFiredRef.current = true;
+      openSubCtrl();
+    }, 1000);
+  };
+
+  const stopEmbyHold = () => {
+    clearTimeout(embyHoldRef.current);
+    if (!embyHoldFiredRef.current) {
+      tvCmd("emby");
+    }
+    embyHoldFiredRef.current = false;
+  };
+
+  const openSubCtrl = async () => {
+    setShowSubCtrl(true);
+    setSubOffset(0);
+    setSubPlayerIdx(0);
+    try {
+      const data = await fetch(`${TV_TV_URL}/tv/emby/playing`).then((r) =>
+        r.json(),
+      );
+      if (data.ok) setSubPlayers(data.playing);
+    } catch (_) {}
+  };
+
+  const subCyclePlayer = () => {
+    setSubPlayerIdx((i) => (i + 1) % Math.max(subPlayers.length, 1));
+    setSubOffset(0);
+  };
+
+  const subClose = () => setShowSubCtrl(false);
+
+  const subSaveAndClose = () => setShowSubCtrl(false);
+
+  const subAdjustOffset = async (deltaMs) => {
+    const newOffset = subOffset + deltaMs;
+    setSubOffset(newOffset);
+    const player = subPlayers[subPlayerIdx];
+    if (!player) return;
+    try {
+      await fetch(`${TV_TV_URL}/tv/emby/subtitle-offset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: player.sessionId,
+          offsetMs: newOffset,
+        }),
+      });
+    } catch (_) {}
+  };
+
+  const subSelectTrack = async (index) => {
+    const player = subPlayers[subPlayerIdx];
+    if (!player) return;
+    setSubPlayers((prev) => {
+      const next = [...prev];
+      next[subPlayerIdx] = {
+        ...next[subPlayerIdx],
+        subtitleStreamIndex: index,
+      };
+      return next;
+    });
+    try {
+      await fetch(`${TV_TV_URL}/tv/emby/subtitle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: player.sessionId, index }),
+      });
+    } catch (_) {}
+  };
+
   const kybdSendText = async () => {
     const text = kybdInput.trim();
     if (!text) return;
@@ -337,7 +417,8 @@ export default function App() {
       smallText: true,
       bg: () => cellBg("white", "emby"),
       onPress: () => {},
-      onPressIn: () => tvCmd("emby"),
+      onPressIn: () => startEmbyHold(),
+      onPressOut: () => stopEmbyHold(),
     },
     {
       key: "down",
@@ -423,6 +504,101 @@ export default function App() {
       onPressOut: stopHold,
     },
   ];
+
+  if (showSubCtrl) {
+    const currentPlayer = subPlayers[subPlayerIdx] ?? null;
+    return (
+      <View style={subCtrlStyles.container}>
+        <StatusBar hidden />
+        {/* Header row 1: show name + offset + close */}
+        <View style={subCtrlStyles.headerRow1}>
+          <TouchableOpacity onPress={subCyclePlayer} style={{ flex: 1 }}>
+            <Text style={subCtrlStyles.showName} numberOfLines={1}>
+              {currentPlayer ? currentPlayer.showName : "No video playing"}
+            </Text>
+          </TouchableOpacity>
+          {subOffset !== 0 && (
+            <Text style={subCtrlStyles.offsetText}>
+              {subOffset > 0 ? "+" : ""}
+              {subOffset}ms
+            </Text>
+          )}
+          <TouchableOpacity onPress={subClose} style={subCtrlStyles.closeBtn}>
+            <Text style={subCtrlStyles.closeBtnText}>✕</Text>
+          </TouchableOpacity>
+        </View>
+        {/* Header row 2: left arrow, OK, right arrow */}
+        <View style={subCtrlStyles.headerRow2}>
+          <TouchableOpacity
+            style={subCtrlStyles.arrowBtn}
+            onPress={() => subAdjustOffset(-100)}
+          >
+            <Text style={subCtrlStyles.arrowText}>◀</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={subCtrlStyles.okBtn}
+            onPress={subSaveAndClose}
+          >
+            <Text style={subCtrlStyles.okText}>OK</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[subCtrlStyles.arrowBtn, { borderRightWidth: 0 }]}
+            onPress={() => subAdjustOffset(100)}
+          >
+            <Text style={subCtrlStyles.arrowText}>▶</Text>
+          </TouchableOpacity>
+        </View>
+        {/* Subtitle list */}
+        <ScrollView style={{ flex: 1 }}>
+          {!currentPlayer ? (
+            <Text style={subCtrlStyles.noVideo}>No video playing</Text>
+          ) : (
+            <>
+              <TouchableOpacity
+                onPress={() => subSelectTrack(-1)}
+                style={[
+                  subCtrlStyles.card,
+                  currentPlayer.subtitleStreamIndex === -1 &&
+                    subCtrlStyles.cardSelected,
+                ]}
+              >
+                <Text
+                  style={[
+                    subCtrlStyles.cardText,
+                    currentPlayer.subtitleStreamIndex === -1 &&
+                      subCtrlStyles.cardTextSelected,
+                  ]}
+                >
+                  None
+                </Text>
+              </TouchableOpacity>
+              {currentPlayer.subtitles.map((sub) => (
+                <TouchableOpacity
+                  key={sub.index}
+                  onPress={() => subSelectTrack(sub.index)}
+                  style={[
+                    subCtrlStyles.card,
+                    currentPlayer.subtitleStreamIndex === sub.index &&
+                      subCtrlStyles.cardSelected,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      subCtrlStyles.cardText,
+                      currentPlayer.subtitleStreamIndex === sub.index &&
+                        subCtrlStyles.cardTextSelected,
+                    ]}
+                  >
+                    {sub.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
+        </ScrollView>
+      </View>
+    );
+  }
 
   if (showKeybd) {
     return (
@@ -696,5 +872,93 @@ const kybdStyles = StyleSheet.create({
   },
   historyItemText: {
     fontSize: 15,
+  },
+});
+
+const subCtrlStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    borderWidth: 3,
+    borderColor: "#000",
+    backgroundColor: "#fff",
+  },
+  headerRow1: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 10,
+    borderBottomWidth: 3,
+    borderBottomColor: "#000",
+    gap: 8,
+  },
+  showName: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#000",
+  },
+  offsetText: {
+    fontSize: 13,
+    color: "#555",
+  },
+  closeBtn: {
+    padding: 8,
+  },
+  closeBtnText: {
+    fontSize: 20,
+    color: "#000",
+  },
+  headerRow2: {
+    flexDirection: "row",
+    height: 80,
+    borderBottomWidth: 3,
+    borderBottomColor: "#000",
+  },
+  arrowBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f5e642",
+    borderRightWidth: 3,
+    borderRightColor: "#000",
+  },
+  okBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "lightgreen",
+    borderRightWidth: 3,
+    borderRightColor: "#000",
+  },
+  arrowText: {
+    fontSize: 42,
+    fontWeight: "bold",
+    color: "#000",
+  },
+  okText: {
+    fontSize: 42,
+    fontWeight: "bold",
+    color: "#000",
+  },
+  noVideo: {
+    padding: 20,
+    textAlign: "center",
+    color: "#999",
+    fontSize: 16,
+  },
+  card: {
+    padding: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
+    backgroundColor: "#fff",
+  },
+  cardSelected: {
+    backgroundColor: "#d0e8ff",
+  },
+  cardText: {
+    fontSize: 18,
+    color: "#000",
+  },
+  cardTextSelected: {
+    fontWeight: "bold",
   },
 });

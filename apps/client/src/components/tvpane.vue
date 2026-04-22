@@ -148,6 +148,134 @@
         </div>
       </div>
     </div>
+    <!-- Sub ctrl pane -->
+    <div
+      v-else-if="showSubCtrl"
+      style="
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        border: 3px solid #000;
+        box-sizing: border-box;
+      "
+    >
+      <!-- Header row 1: show name + offset + close -->
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 6px 10px;
+          border-bottom: 3px solid #000;
+          flex-shrink: 0;
+          gap: 8px;
+        "
+      >
+        <button
+          @mousedown.prevent="subCyclePlayer"
+          @touchstart.prevent="subCyclePlayer"
+          style="
+            flex: 1;
+            text-align: left;
+            font-size: 15px;
+            font-weight: bold;
+            border: none;
+            background: none;
+            cursor: pointer;
+            padding: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          "
+        >
+          {{
+            subCurrentPlayer ? subCurrentPlayer.showName : "No video playing"
+          }}
+        </button>
+        <span
+          v-if="subOffset !== 0"
+          style="font-size: 13px; color: #555; flex-shrink: 0"
+          >{{ subOffset > 0 ? "+" : "" }}{{ subOffset }}ms</span
+        >
+        <button
+          @mousedown.prevent="subClose"
+          @touchstart.prevent="subClose"
+          style="
+            font-size: 22px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            padding: 4px 8px;
+            flex-shrink: 0;
+          "
+        >
+          ✕
+        </button>
+      </div>
+      <!-- Header row 2: left arrow, OK, right arrow (matches remote row 2 style) -->
+      <div
+        style="
+          display: flex;
+          flex-shrink: 0;
+          height: 20%;
+          border-bottom: 3px solid #000;
+        "
+      >
+        <div
+          :style="subRowBtnStyle('#f5e642', false)"
+          @mousedown="subAdjustOffset(-100)"
+          @touchstart.prevent="subAdjustOffset(-100)"
+        >
+          ◀
+        </div>
+        <div
+          :style="subRowBtnStyle('lightgreen', false)"
+          @mousedown="subSaveAndClose"
+          @touchstart.prevent="subSaveAndClose"
+        >
+          OK
+        </div>
+        <div
+          :style="subRowBtnStyle('#f5e642', true)"
+          @mousedown="subAdjustOffset(100)"
+          @touchstart.prevent="subAdjustOffset(100)"
+        >
+          ▶
+        </div>
+      </div>
+      <!-- Scrollable subtitle list -->
+      <div style="overflow-y: auto; flex: 1">
+        <div
+          v-if="!subCurrentPlayer"
+          style="
+            padding: 20px;
+            text-align: center;
+            color: #999;
+            font-size: 16px;
+          "
+        >
+          No video playing
+        </div>
+        <template v-else>
+          <div
+            :style="subCardStyle(-1)"
+            @mousedown="subSelectTrack(-1)"
+            @touchstart.prevent="subSelectTrack(-1)"
+          >
+            None
+          </div>
+          <div
+            v-for="sub in subCurrentPlayer.subtitles"
+            :key="sub.index"
+            :style="subCardStyle(sub.index)"
+            @mousedown="subSelectTrack(sub.index)"
+            @touchstart.prevent="subSelectTrack(sub.index)"
+          >
+            {{ sub.label }}
+          </div>
+        </template>
+      </div>
+    </div>
     <div
       v-else
       style="
@@ -228,8 +356,11 @@
       <!-- Row 3: emby, down, keyboard -->
       <div
         :style="cellStyle('white', 'emby')"
-        @mousedown="tvCmd('emby')"
-        @touchstart.prevent="tvCmd('emby')"
+        @mousedown="startEmbyHold"
+        @mouseup="stopEmbyHold"
+        @mouseleave="stopEmbyHold"
+        @touchstart.prevent="startEmbyHold"
+        @touchend="stopEmbyHold"
       >
         Emby
       </div>
@@ -351,6 +482,10 @@ export default {
       showKeybd: false,
       keybdInput: "",
       keybdHistory: [],
+      showSubCtrl: false,
+      subPlayers: [],
+      subPlayerIdx: 0,
+      subOffset: 0,
     };
   },
 
@@ -391,6 +526,9 @@ export default {
         this.flashBtn === "off" ? "orange" : this.isOff ? "lightblue" : "white";
       return { ...CELL_BASE, backgroundColor: bg };
     },
+    subCurrentPlayer() {
+      return this.subPlayers[this.subPlayerIdx] ?? null;
+    },
   },
 
   mounted() {
@@ -409,6 +547,105 @@ export default {
   },
 
   methods: {
+    startEmbyHold() {
+      this._embyHoldFired = false;
+      this._embyHoldTimer = setTimeout(() => {
+        this._embyHoldFired = true;
+        this.openSubCtrl();
+      }, 1000);
+    },
+
+    stopEmbyHold() {
+      clearTimeout(this._embyHoldTimer);
+      if (!this._embyHoldFired) {
+        this.tvCmd("emby");
+      }
+      this._embyHoldFired = false;
+    },
+
+    async openSubCtrl() {
+      this.flash("emby");
+      this.showSubCtrl = true;
+      this.subOffset = 0;
+      this.subPlayerIdx = 0;
+      try {
+        const data = await fetch(`${config.tvTvUrl}/tv/emby/playing`).then(
+          (r) => r.json(),
+        );
+        if (data.ok) this.subPlayers = data.playing;
+      } catch (_) {}
+    },
+
+    subCyclePlayer() {
+      if (this.subPlayers.length <= 1) return;
+      this.subPlayerIdx = (this.subPlayerIdx + 1) % this.subPlayers.length;
+      this.subOffset = 0;
+    },
+
+    subClose() {
+      this.showSubCtrl = false;
+    },
+
+    subSaveAndClose() {
+      this.showSubCtrl = false;
+    },
+
+    async subAdjustOffset(deltaMs) {
+      this.subOffset += deltaMs;
+      const player = this.subCurrentPlayer;
+      if (!player) return;
+      await fetch(`${config.tvTvUrl}/tv/emby/subtitle-offset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: player.sessionId,
+          offsetMs: this.subOffset,
+        }),
+      }).catch(() => {});
+    },
+
+    async subSelectTrack(index) {
+      const player = this.subCurrentPlayer;
+      if (!player) return;
+      this.subPlayers[this.subPlayerIdx] = {
+        ...player,
+        subtitleStreamIndex: index,
+      };
+      await fetch(`${config.tvTvUrl}/tv/emby/subtitle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: player.sessionId, index }),
+      }).catch(() => {});
+    },
+
+    subRowBtnStyle(bg, isLast) {
+      return {
+        borderRight: isLast ? "none" : "3px solid #000",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        fontSize: "42px",
+        fontWeight: "bold",
+        userSelect: "none",
+        backgroundColor: bg,
+        flex: 1,
+      };
+    },
+
+    subCardStyle(index) {
+      const isSelected = this.subCurrentPlayer?.subtitleStreamIndex === index;
+      return {
+        padding: "12px 16px",
+        borderBottom: "1px solid #ddd",
+        cursor: "pointer",
+        fontSize: "18px",
+        userSelect: "none",
+        backgroundColor: isSelected ? "#d0e8ff" : "#fff",
+        fontWeight: isSelected ? "bold" : "normal",
+      };
+    },
+
     startRepeat(key) {
       if (this.isOff || this.isOther) return;
       if (!this._debounce()) return;
@@ -551,7 +788,10 @@ export default {
     },
 
     _onPaneChanged(pane) {
-      if (pane !== "tv") this.showKeybd = false;
+      if (pane !== "tv") {
+        this.showKeybd = false;
+        this.showSubCtrl = false;
+      }
     },
 
     _onTvCloseKeybd() {

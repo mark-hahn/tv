@@ -1875,7 +1875,7 @@ export default {
         let dateStr = "";
         if (node && node.size != null) {
           sizeStr = this.formatFileSize(node.size);
-          dateStr = node.date || "";
+          dateStr = (node.date || "").replace(/:\d+\.\d+$|:\d+$/, "");
           this.infoFileMeta = dateStr ? `${sizeStr} | ${dateStr}` : sizeStr;
         }
         if (!VIDEO_EXTS.has(getExt(fileName))) {
@@ -1953,9 +1953,8 @@ export default {
           let dateStr = "";
           if (node && node.size != null) {
             sizeStr = this.formatFileSize(node.size);
-            dateStr = node.date || "";
+            dateStr = (node.date || "").replace(/:\d+\.\d+$|:\d+$/, "");
           }
-          let wStr = "";
           let rStr = "";
           let dStr = "";
           if (VIDEO_EXTS.has(getExt(fileName))) {

@@ -12,12 +12,12 @@ const TV_ERRORS_ROOT = "/mnt/media/tv-errors";
  * Returns a file tree of /mnt/media/tv from the local file system.
  */
 export async function getLocalFiles(root = TV_ROOT) {
-  // using find with -printf to get type, path, size, and date
+  // using find with -printf to get type, path, size, and date+time
   // %y: type (f=file, d=directory)
   // %P: file's name relative to start point
   // %s: size in bytes
-  // %CY-%Cm-%Cd: date (YYYY-MM-DD)
-  const cmd = `find ${root} -maxdepth 5 -not -path '*/.*' -printf "%y|%P|%s|%CY-%Cm-%Cd\\n" | sort`;
+  // %CY-%Cm-%Cd %CH:%CM:%CS: datetime (YYYY-MM-DD HH:MM:SS)
+  const cmd = `find ${root} -maxdepth 5 -not -path '*/.*' -printf "%y|%P|%s|%CY-%Cm-%Cd %CH:%CM:%CS\\n" | sort`;
 
   try {
     const { stdout } = await execFileAsync("bash", ["-c", cmd], {

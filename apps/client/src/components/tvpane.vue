@@ -315,7 +315,7 @@
             @mousedown="subSelectTrack(sub.index)"
             @touchstart.prevent="subSelectTrack(sub.index)"
           >
-            {{ subTypeChar(sub.type) }}: {{ sub.label }}
+            {{ subTypeChar(sub.type) }}: {{ subShortLabel(sub.label) }}
           </div>
         </template>
       </div>
@@ -630,6 +630,10 @@ export default {
       return "S";
     },
 
+    subShortLabel(label) {
+      return (label || "").replace(/\bdefault\b/gi, "Def");
+    },
+
     notifyAction(fromSubCtrl = false) {
       console.log(
         `[collision] notifyAction sending tvRemoteAction fromSubCtrl=${fromSubCtrl}`,
@@ -664,7 +668,7 @@ export default {
         () => {
           this.avoidingCollisions = false;
         },
-        fromSubCtrl ? 5000 : 5000,
+        fromSubCtrl ? 5000 : 1500,
       );
     },
 
@@ -837,10 +841,10 @@ export default {
           `[sub] highlight on index=${index} pending=${this._subPending?.index ?? "null"}`,
         );
       return {
-        padding: "12px 16px",
+        padding: "24px 16px",
         borderBottom: "1px solid #ddd",
         cursor: "pointer",
-        fontSize: "18px",
+        fontSize: "27px",
         userSelect: "none",
         backgroundColor: isSelected ? "#d0e8ff" : "#fff",
         fontWeight: isSelected ? "bold" : "normal",

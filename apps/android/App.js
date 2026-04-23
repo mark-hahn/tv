@@ -153,7 +153,7 @@ export default function App() {
             () => {
               avoidingRef.current = false;
             },
-            fromSubCtrl ? 5000 : 5000,
+            fromSubCtrl ? 5000 : 1500,
           );
         } else if (msg.id === 0 && msg.notification === "tvRemoteLock") {
           setLocked(true);
@@ -348,6 +348,9 @@ export default function App() {
     if (type === "srt") return "S";
     return "S";
   };
+
+  const subShortLabel = (label) =>
+    (label || "").replace(/\bdefault\b/gi, "Def");
 
   const subShortDevice = (name) => {
     if (!name) return name;
@@ -733,7 +736,7 @@ export default function App() {
                           subCtrlStyles.cardTextSelected,
                       ]}
                     >
-                      {subTypeChar(sub.type)}: {sub.label}
+                      {subTypeChar(sub.type)}: {subShortLabel(sub.label)}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -1107,7 +1110,7 @@ const subCtrlStyles = StyleSheet.create({
     fontSize: 16,
   },
   card: {
-    padding: 14,
+    padding: 28,
     borderBottomWidth: 1,
     borderBottomColor: "#ddd",
     backgroundColor: "#fff",
@@ -1116,7 +1119,7 @@ const subCtrlStyles = StyleSheet.create({
     backgroundColor: "#d0e8ff",
   },
   cardText: {
-    fontSize: 18,
+    fontSize: 27,
     color: "#000",
   },
   cardTextSelected: {

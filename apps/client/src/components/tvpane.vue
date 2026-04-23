@@ -633,14 +633,14 @@ export default {
         .then((r) => r.json())
         .catch(() => ({}));
       const waitMs = resp.waitMs ?? 4000;
-      // Wait for IRCC navigation to complete, then rapid-poll up to 10s; stop early when Emby confirms
-      await new Promise((r) => setTimeout(r, waitMs));
-      for (let i = 0; i < 20; i++) {
-        await this._fetchSubPlayers();
-        if (!this._subPending) break; // Emby confirmed the selection
-        await new Promise((r) => setTimeout(r, 500));
-      }
+      const navMs = resp.navMs ?? waitMs;
+      await new Promise((r) => setTimeout(r, navMs));
+      clearInterval(this._subPollTimer);
+      this._subPollTimer = setInterval(() => this._fetchSubPlayers(), 500);
+      await new Promise((r) => setTimeout(r, waitMs - navMs));
+      clearInterval(this._subPollTimer);
       this._subPending = null;
+      this._subPollTimer = setInterval(() => this._fetchSubPlayers(), 3000);
       await this._fetchSubPlayers();
     },
 

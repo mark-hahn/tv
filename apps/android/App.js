@@ -321,6 +321,7 @@ export default function App() {
       return next;
     });
     let waitMs = 4000;
+    let navMs = waitMs;
     try {
       const resp = await fetch(`${TV_TV_URL}/tv/emby/subtitle`, {
         method: "POST",
@@ -329,15 +330,15 @@ export default function App() {
       });
       const data = await resp.json();
       waitMs = data.waitMs ?? 4000;
+      navMs = data.navMs ?? waitMs;
     } catch (_) {}
-    // Wait for IRCC navigation to complete, then rapid-poll up to 10s; stop early when Emby confirms
-    await new Promise((r) => setTimeout(r, waitMs));
-    for (let i = 0; i < 20; i++) {
-      await fetchSubPlayers();
-      if (!subPendingRef.current) break; // Emby confirmed the selection
-      await new Promise((r) => setTimeout(r, 500));
-    }
+    await new Promise((r) => setTimeout(r, navMs));
+    clearInterval(subPollRef.current);
+    subPollRef.current = setInterval(fetchSubPlayers, 500);
+    await new Promise((r) => setTimeout(r, waitMs - navMs));
+    clearInterval(subPollRef.current);
     subPendingRef.current = null;
+    subPollRef.current = setInterval(fetchSubPlayers, 3000);
     await fetchSubPlayers();
   };
 

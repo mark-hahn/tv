@@ -845,6 +845,9 @@ export default {
 
     const onBrowseTabClicked = () => {
       showTvdbInfo.value = false;
+      if (props.active) {
+        void handleNext();
+      }
     };
     evtBus.on("browseTabClicked", onBrowseTabClicked);
 

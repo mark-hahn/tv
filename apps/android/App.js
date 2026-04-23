@@ -256,8 +256,11 @@ export default function App() {
         }
         setSubPlayers(players);
         setSubDeviceName((prev) => {
-          if (!prev && data.playing.length > 0) {
-            return data.playing[0].deviceName || data.playing[0].sessionId;
+          const hasCurrentPlayer =
+            prev && players.find((p) => (p.deviceName || p.sessionId) === prev);
+          if (!hasCurrentPlayer) {
+            const lrtv = players.find((p) => p.deviceName === "Living Room TV");
+            if (lrtv) return "Living Room TV";
           }
           return prev;
         });
@@ -612,6 +615,10 @@ export default function App() {
           <ScrollView style={{ flex: 1 }}>
             {!currentPlayer ? (
               <Text style={subCtrlStyles.noVideo}>No video playing</Text>
+            ) : currentPlayer.deviceName !== "Living Room TV" ? (
+              <Text style={subCtrlStyles.noVideo}>
+                Only the Living Room TV is supported
+              </Text>
             ) : (
               <>
                 <TouchableOpacity

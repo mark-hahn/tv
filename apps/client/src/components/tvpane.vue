@@ -218,6 +218,17 @@
         >
           No video playing
         </div>
+        <div
+          v-else-if="subCurrentPlayer.deviceName !== 'Living Room TV'"
+          style="
+            padding: 20px;
+            text-align: center;
+            color: #999;
+            font-size: 16px;
+          "
+        >
+          Only the Living Room TV is supported
+        </div>
         <template v-else>
           <div
             :style="subCardStyle(-1)"
@@ -591,9 +602,14 @@ export default {
             });
           }
           this.subPlayers = players;
-          if (!this.subDeviceName && this.subPlayers.length > 0) {
-            this.subDeviceName =
-              this.subPlayers[0].deviceName || this.subPlayers[0].sessionId;
+          const hasCurrentPlayer =
+            this.subDeviceName &&
+            players.find(
+              (p) => (p.deviceName || p.sessionId) === this.subDeviceName,
+            );
+          if (!hasCurrentPlayer) {
+            const lrtv = players.find((p) => p.deviceName === "Living Room TV");
+            if (lrtv) this.subDeviceName = "Living Room TV";
           }
         }
       } catch (_) {}

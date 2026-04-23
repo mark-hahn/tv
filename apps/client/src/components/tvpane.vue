@@ -640,7 +640,7 @@ export default {
       await new Promise((r) => setTimeout(r, waitMs - navMs));
       clearInterval(this._subPollTimer);
       this._subPending = null;
-      this._subPollTimer = setInterval(() => this._fetchSubPlayers(), 3000);
+      this._subPollTimer = setInterval(() => this._fetchSubPlayers(), 2000);
       await this._fetchSubPlayers();
     },
 

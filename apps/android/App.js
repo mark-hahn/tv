@@ -338,7 +338,7 @@ export default function App() {
     await new Promise((r) => setTimeout(r, waitMs - navMs));
     clearInterval(subPollRef.current);
     subPendingRef.current = null;
-    subPollRef.current = setInterval(fetchSubPlayers, 3000);
+    subPollRef.current = setInterval(fetchSubPlayers, 2000);
     await fetchSubPlayers();
   };
 

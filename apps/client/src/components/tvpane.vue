@@ -811,7 +811,13 @@ export default {
     _onPaneChanged(pane) {
       if (pane !== "tv") {
         this.showKeybd = false;
-        this.showSubCtrl = false;
+      } else if (this.showSubCtrl) {
+        fetch(`${config.tvTvUrl}/tv/emby/playing`)
+          .then((r) => r.json())
+          .then((data) => {
+            if (data.ok) this.subPlayers = data.playing;
+          })
+          .catch(() => {});
       }
     },
 

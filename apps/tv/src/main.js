@@ -25,6 +25,13 @@ const GOOGLE_EMBY_DELAY_MS = 250; // ms after TV turns on before launching Emby
 const FIRE_HOME_DELAY_MS = 0; // ms after Fire TV turns on before sending home key
 const FIRE_EMBY_DELAY_MS = 5000; // ms after Fire TV turns on before launching Emby
 
+// Subtitle nav (IRCC key sequence) delays
+const SUB_NAV_CAPTIONS_DELAY_MS = 1500; // after ClosedCaption — wait for OSD to open
+const SUB_NAV_RIGHT_DELAY_MS = 400; // after each Right arrow
+const SUB_NAV_OPEN_DELAY_MS = 800; // after Confirm to open subtitle menu
+const SUB_NAV_DOWN_DELAY_MS = 400; // after each Down arrow in subtitle menu
+const SUB_NAV_BACK_DELAY_MS = 500; // after final Confirm before sending Back
+
 // PST LA timestamp  MM-DD HH:mm
 function ts() {
   return new Date()
@@ -717,6 +724,7 @@ app.get("/tv/key/:key", async (req, res) => {
     right: "Right",
     home: "Home",
     back: "Return",
+    captions: "ClosedCaption",
   };
   const FIRE_KEY_MAP = {
     ok: "23", // KEYCODE_DPAD_CENTER
@@ -898,6 +906,13 @@ app.get("/tv/status", (req, res) => {
 
 // ─── Emby subtitle control ───────────────────────────────────────────────────
 
+function sendIrcc(command, delayAfterMs) {
+  return new Promise((resolve) => {
+    callService("remote", "send_command", REMOTE_ENTITY_ID, { command });
+    setTimeout(resolve, delayAfterMs);
+  });
+}
+
 function normalizeCodec(codec) {
   const c = (codec || "").toLowerCase();
   if (c === "hdmv_pgs_subtitle" || c === "pgssub") return "PGS";
@@ -1002,26 +1017,79 @@ app.post("/tv/emby/subtitle", async (req, res) => {
     res.status(400).json({ ok: false, error: "missing sessionId or index" });
     return;
   }
-  try {
-    const r = await fetch(
-      `${EMBY_BASE_URL}/Sessions/${sessionId}/Command?api_key=${EMBY_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          Name: "SetSubtitleStreamIndex",
-          Arguments: { Index: String(index) },
-        }),
-      },
-    );
-    log(
-      `[emby] SetSubtitleStreamIndex ${index} session=${sessionId} -> ${r.status}`,
-    );
-    res.json({ ok: r.ok });
-  } catch (err) {
-    loge("emby/subtitle error:", err.message);
-    res.json({ ok: false, error: err.message });
+
+  // Determine how many Down presses to reach the target track in the IRCC menu.
+  // Menu order: None (0 downs), then each subtitle in stream order (+1 per track).
+  let downCount;
+  if (index === -1) {
+    downCount = 0;
+  } else {
+    try {
+      const sessRes = await fetch(
+        `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
+        { headers: { Accept: "application/json" } },
+      );
+      if (!sessRes.ok) {
+        res.json({ ok: false, error: `sessions ${sessRes.status}` });
+        return;
+      }
+      const sessions = await sessRes.json();
+      const session = sessions.find((s) => s.Id === sessionId);
+      if (!session?.NowPlayingItem) {
+        res.json({ ok: false, error: "session not found or not playing" });
+        return;
+      }
+      const item = session.NowPlayingItem;
+      let streams;
+      try {
+        const itemRes = await fetch(
+          `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${item.Id}?Fields=MediaSources&api_key=${EMBY_API_KEY}`,
+          { headers: { Accept: "application/json" } },
+        );
+        if (itemRes.ok) {
+          const itemData = await itemRes.json();
+          streams = itemData.MediaSources?.[0]?.MediaStreams;
+        }
+      } catch (_) {}
+      if (!streams) streams = item.MediaSources?.[0]?.MediaStreams;
+
+      const subStreams = (streams ?? []).filter((s) => {
+        if (s.Type !== "Subtitle") return false;
+        if (!s.IsExternal) {
+          const lang = (s.Language || "").toLowerCase();
+          if (lang && lang !== "eng" && lang !== "en") return false;
+        }
+        return true;
+      });
+
+      const pos = subStreams.findIndex((s) => s.Index === index);
+      if (pos === -1) {
+        res.json({ ok: false, error: "subtitle index not found in list" });
+        return;
+      }
+      downCount = pos + 1;
+    } catch (err) {
+      loge("emby/subtitle lookup error:", err.message);
+      res.json({ ok: false, error: err.message });
+      return;
+    }
   }
+
+  log(`[emby] subtitle nav: index=${index} downCount=${downCount}`);
+  res.json({ ok: true });
+
+  await sendIrcc("ClosedCaption", SUB_NAV_CAPTIONS_DELAY_MS);
+  await sendIrcc("Right", SUB_NAV_RIGHT_DELAY_MS);
+  await sendIrcc("Right", SUB_NAV_RIGHT_DELAY_MS);
+  await sendIrcc("Right", SUB_NAV_RIGHT_DELAY_MS);
+  await sendIrcc("Confirm", SUB_NAV_OPEN_DELAY_MS);
+  for (let i = 0; i < downCount; i++) {
+    await sendIrcc("Down", SUB_NAV_DOWN_DELAY_MS);
+  }
+  await sendIrcc("Confirm", SUB_NAV_BACK_DELAY_MS);
+  callService("remote", "send_command", REMOTE_ENTITY_ID, {
+    command: "Return",
+  });
 });
 
 app.post("/tv/emby/subtitle-offset", async (req, res) => {

@@ -54,6 +54,7 @@ export default function App() {
   const embyHoldRef = useRef(null);
   const embyHoldFiredRef = useRef(false);
   const subPollRef = useRef(null);
+  const subPendingRef = useRef(null); // { deviceName, index } while optimistic highlight is active
 
   const debounce = () => {
     const now = Date.now();
@@ -237,7 +238,21 @@ export default function App() {
         r.json(),
       );
       if (data.ok) {
-        setSubPlayers(data.playing);
+        const pending = subPendingRef.current;
+        let players = data.playing;
+        if (pending) {
+          players = players.map((p) => {
+            if ((p.deviceName || p.sessionId) === pending.deviceName) {
+              if (p.subtitleStreamIndex === pending.index) {
+                subPendingRef.current = null; // Emby confirmed
+              } else {
+                return { ...p, subtitleStreamIndex: pending.index }; // keep optimistic
+              }
+            }
+            return p;
+          });
+        }
+        setSubPlayers(players);
         setSubDeviceName((prev) => {
           if (!prev && data.playing.length > 0) {
             return data.playing[0].deviceName || data.playing[0].sessionId;
@@ -264,6 +279,16 @@ export default function App() {
     return "S";
   };
 
+  const subShortDevice = (name) => {
+    if (!name) return name;
+    if (name === "Living Room TV") return "TV";
+    if (name === "Firefox Browser") return "Firefox";
+    if (name === "Firefox Windows") return "Firefox";
+    if (name === "Google Chrome Windows") return "Chrome";
+    if (name === "Galaxy Tab S8") return "Tablet";
+    return name;
+  };
+
   const subCyclePlayer = () => {
     if (subPlayers.length === 0) return;
     const curIdx = subPlayers.findIndex(
@@ -285,6 +310,7 @@ export default function App() {
       (p) => (p.deviceName || p.sessionId) === subDeviceName,
     );
     if (!player) return;
+    subPendingRef.current = { deviceName: subDeviceName, index };
     setSubPlayers((prev) => {
       const idx = prev.findIndex(
         (p) => (p.deviceName || p.sessionId) === subDeviceName,
@@ -294,19 +320,25 @@ export default function App() {
       next[idx] = { ...next[idx], subtitleStreamIndex: index };
       return next;
     });
+    let waitMs = 4000;
     try {
-      await fetch(`${TV_TV_URL}/tv/emby/subtitle`, {
+      const resp = await fetch(`${TV_TV_URL}/tv/emby/subtitle`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId: player.sessionId, index }),
       });
+      const data = await resp.json();
+      waitMs = data.waitMs ?? 4000;
     } catch (_) {}
-    // Wait for IRCC navigation to complete (~4.5s), then rapid-poll for 15s
-    await new Promise((r) => setTimeout(r, 4000));
-    for (let i = 0; i < 22; i++) {
+    // Wait for IRCC navigation to complete, then rapid-poll up to 10s; stop early when Emby confirms
+    await new Promise((r) => setTimeout(r, waitMs));
+    for (let i = 0; i < 20; i++) {
       await fetchSubPlayers();
+      if (!subPendingRef.current) break; // Emby confirmed the selection
       await new Promise((r) => setTimeout(r, 500));
     }
+    subPendingRef.current = null;
+    await fetchSubPlayers();
   };
 
   const kybdSendText = async () => {
@@ -549,7 +581,7 @@ export default function App() {
                     ? `${currentPlayer.showName} ${currentPlayer.episodeCode}`
                     : currentPlayer.showName;
                   if (currentPlayer.deviceName)
-                    base += ` (${currentPlayer.deviceName})`;
+                    base += ` (${subShortDevice(currentPlayer.deviceName)})`;
                   const active = currentPlayer.subtitles.find(
                     (s) => s.index === currentPlayer.subtitleStreamIndex,
                   );

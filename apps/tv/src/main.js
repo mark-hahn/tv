@@ -26,11 +26,13 @@ const FIRE_HOME_DELAY_MS = 0; // ms after Fire TV turns on before sending home k
 const FIRE_EMBY_DELAY_MS = 5000; // ms after Fire TV turns on before launching Emby
 
 // Subtitle nav (IRCC key sequence) delays
-const SUB_NAV_CAPTIONS_DELAY_MS = 1500; // after ClosedCaption — wait for OSD to open
-const SUB_NAV_RIGHT_DELAY_MS = 400; // after each Right arrow
-const SUB_NAV_OPEN_DELAY_MS = 800; // after Confirm to open subtitle menu
-const SUB_NAV_DOWN_DELAY_MS = 50; // after each Down arrow in subtitle menu
-const SUB_NAV_BACK_DELAY_MS = 500; // after final Confirm before sending Back
+const SUB_NAV_DOWN_OPEN_DELAY_MS = 1000; // after initial Down to open OSD
+const SUB_NAV_RIGHT_DELAY_MS = 1000; // after each Right arrow
+const SUB_NAV_OPEN_DELAY_MS = 1000; // after Confirm to open subtitle menu
+const SUB_NAV_DOWN_DELAY_MS = 1000; // after each Down arrow in subtitle menu
+const SUB_NAV_CONFIRM_DELAY_MS = 2500; // after last Down arrow before Confirm
+const SUB_NAV_BACK_DELAY_MS = 50; // after final Confirm before sending Back
+const SUB_NAV_POLL_MS = 10_000; // fast-poll window after nav completes
 
 // PST LA timestamp  MM-DD HH:mm
 function ts() {
@@ -1075,9 +1077,18 @@ app.post("/tv/emby/subtitle", async (req, res) => {
   log(
     `[emby] subtitle nav: index=${index} downCount=${downCount} rightCount=${rightCount}`,
   );
-  res.json({ ok: true });
+  const navMs =
+    SUB_NAV_DOWN_OPEN_DELAY_MS +
+    rightCount * SUB_NAV_RIGHT_DELAY_MS +
+    SUB_NAV_OPEN_DELAY_MS +
+    downCount * SUB_NAV_DOWN_DELAY_MS +
+    SUB_NAV_CONFIRM_DELAY_MS +
+    SUB_NAV_BACK_DELAY_MS;
+  const waitMs = navMs + SUB_NAV_POLL_MS;
+  log(`[emby] subtitle nav waitMs=${waitMs}`);
+  res.json({ ok: true, waitMs });
 
-  await sendIrcc("ClosedCaption", SUB_NAV_CAPTIONS_DELAY_MS);
+  await sendIrcc("Down", SUB_NAV_DOWN_OPEN_DELAY_MS);
   for (let i = 0; i < rightCount; i++) {
     await sendIrcc("Right", SUB_NAV_RIGHT_DELAY_MS);
   }
@@ -1085,6 +1096,7 @@ app.post("/tv/emby/subtitle", async (req, res) => {
   for (let i = 0; i < downCount; i++) {
     await sendIrcc("Down", SUB_NAV_DOWN_DELAY_MS);
   }
+  await new Promise((r) => setTimeout(r, SUB_NAV_CONFIRM_DELAY_MS));
   await sendIrcc("Confirm", SUB_NAV_BACK_DELAY_MS);
   callService("remote", "send_command", REMOTE_ENTITY_ID, {
     command: "Return",

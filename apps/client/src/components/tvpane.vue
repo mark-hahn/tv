@@ -501,7 +501,8 @@ export default {
       let base = player.episodeCode
         ? `${player.showName} ${player.episodeCode}`
         : player.showName;
-      if (player.deviceName) base += ` (${player.deviceName})`;
+      if (player.deviceName)
+        base += ` (${this.subShortDevice(player.deviceName)})`;
       const active = player.subtitles.find(
         (s) => s.index === player.subtitleStreamIndex,
       );
@@ -536,6 +537,16 @@ export default {
       return "S";
     },
 
+    subShortDevice(name) {
+      if (!name) return name;
+      if (name === "Living Room TV") return "TV";
+      if (name === "Firefox Browser") return "Firefox";
+      if (name === "Firefox Windows") return "Firefox";
+      if (name === "Google Chrome Windows") return "Chrome";
+      if (name === "Galaxy Tab S8") return "Tablet";
+      return name;
+    },
+
     startEmbyHold() {
       this._embyHoldFired = false;
       this._embyHoldTimer = setTimeout(() => {
@@ -558,7 +569,21 @@ export default {
           (r) => r.json(),
         );
         if (data.ok) {
-          this.subPlayers = data.playing;
+          const pending = this._subPending;
+          let players = data.playing;
+          if (pending) {
+            players = players.map((p) => {
+              if ((p.deviceName || p.sessionId) === pending.deviceName) {
+                if (p.subtitleStreamIndex === pending.index) {
+                  this._subPending = null; // Emby confirmed
+                } else {
+                  return { ...p, subtitleStreamIndex: pending.index }; // keep optimistic
+                }
+              }
+              return p;
+            });
+          }
+          this.subPlayers = players;
           if (!this.subDeviceName && this.subPlayers.length > 0) {
             this.subDeviceName =
               this.subPlayers[0].deviceName || this.subPlayers[0].sessionId;
@@ -594,22 +619,29 @@ export default {
     async subSelectTrack(index) {
       const player = this.subCurrentPlayer;
       if (!player) return;
+      this._subPending = { deviceName: this.subDeviceName, index };
       const idx = this.subPlayers.findIndex(
         (p) => (p.deviceName || p.sessionId) === this.subDeviceName,
       );
       if (idx >= 0)
         this.subPlayers[idx] = { ...player, subtitleStreamIndex: index };
-      await fetch(`${config.tvTvUrl}/tv/emby/subtitle`, {
+      const resp = await fetch(`${config.tvTvUrl}/tv/emby/subtitle`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId: player.sessionId, index }),
-      }).catch(() => {});
-      // Wait for IRCC navigation to complete (~4.5s), then rapid-poll for 15s
-      await new Promise((r) => setTimeout(r, 4000));
-      for (let i = 0; i < 22; i++) {
+      })
+        .then((r) => r.json())
+        .catch(() => ({}));
+      const waitMs = resp.waitMs ?? 4000;
+      // Wait for IRCC navigation to complete, then rapid-poll up to 10s; stop early when Emby confirms
+      await new Promise((r) => setTimeout(r, waitMs));
+      for (let i = 0; i < 20; i++) {
         await this._fetchSubPlayers();
+        if (!this._subPending) break; // Emby confirmed the selection
         await new Promise((r) => setTimeout(r, 500));
       }
+      this._subPending = null;
+      await this._fetchSubPlayers();
     },
 
     subCardStyle(index) {

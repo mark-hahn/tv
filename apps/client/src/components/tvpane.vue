@@ -571,12 +571,19 @@ export default {
         if (data.ok) {
           const pending = this._subPending;
           let players = data.playing;
+          console.log(
+            `[sub] fetch pending=${pending?.index ?? "null"} emby=${data.playing.find((p) => (p.deviceName || p.sessionId) === this.subDeviceName)?.subtitleStreamIndex ?? "?"}`,
+          );
           if (pending) {
             players = players.map((p) => {
               if ((p.deviceName || p.sessionId) === pending.deviceName) {
                 if (p.subtitleStreamIndex === pending.index) {
+                  console.log("[sub] confirmed by emby");
                   this._subPending = null; // Emby confirmed
                 } else {
+                  console.log(
+                    `[sub] keeping optimistic emby=${p.subtitleStreamIndex} want=${pending.index}`,
+                  );
                   return { ...p, subtitleStreamIndex: pending.index }; // keep optimistic
                 }
               }
@@ -619,6 +626,7 @@ export default {
     async subSelectTrack(index) {
       const player = this.subCurrentPlayer;
       if (!player) return;
+      console.log(`[sub] select index=${index}`);
       this._subPending = { deviceName: this.subDeviceName, index };
       const idx = this.subPlayers.findIndex(
         (p) => (p.deviceName || p.sessionId) === this.subDeviceName,
@@ -634,18 +642,31 @@ export default {
         .catch(() => ({}));
       const waitMs = resp.waitMs ?? 4000;
       const navMs = resp.navMs ?? waitMs;
+      console.log(`[sub] navMs=${navMs} waitMs=${waitMs}`);
       clearInterval(this._subPollTimer);
       await new Promise((r) => setTimeout(r, navMs));
-      this._subPollTimer = setInterval(() => this._fetchSubPlayers(), 500);
-      await new Promise((r) => setTimeout(r, waitMs - navMs));
-      clearInterval(this._subPollTimer);
+      console.log("[sub] navMs expired, starting fast poll");
+      const deadline = Date.now() + (waitMs - navMs);
+      while (this._subPending && Date.now() < deadline) {
+        await this._fetchSubPlayers();
+        if (!this._subPending) break;
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      console.log(
+        `[sub] waitMs expired or confirmed, pending=${this._subPending?.index ?? "null"}`,
+      );
       this._subPending = null;
+      console.log("[sub] pending force-cleared (deadline)");
       this._subPollTimer = setInterval(() => this._fetchSubPlayers(), 2000);
       await this._fetchSubPlayers();
     },
 
     subCardStyle(index) {
       const isSelected = this.subCurrentPlayer?.subtitleStreamIndex === index;
+      if (isSelected)
+        console.log(
+          `[sub] highlight on index=${index} pending=${this._subPending?.index ?? "null"}`,
+        );
       return {
         padding: "12px 16px",
         borderBottom: "1px solid #ddd",

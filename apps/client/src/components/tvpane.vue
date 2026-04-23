@@ -505,8 +505,7 @@ export default {
       const active = player.subtitles.find(
         (s) => s.index === player.subtitleStreamIndex,
       );
-      if (!active) return base;
-      return `${this.subTypeChar(active.type)}: ${base}`;
+      return base;
     },
   },
 
@@ -605,6 +604,12 @@ export default {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId: player.sessionId, index }),
       }).catch(() => {});
+      // Wait for IRCC navigation to complete (~4.5s), then rapid-poll for 15s
+      await new Promise((r) => setTimeout(r, 4000));
+      for (let i = 0; i < 22; i++) {
+        await this._fetchSubPlayers();
+        await new Promise((r) => setTimeout(r, 500));
+      }
     },
 
     subCardStyle(index) {
@@ -764,13 +769,9 @@ export default {
     _onPaneChanged(pane) {
       if (pane !== "tv") {
         this.showKeybd = false;
+        if (this.showSubCtrl) this.subClose();
       } else if (this.showSubCtrl) {
-        fetch(`${config.tvTvUrl}/tv/emby/playing`)
-          .then((r) => r.json())
-          .then((data) => {
-            if (data.ok) this.subPlayers = data.playing;
-          })
-          .catch(() => {});
+        this.subClose();
       }
     },
 

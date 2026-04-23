@@ -29,7 +29,7 @@ const FIRE_EMBY_DELAY_MS = 5000; // ms after Fire TV turns on before launching E
 const SUB_NAV_CAPTIONS_DELAY_MS = 1500; // after ClosedCaption — wait for OSD to open
 const SUB_NAV_RIGHT_DELAY_MS = 400; // after each Right arrow
 const SUB_NAV_OPEN_DELAY_MS = 800; // after Confirm to open subtitle menu
-const SUB_NAV_DOWN_DELAY_MS = 400; // after each Down arrow in subtitle menu
+const SUB_NAV_DOWN_DELAY_MS = 50; // after each Down arrow in subtitle menu
 const SUB_NAV_BACK_DELAY_MS = 500; // after final Confirm before sending Back
 
 // PST LA timestamp  MM-DD HH:mm
@@ -1018,70 +1018,69 @@ app.post("/tv/emby/subtitle", async (req, res) => {
     return;
   }
 
-  // Determine how many Down presses to reach the target track in the IRCC menu.
+  // Fetch streams to determine downCount and audio track count.
   // Menu order: None (0 downs), then each subtitle in stream order (+1 per track).
+  // Right arrow count: 3 when single audio track, 4 when multiple audio tracks.
   let downCount;
-  if (index === -1) {
-    downCount = 0;
-  } else {
+  let rightCount = 3;
+  try {
+    const sessRes = await fetch(
+      `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
+      { headers: { Accept: "application/json" } },
+    );
+    if (!sessRes.ok) {
+      res.json({ ok: false, error: `sessions ${sessRes.status}` });
+      return;
+    }
+    const sessions = await sessRes.json();
+    const session = sessions.find((s) => s.Id === sessionId);
+    if (!session?.NowPlayingItem) {
+      res.json({ ok: false, error: "session not found or not playing" });
+      return;
+    }
+    const item = session.NowPlayingItem;
+    let streams;
     try {
-      const sessRes = await fetch(
-        `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
+      const itemRes = await fetch(
+        `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${item.Id}?Fields=MediaSources&api_key=${EMBY_API_KEY}`,
         { headers: { Accept: "application/json" } },
       );
-      if (!sessRes.ok) {
-        res.json({ ok: false, error: `sessions ${sessRes.status}` });
-        return;
+      if (itemRes.ok) {
+        const itemData = await itemRes.json();
+        streams = itemData.MediaSources?.[0]?.MediaStreams;
       }
-      const sessions = await sessRes.json();
-      const session = sessions.find((s) => s.Id === sessionId);
-      if (!session?.NowPlayingItem) {
-        res.json({ ok: false, error: "session not found or not playing" });
-        return;
-      }
-      const item = session.NowPlayingItem;
-      let streams;
-      try {
-        const itemRes = await fetch(
-          `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${item.Id}?Fields=MediaSources&api_key=${EMBY_API_KEY}`,
-          { headers: { Accept: "application/json" } },
-        );
-        if (itemRes.ok) {
-          const itemData = await itemRes.json();
-          streams = itemData.MediaSources?.[0]?.MediaStreams;
-        }
-      } catch (_) {}
-      if (!streams) streams = item.MediaSources?.[0]?.MediaStreams;
+    } catch (_) {}
+    if (!streams) streams = item.MediaSources?.[0]?.MediaStreams ?? [];
 
-      const subStreams = (streams ?? []).filter((s) => {
-        if (s.Type !== "Subtitle") return false;
-        if (!s.IsExternal) {
-          const lang = (s.Language || "").toLowerCase();
-          if (lang && lang !== "eng" && lang !== "en") return false;
-        }
-        return true;
-      });
+    const audioStreams = streams.filter((s) => s.Type === "Audio");
+    if (audioStreams.length > 1) rightCount = 4;
 
+    if (index === -1) {
+      downCount = 0;
+    } else {
+      const subStreams = streams.filter((s) => s.Type === "Subtitle");
       const pos = subStreams.findIndex((s) => s.Index === index);
       if (pos === -1) {
         res.json({ ok: false, error: "subtitle index not found in list" });
         return;
       }
       downCount = pos + 1;
-    } catch (err) {
-      loge("emby/subtitle lookup error:", err.message);
-      res.json({ ok: false, error: err.message });
-      return;
     }
+  } catch (err) {
+    loge("emby/subtitle lookup error:", err.message);
+    res.json({ ok: false, error: err.message });
+    return;
   }
 
-  log(`[emby] subtitle nav: index=${index} downCount=${downCount}`);
+  log(
+    `[emby] subtitle nav: index=${index} downCount=${downCount} rightCount=${rightCount}`,
+  );
   res.json({ ok: true });
 
   await sendIrcc("ClosedCaption", SUB_NAV_CAPTIONS_DELAY_MS);
-  await sendIrcc("Right", SUB_NAV_RIGHT_DELAY_MS);
-  await sendIrcc("Right", SUB_NAV_RIGHT_DELAY_MS);
-  await sendIrcc("Right", SUB_NAV_RIGHT_DELAY_MS);
+  for (let i = 0; i < rightCount; i++) {
+    await sendIrcc("Right", SUB_NAV_RIGHT_DELAY_MS);
+  }
   await sendIrcc("Confirm", SUB_NAV_OPEN_DELAY_MS);
   for (let i = 0; i < downCount; i++) {
     await sendIrcc("Down", SUB_NAV_DOWN_DELAY_MS);

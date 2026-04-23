@@ -222,7 +222,11 @@ export default function App() {
   const stopEmbyHold = () => {
     clearTimeout(embyHoldRef.current);
     if (!embyHoldFiredRef.current) {
-      tvCmd("emby");
+      if (showSubCtrl) {
+        subClose();
+      } else {
+        tvCmd("emby");
+      }
     }
     embyHoldFiredRef.current = false;
   };
@@ -297,6 +301,12 @@ export default function App() {
         body: JSON.stringify({ sessionId: player.sessionId, index }),
       });
     } catch (_) {}
+    // Wait for IRCC navigation to complete (~4.5s), then rapid-poll for 15s
+    await new Promise((r) => setTimeout(r, 4000));
+    for (let i = 0; i < 22; i++) {
+      await fetchSubPlayers();
+      await new Promise((r) => setTimeout(r, 500));
+    }
   };
 
   const kybdSendText = async () => {
@@ -525,79 +535,89 @@ export default function App() {
       subPlayers.find((p) => (p.deviceName || p.sessionId) === subDeviceName) ??
       null;
     return (
-      <View style={subCtrlStyles.container}>
+      <View style={styles.container}>
         <StatusBar hidden />
-        {/* Header row 1: show name + offset + close */}
-        <View style={subCtrlStyles.headerRow1}>
-          <TouchableOpacity onPress={subCyclePlayer} style={{ flex: 1 }}>
-            <Text style={subCtrlStyles.showName} numberOfLines={1}>
-              {(() => {
-                if (!currentPlayer)
-                  return subDeviceName ? "---" : "No video playing";
-                let base = currentPlayer.episodeCode
-                  ? `${currentPlayer.showName} ${currentPlayer.episodeCode}`
-                  : currentPlayer.showName;
-                if (currentPlayer.deviceName)
-                  base += ` (${currentPlayer.deviceName})`;
-                const active = currentPlayer.subtitles.find(
-                  (s) => s.index === currentPlayer.subtitleStreamIndex,
-                );
-                return active ? `${subTypeChar(active.type)}: ${base}` : base;
-              })()}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={subClose} style={subCtrlStyles.closeBtn}>
-            <Text style={subCtrlStyles.closeBtnText}>✕</Text>
-          </TouchableOpacity>
-        </View>
-        {/* Subtitle list */}
-        <ScrollView style={{ flex: 1 }}>
-          {!currentPlayer ? (
-            <Text style={subCtrlStyles.noVideo}>No video playing</Text>
-          ) : (
-            <>
-              <TouchableOpacity
-                onPress={() => subSelectTrack(-1)}
-                style={[
-                  subCtrlStyles.card,
-                  currentPlayer.subtitleStreamIndex === -1 &&
-                    subCtrlStyles.cardSelected,
-                ]}
-              >
-                <Text
-                  style={[
-                    subCtrlStyles.cardText,
-                    currentPlayer.subtitleStreamIndex === -1 &&
-                      subCtrlStyles.cardTextSelected,
-                  ]}
-                >
-                  None
-                </Text>
-              </TouchableOpacity>
-              {currentPlayer.subtitles.map((sub) => (
+        <View style={subCtrlStyles.container}>
+          {/* Header row 1: show name + offset + close */}
+          <View style={subCtrlStyles.headerRow1}>
+            <TouchableOpacity onPress={subCyclePlayer} style={{ flex: 1 }}>
+              <Text style={subCtrlStyles.showName} numberOfLines={1}>
+                {(() => {
+                  if (!currentPlayer)
+                    return subDeviceName ? "---" : "No video playing";
+                  let base = currentPlayer.episodeCode
+                    ? `${currentPlayer.showName} ${currentPlayer.episodeCode}`
+                    : currentPlayer.showName;
+                  if (currentPlayer.deviceName)
+                    base += ` (${currentPlayer.deviceName})`;
+                  const active = currentPlayer.subtitles.find(
+                    (s) => s.index === currentPlayer.subtitleStreamIndex,
+                  );
+                  return active ? base : base;
+                })()}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={subClose} style={subCtrlStyles.closeBtn}>
+              <Text style={subCtrlStyles.closeBtnText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          {/* Subtitle list */}
+          <ScrollView style={{ flex: 1 }}>
+            {!currentPlayer ? (
+              <Text style={subCtrlStyles.noVideo}>No video playing</Text>
+            ) : (
+              <>
                 <TouchableOpacity
-                  key={sub.index}
-                  onPress={() => subSelectTrack(sub.index)}
+                  onPress={() => subSelectTrack(-1)}
                   style={[
                     subCtrlStyles.card,
-                    currentPlayer.subtitleStreamIndex === sub.index &&
-                      subCtrlStyles.cardSelected,
+                    {
+                      backgroundColor:
+                        currentPlayer.subtitleStreamIndex === -1
+                          ? "#d0e8ff"
+                          : "#fff",
+                    },
                   ]}
                 >
                   <Text
                     style={[
                       subCtrlStyles.cardText,
-                      currentPlayer.subtitleStreamIndex === sub.index &&
+                      currentPlayer.subtitleStreamIndex === -1 &&
                         subCtrlStyles.cardTextSelected,
                     ]}
                   >
-                    {subTypeChar(sub.type)}: {sub.label}
+                    None
                   </Text>
                 </TouchableOpacity>
-              ))}
-            </>
-          )}
-        </ScrollView>
+                {currentPlayer.subtitles.map((sub) => (
+                  <TouchableOpacity
+                    key={sub.index}
+                    onPress={() => subSelectTrack(sub.index)}
+                    style={[
+                      subCtrlStyles.card,
+                      {
+                        backgroundColor:
+                          currentPlayer.subtitleStreamIndex === sub.index
+                            ? "#d0e8ff"
+                            : "#fff",
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        subCtrlStyles.cardText,
+                        currentPlayer.subtitleStreamIndex === sub.index &&
+                          subCtrlStyles.cardTextSelected,
+                      ]}
+                    >
+                      {subTypeChar(sub.type)}: {sub.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </>
+            )}
+          </ScrollView>
+        </View>
       </View>
     );
   }

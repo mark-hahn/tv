@@ -20,6 +20,13 @@
     "plugins": [
       "expo-asset",
       "expo-font"
-    ]
+    ],
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/aa17387b-2be3-4783-99c9-a0a91fb8b4e0"
+    },
+    "ios": {}
   }
 }

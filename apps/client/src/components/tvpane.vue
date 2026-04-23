@@ -1,8 +1,79 @@
 <template>
   <div
     id="tvPane"
-    style="padding: 0; box-sizing: border-box; width: 100%; height: 100%"
+    style="
+      padding: 0;
+      box-sizing: border-box;
+      width: 100%;
+      height: 100%;
+      position: relative;
+    "
   >
+    <!-- Lock pane overlay -->
+    <div
+      v-if="locked"
+      style="
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: white;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        border: 3px solid #000;
+        box-sizing: border-box;
+      "
+    >
+      <div
+        style="
+          padding: 8px 10px;
+          font-size: 28px;
+          font-weight: bold;
+          flex-shrink: 0;
+        "
+      >
+        Remote Collision
+      </div>
+      <div
+        style="
+          flex: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 16px;
+          text-align: center;
+          font-size: 24px;
+          font-weight: bold;
+        "
+      >
+        A remote collision has been detected and the remote has been locked.
+        Press and hold unlock button to continue.
+      </div>
+      <div
+        @mousedown.prevent="startUnlockHold"
+        @mouseup="stopUnlockHold"
+        @mouseleave="stopUnlockHold"
+        @touchstart.prevent="startUnlockHold"
+        @touchend="stopUnlockHold"
+        style="
+          background: lightgreen;
+          border-top: 3px solid #000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 26px;
+          font-weight: bold;
+          cursor: pointer;
+          flex-shrink: 0;
+          height: 20%;
+          user-select: none;
+        "
+      >
+        Unlock
+      </div>
+    </div>
     <!-- Keyboard pane -->
     <div
       v-if="showKeybd"
@@ -427,6 +498,7 @@
 <script>
 import { config } from "../config.js";
 import evtBus from "../evtBus.js";
+import { wsSend } from "../srvr.js";
 import allServices from "../../../tv/services.json";
 
 const CELL_BASE = {
@@ -458,6 +530,8 @@ export default {
       showSubCtrl: false,
       subPlayers: [],
       subDeviceName: null,
+      avoidingCollisions: false,
+      locked: false,
     };
   },
 
@@ -526,15 +600,23 @@ export default {
     evtBus.on("tvMuteState", this._onTvMuteState);
     evtBus.on("paneChanged", this._onPaneChanged);
     evtBus.on("tvCloseKeybd", this._onTvCloseKeybd);
+    evtBus.on("tvRemoteAction", this._onTvRemoteAction);
+    evtBus.on("tvRemoteLock", this._onTvRemoteLock);
+    evtBus.on("tvRemoteUnlock", this._onTvRemoteUnlock);
   },
 
   beforeUnmount() {
     evtBus.off("tvMuteState", this._onTvMuteState);
     evtBus.off("paneChanged", this._onPaneChanged);
     evtBus.off("tvCloseKeybd", this._onTvCloseKeybd);
+    evtBus.off("tvRemoteAction", this._onTvRemoteAction);
+    evtBus.off("tvRemoteLock", this._onTvRemoteLock);
+    evtBus.off("tvRemoteUnlock", this._onTvRemoteUnlock);
     this.stopRepeat();
     this.stopHold();
     clearInterval(this._subPollTimer);
+    clearTimeout(this._avoidTimer);
+    clearTimeout(this._unlockHoldTimer);
   },
 
   methods: {
@@ -546,6 +628,56 @@ export default {
       if (type === "opn") return "V";
       if (type === "srt") return "S";
       return "S";
+    },
+
+    notifyAction(fromSubCtrl = false) {
+      console.log(`[collision] notifyAction sending tvRemoteAction fromSubCtrl=${fromSubCtrl}`);
+      wsSend({ fname: "tvRemoteAction", param: { fromSubCtrl } });
+    },
+
+    checkBlocked() {
+      console.log(`[collision] checkBlocked locked=${this.locked} avoiding=${this.avoidingCollisions}`);
+      if (this.locked) return true;
+      if (this.avoidingCollisions) {
+        console.log(`[collision] checkBlocked -> BLOCKED (avoidingCollisions), sending tvRemoteCollision`);
+        wsSend({ fname: "tvRemoteCollision" });
+        return true;
+      }
+      return false;
+    },
+
+    _onTvRemoteAction(data) {
+      console.log(`[collision] _onTvRemoteAction received, entering avoidance 5s`, data);
+      const fromSubCtrl = data?.fromSubCtrl ?? false;
+      this.avoidingCollisions = true;
+      clearTimeout(this._avoidTimer);
+      this._avoidTimer = setTimeout(
+        () => {
+          this.avoidingCollisions = false;
+        },
+        fromSubCtrl ? 5000 : 5000,
+      );
+    },
+
+    _onTvRemoteLock() {
+      console.log(`[collision] _onTvRemoteLock received, setting locked=true`);
+      this.locked = true;
+    },
+
+    _onTvRemoteUnlock() {
+      console.log(`[collision] _onTvRemoteUnlock received, setting locked=false`);
+      this.locked = false;
+    },
+
+    startUnlockHold() {
+      this._unlockHoldTimer = setTimeout(() => {
+        this.locked = false;
+        wsSend({ fname: "tvRemoteUnlock" });
+      }, 500);
+    },
+
+    stopUnlockHold() {
+      clearTimeout(this._unlockHoldTimer);
     },
 
     subShortDevice(name) {
@@ -643,7 +775,9 @@ export default {
       const player = this.subCurrentPlayer;
       if (!player) return;
       if (this._subNavigating) return;
+      if (this.checkBlocked()) return;
       console.log(`[sub] select index=${index}`);
+      this.notifyAction(true);
       const gen = (this._subGen = (this._subGen ?? 0) + 1);
       clearInterval(this._subPollTimer);
       this._subPending = { deviceName: this.subDeviceName, index };
@@ -704,8 +838,10 @@ export default {
 
     startRepeat(key) {
       if (this.isOff || this.isOther) return;
+      if (this.checkBlocked()) return;
       if (!this._debounce()) return;
       this.flash(key);
+      this.notifyAction();
       this._repeatActive = true;
       (async () => {
         await fetch(`${config.tvTvUrl}/tv/key/${key}`).catch(() => {});
@@ -790,19 +926,23 @@ export default {
     },
 
     async googleBtn() {
+      if (this.checkBlocked()) return;
       if (this.mode === "google") {
         this.tvCmd("off");
       } else {
         this.flash("google");
+        this.notifyAction();
         fetch(`${config.tvTvUrl}/tv/googlebtn`).catch(() => {});
       }
     },
 
     async fireBtn() {
+      if (this.checkBlocked()) return;
       if (this.mode === "fire") {
         this.tvCmd("off");
       } else {
         this.flash("fire");
+        this.notifyAction();
         fetch(`${config.tvTvUrl}/tv/firebtn`).catch(() => {});
       }
     },
@@ -876,6 +1016,8 @@ export default {
 
     async openApp(svc) {
       if (this.isOff) return;
+      if (this.checkBlocked()) return;
+      this.notifyAction();
       setTimeout(() => {
         this.showStreamers = false;
       }, 1000);
@@ -902,8 +1044,10 @@ export default {
 
     async tvCmd(cmd) {
       if (this.isOff || this.isOther) return;
+      if (this.checkBlocked()) return;
       this.flash(cmd);
       if (!this._debounce()) return;
+      this.notifyAction();
       const res = await fetch(`${config.tvTvUrl}/tv/${cmd}`);
       const data = await res.json();
       if (cmd === "mute" && data.ok) this.muted = data.muted;
@@ -912,7 +1056,9 @@ export default {
 
     async tvVolCmd(dir) {
       if (this.isOff || this.isOther) return;
+      if (this.checkBlocked()) return;
       this.flash(dir === "down" ? "vold" : "volu");
+      this.notifyAction();
       fetch(`${config.tvTvUrl}/tv/vol/${dir}`).catch(() => {});
     },
 
@@ -924,8 +1070,10 @@ export default {
 
     async tvKey(key) {
       if (this.isOff || this.isOther) return;
+      if (this.checkBlocked()) return;
       if (!this._debounce()) return;
       this.flash(key);
+      this.notifyAction();
       const res = await fetch(`${config.tvTvUrl}/tv/key/${key}`);
       const data = await res.json();
       console.log(`[TV] key ${key} response:`, data);

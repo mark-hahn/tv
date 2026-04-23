@@ -51,6 +51,10 @@ const attachWsHandlers = () => {
 
 openWs();
 
+export const wsSend = (obj) => {
+  if (haveSocket) ws.send(JSON.stringify(obj));
+};
+
 // WebSocket call - only for ASR streaming
 const fCall = async (fname, param) => {
   if (!haveSocket) {

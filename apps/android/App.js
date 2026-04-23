@@ -31,6 +31,7 @@ export default function App() {
   const [showSubCtrl, setShowSubCtrl] = useState(false);
   const [subPlayers, setSubPlayers] = useState([]);
   const [subDeviceName, setSubDeviceName] = useState(null);
+  const [locked, setLocked] = useState(false);
 
   const onGridLayout = ({ nativeEvent: { layout } }) => {
     if (layout.width < 10 || layout.height < 10) return;
@@ -57,6 +58,9 @@ export default function App() {
   const subPendingRef = useRef(null); // { deviceName, index } while optimistic highlight is active
   const subGenRef = useRef(0);
   const subNavigatingRef = useRef(false);
+  const avoidingRef = useRef(false);
+  const avoidTimerRef = useRef(null);
+  const unlockHoldTimerRef = useRef(null);
 
   const debounce = () => {
     const now = Date.now();
@@ -67,8 +71,10 @@ export default function App() {
 
   const startRepeat = (key) => {
     if (isOff || isOther) return;
+    if (checkBlocked()) return;
     if (!debounce()) return;
     flash(key);
+    notifyAction();
     repeatActiveRef.current = true;
     (async () => {
       await fetch(`${TV_TV_URL}/tv/key/${key}`).catch(() => {});
@@ -139,6 +145,20 @@ export default function App() {
         const msg = JSON.parse(e.data);
         if (msg.id === 0 && msg.notification === "tvMuteState") {
           applyMuteState(msg.data);
+        } else if (msg.id === 0 && msg.notification === "tvRemoteAction") {
+          const fromSubCtrl = msg.data?.fromSubCtrl ?? false;
+          avoidingRef.current = true;
+          clearTimeout(avoidTimerRef.current);
+          avoidTimerRef.current = setTimeout(
+            () => {
+              avoidingRef.current = false;
+            },
+            fromSubCtrl ? 5000 : 5000,
+          );
+        } else if (msg.id === 0 && msg.notification === "tvRemoteLock") {
+          setLocked(true);
+        } else if (msg.id === 0 && msg.notification === "tvRemoteUnlock") {
+          setLocked(false);
         }
       } catch (_) {}
     };
@@ -160,6 +180,8 @@ export default function App() {
       clearTimeout(repeatTimeoutRef.current);
       clearTimeout(holdRef.current);
       clearInterval(subPollRef.current);
+      clearTimeout(avoidTimerRef.current);
+      clearTimeout(unlockHoldTimerRef.current);
     };
   }, []);
 
@@ -168,10 +190,47 @@ export default function App() {
     setTimeout(() => setFlashBtn(null), 150);
   };
 
+  const notifyAction = (fromSubCtrl = false) => {
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(
+        JSON.stringify({ fname: "tvRemoteAction", param: { fromSubCtrl } }),
+      );
+    }
+  };
+
+  const checkBlocked = () => {
+    if (locked) return true;
+    if (avoidingRef.current) {
+      const ws = wsRef.current;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ fname: "tvRemoteCollision" }));
+      }
+      return true;
+    }
+    return false;
+  };
+
+  const startUnlockHold = () => {
+    unlockHoldTimerRef.current = setTimeout(() => {
+      setLocked(false);
+      const ws = wsRef.current;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ fname: "tvRemoteUnlock" }));
+      }
+    }, 500);
+  };
+
+  const stopUnlockHold = () => {
+    clearTimeout(unlockHoldTimerRef.current);
+  };
+
   const tvCmd = async (cmd) => {
     if (isOff || isOther) return;
+    if (checkBlocked()) return;
     flash(cmd);
     if (!debounce()) return;
+    notifyAction();
     try {
       const res = await fetch(`${TV_TV_URL}/tv/${cmd}`);
       const data = await res.json();
@@ -181,8 +240,10 @@ export default function App() {
 
   const tvKey = async (key) => {
     if (isOff || isOther) return;
+    if (checkBlocked()) return;
     if (!debounce()) return;
     flash(key);
+    notifyAction();
     try {
       await fetch(`${TV_TV_URL}/tv/key/${key}`);
     } catch (_) {}
@@ -197,19 +258,23 @@ export default function App() {
   };
 
   const googleBtn = async () => {
+    if (checkBlocked()) return;
     if (mode === "google") {
       tvCmd("off");
     } else {
       flash("google");
+      notifyAction();
       fetch(`${TV_TV_URL}/tv/googlebtn`).catch(() => {});
     }
   };
 
   const fireBtn = async () => {
+    if (checkBlocked()) return;
     if (mode === "fire") {
       tvCmd("off");
     } else {
       flash("fire");
+      notifyAction();
       fetch(`${TV_TV_URL}/tv/firebtn`).catch(() => {});
     }
   };
@@ -316,6 +381,8 @@ export default function App() {
     );
     if (!player) return;
     if (subNavigatingRef.current) return;
+    if (checkBlocked()) return;
+    notifyAction(true);
     const gen = ++subGenRef.current;
     clearInterval(subPollRef.current);
     subPollRef.current = null;
@@ -394,6 +461,8 @@ export default function App() {
 
   const openApp = async (svc) => {
     if (isOff) return;
+    if (checkBlocked()) return;
+    notifyAction();
     setTimeout(() => setShowStreamers(false), 1000);
     try {
       await fetch(`${TV_TV_URL}/tv/openapp?uri=${encodeURIComponent(svc.uri)}`);
@@ -672,6 +741,32 @@ export default function App() {
             )}
           </ScrollView>
         </View>
+        {locked && (
+          <View style={lockStyles.overlay}>
+            <Text style={lockStyles.title}>Remote Collision</Text>
+            <View
+              style={{
+                flex: 1,
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 16,
+              }}
+            >
+              <Text style={lockStyles.message}>
+                A remote collision has been detected and the remote has been
+                locked. Press and hold unlock button to continue.
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPressIn={startUnlockHold}
+              onPressOut={stopUnlockHold}
+              style={lockStyles.unlockBtn}
+              activeOpacity={1}
+            >
+              <Text style={lockStyles.unlockBtnText}>Unlock</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     );
   }
@@ -805,6 +900,32 @@ export default function App() {
             </View>
           ))}
       </View>
+      {locked && (
+        <View style={lockStyles.overlay}>
+          <Text style={lockStyles.title}>Remote Collision</Text>
+          <View
+            style={{
+              flex: 1,
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 16,
+            }}
+          >
+            <Text style={lockStyles.message}>
+              A remote collision has been detected and the remote has been
+              locked. Press and hold unlock button to continue.
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPressIn={startUnlockHold}
+            onPressOut={stopUnlockHold}
+            style={lockStyles.unlockBtn}
+            activeOpacity={1}
+          >
+            <Text style={lockStyles.unlockBtnText}>Unlock</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -999,6 +1120,44 @@ const subCtrlStyles = StyleSheet.create({
     color: "#000",
   },
   cardTextSelected: {
+    fontWeight: "bold",
+  },
+});
+
+const lockStyles = StyleSheet.create({
+  overlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "white",
+    zIndex: 10,
+    borderWidth: 3,
+    borderColor: "#000",
+    flexDirection: "column",
+  },
+  title: {
+    fontSize: 14,
+    fontWeight: "bold",
+    padding: 10,
+    paddingBottom: 6,
+  },
+  message: {
+    fontSize: 12,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  unlockBtn: {
+    backgroundColor: "lightgreen",
+    borderTopWidth: 3,
+    borderTopColor: "#000",
+    alignItems: "center",
+    justifyContent: "center",
+    height: "20%",
+  },
+  unlockBtnText: {
+    fontSize: 13,
     fontWeight: "bold",
   },
 });

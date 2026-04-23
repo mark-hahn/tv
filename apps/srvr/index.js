@@ -4054,6 +4054,30 @@ wss.on("connection", (ws) => {
       handleFix(ws, id, param);
     } else if (fname == "handleEmb") {
       handleEmb(ws, id, param);
+    } else if (fname === "tvRemoteAction") {
+      // Broadcast to other clients only; sender handles its own avoidance locally
+      const otherClients = [...connectedClients].filter(c => c !== ws && c.readyState === 1);
+      console.log(`[collision] tvRemoteAction received, broadcasting to ${otherClients.length} other clients (total=${connectedClients.size})`);
+      const outMsg = JSON.stringify({ id: 0, notification: "tvRemoteAction", data: param });
+      for (const client of otherClients) {
+        try { client.send(outMsg); } catch (_) {}
+      }
+    } else if (fname === "tvRemoteCollision") {
+      console.log(`[collision] tvRemoteCollision received, sending tvRemoteLock to all ${connectedClients.size} clients`);
+      notifyClients("tvRemoteLock", null);
+    } else if (fname === "tvRemoteUnlock") {
+      const outMsg = JSON.stringify({
+        id: 0,
+        notification: "tvRemoteUnlock",
+        data: null,
+      });
+      for (const client of connectedClients) {
+        if (client !== ws && client.readyState === 1) {
+          try {
+            client.send(outMsg);
+          } catch (_) {}
+        }
+      }
     } else {
       console.warn("WebSocket function not supported (use HTTP):", fname);
       try {

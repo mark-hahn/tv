@@ -190,11 +190,6 @@
         >
           {{ subHeaderLabel }}
         </button>
-        <span
-          v-if="subOffset !== 0"
-          style="font-size: 13px; color: #555; flex-shrink: 0"
-          >{{ subOffset > 0 ? "+" : "" }}{{ subOffset }}ms</span
-        >
         <button
           @mousedown.prevent="subClose"
           @touchstart.prevent="subClose"
@@ -209,37 +204,6 @@
         >
           ✕
         </button>
-      </div>
-      <!-- Header row 2: left arrow, OK, right arrow (matches remote row 2 style) -->
-      <div
-        style="
-          display: flex;
-          flex-shrink: 0;
-          height: 20%;
-          border-bottom: 3px solid #000;
-        "
-      >
-        <div
-          :style="subRowBtnStyle('#f5e642', false)"
-          @mousedown="subAdjustOffset(-100)"
-          @touchstart.prevent="subAdjustOffset(-100)"
-        >
-          ◀
-        </div>
-        <div
-          :style="subRowBtnStyle('lightgreen', false)"
-          @mousedown="subSaveAndClose"
-          @touchstart.prevent="subSaveAndClose"
-        >
-          OK
-        </div>
-        <div
-          :style="subRowBtnStyle('#f5e642', true)"
-          @mousedown="subAdjustOffset(100)"
-          @touchstart.prevent="subAdjustOffset(100)"
-        >
-          ▶
-        </div>
       </div>
       <!-- Scrollable subtitle list -->
       <div style="overflow-y: auto; flex: 1">
@@ -482,8 +446,7 @@ export default {
       keybdHistory: [],
       showSubCtrl: false,
       subPlayers: [],
-      subPlayerIdx: 0,
-      subOffset: 0,
+      subDeviceName: null,
     };
   },
 
@@ -525,11 +488,16 @@ export default {
       return { ...CELL_BASE, backgroundColor: bg };
     },
     subCurrentPlayer() {
-      return this.subPlayers[this.subPlayerIdx] ?? null;
+      if (!this.subDeviceName) return null;
+      return (
+        this.subPlayers.find(
+          (p) => (p.deviceName || p.sessionId) === this.subDeviceName,
+        ) ?? null
+      );
     },
     subHeaderLabel() {
       const player = this.subCurrentPlayer;
-      if (!player) return "No video playing";
+      if (!player) return this.subDeviceName ? "---" : "No video playing";
       let base = player.episodeCode
         ? `${player.showName} ${player.episodeCode}`
         : player.showName;
@@ -555,6 +523,7 @@ export default {
     evtBus.off("tvCloseKeybd", this._onTvCloseKeybd);
     this.stopRepeat();
     this.stopHold();
+    clearInterval(this._subPollTimer);
   },
 
   methods: {
@@ -584,74 +553,58 @@ export default {
       this._embyHoldFired = false;
     },
 
-    async openSubCtrl() {
-      this.flash("emby");
-      this.showSubCtrl = true;
-      this.subOffset = 0;
-      this.subPlayerIdx = 0;
+    async _fetchSubPlayers() {
       try {
         const data = await fetch(`${config.tvTvUrl}/tv/emby/playing`).then(
           (r) => r.json(),
         );
-        if (data.ok) this.subPlayers = data.playing;
+        if (data.ok) {
+          this.subPlayers = data.playing;
+          if (!this.subDeviceName && this.subPlayers.length > 0) {
+            this.subDeviceName =
+              this.subPlayers[0].deviceName || this.subPlayers[0].sessionId;
+          }
+        }
       } catch (_) {}
     },
 
+    async openSubCtrl() {
+      this.flash("emby");
+      this.showSubCtrl = true;
+      this.subPlayerIdx = 0;
+      await this._fetchSubPlayers();
+      this._subPollTimer = setInterval(() => this._fetchSubPlayers(), 3000);
+    },
+
     subCyclePlayer() {
-      if (this.subPlayers.length <= 1) return;
-      this.subPlayerIdx = (this.subPlayerIdx + 1) % this.subPlayers.length;
-      this.subOffset = 0;
+      if (this.subPlayers.length === 0) return;
+      const curIdx = this.subPlayers.findIndex(
+        (p) => (p.deviceName || p.sessionId) === this.subDeviceName,
+      );
+      const nextIdx = (curIdx + 1) % this.subPlayers.length;
+      this.subDeviceName =
+        this.subPlayers[nextIdx].deviceName ||
+        this.subPlayers[nextIdx].sessionId;
     },
 
     subClose() {
+      clearInterval(this._subPollTimer);
       this.showSubCtrl = false;
-    },
-
-    subSaveAndClose() {
-      this.showSubCtrl = false;
-    },
-
-    async subAdjustOffset(deltaMs) {
-      this.subOffset += deltaMs;
-      const player = this.subCurrentPlayer;
-      if (!player) return;
-      await fetch(`${config.tvTvUrl}/tv/emby/subtitle-offset`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId: player.sessionId,
-          offsetMs: this.subOffset,
-        }),
-      }).catch(() => {});
     },
 
     async subSelectTrack(index) {
       const player = this.subCurrentPlayer;
       if (!player) return;
-      this.subPlayers[this.subPlayerIdx] = {
-        ...player,
-        subtitleStreamIndex: index,
-      };
+      const idx = this.subPlayers.findIndex(
+        (p) => (p.deviceName || p.sessionId) === this.subDeviceName,
+      );
+      if (idx >= 0)
+        this.subPlayers[idx] = { ...player, subtitleStreamIndex: index };
       await fetch(`${config.tvTvUrl}/tv/emby/subtitle`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId: player.sessionId, index }),
       }).catch(() => {});
-    },
-
-    subRowBtnStyle(bg, isLast) {
-      return {
-        borderRight: isLast ? "none" : "3px solid #000",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        cursor: "pointer",
-        fontSize: "42px",
-        fontWeight: "bold",
-        userSelect: "none",
-        backgroundColor: bg,
-        flex: 1,
-      };
     },
 
     subCardStyle(index) {

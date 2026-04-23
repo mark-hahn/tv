@@ -30,8 +30,7 @@ export default function App() {
   const [kybdHistory, setKybdHistory] = useState([]);
   const [showSubCtrl, setShowSubCtrl] = useState(false);
   const [subPlayers, setSubPlayers] = useState([]);
-  const [subPlayerIdx, setSubPlayerIdx] = useState(0);
-  const [subOffset, setSubOffset] = useState(0);
+  const [subDeviceName, setSubDeviceName] = useState(null);
 
   const onGridLayout = ({ nativeEvent: { layout } }) => {
     if (layout.width < 10 || layout.height < 10) return;
@@ -54,6 +53,7 @@ export default function App() {
   const kybdInputRef = useRef(null);
   const embyHoldRef = useRef(null);
   const embyHoldFiredRef = useRef(false);
+  const subPollRef = useRef(null);
 
   const debounce = () => {
     const now = Date.now();
@@ -156,6 +156,7 @@ export default function App() {
       clearTimeout(repeatDelayRef.current);
       clearTimeout(repeatTimeoutRef.current);
       clearTimeout(holdRef.current);
+      clearInterval(subPollRef.current);
     };
   }, []);
 
@@ -226,16 +227,27 @@ export default function App() {
     embyHoldFiredRef.current = false;
   };
 
-  const openSubCtrl = async () => {
-    setShowSubCtrl(true);
-    setSubOffset(0);
-    setSubPlayerIdx(0);
+  const fetchSubPlayers = async () => {
     try {
       const data = await fetch(`${TV_TV_URL}/tv/emby/playing`).then((r) =>
         r.json(),
       );
-      if (data.ok) setSubPlayers(data.playing);
+      if (data.ok) {
+        setSubPlayers(data.playing);
+        setSubDeviceName((prev) => {
+          if (!prev && data.playing.length > 0) {
+            return data.playing[0].deviceName || data.playing[0].sessionId;
+          }
+          return prev;
+        });
+      }
     } catch (_) {}
+  };
+
+  const openSubCtrl = async () => {
+    setShowSubCtrl(true);
+    await fetchSubPlayers();
+    subPollRef.current = setInterval(fetchSubPlayers, 3000);
   };
 
   const subTypeChar = (type) => {
@@ -249,40 +261,33 @@ export default function App() {
   };
 
   const subCyclePlayer = () => {
-    setSubPlayerIdx((i) => (i + 1) % Math.max(subPlayers.length, 1));
-    setSubOffset(0);
+    if (subPlayers.length === 0) return;
+    const curIdx = subPlayers.findIndex(
+      (p) => (p.deviceName || p.sessionId) === subDeviceName,
+    );
+    const nextIdx = (curIdx + 1) % subPlayers.length;
+    setSubDeviceName(
+      subPlayers[nextIdx].deviceName || subPlayers[nextIdx].sessionId,
+    );
   };
 
-  const subClose = () => setShowSubCtrl(false);
-
-  const subSaveAndClose = () => setShowSubCtrl(false);
-
-  const subAdjustOffset = async (deltaMs) => {
-    const newOffset = subOffset + deltaMs;
-    setSubOffset(newOffset);
-    const player = subPlayers[subPlayerIdx];
-    if (!player) return;
-    try {
-      await fetch(`${TV_TV_URL}/tv/emby/subtitle-offset`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId: player.sessionId,
-          offsetMs: newOffset,
-        }),
-      });
-    } catch (_) {}
+  const subClose = () => {
+    clearInterval(subPollRef.current);
+    setShowSubCtrl(false);
   };
 
   const subSelectTrack = async (index) => {
-    const player = subPlayers[subPlayerIdx];
+    const player = subPlayers.find(
+      (p) => (p.deviceName || p.sessionId) === subDeviceName,
+    );
     if (!player) return;
     setSubPlayers((prev) => {
+      const idx = prev.findIndex(
+        (p) => (p.deviceName || p.sessionId) === subDeviceName,
+      );
+      if (idx < 0) return prev;
       const next = [...prev];
-      next[subPlayerIdx] = {
-        ...next[subPlayerIdx],
-        subtitleStreamIndex: index,
-      };
+      next[idx] = { ...next[idx], subtitleStreamIndex: index };
       return next;
     });
     try {
@@ -516,7 +521,9 @@ export default function App() {
   ];
 
   if (showSubCtrl) {
-    const currentPlayer = subPlayers[subPlayerIdx] ?? null;
+    const currentPlayer =
+      subPlayers.find((p) => (p.deviceName || p.sessionId) === subDeviceName) ??
+      null;
     return (
       <View style={subCtrlStyles.container}>
         <StatusBar hidden />
@@ -525,7 +532,8 @@ export default function App() {
           <TouchableOpacity onPress={subCyclePlayer} style={{ flex: 1 }}>
             <Text style={subCtrlStyles.showName} numberOfLines={1}>
               {(() => {
-                if (!currentPlayer) return "No video playing";
+                if (!currentPlayer)
+                  return subDeviceName ? "---" : "No video playing";
                 let base = currentPlayer.episodeCode
                   ? `${currentPlayer.showName} ${currentPlayer.episodeCode}`
                   : currentPlayer.showName;
@@ -538,35 +546,8 @@ export default function App() {
               })()}
             </Text>
           </TouchableOpacity>
-          {subOffset !== 0 && (
-            <Text style={subCtrlStyles.offsetText}>
-              {subOffset > 0 ? "+" : ""}
-              {subOffset}ms
-            </Text>
-          )}
           <TouchableOpacity onPress={subClose} style={subCtrlStyles.closeBtn}>
             <Text style={subCtrlStyles.closeBtnText}>✕</Text>
-          </TouchableOpacity>
-        </View>
-        {/* Header row 2: left arrow, OK, right arrow */}
-        <View style={subCtrlStyles.headerRow2}>
-          <TouchableOpacity
-            style={subCtrlStyles.arrowBtn}
-            onPress={() => subAdjustOffset(-100)}
-          >
-            <Text style={subCtrlStyles.arrowText}>◀</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={subCtrlStyles.okBtn}
-            onPress={subSaveAndClose}
-          >
-            <Text style={subCtrlStyles.okText}>OK</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[subCtrlStyles.arrowBtn, { borderRightWidth: 0 }]}
-            onPress={() => subAdjustOffset(100)}
-          >
-            <Text style={subCtrlStyles.arrowText}>▶</Text>
           </TouchableOpacity>
         </View>
         {/* Subtitle list */}
@@ -917,47 +898,11 @@ const subCtrlStyles = StyleSheet.create({
     fontWeight: "bold",
     color: "#000",
   },
-  offsetText: {
-    fontSize: 13,
-    color: "#555",
-  },
   closeBtn: {
     padding: 8,
   },
   closeBtnText: {
     fontSize: 20,
-    color: "#000",
-  },
-  headerRow2: {
-    flexDirection: "row",
-    height: 80,
-    borderBottomWidth: 3,
-    borderBottomColor: "#000",
-  },
-  arrowBtn: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#f5e642",
-    borderRightWidth: 3,
-    borderRightColor: "#000",
-  },
-  okBtn: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "lightgreen",
-    borderRightWidth: 3,
-    borderRightColor: "#000",
-  },
-  arrowText: {
-    fontSize: 42,
-    fontWeight: "bold",
-    color: "#000",
-  },
-  okText: {
-    fontSize: 42,
-    fontWeight: "bold",
     color: "#000",
   },
   noVideo: {

@@ -634,8 +634,8 @@ export default {
         .catch(() => ({}));
       const waitMs = resp.waitMs ?? 4000;
       const navMs = resp.navMs ?? waitMs;
-      await new Promise((r) => setTimeout(r, navMs));
       clearInterval(this._subPollTimer);
+      await new Promise((r) => setTimeout(r, navMs));
       this._subPollTimer = setInterval(() => this._fetchSubPlayers(), 500);
       await new Promise((r) => setTimeout(r, waitMs - navMs));
       clearInterval(this._subPollTimer);

@@ -332,8 +332,8 @@ export default function App() {
       waitMs = data.waitMs ?? 4000;
       navMs = data.navMs ?? waitMs;
     } catch (_) {}
-    await new Promise((r) => setTimeout(r, navMs));
     clearInterval(subPollRef.current);
+    await new Promise((r) => setTimeout(r, navMs));
     subPollRef.current = setInterval(fetchSubPlayers, 500);
     await new Promise((r) => setTimeout(r, waitMs - navMs));
     clearInterval(subPollRef.current);

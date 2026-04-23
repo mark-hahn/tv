@@ -57,8 +57,8 @@
 - when any change is made to web client tv pane ui or the android app ui then the same change should be made to the other
 - when modifying files use local changes and don't replace entire files because another copilot conversation might be changing the same file
 - you only need to check if a change affects android when change is in tv-pane or android
-- when i enter a prompt with the exact text `fix changes` then:
-  - stage changes 
-  - do git add -A
-  - do git commit --amend --no-edit
-  - do git push --force
+- to develop on android use expo go and metro and always use usb cable with usbipd and set ipv4 not ipv6
+- run metro in the foreground (not background) so you can see errors: `cd apps/android && npx expo start --localhost`
+- after metro starts, run `adb -s <device-id> reverse tcp:8081 tcp:8081` in another terminal
+- expo go should connect using url exp://127.0.0.1:8081 (not localhost -- use the IP)
+- if metro hangs and does not respond to http it has crashed -- kill it and restart in foreground to see the error

@@ -1127,10 +1127,10 @@ const subCtrlStyles = StyleSheet.create({
 const lockStyles = StyleSheet.create({
   overlay: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: SCREEN_MARGIN * 2,
+    left: SCREEN_MARGIN,
+    right: SCREEN_MARGIN,
+    bottom: SCREEN_MARGIN * 2,
     backgroundColor: "white",
     zIndex: 10,
     borderWidth: 3,
@@ -1138,13 +1138,13 @@ const lockStyles = StyleSheet.create({
     flexDirection: "column",
   },
   title: {
-    fontSize: 14,
+    fontSize: 42,
     fontWeight: "bold",
     padding: 10,
     paddingBottom: 6,
   },
   message: {
-    fontSize: 12,
+    fontSize: 25,
     fontWeight: "bold",
     textAlign: "center",
   },
@@ -1157,7 +1157,7 @@ const lockStyles = StyleSheet.create({
     height: "20%",
   },
   unlockBtnText: {
-    fontSize: 13,
+    fontSize: 39,
     fontWeight: "bold",
   },
 });

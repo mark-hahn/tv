@@ -55,6 +55,8 @@ export default function App() {
   const embyHoldFiredRef = useRef(false);
   const subPollRef = useRef(null);
   const subPendingRef = useRef(null); // { deviceName, index } while optimistic highlight is active
+  const subGenRef = useRef(0);
+  const subNavigatingRef = useRef(false);
 
   const debounce = () => {
     const now = Date.now();
@@ -310,7 +312,12 @@ export default function App() {
       (p) => (p.deviceName || p.sessionId) === subDeviceName,
     );
     if (!player) return;
+    if (subNavigatingRef.current) return;
+    const gen = ++subGenRef.current;
+    clearInterval(subPollRef.current);
+    subPollRef.current = null;
     subPendingRef.current = { deviceName: subDeviceName, index };
+    subNavigatingRef.current = true;
     setSubPlayers((prev) => {
       const idx = prev.findIndex(
         (p) => (p.deviceName || p.sessionId) === subDeviceName,
@@ -332,14 +339,17 @@ export default function App() {
       waitMs = data.waitMs ?? 4000;
       navMs = data.navMs ?? waitMs;
     } catch (_) {}
-    clearInterval(subPollRef.current);
-    subPollRef.current = null;
+    if (subGenRef.current !== gen) return;
     await new Promise((r) => setTimeout(r, navMs));
+    subNavigatingRef.current = false;
+    if (subGenRef.current !== gen) return;
     const deadline = Date.now() + (waitMs - navMs);
     while (subPendingRef.current && Date.now() < deadline) {
       await fetchSubPlayers();
+      if (subGenRef.current !== gen) return;
       if (!subPendingRef.current) break;
       await new Promise((r) => setTimeout(r, 500));
+      if (subGenRef.current !== gen) return;
     }
     subPendingRef.current = null;
     subPollRef.current = setInterval(fetchSubPlayers, 2000);

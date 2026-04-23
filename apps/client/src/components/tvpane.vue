@@ -626,8 +626,12 @@ export default {
     async subSelectTrack(index) {
       const player = this.subCurrentPlayer;
       if (!player) return;
+      if (this._subNavigating) return;
       console.log(`[sub] select index=${index}`);
+      const gen = (this._subGen = (this._subGen ?? 0) + 1);
+      clearInterval(this._subPollTimer);
       this._subPending = { deviceName: this.subDeviceName, index };
+      this._subNavigating = true;
       const idx = this.subPlayers.findIndex(
         (p) => (p.deviceName || p.sessionId) === this.subDeviceName,
       );
@@ -640,17 +644,21 @@ export default {
       })
         .then((r) => r.json())
         .catch(() => ({}));
+      if (this._subGen !== gen) return;
       const waitMs = resp.waitMs ?? 4000;
       const navMs = resp.navMs ?? waitMs;
       console.log(`[sub] navMs=${navMs} waitMs=${waitMs}`);
-      clearInterval(this._subPollTimer);
       await new Promise((r) => setTimeout(r, navMs));
+      this._subNavigating = false;
+      if (this._subGen !== gen) return;
       console.log("[sub] navMs expired, starting fast poll");
       const deadline = Date.now() + (waitMs - navMs);
       while (this._subPending && Date.now() < deadline) {
         await this._fetchSubPlayers();
+        if (this._subGen !== gen) return;
         if (!this._subPending) break;
         await new Promise((r) => setTimeout(r, 500));
+        if (this._subGen !== gen) return;
       }
       console.log(
         `[sub] waitMs expired or confirmed, pending=${this._subPending?.index ?? "null"}`,

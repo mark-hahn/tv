@@ -29,8 +29,8 @@ const FIRE_EMBY_DELAY_MS = 5000; // ms after Fire TV turns on before launching E
 const SUB_NAV_DOWN_OPEN_DELAY_MS = 1000; // after initial Down to open OSD
 const SUB_NAV_RIGHT_DELAY_MS = 200; // after each Right arrow
 const SUB_NAV_OPEN_DELAY_MS = 500; // after Confirm to open subtitle menu
-const SUB_NAV_DOWN_DELAY_MS = 10; // after each Down arrow in subtitle menu
-const SUB_NAV_CONFIRM_DELAY_MS = 100; // after last Down arrow before Confirm
+const SUB_NAV_DOWN_DELAY_MS = 50; // after each Down arrow in subtitle menu
+const SUB_NAV_CONFIRM_DELAY_MS = 200; // after last Down arrow before Confirm
 const SUB_NAV_BACK_DELAY_MS = 500; // after final Confirm before sending Back
 const SUB_NAV_POLL_MS = 10_000; // fast-poll window after nav completes
 

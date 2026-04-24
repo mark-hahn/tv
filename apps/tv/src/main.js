@@ -126,6 +126,8 @@ function updateNowPlaying(sessions) {
     .map((s) => ({
       showName: s.NowPlayingItem.SeriesName,
       device: deviceLabel(s),
+      season: s.NowPlayingItem.ParentIndexNumber ?? null,
+      episode: s.NowPlayingItem.IndexNumber ?? null,
     }));
 
   const key = JSON.stringify(playing);

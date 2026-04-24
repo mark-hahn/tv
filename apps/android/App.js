@@ -32,6 +32,7 @@ export default function App() {
   const [subPlayers, setSubPlayers] = useState([]);
   const [subDeviceName, setSubDeviceName] = useState(null);
   const [locked, setLocked] = useState(false);
+  const [missingEpWarning, setMissingEpWarning] = useState(null);
 
   const onGridLayout = ({ nativeEvent: { layout } }) => {
     if (layout.width < 10 || layout.height < 10) return;
@@ -159,6 +160,11 @@ export default function App() {
           setLocked(true);
         } else if (msg.id === 0 && msg.notification === "tvRemoteUnlock") {
           setLocked(false);
+        } else if (
+          msg.id === 0 &&
+          msg.notification === "missingEpisodeWarning"
+        ) {
+          setMissingEpWarning(msg.data);
         }
       } catch (_) {}
     };
@@ -929,6 +935,37 @@ export default function App() {
           </TouchableOpacity>
         </View>
       )}
+      {missingEpWarning && (
+        <View style={missingEpStyles.overlay}>
+          <View style={missingEpStyles.box}>
+            <Text style={missingEpStyles.text}>
+              There is an unwatched episode before this one
+            </Text>
+            <Text style={missingEpStyles.text}>
+              Show: {missingEpWarning.showName}
+            </Text>
+            <Text style={missingEpStyles.text}>
+              Unwatched: S
+              {String(missingEpWarning.missingSeason).padStart(2, "0")}E
+              {String(missingEpWarning.missingEpisode).padStart(2, "0")}
+            </Text>
+            <Text style={missingEpStyles.text}>
+              Currently playing: S
+              {String(missingEpWarning.currentSeason).padStart(2, "0")}E
+              {String(missingEpWarning.currentEpisode).padStart(2, "0")}
+            </Text>
+            <Text style={[missingEpStyles.text, { marginBottom: 20 }]}>
+              Device: {missingEpWarning.device}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setMissingEpWarning(null)}
+              style={missingEpStyles.closeBtn}
+            >
+              <Text style={missingEpStyles.closeBtnText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -1161,6 +1198,48 @@ const lockStyles = StyleSheet.create({
   },
   unlockBtnText: {
     fontSize: 39,
+    fontWeight: "bold",
+  },
+});
+
+const missingEpStyles = StyleSheet.create({
+  overlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 20,
+  },
+  box: {
+    backgroundColor: "#ffcccc",
+    borderWidth: 2,
+    borderColor: "#cc0000",
+    borderRadius: 10,
+    padding: 24,
+    maxWidth: 400,
+    width: "90%",
+  },
+  text: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 6,
+  },
+  closeBtn: {
+    marginTop: 4,
+    alignSelf: "flex-start",
+    backgroundColor: "whitesmoke",
+    borderWidth: 1,
+    borderColor: "#cc0000",
+    borderRadius: 7,
+    paddingVertical: 6,
+    paddingHorizontal: 18,
+  },
+  closeBtnText: {
+    fontSize: 16,
     fontWeight: "bold",
   },
 });

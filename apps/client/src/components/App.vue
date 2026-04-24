@@ -399,6 +399,71 @@
         ></div>
       </div>
     </div>
+    <!-- Missing episode warning modal -->
+    <div
+      v-if="missingEpWarning"
+      @click.stop.prevent
+      @pointerdown.stop
+      style="
+        position: fixed;
+        inset: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 3000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <div
+        @click.stop.prevent
+        @pointerdown.stop
+        style="
+          background-color: #ffcccc;
+          border: 2px solid #cc0000;
+          border-radius: 10px;
+          padding: 24px 28px;
+          max-width: 480px;
+          width: calc(100% - 40px);
+          font-size: 16px;
+          font-weight: bold;
+        "
+      >
+        <div style="margin-bottom: 12px">
+          There is an unwatched episode before this one
+        </div>
+        <div style="margin-bottom: 6px">
+          Show: {{ missingEpWarning.showName }}
+        </div>
+        <div style="margin-bottom: 6px">
+          Unwatched: S{{
+            String(missingEpWarning.missingSeason).padStart(2, "0")
+          }}E{{ String(missingEpWarning.missingEpisode).padStart(2, "0") }}
+        </div>
+        <div style="margin-bottom: 6px">
+          Currently playing: S{{
+            String(missingEpWarning.currentSeason).padStart(2, "0")
+          }}E{{ String(missingEpWarning.currentEpisode).padStart(2, "0") }}
+        </div>
+        <div style="margin-bottom: 16px">
+          Device: {{ missingEpWarning.device }}
+        </div>
+        <button
+          @click.stop.prevent="missingEpWarning = null"
+          @pointerdown.stop.prevent
+          style="
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 7px;
+            padding: 6px 18px;
+            border: 1px solid #cc0000;
+            background-color: whitesmoke;
+          "
+        >
+          Close
+        </button>
+      </div>
+    </div>
     <!-- TVDB mismatch detail modal (OK-only)-->
     <div
       id="tvdbMismatchModal"
@@ -555,6 +620,8 @@ export default {
       tvdbMismatchOpen: false,
       tvdbMismatchTitle: "TVDB cache mismatch detected",
       tvdbMismatchText: "",
+
+      missingEpWarning: null,
 
       helpDialogOpen: false,
 
@@ -869,6 +936,8 @@ export default {
   unmounted() {
     evtBus.off("downActivePart", this.handleDownActivePart);
     evtBus.off("tvdb-mismatch", this.handleTvdbMismatch);
+    if (this._onMissingEpWarning)
+      evtBus.off("missingEpisodeWarning", this._onMissingEpWarning);
     evtBus.off("playEpisodePath", this._onPlayEpisodePath);
     evtBus.off("openChksrt", this._onOpenChksrt);
     evtBus.off("chksrt-count", this._onChksrtCount);
@@ -1920,6 +1989,10 @@ export default {
     // Derive downActive and schedule deferred Tor restarts.
     evtBus.on("downActivePart", this.handleDownActivePart);
     evtBus.on("tvdb-mismatch", this.handleTvdbMismatch);
+    this._onMissingEpWarning = (data) => {
+      this.missingEpWarning = data;
+    };
+    evtBus.on("missingEpisodeWarning", this._onMissingEpWarning);
     this._onPlayEpisodePath = (path) => {
       this.videoPlayerPath = path;
     };

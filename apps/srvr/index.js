@@ -3191,7 +3191,10 @@ function writeSnoozeList(list) {
   fs.writeFileSync(SNOOZE_FILE, JSON.stringify(list), "utf8");
 }
 
-app.get("/api/snooze-list", apiWrapper(async () => readSnoozeList()));
+app.get(
+  "/api/snooze-list",
+  apiWrapper(async () => readSnoozeList()),
+);
 
 app.post(
   "/api/snooze",
@@ -4009,6 +4012,7 @@ app.post("/internal/tv-state", (req, res) => {
 
 let lastNowPlayingShowName = null;
 let lastNowPlayingList = [];
+const prevPlaying = new Set(); // "showName|season|episode" keys seen so far
 
 app.post("/internal/nowPlaying", (req, res) => {
   const { showName, playing } = req.body;
@@ -4020,7 +4024,59 @@ app.post("/internal/nowPlaying", (req, res) => {
   });
   view.recordNowPlaying(lastNowPlayingShowName);
   res.json({ ok: true });
+  checkMissingEpisodes(lastNowPlayingList).catch(() => {});
 });
+
+async function checkMissingEpisodes(playing) {
+  for (const item of playing) {
+    const { showName, device, season, episode } = item;
+    if (!showName || !device || season == null || episode == null) continue;
+
+    const key = `${showName}|${season}|${episode}`;
+    const isNew = !prevPlaying.has(key);
+    prevPlaying.add(key);
+
+    if (!isNew) continue;
+
+    // New episode started — check for unwatched episodes before this one
+    const allTvdbData = tvdb.getAllTvdbSync();
+    const tvdbRecord = allTvdbData?.[showName];
+    if (!tvdbRecord?.id) continue;
+
+    let seriesMap;
+    try {
+      seriesMap = await emby.getSeriesMap({ id: tvdbRecord.id });
+    } catch (_) {
+      continue;
+    }
+    if (!Array.isArray(seriesMap)) continue;
+
+    let missingSeason = null;
+    let missingEpisode = null;
+    outer: for (const [s, episodes] of seriesMap) {
+      if (s > season) break;
+      for (const [e, data] of episodes) {
+        if (s === season && e >= episode) break outer;
+        if (!data.played && !data.noFile && !data.unaired) {
+          missingSeason = s;
+          missingEpisode = e;
+          break outer;
+        }
+      }
+    }
+
+    if (missingSeason !== null) {
+      notifyClients("missingEpisodeWarning", {
+        showName,
+        missingSeason,
+        missingEpisode,
+        currentSeason: season,
+        currentEpisode: episode,
+        device,
+      });
+    }
+  }
+}
 
 http.createServer(app).listen(SRVR_INTERNAL_PORT, "127.0.0.1", () => {
   console.log(`Internal HTTP listening on port ${SRVR_INTERNAL_PORT}`);

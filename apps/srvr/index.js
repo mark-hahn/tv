@@ -3180,6 +3180,40 @@ app.post(
   }),
 );
 
+// Snooze list
+const SNOOZE_FILE = path.join(SRVR_DATA_DIR, "snooze-list.json");
+
+function readSnoozeList() {
+  if (!fs.existsSync(SNOOZE_FILE)) return [];
+  return JSON.parse(fs.readFileSync(SNOOZE_FILE, "utf8"));
+}
+function writeSnoozeList(list) {
+  fs.writeFileSync(SNOOZE_FILE, JSON.stringify(list), "utf8");
+}
+
+app.get("/api/snooze-list", apiWrapper(async () => readSnoozeList()));
+
+app.post(
+  "/api/snooze",
+  apiWrapper(async ({ tvdbId, name, image, year }) => {
+    const list = readSnoozeList();
+    if (!list.find((s) => s.tvdbId === tvdbId)) {
+      list.push({ tvdbId, name, image, year });
+      writeSnoozeList(list);
+    }
+    return list;
+  }),
+);
+
+app.post(
+  "/api/unsnooze",
+  apiWrapper(async ({ tvdbId }) => {
+    const list = readSnoozeList().filter((s) => s.tvdbId !== tvdbId);
+    writeSnoozeList(list);
+    return list;
+  }),
+);
+
 // CRUD operations
 app.post("/api/addReject", apiWrapper(addReject));
 app.post("/api/delReject", apiWrapper(delReject));

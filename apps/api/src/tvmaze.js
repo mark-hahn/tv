@@ -1055,6 +1055,13 @@ export function markShowBrowsed(tvmazeId) {
   _db.prepare("UPDATE shows SET browsed = 1 WHERE tvmaze_id = ?").run(tvmazeId);
 }
 
+export function unmarkShowBrowsed(tvdbId) {
+  if (!_db) openDb();
+  _db
+    .prepare("UPDATE shows SET browsed = 0 WHERE tvdb_id = ?")
+    .run(Number(tvdbId));
+}
+
 export function getTvmazeIdByTvdbId(tvdbId) {
   if (!_db) openDb();
   if (!tvdbId) return null;

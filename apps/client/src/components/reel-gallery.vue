@@ -86,6 +86,10 @@ export default {
       type: String,
       default: null,
     },
+    explicitList: {
+      type: Array,
+      default: null,
+    },
   },
   emits: ["select", "preview", "search-complete"],
   setup(props, { emit }) {
@@ -263,13 +267,45 @@ export default {
     watch(
       () => props.srchStr,
       () => {
+        if (props.explicitList !== null) return;
         void loadTvdbData();
+      },
+    );
+
+    // Watch for explicitList changes
+    watch(
+      () => props.explicitList,
+      async (val) => {
+        if (val !== null) {
+          tvdbList.value = val || [];
+          await nextTick();
+          if (galleryPane.value) galleryPane.value.scrollTop = 0;
+          selectedIdx.value = 0;
+          if (val && val.length > 0) {
+            emit("select", val[0]);
+            emit("search-complete", val[0]);
+          } else {
+            emit("select", null);
+            emit("search-complete", null);
+          }
+        } else {
+          void loadTvdbData();
+        }
       },
     );
 
     // Load on mount
     onMounted(() => {
-      void loadTvdbData();
+      if (props.explicitList !== null) {
+        tvdbList.value = props.explicitList || [];
+        selectedIdx.value = 0;
+        if (props.explicitList && props.explicitList.length > 0) {
+          emit("select", props.explicitList[0]);
+          emit("search-complete", props.explicitList[0]);
+        }
+      } else {
+        void loadTvdbData();
+      }
     });
 
     return {

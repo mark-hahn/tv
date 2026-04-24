@@ -31,6 +31,7 @@
         :imdbid="curImdbId"
         :tvdbid="curTvdbId"
         :fallbackImage="curFallbackImage"
+        :explicitList="unSnoozeMode ? snoozeList : null"
         @select="handleGallerySelect"
         @preview="handleGalleryPreview"
         @search-complete="handleSearchComplete"
@@ -211,6 +212,50 @@
             }"
           >
             Next
+          </button>
+          <button
+            v-if="curTvdb"
+            @click="handleSnooze"
+            :disabled="unSnoozeMode"
+            :style="{
+              height: '18px',
+              margin: '0',
+              padding: '0 2px',
+              lineHeight: '18px',
+              fontSize: '15px',
+              boxSizing: 'border-box',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '1px solid black',
+              backgroundColor: snoozeFlash
+                ? '#90ee90'
+                : unSnoozeMode
+                  ? '#d3d3d3'
+                  : '',
+              cursor: unSnoozeMode ? 'default' : 'pointer',
+            }"
+          >
+            Snooze
+          </button>
+          <button
+            v-if="snoozeList.length > 0"
+            @click="handleUnSnooze"
+            :style="{
+              height: '18px',
+              margin: '0',
+              padding: '0 2px',
+              lineHeight: '18px',
+              fontSize: '15px',
+              boxSizing: 'border-box',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '1px solid black',
+              backgroundColor: unSnoozeMode ? 'lightblue' : '',
+            }"
+          >
+            UnSnooze ({{ snoozeList.length }})
           </button>
           <button
             v-if="curTvdb &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
@@ -570,7 +615,15 @@
               </div>
             </div>
           </div>
-          <div v-else-if="curTvdb">{{ curTvdb.overview }}</div>
+          <div v-else-if="curTvdb">
+            <div
+              v-if="unSnoozeMode"
+              style="color: red; margin-bottom: 4px"
+            >
+              Snoozed show.
+            </div>
+            {{ curTvdb.overview }}
+          </div>
         </div>
       </div>
       <div
@@ -829,12 +882,21 @@ export default {
     const showTvdbInfo = ref(false);
     const loadingShowSelection = ref(false);
     const loadingShowName = ref("");
+    const snoozeList = ref([]);
+    const unSnoozeMode = ref(false);
+    const snoozeFlash = ref(false);
 
     onMounted(async () => {
       try {
         allTvdbData.value = await getAllTvdb();
       } catch (e) {
         console.error("Failed to load allTvdbData:", e);
+      }
+      try {
+        const res = await fetch(`${config.tvSrvrUrl}/api/snooze-list`);
+        if (res.ok) snoozeList.value = await res.json();
+      } catch (e) {
+        console.error("Failed to load snooze list:", e);
       }
     });
 
@@ -1056,6 +1118,10 @@ export default {
     };
 
     const handleNext = async () => {
+      if (unSnoozeMode.value) {
+        unSnoozeMode.value = false;
+        return;
+      }
       shouldAutoAdvance.value = false;
       if (previewMode.value) {
         evtBus.emit("exitPreviewMode");
@@ -1187,6 +1253,68 @@ export default {
         suppressButtons.value = false;
       } finally {
         isLoadingNext.value = false;
+      }
+    };
+
+    const handleSnooze = async () => {
+      if (!curTvdb.value) return;
+      const tvdbId = String(
+        curTvdb.value.tvdb_id || curTvdb.value.tvdbId || curTvdb.value.id || "",
+      );
+      if (!tvdbId) return;
+      const name = curTvdb.value.name || "";
+      const image =
+        curTvdb.value.image_url ||
+        curTvdb.value.thumbnail ||
+        curTvdb.value.image ||
+        "";
+      const year = curTvdb.value.year || "";
+      try {
+        const res = await fetch(`${config.tvSrvrUrl}/api/snooze`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tvdbId, name, image, year }),
+        });
+        if (res.ok) snoozeList.value = await res.json();
+      } catch (e) {
+        console.error("handleSnooze error:", e);
+      }
+      snoozeFlash.value = true;
+      setTimeout(() => {
+        snoozeFlash.value = false;
+      }, 400);
+    };
+
+    const handleUnSnooze = async () => {
+      if (unSnoozeMode.value) {
+        if (!curTvdb.value) return;
+        const tvdbId = String(
+          curTvdb.value.tvdbId ||
+            curTvdb.value.tvdb_id ||
+            curTvdb.value.id ||
+            "",
+        );
+        if (!tvdbId) return;
+        try {
+          await fetch(`${config.torrentsApiUrl}/api/unackBrowsed`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tvdbId }),
+          });
+          const res = await fetch(`${config.tvSrvrUrl}/api/unsnooze`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tvdbId }),
+          });
+          if (res.ok) snoozeList.value = await res.json();
+        } catch (e) {
+          console.error("handleUnSnooze error:", e);
+        }
+        if (snoozeList.value.length === 0) {
+          unSnoozeMode.value = false;
+        }
+      } else {
+        unSnoozeMode.value = true;
       }
     };
 
@@ -2142,6 +2270,11 @@ export default {
       handleManualSearch,
       existingShowMatch,
       curFallbackImage,
+      snoozeList,
+      unSnoozeMode,
+      snoozeFlash,
+      handleSnooze,
+      handleUnSnooze,
     };
   },
 };

@@ -9,7 +9,7 @@ import * as search from "./search.js";
 import { searchTorrentsInChild } from "./searchInChild.js";
 import * as download from "./download.js";
 import "./tvmaze.js";
-import { searchShowsByName } from "./tvmaze.js";
+import { searchShowsByName, unmarkShowBrowsed } from "./tvmaze.js";
 import {
   getQbtInfo,
   delQbtTorrent,
@@ -1995,6 +1995,14 @@ app.post("/api/ackBrowsed", (req, res) => {
   if (!Number.isFinite(tvmazeId))
     return res.status(400).json({ error: "invalid tvmazeId" });
   ackBrowsed(tvmazeId);
+  res.json({ ok: true });
+});
+
+// POST /api/unackBrowsed — reset browsed=0 so show returns to browse rotation
+app.post("/api/unackBrowsed", (req, res) => {
+  const { tvdbId } = req.body || {};
+  if (!tvdbId) return res.status(400).json({ error: "missing tvdbId" });
+  unmarkShowBrowsed(tvdbId);
   res.json({ ok: true });
 });
 

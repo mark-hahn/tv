@@ -1,79 +1,8 @@
 <template>
   <div
     id="tvPane"
-    style="
-      padding: 0;
-      box-sizing: border-box;
-      width: 100%;
-      height: 100%;
-      position: relative;
-    "
+    style="padding: 0; box-sizing: border-box; width: 100%; height: 100%"
   >
-    <!-- Lock pane overlay -->
-    <div
-      v-if="locked"
-      style="
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: white;
-        z-index: 10;
-        display: flex;
-        flex-direction: column;
-        border: 3px solid #000;
-        box-sizing: border-box;
-      "
-    >
-      <div
-        style="
-          padding: 8px 10px;
-          font-size: 28px;
-          font-weight: bold;
-          flex-shrink: 0;
-        "
-      >
-        Remote Collision
-      </div>
-      <div
-        style="
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 16px;
-          text-align: center;
-          font-size: 24px;
-          font-weight: bold;
-        "
-      >
-        A remote collision has been detected and the remote has been locked.
-        Press and hold unlock button to continue.
-      </div>
-      <div
-        @mousedown.prevent="startUnlockHold"
-        @mouseup="stopUnlockHold"
-        @mouseleave="stopUnlockHold"
-        @touchstart.prevent="startUnlockHold"
-        @touchend="stopUnlockHold"
-        style="
-          background: lightgreen;
-          border-top: 3px solid #000;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 26px;
-          font-weight: bold;
-          cursor: pointer;
-          flex-shrink: 0;
-          height: 20%;
-          user-select: none;
-        "
-      >
-        Unlock
-      </div>
-    </div>
     <!-- Keyboard pane -->
     <div
       v-if="showKeybd"
@@ -219,107 +148,6 @@
         </div>
       </div>
     </div>
-    <!-- Sub ctrl pane -->
-    <div
-      v-else-if="showSubCtrl"
-      style="
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        border: 3px solid #000;
-        box-sizing: border-box;
-      "
-    >
-      <!-- Header row 1: show name + offset + close -->
-      <div
-        style="
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 6px 10px;
-          border-bottom: 3px solid #000;
-          flex-shrink: 0;
-          gap: 8px;
-        "
-      >
-        <button
-          @mousedown.prevent="subCyclePlayer"
-          @touchstart.prevent="subCyclePlayer"
-          style="
-            flex: 1;
-            text-align: left;
-            font-size: 15px;
-            font-weight: bold;
-            border: none;
-            background: none;
-            cursor: pointer;
-            padding: 0;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-          "
-        >
-          {{ subHeaderLabel }}
-        </button>
-        <button
-          @mousedown.prevent="subClose"
-          @touchstart.prevent="subClose"
-          style="
-            font-size: 22px;
-            border: none;
-            background: none;
-            cursor: pointer;
-            padding: 4px 8px;
-            flex-shrink: 0;
-          "
-        >
-          ✕
-        </button>
-      </div>
-      <!-- Scrollable subtitle list -->
-      <div style="overflow-y: auto; flex: 1">
-        <div
-          v-if="!subCurrentPlayer"
-          style="
-            padding: 20px;
-            text-align: center;
-            color: #999;
-            font-size: 16px;
-          "
-        >
-          No video playing
-        </div>
-        <div
-          v-else-if="subCurrentPlayer.deviceName !== 'Living Room TV'"
-          style="
-            padding: 20px;
-            text-align: center;
-            color: #999;
-            font-size: 16px;
-          "
-        >
-          Only the Living Room TV is supported
-        </div>
-        <template v-else>
-          <div
-            :style="subCardStyle(-1)"
-            @mousedown="subSelectTrack(-1)"
-            @touchstart.prevent="subSelectTrack(-1)"
-          >
-            None
-          </div>
-          <div
-            v-for="sub in subCurrentPlayer.subtitles"
-            :key="sub.index"
-            :style="subCardStyle(sub.index)"
-            @mousedown="subSelectTrack(sub.index)"
-            @touchstart.prevent="subSelectTrack(sub.index)"
-          >
-            {{ subTypeChar(sub.type) }}: {{ subShortLabel(sub.label) }}
-          </div>
-        </template>
-      </div>
-    </div>
     <div
       v-else
       style="
@@ -400,11 +228,8 @@
       <!-- Row 3: emby, down, keyboard -->
       <div
         :style="cellStyle('white', 'emby')"
-        @mousedown="startEmbyHold"
-        @mouseup="stopEmbyHold"
-        @mouseleave="stopEmbyHold"
-        @touchstart.prevent="startEmbyHold"
-        @touchend="stopEmbyHold"
+        @mousedown="tvCmd('emby')"
+        @touchstart.prevent="tvCmd('emby')"
       >
         Emby
       </div>
@@ -498,7 +323,6 @@
 <script>
 import { config } from "../config.js";
 import evtBus from "../evtBus.js";
-import { wsSend } from "../srvr.js";
 import allServices from "../../../tv/services.json";
 
 const CELL_BASE = {
@@ -527,11 +351,6 @@ export default {
       showKeybd: false,
       keybdInput: "",
       keybdHistory: [],
-      showSubCtrl: false,
-      subPlayers: [],
-      subDeviceName: null,
-      avoidingCollisions: false,
-      locked: false,
     };
   },
 
@@ -572,27 +391,6 @@ export default {
         this.flashBtn === "off" ? "orange" : this.isOff ? "lightblue" : "white";
       return { ...CELL_BASE, backgroundColor: bg };
     },
-    subCurrentPlayer() {
-      if (!this.subDeviceName) return null;
-      return (
-        this.subPlayers.find(
-          (p) => (p.deviceName || p.sessionId) === this.subDeviceName,
-        ) ?? null
-      );
-    },
-    subHeaderLabel() {
-      const player = this.subCurrentPlayer;
-      if (!player) return this.subDeviceName ? "---" : "No video playing";
-      let base = player.episodeCode
-        ? `${player.showName} ${player.episodeCode}`
-        : player.showName;
-      if (player.deviceName)
-        base += ` (${this.subShortDevice(player.deviceName)})`;
-      const active = player.subtitles.find(
-        (s) => s.index === player.subtitleStreamIndex,
-      );
-      return base;
-    },
   },
 
   mounted() {
@@ -600,263 +398,21 @@ export default {
     evtBus.on("tvMuteState", this._onTvMuteState);
     evtBus.on("paneChanged", this._onPaneChanged);
     evtBus.on("tvCloseKeybd", this._onTvCloseKeybd);
-    evtBus.on("tvRemoteAction", this._onTvRemoteAction);
-    evtBus.on("tvRemoteLock", this._onTvRemoteLock);
-    evtBus.on("tvRemoteUnlock", this._onTvRemoteUnlock);
   },
 
   beforeUnmount() {
     evtBus.off("tvMuteState", this._onTvMuteState);
     evtBus.off("paneChanged", this._onPaneChanged);
     evtBus.off("tvCloseKeybd", this._onTvCloseKeybd);
-    evtBus.off("tvRemoteAction", this._onTvRemoteAction);
-    evtBus.off("tvRemoteLock", this._onTvRemoteLock);
-    evtBus.off("tvRemoteUnlock", this._onTvRemoteUnlock);
     this.stopRepeat();
     this.stopHold();
-    clearInterval(this._subPollTimer);
-    clearTimeout(this._avoidTimer);
-    clearTimeout(this._unlockHoldTimer);
   },
 
   methods: {
-    subTypeChar(type) {
-      if (type === "pgs") return "*";
-      if (type === "embedded") return "T";
-      if (type === "asr") return "+";
-      if (type === "mbs") return ">";
-      if (type === "opn") return "V";
-      if (type === "srt") return "S";
-      return "S";
-    },
-
-    subShortLabel(label) {
-      return (label || "").replace(/\bdefault\b/gi, "Def");
-    },
-
-    notifyAction(fromSubCtrl = false) {
-      console.log(
-        `[collision] notifyAction sending tvRemoteAction fromSubCtrl=${fromSubCtrl}`,
-      );
-      wsSend({ fname: "tvRemoteAction", param: { fromSubCtrl } });
-    },
-
-    checkBlocked() {
-      console.log(
-        `[collision] checkBlocked locked=${this.locked} avoiding=${this.avoidingCollisions}`,
-      );
-      if (this.locked) return true;
-      if (this.avoidingCollisions) {
-        console.log(
-          `[collision] checkBlocked -> BLOCKED (avoidingCollisions), sending tvRemoteCollision`,
-        );
-        wsSend({ fname: "tvRemoteCollision" });
-        return true;
-      }
-      return false;
-    },
-
-    _onTvRemoteAction(data) {
-      console.log(
-        `[collision] _onTvRemoteAction received, entering avoidance 5s`,
-        data,
-      );
-      const fromSubCtrl = data?.fromSubCtrl ?? false;
-      this.avoidingCollisions = true;
-      clearTimeout(this._avoidTimer);
-      this._avoidTimer = setTimeout(
-        () => {
-          this.avoidingCollisions = false;
-        },
-        fromSubCtrl ? 5000 : 1500,
-      );
-    },
-
-    _onTvRemoteLock() {
-      console.log(`[collision] _onTvRemoteLock received, setting locked=true`);
-      this.locked = true;
-    },
-
-    _onTvRemoteUnlock() {
-      console.log(
-        `[collision] _onTvRemoteUnlock received, setting locked=false`,
-      );
-      this.locked = false;
-    },
-
-    startUnlockHold() {
-      this._unlockHoldTimer = setTimeout(() => {
-        this.locked = false;
-        wsSend({ fname: "tvRemoteUnlock" });
-      }, 500);
-    },
-
-    stopUnlockHold() {
-      clearTimeout(this._unlockHoldTimer);
-    },
-
-    subShortDevice(name) {
-      if (!name) return name;
-      if (name === "Living Room TV") return "TV";
-      if (name === "Firefox Browser") return "Firefox";
-      if (name === "Firefox Windows") return "Firefox";
-      if (name === "Google Chrome Windows") return "Chrome";
-      if (name === "Galaxy Tab S8") return "Tablet";
-      return name;
-    },
-
-    startEmbyHold() {
-      this._embyHoldFired = false;
-      this._embyHoldTimer = setTimeout(() => {
-        this._embyHoldFired = true;
-        this.openSubCtrl();
-      }, 1000);
-    },
-
-    stopEmbyHold() {
-      clearTimeout(this._embyHoldTimer);
-      if (!this._embyHoldFired) {
-        this.tvCmd("emby");
-      }
-      this._embyHoldFired = false;
-    },
-
-    async _fetchSubPlayers() {
-      try {
-        const data = await fetch(`${config.tvTvUrl}/tv/emby/playing`).then(
-          (r) => r.json(),
-        );
-        if (data.ok) {
-          const pending = this._subPending;
-          let players = data.playing;
-          console.log(
-            `[sub] fetch pending=${pending?.index ?? "null"} emby=${data.playing.find((p) => (p.deviceName || p.sessionId) === this.subDeviceName)?.subtitleStreamIndex ?? "?"}`,
-          );
-          if (pending) {
-            players = players.map((p) => {
-              if ((p.deviceName || p.sessionId) === pending.deviceName) {
-                if (p.subtitleStreamIndex === pending.index) {
-                  console.log("[sub] confirmed by emby");
-                  this._subPending = null; // Emby confirmed
-                } else {
-                  console.log(
-                    `[sub] keeping optimistic emby=${p.subtitleStreamIndex} want=${pending.index}`,
-                  );
-                  return { ...p, subtitleStreamIndex: pending.index }; // keep optimistic
-                }
-              }
-              return p;
-            });
-          }
-          this.subPlayers = players;
-          const hasCurrentPlayer =
-            this.subDeviceName &&
-            players.find(
-              (p) => (p.deviceName || p.sessionId) === this.subDeviceName,
-            );
-          if (!hasCurrentPlayer) {
-            const lrtv = players.find((p) => p.deviceName === "Living Room TV");
-            if (lrtv) this.subDeviceName = "Living Room TV";
-          }
-        }
-      } catch (_) {}
-    },
-
-    async openSubCtrl() {
-      this.flash("emby");
-      this.showSubCtrl = true;
-      this.subPlayerIdx = 0;
-      await this._fetchSubPlayers();
-      this._subPollTimer = setInterval(() => this._fetchSubPlayers(), 3000);
-    },
-
-    subCyclePlayer() {
-      if (this.subPlayers.length === 0) return;
-      const curIdx = this.subPlayers.findIndex(
-        (p) => (p.deviceName || p.sessionId) === this.subDeviceName,
-      );
-      const nextIdx = (curIdx + 1) % this.subPlayers.length;
-      this.subDeviceName =
-        this.subPlayers[nextIdx].deviceName ||
-        this.subPlayers[nextIdx].sessionId;
-    },
-
-    subClose() {
-      clearInterval(this._subPollTimer);
-      this.showSubCtrl = false;
-    },
-
-    async subSelectTrack(index) {
-      const player = this.subCurrentPlayer;
-      if (!player) return;
-      if (this._subNavigating) return;
-      if (this.checkBlocked()) return;
-      console.log(`[sub] select index=${index}`);
-      this.notifyAction(true);
-      const gen = (this._subGen = (this._subGen ?? 0) + 1);
-      clearInterval(this._subPollTimer);
-      this._subPending = { deviceName: this.subDeviceName, index };
-      this._subNavigating = true;
-      const idx = this.subPlayers.findIndex(
-        (p) => (p.deviceName || p.sessionId) === this.subDeviceName,
-      );
-      if (idx >= 0)
-        this.subPlayers[idx] = { ...player, subtitleStreamIndex: index };
-      const resp = await fetch(`${config.tvTvUrl}/tv/emby/subtitle`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: player.sessionId, index }),
-      })
-        .then((r) => r.json())
-        .catch(() => ({}));
-      if (this._subGen !== gen) return;
-      const waitMs = resp.waitMs ?? 4000;
-      const navMs = resp.navMs ?? waitMs;
-      console.log(`[sub] navMs=${navMs} waitMs=${waitMs}`);
-      await new Promise((r) => setTimeout(r, navMs));
-      this._subNavigating = false;
-      if (this._subGen !== gen) return;
-      console.log("[sub] navMs expired, starting fast poll");
-      const deadline = Date.now() + (waitMs - navMs);
-      while (this._subPending && Date.now() < deadline) {
-        await this._fetchSubPlayers();
-        if (this._subGen !== gen) return;
-        if (!this._subPending) break;
-        await new Promise((r) => setTimeout(r, 500));
-        if (this._subGen !== gen) return;
-      }
-      console.log(
-        `[sub] waitMs expired or confirmed, pending=${this._subPending?.index ?? "null"}`,
-      );
-      this._subPending = null;
-      console.log("[sub] pending force-cleared (deadline)");
-      this._subPollTimer = setInterval(() => this._fetchSubPlayers(), 2000);
-      await this._fetchSubPlayers();
-    },
-
-    subCardStyle(index) {
-      const isSelected = this.subCurrentPlayer?.subtitleStreamIndex === index;
-      if (isSelected)
-        console.log(
-          `[sub] highlight on index=${index} pending=${this._subPending?.index ?? "null"}`,
-        );
-      return {
-        padding: "24px 16px",
-        borderBottom: "1px solid #ddd",
-        cursor: "pointer",
-        fontSize: "27px",
-        userSelect: "none",
-        backgroundColor: isSelected ? "#d0e8ff" : "#fff",
-        fontWeight: isSelected ? "bold" : "normal",
-      };
-    },
-
     startRepeat(key) {
       if (this.isOff || this.isOther) return;
-      if (this.checkBlocked()) return;
       if (!this._debounce()) return;
       this.flash(key);
-      this.notifyAction();
       this._repeatActive = true;
       (async () => {
         await fetch(`${config.tvTvUrl}/tv/key/${key}`).catch(() => {});
@@ -941,23 +497,19 @@ export default {
     },
 
     async googleBtn() {
-      if (this.checkBlocked()) return;
       if (this.mode === "google") {
         this.tvCmd("off");
       } else {
         this.flash("google");
-        this.notifyAction();
         fetch(`${config.tvTvUrl}/tv/googlebtn`).catch(() => {});
       }
     },
 
     async fireBtn() {
-      if (this.checkBlocked()) return;
       if (this.mode === "fire") {
         this.tvCmd("off");
       } else {
         this.flash("fire");
-        this.notifyAction();
         fetch(`${config.tvTvUrl}/tv/firebtn`).catch(() => {});
       }
     },
@@ -999,12 +551,7 @@ export default {
     },
 
     _onPaneChanged(pane) {
-      if (pane !== "tv") {
-        this.showKeybd = false;
-        if (this.showSubCtrl) this.subClose();
-      } else if (this.showSubCtrl) {
-        this.subClose();
-      }
+      if (pane !== "tv") this.showKeybd = false;
     },
 
     _onTvCloseKeybd() {
@@ -1031,8 +578,6 @@ export default {
 
     async openApp(svc) {
       if (this.isOff) return;
-      if (this.checkBlocked()) return;
-      this.notifyAction();
       setTimeout(() => {
         this.showStreamers = false;
       }, 1000);
@@ -1059,10 +604,8 @@ export default {
 
     async tvCmd(cmd) {
       if (this.isOff || this.isOther) return;
-      if (this.checkBlocked()) return;
       this.flash(cmd);
       if (!this._debounce()) return;
-      this.notifyAction();
       const res = await fetch(`${config.tvTvUrl}/tv/${cmd}`);
       const data = await res.json();
       if (cmd === "mute" && data.ok) this.muted = data.muted;
@@ -1071,9 +614,7 @@ export default {
 
     async tvVolCmd(dir) {
       if (this.isOff || this.isOther) return;
-      if (this.checkBlocked()) return;
       this.flash(dir === "down" ? "vold" : "volu");
-      this.notifyAction();
       fetch(`${config.tvTvUrl}/tv/vol/${dir}`).catch(() => {});
     },
 
@@ -1085,10 +626,8 @@ export default {
 
     async tvKey(key) {
       if (this.isOff || this.isOther) return;
-      if (this.checkBlocked()) return;
       if (!this._debounce()) return;
       this.flash(key);
-      this.notifyAction();
       const res = await fetch(`${config.tvTvUrl}/tv/key/${key}`);
       const data = await res.json();
       console.log(`[TV] key ${key} response:`, data);

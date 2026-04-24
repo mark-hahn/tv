@@ -62,3 +62,8 @@
 - after metro starts, run `adb -s <device-id> reverse tcp:8081 tcp:8081` in another terminal
 - expo go should connect using url exp://127.0.0.1:8081 (not localhost -- use the IP)
 - if metro hangs and does not respond to http it has crashed -- kill it and restart in foreground to see the error
+- before running `eas build`, check for a duplicate build using the cache file:
+  1. Run: `cd apps/android && md5sum App.js app.json package.json babel.config.js eas.json index.js | md5sum | cut -d' ' -f1`
+  2. Compare result to the first field in `apps/android/.build-cache`
+  3. If they match, use the APK URL (second field) from `.build-cache` — do NOT run `eas build`
+  4. If they differ (or file missing), run `eas build`, then update `.build-cache` with the new checksum and APK URL in format: `<checksum> <apk-url>`

@@ -1022,9 +1022,9 @@ app.post("/tv/emby/subtitle", async (req, res) => {
 
   // Fetch streams to determine downCount and audio track count.
   // Menu order: None (0 downs), then each subtitle in stream order (+1 per track).
-  // Right arrow count: 3 when single audio track, 4 when multiple audio tracks.
+  // Right arrow count: 2 when single audio track, 3 when multiple audio tracks.
   let downCount;
-  let rightCount = 3;
+  let rightCount = 2;
   try {
     const sessRes = await fetch(
       `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
@@ -1055,7 +1055,7 @@ app.post("/tv/emby/subtitle", async (req, res) => {
     if (!streams) streams = item.MediaSources?.[0]?.MediaStreams ?? [];
 
     const audioStreams = streams.filter((s) => s.Type === "Audio");
-    if (audioStreams.length > 1) rightCount = 4;
+    if (audioStreams.length > 1) rightCount = 3;
 
     if (index === -1) {
       downCount = 0;

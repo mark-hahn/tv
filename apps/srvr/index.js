@@ -5320,23 +5320,37 @@ watcher
     const entry = changedShows.get(showName);
     entry.timeout = setTimeout(async () => {
       changedShows.delete(showName);
-      const tvdbAll = tvdb.getAllTvdbSync?.();
-      const tvdbRec = tvdbAll?.[showName];
-      if (tvdbRec && tvdbRec.inEmby) {
-        let queued = false;
-        for (const fp of entry.files) {
-          if (await fileNeedsSubChecked(fp, showName)) {
-            enqueueSubQueue(
-              { videoFilePath: fp, fromUI: false, lowPriority: false },
-              false,
+      try {
+        const tvdbAll = tvdb.getAllTvdbSync?.();
+        const tvdbRec = tvdbAll?.[showName];
+        console.log(
+          `[chokidar] sub check for ${showName}: inEmby=${tvdbRec?.inEmby}, files=${[...entry.files].join(",")}`,
+        );
+        if (tvdbRec && tvdbRec.inEmby) {
+          let queued = false;
+          for (const fp of entry.files) {
+            const needs = await fileNeedsSubChecked(fp, showName);
+            console.log(
+              `[chokidar] fileNeedsSubChecked(${path.basename(fp)}) = ${needs}`,
             );
-            queued = true;
+            if (needs) {
+              enqueueSubQueue(
+                { videoFilePath: fp, fromUI: false, lowPriority: false },
+                false,
+              );
+              queued = true;
+            }
+          }
+          if (queued) {
+            persistSubQueue();
+            doSubQueueNow();
           }
         }
-        if (queued) {
-          persistSubQueue();
-          doSubQueueNow();
-        }
+      } catch (err) {
+        console.error(
+          `[chokidar] sub check error for ${showName}:`,
+          err.message,
+        );
       }
       tvdb.enqueueShowProcess(showName);
     }, DISK_CHANGE_DEBOUNCE_MS);

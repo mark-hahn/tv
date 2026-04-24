@@ -4012,7 +4012,7 @@ app.post("/internal/tv-state", (req, res) => {
 
 let lastNowPlayingShowName = null;
 let lastNowPlayingList = [];
-const prevPlaying = new Set(); // "showName|season|episode" keys seen so far
+let lastPlayingKey = null; // "showName|season|episode" of the last playing item
 let lastMissingEpWarning = null;
 
 app.post("/internal/nowPlaying", (req, res) => {
@@ -4035,8 +4035,8 @@ async function checkMissingEpisodes(playing) {
     if (!showName || !device || season == null || episode == null) continue;
 
     const key = `${showName}|${season}|${episode}`;
-    const isNew = !prevPlaying.has(key);
-    prevPlaying.add(key);
+    const isNew = key !== lastPlayingKey;
+    lastPlayingKey = key;
 
     if (!isNew) continue;
 

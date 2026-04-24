@@ -142,7 +142,8 @@ async function main() {
     forcedFiles,
     processingForced,
     embyMap,
-    destTitle;
+    destTitle,
+    _cycleTiming;
 
   forcedFiles = null;
   processingForced = false;
@@ -404,6 +405,7 @@ async function main() {
     try {
       fs.writeFileSync(REJECT_LOG_PATH, "");
     } catch (e) {}
+    _cycleTiming = { cycleStart: Date.now() };
   };
 
   scheduleNextCycle = function () {
@@ -1804,6 +1806,7 @@ async function main() {
         err("findUsb failed:", e.message || e);
         usbFiles = [];
       }
+      if (_cycleTiming) _cycleTiming.afterFind = Date.now();
     }
 
     // Trace if the target show appears anywhere in the USB list.
@@ -1918,6 +1921,7 @@ async function main() {
     } catch (e) {
       err("processDvdFolders error:", e && e.message ? e.message : String(e));
     }
+    if (_cycleTiming) _cycleTiming.afterDvd = Date.now();
 
     return process.nextTick(checkFile);
   };
@@ -2008,19 +2012,26 @@ async function main() {
       trace("checkFile: filename", { fname, usbFilePath, usbFileBytes });
 
       parts = fname.split(".");
-      fext = parts[parts.length - 1];
+      fext = parts[parts.length - 1].toLowerCase();
 
-      if (
-        fext.length === 6 ||
-        fext === "nfo" ||
-        fext === "idx" ||
-        fext === "sub" ||
-        fext === "txt" ||
-        fext === "jpg" ||
-        fext === "gif" ||
-        fext === "jpeg" ||
-        fext === "part"
-      ) {
+      const ALLOWED_EXTS = new Set([
+        "mkv",
+        "mp4",
+        "avi",
+        "ts",
+        "m2ts",
+        "wmv",
+        "srt",
+        "ass",
+        "ssa",
+        "asa",
+        "srr",
+        "nfo",
+        "jpg",
+        "png",
+      ]);
+
+      if (!ALLOWED_EXTS.has(fext)) {
         trace("checkFile: skip extension", { fname, fext });
         postHistory({
           tvdbId: lookupTvdbId(title),
@@ -2246,6 +2257,22 @@ async function main() {
         0
       ) {
         log("***********************************************************");
+      }
+      if (_cycleTiming) {
+        _cycleTiming.cycleEnd = Date.now();
+        const total =
+          _cycleTiming.cycleEnd -
+          (_cycleTiming.cycleStart || _cycleTiming.cycleEnd);
+        if (total >= 60000) {
+          const fmt = (a, b) => (b != null && a != null ? `${b - a}ms` : "?");
+          log(
+            `[cycle-timing] total=${total}ms` +
+              ` find=${fmt(_cycleTiming.cycleStart, _cycleTiming.afterFind)}` +
+              ` dvd=${fmt(_cycleTiming.afterFind, _cycleTiming.afterDvd)}` +
+              ` checkFiles=${fmt(_cycleTiming.afterDvd, _cycleTiming.cycleEnd)}`,
+          );
+        }
+        _cycleTiming = null;
       }
       cycleRunning = false;
       // If a startProc request came in during this cycle, finish the cycle first,

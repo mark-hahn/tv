@@ -148,6 +148,114 @@
         </div>
       </div>
     </div>
+    <!-- SubCtrl pane -->
+    <div
+      v-else-if="showSubCtrl"
+      style="
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        background: #fff;
+      "
+    >
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 8px 12px;
+          border-bottom: 2px solid #ccc;
+        "
+      >
+        <span
+          style="
+            font-size: 18px;
+            font-weight: bold;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            cursor: pointer;
+          "
+          @mousedown.prevent="subCyclePlayer"
+          @touchstart.prevent="subCyclePlayer"
+          >{{ subCurrentLabel }}</span
+        >
+      </div>
+      <div style="overflow-y: auto; flex: 1">
+        <div
+          v-if="!subCurrentPlayer"
+          style="padding: 16px; color: #666"
+        >
+          No video playing
+        </div>
+        <template v-else-if="subCurrentPlayer.deviceName !== 'Living Room TV'">
+          <div style="padding: 16px; color: #666">
+            Only the Living Room TV is supported
+          </div>
+        </template>
+        <template v-else>
+          <div
+            @mousedown.prevent="subSelectTrack(-1)"
+            @touchstart.prevent="subSelectTrack(-1)"
+            :style="{
+              padding: '10px 14px',
+              borderBottom: '1px solid #eee',
+              cursor: 'pointer',
+              fontSize: '17px',
+              fontWeight:
+                subCurrentPlayer.subtitleStreamIndex === -1 ? 'bold' : 'normal',
+              backgroundColor:
+                subCurrentPlayer.subtitleStreamIndex === -1
+                  ? '#d0e8ff'
+                  : '#fff',
+            }"
+          >
+            None
+          </div>
+          <div
+            v-for="sub in subCurrentPlayer.subtitles"
+            :key="sub.index"
+            @mousedown.prevent="subSelectTrack(sub.index)"
+            @touchstart.prevent="subSelectTrack(sub.index)"
+            :style="{
+              padding: '10px 14px',
+              borderBottom: '1px solid #eee',
+              cursor: 'pointer',
+              fontSize: '17px',
+              fontWeight:
+                subCurrentPlayer.subtitleStreamIndex === sub.index
+                  ? 'bold'
+                  : 'normal',
+              backgroundColor:
+                subCurrentPlayer.subtitleStreamIndex === sub.index
+                  ? '#d0e8ff'
+                  : '#fff',
+            }"
+          >
+            {{ sub.label }}
+          </div>
+        </template>
+      </div>
+      <div
+        @mousedown.prevent="subClose"
+        @touchstart.prevent="subClose"
+        style="
+          background: lightgreen;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 26px;
+          font-weight: bold;
+          cursor: pointer;
+          flex-shrink: 0;
+          height: 20%;
+          user-select: none;
+        "
+      >
+        Close
+      </div>
+    </div>
     <div
       v-else
       style="
@@ -245,12 +353,11 @@
       </div>
       <div
         :style="cellStyle('white', 'stream')"
-        @mousedown="
-          (mode === 'google' || mode === 'fire') && (showStreamers = true)
-        "
-        @touchstart.prevent="
-          (mode === 'google' || mode === 'fire') && (showStreamers = true)
-        "
+        @mousedown="startAppsHold"
+        @mouseup="stopAppsHold"
+        @mouseleave="stopAppsHold"
+        @touchstart.prevent="startAppsHold"
+        @touchend="stopAppsHold"
       >
         Apps
       </div>
@@ -276,25 +383,13 @@
       >
         Mute
       </div>
-      <!-- Row 5: keybd, fire, google -->
+      <!-- Row 5: subs, fire, google -->
       <div
-        :style="cellStyle('white', 'keybd')"
-        @mousedown="startHold(() => keybdBtn())"
-        @mouseup="stopHold"
-        @mouseleave="stopHold"
-        @touchstart.prevent="startHold(() => keybdBtn())"
-        @touchend="stopHold"
+        :style="cellStyle('white', 'subs')"
+        @mousedown="openSubCtrl"
+        @touchstart.prevent="openSubCtrl"
       >
-        <svg
-          width="1.5em"
-          height="1.5em"
-          viewBox="0 0 24 24"
-          fill="currentColor"
-        >
-          <path
-            d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 5H5v-2h2v2zm0-3H5v-2h2v2zm0-3H5V8h2v2zm9 6H8v-2h8v2zm0-3h-2v-2h2v2zm0-3h-2V8h2v2zm3 6h-2v-2h2v2zm0-3h-2v-2h2v2zm0-3h-2V8h2v2z"
-          />
-        </svg>
+        Subs
       </div>
       <div
         :style="modeBtnStyle('fire')"
@@ -351,10 +446,27 @@ export default {
       showKeybd: false,
       keybdInput: "",
       keybdHistory: [],
+      showSubCtrl: false,
+      subPlayers: [],
+      subDeviceName: null,
     };
   },
 
   computed: {
+    subCurrentPlayer() {
+      return (
+        this.subPlayers.find(
+          (p) => (p.deviceName || p.sessionId) === this.subDeviceName,
+        ) ?? null
+      );
+    },
+    subCurrentLabel() {
+      const p = this.subCurrentPlayer;
+      if (!p) return this.subDeviceName ? "---" : "No video playing";
+      let base = p.episodeCode ? `${p.showName} ${p.episodeCode}` : p.showName;
+      if (p.deviceName) base += ` (${p.deviceName})`;
+      return base;
+    },
     muteCellStyle() {
       const bg =
         this.flashBtn === "mute"
@@ -475,6 +587,92 @@ export default {
       clearTimeout(this._holdTimer);
     },
 
+    startAppsHold() {
+      this._appsHoldFired = false;
+      this._appsHoldTimer = setTimeout(() => {
+        this._appsHoldFired = true;
+        this.keybdBtn();
+      }, 1000);
+    },
+
+    stopAppsHold() {
+      clearTimeout(this._appsHoldTimer);
+      if (!this._appsHoldFired) {
+        if (this.mode === "google" || this.mode === "fire") {
+          this.showStreamers = true;
+        }
+      }
+      this._appsHoldFired = false;
+    },
+
+    async fetchSubPlayers() {
+      try {
+        const data = await fetch(`${config.tvTvUrl}/tv/emby/playing`).then(
+          (r) => r.json(),
+        );
+        if (data.ok) {
+          this.subPlayers = data.playing;
+          if (
+            !this.subDeviceName ||
+            !data.playing.find(
+              (p) => (p.deviceName || p.sessionId) === this.subDeviceName,
+            )
+          ) {
+            const lrtv = data.playing.find(
+              (p) => p.deviceName === "Living Room TV",
+            );
+            this.subDeviceName = lrtv
+              ? lrtv.deviceName
+              : (data.playing[0]?.deviceName ??
+                data.playing[0]?.sessionId ??
+                null);
+          }
+        }
+      } catch (_) {}
+    },
+
+    async openSubCtrl() {
+      this.showSubCtrl = true;
+      await this.fetchSubPlayers();
+      this._subPollTimer = setInterval(() => this.fetchSubPlayers(), 3000);
+    },
+
+    subClose() {
+      clearInterval(this._subPollTimer);
+      this.showSubCtrl = false;
+    },
+
+    subCyclePlayer() {
+      if (this.subPlayers.length === 0) return;
+      const cur = this.subPlayers.findIndex(
+        (p) => (p.deviceName || p.sessionId) === this.subDeviceName,
+      );
+      const next = (cur + 1) % this.subPlayers.length;
+      this.subDeviceName =
+        this.subPlayers[next].deviceName || this.subPlayers[next].sessionId;
+    },
+
+    async subSelectTrack(index) {
+      const player = this.subPlayers.find(
+        (p) => (p.deviceName || p.sessionId) === this.subDeviceName,
+      );
+      if (!player) return;
+      // optimistic update
+      this.subPlayers = this.subPlayers.map((p) =>
+        (p.deviceName || p.sessionId) === this.subDeviceName
+          ? { ...p, subtitleStreamIndex: index }
+          : p,
+      );
+      try {
+        await fetch(`${config.tvTvUrl}/tv/emby/subtitle`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId: player.sessionId, index }),
+        });
+      } catch (_) {}
+      await this.fetchSubPlayers();
+    },
+
     modeBtnStyle(m) {
       let bg;
       if (this.flashBtn === m) bg = "orange";
@@ -551,7 +749,10 @@ export default {
     },
 
     _onPaneChanged(pane) {
-      if (pane !== "tv") this.showKeybd = false;
+      if (pane !== "tv") {
+        this.showKeybd = false;
+        this.subClose();
+      }
     },
 
     _onTvCloseKeybd() {

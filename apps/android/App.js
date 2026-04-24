@@ -55,6 +55,8 @@ export default function App() {
   const kybdInputRef = useRef(null);
   const embyHoldRef = useRef(null);
   const embyHoldFiredRef = useRef(false);
+  const appsHoldRef = useRef(null);
+  const appsHoldFiredRef = useRef(false);
   const subPollRef = useRef(null);
   const subPendingRef = useRef(null); // { deviceName, index } while optimistic highlight is active
   const subGenRef = useRef(0);
@@ -289,7 +291,6 @@ export default function App() {
     embyHoldFiredRef.current = false;
     embyHoldRef.current = setTimeout(() => {
       embyHoldFiredRef.current = true;
-      openSubCtrl();
     }, 1000);
   };
 
@@ -303,6 +304,22 @@ export default function App() {
       }
     }
     embyHoldFiredRef.current = false;
+  };
+
+  const startAppsHold = () => {
+    appsHoldFiredRef.current = false;
+    appsHoldRef.current = setTimeout(() => {
+      appsHoldFiredRef.current = true;
+      setShowKeybd(true);
+    }, 1000);
+  };
+
+  const stopAppsHold = () => {
+    clearTimeout(appsHoldRef.current);
+    if (!appsHoldFiredRef.current) {
+      if (mode === "google" || mode === "fire") setShowStreamers(true);
+    }
+    appsHoldFiredRef.current = false;
   };
 
   const fetchSubPlayers = async () => {
@@ -587,9 +604,8 @@ export default function App() {
       smallText: true,
       bg: () => cellBg("white", "stream"),
       onPress: () => {},
-      onPressIn: () => {
-        if (mode === "google" || mode === "fire") setShowStreamers(true);
-      },
+      onPressIn: () => startAppsHold(),
+      onPressOut: () => stopAppsHold(),
     },
     // Row 4: vol-, vol+, mute
     {
@@ -624,19 +640,14 @@ export default function App() {
       onPress: () => {},
       onPressIn: () => tvCmd("mute"),
     },
-    // Row 5: keybd, fire, google
+    // Row 5: subs, fire, google
     {
-      key: "keybd",
-      label: null,
-      icon: <MaterialIcons name="keyboard" size={42} color="black" />,
-      bg: () => cellBg("white", "keybd"),
+      key: "subs",
+      label: "Subs",
+      smallText: true,
+      bg: () => cellBg("white", "subs"),
       onPress: () => {},
-      onPressIn: () =>
-        startHold(() => {
-          flash("keybd");
-          setTimeout(() => setShowKeybd(true), 500);
-        }),
-      onPressOut: () => clearTimeout(holdRef.current),
+      onPressIn: () => openSubCtrl(),
     },
     {
       key: "fire",
@@ -685,12 +696,9 @@ export default function App() {
                 })()}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={subClose} style={subCtrlStyles.closeBtn}>
-              <Text style={subCtrlStyles.closeBtnText}>✕</Text>
-            </TouchableOpacity>
           </View>
           {/* Subtitle list */}
-          <ScrollView style={{ flex: 1 }}>
+          <ScrollView style={{ flex: 1, minHeight: 0 }}>
             {!currentPlayer ? (
               <Text style={subCtrlStyles.noVideo}>No video playing</Text>
             ) : currentPlayer.deviceName !== "Living Room TV" ? (
@@ -749,6 +757,13 @@ export default function App() {
               </>
             )}
           </ScrollView>
+          <TouchableOpacity
+            onPress={subClose}
+            style={subCtrlStyles.closeBtn}
+            activeOpacity={0.7}
+          >
+            <Text style={subCtrlStyles.closeBtnText}>Close</Text>
+          </TouchableOpacity>
         </View>
         {locked && (
           <View style={lockStyles.overlay}>
@@ -1087,14 +1102,16 @@ const kybdStyles = StyleSheet.create({
     textAlign: "left",
   },
   closeBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: "#999",
-    borderRadius: 5,
+    backgroundColor: "lightgreen",
+    borderTopWidth: 3,
+    borderTopColor: "#000",
+    alignItems: "center",
+    justifyContent: "center",
+    height: "20%",
+    flexShrink: 0,
   },
   closeBtnText: {
-    fontSize: 14,
+    fontSize: 39,
     fontWeight: "bold",
     color: "#000",
     lineHeight: 18,

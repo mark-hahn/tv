@@ -4,3 +4,4 @@ android/
 ios/
 dist/
 package-lock.json
+apps/android/.build-cache

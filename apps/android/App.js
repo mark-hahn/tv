@@ -852,6 +852,35 @@ export default function App() {
           </TouchableOpacity>
         </View>
         <ScrollView style={streamerStyles.list}>
+          <View style={streamerStyles.pinnedRow}>
+            {["Netflix", "Prime Video", "HBO Max"]
+              .map((name) => services.find((s) => s.name === name))
+              .filter(Boolean)
+              .map((svc) => (
+                <TouchableOpacity
+                  key={"pin-" + svc.name}
+                  onPressIn={() => {
+                    setFlashSvc("pin-" + svc.name);
+                    setTimeout(() => setFlashSvc(null), 500);
+                  }}
+                  onPress={() => openApp(svc)}
+                  style={[
+                    streamerStyles.pinnedCard,
+                    flashSvc === "pin-" + svc.name && {
+                      backgroundColor: "lightblue",
+                    },
+                  ]}
+                >
+                  <Image
+                    source={{
+                      uri: `https://hahnca.com/shows/logos/${svc.logo}`,
+                    }}
+                    style={streamerStyles.logo}
+                  />
+                  <Text style={streamerStyles.cardName}>{svc.name}</Text>
+                </TouchableOpacity>
+              ))}
+          </View>
           <View style={streamerStyles.grid}>
             {services.map((svc) => (
               <TouchableOpacity
@@ -1047,6 +1076,22 @@ const streamerStyles = StyleSheet.create({
   list: {
     flex: 1,
     padding: 8,
+  },
+  pinnedRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 8,
+  },
+  pinnedCard: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    backgroundColor: "#fff",
+    gap: 6,
   },
   grid: {
     flexDirection: "row",

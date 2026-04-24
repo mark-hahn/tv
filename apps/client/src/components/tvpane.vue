@@ -105,6 +105,56 @@
         </button>
       </div>
       <div style="overflow-y: auto; flex: 1; padding: 8px">
+        <div style="display: flex; gap: 8px; margin-bottom: 8px">
+          <button
+            v-for="svc in services
+              .filter((s) =>
+                ['Netflix', 'Prime Video', 'HBO Max'].includes(s.name),
+              )
+              .sort(
+                (a, b) =>
+                  ['Netflix', 'Prime Video', 'HBO Max'].indexOf(a.name) -
+                  ['Netflix', 'Prime Video', 'HBO Max'].indexOf(b.name),
+              )"
+            :key="'pin-' + svc.name"
+            @pointerdown="flashSvcName('pin-' + svc.name)"
+            @click="openApp(svc)"
+            :style="{
+              '--btn-bg':
+                flashSvc === 'pin-' + svc.name ? 'lightblue' : 'white',
+              flex: '1',
+              boxSizing: 'border-box',
+              padding: '10px 8px',
+              border: '1px solid #ccc',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '6px',
+            }"
+          >
+            <img
+              :src="'logos/' + svc.logo"
+              :alt="svc.name"
+              style="
+                width: 72px;
+                height: 72px;
+                object-fit: contain;
+                border-radius: 6px;
+              "
+            />
+            <span
+              style="
+                color: #000;
+                font-size: 21px;
+                text-align: center;
+                word-break: break-word;
+              "
+              >{{ svc.name }}</span
+            >
+          </button>
+        </div>
         <div style="display: flex; flex-wrap: wrap; gap: 8px">
           <button
             v-for="svc in services"

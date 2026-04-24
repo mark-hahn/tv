@@ -676,44 +676,62 @@ export default function App() {
     return (
       <View style={styles.container}>
         <StatusBar hidden />
-        <View style={subCtrlStyles.container}>
-          {/* Header row 1: show name + offset + close */}
-          <View style={subCtrlStyles.headerRow1}>
-            <TouchableOpacity onPress={subCyclePlayer} style={{ flex: 1 }}>
-              <Text style={subCtrlStyles.showName} numberOfLines={1}>
-                {(() => {
-                  if (!currentPlayer)
-                    return subDeviceName ? "---" : "No video playing";
-                  let base = currentPlayer.episodeCode
-                    ? `${currentPlayer.showName} ${currentPlayer.episodeCode}`
-                    : currentPlayer.showName;
-                  if (currentPlayer.deviceName)
-                    base += ` (${subShortDevice(currentPlayer.deviceName)})`;
-                  const active = currentPlayer.subtitles.find(
-                    (s) => s.index === currentPlayer.subtitleStreamIndex,
-                  );
-                  return active ? base : base;
-                })()}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          {/* Subtitle list */}
-          <ScrollView style={{ flex: 1, minHeight: 0 }}>
-            {!currentPlayer ? (
-              <Text style={subCtrlStyles.noVideo}>No video playing</Text>
-            ) : currentPlayer.deviceName !== "Living Room TV" ? (
-              <Text style={subCtrlStyles.noVideo}>
-                Only the Living Room TV is supported
-              </Text>
-            ) : (
-              <>
+        <View style={subCtrlStyles.header}>
+          <TouchableOpacity onPress={subCyclePlayer} style={{ flex: 1 }}>
+            <Text style={subCtrlStyles.showName} numberOfLines={1}>
+              {(() => {
+                if (!currentPlayer)
+                  return subDeviceName ? "---" : "No video playing";
+                let base = currentPlayer.episodeCode
+                  ? `${currentPlayer.showName} ${currentPlayer.episodeCode}`
+                  : currentPlayer.showName;
+                if (currentPlayer.deviceName)
+                  base += ` (${subShortDevice(currentPlayer.deviceName)})`;
+                return base;
+              })()}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView style={subCtrlStyles.list}>
+          {!currentPlayer ? (
+            <Text style={subCtrlStyles.noVideo}>No video playing</Text>
+          ) : currentPlayer.deviceName !== "Living Room TV" ? (
+            <Text style={subCtrlStyles.noVideo}>
+              Only the Living Room TV is supported
+            </Text>
+          ) : (
+            <>
+              <TouchableOpacity
+                onPress={() => subSelectTrack(-1)}
+                style={[
+                  subCtrlStyles.card,
+                  {
+                    backgroundColor:
+                      currentPlayer.subtitleStreamIndex === -1
+                        ? "#d0e8ff"
+                        : "#fff",
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    subCtrlStyles.cardText,
+                    currentPlayer.subtitleStreamIndex === -1 &&
+                      subCtrlStyles.cardTextSelected,
+                  ]}
+                >
+                  None
+                </Text>
+              </TouchableOpacity>
+              {currentPlayer.subtitles.map((sub) => (
                 <TouchableOpacity
-                  onPress={() => subSelectTrack(-1)}
+                  key={sub.index}
+                  onPress={() => subSelectTrack(sub.index)}
                   style={[
                     subCtrlStyles.card,
                     {
                       backgroundColor:
-                        currentPlayer.subtitleStreamIndex === -1
+                        currentPlayer.subtitleStreamIndex === sub.index
                           ? "#d0e8ff"
                           : "#fff",
                     },
@@ -722,49 +740,24 @@ export default function App() {
                   <Text
                     style={[
                       subCtrlStyles.cardText,
-                      currentPlayer.subtitleStreamIndex === -1 &&
+                      currentPlayer.subtitleStreamIndex === sub.index &&
                         subCtrlStyles.cardTextSelected,
                     ]}
                   >
-                    None
+                    {subTypeChar(sub.type)}: {subShortLabel(sub.label)}
                   </Text>
                 </TouchableOpacity>
-                {currentPlayer.subtitles.map((sub) => (
-                  <TouchableOpacity
-                    key={sub.index}
-                    onPress={() => subSelectTrack(sub.index)}
-                    style={[
-                      subCtrlStyles.card,
-                      {
-                        backgroundColor:
-                          currentPlayer.subtitleStreamIndex === sub.index
-                            ? "#d0e8ff"
-                            : "#fff",
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        subCtrlStyles.cardText,
-                        currentPlayer.subtitleStreamIndex === sub.index &&
-                          subCtrlStyles.cardTextSelected,
-                      ]}
-                    >
-                      {subTypeChar(sub.type)}: {subShortLabel(sub.label)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </>
-            )}
-          </ScrollView>
-          <TouchableOpacity
-            onPress={subClose}
-            style={subCtrlStyles.closeBtn}
-            activeOpacity={0.7}
-          >
-            <Text style={subCtrlStyles.closeBtnText}>Close</Text>
-          </TouchableOpacity>
-        </View>
+              ))}
+            </>
+          )}
+        </ScrollView>
+        <TouchableOpacity
+          onPress={subClose}
+          style={subCtrlStyles.closeBtn}
+          activeOpacity={0.7}
+        >
+          <Text style={subCtrlStyles.closeBtnText}>Close</Text>
+        </TouchableOpacity>
         {locked && (
           <View style={lockStyles.overlay}>
             <Text style={lockStyles.title}>Remote Collision</Text>
@@ -1147,17 +1140,10 @@ const kybdStyles = StyleSheet.create({
     textAlign: "left",
   },
   closeBtn: {
-    backgroundColor: "lightgreen",
-    borderTopWidth: 3,
-    borderTopColor: "#000",
-    alignItems: "center",
-    justifyContent: "center",
-    height: "20%",
-    flexShrink: 0,
+    padding: 8,
   },
   closeBtnText: {
-    fontSize: 39,
-    fontWeight: "bold",
+    fontSize: 20,
     color: "#000",
   },
   historyList: {
@@ -1174,25 +1160,24 @@ const kybdStyles = StyleSheet.create({
 });
 
 const subCtrlStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    borderWidth: 3,
-    borderColor: "#000",
-    backgroundColor: "#fff",
-  },
-  headerRow1: {
+  header: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 10,
-    borderBottomWidth: 3,
-    borderBottomColor: "#000",
-    gap: 8,
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 2,
+    borderBottomColor: "#333",
+    backgroundColor: "#fff",
   },
   showName: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: "bold",
     color: "#000",
+    fontSize: 20,
+    fontWeight: "bold",
+  },
+  list: {
+    flex: 1,
+    backgroundColor: "#fff",
   },
   closeBtn: {
     backgroundColor: "lightgreen",
@@ -1217,9 +1202,6 @@ const subCtrlStyles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#ddd",
     backgroundColor: "#fff",
-  },
-  cardSelected: {
-    backgroundColor: "#d0e8ff",
   },
   cardText: {
     fontSize: 27,

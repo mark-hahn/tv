@@ -736,7 +736,12 @@ import { config } from "../config.js";
 import evtBus from "../evtBus.js";
 import * as srvr from "../srvr.js";
 import * as util from "../util.js";
-import { getAllTvdb, getRemotes, applyTvdbPush } from "../tvdb.js";
+import {
+  getAllTvdb,
+  getRemotes,
+  applyTvdbPush,
+  srchTvdbData,
+} from "../tvdb.js";
 
 export default {
   name: "BrowsePane",
@@ -1279,6 +1284,32 @@ export default {
       } catch (e) {
         console.error("handleSnooze error:", e);
       }
+      // Remove from browse-cards.json on api server so it won't reappear as a fresh card
+      fetch(`${config.torrentsApiUrl}/api/removeBrowseCard`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tvdbId: tvdbId || null, name }),
+      }).catch(() => {});
+      // Remove the snoozed show from titleStrings
+      const normName = (s) =>
+        String(s || "")
+          .trim()
+          .toLowerCase();
+      const snoozeTitle = normName(name);
+      titleStrings.value = titleStrings.value.filter((s) => {
+        try {
+          const str = String(s);
+          if (str.trim().startsWith("{")) {
+            const o = JSON.parse(str);
+            if (normName(o.title) === snoozeTitle) return false;
+          } else {
+            const parts = str.split("|");
+            const t = parts[1] ? parts[1].trim() : parts[0].trim();
+            if (normName(t) === snoozeTitle) return false;
+          }
+        } catch (e) {}
+        return true;
+      });
       snoozeFlash.value = true;
       setTimeout(() => {
         snoozeFlash.value = false;
@@ -1309,6 +1340,30 @@ export default {
           if (res.ok) snoozeList.value = await res.json();
         } catch (e) {
           console.error("handleUnSnooze error:", e);
+        }
+        // Remove from titleStrings so when Next returns it, it lands fresh at bottom
+        const unsnoozeTitle = String(curTvdb.value?.name || "")
+          .trim()
+          .toLowerCase();
+        if (unsnoozeTitle) {
+          titleStrings.value = titleStrings.value.filter((s) => {
+            try {
+              const str = String(s);
+              if (str.trim().startsWith("{")) {
+                const o = JSON.parse(str);
+                return (
+                  String(o.title || "")
+                    .trim()
+                    .toLowerCase() !== unsnoozeTitle
+                );
+              } else {
+                const parts = str.split("|");
+                const t = parts[1] ? parts[1].trim() : parts[0].trim();
+                return t.toLowerCase() !== unsnoozeTitle;
+              }
+            } catch (e) {}
+            return true;
+          });
         }
         if (snoozeList.value.length === 0) {
           unSnoozeMode.value = false;
@@ -2068,9 +2123,29 @@ export default {
     };
 
     // Handle gallery card selection
-    const handleGallerySelect = (tvdb) => {
-      curTvdb.value = tvdb;
-      postBrowseHistory("browse", tvdb);
+    const handleGallerySelect = async (tvdb) => {
+      if (unSnoozeMode.value && tvdb) {
+        const tvdbId = String(tvdb.tvdbId || tvdb.tvdb_id || tvdb.id || "");
+        try {
+          const results = await srchTvdbData(tvdb.name);
+          if (results && results.length > 0) {
+            const match = tvdbId
+              ? results.find(
+                  (r) =>
+                    String(r.id) === tvdbId || String(r.tvdb_id) === tvdbId,
+                )
+              : null;
+            curTvdb.value = match || results[0];
+          } else {
+            curTvdb.value = tvdb;
+          }
+        } catch (e) {
+          curTvdb.value = tvdb;
+        }
+      } else {
+        curTvdb.value = tvdb;
+      }
+      postBrowseHistory("browse", curTvdb.value);
     };
 
     const handleSearchComplete = (tvdb) => {

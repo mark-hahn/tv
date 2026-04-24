@@ -25,7 +25,12 @@ import {
   renameUsbFile,
 } from "./usb.js";
 import { getLocalFiles, renameLocalFile, moveToTrial } from "./local.js";
-import { getBrowseShow, getAllBrowse, ackBrowsed } from "./browse.js";
+import {
+  getBrowseShow,
+  getAllBrowse,
+  ackBrowsed,
+  removeResultTitleByTvdbId,
+} from "./browse.js";
 import * as reviews from "./reviews.js";
 import { checkFiles as tvProcCheckFiles } from "./tv-proc.js";
 import { getActorCredits } from "./imdb-credits.js";
@@ -1998,11 +2003,21 @@ app.post("/api/ackBrowsed", (req, res) => {
   res.json({ ok: true });
 });
 
+// POST /api/removeBrowseCard — remove a show from browse-cards.json without touching db
+app.post("/api/removeBrowseCard", (req, res) => {
+  const { tvdbId, name } = req.body || {};
+  if (!tvdbId && !name)
+    return res.status(400).json({ error: "missing tvdbId or name" });
+  removeResultTitleByTvdbId(tvdbId || null, name || null);
+  res.json({ ok: true });
+});
+
 // POST /api/unackBrowsed — reset browsed=0 so show returns to browse rotation
 app.post("/api/unackBrowsed", (req, res) => {
   const { tvdbId } = req.body || {};
   if (!tvdbId) return res.status(400).json({ error: "missing tvdbId" });
   unmarkShowBrowsed(tvdbId);
+  removeResultTitleByTvdbId(tvdbId);
   res.json({ ok: true });
 });
 

@@ -3,6 +3,7 @@ import path from "node:path";
 import { franc } from "franc-min";
 import { getApiDataDir } from "./tvPaths.js";
 import { getCandidateShows, markShowBrowsed } from "./tvmaze.js";
+import { smartTitleMatch } from "@tv/share";
 
 // --- Constants & Config ---
 
@@ -351,4 +352,40 @@ export async function getAllBrowse() {
 
 export function ackBrowsed(tvmazeId) {
   if (tvmazeId != null) markShowBrowsed(tvmazeId);
+}
+
+export function removeResultTitleByTvdbId(tvdbId, name) {
+  const id = tvdbId != null ? Number(tvdbId) : null;
+  if (id == null && !name) return;
+  const before = resultTitles.length;
+  // Build an array of candidate title strings for smartTitleMatch
+  const candidateObjects = resultTitles.map((entry, idx) => ({
+    _idx: idx,
+    title: parseResultTitle(String(entry || "")),
+  }));
+  const toRemove = new Set();
+  if (id != null) {
+    resultTitles.forEach((entry, idx) => {
+      try {
+        const s = String(entry || "");
+        if (s.trim().startsWith("{")) {
+          const o = JSON.parse(s);
+          if (o.tvdbid != null && Number(o.tvdbid) === id) toRemove.add(idx);
+        }
+      } catch {}
+    });
+  }
+  if (name) {
+    const matched = smartTitleMatch(name, candidateObjects, null, false);
+    if (matched) {
+      const matchedTitle = typeof matched === "string" ? matched : matched.title;
+      candidateObjects.forEach((c) => {
+        if (c.title === matchedTitle) toRemove.add(c._idx);
+      });
+    }
+  }
+  if (toRemove.size > 0) {
+    resultTitles = resultTitles.filter((_, idx) => !toRemove.has(idx));
+    saveResultTitles();
+  }
 }

@@ -4013,11 +4013,13 @@ app.post("/internal/tv-state", (req, res) => {
 let lastNowPlayingShowName = null;
 let lastNowPlayingList = [];
 const prevPlaying = new Set(); // "showName|season|episode" keys seen so far
+let lastMissingEpWarning = null;
 
 app.post("/internal/nowPlaying", (req, res) => {
   const { showName, playing } = req.body;
   lastNowPlayingShowName = showName ?? null;
   lastNowPlayingList = Array.isArray(playing) ? playing : [];
+  if (lastNowPlayingList.length === 0) lastMissingEpWarning = null;
   notifyClients("nowPlaying", {
     showName: lastNowPlayingShowName,
     playing: lastNowPlayingList,
@@ -4057,7 +4059,7 @@ async function checkMissingEpisodes(playing) {
       if (s > season) break;
       for (const [e, data] of episodes) {
         if (s === season && e >= episode) break outer;
-        if (!data.played && !data.noFile && !data.unaired) {
+        if (!data.played) {
           missingSeason = s;
           missingEpisode = e;
           break outer;
@@ -4066,14 +4068,16 @@ async function checkMissingEpisodes(playing) {
     }
 
     if (missingSeason !== null) {
-      notifyClients("missingEpisodeWarning", {
+      const warningData = {
         showName,
         missingSeason,
         missingEpisode,
         currentSeason: season,
         currentEpisode: episode,
         device,
-      });
+      };
+      lastMissingEpWarning = warningData;
+      notifyClients("missingEpisodeWarning", warningData);
     }
   }
 }
@@ -4121,6 +4125,15 @@ wss.on("connection", (ws) => {
         id: 0,
         notification: "nowPlaying",
         data: { showName: lastNowPlayingShowName, playing: lastNowPlayingList },
+      }),
+    );
+  }
+  if (lastMissingEpWarning !== null) {
+    ws.send(
+      JSON.stringify({
+        id: 0,
+        notification: "missingEpisodeWarning",
+        data: lastMissingEpWarning,
       }),
     );
   }

@@ -120,6 +120,7 @@ function devicePriority(s) {
 }
 
 function updateNowPlaying(sessions) {
+  const withItem = sessions.filter((s) => s.NowPlayingItem);
   const playing = sessions
     .filter((s) => s.NowPlayingItem?.SeriesName)
     .sort((a, b) => devicePriority(a) - devicePriority(b))

@@ -1114,7 +1114,6 @@ const kybdStyles = StyleSheet.create({
     fontSize: 39,
     fontWeight: "bold",
     color: "#000",
-    lineHeight: 18,
   },
   historyList: {
     flex: 1,
@@ -1151,10 +1150,15 @@ const subCtrlStyles = StyleSheet.create({
     color: "#000",
   },
   closeBtn: {
-    padding: 8,
+    backgroundColor: "lightgreen",
+    alignItems: "center",
+    justifyContent: "center",
+    height: 80,
+    flexShrink: 0,
   },
   closeBtnText: {
-    fontSize: 20,
+    fontSize: 39,
+    fontWeight: "bold",
     color: "#000",
   },
   noVideo: {

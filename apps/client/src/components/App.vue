@@ -356,7 +356,7 @@
       :chksrtCount="chksrtCount"
       @close="handleVideoPlayerClose"
       @chksrt-next="handleChksrtNext"
-      @chksrt-subs="handleChksrtSubs"
+      @chksrt-sel="handleChksrtSel"
     />
     <!-- Help dialog -->
     <div
@@ -974,10 +974,17 @@ export default {
         this.fetchChksrtCount();
       }
     },
-    handleChksrtSubs(path) {
-      srvr
-        .enqueueSubs([path], true)
-        .catch((e) => console.error("enqueueSubs", e));
+    handleChksrtSel(path) {
+      this.videoPlayerPath = null;
+      this.videoPlayerMode = null;
+      if (!path) return;
+      const TV_DIR = "/mnt/media/tv/";
+      const showName = path.startsWith(TV_DIR)
+        ? path.slice(TV_DIR.length).split("/")[0]
+        : null;
+      if (showName) {
+        evtBus.emit("selectShowFromCardTitle", showName);
+      }
     },
     async fetchChksrtCount() {
       try {

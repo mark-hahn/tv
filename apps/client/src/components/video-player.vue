@@ -218,10 +218,10 @@
               : choice.label
         }}
       </div>
-      <!-- Subs button (chksrt mode only) -->
+      <!-- Sel button (chksrt mode only) -->
       <div
         v-if="mode === 'chksrt'"
-        @click.stop="clickSubs"
+        @click.stop="clickSel"
         style="
           color: white;
           font-size: 13px;
@@ -236,7 +236,7 @@
           text-shadow: 0 0 3px #000;
         "
       >
-        Subs
+        Sel
       </div>
       <!-- X close -->
       <div
@@ -295,7 +295,7 @@ export default {
     mode: { type: String, default: null },
     chksrtCount: { type: Number, default: 0 },
   },
-  emits: ["close", "chksrt-next", "chksrt-subs"],
+  emits: ["close", "chksrt-next", "chksrt-sel"],
   data() {
     return {
       subtitleTracks: [],
@@ -615,7 +615,7 @@ export default {
         this.selectTrack(choice.id);
       }
     },
-    clickSubs() {
+    clickSel() {
       this._mseStop();
       this.vidSrc = "";
       const vid = this.$refs.vid;
@@ -626,7 +626,7 @@ export default {
       if (document.fullscreenElement) {
         document.exitFullscreen().catch(() => {});
       }
-      this.$emit("chksrt-subs", this.path);
+      this.$emit("chksrt-sel", this.path);
     },
     close() {
       this._mseStop();

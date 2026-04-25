@@ -424,15 +424,13 @@
           </button>
           <button
             @click="startAsr"
-            :disabled="asrBusy"
             :style="{
-              cursor: asrBusy ? 'not-allowed' : 'pointer',
+              cursor: 'pointer',
               borderRadius: '4px',
               padding: '2px 8px',
               border: '1px solid #bbb',
               backgroundColor: 'whitesmoke',
               marginRight: '5px',
-              opacity: asrBusy ? 0.6 : 1,
             }"
           >
             Start
@@ -509,10 +507,10 @@
             flexDirection: 'column',
           }"
         >
-          <span style="font-size: 1.8em; word-break: break-all">{{
+          <span style="font-size: 14px; word-break: break-all">{{
             entry.videoPath.split("/").pop()
           }}</span>
-          <span style="font-size: 1.6em; color: #666">
+          <span style="font-size: 14px; color: #666">
             Added by {{ entry.source || "unknown" }}, at
             {{ formatAsrTime(entry.addedAt)
             }}<span

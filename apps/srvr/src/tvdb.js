@@ -2258,11 +2258,38 @@ const tryLocalGetTvdb = async () => {
     }
 
     // Fallback to TVDB if Emby fails or show not in Emby
+    let tvdbSeriesMap = null;
     if (!seriesMap && processRecord.tvdbId) {
-      seriesMap = await getSeriesMap(
+      tvdbSeriesMap = await getSeriesMap(
         processRecord.tvdbId,
         processRecord.watchedEpis,
       );
+      seriesMap = tvdbSeriesMap;
+    }
+
+    // Compute season premiere dates from TVDB if not yet stored
+    if (!processRecord.seasonPremiereDates && processRecord.tvdbId) {
+      if (!tvdbSeriesMap) {
+        tvdbSeriesMap = await getSeriesMap(processRecord.tvdbId, null);
+      }
+      if (tvdbSeriesMap && tvdbSeriesMap.length > 0) {
+        const spd = {};
+        for (const [seasonNum, episodes] of tvdbSeriesMap) {
+          const sorted = [...episodes].sort(
+            (a, b) => Number(a[0]) - Number(b[0]),
+          );
+          const first = sorted.find(([n]) => Number(n) === 1) || sorted[0];
+          if (first?.[1]?.aired) {
+            spd[String(seasonNum)] = first[1].aired
+              .slice(0, 7)
+              .replace("-", "/");
+          }
+        }
+        if (Object.keys(spd).length > 0) {
+          processRecord.seasonPremiereDates = spd;
+          await saveTvdbFiles(allTvdb);
+        }
+      }
     }
   } catch (err) {
     log("err", "tryLocalGetTvdb seriesMap fetch error:", err.message);

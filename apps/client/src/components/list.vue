@@ -2502,6 +2502,10 @@ export default {
         }
       }
 
+      // Attach season premiere dates from allTvdb if available
+      const spd = allTvdb?.[show.name]?.seasonPremiereDates;
+      if (spd) this.mapShow = { ...this.mapShow, seasonPremiereDates: spd };
+
       // Emit to App.vue to show map
       this.$emit("show-map", {
         mapShow: this.mapShow,

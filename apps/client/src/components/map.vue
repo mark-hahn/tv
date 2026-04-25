@@ -438,6 +438,27 @@
                     >u</span
                   >
                 </td>
+                <td
+                  :style="{
+                    width: '56px',
+                    minWidth: '56px',
+                    maxWidth: '56px',
+                    height: '22px',
+                    minHeight: '22px',
+                    maxHeight: '22px',
+                    lineHeight: '16px',
+                    whiteSpace: 'nowrap',
+                    verticalAlign: 'middle',
+                    textAlign: 'center',
+                    padding: '1px 4px',
+                    border: '1px solid #ccc',
+                    backgroundColor: 'white',
+                    fontSize: '13px',
+                    color: '#666',
+                  }"
+                >
+                  {{ mapShow?.seasonPremiereDates?.[String(season)] || "" }}
+                </td>
               </tr>
             </tbody>
           </table>

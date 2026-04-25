@@ -612,6 +612,7 @@ export default {
       seriesMapEpis: [],
       seriesMap: {},
       watchingName: "---",
+      lastWatchingName: null,
       nowPlayingShowNames: new Set(),
       sortPopped: false,
       sortChoice: "Viewed",
@@ -2956,8 +2957,11 @@ export default {
 
     watchClick() {
       console.log("watchClick");
-      if (this.watchingName !== "---") {
-        window.localStorage.setItem("lastVisShow", this.watchingName);
+      const target =
+        this.lastWatchingName ??
+        (this.watchingName !== "---" ? this.watchingName : null);
+      if (target) {
+        window.localStorage.setItem("lastVisShow", target);
         this.scrollToSavedShow(true);
 
         // If we have episode info, open actors pane and show episode actors
@@ -3536,7 +3540,12 @@ export default {
     });
 
     on("nowPlaying", ({ showName, playing }) => {
-      this.watchingName = showName ?? "---";
+      if (showName) {
+        this.lastWatchingName = showName;
+        this.watchingName = showName;
+      } else {
+        this.watchingName = this.lastWatchingName ?? "---";
+      }
       this.nowPlayingShowNames = new Set(
         Array.isArray(playing) ? playing.map((p) => p.showName) : [],
       );

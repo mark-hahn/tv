@@ -15,7 +15,6 @@ import * as tvdb from "./src/tvdb.js";
 import * as util from "./src/util.js";
 import * as email from "./src/email.js";
 import * as tmdb from "./src/tmdb.js";
-import { handleAsr } from "./src/asr.js";
 import { handleFix } from "./src/fix.js";
 import { handleEmb } from "./src/emb.js";
 import { checkFlexgetStatus } from "../api/src/usb.js";
@@ -92,19 +91,21 @@ const tvDir = "/mnt/media/tv";
 const SUB_QUEUE_PATH = "/root/dev/apps/tv/apps/asr/data/subQueue.json";
 const SUB_QUEUE_CHKSRT_PATH =
   "/root/dev/apps/tv/apps/asr/data/subQueueChkSrt.json";
-const SUB_QUEUE_GENSRT_PATH =
-  "/root/dev/apps/tv/apps/asr/data/subQueueGenSrt.json";
+const ASR_QUEUE_PATH = "/root/dev/apps/tv/apps/asr/data/asrQueue.json";
 const SUBTITLE_LOG_PATH = "/root/dev/apps/tv/apps/asr/data/subtitle.log";
 const SUBTITLE_LOG_DIR = "/root/dev/apps/tv/apps/asr/data/subtitle-logs/";
 const ASR_JS_PATH = "/root/dev/apps/tv/apps/asr/asr.js";
+const ASR_LOG_BUFFER_MAX = 500;
 let subQueue = [],
   subQueueChkSrt = [],
-  subQueueGenSrt = [];
+  asrQueue = [];
 let subQueueBusy = false,
   chkSubQueueDelay = 10_000,
-  chkGenSrtDelay = 10_000;
+  asrQueueDelay = 10_000;
 let genSrtRunning = false,
+  genSrtChild = null,
   subQueuePendingNow = false;
+let asrLogBuffer = [];
 const exec = utilNode.promisify(cp.exec);
 
 function readTextOr(filePathOrPaths, fallback) {
@@ -757,10 +758,37 @@ function persistSubQueueChkSrt() {
 }
 function persistSubQueueGenSrt() {
   fs.writeFileSync(
-    SUB_QUEUE_GENSRT_PATH,
-    JSON.stringify(subQueueGenSrt),
+    "/root/dev/apps/tv/apps/asr/data/subQueueGenSrt.json",
+    JSON.stringify([]),
     "utf8",
   );
+}
+function persistAsrQueue() {
+  fs.writeFileSync(ASR_QUEUE_PATH, JSON.stringify(asrQueue), "utf8");
+}
+function appendAsrLog(line) {
+  asrLogBuffer.push(line);
+  if (asrLogBuffer.length > ASR_LOG_BUFFER_MAX) {
+    asrLogBuffer = asrLogBuffer.slice(-ASR_LOG_BUFFER_MAX);
+  }
+  notifyClients("asr-log", line);
+}
+function addToAsrQueue(entries) {
+  let added = 0;
+  for (const entry of entries) {
+    if (!asrQueue.some((e) => e.videoPath === entry.videoPath)) {
+      asrQueue.push(entry);
+      added++;
+    }
+  }
+  if (added > 0) {
+    persistAsrQueue();
+    notifyClients("asr-queue-update", {
+      count: asrQueue.length,
+      running: genSrtRunning,
+    });
+    asrQueueDelay = 500;
+  }
 }
 function enqueueSubQueue(entry, toFront) {
   const idx = subQueue.findIndex(
@@ -800,25 +828,6 @@ function enqueueSubQueueChkSrt(entry, toFront) {
   if (toFront) subQueueChkSrt.unshift(entry);
   else subQueueChkSrt.push(entry);
 }
-function enqueueSubQueueGenSrt(entry, toFront) {
-  const idx = subQueueGenSrt.findIndex(
-    (e) => e.videoFilePath === entry.videoFilePath,
-  );
-  if (idx !== -1) {
-    const existing = subQueueGenSrt[idx];
-    if (!entry.lowPriority && existing.lowPriority) {
-      subQueueGenSrt.splice(idx, 1);
-      subQueueGenSrt.unshift({
-        ...existing,
-        lowPriority: false,
-        fromUI: entry.fromUI ?? existing.fromUI,
-      });
-    }
-    return;
-  }
-  if (toFront) subQueueGenSrt.unshift(entry);
-  else subQueueGenSrt.push(entry);
-}
 function loadQueues() {
   try {
     subQueue = JSON.parse(fs.readFileSync(SUB_QUEUE_PATH, "utf8"));
@@ -831,9 +840,9 @@ function loadQueues() {
     subQueueChkSrt = [];
   }
   try {
-    subQueueGenSrt = JSON.parse(fs.readFileSync(SUB_QUEUE_GENSRT_PATH, "utf8"));
+    asrQueue = JSON.parse(fs.readFileSync(ASR_QUEUE_PATH, "utf8"));
   } catch {
-    subQueueGenSrt = [];
+    asrQueue = [];
   }
 }
 function logSubtitle(msg) {
@@ -852,8 +861,7 @@ async function fileNeedsSubChecked(videoFilePath, showName) {
   if (subQueue.some((e) => e.videoFilePath === videoFilePath)) return false;
   if (subQueueChkSrt.some((e) => e.videoFilePath === videoFilePath))
     return false;
-  if (subQueueGenSrt.some((e) => e.videoFilePath === videoFilePath))
-    return false;
+  if (asrQueue.some((e) => e.videoPath === videoFilePath)) return false;
   const base = videoFilePath.replace(/\.[^.]+$/, "");
   const dir = path.dirname(videoFilePath);
   let entries;
@@ -1044,32 +1052,43 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
   const base = videoFilePath.replace(/\.[^.]+$/, "");
   const srtPath = base + ".asr.srt";
   if (fs.existsSync(srtPath)) {
+    asrLogBuffer = [];
+    appendAsrLog(
+      `=== Skipped: ${path.basename(videoFilePath)} (srt already exists) ===`,
+    );
     logSubtitle(`asr skip exists: ${videoFilePath}`);
+    console.log(`[asr] skipped (srt exists): ${videoFilePath}`);
     return;
   }
+  asrLogBuffer = [];
+  appendAsrLog(`=== Starting: ${path.basename(videoFilePath)} ===`);
   logSubtitle(`asr start: ${videoFilePath}`);
   genSrtRunning = true;
+  notifyClients("asr-queue-update", { count: asrQueue.length, running: true });
   try {
     await new Promise((resolve, reject) => {
       const child = cp.spawn("node", [ASR_JS_PATH, videoFilePath], {
         stdio: ["ignore", "pipe", "pipe"],
       });
+      genSrtChild = child;
       child.stdout.on("data", (d) => {
         const line = d.toString().trimEnd();
         logSubtitle(line);
-        if (fromUI) notifyClients("asr-log", line);
+        appendAsrLog(line);
       });
       child.stderr.on("data", (d) => {
         const line = d.toString().trimEnd();
         logSubtitle(line);
-        if (fromUI) notifyClients("asr-log", line);
+        appendAsrLog(line);
       });
       child.on("close", (code) => {
+        genSrtChild = null;
         if (code === 0) resolve();
         else reject(new Error(`asr.js exited ${code}`));
       });
     });
     logSubtitle(`asr done: ${videoFilePath}`);
+    appendAsrLog(`=== Done: ${path.basename(videoFilePath)} ===`);
     if (fromUI)
       notifyClients("subs-progress", {
         path: videoFilePath,
@@ -1077,8 +1096,14 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
       });
   } catch (e) {
     logSubtitle(`asr error: ${e.message}`);
+    appendAsrLog(`=== Error: ${e.message} ===`);
   } finally {
     genSrtRunning = false;
+    genSrtChild = null;
+    notifyClients("asr-queue-update", {
+      count: asrQueue.length,
+      running: false,
+    });
   }
 }
 function doSubQueueNow() {
@@ -1101,9 +1126,6 @@ function doSubQueueNow() {
     };
     setTimeout(poll, 1000);
   }
-}
-function doSubQueueGenSrtNow() {
-  chkGenSrtDelay = 500;
 }
 async function processSubQueueEntry() {
   if (subQueue.length === 0) return;
@@ -1146,16 +1168,18 @@ async function processSubQueueEntry() {
         /^\.(#[A-Z2-7]+)\.srt$/.test(f.slice(basename.length)),
     );
     if (!hasSidecar && !pgsOnly) {
-      enqueueSubQueueGenSrt(
+      addToAsrQueue([
         {
-          videoFilePath: entry.videoFilePath,
+          videoPath: entry.videoFilePath,
+          showName,
+          season: parsed?.season ?? 0,
+          episode: parsed?.episode ?? 0,
           fromUI: entry.fromUI,
           lowPriority: entry.lowPriority,
+          source: entry.fromUI ? "ASR pane" : "subtitle pipeline",
+          addedAt: Date.now(),
         },
-        true,
-      );
-      persistSubQueueGenSrt();
-      doSubQueueGenSrtNow();
+      ]);
     } else {
       enqueueSubQueueChkSrt(
         { videoFilePath: entry.videoFilePath, fromUI: entry.fromUI },
@@ -1187,25 +1211,32 @@ function startSubQueueLoop() {
   };
   setTimeout(loop, chkSubQueueDelay);
 }
-function checkSubQueueGenSrt() {
+function startAsrQueueLoop() {
   const loop = async () => {
-    if (!genSrtRunning && subQueueGenSrt.length > 0) {
-      const entry = subQueueGenSrt[0];
+    if (!genSrtRunning && asrQueue.length > 0) {
+      const entry = asrQueue[0];
       if (entry.lowPriority && os.loadavg()[0] > 2) {
-        chkGenSrtDelay = 10_000;
+        asrQueueDelay = 10_000;
       } else {
-        subQueueGenSrt.shift();
-        persistSubQueueGenSrt();
-        generateSrtWithAsr(entry.videoFilePath, entry.fromUI).catch((e) =>
-          console.error("[genSrt loop]", e.message),
-        );
-        chkGenSrtDelay = 500;
+        asrQueueDelay = 500;
+        generateSrtWithAsr(entry.videoPath, entry.fromUI)
+          .catch((e) => console.error("[asrQueue]", e.message))
+          .finally(() => {
+            if (asrQueue[0]?.videoPath === entry.videoPath) {
+              asrQueue.shift();
+              persistAsrQueue();
+              notifyClients("asr-queue-update", {
+                count: asrQueue.length,
+                running: false,
+              });
+            }
+          });
       }
     }
-    if (subQueueGenSrt.length === 0) chkGenSrtDelay = 10_000;
-    setTimeout(loop, chkGenSrtDelay);
+    if (asrQueue.length === 0) asrQueueDelay = 10_000;
+    setTimeout(loop, asrQueueDelay);
   };
-  setTimeout(loop, chkGenSrtDelay);
+  setTimeout(loop, asrQueueDelay);
 }
 cron.schedule(
   "0 5 * * *",
@@ -3861,14 +3892,21 @@ app.post("/api/asr/gensrt/enqueue", (req, res) => {
     res.status(400).json({ error: "videoPaths required" });
     return;
   }
-  for (const vp of [...videoPaths].reverse()) {
-    enqueueSubQueueGenSrt(
-      { videoFilePath: vp, fromUI: !!fromUI, lowPriority: false },
-      true,
-    );
-  }
-  persistSubQueueGenSrt();
-  doSubQueueGenSrtNow();
+  const entries = videoPaths.map((vp) => {
+    const showName = vp.replace(tvDir + "/", "").split("/")[0];
+    const parsed = parseFileSeasonEpisode(vp);
+    return {
+      videoPath: vp,
+      showName,
+      season: parsed?.season ?? 0,
+      episode: parsed?.episode ?? 0,
+      fromUI: !!fromUI,
+      lowPriority: false,
+      source: fromUI ? "ASR pane" : "subtitle pipeline",
+      addedAt: Date.now(),
+    };
+  });
+  addToAsrQueue(entries);
   res.json({ ok: true, queued: videoPaths.length });
 });
 
@@ -3920,12 +3958,20 @@ app.post("/api/asr/chksrt/ok", (req, res) => {
 app.post("/api/asr/chksrt/gensrt", (req, res) => {
   const entry = subQueueChkSrt.shift();
   if (entry) {
-    enqueueSubQueueGenSrt(
-      { videoFilePath: entry.videoFilePath, fromUI: false, lowPriority: false },
-      true,
-    );
-    persistSubQueueGenSrt();
-    doSubQueueGenSrtNow();
+    const showName = entry.videoFilePath.replace(tvDir + "/", "").split("/")[0];
+    const parsed = parseFileSeasonEpisode(entry.videoFilePath);
+    addToAsrQueue([
+      {
+        videoPath: entry.videoFilePath,
+        showName,
+        season: parsed?.season ?? 0,
+        episode: parsed?.episode ?? 0,
+        fromUI: false,
+        lowPriority: false,
+        source: "chksrt player",
+        addedAt: Date.now(),
+      },
+    ]);
   }
   persistSubQueueChkSrt();
   notifyClients("chksrt-count", subQueueChkSrt.length);
@@ -3979,6 +4025,74 @@ app.post("/api/asr/chksrt/select", (req, res) => {
 // Email
 app.post("/api/sendEmail", apiWrapper(sendEmailHandler));
 
+// ASR queue and log endpoints
+app.get("/api/asr/queue", (req, res) => {
+  res.json({
+    entries: asrQueue,
+    count: asrQueue.length,
+    running: genSrtRunning,
+  });
+});
+
+app.post("/api/asr/queue/add", (req, res) => {
+  const { videoPaths } = req.body || {};
+  if (!Array.isArray(videoPaths) || videoPaths.length === 0) {
+    res.status(400).json({ error: "videoPaths required" });
+    return;
+  }
+  const entries = videoPaths.map((vp) => {
+    const showName = vp.replace(tvDir + "/", "").split("/")[0];
+    const parsed = parseFileSeasonEpisode(vp);
+    return {
+      videoPath: vp,
+      showName,
+      season: parsed?.season ?? 0,
+      episode: parsed?.episode ?? 0,
+      fromUI: true,
+      lowPriority: false,
+      source: "ASR pane",
+      addedAt: Date.now(),
+    };
+  });
+  addToAsrQueue(entries);
+  res.json({ ok: true, count: asrQueue.length });
+});
+
+app.post("/api/asr/queue/remove", (req, res) => {
+  const { videoPath } = req.body || {};
+  if (!videoPath) {
+    res.status(400).json({ error: "videoPath required" });
+    return;
+  }
+  const isProcessing = genSrtRunning && asrQueue[0]?.videoPath === videoPath;
+  const idx = asrQueue.findIndex((e) => e.videoPath === videoPath);
+  if (idx !== -1) {
+    asrQueue.splice(idx, 1);
+    persistAsrQueue();
+    notifyClients("asr-queue-update", {
+      count: asrQueue.length,
+      running: genSrtRunning,
+    });
+  }
+  if (isProcessing && genSrtChild) {
+    genSrtChild.kill("SIGTERM");
+  }
+  res.json({ ok: true, count: asrQueue.length });
+});
+
+app.get("/api/asr/log", (req, res) => {
+  res.json({ lines: asrLogBuffer.join("\n") });
+});
+
+app.post("/api/asr/kill", (req, res) => {
+  if (genSrtChild) {
+    genSrtChild.kill("SIGTERM");
+    res.json({ ok: true, killed: true });
+  } else {
+    res.json({ ok: true, killed: false });
+  }
+});
+
 // Background operations
 app.post(
   "/api/updateTvdb",
@@ -4002,7 +4116,7 @@ https.createServer(httpsOptions, app).listen(HTTP_PORT, () => {
   console.log(`HTTPS API listening on port ${HTTP_PORT}`);
   loadQueues();
   startSubQueueLoop();
-  checkSubQueueGenSrt();
+  startAsrQueueLoop();
 });
 
 app.post("/internal/tv-state", (req, res) => {
@@ -4152,7 +4266,27 @@ wss.on("connection", (ws) => {
     if (fname == "register") {
       // client registration — no response needed
     } else if (fname == "handleAsr") {
-      handleAsr(ws, id, param);
+      const asrAction = param?.action;
+      if (asrAction === "kill") {
+        if (genSrtChild) {
+          genSrtChild.kill("SIGTERM");
+          try {
+            ws.send(
+              JSON.stringify({ id, status: "ok", data: { killed: true } }),
+            );
+          } catch (_) {}
+        } else {
+          try {
+            ws.send(
+              JSON.stringify({ id, status: "ok", data: { killed: false } }),
+            );
+          } catch (_) {}
+        }
+      } else {
+        try {
+          ws.send(JSON.stringify({ id, status: "ok", data: null }));
+        } catch (_) {}
+      }
     } else if (fname == "handleFix") {
       handleFix(ws, id, param);
     } else if (fname == "handleEmb") {

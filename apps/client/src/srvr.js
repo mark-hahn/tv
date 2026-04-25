@@ -463,6 +463,26 @@ export function chksrtSelect(videoPath, selectedSrtPath) {
   );
 }
 
+export function getAsrLog() {
+  return httpCall("/api/asr/log");
+}
+
+export function getAsrQueue() {
+  return httpCall("/api/asr/queue");
+}
+
+export function addToAsrQueue(videoPaths) {
+  return httpCall("/api/asr/queue/add", { videoPaths }, "POST");
+}
+
+export function removeFromAsrQueue(videoPath) {
+  return httpCall("/api/asr/queue/remove", { videoPath }, "POST");
+}
+
+export function killAsrProcess() {
+  return httpCall("/api/asr/kill", {}, "POST");
+}
+
 export function setTvdbFields(params) {
   return httpCall("/api/setTvdbFields", params, "POST");
 }

@@ -402,8 +402,26 @@
         <div>
           <strong>ASR Output</strong>
           <span v-if="asrBusy">(Running)</span>
+          <span
+            v-if="asrQueueLen > 0"
+            style="margin-left: 6px; font-size: 0.85em; color: #555"
+            >[Queue: {{ asrQueueLen }}]</span
+          >
         </div>
         <div>
+          <button
+            @click="clickQueue"
+            :style="{
+              cursor: 'pointer',
+              borderRadius: '4px',
+              padding: '2px 8px',
+              border: '1px solid #bbb',
+              '--btn-bg': asrQueueMode ? 'lightgray' : 'whitesmoke',
+              marginRight: '5px',
+            }"
+          >
+            Queue
+          </button>
           <button
             @click="startAsr"
             :disabled="asrBusy"
@@ -433,20 +451,6 @@
             Clear
           </button>
           <button
-            @click="killAsr"
-            :disabled="!asrBusy"
-            :style="{
-              cursor: !asrBusy ? 'not-allowed' : 'pointer',
-              borderRadius: '4px',
-              padding: '2px 8px',
-              border: '1px solid #bbb',
-              backgroundColor: 'whitesmoke',
-              opacity: !asrBusy ? 0.6 : 1,
-            }"
-          >
-            Kill
-          </button>
-          <button
             @click="showAsr = false"
             title="Close"
             :style="{
@@ -464,6 +468,7 @@
         </div>
       </div>
       <div
+        v-if="!asrQueueMode"
         ref="asrScroll"
         style="
           flex: 1 1 auto;
@@ -475,6 +480,50 @@
         "
       >
         {{ asrLogs }}
+      </div>
+      <div
+        v-else
+        style="
+          flex: 1 1 auto;
+          overflow: auto;
+          background-color: #fff;
+          border: 1px solid #eee;
+          padding: 4px;
+        "
+      >
+        <div
+          v-if="asrQueueEntries.length === 0"
+          style="color: #888; padding: 8px"
+        >
+          Queue is empty
+        </div>
+        <div
+          v-for="entry in sortedAsrQueue"
+          :key="entry.videoPath"
+          @click="removeFromQueue(entry.videoPath)"
+          :style="{
+            cursor: 'pointer',
+            padding: '6px 8px',
+            borderBottom: '1px solid #eee',
+            display: 'flex',
+            flexDirection: 'column',
+          }"
+        >
+          <span style="font-size: 1.8em; word-break: break-all">{{
+            entry.videoPath.split("/").pop()
+          }}</span>
+          <span style="font-size: 1.6em; color: #666">
+            Added by {{ entry.source || "unknown" }}, at
+            {{ formatAsrTime(entry.addedAt)
+            }}<span
+              v-if="
+                asrBusy && asrQueueEntries[0]?.videoPath === entry.videoPath
+              "
+              style="color: #c77"
+              >, Processing</span
+            >
+          </span>
+        </div>
       </div>
     </div>
 
@@ -752,6 +801,11 @@ import {
   enqueueSubs,
   enqueueGenSrt,
   generateEmb,
+  getAsrLog,
+  getAsrQueue,
+  addToAsrQueue,
+  removeFromAsrQueue,
+  killAsrProcess,
 } from "../srvr.js";
 import evtBus from "../evtBus.js";
 import * as util from "../util.js";
@@ -786,6 +840,9 @@ export default {
       asrBusy: false,
       activeAsrPath: null,
       ignoreLogs: false,
+      asrQueueMode: false,
+      asrQueueEntries: [],
+      asrQueueLen: 0,
 
       // Emb
       showEmb: false,
@@ -895,9 +952,15 @@ export default {
     if (this.active && !this.hasLoaded) {
       this.fetchFiles();
     }
+    evtBus.off("asr-log", this.onAsrLog);
+    evtBus.off("asr-queue-update", this.onAsrQueueUpdate);
     evtBus.on("asr-log", this.onAsrLog);
+    evtBus.on("asr-queue-update", this.onAsrQueueUpdate);
+    evtBus.off("fix-log", this.onFixLog);
     evtBus.on("fix-log", this.onFixLog);
+    evtBus.off("emb-log", this.onEmbLog);
     evtBus.on("emb-log", this.onEmbLog);
+    evtBus.off("subs-progress", this.onSubsProgress);
     evtBus.on("subs-progress", this.onSubsProgress);
     this.initAsrState();
     this.initFixState();
@@ -905,11 +968,17 @@ export default {
   },
   unmounted() {
     evtBus.off("asr-log", this.onAsrLog);
+    evtBus.off("asr-queue-update", this.onAsrQueueUpdate);
     evtBus.off("fix-log", this.onFixLog);
     evtBus.off("emb-log", this.onEmbLog);
     evtBus.off("subs-progress", this.onSubsProgress);
   },
   computed: {
+    sortedAsrQueue() {
+      return [...this.asrQueueEntries].sort(
+        (a, b) => (a.addedAt ?? 0) - (b.addedAt ?? 0),
+      );
+    },
     infoLines() {
       if (!this.infoText) return [];
       const lines = this.infoText.split("\n");
@@ -931,6 +1000,25 @@ export default {
   methods: {
     wrapFileName(name) {
       return util.wrapFileName(name);
+    },
+    formatAsrTime(ts) {
+      if (!ts) return "";
+      const d = new Date(ts);
+      const fmt = new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/Los_Angeles",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      });
+      const parts = fmt.formatToParts(d);
+      const p = {};
+      for (const { type, value } of parts) p[type] = value;
+      let hh = p.hour;
+      if (hh === "24") hh = "00";
+      return `${p.month}/${p.day} ${hh}:${p.minute}:${p.second}`;
     },
     formatFileSize(bytes) {
       if (bytes == null) return "";
@@ -1507,12 +1595,7 @@ export default {
     },
     async clearAsrLog() {
       this.asrLogs = "";
-      try {
-        // Send a request to truncate the log file on the server
-        await handleAsr({ action: "clear" });
-      } catch (e) {
-        console.error("Failed to clear remote log", e);
-      }
+      this.asrQueueMode = false;
     },
     async startAsr() {
       const videoPaths = this.collectFilePaths()
@@ -1522,9 +1605,9 @@ export default {
         this.asrLogs += "[Error] No video files selected.\n";
         return;
       }
-      this.asrLogs = "";
+      this.asrQueueMode = false;
       try {
-        await enqueueGenSrt(videoPaths, true);
+        await addToAsrQueue(videoPaths);
         this.asrLogs += `Queued ${videoPaths.length} file(s) for ASR.\n`;
       } catch (e) {
         this.asrLogs += `Error: ${e.message}\n`;
@@ -1532,16 +1615,11 @@ export default {
     },
     async killAsr() {
       try {
-        const res = await handleAsr({ action: "kill" });
+        await killAsrProcess();
         this.asrLogs += `\n[Kill command sent]\n`;
-        if (res && res.stdout) this.asrLogs += res.stdout;
-        if (res && res.stderr) this.asrLogs += res.stderr;
       } catch (e) {
         this.asrLogs += `\nError killing ASR: ${e.message}\n`;
       }
-      this.asrBusy = false;
-      // Keep activeAsrPath so we can restart the same job easily
-      // this.activeAsrPath = null;
     },
     onAsrLog(msg) {
       if (this.ignoreLogs) return;
@@ -1580,22 +1658,57 @@ export default {
     },
     async initAsrState() {
       try {
-        const res = await handleAsr({ action: "check" });
-        if (res && res.running) {
-          this.asrBusy = true;
-          if (res.stdout) {
-            const match = res.stdout.match(/Processing: (.+)$/m);
-            if (match) {
-              this.activeAsrPath = match[1].trim();
-            }
-          }
-          // Only tail if actually running
-          await handleAsr({ action: "tail", path: this.activeAsrPath || "" });
-        } else {
-          this.asrBusy = false;
+        const [logRes, queueRes] = await Promise.all([
+          getAsrLog(),
+          getAsrQueue(),
+        ]);
+        if (logRes?.lines) this.asrLogs = logRes.lines;
+        if (queueRes) {
+          this.asrQueueLen = queueRes.count ?? 0;
+          this.asrBusy = queueRes.running ?? false;
         }
       } catch (e) {
         console.error("Failed to init Asr State", e);
+      }
+    },
+    onAsrQueueUpdate({ count, running, entries }) {
+      this.asrQueueLen = count ?? 0;
+      if (running !== undefined) this.asrBusy = running;
+      if (entries !== undefined) this.asrQueueEntries = entries;
+    },
+    async clickQueue() {
+      this.asrQueueMode = !this.asrQueueMode;
+      if (this.asrQueueMode) {
+        await this.fetchAsrQueue();
+      }
+    },
+    async fetchAsrLog() {
+      try {
+        const res = await getAsrLog();
+        if (res?.lines != null) this.asrLogs = res.lines;
+      } catch (e) {
+        console.error("fetchAsrLog error", e);
+      }
+    },
+    async fetchAsrQueue() {
+      try {
+        const res = await getAsrQueue();
+        if (res) {
+          this.asrQueueEntries = res.entries ?? [];
+          this.asrQueueLen = res.count ?? 0;
+          this.asrBusy = res.running ?? this.asrBusy;
+        }
+      } catch (e) {
+        console.error("fetchAsrQueue error", e);
+      }
+    },
+    async removeFromQueue(videoPath) {
+      if (!confirm(`Remove from queue?\n${videoPath}`)) return;
+      try {
+        await removeFromAsrQueue(videoPath);
+        await this.fetchAsrQueue();
+      } catch (e) {
+        console.error("removeFromQueue error", e);
       }
     },
     clickFix() {

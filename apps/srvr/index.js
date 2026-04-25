@@ -1061,6 +1061,7 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
     return;
   }
   asrLogBuffer = [];
+  appendAsrLog("");
   appendAsrLog(`=== Starting: ${path.basename(videoFilePath)} ===`);
   logSubtitle(`asr start: ${videoFilePath}`);
   genSrtRunning = true;
@@ -1084,6 +1085,7 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
       child.on("close", (code) => {
         genSrtChild = null;
         if (code === 0) resolve();
+        else if (code === null) reject(new Error(`__cancelled__`));
         else reject(new Error(`asr.js exited ${code}`));
       });
     });
@@ -1096,13 +1098,20 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
       });
   } catch (e) {
     logSubtitle(`asr error: ${e.message}`);
-    appendAsrLog(`=== Error: ${e.message} ===`);
+    if (e.message === "__cancelled__") {
+      appendAsrLog(
+        `File ${path.basename(videoFilePath)} processing cancelled.`,
+      );
+    } else {
+      appendAsrLog(`=== Error: ${e.message} ===`);
+    }
   } finally {
     genSrtRunning = false;
     genSrtChild = null;
     notifyClients("asr-queue-update", {
       count: asrQueue.length,
       running: false,
+      entries: asrQueue,
     });
   }
 }
@@ -1228,6 +1237,7 @@ function startAsrQueueLoop() {
               notifyClients("asr-queue-update", {
                 count: asrQueue.length,
                 running: false,
+                entries: asrQueue,
               });
             }
           });

@@ -10,6 +10,7 @@ import {
   Image,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import allServices from "./services.json";
 
 const TV_TV_URL = "https://hahnca.com/tv-tv";
@@ -33,6 +34,8 @@ export default function App() {
   const [subDeviceName, setSubDeviceName] = useState(null);
   const [locked, setLocked] = useState(false);
   const [missingEpWarning, setMissingEpWarning] = useState(null);
+  const [layoutOption, setLayoutOption] = useState("mark");
+  const [showShows, setShowShows] = useState(false);
 
   const onGridLayout = ({ nativeEvent: { layout } }) => {
     if (layout.width < 10 || layout.height < 10) return;
@@ -64,6 +67,10 @@ export default function App() {
   const avoidingRef = useRef(false);
   const avoidTimerRef = useRef(null);
   const unlockHoldTimerRef = useRef(null);
+  const homeHoldRef = useRef(null);
+  const homeHoldFiredRef = useRef(false);
+  const backHoldRef = useRef(null);
+  const backHoldFiredRef = useRef(false);
 
   const debounce = () => {
     const now = Date.now();
@@ -179,6 +186,11 @@ export default function App() {
     console.log("[vol] APP VERSION v23");
     pollMute();
     connectWs();
+    AsyncStorage.getItem("layoutOption")
+      .then((val) => {
+        if (val === "mark" || val === "linda") setLayoutOption(val);
+      })
+      .catch(() => {});
     return () => {
       if (wsRef.current) wsRef.current.onclose = null;
       wsRef.current?.close();
@@ -187,6 +199,8 @@ export default function App() {
       clearTimeout(repeatDelayRef.current);
       clearTimeout(repeatTimeoutRef.current);
       clearTimeout(holdRef.current);
+      clearTimeout(homeHoldRef.current);
+      clearTimeout(backHoldRef.current);
       clearInterval(subPollRef.current);
       clearTimeout(avoidTimerRef.current);
       clearTimeout(unlockHoldTimerRef.current);
@@ -289,19 +303,23 @@ export default function App() {
 
   const startEmbyHold = () => {
     embyHoldFiredRef.current = false;
-    embyHoldRef.current = setTimeout(() => {
-      embyHoldFiredRef.current = true;
-    }, 1000);
+    if (layoutOption === "mark") {
+      embyHoldRef.current = setTimeout(() => {
+        embyHoldFiredRef.current = true;
+        if (mode === "google" || mode === "fire") setShowStreamers(true);
+      }, 500);
+    } else {
+      embyHoldRef.current = setTimeout(() => {
+        embyHoldFiredRef.current = true;
+      }, 1000);
+    }
   };
 
   const stopEmbyHold = () => {
     clearTimeout(embyHoldRef.current);
     if (!embyHoldFiredRef.current) {
-      if (showSubCtrl) {
-        subClose();
-      } else {
-        tvCmd("emby");
-      }
+      if (showSubCtrl) subClose();
+      else tvCmd("emby");
     }
     embyHoldFiredRef.current = false;
   };
@@ -310,7 +328,6 @@ export default function App() {
     appsHoldFiredRef.current = false;
     appsHoldRef.current = setTimeout(() => {
       appsHoldFiredRef.current = true;
-      setShowKeybd(true);
     }, 1000);
   };
 
@@ -320,6 +337,46 @@ export default function App() {
       if (mode === "google" || mode === "fire") setShowStreamers(true);
     }
     appsHoldFiredRef.current = false;
+  };
+
+  const startBackHold = () => {
+    backHoldFiredRef.current = false;
+    backHoldRef.current = setTimeout(() => {
+      backHoldFiredRef.current = true;
+      setShowKeybd(true);
+    }, 1000);
+  };
+
+  const stopBackHold = () => {
+    clearTimeout(backHoldRef.current);
+    if (!backHoldFiredRef.current) {
+      tvKey("back");
+    }
+    backHoldFiredRef.current = false;
+  };
+
+  const toggleLayoutOption = async () => {
+    const next = layoutOption === "mark" ? "linda" : "mark";
+    setLayoutOption(next);
+    try {
+      await AsyncStorage.setItem("layoutOption", next);
+    } catch (_) {}
+  };
+
+  const startHomeHold = () => {
+    homeHoldFiredRef.current = false;
+    homeHoldRef.current = setTimeout(() => {
+      homeHoldFiredRef.current = true;
+      toggleLayoutOption();
+    }, 2000);
+  };
+
+  const stopHomeHold = () => {
+    clearTimeout(homeHoldRef.current);
+    if (!homeHoldFiredRef.current) {
+      tvKey("home");
+    }
+    homeHoldFiredRef.current = false;
   };
 
   const fetchSubPlayers = async () => {
@@ -535,7 +592,8 @@ export default function App() {
       largeText: true,
       bg: () => cellBg("white", "back"),
       onPress: () => {},
-      onPressIn: () => tvKey("back"),
+      onPressIn: () => startBackHold(),
+      onPressOut: () => stopBackHold(),
     },
     {
       key: "up",
@@ -551,7 +609,8 @@ export default function App() {
       icon: <MaterialIcons name="home" size={42} color="black" />,
       bg: () => cellBg("white", "home"),
       onPress: () => {},
-      onPressIn: () => tvKey("home"),
+      onPressIn: () => startHomeHold(),
+      onPressOut: () => stopHomeHold(),
     },
     // Row 2: left, ok, right
     {
@@ -598,15 +657,24 @@ export default function App() {
       onPressIn: () => startRepeat("down"),
       onPressOut: stopRepeat,
     },
-    {
-      key: "stream",
-      label: "Apps",
-      smallText: true,
-      bg: () => cellBg("white", "stream"),
-      onPress: () => {},
-      onPressIn: () => startAppsHold(),
-      onPressOut: () => stopAppsHold(),
-    },
+    layoutOption === "mark"
+      ? {
+          key: "shows",
+          label: "Shows",
+          smallText: true,
+          bg: () => cellBg("white", "shows"),
+          onPress: () => {},
+          onPressIn: () => setShowShows(true),
+        }
+      : {
+          key: "stream",
+          label: "Apps",
+          smallText: true,
+          bg: () => cellBg("white", "stream"),
+          onPress: () => {},
+          onPressIn: () => startAppsHold(),
+          onPressOut: () => stopAppsHold(),
+        },
     // Row 4: vol-, vol+, mute
     {
       key: "vold",
@@ -641,14 +709,23 @@ export default function App() {
       onPressIn: () => tvCmd("mute"),
     },
     // Row 5: subs, fire, google
-    {
-      key: "subs",
-      label: "Subs",
-      smallText: true,
-      bg: () => cellBg("white", "subs"),
-      onPress: () => {},
-      onPressIn: () => openSubCtrl(),
-    },
+    layoutOption === "linda"
+      ? {
+          key: "shows",
+          label: "Shows",
+          smallText: true,
+          bg: () => cellBg("white", "shows"),
+          onPress: () => {},
+          onPressIn: () => setShowShows(true),
+        }
+      : {
+          key: "subs",
+          label: "Subs",
+          smallText: true,
+          bg: () => cellBg("white", "subs"),
+          onPress: () => {},
+          onPressIn: () => openSubCtrl(),
+        },
     {
       key: "fire",
       label: "Fire",
@@ -827,6 +904,23 @@ export default function App() {
             </TouchableOpacity>
           ))}
         </ScrollView>
+      </View>
+    );
+  }
+
+  if (showShows) {
+    return (
+      <View style={showsStyles.container}>
+        <StatusBar hidden />
+        <View style={showsStyles.header}>
+          <Text style={showsStyles.title}>Shows Screen</Text>
+          <TouchableOpacity
+            onPress={() => setShowShows(false)}
+            style={showsStyles.closeBtn}
+          >
+            <Text style={showsStyles.closeBtnText}>✕</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -1289,5 +1383,34 @@ const missingEpStyles = StyleSheet.create({
   closeBtnText: {
     fontSize: 16,
     fontWeight: "bold",
+  },
+});
+
+const showsStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#000",
+    paddingTop: SCREEN_MARGIN,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  title: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "bold",
+    flex: 1,
+  },
+  closeBtn: {
+    padding: 8,
+  },
+  closeBtnText: {
+    color: "#fff",
+    fontSize: 28,
+    lineHeight: 32,
   },
 });

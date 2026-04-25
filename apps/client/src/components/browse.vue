@@ -183,8 +183,8 @@
           id="browseButtons"
           :style="{
             display: 'flex',
-            flexWrap: 'wrap',
-            gap: '10px',
+            flexDirection: 'column',
+            gap: '5px',
             padding: '5px',
             marginTop: '8px',
             border: '1px solid #808080',
@@ -194,275 +194,287 @@
             boxSizing: 'border-box',
           }"
         >
-          <button
-            @click="handleNext"
-            :style="{
-              height: '18px',
-              margin: '0',
-              padding: '0 2px',
-              lineHeight: '18px',
-              fontSize: '15px',
-              boxSizing: 'border-box',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '60px',
-              backgroundColor: isLoadingNext ? '#d3d3d3' : '',
-              border: '1px solid black',
-            }"
+          <!-- Row 1: action buttons -->
+          <div :style="{ display: 'flex', flexWrap: 'wrap', gap: '10px' }">
+            <button
+              @click="handleNext"
+              :style="{
+                height: '18px',
+                margin: '0',
+                padding: '0 2px',
+                lineHeight: '18px',
+                fontSize: '15px',
+                boxSizing: 'border-box',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '70px',
+                backgroundColor: isLoadingNext ? '#d3d3d3' : '',
+                border: '1px solid black',
+              }"
+            >
+              Next
+            </button>
+            <button
+              v-if="curTvdb"
+              @click="handleSnooze"
+              :disabled="unSnoozeMode"
+              :style="{
+                height: '18px',
+                margin: '0',
+                padding: '0 2px',
+                lineHeight: '18px',
+                fontSize: '15px',
+                boxSizing: 'border-box',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '70px',
+                border: '1px solid black',
+                backgroundColor: snoozeFlash
+                  ? '#90ee90'
+                  : unSnoozeMode
+                    ? '#d3d3d3'
+                    : '',
+                cursor: unSnoozeMode ? 'default' : 'pointer',
+              }"
+            >
+              Snooze
+            </button>
+            <button
+              v-if="snoozeList.length > 0"
+              @click="handleUnSnooze"
+              :style="{
+                height: '18px',
+                margin: '0',
+                padding: '0 2px',
+                lineHeight: '18px',
+                fontSize: '15px',
+                boxSizing: 'border-box',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '101px',
+                border: '1px solid black',
+                backgroundColor: unSnoozeMode ? 'lightblue' : '',
+              }"
+            >
+              UnSnooze {{ snoozeList.length }}
+            </button>
+            <button
+              v-if="curTvdb &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
+              @click="handlePreview"
+              :style="{
+                height: '18px',
+                margin: '0',
+                padding: '0 2px',
+                lineHeight: '18px',
+                fontSize: '15px',
+                boxSizing: 'border-box',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '70px',
+                border: '1px solid black',
+              }"
+            >
+              Preview
+            </button>
+            <button
+              v-if="curTvdb &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
+              @click="handleGet"
+              :style="{
+                height: '18px',
+                margin: '0',
+                padding: '0 2px',
+                lineHeight: '18px',
+                fontSize: '15px',
+                boxSizing: 'border-box',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '70px',
+                border: '1px solid black',
+              }"
+            >
+              Get
+            </button>
+            <button
+              v-if="
+                hasTvdbEntry &&
+                !existingShowMatch &&
+                !isLoadingNext &&
+                !suppressButtons
+              "
+              @click="toggleTvdbInfo"
+              :style="{
+                height: '18px',
+                margin: '0',
+                padding: '0 2px',
+                lineHeight: '18px',
+                fontSize: '15px',
+                boxSizing: 'border-box',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '70px',
+                backgroundColor: showTvdbInfo ? '#d3d3d3' : '#FFCCCB',
+                border: '1px solid black',
+              }"
+            >
+              Tvdb
+            </button>
+            <button
+              v-if="existingShowMatch && !isLoadingNext && !suppressButtons"
+              @click="handleSelectExisting(existingShowMatch.name)"
+              :style="{
+                height: '18px',
+                margin: '0',
+                marginLeft: '5px',
+                padding: '0 2px',
+                lineHeight: '18px',
+                fontSize: '15px',
+                boxSizing: 'border-box',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '70px',
+                backgroundColor: '#dfd',
+                border: '1px solid black',
+              }"
+            >
+              Select
+            </button>
+            <span
+              v-if="isLoadingNext"
+              :style="{
+                marginLeft: '10px',
+                color: '#888',
+                fontStyle: 'italic',
+                display: 'inline-flex',
+                alignItems: 'center',
+              }"
+              >&lt;loading shows&gt;</span
+            >
+            <span
+              v-if="!curTvdb &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
+              :style="{
+                marginLeft: '10px',
+                color: '#888',
+                fontStyle: 'italic',
+                display: 'inline-flex',
+                alignItems: 'center',
+              }"
+              >&lt;no show info&gt;</span
+            >
+          </div>
+          <!-- Row 2: remote buttons -->
+          <div
+            v-if="hasAnyRemoteButton &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons || (loadingRemotesCount > 0 &amp;&amp; !isLoadingNext)"
+            :style="{ display: 'flex', flexWrap: 'wrap', gap: '10px' }"
           >
-            Next
-          </button>
-          <button
-            v-if="curTvdb"
-            @click="handleSnooze"
-            :disabled="unSnoozeMode"
-            :style="{
-              height: '18px',
-              margin: '0',
-              padding: '0 2px',
-              lineHeight: '18px',
-              fontSize: '15px',
-              boxSizing: 'border-box',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '1px solid black',
-              backgroundColor: snoozeFlash
-                ? '#90ee90'
-                : unSnoozeMode
-                  ? '#d3d3d3'
-                  : '',
-              cursor: unSnoozeMode ? 'default' : 'pointer',
-            }"
-          >
-            Snooze
-          </button>
-          <button
-            v-if="snoozeList.length > 0"
-            @click="handleUnSnooze"
-            :style="{
-              height: '18px',
-              margin: '0',
-              padding: '0 2px',
-              lineHeight: '18px',
-              fontSize: '15px',
-              boxSizing: 'border-box',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '1px solid black',
-              backgroundColor: unSnoozeMode ? 'lightblue' : '',
-            }"
-          >
-            UnSnooze ({{ snoozeList.length }})
-          </button>
-          <button
-            v-if="curTvdb &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
-            @click="handlePreview"
-            :style="{
-              height: '18px',
-              margin: '0',
-              padding: '0 2px',
-              lineHeight: '18px',
-              fontSize: '15px',
-              boxSizing: 'border-box',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '1px solid black',
-            }"
-          >
-            Preview
-          </button>
-          <button
-            v-if="curTvdb &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
-            @click="handleGet"
-            :style="{
-              height: '18px',
-              margin: '0',
-              padding: '0 2px',
-              lineHeight: '18px',
-              fontSize: '15px',
-              boxSizing: 'border-box',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '1px solid black',
-            }"
-          >
-            Get
-          </button>
-          <button
-            v-if="
-              hasTvdbEntry &&
-              !existingShowMatch &&
-              !isLoadingNext &&
-              !suppressButtons
-            "
-            @click="toggleTvdbInfo"
-            :style="{
-              height: '18px',
-              margin: '0',
-              padding: '0 2px',
-              lineHeight: '18px',
-              fontSize: '15px',
-              boxSizing: 'border-box',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: showTvdbInfo ? '#d3d3d3' : '#FFCCCB',
-              border: '1px solid black',
-            }"
-          >
-            Tvdb
-          </button>
-          <button
-            v-if="existingShowMatch && !isLoadingNext && !suppressButtons"
-            @click="handleSelectExisting(existingShowMatch.name)"
-            :style="{
-              height: '18px',
-              margin: '0',
-              marginLeft: '5px',
-              padding: '0 2px',
-              lineHeight: '18px',
-              fontSize: '15px',
-              boxSizing: 'border-box',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: '#dfd',
-              border: '1px solid black',
-            }"
-          >
-            Select
-          </button>
-          <span
-            v-if="isLoadingNext"
-            :style="{
-              marginLeft: '10px',
-              color: '#888',
-              fontStyle: 'italic',
-              display: 'inline-flex',
-              alignItems: 'center',
-            }"
-            >&lt;loading shows&gt;</span
-          ><span
-            v-if="hasAnyRemoteButton &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
-            :style="{ lineHeight: '18px', fontSize: '12px' }"
-          >
-            |</span
-          >
-          <button
-            v-if="imdbResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
-            @click="handleImdb"
-            :style="{
-              height: '18px',
-              margin: '0',
-              padding: '0 2px',
-              lineHeight: '18px',
-              fontSize: '15px',
-              boxSizing: 'border-box',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '1px solid black',
-            }"
-          >
-            {{ imdbButtonLabel }}
-          </button>
-          <button
-            v-if="rtResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
-            @click="handleRt"
-            :style="{
-              height: '18px',
-              margin: '0',
-              padding: '0 2px',
-              lineHeight: '18px',
-              fontSize: '15px',
-              boxSizing: 'border-box',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '1px solid black',
-            }"
-          >
-            {{ rtButtonLabel }}
-          </button>
-          <button
-            v-if="googleResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
-            @click="handleGoogle"
-            :style="{
-              height: '18px',
-              margin: '0',
-              padding: '0 2px',
-              lineHeight: '18px',
-              fontSize: '15px',
-              boxSizing: 'border-box',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '1px solid black',
-            }"
-          >
-            Google
-          </button>
-          <button
-            v-if="wikiResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
-            @click="handleWiki"
-            :style="{
-              height: '18px',
-              margin: '0',
-              padding: '0 2px',
-              lineHeight: '18px',
-              fontSize: '15px',
-              boxSizing: 'border-box',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '1px solid black',
-            }"
-          >
-            Wiki
-          </button>
-          <button
-            v-if="officialResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
-            @click="handleOfficial"
-            :style="{
-              height: '18px',
-              margin: '0',
-              padding: '0 2px',
-              lineHeight: '18px',
-              fontSize: '15px',
-              boxSizing: 'border-box',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '1px solid black',
-            }"
-          >
-            Official</button
-          ><span
-            v-if="loadingRemotesCount &gt; 0 &amp;&amp; !isLoadingNext"
-            :style="{
-              marginLeft: '10px',
-              color: '#888',
-              fontStyle: 'italic',
-              display: 'inline-flex',
-              alignItems: 'center',
-            }"
-            >&lt;loading remotes ({{ loadingRemotesCount }})&gt;</span
-          ><span
-            v-if="!curTvdb &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
-            :style="{
-              marginLeft: '10px',
-              color: '#888',
-              fontStyle: 'italic',
-              display: 'inline-flex',
-              alignItems: 'center',
-            }"
-            >&lt;no show info&gt;</span
-          >
+            <button
+              v-if="imdbResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
+              @click="handleImdb"
+              :style="{
+                height: '18px',
+                margin: '0',
+                padding: '0 2px',
+                lineHeight: '18px',
+                fontSize: '15px',
+                boxSizing: 'border-box',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '1px solid black',
+              }"
+            >
+              {{ imdbButtonLabel }}
+            </button>
+            <button
+              v-if="rtResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
+              @click="handleRt"
+              :style="{
+                height: '18px',
+                margin: '0',
+                padding: '0 2px',
+                lineHeight: '18px',
+                fontSize: '15px',
+                boxSizing: 'border-box',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '1px solid black',
+              }"
+            >
+              {{ rtButtonLabel }}
+            </button>
+            <button
+              v-if="googleResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
+              @click="handleGoogle"
+              :style="{
+                height: '18px',
+                margin: '0',
+                padding: '0 2px',
+                lineHeight: '18px',
+                fontSize: '15px',
+                boxSizing: 'border-box',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '1px solid black',
+              }"
+            >
+              Google
+            </button>
+            <button
+              v-if="wikiResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
+              @click="handleWiki"
+              :style="{
+                height: '18px',
+                margin: '0',
+                padding: '0 2px',
+                lineHeight: '18px',
+                fontSize: '15px',
+                boxSizing: 'border-box',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '1px solid black',
+              }"
+            >
+              Wiki
+            </button>
+            <button
+              v-if="officialResult &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
+              @click="handleOfficial"
+              :style="{
+                height: '18px',
+                margin: '0',
+                padding: '0 2px',
+                lineHeight: '18px',
+                fontSize: '15px',
+                boxSizing: 'border-box',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '1px solid black',
+              }"
+            >
+              Official
+            </button>
+            <span
+              v-if="loadingRemotesCount &gt; 0 &amp;&amp; !isLoadingNext"
+              :style="{
+                marginLeft: '10px',
+                color: '#888',
+                fontStyle: 'italic',
+                display: 'inline-flex',
+                alignItems: 'center',
+              }"
+              >&lt;loading remotes ({{ loadingRemotesCount }})&gt;</span
+            >
+          </div>
         </div>
         <div
           id="browseDescr"

@@ -58,6 +58,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("List");
   const [guestActors, setGuestActors] = useState([]);
   const [showSearch, setShowSearch] = useState("");
+  const [posterExpanded, setPosterExpanded] = useState(false);
 
   const onGridLayout = ({ nativeEvent: { layout } }) => {
     if (layout.width < 10 || layout.height < 10) return;
@@ -1132,28 +1133,49 @@ export default function App() {
     const renderInfoContent = () => {
       if (!show) return null;
       const posterUri = show.image ?? show.imageUrl ?? null;
-      const dates = [show.firstAired, show.lastAired]
-        .filter(Boolean)
-        .join(" — ");
+      const firstAired = show.firstAired ?? "";
+      const lastAired = show.lastAired ?? "";
       const network = show.originalNetwork ?? "";
       const genres = Array.isArray(show.genres) ? show.genres.join(", ") : "";
       const status = show.status ?? "";
       const runtime = show.averageRuntime ? `${show.averageRuntime} Mins` : "";
-      const seasons = show.seasonCount ? `${show.seasonCount} seasons` : "";
+      const seasonCount = show.seasonCount ?? 0;
+      const seasons =
+        seasonCount === 1
+          ? "1 Season"
+          : seasonCount > 1
+            ? `${seasonCount} Seasons`
+            : "";
+      const episodeCount = show.episodeCount ?? 0;
+      const watchedCount = show.watchedCount ?? null;
+      let watchedTxt = "";
+      if (episodeCount > 0 && watchedCount !== null) {
+        watchedTxt =
+          watchedCount === episodeCount
+            ? `all ${episodeCount} episodes`
+            : `${watchedCount} of ${episodeCount}`;
+      }
       const cntryLang = [show.originalCountry, show.originalLanguage]
         .filter(Boolean)
         .join(" / ");
       const overview = show.overview ?? show.description ?? "";
       return (
-        <ScrollView>
+        <View style={{ flex: 1 }}>
           <View style={showsStyles.infoTop}>
-            <View style={showsStyles.posterBox}>
+            <View
+              style={posterExpanded ? { width: "100%" } : showsStyles.posterBox}
+            >
               {posterUri ? (
-                <Image
-                  source={{ uri: posterUri }}
-                  style={showsStyles.posterImg}
-                  resizeMode="cover"
-                />
+                <TouchableOpacity
+                  onPress={() => setPosterExpanded((v) => !v)}
+                  activeOpacity={0.85}
+                >
+                  <Image
+                    source={{ uri: posterUri }}
+                    style={showsStyles.posterImg}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
               ) : (
                 <View style={showsStyles.posterPlaceholder}>
                   <Text style={showsStyles.posterPlaceholderText}>
@@ -1162,34 +1184,48 @@ export default function App() {
                 </View>
               )}
             </View>
-            <View style={showsStyles.infoBox}>
-              {dates ? (
-                <Text style={showsStyles.infoField}>{dates}</Text>
-              ) : null}
-              {status ? (
-                <Text style={showsStyles.infoField}>{status}</Text>
-              ) : null}
-              {network ? (
-                <Text style={showsStyles.infoField}>{network}</Text>
-              ) : null}
-              {genres ? (
-                <Text style={showsStyles.infoField}>{genres}</Text>
-              ) : null}
-              {seasons ? (
-                <Text style={showsStyles.infoField}>{seasons}</Text>
-              ) : null}
-              {cntryLang ? (
-                <Text style={showsStyles.infoField}>{cntryLang}</Text>
-              ) : null}
-              {runtime ? (
-                <Text style={showsStyles.infoField}>{runtime}</Text>
-              ) : null}
-            </View>
+            {!posterExpanded && (
+              <View style={showsStyles.infoBox}>
+                {firstAired ? (
+                  <Text style={showsStyles.infoField}>{firstAired}</Text>
+                ) : null}
+                {lastAired ? (
+                  <Text style={showsStyles.infoField}>{lastAired}</Text>
+                ) : null}
+                {status ? (
+                  <Text style={showsStyles.infoField}>{status}</Text>
+                ) : null}
+                {cntryLang ? (
+                  <Text style={showsStyles.infoField}>
+                    {cntryLang.toUpperCase()}
+                  </Text>
+                ) : null}
+                {network ? (
+                  <Text style={showsStyles.infoField}>{network}</Text>
+                ) : null}
+                {genres ? (
+                  <Text style={showsStyles.infoField}>{genres}</Text>
+                ) : null}
+                {runtime ? (
+                  <Text style={showsStyles.infoField}>{runtime}</Text>
+                ) : null}
+                {seasons ? (
+                  <Text style={showsStyles.infoField}>{seasons}</Text>
+                ) : null}
+                {watchedTxt ? (
+                  <Text style={showsStyles.infoField}>
+                    Watched {watchedTxt}
+                  </Text>
+                ) : null}
+              </View>
+            )}
           </View>
           {overview ? (
-            <Text style={showsStyles.overviewText}>{overview}</Text>
+            <ScrollView style={{ flex: 1 }}>
+              <Text style={showsStyles.overviewText}>{overview}</Text>
+            </ScrollView>
           ) : null}
-        </ScrollView>
+        </View>
       );
     };
 
@@ -1979,7 +2015,7 @@ const showsStyles = StyleSheet.create({
     padding: 12,
   },
   posterBox: {
-    flex: 1,
+    width: "50%",
     marginRight: 12,
   },
   posterImg: {
@@ -2000,18 +2036,19 @@ const showsStyles = StyleSheet.create({
     fontSize: 12,
   },
   infoBox: {
-    flex: 2,
+    flex: 1,
   },
   infoField: {
-    fontSize: 13,
+    fontSize: 16,
+    fontWeight: "bold",
     color: "#222",
-    lineHeight: 18,
+    lineHeight: 22,
     marginBottom: 2,
   },
   overviewText: {
-    fontSize: 13,
+    fontSize: 20,
     color: "#333",
-    lineHeight: 20,
+    lineHeight: 28,
     paddingHorizontal: 12,
     paddingBottom: 16,
   },

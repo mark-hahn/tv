@@ -57,6 +57,7 @@ export default function App() {
   const [followPlaying, setFollowPlaying] = useState(false);
   const [activeTab, setActiveTab] = useState("List");
   const [guestActors, setGuestActors] = useState([]);
+  const [showSearch, setShowSearch] = useState("");
 
   const onGridLayout = ({ nativeEvent: { layout } }) => {
     if (layout.width < 10 || layout.height < 10) return;
@@ -257,10 +258,11 @@ export default function App() {
     showsListLoadedRef.current = true;
     (async () => {
       try {
-        const res = await fetch(`${TV_SRVR_HTTP_URL}/api/getAllTvdb?hasEmby=0`);
+        const res = await fetch(`${TV_SRVR_HTTP_URL}/api/getAllTvdb?hasEmby=1`);
         const data = await res.json();
         const list = Object.entries(data)
           .map(([name, show]) => ({ ...show, name }))
+          .filter((show) => show.inEmby !== false)
           .sort((a, b) => {
             const ka = a.name.replace(/^the /i, "").toLowerCase();
             const kb = b.name.replace(/^the /i, "").toLowerCase();
@@ -1073,18 +1075,25 @@ export default function App() {
     };
 
     const renderListContent = () => {
-      const initialIdx = Math.max(
-        0,
-        showsList.findIndex((s) => s.name === show?.name),
-      );
+      const filtered = showSearch
+        ? showsList.filter((s) =>
+            s.name.toLowerCase().includes(showSearch.toLowerCase()),
+          )
+        : showsList;
+      const initialIdx = showSearch
+        ? 0
+        : Math.max(
+            0,
+            showsList.findIndex((s) => s.name === show?.name),
+          );
       return (
         <FlatList
           ref={showsFlatListRef}
-          data={showsList}
+          data={filtered}
           keyExtractor={(item) => item.name}
           getItemLayout={(_, index) => ({
-            length: 40,
-            offset: 40 * index,
+            length: 52,
+            offset: 52 * index,
             index,
           })}
           initialScrollIndex={initialIdx}
@@ -1092,6 +1101,7 @@ export default function App() {
           renderItem={({ item }) => (
             <TouchableOpacity
               onPress={() => {
+                setShowSearch("");
                 setSelectedShow(item);
                 setFollowPlaying(false);
                 setSelectedSE(null);
@@ -1344,6 +1354,16 @@ export default function App() {
       );
     };
 
+    const handleTabPress = (tab) => {
+      setShowSearch("");
+      setActiveTab(tab);
+    };
+
+    const handleClose = () => {
+      setShowSearch("");
+      setShowShows(false);
+    };
+
     return (
       <View style={showsStyles.container}>
         <StatusBar hidden />
@@ -1361,7 +1381,7 @@ export default function App() {
           {["List", "Info", "Map", "Actors"].map((tab) => (
             <TouchableOpacity
               key={tab}
-              onPress={() => setActiveTab(tab)}
+              onPress={() => handleTabPress(tab)}
               style={[
                 showsStyles.tabBtn,
                 activeTab === tab && showsStyles.tabBtnActive,
@@ -1372,12 +1392,23 @@ export default function App() {
           ))}
           <Text style={showsStyles.tabPipe}>|</Text>
           <TouchableOpacity
-            onPress={() => setShowShows(false)}
+            onPress={handleClose}
             style={showsStyles.closeTabBtn}
           >
             <Text style={showsStyles.tabBtnText}>Close</Text>
           </TouchableOpacity>
         </View>
+        {activeTab === "List" && (
+          <TextInput
+            style={showsStyles.searchInput}
+            value={showSearch}
+            onChangeText={setShowSearch}
+            placeholder="Search shows..."
+            placeholderTextColor="#aaa"
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+        )}
         <View style={showsStyles.contentPane}>
           {activeTab === "List" && renderListContent()}
           {activeTab === "Info" && renderInfoContent()}
@@ -1853,29 +1884,32 @@ const showsStyles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
-    paddingTop: SCREEN_MARGIN,
+    paddingTop: SCREEN_MARGIN * 2,
+    paddingBottom: SCREEN_MARGIN * 2,
   },
   headerRow: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     backgroundColor: "#f0f0f0",
-    borderBottomWidth: 1,
-    borderBottomColor: "#ccc",
+    borderTopWidth: 3,
+    borderTopColor: "#000",
+    borderBottomWidth: 3,
+    borderBottomColor: "#000",
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 27,
     fontWeight: "bold",
     color: "#000",
   },
   tabRow: {
     flexDirection: "row",
     alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: "#ccc",
+    borderBottomWidth: 3,
+    borderBottomColor: "#000",
   },
   tabBtn: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 13,
     alignItems: "center",
     backgroundColor: "whitesmoke",
   },
@@ -1883,7 +1917,7 @@ const showsStyles = StyleSheet.create({
     backgroundColor: "lightgray",
   },
   tabBtnText: {
-    fontSize: 13,
+    fontSize: 22,
     fontWeight: "500",
   },
   tabPipe: {
@@ -1893,17 +1927,26 @@ const showsStyles = StyleSheet.create({
   },
   closeTabBtn: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 13,
     alignItems: "center",
     backgroundColor: "whitesmoke",
   },
   contentPane: {
     flex: 1,
   },
+  searchInput: {
+    height: 52,
+    paddingHorizontal: 12,
+    fontSize: 22,
+    backgroundColor: "#fff",
+    borderBottomWidth: 3,
+    borderBottomColor: "#000",
+    marginBottom: 10,
+  },
   listRow: {
     flexDirection: "row",
     alignItems: "center",
-    height: 40,
+    height: 52,
     paddingHorizontal: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "#eee",
@@ -1914,7 +1957,7 @@ const showsStyles = StyleSheet.create({
   },
   listRowName: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 23,
     fontWeight: "bold",
     color: "#000",
   },
@@ -1924,11 +1967,11 @@ const showsStyles = StyleSheet.create({
     gap: 6,
   },
   listRowPlus: {
-    fontSize: 14,
+    fontSize: 16,
     color: "#000",
   },
   listRowWait: {
-    fontSize: 12,
+    fontSize: 16,
     color: "blue",
   },
   infoTop: {

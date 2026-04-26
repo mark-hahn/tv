@@ -471,21 +471,6 @@
               >
                 <div style="white-space: nowrap">Next Up</div>
                 <div style="white-space: nowrap">{{ nextUpValTxt }}</div>
-                <div
-                  v-if="!nextUpSuffixTxt && nextUpSeason !== null"
-                  @click.stop="playNextEpisode()"
-                  style="
-                    white-space: nowrap;
-                    padding: 1px 7px;
-                    border-radius: 5px;
-                    border: 1px solid #888;
-                    font-weight: bold;
-                    cursor: pointer;
-                    user-select: none;
-                  "
-                >
-                  ▶
-                </div>
               </div>
               <div
                 v-if="nextUpSuffixTxt &amp;&amp; String(nextUpSuffixTxt).length &gt; 0"

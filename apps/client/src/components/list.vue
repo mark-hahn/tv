@@ -1771,7 +1771,6 @@ export default {
       evtBus.emit("actorSearchCleared");
       window.localStorage.setItem("fltrChoice", "All");
       this.fltrChoice = "All";
-      this.sortChoice = "Viewed";
       this.filterStr = "";
       for (let cond of this.conds) {
         util.setCondFltr(cond, "All");

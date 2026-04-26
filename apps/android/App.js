@@ -243,6 +243,7 @@ export default function App() {
         if (val === "mark" || val === "linda") setLayoutOption(val);
       })
       .catch(() => {});
+
     return () => {
       if (wsRef.current) wsRef.current.onclose = null;
       wsRef.current?.close();
@@ -264,7 +265,10 @@ export default function App() {
     showsListLoadedRef.current = true;
     (async () => {
       try {
-        const res = await fetch(`${TV_SRVR_HTTP_URL}/api/getAllTvdb?hasEmby=1`);
+        const [res, savedName] = await Promise.all([
+          fetch(`${TV_SRVR_HTTP_URL}/api/getAllTvdb?hasEmby=1`),
+          AsyncStorage.getItem("selectedShowName").catch(() => null),
+        ]);
         const data = await res.json();
         const list = Object.entries(data)
           .map(([name, show]) => ({ ...show, name }))
@@ -277,7 +281,10 @@ export default function App() {
         showsListRef.current = list;
         setShowsList(list);
         if (list.length > 0) {
-          showSelectedRef.current = { name: list[0].name };
+          const persisted = savedName
+            ? list.find((s) => s.name === savedName)
+            : null;
+          showSelectedRef.current = { name: (persisted ?? list[0]).name };
           const lp = showPlayingRef.current;
           const playingShow = lp ? list.find((s) => s.name === lp.name) : null;
           if (playingShow) {
@@ -287,7 +294,7 @@ export default function App() {
               lp.s != null && lp.e != null ? { s: lp.s, e: lp.e } : null,
             );
           } else {
-            setSelectedShow((prev) => prev ?? list[0]);
+            setSelectedShow((prev) => prev ?? persisted ?? list[0]);
           }
         }
       } catch (_) {}
@@ -348,24 +355,48 @@ export default function App() {
 
   useEffect(() => {
     if (!selectedShow) return;
+    AsyncStorage.setItem("selectedShowName", selectedShow.name).catch(() => {});
+  }, [selectedShow?.name]);
+
+  useEffect(() => {
+    if (!selectedShow) return;
     showSeriesMapNameRef.current = null;
     setShowSeriesMap(null);
     setActiveTab("Info");
   }, [selectedShow?.name]);
 
   useEffect(() => {
-    if (activeTab !== "Map" || !selectedShow?.tvdbId) return;
+    if (activeTab !== "Map" || !selectedShow) return;
     if (showSeriesMapNameRef.current === selectedShow.name) return;
     showSeriesMapNameRef.current = selectedShow.name;
     setShowSeriesMap(null);
     (async () => {
       try {
-        const res = await fetch(`${TV_SRVR_HTTP_URL}/api/getSeriesMapFromTvdb`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tvdbId: selectedShow.tvdbId, watchedEpis: selectedShow.watchedEpis ?? null }),
-        });
-        const data = await res.json();
+        let data;
+        if (selectedShow.inEmby !== false) {
+          const res = await fetch(
+            `${TV_SRVR_HTTP_URL}/api/getSeriesMapFromEmby`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ showName: selectedShow.name }),
+            },
+          );
+          data = await res.json();
+        } else {
+          const res = await fetch(
+            `${TV_SRVR_HTTP_URL}/api/getSeriesMapFromTvdb`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                tvdbId: selectedShow.tvdbId,
+                watchedEpis: selectedShow.watchedEpis ?? null,
+              }),
+            },
+          );
+          data = await res.json();
+        }
         if (data.success && data.seriesMap) setShowSeriesMap(data.seriesMap);
       } catch (_) {}
     })();
@@ -1108,18 +1139,18 @@ export default function App() {
 
     const getCellBg = (cell) => {
       if (!cell) return {};
-      if (cell.error) return { backgroundColor: "yellow" };
-      if (cell.noFile) return { backgroundColor: "#faa" };
+      if (cell.unaired) return {};
+      if (!cell.avail) return {};
+      if (cell.played) return { backgroundColor: "#cfc" };
       return { backgroundColor: "white" };
     };
 
     const getCellText = (cell) => {
       if (!cell) return "";
+      if (cell.unaired) return "U";
+      if (!cell.avail) return "";
       if (cell.played) return "W";
-      if (cell.avail && !cell.unaired) return "+";
-      if (cell.noFile && !cell.unaired) return "-";
-      if (cell.unaired && !cell.played && cell.noFile) return "U";
-      return "";
+      return "+";
     };
 
     const renderListContent = () => {
@@ -1282,7 +1313,14 @@ export default function App() {
     };
 
     const renderMapContent = () => {
-      if (!showSeriesMap) return <View style={{flex:1,justifyContent:"center",alignItems:"center"}}><Text>Loading...</Text></View>;
+      if (!showSeriesMap)
+        return (
+          <View
+            style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+          >
+            <Text>Loading...</Text>
+          </View>
+        );
       const sm = buildSeriesMap(showSeriesMap);
       if (!sm) return null;
       const seasons = Object.keys(sm)
@@ -1310,9 +1348,15 @@ export default function App() {
                 {seasons.map((s) => (
                   <View
                     key={s}
-                    style={{ width: COL_W, justifyContent: "center", alignItems: "center" }}
+                    style={{
+                      width: COL_W,
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
                   >
-                    <Text style={{ fontSize: 14, fontWeight: "bold" }}>S{s}</Text>
+                    <Text style={{ fontSize: 14, fontWeight: "bold" }}>
+                      S{s}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -1325,9 +1369,21 @@ export default function App() {
                 {episodes.map((ep) => (
                   <View
                     key={ep}
-                    style={{ height: ROW_H, justifyContent: "center", alignItems: "center" }}
+                    style={{
+                      height: ROW_H,
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
                   >
-                    <Text style={{ fontSize: 14, fontWeight: "bold", color: "#555" }}>{ep}</Text>
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        fontWeight: "bold",
+                        color: "#555",
+                      }}
+                    >
+                      {ep}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -1345,7 +1401,10 @@ export default function App() {
               >
                 <View>
                   {episodes.map((ep) => (
-                    <View key={ep} style={{ flexDirection: "row", height: ROW_H }}>
+                    <View
+                      key={ep}
+                      style={{ flexDirection: "row", height: ROW_H }}
+                    >
                       {seasons.map((s) => {
                         const cell = sm[s]?.[ep];
                         return (

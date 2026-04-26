@@ -3078,6 +3078,24 @@ app.post(
   }),
 );
 app.post("/api/getActorPage", apiWrapper(tvdb.getActorPage));
+app.post(
+  "/api/getSeriesMapFromEmby",
+  apiWrapper(async (params) => {
+    const { showName } = params;
+    if (!showName) return { success: false, error: "Missing showName" };
+    const allTvdb = tvdb.getAllTvdbSync();
+    const rec = allTvdb?.[showName];
+    if (!rec?.id)
+      return { success: false, error: "Show not found or no Emby id" };
+    try {
+      const seriesMap = await emby.getSeriesMap({ id: rec.id });
+      return { success: true, seriesMap: seriesMap ?? [] };
+    } catch (err) {
+      console.error("[getSeriesMapFromEmby] error:", err);
+      return { success: false, error: err.message };
+    }
+  }),
+);
 app.post("/api/searchActorsInNonEmby", apiWrapper(tvdb.searchActorsInNonEmby));
 app.post("/api/getTmdb", apiWrapper(tmdb.getTmdb));
 app.post("/api/getStreamProviders", apiWrapper(tmdb.getStreamProviders));

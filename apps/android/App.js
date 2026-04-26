@@ -231,8 +231,8 @@ export default function App() {
                 setSelectedShow(playingShow);
                 setSelectedSE(s != null && e != null ? { s, e } : null);
               }
-            } else {
-              setSelectedSE(s != null && e != null ? { s, e } : null);
+            } else if (s != null && e != null) {
+              setSelectedSE({ s, e });
             }
           }
         }
@@ -345,6 +345,7 @@ export default function App() {
             image: data.image ?? null,
             overview: data.overview ?? null,
             name: data.name ?? null,
+            aired: data.aired ?? null,
           });
         } else {
           setEpisodeInfo(null);
@@ -1489,63 +1490,90 @@ export default function App() {
               return (
                 <View
                   style={{
-                    flexDirection: "row",
                     borderTopWidth: 3,
                     borderTopColor: "#000",
-                    height: imgHeight + 30,
-                    paddingVertical: 15,
                   }}
                 >
-                  {episodeInfo.image ? (
-                    <TouchableOpacity
-                      activeOpacity={0.85}
-                      onPress={() => setMapImageExpanded(true)}
-                    >
-                      <Image
-                        source={{ uri: episodeInfo.image }}
-                        style={{ width: imgWidth, height: imgHeight }}
-                        resizeMode="cover"
-                      />
-                    </TouchableOpacity>
-                  ) : (
-                    <View
-                      style={{
-                        width: imgWidth,
-                        height: imgHeight,
-                        backgroundColor: "#ddd",
-                      }}
-                    />
-                  )}
-                  <ScrollView
+                  <View
                     style={{
-                      flex: 1,
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
                       paddingHorizontal: 8,
                       paddingVertical: 4,
+                      borderBottomWidth: 3,
+                      borderBottomColor: "#000",
                     }}
                   >
-                    {episodeInfo.name ? (
-                      <Text
-                        style={{
-                          fontSize: fs(17),
-                          fontWeight: "bold",
-                          marginBottom: 2,
-                        }}
+                    <Text
+                      style={{
+                        fontSize: fs(16),
+                        fontWeight: "bold",
+                        flex: 1,
+                      }}
+                      numberOfLines={1}
+                    >
+                      {episodeInfo.name ?? ""}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: fs(14),
+                        color: "#555",
+                        marginLeft: 8,
+                      }}
+                    >
+                      {episodeInfo.aired
+                        ? episodeInfo.aired.replace(/-/g, "/")
+                        : ""}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      height: imgHeight + 30,
+                      paddingVertical: 15,
+                    }}
+                  >
+                    {episodeInfo.image ? (
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() => setMapImageExpanded(true)}
                       >
-                        {episodeInfo.name}
-                      </Text>
-                    ) : null}
-                    {episodeInfo.overview ? (
-                      <Text
+                        <Image
+                          source={{ uri: episodeInfo.image }}
+                          style={{ width: imgWidth, height: imgHeight }}
+                          resizeMode="cover"
+                        />
+                      </TouchableOpacity>
+                    ) : (
+                      <View
                         style={{
-                          fontSize: fs(16),
-                          color: "#333",
-                          lineHeight: fs(22),
+                          width: imgWidth,
+                          height: imgHeight,
+                          backgroundColor: "#ddd",
                         }}
-                      >
-                        {episodeInfo.overview}
-                      </Text>
-                    ) : null}
-                  </ScrollView>
+                      />
+                    )}
+                    <ScrollView
+                      style={{
+                        flex: 1,
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                      }}
+                    >
+                      {episodeInfo.overview ? (
+                        <Text
+                          style={{
+                            fontSize: fs(16),
+                            color: "#333",
+                            lineHeight: fs(22),
+                          }}
+                        >
+                          {episodeInfo.overview}
+                        </Text>
+                      ) : null}
+                    </ScrollView>
+                  </View>
                 </View>
               );
             })()}

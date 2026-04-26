@@ -98,6 +98,7 @@ export async function getTmdb(params) {
         : null,
       overview: episodeInfo.overview ?? null,
       name: episodeInfo.name ?? null,
+      aired: episodeInfo.air_date ?? null,
     };
   } catch (error) {
     console.error("[tmdb] getTmdb error:", error);

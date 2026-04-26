@@ -145,8 +145,12 @@ export default {
     };
 
     const selectCard = (idx) => {
-      selectedIdx.value = idx;
-      emit("select", tvdbList.value[idx]);
+      if (idx !== 0) {
+        const [item] = tvdbList.value.splice(idx, 1);
+        tvdbList.value.unshift(item);
+      }
+      selectedIdx.value = 0;
+      emit("select", tvdbList.value[0]);
     };
 
     const previewCard = (idx) => {

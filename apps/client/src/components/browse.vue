@@ -386,6 +386,7 @@
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                minWidth: '70px',
                 border: '1px solid black',
               }"
             >
@@ -404,6 +405,7 @@
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                minWidth: '70px',
                 border: '1px solid black',
               }"
             >
@@ -422,6 +424,7 @@
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                minWidth: '70px',
                 border: '1px solid black',
               }"
             >
@@ -440,6 +443,7 @@
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                minWidth: '70px',
                 border: '1px solid black',
               }"
             >
@@ -458,6 +462,7 @@
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                minWidth: '70px',
                 border: '1px solid black',
               }"
             >

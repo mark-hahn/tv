@@ -2169,7 +2169,7 @@ export default {
       if (shouldAutoAdvance.value) {
         shouldAutoAdvance.value = false;
         const lang = (tvdb?.primary_language || "").toLowerCase();
-        if (!tvdb || (lang && lang !== "eng")) {
+        if (!tvdb || (lang && lang !== "eng" && lang !== "spa")) {
           void handleNext();
         }
       }

@@ -1353,23 +1353,6 @@ export default function App() {
       const COL_W = 47;
       const ROW_H = 36;
 
-      // Expanded image view
-      if (mapImageExpanded && episodeInfo?.image) {
-        return (
-          <TouchableOpacity
-            style={{ flex: 1 }}
-            activeOpacity={1}
-            onPress={() => setMapImageExpanded(false)}
-          >
-            <Image
-              source={{ uri: episodeInfo.image }}
-              style={{ flex: 1, width: "100%" }}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-        );
-      }
-
       return (
         <View style={{ flex: 1 }}>
           {/* Fixed season header row */}
@@ -1480,6 +1463,26 @@ export default function App() {
               </ScrollView>
             </View>
           </ScrollView>
+          {/* Expanded episode image */}
+          {mapImageExpanded &&
+            episodeInfo?.image &&
+            (() => {
+              const screenWidth = Dimensions.get("window").width;
+              const expandedHeight = Math.round(screenWidth * (9 / 16));
+              return (
+                <TouchableOpacity
+                  activeOpacity={1}
+                  onPress={() => setMapImageExpanded(false)}
+                  style={{ borderTopWidth: 6, borderTopColor: "#000" }}
+                >
+                  <Image
+                    source={{ uri: episodeInfo.image }}
+                    style={{ width: screenWidth, height: expandedHeight }}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+              );
+            })()}
           {/* Episode info box */}
           {selectedSE &&
             episodeInfo &&
@@ -1537,7 +1540,7 @@ export default function App() {
                     {episodeInfo.image ? (
                       <TouchableOpacity
                         activeOpacity={0.85}
-                        onPress={() => setMapImageExpanded(true)}
+                        onPress={() => setMapImageExpanded((v) => !v)}
                       >
                         <Image
                           source={{ uri: episodeInfo.image }}

@@ -10,10 +10,16 @@ import {
   TextInput,
   Image,
   Linking,
+  PixelRatio,
+  Dimensions,
 } from "react-native";
+
 import { MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import allServices from "./services.json";
+
+// Normalize font sizes so system font scale doesn't affect the app
+const fs = (size) => size / PixelRatio.getFontScale();
 
 const TV_TV_URL = "https://hahnca.com/tv-tv";
 const TV_SRVR_WS_URL = "wss://hahnca.com/tv-srvr";
@@ -58,11 +64,13 @@ export default function App() {
   const [followPlaying, setFollowPlaying] = useState(false);
   const [activeTab, setActiveTab] = useState("List");
   const [guestActors, setGuestActors] = useState([]);
+  const [episodeInfo, setEpisodeInfo] = useState(null);
   const [showSearch, setShowSearch] = useState("");
   const [posterExpanded, setPosterExpanded] = useState(false);
   const [showSeriesMap, setShowSeriesMap] = useState(null);
   const showSeriesMapNameRef = useRef(null);
   const [flashCell, setFlashCell] = useState(null);
+  const [mapImageExpanded, setMapImageExpanded] = useState(false);
 
   const onGridLayout = ({ nativeEvent: { layout } }) => {
     if (layout.width < 10 || layout.height < 10) return;
@@ -305,6 +313,7 @@ export default function App() {
   useEffect(() => {
     if (!selectedSE || !selectedShow) {
       setGuestActors([]);
+      setEpisodeInfo(null);
       return;
     }
     let cancelled = false;
@@ -322,7 +331,8 @@ export default function App() {
         });
         const data = await res.json();
         if (cancelled) return;
-        const guests = (Array.isArray(data) ? data : []).map((g) => ({
+        const guestList = Array.isArray(data) ? data : (data?.guests ?? []);
+        const guests = guestList.map((g) => ({
           personName: g.name,
           name: g.character,
           image: g.profile_path
@@ -330,8 +340,20 @@ export default function App() {
             : null,
         }));
         setGuestActors(guests);
+        if (data?.image || data?.overview) {
+          setEpisodeInfo({
+            image: data.image ?? null,
+            overview: data.overview ?? null,
+            name: data.name ?? null,
+          });
+        } else {
+          setEpisodeInfo(null);
+        }
       } catch (_) {
-        if (!cancelled) setGuestActors([]);
+        if (!cancelled) {
+          setGuestActors([]);
+          setEpisodeInfo(null);
+        }
       }
     })();
     return () => {
@@ -364,6 +386,7 @@ export default function App() {
     showSeriesMapNameRef.current = null;
     setShowSeriesMap(null);
     setFlashCell(null);
+    setMapImageExpanded(false);
     setActiveTab("Info");
   }, [selectedShow?.name]);
 
@@ -1107,10 +1130,9 @@ export default function App() {
 
   if (showShows) {
     const show = selectedShow;
-    const seLabel =
-      followPlaying && selectedSE
-        ? ` (S${String(selectedSE.s).padStart(2, "0")}E${String(selectedSE.e).padStart(2, "0")})`
-        : "";
+    const seLabel = selectedSE
+      ? ` (S${String(selectedSE.s).padStart(2, "0")}E${String(selectedSE.e).padStart(2, "0")})`
+      : "";
 
     const handleHeaderPress = () => {
       if (followPlaying) {
@@ -1121,7 +1143,6 @@ export default function App() {
         if (!selShow) return;
         setFollowPlaying(false);
         setSelectedShow(selShow);
-        setSelectedSE(null);
       } else {
         // Toggle on: go to playing show
         const lp = showPlayingRef.current;
@@ -1330,6 +1351,24 @@ export default function App() {
       const episodes = Array.from({ length: maxEp }, (_, i) => i + 1);
       const COL_W = 47;
       const ROW_H = 36;
+
+      // Expanded image view
+      if (mapImageExpanded && episodeInfo?.image) {
+        return (
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={() => setMapImageExpanded(false)}
+          >
+            <Image
+              source={{ uri: episodeInfo.image }}
+              style={{ flex: 1, width: "100%" }}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+        );
+      }
+
       return (
         <View style={{ flex: 1 }}>
           {/* Fixed season header row */}
@@ -1351,7 +1390,7 @@ export default function App() {
                       alignItems: "center",
                     }}
                   >
-                    <Text style={{ fontSize: 18, fontWeight: "bold" }}>
+                    <Text style={{ fontSize: fs(18), fontWeight: "bold" }}>
                       S{s}
                     </Text>
                   </View>
@@ -1374,7 +1413,7 @@ export default function App() {
                   >
                     <Text
                       style={{
-                        fontSize: 18,
+                        fontSize: fs(18),
                         fontWeight: "bold",
                         color: "#555",
                       }}
@@ -1404,20 +1443,13 @@ export default function App() {
                     >
                       {seasons.map((s) => {
                         const cell = sm[s]?.[ep];
-                        const isFlashing =
-                          flashCell?.s === s && flashCell?.e === ep;
+                        const isSelected =
+                          selectedSE?.s === s && selectedSE?.e === ep;
                         return (
                           <TouchableOpacity
                             key={s}
                             onPress={() => {
-                              setFlashCell({ s, e: ep });
-                              setTimeout(() => {
-                                setFlashCell(null);
-                                setTimeout(() => {
-                                  setSelectedSE({ s, e: ep });
-                                  setActiveTab("Actors");
-                                }, 500);
-                              }, 500);
+                              setSelectedSE({ s, e: ep });
                             }}
                             style={[
                               {
@@ -1428,12 +1460,14 @@ export default function App() {
                                 justifyContent: "center",
                                 alignItems: "center",
                               },
-                              isFlashing
-                                ? { backgroundColor: "red" }
+                              isSelected
+                                ? { backgroundColor: "lightgreen" }
                                 : getCellBg(cell),
                             ]}
                           >
-                            <Text style={{ fontSize: 17, fontWeight: "bold" }}>
+                            <Text
+                              style={{ fontSize: fs(17), fontWeight: "bold" }}
+                            >
                               {getCellText(cell)}
                             </Text>
                           </TouchableOpacity>
@@ -1445,6 +1479,76 @@ export default function App() {
               </ScrollView>
             </View>
           </ScrollView>
+          {/* Episode info box */}
+          {selectedSE &&
+            episodeInfo &&
+            (() => {
+              const screenWidth = Dimensions.get("window").width;
+              const imgWidth = Math.round(screenWidth / 2);
+              const imgHeight = Math.round(imgWidth * (9 / 16));
+              return (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    borderTopWidth: 3,
+                    borderTopColor: "#000",
+                    height: imgHeight + 30,
+                    paddingVertical: 15,
+                  }}
+                >
+                  {episodeInfo.image ? (
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={() => setMapImageExpanded(true)}
+                    >
+                      <Image
+                        source={{ uri: episodeInfo.image }}
+                        style={{ width: imgWidth, height: imgHeight }}
+                        resizeMode="cover"
+                      />
+                    </TouchableOpacity>
+                  ) : (
+                    <View
+                      style={{
+                        width: imgWidth,
+                        height: imgHeight,
+                        backgroundColor: "#ddd",
+                      }}
+                    />
+                  )}
+                  <ScrollView
+                    style={{
+                      flex: 1,
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                    }}
+                  >
+                    {episodeInfo.name ? (
+                      <Text
+                        style={{
+                          fontSize: fs(17),
+                          fontWeight: "bold",
+                          marginBottom: 2,
+                        }}
+                      >
+                        {episodeInfo.name}
+                      </Text>
+                    ) : null}
+                    {episodeInfo.overview ? (
+                      <Text
+                        style={{
+                          fontSize: fs(16),
+                          color: "#333",
+                          lineHeight: fs(22),
+                        }}
+                      >
+                        {episodeInfo.overview}
+                      </Text>
+                    ) : null}
+                  </ScrollView>
+                </View>
+              );
+            })()}
         </View>
       );
     };
@@ -1820,18 +1924,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   cellText: {
-    fontSize: 42,
+    fontSize: fs(42),
     fontWeight: "bold",
     color: "#000",
   },
   cellTextSmall: {
-    fontSize: 28,
+    fontSize: fs(28),
   },
   cellTextTiny: {
-    fontSize: 20,
+    fontSize: fs(20),
   },
   cellTextLarge: {
-    fontSize: 84,
+    fontSize: fs(84),
   },
 });
 
@@ -1847,7 +1951,7 @@ const streamerStyles = StyleSheet.create({
   },
   headerTitle: {
     color: "#fff",
-    fontSize: 20,
+    fontSize: fs(20),
     fontWeight: "bold",
   },
   closeBtn: {
@@ -1855,7 +1959,7 @@ const streamerStyles = StyleSheet.create({
   },
   closeBtnText: {
     color: "#fff",
-    fontSize: 28,
+    fontSize: fs(28),
     lineHeight: 32,
   },
   list: {
@@ -1902,7 +2006,7 @@ const streamerStyles = StyleSheet.create({
   },
   cardName: {
     color: "#000",
-    fontSize: 13,
+    fontSize: fs(13),
   },
 });
 
@@ -1924,7 +2028,7 @@ const kybdStyles = StyleSheet.create({
   textInput: {
     flex: 1,
     padding: 8,
-    fontSize: 16,
+    fontSize: fs(16),
     borderWidth: 1,
     borderColor: "#bbb",
     borderRadius: 5,
@@ -1935,7 +2039,7 @@ const kybdStyles = StyleSheet.create({
     padding: 8,
   },
   closeBtnText: {
-    fontSize: 20,
+    fontSize: fs(20),
     color: "#000",
   },
   historyList: {
@@ -1947,7 +2051,7 @@ const kybdStyles = StyleSheet.create({
     borderBottomColor: "#eee",
   },
   historyItemText: {
-    fontSize: 15,
+    fontSize: fs(15),
   },
 });
 
@@ -1964,7 +2068,7 @@ const subCtrlStyles = StyleSheet.create({
   },
   showName: {
     color: "#000",
-    fontSize: 20,
+    fontSize: fs(20),
     fontWeight: "bold",
   },
   list: {
@@ -1979,7 +2083,7 @@ const subCtrlStyles = StyleSheet.create({
     flexShrink: 0,
   },
   closeBtnText: {
-    fontSize: 39,
+    fontSize: fs(39),
     fontWeight: "bold",
     color: "#000",
   },
@@ -1987,7 +2091,7 @@ const subCtrlStyles = StyleSheet.create({
     padding: 20,
     textAlign: "center",
     color: "#999",
-    fontSize: 16,
+    fontSize: fs(16),
   },
   card: {
     padding: 28,
@@ -1996,7 +2100,7 @@ const subCtrlStyles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   cardText: {
-    fontSize: 27,
+    fontSize: fs(27),
     color: "#000",
   },
   cardTextSelected: {
@@ -2018,13 +2122,13 @@ const lockStyles = StyleSheet.create({
     flexDirection: "column",
   },
   title: {
-    fontSize: 42,
+    fontSize: fs(42),
     fontWeight: "bold",
     padding: 10,
     paddingBottom: 6,
   },
   message: {
-    fontSize: 25,
+    fontSize: fs(25),
     fontWeight: "bold",
     textAlign: "center",
   },
@@ -2037,7 +2141,7 @@ const lockStyles = StyleSheet.create({
     height: "20%",
   },
   unlockBtnText: {
-    fontSize: 39,
+    fontSize: fs(39),
     fontWeight: "bold",
   },
 });
@@ -2064,7 +2168,7 @@ const missingEpStyles = StyleSheet.create({
     width: "90%",
   },
   text: {
-    fontSize: 16,
+    fontSize: fs(16),
     fontWeight: "bold",
     marginBottom: 6,
   },
@@ -2079,7 +2183,7 @@ const missingEpStyles = StyleSheet.create({
     paddingHorizontal: 18,
   },
   closeBtnText: {
-    fontSize: 16,
+    fontSize: fs(16),
     fontWeight: "bold",
   },
 });
@@ -2101,7 +2205,7 @@ const showsStyles = StyleSheet.create({
     borderBottomColor: "#000",
   },
   headerTitle: {
-    fontSize: 27,
+    fontSize: fs(27),
     fontWeight: "bold",
     color: "#000",
   },
@@ -2121,7 +2225,7 @@ const showsStyles = StyleSheet.create({
     backgroundColor: "lightgray",
   },
   tabBtnText: {
-    fontSize: 22,
+    fontSize: fs(22),
     fontWeight: "500",
   },
   tabDivider: {
@@ -2141,7 +2245,7 @@ const showsStyles = StyleSheet.create({
   searchInput: {
     height: 52,
     paddingHorizontal: 12,
-    fontSize: 22,
+    fontSize: fs(22),
     backgroundColor: "#fff",
     borderBottomWidth: 3,
     borderBottomColor: "#000",
@@ -2161,7 +2265,7 @@ const showsStyles = StyleSheet.create({
   },
   listRowName: {
     flex: 1,
-    fontSize: 23,
+    fontSize: fs(23),
     fontWeight: "bold",
     color: "#000",
   },
@@ -2171,11 +2275,11 @@ const showsStyles = StyleSheet.create({
     gap: 6,
   },
   listRowPlus: {
-    fontSize: 16,
+    fontSize: fs(16),
     color: "#000",
   },
   listRowWait: {
-    fontSize: 16,
+    fontSize: fs(16),
     color: "blue",
   },
   infoTop: {
@@ -2201,27 +2305,27 @@ const showsStyles = StyleSheet.create({
   },
   posterPlaceholderText: {
     color: "#888",
-    fontSize: 12,
+    fontSize: fs(12),
   },
   infoBox: {
     flex: 1,
   },
   infoField: {
-    fontSize: 16,
+    fontSize: fs(16),
     fontWeight: "bold",
     color: "#222",
     lineHeight: 22,
     marginBottom: 2,
   },
   overviewText: {
-    fontSize: 20,
+    fontSize: fs(20),
     color: "#333",
     lineHeight: 28,
     paddingHorizontal: 12,
     paddingBottom: 16,
   },
   actorSectionTitle: {
-    fontSize: 14,
+    fontSize: fs(14),
     fontWeight: "bold",
     paddingHorizontal: 12,
     paddingTop: 10,
@@ -2255,13 +2359,13 @@ const showsStyles = StyleSheet.create({
     marginBottom: 4,
   },
   actorPersonName: {
-    fontSize: 12,
+    fontSize: fs(12),
     fontWeight: "bold",
     textAlign: "center",
     color: "#000",
   },
   actorCharName: {
-    fontSize: 11,
+    fontSize: fs(11),
     color: "#555",
     textAlign: "center",
   },

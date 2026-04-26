@@ -91,7 +91,14 @@ export async function getTmdb(params) {
 
     console.log("[tmdb] Guest actor list with images:", guestActorList);
 
-    return guestActorList;
+    return {
+      guests: guestActorList,
+      image: episodeInfo.still_path
+        ? `https://image.tmdb.org/t/p/w300${episodeInfo.still_path}`
+        : null,
+      overview: episodeInfo.overview ?? null,
+      name: episodeInfo.name ?? null,
+    };
   } catch (error) {
     console.error("[tmdb] getTmdb error:", error);
     throw new Error(`getTmdb error: ${error.message}`);

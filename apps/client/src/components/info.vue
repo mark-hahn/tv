@@ -59,7 +59,7 @@
         :style="{
           display: 'grid',
           gridTemplateColumns: '1fr 3fr 1fr 3fr 1fr',
-          alignItems: 'center',
+          alignItems: 'start',
           width: '100%',
         }"
       >
@@ -84,42 +84,88 @@
           :style="{
             gridColumn: '4 / span 2',
             display: 'flex',
-            alignItems: 'center',
+            flexDirection: 'column',
+            gap: '4px',
             minWidth: '0px',
             width: '100%',
           }"
         >
-          <template v-if="!previewMode">
-            <textarea
-              v-model="show.notes"
-              @click.stop
-              @keydown.stop
-              @keydown.enter.prevent.stop="saveNote"
-              rows="1"
-              placeholder="Notes"
+          <div :style="{ display: 'flex', alignItems: 'center' }">
+            <template v-if="!previewMode">
+              <input
+                v-model="descrSearchStr"
+                @input="onDescrSearch"
+                @click.stop
+                @keydown.stop
+                placeholder="Search Descr"
+                :style="{
+                  width: '125px',
+                  padding: '2px',
+                  fontSize: '14px',
+                  border: 'none',
+                  backgroundColor: descrSearchStr ? '#fffde7' : '#eee',
+                  height: '14px',
+                  marginTop: '4px',
+                  marginLeft: '0px',
+                }"
+              />
+            </template>
+            <div
               :style="{
-                width: '125px',
-                padding: '2px',
-                fontSize: '14px',
-                border: 'none',
-                backgroundColor: '#eee',
-                resize: 'none',
-                height: '14px',
-                lineHeight: '1.2',
-                marginTop: '4px',
-                marginRight: '10px',
-                marginLeft: '0px',
+                display: 'flex',
+                alignItems: 'center',
+                marginLeft: 'auto',
+                minWidth: '0px',
               }"
-            ></textarea>
-          </template>
-          <div
+            >
+              <div
+                v-if="show?.reject"
+                style="
+                  font-weight: bold;
+                  color: red;
+                  font-size: 18px;
+                  margin-top: 4px;
+                  max-height: 24px;
+                  margin-right: 10px;
+                  white-space: nowrap;
+                "
+              >
+                Banned From Download
+              </div>
+            </div>
+          </div>
+          <textarea
+            v-if="!previewMode"
+            v-model="show.notes"
+            @click.stop
+            @keydown.stop
+            @keydown.enter.prevent.stop="saveNote"
+            rows="1"
+            placeholder="Notes"
             :style="{
-              display: 'flex',
-              alignItems: 'center',
-              marginLeft: 'auto',
-              minWidth: '0px',
+              width: '100%',
+              padding: '2px',
+              fontSize: '14px',
+              border: 'none',
+              backgroundColor: '#eee',
+              resize: 'none',
+              height: '14px',
+              lineHeight: '1.2',
+              boxSizing: 'border-box',
             }"
-          >
+          ></textarea>
+        </div>
+        <!-- Non-simple mode: align left edge of Notes with left edge of infobox (start of infobox column)-->
+        <div
+          v-else
+          :style="{
+            gridColumn: '4 / span 2',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+          }"
+        >
+          <div :style="{ display: 'flex', alignItems: 'center' }">
             <div
               v-if="show?.reject"
               style="
@@ -129,98 +175,89 @@
                 margin-top: 4px;
                 max-height: 24px;
                 margin-right: 10px;
-                white-space: nowrap;
               "
             >
               Banned From Download
             </div>
+            <template v-if="!previewMode">
+              <input
+                v-model="descrSearchStr"
+                @input="onDescrSearch"
+                @click.stop
+                @keydown.stop
+                placeholder="Search Descr"
+                :style="{
+                  width: '125px',
+                  padding: '2px',
+                  fontSize: '14px',
+                  border: 'none',
+                  backgroundColor: descrSearchStr ? '#fffde7' : '#eee',
+                  height: '14px',
+                  marginTop: '4px',
+                  marginLeft: '0px',
+                }"
+              />
+              <button
+                v-if="notInEmby"
+                @click.stop="loadIntoEmby"
+                style="
+                  font-size: 13px;
+                  cursor: pointer;
+                  margin-left: 10px;
+                  margin-top: 3px;
+                  max-height: 24px;
+                  border-radius: 7px;
+                "
+              >
+                Load
+              </button>
+              <button
+                @click.stop="refreshTvdb"
+                :style="{
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  marginLeft: '10px',
+                  marginTop: '3px',
+                  maxHeight: '24px',
+                  borderRadius: '7px',
+                }"
+              >
+                Refresh
+              </button>
+              <button
+                @click.stop="deleteClick"
+                style="
+                  font-size: 13px;
+                  cursor: pointer;
+                  margin-left: 10px;
+                  margin-top: 3px;
+                  max-height: 24px;
+                  border-radius: 7px;
+                "
+              >
+                Delete
+              </button>
+            </template>
           </div>
-        </div>
-        <!-- Non-simple mode: align left edge of Notes with left edge of infobox (start of infobox column)-->
-        <div
-          v-else
-          :style="{
-            gridColumn: '4 / span 2',
-            display: 'flex',
-            alignItems: 'center',
-          }"
-        >
-          <div
-            v-if="show?.reject"
-            style="
-              font-weight: bold;
-              color: red;
-              font-size: 18px;
-              margin-top: 4px;
-              max-height: 24px;
-              margin-right: 10px;
-            "
-          >
-            Banned From Download
-          </div>
-          <template v-if="!previewMode">
-            <textarea
-              v-model="show.notes"
-              @click.stop
-              @keydown.stop
-              @keydown.enter.prevent.stop="saveNote"
-              rows="1"
-              placeholder="Notes"
-              :style="{
-                width: '125px',
-                padding: '2px',
-                fontSize: '14px',
-                border: 'none',
-                backgroundColor: '#eee',
-                resize: 'none',
-                height: '14px',
-                lineHeight: '1.2',
-                marginTop: '4px',
-                marginRight: '10px',
-                marginLeft: '0px',
-              }"
-            ></textarea>
-            <button
-              v-if="notInEmby"
-              @click.stop="loadIntoEmby"
-              style="
-                font-size: 13px;
-                cursor: pointer;
-                margin-left: 10px;
-                margin-top: 3px;
-                max-height: 24px;
-                border-radius: 7px;
-              "
-            >
-              Load
-            </button>
-            <button
-              @click.stop="refreshTvdb"
-              :style="{
-                fontSize: '13px',
-                cursor: 'pointer',
-                marginLeft: '10px',
-                marginTop: '3px',
-                maxHeight: '24px',
-                borderRadius: '7px',
-              }"
-            >
-              Refresh
-            </button>
-            <button
-              @click.stop="deleteClick"
-              style="
-                font-size: 13px;
-                cursor: pointer;
-                margin-left: 10px;
-                margin-top: 3px;
-                max-height: 24px;
-                border-radius: 7px;
-              "
-            >
-              Delete
-            </button>
-          </template>
+          <textarea
+            v-if="!previewMode"
+            v-model="show.notes"
+            @click.stop
+            @keydown.stop
+            @keydown.enter.prevent.stop="saveNote"
+            rows="1"
+            placeholder="Notes"
+            :style="{
+              width: '75%',
+              padding: '2px',
+              fontSize: '14px',
+              border: 'none',
+              backgroundColor: '#eee',
+              resize: 'none',
+              height: '14px',
+              lineHeight: '1.2',
+            }"
+          ></textarea>
         </div>
       </div>
     </div>
@@ -628,6 +665,7 @@ export default {
       seriesReady: false,
       previewMode: false,
       previewAddBusy: false,
+      descrSearchStr: "",
       dates: "",
       statusTxt: "",
       remoteShowName: "",
@@ -747,6 +785,10 @@ export default {
       } catch (e) {
         return { seasonCount: 0, episodeCount: 0 };
       }
+    },
+
+    onDescrSearch() {
+      evtBus.emit("descrSearch", this.descrSearchStr);
     },
 
     async handleBodyClick() {

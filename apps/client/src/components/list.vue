@@ -599,6 +599,7 @@ export default {
       updatingMsg: "",
       shows: [],
       filterStr: "",
+      descrSearchStr: "",
       errMsg: "",
       highlightName: "",
       previewMode: false,
@@ -2696,6 +2697,14 @@ export default {
         srchStrLc = filterEmpty ? null : String(this.filterStr).toLowerCase();
       }
 
+      const descrSrchLc = this.descrSearchStr
+        ? String(this.descrSearchStr).toLowerCase()
+        : null;
+      if (descrSrchLc && !localAllTvdb) {
+        if (!allTvdb) allTvdb = await tvdb.getAllTvdb();
+        localAllTvdb = allTvdb;
+      }
+
       const filteredShows = [];
       fltrLoop: for (const show of allShows) {
         if (this.fltrChoice === "Finished") {
@@ -2714,6 +2723,12 @@ export default {
           } else {
             continue;
           }
+        }
+        if (descrSrchLc) {
+          const overview = String(
+            localAllTvdb?.[show.name]?.overview ?? "",
+          ).toLowerCase();
+          if (!overview.includes(descrSrchLc)) continue;
         }
         for (let cond of this.conds) {
           if (cond.filter === 0) continue;
@@ -3225,6 +3240,11 @@ export default {
       this.evtHandlers[name] = fn;
       evtBus.on(name, fn);
     };
+
+    on("descrSearch", (str) => {
+      this.descrSearchStr = String(str || "");
+      void this.select();
+    });
 
     on("deleteShow", async (show) => {
       if (!show) return;

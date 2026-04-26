@@ -89,6 +89,20 @@
             justify-content: flex-end;
           "
         >
+          <input
+            v-model="fileSearch"
+            type="text"
+            placeholder="Search files"
+            style="
+              font-size: 13px;
+              border-radius: 7px;
+              padding: 4px 8px;
+              border: 1px solid #bbb;
+              background-color: white;
+              width: 98px;
+              outline: none;
+            "
+          />
           <button
             @click.stop="showFirstDownloading"
             style="
@@ -227,7 +241,7 @@
       @wheel.stop.prevent="handleScaledWheel"
     >
       <template
-        v-for="(it, idx) in displayedItems"
+        v-for="(it, idx) in filteredItems"
         :key="idx"
       >
         <div
@@ -383,6 +397,7 @@ export default {
       isChecking: false,
       showErrs: false,
       pollingStopped: false,
+      fileSearch: "",
     };
   },
 
@@ -447,6 +462,16 @@ export default {
 
     errsButtonBg() {
       return this.showErrs ? "#aaa" : "whitesmoke";
+    },
+
+    filteredItems() {
+      const q = (this.fileSearch || "").trim().toLowerCase();
+      if (!q) return this.displayedItems;
+      return this.displayedItems.filter((it) =>
+        String(it?.title || "")
+          .toLowerCase()
+          .includes(q),
+      );
     },
   },
 

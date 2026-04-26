@@ -1138,19 +1138,14 @@ export default function App() {
     };
 
     const getCellBg = (cell) => {
-      if (!cell) return {};
-      if (cell.unaired) return {};
-      if (!cell.avail) return {};
-      if (cell.played) return { backgroundColor: "#cfc" };
-      return { backgroundColor: "white" };
+      if (!cell || cell.avail) return { backgroundColor: "white" };
+      return { backgroundColor: "#fcc" };
     };
 
     const getCellText = (cell) => {
       if (!cell) return "";
-      if (cell.unaired) return "U";
-      if (!cell.avail) return "";
-      if (cell.played) return "W";
-      return "+";
+      const w = cell.unaired ? "U" : cell.played ? "W" : "";
+      return w + (cell.avail ? "+" : "-");
     };
 
     const renderListContent = () => {

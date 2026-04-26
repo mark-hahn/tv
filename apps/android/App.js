@@ -95,7 +95,8 @@ export default function App() {
   const homeHoldFiredRef = useRef(false);
   const backHoldRef = useRef(null);
   const backHoldFiredRef = useRef(false);
-  const lastPlayingShowRef = useRef(null);
+  const showPlayingRef = useRef(null);
+  const showSelectedRef = useRef(null);
   const showsListRef = useRef([]);
   const showsListLoadedRef = useRef(false);
   const showsFlatListRef = useRef(null);
@@ -207,8 +208,8 @@ export default function App() {
           if (showName) {
             const s = playing?.[0]?.season ?? null;
             const e = playing?.[0]?.episode ?? null;
-            const prev = lastPlayingShowRef.current;
-            lastPlayingShowRef.current = { name: showName, s, e };
+            const prev = showPlayingRef.current;
+            showPlayingRef.current = { name: showName, s, e };
             if (prev?.name !== showName) {
               const playingShow = showsListRef.current.find(
                 (sh) => sh.name === showName,
@@ -273,7 +274,8 @@ export default function App() {
         showsListRef.current = list;
         setShowsList(list);
         if (list.length > 0) {
-          const lp = lastPlayingShowRef.current;
+          showSelectedRef.current = { name: list[0].name };
+          const lp = showPlayingRef.current;
           const playingShow = lp ? list.find((s) => s.name === lp.name) : null;
           if (playingShow) {
             setFollowPlaying(true);
@@ -340,6 +342,11 @@ export default function App() {
       showsFlatListRef.current?.scrollToIndex({ index: idx, animated: false });
     }, 100);
   }, [showShows, activeTab, selectedShow?.name, showsList.length]);
+
+  useEffect(() => {
+    if (!selectedShow) return;
+    setActiveTab("Info");
+  }, [selectedShow?.name]);
 
   const flash = (btn) => {
     setFlashBtn(btn);
@@ -1050,13 +1057,29 @@ export default function App() {
         : "";
 
     const handleHeaderPress = () => {
-      const lp = lastPlayingShowRef.current;
-      if (!lp) return;
-      const playingShow = showsListRef.current.find((s) => s.name === lp.name);
-      if (!playingShow) return;
-      setFollowPlaying(true);
-      setSelectedShow(playingShow);
-      setSelectedSE(lp.s != null && lp.e != null ? { s: lp.s, e: lp.e } : null);
+      if (followPlaying) {
+        // Toggle off: go to saved selected show
+        const sel = showSelectedRef.current;
+        if (!sel) return;
+        const selShow = showsListRef.current.find((s) => s.name === sel.name);
+        if (!selShow) return;
+        setFollowPlaying(false);
+        setSelectedShow(selShow);
+        setSelectedSE(null);
+      } else {
+        // Toggle on: go to playing show
+        const lp = showPlayingRef.current;
+        if (!lp) return;
+        const playingShow = showsListRef.current.find(
+          (s) => s.name === lp.name,
+        );
+        if (!playingShow) return;
+        setFollowPlaying(true);
+        setSelectedShow(playingShow);
+        setSelectedSE(
+          lp.s != null && lp.e != null ? { s: lp.s, e: lp.e } : null,
+        );
+      }
       setActiveTab("Info");
     };
 
@@ -1103,6 +1126,7 @@ export default function App() {
           renderItem={({ item }) => (
             <TouchableOpacity
               onPress={() => {
+                showSelectedRef.current = { name: item.name };
                 setShowSearch("");
                 setSelectedShow(item);
                 setFollowPlaying(false);

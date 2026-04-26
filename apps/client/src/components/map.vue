@@ -245,7 +245,6 @@
             overflow: hidden;
             box-sizing: border-box;
             background-color: white;
-            pointer-events: none;
           "
         >
           <table
@@ -277,7 +276,8 @@
                   &nbsp;
                 </td>
                 <td
-                  v-for="episode in seriesMapEpis"
+                  v-for="season in seriesMapSeasons"
+                  @click="handleSeasonClick($event, season)"
                   :style="{
                     width: '30px',
                     minWidth: '30px',
@@ -292,10 +292,11 @@
                     textAlign: 'center',
                     border: '1px solid #ccc',
                     backgroundColor: 'white',
+                    cursor: simpleMode ? 'default' : 'pointer',
                   }"
-                  :key="episode"
+                  :key="season"
                 >
-                  {{ episode }}
+                  S{{ season }}
                 </td>
               </tr>
             </tbody>
@@ -364,12 +365,11 @@
           >
             <tbody>
               <tr
-                v-for="season in seriesMapSeasons"
-                :key="mapUpdateKey + '-season-' + season"
+                v-for="episode in seriesMapEpis"
+                :key="mapUpdateKey + '-ep-' + episode"
                 style="outline: thin solid"
               >
                 <td
-                  @click="handleSeasonClick($event, season)"
                   :style="{
                     fontWeight: 'bold',
                     width: '30px',
@@ -382,16 +382,15 @@
                     whiteSpace: 'nowrap',
                     verticalAlign: 'middle',
                     textAlign: 'center',
-                    cursor: simpleMode ? 'default' : 'pointer',
                     padding: '1px 4px',
                     border: '1px solid #ccc',
                     backgroundColor: 'white',
                   }"
                 >
-                  {{ season }}
+                  {{ episode }}
                 </td>
                 <td
-                  v-for="episode in seriesMapEpis"
+                  v-for="season in seriesMapSeasons"
                   :key="mapUpdateKey + '-' + season + '.' + episode"
                   @click="handleEpisodeClick($event, mapShow, season, episode)"
                   :style="{
@@ -438,27 +437,6 @@
                     >u</span
                   >
                 </td>
-                <td
-                  :style="{
-                    width: '56px',
-                    minWidth: '56px',
-                    maxWidth: '56px',
-                    height: '22px',
-                    minHeight: '22px',
-                    maxHeight: '22px',
-                    lineHeight: '16px',
-                    whiteSpace: 'nowrap',
-                    verticalAlign: 'middle',
-                    textAlign: 'center',
-                    padding: '1px 4px',
-                    border: '1px solid #ccc',
-                    backgroundColor: 'white',
-                    fontSize: '13px',
-                    color: '#666',
-                  }"
-                >
-                  {{ mapShow?.seasonPremiereDates?.[String(season)] || "" }}
-                </td>
               </tr>
             </tbody>
           </table>
@@ -491,12 +469,11 @@
           >
             <tbody>
               <tr
-                v-for="season in seriesMapSeasons"
-                :key="mapUpdateKey + '-sticky-' + season"
+                v-for="episode in seriesMapEpis"
+                :key="mapUpdateKey + '-sticky-ep-' + episode"
                 style="outline: thin solid"
               >
                 <td
-                  @click="handleSeasonClick($event, season)"
                   :style="{
                     fontWeight: 'bold',
                     width: '30px',
@@ -509,13 +486,12 @@
                     whiteSpace: 'nowrap',
                     verticalAlign: 'middle',
                     textAlign: 'center',
-                    cursor: simpleMode ? 'default' : 'pointer',
                     padding: '1px 4px',
                     border: '1px solid #ccc',
                     backgroundColor: 'white',
                   }"
                 >
-                  {{ season }}
+                  {{ episode }}
                 </td>
               </tr>
             </tbody>

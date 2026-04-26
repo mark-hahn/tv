@@ -60,6 +60,8 @@ export default function App() {
   const [guestActors, setGuestActors] = useState([]);
   const [showSearch, setShowSearch] = useState("");
   const [posterExpanded, setPosterExpanded] = useState(false);
+  const [showSeriesMap, setShowSeriesMap] = useState(null);
+  const showSeriesMapNameRef = useRef(null);
 
   const onGridLayout = ({ nativeEvent: { layout } }) => {
     if (layout.width < 10 || layout.height < 10) return;
@@ -100,6 +102,7 @@ export default function App() {
   const showsListRef = useRef([]);
   const showsListLoadedRef = useRef(false);
   const showsFlatListRef = useRef(null);
+  const mapHeaderScrollRef = useRef(null);
 
   const debounce = () => {
     const now = Date.now();
@@ -345,8 +348,28 @@ export default function App() {
 
   useEffect(() => {
     if (!selectedShow) return;
+    showSeriesMapNameRef.current = null;
+    setShowSeriesMap(null);
     setActiveTab("Info");
   }, [selectedShow?.name]);
+
+  useEffect(() => {
+    if (activeTab !== "Map" || !selectedShow?.tvdbId) return;
+    if (showSeriesMapNameRef.current === selectedShow.name) return;
+    showSeriesMapNameRef.current = selectedShow.name;
+    setShowSeriesMap(null);
+    (async () => {
+      try {
+        const res = await fetch(`${TV_SRVR_HTTP_URL}/api/getSeriesMapFromTvdb`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tvdbId: selectedShow.tvdbId, watchedEpis: selectedShow.watchedEpis ?? null }),
+        });
+        const data = await res.json();
+        if (data.success && data.seriesMap) setShowSeriesMap(data.seriesMap);
+      } catch (_) {}
+    })();
+  }, [activeTab, selectedShow?.name]);
 
   const flash = (btn) => {
     setFlashBtn(btn);
@@ -1259,8 +1282,8 @@ export default function App() {
     };
 
     const renderMapContent = () => {
-      if (!show?.seriesMap) return null;
-      const sm = buildSeriesMap(show.seriesMap);
+      if (!showSeriesMap) return <View style={{flex:1,justifyContent:"center",alignItems:"center"}}><Text>Loading...</Text></View>;
+      const sm = buildSeriesMap(showSeriesMap);
       if (!sm) return null;
       const seasons = Object.keys(sm)
         .map(Number)
@@ -1270,78 +1293,89 @@ export default function App() {
         return Math.max(max, ...epNums);
       }, 0);
       const episodes = Array.from({ length: maxEp }, (_, i) => i + 1);
-      const COL_W = 36;
-      const ROW_H = 28;
+      const COL_W = 47;
+      const ROW_H = 36;
       return (
-        <ScrollView nestedScrollEnabled>
+        <View style={{ flex: 1 }}>
+          {/* Fixed season header row */}
           <View style={{ flexDirection: "row" }}>
-            <View style={{ width: 40 }}>
-              <View style={{ height: ROW_H }} />
-              {episodes.map((ep) => (
-                <View
-                  key={ep}
-                  style={{
-                    height: ROW_H,
-                    justifyContent: "center",
-                    alignItems: "center",
-                  }}
-                >
-                  <Text style={{ fontSize: 11, color: "#555" }}>{ep}</Text>
-                </View>
-              ))}
-            </View>
-            <ScrollView horizontal nestedScrollEnabled>
-              <View>
-                <View style={{ flexDirection: "row", height: ROW_H }}>
-                  {seasons.map((s) => (
-                    <View
-                      key={s}
-                      style={{
-                        width: COL_W,
-                        justifyContent: "center",
-                        alignItems: "center",
-                      }}
-                    >
-                      <Text style={{ fontSize: 11, fontWeight: "bold" }}>
-                        S{s}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-                {episodes.map((ep) => (
+            <View style={{ width: 40, height: ROW_H }} />
+            <ScrollView
+              horizontal
+              ref={mapHeaderScrollRef}
+              scrollEnabled={false}
+              showsHorizontalScrollIndicator={false}
+            >
+              <View style={{ flexDirection: "row", height: ROW_H }}>
+                {seasons.map((s) => (
                   <View
-                    key={ep}
-                    style={{ flexDirection: "row", height: ROW_H }}
+                    key={s}
+                    style={{ width: COL_W, justifyContent: "center", alignItems: "center" }}
                   >
-                    {seasons.map((s) => {
-                      const cell = sm[s]?.[ep];
-                      return (
-                        <View
-                          key={s}
-                          style={[
-                            {
-                              width: COL_W,
-                              height: ROW_H,
-                              borderWidth: 0.5,
-                              borderColor: "#ccc",
-                              justifyContent: "center",
-                              alignItems: "center",
-                            },
-                            getCellBg(cell),
-                          ]}
-                        >
-                          <Text style={{ fontSize: 10 }}>
-                            {getCellText(cell)}
-                          </Text>
-                        </View>
-                      );
-                    })}
+                    <Text style={{ fontSize: 14, fontWeight: "bold" }}>S{s}</Text>
                   </View>
                 ))}
               </View>
             </ScrollView>
           </View>
-        </ScrollView>
+          {/* Scrollable body */}
+          <ScrollView>
+            <View style={{ flexDirection: "row" }}>
+              <View style={{ width: 40 }}>
+                {episodes.map((ep) => (
+                  <View
+                    key={ep}
+                    style={{ height: ROW_H, justifyContent: "center", alignItems: "center" }}
+                  >
+                    <Text style={{ fontSize: 14, fontWeight: "bold", color: "#555" }}>{ep}</Text>
+                  </View>
+                ))}
+              </View>
+              <ScrollView
+                horizontal
+                nestedScrollEnabled
+                showsHorizontalScrollIndicator={false}
+                scrollEventThrottle={16}
+                onScroll={(e) =>
+                  mapHeaderScrollRef.current?.scrollTo({
+                    x: e.nativeEvent.contentOffset.x,
+                    animated: false,
+                  })
+                }
+              >
+                <View>
+                  {episodes.map((ep) => (
+                    <View key={ep} style={{ flexDirection: "row", height: ROW_H }}>
+                      {seasons.map((s) => {
+                        const cell = sm[s]?.[ep];
+                        return (
+                          <View
+                            key={s}
+                            style={[
+                              {
+                                width: COL_W,
+                                height: ROW_H,
+                                borderWidth: 0.5,
+                                borderColor: "#ccc",
+                                justifyContent: "center",
+                                alignItems: "center",
+                              },
+                              getCellBg(cell),
+                            ]}
+                          >
+                            <Text style={{ fontSize: 13, fontWeight: "bold" }}>
+                              {getCellText(cell)}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+          </ScrollView>
+        </View>
       );
     };
 

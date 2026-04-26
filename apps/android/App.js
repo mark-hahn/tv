@@ -1543,7 +1543,7 @@ export default function App() {
               <Text style={showsStyles.tabBtnText}>{tab}</Text>
             </TouchableOpacity>
           ))}
-          <Text style={showsStyles.tabPipe}>|</Text>
+          <View style={showsStyles.tabDivider} />
           <TouchableOpacity
             onPress={handleClose}
             style={showsStyles.closeTabBtn}
@@ -2073,10 +2073,10 @@ const showsStyles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "500",
   },
-  tabPipe: {
-    paddingHorizontal: 4,
-    color: "#999",
-    fontSize: 16,
+  tabDivider: {
+    width: 3,
+    alignSelf: "stretch",
+    backgroundColor: "#000",
   },
   closeTabBtn: {
     flex: 1,

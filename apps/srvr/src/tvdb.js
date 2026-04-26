@@ -2544,11 +2544,31 @@ export const debugTvdb = async (params) => {
 
 export const getActorPage = async (params) => {
   const actorName = params?.name || "";
-  if (!actorName) {
-    throw new Error("getActorPage: missing name");
+  const tvdbPersonId = params?.tvdbPersonId || null;
+
+  // If we have a TVDB person ID, use the TVDB API to get the IMDB ID directly
+  if (tvdbPersonId) {
+    try {
+      const token = await getToken();
+      const res = await fetch(
+        `https://api4.thetvdb.com/v4/people/${tvdbPersonId}/extended`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const imdbRemote = (data?.data?.remoteIds || []).find(
+          (r) => r.sourceName === "IMDB",
+        );
+        if (imdbRemote?.id) {
+          return `https://www.imdb.com/name/${imdbRemote.id}`;
+        }
+      }
+    } catch (err) {
+      log("err", "getActorPage TVDB person lookup error:", err.message);
+    }
   }
 
-  const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, "_")}`;
+  if (!actorName) return null;
 
   try {
     // Search IMDb for the actor
@@ -2556,40 +2576,33 @@ export const getActorPage = async (params) => {
     const searchResp = await fetch(searchUrl);
 
     if (!searchResp.ok) {
-      log("err", "getActorPage IMDb search failed:", searchResp.status);
-      return wikiUrl;
+      return null;
     }
 
     const html = await searchResp.text();
 
-    // Find all matches to check for exact name match
-    // IMDb uses format: <a href="/name/nm1234567/?ref_=..."><h3 class="ipc-title__text">Actor Name</h3></a>
-    let match;
     const allMatches = [];
     const globalRegex = new RegExp(
       `<a\\s+href="(/name/nm\\d+)/[^"]*"[^>]*>.*?<h3[^>]*>([^<]+)</h3>`,
       "gis",
     );
-
+    let match;
     while ((match = globalRegex.exec(html)) !== null) {
       allMatches.push({ url: match[1], name: match[2].trim() });
     }
 
-    // Find exact match (case-insensitive)
     const exactMatch = allMatches.find(
       (m) => m.name.toLowerCase() === actorName.toLowerCase(),
     );
 
     if (exactMatch) {
-      const actorUrl = `https://www.imdb.com${exactMatch.url}`;
-      return actorUrl;
+      return `https://www.imdb.com${exactMatch.url}`;
     }
 
-    // No exact match found, return Wikipedia URL
-    return wikiUrl;
+    return null;
   } catch (err) {
     log("err", "getActorPage error:", err.message);
-    return wikiUrl;
+    return null;
   }
 };
 

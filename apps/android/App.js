@@ -1436,8 +1436,28 @@ export default function App() {
     const renderActorsContent = () => {
       const chars = show?.characters ?? [];
       const crew = show?.crew ?? [];
+      const openActorImdb = async (actor) => {
+        const name = (actor.actor ?? actor.personName ?? "").trim();
+        if (!name) return;
+        // Extract TVDB person ID from tvdbUrl e.g. https://thetvdb.com/people/252099-seth-green
+        const tvdbPersonId = actor.tvdbUrl
+          ? (actor.tvdbUrl.match(/\/people\/(\d+)/) || [])[1] ?? null
+          : null;
+        try {
+          const res = await fetch(`${TV_SRVR_HTTP_URL}/api/getActorPage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, tvdbPersonId }),
+          });
+          const url = await res.json();
+          if (url) Linking.openURL(url);
+          else Linking.openURL(`https://www.imdb.com/find?q=${encodeURIComponent(name)}&s=nm`);
+        } catch (_) {
+          Linking.openURL(`https://www.imdb.com/find?q=${encodeURIComponent(name)}&s=nm`);
+        }
+      };
       const renderActorCard = (actor, key) => (
-        <View key={key} style={showsStyles.actorCard}>
+        <TouchableOpacity key={key} style={showsStyles.actorCard} onPress={() => openActorImdb(actor)}>
           {actor.image || actor.personImgURL ? (
             <Image
               source={{ uri: actor.image ?? actor.personImgURL }}
@@ -1453,7 +1473,7 @@ export default function App() {
           <Text style={showsStyles.actorCharName} numberOfLines={1}>
             {(actor.character ?? actor.name) ? `(${actor.character ?? actor.name})` : ""}
           </Text>
-        </View>
+        </TouchableOpacity>
       );
       return (
         <ScrollView>
@@ -1482,7 +1502,7 @@ export default function App() {
               <Text style={showsStyles.actorSectionTitle}>Crew</Text>
               <View style={showsStyles.actorGrid}>
                 {crew.map((member, i) => (
-                  <View key={i} style={showsStyles.actorCard}>
+                  <TouchableOpacity key={i} style={showsStyles.actorCard} onPress={() => openActorImdb({ actor: member.name })}>
                     {member.image ? (
                       <Image
                         source={{ uri: member.image }}
@@ -1498,7 +1518,7 @@ export default function App() {
                     <Text style={showsStyles.actorCharName} numberOfLines={1}>
                       {member.type ? `(${member.type})` : ""}
                     </Text>
-                  </View>
+                  </TouchableOpacity>
                 ))}
               </View>
             </>

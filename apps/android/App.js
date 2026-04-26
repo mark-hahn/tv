@@ -1448,10 +1448,10 @@ export default function App() {
             <View style={showsStyles.actorImgPlaceholder} />
           )}
           <Text style={showsStyles.actorPersonName} numberOfLines={1}>
-            {actor.personName}
+            {actor.actor ?? actor.personName}
           </Text>
           <Text style={showsStyles.actorCharName} numberOfLines={1}>
-            {actor.name}
+            {(actor.character ?? actor.name) ? `(${actor.character ?? actor.name})` : ""}
           </Text>
         </View>
       );
@@ -1496,7 +1496,7 @@ export default function App() {
                       {member.name}
                     </Text>
                     <Text style={showsStyles.actorCharName} numberOfLines={1}>
-                      {member.type}
+                      {member.type ? `(${member.type})` : ""}
                     </Text>
                   </View>
                 ))}
@@ -2187,6 +2187,8 @@ const showsStyles = StyleSheet.create({
     padding: 4,
     alignItems: "center",
     marginBottom: 8,
+    backgroundColor: "#f5f5f5",
+    borderRadius: 6,
   },
   actorImg: {
     width: "100%",

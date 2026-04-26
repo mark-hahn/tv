@@ -62,6 +62,7 @@ export default function App() {
   const [posterExpanded, setPosterExpanded] = useState(false);
   const [showSeriesMap, setShowSeriesMap] = useState(null);
   const showSeriesMapNameRef = useRef(null);
+  const [flashCell, setFlashCell] = useState(null);
 
   const onGridLayout = ({ nativeEvent: { layout } }) => {
     if (layout.width < 10 || layout.height < 10) return;
@@ -362,6 +363,7 @@ export default function App() {
     if (!selectedShow) return;
     showSeriesMapNameRef.current = null;
     setShowSeriesMap(null);
+    setFlashCell(null);
     setActiveTab("Info");
   }, [selectedShow?.name]);
 
@@ -1349,7 +1351,7 @@ export default function App() {
                       alignItems: "center",
                     }}
                   >
-                    <Text style={{ fontSize: 14, fontWeight: "bold" }}>
+                    <Text style={{ fontSize: 18, fontWeight: "bold" }}>
                       S{s}
                     </Text>
                   </View>
@@ -1372,7 +1374,7 @@ export default function App() {
                   >
                     <Text
                       style={{
-                        fontSize: 14,
+                        fontSize: 18,
                         fontWeight: "bold",
                         color: "#555",
                       }}
@@ -1402,9 +1404,21 @@ export default function App() {
                     >
                       {seasons.map((s) => {
                         const cell = sm[s]?.[ep];
+                        const isFlashing =
+                          flashCell?.s === s && flashCell?.e === ep;
                         return (
-                          <View
+                          <TouchableOpacity
                             key={s}
+                            onPress={() => {
+                              setFlashCell({ s, e: ep });
+                              setTimeout(() => {
+                                setFlashCell(null);
+                                setTimeout(() => {
+                                  setSelectedSE({ s, e: ep });
+                                  setActiveTab("Actors");
+                                }, 500);
+                              }, 500);
+                            }}
                             style={[
                               {
                                 width: COL_W,
@@ -1414,13 +1428,15 @@ export default function App() {
                                 justifyContent: "center",
                                 alignItems: "center",
                               },
-                              getCellBg(cell),
+                              isFlashing
+                                ? { backgroundColor: "red" }
+                                : getCellBg(cell),
                             ]}
                           >
-                            <Text style={{ fontSize: 13, fontWeight: "bold" }}>
+                            <Text style={{ fontSize: 17, fontWeight: "bold" }}>
                               {getCellText(cell)}
                             </Text>
-                          </View>
+                          </TouchableOpacity>
                         );
                       })}
                     </View>
@@ -1441,7 +1457,7 @@ export default function App() {
         if (!name) return;
         // Extract TVDB person ID from tvdbUrl e.g. https://thetvdb.com/people/252099-seth-green
         const tvdbPersonId = actor.tvdbUrl
-          ? (actor.tvdbUrl.match(/\/people\/(\d+)/) || [])[1] ?? null
+          ? ((actor.tvdbUrl.match(/\/people\/(\d+)/) || [])[1] ?? null)
           : null;
         try {
           const res = await fetch(`${TV_SRVR_HTTP_URL}/api/getActorPage`, {
@@ -1451,13 +1467,22 @@ export default function App() {
           });
           const url = await res.json();
           if (url) Linking.openURL(url);
-          else Linking.openURL(`https://www.imdb.com/find?q=${encodeURIComponent(name)}&s=nm`);
+          else
+            Linking.openURL(
+              `https://www.imdb.com/find?q=${encodeURIComponent(name)}&s=nm`,
+            );
         } catch (_) {
-          Linking.openURL(`https://www.imdb.com/find?q=${encodeURIComponent(name)}&s=nm`);
+          Linking.openURL(
+            `https://www.imdb.com/find?q=${encodeURIComponent(name)}&s=nm`,
+          );
         }
       };
       const renderActorCard = (actor, key) => (
-        <TouchableOpacity key={key} style={showsStyles.actorCard} onPress={() => openActorImdb(actor)}>
+        <TouchableOpacity
+          key={key}
+          style={showsStyles.actorCard}
+          onPress={() => openActorImdb(actor)}
+        >
           {actor.image || actor.personImgURL ? (
             <Image
               source={{ uri: actor.image ?? actor.personImgURL }}
@@ -1471,7 +1496,9 @@ export default function App() {
             {actor.actor ?? actor.personName}
           </Text>
           <Text style={showsStyles.actorCharName} numberOfLines={1}>
-            {(actor.character ?? actor.name) ? `(${actor.character ?? actor.name})` : ""}
+            {(actor.character ?? actor.name)
+              ? `(${actor.character ?? actor.name})`
+              : ""}
           </Text>
         </TouchableOpacity>
       );
@@ -1502,7 +1529,11 @@ export default function App() {
               <Text style={showsStyles.actorSectionTitle}>Crew</Text>
               <View style={showsStyles.actorGrid}>
                 {crew.map((member, i) => (
-                  <TouchableOpacity key={i} style={showsStyles.actorCard} onPress={() => openActorImdb({ actor: member.name })}>
+                  <TouchableOpacity
+                    key={i}
+                    style={showsStyles.actorCard}
+                    onPress={() => openActorImdb({ actor: member.name })}
+                  >
                     {member.image ? (
                       <Image
                         source={{ uri: member.image }}

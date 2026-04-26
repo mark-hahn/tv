@@ -784,6 +784,7 @@ export default {
     },
 
     startAppsHold() {
+      this._appsHoldActive = true;
       this._appsHoldFired = false;
       this._appsHoldTimer = setTimeout(() => {
         this._appsHoldFired = true;
@@ -793,11 +794,12 @@ export default {
 
     stopAppsHold() {
       clearTimeout(this._appsHoldTimer);
-      if (!this._appsHoldFired) {
+      if (this._appsHoldActive && !this._appsHoldFired) {
         if (this.mode === "google" || this.mode === "fire") {
           this.showStreamers = true;
         }
       }
+      this._appsHoldActive = false;
       this._appsHoldFired = false;
     },
 

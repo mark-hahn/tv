@@ -463,6 +463,14 @@ export function chksrtSelect(videoPath, selectedSrtPath) {
   );
 }
 
+export function getChksrtHistory() {
+  return httpCall("/api/asr/chksrt/history");
+}
+
+export function addChksrtHistory(entry) {
+  return httpCall("/api/asr/chksrt/history/add", entry, "POST");
+}
+
 export function getAsrLog() {
   return httpCall("/api/asr/log");
 }

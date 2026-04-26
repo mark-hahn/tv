@@ -31,17 +31,36 @@
         v-if="mode === 'chksrt'"
         style="
           flex: 1;
-          color: white;
-          font-size: 13px;
+          display: flex;
+          align-items: center;
           padding-left: 14px;
-          user-select: none;
-          text-shadow: 0 0 3px #000;
           overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
+          gap: 6px;
         "
       >
-        {{ chksrtFilename }}
+        <span
+          v-if="chksrtMatch"
+          style="
+            color: yellow;
+            font-size: 13px;
+            flex-shrink: 0;
+            text-shadow: 0 0 3px #000;
+            user-select: none;
+          "
+          >Match</span
+        >
+        <span
+          style="
+            color: white;
+            font-size: 13px;
+            user-select: none;
+            text-shadow: 0 0 3px #000;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          "
+          >{{ chksrtFilename }}</span
+        >
       </div>
       <!-- Timing slider (srt tracks only, not in chksrt mode) -->
       <div
@@ -199,7 +218,13 @@
           padding: '2px 8px',
           borderRadius: '4px',
           border:
-            activeTrackId === choice.id ? '2px solid white' : '1px solid #666',
+            chksrtMatch &&
+            (subtitleLabelMap.get(choice.id) ?? choice.label) ===
+              chksrtMatch.choice
+              ? '2px solid yellow'
+              : activeTrackId === choice.id
+                ? '2px solid white'
+                : '1px solid #666',
           color: activeTrackId === choice.id ? 'white' : '#999',
           fontSize: '13px',
           cursor: 'pointer',
@@ -283,6 +308,8 @@ import {
   chksrtOk,
   chksrtGenSrt,
   chksrtSelect,
+  getChksrtHistory,
+  addChksrtHistory,
 } from "../srvr.js";
 
 const TV_SRVR_URL = config.tvSrvrUrl;
@@ -303,6 +330,7 @@ export default {
       subtitleOffset: 0,
       vidSrc: "",
       errorRetries: 0,
+      chksrtMatch: null,
     };
   },
   computed: {
@@ -377,6 +405,7 @@ export default {
       this._mseStop();
       this.subtitleTracks = [];
       this.activeTrackId = null;
+      this.chksrtMatch = null;
       this.errorRetries = 0;
       this.vidSrc = newVal ? this.streamUrl : "";
       this.subtitleOffset = offsetCache.get(newVal) ?? 0;
@@ -411,6 +440,8 @@ export default {
             this.vidSrc = this._buildStreamUrl(tracks[0].index);
           }
         }
+        if (this.mode === "chksrt")
+          await this._loadChksrtHistoryAndCompare(filePath);
       } catch (e) {
         console.error("[subtitle-list] fetch error:", e);
       }
@@ -556,6 +587,66 @@ export default {
       );
       this.vidSrc = blobUrl;
     },
+    async _loadChksrtHistoryAndCompare(forPath) {
+      this.chksrtMatch = null;
+      let history;
+      try {
+        history = await getChksrtHistory();
+      } catch (e) {
+        return;
+      }
+      if (this.path !== forPath) return; // stale — path changed while fetching
+      if (!Array.isArray(history) || history.length === 0) return;
+      const pathParts = forPath.split("/");
+      const videoFilename = pathParts[pathParts.length - 1];
+      const showName = forPath.startsWith("/mnt/media/tv/")
+        ? forPath.slice("/mnt/media/tv/".length).split("/")[0]
+        : "";
+      const embeddedCounts = {};
+      let openSubsCount = 0;
+      for (const t of this.subtitleTracks) {
+        if (t.type === "pgs")
+          embeddedCounts.pgs = (embeddedCounts.pgs || 0) + 1;
+        else if (t.type === "embedded")
+          embeddedCounts.text = (embeddedCounts.text || 0) + 1;
+        else if (t.type === "srt" && /\.opn.{5}\.srt$/i.test(t.file || ""))
+          openSubsCount++;
+      }
+      const last12 = videoFilename.slice(-12);
+      const ecStr = JSON.stringify(embeddedCounts);
+      for (const h of history) {
+        if (h.showName !== showName) continue;
+        if ((h.videoFilename || "").slice(-12) !== last12) continue;
+        if (JSON.stringify(h.embeddedCounts || {}) !== ecStr) continue;
+        this.chksrtMatch = h;
+        break;
+      }
+    },
+    _saveChksrtHistory(choiceLabel) {
+      if (!this.path) return;
+      const pathParts = this.path.split("/");
+      const videoFilename = pathParts[pathParts.length - 1];
+      const showName = this.path.startsWith("/mnt/media/tv/")
+        ? this.path.slice("/mnt/media/tv/".length).split("/")[0]
+        : "";
+      const embeddedCounts = {};
+      let openSubsCount = 0;
+      for (const t of this.subtitleTracks) {
+        if (t.type === "pgs")
+          embeddedCounts.pgs = (embeddedCounts.pgs || 0) + 1;
+        else if (t.type === "embedded")
+          embeddedCounts.text = (embeddedCounts.text || 0) + 1;
+        else if (t.type === "srt" && /\.opn.{5}\.srt$/i.test(t.file || ""))
+          openSubsCount++;
+      }
+      addChksrtHistory({
+        showName,
+        videoFilename,
+        embeddedCounts,
+        openSubsCount,
+        choice: choiceLabel,
+      }).catch((e) => console.error("[chksrt] addChksrtHistory error:", e));
+    },
     async applySliderOffset() {
       const track = this.activeTrack;
       if (!track || track.type !== "srt" || this.subtitleOffset === 0) return;
@@ -598,13 +689,17 @@ export default {
     },
     onChoiceClick(choice, event) {
       if (event.ctrlKey && this.mode === "chksrt") {
+        const choiceLabel =
+          this.subtitleLabelMap.get(choice.id) ?? choice.label;
         if (choice.type === "srt" && choice.file) {
           const dir = this.path.replace(/\/[^\/]+$/, "");
           const selectedSrtPath = dir + "/" + choice.file;
+          this._saveChksrtHistory(choiceLabel);
           chksrtSelect(this.path, selectedSrtPath)
             .then(() => this.$emit("chksrt-next", null))
             .catch((e) => console.error("[chksrt] select error:", e));
         } else if (choice.type === "embedded" || choice.type === "pgs") {
+          this._saveChksrtHistory(choiceLabel);
           chksrtSelect(this.path, null)
             .then(() => this.$emit("chksrt-next", null))
             .catch((e) => console.error("[chksrt] select error:", e));

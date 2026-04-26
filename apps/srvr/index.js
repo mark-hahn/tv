@@ -95,10 +95,12 @@ const ASR_QUEUE_PATH = "/root/dev/apps/tv/apps/asr/data/asrQueue.json";
 const SUBTITLE_LOG_PATH = "/root/dev/apps/tv/apps/asr/data/subtitle.log";
 const SUBTITLE_LOG_DIR = "/root/dev/apps/tv/apps/asr/data/subtitle-logs/";
 const ASR_JS_PATH = "/root/dev/apps/tv/apps/asr/asr.js";
+const CHKSRT_HISTORY_PATH = path.join(SRVR_DATA_DIR, "chksrt-history.json");
 const ASR_LOG_BUFFER_MAX = 500;
 let subQueue = [],
   subQueueChkSrt = [],
   asrQueue = [];
+let chksrtHistory = [];
 let subQueueBusy = false,
   chkSubQueueDelay = 10_000,
   asrQueueDelay = 10_000;
@@ -843,6 +845,25 @@ function loadQueues() {
     asrQueue = JSON.parse(fs.readFileSync(ASR_QUEUE_PATH, "utf8"));
   } catch {
     asrQueue = [];
+  }
+}
+function loadChksrtHistory() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(CHKSRT_HISTORY_PATH, "utf8"));
+    chksrtHistory = Array.isArray(raw) ? raw : [];
+  } catch {
+    chksrtHistory = [];
+  }
+}
+function persistChksrtHistory() {
+  try {
+    fs.writeFileSync(
+      CHKSRT_HISTORY_PATH,
+      JSON.stringify(chksrtHistory),
+      "utf8",
+    );
+  } catch (e) {
+    console.error("[chksrt-history] persist error:", e.message);
   }
 }
 function logSubtitle(msg) {
@@ -4050,6 +4071,43 @@ app.post("/api/asr/chksrt/select", (req, res) => {
   res.json({ ok: true });
 });
 
+app.get("/api/asr/chksrt/history", (req, res) => {
+  res.json(chksrtHistory);
+});
+
+app.post("/api/asr/chksrt/history/add", (req, res) => {
+  const { showName, videoFilename, embeddedCounts, openSubsCount, choice } =
+    req.body || {};
+  if (!showName || !videoFilename || !choice) {
+    res.status(400).json({ error: "showName, videoFilename, choice required" });
+    return;
+  }
+  const entry = {
+    showName: String(showName),
+    videoFilename: String(videoFilename),
+    embeddedCounts:
+      embeddedCounts && typeof embeddedCounts === "object"
+        ? embeddedCounts
+        : {},
+    openSubsCount: Number(openSubsCount) || 0,
+    choice: String(choice),
+  };
+  // Dedup: remove identical entries (exact filename match)
+  chksrtHistory = chksrtHistory.filter(
+    (h) =>
+      h.videoFilename !== entry.videoFilename ||
+      h.showName !== entry.showName ||
+      JSON.stringify(h.embeddedCounts || {}) !==
+        JSON.stringify(entry.embeddedCounts) ||
+      (h.openSubsCount || 0) !== entry.openSubsCount ||
+      h.choice !== entry.choice,
+  );
+  chksrtHistory.unshift(entry);
+  if (chksrtHistory.length > 100) chksrtHistory.length = 100;
+  persistChksrtHistory();
+  res.json({ ok: true });
+});
+
 // Email
 app.post("/api/sendEmail", apiWrapper(sendEmailHandler));
 
@@ -4143,6 +4201,7 @@ const httpsOptions = {
 https.createServer(httpsOptions, app).listen(HTTP_PORT, () => {
   console.log(`HTTPS API listening on port ${HTTP_PORT}`);
   loadQueues();
+  loadChksrtHistory();
   startSubQueueLoop();
   startAsrQueueLoop();
 });

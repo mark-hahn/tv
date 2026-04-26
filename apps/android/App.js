@@ -5,6 +5,7 @@ import {
   StyleSheet,
   StatusBar,
   ScrollView,
+  FlatList,
   TouchableOpacity,
   TextInput,
   Image,
@@ -15,6 +16,20 @@ import allServices from "./services.json";
 
 const TV_TV_URL = "https://hahnca.com/tv-tv";
 const TV_SRVR_WS_URL = "wss://hahnca.com/tv-srvr";
+const TV_SRVR_HTTP_URL = "https://hahnca.com/tv-srvr";
+
+function buildSeriesMap(seriesMapIn) {
+  if (!seriesMapIn || seriesMapIn.length === 0) return null;
+  const result = {};
+  for (const [seasonNum, episodes] of seriesMapIn) {
+    const seasonMap = {};
+    result[seasonNum] = seasonMap;
+    for (const [episodeNum, epiObj] of episodes) {
+      seasonMap[episodeNum] = epiObj;
+    }
+  }
+  return result;
+}
 
 const COLS = 3;
 const ROWS = 5;
@@ -36,6 +51,12 @@ export default function App() {
   const [missingEpWarning, setMissingEpWarning] = useState(null);
   const [layoutOption, setLayoutOption] = useState("mark");
   const [showShows, setShowShows] = useState(false);
+  const [showsList, setShowsList] = useState([]);
+  const [selectedShow, setSelectedShow] = useState(null);
+  const [selectedSE, setSelectedSE] = useState(null);
+  const [followPlaying, setFollowPlaying] = useState(false);
+  const [activeTab, setActiveTab] = useState("List");
+  const [guestActors, setGuestActors] = useState([]);
 
   const onGridLayout = ({ nativeEvent: { layout } }) => {
     if (layout.width < 10 || layout.height < 10) return;
@@ -71,6 +92,10 @@ export default function App() {
   const homeHoldFiredRef = useRef(false);
   const backHoldRef = useRef(null);
   const backHoldFiredRef = useRef(false);
+  const lastPlayingShowRef = useRef(null);
+  const showsListRef = useRef([]);
+  const showsListLoadedRef = useRef(false);
+  const showsFlatListRef = useRef(null);
 
   const debounce = () => {
     const now = Date.now();
@@ -174,6 +199,26 @@ export default function App() {
           msg.notification === "missingEpisodeWarning"
         ) {
           setMissingEpWarning(msg.data);
+        } else if (msg.id === 0 && msg.notification === "nowPlaying") {
+          const { showName, playing } = msg.data ?? {};
+          if (showName) {
+            const s = playing?.[0]?.season ?? null;
+            const e = playing?.[0]?.episode ?? null;
+            const prev = lastPlayingShowRef.current;
+            lastPlayingShowRef.current = { name: showName, s, e };
+            if (prev?.name !== showName) {
+              const playingShow = showsListRef.current.find(
+                (sh) => sh.name === showName,
+              );
+              if (playingShow) {
+                setFollowPlaying(true);
+                setSelectedShow(playingShow);
+                setSelectedSE(s != null && e != null ? { s, e } : null);
+              }
+            } else {
+              setSelectedSE(s != null && e != null ? { s, e } : null);
+            }
+          }
         }
       } catch (_) {}
     };
@@ -206,6 +251,91 @@ export default function App() {
       clearTimeout(unlockHoldTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!showShows || showsListLoadedRef.current) return;
+    showsListLoadedRef.current = true;
+    (async () => {
+      try {
+        const res = await fetch(`${TV_SRVR_HTTP_URL}/api/getAllTvdb?hasEmby=0`);
+        const data = await res.json();
+        const list = Object.entries(data)
+          .map(([name, show]) => ({ ...show, name }))
+          .sort((a, b) => {
+            const ka = a.name.replace(/^the /i, "").toLowerCase();
+            const kb = b.name.replace(/^the /i, "").toLowerCase();
+            return ka < kb ? -1 : ka > kb ? 1 : 0;
+          });
+        showsListRef.current = list;
+        setShowsList(list);
+        if (list.length > 0) {
+          const lp = lastPlayingShowRef.current;
+          const playingShow = lp ? list.find((s) => s.name === lp.name) : null;
+          if (playingShow) {
+            setFollowPlaying(true);
+            setSelectedShow(playingShow);
+            setSelectedSE(
+              lp.s != null && lp.e != null ? { s: lp.s, e: lp.e } : null,
+            );
+          } else {
+            setSelectedShow((prev) => prev ?? list[0]);
+          }
+        }
+      } catch (_) {}
+    })();
+  }, [showShows]);
+
+  useEffect(() => {
+    if (!selectedSE || !selectedShow) {
+      setGuestActors([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${TV_SRVR_HTTP_URL}/api/getTmdb`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            showName: selectedShow.name,
+            year: null,
+            season: selectedSE.s,
+            episode: selectedSE.e,
+          }),
+        });
+        const data = await res.json();
+        if (cancelled) return;
+        const guests = (Array.isArray(data) ? data : []).map((g) => ({
+          personName: g.name,
+          name: g.character,
+          image: g.profile_path
+            ? `https://image.tmdb.org/t/p/w185${g.profile_path}`
+            : null,
+        }));
+        setGuestActors(guests);
+      } catch (_) {
+        if (!cancelled) setGuestActors([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedShow?.name, selectedSE?.s, selectedSE?.e]);
+
+  useEffect(() => {
+    if (
+      !showShows ||
+      activeTab !== "List" ||
+      showsList.length === 0 ||
+      !selectedShow
+    )
+      return;
+    const idx = showsList.findIndex((s) => s.name === selectedShow.name);
+    if (idx < 0) return;
+    setTimeout(() => {
+      showsFlatListRef.current?.scrollToIndex({ index: idx, animated: false });
+    }, 100);
+  }, [showShows, activeTab, selectedShow?.name, showsList.length]);
 
   const flash = (btn) => {
     setFlashBtn(btn);
@@ -909,17 +1039,350 @@ export default function App() {
   }
 
   if (showShows) {
+    const show = selectedShow;
+    const seLabel =
+      followPlaying && selectedSE
+        ? ` (S${String(selectedSE.s).padStart(2, "0")}E${String(selectedSE.e).padStart(2, "0")})`
+        : "";
+
+    const handleHeaderPress = () => {
+      const lp = lastPlayingShowRef.current;
+      if (!lp) return;
+      const playingShow = showsListRef.current.find((s) => s.name === lp.name);
+      if (!playingShow) return;
+      setFollowPlaying(true);
+      setSelectedShow(playingShow);
+      setSelectedSE(lp.s != null && lp.e != null ? { s: lp.s, e: lp.e } : null);
+      setActiveTab("Info");
+    };
+
+    const getCellBg = (cell) => {
+      if (!cell) return {};
+      if (cell.error) return { backgroundColor: "yellow" };
+      if (cell.noFile) return { backgroundColor: "#faa" };
+      return { backgroundColor: "white" };
+    };
+
+    const getCellText = (cell) => {
+      if (!cell) return "";
+      if (cell.played) return "W";
+      if (cell.avail && !cell.unaired) return "+";
+      if (cell.noFile && !cell.unaired) return "-";
+      if (cell.unaired && !cell.played && cell.noFile) return "U";
+      return "";
+    };
+
+    const renderListContent = () => {
+      const initialIdx = Math.max(
+        0,
+        showsList.findIndex((s) => s.name === show?.name),
+      );
+      return (
+        <FlatList
+          ref={showsFlatListRef}
+          data={showsList}
+          keyExtractor={(item) => item.name}
+          getItemLayout={(_, index) => ({
+            length: 40,
+            offset: 40 * index,
+            index,
+          })}
+          initialScrollIndex={initialIdx}
+          onScrollToIndexFailed={() => {}}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              onPress={() => {
+                setSelectedShow(item);
+                setFollowPlaying(false);
+                setSelectedSE(null);
+                setActiveTab("Info");
+              }}
+              style={[
+                showsStyles.listRow,
+                item.name === show?.name && showsStyles.listRowSelected,
+              ]}
+            >
+              <Text style={showsStyles.listRowName} numberOfLines={1}>
+                {item.name}
+              </Text>
+              <View style={showsStyles.listRowRight}>
+                {item.notReady === false && (
+                  <Text style={showsStyles.listRowPlus}>+</Text>
+                )}
+                {item.waitStr ? (
+                  <Text style={showsStyles.listRowWait}>{item.waitStr}</Text>
+                ) : null}
+              </View>
+            </TouchableOpacity>
+          )}
+        />
+      );
+    };
+
+    const renderInfoContent = () => {
+      if (!show) return null;
+      const posterUri = show.image ?? show.imageUrl ?? null;
+      const dates = [show.firstAired, show.lastAired]
+        .filter(Boolean)
+        .join(" — ");
+      const network = show.originalNetwork ?? "";
+      const genres = Array.isArray(show.genres) ? show.genres.join(", ") : "";
+      const status = show.status ?? "";
+      const runtime = show.averageRuntime ? `${show.averageRuntime} Mins` : "";
+      const seasons = show.seasonCount ? `${show.seasonCount} seasons` : "";
+      const cntryLang = [show.originalCountry, show.originalLanguage]
+        .filter(Boolean)
+        .join(" / ");
+      const overview = show.overview ?? show.description ?? "";
+      return (
+        <ScrollView>
+          <View style={showsStyles.infoTop}>
+            <View style={showsStyles.posterBox}>
+              {posterUri ? (
+                <Image
+                  source={{ uri: posterUri }}
+                  style={showsStyles.posterImg}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={showsStyles.posterPlaceholder}>
+                  <Text style={showsStyles.posterPlaceholderText}>
+                    No Image
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View style={showsStyles.infoBox}>
+              {dates ? (
+                <Text style={showsStyles.infoField}>{dates}</Text>
+              ) : null}
+              {status ? (
+                <Text style={showsStyles.infoField}>{status}</Text>
+              ) : null}
+              {network ? (
+                <Text style={showsStyles.infoField}>{network}</Text>
+              ) : null}
+              {genres ? (
+                <Text style={showsStyles.infoField}>{genres}</Text>
+              ) : null}
+              {seasons ? (
+                <Text style={showsStyles.infoField}>{seasons}</Text>
+              ) : null}
+              {cntryLang ? (
+                <Text style={showsStyles.infoField}>{cntryLang}</Text>
+              ) : null}
+              {runtime ? (
+                <Text style={showsStyles.infoField}>{runtime}</Text>
+              ) : null}
+            </View>
+          </View>
+          {overview ? (
+            <Text style={showsStyles.overviewText}>{overview}</Text>
+          ) : null}
+        </ScrollView>
+      );
+    };
+
+    const renderMapContent = () => {
+      if (!show?.seriesMap) return null;
+      const sm = buildSeriesMap(show.seriesMap);
+      if (!sm) return null;
+      const seasons = Object.keys(sm)
+        .map(Number)
+        .sort((a, b) => a - b);
+      const maxEp = seasons.reduce((max, s) => {
+        const epNums = Object.keys(sm[s]).map(Number);
+        return Math.max(max, ...epNums);
+      }, 0);
+      const episodes = Array.from({ length: maxEp }, (_, i) => i + 1);
+      const COL_W = 36;
+      const ROW_H = 28;
+      return (
+        <ScrollView nestedScrollEnabled>
+          <View style={{ flexDirection: "row" }}>
+            <View style={{ width: 40 }}>
+              <View style={{ height: ROW_H }} />
+              {episodes.map((ep) => (
+                <View
+                  key={ep}
+                  style={{
+                    height: ROW_H,
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  <Text style={{ fontSize: 11, color: "#555" }}>{ep}</Text>
+                </View>
+              ))}
+            </View>
+            <ScrollView horizontal nestedScrollEnabled>
+              <View>
+                <View style={{ flexDirection: "row", height: ROW_H }}>
+                  {seasons.map((s) => (
+                    <View
+                      key={s}
+                      style={{
+                        width: COL_W,
+                        justifyContent: "center",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: "bold" }}>
+                        S{s}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+                {episodes.map((ep) => (
+                  <View
+                    key={ep}
+                    style={{ flexDirection: "row", height: ROW_H }}
+                  >
+                    {seasons.map((s) => {
+                      const cell = sm[s]?.[ep];
+                      return (
+                        <View
+                          key={s}
+                          style={[
+                            {
+                              width: COL_W,
+                              height: ROW_H,
+                              borderWidth: 0.5,
+                              borderColor: "#ccc",
+                              justifyContent: "center",
+                              alignItems: "center",
+                            },
+                            getCellBg(cell),
+                          ]}
+                        >
+                          <Text style={{ fontSize: 10 }}>
+                            {getCellText(cell)}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        </ScrollView>
+      );
+    };
+
+    const renderActorsContent = () => {
+      const chars = show?.characters ?? [];
+      const crew = show?.crew ?? [];
+      const renderActorCard = (actor, key) => (
+        <View key={key} style={showsStyles.actorCard}>
+          {actor.image || actor.personImgURL ? (
+            <Image
+              source={{ uri: actor.image ?? actor.personImgURL }}
+              style={showsStyles.actorImg}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={showsStyles.actorImgPlaceholder} />
+          )}
+          <Text style={showsStyles.actorPersonName} numberOfLines={1}>
+            {actor.personName}
+          </Text>
+          <Text style={showsStyles.actorCharName} numberOfLines={1}>
+            {actor.name}
+          </Text>
+        </View>
+      );
+      return (
+        <ScrollView>
+          {chars.length > 0 && (
+            <>
+              <Text style={showsStyles.actorSectionTitle}>Cast</Text>
+              <View style={showsStyles.actorGrid}>
+                {chars.map((actor, i) => renderActorCard(actor, i))}
+              </View>
+            </>
+          )}
+          {selectedSE && guestActors.length > 0 && (
+            <>
+              <View style={showsStyles.sectionDivider} />
+              <Text style={showsStyles.actorSectionTitle}>
+                {`Guests S${String(selectedSE.s).padStart(2, "0")}E${String(selectedSE.e).padStart(2, "0")}`}
+              </Text>
+              <View style={showsStyles.actorGrid}>
+                {guestActors.map((actor, i) => renderActorCard(actor, i))}
+              </View>
+            </>
+          )}
+          {crew.length > 0 && (
+            <>
+              <View style={showsStyles.sectionDivider} />
+              <Text style={showsStyles.actorSectionTitle}>Crew</Text>
+              <View style={showsStyles.actorGrid}>
+                {crew.map((member, i) => (
+                  <View key={i} style={showsStyles.actorCard}>
+                    {member.image ? (
+                      <Image
+                        source={{ uri: member.image }}
+                        style={showsStyles.actorImg}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={showsStyles.actorImgPlaceholder} />
+                    )}
+                    <Text style={showsStyles.actorPersonName} numberOfLines={1}>
+                      {member.name}
+                    </Text>
+                    <Text style={showsStyles.actorCharName} numberOfLines={1}>
+                      {member.type}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+        </ScrollView>
+      );
+    };
+
     return (
       <View style={showsStyles.container}>
         <StatusBar hidden />
-        <View style={showsStyles.header}>
-          <Text style={showsStyles.title}>Shows Screen</Text>
+        <TouchableOpacity
+          onPress={handleHeaderPress}
+          style={showsStyles.headerRow}
+          activeOpacity={0.7}
+        >
+          <Text style={showsStyles.headerTitle} numberOfLines={1}>
+            {show?.name ?? "—"}
+            {seLabel}
+          </Text>
+        </TouchableOpacity>
+        <View style={showsStyles.tabRow}>
+          {["List", "Info", "Map", "Actors"].map((tab) => (
+            <TouchableOpacity
+              key={tab}
+              onPress={() => setActiveTab(tab)}
+              style={[
+                showsStyles.tabBtn,
+                activeTab === tab && showsStyles.tabBtnActive,
+              ]}
+            >
+              <Text style={showsStyles.tabBtnText}>{tab}</Text>
+            </TouchableOpacity>
+          ))}
+          <Text style={showsStyles.tabPipe}>|</Text>
           <TouchableOpacity
             onPress={() => setShowShows(false)}
-            style={showsStyles.closeBtn}
+            style={showsStyles.closeTabBtn}
           >
-            <Text style={showsStyles.closeBtnText}>✕</Text>
+            <Text style={showsStyles.tabBtnText}>Close</Text>
           </TouchableOpacity>
+        </View>
+        <View style={showsStyles.contentPane}>
+          {activeTab === "List" && renderListContent()}
+          {activeTab === "Info" && renderInfoContent()}
+          {activeTab === "Map" && renderMapContent()}
+          {activeTab === "Actors" && renderActorsContent()}
         </View>
       </View>
     );
@@ -1389,28 +1852,173 @@ const missingEpStyles = StyleSheet.create({
 const showsStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: "#fff",
     paddingTop: SCREEN_MARGIN,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  headerRow: {
     paddingHorizontal: 16,
     paddingVertical: 10,
+    backgroundColor: "#f0f0f0",
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
   },
-  title: {
-    color: "#fff",
-    fontSize: 24,
+  headerTitle: {
+    fontSize: 18,
     fontWeight: "bold",
+    color: "#000",
+  },
+  tabRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
+  },
+  tabBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: "center",
+    backgroundColor: "whitesmoke",
+  },
+  tabBtnActive: {
+    backgroundColor: "lightgray",
+  },
+  tabBtnText: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  tabPipe: {
+    paddingHorizontal: 4,
+    color: "#999",
+    fontSize: 16,
+  },
+  closeTabBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: "center",
+    backgroundColor: "whitesmoke",
+  },
+  contentPane: {
     flex: 1,
   },
-  closeBtn: {
-    padding: 8,
+  listRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: 40,
+    paddingHorizontal: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#eee",
+    backgroundColor: "white",
   },
-  closeBtnText: {
-    color: "#fff",
-    fontSize: 28,
-    lineHeight: 32,
+  listRowSelected: {
+    backgroundColor: "lightblue",
+  },
+  listRowName: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#000",
+  },
+  listRowRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  listRowPlus: {
+    fontSize: 14,
+    color: "#000",
+  },
+  listRowWait: {
+    fontSize: 12,
+    color: "blue",
+  },
+  infoTop: {
+    flexDirection: "row",
+    padding: 12,
+  },
+  posterBox: {
+    flex: 1,
+    marginRight: 12,
+  },
+  posterImg: {
+    width: "100%",
+    aspectRatio: 2 / 3,
+    borderRadius: 4,
+  },
+  posterPlaceholder: {
+    width: "100%",
+    aspectRatio: 2 / 3,
+    backgroundColor: "#ddd",
+    borderRadius: 4,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  posterPlaceholderText: {
+    color: "#888",
+    fontSize: 12,
+  },
+  infoBox: {
+    flex: 2,
+  },
+  infoField: {
+    fontSize: 13,
+    color: "#222",
+    lineHeight: 18,
+    marginBottom: 2,
+  },
+  overviewText: {
+    fontSize: 13,
+    color: "#333",
+    lineHeight: 20,
+    paddingHorizontal: 12,
+    paddingBottom: 16,
+  },
+  actorSectionTitle: {
+    fontSize: 14,
+    fontWeight: "bold",
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 6,
+    color: "#000",
+  },
+  actorGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: 6,
+  },
+  actorCard: {
+    width: "33.33%",
+    padding: 4,
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  actorImg: {
+    width: "100%",
+    aspectRatio: 100 / 130,
+    borderRadius: 4,
+    marginBottom: 4,
+  },
+  actorImgPlaceholder: {
+    width: "100%",
+    aspectRatio: 100 / 130,
+    backgroundColor: "#ddd",
+    borderRadius: 4,
+    marginBottom: 4,
+  },
+  actorPersonName: {
+    fontSize: 12,
+    fontWeight: "bold",
+    textAlign: "center",
+    color: "#000",
+  },
+  actorCharName: {
+    fontSize: 11,
+    color: "#555",
+    textAlign: "center",
+  },
+  sectionDivider: {
+    height: 2,
+    backgroundColor: "#000",
+    marginVertical: 4,
+    marginHorizontal: 12,
   },
 });

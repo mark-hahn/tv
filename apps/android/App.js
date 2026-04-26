@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   TextInput,
   Image,
+  Linking,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -1185,7 +1186,11 @@ export default function App() {
               )}
             </View>
             {!posterExpanded && (
-              <View style={showsStyles.infoBox}>
+              <TouchableOpacity
+                style={showsStyles.infoBox}
+                activeOpacity={show.imdbUrl ? 0.6 : 1}
+                onPress={() => show.imdbUrl && Linking.openURL(show.imdbUrl)}
+              >
                 {firstAired ? (
                   <Text style={showsStyles.infoField}>{firstAired}</Text>
                 ) : null}
@@ -1217,7 +1222,7 @@ export default function App() {
                     Watched {watchedTxt}
                   </Text>
                 ) : null}
-              </View>
+              </TouchableOpacity>
             )}
           </View>
           {overview ? (

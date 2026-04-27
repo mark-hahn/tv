@@ -2163,6 +2163,9 @@ export default {
         curTvdb.value = tvdb;
       }
       postBrowseHistory("browse", curTvdb.value);
+      if (previewMode.value) {
+        handlePreview();
+      }
     };
 
     const handleSearchComplete = (tvdb) => {

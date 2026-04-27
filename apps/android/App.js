@@ -68,7 +68,7 @@ export default function App() {
   const [showSearch, setShowSearch] = useState("");
   const [posterExpanded, setPosterExpanded] = useState(false);
   const [showSeriesMap, setShowSeriesMap] = useState(null);
-  const showSeriesMapNameRef = useRef(null);
+  const [mapRefreshKey, setMapRefreshKey] = useState(0);
   const [flashCell, setFlashCell] = useState(null);
   const [mapImageExpanded, setMapImageExpanded] = useState(false);
 
@@ -217,6 +217,7 @@ export default function App() {
           setMissingEpWarning(msg.data);
         } else if (msg.id === 0 && msg.notification === "nowPlaying") {
           const { showName, playing } = msg.data ?? {};
+          setMapRefreshKey((k) => k + 1);
           if (showName) {
             const s = playing?.[0]?.season ?? null;
             const e = playing?.[0]?.episode ?? null;
@@ -384,7 +385,6 @@ export default function App() {
 
   useEffect(() => {
     if (!selectedShow) return;
-    showSeriesMapNameRef.current = null;
     setShowSeriesMap(null);
     setFlashCell(null);
     setMapImageExpanded(false);
@@ -393,8 +393,6 @@ export default function App() {
 
   useEffect(() => {
     if (activeTab !== "Map" || !selectedShow) return;
-    if (showSeriesMapNameRef.current === selectedShow.name) return;
-    showSeriesMapNameRef.current = selectedShow.name;
     setShowSeriesMap(null);
     (async () => {
       try {
@@ -426,7 +424,7 @@ export default function App() {
         if (data.success && data.seriesMap) setShowSeriesMap(data.seriesMap);
       } catch (_) {}
     })();
-  }, [activeTab, selectedShow?.name]);
+  }, [activeTab, selectedShow?.name, mapRefreshKey]);
 
   const flash = (btn) => {
     setFlashBtn(btn);

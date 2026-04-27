@@ -144,10 +144,12 @@ export default {
       };
     };
 
-    const selectCard = (idx) => {
+    const selectCard = async (idx) => {
       if (idx !== 0) {
         const [item] = tvdbList.value.splice(idx, 1);
         tvdbList.value.unshift(item);
+        await nextTick();
+        if (galleryPane.value) galleryPane.value.scrollTop = 0;
       }
       selectedIdx.value = 0;
       emit("select", tvdbList.value[0]);

@@ -850,6 +850,7 @@ export default {
       img.style.height = "auto";
       img.style.objectFit = "contain";
       img.style.display = "block";
+      img.style.visibility = "hidden";
 
       // Use tvdbData image if available, otherwise use show.imageUrl, fallback to placeholder
       let src = "./question-mark.png";
@@ -876,6 +877,12 @@ export default {
       if (this.show?.name !== showNameAtStart) return;
 
       posterEl.replaceChildren(img);
+
+      const infoBoxEl = document.getElementById("infoBox");
+      if (infoBoxEl && infoBoxEl.clientHeight > 0) {
+        img.style.maxHeight = infoBoxEl.clientHeight + "px";
+        img.style.visibility = "visible";
+      }
     },
 
     async setCrewTxt(tvdbData) {
@@ -1581,6 +1588,7 @@ export default {
               const posterImg = document.querySelector("#poster img");
               if (infoBoxEl && posterImg) {
                 posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
+                posterImg.style.visibility = "visible";
               }
             });
             void this.setRemotes();
@@ -1594,6 +1602,7 @@ export default {
             const posterImg = document.querySelector("#poster img");
             if (infoBoxEl && posterImg) {
               posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
+              posterImg.style.visibility = "visible";
             }
           }
         } finally {

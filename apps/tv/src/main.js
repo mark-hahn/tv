@@ -120,7 +120,6 @@ function devicePriority(s) {
 }
 
 function updateNowPlaying(sessions) {
-  const withItem = sessions.filter((s) => s.NowPlayingItem);
   const playing = sessions
     .filter((s) => s.NowPlayingItem?.SeriesName)
     .sort((a, b) => devicePriority(a) - devicePriority(b))
@@ -129,10 +128,15 @@ function updateNowPlaying(sessions) {
       device: deviceLabel(s),
       season: s.NowPlayingItem.ParentIndexNumber ?? null,
       episode: s.NowPlayingItem.IndexNumber ?? null,
+      positionTicks: s.PlayState?.PositionTicks ?? null,
+      runtimeTicks: s.NowPlayingItem.RunTimeTicks ?? null,
     }));
 
-  const key = JSON.stringify(playing);
-  if (key === currentShowName) return;
+  // Dedup key excludes position so position-only changes don't suppress the send
+  const key = JSON.stringify(
+    playing.map(({ positionTicks, runtimeTicks, ...p }) => p),
+  );
+  if (key === currentShowName && playing.length === 0) return;
   currentShowName = key;
 
   const showName = playing[0]?.showName ?? null;

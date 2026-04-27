@@ -69,6 +69,7 @@ export default function App() {
   const [posterExpanded, setPosterExpanded] = useState(false);
   const [showSeriesMap, setShowSeriesMap] = useState(null);
   const [mapRefreshKey, setMapRefreshKey] = useState(0);
+  const [playProgress, setPlayProgress] = useState(null);
   const [flashCell, setFlashCell] = useState(null);
   const [mapImageExpanded, setMapImageExpanded] = useState(false);
 
@@ -217,12 +218,26 @@ export default function App() {
           setMissingEpWarning(msg.data);
         } else if (msg.id === 0 && msg.notification === "nowPlaying") {
           const { showName, playing } = msg.data ?? {};
-          setMapRefreshKey((k) => k + 1);
+          const s = playing?.[0]?.season ?? null;
+          const e = playing?.[0]?.episode ?? null;
+          const positionTicks = playing?.[0]?.positionTicks ?? null;
+          const runtimeTicks = playing?.[0]?.runtimeTicks ?? null;
+          const prev = showPlayingRef.current;
+          const episodeChanged =
+            prev?.name !== showName || prev?.s !== s || prev?.e !== e;
+          if (episodeChanged) setMapRefreshKey((k) => k + 1);
           if (showName) {
-            const s = playing?.[0]?.season ?? null;
-            const e = playing?.[0]?.episode ?? null;
-            const prev = showPlayingRef.current;
             showPlayingRef.current = { name: showName, s, e };
+            if (
+              positionTicks != null &&
+              runtimeTicks != null &&
+              runtimeTicks > 0
+            ) {
+              setPlayProgress({
+                position: positionTicks,
+                duration: runtimeTicks,
+              });
+            }
             if (prev?.name !== showName) {
               const playingShow = showsListRef.current.find(
                 (sh) => sh.name === showName,
@@ -1528,6 +1543,17 @@ export default function App() {
                         : ""}
                     </Text>
                   </View>
+                  {followPlaying && playProgress && (
+                    <View style={{ height: 3, backgroundColor: "#ddd" }}>
+                      <View
+                        style={{
+                          height: 3,
+                          backgroundColor: "#2a2",
+                          width: `${Math.min(100, (playProgress.position / playProgress.duration) * 100)}%`,
+                        }}
+                      />
+                    </View>
+                  )}
                   <View
                     style={{
                       flexDirection: "row",

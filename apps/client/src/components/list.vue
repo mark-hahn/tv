@@ -1767,6 +1767,7 @@ export default {
 
     async allClick() {
       evtBus.emit("clearFilterButtons");
+      evtBus.emit("clearDescrSearch");
       this.actorFilter = null;
       this.actorSearchParams = null;
       evtBus.emit("actorSearchCleared");
@@ -2170,6 +2171,7 @@ export default {
       this.actorFilter = null; // Clear actor filter when changing filter
       this.actorSearchParams = null;
       evtBus.emit("actorSearchCleared");
+      if (fltrChoice === "All") evtBus.emit("clearDescrSearch");
       if (fltrChoice != "Close") {
         // Set filters first
         window.localStorage.setItem("fltrChoice", fltrChoice);

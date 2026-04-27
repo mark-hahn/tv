@@ -762,6 +762,11 @@ export default {
       evtBus.emit("descrSearch", this.descrSearchStr);
     },
 
+    onClearDescrSearch() {
+      this.descrSearchStr = "";
+      evtBus.emit("descrSearch", "");
+    },
+
     async handleBodyClick() {
       // In preview mode, do not open/switch to Map.
       if (this.previewMode) return;
@@ -1774,6 +1779,7 @@ export default {
     };
     evtBus.on("showQueueEmpty", this.onShowQueueEmpty);
     evtBus.on("localFoldersChanged", this.recheckTwoLocalFolders);
+    evtBus.on("clearDescrSearch", this.onClearDescrSearch);
   },
 
   beforeUnmount() {
@@ -1788,6 +1794,7 @@ export default {
     if (this.onShowQueueEmpty)
       evtBus.off("showQueueEmpty", this.onShowQueueEmpty);
     evtBus.off("localFoldersChanged", this.recheckTwoLocalFolders);
+    evtBus.off("clearDescrSearch", this.onClearDescrSearch);
 
     if (this.refreshStuckLogTimerId) {
       clearTimeout(this.refreshStuckLogTimerId);

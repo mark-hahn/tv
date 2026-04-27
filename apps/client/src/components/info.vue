@@ -1789,6 +1789,19 @@ export default {
     evtBus.on("showQueueEmpty", this.onShowQueueEmpty);
     evtBus.on("localFoldersChanged", this.recheckTwoLocalFolders);
     evtBus.on("clearDescrSearch", this.onClearDescrSearch);
+
+    this._onPaneChanged = (pane) => {
+      if (pane !== "info") return;
+      this.$nextTick(() => {
+        const infoBoxEl = document.getElementById("infoBox");
+        const posterImg = document.querySelector("#poster img");
+        if (infoBoxEl && posterImg && infoBoxEl.clientHeight > 0) {
+          posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
+          posterImg.style.visibility = "visible";
+        }
+      });
+    };
+    evtBus.on("paneChanged", this._onPaneChanged);
   },
 
   beforeUnmount() {
@@ -1804,6 +1817,7 @@ export default {
       evtBus.off("showQueueEmpty", this.onShowQueueEmpty);
     evtBus.off("localFoldersChanged", this.recheckTwoLocalFolders);
     evtBus.off("clearDescrSearch", this.onClearDescrSearch);
+    if (this._onPaneChanged) evtBus.off("paneChanged", this._onPaneChanged);
 
     if (this.refreshStuckLogTimerId) {
       clearTimeout(this.refreshStuckLogTimerId);

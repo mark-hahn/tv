@@ -221,7 +221,7 @@
         >
           <Info
             v-show="currentPane === 'info'"
-            style="display: block; width: 100%; height: 100%"
+            style="display: flex; width: 100%; height: 100%"
             :simpleMode="simpleMode"
             :sizing="activeSizing"
             :hideButtonsPane="showSideButtons"

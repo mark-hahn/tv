@@ -9,8 +9,7 @@
       margin: 0,
       display: 'flex',
       flexDirection: 'column',
-      overflowY: 'auto',
-      overflowX: 'hidden',
+      overflow: 'hidden',
       maxWidth: '100%',
       boxSizing: 'border-box',
       position: 'relative',
@@ -53,6 +52,7 @@
         gap: '10px',
         margin: '0px',
         marginBottom: '10px',
+        flexShrink: 0,
       }"
     >
       <div
@@ -270,6 +270,7 @@
         width: '100%',
         gridTemplateColumns: '1fr 3fr 1fr 3fr 1fr',
         alignItems: 'start',
+        flexShrink: 0,
       }"
     >
       <!-- Column 2: poster (1/3)-->
@@ -577,6 +578,7 @@
         margin-top: 15px;
         padding: 0 10px;
         width: 100%;
+        flex-shrink: 0;
       "
     >
       <div
@@ -613,9 +615,15 @@
     </div>
     <div
       id="bot"
-      :style="{ fontSize: sizing.overviewFontSize || '20px', padding: '10px' }"
+      :style="{
+        overflowY: 'scroll',
+        flex: '1 1 0',
+        minHeight: '0',
+      }"
     >
-      {{ show.overview }}
+      <div :style="{ fontSize: sizing.overviewFontSize || '20px', padding: '10px' }">
+        {{ show.overview }}
+      </div>
     </div>
   </div>
 </template>

@@ -268,7 +268,7 @@
         display: 'grid',
         cursor: 'default',
         width: '100%',
-        gridTemplateColumns: '1fr 3fr 1fr 3fr 1fr',
+        gridTemplateColumns: '1fr 3fr 1fr 3.6fr 1fr',
         alignItems: 'start',
         flexShrink: 0,
       }"
@@ -403,18 +403,6 @@
               </div>
             </div>
             <div
-              id="lastwatched"
-              v-if="lastWatchedDate"
-              style="
-                min-height: 20px;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-              "
-            >
-              Last watched: {{ lastWatchedDate }}
-            </div>
-            <div
               id="cntrylang"
               v-if="(cntryLangLeftTxt &amp;&amp; cntryLangLeftTxt.length &gt; 0) || (cntryLangRightTxt &amp;&amp; cntryLangRightTxt.length &gt; 0)"
               style="
@@ -487,36 +475,6 @@
                 text-overflow: ellipsis;
               "
             ></div>
-            <!-- Next Up: keep episode and suffix on separate lines-->
-            <div
-              id="nextup"
-              v-if="nextUpValTxt &amp;&amp; String(nextUpValTxt).length &gt; 0"
-              style="
-                min-height: 32px;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-              "
-            >
-              <div
-                style="
-                  display: flex;
-                  column-gap: 8px;
-                  justify-content: center;
-                  align-items: center;
-                "
-              >
-                <div style="white-space: nowrap">Next Up</div>
-                <div style="white-space: nowrap">{{ nextUpValTxt }}</div>
-              </div>
-              <div
-                v-if="nextUpSuffixTxt &amp;&amp; String(nextUpSuffixTxt).length &gt; 0"
-                style="white-space: nowrap"
-              >
-                {{ nextUpSuffixTxt }}
-              </div>
-            </div>
             <div
               id="collection"
               v-if="collectionName"
@@ -621,7 +579,12 @@
         minHeight: '0',
       }"
     >
-      <div :style="{ fontSize: sizing.overviewFontSize || '20px', padding: '10px' }">
+      <div
+        :style="{
+          fontSize: sizing.overviewFontSize || '20px',
+          padding: '10px',
+        }"
+      >
         {{ show.overview }}
       </div>
     </div>
@@ -878,11 +841,8 @@ export default {
       const showNameAtStart = this.show?.name;
 
       const img = new Image();
-      // Poster column is 25% of pane; fill that column.
-      img.style.width = "100%";
-      img.style.maxWidth = "100%";
+      img.style.width = "auto";
       img.style.height = "auto";
-      // Cap poster height to keep the header compact.
       img.style.objectFit = "contain";
       img.style.display = "block";
 
@@ -1611,12 +1571,25 @@ export default {
           if (this.previewMode) {
             // Preview should render core info immediately; remotes can populate later.
             this.seriesReady = true;
+            void this.$nextTick().then(() => {
+              const infoBoxEl = document.getElementById("infoBox");
+              const posterImg = document.querySelector("#poster img");
+              if (infoBoxEl && posterImg) {
+                posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
+              }
+            });
             void this.setRemotes();
           } else {
             await this.setNextWatch();
             await this.setRemotes();
             // Only show the info box (and email input) once everything is populated.
             this.seriesReady = true;
+            await this.$nextTick();
+            const infoBoxEl = document.getElementById("infoBox");
+            const posterImg = document.querySelector("#poster img");
+            if (infoBoxEl && posterImg) {
+              posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
+            }
           }
         } finally {
           evtBus.emit("previewPanesLoading", false);

@@ -108,6 +108,7 @@ export default function App() {
   const backHoldRef = useRef(null);
   const backHoldFiredRef = useRef(false);
   const showPlayingRef = useRef(null);
+  const followPlayingRef = useRef(false);
   const showSelectedRef = useRef(null);
   const showsListRef = useRef([]);
   const showsListLoadedRef = useRef(false);
@@ -243,11 +244,12 @@ export default function App() {
                 (sh) => sh.name === showName,
               );
               if (playingShow) {
+                followPlayingRef.current = true;
                 setFollowPlaying(true);
                 setSelectedShow(playingShow);
                 setSelectedSE(s != null && e != null ? { s, e } : null);
               }
-            } else if (s != null && e != null) {
+            } else if (s != null && e != null && followPlayingRef.current) {
               setSelectedSE({ s, e });
             }
           }
@@ -1165,6 +1167,7 @@ export default function App() {
           (s) => s.name === lp.name,
         );
         if (!playingShow) return;
+        followPlayingRef.current = true;
         setFollowPlaying(true);
         setSelectedShow(playingShow);
         setSelectedSE(
@@ -1215,6 +1218,7 @@ export default function App() {
                 showSelectedRef.current = { name: item.name };
                 setShowSearch("");
                 setSelectedShow(item);
+                followPlayingRef.current = false;
                 setFollowPlaying(false);
                 setSelectedSE(null);
                 setActiveTab("Info");
@@ -1446,6 +1450,8 @@ export default function App() {
                           <TouchableOpacity
                             key={s}
                             onPress={() => {
+                              followPlayingRef.current = false;
+                              setFollowPlaying(false);
                               setSelectedSE({ s, e: ep });
                             }}
                             style={[

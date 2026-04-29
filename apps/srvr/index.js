@@ -1938,8 +1938,10 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
 let embyFullSweepTickCount = 0;
 tvdb.setPreTvdbTickCallback(async ({ isBackground } = {}) => {
   embyFullSweepTickCount++;
-  if (!isBackground || embyFullSweepTickCount % 10 === 1) {
-    await runEmbyFullSweep();
+  // TEST: skip sweep on foreground (user-triggered) ticks — revert by removing `&& isBackground`
+  if (isBackground && embyFullSweepTickCount % 10 === 1) {
+    const caller = `preTick-bg#${embyFullSweepTickCount}`;
+    await runEmbyFullSweep(caller);
   }
 });
 
@@ -3130,7 +3132,7 @@ app.post(
   "/api/triggerEmbySync",
   apiWrapper(async () => {
     console.log("[triggerEmbySync] Running full Emby sweep");
-    await runEmbyFullSweep();
+    await runEmbyFullSweep("triggerEmbySync");
     return { ok: true };
   }),
 );
@@ -3839,7 +3841,7 @@ app.post("/api/createShowFolder", apiWrapper(createShowFolder));
 app.post(
   "/api/embySync",
   apiWrapper(async () => {
-    await runEmbyFullSweep();
+    await runEmbyFullSweep("embySync");
     return { ok: true };
   }),
 );
@@ -4781,11 +4783,15 @@ async function syncEmbyUserData() {
  */
 let embyFullSweepRunning = false;
 let embyFullSweepQueued = false;
-async function runEmbyFullSweep() {
+let embyFullSweepQueuedCaller = null;
+async function runEmbyFullSweep(caller = "unknown") {
   if (embyFullSweepRunning) {
     embyFullSweepQueued = true;
+    embyFullSweepQueuedCaller = caller;
+    console.log(`[runEmbyFullSweep] queued from: ${caller}`);
     return;
   }
+  console.log(`[runEmbyFullSweep] starting from: ${caller}`);
   embyFullSweepRunning = true;
   try {
     const allTvdb = tvdb.getAllTvdbSync();
@@ -5146,7 +5152,9 @@ async function runEmbyFullSweep() {
     embyFullSweepRunning = false;
     if (embyFullSweepQueued) {
       embyFullSweepQueued = false;
-      runEmbyFullSweep();
+      const c = embyFullSweepQueuedCaller || "queued";
+      embyFullSweepQueuedCaller = null;
+      runEmbyFullSweep(c);
     }
   }
 }

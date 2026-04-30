@@ -1450,8 +1450,10 @@ export default function App() {
                           <TouchableOpacity
                             key={s}
                             onPress={() => {
-                              followPlayingRef.current = false;
-                              setFollowPlaying(false);
+                              const lp = showPlayingRef.current;
+                              const isPlaying = lp && lp.s === s && lp.e === ep;
+                              followPlayingRef.current = isPlaying;
+                              setFollowPlaying(isPlaying);
                               setSelectedSE({ s, e: ep });
                             }}
                             style={[
@@ -1540,6 +1542,7 @@ export default function App() {
                     <Text
                       style={{
                         fontSize: fs(14),
+                        fontWeight: "bold",
                         color: "#555",
                         marginLeft: 8,
                       }}
@@ -1549,22 +1552,66 @@ export default function App() {
                         : ""}
                     </Text>
                   </View>
-                  {followPlaying && playProgress && (
-                    <View style={{ height: 3, backgroundColor: "#ddd" }}>
-                      <View
-                        style={{
-                          height: 3,
-                          backgroundColor: "#2a2",
-                          width: `${Math.min(100, (playProgress.position / playProgress.duration) * 100)}%`,
-                        }}
-                      />
-                    </View>
-                  )}
+                  {followPlaying &&
+                    playProgress &&
+                    (() => {
+                      const totalSec = Math.round(playProgress.duration / 1e7);
+                      const posSec = Math.round(playProgress.position / 1e7);
+                      const remSec = Math.max(0, totalSec - posSec);
+                      const fmt = (s) => {
+                        const h = Math.floor(s / 3600);
+                        const m = Math.floor((s % 3600) / 60);
+                        return `${h}:${String(m).padStart(2, "0")}`;
+                      };
+                      const pct = Math.min(
+                        100,
+                        (playProgress.position / playProgress.duration) * 100,
+                      );
+                      return (
+                        <View
+                          style={{ flexDirection: "row", alignItems: "center" }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: fs(18),
+                              color: "#555",
+                              marginHorizontal: 4,
+                            }}
+                          >
+                            {fmt(totalSec)}
+                          </Text>
+                          <View
+                            style={{
+                              flex: 1,
+                              height: 6,
+                              backgroundColor: "#ddd",
+                            }}
+                          >
+                            <View
+                              style={{
+                                height: 6,
+                                backgroundColor: "#2a2",
+                                width: `${pct}%`,
+                              }}
+                            />
+                          </View>
+                          <Text
+                            style={{
+                              fontSize: fs(18),
+                              color: "#555",
+                              marginHorizontal: 4,
+                            }}
+                          >
+                            {fmt(remSec)}
+                          </Text>
+                        </View>
+                      );
+                    })()}
                   <View
                     style={{
                       flexDirection: "row",
                       height: imgHeight + 30,
-                      paddingVertical: 15,
+                      paddingVertical: 7,
                     }}
                   >
                     {episodeInfo.image ? (

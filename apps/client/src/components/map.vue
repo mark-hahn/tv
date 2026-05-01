@@ -519,12 +519,11 @@
       "
     />
     <div
-      v-if="!hideMapBottom && !showHistory && mapImageExpanded && episodeInfo?.image"
-      @click="mapImageExpanded = false"
-      style="
-        border-top: 6px solid black;
-        cursor: pointer;
+      v-if="
+        !hideMapBottom && !showHistory && mapImageExpanded && episodeInfo?.image
       "
+      @click="mapImageExpanded = false"
+      style="border-top: 6px solid black; cursor: pointer"
     >
       <img
         :src="episodeInfo.image"
@@ -539,9 +538,7 @@
     </div>
     <div
       v-if="!hideMapBottom && !showHistory && selectedEpisode && episodeInfo"
-      style="
-        border-top: 3px solid black;
-      "
+      style="border-top: 3px solid black"
     >
       <div
         style="

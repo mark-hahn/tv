@@ -412,11 +412,15 @@
                     padding: '1px 4px',
                     textAlign: 'center',
                     border: '1px solid #ccc',
-                    backgroundColor: seriesMap[season]?.[episode]?.error
-                      ? 'yellow'
-                      : seriesMap[season]?.[episode]?.noFile
-                        ? '#faa'
-                        : 'white',
+                    backgroundColor:
+                      selectedEpisode?.s === season &&
+                      selectedEpisode?.e === episode
+                        ? 'lightgreen'
+                        : seriesMap[season]?.[episode]?.error
+                          ? 'yellow'
+                          : seriesMap[season]?.[episode]?.noFile
+                            ? '#faa'
+                            : 'white',
                   }"
                 >
                   <span v-if="seriesMap?.[season]?.[episode]?.played"> w</span
@@ -514,6 +518,122 @@
         box-sizing: border-box;
       "
     />
+    <div
+      v-if="!hideMapBottom && !showHistory && mapImageExpanded && episodeInfo?.image"
+      @click="mapImageExpanded = false"
+      style="
+        border-top: 6px solid black;
+        cursor: pointer;
+      "
+    >
+      <img
+        :src="episodeInfo.image"
+        alt="episode"
+        style="
+          display: block;
+          width: 100%;
+          aspect-ratio: 16 / 9;
+          object-fit: cover;
+        "
+      />
+    </div>
+    <div
+      v-if="!hideMapBottom && !showHistory && selectedEpisode && episodeInfo"
+      style="
+        border-top: 3px solid black;
+      "
+    >
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 8px;
+          padding: 4px 8px;
+          border-bottom: 3px solid black;
+        "
+      >
+        <div
+          style="
+            flex: 1;
+            font-size: 16px;
+            font-weight: bold;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          "
+        >
+          {{ episodeInfo.name || "" }}
+        </div>
+        <div
+          style="
+            flex: 0 0 auto;
+            font-size: 14px;
+            font-weight: bold;
+            color: #555;
+            white-space: nowrap;
+          "
+        >
+          {{ formatEpisodeAired(episodeInfo.aired) }}
+        </div>
+      </div>
+      <div
+        style="
+          display: grid;
+          grid-template-columns: minmax(220px, 1fr) 1fr;
+          gap: 0;
+          padding: 7px 0;
+          align-items: stretch;
+        "
+      >
+        <button
+          v-if="episodeInfo.image"
+          @click.stop="mapImageExpanded = !mapImageExpanded"
+          style="
+            padding: 0;
+            margin: 0;
+            border: 0;
+            background: transparent;
+            cursor: pointer;
+          "
+        >
+          <img
+            :src="episodeInfo.image"
+            alt="episode"
+            style="
+              display: block;
+              width: 100%;
+              height: 100%;
+              aspect-ratio: 16 / 9;
+              object-fit: cover;
+            "
+          />
+        </button>
+        <div
+          v-else
+          style="
+            width: 100%;
+            height: 100%;
+            min-height: 140px;
+            background-color: #ddd;
+            aspect-ratio: 16 / 9;
+          "
+        ></div>
+        <div
+          style="
+            padding: 4px 8px;
+            overflow-y: auto;
+            color: #333;
+            font-size: 16px;
+            line-height: 22px;
+          "
+        >
+          <div v-if="episodeInfo.overview">
+            {{ episodeInfo.overview }}
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -598,6 +718,10 @@ export default {
       mapTouchSuppressClickUntil: 0,
       mapUpdateKey: 0,
       showHistory: false,
+      selectedEpisode: null,
+      episodeInfo: null,
+      mapImageExpanded: false,
+      episodeInfoRequestId: 0,
     };
   },
 
@@ -657,6 +781,9 @@ export default {
   watch: {
     async mapShow(newShow) {
       this.showHistory = false;
+      this.selectedEpisode = null;
+      this.episodeInfo = null;
+      this.mapImageExpanded = false;
       if (newShow && newShow.name) {
         this.seasonStates = {}; // Clear season states when show changes
         await this.loadTvdbData();
@@ -1127,6 +1254,42 @@ export default {
     handleMapClick() {
       // No action: click-to-close removed.
     },
+    formatEpisodeAired(aired) {
+      return aired ? String(aired).replace(/-/g, "/") : "";
+    },
+    async selectEpisode(season, episode) {
+      if (!this.mapShow?.name || !season || !episode) return;
+
+      this.selectedEpisode = { s: season, e: episode };
+      this.mapImageExpanded = false;
+      this.episodeInfo = null;
+
+      const reqId = ++this.episodeInfoRequestId;
+
+      try {
+        const data = await srvr.getTmdb({
+          showName: this.mapShow.name,
+          year: null,
+          season,
+          episode,
+        });
+        if (reqId !== this.episodeInfoRequestId) return;
+        if (data?.image || data?.overview) {
+          this.episodeInfo = {
+            image: data.image ?? null,
+            overview: data.overview ?? null,
+            name: data.name ?? null,
+            aired: data.aired ?? null,
+          };
+        } else {
+          this.episodeInfo = null;
+        }
+      } catch (err) {
+        if (reqId !== this.episodeInfoRequestId) return;
+        console.error("selectEpisode getTmdb error:", err);
+        this.episodeInfo = null;
+      }
+    },
     handleEpisodeClick(event, mapShow, season, episode) {
       if (this.simpleMode) {
         // In simple mode: click plays the episode if a file exists.
@@ -1138,6 +1301,14 @@ export default {
         return;
       }
       event.stopPropagation();
+
+      // Android behavior: plain click selects the episode and shows details.
+      // Keep legacy watched-toggle available on Shift-click.
+      if (!event?.ctrlKey && !event?.altKey && !event?.shiftKey) {
+        this.selectEpisode(season, episode);
+        return;
+      }
+
       // Alt-click plays the episode.
       if (event?.altKey) {
         const cell = this.seriesMap?.[season]?.[episode];
@@ -1146,6 +1317,12 @@ export default {
           return;
         }
       }
+
+      if (event?.shiftKey) {
+        this.$emit("episode-click", event, mapShow, season, episode);
+        return;
+      }
+
       this.$emit("episode-click", event, mapShow, season, episode);
     },
     handleSeasonClick(event, season) {

@@ -3638,7 +3638,8 @@ app.get("/api/subtitle-list", async (req, res) => {
       if (lang && lang !== "eng" && lang !== "en") continue;
       if (s.disposition?.forced === 1) continue;
       const label = s.tags?.title || s.tags?.language || "eng";
-      const isPgs = s.codec_name === "hdmv_pgs_subtitle";
+      const isPgs =
+        s.codec_name === "hdmv_pgs_subtitle" || s.codec_name === "dvb_subtitle";
       tracks.push({
         id: `emb-${s.index}`,
         label,

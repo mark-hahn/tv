@@ -863,14 +863,20 @@ export default {
           ? { ...p, subtitleStreamIndex: index }
           : p,
       );
+      clearInterval(this._subPollTimer);
+      let waitMs = 5000;
       try {
-        await fetch(`${config.tvTvUrl}/tv/emby/subtitle`, {
+        const res = await fetch(`${config.tvTvUrl}/tv/emby/subtitle`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sessionId: player.sessionId, index }),
         });
+        const data = await res.json();
+        if (data.waitMs) waitMs = data.waitMs;
       } catch (_) {}
+      await new Promise((r) => setTimeout(r, waitMs));
       await this.fetchSubPlayers();
+      this._subPollTimer = setInterval(() => this.fetchSubPlayers(), 3000);
     },
 
     modeBtnStyle(m) {

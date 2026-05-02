@@ -1,0 +1,19 @@
+#!/bin/bash
+START=$(date +%s)
+
+elapsed() {
+  local e=$(( $(date +%s) - START ))
+  printf "%02d:%02d" $(( e / 60 )) $(( e % 60 ))
+}
+
+DEVICE=$(adb devices | awk '/\tdevice$/{print $1; exit}')
+if [[ -z "$DEVICE" ]]; then
+  echo "No ADB device connected"
+  exit 1
+fi
+echo "$(elapsed) Device: $DEVICE"
+
+# Start build, prefix each line with elapsed time
+(cd /root/apps/tv/apps/android && ./build-apk "$DEVICE") 2>&1 | while IFS= read -r line; do
+  echo "$(elapsed) $line"
+done

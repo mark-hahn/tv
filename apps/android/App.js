@@ -38,6 +38,17 @@ function buildSeriesMap(seriesMapIn) {
   return result;
 }
 
+function displayEpisodeTitle(name) {
+  const title = String(name || "").trim();
+  if (!title) return "";
+  return /^(season|episode)\s+\d+$/i.test(title) ? "" : title;
+}
+
+function formatSelectedSE(selectedSE) {
+  if (!selectedSE?.s || !selectedSE?.e) return "";
+  return `(S${String(selectedSE.s).padStart(2, "0")}E${String(selectedSE.e).padStart(2, "0")})`;
+}
+
 const COLS = 3;
 const ROWS = 5;
 const BORDER = 13;
@@ -1529,19 +1540,40 @@ export default function App() {
                       borderBottomColor: "#000",
                     }}
                   >
+                    <View
+                      style={{
+                        flex: 1,
+                        flexDirection: "row",
+                        alignItems: "center",
+                      }}
+                    >
+                      {displayEpisodeTitle(episodeInfo.name) ? (
+                        <Text
+                          style={{
+                            fontSize: fs(16),
+                            fontWeight: "bold",
+                            flexShrink: 1,
+                          }}
+                          numberOfLines={1}
+                        >
+                          {displayEpisodeTitle(episodeInfo.name)}
+                        </Text>
+                      ) : null}
+                      <Text
+                        style={{
+                          fontSize: fs(16),
+                          marginLeft: displayEpisodeTitle(episodeInfo.name)
+                            ? 8
+                            : 0,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {formatSelectedSE(selectedSE)}
+                      </Text>
+                    </View>
                     <Text
                       style={{
                         fontSize: fs(16),
-                        fontWeight: "bold",
-                        flex: 1,
-                      }}
-                      numberOfLines={1}
-                    >
-                      {episodeInfo.name ?? ""}
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: fs(14),
                         fontWeight: "bold",
                         color: "#555",
                         marginLeft: 8,

@@ -1898,29 +1898,31 @@ export default function App() {
               <Text style={showsStyles.tabBtnText}>{tab}</Text>
             </TouchableOpacity>
           ))}
-          <TouchableOpacity
-            onPress={() => {
-              setShowEpiSubs(true);
-              if (selectedSE && selectedShow) {
-                fetch(
-                  `${TV_SRVR_HTTP_URL}/api/episodeSubs?show=${encodeURIComponent(selectedShow.name)}&s=${selectedSE.s}&e=${selectedSE.e}`,
-                )
-                  .then((r) => r.json())
-                  .then((tracks) =>
-                    setEpiSubTracks(Array.isArray(tracks) ? tracks : []),
+          {layoutOption !== "linda" && (
+            <TouchableOpacity
+              onPress={() => {
+                setShowEpiSubs(true);
+                if (selectedSE && selectedShow) {
+                  fetch(
+                    `${TV_SRVR_HTTP_URL}/api/episodeSubs?show=${encodeURIComponent(selectedShow.name)}&s=${selectedSE.s}&e=${selectedSE.e}`,
                   )
-                  .catch(() => setEpiSubTracks([]));
-              } else {
-                setEpiSubTracks([]);
-              }
-            }}
-            style={[
-              showsStyles.closeTabBtn,
-              showEpiSubs && showsStyles.tabBtnActive,
-            ]}
-          >
-            <Text style={showsStyles.tabBtnText}>Subs</Text>
-          </TouchableOpacity>
+                    .then((r) => r.json())
+                    .then((tracks) =>
+                      setEpiSubTracks(Array.isArray(tracks) ? tracks : []),
+                    )
+                    .catch(() => setEpiSubTracks([]));
+                } else {
+                  setEpiSubTracks([]);
+                }
+              }}
+              style={[
+                showsStyles.closeTabBtn,
+                showEpiSubs && showsStyles.tabBtnActive,
+              ]}
+            >
+              <Text style={showsStyles.tabBtnText}>Subs</Text>
+            </TouchableOpacity>
+          )}
         </View>
         {!showEpiSubs && activeTab === "List" && (
           <TextInput

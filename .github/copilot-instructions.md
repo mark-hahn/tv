@@ -15,7 +15,7 @@
 ## Where things run
 
 - **All server apps run on the remote server**.
-- The only thing that runs locally is **Vite**.
+- The only things that run locally are **Vite** and **Metro** (Android bundler).
 
 ## Nginx
 

@@ -26,6 +26,9 @@ const FIRE_HOME_DELAY_MS = 0; // ms after Fire TV turns on before sending home k
 const FIRE_EMBY_DELAY_MS = 5000; // ms after Fire TV turns on before launching Emby
 
 // Subtitle nav (IRCC key sequence) delays
+const SUB_NAV_PRE_DOWN1_DELAY_MS = 300; // after first prepend Down
+const SUB_NAV_PRE_DOWN2_DELAY_MS = 300; // after second prepend Down
+const SUB_NAV_PRE_RETURN_DELAY_MS = 300; // after prepend Return
 const SUB_NAV_DOWN_OPEN_DELAY_MS = 1000; // after initial Down to open OSD
 const SUB_NAV_RIGHT_DELAY_MS = 200; // after each Right arrow
 const SUB_NAV_OPEN_DELAY_MS = 500; // after Confirm to open subtitle menu
@@ -1085,6 +1088,9 @@ app.post("/tv/emby/subtitle", async (req, res) => {
     `[emby] subtitle nav: index=${index} downCount=${downCount} rightCount=${rightCount}`,
   );
   const navMs =
+    SUB_NAV_PRE_DOWN1_DELAY_MS +
+    SUB_NAV_PRE_DOWN2_DELAY_MS +
+    SUB_NAV_PRE_RETURN_DELAY_MS +
     SUB_NAV_DOWN_OPEN_DELAY_MS +
     rightCount * SUB_NAV_RIGHT_DELAY_MS +
     SUB_NAV_OPEN_DELAY_MS +
@@ -1095,6 +1101,9 @@ app.post("/tv/emby/subtitle", async (req, res) => {
   log(`[emby] subtitle nav waitMs=${waitMs}`);
   res.json({ ok: true, waitMs, navMs });
 
+  await sendIrcc("Down", SUB_NAV_PRE_DOWN1_DELAY_MS);
+  await sendIrcc("Down", SUB_NAV_PRE_DOWN2_DELAY_MS);
+  await sendIrcc("Return", SUB_NAV_PRE_RETURN_DELAY_MS);
   await sendIrcc("Down", SUB_NAV_DOWN_OPEN_DELAY_MS);
   for (let i = 0; i < rightCount; i++) {
     await sendIrcc("Right", SUB_NAV_RIGHT_DELAY_MS);

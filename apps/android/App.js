@@ -83,6 +83,8 @@ export default function App() {
   const [playProgress, setPlayProgress] = useState(null);
   const [flashCell, setFlashCell] = useState(null);
   const [mapImageExpanded, setMapImageExpanded] = useState(false);
+  const [showEpiSubs, setShowEpiSubs] = useState(false);
+  const [epiSubTracks, setEpiSubTracks] = useState([]);
 
   const onGridLayout = ({ nativeEvent: { layout } }) => {
     if (layout.width < 10 || layout.height < 10) return;
@@ -1803,13 +1805,70 @@ export default function App() {
       );
     };
 
+    const renderEpiSubsContent = () => {
+      const epName = episodeInfo?.name ?? "";
+      const isSeason = /^Season\s+\d+$/i.test(epName);
+      const displayName = isSeason ? "" : epName;
+      const seStr = selectedSE
+        ? `S${String(selectedSE.s).padStart(2, "0")}E${String(selectedSE.e).padStart(2, "0")}`
+        : "";
+      const headerText = displayName ? `${displayName} (${seStr})` : seStr;
+      return (
+        <View style={{ flex: 1 }}>
+          {displayName || seStr ? (
+            <View
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderBottomWidth: 1,
+                borderBottomColor: "#ccc",
+                backgroundColor: "#f8f8f8",
+              }}
+            >
+              <Text style={{ fontSize: fs(24) }}>
+                {displayName ? (
+                  <>
+                    <Text style={{ fontWeight: "bold" }}>{displayName}</Text>
+                    {seStr ? (
+                      <Text style={{ fontWeight: "normal" }}>
+                        {" (" + seStr + ")"}
+                      </Text>
+                    ) : null}
+                  </>
+                ) : (
+                  <Text>{seStr}</Text>
+                )}
+              </Text>
+            </View>
+          ) : null}
+          <ScrollView style={{ flex: 1, backgroundColor: "#fff" }}>
+            {!selectedSE ? (
+              <Text style={subCtrlStyles.noVideo}>No episode selected.</Text>
+            ) : epiSubTracks.length === 0 ? (
+              <Text style={subCtrlStyles.noVideo}>No subtitles found.</Text>
+            ) : (
+              epiSubTracks.map((sub, idx) => (
+                <View key={idx} style={subCtrlStyles.card}>
+                  <Text style={subCtrlStyles.cardText}>
+                    {subTypeChar(sub.type)}: {subShortLabel(sub.label)}
+                  </Text>
+                </View>
+              ))
+            )}
+          </ScrollView>
+        </View>
+      );
+    };
+
     const handleTabPress = (tab) => {
       setShowSearch("");
+      setShowEpiSubs(false);
       setActiveTab(tab);
     };
 
     const handleClose = () => {
       setShowSearch("");
+      setShowEpiSubs(false);
       setShowShows(false);
     };
 
@@ -1833,21 +1892,37 @@ export default function App() {
               onPress={() => handleTabPress(tab)}
               style={[
                 showsStyles.tabBtn,
-                activeTab === tab && showsStyles.tabBtnActive,
+                !showEpiSubs && activeTab === tab && showsStyles.tabBtnActive,
               ]}
             >
               <Text style={showsStyles.tabBtnText}>{tab}</Text>
             </TouchableOpacity>
           ))}
-          <View style={showsStyles.tabDivider} />
           <TouchableOpacity
-            onPress={handleClose}
-            style={showsStyles.closeTabBtn}
+            onPress={() => {
+              setShowEpiSubs(true);
+              if (selectedSE && selectedShow) {
+                fetch(
+                  `${TV_SRVR_HTTP_URL}/api/episodeSubs?show=${encodeURIComponent(selectedShow.name)}&s=${selectedSE.s}&e=${selectedSE.e}`,
+                )
+                  .then((r) => r.json())
+                  .then((tracks) =>
+                    setEpiSubTracks(Array.isArray(tracks) ? tracks : []),
+                  )
+                  .catch(() => setEpiSubTracks([]));
+              } else {
+                setEpiSubTracks([]);
+              }
+            }}
+            style={[
+              showsStyles.closeTabBtn,
+              showEpiSubs && showsStyles.tabBtnActive,
+            ]}
           >
-            <Text style={showsStyles.tabBtnText}>Close</Text>
+            <Text style={showsStyles.tabBtnText}>Subs</Text>
           </TouchableOpacity>
         </View>
-        {activeTab === "List" && (
+        {!showEpiSubs && activeTab === "List" && (
           <TextInput
             style={showsStyles.searchInput}
             value={showSearch}
@@ -1859,11 +1934,24 @@ export default function App() {
           />
         )}
         <View style={showsStyles.contentPane}>
-          {activeTab === "List" && renderListContent()}
-          {activeTab === "Info" && renderInfoContent()}
-          {activeTab === "Map" && renderMapContent()}
-          {activeTab === "Actors" && renderActorsContent()}
+          {showEpiSubs ? (
+            renderEpiSubsContent()
+          ) : (
+            <>
+              {activeTab === "List" && renderListContent()}
+              {activeTab === "Info" && renderInfoContent()}
+              {activeTab === "Map" && renderMapContent()}
+              {activeTab === "Actors" && renderActorsContent()}
+            </>
+          )}
         </View>
+        <TouchableOpacity
+          onPress={handleClose}
+          style={subCtrlStyles.closeBtn}
+          activeOpacity={0.7}
+        >
+          <Text style={subCtrlStyles.closeBtnText}>Close</Text>
+        </TouchableOpacity>
       </View>
     );
   }

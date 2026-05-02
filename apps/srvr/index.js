@@ -3701,6 +3701,78 @@ app.get("/api/subtitle-list", async (req, res) => {
   res.json(tracks);
 });
 
+app.get("/api/episodeSubs", async (req, res) => {
+  const showName = (req.query.show || "").trim();
+  const season = parseInt(req.query.s, 10);
+  const episode = parseInt(req.query.e, 10);
+  if (!showName || isNaN(season) || isNaN(episode)) {
+    res.status(400).json({ error: "show, s, e required" });
+    return;
+  }
+  if (showName.includes("/") || showName.includes("\\")) {
+    res.status(400).json({ error: "invalid show name" });
+    return;
+  }
+  const seasonDir = path.join(tvDir, showName, `Season ${season}`);
+  let entries;
+  try {
+    entries = fs.readdirSync(seasonDir);
+  } catch {
+    res.json([]);
+    return;
+  }
+  const seKey = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
+  const videoExt = /\.(mkv|mp4|avi|m4v|ts)$/i;
+  const videoFile = entries.find(
+    (f) => videoExt.test(f) && f.toUpperCase().includes(seKey),
+  );
+  if (!videoFile) {
+    res.json([]);
+    return;
+  }
+  const resolved = path.join(seasonDir, videoFile);
+  const stem = videoFile.replace(/\.[^.]+$/, "");
+  const tracks = [];
+  try {
+    const probeOut = cp
+      .execSync(
+        `ffprobe -v quiet -print_format json -show_streams "${resolved.replace(/"/g, '\\"')}"`,
+        { maxBuffer: 2 * 1024 * 1024 },
+      )
+      .toString();
+    const streams = JSON.parse(probeOut).streams || [];
+    for (const s of streams.filter((s) => s.codec_type === "subtitle")) {
+      const lang = (s.tags?.language || "").toLowerCase();
+      if (lang && lang !== "eng" && lang !== "en") continue;
+      if (s.disposition?.forced === 1) continue;
+      const label = s.tags?.title || s.tags?.language || "eng";
+      const isPgs =
+        s.codec_name === "hdmv_pgs_subtitle" || s.codec_name === "dvb_subtitle";
+      tracks.push({
+        id: `emb-${s.index}`,
+        label,
+        type: isPgs ? "pgs" : "embedded",
+        index: s.index,
+      });
+    }
+  } catch (e) {
+    console.error("[episodeSubs] probe error:", e.message);
+  }
+  try {
+    for (const f of entries) {
+      if (!f.endsWith(".srt") || !f.startsWith(stem)) continue;
+      const suffix = f
+        .slice(stem.length)
+        .replace(/\.srt$/, "")
+        .replace(/^\./, "");
+      tracks.push({ id: `srt-${f}`, label: suffix || f, type: "srt", file: f });
+    }
+  } catch (e) {
+    // ignore
+  }
+  res.json(tracks);
+});
+
 app.get("/api/subtitle", async (req, res) => {
   const filePath = req.query.path;
   if (!filePath) {

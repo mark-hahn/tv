@@ -26,9 +26,9 @@ const FIRE_HOME_DELAY_MS = 0; // ms after Fire TV turns on before sending home k
 const FIRE_EMBY_DELAY_MS = 5000; // ms after Fire TV turns on before launching Emby
 
 // Subtitle nav (IRCC key sequence) delays
-const SUB_NAV_PRE_DOWN1_DELAY_MS = 300; // after first prepend Down
-const SUB_NAV_PRE_DOWN2_DELAY_MS = 300; // after second prepend Down
-const SUB_NAV_PRE_RETURN_DELAY_MS = 300; // after prepend Return
+const SUB_NAV_PRE_DOWN1_DELAY_MS = 400; // after first prepend Down
+const SUB_NAV_PRE_DOWN2_DELAY_MS = 400; // after second prepend Down
+const SUB_NAV_PRE_RETURN_DELAY_MS = 600; // after prepend Return
 const SUB_NAV_DOWN_OPEN_DELAY_MS = 1000; // after initial Down to open OSD
 const SUB_NAV_RIGHT_DELAY_MS = 200; // after each Right arrow
 const SUB_NAV_OPEN_DELAY_MS = 500; // after Confirm to open subtitle menu

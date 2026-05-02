@@ -552,15 +552,29 @@
       >
         <div
           style="
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
             flex: 1;
-            font-size: 16px;
-            font-weight: bold;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
           "
         >
-          {{ episodeInfo.name || "" }}
+          <div
+            v-if="displayEpisodeTitle(episodeInfo.name)"
+            style="
+              min-width: 0;
+              font-size: 16px;
+              font-weight: bold;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            "
+          >
+            {{ displayEpisodeTitle(episodeInfo.name) }}
+          </div>
+          <div style="flex: 0 0 auto; font-size: 16px; white-space: nowrap">
+            {{ formatSelectedEpisode(selectedEpisode) }}
+          </div>
         </div>
         <div
           style="
@@ -1253,6 +1267,15 @@ export default {
     },
     formatEpisodeAired(aired) {
       return aired ? String(aired).replace(/-/g, "/") : "";
+    },
+    displayEpisodeTitle(name) {
+      const title = String(name || "").trim();
+      if (!title) return "";
+      return /^(season|episode)\s+\d+$/i.test(title) ? "" : title;
+    },
+    formatSelectedEpisode(selectedEpisode) {
+      if (!selectedEpisode?.s || !selectedEpisode?.e) return "";
+      return `(S${String(selectedEpisode.s).padStart(2, "0")}E${String(selectedEpisode.e).padStart(2, "0")})`;
     },
     async selectEpisode(season, episode) {
       if (!this.mapShow?.name || !season || !episode) return;

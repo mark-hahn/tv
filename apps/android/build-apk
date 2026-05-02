@@ -1,0 +1,60 @@
+#!/bin/bash
+# Build APK on hahnca.com and install on connected device
+# Usage: ./build-apk [device-serial]
+set -e
+
+DEVICE=${1:-56221JEBF01987}
+REMOTE=hahnca.com
+BUILD_DIR=/tmp/android-build
+APK_PATH=$BUILD_DIR/android/app/build/outputs/apk/release/app-release.apk
+LOCAL_APK=/tmp/tv-remote.apk
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+CACHE_FILE="$SCRIPT_DIR/.build-cache"
+
+CHECKSUM=$(md5sum "$SCRIPT_DIR/App.js" "$SCRIPT_DIR/app.json" "$SCRIPT_DIR/package.json" "$SCRIPT_DIR/babel.config.js" "$SCRIPT_DIR/eas.json" "$SCRIPT_DIR/index.js" | md5sum | cut -d' ' -f1)
+CACHED_CHECKSUM=$(cut -d' ' -f1 "$CACHE_FILE" 2>/dev/null || echo "")
+CACHED_APK=$(cut -d' ' -f2 "$CACHE_FILE" 2>/dev/null || echo "")
+
+if [[ "$CHECKSUM" == "$CACHED_CHECKSUM" && -n "$CACHED_APK" ]]; then
+  echo "==> Checksum matches cache — skipping build."
+  if [[ "$CACHED_APK" == gradle:* ]]; then
+    echo "==> Downloading cached APK from server..."
+    scp "$REMOTE:${CACHED_APK#gradle:}" "$LOCAL_APK"
+  else
+    echo "==> Downloading cached APK from URL..."
+    curl -L "$CACHED_APK" -o "$LOCAL_APK"
+  fi
+  echo "==> Installing on device $DEVICE..."
+  adb -s "$DEVICE" uninstall com.hahnca.tvremote 2>/dev/null || true
+  adb -s "$DEVICE" install -r "$LOCAL_APK"
+  echo "==> Done (from cache)."
+  exit 0
+fi
+
+echo "==> Syncing project to server..."
+rsync -a --delete \
+  --exclude node_modules \
+  --exclude .git \
+  --exclude android/build \
+  --exclude android/.gradle \
+  /root/apps/tv/apps/android/ $REMOTE:$BUILD_DIR/
+
+echo "==> Installing npm deps..."
+ssh $REMOTE "cd $BUILD_DIR && npm install --legacy-peer-deps 2>&1 | tail -3"
+
+echo "==> Building APK..."
+ssh $REMOTE "
+  export ANDROID_HOME=/opt/android-sdk
+  export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+  cd $BUILD_DIR/android
+  ./gradlew assembleRelease --console=plain 2>&1 | grep -E 'Task :app:|BUILD|FAIL|error'
+"
+
+echo "==> Downloading APK..."
+scp $REMOTE:$APK_PATH $LOCAL_APK
+
+echo "==> Installing on device $DEVICE..."
+adb -s $DEVICE uninstall com.hahnca.tvremote 2>/dev/null || true
+adb -s $DEVICE install -r $LOCAL_APK
+
+echo "==> Done."

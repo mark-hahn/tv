@@ -661,6 +661,7 @@ export default function App() {
   };
 
   const openSubCtrl = async () => {
+    if (mode !== "google" && mode !== "fire") return;
     setShowSubCtrl(true);
     await fetchSubPlayers();
     subPollRef.current = setInterval(fetchSubPlayers, 3000);

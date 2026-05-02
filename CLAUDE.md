@@ -41,26 +41,26 @@ cd apps/android && npx expo start --localhost
 adb -s <device-id> reverse tcp:8081 tcp:8081
 # Connect Expo Go to: exp://127.0.0.1:8081
 
-# Android: check build cache before running eas build
-cd apps/android && md5sum App.js app.json package.json babel.config.js eas.json index.js | md5sum | cut -d' ' -f1
-# Compare to first field in apps/android/.build-cache
-# If match: use APK URL from .build-cache -- do NOT run eas build
-# If differ: run eas build, then update .build-cache: "<checksum> <apk-url>"
+# Android: build and install APK (do NOT use eas build -- expo account cancelled)
+cd apps/android && ./build-apk [device-serial]
+# The script handles checksum caching, rsync to server, gradlew build, download, and adb install
+# If signature mismatch: adb uninstall com.hahnca.tvremote first
+# Known serials: 9a=56221JEBF01987, 6a=28231JEGR06978
 ```
 
 ## Monorepo Structure
 
 pnpm workspaces + Turborepo. Packages:
 
-| Package | Description |
-|---|---|
-| `apps/client` | Vue 3 web client (Vite build, served at `/shows/`) |
-| `apps/srvr` | Main backend — Express + WebSocket, serves show data, Emby integration, TVDB/TMDB |
-| `apps/api` | Torrent search backend — Playwright-based scraping of IPTorrents/TorrentLeech |
-| `apps/down` | Download manager — polls USB server, moves files into structured TV folder |
-| `apps/tv` | TV hardware control — Sony Bravia + Fire TV via Home Assistant, Broadlink IR |
-| `apps/asr` | Automatic subtitle recognition — Mistral audio API |
-| `apps/android` | React Native / Expo Go Android remote control app |
+| Package          | Description                                                                                |
+| ---------------- | ------------------------------------------------------------------------------------------ |
+| `apps/client`    | Vue 3 web client (Vite build, served at `/shows/`)                                         |
+| `apps/srvr`      | Main backend — Express + WebSocket, serves show data, Emby integration, TVDB/TMDB          |
+| `apps/api`       | Torrent search backend — Playwright-based scraping of IPTorrents/TorrentLeech              |
+| `apps/down`      | Download manager — polls USB server, moves files into structured TV folder                 |
+| `apps/tv`        | TV hardware control — Sony Bravia + Fire TV via Home Assistant, Broadlink IR               |
+| `apps/asr`       | Automatic subtitle recognition — Mistral audio API                                         |
+| `apps/android`   | React Native / Expo Go Android remote control app                                          |
 | `packages/share` | Shared utilities (title normalization, filename parsing, history) used by client + servers |
 
 ## Architecture
@@ -83,6 +83,7 @@ pnpm workspaces + Turborepo. Packages:
 ### Web Client (`apps/client`)
 
 Vue 3 SPA. Layout is a multi-pane UI with a sidebar buttons column and tabbed right panes. Key components:
+
 - `App.vue` — root layout, global CSS including `background-color: var(--btn-bg, whitesmoke) !important` on buttons inside named panes (`#tor`, `#info`, `#actors`, etc.). **To change button background dynamically, set `--btn-bg` CSS variable, not `backgroundColor` inline style.**
 - `tvpane.vue` — TV remote control UI (shared concern with Android app)
 - `srvr.js` — WebSocket + HTTP client that talks to `apps/srvr`
@@ -106,9 +107,9 @@ React Native single-file app (`App.js`). Mirrors the functionality of `tvpane.vu
 
 ## Log Locations (on remote)
 
-| Log | Path |
-|---|---|
-| srvr | `apps/srvr/data/misc/srvr.log` |
-| download | `apps/down/data/misc/tv.log` |
-| torrent results | `apps/api/data/tor-results.txt` |
-| asr | `apps/asr/data/asr.log` (remote), `/tmp/asr-debug.log` |
+| Log             | Path                                                   |
+| --------------- | ------------------------------------------------------ |
+| srvr            | `apps/srvr/data/misc/srvr.log`                         |
+| download        | `apps/down/data/misc/tv.log`                           |
+| torrent results | `apps/api/data/tor-results.txt`                        |
+| asr             | `apps/asr/data/asr.log` (remote), `/tmp/asr-debug.log` |

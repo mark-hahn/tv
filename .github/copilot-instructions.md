@@ -62,8 +62,40 @@
 - after metro starts, run `adb -s <device-id> reverse tcp:8081 tcp:8081` in another terminal
 - expo go should connect using url exp://127.0.0.1:8081 (not localhost -- use the IP)
 - if metro hangs and does not respond to http it has crashed -- kill it and restart in foreground to see the error
-- before running `eas build`, check for a duplicate build using the cache file:
-  1. Run: `cd apps/android && md5sum App.js app.json package.json babel.config.js eas.json index.js | md5sum | cut -d' ' -f1`
-  2. Compare result to the first field in `apps/android/.build-cache`
-  3. If they match, use the APK URL (second field) from `.build-cache` — do NOT run `eas build`
-  4. If they differ (or file missing), run `eas build`, then update `.build-cache` with the new checksum and APK URL in format: `<checksum> <apk-url>`
+
+## Android deployment
+
+### Hot update (JS changes only — no native rebuild needed)
+
+For changes to `App.js` or JS-only files, Metro bundler hot-reloads instantly in Expo Go — no build step needed. Just save the file and the app reloads on the device.
+
+### Final APK build and install
+
+Use the `build-apk` script (do NOT use `eas build` — expo account has been cancelled):
+
+```bash
+cd apps/android && ./build-apk [device-serial]
+```
+
+The script:
+
+1. Checks `.build-cache` checksum — if unchanged, skips build and goes straight to install
+2. rsyncs project to `hahnca.com:/tmp/android-build/`
+3. Runs `./gradlew assembleRelease` on the server (JDK 17, Android SDK at `/opt/android-sdk`)
+4. Downloads APK to `/tmp/tv-remote.apk` and installs via adb
+5. Updates `.build-cache` with new checksum
+
+If the device has an old EAS-signed app, adb install will fail with signature mismatch — uninstall first:
+
+```bash
+adb -s <device-serial> uninstall com.hahnca.tvremote
+adb -s <device-serial> install /tmp/tv-remote.apk
+```
+
+Known device serials: 9a = `56221JEBF01987`, 6a = `28231JEGR06978`
+
+After installing, set up the adb reverse tunnel so Expo Go can reach Metro if needed:
+
+```bash
+adb -s <device-serial> reverse tcp:8081 tcp:8081
+```

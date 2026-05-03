@@ -1592,7 +1592,7 @@ export const createShowFolderAndRefreshEmby = async ({
   let refreshRes = null;
   try {
     if (typeof onStatus === "function") onStatus("Refreshing Emby...");
-    refreshRes = await refreshLib();
+    refreshRes = await withTimeout(refreshLib(), 30000, "refreshLib");
     if (refreshRes?.status === "hasTask" && refreshRes?.taskId) {
       const startMs = Date.now();
       while (Date.now() - startMs < refreshTimeoutMs) {

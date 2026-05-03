@@ -945,7 +945,11 @@ export default {
           refreshTimeoutMs: 120000,
         });
 
-        if (!res?.createdFolder) {
+        if (res?.status === "refreshfailed") {
+          window.alert(
+            `The folder for "${showName}" was created, but the Emby library refresh timed out.\nThe show should appear after Emby finishes scanning on its own.`,
+          );
+        } else if (!res?.createdFolder) {
           console.error("Map: createShowFolderAndRefreshEmby failed", {
             showName,
             tvdbId,

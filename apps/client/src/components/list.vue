@@ -1511,7 +1511,11 @@ export default {
           });
           createResult = res;
           createdFolder = !!res?.createdFolder;
-          if (!createdFolder) {
+          if (res?.status === "refreshfailed") {
+            alert(
+              `The folder for "${name}" was created, but the Emby library refresh timed out.\nThe show should appear after Emby finishes scanning on its own.`,
+            );
+          } else if (!createdFolder) {
             console.error("web add: createShowFolderAndRefreshEmby failed", {
               name,
               tvdbId,

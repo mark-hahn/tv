@@ -7,7 +7,7 @@ DEVICE=${1:-56221JEBF01987}
 REMOTE=hahnca.com
 BUILD_DIR=/tmp/android-build
 APK_PATH=$BUILD_DIR/android/app/build/outputs/apk/release/app-release.apk
-LOCAL_APK=/root/apps/tv/build-apk
+LOCAL_APK=/root/apps/tv/build.apk
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CACHE_FILE="$SCRIPT_DIR/.build-cache"
 
@@ -53,6 +53,6 @@ echo "==> Downloading APK..."
 scp $REMOTE:$APK_PATH $LOCAL_APK
 
 echo "==> Installing on device $DEVICE..."
-adb -s $DEVICE install -r $LOCAL_APK
+adb -s $DEVICE install -r "$LOCAL_APK"
 
 echo "==> Done."

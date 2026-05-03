@@ -18,12 +18,12 @@ if [[ "$1" == "-deploy" ]]; then
     echo "No ADB device connected"
     exit 1
   fi
-  if [[ ! -f /root/apps/tv/build-apk ]]; then
-    echo "No APK found at /root/apps/tv/build-apk"
+  if [[ ! -f /root/apps/tv/build.apk ]]; then
+    echo "No APK found at /root/apps/tv/build.apk"
     exit 1
   fi
   echo "Installing on $DEVICE..."
-  adb -s "$DEVICE" install -r /root/apps/tv/build-apk
+  adb -s "$DEVICE" install -r /root/apps/tv/build.apk
   echo "Done."
 elif [[ "$1" == "-build" ]]; then
   START=$(date +%s)

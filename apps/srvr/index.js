@@ -1952,6 +1952,8 @@ async function checkAndDownloadOpnSrt(showName, tvdbRecord) {
     const txt = await resp.text();
     await fs.promises.writeFile(outPath, stripSrtFormatting(txt), "utf8");
     opnDailyCount++;
+    delete opnCheckHistory[histKey];
+    persistOpnCheckHistory();
     logSubtitle(`opn-bg: ${outPath}`);
   } catch (e) {
     logSubtitle(`opn-bg dl err ${showName} ${key} fid=${fid}: ${e.message}`);

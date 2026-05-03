@@ -1,6 +1,41 @@
 #!/bin/bash
 BUILD_START_FILE="/root/apps/tv/build-start"
 BUILD_PHASE_FILE="/root/apps/tv/build-phase"
+USBIPD_BUSID="2-6"
+
+USBIPD="/mnt/c/Program Files/usbipd-win/usbipd.exe"
+
+attach_usb() {
+  echo "Attaching USB (busid $USBIPD_BUSID)..."
+  "$USBIPD" detach --busid "$USBIPD_BUSID" 2>/dev/null || true
+  "$USBIPD" unbind --busid "$USBIPD_BUSID" 2>/dev/null || true
+  sleep 1
+  "$USBIPD" bind --busid "$USBIPD_BUSID" 2>/dev/null || true
+  sleep 1
+  for i in {1..3}; do
+    "$USBIPD" attach --wsl --busid "$USBIPD_BUSID" 2>/dev/null || true
+    sleep 3
+    adb kill-server 2>/dev/null || true
+    adb start-server 2>/dev/null || true
+    sleep 2
+    local d
+    d=$(adb devices | awk '/\tdevice$/{print $1; exit}')
+    [[ -n "$d" ]] && return
+    echo "USB attach attempt $i failed, retrying..."
+    "$USBIPD" detach --busid "$USBIPD_BUSID" 2>/dev/null || true
+    sleep 1
+  done
+}
+
+wait_for_device() {
+  local d
+  for i in {1..10}; do
+    d=$(adb devices | awk '/\tdevice$/{print $1; exit}')
+    [[ -n "$d" ]] && { echo "$d"; return; }
+    sleep 1
+  done
+  echo ""
+}
 
 elapsed() {
   local ref
@@ -13,8 +48,24 @@ elapsed() {
   printf "%02d:%02d" $(( e / 60 )) $(( e % 60 ))
 }
 
-if [[ "$1" == "-deploy" ]]; then
-  DEVICE=$(adb devices | awk '/\tdevice$/{print $1; exit}')
+if [[ "$1" == "-dev" ]]; then
+  attach_usb
+  # Kill any existing Metro
+  pkill -f "expo start" 2>/dev/null || true
+  sleep 1
+  DEVICE=$(wait_for_device)
+  if [[ -z "$DEVICE" ]]; then
+    echo "No ADB device connected"
+    exit 1
+  fi
+  echo "Device: $DEVICE"
+  echo "Setting up ADB reverse tunnel..."
+  adb -s "$DEVICE" reverse tcp:8081 tcp:8081
+  echo "Starting Metro (foreground)..."
+  cd /root/apps/tv/apps/android && npx expo start --localhost
+elif [[ "$1" == "-deploy" ]]; then
+  attach_usb
+  DEVICE=$(wait_for_device)
   if [[ -z "$DEVICE" ]]; then
     echo "No ADB device connected"
     exit 1
@@ -26,10 +77,11 @@ if [[ "$1" == "-deploy" ]]; then
   echo "Installing on $DEVICE..."
   adb -s "$DEVICE" install -r /root/apps/tv/build.apk
   echo "Done."
-elif [[ "$1" == "-build" ]]; then
+elif [[ -z "$1" ]]; then
   START=$(date +%s)
   echo "$START" > "$BUILD_START_FILE"
-  DEVICE=$(adb devices | awk '/\tdevice$/{print $1; exit}')
+  attach_usb
+  DEVICE=$(wait_for_device)
   if [[ -z "$DEVICE" ]]; then
     echo "No ADB device connected"
     rm -f "$BUILD_START_FILE"
@@ -46,7 +98,7 @@ elif [[ "$1" == "-build" ]]; then
   wait $BUILD_PID
   rm -f "$BUILD_START_FILE"
   echo "$(elapsed) done"
-else
+elif [[ "$1" == "-tail" ]]; then
   if [[ ! -f "$BUILD_START_FILE" ]]; then
     echo "No build in progress (build-start file not found)"
     exit 1
@@ -57,4 +109,16 @@ else
     sleep 5
   done
   echo "$(elapsed) done"
+else
+  if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "Usage: build [option]"
+    echo "  (none)   attach USB, build APK on server, install on device"
+    echo "  -dev     attach USB, setup ADB tunnel, start Metro (hot reload)"
+    echo "  -deploy  attach USB, install existing build.apk on device"
+    echo "  -tail    watch progress of a running build"
+    echo "  -h       show this help"
+    exit 0
+  fi
+  echo "Unknown option: $1"
+  exit 1
 fi

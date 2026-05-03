@@ -19,6 +19,7 @@ CACHED_APK=$(cut -d' ' -f2 "$CACHE_FILE" 2>/dev/null || echo "")
 
 if [[ "$CHECKSUM" == "$CACHED_CHECKSUM" && -n "$CACHED_APK" ]]; then
   echo "==> Checksum matches cache — skipping build."
+  echo "downloading" > "$PHASE_FILE"
   if [[ "$CACHED_APK" == gradle:* ]]; then
     echo "==> Downloading cached APK from server..."
     scp "$REMOTE:${CACHED_APK#gradle:}" "$LOCAL_APK"
@@ -26,8 +27,16 @@ if [[ "$CHECKSUM" == "$CACHED_CHECKSUM" && -n "$CACHED_APK" ]]; then
     echo "==> Downloading cached APK from URL..."
     curl -L "$CACHED_APK" -o "$LOCAL_APK"
   fi
+  echo "installing" > "$PHASE_FILE"
   echo "==> Installing on device $DEVICE..."
-  adb -s "$DEVICE" install -r "$LOCAL_APK"
+  if ! timeout 15 adb -s "$DEVICE" install -r "$LOCAL_APK"; then
+    echo "==> Install timed out or failed — restarting adb and retrying..."
+    adb kill-server 2>/dev/null || true
+    adb start-server 2>/dev/null || true
+    sleep 2
+    adb -s "$DEVICE" install -r "$LOCAL_APK"
+  fi
+  rm -f "$PHASE_FILE"
   echo "==> Done (from cache)."
   exit 0
 fi
@@ -39,6 +48,7 @@ rsync -a --delete \
   --exclude .git \
   --exclude android/build \
   --exclude android/.gradle \
+  --exclude android/app/.cxx \
   /root/apps/tv/apps/android/ $REMOTE:$BUILD_DIR/
 
 echo "npm" > "$PHASE_FILE"
@@ -60,7 +70,14 @@ scp $REMOTE:$APK_PATH $LOCAL_APK
 
 echo "installing" > "$PHASE_FILE"
 echo "==> Installing on device $DEVICE..."
-adb -s $DEVICE install -r "$LOCAL_APK"
+if ! timeout 15 adb -s $DEVICE install -r "$LOCAL_APK"; then
+  echo "==> Install timed out or failed — restarting adb and retrying..."
+  adb kill-server 2>/dev/null || true
+  adb start-server 2>/dev/null || true
+  sleep 2
+  adb -s $DEVICE install -r "$LOCAL_APK"
+fi
 
+echo "$CHECKSUM gradle:$APK_PATH" > "$CACHE_FILE"
 rm -f "$PHASE_FILE"
 echo "==> Done."

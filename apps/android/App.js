@@ -1520,7 +1520,6 @@ export default function App() {
             })()}
           {/* Episode info box */}
           {selectedSE &&
-            episodeInfo &&
             (() => {
               const screenWidth = Dimensions.get("window").width;
               const imgWidth = Math.round(screenWidth / 2);
@@ -1550,7 +1549,7 @@ export default function App() {
                         alignItems: "center",
                       }}
                     >
-                      {displayEpisodeTitle(episodeInfo.name) ? (
+                      {episodeInfo && displayEpisodeTitle(episodeInfo.name) ? (
                         <Text
                           style={{
                             fontSize: fs(16),
@@ -1565,9 +1564,10 @@ export default function App() {
                       <Text
                         style={{
                           fontSize: fs(16),
-                          marginLeft: displayEpisodeTitle(episodeInfo.name)
-                            ? 8
-                            : 0,
+                          marginLeft:
+                            episodeInfo && displayEpisodeTitle(episodeInfo.name)
+                              ? 8
+                              : 0,
                         }}
                         numberOfLines={1}
                       >
@@ -1582,7 +1582,7 @@ export default function App() {
                         marginLeft: 8,
                       }}
                     >
-                      {episodeInfo.aired
+                      {episodeInfo?.aired
                         ? episodeInfo.aired.replace(/-/g, "/")
                         : ""}
                     </Text>
@@ -1649,7 +1649,7 @@ export default function App() {
                       paddingVertical: 7,
                     }}
                   >
-                    {episodeInfo.image ? (
+                    {episodeInfo?.image ? (
                       <TouchableOpacity
                         activeOpacity={0.85}
                         onPress={() => setMapImageExpanded((v) => !v)}
@@ -1676,7 +1676,7 @@ export default function App() {
                         paddingVertical: 4,
                       }}
                     >
-                      {episodeInfo.overview ? (
+                      {episodeInfo?.overview ? (
                         <Text
                           style={{
                             fontSize: fs(16),

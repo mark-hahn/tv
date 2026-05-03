@@ -11,6 +11,8 @@ LOCAL_APK=/root/apps/tv/build.apk
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CACHE_FILE="$SCRIPT_DIR/.build-cache"
 
+PHASE_FILE=/root/apps/tv/build-phase
+
 CHECKSUM=$(md5sum "$SCRIPT_DIR/App.js" "$SCRIPT_DIR/app.json" "$SCRIPT_DIR/package.json" "$SCRIPT_DIR/babel.config.js" "$SCRIPT_DIR/eas.json" "$SCRIPT_DIR/index.js" | md5sum | cut -d' ' -f1)
 CACHED_CHECKSUM=$(cut -d' ' -f1 "$CACHE_FILE" 2>/dev/null || echo "")
 CACHED_APK=$(cut -d' ' -f2 "$CACHE_FILE" 2>/dev/null || echo "")
@@ -30,6 +32,7 @@ if [[ "$CHECKSUM" == "$CACHED_CHECKSUM" && -n "$CACHED_APK" ]]; then
   exit 0
 fi
 
+echo "syncing" > "$PHASE_FILE"
 echo "==> Syncing project to server..."
 rsync -a --delete \
   --exclude node_modules \
@@ -38,21 +41,26 @@ rsync -a --delete \
   --exclude android/.gradle \
   /root/apps/tv/apps/android/ $REMOTE:$BUILD_DIR/
 
+echo "npm" > "$PHASE_FILE"
 echo "==> Installing npm deps..."
 ssh $REMOTE "cd $BUILD_DIR && npm install --legacy-peer-deps 2>&1 | tail -3"
 
+echo "building" > "$PHASE_FILE"
 echo "==> Building APK..."
 ssh $REMOTE "
   export ANDROID_HOME=/opt/android-sdk
   export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
   cd $BUILD_DIR/android
-  ./gradlew assembleRelease --console=plain 2>&1 | grep -E 'Task :app:|BUILD|FAIL|error'
+  ./gradlew assembleRelease --console=plain 2>&1 | grep --line-buffered -E 'Task :app:|BUILD|FAIL|error'
 "
 
+echo "downloading" > "$PHASE_FILE"
 echo "==> Downloading APK..."
 scp $REMOTE:$APK_PATH $LOCAL_APK
 
+echo "installing" > "$PHASE_FILE"
 echo "==> Installing on device $DEVICE..."
 adb -s $DEVICE install -r "$LOCAL_APK"
 
+rm -f "$PHASE_FILE"
 echo "==> Done."

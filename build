@@ -1,5 +1,6 @@
 #!/bin/bash
 BUILD_START_FILE="/root/apps/tv/build-start"
+BUILD_PHASE_FILE="/root/apps/tv/build-phase"
 
 elapsed() {
   local ref
@@ -35,17 +36,24 @@ elif [[ "$1" == "-build" ]]; then
     exit 1
   fi
   echo "$(elapsed) Device: $DEVICE"
-  (cd /root/apps/tv/apps/android && ./build-apk "$DEVICE") 2>&1 | while IFS= read -r line; do
-    echo "$(elapsed) $line"
+  (cd /root/apps/tv/apps/android && ./build-apk "$DEVICE") > /dev/null 2>&1 &
+  BUILD_PID=$!
+  while kill -0 $BUILD_PID 2>/dev/null; do
+    PHASE=$(cat "$BUILD_PHASE_FILE" 2>/dev/null || echo "building")
+    echo "$(elapsed) $PHASE..."
+    sleep 5
   done
+  wait $BUILD_PID
   rm -f "$BUILD_START_FILE"
+  echo "$(elapsed) done"
 else
   if [[ ! -f "$BUILD_START_FILE" ]]; then
     echo "No build in progress (build-start file not found)"
     exit 1
   fi
   while [[ -f "$BUILD_START_FILE" ]]; do
-    echo "$(elapsed) building..."
+    PHASE=$(cat "$BUILD_PHASE_FILE" 2>/dev/null || echo "building")
+    echo "$(elapsed) $PHASE..."
     sleep 5
   done
   echo "$(elapsed) done"

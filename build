@@ -1,19 +1,48 @@
 #!/bin/bash
-START=$(date +%s)
+BUILD_START_FILE="/root/apps/tv/build-start"
 
 elapsed() {
-  local e=$(( $(date +%s) - START ))
+  local ref
+  if [[ -f "$BUILD_START_FILE" ]]; then
+    ref=$(cat "$BUILD_START_FILE")
+  else
+    ref=$START
+  fi
+  local e=$(( $(date +%s) - ref ))
   printf "%02d:%02d" $(( e / 60 )) $(( e % 60 ))
 }
 
-DEVICE=$(adb devices | awk '/\tdevice$/{print $1; exit}')
-if [[ -z "$DEVICE" ]]; then
-  echo "No ADB device connected"
-  exit 1
+if [[ "$1" == "-deploy" ]]; then
+  DEVICE=$(adb devices | awk '/\tdevice$/{print $1; exit}')
+  if [[ -z "$DEVICE" ]]; then
+    echo "No ADB device connected"
+    exit 1
+  fi
+  if [[ ! -f /root/apps/tv/build-apk ]]; then
+    echo "No APK found at /root/apps/tv/build-apk"
+    exit 1
+  fi
+  echo "Installing on $DEVICE..."
+  adb -s "$DEVICE" uninstall com.hahnca.tvremote 2>/dev/null || true
+  adb -s "$DEVICE" install -r /root/apps/tv/build-apk
+  echo "Done."
+elif [[ "$1" == "-build" ]]; then
+  START=$(date +%s)
+  echo "$START" > "$BUILD_START_FILE"
+  DEVICE=$(adb devices | awk '/\tdevice$/{print $1; exit}')
+  if [[ -z "$DEVICE" ]]; then
+    echo "No ADB device connected"
+    rm -f "$BUILD_START_FILE"
+    exit 1
+  fi
+  echo "$(elapsed) Device: $DEVICE"
+  (cd /root/apps/tv/apps/android && ./build-apk "$DEVICE") 2>&1 | while IFS= read -r line; do
+    echo "$(elapsed) $line"
+  done
+  rm -f "$BUILD_START_FILE"
+else
+  START=$(date +%s)
+  ssh hahnca.com 'while pgrep -x java > /dev/null; do echo "building..."; sleep 5; done; echo "done"' | while IFS= read -r line; do
+    echo "$(elapsed) $line"
+  done
 fi
-echo "$(elapsed) Device: $DEVICE"
-
-# Start build, prefix each line with elapsed time
-(cd /root/apps/tv/apps/android && ./build-apk "$DEVICE") 2>&1 | while IFS= read -r line; do
-  echo "$(elapsed) $line"
-done

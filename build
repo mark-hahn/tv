@@ -23,7 +23,6 @@ if [[ "$1" == "-deploy" ]]; then
     exit 1
   fi
   echo "Installing on $DEVICE..."
-  adb -s "$DEVICE" uninstall com.hahnca.tvremote 2>/dev/null || true
   adb -s "$DEVICE" install -r /root/apps/tv/build-apk
   echo "Done."
 elif [[ "$1" == "-build" ]]; then
@@ -41,8 +40,13 @@ elif [[ "$1" == "-build" ]]; then
   done
   rm -f "$BUILD_START_FILE"
 else
-  START=$(date +%s)
-  ssh hahnca.com 'while pgrep -x java > /dev/null; do echo "building..."; sleep 5; done; echo "done"' | while IFS= read -r line; do
-    echo "$(elapsed) $line"
+  if [[ ! -f "$BUILD_START_FILE" ]]; then
+    echo "No build in progress (build-start file not found)"
+    exit 1
+  fi
+  while [[ -f "$BUILD_START_FILE" ]]; do
+    echo "$(elapsed) building..."
+    sleep 5
   done
+  echo "$(elapsed) done"
 fi

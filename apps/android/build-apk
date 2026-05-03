@@ -25,7 +25,6 @@ if [[ "$CHECKSUM" == "$CACHED_CHECKSUM" && -n "$CACHED_APK" ]]; then
     curl -L "$CACHED_APK" -o "$LOCAL_APK"
   fi
   echo "==> Installing on device $DEVICE..."
-  adb -s "$DEVICE" uninstall com.hahnca.tvremote 2>/dev/null || true
   adb -s "$DEVICE" install -r "$LOCAL_APK"
   echo "==> Done (from cache)."
   exit 0
@@ -54,7 +53,6 @@ echo "==> Downloading APK..."
 scp $REMOTE:$APK_PATH $LOCAL_APK
 
 echo "==> Installing on device $DEVICE..."
-adb -s $DEVICE uninstall com.hahnca.tvremote 2>/dev/null || true
 adb -s $DEVICE install -r $LOCAL_APK
 
 echo "==> Done."

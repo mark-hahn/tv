@@ -2267,12 +2267,19 @@ const tryLocalGetTvdb = async () => {
       seriesMap = tvdbSeriesMap;
     }
 
-    // Compute season premiere dates from TVDB if not yet stored
-    if (!processRecord.seasonPremiereDates && processRecord.tvdbId) {
+    // Compute season premiere dates and episodeAiredDates from TVDB if needed
+    if (
+      (!processRecord.seasonPremiereDates ||
+        !processRecord.episodeAiredDates) &&
+      processRecord.tvdbId
+    ) {
       if (!tvdbSeriesMap) {
         tvdbSeriesMap = await getSeriesMap(processRecord.tvdbId, null);
       }
-      if (tvdbSeriesMap && tvdbSeriesMap.length > 0) {
+    }
+    if (tvdbSeriesMap && tvdbSeriesMap.length > 0 && processRecord.tvdbId) {
+      let needsSave = false;
+      if (!processRecord.seasonPremiereDates) {
         const spd = {};
         for (const [seasonNum, episodes] of tvdbSeriesMap) {
           const sorted = [...episodes].sort(
@@ -2287,9 +2294,24 @@ const tryLocalGetTvdb = async () => {
         }
         if (Object.keys(spd).length > 0) {
           processRecord.seasonPremiereDates = spd;
-          await saveTvdbFiles(allTvdb);
+          needsSave = true;
         }
       }
+      // Always update episodeAiredDates when tvdbSeriesMap is available
+      const ead = {};
+      for (const [seasonNum, episodes] of tvdbSeriesMap) {
+        for (const [episodeNum, epData] of episodes) {
+          if (epData?.aired) {
+            const key = `S${String(seasonNum).padStart(2, "0")}E${String(episodeNum).padStart(2, "0")}`;
+            ead[key] = epData.aired;
+          }
+        }
+      }
+      if (Object.keys(ead).length > 0) {
+        processRecord.episodeAiredDates = ead;
+        needsSave = true;
+      }
+      if (needsSave) await saveTvdbFiles(allTvdb);
     }
   } catch (err) {
     log("err", "tryLocalGetTvdb seriesMap fetch error:", err.message);

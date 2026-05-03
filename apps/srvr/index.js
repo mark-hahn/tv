@@ -96,11 +96,19 @@ const SUBTITLE_LOG_PATH = "/root/dev/apps/tv/apps/asr/data/subtitle.log";
 const SUBTITLE_LOG_DIR = "/root/dev/apps/tv/apps/asr/data/subtitle-logs/";
 const ASR_JS_PATH = "/root/dev/apps/tv/apps/asr/asr.js";
 const CHKSRT_HISTORY_PATH = path.join(SRVR_DATA_DIR, "chksrt-history.json");
+const OPN_CHECK_HISTORY_PATH = path.join(
+  SRVR_DATA_DIR,
+  "opn-check-history.json",
+);
+const OPN_DAILY_LIMIT = 500;
 const ASR_LOG_BUFFER_MAX = 500;
 let subQueue = [],
   subQueueChkSrt = [],
   asrQueue = [];
 let chksrtHistory = [];
+let opnCheckHistory = {};
+let opnDailyCount = 0;
+let opnDailyCountDate = "";
 let subQueueBusy = false,
   chkSubQueueDelay = 10_000,
   asrQueueDelay = 10_000;
@@ -864,6 +872,26 @@ function persistChksrtHistory() {
     );
   } catch (e) {
     console.error("[chksrt-history] persist error:", e.message);
+  }
+}
+function loadOpnCheckHistory() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(OPN_CHECK_HISTORY_PATH, "utf8"));
+    opnCheckHistory =
+      raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  } catch {
+    opnCheckHistory = {};
+  }
+}
+function persistOpnCheckHistory() {
+  try {
+    fs.writeFileSync(
+      OPN_CHECK_HISTORY_PATH,
+      JSON.stringify(opnCheckHistory),
+      "utf8",
+    );
+  } catch (e) {
+    console.error("[opn-check-history] persist error:", e.message);
   }
 }
 function logSubtitle(msg) {
@@ -1760,6 +1788,176 @@ const fixCompactEpisodeNaming = async (showId, showName) => {
   return anyFixed;
 };
 
+async function checkAndDownloadOpnSrt(showName, tvdbRecord) {
+  if (!tvdbRecord.inEmby) return;
+  if (!tvdbRecord.imdbId) return;
+
+  // Global daily cap — reset at midnight LA
+  const todayLA = new Date()
+    .toLocaleDateString("en-US", { timeZone: "America/Los_Angeles" })
+    .replace(/\//g, "-");
+  if (opnDailyCountDate !== todayLA) {
+    opnDailyCount = 0;
+    opnDailyCountDate = todayLA;
+  }
+  if (opnDailyCount >= OPN_DAILY_LIMIT) return;
+
+  // Build set of watched episode keys from watchedEpis array
+  const watchedSet = new Set();
+  if (Array.isArray(tvdbRecord.watchedEpis)) {
+    for (const seasonEntry of tvdbRecord.watchedEpis) {
+      if (!Array.isArray(seasonEntry) || seasonEntry.length < 1) continue;
+      const [seasonNum, ...eps] = seasonEntry;
+      for (const ep of eps) {
+        const key = `S${String(seasonNum).padStart(2, "0")}E${String(ep).padStart(2, "0")}`;
+        watchedSet.add(key);
+      }
+    }
+  }
+
+  const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const twentyFourHours = 24 * 60 * 60 * 1000;
+  const episodeAiredDates = tvdbRecord.episodeAiredDates || {};
+
+  // Collect eligible episodes
+  const eligible = []; // { filePath, key, airedMs }
+  const showFolder = path.join(tvDir, showName);
+  let seasonDirs;
+  try {
+    seasonDirs = fs.readdirSync(showFolder);
+  } catch {
+    return;
+  }
+
+  for (const seasonDir of seasonDirs) {
+    const seasonPath = path.join(showFolder, seasonDir);
+    try {
+      if (!fs.statSync(seasonPath).isDirectory()) continue;
+    } catch {
+      continue;
+    }
+    let files;
+    try {
+      files = fs.readdirSync(seasonPath);
+    } catch {
+      continue;
+    }
+    for (const f of files) {
+      if (!videoFileExtensions.includes(f.split(".").pop())) continue;
+      const fp = path.join(seasonPath, f);
+      const parsed = parseFileSeasonEpisode(fp);
+      if (!parsed) continue;
+      const key = `S${String(parsed.season).padStart(2, "0")}E${String(parsed.episode).padStart(2, "0")}`;
+
+      // Skip watched
+      if (watchedSet.has(key)) continue;
+
+      // Check aired date
+      const airedStr = episodeAiredDates[key];
+      if (!airedStr) continue;
+      const airedMs = new Date(airedStr).getTime();
+      if (isNaN(airedMs)) continue;
+      if (airedMs < oneYearAgo) continue;
+      // Skip future / today-unaired
+      if (airedMs > now) continue;
+
+      // Skip if .opnXXXXX.srt sidecar already exists
+      const base = fp.replace(/\.[^.]+$/, "");
+      const dir = path.dirname(fp);
+      const basename = path.basename(base);
+      let dirEntries;
+      try {
+        dirEntries = fs.readdirSync(dir);
+      } catch {
+        continue;
+      }
+      if (
+        dirEntries.some((e) =>
+          /^\.opn.{5}\.srt$/.test(e.slice(basename.length)),
+        )
+      )
+        continue;
+
+      // Skip if checked within past 24 hours
+      const histKey = `${showName}|||${key}`;
+      const lastCheck = opnCheckHistory[histKey];
+      if (lastCheck && now - lastCheck < twentyFourHours) continue;
+
+      eligible.push({ filePath: fp, key, airedMs, parsed });
+    }
+  }
+
+  if (eligible.length === 0) return;
+
+  // Pick the oldest by aired date
+  eligible.sort((a, b) => a.airedMs - b.airedMs);
+  const { filePath, key, parsed } = eligible[0];
+  const histKey = `${showName}|||${key}`;
+
+  // Record check timestamp before attempting (prevents 24h retry on any outcome)
+  opnCheckHistory[histKey] = now;
+  persistOpnCheckHistory();
+
+  // Search OpenSubtitles
+  let results;
+  try {
+    results = await subsSearch({
+      imdb_id: tvdbRecord.imdbId,
+      season: parsed.season,
+      episode: parsed.episode,
+      language: "en",
+    });
+  } catch (e) {
+    if (e?.message?.includes("406") || e?.details?.status === 406) {
+      logSubtitle(`opn-bg quota exceeded for ${showName} ${key}`);
+    } else {
+      logSubtitle(`opn-bg search err ${showName} ${key}: ${e.message}`);
+    }
+    return;
+  }
+
+  const items = Array.isArray(results?.data) ? results.data : [];
+  if (items.length === 0) {
+    logSubtitle(`opn-bg no results: ${showName} ${key}`);
+    return;
+  }
+
+  const r = items[0];
+  const fid = r.file_id || r.attributes?.files?.[0]?.file_id;
+  if (!fid) return;
+
+  const base = filePath.replace(/\.[^.]+$/, "");
+  const tag = "opn" + encodeFileIdBase32(fid).slice(1);
+  const outPath = `${base}.${tag}.srt`;
+  if (fs.existsSync(outPath)) return;
+
+  try {
+    const login = loadSubsLogin();
+    const dl = await openSubtitlesDownloadWithRetry({
+      apiKey: login.apiKey,
+      token: subsTokenCache,
+      fileId: fid,
+    });
+    if (!dl?.resp?.ok) {
+      if (dl?.resp?.status === 406) {
+        logSubtitle(`opn-bg quota exceeded (dl) for ${showName} ${key}`);
+      }
+      return;
+    }
+    const url = typeof dl.body?.link === "string" ? dl.body.link.trim() : "";
+    if (!url) return;
+    const resp = await fetch(url, { headers: { Accept: "*/*" } });
+    if (!resp.ok) return;
+    const txt = await resp.text();
+    await fs.promises.writeFile(outPath, stripSrtFormatting(txt), "utf8");
+    opnDailyCount++;
+    logSubtitle(`opn-bg: ${outPath}`);
+  } catch (e) {
+    logSubtitle(`opn-bg dl err ${showName} ${key} fid=${fid}: ${e.message}`);
+  }
+}
+
 tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
   try {
     delete tvdbRecord.haveSubs;
@@ -1928,6 +2126,12 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
       if (!options?.suppressNotify) {
         console.log(`[perShow push2] ${showName}: no changes`);
       }
+    }
+    // Background OpenSubtitles check: download one missing .opnXXXXX.srt per show
+    try {
+      await checkAndDownloadOpnSrt(showName, tvdbRecord);
+    } catch (e) {
+      console.error("[opn-bg] error for", showName, e.message);
     }
     return { hasChanges: push2Changes.length > 0, changes: push2Changes };
   } catch (e) {
@@ -4277,6 +4481,7 @@ https.createServer(httpsOptions, app).listen(HTTP_PORT, () => {
   console.log(`HTTPS API listening on port ${HTTP_PORT}`);
   loadQueues();
   loadChksrtHistory();
+  loadOpnCheckHistory();
   startSubQueueLoop();
   startAsrQueueLoop();
 });

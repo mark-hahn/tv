@@ -3606,6 +3606,13 @@ app.get("/api/flexget-history", (req, res) => {
   }
 });
 
+app.post("/api/flexget-run", (req, res) => {
+  runFlexgetAndProcess().catch((e) =>
+    console.error("[flexget] manual run error:", e.message),
+  );
+  res.json({ ok: true });
+});
+
 app.post("/api/saveNote", apiWrapper(saveNote));
 
 // Open qBittorrent web UI — auto-login page served from hahnca.com so the
@@ -6022,7 +6029,10 @@ async function fetchLastWatchedDate(showId) {
 // NOTE: syncDiskData and runGapCheckBatch periodic timers removed - now handled by tryLocalGetTvdb
 // per-show tick via perShowCallback (disk + gap) and preTvdbTickCallback (Emby sweep)
 
-// Run flexget every 15 minutes to fetch new torrent candidates.
+// Regenerate config.yml on startup and schedule flexget every 15 minutes.
+upload().catch((e) =>
+  console.error("[flexget] startup upload error:", e.message),
+);
 cron.schedule("*/15 * * * *", () => {
   runFlexgetAndProcess().catch((e) =>
     console.error("[flexget] cron error:", e.message),

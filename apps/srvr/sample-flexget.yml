@@ -1,5 +1,21 @@
+schedules:
+  - tasks:
+      - clear-list
+      - fetch-feeds
+      - run-script
+    interval:
+      minutes: 15
+
 tasks:
-  list-and-run:
+
+  clear-list:
+    priority: 1
+    exec:
+      on_start:
+        phase: truncate /home/user/available.txt
+
+  fetch-feeds:
+    priority: 2
     inputs:
       - rss: http://example.com/torrents.xml
       - rss: http://example2.com/torrents.xml
@@ -7,6 +23,10 @@ tasks:
     regexp:
       accept:
         - some show title
+        - another show title
+      reject:
+        - some rejected title
+        - another rejected title
 
     quality: "any"
 
@@ -14,9 +34,6 @@ tasks:
       - seen
 
     exec:
-      on_start:
-        phase: truncate /home/user/available.txt
-
       on_output:
         for_accepted: >
           python3 -c "
@@ -52,5 +69,8 @@ tasks:
           print(json.dumps(d))
           " >> /home/user/available.txt
 
-      on_exit:
+  run-script:
+    priority: 3
+    exec:
+      on_start:
         phase: /home/user/your_script.sh /home/user/available.txt

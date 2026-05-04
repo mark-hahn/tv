@@ -1268,7 +1268,9 @@ async function main() {
       }
       var parsed2 = {};
       try {
-        parsed2 = parseTorrentTitle(torrentFolder) || {};
+        parsed2 =
+          parseTorrentTitle(torrentFolder.replace(/\.[a-z0-9]{2,4}$/i, "")) ||
+          {};
       } catch (e) {
         parsed2 = {};
       }
@@ -1888,7 +1890,8 @@ async function main() {
         var base = parts[parts.length - 1];
         var parsed = {};
         try {
-          parsed = parseTorrentTitle(base) || {};
+          parsed =
+            parseTorrentTitle(base.replace(/\.[a-z0-9]{2,4}$/i, "")) || {};
         } catch (e) {
           parsed = {};
         }
@@ -1980,10 +1983,14 @@ async function main() {
       const pathParts2 = usbFilePath.split("/");
       const folderName2 = pathParts2.length >= 2 ? pathParts2[0] : "";
       try {
-        var parsed = parseTorrentTitle(fname) || {};
+        var parsed =
+          parseTorrentTitle(fname.replace(/\.[a-z0-9]{2,4}$/i, "")) || {};
         var parsedFolder = {};
         try {
-          if (folderName2) parsedFolder = parseTorrentTitle(folderName2) || {};
+          if (folderName2)
+            parsedFolder =
+              parseTorrentTitle(folderName2.replace(/\.[a-z0-9]{2,4}$/i, "")) ||
+              {};
         } catch (e) {}
         title = parseTitleFromFilename(fname, folderName2, parsed);
         folderTitle = folderName2

@@ -726,10 +726,13 @@ function parseSeasonEpisodeFromFilename(fileName, folderName) {
   let parsedPtt = null;
   let parsedPttFolder = null;
   try {
-    parsedPtt = parseTorrentTitle(base);
+    parsedPtt = parseTorrentTitle(base.replace(/\.[a-z0-9]{2,4}$/i, ""));
   } catch {}
   try {
-    if (folderName) parsedPttFolder = parseTorrentTitle(String(folderName));
+    if (folderName)
+      parsedPttFolder = parseTorrentTitle(
+        String(folderName).replace(/\.[a-z0-9]{2,4}$/i, ""),
+      );
   } catch {}
 
   const result = parseFileSeasonEpisode(

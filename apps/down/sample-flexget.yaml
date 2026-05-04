@@ -1,0 +1,56 @@
+tasks:
+  list-and-run:
+    inputs:
+      - rss: http://example.com/torrents.xml
+      - rss: http://example2.com/torrents.xml
+
+    regexp:
+      accept:
+        - some show title
+
+    quality: "any"
+
+    disable:
+      - seen
+
+    exec:
+      on_start:
+        phase: truncate /home/user/available.txt
+
+      on_output:
+        for_accepted: >
+          python3 -c "
+          import json, sys
+          d = {
+            'title':        '{{title}}',
+            'url':          '{{url}}',
+            'quality':      '{{quality}}',
+            'content_size': '{{content_size}}',
+            'torrent_seeds':'{{torrent_seeds}}',
+            'torrent_leeches':'{{torrent_leeches}}',
+            'torrent_availability':'{{torrent_availability}}',
+            'torrent_timestamp':'{{torrent_timestamp}}',
+            'description':  '{{description}}',
+            'series_name':  '{{series_name}}',
+            'series_season':'{{series_season}}',
+            'series_episode':'{{series_episode}}',
+            'series_id':    '{{series_id}}',
+            'imdb_id':      '{{imdb_id}}',
+            'imdb_score':   '{{imdb_score}}',
+            'imdb_votes':   '{{imdb_votes}}',
+            'imdb_url':     '{{imdb_url}}',
+            'movie_name':   '{{movie_name}}',
+            'movie_year':   '{{movie_year}}',
+            'proper':       '{{proper}}',
+            'release_group':'{{release_group}}',
+            'location':     '{{location}}',
+            'filename':     '{{filename}}',
+            'mime_type':    '{{mime_type}}',
+            'task':         '{{task}}',
+            'original_url': '{{original_url}}',
+          }
+          print(json.dumps(d))
+          " >> /home/user/available.txt
+
+      on_exit:
+        phase: /home/user/your_script.sh /home/user/available.txt

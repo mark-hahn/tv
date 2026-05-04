@@ -4912,6 +4912,11 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
     proper: candidate.proper || null,
     release_group: candidate.release_group || null,
     task: candidate.task || null,
+    provider: String(candidate.url || "").includes("iptorrents.com")
+      ? "ipt"
+      : String(candidate.url || "").includes("torrentleech.org")
+        ? "tl"
+        : null,
     sent: null,
   };
 

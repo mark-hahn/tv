@@ -171,20 +171,34 @@
           <span style="font-weight: bold; color: #444">{{ key }}</span
           >: {{ val }}
         </div>
-        <button
-          @click.stop="dialogRow = null"
-          style="
-            margin-top: 16px;
-            font-size: 13px;
-            cursor: pointer;
-            border-radius: 7px;
-            padding: 4px 14px;
-            border: 1px solid #bbb;
-            background-color: whitesmoke;
-          "
-        >
-          Close
-        </button>
+        <div style="margin-top: 16px; display: flex; gap: 10px">
+          <button
+            @click.stop="goToShow"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 14px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            To show
+          </button>
+          <button
+            @click.stop="dialogRow = null"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 14px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -274,6 +288,7 @@ export default {
         "episodeKey",
         "title",
         "sent",
+        "provider",
         "url",
         "quality",
         "release_group",
@@ -314,6 +329,11 @@ export default {
   },
 
   methods: {
+    goToShow() {
+      const name = this.dialogRow?.entry?.showName;
+      if (name) evtBus.emit("selectShowFromCardTitle", name);
+      this.dialogRow = null;
+    },
     getRowStyle(row) {
       const isHighlighted = this.highlightKey && row.key === this.highlightKey;
       return {

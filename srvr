@@ -118,6 +118,12 @@ remote_sync_app() {
     extra_excludes+=(--exclude 'secrets/')
   fi
 
+  if [[ "$project" == "srvr" ]]; then
+    # Dynamic JSON config files are server-owned; never overwrite during deploy.
+    extra_excludes+=(--exclude 'config/config2-rejects.json')
+    extra_excludes+=(--exclude 'config/config4-pickups.json')
+  fi
+
   if [[ ! -d "$local_dir" ]]; then
     echo "Error: missing local app dir: $local_dir" >&2
     exit 1

@@ -17,10 +17,9 @@ import * as email from "./src/email.js";
 import * as tmdb from "./src/tmdb.js";
 import { handleFix } from "./src/fix.js";
 import { handleEmb } from "./src/emb.js";
-import { checkFlexgetStatus } from "../api/src/usb.js";
 import fetch from "node-fetch";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
-import { parseFileSeasonEpisode } from "@tv/share";
+import { parseFileSeasonEpisode, smartTitleMatch } from "@tv/share";
 import chokidar from "chokidar";
 import cron from "node-cron";
 import {
@@ -41,10 +40,19 @@ const tvdbIdByName = (name) => {
   return String(rec?.tvdbId || "").trim() || null;
 };
 
-const dontupload = false;
-
 const CONFIG_DIR = path.join(SRVR_ROOT_DIR, "config");
 const SECRETS_DIR = SRVR_SECRETS_DIR;
+const FLEXGET_HISTORY_PATH = path.join(SRVR_DATA_DIR, "flexget-history.json");
+const PREFTOR_PROVIDERS_PATH = path.join(CONFIG_DIR, "prefTorProviders.txt");
+const QBT_CRED_PATH_FLEX = path.join(
+  path.dirname(SRVR_ROOT_DIR),
+  "api",
+  "secrets",
+  "qbt-cred.txt",
+);
+const FLEXGET_CMD = "/root/.local/bin/flexget";
+const FLEXGET_CONFIG = path.join(SRVR_ROOT_DIR, "config", "config.yml");
+const FLEXGET_DUMP_LOG = path.join(SRVR_DATA_DIR, "flexget-dump.log");
 
 function ensureDir(dir) {
   try {
@@ -247,6 +255,36 @@ try {
     `[tv-srvr] FATAL: invalid JSON in pickups config at ${pickupLoad.chosenPath || "<fallback>"}: ${e.message}`,
   );
   process.exit(1);
+}
+
+// Load prefTorProviders.txt at startup — fail fast if missing.
+let prefTorProviders = [];
+{
+  const provText = readTextOr(PREFTOR_PROVIDERS_PATH, null);
+  if (provText === null) {
+    console.error(
+      `[tv-srvr] FATAL: missing prefTorProviders.txt at ${PREFTOR_PROVIDERS_PATH}`,
+    );
+    process.exit(1);
+  }
+  prefTorProviders = provText
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+// Load flexget-history.json at startup — create empty {} if missing (first run).
+let flexgetHistory = {};
+try {
+  const histText = fs.readFileSync(FLEXGET_HISTORY_PATH, "utf8");
+  flexgetHistory = JSON.parse(histText);
+} catch (e) {
+  if (e.code !== "ENOENT") {
+    console.error(
+      `[tv-srvr] FATAL: flexget-history.json parse error: ${e.message}`,
+    );
+    process.exit(1);
+  }
 }
 
 function encodeFileIdBase32(fileId) {
@@ -2360,51 +2398,14 @@ const getShowDiskInfo = async (showFolderName) => {
 const upload = async () => {
   let str = headerStr;
   str += '        - "dummy"\n';
-  for (let name of rejects)
+  for (let name of pickups)
     str += '        - "' + name.replace(/"/g, "") + '"\n';
   str += middleStr;
-  for (let name of pickups)
+  str += '        - "dummy"\n';
+  for (let name of rejects)
     str += '        - "' + name.replace(/"/g, "") + '"\n';
   str += footerStr;
   await util.writeFile(configWritePath("config.yml"), str);
-
-  if (dontupload) {
-    console.log("---- didn't upload config.yml ----");
-    return "ok";
-  }
-
-  const { stdout } = await exec(
-    `rsync -av "${configWritePath("config.yml")}" xobtlu@oracle.usbx.me:` +
-      "/home/xobtlu/.config/flexget/config.yml",
-  );
-
-  const rx = new RegExp("total size is ([0-9,]*)");
-  const matches = rx.exec(stdout);
-  if (!matches || parseInt(matches[1].replace(",", "")) < 1000) {
-    console.error("\nERROR: config.yml upload failed\n", stdout, "\n");
-    return `config.yml upload failed: ${stdout.toString()}`;
-  }
-  return "ok";
-};
-
-const reload = async () => {
-  if (dontupload) {
-    console.log("---- didn't reload ----");
-    return "ok";
-  }
-
-  console.log("reloading config.yml");
-  const timeBeforeUSB = new Date().getTime();
-  const { stdout } = await exec(
-    "ssh xobtlu@oracle.usbx.me /home/xobtlu/reload-cmd",
-  );
-  console.log("reload delay:", new Date().getTime() - timeBeforeUSB);
-
-  if (!stdout.includes("Config successfully reloaded")) {
-    console.log("\nERROR: config.yml reload failed\n", stdout, "\n");
-    return `config.yml reload failed: ${stdout.toString()}`;
-  }
-  console.log("reloaded config.yml");
   return "ok";
 };
 
@@ -2442,10 +2443,6 @@ const trySaveConfigYml = async (id, result, resolve, reject) => {
 
   const uploadRes = await upload();
   if (uploadRes != "ok") errResult = uploadRes;
-  if (!errResult) {
-    const reloadRes = await reload();
-    if (reloadRes != "ok") errResult = reloadRes;
-  }
 
   if (errResult) {
     console.error("trySaveConfigYml error:", errResult);
@@ -3585,6 +3582,30 @@ app.get("/api/history/byHash", (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+app.get("/api/flexget-history", (req, res) => {
+  try {
+    const result = [];
+    for (const [key, list] of Object.entries(flexgetHistory)) {
+      if (!Array.isArray(list)) continue;
+      const parts = key.split("\x00");
+      const showName = parts[0] || "";
+      const seasonKey = parts[1] || "";
+      const episodeKey = parts[2] || "";
+      for (const c of list) {
+        if (c.sent !== null) {
+          result.push({ ...c, showName, seasonKey, episodeKey });
+        }
+      }
+    }
+    result.sort((a, b) => (a.sent || 0) - (b.sent || 0));
+    res.json(result);
+  } catch (e) {
+    console.error("[flexget-history] error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post("/api/saveNote", apiWrapper(saveNote));
 
 // Open qBittorrent web UI — auto-login page served from hahnca.com so the
@@ -4728,24 +4749,314 @@ wss.on("connection", (ws) => {
   });
 });
 
-const CHECK_INTERVAL_MS = 60 * 60 * 1000;
+// ==================== FLEXGET PROCESSING ====================
 
-async function runUsbCheck() {
-  try {
-    await checkFlexgetStatus();
-    console.log("[flexget] USB flexget check ok");
-  } catch (err) {
-    console.log("[flexget] USB flexget check FAILED:", err.message);
-    try {
-      let emailBody = `USB Status Check Failed:\n${err.message}`;
-      if (err.fullOutput) {
-        emailBody += `\n\nFull flexget status output:\n${err.fullOutput}`;
+async function addUrlToQbt(torrentUrl) {
+  const credText = await fs.promises.readFile(QBT_CRED_PATH_FLEX, "utf8");
+  const creds = {};
+  for (const rawLine of credText.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const eq = line.indexOf("=");
+    if (eq === -1) continue;
+    creds[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
+  }
+  const qbHostRaw = String(creds.QB_HOST || "localhost");
+  const qbHost = qbHostRaw.includes("@")
+    ? qbHostRaw.split("@").slice(-1)[0]
+    : qbHostRaw;
+  const qbPort = parseInt(String(creds.QB_PORT || "8080"), 10) || 8080;
+  const qbUser = qbHostRaw.includes("@")
+    ? qbHostRaw.split("@")[0]
+    : String(creds.QB_USER || "");
+  const qbPass = String(creds.QB_PASS || "");
+  const baseUrl = `http://${qbHost}:${qbPort}`;
+
+  const loginParams = new URLSearchParams({
+    username: qbUser,
+    password: qbPass,
+  });
+  const loginRes = await fetch(`${baseUrl}/api/v2/auth/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Origin: baseUrl,
+      Referer: `${baseUrl}/`,
+    },
+    body: loginParams.toString(),
+  });
+  const cookie = loginRes.headers.get("set-cookie") || "";
+
+  const form = new FormData();
+  form.append("urls", torrentUrl);
+  form.append("category", "tv");
+  const addRes = await fetch(`${baseUrl}/api/v2/torrents/add`, {
+    method: "POST",
+    headers: { Cookie: cookie, Origin: baseUrl, Referer: `${baseUrl}/` },
+    body: form,
+  });
+  const resText = await addRes.text().catch(() => "");
+  const t = resText.trim().toLowerCase();
+  if (!addRes.ok || (t.length > 0 && !t.startsWith("ok"))) {
+    throw new Error(`qbt add failed: HTTP ${addRes.status} ${resText}`);
+  }
+}
+
+function flexgetGroupRank(groupName) {
+  if (!groupName) return prefTorProviders.length + 1;
+  const lower = groupName.toLowerCase();
+  const idx = prefTorProviders.findIndex((g) => g.toLowerCase() === lower);
+  return idx === -1 ? prefTorProviders.length + 1 : idx;
+}
+
+function flexgetResolution(quality, title) {
+  const src = String(quality || title || "");
+  if (/2160p/i.test(src)) return 2160;
+  if (/1080p/i.test(src)) return 1080;
+  if (/720p/i.test(src)) return 720;
+  if (/480p/i.test(src)) return 480;
+  return 640;
+}
+
+function flexgetBitDepth(title) {
+  if (/10.?bit|x265|hevc|h\.?265|hdr/i.test(String(title || ""))) return 10;
+  return 8;
+}
+
+function flexgetIsBetter(candidate, lastSent) {
+  const cRes = flexgetResolution(candidate.quality, candidate.title);
+  const lRes = flexgetResolution(lastSent.quality, lastSent.title);
+  if (cRes !== lRes) return cRes > lRes;
+
+  const cDepth = flexgetBitDepth(candidate.title);
+  const lDepth = flexgetBitDepth(lastSent.title);
+  if (cDepth !== lDepth) return cDepth > lDepth;
+
+  const cRank = flexgetGroupRank(candidate.release_group);
+  const lRank = flexgetGroupRank(lastSent.release_group);
+  if (cRank !== lRank) return cRank < lRank;
+
+  const cSeeds = parseInt(String(candidate.torrent_seeds || "0"), 10) || 0;
+  const lSeeds = parseInt(String(lastSent.torrent_seeds || "0"), 10) || 0;
+  return cSeeds > lSeeds;
+}
+
+async function saveFlexgetHistory() {
+  await util.writeFile(FLEXGET_HISTORY_PATH, flexgetHistory);
+}
+
+async function processFlexgetCandidate(candidate) {
+  const rawTitle = String(candidate.title || "").trim();
+  if (!rawTitle) return;
+
+  const ptt = parseTorrentTitle(rawTitle.replace(/\.[a-z0-9]{2,4}$/i, ""));
+  const showName = ptt?.title;
+  const season = ptt?.season;
+  let episode = ptt?.episode;
+  if (!episode && Array.isArray(ptt?.episodes) && ptt.episodes.length)
+    episode = ptt.episodes[0];
+
+  if (!showName || !Number.isInteger(season) || !Number.isInteger(episode))
+    return;
+  if (episode === 0) return; // skip season packs
+
+  const allTvdb = tvdb.getAllTvdbSync();
+  const matchedName = smartTitleMatch(
+    showName,
+    Object.keys(allTvdb),
+    null,
+    false,
+  );
+  if (!matchedName) return;
+  const rec = allTvdb[matchedName];
+  if (!rec?.inEmby) return;
+
+  const sKey = `S${String(season).padStart(2, "0")}`;
+  const eKey = `E${String(episode).padStart(2, "0")}`;
+  const histKey = `${matchedName}\x00${sKey}\x00${eKey}`;
+
+  const list = flexgetHistory[histKey] || [];
+  if (list.some((c) => c.url === candidate.url)) return; // deduplicate
+
+  const newCandidate = {
+    title: rawTitle,
+    url: candidate.url || null,
+    quality: candidate.quality || null,
+    content_size: candidate.content_size || null,
+    torrent_seeds: candidate.torrent_seeds || null,
+    torrent_leeches: candidate.torrent_leeches || null,
+    proper: candidate.proper || null,
+    release_group: candidate.release_group || null,
+    task: candidate.task || null,
+    sent: null,
+  };
+
+  list.push(newCandidate);
+  flexgetHistory[histKey] = list;
+
+  const lastSent = list.reduce((best, c) => {
+    if (c.sent === null) return best;
+    if (!best || c.sent > best.sent) return c;
+    return best;
+  }, null);
+
+  if (!lastSent) {
+    if (newCandidate.url) {
+      try {
+        await addUrlToQbt(newCandidate.url);
+        newCandidate.sent = Math.floor(Date.now() / 1000);
+        console.log(
+          `[flexget] SENT(first) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
+        );
+      } catch (e) {
+        console.error(`[flexget] qbt add failed for "${rawTitle}":`, e.message);
       }
-      await email.sendEmail(emailBody);
-    } catch (e) {
-      console.error("[flexget] Failed to send error email:", e);
+    }
+  } else if (flexgetIsBetter(newCandidate, lastSent)) {
+    if (newCandidate.url) {
+      try {
+        await addUrlToQbt(newCandidate.url);
+        newCandidate.sent = Math.floor(Date.now() / 1000);
+        console.log(
+          `[flexget] SENT(better) ${matchedName} ${sKey}${eKey} "${rawTitle}" over "${lastSent.title}"`,
+        );
+      } catch (e) {
+        console.error(`[flexget] qbt add failed for "${rawTitle}":`, e.message);
+      }
+    }
+  } else {
+    console.log(
+      `[flexget] SKIP(worse) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
+    );
+  }
+}
+
+function parseFlexgetDumpOutput(stdout) {
+  // flexget 3.x --dump output format (verified from config-test):
+  //   ─── Accepted ─── (section header, one per task)
+  //   title         : Number One Fan S01E03 720p WEB H264-iNSiDiOUS
+  //   url           : https://...
+  //   description   : 1.44 GB; TV/Web-DL (S:0 L:0)
+  //   quality       : 720p webdl h264
+  //   ...
+  //   (empty line separates entries)
+  // Raw stdout is also saved to flexget-dump.log for format inspection.
+  const candidates = [];
+  const lines = stdout.split(/\r?\n/);
+  let inAcceptedSection = false;
+  let current = null;
+  for (const line of lines) {
+    // Section header for accepted entries
+    if (/─+\s*Accepted\s*─+/i.test(line)) {
+      inAcceptedSection = true;
+      continue;
+    }
+    // Section header for other sections ends accepted block
+    if (/─+\s*(Rejected|Undecided|Failed)\s*─+/i.test(line)) {
+      inAcceptedSection = false;
+      if (current) {
+        candidates.push(current);
+        current = null;
+      }
+      continue;
+    }
+    if (!inAcceptedSection) continue;
+    // Empty line = entry separator
+    if (/^\s*$/.test(line)) {
+      if (current) {
+        candidates.push(current);
+        current = null;
+      }
+      continue;
+    }
+    const fieldMatch = line.match(/^([a-z_]+)\s*:\s*(.*)$/i);
+    if (fieldMatch) {
+      const key = fieldMatch[1].trim().toLowerCase();
+      const val = fieldMatch[2].trim();
+      if (key === "title") {
+        if (current) candidates.push(current);
+        current = {
+          title: val,
+          url: null,
+          quality: null,
+          release_group: null,
+          torrent_seeds: null,
+          torrent_leeches: null,
+          content_size: null,
+          proper: null,
+          task: null,
+        };
+      } else if (current) {
+        if (key === "url" || key === "original_url") {
+          if (!current.url) current.url = val; // prefer first url
+        } else if (key === "quality") current.quality = val;
+        else if (key === "release_group") current.release_group = val;
+        else if (key === "torrent_seeds" || key === "seeds")
+          current.torrent_seeds = parseInt(val, 10) || 0;
+        else if (key === "torrent_leeches" || key === "leeches")
+          current.torrent_leeches = parseInt(val, 10) || 0;
+        else if (key === "content_size") current.content_size = val;
+        else if (key === "task") current.task = val;
+        else if (key === "proper") current.proper = val;
+        else if (key === "description") {
+          // iptorrents: "1.44 GB; TV/Web-DL (S:4 L:4)"
+          const ipMatch = val.match(/\(S:(\d+)\s+L:(\d+)\)/);
+          // torrentleech: "Category: ... - Seeders: 14 - Leechers: 0"
+          const tlMatch = val.match(/Seeders:\s*(\d+).*?Leechers:\s*(\d+)/i);
+          const sm = ipMatch || tlMatch;
+          if (sm) {
+            if (current.torrent_seeds === null)
+              current.torrent_seeds = parseInt(sm[1], 10);
+            if (current.torrent_leeches === null)
+              current.torrent_leeches = parseInt(sm[2], 10);
+          }
+        }
+      }
     }
   }
+  if (current) candidates.push(current);
+  return candidates;
+}
+
+async function runFlexgetAndProcess() {
+  const cmd = `"${FLEXGET_CMD}" -c "${FLEXGET_CONFIG}" execute --tasks fetch-feeds --dump accepted 2>&1`;
+  console.log(`[flexget] running flexget execute --tasks fetch-feeds`);
+  let stdout = "";
+  try {
+    const result = await exec(cmd, {
+      maxBuffer: 10 * 1024 * 1024,
+      env: { ...process.env, COLUMNS: "300" },
+    });
+    stdout = String(result.stdout || "");
+  } catch (e) {
+    stdout = String(e.stdout || e.message || "");
+    console.error(
+      "[flexget] execute error:",
+      String(e.message || "").slice(0, 200),
+    );
+  }
+
+  // Log raw output for config-test format inspection.
+  try {
+    const ts = new Date().toISOString();
+    fs.appendFileSync(FLEXGET_DUMP_LOG, `\n--- ${ts} ---\n${stdout}\n`);
+  } catch {}
+
+  const candidates = parseFlexgetDumpOutput(stdout);
+  if (candidates.length === 0) {
+    console.log("[flexget] no accepted entries");
+    return;
+  }
+  console.log(`[flexget] processing ${candidates.length} accepted candidates`);
+
+  for (const candidate of candidates) {
+    try {
+      await processFlexgetCandidate(candidate);
+    } catch (e) {
+      console.error("[flexget] processCandidate error:", e.message);
+    }
+  }
+  await saveFlexgetHistory();
 }
 
 // Phase 3: Incremental sync functions
@@ -5711,8 +6022,12 @@ async function fetchLastWatchedDate(showId) {
 // NOTE: syncDiskData and runGapCheckBatch periodic timers removed - now handled by tryLocalGetTvdb
 // per-show tick via perShowCallback (disk + gap) and preTvdbTickCallback (Emby sweep)
 
-runUsbCheck();
-setInterval(runUsbCheck, CHECK_INTERVAL_MS);
+// Run flexget every 15 minutes to fetch new torrent candidates.
+cron.schedule("*/15 * * * *", () => {
+  runFlexgetAndProcess().catch((e) =>
+    console.error("[flexget] cron error:", e.message),
+  );
+});
 
 //////////////////  CHOKIDAR FILE WATCHER  //////////////////
 

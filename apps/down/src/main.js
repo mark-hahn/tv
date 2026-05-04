@@ -237,6 +237,13 @@ async function main() {
   var TV_INPROGRESS_PATH = dataPath("tv-inProgress.json");
   var TV_MAP_PATH = dataPath("tv-map");
   var TVDB_JSON_PATH = path.join(APP_DIR, "..", "srvr", "data", "tvdb.json");
+  var FLEXGET_HISTORY_PATH = path.join(
+    APP_DIR,
+    "..",
+    "srvr",
+    "data",
+    "flexget-history.json",
+  );
 
   // State is stored under apps/down/data.
 
@@ -2735,7 +2742,63 @@ async function main() {
       } catch (e2) {
         // Season dir doesn't exist yet — no file to find.
       }
-      if (epFileExists) {
+
+      // Check flexget-history.json: only allow the most-recently-sent candidate.
+      var flexHistKeyExists = false;
+      var flexHistMostRecentSent = null;
+      var fnameBase = fname.replace(/\.[a-z0-9]{2,4}$/i, "");
+      try {
+        var flexHistText = fs.readFileSync(FLEXGET_HISTORY_PATH, "utf8");
+        var flexHistJson = JSON.parse(flexHistText);
+        var sHistKey = "S" + String(season).padStart(2, "0");
+        var eHistKey = "E" + String(episode).padStart(2, "0");
+        var flexHistoryKey = seriesName + "\x00" + sHistKey + "\x00" + eHistKey;
+        if (flexHistJson[flexHistoryKey]) {
+          flexHistKeyExists = true;
+          flexHistMostRecentSent = flexHistJson[flexHistoryKey].reduce(
+            function (best, c) {
+              if (c.sent === null) return best;
+              if (!best || c.sent > best.sent) return c;
+              return best;
+            },
+            null,
+          );
+        }
+      } catch (e3) {
+        // Missing or unreadable — fall through to old behavior.
+      }
+
+      if (flexHistKeyExists && flexHistMostRecentSent) {
+        var mostRecentBase = String(flexHistMostRecentSent.title || "").replace(
+          /\.[a-z0-9]{2,4}$/i,
+          "",
+        );
+        if (fnameBase !== mostRecentBase) {
+          existsCount++;
+          log(
+            "------",
+            downloadCount,
+            "/",
+            chkCount,
+            "FLEX SKIP (not most-recent-sent):",
+            fname,
+          );
+          trace("checkFileExists: flex skip not most-recent-sent", {
+            fname,
+            flexSeStr,
+            mostRecentBase,
+          });
+          postHistory({
+            tvdbId: lookupTvdbId(seriesName),
+            showName: seriesName || fname,
+            type: "skipDown",
+            description: `flex skip: not most-recent-sent for ${flexSeStr}`,
+          });
+          return process.nextTick(checkFile);
+        }
+        // Is most-recently-sent — allow through even if an old version exists.
+      } else if (epFileExists) {
+        // No flexget history for this episode — use original skip behavior.
         existsCount++;
         log(
           "------",
@@ -2798,6 +2861,47 @@ async function main() {
           description: `flex skip: ${flexSeStr} already watched`,
         });
         return process.nextTick(checkFile);
+      }
+    }
+
+    // If replacing via flexget (most-recently-sent), rename any existing video
+    // file for this episode to .old before the new one is downloaded.
+    if (
+      fromFlex &&
+      epFileExists &&
+      flexSeRe &&
+      flexHistKeyExists &&
+      flexHistMostRecentSent
+    ) {
+      var videoExtsOld = [
+        "mkv",
+        "mp4",
+        "avi",
+        "mov",
+        "m4v",
+        "wmv",
+        "ts",
+        "m2ts",
+      ];
+      try {
+        var seasonFilesForRename = fs.readdirSync(tvSeasonPath);
+        for (var ri = 0; ri < seasonFilesForRename.length; ri++) {
+          var rFile = seasonFilesForRename[ri];
+          if (!flexSeRe.test(rFile)) continue;
+          var rExt = rFile.split(".").pop().toLowerCase();
+          if (!videoExtsOld.includes(rExt)) continue;
+          var rSrc = path.join(tvSeasonPath, rFile);
+          var rDst = rSrc + ".old";
+          while (fs.existsSync(rDst)) rDst = rDst + ".old";
+          try {
+            fs.renameSync(rSrc, rDst);
+            log("flex: renamed to .old:", rFile, "→", path.basename(rDst));
+          } catch (renameErr) {
+            log("flex: rename to .old failed:", rFile, renameErr.message);
+          }
+        }
+      } catch (e4) {
+        // Season dir doesn't exist — nothing to rename.
       }
     }
 

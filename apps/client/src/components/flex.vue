@@ -197,26 +197,9 @@ import * as util from "../util.js";
 
 const FLEX_DISPLAY_TIME_ZONE = "America/Los_Angeles";
 
-function fmtSentTs(sentSec) {
-  if (!Number.isFinite(sentSec) || sentSec <= 0) return "??/??/?? ??:??:??";
-  try {
-    const d = new Date(sentSec * 1000);
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: FLEX_DISPLAY_TIME_ZONE,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-      hourCycle: "h23",
-    }).formatToParts(d);
-    const get = (t) => parts.find((p) => p.type === t)?.value || "";
-    return `${get("year")}/${get("month")}/${get("day")} ${get("hour")}:${get("minute")}:${get("second")}`;
-  } catch {
-    return String(sentMs);
-  }
+function fmtSentTs(sent) {
+  if (!sent) return "??/??/?? ??:??:??";
+  return String(sent);
 }
 
 function buildRows(entries) {

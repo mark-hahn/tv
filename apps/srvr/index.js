@@ -3598,7 +3598,7 @@ app.get("/api/flexget-history", (req, res) => {
         }
       }
     }
-    result.sort((a, b) => (a.sent || 0) - (b.sent || 0));
+    result.sort((a, b) => (a.sent || "").localeCompare(b.sent || ""));
     res.json(result);
   } catch (e) {
     console.error("[flexget-history] error:", e.message);
@@ -4809,6 +4809,23 @@ async function addUrlToQbt(torrentUrl) {
   }
 }
 
+function flexgetFmtSent() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const get = (t) => parts.find((p) => p.type === t)?.value || "";
+  return `${get("year")}/${get("month")}/${get("day")}-${get("hour")}:${get("minute")}:${get("second")}`;
+}
+
 function flexgetGroupRank(groupName) {
   if (!groupName) return prefTorProviders.length + 1;
   const lower = groupName.toLowerCase();
@@ -4915,7 +4932,7 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
     if (newCandidate.url) {
       try {
         await addUrlToQbt(newCandidate.url);
-        newCandidate.sent = Math.floor(Date.now() / 1000);
+        newCandidate.sent = flexgetFmtSent();
         console.log(
           `[flexget] SENT(first) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
         );
@@ -4927,7 +4944,7 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
     if (newCandidate.url) {
       try {
         await addUrlToQbt(newCandidate.url);
-        newCandidate.sent = Math.floor(Date.now() / 1000);
+        newCandidate.sent = flexgetFmtSent();
         console.log(
           `[flexget] SENT(better) ${matchedName} ${sKey}${eKey} "${rawTitle}" over "${lastSent.title}"`,
         );

@@ -2773,7 +2773,9 @@ async function main() {
           /\.[a-z0-9]{2,4}$/i,
           "",
         );
-        if (fnameBase !== mostRecentBase) {
+        var normalizeTitle = (s) =>
+          s.replace(/[._]/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+        if (normalizeTitle(fnameBase) !== normalizeTitle(mostRecentBase)) {
           existsCount++;
           log(
             "------",

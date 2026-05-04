@@ -9,10 +9,9 @@
 5. **New `flexget-history.json`** — replaces `pending-flexget.json`; stores all candidates with `sent` timestamp
 6. **Incremental decision logic** — runs per-candidate as received; no 24hr wait; better files re-sent to qbt
 7. **Down server changes** — skip files that are not the most-recent-sent for an episode; rename old video file to `.old` when replaced
-8. **Logging** — `apps/srvr/data/flexget-decision.log`
-9. **Deploy script update** — rsync static config files from local; skip the two dynamic JSON files
-10. **One-time config-test** — execute flexget dry run to verify config.yml is valid
-11. **Web client flex pane redesign** — lists files sent to qbt from flexget-history.json
+8. **Deploy script update** — rsync static config files from local; skip the two dynamic JSON files
+9. **One-time config-test** — execute flexget dry run to verify config.yml is valid
+10. **Web client flex pane redesign** — lists files sent to qbt from flexget-history.json
 
 ---
 
@@ -195,10 +194,9 @@ Loaded at srvr startup. Fail fast if missing (per workspace rules) — pre-creat
 1. Parse `title` using `parseTorrentTitle(title)` (no extension to strip — these are torrent names) to get show name, season, episode
 2. Skip if parsed show is not in Emby (`show.inEmby` is false)
 3. Skip if parsed show name or season/episode cannot be determined
-4. Skip if a video file for that episode already exists in the media library
-5. Skip if the exact same `url` is already in the history list for this key
-6. Add candidate object to array with `sent: null`
-7. Run decision logic for this episode key
+4. Skip if the exact same `url` is already in the history list for this key
+5. Add candidate object to array with `sent: null`
+6. Run decision logic for this episode key
 
 ---
 
@@ -220,15 +218,6 @@ Runs per-episode-key immediately after each new candidate is added. No 24hr wait
    - If new candidate is **better**: send to qbt, set `sent` to current timestamp
    - If new candidate is **same or worse**: do not send, leave `sent: null`
 4. Save flexget-history.json after every change
-5. Log decision to `apps/srvr/data/flexget-decision.log`
-
-### Log format
-
-```
-05-04 14:23 SENT(first)  Slow Horses S04E01  "Slow.Horses.S04E01.720p.WEBRip.x264-FoV" (720p, 8bit, group=FoV[rank 8], seeds=12)
-05-04 16:41 SENT(better) Slow Horses S04E01  "Slow.Horses.S04E01.1080p.WEB-DL.x265-NTb" (1080p, 10bit, group=NTb[rank 3], seeds=42)  prev: "Slow.Horses.S04E01.720p.WEBRip.x264-FoV"
-05-04 16:41 SKIP(worse)  The Bear S04E03     "The.Bear.S04E03.720p.HDTV.x264-LOL" (720p, 8bit, group=LOL[unranked], seeds=5)  prev: "The.Bear.S04E03.1080p.WEB-DL.x265-ELiTE"
-```
 
 ---
 
@@ -274,7 +263,7 @@ No changes needed for `./srvr down`.
 ## 9. index.js changes summary
 
 - Add `node-cron` job: every 15 min run `flexget execute --tasks fetch-feeds --config <path> --dump`
-- Parse stdout of `--dump` to extract candidate records
+- Parse stdout of `--dump` to extract candidate records (see config-test section for format verification steps)
 - For each candidate: run merge + decision logic
 - Load `prefTorProviders.txt` at startup (fail fast if missing)
 - Load `flexget-history.json` at startup (create empty `{}` if missing — first run)
@@ -285,14 +274,27 @@ No changes needed for `./srvr down`.
 
 ## 10. One-time config-test
 
-Steps:
+**Key constraint**: Do not deploy with `./srvr srvr` during testing — old flexget code must not run with new data. Deploy files directly to the test folder only.
+
+### If using `--dump` stdout (chosen approach):
+
+Steps (order matters — confirm format before writing parse code):
 
 1. Create local static files (`config1-header.txt`, `config3-middle.txt`, `config5-footer.txt`) with new content
 2. Create local `config/prefTorProviders.txt`
-3. Deploy srvr (`./srvr srvr`) — syncs static config files to server
-4. On remote, assemble `config-test/config.yml` using same logic as `upload()`, sourcing from the deployed static files + existing `config2-rejects.json` + `config4-pickups.json`
-5. Run `flexget execute --tasks fetch-feeds --config /root/dev/apps/tv/apps/srvr/config-test/config.yml --test --dump` on the server
-6. Confirm no config errors in output and accepted entries look correct
+3. On remote, create `/root/dev/apps/tv/apps/srvr/config-test/`
+4. rsync static txt files and prefTorProviders.txt directly to `config-test/` on the server (do not `./srvr srvr`)
+5. Copy `config2-rejects.json` and `config4-pickups.json` from `config/` to `config-test/`
+6. Run a small Node snippet that does the same assembly as the new `upload()` and writes `config-test/config.yml`
+7. Run `flexget execute --tasks fetch-feeds --config /root/dev/apps/tv/apps/srvr/config-test/config.yml --test --dump` to see output format
+8. Confirm which fields are present in `--dump` output (`title`, `url`, `seeds`, `quality`, `release_group`, etc.)
+9. Update the stdout-parsing code in index.js to match the confirmed format
+10. Re-rsync updated files to `config-test/` if config changed
+11. Run `flexget execute --tasks fetch-feeds --config /root/dev/apps/tv/apps/srvr/config-test/config.yml --test --dump` again to confirm accepted entries look correct
+
+### If switching away from `--dump`:
+
+Use the same test-folder approach. Run whichever format check is needed at step 7 before writing parse code.
 
 ---
 
@@ -302,7 +304,7 @@ The existing flex pane is replaced with a list of files sent to qbt.
 
 **Data source**: `GET /api/flexget-history` endpoint — returns all candidates with non-null `sent` from `flexget-history.json`, flattened into a list.
 
-**Sort**: by `sent` timestamp, most recent first.
+**Sort**: by `sent` timestamp, oldest first (standard log scrolling; bottom is non-sticky — new entries appear at bottom but do not auto-scroll).
 
 **Line format**: `yyyy/mm/dd hh:mm:ss  S01E01  <show name>  <idx>`
 
@@ -324,24 +326,24 @@ The existing flex pane is replaced with a list of files sent to qbt.
 
 ---
 
-## Issues, ambiguities, and questions
+## Resolved questions
 
-1. **`--dump` output format**: The exact plain-text format of `flexget execute --dump` varies by flexget version and installed plugins. Key fields needed are `title`, `url`, `seeds`, `quality`. Need to run `flexget execute --tasks fetch-feeds --test --dump` on the server after install to confirm parseable fields are present. If the format is unreliable, a local temp file written by an exec plugin (same server, no SSH needed) may be cleaner — but instructions say use stdout.
+1. **`--dump` output format**: Approach: use `--dump` stdout. Format must be confirmed before writing parse code — see config-test section (step 7 first, code second). If `--dump` proves unreliable, a server-local temp file via exec plugin is an alternative.
 
-2. **flexget installation on hahnca.com**: Instructions say "install flexget" but don't specify method (pip, pipx, apt, docker). Recommend `pipx install flexget` for isolation. Need to confirm Python version available on server.
+2. **flexget installation**: Use `pipx install flexget`. Confirm Python version available on hahnca.com before installing.
 
-3. **`--config` path for flexget**: Confirm the correct path to pass. Plan assumes `apps/srvr/config/config.yml` on the remote. The `upload()` function currently writes this file — the path doesn't change, just the content.
+3. **`--config` path**: Pass `--config /root/dev/apps/tv/apps/srvr/config/config.yml` to all flexget commands. The `upload()` function already writes to that path — no change needed.
 
-4. **Season packs**: `regexp` accept/reject will match season pack titles (e.g. "Slow Horses S04"). `parseTorrentTitle` will return `season` but no `episode` for these. Decision: skip candidates where episode is null — do not send season packs to qbt.
+4. **Season packs**: Skip candidates where episode is null — do not send season packs to qbt.
 
-5. **`release_group` from --dump vs parseTorrentTitle**: Flexget may provide `release_group` as a field in `--dump` output. If not available, use `parseTorrentTitle(title).group` (after verifying torrent names have no extension). Plan should use whichever is available, preferring flexget's value.
+5. **`release_group` source**: Use whichever is available, preferring flexget's `release_group` field. Fall back to `parseTorrentTitle(title).group`.
 
-6. **flexget-history.json path from down server**: `down` runs as a separate pm2 process. It needs to read `apps/srvr/data/flexget-history.json`. The path is `/root/dev/apps/tv/apps/srvr/data/flexget-history.json` — hard-code as uppercase constant in `down/src/main.js`. Confirm this cross-app file read is acceptable.
+6. **Cross-app file read**: `down` reading `apps/srvr/data/flexget-history.json` directly is confirmed acceptable. Hard-code path as uppercase constant in `down/src/main.js`.
 
-7. **`.old` file accumulation**: If many better files are downloaded over time, old `.old` files accumulate. No cleanup is specified in the instructions — confirm no cleanup is needed, or whether a second `.old` rename should chain (e.g. `.old.old`).
+7. **`.old` file accumulation**: No cleanup needed. If a file already has a `.old` suffix, chain the rename (e.g. `.old` → `.old.old`).
 
-8. **qbt send mechanism**: Decision logic sends candidate `url` to qbittorrent. Confirm the existing qbt API call path in srvr is reusable for this, or if a new direct HTTP call to qbt is needed.
+8. **qbt send mechanism**: Reuse the existing qbt API call path in srvr.
 
-9. **flex pane `<idx>` calculation**: `<idx>` is determined at display time by counting prior sends for the same episode key, ordered by `sent`. This is a client-side computation over the returned list — no server-side field needed.
+9. **`<idx>` calculation**: Client-side computation over the returned list — no server field needed.
 
-10. **USB server flexget**: Instructions say "usb server flexget will be idled". This means stopping the flexget daemon on the USB server and removing/disabling the cron or systemd unit there. The `reload-cmd` script on the USB server is no longer needed. The existing `send-data.sh` and `reload-cmd` infrastructure can be left in place but unused, or cleaned up separately.
+10. **USB server flexget**: Stop the flexget daemon on the USB server and disable the cron or systemd unit. Infrastructure (`send-data.sh`, `reload-cmd`) can remain in place but unused. Note: shared server — privileges may be limited.

@@ -197,10 +197,10 @@ import * as util from "../util.js";
 
 const FLEX_DISPLAY_TIME_ZONE = "America/Los_Angeles";
 
-function fmtSentTs(sentMs) {
-  if (!Number.isFinite(sentMs) || sentMs <= 0) return "??/??/?? ??:??:??";
+function fmtSentTs(sentSec) {
+  if (!Number.isFinite(sentSec) || sentSec <= 0) return "??/??/?? ??:??:??";
   try {
-    const d = new Date(sentMs);
+    const d = new Date(sentSec * 1000);
     const parts = new Intl.DateTimeFormat("en-US", {
       timeZone: FLEX_DISPLAY_TIME_ZONE,
       year: "numeric",
@@ -493,7 +493,7 @@ export default {
         const scroller = this.getScroller();
         const wasAtBottom = this.isAtBottom(scroller);
 
-        const url = `${config.torrentsApiUrl}/api/flexget-history`;
+        const url = `${config.tvSrvrUrl}/api/flexget-history`;
         const res = await fetch(url);
         if (!res.ok) return;
         const entries = await res.json();

@@ -4852,7 +4852,7 @@ async function saveFlexgetHistory() {
   await util.writeFile(FLEXGET_HISTORY_PATH, flexgetHistory);
 }
 
-async function processFlexgetCandidate(candidate) {
+async function processFlexgetCandidate(candidate, storeOnly = false) {
   const rawTitle = String(candidate.title || "").trim();
   if (!rawTitle) return;
 
@@ -4907,7 +4907,11 @@ async function processFlexgetCandidate(candidate) {
     return best;
   }, null);
 
-  if (!lastSent) {
+  if (storeOnly) {
+    console.log(
+      `[flexget] SKIP(run-loser) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
+    );
+  } else if (!lastSent) {
     if (newCandidate.url) {
       try {
         await addUrlToQbt(newCandidate.url);
@@ -5056,9 +5060,41 @@ async function runFlexgetAndProcess() {
   }
   console.log(`[flexget] processing ${candidates.length} accepted candidates`);
 
-  for (const candidate of candidates) {
+  // Group by rough episode key to detect duplicates within this run.
+  // For groups with multiple candidates, only the best may be sent; others are store-only.
+  const runGroups = new Map(); // roughKey -> candidate indices
+  for (let i = 0; i < candidates.length; i++) {
+    const rawTitle = String(candidates[i].title || "").trim();
+    const ptt = parseTorrentTitle(rawTitle.replace(/\.[a-z0-9]{2,4}$/i, ""));
+    const sn = ptt?.title;
+    let ep = ptt?.episode;
+    if (!ep && Array.isArray(ptt?.episodes) && ptt.episodes.length)
+      ep = ptt.episodes[0];
+    const roughKey =
+      sn && Number.isInteger(ptt?.season) && Number.isInteger(ep)
+        ? `${sn}\x00${ptt.season}\x00${ep}`
+        : `__solo__${i}`;
+    if (!runGroups.has(roughKey)) runGroups.set(roughKey, []);
+    runGroups.get(roughKey).push(i);
+  }
+
+  const storeOnlySet = new Set();
+  for (const indices of runGroups.values()) {
+    if (indices.length <= 1) continue;
+    let bestIdx = indices[0];
+    for (let j = 1; j < indices.length; j++) {
+      if (flexgetIsBetter(candidates[indices[j]], candidates[bestIdx])) {
+        storeOnlySet.add(bestIdx);
+        bestIdx = indices[j];
+      } else {
+        storeOnlySet.add(indices[j]);
+      }
+    }
+  }
+
+  for (let i = 0; i < candidates.length; i++) {
     try {
-      await processFlexgetCandidate(candidate);
+      await processFlexgetCandidate(candidates[i], storeOnlySet.has(i));
     } catch (e) {
       console.error("[flexget] processCandidate error:", e.message);
     }

@@ -5025,7 +5025,54 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
   const histKey = `${matchedName}\x00${sKey}\x00${eKey}`;
 
   const list = flexgetHistory[histKey] || [];
-  if (list.some((c) => c.url === candidate.url)) return; // deduplicate
+  if (list.some((c) => c.url === candidate.url)) return; // exact URL deduplicate
+
+  const normTitle = (t) =>
+    String(t || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
+  const normQuality = (q) =>
+    String(q || "")
+      .toLowerCase()
+      .replace(/\s+/g, "");
+
+  const newNormTitle = normTitle(rawTitle);
+  const newNormQuality = normQuality(candidate.quality);
+  // Same file from a different provider: same normalized title + quality → deduplicate,
+  // but prefer the entry with more seeds if this one is better.
+  const sameFileIdx = list.findIndex(
+    (c) =>
+      normTitle(c.title) === newNormTitle &&
+      normQuality(c.quality) === newNormQuality,
+  );
+  if (sameFileIdx !== -1) {
+    const existing = list[sameFileIdx];
+    const cSeeds = parseInt(String(candidate.torrent_seeds || "0"), 10) || 0;
+    const eSeeds = parseInt(String(existing.torrent_seeds || "0"), 10) || 0;
+    if (cSeeds > eSeeds) {
+      // Update seeds/leeches/url/provider on the existing entry but keep sent timestamp
+      existing.torrent_seeds =
+        candidate.torrent_seeds || existing.torrent_seeds;
+      existing.torrent_leeches =
+        candidate.torrent_leeches || existing.torrent_leeches;
+      existing.url = candidate.url || existing.url;
+      existing.provider = String(candidate.url || "").includes("iptorrents.com")
+        ? "ipt"
+        : String(candidate.url || "").includes("torrentleech.org")
+          ? "tl"
+          : existing.provider;
+      flexgetHistory[histKey] = list;
+      await saveFlexgetHistory();
+      console.log(
+        `[flexget] SKIP(same-file better-seeds) ${matchedName} ${sKey}${eKey} "${rawTitle}" seeds ${eSeeds}->${cSeeds}`,
+      );
+    } else {
+      console.log(
+        `[flexget] SKIP(same-file) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
+      );
+    }
+    return;
+  }
 
   const newCandidate = {
     title: rawTitle,

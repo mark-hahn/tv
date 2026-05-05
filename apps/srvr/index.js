@@ -4972,22 +4972,30 @@ function flexgetBitDepth(title) {
   return 8;
 }
 
-function flexgetIsBetter(candidate, lastSent) {
-  const cRes = flexgetResolution(candidate.quality, candidate.title);
-  const lRes = flexgetResolution(lastSent.quality, lastSent.title);
-  if (cRes !== lRes) return cRes > lRes;
+// Same-run dedup: resolution → bit depth → seeds
+function flexgetIsBetterSameRun(a, b) {
+  const aRes = flexgetResolution(a.quality, a.title);
+  const bRes = flexgetResolution(b.quality, b.title);
+  if (aRes !== bRes) return aRes > bRes;
 
-  const cDepth = flexgetBitDepth(candidate.title);
-  const lDepth = flexgetBitDepth(lastSent.title);
-  if (cDepth !== lDepth) return cDepth > lDepth;
+  const aDepth = flexgetBitDepth(a.title);
+  const bDepth = flexgetBitDepth(b.title);
+  if (aDepth !== bDepth) return aDepth > bDepth;
 
-  const cRank = flexgetGroupRank(candidate.release_group);
-  const lRank = flexgetGroupRank(lastSent.release_group);
-  if (cRank !== lRank) return cRank < lRank;
+  const aSeeds = parseInt(String(a.torrent_seeds || "0"), 10) || 0;
+  const bSeeds = parseInt(String(b.torrent_seeds || "0"), 10) || 0;
+  return aSeeds > bSeeds;
+}
 
-  const cSeeds = parseInt(String(candidate.torrent_seeds || "0"), 10) || 0;
-  const lSeeds = parseInt(String(lastSent.torrent_seeds || "0"), 10) || 0;
-  return cSeeds > lSeeds;
+// Cross-run comparison: resolution → bit depth only (no seeds)
+function flexgetIsBetterCrossRun(a, b) {
+  const aRes = flexgetResolution(a.quality, a.title);
+  const bRes = flexgetResolution(b.quality, b.title);
+  if (aRes !== bRes) return aRes > bRes;
+
+  const aDepth = flexgetBitDepth(a.title);
+  const bDepth = flexgetBitDepth(b.title);
+  return aDepth > bDepth;
 }
 
 async function saveFlexgetHistory() {
@@ -5118,7 +5126,7 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
         console.error(`[flexget] qbt add failed for "${rawTitle}":`, e.message);
       }
     }
-  } else if (flexgetIsBetter(newCandidate, lastSent)) {
+  } else if (flexgetIsBetterCrossRun(newCandidate, lastSent)) {
     if (newCandidate.url) {
       try {
         await addUrlToQbt(newCandidate.url);
@@ -5278,7 +5286,7 @@ async function runFlexgetAndProcess() {
     if (indices.length <= 1) continue;
     let bestIdx = indices[0];
     for (let j = 1; j < indices.length; j++) {
-      if (flexgetIsBetter(candidates[indices[j]], candidates[bestIdx])) {
+      if (flexgetIsBetterSameRun(candidates[indices[j]], candidates[bestIdx])) {
         storeOnlySet.add(bestIdx);
         bestIdx = indices[j];
       } else {

@@ -2571,14 +2571,12 @@ async function main() {
   function flexBitDepth(s) {
     return /10.?bit|x265|hevc|h\.?265|hdr/i.test(String(s || "")) ? 10 : 8;
   }
-  function flexFileIsBetter(usbFname, sentEntry) {
+  function flexFileMatchesSent(usbFname, sentEntry) {
     var sentSrc = String(sentEntry.quality || sentEntry.title || "");
-    var usbRes = flexResolution(usbFname);
-    var sentRes = flexResolution(sentSrc);
-    if (usbRes !== sentRes) return usbRes > sentRes;
-    var usbDepth = flexBitDepth(usbFname);
-    var sentDepth = flexBitDepth(sentSrc);
-    return usbDepth > sentDepth;
+    return (
+      flexResolution(usbFname) === flexResolution(sentSrc) &&
+      flexBitDepth(usbFname) === flexBitDepth(sentSrc)
+    );
   }
 
   checkFileExists = () => {
@@ -2753,21 +2751,9 @@ async function main() {
       var flexSeStr = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
       var flexSeRe = new RegExp(flexSeStr, "i");
 
-      // Check if any file for the same S/E already exists in the season folder.
-      var epFileExists = false;
-      try {
-        var seasonFiles = fs.readdirSync(tvSeasonPath);
-        epFileExists = seasonFiles.some(function (f) {
-          return flexSeRe.test(f);
-        });
-      } catch (e2) {
-        // Season dir doesn't exist yet — no file to find.
-      }
-
       // Check flexget-history.json: only allow the most-recently-sent candidate.
       var flexHistKeyExists = false;
       var flexHistMostRecentSent = null;
-      var fnameBase = fname.replace(/\.[a-z0-9]{2,4}$/i, "");
       try {
         var flexHistText = fs.readFileSync(FLEXGET_HISTORY_PATH, "utf8");
         var flexHistJson = JSON.parse(flexHistText);
@@ -2790,18 +2776,18 @@ async function main() {
       }
 
       if (flexHistKeyExists && flexHistMostRecentSent) {
-        // Allow through only if USB file is better quality than what was sent.
-        if (!flexFileIsBetter(fname, flexHistMostRecentSent)) {
+        // Allow only if USB file matches the quality (resolution + bit-depth) of what was sent.
+        if (!flexFileMatchesSent(fname, flexHistMostRecentSent)) {
           existsCount++;
           log(
             "------",
             downloadCount,
             "/",
             chkCount,
-            "FLEX SKIP (not better quality):",
+            "FLEX SKIP (quality mismatch):",
             fname,
           );
-          trace("checkFileExists: flex skip not better quality", {
+          trace("checkFileExists: flex skip quality mismatch", {
             fname,
             flexSeStr,
             sentTitle: flexHistMostRecentSent.title,
@@ -2810,34 +2796,56 @@ async function main() {
             tvdbId: lookupTvdbId(seriesName),
             showName: seriesName || fname,
             type: "skipDown",
-            description: `flex skip: not better quality for ${flexSeStr}`,
+            description: `flex skip: quality mismatch for ${flexSeStr}`,
           });
           return process.nextTick(checkFile);
         }
-        // File is better — allow through. The .old rename below handles replacing any existing file.
-      } else if (epFileExists) {
-        // No flexget history for this episode — use original skip behavior.
-        existsCount++;
-        log(
-          "------",
-          downloadCount,
-          "/",
-          chkCount,
-          "FLEX SKIP (S/E file exists):",
-          fname,
-          flexSeStr,
-        );
-        trace("checkFileExists: flex skip s/e file exists", {
-          fname,
-          flexSeStr,
-        });
-        postHistory({
-          tvdbId: lookupTvdbId(seriesName),
-          showName: seriesName || fname,
-          type: "skipDown",
-          description: `flex skip: ${flexSeStr} file already exists`,
-        });
-        return process.nextTick(checkFile);
+        // Quality matches — allow through.
+      } else if (!flexHistKeyExists) {
+        // No flexget history for this episode — block if a same-quality-or-better file
+        // already exists on disk for the same S/E.
+        var diskFile = null;
+        try {
+          var seasonFiles = fs.readdirSync(tvSeasonPath);
+          diskFile =
+            seasonFiles.find(function (f) {
+              return flexSeRe.test(f);
+            }) || null;
+        } catch (e2) {
+          // Season dir doesn't exist yet — nothing to compare.
+        }
+        if (diskFile) {
+          var diskRes = flexResolution(diskFile);
+          var usbRes = flexResolution(fname);
+          var diskDepth = flexBitDepth(diskFile);
+          var usbDepth = flexBitDepth(fname);
+          var usbIsBetter =
+            usbRes > diskRes || (usbRes === diskRes && usbDepth > diskDepth);
+          if (!usbIsBetter) {
+            existsCount++;
+            log(
+              "------",
+              downloadCount,
+              "/",
+              chkCount,
+              "FLEX SKIP (disk file same/better quality):",
+              fname,
+              flexSeStr,
+            );
+            trace("checkFileExists: flex skip disk file same/better quality", {
+              fname,
+              flexSeStr,
+              diskFile,
+            });
+            postHistory({
+              tvdbId: lookupTvdbId(seriesName),
+              showName: seriesName || fname,
+              type: "skipDown",
+              description: `flex skip: ${flexSeStr} disk file same/better quality`,
+            });
+            return process.nextTick(checkFile);
+          }
+        }
       }
 
       // Check if the episode is already watched.

@@ -888,7 +888,7 @@ export default {
       },
     },
     active(val) {
-      if (val && !this.hasLoaded && !this.loading) {
+      if (val && !this.loading) {
         this.fetchFiles();
       }
     },

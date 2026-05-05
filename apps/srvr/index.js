@@ -5090,6 +5090,7 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
         ? "tl"
         : null,
     sent: null,
+    addedAt: flexgetFmtSent(),
   };
 
   list.push(newCandidate);

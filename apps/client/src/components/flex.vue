@@ -81,6 +81,20 @@
           >
             Bottom
           </button>
+          <button
+            @click.stop="forceRun"
+            :disabled="forcing"
+            :style="{
+              fontSize: '13px',
+              cursor: forcing ? 'default' : 'pointer',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': forcing ? '#ccc' : 'whitesmoke',
+            }"
+          >
+            {{ forcing ? "Running…" : "Force" }}
+          </button>
         </div>
       </div>
       <div
@@ -355,6 +369,7 @@ export default {
       dialogRow: null,
       _pollTimer: null,
       _polling: false,
+      forcing: false,
       _didInitialScroll: false,
       _didLoadOnce: false,
       _inFlight: false,
@@ -597,6 +612,19 @@ export default {
       const targetEl = wrapper.children[idx];
       if (targetEl)
         targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    },
+
+    async forceRun() {
+      if (this.forcing) return;
+      this.forcing = true;
+      try {
+        await fetch(`${config.tvSrvrUrl}/api/flexget-run`, { method: "POST" });
+        this.scheduleNextPoll(3000);
+      } catch {
+        // ignore
+      } finally {
+        this.forcing = false;
+      }
     },
 
     async pollOnce() {

@@ -204,7 +204,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.mark = 0;
       tmp.linda = 0;
       tmp.ban = -1;
-      tmp.hasemby = 0;
+      tmp.hasemby = 1;
       tmp.full = 0;
       tmp.haveSubs = 0;
       break;

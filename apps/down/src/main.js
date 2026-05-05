@@ -2560,6 +2560,27 @@ async function main() {
     return tryTvdbQuery(tvdbQueryVariants);
   };
 
+  function flexResolution(s) {
+    var src = String(s || "");
+    if (/2160p/i.test(src)) return 2160;
+    if (/1080p/i.test(src)) return 1080;
+    if (/720p/i.test(src)) return 720;
+    if (/480p/i.test(src)) return 480;
+    return 640;
+  }
+  function flexBitDepth(s) {
+    return /10.?bit|x265|hevc|h\.?265|hdr/i.test(String(s || "")) ? 10 : 8;
+  }
+  function flexFileIsBetter(usbFname, sentEntry) {
+    var sentSrc = String(sentEntry.quality || sentEntry.title || "");
+    var usbRes = flexResolution(usbFname);
+    var sentRes = flexResolution(sentSrc);
+    if (usbRes !== sentRes) return usbRes > sentRes;
+    var usbDepth = flexBitDepth(usbFname);
+    var sentDepth = flexBitDepth(sentSrc);
+    return usbDepth > sentDepth;
+  }
+
   checkFileExists = () => {
     var e, tvFilePath, tvSeasonPath, usbLongPath, videoPath;
     const embyKeyForFolder =
@@ -2769,36 +2790,31 @@ async function main() {
       }
 
       if (flexHistKeyExists && flexHistMostRecentSent) {
-        var mostRecentBase = String(flexHistMostRecentSent.title || "").replace(
-          /\.[a-z0-9]{2,4}$/i,
-          "",
-        );
-        var normalizeTitle = (s) =>
-          s.replace(/[._]/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
-        if (normalizeTitle(fnameBase) !== normalizeTitle(mostRecentBase)) {
+        // Allow through only if USB file is better quality than what was sent.
+        if (!flexFileIsBetter(fname, flexHistMostRecentSent)) {
           existsCount++;
           log(
             "------",
             downloadCount,
             "/",
             chkCount,
-            "FLEX SKIP (not most-recent-sent):",
+            "FLEX SKIP (not better quality):",
             fname,
           );
-          trace("checkFileExists: flex skip not most-recent-sent", {
+          trace("checkFileExists: flex skip not better quality", {
             fname,
             flexSeStr,
-            mostRecentBase,
+            sentTitle: flexHistMostRecentSent.title,
           });
           postHistory({
             tvdbId: lookupTvdbId(seriesName),
             showName: seriesName || fname,
             type: "skipDown",
-            description: `flex skip: not most-recent-sent for ${flexSeStr}`,
+            description: `flex skip: not better quality for ${flexSeStr}`,
           });
           return process.nextTick(checkFile);
         }
-        // Is most-recently-sent — allow through even if an old version exists.
+        // File is better — allow through. The .old rename below handles replacing any existing file.
       } else if (epFileExists) {
         // No flexget history for this episode — use original skip behavior.
         existsCount++;

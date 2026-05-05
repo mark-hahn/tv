@@ -2718,7 +2718,11 @@ export default {
           if (!tvdbData) continue;
           const { status, episodeCount, watchedCount } = tvdbData;
           const watchedAll = episodeCount > 0 && watchedCount == episodeCount;
-          const finished = status == "Ended" && watchedAll && !show.reject;
+          const finished =
+            status == "Ended" &&
+            watchedAll &&
+            !show.reject &&
+            show.inEmby !== false;
           if (finished) filteredShows.push(show);
           continue;
         }

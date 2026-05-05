@@ -966,8 +966,10 @@ async function fileNeedsSubChecked(videoFilePath, showName) {
       (f) =>
         f === basename + ".asr.srt" ||
         f === basename + ".mb.chosen" ||
-        /^\.(mb\d+|opn.{5})\.srt$/.test(f.slice(basename.length)) ||
-        /^\.(#[A-Z2-7]+)\.srt$/.test(f.slice(basename.length)),
+        (f.startsWith(basename) &&
+          /^\.(mb\d+|opn.{5})\.srt$/.test(f.slice(basename.length))) ||
+        (f.startsWith(basename) &&
+          /^\.(#[A-Z2-7]+)\.srt$/.test(f.slice(basename.length))),
     )
   )
     return false;
@@ -1388,8 +1390,10 @@ async function processSubQueueEntry() {
       (f) =>
         f === basename + ".asr.srt" ||
         f === basename + ".mb.chosen" ||
-        /^\.(mb\d+|opn.{5})\.srt$/.test(f.slice(basename.length)) ||
-        /^\.(#[A-Z2-7]+)\.srt$/.test(f.slice(basename.length)),
+        (f.startsWith(basename) &&
+          /^\.(mb\d+|opn.{5})\.srt$/.test(f.slice(basename.length))) ||
+        (f.startsWith(basename) &&
+          /^\.(#[A-Z2-7]+)\.srt$/.test(f.slice(basename.length))),
     );
     if (!hasSidecar && !pgsOnly) {
       addToAsrQueue([
@@ -2039,8 +2043,10 @@ async function checkAndDownloadOpnSrt(showName, tvdbRecord) {
         continue;
       }
       if (
-        dirEntries.some((e) =>
-          /^\.opn.{5}\.srt$/.test(e.slice(basename.length)),
+        dirEntries.some(
+          (e) =>
+            e.startsWith(basename) &&
+            /^\.opn.{5}\.srt$/.test(e.slice(basename.length)),
         )
       )
         continue;

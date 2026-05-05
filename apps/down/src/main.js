@@ -2892,6 +2892,13 @@ async function main() {
 
     // If replacing via flexget (most-recently-sent), rename any existing video
     // file for this episode to .old before the new one is downloaded.
+    var epFileExists = false;
+    try {
+      var seasonFiles2 = fs.readdirSync(tvSeasonPath);
+      epFileExists = seasonFiles2.some(function (f) {
+        return flexSeRe && flexSeRe.test(f);
+      });
+    } catch (e4) {}
     if (
       fromFlex &&
       epFileExists &&

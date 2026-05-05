@@ -119,7 +119,7 @@
         v-else
         style="
           padding: 10px;
-          font-size: 13px;
+          font-size: 16px;
           font-family: monospace;
           font-weight: normal;
         "
@@ -209,32 +209,124 @@ import evtBus from "../evtBus.js";
 import { config } from "../config.js";
 import * as util from "../util.js";
 
-const FLEX_DISPLAY_TIME_ZONE = "America/Los_Angeles";
-
 function fmtSentTs(sent) {
   if (!sent) return "??/??/?? ??:??:??";
   return String(sent);
 }
 
+// Parse "2026/05/04-14:41:48" → ms timestamp, returns 0 on failure
+function sentToMs(sent) {
+  if (!sent) return 0;
+  // Format: YYYY/MM/DD-HH:mm:ss
+  const m = /(\d{4})\/(\d{2})\/(\d{2})-(\d{2}):(\d{2}):(\d{2})/.exec(
+    String(sent),
+  );
+  if (!m) return 0;
+  return new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}`).getTime();
+}
+
+// Format ms timestamp as "MM-DD HH:mm" PST
+function fmtGroupTs(ms) {
+  if (!ms) return "?";
+  const d = new Date(ms);
+  const opts = { timeZone: "America/Los_Angeles" };
+  const weekday = d.toLocaleString("en-US", { ...opts, weekday: "short" });
+  const rest = d
+    .toLocaleString("en-US", {
+      ...opts,
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+    .replace(/(\d+)\/(\d+),\s*/, "$1/$2 ");
+  return `${weekday} ${rest}`;
+}
+
+const RUN_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+const GROUP_GAP_MS = RUN_INTERVAL_MS / 2; // 7.5 minutes
+
 function buildRows(entries) {
-  // entries sorted by sent ascending (server guarantees this)
-  const episodeSendCount = new Map();
-  const rows = [];
-  for (const e of entries) {
+  if (entries.length === 0) return [];
+
+  // Sort all entries by sent timestamp ascending
+  const sorted = [...entries].sort(
+    (a, b) => sentToMs(a.sent) - sentToMs(b.sent),
+  );
+
+  // Compute global duplicate index per episode (independent of grouping)
+  const globalEpCount = new Map();
+  const globalIdx = new Map();
+  for (const e of sorted) {
     const epKey = `${e.showName}\x00${e.seasonKey}\x00${e.episodeKey}`;
-    const count = (episodeSendCount.get(epKey) || 0) + 1;
-    episodeSendCount.set(epKey, count);
-    const idx = count === 1 ? "" : ` (${count})`;
-    const seKey = `${e.seasonKey || "?"}${e.episodeKey || "?"}`;
-    const ts = fmtSentTs(e.sent);
-    const line = `${ts}  ${seKey}  ${e.showName || "?"}${idx}`;
-    rows.push({
-      key: `${epKey}\x00${e.sent}\x00${count}`,
-      line,
-      showName: e.showName || "",
-      entry: e,
-    });
+    const count = (globalEpCount.get(epKey) || 0) + 1;
+    globalEpCount.set(epKey, count);
+    globalIdx.set(e, count);
   }
+
+  // Group consecutive entries where gap < GROUP_GAP_MS
+  const groups = [];
+  let currentGroup = [sorted[0]];
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1];
+    const curr = sorted[i];
+    const gap = sentToMs(curr.sent) - sentToMs(prev.sent);
+    if (gap <= GROUP_GAP_MS) {
+      currentGroup.push(curr);
+    } else {
+      groups.push(currentGroup);
+      currentGroup = [curr];
+    }
+  }
+  groups.push(currentGroup);
+
+  const rows = [];
+
+  for (const group of groups) {
+    // Sort within group: showName → seasonKey → episodeKey → globalIdx → sent
+    const withIdx = group.map((e) => {
+      const epKey = `${e.showName}\x00${e.seasonKey}\x00${e.episodeKey}`;
+      return { e, epKey, idx: globalIdx.get(e) || 1 };
+    });
+    withIdx.sort((a, b) => {
+      const sn = (a.e.showName || "").localeCompare(b.e.showName || "");
+      if (sn !== 0) return sn;
+      const sk = (a.e.seasonKey || "").localeCompare(b.e.seasonKey || "");
+      if (sk !== 0) return sk;
+      const ek = (a.e.episodeKey || "").localeCompare(b.e.episodeKey || "");
+      if (ek !== 0) return ek;
+      if (a.idx !== b.idx) return a.idx - b.idx;
+      return sentToMs(a.e.sent) - sentToMs(b.e.sent);
+    });
+
+    // Header row
+    const oldestMs = Math.min(...group.map((e) => sentToMs(e.sent)));
+    const headerTs = fmtGroupTs(oldestMs);
+    const dashes = `──────────── ${headerTs} ────────────`;
+    rows.push({
+      key: `__header__${oldestMs}`,
+      line: dashes,
+      showName: "",
+      entry: null,
+      isHeader: true,
+    });
+
+    // Entry rows (no timestamp)
+    for (const { e, epKey, idx } of withIdx) {
+      const idxSuffix = idx > 1 ? " *" : "";
+      const seKey = `${e.seasonKey || "?"}${e.episodeKey || "?"}`;
+      const line = `${e.showName || "?"} (${seKey})${idxSuffix}`;
+      rows.push({
+        key: `${epKey}\x00${e.sent}\x00${idx}`,
+        line,
+        showName: e.showName || "",
+        entry: e,
+        isHeader: false,
+      });
+    }
+  }
+
   return rows;
 }
 
@@ -319,6 +411,10 @@ export default {
     void this.$nextTick(() => {
       this.scrollToBottom();
     });
+    this._onKeyDown = (e) => {
+      if (e.key === "Enter" && this.dialogRow) this.dialogRow = null;
+    };
+    window.addEventListener("keydown", this._onKeyDown);
   },
 
   unmounted() {
@@ -326,6 +422,7 @@ export default {
     this.stopPolling();
     this.rows = [];
     this.dialogRow = null;
+    window.removeEventListener("keydown", this._onKeyDown);
   },
 
   methods: {
@@ -335,6 +432,16 @@ export default {
       this.dialogRow = null;
     },
     getRowStyle(row) {
+      if (row.isHeader) {
+        return {
+          padding: "6px 4px 2px 4px",
+          color: "#000",
+          fontWeight: "bold",
+          whiteSpace: "pre",
+          userSelect: "none",
+          cursor: "default",
+        };
+      }
       const isHighlighted = this.highlightKey && row.key === this.highlightKey;
       return {
         padding: "2px 4px",
@@ -346,6 +453,7 @@ export default {
     },
 
     handleRowClick(row) {
+      if (row.isHeader) return;
       this.dialogRow = row;
     },
 
@@ -466,6 +574,7 @@ export default {
       let bestRow = null;
       for (let i = startIndex; i < this.rows.length; i++) {
         const row = this.rows[i];
+        if (row.isHeader) continue;
         const match = util.smartTitleMatch(
           row.showName,
           candidates,

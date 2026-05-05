@@ -634,10 +634,10 @@
           </div>
           <div v-else-if="curTvdb">
             <div
-              v-if="unSnoozeMode"
+              v-if="isCurrentSnoozed"
               style="color: red; margin-bottom: 4px"
             >
-              Snoozed show.
+              Snoozed
             </div>
             {{ curTvdb.overview }}
           </div>
@@ -1389,6 +1389,21 @@ export default {
         unSnoozeMode.value = true;
       }
     };
+
+    const isCurrentSnoozed = computed(() => {
+      if (!curTvdb.value || snoozeList.value.length === 0) return false;
+      const curId = String(
+        curTvdb.value.tvdb_id || curTvdb.value.tvdbId || curTvdb.value.id || "",
+      ).trim();
+      const curName = String(curTvdb.value.name || "").trim();
+      return snoozeList.value.some((s) => {
+        const sid = String(s.tvdbId || "").trim();
+        return (
+          (curId && sid && curId === sid) ||
+          (curName && curName === String(s.name || "").trim())
+        );
+      });
+    });
 
     const googleResult = computed(() => {
       const arr = Array.isArray(getRemotesResults.value)
@@ -2366,6 +2381,7 @@ export default {
       existingShowMatch,
       curFallbackImage,
       snoozeList,
+      isCurrentSnoozed,
       unSnoozeMode,
       snoozeFlash,
       handleSnooze,

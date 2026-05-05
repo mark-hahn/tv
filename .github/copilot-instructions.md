@@ -99,3 +99,5 @@ After installing, set up the adb reverse tunnel so Expo Go can reach Metro if ne
 ```bash
 adb -s <device-serial> reverse tcp:8081 tcp:8081
 ```
+
+- never do a `find / ...`, it is too slow

@@ -888,6 +888,61 @@ async function main() {
           });
         }
 
+        // Handle /delItems endpoint – deletes download records and their files
+        if (pathname === "/delItems") {
+          if (req.method === "POST") {
+            return readBody(req, (err1, body) => {
+              if (err1) {
+                return json(res, 400, {
+                  status: "error",
+                  error: String(err1 && err1.message ? err1.message : err1),
+                });
+              }
+              try {
+                var parsed1 = body ? JSON.parse(body) : {};
+                var titles1 = Array.isArray(parsed1.titles)
+                  ? parsed1.titles
+                  : [];
+                if (titles1.length === 0) {
+                  return json(res, 400, {
+                    status: "error",
+                    error: "titles must be a non-empty array",
+                  });
+                }
+                var localPaths = tvJsonMod.deleteByTitles(titles1);
+                // Delete actual files from disk
+                for (var lpi = 0; lpi < localPaths.length; lpi++) {
+                  var lp = localPaths[lpi];
+                  if (lp && pathNode.isAbsolute(lp)) {
+                    try {
+                      fsNode.rmSync(lp, { recursive: true, force: true });
+                    } catch (rmErr) {
+                      log(
+                        "delItems: failed to delete",
+                        lp,
+                        String(rmErr && rmErr.message ? rmErr.message : rmErr),
+                      );
+                    }
+                  }
+                }
+                return json(res, 200, {
+                  status: "ok",
+                  deleted: titles1.length,
+                });
+              } catch (e) {
+                return json(res, 500, {
+                  status: "error",
+                  error: String(e && e.message ? e.message : e),
+                });
+              }
+            });
+          }
+          return json(res, 405, {
+            status: "error",
+            error: "method not allowed",
+          });
+        }
+
         // No matching endpoint
         return json(res, 404, { status: "not found" });
       })

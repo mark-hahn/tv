@@ -61,7 +61,7 @@
             margin-right: 8px;
           "
         >
-          From show
+          From
         </button>
 
         <button
@@ -76,7 +76,7 @@
             margin-right: 8px;
           "
         >
-          Force Down
+          Force
         </button>
 
         <button
@@ -103,9 +103,73 @@
             padding: 4px 10px;
             border: 1px solid #bbb;
             background-color: whitesmoke;
+            margin-right: 8px;
           "
         >
           Refresh
+        </button>
+
+        <button
+          @click.stop="usbSelClick"
+          :disabled="!hasSelection"
+          :style="{
+            cursor: hasSelection ? 'pointer' : 'default',
+            borderRadius: '7px',
+            padding: '4px 10px',
+            border: '1px solid #bbb',
+            '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
+            color: hasSelection ? 'inherit' : '#aaa',
+            marginRight: '8px',
+          }"
+        >
+          Sel
+        </button>
+
+        <button
+          @click.stop="usbAllClick"
+          :disabled="!hasSelection"
+          :style="{
+            cursor: hasSelection ? 'pointer' : 'default',
+            borderRadius: '7px',
+            padding: '4px 10px',
+            border: '1px solid #bbb',
+            '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
+            color: hasSelection ? 'inherit' : '#aaa',
+            marginRight: '8px',
+          }"
+        >
+          All
+        </button>
+
+        <button
+          @click.stop="usbFirstClick"
+          :disabled="!hasSelection"
+          :style="{
+            cursor: hasSelection ? 'pointer' : 'default',
+            borderRadius: '7px',
+            padding: '4px 10px',
+            border: '1px solid #bbb',
+            '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
+            color: hasSelection ? 'inherit' : '#aaa',
+            marginRight: '8px',
+          }"
+        >
+          First
+        </button>
+
+        <button
+          @click.stop="usbDelClick"
+          :disabled="!hasSelection"
+          :style="{
+            cursor: hasSelection ? 'pointer' : 'default',
+            borderRadius: '7px',
+            padding: '4px 10px',
+            border: '1px solid #bbb',
+            '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
+            color: hasSelection ? 'inherit' : '#aaa',
+          }"
+        >
+          Del
         </button>
       </div>
 
@@ -1028,6 +1092,126 @@ export default {
         alert("Error: " + e.message);
       } finally {
         this.loading = false;
+      }
+    },
+
+    // Sel: emit selectShowFromCardTitle for first selected
+    usbSelClick() {
+      if (this.selectedName) {
+        evtBus.emit("selectShowFromCardTitle", this.selectedName);
+        return;
+      }
+      if (this.selectedFiles.size > 0) {
+        // Use parent folder name or first file name
+        const parentPath = this.selectionParentPath;
+        if (parentPath) {
+          // Last segment of parent path as show name
+          const parts = parentPath.split("/");
+          const name = parts[parts.length - 1];
+          if (name) {
+            evtBus.emit("selectShowFromCardTitle", name);
+            return;
+          }
+        }
+        // Fall back to first file name
+        const firstPath = [...this.selectedFiles][0];
+        const fileName = firstPath ? firstPath.split("/").pop() : null;
+        if (fileName) evtBus.emit("selectShowFromCardTitle", fileName);
+      }
+    },
+
+    // All: select all siblings of first selected file
+    usbAllClick() {
+      const parentPath =
+        this.selectedFiles.size > 0 ? this.selectionParentPath : null;
+
+      if (!parentPath && this.selectedName) {
+        // For top-level, select all immediate children that are folders or files?
+        // Just emit selectShowFromCardTitle — All doesn't make sense for top-level
+        return;
+      }
+      if (!parentPath) return;
+
+      const siblings = this.getSiblings(parentPath);
+      if (!siblings || siblings.length === 0) return;
+
+      const newFiles = new Set();
+      for (const s of siblings) {
+        if (s.type === "file" || s.type === "folder") {
+          newFiles.add(this.getPath(parentPath, s.name));
+        }
+      }
+      this.selectedFiles = newFiles;
+      this.selectionParentPath = parentPath;
+      this.lastSelectedFile = [...newFiles][0] || null;
+    },
+
+    // First: scroll to first selected item
+    usbFirstClick() {
+      const target =
+        this.selectedName ||
+        (this.selectedFiles.size > 0 ? [...this.selectedFiles][0] : null);
+      if (!target) return;
+
+      if (this.selectedName && this.$refs.treeNodes) {
+        const comp = this.$refs.treeNodes.find((c) => {
+          const n = c.node || c.$props?.node;
+          return n && n.name === this.selectedName;
+        });
+        if (comp && comp.$el) {
+          comp.$el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        return;
+      }
+
+      if (this.$refs.treeNodes) {
+        // find by emitting event from child or scanning $el text
+        const firstFile = [...this.selectedFiles][0];
+        const firstName = firstFile ? firstFile.split("/").pop() : null;
+        if (firstName) {
+          const comp = this.$refs.treeNodes.find((c) => {
+            const n = c.node || c.$props?.node;
+            return n && n.name === firstName;
+          });
+          if (comp && comp.$el) {
+            comp.$el.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        }
+      }
+    },
+
+    // Del: confirm then delete selected files from USB
+    async usbDelClick() {
+      if (!this.hasSelection) return;
+      const paths = [...this.selectedFiles];
+      const count = paths.length;
+      if (count === 0) return;
+
+      const ok = window.confirm(
+        `Delete ${count} file${count === 1 ? "" : "s"} from USB disk?`,
+      );
+      if (!ok) return;
+
+      try {
+        const res = await fetch(
+          `${config.torrentsApiUrl}/api/usb/deleteFiles`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ paths }),
+          },
+        );
+        if (!res.ok) {
+          const txt = await res.text().catch(() => "");
+          window.alert(`Delete failed: ${txt || res.statusText}`);
+          return;
+        }
+        this.selectedFiles.clear();
+        this.selectionParentPath = null;
+        this.lastSelectedFile = null;
+        await this.fetchFiles();
+      } catch (err) {
+        window.alert(`Delete failed: ${err?.message || String(err)}`);
       }
     },
   },

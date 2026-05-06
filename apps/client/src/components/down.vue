@@ -104,19 +104,6 @@
             "
           />
           <button
-            @click.stop="showFirstDownloading"
-            style="
-              font-size: 13px;
-              cursor: pointer;
-              border-radius: 7px;
-              padding: 4px 10px;
-              border: 1px solid #bbb;
-              background-color: whitesmoke;
-            "
-          >
-            From
-          </button>
-          <button
             @click.stop="startCheck"
             style="
               font-size: 13px;
@@ -193,6 +180,81 @@
             :style="{ backgroundColor: pollingStopped ? '#f66' : 'whitesmoke' }"
           >
             {{ pollingStopped ? "Resume" : "Stop" }}
+          </button>
+          <button
+            @click.stop="downSelClick"
+            :disabled="selectedItems.size === 0"
+            :style="{
+              fontSize: '13px',
+              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+            }"
+          >
+            Sel
+          </button>
+          <button
+            @click.stop="downFromClick"
+            :disabled="!show"
+            :style="{
+              fontSize: '13px',
+              cursor: show ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': show ? 'whitesmoke' : '#e8e8e8',
+              color: show ? 'inherit' : '#aaa',
+            }"
+          >
+            From
+          </button>
+          <button
+            @click.stop="downAllClick"
+            :disabled="selectedItems.size === 0"
+            :style="{
+              fontSize: '13px',
+              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+            }"
+          >
+            All
+          </button>
+          <button
+            @click.stop="downFirstClick"
+            :disabled="selectedItems.size === 0"
+            :style="{
+              fontSize: '13px',
+              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+            }"
+          >
+            First
+          </button>
+          <button
+            @click.stop="downDelClick"
+            :disabled="selectedItems.size === 0"
+            :style="{
+              fontSize: '13px',
+              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+            }"
+          >
+            Del
           </button>
         </div>
       </div>
@@ -398,6 +460,8 @@ export default {
       showErrs: false,
       pollingStopped: false,
       fileSearch: "",
+      selectedItems: new Set(), // Multi-select for new button group
+      lastSelectedIndex: null,
     };
   },
 
@@ -478,6 +542,8 @@ export default {
   watch: {
     show() {
       this.matchedTitle = null;
+      this.selectedItems = new Set();
+      this.lastSelectedIndex = null;
     },
   },
 
@@ -574,6 +640,8 @@ export default {
       } else {
         // Clear highlight when leaving pane
         this.matchedTitle = null;
+        this.selectedItems = new Set();
+        this.lastSelectedIndex = null;
 
         // Store scroll position when leaving
         const el = this.$refs.scroller;
@@ -887,15 +955,15 @@ export default {
         .trim()
         .toLowerCase();
       const isDownloading = status === "downloading";
-      const isMatched = this.matchedTitle && it?.title === this.matchedTitle;
+      const isSelected = this.selectedItems.has(it);
       return {
         position: "relative",
-        border: isMatched ? "3px solid #007bff" : "1px solid #ddd",
+        border: isSelected ? "3px solid #007bff" : "1px solid #ddd",
         borderRadius: "8px",
         padding: "10px",
         background: isDownloading ? "#fffacd" : "#fff",
         cursor: "pointer",
-        zIndex: isMatched ? 1 : 0,
+        zIndex: isSelected ? 1 : 0,
       };
     },
 
@@ -909,9 +977,40 @@ export default {
     },
 
     handleCardClick(event, it) {
-      void event;
-      const clickedTitle = it?.seriesName || it?.title;
-      if (clickedTitle) evtBus.emit("selectShowFromCardTitle", clickedTitle);
+      const isAltClick = Boolean(event?.altKey);
+      const isCtrlClick = Boolean(event?.ctrlKey || event?.metaKey);
+      const isShiftClick = Boolean(event?.shiftKey);
+
+      // Alt-click: copy title to clipboard
+      if (isAltClick) {
+        const title = String(it?.title || "");
+        navigator.clipboard.writeText(title).catch(() => {});
+        return;
+      }
+
+      const idx = this.orderedItems.indexOf(it);
+
+      if (isShiftClick && this.lastSelectedIndex !== null) {
+        const lo = Math.min(this.lastSelectedIndex, idx);
+        const hi = Math.max(this.lastSelectedIndex, idx);
+        for (let i = lo; i <= hi; i++) {
+          this.selectedItems.add(this.orderedItems[i]);
+        }
+      } else if (isCtrlClick) {
+        if (this.selectedItems.has(it)) {
+          this.selectedItems.delete(it);
+        } else {
+          this.selectedItems.add(it);
+        }
+        this.lastSelectedIndex = idx;
+      } else {
+        // Plain click: single-select
+        this.selectedItems.clear();
+        this.selectedItems.add(it);
+        this.lastSelectedIndex = idx;
+      }
+      // Trigger reactivity
+      this.selectedItems = new Set(this.selectedItems);
     },
 
     async retryDownload(title) {
@@ -1440,6 +1539,148 @@ export default {
       } finally {
         this.finishLoadingDelay();
       }
+    },
+
+    // Helper: extract show name from a download item
+    downExtractShowName(it) {
+      const rawTitle = String(it?.seriesName || it?.title || "");
+      if (!rawTitle) return "";
+      try {
+        let parser = null;
+        if (typeof parseTorrentTitle === "function") {
+          parser = parseTorrentTitle;
+        } else if (
+          parseTorrentTitle &&
+          typeof parseTorrentTitle.parse === "function"
+        ) {
+          parser = parseTorrentTitle.parse;
+        } else if (
+          parseTorrentTitle?.default &&
+          typeof parseTorrentTitle.default.parse === "function"
+        ) {
+          parser = parseTorrentTitle.default.parse;
+        }
+        if (!parser) return rawTitle;
+        const parsed = parser(rawTitle);
+        return parsed?.title || rawTitle;
+      } catch {
+        return rawTitle;
+      }
+    },
+
+    // Helper: scroll scroller to item at orderedItems index
+    downScrollToIndex(idx) {
+      const scroller = this.$refs.scroller;
+      if (!scroller) return;
+      const allChildren = Array.from(scroller.children);
+      let currentIdx = 0;
+      for (const el of allChildren) {
+        if (el.textContent && el.textContent.includes("====")) continue;
+        if (currentIdx === idx) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          return;
+        }
+        currentIdx++;
+      }
+    },
+
+    // Sel: emit selectShowFromCardTitle for first selected item
+    downSelClick() {
+      const first = [...this.selectedItems][0];
+      if (!first) return;
+      const name = this.downExtractShowName(first);
+      if (name) evtBus.emit("selectShowFromCardTitle", name);
+    },
+
+    // From: select all items matching current show; scroll to first
+    downFromClick() {
+      if (!this.show) return;
+      const candidates = [this.show];
+      const newSel = new Set();
+      let firstIdx = null;
+      for (let i = 0; i < this.orderedItems.length; i++) {
+        const it = this.orderedItems[i];
+        const name = this.downExtractShowName(it);
+        if (!name) continue;
+        const match = util.smartTitleMatch(name, candidates, null, false);
+        if (match) {
+          newSel.add(it);
+          if (firstIdx === null) firstIdx = i;
+        }
+      }
+      this.selectedItems = newSel;
+      if (firstIdx !== null) {
+        this.lastSelectedIndex = firstIdx;
+        this.$nextTick(() => this.downScrollToIndex(firstIdx));
+      }
+    },
+
+    // All: select all items matching first selected item's show
+    downAllClick() {
+      const first = [...this.selectedItems][0];
+      if (!first) return;
+      const pivotName = this.downExtractShowName(first);
+      if (!pivotName) return;
+      const newSel = new Set();
+      let firstIdx = null;
+      for (let i = 0; i < this.orderedItems.length; i++) {
+        const it = this.orderedItems[i];
+        const name = this.downExtractShowName(it);
+        if (!name) continue;
+        const match = util.smartTitleMatch(
+          name,
+          [{ name: pivotName }],
+          null,
+          false,
+        );
+        if (match) {
+          newSel.add(it);
+          if (firstIdx === null) firstIdx = i;
+        }
+      }
+      this.selectedItems = newSel;
+      if (firstIdx !== null) {
+        this.lastSelectedIndex = firstIdx;
+        this.$nextTick(() => this.downScrollToIndex(firstIdx));
+      }
+    },
+
+    // First: scroll to first selected item
+    downFirstClick() {
+      const first = [...this.selectedItems][0];
+      if (!first) return;
+      const idx = this.orderedItems.indexOf(first);
+      if (idx < 0) return;
+      this.$nextTick(() => this.downScrollToIndex(idx));
+    },
+
+    // Del: confirm then delete selected items (DB + file)
+    async downDelClick() {
+      const count = this.selectedItems.size;
+      if (count === 0) return;
+      const ok = window.confirm(
+        `Delete ${count} file${count === 1 ? "" : "s"}?`,
+      );
+      if (!ok) return;
+      const titles = [...this.selectedItems]
+        .map((it) => String(it?.title || ""))
+        .filter(Boolean);
+      this.selectedItems = new Set();
+      if (titles.length === 0) return;
+      try {
+        const res = await fetch(`${config.tvDownUrl}/delItems`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ titles }),
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          window.alert(`Delete failed: ${text || res.statusText}`);
+        }
+      } catch (err) {
+        window.alert(`Delete failed: ${err?.message || String(err)}`);
+      }
+      await this.loadTvproc();
     },
   },
 };

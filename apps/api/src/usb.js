@@ -1356,7 +1356,9 @@ export async function checkFlexgetStatus() {
   for (const name of ["ipt", "tl"]) {
     const info = tasks[name];
     if (!info) {
-      const err = new Error(`[flexget] Task ${name} missing from status output`);
+      const err = new Error(
+        `[flexget] Task ${name} missing from status output`,
+      );
       err.fullOutput = output;
       throw err;
     }
@@ -1436,4 +1438,36 @@ export async function renameUsbFile(oldPath, newName) {
 
   await execFileAsync("ssh", [...sshBaseArgs, qbHost, cmd]);
   return { success: true };
+}
+
+export async function deleteUsbFiles(paths) {
+  if (!Array.isArray(paths) || paths.length === 0) {
+    throw new Error("paths must be a non-empty array");
+  }
+
+  const qbHost = await loadQbHostForSsh();
+  const root = "/home/xobtlu/files";
+
+  const sshBaseArgs = [
+    "-o",
+    "BatchMode=yes",
+    "-o",
+    "ConnectTimeout=10",
+    "-o",
+    "StrictHostKeyChecking=no",
+    "-o",
+    "UserKnownHostsFile=/dev/null",
+  ];
+
+  for (const p of paths) {
+    const str = String(p || "").trim();
+    if (!str || str.includes("..")) {
+      throw new Error(`Invalid path: ${str}`);
+    }
+    const fullPath = `${root}/${str}`;
+    const cmd = `rm -rf -- ${shellQuote(fullPath)}`;
+    await execFileAsync("ssh", [...sshBaseArgs, qbHost, cmd]);
+  }
+
+  return { success: true, deleted: paths.length };
 }

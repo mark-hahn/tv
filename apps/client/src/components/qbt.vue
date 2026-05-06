@@ -79,19 +79,6 @@
             Open UI
           </button>
           <button
-            @click.stop="highlightShow"
-            style="
-              font-size: 13px;
-              cursor: pointer;
-              border-radius: 7px;
-              padding: 4px 10px;
-              border: 1px solid #bbb;
-              background-color: whitesmoke;
-            "
-          >
-            From show
-          </button>
-          <button
             @click.stop="activeOnly = !activeOnly"
             :style="{
               fontSize: '13px',
@@ -131,6 +118,96 @@
             "
           >
             Bottom
+          </button>
+          <button
+            @click.stop="qbtSelClick"
+            :disabled="selectedItems.size === 0"
+            :style="{
+              fontSize: '13px',
+              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+            }"
+          >
+            Sel
+          </button>
+          <button
+            @click.stop="qbtFromClick"
+            :disabled="!show"
+            :style="{
+              fontSize: '13px',
+              cursor: show ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': show ? 'whitesmoke' : '#e8e8e8',
+              color: show ? 'inherit' : '#aaa',
+            }"
+          >
+            From
+          </button>
+          <button
+            @click.stop="qbtAllClick"
+            :disabled="selectedItems.size === 0"
+            :style="{
+              fontSize: '13px',
+              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+            }"
+          >
+            All
+          </button>
+          <button
+            @click.stop="qbtFirstClick"
+            :disabled="selectedItems.size === 0"
+            :style="{
+              fontSize: '13px',
+              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+            }"
+          >
+            First
+          </button>
+          <button
+            @click.stop="qbtForceClick"
+            :disabled="selectedItems.size === 0"
+            :style="{
+              fontSize: '13px',
+              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+            }"
+          >
+            Force
+          </button>
+          <button
+            @click.stop="qbtDelClick"
+            :disabled="selectedItems.size === 0"
+            :style="{
+              fontSize: '13px',
+              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+            }"
+          >
+            Del
           </button>
         </div>
       </div>
@@ -249,12 +326,16 @@ export default {
       matchedTitle: null,
       activeOnly: false,
       _knownHashes: new Set(),
+      selectedItems: new Set(), // Multi-select for new button group
+      lastSelectedIndex: null,
     };
   },
 
   watch: {
     show() {
       this.matchedTitle = null;
+      this.selectedItems = new Set();
+      this.lastSelectedIndex = null;
     },
   },
 
@@ -714,15 +795,15 @@ export default {
 
     getCardStyle(t) {
       const isDownloading = t?.state === "downloading";
-      const isMatched = this.matchedTitle && t?.name === this.matchedTitle;
+      const isSelected = this.selectedItems.has(t);
       return {
         position: "relative",
         background: isDownloading ? "#fffacd" : "#fff",
-        border: isMatched ? "3px solid #007bff" : "1px solid #ddd",
+        border: isSelected ? "3px solid #007bff" : "1px solid #ddd",
         borderRadius: "5px",
         padding: "10px",
         cursor: "pointer",
-        zIndex: isMatched ? 1 : 0,
+        zIndex: isSelected ? 1 : 0,
       };
     },
 
@@ -792,32 +873,40 @@ export default {
     },
 
     async handleCardClick(event, t) {
-      // Ctrl+Click (Cmd+Click on mac) deletes torrent and its files.
-      if (event && (event.ctrlKey || event.metaKey)) {
-        try {
-          event.preventDefault();
-          event.stopPropagation();
-        } catch {
-          // ignore
-        }
+      const isAltClick = Boolean(event?.altKey);
+      const isCtrlClick = Boolean(event?.ctrlKey || event?.metaKey);
+      const isShiftClick = Boolean(event?.shiftKey);
 
-        const title = (t?.name || t?.hash || "Unknown").toString();
-        const ok = window.confirm(
-          `Is it ok to delete the torrent ${title} from qbittorrent and its files?`,
-        );
-        if (!ok) return;
-
-        try {
-          await this.deleteTorrentAndFiles(t);
-          await this.pollOnce();
-        } catch (err) {
-          window.alert(err?.message || String(err));
-        }
+      // Alt-click: copy torrent name to clipboard
+      if (isAltClick) {
+        const title = String(t?.name || "");
+        navigator.clipboard.writeText(title).catch(() => {});
         return;
       }
 
-      const title = t?.name;
-      if (title) evtBus.emit("selectShowFromCardTitle", title);
+      const idx = this.sortedTorrents.indexOf(t);
+
+      if (isShiftClick && this.lastSelectedIndex !== null) {
+        const lo = Math.min(this.lastSelectedIndex, idx);
+        const hi = Math.max(this.lastSelectedIndex, idx);
+        for (let i = lo; i <= hi; i++) {
+          this.selectedItems.add(this.sortedTorrents[i]);
+        }
+      } else if (isCtrlClick) {
+        if (this.selectedItems.has(t)) {
+          this.selectedItems.delete(t);
+        } else {
+          this.selectedItems.add(t);
+        }
+        this.lastSelectedIndex = idx;
+      } else {
+        // Plain click: single-select
+        this.selectedItems.clear();
+        this.selectedItems.add(t);
+        this.lastSelectedIndex = idx;
+      }
+      // Trigger reactivity
+      this.selectedItems = new Set(this.selectedItems);
     },
 
     openQbtUI() {
@@ -902,6 +991,8 @@ export default {
       }
 
       // Found the matching card
+      this.selectedItems = new Set([bestMatch]);
+      this.lastSelectedIndex = this.sortedTorrents.indexOf(bestMatch);
       this.matchedTitle = bestMatch.name;
 
       const scroller = this.$refs.scroller;
@@ -965,6 +1056,171 @@ export default {
       if (!title) return;
       console.log("history: emitting forceFile event");
       evtBus.emit("forceFile", title);
+    },
+
+    // Helper: extract clean show name from torrent name using parse-torrent-title
+    qbtExtractShowName(t) {
+      const rawTitle = String(t?.name || "");
+      if (!rawTitle) return "";
+      return this.toParsedTitle(rawTitle) || rawTitle;
+    },
+
+    // Sel: emit selectShowFromCardTitle for first selected item
+    qbtSelClick() {
+      const first = [...this.selectedItems][0];
+      if (!first) return;
+      const name = this.qbtExtractShowName(first);
+      if (name) evtBus.emit("selectShowFromCardTitle", name);
+    },
+
+    // From: select all items matching current show
+    qbtFromClick() {
+      if (!this.show) return;
+      const candidates = [this.show];
+      const newSel = new Set();
+      let firstIdx = null;
+      for (let i = 0; i < this.sortedTorrents.length; i++) {
+        const t = this.sortedTorrents[i];
+        const name = this.qbtExtractShowName(t);
+        if (!name) continue;
+        const match = util.smartTitleMatch(name, candidates, null, false);
+        if (match) {
+          newSel.add(t);
+          if (firstIdx === null) firstIdx = i;
+        }
+      }
+      this.selectedItems = newSel;
+      if (firstIdx !== null) {
+        this.lastSelectedIndex = firstIdx;
+        this.$nextTick(() => {
+          const scroller = this.$refs.scroller;
+          if (!scroller) return;
+          const container = scroller.children[0];
+          if (!container) return;
+          const card = container.children[firstIdx];
+          if (card)
+            card.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+      }
+    },
+
+    // All: select all items matching first selected item's show
+    qbtAllClick() {
+      const first = [...this.selectedItems][0];
+      if (!first) return;
+      const pivotName = this.qbtExtractShowName(first);
+      if (!pivotName) return;
+      const newSel = new Set();
+      let firstIdx = null;
+      for (let i = 0; i < this.sortedTorrents.length; i++) {
+        const t = this.sortedTorrents[i];
+        const name = this.qbtExtractShowName(t);
+        if (!name) continue;
+        const match = util.smartTitleMatch(
+          name,
+          [{ name: pivotName }],
+          null,
+          false,
+        );
+        if (match) {
+          newSel.add(t);
+          if (firstIdx === null) firstIdx = i;
+        }
+      }
+      this.selectedItems = newSel;
+      if (firstIdx !== null) {
+        this.lastSelectedIndex = firstIdx;
+        this.$nextTick(() => {
+          const scroller = this.$refs.scroller;
+          if (!scroller) return;
+          const container = scroller.children[0];
+          if (!container) return;
+          const card = container.children[firstIdx];
+          if (card)
+            card.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+      }
+    },
+
+    // First: scroll to first selected item
+    qbtFirstClick() {
+      const first = [...this.selectedItems][0];
+      if (!first) return;
+      const idx = this.sortedTorrents.indexOf(first);
+      if (idx < 0) return;
+      this.$nextTick(() => {
+        const scroller = this.$refs.scroller;
+        if (!scroller) return;
+        const container = scroller.children[0];
+        if (!container) return;
+        const card = container.children[idx];
+        if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    },
+
+    // Force: delete each selected torrent then re-add via magnet URI
+    async qbtForceClick() {
+      const count = this.selectedItems.size;
+      if (count === 0) return;
+      const ok = window.confirm(
+        `Restart download for ${count} torrent${count === 1 ? "" : "s"}?`,
+      );
+      if (!ok) return;
+      const items = [...this.selectedItems];
+      for (const t of items) {
+        const magnetUrl = String(t?.magnet_uri || "").trim();
+        try {
+          await this.deleteTorrentAndFiles(t);
+        } catch (err) {
+          window.alert(
+            `Delete failed for ${t?.name}: ${err?.message || String(err)}`,
+          );
+          continue;
+        }
+        if (magnetUrl) {
+          try {
+            const url = new URL(`${config.torrentsApiUrl}/api/qbt/addMagnet`);
+            const res = await fetch(url.toString(), {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ magnetUrl }),
+            });
+            if (!res.ok) {
+              const text = await res.text().catch(() => "");
+              window.alert(
+                `Re-add failed for ${t?.name}: ${text || res.statusText}`,
+              );
+            }
+          } catch (err) {
+            window.alert(
+              `Re-add failed for ${t?.name}: ${err?.message || String(err)}`,
+            );
+          }
+        }
+      }
+      await this.pollOnce();
+    },
+
+    // Del: confirm then delete each selected torrent and its files
+    async qbtDelClick() {
+      const count = this.selectedItems.size;
+      if (count === 0) return;
+      const ok = window.confirm(
+        `Delete ${count} torrent${count === 1 ? "" : "s"} from qbt and their files from USB disk?`,
+      );
+      if (!ok) return;
+      const items = [...this.selectedItems];
+      this.selectedItems = new Set();
+      for (const t of items) {
+        try {
+          await this.deleteTorrentAndFiles(t);
+        } catch (err) {
+          window.alert(
+            `Delete failed for ${t?.name}: ${err?.message || String(err)}`,
+          );
+        }
+      }
+      await this.pollOnce();
     },
   },
 };

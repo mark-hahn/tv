@@ -62,7 +62,7 @@
               >Searching</span
             >
             <button
-              v-if="selectedTorrent && !previewMode"
+              v-if="selectedItems.size > 0 && !previewMode"
               @click.stop="
                 showStream = false;
                 continueDownload();
@@ -79,7 +79,7 @@
               Get
             </button>
             <button
-              v-if="selectedTorrent"
+              v-if="selectedItems.size > 0"
               @click.stop="
                 showStream = false;
                 openDetails();
@@ -202,6 +202,123 @@
               Cookies
             </button>
           </div>
+        </div>
+        <!-- Second header row: multi-select action buttons -->
+        <div
+          v-if="!showStream && !previewMode"
+          style="
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 6px;
+            margin-top: 6px;
+          "
+        >
+          <button
+            @click.stop="torSelClick"
+            :disabled="selectedItems.size === 0"
+            :style="{
+              fontSize: '13px',
+              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 8px',
+              border: '1px solid #bbb',
+              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+            }"
+          >
+            Sel
+          </button>
+          <button
+            @click.stop="torFromClick"
+            :disabled="!currentShow"
+            :style="{
+              fontSize: '13px',
+              cursor: currentShow ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 8px',
+              border: '1px solid #bbb',
+              '--btn-bg': currentShow ? 'whitesmoke' : '#e8e8e8',
+              color: currentShow ? 'inherit' : '#aaa',
+            }"
+          >
+            From
+          </button>
+          <button
+            @click.stop="torAllClick"
+            :disabled="selectedItems.size === 0"
+            :style="{
+              fontSize: '13px',
+              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 8px',
+              border: '1px solid #bbb',
+              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+            }"
+          >
+            All
+          </button>
+          <button
+            @click.stop="torFirstClick"
+            :disabled="selectedItems.size === 0"
+            :style="{
+              fontSize: '13px',
+              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 8px',
+              border: '1px solid #bbb',
+              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+            }"
+          >
+            First
+          </button>
+          <button
+            @click.stop="torShowClick"
+            :disabled="selectedItems.size === 0"
+            :style="{
+              fontSize: '13px',
+              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 8px',
+              border: '1px solid #bbb',
+              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+            }"
+          >
+            Show
+          </button>
+          <button
+            @click.stop="torSendClick"
+            :disabled="selectedItems.size === 0"
+            :style="{
+              fontSize: '13px',
+              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 8px',
+              border: '1px solid #bbb',
+              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+            }"
+          >
+            Send
+          </button>
+          <button
+            @click.stop="torForceClick"
+            :disabled="selectedItems.size === 0"
+            :style="{
+              fontSize: '13px',
+              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 8px',
+              border: '1px solid #bbb',
+              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+            }"
+          >
+            Force
+          </button>
         </div>
         <div
           style="
@@ -787,7 +904,7 @@
         <div style="font-size: 16px; margin-bottom: 20px; line-height: 1.5">
           Is it OK to download file
           <span style="font-weight: bold">{{
-            selectedTorrent?.raw?.title || "Unknown"
+            [...selectedItems][0]?.raw?.title || "Unknown"
           }}</span
           >?
         </div>
@@ -990,6 +1107,7 @@ import * as emby from "../emby.js";
 import * as util from "../util.js";
 import { config } from "../config.js";
 import Stream from "./stream.vue";
+import parseTorrentTitle from "parse-torrent-title";
 
 export default {
   name: "Torrents",
@@ -1028,7 +1146,8 @@ export default {
       tlCfClearance: "",
       currentShow: null,
       SHOW_TITLE: true, // Show torrent title on card
-      selectedTorrent: null, // Currently selected torrent
+      selectedItems: new Set(), // Currently selected torrents (multi-select)
+      lastSelectedIndex: null, // Index in filteredTorrents for shift-select
       showModal: false, // Show download confirmation modal
       showErrorModal: false,
       errorModalMsg: "",
@@ -1413,7 +1532,7 @@ export default {
       void this.updateSpaceAvail();
     },
     openDetails() {
-      const url = this.selectedTorrent?.detailUrl;
+      const url = [...this.selectedItems][0]?.detailUrl;
       if (url) util.openExternalPage(url);
     },
 
@@ -1741,7 +1860,8 @@ export default {
       };
     },
     resetPane() {
-      this.selectedTorrent = null;
+      this.selectedItems = new Set();
+      this.lastSelectedIndex = null;
       this.showModal = false;
       this.clickedTorrents.clear();
       this.torrents = [];
@@ -1928,7 +2048,8 @@ export default {
       this.torrents = [];
       this.error = null;
       this.hasSearched = false;
-      this.selectedTorrent = null;
+      this.selectedItems = new Set();
+      this.lastSelectedIndex = null;
       this.clickedTorrents.clear();
       this.noTorrentsNeeded = false;
       this.providerWarning = "";
@@ -2615,16 +2736,9 @@ export default {
         return;
       }
 
-      // Select the card
-      this.selectedTorrent = torrent;
-
-      const alreadyClicked = this.isClicked(torrent);
-      // Add to clicked set
-      this.clickedTorrents.add(torrent);
-
-      // Only open the detail tab the first time (no auto-open if it already has a checkmark).
       const isAltClick = Boolean(event?.altKey);
       const isCtrlClick = Boolean(event?.ctrlKey || event?.metaKey);
+      const isShiftClick = Boolean(event?.shiftKey);
 
       // Alt-click copies torrent title to clipboard.
       if (isAltClick) {
@@ -2633,15 +2747,34 @@ export default {
         return;
       }
 
-      // Ctrl-click should behave like clicking the Get button.
-      if (isCtrlClick) {
-        void this.enqueueDownload(torrent, { forceDownload: false });
-        return;
-      }
+      const idx = this.filteredTorrents.indexOf(torrent);
 
-      if (!alreadyClicked && torrent.detailUrl) {
-        util.openExternalPage(torrent.detailUrl);
+      if (isShiftClick && this.lastSelectedIndex !== null) {
+        // Range-select from lastSelectedIndex to idx
+        const lo = Math.min(this.lastSelectedIndex, idx);
+        const hi = Math.max(this.lastSelectedIndex, idx);
+        for (let i = lo; i <= hi; i++) {
+          this.selectedItems.add(this.filteredTorrents[i]);
+          this.clickedTorrents.add(this.filteredTorrents[i]);
+        }
+      } else if (isCtrlClick) {
+        // Toggle clicked item
+        if (this.selectedItems.has(torrent)) {
+          this.selectedItems.delete(torrent);
+        } else {
+          this.selectedItems.add(torrent);
+          this.clickedTorrents.add(torrent);
+        }
+        this.lastSelectedIndex = idx;
+      } else {
+        // Plain click: single-select
+        this.selectedItems.clear();
+        this.selectedItems.add(torrent);
+        this.clickedTorrents.add(torrent);
+        this.lastSelectedIndex = idx;
       }
+      // Trigger reactivity for the Set
+      this.selectedItems = new Set(this.selectedItems);
     },
 
     isClicked(torrent) {
@@ -2649,7 +2782,7 @@ export default {
     },
 
     getCardStyle(torrent) {
-      const isSelected = !this.previewMode && this.selectedTorrent === torrent;
+      const isSelected = !this.previewMode && this.selectedItems.has(torrent);
       const isDownloaded = this.isDownloadedNow(torrent);
       const hasWarnings = this.getTorrentWarnings(torrent).length > 0;
       let bgColor = "#fff";
@@ -2689,7 +2822,8 @@ export default {
     continueDownload() {
       // Keep the existing template bindings, but route through the queue.
       this.showModal = false;
-      void this.enqueueDownload(this.selectedTorrent);
+      const first = [...this.selectedItems][0];
+      void this.enqueueDownload(first);
     },
 
     statusKeyForTorrent(torrent) {
@@ -2796,7 +2930,8 @@ export default {
 
       // Save search results so they survive the show reload triggered by addSearchChoice
       const savedTorrents = this.torrents.slice();
-      const savedSelected = this.selectedTorrent;
+      const savedSelected = new Set(this.selectedItems);
+      const savedLastSelectedIndex = this.lastSelectedIndex;
       const savedHasSearched = this.hasSearched;
       const savedLastNeeded = this.lastNeeded;
       const savedProviderWarning = this.providerWarning;
@@ -2845,7 +2980,8 @@ export default {
 
         // Restore search results
         this.torrents = savedTorrents;
-        this.selectedTorrent = savedSelected;
+        this.selectedItems = savedSelected;
+        this.lastSelectedIndex = savedLastSelectedIndex;
         this.hasSearched = savedHasSearched;
         this.lastNeeded = savedLastNeeded;
         this.providerWarning = savedProviderWarning;
@@ -3561,6 +3697,158 @@ export default {
     formatGroup(group) {
       if (!group) return "";
       return group.toLowerCase();
+    },
+
+    // Helper: extract show name from a torrent using parse-torrent-title
+    torExtractShowName(torrent) {
+      const rawTitle = String(torrent?.raw?.title || torrent?.title || "");
+      if (!rawTitle) return "";
+      try {
+        let parser = null;
+        if (typeof parseTorrentTitle === "function") {
+          parser = parseTorrentTitle;
+        } else if (
+          parseTorrentTitle &&
+          typeof parseTorrentTitle.parse === "function"
+        ) {
+          parser = parseTorrentTitle.parse;
+        } else if (
+          parseTorrentTitle?.default &&
+          typeof parseTorrentTitle.default.parse === "function"
+        ) {
+          parser = parseTorrentTitle.default.parse;
+        }
+        if (!parser) return rawTitle;
+        const parsed = parser(rawTitle);
+        return parsed?.title || rawTitle;
+      } catch {
+        return rawTitle;
+      }
+    },
+
+    // Sel: emit selectShowFromCardTitle using show name from first selected torrent
+    torSelClick() {
+      const first = [...this.selectedItems][0];
+      if (!first) return;
+      const name = this.torExtractShowName(first);
+      if (name) evtBus.emit("selectShowFromCardTitle", name);
+    },
+
+    // From: select all torrents matching current show
+    torFromClick() {
+      if (!this.currentShow) return;
+      const candidates = [this.currentShow];
+      const newSel = new Set();
+      let firstIdx = null;
+      for (let i = 0; i < this.filteredTorrents.length; i++) {
+        const t = this.filteredTorrents[i];
+        const name = this.torExtractShowName(t);
+        if (!name) continue;
+        const match = util.smartTitleMatch(name, candidates, null, false);
+        if (match) {
+          newSel.add(t);
+          if (firstIdx === null) firstIdx = i;
+        }
+      }
+      this.selectedItems = newSel;
+      if (firstIdx !== null) {
+        this.lastSelectedIndex = firstIdx;
+        this.$nextTick(() => {
+          const el = this.$refs.scroller;
+          if (!el) return;
+          const cards = el.querySelectorAll("#torrents-list > div");
+          const card = cards[firstIdx];
+          if (card) card.scrollIntoView({ block: "nearest" });
+        });
+      }
+    },
+
+    // All: select all torrents matching the show of the first selected item
+    torAllClick() {
+      const first = [...this.selectedItems][0];
+      if (!first) return;
+      const pivotName = this.torExtractShowName(first);
+      if (!pivotName) return;
+      const newSel = new Set();
+      let firstIdx = null;
+      for (let i = 0; i < this.filteredTorrents.length; i++) {
+        const t = this.filteredTorrents[i];
+        const name = this.torExtractShowName(t);
+        if (!name) continue;
+        const match = util.smartTitleMatch(
+          name,
+          [{ name: pivotName }],
+          null,
+          false,
+        );
+        if (match) {
+          newSel.add(t);
+          if (firstIdx === null) firstIdx = i;
+        }
+      }
+      this.selectedItems = newSel;
+      if (firstIdx !== null) {
+        this.lastSelectedIndex = firstIdx;
+        this.$nextTick(() => {
+          const el = this.$refs.scroller;
+          if (!el) return;
+          const cards = el.querySelectorAll("#torrents-list > div");
+          const card = cards[firstIdx];
+          if (card) card.scrollIntoView({ block: "nearest" });
+        });
+      }
+    },
+
+    // First: scroll to first selected item
+    torFirstClick() {
+      const first = [...this.selectedItems][0];
+      if (!first) return;
+      const idx = this.filteredTorrents.indexOf(first);
+      if (idx < 0) return;
+      this.$nextTick(() => {
+        const el = this.$refs.scroller;
+        if (!el) return;
+        const cards = el.querySelectorAll("#torrents-list > div");
+        const card = cards[idx];
+        if (card) card.scrollIntoView({ block: "nearest" });
+      });
+    },
+
+    // Show: open detail URL for first selected torrent
+    torShowClick() {
+      const first = [...this.selectedItems][0];
+      if (!first || !first.detailUrl) return;
+      util.openExternalPage(first.detailUrl);
+    },
+
+    // Send: enqueue download for each selected torrent
+    torSendClick() {
+      for (const t of this.selectedItems) {
+        void this.enqueueDownload(t, { forceDownload: false });
+      }
+    },
+
+    // Force: confirm then enqueue with forceDownload:true for each selected
+    async torForceClick() {
+      const count = this.selectedItems.size;
+      if (count === 0) return;
+      const msg = `Send ${count} selected torrent${count === 1 ? "" : "s"} to qbt even if already downloaded?`;
+      const confirmed = await this.showConfirmDialog(msg);
+      if (!confirmed) return;
+      for (const t of this.selectedItems) {
+        void this.enqueueDownload(t, { forceDownload: true });
+      }
+    },
+
+    // Generic confirm dialog using a modal-like approach with Enter/Escape
+    showConfirmDialog(msg) {
+      return new Promise((resolve) => {
+        if (!window.confirm(msg)) {
+          resolve(false);
+          return;
+        }
+        resolve(true);
+      });
     },
   },
 };

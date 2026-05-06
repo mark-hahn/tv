@@ -353,23 +353,23 @@ Flex uses single-selection only via mouse. No range-select needed. Header rows r
 
 ### 8. ~~usb Sel show inference~~ **[RESOLVED]**
 
-If a top-level folder is selected use its name. If only files are selected (no top-level folder active), use `parse-torrent-title` on the selected file name.
+If the selected item is a top-level folder, use its name. If the selected item is a file inside a folder, use the folder name. If the selected item is a root-level file (some USB files are not inside any folder — they live directly under the root of the files directory), use `parse-torrent-title` on the file name.
 
-### 9. **[NEW]** qbt Force — re-add without file deletion
+### 9. ~~qbt Force — re-add~~ **[RESOLVED]**
 
-The existing `deleteTorrentAndFiles()` removes the torrent from qbt AND deletes the file from disk. For Force (restart), we need to delete from qbt only (not the file), then re-add the torrent. This likely requires a different API call than `deleteTorrentAndFiles`. Need to check whether the qbt API / srvr has a "delete torrent but keep file" endpoint, or whether a new one needs to be added.
+Force does a full delete (torrent + files, same as `deleteTorrentAndFiles()`) then re-adds using `t.magnet_uri` (confirmed present in qbt torrent objects). Requires a new `POST /api/qbt/addMagnet` endpoint in `apps/api/src/server.js` wrapping the existing `addQbtMagnet()` helper.
 
-### 10. **[NEW]** down Del — new server endpoint required
+### 10. ~~down Del — server endpoint~~ **[RESOLVED]**
 
-The down pane currently has no delete-from-DB functionality. A new endpoint in `apps/down` (or `apps/srvr`) is needed that accepts a list of item IDs/titles and: removes the DB record, clears in-progress state, and deletes the file. Confirm which server owns this endpoint.
+New `POST /api/tvproc/delItems` endpoint added to `apps/down`. Accepts list of item titles, removes DB records, clears in-progress/all state, deletes actual files from server disk.
 
-### 11. **[NEW]** local First button — no All button in local
+### 11. ~~local First button placement~~ **[RESOLVED]**
 
-The instruction says "add a First button after the All button". Local pane has no All button (Err/Errs was kept unchanged, From just navigates). First is placed after From in the local group. Confirm this is acceptable, or should local also get an All button?
+First placed after From in the local far-right group. Confirmed.
 
-### 12. **[NEW]** usb All button — scope
+### 12. ~~usb All button scope~~ **[RESOLVED]**
 
-For the new usb All button: "select all files within the same top-level folder as the first selected file". If the first selection is a top-level folder (not a file), does All select all files inside that folder, or is it a no-op? Proposed: if `selectedName` is set but `selectedFiles` is empty, All selects all direct-child files of `selectedName`.
+If `selectedName` is set but `selectedFiles` is empty, All selects all direct-child files of `selectedName`. Confirmed.
 
 ---
 
@@ -379,3 +379,26 @@ For the new usb All button: "select all files within the same top-level folder a
 - **"All" with empty selection**: All button grayed out when nothing selected. **[CONFIRMED]**
 - **tor second header row**: Confirmed. **[CONFIRMED]**
 - **Confirmation dialogs**: Enter = ok, Escape = cancel. **[CONFIRMED]**
+
+---
+
+## Implementation notes (added after all issues resolved)
+
+### New server endpoints required
+
+1. **`POST /api/qbt/addMagnet`** in `apps/api/src/server.js`  
+   Body: `{ magnetUrl: string }`. Wraps existing `addQbtMagnet()`. Used by qbt Force.
+
+2. **`POST /api/tvproc/delItems`** in `apps/down`  
+   Body: `{ titles: string[] }`. For each title: remove DB record, clear all in-progress state, delete file. Used by down Del.
+
+3. **`POST /api/usb/deleteFiles`** in `apps/api/src/server.js`  
+   Body: `{ paths: string[] }`. Deletes listed files from USB disk. Used by usb Del.
+
+### qbt Force implementation detail
+
+Client-side sequence:
+
+1. Collect `t.magnet_uri` for each selected torrent before deleting
+2. Call existing `deleteTorrentAndFiles(t)` for each (deletes torrent + files)
+3. Call new `POST /api/qbt/addMagnet` with each saved magnet URI

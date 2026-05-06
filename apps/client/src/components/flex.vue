@@ -56,19 +56,6 @@
           "
         >
           <button
-            @click.stop="showFirstDownloading"
-            style="
-              font-size: 13px;
-              cursor: pointer;
-              border-radius: 7px;
-              padding: 4px 10px;
-              border: 1px solid #bbb;
-              background-color: whitesmoke;
-            "
-          >
-            From show
-          </button>
-          <button
             @click.stop="scrollToBottomAction"
             style="
               font-size: 13px;
@@ -93,7 +80,82 @@
               '--btn-bg': forcing ? '#ccc' : 'whitesmoke',
             }"
           >
-            {{ forcing ? "Running…" : "Force" }}
+            {{ forcing ? "Running…" : "Run" }}
+          </button>
+          <button
+            @click.stop="flexSelClick"
+            :disabled="selectedRows.size === 0"
+            :style="{
+              fontSize: '13px',
+              cursor: selectedRows.size > 0 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': selectedRows.size > 0 ? 'whitesmoke' : '#e8e8e8',
+              color: selectedRows.size > 0 ? 'inherit' : '#aaa',
+            }"
+          >
+            Sel
+          </button>
+          <button
+            @click.stop="flexFromClick"
+            :disabled="!show"
+            :style="{
+              fontSize: '13px',
+              cursor: show ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': show ? 'whitesmoke' : '#e8e8e8',
+              color: show ? 'inherit' : '#aaa',
+            }"
+          >
+            From
+          </button>
+          <button
+            @click.stop="flexAllClick"
+            :disabled="selectedRows.size === 0"
+            :style="{
+              fontSize: '13px',
+              cursor: selectedRows.size > 0 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': selectedRows.size > 0 ? 'whitesmoke' : '#e8e8e8',
+              color: selectedRows.size > 0 ? 'inherit' : '#aaa',
+            }"
+          >
+            All
+          </button>
+          <button
+            @click.stop="flexFirstClick"
+            :disabled="selectedRows.size === 0"
+            :style="{
+              fontSize: '13px',
+              cursor: selectedRows.size > 0 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': selectedRows.size > 0 ? 'whitesmoke' : '#e8e8e8',
+              color: selectedRows.size > 0 ? 'inherit' : '#aaa',
+            }"
+          >
+            First
+          </button>
+          <button
+            @click.stop="flexInfoClick"
+            :disabled="selectedRows.size === 0"
+            :style="{
+              fontSize: '13px',
+              cursor: selectedRows.size > 0 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': selectedRows.size > 0 ? 'whitesmoke' : '#e8e8e8',
+              color: selectedRows.size > 0 ? 'inherit' : '#aaa',
+            }"
+          >
+            Info
           </button>
         </div>
       </div>
@@ -141,7 +203,7 @@
         <div
           v-for="row in rows"
           :key="row.key"
-          @click="handleRowClick(row)"
+          @click="handleRowClick(row, $event)"
           :style="getRowStyle(row)"
         >
           {{ row.line }}
@@ -366,6 +428,7 @@ export default {
     return {
       rows: [],
       highlightKey: null,
+      selectedRows: new Set(), // Multi-select; From button is the only source of multiple
       dialogRow: null,
       _pollTimer: null,
       _polling: false,
@@ -457,7 +520,9 @@ export default {
           cursor: "default",
         };
       }
-      const isHighlighted = this.highlightKey && row.key === this.highlightKey;
+      const isHighlighted =
+        this.selectedRows.has(row) ||
+        (this.highlightKey && row.key === this.highlightKey);
       return {
         padding: "2px 4px",
         cursor: "pointer",
@@ -467,9 +532,22 @@ export default {
       };
     },
 
-    handleRowClick(row) {
+    handleRowClick(row, event) {
       if (row.isHeader) return;
-      this.dialogRow = row;
+      // Alt-click: copy show name + season/episode to clipboard
+      if (event?.altKey) {
+        const text = row.line ? String(row.line).trim() : "";
+        navigator.clipboard.writeText(text).catch(() => {});
+        return;
+      }
+      // Plain/ctrl/shift: toggle single selection
+      if (this.selectedRows.has(row)) {
+        this.selectedRows = new Set();
+        this.highlightKey = null;
+      } else {
+        this.selectedRows = new Set([row]);
+        this.highlightKey = row.key;
+      }
     },
 
     handleScaledWheel(event) {
@@ -509,6 +587,7 @@ export default {
       } else {
         this.stopPolling();
         this.highlightKey = null;
+        this.selectedRows = new Set();
         this.dialogRow = null;
       }
     },
@@ -625,6 +704,108 @@ export default {
       } finally {
         this.forcing = false;
       }
+    },
+
+    // Sel: emit selectShowFromCardTitle for the selected row's show name
+    flexSelClick() {
+      const row = [...this.selectedRows][0];
+      if (!row || !row.showName) return;
+      evtBus.emit("selectShowFromCardTitle", row.showName);
+    },
+
+    // From: select all rows whose show matches current show prop; scroll to first
+    flexFromClick() {
+      if (!this.show) return;
+      const candidates = [this.show];
+      const newSel = new Set();
+      let firstRow = null;
+      for (const row of this.rows) {
+        if (row.isHeader) continue;
+        const match = util.smartTitleMatch(
+          row.showName,
+          candidates,
+          null,
+          false,
+        );
+        if (match) {
+          newSel.add(row);
+          if (!firstRow) firstRow = row;
+        }
+      }
+      this.selectedRows = newSel;
+      if (firstRow) {
+        this.highlightKey = firstRow.key;
+        this.$nextTick(() => {
+          const idx = this.rows.indexOf(firstRow);
+          const scroller = this.getScroller();
+          if (!scroller || idx < 0) return;
+          const wrapper = scroller.children[0];
+          if (!wrapper || !wrapper.children) return;
+          const targetEl = wrapper.children[idx];
+          if (targetEl)
+            targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+      }
+    },
+
+    // All: select all rows whose show matches the currently selected row's show
+    flexAllClick() {
+      const first = [...this.selectedRows][0];
+      if (!first || !first.showName) return;
+      const pivotName = first.showName;
+      const newSel = new Set();
+      let firstRow = null;
+      for (const row of this.rows) {
+        if (row.isHeader) continue;
+        const match = util.smartTitleMatch(
+          row.showName,
+          [{ name: pivotName }],
+          null,
+          false,
+        );
+        if (match) {
+          newSel.add(row);
+          if (!firstRow) firstRow = row;
+        }
+      }
+      this.selectedRows = newSel;
+      if (firstRow) {
+        this.highlightKey = firstRow.key;
+        this.$nextTick(() => {
+          const idx = this.rows.indexOf(firstRow);
+          const scroller = this.getScroller();
+          if (!scroller || idx < 0) return;
+          const wrapper = scroller.children[0];
+          if (!wrapper || !wrapper.children) return;
+          const targetEl = wrapper.children[idx];
+          if (targetEl)
+            targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+      }
+    },
+
+    // First: scroll to the first selected row
+    flexFirstClick() {
+      const first = [...this.selectedRows][0];
+      if (!first) return;
+      const idx = this.rows.indexOf(first);
+      if (idx < 0) return;
+      this.$nextTick(() => {
+        const scroller = this.getScroller();
+        if (!scroller) return;
+        const wrapper = scroller.children[0];
+        if (!wrapper || !wrapper.children) return;
+        const targetEl = wrapper.children[idx];
+        if (targetEl)
+          targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    },
+
+    // Info: open detail dialog for selected row
+    flexInfoClick() {
+      const row = [...this.selectedRows][0];
+      if (!row) return;
+      this.dialogRow = row;
     },
 
     async pollOnce() {

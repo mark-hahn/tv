@@ -62,39 +62,6 @@
             placeholder="Rename"
             style="width: 150px; margin-right: 10px"
           />
-
-          <button
-            @click="errsMode || toShow()"
-            :disabled="errsMode"
-            title="Select show matching selected folder"
-            :style="{
-              cursor: errsMode ? 'default' : 'pointer',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              backgroundColor: errsMode ? '#e8e8e8' : 'whitesmoke',
-              color: errsMode ? '#aaa' : 'inherit',
-              marginRight: '10px',
-            }"
-          >
-            To
-          </button>
-
-          <button
-            @click="errsMode || selectTopLevel()"
-            :disabled="errsMode"
-            title="Find folder matching current show"
-            :style="{
-              cursor: errsMode ? 'default' : 'pointer',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              backgroundColor: errsMode ? '#e8e8e8' : 'whitesmoke',
-              color: errsMode ? '#aaa' : 'inherit',
-            }"
-          >
-            From
-          </button>
         </div>
 
         <!-- Row 2: Subs, Asr, Fix, Errs, Del, Ref aligned right -->
@@ -190,20 +157,6 @@
           </button>
 
           <button
-            @click="clickInfo"
-            :style="{
-              cursor: 'pointer',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              backgroundColor: showInfo ? '#ddd' : 'whitesmoke',
-              marginRight: '10px',
-            }"
-          >
-            Info
-          </button>
-
-          <button
             @click="moveSelected"
             :disabled="!errsMode || loading || selectedFiles.size === 0"
             title="Move selected error file to Trial &amp; Error"
@@ -223,9 +176,8 @@
           </button>
 
           <button
-            @click="deleteSelected"
-            :disabled="loading || (!selectedName && selectedFiles.size === 0)"
-            title="Delete selected files"
+            @click="refresh"
+            :disabled="loading"
             style="
               cursor: pointer;
               border-radius: 7px;
@@ -235,21 +187,108 @@
               margin-right: 10px;
             "
           >
-            Del
+            Ref
           </button>
 
           <button
-            @click="refresh"
-            :disabled="loading"
-            style="
-              cursor: pointer;
-              border-radius: 7px;
-              padding: 4px 10px;
-              border: 1px solid #bbb;
-              background-color: whitesmoke;
-            "
+            @click="errsMode || toShow()"
+            :disabled="errsMode || (!selectedName && selectedFiles.size === 0)"
+            :style="{
+              cursor:
+                !errsMode && (selectedName || selectedFiles.size > 0)
+                  ? 'pointer'
+                  : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg':
+                !errsMode && (selectedName || selectedFiles.size > 0)
+                  ? 'whitesmoke'
+                  : '#e8e8e8',
+              color:
+                !errsMode && (selectedName || selectedFiles.size > 0)
+                  ? 'inherit'
+                  : '#aaa',
+              marginRight: '10px',
+            }"
           >
-            Ref
+            Sel
+          </button>
+
+          <button
+            @click="errsMode || selectTopLevel()"
+            :disabled="errsMode"
+            :style="{
+              cursor: errsMode ? 'default' : 'pointer',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': errsMode ? '#e8e8e8' : 'whitesmoke',
+              color: errsMode ? '#aaa' : 'inherit',
+              marginRight: '10px',
+            }"
+          >
+            From
+          </button>
+
+          <button
+            @click="localFirstClick"
+            :disabled="!selectedName && selectedFiles.size === 0"
+            :style="{
+              cursor:
+                selectedName || selectedFiles.size > 0 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg':
+                selectedName || selectedFiles.size > 0
+                  ? 'whitesmoke'
+                  : '#e8e8e8',
+              color:
+                selectedName || selectedFiles.size > 0 ? 'inherit' : '#aaa',
+              marginRight: '10px',
+            }"
+          >
+            First
+          </button>
+
+          <button
+            @click="clickInfo"
+            :style="{
+              cursor: 'pointer',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': showInfo ? '#ddd' : 'whitesmoke',
+              marginRight: '10px',
+            }"
+          >
+            Info
+          </button>
+
+          <button
+            @click="deleteSelected"
+            :disabled="loading || (!selectedName && selectedFiles.size === 0)"
+            title="Delete selected files"
+            :style="{
+              cursor:
+                !loading && (selectedName || selectedFiles.size > 0)
+                  ? 'pointer'
+                  : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg':
+                !loading && (selectedName || selectedFiles.size > 0)
+                  ? 'whitesmoke'
+                  : '#e8e8e8',
+              color:
+                !loading && (selectedName || selectedFiles.size > 0)
+                  ? 'inherit'
+                  : '#aaa',
+            }"
+          >
+            Del
           </button>
         </div>
       </div>
@@ -2188,6 +2227,23 @@ export default {
     async refreshInfo() {
       // Re-run loadInfo without toggling off
       await this.loadInfo();
+    },
+
+    // First: scroll to first selected item
+    localFirstClick() {
+      const targetName =
+        this.selectedName ||
+        (this.selectedFiles.size > 0
+          ? [...this.selectedFiles][0]?.split("/")[0]
+          : null);
+      if (!targetName) return;
+      const el = this.nodeRefs.get(targetName);
+      if (el) {
+        const domEl = el.$el || el;
+        if (domEl && domEl.scrollIntoView) {
+          domEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
     },
   },
 };

@@ -23,6 +23,7 @@ import {
   getUsbPruneStatus,
   pruneUsbFiles,
   renameUsbFile,
+  deleteUsbFiles,
 } from "./usb.js";
 import { getLocalFiles, renameLocalFile, moveToTrial } from "./local.js";
 import {
@@ -683,6 +684,22 @@ app.post("/api/qbt/delTorrent", async (req, res) => {
   }
 });
 
+app.post("/api/qbt/addMagnet", async (req, res) => {
+  try {
+    const b = req.body || {};
+    const magnetUrl = typeof b.magnetUrl === "string" ? b.magnetUrl.trim() : "";
+    if (!magnetUrl) {
+      res.status(400).json({ error: "magnetUrl required" });
+      return;
+    }
+    const result = await addQbtMagnet({ magnetUrl });
+    res.json(result);
+  } catch (error) {
+    console.error("qbt addMagnet error:", error);
+    res.status(500).json({ error: error?.message || String(error) });
+  }
+});
+
 app.get("/api/space/avail", async (req, res) => {
   try {
     const info = await spaceAvail();
@@ -763,6 +780,21 @@ app.post("/api/usb/rename", async (req, res) => {
   } catch (err) {
     console.error("usb rename error:", err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/usb/deleteFiles", async (req, res) => {
+  try {
+    const b = req.body || {};
+    const paths = Array.isArray(b.paths) ? b.paths : [];
+    if (paths.length === 0) {
+      return res.status(400).json({ error: "paths must be a non-empty array" });
+    }
+    const result = await deleteUsbFiles(paths);
+    res.json(result);
+  } catch (err) {
+    console.error("usb deleteFiles error:", err);
+    res.status(500).json({ error: err?.message || String(err) });
   }
 });
 

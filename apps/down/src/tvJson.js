@@ -1659,6 +1659,22 @@ const deleteDvdFileEntries = (titles) => {
   );
 };
 
+const deleteByTitles = (titles) => {
+  if (!Array.isArray(titles) || titles.length === 0) return [];
+  openDb();
+  const localPaths = [];
+  for (const title of titles) {
+    const row = stmtGetByTitle.get(String(title));
+    if (row) {
+      const lp = row.localPath ? String(row.localPath) : "";
+      if (lp) localPaths.push(lp);
+    }
+    removeInProgress(String(title));
+    stmtDeleteByTitle.run(String(title));
+  }
+  return localPaths;
+};
+
 export {
   addEntry,
   markFinished,
@@ -1676,4 +1692,5 @@ export {
   getWorkerCount,
   upsertDvdEntry,
   deleteDvdFileEntries,
+  deleteByTitles,
 };

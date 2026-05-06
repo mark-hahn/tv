@@ -2845,6 +2845,25 @@ async function main() {
             });
             return process.nextTick(checkFile);
           }
+          // USB is better — rename the worse disk file to .old before downloading.
+          try {
+            var oldPath = path.join(tvSeasonPath, diskFile);
+            var oldDst = oldPath + ".old";
+            while (fs.existsSync(oldDst)) oldDst = oldDst + ".old";
+            fs.renameSync(oldPath, oldDst);
+            log(
+              "flex: renamed worse disk file to .old:",
+              diskFile,
+              "→",
+              path.basename(oldDst),
+            );
+          } catch (renameErr2) {
+            log(
+              "flex: rename worse disk file to .old failed:",
+              diskFile,
+              renameErr2.message,
+            );
+          }
         }
       }
 

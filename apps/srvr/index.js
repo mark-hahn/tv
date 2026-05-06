@@ -54,6 +54,8 @@ const FLEXGET_CMD = "/root/.local/bin/flexget";
 const FLEXGET_CONFIG = path.join(SRVR_ROOT_DIR, "config", "config.yml");
 const FLEXGET_DUMP_LOG = path.join(SRVR_DATA_DIR, "flexget-dump.log");
 
+let flexgetIsRunning = false;
+
 function ensureDir(dir) {
   try {
     fs.mkdirSync(dir, { recursive: true });
@@ -3744,6 +3746,10 @@ app.post("/api/flexget-run", (req, res) => {
   res.json({ ok: true });
 });
 
+app.get("/api/flexget-status", (req, res) => {
+  res.json({ running: flexgetIsRunning });
+});
+
 app.post("/api/saveNote", apiWrapper(saveNote));
 
 // Open qBittorrent web UI — auto-login page served from hahnca.com so the
@@ -5245,76 +5251,86 @@ function parseFlexgetDumpOutput(stdout) {
 }
 
 async function runFlexgetAndProcess() {
-  const cmd = `"${FLEXGET_CMD}" -c "${FLEXGET_CONFIG}" execute --tasks fetch-feeds --dump accepted 2>&1`;
-  console.log(`[flexget] running flexget execute --tasks fetch-feeds`);
-  let stdout = "";
+  if (flexgetIsRunning) return;
+  flexgetIsRunning = true;
   try {
-    const result = await exec(cmd, {
-      maxBuffer: 10 * 1024 * 1024,
-      env: { ...process.env, COLUMNS: "300" },
-    });
-    stdout = String(result.stdout || "");
-  } catch (e) {
-    stdout = String(e.stdout || e.message || "");
-    console.error(
-      "[flexget] execute error:",
-      String(e.message || "").slice(0, 200),
+    const cmd = `"${FLEXGET_CMD}" -c "${FLEXGET_CONFIG}" execute --tasks fetch-feeds --dump accepted 2>&1`;
+    console.log(`[flexget] running flexget execute --tasks fetch-feeds`);
+    let stdout = "";
+    try {
+      const result = await exec(cmd, {
+        maxBuffer: 10 * 1024 * 1024,
+        env: { ...process.env, COLUMNS: "300" },
+      });
+      stdout = String(result.stdout || "");
+    } catch (e) {
+      stdout = String(e.stdout || e.message || "");
+      console.error(
+        "[flexget] execute error:",
+        String(e.message || "").slice(0, 200),
+      );
+    }
+
+    // Log raw output for config-test format inspection.
+    try {
+      const ts = new Date().toISOString();
+      fs.appendFileSync(FLEXGET_DUMP_LOG, `\n--- ${ts} ---\n${stdout}\n`);
+    } catch {}
+
+    const candidates = parseFlexgetDumpOutput(stdout);
+    if (candidates.length === 0) {
+      console.log("[flexget] no accepted entries");
+      return;
+    }
+    console.log(
+      `[flexget] processing ${candidates.length} accepted candidates`,
     );
-  }
 
-  // Log raw output for config-test format inspection.
-  try {
-    const ts = new Date().toISOString();
-    fs.appendFileSync(FLEXGET_DUMP_LOG, `\n--- ${ts} ---\n${stdout}\n`);
-  } catch {}
+    // Group by rough episode key to detect duplicates within this run.
+    // For groups with multiple candidates, only the best may be sent; others are store-only.
+    const runGroups = new Map(); // roughKey -> candidate indices
+    for (let i = 0; i < candidates.length; i++) {
+      const rawTitle = String(candidates[i].title || "").trim();
+      const ptt = parseTorrentTitle(rawTitle.replace(/\.[a-z0-9]{2,4}$/i, ""));
+      const sn = ptt?.title;
+      let ep = ptt?.episode;
+      if (!ep && Array.isArray(ptt?.episodes) && ptt.episodes.length)
+        ep = ptt.episodes[0];
+      const roughKey =
+        sn && Number.isInteger(ptt?.season) && Number.isInteger(ep)
+          ? `${sn}\x00${ptt.season}\x00${ep}`
+          : `__solo__${i}`;
+      if (!runGroups.has(roughKey)) runGroups.set(roughKey, []);
+      runGroups.get(roughKey).push(i);
+    }
 
-  const candidates = parseFlexgetDumpOutput(stdout);
-  if (candidates.length === 0) {
-    console.log("[flexget] no accepted entries");
-    return;
-  }
-  console.log(`[flexget] processing ${candidates.length} accepted candidates`);
-
-  // Group by rough episode key to detect duplicates within this run.
-  // For groups with multiple candidates, only the best may be sent; others are store-only.
-  const runGroups = new Map(); // roughKey -> candidate indices
-  for (let i = 0; i < candidates.length; i++) {
-    const rawTitle = String(candidates[i].title || "").trim();
-    const ptt = parseTorrentTitle(rawTitle.replace(/\.[a-z0-9]{2,4}$/i, ""));
-    const sn = ptt?.title;
-    let ep = ptt?.episode;
-    if (!ep && Array.isArray(ptt?.episodes) && ptt.episodes.length)
-      ep = ptt.episodes[0];
-    const roughKey =
-      sn && Number.isInteger(ptt?.season) && Number.isInteger(ep)
-        ? `${sn}\x00${ptt.season}\x00${ep}`
-        : `__solo__${i}`;
-    if (!runGroups.has(roughKey)) runGroups.set(roughKey, []);
-    runGroups.get(roughKey).push(i);
-  }
-
-  const storeOnlySet = new Set();
-  for (const indices of runGroups.values()) {
-    if (indices.length <= 1) continue;
-    let bestIdx = indices[0];
-    for (let j = 1; j < indices.length; j++) {
-      if (flexgetIsBetterSameRun(candidates[indices[j]], candidates[bestIdx])) {
-        storeOnlySet.add(bestIdx);
-        bestIdx = indices[j];
-      } else {
-        storeOnlySet.add(indices[j]);
+    const storeOnlySet = new Set();
+    for (const indices of runGroups.values()) {
+      if (indices.length <= 1) continue;
+      let bestIdx = indices[0];
+      for (let j = 1; j < indices.length; j++) {
+        if (
+          flexgetIsBetterSameRun(candidates[indices[j]], candidates[bestIdx])
+        ) {
+          storeOnlySet.add(bestIdx);
+          bestIdx = indices[j];
+        } else {
+          storeOnlySet.add(indices[j]);
+        }
       }
     }
-  }
 
-  for (let i = 0; i < candidates.length; i++) {
-    try {
-      await processFlexgetCandidate(candidates[i], storeOnlySet.has(i));
-    } catch (e) {
-      console.error("[flexget] processCandidate error:", e.message);
+    for (let i = 0; i < candidates.length; i++) {
+      try {
+        await processFlexgetCandidate(candidates[i], storeOnlySet.has(i));
+      } catch (e) {
+        console.error("[flexget] processCandidate error:", e.message);
+      }
     }
+    await saveFlexgetHistory();
+  } finally {
+    flexgetIsRunning = false;
   }
-  await saveFlexgetHistory();
 }
 
 // Phase 3: Incremental sync functions

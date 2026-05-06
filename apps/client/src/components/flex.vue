@@ -56,19 +56,6 @@
           "
         >
           <button
-            @click.stop="scrollToBottomAction"
-            style="
-              font-size: 13px;
-              cursor: pointer;
-              border-radius: 7px;
-              padding: 4px 10px;
-              border: 1px solid #bbb;
-              background-color: whitesmoke;
-            "
-          >
-            Bottom
-          </button>
-          <button
             @click.stop="forceRun"
             :disabled="forcing"
             :style="{
@@ -112,6 +99,16 @@
           >
             From
           </button>
+          <span
+            v-if="flexRunning"
+            style="
+              font-size: 13px;
+              color: #666;
+              align-self: center;
+              margin-left: 4px;
+            "
+            >Running...</span
+          >
           <button
             @click.stop="flexAllClick"
             :disabled="selectedRows.size === 0"
@@ -156,6 +153,19 @@
             }"
           >
             Info
+          </button>
+          <button
+            @click.stop="scrollToBottomAction"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Bottom
           </button>
         </div>
       </div>
@@ -248,19 +258,6 @@
           >: {{ val }}
         </div>
         <div style="margin-top: 16px; display: flex; gap: 10px">
-          <button
-            @click.stop="goToShow"
-            style="
-              font-size: 13px;
-              cursor: pointer;
-              border-radius: 7px;
-              padding: 4px 14px;
-              border: 1px solid #bbb;
-              background-color: whitesmoke;
-            "
-          >
-            To show
-          </button>
           <button
             @click.stop="dialogRow = null"
             style="
@@ -433,6 +430,7 @@ export default {
       _pollTimer: null,
       _polling: false,
       forcing: false,
+      flexRunning: false,
       _didInitialScroll: false,
       _didLoadOnce: false,
       _inFlight: false,
@@ -819,7 +817,40 @@ export default {
         if (!res.ok) return;
         const entries = await res.json();
 
-        this.rows = buildRows(Array.isArray(entries) ? entries : []);
+        const newRows = buildRows(Array.isArray(entries) ? entries : []);
+
+        // Re-map selectedRows to new row objects by key so selection survives polling
+        if (this.selectedRows.size > 0) {
+          const selectedKeys = new Set(
+            [...this.selectedRows].map((r) => r.key),
+          );
+          const newKeyMap = new Map(newRows.map((r) => [r.key, r]));
+          const remapped = new Set();
+          for (const k of selectedKeys) {
+            const newRow = newKeyMap.get(k);
+            if (newRow) remapped.add(newRow);
+          }
+          this.selectedRows = remapped;
+          // Update highlightKey to first still-selected row
+          if (this.highlightKey && !newKeyMap.has(this.highlightKey)) {
+            this.highlightKey = remapped.size > 0 ? [...remapped][0].key : null;
+          }
+        }
+
+        // Also fetch running status
+        try {
+          const statusRes = await fetch(
+            `${config.tvSrvrUrl}/api/flexget-status`,
+          );
+          if (statusRes.ok) {
+            const statusJson = await statusRes.json();
+            this.flexRunning = Boolean(statusJson?.running);
+          }
+        } catch {
+          // ignore
+        }
+
+        this.rows = newRows;
         this._didLoadOnce = true;
 
         await this.$nextTick();

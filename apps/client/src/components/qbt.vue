@@ -560,6 +560,37 @@ export default {
           const hashOf = (t) => String(t?.hash || "").trim();
           const nameOf = (t) => String(t?.name || "").trim();
 
+          // Re-map selectedItems to new torrent objects by hash so selection survives polling
+          if (this.selectedItems.size > 0) {
+            const selectedHashes = new Set(
+              [...this.selectedItems].map(hashOf).filter(Boolean),
+            );
+            const newByHash = new Map(
+              torrents.map((t) => [hashOf(t), t]).filter(([h]) => h),
+            );
+            const remapped = new Set();
+            for (const h of selectedHashes) {
+              const newT = newByHash.get(h);
+              if (newT) remapped.add(newT);
+            }
+            this.selectedItems = remapped;
+            // Re-map lastSelectedIndex
+            if (this.lastSelectedIndex !== null) {
+              const sorted = [...(torrents || [])].sort((a, b) => {
+                // Use same sort logic as computed sortedTorrents
+                const stA = String(a?.state || "").trim();
+                const stB = String(b?.state || "").trim();
+                const dl = (s) => (s === "downloading" ? 0 : 1);
+                if (dl(stA) !== dl(stB)) return dl(stA) - dl(stB);
+                return (a?.name || "").localeCompare(b?.name || "");
+              });
+              if (remapped.size > 0) {
+                const lastRemapped = [...remapped][remapped.size - 1];
+                this.lastSelectedIndex = sorted.indexOf(lastRemapped);
+              }
+            }
+          }
+
           // Track new and removed hashes for history events.
           const curHashes = new Set(torrents.map(hashOf).filter(Boolean));
           const torrentByHash = {};
@@ -887,6 +918,7 @@ export default {
       const idx = this.sortedTorrents.indexOf(t);
 
       if (isShiftClick && this.lastSelectedIndex !== null) {
+        event.preventDefault(); // prevent browser text selection on shift-click
         const lo = Math.min(this.lastSelectedIndex, idx);
         const hi = Math.max(this.lastSelectedIndex, idx);
         for (let i = lo; i <= hi; i++) {

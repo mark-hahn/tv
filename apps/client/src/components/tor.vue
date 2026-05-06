@@ -55,7 +55,19 @@
           "
         >
           <div style="margin-left: 20px">{{ headerShowName }}</div>
-          <div style="display: flex; gap: 8px; margin-left: auto">
+        </div>
+        <!-- Second header row: row-1 buttons on left, action buttons on right -->
+        <div
+          v-if="!showStream && !previewMode"
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 6px;
+            margin-top: 6px;
+          "
+        >
+          <div style="display: flex; gap: 8px; align-items: center">
             <span
               v-if="loading"
               style="font-size: 13px; color: #666; align-self: center"
@@ -202,123 +214,83 @@
               Cookies
             </button>
           </div>
-        </div>
-        <!-- Second header row: multi-select action buttons -->
-        <div
-          v-if="!showStream && !previewMode"
-          style="
-            display: flex;
-            justify-content: flex-end;
-            align-items: center;
-            gap: 6px;
-            margin-top: 6px;
-          "
-        >
-          <button
-            @click.stop="torSelClick"
-            :disabled="selectedItems.size === 0"
-            :style="{
-              fontSize: '13px',
-              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 8px',
-              border: '1px solid #bbb',
-              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
-              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
-            }"
-          >
-            Sel
-          </button>
-          <button
-            @click.stop="torFromClick"
-            :disabled="!currentShow"
-            :style="{
-              fontSize: '13px',
-              cursor: currentShow ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 8px',
-              border: '1px solid #bbb',
-              '--btn-bg': currentShow ? 'whitesmoke' : '#e8e8e8',
-              color: currentShow ? 'inherit' : '#aaa',
-            }"
-          >
-            From
-          </button>
-          <button
-            @click.stop="torAllClick"
-            :disabled="selectedItems.size === 0"
-            :style="{
-              fontSize: '13px',
-              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 8px',
-              border: '1px solid #bbb',
-              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
-              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
-            }"
-          >
-            All
-          </button>
-          <button
-            @click.stop="torFirstClick"
-            :disabled="selectedItems.size === 0"
-            :style="{
-              fontSize: '13px',
-              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 8px',
-              border: '1px solid #bbb',
-              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
-              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
-            }"
-          >
-            First
-          </button>
-          <button
-            @click.stop="torShowClick"
-            :disabled="selectedItems.size === 0"
-            :style="{
-              fontSize: '13px',
-              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 8px',
-              border: '1px solid #bbb',
-              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
-              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
-            }"
-          >
-            Show
-          </button>
-          <button
-            @click.stop="torSendClick"
-            :disabled="selectedItems.size === 0"
-            :style="{
-              fontSize: '13px',
-              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 8px',
-              border: '1px solid #bbb',
-              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
-              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
-            }"
-          >
-            Send
-          </button>
-          <button
-            @click.stop="torForceClick"
-            :disabled="selectedItems.size === 0"
-            :style="{
-              fontSize: '13px',
-              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 8px',
-              border: '1px solid #bbb',
-              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
-              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
-            }"
-          >
-            Force
-          </button>
+          <div style="display: flex; gap: 6px; align-items: center">
+            <button
+              @click.stop="torAllClick"
+              :disabled="selectedItems.size === 0"
+              :style="{
+                fontSize: '13px',
+                cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+                borderRadius: '7px',
+                padding: '4px 8px',
+                border: '1px solid #bbb',
+                '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+                color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+              }"
+            >
+              All
+            </button>
+            <button
+              @click.stop="torFirstClick"
+              :disabled="selectedItems.size === 0"
+              :style="{
+                fontSize: '13px',
+                cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+                borderRadius: '7px',
+                padding: '4px 8px',
+                border: '1px solid #bbb',
+                '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+                color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+              }"
+            >
+              First
+            </button>
+            <button
+              @click.stop="torShowClick"
+              :disabled="selectedItems.size === 0"
+              :style="{
+                fontSize: '13px',
+                cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+                borderRadius: '7px',
+                padding: '4px 8px',
+                border: '1px solid #bbb',
+                '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+                color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+              }"
+            >
+              Show
+            </button>
+            <button
+              @click.stop="torSendClick"
+              :disabled="selectedItems.size === 0"
+              :style="{
+                fontSize: '13px',
+                cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+                borderRadius: '7px',
+                padding: '4px 8px',
+                border: '1px solid #bbb',
+                '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+                color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+              }"
+            >
+              Send
+            </button>
+            <button
+              @click.stop="torForceClick"
+              :disabled="selectedItems.size === 0"
+              :style="{
+                fontSize: '13px',
+                cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+                borderRadius: '7px',
+                padding: '4px 8px',
+                border: '1px solid #bbb',
+                '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+                color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+              }"
+            >
+              Force
+            </button>
+          </div>
         </div>
         <div
           style="

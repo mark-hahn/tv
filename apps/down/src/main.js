@@ -2921,11 +2921,12 @@ async function main() {
       });
     } catch (e4) {}
     if (
-      fromFlex &&
-      epFileExists &&
-      flexSeRe &&
-      flexHistKeyExists &&
-      flexHistMostRecentSent
+      (fromFlex &&
+        epFileExists &&
+        flexSeRe &&
+        flexHistKeyExists &&
+        flexHistMostRecentSent) ||
+      (processingForced && epFileExists && flexSeRe)
     ) {
       var videoExtsOld = [
         "mkv",

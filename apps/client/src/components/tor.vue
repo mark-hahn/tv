@@ -702,6 +702,10 @@
             <span style="color: blue !important">{{
               getDisplaySeasonEpisode(torrent)
             }}</span
+            ><span
+              v-if="torrent.parsed?.resolution"
+              style="color: blue !important"
+              >&nbsp;-&nbsp;{{ torrent.parsed.resolution }}</span
             ><span style="color: rgba(0, 0, 0, 0.5) !important"
               >:
               {{ fmtSize(torrent.raw?.size) || torrent.raw?.size || "N/A" }} |
@@ -709,10 +713,6 @@
                 v-if="torrent.raw?.provider"
                 style="color: rgba(0, 0, 0, 0.5) !important"
                 >&nbsp;|&nbsp;{{ formatProvider(torrent.raw.provider) }}</span
-              ><span
-                v-if="torrent.parsed?.resolution"
-                style="color: rgba(0, 0, 0, 0.5) !important"
-                >&nbsp;|&nbsp;{{ torrent.parsed.resolution }}</span
               ><span
                 v-if="torrent.parsed?.group"
                 style="color: rgba(0, 0, 0, 0.5) !important"
@@ -1225,7 +1225,17 @@ export default {
           if (eA !== eB) return eA - eB; // Ascending
         }
 
-        // 5. Rest of priorities (Seeds -> Title)
+        // 5. Resolution (descending: 2160 > 1080 > 720 > unknown)
+        const resNum = (t) => {
+          const r = String(t.parsed?.resolution || "");
+          const m = r.match(/(\d+)/);
+          return m ? parseInt(m[1], 10) : 0;
+        };
+        const rA = resNum(a);
+        const rB = resNum(b);
+        if (rA !== rB) return rB - rA;
+
+        // 6. Rest of priorities (Seeds -> Title)
         const sd = asNumber(b?.raw?.seeds) - asNumber(a?.raw?.seeds);
         if (sd !== 0) return sd;
 

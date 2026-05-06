@@ -15,6 +15,7 @@ function normalizeAggressive(s) {
   out = out.replace(/\b([a-z])\./g, "$1"); // collapse initials: "r.j." -> "rj"
   out = out.replace(/\./g, " ");
   out = out.replace(/&/g, " and ");
+  out = out.replace(/['\u2019\u2018]/g, ""); // strip apostrophes: "margo's" -> "margos"
   out = out.replace(/[^a-z0-9\s]/g, " ");
   out = out.trim().replace(/\s+/g, " ");
   return out;

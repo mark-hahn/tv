@@ -2571,12 +2571,14 @@ async function main() {
   function flexBitDepth(s) {
     return /10.?bit|x265|hevc|h\.?265|hdr/i.test(String(s || "")) ? 10 : 8;
   }
-  function flexFileMatchesSent(usbFname, sentEntry) {
+  function flexFileIsBetterThanSent(usbFname, sentEntry) {
     var sentSrc = String(sentEntry.quality || sentEntry.title || "");
-    return (
-      flexResolution(usbFname) === flexResolution(sentSrc) &&
-      flexBitDepth(usbFname) === flexBitDepth(sentSrc)
-    );
+    var usbRes = flexResolution(usbFname);
+    var sentRes = flexResolution(sentSrc);
+    if (usbRes !== sentRes) return usbRes > sentRes;
+    var usbDepth = flexBitDepth(usbFname);
+    var sentDepth = flexBitDepth(sentSrc);
+    return usbDepth > sentDepth;
   }
 
   checkFileExists = () => {
@@ -2777,17 +2779,17 @@ async function main() {
 
       if (flexHistKeyExists && flexHistMostRecentSent) {
         // Allow only if USB file matches the quality (resolution + bit-depth) of what was sent.
-        if (!flexFileMatchesSent(fname, flexHistMostRecentSent)) {
+        if (!flexFileIsBetterThanSent(fname, flexHistMostRecentSent)) {
           existsCount++;
           log(
             "------",
             downloadCount,
             "/",
             chkCount,
-            "FLEX SKIP (quality mismatch):",
+            "FLEX SKIP (not better quality than sent):",
             fname,
           );
-          trace("checkFileExists: flex skip quality mismatch", {
+          trace("checkFileExists: flex skip not better than sent", {
             fname,
             flexSeStr,
             sentTitle: flexHistMostRecentSent.title,
@@ -2796,7 +2798,7 @@ async function main() {
             tvdbId: lookupTvdbId(seriesName),
             showName: seriesName || fname,
             type: "skipDown",
-            description: `flex skip: quality mismatch for ${flexSeStr}`,
+            description: `flex skip: not better quality than sent for ${flexSeStr}`,
           });
           return process.nextTick(checkFile);
         }

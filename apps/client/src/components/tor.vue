@@ -2626,10 +2626,16 @@ export default {
       const isAltClick = Boolean(event?.altKey);
       const isCtrlClick = Boolean(event?.ctrlKey || event?.metaKey);
 
+      // Alt-click copies torrent title to clipboard.
+      if (isAltClick) {
+        const title = String(torrent.raw?.title || torrent.title || "");
+        navigator.clipboard.writeText(title).catch(() => {});
+        return;
+      }
+
       // Ctrl-click should behave like clicking the Get button.
-      // Alt-click behaves like ctrl-click but forces download (bypass server-side "already downloaded" checks).
-      if (isAltClick || isCtrlClick) {
-        void this.enqueueDownload(torrent, { forceDownload: isAltClick });
+      if (isCtrlClick) {
+        void this.enqueueDownload(torrent, { forceDownload: false });
         return;
       }
 

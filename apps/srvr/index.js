@@ -5208,7 +5208,13 @@ function parseFlexgetDumpOutput(stdout) {
         };
       } else if (current) {
         if (key === "url" || key === "original_url") {
-          if (!current.url) current.url = val; // prefer first url
+          if (!current.url)
+            current.url = val
+              .replace(/&#39;/g, "'")
+              .replace(/&amp;/g, "&")
+              .replace(/&quot;/g, '"')
+              .replace(/&lt;/g, "<")
+              .replace(/&gt;/g, ">"); // prefer first url; decode HTML entities
         } else if (key === "quality") current.quality = val;
         else if (key === "release_group") current.release_group = val;
         else if (key === "torrent_seeds" || key === "seeds")

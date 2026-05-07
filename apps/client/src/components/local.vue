@@ -189,7 +189,17 @@
           >
             Ref
           </button>
+        </div>
 
+        <!-- Row 3: Sel, From, First, Info, Del aligned right -->
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            margin-top: 4px;
+          "
+        >
           <button
             @click="errsMode || toShow()"
             :disabled="errsMode || (!selectedName && selectedFiles.size === 0)"
@@ -312,7 +322,7 @@
           :key="node.name"
           :node="node"
           :ref="(el) => setNodeRef(el, node.name)"
-          :selected="selectedName === node.name"
+          :selected="selectedFolders.has(node.name)"
           :selected-files="selectedFiles"
           @node-click="handleNodeClick"
         />
@@ -861,7 +871,8 @@ export default {
   data() {
     return {
       tree: [],
-      selectedName: null, // For top-level folder selection
+      selectedName: null, // For top-level folder selection (first of selectedFolders)
+      selectedFolders: new Set(), // Multi-select top-level folders
       selectedFiles: new Set(), // For file selection inside a folder
       selectionParentPath: null, // To enforce "same folder" rule
       lastSelectedFile: null, // For check-range logic
@@ -1436,17 +1447,20 @@ export default {
       return node;
     },
     async deleteSelected() {
-      if (!this.selectedName && this.selectedFiles.size === 0) return;
+      if (this.selectedFolders.size === 0 && this.selectedFiles.size === 0)
+        return;
 
       let fileCount = 0;
       let pathsToDelete = [];
 
-      if (this.selectedName) {
-        // Top level folder deletion
-        const node = this.tree.find((n) => n.name === this.selectedName);
-        if (node) {
-          fileCount = this.countRecursive(node);
-          pathsToDelete.push(this.selectedName);
+      if (this.selectedFolders.size > 0) {
+        // One or more top-level folders selected
+        for (const folderName of this.selectedFolders) {
+          const node = this.tree.find((n) => n.name === folderName);
+          if (node) {
+            fileCount += this.countRecursive(node);
+            pathsToDelete.push(folderName);
+          }
         }
       } else {
         // Selected files/folders
@@ -1480,6 +1494,7 @@ export default {
 
         this.selectedFiles.clear();
         this.selectedName = null; // Clear top level selection too
+        this.selectedFolders = new Set();
         this.selectionParentPath = null;
         this.lastSelectedFile = null;
         evtBus.emit("localFoldersChanged");
@@ -1501,9 +1516,16 @@ export default {
         // If clicking top-level folder, clear any file selection context
         this.selectedFiles.clear();
         this.selectionParentPath = null;
-        if (ctrlKey && this.selectedName === node.name) {
-          this.selectedName = null;
+        if (ctrlKey) {
+          if (this.selectedFolders.has(node.name)) {
+            this.selectedFolders.delete(node.name);
+          } else {
+            this.selectedFolders.add(node.name);
+          }
+          this.selectedFolders = new Set(this.selectedFolders);
+          this.selectedName = [...this.selectedFolders][0] || null;
         } else {
+          this.selectedFolders = new Set([node.name]);
           this.selectedName = node.name;
         }
         this.lastSelectedFile = null;
@@ -1518,6 +1540,7 @@ export default {
         // If switching folders, or if a top-level folder was previously selected, reset.
         if (this.selectedName) {
           this.selectedName = null;
+          this.selectedFolders = new Set();
         }
 
         if (

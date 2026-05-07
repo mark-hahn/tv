@@ -1667,7 +1667,14 @@ const deleteByTitles = (titles) => {
     const row = stmtGetByTitle.get(String(title));
     if (row) {
       const lp = row.localPath ? String(row.localPath) : "";
-      if (lp) localPaths.push(lp);
+      if (lp) {
+        // localPath is the directory; construct the actual file path
+        const fileTitle =
+          (row.destTitle ? String(row.destTitle) : "") ||
+          String(row.title || title);
+        const fullPath = path.join(lp, fileTitle);
+        localPaths.push(fullPath);
+      }
     }
     removeInProgress(String(title));
     stmtDeleteByTitle.run(String(title));

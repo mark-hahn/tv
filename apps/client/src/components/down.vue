@@ -181,6 +181,17 @@
           >
             {{ pollingStopped ? "Resume" : "Stop" }}
           </button>
+        </div>
+      </div>
+      <div
+        style="
+          display: flex;
+          justify-content: flex-end;
+          align-items: center;
+          gap: 10px;
+          margin-top: 4px;
+        "
+      >
           <button
             @click.stop="downSelClick"
             :disabled="selectedItems.size === 0"

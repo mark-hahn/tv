@@ -228,7 +228,7 @@
         :key="node.name"
         ref="treeNodes"
         :node="node"
-        :selected="selectedName === node.name"
+        :selected="selectedFolders.has(node.name)"
         :selected-files="selectedFiles"
         @node-click="handleNodeClick"
       />
@@ -259,7 +259,8 @@ export default {
   data() {
     return {
       tree: [],
-      selectedName: null, // For top-level folder selection
+      selectedName: null, // For top-level folder selection (first of selectedFolders)
+      selectedFolders: new Set(), // Multi-select top-level folders
       selectedFiles: new Set(), // For file selection inside a folder
       selectionParentPath: null, // To enforce "same folder" rule
       lastSelectedFile: null, // For check-range logic
@@ -279,7 +280,7 @@ export default {
   },
   computed: {
     hasSelection() {
-      const hasName = !!this.selectedName;
+      const hasName = this.selectedFolders.size > 0;
       const hasFiles = this.selectedFiles.size > 0;
       return hasName || hasFiles;
     },
@@ -512,11 +513,8 @@ export default {
         if (!nodeName.includes(norm)) continue;
 
         this.selectedName = node.name;
+        this.selectedFolders = new Set([node.name]);
         this.selectedFiles.clear();
-        this.renameInput = "";
-        this.selectionParentPath = null;
-        this.lastSelectedFile = null;
-
         this.$nextTick(() => {
           if (this.$refs.treeNodes) {
             const comp = this.$refs.treeNodes.find((c) => {
@@ -608,6 +606,7 @@ export default {
         bestMatch = allMatches[nextIndex];
 
         this.selectedName = bestMatch.name;
+        this.selectedFolders = new Set([bestMatch.name]);
         this.selectedFiles.clear();
         this.renameInput = "";
         this.selectionParentPath = null;
@@ -654,7 +653,7 @@ export default {
         this.hasLoaded = true;
         await this.updateUsbSpaceAvail();
 
-        if (this.show && !this.selectedName) {
+        if (this.show && this.selectedFolders.size === 0) {
           this.$nextTick(() => {
             this.highlightShow();
           });
@@ -770,9 +769,17 @@ export default {
         this.selectedFiles.clear();
         this.renameInput = "";
         this.selectionParentPath = null;
-        if (ctrlKey && this.selectedName === node.name) {
-          this.selectedName = null;
+        if (ctrlKey) {
+          // Toggle this folder in multi-select
+          if (this.selectedFolders.has(node.name)) {
+            this.selectedFolders.delete(node.name);
+          } else {
+            this.selectedFolders.add(node.name);
+          }
+          this.selectedFolders = new Set(this.selectedFolders);
+          this.selectedName = [...this.selectedFolders][0] || null;
         } else {
+          this.selectedFolders = new Set([node.name]);
           this.selectedName = node.name;
         }
         this.lastSelectedFile = null;
@@ -791,6 +798,7 @@ export default {
         if (this.selectedName) {
           // Clearing top-level highlight because we are now selecting files
           this.selectedName = null;
+          this.selectedFolders = new Set();
         }
 
         if (
@@ -895,17 +903,19 @@ export default {
       return [];
     },
     async forceDown() {
-      if (!this.selectedName && this.selectedFiles.size === 0) return;
+      if (this.selectedFolders.size === 0 && this.selectedFiles.size === 0)
+        return;
 
       let files = [];
       let label = "";
 
-      if (this.selectedName) {
-        // Whole top-level folder selected
-        const node = this.tree.find((n) => n.name === this.selectedName);
-        if (!node) return;
-        files = this.collectFiles(node, node.name);
-        label = `'${node.name}'`;
+      if (this.selectedFolders.size > 0) {
+        // One or more top-level folders selected
+        for (const folderName of this.selectedFolders) {
+          const node = this.tree.find((n) => n.name === folderName);
+          if (node) files.push(...this.collectFiles(node, node.name));
+        }
+        label = `'${[...this.selectedFolders].join(", ")}'`;
       } else {
         // Top level folders don't have parentPath/siblings logic here easily,
         // but if selectionParentPath is null, we can check root tree?
@@ -1097,8 +1107,8 @@ export default {
 
     // Sel: emit selectShowFromCardTitle for first selected
     usbSelClick() {
-      if (this.selectedName) {
-        evtBus.emit("selectShowFromCardTitle", this.selectedName);
+      if (this.selectedFolders.size > 0) {
+        evtBus.emit("selectShowFromCardTitle", [...this.selectedFolders][0]);
         return;
       }
       if (this.selectedFiles.size > 0) {
@@ -1125,7 +1135,7 @@ export default {
       const parentPath =
         this.selectedFiles.size > 0 ? this.selectionParentPath : null;
 
-      if (!parentPath && this.selectedName) {
+      if (!parentPath && this.selectedFolders.size > 0) {
         // For top-level, select all immediate children that are folders or files?
         // Just emit selectShowFromCardTitle — All doesn't make sense for top-level
         return;
@@ -1148,15 +1158,16 @@ export default {
 
     // First: scroll to first selected item
     usbFirstClick() {
+      const firstFolder = [...this.selectedFolders][0] || null;
       const target =
-        this.selectedName ||
+        firstFolder ||
         (this.selectedFiles.size > 0 ? [...this.selectedFiles][0] : null);
       if (!target) return;
 
-      if (this.selectedName && this.$refs.treeNodes) {
+      if (firstFolder && this.$refs.treeNodes) {
         const comp = this.$refs.treeNodes.find((c) => {
           const n = c.node || c.$props?.node;
-          return n && n.name === this.selectedName;
+          return n && n.name === firstFolder;
         });
         if (comp && comp.$el) {
           comp.$el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1183,7 +1194,15 @@ export default {
     // Del: confirm then delete selected files from USB
     async usbDelClick() {
       if (!this.hasSelection) return;
-      const paths = [...this.selectedFiles];
+
+      let paths = [];
+      if (this.selectedName) {
+        // Whole top-level folder selected
+        paths = [this.selectedName];
+      } else {
+        paths = [...this.selectedFiles];
+      }
+
       const count = paths.length;
       if (count === 0) return;
 
@@ -1206,6 +1225,8 @@ export default {
           window.alert(`Delete failed: ${txt || res.statusText}`);
           return;
         }
+        this.selectedName = null;
+        this.selectedFolders = new Set();
         this.selectedFiles.clear();
         this.selectionParentPath = null;
         this.lastSelectedFile = null;

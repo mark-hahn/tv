@@ -34,36 +34,6 @@
           <span>USB Files</span>
         </div>
 
-        <input
-          v-model="searchInput"
-          @keyup.enter="searchUsb"
-          placeholder="Search"
-          style="width: 100px; margin-right: 8px"
-        />
-
-        <input
-          v-model="renameInput"
-          @focus="onRenameFocus"
-          @keyup.enter="renameFile"
-          placeholder="Rename"
-          style="width: 100px; margin-right: 8px"
-        />
-
-        <button
-          @click.stop="highlightShow"
-          :disabled="!show"
-          style="
-            cursor: pointer;
-            border-radius: 7px;
-            padding: 4px 10px;
-            border: 1px solid #bbb;
-            background-color: whitesmoke;
-            margin-right: 8px;
-          "
-        >
-          From
-        </button>
-
         <button
           @click="forceDown"
           :disabled="loading || !hasSelection"
@@ -103,74 +73,111 @@
             padding: 4px 10px;
             border: 1px solid #bbb;
             background-color: whitesmoke;
-            margin-right: 8px;
           "
         >
           Refresh
         </button>
+      </div>
 
-        <button
-          @click.stop="usbSelClick"
-          :disabled="!hasSelection"
-          :style="{
-            cursor: hasSelection ? 'pointer' : 'default',
-            borderRadius: '7px',
-            padding: '4px 10px',
-            border: '1px solid #bbb',
-            '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
-            color: hasSelection ? 'inherit' : '#aaa',
-            marginRight: '8px',
-          }"
-        >
-          Sel
-        </button>
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 8px;
+          margin-top: 4px;
+        "
+      >
+        <div style="display: flex; gap: 8px; align-items: center">
+          <input
+            v-model="searchInput"
+            @keyup.enter="searchUsb"
+            placeholder="Search"
+            style="width: 120px"
+          />
+          <input
+            v-model="renameInput"
+            @focus="onRenameFocus"
+            @keyup.enter="renameFile"
+            placeholder="Rename"
+            style="width: 120px"
+          />
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center">
+          <button
+            @click.stop="usbSelClick"
+            :disabled="!hasSelection"
+            :style="{
+              cursor: hasSelection ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
+              color: hasSelection ? 'inherit' : '#aaa',
+            }"
+          >
+            Sel
+          </button>
 
-        <button
-          @click.stop="usbAllClick"
-          :disabled="!hasSelection"
-          :style="{
-            cursor: hasSelection ? 'pointer' : 'default',
-            borderRadius: '7px',
-            padding: '4px 10px',
-            border: '1px solid #bbb',
-            '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
-            color: hasSelection ? 'inherit' : '#aaa',
-            marginRight: '8px',
-          }"
-        >
-          All
-        </button>
+          <button
+            @click.stop="highlightShow"
+            :disabled="!show"
+            style="
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            From
+          </button>
 
-        <button
-          @click.stop="usbFirstClick"
-          :disabled="!hasSelection"
-          :style="{
-            cursor: hasSelection ? 'pointer' : 'default',
-            borderRadius: '7px',
-            padding: '4px 10px',
-            border: '1px solid #bbb',
-            '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
-            color: hasSelection ? 'inherit' : '#aaa',
-            marginRight: '8px',
-          }"
-        >
-          First
-        </button>
+          <button
+            @click.stop="usbAllClick"
+            :disabled="!hasSelection"
+            :style="{
+              cursor: hasSelection ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
+              color: hasSelection ? 'inherit' : '#aaa',
+            }"
+          >
+            All
+          </button>
 
-        <button
-          @click.stop="usbDelClick"
-          :disabled="!hasSelection"
-          :style="{
-            cursor: hasSelection ? 'pointer' : 'default',
-            borderRadius: '7px',
-            padding: '4px 10px',
-            border: '1px solid #bbb',
-            '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
-            color: hasSelection ? 'inherit' : '#aaa',
-          }"
-        >
-          Del
-        </button>
+          <button
+            @click.stop="usbFirstClick"
+            :disabled="!hasSelection"
+            :style="{
+              cursor: hasSelection ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
+              color: hasSelection ? 'inherit' : '#aaa',
+            }"
+          >
+            First
+          </button>
+
+          <button
+            @click.stop="usbDelClick"
+            :disabled="!hasSelection"
+            :style="{
+              cursor: hasSelection ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
+              color: hasSelection ? 'inherit' : '#aaa',
+            }"
+          >
+            Del
+          </button>
+        </div>
       </div>
 
       <div

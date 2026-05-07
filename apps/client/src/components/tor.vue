@@ -54,7 +54,69 @@
             align-items: center;
           "
         >
-          <div style="margin-left: 20px">{{ headerShowName }}</div>
+          <div style="margin-left: 0">Tor: {{ headerShowName }}</div>
+          <div style="display: flex; gap: 8px; align-items: center">
+            <button
+              @click.stop="
+                showStream = false;
+                openTorTabs();
+              "
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px;
+                border: 1px solid #bbb;
+                background-color: whitesmoke;
+              "
+            >
+              Tabs
+            </button>
+            <button
+              @click.stop="showStream = !showStream"
+              :style="{
+                fontSize: '13px',
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px',
+                border: '1px solid #bbb',
+                '--btn-bg': showStream ? 'lightgray' : 'whitesmoke',
+              }"
+            >
+              Stream
+            </button>
+            <button
+              v-if="showFilesPane"
+              @click.stop="showFilesPane = false"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px;
+                border: 1px solid #bbb;
+                background-color: whitesmoke;
+              "
+            >
+              Close
+            </button>
+            <button
+              v-if="!showFilesPane"
+              @click.stop="
+                showStream = false;
+                toggleCookieInputs();
+              "
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px;
+                border: 1px solid #bbb;
+                background-color: whitesmoke;
+              "
+            >
+              Cookies
+            </button>
+          </div>
         </div>
         <!-- Second header row: row-1 buttons on left, action buttons on right -->
         <div
@@ -152,66 +214,6 @@
               "
             >
               More
-            </button>
-            <button
-              @click.stop="
-                showStream = false;
-                openTorTabs();
-              "
-              style="
-                font-size: 13px;
-                cursor: pointer;
-                border-radius: 7px;
-                padding: 4px;
-                border: 1px solid #bbb;
-                background-color: whitesmoke;
-              "
-            >
-              Tabs
-            </button>
-            <button
-              @click.stop="showStream = !showStream"
-              :style="{
-                fontSize: '13px',
-                cursor: 'pointer',
-                borderRadius: '7px',
-                padding: '4px',
-                border: '1px solid #bbb',
-                '--btn-bg': showStream ? 'lightgray' : 'whitesmoke',
-              }"
-            >
-              Stream
-            </button>
-            <button
-              v-if="showFilesPane"
-              @click.stop="showFilesPane = false"
-              style="
-                font-size: 13px;
-                cursor: pointer;
-                border-radius: 7px;
-                padding: 4px;
-                border: 1px solid #bbb;
-                background-color: whitesmoke;
-              "
-            >
-              Close
-            </button>
-            <button
-              v-if="!showFilesPane"
-              @click.stop="
-                showStream = false;
-                toggleCookieInputs();
-              "
-              style="
-                font-size: 13px;
-                cursor: pointer;
-                border-radius: 7px;
-                padding: 4px;
-                border: 1px solid #bbb;
-                background-color: whitesmoke;
-              "
-            >
-              Cookies
             </button>
           </div>
           <div style="display: flex; gap: 6px; align-items: center">

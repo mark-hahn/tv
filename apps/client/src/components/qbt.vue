@@ -119,97 +119,108 @@
           >
             Bottom
           </button>
-          <button
-            @click.stop="qbtSelClick"
-            :disabled="selectedItems.size === 0"
-            :style="{
-              fontSize: '13px',
-              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
-              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
-            }"
-          >
-            Sel
-          </button>
-          <button
-            @click.stop="qbtFromClick"
-            :disabled="!show"
-            :style="{
-              fontSize: '13px',
-              cursor: show ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': show ? 'whitesmoke' : '#e8e8e8',
-              color: show ? 'inherit' : '#aaa',
-            }"
-          >
-            From
-          </button>
-          <button
-            @click.stop="qbtAllClick"
-            :disabled="selectedItems.size === 0"
-            :style="{
-              fontSize: '13px',
-              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
-              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
-            }"
-          >
-            All
-          </button>
-          <button
-            @click.stop="qbtFirstClick"
-            :disabled="selectedItems.size === 0"
-            :style="{
-              fontSize: '13px',
-              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
-              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
-            }"
-          >
-            First
-          </button>
-          <button
-            @click.stop="qbtForceClick"
-            :disabled="selectedItems.size === 0"
-            :style="{
-              fontSize: '13px',
-              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
-              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
-            }"
-          >
-            Force
-          </button>
-          <button
-            @click.stop="qbtDelClick"
-            :disabled="selectedItems.size === 0"
-            :style="{
-              fontSize: '13px',
-              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
-              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
-            }"
-          >
-            Del
-          </button>
         </div>
+      </div>
+      <div
+        style="
+          display: flex;
+          justify-content: flex-end;
+          align-items: center;
+          gap: 10px;
+          margin-top: 4px;
+          margin-right: 20px;
+        "
+      >
+        <button
+          @click.stop="qbtSelClick"
+          :disabled="selectedItems.size === 0"
+          :style="{
+            fontSize: '13px',
+            cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+            borderRadius: '7px',
+            padding: '4px 10px',
+            border: '1px solid #bbb',
+            '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+            color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+          }"
+        >
+          Sel
+        </button>
+        <button
+          @click.stop="qbtFromClick"
+          :disabled="!show"
+          :style="{
+            fontSize: '13px',
+            cursor: show ? 'pointer' : 'default',
+            borderRadius: '7px',
+            padding: '4px 10px',
+            border: '1px solid #bbb',
+            '--btn-bg': show ? 'whitesmoke' : '#e8e8e8',
+            color: show ? 'inherit' : '#aaa',
+          }"
+        >
+          From
+        </button>
+        <button
+          @click.stop="qbtAllClick"
+          :disabled="selectedItems.size === 0"
+          :style="{
+            fontSize: '13px',
+            cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+            borderRadius: '7px',
+            padding: '4px 10px',
+            border: '1px solid #bbb',
+            '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+            color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+          }"
+        >
+          All
+        </button>
+        <button
+          @click.stop="qbtFirstClick"
+          :disabled="selectedItems.size === 0"
+          :style="{
+            fontSize: '13px',
+            cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+            borderRadius: '7px',
+            padding: '4px 10px',
+            border: '1px solid #bbb',
+            '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+            color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+          }"
+        >
+          First
+        </button>
+        <button
+          @click.stop="qbtForceClick"
+          :disabled="selectedItems.size === 0"
+          :style="{
+            fontSize: '13px',
+            cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+            borderRadius: '7px',
+            padding: '4px 10px',
+            border: '1px solid #bbb',
+            '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+            color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+          }"
+        >
+          Force
+        </button>
+        <button
+          @click.stop="qbtDelClick"
+          :disabled="selectedItems.size === 0"
+          :style="{
+            fontSize: '13px',
+            cursor: selectedItems.size > 0 ? 'pointer' : 'default',
+            borderRadius: '7px',
+            padding: '4px 10px',
+            border: '1px solid #bbb',
+            '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
+            color: selectedItems.size > 0 ? 'inherit' : '#aaa',
+          }"
+        >
+          Del
+        </button>
       </div>
       <div
         style="

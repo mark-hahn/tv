@@ -89,20 +89,6 @@
             justify-content: flex-end;
           "
         >
-          <input
-            v-model="fileSearch"
-            type="text"
-            placeholder="Search files"
-            style="
-              font-size: 13px;
-              border-radius: 7px;
-              padding: 4px 8px;
-              border: 1px solid #bbb;
-              background-color: white;
-              width: 98px;
-              outline: none;
-            "
-          />
           <button
             @click.stop="startCheck"
             style="
@@ -186,12 +172,29 @@
       <div
         style="
           display: flex;
-          justify-content: flex-end;
+          justify-content: space-between;
           align-items: center;
           gap: 10px;
           margin-top: 4px;
+          margin-right: 20px;
         "
       >
+        <input
+          v-model="fileSearch"
+          type="text"
+          placeholder="Search files"
+          style="
+            font-size: 13px;
+            border-radius: 7px;
+            padding: 4px 8px;
+            border: 1px solid #bbb;
+            background-color: white;
+            width: 98px;
+            margin-left: 20px;
+            outline: none;
+          "
+        />
+        <div style="display: flex; gap: 10px; align-items: center">
           <button
             @click.stop="downSelClick"
             :disabled="selectedItems.size === 0"

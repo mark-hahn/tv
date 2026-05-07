@@ -6,7 +6,6 @@
       width: '100%',
       padding: '5px',
       margin: 0,
-      marginLeft: '16px',
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
@@ -182,14 +181,14 @@
         <input
           v-model="fileSearch"
           type="text"
-          placeholder="Search files"
+          placeholder="Search"
           style="
             font-size: 13px;
             border-radius: 7px;
             padding: 4px 8px;
             border: 1px solid #bbb;
             background-color: white;
-            width: 98px;
+            width: 120px;
             margin-left: 20px;
             outline: none;
           "

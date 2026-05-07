@@ -6,7 +6,6 @@
       width: '100%',
       padding: '5px',
       margin: 0,
-      marginLeft: '16px',
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',

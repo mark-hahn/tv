@@ -1715,29 +1715,43 @@ async function handleDownloadRequest(req, res) {
           const qbtInfo = await getQbtInfo({ hash: infoHash });
           const list = Array.isArray(qbtInfo) ? qbtInfo : [];
           if (list.length > 0) {
-            const existing = list[0] || {};
-            const existingName = String(existing?.name || "").trim();
-            const fallbackTitle = String(
+            // Force mode: delete existing torrent and re-add
+            try {
+              await delQbtTorrent({ hash: infoHash, deleteFiles: true });
+            } catch {
+              // ignore delete error
+            }
+            try {
+              await addQbtTorrent({
+                torrentData: fetched.torrentData,
+                filename: hint,
+                tags: addTag,
+              });
+            } catch {
+              // ignore re-add error
+            }
+            const torTitle = String(
               torrent?.raw?.title ||
                 torrent?.title ||
                 torrent?.clientTitle ||
-                "",
+                "unknown",
             ).trim();
-            const title = existingName || fallbackTitle || infoHash;
+            postHistory({
+              tvdbId: dlTvdbId,
+              showName: dlShowName || torTitle,
+              type: "torSent",
+              hash: infoHash || undefined,
+              description: `${torTitle} | provider: ${torrent?.raw?.provider || torrent?.provider || "?"} | tag: ${addTag} | force-restart`,
+            });
             res.json({
               ...tvProcResult,
-              success: false,
-              stage: "qbt",
-              error: `QbitTorrent already has torrent ${title}`,
-              hash: infoHash,
-              qbt: {
-                name: existingName || undefined,
-                state: existing?.state || undefined,
-                progress:
-                  typeof existing?.progress === "number"
-                    ? existing.progress
-                    : undefined,
-              },
+              success: true,
+              provider: fetched.provider,
+              method: fetched.method,
+              downloadUrl: fetched.downloadUrl,
+              bytes: fetched.bytes,
+              hash: infoHash || undefined,
+              debug,
             });
             return;
           }

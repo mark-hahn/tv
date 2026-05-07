@@ -709,6 +709,7 @@
           :key="getTorrentCardKey(torrent, index)"
           @click="handleTorrentClick($event, torrent)"
           @click.stop
+          @mousedown="$event.shiftKey && $event.preventDefault()"
           :style="getCardStyle(torrent)"
           @mouseenter="
             $event.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)'
@@ -2722,6 +2723,7 @@ export default {
       const idx = this.filteredTorrents.indexOf(torrent);
 
       if (isShiftClick && this.lastSelectedIndex !== null) {
+        event.preventDefault(); // prevent browser text selection on shift-click
         // Range-select from lastSelectedIndex to idx
         const lo = Math.min(this.lastSelectedIndex, idx);
         const hi = Math.max(this.lastSelectedIndex, idx);
@@ -2758,10 +2760,8 @@ export default {
       const isDownloaded = this.isDownloadedNow(torrent);
       const hasWarnings = this.getTorrentWarnings(torrent).length > 0;
       let bgColor = "#fff";
-      if (isDownloaded) {
-        bgColor = "#ffcccb"; // Light red for downloaded
-      } else if (isSelected) {
-        bgColor = "#fffacd"; // Light yellow for selected
+      if (isSelected) {
+        bgColor = "#fffacd"; // Light yellow for selected (takes priority)
       } else if (hasWarnings) {
         bgColor = "#fff0f0"; // Light red/pink for warnings
       }
@@ -3036,7 +3036,7 @@ export default {
 
       const torrentTitle = torrent?.raw?.title || "Unknown";
       const isAlreadyInQbtMessage = (msg) =>
-        /qbit\s*torrent\s+already\s+downloaded/i.test(String(msg || ""));
+        /qbit\s*torrent\s+already\s+(has|downloaded)/i.test(String(msg || ""));
 
       // Mark as downloaded immediately to change card color
       try {
@@ -3412,8 +3412,28 @@ export default {
             const errorMsg = wrapper.error || wrapper.message;
             if (errorMsg) {
               if (isAlreadyInQbtMessage(errorMsg)) {
+                if (forceDownload) {
+                  // Force: delete then re-add
+                  try {
+                    const delUrl = new URL(
+                      `${config.torrentsApiUrl}/api/qbt/delTorrent`,
+                    );
+                    await fetch(delUrl.toString(), {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        hash: wrapper?.hash || "",
+                        deleteFiles: true,
+                        title: torrentTitle,
+                      }),
+                    });
+                  } catch {
+                    /* ignore */
+                  }
+                  return { ok: true, message: "Restarting" };
+                }
                 this.showError(
-                  `QbitTorrent already downloaded the torrent ${torrentTitle}`,
+                  `QbitTorrent already has torrent ${torrentTitle}`,
                 );
                 return { ok: true, message: "Already in qBittorrent" };
               }
@@ -3485,9 +3505,11 @@ export default {
           }
 
           if (isAlreadyInQbtMessage(detail)) {
-            this.showError(
-              `QbitTorrent already downloaded the torrent ${torrentTitle}`,
-            );
+            if (forceDownload) {
+              // Force: delete then re-add — caller will retry
+              return { ok: true, message: "Restarting" };
+            }
+            this.showError(`QbitTorrent already has torrent ${torrentTitle}`);
             return { ok: true, message: "Already in qBittorrent" };
           }
 
@@ -3782,7 +3804,7 @@ export default {
         if (!el) return;
         const cards = el.querySelectorAll("#torrents-list > div");
         const card = cards[idx];
-        if (card) card.scrollIntoView({ block: "nearest" });
+        if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
       });
     },
 

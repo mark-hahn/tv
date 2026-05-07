@@ -55,6 +55,16 @@
             justify-content: flex-end;
           "
         >
+          <span
+            v-if="flexRunning || forcing"
+            style="
+              font-size: 13px;
+              color: #666;
+              align-self: center;
+              margin-right: 4px;
+            "
+            >Running...</span
+          >
           <button
             @click.stop="forceRun"
             :disabled="forcing"
@@ -67,7 +77,35 @@
               '--btn-bg': forcing ? '#ccc' : 'whitesmoke',
             }"
           >
-            {{ forcing ? "Running…" : "Run" }}
+            Run
+          </button>
+          <button
+            @click.stop="flexInfoClick"
+            :disabled="selectedRows.size === 0"
+            :style="{
+              fontSize: '13px',
+              cursor: selectedRows.size > 0 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': selectedRows.size > 0 ? 'whitesmoke' : '#e8e8e8',
+              color: selectedRows.size > 0 ? 'inherit' : '#aaa',
+            }"
+          >
+            Info
+          </button>
+          <button
+            @click.stop="scrollToBottomAction"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Bottom
           </button>
           <button
             @click.stop="flexSelClick"
@@ -99,16 +137,6 @@
           >
             From
           </button>
-          <span
-            v-if="flexRunning"
-            style="
-              font-size: 13px;
-              color: #666;
-              align-self: center;
-              margin-left: 4px;
-            "
-            >Running...</span
-          >
           <button
             @click.stop="flexAllClick"
             :disabled="selectedRows.size === 0"
@@ -138,34 +166,6 @@
             }"
           >
             First
-          </button>
-          <button
-            @click.stop="flexInfoClick"
-            :disabled="selectedRows.size === 0"
-            :style="{
-              fontSize: '13px',
-              cursor: selectedRows.size > 0 ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': selectedRows.size > 0 ? 'whitesmoke' : '#e8e8e8',
-              color: selectedRows.size > 0 ? 'inherit' : '#aaa',
-            }"
-          >
-            Info
-          </button>
-          <button
-            @click.stop="scrollToBottomAction"
-            style="
-              font-size: 13px;
-              cursor: pointer;
-              border-radius: 7px;
-              padding: 4px 10px;
-              border: 1px solid #bbb;
-              background-color: whitesmoke;
-            "
-          >
-            Bottom
           </button>
         </div>
       </div>
@@ -214,6 +214,7 @@
           v-for="row in rows"
           :key="row.key"
           @click="handleRowClick(row, $event)"
+          @mousedown="$event.shiftKey && $event.preventDefault()"
           :style="getRowStyle(row)"
         >
           {{ row.line }}
@@ -426,6 +427,7 @@ export default {
       rows: [],
       highlightKey: null,
       selectedRows: new Set(), // Multi-select; From button is the only source of multiple
+      lastSelectedIndex: null,
       dialogRow: null,
       _pollTimer: null,
       _polling: false,
@@ -525,7 +527,7 @@ export default {
         padding: "2px 4px",
         cursor: "pointer",
         borderRadius: "3px",
-        background: isHighlighted ? "#cce5ff" : "transparent",
+        background: isHighlighted ? "#fffacd" : "transparent",
         whiteSpace: "pre",
       };
     },
@@ -538,13 +540,34 @@ export default {
         navigator.clipboard.writeText(text).catch(() => {});
         return;
       }
-      // Plain/ctrl/shift: toggle single selection
-      if (this.selectedRows.has(row)) {
-        this.selectedRows = new Set();
-        this.highlightKey = null;
+      const rows = this.rows.filter((r) => !r.isHeader);
+      const idx = rows.indexOf(row);
+      if (event?.shiftKey && this.lastSelectedIndex !== null) {
+        event.preventDefault(); // prevent browser text selection on shift-click
+        const lo = Math.min(this.lastSelectedIndex, idx);
+        const hi = Math.max(this.lastSelectedIndex, idx);
+        const newSel = new Set(this.selectedRows);
+        for (let i = lo; i <= hi; i++) {
+          if (rows[i]) newSel.add(rows[i]);
+        }
+        this.selectedRows = newSel;
+        this.highlightKey = row.key;
+      } else if (event?.ctrlKey || event?.metaKey) {
+        // Toggle clicked item
+        const newSel = new Set(this.selectedRows);
+        if (newSel.has(row)) {
+          newSel.delete(row);
+        } else {
+          newSel.add(row);
+          this.highlightKey = row.key;
+        }
+        this.selectedRows = newSel;
+        this.lastSelectedIndex = idx;
       } else {
+        // Plain click: single-select (no toggle)
         this.selectedRows = new Set([row]);
         this.highlightKey = row.key;
+        this.lastSelectedIndex = idx;
       }
     },
 
@@ -585,7 +608,6 @@ export default {
       } else {
         this.stopPolling();
         this.highlightKey = null;
-        this.selectedRows = new Set();
         this.dialogRow = null;
       }
     },
@@ -694,6 +716,7 @@ export default {
     async forceRun() {
       if (this.forcing) return;
       this.forcing = true;
+      this.flexRunning = true;
       try {
         await fetch(`${config.tvSrvrUrl}/api/flexget-run`, { method: "POST" });
         this.scheduleNextPoll(3000);

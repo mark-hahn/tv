@@ -257,6 +257,7 @@
           :key="String(t.hash || t.name || t.added_on)"
           :style="getCardStyle(t)"
           @click="handleCardClick($event, t)"
+          @mousedown="$event.shiftKey && $event.preventDefault()"
         >
           <div
             style="
@@ -829,12 +830,11 @@ export default {
       const isSelected = this.selectedItems.has(t);
       return {
         position: "relative",
-        background: isDownloading ? "#fffacd" : "#fff",
-        border: isSelected ? "3px solid #007bff" : "1px solid #ddd",
+        background: isSelected ? "#fffacd" : isDownloading ? "#ffe" : "#fff",
+        border: "1px solid #ddd",
         borderRadius: "5px",
         padding: "10px",
         cursor: "pointer",
-        zIndex: isSelected ? 1 : 0,
       };
     },
 

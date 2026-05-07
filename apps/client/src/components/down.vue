@@ -322,6 +322,7 @@
         <div
           :style="getCardStyle(it)"
           @click="handleCardClick($event, it)"
+          @mousedown="$event.shiftKey && $event.preventDefault()"
           @mouseenter="handleMouseEnter($event, it)"
           @mouseleave="handleMouseLeave($event)"
         >
@@ -640,8 +641,6 @@ export default {
       } else {
         // Clear highlight when leaving pane
         this.matchedTitle = null;
-        this.selectedItems = new Set();
-        this.lastSelectedIndex = null;
 
         // Store scroll position when leaving
         const el = this.$refs.scroller;
@@ -958,12 +957,11 @@ export default {
       const isSelected = this.selectedItems.has(it);
       return {
         position: "relative",
-        border: isSelected ? "3px solid #007bff" : "1px solid #ddd",
+        border: "1px solid #ddd",
         borderRadius: "8px",
         padding: "10px",
-        background: isDownloading ? "#fffacd" : "#fff",
+        background: isSelected ? "#fffacd" : isDownloading ? "#e8f4e8" : "#fff",
         cursor: "pointer",
-        zIndex: isSelected ? 1 : 0,
       };
     },
 
@@ -991,6 +989,7 @@ export default {
       const idx = this.orderedItems.indexOf(it);
 
       if (isShiftClick && this.lastSelectedIndex !== null) {
+        event.preventDefault(); // prevent browser text selection on shift-click
         const lo = Math.min(this.lastSelectedIndex, idx);
         const hi = Math.max(this.lastSelectedIndex, idx);
         for (let i = lo; i <= hi; i++) {
@@ -1518,6 +1517,26 @@ export default {
         }
 
         this.items = arr;
+
+        // Remap selectedItems to new objects by title so selection persists through polls
+        if (this.selectedItems.size > 0) {
+          const selectedTitles = new Set(
+            [...this.selectedItems].map((it) => it?.title).filter(Boolean),
+          );
+          if (selectedTitles.size > 0) {
+            const newSel = new Set();
+            let newLastIdx = null;
+            for (let i = 0; i < arr.length; i++) {
+              const newIt = arr[i];
+              if (newIt && selectedTitles.has(newIt.title)) {
+                newSel.add(newIt);
+                newLastIdx = i;
+              }
+            }
+            this.selectedItems = newSel;
+            if (newLastIdx !== null) this.lastSelectedIndex = newLastIdx;
+          }
+        }
 
         const isFirstLoad = !this._didLoadOnce;
         this._didLoadOnce = true;

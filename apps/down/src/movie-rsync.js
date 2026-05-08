@@ -81,7 +81,14 @@ function startCopyFile(filePath, totalBytes) {
 
   try {
     const stat = fs.statSync(destPath);
-    if (totalBytes > 0 && stat.size >= totalBytes) return false;
+    if (totalBytes > 0 && stat.size >= totalBytes) {
+      // Copy already done — ensure .done rename on USB (idempotent if already renamed)
+      childProcess.spawn("ssh", [
+        USB_HOST,
+        `mv -- '${filePath}' '${filePath}.done' 2>/dev/null; true`,
+      ]);
+      return false;
+    }
   } catch {}
 
   childProcess.spawnSync("pkill", ["-f", `ssh.*dd.*${basename}`]);

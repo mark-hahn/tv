@@ -345,6 +345,7 @@ export default {
       _knownHashes: new Set(),
       selectedItems: new Set(), // Multi-select for new button group
       lastSelectedIndex: null,
+      flashingHash: null,
     };
   },
 
@@ -853,9 +854,17 @@ export default {
     getCardStyle(t) {
       const isDownloading = t?.state === "downloading";
       const isSelected = this.selectedItems.has(t);
+      const isFlashing =
+        this.flashingHash && this.flashingHash === String(t?.hash || "");
       return {
         position: "relative",
-        background: isSelected ? "#fffacd" : isDownloading ? "#ffe" : "#fff",
+        background: isFlashing
+          ? "#ffcccc"
+          : isSelected
+            ? "#fffacd"
+            : isDownloading
+              ? "#ffe"
+              : "#fff",
         border: "1px solid #ddd",
         borderRadius: "5px",
         padding: "10px",
@@ -937,6 +946,10 @@ export default {
       if (isAltClick) {
         const title = String(t?.name || "");
         navigator.clipboard.writeText(title).catch(() => {});
+        this.flashingHash = String(t?.hash || "");
+        setTimeout(() => {
+          this.flashingHash = null;
+        }, 300);
         return;
       }
 

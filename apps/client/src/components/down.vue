@@ -78,28 +78,6 @@
               font-weight: normal;
             "
             >{{ avgDownloadingSpeedText }}</span
-          ><span
-            v-if="movieMode && movieDownloadStats.totalText"
-            style="
-              margin-left: 20px;
-              align-self: center;
-              font-size: 13px;
-              color: #555;
-              white-space: nowrap;
-              font-weight: normal;
-            "
-            >{{ movieDownloadStats.totalText }}</span
-          ><span
-            v-if="movieMode && movieDownloadStats.avgText"
-            style="
-              margin-left: 20px;
-              align-self: center;
-              font-size: 13px;
-              color: #555;
-              white-space: nowrap;
-              font-weight: normal;
-            "
-            >avg: {{ movieDownloadStats.avgText }}</span
           >
         </div>
         <div

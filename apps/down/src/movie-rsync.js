@@ -85,7 +85,7 @@ function startCopyFile(filePath, totalBytes) {
       // Copy already done — ensure .done rename on USB (idempotent if already renamed)
       childProcess.spawn("ssh", [
         USB_HOST,
-        `mv -- '${filePath}' '${filePath}.done' 2>/dev/null; true`,
+        `mv -- '${filePath}' '${filePath}.done' 2>/dev/null; rm -f -- '${filePath}.lftp-pget-status'; true`,
       ]);
       return false;
     }
@@ -211,7 +211,7 @@ async function runParallelDd(filePath, basename, destPath, totalBytes, job) {
   job.status = "Finished";
   childProcess.spawn("ssh", [
     USB_HOST,
-    `mv -- '${filePath}' '${filePath}.done'`,
+    `mv -- '${filePath}' '${filePath}.done'; rm -f -- '${filePath}.lftp-pget-status'`,
   ]);
 }
 

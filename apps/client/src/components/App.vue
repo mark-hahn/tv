@@ -192,6 +192,20 @@
             >
               Chksrt {{ chksrtCount }}
             </button>
+            <button
+              @click.stop="movieMode = !movieMode"
+              :style="{
+                fontSize: '13px',
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                marginLeft: '4px',
+                border: '1px solid #bbb',
+                '--btn-bg': movieMode ? 'lightgray' : 'whitesmoke',
+              }"
+            >
+              {{ movieMode ? "Exit Movie" : "Movie" }}
+            </button>
             <div style="flex: 1"></div>
             <button
               @click.stop="helpDialogOpen = true"
@@ -281,7 +295,7 @@
             :sizing="activeSizing"
             :activeShow="currentShow"
             :previewMode="previewMode"
-            @movieModeChange="onMovieModeChange"
+            :movieMode="movieMode"
           ></Tor>
           <Flex
             v-show="!simpleMode && currentPane === 'flex'"
@@ -304,6 +318,7 @@
             :active="currentPane === 'local'"
             :show="currentShow"
             :allShows="allShows"
+            :movieMode="movieMode"
             @select-show="handleLocalSelectShow"
           ></Local>
           <Usb
@@ -312,6 +327,7 @@
             :active="currentPane === 'usb'"
             :show="currentShow"
             :allShows="allShows"
+            :movieMode="movieMode"
           ></Usb>
           <Down
             v-show="!simpleMode && currentPane === 'down'"

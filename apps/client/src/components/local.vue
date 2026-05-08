@@ -33,8 +33,9 @@
           flex: '0 0 auto',
         }"
       >
-        <!-- Row 1: title left, Subs through Ref buttons right -->
+        <!-- Row 1: title left, Subs through Ref buttons right — hidden in movie mode -->
         <div
+          v-if="!movieMode"
           style="
             display: flex;
             align-items: center;
@@ -168,6 +169,7 @@
 
         <!-- Row 2: search + rename inputs left, Sel through Del buttons right -->
         <div
+          v-if="!movieMode"
           style="
             display: flex;
             align-items: center;
@@ -266,6 +268,81 @@
               }"
             >
               Info
+            </button>
+
+            <button
+              @click="deleteSelected"
+              :disabled="loading || (!selectedName && selectedFiles.size === 0)"
+              title="Delete selected files"
+              :style="{
+                cursor:
+                  !loading && (selectedName || selectedFiles.size > 0)
+                    ? 'pointer'
+                    : 'default',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg':
+                  !loading && (selectedName || selectedFiles.size > 0)
+                    ? 'whitesmoke'
+                    : '#e8e8e8',
+                color:
+                  !loading && (selectedName || selectedFiles.size > 0)
+                    ? 'inherit'
+                    : '#aaa',
+              }"
+            >
+              Del
+            </button>
+          </div>
+        </div>
+
+        <!-- Row 2: movie mode — title + First/Refresh/Del -->
+        <div
+          v-else
+          style="
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 0;
+          "
+        >
+          <div class="pane-header-title">Local Movies</div>
+          <div style="display: flex; align-items: center; gap: 10px">
+            <button
+              @click="localFirstClick"
+              :disabled="!selectedName && selectedFiles.size === 0"
+              :style="{
+                cursor:
+                  selectedName || selectedFiles.size > 0
+                    ? 'pointer'
+                    : 'default',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg':
+                  selectedName || selectedFiles.size > 0
+                    ? 'whitesmoke'
+                    : '#e8e8e8',
+                color:
+                  selectedName || selectedFiles.size > 0 ? 'inherit' : '#aaa',
+              }"
+            >
+              First
+            </button>
+
+            <button
+              @click="refresh"
+              :disabled="loading"
+              style="
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px 10px;
+                border: 1px solid #bbb;
+                background-color: whitesmoke;
+              "
+            >
+              Refresh
             </button>
 
             <button
@@ -860,6 +937,7 @@ export default {
     active: Boolean,
     show: Object,
     allShows: Array,
+    movieMode: { type: Boolean, default: false },
   },
   data() {
     return {
@@ -921,6 +999,13 @@ export default {
   },
   watch: {
     show(val) {},
+    movieMode() {
+      this.hasLoaded = false;
+      this.tree = [];
+      this.selectedFolders = new Set();
+      this.selectedFiles = new Set();
+      this.fetchFiles();
+    },
     selectedName() {
       this.handleSelectionChanged();
     },
@@ -1086,9 +1171,11 @@ export default {
       this.loading = true;
       this.error = null;
       try {
-        const endpoint = this.errsMode
-          ? "/api/local/error-files"
-          : "/api/local/files";
+        const endpoint = this.movieMode
+          ? "/api/local/movies"
+          : this.errsMode
+            ? "/api/local/error-files"
+            : "/api/local/files";
         const url = `${config.torrentsApiUrl}${endpoint}`;
         const res = await fetch(url);
         if (!res.ok) {
@@ -1479,7 +1566,11 @@ export default {
 
       this.loading = true;
       try {
-        const root = this.errsMode ? "/mnt/media/tv-errors" : "/mnt/media/tv";
+        const root = this.movieMode
+          ? "/mnt/media/movies"
+          : this.errsMode
+            ? "/mnt/media/tv-errors"
+            : "/mnt/media/tv";
         for (const relPath of pathsToDelete) {
           const fullPath = `${root}/${relPath}`;
           await deletePath(fullPath);

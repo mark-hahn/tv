@@ -24,6 +24,8 @@ import {
   pruneUsbFiles,
   renameUsbFile,
   deleteUsbFiles,
+  getUsbMovies,
+  deleteUsbMovies,
 } from "./usb.js";
 import { getLocalFiles, renameLocalFile, moveToTrial } from "./local.js";
 import {
@@ -794,6 +796,39 @@ app.post("/api/usb/deleteFiles", async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error("usb deleteFiles error:", err);
+    res.status(500).json({ error: err?.message || String(err) });
+  }
+});
+
+app.get("/api/usb/movies", async (req, res) => {
+  try {
+    const tree = await getUsbMovies();
+    res.json(tree);
+  } catch (err) {
+    res.status(500).json({ error: err?.message || String(err) });
+  }
+});
+
+app.post("/api/usb/deleteMovies", async (req, res) => {
+  try {
+    const b = req.body || {};
+    const paths = Array.isArray(b.paths) ? b.paths : [];
+    if (paths.length === 0) {
+      return res.status(400).json({ error: "paths must be a non-empty array" });
+    }
+    const result = await deleteUsbMovies(paths);
+    res.json(result);
+  } catch (err) {
+    console.error("usb deleteMovies error:", err);
+    res.status(500).json({ error: err?.message || String(err) });
+  }
+});
+
+app.get("/api/local/movies", async (req, res) => {
+  try {
+    const tree = await getLocalFiles("/mnt/media/movies");
+    res.json(tree);
+  } catch (err) {
     res.status(500).json({ error: err?.message || String(err) });
   }
 });

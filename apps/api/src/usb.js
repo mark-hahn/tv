@@ -1473,3 +1473,127 @@ export async function deleteUsbFiles(paths) {
 
   return { success: true, deleted: paths.length };
 }
+
+const USB_MOVIES_ROOT = "/home/xobtlu/movies";
+
+/**
+ * Returns a file tree of /home/xobtlu/movies from the USB server.
+ */
+export async function getUsbMovies() {
+  const qbHost = await loadQbHostForSsh();
+  const root = USB_MOVIES_ROOT;
+
+  const sshBaseArgs = [
+    "-o",
+    "BatchMode=yes",
+    "-o",
+    "ConnectTimeout=20",
+    "-o",
+    "LogLevel=ERROR",
+    "-o",
+    "StrictHostKeyChecking=no",
+    "-o",
+    "UserKnownHostsFile=/dev/null",
+  ];
+
+  const cmd = `find ${root} -maxdepth 5 -not -path '*/.*' -printf "%y|%P|%s|%CY-%Cm-%Cd\\n" | sort`;
+
+  try {
+    const { stdout } = await execFileAsync(
+      "ssh",
+      [...sshBaseArgs, qbHost, cmd],
+      { maxBuffer: 10 * 1024 * 1024 },
+    );
+
+    const lines = (stdout || "").split("\n").filter(Boolean);
+    const tree = [];
+
+    const findOrCreate = (list, name, type, size, date) => {
+      let node = list.find((n) => n.name === name);
+      if (!node) {
+        node = { name, type, children: [] };
+        if (type === "file") {
+          node.size = size;
+          node.date = date;
+        }
+        list.push(node);
+      }
+      return node;
+    };
+
+    for (const line of lines) {
+      const parts = line.split("|");
+      if (parts.length < 4) continue;
+      const type = parts[0];
+      const relPath = parts[1];
+      const size = parseInt(parts[2], 10) || 0;
+      const date = parts[3];
+
+      if (!relPath) continue;
+
+      const segments = relPath.split("/");
+      let currentLevel = tree;
+
+      for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        const isLast = i === segments.length - 1;
+        const segType = isLast ? (type === "d" ? "folder" : "file") : "folder";
+        const node = findOrCreate(currentLevel, seg, segType, size, date);
+        if (segType === "folder") {
+          if (!node.children) node.children = [];
+          currentLevel = node.children;
+        }
+      }
+    }
+
+    const sortNodes = (nodes) => {
+      nodes.sort((a, b) => {
+        if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
+        const nameA = a.name.toLowerCase().replace(/^the\s+/, "");
+        const nameB = b.name.toLowerCase().replace(/^the\s+/, "");
+        return nameA.localeCompare(nameB);
+      });
+      nodes.forEach((n) => {
+        if (n.children) sortNodes(n.children);
+      });
+    };
+    sortNodes(tree);
+
+    return tree;
+  } catch (e) {
+    console.error("getUsbMovies failed", e);
+    throw new Error(`Failed to list USB movies: ${e.message}`);
+  }
+}
+
+export async function deleteUsbMovies(paths) {
+  if (!Array.isArray(paths) || paths.length === 0) {
+    throw new Error("paths must be a non-empty array");
+  }
+
+  const qbHost = await loadQbHostForSsh();
+  const root = USB_MOVIES_ROOT;
+
+  const sshBaseArgs = [
+    "-o",
+    "BatchMode=yes",
+    "-o",
+    "ConnectTimeout=10",
+    "-o",
+    "StrictHostKeyChecking=no",
+    "-o",
+    "UserKnownHostsFile=/dev/null",
+  ];
+
+  for (const p of paths) {
+    const str = String(p || "").trim();
+    if (!str || str.includes("..")) {
+      throw new Error(`Invalid path: ${str}`);
+    }
+    const fullPath = `${root}/${str}`;
+    const cmd = `rm -rf -- ${shellQuote(fullPath)}`;
+    await execFileAsync("ssh", [...sshBaseArgs, qbHost, cmd]);
+  }
+
+  return { success: true, deleted: paths.length };
+}

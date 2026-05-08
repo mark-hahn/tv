@@ -119,19 +119,6 @@
             >
               Cookies
             </button>
-            <button
-              @click.stop="toggleMovieMode()"
-              :style="{
-                fontSize: '13px',
-                cursor: 'pointer',
-                borderRadius: '7px',
-                padding: '4px',
-                border: '1px solid #bbb',
-                '--btn-bg': movieMode ? 'lightgray' : 'whitesmoke',
-              }"
-            >
-              {{ movieMode ? "Exit Movie" : "Movie" }}
-            </button>
           </div>
         </div>
         <!-- Second header row: row-1 buttons on left, action buttons on right -->
@@ -1136,8 +1123,6 @@ import parseTorrentTitle from "parse-torrent-title";
 export default {
   name: "Torrents",
   components: { Stream },
-  emits: ["movieModeChange"],
-
   props: {
     simpleMode: {
       type: Boolean,
@@ -1152,6 +1137,10 @@ export default {
       default: () => ({}),
     },
     previewMode: {
+      type: Boolean,
+      default: false,
+    },
+    movieMode: {
       type: Boolean,
       default: false,
     },
@@ -1170,7 +1159,6 @@ export default {
       iptCfClearance: "",
       tlCfClearance: "",
       currentShow: null,
-      movieMode: false,
       movieSrchText: "",
       SHOW_TITLE: true, // Show torrent title on card
       selectedItems: new Set(), // Currently selected torrents (multi-select)
@@ -2144,15 +2132,6 @@ export default {
 
       // Kick off the actual search now that needed is ready.
       await this.searchClick();
-    },
-
-    toggleMovieMode() {
-      this.movieMode = !this.movieMode;
-      this.$emit("movieModeChange", this.movieMode);
-      this.torrents = [];
-      this.hasSearched = false;
-      this.error = null;
-      this.movieSrchText = "";
     },
 
     async movieSearchEnter() {

@@ -21,7 +21,11 @@
         flex: '0 0 auto',
       }"
     >
-      <div style="display: flex; align-items: center">
+      <!-- Row 1: hidden in movie mode -->
+      <div
+        v-if="!movieMode"
+        style="display: flex; align-items: center"
+      >
         <div
           class="pane-header-title"
           style="
@@ -79,7 +83,9 @@
         </button>
       </div>
 
+      <!-- Row 2: normal mode -->
       <div
+        v-if="!movieMode"
         style="
           display: flex;
           justify-content: space-between;
@@ -131,6 +137,95 @@
             "
           >
             From
+          </button>
+
+          <button
+            @click.stop="usbAllClick"
+            :disabled="!hasSelection"
+            :style="{
+              cursor: hasSelection ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
+              color: hasSelection ? 'inherit' : '#aaa',
+            }"
+          >
+            All
+          </button>
+
+          <button
+            @click.stop="usbFirstClick"
+            :disabled="!hasSelection"
+            :style="{
+              cursor: hasSelection ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
+              color: hasSelection ? 'inherit' : '#aaa',
+            }"
+          >
+            First
+          </button>
+
+          <button
+            @click.stop="usbDelClick"
+            :disabled="!hasSelection"
+            :style="{
+              cursor: hasSelection ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
+              color: hasSelection ? 'inherit' : '#aaa',
+            }"
+          >
+            Del
+          </button>
+        </div>
+      </div>
+
+      <!-- Row 2: movie mode — title + Force/Refresh/All/First/Del -->
+      <div
+        v-else
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 8px;
+          margin-top: 4px;
+        "
+      >
+        <div class="pane-header-title">USB Movies</div>
+        <div style="display: flex; gap: 8px; align-items: center">
+          <button
+            @click="forceMovieDown"
+            :disabled="loading || !hasSelection"
+            :style="{
+              cursor: loading || !hasSelection ? 'default' : 'pointer',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': !loading && hasSelection ? 'whitesmoke' : '#e8e8e8',
+              color: !loading && hasSelection ? 'inherit' : '#aaa',
+            }"
+          >
+            Force
+          </button>
+
+          <button
+            @click="refresh"
+            :disabled="loading"
+            style="
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Refresh
           </button>
 
           <button
@@ -247,6 +342,7 @@
 import parseTorrentTitle from "parse-torrent-title";
 import TreeNode from "./tree-node.vue";
 import { config } from "../config.js";
+import { deletePath } from "../srvr.js";
 import evtBus from "../evtBus.js";
 import * as util from "../util.js";
 import {
@@ -262,6 +358,7 @@ export default {
     active: Boolean,
     show: Object,
     allShows: Array,
+    movieMode: { type: Boolean, default: false },
   },
   data() {
     return {
@@ -308,6 +405,13 @@ export default {
           this.fetchFiles();
         }
       },
+    },
+    movieMode() {
+      this.hasLoaded = false;
+      this.tree = [];
+      this.selectedFolders = new Set();
+      this.selectedFiles = new Set();
+      this.fetchFiles();
     },
   },
   mounted() {
@@ -649,7 +753,9 @@ export default {
       this.error = null;
       try {
         console.log("usb: fetchFiles start");
-        const url = `${config.torrentsApiUrl}/api/usb/files`;
+        const url = this.movieMode
+          ? `${config.torrentsApiUrl}/api/usb/movies`
+          : `${config.torrentsApiUrl}/api/usb/files`;
         const res = await fetch(url);
         if (!res.ok) {
           const txt = await res.text();
@@ -908,6 +1014,24 @@ export default {
         );
       }
       return [];
+    },
+    async forceMovieDown() {
+      if (this.selectedFolders.size === 0 && this.selectedFiles.size === 0)
+        return;
+      const paths = [...[...this.selectedFolders], ...[...this.selectedFiles]];
+      if (!confirm(`Delete ${paths.length} item(s) from local movies?`)) return;
+      this.loading = true;
+      try {
+        for (const relPath of paths) {
+          await deletePath(`/mnt/media/movies/${relPath}`);
+        }
+        await fetch(`${config.tvDownUrl}/movieCycle`, { method: "POST" });
+      } catch (e) {
+        alert("Error: " + (e?.message || e));
+      } finally {
+        this.loading = false;
+        await this.fetchFiles();
+      }
     },
     async forceDown() {
       if (this.selectedFolders.size === 0 && this.selectedFiles.size === 0)

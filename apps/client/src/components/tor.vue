@@ -1236,6 +1236,15 @@ export default {
     };
   },
 
+  watch: {
+    movieMode(val) {
+      if (!val) {
+        this.torrents = [];
+        this.movieSrchText = "";
+      }
+    },
+  },
+
   computed: {
     headerShowName() {
       const name =

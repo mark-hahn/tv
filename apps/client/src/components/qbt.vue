@@ -370,6 +370,11 @@ export default {
           if (added < cutoff) return false;
           if (this.activeOnly && this.fmtState(t?.state) === "Finished")
             return false;
+          const isMovie = String(t?.save_path || "")
+            .replace(/\/+$/, "")
+            .endsWith("/movies");
+          if (this.movieMode && !isMovie) return false;
+          if (!this.movieMode && isMovie) return false;
           return true;
         })
         .sort((a, b) => {

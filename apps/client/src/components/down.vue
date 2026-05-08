@@ -44,7 +44,7 @@
         "
       >
         <div style="margin-left: 20px; display: flex; align-items: center">
-          <span>Downloads</span
+          <span>{{ movieMode ? "Movie Downloads" : "Downloads" }}</span
           ><span
             v-if="isChecking"
             style="

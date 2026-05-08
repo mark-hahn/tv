@@ -1141,7 +1141,12 @@ async function handleDownloadRequest(req, res) {
         return;
       }
 
-      const valid = download.validateTorrentBytes(fetched.torrentData);
+      const isMovieDownload =
+        dlSavePath &&
+        String(dlSavePath).replace(/\/+$/, "").endsWith("/movies");
+      const valid = isMovieDownload
+        ? { success: true }
+        : download.validateTorrentBytes(fetched.torrentData);
       if (!valid.success) {
         try {
           const rawTitle = String(
@@ -1515,7 +1520,11 @@ async function handleDownloadRequest(req, res) {
       return;
     }
 
-    const valid = download.validateTorrentBytes(fetched.torrentData);
+    const isMovieDownload =
+      dlSavePath && String(dlSavePath).replace(/\/+$/, "").endsWith("/movies");
+    const valid = isMovieDownload
+      ? { success: true }
+      : download.validateTorrentBytes(fetched.torrentData);
     if (!valid.success) {
       res.json({ ...baseWrapper, ...valid });
       return;

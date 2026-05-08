@@ -111,6 +111,20 @@
           "
         >
           <button
+            v-if="movieMode"
+            @click.stop="startMovieCycle"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Cycle
+          </button>
+          <button
             v-if="!movieMode"
             @click.stop="startCheck"
             style="
@@ -581,12 +595,7 @@ export default {
       };
       const total = active.reduce((s, j) => s + parseRate(j.rate), 0);
       const avg = total / active.length;
-      const fmt = (v) =>
-        v >= 1024
-          ? `${(v / 1024).toFixed(2)} GB/s`
-          : v >= 1
-            ? `${v.toFixed(1)} MB/s`
-            : `${(v * 1024).toFixed(0)} KB/s`;
+      const fmt = (v) => `${Math.round(v * 8)} mb`;
       return { totalText: fmt(total), avgText: fmt(avg) };
     },
 
@@ -695,6 +704,14 @@ export default {
   },
 
   methods: {
+    async startMovieCycle() {
+      try {
+        await fetch(`${config.tvDownUrl}/movieCycle`, { method: "POST" });
+      } catch {
+        /* ignore */
+      }
+    },
+
     startMoviePoll() {
       if (this._moviePollTimer) return;
       const poll = async () => {

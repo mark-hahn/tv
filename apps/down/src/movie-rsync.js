@@ -1,6 +1,7 @@
 // movie-rsync.js — polls qBittorrent for completed movies in /home/xobtlu/movies
 // and rsyncs each one to /mnt/media/movies on the local server.
 import childProcess from "node:child_process";
+import fs from "node:fs";
 
 const USB_HOST = "xobtlu@oracle.usbx.me";
 const USB_MOVIES_PATH = "/home/xobtlu/movies";
@@ -11,10 +12,18 @@ const QB_PORT = 12041;
 const QB_USER = "xobtlu";
 const QB_PASS = "90-TYUrtyasd";
 
-// Map: name → job object { name, status, percent, rate, eta, _proc }
+const NORMAL_INTERVAL_MS = 60 * 1000;
+const FAST_INTERVAL_MS = 5 * 1000;
+const FAST_MODE_MAX_MS = 60 * 1000;
+
+// Map: filePath → job object
 const jobs = new Map();
 
 let _qbCookie = null;
+let _cycleTimer = null;
+let _fastMode = false;
+let _fastModeStart = 0;
+let _prevFinishedNames = new Set();
 
 async function qbLogin() {
   const res = await fetch(`http://${QB_HOST}:${QB_PORT}/api/v2/auth/login`, {
@@ -72,15 +81,20 @@ function parseRsyncProgress(line) {
   return null;
 }
 
-function startRsync(torrent) {
-  const name = String(torrent.name || "");
-  if (!name || jobs.has(name)) return;
+// Returns true if a new rsync job was started, false if skipped.
+function startRsyncFile(filePath) {
+  if (jobs.has(filePath)) return false;
+  const nameParts = filePath.split("/");
+  const basename = nameParts[nameParts.length - 1];
+  const destPath = `${LOCAL_MOVIES_PATH}/${basename}`;
 
-  const src = `${USB_HOST}:${USB_MOVIES_PATH}/${name}`;
+  if (fs.existsSync(destPath)) return false;
+
+  const src = `${USB_HOST}:${filePath}`;
   const dst = `${LOCAL_MOVIES_PATH}/`;
 
   const job = {
-    name,
+    name: basename,
     status: "Downloading",
     percent: 0,
     bytes_done: 0,
@@ -88,7 +102,7 @@ function startRsync(torrent) {
     eta: "",
     _proc: null,
   };
-  jobs.set(name, job);
+  jobs.set(filePath, job);
 
   const proc = childProcess.spawn("rsync", [
     "-e",
@@ -98,7 +112,6 @@ function startRsync(torrent) {
     src,
     dst,
   ]);
-
   job._proc = proc;
 
   let buf = "";
@@ -121,28 +134,99 @@ function startRsync(torrent) {
   proc.stderr.on("data", processChunk);
 
   proc.on("close", (code) => {
+    job._proc = null;
     if (code === 0) {
       job.status = "Finished";
-      job._proc = null;
-      // Remove finished jobs after 30 seconds
-      setTimeout(() => jobs.delete(name), 30000);
+      // Rename source file on USB to prevent re-download
+      childProcess.spawn("ssh", [
+        USB_HOST,
+        `mv -- '${filePath}' '${filePath}.done'`,
+      ]);
     } else {
       job.status = `Error (exit ${code})`;
-      job._proc = null;
     }
+  });
+
+  return true;
+}
+
+async function findVideoFilesInPath(remotePath) {
+  return new Promise((resolve) => {
+    const proc = childProcess.spawn("ssh", [
+      USB_HOST,
+      `find ${remotePath} -type f \\( -iname '*.mkv' -o -iname '*.mp4' -o -iname '*.avi' -o -iname '*.m4v' -o -iname '*.ts' \\) 2>/dev/null`,
+    ]);
+    let out = "";
+    proc.stdout.on("data", (d) => {
+      out += d.toString();
+    });
+    proc.on("close", () => resolve(out.trim().split("\n").filter(Boolean)));
+    proc.on("error", () => resolve([]));
   });
 }
 
-export async function pollAndSync() {
+async function runCycle() {
   let torrents;
   try {
     torrents = await getMovieTorrents();
   } catch {
     return;
   }
-  for (const t of torrents) {
-    startRsync(t);
+
+  // Detect newly finished qBt torrents → enter fast mode
+  const currentFinishedNames = new Set(
+    torrents.map((t) => String(t.name || "")),
+  );
+  for (const name of currentFinishedNames) {
+    if (!_prevFinishedNames.has(name)) {
+      _fastMode = true;
+      _fastModeStart = Date.now();
+      break;
+    }
   }
+  _prevFinishedNames = currentFinishedNames;
+
+  let anyStarted = false;
+  for (const t of torrents) {
+    const torrentPath = `${USB_MOVIES_PATH}/${String(t.name || "")}`;
+    const files = await findVideoFilesInPath(torrentPath).catch(() => []);
+    for (const filePath of files) {
+      if (startRsyncFile(filePath)) anyStarted = true;
+    }
+  }
+
+  // Rsync started → back to normal interval
+  if (anyStarted) _fastMode = false;
+
+  // Fast mode expired after 1 min → revert
+  if (_fastMode && Date.now() - _fastModeStart >= FAST_MODE_MAX_MS)
+    _fastMode = false;
+}
+
+function scheduleNextCycle() {
+  if (_cycleTimer) clearTimeout(_cycleTimer);
+  const delay = _fastMode ? FAST_INTERVAL_MS : NORMAL_INTERVAL_MS;
+  _cycleTimer = setTimeout(() => {
+    runCycle()
+      .catch(() => {})
+      .finally(scheduleNextCycle);
+  }, delay);
+}
+
+export function startCycling() {
+  scheduleNextCycle();
+}
+
+export function stopCycling() {
+  if (_cycleTimer) clearTimeout(_cycleTimer);
+  _cycleTimer = null;
+}
+
+export async function triggerCycle() {
+  if (_cycleTimer) clearTimeout(_cycleTimer);
+  _cycleTimer = null;
+  await runCycle().catch(() => {});
+  scheduleNextCycle();
 }
 
 export function getMovieDownJobs() {

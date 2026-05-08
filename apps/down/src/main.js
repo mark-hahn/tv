@@ -959,15 +959,22 @@ async function main() {
           return json(res, 405, { status: "method not allowed" });
         }
 
+        // Handle /movieCycle endpoint – manually triggers a movie rsync cycle
+        if (pathname === "/movieCycle") {
+          if (req.method === "POST") {
+            movieRsync.triggerCycle().catch(() => {});
+            return json(res, 200, { status: "ok" });
+          }
+          return json(res, 405, { status: "method not allowed" });
+        }
+
         // No matching endpoint
         return json(res, 404, { status: "not found" });
       })
       .listen(3003, "0.0.0.0");
 
-    // Start movie rsync poll loop every 10 seconds
-    setInterval(() => {
-      movieRsync.pollAndSync().catch(() => {});
-    }, 10000);
+    // Start movie rsync cycling (1 min normal, 5 sec fast after qBt finishes)
+    movieRsync.startCycling();
   })();
 
   findUsb =

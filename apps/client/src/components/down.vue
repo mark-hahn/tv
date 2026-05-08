@@ -679,6 +679,7 @@ export default {
       } else {
         this.stopMoviePoll();
         this.movieDownJobs = [];
+        void this.loadTvproc();
       }
     },
   },
@@ -1727,7 +1728,9 @@ export default {
             delete this.retryingTitles[t];
         }
 
-        this.items = arr;
+        if (!this.movieMode) {
+          this.items = arr;
+        }
 
         // Remap selectedItems to new objects by title so selection persists through polls
         if (this.selectedItems.size > 0) {

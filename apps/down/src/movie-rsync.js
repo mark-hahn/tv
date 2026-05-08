@@ -219,7 +219,7 @@ async function findVideoFilesInPath(remotePath) {
   return new Promise((resolve) => {
     const proc = childProcess.spawn("ssh", [
       USB_HOST,
-      `find ${remotePath} -type f \\( -iname '*.mkv' -o -iname '*.mp4' -o -iname '*.avi' -o -iname '*.m4v' -o -iname '*.ts' \\) -printf '%p\t%s\n' 2>/dev/null`,
+      `find '${remotePath}' -type f \\( -iname '*.mkv' -o -iname '*.mp4' -o -iname '*.avi' -o -iname '*.m4v' -o -iname '*.ts' \\) -printf '%p\t%s\n' 2>/dev/null`,
     ]);
     let out = "";
     proc.stdout.on("data", (d) => {

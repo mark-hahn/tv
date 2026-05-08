@@ -808,6 +808,7 @@ export async function addQbtTorrent(input) {
   const blob = new Blob([torrentData], { type: "application/x-bittorrent" });
   form.append("torrents", blob, filename);
   if (tags) form.append("tags", tags);
+  if (input?.savePath) form.append("savepath", input.savePath);
 
   const res = await fetch(new URL("/api/v2/torrents/add", baseUrl), {
     method: "POST",
@@ -854,6 +855,7 @@ export async function addQbtMagnet(input) {
   const form = new FormData();
   form.append("urls", magnetUrl);
   if (tags) form.append("tags", tags);
+  if (input?.savePath) form.append("savepath", input.savePath);
 
   const res = await fetch(new URL("/api/v2/torrents/add", baseUrl), {
     method: "POST",

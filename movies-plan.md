@@ -1,26 +1,41 @@
 # Movies Plan
 
+## Changes in This Version (v3 — movies-response2.md)
+
+> **Differences from previous version** (v2):
+>
+> 1. **qbt savePath corrected**: was `/mnt/media/movies` (wrong — that's the final destination on the local server). Now `/home/xobtlu/movies` (the USB qBittorrent staging folder, confirmed to exist).
+> 2. **Added movie download flow**: after qbt finishes a file on USB, the `apps/down` server rsyncs it to `/mnt/media/movies` on `hahnca.com` (one per file, up to 8 simultaneous). Client shows live rsync progress.
+> 3. **Added `down.vue` changes**: movie mode changes row 1 label/buttons, hides row 2, switches to a new `movieDownPane` subpane.
+> 4. **Single-file-only constraint**: tor/qbt must not download folders — only individual movie files.
+> 5. **New files to change**: `apps/client/src/components/down.vue` + server-side rsync logic in `apps/down/src/`.
+
+---
+
 ## Overview
 
-Add a movie download mode to the tor and qbt panes. A `Movie` toggle button in the tor pane header switches both panes into movie mode, changing search behavior, card display, and download destination.
+Add a movie download mode to the tor, qbt, and down panes. A `Movie` toggle button in the tor pane header switches all three panes into movie mode, changing search behavior, card display, download destination, and the download progress view.
 
 ---
 
 ## Files to Change
 
-| File                                 | Change                                                                                                                               |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `apps/client/src/components/tor.vue` | Add Movie button, movie mode toggle, row 2 movie search input, hide/show elements, card rendering, visual indicator                  |
-| `apps/client/src/components/qbt.vue` | Movie mode header text, hide/show buttons, savePath on download, clear cards on mode switch                                          |
-| `apps/api/src/search.js`             | Accept `category` param, use movie provider categories, skip TV-only season filter in movie mode, bypass IPT/TL cache                |
-| `apps/api/src/server.js`             | Pass `category` from `/api/search` to `searchTorrents()`; pass `savePath` from `/api/torrent-file` to `addQbtTorrent`/`addQbtMagnet` |
-| `apps/api/src/usb.js`                | Add `savePath` param to `addQbtTorrent()` and `addQbtMagnet()`                                                                       |
+| File                                  | Change                                                                                                                               |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `apps/client/src/components/tor.vue`  | Add Movie button, movie mode toggle, row 2 movie search input, hide/show elements, card rendering, visual indicator                  |
+| `apps/client/src/components/qbt.vue`  | Movie mode header text, hide/show buttons, savePath on download, clear cards on mode switch                                          |
+| `apps/client/src/components/down.vue` | Movie mode row 1 (label + buttons), hide row 2, switch subpane to movieDownPane (v-show); receive movieMode prop                     |
+| `apps/api/src/search.js`              | Accept `category` param, use movie provider categories, skip TV-only season filter in movie mode, bypass IPT/TL cache                |
+| `apps/api/src/server.js`              | Pass `category` from `/api/search` to `searchTorrents()`; pass `savePath` from `/api/torrent-file` to `addQbtTorrent`/`addQbtMagnet` |
+| `apps/api/src/usb.js`                 | Add `savePath` param to `addQbtTorrent()` and `addQbtMagnet()`                                                                       |
+| `apps/down/src/movie-rsync.js` (new)  | Start/track rsync jobs (USB → local), capture live progress, expose via polling endpoint                                             |
+| `apps/down/src/server.js` (or index)  | Add `/movieDownloads` polling endpoint; wire movie-rsync module                                                                      |
 
 ---
 
 ## State Management
 
-Add a `movieMode` boolean in the **parent component** (App.vue or equivalent) as a reactive prop/data field, passed down to both `tor.vue` and `qbt.vue`. When tor emits a `movieModeChange` event the parent flips the flag, which propagates to qbt.
+Add a `movieMode` boolean in the **parent component** (App.vue or equivalent) as a reactive prop/data field, passed down to `tor.vue`, `qbt.vue`, and `down.vue`. When tor emits a `movieModeChange` event the parent flips the flag, which propagates to all three panes.
 
 ---
 
@@ -158,7 +173,13 @@ Add `v-if="!movieMode"` to:
 
 ### savePath on download
 
-When `movieMode` is true, include `&savePath=%2Fmnt%2Fmedia%2Fmovies` in the torrent-file URL call. When false the existing behavior (no savePath, qBittorrent uses its default `/mnt/media/tv`) remains unchanged.
+**⚠️ Changed from v2**: qBittorrent (which runs on the USB server `oracle.usbx.me`) must save movie files to its local `~/movies` staging folder (`/home/xobtlu/movies`), **not** to the final destination `/mnt/media/movies`. The `apps/down` server then rsyncs files from USB to `/mnt/media/movies`.
+
+When `movieMode` is true, include `&savePath=%2Fhome%2Fxobtlu%2Fmovies` in the torrent-file URL call. When false the existing behavior (no savePath, qBittorrent uses its default) remains unchanged.
+
+### Single-file constraint
+
+In movie mode, tor and qbt handle **single-file downloads only** — no folders. This constraint is enforced by the user selecting individual movie file torrents, not torrent packs containing multiple files or folder structures.
 
 ### Clear cards and trigger immediate poll on mode switch
 
@@ -170,6 +191,128 @@ watch: {
   }
 }
 ```
+
+---
+
+## Down Pane Changes (`down.vue`)
+
+### Prop
+
+```js
+props: {
+  movieMode: { type: Boolean, default: false },
+  // ...existing props
+}
+```
+
+### Row 1 — Title and buttons in movie mode
+
+In movie mode:
+
+- Left span changes from `Downloads` to **`Movie Downloads`** (conditional)
+- The speed stats (`totalDownloadingSpeedText`, `avgDownloadingSpeedText`) remain visible — they now reflect combined rsync throughput rather than TV downloads
+- Remove (add `v-if="!movieMode"` to): **Cycle**, **Errs**, **Clr**, **Active** buttons
+- Other buttons (Bot, Stop) remain
+
+```html
+<span>{{ movieMode ? 'Movie Downloads' : 'Downloads' }}</span>
+```
+
+### Row 2 — Hidden in movie mode
+
+The entire row 2 (`<div style="display: flex; justify-content: space-between ..."`) is wrapped with `v-if="!movieMode"`. This hides the search input, Sel, From, All, First, etc. buttons.
+
+### Subpane switching — v-show
+
+Use `v-show` (not `v-if`) to switch between the normal down card list and `movieDownPane`. Both components stay mounted so the normal down pane continues polling while hidden.
+
+```html
+<!-- Normal down subpane -->
+<div id="scroller" v-show="!movieMode" ...>
+  <!-- existing card list -->
+</div>
+
+<!-- Movie download subpane -->
+<div id="movie-down-pane" v-show="movieMode" ...>
+  <div v-for="job in movieDownJobs" :key="job.filename" ...>
+    <div>{{ job.filename }}</div>
+    <div>{{ job.progressLine }}</div>
+  </div>
+</div>
+```
+
+### `movieDownJobs` data
+
+New data property:
+
+```js
+movieDownJobs: []; // Array of { filename, progressLine }. Never removed. Not persistent across page loads.
+```
+
+When a new job arrives from the server (via polling `/movieDownloads`), append to `movieDownJobs` if not already present; update `progressLine` in place if already present.
+
+### Movie download polling
+
+When `movieMode` is true, start a separate poll to a new endpoint (e.g., `${config.tvDownUrl}/movieDownloads`) every ~2 seconds. Stop polling when `movieMode` is false. The endpoint returns an array of `{ filename, progressLine }` objects.
+
+### progressLine format
+
+Rsync `--progress` output line: `238,551,040   1%   10.49MB/s    0:26:59`
+
+Parsed fields:
+
+- `bytes_done` = `238551040` (remove commas)
+- `pct` = `1`
+- `total_bytes` = `bytes_done / (pct / 100)` — compute total from bytes + percentage
+- `rate_mbps` = rate in MB/s × 8 → format like existing speed display (e.g., `83.9 Mbps`)
+- `time_remaining` = `0:26:59`
+- `eta` = `now + time_remaining`, formatted as `HH:mm PST`
+- `status` = `Downloading` (while running) or `Finished`
+
+Row 2 display: `<total_size> | <bytes_done_formatted> | <rate_mbps> | Rem: <time_remaining> | Eta: <HH:mm> | <status>`
+
+Size formatting uses the same helper as existing down cards (e.g., `4.25 GB`).
+
+---
+
+## Movie Download Flow (Server Side)
+
+### Overview
+
+1. User selects a single-file movie torrent in `tor.vue` and downloads it → qBittorrent on USB server saves to `/home/xobtlu/movies/`.
+2. `apps/down` server polls for completed movie torrents (qBittorrent save_path = `/home/xobtlu/movies`, state = completed).
+3. For each completed file (up to 8 simultaneously), start an rsync job: `rsync --progress xobtlu@oracle.usbx.me:/home/xobtlu/movies/<filename> /mnt/media/movies/<filename>`.
+4. Capture rsync `--progress` stdout line-by-line; update in-memory job state.
+5. Client polls `/movieDownloads` → server returns current job states → client updates `movieDownPane`.
+
+### `apps/down/src/movie-rsync.js` (new file)
+
+```js
+const USB_MOVIES_PATH = "/home/xobtlu/movies";
+const LOCAL_MOVIES_PATH = "/mnt/media/movies";
+const MAX_SIMULTANEOUS = 8;
+const USB_USER = "xobtlu";
+const USB_HOST = "oracle.usbx.me";
+```
+
+- `getActiveJobs()` → returns array of `{ filename, progressLine, status }`
+- `startRsync(filename)` → spawns `rsync --progress` process; captures stdout; updates job state; marks `status = 'Finished'` on exit code 0
+- `pollQbtMovies()` → polls qBittorrent API for completed torrents with `save_path` matching `/home/xobtlu/movies`; starts rsync for any not already tracked
+
+### `/movieDownloads` endpoint (in `apps/down` server)
+
+```
+GET /movieDownloads
+Response: [{ filename: string, progressLine: string }]
+```
+
+Returns the current job array from `movie-rsync.js`. Called by the client every ~2 seconds when in movie mode.
+
+### ⚠️ Resolved decisions
+
+1. **qbt polling for completion**: Detect completed movie torrents by `save_path = /home/xobtlu/movies` in the qBittorrent torrent info. No tagging needed. Filter qbt torrents where `save_path` matches and `state` is one of the finished states (`uploading`, `stalledUP`, `stoppedUP`, `forcedUP`).
+2. **tvDownUrl config**: Confirmed — `/movieDownloads` is served from `config.tvDownUrl` (existing `apps/down` server).
+3. **Speed stats in row 1**: `totalDownloadingSpeedText` and `avgDownloadingSpeedText` are replaced in movie mode by aggregate rsync stats computed from `movieDownJobs`. A `movieDownloadStats` computed property reads active (non-Finished) jobs, sums their parsed rates for total throughput, and averages them for avg throughput. These are shown in the same position as the existing speed spans but only reflect rsync jobs. The existing TV speed spans get `v-if="!movieMode"`.
 
 ---
 
@@ -213,7 +356,7 @@ const savePath = req.query.savePath || null;
 
 ### `apps/api/src/usb.js` — `addQbtTorrent()` and `addQbtMagnet()`
 
-The qBittorrent WebAPI (`/api/v2/torrents/add`) form field is **`savepath`** (all lowercase — confirmed from official API docs for API v2.11.2).
+The qBittorrent WebAPI (`/api/v2/torrents/add`) form field is **`savepath`** (all lowercase — confirmed from official API docs for API v2.11.2). The value passed in movie mode is `/home/xobtlu/movies` (USB staging folder).
 
 ```js
 if (input?.savePath) form.append("savepath", input.savePath);
@@ -235,6 +378,10 @@ if (input?.savePath) form.append("savepath", input.savePath);
 | 8   | qbt savePath field name      | **Confirmed: `savepath`** (all lowercase) — verified against qBittorrent WebAPI v2.11.2 docs                                                 |
 | 9   | Trigger poll immediately     | **Yes** — call `pollOnce()` immediately on mode switch, do not wait for next tick                                                            |
 | 10  | Search input position        | **Far left** of row 2, before Get/Tab buttons                                                                                                |
+| 11  | qbt savePath value           | **`/home/xobtlu/movies`** (USB staging folder, confirmed exists) — rsync moves to `/mnt/media/movies` after qbt finishes                     |
+| 12  | Single-file constraint       | **Yes** — tor/qbt for movies handle individual files only, not folder torrents                                                               |
+| 13  | down.vue movie mode          | Row 1: `Movie Downloads` label, hide Cycle/Errs/Clr/Active; Row 2: hidden; subpane: `movieDownPane` (v-show)                                 |
+| 14  | movieDownPane cards          | Accumulate per rsync job; never removed during session; not persisted across page loads; no card selection                                   |
 
 ## Movie Mode Visual Indicators
 
@@ -246,3 +393,9 @@ if (input?.savePath) form.append("savepath", input.savePath);
 ### qbt pane
 
 - Row 2 left side shows: **`Movies`** label (matches `qBittorrent` style in row 1)
+
+### Down pane
+
+- Row 1 left label changes to: **`Movie Downloads`**
+- Cycle, Errs, Clr, Active buttons hidden
+- Subpane shows `movieDownPane` with live rsync progress cards

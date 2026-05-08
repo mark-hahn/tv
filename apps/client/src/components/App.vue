@@ -281,6 +281,7 @@
             :sizing="activeSizing"
             :activeShow="currentShow"
             :previewMode="previewMode"
+            @movieModeChange="onMovieModeChange"
           ></Tor>
           <Flex
             v-show="!simpleMode && currentPane === 'flex'"
@@ -295,6 +296,7 @@
             :simpleMode="simpleMode"
             :sizing="activeSizing"
             :show="currentShow"
+            :movieMode="movieMode"
           ></Qbt>
           <Local
             v-show="!simpleMode && currentPane === 'local'"
@@ -317,6 +319,7 @@
             :simpleMode="simpleMode"
             :sizing="activeSizing"
             :show="currentShow"
+            :movieMode="movieMode"
           ></Down>
           <TvPane
             v-show="currentPane === 'tv'"
@@ -587,6 +590,7 @@ export default {
       videoPlayerMode: null,
       chksrtCount: 0,
       currentPane: "info", // 'info', 'map', 'actors', 'reviews', 'trailer', 'tor', 'flex', 'qbt', 'down'
+      movieMode: false,
       savedPane: null,
       restoringPreviewPane: false,
       previewMode: false,
@@ -1809,6 +1813,10 @@ export default {
     handleLocalSelectShow(showName) {
       if (!showName) return;
       evtBus.emit("selectShowFromCardTitle", showName);
+    },
+
+    onMovieModeChange(val) {
+      this.movieMode = val;
     },
 
     handleShowActors(fromMap = false) {

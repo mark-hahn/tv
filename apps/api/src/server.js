@@ -921,6 +921,7 @@ app.get("/api/search", async (req, res) => {
   const iptCfRaw = req.query.ipt_cf;
   const tlCfRaw = req.query.tl_cf;
   const more = req.query.more === "true";
+  const category = req.query.category || "tv";
   let needed = [];
 
   // Parse needed array if provided
@@ -961,6 +962,7 @@ app.get("/api/search", async (req, res) => {
       tlCf,
       needed,
       more,
+      category,
     });
     res.json(result);
   } catch (error) {
@@ -1069,6 +1071,7 @@ async function handleDownloadRequest(req, res) {
     const forceDownload = body.forceDownload === true;
     const dlShowName = String(body.showName || "").trim() || null;
     const dlTvdbId = String(body.tvdbId || "").trim() || null;
+    const dlSavePath = body.savePath ? String(body.savePath).trim() : null;
     // Temporary: hardwire debug on so we always return/emit extra diagnostics.
     const debug = true;
 
@@ -1285,6 +1288,7 @@ async function handleDownloadRequest(req, res) {
           torrentData: fetched.torrentData,
           filename: hint,
           tags: addTag,
+          ...(dlSavePath ? { savePath: dlSavePath } : {}),
         });
       } catch (e) {
         if (debug)
@@ -1624,6 +1628,7 @@ async function handleDownloadRequest(req, res) {
         torrentData: fetched.torrentData,
         filename: hint,
         tags: addTag,
+        ...(dlSavePath ? { savePath: dlSavePath } : {}),
       });
     } catch (e) {
       if (debug)
@@ -1839,13 +1844,16 @@ app.get("/api/torrent-file", async (req, res) => {
   if (!showName) {
     return res.status(400).json({ error: "show query parameter required" });
   }
+  const savePath = req.query.savePath
+    ? String(req.query.savePath).trim()
+    : null;
   try {
     // If the client sent a specific magnet (the user selected a specific result),
     // use it directly instead of doing a fresh search that may return the wrong torrent.
     const magnetUrl = String(req.query.magnet || "").trim();
     if (magnetUrl.startsWith("magnet:")) {
       console.log("[torrent-file] using provided magnet for:", showName);
-      const magRes = await addQbtMagnet({ magnetUrl });
+      const magRes = await addQbtMagnet({ magnetUrl, savePath });
       if (!magRes.ok) {
         postHistory({
           showName,
@@ -1879,7 +1887,7 @@ app.get("/api/torrent-file", async (req, res) => {
           showName,
           infoHash,
         );
-        const magRes = await addQbtMagnet({ magnetUrl: magnet });
+        const magRes = await addQbtMagnet({ magnetUrl: magnet, savePath });
         if (!magRes.ok) {
           postHistory({
             showName,
@@ -1917,6 +1925,7 @@ app.get("/api/torrent-file", async (req, res) => {
     const addRes = await addQbtTorrent({
       torrentData: fileBuffer,
       filename: showName,
+      savePath,
     });
     console.log("[torrent-file] qbt add result:", {
       ok: addRes.ok,

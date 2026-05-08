@@ -57,7 +57,7 @@
             "
             >&lt;Checking&gt;</span
           ><span
-            v-if="totalDownloadingSpeedText"
+            v-if="!movieMode && totalDownloadingSpeedText"
             style="
               margin-left: 20px;
               align-self: center;
@@ -68,7 +68,7 @@
             "
             >{{ totalDownloadingSpeedText }}</span
           ><span
-            v-if="avgDownloadingSpeedText"
+            v-if="!movieMode && avgDownloadingSpeedText"
             style="
               margin-left: 20px;
               align-self: center;
@@ -78,6 +78,28 @@
               font-weight: normal;
             "
             >{{ avgDownloadingSpeedText }}</span
+          ><span
+            v-if="movieMode && movieDownloadStats.totalText"
+            style="
+              margin-left: 20px;
+              align-self: center;
+              font-size: 13px;
+              color: #555;
+              white-space: nowrap;
+              font-weight: normal;
+            "
+            >{{ movieDownloadStats.totalText }}</span
+          ><span
+            v-if="movieMode && movieDownloadStats.avgText"
+            style="
+              margin-left: 20px;
+              align-self: center;
+              font-size: 13px;
+              color: #555;
+              white-space: nowrap;
+              font-weight: normal;
+            "
+            >avg: {{ movieDownloadStats.avgText }}</span
           >
         </div>
         <div
@@ -89,6 +111,7 @@
           "
         >
           <button
+            v-if="!movieMode"
             @click.stop="startCheck"
             style="
               font-size: 13px;
@@ -102,6 +125,7 @@
             Cycle
           </button>
           <button
+            v-if="!movieMode"
             @click.stop="toggleErrs"
             style="
               font-size: 13px;
@@ -115,6 +139,7 @@
             Errs
           </button>
           <button
+            v-if="!movieMode"
             @click.stop="clearErrorRecords"
             style="
               font-size: 13px;
@@ -141,6 +166,7 @@
             Bot
           </button>
           <button
+            v-if="!movieMode"
             @click.stop="scrollToActive"
             style="
               font-size: 13px;
@@ -169,6 +195,7 @@
         </div>
       </div>
       <div
+        v-if="!movieMode"
         style="
           display: flex;
           justify-content: space-between;
@@ -281,7 +308,7 @@
       ></div>
     </div>
     <div
-      v-if="error"
+      v-if="error && !movieMode"
       style="
         text-align: center;
         color: #c00;
@@ -294,13 +321,14 @@
       <div>Error: {{ error }}</div>
     </div>
     <div
-      v-else-if="!hasContent"
+      v-else-if="!hasContent && !movieMode"
       style="text-align: center; color: #666; margin-top: 50px; font-size: 18px"
     >
       <div v-if="emptyStateText">{{ emptyStateText }}</div>
     </div>
     <div
-      v-else
+      v-show="!movieMode"
+      v-if="hasContent"
       ref="scroller"
       :style="{
         flex: '1 1 auto',
@@ -417,6 +445,54 @@
         </div>
       </template>
     </div>
+    <!-- Movie downloads pane: shows rsync progress from down server -->
+    <div
+      v-show="movieMode"
+      :style="{
+        flex: '1 1 auto',
+        margin: '0px',
+        padding: '10px',
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        background: '#fff',
+        fontFamily: 'sans-serif',
+        fontSize: '14px',
+        fontWeight: 'normal',
+      }"
+    >
+      <div
+        v-if="movieDownJobs.length === 0"
+        style="
+          text-align: center;
+          color: #666;
+          margin-top: 50px;
+          font-size: 18px;
+        "
+      >
+        No movie downloads in progress.
+      </div>
+      <div
+        v-for="(job, idx) in movieDownJobs"
+        :key="idx"
+        style="
+          margin-bottom: 8px;
+          padding: 8px;
+          border: 1px solid #ddd;
+          border-radius: 7px;
+          background: #fafafa;
+        "
+      >
+        <div style="font-weight: bold; font-size: 13px; margin-bottom: 4px">
+          {{ job.name }}
+        </div>
+        <div style="font-size: 12px; color: #555">
+          {{ fmtSize(fmtMovieTotalBytes(job)) }} |
+          {{ fmtSize(job.bytes_done) }} | {{ fmtMovieRsyncRate(job.rate) }} |
+          Rem: {{ job.eta }} | Eta: {{ fmtMovieEta(job.eta) }} |
+          {{ job.status }}
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -442,6 +518,10 @@ export default {
     sizing: {
       type: Object,
       default: () => ({}),
+    },
+    movieMode: {
+      type: Boolean,
+      default: false,
     },
   },
 
@@ -476,12 +556,38 @@ export default {
       fileSearch: "",
       selectedItems: new Set(), // Multi-select for new button group
       lastSelectedIndex: null,
+      movieDownJobs: [],
+      _moviePollTimer: null,
     };
   },
 
   computed: {
     hasContent() {
       return !this.error && Array.isArray(this.items) && this.items.length > 0;
+    },
+
+    movieDownloadStats() {
+      const active = this.movieDownJobs.filter((j) => j.status !== "Finished");
+      if (active.length === 0) return { totalText: "", avgText: "" };
+      const parseRate = (r) => {
+        if (!r) return 0;
+        const m = r.match(/([\d.]+)(MB|KB|GB)\/s/i);
+        if (!m) return 0;
+        const n = parseFloat(m[1]);
+        const u = m[2].toUpperCase();
+        if (u === "GB") return n * 1024;
+        if (u === "KB") return n / 1024;
+        return n; // MB/s
+      };
+      const total = active.reduce((s, j) => s + parseRate(j.rate), 0);
+      const avg = total / active.length;
+      const fmt = (v) =>
+        v >= 1024
+          ? `${(v / 1024).toFixed(2)} GB/s`
+          : v >= 1
+            ? `${v.toFixed(1)} MB/s`
+            : `${(v * 1024).toFixed(0)} KB/s`;
+      return { totalText: fmt(total), avgText: fmt(avg) };
     },
 
     totalDownloadingSpeedText() {
@@ -559,6 +665,14 @@ export default {
       this.selectedItems = new Set();
       this.lastSelectedIndex = null;
     },
+    movieMode(val) {
+      if (val) {
+        this.startMoviePoll();
+      } else {
+        this.stopMoviePoll();
+        this.movieDownJobs = [];
+      }
+    },
   },
 
   mounted() {
@@ -575,11 +689,39 @@ export default {
     evtBus.off("paneChanged", this.onPaneChanged);
     evtBus.off("cycle-started", this.handleCycleStarted);
     this.stopPolling();
+    this.stopMoviePoll();
     this.items = [];
     this.error = null;
   },
 
   methods: {
+    startMoviePoll() {
+      if (this._moviePollTimer) return;
+      const poll = async () => {
+        if (!this.movieMode) return;
+        try {
+          const res = await fetch(`${config.tvDownUrl}/movieDownloads`);
+          if (res.ok) {
+            const data = await res.json().catch(() => null);
+            if (Array.isArray(data)) this.movieDownJobs = data;
+          }
+        } catch {
+          /* ignore */
+        }
+        if (this.movieMode) {
+          this._moviePollTimer = setTimeout(poll, 2000);
+        }
+      };
+      poll();
+    },
+
+    stopMoviePoll() {
+      if (this._moviePollTimer) {
+        clearTimeout(this._moviePollTimer);
+        this._moviePollTimer = null;
+      }
+    },
+
     handleScaledWheel(event) {
       if (!event) return;
       const el = event.currentTarget;
@@ -812,6 +954,35 @@ export default {
       const mins = Math.floor(n / 60);
       const secs = Math.floor(n % 60);
       return `${mins}:${String(secs).padStart(2, "0")}`;
+    },
+
+    fmtMovieTotalBytes(job) {
+      if (!job.bytes_done || !job.percent) return 0;
+      return Math.round(job.bytes_done / (job.percent / 100));
+    },
+
+    fmtMovieRsyncRate(rateStr) {
+      const m = String(rateStr || "").match(/^([\d.]+)(KB|MB|GB)\/s$/i);
+      if (!m) return rateStr || "";
+      let mbps = parseFloat(m[1]);
+      const unit = m[2].toUpperCase();
+      if (unit === "KB") mbps = (mbps * 8) / 1024;
+      else if (unit === "MB") mbps = mbps * 8;
+      else if (unit === "GB") mbps = mbps * 8 * 1024;
+      return `${Math.round(mbps)} mb`;
+    },
+
+    fmtMovieEta(remStr) {
+      const parts = String(remStr || "")
+        .split(":")
+        .map(Number);
+      if (parts.length < 2 || parts.some(isNaN)) return "";
+      let secs = 0;
+      if (parts.length === 3) secs = parts[0] * 3600 + parts[1] * 60 + parts[2];
+      else secs = parts[0] * 60 + parts[1];
+      if (secs <= 0) return "";
+      const eta = new Date(Date.now() + secs * 1000);
+      return `${String(eta.getHours()).padStart(2, "0")}:${String(eta.getMinutes()).padStart(2, "0")}`;
     },
 
     fmtEtaRemaining(eta) {

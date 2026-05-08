@@ -20,6 +20,9 @@ const PROVIDER_TIMEOUT_MS = 90_000;
 // TV category codes returned by apibay (205=SD, 207=SD-episodes, 208=HD-TV, 212=UHD)
 const TPB_TV_CATEGORIES = new Set(["202", "205", "207", "208", "212"]);
 
+// Movie category codes returned by apibay (201=Movies, 202=DVDR, 207=HD, 209=3D, 211=DVDR)
+const TPB_MOVIE_CATEGORIES = new Set(["201", "202", "207", "209", "211"]);
+
 // Race a promise against a timeout; rejects with a descriptive error on timeout
 function withTimeout(promise, ms, label) {
   return new Promise((resolve, reject) => {
@@ -79,6 +82,49 @@ async function searchTpbDirect(query, limit = 100) {
     }));
   } catch (e) {
     console.warn(`[searchTpbDirect] failed for "${query}": ${e.message}`);
+    return [];
+  }
+}
+
+async function searchTpbDirectMovie(query, limit = 100) {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
+    const res = await fetch(
+      `https://apibay.org/q.php?q=${encodeURIComponent(query)}&cat=200`,
+      { signal: controller.signal },
+    );
+    clearTimeout(timer);
+    if (!res.ok) {
+      console.warn(
+        `[searchTpbDirectMovie] apibay HTTP ${res.status} for "${query}"`,
+      );
+      return [];
+    }
+    const data = await res.json().catch(() => null);
+    if (!Array.isArray(data)) {
+      console.warn(
+        `[searchTpbDirectMovie] apibay non-array response for "${query}"`,
+      );
+      return [];
+    }
+    const real = data.filter((r) => String(r.id) !== "0");
+    const movies = real.filter((r) =>
+      TPB_MOVIE_CATEGORIES.has(String(r.category ?? "")),
+    );
+    return movies.slice(0, limit).map((r) => ({
+      provider: "ThePirateBay",
+      id: r.id,
+      title: r.name,
+      size: Number(r.size),
+      seeds: Number(r.seeders),
+      peers: Number(r.leechers),
+      time: new Date(Number(r.added) * 1000).toISOString(),
+      magnet: `magnet:?xt=urn:btih:${r.info_hash}&dn=${encodeURIComponent(r.name)}&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce`,
+      category: r.category,
+    }));
+  } catch (e) {
+    console.warn(`[searchTpbDirectMovie] failed for "${query}": ${e.message}`);
     return [];
   }
 }
@@ -514,6 +560,7 @@ export async function searchTorrents({
   tlCf,
   needed = [],
   more = false,
+  category = "tv",
 }) {
   const activeProvidersRaw = TorrentSearchApi.getActiveProviders();
   const activeProviders = formatActiveProviders(activeProvidersRaw);
@@ -609,11 +656,54 @@ export async function searchTorrents({
     uniqueQueries.push(q);
   }
 
-  // Determine which providers to search based on the `more` flag
+  // Determine which providers to search based on category and `more` flag
   let rawCombined = [];
   let tpbFailed = false;
-  if (!more) {
-    // Normal search: IPT/TL only — search them in parallel rather than sequentially
+
+  if (category === "movie") {
+    // Movie mode: search all 4 providers in parallel, no caching, no EZTV
+    // Clear any existing TV cache for this show so it's not reused on mode exit
+    const cacheKey = showName.toLowerCase();
+    iptTlSearchCache.delete(cacheKey);
+    try {
+      const cachePath = iptTlCacheFilePath(showName);
+      if (fs.existsSync(cachePath)) fs.unlinkSync(cachePath);
+    } catch {
+      /* ignore */
+    }
+
+    const movieResults = await Promise.all(
+      uniqueQueries.flatMap((q) => [
+        withTimeout(
+          TorrentSearchApi.search(["IpTorrents"], q, "TV", limit),
+          PROVIDER_TIMEOUT_MS,
+          "IpTorrents",
+        ).catch((e) => {
+          console.warn(`[search/movie] IpTorrents: ${e.message}`);
+          return [];
+        }),
+        withTimeout(
+          TorrentSearchApi.search(["TorrentLeech"], q, "Movies", limit),
+          PROVIDER_TIMEOUT_MS,
+          "TorrentLeech",
+        ).catch((e) => {
+          console.warn(`[search/movie] TorrentLeech: ${e.message}`);
+          return [];
+        }),
+        searchTpbDirectMovie(q, limit),
+        withTimeout(
+          TorrentSearchApi.search(["Limetorrents"], q, "Movies", limit),
+          PROVIDER_TIMEOUT_MS,
+          "Limetorrents",
+        ).catch((e) => {
+          console.warn(`[search/movie] Limetorrents: ${e.message}`);
+          return [];
+        }),
+      ]),
+    );
+    rawCombined = movieResults.flat();
+  } else if (!more) {
+    // Normal TV search: IPT/TL only — search them in parallel rather than sequentially
     const resultsArrays = await Promise.all(
       uniqueQueries.flatMap((q) => [
         withTimeout(
@@ -715,8 +805,8 @@ export async function searchTorrents({
   }
   torrents = deduped;
 
-  // Cache IPT/TL-only results for subsequent more=true calls (only on more=false)
-  if (!more) {
+  // Cache IPT/TL-only results for subsequent more=true calls (only on more=false TV)
+  if (!more && category !== "movie") {
     iptTlSearchCache.set(showName.toLowerCase(), deduped);
     writeIptTlCache(showName, deduped);
   }
@@ -753,9 +843,12 @@ export async function searchTorrents({
     rawProviderCodeCounts[code] = (rawProviderCodeCounts[code] || 0) + count;
   }
   // Always include all expected providers so stats show even when a provider returns 0
-  const expectedProviderCodes = more
-    ? ["IPT", "TL", "TPB", "LIM", "EZT"]
-    : ["IPT", "TL"];
+  const expectedProviderCodes =
+    category === "movie"
+      ? ["IPT", "TL", "TPB", "LIM"]
+      : more
+        ? ["IPT", "TL", "TPB", "LIM", "EZT"]
+        : ["IPT", "TL"];
   for (const code of expectedProviderCodes) {
     if (!(code in rawProviderCodeCounts)) rawProviderCodeCounts[code] = 0;
   }
@@ -836,24 +929,62 @@ export async function searchTorrents({
 
   // Filter out torrents without season information (movies, etc.)
   // Allow season-range and "complete series" torrents through
-  const tvOnlyStage = filterWithReasons(
-    matches,
-    (torrent) => {
-      const hasSeason =
-        torrent?.parsed?.season !== undefined &&
-        torrent?.parsed?.season !== null;
-      const hasSeasonRange = !!torrent?.seasonRange?.isRange;
-      const isCompleteSeries = !!torrent?.completeSeries;
-      return hasSeason || hasSeasonRange || isCompleteSeries;
-    },
-    () =>
-      "missing season info (and not a season-range or complete-series torrent)",
-  );
-  const tvOnly = tvOnlyStage.kept;
-  logFilterStage("tv-only", matches.length, tvOnly.length, tvOnlyStage.removed);
+  // Skip entirely in movie mode — movies don't have season info
+  const tvOnly =
+    category === "movie"
+      ? matches
+      : (() => {
+          const tvOnlyStage = filterWithReasons(
+            matches,
+            (torrent) => {
+              const hasSeason =
+                torrent?.parsed?.season !== undefined &&
+                torrent?.parsed?.season !== null;
+              const hasSeasonRange = !!torrent?.seasonRange?.isRange;
+              const isCompleteSeries = !!torrent?.completeSeries;
+              return hasSeason || hasSeasonRange || isCompleteSeries;
+            },
+            () =>
+              "missing season info (and not a season-range or complete-series torrent)",
+          );
+          logFilterStage(
+            "tv-only",
+            matches.length,
+            tvOnlyStage.kept.length,
+            tvOnlyStage.removed,
+          );
+          return tvOnlyStage.kept;
+        })();
+
+  // In movie mode: drop anything that looks like a TV episode (has season/episode info)
+  const movieFiltered =
+    category === "movie"
+      ? (() => {
+          const movieOnlyStage = filterWithReasons(
+            tvOnly,
+            (torrent) => {
+              const hasSeason =
+                torrent?.parsed?.season !== undefined &&
+                torrent?.parsed?.season !== null;
+              const hasEpisode =
+                torrent?.parsed?.episode !== undefined &&
+                torrent?.parsed?.episode !== null;
+              return !hasSeason && !hasEpisode;
+            },
+            () => "movie-only: has season/episode info (TV torrent)",
+          );
+          logFilterStage(
+            "movie-only",
+            tvOnly.length,
+            movieOnlyStage.kept.length,
+            movieOnlyStage.removed,
+          );
+          return movieOnlyStage.kept;
+        })()
+      : tvOnly;
 
   // Filter by year if show name contains a year
-  let yearFiltered = tvOnly;
+  let yearFiltered = movieFiltered;
   const showYearRegex = /\((\d{4})\)/g;
   const showYears = [];
   let showYearMatch;
@@ -867,7 +998,7 @@ export async function searchTorrents({
   if (showYears.length > 0) {
     const showYear = Math.min(...showYears);
     const yearStage = filterWithReasons(
-      tvOnly,
+      movieFiltered,
       (torrent) => !torrent?.raw?.year || torrent.raw.year === showYear,
       (torrent) => {
         const y = torrent?.raw?.year;
@@ -877,7 +1008,7 @@ export async function searchTorrents({
     yearFiltered = yearStage.kept;
     logFilterStage(
       "year match",
-      tvOnly.length,
+      movieFiltered.length,
       yearFiltered.length,
       yearStage.removed,
       { showYear },

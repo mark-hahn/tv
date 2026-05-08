@@ -54,7 +54,9 @@
             align-items: center;
           "
         >
-          <div style="margin-left: 0">Tor: {{ headerShowName }}</div>
+          <div style="margin-left: 0">
+            {{ movieMode ? "Movies" : "Tor: " + headerShowName }}
+          </div>
           <div style="display: flex; gap: 8px; align-items: center">
             <button
               @click.stop="
@@ -73,6 +75,7 @@
               Tabs
             </button>
             <button
+              v-if="!movieMode"
               @click.stop="showStream = !showStream"
               :style="{
                 fontSize: '13px',
@@ -100,7 +103,7 @@
               Close
             </button>
             <button
-              v-if="!showFilesPane"
+              v-if="!showFilesPane && !movieMode"
               @click.stop="
                 showStream = false;
                 toggleCookieInputs();
@@ -115,6 +118,19 @@
               "
             >
               Cookies
+            </button>
+            <button
+              @click.stop="toggleMovieMode()"
+              :style="{
+                fontSize: '13px',
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px',
+                border: '1px solid #bbb',
+                '--btn-bg': movieMode ? 'lightgray' : 'whitesmoke',
+              }"
+            >
+              {{ movieMode ? "Exit Movie" : "Movie" }}
             </button>
           </div>
         </div>
@@ -170,6 +186,7 @@
               Tab
             </button>
             <input
+              v-if="!movieMode"
               v-model="seasonFilter"
               @keydown.stop
               @click.stop
@@ -183,6 +200,7 @@
               "
             />
             <button
+              v-if="!movieMode"
               @click.stop="
                 showStream = false;
                 noTorrentsNeeded ? forceClick() : searchClick();
@@ -199,6 +217,7 @@
               Search
             </button>
             <button
+              v-if="!movieMode"
               @click.stop="
                 showStream = false;
                 moreClick();
@@ -214,6 +233,35 @@
               "
             >
               More
+            </button>
+            <input
+              v-if="movieMode"
+              v-model="movieSrchText"
+              @keydown.stop
+              @keydown.enter.stop="movieSearchEnter()"
+              @click.stop
+              placeholder="Movie title"
+              style="
+                width: 120px;
+                font-size: 13px;
+                padding: 4px;
+                border: 1px solid #bbb;
+                border-radius: 7px;
+              "
+            />
+            <button
+              v-if="movieMode"
+              @click.stop="movieSearchEnter()"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px;
+                border: 1px solid #bbb;
+                background-color: whitesmoke;
+              "
+            >
+              Search
             </button>
           </div>
           <div style="display: flex; gap: 6px; align-items: center">
@@ -791,9 +839,10 @@
               color: #333;
             "
           >
-            <span style="color: blue !important">{{
-              getDisplaySeasonEpisode(torrent)
-            }}</span
+            <span
+              v-if="!movieMode"
+              style="color: blue !important"
+              >{{ getDisplaySeasonEpisode(torrent) }}</span
             ><span
               v-if="torrent.parsed?.resolution"
               style="color: blue !important"
@@ -1087,6 +1136,7 @@ import parseTorrentTitle from "parse-torrent-title";
 export default {
   name: "Torrents",
   components: { Stream },
+  emits: ["movieModeChange"],
 
   props: {
     simpleMode: {
@@ -1120,6 +1170,8 @@ export default {
       iptCfClearance: "",
       tlCfClearance: "",
       currentShow: null,
+      movieMode: false,
+      movieSrchText: "",
       SHOW_TITLE: true, // Show torrent title on card
       selectedItems: new Set(), // Currently selected torrents (multi-select)
       lastSelectedIndex: null, // Index in filteredTorrents for shift-select
@@ -2094,6 +2146,25 @@ export default {
       await this.searchClick();
     },
 
+    toggleMovieMode() {
+      this.movieMode = !this.movieMode;
+      this.$emit("movieModeChange", this.movieMode);
+      this.torrents = [];
+      this.hasSearched = false;
+      this.error = null;
+      this.movieSrchText = "";
+    },
+
+    async movieSearchEnter() {
+      const q = this.movieSrchText.trim();
+      if (!q) return;
+      this.currentShow = { name: q };
+      this.showName = q;
+      this.torrents = [];
+      this.hasSearched = false;
+      await this.loadTorrents([], false);
+    },
+
     async searchClick() {
       if (
         (!this.currentShow || !this.currentShow.name) &&
@@ -2436,6 +2507,9 @@ export default {
         }
         if (more) {
           url += `&more=true`;
+        }
+        if (this.movieMode) {
+          url += `&category=movie&more=true`;
         }
 
         // Debug info
@@ -3084,7 +3158,7 @@ export default {
             typeof magnet === "string" && magnet.startsWith("http")
               ? `&link=${encodeURIComponent(magnet)}`
               : "";
-          const url = `${config.torrentsApiUrl}/api/torrent-file?show=${encodeURIComponent(showName)}${magnetParam}${linkParam}`;
+          const url = `${config.torrentsApiUrl}/api/torrent-file?show=${encodeURIComponent(showName)}${magnetParam}${linkParam}${this.movieMode ? "&savePath=" + encodeURIComponent("/home/xobtlu/movies") : ""}`;
           const res = await this.fetchWithTimeout(url, {}, 60000);
           if (!res.ok) {
             let detail = "";
@@ -3279,12 +3353,18 @@ export default {
                   ...(forceDownload ? { forceDownload: true } : {}),
                   ...(dlShowName ? { showName: dlShowName } : {}),
                   ...(dlTvdbId ? { tvdbId: dlTvdbId } : {}),
+                  ...(this.movieMode
+                    ? { savePath: "/home/xobtlu/movies" }
+                    : {}),
                 }
               : {
                   torrent,
                   ...(forceDownload ? { forceDownload: true } : {}),
                   ...(dlShowName ? { showName: dlShowName } : {}),
                   ...(dlTvdbId ? { tvdbId: dlTvdbId } : {}),
+                  ...(this.movieMode
+                    ? { savePath: "/home/xobtlu/movies" }
+                    : {}),
                 };
 
           let downloadsBody = "";

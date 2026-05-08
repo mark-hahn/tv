@@ -44,7 +44,7 @@
         "
       >
         <div style="margin-left: 20px; display: flex; align-items: center">
-          <span>qBittorrent</span>
+          <span>{{ movieMode ? "Movies - qBittorrent" : "qBittorrent" }}</span>
         </div>
         <div
           style="
@@ -131,6 +131,7 @@
         "
       >
         <button
+          v-if="!movieMode"
           @click.stop="qbtSelClick"
           :disabled="selectedItems.size === 0"
           :style="{
@@ -146,6 +147,7 @@
           Sel
         </button>
         <button
+          v-if="!movieMode"
           @click.stop="qbtFromClick"
           :disabled="!show"
           :style="{
@@ -317,6 +319,10 @@ export default {
       type: Object,
       default: () => ({}),
     },
+    movieMode: {
+      type: Boolean,
+      default: false,
+    },
   },
 
   data() {
@@ -347,6 +353,10 @@ export default {
       this.matchedTitle = null;
       this.selectedItems = new Set();
       this.lastSelectedIndex = null;
+    },
+    movieMode() {
+      this.torrents = [];
+      this.pollOnce();
     },
   },
 

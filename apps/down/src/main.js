@@ -11,6 +11,7 @@ import rimrafPkg from "rimraf";
 import parseTorrentTitlePkg from "parse-torrent-title";
 
 import * as tvJsonMod from "./tvJson.js";
+import * as movieRsync from "./movie-rsync.js";
 import {
   smartTitleMatch,
   parseFileSeasonEpisode,
@@ -943,10 +944,30 @@ async function main() {
           });
         }
 
+        // Handle /movieDownloads endpoint – returns current movie rsync job status
+        if (pathname === "/movieDownloads") {
+          if (req.method === "GET") {
+            try {
+              return json(res, 200, movieRsync.getMovieDownJobs());
+            } catch (e) {
+              return json(res, 500, {
+                status: "error",
+                error: String(e && e.message ? e.message : e),
+              });
+            }
+          }
+          return json(res, 405, { status: "method not allowed" });
+        }
+
         // No matching endpoint
         return json(res, 404, { status: "not found" });
       })
       .listen(3003, "0.0.0.0");
+
+    // Start movie rsync poll loop every 10 seconds
+    setInterval(() => {
+      movieRsync.pollAndSync().catch(() => {});
+    }, 10000);
   })();
 
   findUsb =

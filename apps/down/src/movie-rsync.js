@@ -21,6 +21,7 @@ const jobs = new Map();
 
 let _qbCookie = null;
 let _cycleTimer = null;
+let _cycling = false;
 let _fastMode = false;
 let _fastModeStart = 0;
 let _prevFinishedNames = new Set();
@@ -70,19 +71,13 @@ async function getMovieTorrents() {
 
 function parseRsyncProgress(line) {
   // e.g.: "238,551,040   1%   10.49MB/s    0:26:59"
-  const m = line.match(/^([\d,]+)\s+(\d+)%\s+([\d.]+\w+\/s)\s+([\d:]+)/);
-  if (m)
-    return {
-      bytes_done: parseInt(m[1].replace(/,/g, "")),
-      percent: parseInt(m[2]),
-      rate: m[3],
-      eta: m[4],
-    };
+  const m = line.match(/^[\d,]+\s+(\d+)%\s+([\d.]+\w+\/s)\s+([\d:]+)/);
+  if (m) return { percent: parseInt(m[1]), rate: m[2], eta: m[3] };
   return null;
 }
 
 // Returns true if a new rsync job was started, false if skipped.
-function startRsyncFile(filePath) {
+function startRsyncFile(filePath, totalBytes) {
   if (jobs.has(filePath)) return false;
   const nameParts = filePath.split("/");
   const basename = nameParts[nameParts.length - 1];
@@ -97,7 +92,7 @@ function startRsyncFile(filePath) {
     name: basename,
     status: "Downloading",
     percent: 0,
-    bytes_done: 0,
+    total_bytes: totalBytes || 0,
     rate: "",
     eta: "",
     _proc: null,
@@ -123,7 +118,6 @@ function startRsyncFile(filePath) {
       const p = parseRsyncProgress(line.trim());
       if (p) {
         job.percent = p.percent;
-        job.bytes_done = p.bytes_done;
         job.rate = p.rate;
         job.eta = p.eta;
       }
@@ -154,22 +148,38 @@ async function findVideoFilesInPath(remotePath) {
   return new Promise((resolve) => {
     const proc = childProcess.spawn("ssh", [
       USB_HOST,
-      `find ${remotePath} -type f \\( -iname '*.mkv' -o -iname '*.mp4' -o -iname '*.avi' -o -iname '*.m4v' -o -iname '*.ts' \\) 2>/dev/null`,
+      `find ${remotePath} -type f \\( -iname '*.mkv' -o -iname '*.mp4' -o -iname '*.avi' -o -iname '*.m4v' -o -iname '*.ts' \\) -printf '%p\t%s\n' 2>/dev/null`,
     ]);
     let out = "";
     proc.stdout.on("data", (d) => {
       out += d.toString();
     });
-    proc.on("close", () => resolve(out.trim().split("\n").filter(Boolean)));
+    proc.on("close", () => {
+      const results = out
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => {
+          const tab = line.lastIndexOf("\t");
+          if (tab === -1) return { path: line, size: 0 };
+          return {
+            path: line.slice(0, tab),
+            size: parseInt(line.slice(tab + 1)) || 0,
+          };
+        });
+      resolve(results);
+    });
     proc.on("error", () => resolve([]));
   });
 }
 
 async function runCycle() {
+  _cycling = true;
   let torrents;
   try {
     torrents = await getMovieTorrents();
   } catch {
+    _cycling = false;
     return;
   }
 
@@ -190,8 +200,8 @@ async function runCycle() {
   for (const t of torrents) {
     const torrentPath = `${USB_MOVIES_PATH}/${String(t.name || "")}`;
     const files = await findVideoFilesInPath(torrentPath).catch(() => []);
-    for (const filePath of files) {
-      if (startRsyncFile(filePath)) anyStarted = true;
+    for (const { path: filePath, size } of files) {
+      if (startRsyncFile(filePath, size)) anyStarted = true;
     }
   }
 
@@ -201,6 +211,7 @@ async function runCycle() {
   // Fast mode expired after 1 min → revert
   if (_fastMode && Date.now() - _fastModeStart >= FAST_MODE_MAX_MS)
     _fastMode = false;
+  _cycling = false;
 }
 
 function scheduleNextCycle() {
@@ -230,12 +241,25 @@ export async function triggerCycle() {
 }
 
 export function getMovieDownJobs() {
-  return Array.from(jobs.values()).map((j) => ({
-    name: j.name,
-    status: j.status,
-    percent: j.percent,
-    bytes_done: j.bytes_done,
-    rate: j.rate,
-    eta: j.eta,
-  }));
+  return {
+    cycling: _cycling,
+    jobs: Array.from(jobs.values()).map((j) => ({
+      name: j.name,
+      status: j.status,
+      percent: j.percent,
+      total_bytes: j.total_bytes,
+      rate: j.rate,
+      eta: j.eta,
+    })),
+  };
+}
+
+export function killAll() {
+  for (const job of jobs.values()) {
+    if (job._proc) {
+      job._proc.kill();
+      job._proc = null;
+    }
+    if (job.status === "Downloading") job.status = "Killed";
+  }
 }

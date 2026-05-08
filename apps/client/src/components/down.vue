@@ -124,6 +124,11 @@
           >
             Cycle
           </button>
+          <span
+            v-if="movieMode && movieCycling"
+            style="font-size: 13px; color: #555; align-self: center"
+            >Cycling</span
+          >
           <button
             v-if="!movieMode"
             @click.stop="startCheck"
@@ -194,6 +199,21 @@
             Active
           </button>
           <button
+            v-if="movieMode"
+            @click.stop="killMovieDownloads"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Kill
+          </button>
+          <button
+            v-if="!movieMode"
             @click.stop="togglePolling"
             style="
               font-size: 13px;
@@ -500,9 +520,9 @@
           {{ job.name }}
         </div>
         <div style="font-size: 12px; color: #555">
-          {{ fmtSize(fmtMovieTotalBytes(job)) }} |
-          {{ fmtSize(job.bytes_done) }} | {{ fmtMovieRsyncRate(job.rate) }} |
-          Rem: {{ job.eta }} | Eta: {{ fmtMovieEta(job.eta) }} |
+          {{ fmtSize(job.total_bytes) }} | {{ job.percent }}% |
+          {{ fmtMovieRsyncRate(job.rate) }} | Rem: {{ job.eta }} | Eta:
+          {{ fmtMovieEta(job.eta) }} |
           {{ job.status }}
         </div>
       </div>
@@ -571,6 +591,7 @@ export default {
       selectedItems: new Set(), // Multi-select for new button group
       lastSelectedIndex: null,
       movieDownJobs: [],
+      movieCycling: false,
       _moviePollTimer: null,
     };
   },
@@ -712,6 +733,14 @@ export default {
       }
     },
 
+    async killMovieDownloads() {
+      try {
+        await fetch(`${config.tvDownUrl}/movieKill`, { method: "POST" });
+      } catch {
+        /* ignore */
+      }
+    },
+
     startMoviePoll() {
       if (this._moviePollTimer) return;
       const poll = async () => {
@@ -720,7 +749,10 @@ export default {
           const res = await fetch(`${config.tvDownUrl}/movieDownloads`);
           if (res.ok) {
             const data = await res.json().catch(() => null);
-            if (Array.isArray(data)) this.movieDownJobs = data;
+            if (data && Array.isArray(data.jobs)) {
+              this.movieDownJobs = data.jobs;
+              this.movieCycling = data.cycling === true;
+            }
           }
         } catch {
           /* ignore */

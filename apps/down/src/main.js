@@ -968,6 +968,15 @@ async function main() {
           return json(res, 405, { status: "method not allowed" });
         }
 
+        // Handle /movieKill endpoint – aborts all active rsync downloads
+        if (pathname === "/movieKill") {
+          if (req.method === "POST") {
+            movieRsync.killAll();
+            return json(res, 200, { status: "ok" });
+          }
+          return json(res, 405, { status: "method not allowed" });
+        }
+
         // No matching endpoint
         return json(res, 404, { status: "not found" });
       })

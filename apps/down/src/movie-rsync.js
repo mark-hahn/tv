@@ -71,8 +71,14 @@ async function getMovieTorrents() {
 
 function parseRsyncProgress(line) {
   // e.g.: "238,551,040   1%   10.49MB/s    0:26:59"
-  const m = line.match(/^[\d,]+\s+(\d+)%\s+([\d.]+\w+\/s)\s+([\d:]+)/);
-  if (m) return { percent: parseInt(m[1]), rate: m[2], eta: m[3] };
+  const m = line.match(/^([\d,]+)\s+(\d+)%\s+([\d.]+\w+\/s)\s+([\d:]+)/);
+  if (m)
+    return {
+      bytes_done: parseInt(m[1].replace(/,/g, "")),
+      percent: parseInt(m[2]),
+      rate: m[3],
+      eta: m[4],
+    };
   return null;
 }
 
@@ -83,7 +89,17 @@ function startRsyncFile(filePath, totalBytes) {
   const basename = nameParts[nameParts.length - 1];
   const destPath = `${LOCAL_MOVIES_PATH}/${basename}`;
 
-  if (fs.existsSync(destPath)) return false;
+  // Get existing partial size to compute real percent during resume
+  let startOffset = 0;
+  try {
+    startOffset = fs.statSync(destPath).size;
+    if (totalBytes > 0 && startOffset >= totalBytes) return false;
+  } catch {
+    // File doesn't exist yet — proceed
+  }
+
+  // Kill any orphaned rsync for this file (e.g. from a previous pm2 instance)
+  childProcess.spawnSync("pkill", ["-f", `rsync.*${basename}`]);
 
   const src = `${USB_HOST}:${filePath}`;
   const dst = `${LOCAL_MOVIES_PATH}/`;
@@ -103,6 +119,7 @@ function startRsyncFile(filePath, totalBytes) {
     "-e",
     "ssh",
     "--progress",
+    "--append",
     "--",
     src,
     dst,
@@ -117,7 +134,17 @@ function startRsyncFile(filePath, totalBytes) {
     for (const line of lines) {
       const p = parseRsyncProgress(line.trim());
       if (p) {
-        job.percent = p.percent;
+        // p.bytes_done is bytes transferred in this session only.
+        // Compute real percent using startOffset + session bytes.
+        if (totalBytes > 0) {
+          const realDone = startOffset + p.bytes_done;
+          job.percent = Math.min(
+            100,
+            Math.round((realDone / totalBytes) * 100),
+          );
+        } else {
+          job.percent = p.percent;
+        }
         job.rate = p.rate;
         job.eta = p.eta;
       }

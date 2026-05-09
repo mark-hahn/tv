@@ -231,6 +231,7 @@
           userSelect: 'none',
           backgroundColor: 'rgba(0,0,0,0.5)',
           textShadow: '0 0 3px #000',
+          fontWeight: 'bold',
           whiteSpace: 'nowrap',
           marginRight: '8px',
         }"
@@ -384,10 +385,10 @@ export default {
         if (t.type === "pgs") char = "*";
         else if (t.type === "embedded") char = "t";
         else if (/\.asr\.srt$/.test(t.file || "")) char = "+";
-        else if (/\.mb\d+\.srt$/.test(t.file || "")) char = ">";
+        else if (/\.mb\d+\.srt$/.test(t.file || "")) char = "e";
         else if (/\.opn[A-Z2-7]{5}\.srt$/i.test(t.file || "")) char = "v";
         else char = "s";
-        map.set(t.id, `${char} ${n}`);
+        map.set(t.id, char.toUpperCase());
         n++;
       }
       map.set("off", "off");

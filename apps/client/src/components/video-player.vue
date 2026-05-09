@@ -384,7 +384,7 @@ export default {
         let char;
         if (t.type === "pgs") char = "*";
         else if (t.type === "embedded") char = "t";
-        else if (/\.asr\.srt$/.test(t.file || "")) char = "+";
+        else if (/\.asr\.srt$/.test(t.file || "")) char = "a";
         else if (/\.mb\d+\.srt$/.test(t.file || "")) char = "e";
         else if (/\.opn[A-Z2-7]{5}\.srt$/i.test(t.file || "")) char = "v";
         else char = "s";

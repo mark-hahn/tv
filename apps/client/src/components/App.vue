@@ -192,6 +192,7 @@
             >
               Chksrt {{ chksrtCount }}
             </button>
+            <div style="flex: 1"></div>
             <button
               @click.stop="movieMode = !movieMode"
               :style="{
@@ -200,27 +201,12 @@
                 borderRadius: '7px',
                 padding: '4px 10px',
                 marginLeft: '4px',
+                marginRight: '6px',
                 border: '1px solid #bbb',
                 '--btn-bg': movieMode ? 'lightgray' : 'whitesmoke',
               }"
             >
               {{ movieMode ? "Exit Movie" : "Movie" }}
-            </button>
-            <div style="flex: 1"></div>
-            <button
-              @click.stop="helpDialogOpen = true"
-              title="Modifier-click help"
-              :style="{
-                fontSize: '13px',
-                cursor: 'pointer',
-                borderRadius: '7px',
-                padding: '4px 8px',
-                marginRight: '6px',
-                border: '1px solid #bbb',
-                '--btn-bg': 'whitesmoke',
-              }"
-            >
-              ?
             </button>
           </div>
         </div>

@@ -65,6 +65,9 @@ export default function App() {
   const [showSubCtrl, setShowSubCtrl] = useState(false);
   const [subPlayers, setSubPlayers] = useState([]);
   const [subDeviceName, setSubDeviceName] = useState(null);
+  const [showPicCtrl, setShowPicCtrl] = useState(false);
+  const [picSettings, setPicSettings] = useState([]);
+  const [picInputs, setPicInputs] = useState({}); // target -> { typing, raw }
   const [locked, setLocked] = useState(false);
   const [missingEpWarning, setMissingEpWarning] = useState(null);
   const [layoutOption, setLayoutOption] = useState("mark");
@@ -109,6 +112,11 @@ export default function App() {
   const embyHoldFiredRef = useRef(false);
   const appsHoldRef = useRef(null);
   const appsHoldFiredRef = useRef(false);
+  const volDownHoldRef = useRef(null);
+  const volDownHoldFiredRef = useRef(false);
+  const picPollRef = useRef(null);
+  const picCommitTimersRef = useRef({});
+  const picInputsRef = useRef({});
   const subPollRef = useRef(null);
   const subPendingRef = useRef(null); // { deviceName, index } while optimistic highlight is active
   const subGenRef = useRef(0);
@@ -588,6 +596,135 @@ export default function App() {
     appsHoldFiredRef.current = false;
   };
 
+  const startVolDownHold = () => {
+    volDownHoldFiredRef.current = false;
+    volDownHoldRef.current = setTimeout(() => {
+      volDownHoldFiredRef.current = true;
+      openPicCtrl();
+    }, 500);
+  };
+
+  const stopVolDownHold = () => {
+    clearTimeout(volDownHoldRef.current);
+    if (!volDownHoldFiredRef.current) {
+      if (isOff || isOther) return;
+      flash("vold");
+      fetch(`${TV_TV_URL}/tv/vol/down`).catch(() => {});
+    }
+    volDownHoldFiredRef.current = false;
+  };
+
+  const openPicCtrl = () => {
+    setShowPicCtrl(true);
+    fetchPicSettings();
+    picPollRef.current = setInterval(() => fetchPicSettings(), 3000);
+  };
+
+  const closePicCtrl = () => {
+    clearInterval(picPollRef.current);
+    setShowPicCtrl(false);
+  };
+
+  const fetchPicSettings = async () => {
+    try {
+      const data = await fetch(`${TV_TV_URL}/tv/picture`).then((r) => r.json());
+      if (data.ok) {
+        setPicSettings(data.settings);
+        setPicInputs((prev) => {
+          const next = { ...prev };
+          for (const s of data.settings) {
+            if (next[s.target]?.typing) continue;
+            next[s.target] = { typing: false, raw: s.value };
+          }
+          picInputsRef.current = next;
+          return next;
+        });
+      }
+    } catch (_) {}
+  };
+
+  const picNextValue = (setting, dir) => {
+    if (setting.type === "range") {
+      const v = Number(setting.value) + dir * setting.step;
+      if (v < setting.min || v > setting.max) return null;
+      return String(v);
+    } else {
+      const idx = setting.options.indexOf(setting.value);
+      if (idx < 0) return null;
+      const next = idx + dir;
+      if (next < 0 || next >= setting.options.length) return null;
+      return setting.options[next];
+    }
+  };
+
+  const picAdjust = async (setting, dir) => {
+    const newVal = picNextValue(setting, dir);
+    if (newVal === null) return;
+    const upd = {
+      ...picInputsRef.current,
+      [setting.target]: { typing: false, raw: newVal },
+    };
+    picInputsRef.current = upd;
+    setPicInputs(upd);
+    try {
+      await fetch(`${TV_TV_URL}/tv/picture`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: setting.target, value: newVal }),
+      });
+    } catch (_) {}
+    await fetchPicSettings();
+  };
+
+  const schedulePicCommit = (setting) => {
+    clearTimeout(picCommitTimersRef.current[setting.target]);
+    picCommitTimersRef.current[setting.target] = setTimeout(
+      () => commitPicInput(setting),
+      750,
+    );
+  };
+
+  const commitPicInput = async (setting) => {
+    clearTimeout(picCommitTimersRef.current[setting.target]);
+    const inp = picInputsRef.current[setting.target];
+    if (!inp?.typing) return;
+    const num = Number(inp.raw);
+    if (isNaN(num) || num < setting.min || num > setting.max) {
+      const revert = {
+        ...picInputsRef.current,
+        [setting.target]: { typing: false, raw: setting.value },
+      };
+      picInputsRef.current = revert;
+      setPicInputs(revert);
+      return;
+    }
+    const newVal = String(Math.round(num));
+    const upd = {
+      ...picInputsRef.current,
+      [setting.target]: { typing: false, raw: newVal },
+    };
+    picInputsRef.current = upd;
+    setPicInputs(upd);
+    try {
+      await fetch(`${TV_TV_URL}/tv/picture`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: setting.target, value: newVal }),
+      });
+    } catch (_) {}
+    await fetchPicSettings();
+  };
+
+  const picInputChange = (setting, text) => {
+    const upd = {
+      ...picInputsRef.current,
+      [setting.target]: { typing: true, raw: text },
+    };
+    picInputsRef.current = upd;
+    setPicInputs(upd);
+    schedulePicCommit(setting);
+  };
+
   const startBackHold = () => {
     backHoldFiredRef.current = false;
     backHoldRef.current = setTimeout(() => {
@@ -932,11 +1069,8 @@ export default function App() {
       smallText: true,
       bg: () => cellBg("lightgreen", "vold"),
       onPress: () => {},
-      onPressIn: () => {
-        if (isOff || isOther) return;
-        flash("vold");
-        fetch(`${TV_TV_URL}/tv/vol/down`).catch(() => {});
-      },
+      onPressIn: () => startVolDownHold(),
+      onPressOut: () => stopVolDownHold(),
     },
     {
       key: "volu",
@@ -1958,6 +2092,59 @@ export default function App() {
     );
   }
 
+  if (showPicCtrl) {
+    return (
+      <View style={styles.container}>
+        <StatusBar hidden />
+        <View style={picCtrlStyles.header}>
+          <Text style={picCtrlStyles.headerTitle}>Picture Settings</Text>
+          <TouchableOpacity
+            onPress={closePicCtrl}
+            style={picCtrlStyles.closeBtn}
+          >
+            <Text style={picCtrlStyles.closeBtnText}>✕</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView style={picCtrlStyles.list}>
+          {picSettings.map((s) => (
+            <View key={s.target} style={picCtrlStyles.row}>
+              <Text style={picCtrlStyles.label}>{s.label}</Text>
+              <Text style={picCtrlStyles.rangeHint}>
+                {s.type === "range"
+                  ? `${s.min}–${s.max}`
+                  : s.options.join(" · ")}
+              </Text>
+              <TouchableOpacity
+                onPress={() => picAdjust(s, -1)}
+                style={picCtrlStyles.arrowBtn}
+              >
+                <Text style={picCtrlStyles.arrowText}>▼</Text>
+              </TouchableOpacity>
+              {s.type === "range" ? (
+                <TextInput
+                  style={picCtrlStyles.valueInput}
+                  value={picInputs[s.target]?.raw ?? s.value}
+                  keyboardType="numeric"
+                  onChangeText={(t) => picInputChange(s, t)}
+                  onBlur={() => commitPicInput(s)}
+                  selectTextOnFocus
+                />
+              ) : (
+                <Text style={picCtrlStyles.value}>{s.value}</Text>
+              )}
+              <TouchableOpacity
+                onPress={() => picAdjust(s, 1)}
+                style={picCtrlStyles.arrowBtn}
+              >
+                <Text style={picCtrlStyles.arrowText}>▲</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  }
+
   if (showStreamers) {
     return (
       <View style={styles.container}>
@@ -2336,6 +2523,88 @@ const subCtrlStyles = StyleSheet.create({
   },
   cardTextSelected: {
     fontWeight: "bold",
+  },
+});
+
+const picCtrlStyles = StyleSheet.create({
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 2,
+    borderBottomColor: "#ccc",
+    backgroundColor: "#fff",
+  },
+  headerTitle: {
+    color: "#000",
+    fontSize: fs(20),
+    fontWeight: "bold",
+  },
+  closeBtn: {
+    padding: 8,
+  },
+  closeBtnText: {
+    color: "#000",
+    fontSize: fs(28),
+    lineHeight: 32,
+  },
+  list: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+    backgroundColor: "#fff",
+    gap: 8,
+  },
+  label: {
+    flex: 1,
+    fontSize: fs(18),
+    fontWeight: "bold",
+    color: "#000",
+  },
+  arrowBtn: {
+    backgroundColor: "whitesmoke",
+    borderWidth: 1,
+    borderColor: "#bbb",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  arrowText: {
+    fontSize: fs(18),
+    color: "#000",
+  },
+  value: {
+    minWidth: 72,
+    textAlign: "center",
+    fontSize: fs(18),
+    fontWeight: "bold",
+    color: "#000",
+  },
+  rangeHint: {
+    fontSize: fs(12),
+    color: "#888",
+    textAlign: "right",
+    minWidth: 70,
+  },
+  valueInput: {
+    minWidth: 72,
+    textAlign: "center",
+    fontSize: fs(18),
+    fontWeight: "bold",
+    color: "#000",
+    borderWidth: 1,
+    borderColor: "#bbb",
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+    backgroundColor: "#fff",
   },
 });
 

@@ -13,6 +13,25 @@ const FIRE_TV_ENTITY_ID = "media_player.fire_tv_192_168_1_47";
 const FIRE_TV_REMOTE_ID = "remote.fire_tv_192_168_1_47";
 const FIRE_TV_IP = "192.168.1.47";
 const BRAVIA_TV_IP = "192.168.1.85";
+const BRAVIA_PICTURE_URL = `http://${BRAVIA_TV_IP}/sony/video`;
+const BRAVIA_PSK = "qwerty";
+
+const PIC_TARGETS = [
+  "brightness",
+  "contrast",
+  "color",
+  "sharpness",
+  "hue",
+  "colorTemperature",
+];
+const PIC_LABELS = {
+  brightness: "Brightness",
+  contrast: "Contrast",
+  color: "Color",
+  sharpness: "Sharpness",
+  hue: "Hue",
+  colorTemperature: "Color Temp",
+};
 
 const EMBY_HOST = "hahnca.com:8920";
 const EMBY_API_KEY = "1c399bd079d549cba8c916244d3add2b";
@@ -1143,6 +1162,82 @@ app.post("/tv/emby/subtitle-offset", async (req, res) => {
     res.json({ ok: r.ok });
   } catch (err) {
     loge("emby/subtitle-offset error:", err.message);
+    res.json({ ok: false, error: err.message });
+  }
+});
+
+// ─── Bravia picture quality settings ─────────────────────────────────────────
+
+app.get("/tv/picture", async (req, res) => {
+  try {
+    const resp = await fetch(BRAVIA_PICTURE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Auth-PSK": BRAVIA_PSK },
+      body: JSON.stringify({
+        method: "getPictureQualitySettings",
+        params: [{ target: "" }],
+        id: 1,
+        version: "1.0",
+      }),
+    });
+    const data = await resp.json();
+    const all = data.result?.[0] ?? [];
+    const settings = all
+      .filter((s) => PIC_TARGETS.includes(s.target))
+      .map((s) => {
+        const cand = s.candidate?.[0] ?? {};
+        if (cand.max !== undefined) {
+          return {
+            target: s.target,
+            label: PIC_LABELS[s.target] ?? s.target,
+            value: s.currentValue,
+            type: "range",
+            min: cand.min,
+            max: cand.max,
+            step: cand.step ?? 1,
+          };
+        } else {
+          const options = s.candidate.map((c) => c.value);
+          return {
+            target: s.target,
+            label: PIC_LABELS[s.target] ?? s.target,
+            value: s.currentValue,
+            type: "enum",
+            options,
+          };
+        }
+      });
+    res.json({ ok: true, settings });
+  } catch (err) {
+    res.json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/tv/picture", async (req, res) => {
+  const { target, value } = req.body ?? {};
+  if (!target || value === undefined) {
+    res.status(400).json({ ok: false, error: "missing target or value" });
+    return;
+  }
+  try {
+    const resp = await fetch(BRAVIA_PICTURE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Auth-PSK": BRAVIA_PSK },
+      body: JSON.stringify({
+        method: "setPictureQualitySettings",
+        params: [{ settings: [{ target, value }] }],
+        id: 1,
+        version: "1.0",
+      }),
+    });
+    const data = await resp.json();
+    if (data.error) {
+      res.json({ ok: false, error: JSON.stringify(data.error) });
+      return;
+    }
+    log(`picture set ${target}=${value}`);
+    res.json({ ok: true });
+  } catch (err) {
     res.json({ ok: false, error: err.message });
   }
 });

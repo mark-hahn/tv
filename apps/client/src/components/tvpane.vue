@@ -377,6 +377,125 @@
         Close
       </div>
     </div>
+    <!-- Picture settings pane -->
+    <div
+      v-else-if="showPicCtrl"
+      style="
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        background: #fff;
+      "
+    >
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 8px 12px;
+          border-bottom: 2px solid #ccc;
+          flex-shrink: 0;
+        "
+      >
+        <span style="font-size: 20px; font-weight: bold">Picture Settings</span>
+        <button
+          @mousedown.prevent="closePicCtrl"
+          @touchstart.prevent="closePicCtrl"
+          :style="{
+            '--btn-bg': '#fff',
+            border: 'none',
+            fontSize: '28px',
+            cursor: 'pointer',
+            padding: '4px 8px',
+            lineHeight: '1',
+          }"
+        >
+          ✕
+        </button>
+      </div>
+      <div style="overflow-y: auto; flex: 1">
+        <div
+          v-for="s in picSettings"
+          :key="s.target"
+          style="
+            display: flex;
+            align-items: center;
+            padding: 10px 16px;
+            border-bottom: 1px solid #eee;
+            gap: 8px;
+          "
+        >
+          <span style="flex: 1; font-size: 18px; font-weight: bold">{{
+            s.label
+          }}</span>
+          <span
+            style="
+              font-size: 13px;
+              color: #888;
+              white-space: nowrap;
+              min-width: 80px;
+              text-align: right;
+            "
+          >
+            <template v-if="s.type === 'range'"
+              >{{ s.min }}–{{ s.max }}</template
+            >
+            <template v-else>{{ s.options.join(" · ") }}</template>
+          </span>
+          <button
+            @mousedown.prevent="picAdjust(s, -1)"
+            @touchstart.prevent="picAdjust(s, -1)"
+            :style="{
+              '--btn-bg': 'whitesmoke',
+              fontSize: '20px',
+              padding: '6px 14px',
+              border: '1px solid #bbb',
+              cursor: 'pointer',
+            }"
+          >
+            ▼
+          </button>
+          <input
+            v-if="s.type === 'range'"
+            :value="picInputVal(s)"
+            @keydown="picKeydown($event, s)"
+            @blur="picBlur($event, s)"
+            style="
+              width: 72px;
+              text-align: center;
+              font-size: 18px;
+              font-weight: bold;
+              border: 1px solid #bbb;
+              padding: 4px 2px;
+              background: #fff;
+            "
+          />
+          <span
+            v-else
+            style="
+              min-width: 72px;
+              text-align: center;
+              font-size: 18px;
+              font-weight: bold;
+            "
+            >{{ s.value }}</span
+          >
+          <button
+            @mousedown.prevent="picAdjust(s, +1)"
+            @touchstart.prevent="picAdjust(s, +1)"
+            :style="{
+              '--btn-bg': 'whitesmoke',
+              fontSize: '20px',
+              padding: '6px 14px',
+              border: '1px solid #bbb',
+              cursor: 'pointer',
+            }"
+          >
+            ▲
+          </button>
+        </div>
+      </div>
+    </div>
     <div
       v-else
       style="
@@ -485,8 +604,11 @@
       <!-- Row 4: vol-, vol+, mute -->
       <div
         :style="cellStyle('lightgreen', 'vold')"
-        @mousedown="tvVolCmd('down')"
-        @touchstart.prevent="tvVolCmd('down')"
+        @mousedown="startVolDownHold"
+        @mouseup="stopVolDownHold"
+        @mouseleave="stopVolDownHold"
+        @touchstart.prevent="startVolDownHold"
+        @touchend="stopVolDownHold"
       >
         Vol-
       </div>
@@ -573,6 +695,9 @@ export default {
       subDeviceName: null,
       avoidingCollisions: false,
       locked: false,
+      showPicCtrl: false,
+      picSettings: [],
+      picInputs: {}, // target -> { typing: bool, raw: string }
     };
   },
 
@@ -781,6 +906,172 @@ export default {
 
     stopHold() {
       clearTimeout(this._holdTimer);
+    },
+
+    startVolDownHold() {
+      this._volDownHoldFired = false;
+      this._volDownHoldTimer = setTimeout(() => {
+        this._volDownHoldFired = true;
+        this.openPicCtrl();
+      }, 500);
+    },
+
+    stopVolDownHold() {
+      clearTimeout(this._volDownHoldTimer);
+      if (!this._volDownHoldFired) {
+        this.tvVolCmd("down");
+      }
+      this._volDownHoldFired = false;
+    },
+
+    openPicCtrl() {
+      this.showPicCtrl = true;
+      this.fetchPicSettings();
+      this._picPollTimer = setInterval(() => this.fetchPicSettings(), 3000);
+    },
+
+    closePicCtrl() {
+      clearInterval(this._picPollTimer);
+      this.showPicCtrl = false;
+    },
+
+    async fetchPicSettings() {
+      try {
+        const data = await fetch(`${config.tvTvUrl}/tv/picture`).then((r) =>
+          r.json(),
+        );
+        if (data.ok) {
+          this.picSettings = data.settings;
+          // clear typing state for any setting that was updated
+          for (const s of data.settings) {
+            const inp = this.picInputs[s.target];
+            if (inp && inp.typing) continue; // don't override while user is typing
+            this.picInputs[s.target] = { typing: false, raw: s.value };
+          }
+        }
+      } catch (_) {}
+    },
+
+    picInputVal(s) {
+      return this.picInputs[s.target]?.raw ?? s.value;
+    },
+
+    picKeydown(e, s) {
+      const inp = this.picInputs[s.target] ?? { typing: false, raw: s.value };
+      const key = e.key;
+
+      if (key === "Enter") {
+        e.target.blur();
+        return;
+      }
+      if (key === "Escape") {
+        this.picInputs = {
+          ...this.picInputs,
+          [s.target]: { typing: false, raw: s.value },
+        };
+        e.target.blur();
+        return;
+      }
+      if (key === "Backspace") {
+        const next = inp.typing ? inp.raw.slice(0, -1) || "0" : "0";
+        this.picInputs = {
+          ...this.picInputs,
+          [s.target]: { typing: true, raw: next },
+        };
+        this._schedulePicCommit(s);
+        e.preventDefault();
+        return;
+      }
+      if (!/^[0-9\-]$/.test(key)) {
+        e.preventDefault();
+        return;
+      }
+
+      let next;
+      if (!inp.typing) {
+        // first digit replaces current value
+        next = key === "-" ? "-" : key;
+      } else {
+        next = inp.raw + key;
+      }
+      this.picInputs = {
+        ...this.picInputs,
+        [s.target]: { typing: true, raw: next },
+      };
+      this._schedulePicCommit(s);
+      e.preventDefault();
+    },
+
+    picBlur(e, s) {
+      this._commitPicInput(s);
+    },
+
+    _schedulePicCommit(s) {
+      clearTimeout(this._picCommitTimers?.[s.target]);
+      if (!this._picCommitTimers) this._picCommitTimers = {};
+      this._picCommitTimers[s.target] = setTimeout(
+        () => this._commitPicInput(s),
+        750,
+      );
+    },
+
+    async _commitPicInput(s) {
+      clearTimeout(this._picCommitTimers?.[s.target]);
+      const inp = this.picInputs[s.target];
+      if (!inp || !inp.typing) return;
+      const num = Number(inp.raw);
+      if (isNaN(num) || num < s.min || num > s.max) {
+        // invalid — revert
+        this.picInputs = {
+          ...this.picInputs,
+          [s.target]: { typing: false, raw: s.value },
+        };
+        return;
+      }
+      const newVal = String(Math.round(num));
+      this.picInputs = {
+        ...this.picInputs,
+        [s.target]: { typing: false, raw: newVal },
+      };
+      try {
+        await fetch(`${config.tvTvUrl}/tv/picture`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ target: s.target, value: newVal }),
+        });
+      } catch (_) {}
+      await this.fetchPicSettings();
+    },
+
+    async picAdjust(setting, dir) {
+      const newVal = this.picNextValue(setting, dir);
+      if (newVal === null) return;
+      this.picInputs = {
+        ...this.picInputs,
+        [setting.target]: { typing: false, raw: newVal },
+      };
+      try {
+        await fetch(`${config.tvTvUrl}/tv/picture`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ target: setting.target, value: newVal }),
+        });
+      } catch (_) {}
+      await this.fetchPicSettings();
+    },
+
+    picNextValue(setting, dir) {
+      if (setting.type === "range") {
+        const v = Number(setting.value) + dir * setting.step;
+        if (v < setting.min || v > setting.max) return null;
+        return String(v);
+      } else {
+        const idx = setting.options.indexOf(setting.value);
+        if (idx < 0) return null;
+        const next = idx + dir;
+        if (next < 0 || next >= setting.options.length) return null;
+        return setting.options[next];
+      }
     },
 
     startAppsHold() {

@@ -367,6 +367,17 @@
               }"
               >&lt;no show info&gt;</span
             >
+            <span
+              v-if="noMoreShows && !isLoadingNext"
+              :style="{
+                marginLeft: '10px',
+                color: 'red',
+                fontWeight: 'bold',
+                display: 'inline-flex',
+                alignItems: 'center',
+              }"
+              >No more shows</span
+            >
           </div>
           <!-- Row 2: remote buttons -->
           <div
@@ -632,7 +643,7 @@
               </div>
             </div>
           </div>
-          <div v-else-if="curTvdb">
+          <div v-if="curTvdb">
             <div
               v-if="isCurrentSnoozed"
               style="color: red; margin-bottom: 4px"
@@ -1246,6 +1257,9 @@ export default {
             (s) => String(s) === NO_MORE_ENTRY,
           );
           if (!hasNoMore) {
+            console.log(
+              "[noMoreShows] appending NO_MORE_ENTRY (empty getBrowseShow)",
+            );
             titleStrings.value = [...titleStrings.value, NO_MORE_ENTRY];
           } else {
             // Force a new array assignment so the UI updates consistently.
@@ -1714,6 +1728,10 @@ export default {
     const handleOfficial = () => {
       openUrl(officialResult.value?.url);
     };
+
+    const noMoreShows = computed(() => {
+      return titleStrings.value.some((s) => String(s) === NO_MORE_ENTRY);
+    });
 
     const hasAnyRemoteButton = computed(() => {
       return !!(
@@ -2332,6 +2350,7 @@ export default {
       handleSelectExisting,
       rtButtonLabel,
       hasAnyRemoteButton,
+      noMoreShows,
       titleStrings,
       selectedTitleIdx,
       parsedTitles,

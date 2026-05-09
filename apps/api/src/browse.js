@@ -342,7 +342,10 @@ export async function getBrowseShow() {
     break;
   }
 
-  // If we exhausted candidates loop without finding anything, we just return the current list.
+  // If no new show was found, return empty titles so the client knows to show "no more".
+  if (!foundNew) {
+    return { titles: [], pendingBrowsedId: null };
+  }
   return { titles: resultTitles, pendingBrowsedId };
 }
 
@@ -378,7 +381,8 @@ export function removeResultTitleByTvdbId(tvdbId, name) {
   if (name) {
     const matched = smartTitleMatch(name, candidateObjects, null, false);
     if (matched) {
-      const matchedTitle = typeof matched === "string" ? matched : matched.title;
+      const matchedTitle =
+        typeof matched === "string" ? matched : matched.title;
       candidateObjects.forEach((c) => {
         if (c.title === matchedTitle) toRemove.add(c._idx);
       });

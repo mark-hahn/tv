@@ -2187,7 +2187,7 @@ export default {
       if (shouldAutoAdvance.value) {
         shouldAutoAdvance.value = false;
         const lang = (tvdb?.primary_language || "").toLowerCase();
-        if (!tvdb || (lang && lang !== "eng" && lang !== "spa")) {
+        if (tvdb && lang && lang !== "eng" && lang !== "spa") {
           void handleNext();
         }
       }
@@ -2253,11 +2253,7 @@ export default {
         await nextTick();
         if (shouldAutoAdvance.value) {
           shouldAutoAdvance.value = false;
-          if (!curTvdb.value) {
-            void handleNext();
-          } else {
-            suppressButtons.value = false;
-          }
+          suppressButtons.value = false;
         } else {
           suppressButtons.value = false;
         }

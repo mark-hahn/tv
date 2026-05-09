@@ -1595,13 +1595,16 @@ export const createShowFolderAndRefreshEmby = async ({
     refreshRes = await withTimeout(refreshLib(), 30000, "refreshLib");
     if (refreshRes?.status === "hasTask" && refreshRes?.taskId) {
       const startMs = Date.now();
+      let hasSeenRunning = false;
       while (Date.now() - startMs < refreshTimeoutMs) {
-        const st = await withTimeout(
-          taskStatus(refreshRes.taskId),
-          15000,
-          "emby task status",
-        );
-        if (st?.status !== "refreshing") break;
+        const st = await srvr.embyTaskStatus(refreshRes.taskId);
+        if (st?.status === "refreshing") {
+          hasSeenRunning = true;
+        } else if (hasSeenRunning || st?.status === "refreshdone") {
+          break;
+        } else if (Date.now() - startMs > 30000) {
+          break;
+        }
         await sleep(2000);
       }
     }
@@ -1644,13 +1647,24 @@ export const taskStatus = async (taskId) => {
     const hasProgress = Number.isFinite(progressNum);
 
     if (hasProgress && progressNum >= 100) return { status: "refreshdone" };
-    if (state && state !== "running") return { status: "refreshdone" };
-
-    return {
-      status: "refreshing",
-      taskStatus: stateRaw,
-      progress: hasProgress ? progressNum : undefined,
-    };
+    // Treat explicitly completed/cancelled states as done
+    if (
+      state === "completed" ||
+      state === "cancelling" ||
+      state === "cancelled"
+    ) {
+      return { status: "refreshdone" };
+    }
+    // "Running" means in progress
+    if (state === "running") {
+      return {
+        status: "refreshing",
+        taskStatus: stateRaw,
+        progress: hasProgress ? progressNum : undefined,
+      };
+    }
+    // "Idle", "Queued", or unknown — task may not have started yet; treat as still pending
+    return { status: "refreshing", taskStatus: stateRaw };
   } catch (e) {
     return { status: e?.message || String(e) };
   }

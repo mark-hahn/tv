@@ -3502,8 +3502,47 @@ app.post(
   "/api/triggerEmbySync",
   apiWrapper(async () => {
     console.log("[triggerEmbySync] Running full Emby sweep");
-    await runEmbyFullSweep("triggerEmbySync");
+    runEmbyFullSweep("triggerEmbySync").catch((e) =>
+      console.error("[triggerEmbySync] sweep error:", e?.message || e),
+    );
     return { ok: true };
+  }),
+);
+
+app.get(
+  "/api/embyTaskStatus",
+  apiWrapper(async (params) => {
+    const { taskId } = params;
+    if (!taskId) return { status: "notask" };
+    const res = await fetch(
+      `${EMBY_BASE_URL}/ScheduledTasks?api_key=${EMBY_API_KEY}`,
+    );
+    if (!res.ok) return { status: "fetchfailed" };
+    const tasks = await res.json();
+    const task = (Array.isArray(tasks) ? tasks : []).find(
+      (t) => String(t?.Id) === String(taskId),
+    );
+    if (!task) return { status: "refreshdone" };
+    const stateRaw = String(task?.State || task?.Status || "").trim();
+    const state = stateRaw.toLowerCase();
+    const progressNum = Number(task?.CurrentProgressPercentage);
+    const hasProgress = Number.isFinite(progressNum);
+    if (hasProgress && progressNum >= 100) return { status: "refreshdone" };
+    if (
+      state === "completed" ||
+      state === "cancelling" ||
+      state === "cancelled"
+    )
+      return { status: "refreshdone" };
+    if (state === "running")
+      return {
+        status: "refreshing",
+        taskStatus: stateRaw,
+        progress: hasProgress ? progressNum : undefined,
+      };
+    if (state === "idle")
+      return { status: "refreshdone", taskStatus: stateRaw };
+    return { status: "refreshing", taskStatus: stateRaw };
   }),
 );
 
@@ -5833,7 +5872,9 @@ async function runEmbyFullSweep(caller = "unknown") {
     for (const embyShow of embyShows) {
       const name = embyShow.Name;
       const tvdbId = embyShow.ProviderIds?.Tvdb || embyShow.TvdbId;
-      if (!tvdbId || tvdbId === "0") continue;
+      if (!tvdbId || tvdbId === "0") {
+        continue;
+      }
       const embyPath = embyShow.Path?.split("/").pop() || "";
       const showId = embyShow.Id;
 
@@ -6313,7 +6354,7 @@ async function runGapCheckBatch() {
 // Phase 3: Set up sync timers
 const EMBY_API_KEY = "1c399bd079d549cba8c916244d3add2b";
 const EMBY_USER_ID = "894c752d448f45a3a1260ccaabd0adff";
-const EMBY_BASE_URL = "https://hahnca.com:8920/emby";
+const EMBY_BASE_URL = "http://hahnca.com:8096/emby";
 const COLLECTION_IDS = {
   toTry: "1468316",
   continue: "4719143",
@@ -6413,13 +6454,13 @@ async function handleShowDiskChange(showName) {
     let taskId = null;
     try {
       const refreshRes = await fetch(
-        `https://hahnca.com:8920/emby/Library/Refresh?api_key=${EMBY_API_KEY}`,
+        `${EMBY_BASE_URL}/Library/Refresh?api_key=${EMBY_API_KEY}`,
         { method: "POST" },
       );
       if (refreshRes.ok) {
         // Get the task ID
         const tasksRes = await fetch(
-          `https://hahnca.com:8920/emby/ScheduledTasks?api_key=${EMBY_API_KEY}`,
+          `${EMBY_BASE_URL}/ScheduledTasks?api_key=${EMBY_API_KEY}`,
         );
         if (tasksRes.ok) {
           const tasks = await tasksRes.json();
@@ -6465,7 +6506,7 @@ async function handleShowDiskChange(showName) {
         await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
         try {
           const taskRes = await fetch(
-            `https://hahnca.com:8920/emby/ScheduledTasks/${taskId}?api_key=${EMBY_API_KEY}`,
+            `${EMBY_BASE_URL}/ScheduledTasks/${taskId}?api_key=${EMBY_API_KEY}`,
           );
           if (taskRes.ok) {
             const task = await taskRes.json();

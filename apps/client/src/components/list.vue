@@ -1449,7 +1449,6 @@ export default {
           60000,
           "tvdb data",
         );
-
         // If tvdbId was empty (e.g. load from info pane), resolve it from the returned tvdbData.
         if (!tvdbId && tvdbData?.tvdbId) {
           tvdbId = String(tvdbData.tvdbId).trim();
@@ -1551,16 +1550,6 @@ export default {
             const noEmbyMatch = findShowByTvdbIdOrName({
               requireInEmby: false,
             });
-            if (noEmbyMatch && noEmbyMatch.inEmby === false) {
-              console.warn(
-                "web add: found matching no-Emby record after refresh; waiting for Emby-visible item",
-                {
-                  name,
-                  tvdbId,
-                  noEmbyId: noEmbyMatch.id,
-                },
-              );
-            }
             setWebAddStatus("Waiting for Emby scan...");
             for (let attempt = 1; attempt <= 4; attempt++) {
               await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -1572,6 +1561,11 @@ export default {
             }
           }
 
+          if (!show) {
+            // Folder was created but Emby scan hasn't indexed it yet.
+            // Fall back to the existing record — inEmby will update when Emby finishes scanning.
+            show = findShowByTvdbIdOrName({ requireInEmby: false });
+          }
           if (!show) {
             throw new Error(
               `Created in Emby but not found after refresh: ${name} (tvdbId=${tvdbId})`,

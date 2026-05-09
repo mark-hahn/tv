@@ -383,6 +383,14 @@ export function triggerEmbySync() {
   return httpCall("/api/triggerEmbySync", {}, "POST");
 }
 
+export function embyTaskStatus(taskId) {
+  return httpCall(
+    `/api/embyTaskStatus?taskId=${encodeURIComponent(taskId)}`,
+    null,
+    "GET",
+  );
+}
+
 export function refreshEmbyItem(showId, showName) {
   return httpCall("/api/refreshEmbyItem", { showId, showName }, "POST");
 }

@@ -291,7 +291,7 @@ try {
 
 function encodeFileIdBase32(fileId) {
   // base-32 using RFC4648 alphabet: A-Z then 2-7.
-  // Output is minimal-length (no left padding).
+  // Output is always exactly 5 chars, left-padded with 'A' (the zero char).
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
   let n = Number(fileId);
   if (!Number.isFinite(n) || n < 0) n = 0;
@@ -303,6 +303,7 @@ function encodeFileIdBase32(fileId) {
     out = alphabet[digit] + out;
     n = Math.floor(n / 32);
   } while (n > 0);
+  out = out.padStart(5, "A");
   // Prefix with '#' so these can be uniquely identified for later deletion.
   return "#" + out;
 }
@@ -969,7 +970,7 @@ async function fileNeedsSubChecked(videoFilePath, showName) {
         f === basename + ".asr.srt" ||
         f === basename + ".mb.chosen" ||
         (f.startsWith(basename) &&
-          /^\.(mb\d+|opn.{5})\.srt$/.test(f.slice(basename.length))) ||
+          /^\.(mb\d+|opn[A-Z2-7]{5})\.srt$/i.test(f.slice(basename.length))) ||
         (f.startsWith(basename) &&
           /^\.(#[A-Z2-7]+)\.srt$/.test(f.slice(basename.length))),
     )
@@ -1209,24 +1210,40 @@ async function generateEmbSrts(
   return { pgsOnly };
 }
 async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
-  const tvdbAll = tvdb.getAllTvdbSync?.();
-  if (!tvdbAll) return;
-  const tvdbRec = tvdbAll[showname];
-  if (!tvdbRec?.imdbId) {
-    logSubtitle(`opensubs skip no imdb: ${videoFilePath}`);
-    return;
-  }
+  const moviesDir = "/mnt/media/movies";
+  const isMovie = videoFilePath.startsWith(moviesDir + "/");
   let results;
-  try {
-    results = await subsSearch({
-      imdb_id: tvdbRec.imdbId,
-      season,
-      episode,
-      language: "en",
-    });
-  } catch (e) {
-    logSubtitle(`opensubs search err: ${e.message}`);
-    return;
+  if (isMovie) {
+    const filename = path.basename(videoFilePath, path.extname(videoFilePath));
+    const yearMatch = filename.match(/\b(19|20)\d{2}\b/);
+    const year = yearMatch ? yearMatch[0] : null;
+    const title = yearMatch
+      ? filename.slice(0, yearMatch.index).replace(/\./g, " ").trim()
+      : filename.replace(/\./g, " ");
+    try {
+      results = await subsSearch({ query: title, year });
+    } catch (e) {
+      logSubtitle(`opensubs search err: ${e.message}`);
+      return;
+    }
+  } else {
+    const tvdbAll = tvdb.getAllTvdbSync?.();
+    if (!tvdbAll) return;
+    const tvdbRec = tvdbAll[showname];
+    if (!tvdbRec?.imdbId) {
+      logSubtitle(`opensubs skip no imdb: ${videoFilePath}`);
+      return;
+    }
+    try {
+      results = await subsSearch({
+        imdb_id: tvdbRec.imdbId,
+        season,
+        episode,
+      });
+    } catch (e) {
+      logSubtitle(`opensubs search err: ${e.message}`);
+      return;
+    }
   }
   const items = Array.isArray(results?.data) ? results.data : [];
   if (items.length === 0) {
@@ -1393,7 +1410,7 @@ async function processSubQueueEntry() {
         f === basename + ".asr.srt" ||
         f === basename + ".mb.chosen" ||
         (f.startsWith(basename) &&
-          /^\.(mb\d+|opn.{5})\.srt$/.test(f.slice(basename.length))) ||
+          /^\.(mb\d+|opn[A-Z2-7]{5})\.srt$/i.test(f.slice(basename.length))) ||
         (f.startsWith(basename) &&
           /^\.(#[A-Z2-7]+)\.srt$/.test(f.slice(basename.length))),
     );
@@ -1573,21 +1590,29 @@ async function openSubtitlesSubtitles({
   apiKey,
   token,
   imdbDigits,
+  query,
+  year,
   page,
   season,
   episode,
 }) {
   const url = new URL("https://api.opensubtitles.com/api/v1/subtitles");
   const params = {
-    parent_imdb_id: imdbDigits,
     page: String(page),
     languages: "en",
   };
-  if (season !== undefined && season !== null) {
-    params.season_number = String(season);
-  }
-  if (episode !== undefined && episode !== null) {
-    params.episode_number = String(episode);
+  if (query) {
+    params.query = query;
+    params.type = "movie";
+    if (year) params.year = String(year);
+  } else {
+    params.parent_imdb_id = imdbDigits;
+    if (season !== undefined && season !== null) {
+      params.season_number = String(season);
+    }
+    if (episode !== undefined && episode !== null) {
+      params.episode_number = String(episode);
+    }
   }
 
   url.search = new URLSearchParams(params).toString();
@@ -1679,12 +1704,14 @@ async function openSubtitlesDownloadWithRetry({
 
 const subsSearch = async (params) => {
   const imdbDigits = normalizeImdbId(params?.imdb_id);
+  const query = params?.query || null;
+  const year = params?.year || null;
   let page = params?.page;
   const season = params?.season;
   const episode = params?.episode;
 
-  if (!imdbDigits) {
-    throw new Error("subsSearch: missing imdb_id");
+  if (!imdbDigits && !query) {
+    throw new Error("subsSearch: missing imdb_id or query");
   }
 
   if (page === undefined || page === null || page === "") page = 1;
@@ -1699,6 +1726,8 @@ const subsSearch = async (params) => {
       apiKey: login.apiKey,
       token: subsTokenCache,
       imdbDigits,
+      query,
+      year,
       page,
       season,
       episode,
@@ -1717,6 +1746,8 @@ const subsSearch = async (params) => {
         apiKey: login.apiKey,
         token: subsTokenCache,
         imdbDigits,
+        query,
+        year,
         page,
         season,
         episode,
@@ -2048,7 +2079,7 @@ async function checkAndDownloadOpnSrt(showName, tvdbRecord) {
         dirEntries.some(
           (e) =>
             e.startsWith(basename) &&
-            /^\.opn.{5}\.srt$/.test(e.slice(basename.length)),
+            /^\.opn[A-Z2-7]{5}\.srt$/i.test(e.slice(basename.length)),
         )
       )
         continue;
@@ -3816,9 +3847,15 @@ app.get("/api/stream", async (req, res) => {
     return;
   }
 
-  // Security: path must be within tvDir
+  // Security: path must be within tvDir or moviesDir
   const resolved = path.resolve(filePath);
-  if (!resolved.startsWith(tvDir + "/") && resolved !== tvDir) {
+  const moviesDir = "/mnt/media/movies";
+  if (
+    !resolved.startsWith(tvDir + "/") &&
+    resolved !== tvDir &&
+    !resolved.startsWith(moviesDir + "/") &&
+    resolved !== moviesDir
+  ) {
     res.status(403).json({ error: "forbidden" });
     return;
   }
@@ -3988,7 +4025,13 @@ app.get("/api/subtitle-list", async (req, res) => {
     return;
   }
   const resolved = path.resolve(filePath);
-  if (!resolved.startsWith(tvDir + "/") && resolved !== tvDir) {
+  const moviesDir2 = "/mnt/media/movies";
+  if (
+    !resolved.startsWith(tvDir + "/") &&
+    resolved !== tvDir &&
+    !resolved.startsWith(moviesDir2 + "/") &&
+    resolved !== moviesDir2
+  ) {
     res.status(403).json({ error: "forbidden" });
     return;
   }
@@ -4043,7 +4086,7 @@ app.get("/api/subtitle-list", async (req, res) => {
       if (t.type === "embedded") return "t";
       if (/\.asr\.srt$/.test(t.file || "")) return "+";
       if (/\.mb\d+\.srt$/.test(t.file || "")) return ">";
-      if (/\.opn.{5}\.srt$/.test(t.file || "")) return "v";
+      if (/\.opn[A-Z2-7]{5}\.srt$/i.test(t.file || "")) return "v";
       return "s";
     };
     const lines = [`## ${path.basename(resolved)}\n`];
@@ -4154,7 +4197,13 @@ app.get("/api/subtitle", async (req, res) => {
     return;
   }
   const resolved = path.resolve(filePath);
-  if (!resolved.startsWith(tvDir + "/") && resolved !== tvDir) {
+  const moviesDir3 = "/mnt/media/movies";
+  if (
+    !resolved.startsWith(tvDir + "/") &&
+    resolved !== tvDir &&
+    !resolved.startsWith(moviesDir3 + "/") &&
+    resolved !== moviesDir3
+  ) {
     res.status(403).json({ error: "forbidden" });
     return;
   }

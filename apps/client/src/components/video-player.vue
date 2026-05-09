@@ -385,7 +385,7 @@ export default {
         else if (t.type === "embedded") char = "t";
         else if (/\.asr\.srt$/.test(t.file || "")) char = "+";
         else if (/\.mb\d+\.srt$/.test(t.file || "")) char = ">";
-        else if (/\.opn.{5}\.srt$/.test(t.file || "")) char = "v";
+        else if (/\.opn[A-Z2-7]{5}\.srt$/i.test(t.file || "")) char = "v";
         else char = "s";
         map.set(t.id, `${char} ${n}`);
         n++;
@@ -609,7 +609,10 @@ export default {
           embeddedCounts.pgs = (embeddedCounts.pgs || 0) + 1;
         else if (t.type === "embedded")
           embeddedCounts.text = (embeddedCounts.text || 0) + 1;
-        else if (t.type === "srt" && /\.opn.{5}\.srt$/i.test(t.file || ""))
+        else if (
+          t.type === "srt" &&
+          /\.opn[A-Z2-7]{5}\.srt$/i.test(t.file || "")
+        )
           openSubsCount++;
       }
       const last12 = videoFilename.slice(-12);
@@ -636,7 +639,10 @@ export default {
           embeddedCounts.pgs = (embeddedCounts.pgs || 0) + 1;
         else if (t.type === "embedded")
           embeddedCounts.text = (embeddedCounts.text || 0) + 1;
-        else if (t.type === "srt" && /\.opn.{5}\.srt$/i.test(t.file || ""))
+        else if (
+          t.type === "srt" &&
+          /\.opn[A-Z2-7]{5}\.srt$/i.test(t.file || "")
+        )
           openSubsCount++;
       }
       addChksrtHistory({

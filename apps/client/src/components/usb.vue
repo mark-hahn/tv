@@ -876,8 +876,8 @@ export default {
       this.fetchFiles();
     },
     handleNodeClick({ node, depth, fullPath, ctrlKey, shiftKey }) {
-      // 1. Top-level folder selection
-      if (depth === 0) {
+      // 1. Top-level folder selection (folders at depth 0 only)
+      if (depth === 0 && node.type !== "file") {
         // If clicking top-level folder, clear any file selection context
         this.selectedFiles.clear();
         this.renameInput = "";
@@ -986,7 +986,7 @@ export default {
     getSiblings(parentPath) {
       // Traverse tree to find the array of children for this path
       // parentPath e.g. "ShowName/Season 1"
-      if (!parentPath) return []; // Should not happen for files inside folder
+      if (!parentPath) return this.tree; // depth-0 items (flat file list)
       const parts = parentPath.split("/");
       // First part is top level
       let current = this.tree.find((n) => n.name === parts[0]);

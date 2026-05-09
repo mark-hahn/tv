@@ -310,6 +310,58 @@
           <div class="pane-header-title">Local Movies</div>
           <div style="display: flex; align-items: center; gap: 10px">
             <button
+              @click="clickSubs()"
+              :style="{
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                backgroundColor:
+                  subsPending.length > 0 ? 'lightgray' : 'whitesmoke',
+              }"
+            >
+              Subs
+            </button>
+
+            <button
+              @click="errsMode || clickAsr()"
+              :disabled="errsMode"
+              :style="{
+                cursor: errsMode ? 'default' : 'pointer',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                backgroundColor: errsMode
+                  ? '#e8e8e8'
+                  : showAsr
+                    ? '#ddd'
+                    : 'whitesmoke',
+                color: errsMode ? '#aaa' : 'inherit',
+              }"
+            >
+              Asr
+            </button>
+
+            <button
+              @click="errsMode || clickEmb()"
+              :disabled="errsMode"
+              :style="{
+                cursor: errsMode ? 'default' : 'pointer',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                backgroundColor: errsMode
+                  ? '#e8e8e8'
+                  : showEmb
+                    ? '#ddd'
+                    : 'whitesmoke',
+                color: errsMode ? '#aaa' : 'inherit',
+              }"
+            >
+              Emb
+            </button>
+
+            <button
               @click="localFirstClick"
               :disabled="!selectedName && selectedFiles.size === 0"
               :style="{
@@ -1595,8 +1647,8 @@ export default {
       return this.fetchFiles();
     },
     handleNodeClick({ node, depth, fullPath, ctrlKey, shiftKey }) {
-      // 1. Top-level folder selection (normal mode only)
-      if (depth === 0 && !this.errsMode) {
+      // 1. Top-level folder selection (folders at depth 0 only)
+      if (depth === 0 && node.type !== "file") {
         // If clicking top-level folder, clear any file selection context
         this.selectedFiles.clear();
         this.selectionParentPath = null;
@@ -1706,9 +1758,14 @@ export default {
     },
     // Subtitles logic
     clickSubs() {
+      const mediaRoot = this.movieMode
+        ? "/mnt/media/movies"
+        : this.errsMode
+          ? "/mnt/media/tv-errors"
+          : "/mnt/media/tv";
       const videoPaths = this.collectFilePaths()
         .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
-        .map((p) => `/mnt/media/tv/${p}`);
+        .map((p) => `${mediaRoot}/${p}`);
       if (videoPaths.length === 0) {
         alert("No video files selected");
         return;
@@ -1742,9 +1799,14 @@ export default {
       this.asrQueueMode = false;
     },
     async startAsr() {
+      const mediaRoot = this.movieMode
+        ? "/mnt/media/movies"
+        : this.errsMode
+          ? "/mnt/media/tv-errors"
+          : "/mnt/media/tv";
       const videoPaths = this.collectFilePaths()
         .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
-        .map((p) => `/mnt/media/tv/${p}`);
+        .map((p) => `${mediaRoot}/${p}`);
       if (videoPaths.length === 0) {
         this.asrLogs += "[Error] No video files selected.\n";
         return;
@@ -1989,9 +2051,14 @@ export default {
       this.showInfo = false;
 
       try {
+        const mediaRoot = this.movieMode
+          ? "/mnt/media/movies"
+          : this.errsMode
+            ? "/mnt/media/tv-errors"
+            : "/mnt/media/tv";
         const videoPaths = this.collectFilePaths()
           .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
-          .map((p) => `/mnt/media/tv/${p}`);
+          .map((p) => `${mediaRoot}/${p}`);
         if (videoPaths.length === 0) {
           this.embLogs += "[Error] No video files selected.\n\n";
           this.embBusy = false;

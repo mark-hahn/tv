@@ -184,7 +184,7 @@
                 background-color: whitesmoke;
               "
             >
-              Ref
+              Refresh
             </button>
           </div>
         </div>

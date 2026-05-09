@@ -633,8 +633,8 @@ export default function App() {
         setPicInputs((prev) => {
           const next = { ...prev };
           for (const s of data.settings) {
-            if (next[s.target]?.typing) continue;
-            next[s.target] = { typing: false, raw: s.value };
+            if (picCommitTimersRef.current[s.target]) continue; // actively typing
+            next[s.target] = { raw: s.value, resetNext: true };
           }
           picInputsRef.current = next;
           return next;
@@ -665,7 +665,7 @@ export default function App() {
     if (newVal === null) return;
     const upd = {
       ...picInputsRef.current,
-      [setting.target]: { typing: false, raw: newVal },
+      [setting.target]: { raw: newVal, resetNext: true },
     };
     picInputsRef.current = upd;
     setPicInputs(upd);
@@ -689,8 +689,9 @@ export default function App() {
 
   const commitPicInput = async (setting) => {
     clearTimeout(picCommitTimersRef.current[setting.target]);
+    picCommitTimersRef.current[setting.target] = null;
     const inp = picInputsRef.current[setting.target];
-    if (!inp?.typing) return;
+    if (!inp || inp.resetNext) return; // nothing was typed
     const num = Number(inp.raw);
     if (
       inp.raw === "" ||
@@ -698,21 +699,11 @@ export default function App() {
       num < setting.min ||
       num > setting.max
     ) {
-      const revert = {
-        ...picInputsRef.current,
-        [setting.target]: { typing: false, raw: setting.value },
-      };
-      picInputsRef.current = revert;
-      setPicInputs(revert);
+      // invalid — revert to last server value
+      await fetchPicSettings();
       return;
     }
     const newVal = String(Math.round(num));
-    const upd = {
-      ...picInputsRef.current,
-      [setting.target]: { typing: false, raw: newVal },
-    };
-    picInputsRef.current = upd;
-    setPicInputs(upd);
     try {
       await fetch(`${TV_TV_URL}/tv/picture`, {
         method: "POST",
@@ -724,9 +715,12 @@ export default function App() {
   };
 
   const picInputChange = (setting, text) => {
+    const inp = picInputsRef.current[setting.target];
+    // When resetNext, RN gave us oldRaw+newChar — extract just the new part
+    const newRaw = inp?.resetNext ? text.slice((inp.raw ?? "").length) : text;
     const upd = {
       ...picInputsRef.current,
-      [setting.target]: { typing: true, raw: text },
+      [setting.target]: { raw: newRaw, resetNext: false },
     };
     picInputsRef.current = upd;
     setPicInputs(upd);
@@ -2135,14 +2129,6 @@ export default function App() {
                   style={picCtrlStyles.valueInput}
                   value={picInputs[s.target]?.raw ?? s.value}
                   keyboardType="number-pad"
-                  onFocus={() => {
-                    const upd = {
-                      ...picInputsRef.current,
-                      [s.target]: { typing: true, raw: "" },
-                    };
-                    picInputsRef.current = upd;
-                    setPicInputs(upd);
-                  }}
                   onChangeText={(t) => picInputChange(s, t)}
                   onBlur={() => commitPicInput(s)}
                   onSubmitEditing={() => commitPicInput(s)}

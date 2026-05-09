@@ -17,20 +17,26 @@ const BRAVIA_PICTURE_URL = `http://${BRAVIA_TV_IP}/sony/video`;
 const BRAVIA_PSK = "qwerty";
 
 const PIC_TARGETS = [
+  "pictureMode",
   "brightness",
   "contrast",
-  "color",
   "sharpness",
+  "color",
   "hue",
   "colorTemperature",
+  "hdrMode",
+  "autoLocalDimming",
 ];
 const PIC_LABELS = {
   brightness: "Brightness",
   contrast: "Contrast",
-  color: "Color",
   sharpness: "Sharpness",
+  color: "Color",
   hue: "Hue",
   colorTemperature: "Color Temp",
+  pictureMode: "Picture Mode",
+  autoLocalDimming: "Local Dimming",
+  hdrMode: "HDR Mode",
 };
 
 const EMBY_HOST = "hahnca.com:8920";
@@ -1206,7 +1212,10 @@ app.get("/tv/picture", async (req, res) => {
             options,
           };
         }
-      });
+      })
+      .sort(
+        (a, b) => PIC_TARGETS.indexOf(a.target) - PIC_TARGETS.indexOf(b.target),
+      );
     res.json({ ok: true, settings });
   } catch (err) {
     res.json({ ok: false, error: err.message });

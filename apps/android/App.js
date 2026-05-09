@@ -2109,11 +2109,11 @@ export default function App() {
           {picSettings.map((s) => (
             <View key={s.target} style={picCtrlStyles.row}>
               <Text style={picCtrlStyles.label}>{s.label}</Text>
-              <Text style={picCtrlStyles.rangeHint}>
-                {s.type === "range"
-                  ? `${s.min}–${s.max}`
-                  : s.options.join(" · ")}
-              </Text>
+              {s.type === "range" && (
+                <Text style={picCtrlStyles.rangeHint}>
+                  {`${s.min}–${s.max}`}
+                </Text>
+              )}
               <TouchableOpacity
                 onPress={() => picAdjust(s, -1)}
                 style={picCtrlStyles.arrowBtn}
@@ -2124,10 +2124,12 @@ export default function App() {
                 <TextInput
                   style={picCtrlStyles.valueInput}
                   value={picInputs[s.target]?.raw ?? s.value}
-                  keyboardType="numeric"
+                  keyboardType="number-pad"
                   onChangeText={(t) => picInputChange(s, t)}
                   onBlur={() => commitPicInput(s)}
+                  onSubmitEditing={() => commitPicInput(s)}
                   selectTextOnFocus
+                  returnKeyType="done"
                 />
               ) : (
                 <Text style={picCtrlStyles.value}>{s.value}</Text>

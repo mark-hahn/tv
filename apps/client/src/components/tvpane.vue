@@ -440,7 +440,6 @@
             <template v-if="s.type === 'range'"
               >{{ s.min }}–{{ s.max }}</template
             >
-            <template v-else>{{ s.options.join(" · ") }}</template>
           </span>
           <button
             @mousedown.prevent="picAdjust(s, -1)"
@@ -961,7 +960,8 @@ export default {
       const key = e.key;
 
       if (key === "Enter") {
-        e.target.blur();
+        e.preventDefault();
+        this._commitPicInput(s).then(() => e.target.blur());
         return;
       }
       if (key === "Escape") {

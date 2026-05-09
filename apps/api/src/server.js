@@ -881,11 +881,15 @@ app.post("/api/local/move-to-trial", async (req, res) => {
 
 app.post("/api/local/mediainfo", async (req, res) => {
   try {
-    const { relPath, errsMode } = req.body;
+    const { relPath, errsMode, movieMode } = req.body;
     if (!relPath) {
       return res.status(400).json({ error: "Missing relPath" });
     }
-    const root = errsMode ? "/mnt/media/tv-errors" : "/mnt/media/tv";
+    const root = movieMode
+      ? "/mnt/media/movies"
+      : errsMode
+        ? "/mnt/media/tv-errors"
+        : "/mnt/media/tv";
     const fullPath = path.join(root, relPath);
     const { execFile } = await import("node:child_process");
     const { promisify } = await import("node:util");

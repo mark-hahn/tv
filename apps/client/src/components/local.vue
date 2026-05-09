@@ -398,6 +398,19 @@
             </button>
 
             <button
+              @click="clickInfo"
+              :style="{
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg': showInfo ? '#ddd' : 'whitesmoke',
+              }"
+            >
+              Info
+            </button>
+
+            <button
               @click="deleteSelected"
               :disabled="loading || (!selectedName && selectedFiles.size === 0)"
               title="Delete selected files"
@@ -2211,7 +2224,11 @@ export default {
           const res = await fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ relPath, errsMode: this.errsMode }),
+            body: JSON.stringify({
+              relPath,
+              errsMode: this.errsMode,
+              movieMode: this.movieMode,
+            }),
           });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
@@ -2287,7 +2304,11 @@ export default {
               const res = await fetch(url, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ relPath, errsMode: this.errsMode }),
+                body: JSON.stringify({
+                  relPath,
+                  errsMode: this.errsMode,
+                  movieMode: this.movieMode,
+                }),
               });
               const data = await res.json();
               let bdStr = "";

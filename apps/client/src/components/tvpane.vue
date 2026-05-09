@@ -425,22 +425,16 @@
             gap: 8px;
           "
         >
-          <span style="flex: 1; font-size: 18px; font-weight: bold">{{
-            s.label
-          }}</span>
-          <span
-            style="
-              font-size: 13px;
-              color: #888;
-              white-space: nowrap;
-              min-width: 80px;
-              text-align: right;
-            "
-          >
-            <template v-if="s.type === 'range'"
-              >{{ s.min }}–{{ s.max }}</template
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 2px">
+            <span style="font-size: 18px; font-weight: bold">{{
+              s.label
+            }}</span>
+            <span
+              v-if="s.type === 'range'"
+              style="font-size: 16px; color: #000"
+              >{{ s.min }}–{{ s.max }}</span
             >
-          </span>
+          </div>
           <button
             @mousedown.prevent="picAdjust(s, -1)"
             @touchstart.prevent="picAdjust(s, -1)"
@@ -1067,7 +1061,10 @@ export default {
         return String(v);
       } else {
         const idx = setting.options.indexOf(setting.value);
-        if (idx < 0) return null;
+        if (idx < 0)
+          return dir > 0
+            ? setting.options[0]
+            : setting.options[setting.options.length - 1];
         const next = idx + dir;
         if (next < 0 || next >= setting.options.length) return null;
         return setting.options[next];

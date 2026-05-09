@@ -1203,7 +1203,11 @@ app.get("/tv/picture", async (req, res) => {
             step: cand.step ?? 1,
           };
         } else {
-          const options = s.candidate.map((c) => c.value);
+          const SKIP_OPTIONS = { hdrMode: ["hdr10"] };
+          const skip = SKIP_OPTIONS[s.target] ?? [];
+          const options = s.candidate
+            .map((c) => c.value)
+            .filter((v) => !skip.includes(v));
           return {
             target: s.target,
             label: PIC_LABELS[s.target] ?? s.target,

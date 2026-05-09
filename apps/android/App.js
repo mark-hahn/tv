@@ -650,7 +650,10 @@ export default function App() {
       return String(v);
     } else {
       const idx = setting.options.indexOf(setting.value);
-      if (idx < 0) return null;
+      if (idx < 0)
+        return dir > 0
+          ? setting.options[0]
+          : setting.options[setting.options.length - 1];
       const next = idx + dir;
       if (next < 0 || next >= setting.options.length) return null;
       return setting.options[next];
@@ -689,7 +692,12 @@ export default function App() {
     const inp = picInputsRef.current[setting.target];
     if (!inp?.typing) return;
     const num = Number(inp.raw);
-    if (isNaN(num) || num < setting.min || num > setting.max) {
+    if (
+      inp.raw === "" ||
+      isNaN(num) ||
+      num < setting.min ||
+      num > setting.max
+    ) {
       const revert = {
         ...picInputsRef.current,
         [setting.target]: { typing: false, raw: setting.value },
@@ -2108,12 +2116,14 @@ export default function App() {
         <ScrollView style={picCtrlStyles.list}>
           {picSettings.map((s) => (
             <View key={s.target} style={picCtrlStyles.row}>
-              <Text style={picCtrlStyles.label}>{s.label}</Text>
-              {s.type === "range" && (
-                <Text style={picCtrlStyles.rangeHint}>
-                  {`${s.min}–${s.max}`}
-                </Text>
-              )}
+              <View style={picCtrlStyles.labelCol}>
+                <Text style={picCtrlStyles.label}>{s.label}</Text>
+                {s.type === "range" && (
+                  <Text
+                    style={picCtrlStyles.rangeHint}
+                  >{`${s.min}–${s.max}`}</Text>
+                )}
+              </View>
               <TouchableOpacity
                 onPress={() => picAdjust(s, -1)}
                 style={picCtrlStyles.arrowBtn}
@@ -2125,10 +2135,17 @@ export default function App() {
                   style={picCtrlStyles.valueInput}
                   value={picInputs[s.target]?.raw ?? s.value}
                   keyboardType="number-pad"
+                  onFocus={() => {
+                    const upd = {
+                      ...picInputsRef.current,
+                      [s.target]: { typing: true, raw: "" },
+                    };
+                    picInputsRef.current = upd;
+                    setPicInputs(upd);
+                  }}
                   onChangeText={(t) => picInputChange(s, t)}
                   onBlur={() => commitPicInput(s)}
                   onSubmitEditing={() => commitPicInput(s)}
-                  selectTextOnFocus
                   returnKeyType="done"
                 />
               ) : (
@@ -2566,8 +2583,12 @@ const picCtrlStyles = StyleSheet.create({
     backgroundColor: "#fff",
     gap: 8,
   },
-  label: {
+  labelCol: {
     flex: 1,
+    flexDirection: "column",
+    gap: 2,
+  },
+  label: {
     fontSize: fs(18),
     fontWeight: "bold",
     color: "#000",
@@ -2591,10 +2612,8 @@ const picCtrlStyles = StyleSheet.create({
     color: "#000",
   },
   rangeHint: {
-    fontSize: fs(12),
-    color: "#888",
-    textAlign: "right",
-    minWidth: 70,
+    fontSize: fs(15),
+    color: "#000",
   },
   valueInput: {
     minWidth: 72,

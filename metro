@@ -1,0 +1,33 @@
+#!/bin/bash
+# Start Metro bundler and set up ADB reverse tunnel for connected device
+set -e
+
+DEVICE=$(adb devices | awk '/\tdevice$/{print $1; exit}')
+if [[ -z "$DEVICE" ]]; then
+  echo "No device found — trying usbipd attach..."
+  BUSID=$(powershell.exe -Command "usbipd list" 2>/dev/null | awk '/Shared/{print $1; exit}')
+  if [[ -z "$BUSID" ]]; then
+    echo "No shared USB device found in usbipd. Share the device first."
+    exit 1
+  fi
+  echo "Attaching busid $BUSID to WSL..."
+  powershell.exe -Command "usbipd unbind --busid $BUSID" 2>/dev/null || true
+  sleep 1
+  powershell.exe -Command "usbipd bind --busid $BUSID" 2>/dev/null || true
+  sleep 1
+  powershell.exe -Command "usbipd attach --wsl --busid $BUSID"
+  sleep 2
+  DEVICE=$(adb devices | awk '/\tdevice$/{print $1; exit}')
+  if [[ -z "$DEVICE" ]]; then
+    echo "Device still not visible to adb after attach."
+    exit 1
+  fi
+fi
+
+echo "Device: $DEVICE"
+echo "Setting up ADB reverse tunnel..."
+adb -s "$DEVICE" reverse tcp:8081 tcp:8081
+
+echo "Starting Metro (Expo Go: exp://127.0.0.1:8081)"
+cd "$(dirname "$0")/apps/android"
+npx expo start --localhost

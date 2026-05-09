@@ -945,6 +945,7 @@ export default {
     if (this._onMissingEpWarning)
       evtBus.off("missingEpisodeWarning", this._onMissingEpWarning);
     evtBus.off("playEpisodePath", this._onPlayEpisodePath);
+    evtBus.off("playSimplePath", this._onPlaySimplePath);
     evtBus.off("openChksrt", this._onOpenChksrt);
     evtBus.off("chksrt-count", this._onChksrtCount);
     evtBus.off("previewSrchChoice", this.onPreviewSrchChoice);
@@ -2014,6 +2015,11 @@ export default {
       this.videoPlayerPath = path;
     };
     evtBus.on("playEpisodePath", this._onPlayEpisodePath);
+    this._onPlaySimplePath = (path) => {
+      this.videoPlayerMode = "simple";
+      this.videoPlayerPath = path;
+    };
+    evtBus.on("playSimplePath", this._onPlaySimplePath);
     this._onOpenChksrt = (path) => {
       this.videoPlayerMode = "chksrt";
       this.videoPlayerPath = path;

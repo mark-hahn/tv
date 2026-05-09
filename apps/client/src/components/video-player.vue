@@ -62,9 +62,34 @@
           >{{ chksrtFilename }}</span
         >
       </div>
-      <!-- Timing slider (srt tracks only, not in chksrt mode) -->
+      <!-- Filename (non-chksrt modes) -->
       <div
-        v-if="showSlider && mode !== 'chksrt'"
+        v-else
+        style="
+          padding-left: 14px;
+          padding-right: 14px;
+          overflow: hidden;
+          flex-shrink: 1;
+          min-width: 0;
+        "
+      >
+        <span
+          style="
+            color: white;
+            font-size: 13px;
+            user-select: none;
+            text-shadow: 0 0 3px #000;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            display: block;
+          "
+          >{{ path ? path.split("/").pop() : "" }}</span
+        >
+      </div>
+      <!-- Timing slider (srt tracks only, not in chksrt/simple mode) -->
+      <div
+        v-if="showSlider && mode !== 'chksrt' && mode !== 'simple'"
         ref="slider"
         style="
           flex: 1;
@@ -135,7 +160,7 @@
       </div>
       <!-- Offset value -->
       <div
-        v-if="showSlider && mode !== 'chksrt'"
+        v-if="showSlider && mode !== 'chksrt' && mode !== 'simple'"
         style="
           color: white;
           font-size: 13px;
@@ -148,9 +173,9 @@
       >
         {{ offsetDisplay }}
       </div>
-      <!-- Apply button (srt only, not in chksrt mode) -->
+      <!-- Apply button (srt only, not in chksrt/simple mode) -->
       <div
-        v-if="showSlider && mode !== 'chksrt'"
+        v-if="showSlider && mode !== 'chksrt' && mode !== 'simple'"
         @click.stop="applySliderOffset"
         style="
           color: white;
@@ -209,6 +234,7 @@
       </div>
       <!-- Subtitle choice buttons -->
       <div
+        v-if="mode !== 'simple'"
         v-for="(choice, i) in subtitleChoices"
         :key="choice.id"
         @click.stop="onChoiceClick(choice, $event)"
@@ -268,12 +294,14 @@
       <div
         @click.stop="close"
         style="
+          margin-left: auto;
           color: white;
           font-size: 28px;
           line-height: 1;
           cursor: pointer;
           user-select: none;
           text-shadow: 0 0 4px #000;
+          padding-left: 14px;
         "
       >
         ✕
@@ -384,7 +412,7 @@ export default {
         let char;
         if (t.type === "pgs") char = "*";
         else if (t.type === "embedded") char = "t";
-        else if (/\.asr\.srt$/.test(t.file || "")) char = "a";
+        else if (/\.asr\.srt$/.test(t.file || "")) char = "+";
         else if (/\.mb\d+\.srt$/.test(t.file || "")) char = "e";
         else if (/\.opn[A-Z2-7]{5}\.srt$/i.test(t.file || "")) char = "v";
         else char = "s";

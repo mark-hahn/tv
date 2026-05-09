@@ -152,6 +152,28 @@
             </button>
 
             <button
+              @click="clickPlay"
+              :disabled="selectedFiles.size === 0 && !selectedName"
+              :style="{
+                cursor:
+                  selectedFiles.size > 0 || selectedName
+                    ? 'pointer'
+                    : 'default',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg':
+                  selectedFiles.size > 0 || selectedName
+                    ? 'whitesmoke'
+                    : '#e8e8e8',
+                color:
+                  selectedFiles.size > 0 || selectedName ? 'inherit' : '#aaa',
+              }"
+            >
+              Play
+            </button>
+
+            <button
               @click="refresh"
               :disabled="loading"
               style="
@@ -381,6 +403,28 @@
               }"
             >
               First
+            </button>
+
+            <button
+              @click="clickPlay"
+              :disabled="selectedFiles.size === 0 && !selectedName"
+              :style="{
+                cursor:
+                  selectedFiles.size > 0 || selectedName
+                    ? 'pointer'
+                    : 'default',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg':
+                  selectedFiles.size > 0 || selectedName
+                    ? 'whitesmoke'
+                    : '#e8e8e8',
+                color:
+                  selectedFiles.size > 0 || selectedName ? 'inherit' : '#aaa',
+              }"
+            >
+              Play
             </button>
 
             <button
@@ -1770,6 +1814,18 @@ export default {
       return current.children || [];
     },
     // Subtitles logic
+    clickPlay() {
+      const mediaRoot = this.movieMode
+        ? "/mnt/media/movies"
+        : this.errsMode
+          ? "/mnt/media/tv-errors"
+          : "/mnt/media/tv";
+      const videoPath = this.collectFilePaths()
+        .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
+        .map((p) => `${mediaRoot}/${p}`)[0];
+      if (!videoPath) return;
+      evtBus.emit("playSimplePath", videoPath);
+    },
     clickSubs() {
       const mediaRoot = this.movieMode
         ? "/mnt/media/movies"

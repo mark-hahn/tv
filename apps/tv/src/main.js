@@ -42,7 +42,7 @@ const PIC_LABELS = {
 const EMBY_HOST = "hahnca.com:8920";
 const EMBY_API_KEY = "1c399bd079d549cba8c916244d3add2b";
 const EMBY_USER_ID = "894c752d448f45a3a1260ccaabd0adff";
-const EMBY_BASE_URL = `https://${EMBY_HOST}/emby`;
+const EMBY_BASE_URL = "http://127.0.0.1:8096/emby";
 const SRVR_INTERNAL_URL = "http://127.0.0.1:8739";
 
 const GOOGLE_HOME_DELAY_MS = 0; // ms after TV turns on before sending Home key
@@ -177,7 +177,7 @@ function updateNowPlaying(sessions) {
 
 function connectEmby() {
   const deviceId = "tv-server";
-  const url = `wss://${EMBY_HOST}/embywebsocket?api_key=${EMBY_API_KEY}&deviceId=${deviceId}`;
+  const url = `ws://127.0.0.1:8096/embywebsocket?api_key=${EMBY_API_KEY}&deviceId=${deviceId}`;
   log("connecting to Emby WebSocket...");
   const embyWs = new WebSocket(url, { rejectUnauthorized: false });
 

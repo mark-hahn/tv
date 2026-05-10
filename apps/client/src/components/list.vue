@@ -1784,7 +1784,8 @@ export default {
       const wasPreview = !!this.previewMode;
       const wasAlreadySelected = show?.name === this.highlightName;
       const keepCurrentPane = this.currentPane;
-      const preserveMapPane = keepCurrentPane === "map";
+      const preserveMapPane =
+        keepCurrentPane === "map" || this.mapShow !== null;
 
       if (wasPreview) this.setPreviewMode(false);
       this.saveVisShow(show, scroll);
@@ -2049,7 +2050,7 @@ export default {
       const showName = show.name;
       const shouldUpdateVisibleMap =
         !options.skipMapUpdate &&
-        this.currentPane === "map" &&
+        (this.currentPane === "map" || this.mapShow !== null) &&
         this.mapShow !== null;
 
       const showChanged = options.forceSetUpSeries

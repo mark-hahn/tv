@@ -145,7 +145,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.unplayed = 1;
       tmp.gap = 0;
       tmp.ended = 0;
-      tmp.waiting = 0;
+      tmp.waiting = -1;
       tmp.drama = 1;
       tmp.foreign = 0;
       tmp.totry = 1;

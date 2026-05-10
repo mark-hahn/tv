@@ -109,9 +109,9 @@
                 cursor: canPanLeft ? 'pointer' : 'default',
               }"
               style="
-                font-size: 15px;
-                margin: 5px;
-                max-height: 24px;
+                font-size: 13.5px;
+                margin: 4.5px;
+                max-height: 21.5px;
                 border-radius: 7px;
               "
             >
@@ -129,9 +129,9 @@
                 cursor: canPanRight ? 'pointer' : 'default',
               }"
               style="
-                font-size: 15px;
-                margin: 5px;
-                max-height: 24px;
+                font-size: 13.5px;
+                margin: 4.5px;
+                max-height: 21.5px;
                 border-radius: 7px;
               "
             >
@@ -141,10 +141,10 @@
               @click.stop="showHistory = !showHistory"
               :style="{ '--btn-bg': showHistory ? 'lightgray' : 'whitesmoke' }"
               style="
-                font-size: 15px;
+                font-size: 13.5px;
                 cursor: pointer;
-                margin: 5px;
-                max-height: 24px;
+                margin: 4.5px;
+                max-height: 21.5px;
                 border-radius: 7px;
               "
             >
@@ -154,10 +154,10 @@
               v-if="mapShow?.inEmby !== false"
               @click.stop="$emit('prune', mapShow)"
               style="
-                font-size: 15px;
+                font-size: 13.5px;
                 cursor: pointer;
-                margin: 5px 0 5px 5px;
-                max-height: 24px;
+                margin: 4.5px 0 4.5px 4.5px;
+                max-height: 21.5px;
                 border-radius: 7px;
               "
             >
@@ -537,7 +537,7 @@
       />
     </div>
     <div
-      v-if="!hideMapBottom && !showHistory && selectedEpisode"
+      v-if="!hideMapBottom && !showHistory && selectedEpisode && episodeInfo"
       style="border-top: 3px solid black"
     >
       <div
@@ -560,7 +560,7 @@
           "
         >
           <div
-            v-if="displayEpisodeTitle(episodeInfo?.name)"
+            v-if="displayEpisodeTitle(episodeInfo.name)"
             style="
               min-width: 0;
               font-size: 16px;
@@ -570,7 +570,7 @@
               text-overflow: ellipsis;
             "
           >
-            {{ displayEpisodeTitle(episodeInfo?.name) }}
+            {{ displayEpisodeTitle(episodeInfo.name) }}
           </div>
           <div style="flex: 0 0 auto; font-size: 16px; white-space: nowrap">
             {{ formatSelectedEpisode(selectedEpisode) }}
@@ -585,7 +585,7 @@
             white-space: nowrap;
           "
         >
-          {{ formatEpisodeAired(episodeInfo?.aired) }}
+          {{ formatEpisodeAired(episodeInfo.aired) }}
         </div>
       </div>
       <div
@@ -598,7 +598,7 @@
         "
       >
         <button
-          v-if="episodeInfo?.image"
+          v-if="episodeInfo.image"
           @click.stop="mapImageExpanded = !mapImageExpanded"
           style="
             padding: 0;
@@ -609,7 +609,7 @@
           "
         >
           <img
-            :src="episodeInfo?.image"
+            :src="episodeInfo.image"
             alt="episode"
             style="
               display: block;
@@ -639,8 +639,8 @@
             line-height: 22px;
           "
         >
-          <div v-if="episodeInfo?.overview">
-            {{ episodeInfo?.overview }}
+          <div v-if="episodeInfo.overview">
+            {{ episodeInfo.overview }}
           </div>
         </div>
       </div>
@@ -790,7 +790,7 @@ export default {
   },
 
   watch: {
-    async mapShow(newShow, oldShow) {
+    async mapShow(newShow) {
       this.showHistory = false;
       this.selectedEpisode = null;
       this.episodeInfo = null;
@@ -1282,9 +1282,7 @@ export default {
       return `(S${String(selectedEpisode.s).padStart(2, "0")}E${String(selectedEpisode.e).padStart(2, "0")})`;
     },
     async selectEpisode(season, episode) {
-      if (!this.mapShow?.name || !season || !episode) {
-        return;
-      }
+      if (!this.mapShow?.name || !season || !episode) return;
 
       this.selectedEpisode = { s: season, e: episode };
       this.mapImageExpanded = false;

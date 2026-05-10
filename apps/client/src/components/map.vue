@@ -163,6 +163,57 @@
             >
               Prune
             </button>
+            <button
+              @click.stop="handleSelectedPlay"
+              :disabled="!selectedEpisode"
+              :style="{
+                opacity: selectedEpisode ? 1 : 0.35,
+                cursor: selectedEpisode ? 'pointer' : 'default',
+              }"
+              style="
+                font-size: 13.5px;
+                cursor: pointer;
+                margin: 4.5px 0 4.5px 4.5px;
+                max-height: 21.5px;
+                border-radius: 7px;
+              "
+            >
+              Play
+            </button>
+            <button
+              @click.stop="handleSelectedWatch"
+              :disabled="!selectedEpisode"
+              :style="{
+                opacity: selectedEpisode ? 1 : 0.35,
+                cursor: selectedEpisode ? 'pointer' : 'default',
+              }"
+              style="
+                font-size: 13.5px;
+                cursor: pointer;
+                margin: 4.5px 0 4.5px 4.5px;
+                max-height: 21.5px;
+                border-radius: 7px;
+              "
+            >
+              Watch
+            </button>
+            <button
+              @click.stop="handleSelectedDelete"
+              :disabled="!selectedEpisode"
+              :style="{
+                opacity: selectedEpisode ? 1 : 0.35,
+                cursor: selectedEpisode ? 'pointer' : 'default',
+              }"
+              style="
+                font-size: 13.5px;
+                cursor: pointer;
+                margin: 4.5px 0 4.5px 4.5px;
+                max-height: 21.5px;
+                border-radius: 7px;
+              "
+            >
+              Del
+            </button>
           </div>
         </div>
       </div>
@@ -790,11 +841,14 @@ export default {
   },
 
   watch: {
-    async mapShow(newShow) {
+    async mapShow(newShow, oldShow) {
       this.showHistory = false;
-      this.selectedEpisode = null;
-      this.episodeInfo = null;
-      this.mapImageExpanded = false;
+      const showChanged = (newShow?.name || null) !== (oldShow?.name || null);
+      if (showChanged) {
+        this.selectedEpisode = null;
+        this.episodeInfo = null;
+        this.mapImageExpanded = false;
+      }
       if (newShow && newShow.name) {
         this.seasonStates = {}; // Clear season states when show changes
         await this.loadTvdbData();
@@ -1314,40 +1368,58 @@ export default {
         this.episodeInfo = null;
       }
     },
-    handleEpisodeClick(event, mapShow, season, episode) {
-      if (this.simpleMode) {
-        // In simple mode: click plays the episode if a file exists.
-        const cell = this.seriesMap?.[season]?.[episode];
-        if (cell?.path && !cell?.noFile) {
-          event.stopPropagation();
-          this.$emit("play-episode", event, mapShow, season, episode);
-        }
-        return;
+    buildSelectedEpisodeActionEvent(overrides = {}) {
+      return {
+        stopPropagation() {},
+        preventDefault() {},
+        altKey: false,
+        shiftKey: false,
+        ctrlKey: false,
+        ...overrides,
+      };
+    },
+    performEpisodePlay(event, mapShow, season, episode) {
+      const cell = this.seriesMap?.[season]?.[episode];
+      if (cell?.path && !cell?.noFile) {
+        this.$emit("play-episode", event, mapShow, season, episode);
       }
-      event.stopPropagation();
-
-      // Android behavior: plain click selects the episode and shows details.
-      // Keep legacy watched-toggle available on Shift-click.
-      if (!event?.ctrlKey && !event?.altKey && !event?.shiftKey) {
-        this.selectEpisode(season, episode);
-        return;
-      }
-
-      // Alt-click plays the episode.
-      if (event?.altKey) {
-        const cell = this.seriesMap?.[season]?.[episode];
-        if (cell?.path && !cell?.noFile) {
-          this.$emit("play-episode", event, mapShow, season, episode);
-          return;
-        }
-      }
-
-      if (event?.shiftKey) {
-        this.$emit("episode-click", event, mapShow, season, episode);
-        return;
-      }
-
+    },
+    performEpisodeWatch(event, mapShow, season, episode) {
       this.$emit("episode-click", event, mapShow, season, episode);
+    },
+    performEpisodeDelete(event, mapShow, season, episode) {
+      this.$emit("episode-click", event, mapShow, season, episode);
+    },
+    handleSelectedPlay() {
+      if (!this.selectedEpisode) return;
+      this.performEpisodePlay(
+        this.buildSelectedEpisodeActionEvent({ altKey: true }),
+        this.mapShow,
+        this.selectedEpisode.s,
+        this.selectedEpisode.e,
+      );
+    },
+    handleSelectedWatch() {
+      if (!this.selectedEpisode) return;
+      this.performEpisodeWatch(
+        this.buildSelectedEpisodeActionEvent({ shiftKey: true }),
+        this.mapShow,
+        this.selectedEpisode.s,
+        this.selectedEpisode.e,
+      );
+    },
+    handleSelectedDelete() {
+      if (!this.selectedEpisode) return;
+      this.performEpisodeDelete(
+        this.buildSelectedEpisodeActionEvent({ ctrlKey: true }),
+        this.mapShow,
+        this.selectedEpisode.s,
+        this.selectedEpisode.e,
+      );
+    },
+    handleEpisodeClick(event, mapShow, season, episode) {
+      event?.stopPropagation?.();
+      this.selectEpisode(season, episode);
     },
     handleSeasonClick(event, season) {
       if (this.simpleMode) {

@@ -2234,6 +2234,23 @@ export default {
           return;
         }
 
+        if (cell) {
+          cell.path = null;
+          cell.noFile = true;
+          cell.avail = false;
+          cell.error = false;
+        }
+
+        this.$emit("show-map", {
+          mapShow: this.mapShow,
+          hideMapBottom: this.hideMapBottom,
+          seriesMapSeasons: this.seriesMapSeasons,
+          seriesMapEpis: this.seriesMapEpis,
+          seriesMap: this.seriesMap,
+          mapError: "",
+          noSwitch: true,
+        });
+
         // Refresh just this show in Emby so the episode is removed from its list
         this.markShowUpdating(show.name);
         await srvr
@@ -2333,6 +2350,24 @@ export default {
         try {
           await srvr.deletePath(path);
           deletedCount += 1;
+
+          const cell = this.seriesMap?.[season]?.[episode];
+          if (cell) {
+            cell.path = null;
+            cell.noFile = true;
+            cell.avail = false;
+            cell.error = false;
+          }
+
+          this.$emit("show-map", {
+            mapShow: this.mapShow,
+            hideMapBottom: this.hideMapBottom,
+            seriesMapSeasons: this.seriesMapSeasons,
+            seriesMapEpis: this.seriesMapEpis,
+            seriesMap: this.seriesMap,
+            mapError: "",
+            noSwitch: true,
+          });
         } catch (err) {
           console.error("deleteEpisodes: deletePath failed", {
             path,

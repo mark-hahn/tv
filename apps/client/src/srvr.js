@@ -548,6 +548,10 @@ export function getTmdb(params) {
   return httpCall("/api/getTmdb", params, "POST");
 }
 
+export function searchTmdbPerson(params) {
+  return httpCall("/api/searchTmdbPerson", params, "POST");
+}
+
 export function getStreamProviders(params) {
   return httpCall("/api/getStreamProviders", params, "POST");
 }

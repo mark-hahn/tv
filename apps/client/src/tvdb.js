@@ -388,6 +388,27 @@ export const getEpisode = async (showName, seasonNum, episodeNum) => {
   return extendedResObj.data;
 };
 
+//////////// look up a person's image across all cached shows //////////////
+
+export const getPersonImageFromCache = (personName) => {
+  if (!allTvdb || !personName) return null;
+  const norm = String(personName).trim().toLowerCase();
+  for (const showRecord of Object.values(allTvdb)) {
+    if (!Array.isArray(showRecord?.characters)) continue;
+    for (const char of showRecord.characters) {
+      if (
+        String(char.actor || "")
+          .trim()
+          .toLowerCase() === norm &&
+        char.image
+      ) {
+        return char.image;
+      }
+    }
+  }
+  return null;
+};
+
 //////////// get episode guest actors //////////////
 
 export const getEpisodeGuests = async (showName, seasonNum, episodeNum) => {

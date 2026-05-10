@@ -106,6 +106,20 @@ export async function getTmdb(params) {
   }
 }
 
+export async function searchPerson(params) {
+  const { name } = params;
+  if (!name) return null;
+  try {
+    const res = await moviedb.searchPerson({ query: name });
+    const person = res.results?.[0];
+    if (!person?.profile_path) return null;
+    return `https://image.tmdb.org/t/p/w185${person.profile_path}`;
+  } catch (error) {
+    console.error("[tmdb] searchPerson error:", error.message);
+    return null;
+  }
+}
+
 export async function getStreamProviders(params) {
   const { showName, year } = params;
 

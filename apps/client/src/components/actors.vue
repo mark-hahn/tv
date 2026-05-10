@@ -928,6 +928,31 @@ export default {
       return Boolean(actor?.image || actor?.personImgURL);
     },
 
+    async fillMissingImages(list) {
+      // list items may use personName/name (actors) or just name (crew)
+      await Promise.all(
+        list.map(async (item) => {
+          if (item.image || item.personImgURL) return;
+          const name = item.personName || item.name;
+          const cached = tvdb.getPersonImageFromCache(name);
+          if (cached) {
+            item.image = cached;
+            if ("personImgURL" in item) item.personImgURL = cached;
+            return;
+          }
+          try {
+            const tmdbImage = await srvr.searchTmdbPerson({ name });
+            if (tmdbImage) {
+              item.image = tmdbImage;
+              if ("personImgURL" in item) item.personImgURL = tmdbImage;
+            }
+          } catch (_) {
+            // no image available
+          }
+        }),
+      );
+    },
+
     normPersonName(name) {
       return String(name || "")
         .trim()
@@ -1243,6 +1268,9 @@ export default {
       // Merge TMDB and TVDB guest lists
       const mergeResult = this.mergeTmdbTvdbActors(tmdbList, tvdbList);
       this.actors = mergeResult.output;
+
+      // Fill in missing images via cache then TMDB person search
+      await this.fillMissingImages(this.actors);
 
       if (this.actors.length === 0) {
         this.errorMessage = "No guest stars found";
@@ -1564,6 +1592,7 @@ export default {
           actualData.crew.some((c) => c.image === undefined);
         if (!hasImageGap) {
           this.crew = [...actualData.crew].sort(crewSort);
+          await this.fillMissingImages(this.crew);
           return;
         }
       }
@@ -1574,6 +1603,7 @@ export default {
         const res = await tvdb.fetchExtendedForCrew(tvdbId);
         if (!Array.isArray(res)) return;
         this.crew = [...res].sort(crewSort);
+        await this.fillMissingImages(this.crew);
         const showName = actualData?.name || show?.name;
         if (showName) {
           await srvr.setTvdbFields({ name: showName, crew: res });
@@ -1782,6 +1812,7 @@ export default {
       }
 
       // Cache series actors for restore
+      await this.fillMissingImages(this.actors);
       this.seriesActors = [...this.actors];
       this.isGuestMode = false;
       this.showingEpisodeActors = false;

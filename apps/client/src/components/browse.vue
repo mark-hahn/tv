@@ -652,6 +652,12 @@
             </div>
             {{ curTvdb.overview }}
           </div>
+          <div
+            v-else-if="curTitle && !isLoadingNext"
+            style="color: red"
+          >
+            Not in tvdb
+          </div>
         </div>
       </div>
       <div
@@ -2187,6 +2193,9 @@ export default {
           curTvdb.value = tvdb;
         }
       } else {
+        if (tvdb === null && curTvdb.value === null) {
+          suppressButtons.value = false;
+        }
         curTvdb.value = tvdb;
       }
       postBrowseHistory("browse", curTvdb.value);

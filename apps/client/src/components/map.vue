@@ -349,6 +349,7 @@
                 <td
                   v-for="season in seriesMapSeasons"
                   @mousedown.prevent
+                  @click.alt.exact="handleSeasonAltClick($event, season)"
                   @click.exact="handleSeasonPlainClick($event, season)"
                   @click.ctrl="handleSeasonClick($event, season)"
                   :style="{
@@ -364,9 +365,12 @@
                     padding: '1px 4px',
                     textAlign: 'center',
                     border: '1px solid #ccc',
-                    backgroundColor: selectedSeasons.has(season)
-                      ? 'lightgreen'
-                      : 'white',
+                    backgroundColor:
+                      copiedSeason === season
+                        ? '#ffcccc'
+                        : selectedSeasons.has(season)
+                          ? 'lightgreen'
+                          : 'white',
                     cursor: simpleMode ? 'default' : 'pointer',
                   }"
                   :key="season"
@@ -468,6 +472,9 @@
                   v-for="season in seriesMapSeasons"
                   :key="mapUpdateKey + '-' + season + '.' + episode"
                   @mousedown.prevent
+                  @click.alt.exact="
+                    handleEpisodeAltClick($event, mapShow, season, episode)
+                  "
                   @click.exact="
                     handleEpisodePlainClick($event, mapShow, season, episode)
                   "
@@ -499,13 +506,16 @@
                     padding: '1px 4px',
                     textAlign: 'center',
                     border: '1px solid #ccc',
-                    backgroundColor: selectedCells.has(cellKey(season, episode))
-                      ? 'lightgreen'
-                      : seriesMap[season]?.[episode]?.error
-                        ? 'yellow'
-                        : seriesMap[season]?.[episode]?.noFile
-                          ? '#faa'
-                          : 'white',
+                    backgroundColor:
+                      copiedCellKey === cellKey(season, episode)
+                        ? '#ffcccc'
+                        : selectedCells.has(cellKey(season, episode))
+                          ? 'lightgreen'
+                          : seriesMap[season]?.[episode]?.error
+                            ? 'yellow'
+                            : seriesMap[season]?.[episode]?.noFile
+                              ? '#faa'
+                              : 'white',
                   }"
                 >
                   <span v-if="seriesMap?.[season]?.[episode]?.played"> w</span
@@ -837,6 +847,8 @@ export default {
       showHistory: false,
       selectedSeasons: new Set(),
       selectedCells: new Set(),
+      copiedSeason: null,
+      copiedCellKey: null,
       selectionSeason: null,
       lastSelectedCell: null,
       showEpisodePane: false,
@@ -1405,6 +1417,74 @@ export default {
     },
     cellKey(season, episode) {
       return `${season}.${episode}`;
+    },
+    flashCopiedSeason(season) {
+      this.copiedSeason = season;
+      setTimeout(() => {
+        if (this.copiedSeason === season) this.copiedSeason = null;
+      }, 300);
+    },
+    flashCopiedCell(key) {
+      this.copiedCellKey = key;
+      setTimeout(() => {
+        if (this.copiedCellKey === key) this.copiedCellKey = null;
+      }, 300);
+    },
+    getMapShowFolder() {
+      const showPath = String(this.mapShow?.path || "").trim();
+      if (showPath) {
+        const parts = showPath.split("/").filter(Boolean);
+        const last = parts[parts.length - 1];
+        if (last) return last;
+      }
+      return String(this.mapShow?.name || "").trim();
+    },
+    getSeasonClipboardPath(season) {
+      const showFolder = this.getMapShowFolder();
+      if (!showFolder) return "";
+      return `${showFolder}/Season ${season}`;
+    },
+    getEpisodeClipboardPath(season, episode) {
+      const episodePath = String(
+        this.seriesMap?.[season]?.[episode]?.path || "",
+      ).trim();
+      const showFolder = this.getMapShowFolder();
+      if (!episodePath || !showFolder) return "";
+
+      const marker = `/${showFolder}/`;
+      const markerIdx = episodePath.indexOf(marker);
+      if (markerIdx !== -1) {
+        return episodePath.slice(markerIdx + 1);
+      }
+
+      const parts = episodePath.split("/").filter(Boolean);
+      const fileName = parts[parts.length - 1] || "";
+      if (!fileName) return "";
+      return `${showFolder}/Season ${season}/${fileName}`;
+    },
+    async copyTextToClipboard(text) {
+      if (!text) return false;
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (err) {
+        console.error("Copy failed", err);
+        return false;
+      }
+    },
+    async handleSeasonAltClick(event, season) {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      const path = this.getSeasonClipboardPath(season);
+      const ok = await this.copyTextToClipboard(path);
+      if (ok) this.flashCopiedSeason(season);
+    },
+    async handleEpisodeAltClick(event, mapShow, season, episode) {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      const path = this.getEpisodeClipboardPath(season, episode);
+      const ok = await this.copyTextToClipboard(path);
+      if (ok) this.flashCopiedCell(this.cellKey(season, episode));
     },
     parseCellKey(key) {
       const [season, episode] = String(key || "")

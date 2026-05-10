@@ -2360,6 +2360,9 @@ export default {
 
     async seriesMapAction(action, show) {
       if (action == "close") {
+        // Invalidate any in-flight open/refresh so it bails on its next token check
+        // and does not later overwrite mapShow with a stale/partial object.
+        this._mapActionToken++;
         this.mapShow = null;
         this.$emit("hide-map");
         return;
@@ -2494,9 +2497,14 @@ export default {
 
       // Attach season premiere dates from allTvdb if available
       const spd = allTvdb?.[show.name]?.seasonPremiereDates;
-      if (spd) this.mapShow = { ...this.mapShow, seasonPremiereDates: spd };
+      // Guard: if mapShow has been cleared out from under us (e.g. by an external
+      // close), do not merge — spreading null would emit a partial object.
+      if (spd && this.mapShow?.name === show.name) {
+        this.mapShow = { ...this.mapShow, seasonPremiereDates: spd };
+      } else if (spd) {
+        return;
+      }
 
-      // Emit to App.vue to show map
       this.$emit("show-map", {
         mapShow: this.mapShow,
         hideMapBottom: this.hideMapBottom,

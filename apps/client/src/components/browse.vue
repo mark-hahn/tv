@@ -368,7 +368,7 @@
               >&lt;no show info&gt;</span
             >
             <span
-              v-if="noMoreShows && !isLoadingNext"
+              v-if="showNoMoreMsg && !isLoadingNext"
               :style="{
                 marginLeft: '10px',
                 color: 'red',
@@ -1252,19 +1252,11 @@ export default {
           // await scrollTitlesToBottom(); // allow watcher to handle this
         } else {
           shouldAutoAdvance.value = false;
-          // If none returned, ensure the sentinel exists (once).
-          const hasNoMore = titleStrings.value.some(
-            (s) => String(s) === NO_MORE_ENTRY,
-          );
-          if (!hasNoMore) {
-            console.log(
-              "[noMoreShows] appending NO_MORE_ENTRY (empty getBrowseShow)",
-            );
-            titleStrings.value = [...titleStrings.value, NO_MORE_ENTRY];
-          } else {
-            // Force a new array assignment so the UI updates consistently.
-            titleStrings.value = [...titleStrings.value];
-          }
+          if (_noMoreMsgTimer) clearTimeout(_noMoreMsgTimer);
+          showNoMoreMsg.value = true;
+          _noMoreMsgTimer = setTimeout(() => {
+            showNoMoreMsg.value = false;
+          }, 1000);
 
           // Always scroll to the bottom even if the msg card already exists;
           // if we just added it, wait for it to render first.
@@ -1729,9 +1721,11 @@ export default {
       openUrl(officialResult.value?.url);
     };
 
-    const noMoreShows = computed(() => {
-      return titleStrings.value.some((s) => String(s) === NO_MORE_ENTRY);
-    });
+    const showNoMoreMsg = ref(false);
+    let _noMoreMsgTimer = null;
+    const noMoreShows = computed(() =>
+      titleStrings.value.some((s) => String(s) === NO_MORE_ENTRY),
+    );
 
     const hasAnyRemoteButton = computed(() => {
       return !!(
@@ -2351,6 +2345,7 @@ export default {
       rtButtonLabel,
       hasAnyRemoteButton,
       noMoreShows,
+      showNoMoreMsg,
       titleStrings,
       selectedTitleIdx,
       parsedTitles,

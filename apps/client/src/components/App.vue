@@ -242,6 +242,7 @@
             @close="handleMapAction('close')"
             @show-actors="() => handleShowActors(false)"
             @episode-click="handleEpisodeClick"
+            @delete-episodes="handleDeleteEpisodes"
             @play-episode="handlePlayEpisode"
             @season-watched="handleSeasonWatched"
             @season-delete="handleSeasonDelete"
@@ -1973,6 +1974,9 @@ export default {
     },
     handleEpisodeClick(e, show, season, episode, setWatched = null) {
       evtBus.emit("episodeClick", { e, show, season, episode, setWatched });
+    },
+    handleDeleteEpisodes(show, targets) {
+      evtBus.emit("deleteEpisodes", { show, targets });
     },
     handlePlayEpisode(e, show, season, episode) {
       const cell = this.seriesMap?.[season]?.[episode];

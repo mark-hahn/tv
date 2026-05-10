@@ -2295,6 +2295,81 @@ export default {
       }
     },
 
+    async deleteEpisodes(show, targets) {
+      const showName = show?.name || "";
+      const deletableTargets = Array.isArray(targets)
+        ? targets
+            .map(({ season, episode }) => {
+              const cell = this.seriesMap?.[season]?.[episode];
+              const path = cell?.path;
+              const noFile = !!cell?.noFile;
+              if (!path || noFile) return null;
+              return { path, season, episode };
+            })
+            .filter(Boolean)
+        : [];
+
+      if (deletableTargets.length === 0) return;
+
+      const preview = deletableTargets
+        .slice(0, 12)
+        .map(
+          ({ season, episode }) =>
+            `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`,
+        )
+        .join(", ");
+      const extraCount =
+        deletableTargets.length - Math.min(deletableTargets.length, 12);
+      const msg =
+        `OK to delete ${deletableTargets.length} episode file(s) for ${showName}?` +
+        (preview
+          ? `\n${preview}${extraCount > 0 ? `, +${extraCount} more` : ""}`
+          : "");
+      if (!window.confirm(msg)) return;
+
+      const failures = [];
+      let deletedCount = 0;
+      for (const { path, season, episode } of deletableTargets) {
+        try {
+          await srvr.deletePath(path);
+          deletedCount += 1;
+        } catch (err) {
+          console.error("deleteEpisodes: deletePath failed", {
+            path,
+            season,
+            episode,
+            err,
+          });
+          failures.push({ season, episode, err });
+        }
+      }
+
+      if (deletedCount > 0) {
+        this.markShowUpdating(show.name);
+        await srvr
+          .refreshEmbyItem(show.id, show.name)
+          .catch((err) => console.error("refreshEmbyItem failed:", err));
+
+        await this.seriesMapAction("refresh", show, null);
+      }
+
+      if (failures.length > 0) {
+        const summary = failures
+          .slice(0, 8)
+          .map(
+            ({ season, episode, err }) =>
+              `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}: ${err?.message || String(err)}`,
+          )
+          .join("\n");
+        const extraFailures = failures.length - Math.min(failures.length, 8);
+        window.alert(
+          `${deletedCount > 0 ? `Deleted ${deletedCount} item(s).\n` : ""}Failed to delete ${failures.length} item(s).` +
+            (summary ? `\n${summary}` : "") +
+            (extraFailures > 0 ? `\n+${extraFailures} more failure(s)` : ""),
+        );
+      }
+    },
+
     async seasonWatched(show, season, episodeStates) {
       if (show.inEmby !== false) return;
       const seasonMap = this.seriesMap?.[season];
@@ -3411,6 +3486,10 @@ export default {
     // Listen for episode clicks from App.vue
     on("episodeClick", async ({ e, show, season, episode, setWatched }) => {
       await this.episodeClick(e, show, season, episode, setWatched);
+    });
+
+    on("deleteEpisodes", async ({ show, targets }) => {
+      await this.deleteEpisodes(show, targets);
     });
 
     // Listen for season watched toggle from App.vue (non-Emby shows)

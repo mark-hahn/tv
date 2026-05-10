@@ -164,11 +164,29 @@
               Prune
             </button>
             <button
-              @click.stop="handleSelectedPlay"
-              :disabled="!selectedEpisode"
+              @click.stop="toggleEpisodePane"
+              :disabled="!hasSelectedCell"
               :style="{
-                opacity: selectedEpisode ? 1 : 0.35,
-                cursor: selectedEpisode ? 'pointer' : 'default',
+                '--btn-bg': showEpisodePane ? 'lightgray' : 'whitesmoke',
+                opacity: hasSelectedCell ? 1 : 0.35,
+                cursor: hasSelectedCell ? 'pointer' : 'default',
+              }"
+              style="
+                font-size: 13.5px;
+                cursor: pointer;
+                margin: 4.5px 0 4.5px 4.5px;
+                max-height: 21.5px;
+                border-radius: 7px;
+              "
+            >
+              Episode
+            </button>
+            <button
+              @click.stop="handleSelectedPlay"
+              :disabled="!hasMapSelection"
+              :style="{
+                opacity: hasMapSelection ? 1 : 0.35,
+                cursor: hasMapSelection ? 'pointer' : 'default',
               }"
               style="
                 font-size: 13.5px;
@@ -182,10 +200,10 @@
             </button>
             <button
               @click.stop="handleSelectedWatch"
-              :disabled="!selectedEpisode"
+              :disabled="!hasMapSelection"
               :style="{
-                opacity: selectedEpisode ? 1 : 0.35,
-                cursor: selectedEpisode ? 'pointer' : 'default',
+                opacity: hasMapSelection ? 1 : 0.35,
+                cursor: hasMapSelection ? 'pointer' : 'default',
               }"
               style="
                 font-size: 13.5px;
@@ -199,10 +217,10 @@
             </button>
             <button
               @click.stop="handleSelectedDelete"
-              :disabled="!selectedEpisode"
+              :disabled="!hasMapSelection"
               :style="{
-                opacity: selectedEpisode ? 1 : 0.35,
-                cursor: selectedEpisode ? 'pointer' : 'default',
+                opacity: hasMapSelection ? 1 : 0.35,
+                cursor: hasMapSelection ? 'pointer' : 'default',
               }"
               style="
                 font-size: 13.5px;
@@ -272,6 +290,7 @@
       <div
         id="maptblpane"
         ref="mapViewport"
+        @selectstart.prevent
         @wheel.stop.prevent="handleMapWheel"
         @pointerdown="handleMapPointerDown"
         @pointermove="handleMapPointerMove"
@@ -283,6 +302,7 @@
           overflow: hidden;
           box-sizing: border-box;
           touch-action: none;
+          user-select: none;
         "
       >
         <!-- Sticky header row: moves horizontally with pan but stays fixed vertically.-->
@@ -328,7 +348,9 @@
                 </td>
                 <td
                   v-for="season in seriesMapSeasons"
-                  @click="handleSeasonClick($event, season)"
+                  @mousedown.prevent
+                  @click.exact="handleSeasonPlainClick($event, season)"
+                  @click.ctrl="handleSeasonClick($event, season)"
                   :style="{
                     width: '30px',
                     minWidth: '30px',
@@ -342,7 +364,9 @@
                     padding: '1px 4px',
                     textAlign: 'center',
                     border: '1px solid #ccc',
-                    backgroundColor: 'white',
+                    backgroundColor: selectedSeasons.has(season)
+                      ? 'lightgreen'
+                      : 'white',
                     cursor: simpleMode ? 'default' : 'pointer',
                   }"
                   :key="season"
@@ -443,7 +467,19 @@
                 <td
                   v-for="season in seriesMapSeasons"
                   :key="mapUpdateKey + '-' + season + '.' + episode"
-                  @click="handleEpisodeClick($event, mapShow, season, episode)"
+                  @mousedown.prevent
+                  @click.exact="
+                    handleEpisodePlainClick($event, mapShow, season, episode)
+                  "
+                  @click.ctrl="
+                    handleEpisodeClick($event, mapShow, season, episode)
+                  "
+                  @click.shift="
+                    handleEpisodeClick($event, mapShow, season, episode)
+                  "
+                  @click.ctrl.shift="
+                    handleEpisodeClick($event, mapShow, season, episode)
+                  "
                   :style="{
                     cursor: simpleMode
                       ? seriesMap[season]?.[episode]?.path &&
@@ -463,15 +499,13 @@
                     padding: '1px 4px',
                     textAlign: 'center',
                     border: '1px solid #ccc',
-                    backgroundColor:
-                      selectedEpisode?.s === season &&
-                      selectedEpisode?.e === episode
-                        ? 'lightgreen'
-                        : seriesMap[season]?.[episode]?.error
-                          ? 'yellow'
-                          : seriesMap[season]?.[episode]?.noFile
-                            ? '#faa'
-                            : 'white',
+                    backgroundColor: selectedCells.has(cellKey(season, episode))
+                      ? 'lightgreen'
+                      : seriesMap[season]?.[episode]?.error
+                        ? 'yellow'
+                        : seriesMap[season]?.[episode]?.noFile
+                          ? '#faa'
+                          : 'white',
                   }"
                 >
                   <span v-if="seriesMap?.[season]?.[episode]?.played"> w</span
@@ -571,7 +605,11 @@
     />
     <div
       v-if="
-        !hideMapBottom && !showHistory && mapImageExpanded && episodeInfo?.image
+        !hideMapBottom &&
+        !showHistory &&
+        showEpisodePane &&
+        mapImageExpanded &&
+        episodeInfo?.image
       "
       @click="mapImageExpanded = false"
       style="border-top: 6px solid black; cursor: pointer"
@@ -588,8 +626,19 @@
       />
     </div>
     <div
-      v-if="!hideMapBottom && !showHistory && selectedEpisode && episodeInfo"
-      style="border-top: 3px solid black"
+      v-if="
+        !hideMapBottom &&
+        !showHistory &&
+        showEpisodePane &&
+        selectedEpisode &&
+        episodeInfo
+      "
+      style="
+        border-top: 3px solid black;
+        flex: 0 0 auto;
+        max-height: min(320px, 45vh);
+        overflow: hidden;
+      "
     >
       <div
         style="
@@ -646,6 +695,9 @@
           gap: 0;
           padding: 7px 0;
           align-items: stretch;
+          height: min(260px, calc(45vh - 48px));
+          min-height: 150px;
+          overflow: hidden;
         "
       >
         <button
@@ -657,6 +709,8 @@
             border: 0;
             background: transparent;
             cursor: pointer;
+            height: 100%;
+            overflow: hidden;
           "
         >
           <img
@@ -684,6 +738,7 @@
         <div
           style="
             padding: 4px 8px;
+            min-height: 0;
             overflow-y: auto;
             color: #333;
             font-size: 16px;
@@ -780,6 +835,11 @@ export default {
       mapTouchSuppressClickUntil: 0,
       mapUpdateKey: 0,
       showHistory: false,
+      selectedSeasons: new Set(),
+      selectedCells: new Set(),
+      selectionSeason: null,
+      lastSelectedCell: null,
+      showEpisodePane: false,
       selectedEpisode: null,
       episodeInfo: null,
       mapImageExpanded: false,
@@ -838,6 +898,13 @@ export default {
       const eps = 0.5;
       return (this.mapScrollLeft || 0) < (this.mapMaxScrollLeft || 0) - eps;
     },
+
+    hasMapSelection() {
+      return this.selectedSeasons.size > 0 || this.selectedCells.size > 0;
+    },
+    hasSelectedCell() {
+      return this.selectedCells.size > 0;
+    },
   },
 
   watch: {
@@ -845,6 +912,10 @@ export default {
       this.showHistory = false;
       const showChanged = (newShow?.name || null) !== (oldShow?.name || null);
       if (showChanged) {
+        this.selectedSeasons = new Set();
+        this.selectedCells = new Set();
+        this.selectionSeason = null;
+        this.lastSelectedCell = null;
         this.selectedEpisode = null;
         this.episodeInfo = null;
         this.mapImageExpanded = false;
@@ -887,6 +958,7 @@ export default {
     "set-date",
     "close",
     "episode-click",
+    "delete-episodes",
     "season-watched",
     "season-delete",
     "show-actors",
@@ -1331,9 +1403,72 @@ export default {
       if (!title) return "";
       return /^(season|episode)\s+\d+$/i.test(title) ? "" : title;
     },
+    cellKey(season, episode) {
+      return `${season}.${episode}`;
+    },
+    parseCellKey(key) {
+      const [season, episode] = String(key || "")
+        .split(".")
+        .map(Number);
+      return { season, episode };
+    },
     formatSelectedEpisode(selectedEpisode) {
       if (!selectedEpisode?.s || !selectedEpisode?.e) return "";
       return `(S${String(selectedEpisode.s).padStart(2, "0")}E${String(selectedEpisode.e).padStart(2, "0")})`;
+    },
+    clearMapSelectionDetails() {
+      this.showEpisodePane = false;
+      this.selectedEpisode = null;
+      this.episodeInfo = null;
+      this.mapImageExpanded = false;
+      this.episodeInfoRequestId += 1;
+    },
+    getFirstSelectedCellTarget() {
+      if (this.selectedCells.size === 0) return null;
+      const firstKey = Array.from(this.selectedCells)[0];
+      const { season, episode } = this.parseCellKey(firstKey);
+      if (!season || !episode) return null;
+      return { key: firstKey, season, episode };
+    },
+    async toggleEpisodePane() {
+      const target = this.getFirstSelectedCellTarget();
+      if (!target) return;
+
+      if (
+        this.showEpisodePane &&
+        this.selectedEpisode?.s === target.season &&
+        this.selectedEpisode?.e === target.episode
+      ) {
+        this.clearMapSelectionDetails();
+        return;
+      }
+
+      this.showEpisodePane = true;
+      await this.selectEpisode(target.season, target.episode);
+    },
+    getSeasonEpisodeNumbers(season) {
+      return this.seriesMapEpis.filter(
+        (episode) => this.seriesMap?.[season]?.[episode],
+      );
+    },
+    getSelectedMapTargets() {
+      if (this.selectedCells.size > 0) {
+        return Array.from(this.selectedCells)
+          .map((key) => {
+            const { season, episode } = this.parseCellKey(key);
+            return { season, episode };
+          })
+          .sort((a, b) => a.season - b.season || a.episode - b.episode);
+      }
+
+      const targets = [];
+      for (const season of this.seriesMapSeasons) {
+        if (!this.selectedSeasons.has(season)) continue;
+        for (const episode of this.getSeasonEpisodeNumbers(season)) {
+          targets.push({ season, episode });
+        }
+      }
+      return targets;
     },
     async selectEpisode(season, episode) {
       if (!this.mapShow?.name || !season || !episode) return;
@@ -1391,130 +1526,150 @@ export default {
       this.$emit("episode-click", event, mapShow, season, episode);
     },
     handleSelectedPlay() {
-      if (!this.selectedEpisode) return;
+      const target = this.getSelectedMapTargets()[0];
+      if (!target) return;
       this.performEpisodePlay(
         this.buildSelectedEpisodeActionEvent({ altKey: true }),
         this.mapShow,
-        this.selectedEpisode.s,
-        this.selectedEpisode.e,
+        target.season,
+        target.episode,
       );
     },
     handleSelectedWatch() {
-      if (!this.selectedEpisode) return;
-      this.performEpisodeWatch(
-        this.buildSelectedEpisodeActionEvent({ shiftKey: true }),
-        this.mapShow,
-        this.selectedEpisode.s,
-        this.selectedEpisode.e,
-      );
+      const targets = this.getSelectedMapTargets();
+      if (targets.length === 0) return;
+      for (const target of targets) {
+        this.performEpisodeWatch(
+          this.buildSelectedEpisodeActionEvent({ shiftKey: true }),
+          this.mapShow,
+          target.season,
+          target.episode,
+        );
+      }
     },
     handleSelectedDelete() {
-      if (!this.selectedEpisode) return;
-      this.performEpisodeDelete(
-        this.buildSelectedEpisodeActionEvent({ ctrlKey: true }),
-        this.mapShow,
-        this.selectedEpisode.s,
-        this.selectedEpisode.e,
-      );
+      const targets = this.getSelectedMapTargets();
+      if (targets.length === 0) return;
+      this.$emit("delete-episodes", this.mapShow, targets);
+    },
+    handleEpisodePlainClick(event, mapShow, season, episode) {
+      event?.preventDefault?.();
+      if (this.simpleMode) {
+        const cell = this.seriesMap?.[season]?.[episode];
+        if (cell?.path && !cell?.noFile) {
+          event?.stopPropagation?.();
+          this.$emit("play-episode", event, mapShow, season, episode);
+        }
+        return;
+      }
+
+      event?.stopPropagation?.();
+
+      const key = this.cellKey(season, episode);
+      this.selectedSeasons = new Set();
+      this.selectedCells = new Set([key]);
+      this.selectionSeason = String(season);
+      this.lastSelectedCell = key;
     },
     handleEpisodeClick(event, mapShow, season, episode) {
+      event?.preventDefault?.();
+      if (this.simpleMode) return;
+
       event?.stopPropagation?.();
-      this.selectEpisode(season, episode);
+
+      const key = this.cellKey(season, episode);
+      const seasonKey = String(season);
+
+      if (this.selectedSeasons.size > 0) {
+        this.selectedSeasons = new Set();
+      }
+
+      if (
+        this.selectionSeason &&
+        this.selectionSeason !== seasonKey &&
+        !this.selectedCells.has(key)
+      ) {
+        this.selectedCells = new Set();
+        this.selectionSeason = null;
+      }
+
+      if (!this.selectionSeason) {
+        this.selectionSeason = seasonKey;
+      }
+
+      if (event?.shiftKey && this.selectedCells.size === 0) {
+        this.selectedCells = new Set([key]);
+        this.selectionSeason = seasonKey;
+        this.lastSelectedCell = key;
+        return;
+      }
+
+      if (
+        event?.shiftKey &&
+        this.lastSelectedCell &&
+        this.selectionSeason === seasonKey
+      ) {
+        const { season: lastSeason, episode: lastEpisode } = this.parseCellKey(
+          this.lastSelectedCell,
+        );
+        if (String(lastSeason) === seasonKey) {
+          const idx1 = this.seriesMapEpis.findIndex((ep) => ep === lastEpisode);
+          const idx2 = this.seriesMapEpis.findIndex((ep) => ep === episode);
+          if (idx1 !== -1 && idx2 !== -1) {
+            const start = Math.min(idx1, idx2);
+            const end = Math.max(idx1, idx2);
+            const next = new Set(this.selectedCells);
+            for (const ep of this.seriesMapEpis.slice(start, end + 1)) {
+              next.add(this.cellKey(season, ep));
+            }
+            this.selectedCells = next;
+          }
+        }
+      } else if (event?.ctrlKey) {
+        const next = new Set(this.selectedCells);
+        if (next.has(key)) {
+          next.delete(key);
+          if (next.size === 0) this.selectionSeason = null;
+        } else {
+          next.add(key);
+        }
+        this.selectedCells = next;
+        this.lastSelectedCell = key;
+      } else {
+        this.selectedCells = new Set([key]);
+        this.selectionSeason = seasonKey;
+        this.lastSelectedCell = key;
+      }
     },
-    handleSeasonClick(event, season) {
+    handleSeasonPlainClick(event, season) {
+      event?.preventDefault?.();
       if (this.simpleMode) {
         // Let it bubble to handleMapClick (which returns to Series).
         return;
       }
       event.stopPropagation();
 
-      // Ctrl-click: delete the entire Season <n> folder.
-      if (event?.ctrlKey) {
-        this.$emit("season-delete", event, this.mapShow, season);
+      this.selectedCells = new Set();
+      this.selectionSeason = null;
+      this.lastSelectedCell = null;
+      this.selectedSeasons = new Set([season]);
+    },
+    handleSeasonClick(event, season) {
+      event?.preventDefault?.();
+      if (this.simpleMode) {
+        // Let it bubble to handleMapClick (which returns to Series).
         return;
       }
+      event.stopPropagation();
 
-      const seasonEpisodes = this.seriesMap[season];
-      if (!seasonEpisodes) return;
+      this.selectedCells = new Set();
+      this.selectionSeason = null;
+      this.lastSelectedCell = null;
 
-      // Initialize season state tracking if needed (save original state only once)
-      if (!this.seasonStates[season]) {
-        const episodeStates = {};
-        Object.keys(seasonEpisodes).forEach((episodeNum) => {
-          const episode = seasonEpisodes[episodeNum];
-          if (episode && !episode.unaired) {
-            episodeStates[episodeNum] = episode.played || false;
-          }
-        });
-
-        // Determine initial state based on current episode states
-        const episodeValues = Object.values(episodeStates);
-        const allWatched =
-          episodeValues.length > 0 && episodeValues.every((watched) => watched);
-        const noneWatched =
-          episodeValues.length > 0 &&
-          episodeValues.every((watched) => !watched);
-        let initialState;
-        if (allWatched) {
-          initialState = 1; // All watched
-        } else {
-          initialState = 0; // None watched or mixed: first click → all watched
-        }
-
-        this.seasonStates[season] = {
-          original: { ...episodeStates },
-          currentState: initialState,
-        };
-      }
-
-      const state = this.seasonStates[season];
-
-      // Determine next state based on current state
-      let targetState;
-      if (state.currentState === 0) {
-        targetState = 1; // First click: all watched
-      } else if (state.currentState === 1) {
-        targetState = 2; // Second click: all unwatched
-      } else {
-        targetState = 0; // Third click: restore original
-      }
-
-      state.currentState = targetState;
-
-      // Build episode states map for the target state
-      const episodeStates = {};
-      Object.keys(state.original).forEach((episodeNum) => {
-        if (targetState === 0) {
-          episodeStates[episodeNum] = state.original[episodeNum];
-        } else if (targetState === 1) {
-          episodeStates[episodeNum] = true;
-        } else {
-          episodeStates[episodeNum] = false;
-        }
-      });
-
-      if (this.mapShow?.inEmby === false) {
-        // Non-Emby: single event with all episode states
-        this.$emit(
-          "season-watched",
-          event,
-          this.mapShow,
-          season,
-          episodeStates,
-        );
-      } else {
-        // Emby: per-episode events (each hits Emby API individually)
-        for (const [episodeNum, setWatched] of Object.entries(episodeStates)) {
-          this.$emit(
-            "episode-click",
-            event,
-            this.mapShow,
-            season,
-            parseInt(episodeNum),
-            setWatched,
-          );
-        }
-      }
+      const next = new Set(this.selectedSeasons);
+      if (next.has(season)) next.delete(season);
+      else next.add(season);
+      this.selectedSeasons = next;
     },
 
     async setNextWatch() {

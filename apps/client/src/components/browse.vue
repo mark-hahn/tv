@@ -652,11 +652,40 @@
             </div>
             {{ curTvdb.overview }}
           </div>
-          <div
-            v-else-if="curTitle && !isLoadingNext"
-            style="color: red"
-          >
-            Not in tvdb
+          <div v-else-if="curTitle && !isLoadingNext">
+            <div style="color: red; margin-bottom: 4px">Not in tvdb</div>
+            <div v-if="curTvmazeMeta">
+              <div
+                v-if="curTvmazeMeta.genres && curTvmazeMeta.genres.length"
+                style="margin-bottom: 2px"
+              >
+                <b>Genres:</b> {{ curTvmazeMeta.genres.join(", ") }}
+              </div>
+              <div
+                v-if="curTvmazeMeta.premiered"
+                style="margin-bottom: 2px"
+              >
+                <b>Premiered:</b> {{ curTvmazeMeta.premiered }}
+              </div>
+              <div
+                v-if="curTvmazeMeta.status"
+                style="margin-bottom: 2px"
+              >
+                <b>Status:</b> {{ curTvmazeMeta.status }}
+              </div>
+              <div
+                v-if="curTvmazeMeta.network || curTvmazeMeta.webChannel"
+                style="margin-bottom: 2px"
+              >
+                <b>Network:</b>
+                {{ (curTvmazeMeta.network || curTvmazeMeta.webChannel)?.name }}
+              </div>
+              <div
+                v-if="curTvmazeMeta.summary"
+                style="margin-top: 4px"
+                v-html="curTvmazeMeta.summary"
+              ></div>
+            </div>
           </div>
         </div>
       </div>
@@ -2016,6 +2045,11 @@ export default {
       return parsedTitles.value[selectedTitleIdx.value]?.tvdbid || null;
     });
 
+    const curTvmazeMeta = computed(() => {
+      const item = parsedTitles.value[selectedTitleIdx.value];
+      return item?.data || null;
+    });
+
     const curFallbackImage = computed(() => {
       const item = parsedTitles.value[selectedTitleIdx.value];
       if (item?.data?.image?.original) {
@@ -2399,6 +2433,7 @@ export default {
       handleManualSearch,
       existingShowMatch,
       curFallbackImage,
+      curTvmazeMeta,
       snoozeList,
       isCurrentSnoozed,
       unSnoozeMode,

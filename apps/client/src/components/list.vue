@@ -952,6 +952,8 @@ export default {
               this.filterStr = String(shared.filterStr || "");
             if (shared.fltrChoice !== undefined)
               this.fltrChoice = String(shared.fltrChoice || "All");
+            if (shared.sortChoice !== undefined)
+              this.sortChoice = String(shared.sortChoice || "Viewed");
 
             const condFilters =
               shared.condFilters && typeof shared.condFilters === "object"
@@ -990,6 +992,7 @@ export default {
           fltrChoice: this.fltrChoice,
           filterStr: this.filterStr,
           condFilters,
+          sortChoice: this.sortChoice,
         };
 
         const isAllMode =
@@ -1054,8 +1057,9 @@ export default {
 
       // Custom: apply previously-shared filter state (saved by non-simple Send).
       if (activeButtons && activeButtons["Custom"]) {
+        let shared = null;
         try {
-          const shared = await srvr.getSharedFilters();
+          shared = await srvr.getSharedFilters();
           if (shared && typeof shared === "object") {
             if (shared.filterStr !== undefined)
               this.filterStr = String(shared.filterStr || "");
@@ -1078,24 +1082,9 @@ export default {
           console.error("Custom sharedFilters parse/apply failed:", e);
         }
 
-        // Preserve current sort unless an order button is active.
-        const orderToSortMap = {
-          "Added Order": "Added",
-          "Viewed Order": "Viewed",
-          "Ratings Order": "Ratings",
-          "Notes Order": "Notes",
-          "Ended Order": "Ended",
-          "Length Order": "Length",
-        };
-        let activeSortOrder = null;
-        for (const [label, isActive] of Object.entries(activeButtons || {})) {
-          if (isActive && orderToSortMap[label]) {
-            activeSortOrder = orderToSortMap[label];
-            break;
-          }
-        }
-        if (activeSortOrder) {
-          this.sortChoice = activeSortOrder;
+        // Apply sortChoice from sharedFilters if present.
+        if (shared && shared.sortChoice !== undefined) {
+          this.sortChoice = String(shared.sortChoice || "Viewed");
         }
 
         await this.select();

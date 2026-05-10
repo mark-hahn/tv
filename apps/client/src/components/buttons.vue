@@ -283,12 +283,15 @@ export default {
         this.activeButtons["Custom"] = nextVal;
 
         if (nextVal) {
-          // Clear highlights from all buttons above Custom
-          [...this.filters, ...this.genres, ...this.collections].forEach(
-            (btn) => {
-              this.activeButtons[btn] = false;
-            },
-          );
+          // Clear all other button highlights — Custom overrides everything
+          [
+            ...this.filters,
+            ...this.genres,
+            ...this.collections,
+            ...this.sortOrders,
+          ].forEach((btn) => {
+            this.activeButtons[btn] = false;
+          });
         }
         this.$emit("button-click", this.activeButtons, label);
         return;

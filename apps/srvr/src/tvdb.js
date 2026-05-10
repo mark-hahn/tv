@@ -1354,7 +1354,8 @@ async function getTmdbFallback(showName) {
 // update allTvdb & tvdb.json
 // Calculate waitStr from nextAired and lastAired dates
 // Returns string for future dates, "" for past dates, null if no dates available
-const calculateWaitStr = (nextAired, lastAired) => {
+// Appends '*' when unwatched episodes >= days until air date (no need to wait)
+const calculateWaitStr = (nextAired, lastAired, episodeCount, watchedCount) => {
   try {
     // Use the greater of nextAired and lastAired
     const next = nextAired || "";
@@ -1366,7 +1367,16 @@ const calculateWaitStr = (nextAired, lastAired) => {
     const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
     if (airDate >= today) {
       const airDateNoYr = airDate.slice(5).replace(/^0/, " ").trim();
-      return `{${airDateNoYr}}`;
+      const baseStr = `{${airDateNoYr}}`;
+      const todayMs = new Date(today).getTime();
+      const airDateMs = new Date(airDate).getTime();
+      const daysUntil = Math.round(
+        (airDateMs - todayMs) / (1000 * 60 * 60 * 24),
+      );
+      const unwatched = (episodeCount || 0) - (watchedCount || 0);
+      // needToWait: true when unwatched episodes run out before air date
+      const needToWait = unwatched < daysUntil;
+      return needToWait ? baseStr : baseStr + "*";
     }
     return ""; // past date — actively clear
   } catch (e) {
@@ -1894,7 +1904,12 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   // If the show is full (every episode watched or has a file), nothing to wait for
   const calculatedWaitStr = tvdbData.full
     ? null
-    : calculateWaitStr(tvdbData.nextAired, tvdbData.lastAired);
+    : calculateWaitStr(
+        tvdbData.nextAired,
+        tvdbData.lastAired,
+        tvdbData.episodeCount,
+        tvdbData.watchedCount,
+      );
   tvdbData.waitStr = calculatedWaitStr || null;
 
   // Flattened Sync timestamps (no nested object)
@@ -2853,7 +2868,7 @@ export const searchTvdbByImdbId = async (params) => {
       crew: crew,
       remotes: [], // Don't fetch remotes for preview
       inEmby: false,
-      WaitStr: calculateWaitStr(nextAired, lastAired),
+      WaitStr: calculateWaitStr(nextAired, lastAired, 0, 0),
     };
 
     log(

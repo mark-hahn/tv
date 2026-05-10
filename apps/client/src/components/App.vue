@@ -2071,6 +2071,9 @@ export default {
     // Map navigation is centralized through list.vue via mapAction('open')
 
     evtBus.on("showSeriesPane", () => {
+      if (this.currentPane === "map") {
+        return;
+      }
       this.handleActorsClose();
     });
 

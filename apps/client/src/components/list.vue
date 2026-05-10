@@ -1783,19 +1783,25 @@ export default {
       // console.log('List: selected show:', show);
       const wasPreview = !!this.previewMode;
       const wasAlreadySelected = show?.name === this.highlightName;
+      const keepCurrentPane = this.currentPane;
+      const preserveMapPane = keepCurrentPane === "map";
 
       if (wasPreview) this.setPreviewMode(false);
       this.saveVisShow(show, scroll);
 
       // If we just exited preview mode, always land on Series for the newly selected show.
       if (wasPreview) {
-        evtBus.emit("showSeriesPane");
+        if (!preserveMapPane) {
+          evtBus.emit("showSeriesPane");
+        }
         return;
       }
 
       // If clicking on an already-selected show, always switch to info pane.
       if (wasAlreadySelected) {
-        evtBus.emit("showSeriesPane");
+        if (!preserveMapPane) {
+          evtBus.emit("showSeriesPane");
+        }
         return;
       }
 
@@ -1810,7 +1816,7 @@ export default {
         "trailer",
         "ai",
       ]);
-      if (!keepPane.has(this.currentPane)) {
+      if (!keepPane.has(keepCurrentPane)) {
         evtBus.emit("showSeriesPane");
       }
     },
@@ -2041,6 +2047,10 @@ export default {
       }
       const options = opts && typeof opts === "object" ? opts : {};
       const showName = show.name;
+      const shouldUpdateVisibleMap =
+        !options.skipMapUpdate &&
+        this.currentPane === "map" &&
+        this.mapShow !== null;
 
       const showChanged = options.forceSetUpSeries
         ? true
@@ -2108,11 +2118,7 @@ export default {
       }
 
       // If map pane is currently showing, update it to show the newly selected show
-      if (
-        !options.skipMapUpdate &&
-        this.currentPane === "map" &&
-        this.mapShow !== null
-      ) {
+      if (shouldUpdateVisibleMap) {
         void this.seriesMapAction("open", show);
       }
 

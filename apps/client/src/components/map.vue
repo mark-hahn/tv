@@ -213,7 +213,7 @@
                 border-radius: 7px;
               "
             >
-              Watch
+              Watched
             </button>
             <button
               @click.stop="handleSelectedDelete"
@@ -1446,6 +1446,26 @@ export default {
       this.showEpisodePane = true;
       await this.selectEpisode(target.season, target.episode);
     },
+    syncOpenEpisodePaneToSelection() {
+      if (!this.showEpisodePane) return;
+
+      const target = this.getFirstSelectedCellTarget();
+      if (!target) {
+        this.clearMapSelectionDetails();
+        return;
+      }
+
+      if (
+        this.selectedEpisode?.s === target.season &&
+        this.selectedEpisode?.e === target.episode &&
+        this.episodeInfo
+      ) {
+        return;
+      }
+
+      this.showEpisodePane = true;
+      this.selectEpisode(target.season, target.episode);
+    },
     getSeasonEpisodeNumbers(season) {
       return this.seriesMapEpis.filter(
         (episode) => this.seriesMap?.[season]?.[episode],
@@ -1570,6 +1590,7 @@ export default {
       this.selectedCells = new Set([key]);
       this.selectionSeason = String(season);
       this.lastSelectedCell = key;
+      this.syncOpenEpisodePaneToSelection();
     },
     handleEpisodeClick(event, mapShow, season, episode) {
       event?.preventDefault?.();
@@ -1601,6 +1622,7 @@ export default {
         this.selectedCells = new Set([key]);
         this.selectionSeason = seasonKey;
         this.lastSelectedCell = key;
+        this.syncOpenEpisodePaneToSelection();
         return;
       }
 
@@ -1640,6 +1662,8 @@ export default {
         this.selectionSeason = seasonKey;
         this.lastSelectedCell = key;
       }
+
+      this.syncOpenEpisodePaneToSelection();
     },
     handleSeasonPlainClick(event, season) {
       event?.preventDefault?.();
@@ -1653,6 +1677,7 @@ export default {
       this.selectionSeason = null;
       this.lastSelectedCell = null;
       this.selectedSeasons = new Set([season]);
+      this.syncOpenEpisodePaneToSelection();
     },
     handleSeasonClick(event, season) {
       event?.preventDefault?.();
@@ -1670,6 +1695,7 @@ export default {
       if (next.has(season)) next.delete(season);
       else next.add(season);
       this.selectedSeasons = next;
+      this.syncOpenEpisodePaneToSelection();
     },
 
     async setNextWatch() {

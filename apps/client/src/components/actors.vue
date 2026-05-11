@@ -136,7 +136,7 @@
           >
             <span
               v-if="showingCredits && credits.length > 0"
-              style="font-size: 13px; color: #666"
+              style="font-size: 15.6px; font-weight: bold; color: #666"
             >
               {{ credits.length }} credit{{ credits.length !== 1 ? "s" : "" }}
             </span>

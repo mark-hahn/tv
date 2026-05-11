@@ -1118,18 +1118,26 @@ export default {
             (s) => String(s) !== NO_MORE_ENTRY,
           );
 
-          const nextParsed = nextTitles.map((str) => {
+          const parseTitleStr = (str) => {
+            try {
+              if (str.trim().startsWith("{")) {
+                const o = JSON.parse(str);
+                if (o.title) return o.title;
+              }
+            } catch (e) {
+              /* ignore */
+            }
             const parts = str.split("|");
             return parts[1] ? parts[1].trim() : parts[0].trim();
-          });
+          };
+
+          const nextParsed = nextTitles.map(parseTitleStr);
 
           // remove any matching title from earlier in the list to avoid duplication
           // when receiving full history from server
-          current = current.filter((s) => {
-            const parts = s.split("|");
-            const title = parts[1] ? parts[1].trim() : parts[0].trim();
-            return !nextParsed.includes(title);
-          });
+          current = current.filter(
+            (s) => !nextParsed.includes(parseTitleStr(s)),
+          );
 
           titleStrings.value = [...current, ...nextTitles];
         } else if (titleStrings.value.length === 0) {

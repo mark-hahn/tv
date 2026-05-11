@@ -906,10 +906,22 @@ export default {
       this.actorPageUrl = null;
     },
 
-    handleCreditCardClick(credit) {
+    async handleCreditCardClick(credit) {
       if (!credit || !credit.title) return;
+
+      let tvdbItem = null;
+      if (credit.imdbId) {
+        tvdbItem = await tvdb.getTvdbSearchByImdbId(credit.imdbId);
+      }
+
       evtBus.emit("showBrowsePane");
-      evtBus.emit("browseSearchTitle", credit.title);
+      if (tvdbItem && !tvdbItem.isMovie) {
+        evtBus.emit("browseShowByTvdbId", tvdbItem);
+      } else {
+        const isMovie = !!(tvdbItem && tvdbItem.isMovie);
+        const title = (tvdbItem && tvdbItem.name) || credit.title;
+        evtBus.emit("browseSearchTitle", { title, isMovie });
+      }
     },
 
     hasAnyImage(actor) {

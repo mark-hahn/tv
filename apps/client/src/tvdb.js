@@ -371,8 +371,14 @@ export const getTvdbSearchByImdbId = async (imdbId) => {
     const obj = await res.json();
     const item = obj?.data?.[0];
     if (!item) return null;
-    // remoteid endpoint nests series data under item.series
-    const s = item.series || item;
+    // remoteid endpoint nests data under item.series or item.movie
+    const s = item.series;
+    if (!s) {
+      // it's a movie or unknown type
+      const m = item.movie;
+      if (m) return { isMovie: true, name: m.name };
+      return null;
+    }
     return {
       id: s.id,
       tvdb_id: s.id,

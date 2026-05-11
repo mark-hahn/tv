@@ -659,7 +659,9 @@
             {{ curTvdb.overview }}
           </div>
           <div v-else-if="curTitle && !isLoadingNext">
-            <div style="color: red; margin-bottom: 4px">Not in tvdb</div>
+            <div style="color: red; margin-bottom: 4px">
+              {{ creditIsMovie ? curTitle + " is a movie." : "Not in tvdb" }}
+            </div>
             <div v-if="curTvmazeMeta">
               <div
                 v-if="curTvmazeMeta.genres && curTvmazeMeta.genres.length"
@@ -960,6 +962,7 @@ export default {
     const unSnoozeMode = ref(false);
     const snoozeFlash = ref(false);
     const creditShowList = ref(null);
+    const creditIsMovie = ref(false);
 
     onMounted(async () => {
       try {
@@ -982,6 +985,7 @@ export default {
 
     const onBrowseTabClicked = () => {
       showTvdbInfo.value = false;
+      creditIsMovie.value = false;
       creditShowList.value = null;
       if (props.active) {
         void handleNext();
@@ -996,9 +1000,11 @@ export default {
     };
     evtBus.on("browseShowByTvdbId", onBrowseShowByTvdbId);
 
-    const onBrowseSearchTitle = async (title) => {
+    const onBrowseSearchTitle = async ({ title, isMovie } = {}) => {
       if (!title) return;
       creditShowList.value = null;
+      creditIsMovie.value = !!isMovie;
+      await ensureBrowseStarted();
       manualSearchQuery.value = title;
       await handleManualSearch();
     };
@@ -1224,6 +1230,7 @@ export default {
         return;
       }
       creditShowList.value = null;
+      creditIsMovie.value = false;
       shouldAutoAdvance.value = false;
       if (previewMode.value) {
         evtBus.emit("exitPreviewMode");
@@ -1462,6 +1469,7 @@ export default {
         }
       } else {
         creditShowList.value = null;
+        creditIsMovie.value = false;
         unSnoozeMode.value = true;
       }
     };
@@ -2476,6 +2484,7 @@ export default {
       handleSnooze,
       handleUnSnooze,
       creditShowList,
+      creditIsMovie,
     };
   },
 };

@@ -224,7 +224,6 @@
             <button
               v-if="curTvdb"
               @click="handleSnooze"
-              :disabled="unSnoozeMode"
               :style="{
                 height: '18px',
                 margin: '0',
@@ -237,19 +236,15 @@
                 justifyContent: 'center',
                 width: '70px',
                 border: '1px solid black',
-                backgroundColor: snoozeFlash
-                  ? '#90ee90'
-                  : unSnoozeMode
-                    ? '#d3d3d3'
-                    : '',
-                cursor: unSnoozeMode ? 'default' : 'pointer',
+                backgroundColor: snoozeFlash ? '#90ee90' : '',
+                cursor: 'pointer',
               }"
             >
-              Snooze
+              {{ unSnoozeMode ? "Unsnooze" : "Snooze" }}
             </button>
             <button
               v-if="snoozeList.length > 0"
-              @click="handleUnSnooze"
+              @click="unSnoozeMode ? (unSnoozeMode = false) : handleUnSnooze()"
               :style="{
                 height: '18px',
                 margin: '0',
@@ -263,9 +258,10 @@
                 width: '101px',
                 border: '1px solid black',
                 backgroundColor: unSnoozeMode ? 'lightblue' : '',
+                cursor: 'pointer',
               }"
             >
-              UnSnooze {{ snoozeList.length }}
+              Snoozed {{ snoozeList.length }}
             </button>
             <button
               v-if="curTvdb &amp;&amp; !isLoadingNext &amp;&amp; !suppressButtons"
@@ -1227,7 +1223,6 @@ export default {
     const handleNext = async () => {
       if (unSnoozeMode.value) {
         unSnoozeMode.value = false;
-        return;
       }
       creditShowList.value = null;
       creditIsMovie.value = false;
@@ -1361,6 +1356,58 @@ export default {
     };
 
     const handleSnooze = async () => {
+      if (unSnoozeMode.value) {
+        // In snoozed mode: unsnooze selected show, stay in snoozed mode
+        if (!curTvdb.value) return;
+        const tvdbId = String(
+          curTvdb.value.tvdbId ||
+            curTvdb.value.tvdb_id ||
+            curTvdb.value.id ||
+            "",
+        );
+        if (!tvdbId) return;
+        try {
+          await fetch(`${config.torrentsApiUrl}/api/unackBrowsed`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tvdbId }),
+          });
+          const res = await fetch(`${config.tvSrvrUrl}/api/unsnooze`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tvdbId }),
+          });
+          if (res.ok) snoozeList.value = await res.json();
+        } catch (e) {
+          console.error("handleSnooze unsnooze error:", e);
+        }
+        const unsnoozeTitle = String(curTvdb.value?.name || "")
+          .trim()
+          .toLowerCase();
+        if (unsnoozeTitle) {
+          titleStrings.value = titleStrings.value.filter((s) => {
+            try {
+              const str = String(s);
+              if (str.trim().startsWith("{")) {
+                const o = JSON.parse(str);
+                return (
+                  String(o.title || "")
+                    .trim()
+                    .toLowerCase() !== unsnoozeTitle
+                );
+              } else {
+                const parts = str.split("|");
+                const t = parts[1] ? parts[1].trim() : parts[0].trim();
+                return t.toLowerCase() !== unsnoozeTitle;
+              }
+            } catch (e) {}
+            return true;
+          });
+        }
+        creditShowList.value = null;
+        creditIsMovie.value = false;
+        return;
+      }
       if (!curTvdb.value) return;
       const tvdbId = String(
         curTvdb.value.tvdb_id || curTvdb.value.tvdbId || curTvdb.value.id || "",
@@ -1415,63 +1462,11 @@ export default {
       }, 400);
     };
 
-    const handleUnSnooze = async () => {
-      if (unSnoozeMode.value) {
-        if (!curTvdb.value) return;
-        const tvdbId = String(
-          curTvdb.value.tvdbId ||
-            curTvdb.value.tvdb_id ||
-            curTvdb.value.id ||
-            "",
-        );
-        if (!tvdbId) return;
-        try {
-          await fetch(`${config.torrentsApiUrl}/api/unackBrowsed`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ tvdbId }),
-          });
-          const res = await fetch(`${config.tvSrvrUrl}/api/unsnooze`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ tvdbId }),
-          });
-          if (res.ok) snoozeList.value = await res.json();
-        } catch (e) {
-          console.error("handleUnSnooze error:", e);
-        }
-        // Remove from titleStrings so when Next returns it, it lands fresh at bottom
-        const unsnoozeTitle = String(curTvdb.value?.name || "")
-          .trim()
-          .toLowerCase();
-        if (unsnoozeTitle) {
-          titleStrings.value = titleStrings.value.filter((s) => {
-            try {
-              const str = String(s);
-              if (str.trim().startsWith("{")) {
-                const o = JSON.parse(str);
-                return (
-                  String(o.title || "")
-                    .trim()
-                    .toLowerCase() !== unsnoozeTitle
-                );
-              } else {
-                const parts = str.split("|");
-                const t = parts[1] ? parts[1].trim() : parts[0].trim();
-                return t.toLowerCase() !== unsnoozeTitle;
-              }
-            } catch (e) {}
-            return true;
-          });
-        }
-        if (snoozeList.value.length === 0) {
-          unSnoozeMode.value = false;
-        }
-      } else {
-        creditShowList.value = null;
-        creditIsMovie.value = false;
-        unSnoozeMode.value = true;
-      }
+    const handleUnSnooze = () => {
+      // Only enters snoozed mode — the Snoozed N button calls this only when not in snoozed mode
+      creditShowList.value = null;
+      creditIsMovie.value = false;
+      unSnoozeMode.value = true;
     };
 
     const isCurrentSnoozed = computed(() => {
@@ -2326,6 +2321,9 @@ export default {
 
     // Handle title selection
     const selectTitle = async (idx, fromUser = false) => {
+      if (fromUser && unSnoozeMode.value) {
+        unSnoozeMode.value = false;
+      }
       if (fromUser) {
         justFetchedNext.value = false;
         shouldAutoAdvance.value = false;

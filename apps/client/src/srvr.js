@@ -306,6 +306,14 @@ export async function setVipActors(list) {
   return httpCall("/api/setVipActors", { list }, "POST");
 }
 
+export function getGroupCounts() {
+  return httpCall("/api/getGroupCounts");
+}
+
+export function incrementGroupCount(group) {
+  return httpCall("/api/incrementGroupCount", { group }, "POST");
+}
+
 export function getDevices() {
   return httpCall("/api/getDevices");
 }

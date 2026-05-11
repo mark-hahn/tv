@@ -1119,6 +1119,7 @@ import * as util from "../util.js";
 import { config } from "../config.js";
 import Stream from "./stream.vue";
 import parseTorrentTitle from "parse-torrent-title";
+import * as srvr from "../srvr.js";
 
 export default {
   name: "Torrents",
@@ -1233,6 +1234,8 @@ export default {
       filesError: null,
       torrentFiles: [],
       filesTorrentTitle: "",
+
+      groupCounts: {},
     };
   },
 
@@ -1420,6 +1423,12 @@ export default {
     evtBus.on("openStream", this.onOpenStream);
 
     this.loadDownloadedHistory();
+    srvr
+      .getGroupCounts()
+      .then((counts) => {
+        if (counts && typeof counts === "object") this.groupCounts = counts;
+      })
+      .catch(() => {});
 
     // App-load refresh: populate space strings as soon as the component mounts.
     void this.updateSpaceAvail();
@@ -2939,6 +2948,16 @@ export default {
 
       this.downloadQueue.push({ torrent, key, forceDownload });
       this.setDownloadStatus(torrent, "queued", "");
+
+      // Track group choice immediately on send
+      const group = String(torrent?.parsed?.group || "")
+        .trim()
+        .toLowerCase();
+      if (group) {
+        this.groupCounts[group] = (this.groupCounts[group] || 0) + 1;
+        srvr.incrementGroupCount(group).catch(() => {});
+      }
+
       void this.processDownloadQueue();
     },
 
@@ -3760,7 +3779,9 @@ export default {
 
     formatGroup(group) {
       if (!group) return "";
-      return group.toLowerCase();
+      const key = group.toLowerCase();
+      const count = this.groupCounts[key];
+      return count ? `${key} (${count})` : key;
     },
 
     // Helper: extract show name from a torrent using parse-torrent-title

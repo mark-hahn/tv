@@ -1323,7 +1323,9 @@ export async function searchTorrents({
             return true;
           }
         } else {
-          // Episode torrent - check if SxxExx is in needed, OR if parent season Sxx is in needed
+          // Episode torrent - check if SxxExx is in needed, OR if parent season Sxx is in needed.
+          // The season marker Sxx is only for season-pack torrents; if individual episodes for
+          // this season are listed in needed, an individual episode torrent must match exactly.
           const seasonStr = `S${String(season).padStart(2, "0")}`;
           const episodeStr = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
 
@@ -1332,8 +1334,13 @@ export async function searchTorrents({
             return true;
           }
           if (needed.includes(seasonStr)) {
-            matchedNeeded.add(seasonStr);
-            return true;
+            const hasIndividualForSeason = needed.some((n) =>
+              n.startsWith(seasonStr + "E"),
+            );
+            if (!hasIndividualForSeason) {
+              matchedNeeded.add(seasonStr);
+              return true;
+            }
           }
         }
 

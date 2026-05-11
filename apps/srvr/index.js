@@ -28,6 +28,7 @@ import {
   SRVR_SECRETS_DIR,
 } from "./src/srvrPaths.js";
 import * as history from "./src/history.js";
+import * as groupCounts from "./src/groupCounts.js";
 
 const tvdbIdByName = (name) => {
   if (!name) return null;
@@ -3499,6 +3500,11 @@ app.post("/api/accessTvdb", apiWrapper(tvdb.accessTvdb));
 app.post("/api/getTvmazeCrew", apiWrapper(tvdb.getTvmazeCrew_cmd));
 app.get("/api/getVipActors", apiWrapper(tvdb.getVipActors));
 app.post("/api/setVipActors", apiWrapper(tvdb.setVipActors));
+app.get("/api/getGroupCounts", apiWrapper(groupCounts.getGroupCounts));
+app.post(
+  "/api/incrementGroupCount",
+  apiWrapper(groupCounts.incrementGroupCount),
+);
 app.post(
   "/api/triggerEmbySync",
   apiWrapper(async () => {

@@ -1118,11 +1118,26 @@ function derollSrt(entries) {
 function sanitizeSrt(raw) {
   const stripped = stripSrtFormatting(raw);
   const entries = parseSrt(stripped);
-  const derolled = derollSrt(entries);
-  if (derolled.length !== entries.length) {
+  // Sort by start time to fix out-of-order entries from embedded extraction
+  const sorted = [...entries].sort((a, b) => a.startMs - b.startMs);
+  // Merge entries with identical timestamps (two cues at same time → one entry)
+  const merged = [];
+  for (const e of sorted) {
+    const prev = merged[merged.length - 1];
+    if (prev && prev.startMs === e.startMs && prev.endMs === e.endMs) {
+      prev.text = prev.text + "\n" + e.text;
+    } else {
+      merged.push({ ...e });
+    }
+  }
+  const reordered = sorted.some((e, i) => e !== entries[i]);
+  const changed =
+    reordered || merged.length !== entries.length || stripped !== raw;
+  const derolled = derollSrt(merged);
+  if (changed || derolled.length !== merged.length) {
     return serializeSrt(derolled);
   }
-  return stripped !== raw ? stripped : null;
+  return null;
 }
 
 async function generateEmbSrts(

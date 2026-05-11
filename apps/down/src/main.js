@@ -2870,8 +2870,29 @@ async function main() {
       }
 
       if (flexHistKeyExists && flexHistMostRecentSent) {
-        // Allow only if USB file matches the quality (resolution + bit-depth) of what was sent.
-        if (!flexFileIsBetterThanSent(fname, flexHistMostRecentSent)) {
+        // Allow through if the file is not actually on disk (sent but never landed).
+        var _epOnDisk = false;
+        try {
+          if (flexSeRe) {
+            var _seasonFiles = fs.readdirSync(tvSeasonPath);
+            _epOnDisk = _seasonFiles.some(function (f) {
+              return flexSeRe.test(f);
+            });
+          }
+        } catch (e4) {
+          // Season dir doesn't exist — not on disk.
+        }
+        // Allow only if USB file is better quality than sent, OR file is missing from disk.
+        if (
+          !_epOnDisk &&
+          !flexFileIsBetterThanSent(fname, flexHistMostRecentSent)
+        ) {
+          trace("checkFileExists: flex sent but not on disk, allowing", {
+            fname,
+            flexSeStr,
+          });
+          // fall through to download
+        } else if (!flexFileIsBetterThanSent(fname, flexHistMostRecentSent)) {
           existsCount++;
           log(
             "------",

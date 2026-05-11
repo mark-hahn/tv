@@ -161,7 +161,13 @@
                 padding: 4px 10px;
               "
             >
-              {{ creditsLoading ? "Loading..." : "All Credits" }}
+              {{
+                creditsLoading
+                  ? "Loading..."
+                  : showingCredits
+                    ? "Hide Credits"
+                    : "All Credits"
+              }}
             </button>
             <button
               @click.stop="handleVipButton"
@@ -763,6 +769,13 @@ export default {
         new Date().toISOString(),
       );
       if (!this.selectedActor) return;
+
+      // Toggle off if already showing
+      if (this.showingCredits) {
+        this.showingCredits = false;
+        return;
+      }
+
       const name = String(
         this.selectedActor?.personName || this.selectedActor?.name || "",
       ).trim();

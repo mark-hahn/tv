@@ -31,7 +31,13 @@
         :imdbid="curImdbId"
         :tvdbid="curTvdbId"
         :fallbackImage="curFallbackImage"
-        :explicitList="unSnoozeMode ? snoozeList : null"
+        :explicitList="
+          creditShowList !== null
+            ? creditShowList
+            : unSnoozeMode
+              ? snoozeList
+              : null
+        "
         @select="handleGallerySelect"
         @preview="handleGalleryPreview"
         @search-complete="handleSearchComplete"
@@ -953,6 +959,7 @@ export default {
     const snoozeList = ref([]);
     const unSnoozeMode = ref(false);
     const snoozeFlash = ref(false);
+    const creditShowList = ref(null);
 
     onMounted(async () => {
       try {
@@ -975,11 +982,27 @@ export default {
 
     const onBrowseTabClicked = () => {
       showTvdbInfo.value = false;
+      creditShowList.value = null;
       if (props.active) {
         void handleNext();
       }
     };
     evtBus.on("browseTabClicked", onBrowseTabClicked);
+
+    const onBrowseShowByTvdbId = (tvdbItem) => {
+      if (!tvdbItem) return;
+      creditShowList.value = [tvdbItem];
+      shouldAutoAdvance.value = false;
+    };
+    evtBus.on("browseShowByTvdbId", onBrowseShowByTvdbId);
+
+    const onBrowseSearchTitle = async (title) => {
+      if (!title) return;
+      creditShowList.value = null;
+      manualSearchQuery.value = title;
+      await handleManualSearch();
+    };
+    evtBus.on("browseSearchTitle", onBrowseSearchTitle);
 
     const onShowSelected = () => {
       loadingShowSelection.value = false;
@@ -1017,6 +1040,8 @@ export default {
     onUnmounted(() => {
       evtBus.off("previewMode", onPreviewMode);
       evtBus.off("browseTabClicked", onBrowseTabClicked);
+      evtBus.off("browseShowByTvdbId", onBrowseShowByTvdbId);
+      evtBus.off("browseSearchTitle", onBrowseSearchTitle);
       evtBus.off("showSelected", onShowSelected);
       evtBus.off("tvdbUpdated", onTvdbUpdated);
     });
@@ -1198,6 +1223,7 @@ export default {
         unSnoozeMode.value = false;
         return;
       }
+      creditShowList.value = null;
       shouldAutoAdvance.value = false;
       if (previewMode.value) {
         evtBus.emit("exitPreviewMode");
@@ -1435,6 +1461,7 @@ export default {
           unSnoozeMode.value = false;
         }
       } else {
+        creditShowList.value = null;
         unSnoozeMode.value = true;
       }
     };
@@ -2448,6 +2475,7 @@ export default {
       snoozeFlash,
       handleSnooze,
       handleUnSnooze,
+      creditShowList,
     };
   },
 };

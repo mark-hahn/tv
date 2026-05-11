@@ -348,6 +348,47 @@ export const srchTvdbData = async (searchStr) => {
   return data;
 };
 
+export const getTvdbByImdbId = async (imdbId) => {
+  if (!imdbId) return null;
+  try {
+    const res = await tvdbFetch(
+      "search/remoteid/" + encodeURIComponent(imdbId),
+    );
+    const obj = await res.json();
+    const item = obj?.data?.[0];
+    return item?.series?.id ?? item?.tvdb_id ?? null;
+  } catch (e) {
+    return null;
+  }
+};
+
+export const getTvdbSearchByImdbId = async (imdbId) => {
+  if (!imdbId) return null;
+  try {
+    const res = await tvdbFetch(
+      "search/remoteid/" + encodeURIComponent(imdbId),
+    );
+    const obj = await res.json();
+    const item = obj?.data?.[0];
+    if (!item) return null;
+    // remoteid endpoint nests series data under item.series
+    const s = item.series || item;
+    return {
+      id: s.id,
+      tvdb_id: s.id,
+      name: s.name,
+      year: s.year,
+      image_url: s.image,
+      thumbnail: s.image,
+      overview: s.overview,
+      primary_language: s.originalLanguage,
+      country: s.originalCountry,
+    };
+  } catch (e) {
+    return null;
+  }
+};
+
 //////////// get episode data //////////////
 
 export const getEpisode = async (showName, seasonNum, episodeNum) => {

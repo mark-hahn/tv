@@ -2077,6 +2077,12 @@ export default {
       this.handleActorsClose();
     });
 
+    evtBus.on("showBrowsePane", () => {
+      if (this.simpleMode) return;
+      this.currentPane = "browse";
+      evtBus.emit("paneChanged", this.currentPane);
+    });
+
     evtBus.on("showLocalPane", () => {
       if (this.simpleMode) return;
       this.currentPane = "local";

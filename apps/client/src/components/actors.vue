@@ -907,21 +907,9 @@ export default {
     },
 
     handleCreditCardClick(credit) {
-      if (!credit || !credit.imdbId) return;
-
-      // Prepare the search choice data structure for preview mode
-      const srchChoice = {
-        name: credit.title,
-        tvdbId: null, // We only have imdbId, not tvdbId
-        imdbId: credit.imdbId,
-        overview: null, // Will be filled from TVDB data
-        // Add image if available
-        imageUrl: credit.imageUrl,
-      };
-
-      // Emit event to trigger preview mode (same as browse pane)
-      evtBus.emit("reelSearchAction", { srchChoice, action: "preview" });
-      // Don't deselect actor - keep it selected
+      if (!credit || !credit.title) return;
+      evtBus.emit("showBrowsePane");
+      evtBus.emit("browseSearchTitle", credit.title);
     },
 
     hasAnyImage(actor) {

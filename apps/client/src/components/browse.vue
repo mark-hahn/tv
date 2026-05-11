@@ -96,6 +96,11 @@
               gap: '5px',
             }"
           >
+            <span
+              v-if="streamNotFound"
+              style="color: red; font-weight: bold; font-size: 13px"
+              >Stream not found</span
+            >
             <button
               @click="handleStream"
               :style="{
@@ -797,6 +802,7 @@ export default {
     const snoozeFlash = ref(false);
     const creditShowList = ref(null);
     const creditIsMovie = ref(false);
+    const streamNotFound = ref(false);
 
     onMounted(async () => {
       try {
@@ -1835,10 +1841,32 @@ export default {
       return "";
     });
 
-    const handleStream = () => {
+    const handleStream = async () => {
       const t = curTvdb.value;
       const name = galleryTitleLine.value;
       if (!name) return;
+
+      // Pre-fetch providers before switching panes
+      let providers = [];
+      try {
+        const params = { showName: name };
+        const res = await srvr.getStreamProviders(params);
+        providers = res?.providers || [];
+      } catch (e) {
+        // treat fetch error as not found
+      }
+
+      if (!providers.length) {
+        streamNotFound.value = true;
+        // Exit preview mode if we had entered it
+        if (previewMode.value) {
+          evtBus.emit("exitPreviewMode");
+        }
+        setTimeout(() => {
+          streamNotFound.value = false;
+        }, 750);
+        return;
+      }
 
       // If show exists in list, just emit stream event (App.vue currentShow is already set)
       const tvdbId = String(t?.tvdbId || t?.tvdb_id || t?.id || "").trim();
@@ -2123,6 +2151,7 @@ export default {
       handleGalleryPreview,
       handleDebugClick,
       handleStream,
+      streamNotFound,
       debugFlash,
       selectTitle,
       handleNext,

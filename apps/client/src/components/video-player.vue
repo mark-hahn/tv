@@ -377,7 +377,11 @@ export default {
       const track = this.activeTrack;
       if (!track || !this.path) return null;
       const base = `${TV_SRVR_URL}/api/subtitle?path=${encodeURIComponent(this.path)}`;
-      if (track.type === "embedded" || track.type === "pgs")
+      if (
+        track.type === "embedded" ||
+        track.type === "forced" ||
+        track.type === "pgs"
+      )
         return `${base}&index=${track.index}`;
       if (track.type === "srt") {
         let url = `${base}&file=${encodeURIComponent(track.file)}`;
@@ -412,6 +416,7 @@ export default {
         let char;
         if (t.type === "pgs") char = "*";
         else if (t.type === "embedded") char = "t";
+        else if (t.type === "forced") char = "f";
         else if (/\.asr\.srt$/.test(t.file || "")) char = "+";
         else if (/\.mb\d+\.srt$/.test(t.file || "")) char = "e";
         else if (/\.opn[A-Z2-7]{5}\.srt$/i.test(t.file || "")) char = "v";
@@ -636,7 +641,7 @@ export default {
       for (const t of this.subtitleTracks) {
         if (t.type === "pgs")
           embeddedCounts.pgs = (embeddedCounts.pgs || 0) + 1;
-        else if (t.type === "embedded")
+        else if (t.type === "embedded" || t.type === "forced")
           embeddedCounts.text = (embeddedCounts.text || 0) + 1;
         else if (
           t.type === "srt" &&
@@ -666,7 +671,7 @@ export default {
       for (const t of this.subtitleTracks) {
         if (t.type === "pgs")
           embeddedCounts.pgs = (embeddedCounts.pgs || 0) + 1;
-        else if (t.type === "embedded")
+        else if (t.type === "embedded" || t.type === "forced")
           embeddedCounts.text = (embeddedCounts.text || 0) + 1;
         else if (
           t.type === "srt" &&
@@ -708,7 +713,7 @@ export default {
     },
     async clickGenSrt() {
       const embedded = this.subtitleTracks.filter(
-        (t) => t.type === "embedded" || t.type === "pgs",
+        (t) => t.type === "embedded" || t.type === "forced" || t.type === "pgs",
       );
       const currentIdx = embedded.findIndex((t) => t.id === this.activeTrackId);
       if (currentIdx >= 0 && currentIdx < embedded.length - 1) {
@@ -733,7 +738,11 @@ export default {
           chksrtSelect(this.path, selectedSrtPath)
             .then(() => this.$emit("chksrt-next", null))
             .catch((e) => console.error("[chksrt] select error:", e));
-        } else if (choice.type === "embedded" || choice.type === "pgs") {
+        } else if (
+          choice.type === "embedded" ||
+          choice.type === "forced" ||
+          choice.type === "pgs"
+        ) {
           this._saveChksrtHistory(choiceLabel);
           chksrtSelect(this.path, null)
             .then(() => this.$emit("chksrt-next", null))

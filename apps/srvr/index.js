@@ -4099,14 +4099,15 @@ app.get("/api/subtitle-list", async (req, res) => {
     for (const s of streams.filter((s) => s.codec_type === "subtitle")) {
       const lang = (s.tags?.language || "").toLowerCase();
       if (lang && lang !== "eng" && lang !== "en") continue;
-      if (s.disposition?.forced === 1) continue;
       const label = s.tags?.title || s.tags?.language || "eng";
       const isPgs =
         s.codec_name === "hdmv_pgs_subtitle" || s.codec_name === "dvb_subtitle";
+      if (isPgs && s.disposition?.forced === 1) continue;
+      const isForced = !isPgs && s.disposition?.forced === 1;
       tracks.push({
         id: `emb-${s.index}`,
         label,
-        type: isPgs ? "pgs" : "embedded",
+        type: isPgs ? "pgs" : isForced ? "forced" : "embedded",
         index: s.index,
       });
     }
@@ -4130,6 +4131,7 @@ app.get("/api/subtitle-list", async (req, res) => {
     const charFor = (t) => {
       if (t.type === "pgs") return "*";
       if (t.type === "embedded") return "t";
+      if (t.type === "forced") return "f";
       if (/\.asr\.srt$/.test(t.file || "")) return "+";
       if (/\.mb\d+\.srt$/.test(t.file || "")) return ">";
       if (/\.opn[A-Z2-7]{5}\.srt$/i.test(t.file || "")) return "v";
@@ -4207,14 +4209,15 @@ app.get("/api/episodeSubs", async (req, res) => {
     for (const s of streams.filter((s) => s.codec_type === "subtitle")) {
       const lang = (s.tags?.language || "").toLowerCase();
       if (lang && lang !== "eng" && lang !== "en") continue;
-      if (s.disposition?.forced === 1) continue;
       const label = s.tags?.title || s.tags?.language || "eng";
       const isPgs =
         s.codec_name === "hdmv_pgs_subtitle" || s.codec_name === "dvb_subtitle";
+      if (isPgs && s.disposition?.forced === 1) continue;
+      const isForced = !isPgs && s.disposition?.forced === 1;
       tracks.push({
         id: `emb-${s.index}`,
         label,
-        type: isPgs ? "pgs" : "embedded",
+        type: isPgs ? "pgs" : isForced ? "forced" : "embedded",
         index: s.index,
       });
     }

@@ -302,31 +302,6 @@
               Get
             </button>
             <button
-              v-if="
-                hasTvdbEntry &&
-                !existingShowMatch &&
-                !isLoadingNext &&
-                !suppressButtons
-              "
-              @click="toggleTvdbInfo"
-              :style="{
-                height: '18px',
-                margin: '0',
-                padding: '0 2px',
-                lineHeight: '18px',
-                fontSize: '15px',
-                boxSizing: 'border-box',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '70px',
-                backgroundColor: showTvdbInfo ? '#d3d3d3' : '#FFCCCB',
-                border: '1px solid black',
-              }"
-            >
-              Tvdb
-            </button>
-            <button
               v-if="existingShowMatch && !isLoadingNext && !suppressButtons"
               @click="handleSelectExisting(existingShowMatch.name)"
               :style="{
@@ -509,142 +484,6 @@
           @wheel.stop.prevent="handleScaledWheel"
           @click.stop
         >
-          <div
-            v-if="showTvdbInfo && matchingTvdbEntry"
-            :style="{
-              display: 'flex',
-              flexDirection: 'column',
-              textAlign: 'center',
-              fontWeight: 'bold',
-              lineHeight: '1.2',
-            }"
-          >
-            <div
-              :style="{
-                border: '1px solid #ccc',
-                borderRadius: '5px',
-                padding: '5px',
-                width: '100%',
-                boxSizing: 'border-box',
-              }"
-            >
-              <div
-                v-if="tvdbInfo.dates"
-                style="
-                  min-height: 24px;
-                  white-space: normal;
-                  display: -webkit-box;
-                  -webkit-box-orient: vertical;
-                  -webkit-line-clamp: 2;
-                  line-clamp: 2;
-                  overflow: hidden;
-                "
-              >
-                {{ tvdbInfo.dates }}
-              </div>
-              <div
-                v-if="tvdbInfo.status"
-                v-html="tvdbInfo.status"
-                style="
-                  min-height: 20px;
-                  white-space: nowrap;
-                  overflow: hidden;
-                  text-overflow: ellipsis;
-                "
-              ></div>
-              <div
-                v-if="tvdbInfo.seasons"
-                v-html="tvdbInfo.seasons"
-                style="
-                  min-height: 24px;
-                  white-space: nowrap;
-                  overflow: hidden;
-                  text-overflow: ellipsis;
-                  margin-top: 5px;
-                "
-              ></div>
-              <!-- <div
-                v-if="tvdbInfo.cntryLangLeft || tvdbInfo.cntryLangRight"
-                style="
-                  min-height: 20px;
-                  display: flex;
-                  flex-wrap: wrap;
-                  justify-content: center;
-                  column-gap: 8px;
-                  margin-top: 5px;
-                "
-              >
-                <div
-                  v-if="tvdbInfo.cntryLangLeft"
-                  style="white-space: nowrap"
-                >
-                  {{ tvdbInfo.cntryLangLeft }}
-                </div>
-                <div
-                  v-if="tvdbInfo.cntryLangRight"
-                  style="
-                    white-space: normal;
-                    overflow-wrap: anywhere;
-                    word-break: break-word;
-                  "
-                >
-                  {{ tvdbInfo.cntryLangRight }}
-                </div>
-              </div> -->
-              <!-- <div
-                v-if="tvdbInfo.watched"
-                style="
-                  min-height: 20px;
-                  white-space: nowrap;
-                  overflow: hidden;
-                  text-overflow: ellipsis;
-                  margin-top: 5px;
-                "
-              >
-                {{ tvdbInfo.watched }}
-              </div> -->
-              <div
-                v-if="tvdbInfo.runtime"
-                style="
-                  min-height: 20px;
-                  white-space: nowrap;
-                  overflow: hidden;
-                  text-overflow: ellipsis;
-                  margin-top: 5px;
-                "
-              >
-                {{ tvdbInfo.runtime }}
-              </div>
-              <div
-                v-if="tvdbInfo.inEmby === false"
-                style="
-                  min-height: 20px;
-                  white-space: nowrap;
-                  overflow: hidden;
-                  text-overflow: ellipsis;
-                  margin-top: 5px;
-                  color: red;
-                "
-              >
-                Not in Emby
-              </div>
-              <div
-                v-if="tvdbInfo.existingShowName"
-                style="
-                  display: flex;
-                  justify-content: flex-start;
-                  margin-top: 5px;
-                "
-              >
-                <button
-                  @click="handleSelectExisting(tvdbInfo.existingShowName)"
-                  style="font-size: 14px; padding: 2px 8px; cursor: pointer"
-                >
-                  Select
-                </button>
-              </div>
-            </div>
-          </div>
           <div v-if="curTvdb">
             <div
               v-if="isCurrentSnoozed"
@@ -951,7 +790,6 @@ export default {
     const suppressButtons = ref(false);
     const previewMode = ref(false);
     const allTvdbData = ref(null);
-    const showTvdbInfo = ref(false);
     const loadingShowSelection = ref(false);
     const loadingShowName = ref("");
     const snoozeList = ref([]);
@@ -980,7 +818,6 @@ export default {
     evtBus.on("previewMode", onPreviewMode);
 
     const onBrowseTabClicked = () => {
-      showTvdbInfo.value = false;
       creditIsMovie.value = false;
       creditShowList.value = null;
       if (props.active) {
@@ -1506,45 +1343,8 @@ export default {
       );
     });
 
-    const matchingTvdbEntry = computed(() => {
-      const all = allTvdbData.value;
-      const t = curTvdb.value;
-      if (!all || !t) return null;
-
-      const currentTvdbId = String(t.tvdb_id || t.tvdbId || t.id || "").trim();
-      const currentName = String(
-        t.name || t.name || t.seriesName || t.title || "",
-      ).trim();
-
-      if (!currentTvdbId && !currentName) return null;
-
-      const getEntryTvdbId = (entry) =>
-        String(
-          entry?.tvdb_id || entry?.tvdbId || entry?.tvdbId || entry?.id || "",
-        ).trim();
-
-      const isRealTvdbEntry = (entry) => {
-        if (!entry || typeof entry !== "object") return false;
-        return !!getEntryTvdbId(entry);
-      };
-
-      if (currentTvdbId) {
-        for (const entry of Object.values(all)) {
-          if (!entry || typeof entry !== "object") continue;
-          if (!isRealTvdbEntry(entry)) continue;
-          if (getEntryTvdbId(entry) === currentTvdbId) return entry;
-        }
-      }
-
-      if (!currentName) return null;
-      const byName = all[currentName] || null;
-      if (!isRealTvdbEntry(byName)) return null;
-
-      if (!currentTvdbId) return byName;
-      return getEntryTvdbId(byName) === currentTvdbId ? byName : null;
-    });
-
-    const hasTvdbEntry = computed(() => !!matchingTvdbEntry.value);
+    const matchingTvdbEntry = computed(() => null);
+    const hasTvdbEntry = computed(() => false);
 
     const existingShowMatch = computed(() => {
       const t = curTvdb.value;
@@ -1567,130 +1367,9 @@ export default {
       });
     });
 
-    const toggleTvdbInfo = () => {
-      const t = curTvdb.value;
-      if (t) {
-        const name = t.name || t.name || t.seriesName || t.title;
-        if (name) {
-          const tvdbId = String(t.tvdb_id || t.tvdbId || t.id || "").trim();
-          handleSelectExisting(name, { tvdbId });
-          return;
-        }
-      }
-      showTvdbInfo.value = !showTvdbInfo.value;
-    };
-
-    const watchedStatus = computed(() => {
-      const data = matchingTvdbEntry.value;
-      if (!data) return "";
-
-      if ((data.episodeCount ?? 0) > 0) {
-        let wCount = data.watchedCount ?? 0;
-        if (data.id && data.inEmby === false) wCount = 0;
-        const total = data.episodeCount;
-        if (wCount === total) {
-          return `Watched all ${total} episodes`;
-        } else {
-          return `Watched ${wCount} of ${total}`;
-        }
-      }
-      return "";
-    });
-
-    const tvdbInfo = computed(() => {
-      const data = matchingTvdbEntry.value;
-      if (!data) return {};
-
-      const info = {};
-
-      const {
-        firstAired,
-        lastAired,
-        status,
-        seasonCount,
-        originalCountry,
-        originalLanguage,
-        originalNetwork,
-        averageRuntime,
-        inEmby,
-        tvdb_id,
-        tvdbId,
-      } = data;
-
-      const fa = firstAired || "";
-      const la = lastAired || "";
-      const st = status || "";
-      if (fa && la) info.dates = `${fa} - ${la}`;
-      else if (fa) info.dates = `${fa}`;
-      else if (la) info.dates = `${la}`;
-
-      info.status = st ? ` &nbsp; ${st}` : "";
-
-      let seasonsTxt = "";
-      switch (seasonCount) {
-        case 0:
-          break;
-        case 1:
-          seasonsTxt = "1 Season";
-          break;
-        default:
-          seasonsTxt = `${seasonCount} Seasons`;
-      }
-      info.seasons = seasonsTxt ? ` &nbsp; ${seasonsTxt}` : "";
-
-      const capWords = (raw) => {
-        const s = String(raw || "").trim();
-        if (!s) return "";
-        if (s === "UK") return "UK";
-        return s
-          .toLowerCase()
-          .split(/\s+/)
-          .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ""))
-          .join(" ");
-      };
-
-      let oc = String(originalCountry || "")
-        .trim()
-        .toUpperCase();
-      if (oc === "GBR" || oc === "gbr") oc = "UK";
-
-      const ol = capWords(originalLanguage);
-      let on = String(originalNetwork || "");
-      if (on.includes("Amazon")) on = "Amazon";
-      if (on.includes("Paramount+")) on = "Paramount+";
-      on = on.trim().toUpperCase();
-
-      // const left = `${oc}${oc ? "/" : ""}${ol}`.trim();
-      // if (left) info.cntryLangLeft = left;
-      // if (on) info.cntryLangRight = on;
-
-      if (averageRuntime) info.runtime = `${averageRuntime} Mins`;
-
-      if (inEmby === false) info.inEmby = false;
-
-      if (data.name && allTvdbData.value) {
-        const local = allTvdbData.value[data.name];
-        if (local && (local.episodeCount ?? 0) > 0) {
-          let wCount = local.watchedCount ?? 0;
-          if (local.id && local.inEmby === false) wCount = 0;
-          const total = local.episodeCount;
-          if (wCount === total) {
-            info.watched = `Watched all ${total} episodes`;
-          } else {
-            info.watched = `Watched ${wCount} of ${total}`;
-          }
-        }
-      }
-
-      const tId = String(tvdb_id || tvdbId || "").trim();
-      if (data.name || tId) {
-        if (existingShowMatch.value) {
-          info.existingShowName = existingShowMatch.value.name;
-        }
-      }
-
-      return info;
-    });
+    const toggleTvdbInfo = () => {};
+    const watchedStatus = computed(() => "");
+    const tvdbInfo = computed(() => ({}));
 
     const handleSelectExisting = async (name, options = {}) => {
       if (!name) {
@@ -2006,7 +1685,6 @@ export default {
     watch(
       () => props.active,
       async (isActive) => {
-        if (!isActive) showTvdbInfo.value = false;
         if (!isActive) return;
         if (_didInitialVisibleScroll.value) return;
         if (!_titlesPopulated.value) return;
@@ -2295,7 +1973,6 @@ export default {
     watch(
       curTvdb,
       async (val) => {
-        showTvdbInfo.value = false;
         void loadRemotesForTvdb(val);
         await nextTick();
         if (titlesPane.value) {
@@ -2468,7 +2145,7 @@ export default {
       hasTvdbEntry,
       toggleTvdbInfo,
       tvdbInfo,
-      showTvdbInfo,
+      showTvdbInfo: ref(false),
       watchedStatus,
       manualSearchQuery,
       handleManualSearch,

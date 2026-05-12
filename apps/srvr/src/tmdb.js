@@ -121,10 +121,20 @@ export async function searchPerson(params) {
 }
 
 export async function getStreamProviders(params) {
-  const { showName, year } = params;
+  let { showName, year } = params;
+
+  // Strip trailing (YYYY) from show name and use as year if not already provided
+  const yearMatch = String(showName || "").match(/\s*\((\d{4})\)$/);
+  if (yearMatch) {
+    if (!year) year = yearMatch[1];
+    showName = showName.slice(0, showName.length - yearMatch[0].length).trim();
+  }
 
   const searchRes = await moviedb.searchTv({ query: showName });
-  const match = smartTitleMatch(showName, searchRes.results || [], year, false);
+  let match = smartTitleMatch(showName, searchRes.results || [], year, false);
+  if (!match?.id && year) {
+    match = smartTitleMatch(showName, searchRes.results || [], null, false);
+  }
   if (!match?.id) return { providers: [], error: "show not found" };
 
   const COUNTRIES = ["US", "GB", "AU"];

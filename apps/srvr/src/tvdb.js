@@ -1375,7 +1375,7 @@ const calculateWaitStr = (nextAired, lastAired, episodeCount, watchedCount) => {
       );
       const unwatched = (episodeCount || 0) - (watchedCount || 0);
       // needToWait: true when unwatched episodes run out before air date
-      const needToWait = unwatched < daysUntil;
+      const needToWait = unwatched < daysUntil + 2;
       return needToWait ? baseStr : baseStr + "*";
     }
     return ""; // past date — actively clear

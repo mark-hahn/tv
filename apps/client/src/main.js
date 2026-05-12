@@ -1,6 +1,5 @@
 import { createApp } from "vue";
 import App from "./components/App.vue";
-import { initBtnTips } from "./btnTip.js";
 
 const DEBUG_CLICKS = true;
 
@@ -20,4 +19,3 @@ if (DEBUG_CLICKS) {
 
 const app = createApp(App);
 app.mount("#app");
-initBtnTips();

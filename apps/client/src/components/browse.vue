@@ -96,6 +96,18 @@
               gap: '5px',
             }"
           >
+            <input
+              id="browseSearch"
+              v-model="manualSearchQuery"
+              @keyup.enter="handleManualSearch"
+              placeholder="Search"
+              :style="{
+                border: '1px solid #ccc',
+                borderRadius: '3px',
+                padding: '2px 5px',
+                width: '120px',
+              }"
+            />
             <span
               v-if="streamNotFound"
               style="color: red; font-weight: bold; font-size: 13px"
@@ -114,33 +126,6 @@
             >
               Stream
             </button>
-            <button
-              @click="handleDebugClick"
-              :style="{
-                height: '24px',
-                backgroundColor: debugFlash ? '#4CAF50' : 'white',
-                fontSize: '13px',
-                padding: '2px 8px',
-                border: '1px solid black',
-                borderRadius: '3px',
-                cursor: 'pointer',
-                transition: 'background-color 0.15s ease',
-              }"
-            >
-              Save Tvdb
-            </button>
-            <input
-              id="browseSearch"
-              v-model="manualSearchQuery"
-              @keyup.enter="handleManualSearch"
-              placeholder="Search"
-              :style="{
-                border: '1px solid #ccc',
-                borderRadius: '3px',
-                padding: '2px 5px',
-                width: '80px',
-              }"
-            />
           </div>
         </div>
         <div
@@ -652,6 +637,7 @@ import {
   getRemotes,
   applyTvdbPush,
   srchTvdbData,
+  getGenresByTvdbId,
 } from "../tvdb.js";
 
 export default {
@@ -779,7 +765,6 @@ export default {
     const shouldAutoAdvance = ref(false);
     const getRemotesResults = ref([]);
     const _lastRemotesKey = ref("");
-    const debugFlash = ref(false);
     const titleStrings = ref([]);
     const selectedTitleIdx = ref(-1);
     const titlesPane = ref(null);
@@ -1586,40 +1571,6 @@ export default {
       }
     };
 
-    const handleDebugClick = async () => {
-      try {
-        if (!curTvdb.value) {
-          console.log("No show selected in gallery");
-          return;
-        }
-
-        const tvdbId =
-          curTvdb.value.tvdb_id || curTvdb.value.tvdbId || curTvdb.value.id;
-        const name = curTvdb.value.name;
-
-        if (!tvdbId) {
-          console.log("Selected show has no TvdbId:", name);
-          return;
-        }
-
-        console.log("Fetching TVDB API data for:", name, "TvdbId:", tvdbId);
-
-        debugFlash.value = true;
-        setTimeout(() => {
-          debugFlash.value = false;
-        }, 300);
-
-        const result = await srvr.debugTvdb({
-          name: name,
-          tvdbId: tvdbId,
-        });
-
-        console.log("Debug result:", result);
-      } catch (e) {
-        console.error("debugClick failed:", e);
-      }
-    };
-
     const toastMessage = ref("");
     let toastTimer = null;
 
@@ -1821,8 +1772,8 @@ export default {
         }
       }
 
-      if (browseItem?.data?.genres?.length) {
-        line += ` | ${browseItem.data.genres.join(", ")}`;
+      if (t.genres?.length) {
+        line += ` | ${t.genres.join(", ")}`;
       }
       return line;
     });
@@ -1976,6 +1927,38 @@ export default {
         }
         curTvdb.value = tvdb;
       }
+
+      // Attach genres from tvdb.json or fetch from TVDB extended API
+      if (curTvdb.value && !curTvdb.value.genres?.length) {
+        const tvdbId = String(
+          curTvdb.value.tvdb_id ||
+            curTvdb.value.tvdbId ||
+            curTvdb.value.id ||
+            "",
+        );
+        const name = String(curTvdb.value.name || "");
+        let genres = null;
+        if (allTvdbData.value) {
+          const rec = tvdbId
+            ? Object.values(allTvdbData.value).find(
+                (r) => String(r.tvdbId || "") === tvdbId,
+              )
+            : null;
+          if (!rec && name) {
+            const found = allTvdbData.value[name];
+            if (found?.genres?.length) genres = found.genres;
+          } else if (rec?.genres?.length) {
+            genres = rec.genres;
+          }
+        }
+        if (!genres?.length && tvdbId) {
+          genres = await getGenresByTvdbId(tvdbId);
+        }
+        if (genres?.length) {
+          curTvdb.value = { ...curTvdb.value, genres };
+        }
+      }
+
       postBrowseHistory("browse", curTvdb.value);
       if (previewMode.value) {
         handlePreview();
@@ -2149,10 +2132,8 @@ export default {
       handleGallerySelect,
       handleSearchComplete,
       handleGalleryPreview,
-      handleDebugClick,
       handleStream,
       streamNotFound,
-      debugFlash,
       selectTitle,
       handleNext,
       handlePreview,

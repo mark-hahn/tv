@@ -1575,6 +1575,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     originalNetwork: originalNetworkIn,
     status: statusIn,
     trailers: trailersIn,
+    genres: genresIn,
   } = extResObj.data;
   const image = getTvdbImageUrl(extResObj);
   const characters = getTvdbCharacters(extResObj);
@@ -1721,13 +1722,14 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     imdbVideo: fetchedUrls.imdbVideo ?? existing.imdbVideo ?? null,
     rottenUrl: fetchedUrls.rottenUrl ?? existing.rottenUrl ?? null,
     rottenRatings: fetchedUrls.rottenRatings ?? existing.rottenRatings ?? null,
+    genres:
+      genresIn?.map((g) => g.name).filter(Boolean) || existing.genres || [],
   };
 
   // Add optional TMDB-only fields if available
   if (tmdbData?.backdrop)
     tvdbData.backdrop = preserve(null, existing.backdrop, tmdbData.backdrop);
-  if (tmdbData?.genres)
-    tvdbData.genres = preserve(null, existing.genres, tmdbData.genres);
+  if (tmdbData?.genres?.length) tvdbData.genres = tmdbData.genres; // TMDB genre names preferred over TVDB extended
   if (tmdbData?.homepage)
     tvdbData.homepage = preserve(null, existing.homepage, tmdbData.homepage);
   if (tmdbData?.tagline)

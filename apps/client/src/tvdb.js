@@ -348,6 +348,17 @@ export const srchTvdbData = async (searchStr) => {
   return data;
 };
 
+export const getGenresByTvdbId = async (tvdbId) => {
+  if (!tvdbId) return [];
+  try {
+    const res = await tvdbFetch(`series/${tvdbId}/extended`);
+    const obj = await res.json();
+    return obj?.data?.genres?.map((g) => g.name).filter(Boolean) || [];
+  } catch (e) {
+    return [];
+  }
+};
+
 export const getTvdbByImdbId = async (imdbId) => {
   if (!imdbId) return null;
   try {

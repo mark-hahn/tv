@@ -69,7 +69,7 @@
         <span style="font-size: 16px; flex: 1">{{ p.name }}</span>
         <span
           style="
-            font-size: 11px;
+            font-size: 16.5px;
             color: #888;
             background: #f5f5f5;
             border-radius: 3px;

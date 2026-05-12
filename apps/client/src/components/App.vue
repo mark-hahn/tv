@@ -283,6 +283,7 @@
             :activeShow="currentShow"
             :previewMode="previewMode"
             :movieMode="movieMode"
+            :active="currentPane === 'tor'"
           ></Tor>
           <Flex
             v-show="!simpleMode && currentPane === 'flex'"

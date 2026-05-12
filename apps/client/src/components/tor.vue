@@ -1145,6 +1145,10 @@ export default {
       type: Boolean,
       default: false,
     },
+    active: {
+      type: Boolean,
+      default: false,
+    },
   },
 
   data() {
@@ -1245,6 +1249,12 @@ export default {
         this.torrents = [];
         this.movieSrchText = "";
       }
+    },
+    activeShow() {
+      this.showStream = false;
+    },
+    active(val) {
+      if (!val) this.showStream = false;
     },
   },
 

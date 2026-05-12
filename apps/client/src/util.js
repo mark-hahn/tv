@@ -150,8 +150,8 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.foreign = 0;
       tmp.totry = 1;
       tmp.continue = 0;
-      tmp.mark = 0;
-      tmp.linda = 0;
+      tmp.mark = -1;
+      tmp.linda = -1;
       tmp.ban = -1;
       tmp.hasemby = 1;
       tmp.full = 0;

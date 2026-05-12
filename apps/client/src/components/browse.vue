@@ -673,70 +673,10 @@ export default {
           .replace(/\s+/g, " ")
           .toLowerCase();
 
-      // Search tvmaze.sqlite (includes already-browsed shows)
-      let tvmazeResults = [];
-      try {
-        const res = await fetch(
-          `${config.torrentsApiUrl}/api/browseSearch?q=${encodeURIComponent(query)}`,
-        );
-        if (res.ok) tvmazeResults = await res.json();
-      } catch (e) {
-        // ignore — fall through to TVDB gallery search
+      // Only change the gallery — do not touch the titles list
+      if (norm(query) !== norm(srchStr.value)) {
+        srchStr.value = query;
       }
-
-      if (tvmazeResults.length > 0) {
-        const entries = tvmazeResults.map((r) => JSON.stringify(r));
-        const firstTitle = tvmazeResults[0].title;
-
-        // Deduplicate against existing list
-        let current = titleStrings.value.filter((s) => {
-          const t = s.trim().startsWith("{")
-            ? (() => {
-                try {
-                  return JSON.parse(s).title || "";
-                } catch {
-                  return "";
-                }
-              })()
-            : s.split("|")[1] || "";
-          return !entries.some((e) => {
-            try {
-              return norm(JSON.parse(e).title) === norm(t);
-            } catch {
-              return false;
-            }
-          });
-        });
-        titleStrings.value = [...current, ...entries];
-
-        // Select the first result
-        await nextTick();
-        const idx = titleStrings.value.length - entries.length;
-        await selectTitle(idx, true);
-        await nextTick();
-        if (titlesPane.value) {
-          console.log("[browse-bounce] manual search handler");
-          titlesPane.value.scrollTop = titlesPane.value.scrollHeight;
-        }
-
-        // Also trigger gallery search with the original user query
-        if (norm(query) !== norm(srchStr.value)) {
-          srchStr.value = query;
-        }
-        return;
-      }
-
-      // Fallback: search TVDB gallery by name
-      const nextTitle = query;
-      curTitle.value = nextTitle;
-
-      if (norm(nextTitle) !== norm(srchStr.value)) {
-        srchStr.value = nextTitle;
-      } else {
-        await nextTick();
-        suppressButtons.value = false;
-      }
-      selectedTitleIdx.value = -1;
     };
 
     const curTitle = ref("");
@@ -1058,6 +998,22 @@ export default {
       if (previewMode.value) {
         evtBus.emit("exitPreviewMode");
       }
+
+      // If a manual search is active, clear it and restore gallery to the current title card
+      if (manualSearchQuery.value) {
+        manualSearchQuery.value = "";
+        const norm = (s) =>
+          String(s || "")
+            .trim()
+            .replace(/\s+/g, " ")
+            .toLowerCase();
+        const title = curTitle.value;
+        if (title && norm(title) !== norm(srchStr.value)) {
+          srchStr.value = title;
+        }
+        return;
+      }
+
       isLoadingNext.value = true;
       justFetchedNext.value = true;
       suppressButtons.value = true;

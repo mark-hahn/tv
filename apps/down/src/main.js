@@ -2769,6 +2769,52 @@ async function main() {
       return process.nextTick(checkFile);
     }
 
+    // Watched episode filter: skip if this episode has already been watched.
+    if (
+      !processingForced &&
+      embyMap &&
+      embyKeyForFolder &&
+      Number.isInteger(season) &&
+      Number.isInteger(episode)
+    ) {
+      const watchedEpis = embyMap[embyKeyForFolder]?.watchedEpis;
+      if (Array.isArray(watchedEpis)) {
+        let epIsWatched = false;
+        for (let wi = 0; wi < watchedEpis.length; wi++) {
+          const wRow = watchedEpis[wi];
+          if (!Array.isArray(wRow) || wRow[0] !== season) continue;
+          for (let wj = 1; wj < wRow.length; wj++) {
+            if (wRow[wj] === episode) {
+              epIsWatched = true;
+              break;
+            }
+          }
+          if (epIsWatched) break;
+        }
+        if (epIsWatched) {
+          const seStr = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
+          existsCount++;
+          log(
+            "------",
+            downloadCount,
+            "/",
+            chkCount,
+            "SKIP (episode watched):",
+            fname,
+            seStr,
+          );
+          trace("checkFileExists: skip episode watched", { fname, seStr });
+          postHistory({
+            tvdbId: lookupTvdbId(seriesName),
+            showName: seriesName || fname,
+            type: "skipDown",
+            description: `skip: ${seStr} already watched`,
+          });
+          return process.nextTick(checkFile);
+        }
+      }
+    }
+
     // In-progress authority: tv-inProgress.json (do not create duplicate tv.json entries
     // for files already queued/downloading).
     if (!processingForced && inProgress && inProgress[fname]) {

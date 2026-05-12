@@ -924,7 +924,15 @@ export default {
         if (aVip !== bVip) return aVip - bVip;
         return CREW_PREF.indexOf(a.type) - CREW_PREF.indexOf(b.type);
       });
-      const picked = sorted.slice(0, 2);
+      const picked = [];
+      const seenNames = new Set();
+      for (const c of sorted) {
+        if (!seenNames.has(c.name)) {
+          seenNames.add(c.name);
+          picked.push(c);
+          if (picked.length === 2) break;
+        }
+      }
       const abbrev = (t) => (t === "Executive Producer" ? "Exec Producer" : t);
       this.crewLines = picked.map((c) => `${abbrev(c.type)}: ${c.name}`);
     },

@@ -152,7 +152,8 @@
             </button>
             <button
               v-if="mapShow?.inEmby !== false"
-              @click.stop="$emit('prune', mapShow)"
+              @click.stop="onPruneClick"
+              :style="{ '--btn-bg': pruneFlash ? 'lightgray' : 'whitesmoke' }"
               style="
                 font-size: 13.5px;
                 cursor: pointer;
@@ -845,6 +846,7 @@ export default {
       mapTouchSuppressClickUntil: 0,
       mapUpdateKey: 0,
       showHistory: false,
+      pruneFlash: false,
       selectedSeasons: new Set(),
       selectedCells: new Set(),
       copiedSeason: null,
@@ -996,6 +998,14 @@ export default {
   },
 
   methods: {
+    onPruneClick() {
+      this.pruneFlash = true;
+      this.$emit("prune", this.mapShow);
+      setTimeout(() => {
+        this.pruneFlash = false;
+      }, 750);
+    },
+
     onTvdbDataReady({ show, tvdbData }) {
       if (!tvdbData || !this.mapShow) return;
       if (show?.name === this.mapShow.name && !this.tvdbData) {

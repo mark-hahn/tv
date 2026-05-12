@@ -403,6 +403,13 @@
               </div>
             </div>
             <div
+              id="lastwatched"
+              v-if="!previewMode && lastWatchedTxt"
+              style="min-height: 20px; white-space: nowrap"
+            >
+              Last watched: {{ lastWatchedTxt }}
+            </div>
+            <div
               id="cntrylang"
               v-if="(cntryLangLeftTxt &amp;&amp; cntryLangLeftTxt.length &gt; 0) || (cntryLangRightTxt &amp;&amp; cntryLangRightTxt.length &gt; 0)"
               style="
@@ -643,6 +650,7 @@ export default {
       remotes: [],
       seasonsTxt: "",
       watchedValTxt: "",
+      lastWatchedTxt: "",
       cntryLangLeftTxt: "",
       cntryLangRightTxt: "",
       genresTxt: "",
@@ -947,7 +955,7 @@ export default {
 
     setDates(tvdbData) {
       const show = this.show;
-      const { firstAired, lastAired, status } = tvdbData;
+      const { firstAired, lastAired, status, lastWatched } = tvdbData;
       const fa = firstAired || "";
       const la = lastAired || "";
       const st = status || "";
@@ -957,6 +965,12 @@ export default {
       else if (la) this.dates = `${la}`;
       else this.dates = "";
       this.statusTxt = st ? ` &nbsp; ${st}` : "";
+      if (lastWatched) {
+        const [y, m, d] = lastWatched.split("-");
+        this.lastWatchedTxt = `${y}/${m}/${d}`;
+      } else {
+        this.lastWatchedTxt = "";
+      }
     },
 
     async setSeasonsTxt(tvdbData) {
@@ -1389,6 +1403,7 @@ export default {
       this.statusTxt = "";
       this.seasonsTxt = "";
       this.watchedValTxt = "";
+      this.lastWatchedTxt = "";
       this.cntryLangLeftTxt = "";
       this.cntryLangRightTxt = "";
       this.runtimeTxt = "";

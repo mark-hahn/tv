@@ -267,7 +267,8 @@ const getShowState = async (showId, showName, showMeta) => {
 
         if (!haveFile && !unaired) anyEpisodeNoFile = true;
         if (!watched && !unaired) anyAiredEpisodeNotWatched = true;
-        if (!watched && !haveFile) anyEpisodeNeitherWatchedNorFile = true;
+        if (!watched && !haveFile && !unaired)
+          anyEpisodeNeitherWatchedNorFile = true;
 
         // Track the first aired episode that has no file.
         if (!unaired && !haveFile && firstNoFileSeason === null) {

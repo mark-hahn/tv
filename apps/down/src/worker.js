@@ -186,6 +186,47 @@ const main = () => {
     }
   }
 
+  // Rename any existing same-SxxExx video file to .old right before rsync writes.
+  // This is the only place the rename happens — done iff a higher-quality file
+  // is actually about to replace it (we already passed the quality gate in main.js).
+  {
+    const { dst } = makeSrcDst();
+    const localDir = path.dirname(dst);
+    const seMatch = (entry.destTitle || title).match(/S(\d{2})E(\d{2})/i);
+    if (seMatch && !entry.forced) {
+      const seRe = new RegExp(`S${seMatch[1]}E${seMatch[2]}`, "i");
+      const videoExts = new Set([
+        "mkv",
+        "mp4",
+        "avi",
+        "mov",
+        "m4v",
+        "wmv",
+        "ts",
+        "m2ts",
+      ]);
+      try {
+        const existing = fs.readdirSync(localDir);
+        for (const f of existing) {
+          if (!seRe.test(f)) continue;
+          const ext = f.split(".").pop().toLowerCase();
+          if (!videoExts.has(ext)) continue;
+          const fPath = path.join(localDir, f);
+          if (fPath === dst) continue; // same file — rsync will overwrite
+          let oldDst = fPath + ".old";
+          while (fs.existsSync(oldDst)) oldDst = oldDst + ".old";
+          try {
+            fs.renameSync(fPath, oldDst);
+          } catch (e) {
+            // ignore rename failure — rsync will still proceed
+          }
+        }
+      } catch (e) {
+        // localDir doesn't exist yet — nothing to rename
+      }
+    }
+  }
+
   const startRsync = (attempt) => {
     const { src, dst, usbPath2 } = makeSrcDst();
     const rsyncArgs = [

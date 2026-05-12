@@ -5112,15 +5112,11 @@ function flexgetIsBetterSameRun(a, b) {
   return aSeeds > bSeeds;
 }
 
-// Cross-run comparison: resolution → bit depth only (no seeds)
+// Cross-run comparison: resolution only — same resolution never triggers a re-send
 function flexgetIsBetterCrossRun(a, b) {
   const aRes = flexgetResolution(a.quality, a.title);
   const bRes = flexgetResolution(b.quality, b.title);
-  if (aRes !== bRes) return aRes > bRes;
-
-  const aDepth = flexgetBitDepth(a.title);
-  const bDepth = flexgetBitDepth(b.title);
-  return aDepth > bDepth;
+  return aRes > bRes;
 }
 
 async function saveFlexgetHistory() {
@@ -5229,10 +5225,11 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
   list.push(newCandidate);
   flexgetHistory[histKey] = list;
 
+  // Best-quality ever sent — used to decide if a new candidate is an upgrade.
   const lastSent = list.reduce((best, c) => {
     if (c.sent === null) return best;
-    if (!best || c.sent > best.sent) return c;
-    return best;
+    if (!best) return c;
+    return flexgetIsBetterCrossRun(c, best) ? c : best;
   }, null);
 
   if (storeOnly) {

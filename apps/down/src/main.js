@@ -2661,7 +2661,7 @@ async function main() {
     return 640;
   }
   function flexBitDepth(s) {
-    return /10.?bit|x265|hevc|h\.?265|hdr/i.test(String(s || "")) ? 10 : 8;
+    return /10.?bit|hdr/i.test(String(s || "")) ? 10 : 8;
   }
   function flexFileIsBetterThanSent(usbFname, sentEntry) {
     var sentSrc = String(sentEntry.quality || sentEntry.title || "");
@@ -2870,52 +2870,81 @@ async function main() {
       }
 
       if (flexHistKeyExists && flexHistMostRecentSent) {
-        // Allow through if the file is not actually on disk (sent but never landed).
-        var _epOnDisk = false;
+        // Find any existing disk file for this S/E.
+        var _diskFile = null;
         try {
           if (flexSeRe) {
             var _seasonFiles = fs.readdirSync(tvSeasonPath);
-            _epOnDisk = _seasonFiles.some(function (f) {
-              return flexSeRe.test(f);
-            });
+            _diskFile =
+              _seasonFiles.find(function (f) {
+                return flexSeRe.test(f);
+              }) || null;
           }
         } catch (e4) {
           // Season dir doesn't exist — not on disk.
         }
-        // Allow only if USB file is better quality than sent, OR file is missing from disk.
-        if (
-          !_epOnDisk &&
-          !flexFileIsBetterThanSent(fname, flexHistMostRecentSent)
-        ) {
+        var _epOnDisk = !!_diskFile;
+
+        if (!_epOnDisk) {
+          // File was sent but never landed on disk — allow download regardless of quality.
           trace("checkFileExists: flex sent but not on disk, allowing", {
             fname,
             flexSeStr,
           });
           // fall through to download
-        } else if (!flexFileIsBetterThanSent(fname, flexHistMostRecentSent)) {
-          existsCount++;
-          log(
-            "------",
-            downloadCount,
-            "/",
-            chkCount,
-            "FLEX SKIP (not better quality than sent):",
-            fname,
-          );
-          trace("checkFileExists: flex skip not better than sent", {
-            fname,
-            flexSeStr,
-            sentTitle: flexHistMostRecentSent.title,
-          });
-          postHistory({
-            tvdbId: lookupTvdbId(seriesName),
-            showName: seriesName || fname,
-            type: "skipDown",
-            description: `flex skip: not better quality than sent for ${flexSeStr}`,
-          });
-          return process.nextTick(checkFile);
+        } else {
+          // File is on disk. Allow if USB is better than what's on disk.
+          var _diskRes = flexResolution(_diskFile);
+          var _usbRes = flexResolution(fname);
+          var _diskDepth = flexBitDepth(_diskFile);
+          var _usbDepth = flexBitDepth(fname);
+          var _usbBetterThanDisk =
+            _usbRes > _diskRes ||
+            (_usbRes === _diskRes && _usbDepth > _diskDepth);
+          if (!_usbBetterThanDisk) {
+            existsCount++;
+            log(
+              "------",
+              downloadCount,
+              "/",
+              chkCount,
+              "FLEX SKIP (disk file same/better quality):",
+              fname,
+            );
+            trace("checkFileExists: flex skip disk file same/better quality", {
+              fname,
+              flexSeStr,
+              _diskFile,
+            });
+            postHistory({
+              tvdbId: lookupTvdbId(seriesName),
+              showName: seriesName || fname,
+              type: "skipDown",
+              description: `flex skip: ${flexSeStr} disk file same/better quality`,
+            });
+            return process.nextTick(checkFile);
+          }
+          // USB is better than disk — rename disk file to .old before downloading.
+          try {
+            var _oldPath = path.join(tvSeasonPath, _diskFile);
+            var _oldDst = _oldPath + ".old";
+            while (fs.existsSync(_oldDst)) _oldDst = _oldDst + ".old";
+            fs.renameSync(_oldPath, _oldDst);
+            log(
+              "flex: renamed worse disk file to .old:",
+              _diskFile,
+              "→",
+              path.basename(_oldDst),
+            );
+          } catch (renameErr3) {
+            log(
+              "flex: rename worse disk file to .old failed:",
+              _diskFile,
+              renameErr3.message,
+            );
+          }
         }
-        // Quality matches — allow through.
+        // Allow through — download the better USB file.
       } else if (!flexHistKeyExists) {
         // No flexget history for this episode — block if a same-quality-or-better file
         // already exists on disk for the same S/E.
@@ -3021,55 +3050,6 @@ async function main() {
           description: `flex skip: ${flexSeStr} already watched`,
         });
         return process.nextTick(checkFile);
-      }
-    }
-
-    // If replacing via flexget (most-recently-sent), rename any existing video
-    // file for this episode to .old before the new one is downloaded.
-    var epFileExists = false;
-    try {
-      var seasonFiles2 = fs.readdirSync(tvSeasonPath);
-      epFileExists = seasonFiles2.some(function (f) {
-        return flexSeRe && flexSeRe.test(f);
-      });
-    } catch (e4) {}
-    if (
-      (fromFlex &&
-        epFileExists &&
-        flexSeRe &&
-        flexHistKeyExists &&
-        flexHistMostRecentSent) ||
-      (processingForced && epFileExists && flexSeRe)
-    ) {
-      var videoExtsOld = [
-        "mkv",
-        "mp4",
-        "avi",
-        "mov",
-        "m4v",
-        "wmv",
-        "ts",
-        "m2ts",
-      ];
-      try {
-        var seasonFilesForRename = fs.readdirSync(tvSeasonPath);
-        for (var ri = 0; ri < seasonFilesForRename.length; ri++) {
-          var rFile = seasonFilesForRename[ri];
-          if (!flexSeRe.test(rFile)) continue;
-          var rExt = rFile.split(".").pop().toLowerCase();
-          if (!videoExtsOld.includes(rExt)) continue;
-          var rSrc = path.join(tvSeasonPath, rFile);
-          var rDst = rSrc + ".old";
-          while (fs.existsSync(rDst)) rDst = rDst + ".old";
-          try {
-            fs.renameSync(rSrc, rDst);
-            log("flex: renamed to .old:", rFile, "→", path.basename(rDst));
-          } catch (renameErr) {
-            log("flex: rename to .old failed:", rFile, renameErr.message);
-          }
-        }
-      } catch (e4) {
-        // Season dir doesn't exist — nothing to rename.
       }
     }
 

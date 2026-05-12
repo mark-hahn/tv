@@ -3355,6 +3355,65 @@ export default {
             .map((v) => v);
         };
 
+        // Quality gate: block send if qbt already has a higher-quality torrent for
+        // the same S/E. forceDownload bypasses this check entirely.
+        if (!forceDownload) {
+          const newTitle = String(torrent?.raw?.title || torrent?.title || "");
+          const seMatch = newTitle.match(/S(\d{2})E(\d{2})/i);
+          if (seMatch) {
+            const seStr = `S${seMatch[1]}E${seMatch[2]}`.toUpperCase();
+            const torRes = (t) => {
+              const s = String(t || "");
+              if (/2160p|4k|uhd/i.test(s)) return 2160;
+              if (/1080p|1080i/i.test(s)) return 1080;
+              if (/720p|720i/i.test(s)) return 720;
+              return 480;
+            };
+            const torDepth = (t) =>
+              /10.?bit|hdr/i.test(String(t || "")) ? 10 : 8;
+            const newRes = torRes(newTitle);
+            const newDepth = torDepth(newTitle);
+            try {
+              const qbtInfoUrl = new URL(
+                `${config.torrentsApiUrl}/api/qbt/info`,
+              );
+              const qbtInfoRes = await this.fetchWithTimeout(
+                qbtInfoUrl.toString(),
+                {},
+                15000,
+              );
+              if (qbtInfoRes && qbtInfoRes.ok) {
+                const qbtList = await qbtInfoRes.json().catch(() => []);
+                if (Array.isArray(qbtList)) {
+                  for (const qt of qbtList) {
+                    const qName = String(qt?.name || "");
+                    const qSeMatch = qName.match(/S(\d{2})E(\d{2})/i);
+                    if (!qSeMatch) continue;
+                    const qSe = `S${qSeMatch[1]}E${qSeMatch[2]}`.toUpperCase();
+                    if (qSe !== seStr) continue;
+                    const qRes = torRes(qName);
+                    const qDepth = torDepth(qName);
+                    if (
+                      qRes > newRes ||
+                      (qRes === newRes && qDepth > newDepth)
+                    ) {
+                      this.showError(
+                        `qBittorrent already has a higher quality version of ${seStr}:\n${qName}`,
+                      );
+                      return {
+                        ok: false,
+                        message: "Higher quality already in qBittorrent",
+                      };
+                    }
+                  }
+                }
+              }
+            } catch {
+              // qbt check failed — proceed with the send
+            }
+          }
+        }
+
         let downloadsRes = null;
         try {
           const downloadsUrl = `${config.torrentsApiUrl}/downloads`;

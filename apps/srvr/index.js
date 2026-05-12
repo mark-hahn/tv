@@ -5093,7 +5093,7 @@ function flexgetResolution(quality, title) {
 }
 
 function flexgetBitDepth(title) {
-  if (/10.?bit|x265|hevc|h\.?265|hdr/i.test(String(title || ""))) return 10;
+  if (/10.?bit|hdr/i.test(String(title || ""))) return 10;
   return 8;
 }
 

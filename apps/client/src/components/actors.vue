@@ -431,6 +431,17 @@
       ></Actor>
     </div>
 
+    <!-- Separator between actors and crew -->
+    <hr
+      v-if="!showingCredits && actors.length > 0 && crew.length > 0"
+      style="
+        border: none;
+        border-top: 2px solid #ccc;
+        margin: 4px 0;
+        width: 100%;
+      "
+    />
+
     <!-- Crew section (Creator, Executive Producer, Producer, Writer) -->
     <div
       v-if="!showingCredits && crew.length > 0"
@@ -941,6 +952,16 @@ export default {
       return Boolean(actor?.image || actor?.personImgURL);
     },
 
+    dedupeByPersonName(list) {
+      const seen = new Set();
+      return list.filter((item) => {
+        const name = this.normPersonName(item.personName || item.name);
+        if (!name || seen.has(name)) return false;
+        seen.add(name);
+        return true;
+      });
+    },
+
     async fillMissingImages(list) {
       // list items may use personName/name (actors) or just name (crew)
       await Promise.all(
@@ -1280,7 +1301,7 @@ export default {
 
       // Merge TMDB and TVDB guest lists
       const mergeResult = this.mergeTmdbTvdbActors(tmdbList, tvdbList);
-      this.actors = mergeResult.output;
+      this.actors = this.dedupeByPersonName(mergeResult.output);
 
       // Fill in missing images via cache then TMDB person search
       await this.fillMissingImages(this.actors);
@@ -1604,7 +1625,9 @@ export default {
           actualData.crew.length > 0 &&
           actualData.crew.some((c) => c.image === undefined);
         if (!hasImageGap) {
-          this.crew = [...actualData.crew].sort(crewSort);
+          this.crew = this.dedupeByPersonName(
+            [...actualData.crew].sort(crewSort),
+          );
           await this.fillMissingImages(this.crew);
           return;
         }
@@ -1615,7 +1638,7 @@ export default {
       try {
         const res = await tvdb.fetchExtendedForCrew(tvdbId);
         if (!Array.isArray(res)) return;
-        this.crew = [...res].sort(crewSort);
+        this.crew = this.dedupeByPersonName([...res].sort(crewSort));
         await this.fillMissingImages(this.crew);
         const showName = actualData?.name || show?.name;
         if (showName) {
@@ -1825,6 +1848,7 @@ export default {
       }
 
       // Cache series actors for restore
+      this.actors = this.dedupeByPersonName(this.actors);
       await this.fillMissingImages(this.actors);
       this.seriesActors = [...this.actors];
       this.isGuestMode = false;

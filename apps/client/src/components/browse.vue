@@ -1002,13 +1002,10 @@ export default {
       // If a manual search is active, clear it and restore gallery to the current title card
       if (manualSearchQuery.value) {
         manualSearchQuery.value = "";
-        const norm = (s) =>
-          String(s || "")
-            .trim()
-            .replace(/\s+/g, " ")
-            .toLowerCase();
         const title = curTitle.value;
-        if (title && norm(title) !== norm(srchStr.value)) {
+        if (title) {
+          srchStr.value = title + " ";
+          await nextTick();
           srchStr.value = title;
         }
         return;

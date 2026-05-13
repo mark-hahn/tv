@@ -1166,8 +1166,8 @@ export const getSeriesMap = async (show, prune = false) => {
         (seasonNumber == show.watchGapSeason &&
           episodeNumber == show.watchGapEpisode &&
           show.watchGap) ||
-        (seasonNumber == show.FileGapSeason &&
-          episodeNumber == show.FileGapEpisode &&
+        (seasonNumber == show.fileGapSeason &&
+          episodeNumber == show.fileGapEpisode &&
           show.fileGap);
 
       const noFileVal = !path; // noFile is true when there's no path

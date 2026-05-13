@@ -332,8 +332,8 @@ const getShowState = async (showId, showName, showMeta) => {
         // Flag fileGap when an unwatched+no-file episode precedes an episode with a file
         if (!fileGap && seenUnwatchedNoFile && haveFile) {
           if (fileGapSeason === null) {
-            fileGapSeason = seenUnwatchedNoFileSeason;
-            fileGapEpisode = seenUnwatchedNoFileEpisode;
+            fileGapSeason = seasonNumber;
+            fileGapEpisode = episodeNumber;
           }
           console.log(
             `[getShowState] fileGap set (unwatched-no-file before file) for ${showName} S${seenUnwatchedNoFileSeason}E${seenUnwatchedNoFileEpisode}`,

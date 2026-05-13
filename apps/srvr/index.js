@@ -5262,6 +5262,7 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
     title: rawTitle,
     url: candidate.url || null,
     quality: candidate.quality || null,
+    resolution: ptt?.resolution || null,
     content_size: candidate.content_size || null,
     torrent_seeds: candidate.torrent_seeds || null,
     torrent_leeches: candidate.torrent_leeches || null,

@@ -390,7 +390,8 @@ function buildRows(entries) {
     for (const { e, epKey, idx } of withIdx) {
       const idxSuffix = idx > 1 ? " *" : "";
       const seKey = `${e.seasonKey || "?"}${e.episodeKey || "?"}`;
-      const line = `${e.showName || "?"} (${seKey})${idxSuffix}`;
+      const resSuffix = e.resolution ? ` ${e.resolution}` : "";
+      const line = `${e.showName || "?"} (${seKey})${resSuffix}${idxSuffix}`;
       rows.push({
         key: `${epKey}\x00${e.sent}\x00${idx}`,
         line,

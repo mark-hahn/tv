@@ -330,7 +330,8 @@ const getShowState = async (showId, showName, showMeta) => {
           seenUnwatchedNoFileEpisode = episodeNumber;
         }
         // Flag fileGap when an unwatched+no-file episode precedes an episode with a file
-        if (!fileGap && seenUnwatchedNoFile && haveFile) {
+        // Watched episodes count as having a file for gap detection purposes
+        if (!fileGap && seenUnwatchedNoFile && (haveFile || watched)) {
           if (fileGapSeason === null) {
             fileGapSeason = seasonNumber;
             fileGapEpisode = episodeNumber;
@@ -341,9 +342,11 @@ const getShowState = async (showId, showName, showMeta) => {
           fileGap = true;
         }
 
-        haveFileShow ||= haveFile;
-        if (haveFileShow && !haveFile && !unaired) noFileAfterFile = true;
-        if (!fileGap && noFileAfterFile && haveFile) {
+        const effectiveHaveFile = haveFile || watched;
+        haveFileShow ||= effectiveHaveFile;
+        if (haveFileShow && !effectiveHaveFile && !unaired)
+          noFileAfterFile = true;
+        if (!fileGap && noFileAfterFile && effectiveHaveFile) {
           if (fileGapSeason === null) {
             fileGapSeason = seasonNumber;
             fileGapEpisode = episodeNumber;

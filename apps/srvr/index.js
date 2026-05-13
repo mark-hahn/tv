@@ -2221,7 +2221,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
     const diskInfo = await getShowDiskInfo(pathPart);
     const diskChanges = [];
     if (diskInfo) {
-      const [newDate, newSize] = diskInfo;
+      const [newDate, newSize, newFilesOnDisk] = diskInfo;
       if (tvdbRecord.date !== newDate) {
         diskChanges.push(`Date:${tvdbRecord.date}->${newDate}`);
         tvdbRecord.date = newDate;
@@ -2234,6 +2234,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         diskChanges.push(`NoFiles:true->false`);
         tvdbRecord.noFiles = false;
       }
+      tvdbRecord.filesOnDisk = newFilesOnDisk || [];
     } else if (!tvdbRecord.noFiles) {
       diskChanges.push(`NoFiles:false->true`);
       tvdbRecord.noFiles = true;
@@ -2532,21 +2533,38 @@ const getShowDiskInfo = async (showFolderName) => {
   let maxDate = 0;
   let totalSize = 0;
   let errFlg = null;
+  // Track which episodes are on disk: { season -> Set<episode> }
+  const episodesBySeason = new Map();
 
-  const recurs = async (path) => {
-    if (errFlg || path == tvDir + "/.stfolder") return;
+  const recurs = async (dirPath) => {
+    if (errFlg || dirPath == tvDir + "/.stfolder") return;
     try {
-      const fstat = fs.statSync(path);
+      const fstat = fs.statSync(dirPath);
       if (fstat.isDirectory()) {
-        const dir = fs.readdirSync(path);
-        for (const dirent of dir) await recurs(path + "/" + dirent);
+        const dir = fs.readdirSync(dirPath);
+        const folderName = path.basename(dirPath);
+        for (const dirent of dir)
+          await recurs(dirPath + "/" + dirent, folderName);
         return;
       }
-      const sfx = path.split(".").pop();
+      const sfx = dirPath.split(".").pop();
       if (videoFileExtensions.includes(sfx)) {
         const date = fmtDateWithTZ(fstat.mtime);
         if (!maxDate || date > maxDate) maxDate = date;
         totalSize += fstat.size;
+        // Parse season/episode from filename + parent folder name
+        const fname = path.basename(dirPath);
+        const folderName = path.basename(path.dirname(dirPath));
+        const parsed = parseFileSeasonEpisode(fname, folderName);
+        if (
+          parsed &&
+          Number.isInteger(parsed.season) &&
+          Number.isInteger(parsed.episode)
+        ) {
+          if (!episodesBySeason.has(parsed.season))
+            episodesBySeason.set(parsed.season, new Set());
+          episodesBySeason.get(parsed.season).add(parsed.episode);
+        }
       }
     } catch (err) {
       errFlg = err;
@@ -2568,7 +2586,15 @@ const getShowDiskInfo = async (showFolderName) => {
       return null;
     }
 
-    return [maxDate, totalSize];
+    // Encode filesOnDisk in same format as watchedEpis: [[season, ep1, ep2, ...], ...]
+    const filesOnDisk = Array.from(episodesBySeason.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([season, epSet]) => [
+        season,
+        ...Array.from(epSet).sort((a, b) => a - b),
+      ]);
+
+    return [maxDate, totalSize, filesOnDisk];
   } catch (err) {
     // Show folder doesn't exist or not accessible
     return null;
@@ -3528,6 +3554,35 @@ app.post(
       console.error("[triggerEmbySync] sweep error:", e?.message || e),
     );
     return { ok: true };
+  }),
+);
+
+app.post(
+  "/api/populateFilesOnDisk",
+  apiWrapper(async () => {
+    const allTvdb = tvdb.getAllTvdbSync();
+    let updated = 0;
+    let skipped = 0;
+    for (const [name, tvdbRecord] of Object.entries(allTvdb)) {
+      const folderName =
+        tvdbRecord.path?.split("/").pop() ||
+        tvdbRecord.emby?.path?.split("/").pop() ||
+        name;
+      const diskInfo = await getShowDiskInfo(folderName);
+      if (diskInfo) {
+        const [, , filesOnDisk] = diskInfo;
+        tvdbRecord.filesOnDisk = filesOnDisk || [];
+        updated++;
+      } else {
+        tvdbRecord.filesOnDisk = [];
+        skipped++;
+      }
+    }
+    await tvdb.saveTvdbSync();
+    console.log(
+      `[populateFilesOnDisk] Done: updated=${updated} skipped=${skipped}`,
+    );
+    return { ok: true, updated, skipped };
   }),
 );
 
@@ -6172,6 +6227,7 @@ async function syncDiskData() {
 
       const newDate = diskInfo ? diskInfo[0] : null;
       const newSize = diskInfo ? diskInfo[1] : 0;
+      const newFilesOnDisk = diskInfo ? diskInfo[2] || [] : [];
       const newNoFiles = !diskInfo;
 
       // Check if disk data changed
@@ -6179,6 +6235,8 @@ async function syncDiskData() {
         tvdbRecord.date !== newDate ||
         tvdbRecord.size !== newSize ||
         tvdbRecord.noFiles !== newNoFiles;
+
+      tvdbRecord.filesOnDisk = newFilesOnDisk;
 
       if (changed) {
         tvdbRecord.date = newDate;
@@ -6249,7 +6307,7 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
         const diskInfo = await getShowDiskInfo(pathPart);
 
         if (diskInfo) {
-          const [newDate, newSize] = diskInfo;
+          const [newDate, newSize, newFilesOnDisk] = diskInfo;
           const changed =
             tvdbRecord.date !== newDate || tvdbRecord.size !== newSize;
 
@@ -6259,6 +6317,7 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
             tvdbRecord.noFiles = false;
             diskUpdateCount++;
           }
+          tvdbRecord.filesOnDisk = newFilesOnDisk || [];
         } else {
           // Folder doesn't exist or empty
           const changed = tvdbRecord.noFiles !== true;
@@ -6268,6 +6327,7 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
             tvdbRecord.size = 0;
             diskUpdateCount++;
           }
+          tvdbRecord.filesOnDisk = [];
         }
       }
 
@@ -6456,7 +6516,7 @@ async function handleShowDiskChange(showName) {
     // Update disk info for this show
     const diskInfo = await getShowDiskInfo(showName);
     if (diskInfo) {
-      const [maxDate, totalSize] = diskInfo;
+      const [maxDate, totalSize, filesOnDisk] = diskInfo;
 
       // Update tvdb record with new disk info
       const allTvdb = tvdb.getAllTvdbSync();
@@ -6464,6 +6524,7 @@ async function handleShowDiskChange(showName) {
       if (tvdbRecord) {
         tvdbRecord.date = maxDate;
         tvdbRecord.size = totalSize;
+        tvdbRecord.filesOnDisk = filesOnDisk || [];
         await tvdb.saveTvdbSync();
         console.log(
           `[chokidar] Updated disk info for ${showName}: ${totalSize} bytes, ${maxDate}`,

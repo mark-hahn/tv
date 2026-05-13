@@ -2566,6 +2566,38 @@ export default {
           };
         }
       }
+
+      // Override avail/noFile using filesOnDisk — shows + immediately when
+      // a file lands on disk without waiting for Emby to finish scanning.
+      const diskFiles = allTvdb?.[show.name]?.filesOnDisk;
+      if (Array.isArray(diskFiles)) {
+        for (const row of diskFiles) {
+          const s = row[0];
+          for (let i = 1; i < row.length; i++) {
+            const e = row[i];
+            if (!seriesMap[s]) {
+              seriesMap[s] = {};
+              seriesMapSeasons[s] = s;
+            }
+            if (!seriesMapEpis[e]) seriesMapEpis[e] = e;
+            const cell = seriesMap[s][e];
+            if (cell) {
+              cell.avail = true;
+              cell.noFile = false;
+              cell.unaired = false;
+            } else {
+              seriesMap[s][e] = {
+                avail: true,
+                noFile: false,
+                unaired: false,
+                played: false,
+                error: false,
+                path: null,
+              };
+            }
+          }
+        }
+      }
       this.seriesMapSeasons = seriesMapSeasons.filter((x) => x !== null);
       this.seriesMapEpis = seriesMapEpis.filter((x) => x !== null);
       this.seriesMap = seriesMap;
@@ -3282,7 +3314,7 @@ export default {
           show.watchGap = show.watchGap;
           show.fileGap =
             !(show.notReady === false && show.inToTry) &&
-            (show.fileGap || show.fileEndError || show.seasonWatchedThenNofile);
+            (show.fileGap || show.seasonWatchedThenNofile);
           show.full = tvdbRecord.full ?? false;
 
           // Update allTvdb cache

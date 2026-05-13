@@ -221,6 +221,16 @@ const getShowState = async (showId, showName, showMeta) => {
 
     // Once we hit an unaired episode, treat all later episodes as unaired.
     let unairedFromHere = false;
+
+    // Build a fast lookup from filesOnDisk: [[season, ep1, ep2,...], ...] -> Set of "S-E" keys
+    const diskFileSet = new Set();
+    if (Array.isArray(showMeta?.filesOnDisk)) {
+      for (const row of showMeta.filesOnDisk) {
+        const s = row[0];
+        for (let i = 1; i < row.length; i++) diskFileSet.add(`${s}-${row[i]}`);
+      }
+    }
+
     for (let seasonIdx = 0; seasonIdx < seasons.length; seasonIdx++) {
       const season = seasons[seasonIdx];
       const seasonId = season.Id;
@@ -251,9 +261,13 @@ const getShowState = async (showId, showName, showMeta) => {
         sawAnyEpisode = true;
         const userData = episode?.UserData;
         const watched = !!userData?.Played;
-        const haveFile = episode.LocationType != "Virtual";
+        const embyHaveFile = episode.LocationType != "Virtual";
+        // If disk scan says the file exists, trust it even if Emby hasn't scanned yet
+        const onDisk = diskFileSet.has(`${seasonNumber}-${episodeNumber}`);
+        const haveFile = embyHaveFile || onDisk;
         const hasPath = !!episode.Path;
 
+        // A file on disk overrides unaired — it clearly aired if we have it
         if (haveFile) fileCount++;
         if (firstEpisode && haveFile && !watched) {
           firstEpisodeFileUnwatched = true;
@@ -261,6 +275,8 @@ const getShowState = async (showId, showName, showMeta) => {
 
         let unaired = unairedFromHere || !!unairedObj[episodeNumber];
         if (watched) unaired = false;
+        else if (onDisk)
+          unaired = false; // file on disk overrides unaired
         else if (unaired) unairedFromHere = true;
         if (unaired) anyUnaired = true;
         if (!unaired) anyAiredEpisode = true;

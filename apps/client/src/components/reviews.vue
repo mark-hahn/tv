@@ -480,7 +480,6 @@ export default {
   methods: {
     onPaneChanged(pane) {
       if (pane !== "reviews") return;
-      this.scrollReviewPanesToTop();
       if (this.pendingLoad) {
         this.pendingLoad = false;
         void this.loadAllReviews();

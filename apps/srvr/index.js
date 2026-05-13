@@ -811,6 +811,18 @@ function persistSubQueueChkSrt() {
     "utf8",
   );
 }
+function cleanChkSrtQueue() {
+  const before = subQueueChkSrt.length;
+  subQueueChkSrt = subQueueChkSrt.filter(
+    (e) => e?.videoFilePath && fs.existsSync(e.videoFilePath),
+  );
+  if (subQueueChkSrt.length !== before) {
+    console.log(
+      `[chksrt] cleaned ${before - subQueueChkSrt.length} missing file(s) from queue`,
+    );
+    persistSubQueueChkSrt();
+  }
+}
 function persistSubQueueGenSrt() {
   fs.writeFileSync(
     "/root/dev/apps/tv/apps/asr/data/subQueueGenSrt.json",
@@ -1448,6 +1460,7 @@ async function processSubQueueEntry() {
         { videoFilePath: entry.videoFilePath, fromUI: entry.fromUI },
         false,
       );
+      cleanChkSrtQueue();
       persistSubQueueChkSrt();
       notifyClients("chksrt-count", subQueueChkSrt.length);
       if (entry.fromUI)
@@ -4591,6 +4604,8 @@ app.post("/api/asr/emb/generate", async (req, res) => {
 });
 
 app.get("/api/asr/chksrt/list", (req, res) => {
+  cleanChkSrtQueue();
+  notifyClients("chksrt-count", subQueueChkSrt.length);
   res.json({
     count: subQueueChkSrt.length,
     path: subQueueChkSrt[0]?.videoFilePath,
@@ -4616,6 +4631,7 @@ app.post("/api/asr/chksrt/ok", (req, res) => {
     }
   }
   subQueueChkSrt.shift();
+  cleanChkSrtQueue();
   persistSubQueueChkSrt();
   notifyClients("chksrt-count", subQueueChkSrt.length);
   res.json({ ok: true });
@@ -4639,6 +4655,7 @@ app.post("/api/asr/chksrt/gensrt", (req, res) => {
       },
     ]);
   }
+  cleanChkSrtQueue();
   persistSubQueueChkSrt();
   notifyClients("chksrt-count", subQueueChkSrt.length);
   res.json({ ok: true });
@@ -4683,6 +4700,7 @@ app.post("/api/asr/chksrt/select", (req, res) => {
   }
   const idx = subQueueChkSrt.findIndex((e) => e.videoFilePath === videoPath);
   if (idx !== -1) subQueueChkSrt.splice(idx, 1);
+  cleanChkSrtQueue();
   persistSubQueueChkSrt();
   notifyClients("chksrt-count", subQueueChkSrt.length);
   res.json({ ok: true });

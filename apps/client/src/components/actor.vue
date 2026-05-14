@@ -96,6 +96,11 @@ export default {
       ).trim();
       if (!name) return;
 
+      if (e?.altKey) {
+        navigator.clipboard.writeText(name);
+        return;
+      }
+
       if (e?.ctrlKey) {
         const url = `https://${theMan}.com/search/celebs?term=${encodeURIComponent(name)}`;
         util.openExternalPage(url);

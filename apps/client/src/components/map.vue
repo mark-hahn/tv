@@ -1015,6 +1015,7 @@ export default {
       const ead = this.tvdbData?.episodeAiredDates;
       if (!ead || !this.seriesMapSeasons?.length) return {};
       const result = {};
+      const lastSeason = Math.max(...this.seriesMapSeasons);
       for (const season of this.seriesMapSeasons) {
         const padded = String(season).padStart(2, "0");
         const prefix = `S${padded}E`;
@@ -1024,9 +1025,17 @@ export default {
           .filter(Boolean)
           .sort();
         if (dates.length > 0) {
+          let endDate = dates[dates.length - 1];
+          if (
+            season === lastSeason &&
+            this.tvdbData?.lastAired &&
+            this.tvdbData.lastAired > endDate
+          ) {
+            endDate = this.tvdbData.lastAired;
+          }
           result[season] = {
             start: dates[0].replace(/-/g, "/"),
-            end: dates[dates.length - 1].replace(/-/g, "/"),
+            end: endDate.replace(/-/g, "/"),
           };
         }
       }

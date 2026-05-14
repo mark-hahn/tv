@@ -2292,15 +2292,9 @@ const tryLocalGetTvdb = async () => {
       seriesMap = tvdbSeriesMap;
     }
 
-    // Compute season premiere dates and episodeAiredDates from TVDB if needed
-    if (
-      (!processRecord.seasonPremiereDates ||
-        !processRecord.episodeAiredDates) &&
-      processRecord.tvdbId
-    ) {
-      if (!tvdbSeriesMap) {
-        tvdbSeriesMap = await getSeriesMap(processRecord.tvdbId, null);
-      }
+    // Fetch tvdbSeriesMap to keep episodeAiredDates and seasonPremiereDates current
+    if (!tvdbSeriesMap && processRecord.tvdbId) {
+      tvdbSeriesMap = await getSeriesMap(processRecord.tvdbId, null);
     }
     if (tvdbSeriesMap && tvdbSeriesMap.length > 0 && processRecord.tvdbId) {
       let needsSave = false;

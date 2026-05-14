@@ -2309,13 +2309,6 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         gapChanges.push(`full:${tvdbRecord.full}->${newFull}`);
         tvdbRecord.full = newFull;
       }
-      // If every episode is watched or has a file, there's nothing to wait for
-      if (gapData && gapData.allWatchedOrHaveFile) {
-        if (tvdbRecord.waitStr) {
-          gapChanges.push(`waitStr:${tvdbRecord.waitStr}->null`);
-          tvdbRecord.waitStr = null;
-        }
-      }
     } else if (!tvdbRecord.inEmby) {
       // For shows not in emby, set error fields to known constants
       const nonEmbyConstants = [

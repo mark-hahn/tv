@@ -668,7 +668,7 @@ export default {
           filter: 0,
           icon: ["far", "clock"],
           cond(show) {
-            return !!(show.waitStr?.length && !show.waitStr.endsWith("*"));
+            return !!show.waitStr?.length;
           },
           click() {},
           name: "waiting",

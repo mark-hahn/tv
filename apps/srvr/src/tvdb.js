@@ -1352,33 +1352,44 @@ async function getTmdbFallback(showName) {
 // fetch data from tvdb.com
 // create tvdbData object
 // update allTvdb & tvdb.json
-// Calculate waitStr from nextAired and lastAired dates
-// Returns string for future dates, "" for past dates, null if no dates available
-// Appends '*' when unwatched episodes >= days until air date (no need to wait)
+// Calculate waitStr: the date when it is safe to start watching without running
+// out of episodes before the last air date (with a 2-episode safety margin).
+// Returns a date string e.g. "{8-3}" when the safe-start date is in the future,
+// "" when it is today or past (safe to start now), null when no air date available.
 const calculateWaitStr = (nextAired, lastAired, episodeCount, watchedCount) => {
   try {
-    // Use the greater of nextAired and lastAired
+    // Use the greater of nextAired and lastAired as the show end date
     const next = nextAired || "";
     const last = lastAired || "";
     const airDate = next > last ? next : last;
     if (!airDate) return null;
 
-    // Check if date is in the future
     const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    if (airDate >= today) {
-      const airDateNoYr = airDate.slice(5).replace(/^0/, " ").trim();
-      const baseStr = `{${airDateNoYr}}`;
-      const todayMs = new Date(today).getTime();
-      const airDateMs = new Date(airDate).getTime();
-      const daysUntil = Math.round(
-        (airDateMs - todayMs) / (1000 * 60 * 60 * 24),
-      );
-      const unwatched = (episodeCount || 0) - (watchedCount || 0);
-      // needToWait: true when unwatched episodes run out before air date
-      const needToWait = unwatched < daysUntil + 2;
-      return needToWait ? baseStr : baseStr + "*";
+    if (airDate < today) return ""; // past end date — actively clear
+
+    const unwatched = (episodeCount || 0) - (watchedCount || 0);
+    // Safe-start date: (airDate + 2) - unwatched days
+    // The +2 accounts for the delay between air date and file availability.
+    const airDateMs = new Date(airDate).getTime();
+    const waitMs =
+      airDateMs + 2 * 24 * 60 * 60 * 1000 - unwatched * 24 * 60 * 60 * 1000;
+    const waitDate = new Date(waitMs).toISOString().slice(0, 10);
+
+    if (waitDate > today) {
+      // Ignore absurd dates more than a year away
+      const oneYearOut = new Date(
+        new Date(today).getTime() + 365 * 24 * 60 * 60 * 1000,
+      )
+        .toISOString()
+        .slice(0, 10);
+      if (waitDate > oneYearOut) return "";
+      const waitMD = waitDate.slice(5).replace(/^0/, " ").trim();
+      const todayYear = today.slice(0, 4);
+      const waitYear = waitDate.slice(0, 4);
+      const yearPrefix = waitYear !== todayYear ? `${waitYear.slice(2)}-` : "";
+      return `{${yearPrefix}${waitMD}}`;
     }
-    return ""; // past date — actively clear
+    return ""; // safe to start now
   } catch (e) {
     // Silently fail on date calculation errors
   }
@@ -1903,15 +1914,12 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   tvdbData.lastWatched = paramObj.lastWatched || existing.lastWatched || null;
 
   // Calculate waitStr from nextAired and lastAired (single source of truth)
-  // If the show is full (every episode watched or has a file), nothing to wait for
-  const calculatedWaitStr = tvdbData.full
-    ? null
-    : calculateWaitStr(
-        tvdbData.nextAired,
-        tvdbData.lastAired,
-        tvdbData.episodeCount,
-        tvdbData.watchedCount,
-      );
+  const calculatedWaitStr = calculateWaitStr(
+    tvdbData.nextAired,
+    tvdbData.lastAired,
+    tvdbData.episodeCount,
+    tvdbData.watchedCount,
+  );
   tvdbData.waitStr = calculatedWaitStr || null;
 
   // Flattened Sync timestamps (no nested object)

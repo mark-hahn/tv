@@ -1356,10 +1356,11 @@ async function getTmdbFallback(showName) {
 // always have an episode ready (viewer watches 1/day, no air-date cadence assumed).
 // For each episode ranked k (0-indexed by air date), you watch it on day startDate+k.
 // It must be available: startDate+k >= airDate[k]+2  =>  startDate >= airDate[k]+2-k
+// Episodes with a file on disk are already available — effective airDate = "2000-01-01".
 // safe_start(season) = max over all k of (airDate[k] + 2 - k)
 // waitDate = min(safe_start across all seasons with unwatched episodes).
 // Returns "{M-DD}" or "{YY-M-DD}" when future, "" when past/today, null when no data.
-const calculateWaitStr = (episodeAiredDates, watchedEpis) => {
+const calculateWaitStr = (episodeAiredDates, watchedEpis, filesOnDisk) => {
   try {
     if (!episodeAiredDates || typeof episodeAiredDates !== "object")
       return null;
@@ -1385,7 +1386,27 @@ const calculateWaitStr = (episodeAiredDates, watchedEpis) => {
       }
     }
 
+    // Build per-season disk-file set: season -> Set of episode numbers
+    const diskBySeason = new Map();
+    if (Array.isArray(filesOnDisk)) {
+      for (const entry of filesOnDisk) {
+        if (!Array.isArray(entry) || entry.length < 1) continue;
+        const seasonNum = Number(entry[0]);
+        if (!Number.isFinite(seasonNum)) continue;
+        diskBySeason.set(
+          seasonNum,
+          new Set(
+            entry
+              .slice(1)
+              .map(Number)
+              .filter((n) => Number.isFinite(n)),
+          ),
+        );
+      }
+    }
+
     // Build per-season episode map: season -> Map(episodeNum -> airDate)
+    // Episodes with a file on disk use "2000-01-01" — always already available.
     const seasonData = new Map();
     for (const [key, airDate] of Object.entries(episodeAiredDates)) {
       const match = /^S(\d+)E(\d+)$/i.exec(key);
@@ -1394,7 +1415,10 @@ const calculateWaitStr = (episodeAiredDates, watchedEpis) => {
       const episodeNum = Number(match[2]);
       if (!Number.isFinite(seasonNum) || !Number.isFinite(episodeNum)) continue;
       if (!seasonData.has(seasonNum)) seasonData.set(seasonNum, new Map());
-      seasonData.get(seasonNum).set(episodeNum, airDate || "");
+      const hasDiskFile = diskBySeason.get(seasonNum)?.has(episodeNum) ?? false;
+      seasonData
+        .get(seasonNum)
+        .set(episodeNum, hasDiskFile ? "2000-01-01" : airDate || "");
     }
 
     if (seasonData.size === 0) return null;
@@ -1974,6 +1998,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   const calculatedWaitStr = calculateWaitStr(
     existing.episodeAiredDates,
     existing.watchedEpis,
+    existing.filesOnDisk,
   );
   tvdbData.waitStr =
     calculatedWaitStr !== null
@@ -2391,6 +2416,7 @@ const tryLocalGetTvdb = async () => {
         const freshWaitStr = calculateWaitStr(
           processRecord.episodeAiredDates,
           processRecord.watchedEpis,
+          processRecord.filesOnDisk,
         );
         if (freshWaitStr !== null) {
           processRecord.waitStr = freshWaitStr || null;

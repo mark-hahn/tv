@@ -3,9 +3,19 @@ import evtBus from "./evtBus.js";
 
 const HTTP_URL = config.tvSrvrUrl;
 const WS_URL = HTTP_URL.replace(/^https/, "wss");
+const WS_START_DELAY_MS = 5000;
+const WS_RECONNECT_DELAY_MS = 10000;
 
 let ws;
+let reconnectTimer = null;
+let wsWanted = false;
+
 const openWs = () => {
+  if (
+    ws?.readyState === WebSocket.OPEN ||
+    ws?.readyState === WebSocket.CONNECTING
+  )
+    return;
   ws = new WebSocket(WS_URL);
   attachWsHandlers();
 };
@@ -13,6 +23,22 @@ const openWs = () => {
 let handleMsg = null;
 
 const isSocketOpen = () => ws?.readyState === WebSocket.OPEN;
+
+const waitForSocket = async (timeoutMs) => {
+  if (isSocketOpen()) return true;
+  const start = Date.now();
+  while (!isSocketOpen() && Date.now() - start < timeoutMs) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return isSocketOpen();
+};
+
+const ensureWs = async ({ waitMs = 0 } = {}) => {
+  wsWanted = true;
+  openWs();
+  if (waitMs <= 0) return isSocketOpen();
+  return waitForSocket(waitMs);
+};
 
 const calls = [];
 let nextId = 0;
@@ -34,9 +60,21 @@ const attachWsHandlers = () => {
     handleMsg(event.data);
   };
 
+  ws.onopen = () => {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+  };
+
   ws.onclose = () => {
     rejectAllPending({ error: "websocket closed" });
-    setTimeout(openWs, 2000);
+    if (wsWanted && !reconnectTimer) {
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        openWs();
+      }, WS_RECONNECT_DELAY_MS);
+    }
   };
 
   ws.onerror = (err) => {
@@ -44,21 +82,25 @@ const attachWsHandlers = () => {
   };
 };
 
-openWs();
+setTimeout(() => {
+  ensureWs().catch((err) => {
+    console.error("Failed to start WebSocket", err);
+  });
+}, WS_START_DELAY_MS);
 
 export const wsSend = (obj) => {
-  if (isSocketOpen()) ws.send(JSON.stringify(obj));
+  ensureWs({ waitMs: 5000 })
+    .then((ready) => {
+      if (ready) ws.send(JSON.stringify(obj));
+    })
+    .catch((err) => {
+      console.error("WebSocket send failed", err);
+    });
 };
 
 // WebSocket call - only for ASR streaming
 const fCall = async (fname, param) => {
-  if (!isSocketOpen()) {
-    const start = Date.now();
-    // Wait up to 5 seconds for WebSocket to connect
-    while (!isSocketOpen() && Date.now() - start < 5000) {
-      await new Promise((r) => setTimeout(r, 100));
-    }
-  }
+  await ensureWs({ waitMs: 5000 });
 
   if (!isSocketOpen()) throw { error: "websocket closed" };
 

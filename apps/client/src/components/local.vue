@@ -1198,8 +1198,6 @@ export default {
     evtBus.off("subs-progress", this.onSubsProgress);
     evtBus.on("subs-progress", this.onSubsProgress);
     this.initAsrState();
-    this.initFixState();
-    this.initEmbState();
   },
   unmounted() {
     evtBus.off("asr-log", this.onAsrLog);
@@ -1991,6 +1989,7 @@ export default {
       if (this.showFix) {
         this.showAsr = false;
         this.showInfo = false;
+        this.initFixState();
       }
     },
     async clearFixLog() {
@@ -2109,6 +2108,7 @@ export default {
         this.showAsr = false;
         this.showFix = false;
         this.showInfo = false;
+        this.initEmbState();
       }
     },
     async applyEmb() {

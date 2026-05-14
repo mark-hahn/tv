@@ -863,7 +863,7 @@ export default {
       await nextTick();
       if (titlesPane.value) {
         console.log("[browse-bounce] scrollTitlesToBottom");
-        titlesPane.value.scrollTop = titlesPane.value.scrollHeight;
+        titlesPane.value.scrollTop = titlesPane.value.scrollHeight + 1000;
       }
     };
 
@@ -871,7 +871,7 @@ export default {
       await nextTick();
       if (titlesPane.value) {
         console.log("[browse-bounce] scrollTitlesPaneToBottom");
-        titlesPane.value.scrollTop = titlesPane.value.scrollHeight;
+        titlesPane.value.scrollTop = titlesPane.value.scrollHeight + 1000;
       }
     };
 
@@ -1952,7 +1952,7 @@ export default {
               "len:",
               titleStrings.value.length,
             );
-            titlesPane.value.scrollTop = titlesPane.value.scrollHeight;
+            titlesPane.value.scrollTop = titlesPane.value.scrollHeight + 1000;
             justFetchedNext.value = false;
           }
         }
@@ -2004,7 +2004,7 @@ export default {
         await nextTick();
         if (titlesPane.value) {
           console.log("[browse-bounce] titleStrings watcher");
-          titlesPane.value.scrollTop = titlesPane.value.scrollHeight;
+          titlesPane.value.scrollTop = titlesPane.value.scrollHeight + 1000;
         }
 
         // Log parsed title cards for debugging

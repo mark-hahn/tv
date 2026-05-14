@@ -1352,40 +1352,90 @@ async function getTmdbFallback(showName) {
 // fetch data from tvdb.com
 // create tvdbData object
 // update allTvdb & tvdb.json
-// Calculate waitStr: the date when it is safe to start watching without running
-// out of episodes before the last air date (with a 2-episode safety margin).
-// Returns a date string e.g. "{8-3}" when the safe-start date is in the future,
-// "" when it is today or past (safe to start now), null when no air date available.
-const calculateWaitStr = (nextAired, lastAired, episodeCount, watchedCount) => {
+// Calculate waitStr: the earliest date when you can start watching any season
+// and finish it without running out of episodes (per-season safe-start minimum).
+// For each season with unwatched episodes: safe_start = last_aired + 2 - unwatched.
+// waitDate = min(safe_start across all seasons with unwatched episodes).
+// Returns "{M-DD}" or "{YY-M-DD}" when future, "" when past/today, null when no data.
+const calculateWaitStr = (episodeAiredDates, watchedEpis) => {
   try {
-    // Use the greater of nextAired and lastAired as the show end date
-    const next = nextAired || "";
-    const last = lastAired || "";
-    const airDate = next > last ? next : last;
-    if (!airDate) return null;
+    if (!episodeAiredDates || typeof episodeAiredDates !== "object")
+      return null;
 
-    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    if (airDate < today) return ""; // past end date — actively clear
+    const today = new Date().toISOString().slice(0, 10);
 
-    const unwatched = (episodeCount || 0) - (watchedCount || 0);
-    // Safe-start date: (airDate + 2) - unwatched days
-    // The +2 accounts for the delay between air date and file availability.
-    const airDateMs = new Date(airDate).getTime();
-    const waitMs =
-      airDateMs + 2 * 24 * 60 * 60 * 1000 - unwatched * 24 * 60 * 60 * 1000;
-    const waitDate = new Date(waitMs).toISOString().slice(0, 10);
+    // Build per-season watched set: season -> Set of episode numbers
+    const watchedBySeason = new Map();
+    if (Array.isArray(watchedEpis)) {
+      for (const entry of watchedEpis) {
+        if (!Array.isArray(entry) || entry.length < 1) continue;
+        const seasonNum = Number(entry[0]);
+        if (!Number.isFinite(seasonNum)) continue;
+        watchedBySeason.set(
+          seasonNum,
+          new Set(
+            entry
+              .slice(1)
+              .map(Number)
+              .filter((n) => Number.isFinite(n)),
+          ),
+        );
+      }
+    }
 
-    if (waitDate > today) {
-      // Ignore absurd dates more than a year away
+    // Build per-season episode map: season -> Map(episodeNum -> airDate)
+    const seasonData = new Map();
+    for (const [key, airDate] of Object.entries(episodeAiredDates)) {
+      const match = /^S(\d+)E(\d+)$/i.exec(key);
+      if (!match) continue;
+      const seasonNum = Number(match[1]);
+      const episodeNum = Number(match[2]);
+      if (!Number.isFinite(seasonNum) || !Number.isFinite(episodeNum)) continue;
+      if (!seasonData.has(seasonNum)) seasonData.set(seasonNum, new Map());
+      seasonData.get(seasonNum).set(episodeNum, airDate || "");
+    }
+
+    if (seasonData.size === 0) return null;
+
+    let minWaitDate = null;
+
+    for (const [seasonNum, episodes] of seasonData) {
+      const watchedEps = watchedBySeason.get(seasonNum) || new Set();
+      const total = episodes.size;
+      const watched = [...episodes.keys()].filter((ep) =>
+        watchedEps.has(ep),
+      ).length;
+      const unwatched = total - watched;
+      if (unwatched <= 0) continue; // fully watched season — skip
+
+      // Last aired date in this season
+      const dates = [...episodes.values()].filter((d) => d).sort();
+      if (dates.length === 0) continue;
+      const lastAired = dates[dates.length - 1];
+
+      // safe_start = lastAired + 2 days - unwatched days
+      const lastAiredMs = new Date(lastAired).getTime();
+      const safeStartMs =
+        lastAiredMs + 2 * 24 * 60 * 60 * 1000 - unwatched * 24 * 60 * 60 * 1000;
+      const safeStart = new Date(safeStartMs).toISOString().slice(0, 10);
+
+      if (minWaitDate === null || safeStart < minWaitDate) {
+        minWaitDate = safeStart;
+      }
+    }
+
+    if (minWaitDate === null) return null;
+
+    if (minWaitDate > today) {
       const oneYearOut = new Date(
         new Date(today).getTime() + 365 * 24 * 60 * 60 * 1000,
       )
         .toISOString()
         .slice(0, 10);
-      if (waitDate > oneYearOut) return "";
-      const waitMD = waitDate.slice(5).replace(/^0/, " ").trim();
+      if (minWaitDate > oneYearOut) return "";
+      const waitMD = minWaitDate.slice(5).replace(/^0/, " ").trim();
       const todayYear = today.slice(0, 4);
-      const waitYear = waitDate.slice(0, 4);
+      const waitYear = minWaitDate.slice(0, 4);
       const yearPrefix = waitYear !== todayYear ? `${waitYear.slice(2)}-` : "";
       return `{${yearPrefix}${waitMD}}`;
     }
@@ -1916,14 +1966,16 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   tvdbData.haveSubs = paramObj.haveSubs ?? existing.haveSubs ?? false;
   tvdbData.lastWatched = paramObj.lastWatched || existing.lastWatched || null;
 
-  // Calculate waitStr from nextAired and lastAired (single source of truth)
+  // Calculate waitStr using per-season formula (uses existing episodeAiredDates
+  // since fresh series map data hasn't been fetched yet at this stage).
   const calculatedWaitStr = calculateWaitStr(
-    tvdbData.nextAired,
-    tvdbData.lastAired,
-    tvdbData.episodeCount,
-    tvdbData.watchedCount,
+    existing.episodeAiredDates,
+    existing.watchedEpis,
   );
-  tvdbData.waitStr = calculatedWaitStr || null;
+  tvdbData.waitStr =
+    calculatedWaitStr !== null
+      ? calculatedWaitStr || null
+      : (existing.waitStr ?? null);
 
   // Flattened Sync timestamps (no nested object)
   tvdbData.lastDiskCheck =
@@ -2332,6 +2384,14 @@ const tryLocalGetTvdb = async () => {
       if (Object.keys(ead).length > 0) {
         processRecord.episodeAiredDates = ead;
         needsSave = true;
+        // Recalculate waitStr now that episodeAiredDates is fresh
+        const freshWaitStr = calculateWaitStr(
+          processRecord.episodeAiredDates,
+          processRecord.watchedEpis,
+        );
+        if (freshWaitStr !== null) {
+          processRecord.waitStr = freshWaitStr || null;
+        }
       }
       if (needsSave) await saveTvdbFiles(allTvdb);
     }

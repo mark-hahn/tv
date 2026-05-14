@@ -1012,30 +1012,44 @@ export default {
     },
 
     seasonDateRanges() {
+      const seasons = this.seriesMapSeasons;
+      if (!seasons?.length) return {};
       const ead = this.tvdbData?.episodeAiredDates;
-      if (!ead || !this.seriesMapSeasons?.length) return {};
       const result = {};
-      const lastSeason = Math.max(...this.seriesMapSeasons);
-      for (const season of this.seriesMapSeasons) {
-        const padded = String(season).padStart(2, "0");
-        const prefix = `S${padded}E`;
-        const dates = Object.entries(ead)
-          .filter(([k]) => k.startsWith(prefix))
-          .map(([, v]) => v)
-          .filter(Boolean)
-          .sort();
-        if (dates.length > 0) {
-          let endDate = dates[dates.length - 1];
-          if (
-            season === lastSeason &&
-            this.tvdbData?.lastAired &&
-            this.tvdbData.lastAired > endDate
-          ) {
-            endDate = this.tvdbData.lastAired;
+      const firstSeason = Math.min(...seasons);
+      const lastSeason = Math.max(...seasons);
+      if (ead) {
+        for (const season of seasons) {
+          const padded = String(season).padStart(2, "0");
+          const prefix = `S${padded}E`;
+          const dates = Object.entries(ead)
+            .filter(([k]) => k.startsWith(prefix))
+            .map(([, v]) => v)
+            .filter(Boolean)
+            .sort();
+          if (dates.length > 0) {
+            let endDate = dates[dates.length - 1];
+            if (
+              season === lastSeason &&
+              this.tvdbData?.lastAired &&
+              this.tvdbData.lastAired > endDate
+            ) {
+              endDate = this.tvdbData.lastAired;
+            }
+            result[season] = {
+              start: dates[0].replace(/-/g, "/"),
+              end: endDate.replace(/-/g, "/"),
+            };
           }
+        }
+      } else {
+        // No episode-level data — show series firstAired/lastAired on first/last season only
+        const fa = this.tvdbData?.firstAired;
+        const la = this.tvdbData?.lastAired;
+        for (const season of seasons) {
           result[season] = {
-            start: dates[0].replace(/-/g, "/"),
-            end: endDate.replace(/-/g, "/"),
+            start: season === firstSeason && fa ? fa.replace(/-/g, "/") : "-",
+            end: season === lastSeason && la ? la.replace(/-/g, "/") : "-",
           };
         }
       }

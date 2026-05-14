@@ -532,6 +532,7 @@
           flexDirection: 'column',
           gap: '0',
           minHeight: '0',
+          paddingBottom: '25px',
         }"
         @wheel.stop.prevent="handleScaledWheel"
       >

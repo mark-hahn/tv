@@ -62,7 +62,7 @@
             fontSize: '15px',
             margin: '4px',
             whiteSpace: 'nowrap',
-            width: '60px',
+            width: '72px',
           }"
         >
           {{ selectedSortNbsp }}

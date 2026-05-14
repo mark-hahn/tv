@@ -1140,7 +1140,6 @@ export default {
         "Viewed Order": "Viewed",
         "Ratings Order": "Ratings",
         "Notes Order": "Notes",
-        "Start Order": "Safe start",
         "Ended Order": "Ended",
         "Length Order": "Length",
       };
@@ -1226,7 +1225,7 @@ export default {
           return util.fmtSize(show);
         case "Safe start": {
           const ws = show.waitStr || "";
-          if (!ws) return forSort ? "9999-99-99" : "";
+          if (!ws) return "9999-99-99";
           const inner = ws.slice(1, -1);
           const parts = inner.split("-");
           const yr =

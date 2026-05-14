@@ -1448,8 +1448,11 @@ const getApiCounts = (seriesData) => {
 
 const chooseCount = ({ inputCount, existingCount, apiCount }) => {
   const inputPositive = toPositiveInt(inputCount);
-  if (inputPositive) return inputPositive;
   const apiPositive = toPositiveInt(apiCount);
+  // Use the maximum of Emby and TVDB API counts — TVDB knows about future/unaired
+  // episodes that Emby doesn't have yet, so we must not let Emby's lower count win.
+  if (inputPositive && apiPositive) return Math.max(inputPositive, apiPositive);
+  if (inputPositive) return inputPositive;
   if (apiPositive) return apiPositive;
   const existingPositive = toPositiveInt(existingCount);
   if (existingPositive) return existingPositive;

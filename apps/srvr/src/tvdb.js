@@ -1352,9 +1352,11 @@ async function getTmdbFallback(showName) {
 // fetch data from tvdb.com
 // create tvdbData object
 // update allTvdb & tvdb.json
-// Calculate waitStr: the earliest date when you can start watching any season
-// and finish it without running out of episodes (per-season safe-start minimum).
-// For each season with unwatched episodes: safe_start = last_aired + 2 - unwatched.
+// Calculate waitStr: earliest date when you can start watching any season and
+// always have an episode ready (viewer watches 1/day, no air-date cadence assumed).
+// For each episode ranked k (0-indexed by air date), you watch it on day startDate+k.
+// It must be available: startDate+k >= airDate[k]+2  =>  startDate >= airDate[k]+2-k
+// safe_start(season) = max over all k of (airDate[k] + 2 - k)
 // waitDate = min(safe_start across all seasons with unwatched episodes).
 // Returns "{M-DD}" or "{YY-M-DD}" when future, "" when past/today, null when no data.
 const calculateWaitStr = (episodeAiredDates, watchedEpis) => {
@@ -1401,22 +1403,23 @@ const calculateWaitStr = (episodeAiredDates, watchedEpis) => {
 
     for (const [seasonNum, episodes] of seasonData) {
       const watchedEps = watchedBySeason.get(seasonNum) || new Set();
-      const total = episodes.size;
-      const watched = [...episodes.keys()].filter((ep) =>
-        watchedEps.has(ep),
-      ).length;
-      const unwatched = total - watched;
-      if (unwatched <= 0) continue; // fully watched season — skip
 
-      // Last aired date in this season
-      const dates = [...episodes.values()].filter((d) => d).sort();
-      if (dates.length === 0) continue;
-      const lastAired = dates[dates.length - 1];
+      // Sort unwatched episode air dates ascending (by air date, not episode number).
+      // For each rank i (0-indexed): startDate >= airDate[i] + 2 - i
+      // safe_start = max over all i
+      const unwatchedDates = [...episodes.entries()]
+        .filter(([ep]) => !watchedEps.has(ep))
+        .map(([, d]) => d)
+        .filter((d) => d)
+        .sort();
+      if (unwatchedDates.length === 0) continue;
 
-      // safe_start = lastAired + 2 days - unwatched days
-      const lastAiredMs = new Date(lastAired).getTime();
-      const safeStartMs =
-        lastAiredMs + 2 * 24 * 60 * 60 * 1000 - unwatched * 24 * 60 * 60 * 1000;
+      let safeStartMs = -Infinity;
+      for (let i = 0; i < unwatchedDates.length; i++) {
+        const ms =
+          new Date(unwatchedDates[i]).getTime() + (2 - i) * 24 * 60 * 60 * 1000;
+        if (ms > safeStartMs) safeStartMs = ms;
+      }
       const safeStart = new Date(safeStartMs).toISOString().slice(0, 10);
 
       if (minWaitDate === null || safeStart < minWaitDate) {

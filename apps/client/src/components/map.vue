@@ -274,7 +274,6 @@
       </div>
     </div>
     <div
-      id="maptable"
       v-if="!hideMapBottom"
       v-show="!showHistory"
       style="
@@ -283,320 +282,429 @@
         margin-left: 15px;
         margin-right: 15px;
         box-sizing: border-box;
-        position: relative;
-        overflow: hidden;
+        display: flex;
+        flex-direction: row;
+        gap: 30px;
       "
     >
-      <!-- No scrollbars: pan the table with arrows (horizontal) and mouse wheel (vertical).-->
       <div
-        id="maptblpane"
-        ref="mapViewport"
-        @selectstart.prevent
-        @wheel.stop.prevent="handleMapWheel"
-        @pointerdown="handleMapPointerDown"
-        @pointermove="handleMapPointerMove"
-        @pointerup="handleMapPointerUp"
-        @pointercancel="handleMapPointerUp"
+        id="maptable"
         style="
-          position: absolute;
-          inset: 0;
-          overflow: hidden;
+          flex: 1 1 auto;
+          min-height: 0px;
           box-sizing: border-box;
-          touch-action: none;
-          user-select: none;
+          position: relative;
+          overflow: hidden;
         "
       >
-        <!-- Sticky header row: moves horizontally with pan but stays fixed vertically.-->
+        <!-- No scrollbars: pan the table with arrows (horizontal) and mouse wheel (vertical).-->
         <div
-          ref="mapHeader"
-          style="
-            position: absolute;
-            left: 0;
-            right: 0;
-            top: 0;
-            overflow: hidden;
-            box-sizing: border-box;
-            background-color: white;
-          "
-        >
-          <table
-            :style="{
-              fontSize: '16px',
-              borderCollapse: 'collapse',
-              transform: 'translate(' + -mapScrollLeft + 'px,0px)',
-            }"
-          >
-            <tbody>
-              <tr style="font-weight: bold">
-                <td
-                  :style="{
-                    width: '30px',
-                    minWidth: '30px',
-                    maxWidth: '30px',
-                    height: '22px',
-                    minHeight: '22px',
-                    maxHeight: '22px',
-                    lineHeight: '16px',
-                    whiteSpace: 'nowrap',
-                    verticalAlign: 'middle',
-                    textAlign: 'center',
-                    padding: '1px 4px',
-                    border: '1px solid #ccc',
-                    backgroundColor: 'white',
-                  }"
-                >
-                  &nbsp;
-                </td>
-                <td
-                  v-for="season in seriesMapSeasons"
-                  @mousedown.prevent
-                  @click.alt.exact="handleSeasonAltClick($event, season)"
-                  @click.exact="handleSeasonPlainClick($event, season)"
-                  @click.ctrl="handleSeasonClick($event, season)"
-                  :style="{
-                    width: '30px',
-                    minWidth: '30px',
-                    maxWidth: '30px',
-                    height: '22px',
-                    minHeight: '22px',
-                    maxHeight: '22px',
-                    lineHeight: '16px',
-                    whiteSpace: 'nowrap',
-                    verticalAlign: 'middle',
-                    padding: '1px 4px',
-                    textAlign: 'center',
-                    border: '1px solid #ccc',
-                    backgroundColor:
-                      copiedSeason === season
-                        ? '#ffcccc'
-                        : selectedSeasons.has(season)
-                          ? 'lightgreen'
-                          : 'white',
-                    cursor: simpleMode ? 'default' : 'pointer',
-                  }"
-                  :key="season"
-                >
-                  S{{ season }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <!-- Sticky top-left corner cell (covers the moving blank header cell when panning horizontally).-->
-        <div
-          style="
-            position: absolute;
-            left: 0;
-            top: 0;
-            z-index: 6;
-            overflow: hidden;
-            background-color: white;
-            pointer-events: none;
-          "
-        >
-          <table :style="{ fontSize: '16px', borderCollapse: 'collapse' }">
-            <tbody>
-              <tr style="font-weight: bold">
-                <td
-                  :style="{
-                    width: '30px',
-                    minWidth: '30px',
-                    maxWidth: '30px',
-                    height: '22px',
-                    minHeight: '22px',
-                    maxHeight: '22px',
-                    lineHeight: '16px',
-                    whiteSpace: 'nowrap',
-                    verticalAlign: 'middle',
-                    textAlign: 'center',
-                    padding: '1px 4px',
-                    border: '1px solid #ccc',
-                    backgroundColor: 'white',
-                  }"
-                >
-                  &nbsp;
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <!-- Body viewport starts below the sticky header.-->
-        <div
-          ref="mapBodyViewport"
-          :key="'map-body-' + mapUpdateKey"
-          :style="{
-            position: 'absolute',
-            left: '0',
-            right: '0',
-            top: mapHeaderH + 'px',
-            bottom: '0',
-            overflow: 'hidden',
-            boxSizing: 'border-box',
-          }"
-        >
-          <table
-            ref="mapBodyTable"
-            :style="{
-              fontSize: '16px',
-              borderCollapse: 'collapse',
-              transform:
-                'translate(' + -mapScrollLeft + 'px,' + -mapScrollTop + 'px)',
-            }"
-          >
-            <tbody>
-              <tr
-                v-for="episode in seriesMapEpis"
-                :key="mapUpdateKey + '-ep-' + episode"
-                style="outline: thin solid"
-              >
-                <td
-                  :style="{
-                    fontWeight: 'bold',
-                    width: '30px',
-                    minWidth: '30px',
-                    maxWidth: '30px',
-                    height: '22px',
-                    minHeight: '22px',
-                    maxHeight: '22px',
-                    lineHeight: '16px',
-                    whiteSpace: 'nowrap',
-                    verticalAlign: 'middle',
-                    textAlign: 'center',
-                    padding: '1px 4px',
-                    border: '1px solid #ccc',
-                    backgroundColor: 'white',
-                  }"
-                >
-                  {{ episode }}
-                </td>
-                <td
-                  v-for="season in seriesMapSeasons"
-                  :key="mapUpdateKey + '-' + season + '.' + episode"
-                  @mousedown.prevent
-                  @click.alt.exact="
-                    handleEpisodeAltClick($event, mapShow, season, episode)
-                  "
-                  @click.exact="
-                    handleEpisodePlainClick($event, mapShow, season, episode)
-                  "
-                  @click.ctrl="
-                    handleEpisodeClick($event, mapShow, season, episode)
-                  "
-                  @click.shift="
-                    handleEpisodeClick($event, mapShow, season, episode)
-                  "
-                  @click.ctrl.shift="
-                    handleEpisodeClick($event, mapShow, season, episode)
-                  "
-                  :style="{
-                    cursor: simpleMode
-                      ? seriesMap[season]?.[episode]?.path &&
-                        !seriesMap[season]?.[episode]?.noFile
-                        ? 'pointer'
-                        : 'default'
-                      : 'pointer',
-                    width: '30px',
-                    minWidth: '30px',
-                    maxWidth: '30px',
-                    height: '22px',
-                    minHeight: '22px',
-                    maxHeight: '22px',
-                    lineHeight: '16px',
-                    whiteSpace: 'nowrap',
-                    verticalAlign: 'middle',
-                    padding: '1px 4px',
-                    textAlign: 'center',
-                    border: '1px solid #ccc',
-                    backgroundColor:
-                      copiedCellKey === cellKey(season, episode)
-                        ? '#ffcccc'
-                        : selectedCells.has(cellKey(season, episode))
-                          ? 'lightgreen'
-                          : seriesMap[season]?.[episode]?.error
-                            ? 'yellow'
-                            : seriesMap[season]?.[episode]?.noFile
-                              ? '#faa'
-                              : 'white',
-                  }"
-                >
-                  <span v-if="seriesMap?.[season]?.[episode]?.played"> w</span
-                  ><span
-                    v-if="
-                      seriesMap?.[season]?.[episode]?.avail &&
-                      !seriesMap?.[season]?.[episode]?.unaired &&
-                      mapShow?.inEmby !== false
-                    "
-                  >
-                    +</span
-                  ><span
-                    v-if="seriesMap?.[season]?.[episode]?.noFile &amp;&amp; !seriesMap?.[season]?.[episode]?.unaired"
-                  >
-                    -</span
-                  ><span
-                    v-if="seriesMap?.[season]?.[episode]?.unaired &amp;&amp; !seriesMap?.[season]?.[episode]?.played &amp;&amp; seriesMap?.[season]?.[episode]?.noFile"
-                    >u</span
-                  >
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <!-- Sticky season column (covers the moving season cells when panning horizontally).-->
-        <div
+          id="maptblpane"
+          ref="mapViewport"
+          @selectstart.prevent
+          @wheel.stop.prevent="handleMapWheel"
           @pointerdown="handleMapPointerDown"
           @pointermove="handleMapPointerMove"
           @pointerup="handleMapPointerUp"
           @pointercancel="handleMapPointerUp"
-          :style="{
-            position: 'absolute',
-            left: '0',
-            top: mapHeaderH + 'px',
-            bottom: '0',
-            width: '30px',
-            overflow: 'hidden',
-            zIndex: 5,
-            backgroundColor: 'white',
-            pointerEvents: 'auto',
-            touchAction: 'none',
-          }"
+          style="
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+            box-sizing: border-box;
+            touch-action: none;
+            user-select: none;
+          "
         >
-          <table
+          <!-- Sticky header row: moves horizontally with pan but stays fixed vertically.-->
+          <div
+            ref="mapHeader"
+            style="
+              position: absolute;
+              left: 0;
+              right: 0;
+              top: 0;
+              overflow: hidden;
+              box-sizing: border-box;
+              background-color: white;
+            "
+          >
+            <table
+              :style="{
+                fontSize: '16px',
+                borderCollapse: 'collapse',
+                transform: 'translate(' + -mapScrollLeft + 'px,0px)',
+              }"
+            >
+              <tbody>
+                <tr style="font-weight: bold">
+                  <td
+                    :style="{
+                      width: '30px',
+                      minWidth: '30px',
+                      maxWidth: '30px',
+                      height: '22px',
+                      minHeight: '22px',
+                      maxHeight: '22px',
+                      lineHeight: '16px',
+                      whiteSpace: 'nowrap',
+                      verticalAlign: 'middle',
+                      textAlign: 'center',
+                      padding: '1px 4px',
+                      border: '1px solid #ccc',
+                      backgroundColor: 'white',
+                    }"
+                  >
+                    &nbsp;
+                  </td>
+                  <td
+                    v-for="season in seriesMapSeasons"
+                    @mousedown.prevent
+                    @click.alt.exact="handleSeasonAltClick($event, season)"
+                    @click.exact="handleSeasonPlainClick($event, season)"
+                    @click.ctrl="handleSeasonClick($event, season)"
+                    :style="{
+                      width: '30px',
+                      minWidth: '30px',
+                      maxWidth: '30px',
+                      height: '22px',
+                      minHeight: '22px',
+                      maxHeight: '22px',
+                      lineHeight: '16px',
+                      whiteSpace: 'nowrap',
+                      verticalAlign: 'middle',
+                      padding: '1px 4px',
+                      textAlign: 'center',
+                      border: '1px solid #ccc',
+                      backgroundColor:
+                        copiedSeason === season
+                          ? '#ffcccc'
+                          : selectedSeasons.has(season)
+                            ? 'lightgreen'
+                            : 'white',
+                      cursor: simpleMode ? 'default' : 'pointer',
+                    }"
+                    :key="season"
+                  >
+                    S{{ season }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <!-- Sticky top-left corner cell (covers the moving blank header cell when panning horizontally).-->
+          <div
+            style="
+              position: absolute;
+              left: 0;
+              top: 0;
+              z-index: 6;
+              overflow: hidden;
+              background-color: white;
+              pointer-events: none;
+            "
+          >
+            <table :style="{ fontSize: '16px', borderCollapse: 'collapse' }">
+              <tbody>
+                <tr style="font-weight: bold">
+                  <td
+                    :style="{
+                      width: '30px',
+                      minWidth: '30px',
+                      maxWidth: '30px',
+                      height: '22px',
+                      minHeight: '22px',
+                      maxHeight: '22px',
+                      lineHeight: '16px',
+                      whiteSpace: 'nowrap',
+                      verticalAlign: 'middle',
+                      textAlign: 'center',
+                      padding: '1px 4px',
+                      border: '1px solid #ccc',
+                      backgroundColor: 'white',
+                    }"
+                  >
+                    &nbsp;
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <!-- Body viewport starts below the sticky header.-->
+          <div
+            ref="mapBodyViewport"
+            :key="'map-body-' + mapUpdateKey"
             :style="{
-              fontSize: '16px',
-              borderCollapse: 'collapse',
-              transform: 'translate(0px,' + -mapScrollTop + 'px)',
+              position: 'absolute',
+              left: '0',
+              right: '0',
+              top: mapHeaderH + 'px',
+              bottom: '0',
+              overflow: 'hidden',
+              boxSizing: 'border-box',
             }"
           >
-            <tbody>
-              <tr
-                v-for="episode in seriesMapEpis"
-                :key="mapUpdateKey + '-sticky-ep-' + episode"
-                style="outline: thin solid"
-              >
-                <td
-                  :style="{
-                    fontWeight: 'bold',
-                    width: '30px',
-                    minWidth: '30px',
-                    maxWidth: '30px',
-                    height: '22px',
-                    minHeight: '22px',
-                    maxHeight: '22px',
-                    lineHeight: '16px',
-                    whiteSpace: 'nowrap',
-                    verticalAlign: 'middle',
-                    textAlign: 'center',
-                    padding: '1px 4px',
-                    border: '1px solid #ccc',
-                    backgroundColor: 'white',
-                  }"
+            <table
+              ref="mapBodyTable"
+              :style="{
+                fontSize: '16px',
+                borderCollapse: 'collapse',
+                transform:
+                  'translate(' + -mapScrollLeft + 'px,' + -mapScrollTop + 'px)',
+              }"
+            >
+              <tbody>
+                <tr
+                  v-for="episode in seriesMapEpis"
+                  :key="mapUpdateKey + '-ep-' + episode"
+                  style="outline: thin solid"
                 >
-                  {{ episode }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                  <td
+                    :style="{
+                      fontWeight: 'bold',
+                      width: '30px',
+                      minWidth: '30px',
+                      maxWidth: '30px',
+                      height: '22px',
+                      minHeight: '22px',
+                      maxHeight: '22px',
+                      lineHeight: '16px',
+                      whiteSpace: 'nowrap',
+                      verticalAlign: 'middle',
+                      textAlign: 'center',
+                      padding: '1px 4px',
+                      border: '1px solid #ccc',
+                      backgroundColor: 'white',
+                    }"
+                  >
+                    {{ episode }}
+                  </td>
+                  <td
+                    v-for="season in seriesMapSeasons"
+                    :key="mapUpdateKey + '-' + season + '.' + episode"
+                    @mousedown.prevent
+                    @click.alt.exact="
+                      handleEpisodeAltClick($event, mapShow, season, episode)
+                    "
+                    @click.exact="
+                      handleEpisodePlainClick($event, mapShow, season, episode)
+                    "
+                    @click.ctrl="
+                      handleEpisodeClick($event, mapShow, season, episode)
+                    "
+                    @click.shift="
+                      handleEpisodeClick($event, mapShow, season, episode)
+                    "
+                    @click.ctrl.shift="
+                      handleEpisodeClick($event, mapShow, season, episode)
+                    "
+                    :style="{
+                      cursor: simpleMode
+                        ? seriesMap[season]?.[episode]?.path &&
+                          !seriesMap[season]?.[episode]?.noFile
+                          ? 'pointer'
+                          : 'default'
+                        : 'pointer',
+                      width: '30px',
+                      minWidth: '30px',
+                      maxWidth: '30px',
+                      height: '22px',
+                      minHeight: '22px',
+                      maxHeight: '22px',
+                      lineHeight: '16px',
+                      whiteSpace: 'nowrap',
+                      verticalAlign: 'middle',
+                      padding: '1px 4px',
+                      textAlign: 'center',
+                      border: '1px solid #ccc',
+                      backgroundColor:
+                        copiedCellKey === cellKey(season, episode)
+                          ? '#ffcccc'
+                          : selectedCells.has(cellKey(season, episode))
+                            ? 'lightgreen'
+                            : seriesMap[season]?.[episode]?.error
+                              ? 'yellow'
+                              : seriesMap[season]?.[episode]?.noFile
+                                ? '#faa'
+                                : 'white',
+                    }"
+                  >
+                    <span v-if="seriesMap?.[season]?.[episode]?.played"> w</span
+                    ><span
+                      v-if="
+                        seriesMap?.[season]?.[episode]?.avail &&
+                        !seriesMap?.[season]?.[episode]?.unaired &&
+                        mapShow?.inEmby !== false
+                      "
+                    >
+                      +</span
+                    ><span
+                      v-if="seriesMap?.[season]?.[episode]?.noFile &amp;&amp; !seriesMap?.[season]?.[episode]?.unaired"
+                    >
+                      -</span
+                    ><span
+                      v-if="seriesMap?.[season]?.[episode]?.unaired &amp;&amp; !seriesMap?.[season]?.[episode]?.played &amp;&amp; seriesMap?.[season]?.[episode]?.noFile"
+                      >u</span
+                    >
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <!-- Sticky season column (covers the moving season cells when panning horizontally).-->
+          <div
+            @pointerdown="handleMapPointerDown"
+            @pointermove="handleMapPointerMove"
+            @pointerup="handleMapPointerUp"
+            @pointercancel="handleMapPointerUp"
+            :style="{
+              position: 'absolute',
+              left: '0',
+              top: mapHeaderH + 'px',
+              bottom: '0',
+              width: '30px',
+              overflow: 'hidden',
+              zIndex: 5,
+              backgroundColor: 'white',
+              pointerEvents: 'auto',
+              touchAction: 'none',
+            }"
+          >
+            <table
+              :style="{
+                fontSize: '16px',
+                borderCollapse: 'collapse',
+                transform: 'translate(0px,' + -mapScrollTop + 'px)',
+              }"
+            >
+              <tbody>
+                <tr
+                  v-for="episode in seriesMapEpis"
+                  :key="mapUpdateKey + '-sticky-ep-' + episode"
+                  style="outline: thin solid"
+                >
+                  <td
+                    :style="{
+                      fontWeight: 'bold',
+                      width: '30px',
+                      minWidth: '30px',
+                      maxWidth: '30px',
+                      height: '22px',
+                      minHeight: '22px',
+                      maxHeight: '22px',
+                      lineHeight: '16px',
+                      whiteSpace: 'nowrap',
+                      verticalAlign: 'middle',
+                      textAlign: 'center',
+                      padding: '1px 4px',
+                      border: '1px solid #ccc',
+                      backgroundColor: 'white',
+                    }"
+                  >
+                    {{ episode }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
+      </div>
+      <!-- Season dates table -->
+      <div style="flex: 0 0 auto; overflow-y: auto; overflow-x: hidden">
+        <table
+          style="
+            font-size: 16px;
+            border-collapse: collapse;
+            white-space: nowrap;
+          "
+        >
+          <thead>
+            <tr style="font-weight: bold">
+              <th
+                style="
+                  padding: 1px 4px;
+                  border: 1px solid #ccc;
+                  text-align: center;
+                  background-color: white;
+                  height: 22px;
+                  line-height: 16px;
+                  vertical-align: middle;
+                "
+              ></th>
+              <th
+                style="
+                  padding: 1px 4px;
+                  border: 1px solid #ccc;
+                  text-align: center;
+                  background-color: white;
+                  height: 22px;
+                  line-height: 16px;
+                  vertical-align: middle;
+                "
+              >
+                Start
+              </th>
+              <th
+                style="
+                  padding: 1px 4px;
+                  border: 1px solid #ccc;
+                  text-align: center;
+                  background-color: white;
+                  height: 22px;
+                  line-height: 16px;
+                  vertical-align: middle;
+                "
+              >
+                End
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="season in seriesMapSeasons"
+              :key="'dates-' + season"
+              style="outline: thin solid"
+            >
+              <td
+                style="
+                  font-weight: bold;
+                  padding: 1px 4px;
+                  border: 1px solid #ccc;
+                  text-align: center;
+                  height: 22px;
+                  line-height: 16px;
+                  vertical-align: middle;
+                "
+              >
+                S{{ season }}
+              </td>
+              <td
+                style="
+                  padding: 4px 10px;
+                  border: 1px solid #ccc;
+                  text-align: center;
+                  height: 22px;
+                  line-height: 16px;
+                  vertical-align: middle;
+                "
+              >
+                {{ seasonDateRanges[season]?.start || "" }}
+              </td>
+              <td
+                style="
+                  padding: 4px 10px;
+                  border: 1px solid #ccc;
+                  text-align: center;
+                  height: 22px;
+                  line-height: 16px;
+                  vertical-align: middle;
+                "
+              >
+                {{ seasonDateRanges[season]?.end || "" }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
     <History
@@ -901,6 +1009,28 @@ export default {
         parts.push("Waiting " + this.mapShow.waitStr);
 
       return parts;
+    },
+
+    seasonDateRanges() {
+      const ead = this.tvdbData?.episodeAiredDates;
+      if (!ead || !this.seriesMapSeasons?.length) return {};
+      const result = {};
+      for (const season of this.seriesMapSeasons) {
+        const padded = String(season).padStart(2, "0");
+        const prefix = `S${padded}E`;
+        const dates = Object.entries(ead)
+          .filter(([k]) => k.startsWith(prefix))
+          .map(([, v]) => v)
+          .filter(Boolean)
+          .sort();
+        if (dates.length > 0) {
+          result[season] = {
+            start: dates[0].replace(/-/g, "/"),
+            end: dates[dates.length - 1].replace(/-/g, "/"),
+          };
+        }
+      }
+      return result;
     },
 
     canPanLeft() {

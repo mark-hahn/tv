@@ -1406,7 +1406,8 @@ const calculateWaitStr = (episodeAiredDates, watchedEpis, filesOnDisk) => {
     }
 
     // Build per-season episode map: season -> Map(episodeNum -> airDate)
-    // Episodes with a file on disk use "2000-01-01" — always already available.
+    // If a file is on disk and the TVDB air date is in the future (unaired),
+    // treat it as available today. Already-aired episodes use their TVDB date.
     const seasonData = new Map();
     for (const [key, airDate] of Object.entries(episodeAiredDates)) {
       const match = /^S(\d+)E(\d+)$/i.exec(key);
@@ -1416,9 +1417,9 @@ const calculateWaitStr = (episodeAiredDates, watchedEpis, filesOnDisk) => {
       if (!Number.isFinite(seasonNum) || !Number.isFinite(episodeNum)) continue;
       if (!seasonData.has(seasonNum)) seasonData.set(seasonNum, new Map());
       const hasDiskFile = diskBySeason.get(seasonNum)?.has(episodeNum) ?? false;
-      seasonData
-        .get(seasonNum)
-        .set(episodeNum, hasDiskFile ? "2000-01-01" : airDate || "");
+      const effectiveDate =
+        hasDiskFile && airDate > today ? today : airDate || "";
+      seasonData.get(seasonNum).set(episodeNum, effectiveDate);
     }
 
     if (seasonData.size === 0) return null;

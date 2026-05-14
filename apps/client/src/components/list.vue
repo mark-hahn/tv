@@ -1140,6 +1140,7 @@ export default {
         "Viewed Order": "Viewed",
         "Ratings Order": "Ratings",
         "Notes Order": "Notes",
+        "Start Order": "Safe start",
         "Ended Order": "Ended",
         "Length Order": "Length",
       };
@@ -1225,11 +1226,17 @@ export default {
           return util.fmtSize(show);
         case "Safe start": {
           const ws = show.waitStr || "";
-          if (!ws) return "9999-99-99";
+          if (!ws) return forSort ? "9999-99-99" : "";
           const inner = ws.slice(1, -1);
           const parts = inner.split("-");
-          const yr = parts.length === 3 ? `20${parts[0]}` : String(new Date().getFullYear());
-          const mo = (parts.length === 3 ? parts[1] : parts[0]).padStart(2, "0");
+          const yr =
+            parts.length === 3
+              ? `20${parts[0]}`
+              : String(new Date().getFullYear());
+          const mo = (parts.length === 3 ? parts[1] : parts[0]).padStart(
+            2,
+            "0",
+          );
           const dy = parts.length === 3 ? parts[2] : parts[1];
           return `${yr}-${mo}-${dy}`;
         }
@@ -2740,7 +2747,9 @@ export default {
         a = this.getValBySortChoice(a, true);
         b = this.getValBySortChoice(b, true);
         if (a == b) return 0;
-        if (["Alpha", "Length", "Creator", "Safe start"].includes(this.sortChoice)) {
+        if (
+          ["Alpha", "Length", "Creator", "Safe start"].includes(this.sortChoice)
+        ) {
           if (this.sortChoice === "Creator") {
             if (a === "" && b !== "") return 1;
             if (b === "" && a !== "") return -1;

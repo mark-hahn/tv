@@ -268,6 +268,7 @@ export default {
         Ratings: "25px",
         Notes: "0",
         Size: "25px",
+        "Safe start": "0",
         Ended: "75px",
         Length: "25px",
         Creator: "0",

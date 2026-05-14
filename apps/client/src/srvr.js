@@ -11,7 +11,8 @@ const openWs = () => {
 };
 
 let handleMsg = null;
-let haveSocket = false;
+
+const isSocketOpen = () => ws?.readyState === WebSocket.OPEN;
 
 const calls = [];
 let nextId = 0;
@@ -33,18 +34,12 @@ const attachWsHandlers = () => {
     handleMsg(event.data);
   };
 
-  ws.onopen = () => {
-    haveSocket = true;
-  };
-
   ws.onclose = () => {
-    haveSocket = false;
     rejectAllPending({ error: "websocket closed" });
     setTimeout(openWs, 2000);
   };
 
   ws.onerror = (err) => {
-    haveSocket = false;
     rejectAllPending({ error: "websocket error", details: err });
   };
 };
@@ -52,20 +47,20 @@ const attachWsHandlers = () => {
 openWs();
 
 export const wsSend = (obj) => {
-  if (haveSocket) ws.send(JSON.stringify(obj));
+  if (isSocketOpen()) ws.send(JSON.stringify(obj));
 };
 
 // WebSocket call - only for ASR streaming
 const fCall = async (fname, param) => {
-  if (!haveSocket) {
+  if (!isSocketOpen()) {
     const start = Date.now();
     // Wait up to 5 seconds for WebSocket to connect
-    while (!haveSocket && Date.now() - start < 5000) {
+    while (!isSocketOpen() && Date.now() - start < 5000) {
       await new Promise((r) => setTimeout(r, 100));
     }
   }
 
-  if (!haveSocket) throw { error: "websocket closed" };
+  if (!isSocketOpen()) throw { error: "websocket closed" };
 
   const id = ++nextId;
   const promise = new Promise((resolve, reject) => {
@@ -77,28 +72,9 @@ const fCall = async (fname, param) => {
   return promise;
 };
 
-// HTTP call - for all non-streaming operations
-const waitForServer = async () => {
-  if (haveSocket) return;
-  const start = Date.now();
-  // Wait up to 5 seconds for WebSocket to connect
-  while (!haveSocket && Date.now() - start < 5000) {
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  // If still no socket, log warning but proceed (HTTP might work independently)
-  if (!haveSocket) {
-    console.warn(
-      "waitForServer: proceeding without WebSocket connection (timeout)",
-    );
-  }
-};
-
 const httpCall = async (endpoint, param, method = "GET", timeoutMs = 30000) => {
   const url = `${HTTP_URL}${endpoint}`;
   const TIMEOUT_MS = timeoutMs;
-
-  // Wait for server readiness to avoid startup errors if server is restarting
-  await waitForServer();
 
   const options = {
     method,

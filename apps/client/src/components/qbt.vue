@@ -208,6 +208,19 @@
           Force
         </button>
         <button
+          v-if="movieMode"
+          @click.stop="qbtRecheckClick"
+          :style="{
+            fontSize: '13px',
+            cursor: 'pointer',
+            borderRadius: '7px',
+            padding: '4px 10px',
+            border: '1px solid #bbb',
+          }"
+        >
+          Recheck
+        </button>
+        <button
           @click.stop="qbtDelClick"
           :disabled="selectedItems.size === 0"
           :style="{
@@ -1267,6 +1280,27 @@ export default {
             );
           }
         }
+      }
+      await this.pollOnce();
+    },
+
+    // Recheck: force qBittorrent to re-scan files for all movie torrents
+    async qbtRecheckClick() {
+      const hashes = this.sortedTorrents.map((t) => t.hash).filter(Boolean);
+      if (hashes.length === 0) return;
+      try {
+        const url = new URL(`${config.torrentsApiUrl}/api/qbt/recheck`);
+        const res = await fetch(url.toString(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hash: hashes }),
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          window.alert(`Recheck failed: ${text || res.statusText}`);
+        }
+      } catch (err) {
+        window.alert(`Recheck failed: ${err?.message || String(err)}`);
       }
       await this.pollOnce();
     },

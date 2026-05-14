@@ -82,13 +82,10 @@ function startCopyFile(filePath, totalBytes) {
   try {
     const stat = fs.statSync(destPath);
     if (totalBytes > 0 && stat.size >= totalBytes) {
-      // Copy already done — ensure .done rename on USB (idempotent if already renamed)
-      childProcess.spawn("ssh", [
-        USB_HOST,
-        `mv -- '${filePath}' '${filePath}.done' 2>/dev/null; rm -f -- '${filePath}.lftp-pget-status'; true`,
-      ]);
-      return false;
-    }
+        // Copy already done — create .tv-done sidecar on USB so it won't be reprocessed
+        childProcess.spawn("ssh", [
+          USB_HOST,
+          `touch -- '${filePath}.tv-done'; rm -f -- '${filePath}.lftp-pget-status'; true`,
   } catch {}
 
   childProcess.spawnSync("pkill", ["-f", `ssh.*dd.*${basename}`]);
@@ -211,7 +208,7 @@ async function runParallelDd(filePath, basename, destPath, totalBytes, job) {
   job.status = "Finished";
   childProcess.spawn("ssh", [
     USB_HOST,
-    `mv -- '${filePath}' '${filePath}.done'; rm -f -- '${filePath}.lftp-pget-status'`,
+    `touch -- '${filePath}.tv-done'; rm -f -- '${filePath}.lftp-pget-status'`,
   ]);
 }
 
@@ -219,7 +216,7 @@ async function findVideoFilesInPath(remotePath) {
   return new Promise((resolve) => {
     const proc = childProcess.spawn("ssh", [
       USB_HOST,
-      `find '${remotePath}' -type f \\( -iname '*.mkv' -o -iname '*.mp4' -o -iname '*.avi' -o -iname '*.m4v' -o -iname '*.ts' \\) -printf '%p\t%s\n' 2>/dev/null`,
+      `find '${remotePath}' -type f \( -iname '*.mkv' -o -iname '*.mp4' -o -iname '*.avi' -o -iname '*.m4v' -o -iname '*.ts' \) -printf '%p\t%s\n' 2>/dev/null | while IFS='\t' read -r p s; do [ ! -f "\${p}.tv-done" ] && printf '%s\t%s\n' "\$p" "\$s"; done`,
     ]);
     let out = "";
     proc.stdout.on("data", (d) => {

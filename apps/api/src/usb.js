@@ -1476,6 +1476,47 @@ export async function deleteUsbFiles(paths) {
 
 const USB_MOVIES_ROOT = "/home/xobtlu/movies";
 
+export async function recheckQbtTorrent(input) {
+  const { qbHost, qbPort, qbUser, qbPass } = await loadQbtCreds();
+  const baseUrl = `http://${qbHost}:${qbPort}`;
+
+  const hashValue = input?.hash;
+  const hashes =
+    hashValue === "all"
+      ? "all"
+      : Array.isArray(hashValue)
+        ? hashValue
+            .map(String)
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .join("|")
+        : String(hashValue ?? "").trim();
+
+  if (!hashes) throw new Error("recheckQbtTorrent requires hash");
+
+  const cookie = await qbLogin({ baseUrl, qbUser, qbPass });
+
+  const res = await fetch(new URL("/api/v2/torrents/recheck", baseUrl), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Cookie: cookie,
+      Origin: baseUrl,
+      Referer: `${baseUrl}/`,
+    },
+    body: new URLSearchParams({ hashes }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `qBittorrent recheck failed: HTTP ${res.status}${text ? `: ${text}` : ""}`,
+    );
+  }
+
+  return { ok: true, hashes };
+}
+
 /**
  * Returns a file tree of /home/xobtlu/movies from the USB server.
  */

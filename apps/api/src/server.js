@@ -13,6 +13,7 @@ import { searchShowsByName, unmarkShowBrowsed } from "./tvmaze.js";
 import {
   getQbtInfo,
   delQbtTorrent,
+  recheckQbtTorrent,
   spaceAvail,
   spaceAvailUsb,
   spaceAvailMedia,
@@ -682,6 +683,18 @@ app.post("/api/qbt/delTorrent", async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error("qbt delTorrent error:", error);
+    res.status(500).json({ error: error?.message || String(error) });
+  }
+});
+
+app.post("/api/qbt/recheck", async (req, res) => {
+  try {
+    const b = req.body || {};
+    const hash = b.hash || "all";
+    const result = await recheckQbtTorrent({ hash });
+    res.json(result);
+  } catch (error) {
+    console.error("qbt recheck error:", error);
     res.status(500).json({ error: error?.message || String(error) });
   }
 });

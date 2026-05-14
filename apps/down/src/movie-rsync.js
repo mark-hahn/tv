@@ -82,10 +82,13 @@ function startCopyFile(filePath, totalBytes) {
   try {
     const stat = fs.statSync(destPath);
     if (totalBytes > 0 && stat.size >= totalBytes) {
-        // Copy already done — create .tv-done sidecar on USB so it won't be reprocessed
-        childProcess.spawn("ssh", [
-          USB_HOST,
-          `touch -- '${filePath}.tv-done'; rm -f -- '${filePath}.lftp-pget-status'; true`,
+      // Copy already done — create .tv-done sidecar on USB so it won't be reprocessed
+      childProcess.spawn("ssh", [
+        USB_HOST,
+        `touch -- '${filePath}.tv-done'; rm -f -- '${filePath}.lftp-pget-status'; true`,
+      ]);
+      return false;
+    }
   } catch {}
 
   childProcess.spawnSync("pkill", ["-f", `ssh.*dd.*${basename}`]);

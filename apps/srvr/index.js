@@ -44,7 +44,6 @@ const tvdbIdByName = (name) => {
 const CONFIG_DIR = path.join(SRVR_ROOT_DIR, "config");
 const SECRETS_DIR = SRVR_SECRETS_DIR;
 const FLEXGET_HISTORY_PATH = path.join(SRVR_DATA_DIR, "flexget-history.json");
-const PREFTOR_PROVIDERS_PATH = path.join(CONFIG_DIR, "prefTorProviders.txt");
 const QBT_CRED_PATH_FLEX = path.join(
   path.dirname(SRVR_ROOT_DIR),
   "api",
@@ -258,22 +257,6 @@ try {
     `[tv-srvr] FATAL: invalid JSON in pickups config at ${pickupLoad.chosenPath || "<fallback>"}: ${e.message}`,
   );
   process.exit(1);
-}
-
-// Load prefTorProviders.txt at startup — fail fast if missing.
-let prefTorProviders = [];
-{
-  const provText = readTextOr(PREFTOR_PROVIDERS_PATH, null);
-  if (provText === null) {
-    console.error(
-      `[tv-srvr] FATAL: missing prefTorProviders.txt at ${PREFTOR_PROVIDERS_PATH}`,
-    );
-    process.exit(1);
-  }
-  prefTorProviders = provText
-    .split(/\r?\n/)
-    .map((s) => s.trim())
-    .filter(Boolean);
 }
 
 // Load flexget-history.json at startup — create empty {} if missing (first run).
@@ -5140,13 +5123,6 @@ function flexgetFmtSent() {
   }).formatToParts(now);
   const get = (t) => parts.find((p) => p.type === t)?.value || "";
   return `${get("year")}/${get("month")}/${get("day")}-${get("hour")}:${get("minute")}:${get("second")}`;
-}
-
-function flexgetGroupRank(groupName) {
-  if (!groupName) return prefTorProviders.length + 1;
-  const lower = groupName.toLowerCase();
-  const idx = prefTorProviders.findIndex((g) => g.toLowerCase() === lower);
-  return idx === -1 ? prefTorProviders.length + 1 : idx;
 }
 
 function flexgetResolution(quality, title) {

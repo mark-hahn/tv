@@ -5,13 +5,12 @@
 1. **New local static config files** — currently server-only, will now live in local workspace
 2. **New config.yml structure** — no qbittorrent plugin, no exec/python output block; regexp accept/reject + RSS feeds only
 3. **Flexget runs on hahnca.com** — srvr triggers `flexget execute` via cron every 15 min; results parsed from stdout `--dump` output
-4. **New `prefTorProviders.txt`** — local, deployed with srvr
-5. **New `flexget-history.json`** — replaces `pending-flexget.json`; stores all candidates with `sent` timestamp
-6. **Incremental decision logic** — runs per-candidate as received; no 24hr wait; better files re-sent to qbt
-7. **Down server changes** — skip files that are not the most-recent-sent for an episode; rename old video file to `.old` when replaced
-8. **Deploy script update** — rsync static config files from local; skip the two dynamic JSON files
-9. **One-time config-test** — execute flexget dry run to verify config.yml is valid
-10. **Web client flex pane redesign** — lists files sent to qbt from flexget-history.json
+4. **New `flexget-history.json`** — replaces `pending-flexget.json`; stores all candidates with `sent` timestamp
+5. **Incremental decision logic** — runs per-candidate as received; no 24hr wait; better files re-sent to qbt
+6. **Down server changes** — skip files that are not the most-recent-sent for an episode; rename old video file to `.old` when replaced
+7. **Deploy script update** — rsync static config files from local; skip the two dynamic JSON files
+8. **One-time config-test** — execute flexget dry run to verify config.yml is valid
+9. **Web client flex pane redesign** — lists files sent to qbt from flexget-history.json
 
 ---
 
@@ -19,12 +18,11 @@
 
 Create these files in local workspace under `apps/srvr/config/`:
 
-| File                          | Content                                                                                          |
-| ----------------------------- | ------------------------------------------------------------------------------------------------ |
-| `config/config1-header.txt`   | `tasks:\n\n  fetch-feeds:\n    inputs:` block through RSS feed lines                             |
-| `config/config3-middle.txt`   | closes `inputs` + opens `regexp:\n      accept:`                                                 |
-| `config/config5-footer.txt`   | closes `accept:`, opens `reject:` then closes it; adds `quality: "any"` and `disable:\n  - seen` |
-| `config/prefTorProviders.txt` | ordered release group names, one per line, case-insensitive                                      |
+| File                        | Content                                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------------------------ |
+| `config/config1-header.txt` | `tasks:\n\n  fetch-feeds:\n    inputs:` block through RSS feed lines                             |
+| `config/config3-middle.txt` | closes `inputs` + opens `regexp:\n      accept:`                                                 |
+| `config/config5-footer.txt` | closes `accept:`, opens `reject:` then closes it; adds `quality: "any"` and `disable:\n  - seen` |
 
 No `schedules` block is needed — srvr triggers flexget directly. The two JSON files (`config2-rejects.json`, `config4-pickups.json`) remain server-side data only.
 
@@ -101,33 +99,7 @@ The exact format depends on flexget version — fields available and delimiters 
 
 ---
 
-## 4. prefTorProviders.txt
-
-Local file: `apps/srvr/config/prefTorProviders.txt`  
-Deployed to: `/root/dev/apps/tv/apps/srvr/config/prefTorProviders.txt` via `./srvr srvr`
-
-One release group name per line, most preferred first. Example (based on groups found in library):
-
-```
-BHDStudio
-CtrlHD
-NTb
-Kitsune
-FLUX
-SYNCOPY
-ELiTE
-FENiX
-EDGE2020
-MeGusta
-RCVR
-XEBEC
-```
-
-Loaded at srvr startup. Fail fast if missing (per workspace rules) — pre-create during config-test.
-
----
-
-## 5. flexget-history.json (renamed from pending-flexget.json)
+## 4. flexget-history.json (renamed from pending-flexget.json)
 
 **File**: `apps/srvr/data/flexget-history.json`
 
@@ -213,7 +185,6 @@ Runs per-episode-key immediately after each new candidate is added. No 24hr wait
 3. If `lastSent` exists, compare new candidate vs `lastSent` by priority:
    - **Resolution**: higher is better; missing treated as 640
    - **Bit depth**: higher is better; missing treated as 8
-   - **Group rank**: position in `prefTorProviders.txt`; lower rank number = better; missing group = worst
    - **Seeds**: higher is better
    - If new candidate is **better**: send to qbt, set `sent` to current timestamp
    - If new candidate is **same or worse**: do not send, leave `sent: null`
@@ -254,7 +225,7 @@ Add two rsync excludes for srvr so dynamic JSON config files are never overwritt
 --exclude 'config/config4-pickups.json'
 ```
 
-Static files (`config1-header.txt`, `config3-middle.txt`, `config5-footer.txt`, `prefTorProviders.txt`) sync normally since they now exist in local workspace.
+Static files (`config1-header.txt`, `config3-middle.txt`, `config5-footer.txt`) sync normally since they now exist in local workspace.
 
 No changes needed for `./srvr down`.
 
@@ -265,7 +236,6 @@ No changes needed for `./srvr down`.
 - Add `node-cron` job: every 15 min run `flexget execute --tasks fetch-feeds --config <path> --dump`
 - Parse stdout of `--dump` to extract candidate records (see config-test section for format verification steps)
 - For each candidate: run merge + decision logic
-- Load `prefTorProviders.txt` at startup (fail fast if missing)
 - Load `flexget-history.json` at startup (create empty `{}` if missing — first run)
 - `upload()` function: updated assembly order (header + pickups + middle + rejects + footer); remove qbittorrent
 - Remove: `send-data.sh` logic, USB flexget reload, `POST /api/flexget-data` endpoint, `pending-flexget.json`
@@ -281,16 +251,15 @@ No changes needed for `./srvr down`.
 Steps (order matters — confirm format before writing parse code):
 
 1. Create local static files (`config1-header.txt`, `config3-middle.txt`, `config5-footer.txt`) with new content
-2. Create local `config/prefTorProviders.txt`
-3. On remote, create `/root/dev/apps/tv/apps/srvr/config-test/`
-4. rsync static txt files and prefTorProviders.txt directly to `config-test/` on the server (do not `./srvr srvr`)
-5. Copy `config2-rejects.json` and `config4-pickups.json` from `config/` to `config-test/`
-6. Run a small Node snippet that does the same assembly as the new `upload()` and writes `config-test/config.yml`
-7. Run `flexget execute --tasks fetch-feeds --config /root/dev/apps/tv/apps/srvr/config-test/config.yml --test --dump` to see output format
-8. Confirm which fields are present in `--dump` output (`title`, `url`, `seeds`, `quality`, `release_group`, etc.)
-9. Update the stdout-parsing code in index.js to match the confirmed format
-10. Re-rsync updated files to `config-test/` if config changed
-11. Run `flexget execute --tasks fetch-feeds --config /root/dev/apps/tv/apps/srvr/config-test/config.yml --test --dump` again to confirm accepted entries look correct
+2. On remote, create `/root/dev/apps/tv/apps/srvr/config-test/`
+3. rsync static txt files directly to `config-test/` on the server (do not `./srvr srvr`)
+4. Copy `config2-rejects.json` and `config4-pickups.json` from `config/` to `config-test/`
+5. Run a small Node snippet that does the same assembly as the new `upload()` and writes `config-test/config.yml`
+6. Run `flexget execute --tasks fetch-feeds --config /root/dev/apps/tv/apps/srvr/config-test/config.yml --test --dump` to see output format
+7. Confirm which fields are present in `--dump` output (`title`, `url`, `seeds`, `quality`, `release_group`, etc.)
+8. Update the stdout-parsing code in index.js to match the confirmed format
+9. Re-rsync updated files to `config-test/` if config changed
+10. Run `flexget execute --tasks fetch-feeds --config /root/dev/apps/tv/apps/srvr/config-test/config.yml --test --dump` again to confirm accepted entries look correct
 
 ### If switching away from `--dump`:
 

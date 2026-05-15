@@ -5,6 +5,9 @@ const HTTP_URL = config.tvSrvrUrl;
 const WS_URL = HTTP_URL.replace(/^https/, "wss");
 const WS_START_DELAY_MS = 5000;
 const WS_RECONNECT_DELAY_MS = 10000;
+const LAST_VIEWED_START_DELAY_MS = 0;
+const LAST_VIEWED_POLL_MS = 10 * 1000;
+const LAST_VIEWED_TIMEOUT_MS = 8000;
 
 let ws;
 let reconnectTimer = null;
@@ -115,33 +118,35 @@ const fCall = async (fname, param) => {
 };
 
 const httpCall = async (endpoint, param, method = "GET", timeoutMs = 30000) => {
-  const url = `${HTTP_URL}${endpoint}`;
+  let url = `${HTTP_URL}${endpoint}`;
   const TIMEOUT_MS = timeoutMs;
+  const controller = new AbortController();
+  let timedOut = false;
 
   const options = {
     method,
     headers: { "Content-Type": "application/json" },
+    signal: controller.signal,
   };
 
   if (method === "GET" && param) {
     const params = new URLSearchParams(
       typeof param === "string" ? { param } : param,
     );
-    return fetch(`${url}?${params}`).then((r) => r.json());
+    url = `${url}?${params}`;
   } else if (method === "POST") {
     if (param !== undefined) {
       options.body = JSON.stringify(param);
     }
   }
 
-  try {
-    // Create timeout promise
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Request timeout")), TIMEOUT_MS);
-    });
+  const timeoutId = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, TIMEOUT_MS);
 
-    // Race between fetch and timeout
-    const response = await Promise.race([fetch(url, options), timeoutPromise]);
+  try {
+    const response = await fetch(url, options);
 
     if (!response.ok) {
       const error = await response
@@ -151,11 +156,16 @@ const httpCall = async (endpoint, param, method = "GET", timeoutMs = 30000) => {
     }
     return response.json();
   } catch (err) {
+    if (timedOut) {
+      throw new Error("Request timeout");
+    }
     // Add more context to network errors
     if (err instanceof TypeError && err.message === "Failed to fetch") {
       throw new Error(`Network error: Unable to reach server at ${url}`);
     }
     throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
 };
 
@@ -261,12 +271,35 @@ export async function deleteShowFromSrvr(show) {
 
 export const lastViewedCache = {};
 
+let lastViewedCacheUpdating = false;
+let lastViewedCacheFailureCount = 0;
+
 const updateLastViewedCache = async () => {
-  const lastViewed = await getLastViewed();
-  Object.assign(lastViewedCache, lastViewed);
+  if (lastViewedCacheUpdating) return;
+  lastViewedCacheUpdating = true;
+  try {
+    const lastViewed = await httpCall(
+      "/api/getLastViewed",
+      null,
+      "GET",
+      LAST_VIEWED_TIMEOUT_MS,
+    );
+    Object.assign(lastViewedCache, lastViewed);
+    lastViewedCacheFailureCount = 0;
+  } catch (err) {
+    lastViewedCacheFailureCount += 1;
+    if (
+      lastViewedCacheFailureCount === 1 ||
+      lastViewedCacheFailureCount % 10 === 0
+    ) {
+      console.warn("Failed to update lastViewed cache", err);
+    }
+  } finally {
+    lastViewedCacheUpdating = false;
+  }
 };
-setTimeout(updateLastViewedCache, 0);
-setInterval(updateLastViewedCache, 10 * 1000); // every 10 secs
+setTimeout(updateLastViewedCache, LAST_VIEWED_START_DELAY_MS);
+setInterval(updateLastViewedCache, LAST_VIEWED_POLL_MS);
 
 export function getShowsFromDisk() {
   return httpCall("/api/getShowsFromDisk");
@@ -280,7 +313,7 @@ export function embySync() {
 
 // Shared filters (cross-computer)
 export function getSharedFilters() {
-  return httpCall("/api/getSharedFilters");
+  return httpCall("/api/getSharedFilters", null, "GET", 8000);
 }
 export function setSharedFilters(sharedFilters) {
   return httpCall("/api/setSharedFilters", sharedFilters, "POST");

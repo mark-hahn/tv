@@ -230,15 +230,20 @@ export default {
       // When it changes, reset internal filters by emitting current button state
       // (with Custom turned off) so List recomputes from visible buttons.
       this._lastSharedFiltersRaw = "";
+      this._sharedFiltersInFlight = false;
 
       if (this._sharedFiltersPoll) return;
       this._sharedFiltersPoll = setInterval(() => {
+        if (this._sharedFiltersInFlight) return;
+        this._sharedFiltersInFlight = true;
         void (async () => {
           let shared = null;
           try {
             shared = await srvr.getSharedFilters();
           } catch {
             shared = null;
+          } finally {
+            this._sharedFiltersInFlight = false;
           }
 
           const raw = shared ? JSON.stringify(shared) : "";

@@ -3886,6 +3886,15 @@ app.get("/api/flexget-status", (req, res) => {
   res.json({ running: flexgetIsRunning });
 });
 
+app.get("/api/flexget-config", async (req, res) => {
+  try {
+    const text = await fs.promises.readFile(FLEXGET_CONFIG, "utf8");
+    res.type("text/plain").send(text);
+  } catch (e) {
+    res.status(500).send(e.message);
+  }
+});
+
 app.post("/api/saveNote", apiWrapper(saveNote));
 
 // Open qBittorrent web UI — auto-login page served from hahnca.com so the

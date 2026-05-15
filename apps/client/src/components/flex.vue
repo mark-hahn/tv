@@ -95,6 +95,19 @@
             Info
           </button>
           <button
+            @click.stop="toggleConfig"
+            :style="{
+              fontSize: '13px',
+              cursor: 'pointer',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': showConfig ? 'lightgray' : 'whitesmoke',
+            }"
+          >
+            Config
+          </button>
+          <button
             @click.stop="scrollToBottomAction"
             style="
               font-size: 13px;
@@ -180,6 +193,28 @@
     </div>
 
     <div
+      v-if="showConfig"
+      :style="{
+        flex: '1 1 auto',
+        minHeight: '0px',
+        overflowY: 'auto',
+        overflowX: 'auto',
+        padding: '10px',
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        fontWeight: 'normal',
+        whiteSpace: 'pre',
+      }"
+    >
+      <span
+        v-if="configLoading"
+        style="color: #666"
+        >Loading...</span
+      >
+      <span v-else>{{ configText }}</span>
+    </div>
+    <div
+      v-else
       id="scroller"
       ref="scroller"
       :style="{
@@ -439,6 +474,9 @@ export default {
       _inFlight: false,
       _loadingTimer: null,
       _showLoading: false,
+      showConfig: false,
+      configText: "",
+      configLoading: false,
     };
   },
 
@@ -505,6 +543,22 @@ export default {
   },
 
   methods: {
+    async toggleConfig() {
+      this.showConfig = !this.showConfig;
+      if (this.showConfig) {
+        this.configLoading = true;
+        this.configText = "";
+        try {
+          const res = await fetch(`${config.tvSrvrUrl}/api/flexget-config`);
+          this.configText = res.ok ? await res.text() : `Error: ${res.status}`;
+        } catch (e) {
+          this.configText = `Error: ${e.message}`;
+        } finally {
+          this.configLoading = false;
+        }
+      }
+    },
+
     goToShow() {
       const name = this.dialogRow?.entry?.showName;
       if (name) evtBus.emit("selectShowFromCardTitle", name);

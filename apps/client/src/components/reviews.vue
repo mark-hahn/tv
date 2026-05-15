@@ -487,7 +487,7 @@ export default {
     },
 
     onSetUpSeries(show) {
-      console.log("[reviews] onSetUpSeries", show?.name);
+      void show?.name;
       this.showName = show?.name || "";
       this.reviews = [];
       this.stats = null;
@@ -506,13 +506,13 @@ export default {
     onTvdbDataReady(data) {
       this.checkedRemotes = true;
       const tvdbData = data?.tvdbData;
-      console.log("[reviews] onTvdbDataReady", {
+      void {
         hasData: !!tvdbData,
         imdbUrl: tvdbData?.imdbUrl,
         imdbId: tvdbData?.imdbId,
         rottenUrl: tvdbData?.rottenUrl,
         remotesLen: tvdbData?.remotes?.length,
-      });
+      };
 
       if (tvdbData) {
         // First try the runtime-built remotes array (populated when show is freshly fetched)

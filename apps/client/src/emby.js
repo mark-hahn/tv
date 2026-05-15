@@ -148,14 +148,14 @@ export async function loadAllShows() {
 
     // DEBUG Swiss Toni
     if (rec.name === "Swiss Toni") {
-      console.log("[DEBUG Swiss Toni] after computed props:", {
+      void {
         notReady: rec.notReady,
         inEmby: rec.inEmby,
         fileGap: rec.fileGap,
         fileEndError: rec.fileEndError,
         seasonWatchedThenNofile: rec.seasonWatchedThenNofile,
         inToTry: rec.inToTry,
-      });
+      };
     }
   }
 

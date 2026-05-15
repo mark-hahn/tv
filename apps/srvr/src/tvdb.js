@@ -448,30 +448,6 @@ try {
 // Phase 5: Migrate separate JSON files into tvdb.json
 let phase5MigrationNeeded = false;
 
-// 5.1: Migrate gaps.json
-const gapsPath = path.join(SRVR_DATA_DIR, "gaps.json");
-if (fs.existsSync(gapsPath) && !fs.existsSync(gapsPath + ".backup")) {
-  log("Phase 5.1: Migrating gaps.json into tvdb.json");
-  try {
-    const gaps = util.jParse(fs.readFileSync(gapsPath, "utf8"));
-    let gapCount = 0;
-
-    for (const [embyId, gapData] of Object.entries(gaps)) {
-      const tvdb = Object.values(allTvdb).find((t) => t.emby?.id === embyId);
-      if (tvdb && !tvdb.gap) {
-        tvdb.gap = gapData;
-        gapCount++;
-        phase5MigrationNeeded = true;
-      }
-    }
-
-    log(`Phase 5.1: Migrated ${gapCount} gaps from gaps.json`);
-    fs.renameSync(gapsPath, gapsPath + ".backup");
-  } catch (e) {
-    log("err", "Phase 5.1: gaps.json migration failed:", e);
-  }
-}
-
 // 5.2: Migrate notes.json
 const notesPath = path.join(SRVR_DATA_DIR, "notes.json");
 if (fs.existsSync(notesPath) && !fs.existsSync(notesPath + ".backup")) {

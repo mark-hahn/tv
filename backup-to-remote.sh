@@ -41,7 +41,7 @@ finish() {
     log "done  elapsed: ${MIN}m ${SEC}s  status: $RESULT"
     echo >> "$LOG"
 }
-trap 'STATUS=130; RESULT="cancelled"; finish' INT TERM
+trap 'trap - EXIT INT TERM; STATUS=130; RESULT="cancelled"; finish' INT TERM
 trap 'STATUS=$?; finish' EXIT
 
 init_repo

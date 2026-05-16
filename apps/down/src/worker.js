@@ -232,7 +232,7 @@ const main = () => {
     const rsyncArgs = [
       "-av",
       "--protect-args",
-      "--inplace",
+      "--partial-dir=.rsync-tmp",
       "-e",
       "ssh",
       "--timeout=20",

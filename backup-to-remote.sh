@@ -22,14 +22,6 @@ run_backup() {
         --tag "automated"
 }
 
-cleanup() {
-    echo "Cleaning up old snapshots..."
-    restic -r "$REPO" -p "$PASSWORD_FILE" forget \
-        --keep-daily 7 \
-        --keep-weekly 4 \
-        --prune
-}
-
 if [ ! -f "$PASSWORD_FILE" ]; then
     echo "Error: $PASSWORD_FILE not found."
     exit 1
@@ -37,4 +29,3 @@ fi
 
 init_repo
 run_backup
-cleanup

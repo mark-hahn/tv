@@ -59,7 +59,7 @@
             text-overflow: ellipsis;
             white-space: nowrap;
           "
-          >{{ chksrtFilename }}</span
+          >{{ chksrtFilename }}{{ activeTrackSuffix }}</span
         >
       </div>
       <!-- Filename (non-chksrt modes) -->

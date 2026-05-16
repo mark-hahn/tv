@@ -67,14 +67,13 @@
           >
           <button
             @click.stop="forceRun"
-            :disabled="forcing"
             :style="{
               fontSize: '13px',
-              cursor: forcing ? 'default' : 'pointer',
+              cursor: 'pointer',
               borderRadius: '7px',
               padding: '4px 10px',
               border: '1px solid #bbb',
-              '--btn-bg': forcing ? '#ccc' : 'whitesmoke',
+              '--btn-bg': showRunPane ? 'lightgray' : 'whitesmoke',
             }"
           >
             Run
@@ -212,6 +211,23 @@
         >Loading...</span
       >
       <span v-else>{{ configText }}</span>
+    </div>
+    <div
+      v-else-if="showRunPane"
+      ref="runPane"
+      :style="{
+        flex: '1 1 auto',
+        minHeight: '0px',
+        overflowY: 'auto',
+        overflowX: 'auto',
+        padding: '10px',
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        fontWeight: 'normal',
+        whiteSpace: 'pre',
+      }"
+    >
+      {{ runOutput }}
     </div>
     <div
       v-else
@@ -477,6 +493,9 @@ export default {
       showConfig: false,
       configText: "",
       configLoading: false,
+      showRunPane: false,
+      runOutput: "",
+      _runAbortCtrl: null,
     };
   },
 
@@ -540,6 +559,10 @@ export default {
     this.rows = [];
     this.dialogRow = null;
     window.removeEventListener("keydown", this._onKeyDown);
+    if (this._runAbortCtrl) {
+      this._runAbortCtrl.abort();
+      this._runAbortCtrl = null;
+    }
   },
 
   methods: {
@@ -769,17 +792,61 @@ export default {
     },
 
     async forceRun() {
+      if (this.showRunPane) {
+        this.showRunPane = false;
+        if (this._runAbortCtrl) {
+          this._runAbortCtrl.abort();
+          this._runAbortCtrl = null;
+        }
+        return;
+      }
       if (this.forcing) return;
+      this.showRunPane = true;
+      this.runOutput = "";
       this.forcing = true;
       this.flexRunning = true;
+      const ctrl = new AbortController();
+      this._runAbortCtrl = ctrl;
       try {
-        await fetch(`${config.tvSrvrUrl}/api/flexget-run`, { method: "POST" });
-        this.scheduleNextPoll(3000);
-      } catch {
-        // ignore
+        const res = await fetch(`${config.tvSrvrUrl}/api/flexget-run-stream`, {
+          signal: ctrl.signal,
+        });
+        if (!res.ok) {
+          this.runOutput = `Error: ${res.status}`;
+          return;
+        }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const parts = buf.split("\n");
+          buf = parts.pop();
+          for (const part of parts) {
+            if (part.startsWith("data:")) {
+              this.runOutput += part.slice(5).replace(/^ /, "") + "\n";
+              await this.$nextTick();
+              this._scrollRunPaneToBottom();
+            }
+          }
+        }
+      } catch (e) {
+        if (e.name !== "AbortError") {
+          this.runOutput += `\nError: ${e.message}`;
+        }
       } finally {
         this.forcing = false;
+        this.flexRunning = false;
+        this._runAbortCtrl = null;
+        this.scheduleNextPoll(1000);
       }
+    },
+
+    _scrollRunPaneToBottom() {
+      const el = this.$refs.runPane;
+      if (el) el.scrollTop = el.scrollHeight;
     },
 
     // Sel: emit selectShowFromCardTitle for the selected row's show name

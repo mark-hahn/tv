@@ -3882,6 +3882,91 @@ app.post("/api/flexget-run", (req, res) => {
   res.json({ ok: true });
 });
 
+app.get("/api/flexget-run-stream", (req, res) => {
+  res.set({
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+  });
+  res.flushHeaders();
+
+  if (flexgetIsRunning) {
+    res.write("data: [flexget is already running]\n\n");
+    res.end();
+    return;
+  }
+
+  flexgetIsRunning = true;
+  console.log("[flexget] stream run started");
+
+  const args = [
+    "-c",
+    FLEXGET_CONFIG,
+    "execute",
+    "--tasks",
+    "fetch-feeds",
+    "--dump",
+    "accepted",
+  ];
+  const child = cp.spawn(FLEXGET_CMD, args, {
+    env: { ...process.env, COLUMNS: "300" },
+  });
+
+  let stdout = "";
+  let clientGone = false;
+
+  const sendLine = (line) => {
+    if (!clientGone) {
+      try {
+        let out = line.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} /, "");
+        if (/^(VERBOSE|WARNING)  /.test(out)) out = out.slice(39);
+        res.write(`data: ${out}\n\n`);
+      } catch {}
+    }
+  };
+
+  const bufferStream = (stream) => {
+    let buf = "";
+    stream.on("data", (chunk) => {
+      buf += chunk.toString();
+      const parts = buf.split("\n");
+      buf = parts.pop();
+      for (const line of parts) {
+        stdout += line + "\n";
+        sendLine(line);
+      }
+    });
+    stream.on("end", () => {
+      if (buf) {
+        stdout += buf + "\n";
+        sendLine(buf);
+      }
+    });
+  };
+
+  bufferStream(child.stdout);
+  bufferStream(child.stderr);
+
+  req.on("close", () => {
+    clientGone = true;
+  });
+
+  child.on("close", async () => {
+    try {
+      await processFlexgetOutput(stdout);
+    } catch (e) {
+      console.error("[flexget] stream run processing error:", e.message);
+    } finally {
+      flexgetIsRunning = false;
+      if (!clientGone) {
+        try {
+          res.end();
+        } catch {}
+      }
+    }
+  });
+});
+
 app.get("/api/flexget-status", (req, res) => {
   res.json({ running: flexgetIsRunning });
 });
@@ -5412,6 +5497,59 @@ function parseFlexgetDumpOutput(stdout) {
   return candidates;
 }
 
+async function processFlexgetOutput(stdout) {
+  try {
+    const ts = new Date().toISOString();
+    fs.appendFileSync(FLEXGET_DUMP_LOG, `\n--- ${ts} ---\n${stdout}\n`);
+  } catch {}
+
+  const candidates = parseFlexgetDumpOutput(stdout);
+  if (candidates.length === 0) {
+    console.log("[flexget] no accepted entries");
+    return;
+  }
+  console.log(`[flexget] processing ${candidates.length} accepted candidates`);
+
+  const runGroups = new Map();
+  for (let i = 0; i < candidates.length; i++) {
+    const rawTitle = String(candidates[i].title || "").trim();
+    const ptt = parseTorrentTitle(rawTitle.replace(/\.[a-z0-9]{2,4}$/i, ""));
+    const sn = ptt?.title;
+    let ep = ptt?.episode;
+    if (!ep && Array.isArray(ptt?.episodes) && ptt.episodes.length)
+      ep = ptt.episodes[0];
+    const roughKey =
+      sn && Number.isInteger(ptt?.season) && Number.isInteger(ep)
+        ? `${sn}\x00${ptt.season}\x00${ep}`
+        : `__solo__${i}`;
+    if (!runGroups.has(roughKey)) runGroups.set(roughKey, []);
+    runGroups.get(roughKey).push(i);
+  }
+
+  const storeOnlySet = new Set();
+  for (const indices of runGroups.values()) {
+    if (indices.length <= 1) continue;
+    let bestIdx = indices[0];
+    for (let j = 1; j < indices.length; j++) {
+      if (flexgetIsBetterSameRun(candidates[indices[j]], candidates[bestIdx])) {
+        storeOnlySet.add(bestIdx);
+        bestIdx = indices[j];
+      } else {
+        storeOnlySet.add(indices[j]);
+      }
+    }
+  }
+
+  for (let i = 0; i < candidates.length; i++) {
+    try {
+      await processFlexgetCandidate(candidates[i], storeOnlySet.has(i));
+    } catch (e) {
+      console.error("[flexget] processCandidate error:", e.message);
+    }
+  }
+  await saveFlexgetHistory();
+}
+
 async function runFlexgetAndProcess() {
   if (flexgetIsRunning) return;
   flexgetIsRunning = true;
@@ -5432,64 +5570,7 @@ async function runFlexgetAndProcess() {
         String(e.message || "").slice(0, 200),
       );
     }
-
-    // Log raw output for config-test format inspection.
-    try {
-      const ts = new Date().toISOString();
-      fs.appendFileSync(FLEXGET_DUMP_LOG, `\n--- ${ts} ---\n${stdout}\n`);
-    } catch {}
-
-    const candidates = parseFlexgetDumpOutput(stdout);
-    if (candidates.length === 0) {
-      console.log("[flexget] no accepted entries");
-      return;
-    }
-    console.log(
-      `[flexget] processing ${candidates.length} accepted candidates`,
-    );
-
-    // Group by rough episode key to detect duplicates within this run.
-    // For groups with multiple candidates, only the best may be sent; others are store-only.
-    const runGroups = new Map(); // roughKey -> candidate indices
-    for (let i = 0; i < candidates.length; i++) {
-      const rawTitle = String(candidates[i].title || "").trim();
-      const ptt = parseTorrentTitle(rawTitle.replace(/\.[a-z0-9]{2,4}$/i, ""));
-      const sn = ptt?.title;
-      let ep = ptt?.episode;
-      if (!ep && Array.isArray(ptt?.episodes) && ptt.episodes.length)
-        ep = ptt.episodes[0];
-      const roughKey =
-        sn && Number.isInteger(ptt?.season) && Number.isInteger(ep)
-          ? `${sn}\x00${ptt.season}\x00${ep}`
-          : `__solo__${i}`;
-      if (!runGroups.has(roughKey)) runGroups.set(roughKey, []);
-      runGroups.get(roughKey).push(i);
-    }
-
-    const storeOnlySet = new Set();
-    for (const indices of runGroups.values()) {
-      if (indices.length <= 1) continue;
-      let bestIdx = indices[0];
-      for (let j = 1; j < indices.length; j++) {
-        if (
-          flexgetIsBetterSameRun(candidates[indices[j]], candidates[bestIdx])
-        ) {
-          storeOnlySet.add(bestIdx);
-          bestIdx = indices[j];
-        } else {
-          storeOnlySet.add(indices[j]);
-        }
-      }
-    }
-
-    for (let i = 0; i < candidates.length; i++) {
-      try {
-        await processFlexgetCandidate(candidates[i], storeOnlySet.has(i));
-      } catch (e) {
-        console.error("[flexget] processCandidate error:", e.message);
-      }
-    }
-    await saveFlexgetHistory();
+    await processFlexgetOutput(stdout);
   } finally {
     flexgetIsRunning = false;
   }

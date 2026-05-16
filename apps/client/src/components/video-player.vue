@@ -84,7 +84,7 @@
             white-space: nowrap;
             display: block;
           "
-          >{{ path ? path.split("/").pop() : "" }}</span
+          >{{ path ? path.split("/").pop() : "" }}{{ activeTrackSuffix }}</span
         >
       </div>
       <!-- Timing slider (srt tracks only, not in chksrt/simple mode) -->
@@ -392,6 +392,20 @@ export default {
     },
     showSlider() {
       return this.activeTrack?.type === "srt";
+    },
+    activeTrackSuffix() {
+      const track = this.activeTrack;
+      if (!track) return "";
+      const keywords = ["SDH", "CC", "HI", "FORCED"];
+      const src = [
+        track.type === "forced" ? "forced" : "",
+        track.label || "",
+        track.file || "",
+      ]
+        .join(" ")
+        .toUpperCase();
+      const found = keywords.filter((k) => src.includes(k));
+      return found.length ? " (" + found.join(", ") + ")" : "";
     },
     ballPct() {
       return ((this.subtitleOffset + 3) / 6) * 100;

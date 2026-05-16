@@ -99,14 +99,14 @@
             v-model="searchInput"
             @keyup.enter="searchUsb"
             placeholder="Search"
-            style="width: 120px"
+            style="width: 96px"
           />
           <input
             v-model="renameInput"
             @focus="onRenameFocus"
             @keyup.enter="renameFile"
             placeholder="Rename"
-            style="width: 120px"
+            style="width: 96px"
           />
         </div>
         <div style="display: flex; gap: 8px; align-items: center">
@@ -167,6 +167,19 @@
             }"
           >
             First
+          </button>
+
+          <button
+            @click.stop="clickInfo"
+            :style="{
+              cursor: 'pointer',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': showInfo ? '#ddd' : 'whitesmoke',
+            }"
+          >
+            Info
           </button>
 
           <button
@@ -259,6 +272,19 @@
           </button>
 
           <button
+            @click.stop="clickInfo"
+            :style="{
+              cursor: 'pointer',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': showInfo ? '#ddd' : 'whitesmoke',
+            }"
+          >
+            Info
+          </button>
+
+          <button
             @click.stop="usbDelClick"
             :disabled="!hasSelection"
             :style="{
@@ -314,9 +340,10 @@
     <!-- Tree -->
     <div
       :style="{
-        flex: '1 1 auto',
+        flex: showInfo ? '0 0 50%' : '1 1 auto',
         overflow: 'auto',
         padding: '0px 8px',
+        borderBottom: showInfo ? '1px solid #ddd' : 'none',
       }"
     >
       <div
@@ -334,6 +361,119 @@
         :selected-files="selectedFiles"
         @node-click="handleNodeClick"
       />
+    </div>
+
+    <!-- Info Pane -->
+    <div
+      v-show="showInfo"
+      :style="{
+        flex: '1 1 50%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        backgroundColor: '#fafafa',
+        color: '#000',
+        fontFamily: 'monospace',
+        padding: '10px',
+      }"
+    >
+      <div
+        style="
+          flex: 0 0 auto;
+          border-bottom: 1px solid #ddd;
+          padding-bottom: 5px;
+          margin-bottom: 5px;
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+        "
+      >
+        <div style="min-width: 0; margin-right: 8px; overflow: hidden">
+          <div style="white-space: pre-wrap; word-break: break-word">
+            {{ wrapFileName(infoFileName) }}
+          </div>
+          <div
+            v-if="infoFileMeta"
+            style="margin-top: 2px"
+          >
+            {{ infoFileMeta }}
+          </div>
+        </div>
+        <button
+          @click="showInfo = false"
+          title="Close"
+          :style="{
+            cursor: 'pointer',
+            borderRadius: '4px',
+            padding: '2px 8px',
+            border: '1px solid #bbb',
+            backgroundColor: 'whitesmoke',
+            fontWeight: 'bold',
+            flexShrink: 0,
+          }"
+        >
+          ✕
+        </button>
+      </div>
+      <div
+        style="
+          flex: 1 1 auto;
+          overflow: auto;
+          background-color: #fff;
+          border: 1px solid #eee;
+          padding: 4px;
+          font-size: 12px;
+        "
+      >
+        <span
+          v-if="infoLoading"
+          style="color: #666"
+          >Loading...</span
+        >
+        <template v-else-if="infoMultiFiles.length > 0">
+          <div
+            v-for="(f, idx) in infoMultiFiles"
+            :key="idx"
+            style="
+              padding: 3px 2px;
+              border-bottom: 1px solid #eee;
+              line-height: 1.5;
+            "
+          >
+            <div
+              style="
+                font-family: sans-serif;
+                font-size: 13px;
+                white-space: pre-wrap;
+                word-break: break-word;
+              "
+            >
+              {{ wrapFileName(f.name) }}
+            </div>
+            <div
+              v-if="f.meta"
+              style="color: #555; font-size: 11px"
+            >
+              {{ f.meta }}
+            </div>
+          </div>
+        </template>
+        <template v-else-if="!infoFileName && infoText">
+          <span style="color: #888">{{ infoText }}</span>
+        </template>
+        <template v-else-if="!infoFileName">
+          <span style="color: #888">No files selected</span>
+        </template>
+        <template v-else>
+          <div
+            v-for="(line, idx) in infoText.split('\n')"
+            :key="idx"
+            style="white-space: pre; line-height: 1.4"
+          >
+            {{ line || "\u00a0" }}
+          </div>
+        </template>
+      </div>
     </div>
   </div>
 </template>
@@ -380,6 +520,12 @@ export default {
       pruneSummaryLine: "",
       showPruneLine: false,
       _prunePollTimer: null,
+      showInfo: false,
+      infoFileName: "",
+      infoFileMeta: "",
+      infoText: "",
+      infoLoading: false,
+      infoMultiFiles: [],
     };
   },
   computed: {
@@ -1014,6 +1160,161 @@ export default {
         );
       }
       return [];
+    },
+    wrapFileName(name) {
+      return util.wrapFileName(name);
+    },
+    formatFileSize(bytes) {
+      if (bytes == null) return "";
+      if (bytes >= 1024 * 1024 * 1024)
+        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+      if (bytes >= 1024 * 1024)
+        return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+      if (bytes >= 1024) return (bytes / 1024).toFixed(0) + " KB";
+      return bytes + " B";
+    },
+    // Find the first video file path in the current selection
+    findFirstFile() {
+      const VIDEO_EXTS = new Set([
+        "mkv",
+        "avi",
+        "mp4",
+        "m4v",
+        "mov",
+        "wmv",
+        "webm",
+        "mpg",
+        "mpeg",
+        "ts",
+        "m2ts",
+      ]);
+      const getExt = (name) => {
+        const i = name.lastIndexOf(".");
+        return i >= 0 ? name.slice(i + 1).toLowerCase() : "";
+      };
+      const firstInNode = (node, prefix) => {
+        const p = prefix ? `${prefix}/${node.name}` : node.name;
+        if (node.type === "file") return { relPath: p, node };
+        if (node.children) {
+          for (const c of node.children) {
+            const r = firstInNode(c, p);
+            if (r) return r;
+          }
+        }
+        return null;
+      };
+      // Try selected folders first
+      for (const folderName of this.selectedFolders) {
+        const topNode = this.tree.find((n) => n.name === folderName);
+        if (topNode) {
+          const r = firstInNode(topNode, null);
+          if (r && VIDEO_EXTS.has(getExt(r.node.name))) return r;
+          if (r) return r;
+        }
+      }
+      // Fall back to selected files
+      if (this.selectedFiles.size > 0) {
+        const relPath = [...this.selectedFiles][0];
+        const parts = relPath.split("/");
+        let cur = this.tree;
+        let node = null;
+        for (const part of parts) {
+          node = (cur || []).find((n) => n.name === part) || null;
+          cur = node ? node.children : null;
+        }
+        return node
+          ? { relPath, node }
+          : { relPath, node: { name: parts[parts.length - 1] } };
+      }
+      return null;
+    },
+    async clickInfo() {
+      if (this.showInfo) {
+        this.showInfo = false;
+        return;
+      }
+      this.showInfo = true;
+      await this.loadInfo();
+    },
+    async loadInfo() {
+      this.infoText = "";
+      this.infoFileName = "";
+      this.infoFileMeta = "";
+      this.infoMultiFiles = [];
+      this.infoLoading = true;
+      const found = this.findFirstFile();
+      if (!found) {
+        this.infoLoading = false;
+        return;
+      }
+      const { relPath, node } = found;
+      const fileName = relPath.split("/").pop();
+      this.infoFileName = fileName;
+      if (node && node.size != null) {
+        const sizeStr = this.formatFileSize(node.size);
+        const dateStr = (node.date || "").replace(/:\d+\.\d+$|:\d+$/, "");
+        this.infoFileMeta = dateStr ? `${sizeStr} | ${dateStr}` : sizeStr;
+      }
+      try {
+        const res = await fetch(`${config.torrentsApiUrl}/api/usb/mediainfo`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ relPath, movieMode: this.movieMode }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        this.infoText = data.output || "";
+        let sizeStr =
+          node && node.size != null ? this.formatFileSize(node.size) : "";
+        let dateStr = node
+          ? (node.date || "").replace(/:\d+\.\d+$|:\d+$/, "")
+          : "";
+        let durStr = "";
+        let widthStr = "";
+        let bitDepthStr = "";
+        let rateStr = "";
+        const widthMatch = this.infoText.match(
+          /^Height\s+:\s+(\d[\d\s]*)pixels/m,
+        );
+        if (widthMatch) widthStr = widthMatch[1].replace(/\s/g, "") + " px";
+        const bitrateMatch = this.infoText.match(
+          /^Bit rate\s+:\s+([\d\s]+kb\/s)/m,
+        );
+        if (bitrateMatch)
+          rateStr = bitrateMatch[1].replace(/\s(?=\d)/g, "").trim();
+        const vSecs = this.infoText.split(/\n\n+/);
+        const vSec = vSecs.find((s) => /^Video\b/.test(s.trim()));
+        if (vSec) {
+          const durLine = vSec.match(/^Duration\s+:\s+(.+)/m);
+          if (durLine) {
+            const raw = durLine[1];
+            const hm = raw.match(/(\d+)\s*h/);
+            const mm = raw.match(/(\d+)\s*min/);
+            const total =
+              (hm ? parseInt(hm[1]) : 0) * 60 + (mm ? parseInt(mm[1]) : 0);
+            if (total > 0) durStr = total + " min";
+          }
+          const bdLine = vSec.match(/^Bit depth\s+:\s+(\d+)\s*bits/m);
+          if (bdLine) bitDepthStr = bdLine[1] + " bits";
+        }
+        this.infoFileMeta = [
+          sizeStr,
+          durStr,
+          dateStr,
+          widthStr,
+          bitDepthStr,
+          rateStr,
+        ]
+          .filter(Boolean)
+          .join(" | ");
+        const subsCount = data.subsCount ?? 0;
+        const srtsCount = data.srtsCount ?? 0;
+        this.infoFileMeta += ` | ${subsCount} sub | ${srtsCount} srt`;
+      } catch (e) {
+        this.infoText = `Error: ${e.message}`;
+      } finally {
+        this.infoLoading = false;
+      }
     },
     async forceMovieDown() {
       if (this.selectedFolders.size === 0 && this.selectedFiles.size === 0)

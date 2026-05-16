@@ -1822,7 +1822,7 @@ export default {
         .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
         .map((p) => `${mediaRoot}/${p}`)[0];
       if (!videoPath) return;
-      evtBus.emit("playSimplePath", videoPath);
+      evtBus.emit("playEpisodePath", videoPath);
     },
     clickSubs() {
       const mediaRoot = this.movieMode

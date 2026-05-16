@@ -1982,6 +1982,7 @@ export default {
     handlePlayEpisode(e, show, season, episode) {
       const cell = this.seriesMap?.[season]?.[episode];
       if (cell?.path && !cell?.noFile) {
+        this.videoPlayerMode = "simple";
         this.videoPlayerPath = cell.path;
       }
     },
@@ -2017,6 +2018,7 @@ export default {
     };
     evtBus.on("missingEpisodeWarning", this._onMissingEpWarning);
     this._onPlayEpisodePath = (path) => {
+      this.videoPlayerMode = null;
       this.videoPlayerPath = path;
     };
     evtBus.on("playEpisodePath", this._onPlayEpisodePath);

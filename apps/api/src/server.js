@@ -846,6 +846,87 @@ app.get("/api/local/movies", async (req, res) => {
   }
 });
 
+const USB_HOST_FOR_MEDIAINFO = "xobtlu@oracle.usbx.me";
+const USB_FILES_ROOT_MI = "/home/xobtlu/files";
+const USB_MOVIES_ROOT_MI = "/home/xobtlu/movies";
+
+app.post("/api/usb/mediainfo", async (req, res) => {
+  try {
+    const { relPath, movieMode } = req.body;
+    if (!relPath) return res.status(400).json({ error: "Missing relPath" });
+    const str = String(relPath).trim();
+    if (!str || str.includes(".."))
+      return res.status(400).json({ error: "Invalid relPath" });
+    const root = movieMode ? USB_MOVIES_ROOT_MI : USB_FILES_ROOT_MI;
+    const fullPath = `${root}/${str}`;
+    const { execFile } = await import("node:child_process");
+    const { promisify } = await import("node:util");
+    const execAsync = promisify(execFile);
+    const sshArgs = [
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "ConnectTimeout=20",
+      "-o",
+      "StrictHostKeyChecking=no",
+      "-o",
+      "UserKnownHostsFile=/dev/null",
+      "-o",
+      "LogLevel=ERROR",
+    ];
+    const escapedPath = fullPath.replace(/'/g, "'\\''");
+    const { stdout } = await execAsync(
+      "ssh",
+      [...sshArgs, USB_HOST_FOR_MEDIAINFO, `mediainfo -- '${escapedPath}'`],
+      { maxBuffer: 5 * 1024 * 1024 },
+    );
+    const output = stdout
+      .split("\n")
+      .filter((l) => !/^Encoding settings\s*:/i.test(l))
+      .join("\n");
+
+    // Count subtitle streams from mediainfo text output (sections starting with "Text")
+    const sections = output.split(/\n\n+/);
+    const ENGLISH_LANG_TAGS = new Set(["eng", "en", "english"]);
+    let subsCount = 0;
+    for (const sec of sections) {
+      if (!/^Text\b/i.test(sec.trim())) continue;
+      const langMatch = sec.match(/^Language\s*:\s*(.+)/im);
+      const lang = langMatch ? langMatch[1].trim().toLowerCase() : "";
+      if (lang === "" || ENGLISH_LANG_TAGS.has(lang)) subsCount++;
+    }
+
+    // Count .srt sidecar files on USB server
+    const fileName = str.split("/").pop();
+    const dirPath = `${root}/${str.substring(0, str.lastIndexOf("/"))}`.replace(
+      /\/$/,
+      "",
+    );
+    const baseName = fileName
+      .replace(/\.[^.]+$/, "")
+      .replace(/'/g, "'\\''")
+      .toLowerCase();
+    const escapedDir = dirPath.replace(/'/g, "'\\''");
+    let srtsCount = 0;
+    try {
+      const { stdout: srtOut } = await execAsync(
+        "ssh",
+        [
+          ...sshArgs,
+          USB_HOST_FOR_MEDIAINFO,
+          `find '${escapedDir}' -maxdepth 1 -iname '*.srt' -not -iname '*.chosen' | wc -l`,
+        ],
+        { maxBuffer: 64 * 1024 },
+      );
+      srtsCount = parseInt(srtOut.trim()) || 0;
+    } catch (_) {}
+
+    res.json({ output, subsCount, srtsCount });
+  } catch (err) {
+    res.status(500).json({ error: err?.message || String(err) });
+  }
+});
+
 app.post("/api/local/rename", async (req, res) => {
   try {
     const { oldPath, newName, errsMode } = req.body;

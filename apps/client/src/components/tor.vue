@@ -283,21 +283,6 @@
               First
             </button>
             <button
-              @click.stop="torShowClick"
-              :disabled="selectedItems.size === 0"
-              :style="{
-                fontSize: '13px',
-                cursor: selectedItems.size > 0 ? 'pointer' : 'default',
-                borderRadius: '7px',
-                padding: '4px 8px',
-                border: '1px solid #bbb',
-                '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
-                color: selectedItems.size > 0 ? 'inherit' : '#aaa',
-              }"
-            >
-              Show
-            </button>
-            <button
               @click.stop="torSendClick"
               :disabled="selectedItems.size === 0"
               :style="{

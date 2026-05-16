@@ -2,7 +2,7 @@
 
 REPO="/mnt/media/backup/mlap"
 PASSWORD_FILE="$HOME/.restic-password"
-BACKUP_PATHS=("/root" "/etc")
+BACKUP_PATHS=("/root" "/etc" "/mnt/c/Users/mark")
 LOG="$HOME/mlap-bkup/mlap-bkup.log"
 ts() { TZ="America/Los_Angeles" date "+%Y/%m/%d %H:%M:%S"; }
 log() { echo "$(ts) $*" >> "$LOG"; }

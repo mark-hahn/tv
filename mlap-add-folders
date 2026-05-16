@@ -239,10 +239,29 @@ else
 fi
 
 # ---- Set up bind mounts ----
-mkdir -p /mnt/mlap-root /mnt/mlap-mark
-mountpoint -q /mnt/mlap-root && umount /mnt/mlap-root
-mountpoint -q /mnt/mlap-mark && umount /mnt/mlap-mark
-mount --bind "$SNAP_BASE/root" /mnt/mlap-root
-mount --bind "$SNAP_BASE/mnt/c/Users/mark" /mnt/mlap-mark
+VSCODE_DIRS=()
 
-code --add /mnt/mlap-root /mnt/mlap-mark
+mkdir -p /mnt/mlap-root
+mountpoint -q /mnt/mlap-root && umount /mnt/mlap-root
+if [[ -d "$SNAP_BASE/root" ]]; then
+    mount --bind "$SNAP_BASE/root" /mnt/mlap-root
+    VSCODE_DIRS+=(/mnt/mlap-root)
+else
+    echo "WARNING: $SNAP_BASE/root not in snapshot, skipping"
+fi
+
+mkdir -p /mnt/mlap-mark
+mountpoint -q /mnt/mlap-mark && umount /mnt/mlap-mark
+if [[ -d "$SNAP_BASE/mnt/c/Users/mark" ]]; then
+    mount --bind "$SNAP_BASE/mnt/c/Users/mark" /mnt/mlap-mark
+    VSCODE_DIRS+=(/mnt/mlap-mark)
+else
+    echo "WARNING: Windows user files not in snapshot, skipping"
+fi
+
+if [[ ${#VSCODE_DIRS[@]} -eq 0 ]]; then
+    echo "ERROR: No mountable paths found in snapshot"
+    exit 1
+fi
+
+code --add "${VSCODE_DIRS[@]}"

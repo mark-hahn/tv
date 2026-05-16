@@ -37,7 +37,7 @@ finish() {
     ELAPSED=$(( $(date +%s) - START ))
     MIN=$(( ELAPSED / 60 ))
     SEC=$(( ELAPSED % 60 ))
-    [[ -z "$RESULT" ]] && { [[ $STATUS -eq 0 ]] && RESULT="success" || RESULT="failed (exit $STATUS)"; }
+    [[ -z "$RESULT" ]] && { [[ $STATUS -eq 0 ]] && RESULT="success" || [[ $STATUS -eq 3 ]] && RESULT="success (unable to read some files)" || RESULT="failed (exit $STATUS)"; }
     log "done  elapsed: ${MIN}m ${SEC}s  status: $RESULT"
     echo >> "$LOG"
 }

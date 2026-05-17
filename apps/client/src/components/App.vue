@@ -1898,36 +1898,6 @@ export default {
       evtBus.emit("paneChanged", this.currentPane);
     },
 
-    handleHistoryToTor() {
-      // Do not reload/emit showTorrents when just switching panes.
-      if (this._torrentsInitialized) {
-        this.currentPane = "tor";
-        evtBus.emit("paneChanged", this.currentPane);
-        return;
-      }
-
-      // Fallback: if torrents was never initialized, open it with current show.
-      if (this.currentShow) {
-        this.handleShowTor(this.currentShow);
-      } else {
-        this.currentPane = "tor";
-        evtBus.emit("paneChanged", this.currentPane);
-      }
-    },
-
-    handleHistoryToInfo() {
-      this.currentPane = "info";
-      this.mapShow = null;
-      evtBus.emit("paneChanged", this.currentPane);
-      evtBus.emit("mapAction", { action: "close", show: null });
-    },
-
-    handleHistoryToMap() {
-      if (this.currentShow) {
-        evtBus.emit("mapAction", { action: "open", show: this.currentShow });
-      }
-    },
-
     handleTvprocToTor() {
       if (this._torrentsInitialized) {
         this.currentPane = "tor";

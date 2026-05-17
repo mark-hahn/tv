@@ -298,19 +298,6 @@
           style="display: flex; flex-shrink: 0; align-items: center"
         >
           <button
-            @click.stop="showHistory = !showHistory"
-            :style="{ '--btn-bg': showHistory ? 'lightgray' : 'whitesmoke' }"
-            style="
-              font-size: 13.5px;
-              cursor: pointer;
-              margin: 4.5px 0 4.5px 4.5px;
-              max-height: 21.5px;
-              border-radius: 7px;
-            "
-          >
-            History
-          </button>
-          <button
             @click.stop="handleSelectedWatch"
             :disabled="!hasMapSelection"
             :style="{
@@ -363,7 +350,6 @@
     </div>
     <div
       v-if="!hideMapBottom"
-      v-show="!showHistory"
       style="
         flex: 1 1 auto;
         min-height: 0px;
@@ -790,25 +776,9 @@
         </table>
       </div>
     </div>
-    <History
-      v-show="showHistory && !hideMapBottom"
-      :tvdbId="
-        String(mapShow?.tvdbId || mapShow?.tvdbId || tvdbData?.tvdbId || '')
-      "
-      :showName="String(mapShow?.name || '')"
-      :visible="showHistory"
-      style="
-        flex: 1 1 auto;
-        min-height: 0px;
-        margin-left: 15px;
-        margin-right: 15px;
-        box-sizing: border-box;
-      "
-    />
     <div
       v-if="
         !hideMapBottom &&
-        !showHistory &&
         showEpisodePane &&
         mapImageExpanded &&
         episodeInfo?.image
@@ -828,13 +798,7 @@
       />
     </div>
     <div
-      v-if="
-        !hideMapBottom &&
-        !showHistory &&
-        showEpisodePane &&
-        selectedEpisode &&
-        episodeInfo
-      "
+      v-if="!hideMapBottom && showEpisodePane && selectedEpisode && episodeInfo"
       style="
         border-top: 3px solid black;
         flex: 0 0 auto;
@@ -963,13 +927,12 @@ import * as srvr from "../srvr.js";
 import * as urls from "../urls.js";
 import evtBus from "../evtBus.js";
 import History from "./history.vue";
-
 const MAP_ARROW_PAN_PX_PER_SEC = 400;
 const MAP_PAN_SMOOTH_TAU_SEC = 0.1;
 
 export default {
   name: "Map",
-  components: { History },
+  components: {},
 
   props: {
     mapShow: {
@@ -1037,7 +1000,6 @@ export default {
       mapTouchMovedDist: 0,
       mapTouchSuppressClickUntil: 0,
       mapUpdateKey: 0,
-      showHistory: false,
       pruneFlash: false,
       selectedSeasons: new Set(),
       selectedCells: new Set(),

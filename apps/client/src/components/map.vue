@@ -587,12 +587,7 @@
                       handleEpisodeClick($event, mapShow, season, episode)
                     "
                     :style="{
-                      cursor: simpleMode
-                        ? seriesMap[season]?.[episode]?.path &&
-                          !seriesMap[season]?.[episode]?.noFile
-                          ? 'pointer'
-                          : 'default'
-                        : 'pointer',
+                      cursor: 'pointer',
                       width: '30px',
                       minWidth: '30px',
                       maxWidth: '30px',
@@ -1917,14 +1912,6 @@ export default {
     },
     handleEpisodePlainClick(event, mapShow, season, episode) {
       event?.preventDefault?.();
-      if (this.simpleMode) {
-        const cell = this.seriesMap?.[season]?.[episode];
-        if (cell?.path && !cell?.noFile) {
-          event?.stopPropagation?.();
-          this.$emit("play-episode", event, mapShow, season, episode);
-        }
-        return;
-      }
 
       event?.stopPropagation?.();
 
@@ -1937,7 +1924,6 @@ export default {
     },
     handleEpisodeClick(event, mapShow, season, episode) {
       event?.preventDefault?.();
-      if (this.simpleMode) return;
 
       event?.stopPropagation?.();
 

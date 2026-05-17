@@ -1,6 +1,6 @@
 #!/bin/bash
 
-REPO="/mnt/media/backup/mlap"
+REPO="sftp:hahnca.com:/mnt/media/backup/mlap"
 PASSWORD_FILE="$HOME/.restic-password"
 BACKUP_PATHS=("/root" "/etc" "/mnt/c/Users/mark")
 LOG="$HOME/mlap-bkup/mlap-bkup.log"

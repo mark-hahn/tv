@@ -229,7 +229,12 @@ echo "Mounting snapshot: $SNAP_DIR"
 
 # ---- Record snapshot datetime for reference ----
 mkdir -p /root/temp
-NEW_TIME=$(TZ="America/Los_Angeles" date -d "$SNAP_DIR" "+%Y/%m/%d %H:%M:%S")
+DATE_SRC="$SNAP_DIR"
+if [[ "$DATE_SRC" == "latest" ]]; then
+    DATE_SRC=$(readlink "/mnt/mlap-bkup/snapshots/latest" 2>/dev/null)
+    DATE_SRC="${DATE_SRC##*/}"
+fi
+NEW_TIME=$(TZ="America/Los_Angeles" date -d "$DATE_SRC" "+%Y/%m/%d %H:%M:%S")
 OLD_TIME=$(cat /root/temp/mlap-bkup-time 2>/dev/null || echo "(none)")
 echo "$NEW_TIME" > /root/temp/mlap-bkup-time
 if [[ "$NEW_TIME" == "$OLD_TIME" ]]; then

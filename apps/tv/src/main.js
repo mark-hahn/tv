@@ -1,5 +1,6 @@
 import { WebSocket } from "ws";
 import { exec, spawn } from "child_process";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import express from "express";
 import cors from "cors";
 
@@ -40,6 +41,8 @@ const PIC_LABELS = {
 };
 
 const EMBY_HOST = "hahnca.com:8920";
+const HDR_MAP_PATH = "data/hdr-by-item.json";
+const HDR_MAP_MAX_AGE_MS = 60 * 24 * 60 * 60 * 1000; // 60 days
 const EMBY_API_KEY = "1c399bd079d549cba8c916244d3add2b";
 const EMBY_USER_ID = "894c752d448f45a3a1260ccaabd0adff";
 const EMBY_BASE_URL = "http://127.0.0.1:8096/emby";
@@ -91,6 +94,174 @@ function client(req) {
   return `?(${ip}) ua=${ua}`;
 }
 
+// ─── HDR manual-override map ────────────────────────────────────────────────
+
+function pruneHdrMap() {
+  const cutoff = Date.now() - HDR_MAP_MAX_AGE_MS;
+  for (const id of Object.keys(hdrByItemId)) {
+    if (hdrByItemId[id].timestamp < cutoff) delete hdrByItemId[id];
+  }
+}
+
+function loadHdrMap() {
+  try {
+    if (existsSync(HDR_MAP_PATH)) {
+      hdrByItemId = JSON.parse(readFileSync(HDR_MAP_PATH, "utf8"));
+      // migrate old format { value, timestamp } → { timestamp, hdrMode: value }
+      for (const id of Object.keys(hdrByItemId)) {
+        const e = hdrByItemId[id];
+        if (e.value !== undefined) {
+          hdrByItemId[id] = { timestamp: e.timestamp, hdrMode: e.value };
+        }
+      }
+      pruneHdrMap();
+      log(`hdrMap loaded: ${Object.keys(hdrByItemId).length} entries`);
+    }
+  } catch (err) {
+    loge(`hdrMap load error: ${err.message}`);
+    hdrByItemId = {};
+  }
+}
+
+function saveHdrMap() {
+  try {
+    pruneHdrMap();
+    mkdirSync("data", { recursive: true });
+    writeFileSync(HDR_MAP_PATH, JSON.stringify(hdrByItemId));
+  } catch (err) {
+    loge(`hdrMap save error: ${err.message}`);
+  }
+}
+
+// ─── HDR auto-set ───────────────────────────────────────────────────────────
+
+function calcHdrType(streams) {
+  const video = streams?.find((s) => s.Type === "Video");
+  if (!video) return "none";
+  const vrt = (video.VideoRangeType ?? "").toLowerCase();
+  const vr = (video.VideoRange ?? "").toLowerCase();
+  const ct = (video.ColorTransfer ?? "").toLowerCase();
+  if (vrt === "dovi") return "dv";
+  if (vrt === "hdr10plus" || vrt === "hdr10+") return "hdr10+";
+  if (vrt === "hdr10") return "hdr10";
+  if (vrt === "hlg") return "hlg";
+  if (vr === "dovi") return "dv";
+  if (vr === "hdr") return "hdr10";
+  if (ct === "smpte2084") return "hdr10";
+  if (ct === "arib-std-b67") return "hlg";
+  if (ct === "smpte2094-40") return "hdr10+";
+  return "none";
+}
+
+function hdrTypeToSetting(hdrType) {
+  if (hdrType === "dv") return "anything";
+  if (hdrType === "hdr10") return "hdr10";
+  if (hdrType === "hdr10+") return "hdr10";
+  if (hdrType === "hlg") return "hlg";
+  return "auto";
+}
+
+async function getBraviaSetting(target) {
+  const resp = await fetch(BRAVIA_PICTURE_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Auth-PSK": BRAVIA_PSK },
+    body: JSON.stringify({
+      method: "getPictureQualitySettings",
+      params: [{ target }],
+      id: 1,
+      version: "1.0",
+    }),
+  });
+  const data = await resp.json();
+  return data.result?.[0]?.[0]?.currentValue ?? null;
+}
+
+async function setBraviaSetting(target, value) {
+  const resp = await fetch(BRAVIA_PICTURE_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Auth-PSK": BRAVIA_PSK },
+    body: JSON.stringify({
+      method: "setPictureQualitySettings",
+      params: [{ settings: [{ target, value }] }],
+      id: 1,
+      version: "1.0",
+    }),
+  });
+  const data = await resp.json();
+  if (data.error) throw new Error(JSON.stringify(data.error));
+}
+
+function calcSharpness(streams) {
+  const video = streams?.find((s) => s.Type === "Video");
+  if (!video) return 40;
+  const height = video.Height ?? 0;
+  if (height > 1080) return 100;
+  if (height > 720) return 80;
+  return 40;
+}
+
+async function autoSetForItem(itemId) {
+  try {
+    const entry = hdrByItemId[itemId];
+    const hdrOverride = entry?.hdrMode;
+    const sharpOverride = entry?.sharpness;
+    const needStreams = hdrOverride === undefined || sharpOverride === undefined;
+
+    let streams = [];
+    if (needStreams) {
+      const itemRes = await fetch(
+        `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${itemId}?Fields=MediaSources&api_key=${EMBY_API_KEY}`,
+        { headers: { Accept: "application/json" } },
+      );
+      if (!itemRes.ok) {
+        loge(`autoSetForItem: item fetch failed ${itemRes.status}`);
+        return;
+      }
+      const itemData = await itemRes.json();
+      streams = itemData.MediaSources?.[0]?.MediaStreams ?? [];
+    }
+
+    // HDR
+    let desiredHdr;
+    if (hdrOverride !== undefined) {
+      desiredHdr = hdrOverride;
+      log(`autoSetForItem: item=${itemId} hdrMode override=${desiredHdr}`);
+    } else {
+      const hdrType = calcHdrType(streams);
+      desiredHdr = hdrTypeToSetting(hdrType);
+      log(`autoSetForItem: item=${itemId} hdrType=${hdrType} desired hdrMode=${desiredHdr}`);
+    }
+    if (desiredHdr !== "anything") {
+      const currentHdr = await getBraviaSetting("hdrMode");
+      if (currentHdr !== desiredHdr) {
+        await setBraviaSetting("hdrMode", desiredHdr);
+        log(`autoSetForItem: set hdrMode=${desiredHdr}`);
+      } else {
+        log(`autoSetForItem: hdrMode already ${currentHdr}`);
+      }
+    }
+
+    // Sharpness
+    let desiredSharp;
+    if (sharpOverride !== undefined) {
+      desiredSharp = sharpOverride;
+      log(`autoSetForItem: item=${itemId} sharpness override=${desiredSharp}`);
+    } else {
+      desiredSharp = calcSharpness(streams);
+      log(`autoSetForItem: item=${itemId} desired sharpness=${desiredSharp}`);
+    }
+    const currentSharp = await getBraviaSetting("sharpness");
+    if (currentSharp !== desiredSharp) {
+      await setBraviaSetting("sharpness", desiredSharp);
+      log(`autoSetForItem: set sharpness=${desiredSharp}`);
+    } else {
+      log(`autoSetForItem: sharpness already ${currentSharp}`);
+    }
+  } catch (err) {
+    loge(`autoSetForItem error: ${err.message}`);
+  }
+}
+
 // ─── Emby WebSocket ─────────────────────────────────────────────────────────
 
 function handleEmbySession(s) {
@@ -98,9 +269,15 @@ function handleEmbySession(s) {
   if (s.DeviceName === "Living Room TV") device = "google";
   if (!device) return;
   const playing = s.NowPlayingItem?.Name ?? null;
+  const itemId = s.NowPlayingItem?.Id ?? null;
   const remoteCtrl = s.SupportsRemoteControl ?? false;
   const paused = s.PlayState?.IsPaused ?? null;
   const prev = prevSessions[device];
+  const prevItemId = prev?.itemId ?? null;
+  if (itemId !== null && itemId !== prevItemId) {
+    log(`autoSetForItem triggered: new item ${itemId}`);
+    autoSetForItem(itemId);
+  }
   if (prev) {
     const changed =
       (prev.playing === null && playing !== null) ||
@@ -111,7 +288,7 @@ function handleEmbySession(s) {
       log(`activeDevice: ${device}`);
     }
   }
-  prevSessions[device] = { playing, remoteCtrl, paused };
+  prevSessions[device] = { playing, itemId, remoteCtrl, paused };
 }
 
 const DEVICE_PRIORITY = [
@@ -225,6 +402,7 @@ let lastOnAt = 0;
 let pendingGoogleHome = false;
 let currentShowName = null;
 const prevSessions = {};
+let hdrByItemId = {};
 
 function sendCmd(cmd) {
   setTimeout(() => {
@@ -1249,6 +1427,17 @@ app.post("/tv/picture", async (req, res) => {
       return;
     }
     log(`picture set ${target}=${value}`);
+    if (target === "hdrMode" || target === "sharpness") {
+      const itemId = prevSessions["google"]?.itemId ?? null;
+      if (itemId) {
+        const entry = hdrByItemId[itemId] ?? {};
+        entry[target] = value;
+        entry.timestamp = Date.now();
+        hdrByItemId[itemId] = entry;
+        saveHdrMap();
+        log(`hdrMap saved: item=${itemId} ${target}=${value}`);
+      }
+    }
     res.json({ ok: true });
   } catch (err) {
     res.json({ ok: false, error: err.message });
@@ -1257,6 +1446,7 @@ app.post("/tv/picture", async (req, res) => {
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 
+loadHdrMap();
 connectHa();
 connectEmby();
 

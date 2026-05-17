@@ -1,0 +1,26 @@
+#!/bin/bash
+# Print the backup time of the currently mounted restic FUSE snapshot
+
+MOUNT="/mnt/mlap-bkup"
+
+if ! mountpoint -q "$MOUNT" 2>/dev/null; then
+    echo "ERROR: $MOUNT is not mounted"
+    exit 1
+fi
+
+SNAP=$(readlink "$MOUNT/snapshots/latest" 2>/dev/null)
+if [[ -z "$SNAP" ]]; then
+    echo "ERROR: Could not read latest symlink in $MOUNT/snapshots/"
+    exit 1
+fi
+
+# Strip any leading path component — the name itself is the timestamp
+SNAP="${SNAP##*/}"
+
+FORMATTED=$(TZ="America/Los_Angeles" date -d "$SNAP" "+%Y/%m/%d %H:%M:%S" 2>/dev/null)
+if [[ -z "$FORMATTED" ]]; then
+    echo "ERROR: Could not parse snapshot timestamp: $SNAP"
+    exit 1
+fi
+
+echo "Snapshot time: $FORMATTED"

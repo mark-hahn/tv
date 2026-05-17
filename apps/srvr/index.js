@@ -1218,7 +1218,8 @@ async function generateEmbSrts(
   }
   const hasNonText = subStreams.some((s) => !textCodecs.includes(s.codec_name));
   const pgsOnly = hasNonText && textStreams.length === 0;
-  return { pgsOnly };
+  const hasEmbText = textStreams.length > 0;
+  return { pgsOnly, hasEmbText };
 }
 async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
   const moviesDir = "/mnt/media/movies";
@@ -1391,7 +1392,7 @@ async function processSubQueueEntry() {
   try {
     const parsed = parseFileSeasonEpisode(entry.videoFilePath);
     const showName = entry.videoFilePath.replace(tvDir + "/", "").split("/")[0];
-    const { pgsOnly } =
+    const { pgsOnly, hasEmbText } =
       (await generateEmbSrts(
         entry.videoFilePath,
         showName,
@@ -1425,7 +1426,7 @@ async function processSubQueueEntry() {
         (f.startsWith(basename) &&
           /^\.(#[A-Z2-7]+)\.srt$/.test(f.slice(basename.length))),
     );
-    if (!hasSidecar && !pgsOnly) {
+    if (!hasSidecar && !pgsOnly && !hasEmbText) {
       addToAsrQueue([
         {
           videoPath: entry.videoFilePath,

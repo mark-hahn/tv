@@ -128,6 +128,20 @@
         Send
       </button>
       <button
+        v-if="!simpleMode"
+        @click="$emit('custom-click')"
+        style="
+          height: 24px;
+          background-color: white;
+          font-size: 13px;
+          cursor: pointer;
+          border-radius: 7px;
+          margin: 0 0 0 10px;
+        "
+      >
+        Custom
+      </button>
+      <button
         @click="$emit('actors-click')"
         :style="{
           height: '24px',
@@ -196,6 +210,7 @@ export default {
     "send-filters",
     "library-click",
     "all-click",
+    "custom-click",
     "actors-click",
   ],
 

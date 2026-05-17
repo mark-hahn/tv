@@ -131,6 +131,7 @@
               @send-filters="sendSharedFilters"
               @library-click="libraryClick"
               @all-click="allClick"
+              @custom-click="customClick"
               :actorsListMode="actorsListMode"
               @actors-click="startActorsListMode"
             ></HdrTop>
@@ -224,6 +225,7 @@
             @send-filters="sendSharedFilters"
             @library-click="libraryClick"
             @all-click="allClick"
+            @custom-click="customClick"
             :actorsListMode="actorsListMode"
             @actors-click="startActorsListMode"
           ></HdrTop>
@@ -932,6 +934,44 @@ export default {
 
     libraryClick() {
       evtBus.emit("startLibraryRefresh");
+    },
+
+    async customClick() {
+      let shared = null;
+      try {
+        shared = await srvr.getSharedFilters();
+        if (shared && typeof shared === "object") {
+          if (shared.filterStr !== undefined)
+            this.filterStr = String(shared.filterStr || "");
+          if (shared.fltrChoice !== undefined)
+            this.fltrChoice = String(shared.fltrChoice || "All");
+          if (shared.sortChoice !== undefined)
+            this.sortChoice = String(shared.sortChoice || "Viewed");
+          const condFilters =
+            shared.condFilters && typeof shared.condFilters === "object"
+              ? shared.condFilters
+              : null;
+          if (condFilters) {
+            this.conds.forEach((cond) => {
+              if (!cond?.name) return;
+              if (condFilters[cond.name] !== undefined) {
+                cond.filter = condFilters[cond.name];
+              }
+            });
+          }
+        }
+      } catch (e) {
+        console.error("customClick sharedFilters apply failed:", e);
+      }
+      await this.select();
+      this.sortShows();
+      this.$nextTick(() => {
+        const container = document.querySelector("#shows");
+        if (container) container.scrollTop = 0;
+        if (Array.isArray(this.shows) && this.shows.length > 0) {
+          this.saveVisShow(this.shows[0], false);
+        }
+      });
     },
 
     async sendSharedFilters(e) {

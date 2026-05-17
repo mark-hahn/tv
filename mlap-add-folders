@@ -246,6 +246,7 @@ fi
 # ---- Set up bind mounts ----
 VSCODE_DIRS=()
 
+fusermount -uz /mnt/mlap-root 2>/dev/null || umount -l /mnt/mlap-root 2>/dev/null || true
 mkdir -p /mnt/mlap-root
 mountpoint -q /mnt/mlap-root && umount /mnt/mlap-root
 if [[ -d "$SNAP_BASE/root" ]]; then
@@ -255,6 +256,7 @@ else
     echo "WARNING: $SNAP_BASE/root not in snapshot, skipping"
 fi
 
+fusermount -uz /mnt/mlap-mark 2>/dev/null || umount -l /mnt/mlap-mark 2>/dev/null || true
 mkdir -p /mnt/mlap-mark
 mountpoint -q /mnt/mlap-mark && umount /mnt/mlap-mark
 if [[ -d "$SNAP_BASE/mnt/c/Users/mark" ]]; then

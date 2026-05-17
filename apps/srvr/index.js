@@ -5371,12 +5371,21 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
     return flexgetIsBetterCrossRun(c, best) ? c : best;
   }, null);
 
+  const watchedEpis = rec.watchedEpis || [];
+  const isWatched = watchedEpis.some(
+    (row) => row[0] === season && row.slice(1).includes(episode),
+  );
+
   if (storeOnly) {
     console.log(
       `[flexget] SKIP(run-loser) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
     );
   } else if (!lastSent) {
-    if (newCandidate.url) {
+    if (isWatched) {
+      console.log(
+        `[flexget] SKIP(watched) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
+      );
+    } else if (newCandidate.url) {
       try {
         await addUrlToQbt(newCandidate.url);
         newCandidate.sent = flexgetFmtSent();
@@ -5388,7 +5397,11 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
       }
     }
   } else if (flexgetIsBetterCrossRun(newCandidate, lastSent)) {
-    if (newCandidate.url) {
+    if (isWatched) {
+      console.log(
+        `[flexget] SKIP(watched) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
+      );
+    } else if (newCandidate.url) {
       try {
         await addUrlToQbt(newCandidate.url);
         newCandidate.sent = flexgetFmtSent();

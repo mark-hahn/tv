@@ -926,7 +926,7 @@ import * as emby from "../emby.js";
 import * as srvr from "../srvr.js";
 import * as urls from "../urls.js";
 import evtBus from "../evtBus.js";
-import History from "./history.vue";
+
 const MAP_ARROW_PAN_PX_PER_SEC = 400;
 const MAP_PAN_SMOOTH_TAU_SEC = 0.1;
 

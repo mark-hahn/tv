@@ -138,18 +138,63 @@
               →
             </button>
             <button
-              @click.stop="showHistory = !showHistory"
-              :style="{ '--btn-bg': showHistory ? 'lightgray' : 'whitesmoke' }"
+              @click.stop="toggleEpisodePane"
+              :disabled="!hasSelectedCell"
+              :style="{
+                '--btn-bg': showEpisodePane ? 'lightgray' : 'whitesmoke',
+                opacity: hasSelectedCell ? 1 : 0.35,
+                cursor: hasSelectedCell ? 'pointer' : 'default',
+              }"
               style="
                 font-size: 13.5px;
                 cursor: pointer;
-                margin: 4.5px;
+                margin: 4.5px 0 4.5px 4.5px;
                 max-height: 21.5px;
                 border-radius: 7px;
               "
             >
-              History
+              Episode
             </button>
+            <button
+              @click.stop="handleSelectedPlay"
+              :disabled="!hasMapSelection"
+              :style="{
+                opacity: hasMapSelection ? 1 : 0.35,
+                cursor: hasMapSelection ? 'pointer' : 'default',
+              }"
+              style="
+                font-size: 13.5px;
+                cursor: pointer;
+                margin: 4.5px 0 4.5px 4.5px;
+                max-height: 21.5px;
+                border-radius: 7px;
+              "
+            >
+              Play
+            </button>
+            <button
+              v-if="mapShow?.inEmby !== false"
+              @click.stop="handleSelectedEmby"
+              :disabled="!firstSelectedEmbyId"
+              :style="{
+                opacity: firstSelectedEmbyId ? 1 : 0.35,
+                cursor: firstSelectedEmbyId ? 'pointer' : 'default',
+              }"
+              style="
+                font-size: 13.5px;
+                cursor: pointer;
+                margin: 4.5px 0 4.5px 4.5px;
+                max-height: 21.5px;
+                border-radius: 7px;
+              "
+            >
+              Emby
+            </button>
+          </div>
+          <div
+            v-if="simpleMode"
+            style="display: flex; gap: 5px; flex-shrink: 0"
+          >
             <button
               @click.stop="toggleEpisodePane"
               :disabled="!hasSelectedCell"
@@ -203,54 +248,6 @@
             >
               Emby
             </button>
-            <button
-              @click.stop="handleSelectedWatch"
-              :disabled="!hasMapSelection"
-              :style="{
-                opacity: hasMapSelection ? 1 : 0.35,
-                cursor: hasMapSelection ? 'pointer' : 'default',
-              }"
-              style="
-                font-size: 13.5px;
-                cursor: pointer;
-                margin: 4.5px 0 4.5px 4.5px;
-                max-height: 21.5px;
-                border-radius: 7px;
-              "
-            >
-              Watched
-            </button>
-            <button
-              v-if="mapShow?.inEmby !== false"
-              @click.stop="onPruneClick"
-              :style="{ '--btn-bg': pruneFlash ? 'lightgray' : 'whitesmoke' }"
-              style="
-                font-size: 13.5px;
-                cursor: pointer;
-                margin: 4.5px 0 4.5px 4.5px;
-                max-height: 21.5px;
-                border-radius: 7px;
-              "
-            >
-              Prune
-            </button>
-            <button
-              @click.stop="handleSelectedDelete"
-              :disabled="!hasMapSelection"
-              :style="{
-                opacity: hasMapSelection ? 1 : 0.35,
-                cursor: hasMapSelection ? 'pointer' : 'default',
-              }"
-              style="
-                font-size: 13.5px;
-                cursor: pointer;
-                margin: 4.5px 0 4.5px 4.5px;
-                max-height: 21.5px;
-                border-radius: 7px;
-              "
-            >
-              Del
-            </button>
           </div>
         </div>
       </div>
@@ -258,37 +255,110 @@
         id="maphdr2"
         style="
           display: flex;
-          justify-content: flex-start;
+          justify-content: space-between;
           align-items: center;
-          color: red;
           margin: 0 10px 5px 10px;
-          padding-left: 5px;
           font-size: 15px;
-          flex-wrap: wrap;
         "
       >
-        <span
-          v-for="(part, idx) in hdr2Parts"
-          :key="idx"
-          style="white-space: nowrap"
-          ><span
-            v-if="idx &gt; 0"
-            style="padding: 0 6px; font-weight: bold"
-            >|</span
-          ><span>{{ part }}</span></span
-        ><span
-          v-if="mapShow?.inEmby === false"
-          style="white-space: nowrap"
-          ><span
-            v-if="hdr2Parts &amp;&amp; hdr2Parts.length &gt; 0"
-            style="padding: 0 6px; font-weight: bold"
-            >|</span
-          ><span
-            @click.stop.prevent="handleNotInEmbyClick($event)"
-            style="font-weight: bold; cursor: pointer; white-space: nowrap"
-            >Not In Emby</span
-          ></span
+        <div
+          style="
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            color: red;
+            padding-left: 5px;
+          "
         >
+          <span
+            v-for="(part, idx) in hdr2Parts"
+            :key="idx"
+            style="white-space: nowrap"
+            ><span
+              v-if="idx &gt; 0"
+              style="padding: 0 6px; font-weight: bold"
+              >|</span
+            ><span>{{ part }}</span></span
+          ><span
+            v-if="mapShow?.inEmby === false"
+            style="white-space: nowrap"
+            ><span
+              v-if="hdr2Parts &amp;&amp; hdr2Parts.length &gt; 0"
+              style="padding: 0 6px; font-weight: bold"
+              >|</span
+            ><span
+              @click.stop.prevent="handleNotInEmbyClick($event)"
+              style="font-weight: bold; cursor: pointer; white-space: nowrap"
+              >Not In Emby</span
+            ></span
+          >
+        </div>
+        <div
+          v-if="!simpleMode"
+          style="display: flex; flex-shrink: 0; align-items: center"
+        >
+          <button
+            @click.stop="showHistory = !showHistory"
+            :style="{ '--btn-bg': showHistory ? 'lightgray' : 'whitesmoke' }"
+            style="
+              font-size: 13.5px;
+              cursor: pointer;
+              margin: 4.5px 0 4.5px 4.5px;
+              max-height: 21.5px;
+              border-radius: 7px;
+            "
+          >
+            History
+          </button>
+          <button
+            @click.stop="handleSelectedWatch"
+            :disabled="!hasMapSelection"
+            :style="{
+              opacity: hasMapSelection ? 1 : 0.35,
+              cursor: hasMapSelection ? 'pointer' : 'default',
+            }"
+            style="
+              font-size: 13.5px;
+              cursor: pointer;
+              margin: 4.5px 0 4.5px 4.5px;
+              max-height: 21.5px;
+              border-radius: 7px;
+            "
+          >
+            Watched
+          </button>
+          <button
+            v-if="mapShow?.inEmby !== false"
+            @click.stop="onPruneClick"
+            :style="{ '--btn-bg': pruneFlash ? 'lightgray' : 'whitesmoke' }"
+            style="
+              font-size: 13.5px;
+              cursor: pointer;
+              margin: 4.5px 0 4.5px 4.5px;
+              max-height: 21.5px;
+              border-radius: 7px;
+            "
+          >
+            Prune
+          </button>
+          <button
+            @click.stop="handleSelectedDelete"
+            :disabled="!hasMapSelection"
+            :style="{
+              opacity: hasMapSelection ? 1 : 0.35,
+              cursor: hasMapSelection ? 'pointer' : 'default',
+            }"
+            style="
+              font-size: 13.5px;
+              cursor: pointer;
+              margin: 4.5px 0 4.5px 4.5px;
+              max-height: 21.5px;
+              border-radius: 7px;
+            "
+          >
+            Del
+          </button>
+        </div>
       </div>
     </div>
     <div

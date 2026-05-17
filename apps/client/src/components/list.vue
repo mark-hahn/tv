@@ -2571,7 +2571,7 @@ export default {
         seriesMap[seasonNum] = seasonMap;
         for (const episode of episodes) {
           let [episodeNum, epiObj] = episode;
-          const { error, played, avail, noFile, unaired, path } = epiObj;
+          const { error, played, avail, noFile, unaired, path, id } = epiObj;
           seriesMapEpis[episodeNum] = episodeNum;
           seasonMap[episodeNum] = {
             error,
@@ -2580,6 +2580,7 @@ export default {
             noFile,
             unaired,
             path,
+            id,
           };
         }
       }

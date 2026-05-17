@@ -1179,7 +1179,15 @@ export const getSeriesMap = async (show, prune = false) => {
 
       episodes.push([
         episodeNumber,
-        { error, played, avail, noFile: noFileVal, unaired, path },
+        {
+          error,
+          played,
+          avail,
+          noFile: noFileVal,
+          unaired,
+          path,
+          id: episodeRec.Id,
+        },
       ]);
     }
     if (episodes.length === 0) {

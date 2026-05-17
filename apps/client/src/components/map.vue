@@ -151,20 +151,6 @@
               History
             </button>
             <button
-              v-if="mapShow?.inEmby !== false"
-              @click.stop="onPruneClick"
-              :style="{ '--btn-bg': pruneFlash ? 'lightgray' : 'whitesmoke' }"
-              style="
-                font-size: 13.5px;
-                cursor: pointer;
-                margin: 4.5px 0 4.5px 4.5px;
-                max-height: 21.5px;
-                border-radius: 7px;
-              "
-            >
-              Prune
-            </button>
-            <button
               @click.stop="toggleEpisodePane"
               :disabled="!hasSelectedCell"
               :style="{
@@ -200,6 +186,24 @@
               Play
             </button>
             <button
+              v-if="mapShow?.inEmby !== false"
+              @click.stop="handleSelectedEmby"
+              :disabled="!firstSelectedEmbyId"
+              :style="{
+                opacity: firstSelectedEmbyId ? 1 : 0.35,
+                cursor: firstSelectedEmbyId ? 'pointer' : 'default',
+              }"
+              style="
+                font-size: 13.5px;
+                cursor: pointer;
+                margin: 4.5px 0 4.5px 4.5px;
+                max-height: 21.5px;
+                border-radius: 7px;
+              "
+            >
+              Emby
+            </button>
+            <button
               @click.stop="handleSelectedWatch"
               :disabled="!hasMapSelection"
               :style="{
@@ -215,6 +219,20 @@
               "
             >
               Watched
+            </button>
+            <button
+              v-if="mapShow?.inEmby !== false"
+              @click.stop="onPruneClick"
+              :style="{ '--btn-bg': pruneFlash ? 'lightgray' : 'whitesmoke' }"
+              style="
+                font-size: 13.5px;
+                cursor: pointer;
+                margin: 4.5px 0 4.5px 4.5px;
+                max-height: 21.5px;
+                border-radius: 7px;
+              "
+            >
+              Prune
             </button>
             <button
               @click.stop="handleSelectedDelete"
@@ -877,6 +895,7 @@
 import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
 import * as srvr from "../srvr.js";
+import * as urls from "../urls.js";
 import evtBus from "../evtBus.js";
 import History from "./history.vue";
 
@@ -1071,6 +1090,12 @@ export default {
     },
     hasSelectedCell() {
       return this.selectedCells.size > 0;
+    },
+    firstSelectedEmbyId() {
+      if (this.selectedCells.size === 0) return null;
+      const firstKey = Array.from(this.selectedCells)[0];
+      const { season, episode } = this.parseCellKey(firstKey);
+      return this.seriesMap?.[season]?.[episode]?.id || null;
     },
   },
 
@@ -1814,6 +1839,11 @@ export default {
       const targets = this.getSelectedMapTargets();
       if (targets.length === 0) return;
       this.$emit("delete-episodes", this.mapShow, targets);
+    },
+    handleSelectedEmby() {
+      const id = this.firstSelectedEmbyId;
+      if (!id) return;
+      window.open(urls.embyPageUrl(id), "_blank");
     },
     handleEpisodePlainClick(event, mapShow, season, episode) {
       event?.preventDefault?.();

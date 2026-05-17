@@ -124,6 +124,7 @@ export const getSeriesMap = async (show) => {
             unaired,
             deleted: false,
             path,
+            id: episodeRec.Id,
           },
         ]);
       }

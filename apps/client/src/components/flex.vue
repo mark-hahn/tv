@@ -309,6 +309,27 @@
           <span style="font-weight: bold; color: #444">{{ key }}</span
           >: {{ val }}
         </div>
+        <div
+          v-if="dialogPtt"
+          style="
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+          "
+        >
+          <div style="font-weight: bold; color: #444; margin-bottom: 4px">
+            parse-torrent-title
+          </div>
+          <pre
+            style="
+              margin: 0;
+              font-size: 12px;
+              white-space: pre-wrap;
+              word-break: break-all;
+            "
+            >{{ JSON.stringify(dialogPtt, null, 2) }}</pre
+          >
+        </div>
         <div style="margin-top: 16px; display: flex; gap: 10px">
           <button
             @click.stop="dialogRow = null"
@@ -333,6 +354,7 @@
 import evtBus from "../evtBus.js";
 import { config } from "../config.js";
 import * as util from "../util.js";
+import { parse as parseTorrentTitle } from "parse-torrent-title";
 
 function fmtSentTs(sent) {
   if (!sent) return "??/??/?? ??:??:??";
@@ -510,8 +532,11 @@ export default {
       if (!this.dialogRow) return {};
       const e = this.dialogRow.entry;
       const out = {};
+      const pttTitle = this.dialogPtt?.title ?? "";
+      out["Regex"] = e.regexp ?? e.showName ?? "";
+      out["Ptt Title"] = pttTitle;
+      out["Tvdb Show Name"] = e.showName ?? "";
       const fields = [
-        "showName",
         "seasonKey",
         "episodeKey",
         "title",
@@ -532,6 +557,11 @@ export default {
         }
       }
       return out;
+    },
+    dialogPtt() {
+      const title = this.dialogRow?.entry?.title;
+      if (!title) return null;
+      return parseTorrentTitle(title.replace(/\.[a-z0-9]{2,4}$/i, ""));
     },
   },
 

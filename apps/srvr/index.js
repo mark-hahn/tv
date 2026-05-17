@@ -5351,6 +5351,7 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
     proper: candidate.proper || null,
     release_group: candidate.release_group || null,
     task: candidate.task || null,
+    regexp: candidate.regexp || null,
     provider: String(candidate.url || "").includes("iptorrents.com")
       ? "ipt"
       : String(candidate.url || "").includes("torrentleech.org")
@@ -5451,6 +5452,7 @@ function parseFlexgetDumpOutput(stdout) {
         if (current) candidates.push(current);
         current = {
           title: val,
+          regexp: null,
           url: null,
           quality: null,
           release_group: null,
@@ -5478,7 +5480,10 @@ function parseFlexgetDumpOutput(stdout) {
         else if (key === "content_size") current.content_size = val;
         else if (key === "task") current.task = val;
         else if (key === "proper") current.proper = val;
-        else if (key === "description") {
+        else if (key === "reason") {
+          const m = val.match(/regexp '(.+?)' matched/);
+          if (m) current.regexp = m[1];
+        } else if (key === "description") {
           // iptorrents: "1.44 GB; TV/Web-DL (S:4 L:4)"
           const ipMatch = val.match(/\(S:(\d+)\s+L:(\d+)\)/);
           // torrentleech: "Category: ... - Seeders: 14 - Leechers: 0"

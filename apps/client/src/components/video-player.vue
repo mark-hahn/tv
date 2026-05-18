@@ -1066,8 +1066,9 @@ export default {
     clickIntroTest() {
       const vid = this.$refs.vid;
       if (!vid) return;
-      this._cancelSeek();
-      vid.currentTime += Math.max(0, this.endMark - this.startMark) / 1000;
+      const targetSec =
+        vid.currentTime + Math.max(0, this.endMark - this.startMark) / 1000;
+      this._seekWithConfirm(targetSec);
     },
     _saveIntroDur() {
       if (!this.introShow) return;

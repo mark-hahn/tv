@@ -739,9 +739,7 @@ export default function App() {
   };
 
   const startBackHold = () => {
-    fetch(`${TV_SRVR_HTTP_URL}/api/skipIntro`, { method: "POST" }).catch(
-      () => {},
-    );
+    tvKey("back");
   };
 
   const stopBackHold = () => {};

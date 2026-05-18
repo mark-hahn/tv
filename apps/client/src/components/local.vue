@@ -2269,12 +2269,6 @@ export default {
         return;
       }
 
-      if (this.selectedName) {
-        this.infoText = "Show folders are not supported.";
-        this.infoLoading = false;
-        return;
-      }
-
       if (filePaths.length === 1) {
         // Single file — full mediainfo
         const relPath = filePaths[0];

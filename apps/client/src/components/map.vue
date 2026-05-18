@@ -315,6 +315,23 @@
             Watched
           </button>
           <button
+            @click.stop="handleMapIntroClick"
+            :disabled="!firstSelectedCellPath"
+            :style="{
+              opacity: firstSelectedCellPath ? 1 : 0.35,
+              cursor: firstSelectedCellPath ? 'pointer' : 'default',
+            }"
+            style="
+              font-size: 13.5px;
+              cursor: pointer;
+              margin: 4.5px 0 4.5px 4.5px;
+              max-height: 21.5px;
+              border-radius: 7px;
+            "
+          >
+            Intro
+          </button>
+          <button
             v-if="mapShow?.inEmby !== false"
             @click.stop="onPruneClick"
             :style="{ '--btn-bg': pruneFlash ? 'lightgray' : 'whitesmoke' }"
@@ -1115,6 +1132,12 @@ export default {
     hasMapSelection() {
       return this.selectedSeasons.size > 0 || this.selectedCells.size > 0;
     },
+    firstSelectedCellPath() {
+      if (this.selectedCells.size === 0) return null;
+      const firstKey = Array.from(this.selectedCells)[0];
+      const { season, episode } = this.parseCellKey(firstKey);
+      return this.seriesMap?.[season]?.[episode]?.path || null;
+    },
     hasSelectedCell() {
       return this.selectedCells.size > 0;
     },
@@ -1181,6 +1204,7 @@ export default {
     "season-watched",
     "season-delete",
     "show-actors",
+    "open-intro",
   ],
 
   async mounted() {
@@ -1849,6 +1873,11 @@ export default {
         target.season,
         target.episode,
       );
+    },
+    handleMapIntroClick() {
+      const path = this.firstSelectedCellPath;
+      if (!path) return;
+      this.$emit("open-intro", { show: this.mapShow, path });
     },
     handleSelectedWatch() {
       const targets = this.getSelectedMapTargets();

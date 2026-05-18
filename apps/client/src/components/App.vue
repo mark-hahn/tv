@@ -225,6 +225,7 @@
             :simpleMode="simpleMode"
             :sizing="activeSizing"
             :hideButtonsPane="showSideButtons"
+            @open-intro="handleOpenIntro"
           ></Info>
           <Map
             v-show="currentPane === 'map'"
@@ -246,6 +247,7 @@
             @play-episode="handlePlayEpisode"
             @season-watched="handleSeasonWatched"
             @season-delete="handleSeasonDelete"
+            @open-intro="handleOpenIntro"
           ></Map>
           <Actors
             v-show="currentPane === 'actors'"
@@ -353,6 +355,7 @@
         @show-actors="handleShowActors"
         @show-tor="handleShowTor"
         @all-shows="handleAllShows"
+        @filtered-shows="handleFilteredShows"
         @all-tvdb="handleAllTvdb"
       >
       </List>
@@ -361,9 +364,12 @@
       :path="videoPlayerPath"
       :mode="videoPlayerMode"
       :chksrtCount="chksrtCount"
+      :introShow="videoPlayerIntroShow"
+      :introShows="filteredShows"
       @close="handleVideoPlayerClose"
       @chksrt-next="handleChksrtNext"
       @chksrt-sel="handleChksrtSel"
+      @intro-next="handleIntroNext"
     />
     <!-- Help dialog -->
     <div
@@ -592,6 +598,7 @@ export default {
       simpleMode: new URLSearchParams(window.location.search).has("simple"),
       videoPlayerPath: null,
       videoPlayerMode: null,
+      videoPlayerIntroShow: null,
       chksrtCount: 0,
       currentPane: "info", // 'info', 'map', 'actors', 'reviews', 'trailer', 'tor', 'flex', 'qbt', 'down'
       movieMode: false,
@@ -615,6 +622,7 @@ export default {
       seriesMap: {},
       mapError: "",
       allShows: [],
+      filteredShows: [],
       allTvdb: {},
       _didRequestNotifications: false,
 
@@ -964,6 +972,7 @@ export default {
     handleVideoPlayerClose() {
       this.videoPlayerPath = null;
       this.videoPlayerMode = null;
+      this.videoPlayerIntroShow = null;
       this.fetchChksrtCount();
     },
     async handleChksrtNext() {
@@ -1026,6 +1035,31 @@ export default {
         }
       } catch (e) {
         console.error("clickChksrt error:", e);
+      }
+    },
+
+    async handleOpenIntro({ show, path }) {
+      this.videoPlayerIntroShow = show;
+      this.videoPlayerPath = path;
+      this.videoPlayerMode = "intro";
+    },
+
+    async handleIntroNext(nextShow) {
+      evtBus.emit("selectShowFromCardTitle", nextShow.name);
+      try {
+        const result = await srvr.introFirstFile(nextShow.name);
+        if (result?.ok) {
+          this.videoPlayerIntroShow = nextShow;
+          this.videoPlayerPath = result.path;
+        } else {
+          this.videoPlayerPath = null;
+          this.videoPlayerMode = null;
+          this.videoPlayerIntroShow = null;
+        }
+      } catch (e) {
+        this.videoPlayerPath = null;
+        this.videoPlayerMode = null;
+        this.videoPlayerIntroShow = null;
       }
     },
     openTvdbMismatchModal(title, text, payload = null) {
@@ -1676,6 +1710,10 @@ export default {
     },
     handleAllShows(shows) {
       this.allShows = Array.isArray(shows) ? shows : [];
+    },
+
+    handleFilteredShows(shows) {
+      this.filteredShows = Array.isArray(shows) ? shows : [];
     },
     handleAllTvdb(tvdbData) {
       this.allTvdb = tvdbData || {};

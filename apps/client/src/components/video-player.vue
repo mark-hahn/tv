@@ -62,9 +62,9 @@
           >{{ chksrtFilename }}{{ activeTrackSuffix }}</span
         >
       </div>
-      <!-- Filename (non-chksrt modes) -->
+      <!-- Filename (non-chksrt, non-intro modes) -->
       <div
-        v-else
+        v-else-if="mode !== 'intro'"
         style="
           padding-left: 14px;
           padding-right: 14px;
@@ -87,9 +87,243 @@
           >{{ path ? path.split("/").pop() : "" }}{{ activeTrackSuffix }}</span
         >
       </div>
-      <!-- Timing slider (srt tracks only, not in chksrt/simple mode) -->
+      <!-- Intro mode: show name (left) -->
       <div
-        v-if="showSlider && mode !== 'chksrt' && mode !== 'simple'"
+        v-else
+        style="
+          flex: 1;
+          display: flex;
+          align-items: center;
+          padding-left: 14px;
+          overflow: hidden;
+          min-width: 0;
+        "
+      >
+        <span
+          style="
+            color: white;
+            font-size: 13px;
+            user-select: none;
+            text-shadow: 0 0 3px #000;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          "
+          >{{ introShow ? introShow.name : "" }}</span
+        >
+      </div>
+      <!-- Intro mode: mark controls (right, next to X) -->
+      <template v-if="mode === 'intro'">
+        <div
+          style="
+            color: white;
+            font-size: 13px;
+            min-width: 52px;
+            text-align: right;
+            user-select: none;
+            text-shadow: 0 0 3px #000;
+            flex-shrink: 0;
+            margin-right: 14px;
+          "
+        >
+          {{ fmtTime(currentTimeSec * 1000) }}
+        </div>
+        <div
+          @click.stop="
+            $refs.vid.currentTime = Math.max(0, $refs.vid.currentTime - 30)
+          "
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(0, 0, 0, 0.5);
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 6px;
+          "
+        >
+          &lt;&lt;
+        </div>
+        <div
+          @click.stop="
+            $refs.vid.currentTime = Math.max(0, $refs.vid.currentTime - 10)
+          "
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(0, 0, 0, 0.5);
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 6px;
+          "
+        >
+          &lt;
+        </div>
+        <div
+          @click.stop="$refs.vid.currentTime += 10"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(0, 0, 0, 0.5);
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 6px;
+          "
+        >
+          &gt;
+        </div>
+        <div
+          @click.stop="$refs.vid.currentTime += 30"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(0, 0, 0, 0.5);
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 20px;
+          "
+        >
+          &gt;&gt;
+        </div>
+        <div
+          @click.stop="clickIntroPre"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(0, 0, 0, 0.5);
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 6px;
+          "
+        >
+          Pre
+        </div>
+        <div
+          @click.stop="clickIntroStart"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(0, 80, 0, 0.6);
+            white-space: nowrap;
+            flex-shrink: 0;
+            width: 74px;
+            text-align: center;
+            margin-right: 6px;
+          "
+        >
+          {{ fmtTime(startMark) }}
+        </div>
+        <div
+          @click.stop="clickIntroEnd"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(80, 0, 0, 0.6);
+            white-space: nowrap;
+            flex-shrink: 0;
+            width: 74px;
+            text-align: center;
+            margin-right: 6px;
+          "
+        >
+          {{ fmtTime(endMark) }}
+        </div>
+        <div
+          style="
+            color: black;
+            font-size: 13px;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: white;
+            white-space: nowrap;
+            flex-shrink: 0;
+            min-width: 60px;
+            text-align: center;
+            margin-right: 6px;
+          "
+        >
+          {{ fmtTime(Math.max(0, endMark - startMark)) }}
+        </div>
+        <div
+          @click.stop="clickIntroTest"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(0, 0, 100, 0.6);
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 6px;
+          "
+        >
+          Test
+        </div>
+        <div
+          @click.stop="clickIntroNext"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(0, 0, 0, 0.5);
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 6px;
+          "
+        >
+          Next
+        </div>
+      </template>
+      <!-- Timing slider (srt tracks only, not in chksrt/simple/intro mode) -->
+      <div
+        v-if="
+          showSlider &&
+          mode !== 'chksrt' &&
+          mode !== 'simple' &&
+          mode !== 'intro'
+        "
         ref="slider"
         style="
           flex: 1;
@@ -160,7 +394,12 @@
       </div>
       <!-- Offset value -->
       <div
-        v-if="showSlider && mode !== 'chksrt' && mode !== 'simple'"
+        v-if="
+          showSlider &&
+          mode !== 'chksrt' &&
+          mode !== 'simple' &&
+          mode !== 'intro'
+        "
         style="
           color: white;
           font-size: 13px;
@@ -173,9 +412,14 @@
       >
         {{ offsetDisplay }}
       </div>
-      <!-- Apply button (srt only, not in chksrt/simple mode) -->
+      <!-- Apply button (srt only, not in chksrt/simple/intro mode) -->
       <div
-        v-if="showSlider && mode !== 'chksrt' && mode !== 'simple'"
+        v-if="
+          showSlider &&
+          mode !== 'chksrt' &&
+          mode !== 'simple' &&
+          mode !== 'intro'
+        "
         @click.stop="applySliderOffset"
         style="
           color: white;
@@ -234,7 +478,7 @@
       </div>
       <!-- Subtitle choice buttons -->
       <div
-        v-if="mode !== 'simple'"
+        v-if="mode !== 'simple' && mode !== 'intro'"
         v-for="(choice, i) in subtitleChoices"
         :key="choice.id"
         @click.stop="onChoiceClick(choice, $event)"
@@ -311,11 +555,13 @@
       ref="vid"
       controls
       autoplay
+      :muted="mode === 'intro'"
       crossorigin="anonymous"
       :src="vidSrc"
       style="max-width: 100%; max-height: 100%; outline: none; display: block"
       @dblclick="toggleFullscreen"
       @error="onVideoError"
+      @timeupdate="currentTimeSec = $refs.vid ? $refs.vid.currentTime : 0"
     >
       <track
         v-if="activeTrackUrl"
@@ -339,10 +585,21 @@ import {
   chksrtSelect,
   getChksrtHistory,
   addChksrtHistory,
+  setTvdbFields,
 } from "../srvr.js";
 
 const TV_SRVR_URL = config.tvSrvrUrl;
 const offsetCache = new Map(); // in-memory per-file subtitle offset
+
+function fmtTime(ms) {
+  const totalSec = ms / 1000;
+  const mm = Math.floor(totalSec / 60).toString();
+  const ss = Math.floor(totalSec % 60)
+    .toString()
+    .padStart(2, "0");
+  const t = Math.floor((totalSec % 1) * 10);
+  return `${mm}:${ss}.${t}`;
+}
 
 export default {
   name: "VideoPlayer",
@@ -350,8 +607,10 @@ export default {
     path: { type: String, default: null },
     mode: { type: String, default: null },
     chksrtCount: { type: Number, default: 0 },
+    introShow: { type: Object, default: null },
+    introShows: { type: Array, default: () => [] },
   },
-  emits: ["close", "chksrt-next", "chksrt-sel"],
+  emits: ["close", "chksrt-next", "chksrt-sel", "intro-next"],
   data() {
     return {
       subtitleTracks: [],
@@ -360,6 +619,9 @@ export default {
       vidSrc: "",
       errorRetries: 0,
       chksrtMatch: null,
+      startMark: 3 * 60 * 1000,
+      endMark: 4 * 60 * 1000,
+      currentTimeSec: 0,
     };
   },
   computed: {
@@ -700,6 +962,55 @@ export default {
         openSubsCount,
         choice: choiceLabel,
       }).catch((e) => console.error("[chksrt] addChksrtHistory error:", e));
+    },
+    clickIntroPre() {
+      const vid = this.$refs.vid;
+      if (!vid) return;
+      vid.currentTime = Math.max(0, (this.startMark - 3000) / 1000);
+    },
+    clickIntroStart() {
+      const vid = this.$refs.vid;
+      if (!vid) return;
+      this.startMark = vid.currentTime * 1000;
+      this._saveIntroDur();
+    },
+    clickIntroEnd() {
+      const vid = this.$refs.vid;
+      if (!vid) return;
+      this.endMark = vid.currentTime * 1000;
+      this._saveIntroDur();
+    },
+    clickIntroTest() {
+      const vid = this.$refs.vid;
+      if (!vid) return;
+      vid.currentTime += Math.max(0, this.endMark - this.startMark) / 1000;
+    },
+    _saveIntroDur() {
+      if (!this.introShow) return;
+      const introDur = Math.max(0, this.endMark - this.startMark);
+      setTvdbFields({ name: this.introShow.name, introDur }).catch((e) =>
+        console.error("[intro] setTvdbFields error:", e),
+      );
+    },
+    clickIntroNext() {
+      const current = this.introShow;
+      const shows = this.introShows;
+      if (!current || !Array.isArray(shows)) {
+        this.$emit("close");
+        return;
+      }
+      const idx = shows.findIndex((s) => s.name === current.name);
+      for (let i = idx + 1; i < shows.length; i++) {
+        const s = shows[i];
+        if (s.introDur == null && s.inEmby !== false) {
+          this.$emit("intro-next", s);
+          return;
+        }
+      }
+      this.$emit("close");
+    },
+    fmtTime(ms) {
+      return fmtTime(ms);
     },
     async applySliderOffset() {
       const track = this.activeTrack;

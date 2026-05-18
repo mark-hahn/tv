@@ -225,6 +225,21 @@
                 Refresh
               </button>
               <button
+                @click.stop="introClick"
+                :disabled="show.noFiles"
+                :style="{
+                  fontSize: '13px',
+                  cursor: show.noFiles ? 'default' : 'pointer',
+                  marginLeft: '10px',
+                  marginTop: '3px',
+                  maxHeight: '24px',
+                  borderRadius: '7px',
+                  opacity: show.noFiles ? 0.4 : 1,
+                }"
+              >
+                Intro
+              </button>
+              <button
                 @click.stop="deleteClick"
                 style="
                   font-size: 13px;
@@ -235,7 +250,7 @@
                   border-radius: 7px;
                 "
               >
-                Delete
+                Del
               </button>
             </template>
           </div>
@@ -625,6 +640,8 @@ const laTimestamp = () => {
 export default {
   name: "Series",
 
+  emits: ["open-intro"],
+
   props: {
     simpleMode: {
       type: Boolean,
@@ -805,6 +822,13 @@ export default {
         return;
       }
       evtBus.emit("openMap", show);
+    },
+
+    async introClick() {
+      if (this.show.noFiles) return;
+      const result = await srvr.introFirstFile(this.show.name);
+      if (!result?.ok) return;
+      this.$emit("open-intro", { show: this.show, path: result.path });
     },
 
     deleteClick() {

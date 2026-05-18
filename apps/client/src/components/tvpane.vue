@@ -74,69 +74,6 @@
         Unlock
       </div>
     </div>
-    <!-- Keyboard pane -->
-    <div
-      v-if="showKeybd"
-      style="
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        padding: 12px;
-        box-sizing: border-box;
-        gap: 10px;
-      "
-    >
-      <div style="display: flex; gap: 8px; align-items: center">
-        <input
-          ref="keybdInput"
-          v-model="keybdInput"
-          type="text"
-          style="
-            flex: 1;
-            padding: 8px;
-            font-size: 16px;
-            border: 1px solid #bbb;
-            border-radius: 5px;
-            box-sizing: border-box;
-          "
-          placeholder="Type here..."
-          @keydown.enter="keybdSend"
-        />
-        <button
-          @mousedown.prevent="showKeybd = false"
-          @touchstart.prevent="showKeybd = false"
-          :style="{
-            '--btn-bg': '#111',
-            border: 'none',
-            color: '#fff',
-            fontSize: '20px',
-            cursor: 'pointer',
-            padding: '8px 12px',
-            borderRadius: '8px',
-            lineHeight: '1',
-          }"
-        >
-          ✕
-        </button>
-      </div>
-      <div style="overflow-y: auto; flex: 1">
-        <div
-          v-for="(item, idx) in keybdHistory"
-          :key="item"
-          @click="keybdRecall(item)"
-          :style="{
-            padding: '6px 8px',
-            borderBottom: '1px solid #eee',
-            cursor: 'pointer',
-            fontSize: '15px',
-            userSelect: 'none',
-            backgroundColor: idx % 2 === 0 ? '#fafafa' : '#fff',
-          }"
-        >
-          {{ item }}
-        </div>
-      </div>
-    </div>
     <!-- Streamers pane -->
     <div
       v-else-if="showStreamers"
@@ -680,9 +617,6 @@ export default {
       mediaTitle: null,
       showStreamers: false,
       flashSvc: null,
-      showKeybd: false,
-      keybdInput: "",
-      keybdHistory: [],
       showSubCtrl: false,
       subPlayers: [],
       subDeviceName: null,
@@ -751,7 +685,6 @@ export default {
     this.pollMute();
     evtBus.on("tvMuteState", this._onTvMuteState);
     evtBus.on("paneChanged", this._onPaneChanged);
-    evtBus.on("tvCloseKeybd", this._onTvCloseKeybd);
     evtBus.on("tvRemoteAction", this._onTvRemoteAction);
     evtBus.on("tvRemoteLock", this._onTvRemoteLock);
     evtBus.on("tvRemoteUnlock", this._onTvRemoteUnlock);
@@ -760,7 +693,6 @@ export default {
   beforeUnmount() {
     evtBus.off("tvMuteState", this._onTvMuteState);
     evtBus.off("paneChanged", this._onPaneChanged);
-    evtBus.off("tvCloseKeybd", this._onTvCloseKeybd);
     evtBus.off("tvRemoteAction", this._onTvRemoteAction);
     evtBus.off("tvRemoteLock", this._onTvRemoteLock);
     evtBus.off("tvRemoteUnlock", this._onTvRemoteUnlock);
@@ -1074,14 +1006,16 @@ export default {
     startAppsHold() {
       this._appsHoldActive = true;
       this._appsHoldFired = false;
-      this._appsHoldTimer = setTimeout(() => {
+      this._skipIntroTimer = setTimeout(() => {
         this._appsHoldFired = true;
-        this.keybdBtn();
-      }, 1000);
+        fetch(`${config.tvSrvrUrl}/api/skipIntro`, { method: "POST" }).catch(
+          () => {},
+        );
+      }, 300);
     },
 
     stopAppsHold() {
-      clearTimeout(this._appsHoldTimer);
+      clearTimeout(this._skipIntroTimer);
       if (this._appsHoldActive && !this._appsHoldFired) {
         if (this.mode === "google" || this.mode === "fire") {
           this.showStreamers = true;
@@ -1210,51 +1144,10 @@ export default {
       }
     },
 
-    keybdBtn() {
-      this.flash("keybd");
-      this.showKeybd = true;
-      this.$nextTick(() => {
-        if (this.$refs.keybdInput) this.$refs.keybdInput.focus();
-      });
-    },
-
-    async keybdSend() {
-      const text = this.keybdInput.trim();
-      if (!text) return;
-      for (let i = 0; i < 50; i++) {
-        try {
-          await fetch(config.tvTvUrl + "/tv/keyevent/KEYCODE_DEL");
-        } catch (e) {}
-      }
-      try {
-        await fetch(config.tvTvUrl + "/tv/text?t=" + encodeURIComponent(text));
-      } catch (e) {}
-      try {
-        await fetch(config.tvTvUrl + "/tv/keyevent/KEYCODE_ENTER");
-      } catch (e) {}
-      this.keybdHistory = [
-        text,
-        ...this.keybdHistory.filter((i) => i !== text),
-      ];
-      this.keybdInput = "";
-    },
-
-    keybdRecall(item) {
-      this.keybdInput = item;
-      this.$nextTick(() => {
-        if (this.$refs.keybdInput) this.$refs.keybdInput.focus();
-      });
-    },
-
     _onPaneChanged(pane) {
       if (pane !== "tv") {
-        this.showKeybd = false;
         this.subClose();
       }
-    },
-
-    _onTvCloseKeybd() {
-      this.showKeybd = false;
     },
 
     _onTvMuteState(data) {

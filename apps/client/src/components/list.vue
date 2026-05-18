@@ -387,7 +387,7 @@ export default {
 
   components: { FontAwesomeIcon, Shows, HdrTop, HdrBot, Buttons },
 
-  emits: ["show-map", "hide-map", "all-shows", "all-tvdb"],
+  emits: ["show-map", "hide-map", "all-shows", "all-tvdb", "filtered-shows"],
 
   props: {
     simpleMode: {
@@ -657,6 +657,7 @@ export default {
         "Needs Files",
         "Finished",
         "Playing",
+        "No Intro",
       ],
       conds: [
         {
@@ -2821,6 +2822,7 @@ export default {
     },
 
     async refilter(scroll = true) {
+      let selectFirstAfterSort = false;
       // If actor filter is active, maintain it
       if (this.actorFilter) {
         // Check if we have search params (word-based search) or just filter (exact match)
@@ -2946,16 +2948,23 @@ export default {
           if (!overview.includes(descrSrchLc)) continue;
         }
         for (let cond of this.conds) {
-          if (cond.filter === 0) continue;
-          if ((cond.filter === +1) != !!cond.cond(show)) {
+          const effectiveFilter =
+            this.fltrChoice === "No Intro" && cond.name === "hasemby"
+              ? +1
+              : cond.filter;
+          if (effectiveFilter === 0) continue;
+          if ((effectiveFilter === +1) != !!cond.cond(show)) {
             continue fltrLoop;
           }
+        }
+        if (this.fltrChoice === "No Intro" && show.introDur != null) {
+          continue;
         }
         filteredShows.push(show);
       }
 
       this.shows = filteredShows;
-      let selectFirstAfterSort = false;
+      this.$emit("filtered-shows", this.shows);
       if (this.shows.length === 1) this.saveVisShow(this.shows[0]);
       else if (this.highlightName) {
         // Only update selection if highlightName is already set

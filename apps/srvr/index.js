@@ -4913,6 +4913,91 @@ app.post("/api/asr/chksrt/history/add", (req, res) => {
   res.json({ ok: true });
 });
 
+// Intro: get first available video file for a show
+app.get("/api/introFirstFile", async (req, res) => {
+  const showName = req.query.showName;
+  if (!showName) {
+    res.status(400).json({ ok: false, error: "showName required" });
+    return;
+  }
+  try {
+    const allTvdb = tvdb.getAllTvdbSync();
+    const record = allTvdb[showName];
+    if (!record?.id) {
+      res.json({ ok: false, error: "show not found" });
+      return;
+    }
+    const seriesMap = await emby.getSeriesMap(record);
+    if (!seriesMap) {
+      res.json({ ok: false });
+      return;
+    }
+    const sorted = [...seriesMap].sort((a, b) => a[0] - b[0]);
+    for (const [, episodes] of sorted) {
+      const sortedEps = [...episodes].sort((a, b) => a[0] - b[0]);
+      for (const [, ep] of sortedEps) {
+        if (ep.path && !ep.noFile) {
+          res.json({ ok: true, path: ep.path });
+          return;
+        }
+      }
+    }
+    res.json({ ok: false });
+  } catch (err) {
+    console.error("[introFirstFile] error:", err.message);
+    res.json({ ok: false, error: err.message });
+  }
+});
+
+// Intro: skip forward by introDur on the Living Room TV
+app.post("/api/skipIntro", async (req, res) => {
+  try {
+    const sessRes = await fetch(
+      `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
+      { headers: { Accept: "application/json" } },
+    );
+    if (!sessRes.ok) {
+      res.json({ ok: false, error: `sessions ${sessRes.status}` });
+      return;
+    }
+    const sessions = await sessRes.json();
+    const session = sessions.find(
+      (s) => s.NowPlayingItem && s.DeviceName === "Living Room TV",
+    );
+    if (!session) {
+      res.json({ ok: false, reason: "notPlaying" });
+      return;
+    }
+    const positionTicks = session.PlayState?.PositionTicks ?? 0;
+    const showName =
+      session.NowPlayingItem.SeriesName || session.NowPlayingItem.Name;
+    const allTvdb = tvdb.getAllTvdbSync();
+    const showId = session.NowPlayingItem.SeriesId || session.NowPlayingItem.Id;
+    let record = allTvdb[showName];
+    if (!record) {
+      record = Object.values(allTvdb).find((r) => r.id === showId);
+    }
+    const introDur = record?.introDur;
+    if (!introDur) {
+      res.json({ ok: false, reason: "noIntroDur" });
+      return;
+    }
+    const newTicks = positionTicks + introDur * 10000;
+    const seekRes = await fetch(
+      `${EMBY_BASE_URL}/Sessions/${session.Id}/Playing/seek?SeekPositionTicks=${newTicks}&api_key=${EMBY_API_KEY}`,
+      { method: "POST", headers: { Accept: "application/json" } },
+    );
+    if (!seekRes.ok) {
+      res.json({ ok: false, error: `seek ${seekRes.status}` });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[skipIntro] error:", err.message);
+    res.json({ ok: false, error: err.message });
+  }
+});
+
 // Email
 app.post("/api/sendEmail", apiWrapper(sendEmailHandler));
 

@@ -561,6 +561,14 @@ export function killAsrProcess() {
 export function setTvdbFields(params) {
   return httpCall("/api/setTvdbFields", params, "POST");
 }
+
+export function introFirstFile(showName) {
+  return httpCall(
+    `/api/introFirstFile?showName=${encodeURIComponent(showName)}`,
+    null,
+    "GET",
+  );
+}
 export function getRemotesCmd(params) {
   return httpCall("/api/getRemotes", params, "POST");
 }

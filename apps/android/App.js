@@ -59,9 +59,6 @@ export default function App() {
   const [cellDims, setCellDims] = useState({ w: 0, h: 0 });
   const [showStreamers, setShowStreamers] = useState(false);
   const [flashSvc, setFlashSvc] = useState(null);
-  const [showKeybd, setShowKeybd] = useState(false);
-  const [kybdInput, setKybdInput] = useState("");
-  const [kybdHistory, setKybdHistory] = useState([]);
   const [showSubCtrl, setShowSubCtrl] = useState(false);
   const [subPlayers, setSubPlayers] = useState([]);
   const [subDeviceName, setSubDeviceName] = useState(null);
@@ -125,8 +122,6 @@ export default function App() {
   const unlockHoldTimerRef = useRef(null);
   const homeHoldRef = useRef(null);
   const homeHoldFiredRef = useRef(false);
-  const backHoldRef = useRef(null);
-  const backHoldFiredRef = useRef(false);
   const showPlayingRef = useRef(null);
   const followPlayingRef = useRef(false);
   const showSelectedRef = useRef(null);
@@ -300,7 +295,6 @@ export default function App() {
       clearTimeout(repeatTimeoutRef.current);
       clearTimeout(holdRef.current);
       clearTimeout(homeHoldRef.current);
-      clearTimeout(backHoldRef.current);
       clearInterval(subPollRef.current);
       clearTimeout(avoidTimerRef.current);
       clearTimeout(unlockHoldTimerRef.current);
@@ -599,7 +593,10 @@ export default function App() {
     appsHoldFiredRef.current = false;
     appsHoldRef.current = setTimeout(() => {
       appsHoldFiredRef.current = true;
-    }, 1000);
+      fetch(`${TV_SRVR_HTTP_URL}/api/skipIntro`, { method: "POST" }).catch(
+        () => {},
+      );
+    }, 300);
   };
 
   const stopAppsHold = () => {
@@ -742,19 +739,32 @@ export default function App() {
   };
 
   const startBackHold = () => {
-    backHoldFiredRef.current = false;
-    backHoldRef.current = setTimeout(() => {
-      backHoldFiredRef.current = true;
-      setShowKeybd(true);
-    }, 1000);
+    fetch(`${TV_SRVR_HTTP_URL}/api/skipIntro`, { method: "POST" }).catch(
+      () => {},
+    );
   };
 
-  const stopBackHold = () => {
-    clearTimeout(backHoldRef.current);
-    if (!backHoldFiredRef.current) {
-      tvKey("back");
+  const stopBackHold = () => {};
+
+  const showsHoldRef = useRef(null);
+  const showsHoldFiredRef = useRef(false);
+
+  const startShowsHold = () => {
+    showsHoldFiredRef.current = false;
+    showsHoldRef.current = setTimeout(() => {
+      showsHoldFiredRef.current = true;
+      fetch(`${TV_SRVR_HTTP_URL}/api/skipIntro`, { method: "POST" }).catch(
+        () => {},
+      );
+    }, 300);
+  };
+
+  const stopShowsHold = () => {
+    clearTimeout(showsHoldRef.current);
+    if (!showsHoldFiredRef.current) {
+      setShowShows(true);
     }
-    backHoldFiredRef.current = false;
+    showsHoldFiredRef.current = false;
   };
 
   const toggleLayoutOption = async () => {
@@ -912,38 +922,10 @@ export default function App() {
     await fetchSubPlayers();
   };
 
-  const kybdSendText = async () => {
-    const text = kybdInput.trim();
-    if (!text) return;
-    for (let i = 0; i < 50; i++) {
-      try {
-        await fetch(`${TV_TV_URL}/tv/keyevent/KEYCODE_DEL`);
-      } catch (_) {}
-    }
-    try {
-      await fetch(`${TV_TV_URL}/tv/text?t=${encodeURIComponent(text)}`);
-    } catch (_) {}
-    try {
-      await fetch(`${TV_TV_URL}/tv/keyevent/KEYCODE_ENTER`);
-    } catch (_) {}
-    setKybdHistory((h) => {
-      const next = [text, ...h.filter((i) => i !== text)];
-      return next;
-    });
-    setKybdInput("");
-  };
+  const kybdSendText = async () => {};
+  const kybdSendKeyevent = async (code) => {};
 
-  const kybdSendKeyevent = async (code) => {
-    try {
-      await fetch(`${TV_TV_URL}/tv/keyevent/${code}`);
-    } catch (_) {}
-  };
-
-  const kybdSendHaKey = async (key) => {
-    try {
-      await fetch(`${TV_TV_URL}/tv/key/${key}`);
-    } catch (_) {}
-  };
+  const kybdSendHaKey = async (key) => {};
 
   const openApp = async (svc) => {
     if (isOff) return;
@@ -1067,7 +1049,8 @@ export default function App() {
           smallText: true,
           bg: () => cellBg("white", "shows"),
           onPress: () => {},
-          onPressIn: () => setShowShows(true),
+          onPressIn: () => startShowsHold(),
+          onPressOut: () => stopShowsHold(),
         }
       : {
           key: "stream",
@@ -1261,49 +1244,6 @@ export default function App() {
             </TouchableOpacity>
           </View>
         )}
-      </View>
-    );
-  }
-
-  if (showKeybd) {
-    return (
-      <View style={kybdStyles.container}>
-        <StatusBar hidden />
-        <View style={kybdStyles.inputRow}>
-          <TextInput
-            ref={kybdInputRef}
-            style={kybdStyles.textInput}
-            value={kybdInput}
-            onChangeText={setKybdInput}
-            placeholder="Type here..."
-            onSubmitEditing={kybdSendText}
-            returnKeyType="send"
-            autoFocus
-          />
-          <TouchableOpacity
-            onPress={() => setShowKeybd(false)}
-            style={kybdStyles.closeBtn}
-          >
-            <Text style={kybdStyles.closeBtnText}>✕</Text>
-          </TouchableOpacity>
-        </View>
-        <ScrollView style={kybdStyles.historyList}>
-          {kybdHistory.map((item, idx) => (
-            <TouchableOpacity
-              key={idx}
-              onPress={() => {
-                kybdInputRef.current?.focus();
-                setKybdInput(item);
-              }}
-              style={[
-                kybdStyles.historyItem,
-                { backgroundColor: idx % 2 === 0 ? "#fafafa" : "#fff" },
-              ]}
-            >
-              <Text style={kybdStyles.historyItemText}>{item}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
       </View>
     );
   }

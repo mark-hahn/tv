@@ -109,11 +109,29 @@
             text-overflow: ellipsis;
             white-space: nowrap;
           "
-          >{{ introShow ? introShow.name : "" }}</span
+          >{{ introShow ? introShow.name : ""
+          }}{{
+            introSeason != null && introEpisode != null
+              ? ` (S${String(introSeason).padStart(2, "0")}E${String(introEpisode).padStart(2, "0")})`
+              : ""
+          }}</span
         >
       </div>
       <!-- Intro mode: mark controls (right, next to X) -->
       <template v-if="mode === 'intro'">
+        <div
+          v-if="seekTarget !== null"
+          style="
+            color: yellow;
+            font-size: 13px;
+            user-select: none;
+            text-shadow: 0 0 3px #000;
+            flex-shrink: 0;
+            margin-right: 8px;
+          "
+        >
+          {{ fmtTime(seekTarget * 1000) }}
+        </div>
         <div
           style="
             color: white;
@@ -129,9 +147,7 @@
           {{ fmtTime(currentTimeSec * 1000) }}
         </div>
         <div
-          @click.stop="
-            $refs.vid.currentTime = Math.max(0, $refs.vid.currentTime - 30)
-          "
+          @click.stop="clickNavBack30"
           style="
             color: white;
             font-size: 13px;
@@ -149,9 +165,7 @@
           &lt;&lt;
         </div>
         <div
-          @click.stop="
-            $refs.vid.currentTime = Math.max(0, $refs.vid.currentTime - 10)
-          "
+          @click.stop="clickNavBack10"
           style="
             color: white;
             font-size: 13px;
@@ -169,7 +183,7 @@
           &lt;
         </div>
         <div
-          @click.stop="$refs.vid.currentTime += 10"
+          @click.stop="clickNavFwd10"
           style="
             color: white;
             font-size: 13px;
@@ -187,7 +201,7 @@
           &gt;
         </div>
         <div
-          @click.stop="$refs.vid.currentTime += 30"
+          @click.stop="clickNavFwd30"
           style="
             color: white;
             font-size: 13px;
@@ -562,6 +576,7 @@
       @dblclick="toggleFullscreen"
       @error="onVideoError"
       @timeupdate="currentTimeSec = $refs.vid ? $refs.vid.currentTime : 0"
+      @loadedmetadata="onVideoLoadedMetadata"
     >
       <track
         v-if="activeTrackUrl"
@@ -609,6 +624,8 @@ export default {
     chksrtCount: { type: Number, default: 0 },
     introShow: { type: Object, default: null },
     introShows: { type: Array, default: () => [] },
+    introSeason: { type: Number, default: null },
+    introEpisode: { type: Number, default: null },
   },
   emits: ["close", "chksrt-next", "chksrt-sel", "intro-next"],
   data() {
@@ -622,6 +639,7 @@ export default {
       startMark: 3 * 60 * 1000,
       endMark: 4 * 60 * 1000,
       currentTimeSec: 0,
+      seekTarget: null,
     };
   },
   computed: {
@@ -718,6 +736,8 @@ export default {
       this.chksrtMatch = null;
       this.errorRetries = 0;
       this.vidSrc = newVal ? this.streamUrl : "";
+      if (newVal && this.mode === "intro" && this.introSeason != null)
+        this._seekOnLoad = true;
       this.subtitleOffset = offsetCache.get(newVal) ?? 0;
       if (newVal) this._fetchSubtitleList(newVal);
     },
@@ -963,26 +983,90 @@ export default {
         choice: choiceLabel,
       }).catch((e) => console.error("[chksrt] addChksrtHistory error:", e));
     },
+    onVideoLoadedMetadata() {
+      if (!this._seekOnLoad) return;
+      this._seekOnLoad = false;
+      const targetSec = Math.max(0, (this.startMark - 3000) / 1000);
+      this._seekWithConfirm(targetSec);
+      const vid = this.$refs.vid;
+      if (vid) vid.play().catch(() => {});
+    },
+    _seekWithConfirm(targetSec) {
+      this._cancelSeek();
+      this.seekTarget = targetSec;
+      const vid = this.$refs.vid;
+      if (!vid) {
+        this.seekTarget = null;
+        return;
+      }
+      vid.currentTime = targetSec;
+      this._seekPollInterval = setInterval(() => {
+        const v = this.$refs.vid;
+        if (!v || this.seekTarget === null) {
+          clearInterval(this._seekPollInterval);
+          this._seekPollInterval = null;
+          return;
+        }
+        if (Math.abs(v.currentTime - this.seekTarget) < 1.0) {
+          this.seekTarget = null;
+          clearInterval(this._seekPollInterval);
+          this._seekPollInterval = null;
+        } else {
+          v.currentTime = this.seekTarget;
+        }
+      }, 300);
+    },
+    _cancelSeek() {
+      if (this._seekPollInterval) {
+        clearInterval(this._seekPollInterval);
+        this._seekPollInterval = null;
+      }
+      this.seekTarget = null;
+    },
+    clickNavBack30() {
+      this._cancelSeek();
+      const vid = this.$refs.vid;
+      if (vid) vid.currentTime = Math.max(0, vid.currentTime - 30);
+    },
+    clickNavBack10() {
+      this._cancelSeek();
+      const vid = this.$refs.vid;
+      if (vid) vid.currentTime = Math.max(0, vid.currentTime - 10);
+    },
+    clickNavFwd10() {
+      this._cancelSeek();
+      const vid = this.$refs.vid;
+      if (vid) vid.currentTime += 10;
+    },
+    clickNavFwd30() {
+      this._cancelSeek();
+      const vid = this.$refs.vid;
+      if (vid) vid.currentTime += 30;
+    },
     clickIntroPre() {
       const vid = this.$refs.vid;
       if (!vid) return;
+      this._cancelSeek();
       vid.currentTime = Math.max(0, (this.startMark - 3000) / 1000);
     },
     clickIntroStart() {
       const vid = this.$refs.vid;
       if (!vid) return;
+      this._cancelSeek();
       this.startMark = vid.currentTime * 1000;
       this._saveIntroDur();
     },
     clickIntroEnd() {
       const vid = this.$refs.vid;
       if (!vid) return;
+      this._cancelSeek();
       this.endMark = vid.currentTime * 1000;
       this._saveIntroDur();
     },
     clickIntroTest() {
       const vid = this.$refs.vid;
       if (!vid) return;
+      this._cancelSeek();
       vid.currentTime += Math.max(0, this.endMark - this.startMark) / 1000;
     },
     _saveIntroDur() {
@@ -993,21 +1077,8 @@ export default {
       );
     },
     clickIntroNext() {
-      const current = this.introShow;
-      const shows = this.introShows;
-      if (!current || !Array.isArray(shows)) {
-        this.$emit("close");
-        return;
-      }
-      const idx = shows.findIndex((s) => s.name === current.name);
-      for (let i = idx + 1; i < shows.length; i++) {
-        const s = shows[i];
-        if (s.introDur == null && s.inEmby !== false) {
-          this.$emit("intro-next", s);
-          return;
-        }
-      }
-      this.$emit("close");
+      if (this.introSeason != null) this._seekOnLoad = true;
+      this.$emit("intro-next");
     },
     fmtTime(ms) {
       return fmtTime(ms);

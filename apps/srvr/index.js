@@ -4982,7 +4982,7 @@ app.post("/api/skipIntro", async (req, res) => {
       res.json({ ok: false, reason: "noIntroDur" });
       return;
     }
-    const newTicks = positionTicks + introDur * 10000;
+    const newTicks = positionTicks + Math.max(0, introDur - 1000) * 10000;
     const seekRes = await fetch(
       `${EMBY_BASE_URL}/Sessions/${session.Id}/Playing/seek?SeekPositionTicks=${newTicks}&api_key=${EMBY_API_KEY}`,
       { method: "POST", headers: { Accept: "application/json" } },

@@ -228,6 +228,7 @@
             @open-intro="handleOpenIntro"
           ></Info>
           <Map
+            ref="mapComp"
             v-show="currentPane === 'map'"
             :mapShow="mapShow"
             :hideMapBottom="hideMapBottom"
@@ -366,6 +367,8 @@
       :chksrtCount="chksrtCount"
       :introShow="videoPlayerIntroShow"
       :introShows="filteredShows"
+      :introSeason="videoPlayerMapSeason"
+      :introEpisode="videoPlayerMapEpisode"
       @close="handleVideoPlayerClose"
       @chksrt-next="handleChksrtNext"
       @chksrt-sel="handleChksrtSel"
@@ -599,6 +602,9 @@ export default {
       videoPlayerPath: null,
       videoPlayerMode: null,
       videoPlayerIntroShow: null,
+      videoPlayerSource: null,
+      videoPlayerMapSeason: null,
+      videoPlayerMapEpisode: null,
       chksrtCount: 0,
       currentPane: "info", // 'info', 'map', 'actors', 'reviews', 'trailer', 'tor', 'flex', 'qbt', 'down'
       movieMode: false,
@@ -973,6 +979,9 @@ export default {
       this.videoPlayerPath = null;
       this.videoPlayerMode = null;
       this.videoPlayerIntroShow = null;
+      this.videoPlayerSource = null;
+      this.videoPlayerMapSeason = null;
+      this.videoPlayerMapEpisode = null;
       this.fetchChksrtCount();
     },
     async handleChksrtNext() {
@@ -1038,13 +1047,59 @@ export default {
       }
     },
 
-    async handleOpenIntro({ show, path }) {
+    async handleOpenIntro({ show, path, source, season, episode }) {
       this.videoPlayerIntroShow = show;
       this.videoPlayerPath = path;
       this.videoPlayerMode = "intro";
+      this.videoPlayerSource = source || "info";
+      this.videoPlayerMapSeason = season != null ? season : null;
+      this.videoPlayerMapEpisode = episode != null ? episode : null;
     },
 
-    async handleIntroNext(nextShow) {
+    async handleIntroNext() {
+      if (this.videoPlayerSource === "map") {
+        const result = this.$refs.mapComp?.selectNextEpisodeWithFile(
+          this.videoPlayerMapSeason,
+          this.videoPlayerMapEpisode,
+        );
+        if (result) {
+          this.videoPlayerPath = result.path;
+          this.videoPlayerMapSeason = result.season;
+          this.videoPlayerMapEpisode = result.episode;
+        } else {
+          this.videoPlayerPath = null;
+          this.videoPlayerMode = null;
+          this.videoPlayerIntroShow = null;
+          this.videoPlayerSource = null;
+          this.videoPlayerMapSeason = null;
+          this.videoPlayerMapEpisode = null;
+        }
+        return;
+      }
+      // info pane: find next show in filteredShows that needs introDur set
+      const current = this.videoPlayerIntroShow;
+      const shows = this.filteredShows;
+      if (!current || !Array.isArray(shows)) {
+        this.videoPlayerPath = null;
+        this.videoPlayerMode = null;
+        this.videoPlayerIntroShow = null;
+        return;
+      }
+      const idx = shows.findIndex((s) => s.name === current.name);
+      let nextShow = null;
+      for (let i = idx + 1; i < shows.length; i++) {
+        const s = shows[i];
+        if (s.introDur == null && s.inEmby !== false) {
+          nextShow = s;
+          break;
+        }
+      }
+      if (!nextShow) {
+        this.videoPlayerPath = null;
+        this.videoPlayerMode = null;
+        this.videoPlayerIntroShow = null;
+        return;
+      }
       evtBus.emit("selectShowFromCardTitle", nextShow.name);
       try {
         const result = await srvr.introFirstFile(nextShow.name);

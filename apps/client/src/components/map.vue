@@ -1875,9 +1875,39 @@ export default {
       );
     },
     handleMapIntroClick() {
-      const path = this.firstSelectedCellPath;
+      if (this.selectedCells.size === 0) return;
+      const firstKey = Array.from(this.selectedCells)[0];
+      const { season, episode } = this.parseCellKey(firstKey);
+      const path = this.seriesMap?.[season]?.[episode]?.path || null;
       if (!path) return;
-      this.$emit("open-intro", { show: this.mapShow, path });
+      this.$emit("open-intro", {
+        show: this.mapShow,
+        path,
+        source: "map",
+        season,
+        episode,
+      });
+    },
+    selectNextEpisodeWithFile(currentSeason, currentEpisode) {
+      const seasons = this.seriesMapSeasons;
+      const epis = this.seriesMapEpis;
+      if (!seasons || !epis) return null;
+      let found = false;
+      for (const s of seasons) {
+        for (const e of epis) {
+          if (!found) {
+            if (s === currentSeason && e === currentEpisode) found = true;
+            continue;
+          }
+          const ep = this.seriesMap?.[s]?.[e];
+          if (ep?.path && !ep?.noFile) {
+            this.selectedSeasons = new Set();
+            this.selectedCells = new Set([`${s}.${e}`]);
+            return { path: ep.path, season: s, episode: e };
+          }
+        }
+      }
+      return null;
     },
     handleSelectedWatch() {
       const targets = this.getSelectedMapTargets();

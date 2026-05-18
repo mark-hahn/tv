@@ -39,10 +39,6 @@
           {{ showsLength + "/" + allShowsLength }}
         </div>
       </div>
-    </div>
-    <div
-      style="display: flex; justify-content: space-between; margin-bottom: 10px"
-    >
       <input
         :value="filterStr"
         @input="handleFilterInput"
@@ -51,9 +47,8 @@
         @blur="$emit('filter-blur')"
         placeholder="Filter..."
         style="
-          width: 100px;
-          height: 30px !important;
-          margin: 5px 10px;
+          width: 120px;
+          margin: 5px 20px 5px 10px;
           padding: 5px;
           border: 1.5px solid black;
           background-color: #eee;
@@ -61,24 +56,24 @@
           font-size: 16px;
         "
       />
+      <button
+        @click="$emit('watch-click')"
+        style="
+          height: 30px;
+          background-color: white;
+          font-size: 13px;
+          cursor: pointer;
+          margin: 5px 5px 5px 0;
+          width: 136px;
+          flex-shrink: 0;
+          white-space: nowrap;
+          overflow: hidden;
+          border-radius: 7px;
+        "
+      >
+        {{ watchingName }}
+      </button>
     </div>
-    <button
-      @click="$emit('watch-click')"
-      style="
-        height: 24px;
-        background-color: white;
-        font-size: 13px;
-        cursor: pointer;
-        margin: 8px 5px 0 10px;
-        width: 113px;
-        flex-shrink: 0;
-        white-space: nowrap;
-        overflow: hidden;
-        border-radius: 7px;
-      "
-    >
-      {{ watchingName }}
-    </button>
     <div
       style="
         flex: 1;

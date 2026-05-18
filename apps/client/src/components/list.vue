@@ -132,6 +132,7 @@
               @library-click="libraryClick"
               @all-click="allClick"
               @custom-click="customClick"
+              :hasSharedFilters="hasSharedFilters"
               :actorsListMode="actorsListMode"
               @actors-click="startActorsListMode"
             ></HdrTop>
@@ -226,6 +227,7 @@
             @library-click="libraryClick"
             @all-click="allClick"
             @custom-click="customClick"
+            :hasSharedFilters="hasSharedFilters"
             :actorsListMode="actorsListMode"
             @actors-click="startActorsListMode"
           ></HdrTop>
@@ -634,6 +636,7 @@ export default {
       qbtActiveShowNames: [],
       downActiveShowNames: [],
       hasLoadedAllShows: false,
+      hasSharedFilters: false,
       sortChoices: [
         "Close",
         "Alpha",
@@ -1042,13 +1045,16 @@ export default {
           (this.conds || []).every((c) => {
             if (!c?.name) return true;
             if (c.name === "ban") return c.filter === -1; // default ban behavior
+            if (c.name === "hasemby") return c.filter === 1; // default hasemby behavior
             return c.filter === 0;
           });
 
         if (isAllMode) {
           await srvr.setSharedFilters(null);
+          this.hasSharedFilters = false;
         } else {
           await srvr.setSharedFilters(payload);
+          this.hasSharedFilters = true;
         }
       } catch (e) {
         console.error("sendSharedFilters failed:", e);
@@ -3407,6 +3413,35 @@ export default {
     window.addEventListener("resize", this._onResizeWideLandscape);
     window.addEventListener("orientationchange", this._onResizeWideLandscape);
 
+    void (async () => {
+      try {
+        const shared = await srvr.getSharedFilters();
+        this.hasSharedFilters =
+          !!shared &&
+          typeof shared === "object" &&
+          Object.keys(shared).length > 0;
+      } catch {
+        this.hasSharedFilters = false;
+      }
+    })();
+    this._sharedFiltersPollList = setInterval(() => {
+      if (this._sharedFiltersPollListInFlight) return;
+      this._sharedFiltersPollListInFlight = true;
+      void (async () => {
+        try {
+          const shared = await srvr.getSharedFilters();
+          this.hasSharedFilters =
+            !!shared &&
+            typeof shared === "object" &&
+            Object.keys(shared).length > 0;
+        } catch {
+          this.hasSharedFilters = false;
+        } finally {
+          this._sharedFiltersPollListInFlight = false;
+        }
+      })();
+    }, 3000);
+
     // Click-outside handler for actors list mode (capture phase to consume the click)
     this._actorsListClickOutside = (e) => {
       if (!this.actorsListMode) return;
@@ -3830,6 +3865,11 @@ export default {
         this._onResizeWideLandscape,
       );
       this._onResizeWideLandscape = null;
+    }
+
+    if (this._sharedFiltersPollList) {
+      clearInterval(this._sharedFiltersPollList);
+      this._sharedFiltersPollList = null;
     }
   },
 };

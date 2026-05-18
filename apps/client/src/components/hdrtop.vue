@@ -129,7 +129,7 @@
       </button>
       <button
         v-if="!simpleMode"
-        @click="$emit('custom-click')"
+        @click="hasSharedFilters && $emit('custom-click')"
         style="
           height: 24px;
           background-color: white;
@@ -138,6 +138,7 @@
           border-radius: 7px;
           margin: 0 0 0 10px;
         "
+        :style="!hasSharedFilters ? { opacity: '0.4' } : {}"
       >
         Custom
       </button>
@@ -196,6 +197,10 @@ export default {
       default: false,
     },
     actorsListMode: {
+      type: Boolean,
+      default: false,
+    },
+    hasSharedFilters: {
       type: Boolean,
       default: false,
     },

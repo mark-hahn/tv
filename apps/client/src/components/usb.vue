@@ -10,226 +10,77 @@
       backgroundColor: '#fafafa',
     }"
   >
-    <!-- Header -->
+    <!-- Files section (header + tree) -->
     <div
       :style="{
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'stretch',
-        padding: '8px',
-        borderBottom: '1px solid #000',
-        flex: '0 0 auto',
+        overflow: 'hidden',
+        flex: showInfo ? '0 0 50%' : '1 1 auto',
+        borderBottom: showInfo ? '1px solid #ddd' : 'none',
       }"
     >
-      <!-- Row 1: hidden in movie mode -->
+      <!-- Header -->
       <div
-        v-if="!movieMode"
-        style="display: flex; align-items: center"
+        :style="{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'stretch',
+          padding: '8px',
+          borderBottom: '1px solid #000',
+          flex: '0 0 auto',
+        }"
       >
+        <!-- Row 1: hidden in movie mode -->
         <div
-          class="pane-header-title"
-          style="
-            margin-right: auto;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-          "
+          v-if="!movieMode"
+          style="display: flex; align-items: center"
         >
-          <span>USB Files</span>
-        </div>
-
-        <button
-          @click="forceDown"
-          :disabled="loading || !hasSelection"
-          style="
-            cursor: pointer;
-            border-radius: 7px;
-            padding: 4px 10px;
-            border: 1px solid #bbb;
-            background-color: whitesmoke;
-            margin-right: 8px;
-          "
-        >
-          Force
-        </button>
-
-        <button
-          @click="prune"
-          :disabled="loading || pruneBusy"
-          :style="{
-            cursor: loading || pruneBusy ? 'default' : 'pointer',
-            borderRadius: '7px',
-            padding: '4px 10px',
-            border: '1px solid #bbb',
-            backgroundColor: pruneBusy ? 'lightgray' : 'whitesmoke',
-            marginRight: '8px',
-          }"
-        >
-          Prune
-        </button>
-
-        <button
-          @click="refresh"
-          :disabled="loading || pruneBusy"
-          style="
-            cursor: pointer;
-            border-radius: 7px;
-            padding: 4px 10px;
-            border: 1px solid #bbb;
-            background-color: whitesmoke;
-          "
-        >
-          Refresh
-        </button>
-      </div>
-
-      <!-- Row 2: normal mode -->
-      <div
-        v-if="!movieMode"
-        style="
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 8px;
-          margin-top: 4px;
-        "
-      >
-        <div style="display: flex; gap: 8px; align-items: center">
-          <input
-            v-model="searchInput"
-            @keyup.enter="searchUsb"
-            placeholder="Search"
-            style="width: 96px"
-          />
-          <input
-            v-model="renameInput"
-            @focus="onRenameFocus"
-            @keyup.enter="renameFile"
-            placeholder="Rename"
-            style="width: 96px"
-          />
-        </div>
-        <div style="display: flex; gap: 8px; align-items: center">
-          <button
-            @click.stop="usbSelClick"
-            :disabled="!hasSelection"
-            :style="{
-              cursor: hasSelection ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
-              color: hasSelection ? 'inherit' : '#aaa',
-            }"
+          <div
+            class="pane-header-title"
+            style="
+              margin-right: auto;
+              display: flex;
+              align-items: center;
+              gap: 12px;
+            "
           >
-            Sel
-          </button>
+            <span>USB Files</span>
+          </div>
 
           <button
-            @click.stop="highlightShow"
-            :disabled="!show"
+            @click="forceDown"
+            :disabled="loading || !hasSelection"
             style="
               cursor: pointer;
               border-radius: 7px;
               padding: 4px 10px;
               border: 1px solid #bbb;
               background-color: whitesmoke;
+              margin-right: 8px;
             "
-          >
-            From
-          </button>
-
-          <button
-            @click.stop="usbAllClick"
-            :disabled="!hasSelection"
-            :style="{
-              cursor: hasSelection ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
-              color: hasSelection ? 'inherit' : '#aaa',
-            }"
-          >
-            All
-          </button>
-
-          <button
-            @click.stop="usbFirstClick"
-            :disabled="!hasSelection"
-            :style="{
-              cursor: hasSelection ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
-              color: hasSelection ? 'inherit' : '#aaa',
-            }"
-          >
-            First
-          </button>
-
-          <button
-            @click.stop="clickInfo"
-            :style="{
-              cursor: 'pointer',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': showInfo ? '#ddd' : 'whitesmoke',
-            }"
-          >
-            Info
-          </button>
-
-          <button
-            @click.stop="usbDelClick"
-            :disabled="!hasSelection"
-            :style="{
-              cursor: hasSelection ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
-              color: hasSelection ? 'inherit' : '#aaa',
-            }"
-          >
-            Del
-          </button>
-        </div>
-      </div>
-
-      <!-- Row 2: movie mode — title + Force/Refresh/All/First/Del -->
-      <div
-        v-else
-        style="
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 8px;
-          margin-top: 4px;
-        "
-      >
-        <div class="pane-header-title">USB Movies</div>
-        <div style="display: flex; gap: 8px; align-items: center">
-          <button
-            @click="forceMovieDown"
-            :disabled="loading || !hasSelection"
-            :style="{
-              cursor: loading || !hasSelection ? 'default' : 'pointer',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': !loading && hasSelection ? 'whitesmoke' : '#e8e8e8',
-              color: !loading && hasSelection ? 'inherit' : '#aaa',
-            }"
           >
             Force
           </button>
 
           <button
+            @click="prune"
+            :disabled="loading || pruneBusy"
+            :style="{
+              cursor: loading || pruneBusy ? 'default' : 'pointer',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              backgroundColor: pruneBusy ? 'lightgray' : 'whitesmoke',
+              marginRight: '8px',
+            }"
+          >
+            Prune
+          </button>
+
+          <button
             @click="refresh"
-            :disabled="loading"
+            :disabled="loading || pruneBusy"
             style="
               cursor: pointer;
               border-radius: 7px;
@@ -240,127 +91,286 @@
           >
             Refresh
           </button>
+        </div>
 
-          <button
-            @click.stop="usbAllClick"
-            :disabled="!hasSelection"
-            :style="{
-              cursor: hasSelection ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
-              color: hasSelection ? 'inherit' : '#aaa',
-            }"
-          >
-            All
-          </button>
+        <!-- Row 2: normal mode -->
+        <div
+          v-if="!movieMode"
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            margin-top: 4px;
+          "
+        >
+          <div style="display: flex; gap: 8px; align-items: center">
+            <input
+              v-model="searchInput"
+              @keyup.enter="searchUsb"
+              placeholder="Search"
+              style="width: 96px"
+            />
+            <input
+              v-model="renameInput"
+              @focus="onRenameFocus"
+              @keyup.enter="renameFile"
+              placeholder="Rename"
+              style="width: 96px"
+            />
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center">
+            <button
+              @click.stop="usbSelClick"
+              :disabled="!hasSelection"
+              :style="{
+                cursor: hasSelection ? 'pointer' : 'default',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
+                color: hasSelection ? 'inherit' : '#aaa',
+              }"
+            >
+              Sel
+            </button>
 
-          <button
-            @click.stop="usbFirstClick"
-            :disabled="!hasSelection"
-            :style="{
-              cursor: hasSelection ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
-              color: hasSelection ? 'inherit' : '#aaa',
-            }"
-          >
-            First
-          </button>
+            <button
+              @click.stop="highlightShow"
+              :disabled="!show"
+              style="
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px 10px;
+                border: 1px solid #bbb;
+                background-color: whitesmoke;
+              "
+            >
+              From
+            </button>
 
-          <button
-            @click.stop="clickInfo"
-            :style="{
-              cursor: 'pointer',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': showInfo ? '#ddd' : 'whitesmoke',
-            }"
-          >
-            Info
-          </button>
+            <button
+              @click.stop="usbAllClick"
+              :disabled="!hasSelection"
+              :style="{
+                cursor: hasSelection ? 'pointer' : 'default',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
+                color: hasSelection ? 'inherit' : '#aaa',
+              }"
+            >
+              All
+            </button>
 
-          <button
-            @click.stop="usbDelClick"
-            :disabled="!hasSelection"
-            :style="{
-              cursor: hasSelection ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
-              color: hasSelection ? 'inherit' : '#aaa',
-            }"
+            <button
+              @click.stop="usbFirstClick"
+              :disabled="!hasSelection"
+              :style="{
+                cursor: hasSelection ? 'pointer' : 'default',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
+                color: hasSelection ? 'inherit' : '#aaa',
+              }"
+            >
+              First
+            </button>
+
+            <button
+              @click.stop="clickInfo"
+              :style="{
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg': showInfo ? '#ddd' : 'whitesmoke',
+              }"
+            >
+              Info
+            </button>
+
+            <button
+              @click.stop="usbDelClick"
+              :disabled="!hasSelection"
+              :style="{
+                cursor: hasSelection ? 'pointer' : 'default',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
+                color: hasSelection ? 'inherit' : '#aaa',
+              }"
+            >
+              Del
+            </button>
+          </div>
+        </div>
+
+        <!-- Row 2: movie mode — title + Force/Refresh/All/First/Del -->
+        <div
+          v-else
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            margin-top: 4px;
+          "
+        >
+          <div class="pane-header-title">USB Movies</div>
+          <div style="display: flex; gap: 8px; align-items: center">
+            <button
+              @click="forceMovieDown"
+              :disabled="loading || !hasSelection"
+              :style="{
+                cursor: loading || !hasSelection ? 'default' : 'pointer',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg': !loading && hasSelection ? 'whitesmoke' : '#e8e8e8',
+                color: !loading && hasSelection ? 'inherit' : '#aaa',
+              }"
+            >
+              Force
+            </button>
+
+            <button
+              @click="refresh"
+              :disabled="loading"
+              style="
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px 10px;
+                border: 1px solid #bbb;
+                background-color: whitesmoke;
+              "
+            >
+              Refresh
+            </button>
+
+            <button
+              @click.stop="usbAllClick"
+              :disabled="!hasSelection"
+              :style="{
+                cursor: hasSelection ? 'pointer' : 'default',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
+                color: hasSelection ? 'inherit' : '#aaa',
+              }"
+            >
+              All
+            </button>
+
+            <button
+              @click.stop="usbFirstClick"
+              :disabled="!hasSelection"
+              :style="{
+                cursor: hasSelection ? 'pointer' : 'default',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
+                color: hasSelection ? 'inherit' : '#aaa',
+              }"
+            >
+              First
+            </button>
+
+            <button
+              @click.stop="clickInfo"
+              :style="{
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg': showInfo ? '#ddd' : 'whitesmoke',
+              }"
+            >
+              Info
+            </button>
+
+            <button
+              @click.stop="usbDelClick"
+              :disabled="!hasSelection"
+              :style="{
+                cursor: hasSelection ? 'pointer' : 'default',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
+                color: hasSelection ? 'inherit' : '#aaa',
+              }"
+            >
+              Del
+            </button>
+          </div>
+        </div>
+
+        <div
+          v-if="showPruneLine && pruneLineText"
+          style="
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            font-weight: normal;
+            color: #666;
+            font-size: 13px;
+          "
+        >
+          <span
+            style="
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+              margin-right: auto;
+            "
+            >{{ pruneLineText }}</span
           >
-            Del
+          <button
+            @click="clearPruneLine"
+            style="
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 2px 8px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+              margin-left: 8px;
+            "
+          >
+            Clr
           </button>
         </div>
       </div>
 
+      <!-- Tree -->
       <div
-        v-if="showPruneLine && pruneLineText"
-        style="
-          margin-top: 6px;
-          display: flex;
-          align-items: center;
-          font-weight: normal;
-          color: #666;
-          font-size: 13px;
-        "
+        :style="{
+          flex: '1 1 auto',
+          overflow: 'auto',
+          padding: '0px 8px',
+        }"
       >
-        <span
-          style="
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            margin-right: auto;
-          "
-          >{{ pruneLineText }}</span
+        <div
+          v-if="error"
+          style="color: red; margin: 10px 0"
         >
-        <button
-          @click="clearPruneLine"
-          style="
-            cursor: pointer;
-            border-radius: 7px;
-            padding: 2px 8px;
-            border: 1px solid #bbb;
-            background-color: whitesmoke;
-            margin-left: 8px;
-          "
-        >
-          Clr
-        </button>
+          {{ error }}
+        </div>
+        <tree-node
+          v-for="node in tree"
+          :key="node.name"
+          ref="treeNodes"
+          :node="node"
+          :selected="selectedFolders.has(node.name)"
+          :selected-files="selectedFiles"
+          @node-click="handleNodeClick"
+        />
       </div>
-    </div>
-
-    <!-- Tree -->
-    <div
-      :style="{
-        flex: showInfo ? '0 0 50%' : '1 1 auto',
-        overflow: 'auto',
-        padding: '0px 8px',
-        borderBottom: showInfo ? '1px solid #ddd' : 'none',
-      }"
-    >
-      <div
-        v-if="error"
-        style="color: red; margin: 10px 0"
-      >
-        {{ error }}
-      </div>
-      <tree-node
-        v-for="node in tree"
-        :key="node.name"
-        ref="treeNodes"
-        :node="node"
-        :selected="selectedFolders.has(node.name)"
-        :selected-files="selectedFiles"
-        @node-click="handleNodeClick"
-      />
     </div>
 
     <!-- Info Pane -->
@@ -389,15 +399,28 @@
         "
       >
         <div style="min-width: 0; margin-right: 8px; overflow: hidden">
-          <div style="white-space: pre-wrap; word-break: break-word">
-            {{ wrapFileName(infoFileName) }}
-          </div>
-          <div
-            v-if="infoFileMeta"
-            style="margin-top: 2px"
-          >
-            {{ infoFileMeta }}
-          </div>
+          <template v-if="infoMultiFiles.length > 0">
+            <div style="white-space: pre-wrap; word-break: break-word">
+              {{ infoMultiTitle }}
+            </div>
+            <div
+              v-if="infoMultiMeta"
+              style="margin-top: 2px"
+            >
+              {{ infoMultiMeta }}
+            </div>
+          </template>
+          <template v-else>
+            <div style="white-space: pre-wrap; word-break: break-word">
+              {{ wrapFileName(infoFileName) }}
+            </div>
+            <div
+              v-if="infoFileMeta"
+              style="margin-top: 2px"
+            >
+              {{ infoFileMeta }}
+            </div>
+          </template>
         </div>
         <button
           @click="showInfo = false"
@@ -526,6 +549,9 @@ export default {
       infoText: "",
       infoLoading: false,
       infoMultiFiles: [],
+      infoMultiTitle: "",
+      infoMultiMeta: "",
+      _infoRefreshTimer: null,
     };
   },
   computed: {
@@ -558,6 +584,15 @@ export default {
       this.selectedFolders = new Set();
       this.selectedFiles = new Set();
       this.fetchFiles();
+    },
+    selectedFolders() {
+      this.handleSelectionChanged();
+    },
+    selectedFiles: {
+      deep: true,
+      handler() {
+        this.handleSelectionChanged();
+      },
     },
   },
   mounted() {
@@ -1228,6 +1263,54 @@ export default {
       }
       return null;
     },
+    findNodeByPath(relPath) {
+      if (!relPath) return null;
+      const parts = relPath.split("/");
+      let current = this.tree;
+      let node = null;
+      for (const part of parts) {
+        if (!current) return null;
+        node = current.find((n) => n.name === part);
+        if (!node) return null;
+        current = node.children;
+      }
+      return node;
+    },
+    collectFilePaths() {
+      const paths = [];
+      const collectNode = (n, prefix) => {
+        const fullPath = prefix ? `${prefix}/${n.name}` : n.name;
+        if (n.type === "file") {
+          paths.push(fullPath);
+        } else if (n.children) {
+          n.children.forEach((c) => collectNode(c, fullPath));
+        }
+      };
+      if (this.selectedFolders.size > 0) {
+        for (const folderName of this.selectedFolders) {
+          const node = this.tree.find((n) => n.name === folderName);
+          if (node) collectNode(node, null);
+        }
+      } else {
+        for (const relPath of this.selectedFiles) {
+          const node = this.findNodeByPath(relPath);
+          if (node)
+            collectNode(
+              node,
+              relPath.substring(0, relPath.lastIndexOf("/")) || null,
+            );
+        }
+      }
+      return paths;
+    },
+    handleSelectionChanged() {
+      if (this.showInfo) {
+        if (this._infoRefreshTimer) clearTimeout(this._infoRefreshTimer);
+        this._infoRefreshTimer = setTimeout(() => {
+          this.loadInfo();
+        }, 300);
+      }
+    },
     async clickInfo() {
       if (this.showInfo) {
         this.showInfo = false;
@@ -1237,84 +1320,223 @@ export default {
       await this.loadInfo();
     },
     async loadInfo() {
+      const VIDEO_EXTS = new Set([
+        "mkv",
+        "avi",
+        "mp4",
+        "m4v",
+        "mov",
+        "wmv",
+        "webm",
+        "mpg",
+        "mpeg",
+        "ts",
+        "m2ts",
+      ]);
+      const getExt = (name) => {
+        const i = name.lastIndexOf(".");
+        return i >= 0 ? name.slice(i + 1).toLowerCase() : "";
+      };
       this.infoText = "";
       this.infoFileName = "";
       this.infoFileMeta = "";
       this.infoMultiFiles = [];
+      this.infoMultiTitle = "";
+      this.infoMultiMeta = "";
       this.infoLoading = true;
-      const found = this.findFirstFile();
-      if (!found) {
+
+      const filePaths = this.collectFilePaths();
+
+      if (filePaths.length === 0) {
         this.infoLoading = false;
         return;
       }
-      const { relPath, node } = found;
-      const fileName = relPath.split("/").pop();
-      this.infoFileName = fileName;
-      if (node && node.size != null) {
-        const sizeStr = this.formatFileSize(node.size);
-        const dateStr = (node.date || "").replace(/:\d+\.\d+$|:\d+$/, "");
-        this.infoFileMeta = dateStr ? `${sizeStr} | ${dateStr}` : sizeStr;
-      }
-      try {
-        const res = await fetch(`${config.torrentsApiUrl}/api/usb/mediainfo`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ relPath, movieMode: this.movieMode }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-        this.infoText = data.output || "";
-        let sizeStr =
-          node && node.size != null ? this.formatFileSize(node.size) : "";
-        let dateStr = node
-          ? (node.date || "").replace(/:\d+\.\d+$|:\d+$/, "")
-          : "";
-        let durStr = "";
-        let widthStr = "";
-        let bitDepthStr = "";
-        let rateStr = "";
-        const widthMatch = this.infoText.match(
-          /^Height\s+:\s+(\d[\d\s]*)pixels/m,
-        );
-        if (widthMatch) widthStr = widthMatch[1].replace(/\s/g, "") + " px";
-        const bitrateMatch = this.infoText.match(
-          /^Bit rate\s+:\s+([\d\s]+kb\/s)/m,
-        );
-        if (bitrateMatch)
-          rateStr = bitrateMatch[1].replace(/\s(?=\d)/g, "").trim();
-        const vSecs = this.infoText.split(/\n\n+/);
-        const vSec = vSecs.find((s) => /^Video\b/.test(s.trim()));
-        if (vSec) {
-          const durLine = vSec.match(/^Duration\s+:\s+(.+)/m);
-          if (durLine) {
-            const raw = durLine[1];
-            const hm = raw.match(/(\d+)\s*h/);
-            const mm = raw.match(/(\d+)\s*min/);
-            const total =
-              (hm ? parseInt(hm[1]) : 0) * 60 + (mm ? parseInt(mm[1]) : 0);
-            if (total > 0) durStr = total + " min";
-          }
-          const bdLine = vSec.match(/^Bit depth\s+:\s+(\d+)\s*bits/m);
-          if (bdLine) bitDepthStr = bdLine[1] + " bits";
+
+      if (filePaths.length === 1) {
+        // Single file
+        const relPath = filePaths[0];
+        const node = this.findNodeByPath(relPath);
+        const fileName = relPath.split("/").pop();
+        this.infoFileName = fileName;
+        if (node && node.size != null) {
+          const sizeStr = this.formatFileSize(node.size);
+          const dateStr = (node.date || "").replace(/:\d+\.\d+$|:\d+$/, "");
+          this.infoFileMeta = dateStr ? `${sizeStr} | ${dateStr}` : sizeStr;
         }
-        this.infoFileMeta = [
-          sizeStr,
-          durStr,
-          dateStr,
-          widthStr,
-          bitDepthStr,
-          rateStr,
-        ]
-          .filter(Boolean)
-          .join(" | ");
-        const subsCount = data.subsCount ?? 0;
-        const srtsCount = data.srtsCount ?? 0;
-        this.infoFileMeta += ` | ${subsCount} sub | ${srtsCount} srt`;
-      } catch (e) {
-        this.infoText = `Error: ${e.message}`;
-      } finally {
-        this.infoLoading = false;
+        if (!VIDEO_EXTS.has(getExt(fileName))) {
+          this.infoLoading = false;
+          return;
+        }
+        try {
+          const res = await fetch(
+            `${config.torrentsApiUrl}/api/usb/mediainfo`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ relPath, movieMode: this.movieMode }),
+            },
+          );
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+          this.infoText = data.output || "";
+          const sizeStr =
+            node && node.size != null ? this.formatFileSize(node.size) : "";
+          const dateStr = node
+            ? (node.date || "").replace(/:\d+\.\d+$|:\d+$/, "")
+            : "";
+          let durStr = "";
+          let widthStr = "";
+          let bitDepthStr = "";
+          let rateStr = "";
+          const widthMatch = this.infoText.match(
+            /^Height\s+:\s+(\d[\d\s]*)pixels/m,
+          );
+          if (widthMatch) widthStr = widthMatch[1].replace(/\s/g, "") + " px";
+          const bitrateMatch = this.infoText.match(
+            /^Bit rate\s+:\s+([\d\s]+kb\/s)/m,
+          );
+          if (bitrateMatch)
+            rateStr = bitrateMatch[1].replace(/\s(?=\d)/g, "").trim();
+          const vSecs = this.infoText.split(/\n\n+/);
+          const vSec = vSecs.find((s) => /^Video\b/.test(s.trim()));
+          if (vSec) {
+            const durLine = vSec.match(/^Duration\s+:\s+(.+)/m);
+            if (durLine) {
+              const raw = durLine[1];
+              const hm = raw.match(/(\d+)\s*h/);
+              const mm = raw.match(/(\d+)\s*min/);
+              const total =
+                (hm ? parseInt(hm[1]) : 0) * 60 + (mm ? parseInt(mm[1]) : 0);
+              if (total > 0) durStr = total + " min";
+            }
+            const bdLine = vSec.match(/^Bit depth\s+:\s+(\d+)\s*bits/m);
+            if (bdLine) bitDepthStr = bdLine[1] + " bits";
+          }
+          this.infoFileMeta = [
+            sizeStr,
+            durStr,
+            dateStr,
+            widthStr,
+            bitDepthStr,
+            rateStr,
+          ]
+            .filter(Boolean)
+            .join(" | ");
+          const subsCount = data.subsCount ?? 0;
+          const srtsCount = data.srtsCount ?? 0;
+          this.infoFileMeta += ` | ${subsCount} sub | ${srtsCount} srt`;
+        } catch (e) {
+          this.infoText = `Error: ${e.message}`;
+        } finally {
+          this.infoLoading = false;
+        }
+        return;
       }
+
+      // Multiple files
+      const entries = [];
+      for (const relPath of filePaths) {
+        const fileName = relPath.split("/").pop();
+        const node = this.findNodeByPath(relPath);
+        let sizeStr = "";
+        let dateStr = "";
+        if (node && node.size != null) {
+          sizeStr = this.formatFileSize(node.size);
+          dateStr = (node.date || "").replace(/:\d+\.\d+$|:\d+$/, "");
+        }
+        if (VIDEO_EXTS.has(getExt(fileName))) {
+          try {
+            const res = await fetch(
+              `${config.torrentsApiUrl}/api/usb/mediainfo`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ relPath, movieMode: this.movieMode }),
+              },
+            );
+            const data = await res.json();
+            let rStr = "";
+            let dStr = "";
+            let wStr = "";
+            let bdStr = "";
+            if (res.ok && data.output) {
+              const wm = data.output.match(/^Height\s+:\s+(\d[\d\s]*)pixels/m);
+              if (wm) wStr = wm[1].replace(/\s/g, "") + " px";
+              const bm = data.output.match(/^Bit rate\s+:\s+([\d\s]+kb\/s)/m);
+              if (bm) rStr = bm[1].replace(/\s(?=\d)/g, "").trim();
+              const vSecs = data.output.split(/\n\n+/);
+              const vSec = vSecs.find((s) => /^Video\b/.test(s.trim()));
+              if (vSec) {
+                const durLine = vSec.match(/^Duration\s+:\s+(.+)/m);
+                if (durLine) {
+                  const raw = durLine[1];
+                  const hm = raw.match(/(\d+)\s*h/);
+                  const mm = raw.match(/(\d+)\s*min/);
+                  const total =
+                    (hm ? parseInt(hm[1]) : 0) * 60 +
+                    (mm ? parseInt(mm[1]) : 0);
+                  if (total > 0) dStr = total + " min";
+                }
+                const bdLine = vSec.match(/^Bit depth\s+:\s+(\d+)\s*bits/m);
+                if (bdLine) bdStr = bdLine[1] + " bits";
+              }
+            }
+            const subsCount = data.subsCount ?? 0;
+            const srtsCount = data.srtsCount ?? 0;
+            const meta =
+              [sizeStr, dStr, dateStr, wStr, bdStr, rStr]
+                .filter(Boolean)
+                .join(" | ") + ` | ${subsCount} sub | ${srtsCount} srt`;
+            entries.push({ name: fileName, meta });
+          } catch (_) {
+            const meta = [sizeStr, dateStr].filter(Boolean).join(" | ");
+            entries.push({ name: fileName, meta });
+          }
+          continue;
+        }
+        {
+          const meta = [sizeStr, dateStr].filter(Boolean).join(" | ");
+          entries.push({ name: fileName, meta });
+        }
+      }
+      this.infoMultiFiles = entries;
+
+      // Aggregate header
+      const names = filePaths.map((p) => p.split("/").pop());
+      let prefix = names[0] || "";
+      for (let i = 1; i < names.length; i++) {
+        let j = 0;
+        while (
+          j < prefix.length &&
+          j < names[i].length &&
+          prefix[j] === names[i][j]
+        )
+          j++;
+        prefix = prefix.slice(0, j);
+      }
+      this.infoMultiTitle = prefix.replace(/\./g, " ").trim();
+
+      let totalSize = 0;
+      const allDates = [];
+      for (const relPath of filePaths) {
+        const node = this.findNodeByPath(relPath);
+        if (node && node.size != null) totalSize += node.size;
+        if (node && node.date) {
+          const d = (node.date || "").replace(/:\d+\.\d+$|:\d+$/, "");
+          if (d) allDates.push(d);
+        }
+      }
+      const sizeAgg = this.formatFileSize(totalSize);
+      allDates.sort();
+      if (allDates.length >= 2) {
+        this.infoMultiMeta = `${sizeAgg} | ${allDates[0]} | ${allDates[allDates.length - 1]}`;
+      } else if (allDates.length === 1) {
+        this.infoMultiMeta = `${sizeAgg} | ${allDates[0]}`;
+      } else {
+        this.infoMultiMeta = sizeAgg;
+      }
+
+      this.infoLoading = false;
     },
     async forceMovieDown() {
       if (this.selectedFolders.size === 0 && this.selectedFiles.size === 0)

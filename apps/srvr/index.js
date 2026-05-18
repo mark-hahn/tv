@@ -5316,7 +5316,8 @@ function flexgetFmtSent() {
     hourCycle: "h23",
   }).formatToParts(now);
   const get = (t) => parts.find((p) => p.type === t)?.value || "";
-  return `${get("year")}/${get("month")}/${get("day")}-${get("hour")}:${get("minute")}:${get("second")}`;
+  const hour = get("hour") === "24" ? "00" : get("hour");
+  return `${get("year")}/${get("month")}/${get("day")}-${hour}:${get("minute")}:${get("second")}`;
 }
 
 function flexgetResolution(quality, title) {

@@ -86,8 +86,7 @@ export default function App() {
   const [playProgress, setPlayProgress] = useState(null);
   const [flashCell, setFlashCell] = useState(null);
   const [mapImageExpanded, setMapImageExpanded] = useState(false);
-  const [showEpiSubs, setShowEpiSubs] = useState(false);
-  const [epiSubTracks, setEpiSubTracks] = useState([]);
+  const [epiStats, setEpiStats] = useState(null);
 
   const onGridLayout = ({ nativeEvent: { layout } }) => {
     if (layout.width < 10 || layout.height < 10) return;
@@ -463,6 +462,21 @@ export default function App() {
       } catch (_) {}
     })();
   }, [activeTab, selectedShow?.name, mapRefreshKey]);
+
+  useEffect(() => {
+    if (activeTab !== "Stats") return;
+    if (!selectedSE || !selectedShow) {
+      setEpiStats(null);
+      return;
+    }
+    setEpiStats(null);
+    fetch(
+      `${TV_SRVR_HTTP_URL}/api/episodeStats?show=${encodeURIComponent(selectedShow.name)}&s=${selectedSE.s}&e=${selectedSE.e}`,
+    )
+      .then((r) => r.json())
+      .then((data) => setEpiStats(data && !data.error ? data : {}))
+      .catch(() => setEpiStats({}));
+  }, [activeTab, selectedSE?.s, selectedSE?.e]);
 
   const flash = (btn) => {
     setFlashBtn(btn);
@@ -1941,70 +1955,124 @@ export default function App() {
       );
     };
 
-    const renderEpiSubsContent = () => {
-      const epName = episodeInfo?.name ?? "";
-      const isSeason = /^Season\s+\d+$/i.test(epName);
-      const displayName = isSeason ? "" : epName;
-      const seStr = selectedSE
-        ? `S${String(selectedSE.s).padStart(2, "0")}E${String(selectedSE.e).padStart(2, "0")}`
-        : "";
-      const headerText = displayName ? `${displayName} (${seStr})` : seStr;
+    const renderEpiStatsContent = () => {
+      if (!selectedSE) {
+        return <Text style={subCtrlStyles.noVideo}>No episode selected</Text>;
+      }
+      if (!epiStats) {
+        return <Text style={subCtrlStyles.noVideo}>Loading…</Text>;
+      }
+      const fmtSize = (bytes) => {
+        if (!bytes) return null;
+        const gb = bytes / (1024 * 1024 * 1024);
+        return gb >= 1
+          ? `${gb.toFixed(2)} GB`
+          : `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
+      };
+      const fmtRate = (bps) => {
+        if (!bps) return null;
+        return `${(bps / 1000000).toFixed(1)} Mbps`;
+      };
+      const rows = [
+        { label: "File", value: epiStats.fileName },
+        {
+          label: "PTT Title",
+          value:
+            epiStats.ptt?.title?.toLowerCase() !==
+            selectedShow?.name?.toLowerCase()
+              ? epiStats.ptt?.title
+              : null,
+        },
+        { label: "Show", value: selectedShow?.name },
+        {
+          label: "Season",
+          value: selectedSE?.s != null ? String(selectedSE.s) : null,
+        },
+        {
+          label: "Episode",
+          value: selectedSE?.e != null ? String(selectedSE.e) : null,
+        },
+        { label: "Air Date", value: episodeInfo?.aired },
+        { label: "File Size", value: fmtSize(epiStats.fileSize) },
+        {
+          label: "Duration",
+          value:
+            epiStats.durationMins != null
+              ? `${epiStats.durationMins} min`
+              : null,
+        },
+        {
+          label: "Bit Depth",
+          value:
+            epiStats.videoBitDepth != null
+              ? `${epiStats.videoBitDepth}-bit`
+              : null,
+        },
+        { label: "Bit Rate", value: fmtRate(epiStats.videoBitRate) },
+        {
+          label: "Resolution",
+          value:
+            epiStats.videoWidth && epiStats.videoHeight
+              ? `${epiStats.videoWidth}x${epiStats.videoHeight}`
+              : null,
+        },
+        { label: "HDR", value: epiStats.hdr },
+        {
+          label: "Audio Ch",
+          value:
+            epiStats.audioChannels != null
+              ? String(epiStats.audioChannels)
+              : null,
+        },
+        { label: "Source", value: epiStats.ptt?.source },
+        { label: "Codec", value: epiStats.ptt?.codec },
+        { label: "Group", value: epiStats.ptt?.group },
+        { label: "Language", value: epiStats.ptt?.language },
+        { label: "Audio", value: epiStats.ptt?.audio },
+        { label: "Resolution (PTT)", value: epiStats.ptt?.resolution },
+        {
+          label: "Year",
+          value: epiStats.ptt?.year != null ? String(epiStats.ptt.year) : null,
+        },
+        { label: "Proper", value: epiStats.ptt?.proper ? "Yes" : null },
+        { label: "Repack", value: epiStats.ptt?.repack ? "Yes" : null },
+        { label: "Extended", value: epiStats.ptt?.extended ? "Yes" : null },
+        { label: "Unrated", value: epiStats.ptt?.unrated ? "Yes" : null },
+        { label: "Hardcoded", value: epiStats.ptt?.hardcoded ? "Yes" : null },
+      ].filter((r) => r.value != null && r.value !== "");
       return (
-        <View style={{ flex: 1 }}>
-          {displayName || seStr ? (
+        <ScrollView style={{ flex: 1, backgroundColor: "#fff" }}>
+          {rows.map((r, idx) => (
             <View
+              key={idx}
               style={{
+                flexDirection: "row",
                 paddingHorizontal: 12,
-                paddingVertical: 8,
+                paddingVertical: 6,
                 borderBottomWidth: 1,
-                borderBottomColor: "#ccc",
-                backgroundColor: "#f8f8f8",
+                borderBottomColor: "#eee",
+                backgroundColor: idx % 2 === 0 ? "#fff" : "#f8f8f8",
               }}
             >
-              <Text style={{ fontSize: fs(24) }}>
-                {displayName ? (
-                  <>
-                    <Text style={{ fontWeight: "bold" }}>{displayName}</Text>
-                    {seStr ? (
-                      <Text style={{ fontWeight: "normal" }}>
-                        {" (" + seStr + ")"}
-                      </Text>
-                    ) : null}
-                  </>
-                ) : (
-                  <Text>{seStr}</Text>
-                )}
+              <Text style={{ fontSize: fs(18), color: "#666", width: 120 }}>
+                {r.label}
+              </Text>
+              <Text style={{ fontSize: fs(18), flex: 1, flexWrap: "wrap" }}>
+                {r.value}
               </Text>
             </View>
-          ) : null}
-          <ScrollView style={{ flex: 1, backgroundColor: "#fff" }}>
-            {!selectedSE ? (
-              <Text style={subCtrlStyles.noVideo}>No episode selected.</Text>
-            ) : epiSubTracks.length === 0 ? (
-              <Text style={subCtrlStyles.noVideo}>No subtitles found.</Text>
-            ) : (
-              epiSubTracks.map((sub, idx) => (
-                <View key={idx} style={subCtrlStyles.card}>
-                  <Text style={subCtrlStyles.cardText}>
-                    {subTypeChar(sub.type)}: {subShortLabel(sub.label)}
-                  </Text>
-                </View>
-              ))
-            )}
-          </ScrollView>
-        </View>
+          ))}
+        </ScrollView>
       );
     };
 
     const handleTabPress = (tab) => {
       setShowSearch("");
-      setShowEpiSubs(false);
       setActiveTab(tab);
     };
 
     const handleClose = () => {
       setShowSearch("");
-      setShowEpiSubs(false);
       setShowShows(false);
     };
 
@@ -2022,45 +2090,20 @@ export default function App() {
           </Text>
         </TouchableOpacity>
         <View style={showsStyles.tabRow}>
-          {["List", "Info", "Map", "Actors"].map((tab) => (
+          {["List", "Info", "Map", "Actors", "Stats"].map((tab) => (
             <TouchableOpacity
               key={tab}
               onPress={() => handleTabPress(tab)}
               style={[
                 showsStyles.tabBtn,
-                !showEpiSubs && activeTab === tab && showsStyles.tabBtnActive,
+                activeTab === tab && showsStyles.tabBtnActive,
               ]}
             >
               <Text style={showsStyles.tabBtnText}>{tab}</Text>
             </TouchableOpacity>
           ))}
-          {layoutOption !== "linda" && (
-            <TouchableOpacity
-              onPress={() => {
-                setShowEpiSubs(true);
-                if (selectedSE && selectedShow) {
-                  fetch(
-                    `${TV_SRVR_HTTP_URL}/api/episodeSubs?show=${encodeURIComponent(selectedShow.name)}&s=${selectedSE.s}&e=${selectedSE.e}`,
-                  )
-                    .then((r) => r.json())
-                    .then((tracks) =>
-                      setEpiSubTracks(Array.isArray(tracks) ? tracks : []),
-                    )
-                    .catch(() => setEpiSubTracks([]));
-                } else {
-                  setEpiSubTracks([]);
-                }
-              }}
-              style={[
-                showsStyles.closeTabBtn,
-                showEpiSubs && showsStyles.tabBtnActive,
-              ]}
-            >
-              <Text style={showsStyles.tabBtnText}>Subs</Text>
-            </TouchableOpacity>
-          )}
         </View>
-        {!showEpiSubs && activeTab === "List" && (
+        {activeTab === "List" && (
           <TextInput
             style={showsStyles.searchInput}
             value={showSearch}
@@ -2072,16 +2115,13 @@ export default function App() {
           />
         )}
         <View style={showsStyles.contentPane}>
-          {showEpiSubs ? (
-            renderEpiSubsContent()
-          ) : (
-            <>
-              {activeTab === "List" && renderListContent()}
-              {activeTab === "Info" && renderInfoContent()}
-              {activeTab === "Map" && renderMapContent()}
-              {activeTab === "Actors" && renderActorsContent()}
-            </>
-          )}
+          <>
+            {activeTab === "List" && renderListContent()}
+            {activeTab === "Info" && renderInfoContent()}
+            {activeTab === "Map" && renderMapContent()}
+            {activeTab === "Actors" && renderActorsContent()}
+            {activeTab === "Stats" && renderEpiStatsContent()}
+          </>
         </View>
         <TouchableOpacity
           onPress={handleClose}

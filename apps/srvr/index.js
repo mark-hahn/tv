@@ -4393,6 +4393,105 @@ app.get("/api/episodeSubs", async (req, res) => {
   res.json(tracks);
 });
 
+app.get("/api/episodeStats", async (req, res) => {
+  const showName = (req.query.show || "").trim();
+  const season = parseInt(req.query.s, 10);
+  const episode = parseInt(req.query.e, 10);
+  if (!showName || isNaN(season) || isNaN(episode)) {
+    res.status(400).json({ error: "show, s, e required" });
+    return;
+  }
+  if (showName.includes("/") || showName.includes("\\")) {
+    res.status(400).json({ error: "invalid show name" });
+    return;
+  }
+  const seasonDir = path.join(tvDir, showName, `Season ${season}`);
+  let entries;
+  try {
+    entries = fs.readdirSync(seasonDir);
+  } catch {
+    res.status(404).json({ error: "season not found" });
+    return;
+  }
+  const seKey = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
+  const videoExt = /\.(mkv|mp4|avi|m4v|ts)$/i;
+  const videoFile = entries.find(
+    (f) => videoExt.test(f) && f.toUpperCase().includes(seKey),
+  );
+  if (!videoFile) {
+    res.status(404).json({ error: "file not found" });
+    return;
+  }
+  const resolved = path.join(seasonDir, videoFile);
+
+  // ffprobe
+  let fileSize = null;
+  let durationMins = null;
+  let videoWidth = null;
+  let videoHeight = null;
+  let videoBitRate = null;
+  let videoBitDepth = null;
+  let hdr = null;
+  let audioChannels = null;
+  try {
+    const probeOut = cp
+      .execSync(
+        `ffprobe -v quiet -print_format json -show_streams -show_format "${resolved.replace(/"/g, '\\"')}"`,
+        { maxBuffer: 4 * 1024 * 1024 },
+      )
+      .toString();
+    const probe = JSON.parse(probeOut);
+    const fmt = probe.format || {};
+    fileSize = fmt.size ? parseInt(fmt.size, 10) : null;
+    durationMins = fmt.duration
+      ? Math.round((parseFloat(fmt.duration) / 60) * 10) / 10
+      : null;
+    const fmtBitRate = fmt.bit_rate ? parseInt(fmt.bit_rate, 10) : null;
+    const streams = probe.streams || [];
+    const vStream = streams.find((s) => s.codec_type === "video");
+    if (vStream) {
+      videoWidth = vStream.width || null;
+      videoHeight = vStream.height || null;
+      videoBitRate = vStream.bit_rate
+        ? parseInt(vStream.bit_rate, 10)
+        : fmtBitRate;
+      const pf = vStream.pix_fmt || "";
+      if (/12/.test(pf)) videoBitDepth = 12;
+      else if (/10/.test(pf)) videoBitDepth = 10;
+      else videoBitDepth = 8;
+      const ct = vStream.color_transfer || "";
+      const cp2 = vStream.color_primaries || "";
+      if (ct === "smpte2084") hdr = "HDR10";
+      else if (ct === "arib-std-b67") hdr = "HLG";
+      else if (cp2 === "bt2020") hdr = "HDR";
+      else hdr = null;
+    }
+    const aStream = streams.find((s) => s.codec_type === "audio");
+    if (aStream) {
+      audioChannels = aStream.channels || null;
+    }
+  } catch (e) {
+    console.error("[episodeStats] probe error:", e.message);
+  }
+
+  // parse-torrent-title
+  const ptt =
+    parseTorrentTitle(videoFile.replace(/\.[a-z0-9]{2,4}$/i, "")) || {};
+
+  res.json({
+    fileName: videoFile,
+    fileSize,
+    durationMins,
+    videoWidth,
+    videoHeight,
+    videoBitRate,
+    videoBitDepth,
+    hdr,
+    audioChannels,
+    ptt,
+  });
+});
+
 app.get("/api/subtitle", async (req, res) => {
   const filePath = req.query.path;
   if (!filePath) {

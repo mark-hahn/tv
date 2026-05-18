@@ -886,15 +886,28 @@
         "
       >
         <div style="min-width: 0; margin-right: 8px; overflow: hidden">
-          <div style="white-space: pre-wrap; word-break: break-word">
-            {{ wrapFileName(infoFileName) }}
-          </div>
-          <div
-            v-if="infoFileMeta"
-            style="margin-top: 2px"
-          >
-            {{ infoFileMeta }}
-          </div>
+          <template v-if="infoMultiFiles.length > 0">
+            <div style="white-space: pre-wrap; word-break: break-word">
+              {{ infoMultiTitle }}
+            </div>
+            <div
+              v-if="infoMultiMeta"
+              style="margin-top: 2px"
+            >
+              {{ infoMultiMeta }}
+            </div>
+          </template>
+          <template v-else>
+            <div style="white-space: pre-wrap; word-break: break-word">
+              {{ wrapFileName(infoFileName) }}
+            </div>
+            <div
+              v-if="infoFileMeta"
+              style="margin-top: 2px"
+            >
+              {{ infoFileMeta }}
+            </div>
+          </template>
         </div>
         <button
           @click="showInfo = false"
@@ -1098,6 +1111,8 @@ export default {
       infoLoading: false,
       infoSelectedLine: null,
       infoMultiFiles: [], // [{name, meta}] for multi-file display
+      infoMultiTitle: "", // common prefix of multi-file names
+      infoMultiMeta: "", // aggregated size | oldest date | newest date
     };
   },
   created() {
@@ -2222,6 +2237,8 @@ export default {
       this.infoFileName = "";
       this.infoFileMeta = "";
       this.infoMultiFiles = [];
+      this.infoMultiTitle = "";
+      this.infoMultiMeta = "";
       this.infoSelectedLine = null;
       this.infoLoading = true;
 
@@ -2413,6 +2430,42 @@ export default {
           }
         }
         this.infoMultiFiles = entries;
+
+        // Compute aggregate header for multi-file
+        const names = filePaths.map((p) => p.split("/").pop());
+        let prefix = names[0] || "";
+        for (let i = 1; i < names.length; i++) {
+          let j = 0;
+          while (
+            j < prefix.length &&
+            j < names[i].length &&
+            prefix[j] === names[i][j]
+          )
+            j++;
+          prefix = prefix.slice(0, j);
+        }
+        this.infoMultiTitle = prefix.replace(/\./g, " ").trim();
+
+        let totalSize = 0;
+        const allDates = [];
+        for (const relPath of filePaths) {
+          const node = this.findNodeByPath(relPath);
+          if (node && node.size != null) totalSize += node.size;
+          if (node && node.date) {
+            const d = (node.date || "").replace(/:\d+\.\d+$|:\d+$/, "");
+            if (d) allDates.push(d);
+          }
+        }
+        const sizeAgg = this.formatFileSize(totalSize);
+        allDates.sort();
+        if (allDates.length >= 2) {
+          this.infoMultiMeta = `${sizeAgg} | ${allDates[0]} | ${allDates[allDates.length - 1]}`;
+        } else if (allDates.length === 1) {
+          this.infoMultiMeta = `${sizeAgg} | ${allDates[0]}`;
+        } else {
+          this.infoMultiMeta = sizeAgg;
+        }
+
         this.infoLoading = false;
       }
     },

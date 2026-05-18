@@ -84,10 +84,15 @@
       "
     >
       <span
-        v-if="libraryProgressText && !simpleMode"
+        v-if="
+          libraryProgressText &&
+          libraryProgressText.includes('%') &&
+          !simpleMode
+        "
         style="
-          font-size: 11px;
-          color: #555;
+          font-size: 13px;
+          font-weight: bold;
+          color: #000;
           white-space: nowrap;
           margin-right: 6px;
         "

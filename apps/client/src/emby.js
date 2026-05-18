@@ -1671,7 +1671,9 @@ export const taskStatus = async (taskId) => {
         progress: hasProgress ? progressNum : undefined,
       };
     }
-    // "Idle", "Queued", or unknown — task may not have started yet; treat as still pending
+    // "Idle" means completed and reset — treat as done
+    if (state === "idle") return { status: "refreshdone" };
+    // "Queued" or unknown — task may not have started yet; treat as still pending
     return { status: "refreshing", taskStatus: stateRaw };
   } catch (e) {
     return { status: e?.message || String(e) };

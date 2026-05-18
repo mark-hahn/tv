@@ -1503,18 +1503,50 @@ export default {
 
       // Aggregate header
       const names = filePaths.map((p) => p.split("/").pop());
-      let prefix = names[0] || "";
-      for (let i = 1; i < names.length; i++) {
-        let j = 0;
-        while (
-          j < prefix.length &&
-          j < names[i].length &&
-          prefix[j] === names[i][j]
-        )
-          j++;
-        prefix = prefix.slice(0, j);
+      // Common sections via recursive longest-common-substring
+      const MIN_SECT = 8;
+      const s0 = names[0] || "";
+      const s1 = names.length > 1 ? names[1] : "";
+      if (!s1) {
+        this.infoMultiTitle = s0;
+      } else {
+        const lcsRange = (aS, aE, bS, bE) => {
+          let best = { a: aS, b: bS, len: 0 };
+          for (let i = aS; i < aE; i++) {
+            for (let j = bS; j < bE; j++) {
+              let k = 0;
+              while (i + k < aE && j + k < bE && s0[i + k] === s1[j + k]) k++;
+              if (k > best.len) best = { a: i, b: j, len: k };
+            }
+          }
+          return best;
+        };
+        const rawSects = [];
+        const findSects = (aS, aE, bS, bE) => {
+          if (aS >= aE || bS >= bE) return;
+          const m = lcsRange(aS, aE, bS, bE);
+          if (m.len < MIN_SECT) return;
+          findSects(aS, m.a, bS, m.b);
+          rawSects.push(s0.slice(m.a, m.a + m.len));
+          findSects(m.a + m.len, aE, m.b + m.len, bE);
+        };
+        findSects(0, s0.length, 0, s1.length);
+        const valid = rawSects.filter((t) =>
+          names.every((nm) => nm.includes(t)),
+        );
+        if (valid.length === 0) {
+          this.infoMultiTitle = s0;
+        } else {
+          const parts = valid
+            .map((t) => t.replace(/^\.+|\.+$/g, ""))
+            .filter(Boolean);
+          const last = parts[parts.length - 1] || "";
+          const hasTrail =
+            last &&
+            names.some((nm) => nm.indexOf(last) + last.length < nm.length);
+          this.infoMultiTitle = parts.join(" ... ") + (hasTrail ? " ..." : "");
+        }
       }
-      this.infoMultiTitle = prefix.replace(/\./g, " ").trim();
 
       let totalSize = 0;
       const allDates = [];

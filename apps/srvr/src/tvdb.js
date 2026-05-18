@@ -1975,6 +1975,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   tvdbData.reject = paramObj.reject ?? existing.reject ?? false;
   tvdbData.haveSubs = paramObj.haveSubs ?? existing.haveSubs ?? false;
   tvdbData.lastWatched = paramObj.lastWatched || existing.lastWatched || null;
+  if (existing.introDur != null) tvdbData.introDur = existing.introDur;
 
   // Calculate waitStr using per-season formula (uses existing episodeAiredDates
   // since fresh series map data hasn't been fetched yet at this stage).

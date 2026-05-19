@@ -4963,51 +4963,62 @@ app.get("/api/introFirstFile", async (req, res) => {
 });
 
 // Intro: skip forward by introDur on the Living Room TV
+async function doSkipIntro(pressedAt) {
+  const sessRes = await fetch(
+    `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
+    { headers: { Accept: "application/json" } },
+  );
+  if (!sessRes.ok) {
+    console.log(`[skipIntro] sessions fetch failed: ${sessRes.status}`);
+    return { ok: false, error: `sessions ${sessRes.status}` };
+  }
+  const sessions = await sessRes.json();
+  const session = sessions.find(
+    (s) => s.NowPlayingItem && s.DeviceName === "Living Room TV",
+  );
+  if (!session) {
+    const deviceNames = sessions.map((s) => s.DeviceName).join(", ");
+    console.log(
+      `[skipIntro] no Living Room TV session. devices: ${deviceNames}`,
+    );
+    return { ok: false, reason: "notPlaying" };
+  }
+  const rawPositionTicks = session.PlayState?.PositionTicks ?? 0;
+  const pressDelay = pressedAt ? Math.max(0, Date.now() - pressedAt) : 0;
+  const positionTicks = Math.max(0, rawPositionTicks - pressDelay * 10000);
+  const showName =
+    session.NowPlayingItem.SeriesName || session.NowPlayingItem.Name;
+  const allTvdb = tvdb.getAllTvdbSync();
+  const showId = session.NowPlayingItem.SeriesId || session.NowPlayingItem.Id;
+  let record = allTvdb[showName];
+  if (!record) {
+    record = Object.values(allTvdb).find((r) => r.id === showId);
+  }
+  const introDur = record?.introDur;
+  if (!introDur) {
+    console.log(`[skipIntro] no introDur for show: ${showName}`);
+    return { ok: false, reason: "noIntroDur" };
+  }
+  const newTicks = positionTicks + Math.max(0, introDur - 1000) * 10000;
+  console.log(
+    `[skipIntro] show=${showName} pressDelay=${pressDelay}ms rawPos=${Math.round(rawPositionTicks / 10000)}ms newPos=${Math.round(newTicks / 10000)}ms`,
+  );
+  const seekRes = await fetch(
+    `${EMBY_BASE_URL}/Sessions/${session.Id}/Playing/seek?SeekPositionTicks=${newTicks}&api_key=${EMBY_API_KEY}`,
+    { method: "POST", headers: { Accept: "application/json" } },
+  );
+  if (!seekRes.ok) {
+    console.log(`[skipIntro] seek failed: ${seekRes.status}`);
+    return { ok: false, error: `seek ${seekRes.status}` };
+  }
+  return { ok: true };
+}
+
 app.post("/api/skipIntro", async (req, res) => {
   try {
-    const sessRes = await fetch(
-      `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
-      { headers: { Accept: "application/json" } },
-    );
-    if (!sessRes.ok) {
-      res.json({ ok: false, error: `sessions ${sessRes.status}` });
-      return;
-    }
-    const sessions = await sessRes.json();
-    const session = sessions.find(
-      (s) => s.NowPlayingItem && s.DeviceName === "Living Room TV",
-    );
-    if (!session) {
-      res.json({ ok: false, reason: "notPlaying" });
-      return;
-    }
-    const rawPositionTicks = session.PlayState?.PositionTicks ?? 0;
     const { pressedAt } = req.body || {};
-    const pressDelay = pressedAt ? Math.max(0, Date.now() - pressedAt) : 0;
-    const positionTicks = Math.max(0, rawPositionTicks - pressDelay * 10000);
-    const showName =
-      session.NowPlayingItem.SeriesName || session.NowPlayingItem.Name;
-    const allTvdb = tvdb.getAllTvdbSync();
-    const showId = session.NowPlayingItem.SeriesId || session.NowPlayingItem.Id;
-    let record = allTvdb[showName];
-    if (!record) {
-      record = Object.values(allTvdb).find((r) => r.id === showId);
-    }
-    const introDur = record?.introDur;
-    if (!introDur) {
-      res.json({ ok: false, reason: "noIntroDur" });
-      return;
-    }
-    const newTicks = positionTicks + Math.max(0, introDur - 1000) * 10000;
-    const seekRes = await fetch(
-      `${EMBY_BASE_URL}/Sessions/${session.Id}/Playing/seek?SeekPositionTicks=${newTicks}&api_key=${EMBY_API_KEY}`,
-      { method: "POST", headers: { Accept: "application/json" } },
-    );
-    if (!seekRes.ok) {
-      res.json({ ok: false, error: `seek ${seekRes.status}` });
-      return;
-    }
-    res.json({ ok: true });
+    const result = await doSkipIntro(pressedAt);
+    res.json(result);
   } catch (err) {
     console.error("[skipIntro] error:", err.message);
     res.json({ ok: false, error: err.message });
@@ -5303,6 +5314,11 @@ wss.on("connection", (ws) => {
           client.send(outMsg);
         } catch (_) {}
       }
+    } else if (fname === "skipIntro") {
+      const pressedAt = param?.pressedAt;
+      doSkipIntro(pressedAt).catch((err) =>
+        console.error("[skipIntro ws] error:", err.message),
+      );
     } else if (fname === "tvRemoteCollision") {
       console.log(
         `[collision] tvRemoteCollision received, sending tvRemoteLock to all ${connectedClients.size} clients`,

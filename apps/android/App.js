@@ -596,11 +596,10 @@ export default function App() {
     appsHoldRef.current = setTimeout(() => {
       appsHoldFiredRef.current = true;
       flash("stream");
-      fetch(`${TV_SRVR_HTTP_URL}/api/skipIntro`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pressedAt }),
-      }).catch(() => {});
+      const ws = wsRef.current;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ fname: "skipIntro", param: { pressedAt } }));
+      }
     }, 400);
   };
 
@@ -759,11 +758,10 @@ export default function App() {
     showsHoldRef.current = setTimeout(() => {
       showsHoldFiredRef.current = true;
       flash("shows");
-      fetch(`${TV_SRVR_HTTP_URL}/api/skipIntro`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pressedAt }),
-      }).catch(() => {});
+      const ws = wsRef.current;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ fname: "skipIntro", param: { pressedAt } }));
+      }
     }, 400);
   };
 

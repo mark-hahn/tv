@@ -108,6 +108,7 @@ export default function App() {
   const embyHoldFiredRef = useRef(false);
   const appsHoldRef = useRef(null);
   const appsHoldFiredRef = useRef(false);
+  const lpRef = useRef(null);
   const volDownHoldRef = useRef(null);
   const volDownHoldFiredRef = useRef(false);
   const picPollRef = useRef(null);
@@ -294,7 +295,11 @@ export default function App() {
       clearTimeout(repeatDelayRef.current);
       clearTimeout(repeatTimeoutRef.current);
       clearTimeout(holdRef.current);
-      clearTimeout(homeHoldRef.current);
+      clearTimeout(lpRef.current?.debounceTimer ?? lpRef.current?.timer);
+      clearTimeout(lpRef.current?.longTimer);
+      lpRef.current = null;
+      clearTimeout(dbRef.current?.timer);
+      dbRef.current = null;
       clearInterval(subPollRef.current);
       clearTimeout(avoidTimerRef.current);
       clearTimeout(unlockHoldTimerRef.current);
@@ -474,7 +479,7 @@ export default function App() {
 
   const flash = (btn) => {
     setFlashBtn(btn);
-    setTimeout(() => setFlashBtn(null), 500);
+    setTimeout(() => setFlashBtn(null), 300);
   };
 
   const notifyAction = (fromSubCtrl = false) => {
@@ -544,6 +549,49 @@ export default function App() {
     clearTimeout(holdRef.current);
   };
 
+  // Shared long-press: 100ms debounce → short; 400ms → long
+  const lpStart = (shortAction, longAction) => {
+    const lp = { shortAction, longAction, phase: 0 };
+    lpRef.current = lp;
+    lp.debounceTimer = setTimeout(() => {
+      if (lpRef.current === lp) lp.phase = 1;
+    }, 100);
+    lp.longTimer = setTimeout(() => {
+      if (lpRef.current !== lp) return;
+      lpRef.current = null;
+      longAction?.();
+    }, 400);
+  };
+
+  const lpStop = () => {
+    const lp = lpRef.current;
+    if (!lp) return;
+    clearTimeout(lp.debounceTimer);
+    clearTimeout(lp.longTimer);
+    lpRef.current = null;
+    if (lp.phase === 0) return;
+    if (lp.phase === 1) lp.shortAction?.();
+  };
+
+  // Shared simple debounce: 100ms → action, no long-press
+  const dbRef = useRef(null);
+  const dbStart = (action) => {
+    clearTimeout(dbRef.current?.timer);
+    const db = { action };
+    dbRef.current = db;
+    db.timer = setTimeout(() => {
+      if (dbRef.current !== db) return;
+      dbRef.current = null;
+      action?.();
+    }, 100);
+  };
+
+  const dbStop = () => {
+    if (!dbRef.current) return;
+    clearTimeout(dbRef.current.timer);
+    dbRef.current = null;
+  };
+
   const googleBtn = async () => {
     if (checkBlocked()) return;
     if (mode === "google") {
@@ -567,72 +615,69 @@ export default function App() {
   };
 
   const startEmbyHold = () => {
-    embyHoldFiredRef.current = false;
-    if (layoutOption === "mark") {
-      embyHoldRef.current = setTimeout(() => {
-        embyHoldFiredRef.current = true;
+    lpStart(
+      () => tvCmd("emby"),
+      () => {
         flash("emby");
-        if (mode === "google" || mode === "fire") setShowStreamers(true);
-      }, 400);
-    } else {
-      embyHoldRef.current = setTimeout(() => {
-        embyHoldFiredRef.current = true;
-      }, 400);
-    }
+        setShowStreamers(true);
+      },
+    );
   };
 
-  const stopEmbyHold = () => {
-    clearTimeout(embyHoldRef.current);
-    if (!embyHoldFiredRef.current) {
-      if (showSubCtrl) subClose();
-      else tvCmd("emby");
-    }
-    embyHoldFiredRef.current = false;
-  };
+  const stopEmbyHold = () => lpStop();
 
   const startAppsHold = () => {
-    appsHoldFiredRef.current = false;
-    appsHoldRef.current = setTimeout(() => {
-      appsHoldFiredRef.current = true;
-      setFlashBtn("stream");
-    }, 400);
+    lpStart(
+      () => {
+        flash("stream");
+        setShowStreamers(true);
+      },
+      () => {
+        flash("stream");
+        fireBtn();
+      },
+    );
   };
 
-  const stopAppsHold = () => {
-    clearTimeout(appsHoldRef.current);
-    if (!appsHoldFiredRef.current) {
-      flash("stream");
-      if (mode === "google" || mode === "fire") setShowStreamers(true);
-    } else {
-      setFlashBtn(null);
-      fireBtn();
-    }
-    appsHoldFiredRef.current = false;
-  };
+  const stopAppsHold = () => lpStop();
 
   const startVolDownHold = () => {
-    volDownHoldFiredRef.current = false;
-    volDownHoldRef.current = setTimeout(() => {
-      volDownHoldFiredRef.current = true;
-      openPicCtrl();
-    }, 400);
+    lpStart(
+      () => {
+        if (isOff || isOther) return;
+        flash("vold");
+        fetch(`${TV_TV_URL}/tv/vol/down`).catch(() => {});
+      },
+      () => {
+        flash("vold");
+        openPicCtrl();
+      },
+    );
   };
 
-  const stopVolDownHold = () => {
-    clearTimeout(volDownHoldRef.current);
-    if (!volDownHoldFiredRef.current) {
-      if (isOff || isOther) return;
-      flash("vold");
-      fetch(`${TV_TV_URL}/tv/vol/down`).catch(() => {});
-    }
-    volDownHoldFiredRef.current = false;
-  };
+  const stopVolDownHold = () => lpStop();
 
   const openPicCtrl = () => {
     setShowPicCtrl(true);
     fetchPicSettings();
     picPollRef.current = setInterval(() => fetchPicSettings(), 3000);
   };
+
+  const startVolUpHold = () => {
+    lpStart(
+      () => {
+        if (isOff || isOther) return;
+        flash("volu");
+        fetch(`${TV_TV_URL}/tv/vol/up`).catch(() => {});
+      },
+      () => {
+        flash("volu");
+        openSubCtrl();
+      },
+    );
+  };
+
+  const stopVolUpHold = () => lpStop();
 
   const closePicCtrl = () => {
     clearInterval(picPollRef.current);
@@ -741,63 +786,33 @@ export default function App() {
     schedulePicCommit(setting);
   };
 
-  const startBackHold = () => {
-    tvKey("back");
-  };
+  const startBackHold = () => dbStart(() => tvKey("back"));
 
-  const stopBackHold = () => {};
+  const stopBackHold = () => dbStop();
 
   const showsHoldRef = useRef(null);
   const showsHoldFiredRef = useRef(false);
 
-  const startShowsHold = () => {
-    showsHoldFiredRef.current = false;
-    showsHoldRef.current = setTimeout(() => {
-      showsHoldFiredRef.current = true;
-      setFlashBtn("shows");
-    }, 400);
-  };
-
-  const stopShowsHold = () => {
-    clearTimeout(showsHoldRef.current);
-    if (!showsHoldFiredRef.current) {
+  const startShowsHold = () =>
+    dbStart(() => {
       flash("shows");
       setShowShows(true);
-    } else {
-      setFlashBtn(null);
-      fireBtn();
-    }
-    showsHoldFiredRef.current = false;
-  };
+    });
 
-  const skipHoldRef = useRef(null);
-  const skipHoldFiredRef = useRef(false);
-  const skipPressedAtRef = useRef(null);
+  const stopShowsHold = () => dbStop();
 
   const startSkipHold = () => {
-    skipPressedAtRef.current = Date.now();
-    skipHoldFiredRef.current = false;
-    skipHoldRef.current = setTimeout(() => {
-      skipHoldFiredRef.current = true;
-    }, 400);
-  };
-
-  const stopSkipHold = () => {
-    clearTimeout(skipHoldRef.current);
-    if (!skipHoldFiredRef.current) {
+    const pressedAt = Date.now();
+    dbStart(() => {
       flash("skip");
       const ws = wsRef.current;
       if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(
-          JSON.stringify({
-            fname: "skipIntro",
-            param: { pressedAt: skipPressedAtRef.current },
-          }),
-        );
+        ws.send(JSON.stringify({ fname: "skipIntro", param: { pressedAt } }));
       }
-    }
-    skipHoldFiredRef.current = false;
+    });
   };
+
+  const stopSkipHold = () => dbStop();
 
   const toggleLayoutOption = async () => {
     const next = layoutOption === "mark" ? "linda" : "mark";
@@ -807,21 +822,18 @@ export default function App() {
     } catch (_) {}
   };
 
-  const startHomeHold = () => {
-    homeHoldFiredRef.current = false;
-    homeHoldRef.current = setTimeout(() => {
-      homeHoldFiredRef.current = true;
-      toggleLayoutOption();
-    }, 400);
-  };
+  const startHomeHold = () => dbStart(() => tvKey("home"));
 
-  const stopHomeHold = () => {
-    clearTimeout(homeHoldRef.current);
-    if (!homeHoldFiredRef.current) {
-      tvKey("home");
-    }
-    homeHoldFiredRef.current = false;
+  const stopHomeHold = () => dbStop();
+
+  const startOkHold = () => {
+    stopRepeat();
+    dbStart(() => tvKey("ok"));
   };
+  const stopOkHold = () => dbStop();
+
+  const startMuteHold = () => dbStart(() => tvCmd("mute"));
+  const stopMuteHold = () => dbStop();
 
   const fetchSubPlayers = async () => {
     try {
@@ -1043,10 +1055,8 @@ export default function App() {
       label: "OK",
       bg: () => cellBg("lightgreen", "ok"),
       onPress: () => {},
-      onPressIn: () => {
-        stopRepeat();
-        tvKey("ok");
-      },
+      onPressIn: () => startOkHold(),
+      onPressOut: () => stopOkHold(),
     },
     {
       key: "right",
@@ -1099,11 +1109,8 @@ export default function App() {
       smallText: true,
       bg: () => cellBg("lightgreen", "volu"),
       onPress: () => {},
-      onPressIn: () => {
-        if (isOff || isOther) return;
-        flash("volu");
-        fetch(`${TV_TV_URL}/tv/vol/up`).catch(() => {});
-      },
+      onPressIn: () => startVolUpHold(),
+      onPressOut: () => stopVolUpHold(),
     },
     {
       key: "mute",
@@ -1111,45 +1118,28 @@ export default function App() {
       smallText: true,
       bg: () => muteBg,
       onPress: () => {},
-      onPressIn: () => tvCmd("mute"),
+      onPressIn: () => startMuteHold(),
+      onPressOut: () => stopMuteHold(),
     },
-    // Row 5: subs/shows, shows/apps, google
-    layoutOption === "linda"
-      ? {
-          key: "shows",
-          label: "Shows",
-          smallText: true,
-          bg: () => cellBg("white", "shows"),
-          onPress: () => {},
-          onPressIn: () => setShowShows(true),
-        }
-      : {
-          key: "subs",
-          label: "Subs",
-          smallText: true,
-          bg: () => cellBg("white", "subs"),
-          onPress: () => {},
-          onPressIn: () => openSubCtrl(),
-        },
-    layoutOption === "mark"
-      ? {
-          key: "shows",
-          label: "Shows",
-          smallText: true,
-          bg: () => cellBg("white", "shows"),
-          onPress: () => {},
-          onPressIn: () => startShowsHold(),
-          onPressOut: () => stopShowsHold(),
-        }
-      : {
-          key: "stream",
-          label: "Apps",
-          smallText: true,
-          bg: () => cellBg("white", "stream"),
-          onPress: () => {},
-          onPressIn: () => startAppsHold(),
-          onPressOut: () => stopAppsHold(),
-        },
+    // Row 5: shows, apps, google
+    {
+      key: "shows",
+      label: "Shows",
+      smallText: true,
+      bg: () => cellBg("white", "shows"),
+      onPress: () => {},
+      onPressIn: () => startShowsHold(),
+      onPressOut: () => stopShowsHold(),
+    },
+    {
+      key: "stream",
+      label: "Apps",
+      smallText: true,
+      bg: () => cellBg("white", "stream"),
+      onPress: () => {},
+      onPressIn: () => startAppsHold(),
+      onPressOut: () => stopAppsHold(),
+    },
     {
       key: "google",
       label: "Google",

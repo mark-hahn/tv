@@ -440,8 +440,11 @@
       <!-- Row 1: back, up, home -->
       <div
         :style="cellStyle('white', 'back')"
-        @mousedown="tvKey('back')"
-        @touchstart.prevent="tvKey('back')"
+        @mousedown="startBackHold"
+        @mouseup="stopBackHold"
+        @mouseleave="stopBackHold"
+        @touchstart.prevent="startBackHold"
+        @touchend="stopBackHold"
       >
         ↩
       </div>
@@ -457,8 +460,11 @@
       </div>
       <div
         :style="cellStyle('white', 'home')"
-        @mousedown="tvKey('home')"
-        @touchstart.prevent="tvKey('home')"
+        @mousedown="startHomeHold"
+        @mouseup="stopHomeHold"
+        @mouseleave="stopHomeHold"
+        @touchstart.prevent="startHomeHold"
+        @touchend="stopHomeHold"
       >
         <svg
           width="1em"
@@ -482,14 +488,11 @@
       </div>
       <div
         :style="cellStyle('lightgreen', 'ok')"
-        @mousedown="
-          stopRepeat();
-          tvKey('ok');
-        "
-        @touchstart.prevent="
-          stopRepeat();
-          tvKey('ok');
-        "
+        @mousedown="startOkHold"
+        @mouseup="stopOkHold"
+        @mouseleave="stopOkHold"
+        @touchstart.prevent="startOkHold"
+        @touchend="stopOkHold"
       >
         OK
       </div>
@@ -506,7 +509,11 @@
       <!-- Row 3: emby, down, skip -->
       <div
         :style="cellStyle('white', 'emby')"
-        @click="tvCmd('emby')"
+        @mousedown="startEmbyHold"
+        @mouseup="stopEmbyHold"
+        @mouseleave="stopEmbyHold"
+        @touchstart.prevent="startEmbyHold"
+        @touchend="stopEmbyHold"
       >
         Emby
       </div>
@@ -543,23 +550,32 @@
       </div>
       <div
         :style="cellStyle('lightgreen', 'volu')"
-        @mousedown="tvVolCmd('up')"
-        @touchstart.prevent="tvVolCmd('up')"
+        @mousedown="startVolUpHold"
+        @mouseup="stopVolUpHold"
+        @mouseleave="stopVolUpHold"
+        @touchstart.prevent="startVolUpHold"
+        @touchend="stopVolUpHold"
       >
         Vol+
       </div>
       <div
         :style="muteCellStyle"
-        @mousedown="tvCmd('mute')"
-        @touchstart.prevent="tvCmd('mute')"
+        @mousedown="startMuteHold"
+        @mouseup="stopMuteHold"
+        @mouseleave="stopMuteHold"
+        @touchstart.prevent="startMuteHold"
+        @touchend="stopMuteHold"
       >
         Mute
       </div>
       <!-- Row 5: subs, apps, google -->
       <div
         :style="cellStyle('white', 'subs')"
-        @mousedown="openSubCtrl"
-        @touchstart.prevent="openSubCtrl"
+        @mousedown="startSubsHold"
+        @mouseup="stopSubsHold"
+        @mouseleave="stopSubsHold"
+        @touchstart.prevent="startSubsHold"
+        @touchend="stopSubsHold"
       >
         Subs
       </div>
@@ -575,11 +591,11 @@
       </div>
       <div
         :style="modeBtnStyle('google')"
-        @mousedown="startHold(() => googleBtn())"
-        @mouseup="stopHold"
-        @mouseleave="stopHold"
-        @touchstart.prevent="startHold(() => googleBtn())"
-        @touchend="stopHold"
+        @mousedown="startGoogleHold"
+        @mouseup="stopGoogleHold"
+        @mouseleave="stopGoogleHold"
+        @touchstart.prevent="startGoogleHold"
+        @touchend="stopGoogleHold"
       >
         Google
       </div>
@@ -697,6 +713,12 @@ export default {
     evtBus.off("tvRemoteUnlock", this._onTvRemoteUnlock);
     this.stopRepeat();
     this.stopHold();
+    clearTimeout(this._lpDebounceTimer);
+    clearTimeout(this._lpLongTimer);
+    this._lp = null;
+    clearTimeout(this._dbTimer);
+    this._db = null;
+    clearTimeout(this._googleTimer);
     clearInterval(this._subPollTimer);
     clearTimeout(this._avoidTimer);
     clearTimeout(this._unlockHoldTimer);
@@ -832,20 +854,132 @@ export default {
       clearTimeout(this._holdTimer);
     },
 
+    // Shared long-press helper: 100ms debounce then short, 400ms then long
+    _lpStart(shortAction, longAction) {
+      clearTimeout(this._lpDebounceTimer);
+      clearTimeout(this._lpLongTimer);
+      this._lp = { shortAction, longAction, phase: 0 };
+      this._lpDebounceTimer = setTimeout(() => {
+        if (this._lp) this._lp.phase = 1;
+      }, 100);
+      this._lpLongTimer = setTimeout(() => {
+        if (!this._lp) return;
+        const lp = this._lp;
+        this._lp = null;
+        lp.longAction?.();
+      }, 400);
+    },
+
+    _lpStop() {
+      if (!this._lp) return;
+      const lp = this._lp;
+      clearTimeout(this._lpDebounceTimer);
+      clearTimeout(this._lpLongTimer);
+      this._lp = null;
+      if (lp.phase === 0) return;
+      if (lp.phase === 1) lp.shortAction?.();
+    },
+
+    // Shared simple debounce helper: 100ms then action, no long-press
+    _dbStart(action) {
+      clearTimeout(this._dbTimer);
+      this._db = { action };
+      this._dbTimer = setTimeout(() => {
+        if (!this._db) return;
+        const a = this._db.action;
+        this._db = null;
+        a?.();
+      }, 100);
+    },
+
+    _dbStop() {
+      if (!this._db) return;
+      clearTimeout(this._dbTimer);
+      this._db = null;
+    },
+
+    startBackHold() {
+      this._dbStart(() => this.tvKey("back"));
+    },
+    stopBackHold() {
+      this._dbStop();
+    },
+
+    startHomeHold() {
+      this._dbStart(() => this.tvKey("home"));
+    },
+    stopHomeHold() {
+      this._dbStop();
+    },
+
+    startOkHold() {
+      this.stopRepeat();
+      this._dbStart(() => this.tvKey("ok"));
+    },
+    stopOkHold() {
+      this._dbStop();
+    },
+
+    startEmbyHold() {
+      this._lpStart(
+        () => this.tvCmd("emby"),
+        () => {
+          this.flash("emby");
+          this.showStreamers = true;
+        },
+      );
+    },
+    stopEmbyHold() {
+      this._lpStop();
+    },
+
+    startMuteHold() {
+      this._dbStart(() => this.tvCmd("mute"));
+    },
+    stopMuteHold() {
+      this._dbStop();
+    },
+
+    startSubsHold() {
+      this._dbStart(() => this.openSubCtrl());
+    },
+    stopSubsHold() {
+      this._dbStop();
+    },
+
+    startGoogleHold() {
+      this._googleTimer = setTimeout(() => this.googleBtn(), 400);
+    },
+    stopGoogleHold() {
+      clearTimeout(this._googleTimer);
+    },
+
     startVolDownHold() {
-      this._volDownHoldFired = false;
-      this._volDownHoldTimer = setTimeout(() => {
-        this._volDownHoldFired = true;
-        this.openPicCtrl();
-      }, 500);
+      this._lpStart(
+        () => this.tvVolCmd("down"),
+        () => {
+          this.flash("vold");
+          this.openPicCtrl();
+        },
+      );
     },
 
     stopVolDownHold() {
-      clearTimeout(this._volDownHoldTimer);
-      if (!this._volDownHoldFired) {
-        this.tvVolCmd("down");
-      }
-      this._volDownHoldFired = false;
+      this._lpStop();
+    },
+
+    startVolUpHold() {
+      this._lpStart(
+        () => this.tvVolCmd("up"),
+        () => {
+          this.flash("volu");
+          this.openSubCtrl();
+        },
+      );
+    },
+
+    stopVolUpHold() {
+      this._lpStop();
     },
 
     openPicCtrl() {
@@ -1003,47 +1137,36 @@ export default {
     },
 
     startAppsHold() {
-      this._appsHoldActive = true;
-      this._appsHoldFired = false;
-      this._appsHoldTimer = setTimeout(() => {
-        this._appsHoldFired = true;
-        this.flashBtn = "stream";
-      }, 400);
+      this._lpStart(
+        () => {
+          this.flash("stream");
+          this.showStreamers = true;
+        },
+        () => {
+          this.flash("stream");
+          this.fireBtn();
+        },
+      );
     },
 
     stopAppsHold() {
-      clearTimeout(this._appsHoldTimer);
-      if (this._appsHoldActive && !this._appsHoldFired) {
-        this.showStreamers = true;
-      } else if (this._appsHoldFired) {
-        this.flashBtn = null;
-        this.fireBtn();
-      }
-      this._appsHoldActive = false;
-      this._appsHoldFired = false;
+      this._lpStop();
     },
 
     startSkipHold() {
-      this._skipPressedAt = Date.now();
-      this._skipHoldActive = true;
-      this._skipHoldFired = false;
-      this._skipHoldTimer = setTimeout(() => {
-        this._skipHoldFired = true;
-      }, 400);
-    },
-
-    stopSkipHold() {
-      clearTimeout(this._skipHoldTimer);
-      if (this._skipHoldActive && !this._skipHoldFired) {
+      const pressedAt = Date.now();
+      this._dbStart(() => {
         this.flash("skip");
         fetch(`${config.tvSrvrUrl}/api/skipIntro`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pressedAt: this._skipPressedAt }),
+          body: JSON.stringify({ pressedAt }),
         }).catch(() => {});
-      }
-      this._skipHoldActive = false;
-      this._skipHoldFired = false;
+      });
+    },
+
+    stopSkipHold() {
+      this._dbStop();
     },
 
     async fetchSubPlayers() {
@@ -1140,7 +1263,7 @@ export default {
       this.flashBtn = btn;
       setTimeout(() => {
         this.flashBtn = null;
-      }, 500);
+      }, 300);
     },
 
     async googleBtn() {

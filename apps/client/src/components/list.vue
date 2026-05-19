@@ -2890,7 +2890,7 @@ export default {
       // Lightweight version of select(): avoids a full TVDB refresh unless
       // the "Finished" filter needs it.
       let localAllTvdb = null;
-      if (this.fltrChoice === "Finished") {
+      if (this.fltrChoice === "Finished" || this.fltrChoice === "No Intro") {
         if (!allTvdb) allTvdb = await tvdb.getAllTvdb();
         localAllTvdb = allTvdb;
       }
@@ -2917,6 +2917,10 @@ export default {
         if (!allTvdb) allTvdb = await tvdb.getAllTvdb();
         localAllTvdb = allTvdb;
       }
+
+      const prevHighlightIdx = this.highlightName
+        ? this.shows.findIndex((s) => s.name === this.highlightName)
+        : -1;
 
       const filteredShows = [];
       fltrLoop: for (const show of allShows) {
@@ -2957,7 +2961,10 @@ export default {
             continue fltrLoop;
           }
         }
-        if (this.fltrChoice === "No Intro" && show.introDur != null) {
+        if (
+          this.fltrChoice === "No Intro" &&
+          localAllTvdb?.[show.name]?.introDur != null
+        ) {
           continue;
         }
         filteredShows.push(show);
@@ -2980,7 +2987,11 @@ export default {
       }
       this.sortShows();
       if (selectFirstAfterSort && this.shows.length > 0) {
-        this.saveVisShow(this.shows[0]);
+        const idx =
+          prevHighlightIdx >= 0
+            ? Math.min(prevHighlightIdx, this.shows.length - 1)
+            : 0;
+        this.saveVisShow(this.shows[idx]);
       }
       if (scroll) this.scrollToSavedShow();
     },
@@ -3551,6 +3562,7 @@ export default {
           show.noFiles = record.noFiles ?? show.noFiles;
           show.waitStr = record.waitStr ?? show.waitStr;
           if ("notes" in record) show.notes = record.notes;
+          if ("introDur" in record) show.introDur = record.introDur;
         }
 
         // Update allTvdb reference

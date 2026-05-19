@@ -537,7 +537,7 @@ export default function App() {
   };
 
   const startHold = (action) => {
-    holdRef.current = setTimeout(action, 500);
+    holdRef.current = setTimeout(action, 400);
   };
 
   const stopHold = () => {
@@ -573,11 +573,11 @@ export default function App() {
         embyHoldFiredRef.current = true;
         flash("emby");
         if (mode === "google" || mode === "fire") setShowStreamers(true);
-      }, 500);
+      }, 400);
     } else {
       embyHoldRef.current = setTimeout(() => {
         embyHoldFiredRef.current = true;
-      }, 500);
+      }, 400);
     }
   };
 
@@ -601,7 +601,7 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pressedAt }),
       }).catch(() => {});
-    }, 500);
+    }, 400);
   };
 
   const stopAppsHold = () => {
@@ -618,7 +618,7 @@ export default function App() {
     volDownHoldRef.current = setTimeout(() => {
       volDownHoldFiredRef.current = true;
       openPicCtrl();
-    }, 500);
+    }, 400);
   };
 
   const stopVolDownHold = () => {
@@ -764,7 +764,7 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pressedAt }),
       }).catch(() => {});
-    }, 500);
+    }, 400);
   };
 
   const stopShowsHold = () => {
@@ -789,7 +789,7 @@ export default function App() {
     homeHoldRef.current = setTimeout(() => {
       homeHoldFiredRef.current = true;
       toggleLayoutOption();
-    }, 500);
+    }, 400);
   };
 
   const stopHomeHold = () => {

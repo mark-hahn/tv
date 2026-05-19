@@ -729,6 +729,11 @@ export default {
     },
   },
   watch: {
+    introShow(newVal) {
+      if (newVal?.introDur != null) {
+        this.endMark = this.startMark + newVal.introDur;
+      }
+    },
     path(newVal) {
       this._mseStop();
       this.subtitleTracks = [];

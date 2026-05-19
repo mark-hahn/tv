@@ -829,7 +829,7 @@ export default {
     },
 
     startHold(action) {
-      this._holdTimer = setTimeout(action, 500);
+      this._holdTimer = setTimeout(action, 400);
     },
 
     stopHold() {
@@ -1010,8 +1010,9 @@ export default {
       this._embyHoldFired = false;
       this._embyHoldTimer = setTimeout(() => {
         this._embyHoldFired = true;
+        this.flash("emby");
         this.showStreamers = true;
-      }, 500);
+      }, 400);
     },
 
     stopEmbyHold() {
@@ -1028,12 +1029,13 @@ export default {
       this._appsHoldFired = false;
       this._skipIntroTimer = setTimeout(() => {
         this._appsHoldFired = true;
+        this.flash("stream");
         fetch(`${config.tvSrvrUrl}/api/skipIntro`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ pressedAt }),
         }).catch(() => {});
-      }, 500);
+      }, 400);
     },
 
     stopAppsHold() {
@@ -1136,7 +1138,7 @@ export default {
       this.flashBtn = btn;
       setTimeout(() => {
         this.flashBtn = null;
-      }, 150);
+      }, 500);
     },
 
     async googleBtn() {

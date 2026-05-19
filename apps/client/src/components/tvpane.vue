@@ -1019,7 +1019,7 @@ export default {
 
     stopAppsHold() {
       clearTimeout(this._skipIntroTimer);
-      if (!this._appsHoldFired) {
+      if (this._appsHoldActive && !this._appsHoldFired) {
         this.showStreamers = true;
       }
       this._appsHoldActive = false;

@@ -1023,14 +1023,17 @@ export default {
     },
 
     startAppsHold() {
+      const pressedAt = Date.now();
       this._appsHoldActive = true;
       this._appsHoldFired = false;
       this._skipIntroTimer = setTimeout(() => {
         this._appsHoldFired = true;
-        fetch(`${config.tvSrvrUrl}/api/skipIntro`, { method: "POST" }).catch(
-          () => {},
-        );
-      }, 300);
+        fetch(`${config.tvSrvrUrl}/api/skipIntro`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pressedAt }),
+        }).catch(() => {});
+      }, 500);
     },
 
     stopAppsHold() {

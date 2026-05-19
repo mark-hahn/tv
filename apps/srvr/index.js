@@ -4968,7 +4968,10 @@ app.post("/api/skipIntro", async (req, res) => {
       res.json({ ok: false, reason: "notPlaying" });
       return;
     }
-    const positionTicks = session.PlayState?.PositionTicks ?? 0;
+    const rawPositionTicks = session.PlayState?.PositionTicks ?? 0;
+    const { pressedAt } = req.body || {};
+    const pressDelay = pressedAt ? Math.max(0, Date.now() - pressedAt) : 0;
+    const positionTicks = Math.max(0, rawPositionTicks - pressDelay * 10000);
     const showName =
       session.NowPlayingItem.SeriesName || session.NowPlayingItem.Name;
     const allTvdb = tvdb.getAllTvdbSync();

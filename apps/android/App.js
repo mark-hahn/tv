@@ -474,7 +474,7 @@ export default function App() {
 
   const flash = (btn) => {
     setFlashBtn(btn);
-    setTimeout(() => setFlashBtn(null), 150);
+    setTimeout(() => setFlashBtn(null), 500);
   };
 
   const notifyAction = (fromSubCtrl = false) => {
@@ -571,12 +571,13 @@ export default function App() {
     if (layoutOption === "mark") {
       embyHoldRef.current = setTimeout(() => {
         embyHoldFiredRef.current = true;
+        flash("emby");
         if (mode === "google" || mode === "fire") setShowStreamers(true);
       }, 500);
     } else {
       embyHoldRef.current = setTimeout(() => {
         embyHoldFiredRef.current = true;
-      }, 1000);
+      }, 500);
     }
   };
 
@@ -590,18 +591,23 @@ export default function App() {
   };
 
   const startAppsHold = () => {
+    const pressedAt = Date.now();
     appsHoldFiredRef.current = false;
     appsHoldRef.current = setTimeout(() => {
       appsHoldFiredRef.current = true;
-      fetch(`${TV_SRVR_HTTP_URL}/api/skipIntro`, { method: "POST" }).catch(
-        () => {},
-      );
-    }, 300);
+      flash("stream");
+      fetch(`${TV_SRVR_HTTP_URL}/api/skipIntro`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pressedAt }),
+      }).catch(() => {});
+    }, 500);
   };
 
   const stopAppsHold = () => {
     clearTimeout(appsHoldRef.current);
     if (!appsHoldFiredRef.current) {
+      flash("stream");
       if (mode === "google" || mode === "fire") setShowStreamers(true);
     }
     appsHoldFiredRef.current = false;
@@ -748,18 +754,23 @@ export default function App() {
   const showsHoldFiredRef = useRef(false);
 
   const startShowsHold = () => {
+    const pressedAt = Date.now();
     showsHoldFiredRef.current = false;
     showsHoldRef.current = setTimeout(() => {
       showsHoldFiredRef.current = true;
-      fetch(`${TV_SRVR_HTTP_URL}/api/skipIntro`, { method: "POST" }).catch(
-        () => {},
-      );
-    }, 300);
+      flash("shows");
+      fetch(`${TV_SRVR_HTTP_URL}/api/skipIntro`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pressedAt }),
+      }).catch(() => {});
+    }, 500);
   };
 
   const stopShowsHold = () => {
     clearTimeout(showsHoldRef.current);
     if (!showsHoldFiredRef.current) {
+      flash("shows");
       setShowShows(true);
     }
     showsHoldFiredRef.current = false;
@@ -778,7 +789,7 @@ export default function App() {
     homeHoldRef.current = setTimeout(() => {
       homeHoldFiredRef.current = true;
       toggleLayoutOption();
-    }, 2000);
+    }, 500);
   };
 
   const stopHomeHold = () => {

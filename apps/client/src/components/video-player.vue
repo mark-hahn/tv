@@ -219,6 +219,24 @@
           &gt;&gt;
         </div>
         <div
+          @click.stop="clickIntroZero"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(0, 0, 0, 0.5);
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 6px;
+          "
+        >
+          0
+        </div>
+        <div
           @click.stop="clickIntroPre"
           style="
             color: white;
@@ -239,7 +257,6 @@
         <div
           @click.stop="clickIntroStart"
           style="
-            color: white;
             font-size: 13px;
             padding: 2px 8px;
             border-radius: 4px;
@@ -253,6 +270,7 @@
             text-align: center;
             margin-right: 6px;
           "
+          :style="{ color: startMark < 2000 ? 'yellow' : 'white' }"
         >
           {{ fmtTime(startMark) }}
         </div>
@@ -1054,6 +1072,18 @@ export default {
       const vid = this.$refs.vid;
       if (vid) vid.currentTime += 30;
     },
+    clickIntroZero() {
+      if (this.startMark < 2000) {
+        // toggle back to positive: restore default startMark
+        this.startMark = 3 * 60 * 1000;
+      } else {
+        // toggle to negative: intro starts at beginning
+        this.startMark = 0;
+        const vid = this.$refs.vid;
+        if (vid) vid.currentTime = 0;
+      }
+      this._saveIntroDur();
+    },
     clickIntroPre() {
       const vid = this.$refs.vid;
       if (!vid) return;
@@ -1077,8 +1107,12 @@ export default {
     clickIntroTest() {
       const vid = this.$refs.vid;
       if (!vid) return;
+      if (this.startMark < 2000) {
+        vid.currentTime = 0;
+      }
       const targetSec =
-        vid.currentTime + Math.max(0, this.endMark - this.startMark) / 1000;
+        (this.startMark < 2000 ? 0 : vid.currentTime) +
+        Math.max(0, this.endMark - this.startMark) / 1000;
       this._seekWithConfirm(targetSec);
     },
     _saveIntroDur() {

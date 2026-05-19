@@ -5136,6 +5136,7 @@ let lastNowPlayingList = [];
 let lastPlayingKey = null; // "showName|season|episode" of the last playing item
 let lastMissingEpWarning = null;
 let lastLivingRoomWasPlaying = false;
+let lastAutoSkipKey = null; // "showName|season|episode" of last auto-skipped episode
 
 app.post("/internal/nowPlaying", (req, res) => {
   const { showName, playing } = req.body;
@@ -5157,17 +5158,19 @@ app.post("/internal/nowPlaying", (req, res) => {
     isNowPlaying &&
     (lrtv.positionTicks ?? 0) < 3 * 1000 * 10000
   ) {
+    const skipKey = `${lrtv.showName}|${lrtv.season}|${lrtv.episode}`;
     const allTvdb = tvdb.getAllTvdbSync();
     const record = allTvdb?.[lrtv.showName];
-    if (record?.introDur < 0) {
-      doSkipIntro(null).catch((e) =>
-        console.error("[autoSkip] error:", e.message),
-      );
-      console.log(
-        `[autoSkip] ${lrtv.showName} S${lrtv.season}E${lrtv.episode} pos=${Math.round((lrtv.positionTicks ?? 0) / 10000)}ms`,
-      );
+    if (record?.introDur < 0 && skipKey !== lastAutoSkipKey) {
+      lastAutoSkipKey = skipKey;
+      setTimeout(() => {
+        doSkipIntro(null).catch((e) =>
+          console.error("[autoSkip] error:", e.message),
+        );
+      }, 2000);
     }
   }
+  if (!isNowPlaying) lastAutoSkipKey = null;
   lastLivingRoomWasPlaying = isNowPlaying;
 
   checkMissingEpisodes(lastNowPlayingList).catch(() => {});

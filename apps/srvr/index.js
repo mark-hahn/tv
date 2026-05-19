@@ -4999,7 +4999,9 @@ async function doSkipIntro(pressedAt) {
     console.log(`[skipIntro] no introDur for show: ${showName}`);
     return { ok: false, reason: "noIntroDur" };
   }
-  const newTicks = positionTicks + Math.max(0, introDur - 1000) * 10000;
+  const newTicks = Math.round(
+    positionTicks + Math.max(0, introDur - 1000) * 10000,
+  );
   console.log(
     `[skipIntro] show=${showName} pressDelay=${pressDelay}ms rawPos=${Math.round(rawPositionTicks / 10000)}ms newPos=${Math.round(newTicks / 10000)}ms`,
   );
@@ -5007,9 +5009,34 @@ async function doSkipIntro(pressedAt) {
     `${EMBY_BASE_URL}/Sessions/${session.Id}/Playing/seek?SeekPositionTicks=${newTicks}&api_key=${EMBY_API_KEY}`,
     { method: "POST", headers: { Accept: "application/json" } },
   );
-  if (!seekRes.ok) {
-    console.log(`[skipIntro] seek failed: ${seekRes.status}`);
-    return { ok: false, error: `seek ${seekRes.status}` };
+  let lastSeekRes = seekRes;
+  let retrySessionId = session.Id;
+  for (let attempt = 0; attempt < 4 && lastSeekRes.status === 500; attempt++) {
+    console.log(
+      `[skipIntro] seek 500, retrying in 2s (attempt ${attempt + 1})`,
+    );
+    await new Promise((r) => setTimeout(r, 2000));
+    // Re-fetch session — ID may change as Emby initializes playback
+    const resSess = await fetch(
+      `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
+      { headers: { Accept: "application/json" } },
+    );
+    if (resSess.ok) {
+      const resSessions = await resSess.json();
+      const reSess = resSessions.find(
+        (s) => s.NowPlayingItem && s.DeviceName === "Living Room TV",
+      );
+      if (reSess) retrySessionId = reSess.Id;
+    }
+    lastSeekRes = await fetch(
+      `${EMBY_BASE_URL}/Sessions/${retrySessionId}/Playing/seek?SeekPositionTicks=${newTicks}&api_key=${EMBY_API_KEY}`,
+      { method: "POST", headers: { Accept: "application/json" } },
+    );
+  }
+  if (!lastSeekRes.ok) {
+    console.log(`[skipIntro] seek failed: ${lastSeekRes.status}`);
+    );
+    return { ok: false, error: `seek ${lastSeekRes.status}` };
   }
   return { ok: true };
 }

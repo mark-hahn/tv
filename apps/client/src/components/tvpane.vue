@@ -854,14 +854,14 @@ export default {
       clearTimeout(this._holdTimer);
     },
 
-    // Shared long-press helper: 100ms debounce then short, 400ms then long
+    // Shared long-press helper: 70ms debounce then short, 400ms then long
     _lpStart(shortAction, longAction) {
       clearTimeout(this._lpDebounceTimer);
       clearTimeout(this._lpLongTimer);
       this._lp = { shortAction, longAction, phase: 0 };
       this._lpDebounceTimer = setTimeout(() => {
         if (this._lp) this._lp.phase = 1;
-      }, 100);
+      }, 70);
       this._lpLongTimer = setTimeout(() => {
         if (!this._lp) return;
         const lp = this._lp;
@@ -880,7 +880,7 @@ export default {
       if (lp.phase === 1) lp.shortAction?.();
     },
 
-    // Shared simple debounce helper: 100ms then action, no long-press
+    // Shared simple debounce helper: 70ms then action, no long-press
     _dbStart(action) {
       clearTimeout(this._dbTimer);
       this._db = { action };
@@ -889,7 +889,7 @@ export default {
         const a = this._db.action;
         this._db = null;
         a?.();
-      }, 100);
+      }, 70);
     },
 
     _dbStop() {

@@ -549,13 +549,13 @@ export default function App() {
     clearTimeout(holdRef.current);
   };
 
-  // Shared long-press: 100ms debounce → short; 400ms → long
+  // Shared long-press: 70ms debounce → short; 400ms → long
   const lpStart = (shortAction, longAction) => {
     const lp = { shortAction, longAction, phase: 0 };
     lpRef.current = lp;
     lp.debounceTimer = setTimeout(() => {
       if (lpRef.current === lp) lp.phase = 1;
-    }, 100);
+    }, 70);
     lp.longTimer = setTimeout(() => {
       if (lpRef.current !== lp) return;
       lpRef.current = null;
@@ -573,7 +573,7 @@ export default function App() {
     if (lp.phase === 1) lp.shortAction?.();
   };
 
-  // Shared simple debounce: 100ms → action, no long-press
+  // Shared simple debounce: 70ms → action, no long-press
   const dbRef = useRef(null);
   const dbStart = (action) => {
     clearTimeout(dbRef.current?.timer);
@@ -583,7 +583,7 @@ export default function App() {
       if (dbRef.current !== db) return;
       dbRef.current = null;
       action?.();
-    }, 100);
+    }, 70);
   };
 
   const dbStop = () => {

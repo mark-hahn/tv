@@ -4065,12 +4065,25 @@ app.get("/api/stream", async (req, res) => {
   }
 
   try {
-    const probeOut = cp
-      .execSync(
-        `ffprobe -v quiet -analyzeduration 100000 -probesize 100000 -print_format json -show_streams "${resolved.replace(/"/g, '\\"')}"`,
-        { maxBuffer: 2 * 1024 * 1024 },
-      )
-      .toString();
+    const probeResult = cp.spawnSync(
+      "ffprobe",
+      [
+        "-v",
+        "quiet",
+        "-analyzeduration",
+        "100000",
+        "-probesize",
+        "100000",
+        "-print_format",
+        "json",
+        "-show_streams",
+        resolved,
+      ],
+      { maxBuffer: 2 * 1024 * 1024 },
+    );
+    if (probeResult.status !== 0)
+      throw new Error(probeResult.stderr?.toString() || "ffprobe failed");
+    const probeOut = probeResult.stdout.toString();
     const streams = JSON.parse(probeOut).streams || [];
     const videoCodec = streams.find(
       (s) => s.codec_type === "video",
@@ -4932,7 +4945,7 @@ app.get("/api/introFirstFile", async (req, res) => {
       res.json({ ok: false });
       return;
     }
-    const sorted = [...seriesMap].sort((a, b) => a[0] - b[0]);
+    const sorted = [...seriesMap].sort((a, b) => b[0] - a[0]);
     for (const [, episodes] of sorted) {
       const sortedEps = [...episodes].sort((a, b) => a[0] - b[0]);
       for (const [, ep] of sortedEps) {

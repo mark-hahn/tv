@@ -5000,7 +5000,7 @@ async function doSkipIntro(pressedAt) {
     return { ok: false, reason: "noIntroDur" };
   }
   const newTicks = Math.round(
-    positionTicks + Math.max(0, introDur - 1000) * 10000,
+    positionTicks + Math.max(0, Math.abs(introDur) - 1000) * 10000,
   );
   console.log(
     `[skipIntro] show=${showName} pressDelay=${pressDelay}ms rawPos=${Math.round(rawPositionTicks / 10000)}ms newPos=${Math.round(newTicks / 10000)}ms`,
@@ -5135,6 +5135,7 @@ let lastNowPlayingShowName = null;
 let lastNowPlayingList = [];
 let lastPlayingKey = null; // "showName|season|episode" of the last playing item
 let lastMissingEpWarning = null;
+let lastLivingRoomWasPlaying = false;
 
 app.post("/internal/nowPlaying", (req, res) => {
   const { showName, playing } = req.body;
@@ -5147,6 +5148,28 @@ app.post("/internal/nowPlaying", (req, res) => {
   });
   view.recordNowPlaying(lastNowPlayingShowName);
   res.json({ ok: true });
+
+  // Auto-skip: detect not-playing -> playing from start
+  const lrtv = lastNowPlayingList.find((p) => p.device === "Living Room TV");
+  const isNowPlaying = !!lrtv;
+  if (
+    !lastLivingRoomWasPlaying &&
+    isNowPlaying &&
+    (lrtv.positionTicks ?? 0) < 3 * 1000 * 10000
+  ) {
+    const allTvdb = tvdb.getAllTvdbSync();
+    const record = allTvdb?.[lrtv.showName];
+    if (record?.introDur < 0) {
+      doSkipIntro(null).catch((e) =>
+        console.error("[autoSkip] error:", e.message),
+      );
+      console.log(
+        `[autoSkip] ${lrtv.showName} S${lrtv.season}E${lrtv.episode} pos=${Math.round((lrtv.positionTicks ?? 0) / 10000)}ms`,
+      );
+    }
+  }
+  lastLivingRoomWasPlaying = isNowPlaying;
+
   checkMissingEpisodes(lastNowPlayingList).catch(() => {});
 });
 
@@ -5161,9 +5184,10 @@ async function checkMissingEpisodes(playing) {
 
     if (!isNew) continue;
 
-    // New episode started — check for unwatched episodes before this one
     const allTvdbData = tvdb.getAllTvdbSync();
     const tvdbRecord = allTvdbData?.[showName];
+
+    // New episode started — check for unwatched episodes before this one
     if (!tvdbRecord?.id) continue;
 
     let seriesMap;

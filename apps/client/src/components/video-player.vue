@@ -731,7 +731,13 @@ export default {
   watch: {
     introShow(newVal) {
       if (newVal?.introDur != null) {
-        this.endMark = this.startMark + newVal.introDur;
+        const dur = Math.abs(newVal.introDur);
+        if (newVal.introDur < 0) {
+          this.startMark = 0;
+          this.endMark = dur;
+        } else {
+          this.endMark = this.startMark + dur;
+        }
       }
     },
     path(newVal) {
@@ -1077,7 +1083,8 @@ export default {
     },
     _saveIntroDur() {
       if (!this.introShow) return;
-      const introDur = Math.max(0, this.endMark - this.startMark);
+      const dur = Math.max(0, this.endMark - this.startMark);
+      const introDur = this.startMark < 2000 ? -dur : dur;
       setTvdbFields({ name: this.introShow.name, introDur }).catch((e) =>
         console.error("[intro] setTvdbFields error:", e),
       );

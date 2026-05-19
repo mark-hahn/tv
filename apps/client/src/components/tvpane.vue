@@ -503,7 +503,7 @@
       >
         ▶
       </div>
-      <!-- Row 3: emby, down, apps -->
+      <!-- Row 3: emby, down, skip -->
       <div
         :style="cellStyle('white', 'emby')"
         @click="tvCmd('emby')"
@@ -521,14 +521,14 @@
         ▼
       </div>
       <div
-        :style="cellStyle('white', 'stream')"
-        @mousedown="startAppsHold"
-        @mouseup="stopAppsHold"
-        @mouseleave="stopAppsHold"
-        @touchstart.prevent="startAppsHold"
-        @touchend="stopAppsHold"
+        :style="cellStyle('white', 'skip')"
+        @mousedown="startSkipHold"
+        @mouseup="stopSkipHold"
+        @mouseleave="stopSkipHold"
+        @touchstart.prevent="startSkipHold"
+        @touchend="stopSkipHold"
       >
-        Apps
+        Skip
       </div>
       <!-- Row 4: vol-, vol+, mute -->
       <div
@@ -555,7 +555,7 @@
       >
         Mute
       </div>
-      <!-- Row 5: subs, fire, google -->
+      <!-- Row 5: subs, apps, google -->
       <div
         :style="cellStyle('white', 'subs')"
         @mousedown="openSubCtrl"
@@ -564,14 +564,14 @@
         Subs
       </div>
       <div
-        :style="modeBtnStyle('fire')"
-        @mousedown="startHold(() => fireBtn())"
-        @mouseup="stopHold"
-        @mouseleave="stopHold"
-        @touchstart.prevent="startHold(() => fireBtn())"
-        @touchend="stopHold"
+        :style="cellStyle('white', 'stream')"
+        @mousedown="startAppsHold"
+        @mouseup="stopAppsHold"
+        @mouseleave="stopAppsHold"
+        @touchstart.prevent="startAppsHold"
+        @touchend="stopAppsHold"
       >
-        Fire
+        Apps
       </div>
       <div
         :style="modeBtnStyle('google')"
@@ -1003,27 +1003,44 @@ export default {
     },
 
     startAppsHold() {
-      const pressedAt = Date.now();
       this._appsHoldActive = true;
       this._appsHoldFired = false;
-      this._skipIntroTimer = setTimeout(() => {
+      this._appsHoldTimer = setTimeout(() => {
         this._appsHoldFired = true;
-        this.flash("stream");
-        fetch(`${config.tvSrvrUrl}/api/skipIntro`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pressedAt }),
-        }).catch(() => {});
+        this.fireBtn();
       }, 400);
     },
 
     stopAppsHold() {
-      clearTimeout(this._skipIntroTimer);
+      clearTimeout(this._appsHoldTimer);
       if (this._appsHoldActive && !this._appsHoldFired) {
         this.showStreamers = true;
       }
       this._appsHoldActive = false;
       this._appsHoldFired = false;
+    },
+
+    startSkipHold() {
+      this._skipPressedAt = Date.now();
+      this._skipHoldActive = true;
+      this._skipHoldFired = false;
+      this._skipHoldTimer = setTimeout(() => {
+        this._skipHoldFired = true;
+      }, 400);
+    },
+
+    stopSkipHold() {
+      clearTimeout(this._skipHoldTimer);
+      if (this._skipHoldActive && !this._skipHoldFired) {
+        this.flash("skip");
+        fetch(`${config.tvSrvrUrl}/api/skipIntro`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pressedAt: this._skipPressedAt }),
+        }).catch(() => {});
+      }
+      this._skipHoldActive = false;
+      this._skipHoldFired = false;
     },
 
     async fetchSubPlayers() {

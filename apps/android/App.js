@@ -591,15 +591,10 @@ export default function App() {
   };
 
   const startAppsHold = () => {
-    const pressedAt = Date.now();
     appsHoldFiredRef.current = false;
     appsHoldRef.current = setTimeout(() => {
       appsHoldFiredRef.current = true;
-      flash("stream");
-      const ws = wsRef.current;
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ fname: "skipIntro", param: { pressedAt } }));
-      }
+      fireBtn();
     }, 400);
   };
 
@@ -753,15 +748,10 @@ export default function App() {
   const showsHoldFiredRef = useRef(false);
 
   const startShowsHold = () => {
-    const pressedAt = Date.now();
     showsHoldFiredRef.current = false;
     showsHoldRef.current = setTimeout(() => {
       showsHoldFiredRef.current = true;
-      flash("shows");
-      const ws = wsRef.current;
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ fname: "skipIntro", param: { pressedAt } }));
-      }
+      fireBtn();
     }, 400);
   };
 
@@ -772,6 +762,35 @@ export default function App() {
       setShowShows(true);
     }
     showsHoldFiredRef.current = false;
+  };
+
+  const skipHoldRef = useRef(null);
+  const skipHoldFiredRef = useRef(false);
+  const skipPressedAtRef = useRef(null);
+
+  const startSkipHold = () => {
+    skipPressedAtRef.current = Date.now();
+    skipHoldFiredRef.current = false;
+    skipHoldRef.current = setTimeout(() => {
+      skipHoldFiredRef.current = true;
+    }, 400);
+  };
+
+  const stopSkipHold = () => {
+    clearTimeout(skipHoldRef.current);
+    if (!skipHoldFiredRef.current) {
+      flash("skip");
+      const ws = wsRef.current;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(
+          JSON.stringify({
+            fname: "skipIntro",
+            param: { pressedAt: skipPressedAtRef.current },
+          }),
+        );
+      }
+    }
+    skipHoldFiredRef.current = false;
   };
 
   const toggleLayoutOption = async () => {
@@ -1031,7 +1050,7 @@ export default function App() {
       onPressIn: () => startRepeat("right"),
       onPressOut: stopRepeat,
     },
-    // Row 3: emby, down, keyboard (A — no action in web version)
+    // Row 3: emby, down, skip
     {
       key: "emby",
       label: "Emby",
@@ -1049,25 +1068,15 @@ export default function App() {
       onPressIn: () => startRepeat("down"),
       onPressOut: stopRepeat,
     },
-    layoutOption === "mark"
-      ? {
-          key: "shows",
-          label: "Shows",
-          smallText: true,
-          bg: () => cellBg("white", "shows"),
-          onPress: () => {},
-          onPressIn: () => startShowsHold(),
-          onPressOut: () => stopShowsHold(),
-        }
-      : {
-          key: "stream",
-          label: "Apps",
-          smallText: true,
-          bg: () => cellBg("white", "stream"),
-          onPress: () => {},
-          onPressIn: () => startAppsHold(),
-          onPressOut: () => stopAppsHold(),
-        },
+    {
+      key: "skip",
+      label: "Skip",
+      smallText: true,
+      bg: () => cellBg("white", "skip"),
+      onPress: () => {},
+      onPressIn: () => startSkipHold(),
+      onPressOut: () => stopSkipHold(),
+    },
     // Row 4: vol-, vol+, mute
     {
       key: "vold",
@@ -1098,7 +1107,7 @@ export default function App() {
       onPress: () => {},
       onPressIn: () => tvCmd("mute"),
     },
-    // Row 5: subs, fire, google
+    // Row 5: subs/shows, shows/apps, google
     layoutOption === "linda"
       ? {
           key: "shows",
@@ -1116,15 +1125,25 @@ export default function App() {
           onPress: () => {},
           onPressIn: () => openSubCtrl(),
         },
-    {
-      key: "fire",
-      label: "Fire",
-      tinyText: true,
-      bg: () => modeBg("fire"),
-      onPress: () => {},
-      onPressIn: () => startHold(() => fireBtn()),
-      onPressOut: stopHold,
-    },
+    layoutOption === "mark"
+      ? {
+          key: "shows",
+          label: "Shows",
+          smallText: true,
+          bg: () => cellBg("white", "shows"),
+          onPress: () => {},
+          onPressIn: () => startShowsHold(),
+          onPressOut: () => stopShowsHold(),
+        }
+      : {
+          key: "stream",
+          label: "Apps",
+          smallText: true,
+          bg: () => cellBg("white", "stream"),
+          onPress: () => {},
+          onPressIn: () => startAppsHold(),
+          onPressOut: () => stopAppsHold(),
+        },
     {
       key: "google",
       label: "Google",

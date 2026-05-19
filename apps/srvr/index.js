@@ -4999,8 +4999,9 @@ async function doSkipIntro(pressedAt) {
     console.log(`[skipIntro] no introDur for show: ${showName}`);
     return { ok: false, reason: "noIntroDur" };
   }
+  const basePositionTicks = introDur < 0 ? 0 : positionTicks;
   const newTicks = Math.round(
-    positionTicks + Math.max(0, Math.abs(introDur) - 1000) * 10000,
+    basePositionTicks + Math.max(0, Math.abs(introDur) - 1000) * 10000,
   );
   console.log(
     `[skipIntro] show=${showName} pressDelay=${pressDelay}ms rawPos=${Math.round(rawPositionTicks / 10000)}ms newPos=${Math.round(newTicks / 10000)}ms`,

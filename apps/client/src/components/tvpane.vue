@@ -503,14 +503,10 @@
       >
         ▶
       </div>
-      <!-- Row 3: emby, down, shows -->
+      <!-- Row 3: emby, down, apps -->
       <div
         :style="cellStyle('white', 'emby')"
-        @mousedown="startEmbyHold"
-        @mouseup="stopEmbyHold"
-        @mouseleave="stopEmbyHold"
-        @touchstart.prevent="startEmbyHold"
-        @touchend="stopEmbyHold"
+        @click="tvCmd('emby')"
       >
         Emby
       </div>
@@ -532,7 +528,7 @@
         @touchstart.prevent="startAppsHold"
         @touchend="stopAppsHold"
       >
-        Shows
+        Apps
       </div>
       <!-- Row 4: vol-, vol+, mute -->
       <div
@@ -1006,23 +1002,6 @@ export default {
       }
     },
 
-    startEmbyHold() {
-      this._embyHoldFired = false;
-      this._embyHoldTimer = setTimeout(() => {
-        this._embyHoldFired = true;
-        this.flash("emby");
-        this.showStreamers = true;
-      }, 400);
-    },
-
-    stopEmbyHold() {
-      clearTimeout(this._embyHoldTimer);
-      if (!this._embyHoldFired) {
-        this.tvCmd("emby");
-      }
-      this._embyHoldFired = false;
-    },
-
     startAppsHold() {
       const pressedAt = Date.now();
       this._appsHoldActive = true;
@@ -1040,6 +1019,9 @@ export default {
 
     stopAppsHold() {
       clearTimeout(this._skipIntroTimer);
+      if (!this._appsHoldFired) {
+        this.showStreamers = true;
+      }
       this._appsHoldActive = false;
       this._appsHoldFired = false;
     },

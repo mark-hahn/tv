@@ -1007,7 +1007,7 @@ export default {
       this._appsHoldFired = false;
       this._appsHoldTimer = setTimeout(() => {
         this._appsHoldFired = true;
-        this.fireBtn();
+        this.flashBtn = "stream";
       }, 400);
     },
 
@@ -1015,6 +1015,9 @@ export default {
       clearTimeout(this._appsHoldTimer);
       if (this._appsHoldActive && !this._appsHoldFired) {
         this.showStreamers = true;
+      } else if (this._appsHoldFired) {
+        this.flashBtn = null;
+        this.fireBtn();
       }
       this._appsHoldActive = false;
       this._appsHoldFired = false;

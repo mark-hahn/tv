@@ -594,7 +594,7 @@ export default function App() {
     appsHoldFiredRef.current = false;
     appsHoldRef.current = setTimeout(() => {
       appsHoldFiredRef.current = true;
-      fireBtn();
+      setFlashBtn("stream");
     }, 400);
   };
 
@@ -603,6 +603,9 @@ export default function App() {
     if (!appsHoldFiredRef.current) {
       flash("stream");
       if (mode === "google" || mode === "fire") setShowStreamers(true);
+    } else {
+      setFlashBtn(null);
+      fireBtn();
     }
     appsHoldFiredRef.current = false;
   };
@@ -751,7 +754,7 @@ export default function App() {
     showsHoldFiredRef.current = false;
     showsHoldRef.current = setTimeout(() => {
       showsHoldFiredRef.current = true;
-      fireBtn();
+      setFlashBtn("shows");
     }, 400);
   };
 
@@ -760,6 +763,9 @@ export default function App() {
     if (!showsHoldFiredRef.current) {
       flash("shows");
       setShowShows(true);
+    } else {
+      setFlashBtn(null);
+      fireBtn();
     }
     showsHoldFiredRef.current = false;
   };

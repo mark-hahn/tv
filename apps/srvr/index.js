@@ -5507,9 +5507,47 @@ async function saveFlexgetHistory() {
   await util.writeFile(FLEXGET_HISTORY_PATH, flexgetHistory);
 }
 
+function parseResolutionStrict(title, quality) {
+  const src = String(title || "") + " " + String(quality || "");
+  if (/2160p/i.test(src)) return 2160;
+  if (/1080p/i.test(src)) return 1080;
+  if (/720p/i.test(src)) return 720;
+  if (/480p/i.test(src)) return 480;
+  return 0; // unknown — do not fall back
+}
+
+function getEpisodeDiskResolution(showPath, season, episode) {
+  try {
+    const sKey = `S${String(season).padStart(2, "0")}`;
+    const eKey = `E${String(episode).padStart(2, "0")}`;
+    const seasonDir = path.join(tvDir, showPath, `Season ${season}`);
+    const files = fs.readdirSync(seasonDir);
+    const videoExts = new Set([".mkv", ".mp4", ".avi", ".m4v"]);
+    const epRe = new RegExp(`${sKey}${eKey}`, "i");
+    for (const f of files) {
+      if (!epRe.test(f)) continue;
+      if (!videoExts.has(path.extname(f).toLowerCase())) continue;
+      if (/2160p/i.test(f)) return 2160;
+      if (/1080p/i.test(f)) return 1080;
+      if (/720p/i.test(f)) return 720;
+      if (/480p/i.test(f)) return 480;
+    }
+    return 0;
+  } catch {
+    return 0;
+  }
+}
+
 async function processFlexgetCandidate(candidate, storeOnly = false) {
   const rawTitle = String(candidate.title || "").trim();
   if (!rawTitle) return;
+
+  // Exact URL dedup — fast path before any expensive TVDB lookup
+  if (candidate.url) {
+    for (const list of Object.values(flexgetHistory)) {
+      if (list.some((c) => c.url === candidate.url)) return;
+    }
+  }
 
   const ptt = parseTorrentTitle(rawTitle.replace(/\.[a-z0-9]{2,4}$/i, ""));
   const showName = ptt?.title;
@@ -5517,6 +5555,10 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
   let episode = ptt?.episode;
   if (!episode && Array.isArray(ptt?.episodes) && ptt.episodes.length)
     episode = ptt.episodes[0];
+  const newRes = parseResolutionStrict(
+    ptt?.resolution || rawTitle,
+    candidate.quality,
+  );
 
   if (!showName || !Number.isInteger(season) || !Number.isInteger(episode))
     return;
@@ -5536,9 +5578,42 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
   const sKey = `S${String(season).padStart(2, "0")}`;
   const eKey = `E${String(episode).padStart(2, "0")}`;
   const histKey = `${matchedName}\x00${sKey}\x00${eKey}`;
-
   const list = flexgetHistory[histKey] || [];
-  if (list.some((c) => c.url === candidate.url)) return; // exact URL deduplicate
+
+  const watchedEpis = rec.watchedEpis || [];
+  const isWatched = watchedEpis.some(
+    (row) => row[0] === season && row.slice(1).includes(episode),
+  );
+  if (isWatched) {
+    if (candidate.url && !list.some((c) => c.url === candidate.url)) {
+      list.push({
+        title: rawTitle,
+        url: candidate.url || null,
+        quality: candidate.quality || null,
+        resolution: ptt?.resolution || null,
+        content_size: candidate.content_size || null,
+        torrent_seeds: candidate.torrent_seeds || null,
+        torrent_leeches: candidate.torrent_leeches || null,
+        proper: candidate.proper || null,
+        release_group: candidate.release_group || null,
+        task: candidate.task || null,
+        regexp: candidate.regexp || null,
+        provider: String(candidate.url || "").includes("iptorrents.com")
+          ? "ipt"
+          : String(candidate.url || "").includes("torrentleech.org")
+            ? "tl"
+            : null,
+        sent: null,
+        addedAt: flexgetFmtSent(),
+      });
+      flexgetHistory[histKey] = list;
+      await saveFlexgetHistory();
+    }
+    console.log(
+      `[flexget] SKIP(watched) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
+    );
+    return;
+  }
 
   const normTitle = (t) =>
     String(t || "")
@@ -5618,21 +5693,41 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
     return flexgetIsBetterCrossRun(c, best) ? c : best;
   }, null);
 
-  const watchedEpis = rec.watchedEpis || [];
-  const isWatched = watchedEpis.some(
+  const filesOnDisk = rec.filesOnDisk || [];
+  const episodeOnDisk = filesOnDisk.some(
     (row) => row[0] === season && row.slice(1).includes(episode),
   );
+  const diskRes =
+    episodeOnDisk && rec.path
+      ? getEpisodeDiskResolution(rec.path, season, episode)
+      : 0;
 
   if (storeOnly) {
     console.log(
       `[flexget] SKIP(run-loser) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
     );
-  } else if (!lastSent) {
-    if (isWatched) {
+  } else if (episodeOnDisk) {
+    if (!newRes) {
       console.log(
-        `[flexget] SKIP(watched) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
+        `[flexget] SKIP(no-resolution) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
+      );
+    } else if (diskRes >= newRes) {
+      console.log(
+        `[flexget] SKIP(disk-${diskRes}p>=new-${newRes}p) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
       );
     } else if (newCandidate.url) {
+      try {
+        await addUrlToQbt(newCandidate.url);
+        newCandidate.sent = flexgetFmtSent();
+        console.log(
+          `[flexget] SENT(upgrade-${diskRes}p->${newRes}p) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
+        );
+      } catch (e) {
+        console.error(`[flexget] qbt add failed for "${rawTitle}":`, e.message);
+      }
+    }
+  } else if (!lastSent) {
+    if (newCandidate.url) {
       try {
         await addUrlToQbt(newCandidate.url);
         newCandidate.sent = flexgetFmtSent();
@@ -5644,11 +5739,7 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
       }
     }
   } else if (flexgetIsBetterCrossRun(newCandidate, lastSent)) {
-    if (isWatched) {
-      console.log(
-        `[flexget] SKIP(watched) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
-      );
-    } else if (newCandidate.url) {
+    if (newCandidate.url) {
       try {
         await addUrlToQbt(newCandidate.url);
         newCandidate.sent = flexgetFmtSent();

@@ -11,7 +11,9 @@ const args = process.argv.slice(2);
 if (args.length < 2) {
   console.error("Usage: ./seek2 <scrubInterval_secs> <scrubDist_secs>");
   console.error("  scrubInterval: pause after frame (still-frame hold time)");
-  console.error("  scrubDist:     jump distance in seconds (negative = backward)");
+  console.error(
+    "  scrubDist:     jump distance in seconds (negative = backward)",
+  );
   process.exit(1);
 }
 const d3ms = parseFloat(args[0]) * 1000;

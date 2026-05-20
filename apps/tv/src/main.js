@@ -177,12 +177,13 @@ async function getBraviaSetting(target) {
 }
 
 async function setBraviaSetting(target, value) {
+  const strValue = String(value);
   const resp = await fetch(BRAVIA_PICTURE_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Auth-PSK": BRAVIA_PSK },
     body: JSON.stringify({
       method: "setPictureQualitySettings",
-      params: [{ settings: [{ target, value }] }],
+      params: [{ settings: [{ target, value: strValue }] }],
       id: 1,
       version: "1.0",
     }),
@@ -193,21 +194,23 @@ async function setBraviaSetting(target, value) {
 
 function calcSharpness(streams) {
   const video = streams?.find((s) => s.Type === "Video");
-  if (!video) return 40;
+  if (!video) return 0;
   const height = video.Height ?? 0;
   if (height > 1080) return 100;
-  if (height > 720) return 80;
-  return 40;
+  if (height >= 720) return 60;
+  if (height >= 480) return 20;
+  return 0;
 }
 
-async function autoSetForItem(itemId) {
+async function autoSetForItem(itemId, streamsArg) {
   try {
     const entry = hdrByItemId[itemId];
     const hdrOverride = entry?.hdrMode;
     const sharpOverride = entry?.sharpness;
-    const needStreams = hdrOverride === undefined || sharpOverride === undefined;
+    const needStreams =
+      (hdrOverride === undefined || sharpOverride === undefined) && !streamsArg;
 
-    let streams = [];
+    let streams = streamsArg ?? [];
     if (needStreams) {
       const itemRes = await fetch(
         `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${itemId}?Fields=MediaSources&api_key=${EMBY_API_KEY}`,
@@ -229,16 +232,13 @@ async function autoSetForItem(itemId) {
     } else {
       const hdrType = calcHdrType(streams);
       desiredHdr = hdrTypeToSetting(hdrType);
-      log(`autoSetForItem: item=${itemId} hdrType=${hdrType} desired hdrMode=${desiredHdr}`);
+      log(
+        `autoSetForItem: item=${itemId} hdrType=${hdrType} desired hdrMode=${desiredHdr}`,
+      );
     }
     if (desiredHdr !== "anything") {
-      const currentHdr = await getBraviaSetting("hdrMode");
-      if (currentHdr !== desiredHdr) {
-        await setBraviaSetting("hdrMode", desiredHdr);
-        log(`autoSetForItem: set hdrMode=${desiredHdr}`);
-      } else {
-        log(`autoSetForItem: hdrMode already ${currentHdr}`);
-      }
+      await setBraviaSetting("hdrMode", desiredHdr);
+      log(`autoSetForItem: set hdrMode=${desiredHdr}`);
     }
 
     // Sharpness
@@ -250,13 +250,8 @@ async function autoSetForItem(itemId) {
       desiredSharp = calcSharpness(streams);
       log(`autoSetForItem: item=${itemId} desired sharpness=${desiredSharp}`);
     }
-    const currentSharp = await getBraviaSetting("sharpness");
-    if (currentSharp !== desiredSharp) {
-      await setBraviaSetting("sharpness", desiredSharp);
-      log(`autoSetForItem: set sharpness=${desiredSharp}`);
-    } else {
-      log(`autoSetForItem: sharpness already ${currentSharp}`);
-    }
+    await setBraviaSetting("sharpness", desiredSharp);
+    log(`autoSetForItem: set sharpness=${desiredSharp}`);
   } catch (err) {
     loge(`autoSetForItem error: ${err.message}`);
   }
@@ -272,12 +267,11 @@ function handleEmbySession(s) {
   const itemId = s.NowPlayingItem?.Id ?? null;
   const remoteCtrl = s.SupportsRemoteControl ?? false;
   const paused = s.PlayState?.IsPaused ?? null;
+  const positionTicks = s.PlayState?.PositionTicks ?? 0;
+  const streams = s.NowPlayingItem?.MediaStreams ?? [];
   const prev = prevSessions[device];
   const prevItemId = prev?.itemId ?? null;
-  if (itemId !== null && itemId !== prevItemId) {
-    log(`autoSetForItem triggered: new item ${itemId}`);
-    autoSetForItem(itemId);
-  }
+
   if (prev) {
     const changed =
       (prev.playing === null && playing !== null) ||
@@ -288,7 +282,36 @@ function handleEmbySession(s) {
       log(`activeDevice: ${device}`);
     }
   }
-  prevSessions[device] = { playing, itemId, remoteCtrl, paused };
+
+  // Track transition from not-playing to playing.
+  // pendingAutoSetItemId is set when we see null→item transition; cleared once fired.
+  let pendingAutoSetItemId = prev?.pendingAutoSetItemId ?? null;
+  if (prevItemId === null && itemId !== null) {
+    pendingAutoSetItemId = itemId;
+  } else if (itemId === null) {
+    pendingAutoSetItemId = null;
+  }
+
+  if (
+    pendingAutoSetItemId !== null &&
+    itemId === pendingAutoSetItemId &&
+    positionTicks > 0
+  ) {
+    log(
+      `autoSetForItem triggered: item ${itemId} positionTicks=${positionTicks}`,
+    );
+    autoSetForItem(itemId, streams);
+    pendingAutoSetItemId = null;
+  }
+
+  prevSessions[device] = {
+    playing,
+    itemId,
+    remoteCtrl,
+    paused,
+    streams,
+    pendingAutoSetItemId,
+  };
 }
 
 const DEVICE_PRIORITY = [

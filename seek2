@@ -1,10 +1,23 @@
 #!/usr/bin/env node
 
-// Hard-wired seek test script — no args.
-// Edit the TEST section below to try different sequences.
+// Usage: ./seek2 <scrubInterval_secs> <scrubDist_secs>
+//   Sequence per iteration:
+//     pause → seek → pause → [scrubInterval] → (repeat)
+//   scrubDist_secs: jump distance in seconds (negative = backward)
 
 const TV_TV_URL = "https://hahnca.com/tv-tv";
-const DIST_TICKS = 10 * 1000 * 10000; // 10 seconds forward
+
+const args = process.argv.slice(2);
+if (args.length < 2) {
+  console.error("Usage: ./seek2 <scrubInterval_secs> <scrubDist_secs>");
+  console.error("  scrubInterval: pause after frame (still-frame hold time)");
+  console.error("  scrubDist:     jump distance in seconds (negative = backward)");
+  process.exit(1);
+}
+const d3ms = parseFloat(args[0]) * 1000;
+const DIST_TICKS = parseFloat(args[1]) * 10_000_000;
+console.log(`scrubInterval: ${args[0]}s`);
+console.log(`scrubDist:     ${args[1]}s`);
 
 const ts = () => {
   const d = new Date();
@@ -20,27 +33,15 @@ const getPos = () =>
     .then((r) => r.json())
     .catch(() => null);
 
-const seek1 = (ticks) =>
-  fetch(`${TV_TV_URL}/tv/emby/seek`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ticks }),
-  })
-    .then((r) => r.json())
-    .catch(() => null);
-
-// seek2: pause → seek → unpause
+// seek2: pause → [d1] → seek → [d2] → pause → [d3] → (repeat)
 const seek2 = (ticks) =>
   fetch(`${TV_TV_URL}/tv/emby/seek2`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ticks }),
+    body: JSON.stringify({ ticks, d3ms }),
   })
     .then((r) => r.json())
     .catch(() => null);
-
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-const downKey = () => fetch(`${TV_TV_URL}/tv/key/down`).catch(() => {});
 
 process.on("SIGINT", () => {
   console.log("\nStopped.");
@@ -58,26 +59,15 @@ process.on("SIGINT", () => {
     `${ts()} initial position: ${(init.ticks / 10000 / 1000).toFixed(2)}s`,
   );
 
-  await downKey();
-  await wait(2000);
-
-  const fresh = await getPos();
-  const base = fresh?.ok ? fresh.ticks : init.ticks;
-  console.log(
-    `${ts()} position after 2s wait: ${(base / 10000 / 1000).toFixed(2)}s`,
-  );
-
-  // =============================================
-  // TEST: seek2 (pause → seek → unpause) x3, 5s apart
-  // =============================================
-  for (let i = 1; i <= 3; i++) {
-    const pos = await getPos();
-    const target = (pos?.ok ? pos.ticks : base) + DIST_TICKS;
+  let pos = init.ticks;
+  let i = 1;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const target = Math.max(0, pos + DIST_TICKS);
     console.log(`${ts()} seek2 #${i} → ${(target / 10000 / 1000).toFixed(2)}s`);
     const res = await seek2(target);
     console.log(`${ts()} result: ${JSON.stringify(res)}`);
-    await wait(5000);
+    pos = target;
+    i++;
   }
-
-  console.log(`${ts()} done`);
 })();

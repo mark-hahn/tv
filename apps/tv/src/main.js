@@ -1150,9 +1150,9 @@ app.post("/tv/emby/seek", async (req, res) => {
   }
 });
 
-// seek2: pause → seek → unpause, to test if pause+seek works reliably
+// seek2: pause → seek → pause → [d3ms] → (repeat)
 app.post("/tv/emby/seek2", async (req, res) => {
-  const { ticks } = req.body ?? {};
+  const { ticks, d3ms = 500 } = req.body ?? {};
   if (ticks === undefined || ticks === null) {
     res.status(400).json({ ok: false, error: "missing ticks" });
     return;
@@ -1179,16 +1179,15 @@ app.post("/tv/emby/seek2", async (req, res) => {
       `${EMBY_BASE_URL}/Sessions/${id}/Playing/Pause?api_key=${EMBY_API_KEY}`,
       { method: "POST" },
     );
-    await new Promise((r) => setTimeout(r, 100));
     const seekRes = await fetch(
       `${EMBY_BASE_URL}/Sessions/${id}/Playing/seek?SeekPositionTicks=${ticks}&api_key=${EMBY_API_KEY}`,
       { method: "POST", headers: { Accept: "application/json" } },
     );
-    await new Promise((r) => setTimeout(r, 100));
     await fetch(
-      `${EMBY_BASE_URL}/Sessions/${id}/Playing/Unpause?api_key=${EMBY_API_KEY}`,
+      `${EMBY_BASE_URL}/Sessions/${id}/Playing/Pause?api_key=${EMBY_API_KEY}`,
       { method: "POST" },
     );
+    await new Promise((r) => setTimeout(r, d3ms));
     res.json({ ok: seekRes.ok });
   } catch (err) {
     loge("emby/seek error:", err.message);

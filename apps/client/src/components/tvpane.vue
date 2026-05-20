@@ -609,6 +609,9 @@ import evtBus from "../evtBus.js";
 import { wsSend } from "../srvr.js";
 import allServices from "../../../tv/services.json";
 
+const SCRUB_INTERVAL_MS = 500;
+const SCRUB_DIST_MS = 10000;
+
 const CELL_BASE = {
   borderRight: "3px solid #000",
   borderBottom: "3px solid #000",
@@ -796,9 +799,38 @@ export default {
       (async () => {
         await fetch(`${config.tvTvUrl}/tv/key/${key}`).catch(() => {});
         if (!this._repeatActive) return;
+        const isLR = key === "left" || key === "right";
+        const posFetch = isLR
+          ? fetch(`${config.tvTvUrl}/tv/emby/position`)
+              .then((r) => r.json())
+              .catch(() => null)
+          : null;
         await new Promise((r) => {
           this._repeatTimer = setTimeout(r, 400);
         });
+        if (!this._repeatActive) return;
+        const embyPlaying = this.subPlayers.some(
+          (s) => s.deviceName === "Living Room TV",
+        );
+        const posData = posFetch ? await posFetch : null;
+        if (isLR && embyPlaying && posData?.ok) {
+          let currentTicks = posData.ticks;
+          const offsetTicks =
+            (key === "right" ? SCRUB_DIST_MS : -SCRUB_DIST_MS) * 10000;
+          while (this._repeatActive) {
+            currentTicks = Math.max(0, currentTicks + offsetTicks);
+            await fetch(`${config.tvTvUrl}/tv/emby/seek`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ticks: currentTicks }),
+            }).catch(() => {});
+            if (!this._repeatActive) break;
+            await new Promise((r) => {
+              this._repeatTimer = setTimeout(r, SCRUB_INTERVAL_MS);
+            });
+          }
+          return;
+        }
         let count = 0;
         while (this._repeatActive) {
           const isFast = count >= 2;

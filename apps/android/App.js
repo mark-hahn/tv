@@ -24,6 +24,8 @@ const fs = (size) => size / PixelRatio.getFontScale();
 const TV_TV_URL = "https://hahnca.com/tv-tv";
 const TV_SRVR_WS_URL = "wss://hahnca.com/tv-srvr";
 const TV_SRVR_HTTP_URL = "https://hahnca.com/tv-srvr";
+const SCRUB_INTERVAL_MS = 500;
+const SCRUB_DIST_MS = 10000;
 
 function buildSeriesMap(seriesMapIn) {
   if (!seriesMapIn || seriesMapIn.length === 0) return null;
@@ -100,6 +102,7 @@ export default function App() {
   const repeatDelayRef = useRef(null);
   const repeatTimeoutRef = useRef(null);
   const repeatActiveRef = useRef(false);
+  const subPlayersRef = useRef([]);
   const lastCmdRef = useRef(0);
   const holdRef = useRef(null);
   const volActiveRef = useRef(false);
@@ -148,9 +151,38 @@ export default function App() {
     (async () => {
       await fetch(`${TV_TV_URL}/tv/key/${key}`).catch(() => {});
       if (!repeatActiveRef.current) return;
+      const isLR = key === "left" || key === "right";
+      const posFetch = isLR
+        ? fetch(`${TV_TV_URL}/tv/emby/position`)
+            .then((r) => r.json())
+            .catch(() => null)
+        : null;
       await new Promise((r) => {
         repeatDelayRef.current = setTimeout(r, 400);
       });
+      if (!repeatActiveRef.current) return;
+      const embyPlaying = subPlayersRef.current.some(
+        (s) => s.deviceName === "Living Room TV",
+      );
+      const posData = posFetch ? await posFetch : null;
+      if (isLR && embyPlaying && posData?.ok) {
+        let currentTicks = posData.ticks;
+        const offsetTicks =
+          (key === "right" ? SCRUB_DIST_MS : -SCRUB_DIST_MS) * 10000;
+        while (repeatActiveRef.current) {
+          currentTicks = Math.max(0, currentTicks + offsetTicks);
+          await fetch(`${TV_TV_URL}/tv/emby/seek`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ticks: currentTicks }),
+          }).catch(() => {});
+          if (!repeatActiveRef.current) break;
+          await new Promise((r) => {
+            repeatTimeoutRef.current = setTimeout(r, SCRUB_INTERVAL_MS);
+          });
+        }
+        return;
+      }
       let count = 0;
       while (repeatActiveRef.current) {
         const isFast = count >= 4;
@@ -856,6 +888,7 @@ export default function App() {
           });
         }
         setSubPlayers(players);
+        subPlayersRef.current = players;
         setSubDeviceName((prev) => {
           const hasCurrentPlayer =
             prev && players.find((p) => (p.deviceName || p.sessionId) === prev);

@@ -1,0 +1,124 @@
+#!/usr/bin/env node
+
+const TV_TV_URL = "https://hahnca.com/tv-tv";
+
+const ts = () => {
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  const ss = String(d.getSeconds()).padStart(2, "0");
+  const ms = String(d.getMilliseconds()).padStart(3, "0");
+  return `${hh}:${mm}:${ss}.${ms}`;
+};
+
+const args = process.argv.slice(2);
+if (args.length < 4) {
+  console.error(
+    "Usage: ./seek <pollInterval_secs> <seekDelay_secs> <scrubDist_secs> <totalTime_secs>",
+  );
+  console.error(
+    "  pollInterval_secs: time between position polls after each seek",
+  );
+  console.error(
+    "  seekDelay_secs:    delay after pos confirmed before next seek",
+  );
+  console.error("  scrubDist_secs:    can be negative for backward seeking");
+  console.error("  totalTime_secs:    auto-exit after this many seconds");
+  console.error(
+    "  Example: ./seek 0.05 0.1 20 30   # poll 50ms, wait 100ms, forward 20s, run 30s",
+  );
+  process.exit(1);
+}
+
+const pollIntervalMs = parseFloat(args[0]) * 1000;
+const seekDelayMs = parseFloat(args[1]) * 1000;
+const distTicks = parseFloat(args[2]) * 1000 * 10000;
+const totalTimeMs = parseFloat(args[3]) * 1000;
+
+if (
+  isNaN(pollIntervalMs) ||
+  isNaN(seekDelayMs) ||
+  isNaN(distTicks) ||
+  isNaN(totalTimeMs)
+) {
+  console.error("Error: all arguments must be numbers");
+  process.exit(1);
+}
+
+console.log(`Started:      ${ts()}`);
+console.log(`pollInterval: ${args[0]}s (${pollIntervalMs}ms)`);
+console.log(`seekDelay:    ${args[1]}s (${seekDelayMs}ms)`);
+console.log(`scrubDist:    ${args[2]}s (${distTicks} ticks)`);
+console.log(`totalTime:    ${args[3]}s`);
+
+process.on("SIGINT", () => {
+  console.log("\nStopped.");
+  process.exit(0);
+});
+
+(async () => {
+  const posRes = await fetch(`${TV_TV_URL}/tv/emby/position`).then((r) =>
+    r.json(),
+  );
+  if (!posRes.ok) {
+    console.error("Emby not playing:", posRes.reason || posRes.error);
+    process.exit(1);
+  }
+  let currentTicks = posRes.ticks;
+  console.log(
+    `Starting position: ${(currentTicks / 10000 / 1000).toFixed(2)}s`,
+  );
+
+  const seekDelayTicks = seekDelayMs * 10000;
+  const stopAt = Date.now() + totalTimeMs;
+
+  await fetch(`${TV_TV_URL}/tv/key/down`).catch(() => {});
+  await new Promise((r) => setTimeout(r, 2000));
+
+  // re-fetch position after wait so first seek target is accurate
+  const freshPos = await fetch(`${TV_TV_URL}/tv/emby/position`).then((r) =>
+    r.json(),
+  );
+  if (freshPos.ok) currentTicks = freshPos.ticks;
+  console.log(`${ts()} position: ${(currentTicks / 10000 / 1000).toFixed(2)}s`);
+
+  while (Date.now() < stopAt) {
+    // target = last confirmed pos + playback during delay + scrub distance
+    currentTicks = Math.max(0, currentTicks + seekDelayTicks + distTicks);
+    await fetch(`${TV_TV_URL}/tv/key/down`).catch(() => {}); // re-show position overlay
+    const seekRes = await fetch(`${TV_TV_URL}/tv/emby/seek`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticks: currentTicks }),
+    }).then((r) => r.json());
+    console.log(
+      `${ts()} sent → ${(currentTicks / 10000 / 1000).toFixed(2)}s  ${JSON.stringify(seekRes)}`,
+    );
+
+    let polls = 0;
+    while (true) {
+      await new Promise((r) => setTimeout(r, pollIntervalMs));
+      polls++;
+      const pollRes = await fetch(`${TV_TV_URL}/tv/emby/position`).then((r) =>
+        r.json(),
+      );
+      const nearTarget =
+        pollRes.ok &&
+        (distTicks > 0
+          ? pollRes.ticks >= currentTicks
+          : pollRes.ticks <= currentTicks);
+      if (!pollRes.ok || nearTarget) {
+        if (pollRes.ok) currentTicks = pollRes.ticks;
+        console.log(
+          `${ts()} → ${(currentTicks / 10000 / 1000).toFixed(2)}s  polls: ${polls}  seek: ${JSON.stringify(seekRes)}`,
+        );
+        if (seekDelayMs > 0)
+          await new Promise((r) => setTimeout(r, seekDelayMs));
+        break;
+      }
+    }
+  }
+  console.log(
+    `${ts()} Done. Final position: ${(currentTicks / 10000 / 1000).toFixed(2)}s`,
+  );
+})();

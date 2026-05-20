@@ -1,0 +1,83 @@
+#!/usr/bin/env node
+
+// Hard-wired seek test script — no args.
+// Edit the TEST section below to try different sequences.
+
+const TV_TV_URL = "https://hahnca.com/tv-tv";
+const DIST_TICKS = 10 * 1000 * 10000; // 10 seconds forward
+
+const ts = () => {
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  const ss = String(d.getSeconds()).padStart(2, "0");
+  const ms = String(d.getMilliseconds()).padStart(3, "0");
+  return `${hh}:${mm}:${ss}.${ms}`;
+};
+
+const getPos = () =>
+  fetch(`${TV_TV_URL}/tv/emby/position`)
+    .then((r) => r.json())
+    .catch(() => null);
+
+const seek1 = (ticks) =>
+  fetch(`${TV_TV_URL}/tv/emby/seek`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ticks }),
+  })
+    .then((r) => r.json())
+    .catch(() => null);
+
+// seek2: pause → seek → unpause
+const seek2 = (ticks) =>
+  fetch(`${TV_TV_URL}/tv/emby/seek2`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ticks }),
+  })
+    .then((r) => r.json())
+    .catch(() => null);
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const downKey = () => fetch(`${TV_TV_URL}/tv/key/down`).catch(() => {});
+
+process.on("SIGINT", () => {
+  console.log("\nStopped.");
+  process.exit(0);
+});
+
+(async () => {
+  // --- SETUP: get initial position, show overlay ---
+  const init = await getPos();
+  if (!init?.ok) {
+    console.error("Emby not playing");
+    process.exit(1);
+  }
+  console.log(
+    `${ts()} initial position: ${(init.ticks / 10000 / 1000).toFixed(2)}s`,
+  );
+
+  await downKey();
+  await wait(2000);
+
+  const fresh = await getPos();
+  const base = fresh?.ok ? fresh.ticks : init.ticks;
+  console.log(
+    `${ts()} position after 2s wait: ${(base / 10000 / 1000).toFixed(2)}s`,
+  );
+
+  // =============================================
+  // TEST: seek2 (pause → seek → unpause) x3, 5s apart
+  // =============================================
+  for (let i = 1; i <= 3; i++) {
+    const pos = await getPos();
+    const target = (pos?.ok ? pos.ticks : base) + DIST_TICKS;
+    console.log(`${ts()} seek2 #${i} → ${(target / 10000 / 1000).toFixed(2)}s`);
+    const res = await seek2(target);
+    console.log(`${ts()} result: ${JSON.stringify(res)}`);
+    await wait(5000);
+  }
+
+  console.log(`${ts()} done`);
+})();

@@ -1091,6 +1091,111 @@ app.get("/tv/emby/playing", async (req, res) => {
   }
 });
 
+app.get("/tv/emby/position", async (req, res) => {
+  try {
+    const sessRes = await fetch(
+      `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
+      { headers: { Accept: "application/json" } },
+    );
+    if (!sessRes.ok) {
+      res.json({ ok: false, error: `sessions ${sessRes.status}` });
+      return;
+    }
+    const sessions = await sessRes.json();
+    const session = sessions.find(
+      (s) => s.NowPlayingItem && s.DeviceName === "Living Room TV",
+    );
+    if (!session) {
+      res.json({ ok: false, reason: "notPlaying" });
+      return;
+    }
+    res.json({ ok: true, ticks: session.PlayState?.PositionTicks ?? 0 });
+  } catch (err) {
+    loge("emby/position error:", err.message);
+    res.json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/tv/emby/seek", async (req, res) => {
+  const { ticks } = req.body ?? {};
+  if (ticks === undefined || ticks === null) {
+    res.status(400).json({ ok: false, error: "missing ticks" });
+    return;
+  }
+  try {
+    const sessRes = await fetch(
+      `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
+      { headers: { Accept: "application/json" } },
+    );
+    if (!sessRes.ok) {
+      res.json({ ok: false, error: `sessions ${sessRes.status}` });
+      return;
+    }
+    const sessions = await sessRes.json();
+    const session = sessions.find(
+      (s) => s.NowPlayingItem && s.DeviceName === "Living Room TV",
+    );
+    if (!session) {
+      res.json({ ok: false, reason: "notPlaying" });
+      return;
+    }
+    const seekRes = await fetch(
+      `${EMBY_BASE_URL}/Sessions/${session.Id}/Playing/seek?SeekPositionTicks=${ticks}&api_key=${EMBY_API_KEY}`,
+      { method: "POST", headers: { Accept: "application/json" } },
+    );
+    res.json({ ok: seekRes.ok });
+  } catch (err) {
+    loge("emby/seek error:", err.message);
+    res.json({ ok: false, error: err.message });
+  }
+});
+
+// seek2: pause → seek → unpause, to test if pause+seek works reliably
+app.post("/tv/emby/seek2", async (req, res) => {
+  const { ticks } = req.body ?? {};
+  if (ticks === undefined || ticks === null) {
+    res.status(400).json({ ok: false, error: "missing ticks" });
+    return;
+  }
+  try {
+    const sessRes = await fetch(
+      `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
+      { headers: { Accept: "application/json" } },
+    );
+    if (!sessRes.ok) {
+      res.json({ ok: false, error: `sessions ${sessRes.status}` });
+      return;
+    }
+    const sessions = await sessRes.json();
+    const session = sessions.find(
+      (s) => s.NowPlayingItem && s.DeviceName === "Living Room TV",
+    );
+    if (!session) {
+      res.json({ ok: false, reason: "notPlaying" });
+      return;
+    }
+    const id = session.Id;
+    await fetch(
+      `${EMBY_BASE_URL}/Sessions/${id}/Playing/Pause?api_key=${EMBY_API_KEY}`,
+      { method: "POST" },
+    );
+    await new Promise((r) => setTimeout(r, 100));
+    const seekRes = await fetch(
+      `${EMBY_BASE_URL}/Sessions/${id}/Playing/seek?SeekPositionTicks=${ticks}&api_key=${EMBY_API_KEY}`,
+      { method: "POST", headers: { Accept: "application/json" } },
+    );
+    await new Promise((r) => setTimeout(r, 100));
+    await fetch(
+      `${EMBY_BASE_URL}/Sessions/${id}/Playing/Unpause?api_key=${EMBY_API_KEY}`,
+      { method: "POST" },
+    );
+    res.json({ ok: seekRes.ok });
+  } catch (err) {
+    loge("emby/seek error:", err.message);
+    res.json({ ok: false, error: err.message });
+  }
+});
+
 app.post("/tv/emby/subtitle", async (req, res) => {
   const { sessionId, index } = req.body ?? {};
   if (!sessionId || index === undefined) {

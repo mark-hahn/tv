@@ -27,6 +27,7 @@ const PIC_TARGETS = [
   "colorTemperature",
   "hdrMode",
   "autoLocalDimming",
+  "lightSensor",
 ];
 const PIC_LABELS = {
   brightness: "Brightness",
@@ -37,6 +38,7 @@ const PIC_LABELS = {
   colorTemperature: "Color Temp",
   pictureMode: "Picture Mode",
   autoLocalDimming: "Local Dimming",
+  lightSensor: "Light Sensor",
   hdrMode: "HDR Mode",
 };
 

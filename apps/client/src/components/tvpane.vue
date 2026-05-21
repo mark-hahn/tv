@@ -801,13 +801,18 @@ export default {
       this.flash(key);
       this.notifyAction();
       this._repeatActive = true;
+      this._pendingLRKey = null;
+      const isLR = key === "left" || key === "right";
       (async () => {
-        await fetch(`${config.tvTvUrl}/tv/key/${key}`).catch(() => {});
-        if (!this._repeatActive) {
-          console.log(`[scrub] stopped after initial key`);
-          return;
+        if (!isLR) {
+          await fetch(`${config.tvTvUrl}/tv/key/${key}`).catch(() => {});
+          if (!this._repeatActive) {
+            console.log(`[scrub] stopped after initial key`);
+            return;
+          }
+        } else {
+          this._pendingLRKey = key;
         }
-        const isLR = key === "left" || key === "right";
         console.log(`[scrub] isLR=${isLR}, waiting 400ms`);
         await new Promise((r) => {
           this._repeatTimer = setTimeout(r, 400);
@@ -817,6 +822,7 @@ export default {
           return;
         }
         if (isLR) {
+          this._pendingLRKey = null; // long press — key will not be sent on release
           const distTicks =
             (key === "right" ? 1 : -1) * SCRUB_DIST * 10_000_000;
           const intervalMs = SCRUB_INTERVAL * 1000;
@@ -904,7 +910,11 @@ export default {
         fetch(`${config.tvTvUrl}/tv/emby/scrub/stop`, { method: "POST" }).catch(
           () => {},
         );
+      } else if (this._pendingLRKey) {
+        // Short press on left/right — send key on release
+        fetch(`${config.tvTvUrl}/tv/key/${this._pendingLRKey}`).catch(() => {});
       }
+      this._pendingLRKey = null;
     },
 
     startHold(action) {

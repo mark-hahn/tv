@@ -851,6 +851,9 @@ app.get("/tv/key/:key", async (req, res) => {
     service_data: { command },
   };
   const isArrow = ["up", "down", "left", "right"].includes(req.params.key);
+  log(
+    `[key-debug] key=${req.params.key} command=${command} mode=${tvMode} entity=${remoteId} isArrow=${isArrow} haCmd=${JSON.stringify(cmd)}`,
+  );
   if (isArrow) {
     cmd.id = ++cmdId;
     if (ws) ws.send(JSON.stringify(cmd));
@@ -1225,7 +1228,7 @@ app.post("/tv/emby/scrub/start", async (req, res) => {
     }
     const id = session.Id;
     let ticks = session.PlayState?.PositionTicks ?? 0;
-    const state = { active: true, lastPing: Date.now() };
+    const state = { active: true, lastPing: Date.now(), id };
     _scrubState = state;
     (async () => {
       while (state.active) {
@@ -1233,12 +1236,7 @@ app.post("/tv/emby/scrub/start", async (req, res) => {
           log("scrub dead-man expired, stopping");
           break;
         }
-        // Pause → seek → wait
-        await fetch(
-          `${EMBY_BASE_URL}/Sessions/${id}/Playing/Pause?api_key=${EMBY_API_KEY}`,
-          { method: "POST" },
-        );
-        if (!state.active) break;
+        // seek only — no pause, no overlay
         ticks = Math.max(0, ticks + distTicks);
         await fetch(
           `${EMBY_BASE_URL}/Sessions/${id}/Playing/seek?SeekPositionTicks=${ticks}&api_key=${EMBY_API_KEY}`,
@@ -1264,7 +1262,7 @@ app.post("/tv/emby/scrub/ping", (req, res) => {
   res.json({ ok: !!_scrubState });
 });
 
-app.post("/tv/emby/scrub/stop", (req, res) => {
+app.post("/tv/emby/scrub/stop", async (req, res) => {
   if (_scrubState) {
     _scrubState.active = false;
     _scrubState = null;

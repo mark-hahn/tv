@@ -982,6 +982,7 @@ export default {
       this.videoPlayerSource = null;
       this.videoPlayerMapSeason = null;
       this.videoPlayerMapEpisode = null;
+      evtBus.emit("introPaneClosed");
       this.fetchChksrtCount();
     },
     async handleChksrtNext() {
@@ -1066,17 +1067,10 @@ export default {
           this.videoPlayerPath = result.path;
           this.videoPlayerMapSeason = result.season;
           this.videoPlayerMapEpisode = result.episode;
-        } else {
-          this.videoPlayerPath = null;
-          this.videoPlayerMode = null;
-          this.videoPlayerIntroShow = null;
-          this.videoPlayerSource = null;
-          this.videoPlayerMapSeason = null;
-          this.videoPlayerMapEpisode = null;
         }
         return;
       }
-      // info pane: find next show in filteredShows that needs introDur set
+      // info pane: find next show in filtered list order that still needs intro
       const current = this.videoPlayerIntroShow;
       const shows = this.filteredShows;
       if (!current || !Array.isArray(shows)) {
@@ -1086,36 +1080,33 @@ export default {
         return;
       }
       const idx = shows.findIndex((s) => s.name === current.name);
-      let nextShow = null;
       for (let i = idx + 1; i < shows.length; i++) {
         const s = shows[i];
-        if (s.introDur == null && s.inEmby !== false) {
-          nextShow = s;
-          break;
+        if (s.introDur != null || s.inEmby === false || s.inLinda) {
+          continue;
+        }
+        try {
+          const result = await srvr.introFirstFile(s.name);
+          if (result?.ok && result.path) {
+            this.videoPlayerIntroShow = s;
+            this.videoPlayerPath = result.path;
+            this.videoPlayerMapSeason =
+              result.season != null ? result.season : null;
+            this.videoPlayerMapEpisode =
+              result.episode != null ? result.episode : null;
+            return;
+          }
+        } catch {
+          // ignore and continue scanning
         }
       }
-      if (!nextShow) {
-        this.videoPlayerPath = null;
-        this.videoPlayerMode = null;
-        this.videoPlayerIntroShow = null;
-        return;
-      }
-      evtBus.emit("selectShowFromCardTitle", nextShow.name);
-      try {
-        const result = await srvr.introFirstFile(nextShow.name);
-        if (result?.ok) {
-          this.videoPlayerIntroShow = nextShow;
-          this.videoPlayerPath = result.path;
-        } else {
-          this.videoPlayerPath = null;
-          this.videoPlayerMode = null;
-          this.videoPlayerIntroShow = null;
-        }
-      } catch (e) {
-        this.videoPlayerPath = null;
-        this.videoPlayerMode = null;
-        this.videoPlayerIntroShow = null;
-      }
+
+      this.videoPlayerPath = null;
+      this.videoPlayerMode = null;
+      this.videoPlayerIntroShow = null;
+      this.videoPlayerSource = null;
+      this.videoPlayerMapSeason = null;
+      this.videoPlayerMapEpisode = null;
     },
     openTvdbMismatchModal(title, text, payload = null) {
       this.tvdbMismatchTitle = title || "TVDB cache mismatch detected";

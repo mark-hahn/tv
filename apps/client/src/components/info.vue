@@ -828,7 +828,13 @@ export default {
       if (this.show.noFiles) return;
       const result = await srvr.introFirstFile(this.show.name);
       if (!result?.ok) return;
-      this.$emit("open-intro", { show: this.show, path: result.path });
+      this.$emit("open-intro", {
+        show: this.show,
+        path: result.path,
+        source: "info",
+        season: result.season,
+        episode: result.episode,
+      });
     },
 
     deleteClick() {

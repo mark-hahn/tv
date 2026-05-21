@@ -1889,6 +1889,13 @@ export default {
       });
     },
     selectNextEpisodeWithFile(currentSeason, currentEpisode) {
+      if (
+        this.mapShow?.inEmby === false ||
+        this.mapShow?.inLinda ||
+        this.mapShow?.introDur != null
+      ) {
+        return null;
+      }
       const seasons = this.seriesMapSeasons;
       const epis = this.seriesMapEpis;
       if (!seasons || !epis) return null;
@@ -1900,7 +1907,8 @@ export default {
             continue;
           }
           const ep = this.seriesMap?.[s]?.[e];
-          if (ep?.path && !ep?.noFile) {
+          const needsIntro = !!ep && !ep.played;
+          if (needsIntro && ep?.path && !ep?.noFile) {
             this.selectedSeasons = new Set();
             this.selectedCells = new Set([`${s}.${e}`]);
             return { path: ep.path, season: s, episode: e };

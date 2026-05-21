@@ -2961,17 +2961,25 @@ export default {
             continue fltrLoop;
           }
         }
-        if (
-          this.fltrChoice === "No Intro" &&
-          localAllTvdb?.[show.name]?.introDur != null
-        ) {
-          continue;
+        if (this.fltrChoice === "No Intro") {
+          const tvdbData = localAllTvdb?.[show.name] || null;
+          const watchedCount = Number(tvdbData?.watchedCount ?? 0);
+          const episodeCount = Number(tvdbData?.episodeCount ?? 0);
+          const hasUnwatchedEpisode = episodeCount > watchedCount;
+          if (
+            !tvdbData ||
+            tvdbData.introDur != null ||
+            show.inEmby === false ||
+            show.inLinda ||
+            !hasUnwatchedEpisode
+          ) {
+            continue;
+          }
         }
         filteredShows.push(show);
       }
 
       this.shows = filteredShows;
-      this.$emit("filtered-shows", this.shows);
       if (this.shows.length === 1) this.saveVisShow(this.shows[0]);
       else if (this.highlightName) {
         // Only update selection if highlightName is already set
@@ -2986,6 +2994,7 @@ export default {
         }
       }
       this.sortShows();
+      this.$emit("filtered-shows", this.shows);
       if (selectFirstAfterSort && this.shows.length > 0) {
         const idx =
           prevHighlightIdx >= 0
@@ -3770,6 +3779,11 @@ export default {
     // Cross-pane: click a card in Flex/Qbt/Down to select show in list
     on("selectShowFromCardTitle", (rawTitle) => {
       void this.selectShowFromCardTitle(rawTitle);
+    });
+
+    on("introPaneClosed", async () => {
+      if (this.fltrChoice !== "No Intro") return;
+      await this.select();
     });
 
     on("activeQbtTitles", (titles) => {

@@ -112,7 +112,7 @@
           >{{ introShow ? introShow.name : ""
           }}{{
             introSeason != null && introEpisode != null
-              ? ` (S${String(introSeason).padStart(2, "0")}E${String(introEpisode).padStart(2, "0")})`
+              ? ` (s${String(introSeason).padStart(2, "0")}e${String(introEpisode).padStart(2, "0")})`
               : ""
           }}</span
         >
@@ -145,6 +145,26 @@
           "
         >
           {{ fmtTime(currentTimeSec * 1000) }}
+        </div>
+        <div
+          @click.stop="clickIntroZero"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 0;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(0, 0, 0, 0.5);
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 6px;
+            width: 20px;
+            text-align: center;
+          "
+        >
+          0
         </div>
         <div
           @click.stop="clickNavBack30"
@@ -219,24 +239,6 @@
           &gt;&gt;
         </div>
         <div
-          @click.stop="clickIntroZero"
-          style="
-            color: white;
-            font-size: 13px;
-            padding: 2px 8px;
-            border-radius: 4px;
-            border: 1px solid #666;
-            cursor: pointer;
-            user-select: none;
-            background: rgba(0, 0, 0, 0.5);
-            white-space: nowrap;
-            flex-shrink: 0;
-            margin-right: 6px;
-          "
-        >
-          0
-        </div>
-        <div
           @click.stop="clickIntroPre"
           style="
             color: white;
@@ -272,7 +274,7 @@
           "
           :style="{ color: startMark < 2000 ? 'yellow' : 'white' }"
         >
-          {{ fmtTime(startMark) }}
+          {{ introStartLabel }}
         </div>
         <div
           @click.stop="clickIntroEnd"
@@ -292,7 +294,7 @@
             margin-right: 6px;
           "
         >
-          {{ fmtTime(endMark) }}
+          {{ introEndLabel }}
         </div>
         <div
           style="
@@ -309,7 +311,7 @@
             margin-right: 6px;
           "
         >
-          {{ fmtTime(Math.max(0, endMark - startMark)) }}
+          {{ introDurLabel }}
         </div>
         <div
           @click.stop="clickIntroTest"
@@ -328,6 +330,28 @@
           "
         >
           Test
+        </div>
+        <div
+          @click.stop="clickIntroNone"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 6px;
+          "
+          :style="{
+            background: isIntroNone
+              ? 'rgba(0, 90, 0, 0.9)'
+              : 'rgba(0, 0, 0, 0.5)',
+          }"
+        >
+          None
         </div>
         <div
           @click.stop="clickIntroNext"
@@ -587,7 +611,7 @@
       ref="vid"
       controls
       autoplay
-      :muted="mode === 'intro'"
+      :muted="mode === 'intro' ? introMuted : false"
       crossorigin="anonymous"
       :src="vidSrc"
       style="max-width: 100%; max-height: 100%; outline: none; display: block"
@@ -595,6 +619,7 @@
       @error="onVideoError"
       @timeupdate="currentTimeSec = $refs.vid ? $refs.vid.currentTime : 0"
       @loadedmetadata="onVideoLoadedMetadata"
+      @volumechange="onVideoVolumeChange"
     >
       <track
         v-if="activeTrackUrl"
@@ -622,6 +647,7 @@ import {
 } from "../srvr.js";
 
 const TV_SRVR_URL = config.tvSrvrUrl;
+const INTRO_MUTE_STORAGE_KEY = "tvIntroPlayerMuted";
 const offsetCache = new Map(); // in-memory per-file subtitle offset
 
 function fmtTime(ms) {
@@ -658,6 +684,8 @@ export default {
       endMark: 4 * 60 * 1000,
       currentTimeSec: 0,
       seekTarget: null,
+      introMuted: true,
+      introSavedMarks: {},
     };
   },
   computed: {
@@ -745,17 +773,40 @@ export default {
       const name = parts[parts.length - 1];
       return this.chksrtCount > 0 ? `(${this.chksrtCount}) ${name}` : name;
     },
+    isIntroNone() {
+      return this.mode === "intro" && this.introShow?.introDur === 0;
+    },
+    introStartLabel() {
+      return this.isIntroNone ? "-" : this.fmtTime(this.startMark);
+    },
+    introEndLabel() {
+      return this.isIntroNone ? "-" : this.fmtTime(this.endMark);
+    },
+    introDurLabel() {
+      return this.isIntroNone
+        ? "0"
+        : this.fmtTime(Math.max(0, this.endMark - this.startMark));
+    },
   },
   watch: {
     introShow(newVal) {
+      if (!newVal?.name) return;
       if (newVal?.introDur != null) {
+        if (newVal.introDur === 0) {
+          return;
+        }
         const dur = Math.abs(newVal.introDur);
         if (newVal.introDur < 0) {
           this.startMark = 0;
           this.endMark = dur;
         } else {
+          if (this.startMark < 2000) this.startMark = 3 * 60 * 1000;
           this.endMark = this.startMark + dur;
         }
+        this.introSavedMarks = {
+          ...this.introSavedMarks,
+          [newVal.name]: { startMark: this.startMark, endMark: this.endMark },
+        };
       }
     },
     path(newVal) {
@@ -765,8 +816,7 @@ export default {
       this.chksrtMatch = null;
       this.errorRetries = 0;
       this.vidSrc = newVal ? this.streamUrl : "";
-      if (newVal && this.mode === "intro" && this.introSeason != null)
-        this._seekOnLoad = true;
+      if (newVal && this.mode === "intro") this._seekOnLoad = true;
       this.subtitleOffset = offsetCache.get(newVal) ?? 0;
       if (newVal) this._fetchSubtitleList(newVal);
     },
@@ -1015,10 +1065,21 @@ export default {
     onVideoLoadedMetadata() {
       if (!this._seekOnLoad) return;
       this._seekOnLoad = false;
-      const targetSec = Math.max(0, (this.startMark - 3000) / 1000);
+      const targetSec =
+        this.mode === "intro" ? 0 : Math.max(0, (this.startMark - 3000) / 1000);
       this._seekWithConfirm(targetSec);
       const vid = this.$refs.vid;
       if (vid) vid.play().catch(() => {});
+    },
+    onVideoVolumeChange() {
+      if (this.mode !== "intro") return;
+      const vid = this.$refs.vid;
+      if (!vid) return;
+      this.introMuted = !!vid.muted;
+      window.localStorage.setItem(
+        INTRO_MUTE_STORAGE_KEY,
+        this.introMuted ? "1" : "0",
+      );
     },
     _seekWithConfirm(targetSec) {
       this._cancelSeek();
@@ -1084,6 +1145,33 @@ export default {
       }
       this._saveIntroDur();
     },
+    clickIntroNone() {
+      if (!this.introShow?.name) return;
+      if (this.isIntroNone) {
+        const saved = this.introSavedMarks[this.introShow.name];
+        if (
+          saved &&
+          Number.isFinite(saved.startMark) &&
+          Number.isFinite(saved.endMark)
+        ) {
+          this.startMark = saved.startMark;
+          this.endMark = saved.endMark;
+        } else {
+          this.startMark = 3 * 60 * 1000;
+          this.endMark = 4 * 60 * 1000;
+        }
+        this._saveIntroDur();
+        return;
+      }
+      this.introSavedMarks = {
+        ...this.introSavedMarks,
+        [this.introShow.name]: {
+          startMark: this.startMark,
+          endMark: this.endMark,
+        },
+      };
+      this._setIntroDur(0);
+    },
     clickIntroPre() {
       const vid = this.$refs.vid;
       if (!vid) return;
@@ -1119,6 +1207,11 @@ export default {
       if (!this.introShow) return;
       const dur = Math.max(0, this.endMark - this.startMark);
       const introDur = this.startMark < 2000 ? -dur : dur;
+      this._setIntroDur(introDur);
+    },
+    _setIntroDur(introDur) {
+      if (!this.introShow?.name) return;
+      this.introShow.introDur = introDur;
       setTvdbFields({ name: this.introShow.name, introDur }).catch((e) =>
         console.error("[intro] setTvdbFields error:", e),
       );
@@ -1240,6 +1333,8 @@ export default {
   },
   mounted() {
     window.addEventListener("keydown", this.onKeyDown);
+    const savedMuted = window.localStorage.getItem(INTRO_MUTE_STORAGE_KEY);
+    this.introMuted = savedMuted == null ? true : savedMuted === "1";
     this.vidSrc = this.path ? this.streamUrl : "";
     this.subtitleOffset = offsetCache.get(this.path) ?? 0;
     if (this.path) this._fetchSubtitleList(this.path);

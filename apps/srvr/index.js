@@ -4940,20 +4940,37 @@ app.get("/api/introFirstFile", async (req, res) => {
       res.json({ ok: false, error: "show not found" });
       return;
     }
+    if (record.inEmby === false || record.inLinda || record.introDur != null) {
+      res.json({ ok: false, reason: "introNotNeeded" });
+      return;
+    }
     const seriesMap = await emby.getSeriesMap(record);
     if (!seriesMap) {
       res.json({ ok: false });
       return;
     }
     const sorted = [...seriesMap].sort((a, b) => b[0] - a[0]);
-    for (const [, episodes] of sorted) {
+    let hasUnwatchedEpisode = false;
+    for (const [season, episodes] of sorted) {
       const sortedEps = [...episodes].sort((a, b) => a[0] - b[0]);
-      for (const [, ep] of sortedEps) {
+      let seasonHasIntroNeeded = false;
+      for (const [episode, ep] of sortedEps) {
+        if (ep?.played) continue;
+        hasUnwatchedEpisode = true;
+        seasonHasIntroNeeded = true;
         if (ep.path && !ep.noFile) {
-          res.json({ ok: true, path: ep.path });
+          res.json({ ok: true, path: ep.path, season, episode });
           return;
         }
       }
+      if (seasonHasIntroNeeded) {
+        res.json({ ok: false, reason: "noPlayableEpisodeInLastNeededSeason" });
+        return;
+      }
+    }
+    if (!hasUnwatchedEpisode) {
+      res.json({ ok: false, reason: "allWatched" });
+      return;
     }
     res.json({ ok: false });
   } catch (err) {

@@ -110,11 +110,7 @@
             white-space: nowrap;
           "
           >{{ introShow ? introShow.name : ""
-          }}{{
-            introSeason != null && introEpisode != null
-              ? ` (s${String(introSeason).padStart(2, "0")}e${String(introEpisode).padStart(2, "0")})`
-              : ""
-          }}</span
+          }}{{ introSeasonEpisodeLabel }}</span
         >
       </div>
       <!-- Intro mode: mark controls (right, next to X) -->
@@ -160,7 +156,7 @@
             white-space: nowrap;
             flex-shrink: 0;
             margin-right: 6px;
-            width: 20px;
+            width: 50px;
             text-align: center;
           "
         >
@@ -330,6 +326,24 @@
           "
         >
           Test
+        </div>
+        <div
+          @click.stop="clickIntroClear"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(100, 40, 0, 0.7);
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 6px;
+          "
+        >
+          Clear
         </div>
         <div
           @click.stop="clickIntroNone"
@@ -648,6 +662,7 @@ import {
 
 const TV_SRVR_URL = config.tvSrvrUrl;
 const INTRO_MUTE_STORAGE_KEY = "tvIntroPlayerMuted";
+const INTRO_VOLUME_STORAGE_KEY = "tvIntroPlayerVolume";
 const offsetCache = new Map(); // in-memory per-file subtitle offset
 
 function fmtTime(ms) {
@@ -658,6 +673,21 @@ function fmtTime(ms) {
     .padStart(2, "0");
   const t = Math.floor((totalSec % 1) * 10);
   return `${mm}:${ss}.${t}`;
+}
+
+function parseSeasonEpisodeFromPath(path) {
+  if (!path) return { season: null, episode: null };
+  const name = String(path).split("/").pop() || "";
+  let m = name.match(/[sS](\d{1,2})[eE](\d{1,3})/);
+  if (!m) m = name.match(/(?:^|[^0-9])(\d{1,2})x(\d{1,3})(?:[^0-9]|$)/i);
+  if (!m) return { season: null, episode: null };
+
+  const season = Number(m[1]);
+  const episode = Number(m[2]);
+  if (!Number.isFinite(season) || !Number.isFinite(episode)) {
+    return { season: null, episode: null };
+  }
+  return { season, episode };
 }
 
 export default {
@@ -685,6 +715,7 @@ export default {
       currentTimeSec: 0,
       seekTarget: null,
       introMuted: true,
+      introVolume: 1,
       introSavedMarks: {},
     };
   },
@@ -783,9 +814,30 @@ export default {
       return this.isIntroNone ? "-" : this.fmtTime(this.endMark);
     },
     introDurLabel() {
-      return this.isIntroNone
-        ? "0"
-        : this.fmtTime(Math.max(0, this.endMark - this.startMark));
+      if (
+        this.mode === "intro" &&
+        (this.introShow?.introDur == null || this.isIntroNone)
+      ) {
+        return "-";
+      }
+      return this.fmtTime(Math.max(0, this.endMark - this.startMark));
+    },
+    introSeasonForDisplay() {
+      if (this.introSeason != null) return this.introSeason;
+      return parseSeasonEpisodeFromPath(this.path).season;
+    },
+    introEpisodeForDisplay() {
+      if (this.introEpisode != null) return this.introEpisode;
+      return parseSeasonEpisodeFromPath(this.path).episode;
+    },
+    introSeasonEpisodeLabel() {
+      if (
+        this.introSeasonForDisplay == null ||
+        this.introEpisodeForDisplay == null
+      ) {
+        return "";
+      }
+      return ` (s${String(this.introSeasonForDisplay).padStart(2, "0")}e${String(this.introEpisodeForDisplay).padStart(2, "0")})`;
     },
   },
   watch: {
@@ -1063,6 +1115,7 @@ export default {
       }).catch((e) => console.error("[chksrt] addChksrtHistory error:", e));
     },
     onVideoLoadedMetadata() {
+      this._applyIntroAudioState();
       if (!this._seekOnLoad) return;
       this._seekOnLoad = false;
       const targetSec =
@@ -1076,10 +1129,25 @@ export default {
       const vid = this.$refs.vid;
       if (!vid) return;
       this.introMuted = !!vid.muted;
+      const nextVolume = Number(vid.volume);
+      if (Number.isFinite(nextVolume)) {
+        this.introVolume = Math.max(0, Math.min(1, nextVolume));
+      }
       window.localStorage.setItem(
         INTRO_MUTE_STORAGE_KEY,
         this.introMuted ? "1" : "0",
       );
+      window.localStorage.setItem(
+        INTRO_VOLUME_STORAGE_KEY,
+        String(this.introVolume),
+      );
+    },
+    _applyIntroAudioState() {
+      if (this.mode !== "intro") return;
+      const vid = this.$refs.vid;
+      if (!vid) return;
+      vid.muted = this.introMuted;
+      vid.volume = Math.max(0, Math.min(1, Number(this.introVolume) || 0));
     },
     _seekWithConfirm(targetSec) {
       this._cancelSeek();
@@ -1178,10 +1246,26 @@ export default {
       this._cancelSeek();
       vid.currentTime = Math.max(0, (this.startMark - 3000) / 1000);
     },
+    _restoreIntroMarksFromSaved() {
+      if (!this.introShow?.name) return;
+      const saved = this.introSavedMarks[this.introShow.name];
+      if (
+        saved &&
+        Number.isFinite(saved.startMark) &&
+        Number.isFinite(saved.endMark)
+      ) {
+        this.startMark = saved.startMark;
+        this.endMark = saved.endMark;
+      } else {
+        this.startMark = 3 * 60 * 1000;
+        this.endMark = 4 * 60 * 1000;
+      }
+    },
     clickIntroStart() {
       const vid = this.$refs.vid;
       if (!vid) return;
       this._cancelSeek();
+      if (this.isIntroNone) this._restoreIntroMarksFromSaved();
       this.startMark = vid.currentTime * 1000;
       this._saveIntroDur();
     },
@@ -1189,6 +1273,7 @@ export default {
       const vid = this.$refs.vid;
       if (!vid) return;
       this._cancelSeek();
+      if (this.isIntroNone) this._restoreIntroMarksFromSaved();
       this.endMark = vid.currentTime * 1000;
       this._saveIntroDur();
     },
@@ -1203,9 +1288,14 @@ export default {
         Math.max(0, this.endMark - this.startMark) / 1000;
       this._seekWithConfirm(targetSec);
     },
+    clickIntroClear() {
+      this._setIntroDur(null);
+    },
     _saveIntroDur() {
       if (!this.introShow) return;
       const dur = Math.max(0, this.endMark - this.startMark);
+      // Avoid converting a mark click into None mode when start/end are equal.
+      if (dur === 0) return;
       const introDur = this.startMark < 2000 ? -dur : dur;
       this._setIntroDur(introDur);
     },
@@ -1334,10 +1424,18 @@ export default {
   mounted() {
     window.addEventListener("keydown", this.onKeyDown);
     const savedMuted = window.localStorage.getItem(INTRO_MUTE_STORAGE_KEY);
+    const savedVolume = window.localStorage.getItem(INTRO_VOLUME_STORAGE_KEY);
     this.introMuted = savedMuted == null ? true : savedMuted === "1";
+    if (savedVolume != null) {
+      const n = Number(savedVolume);
+      if (Number.isFinite(n)) this.introVolume = Math.max(0, Math.min(1, n));
+    }
     this.vidSrc = this.path ? this.streamUrl : "";
     this.subtitleOffset = offsetCache.get(this.path) ?? 0;
     if (this.path) this._fetchSubtitleList(this.path);
+    this.$nextTick(() => {
+      this._applyIntroAudioState();
+    });
   },
   beforeUnmount() {
     window.removeEventListener("keydown", this.onKeyDown);

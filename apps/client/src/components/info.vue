@@ -826,15 +826,23 @@ export default {
 
     async introClick() {
       if (this.show.noFiles) return;
-      const result = await srvr.introFirstFile(this.show.name);
-      if (!result?.ok) return;
-      this.$emit("open-intro", {
-        show: this.show,
-        path: result.path,
-        source: "info",
-        season: result.season,
-        episode: result.episode,
-      });
+      try {
+        const result = await srvr.introFirstFile(this.show.name);
+        if (!result?.ok || !result?.path) {
+          window.alert("No playable episode found for Intro.");
+          return;
+        }
+        this.$emit("open-intro", {
+          show: this.show,
+          path: result.path,
+          source: "info",
+          season: result.season,
+          episode: result.episode,
+        });
+      } catch (e) {
+        console.error("introClick error:", e);
+        window.alert("Intro failed to open.");
+      }
     },
 
     deleteClick() {

@@ -612,6 +612,7 @@ import allServices from "../../../tv/services.json";
 const SCRUB_INTERVAL_FWD = 0.5; // seconds — interval for forward scrub
 const SCRUB_INTERVAL_BWD = 1.0; // seconds — interval for backward scrub
 const SCRUB_DIST = 10; // seconds — jump distance per seek
+const VOL_STEP = 5;
 const TVPANE_VERSION = 2;
 
 const CELL_BASE = {
@@ -1430,7 +1431,12 @@ export default {
       if (this.checkBlocked()) return;
       this.flash(dir === "down" ? "vold" : "volu");
       this.notifyAction();
-      fetch(`${config.tvTvUrl}/tv/vol/${dir}`).catch(() => {});
+      for (let i = 0; i < VOL_STEP; i++) {
+        await fetch(`${config.tvTvUrl}/tv/vol/${dir}`).catch(() => {});
+        if (i < VOL_STEP - 1) {
+          await new Promise((r) => setTimeout(r, 40));
+        }
+      }
     },
 
     async _tvKeyRaw(key) {

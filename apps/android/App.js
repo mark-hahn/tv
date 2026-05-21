@@ -27,6 +27,7 @@ const TV_SRVR_HTTP_URL = "https://hahnca.com/tv-srvr";
 const SCRUB_INTERVAL_FWD_MS = 500;
 const SCRUB_INTERVAL_BWD_MS = 1000;
 const SCRUB_DIST_TICKS = 10 * 10_000_000;
+const VOL_STEP = 5;
 
 function buildSeriesMap(seriesMapIn) {
   if (!seriesMapIn || seriesMapIn.length === 0) return null;
@@ -695,10 +696,15 @@ export default function App() {
 
   const startVolDownHold = () => {
     lpStart(
-      () => {
+      async () => {
         if (isOff || isOther) return;
         flash("vold");
-        fetch(`${TV_TV_URL}/tv/vol/down`).catch(() => {});
+        for (let i = 0; i < VOL_STEP; i++) {
+          await fetch(`${TV_TV_URL}/tv/vol/down`).catch(() => {});
+          if (i < VOL_STEP - 1) {
+            await new Promise((r) => setTimeout(r, 40));
+          }
+        }
       },
       () => {
         flash("vold");
@@ -717,10 +723,15 @@ export default function App() {
 
   const startVolUpHold = () => {
     lpStart(
-      () => {
+      async () => {
         if (isOff || isOther) return;
         flash("volu");
-        fetch(`${TV_TV_URL}/tv/vol/up`).catch(() => {});
+        for (let i = 0; i < VOL_STEP; i++) {
+          await fetch(`${TV_TV_URL}/tv/vol/up`).catch(() => {});
+          if (i < VOL_STEP - 1) {
+            await new Promise((r) => setTimeout(r, 40));
+          }
+        }
       },
       () => {
         flash("volu");

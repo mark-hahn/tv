@@ -1268,7 +1268,7 @@ async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
   const base = videoFilePath.replace(/\.[^.]+$/, "");
   let dlCount = 0;
   for (const r of items) {
-    if (dlCount >= 10) break;
+    if (dlCount >= 5) break;
     const fid = r.file_id || r.attributes?.files?.[0]?.file_id;
     if (!fid) continue;
     const tag = "opn" + encodeFileIdBase32(fid).slice(1);

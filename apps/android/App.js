@@ -24,8 +24,9 @@ const fs = (size) => size / PixelRatio.getFontScale();
 const TV_TV_URL = "https://hahnca.com/tv-tv";
 const TV_SRVR_WS_URL = "wss://hahnca.com/tv-srvr";
 const TV_SRVR_HTTP_URL = "https://hahnca.com/tv-srvr";
-const SCRUB_INTERVAL_MS = 500;
-const SCRUB_DIST_MS = 10000;
+const SCRUB_INTERVAL_FWD_MS = 500;
+const SCRUB_INTERVAL_BWD_MS = 1000;
+const SCRUB_DIST_TICKS = 10 * 10_000_000;
 
 function buildSeriesMap(seriesMapIn) {
   if (!seriesMapIn || seriesMapIn.length === 0) return null;
@@ -124,6 +125,9 @@ export default function App() {
   const avoidingRef = useRef(false);
   const avoidTimerRef = useRef(null);
   const unlockHoldTimerRef = useRef(null);
+  const scrubActiveRef = useRef(false);
+  const scrubPingRef = useRef(null);
+  const pendingLRKeyRef = useRef(null);
   const homeHoldRef = useRef(null);
   const homeHoldFiredRef = useRef(false);
   const showPlayingRef = useRef(null);
@@ -148,40 +152,41 @@ export default function App() {
     flash(key);
     notifyAction();
     repeatActiveRef.current = true;
+    pendingLRKeyRef.current = null;
+    const isLR = key === "left" || key === "right";
     (async () => {
-      await fetch(`${TV_TV_URL}/tv/key/${key}`).catch(() => {});
-      if (!repeatActiveRef.current) return;
-      const isLR = key === "left" || key === "right";
-      const posFetch = isLR
-        ? fetch(`${TV_TV_URL}/tv/emby/position`)
-            .then((r) => r.json())
-            .catch(() => null)
-        : null;
+      if (!isLR) {
+        await fetch(`${TV_TV_URL}/tv/key/${key}`).catch(() => {});
+        if (!repeatActiveRef.current) return;
+      } else {
+        pendingLRKeyRef.current = key;
+      }
       await new Promise((r) => {
         repeatDelayRef.current = setTimeout(r, 400);
       });
       if (!repeatActiveRef.current) return;
-      const embyPlaying = subPlayersRef.current.some(
-        (s) => s.deviceName === "Living Room TV",
-      );
-      const posData = posFetch ? await posFetch : null;
-      if (isLR && embyPlaying && posData?.ok) {
-        let currentTicks = posData.ticks;
-        const offsetTicks =
-          (key === "right" ? SCRUB_DIST_MS : -SCRUB_DIST_MS) * 10000;
-        while (repeatActiveRef.current) {
-          currentTicks = Math.max(0, currentTicks + offsetTicks);
-          await fetch(`${TV_TV_URL}/tv/emby/seek`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ticks: currentTicks }),
-          }).catch(() => {});
-          if (!repeatActiveRef.current) break;
-          await new Promise((r) => {
-            repeatTimeoutRef.current = setTimeout(r, SCRUB_INTERVAL_MS);
-          });
+      if (isLR) {
+        pendingLRKeyRef.current = null; // long press — key will not be sent on release
+        const distTicks = (key === "right" ? 1 : -1) * SCRUB_DIST_TICKS;
+        const intervalMs =
+          key === "right" ? SCRUB_INTERVAL_FWD_MS : SCRUB_INTERVAL_BWD_MS;
+        const startRes = await fetch(`${TV_TV_URL}/tv/emby/scrub/start`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ intervalMs, distTicks }),
+        })
+          .then((r) => r.json())
+          .catch(() => ({ ok: false }));
+        if (startRes.ok) {
+          scrubActiveRef.current = true;
+          scrubPingRef.current = setInterval(() => {
+            fetch(`${TV_TV_URL}/tv/emby/scrub/ping`, { method: "POST" }).catch(
+              () => {},
+            );
+          }, 500);
+          return;
         }
-        return;
+        // Emby not playing — fall through to normal key repeat
       }
       let count = 0;
       while (repeatActiveRef.current) {
@@ -218,6 +223,17 @@ export default function App() {
     repeatActiveRef.current = false;
     clearTimeout(repeatDelayRef.current);
     clearTimeout(repeatTimeoutRef.current);
+    if (scrubActiveRef.current) {
+      scrubActiveRef.current = false;
+      clearInterval(scrubPingRef.current);
+      scrubPingRef.current = null;
+      fetch(`${TV_TV_URL}/tv/emby/scrub/stop`, { method: "POST" }).catch(
+        () => {},
+      );
+    } else if (pendingLRKeyRef.current) {
+      fetch(`${TV_TV_URL}/tv/key/${pendingLRKeyRef.current}`).catch(() => {});
+    }
+    pendingLRKeyRef.current = null;
   };
 
   const applyMuteState = (data) => {
@@ -324,6 +340,10 @@ export default function App() {
       wsRef.current?.close();
       repeatActiveRef.current = false;
       volActiveRef.current = false;
+      scrubActiveRef.current = false;
+      clearInterval(scrubPingRef.current);
+      scrubPingRef.current = null;
+      pendingLRKeyRef.current = null;
       clearTimeout(repeatDelayRef.current);
       clearTimeout(repeatTimeoutRef.current);
       clearTimeout(holdRef.current);

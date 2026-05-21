@@ -609,7 +609,8 @@ import evtBus from "../evtBus.js";
 import { wsSend } from "../srvr.js";
 import allServices from "../../../tv/services.json";
 
-const SCRUB_INTERVAL = 0.5; // seconds — hold time per frame
+const SCRUB_INTERVAL_FWD = 0.5; // seconds — interval for forward scrub
+const SCRUB_INTERVAL_BWD = 1.0; // seconds — interval for backward scrub
 const SCRUB_DIST = 10; // seconds — jump distance per seek
 const TVPANE_VERSION = 2;
 
@@ -825,7 +826,8 @@ export default {
           this._pendingLRKey = null; // long press — key will not be sent on release
           const distTicks =
             (key === "right" ? 1 : -1) * SCRUB_DIST * 10_000_000;
-          const intervalMs = SCRUB_INTERVAL * 1000;
+          const intervalMs =
+            (key === "right" ? SCRUB_INTERVAL_FWD : SCRUB_INTERVAL_BWD) * 1000;
           console.log(
             `[scrub] calling scrub/start distTicks=${distTicks} intervalMs=${intervalMs}`,
           );

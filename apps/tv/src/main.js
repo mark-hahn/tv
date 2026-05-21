@@ -1200,7 +1200,7 @@ app.post("/tv/emby/seek2", async (req, res) => {
 let _scrubState = null;
 
 app.post("/tv/emby/scrub/start", async (req, res) => {
-  const { intervalMs = 500, distTicks, seekPauseDelayMs = 0 } = req.body ?? {};
+  const { intervalMs = 500, distTicks } = req.body ?? {};
   if (!distTicks) {
     res.status(400).json({ ok: false, error: "missing distTicks" });
     return;
@@ -1233,26 +1233,20 @@ app.post("/tv/emby/scrub/start", async (req, res) => {
           log("scrub dead-man expired, stopping");
           break;
         }
-        ticks = Math.max(0, ticks + distTicks);
+        // Pause → seek → wait
         await fetch(
           `${EMBY_BASE_URL}/Sessions/${id}/Playing/Pause?api_key=${EMBY_API_KEY}`,
           { method: "POST" },
         );
         if (!state.active) break;
-        // Fire seek, wait optional delay, then fire pause2 in parallel
-        const seekFetch = fetch(
+        ticks = Math.max(0, ticks + distTicks);
+        await fetch(
           `${EMBY_BASE_URL}/Sessions/${id}/Playing/seek?SeekPositionTicks=${ticks}&api_key=${EMBY_API_KEY}`,
           { method: "POST" },
-        );
-        if (seekPauseDelayMs > 0)
-          await new Promise((r) => setTimeout(r, seekPauseDelayMs));
-        const pause2Fetch = fetch(
-          `${EMBY_BASE_URL}/Sessions/${id}/Playing/Pause?api_key=${EMBY_API_KEY}`,
-          { method: "POST" },
-        );
-        await Promise.all([seekFetch, pause2Fetch]);
+        ).catch(() => {});
         if (!state.active) break;
         await new Promise((r) => setTimeout(r, intervalMs));
+        if (!state.active) break;
       }
     })().catch((err) => {
       loge("scrub loop error:", err.message);

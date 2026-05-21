@@ -2,14 +2,12 @@
 
 // Test script: start server-side scrub, ping every 0.5s to keep alive
 // Stop by pressing Ctrl+C — server stops scrubbing within 1s of last ping
-// Usage: ./seek3 [intervalSecs] [distSecs] [seekPauseDelaySecs]
-//   intervalSecs       — seconds between seeks (default 0.5)
-//   distSecs           — seconds per seek, negative = backward (default 10)
-//   seekPauseDelaySecs — delay from seek to pause2 in secs (default 0)
+// Usage: ./seek3 [intervalSecs] [distSecs]
+//   intervalSecs — seconds between seeks (default 0.5)
+//   distSecs     — seconds per seek, negative = backward (default 10)
 const TV_TV_URL = "https://hahnca.com/tv-tv";
 const INTERVAL_MS = Number(process.argv[2] ?? 0.5) * 1000;
 const DIST_TICKS = Number(process.argv[3] ?? 10) * 10_000_000;
-const SEEK_PAUSE_DELAY_MS = Number(process.argv[4] ?? 0) * 1000;
 
 const ts = () => {
   const d = new Date();
@@ -26,7 +24,6 @@ const start = () =>
     body: JSON.stringify({
       intervalMs: INTERVAL_MS,
       distTicks: DIST_TICKS,
-      seekPauseDelayMs: SEEK_PAUSE_DELAY_MS,
     }),
   })
     .then((r) => r.json())
@@ -34,7 +31,7 @@ const start = () =>
 
 (async () => {
   console.log(
-    `${ts()} starting scrub (intervalMs=${INTERVAL_MS}, distTicks=${DIST_TICKS}, seekPauseDelayMs=${SEEK_PAUSE_DELAY_MS})...`,
+    `${ts()} starting scrub (intervalMs=${INTERVAL_MS}, distTicks=${DIST_TICKS})...`,
   );
   const startRes = await start();
   console.log(`${ts()} start: ${JSON.stringify(startRes)}`);

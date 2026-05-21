@@ -609,8 +609,9 @@ import evtBus from "../evtBus.js";
 import { wsSend } from "../srvr.js";
 import allServices from "../../../tv/services.json";
 
-const SCRUB_INTERVAL_MS = 500;
-const SCRUB_DIST_MS = 10000;
+const SCRUB_INTERVAL = 0.5; // seconds — hold time per frame
+const SCRUB_DIST = 10; // seconds — jump distance per seek
+const TVPANE_VERSION = 2;
 
 const CELL_BASE = {
   borderRight: "3px solid #000",
@@ -700,6 +701,7 @@ export default {
   },
 
   mounted() {
+    console.log(`[tvpane] version ${TVPANE_VERSION}`);
     this.pollMute();
     evtBus.on("tvMuteState", this._onTvMuteState);
     evtBus.on("paneChanged", this._onPaneChanged);
@@ -790,6 +792,9 @@ export default {
     },
 
     startRepeat(key) {
+      console.log(
+        `[scrub] startRepeat key=${key} isOff=${this.isOff} isOther=${this.isOther}`,
+      );
       if (this.isOff || this.isOther) return;
       if (this.checkBlocked()) return;
       if (!this._debounce()) return;
@@ -798,38 +803,53 @@ export default {
       this._repeatActive = true;
       (async () => {
         await fetch(`${config.tvTvUrl}/tv/key/${key}`).catch(() => {});
-        if (!this._repeatActive) return;
+        if (!this._repeatActive) {
+          console.log(`[scrub] stopped after initial key`);
+          return;
+        }
         const isLR = key === "left" || key === "right";
-        const posFetch = isLR
-          ? fetch(`${config.tvTvUrl}/tv/emby/position`)
-              .then((r) => r.json())
-              .catch(() => null)
-          : null;
+        console.log(`[scrub] isLR=${isLR}, waiting 400ms`);
         await new Promise((r) => {
           this._repeatTimer = setTimeout(r, 400);
         });
-        if (!this._repeatActive) return;
-        const embyPlaying = this.subPlayers.some(
-          (s) => s.deviceName === "Living Room TV",
-        );
-        const posData = posFetch ? await posFetch : null;
-        if (isLR && embyPlaying && posData?.ok) {
-          let currentTicks = posData.ticks;
-          const offsetTicks =
-            (key === "right" ? SCRUB_DIST_MS : -SCRUB_DIST_MS) * 10000;
-          while (this._repeatActive) {
-            currentTicks = Math.max(0, currentTicks + offsetTicks);
-            await fetch(`${config.tvTvUrl}/tv/emby/seek`, {
+        if (!this._repeatActive) {
+          console.log(`[scrub] stopped after 400ms wait`);
+          return;
+        }
+        if (isLR) {
+          const distTicks =
+            (key === "right" ? 1 : -1) * SCRUB_DIST * 10_000_000;
+          const intervalMs = SCRUB_INTERVAL * 1000;
+          console.log(
+            `[scrub] calling scrub/start distTicks=${distTicks} intervalMs=${intervalMs}`,
+          );
+          const startRes = await fetch(
+            `${config.tvTvUrl}/tv/emby/scrub/start`,
+            {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ ticks: currentTicks }),
-            }).catch(() => {});
-            if (!this._repeatActive) break;
-            await new Promise((r) => {
-              this._repeatTimer = setTimeout(r, SCRUB_INTERVAL_MS);
+              body: JSON.stringify({ intervalMs, distTicks }),
+            },
+          )
+            .then((r) => r.json())
+            .catch((e) => {
+              console.log(`[scrub] scrub/start fetch error: ${e.message}`);
+              return { ok: false };
             });
+          console.log(
+            `[scrub] scrub/start result: ${JSON.stringify(startRes)}`,
+          );
+          if (startRes.ok) {
+            this._scrubbing = true;
+            this._scrubPingTimer = setInterval(() => {
+              fetch(`${config.tvTvUrl}/tv/emby/scrub/ping`, {
+                method: "POST",
+              }).catch(() => {});
+            }, 500);
+            return;
           }
-          return;
+          // Emby not playing — fall through to normal key repeat
+          console.log(`[scrub] not playing, falling through to key repeat`);
         }
         let count = 0;
         while (this._repeatActive) {
@@ -874,8 +894,17 @@ export default {
     },
 
     stopRepeat() {
+      console.log(`[scrub] stopRepeat _scrubbing=${this._scrubbing}`);
       this._repeatActive = false;
       clearTimeout(this._repeatTimer);
+      if (this._scrubbing) {
+        this._scrubbing = false;
+        clearInterval(this._scrubPingTimer);
+        this._scrubPingTimer = null;
+        fetch(`${config.tvTvUrl}/tv/emby/scrub/stop`, { method: "POST" }).catch(
+          () => {},
+        );
+      }
     },
 
     startHold(action) {

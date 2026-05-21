@@ -1195,6 +1195,89 @@ app.post("/tv/emby/seek2", async (req, res) => {
   }
 });
 
+// scrub/start: server-side loop — pause → seek → pause → [intervalMs] → repeat
+// scrub/stop:  kills the loop
+let _scrubState = null;
+
+app.post("/tv/emby/scrub/start", async (req, res) => {
+  const { intervalMs = 500, distTicks, seekPauseDelayMs = 0 } = req.body ?? {};
+  if (!distTicks) {
+    res.status(400).json({ ok: false, error: "missing distTicks" });
+    return;
+  }
+  if (_scrubState) _scrubState.active = false;
+  try {
+    const sessRes = await fetch(
+      `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
+      { headers: { Accept: "application/json" } },
+    );
+    if (!sessRes.ok) {
+      res.json({ ok: false, error: `sessions ${sessRes.status}` });
+      return;
+    }
+    const sessions = await sessRes.json();
+    const session = sessions.find(
+      (s) => s.NowPlayingItem && s.DeviceName === "Living Room TV",
+    );
+    if (!session) {
+      res.json({ ok: false, reason: "notPlaying" });
+      return;
+    }
+    const id = session.Id;
+    let ticks = session.PlayState?.PositionTicks ?? 0;
+    const state = { active: true, lastPing: Date.now() };
+    _scrubState = state;
+    (async () => {
+      while (state.active) {
+        if (Date.now() - state.lastPing > 1000) {
+          log("scrub dead-man expired, stopping");
+          break;
+        }
+        ticks = Math.max(0, ticks + distTicks);
+        await fetch(
+          `${EMBY_BASE_URL}/Sessions/${id}/Playing/Pause?api_key=${EMBY_API_KEY}`,
+          { method: "POST" },
+        );
+        if (!state.active) break;
+        // Fire seek, wait optional delay, then fire pause2 in parallel
+        const seekFetch = fetch(
+          `${EMBY_BASE_URL}/Sessions/${id}/Playing/seek?SeekPositionTicks=${ticks}&api_key=${EMBY_API_KEY}`,
+          { method: "POST" },
+        );
+        if (seekPauseDelayMs > 0)
+          await new Promise((r) => setTimeout(r, seekPauseDelayMs));
+        const pause2Fetch = fetch(
+          `${EMBY_BASE_URL}/Sessions/${id}/Playing/Pause?api_key=${EMBY_API_KEY}`,
+          { method: "POST" },
+        );
+        await Promise.all([seekFetch, pause2Fetch]);
+        if (!state.active) break;
+        await new Promise((r) => setTimeout(r, intervalMs));
+      }
+    })().catch((err) => {
+      loge("scrub loop error:", err.message);
+      state.active = false;
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    loge("scrub/start error:", err.message);
+    res.json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/tv/emby/scrub/ping", (req, res) => {
+  if (_scrubState) _scrubState.lastPing = Date.now();
+  res.json({ ok: !!_scrubState });
+});
+
+app.post("/tv/emby/scrub/stop", (req, res) => {
+  if (_scrubState) {
+    _scrubState.active = false;
+    _scrubState = null;
+  }
+  res.json({ ok: true });
+});
+
 app.post("/tv/emby/subtitle", async (req, res) => {
   const { sessionId, index } = req.body ?? {};
   if (!sessionId || index === undefined) {

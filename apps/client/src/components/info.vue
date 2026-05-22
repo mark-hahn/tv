@@ -226,15 +226,26 @@
               </button>
               <button
                 @click.stop="introClick"
-                :disabled="show.noFiles"
+                :disabled="
+                  show.noFiles ||
+                  (Number(show.size ?? 0) <= 0 && !!show.waitStr?.length)
+                "
                 :style="{
                   fontSize: '13px',
-                  cursor: show.noFiles ? 'default' : 'pointer',
+                  cursor:
+                    show.noFiles ||
+                    (Number(show.size ?? 0) <= 0 && !!show.waitStr?.length)
+                      ? 'default'
+                      : 'pointer',
                   marginLeft: '10px',
                   marginTop: '3px',
                   maxHeight: '24px',
                   borderRadius: '7px',
-                  opacity: show.noFiles ? 0.4 : 1,
+                  opacity:
+                    show.noFiles ||
+                    (Number(show.size ?? 0) <= 0 && !!show.waitStr?.length)
+                      ? 0.4
+                      : 1,
                 }"
               >
                 Intro
@@ -825,7 +836,12 @@ export default {
     },
 
     async introClick() {
-      if (this.show.noFiles) return;
+      if (
+        this.show.noFiles ||
+        (Number(this.show.size ?? 0) <= 0 && !!this.show.waitStr?.length)
+      ) {
+        return;
+      }
       try {
         const result = await srvr.introFirstFile(this.show.name);
         if (!result?.ok || !result?.path) {

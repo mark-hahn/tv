@@ -6686,8 +6686,6 @@ async function syncDiskData() {
 
       const pathPart = embyPath.split("/").pop();
       const diskInfo = diskShows[pathPart];
-      if (!diskInfo) continue;
-
       const newDate = diskInfo ? diskInfo[0] : null;
       const newSize = diskInfo ? diskInfo[1] : 0;
       const newFilesOnDisk = diskInfo ? diskInfo[2] || [] : [];

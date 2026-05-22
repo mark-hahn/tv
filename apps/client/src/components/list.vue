@@ -2966,12 +2966,15 @@ export default {
           const watchedCount = Number(tvdbData?.watchedCount ?? 0);
           const episodeCount = Number(tvdbData?.episodeCount ?? 0);
           const hasUnwatchedEpisode = episodeCount > watchedCount;
+          const hasNoPlayableIntroFile =
+            show.noFiles ||
+            (Number(show.size ?? 0) <= 0 && !!show.waitStr?.length);
           if (
             !tvdbData ||
             tvdbData.introDur != null ||
             show.inEmby === false ||
             show.inLinda ||
-            show.noFiles ||
+            hasNoPlayableIntroFile ||
             !hasUnwatchedEpisode
           ) {
             continue;

@@ -1082,11 +1082,13 @@ export default {
       const idx = shows.findIndex((s) => s.name === current.name);
       for (let i = idx + 1; i < shows.length; i++) {
         const s = shows[i];
+        const hasNoPlayableIntroFile =
+          s.noFiles || (Number(s.size ?? 0) <= 0 && !!s.waitStr?.length);
         if (
           s.introDur != null ||
           s.inEmby === false ||
           s.inLinda ||
-          s.noFiles
+          hasNoPlayableIntroFile
         ) {
           continue;
         }

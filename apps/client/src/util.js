@@ -136,7 +136,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.linda = 0;
       tmp.ban = 0;
       tmp.hasemby = 0; // Show both emby and non-emby shows by default
-      tmp.full = 0;
+      tmp.needsIntro = 0;
       tmp.haveSubs = 0;
       break;
 
@@ -154,7 +154,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.linda = -1;
       tmp.ban = -1;
       tmp.hasemby = 1;
-      tmp.full = 0;
+      tmp.needsIntro = 0;
       tmp.haveSubs = 0;
       break;
 
@@ -171,24 +171,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.linda = -1;
       tmp.ban = -1;
       tmp.hasemby = 0;
-      tmp.full = 0;
-      tmp.haveSubs = 0;
-      break;
-
-    case "Needs Files":
-      tmp.unplayed = -1;
-      tmp.gap = 0;
-      tmp.ended = 0;
-      tmp.waiting = -1;
-      tmp.drama = 0;
-      tmp.foreign = 0;
-      tmp.totry = 0;
-      tmp.continue = 0;
-      tmp.mark = 0;
-      tmp.linda = 0;
-      tmp.ban = -1;
-      tmp.hasemby = 1;
-      tmp.full = -1;
+      tmp.needsIntro = 0;
       tmp.haveSubs = 0;
       break;
 
@@ -205,7 +188,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.linda = 0;
       tmp.ban = -1;
       tmp.hasemby = 1;
-      tmp.full = 0;
+      tmp.needsIntro = 0;
       tmp.haveSubs = 0;
       break;
   }

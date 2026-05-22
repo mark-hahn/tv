@@ -2293,12 +2293,31 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         gapChanges.push(`full:${tvdbRecord.full}->${newFull}`);
         tvdbRecord.full = newFull;
       }
+      // Compute needsIntro
+      const newNeedsIntro = !!(
+        tvdbRecord.inEmby &&
+        !tvdbRecord.inLinda &&
+        tvdbRecord.introDur == null &&
+        Number(tvdbRecord.episodeCount ?? 0) >
+          Number(tvdbRecord.watchedCount ?? 0) &&
+        Array.isArray(tvdbRecord.filesOnDisk) &&
+        tvdbRecord.filesOnDisk.some(
+          (row) => Array.isArray(row) && row.length > 1,
+        )
+      );
+      if (!!tvdbRecord.needsIntro !== newNeedsIntro) {
+        gapChanges.push(
+          `needsIntro:${tvdbRecord.needsIntro}->${newNeedsIntro}`,
+        );
+        tvdbRecord.needsIntro = newNeedsIntro;
+      }
     } else if (!tvdbRecord.inEmby) {
       // For shows not in emby, set error fields to known constants
       const nonEmbyConstants = [
         ["fileGap", false],
         ["fileEndError", false],
         ["full", false],
+        ["needsIntro", false],
         ["notReady", true],
       ];
       for (const [f, v] of nonEmbyConstants) {

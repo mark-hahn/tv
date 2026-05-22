@@ -650,15 +650,7 @@ export default {
         "Length",
         "Creator",
       ],
-      fltrChoices: [
-        "Close",
-        "Try Drama",
-        "Watching",
-        "Needs Files",
-        "Finished",
-        "Playing",
-        "Needs Intro",
-      ],
+      fltrChoices: ["Close", "Try Drama", "Watching", "Finished", "Playing"],
       conds: [
         {
           color: "#0cf",
@@ -683,12 +675,12 @@ export default {
         {
           color: "#0cf",
           filter: 0,
-          icon: ["fas", "arrow-up"],
+          icon: ["fas", "film"],
           cond(show) {
-            return !!show.full;
+            return !!show.needsIntro;
           },
           click() {},
-          name: "full",
+          name: "needsIntro",
         },
         {
           color: "#f88",
@@ -2890,7 +2882,7 @@ export default {
       // Lightweight version of select(): avoids a full TVDB refresh unless
       // the "Finished" filter needs it.
       let localAllTvdb = null;
-      if (this.fltrChoice === "Finished" || this.fltrChoice === "Needs Intro") {
+      if (this.fltrChoice === "Finished") {
         if (!allTvdb) allTvdb = await tvdb.getAllTvdb();
         localAllTvdb = allTvdb;
       }
@@ -2952,35 +2944,10 @@ export default {
           if (!overview.includes(descrSrchLc)) continue;
         }
         for (let cond of this.conds) {
-          const effectiveFilter =
-            this.fltrChoice === "Needs Intro" && cond.name === "hasemby"
-              ? +1
-              : cond.filter;
+          const effectiveFilter = cond.filter;
           if (effectiveFilter === 0) continue;
           if ((effectiveFilter === +1) != !!cond.cond(show)) {
             continue fltrLoop;
-          }
-        }
-        if (this.fltrChoice === "Needs Intro") {
-          const tvdbData = localAllTvdb?.[show.name] || null;
-          const watchedCount = Number(tvdbData?.watchedCount ?? 0);
-          const episodeCount = Number(tvdbData?.episodeCount ?? 0);
-          const hasUnwatchedEpisode = episodeCount > watchedCount;
-          const hasPlayableIntroFile =
-            Array.isArray(tvdbData?.filesOnDisk) &&
-            tvdbData.filesOnDisk.some(
-              (seasonRow) => Array.isArray(seasonRow) && seasonRow.length > 1,
-            );
-          const hasNoPlayableIntroFile = !hasPlayableIntroFile;
-          if (
-            !tvdbData ||
-            tvdbData.introDur != null ||
-            show.inEmby === false ||
-            show.inLinda ||
-            hasNoPlayableIntroFile ||
-            !hasUnwatchedEpisode
-          ) {
-            continue;
           }
         }
         filteredShows.push(show);
@@ -3417,7 +3384,7 @@ export default {
           show.fileGap =
             !(show.notReady === false && show.inToTry) &&
             (show.fileGap || show.seasonWatchedThenNofile);
-          show.full = tvdbRecord.full ?? false;
+          show.needsIntro = tvdbRecord.needsIntro ?? false;
 
           // Update allTvdb cache
           tvdb.upsertTvdbCacheRecord(allTvdb, tvdbRecord, showName);
@@ -3571,7 +3538,7 @@ export default {
           show.watchGapSeason = record.watchGapSeason;
           show.watchGapEpisode = record.watchGapEpisode;
           show.fileGap = record.fileGap;
-          show.full = record.full ?? false;
+          show.needsIntro = record.needsIntro ?? false;
           show.notReady = record.notReady;
           show.date = record.date ?? show.date;
           show.size = record.size ?? show.size;
@@ -3790,7 +3757,7 @@ export default {
     });
 
     on("introPaneClosed", async () => {
-      if (this.fltrChoice !== "Needs Intro") return;
+      if (this.conds.find((c) => c.name === "needsIntro")?.filter !== 1) return;
       await this.select();
     });
 

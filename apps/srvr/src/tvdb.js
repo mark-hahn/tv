@@ -1947,6 +1947,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     "notReady",
     "lastGapCheck",
     "full",
+    "needsIntro",
   ];
   for (const f of flatGapFields) {
     if (tvdbData[f] === undefined && existing[f] !== undefined)

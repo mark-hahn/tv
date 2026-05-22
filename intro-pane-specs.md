@@ -1,5 +1,5 @@
-
 # intro video pane spec and changes
+
 - terminology used in these instructions
   - the `intro pane` is the video pane for adding/editing introDur value for show
   - there are 2 modes when intro pane is open
@@ -12,6 +12,7 @@
     - an episode can be counted as not watched even if it has no file or is unaired
   - it does not already have an introDur value in its tvdb record or has introDur is value null
   - the show is not in linda collection
+  - the show has at least one video file (tvdb record field `files-on-disk` is greater than zero)
 
 - add a button `None` to intro pane between test and next buttons
   - when clicked it should set introDur value to zero
@@ -19,7 +20,7 @@
     - it should be a toggle so it switches between 0 and startMark/endMark
   - value of zero means the show has no intro and no intro is needed
   - when introDur value is zero show these in intro pane:
-    - startMark and endMark button labels should be dashes 
+    - startMark and endMark button labels should be dashes
     - the none button should be highlighted
     - intro value should show as zero
   - the skip button in the remote control pane should do nothing when introDur is zero
@@ -46,7 +47,7 @@
 - if show filter is set to `no intro` then shows list should be updated when intro pane is closed
 
 - move the 0 button to the left left of the << button
-  - the 0 button should be 20px wide  
+  - the 0 button should be 20px wide
 
 - if there are any ambiguities, contradictions, or impossibilities in these instructions stop and ask me for help
 - feel free to make suggestions

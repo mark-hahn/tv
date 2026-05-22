@@ -657,7 +657,7 @@ export default {
         "Needs Files",
         "Finished",
         "Playing",
-        "No Intro",
+        "Needs Intro",
       ],
       conds: [
         {
@@ -2890,7 +2890,7 @@ export default {
       // Lightweight version of select(): avoids a full TVDB refresh unless
       // the "Finished" filter needs it.
       let localAllTvdb = null;
-      if (this.fltrChoice === "Finished" || this.fltrChoice === "No Intro") {
+      if (this.fltrChoice === "Finished" || this.fltrChoice === "Needs Intro") {
         if (!allTvdb) allTvdb = await tvdb.getAllTvdb();
         localAllTvdb = allTvdb;
       }
@@ -2953,7 +2953,7 @@ export default {
         }
         for (let cond of this.conds) {
           const effectiveFilter =
-            this.fltrChoice === "No Intro" && cond.name === "hasemby"
+            this.fltrChoice === "Needs Intro" && cond.name === "hasemby"
               ? +1
               : cond.filter;
           if (effectiveFilter === 0) continue;
@@ -2961,7 +2961,7 @@ export default {
             continue fltrLoop;
           }
         }
-        if (this.fltrChoice === "No Intro") {
+        if (this.fltrChoice === "Needs Intro") {
           const tvdbData = localAllTvdb?.[show.name] || null;
           const watchedCount = Number(tvdbData?.watchedCount ?? 0);
           const episodeCount = Number(tvdbData?.episodeCount ?? 0);
@@ -3789,7 +3789,7 @@ export default {
     });
 
     on("introPaneClosed", async () => {
-      if (this.fltrChoice !== "No Intro") return;
+      if (this.fltrChoice !== "Needs Intro") return;
       await this.select();
     });
 

@@ -139,23 +139,6 @@
               >Searching</span
             >
             <button
-              v-if="selectedItems.size > 0 && !previewMode"
-              @click.stop="
-                showStream = false;
-                continueDownload();
-              "
-              style="
-                font-size: 13px;
-                cursor: pointer;
-                border-radius: 7px;
-                padding: 4px;
-                border: 1px solid #bbb;
-                background-color: whitesmoke;
-              "
-            >
-              Get
-            </button>
-            <button
               v-if="selectedItems.size > 0"
               @click.stop="
                 showStream = false;
@@ -3341,7 +3324,7 @@ export default {
         };
 
         // Quality gate: block send if qbt already has a higher-quality torrent for
-        // the same S/E. forceDownload bypasses this check entirely.
+        // the same show + S/E. forceDownload bypasses this check entirely.
         if (!forceDownload) {
           const newTitle = String(torrent?.raw?.title || torrent?.title || "");
           const seMatch = newTitle.match(/S(\d{2})E(\d{2})/i);
@@ -3356,8 +3339,15 @@ export default {
             };
             const torDepth = (t) =>
               /10.?bit|hdr/i.test(String(t || "")) ? 10 : 8;
+            // Extract normalized show name using shared parseTitleFromFilename
+            const showName = (t) => {
+              const s = String(t || "");
+              const parsed = util.parseTitleFromFilename(s, null, null);
+              return parsed ? parsed.toLowerCase().trim() : "";
+            };
             const newRes = torRes(newTitle);
             const newDepth = torDepth(newTitle);
+            const newShow = showName(newTitle);
             try {
               const qbtInfoUrl = new URL(
                 `${config.torrentsApiUrl}/api/qbt/info`,
@@ -3376,6 +3366,9 @@ export default {
                     if (!qSeMatch) continue;
                     const qSe = `S${qSeMatch[1]}E${qSeMatch[2]}`.toUpperCase();
                     if (qSe !== seStr) continue;
+                    // Skip if the show names don't match
+                    const qShow = showName(qName);
+                    if (newShow && qShow && qShow !== newShow) continue;
                     const qRes = torRes(qName);
                     const qDepth = torDepth(qName);
                     if (

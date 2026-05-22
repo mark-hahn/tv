@@ -227,25 +227,38 @@
               <button
                 @click.stop="introClick"
                 :disabled="
-                  show.noFiles ||
-                  (Number(show.size ?? 0) <= 0 && !!show.waitStr?.length)
+                  !(
+                    Array.isArray(show?.filesOnDisk) &&
+                    show.filesOnDisk.some(
+                      (seasonRow) =>
+                        Array.isArray(seasonRow) && seasonRow.length > 1,
+                    )
+                  )
                 "
                 :style="{
                   fontSize: '13px',
-                  cursor:
-                    show.noFiles ||
-                    (Number(show.size ?? 0) <= 0 && !!show.waitStr?.length)
-                      ? 'default'
-                      : 'pointer',
+                  cursor: !(
+                    Array.isArray(show?.filesOnDisk) &&
+                    show.filesOnDisk.some(
+                      (seasonRow) =>
+                        Array.isArray(seasonRow) && seasonRow.length > 1,
+                    )
+                  )
+                    ? 'default'
+                    : 'pointer',
                   marginLeft: '10px',
                   marginTop: '3px',
                   maxHeight: '24px',
                   borderRadius: '7px',
-                  opacity:
-                    show.noFiles ||
-                    (Number(show.size ?? 0) <= 0 && !!show.waitStr?.length)
-                      ? 0.4
-                      : 1,
+                  opacity: !(
+                    Array.isArray(show?.filesOnDisk) &&
+                    show.filesOnDisk.some(
+                      (seasonRow) =>
+                        Array.isArray(seasonRow) && seasonRow.length > 1,
+                    )
+                  )
+                    ? 0.4
+                    : 1,
                 }"
               >
                 Intro
@@ -836,10 +849,12 @@ export default {
     },
 
     async introClick() {
-      if (
-        this.show.noFiles ||
-        (Number(this.show.size ?? 0) <= 0 && !!this.show.waitStr?.length)
-      ) {
+      const hasPlayableIntroFile =
+        Array.isArray(this.show?.filesOnDisk) &&
+        this.show.filesOnDisk.some(
+          (seasonRow) => Array.isArray(seasonRow) && seasonRow.length > 1,
+        );
+      if (!hasPlayableIntroFile) {
         return;
       }
       try {

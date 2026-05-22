@@ -1082,8 +1082,12 @@ export default {
       const idx = shows.findIndex((s) => s.name === current.name);
       for (let i = idx + 1; i < shows.length; i++) {
         const s = shows[i];
-        const hasNoPlayableIntroFile =
-          s.noFiles || (Number(s.size ?? 0) <= 0 && !!s.waitStr?.length);
+        const hasPlayableIntroFile =
+          Array.isArray(s?.filesOnDisk) &&
+          s.filesOnDisk.some(
+            (seasonRow) => Array.isArray(seasonRow) && seasonRow.length > 1,
+          );
+        const hasNoPlayableIntroFile = !hasPlayableIntroFile;
         if (
           s.introDur != null ||
           s.inEmby === false ||

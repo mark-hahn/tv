@@ -2966,9 +2966,12 @@ export default {
           const watchedCount = Number(tvdbData?.watchedCount ?? 0);
           const episodeCount = Number(tvdbData?.episodeCount ?? 0);
           const hasUnwatchedEpisode = episodeCount > watchedCount;
-          const hasNoPlayableIntroFile =
-            show.noFiles ||
-            (Number(show.size ?? 0) <= 0 && !!show.waitStr?.length);
+          const hasPlayableIntroFile =
+            Array.isArray(tvdbData?.filesOnDisk) &&
+            tvdbData.filesOnDisk.some(
+              (seasonRow) => Array.isArray(seasonRow) && seasonRow.length > 1,
+            );
+          const hasNoPlayableIntroFile = !hasPlayableIntroFile;
           if (
             !tvdbData ||
             tvdbData.introDur != null ||

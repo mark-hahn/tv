@@ -116,32 +116,54 @@
       <!-- Intro mode: mark controls (right, next to X) -->
       <template v-if="mode === 'intro'">
         <div
-          v-if="seekTarget !== null"
+          v-if="waitingForVideo"
           style="
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             color: yellow;
-            font-size: 13px;
+            font-size: 16px;
             user-select: none;
             text-shadow: 0 0 3px #000;
-            flex-shrink: 0;
-            margin-right: 8px;
+            pointer-events: none;
           "
         >
-          {{ fmtTime(seekTarget * 1000) }}
+          Waiting for video
         </div>
-        <div
-          style="
-            color: white;
-            font-size: 13px;
-            min-width: 52px;
-            text-align: right;
-            user-select: none;
-            text-shadow: 0 0 3px #000;
-            flex-shrink: 0;
-            margin-right: 14px;
-          "
-        >
-          {{ fmtTime(currentTimeSec * 1000) }}
-        </div>
+        <template v-if="!waitingForVideo">
+          <div
+            v-if="seekTarget !== null"
+            style="
+              color: yellow;
+              font-size: 13px;
+              user-select: none;
+              text-shadow: 0 0 3px #000;
+              flex-shrink: 0;
+              margin-right: 8px;
+            "
+          >
+            {{ fmtTime(seekTarget * 1000) }}
+          </div>
+          <div
+            style="
+              color: white;
+              font-size: 13px;
+              min-width: 52px;
+              text-align: right;
+              user-select: none;
+              text-shadow: 0 0 3px #000;
+              flex-shrink: 0;
+              margin-right: 14px;
+            "
+          >
+            {{ fmtTime(currentTimeSec * 1000) }}
+          </div>
+        </template>
         <div
           @click.stop="clickIntroZero"
           style="
@@ -634,6 +656,10 @@
       @timeupdate="currentTimeSec = $refs.vid ? $refs.vid.currentTime : 0"
       @loadedmetadata="onVideoLoadedMetadata"
       @volumechange="onVideoVolumeChange"
+      @durationchange="onVideoDurationChange"
+      @seeked="onVideoSeeked"
+      @play="onVideoPlay"
+      @pause="onVideoPause"
     >
       <track
         v-if="activeTrackUrl"
@@ -710,13 +736,17 @@ export default {
       vidSrc: "",
       errorRetries: 0,
       chksrtMatch: null,
-      startMark: 3 * 60 * 1000,
-      endMark: 4 * 60 * 1000,
+      startMark: 0,
+      endMark: 0,
       currentTimeSec: 0,
       seekTarget: null,
       introMuted: true,
       introVolume: 1,
       introSavedMarks: {},
+      waitingForVideo: false,
+      waitingForVideoTarget: null,
+      introMarkDirty: false,
+      introLocalNone: false,
     };
   },
   computed: {
@@ -805,7 +835,10 @@ export default {
       return this.chksrtCount > 0 ? `(${this.chksrtCount}) ${name}` : name;
     },
     isIntroNone() {
-      return this.mode === "intro" && this.introShow?.introDur === 0;
+      return (
+        this.mode === "intro" &&
+        (this.introShow?.introDur === 0 || this.introLocalNone)
+      );
     },
     introStartLabel() {
       return this.isIntroNone ? "-" : this.fmtTime(this.startMark);
@@ -843,23 +876,56 @@ export default {
   watch: {
     introShow(newVal) {
       if (!newVal?.name) return;
-      if (newVal?.introDur != null) {
-        if (newVal.introDur === 0) {
-          return;
-        }
-        const dur = Math.abs(newVal.introDur);
-        if (newVal.introDur < 0) {
-          this.startMark = 0;
-          this.endMark = dur;
-        } else {
-          if (this.startMark < 2000) this.startMark = 3 * 60 * 1000;
-          this.endMark = this.startMark + dur;
-        }
-        this.introSavedMarks = {
-          ...this.introSavedMarks,
-          [newVal.name]: { startMark: this.startMark, endMark: this.endMark },
-        };
+      this.introMarkDirty = false;
+      const tvdbIntroDur = newVal?.introDur ?? null;
+      const tvdbStartMark = newVal?.startMark ?? null;
+
+      if (tvdbStartMark == null && tvdbIntroDur == null) {
+        // Case 1: nothing set — treat as none condition
+        this.startMark = 0;
+        this.endMark = 0;
+        this.introLocalNone = true;
+        this._introPlayTargetSec = 0;
+        return;
       }
+
+      if (tvdbStartMark != null && tvdbIntroDur == null) {
+        // Case 2: startMark set, no introDur — none condition
+        this.startMark = tvdbStartMark;
+        this.endMark = tvdbStartMark;
+        this.introLocalNone = true;
+        this._introPlayTargetSec = 0;
+        return;
+      }
+
+      this.introLocalNone = false;
+
+      if (tvdbStartMark == null) {
+        // Case 3: introDur set, no startMark
+        this.startMark = 0;
+        this.endMark = tvdbIntroDur === 0 ? 0 : Math.abs(tvdbIntroDur);
+        this._introPlayTargetSec = 0;
+        return;
+      }
+
+      // Case 4: both introDur and startMark set
+      if (tvdbIntroDur < 0) {
+        this.startMark = 0;
+        this.endMark = Math.abs(tvdbIntroDur);
+        this._introPlayTargetSec = 0;
+      } else if (tvdbIntroDur === 0) {
+        this.startMark = tvdbStartMark;
+        this.endMark = tvdbStartMark;
+        this._introPlayTargetSec = tvdbStartMark / 1000;
+      } else {
+        this.startMark = tvdbStartMark;
+        this.endMark = tvdbStartMark + tvdbIntroDur;
+        this._introPlayTargetSec = tvdbStartMark / 1000;
+      }
+      this.introSavedMarks = {
+        ...this.introSavedMarks,
+        [newVal.name]: { startMark: this.startMark, endMark: this.endMark },
+      };
     },
     path(newVal) {
       this._mseStop();
@@ -871,6 +937,10 @@ export default {
       if (newVal && this.mode === "intro") this._seekOnLoad = true;
       this.subtitleOffset = offsetCache.get(newVal) ?? 0;
       if (newVal) this._fetchSubtitleList(newVal);
+      this.introMarkDirty = false;
+      this.introLocalNone = false;
+      this.waitingForVideo = false;
+      this.waitingForVideoTarget = null;
     },
     activeTrackUrl(newVal) {
       if (newVal) {
@@ -1119,7 +1189,9 @@ export default {
       if (!this._seekOnLoad) return;
       this._seekOnLoad = false;
       const targetSec =
-        this.mode === "intro" ? 0 : Math.max(0, (this.startMark - 3000) / 1000);
+        this.mode === "intro"
+          ? (this._introPlayTargetSec ?? 0)
+          : Math.max(0, (this.startMark - 3000) / 1000);
       this._seekWithConfirm(targetSec);
       const vid = this.$refs.vid;
       if (vid) vid.play().catch(() => {});
@@ -1151,12 +1223,21 @@ export default {
     },
     _seekWithConfirm(targetSec) {
       this._cancelSeek();
-      this.seekTarget = targetSec;
       const vid = this.$refs.vid;
       if (!vid) {
         this.seekTarget = null;
         return;
       }
+      if (
+        this.mode === "intro" &&
+        Number.isFinite(vid.duration) &&
+        vid.duration > 0 &&
+        targetSec > vid.duration
+      ) {
+        this._enterWaitingForVideo(targetSec);
+        return;
+      }
+      this.seekTarget = targetSec;
       vid.currentTime = targetSec;
       this._seekPollInterval = setInterval(() => {
         const v = this.$refs.vid;
@@ -1182,40 +1263,43 @@ export default {
       this.seekTarget = null;
     },
     clickNavBack30() {
+      if (this.waitingForVideo) this._exitWaitingForVideo();
       this._cancelSeek();
       const vid = this.$refs.vid;
       if (vid) vid.currentTime = Math.max(0, vid.currentTime - 30);
     },
     clickNavBack10() {
+      if (this.waitingForVideo) this._exitWaitingForVideo();
       this._cancelSeek();
       const vid = this.$refs.vid;
       if (vid) vid.currentTime = Math.max(0, vid.currentTime - 10);
     },
     clickNavFwd10() {
+      if (this.waitingForVideo) this._exitWaitingForVideo();
       this._cancelSeek();
       const vid = this.$refs.vid;
       if (vid) vid.currentTime += 10;
     },
     clickNavFwd30() {
+      if (this.waitingForVideo) this._exitWaitingForVideo();
       this._cancelSeek();
       const vid = this.$refs.vid;
       if (vid) vid.currentTime += 30;
     },
     clickIntroZero() {
-      if (this.startMark < 2000) {
-        // toggle back to positive: restore default startMark
-        this.startMark = 3 * 60 * 1000;
-      } else {
-        // toggle to negative: intro starts at beginning
-        this.startMark = 0;
-        const vid = this.$refs.vid;
-        if (vid) vid.currentTime = 0;
-      }
+      if (this.waitingForVideo) this._exitWaitingForVideo();
+      this._cancelSeek();
+      this.introMarkDirty = true;
+      this.startMark = 0;
+      const vid = this.$refs.vid;
+      if (vid) vid.currentTime = 0;
       this._saveIntroDur();
     },
     clickIntroNone() {
       if (!this.introShow?.name) return;
+      this.introMarkDirty = true;
       if (this.isIntroNone) {
+        this.introLocalNone = false;
         const saved = this.introSavedMarks[this.introShow.name];
         if (
           saved &&
@@ -1225,10 +1309,12 @@ export default {
           this.startMark = saved.startMark;
           this.endMark = saved.endMark;
         } else {
-          this.startMark = 3 * 60 * 1000;
-          this.endMark = 4 * 60 * 1000;
+          this.startMark = 0;
+          this.endMark = 0;
         }
-        this._saveIntroDur();
+        if (this.introShow?.introDur === 0) {
+          this._saveIntroDur();
+        }
         return;
       }
       this.introSavedMarks = {
@@ -1241,6 +1327,7 @@ export default {
       this._setIntroDur(0);
     },
     clickIntroPre() {
+      if (this.waitingForVideo) this._exitWaitingForVideo();
       const vid = this.$refs.vid;
       if (!vid) return;
       this._cancelSeek();
@@ -1248,6 +1335,7 @@ export default {
     },
     _restoreIntroMarksFromSaved() {
       if (!this.introShow?.name) return;
+      this.introLocalNone = false;
       const saved = this.introSavedMarks[this.introShow.name];
       if (
         saved &&
@@ -1257,27 +1345,32 @@ export default {
         this.startMark = saved.startMark;
         this.endMark = saved.endMark;
       } else {
-        this.startMark = 3 * 60 * 1000;
-        this.endMark = 4 * 60 * 1000;
+        this.startMark = 0;
+        this.endMark = 0;
       }
     },
     clickIntroStart() {
       const vid = this.$refs.vid;
       if (!vid) return;
+      if (this.waitingForVideo) this._exitWaitingForVideo();
       this._cancelSeek();
       if (this.isIntroNone) this._restoreIntroMarksFromSaved();
+      this.introMarkDirty = true;
       this.startMark = vid.currentTime * 1000;
       this._saveIntroDur();
     },
     clickIntroEnd() {
       const vid = this.$refs.vid;
       if (!vid) return;
+      if (this.waitingForVideo) this._exitWaitingForVideo();
       this._cancelSeek();
       if (this.isIntroNone) this._restoreIntroMarksFromSaved();
+      this.introMarkDirty = true;
       this.endMark = vid.currentTime * 1000;
       this._saveIntroDur();
     },
     clickIntroTest() {
+      if (this.waitingForVideo) this._exitWaitingForVideo();
       const vid = this.$refs.vid;
       if (!vid) return;
       if (this.startMark < 2000) {
@@ -1289,6 +1382,8 @@ export default {
       this._seekWithConfirm(targetSec);
     },
     clickIntroClear() {
+      this.introMarkDirty = true;
+      if (this.waitingForVideo) this._exitWaitingForVideo();
       this._setIntroDur(null);
     },
     _saveIntroDur() {
@@ -1307,8 +1402,61 @@ export default {
       );
     },
     clickIntroNext() {
+      if (this.introMarkDirty) this._saveStartMark();
+      this.introMarkDirty = false;
       if (this.introSeason != null) this._seekOnLoad = true;
       this.$emit("intro-next");
+    },
+    _saveStartMark() {
+      if (!this.introShow?.name) return;
+      const introDur = this.introShow?.introDur ?? null;
+      const markToSave =
+        introDur !== null && introDur <= 0 ? 0 : this.startMark;
+      setTvdbFields({ name: this.introShow.name, startMark: markToSave }).catch(
+        (e) => console.error("[intro] saveStartMark error:", e),
+      );
+    },
+    _exitWaitingForVideo() {
+      this.waitingForVideo = false;
+      this.waitingForVideoTarget = null;
+    },
+    _enterWaitingForVideo(targetSec) {
+      const vid = this.$refs.vid;
+      if (!vid) return;
+      this.waitingForVideo = true;
+      this.waitingForVideoTarget = targetSec;
+      this._waitingForVideoSetup = true;
+      vid.pause();
+      vid.currentTime = Math.max(0, vid.currentTime - 10);
+      setTimeout(() => {
+        this._waitingForVideoSetup = false;
+      }, 600);
+    },
+    onVideoDurationChange() {
+      if (!this.waitingForVideo || this.waitingForVideoTarget == null) return;
+      const vid = this.$refs.vid;
+      if (!vid || !Number.isFinite(vid.duration)) return;
+      if (vid.duration >= this.waitingForVideoTarget) {
+        const target = this.waitingForVideoTarget;
+        this._exitWaitingForVideo();
+        this._seekWithConfirm(target);
+        vid.play().catch(() => {});
+      }
+    },
+    onVideoSeeked() {
+      if (this.waitingForVideo && !this._waitingForVideoSetup) {
+        this._exitWaitingForVideo();
+      }
+    },
+    onVideoPlay() {
+      if (this.waitingForVideo) {
+        this._exitWaitingForVideo();
+      }
+    },
+    onVideoPause() {
+      if (this.waitingForVideo && !this._waitingForVideoSetup) {
+        this._exitWaitingForVideo();
+      }
     },
     fmtTime(ms) {
       return fmtTime(ms);
@@ -1394,6 +1542,7 @@ export default {
       this.$emit("chksrt-sel", this.path);
     },
     close() {
+      if (this.mode === "intro" && this.introMarkDirty) this._saveStartMark();
       this._mseStop();
       const vid = this.$refs.vid;
       if (vid) {

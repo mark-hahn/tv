@@ -351,6 +351,7 @@ import {
   faGlobe,
   faTrafficLight,
   faTrash,
+  faFilm,
 } from "@fortawesome/free-solid-svg-icons";
 library.add([
   faLaughBeam,
@@ -374,6 +375,7 @@ library.add([
   faClock,
   faTrafficLight,
   faTrash,
+  faFilm,
   faComment,
 ]);
 

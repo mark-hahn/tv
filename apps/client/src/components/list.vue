@@ -2971,6 +2971,7 @@ export default {
             tvdbData.introDur != null ||
             show.inEmby === false ||
             show.inLinda ||
+            show.noFiles ||
             !hasUnwatchedEpisode
           ) {
             continue;

@@ -1082,7 +1082,12 @@ export default {
       const idx = shows.findIndex((s) => s.name === current.name);
       for (let i = idx + 1; i < shows.length; i++) {
         const s = shows[i];
-        if (s.introDur != null || s.inEmby === false || s.inLinda) {
+        if (
+          s.introDur != null ||
+          s.inEmby === false ||
+          s.inLinda ||
+          s.noFiles
+        ) {
           continue;
         }
         try {

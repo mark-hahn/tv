@@ -91,6 +91,26 @@
             Active
           </button>
           <button
+            @click.stop="showFilterClick"
+            :disabled="selectedItems.size === 0 && !showFilter"
+            :style="{
+              fontSize: '13px',
+              cursor:
+                selectedItems.size > 0 || showFilter ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: showFilter ? '1px solid #888' : '1px solid #bbb',
+              '--btn-bg': showFilter
+                ? '#ccc'
+                : selectedItems.size > 0
+                  ? 'whitesmoke'
+                  : '#e8e8e8',
+              color: selectedItems.size > 0 || showFilter ? 'inherit' : '#aaa',
+            }"
+          >
+            Show
+          </button>
+          <button
             @click.stop="cleanMissingFiles"
             style="
               font-size: 13px;
@@ -367,6 +387,7 @@ export default {
       _showLoading: false,
       matchedTitle: null,
       activeOnly: false,
+      showFilter: null,
       _knownHashes: new Set(),
       selectedItems: new Set(), // Multi-select for new button group
       lastSelectedIndex: null,
@@ -401,6 +422,11 @@ export default {
             .endsWith("/movies");
           if (this.movieMode && !isMovie) return false;
           if (!this.movieMode && isMovie) return false;
+          if (
+            this.showFilter &&
+            this.toParsedTitle(t?.name) !== this.showFilter
+          )
+            return false;
           return true;
         })
         .sort((a, b) => {
@@ -1166,6 +1192,16 @@ export default {
       if (!first) return;
       const name = this.qbtExtractShowName(first);
       if (name) evtBus.emit("selectShowFromCardTitle", name);
+    },
+
+    showFilterClick() {
+      if (this.showFilter) {
+        this.showFilter = null;
+        return;
+      }
+      const first = [...this.selectedItems][0];
+      if (!first) return;
+      this.showFilter = this.toParsedTitle(first?.name) || null;
     },
 
     // From: select all items matching current show

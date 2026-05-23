@@ -192,6 +192,27 @@
           </button>
           <button
             v-if="!movieMode"
+            @click.stop="showFilterClick"
+            :disabled="selectedItems.size === 0 && !showFilter"
+            :style="{
+              fontSize: '13px',
+              cursor:
+                selectedItems.size > 0 || showFilter ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: showFilter ? '1px solid #888' : '1px solid #bbb',
+              '--btn-bg': showFilter
+                ? '#ccc'
+                : selectedItems.size > 0
+                  ? 'whitesmoke'
+                  : '#e8e8e8',
+              color: selectedItems.size > 0 || showFilter ? 'inherit' : '#aaa',
+            }"
+          >
+            Show
+          </button>
+          <button
+            v-if="!movieMode"
             @click.stop="togglePolling"
             style="
               font-size: 13px;
@@ -577,6 +598,7 @@ export default {
       isChecking: false,
       showErrs: false,
       activeOnly: false,
+      showFilter: null,
       pollingStopped: false,
       fileSearch: "",
       selectedItems: new Set(), // Multi-select for new button group
@@ -666,6 +688,9 @@ export default {
             .toLowerCase();
           return st === "waiting" || st === "downloading";
         });
+      }
+      if (this.showFilter) {
+        base = base.filter((it) => this.showName(it) === this.showFilter);
       }
       return base;
     },
@@ -1817,6 +1842,16 @@ export default {
       if (!first) return;
       const name = this.downExtractShowName(first);
       if (name) evtBus.emit("selectShowFromCardTitle", name);
+    },
+
+    showFilterClick() {
+      if (this.showFilter) {
+        this.showFilter = null;
+        return;
+      }
+      const first = [...this.selectedItems][0];
+      if (!first) return;
+      this.showFilter = this.showName(first) || null;
     },
 
     // From: select all items matching current show; scroll to first

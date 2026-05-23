@@ -217,7 +217,7 @@
             color: selectedItems.size > 0 ? 'inherit' : '#aaa',
           }"
         >
-          Force
+          Force Usb
         </button>
         <button
           v-if="movieMode"

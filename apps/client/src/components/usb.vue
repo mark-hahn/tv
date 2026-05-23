@@ -60,7 +60,7 @@
               margin-right: 8px;
             "
           >
-            Force
+            Force Down
           </button>
 
           <button
@@ -245,7 +245,7 @@
                 color: !loading && hasSelection ? 'inherit' : '#aaa',
               }"
             >
-              Force
+              Force Down
             </button>
 
             <button

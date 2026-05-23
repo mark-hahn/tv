@@ -1775,68 +1775,49 @@ export default {
       const k = String(key || "");
       if (!k) return;
 
-      // Preview mode: Map is now enabled, but tabs to the right of AI are disabled.
-      if (this.previewMode) {
-        const disabledKeys = new Set(["flex", "qbt", "usb", "down", "local"]);
-        if (disabledKeys.has(k)) {
-          return;
-        }
-      }
-
-      // In simple mode, only Series/Map/Actors exist.
+      // --- Guard layer ---
+      // Preview mode: tabs to the right of AI are disabled.
+      if (
+        this.previewMode &&
+        ["flex", "qbt", "usb", "down", "local"].includes(k)
+      )
+        return;
+      // Simple mode: only a small set of panes are available.
       if (
         this.simpleMode &&
         !["info", "map", "actors", "reviews", "trailer", "tv"].includes(k)
-      ) {
+      )
         return;
-      }
 
+      // --- Resolve + Emit layer ---
+      // Special cases that have side effects beyond a plain pane switch:
       if (k === "info") {
         this.handleActorsClose();
         return;
       }
-
       if (k === "map") {
         this.currentPane = "map";
         evtBus.emit("paneChanged", this.currentPane);
-        if (this.currentShow) {
+        if (this.currentShow)
           evtBus.emit("mapAction", { action: "open", show: this.currentShow });
-        }
         return;
       }
-
       if (k === "actors") {
         this.handleShowActors();
         return;
       }
-
-      if (k === "reviews") {
-        this.currentPane = "reviews";
-        evtBus.emit("paneChanged", this.currentPane);
-        return;
-      }
-
-      if (k === "trailer") {
-        this.currentPane = "trailer";
-        evtBus.emit("paneChanged", this.currentPane);
-        return;
-      }
-
       if (k === "tv") {
         this.currentPane = "tv";
         evtBus.emit("paneChanged", this.currentPane);
         evtBus.emit("tvCloseKeybd");
         return;
       }
-
       if (k === "browse") {
-        if (this.simpleMode) return;
         this.currentPane = "browse";
         evtBus.emit("paneChanged", this.currentPane);
         evtBus.emit("browseTabClicked");
         return;
       }
-
       if (k === "tor") {
         if (this.currentShow) this.handleShowTor(this.currentShow);
         else {
@@ -1845,39 +1826,16 @@ export default {
         }
         return;
       }
-
-      if (k === "flex") {
-        if (this.simpleMode) return;
-        this.currentPane = "flex";
-        evtBus.emit("paneChanged", this.currentPane);
-        return;
-      }
-
-      if (k === "qbt") {
-        this.handleShowQbt();
-        return;
-      }
-
-      if (k === "usb") {
-        if (this.simpleMode) return;
-        this.currentPane = "usb";
-        evtBus.emit("paneChanged", this.currentPane);
-        return;
-      }
-
-      if (k === "local") {
-        if (this.simpleMode) return;
-        this.currentPane = "local";
-        evtBus.emit("paneChanged", this.currentPane);
-        return;
-      }
-
       if (k === "down") {
         // Prompt for desktop notification permission (Firefox requires user gesture).
         this.requestNotificationsOnce();
         this.handleShowTvproc();
         return;
       }
+
+      // Default: reviews, trailer, flex, qbt, usb, local — plain pane switch.
+      this.currentPane = k;
+      evtBus.emit("paneChanged", this.currentPane);
     },
     handleShowMap(data) {
       this.mapShow = data.mapShow;
@@ -1962,13 +1920,11 @@ export default {
     },
 
     handleShowQbt() {
-      if (this.simpleMode) return;
       this.currentPane = "qbt";
       evtBus.emit("paneChanged", this.currentPane);
     },
 
     handleShowTvproc() {
-      if (this.simpleMode) return;
       this.currentPane = "down";
       evtBus.emit("paneChanged", this.currentPane);
     },

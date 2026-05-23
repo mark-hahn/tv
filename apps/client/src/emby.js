@@ -133,13 +133,8 @@ export async function loadAllShows() {
     if (rec.note && !rec.notes) rec.notes = rec.note;
     if (rec.notReady === undefined) rec.notReady = rec.inEmby === false;
     rec.watchGap = rec.watchGap || false;
-    {
-      const suppressForToTry = rec.notReady === false && rec.inToTry;
-      rec.fileGap =
-        rec.fileGap ||
-        (!suppressForToTry &&
-          (rec.fileEndError || rec.seasonWatchedThenNofile));
-    }
+    rec.fileGap =
+      rec.fileGap || rec.fileEndError || rec.seasonWatchedThenNofile;
     if (rec.inToTry === undefined) rec.inToTry = false;
     if (rec.inContinue === undefined) rec.inContinue = false;
     if (rec.inMark === undefined) rec.inMark = false;
@@ -799,8 +794,7 @@ async function _oldLoadAllShows() {
     // Set computed gap properties
     tvdb.watchGap = tvdb.watchGap || false;
     tvdb.fileGap =
-      !(tvdb.notReady === false && tvdb.inToTry) &&
-      (tvdb.fileGap || tvdb.fileEndError || tvdb.seasonWatchedThenNofile);
+      tvdb.fileGap || tvdb.fileEndError || tvdb.seasonWatchedThenNofile;
 
     // Ensure default values for missing properties
     if (tvdb.inToTry === undefined) tvdb.inToTry = false;

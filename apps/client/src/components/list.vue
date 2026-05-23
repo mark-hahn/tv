@@ -3383,13 +3383,8 @@ export default {
 
           // Update computed fields (uppercase properties)
           show.watchGap = show.watchGap;
-          {
-            const suppressForToTry = show.notReady === false && show.inToTry;
-            show.fileGap =
-              show.fileGap ||
-              (!suppressForToTry &&
-                (show.fileEndError || show.seasonWatchedThenNofile));
-          }
+          show.fileGap =
+            show.fileGap || show.fileEndError || show.seasonWatchedThenNofile;
           show.needsIntro = tvdbRecord.needsIntro ?? false;
 
           // Update allTvdb cache
@@ -3521,13 +3516,10 @@ export default {
         record.watchGap = record.watchGap || false;
         record.watchGapSeason = record.watchGapSeason;
         record.watchGapEpisode = record.watchGapEpisode;
-        {
-          const suppressForToTry = record.notReady === false && record.inToTry;
-          record.fileGap =
-            record.fileGap ||
-            (!suppressForToTry &&
-              (record.fileEndError || record.seasonWatchedThenNofile));
-        }
+        record.fileGap =
+          record.fileGap ||
+          record.fileEndError ||
+          record.seasonWatchedThenNofile;
 
         // Merge fields into the existing show in allShows
         const show = allShows.find((s) => s.name === name);

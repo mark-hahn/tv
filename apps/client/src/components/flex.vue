@@ -77,60 +77,6 @@
             >Sel: {{ selectedRows.size }}</span
           >
           <button
-            @click.stop="forceRun"
-            :style="{
-              fontSize: '13px',
-              cursor: 'pointer',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': showRunPane ? 'lightgray' : 'whitesmoke',
-            }"
-          >
-            Run
-          </button>
-          <button
-            @click.stop="flexInfoClick"
-            :disabled="selectedRows.size === 0"
-            :style="{
-              fontSize: '13px',
-              cursor: selectedRows.size > 0 ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': selectedRows.size > 0 ? 'whitesmoke' : '#e8e8e8',
-              color: selectedRows.size > 0 ? 'inherit' : '#aaa',
-            }"
-          >
-            Info
-          </button>
-          <button
-            @click.stop="toggleConfig"
-            :style="{
-              fontSize: '13px',
-              cursor: 'pointer',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': showConfig ? 'lightgray' : 'whitesmoke',
-            }"
-          >
-            Config
-          </button>
-          <button
-            @click.stop="scrollToBottomAction"
-            style="
-              font-size: 13px;
-              cursor: pointer;
-              border-radius: 7px;
-              padding: 4px 10px;
-              border: 1px solid #bbb;
-              background-color: whitesmoke;
-            "
-          >
-            Bottom
-          </button>
-          <button
             @click.stop="flexSelClick"
             :disabled="selectedRows.size === 0"
             :style="{
@@ -189,6 +135,60 @@
             }"
           >
             First
+          </button>
+          <button
+            @click.stop="forceRun"
+            :style="{
+              fontSize: '13px',
+              cursor: 'pointer',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': showRunPane ? 'lightgray' : 'whitesmoke',
+            }"
+          >
+            Run
+          </button>
+          <button
+            @click.stop="flexInfoClick"
+            :disabled="selectedRows.size === 0"
+            :style="{
+              fontSize: '13px',
+              cursor: selectedRows.size > 0 ? 'pointer' : 'default',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': selectedRows.size > 0 ? 'whitesmoke' : '#e8e8e8',
+              color: selectedRows.size > 0 ? 'inherit' : '#aaa',
+            }"
+          >
+            Info
+          </button>
+          <button
+            @click.stop="toggleConfig"
+            :style="{
+              fontSize: '13px',
+              cursor: 'pointer',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: '1px solid #bbb',
+              '--btn-bg': showConfig ? 'lightgray' : 'whitesmoke',
+            }"
+          >
+            Config
+          </button>
+          <button
+            @click.stop="scrollToBottomAction"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Bottom
           </button>
         </div>
       </div>

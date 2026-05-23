@@ -1838,6 +1838,7 @@ export default {
       evtBus.emit("paneChanged", this.currentPane);
     },
     handleShowMap(data) {
+      // --- Data update (always) ---
       this.mapShow = data.mapShow;
       this.hideMapBottom = data.hideMapBottom;
       this.seriesMapSeasons = data.seriesMapSeasons;
@@ -1845,7 +1846,7 @@ export default {
       this.seriesMap = data.seriesMap;
       this.mapError = data.mapError || "";
 
-      // Let Series pane derive counts from the same map it shows.
+      // --- Emit: let Series pane derive counts from the same map ---
       if (this.mapShow) {
         evtBus.emit("seriesMapUpdated", {
           show: this.mapShow,
@@ -1853,11 +1854,12 @@ export default {
         });
       }
 
-      // Only switch to map pane if noSwitch flag is not set
-      if (!data.noSwitch) {
-        this.currentPane = data.mapShow !== null ? "map" : "info";
-        evtBus.emit("paneChanged", this.currentPane);
-      }
+      // --- Guard: noSwitch means data update only, no pane change ---
+      if (data.noSwitch) return;
+
+      // --- Resolve + Emit: pick next pane ---
+      this.currentPane = data.mapShow !== null ? "map" : "info";
+      evtBus.emit("paneChanged", this.currentPane);
     },
     handleLocalSelectShow(showName) {
       if (!showName) return;

@@ -647,7 +647,9 @@
       ref="vid"
       controls
       autoplay
-      :muted="mode === 'intro' ? introMuted : false"
+      :muted="
+        mode === 'intro' ? introMuted : mode === 'chksrt' ? chksrtMuted : false
+      "
       crossorigin="anonymous"
       :src="vidSrc"
       style="max-width: 100%; max-height: 100%; outline: none; display: block"
@@ -689,6 +691,8 @@ import {
 const TV_SRVR_URL = config.tvSrvrUrl;
 const INTRO_MUTE_STORAGE_KEY = "tvIntroPlayerMuted";
 const INTRO_VOLUME_STORAGE_KEY = "tvIntroPlayerVolume";
+const CHKSRT_MUTE_STORAGE_KEY = "tvChksrtPlayerMuted";
+const CHKSRT_VOLUME_STORAGE_KEY = "tvChksrtPlayerVolume";
 const offsetCache = new Map(); // in-memory per-file subtitle offset
 
 function fmtTime(ms) {
@@ -742,6 +746,8 @@ export default {
       seekTarget: null,
       introMuted: true,
       introVolume: 1,
+      chksrtMuted: false,
+      chksrtVolume: 1,
       introSavedMarks: {},
       waitingForVideo: false,
       waitingForVideoTarget: null,
@@ -1186,6 +1192,11 @@ export default {
     },
     onVideoLoadedMetadata() {
       this._applyIntroAudioState();
+      if (this.mode === "chksrt") {
+        const vid = this.$refs.vid;
+        if (vid) vid.play().catch(() => {});
+        return;
+      }
       if (!this._seekOnLoad) return;
       this._seekOnLoad = false;
       const targetSec =
@@ -1197,29 +1208,43 @@ export default {
       if (vid) vid.play().catch(() => {});
     },
     onVideoVolumeChange() {
-      if (this.mode !== "intro") return;
+      if (this.mode !== "intro" && this.mode !== "chksrt") return;
       const vid = this.$refs.vid;
       if (!vid) return;
-      this.introMuted = !!vid.muted;
+      const nextMuted = !!vid.muted;
       const nextVolume = Number(vid.volume);
-      if (Number.isFinite(nextVolume)) {
-        this.introVolume = Math.max(0, Math.min(1, nextVolume));
+      const volume = Number.isFinite(nextVolume)
+        ? Math.max(0, Math.min(1, nextVolume))
+        : 1;
+      if (this.mode === "intro") {
+        this.introMuted = nextMuted;
+        this.introVolume = volume;
+        window.localStorage.setItem(
+          INTRO_MUTE_STORAGE_KEY,
+          nextMuted ? "1" : "0",
+        );
+        window.localStorage.setItem(INTRO_VOLUME_STORAGE_KEY, String(volume));
+      } else {
+        this.chksrtMuted = nextMuted;
+        this.chksrtVolume = volume;
+        window.localStorage.setItem(
+          CHKSRT_MUTE_STORAGE_KEY,
+          nextMuted ? "1" : "0",
+        );
+        window.localStorage.setItem(CHKSRT_VOLUME_STORAGE_KEY, String(volume));
       }
-      window.localStorage.setItem(
-        INTRO_MUTE_STORAGE_KEY,
-        this.introMuted ? "1" : "0",
-      );
-      window.localStorage.setItem(
-        INTRO_VOLUME_STORAGE_KEY,
-        String(this.introVolume),
-      );
     },
     _applyIntroAudioState() {
-      if (this.mode !== "intro") return;
+      if (this.mode !== "intro" && this.mode !== "chksrt") return;
       const vid = this.$refs.vid;
       if (!vid) return;
-      vid.muted = this.introMuted;
-      vid.volume = Math.max(0, Math.min(1, Number(this.introVolume) || 0));
+      if (this.mode === "intro") {
+        vid.muted = this.introMuted;
+        vid.volume = Math.max(0, Math.min(1, Number(this.introVolume) || 0));
+      } else {
+        vid.muted = this.chksrtMuted;
+        vid.volume = Math.max(0, Math.min(1, Number(this.chksrtVolume) || 0));
+      }
     },
     _seekWithConfirm(targetSec) {
       this._cancelSeek();
@@ -1578,6 +1603,17 @@ export default {
     if (savedVolume != null) {
       const n = Number(savedVolume);
       if (Number.isFinite(n)) this.introVolume = Math.max(0, Math.min(1, n));
+    }
+    const savedChksrtMuted = window.localStorage.getItem(
+      CHKSRT_MUTE_STORAGE_KEY,
+    );
+    const savedChksrtVolume = window.localStorage.getItem(
+      CHKSRT_VOLUME_STORAGE_KEY,
+    );
+    this.chksrtMuted = savedChksrtMuted === "1";
+    if (savedChksrtVolume != null) {
+      const n = Number(savedChksrtVolume);
+      if (Number.isFinite(n)) this.chksrtVolume = Math.max(0, Math.min(1, n));
     }
     this.vidSrc = this.path ? this.streamUrl : "";
     this.subtitleOffset = offsetCache.get(this.path) ?? 0;

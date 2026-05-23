@@ -133,9 +133,13 @@ export async function loadAllShows() {
     if (rec.note && !rec.notes) rec.notes = rec.note;
     if (rec.notReady === undefined) rec.notReady = rec.inEmby === false;
     rec.watchGap = rec.watchGap || false;
-    rec.fileGap =
-      !(rec.notReady === false && rec.inToTry) &&
-      (rec.fileGap || rec.fileEndError || rec.seasonWatchedThenNofile);
+    {
+      const suppressForToTry = rec.notReady === false && rec.inToTry;
+      rec.fileGap =
+        rec.fileGap ||
+        (!suppressForToTry &&
+          (rec.fileEndError || rec.seasonWatchedThenNofile));
+    }
     if (rec.inToTry === undefined) rec.inToTry = false;
     if (rec.inContinue === undefined) rec.inContinue = false;
     if (rec.inMark === undefined) rec.inMark = false;

@@ -2056,40 +2056,49 @@ export default {
     // Preview mode: driven by ctrl-click in the web search dropdown.
     evtBus.on("previewMode", (active) => {
       this.previewMode = !!active;
+
       if (!this.previewMode) {
+        // --- preview-exited ---
+        // Reset preview UI state (always).
         this.previewSrchChoice = null;
         this.previewAddBusy = false;
         this.previewPanesLoading = false;
-        if (this.savedPane) {
-          this.currentPane = this.savedPane;
-          this.savedPane = null;
-          this.restoringPreviewPane = true;
-          // Prevent setUpSeries from resetting pane to 'info' when list.vue triggers it shortly
-          setTimeout(() => {
-            this.restoringPreviewPane = false;
-          }, 500);
-          evtBus.emit("paneChanged", this.currentPane);
 
-          if (this.currentShow) {
-            evtBus.emit("setUpSeries", this.currentShow);
-          }
-        }
+        // Guard: nothing to restore if no pane was saved.
+        if (!this.savedPane) return;
+
+        // Resolve: restore the pane that was active before preview.
+        this.currentPane = this.savedPane;
+        this.savedPane = null;
+
+        // Emit.
+        // restoringPreviewPane suppresses the setUpSeries→info fallback for 500ms.
+        // Removed in step 4 when show-selected is layered.
+        this.restoringPreviewPane = true;
+        setTimeout(() => {
+          this.restoringPreviewPane = false;
+        }, 500);
+        evtBus.emit("paneChanged", this.currentPane);
+        if (this.currentShow) evtBus.emit("setUpSeries", this.currentShow);
+        return;
       }
-      if (this.previewMode) {
-        this.savedPane = this.currentPane;
-        // If currently on a disabled pane, snap back to Series.
-        const allowed = new Set([
-          "info",
-          "actors",
-          "reviews",
-          "trailer",
-          "browse",
-          "tor",
-        ]);
-        if (!allowed.has(this.currentPane)) {
-          this.currentPane = "info";
-          evtBus.emit("paneChanged", this.currentPane);
-        }
+
+      // --- preview-entered ---
+      // Save current pane so preview-exited can restore it.
+      this.savedPane = this.currentPane;
+
+      // Guard + Resolve: if on a pane disabled during preview, snap to info.
+      const previewAllowed = new Set([
+        "info",
+        "actors",
+        "reviews",
+        "trailer",
+        "browse",
+        "tor",
+      ]);
+      if (!previewAllowed.has(this.currentPane)) {
+        this.currentPane = "info";
+        evtBus.emit("paneChanged", this.currentPane);
       }
     });
 

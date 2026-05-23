@@ -130,6 +130,17 @@
           margin-right: 20px;
         "
       >
+        <span
+          v-if="!movieMode && selectedItems.size > 0"
+          style="
+            font-size: 15px;
+            font-weight: bold;
+            color: green;
+            align-self: center;
+            white-space: nowrap;
+          "
+          >Sel: {{ selectedItems.size }}</span
+        >
         <button
           v-if="!movieMode"
           @click.stop="qbtSelClick"

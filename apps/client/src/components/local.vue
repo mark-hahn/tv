@@ -216,6 +216,17 @@
           </div>
 
           <div style="display: flex; align-items: center; gap: 10px">
+            <span
+              v-if="selectedFiles.size > 0"
+              style="
+                font-size: 15px;
+                font-weight: bold;
+                color: green;
+                align-self: center;
+                white-space: nowrap;
+              "
+              >Sel: {{ selectedFiles.size }}</span
+            >
             <button
               @click="errsMode || toShow()"
               :disabled="

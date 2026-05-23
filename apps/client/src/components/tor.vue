@@ -235,6 +235,18 @@
             </button>
           </div>
           <div style="display: flex; gap: 6px; align-items: center">
+            <span
+              v-if="selectedItems.size > 0"
+              style="
+                font-size: 15px;
+                font-weight: bold;
+                color: green;
+                align-self: center;
+                white-space: nowrap;
+                margin-right: 2px;
+              "
+              >Sel: {{ selectedItems.size }}</span
+            >
             <button
               @click.stop="torAllClick"
               :disabled="selectedItems.size === 0"

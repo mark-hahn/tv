@@ -120,6 +120,17 @@
             />
           </div>
           <div style="display: flex; gap: 8px; align-items: center">
+            <span
+              v-if="selectedFolders.size + selectedFiles.size > 0"
+              style="
+                font-size: 15px;
+                font-weight: bold;
+                color: green;
+                align-self: center;
+                white-space: nowrap;
+              "
+              >Sel: {{ selectedFolders.size + selectedFiles.size }}</span
+            >
             <button
               @click.stop="usbSelClick"
               :disabled="!hasSelection"

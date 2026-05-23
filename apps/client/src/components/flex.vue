@@ -65,6 +65,17 @@
             "
             >Running...</span
           >
+          <span
+            v-if="selectedRows.size > 0"
+            style="
+              font-size: 15px;
+              font-weight: bold;
+              color: green;
+              align-self: center;
+              white-space: nowrap;
+            "
+            >Sel: {{ selectedRows.size }}</span
+          >
           <button
             @click.stop="forceRun"
             :style="{

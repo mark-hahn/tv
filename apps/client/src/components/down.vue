@@ -233,6 +233,17 @@
           "
         />
         <div style="display: flex; gap: 10px; align-items: center">
+          <span
+            v-if="selectedItems.size > 0"
+            style="
+              font-size: 15px;
+              font-weight: bold;
+              color: green;
+              align-self: center;
+              white-space: nowrap;
+            "
+            >Sel: {{ selectedItems.size }}</span
+          >
           <button
             @click.stop="downSelClick"
             :disabled="selectedItems.size === 0"

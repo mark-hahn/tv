@@ -2116,48 +2116,28 @@ export default {
       evtBus.emit("openStream", show);
     });
 
-    // Close torrents or actors pane when a different show is selected
+    // show-selected: fired when the user picks a new show from the list.
     evtBus.on("setUpSeries", (show) => {
-      // Keep currentShow synced to the list selection immediately.
-      // tvdbDataReady may arrive later; that's fine.
+      // --- State update (always) ---
       this.currentShow = show;
-
-      // If currently on Map, do not force-switch panes.
-      // list.vue will separately update the map content.
-      if (this.currentPane === "map") {
-        return;
-      }
+      this.currentTvdbData = null; // stale until series pane publishes new data
+      this._torrentsInitialized = false;
+      this._torrentsShowKey = null;
 
       const prevPane = this.currentPane;
-
-      // Check if actor search is active - if so, keep actors pane visible
       const actorSearchActive = !!this._actorSearchParams;
 
-      // New show selection should reset Actors state (unless in actor search mode)
       if (!actorSearchActive) {
         evtBus.emit("resetActorsPane");
         this._actorsInitialized = false;
         this._actorsShowKey = null;
       }
 
-      // Clear stale TVDB data until the series pane publishes the new show data.
-      this.currentTvdbData = null;
+      // --- Guard layer (keep current pane, no switch) ---
+      // Priority 1: map — list.vue handles map content update separately.
+      if (prevPane === "map") return;
 
-      // New show selection should allow torrents pane to reinitialize.
-      this._torrentsInitialized = false;
-      this._torrentsShowKey = null;
-
-      // If tor pane is visible, start a new search for the new show.
-      if (prevPane === "tor") {
-        const showKey = this.currentShow?.id || this.currentShow?.name || null;
-        evtBus.emit("showTorrents", this.currentShow);
-        this._torrentsInitialized = true;
-        this._torrentsShowKey = showKey;
-        return;
-      }
-
-      // When currently viewing Local, stay on Local.
-      // When in actor search mode and on actors pane, stay on Actors.
+      // Priority 2: panes that always keep their content on show change.
       const keepContentPanes = new Set([
         "local",
         "usb",
@@ -2167,17 +2147,26 @@ export default {
         "trailer",
         "actors",
       ]);
-      if (keepContentPanes.has(prevPane)) {
+      if (keepContentPanes.has(prevPane)) return;
+
+      // Priority 3: preview-exit re-emit — pane was just restored, don't override it.
+      // (Decoupled from setUpSeries in a future step.)
+      if (this.restoringPreviewPane) return;
+
+      // --- Resolve + Emit layer ---
+      // Tor: stay on tor and start a new search for the new show.
+      if (prevPane === "tor") {
+        const showKey = this.currentShow?.id || this.currentShow?.name || null;
+        evtBus.emit("showTorrents", this.currentShow);
+        this._torrentsInitialized = true;
+        this._torrentsShowKey = showKey;
         return;
       }
 
-      // If in actor search mode, switch to actors pane instead of info
+      // Actor search active on a non-keepPane: switch to actors.
       if (actorSearchActive) {
         this.currentPane = "actors";
         evtBus.emit("paneChanged", this.currentPane);
-
-        // Immediately show actors with search params for the new show
-        // This ensures matching actors are sorted to the top right away
         const showKey = this.currentShow?.id || this.currentShow?.name || null;
         evtBus.emit("showActors", {
           show: this.currentShow,
@@ -2189,13 +2178,7 @@ export default {
         return;
       }
 
-      // If we are just restoring the previous pane after preview mode,
-      // do not fallback to 'info' pane.
-      if (this.restoringPreviewPane) {
-        return;
-      }
-
-      // Otherwise, return to the Series pane.
+      // Default: return to the Series pane.
       this.currentPane = "info";
       this.mapShow = null;
       evtBus.emit("paneChanged", this.currentPane);

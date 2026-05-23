@@ -1838,35 +1838,32 @@ export default {
       this.fltrPopped = false;
     },
     onSelectShow(show, scroll = false) {
-      // console.log('List: selected show:', show);
       const wasPreview = !!this.previewMode;
       const wasAlreadySelected = show?.name === this.highlightName;
       const keepCurrentPane = this.currentPane;
-      const preserveMapPane = keepCurrentPane === "map";
 
       if (wasPreview) this.setPreviewMode(false);
       this.saveVisShow(show, scroll);
 
-      // If we just exited preview mode, always land on Series for the newly selected show.
+      // --- Guard layer (suppress showSeriesPane when pane should stay) ---
+      // Priority 1: map pane always preserved (setUpSeries also guards this).
+      if (keepCurrentPane === "map") return;
+
+      // Priority 2: preview exit — land on Series for the newly-added show.
       if (wasPreview) {
-        if (!preserveMapPane) {
-          evtBus.emit("showSeriesPane");
-        }
+        evtBus.emit("showSeriesPane");
         return;
       }
 
-      // If clicking on an already-selected show, always switch to info pane.
+      // Priority 3: re-clicking same show — always return to Series.
       if (wasAlreadySelected) {
-        if (!preserveMapPane) {
-          evtBus.emit("showSeriesPane");
-        }
+        evtBus.emit("showSeriesPane");
         return;
       }
 
-      // Clicking a show should generally return to the Series pane.
-      // Exception: when the user is actively in Map/Actors/Subs/Files/Reviews/Trailer/AI, do not switch panes.
+      // --- Resolve layer ---
+      // Panes that keep their content across show changes — stay put.
       const keepPane = new Set([
-        "map",
         "actors",
         "subs",
         "files",
@@ -1874,9 +1871,10 @@ export default {
         "trailer",
         "ai",
       ]);
-      if (!keepPane.has(keepCurrentPane)) {
-        evtBus.emit("showSeriesPane");
-      }
+      if (keepPane.has(keepCurrentPane)) return;
+
+      // Default: return to Series.
+      evtBus.emit("showSeriesPane");
     },
 
     normalizeForShowMatch(name) {

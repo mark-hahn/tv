@@ -235,6 +235,7 @@
         <div style="display: flex; gap: 10px; align-items: center">
           <span
             v-if="selectedItems.size > 0"
+            class="sel-count"
             style="
               font-size: 15px;
               font-weight: bold;

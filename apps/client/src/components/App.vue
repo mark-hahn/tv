@@ -2377,6 +2377,12 @@ body {
   color: #000 !important;
 }
 
+#tor span.sel-count,
+#qbt span.sel-count,
+#down span.sel-count {
+  color: green !important;
+}
+
 /* Force light-gray button backgrounds only in the right-side panes */
 #info button,
 #map button,

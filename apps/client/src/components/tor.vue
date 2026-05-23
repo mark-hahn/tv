@@ -264,6 +264,32 @@
               All
             </button>
             <button
+              @click.stop="torGroupClick"
+              :disabled="selectedItems.size === 0 && groupFilter === null"
+              :style="{
+                fontSize: '13px',
+                cursor:
+                  selectedItems.size > 0 || groupFilter !== null
+                    ? 'pointer'
+                    : 'default',
+                borderRadius: '7px',
+                padding: '4px 8px',
+                border: '1px solid #bbb',
+                '--btn-bg':
+                  groupFilterFlash || groupFilter !== null
+                    ? 'lightgray'
+                    : selectedItems.size > 0
+                      ? 'whitesmoke'
+                      : '#e8e8e8',
+                color:
+                  selectedItems.size > 0 || groupFilter !== null
+                    ? 'inherit'
+                    : '#aaa',
+              }"
+            >
+              Group
+            </button>
+            <button
               @click.stop="torFirstClick"
               :disabled="selectedItems.size === 0"
               :style="{
@@ -1221,6 +1247,9 @@ export default {
       filesTorrentTitle: "",
 
       groupCounts: {},
+
+      groupFilter: null, // non-null = group name filter is active
+      groupFilterFlash: false, // true = flash button highlight for 500ms
     };
   },
 
@@ -1328,6 +1357,13 @@ export default {
           }
           return false;
         });
+      }
+
+      if (this.groupFilter) {
+        const gf = this.groupFilter.toLowerCase();
+        list = list.filter(
+          (t) => String(t.parsed?.group || "").toLowerCase() === gf,
+        );
       }
 
       return list.slice().sort((a, b) => {
@@ -1900,6 +1936,7 @@ export default {
       this.unaired = false;
       this.iptCfClearance = "";
       this.tlCfClearance = "";
+      this.groupFilter = null;
 
       this._didInitialScroll = false;
       this.lastAutoSearchedShowId = null;
@@ -2081,6 +2118,7 @@ export default {
       this.dismissCookieInputs = false;
       this.lastNeeded = null;
       this._didInitialScroll = false;
+      this.groupFilter = null;
 
       // Kick off space fetch ASAP; don't wait for torrent searching.
       void this.updateSpaceAvail();
@@ -3941,6 +3979,49 @@ export default {
           const card = cards[firstIdx];
           if (card) card.scrollIntoView({ block: "nearest" });
         });
+      }
+    },
+
+    // Group: toggle a filter that shows only cards with the same group as the first selected card with a group
+    torGroupClick() {
+      if (this.groupFilter !== null) {
+        // Toggle off - keep current selectedItems (selected while filtering)
+        this.groupFilter = null;
+        return;
+      }
+
+      if (this.selectedItems.size === 0) return;
+
+      // Find group from first visible selected card that has a group
+      let group = null;
+      for (const t of this.filteredTorrents) {
+        if (!this.selectedItems.has(t)) continue;
+        const g = String(t.parsed?.group || "").trim();
+        if (g) {
+          group = g;
+          break;
+        }
+      }
+
+      if (group) {
+        // Keep only selected items that match the group so pre-filter selections
+        // of non-matching cards don't reappear when filter is turned off
+        const gLower = group.toLowerCase();
+        const newSel = new Set();
+        for (const t of this.selectedItems) {
+          if (String(t.parsed?.group || "").toLowerCase() === gLower) {
+            newSel.add(t);
+          }
+        }
+        this.selectedItems = newSel;
+        this.groupFilter = group;
+      } else {
+        // No group found - flash the button highlight for 500ms
+        this.groupFilterFlash = true;
+        window.clearTimeout(this._groupFilterFlashTimer);
+        this._groupFilterFlashTimer = window.setTimeout(() => {
+          this.groupFilterFlash = false;
+        }, 500);
       }
     },
 

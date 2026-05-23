@@ -7213,6 +7213,7 @@ watcher
         );
       }
       tvdb.enqueueShowProcess(showName);
+      handleShowDiskChange(showName);
     }, DISK_CHANGE_DEBOUNCE_MS);
   })
   .on("unlink", (filePath) => {

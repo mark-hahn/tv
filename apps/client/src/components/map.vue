@@ -2,7 +2,6 @@
   <div
     id="map"
     ref="mapScroller"
-    @click="handleMapClick"
     :style="{
       height: '100%',
       width: '100%',
@@ -1198,12 +1197,10 @@ export default {
     "reload-shows",
     "prune",
     "set-date",
-    "close",
     "episode-click",
     "delete-episodes",
     "season-watched",
     "season-delete",
-    "show-actors",
     "open-intro",
   ],
 
@@ -1643,9 +1640,6 @@ export default {
         console.error("loadTvdbData error:", err);
       }
     },
-    handleMapClick() {
-      // No action: click-to-close removed.
-    },
     formatEpisodeAired(aired) {
       return aired ? String(aired).replace(/-/g, "/") : "";
     },
@@ -2026,7 +2020,6 @@ export default {
     handleSeasonPlainClick(event, season) {
       event?.preventDefault?.();
       if (this.simpleMode) {
-        // Let it bubble to handleMapClick (which returns to Series).
         return;
       }
       event.stopPropagation();
@@ -2040,7 +2033,6 @@ export default {
     handleSeasonClick(event, season) {
       event?.preventDefault?.();
       if (this.simpleMode) {
-        // Let it bubble to handleMapClick (which returns to Series).
         return;
       }
       event.stopPropagation();

@@ -241,8 +241,6 @@
             @reload-shows="triggerShowReload"
             @prune="handleMapAction('prune', $event)"
             @set-date="handleMapAction('date', $event)"
-            @close="handleMapAction('close')"
-            @show-actors="() => handleShowActors(false)"
             @episode-click="handleEpisodeClick"
             @delete-episodes="handleDeleteEpisodes"
             @play-episode="handlePlayEpisode"
@@ -352,8 +350,6 @@
         :hideButtonsPane="showSideButtons"
         :libraryProgressText="libraryProgressText"
         @show-map="handleShowMap"
-        @hide-map="handleHideMap"
-        @show-actors="handleShowActors"
         @show-tor="handleShowTor"
         @all-shows="handleAllShows"
         @filtered-shows="handleFilteredShows"
@@ -1810,7 +1806,7 @@ export default {
       }
 
       if (k === "actors") {
-        this.handleShowActors(false);
+        this.handleShowActors();
         return;
       }
 
@@ -1905,11 +1901,6 @@ export default {
         evtBus.emit("paneChanged", this.currentPane);
       }
     },
-    handleHideMap() {
-      this.currentPane = "info";
-      this.mapShow = null;
-      evtBus.emit("paneChanged", this.currentPane);
-    },
     handleLocalSelectShow(showName) {
       if (!showName) return;
       evtBus.emit("selectShowFromCardTitle", showName);
@@ -1919,45 +1910,34 @@ export default {
       this.movieMode = val;
     },
 
-    handleShowActors(fromMap = false) {
-      // If called from map click, show series pane instead
-      if (fromMap) {
-        this.currentPane = "info";
-        this.mapShow = null;
-        evtBus.emit("paneChanged", this.currentPane);
-        evtBus.emit("mapAction", { action: "close", show: null });
-      } else {
-        const showKey = this.currentShow?.id || this.currentShow?.name || null;
-        // Switching panes should not reset actors; only reset when show selection changes.
-        if (
-          this._actorsInitialized &&
-          this._actorsShowKey &&
-          showKey &&
-          this._actorsShowKey === showKey
-        ) {
-          this.currentPane = "actors";
-          evtBus.emit("paneChanged", this.currentPane);
-          return;
-        }
-
+    handleShowActors() {
+      const showKey = this.currentShow?.id || this.currentShow?.name || null;
+      // Switching panes should not reset actors; only reset when show selection changes.
+      if (
+        this._actorsInitialized &&
+        this._actorsShowKey &&
+        showKey &&
+        this._actorsShowKey === showKey
+      ) {
         this.currentPane = "actors";
         evtBus.emit("paneChanged", this.currentPane);
-        // Emit event to actors component with current tvdbData and show
-        evtBus.emit("showActors", {
-          show: this.currentShow,
-          tvdbData: this.currentTvdbData,
-          actorSearchParams: this._actorSearchParams,
-        });
-        this._actorsInitialized = true;
-        this._actorsShowKey = showKey;
+        return;
       }
+
+      this.currentPane = "actors";
+      evtBus.emit("paneChanged", this.currentPane);
+      evtBus.emit("showActors", {
+        show: this.currentShow,
+        tvdbData: this.currentTvdbData,
+        actorSearchParams: this._actorSearchParams,
+      });
+      this._actorsInitialized = true;
+      this._actorsShowKey = showKey;
     },
     handleActorsClose() {
       this.currentPane = "info";
       this.mapShow = null;
       evtBus.emit("paneChanged", this.currentPane);
-      // Clear mapShow in list component via event
-      evtBus.emit("mapAction", { action: "close", show: null });
     },
     handleShowTor(show) {
       if (this.simpleMode) return;
@@ -1993,49 +1973,7 @@ export default {
       evtBus.emit("paneChanged", this.currentPane);
     },
 
-    handleTvprocToTor() {
-      if (this._torrentsInitialized) {
-        this.currentPane = "tor";
-        evtBus.emit("paneChanged", this.currentPane);
-        return;
-      }
-
-      if (this.currentShow) {
-        this.handleShowTor(this.currentShow);
-      } else {
-        this.currentPane = "tor";
-        evtBus.emit("paneChanged", this.currentPane);
-      }
-    },
-
-    handleTvprocToQbt() {
-      this.currentPane = "qbt";
-      evtBus.emit("paneChanged", this.currentPane);
-    },
-
-    handleTvprocToInfo() {
-      this.currentPane = "info";
-      this.mapShow = null;
-      evtBus.emit("paneChanged", this.currentPane);
-      evtBus.emit("mapAction", { action: "close", show: null });
-    },
-
-    handleTvprocToMap() {
-      if (this.currentShow) {
-        evtBus.emit("mapAction", { action: "open", show: this.currentShow });
-      }
-    },
-    handleTorrentsClose() {
-      this.currentPane = "info";
-      this.mapShow = null;
-      evtBus.emit("paneChanged", this.currentPane);
-      // Clear mapShow in list component via event
-      evtBus.emit("mapAction", { action: "close", show: null });
-    },
     handleMapAction(action, show) {
-      if (action === "close") {
-        this.handleHideMap();
-      }
       evtBus.emit("mapAction", { action, show });
     },
     handleEpisodeClick(e, show, season, episode, setWatched = null) {
@@ -2123,11 +2061,11 @@ export default {
 
     // Listen for pane navigation events
     evtBus.on("showActorsPane", () => {
-      this.handleShowActors(false);
+      this.handleShowActors();
     });
 
     evtBus.on("showActorsPaneWithEpisode", (episodeInfo) => {
-      this.handleShowActors(false);
+      this.handleShowActors();
       // Emit event to actors pane with episode info
       evtBus.emit("fillAndSelectEpisode", episodeInfo);
     });

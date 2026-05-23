@@ -389,7 +389,7 @@ export default {
 
   components: { FontAwesomeIcon, Shows, HdrTop, HdrBot, Buttons },
 
-  emits: ["show-map", "hide-map", "all-shows", "all-tvdb", "filtered-shows"],
+  emits: ["show-map", "all-shows", "all-tvdb", "filtered-shows"],
 
   props: {
     simpleMode: {
@@ -2533,14 +2533,6 @@ export default {
     },
 
     async seriesMapAction(action, show) {
-      if (action == "close") {
-        // Invalidate any in-flight open/refresh so it bails on its next token check
-        // and does not later overwrite mapShow with a stale/partial object.
-        this._mapActionToken++;
-        this.mapShow = null;
-        this.$emit("hide-map");
-        return;
-      }
       if (
         action == "open" &&
         this.mapShow?.name === show?.name &&
@@ -3828,14 +3820,6 @@ export default {
       );
     });
 
-    this.keydownHandler = (event) => {
-      if (event.code == "Escape") {
-        this.remotesAction("close");
-        this.seriesMapAction("close");
-      }
-    };
-    document.addEventListener("keydown", this.keydownHandler);
-
     void (async () => {
       try {
         await this.newShows(true);
@@ -3861,11 +3845,6 @@ export default {
         evtBus.off(name, fn);
       }
       this.evtHandlers = null;
-    }
-
-    if (this.keydownHandler) {
-      document.removeEventListener("keydown", this.keydownHandler);
-      this.keydownHandler = null;
     }
 
     if (this._onResizeWideLandscape) {

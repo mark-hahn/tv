@@ -111,7 +111,7 @@ const PANE_TIPS = {
     Errs: "Toggle error records display",
     Clr: "Clear all error records",
     Bot: "Scroll to the bottom of the list",
-    Active: "Scroll to the currently active download",
+    Active: "Toggle showing only active downloads",
     Stop: "Stop automatic download polling",
     Resume: "Resume automatic download polling",
   },

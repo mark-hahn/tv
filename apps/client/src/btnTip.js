@@ -46,6 +46,7 @@ const PANE_TIPS = {
     "All Credits": "Load all credits for this actor from IMDb",
     IMDb: "Open actor's IMDb page",
     Wikipedia: "Search Wikipedia for this actor",
+    "Mr. Skin": "Search Mr. Skin for this actor",
     Done: "Close actor detail and return to cast list",
     Regulars: "Show series regular cast members",
     Guests: "Show guest cast members",

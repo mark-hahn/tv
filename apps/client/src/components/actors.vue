@@ -205,6 +205,17 @@
               Wikipedia
             </button>
             <button
+              @click.stop="handleMrSkinButton"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 5px;
+                padding: 4px 10px;
+              "
+            >
+              Mr. Skin
+            </button>
+            <button
               @click.stop="handleDoneButton"
               style="
                 font-size: 13px;
@@ -920,6 +931,17 @@ export default {
     handleImdbButton() {
       if (!this.actorPageUrl) return;
       util.openExternalPage(this.actorPageUrl);
+    },
+
+    handleMrSkinButton() {
+      if (!this.selectedActor) return;
+      const name = String(
+        this.selectedActor?.personName || this.selectedActor?.name || "",
+      ).trim();
+      if (!name) return;
+      util.openExternalPage(
+        `https://${theMan}.com/search/celebs?term=${encodeURIComponent(name)}`,
+      );
     },
 
     handleDoneButton() {

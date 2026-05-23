@@ -114,7 +114,7 @@ export function fmtBytesSize(value) {
   // - else 123 MB when size >= 1e7
   // - else 123 KB when size >= 1e4
   // - else 123 B
-  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(3)} GB`;
+  if (bytes >= 1e9) return `${parseFloat((bytes / 1e9).toFixed(3))} GB`;
   if (bytes >= 1e7) return `${Math.round(bytes / 1e6)} MB`;
   if (bytes >= 1e4) return `${Math.round(bytes / 1e3)} KB`;
   return `${Math.round(bytes)} B`;

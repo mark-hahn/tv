@@ -647,9 +647,7 @@
       ref="vid"
       controls
       autoplay
-      :muted="
-        mode === 'intro' ? introMuted : mode === 'chksrt' ? chksrtMuted : false
-      "
+      :muted="playerMuted"
       crossorigin="anonymous"
       :src="vidSrc"
       style="max-width: 100%; max-height: 100%; outline: none; display: block"
@@ -689,10 +687,8 @@ import {
 } from "../srvr.js";
 
 const TV_SRVR_URL = config.tvSrvrUrl;
-const INTRO_MUTE_STORAGE_KEY = "tvIntroPlayerMuted";
-const INTRO_VOLUME_STORAGE_KEY = "tvIntroPlayerVolume";
-const CHKSRT_MUTE_STORAGE_KEY = "tvChksrtPlayerMuted";
-const CHKSRT_VOLUME_STORAGE_KEY = "tvChksrtPlayerVolume";
+const PLAYER_MUTE_STORAGE_KEY = "tvPlayerMuted";
+const PLAYER_VOLUME_STORAGE_KEY = "tvPlayerVolume";
 const offsetCache = new Map(); // in-memory per-file subtitle offset
 
 function fmtTime(ms) {
@@ -744,10 +740,8 @@ export default {
       endMark: 0,
       currentTimeSec: 0,
       seekTarget: null,
-      introMuted: true,
-      introVolume: 1,
-      chksrtMuted: false,
-      chksrtVolume: 1,
+      playerMuted: false,
+      playerVolume: 1,
       introSavedMarks: {},
       waitingForVideo: false,
       waitingForVideoTarget: null,
@@ -1192,10 +1186,10 @@ export default {
     },
     onVideoLoadedMetadata() {
       this._applyIntroAudioState();
-      if (this.mode === "chksrt") {
+      if (this.mode !== "intro") {
         const vid = this.$refs.vid;
         if (vid) vid.play().catch(() => {});
-        return;
+        if (this.mode === "chksrt") return;
       }
       if (!this._seekOnLoad) return;
       this._seekOnLoad = false;
@@ -1208,7 +1202,6 @@ export default {
       if (vid) vid.play().catch(() => {});
     },
     onVideoVolumeChange() {
-      if (this.mode !== "intro" && this.mode !== "chksrt") return;
       const vid = this.$refs.vid;
       if (!vid) return;
       const nextMuted = !!vid.muted;
@@ -1216,35 +1209,19 @@ export default {
       const volume = Number.isFinite(nextVolume)
         ? Math.max(0, Math.min(1, nextVolume))
         : 1;
-      if (this.mode === "intro") {
-        this.introMuted = nextMuted;
-        this.introVolume = volume;
-        window.localStorage.setItem(
-          INTRO_MUTE_STORAGE_KEY,
-          nextMuted ? "1" : "0",
-        );
-        window.localStorage.setItem(INTRO_VOLUME_STORAGE_KEY, String(volume));
-      } else {
-        this.chksrtMuted = nextMuted;
-        this.chksrtVolume = volume;
-        window.localStorage.setItem(
-          CHKSRT_MUTE_STORAGE_KEY,
-          nextMuted ? "1" : "0",
-        );
-        window.localStorage.setItem(CHKSRT_VOLUME_STORAGE_KEY, String(volume));
-      }
+      this.playerMuted = nextMuted;
+      this.playerVolume = volume;
+      window.localStorage.setItem(
+        PLAYER_MUTE_STORAGE_KEY,
+        nextMuted ? "1" : "0",
+      );
+      window.localStorage.setItem(PLAYER_VOLUME_STORAGE_KEY, String(volume));
     },
     _applyIntroAudioState() {
-      if (this.mode !== "intro" && this.mode !== "chksrt") return;
       const vid = this.$refs.vid;
       if (!vid) return;
-      if (this.mode === "intro") {
-        vid.muted = this.introMuted;
-        vid.volume = Math.max(0, Math.min(1, Number(this.introVolume) || 0));
-      } else {
-        vid.muted = this.chksrtMuted;
-        vid.volume = Math.max(0, Math.min(1, Number(this.chksrtVolume) || 0));
-      }
+      vid.muted = this.playerMuted;
+      vid.volume = Math.max(0, Math.min(1, Number(this.playerVolume) || 0));
     },
     _seekWithConfirm(targetSec) {
       this._cancelSeek();
@@ -1597,23 +1574,12 @@ export default {
   },
   mounted() {
     window.addEventListener("keydown", this.onKeyDown);
-    const savedMuted = window.localStorage.getItem(INTRO_MUTE_STORAGE_KEY);
-    const savedVolume = window.localStorage.getItem(INTRO_VOLUME_STORAGE_KEY);
-    this.introMuted = savedMuted == null ? true : savedMuted === "1";
+    const savedMuted = window.localStorage.getItem(PLAYER_MUTE_STORAGE_KEY);
+    const savedVolume = window.localStorage.getItem(PLAYER_VOLUME_STORAGE_KEY);
+    this.playerMuted = savedMuted === "1";
     if (savedVolume != null) {
       const n = Number(savedVolume);
-      if (Number.isFinite(n)) this.introVolume = Math.max(0, Math.min(1, n));
-    }
-    const savedChksrtMuted = window.localStorage.getItem(
-      CHKSRT_MUTE_STORAGE_KEY,
-    );
-    const savedChksrtVolume = window.localStorage.getItem(
-      CHKSRT_VOLUME_STORAGE_KEY,
-    );
-    this.chksrtMuted = savedChksrtMuted === "1";
-    if (savedChksrtVolume != null) {
-      const n = Number(savedChksrtVolume);
-      if (Number.isFinite(n)) this.chksrtVolume = Math.max(0, Math.min(1, n));
+      if (Number.isFinite(n)) this.playerVolume = Math.max(0, Math.min(1, n));
     }
     this.vidSrc = this.path ? this.streamUrl : "";
     this.subtitleOffset = offsetCache.get(this.path) ?? 0;

@@ -205,6 +205,7 @@
               Wikipedia
             </button>
             <button
+              v-if="!simpleMode"
               @click.stop="handleMrSkinButton"
               style="
                 font-size: 13px;

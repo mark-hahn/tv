@@ -881,19 +881,19 @@ export default {
       const tvdbStartMark = newVal?.startMark ?? null;
 
       if (tvdbStartMark == null && tvdbIntroDur == null) {
-        // Case 1: nothing set — treat as none condition
+        // Case 1: nothing set — not yet configured
         this.startMark = 0;
         this.endMark = 0;
-        this.introLocalNone = true;
+        this.introLocalNone = false;
         this._introPlayTargetSec = 0;
         return;
       }
 
       if (tvdbStartMark != null && tvdbIntroDur == null) {
-        // Case 2: startMark set, no introDur — none condition
+        // Case 2: startMark set, no introDur — not yet configured
         this.startMark = tvdbStartMark;
         this.endMark = tvdbStartMark;
-        this.introLocalNone = true;
+        this.introLocalNone = false;
         this._introPlayTargetSec = 0;
         return;
       }

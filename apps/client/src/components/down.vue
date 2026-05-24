@@ -1228,10 +1228,13 @@ export default {
       const isCtrlClick = Boolean(event?.ctrlKey || event?.metaKey);
       const isShiftClick = Boolean(event?.shiftKey);
 
-      // Alt-click: copy title to clipboard
+      // Alt-click: copy destination file path to clipboard (relative, no /mnt/media/tv/ prefix)
       if (isAltClick) {
-        const title = String(it?.title || "");
-        navigator.clipboard.writeText(title).catch(() => {});
+        const localPath = String(it?.localPath || "").replace(/\/?$/, "/");
+        const fileName = String(it?.destTitle || it?.title || "");
+        const fullPath = localPath + fileName;
+        const relPath = fullPath.replace(/^\/mnt\/media\/[^/]+\//, "");
+        navigator.clipboard.writeText(relPath).catch(() => {});
         return;
       }
 

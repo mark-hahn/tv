@@ -24,7 +24,7 @@ Ctrl+click "Not in Emby" — create server folder & refresh Emby`,
   trailer: `Auto-plays available trailers
 Native video controls for play/pause/seek`,
 
-  tor: `Alt+click torrent — force-download (bypass already-downloaded checks)
+  tor: `Alt+click torrent — copy torrent title to clipboard
 Ctrl+click torrent — enqueue download`,
 
   browse: `Click gallery item — select or preview a show
@@ -40,7 +40,8 @@ From show — scroll to current show's downloads`,
 Ctrl+click folder — deselect top-level folder / toggle selection
 Shift+click file — range-select files`,
 
-  down: `Click card — select the download
+  down: `Alt+click card — copy destination file path to clipboard
+Click card — select the download
 Retry button — retry a failed download
 Cycle — trigger a download check cycle`,
 

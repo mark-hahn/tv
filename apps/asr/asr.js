@@ -523,11 +523,19 @@ function writeSRT(segments, outputPath) {
       const rightMatch = Math.abs(end - lastEnd) < timeMatchMgn;
       if (leftMatch || rightMatch) {
         hadDuplicate = true;
-        if (text === lastText) continue;
-        if (text.length > lastText.length) {
-          continue;
-        }
-        segOut.pop();
+        // Always concatenate in start-time order — never discard text
+        const prev = segOut.pop();
+        const mergedStart = Math.min(prev.start, start);
+        const mergedEnd = Math.max(prev.end, end);
+        const mergedText =
+          prev.start <= start ? prev.text + " " + text : text + " " + prev.text;
+        segOut.push({
+          start: mergedStart,
+          end: mergedEnd,
+          text: mergedText,
+          norm: normalizeText(mergedText),
+        });
+        continue;
       }
       skipSeg = false;
     } finally {
@@ -542,90 +550,9 @@ function writeSRT(segments, outputPath) {
     }
   }
 
-  // Second pass: merge adjacent/overlapping segments based on normalized text
-  // and collapse runs of short repeated single-token captions.
-  const mergedSegs = [];
-  const GAP_TOL = 2.0; // seconds - normal gap tolerance
-  const SHORT_SEG_MAX_DUR = 2.0; // seconds - consider a segment "short"
-  const SHORT_SEG_GAP = 5.0; // seconds - allow joining short repeated segments across this gap
-  const SINGLE_TOKEN_WINDOW = 30.0; // seconds - window to collapse repeated single-token captions
-
-  for (const seg of segOut) {
-    if (mergedSegs.length === 0) {
-      mergedSegs.push({ ...seg });
-      continue;
-    }
-    const last = mergedSegs[mergedSegs.length - 1];
-    const gap = seg.start - last.end;
-    const segDur = seg.end - seg.start;
-    const lastDur = last.end - last.start;
-    const lastNorm = last.norm || normalizeText(last.text);
-    const segNorm = seg.norm || normalizeText(seg.text);
-
-    let shouldMerge = false;
-    if (segNorm === lastNorm && segNorm.length > 0) {
-      // Overlap or small gap
-      if (seg.start <= last.end + GAP_TOL) shouldMerge = true;
-      // Short repeated segments across a slightly larger gap
-      else if (
-        segDur <= SHORT_SEG_MAX_DUR &&
-        lastDur <= SHORT_SEG_MAX_DUR &&
-        gap <= SHORT_SEG_GAP
-      )
-        shouldMerge = true;
-      // Single-token repeated captions across a larger window
-      else {
-        const lastTokens = lastNorm.split(" ").filter(Boolean).length;
-        const segTokens = segNorm.split(" ").filter(Boolean).length;
-        if (lastTokens === 1 && segTokens === 1 && gap <= SINGLE_TOKEN_WINDOW)
-          shouldMerge = true;
-      }
-    }
-
-    if (shouldMerge) {
-      // Merge into last: extend time bounds and prefer the longer original text
-      last.end = Math.max(last.end, seg.end);
-      last.start = Math.min(last.start, seg.start);
-      // Keep original text from the first occurrence (usually fine) but
-      // if incoming has more characters, prefer that (richer text)
-      if (seg.text.length > last.text.length) last.text = seg.text;
-      // Refresh normalized form
-      last.norm = segNorm;
-    } else {
-      mergedSegs.push({ ...seg });
-    }
-  }
-
-  // Final pass: remove pathological runs where a single short token repeats
-  // many times (e.g., repeated "Kanye" one-second captions). Collapse runs
-  // that are the same normalized single token into a single caption covering
-  // their span.
-  const finalSegs = [];
-  for (const seg of mergedSegs) {
-    if (finalSegs.length === 0) {
-      finalSegs.push({ ...seg });
-      continue;
-    }
-    const last = finalSegs[finalSegs.length - 1];
-    const lastNorm = last.norm || normalizeText(last.text);
-    const segNorm = seg.norm || normalizeText(seg.text);
-    const lastTokens = lastNorm.split(" ").filter(Boolean).length;
-    const segTokens = segNorm.split(" ").filter(Boolean).length;
-    const gap = seg.start - last.end;
-    // If both are single-token identical normalized and within a moderate window, collapse
-    if (
-      lastNorm === segNorm &&
-      lastTokens === 1 &&
-      segTokens === 1 &&
-      gap <= SINGLE_TOKEN_WINDOW
-    ) {
-      last.end = Math.max(last.end, seg.end);
-      // prefer longer/original text for display
-      if (seg.text.length > last.text.length) last.text = seg.text;
-      continue;
-    }
-    finalSegs.push({ ...seg });
-  }
+  // Passes 2 and 3 previously collapsed segments with identical text, but
+  // speakers legitimately repeat words and phrases, so no text is discarded.
+  const finalSegs = segOut;
 
   // Split segments that are longer than 42 chars into smaller chunks
   // with linearly interpolated timestamps.
@@ -736,6 +663,7 @@ function writeSRT(segments, outputPath) {
         start: chunkStart,
         end: chunkEnd,
         text: chunkWords.join(" "),
+        splitCreated: true,
       });
       wordOffset += chunkSize;
     }
@@ -746,6 +674,7 @@ function writeSRT(segments, outputPath) {
   // following name. Iterate backwards to avoid index shifting after splices.
   for (let i = splitSegs.length - 2; i >= 0; i--) {
     const seg = splitSegs[i];
+    if (!seg.splitCreated) continue;
     const words = seg.text.trim().split(/\s+/);
     const lastWord = words[words.length - 1];
     if (!HONORIFICS.has(lastWord.toLowerCase())) continue;

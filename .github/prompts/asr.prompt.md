@@ -28,12 +28,10 @@ For a video at `/mnt/media/tv/ShowName/Season 1/episode.mkv`, the output is:
 
 The SRT content goes through multiple quality passes before writing:
 
-1. **Overlap de-duplication** — segments with near-matching start or end timestamps (within 0.3 s) are collapsed, keeping the shorter text (avoids repeat text from chunk overlaps).
-2. **Adjacent-merge** — consecutive segments with identical normalized text and a gap ≤ 2 s are merged into one. Short repeated captions across slightly larger gaps (≤ 5 s) are also merged.
-3. **Single-token collapse** — single-word captions that repeat within a 30 s window are collapsed into one span.
-4. **Line-length splitting** — segments longer than 42 characters are split at natural word boundaries using a balanced-chunks algorithm that avoids ending a line on an honorific (Mr., Dr., etc.).
-5. **Short-segment padding** — segments under 1 s are padded up to 0.5 s on each side, staying at least 0.2 s away from neighboring entries.
-6. **Honorific re-attachment** — if a segment ends on an honorific word, it is moved to the start of the next segment.
+1. **Overlap de-duplication** — segments with near-matching start or end timestamps (within 0.3 s) are always concatenated in start-time order into one segment spanning both time bounds (avoids losing content at chunk boundaries).
+2. **Line-length splitting** — segments longer than 42 characters are split at natural word boundaries using a balanced-chunks algorithm that avoids ending a line on an honorific (Mr., Dr., etc.).
+3. **Short-segment padding** — segments under 1 s are padded up to 0.5 s on each side, staying at least 0.2 s away from neighboring entries.
+4. **Honorific re-attachment** — if a split-created segment ends on an honorific word, that word is moved to the start of the next segment. Original (non-split) segments are not affected.
 
 ---
 

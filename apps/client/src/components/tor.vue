@@ -1185,6 +1185,7 @@ export default {
       existingDeleteModalMsg: "",
       existingDeleteWrapper: null,
       existingDeleteResolve: null,
+      flashingTorrent: null, // Torrent flashing after alt-click copy
       clickedTorrents: new Set(), // Track which torrents have been clicked
       downloadedTorrents: new Set(), // Track which torrents have been downloaded via Get button
       noTorrentsNeeded: false, // Flag when needed array is empty
@@ -2806,10 +2807,12 @@ export default {
       const isCtrlClick = Boolean(event?.ctrlKey || event?.metaKey);
       const isShiftClick = Boolean(event?.shiftKey);
 
-      // Alt-click copies torrent title to clipboard.
+      // Alt-click copies raw torrent title to clipboard.
       if (isAltClick) {
-        const title = String(torrent.raw?.title || torrent.title || "");
+        const title = torrent.raw?.title ?? "";
         navigator.clipboard.writeText(title).catch(() => {});
+        this.flashingTorrent = torrent;
+        setTimeout(() => { this.flashingTorrent = null; }, 300);
         return;
       }
 
@@ -2852,8 +2855,11 @@ export default {
       const isSelected = !this.previewMode && this.selectedItems.has(torrent);
       const isDownloaded = this.isDownloadedNow(torrent);
       const hasWarnings = this.getTorrentWarnings(torrent).length > 0;
+      const isFlashing = this.flashingTorrent === torrent;
       let bgColor = "#fff";
-      if (isSelected) {
+      if (isFlashing) {
+        bgColor = "#ffcccc"; // Flash on alt-click copy
+      } else if (isSelected) {
         bgColor = "#fffacd"; // Light yellow for selected (takes priority)
       } else if (hasWarnings) {
         bgColor = "#fff0f0"; // Light red/pink for warnings

@@ -591,6 +591,7 @@ export default {
       showFilter: null,
       pollingStopped: false,
       fileSearch: "",
+      flashingItem: null, // Item flashing after alt-click copy
       selectedItems: new Set(), // Multi-select for new button group
       lastSelectedIndex: null,
       movieDownJobs: [],
@@ -1204,12 +1205,13 @@ export default {
         .toLowerCase();
       const isDownloading = status === "downloading";
       const isSelected = this.selectedItems.has(it);
+      const isFlashing = this.flashingItem === it;
       return {
         position: "relative",
         border: "1px solid #ddd",
         borderRadius: "8px",
         padding: "10px",
-        background: isSelected ? "#fffacd" : isDownloading ? "#e8f4e8" : "#fff",
+        background: isFlashing ? "#ffcccc" : isSelected ? "#fffacd" : isDownloading ? "#e8f4e8" : "#fff",
         cursor: "pointer",
       };
     },
@@ -1235,6 +1237,8 @@ export default {
         const fullPath = localPath + fileName;
         const relPath = fullPath.replace(/^\/mnt\/media\/[^/]+\//, "");
         navigator.clipboard.writeText(relPath).catch(() => {});
+        this.flashingItem = it;
+        setTimeout(() => { this.flashingItem = null; }, 300);
         return;
       }
 

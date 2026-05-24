@@ -506,6 +506,7 @@ export default {
     return {
       rows: [],
       highlightKey: null,
+      flashingRowKey: null,
       selectedRows: new Set(), // Multi-select; From button is the only source of multiple
       lastSelectedIndex: null,
       dialogRow: null,
@@ -634,6 +635,7 @@ export default {
           cursor: "default",
         };
       }
+      const isFlashing = this.flashingRowKey && row.key === this.flashingRowKey;
       const isHighlighted =
         this.selectedRows.has(row) ||
         (this.highlightKey && row.key === this.highlightKey);
@@ -641,7 +643,7 @@ export default {
         padding: "2px 4px",
         cursor: "pointer",
         borderRadius: "3px",
-        background: isHighlighted ? "#fffacd" : "transparent",
+        background: isFlashing ? "#ffcccc" : isHighlighted ? "#fffacd" : "transparent",
         whiteSpace: "pre",
       };
     },
@@ -652,6 +654,8 @@ export default {
       if (event?.altKey) {
         const text = row.line ? String(row.line).trim() : "";
         navigator.clipboard.writeText(text).catch(() => {});
+        this.flashingRowKey = row.key;
+        setTimeout(() => { this.flashingRowKey = null; }, 300);
         return;
       }
       const rows = this.rows.filter((r) => !r.isHeader);

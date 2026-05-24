@@ -4463,6 +4463,7 @@ app.get("/api/episodeStats", async (req, res) => {
   let videoHeight = null;
   let videoBitRate = null;
   let videoBitDepth = null;
+  let videoFrameRate = null;
   let hdr = null;
   let audioChannels = null;
   try {
@@ -4497,6 +4498,11 @@ app.get("/api/episodeStats", async (req, res) => {
       else if (ct === "arib-std-b67") hdr = "HLG";
       else if (cp2 === "bt2020") hdr = "HDR";
       else hdr = null;
+      const fpsStr = vStream.r_frame_rate || vStream.avg_frame_rate || "";
+      if (fpsStr && fpsStr.includes("/")) {
+        const [num, den] = fpsStr.split("/").map(Number);
+        if (den > 0) videoFrameRate = Math.round((num / den) * 1000) / 1000;
+      }
     }
     const aStream = streams.find((s) => s.codec_type === "audio");
     if (aStream) {
@@ -4518,6 +4524,7 @@ app.get("/api/episodeStats", async (req, res) => {
     videoHeight,
     videoBitRate,
     videoBitDepth,
+    videoFrameRate,
     hdr,
     audioChannels,
     ptt,

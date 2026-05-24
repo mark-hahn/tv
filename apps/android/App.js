@@ -2036,6 +2036,13 @@ export default function App() {
         },
         { label: "Bit Rate", value: fmtRate(epiStats.videoBitRate) },
         {
+          label: "Frame Rate",
+          value:
+            epiStats.videoFrameRate != null
+              ? `${epiStats.videoFrameRate} fps`
+              : null,
+        },
+        {
           label: "Resolution",
           value:
             epiStats.videoWidth && epiStats.videoHeight

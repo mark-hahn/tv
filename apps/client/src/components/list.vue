@@ -143,7 +143,7 @@
               :fltrPopped="fltrPopped"
               :sortChoices="sortChoices"
               :fltrChoices="fltrChoices"
-              :selectedSort="sortChoice"
+              :selectedSort="actorsListMode ? '---' : sortChoice"
               :selectedFilter="fltrChoice"
               @top-click="topClick"
               @prev-next-click="prevNextClick"
@@ -177,7 +177,7 @@
                   font-weight: bold;
                 "
               >
-                {{ actor.displayName }}
+                {{ actor.displayName }} ({{ actor.showCount }})
               </div>
             </div>
             <Shows
@@ -238,7 +238,7 @@
             :fltrPopped="fltrPopped"
             :sortChoices="sortChoices"
             :fltrChoices="fltrChoices"
-            :selectedSort="sortChoice"
+            :selectedSort="actorsListMode ? '---' : sortChoice"
             :selectedFilter="fltrChoice"
             @top-click="topClick"
             @prev-next-click="prevNextClick"
@@ -279,7 +279,7 @@
                 font-weight: bold;
               "
             >
-              {{ actor.displayName }}
+              {{ actor.displayName }} ({{ actor.showCount }})
             </div>
           </div>
           <Shows
@@ -635,6 +635,7 @@ export default {
       actorSearchParams: null, // Store search params for word-based actor search
       actorsListMode: false, // Whether we are in actors list mode
       actorsList: [], // List of all actors (for actors list mode)
+      savedSortChoice: null, // Sort choice saved when entering actors mode
       qbtActiveShowNames: [],
       downActiveShowNames: [],
       hasLoadedAllShows: false,
@@ -2194,6 +2195,7 @@ export default {
     },
 
     sortClick() {
+      if (this.actorsListMode) return;
       this.sortPopped = !this.sortPopped;
       console.debug("🚀 ~ sortPopped:", this.sortPopped);
       this.fltrPopped = false;
@@ -2999,24 +3001,37 @@ export default {
           .trim()
           .toLowerCase()
           .replace(/\s+/g, " ");
-      const seen = new Set();
-      const actors = [];
+      const actorMap = new Map(); // normKey -> { name, displayName, showCount }
       for (const show of allShows) {
         const tvdbData = allTvdb?.[show.name];
         if (!tvdbData) continue;
         const actualData = tvdbData.response?.data || tvdbData;
         const characters = actualData?.characters;
         if (!Array.isArray(characters)) continue;
+        const seenInShow = new Set();
         for (const char of characters) {
           const name = String(char?.personName || char?.actor || "").trim();
           if (!name) continue;
           const key = normName(name);
-          if (seen.has(key)) continue;
-          seen.add(key);
-          actors.push({ name, displayName: this.formatLastFirst(name) });
+          if (seenInShow.has(key)) continue;
+          seenInShow.add(key);
+          if (actorMap.has(key)) {
+            actorMap.get(key).showCount++;
+          } else {
+            actorMap.set(key, {
+              name,
+              displayName: this.formatLastFirst(name),
+              showCount: 1,
+            });
+          }
         }
       }
-      actors.sort((a, b) => a.displayName.localeCompare(b.displayName));
+      const actors = Array.from(actorMap.values());
+      actors.sort(
+        (a, b) =>
+          b.showCount - a.showCount ||
+          a.displayName.localeCompare(b.displayName),
+      );
       return actors;
     },
 
@@ -3025,6 +3040,7 @@ export default {
         this.endActorsListMode();
         return;
       }
+      this.savedSortChoice = this.sortChoice;
       this.filterStr = "";
       const actors = await this.buildActorsList();
       this.actorsList = actors;
@@ -3037,6 +3053,10 @@ export default {
       this.actorsListMode = false;
       this.filterStr = "";
       this.actorsList = [];
+      if (this.savedSortChoice !== null) {
+        this.sortChoice = this.savedSortChoice;
+        this.savedSortChoice = null;
+      }
     },
 
     async actorsListItemClick(actorName) {

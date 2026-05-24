@@ -173,7 +173,7 @@
               v-if="!movieMode"
               @click.stop="
                 showStream = false;
-                noTorrentsNeeded ? forceClick() : searchClick();
+                noTorrentsNeeded || hasSearched ? forceClick() : searchClick();
               "
               style="
                 font-size: 13px;
@@ -862,6 +862,17 @@
           >
             {{ getDownloadStatus(torrent).message }}
           </div>
+          <div
+            v-if="isDownloadedBefore(torrent)"
+            style="
+              margin-top: 4px;
+              font-size: 13px;
+              color: #c00;
+              font-family: sans-serif;
+            "
+          >
+            Already downloaded
+          </div>
           <button
             @click.stop="filesClick(torrent)"
             style="
@@ -1440,7 +1451,7 @@ export default {
     evtBus.on("refreshSpaceAvail", this.onRefreshSpaceAvail);
     evtBus.on("openStream", this.onOpenStream);
 
-    this.loadDownloadedHistory();
+    void this.loadDownloadedHistory();
     srvr
       .getGroupCounts()
       .then((counts) => {
@@ -1698,38 +1709,23 @@ export default {
       if (!el) return;
       el.scrollTop = el.scrollHeight;
     },
-    downloadHistoryKey() {
-      return "downloadedTorrentHashes";
-    },
-
     downloadHistoryWindowMs() {
       return 60 * 24 * 60 * 60 * 1000;
     },
 
-    loadDownloadedHistory() {
-      let parsed = {};
+    async loadDownloadedHistory() {
       try {
-        const raw = localStorage.getItem(this.downloadHistoryKey());
-        if (raw) {
-          const j = JSON.parse(raw);
-          if (j && typeof j === "object" && !Array.isArray(j)) parsed = j;
+        const res = await fetch(`${config.torrentsApiUrl}/api/tor/sent`);
+        if (res.ok) {
+          const j = await res.json();
+          if (j && typeof j === "object" && !Array.isArray(j)) {
+            this.downloadedByHash = j;
+          }
         }
       } catch {
         // ignore
       }
-      this.downloadedByHash = parsed;
       this.pruneDownloadedHistory();
-    },
-
-    saveDownloadedHistory() {
-      try {
-        localStorage.setItem(
-          this.downloadHistoryKey(),
-          JSON.stringify(this.downloadedByHash || {}),
-        );
-      } catch {
-        // ignore
-      }
     },
 
     pruneDownloadedHistory() {
@@ -1746,7 +1742,6 @@ export default {
       }
       const changed = Object.keys(next).length !== Object.keys(map).length;
       if (changed) this.downloadedByHash = next;
-      if (changed) this.saveDownloadedHistory();
     },
 
     extractBtih(str) {
@@ -1886,7 +1881,12 @@ export default {
       for (const k of keys) next[k] = now;
       this.downloadedByHash = next;
       this.pruneDownloadedHistory();
-      this.saveDownloadedHistory();
+      // Persist to server.
+      fetch(`${config.torrentsApiUrl}/api/tor/sent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keys }),
+      }).catch(() => {});
     },
 
     isDownloadedBefore(torrent) {
@@ -4039,8 +4039,13 @@ export default {
     },
 
     // Send: enqueue download for each selected torrent
-    torSendClick() {
+    async torSendClick() {
       for (const t of this.selectedItems) {
+        if (this.isDownloadedBefore(t)) {
+          const title = this.getDisplayTitleWithProvider(t);
+          this.showError(`This torrent already sent to qbt: ${title}`);
+          continue;
+        }
         void this.enqueueDownload(t, { forceDownload: false });
       }
     },

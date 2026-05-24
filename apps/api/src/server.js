@@ -1047,6 +1047,41 @@ app.post("/api/local/mediainfo", async (req, res) => {
   }
 });
 
+const TOR_SENT_PATH = path.join(getApiMiscDir(), "tor-sent.json");
+
+function loadTorSent() {
+  try {
+    if (fs.existsSync(TOR_SENT_PATH)) {
+      const j = JSON.parse(fs.readFileSync(TOR_SENT_PATH, "utf8"));
+      if (j && typeof j === "object" && !Array.isArray(j)) return j;
+    }
+  } catch {
+    // ignore
+  }
+  return {};
+}
+
+app.get("/api/tor/sent", (req, res) => {
+  res.json(loadTorSent());
+});
+
+app.post("/api/tor/sent", (req, res) => {
+  const keys = Array.isArray(req.body?.keys) ? req.body.keys : [];
+  if (keys.length === 0)
+    return res.status(400).json({ error: "keys required" });
+  const data = loadTorSent();
+  const now = Date.now();
+  for (const k of keys) {
+    if (k && typeof k === "string") data[k] = now;
+  }
+  try {
+    fs.writeFileSync(TOR_SENT_PATH, JSON.stringify(data), "utf8");
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+  res.json({ ok: true });
+});
+
 app.get("/api/search", async (req, res) => {
   const showName = req.query.show;
   const tvdbId = req.query.tvdbId || null;

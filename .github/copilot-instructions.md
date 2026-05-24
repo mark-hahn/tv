@@ -101,3 +101,5 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
 ```
 
 - never do a `find / ...`, it is too slow
+
+when a copilot chat is in ask mode instead of agent mode and i give you instructions that include writing or changing something that means i made a mistake -- stop and tell me to use agent mode

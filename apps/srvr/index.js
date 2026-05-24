@@ -122,6 +122,7 @@ let opnDailyCountDate = "";
 let subQueueBusy = false,
   chkSubQueueDelay = 10_000,
   asrQueueDelay = 10_000;
+let currentlyProcessingSubPath = null;
 let genSrtRunning = false,
   genSrtChild = null,
   subQueuePendingNow = false;
@@ -841,6 +842,7 @@ function addToAsrQueue(entries) {
   }
 }
 function enqueueSubQueue(entry, toFront) {
+  if (currentlyProcessingSubPath === entry.videoFilePath) return;
   const idx = subQueue.findIndex(
     (e) => e.videoFilePath === entry.videoFilePath,
   );
@@ -1266,9 +1268,22 @@ async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
     `opensubs ${items.length} results: ${path.basename(videoFilePath)}`,
   );
   const base = videoFilePath.replace(/\.[^.]+$/, "");
+  const opnDir = path.dirname(videoFilePath);
+  const opnBasename = path.basename(base);
+  let existingOpnCount = 0;
+  try {
+    existingOpnCount = fs
+      .readdirSync(opnDir)
+      .filter(
+        (f) =>
+          f.startsWith(opnBasename) &&
+          /^\.opn[A-Z2-7]{5}\.srt$/i.test(f.slice(opnBasename.length)),
+      ).length;
+  } catch {}
+  if (existingOpnCount >= 5) return;
   let dlCount = 0;
   for (const r of items) {
-    if (dlCount >= 5) break;
+    if (existingOpnCount + dlCount >= 5) break;
     const fid = r.file_id || r.attributes?.files?.[0]?.file_id;
     if (!fid) continue;
     const tag = "opn" + encodeFileIdBase32(fid).slice(1);
@@ -1389,6 +1404,7 @@ async function processSubQueueEntry() {
   const entry = subQueue.shift();
   persistSubQueue();
   subQueueBusy = true;
+  currentlyProcessingSubPath = entry.videoFilePath;
   try {
     const parsed = parseFileSeasonEpisode(entry.videoFilePath);
     const showName = entry.videoFilePath.replace(tvDir + "/", "").split("/")[0];
@@ -1455,6 +1471,7 @@ async function processSubQueueEntry() {
     }
   } finally {
     subQueueBusy = false;
+    currentlyProcessingSubPath = null;
     chkSubQueueDelay = 500;
   }
 }
@@ -7219,7 +7236,6 @@ watcher
           err.message,
         );
       }
-      tvdb.enqueueShowProcess(showName);
       handleShowDiskChange(showName);
     }, DISK_CHANGE_DEBOUNCE_MS);
   })
@@ -7239,10 +7255,7 @@ watcher
 
     const unlinkTimeout = setTimeout(() => {
       changedShows.delete(showName);
-      console.log(
-        `[tvdb loop] chokidar unlink debounce fired: enqueuing ${showName}`,
-      );
-      tvdb.enqueueShowProcess(showName);
+      handleShowDiskChange(showName);
     }, DISK_CHANGE_DEBOUNCE_MS);
 
     if (unlinkEntry) unlinkEntry.timeout = unlinkTimeout;

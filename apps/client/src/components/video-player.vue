@@ -1156,7 +1156,7 @@ export default {
         break;
       }
     },
-    _saveChksrtHistory(choiceLabel) {
+    _saveChksrtHistory(choiceLabel, choice) {
       if (!this.path) return;
       const pathParts = this.path.split("/");
       const videoFilename = pathParts[pathParts.length - 1];
@@ -1182,6 +1182,14 @@ export default {
         embeddedCounts,
         openSubsCount,
         choice: choiceLabel,
+        embStreamIndex:
+          choice &&
+          (choice.type === "embedded" ||
+            choice.type === "forced" ||
+            choice.type === "pgs")
+            ? (choice.index ?? null)
+            : null,
+        srtFile: choice && choice.type === "srt" ? (choice.file ?? null) : null,
       }).catch((e) => console.error("[chksrt] addChksrtHistory error:", e));
     },
     onVideoLoadedMetadata() {
@@ -1510,7 +1518,7 @@ export default {
         if (choice.type === "srt" && choice.file) {
           const dir = this.path.replace(/\/[^\/]+$/, "");
           const selectedSrtPath = dir + "/" + choice.file;
-          this._saveChksrtHistory(choiceLabel);
+          this._saveChksrtHistory(choiceLabel, choice);
           chksrtSelect(this.path, selectedSrtPath)
             .then(() => this.$emit("chksrt-next", null))
             .catch((e) => console.error("[chksrt] select error:", e));
@@ -1519,7 +1527,7 @@ export default {
           choice.type === "forced" ||
           choice.type === "pgs"
         ) {
-          this._saveChksrtHistory(choiceLabel);
+          this._saveChksrtHistory(choiceLabel, choice);
           chksrtSelect(this.path, null)
             .then(() => this.$emit("chksrt-next", null))
             .catch((e) => console.error("[chksrt] select error:", e));

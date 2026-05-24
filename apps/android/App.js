@@ -71,6 +71,7 @@ export default function App() {
   const [picInputs, setPicInputs] = useState({}); // target -> { typing, raw }
   const [locked, setLocked] = useState(false);
   const [missingEpWarning, setMissingEpWarning] = useState(null);
+  const [subtitleMismatch, setSubtitleMismatch] = useState(null);
   const [layoutOption, setLayoutOption] = useState("mark");
   const [showShows, setShowShows] = useState(false);
   const [showsList, setShowsList] = useState([]);
@@ -282,6 +283,8 @@ export default function App() {
           msg.notification === "missingEpisodeWarning"
         ) {
           setMissingEpWarning(msg.data);
+        } else if (msg.id === 0 && msg.notification === "subtitleMismatch") {
+          setSubtitleMismatch(msg.data);
         } else if (msg.id === 0 && msg.notification === "nowPlaying") {
           const { showName, playing } = msg.data ?? {};
           const s = playing?.[0]?.season ?? null;
@@ -1291,6 +1294,9 @@ export default function App() {
                     ]}
                   >
                     {subTypeChar(sub.type)}: {subShortLabel(sub.label)}
+                    {sub.index === currentPlayer.chosenSubIndex
+                      ? " (chosen)"
+                      : ""}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -2388,6 +2394,25 @@ export default function App() {
             </Text>
             <TouchableOpacity
               onPress={() => setMissingEpWarning(null)}
+              style={missingEpStyles.closeBtn}
+            >
+              <Text style={missingEpStyles.closeBtnText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+      {subtitleMismatch && layoutOption === "mark" && (
+        <View style={missingEpStyles.overlay}>
+          <View style={missingEpStyles.box}>
+            <Text style={missingEpStyles.text}>Subtitle mismatch</Text>
+            <Text style={missingEpStyles.text}>
+              {subtitleMismatch.showName} {subtitleMismatch.episodeCode}
+            </Text>
+            <Text style={[missingEpStyles.text, { marginBottom: 20 }]}>
+              The chosen subtitle is not selected in Emby
+            </Text>
+            <TouchableOpacity
+              onPress={() => setSubtitleMismatch(null)}
               style={missingEpStyles.closeBtn}
             >
               <Text style={missingEpStyles.closeBtnText}>Close</Text>

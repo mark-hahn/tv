@@ -4937,8 +4937,15 @@ app.get("/api/asr/chksrt/history", (req, res) => {
 });
 
 app.post("/api/asr/chksrt/history/add", (req, res) => {
-  const { showName, videoFilename, embeddedCounts, openSubsCount, choice } =
-    req.body || {};
+  const {
+    showName,
+    videoFilename,
+    embeddedCounts,
+    openSubsCount,
+    choice,
+    embStreamIndex,
+    srtFile,
+  } = req.body || {};
   if (!showName || !videoFilename || !choice) {
     res.status(400).json({ error: "showName, videoFilename, choice required" });
     return;
@@ -4952,16 +4959,14 @@ app.post("/api/asr/chksrt/history/add", (req, res) => {
         : {},
     openSubsCount: Number(openSubsCount) || 0,
     choice: String(choice),
+    embStreamIndex: embStreamIndex != null ? Number(embStreamIndex) : null,
+    srtFile: srtFile ? String(srtFile) : null,
+    warned: false,
   };
-  // Dedup: remove identical entries (exact filename match)
+  // Dedup: replace any entry with same showName + videoFilename
   chksrtHistory = chksrtHistory.filter(
     (h) =>
-      h.videoFilename !== entry.videoFilename ||
-      h.showName !== entry.showName ||
-      JSON.stringify(h.embeddedCounts || {}) !==
-        JSON.stringify(entry.embeddedCounts) ||
-      (h.openSubsCount || 0) !== entry.openSubsCount ||
-      h.choice !== entry.choice,
+      h.videoFilename !== entry.videoFilename || h.showName !== entry.showName,
   );
   chksrtHistory.unshift(entry);
   if (chksrtHistory.length > 100) chksrtHistory.length = 100;
@@ -5200,6 +5205,61 @@ https.createServer(httpsOptions, app).listen(HTTP_PORT, () => {
 
 app.post("/internal/tv-state", (req, res) => {
   notifyClients("tvMuteState", req.body);
+  res.json({ ok: true });
+});
+
+function findChksrtPreferred(showName, episodeCode) {
+  for (const h of chksrtHistory) {
+    if (h.showName !== showName) continue;
+    const m = (h.videoFilename || "").match(/[Ss](\d+)[Ee](\d+)/);
+    if (!m) continue;
+    const hCode = `S${m[1].padStart(2, "0")}E${m[2].padStart(2, "0")}`;
+    if (hCode !== episodeCode) continue;
+    return h;
+  }
+  return null;
+}
+
+app.get("/internal/chksrt/preferred", (req, res) => {
+  const { showName, episodeCode } = req.query;
+  if (!showName || !episodeCode) {
+    res.status(400).json({ error: "showName and episodeCode required" });
+    return;
+  }
+  const entry = findChksrtPreferred(showName, episodeCode);
+  if (!entry) {
+    res.json(null);
+    return;
+  }
+  res.json({
+    embStreamIndex: entry.embStreamIndex ?? null,
+    srtFile: entry.srtFile ?? null,
+    warned: entry.warned ?? false,
+  });
+});
+
+app.post("/internal/chksrt/mark-warned", (req, res) => {
+  const { showName, episodeCode } = req.body || {};
+  if (!showName || !episodeCode) {
+    res.status(400).json({ error: "showName and episodeCode required" });
+    return;
+  }
+  for (const h of chksrtHistory) {
+    if (h.showName !== showName) continue;
+    const m = (h.videoFilename || "").match(/[Ss](\d+)[Ee](\d+)/);
+    if (!m) continue;
+    const hCode = `S${m[1].padStart(2, "0")}E${m[2].padStart(2, "0")}`;
+    if (hCode !== episodeCode) continue;
+    h.warned = true;
+    persistChksrtHistory();
+    break;
+  }
+  res.json({ ok: true });
+});
+
+app.post("/internal/subtitle-mismatch", (req, res) => {
+  const { showName, episodeCode } = req.body || {};
+  notifyClients("subtitleMismatch", { showName, episodeCode });
   res.json({ ok: true });
 });
 

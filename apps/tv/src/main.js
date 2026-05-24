@@ -241,6 +241,7 @@ function connectEmby() {
     if (msg.MessageType === "Sessions" && Array.isArray(msg.Data)) {
       for (const s of msg.Data) handleEmbySession(s);
       updateNowPlaying(msg.Data);
+      checkSubtitleMismatch(msg.Data).catch(() => {});
     }
   });
 
@@ -1078,6 +1079,36 @@ app.get("/tv/emby/playing", async (req, res) => {
         subtitles.push({ index: stream.Index, label, type });
       }
 
+      let chosenSubIndex = null;
+      if (episodeCode) {
+        try {
+          const prefRes = await fetch(
+            `${SRVR_INTERNAL_URL}/internal/chksrt/preferred?showName=${encodeURIComponent(showName)}&episodeCode=${encodeURIComponent(episodeCode)}`,
+          );
+          if (prefRes.ok) {
+            const pref = await prefRes.json();
+            if (pref) {
+              if (pref.embStreamIndex != null) {
+                const found = (streams ?? []).find(
+                  (s) =>
+                    s.Type === "Subtitle" && s.Index === pref.embStreamIndex,
+                );
+                if (found) chosenSubIndex = found.Index;
+              } else if (pref.srtFile) {
+                const found = (streams ?? []).find(
+                  (s) =>
+                    s.Type === "Subtitle" &&
+                    s.IsExternal &&
+                    s.Path &&
+                    s.Path.endsWith("/" + pref.srtFile),
+                );
+                if (found) chosenSubIndex = found.Index;
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
       playing.push({
         sessionId,
         deviceName,
@@ -1085,6 +1116,7 @@ app.get("/tv/emby/playing", async (req, res) => {
         episodeCode,
         subtitleStreamIndex,
         subtitles,
+        chosenSubIndex,
       });
     }
     res.json({ ok: true, playing });
@@ -1481,6 +1513,81 @@ app.post("/tv/picture", async (req, res) => {
 
 connectHa();
 connectEmby();
+
+let lastSubMismatchKey = null;
+async function checkSubtitleMismatch(sessions) {
+  const lrtv = sessions.find(
+    (s) => s.NowPlayingItem && s.DeviceName === "Living Room TV",
+  );
+  if (!lrtv) {
+    lastSubMismatchKey = null;
+    return;
+  }
+  const item = lrtv.NowPlayingItem;
+  const seasonNum = item.ParentIndexNumber;
+  const episodeNum = item.IndexNumber;
+  if (seasonNum == null || episodeNum == null) return;
+  const showName = item.SeriesName || item.Name;
+  const episodeCode = `S${String(seasonNum).padStart(2, "0")}E${String(episodeNum).padStart(2, "0")}`;
+  const key = `${showName}|${episodeCode}`;
+  if (key === lastSubMismatchKey) return;
+  lastSubMismatchKey = key;
+  try {
+    const prefRes = await fetch(
+      `${SRVR_INTERNAL_URL}/internal/chksrt/preferred?showName=${encodeURIComponent(showName)}&episodeCode=${encodeURIComponent(episodeCode)}`,
+    );
+    if (!prefRes.ok) return;
+    const pref = await prefRes.json();
+    if (!pref || pref.warned) return;
+    const currentSubIndex = lrtv.PlayState?.SubtitleStreamIndex ?? -1;
+    let streams = [];
+    try {
+      const itemRes = await fetch(
+        `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${item.Id}?Fields=MediaSources&api_key=${EMBY_API_KEY}`,
+        { headers: { Accept: "application/json" } },
+      );
+      if (itemRes.ok) {
+        const itemData = await itemRes.json();
+        streams = itemData.MediaSources?.[0]?.MediaStreams ?? [];
+      }
+    } catch (_) {}
+    let chosenSubIndex = null;
+    if (pref.embStreamIndex != null) {
+      const found = streams.find(
+        (s) => s.Type === "Subtitle" && s.Index === pref.embStreamIndex,
+      );
+      if (found) chosenSubIndex = found.Index;
+    } else if (pref.srtFile) {
+      const found = streams.find(
+        (s) =>
+          s.Type === "Subtitle" &&
+          s.IsExternal &&
+          s.Path &&
+          s.Path.endsWith("/" + pref.srtFile),
+      );
+      if (found) chosenSubIndex = found.Index;
+    }
+    if (chosenSubIndex === null) return;
+    if (currentSubIndex === chosenSubIndex) return;
+    log(
+      `[subMismatch] ${showName} ${episodeCode}: current=${currentSubIndex} chosen=${chosenSubIndex}`,
+    );
+    await Promise.all([
+      fetch(`${SRVR_INTERNAL_URL}/internal/subtitle-mismatch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ showName, episodeCode }),
+      }),
+      fetch(`${SRVR_INTERNAL_URL}/internal/chksrt/mark-warned`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ showName, episodeCode }),
+      }),
+    ]);
+  } catch (err) {
+    loge("checkSubtitleMismatch error:", err.message);
+  }
+}
 
 app.listen(TV_PORT, () => {
   log(`listening on port ${TV_PORT}`);

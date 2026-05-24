@@ -203,7 +203,7 @@
                 marginLeft: '4px',
                 marginRight: '6px',
                 border: '1px solid #bbb',
-                '--btn-bg': movieMode ? 'lightgray' : 'whitesmoke',
+                backgroundColor: movieMode ? 'lightgray' : 'whitesmoke',
               }"
             >
               {{ movieMode ? "Exit Movie" : "Movie" }}
@@ -2282,6 +2282,12 @@ body {
 #down button,
 #tvPane button {
   background-color: var(--btn-bg, whitesmoke) !important;
+}
+
+/* Disabled/no-selection button state — matches flex pane's native opacity look */
+.btn-disabled {
+  opacity: 0.5 !important;
+  cursor: default !important;
 }
 
 .pane-header-title {

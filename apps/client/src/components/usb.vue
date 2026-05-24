@@ -134,14 +134,13 @@
             <button
               @click.stop="usbSelClick"
               :disabled="!hasSelection"
-              :style="{
-                cursor: hasSelection ? 'pointer' : 'default',
-                borderRadius: '7px',
-                padding: '4px 10px',
-                border: '1px solid #bbb',
-                '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
-                color: hasSelection ? 'inherit' : '#aaa',
-              }"
+              :class="{ 'btn-disabled': !hasSelection }"
+              style="
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px 10px;
+                border: 1px solid #bbb;
+              "
             >
               Sel
             </button>
@@ -163,14 +162,13 @@
             <button
               @click.stop="usbAllClick"
               :disabled="!hasSelection"
-              :style="{
-                cursor: hasSelection ? 'pointer' : 'default',
-                borderRadius: '7px',
-                padding: '4px 10px',
-                border: '1px solid #bbb',
-                '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
-                color: hasSelection ? 'inherit' : '#aaa',
-              }"
+              :class="{ 'btn-disabled': !hasSelection }"
+              style="
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px 10px;
+                border: 1px solid #bbb;
+              "
             >
               All
             </button>
@@ -178,14 +176,13 @@
             <button
               @click.stop="usbFirstClick"
               :disabled="!hasSelection"
-              :style="{
-                cursor: hasSelection ? 'pointer' : 'default',
-                borderRadius: '7px',
-                padding: '4px 10px',
-                border: '1px solid #bbb',
-                '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
-                color: hasSelection ? 'inherit' : '#aaa',
-              }"
+              :class="{ 'btn-disabled': !hasSelection }"
+              style="
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px 10px;
+                border: 1px solid #bbb;
+              "
             >
               First
             </button>
@@ -206,14 +203,13 @@
             <button
               @click.stop="usbDelClick"
               :disabled="!hasSelection"
-              :style="{
-                cursor: hasSelection ? 'pointer' : 'default',
-                borderRadius: '7px',
-                padding: '4px 10px',
-                border: '1px solid #bbb',
-                '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
-                color: hasSelection ? 'inherit' : '#aaa',
-              }"
+              :class="{ 'btn-disabled': !hasSelection }"
+              style="
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px 10px;
+                border: 1px solid #bbb;
+              "
             >
               Del
             </button>
@@ -236,14 +232,13 @@
             <button
               @click="forceMovieDown"
               :disabled="loading || !hasSelection"
-              :style="{
-                cursor: loading || !hasSelection ? 'default' : 'pointer',
-                borderRadius: '7px',
-                padding: '4px 10px',
-                border: '1px solid #bbb',
-                '--btn-bg': !loading && hasSelection ? 'whitesmoke' : '#e8e8e8',
-                color: !loading && hasSelection ? 'inherit' : '#aaa',
-              }"
+              :class="{ 'btn-disabled': loading || !hasSelection }"
+              style="
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px 10px;
+                border: 1px solid #bbb;
+              "
             >
               Force Down
             </button>
@@ -265,14 +260,13 @@
             <button
               @click.stop="usbAllClick"
               :disabled="!hasSelection"
-              :style="{
-                cursor: hasSelection ? 'pointer' : 'default',
-                borderRadius: '7px',
-                padding: '4px 10px',
-                border: '1px solid #bbb',
-                '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
-                color: hasSelection ? 'inherit' : '#aaa',
-              }"
+              :class="{ 'btn-disabled': !hasSelection }"
+              style="
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px 10px;
+                border: 1px solid #bbb;
+              "
             >
               All
             </button>
@@ -280,14 +274,13 @@
             <button
               @click.stop="usbFirstClick"
               :disabled="!hasSelection"
-              :style="{
-                cursor: hasSelection ? 'pointer' : 'default',
-                borderRadius: '7px',
-                padding: '4px 10px',
-                border: '1px solid #bbb',
-                '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
-                color: hasSelection ? 'inherit' : '#aaa',
-              }"
+              :class="{ 'btn-disabled': !hasSelection }"
+              style="
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px 10px;
+                border: 1px solid #bbb;
+              "
             >
               First
             </button>
@@ -308,14 +301,13 @@
             <button
               @click.stop="usbDelClick"
               :disabled="!hasSelection"
-              :style="{
-                cursor: hasSelection ? 'pointer' : 'default',
-                borderRadius: '7px',
-                padding: '4px 10px',
-                border: '1px solid #bbb',
-                '--btn-bg': hasSelection ? 'whitesmoke' : '#e8e8e8',
-                color: hasSelection ? 'inherit' : '#aaa',
-              }"
+              :class="{ 'btn-disabled': !hasSelection }"
+              style="
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px 10px;
+                border: 1px solid #bbb;
+              "
             >
               Del
             </button>

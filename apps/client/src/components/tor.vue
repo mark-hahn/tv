@@ -251,40 +251,34 @@
             <button
               @click.stop="torAllClick"
               :disabled="selectedItems.size === 0"
-              :style="{
-                fontSize: '13px',
-                cursor: selectedItems.size > 0 ? 'pointer' : 'default',
-                borderRadius: '7px',
-                padding: '4px 8px',
-                border: '1px solid #bbb',
-                '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
-                color: selectedItems.size > 0 ? 'inherit' : '#aaa',
-              }"
+              :class="{ 'btn-disabled': selectedItems.size === 0 }"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px 8px;
+                border: 1px solid #bbb;
+              "
             >
               All
             </button>
             <button
               @click.stop="torGroupClick"
               :disabled="selectedItems.size === 0 && groupFilter === null"
+              :class="{
+                'btn-disabled':
+                  selectedItems.size === 0 && groupFilter === null,
+              }"
               :style="{
                 fontSize: '13px',
-                cursor:
-                  selectedItems.size > 0 || groupFilter !== null
-                    ? 'pointer'
-                    : 'default',
+                cursor: 'pointer',
                 borderRadius: '7px',
                 padding: '4px 8px',
                 border: '1px solid #bbb',
                 '--btn-bg':
                   groupFilterFlash || groupFilter !== null
                     ? 'lightgray'
-                    : selectedItems.size > 0
-                      ? 'whitesmoke'
-                      : '#e8e8e8',
-                color:
-                  selectedItems.size > 0 || groupFilter !== null
-                    ? 'inherit'
-                    : '#aaa',
+                    : 'whitesmoke',
               }"
             >
               Group
@@ -292,45 +286,42 @@
             <button
               @click.stop="torFirstClick"
               :disabled="selectedItems.size === 0"
-              :style="{
-                fontSize: '13px',
-                cursor: selectedItems.size > 0 ? 'pointer' : 'default',
-                borderRadius: '7px',
-                padding: '4px 8px',
-                border: '1px solid #bbb',
-                '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
-                color: selectedItems.size > 0 ? 'inherit' : '#aaa',
-              }"
+              :class="{ 'btn-disabled': selectedItems.size === 0 }"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px 8px;
+                border: 1px solid #bbb;
+              "
             >
               First
             </button>
             <button
               @click.stop="torSendClick"
               :disabled="selectedItems.size === 0"
-              :style="{
-                fontSize: '13px',
-                cursor: selectedItems.size > 0 ? 'pointer' : 'default',
-                borderRadius: '7px',
-                padding: '4px 8px',
-                border: '1px solid #bbb',
-                '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
-                color: selectedItems.size > 0 ? 'inherit' : '#aaa',
-              }"
+              :class="{ 'btn-disabled': selectedItems.size === 0 }"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px 8px;
+                border: 1px solid #bbb;
+              "
             >
               Send
             </button>
             <button
               @click.stop="torForceClick"
               :disabled="selectedItems.size === 0"
-              :style="{
-                fontSize: '13px',
-                cursor: selectedItems.size > 0 ? 'pointer' : 'default',
-                borderRadius: '7px',
-                padding: '4px 8px',
-                border: '1px solid #bbb',
-                '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
-                color: selectedItems.size > 0 ? 'inherit' : '#aaa',
-              }"
+              :class="{ 'btn-disabled': selectedItems.size === 0 }"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px 8px;
+                border: 1px solid #bbb;
+              "
             >
               Force
             </button>

@@ -79,60 +79,56 @@
           <button
             @click.stop="flexSelClick"
             :disabled="selectedRows.size === 0"
-            :style="{
-              fontSize: '13px',
-              cursor: selectedRows.size > 0 ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': selectedRows.size > 0 ? 'whitesmoke' : '#e8e8e8',
-              color: selectedRows.size > 0 ? 'inherit' : '#aaa',
-            }"
+            :class="{ 'btn-disabled': selectedRows.size === 0 }"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+            "
           >
             Sel
           </button>
           <button
             @click.stop="flexFromClick"
             :disabled="!show"
-            :style="{
-              fontSize: '13px',
-              cursor: show ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': show ? 'whitesmoke' : '#e8e8e8',
-              color: show ? 'inherit' : '#aaa',
-            }"
+            :class="{ 'btn-disabled': !show }"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+            "
           >
             From
           </button>
           <button
             @click.stop="flexAllClick"
             :disabled="selectedRows.size === 0"
-            :style="{
-              fontSize: '13px',
-              cursor: selectedRows.size > 0 ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': selectedRows.size > 0 ? 'whitesmoke' : '#e8e8e8',
-              color: selectedRows.size > 0 ? 'inherit' : '#aaa',
-            }"
+            :class="{ 'btn-disabled': selectedRows.size === 0 }"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+            "
           >
             All
           </button>
           <button
             @click.stop="flexFirstClick"
             :disabled="selectedRows.size === 0"
-            :style="{
-              fontSize: '13px',
-              cursor: selectedRows.size > 0 ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': selectedRows.size > 0 ? 'whitesmoke' : '#e8e8e8',
-              color: selectedRows.size > 0 ? 'inherit' : '#aaa',
-            }"
+            :class="{ 'btn-disabled': selectedRows.size === 0 }"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+            "
           >
             First
           </button>
@@ -152,15 +148,14 @@
           <button
             @click.stop="flexInfoClick"
             :disabled="selectedRows.size === 0"
-            :style="{
-              fontSize: '13px',
-              cursor: selectedRows.size > 0 ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': selectedRows.size > 0 ? 'whitesmoke' : '#e8e8e8',
-              color: selectedRows.size > 0 ? 'inherit' : '#aaa',
-            }"
+            :class="{ 'btn-disabled': selectedRows.size === 0 }"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+            "
           >
             Info
           </button>

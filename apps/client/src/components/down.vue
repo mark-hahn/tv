@@ -194,19 +194,14 @@
             v-if="!movieMode"
             @click.stop="showFilterClick"
             :disabled="selectedItems.size === 0 && !showFilter"
+            :class="{ 'btn-disabled': selectedItems.size === 0 && !showFilter }"
             :style="{
               fontSize: '13px',
-              cursor:
-                selectedItems.size > 0 || showFilter ? 'pointer' : 'default',
+              cursor: 'pointer',
               borderRadius: '7px',
               padding: '4px 10px',
               border: showFilter ? '1px solid #888' : '1px solid #bbb',
-              '--btn-bg': showFilter
-                ? '#ccc'
-                : selectedItems.size > 0
-                  ? 'whitesmoke'
-                  : '#e8e8e8',
-              color: selectedItems.size > 0 || showFilter ? 'inherit' : '#aaa',
+              '--btn-bg': showFilter ? '#ccc' : 'whitesmoke',
             }"
           >
             Show
@@ -269,75 +264,70 @@
           <button
             @click.stop="downSelClick"
             :disabled="selectedItems.size === 0"
-            :style="{
-              fontSize: '13px',
-              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
-              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
-            }"
+            :class="{ 'btn-disabled': selectedItems.size === 0 }"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+            "
           >
             Sel
           </button>
           <button
             @click.stop="downFromClick"
             :disabled="!show"
-            :style="{
-              fontSize: '13px',
-              cursor: show ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': show ? 'whitesmoke' : '#e8e8e8',
-              color: show ? 'inherit' : '#aaa',
-            }"
+            :class="{ 'btn-disabled': !show }"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+            "
           >
             From
           </button>
           <button
             @click.stop="downAllClick"
             :disabled="selectedItems.size === 0"
-            :style="{
-              fontSize: '13px',
-              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
-              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
-            }"
+            :class="{ 'btn-disabled': selectedItems.size === 0 }"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+            "
           >
             All
           </button>
           <button
             @click.stop="downFirstClick"
             :disabled="selectedItems.size === 0"
-            :style="{
-              fontSize: '13px',
-              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
-              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
-            }"
+            :class="{ 'btn-disabled': selectedItems.size === 0 }"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+            "
           >
             First
           </button>
           <button
             @click.stop="downDelClick"
             :disabled="selectedItems.size === 0"
-            :style="{
-              fontSize: '13px',
-              cursor: selectedItems.size > 0 ? 'pointer' : 'default',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              '--btn-bg': selectedItems.size > 0 ? 'whitesmoke' : '#e8e8e8',
-              color: selectedItems.size > 0 ? 'inherit' : '#aaa',
-            }"
+            :class="{ 'btn-disabled': selectedItems.size === 0 }"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 4px 10px;
+              border: 1px solid #bbb;
+            "
           >
             Del
           </button>

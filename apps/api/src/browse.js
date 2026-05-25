@@ -349,6 +349,10 @@ export async function getBrowseShow() {
   return { titles: resultTitles, pendingBrowsedId };
 }
 
+export function hasBrowseShow() {
+  return getCandidateShows(1).length > 0;
+}
+
 export async function getAllBrowse() {
   return resultTitles;
 }

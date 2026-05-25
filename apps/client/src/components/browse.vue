@@ -205,7 +205,11 @@
                 alignItems: 'center',
                 justifyContent: 'center',
                 width: '70px',
-                backgroundColor: isLoadingNext ? '#d3d3d3' : '',
+                backgroundColor: isLoadingNext
+                  ? '#d3d3d3'
+                  : browseHasMore
+                    ? '#90ee90'
+                    : '',
                 border: '1px solid black',
               }"
             >
@@ -715,6 +719,7 @@ export default {
     const _didInitialVisibleScroll = ref(false);
     const _startBrowsePromise = ref(null);
     const isLoadingNext = ref(false);
+    const browseHasMore = ref(false);
     const justFetchedNext = ref(false);
     const isLoadingRemotesMsg = ref(false);
     const loadingRemotesCount = ref(0);
@@ -798,6 +803,23 @@ export default {
       await loadRemotesForTvdb(cur);
     };
     evtBus.on("tvdbUpdated", onTvdbUpdated);
+
+    const checkBrowseHasMore = () => {
+      fetch(`${config.torrentsApiUrl}/api/hasBrowseShow`)
+        .then((r) => r.json())
+        .then((d) => {
+          browseHasMore.value = !!d.available;
+        })
+        .catch(() => {});
+    };
+    watch(
+      () => props.active,
+      (isActive) => {
+        if (isActive) {
+          checkBrowseHasMore();
+        }
+      },
+    );
 
     onUnmounted(() => {
       evtBus.off("previewMode", onPreviewMode);

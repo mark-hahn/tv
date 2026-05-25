@@ -32,6 +32,7 @@ import { getLocalFiles, renameLocalFile, moveToTrial } from "./local.js";
 import {
   getBrowseShow,
   getAllBrowse,
+  hasBrowseShow,
   ackBrowsed,
   removeResultTitleByTvdbId,
 } from "./browse.js";
@@ -2173,6 +2174,11 @@ app.get("/api/getAllBrowse", async (req, res) => {
     console.error("getAllBrowse error:", error);
     res.status(500).json({ error: error.message });
   }
+});
+
+// GET /api/hasBrowseShow — lightweight check whether a candidate show exists
+app.get("/api/hasBrowseShow", (req, res) => {
+  res.json({ available: hasBrowseShow() });
 });
 
 // GET /api/browseSearch?q=text — search tvmaze.sqlite by name (ignores browsed status)

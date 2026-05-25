@@ -1,3 +1,7 @@
+---
+description: Android TV remote app documentation and context
+---
+
 > **⚠ WARNING:** This document was generated on **2026-05-24**. The code may have changed since then. Always verify against the source in `apps/android/App.js`.
 
 # Android App — TV Remote (`apps/android`)

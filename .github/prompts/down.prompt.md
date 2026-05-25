@@ -1,3 +1,7 @@
+---
+description: Down server documentation and context
+---
+
 > **Warning:** This document was written on **2026-05-24**. The code may have changed since then — verify against source files before relying on specifics.
 
 # Down Server (`apps/down`)

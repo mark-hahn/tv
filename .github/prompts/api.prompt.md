@@ -1,3 +1,7 @@
+---
+description: API server documentation and context
+---
+
 # API Server Documentation
 
 > **Warning:** This document was generated on **2026-05-24 14:07 PDT**. The code may have changed since then. Always verify against the source files in `apps/api/src/`.

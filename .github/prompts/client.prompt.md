@@ -1,3 +1,7 @@
+---
+description: Web client (Vue 3) documentation and context
+---
+
 > **Generated: 2026-05-24 16:53 PST**
 > **Warning: Code has changed since this was written. Verify details against source before relying on them.**
 
@@ -26,15 +30,15 @@ In landscape orientation the panes sit side by side (list on the left, tabs on t
 
 The URL query parameter `?simple` activates **simple mode**. This is used on smaller or touch devices (tablets, phones).
 
-| Feature | Simple mode | Non-simple mode |
-|---|---|---|
-| Management/action tabs (Tor, Browse, Flex, Qbt, Down, Usb, Local) | Hidden | Visible in a second tab bar row |
-| Condition flag column in show rows | Hidden | Visible |
-| Sort / filter toolbar (HdrBot) | Hidden | Visible |
-| Side buttons panel | Shown (portrait only) | Not shown |
-| Buttons panel inside list | Shown | Not shown |
-| Show row height | 40 px | 30 px |
-| Default pane split | 50 % landscape, 35 % portrait (fixed) | User-draggable |
+| Feature                                                           | Simple mode                           | Non-simple mode                 |
+| ----------------------------------------------------------------- | ------------------------------------- | ------------------------------- |
+| Management/action tabs (Tor, Browse, Flex, Qbt, Down, Usb, Local) | Hidden                                | Visible in a second tab bar row |
+| Condition flag column in show rows                                | Hidden                                | Visible                         |
+| Sort / filter toolbar (HdrBot)                                    | Hidden                                | Visible                         |
+| Side buttons panel                                                | Shown (portrait only)                 | Not shown                       |
+| Buttons panel inside list                                         | Shown                                 | Not shown                       |
+| Show row height                                                   | 40 px                                 | 30 px                           |
+| Default pane split                                                | 50 % landscape, 35 % portrait (fixed) | User-draggable                  |
 
 In simple mode a collapsible `Buttons` panel provides filter shortcuts (Ready To Watch, Drama, Comedy, To Try, Continue, Mark, Linda, Trash, Custom) and sort-order shortcuts.
 
@@ -64,21 +68,21 @@ Each row in the virtualized list (`vue-virtual-scroller`) shows:
 
 Each flag has a color, an icon, and a `cond(show)` predicate. The flags are:
 
-| Name | Color | Icon | Meaning |
-|---|---|---|---|
-| unplayed | cyan | plus | `notReady === false` — has unwatched episodes ready to watch |
-| waiting | lime | clock | has a `waitStr` (waiting for more episodes) |
-| needsIntro | cyan | film | needs intro-scene processing |
-| gap | red/light | minus | file gap or watch gap detected |
-| ended | orange | traffic-light | series has ended |
-| drama | blue | sad-cry | not a comedy (no Comedy genre) |
-| foreign | blue | globe | original country is not USA |
-| totry | lime | question | `inToTry` flag — on the "to try" list |
-| continue | lime | arrow-right | `inContinue` flag |
-| mark | lime | mars | `inMark` flag |
-| linda | lime | venus | `inLinda` flag |
-| ban | red | ban | `reject` — rejected/hidden show |
-| hasemby | brown | tv | `inEmby !== false` — present in the Emby library |
+| Name       | Color     | Icon          | Meaning                                                      |
+| ---------- | --------- | ------------- | ------------------------------------------------------------ |
+| unplayed   | cyan      | plus          | `notReady === false` — has unwatched episodes ready to watch |
+| waiting    | lime      | clock         | has a `waitStr` (waiting for more episodes)                  |
+| needsIntro | cyan      | film          | needs intro-scene processing                                 |
+| gap        | red/light | minus         | file gap or watch gap detected                               |
+| ended      | orange    | traffic-light | series has ended                                             |
+| drama      | blue      | sad-cry       | not a comedy (no Comedy genre)                               |
+| foreign    | blue      | globe         | original country is not USA                                  |
+| totry      | lime      | question      | `inToTry` flag — on the "to try" list                        |
+| continue   | lime      | arrow-right   | `inContinue` flag                                            |
+| mark       | lime      | mars          | `inMark` flag                                                |
+| linda      | lime      | venus         | `inLinda` flag                                               |
+| ban        | red       | ban           | `reject` — rejected/hidden show                              |
+| hasemby    | brown     | tv            | `inEmby !== false` — present in the Emby library             |
 
 Clicking the `totry`, `continue`, `mark`, `linda`, `ban`, and `hasemby` flags triggers async toggles that save state to both Emby (via the Emby REST API) and the server's TVDB record store.
 
@@ -222,13 +226,13 @@ Manages video files that are already in the local media storage for the selected
 
 The **TV pane** (`tvpane.vue`) is a 3×5 grid of large touch-friendly buttons that control the living room TV via the `tv-tv` server. The grid layout:
 
-| Row | Left | Center | Right |
-|---|---|---|---|
-| 1 | Back (hold = long-press) | ▲ Up | Home (hold = long-press) |
-| 2 | ◀ Left | OK (hold) | ▶ Right |
-| 3 | Emby (hold) | ▼ Down | Skip (hold) |
-| 4 | Vol− (hold) | Vol+ (hold) | Mute |
-| 5 | Subs | Apps | Google |
+| Row | Left                     | Center      | Right                    |
+| --- | ------------------------ | ----------- | ------------------------ |
+| 1   | Back (hold = long-press) | ▲ Up        | Home (hold = long-press) |
+| 2   | ◀ Left                   | OK (hold)   | ▶ Right                  |
+| 3   | Emby (hold)              | ▼ Down      | Skip (hold)              |
+| 4   | Vol− (hold)              | Vol+ (hold) | Mute                     |
+| 5   | Subs                     | Apps        | Google                   |
 
 - **Left/Right with hold** — scrubs Emby playback forward/backward (Emby scrub API), falling back to key-repeat navigation.
 - **Mute** — toggles mute; state is polled from the server and reflected in button color.
@@ -250,20 +254,20 @@ The TV pane reflects the current TV input mode (`off`, `google`, `tv`, `fire`, `
 
 All backend processes run on `hahnca.com` and are managed by pm2 (`ecosystem.config.cjs`):
 
-| pm2 name | nginx path | Purpose |
-|---|---|---|
-| `tv-api` | `/tv-api` | Torrent search, TVDB proxy, Emby sync, TMDB, subtitle operations, ASR/embedding queue, file management, reviews, actor data |
-| `tv-srvr` | `/tv-srvr` | Main WebSocket server; show data, TVDB records, gaps, last-viewed, notes, Flexget, fix/emb/asr streaming, shared filters |
-| `tv-down` | `/tv-down` | Download orchestration; moves completed torrent files into show folders, renames, triggers Emby refresh |
-| `tv-tv` | `/tv-tv` | TV remote control bridge; sends key commands to the living room TV via Home Assistant and Bravia APIs |
+| pm2 name  | nginx path | Purpose                                                                                                                     |
+| --------- | ---------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `tv-api`  | `/tv-api`  | Torrent search, TVDB proxy, Emby sync, TMDB, subtitle operations, ASR/embedding queue, file management, reviews, actor data |
+| `tv-srvr` | `/tv-srvr` | Main WebSocket server; show data, TVDB records, gaps, last-viewed, notes, Flexget, fix/emb/asr streaming, shared filters    |
+| `tv-down` | `/tv-down` | Download orchestration; moves completed torrent files into show folders, renames, triggers Emby refresh                     |
+| `tv-tv`   | `/tv-tv`   | TV remote control bridge; sends key commands to the living room TV via Home Assistant and Bravia APIs                       |
 
 ### Client Configuration (`src/config.js`)
 
 ```js
-const TV_API_URL  = "https://hahnca.com/tv-api";
+const TV_API_URL = "https://hahnca.com/tv-api";
 const TV_SRVR_URL = "https://hahnca.com/tv-srvr";
 const TV_DOWN_URL = "https://hahnca.com/tv-down";
-const TV_TV_URL   = "https://hahnca.com/tv-tv";
+const TV_TV_URL = "https://hahnca.com/tv-tv";
 ```
 
 ### WebSocket (`tv-srvr`)
@@ -277,11 +281,13 @@ const TV_TV_URL   = "https://hahnca.com/tv-tv";
 Two types of messages flow over the WebSocket:
 
 **Client → server calls** (`fCall`): Only used for streaming operations:
+
 - `handleAsr` — start/control ASR subtitle generation.
 - `handleEmb` — start/control embedding generation.
 - `handleFix` — start/control video fix/re-encode.
 
 **Server → client pushes** (notifications with `id === 0`):
+
 - `asr-log` — ASR progress log lines.
 - `fix-log` — fix job log lines.
 - `emb-log` — embedding log lines.
@@ -296,42 +302,42 @@ Two types of messages flow over the WebSocket:
 
 All other `tv-srvr` calls are HTTP via `httpCall()` (GET or POST with JSON body, 30-second default timeout). Key endpoints include:
 
-| Endpoint | Method | Purpose |
-|---|---|---|
-| `/api/getShowsFromDisk` | GET | All show folders on disk |
-| `/api/getLastViewed` | GET | Currently-playing show per device |
-| `/api/getAllTvdb` | GET | Full TVDB metadata cache |
-| `/api/setTvdbFields` | POST | Update/delete a TVDB record |
-| `/api/accessTvdb` | POST | Proxy a TVDB API request |
-| `/api/getSeriesMapFromTvdb` | POST | Season/episode map for a show |
-| `/api/saveNote` | POST | Save per-show note text |
-| `/api/getSharedFilters` / `setSharedFilters` | GET/POST | Cross-device filter sharing |
-| `/api/deletePath` | POST | Delete a folder on disk |
-| `/api/delSeasonFiles` | POST | Delete files for one season |
-| `/api/embySync` / `triggerEmbySync` | POST | Trigger Emby library scan |
-| `/api/refreshEmbyItem` | POST | Refresh a single Emby item |
-| `/api/getGroupCounts` / `incrementGroupCount` | GET/POST | Genre group click tracking |
-| `/api/getVipActors` / `setVipActors` | GET/POST | VIP actor list |
-| `/api/subsSearch` | POST | OpenSubtitles search proxy |
-| `/api/applySubFiles` / `deleteSubFiles` / `offsetSubFiles` | POST | Subtitle file management |
-| `/api/asr/log` / `queue` / `kill` | GET/POST | ASR queue management |
-| `/api/asr/chksrt/list` / `ok` / `gensrt` / `select` | GET/POST | Subtitle review queue |
-| `/api/introFirstFile` | GET | First playable file for intro detection |
-| `/api/getRemotes` | POST | Remote control configuration |
+| Endpoint                                                   | Method   | Purpose                                 |
+| ---------------------------------------------------------- | -------- | --------------------------------------- |
+| `/api/getShowsFromDisk`                                    | GET      | All show folders on disk                |
+| `/api/getLastViewed`                                       | GET      | Currently-playing show per device       |
+| `/api/getAllTvdb`                                          | GET      | Full TVDB metadata cache                |
+| `/api/setTvdbFields`                                       | POST     | Update/delete a TVDB record             |
+| `/api/accessTvdb`                                          | POST     | Proxy a TVDB API request                |
+| `/api/getSeriesMapFromTvdb`                                | POST     | Season/episode map for a show           |
+| `/api/saveNote`                                            | POST     | Save per-show note text                 |
+| `/api/getSharedFilters` / `setSharedFilters`               | GET/POST | Cross-device filter sharing             |
+| `/api/deletePath`                                          | POST     | Delete a folder on disk                 |
+| `/api/delSeasonFiles`                                      | POST     | Delete files for one season             |
+| `/api/embySync` / `triggerEmbySync`                        | POST     | Trigger Emby library scan               |
+| `/api/refreshEmbyItem`                                     | POST     | Refresh a single Emby item              |
+| `/api/getGroupCounts` / `incrementGroupCount`              | GET/POST | Genre group click tracking              |
+| `/api/getVipActors` / `setVipActors`                       | GET/POST | VIP actor list                          |
+| `/api/subsSearch`                                          | POST     | OpenSubtitles search proxy              |
+| `/api/applySubFiles` / `deleteSubFiles` / `offsetSubFiles` | POST     | Subtitle file management                |
+| `/api/asr/log` / `queue` / `kill`                          | GET/POST | ASR queue management                    |
+| `/api/asr/chksrt/list` / `ok` / `gensrt` / `select`        | GET/POST | Subtitle review queue                   |
+| `/api/introFirstFile`                                      | GET      | First playable file for intro detection |
+| `/api/getRemotes`                                          | POST     | Remote control configuration            |
 
 ### HTTP Calls (`tv-api`)
 
 Fewer direct HTTP calls go to `tv-api`; these are mainly actor-related:
 
-| Endpoint | Method | Purpose |
-|---|---|---|
-| `/api/getActorPage` | POST | Fetch actor Wikipedia/bio page |
-| `/api/getActorCredits` | POST | Fetch actor filmography |
-| `/api/searchActorsInNonEmby` | POST | Find actors in shows not in Emby |
-| `/api/getTmdb` | POST | TMDB show data |
-| `/api/searchTmdbPerson` | POST | TMDB person search |
-| `/api/getStreamProviders` | POST | TMDB watch provider data |
-| `/api/getReviews` | GET | Aggregated reviews scrape |
+| Endpoint                     | Method | Purpose                          |
+| ---------------------------- | ------ | -------------------------------- |
+| `/api/getActorPage`          | POST   | Fetch actor Wikipedia/bio page   |
+| `/api/getActorCredits`       | POST   | Fetch actor filmography          |
+| `/api/searchActorsInNonEmby` | POST   | Find actors in shows not in Emby |
+| `/api/getTmdb`               | POST   | TMDB show data                   |
+| `/api/searchTmdbPerson`      | POST   | TMDB person search               |
+| `/api/getStreamProviders`    | POST   | TMDB watch provider data         |
+| `/api/getReviews`            | GET    | Aggregated reviews scrape        |
 
 ---
 
@@ -361,6 +367,7 @@ The living room TV is a Sony Bravia 7. Remote control is via the `tv-tv` backend
 - **Emby API** — for playback scrubbing (seek forward/back) via Emby's active-sessions API.
 
 The TV pane detects the current TV mode from the HA `media_player.living_room_tv` state and `mediaTitle`:
+
 - `off` — TV is off or unavailable.
 - `google` — Google TV launcher is active (`mediaTitle === "Smart TV"`).
 - `tv` — regular TV input (`mediaTitle === "TV"`).
@@ -407,31 +414,31 @@ A simple publish/subscribe singleton used for cross-component communication with
 
 ## Component Summary
 
-| File | Role |
-|---|---|
-| `App.vue` | Root; layout, tab routing, pane resize, global modals (help, missing-ep warning, TVDB mismatch) |
-| `list.vue` | Show list controller; data loading, filtering, sorting, show selection |
-| `shows.vue` | Virtualized show rows with condition flags |
-| `hdrtop.vue` | List header: count, filter input, "Watching" indicator, library buttons |
-| `hdrbot.vue` | List subheader (non-simple): sort/filter dropdowns, condition flag toggles |
-| `buttons.vue` | Simple-mode sidebar: filter/genre/collection/sort shortcuts |
-| `info.vue` | Show detail: poster, metadata, notes, watch/remote buttons, stream providers |
-| `map.vue` | Season/episode grid with file and watched indicators |
-| `actors.vue` | Cast list, actor credits, VIP actor management |
-| `reviews.vue` | Aggregated show ratings and reviews |
-| `trailer.vue` | YouTube and video trailer embeds |
-| `tvpane.vue` | Living room TV remote control |
-| `tor.vue` | Torrent search and download (show-specific) |
-| `browse.vue` | New show discovery via TVDB search and reel gallery |
-| `flex.vue` | Flexget scheduler management |
-| `qbt.vue` | qBittorrent torrent client dashboard |
-| `down.vue` | Download orchestration (tv-down server) |
-| `usb.vue` | USB server file browser and copy |
-| `local.vue` | Local file manager: subtitles, ASR, embedding, fix |
-| `video-player.vue` | In-browser full-screen video player (normal, intro, chksrt modes) |
-| `stream.vue` | Streaming provider lookup popup |
-| `reel-gallery.vue` | Scrollable poster gallery for show browsing |
-| `tree-node.vue` | Recursive file tree node for USB/Local panes |
-| `meta.vue` | Show metadata display sub-component |
-| `actor.vue` | Single actor display sub-component |
-| `keyboard-pane.vue` | On-screen keyboard for Android/TV text input |
+| File                | Role                                                                                            |
+| ------------------- | ----------------------------------------------------------------------------------------------- |
+| `App.vue`           | Root; layout, tab routing, pane resize, global modals (help, missing-ep warning, TVDB mismatch) |
+| `list.vue`          | Show list controller; data loading, filtering, sorting, show selection                          |
+| `shows.vue`         | Virtualized show rows with condition flags                                                      |
+| `hdrtop.vue`        | List header: count, filter input, "Watching" indicator, library buttons                         |
+| `hdrbot.vue`        | List subheader (non-simple): sort/filter dropdowns, condition flag toggles                      |
+| `buttons.vue`       | Simple-mode sidebar: filter/genre/collection/sort shortcuts                                     |
+| `info.vue`          | Show detail: poster, metadata, notes, watch/remote buttons, stream providers                    |
+| `map.vue`           | Season/episode grid with file and watched indicators                                            |
+| `actors.vue`        | Cast list, actor credits, VIP actor management                                                  |
+| `reviews.vue`       | Aggregated show ratings and reviews                                                             |
+| `trailer.vue`       | YouTube and video trailer embeds                                                                |
+| `tvpane.vue`        | Living room TV remote control                                                                   |
+| `tor.vue`           | Torrent search and download (show-specific)                                                     |
+| `browse.vue`        | New show discovery via TVDB search and reel gallery                                             |
+| `flex.vue`          | Flexget scheduler management                                                                    |
+| `qbt.vue`           | qBittorrent torrent client dashboard                                                            |
+| `down.vue`          | Download orchestration (tv-down server)                                                         |
+| `usb.vue`           | USB server file browser and copy                                                                |
+| `local.vue`         | Local file manager: subtitles, ASR, embedding, fix                                              |
+| `video-player.vue`  | In-browser full-screen video player (normal, intro, chksrt modes)                               |
+| `stream.vue`        | Streaming provider lookup popup                                                                 |
+| `reel-gallery.vue`  | Scrollable poster gallery for show browsing                                                     |
+| `tree-node.vue`     | Recursive file tree node for USB/Local panes                                                    |
+| `meta.vue`          | Show metadata display sub-component                                                             |
+| `actor.vue`         | Single actor display sub-component                                                              |
+| `keyboard-pane.vue` | On-screen keyboard for Android/TV text input                                                    |

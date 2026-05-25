@@ -1,3 +1,7 @@
+---
+description: srvr server documentation and context
+---
+
 # srvr — Server Documentation
 
 > **Timestamp: 2026-05-24**

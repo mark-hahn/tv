@@ -1,4 +1,5 @@
 ---
+description: ASR (automatic speech recognition / subtitle) server documentation and context
 timestamp: 2026-05-24
 warning: Code may have changed since this document was written. Verify details against current source.
 ---
@@ -91,11 +92,11 @@ Before (or alongside) ASR generation, the system can extract embedded text subti
 
 Three in-memory queues coordinate subtitle processing. Each entry contains `{ videoFilePath, fromUI }`. All queues are persisted to JSON on every change and reloaded on server startup:
 
-| Queue | Persisted file | Purpose |
-|---|---|---|
-| `subQueue` | `data/subQueue.json` | Files needing full subtitle processing (emb extraction + OpenSubs + ASR decision) |
-| `subQueueChkSrt` | `data/subQueueChkSrt.json` | Files awaiting human review to choose/approve a subtitle |
-| `subQueueGenSrt` | `data/subQueueGenSrt.json` | Files queued for ASR generation |
+| Queue            | Persisted file             | Purpose                                                                           |
+| ---------------- | -------------------------- | --------------------------------------------------------------------------------- |
+| `subQueue`       | `data/subQueue.json`       | Files needing full subtitle processing (emb extraction + OpenSubs + ASR decision) |
+| `subQueueChkSrt` | `data/subQueueChkSrt.json` | Files awaiting human review to choose/approve a subtitle                          |
+| `subQueueGenSrt` | `data/subQueueGenSrt.json` | Files queued for ASR generation                                                   |
 
 Queue files are located at `/root/dev/apps/tv/apps/asr/data/` on the remote server.
 
@@ -118,19 +119,19 @@ One ASR job runs at a time, guarded by `genSrtRunning`. CPU load average is chec
 
 All paths below are on the remote server at `/root/dev/apps/tv/apps/asr/data/` unless noted.
 
-| File | Description |
-|---|---|
-| `asr.log` | Output of the most recent `asr.sh` run (overwritten each run). Tailed live by `asr tail`. |
-| `subtitle.log` | Persistent log of all subtitle activity: emb extraction, OpenSubs downloads, ASR starts/completions. Rotated to `subtitle-logs/` at 5 am. |
-| `subtitle-logs/` | Archive of rotated subtitle logs. |
-| `subQueue.json` | Persisted subQueue array. |
-| `subQueueChkSrt.json` | Persisted chkSrt queue array. |
-| `subQueueGenSrt.json` | Persisted genSrt queue array. |
-| `seasonPath` | Single line: the last target directory processed (written by `asr.sh`, read by `asr status`). |
-| `asr-bkgnd.log` | Legacy background log from the retired `tv-asr-bkgnd` pm2 process. |
-| `/tmp/asr-debug.log` | Debug log written by `asr.sh` on every invocation (env, args, Node path). |
-| `/tmp/asr-background.log` | stdout/stderr of the detached bash wrapper process spawned by `asr.sh`. |
-| `apps/asr/secrets/mistral-asr-key.txt` | Mistral API key. Not in repo. Must exist on server at runtime. |
+| File                                   | Description                                                                                                                               |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `asr.log`                              | Output of the most recent `asr.sh` run (overwritten each run). Tailed live by `asr tail`.                                                 |
+| `subtitle.log`                         | Persistent log of all subtitle activity: emb extraction, OpenSubs downloads, ASR starts/completions. Rotated to `subtitle-logs/` at 5 am. |
+| `subtitle-logs/`                       | Archive of rotated subtitle logs.                                                                                                         |
+| `subQueue.json`                        | Persisted subQueue array.                                                                                                                 |
+| `subQueueChkSrt.json`                  | Persisted chkSrt queue array.                                                                                                             |
+| `subQueueGenSrt.json`                  | Persisted genSrt queue array.                                                                                                             |
+| `seasonPath`                           | Single line: the last target directory processed (written by `asr.sh`, read by `asr status`).                                             |
+| `asr-bkgnd.log`                        | Legacy background log from the retired `tv-asr-bkgnd` pm2 process.                                                                        |
+| `/tmp/asr-debug.log`                   | Debug log written by `asr.sh` on every invocation (env, args, Node path).                                                                 |
+| `/tmp/asr-background.log`              | stdout/stderr of the detached bash wrapper process spawned by `asr.sh`.                                                                   |
+| `apps/asr/secrets/mistral-asr-key.txt` | Mistral API key. Not in repo. Must exist on server at runtime.                                                                            |
 
 ---
 
@@ -138,21 +139,21 @@ All paths below are on the remote server at `/root/dev/apps/tv/apps/asr/data/` u
 
 ### Runtime (npm)
 
-| Package | Purpose |
-|---|---|
-| `axios` | HTTP client for Mistral API calls |
-| `form-data` | Multipart form construction for audio file uploads |
+| Package                | Purpose                                                                |
+| ---------------------- | ---------------------------------------------------------------------- |
+| `axios`                | HTTP client for Mistral API calls                                      |
+| `form-data`            | Multipart form construction for audio file uploads                     |
 | `@mistralai/mistralai` | Official Mistral client (currently unused in favor of raw axios calls) |
-| `@tv/share` | Shared workspace utilities |
-| `node-fetch` | Fetch polyfill (available but not directly used in core path) |
+| `@tv/share`            | Shared workspace utilities                                             |
+| `node-fetch`           | Fetch polyfill (available but not directly used in core path)          |
 
 ### System binaries (must be installed on server)
 
-| Binary | Purpose |
-|---|---|
-| `ffmpeg` | Audio extraction, preprocessing (filters), WAV chunking, FLAC encoding, subtitle extraction |
-| `ffprobe` | Video duration, subtitle stream enumeration |
-| `node` | JavaScript runtime for `asr.js` |
+| Binary    | Purpose                                                                                     |
+| --------- | ------------------------------------------------------------------------------------------- |
+| `ffmpeg`  | Audio extraction, preprocessing (filters), WAV chunking, FLAC encoding, subtitle extraction |
+| `ffprobe` | Video duration, subtitle stream enumeration                                                 |
+| `node`    | JavaScript runtime for `asr.js`                                                             |
 
 Both `ffmpeg` and `ffprobe` are verified at startup via a version check; missing binaries cause immediate exit.
 
@@ -168,14 +169,14 @@ Both `ffmpeg` and `ffprobe` are verified at startup via a version check; missing
 
 ## Key Constants
 
-| Constant | Value | Meaning |
-|---|---|---|
-| `model` | `voxtral-mini-latest` | Mistral ASR model |
-| `FILE_LIMIT_BYTES` | 24 MB | API per-file upload limit |
-| `ADAPTIVE_INITIAL_BPS` | 45,000 B/s | Initial estimate of FLAC bytes/sec for chunking |
-| `timeMatchMgn` | 0.3 s | Tolerance for considering two timestamps "equal" during dedup |
-| `MAX_CHARS` | 42 | Max characters per SRT line before splitting |
-| `AUDIO_FILTER` | `highpass=f=80,lowpass=f=8000,loudnorm=I=-16:TP=-1.5:LRA=11` | ffmpeg audio filter chain |
-| `audioConfig` | `max`: 48 kHz / 256 kbps | Audio quality for extraction |
-| `MAX_RETRIES` | 5 | API retry limit |
-| `API_TIMEOUT` | 120,000 ms | Per-request timeout to Mistral |
+| Constant               | Value                                                        | Meaning                                                       |
+| ---------------------- | ------------------------------------------------------------ | ------------------------------------------------------------- |
+| `model`                | `voxtral-mini-latest`                                        | Mistral ASR model                                             |
+| `FILE_LIMIT_BYTES`     | 24 MB                                                        | API per-file upload limit                                     |
+| `ADAPTIVE_INITIAL_BPS` | 45,000 B/s                                                   | Initial estimate of FLAC bytes/sec for chunking               |
+| `timeMatchMgn`         | 0.3 s                                                        | Tolerance for considering two timestamps "equal" during dedup |
+| `MAX_CHARS`            | 42                                                           | Max characters per SRT line before splitting                  |
+| `AUDIO_FILTER`         | `highpass=f=80,lowpass=f=8000,loudnorm=I=-16:TP=-1.5:LRA=11` | ffmpeg audio filter chain                                     |
+| `audioConfig`          | `max`: 48 kHz / 256 kbps                                     | Audio quality for extraction                                  |
+| `MAX_RETRIES`          | 5                                                            | API retry limit                                               |
+| `API_TIMEOUT`          | 120,000 ms                                                   | Per-request timeout to Mistral                                |

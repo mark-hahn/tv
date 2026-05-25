@@ -1796,6 +1796,13 @@ export default {
         return;
       }
       if (k === "map") {
+        if (this.currentShow?.name !== this.mapShow?.name) {
+          this.mapShow = null;
+          this.seriesMapSeasons = [];
+          this.seriesMapEpis = [];
+          this.seriesMap = {};
+          this.mapError = "";
+        }
         this.currentPane = "map";
         evtBus.emit("paneChanged", this.currentPane);
         if (this.currentShow)

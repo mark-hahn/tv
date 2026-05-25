@@ -819,6 +819,7 @@ export default {
           checkBrowseHasMore();
         }
       },
+      { immediate: true },
     );
 
     onUnmounted(() => {
@@ -1137,6 +1138,7 @@ export default {
         suppressButtons.value = false;
       } finally {
         isLoadingNext.value = false;
+        checkBrowseHasMore();
       }
     };
 
@@ -2121,6 +2123,7 @@ export default {
       handleUnSnooze,
       creditShowList,
       creditIsMovie,
+      browseHasMore,
     };
   },
 };

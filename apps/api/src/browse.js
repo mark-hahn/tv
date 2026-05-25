@@ -214,6 +214,60 @@ try {
   resultTitles = [];
 }
 
+// --- Filtering ---
+
+function buildShowTitle(show) {
+  let title = (show.name || "Unknown").trim();
+  if (show.premiered) {
+    const d = new Date(show.premiered * 1000);
+    const y = d.getUTCFullYear();
+    if (y && !Number.isNaN(y)) title = `${title} (${y})`;
+  }
+  return title;
+}
+
+/**
+ * Returns the rejection reason string if the show should be skipped,
+ * or null if the show passes all filters.
+ * Pure check — no side effects (does not call markShowBrowsed).
+ */
+function getShowRejectionReason(show, title) {
+  if (!show.image || (!show.image.medium && !show.image.original))
+    return "no-image";
+
+  if (resultTitles.some((entry) => parseResultTitle(entry) === title))
+    return "already-seen";
+
+  if (show.type && IGNORED_TYPES.has(show.type.toLowerCase())) return show.type;
+
+  if (show.language) {
+    const lang = String(show.language).trim().toLowerCase();
+    if (lang !== "english") return "language";
+  }
+
+  const countryName = show.webChannel?.country?.name;
+  if (countryName && IGNORED_COUNTRIES.has(countryName.toLowerCase()))
+    return "country";
+
+  const networkCountry = show.network?.country?.name;
+  if (networkCountry && IGNORED_COUNTRIES.has(networkCountry.toLowerCase()))
+    return "country";
+
+  const genres = Array.isArray(show.genres) ? show.genres : [];
+  const lowerGenres = genres.map((g) => g.toLowerCase());
+  const rejectedGenre = lowerGenres.find((g) => avoidGenres.includes(g));
+  if (rejectedGenre) return rejectedGenre;
+
+  const summary = (show.summary || "").replace(/<[^>]*>/g, " ").trim();
+  if (summary.length > 50) {
+    const detected = franc(summary);
+    if (detected !== "eng" && detected !== "und" && detected !== "sco")
+      return "desc-language";
+  }
+
+  return null;
+}
+
 // --- Exports ---
 
 /**
@@ -221,107 +275,34 @@ try {
  * Used for both initializing the browse view and fetching the next item.
  */
 export async function getBrowseShow() {
-  // 1. Get candidates from DB (those with browsed != 1)
-  // The query sorts by newest premiered date.
   const candidates = getCandidateShows(100);
 
   let foundNew = false;
   let pendingBrowsedId = null;
 
   for (const show of candidates) {
-    let title = (show.name || "Unknown").trim();
-
-    // Append year if premiered date is available
-    if (show.premiered) {
-      // premiered is stored as epoch seconds
-      const d = new Date(show.premiered * 1000);
-      const y = d.getUTCFullYear();
-      if (y && !Number.isNaN(y)) {
-        title = `${title} (${y})`;
-      }
-    }
-
+    const title = buildShowTitle(show);
     const tvmazeId = show.tvmaze_id;
 
-    // Reject if no poster
-    if (!show.image || (!show.image.medium && !show.image.original)) {
+    const rejection = getShowRejectionReason(show, title);
+    if (rejection !== null) {
       markShowBrowsed(tvmazeId);
-      continue;
-    }
-
-    // Check if we've seen this title in our recent resultTitles
-    if (resultTitles.some((entry) => parseResultTitle(entry) === title)) {
-      markShowBrowsed(tvmazeId);
-      continue;
-    }
-
-    // Reject if type is in ignore list
-    if (show.type && IGNORED_TYPES.has(show.type.toLowerCase())) {
-      markShowBrowsed(tvmazeId);
-      continue;
-    }
-
-    // Reject if language is not English (silent skip)
-    // Accept standard string, or null/undefined
-    if (show.language) {
-      const lang = String(show.language).trim().toLowerCase();
-      if (lang !== "english") {
-        markShowBrowsed(tvmazeId);
-        continue;
+      // Only add a rejected card for genre rejections (except reality which is silent)
+      if (avoidGenres.includes(rejection) && rejection !== "reality") {
+        appendResultTitle(
+          JSON.stringify({
+            status: rejection,
+            title,
+            imdbid: show.externals?.imdb,
+            tvdbid: show.externals?.thetvdb,
+            data: show,
+          }),
+        );
       }
-    }
-
-    // Reject if country is in ignore list
-    const countryName = show.webChannel?.country?.name;
-    if (countryName && IGNORED_COUNTRIES.has(countryName.toLowerCase())) {
-      markShowBrowsed(tvmazeId);
       continue;
-    }
-
-    const networkCountry = show.network?.country?.name;
-    if (networkCountry && IGNORED_COUNTRIES.has(networkCountry.toLowerCase())) {
-      markShowBrowsed(tvmazeId);
-      continue;
-    }
-
-    // Filter Genres
-    // Show genres are usually in show.genres (array of strings)
-    const genres = Array.isArray(show.genres) ? show.genres : [];
-    const lowerGenres = genres.map((g) => g.toLowerCase());
-
-    const rejected = lowerGenres.find((g) => avoidGenres.includes(g));
-
-    if (rejected) {
-      markShowBrowsed(tvmazeId);
-      if (rejected === "reality") continue;
-      // appendResultTitle(`${rejected}|${title}|${JSON.stringify(show)}`);
-      appendResultTitle(
-        JSON.stringify({
-          status: rejected,
-          title,
-          imdbid: show.externals?.imdb,
-          tvdbid: show.externals?.thetvdb,
-          data: show,
-        }),
-      );
-      // "If rejected add ... and continue" to look for next one
-      continue;
-    }
-
-    // Analyze description language
-    const summary = (show.summary || "").replace(/<[^>]*>/g, " ").trim();
-    if (summary.length > 50) {
-      // High certainty check: only if we have sufficient text
-      const detected = franc(summary);
-      // Skip if detected as non-English (and not 'und'etermined, and allow 'sco' as it is often false positive for English)
-      if (detected !== "eng" && detected !== "und" && detected !== "sco") {
-        markShowBrowsed(tvmazeId);
-        continue;
-      }
     }
 
     // Accepted
-    // appendResultTitle(`ok|${title}|${JSON.stringify(show)}`);
     appendResultTitle(
       JSON.stringify({
         status: "ok",
@@ -333,16 +314,9 @@ export async function getBrowseShow() {
     );
     foundNew = true;
     pendingBrowsedId = tvmazeId;
-
-    // "If all checks pass ... return resultTitles"
-    // We stop after finding ONE accepted show, or if we exhaust our candidate batch.
-    // If we only found rejected shows in this batch, we might return them.
-    // But typical behavior (like getReel) is to return when we have a success or give up.
-    // The prompt implies we return immediately upon success.
     break;
   }
 
-  // If no new show was found, return empty titles so the client knows to show "no more".
   if (!foundNew) {
     return { titles: [], pendingBrowsedId: null };
   }
@@ -350,7 +324,12 @@ export async function getBrowseShow() {
 }
 
 export function hasBrowseShow() {
-  return getCandidateShows(1).length > 0;
+  const candidates = getCandidateShows(100);
+  for (const show of candidates) {
+    const title = buildShowTitle(show);
+    if (getShowRejectionReason(show, title) === null) return true;
+  }
+  return false;
 }
 
 export async function getAllBrowse() {

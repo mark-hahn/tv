@@ -182,8 +182,12 @@ const getShowState = async (showId, showName, showMeta) => {
   let fileGapSeason = null;
   let fileGapEpisode = null;
   let fileEndError = false;
+  let fileEndErrorSeason = null;
+  let fileEndErrorEpisode = null;
   let lastSeasonWatched = false;
   let seasonWatchedThenNofile = false;
+  let seasonWatchedThenNofileSeason = null;
+  let seasonWatchedThenNofileEpisode = null;
   let firstNoFileSeason = null;
   let firstNoFileEpisode = null;
   let anyUnaired = false;
@@ -239,6 +243,8 @@ const getShowState = async (showId, showName, showMeta) => {
       let watchedSeason = false;
 
       let fileEndCount = 0;
+      let fileEndStartEpisode = null;
+      let firstEpisodeOfSeason = null;
       let seasonNotWatchedNoFiles = true;
       let allSeasonWatched = true;
 
@@ -259,6 +265,7 @@ const getShowState = async (showId, showName, showMeta) => {
         const episode = episodes[episodeIdx];
         const episodeNumber = episode.IndexNumber;
         if (episodeNumber === undefined) continue;
+        if (firstEpisodeOfSeason === null) firstEpisodeOfSeason = episodeNumber;
         sawAnyEpisode = true;
         const userData = episode?.UserData;
         const watched = !!userData?.Played;
@@ -318,8 +325,13 @@ const getShowState = async (showId, showName, showMeta) => {
           watchGap = true;
         }
 
-        if (!haveFile && !watched && !unaired) fileEndCount++;
-        else fileEndCount = 0;
+        if (!haveFile && !watched && !unaired) {
+          if (fileEndCount === 0) fileEndStartEpisode = episodeNumber;
+          fileEndCount++;
+        } else {
+          fileEndCount = 0;
+          fileEndStartEpisode = null;
+        }
 
         const effectiveHaveFile = haveFile || watched;
         haveFileShow ||= effectiveHaveFile;
@@ -345,10 +357,19 @@ const getShowState = async (showId, showName, showMeta) => {
             `[getShowState] fileEndError set for ${showName} S${seasonNumber}: fileEndCount=${fileEndCount} fileCount=${fileCount} firstEpisodeFileUnwatched=${firstEpisodeFileUnwatched}`,
           );
           fileEndError = true;
+          if (fileEndErrorSeason === null) {
+            fileEndErrorSeason = seasonNumber;
+            fileEndErrorEpisode = fileEndStartEpisode;
+          }
         }
       }
-      if (lastSeasonWatched && !allSeasonWatched && seasonNotWatchedNoFiles)
+      if (lastSeasonWatched && !allSeasonWatched && seasonNotWatchedNoFiles) {
+        if (seasonWatchedThenNofileSeason === null) {
+          seasonWatchedThenNofileSeason = seasonNumber;
+          seasonWatchedThenNofileEpisode = firstEpisodeOfSeason;
+        }
         seasonWatchedThenNofile = true;
+      }
       lastSeasonWatched = allSeasonWatched;
     }
 
@@ -405,7 +426,11 @@ const getShowState = async (showId, showName, showMeta) => {
       fileGapSeason = null;
       fileGapEpisode = null;
       fileEndError = false;
+      fileEndErrorSeason = null;
+      fileEndErrorEpisode = null;
       seasonWatchedThenNofile = false;
+      seasonWatchedThenNofileSeason = null;
+      seasonWatchedThenNofileEpisode = null;
     }
   } catch (error) {
     console.error("getShowState error:", error.message);
@@ -420,7 +445,11 @@ const getShowState = async (showId, showName, showMeta) => {
     notReady: !ready,
     anyWatched,
     fileEndError,
+    fileEndErrorSeason,
+    fileEndErrorEpisode,
     seasonWatchedThenNofile,
+    seasonWatchedThenNofileSeason,
+    seasonWatchedThenNofileEpisode,
     watchGap,
     watchGapSeason,
     watchGapEpisode,
@@ -454,6 +483,8 @@ export const gapCheckOne = async (showId, showName, tvdbRecord) => {
     notReady,
     anyWatched,
     fileEndError,
+    fileEndErrorSeason,
+    fileEndErrorEpisode,
     watchGap,
     watchGapSeason,
     watchGapEpisode,
@@ -461,6 +492,8 @@ export const gapCheckOne = async (showId, showName, tvdbRecord) => {
     fileGapSeason,
     fileGapEpisode,
     seasonWatchedThenNofile,
+    seasonWatchedThenNofileSeason,
+    seasonWatchedThenNofileEpisode,
     allAiredHaveFile,
     allAiredWatched,
     allWatchedOrHaveFile,
@@ -476,7 +509,11 @@ export const gapCheckOne = async (showId, showName, tvdbRecord) => {
     fileGapSeason,
     fileGapEpisode,
     fileEndError,
+    fileEndErrorSeason,
+    fileEndErrorEpisode,
     seasonWatchedThenNofile,
+    seasonWatchedThenNofileSeason,
+    seasonWatchedThenNofileEpisode,
     allAiredHaveFile,
     allAiredWatched,
     allWatchedOrHaveFile,

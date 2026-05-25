@@ -1166,7 +1166,13 @@ export const getSeriesMap = async (show, prune = false) => {
           show.watchGap) ||
         (seasonNumber == show.fileGapSeason &&
           episodeNumber == show.fileGapEpisode &&
-          show.fileGap);
+          show.fileGap) ||
+        (seasonNumber == show.fileEndErrorSeason &&
+          episodeNumber == show.fileEndErrorEpisode &&
+          show.fileEndError) ||
+        (seasonNumber == show.seasonWatchedThenNofileSeason &&
+          episodeNumber == show.seasonWatchedThenNofileEpisode &&
+          show.seasonWatchedThenNofile);
 
       const noFileVal = !path; // noFile is true when there's no path
       if (show.name === "Pluribus" && unaired) {

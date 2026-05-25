@@ -194,9 +194,6 @@ const getShowState = async (showId, showName, showMeta) => {
   let anyEpisodeNoFile = false;
   let anyAiredEpisodeNotWatched = false;
   let anyEpisodeNeitherWatchedNorFile = false;
-  let seenUnwatchedNoFile = false;
-  let seenUnwatchedNoFileSeason = null;
-  let seenUnwatchedNoFileEpisode = null;
 
   try {
     const seasonsRes = await safeGet(urls.childrenUrl(showId));
@@ -323,25 +320,6 @@ const getShowState = async (showId, showName, showMeta) => {
 
         if (!haveFile && !watched && !unaired) fileEndCount++;
         else fileEndCount = 0;
-
-        // Track unwatched episodes with no file (for new check below)
-        if (!watched && !haveFile && !unaired && !seenUnwatchedNoFile) {
-          seenUnwatchedNoFile = true;
-          seenUnwatchedNoFileSeason = seasonNumber;
-          seenUnwatchedNoFileEpisode = episodeNumber;
-        }
-        // Flag fileGap when an unwatched+no-file episode precedes an episode with a file
-        // Watched episodes count as having a file for gap detection purposes
-        if (!fileGap && seenUnwatchedNoFile && (haveFile || watched)) {
-          if (fileGapSeason === null) {
-            fileGapSeason = seasonNumber;
-            fileGapEpisode = episodeNumber;
-          }
-          console.log(
-            `[getShowState] fileGap set (unwatched-no-file before file) for ${showName} S${seenUnwatchedNoFileSeason}E${seenUnwatchedNoFileEpisode}`,
-          );
-          fileGap = true;
-        }
 
         const effectiveHaveFile = haveFile || watched;
         haveFileShow ||= effectiveHaveFile;

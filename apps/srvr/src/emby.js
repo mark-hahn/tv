@@ -352,15 +352,13 @@ const getShowState = async (showId, showName, showMeta) => {
         lastWatched = watched;
       }
       if (!seasonNotWatchedNoFiles && fileEndCount > 2) {
-        if (!(fileCount === 1 && firstEpisodeFileUnwatched)) {
-          console.log(
-            `[getShowState] fileEndError set for ${showName} S${seasonNumber}: fileEndCount=${fileEndCount} fileCount=${fileCount} firstEpisodeFileUnwatched=${firstEpisodeFileUnwatched}`,
-          );
-          fileEndError = true;
-          if (fileEndErrorSeason === null) {
-            fileEndErrorSeason = seasonNumber;
-            fileEndErrorEpisode = fileEndStartEpisode;
-          }
+        console.log(
+          `[getShowState] fileEndError set for ${showName} S${seasonNumber}: fileEndCount=${fileEndCount} fileCount=${fileCount}`,
+        );
+        fileEndError = true;
+        if (fileEndErrorSeason === null) {
+          fileEndErrorSeason = seasonNumber;
+          fileEndErrorEpisode = fileEndStartEpisode;
         }
       }
       if (lastSeasonWatched && !allSeasonWatched && seasonNotWatchedNoFiles) {

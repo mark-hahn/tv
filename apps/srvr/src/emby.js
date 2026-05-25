@@ -373,6 +373,8 @@ const getShowState = async (showId, showName, showMeta) => {
       lastSeasonWatched = allSeasonWatched;
     }
 
+    const tryingShow = !anyWatched && firstEpisodeFileUnwatched;
+
     const allEpisodesUnaired = sawAnyEpisode && anyUnaired && !anyAiredEpisode;
     const showStatus = String(showMeta?.tvdbStatus || "").trim();
     const firstAired = String(showMeta?.firstAired || "").trim();
@@ -421,7 +423,7 @@ const getShowState = async (showId, showName, showMeta) => {
 
     // List/Map treat any of these as "Missing File". If user said skip it,
     // suppress all file-missing related signals.
-    if (skipMissingFileGap) {
+    if (skipMissingFileGap || tryingShow) {
       fileGap = false;
       fileGapSeason = null;
       fileGapEpisode = null;
@@ -431,6 +433,9 @@ const getShowState = async (showId, showName, showMeta) => {
       seasonWatchedThenNofile = false;
       seasonWatchedThenNofileSeason = null;
       seasonWatchedThenNofileEpisode = null;
+      watchGap = false;
+      watchGapSeason = null;
+      watchGapEpisode = null;
     }
   } catch (error) {
     console.error("getShowState error:", error.message);

@@ -192,6 +192,22 @@
             >
               Chksrt {{ chksrtCount }}
             </button>
+            <button
+              v-if="introCount > 0"
+              @click.stop="clickIntro"
+              :style="{
+                fontSize: '13px',
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                marginLeft: '4px',
+                border: '1px solid #c88',
+                backgroundColor: '#faa',
+                color: 'black',
+              }"
+            >
+              Intro {{ introCount }}
+            </button>
             <div style="flex: 1"></div>
             <button
               @click.stop="movieMode = !movieMode"
@@ -952,6 +968,10 @@ export default {
         '<b style="font-weight:700">$1</b>',
       );
     },
+
+    introCount() {
+      return this.filteredShows.filter((s) => s.needsIntro).length;
+    },
   },
   unmounted() {
     evtBus.off("downActivePart", this.handleDownActivePart);
@@ -1043,6 +1063,25 @@ export default {
         }
       } catch (e) {
         console.error("clickChksrt error:", e);
+      }
+    },
+
+    async clickIntro() {
+      const show = this.filteredShows.find((s) => s.needsIntro);
+      if (!show) return;
+      try {
+        const result = await srvr.introFirstFile(show.name);
+        if (result?.ok && result.path) {
+          await this.handleOpenIntro({
+            show,
+            path: result.path,
+            source: "info",
+            season: result.season ?? null,
+            episode: result.episode ?? null,
+          });
+        }
+      } catch (e) {
+        console.error("clickIntro error:", e);
       }
     },
 

@@ -99,7 +99,7 @@
             @keydown.stop
             placeholder="Search Descr"
             :style="{
-              width: '125px',
+              width: '100px',
               minWidth: '0px',
               padding: '2px',
               fontSize: '14px',

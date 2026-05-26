@@ -106,65 +106,43 @@
           </button>
           <button
             @click.stop="introClick"
-            :disabled="
-              !(
-                Array.isArray(show?.filesOnDisk) &&
-                show.filesOnDisk.some(
-                  (seasonRow) =>
-                    Array.isArray(seasonRow) && seasonRow.length > 1,
-                )
-              )
-            "
+            :disabled="!hasVideoFiles"
             :style="{
               fontSize: '13px',
-              cursor: !(
-                Array.isArray(show?.filesOnDisk) &&
-                show.filesOnDisk.some(
-                  (seasonRow) =>
-                    Array.isArray(seasonRow) && seasonRow.length > 1,
-                )
-              )
-                ? 'default'
-                : 'pointer',
+              cursor: hasVideoFiles ? 'pointer' : 'default',
               marginTop: '3px',
               maxHeight: '24px',
               borderRadius: '7px',
-              opacity: !(
-                Array.isArray(show?.filesOnDisk) &&
-                show.filesOnDisk.some(
-                  (seasonRow) =>
-                    Array.isArray(seasonRow) && seasonRow.length > 1,
-                )
-              )
-                ? 0.4
-                : 1,
+              opacity: hasVideoFiles ? 1 : 0.4,
             }"
           >
             Intro
           </button>
           <button
             @click.stop="playFirstUnwatched"
-            :disabled="!canPlayFirstUnwatched"
+            :disabled="!hasVideoFiles"
             :style="{
               fontSize: '13px',
-              cursor: canPlayFirstUnwatched ? 'pointer' : 'default',
+              cursor: hasVideoFiles ? 'pointer' : 'default',
               marginTop: '3px',
               maxHeight: '24px',
               borderRadius: '7px',
-              opacity: canPlayFirstUnwatched ? 1 : 0.4,
+              opacity: hasVideoFiles ? 1 : 0.4,
             }"
           >
             Play
           </button>
           <button
             @click.stop="tvClick"
-            style="
-              font-size: 13px;
-              cursor: pointer;
-              margin-top: 3px;
-              max-height: 24px;
-              border-radius: 7px;
-            "
+            :disabled="show?.inEmby === false"
+            :style="{
+              fontSize: '13px',
+              cursor: show?.inEmby !== false ? 'pointer' : 'default',
+              marginTop: '3px',
+              maxHeight: '24px',
+              borderRadius: '7px',
+              opacity: show?.inEmby !== false ? 1 : 0.4,
+            }"
           >
             TV
           </button>
@@ -618,11 +596,12 @@ export default {
         year: "numeric",
       });
     },
-    canPlayFirstUnwatched() {
+    hasVideoFiles() {
       return (
-        Number.isFinite(+this.nextUpSeason) &&
-        Number.isFinite(+this.nextUpEpisode) &&
-        !this.nextUpSuffixTxt
+        Array.isArray(this.show?.filesOnDisk) &&
+        this.show.filesOnDisk.some(
+          (seasonRow) => Array.isArray(seasonRow) && seasonRow.length > 1,
+        )
       );
     },
   },

@@ -1491,6 +1491,7 @@ export default {
     _setIntroDur(introDur) {
       if (!this.introShow?.name) return;
       this.introShow.introDur = introDur;
+      if (introDur !== null) this.introShow.needsIntro = false;
       setTvdbFields({ name: this.introShow.name, introDur }).catch((e) =>
         console.error("[intro] setTvdbFields error:", e),
       );

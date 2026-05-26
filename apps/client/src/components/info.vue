@@ -92,23 +92,6 @@
             minWidth: '0px',
           }"
         >
-          <input
-            v-model="descrSearchStr"
-            @input="onDescrSearch"
-            @click.stop
-            @keydown.stop
-            placeholder="Search Descr"
-            :style="{
-              width: '100px',
-              minWidth: '0px',
-              padding: '2px',
-              fontSize: '14px',
-              border: 'none',
-              backgroundColor: descrSearchStr ? '#fffde7' : '#eee',
-              height: '14px',
-              marginTop: '4px',
-            }"
-          />
           <button
             @click.stop="refreshTvdb"
             :style="{
@@ -158,6 +141,32 @@
             }"
           >
             Intro
+          </button>
+          <button
+            @click.stop="playFirstUnwatched"
+            :disabled="!canPlayFirstUnwatched"
+            :style="{
+              fontSize: '13px',
+              cursor: canPlayFirstUnwatched ? 'pointer' : 'default',
+              marginTop: '3px',
+              maxHeight: '24px',
+              borderRadius: '7px',
+              opacity: canPlayFirstUnwatched ? 1 : 0.4,
+            }"
+          >
+            Play
+          </button>
+          <button
+            @click.stop="tvClick"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              margin-top: 3px;
+              max-height: 24px;
+              border-radius: 7px;
+            "
+          >
+            TV
           </button>
           <button
             @click.stop="deleteClick"
@@ -537,7 +546,7 @@ const laTimestamp = () => {
 export default {
   name: "Series",
 
-  emits: ["open-intro"],
+  emits: ["open-intro", "play-episode"],
 
   props: {
     simpleMode: {
@@ -557,7 +566,6 @@ export default {
       seriesReady: false,
       previewMode: false,
       previewAddBusy: false,
-      descrSearchStr: "",
       dates: "",
       statusTxt: "",
       remoteShowName: "",
@@ -609,6 +617,13 @@ export default {
         day: "numeric",
         year: "numeric",
       });
+    },
+    canPlayFirstUnwatched() {
+      return (
+        Number.isFinite(+this.nextUpSeason) &&
+        Number.isFinite(+this.nextUpEpisode) &&
+        !this.nextUpSuffixTxt
+      );
     },
   },
 
@@ -666,15 +681,6 @@ export default {
       } catch (e) {
         return { seasonCount: 0, episodeCount: 0 };
       }
-    },
-
-    onDescrSearch() {
-      evtBus.emit("descrSearch", this.descrSearchStr);
-    },
-
-    onClearDescrSearch() {
-      this.descrSearchStr = "";
-      evtBus.emit("descrSearch", "");
     },
 
     async handleBodyClick() {
@@ -736,6 +742,45 @@ export default {
         window.alert("Intro failed to open.");
       }
     },
+
+    buildPlayActionEvent(overrides = {}) {
+      return {
+        stopPropagation() {},
+        preventDefault() {},
+        altKey: false,
+        shiftKey: false,
+        ctrlKey: false,
+        ...overrides,
+      };
+    },
+
+    async playFirstUnwatched() {
+      try {
+        const afterWatched = await emby.afterLastWatched(this.show);
+        const season = Number(afterWatched?.seasonNumber);
+        const episode = Number(afterWatched?.episodeNumber);
+        if (
+          afterWatched?.status !== "ok" ||
+          !Number.isFinite(season) ||
+          !Number.isFinite(episode)
+        ) {
+          window.alert("No playable unwatched episode found.");
+          return;
+        }
+        this.$emit(
+          "play-episode",
+          this.buildPlayActionEvent({ altKey: true }),
+          this.show,
+          season,
+          episode,
+        );
+      } catch (e) {
+        console.error("playFirstUnwatched error:", e);
+        window.alert("Play failed.");
+      }
+    },
+
+    tvClick() {},
 
     deleteClick() {
       console.log("Series, deleteClick:", this.show.name);
@@ -1741,8 +1786,6 @@ export default {
     };
     evtBus.on("showQueueEmpty", this.onShowQueueEmpty);
     evtBus.on("localFoldersChanged", this.recheckTwoLocalFolders);
-    evtBus.on("clearDescrSearch", this.onClearDescrSearch);
-
     this._onPaneChanged = (pane) => {
       if (pane !== "info") return;
       this.$nextTick(() => {
@@ -1769,7 +1812,6 @@ export default {
     if (this.onShowQueueEmpty)
       evtBus.off("showQueueEmpty", this.onShowQueueEmpty);
     evtBus.off("localFoldersChanged", this.recheckTwoLocalFolders);
-    evtBus.off("clearDescrSearch", this.onClearDescrSearch);
     if (this._onPaneChanged) evtBus.off("paneChanged", this._onPaneChanged);
 
     if (this.refreshStuckLogTimerId) {

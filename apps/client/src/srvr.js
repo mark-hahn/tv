@@ -569,6 +569,14 @@ export function introFirstFile(showName) {
     "GET",
   );
 }
+
+export function introNextFile(showName, season, episode) {
+  return httpCall(
+    `/api/introNextFile?showName=${encodeURIComponent(showName)}&season=${season}&episode=${episode}`,
+    null,
+    "GET",
+  );
+}
 export function getRemotesCmd(params) {
   return httpCall("/api/getRemotes", params, "POST");
 }

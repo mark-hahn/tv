@@ -365,6 +365,7 @@
       :introShows="filteredShows"
       :introSeason="videoPlayerMapSeason"
       :introEpisode="videoPlayerMapEpisode"
+      :introSource="videoPlayerSource"
       @close="handleVideoPlayerClose"
       @chksrt-next="handleChksrtNext"
       @chksrt-sel="handleChksrtSel"
@@ -1053,7 +1054,7 @@ export default {
       this.videoPlayerMapEpisode = episode != null ? episode : null;
     },
 
-    async handleIntroNext() {
+    async handleIntroNext(payload) {
       if (this.videoPlayerSource === "map") {
         const result = this.$refs.mapComp?.selectNextEpisodeWithFile(
           this.videoPlayerMapSeason,
@@ -1063,6 +1064,25 @@ export default {
           this.videoPlayerPath = result.path;
           this.videoPlayerMapSeason = result.season;
           this.videoPlayerMapEpisode = result.episode;
+        }
+        return;
+      }
+      // info pane with epiNext: load next episode in the same show
+      if (payload?.epiNext) {
+        const showName = this.videoPlayerIntroShow?.name;
+        const season = this.videoPlayerMapSeason;
+        const episode = this.videoPlayerMapEpisode;
+        if (showName != null && season != null && episode != null) {
+          try {
+            const result = await srvr.introNextFile(showName, season, episode);
+            if (result?.ok && result.path) {
+              this.videoPlayerPath = result.path;
+              this.videoPlayerMapSeason = result.season;
+              this.videoPlayerMapEpisode = result.episode;
+            }
+          } catch {
+            // ignore
+          }
         }
         return;
       }

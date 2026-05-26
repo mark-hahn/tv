@@ -390,6 +390,26 @@
           None
         </div>
         <div
+          @click.stop="introSource !== 'map' && clickIntroEpi()"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 6px;
+          "
+          :style="{
+            background: epiNext ? 'rgba(0, 90, 0, 0.9)' : 'rgba(0, 0, 0, 0.5)',
+            cursor: introSource !== 'map' ? 'pointer' : 'default',
+            opacity: introSource !== 'map' ? 1 : 0.35,
+          }"
+        >
+          Epi
+        </div>
+        <div
           @click.stop="clickIntroNext"
           style="
             color: white;
@@ -726,6 +746,7 @@ export default {
     introShows: { type: Array, default: () => [] },
     introSeason: { type: Number, default: null },
     introEpisode: { type: Number, default: null },
+    introSource: { type: String, default: null },
   },
   emits: ["close", "chksrt-next", "chksrt-sel", "intro-next"],
   data() {
@@ -747,6 +768,7 @@ export default {
       waitingForVideoTarget: null,
       introMarkDirty: false,
       introLocalNone: false,
+      epiNext: false,
     };
   },
   computed: {
@@ -874,8 +896,9 @@ export default {
     },
   },
   watch: {
-    introShow(newVal) {
+    introShow(newVal, oldVal) {
       if (!newVal?.name) return;
+      if (newVal.name !== oldVal?.name) this.epiNext = false;
       this.introMarkDirty = false;
       const tvdbIntroDur = newVal?.introDur ?? null;
       const tvdbStartMark = newVal?.startMark ?? null;
@@ -1411,11 +1434,14 @@ export default {
         console.error("[intro] setTvdbFields error:", e),
       );
     },
+    clickIntroEpi() {
+      this.epiNext = !this.epiNext;
+    },
     clickIntroNext() {
       if (this.introMarkDirty) this._saveStartMark();
       this.introMarkDirty = false;
       if (this.introSeason != null) this._seekOnLoad = true;
-      this.$emit("intro-next");
+      this.$emit("intro-next", { epiNext: this.epiNext });
     },
     _saveStartMark() {
       if (!this.introShow?.name) return;

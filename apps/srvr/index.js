@@ -5038,6 +5038,55 @@ app.get("/api/introFirstFile", async (req, res) => {
   }
 });
 
+app.get("/api/introNextFile", async (req, res) => {
+  const showName = req.query.showName;
+  const currentSeason = parseInt(req.query.season, 10);
+  const currentEpisode = parseInt(req.query.episode, 10);
+  if (!showName || isNaN(currentSeason) || isNaN(currentEpisode)) {
+    res
+      .status(400)
+      .json({ ok: false, error: "showName, season, episode required" });
+    return;
+  }
+  try {
+    const allTvdb = tvdb.getAllTvdbSync();
+    const record = allTvdb[showName];
+    if (!record?.id) {
+      res.json({ ok: false, error: "show not found" });
+      return;
+    }
+    if (record.inEmby === false) {
+      res.json({ ok: false, reason: "notInEmby" });
+      return;
+    }
+    const seriesMap = await emby.getSeriesMap(record);
+    if (!seriesMap) {
+      res.json({ ok: false });
+      return;
+    }
+    const sorted = [...seriesMap].sort((a, b) => a[0] - b[0]);
+    let found = false;
+    for (const [season, episodes] of sorted) {
+      const sortedEps = [...episodes].sort((a, b) => a[0] - b[0]);
+      for (const [episode, ep] of sortedEps) {
+        if (!found) {
+          if (season === currentSeason && episode === currentEpisode)
+            found = true;
+          continue;
+        }
+        if (ep?.path && !ep?.noFile) {
+          res.json({ ok: true, path: ep.path, season, episode });
+          return;
+        }
+      }
+    }
+    res.json({ ok: false, reason: "noNextEpisode" });
+  } catch (err) {
+    console.error("[introNextFile] error:", err.message);
+    res.json({ ok: false, error: err.message });
+  }
+});
+
 // Intro: skip forward by introDur on the Living Room TV
 async function doSkipIntro(pressedAt) {
   const sessRes = await fetch(

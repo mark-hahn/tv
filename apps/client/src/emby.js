@@ -130,7 +130,6 @@ export async function loadAllShows() {
         rec.remotes?.find((r) => r.name?.startsWith("IMDB"))?.ratings ||
         null;
     rec.reject = !!rec.reject;
-    if (rec.note && !rec.notes) rec.notes = rec.note;
     if (rec.notReady === undefined) rec.notReady = rec.inEmby === false;
     rec.watchGap = rec.watchGap || false;
     rec.fileGap =
@@ -305,7 +304,7 @@ async function _oldLoadAllShows() {
   ]);
 
   // 2. Get authoritative tvdb data (our source of truth)
-  // Note: gaps, notes, noEmbys now stored in tvdb.json (Phase 5)
+  // Note: gaps and noEmbys now stored in tvdb.json (Phase 5)
   const allTvdb = allTvdbResult;
   const now = Date.now();
 
@@ -629,7 +628,7 @@ async function _oldLoadAllShows() {
       const wasInEmby = tvdbRecord.inEmby;
       tvdbRecord.inEmby = true;
 
-      // Note: gap and note already in tvdb (Phase 5), don't overwrite
+      // Note: gap already in tvdb (Phase 5), don't overwrite
       if (!wasInEmby) {
         await srvr.setTvdbFields({
           name: tvdbKey,
@@ -786,8 +785,6 @@ async function _oldLoadAllShows() {
         null;
     }
     if (tvdb.reject && !tvdb.reject) tvdb.reject = tvdb.reject;
-    if (tvdb.note && !tvdb.notes) tvdb.notes = tvdb.note;
-
     // Set notReady flag (preserve server-computed value if present)
     if (tvdb.notReady === undefined) tvdb.notReady = tvdb.inEmby === false;
 

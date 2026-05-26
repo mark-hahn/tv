@@ -1,7 +1,6 @@
 =========== Info ===========
 Click remote link — open IMDB, RT, etc. in new tab
 Click poster — deselect show
-Enter in notes — save note
 
 =========== Map ===========
 Ctrl+click episode — delete episode file

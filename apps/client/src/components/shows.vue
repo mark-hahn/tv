@@ -130,20 +130,6 @@
               @click="$emit('select-show', show, false, true)"
             ></div>
             <div
-              v-if="show.notes &amp;&amp; String(show.notes).length"
-              :style="{
-                padding: '2px',
-                fontSize: '14px',
-                color: 'rgba(0,0,0,0.5)',
-                marginRight: '15px',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }"
-            >
-              {{ String(show.notes) }}
-            </div>
-            <div
               v-if="sortChoice === 'Creator' && getSortDisplayValue(show)"
               :style="{
                 padding: '2px',
@@ -266,7 +252,6 @@ export default {
         Viewed: "75px",
         Added: "75px",
         Ratings: "25px",
-        Notes: "0",
         Size: "25px",
         "Safe start": "0",
         Ended: "75px",

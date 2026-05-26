@@ -448,29 +448,6 @@ try {
 // Phase 5: Migrate separate JSON files into tvdb.json
 let phase5MigrationNeeded = false;
 
-// 5.2: Migrate notes.json
-const notesPath = path.join(SRVR_DATA_DIR, "notes.json");
-if (fs.existsSync(notesPath) && !fs.existsSync(notesPath + ".backup")) {
-  log("Phase 5.2: Migrating notes.json into tvdb.json");
-  try {
-    const notes = util.jParse(fs.readFileSync(notesPath, "utf8"));
-    let noteCount = 0;
-
-    for (const [showName, note] of Object.entries(notes)) {
-      if (allTvdb[showName] && !allTvdb[showName].note) {
-        allTvdb[showName].note = note;
-        noteCount++;
-        phase5MigrationNeeded = true;
-      }
-    }
-
-    log(`Phase 5.2: Migrated ${noteCount} notes from notes.json`);
-    fs.renameSync(notesPath, notesPath + ".backup");
-  } catch (e) {
-    log("err", "Phase 5.2: notes.json migration failed:", e);
-  }
-}
-
 // 5.3: Migrate lastViewed.json
 const lastViewedPath = path.join(SRVR_DATA_DIR, "lastViewed.json");
 if (
@@ -1968,9 +1945,6 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   tvdbData.episodeAiredDates = existing.episodeAiredDates ?? null;
   tvdbData.watchedEpis = existing.watchedEpis ?? null;
   tvdbData.seasonPremiereDates = existing.seasonPremiereDates ?? null;
-
-  // Notes
-  tvdbData.notes = paramObj.note ?? existing.notes ?? existing.note ?? "";
 
   // leftEmby timestamp (yyyy-mm-dd format) - set when show is removed from Emby
   tvdbData.leftEmby =

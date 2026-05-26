@@ -210,19 +210,6 @@ export const getAllTvdb = async (hasEmby = 0) => {
 
   const result = await srvr.getAllTvdb(hasEmby);
 
-  // Normalize property names (server uses lowercase, client uses capitalized)
-  // This ensures consistency with loadAllShows normalization
-  if (result && typeof result === "object") {
-    for (const showData of Object.values(result)) {
-      if (showData && typeof showData === "object") {
-        // Convert note to Notes
-        if (showData.note && !showData.notes) {
-          showData.notes = showData.note;
-        }
-      }
-    }
-  }
-
   // Only update cache if we're loading all shows
   if (hasEmby === 0) {
     allTvdb = result;

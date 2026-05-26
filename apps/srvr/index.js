@@ -3252,48 +3252,6 @@ const getSharedFilters = async (_params) => {
   return sharedFilters;
 };
 
-const saveNote = async (params) => {
-  if (!params) {
-    throw new Error("saveNote: missing params");
-  }
-
-  const { showName, noteText } = params;
-
-  if (typeof showName !== "string" || showName.trim() === "") {
-    throw new Error("saveNote: invalid showName");
-  }
-
-  const finalNote =
-    noteText === undefined || noteText === null ? "" : String(noteText);
-  const key = showName.trim();
-
-  const allTvdb = tvdb.getAllTvdbSync();
-  const tvdbRecord = allTvdb[key];
-
-  if (!tvdbRecord) {
-    throw new Error(`saveNote: show not found in tvdb: ${key}`);
-  }
-
-  // Never store empty notes: treat as delete.
-  if (finalNote.trim() === "") {
-    if (!tvdbRecord.notes) return "ok";
-    await tvdb.setTvdbFields({ name: key, notes: "", dontEnqueue: true });
-    return "ok";
-  }
-
-  if (tvdbRecord.notes === finalNote) return "ok";
-
-  await tvdb.setTvdbFields({ name: key, notes: finalNote, dontEnqueue: true });
-
-  try {
-    await email.sendEmail(`${key}~${finalNote}`);
-  } catch (e) {
-    console.error("saveNote: email failed", e.message);
-  }
-
-  return "ok";
-};
-
 const getFile = async (params) => {
   // Param is usually an object { path: "..." }
   let requestedPath = params?.path;
@@ -4016,8 +3974,6 @@ app.get("/api/flexget-config", async (req, res) => {
     res.status(500).send(e.message);
   }
 });
-
-app.post("/api/saveNote", apiWrapper(saveNote));
 
 // Open qBittorrent web UI — auto-login page served from hahnca.com so the
 // SID cookie is set for hahnca.com (which proxies /qbt/ to qBittorrent).

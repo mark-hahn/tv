@@ -78,69 +78,6 @@
         >
           <span>{{ show.name }}</span>
         </div>
-        <!-- Simple mode: align left edge of Notes with left edge of infobox -->
-        <div
-          v-if="simpleMode"
-          :style="{
-            gridColumn: '4 / span 2',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '4px',
-            minWidth: '0px',
-            width: '100%',
-          }"
-        >
-          <textarea
-            v-if="!previewMode"
-            v-model="show.notes"
-            @click.stop
-            @keydown.stop
-            @keydown.enter.prevent.stop="saveNote"
-            rows="1"
-            placeholder="Notes"
-            :style="{
-              width: '100%',
-              padding: '2px',
-              fontSize: '14px',
-              border: 'none',
-              backgroundColor: '#eee',
-              resize: 'none',
-              height: '14px',
-              lineHeight: '1.2',
-              boxSizing: 'border-box',
-            }"
-          ></textarea>
-        </div>
-        <!-- Non-simple mode: align left edge of Notes with left edge of infobox (start of infobox column)-->
-        <div
-          v-else
-          :style="{
-            gridColumn: '4 / span 2',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '4px',
-          }"
-        >
-          <textarea
-            v-if="!previewMode"
-            v-model="show.notes"
-            @click.stop
-            @keydown.stop
-            @keydown.enter.prevent.stop="saveNote"
-            rows="1"
-            placeholder="Notes"
-            :style="{
-              width: '75%',
-              padding: '2px',
-              fontSize: '14px',
-              border: 'none',
-              backgroundColor: '#eee',
-              resize: 'none',
-              height: '14px',
-              lineHeight: '1.2',
-            }"
-          ></textarea>
-        </div>
       </div>
     </div>
     <!-- Layout: 1/9 whitespace, 1/3 poster, 1/9 whitespace, 1/3 infobox, 1/9 whitespace-->
@@ -535,7 +472,6 @@
             </div>
           </div>
         </div>
-        <!-- Notes input moved to header (simple + non-simple)-->
       </div>
     </div>
     <div
@@ -740,18 +676,6 @@ export default {
         e?.target?.blur?.();
       } catch {
         /* ignore */
-      }
-    },
-
-    async saveNote(e) {
-      e.target.blur();
-      const showName = this.show?.name;
-      if (!showName) return;
-      try {
-        await srvr.saveNote(showName, this.show.notes || "");
-      } catch (err) {
-        console.error("Series: saveNote failed", { showName, err });
-        window.alert(err?.message || String(err));
       }
     },
 

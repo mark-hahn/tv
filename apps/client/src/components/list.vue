@@ -646,7 +646,6 @@ export default {
         "Viewed",
         "Added",
         "Ratings",
-        "Notes",
         "Size",
         "Safe start",
         "Ended",
@@ -1181,7 +1180,6 @@ export default {
         "Added Order": "Added",
         "Viewed Order": "Viewed",
         "Ratings Order": "Ratings",
-        "Notes Order": "Notes",
         "Ended Order": "Ended",
         "Length Order": "Length",
       };
@@ -1290,11 +1288,6 @@ export default {
           return ratings !== undefined && ratings !== null && ratings !== 0
             ? String(ratings)
             : "";
-        case "Notes":
-          if (!forSort) return "";
-          return String(show?.notes ?? "")
-            .trim()
-            .toLowerCase();
         case "Creator": {
           const crewArr = Array.isArray(allTvdb?.[show.name]?.crew)
             ? allTvdb[show.name].crew
@@ -2745,37 +2738,6 @@ export default {
     },
 
     sortShows() {
-      if (this.sortChoice === "Notes") {
-        this.shows = [...this.shows].sort((a, b) => {
-          // Get raw note values, handling null/undefined/non-strings more explicitly
-          const aNoteRaw = (a?.notes != null ? String(a.notes) : "").trim();
-          const bNoteRaw = (b?.notes != null ? String(b.notes) : "").trim();
-          // Check if notes are truly non-empty (not just whitespace)
-          const aHas = aNoteRaw.length > 0;
-          const bHas = bNoteRaw.length > 0;
-          // Shows with notes always come before shows without notes
-          if (aHas !== bHas) return aHas ? -1 : 1;
-
-          // Both have notes or both don't - sort alphabetically by note
-          const aKey = aNoteRaw.toLowerCase();
-          const bKey = bNoteRaw.toLowerCase();
-          if (aKey !== bKey) return aKey > bKey ? 1 : -1;
-
-          // Notes are equal - sort by show name as tiebreaker
-          const aName = String(a?.name ?? "")
-            .replace(/^the\s*/i, "")
-            .replace(/[^a-z0-9\s]/gi, "")
-            .toLowerCase();
-          const bName = String(b?.name ?? "")
-            .replace(/^the\s*/i, "")
-            .replace(/[^a-z0-9\s]/gi, "")
-            .toLowerCase();
-          if (aName === bName) return 0;
-          return aName > bName ? 1 : -1;
-        });
-        return;
-      }
-
       this.shows = [...this.shows].sort((a, b) => {
         a = this.getValBySortChoice(a, true);
         b = this.getValBySortChoice(b, true);
@@ -2923,14 +2885,7 @@ export default {
           if (finished) filteredShows.push(show);
           continue;
         }
-        if (srchStrLc && !show.name.toLowerCase().includes(srchStrLc)) {
-          const noteLc = String(show?.notes ?? "").toLowerCase();
-          if (noteLc.includes(srchStrLc)) {
-            // matched notes — allow
-          } else {
-            continue;
-          }
-        }
+        if (srchStrLc && !show.name.toLowerCase().includes(srchStrLc)) continue;
         if (descrSrchLc) {
           const overview = String(
             localAllTvdb?.[show.name]?.overview ?? "",
@@ -3554,7 +3509,6 @@ export default {
           show.size = record.size ?? show.size;
           show.noFiles = record.noFiles ?? show.noFiles;
           show.waitStr = record.waitStr ?? show.waitStr;
-          if ("notes" in record) show.notes = record.notes;
           if ("introDur" in record) show.introDur = record.introDur;
           if ("startMark" in record) show.startMark = record.startMark;
         }

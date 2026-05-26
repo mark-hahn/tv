@@ -378,6 +378,7 @@
       :path="videoPlayerPath"
       :mode="videoPlayerMode"
       :chksrtCount="chksrtCount"
+      :introCount="introCount"
       :introShow="videoPlayerIntroShow"
       :introShows="filteredShows"
       :introSeason="videoPlayerMapSeason"

@@ -109,7 +109,8 @@
             text-overflow: ellipsis;
             white-space: nowrap;
           "
-          >{{ introShow ? introShow.name : ""
+          >{{ introRemainingCount > 0 ? `(${introRemainingCount}) ` : ""
+          }}{{ introShow ? introShow.name : ""
           }}{{ introSeasonEpisodeLabel }}</span
         >
       </div>
@@ -787,6 +788,7 @@ export default {
     path: { type: String, default: null },
     mode: { type: String, default: null },
     chksrtCount: { type: Number, default: 0 },
+    introCount: { type: Number, default: 0 },
     introShow: { type: Object, default: null },
     introShows: { type: Array, default: () => [] },
     introSeason: { type: Number, default: null },
@@ -949,6 +951,9 @@ export default {
         return "";
       }
       return ` (s${String(this.introSeasonForDisplay).padStart(2, "0")}e${String(this.introEpisodeForDisplay).padStart(2, "0")})`;
+    },
+    introRemainingCount() {
+      return this.introCount;
     },
   },
   watch: {

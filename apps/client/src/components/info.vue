@@ -81,26 +81,97 @@
             show.name
           }}</span>
         </div>
-        <input
+        <div
           v-if="!previewMode"
-          v-model="descrSearchStr"
-          @input="onDescrSearch"
-          @click.stop
-          @keydown.stop
-          placeholder="Search Descr"
           :style="{
-            gridColumn: '4 / span 1',
-            justifySelf: 'start',
-            width: '125px',
+            gridColumn: '4 / span 2',
+            justifySelf: 'end',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
             minWidth: '0px',
-            padding: '2px',
-            fontSize: '14px',
-            border: 'none',
-            backgroundColor: descrSearchStr ? '#fffde7' : '#eee',
-            height: '14px',
-            marginTop: '4px',
           }"
-        />
+        >
+          <input
+            v-model="descrSearchStr"
+            @input="onDescrSearch"
+            @click.stop
+            @keydown.stop
+            placeholder="Search Descr"
+            :style="{
+              width: '125px',
+              minWidth: '0px',
+              padding: '2px',
+              fontSize: '14px',
+              border: 'none',
+              backgroundColor: descrSearchStr ? '#fffde7' : '#eee',
+              height: '14px',
+              marginTop: '4px',
+            }"
+          />
+          <button
+            @click.stop="refreshTvdb"
+            :style="{
+              fontSize: '13px',
+              cursor: 'pointer',
+              marginTop: '3px',
+              maxHeight: '24px',
+              borderRadius: '7px',
+            }"
+          >
+            Refresh
+          </button>
+          <button
+            @click.stop="introClick"
+            :disabled="
+              !(
+                Array.isArray(show?.filesOnDisk) &&
+                show.filesOnDisk.some(
+                  (seasonRow) =>
+                    Array.isArray(seasonRow) && seasonRow.length > 1,
+                )
+              )
+            "
+            :style="{
+              fontSize: '13px',
+              cursor: !(
+                Array.isArray(show?.filesOnDisk) &&
+                show.filesOnDisk.some(
+                  (seasonRow) =>
+                    Array.isArray(seasonRow) && seasonRow.length > 1,
+                )
+              )
+                ? 'default'
+                : 'pointer',
+              marginTop: '3px',
+              maxHeight: '24px',
+              borderRadius: '7px',
+              opacity: !(
+                Array.isArray(show?.filesOnDisk) &&
+                show.filesOnDisk.some(
+                  (seasonRow) =>
+                    Array.isArray(seasonRow) && seasonRow.length > 1,
+                )
+              )
+                ? 0.4
+                : 1,
+            }"
+          >
+            Intro
+          </button>
+          <button
+            @click.stop="deleteClick"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              margin-top: 3px;
+              max-height: 24px;
+              border-radius: 7px;
+            "
+          >
+            Del
+          </button>
+        </div>
       </div>
     </div>
     <!-- Layout: 1/9 whitespace, 1/3 poster, 1/9 whitespace, 1/3 infobox, 1/9 whitespace-->
@@ -151,119 +222,6 @@
           justifyContent: 'flex-start',
         }"
       >
-        <div
-          v-if="!previewMode"
-          :style="{
-            width: '100%',
-            boxSizing: 'border-box',
-            display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            justifyContent: 'flex-start',
-            columnGap: '10px',
-            rowGap: '6px',
-            marginBottom: '6px',
-            minWidth: '0px',
-          }"
-        >
-          <div
-            v-if="show?.reject"
-            style="
-              font-weight: bold;
-              color: red;
-              font-size: 18px;
-              white-space: nowrap;
-              flex-basis: 100%;
-            "
-          >
-            Banned From Download
-          </div>
-          <button
-            v-if="notInEmby"
-            @click.stop="loadIntoEmby"
-            style="
-              font-size: 13px;
-              cursor: pointer;
-              margin-top: 3px;
-              max-height: 24px;
-              border-radius: 7px;
-            "
-          >
-            Load
-          </button>
-          <div
-            :style="{
-              marginLeft: 'auto',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              minWidth: '0px',
-            }"
-          >
-            <button
-              @click.stop="refreshTvdb"
-              :style="{
-                fontSize: '13px',
-                cursor: 'pointer',
-                marginTop: '3px',
-                maxHeight: '24px',
-                borderRadius: '7px',
-              }"
-            >
-              Refresh
-            </button>
-            <button
-              @click.stop="introClick"
-              :disabled="
-                !(
-                  Array.isArray(show?.filesOnDisk) &&
-                  show.filesOnDisk.some(
-                    (seasonRow) =>
-                      Array.isArray(seasonRow) && seasonRow.length > 1,
-                  )
-                )
-              "
-              :style="{
-                fontSize: '13px',
-                cursor: !(
-                  Array.isArray(show?.filesOnDisk) &&
-                  show.filesOnDisk.some(
-                    (seasonRow) =>
-                      Array.isArray(seasonRow) && seasonRow.length > 1,
-                  )
-                )
-                  ? 'default'
-                  : 'pointer',
-                marginTop: '3px',
-                maxHeight: '24px',
-                borderRadius: '7px',
-                opacity: !(
-                  Array.isArray(show?.filesOnDisk) &&
-                  show.filesOnDisk.some(
-                    (seasonRow) =>
-                      Array.isArray(seasonRow) && seasonRow.length > 1,
-                  )
-                )
-                  ? 0.4
-                  : 1,
-              }"
-            >
-              Intro
-            </button>
-            <button
-              @click.stop="deleteClick"
-              style="
-                font-size: 13px;
-                cursor: pointer;
-                margin-top: 3px;
-                max-height: 24px;
-                border-radius: 7px;
-              "
-            >
-              Del
-            </button>
-          </div>
-        </div>
         <div
           id="infoBox"
           v-if="seriesReady"

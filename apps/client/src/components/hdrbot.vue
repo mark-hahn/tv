@@ -97,11 +97,11 @@
         display: 'flex',
         justifyContent: 'flex-start',
         margin: '5px 0 0 0',
-        width: conds.length * 22 + 'px',
+        width: visibleConds.length * 22 + 'px',
       }"
     >
       <div
-        v-for="cond in conds"
+        v-for="cond in visibleConds"
         :key="cond.name"
         @click="$emit('cond-fltr-click', cond, $event)"
         :style="{
@@ -229,6 +229,9 @@ export default {
     },
     selectedFilterNbsp() {
       return String(this.selectedFilter || "").replace(/ /g, "\u00A0");
+    },
+    visibleConds() {
+      return this.conds.filter((c) => !c.hideIcon);
     },
   },
 

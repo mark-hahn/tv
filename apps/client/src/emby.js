@@ -138,6 +138,7 @@ export async function loadAllShows() {
     if (rec.inContinue === undefined) rec.inContinue = false;
     if (rec.inMark === undefined) rec.inMark = false;
     if (rec.inLinda === undefined) rec.inLinda = false;
+    if (rec.anticipating === undefined) rec.anticipating = false;
     if (rec.played === undefined) rec.played = false;
     if (rec.playCount === undefined) rec.playCount = 0;
     if (rec.date === undefined) rec.date = "2017-12-05";

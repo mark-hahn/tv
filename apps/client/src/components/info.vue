@@ -93,6 +93,19 @@
           }"
         >
           <button
+            @click.stop="antClick"
+            :style="{
+              fontSize: '13px',
+              cursor: 'pointer',
+              marginTop: '3px',
+              maxHeight: '24px',
+              borderRadius: '7px',
+              '--btn-bg': show?.anticipating ? '#c66' : 'whitesmoke',
+            }"
+          >
+            Ant
+          </button>
+          <button
             @click.stop="refreshTvdb"
             :style="{
               fontSize: '13px',
@@ -1240,6 +1253,21 @@ export default {
         originalCountry: show?.originalCountry || show?.country || "",
       };
       evtBus.emit("reelSearchAction", { srchChoice, action: "add" });
+    },
+
+    async antClick() {
+      if (!this.show?.name) return;
+      const original = !!this.show.anticipating;
+      this.show.anticipating = !original;
+      try {
+        await srvr.setTvdbFields({
+          name: this.show.name,
+          anticipating: this.show.anticipating,
+        });
+      } catch (e) {
+        console.error("antClick error:", e);
+        this.show.anticipating = original;
+      }
     },
 
     async refreshTvdb() {

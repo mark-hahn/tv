@@ -352,6 +352,7 @@ import {
   faTrafficLight,
   faTrash,
   faFilm,
+  faExclamation,
 } from "@fortawesome/free-solid-svg-icons";
 library.add([
   faLaughBeam,
@@ -376,6 +377,7 @@ library.add([
   faTrafficLight,
   faTrash,
   faFilm,
+  faExclamation,
   faComment,
 ]);
 
@@ -433,6 +435,20 @@ export default {
       } catch (err) {
         console.error("toggleToTry error:", err);
         show.inToTry = originalValue; // Revert on error
+      }
+    };
+
+    const toggleAnticipating = async (show) => {
+      const originalValue = !!show.anticipating;
+      show.anticipating = !originalValue;
+      try {
+        await srvr.setTvdbFields({
+          name: show.name,
+          anticipating: show.anticipating,
+        });
+      } catch (err) {
+        console.error("toggleAnticipating error:", err);
+        show.anticipating = originalValue;
       }
     };
 
@@ -678,6 +694,7 @@ export default {
           color: "#0cf",
           filter: 0,
           icon: ["fas", "film"],
+          hideIcon: true,
           cond(show) {
             return !!show.needsIntro;
           },
@@ -735,6 +752,18 @@ export default {
             await toggleToTry(show);
           },
           name: "totry",
+        },
+        {
+          color: "#a66",
+          filter: 0,
+          icon: ["fas", "exclamation"],
+          cond(show) {
+            return !!show.anticipating;
+          },
+          async click(show) {
+            await toggleAnticipating(show);
+          },
+          name: "anticipating",
         },
         {
           color: "lime",
@@ -3351,6 +3380,7 @@ export default {
           show.fileGap =
             show.fileGap || show.fileEndError || show.seasonWatchedThenNofile;
           show.needsIntro = tvdbRecord.needsIntro ?? false;
+          show.anticipating = tvdbRecord.anticipating ?? false;
 
           // Update allTvdb cache
           tvdb.upsertTvdbCacheRecord(allTvdb, tvdbRecord, showName);
@@ -3504,6 +3534,7 @@ export default {
           show.watchGapEpisode = record.watchGapEpisode;
           show.fileGap = record.fileGap;
           show.needsIntro = record.needsIntro ?? false;
+          show.anticipating = record.anticipating ?? false;
           show.notReady = record.notReady;
           show.date = record.date ?? show.date;
           show.size = record.size ?? show.size;

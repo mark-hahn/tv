@@ -390,6 +390,28 @@
           None
         </div>
         <div
+          @click.stop="clickIntroAnt"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 6px;
+          "
+          :style="{
+            background: introShow?.anticipating
+              ? 'rgba(180, 50, 50, 0.9)'
+              : 'rgba(0, 0, 0, 0.5)',
+          }"
+        >
+          Ant
+        </div>
+        <div
           @click.stop="introSource !== 'map' && clickIntroEpi()"
           style="
             color: white;
@@ -629,6 +651,29 @@
       <!-- Sel button (chksrt mode only) -->
       <div
         v-if="mode === 'chksrt'"
+        @click.stop="clickChksrtAnt"
+        style="
+          color: white;
+          font-size: 13px;
+          padding: 2px 8px;
+          border-radius: 4px;
+          border: 1px solid #666;
+          cursor: pointer;
+          user-select: none;
+          margin-right: 8px;
+          white-space: nowrap;
+          text-shadow: 0 0 3px #000;
+        "
+        :style="{
+          background: chksrtShowObj?.anticipating
+            ? 'rgba(180, 50, 50, 0.9)'
+            : 'rgba(0, 0, 0, 0.5)',
+        }"
+      >
+        Ant
+      </div>
+      <div
+        v-if="mode === 'chksrt'"
         @click.stop="clickSel"
         style="
           color: white;
@@ -855,6 +900,17 @@ export default {
       const parts = this.path.split("/");
       const name = parts[parts.length - 1];
       return this.chksrtCount > 0 ? `(${this.chksrtCount}) ${name}` : name;
+    },
+    chksrtShowName() {
+      if (!this.path) return null;
+      const parts = this.path.split("/");
+      return parts.length >= 3 ? parts[parts.length - 3] : null;
+    },
+    chksrtShowObj() {
+      if (!this.chksrtShowName) return null;
+      return (
+        this.introShows.find((s) => s.name === this.chksrtShowName) ?? null
+      );
     },
     isIntroNone() {
       return (
@@ -1436,6 +1492,35 @@ export default {
     },
     clickIntroEpi() {
       this.epiNext = !this.epiNext;
+    },
+    async clickIntroAnt() {
+      if (!this.introShow?.name) return;
+      const original = !!this.introShow.anticipating;
+      this.introShow.anticipating = !original;
+      try {
+        await setTvdbFields({
+          name: this.introShow.name,
+          anticipating: this.introShow.anticipating,
+        });
+      } catch (e) {
+        console.error("clickIntroAnt error:", e);
+        this.introShow.anticipating = original;
+      }
+    },
+    async clickChksrtAnt() {
+      const show = this.chksrtShowObj;
+      if (!show?.name) return;
+      const original = !!show.anticipating;
+      show.anticipating = !original;
+      try {
+        await setTvdbFields({
+          name: show.name,
+          anticipating: show.anticipating,
+        });
+      } catch (e) {
+        console.error("clickChksrtAnt error:", e);
+        show.anticipating = original;
+      }
     },
     clickIntroNext() {
       if (this.introMarkDirty) this._saveStartMark();

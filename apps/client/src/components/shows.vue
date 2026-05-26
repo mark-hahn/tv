@@ -161,7 +161,7 @@
         </div>
         <div
           v-if="showConds"
-          v-for="cond in conds"
+          v-for="cond in visibleConds"
           :key="cond.name"
           class="show-cell cond-icon"
           style="width: 22px; flex-shrink: 0"
@@ -267,6 +267,10 @@ export default {
           ? this.activeDownloadShowNames
           : [],
       );
+    },
+
+    visibleConds() {
+      return this.conds.filter((c) => !c.hideIcon);
     },
   },
 

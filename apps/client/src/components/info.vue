@@ -90,50 +90,6 @@
             width: '100%',
           }"
         >
-          <div :style="{ display: 'flex', alignItems: 'center' }">
-            <template v-if="!previewMode">
-              <input
-                v-model="descrSearchStr"
-                @input="onDescrSearch"
-                @click.stop
-                @keydown.stop
-                placeholder="Search Descr"
-                :style="{
-                  width: '125px',
-                  padding: '2px',
-                  fontSize: '14px',
-                  border: 'none',
-                  backgroundColor: descrSearchStr ? '#fffde7' : '#eee',
-                  height: '14px',
-                  marginTop: '4px',
-                  marginLeft: '0px',
-                }"
-              />
-            </template>
-            <div
-              :style="{
-                display: 'flex',
-                alignItems: 'center',
-                marginLeft: 'auto',
-                minWidth: '0px',
-              }"
-            >
-              <div
-                v-if="show?.reject"
-                style="
-                  font-weight: bold;
-                  color: red;
-                  font-size: 18px;
-                  margin-top: 4px;
-                  max-height: 24px;
-                  margin-right: 10px;
-                  white-space: nowrap;
-                "
-              >
-                Banned From Download
-              </div>
-            </div>
-          </div>
           <textarea
             v-if="!previewMode"
             v-model="show.notes"
@@ -165,119 +121,6 @@
             gap: '4px',
           }"
         >
-          <div :style="{ display: 'flex', alignItems: 'center' }">
-            <div
-              v-if="show?.reject"
-              style="
-                font-weight: bold;
-                color: red;
-                font-size: 18px;
-                margin-top: 4px;
-                max-height: 24px;
-                margin-right: 10px;
-              "
-            >
-              Banned From Download
-            </div>
-            <template v-if="!previewMode">
-              <input
-                v-model="descrSearchStr"
-                @input="onDescrSearch"
-                @click.stop
-                @keydown.stop
-                placeholder="Search Descr"
-                :style="{
-                  width: '125px',
-                  padding: '2px',
-                  fontSize: '14px',
-                  border: 'none',
-                  backgroundColor: descrSearchStr ? '#fffde7' : '#eee',
-                  height: '14px',
-                  marginTop: '4px',
-                  marginLeft: '0px',
-                }"
-              />
-              <button
-                v-if="notInEmby"
-                @click.stop="loadIntoEmby"
-                style="
-                  font-size: 13px;
-                  cursor: pointer;
-                  margin-left: 10px;
-                  margin-top: 3px;
-                  max-height: 24px;
-                  border-radius: 7px;
-                "
-              >
-                Load
-              </button>
-              <button
-                @click.stop="refreshTvdb"
-                :style="{
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  marginLeft: '10px',
-                  marginTop: '3px',
-                  maxHeight: '24px',
-                  borderRadius: '7px',
-                }"
-              >
-                Refresh
-              </button>
-              <button
-                @click.stop="introClick"
-                :disabled="
-                  !(
-                    Array.isArray(show?.filesOnDisk) &&
-                    show.filesOnDisk.some(
-                      (seasonRow) =>
-                        Array.isArray(seasonRow) && seasonRow.length > 1,
-                    )
-                  )
-                "
-                :style="{
-                  fontSize: '13px',
-                  cursor: !(
-                    Array.isArray(show?.filesOnDisk) &&
-                    show.filesOnDisk.some(
-                      (seasonRow) =>
-                        Array.isArray(seasonRow) && seasonRow.length > 1,
-                    )
-                  )
-                    ? 'default'
-                    : 'pointer',
-                  marginLeft: '10px',
-                  marginTop: '3px',
-                  maxHeight: '24px',
-                  borderRadius: '7px',
-                  opacity: !(
-                    Array.isArray(show?.filesOnDisk) &&
-                    show.filesOnDisk.some(
-                      (seasonRow) =>
-                        Array.isArray(seasonRow) && seasonRow.length > 1,
-                    )
-                  )
-                    ? 0.4
-                    : 1,
-                }"
-              >
-                Intro
-              </button>
-              <button
-                @click.stop="deleteClick"
-                style="
-                  font-size: 13px;
-                  cursor: pointer;
-                  margin-left: 10px;
-                  margin-top: 3px;
-                  max-height: 24px;
-                  border-radius: 7px;
-                "
-              >
-                Del
-              </button>
-            </template>
-          </div>
           <textarea
             v-if="!previewMode"
             v-model="show.notes"
@@ -348,6 +191,127 @@
           justifyContent: 'flex-start',
         }"
       >
+        <div
+          v-if="!previewMode"
+          :style="{
+            width: '100%',
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'flex-start',
+            columnGap: '10px',
+            rowGap: '6px',
+            marginBottom: '6px',
+            minWidth: '0px',
+          }"
+        >
+          <div
+            v-if="show?.reject"
+            style="
+              font-weight: bold;
+              color: red;
+              font-size: 18px;
+              white-space: nowrap;
+              flex-basis: 100%;
+            "
+          >
+            Banned From Download
+          </div>
+          <input
+            v-model="descrSearchStr"
+            @input="onDescrSearch"
+            @click.stop
+            @keydown.stop
+            placeholder="Search Descr"
+            :style="{
+              flex: '1 1 140px',
+              minWidth: '0px',
+              maxWidth: '220px',
+              padding: '2px',
+              fontSize: '14px',
+              border: 'none',
+              backgroundColor: descrSearchStr ? '#fffde7' : '#eee',
+              height: '14px',
+              marginTop: '4px',
+            }"
+          />
+          <button
+            v-if="notInEmby"
+            @click.stop="loadIntoEmby"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              margin-top: 3px;
+              max-height: 24px;
+              border-radius: 7px;
+            "
+          >
+            Load
+          </button>
+          <button
+            @click.stop="refreshTvdb"
+            :style="{
+              fontSize: '13px',
+              cursor: 'pointer',
+              marginTop: '3px',
+              maxHeight: '24px',
+              borderRadius: '7px',
+            }"
+          >
+            Refresh
+          </button>
+          <button
+            @click.stop="introClick"
+            :disabled="
+              !(
+                Array.isArray(show?.filesOnDisk) &&
+                show.filesOnDisk.some(
+                  (seasonRow) =>
+                    Array.isArray(seasonRow) && seasonRow.length > 1,
+                )
+              )
+            "
+            :style="{
+              fontSize: '13px',
+              cursor: !(
+                Array.isArray(show?.filesOnDisk) &&
+                show.filesOnDisk.some(
+                  (seasonRow) =>
+                    Array.isArray(seasonRow) && seasonRow.length > 1,
+                )
+              )
+                ? 'default'
+                : 'pointer',
+              marginTop: '3px',
+              maxHeight: '24px',
+              borderRadius: '7px',
+              opacity: !(
+                Array.isArray(show?.filesOnDisk) &&
+                show.filesOnDisk.some(
+                  (seasonRow) =>
+                    Array.isArray(seasonRow) && seasonRow.length > 1,
+                )
+              )
+                ? 0.4
+                : 1,
+            }"
+          >
+            Intro
+          </button>
+          <button
+            @click.stop="deleteClick"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              margin-top: 3px;
+              max-height: 24px;
+              border-radius: 7px;
+            "
+          >
+            Del
+          </button>
+        </div>
         <div
           id="infoBox"
           v-if="seriesReady"

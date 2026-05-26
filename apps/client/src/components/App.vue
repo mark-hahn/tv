@@ -1804,9 +1804,9 @@ export default {
           this.mapError = "";
         }
         this.currentPane = "map";
-        evtBus.emit("paneChanged", this.currentPane);
         if (this.currentShow)
           evtBus.emit("mapAction", { action: "open", show: this.currentShow });
+        evtBus.emit("paneChanged", this.currentPane);
         return;
       }
       if (k === "actors") {

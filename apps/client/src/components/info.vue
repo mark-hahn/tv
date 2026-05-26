@@ -191,68 +191,78 @@
           >
             Load
           </button>
-          <button
-            @click.stop="refreshTvdb"
+          <div
             :style="{
-              fontSize: '13px',
-              cursor: 'pointer',
-              marginTop: '3px',
-              maxHeight: '24px',
-              borderRadius: '7px',
+              marginLeft: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              minWidth: '0px',
             }"
           >
-            Refresh
-          </button>
-          <button
-            @click.stop="introClick"
-            :disabled="
-              !(
-                Array.isArray(show?.filesOnDisk) &&
-                show.filesOnDisk.some(
-                  (seasonRow) =>
-                    Array.isArray(seasonRow) && seasonRow.length > 1,
+            <button
+              @click.stop="refreshTvdb"
+              :style="{
+                fontSize: '13px',
+                cursor: 'pointer',
+                marginTop: '3px',
+                maxHeight: '24px',
+                borderRadius: '7px',
+              }"
+            >
+              Refresh
+            </button>
+            <button
+              @click.stop="introClick"
+              :disabled="
+                !(
+                  Array.isArray(show?.filesOnDisk) &&
+                  show.filesOnDisk.some(
+                    (seasonRow) =>
+                      Array.isArray(seasonRow) && seasonRow.length > 1,
+                  )
                 )
-              )
-            "
-            :style="{
-              fontSize: '13px',
-              cursor: !(
-                Array.isArray(show?.filesOnDisk) &&
-                show.filesOnDisk.some(
-                  (seasonRow) =>
-                    Array.isArray(seasonRow) && seasonRow.length > 1,
+              "
+              :style="{
+                fontSize: '13px',
+                cursor: !(
+                  Array.isArray(show?.filesOnDisk) &&
+                  show.filesOnDisk.some(
+                    (seasonRow) =>
+                      Array.isArray(seasonRow) && seasonRow.length > 1,
+                  )
                 )
-              )
-                ? 'default'
-                : 'pointer',
-              marginTop: '3px',
-              maxHeight: '24px',
-              borderRadius: '7px',
-              opacity: !(
-                Array.isArray(show?.filesOnDisk) &&
-                show.filesOnDisk.some(
-                  (seasonRow) =>
-                    Array.isArray(seasonRow) && seasonRow.length > 1,
+                  ? 'default'
+                  : 'pointer',
+                marginTop: '3px',
+                maxHeight: '24px',
+                borderRadius: '7px',
+                opacity: !(
+                  Array.isArray(show?.filesOnDisk) &&
+                  show.filesOnDisk.some(
+                    (seasonRow) =>
+                      Array.isArray(seasonRow) && seasonRow.length > 1,
+                  )
                 )
-              )
-                ? 0.4
-                : 1,
-            }"
-          >
-            Intro
-          </button>
-          <button
-            @click.stop="deleteClick"
-            style="
-              font-size: 13px;
-              cursor: pointer;
-              margin-top: 3px;
-              max-height: 24px;
-              border-radius: 7px;
-            "
-          >
-            Del
-          </button>
+                  ? 0.4
+                  : 1,
+              }"
+            >
+              Intro
+            </button>
+            <button
+              @click.stop="deleteClick"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                margin-top: 3px;
+                max-height: 24px;
+                border-radius: 7px;
+              "
+            >
+              Del
+            </button>
+          </div>
         </div>
         <div
           id="infoBox"

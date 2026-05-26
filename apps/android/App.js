@@ -691,11 +691,11 @@ export default function App() {
   const startAppsHold = () => {
     lpStart(
       () => {
-        flash("stream");
+        flash("fire");
         setShowStreamers(true);
       },
       () => {
-        flash("stream");
+        flash("fire");
         fireBtn();
       },
     );
@@ -1208,7 +1208,7 @@ export default function App() {
       key: "stream",
       label: "Apps",
       smallText: true,
-      bg: () => cellBg("white", "stream"),
+      bg: () => modeBg("fire"),
       onPress: () => {},
       onPressIn: () => startAppsHold(),
       onPressOut: () => stopAppsHold(),

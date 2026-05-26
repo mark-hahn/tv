@@ -580,7 +580,7 @@
         Subs
       </div>
       <div
-        :style="cellStyle('white', 'stream')"
+        :style="modeBtnStyle('fire')"
         @mousedown="startAppsHold"
         @mouseup="stopAppsHold"
         @mouseleave="stopAppsHold"
@@ -1213,11 +1213,11 @@ export default {
     startAppsHold() {
       this._lpStart(
         () => {
-          this.flash("stream");
+          this.flash("fire");
           this.showStreamers = true;
         },
         () => {
-          this.flash("stream");
+          this.flash("fire");
           this.fireBtn();
         },
       );

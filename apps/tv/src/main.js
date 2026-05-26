@@ -267,6 +267,7 @@ let activeDevice = null;
 let lastOffAt = 0;
 let lastOnAt = 0;
 let pendingGoogleHome = false;
+let pendingFireEmby = false;
 let currentShowName = null;
 const prevSessions = {};
 
@@ -358,7 +359,7 @@ function handleMsg(raw) {
       if (id === BRAVIA_ENTITY_ID) {
         const attrs = event.data?.new_state?.attributes;
         log(
-          `BRAVIA attrs: title=${attrs?.media_title ?? "null"} mediaType=${attrs?.media_content_type ?? "null"} muted=${attrs?.is_volume_muted ?? "null"} pendingGoogleHome=${pendingGoogleHome}`,
+          `BRAVIA attrs: title=${attrs?.media_title ?? "null"} mediaType=${attrs?.media_content_type ?? "null"} muted=${attrs?.is_volume_muted ?? "null"} pendingGoogleHome=${pendingGoogleHome} pendingFireEmby=${pendingFireEmby}`,
         );
         const prevPower = braviaHaPower;
         braviaHaPower = state;
@@ -386,6 +387,23 @@ function handleMsg(raw) {
                   "com.sony.dtv.tv.emby.embyatv.tv.emby.embyatv.startup.StartupActivity",
               }),
             GOOGLE_EMBY_DELAY_MS,
+          );
+        }
+        // pendingFireEmby: launch Emby once FireTV is the active input
+        if (
+          pendingFireEmby &&
+          (braviaMediaTitle === "Fire TV Stick" ||
+            braviaMediaTitle === "HDMI 2")
+        ) {
+          pendingFireEmby = false;
+          log("firebtn: FireTV active — launching Emby");
+          setTimeout(
+            () =>
+              adbExec(
+                "shell am start -n tv.emby.embyatv/.startup.StartupActivity",
+                "emby launch",
+              ),
+            FIRE_EMBY_DELAY_MS,
           );
         }
         // HDMI 2 selected but no CEC signal → Fire Stick is in standby; wake it
@@ -470,6 +488,7 @@ let fireShell = null;
 let fireShellReady = false;
 let fireShellStdoutBuf = "";
 let fireShellPending = null; // { marker, resolve } — at most one in-flight
+let fireShellUnauthorized = false; // stop fast-retry loop when device hasn't authorized
 
 function spawnFireShell() {
   if (fireShell) {
@@ -478,8 +497,10 @@ function spawnFireShell() {
     fireShell.kill();
   }
   fireShellReady = false;
+  fireShellUnauthorized = false;
   fireShell = spawn("adb", ["-s", `${FIRE_TV_IP}:5555`, "shell"]);
   fireShellStdoutBuf = "";
+  let fireShellStderrBuf = "";
   fireShell.stdout.on("data", (chunk) => {
     fireShellStdoutBuf += chunk.toString();
     if (
@@ -491,6 +512,12 @@ function spawnFireShell() {
       resolve();
     }
   });
+  fireShell.stderr.on("data", (chunk) => {
+    fireShellStderrBuf += chunk.toString();
+    if (fireShellStderrBuf.includes("unauthorized")) {
+      fireShellUnauthorized = true;
+    }
+  });
   fireShell.on("spawn", () => {
     log("[fire] adb shell spawned");
     fireShellReady = true;
@@ -500,10 +527,16 @@ function spawnFireShell() {
     fireShellReady = false;
   });
   fireShell.on("close", (code) => {
-    log(`[fire] adb shell closed (${code}), reconnecting in 2s...`);
     fireShellReady = false;
     fireShell = null;
-    setTimeout(connectFireShell, 2000);
+    if (fireShellUnauthorized) {
+      log(
+        `[fire] adb shell closed (${code}) — device unauthorized, NOT retrying (accept USB debug dialog on FireTV then restart tv-tv)`,
+      );
+    } else {
+      log(`[fire] adb shell closed (${code}), reconnecting in 2s...`);
+      setTimeout(connectFireShell, 2000);
+    }
   });
 }
 
@@ -576,6 +609,7 @@ let braviaShellReady = false;
 let braviaShellStdoutBuf = "";
 let braviaShellPending = null;
 let braviaKeySeq = 0;
+let braviaShellUnauthorized = false;
 
 function spawnBraviaShell() {
   if (braviaShell) {
@@ -584,8 +618,10 @@ function spawnBraviaShell() {
     braviaShell.kill();
   }
   braviaShellReady = false;
+  braviaShellUnauthorized = false;
   braviaShell = spawn("adb", ["-s", `${BRAVIA_TV_IP}:5555`, "shell"]);
   braviaShellStdoutBuf = "";
+  let braviaShellStderrBuf = "";
   braviaShell.stdout.on("data", (chunk) => {
     braviaShellStdoutBuf += chunk.toString();
     if (
@@ -597,6 +633,12 @@ function spawnBraviaShell() {
       resolve();
     }
   });
+  braviaShell.stderr.on("data", (chunk) => {
+    braviaShellStderrBuf += chunk.toString();
+    if (braviaShellStderrBuf.includes("unauthorized")) {
+      braviaShellUnauthorized = true;
+    }
+  });
   braviaShell.on("spawn", () => {
     log("[bravia] adb shell spawned");
     braviaShellReady = true;
@@ -606,10 +648,16 @@ function spawnBraviaShell() {
     braviaShellReady = false;
   });
   braviaShell.on("close", (code) => {
-    log(`[bravia] adb shell closed (${code}), reconnecting in 2s...`);
     braviaShellReady = false;
     braviaShell = null;
-    setTimeout(connectBraviaShell, 2000);
+    if (braviaShellUnauthorized) {
+      log(
+        `[bravia] adb shell closed (${code}) — device unauthorized, NOT retrying (accept USB debug dialog on Bravia then restart tv-tv)`,
+      );
+    } else {
+      log(`[bravia] adb shell closed (${code}), reconnecting in 2s...`);
+      setTimeout(connectBraviaShell, 2000);
+    }
   });
 }
 
@@ -689,20 +737,28 @@ app.get("/tv/text", async (req, res) => {
 });
 
 app.get("/tv/firebtn", (req, res) => {
-  log(`firebtn from ${client(req)}`);
+  log(`firebtn from ${client(req)} braviaHaPower=${braviaHaPower}`);
   callService("media_player", "turn_on", FIRE_TV_ENTITY_ID);
-  setTimeout(
-    () => adbExec("shell input keyevent 3", "home"),
-    FIRE_HOME_DELAY_MS,
-  );
-  setTimeout(
-    () =>
-      adbExec(
-        "shell am start -n tv.emby.embyatv/.startup.StartupActivity",
-        "emby launch",
-      ),
-    FIRE_EMBY_DELAY_MS,
-  );
+  if (braviaHaPower !== "on") {
+    // TV display is off — turn it on and wait for FireTV CEC before launching Emby
+    callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
+    pendingFireEmby = true;
+    log("firebtn: TV off — turning on Bravia, set pendingFireEmby=true");
+  } else {
+    // TV already on — send home and launch Emby with fixed delays
+    setTimeout(
+      () => adbExec("shell input keyevent 3", "home"),
+      FIRE_HOME_DELAY_MS,
+    );
+    setTimeout(
+      () =>
+        adbExec(
+          "shell am start -n tv.emby.embyatv/.startup.StartupActivity",
+          "emby launch",
+        ),
+      FIRE_EMBY_DELAY_MS,
+    );
+  }
   res.json({ ok: true });
 });
 

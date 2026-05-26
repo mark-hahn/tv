@@ -138,6 +138,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.hasemby = 0; // Show both emby and non-emby shows by default
       tmp.needsIntro = 0;
       tmp.haveSubs = 0;
+      tmp.anticipating = 0;
       break;
 
     case "Try Drama":
@@ -156,6 +157,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.hasemby = 1;
       tmp.needsIntro = 0;
       tmp.haveSubs = 0;
+      tmp.anticipating = 0;
       break;
 
     case "Watching":
@@ -173,6 +175,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.hasemby = 0;
       tmp.needsIntro = 0;
       tmp.haveSubs = 0;
+      tmp.anticipating = 0;
       break;
 
     case "Finished":
@@ -190,6 +193,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.hasemby = 1;
       tmp.needsIntro = 0;
       tmp.haveSubs = 0;
+      tmp.anticipating = 0;
       break;
   }
   for (const condName in tmp) {

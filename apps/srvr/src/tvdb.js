@@ -1953,6 +1953,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   // Additional flags
   tvdbData.reject = paramObj.reject ?? existing.reject ?? false;
   tvdbData.haveSubs = paramObj.haveSubs ?? existing.haveSubs ?? false;
+  tvdbData.anticipating =
+    paramObj.anticipating ?? existing.anticipating ?? false;
   tvdbData.lastWatched = paramObj.lastWatched || existing.lastWatched || null;
   if (existing.introDur != null) tvdbData.introDur = existing.introDur;
   if (existing.startMark != null) tvdbData.startMark = existing.startMark;

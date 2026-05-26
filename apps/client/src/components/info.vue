@@ -143,7 +143,7 @@
       <div
         id="topRight"
         :style="{
-          gridColumn: '4',
+          gridColumn: '4 / span 2',
           minWidth: '0px',
           display: 'flex',
           flexDirection: 'column',

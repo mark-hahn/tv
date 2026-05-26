@@ -970,7 +970,7 @@ export default {
     },
 
     introCount() {
-      return this.filteredShows.filter((s) => s.needsIntro).length;
+      return this.allShows.filter((s) => s.needsIntro).length;
     },
   },
   unmounted() {

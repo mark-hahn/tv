@@ -74,10 +74,33 @@
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
+            minWidth: '0px',
           }"
         >
-          <span>{{ show.name }}</span>
+          <span :style="{ minWidth: '0px', flex: '1 1 auto' }">{{
+            show.name
+          }}</span>
         </div>
+        <input
+          v-if="!previewMode"
+          v-model="descrSearchStr"
+          @input="onDescrSearch"
+          @click.stop
+          @keydown.stop
+          placeholder="Search Descr"
+          :style="{
+            gridColumn: '4 / span 1',
+            justifySelf: 'start',
+            width: '125px',
+            minWidth: '0px',
+            padding: '2px',
+            fontSize: '14px',
+            border: 'none',
+            backgroundColor: descrSearchStr ? '#fffde7' : '#eee',
+            height: '14px',
+            marginTop: '4px',
+          }"
+        />
       </div>
     </div>
     <!-- Layout: 1/9 whitespace, 1/3 poster, 1/9 whitespace, 1/3 infobox, 1/9 whitespace-->
@@ -155,24 +178,6 @@
           >
             Banned From Download
           </div>
-          <input
-            v-model="descrSearchStr"
-            @input="onDescrSearch"
-            @click.stop
-            @keydown.stop
-            placeholder="Search Descr"
-            :style="{
-              flex: '1 1 140px',
-              minWidth: '0px',
-              maxWidth: '220px',
-              padding: '2px',
-              fontSize: '14px',
-              border: 'none',
-              backgroundColor: descrSearchStr ? '#fffde7' : '#eee',
-              height: '14px',
-              marginTop: '4px',
-            }"
-          />
           <button
             v-if="notInEmby"
             @click.stop="loadIntoEmby"

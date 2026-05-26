@@ -23,6 +23,11 @@ export function embyPageUrl(id) {
   `.replace(/\s*/g, "");
 }
 
+export function viewingUrl(sessionId, showId, showName) {
+  const name = encodeURIComponent(showName);
+  return `${hahnca}Sessions/${sessionId}/Viewing?ItemType=Series&ItemId=${showId}&ItemName=${name}&api_key=${apiKey}`;
+}
+
 export function childrenUrl(parentId = "", unAired = false) {
   if (!parentId) return "";
   return `${hahnca} Users

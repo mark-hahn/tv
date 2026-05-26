@@ -759,7 +759,10 @@ export default {
       }
     },
 
-    tvClick() {},
+    async tvClick() {
+      const result = await srvr.embyViewShow(this.show.id, this.show.name);
+      if (!result?.found) window.alert("Living Room TV is not active in Emby.");
+    },
 
     deleteClick() {
       console.log("Series, deleteClick:", this.show.name);

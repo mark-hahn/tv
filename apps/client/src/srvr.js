@@ -369,6 +369,10 @@ export function getDevices() {
   return httpCall("/api/getDevices");
 }
 
+export function embyViewShow(showId, showName) {
+  return httpCall("/api/embyViewShow", { showId, showName }, "POST");
+}
+
 export function getLastViewed() {
   return httpCall("/api/getLastViewed");
 }

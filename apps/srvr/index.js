@@ -3472,6 +3472,7 @@ app.get("/api/getRejects", apiWrapper(getRejects));
 app.get("/api/getGaps", apiWrapper(getGaps));
 app.get("/api/getNoEmbys", apiWrapper(getNoEmbys));
 app.get("/api/getDevices", apiWrapper(emby.getDevices));
+app.post("/api/embyViewShow", apiWrapper(emby.viewShowOnLivingRoomTv));
 app.get("/api/getLastViewed", apiWrapper(view.getLastViewed));
 app.get("/api/getSharedFilters", apiWrapper(getSharedFilters));
 

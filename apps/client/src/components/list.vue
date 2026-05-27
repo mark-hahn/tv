@@ -3240,14 +3240,6 @@ export default {
       this.$emit("all-shows", allShows);
       this.$emit("all-tvdb", allTvdb);
 
-      // Debug: log needsIntro state at load time
-      console.log(
-        `[needsIntro dbg] load: count=${allShows.filter((s) => s.needsIntro).length}`,
-        allShows
-          .filter((s) => s.needsIntro || s.needsIntro == null)
-          .map((s) => `${s.name}=${s.needsIntro}`),
-      );
-
       // Gap checking now handled server-side
       // Server will notify via WebSocket when tvdb data is updated
 
@@ -3388,9 +3380,6 @@ export default {
           show.fileGap =
             show.fileGap || show.fileEndError || show.seasonWatchedThenNofile;
           show.needsIntro = tvdbRecord.needsIntro ?? false;
-          console.log(
-            `[needsIntro dbg] diskChange ${showName}: needsIntro=${show.needsIntro} (raw=${tvdbRecord.needsIntro})`,
-          );
           show.anticipating = tvdbRecord.anticipating ?? false;
 
           // Update allTvdb cache
@@ -3545,9 +3534,6 @@ export default {
           show.watchGapEpisode = record.watchGapEpisode;
           show.fileGap = record.fileGap;
           show.needsIntro = record.needsIntro ?? false;
-          console.log(
-            `[needsIntro dbg] push ${name}: needsIntro=${show.needsIntro} (raw=${record.needsIntro})`,
-          );
           show.anticipating = record.anticipating ?? false;
           show.notReady = record.notReady;
           show.date = record.date ?? show.date;

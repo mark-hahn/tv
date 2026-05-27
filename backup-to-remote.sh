@@ -21,6 +21,7 @@ run_backup() {
     restic -r "$REPO" -p "$PASSWORD_FILE" backup \
         "${BACKUP_PATHS[@]}" \
         --exclude-file="$HOME/backup-ignore" \
+        --exclude="/mnt/c/Users/mark/CrossDevice" \
         --one-file-system \
         --tag "automated"
 }

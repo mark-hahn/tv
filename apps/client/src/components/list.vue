@@ -2219,7 +2219,6 @@ export default {
     sortClick() {
       if (this.actorsListMode) return;
       this.sortPopped = !this.sortPopped;
-      console.debug("🚀 ~ sortPopped:", this.sortPopped);
       this.fltrPopped = false;
     },
 

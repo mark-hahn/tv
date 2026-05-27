@@ -1184,7 +1184,6 @@ export default {
     },
     seriesMap() {
       // Triggered when seriesMap reference changes (e.g., from disk change refresh)
-      console.log("[map.vue watcher] seriesMap changed, forcing update");
       this.seasonStates = {}; // Clear season states when map data changes
       this.mapUpdateKey++; // Increment key to force re-render
       this.$nextTick(() => {

@@ -2263,6 +2263,8 @@ export default {
 
     openTorTabs() {
       const name = String(this.currentShow?.name || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
         .replace(/\([^)]+\)\s*$/, "")
         .replace(/[?.]+\s*$/g, "")
         .trim();
@@ -2812,7 +2814,9 @@ export default {
         const title = torrent.raw?.title ?? "";
         navigator.clipboard.writeText(title).catch(() => {});
         this.flashingTorrent = torrent;
-        setTimeout(() => { this.flashingTorrent = null; }, 300);
+        setTimeout(() => {
+          this.flashingTorrent = null;
+        }, 300);
         return;
       }
 

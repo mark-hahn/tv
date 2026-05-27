@@ -1,5 +1,7 @@
 function normalizeBasic(s) {
   return String(s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim()
     .replace(/\s+/g, " ");
@@ -11,6 +13,7 @@ function normalizeAggressive(s) {
   if (idx >= 0) {
     out = out.slice(0, idx);
   }
+  out = out.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   out = out.toLowerCase();
   out = out.replace(/\b([a-z])\./g, "$1"); // collapse initials: "r.j." -> "rj"
   out = out.replace(/\./g, " ");

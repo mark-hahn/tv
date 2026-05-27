@@ -1931,8 +1931,14 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     "needsIntro",
   ];
   for (const f of flatGapFields) {
-    if (tvdbData[f] === undefined && existing[f] !== undefined)
+    if (tvdbData[f] === undefined && existing[f] !== undefined) {
+      if (f === "needsIntro" && existing[f] === true) {
+        log(
+          `[needsIntro dbg] flatGapFields preserved needsIntro=true for ${tvdbData.name || "?"}`,
+        );
+      }
       tvdbData[f] = existing[f];
+    }
   }
 
   // Ensure notReady has a value - default to true for inEmby shows until gap check runs

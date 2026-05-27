@@ -2327,6 +2327,16 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
           `needsIntro:${tvdbRecord.needsIntro}->${newNeedsIntro}`,
         );
         tvdbRecord.needsIntro = newNeedsIntro;
+      } else if (newNeedsIntro || tvdbRecord.needsIntro === undefined) {
+        // Log when needsIntro should be true but isn't changing, or when it
+        // stays undefined/false silently — helps diagnose stale-state bugs
+        console.log(
+          `[needsIntro dbg] ${showName}: stored=${tvdbRecord.needsIntro} computed=${newNeedsIntro}` +
+            ` inEmby=${tvdbRecord.inEmby} inLinda=${tvdbRecord.inLinda}` +
+            ` introDur=${tvdbRecord.introDur} epCnt=${tvdbRecord.episodeCount}` +
+            ` watchCnt=${tvdbRecord.watchedCount}` +
+            ` filesOnDisk=${JSON.stringify(tvdbRecord.filesOnDisk?.slice(0, 3))}`,
+        );
       }
     } else if (!tvdbRecord.inEmby) {
       // For shows not in emby, set error fields to known constants

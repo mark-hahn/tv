@@ -93,19 +93,6 @@
           }"
         >
           <button
-            @click.stop="antClick"
-            :style="{
-              fontSize: '13px',
-              cursor: 'pointer',
-              marginTop: '3px',
-              maxHeight: '24px',
-              borderRadius: '7px',
-              '--btn-bg': show?.anticipating ? '#c66' : 'whitesmoke',
-            }"
-          >
-            Ant
-          </button>
-          <button
             @click.stop="refreshTvdb"
             :style="{
               fontSize: '13px',

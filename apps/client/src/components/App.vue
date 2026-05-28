@@ -344,7 +344,7 @@
             :movieMode="movieMode"
           ></Down>
           <TvPane
-            v-show="currentPane === 'tv'"
+            v-show="currentPane === 'remote'"
             style="width: 100%; height: 100%"
           ></TvPane>
         </div>
@@ -937,7 +937,7 @@ export default {
         { label: "Actors", key: "actors" },
         { label: "Reviews", key: "reviews" },
         { label: "Trailer", key: "trailer" },
-        { label: "Remote", key: "tv" },
+        { label: "Remote", key: "remote" },
       ];
     },
 
@@ -1846,7 +1846,7 @@ export default {
       // Simple mode: only a small set of panes are available.
       if (
         this.simpleMode &&
-        !["info", "map", "actors", "reviews", "trailer", "tv"].includes(k)
+        !["info", "map", "actors", "reviews", "trailer", "remote"].includes(k)
       )
         return;
 
@@ -1874,8 +1874,8 @@ export default {
         this.handleShowActors();
         return;
       }
-      if (k === "tv") {
-        this.currentPane = "tv";
+      if (k === "remote") {
+        this.currentPane = "remote";
         evtBus.emit("paneChanged", this.currentPane);
         evtBus.emit("tvCloseKeybd");
         return;

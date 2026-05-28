@@ -1363,7 +1363,7 @@ export default {
     },
 
     _onPaneChanged(pane) {
-      if (pane !== "tv") {
+      if (pane !== "remote") {
         this.subClose();
       }
     },

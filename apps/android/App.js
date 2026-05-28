@@ -2121,6 +2121,21 @@ export default function App() {
       setShowShows(false);
     };
 
+    const handleTvClick = async () => {
+      if (!show) return;
+      try {
+        const res = await fetch(`${TV_SRVR_HTTP_URL}/api/embyViewShow`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ showId: show.id, showName: show.name }),
+        });
+        const data = await res.json();
+        if (!data?.found) alert("Living Room TV is not active in Emby.");
+      } catch (_) {
+        alert("TV request failed.");
+      }
+    };
+
     return (
       <View style={showsStyles.container}>
         <StatusBar hidden />
@@ -2168,13 +2183,22 @@ export default function App() {
             {activeTab === "Stats" && renderEpiStatsContent()}
           </>
         </View>
-        <TouchableOpacity
-          onPress={handleClose}
-          style={subCtrlStyles.closeBtn}
-          activeOpacity={0.7}
-        >
-          <Text style={subCtrlStyles.closeBtnText}>Close</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row" }}>
+          <TouchableOpacity
+            onPress={handleTvClick}
+            style={[subCtrlStyles.closeBtn, { flex: 1 }]}
+            activeOpacity={0.7}
+          >
+            <Text style={subCtrlStyles.closeBtnText}>TV</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleClose}
+            style={[subCtrlStyles.closeBtn, { flex: 1 }]}
+            activeOpacity={0.7}
+          >
+            <Text style={subCtrlStyles.closeBtnText}>Close</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -2603,14 +2627,18 @@ const subCtrlStyles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   closeBtn: {
-    backgroundColor: "lightgreen",
+    backgroundColor: "white",
     alignItems: "center",
     justifyContent: "center",
-    height: 80,
+    height: 64,
     flexShrink: 0,
+    borderWidth: 2,
+    borderColor: "#000",
+    borderRadius: 8,
+    margin: 4,
   },
   closeBtnText: {
-    fontSize: fs(39),
+    fontSize: fs(31),
     fontWeight: "bold",
     color: "#000",
   },

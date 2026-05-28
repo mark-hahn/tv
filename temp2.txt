@@ -1,0 +1,130 @@
+21:16:27.905 [vite] connected from window 3 0147e003-16d5-46a4-be15-dfad4666eb4e:67:11
+21:16:27.907 [vite] new window visibility hidden 3 0147e003-16d5-46a4-be15-dfad4666eb4e:63:12
+21:16:28.292 [vite] ping successful 3 0147e003-16d5-46a4-be15-dfad4666eb4e:69:12
+21:17:41.872 [vite] connected from window 3 1c9e74e5-ac26-47f5-afea-1e45d747e34d:67:11
+21:17:41.876 [vite] new window visibility hidden 3 1c9e74e5-ac26-47f5-afea-1e45d747e34d:63:12
+21:17:42.173 [vite] ping successful 3 1c9e74e5-ac26-47f5-afea-1e45d747e34d:69:12
+21:17:59.314 [vite] connected from window 3 091485ca-452a-4f04-ab49-ba2fa823e1f8:67:11
+21:17:59.316 [vite] new window visibility hidden 3 091485ca-452a-4f04-ab49-ba2fa823e1f8:63:12
+21:18:07.805 [vite] new window visibility visible 3 091485ca-452a-4f04-ab49-ba2fa823e1f8:63:12
+21:18:07.860 [vite] ping successful 3 091485ca-452a-4f04-ab49-ba2fa823e1f8:69:12
+21:23:37.304 [vite] connected from window 3 ef2bc55e-591d-4d99-85a3-5c30464df287:67:11
+21:23:37.306 [vite] new window visibility visible 3 ef2bc55e-591d-4d99-85a3-5c30464df287:63:12
+21:23:37.570 [vite] ping successful 3 ef2bc55e-591d-4d99-85a3-5c30464df287:69:12
+21:24:42.084 [vite] connected from window 3 ff3e5227-1c7c-4dcc-adb5-4bb805873b85:67:11
+21:24:42.085 [vite] new window visibility visible 3 ff3e5227-1c7c-4dcc-adb5-4bb805873b85:63:12
+21:24:42.347 [vite] ping successful 3 ff3e5227-1c7c-4dcc-adb5-4bb805873b85:69:12
+21:25:06.505 [vite] connected from window 3 b3c860dc-8167-4ff6-b740-2190098625e5:67:11
+21:25:06.506 [vite] new window visibility visible 3 b3c860dc-8167-4ff6-b740-2190098625e5:63:12
+21:25:06.775 [vite] ping successful 3 b3c860dc-8167-4ff6-b740-2190098625e5:69:12
+21:25:07.203 [vite] connecting... client:733:9
+21:25:07.566 Cookie “__Secure-YEC” has been rejected because it is in a cross-site context and its “SameSite” is “Lax” or “Strict”. iframe_api
+21:26:19.134 Invalid URI. Load of media resource  failed. localhost:5173
+21:27:49.034 Uncaught (in promise) DOMException: The fetching process for the media resource was aborted by the user agent at the user's request. 6
+21:28:37.799 Uncaught (in promise) DOMException: The fetching process for the media resource was aborted by the user agent at the user's request.
+    patchDOMProp runtime-dom.esm-bundler.js:668
+    patchProp runtime-dom.esm-bundler.js:779
+    patchElement runtime-core.esm-bundler.js:5739
+    processElement runtime-core.esm-bundler.js:5549
+    patch runtime-core.esm-bundler.js:5391
+    patchBlockChildren runtime-core.esm-bundler.js:5777
+    patchElement runtime-core.esm-bundler.js:5695
+    processElement runtime-core.esm-bundler.js:5549
+    patch runtime-core.esm-bundler.js:5391
+    componentUpdateFn runtime-core.esm-bundler.js:6131
+    run reactivity.esm-bundler.js:237
+    updateComponent runtime-core.esm-bundler.js:5982
+    processComponent runtime-core.esm-bundler.js:5916
+    patch runtime-core.esm-bundler.js:5403
+    patchBlockChildren runtime-core.esm-bundler.js:5777
+    patchElement runtime-core.esm-bundler.js:5695
+    processElement runtime-core.esm-bundler.js:5549
+    patch runtime-core.esm-bundler.js:5391
+    componentUpdateFn runtime-core.esm-bundler.js:6131
+    run reactivity.esm-bundler.js:237
+    runIfDirty reactivity.esm-bundler.js:275
+    callWithErrorHandling runtime-core.esm-bundler.js:199
+    flushJobs runtime-core.esm-bundler.js:408
+chunk-EKIDWYUL.js:11364:5
+21:32:01.084 Uncaught (in promise) DOMException: The fetching process for the media resource was aborted by the user agent at the user's request. 5
+21:32:33.090 Cross-Origin Request Blocked: The Same Origin Policy disallows reading the remote resource at https://hahnca.com/tv-srvr/api/subtitle-list?path=%2Fmnt%2Fmedia%2Ftv%2FMaximum%20Pleasure%20Guaranteed%2FSeason%201%2FMaximum.Pleasure.Guaranteed.S01E03.HDR.2160p.WEB.h265-GRACE.mkv. (Reason: CORS request did not succeed). Status code: (null).
+21:33:26.767 Invalid URI. Load of media resource  failed. 3 localhost:5173
+21:38:18.642 Uncaught (in promise) ReferenceError: url is not defined
+    loadTorrents tor.vue:2759
+tor.vue:1636:35
+21:44:13.303 Uncaught (in promise) DOMException: The fetching process for the media resource was aborted by the user agent at the user's request.
+21:45:07.302 Invalid URI. Load of media resource  failed. 5 localhost:5173
+21:55:58.202 Uncaught (in promise) DOMException: The fetching process for the media resource was aborted by the user agent at the user's request. 3
+22:01:46.719 HTTPS-First Mode: Upgrading insecure request “http://www.mrskin.com/search/celebs?term=Karen%20Rodriguez” to use “https”. celebs
+22:17:09.898 Feature Policy: Skipping unsupported feature name “accelerometer”. www-widgetapi.js:194:421
+22:17:09.898 Feature Policy: Skipping unsupported feature name “autoplay”. www-widgetapi.js:194:421
+22:17:09.898 Feature Policy: Skipping unsupported feature name “clipboard-write”. www-widgetapi.js:194:421
+22:17:09.898 Feature Policy: Skipping unsupported feature name “encrypted-media”. www-widgetapi.js:194:421
+22:17:09.898 Feature Policy: Skipping unsupported feature name “gyroscope”. www-widgetapi.js:194:421
+22:17:09.898 Feature Policy: Skipping unsupported feature name “picture-in-picture”. www-widgetapi.js:194:421
+22:17:09.898 Feature Policy: Skipping unsupported feature name “accelerometer”. www-widgetapi.js:195:266
+22:17:09.898 Feature Policy: Skipping unsupported feature name “autoplay”. www-widgetapi.js:195:266
+22:17:09.898 Feature Policy: Skipping unsupported feature name “clipboard-write”. www-widgetapi.js:195:266
+22:17:09.898 Feature Policy: Skipping unsupported feature name “encrypted-media”. www-widgetapi.js:195:266
+22:17:09.898 Feature Policy: Skipping unsupported feature name “gyroscope”. www-widgetapi.js:195:266
+22:17:09.898 Feature Policy: Skipping unsupported feature name “picture-in-picture”. www-widgetapi.js:195:266
+22:17:09.910 Feature Policy: Skipping unsupported feature name “accelerometer”. www-widgetapi.js:197:30
+22:17:09.910 Feature Policy: Skipping unsupported feature name “autoplay”. www-widgetapi.js:197:30
+22:17:09.910 Feature Policy: Skipping unsupported feature name “clipboard-write”. www-widgetapi.js:197:30
+22:17:09.910 Feature Policy: Skipping unsupported feature name “encrypted-media”. www-widgetapi.js:197:30
+22:17:09.910 Feature Policy: Skipping unsupported feature name “gyroscope”. www-widgetapi.js:197:30
+22:17:09.910 Feature Policy: Skipping unsupported feature name “picture-in-picture”. www-widgetapi.js:197:30
+22:17:09.913 Feature Policy: Skipping unsupported feature name “accelerometer”. www-widgetapi.js:194:421
+22:17:09.913 Feature Policy: Skipping unsupported feature name “autoplay”. www-widgetapi.js:194:421
+22:17:09.913 Feature Policy: Skipping unsupported feature name “clipboard-write”. www-widgetapi.js:194:421
+22:17:09.914 Feature Policy: Skipping unsupported feature name “encrypted-media”. www-widgetapi.js:194:421
+22:17:09.914 Feature Policy: Skipping unsupported feature name “gyroscope”. www-widgetapi.js:194:421
+22:17:09.914 Feature Policy: Skipping unsupported feature name “picture-in-picture”. www-widgetapi.js:194:421
+22:17:09.914 Feature Policy: Skipping unsupported feature name “accelerometer”. www-widgetapi.js:195:266
+22:17:09.914 Feature Policy: Skipping unsupported feature name “autoplay”. www-widgetapi.js:195:266
+22:17:09.914 Feature Policy: Skipping unsupported feature name “clipboard-write”. www-widgetapi.js:195:266
+22:17:09.914 Feature Policy: Skipping unsupported feature name “encrypted-media”. www-widgetapi.js:195:266
+22:17:09.914 Feature Policy: Skipping unsupported feature name “gyroscope”. www-widgetapi.js:195:266
+22:17:09.914 Feature Policy: Skipping unsupported feature name “picture-in-picture”. www-widgetapi.js:195:266
+22:17:09.917 Feature Policy: Skipping unsupported feature name “accelerometer”. www-widgetapi.js:197:30
+22:17:09.917 Feature Policy: Skipping unsupported feature name “autoplay”. www-widgetapi.js:197:30
+22:17:09.917 Feature Policy: Skipping unsupported feature name “clipboard-write”. www-widgetapi.js:197:30
+22:17:09.917 Feature Policy: Skipping unsupported feature name “encrypted-media”. www-widgetapi.js:197:30
+22:17:09.917 Feature Policy: Skipping unsupported feature name “gyroscope”. www-widgetapi.js:197:30
+22:17:09.917 Feature Policy: Skipping unsupported feature name “picture-in-picture”. www-widgetapi.js:197:30
+22:17:10.057 Cookie “__Secure-YEC” has been rejected because it is in a cross-site context and its “SameSite” is “Lax” or “Strict”. HgMbkitzhEM
+22:17:10.057 Cookie warnings 4
+22:17:10.116 Cookie “__Secure-YEC” has been rejected because it is in a cross-site context and its “SameSite” is “Lax” or “Strict”. b-Blr0_koQA
+10:35:18.833 Uncaught (in promise) ReferenceError: url is not defined
+    loadTorrents tor.vue:2759
+tor.vue:1636:35
+11:13:46.613 This page is in Quirks Mode. Page layout may be impacted. For Standards Mode use “<!DOCTYPE html>”. blank
+11:18:53.679 Storage access automatically granted for origin “https://www.torrentleech.org” on “http://localhost:5173”.
+11:21:29.740 Storage access automatically granted for origin “https://hahnca.com:8920” on “http://localhost:5173”.
+11:26:56.185 Uncaught (in promise) DOMException: The fetching process for the media resource was aborted by the user agent at the user's request.
+11:51:22.136 Storage access automatically granted for origin “https://hahnca.com:8920” on “http://localhost:5173”. 2
+14:08:08.597 Invalid URI. Load of media resource  failed. 2 localhost:5173
+14:09:24.201 Uncaught (in promise) ReferenceError: url is not defined
+    loadTorrents tor.vue:2759
+3 tor.vue:1636:35
+14:10:42.777 Storage access automatically granted for origin “https://iptorrents.com” on “http://localhost:5173”.
+14:12:19.109 Storage access automatically granted for origin “https://hahnca.com:8920” on “http://localhost:5173”. 3
+14:33:01.425 Invalid URI. Load of media resource  failed. 2 localhost:5173
+14:34:22.314 Storage access automatically granted for origin “https://hahnca.com:8920” on “http://localhost:5173”.
+14:36:10.422 Uncaught (in promise) ReferenceError: url is not defined
+    loadTorrents tor.vue:2759
+tor.vue:1636:35
+14:37:47.506 Invalid URI. Load of media resource  failed. 2 localhost:5173
+14:40:10.141 Uncaught (in promise) ReferenceError: url is not defined
+    loadTorrents tor.vue:2759
+tor.vue:1636:35
+14:40:22.956 Storage access automatically granted for origin “https://iptorrents.com” on “http://localhost:5173”.
+14:42:29.438 Uncaught (in promise) ReferenceError: url is not defined
+    loadTorrents tor.vue:2759
+tor.vue:1636:35
+14:44:24.102 Invalid URI. Load of media resource  failed. localhost:5173
+14:45:55.508 Uncaught (in promise) ReferenceError: url is not defined
+    loadTorrents tor.vue:2759
+5 tor.vue:1636:35
+14:46:57.136 Storage access automatically granted for origin “https://hahnca.com:8920” on “http://localhost:5173”. 6
+16:53:18.339 The Web Console logging API (console.log, console.info, console.warn, console.error) has been disabled by a script on this page.

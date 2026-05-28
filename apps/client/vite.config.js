@@ -33,10 +33,14 @@ function consoleToFile() {
       timer.unref();
       server.middlewares.use("/__terminal", (req, res, next) => {
         try {
-          const qstart = req.url.indexOf("?");
+          const reqUrl = req.url || "";
+          const qstart = reqUrl.indexOf("?");
+          const pathPart = qstart === -1 ? reqUrl : reqUrl.slice(0, qstart);
           if (qstart !== -1) {
-            const params = new URLSearchParams(req.url.slice(qstart + 1));
-            const method = req.url.slice(1, qstart === -1 ? undefined : qstart);
+            const params = new URLSearchParams(reqUrl.slice(qstart + 1));
+            const segments = pathPart.split("/").filter(Boolean);
+            const method =
+              segments.length >= 2 ? segments[1] : segments[0] || "log";
             const message = params.get("m") ?? "";
             if (message) {
               const now = new Date().toLocaleString("en-US", {
@@ -59,7 +63,11 @@ function consoleToFile() {
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [consoleToFile(), vue(), Terminal({ console: "terminal" })],
+  plugins: [
+    consoleToFile(),
+    vue(),
+    Terminal({ console: "terminal", output: ["terminal", "console"] }),
+  ],
   server: {
     fs: {
       // Allow importing prompt/key from ../api (client-only Mistral pane).

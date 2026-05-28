@@ -937,7 +937,7 @@ export default {
         { label: "Actors", key: "actors" },
         { label: "Reviews", key: "reviews" },
         { label: "Trailer", key: "trailer" },
-        { label: "TV", key: "tv" },
+        { label: "Remote", key: "tv" },
       ];
     },
 

@@ -730,30 +730,26 @@ export default {
       };
     },
 
-    async playFirstUnwatched() {
-      try {
-        const afterWatched = await emby.afterLastWatched(this.show);
-        const season = Number(afterWatched?.seasonNumber);
-        const episode = Number(afterWatched?.episodeNumber);
-        if (
-          afterWatched?.status !== "ok" ||
-          !Number.isFinite(season) ||
-          !Number.isFinite(episode)
-        ) {
-          window.alert("No playable unwatched episode found.");
-          return;
-        }
-        this.$emit(
-          "play-episode",
-          this.buildPlayActionEvent({ altKey: true }),
-          this.show,
-          season,
-          episode,
-        );
-      } catch (e) {
-        console.error("playFirstUnwatched error:", e);
-        window.alert("Play failed.");
+    playFirstUnwatched() {
+      const filesOnDisk = this.show?.filesOnDisk;
+      if (!Array.isArray(filesOnDisk) || filesOnDisk.length === 0) {
+        window.alert("No playable episode found.");
+        return;
       }
+      const firstRow = filesOnDisk[0];
+      const season = firstRow[0];
+      const episode = firstRow[1];
+      if (!Number.isFinite(season) || !Number.isFinite(episode)) {
+        window.alert("No playable episode found.");
+        return;
+      }
+      this.$emit(
+        "play-episode",
+        this.buildPlayActionEvent({ altKey: true }),
+        this.show,
+        season,
+        episode,
+      );
     },
 
     async tvClick() {

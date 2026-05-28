@@ -2009,11 +2009,7 @@ export default {
       evtBus.emit("deleteEpisodes", { show, targets });
     },
     handlePlayEpisode(e, show, season, episode) {
-      const cell = this.seriesMap?.[season]?.[episode];
-      if (cell?.path && !cell?.noFile) {
-        this.videoPlayerMode = "simple";
-        this.videoPlayerPath = cell.path;
-      }
+      evtBus.emit("playEpisode", { show, season, episode });
     },
     handleSeasonWatched(e, show, season, episodeStates) {
       evtBus.emit("seasonWatched", { e, show, season, episodeStates });

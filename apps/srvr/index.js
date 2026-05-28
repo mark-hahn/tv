@@ -1407,7 +1407,7 @@ async function processSubQueueEntry() {
   currentlyProcessingSubPath = entry.videoFilePath;
   try {
     const parsed = parseFileSeasonEpisode(entry.videoFilePath);
-    const showName = entry.videoFilePath.replace(tvDir + "/", "").split("/")[0];
+    const showName = showNameFromFilePath(entry.videoFilePath);
     const { pgsOnly, hasEmbText } =
       (await generateEmbSrts(
         entry.videoFilePath,
@@ -2230,9 +2230,16 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
       }
     }
     // Disk check
-    const embyPath = tvdbRecord.path || tvdbRecord.emby?.path || showName;
-    const pathPart = embyPath.split("/").pop();
-    const diskInfo = await getShowDiskInfo(pathPart);
+    // If the show name contains "/" (e.g. "Good Cop/Bad Cop"), path.join handles
+    // it correctly, so use the show name directly instead of the path field whose
+    // last segment could collide with a real different show (e.g. "Friends").
+    const diskInfo = showName.includes("/")
+      ? await getShowDiskInfo(showName)
+      : await getShowDiskInfo(
+          (tvdbRecord.path || tvdbRecord.emby?.path || showName)
+            .split("/")
+            .pop(),
+        );
     const diskChanges = [];
     if (diskInfo) {
       const [newDate, newSize, newFilesOnDisk] = diskInfo;
@@ -2556,6 +2563,21 @@ const getShowsFromDisk = async (_params) => {
   } else {
     return shows;
   }
+};
+
+/**
+ * Extract the show name from an absolute video file path under tvDir.
+ * Handles shows whose name contains a "/" (e.g. "Good Cop/Bad Cop") by
+ * checking whether the two-segment prefix matches a known tvdb entry.
+ */
+const showNameFromFilePath = (filePath) => {
+  const rel = filePath.replace(tvDir + "/", "");
+  const parts = rel.split("/");
+  if (parts.length >= 2) {
+    const twoSeg = parts[0] + "/" + parts[1];
+    if (tvdb.getAllTvdbSync()[twoSeg]) return twoSeg;
+  }
+  return parts[0];
 };
 
 /**
@@ -4765,7 +4787,7 @@ app.post("/api/asr/gensrt/enqueue", (req, res) => {
     return;
   }
   const entries = videoPaths.map((vp) => {
-    const showName = vp.replace(tvDir + "/", "").split("/")[0];
+    const showName = showNameFromFilePath(vp);
     const parsed = parseFileSeasonEpisode(vp);
     return {
       videoPath: vp,
@@ -4833,7 +4855,7 @@ app.post("/api/asr/chksrt/ok", (req, res) => {
 app.post("/api/asr/chksrt/gensrt", (req, res) => {
   const entry = subQueueChkSrt.shift();
   if (entry) {
-    const showName = entry.videoFilePath.replace(tvDir + "/", "").split("/")[0];
+    const showName = showNameFromFilePath(entry.videoFilePath);
     const parsed = parseFileSeasonEpisode(entry.videoFilePath);
     addToAsrQueue([
       {
@@ -5139,7 +5161,7 @@ app.post("/api/asr/queue/add", (req, res) => {
     return;
   }
   const entries = videoPaths.map((vp) => {
-    const showName = vp.replace(tvDir + "/", "").split("/")[0];
+    const showName = showNameFromFilePath(vp);
     const parsed = parseFileSeasonEpisode(vp);
     return {
       videoPath: vp,

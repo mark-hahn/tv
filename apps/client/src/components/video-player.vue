@@ -641,13 +641,7 @@
           marginRight: '8px',
         }"
       >
-        {{
-          mode === "chksrt"
-            ? (subtitleLabelMap.get(choice.id) ?? choice.label)
-            : choice.type && choice.type !== "srt"
-              ? choice.label + " *"
-              : choice.label
-        }}
+        {{ subtitleLabelMap.get(choice.id) ?? choice.label }}
       </div>
       <!-- Sel button (chksrt mode only) -->
       <div
@@ -885,13 +879,17 @@ export default {
       for (const t of this.subtitleTracks) {
         let char;
         if (t.type === "pgs") char = "*";
-        else if (t.type === "embedded") char = "t";
-        else if (t.type === "forced") char = "f";
+        else if (t.type === "sdh") char = "H";
+        else if (t.type === "embedded") char = "T";
+        else if (t.type === "forced") char = "F";
         else if (/\.asr\.srt$/.test(t.file || "")) char = "+";
-        else if (/\.mb\d+\.srt$/.test(t.file || "")) char = "e";
-        else if (/\.opn[A-Z2-7]{5}\.srt$/i.test(t.file || "")) char = "v";
-        else char = "s";
-        map.set(t.id, char.toUpperCase());
+        else if (/\.mb\d+\.srt$/.test(t.file || "")) char = ">";
+        else if (/\.opn[A-Z2-7]{5}\.srt$/i.test(t.file || "")) {
+          const tag = ((t.file || "").match(/\.opn([A-Z2-7]{5})\.srt$/i) ||
+            [])[1];
+          char = tag ? `V ${tag.toUpperCase()}` : "V";
+        } else char = "S";
+        map.set(t.id, char);
         n++;
       }
       map.set("off", "off");

@@ -4318,10 +4318,15 @@ app.get("/api/subtitle-list", async (req, res) => {
         s.codec_name === "hdmv_pgs_subtitle" || s.codec_name === "dvb_subtitle";
       if (isPgs && s.disposition?.forced === 1) continue;
       const isForced = !isPgs && s.disposition?.forced === 1;
+      const isSdh =
+        !isPgs &&
+        !isForced &&
+        (s.disposition?.hearing_impaired === 1 ||
+          /\bsdh\b/i.test(s.tags?.title || ""));
       tracks.push({
         id: `emb-${s.index}`,
         label,
-        type: isPgs ? "pgs" : isForced ? "forced" : "embedded",
+        type: isPgs ? "pgs" : isForced ? "forced" : isSdh ? "sdh" : "embedded",
         index: s.index,
       });
     }
@@ -4344,12 +4349,13 @@ app.get("/api/subtitle-list", async (req, res) => {
   try {
     const charFor = (t) => {
       if (t.type === "pgs") return "*";
-      if (t.type === "embedded") return "t";
-      if (t.type === "forced") return "f";
+      if (t.type === "sdh") return "H";
+      if (t.type === "embedded") return "T";
+      if (t.type === "forced") return "F";
       if (/\.asr\.srt$/.test(t.file || "")) return "+";
       if (/\.mb\d+\.srt$/.test(t.file || "")) return ">";
-      if (/\.opn[A-Z2-7]{5}\.srt$/i.test(t.file || "")) return "v";
-      return "s";
+      if (/\.opn[A-Z2-7]{5}\.srt$/i.test(t.file || "")) return "V";
+      return "S";
     };
     const lines = [`## ${path.basename(resolved)}\n`];
     tracks.forEach((t, i) => {
@@ -4428,10 +4434,15 @@ app.get("/api/episodeSubs", async (req, res) => {
         s.codec_name === "hdmv_pgs_subtitle" || s.codec_name === "dvb_subtitle";
       if (isPgs && s.disposition?.forced === 1) continue;
       const isForced = !isPgs && s.disposition?.forced === 1;
+      const isSdh =
+        !isPgs &&
+        !isForced &&
+        (s.disposition?.hearing_impaired === 1 ||
+          /\bsdh\b/i.test(s.tags?.title || ""));
       tracks.push({
         id: `emb-${s.index}`,
         label,
-        type: isPgs ? "pgs" : isForced ? "forced" : "embedded",
+        type: isPgs ? "pgs" : isForced ? "forced" : isSdh ? "sdh" : "embedded",
         index: s.index,
       });
     }

@@ -951,7 +951,9 @@ export default function App() {
 
   const subTypeChar = (type) => {
     if (type === "pgs") return "*";
+    if (type === "sdh") return "H";
     if (type === "embedded") return "T";
+    if (type === "forced") return "F";
     if (type === "asr") return "+";
     if (type === "mbs") return ">";
     if (type === "opn") return "V";

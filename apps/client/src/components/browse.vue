@@ -755,7 +755,6 @@ export default {
     evtBus.on("previewMode", onPreviewMode);
 
     const onBrowseTabClicked = () => {
-      console.log("[browse] onBrowseTabClicked, active:", props.active);
       creditIsMovie.value = false;
       creditShowList.value = null;
     };
@@ -803,19 +802,14 @@ export default {
     evtBus.on("tvdbUpdated", onTvdbUpdated);
 
     const checkBrowseHasMore = () => {
-      console.log("[browse] checkBrowseHasMore called");
       fetch(`${config.torrentsApiUrl}/api/hasBrowseShow`)
         .then((r) => r.json())
         .then((d) => {
-          console.log("[browse] hasBrowseShow response:", d);
           browseHasMore.value = !!d.available;
         })
-        .catch((e) => {
-          console.log("[browse] hasBrowseShow error:", e);
-        });
+        .catch(() => {});
     };
     watch(browseHasMore, (val) => {
-      console.log("[browse] browseHasMore changed:", val);
       evtBus.emit("browseHasMoreChanged", val);
     });
     watch(
@@ -874,7 +868,6 @@ export default {
       }
       await nextTick();
       if (titlesPane.value) {
-        console.log("[browse-bounce] scrollTitlesToBottom");
         titlesPane.value.scrollTop = titlesPane.value.scrollHeight + 1000;
       }
     };
@@ -967,17 +960,12 @@ export default {
         }
       } catch (e) {
         const msg = e?.message || String(e);
-        console.log("startBrowse failed:", msg);
         titleStrings.value = [...titleStrings.value, `error|${msg}`];
         _titlesPopulated.value = true;
       }
     };
 
     const ensureBrowseStarted = async () => {
-      console.log(
-        "[browse] ensureBrowseStarted, _didStartBrowse:",
-        _didStartBrowse.value,
-      );
       if (_didStartBrowse.value) return true;
 
       if (_startBrowsePromise.value) {
@@ -1004,10 +992,6 @@ export default {
     };
 
     const handleNext = async () => {
-      console.log(
-        "[browse] handleNext called, stack:",
-        new Error().stack?.split("\n").slice(1, 4).join(" | "),
-      );
       if (unSnoozeMode.value) {
         unSnoozeMode.value = false;
       }
@@ -1145,7 +1129,6 @@ export default {
         }
       } catch (e) {
         const msg = e?.message || String(e);
-        console.log("getBrowseShow failed:", msg);
         titleStrings.value = [...titleStrings.value, `error|${msg}`];
         await scrollTitlesToBottom();
         await nextTick();
@@ -2052,12 +2035,6 @@ export default {
     });
 
     const onAllShows = async (val) => {
-      console.log(
-        "[browse] onAllShows, len:",
-        val?.length,
-        "_startedWithShows:",
-        _startedWithShows.value,
-      );
       if (_startedWithShows.value) return;
       if (!Array.isArray(val) || val.length === 0) return;
       await startBrowseAndLoadTitles();
@@ -2068,12 +2045,6 @@ export default {
     watch(
       () => props.active,
       (isActive) => {
-        console.log(
-          "[browse] props.active changed:",
-          isActive,
-          "_didStartBrowse:",
-          _didStartBrowse.value,
-        );
         if (_didStartBrowse.value) return;
         void ensureBrowseStarted();
       },

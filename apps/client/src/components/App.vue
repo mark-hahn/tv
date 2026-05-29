@@ -1050,21 +1050,12 @@ export default {
       }
     },
     fetchBrowseTabHasMore() {
-      console.log("[App] fetchBrowseTabHasMore called");
       fetch(`${config.torrentsApiUrl}/api/hasBrowseShow`)
         .then((r) => r.json())
         .then((d) => {
-          console.log(
-            "[App] hasBrowseShow response:",
-            d,
-            "-> browseTabHasMore:",
-            !!d.available,
-          );
           this.browseTabHasMore = !!d.available;
         })
-        .catch((e) => {
-          console.log("[App] hasBrowseShow error:", e);
-        });
+        .catch(() => {});
     },
     startChksrtPolling() {
       this.stopChksrtPolling();
@@ -2097,7 +2088,6 @@ export default {
     this.startQbtPolling();
 
     this._onBrowseHasMoreChanged = (val) => {
-      console.log("[App] browseHasMoreChanged event received:", val);
       this.browseTabHasMore = !!val;
     };
     evtBus.on("browseHasMoreChanged", this._onBrowseHasMoreChanged);

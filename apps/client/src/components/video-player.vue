@@ -1215,26 +1215,22 @@ export default {
       const showName = forPath.startsWith("/mnt/media/tv/")
         ? forPath.slice("/mnt/media/tv/".length).split("/")[0]
         : "";
-      const embeddedCounts = {};
-      let openSubsCount = 0;
-      for (const t of this.subtitleTracks) {
-        if (t.type === "pgs")
-          embeddedCounts.pgs = (embeddedCounts.pgs || 0) + 1;
-        else if (t.type === "embedded" || t.type === "forced")
-          embeddedCounts.text = (embeddedCounts.text || 0) + 1;
-        else if (
-          t.type === "srt" &&
-          /\.opn[A-Z2-7]{5}\.srt$/i.test(t.file || "")
-        )
-          openSubsCount++;
-      }
       const last12 = videoFilename.slice(-12);
-      const ecStr = JSON.stringify(embeddedCounts);
       for (const h of history) {
         if (h.showName !== showName) continue;
         if ((h.videoFilename || "").slice(-12) !== last12) continue;
-        if (JSON.stringify(h.embeddedCounts || {}) !== ecStr) continue;
         this.chksrtMatch = h;
+        // Auto-select the previously chosen track
+        let matchTrack = null;
+        if (h.srtFile) {
+          matchTrack =
+            this.subtitleTracks.find((t) => t.file === h.srtFile) || null;
+        } else if (h.embStreamIndex != null) {
+          matchTrack =
+            this.subtitleTracks.find((t) => t.index === h.embStreamIndex) ||
+            null;
+        }
+        if (matchTrack) this.selectTrack(matchTrack.id);
         break;
       }
     },
@@ -1267,6 +1263,7 @@ export default {
         embStreamIndex:
           choice &&
           (choice.type === "embedded" ||
+            choice.type === "sdh" ||
             choice.type === "forced" ||
             choice.type === "pgs")
             ? (choice.index ?? null)
@@ -1639,6 +1636,7 @@ export default {
             .catch((e) => console.error("[chksrt] select error:", e));
         } else if (
           choice.type === "embedded" ||
+          choice.type === "sdh" ||
           choice.type === "forced" ||
           choice.type === "pgs"
         ) {

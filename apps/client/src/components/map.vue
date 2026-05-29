@@ -331,6 +331,23 @@
             Intro
           </button>
           <button
+            @click.stop="handleMapChksrtClick"
+            :disabled="!firstSelectedCellPath"
+            :style="{
+              opacity: firstSelectedCellPath ? 1 : 0.35,
+              cursor: firstSelectedCellPath ? 'pointer' : 'default',
+            }"
+            style="
+              font-size: 13.5px;
+              cursor: pointer;
+              margin: 4.5px 0 4.5px 4.5px;
+              max-height: 21.5px;
+              border-radius: 7px;
+            "
+          >
+            Chksrt
+          </button>
+          <button
             v-if="mapShow?.inEmby !== false"
             @click.stop="onPruneClick"
             :style="{ '--btn-bg': pruneFlash ? 'lightgray' : 'whitesmoke' }"
@@ -1880,6 +1897,14 @@ export default {
         season,
         episode,
       });
+    },
+    handleMapChksrtClick() {
+      if (this.selectedCells.size === 0) return;
+      const firstKey = Array.from(this.selectedCells)[0];
+      const { season, episode } = this.parseCellKey(firstKey);
+      const path = this.seriesMap?.[season]?.[episode]?.path || null;
+      if (!path) return;
+      evtBus.emit("openChksrt", path);
     },
     selectNextEpisodeWithFile(currentSeason, currentEpisode) {
       if (

@@ -384,6 +384,13 @@ export function subsSearch(params) {
   return httpCall("/api/subsSearch", params, "POST");
 }
 
+// Search OpenSubtitles for each video path.
+// videoPaths: string[]
+// Returns: { results: [{ videoPath, items: [...], error? }] }
+export function searchOpn(videoPaths) {
+  return httpCall("/api/opn/search", { videoPaths }, "POST", 60000);
+}
+
 // Apply subtitle files to media files on the server.
 // fileIdObjs: [{ file_id:number, showName:string, season:number, episode:number }, ...]
 // Returns: "ok" or { error: string }

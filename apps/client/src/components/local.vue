@@ -17,9 +17,13 @@
         flexDirection: 'column',
         overflow: 'hidden',
         flex:
-          showAsr || showEmb || showFix || showInfo ? '0 0 50%' : '1 1 auto',
+          showAsr || showEmb || showFix || showInfo || showOpn
+            ? '0 0 50%'
+            : '1 1 auto',
         borderBottom:
-          showAsr || showEmb || showFix || showInfo ? '1px solid #ddd' : 'none',
+          showAsr || showEmb || showFix || showInfo || showOpn
+            ? '1px solid #ddd'
+            : 'none',
       }"
     >
       <!-- Header -->
@@ -70,25 +74,6 @@
             </button>
 
             <button
-              @click="errsMode || clickAsr()"
-              :disabled="errsMode"
-              :style="{
-                cursor: errsMode ? 'default' : 'pointer',
-                borderRadius: '7px',
-                padding: '4px 10px',
-                border: '1px solid #bbb',
-                backgroundColor: errsMode
-                  ? '#e8e8e8'
-                  : showAsr
-                    ? '#ddd'
-                    : 'whitesmoke',
-                color: errsMode ? '#aaa' : 'inherit',
-              }"
-            >
-              Asr
-            </button>
-
-            <button
               @click="errsMode || clickEmb()"
               :disabled="errsMode"
               :style="{
@@ -105,6 +90,44 @@
               }"
             >
               Emb
+            </button>
+
+            <button
+              @click="errsMode || clickOpn()"
+              :disabled="errsMode"
+              :style="{
+                cursor: errsMode ? 'default' : 'pointer',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                backgroundColor: errsMode
+                  ? '#e8e8e8'
+                  : showOpn
+                    ? '#ddd'
+                    : 'whitesmoke',
+                color: errsMode ? '#aaa' : 'inherit',
+              }"
+            >
+              Open
+            </button>
+
+            <button
+              @click="errsMode || clickAsr()"
+              :disabled="errsMode"
+              :style="{
+                cursor: errsMode ? 'default' : 'pointer',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                backgroundColor: errsMode
+                  ? '#e8e8e8'
+                  : showAsr
+                    ? '#ddd'
+                    : 'whitesmoke',
+                color: errsMode ? '#aaa' : 'inherit',
+              }"
+            >
+              Asr
             </button>
 
             <button
@@ -357,25 +380,6 @@
             </button>
 
             <button
-              @click="errsMode || clickAsr()"
-              :disabled="errsMode"
-              :style="{
-                cursor: errsMode ? 'default' : 'pointer',
-                borderRadius: '7px',
-                padding: '4px 10px',
-                border: '1px solid #bbb',
-                backgroundColor: errsMode
-                  ? '#e8e8e8'
-                  : showAsr
-                    ? '#ddd'
-                    : 'whitesmoke',
-                color: errsMode ? '#aaa' : 'inherit',
-              }"
-            >
-              Asr
-            </button>
-
-            <button
               @click="errsMode || clickEmb()"
               :disabled="errsMode"
               :style="{
@@ -392,6 +396,44 @@
               }"
             >
               Emb
+            </button>
+
+            <button
+              @click="errsMode || clickOpn()"
+              :disabled="errsMode"
+              :style="{
+                cursor: errsMode ? 'default' : 'pointer',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                backgroundColor: errsMode
+                  ? '#e8e8e8'
+                  : showOpn
+                    ? '#ddd'
+                    : 'whitesmoke',
+                color: errsMode ? '#aaa' : 'inherit',
+              }"
+            >
+              Open
+            </button>
+
+            <button
+              @click="errsMode || clickAsr()"
+              :disabled="errsMode"
+              :style="{
+                cursor: errsMode ? 'default' : 'pointer',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                backgroundColor: errsMode
+                  ? '#e8e8e8'
+                  : showAsr
+                    ? '#ddd'
+                    : 'whitesmoke',
+                color: errsMode ? '#aaa' : 'inherit',
+              }"
+            >
+              Asr
             </button>
 
             <button
@@ -608,6 +650,154 @@
         "
       >
         {{ embLogs }}
+      </div>
+    </div>
+
+    <!-- Open (OpenSubtitles search) Pane -->
+    <div
+      id="opnPane"
+      v-show="showOpn"
+      :style="{
+        flex: '1 1 50%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        backgroundColor: '#fafafa',
+        color: '#000',
+        fontFamily: 'monospace',
+        padding: '10px',
+        borderLeft: '1px solid #ddd',
+      }"
+    >
+      <div
+        style="
+          flex: 0 0 auto;
+          border-bottom: 1px solid #ddd;
+          padding-bottom: 5px;
+          margin-bottom: 5px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
+        <div>
+          <strong>OpenSubs Search</strong>
+          <span v-if="opnBusy"> (Searching...)</span>
+        </div>
+        <div>
+          <button
+            @click="applyOpn"
+            :disabled="opnBusy"
+            :style="{
+              cursor: opnBusy ? 'not-allowed' : 'pointer',
+              borderRadius: '4px',
+              padding: '2px 8px',
+              border: '1px solid #bbb',
+              backgroundColor: 'whitesmoke',
+              marginRight: '5px',
+              opacity: opnBusy ? 0.6 : 1,
+            }"
+          >
+            Apply
+          </button>
+          <button
+            @click="clearOpn"
+            :style="{
+              cursor: 'pointer',
+              borderRadius: '4px',
+              padding: '2px 8px',
+              border: '1px solid #bbb',
+              backgroundColor: 'whitesmoke',
+              marginRight: '5px',
+            }"
+          >
+            Clear
+          </button>
+          <button
+            @click="showOpn = false"
+            title="Close"
+            :style="{
+              cursor: 'pointer',
+              borderRadius: '4px',
+              padding: '2px 8px',
+              border: '1px solid #bbb',
+              backgroundColor: 'whitesmoke',
+              fontWeight: 'bold',
+              marginLeft: '5px',
+            }"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+      <div
+        style="
+          flex: 1 1 auto;
+          overflow: auto;
+          background-color: #fff;
+          border: 1px solid #eee;
+          padding: 4px;
+        "
+      >
+        <div
+          v-if="opnBusy"
+          style="color: #888; padding: 8px"
+        >
+          Searching...
+        </div>
+        <div
+          v-else-if="!opnSearched"
+          style="color: #888; padding: 8px"
+        >
+          Press Apply to search
+        </div>
+        <div
+          v-else-if="opnResults.length === 0"
+          style="color: #888; padding: 8px"
+        >
+          No results
+        </div>
+        <template v-else>
+          <div
+            v-for="group in opnResults"
+            :key="group.videoPath"
+            style="margin-bottom: 12px"
+          >
+            <div
+              style="
+                font-weight: bold;
+                margin-bottom: 4px;
+                word-break: break-all;
+              "
+            >
+              {{ group.videoPath.split("/").pop() }}
+            </div>
+            <div
+              v-if="group.error"
+              style="color: red; padding-left: 8px"
+            >
+              {{ group.error }}
+            </div>
+            <div
+              v-else-if="group.items.length === 0"
+              style="color: #888; padding-left: 8px"
+            >
+              No results
+            </div>
+            <div
+              v-else
+              v-for="item in group.items"
+              :key="item.file_id"
+              style="
+                padding: 2px 8px;
+                border-bottom: 1px solid #f0f0f0;
+                font-size: 0.92em;
+              "
+            >
+              {{ item.release }} <span style="color: #888">{{ item.tag }}</span>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
 
@@ -1056,6 +1246,7 @@ import {
   addToAsrQueue,
   removeFromAsrQueue,
   killAsrProcess,
+  searchOpn,
 } from "../srvr.js";
 import evtBus from "../evtBus.js";
 import * as util from "../util.js";
@@ -1100,6 +1291,12 @@ export default {
       showEmb: false,
       embLogs: "",
       embBusy: false,
+
+      // Open (OpenSubtitles search)
+      showOpn: false,
+      opnResults: [],
+      opnBusy: false,
+      opnSearched: false,
 
       // Fix (ffmpeg)
       showFix: false,
@@ -1883,6 +2080,7 @@ export default {
       this.showAsr = !this.showAsr;
       if (this.showAsr) {
         this.showEmb = false;
+        this.showOpn = false;
         this.showFix = false;
         this.showInfo = false;
       }
@@ -2014,6 +2212,8 @@ export default {
       this.showFix = !this.showFix;
       if (this.showFix) {
         this.showAsr = false;
+        this.showEmb = false;
+        this.showOpn = false;
         this.showInfo = false;
         this.initFixState();
       }
@@ -2132,6 +2332,7 @@ export default {
       this.showEmb = !this.showEmb;
       if (this.showEmb) {
         this.showAsr = false;
+        this.showOpn = false;
         this.showFix = false;
         this.showInfo = false;
         this.initEmbState();
@@ -2142,6 +2343,7 @@ export default {
       this.embBusy = true;
       this.showEmb = true;
       this.showAsr = false;
+      this.showOpn = false;
       this.showFix = false;
       this.showInfo = false;
 
@@ -2185,6 +2387,14 @@ export default {
         console.error("Failed to clear emb log", e);
       }
     },
+    async clearEmbLog() {
+      this.embLogs = "";
+      try {
+        await handleEmb({ action: "clear" });
+      } catch (e) {
+        console.error("Failed to clear emb log", e);
+      }
+    },
     onEmbLog(msg) {
       if (!msg) return;
       const el = this.$refs.embScroll;
@@ -2197,10 +2407,52 @@ export default {
         });
       }
     },
+    clickOpn() {
+      this.showOpn = !this.showOpn;
+      if (this.showOpn) {
+        this.showAsr = false;
+        this.showEmb = false;
+        this.showFix = false;
+        this.showInfo = false;
+      }
+    },
+    async applyOpn() {
+      if (this.opnBusy) return;
+      const mediaRoot = this.movieMode
+        ? "/mnt/media/movies"
+        : this.errsMode
+          ? "/mnt/media/tv-errors"
+          : "/mnt/media/tv";
+      const videoPaths = this.collectFilePaths()
+        .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
+        .map((p) => `${mediaRoot}/${p}`);
+      if (videoPaths.length === 0) {
+        this.opnResults = [
+          { videoPath: "", items: [], error: "No video files selected" },
+        ];
+        this.opnSearched = true;
+        return;
+      }
+      this.opnBusy = true;
+      try {
+        const res = await searchOpn(videoPaths);
+        this.opnResults = res?.results ?? [];
+      } catch (e) {
+        this.opnResults = [{ videoPath: "", items: [], error: e.message }];
+      } finally {
+        this.opnBusy = false;
+        this.opnSearched = true;
+      }
+    },
+    clearOpn() {
+      this.opnResults = [];
+      this.opnSearched = false;
+    },
     toggleErrs() {
       this.errsMode = !this.errsMode;
       if (this.errsMode) {
         this.showAsr = false;
+        this.showOpn = false;
         this.showInfo = false;
       }
       this.selectedName = null;
@@ -2214,6 +2466,8 @@ export default {
       }
       this.showInfo = true;
       this.showAsr = false;
+      this.showEmb = false;
+      this.showOpn = false;
       this.showFix = false;
       await this.loadInfo();
     },

@@ -19,7 +19,11 @@ import { handleFix } from "./src/fix.js";
 import { handleEmb } from "./src/emb.js";
 import fetch from "node-fetch";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
-import { parseFileSeasonEpisode, smartTitleMatch } from "@tv/share";
+import {
+  parseFileSeasonEpisode,
+  smartTitleMatch,
+  parseTitleFromFilename,
+} from "@tv/share";
 import chokidar from "chokidar";
 import cron from "node-cron";
 import {
@@ -4692,6 +4696,83 @@ app.post(
 
 // Subtitles
 app.post("/api/subsSearch", apiWrapper(subsSearch));
+app.post("/api/opn/search", async (req, res) => {
+  const { videoPaths } = req.body || {};
+  if (!Array.isArray(videoPaths) || videoPaths.length === 0) {
+    res.status(400).json({ error: "videoPaths required" });
+    return;
+  }
+  const moviesDir = "/mnt/media/movies";
+  const results = [];
+  for (const vp of videoPaths) {
+    const isMovie = vp.startsWith(moviesDir + "/");
+    let searchParams;
+    if (isMovie) {
+      const filename = path.basename(vp, path.extname(vp));
+      const yearMatch = filename.match(/\b(19|20)\d{2}\b/);
+      const year = yearMatch ? yearMatch[0] : null;
+      const parsed = parseTorrentTitle(filename);
+      const title =
+        parseTitleFromFilename(filename, "", parsed) ||
+        filename.replace(/\./g, " ");
+      searchParams = { query: title, year };
+    } else {
+      const showName = showNameFromFilePath(vp);
+      const tvdbAll = tvdb.getAllTvdbSync?.();
+      let tvdbRec = tvdbAll?.[showName];
+      if (!tvdbRec?.imdbId) {
+        // Try to find the TVDB record via parseTitleFromFilename + smartTitleMatch
+        const fname = path.basename(vp);
+        const ptt = parseTorrentTitle(fname);
+        const title = parseTitleFromFilename(fname, showName, ptt);
+        if (title) {
+          const matched = smartTitleMatch(
+            title,
+            Object.values(tvdbAll),
+            null,
+            false,
+          );
+          if (matched?.imdbId) tvdbRec = matched;
+        }
+      }
+      const parsed = parseFileSeasonEpisode(vp);
+      if (tvdbRec?.imdbId) {
+        searchParams = {
+          imdb_id: tvdbRec.imdbId,
+          season: parsed?.season,
+          episode: parsed?.episode,
+        };
+      } else {
+        searchParams = {
+          query: showName,
+          season: parsed?.season,
+          episode: parsed?.episode,
+        };
+      }
+    }
+    try {
+      const data = await subsSearch(searchParams);
+      const items = Array.isArray(data?.data) ? data.data : [];
+      results.push({
+        videoPath: vp,
+        items: items.map((r) => {
+          const fid = r.file_id || r.attributes?.files?.[0]?.file_id;
+          return {
+            file_id: fid,
+            tag: encodeFileIdBase32(fid),
+            release:
+              r.attributes?.release ||
+              r.attributes?.files?.[0]?.cd_number ||
+              String(fid || ""),
+          };
+        }),
+      });
+    } catch (e) {
+      results.push({ videoPath: vp, items: [], error: e.message });
+    }
+  }
+  res.json({ results });
+});
 app.post("/api/deleteSubFiles", apiWrapper(deleteSubFiles));
 app.post("/api/offsetSubFiles", apiWrapper(offsetSubFiles));
 app.post("/api/applySubOffset", async (req, res) => {

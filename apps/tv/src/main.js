@@ -1079,7 +1079,10 @@ function subStreamInfo(stream) {
   const isPgs =
     stream.Codec === "hdmv_pgs_subtitle" || stream.Codec === "pgssub";
   const isForced = !isPgs && !!stream.IsForced;
-  const isSdh = !isPgs && !isForced && !!stream.IsHearingImpaired;
+  const isSdh =
+    !isPgs &&
+    !isForced &&
+    (!!stream.IsHearingImpaired || /\bsdh\b/i.test(stream.Title || ""));
   const type = isPgs ? "pgs" : isForced ? "forced" : isSdh ? "sdh" : "embedded";
   // DisplayTitle already includes codec like "English (ASS)" — use it directly
   const label =

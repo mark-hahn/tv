@@ -2204,7 +2204,12 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
     delete tvdbRecord.haveSubs;
     // Subtitle scan for inEmby shows
     if (tvdbRecord.inEmby) {
-      const showFolder = path.join(tvDir, showName);
+      const showFolderName = showName.includes("/")
+        ? showName
+        : (tvdbRecord.path || tvdbRecord.emby?.path || showName)
+            .split("/")
+            .pop();
+      const showFolder = path.join(tvDir, showFolderName);
       try {
         const seasonDirs = fs.readdirSync(showFolder);
         for (const seasonDir of seasonDirs) {

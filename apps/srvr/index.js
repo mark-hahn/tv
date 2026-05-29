@@ -48,6 +48,7 @@ const tvdbIdByName = (name) => {
 const CONFIG_DIR = path.join(SRVR_ROOT_DIR, "config");
 const SECRETS_DIR = SRVR_SECRETS_DIR;
 const FLEXGET_HISTORY_PATH = path.join(SRVR_DATA_DIR, "flexget-history.json");
+const BAD_GROUPS_PATH = path.join(SRVR_DATA_DIR, "badGroups.txt");
 const QBT_CRED_PATH_FLEX = path.join(
   path.dirname(SRVR_ROOT_DIR),
   "api",
@@ -5736,7 +5737,28 @@ function flexgetBitDepth(title) {
   return 8;
 }
 
-// Same-run dedup: resolution → bit depth → seeds
+const badGroups = new Set(
+  (() => {
+    try {
+      return fs
+        .readFileSync(BAD_GROUPS_PATH, "utf8")
+        .split(/\r?\n/)
+        .map((l) => l.trim().toLowerCase())
+        .filter(Boolean);
+    } catch {
+      return [];
+    }
+  })(),
+);
+
+function flexgetIsBadGroup(title) {
+  const parsed = parseTorrentTitle(
+    String(title || "").replace(/\.[a-z0-9]{2,4}$/i, ""),
+  );
+  return badGroups.has((parsed?.group || "").toLowerCase());
+}
+
+// Same-run dedup: resolution → bit depth → seeds → bad group
 function flexgetIsBetterSameRun(a, b) {
   const aRes = flexgetResolution(a.quality, a.title);
   const bRes = flexgetResolution(b.quality, b.title);
@@ -5748,7 +5770,12 @@ function flexgetIsBetterSameRun(a, b) {
 
   const aSeeds = parseInt(String(a.torrent_seeds || "0"), 10) || 0;
   const bSeeds = parseInt(String(b.torrent_seeds || "0"), 10) || 0;
-  return aSeeds > bSeeds;
+  if (aSeeds !== bSeeds) return aSeeds > bSeeds;
+
+  const aBad = flexgetIsBadGroup(a.title);
+  const bBad = flexgetIsBadGroup(b.title);
+  if (aBad !== bBad) return bBad; // b is bad group → a is better
+  return false;
 }
 
 // Cross-run comparison: resolution only — same resolution never triggers a re-send

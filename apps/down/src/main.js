@@ -245,6 +245,25 @@ async function main() {
     "data",
     "flexget-history.json",
   );
+  var BAD_GROUPS_PATH = path.join(
+    APP_DIR,
+    "..",
+    "srvr",
+    "data",
+    "badGroups.txt",
+  );
+  var badGroupsSet = new Set();
+  try {
+    badGroupsSet = new Set(
+      fs
+        .readFileSync(BAD_GROUPS_PATH, "utf8")
+        .split(/\r?\n/)
+        .map(function (l) {
+          return l.trim().toLowerCase();
+        })
+        .filter(Boolean),
+    );
+  } catch (e) {}
 
   // State is stored under apps/down/data.
 
@@ -2670,7 +2689,19 @@ async function main() {
     if (usbRes !== sentRes) return usbRes > sentRes;
     var usbDepth = flexBitDepth(usbFname);
     var sentDepth = flexBitDepth(sentSrc);
-    return usbDepth > sentDepth;
+    if (usbDepth !== sentDepth) return usbDepth > sentDepth;
+    var usbGroup = (
+      parseTorrentTitle(usbFname.replace(/\.[a-z0-9]{2,4}$/i, ""))?.group || ""
+    ).toLowerCase();
+    var sentGroup = (
+      parseTorrentTitle(
+        String(sentEntry.title || "").replace(/\.[a-z0-9]{2,4}$/i, ""),
+      )?.group || ""
+    ).toLowerCase();
+    var usbBad = badGroupsSet.has(usbGroup);
+    var sentBad = badGroupsSet.has(sentGroup);
+    if (usbBad !== sentBad) return sentBad; // sent is bad group → usb file is better
+    return false;
   }
 
   checkFileExists = () => {

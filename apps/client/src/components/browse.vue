@@ -755,11 +755,9 @@ export default {
     evtBus.on("previewMode", onPreviewMode);
 
     const onBrowseTabClicked = () => {
+      console.log("[browse] onBrowseTabClicked, active:", props.active);
       creditIsMovie.value = false;
       creditShowList.value = null;
-      if (props.active) {
-        void handleNext();
-      }
     };
     evtBus.on("browseTabClicked", onBrowseTabClicked);
 
@@ -805,13 +803,21 @@ export default {
     evtBus.on("tvdbUpdated", onTvdbUpdated);
 
     const checkBrowseHasMore = () => {
+      console.log("[browse] checkBrowseHasMore called");
       fetch(`${config.torrentsApiUrl}/api/hasBrowseShow`)
         .then((r) => r.json())
         .then((d) => {
+          console.log("[browse] hasBrowseShow response:", d);
           browseHasMore.value = !!d.available;
         })
-        .catch(() => {});
+        .catch((e) => {
+          console.log("[browse] hasBrowseShow error:", e);
+        });
     };
+    watch(browseHasMore, (val) => {
+      console.log("[browse] browseHasMore changed:", val);
+      evtBus.emit("browseHasMoreChanged", val);
+    });
     watch(
       () => props.active,
       (isActive) => {
@@ -968,6 +974,10 @@ export default {
     };
 
     const ensureBrowseStarted = async () => {
+      console.log(
+        "[browse] ensureBrowseStarted, _didStartBrowse:",
+        _didStartBrowse.value,
+      );
       if (_didStartBrowse.value) return true;
 
       if (_startBrowsePromise.value) {
@@ -994,6 +1004,10 @@ export default {
     };
 
     const handleNext = async () => {
+      console.log(
+        "[browse] handleNext called, stack:",
+        new Error().stack?.split("\n").slice(1, 4).join(" | "),
+      );
       if (unSnoozeMode.value) {
         unSnoozeMode.value = false;
       }
@@ -2038,7 +2052,12 @@ export default {
     });
 
     const onAllShows = async (val) => {
-      // console.log('reel.vue onAllShows:', val?.length, '_startedWithShows:', _startedWithShows.value);
+      console.log(
+        "[browse] onAllShows, len:",
+        val?.length,
+        "_startedWithShows:",
+        _startedWithShows.value,
+      );
       if (_startedWithShows.value) return;
       if (!Array.isArray(val) || val.length === 0) return;
       await startBrowseAndLoadTitles();
@@ -2049,6 +2068,12 @@ export default {
     watch(
       () => props.active,
       (isActive) => {
+        console.log(
+          "[browse] props.active changed:",
+          isActive,
+          "_didStartBrowse:",
+          _didStartBrowse.value,
+        );
         if (_didStartBrowse.value) return;
         void ensureBrowseStarted();
       },

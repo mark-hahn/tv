@@ -171,7 +171,12 @@
                 padding: '4px 10px',
                 marginLeft: '4px',
                 border: '1px solid #bbb',
-                backgroundColor: currentPane === t.key ? '#ddd' : 'whitesmoke',
+                backgroundColor:
+                  t.key === 'browse' && browseTabHasMore
+                    ? '#90ee90'
+                    : currentPane === t.key
+                      ? '#ddd'
+                      : 'whitesmoke',
               }"
             >
               {{ t.label }}
@@ -621,6 +626,7 @@ export default {
       videoPlayerMapSeason: null,
       videoPlayerMapEpisode: null,
       chksrtCount: 0,
+      browseTabHasMore: false,
       currentPane: "info", // 'info', 'map', 'actors', 'reviews', 'trailer', 'tor', 'flex', 'qbt', 'down'
       movieMode: false,
       savedPane: null,
@@ -983,6 +989,8 @@ export default {
     evtBus.off("playSimplePath", this._onPlaySimplePath);
     evtBus.off("openChksrt", this._onOpenChksrt);
     evtBus.off("chksrt-count", this._onChksrtCount);
+    if (this._onBrowseHasMoreChanged)
+      evtBus.off("browseHasMoreChanged", this._onBrowseHasMoreChanged);
     evtBus.off("previewSrchChoice", this.onPreviewSrchChoice);
     evtBus.off("addPreviewShowDone", this.onAddPreviewShowDone);
     evtBus.off("previewPanesLoading", this.onPreviewPanesLoading);
@@ -1040,6 +1048,23 @@ export default {
       } catch (e) {
         this.chksrtCount = 0;
       }
+    },
+    fetchBrowseTabHasMore() {
+      console.log("[App] fetchBrowseTabHasMore called");
+      fetch(`${config.torrentsApiUrl}/api/hasBrowseShow`)
+        .then((r) => r.json())
+        .then((d) => {
+          console.log(
+            "[App] hasBrowseShow response:",
+            d,
+            "-> browseTabHasMore:",
+            !!d.available,
+          );
+          this.browseTabHasMore = !!d.available;
+        })
+        .catch((e) => {
+          console.log("[App] hasBrowseShow error:", e);
+        });
     },
     startChksrtPolling() {
       this.stopChksrtPolling();
@@ -2070,6 +2095,13 @@ export default {
     this.fetchChksrtCount();
     this.startChksrtPolling();
     this.startQbtPolling();
+
+    this._onBrowseHasMoreChanged = (val) => {
+      console.log("[App] browseHasMoreChanged event received:", val);
+      this.browseTabHasMore = !!val;
+    };
+    evtBus.on("browseHasMoreChanged", this._onBrowseHasMoreChanged);
+    this.fetchBrowseTabHasMore();
 
     // Refresh space display once on app load.
     this.requestSpaceAvailRefresh("app load");

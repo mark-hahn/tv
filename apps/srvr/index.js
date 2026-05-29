@@ -3569,6 +3569,18 @@ app.post("/api/getTvmazeCrew", apiWrapper(tvdb.getTvmazeCrew_cmd));
 app.get("/api/getVipActors", apiWrapper(tvdb.getVipActors));
 app.post("/api/setVipActors", apiWrapper(tvdb.setVipActors));
 app.get("/api/getGroupCounts", apiWrapper(groupCounts.getGroupCounts));
+app.get("/api/getBadGroups", (_req, res) => {
+  try {
+    const lines = fs
+      .readFileSync(BAD_GROUPS_PATH, "utf8")
+      .split(/\r?\n/)
+      .map((l) => l.trim().toLowerCase())
+      .filter(Boolean);
+    res.json(lines);
+  } catch {
+    res.json([]);
+  }
+});
 app.post(
   "/api/incrementGroupCount",
   apiWrapper(groupCounts.incrementGroupCount),
@@ -5778,11 +5790,15 @@ function flexgetIsBetterSameRun(a, b) {
   return false;
 }
 
-// Cross-run comparison: resolution only — same resolution never triggers a re-send
+// Cross-run comparison: resolution → bad group tiebreaker
 function flexgetIsBetterCrossRun(a, b) {
   const aRes = flexgetResolution(a.quality, a.title);
   const bRes = flexgetResolution(b.quality, b.title);
-  return aRes > bRes;
+  if (aRes !== bRes) return aRes > bRes;
+  const aBad = flexgetIsBadGroup(a.title);
+  const bBad = flexgetIsBadGroup(b.title);
+  if (aBad !== bBad) return bBad; // b is bad group → a is better
+  return false;
 }
 
 async function saveFlexgetHistory() {
@@ -5817,6 +5833,26 @@ function getEpisodeDiskResolution(showPath, season, episode) {
     return 0;
   } catch {
     return 0;
+  }
+}
+
+function getEpisodeDiskGroup(showPath, season, episode) {
+  try {
+    const sKey = `S${String(season).padStart(2, "0")}`;
+    const eKey = `E${String(episode).padStart(2, "0")}`;
+    const seasonDir = path.join(tvDir, showPath, `Season ${season}`);
+    const files = fs.readdirSync(seasonDir);
+    const videoExts = new Set([".mkv", ".mp4", ".avi", ".m4v"]);
+    const epRe = new RegExp(`${sKey}${eKey}`, "i");
+    for (const f of files) {
+      if (!epRe.test(f)) continue;
+      if (!videoExts.has(path.extname(f).toLowerCase())) continue;
+      const parsed = parseTorrentTitle(f.replace(/\.[a-z0-9]{2,4}$/i, ""));
+      return (parsed?.group || "").toLowerCase();
+    }
+    return "";
+  } catch {
+    return "";
   }
 }
 
@@ -5983,6 +6019,12 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
     episodeOnDisk && rec.path
       ? getEpisodeDiskResolution(rec.path, season, episode)
       : 0;
+  const diskGroup =
+    episodeOnDisk && rec.path
+      ? getEpisodeDiskGroup(rec.path, season, episode)
+      : "";
+  const diskIsBadGroup = diskGroup ? badGroups.has(diskGroup) : false;
+  const newIsBadGroup = flexgetIsBadGroup(rawTitle);
 
   if (storeOnly) {
     console.log(
@@ -5993,7 +6035,10 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
       console.log(
         `[flexget] SKIP(no-resolution) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
       );
-    } else if (diskRes >= newRes) {
+    } else if (
+      diskRes > newRes ||
+      (diskRes === newRes && (!diskIsBadGroup || newIsBadGroup))
+    ) {
       console.log(
         `[flexget] SKIP(disk-${diskRes}p>=new-${newRes}p) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
       );

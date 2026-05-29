@@ -841,7 +841,11 @@
                 >&nbsp;|&nbsp;{{ formatProvider(torrent.raw.provider) }}</span
               ><span
                 v-if="torrent.parsed?.group"
-                style="color: rgba(0, 0, 0, 0.5) !important"
+                :style="
+                  badGroups.has(torrent.parsed.group.toLowerCase())
+                    ? 'color: red !important; font-weight: bold'
+                    : 'color: rgba(0, 0, 0, 0.5) !important'
+                "
                 >&nbsp;|&nbsp;{{ formatGroup(torrent.parsed.group) }}</span
               ></span
             >
@@ -1250,6 +1254,7 @@ export default {
       filesTorrentTitle: "",
 
       groupCounts: {},
+      badGroups: new Set(),
 
       groupFilter: null, // non-null = group name filter is active
       groupFilterFlash: false, // true = flash button highlight for 500ms
@@ -1460,11 +1465,12 @@ export default {
       })
       .catch(() => {});
 
-    // App-load refresh: populate space strings as soon as the component mounts.
-    void this.updateSpaceAvail();
-
-    // Establish an initial "bottom" baseline on app load.
-    // v-show preserves scroll position even when hidden.
+    srvr
+      .getBadGroups()
+      .then((list) => {
+        if (Array.isArray(list)) this.badGroups = new Set(list);
+      })
+      .catch(() => {});
     void this.$nextTick(() => {
       this.scrollToBottom();
     });
@@ -3391,6 +3397,16 @@ export default {
             };
             const torDepth = (t) =>
               /10.?bit|hdr/i.test(String(t || "")) ? 10 : 8;
+            const torBadGroup = (t) => {
+              try {
+                const parsed = parseTorrentTitle(
+                  String(t || "").replace(/\.[a-z0-9]{2,4}$/i, ""),
+                );
+                return this.badGroups.has((parsed?.group || "").toLowerCase());
+              } catch {
+                return false;
+              }
+            };
             // Extract normalized show name using shared parseTitleFromFilename
             const showName = (t) => {
               const s = String(t || "");
@@ -3399,6 +3415,7 @@ export default {
             };
             const newRes = torRes(newTitle);
             const newDepth = torDepth(newTitle);
+            const newBad = torBadGroup(newTitle);
             const newShow = showName(newTitle);
             try {
               const qbtInfoUrl = new URL(
@@ -3423,10 +3440,15 @@ export default {
                     if (newShow && qShow && qShow !== newShow) continue;
                     const qRes = torRes(qName);
                     const qDepth = torDepth(qName);
-                    if (
+                    const qBad = torBadGroup(qName);
+                    const qIsHigherQuality =
                       qRes > newRes ||
-                      (qRes === newRes && qDepth > newDepth)
-                    ) {
+                      (qRes === newRes && qDepth > newDepth) ||
+                      (qRes === newRes &&
+                        qDepth === newDepth &&
+                        !qBad &&
+                        newBad);
+                    if (qIsHigherQuality) {
                       this.showError(
                         `qBittorrent already has a higher quality version of ${seStr}:\n${qName}`,
                       );

@@ -1139,6 +1139,8 @@ async function main() {
 
   // Per-cycle view of current tv.json titles (do not cache across cycles)
   var tvJsonTitles = null;
+  // Per-cycle S/E dedup map for fromFlex: key = seriesName+"\x00"+SeStr → fname already queued
+  var cycleSeMap = null;
 
   blocked = null;
   map = {};
@@ -1960,6 +1962,7 @@ async function main() {
     } catch (e) {
       tvJsonTitles = {};
     }
+    cycleSeMap = {};
 
     // Load Emby membership map from srvr's tvdb.json once per cycle.
     // Keys are series names; value.inEmby is true if the show is in Emby.
@@ -2975,9 +2978,23 @@ async function main() {
           var _usbRes = flexResolution(fname);
           var _diskDepth = flexBitDepth(_diskFile);
           var _usbDepth = flexBitDepth(fname);
+          var _diskGroup = (
+            parseTorrentTitle(_diskFile.replace(/\.[a-z0-9]{2,4}$/i, ""))
+              ?.group || ""
+          ).toLowerCase();
+          var _usbGroup = (
+            parseTorrentTitle(fname.replace(/\.[a-z0-9]{2,4}$/i, ""))?.group ||
+            ""
+          ).toLowerCase();
+          var _diskIsBad = badGroupsSet.has(_diskGroup);
+          var _usbIsBad = badGroupsSet.has(_usbGroup);
           var _usbBetterThanDisk =
             _usbRes > _diskRes ||
-            (_usbRes === _diskRes && _usbDepth > _diskDepth);
+            (_usbRes === _diskRes && _usbDepth > _diskDepth) ||
+            (_usbRes === _diskRes &&
+              _usbDepth === _diskDepth &&
+              _diskIsBad &&
+              !_usbIsBad);
           if (!_usbBetterThanDisk) {
             existsCount++;
             log(
@@ -3040,8 +3057,23 @@ async function main() {
           var usbRes = flexResolution(fname);
           var diskDepth = flexBitDepth(diskFile);
           var usbDepth = flexBitDepth(fname);
+          var diskGroup = (
+            parseTorrentTitle(diskFile.replace(/\.[a-z0-9]{2,4}$/i, ""))
+              ?.group || ""
+          ).toLowerCase();
+          var usbGroup = (
+            parseTorrentTitle(fname.replace(/\.[a-z0-9]{2,4}$/i, ""))?.group ||
+            ""
+          ).toLowerCase();
+          var diskIsBad = badGroupsSet.has(diskGroup);
+          var usbIsBad = badGroupsSet.has(usbGroup);
           var usbIsBetter =
-            usbRes > diskRes || (usbRes === diskRes && usbDepth > diskDepth);
+            usbRes > diskRes ||
+            (usbRes === diskRes && usbDepth > diskDepth) ||
+            (usbRes === diskRes &&
+              usbDepth === diskDepth &&
+              diskIsBad &&
+              !usbIsBad);
           if (!usbIsBetter) {
             existsCount++;
             log(
@@ -3131,6 +3163,76 @@ async function main() {
     }
 
     mkdirp.sync(tvSeasonPath);
+
+    // Within-cycle S/E dedup for fromFlex: if two files for the same episode arrive in
+    // the same USB scan, only keep the better one. Bad group loses to non-bad group;
+    // otherwise the first-seen wins.
+    if (
+      fromFlex &&
+      Number.isInteger(season) &&
+      season > 0 &&
+      Number.isInteger(episode) &&
+      episode > 0 &&
+      cycleSeMap
+    ) {
+      var _cycleKey = (seriesName || "") + "\x00" + flexSeStr;
+      var _cycleExistingFname = cycleSeMap[_cycleKey];
+      if (_cycleExistingFname) {
+        var _newGroup = (parseTorrentTitle(fname).group || "").toLowerCase();
+        var _oldGroup = (
+          parseTorrentTitle(_cycleExistingFname).group || ""
+        ).toLowerCase();
+        var _newIsBad = badGroupsSet.has(_newGroup);
+        var _oldIsBad = badGroupsSet.has(_oldGroup);
+        if (_oldIsBad && !_newIsBad) {
+          // New file is better — delete the old queued entry and continue to addEntry.
+          var _oldEntry = tvJson.getEntryByTitle(_cycleExistingFname);
+          if (_oldEntry && typeof _oldEntry.procId === "number") {
+            tvJson.deleteProcids([_oldEntry.procId]);
+          }
+          if (tvJsonTitles) delete tvJsonTitles[_cycleExistingFname];
+          trace("checkFileExists: cycle-dedup replacing bad-group", {
+            replaced: _cycleExistingFname,
+            winner: fname,
+          });
+          log(
+            "------",
+            downloadCount,
+            "/",
+            chkCount,
+            "CYCLE DEDUP (bad group replaced):",
+            _cycleExistingFname,
+            "->",
+            fname,
+          );
+        } else {
+          // Old file is at least as good — skip the new one.
+          trace("checkFileExists: cycle-dedup skip duplicate S/E", {
+            fname,
+            existing: _cycleExistingFname,
+          });
+          log(
+            "------",
+            downloadCount,
+            "/",
+            chkCount,
+            "CYCLE DEDUP SKIP:",
+            fname,
+            "(keeping",
+            _cycleExistingFname + ")",
+          );
+          postHistory({
+            tvdbId: lookupTvdbId(seriesName),
+            showName: seriesName || fname,
+            type: "skipDown",
+            description:
+              "skip: same S/E already queued this cycle " + _cycleExistingFname,
+          });
+          return process.nextTick(checkFile);
+        }
+      }
+    }
+
     // Create a new tv.json entry (tvJson.js will assign procId when a worker starts).
     try {
       tvJson.addEntry({
@@ -3154,9 +3256,19 @@ async function main() {
         fromFlex: fromFlex,
       });
 
-      // Update per-cycle view so later files in the same cycle don't re-queue.
+      // Update per-cycle views so later files in the same cycle don't re-queue.
       if (tvJsonTitles) {
         tvJsonTitles[fname] = { error: false };
+      }
+      if (
+        cycleSeMap &&
+        fromFlex &&
+        Number.isInteger(season) &&
+        season > 0 &&
+        Number.isInteger(episode) &&
+        episode > 0
+      ) {
+        cycleSeMap[(seriesName || "") + "\x00" + flexSeStr] = fname;
       }
 
       trace("checkFileExists: queued tv.json entry", {

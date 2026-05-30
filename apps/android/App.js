@@ -990,6 +990,25 @@ export default function App() {
     setShowSubCtrl(false);
   };
 
+  const subChoose = async () => {
+    const player = subPlayers.find(
+      (p) => (p.deviceName || p.sessionId) === subDeviceName,
+    );
+    if (!player || !player.episodeCode) return;
+    try {
+      await fetch(`${TV_SRVR_HTTP_URL}/api/chksrt/set-preferred`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          showName: player.showName,
+          episodeCode: player.episodeCode,
+          embStreamIndex: player.subtitleStreamIndex,
+        }),
+      });
+    } catch (_) {}
+    subClose();
+  };
+
   const subSelectTrack = async (index) => {
     const player = subPlayers.find(
       (p) => (p.deviceName || p.sessionId) === subDeviceName,
@@ -1311,13 +1330,22 @@ export default function App() {
             </>
           )}
         </ScrollView>
-        <TouchableOpacity
-          onPress={subClose}
-          style={subCtrlStyles.closeBtn}
-          activeOpacity={0.7}
-        >
-          <Text style={subCtrlStyles.closeBtnText}>Close</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row" }}>
+          <TouchableOpacity
+            onPress={subClose}
+            style={[subCtrlStyles.closeBtn, { flex: 1 }]}
+            activeOpacity={0.7}
+          >
+            <Text style={subCtrlStyles.closeBtnText}>Close</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={subChoose}
+            style={[subCtrlStyles.closeBtn, { flex: 1 }]}
+            activeOpacity={0.7}
+          >
+            <Text style={subCtrlStyles.closeBtnText}>Choose</Text>
+          </TouchableOpacity>
+        </View>
         {locked && (
           <View style={lockStyles.overlay}>
             <Text style={lockStyles.title}>Remote Collision</Text>

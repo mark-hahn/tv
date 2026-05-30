@@ -5736,6 +5736,26 @@ app.post("/internal/subtitle-mismatch", (req, res) => {
   res.json({ ok: true });
 });
 
+app.post("/api/chksrt/set-preferred", (req, res) => {
+  const { showName, episodeCode, embStreamIndex } = req.body || {};
+  if (!showName || !episodeCode || embStreamIndex == null) {
+    res
+      .status(400)
+      .json({ error: "showName, episodeCode, embStreamIndex required" });
+    return;
+  }
+  const entry = findChksrtPreferred(showName, episodeCode);
+  if (!entry) {
+    res.status(404).json({ error: "no chksrt entry found for this episode" });
+    return;
+  }
+  entry.embStreamIndex = Number(embStreamIndex);
+  entry.srtFile = null;
+  entry.warned = false;
+  persistChksrtHistory();
+  res.json({ ok: true });
+});
+
 let lastNowPlayingShowName = null;
 let lastNowPlayingList = [];
 let lastPlayingKey = null; // "showName|season|episode" of the last playing item

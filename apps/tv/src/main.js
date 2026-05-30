@@ -1592,6 +1592,8 @@ async function checkSubtitleMismatch(sessions) {
   const episodeCode = `S${String(seasonNum).padStart(2, "0")}E${String(episodeNum).padStart(2, "0")}`;
   const key = `${showName}|${episodeCode}`;
   if (key === lastSubMismatchKey) return;
+  const currentSubIndex = lrtv.PlayState?.SubtitleStreamIndex ?? -1;
+  if (currentSubIndex === -1) return; // emby hasn't settled on a subtitle yet
   lastSubMismatchKey = key;
   try {
     const prefRes = await fetch(
@@ -1599,8 +1601,7 @@ async function checkSubtitleMismatch(sessions) {
     );
     if (!prefRes.ok) return;
     const pref = await prefRes.json();
-    if (!pref || pref.warned) return;
-    const currentSubIndex = lrtv.PlayState?.SubtitleStreamIndex ?? -1;
+    if (!pref) return;
     let streams = [];
     try {
       const itemRes = await fetch(
@@ -1633,18 +1634,11 @@ async function checkSubtitleMismatch(sessions) {
     log(
       `[subMismatch] ${showName} ${episodeCode}: current=${currentSubIndex} chosen=${chosenSubIndex}`,
     );
-    await Promise.all([
-      fetch(`${SRVR_INTERNAL_URL}/internal/subtitle-mismatch`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ showName, episodeCode }),
-      }),
-      fetch(`${SRVR_INTERNAL_URL}/internal/chksrt/mark-warned`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ showName, episodeCode }),
-      }),
-    ]);
+    await fetch(`${SRVR_INTERNAL_URL}/internal/subtitle-mismatch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ showName, episodeCode }),
+    });
   } catch (err) {
     loge("checkSubtitleMismatch error:", err.message);
   }

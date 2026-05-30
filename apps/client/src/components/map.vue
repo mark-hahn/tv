@@ -189,6 +189,24 @@
             >
               Emby
             </button>
+            <button
+              v-if="mapShow?.inEmby !== false"
+              @click.stop="handleSelectedTv"
+              :disabled="!hasMapSelection"
+              :style="{
+                opacity: hasMapSelection ? 1 : 0.35,
+                cursor: hasMapSelection ? 'pointer' : 'default',
+              }"
+              style="
+                font-size: 13.5px;
+                cursor: pointer;
+                margin: 4.5px 0 4.5px 4.5px;
+                max-height: 21.5px;
+                border-radius: 7px;
+              "
+            >
+              TV
+            </button>
           </div>
           <div
             v-if="simpleMode"
@@ -246,6 +264,24 @@
               "
             >
               Emby
+            </button>
+            <button
+              v-if="mapShow?.inEmby !== false"
+              @click.stop="handleSelectedTv"
+              :disabled="!hasMapSelection"
+              :style="{
+                opacity: hasMapSelection ? 1 : 0.35,
+                cursor: hasMapSelection ? 'pointer' : 'default',
+              }"
+              style="
+                font-size: 13.5px;
+                cursor: pointer;
+                margin: 4.5px 0 4.5px 4.5px;
+                max-height: 21.5px;
+                border-radius: 7px;
+              "
+            >
+              TV
             </button>
           </div>
         </div>
@@ -1956,6 +1992,12 @@ export default {
       const id = this.firstSelectedEmbyId;
       if (!id) return;
       window.open(urls.embyPageUrl(id), "_blank");
+    },
+    async handleSelectedTv() {
+      const id = this.firstSelectedEmbyId;
+      if (!id) return;
+      const result = await srvr.embyViewShow(id, this.mapShow?.name);
+      if (!result?.found) window.alert("Living Room TV is not active in Emby.");
     },
     handleEpisodePlainClick(event, mapShow, season, episode) {
       event?.preventDefault?.();

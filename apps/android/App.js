@@ -1006,7 +1006,6 @@ export default function App() {
         }),
       });
     } catch (_) {}
-    subClose();
   };
 
   const subSelectTrack = async (index) => {
@@ -1332,18 +1331,28 @@ export default function App() {
         </ScrollView>
         <View style={{ flexDirection: "row" }}>
           <TouchableOpacity
+            onPress={subChoose}
+            disabled={
+              !currentPlayer || currentPlayer.deviceName !== "Living Room TV"
+            }
+            style={[
+              subCtrlStyles.closeBtn,
+              { flex: 1 },
+              (!currentPlayer ||
+                currentPlayer.deviceName !== "Living Room TV") && {
+                opacity: 0.35,
+              },
+            ]}
+            activeOpacity={0.7}
+          >
+            <Text style={subCtrlStyles.closeBtnText}>Choose</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             onPress={subClose}
             style={[subCtrlStyles.closeBtn, { flex: 1 }]}
             activeOpacity={0.7}
           >
             <Text style={subCtrlStyles.closeBtnText}>Close</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={subChoose}
-            style={[subCtrlStyles.closeBtn, { flex: 1 }]}
-            activeOpacity={0.7}
-          >
-            <Text style={subCtrlStyles.closeBtnText}>Choose</Text>
           </TouchableOpacity>
         </View>
         {locked && (
@@ -2239,12 +2248,6 @@ export default function App() {
         <StatusBar hidden />
         <View style={picCtrlStyles.header}>
           <Text style={picCtrlStyles.headerTitle}>Picture Settings</Text>
-          <TouchableOpacity
-            onPress={closePicCtrl}
-            style={picCtrlStyles.closeBtn}
-          >
-            <Text style={picCtrlStyles.closeBtnText}>✕</Text>
-          </TouchableOpacity>
         </View>
         <ScrollView style={picCtrlStyles.list}>
           {picSettings.map((s) => (
@@ -2285,6 +2288,13 @@ export default function App() {
             </View>
           ))}
         </ScrollView>
+        <TouchableOpacity
+          onPress={closePicCtrl}
+          style={subCtrlStyles.closeBtn}
+          activeOpacity={0.7}
+        >
+          <Text style={subCtrlStyles.closeBtnText}>Close</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -2295,12 +2305,6 @@ export default function App() {
         <StatusBar hidden />
         <View style={streamerStyles.header}>
           <Text style={streamerStyles.headerTitle}>Streaming Services</Text>
-          <TouchableOpacity
-            onPress={() => setShowStreamers(false)}
-            style={streamerStyles.closeBtn}
-          >
-            <Text style={streamerStyles.closeBtnText}>✕</Text>
-          </TouchableOpacity>
         </View>
         <ScrollView style={streamerStyles.list}>
           <View style={streamerStyles.pinnedRow}>
@@ -2355,6 +2359,13 @@ export default function App() {
             ))}
           </View>
         </ScrollView>
+        <TouchableOpacity
+          onPress={() => setShowStreamers(false)}
+          style={subCtrlStyles.closeBtn}
+          activeOpacity={0.7}
+        >
+          <Text style={subCtrlStyles.closeBtnText}>Close</Text>
+        </TouchableOpacity>
       </View>
     );
   }

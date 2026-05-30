@@ -1,3 +1,4 @@
+import { Transform } from "node:stream";
 import fs from "fs";
 import os from "os";
 import * as cp from "child_process";
@@ -4086,6 +4087,315 @@ app.get("/api/qbt-open", async (req, res) => {
   res.send(html);
 });
 
+const HLS_SEGMENT_DURATION = 10; // seconds per segment
+const HLS_MAX_CONCURRENT = 2; // max simultaneous ffmpeg transcode jobs
+let hlsActiveCount = 0;
+
+function resolveMediaPath(filePath) {
+  if (!filePath) return null;
+  const resolved = path.resolve(filePath);
+  const moviesDir = "/mnt/media/movies";
+  if (
+    !resolved.startsWith(tvDir + "/") &&
+    resolved !== tvDir &&
+    !resolved.startsWith(moviesDir + "/") &&
+    resolved !== moviesDir
+  )
+    return null;
+  if (!fs.existsSync(resolved)) return null;
+  return resolved;
+}
+
+function probeMedia(resolved) {
+  const r = cp.spawnSync(
+    "ffprobe",
+    [
+      "-v",
+      "quiet",
+      "-analyzeduration",
+      "100000",
+      "-probesize",
+      "100000",
+      "-print_format",
+      "json",
+      "-show_streams",
+      "-show_format",
+      resolved,
+    ],
+    { maxBuffer: 2 * 1024 * 1024 },
+  );
+  if (r.status !== 0) throw new Error(r.stderr?.toString() || "ffprobe failed");
+  const data = JSON.parse(r.stdout.toString());
+  const streams = data.streams || [];
+  const videoCodec = streams.find((s) => s.codec_type === "video")?.codec_name;
+  const audioCodec = streams.find((s) => s.codec_type === "audio")?.codec_name;
+  const duration =
+    parseFloat(
+      data.format?.duration ||
+        streams.find((s) => s.codec_type === "video")?.duration ||
+        "0",
+    ) || 0;
+  return { videoCodec, audioCodec, duration };
+}
+
+function buildTranscodeArgs(
+  resolved,
+  videoCodec,
+  audioCodec,
+  startSec,
+  durationSec,
+) {
+  const args = [];
+  if (startSec > 0) args.push("-ss", String(startSec));
+  args.push("-i", resolved);
+  if (durationSec != null) args.push("-t", String(durationSec));
+
+  // Always transcode — copy mode preserves source PTS (which may start at a
+  // non-zero offset like 1.48s), causing hls.js to jump the playback position.
+  // setpts/asetpts filters reset PTS to 0 so -output_ts_offset gives correct placement.
+  args.push(
+    "-vf",
+    "setpts=PTS-STARTPTS",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "ultrafast",
+    "-tune",
+    "zerolatency",
+    "-pix_fmt",
+    "yuv420p",
+    "-crf",
+    "23",
+    "-g",
+    "48",
+  );
+  args.push(
+    "-af",
+    "asetpts=PTS-STARTPTS",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "128k",
+    "-ac",
+    "2",
+  );
+  args.push("-muxdelay", "0", "-muxpreload", "0");
+  return args;
+}
+
+app.get("/api/hls/manifest.m3u8", async (req, res) => {
+  const resolved = resolveMediaPath(req.query.path);
+  if (!resolved) {
+    res.status(404).json({ error: "not found" });
+    return;
+  }
+  try {
+    const { duration } = probeMedia(resolved);
+    const segCount = Math.ceil(duration / HLS_SEGMENT_DURATION);
+    const encodedPath = encodeURIComponent(req.query.path);
+    const lines = [
+      "#EXTM3U",
+      "#EXT-X-VERSION:3",
+      `#EXT-X-TARGETDURATION:${HLS_SEGMENT_DURATION}`,
+      "#EXT-X-MEDIA-SEQUENCE:0",
+    ];
+    for (let i = 0; i < segCount; i++) {
+      const segStart = i * HLS_SEGMENT_DURATION;
+      const segDur = Math.min(HLS_SEGMENT_DURATION, duration - segStart);
+      lines.push(`#EXTINF:${segDur.toFixed(3)},`);
+      lines.push(
+        `segment.ts?path=${encodedPath}&start=${segStart}&duration=${HLS_SEGMENT_DURATION}`,
+      );
+    }
+    lines.push("#EXT-X-ENDLIST");
+    res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
+    res.setHeader("Cache-Control", "no-cache");
+    res.send(lines.join("\n") + "\n");
+  } catch (err) {
+    console.error("[hls manifest]", err.message);
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/hls/segment.ts", async (req, res) => {
+  const resolved = resolveMediaPath(req.query.path);
+  if (!resolved) {
+    res.status(404).json({ error: "not found" });
+    return;
+  }
+  const startSec = parseFloat(req.query.start) || 0;
+  const durationSec = parseFloat(req.query.duration) || HLS_SEGMENT_DURATION;
+  if (hlsActiveCount >= HLS_MAX_CONCURRENT) {
+    res.status(503).json({ error: "busy" });
+    return;
+  }
+  try {
+    const { videoCodec, audioCodec } = probeMedia(resolved);
+    const args = buildTranscodeArgs(
+      resolved,
+      videoCodec,
+      audioCodec,
+      startSec,
+      durationSec,
+    );
+    args.push("-output_ts_offset", String(startSec), "-f", "mpegts", "pipe:1");
+    res.setHeader("Content-Type", "video/mp2t");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    hlsActiveCount++;
+    const ffmpeg = cp.spawn("ffmpeg", args);
+    ffmpeg.stdout.pipe(res);
+    ffmpeg.stderr.on("data", () => {});
+    ffmpeg.on("error", (err) =>
+      console.error("[hls segment] ffmpeg error:", err.message),
+    );
+    const kill = () => {
+      if (!ffmpeg.killed) ffmpeg.kill("SIGKILL");
+    };
+    req.on("close", kill);
+    res.on("close", kill);
+    ffmpeg.on("exit", (code) => {
+      hlsActiveCount--;
+      if (code !== 0 && code !== null)
+        console.log(`[hls segment] ffmpeg exit ${code}`);
+      if (!res.writableEnded) res.end();
+    });
+  } catch (err) {
+    console.error("[hls segment]", err.message);
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/stream-info", async (req, res) => {
+  const filePath = req.query.path;
+  if (!filePath) {
+    res.status(400).json({ error: "path required" });
+    return;
+  }
+  const resolved = path.resolve(filePath);
+  const moviesDir = "/mnt/media/movies";
+  if (
+    !resolved.startsWith(tvDir + "/") &&
+    resolved !== tvDir &&
+    !resolved.startsWith(moviesDir + "/") &&
+    resolved !== moviesDir
+  ) {
+    res.status(403).json({ error: "forbidden" });
+    return;
+  }
+  if (!fs.existsSync(resolved)) {
+    res.status(404).json({ error: "file not found" });
+    return;
+  }
+  try {
+    const probeResult = cp.spawnSync(
+      "ffprobe",
+      ["-v", "quiet", "-print_format", "json", "-show_format", resolved],
+      { maxBuffer: 1024 * 1024 },
+    );
+    if (probeResult.status !== 0) throw new Error("ffprobe failed");
+    const fmt = JSON.parse(probeResult.stdout.toString()).format || {};
+    const duration = parseFloat(fmt.duration || "0") || 0;
+    res.json({ duration });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Patch the duration fields inside an fMP4 empty_moov atom so the browser
+// seekbar shows the full length immediately.
+function _patchBoxDurations(buf, start, end, durationSec, movieTimescale) {
+  let pos = start;
+  while (pos + 8 <= end) {
+    const boxSize = buf.readUInt32BE(pos);
+    if (boxSize < 8 || pos + boxSize > end) break;
+    const type = buf.slice(pos + 4, pos + 8).toString("latin1");
+    if (type === "mvhd") {
+      const ver = buf[pos + 8];
+      if (ver === 0) {
+        const ts = buf.readUInt32BE(pos + 20);
+        movieTimescale = ts;
+        buf.writeUInt32BE(
+          Math.min(Math.round(durationSec * ts), 0x7fffffff),
+          pos + 24,
+        );
+      }
+    } else if (type === "tkhd") {
+      const ver = buf[pos + 8];
+      if (ver === 0) {
+        buf.writeUInt32BE(
+          Math.min(Math.round(durationSec * movieTimescale), 0x7fffffff),
+          pos + 28,
+        );
+      }
+    } else if (type === "mdhd") {
+      const ver = buf[pos + 8];
+      if (ver === 0) {
+        const ts = buf.readUInt32BE(pos + 20);
+        buf.writeUInt32BE(
+          Math.min(Math.round(durationSec * ts), 0x7fffffff),
+          pos + 24,
+        );
+      }
+    } else if (
+      ["moov", "trak", "mdia", "minf", "edts", "stbl"].includes(type)
+    ) {
+      movieTimescale = _patchBoxDurations(
+        buf,
+        pos + 8,
+        pos + boxSize,
+        durationSec,
+        movieTimescale,
+      );
+    }
+    pos += boxSize;
+  }
+  return movieTimescale;
+}
+
+function createMoovPatcher(durationSec) {
+  let acc = Buffer.alloc(0);
+  let done = false;
+  return new Transform({
+    transform(chunk, encoding, callback) {
+      if (done) {
+        this.push(chunk);
+        return callback();
+      }
+      acc = Buffer.concat([acc, chunk]);
+      // Find moov box
+      let moovStart = -1;
+      for (let i = 0; i + 8 <= acc.length; i++) {
+        if (acc.slice(i + 4, i + 8).toString("latin1") === "moov") {
+          moovStart = i;
+          break;
+        }
+      }
+      if (moovStart === -1) {
+        if (acc.length > 500000) {
+          done = true;
+          this.push(acc);
+          acc = null;
+        }
+        return callback();
+      }
+      const moovEnd = moovStart + acc.readUInt32BE(moovStart);
+      if (acc.length < moovEnd) return callback();
+      _patchBoxDurations(acc, moovStart + 8, moovEnd, durationSec, 1000);
+      done = true;
+      this.push(acc);
+      acc = null;
+      callback();
+    },
+    flush(callback) {
+      if (acc) {
+        this.push(acc);
+        acc = null;
+      }
+      callback();
+    },
+  });
+}
+
 // Video streaming with codec-aware ffmpeg transcoding
 app.get("/api/stream", async (req, res) => {
   const filePath = req.query.path;
@@ -4124,6 +4434,7 @@ app.get("/api/stream", async (req, res) => {
         "-print_format",
         "json",
         "-show_streams",
+        "-show_format",
         resolved,
       ],
       { maxBuffer: 2 * 1024 * 1024 },
@@ -4131,13 +4442,20 @@ app.get("/api/stream", async (req, res) => {
     if (probeResult.status !== 0)
       throw new Error(probeResult.stderr?.toString() || "ffprobe failed");
     const probeOut = probeResult.stdout.toString();
-    const streams = JSON.parse(probeOut).streams || [];
+    const probeData = JSON.parse(probeOut);
+    const streams = probeData.streams || [];
     const videoCodec = streams.find(
       (s) => s.codec_type === "video",
     )?.codec_name;
     const audioCodec = streams.find(
       (s) => s.codec_type === "audio",
     )?.codec_name;
+    const fileDurationSec =
+      parseFloat(
+        probeData.format?.duration ||
+          streams.find((s) => s.codec_type === "video")?.duration ||
+          "0",
+      ) || 0;
 
     const vCopy = videoCodec === "h264";
     const aCopy = audioCodec === "aac";
@@ -4243,7 +4561,14 @@ app.get("/api/stream", async (req, res) => {
     res.setHeader("Cache-Control", "no-cache");
 
     const ffmpeg = cp.spawn("ffmpeg", ffmpegArgs);
-    ffmpeg.stdout.pipe(res);
+    const effectiveDuration =
+      startSec > 0 ? Math.max(0, fileDurationSec - startSec) : fileDurationSec;
+    if (effectiveDuration > 0) {
+      const patcher = createMoovPatcher(effectiveDuration);
+      ffmpeg.stdout.pipe(patcher).pipe(res);
+    } else {
+      ffmpeg.stdout.pipe(res);
+    }
     ffmpeg.stderr.on("data", () => {});
     ffmpeg.on("error", (err) => {
       console.error("[stream] ffmpeg spawn error:", err.message);

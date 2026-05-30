@@ -2385,15 +2385,51 @@ export default {
           noSwitch: true,
         });
       } else {
-        await emby.editEpisode(
-          show.id,
-          season,
-          episode,
-          false,
-          setWatched,
-          show.name,
-        );
-        await this.seriesMapAction("", show, null);
+        const cell = this.seriesMap?.[season]?.[episode];
+        if (cell && !cell.id) {
+          // Episode is filesOnDisk-only (not in Emby) — use local path
+          cell.played = setWatched !== null ? setWatched : !cell.played;
+          const seriesMapArr = [];
+          for (const sNum of Object.keys(this.seriesMap).sort(
+            (a, b) => a - b,
+          )) {
+            const episodes = [];
+            for (const eNum of Object.keys(this.seriesMap[sNum]).sort(
+              (a, b) => a - b,
+            )) {
+              episodes.push([+eNum, this.seriesMap[sNum][eNum]]);
+            }
+            seriesMapArr.push([+sNum, episodes]);
+          }
+          const watchedEpis = tvdb.seriesMapToWatchedEpis(seriesMapArr);
+          if (allTvdb?.[show.name]) {
+            allTvdb[show.name].watchedEpis = watchedEpis;
+          }
+          await srvr.setTvdbFields({
+            name: show.name,
+            watchedEpis,
+            dontEnqueue: true,
+          });
+          this.$emit("show-map", {
+            mapShow: this.mapShow,
+            hideMapBottom: this.hideMapBottom,
+            seriesMapSeasons: this.seriesMapSeasons,
+            seriesMapEpis: this.seriesMapEpis,
+            seriesMap: this.seriesMap,
+            mapError: "",
+            noSwitch: true,
+          });
+        } else {
+          await emby.editEpisode(
+            show.id,
+            season,
+            episode,
+            false,
+            setWatched,
+            show.name,
+          );
+          await this.seriesMapAction("", show, null);
+        }
       }
     },
 
@@ -2596,7 +2632,14 @@ export default {
         show.inEmby !== false &&
         allTvdb?.[show.name]
       ) {
-        const watchedEpis = tvdb.seriesMapToWatchedEpis(seriesMapIn);
+        const embySeasons = new Set(seriesMapIn.map(([sNum]) => sNum));
+        const existingWatchedEpis = allTvdb[show.name].watchedEpis || [];
+        const embyWatchedEpis = tvdb.seriesMapToWatchedEpis(seriesMapIn);
+        // Preserve watched state for seasons not in Emby (e.g. filesOnDisk-only seasons)
+        const watchedEpis = [
+          ...existingWatchedEpis.filter(([sNum]) => !embySeasons.has(sNum)),
+          ...embyWatchedEpis,
+        ];
         allTvdb[show.name].watchedEpis = watchedEpis;
         await srvr.setTvdbFields({
           name: show.name,
@@ -2643,6 +2686,13 @@ export default {
       // a file lands on disk without waiting for Emby to finish scanning.
       const diskFiles = allTvdb?.[show.name]?.filesOnDisk;
       if (Array.isArray(diskFiles)) {
+        // Build set of watched episodes from persisted watchedEpis for filesOnDisk-only cells
+        const persistedWatchedEpis = allTvdb?.[show.name]?.watchedEpis || [];
+        const filesOnDiskWatchedSet = new Set();
+        for (const entry of persistedWatchedEpis) {
+          const [sNum, ...eps] = entry;
+          for (const ep of eps) filesOnDiskWatchedSet.add(`${sNum}.${ep}`);
+        }
         for (const row of diskFiles) {
           const s = row[0];
           for (let i = 1; i < row.length; i++) {
@@ -2662,7 +2712,7 @@ export default {
                 avail: true,
                 noFile: false,
                 unaired: false,
-                played: false,
+                played: filesOnDiskWatchedSet.has(`${s}.${e}`),
                 error: false,
                 path: null,
               };

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
+  Alert,
   StyleSheet,
   StatusBar,
   ScrollView,
@@ -73,6 +74,9 @@ export default function App() {
   const [missingEpWarning, setMissingEpWarning] = useState(null);
   const [subMismatchWarning, setSubMismatchWarning] = useState(false);
   const [layoutOption, setLayoutOption] = useState("mark");
+  useEffect(() => {
+    layoutOptionRef.current = layoutOption;
+  }, [layoutOption]);
   const [showShows, setShowShows] = useState(false);
   const [showsList, setShowsList] = useState([]);
   const [selectedShow, setSelectedShow] = useState(null);
@@ -134,6 +138,7 @@ export default function App() {
   const homeHoldFiredRef = useRef(false);
   const showPlayingRef = useRef(null);
   const followPlayingRef = useRef(false);
+  const layoutOptionRef = useRef("mark");
   const showSelectedRef = useRef(null);
   const showsListRef = useRef([]);
   const showsListLoadedRef = useRef(false);
@@ -284,6 +289,7 @@ export default function App() {
         ) {
           setMissingEpWarning(msg.data);
         } else if (msg.id === 0 && msg.notification === "subtitleMismatch") {
+          if (layoutOptionRef.current === "linda") return;
           setSubMismatchWarning(true);
           setShowSubCtrl(true);
           fetchSubPlayers().catch(() => {});
@@ -611,7 +617,7 @@ export default function App() {
   };
 
   // Shared long-press: debounce → short; 400ms → long
-  const lpStart = (shortAction, longAction) => {
+  const lpStart = (shortAction, longAction, holdMs = 400) => {
     const lp = { shortAction, longAction, phase: 0 };
     lpRef.current = lp;
     lp.debounceTimer = setTimeout(
@@ -624,7 +630,7 @@ export default function App() {
       if (lpRef.current !== lp) return;
       lpRef.current = null;
       longAction?.();
-    }, 400);
+    }, holdMs);
   };
 
   const lpStop = () => {
@@ -730,6 +736,7 @@ export default function App() {
   const stopVolDownHold = () => lpStop();
 
   const openPicCtrl = () => {
+    if (layoutOptionRef.current === "linda") return;
     setShowPicCtrl(true);
     fetchPicSettings();
     picPollRef.current = setInterval(() => fetchPicSettings(), 3000);
@@ -894,14 +901,16 @@ export default function App() {
   const toggleLayoutOption = async () => {
     const next = layoutOption === "mark" ? "linda" : "mark";
     setLayoutOption(next);
+    Alert.alert(next === "linda" ? "Linda mode" : "Mark mode");
     try {
       await AsyncStorage.setItem("layoutOption", next);
     } catch (_) {}
   };
 
-  const startHomeHold = () => dbStart(() => tvKey("home"));
+  const startHomeHold = () =>
+    lpStart(() => tvKey("home"), toggleLayoutOption, 2000);
 
-  const stopHomeHold = () => dbStop();
+  const stopHomeHold = () => lpStop();
 
   const startOkHold = () => {
     stopRepeat();
@@ -949,6 +958,7 @@ export default function App() {
 
   const openSubCtrl = async () => {
     if (mode !== "google" && mode !== "fire") return;
+    if (layoutOptionRef.current === "linda") return;
     setShowSubCtrl(true);
     await fetchSubPlayers();
     subPollRef.current = setInterval(fetchSubPlayers, 3000);

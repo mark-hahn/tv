@@ -1012,6 +1012,7 @@ export default function App() {
         }),
       });
     } catch (_) {}
+    await fetchSubPlayers();
   };
 
   const subSelectTrack = async (index) => {

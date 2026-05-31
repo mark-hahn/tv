@@ -709,7 +709,7 @@
       autoplay
       :muted="playerMuted"
       crossorigin="anonymous"
-      :src="vidSrc || undefined"
+      :src="vidSrc"
       style="max-width: 100%; max-height: 100%; outline: none; display: block"
       @dblclick="toggleFullscreen"
       @error="onVideoError"
@@ -717,7 +717,6 @@
       @loadedmetadata="onVideoLoadedMetadata"
       @volumechange="onVideoVolumeChange"
       @durationchange="onVideoDurationChange"
-      @seeking="onVideoSeeking"
       @seeked="onVideoSeeked"
       @play="onVideoPlay"
       @pause="onVideoPause"
@@ -737,7 +736,6 @@
 
 <script>
 import { config } from "../config.js";
-import Hls from "hls.js";
 import {
   applySubOffset,
   chksrtOk,
@@ -815,10 +813,6 @@ export default {
     };
   },
   computed: {
-    hlsManifestUrl() {
-      if (!this.path) return "";
-      return `${TV_SRVR_URL}/api/hls/manifest.m3u8?path=${encodeURIComponent(this.path)}`;
-    },
     streamUrl() {
       if (!this.path) return "";
       return `${TV_SRVR_URL}/api/stream?path=${encodeURIComponent(this.path)}`;
@@ -1016,13 +1010,12 @@ export default {
       };
     },
     path(newVal) {
-      this._hlsStop();
+      this._mseStop();
       this.subtitleTracks = [];
       this.activeTrackId = null;
       this.chksrtMatch = null;
       this.errorRetries = 0;
-      if (newVal) this.$nextTick(() => this._startStream());
-      else this.vidSrc = "";
+      this.vidSrc = newVal ? this.streamUrl : "";
       if (newVal && this.mode === "intro") this._seekOnLoad = true;
       this.subtitleOffset = offsetCache.get(newVal) ?? 0;
       if (newVal) this._fetchSubtitleList(newVal);
@@ -1057,8 +1050,6 @@ export default {
         if (tracks.length > 0) {
           this.activeTrackId = tracks[0].id;
           if (tracks[0].type === "pgs") {
-            // PGS: fall back to fMP4 stream with burn-in
-            this._hlsStop();
             this.vidSrc = this._buildStreamUrl(tracks[0].index);
           }
         }
@@ -1075,11 +1066,9 @@ export default {
       const wasPgs = prevTrack?.type === "pgs";
       const isPgs = newTrack?.type === "pgs";
       if (isPgs) {
-        this._hlsStop();
         this.vidSrc = this._buildStreamUrl(newTrack.index);
       } else if (wasPgs) {
-        this.vidSrc = "";
-        this._startStream();
+        this.vidSrc = this.streamUrl;
       }
       if (id === "off") {
         const vid = this.$refs.vid;
@@ -1130,70 +1119,86 @@ export default {
       console.log(
         `[video] error code=${err.code} at ${resumeAt.toFixed(1)}s, retry ${this.errorRetries}`,
       );
-      // Only fires for PGS fMP4 fallback — HLS errors handled by hls.js
+      this._mseStop();
       setTimeout(() => {
         const v = this.$refs.vid;
         if (!v) return;
-        v.src = this.vidSrc;
-        if (resumeAt > 0) v.currentTime = resumeAt;
-        v.play().catch(() => {});
+        if (resumeAt > 0) {
+          this._mseRecover(resumeAt);
+        } else {
+          v.load();
+          v.play().catch(() => {});
+        }
       }, 1000);
     },
-    _hlsStop() {
-      if (this._hls) {
-        this._hls.destroy();
-        this._hls = null;
+    _mseStop() {
+      if (this._mseAbort) {
+        this._mseAbort.abort();
+        this._mseAbort = null;
       }
     },
-    _startStream() {
+    _mseRecover(startSec) {
       const vid = this.$refs.vid;
       if (!vid) return;
-      if (!Hls.isSupported()) {
-        // Safari native HLS
-        this.vidSrc = this.hlsManifestUrl;
+      const url = `${this.streamUrl}&start=${Math.floor(startSec)}`;
+      const mimeType = 'video/mp4; codecs="avc1.640028,mp4a.40.2"';
+      if (!window.MediaSource || !MediaSource.isTypeSupported(mimeType)) {
+        vid.load();
+        vid.play().catch(() => {});
         return;
       }
-      this._hlsStop();
-      this.vidSrc = "";
-      let bufferFullCount = 0;
-      const hls = new Hls({
-        enableWorker: true,
-        maxBufferLength: 10,
-        maxMaxBufferLength: 20,
-        backBufferLength: 0,
-        maxBufferSize: 20 * 1000 * 1000,
-        fragLoadingTimeOut: 60000,
-        fragLoadingMaxRetry: 2,
-        fragLoadingRetryDelay: 500,
-      });
-      this._hls = hls;
-      hls.loadSource(this.hlsManifestUrl);
-      hls.attachMedia(vid);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        vid.play().catch(() => {});
-      });
-      hls.on(Hls.Events.ERROR, (event, data) => {
-        if (data.details === Hls.ErrorDetails.BUFFER_FULL_ERROR) {
-          bufferFullCount++;
-          if (bufferFullCount > 3) {
-            console.warn("[hls] bufferFull loop, restarting");
-            this._hlsStop();
-            setTimeout(() => {
-              if (this.path) this._startStream();
-            }, 500);
-          } else {
-            hls.recoverMediaError();
+      const abort = new AbortController();
+      this._mseAbort = abort;
+      const ms = new MediaSource();
+      const blobUrl = URL.createObjectURL(ms);
+      ms.addEventListener(
+        "sourceopen",
+        async () => {
+          URL.revokeObjectURL(blobUrl);
+          let sb;
+          try {
+            sb = ms.addSourceBuffer(mimeType);
+          } catch (e) {
+            if (!abort.signal.aborted) {
+              vid.load();
+              vid.play().catch(() => {});
+            }
+            return;
           }
-          return;
-        }
-        if (data.fatal) {
-          console.error("[hls] fatal error", data.type, data.details);
-          this._hlsStop();
-          setTimeout(() => {
-            if (this.path) this._startStream();
-          }, 1000);
-        }
-      });
+          sb.timestampOffset = startSec;
+          let res;
+          try {
+            res = await fetch(url, { signal: abort.signal });
+            if (!res.ok) throw new Error(String(res.status));
+          } catch (e) {
+            if (!abort.signal.aborted) {
+              vid.load();
+              vid.play().catch(() => {});
+            }
+            return;
+          }
+          const reader = res.body.getReader();
+          try {
+            while (!abort.signal.aborted) {
+              const { done, value } = await reader.read();
+              if (done) {
+                ms.endOfStream();
+                break;
+              }
+              sb.appendBuffer(value);
+              await new Promise((ok, fail) => {
+                sb.addEventListener("updateend", ok, { once: true });
+                sb.addEventListener("error", fail, { once: true });
+              });
+            }
+          } catch (e) {
+            if (!abort.signal.aborted) console.error("[mse]", e);
+          }
+          if (abort.signal.aborted) reader.cancel().catch(() => {});
+        },
+        { once: true },
+      );
+      this.vidSrc = blobUrl;
     },
     async _loadChksrtHistoryAndCompare(forPath) {
       this.chksrtMatch = null;
@@ -1268,8 +1273,8 @@ export default {
     },
     onVideoLoadedMetadata() {
       this._applyIntroAudioState();
-      const vid = this.$refs.vid;
       if (this.mode !== "intro") {
+        const vid = this.$refs.vid;
         if (vid) vid.play().catch(() => {});
         if (this.mode === "chksrt") return;
       }
@@ -1280,6 +1285,7 @@ export default {
           ? (this._introPlayTargetSec ?? 0)
           : Math.max(0, (this.startMark - 3000) / 1000);
       this._seekWithConfirm(targetSec);
+      const vid = this.$refs.vid;
       if (vid) vid.play().catch(() => {});
     },
     onVideoVolumeChange() {
@@ -1559,9 +1565,6 @@ export default {
         vid.play().catch(() => {});
       }
     },
-    onVideoSeeking() {
-      // hls.js handles seeks automatically; only needed for PGS fMP4 fallback which native player seeks fine
-    },
     onVideoSeeked() {
       if (this.waitingForVideo && !this._waitingForVideoSetup) {
         this._exitWaitingForVideo();
@@ -1649,7 +1652,7 @@ export default {
       }
     },
     clickSel() {
-      this._hlsStop();
+      this._mseStop();
       this.vidSrc = "";
       const vid = this.$refs.vid;
       if (vid) {
@@ -1663,7 +1666,7 @@ export default {
     },
     close() {
       if (this.mode === "intro" && this.introMarkDirty) this._saveStartMark();
-      this._hlsStop();
+      this._mseStop();
       const vid = this.$refs.vid;
       if (vid) {
         vid.pause();
@@ -1699,8 +1702,7 @@ export default {
       const n = Number(savedVolume);
       if (Number.isFinite(n)) this.playerVolume = Math.max(0, Math.min(1, n));
     }
-    if (this.path) this._startStream();
-    else this.vidSrc = "";
+    this.vidSrc = this.path ? this.streamUrl : "";
     this.subtitleOffset = offsetCache.get(this.path) ?? 0;
     if (this.path) this._fetchSubtitleList(this.path);
     this.$nextTick(() => {
@@ -1709,7 +1711,6 @@ export default {
   },
   beforeUnmount() {
     window.removeEventListener("keydown", this.onKeyDown);
-    this._hlsStop();
   },
 };
 </script>

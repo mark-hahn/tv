@@ -62,11 +62,13 @@ function consoleToFile() {
 }
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
     consoleToFile(),
     vue(),
-    Terminal({ console: "terminal", output: ["terminal", "console"] }),
+    ...(command === "serve"
+      ? [Terminal({ console: "terminal", output: ["terminal", "console"] })]
+      : []),
   ],
   server: {
     fs: {
@@ -84,4 +86,4 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
-});
+}));

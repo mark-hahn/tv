@@ -708,6 +708,50 @@ async function main() {
           return json(res, 405, { status: "method not allowed" });
         }
 
+        // Handle /abortDown endpoint – kill an active download, delete its file, and block it
+        // POST body: { title: string }
+        // Returns: { status: 'ok' } or { status: 'error', error: '...' }
+        if (pathname === "/abortDown") {
+          if (req.method === "POST") {
+            return readBody(req, (err1, body) => {
+              if (err1) {
+                return json(res, 400, {
+                  status: "error",
+                  error: String(err1 && err1.message ? err1.message : err1),
+                });
+              }
+              try {
+                var payload = body ? JSON.parse(body) : {};
+                var abortTitle =
+                  payload && payload.title ? String(payload.title) : "";
+                if (!abortTitle) {
+                  return json(res, 400, {
+                    status: "error",
+                    error: "title is required",
+                  });
+                }
+                var aborted = tvJson.abortEntry(abortTitle);
+                if (!aborted) {
+                  return json(res, 404, {
+                    status: "error",
+                    error: "entry not found",
+                  });
+                }
+                return json(res, 200, { status: "ok" });
+              } catch (e) {
+                return json(res, 400, {
+                  status: "error",
+                  error: String(e && e.message ? e.message : e),
+                });
+              }
+            });
+          }
+          return json(res, 405, {
+            status: "error",
+            error: "method not allowed",
+          });
+        }
+
         // Handle /deleteProcids endpoint
         // POST body: { procIds: [...] } (legacy alias: existingProcids)
         // Returns: { status: 'ok' } OR { status: 'error', error: '...' }
@@ -1149,7 +1193,7 @@ async function main() {
     var f, j, len, line, mapLines, mapStr, results, t;
     // Do not cache tv-finished.json / tv-inProgress.json here.
     // Those are loaded once per cycle immediately after the USB file list is fetched.
-    blocked = TV_BLOCKED;
+    blocked = Object.assign({}, TV_BLOCKED);
     map = {};
     mapStr = fs.readFileSync(TV_MAP_PATH, "utf8");
     mapLines = mapStr.split("\n");

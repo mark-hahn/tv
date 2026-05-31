@@ -148,6 +148,11 @@ let nextProcId = 0;
 
 let inProgressCache = null;
 
+// Maps title -> Worker for in-flight downloads.
+const activeWorkers = new Map();
+// Titles being aborted — suppresses error recording in exit handler.
+const abortingTitles = new Set();
+
 let stmtUpsertByTitle = null;
 let stmtGetByTitle = null;
 let stmtGetByProcId = null;
@@ -1040,6 +1045,7 @@ const startWorkerForTitle = (title) => {
       usbHost,
     },
   });
+  activeWorkers.set(title, w);
 
   let finishedReceived = false;
 
@@ -1053,6 +1059,7 @@ const startWorkerForTitle = (title) => {
 
     if (msg.type === "finished" && msg.entry) {
       finishedReceived = true;
+      activeWorkers.delete(title);
       const doneEntry = { ...msg.entry, inProgress: false };
       replaceByProcId(doneEntry);
       workerCount = Math.max(0, workerCount - 1);
@@ -1083,6 +1090,14 @@ const startWorkerForTitle = (title) => {
 
   w.on("message", onMessage);
   w.on("error", (e) => {
+    activeWorkers.delete(title);
+    if (abortingTitles.has(title)) {
+      abortingTitles.delete(title);
+      workerCount = Math.max(0, workerCount - 1);
+      const nextTitle = findOldestWaitingIndex();
+      if (nextTitle) startWorkerForTitle(nextTitle);
+      return;
+    }
     // Treat worker error as a finish with an error status.
     const errEntry = {
       ...entry,
@@ -1105,6 +1120,15 @@ const startWorkerForTitle = (title) => {
     if (nextTitle) startWorkerForTitle(nextTitle);
   });
   w.on("exit", () => {
+    activeWorkers.delete(title);
+    // If the worker was aborted, DB row is already deleted; just update counters.
+    if (abortingTitles.has(title)) {
+      abortingTitles.delete(title);
+      workerCount = Math.max(0, workerCount - 1);
+      const nextTitle = findOldestWaitingIndex();
+      if (nextTitle) startWorkerForTitle(nextTitle);
+      return;
+    }
     // If the worker exits without sending finished, record something actionable.
     if (finishedReceived) return;
     const errEntry = {
@@ -1682,6 +1706,74 @@ const deleteByTitles = (titles) => {
   return localPaths;
 };
 
+// Abort an active (downloading or waiting) entry:
+// - sends abort to the worker (kills rsync), or just removes waiting entry
+// - deletes the partial local file from disk
+// - replaces the DB row with status='user-blocked' so scan cycles skip it forever
+// Returns true if the entry was found.
+const abortEntry = (title) => {
+  if (!title) return false;
+  const t = String(title);
+  openDb();
+  const row = stmtGetByTitle.get(t);
+  if (!row) return false;
+
+  // Signal to worker exit/error handlers that this is an intentional abort.
+  abortingTitles.add(t);
+
+  // Kill the worker if it's running.
+  const w = activeWorkers.get(t);
+  if (w) {
+    try {
+      w.postMessage({ type: "abort" });
+    } catch {}
+    activeWorkers.delete(t);
+  } else {
+    // Waiting entry (no worker yet) — no workerCount to decrement.
+    abortingTitles.delete(t);
+  }
+
+  // Delete the partial local file.
+  const localPath = row.localPath ? String(row.localPath) : "";
+  if (localPath && path.isAbsolute(localPath)) {
+    const tryDelete = (fileName) => {
+      if (!fileName) return;
+      try {
+        const base = path.resolve(localPath);
+        const fp = path.resolve(localPath, fileName);
+        if (fp === base || fp.startsWith(base + path.sep)) {
+          fs.unlinkSync(fp);
+        }
+      } catch {}
+    };
+    tryDelete(row.destTitle ? String(row.destTitle) : "");
+    tryDelete(row.title ? String(row.title) : "");
+  }
+
+  // Replace the DB row with a user-blocked marker so future scan cycles skip this title.
+  // The scan cycle skips any title already present in tvJsonTitles (getTitlesMap).
+  removeInProgress(t);
+  try {
+    upsertEntry({
+      title: t,
+      procId: row.procId != null ? Number(row.procId) : nextProcId++,
+      usbPath: row.usbPath ? String(row.usbPath) : "",
+      localPath: "",
+      status: "user-blocked",
+      inProgress: false,
+      error: false,
+      progress: 0,
+      eta: null,
+      speed: 0,
+      dateStarted: 0,
+      dateEnded: Math.floor(Date.now() / 1000),
+      reason: "user-blocked",
+    });
+  } catch {}
+
+  return true;
+};
+
 export {
   addEntry,
   markFinished,
@@ -1700,4 +1792,5 @@ export {
   upsertDvdEntry,
   deleteDvdFileEntries,
   deleteByTitles,
+  abortEntry,
 };

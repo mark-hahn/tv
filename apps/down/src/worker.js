@@ -15,6 +15,20 @@ const unixNow = () => Math.floor(Date.now() / 1000);
 const { entry: entry0, usbHost } = workerData || {};
 let entry = entry0 && typeof entry0 === "object" ? { ...entry0 } : null;
 
+// Track active rsync process so abort messages can kill it.
+let rsyncProc = null;
+
+parentPort.on("message", (msg) => {
+  if (msg && msg.type === "abort") {
+    try {
+      if (rsyncProc) rsyncProc.kill("SIGKILL");
+    } catch {}
+    try {
+      process.exit(0);
+    } catch {}
+  }
+});
+
 const parseEtaSeconds = (chunk) => {
   // rsync progress2 shows remaining time as MM:SS or HH:MM:SS
   const m = chunk.match(/(\d+):(\d+)(?::(\d+))?/);
@@ -241,6 +255,7 @@ const main = () => {
       dst,
     ];
     const p = spawn("rsync", rsyncArgs, { stdio: ["ignore", "pipe", "pipe"] });
+    rsyncProc = p;
 
     // Capture rsync stderr so failures can be diagnosed.
     // Keep last N bytes to avoid unbounded memory use.

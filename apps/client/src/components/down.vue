@@ -208,6 +208,22 @@
           </button>
           <button
             v-if="!movieMode"
+            @click.stop="downAbortClick"
+            :disabled="selectedAbortableCount === 0"
+            :class="{ 'btn-disabled': selectedAbortableCount === 0 }"
+            :style="{
+              fontSize: '13px',
+              cursor: 'pointer',
+              borderRadius: '7px',
+              padding: '4px 10px',
+              border: aborting ? '1px solid #888' : '1px solid #bbb',
+              '--btn-bg': aborting ? '#ccc' : 'whitesmoke',
+            }"
+          >
+            Abort
+          </button>
+          <button
+            v-if="!movieMode"
             @click.stop="togglePolling"
             style="
               font-size: 13px;
@@ -565,6 +581,7 @@ export default {
       items: [],
       error: null,
       retryingTitles: {},
+      aborting: false,
       _pollTimer: null,
       _polling: false,
       _active: false,
@@ -692,6 +709,15 @@ export default {
 
     errsButtonBg() {
       return this.showErrs ? "#aaa" : "whitesmoke";
+    },
+
+    selectedAbortableCount() {
+      let count = 0;
+      for (const it of this.selectedItems) {
+        const st = String(it?.status || "").toLowerCase();
+        if (st === "waiting" || st === "downloading") count++;
+      }
+      return count;
     },
 
     filteredItems() {
@@ -1297,6 +1323,42 @@ export default {
 
     toggleErrs() {
       this.showErrs = !this.showErrs;
+    },
+
+    async downAbortClick() {
+      const active = [...this.selectedItems].filter((it) => {
+        const st = String(it?.status || "").toLowerCase();
+        return st === "waiting" || st === "downloading";
+      });
+      if (active.length === 0) return;
+      this.aborting = true;
+      try {
+        for (const it of active) {
+          const title = it?.title;
+          if (!title) continue;
+          try {
+            const res = await fetch(`${config.tvDownUrl}/abortDown`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ title }),
+            });
+            if (!res.ok) {
+              const text = await res.text().catch(() => "");
+              window.alert(
+                `Abort failed for ${title}: ${text || res.statusText}`,
+              );
+            }
+          } catch (e) {
+            window.alert(
+              `Abort failed for ${title}: ${e?.message || String(e)}`,
+            );
+          }
+        }
+      } finally {
+        this.aborting = false;
+      }
+      this.selectedItems = new Set();
+      await this.loadTvproc();
     },
 
     async clearErrorRecords() {

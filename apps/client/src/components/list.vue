@@ -959,7 +959,13 @@ export default {
       }
     },
 
-    libraryClick() {
+    libraryClick(evt) {
+      if (evt && evt.ctrlKey) {
+        util.openExternalPage(
+          "https://hahnca.com:8920/web/index.html#!/librarysetup/libraries",
+        );
+        return;
+      }
       evtBus.emit("startLibraryRefresh");
     },
 

@@ -84,11 +84,7 @@
       "
     >
       <span
-        v-if="
-          libraryProgressText &&
-          libraryProgressText.includes('%') &&
-          !simpleMode
-        "
+        v-if="libraryProgressText && !simpleMode"
         style="
           font-size: 13px;
           font-weight: bold;
@@ -101,7 +97,7 @@
       </span>
       <button
         v-if="!simpleMode"
-        @click="$emit('library-click')"
+        @click="$emit('library-click', $event)"
         style="
           height: 24px;
           background-color: white;

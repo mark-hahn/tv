@@ -754,7 +754,7 @@ export default {
           name: "totry",
         },
         {
-          color: "#a66",
+          color: "#c8925a",
           filter: 0,
           icon: ["fas", "exclamation"],
           cond(show) {

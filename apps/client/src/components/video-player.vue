@@ -1302,9 +1302,7 @@ export default {
       if (!this._seekOnLoad) return;
       this._seekOnLoad = false;
       const targetSec =
-        this.mode === "intro"
-          ? (this._introPlayTargetSec ?? 0)
-          : Math.max(0, (this.startMark - 3000) / 1000);
+        this.mode === "intro" ? 0 : Math.max(0, (this.startMark - 3000) / 1000);
       this._seekWithConfirm(targetSec);
       const vid = this.$refs.vid;
       if (vid) vid.play().catch(() => {});

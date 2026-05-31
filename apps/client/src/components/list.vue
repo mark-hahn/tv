@@ -3288,6 +3288,7 @@ export default {
       this.allShowsLength = allShows.length;
       this.$emit("all-shows", allShows);
       this.$emit("all-tvdb", allTvdb);
+      evtBus.emit("intro-count", allShows.filter((s) => s.needsIntro).length);
 
       // Gap checking now handled server-side
       // Server will notify via WebSocket when tvdb data is updated
@@ -3430,6 +3431,10 @@ export default {
             show.fileGap || show.fileEndError || show.seasonWatchedThenNofile;
           show.needsIntro = tvdbRecord.needsIntro ?? false;
           show.anticipating = tvdbRecord.anticipating ?? false;
+          evtBus.emit(
+            "intro-count",
+            allShows.filter((s) => s.needsIntro).length,
+          );
 
           // Update allTvdb cache
           tvdb.upsertTvdbCacheRecord(allTvdb, tvdbRecord, showName);
@@ -3584,6 +3589,10 @@ export default {
           show.fileGap = record.fileGap;
           show.needsIntro = record.needsIntro ?? false;
           show.anticipating = record.anticipating ?? false;
+          evtBus.emit(
+            "intro-count",
+            allShows.filter((s) => s.needsIntro).length,
+          );
           show.notReady = record.notReady;
           show.date = record.date ?? show.date;
           show.size = record.size ?? show.size;

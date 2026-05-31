@@ -626,6 +626,7 @@ export default {
       videoPlayerMapSeason: null,
       videoPlayerMapEpisode: null,
       chksrtCount: 0,
+      introCount: 0,
       browseTabHasMore: false,
       currentPane: "info", // 'info', 'map', 'actors', 'reviews', 'trailer', 'tor', 'flex', 'qbt', 'down'
       movieMode: false,
@@ -975,10 +976,6 @@ export default {
         '<b style="font-weight:700">$1</b>',
       );
     },
-
-    introCount() {
-      return this.allShows.filter((s) => s.needsIntro).length;
-    },
   },
   unmounted() {
     evtBus.off("downActivePart", this.handleDownActivePart);
@@ -989,6 +986,7 @@ export default {
     evtBus.off("playSimplePath", this._onPlaySimplePath);
     evtBus.off("openChksrt", this._onOpenChksrt);
     evtBus.off("chksrt-count", this._onChksrtCount);
+    if (this._onIntroCount) evtBus.off("intro-count", this._onIntroCount);
     if (this._onBrowseHasMoreChanged)
       evtBus.off("browseHasMoreChanged", this._onBrowseHasMoreChanged);
     evtBus.off("previewSrchChoice", this.onPreviewSrchChoice);
@@ -2096,6 +2094,10 @@ export default {
       }
     };
     evtBus.on("chksrt-count", this._onChksrtCount);
+    this._onIntroCount = (count) => {
+      this.introCount = Number(count) || 0;
+    };
+    evtBus.on("intro-count", this._onIntroCount);
     this.fetchChksrtCount();
     this.startChksrtPolling();
     this.startQbtPolling();

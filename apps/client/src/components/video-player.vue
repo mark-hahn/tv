@@ -686,6 +686,25 @@
       >
         Sel
       </div>
+      <div
+        v-if="mode === 'chksrt'"
+        @click.stop="clickChksrtNext"
+        style="
+          color: white;
+          font-size: 13px;
+          padding: 2px 8px;
+          border-radius: 4px;
+          border: 1px solid #666;
+          cursor: pointer;
+          user-select: none;
+          background: rgba(0, 0, 0, 0.5);
+          margin-right: 8px;
+          white-space: nowrap;
+          text-shadow: 0 0 3px #000;
+        "
+      >
+        Next
+      </div>
       <!-- X close -->
       <div
         @click.stop="close"
@@ -1011,6 +1030,8 @@ export default {
     },
     path(newVal) {
       this._mseStop();
+      this._chksrtSelectedSrtPath = undefined;
+      this._chksrtSelectedChoice = undefined;
       this.subtitleTracks = [];
       this.activeTrackId = null;
       this.chksrtMatch = null;
@@ -1624,32 +1645,46 @@ export default {
       }
     },
     onChoiceClick(choice, event) {
-      if (event.ctrlKey && this.mode === "chksrt") {
+      if (this.mode === "chksrt") {
         const choiceLabel =
           this.subtitleLabelMap.get(choice.id) ?? choice.label;
         if (choice.type === "srt" && choice.file) {
           const dir = this.path.replace(/\/[^\/]+$/, "");
-          const selectedSrtPath = dir + "/" + choice.file;
-          this._saveChksrtHistory(choiceLabel, choice);
-          chksrtSelect(this.path, selectedSrtPath)
-            .then(() => this.$emit("chksrt-next", null))
-            .catch((e) => console.error("[chksrt] select error:", e));
+          this._chksrtSelectedSrtPath = dir + "/" + choice.file;
+          this._chksrtSelectedChoice = { choiceLabel, choice };
+          this.selectTrack(choice.id);
         } else if (
           choice.type === "embedded" ||
           choice.type === "sdh" ||
           choice.type === "forced" ||
           choice.type === "pgs"
         ) {
-          this._saveChksrtHistory(choiceLabel, choice);
-          chksrtSelect(this.path, null)
-            .then(() => this.$emit("chksrt-next", null))
-            .catch((e) => console.error("[chksrt] select error:", e));
+          this._chksrtSelectedSrtPath = null;
+          this._chksrtSelectedChoice = { choiceLabel, choice };
+          this.selectTrack(choice.id);
         } else {
           this.selectTrack(choice.id);
         }
       } else {
         this.selectTrack(choice.id);
       }
+    },
+    async _submitChksrtSelection() {
+      const sel = this._chksrtSelectedChoice;
+      if (sel) {
+        this._saveChksrtHistory(sel.choiceLabel, sel.choice);
+        await chksrtSelect(this.path, this._chksrtSelectedSrtPath);
+      } else {
+        await chksrtOk(this.path);
+      }
+    },
+    async clickChksrtNext() {
+      try {
+        await this._submitChksrtSelection();
+      } catch (e) {
+        console.error("[chksrt] next error:", e);
+      }
+      this.$emit("chksrt-next", null);
     },
     clickSel() {
       this._mseStop();
@@ -1666,6 +1701,11 @@ export default {
     },
     close() {
       if (this.mode === "intro" && this.introMarkDirty) this._saveStartMark();
+      if (this.mode === "chksrt") {
+        this._submitChksrtSelection().catch((e) =>
+          console.error("[chksrt] close save error:", e),
+        );
+      }
       this._mseStop();
       const vid = this.$refs.vid;
       if (vid) {

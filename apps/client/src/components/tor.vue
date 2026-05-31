@@ -1567,19 +1567,6 @@ export default {
       if (pane === "tor") {
         // Keep space info fresh whenever Tor pane is shown.
         void this.updateSpaceAvail();
-        // Auto-search when pane becomes active, but only once per show.
-        const showId = this.activeShow?.id || this.activeShow?.name || null;
-        if (showId && showId !== this.lastAutoSearchedShowId) {
-          this.lastAutoSearchedShowId = showId;
-          void this.searchTorrents(this.activeShow);
-        } else if (
-          showId &&
-          this._savedSeriesMapJson != null &&
-          (this.hasSearched || this.noTorrentsNeeded)
-        ) {
-          // Re-check seriesMap; redo search if it changed since last search
-          this._checkSeriesMapChanged(this.currentShow || this.activeShow);
-        }
       }
     },
 

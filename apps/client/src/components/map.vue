@@ -1971,6 +1971,27 @@ export default {
       }
       return null;
     },
+    getNextEpisodeWithFile(currentSeason, currentEpisode) {
+      const seasons = this.seriesMapSeasons;
+      const epis = this.seriesMapEpis;
+      if (!seasons || !epis) return null;
+      let found = false;
+      for (const s of seasons) {
+        for (const e of epis) {
+          if (!found) {
+            if (s === currentSeason && e === currentEpisode) found = true;
+            continue;
+          }
+          const ep = this.seriesMap?.[s]?.[e];
+          if (ep?.path && !ep?.noFile) {
+            this.selectedSeasons = new Set();
+            this.selectedCells = new Set([`${s}.${e}`]);
+            return { path: ep.path, season: s, episode: e };
+          }
+        }
+      }
+      return null;
+    },
     handleSelectedWatch() {
       const targets = this.getSelectedMapTargets();
       if (targets.length === 0) return;

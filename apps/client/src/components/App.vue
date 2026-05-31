@@ -1113,7 +1113,7 @@ export default {
 
     async handleIntroNext(payload) {
       if (this.videoPlayerSource === "map") {
-        const result = this.$refs.mapComp?.selectNextEpisodeWithFile(
+        const result = this.$refs.mapComp?.getNextEpisodeWithFile(
           this.videoPlayerMapSeason,
           this.videoPlayerMapEpisode,
         );

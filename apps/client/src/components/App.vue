@@ -1000,6 +1000,7 @@ export default {
     this.cancelDownInactiveTimer();
     this.stopLibraryPolling();
     this.stopChksrtPolling();
+    this.stopBrowseTabPolling();
   },
   methods: {
     handleVideoPlayerClose() {
@@ -1056,6 +1057,18 @@ export default {
           this.browseTabHasMore = !!d.available;
         })
         .catch(() => {});
+    },
+    startBrowseTabPolling() {
+      this.stopBrowseTabPolling();
+      this._browseTabPollTimer = setInterval(() => {
+        this.fetchBrowseTabHasMore();
+      }, 60000);
+    },
+    stopBrowseTabPolling() {
+      if (this._browseTabPollTimer) {
+        clearInterval(this._browseTabPollTimer);
+        this._browseTabPollTimer = null;
+      }
     },
     startChksrtPolling() {
       this.stopChksrtPolling();
@@ -2092,6 +2105,7 @@ export default {
     };
     evtBus.on("browseHasMoreChanged", this._onBrowseHasMoreChanged);
     this.fetchBrowseTabHasMore();
+    this.startBrowseTabPolling();
 
     // Refresh space display once on app load.
     this.requestSpaceAvailRefresh("app load");

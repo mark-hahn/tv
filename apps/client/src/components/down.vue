@@ -91,13 +91,13 @@
           <button
             v-if="movieMode"
             @click.stop="startMovieCycle"
+            :style="{ '--btn-bg': movieCycling ? 'lightgray' : 'whitesmoke' }"
             style="
               font-size: 13px;
               cursor: pointer;
               border-radius: 7px;
               padding: 4px 10px;
               border: 1px solid #bbb;
-              background-color: whitesmoke;
             "
           >
             Cycle
@@ -110,13 +110,13 @@
           <button
             v-if="!movieMode"
             @click.stop="startCheck"
+            :style="{ '--btn-bg': isChecking ? 'lightgray' : 'whitesmoke' }"
             style="
               font-size: 13px;
               cursor: pointer;
               border-radius: 7px;
               padding: 4px 10px;
               border: 1px solid #bbb;
-              background-color: whitesmoke;
             "
           >
             Cycle
@@ -1211,7 +1211,13 @@ export default {
         border: "1px solid #ddd",
         borderRadius: "8px",
         padding: "10px",
-        background: isFlashing ? "#ffcccc" : isSelected ? "#fffacd" : isDownloading ? "#e8f4e8" : "#fff",
+        background: isFlashing
+          ? "#ffcccc"
+          : isSelected
+            ? "#fffacd"
+            : isDownloading
+              ? "#e8f4e8"
+              : "#fff",
         cursor: "pointer",
       };
     },
@@ -1238,7 +1244,9 @@ export default {
         const relPath = fullPath.replace(/^\/mnt\/media\/[^/]+\//, "");
         navigator.clipboard.writeText(relPath).catch(() => {});
         this.flashingItem = it;
-        setTimeout(() => { this.flashingItem = null; }, 300);
+        setTimeout(() => {
+          this.flashingItem = null;
+        }, 300);
         return;
       }
 

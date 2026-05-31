@@ -1,6 +1,7 @@
 import { Transform } from "node:stream";
 import fs from "fs";
 import os from "os";
+import crypto from "node:crypto";
 import * as cp from "child_process";
 import * as path from "node:path";
 import express from "express";
@@ -4087,9 +4088,43 @@ app.get("/api/qbt-open", async (req, res) => {
   res.send(html);
 });
 
-const HLS_SEGMENT_DURATION = 10; // seconds per segment
-const HLS_MAX_CONCURRENT = 2; // max simultaneous ffmpeg transcode jobs
-let hlsActiveCount = 0;
+// ============================================================================
+// HLS server — session-based ffmpeg with on-disk segment cache
+// ============================================================================
+// One long-lived ffmpeg process per (path) session re-encodes video forward
+// from a seek point, writing keyframe-aligned MPEG-TS segments to disk via
+// the `segment` muxer. Segment requests:
+//   - serve the file from disk if present
+//   - wait briefly if the running ffmpeg is about to produce it
+//   - restart ffmpeg from the requested segment if seeking far ahead/back
+//
+// Recipe for accurate-seek segments (verified empirically against mkv files
+// whose `-ss` lands on cluster boundaries up to several seconds before the
+// requested time):
+//   -ss <kfStart - HLS_DECODE_OVERSHOOT> -copyts
+//   -i file
+//   -vf "trim=start=<kfStart>,setpts=PTS-STARTPTS+<kfStart>/TB"
+//   -af "atrim=start=<kfStart>,asetpts=PTS-STARTPTS+<kfStart>/TB"
+//   -c:v libx264 -preset ultrafast ...
+//   -force_key_frames "<every absolute segment start time>"
+//   -c:a aac -ac 2 -b:a 160k
+//   -to <kfStart + totalDur>           (NOT -t — broken with -copyts)
+//   -f segment -segment_format mpegts
+//   -segment_times "<durations from kfStart>" (RELATIVE to output start)
+//   -segment_start_number <fromIdx>
+//   out_%05d.ts
+//
+// Output PTS equals source PTS (via -copyts + setpts reset+add), so adjacent
+// sessions produce PTS-continuous segments without DISCONTINUITY markers.
+// ============================================================================
+
+const HLS_TARGET_SEG_DURATION = 6;
+const HLS_CACHE_DIR = "/tmp/tv-hls-cache";
+const HLS_SESSION_DIR = "/tmp/tv-hls-sessions";
+const HLS_SESSION_IDLE_MS = 120000;
+const HLS_SEEK_TOLERANCE_SEGS = 5;
+const HLS_SEG_WAIT_MS = 60000;
+const HLS_DECODE_OVERSHOOT = 5;
 
 function resolveMediaPath(filePath) {
   if (!filePath) return null;
@@ -4112,10 +4147,6 @@ function probeMedia(resolved) {
     [
       "-v",
       "quiet",
-      "-analyzeduration",
-      "100000",
-      "-probesize",
-      "100000",
       "-print_format",
       "json",
       "-show_streams",
@@ -4138,24 +4169,224 @@ function probeMedia(resolved) {
   return { videoCodec, audioCodec, duration };
 }
 
-function buildTranscodeArgs(
-  resolved,
-  videoCodec,
-  audioCodec,
-  startSec,
-  durationSec,
-) {
-  const args = [];
-  if (startSec > 0) args.push("-ss", String(startSec));
-  args.push("-i", resolved);
-  if (durationSec != null) args.push("-t", String(durationSec));
+function hlsCacheKey(resolved) {
+  const st = fs.statSync(resolved);
+  return crypto
+    .createHash("sha1")
+    .update(`${resolved}:${st.size}:${st.mtimeMs}`)
+    .digest("hex");
+}
 
-  // Always transcode — copy mode preserves source PTS (which may start at a
-  // non-zero offset like 1.48s), causing hls.js to jump the playback position.
-  // setpts/asetpts filters reset PTS to 0 so -output_ts_offset gives correct placement.
-  args.push(
+function probeKeyframes(resolved) {
+  const r = cp.spawnSync(
+    "ffprobe",
+    [
+      "-v",
+      "error",
+      "-select_streams",
+      "v:0",
+      "-show_entries",
+      "packet=pts_time,flags",
+      "-of",
+      "csv=print_section=0",
+      resolved,
+    ],
+    { maxBuffer: 256 * 1024 * 1024 },
+  );
+  if (r.status !== 0)
+    throw new Error(r.stderr?.toString() || "ffprobe keyframe scan failed");
+  const out = r.stdout.toString();
+  const kfTimes = [];
+  for (const line of out.split("\n")) {
+    if (!line) continue;
+    const [pts, flags] = line.split(",");
+    if (!flags || !flags.includes("K")) continue;
+    const t = parseFloat(pts);
+    if (Number.isFinite(t)) kfTimes.push(t);
+  }
+  kfTimes.sort((a, b) => a - b);
+  return kfTimes;
+}
+
+async function getHlsInfo(resolved) {
+  ensureDir(HLS_CACHE_DIR);
+  const key = hlsCacheKey(resolved);
+  const cacheFile = path.join(HLS_CACHE_DIR, `${key}.json`);
+  if (fs.existsSync(cacheFile)) {
+    try {
+      return JSON.parse(fs.readFileSync(cacheFile, "utf8"));
+    } catch {
+      // fall through and rebuild
+    }
+  }
+  const { videoCodec, audioCodec, duration } = probeMedia(resolved);
+  const kfTimes = probeKeyframes(resolved);
+  if (kfTimes.length === 0 || kfTimes[0] > 0.5) kfTimes.unshift(0);
+  const info = { videoCodec, audioCodec, duration, kfTimes };
+  try {
+    fs.writeFileSync(cacheFile, JSON.stringify(info));
+  } catch {}
+  return info;
+}
+
+function buildSegmentList(info) {
+  const { kfTimes, duration } = info;
+  const segs = [];
+  let i = 0;
+  while (i < kfTimes.length) {
+    const start = kfTimes[i];
+    let j = i + 1;
+    while (j < kfTimes.length && kfTimes[j] - start < HLS_TARGET_SEG_DURATION) {
+      j++;
+    }
+    const end = j < kfTimes.length ? kfTimes[j] : duration;
+    if (end > start) segs.push({ start, duration: end - start });
+    i = j;
+  }
+  return segs;
+}
+
+// ---------------------------------------------------------------------------
+// Session management
+// ---------------------------------------------------------------------------
+
+const hlsSessions = new Map(); // resolved path -> session
+
+function segFileName(idx) {
+  return `seg_${String(idx).padStart(5, "0")}.ts`;
+}
+
+function cleanSessionDir(dir) {
+  try {
+    for (const f of fs.readdirSync(dir)) {
+      try {
+        fs.unlinkSync(path.join(dir, f));
+      } catch {}
+    }
+  } catch {}
+}
+
+function killSessionProc(s) {
+  if (s.proc) {
+    try {
+      s.proc.kill("SIGKILL");
+    } catch {}
+    s.proc = null;
+  }
+  if (s.watcher) {
+    try {
+      s.watcher.close();
+    } catch {}
+    s.watcher = null;
+  }
+  for (const w of s.waiters.values()) {
+    clearTimeout(w.timer);
+    try {
+      w.reject(new Error("session restart"));
+    } catch {}
+  }
+  s.waiters.clear();
+}
+
+async function getOrCreateHlsSession(resolved) {
+  let s = hlsSessions.get(resolved);
+  if (s) {
+    s.lastAccess = Date.now();
+    return s;
+  }
+  const info = await getHlsInfo(resolved);
+  const segs = buildSegmentList(info);
+  ensureDir(HLS_SESSION_DIR);
+  const id = crypto
+    .createHash("sha1")
+    .update(resolved)
+    .digest("hex")
+    .slice(0, 16);
+  const dir = path.join(HLS_SESSION_DIR, id);
+  ensureDir(dir);
+  cleanSessionDir(dir);
+  s = {
+    resolved,
+    info,
+    segs,
+    dir,
+    proc: null,
+    watcher: null,
+    startIdx: -1,
+    producedIdx: -1,
+    waiters: new Map(), // idx -> { resolve, reject, timer }
+    lastAccess: Date.now(),
+  };
+  hlsSessions.set(resolved, s);
+  return s;
+}
+
+function resolveSessionWaiters(s) {
+  for (const [idx, w] of [...s.waiters]) {
+    if (idx <= s.producedIdx) {
+      clearTimeout(w.timer);
+      s.waiters.delete(idx);
+      try {
+        w.resolve();
+      } catch {}
+    }
+  }
+}
+
+function waitForSegment(s, idx) {
+  if (idx <= s.producedIdx) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      if (s.waiters.has(idx)) {
+        s.waiters.delete(idx);
+        reject(new Error(`segment ${idx} timeout`));
+      }
+    }, HLS_SEG_WAIT_MS);
+    s.waiters.set(idx, { resolve, reject, timer });
+  });
+}
+
+function startHlsFfmpeg(s, fromIdx) {
+  killSessionProc(s);
+  cleanSessionDir(s.dir);
+  s.startIdx = fromIdx;
+  s.producedIdx = fromIdx - 1;
+
+  const kfStart = s.segs[fromIdx].start;
+  const inputSeek = Math.max(0, kfStart - HLS_DECODE_OVERSHOOT);
+  // total target span = end of last segment
+  const lastSeg = s.segs[s.segs.length - 1];
+  const endTime = lastSeg.start + lastSeg.duration;
+
+  // Force keyframes at every absolute segment start time from fromIdx onwards
+  const forceKf = [];
+  for (let i = fromIdx; i < s.segs.length; i++) {
+    forceKf.push(s.segs[i].start.toFixed(6));
+  }
+  // segment_times = durations from kfStart to each subsequent split (relative)
+  const splitTimes = [];
+  for (let i = fromIdx + 1; i < s.segs.length; i++) {
+    splitTimes.push((s.segs[i].start - kfStart).toFixed(6));
+  }
+
+  const args = [
+    "-hide_banner",
+    "-loglevel",
+    "warning",
+    "-nostdin",
+    "-ss",
+    inputSeek.toFixed(6),
+    "-copyts",
+    "-i",
+    s.resolved,
+    "-map",
+    "0:v:0",
+    "-map",
+    "0:a:0?",
     "-vf",
-    "setpts=PTS-STARTPTS",
+    `trim=start=${kfStart.toFixed(6)},setpts=PTS-STARTPTS+${kfStart.toFixed(6)}/TB`,
+    "-af",
+    `atrim=start=${kfStart.toFixed(6)},asetpts=PTS-STARTPTS+${kfStart.toFixed(6)}/TB`,
     "-c:v",
     "libx264",
     "-preset",
@@ -4166,22 +4397,119 @@ function buildTranscodeArgs(
     "yuv420p",
     "-crf",
     "23",
-    "-g",
-    "48",
-  );
-  args.push(
-    "-af",
-    "asetpts=PTS-STARTPTS",
+    "-force_key_frames",
+    forceKf.join(","),
     "-c:a",
     "aac",
-    "-b:a",
-    "128k",
     "-ac",
     "2",
+    "-b:a",
+    "160k",
+    "-avoid_negative_ts",
+    "disabled",
+    "-muxdelay",
+    "0",
+    "-muxpreload",
+    "0",
+    "-to",
+    endTime.toFixed(6),
+    "-f",
+    "segment",
+    "-segment_format",
+    "mpegts",
+    "-segment_time_delta",
+    "0.0001",
+  ];
+  if (splitTimes.length > 0) {
+    args.push("-segment_times", splitTimes.join(","));
+  }
+  args.push(
+    "-segment_start_number",
+    String(fromIdx),
+    path.join(s.dir, "seg_%05d.ts"),
   );
-  args.push("-muxdelay", "0", "-muxpreload", "0");
-  return args;
+
+  console.log(
+    `[hls session] start ${path.basename(s.resolved)} fromIdx=${fromIdx} kfStart=${kfStart.toFixed(3)}`,
+  );
+  const proc = cp.spawn("ffmpeg", args);
+  s.proc = proc;
+  let stderrBuf = "";
+  proc.stderr.on("data", (d) => {
+    stderrBuf += d.toString();
+    if (stderrBuf.length > 16000) stderrBuf = stderrBuf.slice(-16000);
+  });
+  proc.on("error", (err) => {
+    console.error("[hls session] ffmpeg error:", err.message);
+  });
+  // Watch the session dir for new segment files. The segment muxer writes
+  // seg_N.ts while it's open and then closes it when it opens seg_(N+1).ts —
+  // so when we see seg_(N+1) appear, seg_N is fully flushed and ready.
+  // (Watching stderr for "Opening ... for writing" only works at -loglevel
+  // verbose, which floods our logs; fs.watch is more robust.)
+  try {
+    s.watcher = fs.watch(s.dir, (event, fname) => {
+      if (!fname) return;
+      const m = /^seg_(\d+)\.ts$/.exec(fname);
+      if (!m) return;
+      const n = parseInt(m[1], 10);
+      // seg_n appearing means seg_(n-1) is now closed/complete.
+      const newProduced = n - 1;
+      if (newProduced > s.producedIdx) {
+        s.producedIdx = newProduced;
+        resolveSessionWaiters(s);
+      }
+    });
+  } catch (err) {
+    console.error("[hls session] watch error:", err.message);
+  }
+  proc.on("exit", (code, signal) => {
+    if (s.proc !== proc) return;
+    s.proc = null;
+    if (s.watcher) {
+      try {
+        s.watcher.close();
+      } catch {}
+      s.watcher = null;
+    }
+    if (code === 0) {
+      // last in-flight segment is now closed
+      s.producedIdx = s.segs.length - 1;
+      resolveSessionWaiters(s);
+    } else if (signal !== "SIGKILL") {
+      console.log(
+        `[hls session] ffmpeg exit code=${code} signal=${signal}: ${stderrBuf.slice(-500)}`,
+      );
+      for (const w of s.waiters.values()) {
+        clearTimeout(w.timer);
+        try {
+          w.reject(new Error(`ffmpeg exit ${code}`));
+        } catch {}
+      }
+      s.waiters.clear();
+    }
+  });
 }
+
+// Idle cleanup
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, s] of [...hlsSessions]) {
+    if (now - s.lastAccess > HLS_SESSION_IDLE_MS) {
+      killSessionProc(s);
+      cleanSessionDir(s.dir);
+      try {
+        fs.rmdirSync(s.dir);
+      } catch {}
+      hlsSessions.delete(key);
+      console.log(`[hls session] idle cleanup ${path.basename(s.resolved)}`);
+    }
+  }
+}, 30000).unref?.();
+
+// ---------------------------------------------------------------------------
+// Endpoints
+// ---------------------------------------------------------------------------
 
 app.get("/api/hls/manifest.m3u8", async (req, res) => {
   const resolved = resolveMediaPath(req.query.path);
@@ -4190,22 +4518,21 @@ app.get("/api/hls/manifest.m3u8", async (req, res) => {
     return;
   }
   try {
-    const { duration } = probeMedia(resolved);
-    const segCount = Math.ceil(duration / HLS_SEGMENT_DURATION);
+    const info = await getHlsInfo(resolved);
+    const segs = buildSegmentList(info);
     const encodedPath = encodeURIComponent(req.query.path);
+    let maxDur = 0;
+    for (const s of segs) if (s.duration > maxDur) maxDur = s.duration;
     const lines = [
       "#EXTM3U",
       "#EXT-X-VERSION:3",
-      `#EXT-X-TARGETDURATION:${HLS_SEGMENT_DURATION}`,
+      "#EXT-X-PLAYLIST-TYPE:VOD",
+      `#EXT-X-TARGETDURATION:${Math.ceil(maxDur)}`,
       "#EXT-X-MEDIA-SEQUENCE:0",
     ];
-    for (let i = 0; i < segCount; i++) {
-      const segStart = i * HLS_SEGMENT_DURATION;
-      const segDur = Math.min(HLS_SEGMENT_DURATION, duration - segStart);
-      lines.push(`#EXTINF:${segDur.toFixed(3)},`);
-      lines.push(
-        `segment.ts?path=${encodedPath}&start=${segStart}&duration=${HLS_SEGMENT_DURATION}`,
-      );
+    for (let i = 0; i < segs.length; i++) {
+      lines.push(`#EXTINF:${segs[i].duration.toFixed(3)},`);
+      lines.push(`segment.ts?path=${encodedPath}&i=${i}`);
     }
     lines.push("#EXT-X-ENDLIST");
     res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
@@ -4223,42 +4550,36 @@ app.get("/api/hls/segment.ts", async (req, res) => {
     res.status(404).json({ error: "not found" });
     return;
   }
-  const startSec = parseFloat(req.query.start) || 0;
-  const durationSec = parseFloat(req.query.duration) || HLS_SEGMENT_DURATION;
-  if (hlsActiveCount >= HLS_MAX_CONCURRENT) {
-    res.status(503).json({ error: "busy" });
+  const idx = parseInt(req.query.i, 10);
+  if (!Number.isFinite(idx) || idx < 0) {
+    res.status(400).json({ error: "bad idx" });
     return;
   }
   try {
-    const { videoCodec, audioCodec } = probeMedia(resolved);
-    const args = buildTranscodeArgs(
-      resolved,
-      videoCodec,
-      audioCodec,
-      startSec,
-      durationSec,
-    );
-    args.push("-output_ts_offset", String(startSec), "-f", "mpegts", "pipe:1");
+    const s = await getOrCreateHlsSession(resolved);
+    s.lastAccess = Date.now();
+    if (idx >= s.segs.length) {
+      res.status(404).end();
+      return;
+    }
+    const segFile = path.join(s.dir, segFileName(idx));
+    const needRestart =
+      !s.proc ||
+      idx < s.startIdx ||
+      idx > s.producedIdx + HLS_SEEK_TOLERANCE_SEGS;
+    if (!fs.existsSync(segFile) && needRestart) {
+      startHlsFfmpeg(s, idx);
+    }
+    if (!fs.existsSync(segFile)) {
+      await waitForSegment(s, idx);
+    }
+    if (!fs.existsSync(segFile)) {
+      res.status(500).json({ error: "segment missing after wait" });
+      return;
+    }
     res.setHeader("Content-Type", "video/mp2t");
     res.setHeader("Cache-Control", "public, max-age=3600");
-    hlsActiveCount++;
-    const ffmpeg = cp.spawn("ffmpeg", args);
-    ffmpeg.stdout.pipe(res);
-    ffmpeg.stderr.on("data", () => {});
-    ffmpeg.on("error", (err) =>
-      console.error("[hls segment] ffmpeg error:", err.message),
-    );
-    const kill = () => {
-      if (!ffmpeg.killed) ffmpeg.kill("SIGKILL");
-    };
-    req.on("close", kill);
-    res.on("close", kill);
-    ffmpeg.on("exit", (code) => {
-      hlsActiveCount--;
-      if (code !== 0 && code !== null)
-        console.log(`[hls segment] ffmpeg exit ${code}`);
-      if (!res.writableEnded) res.end();
-    });
+    fs.createReadStream(segFile).pipe(res);
   } catch (err) {
     console.error("[hls segment]", err.message);
     if (!res.headersSent) res.status(500).json({ error: err.message });

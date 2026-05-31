@@ -147,6 +147,19 @@
             TV
           </button>
           <button
+            v-if="notInEmby"
+            @click.stop="loadIntoEmby"
+            :style="{
+              fontSize: '13px',
+              cursor: 'pointer',
+              marginTop: '3px',
+              maxHeight: '24px',
+              borderRadius: '7px',
+            }"
+          >
+            Load
+          </button>
+          <button
             @click.stop="deleteClick"
             style="
               font-size: 13px;

@@ -5827,12 +5827,10 @@ async function saveFlexgetHistory() {
     const list = flexgetHistory[key];
     const maxSent = list.reduce((best, c) => {
       if (!c.sent) return best;
-      const t = new Date(
-        c.sent.replace(
-          /^(\d{4})\/(\d{2})\/(\d{2})-(\d{2}):(\d{2}):(\d{2})$/,
-          "$1-$2-$3T$4:$5:$6",
-        ),
-      ).getTime();
+      const t = new Date(c.sent.replace(
+        /^(\d{4})\/(\d{2})\/(\d{2})-(\d{2}):(\d{2}):(\d{2})$/,
+        "$1-$2-$3T$4:$5:$6"
+      )).getTime();
       return t > best ? t : best;
     }, 0);
     if (maxSent > 0 && maxSent < cutoff) {

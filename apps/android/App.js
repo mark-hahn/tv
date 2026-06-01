@@ -86,6 +86,10 @@ export default function App() {
   const [guestActors, setGuestActors] = useState([]);
   const [episodeInfo, setEpisodeInfo] = useState(null);
   const [showSearch, setShowSearch] = useState("");
+  const [sortOrder, setSortOrder] = useState("viewed");
+  useEffect(() => {
+    sortOrderRef.current = sortOrder;
+  }, [sortOrder]);
   const [posterExpanded, setPosterExpanded] = useState(false);
   const [showSeriesMap, setShowSeriesMap] = useState(null);
   const [mapRefreshKey, setMapRefreshKey] = useState(0);
@@ -140,6 +144,8 @@ export default function App() {
   const followPlayingRef = useRef(false);
   const layoutOptionRef = useRef("mark");
   const showSelectedRef = useRef(null);
+  const sortOrderRef = useRef("viewed");
+  const lastViewedRef = useRef({});
   const showsListRef = useRef([]);
   const showsListLoadedRef = useRef(false);
   const showsFlatListRef = useRef(null);
@@ -378,11 +384,14 @@ export default function App() {
     showsListLoadedRef.current = true;
     (async () => {
       try {
-        const [res, savedName] = await Promise.all([
+        const [res, lastViewedRes, savedName] = await Promise.all([
           fetch(`${TV_SRVR_HTTP_URL}/api/getAllTvdb?hasEmby=1`),
+          fetch(`${TV_SRVR_HTTP_URL}/api/getLastViewed`),
           AsyncStorage.getItem("selectedShowName").catch(() => null),
         ]);
         const data = await res.json();
+        const lastViewedData = await lastViewedRes.json();
+        lastViewedRef.current = lastViewedData || {};
         const list = Object.entries(data)
           .map(([name, show]) => ({ ...show, name }))
           .filter((show) => show.inEmby !== false)
@@ -543,6 +552,18 @@ export default function App() {
       .then((data) => setEpiStats(data && !data.error ? data : {}))
       .catch(() => setEpiStats({}));
   }, [activeTab, selectedSE?.s, selectedSE?.e]);
+
+  useEffect(() => {
+    if (activeTab === "List" && showShows && showsFlatListRef.current) {
+      showsFlatListRef.current.scrollToOffset({ offset: 0, animated: false });
+    }
+  }, [activeTab, showShows]);
+
+  useEffect(() => {
+    if (activeTab === "List" && showShows && showsFlatListRef.current) {
+      showsFlatListRef.current.scrollToOffset({ offset: 0, animated: false });
+    }
+  }, [sortOrder]);
 
   const flash = (btn) => {
     setFlashBtn(btn);
@@ -880,6 +901,10 @@ export default function App() {
   const startShowsHold = () =>
     dbStart(() => {
       flash("shows");
+      setActiveTab("List");
+      setSortOrder("viewed");
+      setFollowPlaying(true);
+      setSelectedShow(null);
       setShowShows(true);
     });
 
@@ -1460,17 +1485,40 @@ export default function App() {
       return w + (cell.avail ? "+" : "-");
     };
 
+    const getSortedShows = (shows) => {
+      return [...shows].sort((a, b) => {
+        if (sortOrder === "alpha") {
+          const ka = a.name.replace(/^the\s*/i, "").toLowerCase();
+          const kb = b.name.replace(/^the\s*/i, "").toLowerCase();
+          return ka < kb ? -1 : ka > kb ? 1 : 0;
+        } else if (sortOrder === "viewed") {
+          const lastViewedA = lastViewedRef.current[a.name] || 0;
+          const lastViewedB = lastViewedRef.current[b.name] || 0;
+          return lastViewedB - lastViewedA; // Most recent first
+        } else if (sortOrder === "added") {
+          const dateA = a.dateCreated || "";
+          const dateB = b.dateCreated || "";
+          // Pad short dates for proper comparison
+          const paddedA = dateA.length > 10 ? dateA : dateA + " 00:00:00";
+          const paddedB = dateB.length > 10 ? dateB : dateB + " 00:00:00";
+          return paddedB > paddedA ? 1 : paddedB < paddedA ? -1 : 0; // Most recent first
+        }
+        return 0;
+      });
+    };
+
     const renderListContent = () => {
+      const sorted = getSortedShows(showsList);
       const filtered = showSearch
-        ? showsList.filter((s) =>
+        ? sorted.filter((s) =>
             s.name.toLowerCase().includes(showSearch.toLowerCase()),
           )
-        : showsList;
+        : sorted;
       const initialIdx = showSearch
         ? 0
         : Math.max(
             0,
-            showsList.findIndex((s) => s.name === show?.name),
+            sorted.findIndex((s) => s.name === show?.name),
           );
       return (
         <FlatList
@@ -1486,13 +1534,61 @@ export default function App() {
           onScrollToIndexFailed={() => {}}
           renderItem={({ item }) => (
             <TouchableOpacity
-              onPress={() => {
+              onPress={async () => {
                 showSelectedRef.current = { name: item.name };
                 setShowSearch("");
                 setSelectedShow(item);
                 followPlayingRef.current = false;
                 setFollowPlaying(false);
-                setSelectedSE(null);
+
+                // Find first unwatched episode
+                try {
+                  let data;
+                  if (item.inEmby !== false) {
+                    const res = await fetch(
+                      `${TV_SRVR_HTTP_URL}/api/getSeriesMapFromEmby`,
+                      {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ showName: item.name }),
+                      },
+                    );
+                    data = await res.json();
+                  } else {
+                    const res = await fetch(
+                      `${TV_SRVR_HTTP_URL}/api/getSeriesMapFromTvdb`,
+                      {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          tvdbId: item.tvdbId,
+                          watchedEpis: item.watchedEpis ?? null,
+                        }),
+                      },
+                    );
+                    data = await res.json();
+                  }
+
+                  if (data.success && data.seriesMap) {
+                    // Find first unwatched episode
+                    let firstUnwatched = null;
+                    for (const [seasonNum, episodes] of data.seriesMap) {
+                      for (const [episodeNum, epiObj] of episodes) {
+                        if (!epiObj.played && !epiObj.unaired) {
+                          firstUnwatched = { s: seasonNum, e: episodeNum };
+                          break;
+                        }
+                      }
+                      if (firstUnwatched) break;
+                    }
+                    setSelectedSE(firstUnwatched);
+                  } else {
+                    setSelectedSE(null);
+                  }
+                } catch (_) {
+                  setSelectedSE(null);
+                }
+
                 setActiveTab("Info");
               }}
               style={[
@@ -2204,6 +2300,7 @@ export default function App() {
       } catch (_) {
         alert("TV request failed.");
       }
+      handleClose();
     };
 
     return (
@@ -2234,15 +2331,42 @@ export default function App() {
           ))}
         </View>
         {activeTab === "List" && (
-          <TextInput
-            style={showsStyles.searchInput}
-            value={showSearch}
-            onChangeText={setShowSearch}
-            placeholder="Search shows..."
-            placeholderTextColor="#aaa"
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
+          <View style={{ flexDirection: "row", width: "100%" }}>
+            <TextInput
+              style={[showsStyles.searchInput, { flex: 1, marginRight: 0 }]}
+              value={showSearch}
+              onChangeText={setShowSearch}
+              placeholder="Search shows..."
+              placeholderTextColor="#aaa"
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity
+              onPress={() => {
+                const orders = ["alpha", "viewed", "added"];
+                const currentIdx = orders.indexOf(sortOrder);
+                const nextIdx = (currentIdx + 1) % orders.length;
+                setSortOrder(orders[nextIdx]);
+              }}
+              style={[
+                showsStyles.searchInput,
+                {
+                  flex: 1,
+                  marginLeft: 0,
+                  justifyContent: "center",
+                  alignItems: "center",
+                },
+              ]}
+            >
+              <Text style={{ fontSize: fs(18), fontWeight: "bold" }}>
+                {sortOrder === "alpha"
+                  ? "Alpha"
+                  : sortOrder === "viewed"
+                    ? "Viewed"
+                    : "Added"}
+              </Text>
+            </TouchableOpacity>
+          </View>
         )}
         <View style={showsStyles.contentPane}>
           <>

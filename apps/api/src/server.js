@@ -39,7 +39,7 @@ import {
 import * as reviews from "./reviews.js";
 import { checkFiles as tvProcCheckFiles } from "./tv-proc.js";
 import { getActorCredits } from "./imdb-credits.js";
-import { postHistory, parseTitleFromFilename } from "@tv/share";
+import { postHistory, parseTitleFromFilename, TV_BLOCKED } from "@tv/share";
 import parseTorrentTitlePkg from "parse-torrent-title";
 import {
   getApiCookiesDir,
@@ -1289,6 +1289,22 @@ async function handleDownloadRequest(req, res) {
         error: "Torrent data is required",
       });
       return;
+    }
+
+    // Block if torrent title contains any TV_BLOCKED substring (skipped when forceDownload).
+    if (!forceDownload) {
+      const title = torTitle();
+      const blockedKey = Object.keys(TV_BLOCKED).find((k) => title.includes(k));
+      if (blockedKey) {
+        postTorErr("tv-blocked", `title matches blocked key: ${blockedKey}`);
+        res.json({
+          ...baseWrapper,
+          success: false,
+          stage: "tv-blocked",
+          error: `Torrent title blocked: ${blockedKey}`,
+        });
+        return;
+      }
     }
 
     // Default behavior: consult tv-proc before uploading.

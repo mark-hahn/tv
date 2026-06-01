@@ -3628,6 +3628,16 @@ export default {
 
             const errorMsg = wrapper.error || wrapper.message;
             if (errorMsg) {
+              if (payload?.stage === "tv-blocked") {
+                const confirmed = await this.showConfirmDialog(
+                  `Torrent is blocked: ${payload.error || errorMsg}\n\nSend to qBittorrent anyway?`,
+                );
+                if (confirmed) {
+                  void this.enqueueDownload(torrent, { forceDownload: true });
+                }
+                return { ok: false, message: String(errorMsg) };
+              }
+
               if (isAlreadyInQbtMessage(errorMsg)) {
                 if (forceDownload) {
                   // Force: delete then re-add

@@ -343,6 +343,7 @@ function validateTorrentData(torrentData) {
           fileCount: allPaths.length,
           checkedCount: checkList.length,
           checkedFiles,
+          torrentName: parsedTorrent?.name || "Unknown",
         },
       );
     }

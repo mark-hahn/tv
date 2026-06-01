@@ -3628,6 +3628,14 @@ export default {
 
             const errorMsg = wrapper.error || wrapper.message;
             if (errorMsg) {
+              if (payload?.stage === "validate-torrent-files") {
+                const torrentName = payload?.torrentName || "Unknown";
+                this.showError(
+                  `Torrent file name is missing a season or episode number.\n\nTorrent: ${torrentName}`,
+                );
+                return { ok: false, message: String(errorMsg) };
+              }
+
               if (payload?.stage === "tv-blocked") {
                 const confirmed = await this.showConfirmDialog(
                   `Torrent is blocked: ${payload.error || errorMsg}\n\nSend to qBittorrent anyway?`,

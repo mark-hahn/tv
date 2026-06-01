@@ -88,7 +88,10 @@
             marginLeft: '15px',
           }"
         >
-          {{ mapShow?.name }}
+          {{ mapShow?.name
+          }}{{
+            selectedEpisode ? " " + formatSelectedEpisode(selectedEpisode) : ""
+          }}
         </div>
         <div style="display: flex">
           <div

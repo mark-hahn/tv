@@ -3597,6 +3597,15 @@ app.post(
 );
 
 app.post(
+  "/api/requestEmbyLibraryRefresh",
+  apiWrapper(async () => {
+    // Fire and forget — manager throttles, dedupes, polls, and pushes WS progress
+    embyRefreshManager.request("api");
+    return { ok: true };
+  }),
+);
+
+app.post(
   "/api/populateFilesOnDisk",
   apiWrapper(async () => {
     const allTvdb = tvdb.getAllTvdbSync();
@@ -7249,6 +7258,159 @@ cron.schedule("*/15 * * * *", () => {
   );
 });
 
+//////////////////  EMBY REFRESH MANAGER  //////////////////
+// All Library/Refresh calls go through here: one running + one pending max,
+// minimum 3 s gap between scans, server polls internally and pushes
+// libraryProgress / libraryRefreshDone WS events to all clients.
+
+const embyRefreshManager = (() => {
+  const MIN_GAP_MS = 3000;
+  const POLL_INTERVAL_MS = 2000;
+  const POLL_TIMEOUT_MS = 5 * 60 * 1000;
+
+  let running = false;
+  let lastFinishedAt = 0;
+  // pendingShowNames / pendingWaiters accumulate while a scan is running.
+  // At the start of each run() they are moved into myShowNames / myWaiters so
+  // that new arrivals during this scan queue into the *next* generation and
+  // are not resolved until their own dedicated scan completes.
+  let pendingShowNames = new Set();
+  let pendingWaiters = []; // { resolve }
+
+  async function getLibraryTaskId() {
+    try {
+      const tasksRes = await fetch(
+        `${EMBY_BASE_URL}/ScheduledTasks?api_key=${EMBY_API_KEY}`,
+      );
+      if (!tasksRes.ok) return null;
+      const tasks = await tasksRes.json();
+      const task = (Array.isArray(tasks) ? tasks : []).find((t) => {
+        const n = String(t?.Name || "").toLowerCase();
+        return (
+          n.includes("library") && (n.includes("scan") || n.includes("refresh"))
+        );
+      });
+      return task?.Id || null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function run(myShowNames, myWaiters) {
+    running = true; // set synchronously before first await
+
+    const gap = MIN_GAP_MS - (Date.now() - lastFinishedAt);
+    if (gap > 0) await new Promise((r) => setTimeout(r, gap));
+
+    let taskId = null;
+    console.log(
+      `[refreshMgr] starting library refresh (shows: ${[...myShowNames].join(", ") || "manual"})`,
+    );
+    notifyClients("libraryProgress", { pct: 0 });
+
+    try {
+      const res = await fetch(
+        `${EMBY_BASE_URL}/Library/Refresh?api_key=${EMBY_API_KEY}`,
+        { method: "POST" },
+      );
+      if (res.ok) {
+        taskId = await getLibraryTaskId();
+        console.log(`[refreshMgr] taskId: ${taskId || "none"}`);
+      } else {
+        console.error(
+          `[refreshMgr] Library/Refresh failed: ${res.status} ${res.statusText}`,
+        );
+      }
+    } catch (e) {
+      console.error(`[refreshMgr] Library/Refresh error:`, e.message);
+    }
+
+    if (taskId) {
+      const pollStart = Date.now();
+      while (Date.now() - pollStart < POLL_TIMEOUT_MS) {
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+        try {
+          const taskRes = await fetch(
+            `${EMBY_BASE_URL}/ScheduledTasks/${taskId}?api_key=${EMBY_API_KEY}`,
+          );
+          if (taskRes.ok) {
+            const task = await taskRes.json();
+            const progressNum = Number(task?.CurrentProgressPercentage);
+            if (Number.isFinite(progressNum)) {
+              notifyClients("libraryProgress", { pct: progressNum });
+            }
+            if (task.State !== "Running") {
+              console.log(`[refreshMgr] scan finished (State=${task.State})`);
+              break;
+            }
+          }
+        } catch (e) {
+          console.error(`[refreshMgr] poll error:`, e.message);
+        }
+      }
+    } else {
+      console.log(`[refreshMgr] no taskId, waiting 90s`);
+      await new Promise((r) => setTimeout(r, 90 * 1000));
+    }
+
+    running = false;
+    lastFinishedAt = Date.now();
+
+    // Resolve this generation's waiters now — they got their scan.
+    const showNames = [...myShowNames];
+    console.log(
+      `[refreshMgr] done, notifying clients (shows: ${showNames.join(", ") || "manual"})`,
+    );
+    notifyClients("libraryRefreshDone", { showNames });
+    for (const { resolve } of myWaiters) resolve(showNames);
+
+    // If new requests arrived during this scan, start another run for them.
+    if (pendingShowNames.size > 0 || pendingWaiters.length > 0) {
+      const nextShowNames = new Set([...pendingShowNames]);
+      const nextWaiters = [...pendingWaiters];
+      pendingShowNames = new Set();
+      pendingWaiters = [];
+      console.log(
+        `[refreshMgr] pending shows: ${[...nextShowNames].join(", ")}, re-running`,
+      );
+      setTimeout(
+        () =>
+          run(nextShowNames, nextWaiters).catch((e) =>
+            console.error("[refreshMgr] run error:", e.message),
+          ),
+        MIN_GAP_MS,
+      );
+    }
+  }
+
+  return {
+    request(caller = "unknown", showName = null) {
+      const promise = new Promise((resolve) => {
+        if (running) {
+          // Queue for the next generation scan
+          if (showName) pendingShowNames.add(showName);
+          pendingWaiters.push({ resolve });
+          console.log(
+            `[refreshMgr] ${caller}: refresh in flight, queued${showName ? ` ${showName}` : ""}`,
+          );
+        } else {
+          // Start a new scan immediately with this request as the first in its generation
+          if (showName) pendingShowNames.add(showName);
+          pendingWaiters.push({ resolve });
+          const myShowNames = new Set([...pendingShowNames]);
+          const myWaiters = [...pendingWaiters];
+          pendingShowNames = new Set();
+          pendingWaiters = [];
+          run(myShowNames, myWaiters).catch((e) =>
+            console.error("[refreshMgr] run error:", e.message),
+          );
+        }
+      });
+      return promise;
+    },
+  };
+})();
+
 //////////////////  CHOKIDAR FILE WATCHER  //////////////////
 
 const changedShows = new Map(); // showName -> { timeout, files: Set<string> }
@@ -7303,91 +7465,16 @@ async function handleShowDiskChange(showName) {
       }
     }
 
-    // Trigger Emby library refresh so map shows current data
-    console.log(`[chokidar] Triggering Emby library refresh for ${showName}`);
-    let taskId = null;
-    try {
-      const refreshRes = await fetch(
-        `${EMBY_BASE_URL}/Library/Refresh?api_key=${EMBY_API_KEY}`,
-        { method: "POST" },
-      );
-      if (refreshRes.ok) {
-        // Get the task ID
-        const tasksRes = await fetch(
-          `${EMBY_BASE_URL}/ScheduledTasks?api_key=${EMBY_API_KEY}`,
-        );
-        if (tasksRes.ok) {
-          const tasks = await tasksRes.json();
-          const libraryTask = tasks.find((t) => {
-            const n = String(t?.Name || "").toLowerCase();
-            return (
-              n.includes("library") &&
-              (n.includes("scan") || n.includes("refresh"))
-            );
-          });
-          if (libraryTask?.Id) {
-            taskId = libraryTask.Id;
-            console.log(`[chokidar] Emby refresh triggered, taskId: ${taskId}`);
-          } else {
-            console.log(`[chokidar] Emby refresh triggered, no taskId found`);
-          }
-        }
-      } else {
-        console.error(
-          `[chokidar] Emby refresh failed: ${refreshRes.status} ${refreshRes.statusText}`,
-        );
-      }
-    } catch (refreshErr) {
-      console.error(`[chokidar] Emby refresh error:`, refreshErr.message);
-    }
-
-    // Notify all connected clients immediately with taskId
-    notifyClients("showDiskChanged", { showName, taskId });
+    // Notify clients that disk changed for this show (progress comes from libraryProgress WS events)
+    notifyClients("showDiskChanged", { showName });
     console.log(
-      `[chokidar] Notified clients about ${showName} with taskId: ${taskId}`,
+      `[chokidar] Notified clients about disk change for ${showName}`,
     );
 
-    // Wait for Emby scan to finish before running gap check
-    if (taskId) {
-      const POLL_INTERVAL_MS = 5000;
-      const POLL_TIMEOUT_MS = 5 * 60 * 1000;
-      const pollStart = Date.now();
-      let scanDone = false;
-      console.log(
-        `[chokidar] Polling Emby scan task ${taskId} for ${showName}`,
-      );
-      while (Date.now() - pollStart < POLL_TIMEOUT_MS) {
-        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-        try {
-          const taskRes = await fetch(
-            `${EMBY_BASE_URL}/ScheduledTasks/${taskId}?api_key=${EMBY_API_KEY}`,
-          );
-          if (taskRes.ok) {
-            const task = await taskRes.json();
-            if (task.State !== "Running") {
-              console.log(
-                `[chokidar] Emby scan finished (State=${task.State}) for ${showName}`,
-              );
-              scanDone = true;
-              break;
-            }
-          }
-        } catch (pollErr) {
-          console.error(`[chokidar] Task poll error:`, pollErr.message);
-        }
-      }
-      if (!scanDone) {
-        console.warn(
-          `[chokidar] Emby scan poll timed out for ${showName}, proceeding anyway`,
-        );
-      }
-    } else {
-      // No taskId — fall back to fixed wait
-      console.log(
-        `[chokidar] No taskId, waiting 90s for Emby scan for ${showName}`,
-      );
-      await new Promise((r) => setTimeout(r, 90 * 1000));
-    }
+    // Trigger Emby library refresh through manager (throttled, deduped, pushes WS progress)
+    console.log(`[chokidar] Requesting Emby library refresh for ${showName}`);
+    await embyRefreshManager.request(`chokidar:${showName}`, showName);
+    console.log(`[chokidar] Library refresh done for ${showName}`);
 
     try {
       const allTvdb = tvdb.getAllTvdbSync();

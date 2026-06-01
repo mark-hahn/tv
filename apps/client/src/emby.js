@@ -1496,33 +1496,8 @@ export const afterLastWatched = async (show) => {
 
 export const refreshLib = async () => {
   try {
-    await axios({
-      method: "post",
-      url: `https://hahnca.com:8920/emby/Library/Refresh?api_key=${apiKey}`,
-    });
-
-    const tasksRes = await axios({
-      method: "get",
-      url: `https://hahnca.com:8920/emby/ScheduledTasks?api_key=${apiKey}`,
-    });
-
-    const tasks = Array.isArray(tasksRes?.data) ? tasksRes.data : [];
-    const isLibraryRefreshTask = (t) => {
-      const n = String(t?.Name || "").toLowerCase();
-      // Emby task names vary a bit across versions/translations.
-      // Keep this intentionally broad but scoped to "library" + (scan|refresh).
-      if (!n.includes("library")) return false;
-      if (n.includes("scan") || n.includes("refresh")) return true;
-      // Common variants seen in some builds.
-      return /scan\s+media\s+library|refresh\s+media\s+library|scan\s+library|refresh\s+library/.test(
-        n,
-      );
-    };
-
-    const task = tasks.find(isLibraryRefreshTask);
-    if (!task?.Id) return { status: "notask" };
-
-    return { status: "hasTask", taskId: task.Id };
+    await srvr.requestEmbyLibraryRefresh();
+    return { status: "ok" };
   } catch (e) {
     return { status: e?.message || String(e) };
   }
@@ -1599,39 +1574,40 @@ export const createShowFolderAndRefreshEmby = async ({
   }
 
   // Refresh Emby so the new folder gets scanned. Ignore refresh errors, but report them.
-  let refreshRes = null;
   try {
     if (typeof onStatus === "function") onStatus("Refreshing Emby...");
-    refreshRes = await withTimeout(refreshLib(), 30000, "refreshLib");
-    if (refreshRes?.status === "hasTask" && refreshRes?.taskId) {
-      const startMs = Date.now();
-      let hasSeenRunning = false;
-      while (Date.now() - startMs < refreshTimeoutMs) {
-        const st = await srvr.embyTaskStatus(refreshRes.taskId);
-        if (st?.status === "refreshing") {
-          hasSeenRunning = true;
-          if (typeof onStatus === "function") {
-            const pct = Number(st?.progress);
-            onStatus(
-              Number.isFinite(pct)
-                ? `${pct.toFixed(0)}%`
-                : String(st?.taskStatus || "Refreshing..."),
-            );
-          }
-        } else if (hasSeenRunning || st?.status === "refreshdone") {
-          break;
-        } else if (Date.now() - startMs > 30000) {
-          break;
-        }
-        await sleep(2000);
+
+    // Register for progress and completion before triggering to avoid race condition
+    const donePromise = new Promise((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error("timeout waiting for libraryRefreshDone")),
+        refreshTimeoutMs,
+      );
+
+      function onDone() {
+        clearTimeout(timer);
+        evtBus.off("libraryRefreshDone", onDone);
+        evtBus.off("libraryProgress", onProgress);
+        resolve();
       }
-    }
+
+      function onProgress(data) {
+        if (typeof onStatus !== "function") return;
+        if (data?.pct != null) onStatus(`${Number(data.pct).toFixed(0)}%`);
+        else if (data?.status) onStatus(String(data.status));
+      }
+
+      evtBus.on("libraryRefreshDone", onDone);
+      evtBus.on("libraryProgress", onProgress);
+    });
+
+    await srvr.requestEmbyLibraryRefresh();
+    await donePromise;
   } catch (e) {
     return {
       createdFolder: true,
       status: "refreshfailed",
       err: e?.message || String(e),
-      refreshRes,
     };
   }
 

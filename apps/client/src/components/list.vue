@@ -3636,27 +3636,11 @@ export default {
     });
 
     // Listen for disk changes from chokidar watcher
-    on("showDiskChanged", async (data) => {
-      const { showName, taskId } = data || {};
+    on("showDiskChanged", (data) => {
+      const { showName } = data || {};
       if (!showName) return;
-
-      console.log(
-        `[showDiskChanged] Disk changed for: ${showName}, taskId: ${taskId}`,
-      );
-
-      // If we have a taskId, trigger library refresh dialog and wait for completion
-      if (taskId) {
-        evtBus.emit("diskChangeLibraryRefresh", { showName, taskId });
-        // Wait for library scan to complete before refreshing data
-        return;
-      }
-
-      // No taskId - update immediately (shouldn't happen in normal flow)
-      try {
-        await this.updateShowFromDiskChange(showName);
-      } catch (err) {
-        console.error(`[showDiskChanged] Error updating ${showName}:`, err);
-      }
+      console.log(`[showDiskChanged] Disk changed for: ${showName}`);
+      // Progress and reload driven by libraryProgress/libraryRefreshDone WS events via App.vue
     });
 
     // Simple + portrait: Buttons are rendered in App.vue and forward events via evtBus.

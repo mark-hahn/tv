@@ -654,11 +654,7 @@ export default {
       allTvdb: {},
       _didRequestNotifications: false,
 
-      // Library Refresh State
-      _libBusy: false,
-      _libTaskId: null,
-      _libPollTimer: null,
-      _diskChangeShowName: null,
+      // Library Refresh State — progress driven by libraryProgress/libraryRefreshDone WS events
       libraryProgressText: "",
 
       tvdbMismatchOpen: false,
@@ -993,11 +989,12 @@ export default {
     evtBus.off("addPreviewShowDone", this.onAddPreviewShowDone);
     evtBus.off("previewPanesLoading", this.onPreviewPanesLoading);
     evtBus.off("setLibraryProgress", this.handleSetLibraryProgress);
+    evtBus.off("libraryProgress", this.handleLibraryProgress);
+    evtBus.off("libraryRefreshDone", this.handleLibraryRefreshDone);
     if (this._onAppWindowResize)
       window.removeEventListener("resize", this._onAppWindowResize);
     this.stopQbtPolling();
     this.cancelDownInactiveTimer();
-    this.stopLibraryPolling();
     this.stopChksrtPolling();
     this.stopBrowseTabPolling();
   },
@@ -1242,41 +1239,12 @@ export default {
       evtBus.emit("exitPreviewMode");
     },
 
-    async startLibraryRefresh() {
-      if (this._libBusy) return;
-
-      this.stopLibraryPolling();
-      this.libraryProgressText = "";
-      this._libTaskId = null;
-      this._libBusy = true;
-
-      let res = null;
-      try {
-        res = await emby.refreshLib();
-      } catch (e) {
-        this._libBusy = false;
-        this.libraryProgressText = "error";
-        return;
-      }
-
-      if (res?.status === "hasTask") {
-        this._libTaskId = res.taskId;
-        this.libraryProgressText = "Refreshing...";
-        void this.pollLibraryStatus();
-        return;
-      }
-
-      this._libBusy = false;
-      if (res?.status && res.status !== "notask") {
-        this.libraryProgressText = String(res.status);
-      }
-    },
-
-    stopLibraryPolling() {
-      if (this._libPollTimer) {
-        clearTimeout(this._libPollTimer);
-        this._libPollTimer = null;
-      }
+    startLibraryRefresh() {
+      srvr
+        .requestEmbyLibraryRefresh()
+        .catch((err) =>
+          console.error("requestEmbyLibraryRefresh failed:", err),
+        );
     },
 
     handleSetLibraryProgress(txt) {
@@ -1284,78 +1252,29 @@ export default {
       if (!s || s.includes("%")) this.libraryProgressText = s;
     },
 
-    handleDiskChangeLibraryRefresh(payload) {
-      if (!payload || !payload.taskId) return;
-      if (this._libBusy) return;
-
-      this.stopLibraryPolling();
-      this._libTaskId = payload.taskId;
-      this._diskChangeShowName = payload.showName || null;
-      this._libBusy = true;
-      this.libraryProgressText = "Scanning...";
-      void this.pollLibraryStatus();
+    handleLibraryProgress(data) {
+      if (data?.pct != null) {
+        this.libraryProgressText = `${Number(data.pct).toFixed(0)}%`;
+      }
     },
 
-    async pollLibraryStatus() {
-      if (!this._libTaskId) {
-        this._libBusy = false;
-        return;
-      }
+    handleLibraryRefreshDone(data) {
+      this.libraryProgressText = "";
+      const showNames = Array.isArray(data?.showNames) ? data.showNames : [];
 
-      let res = null;
-      try {
-        res = await emby.taskStatus(this._libTaskId);
-      } catch (e) {
-        this._libBusy = false;
-        this._libTaskId = null;
-        this.libraryProgressText = "error";
-        return;
-      }
-      if (res?.status === "refreshing") {
-        if (Number.isFinite(Number(res?.progress))) {
-          this.libraryProgressText = `${Number(res.progress).toFixed(0)}%`;
-        } else if (res?.taskStatus) {
-          this.libraryProgressText = String(res.taskStatus);
-        } else {
-          this.libraryProgressText = "Refreshing...";
-        }
+      srvr
+        .triggerEmbySync()
+        .catch((err) => console.error("triggerEmbySync failed:", err));
 
-        this._libPollTimer = setTimeout(() => {
-          void this.pollLibraryStatus();
-        }, 2000);
-        return;
-      }
-
-      this._libBusy = false;
-      this._libTaskId = null;
-      if (res?.status === "refreshdone") {
-        this.libraryProgressText = "100%";
-
-        // Trigger full Emby sync sweep — pushes changed records to all clients
+      if (showNames.length > 0) {
+        evtBus.emit("library-refresh-complete", {
+          diskChangeShowName: showNames[0],
+        });
         srvr
-          .triggerEmbySync()
-          .catch((err) => console.error("triggerEmbySync failed:", err));
-
-        if (this._diskChangeShowName) {
-          evtBus.emit("library-refresh-complete", {
-            diskChangeShowName: this._diskChangeShowName,
-          });
-          // Enqueue just the changed show for background metadata processing
-          srvr
-            .triggerShowSelect(this._diskChangeShowName)
-            .catch((err) => console.error("triggerShowSelect failed:", err));
-          this._diskChangeShowName = null;
-        } else {
-          evtBus.emit("library-refresh-complete");
-        }
-
-        // Debounce clearing to avoid flicker
-        setTimeout(() => {
-          if (this.libraryProgressText === "100%")
-            this.libraryProgressText = "";
-        }, 5000);
-      } else if (res?.status) {
-        this.libraryProgressText = String(res.status);
+          .triggerShowSelect(showNames[0])
+          .catch((err) => console.error("triggerShowSelect failed:", err));
+      } else {
+        evtBus.emit("library-refresh-complete");
       }
     },
 
@@ -2217,8 +2136,9 @@ export default {
     evtBus.on("addPreviewShowDone", this.onAddPreviewShowDone);
 
     evtBus.on("startLibraryRefresh", this.startLibraryRefresh);
-    evtBus.on("diskChangeLibraryRefresh", this.handleDiskChangeLibraryRefresh);
     evtBus.on("setLibraryProgress", this.handleSetLibraryProgress);
+    evtBus.on("libraryProgress", this.handleLibraryProgress);
+    evtBus.on("libraryRefreshDone", this.handleLibraryRefreshDone);
 
     evtBus.on("showStreamPane", (show) => {
       this.currentPane = "tor";

@@ -457,6 +457,10 @@ export function triggerEmbySync() {
   return httpCall("/api/triggerEmbySync", {}, "POST");
 }
 
+export function requestEmbyLibraryRefresh() {
+  return httpCall("/api/requestEmbyLibraryRefresh", {}, "POST");
+}
+
 export function embyTaskStatus(taskId) {
   return httpCall(
     `/api/embyTaskStatus?taskId=${encodeURIComponent(taskId)}`,

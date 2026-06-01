@@ -1610,6 +1610,14 @@ export const createShowFolderAndRefreshEmby = async ({
         const st = await srvr.embyTaskStatus(refreshRes.taskId);
         if (st?.status === "refreshing") {
           hasSeenRunning = true;
+          if (typeof onStatus === "function") {
+            const pct = Number(st?.progress);
+            onStatus(
+              Number.isFinite(pct)
+                ? `${pct.toFixed(0)}%`
+                : String(st?.taskStatus || "Refreshing..."),
+            );
+          }
         } else if (hasSeenRunning || st?.status === "refreshdone") {
           break;
         } else if (Date.now() - startMs > 30000) {
@@ -1627,12 +1635,14 @@ export const createShowFolderAndRefreshEmby = async ({
     };
   }
 
-  // Run server-side Emby sweep so inEmby status is current before caller reloads
+  // Run server-side Emby sweep and wait for it to finish so inEmby status
+  // is current before the caller reloads the show list.
   try {
-    await srvr.triggerEmbySync();
+    if (typeof onStatus === "function") onStatus("Syncing...");
+    await srvr.embySync();
   } catch (e) {
     console.error(
-      "createShowFolderAndRefreshEmby: triggerEmbySync failed",
+      "createShowFolderAndRefreshEmby: embySync failed",
       e?.message || e,
     );
   }

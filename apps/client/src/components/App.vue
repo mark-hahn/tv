@@ -992,6 +992,7 @@ export default {
     evtBus.off("previewSrchChoice", this.onPreviewSrchChoice);
     evtBus.off("addPreviewShowDone", this.onAddPreviewShowDone);
     evtBus.off("previewPanesLoading", this.onPreviewPanesLoading);
+    evtBus.off("setLibraryProgress", this.handleSetLibraryProgress);
     if (this._onAppWindowResize)
       window.removeEventListener("resize", this._onAppWindowResize);
     this.stopQbtPolling();
@@ -1276,6 +1277,11 @@ export default {
         clearTimeout(this._libPollTimer);
         this._libPollTimer = null;
       }
+    },
+
+    handleSetLibraryProgress(txt) {
+      const s = String(txt || "");
+      if (!s || s.includes("%")) this.libraryProgressText = s;
     },
 
     handleDiskChangeLibraryRefresh(payload) {
@@ -2211,6 +2217,7 @@ export default {
 
     evtBus.on("startLibraryRefresh", this.startLibraryRefresh);
     evtBus.on("diskChangeLibraryRefresh", this.handleDiskChangeLibraryRefresh);
+    evtBus.on("setLibraryProgress", this.handleSetLibraryProgress);
 
     evtBus.on("showStreamPane", (show) => {
       this.currentPane = "tor";

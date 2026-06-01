@@ -1467,6 +1467,7 @@ export default {
 
       const setWebAddStatus = (txt) => {
         this.setSearchingModalStatus(txt);
+        evtBus.emit("setLibraryProgress", txt);
         if (externalOnStatus) externalOnStatus(txt);
       };
       const withTimeout = async (promise, ms, label) => {
@@ -1716,6 +1717,7 @@ export default {
       } finally {
         this.showSearching = false;
         this.searchingStatus = "";
+        evtBus.emit("setLibraryProgress", "");
 
         if (fromPreview) {
           // Done adding: exit preview mode and notify Series so it can hide the button.
@@ -3787,6 +3789,7 @@ export default {
       this.showReloadingShows = true;
       this.logModalMessage("reloadingShowsModal", "Reloading Shows");
       try {
+        tvdb.clearCache();
         await this.newShows();
 
         // If this was triggered by a disk change, update that specific show

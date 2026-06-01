@@ -1358,6 +1358,7 @@ export default {
           showName,
           this.mapWorkingStatus,
         );
+        evtBus.emit("setLibraryProgress", this.mapWorkingStatus);
       };
 
       try {
@@ -1421,6 +1422,7 @@ export default {
         this.mapWorkingTitle = "";
         this.mapWorkingShowName = "";
         this.mapWorkingStatus = "";
+        evtBus.emit("setLibraryProgress", "");
       }
     },
 

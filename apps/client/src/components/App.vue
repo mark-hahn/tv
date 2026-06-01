@@ -2020,6 +2020,7 @@ export default {
       this._torrentsShowKey = showKey;
       this.currentPane = "tor";
       evtBus.emit("paneChanged", this.currentPane);
+      evtBus.emit("setTorShow", show);
     },
 
     handleShowQbt() {

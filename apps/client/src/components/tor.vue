@@ -1453,6 +1453,7 @@ export default {
   mounted() {
     evtBus.on("paneChanged", this.onPaneChanged);
     evtBus.on("showTorrents", this.searchTorrents);
+    evtBus.on("setTorShow", this.setTorShow);
     evtBus.on("resetTorrentsPane", this.resetPane);
     evtBus.on("refreshSpaceAvail", this.onRefreshSpaceAvail);
     evtBus.on("openStream", this.onOpenStream);
@@ -1478,6 +1479,7 @@ export default {
 
   unmounted() {
     evtBus.off("paneChanged", this.onPaneChanged);
+    evtBus.off("setTorShow", this.setTorShow);
     evtBus.off("showTorrents", this.searchTorrents);
     evtBus.off("resetTorrentsPane", this.resetPane);
     evtBus.off("refreshSpaceAvail", this.onRefreshSpaceAvail);
@@ -1561,6 +1563,24 @@ export default {
       const scaledDy = dy * 0.125;
       const max = Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0));
       el.scrollTop = Math.max(0, Math.min(max, (el.scrollTop || 0) + scaledDy));
+    },
+
+    setTorShow(show) {
+      this.torrents = [];
+      this.error = null;
+      this.hasSearched = false;
+      this.selectedItems = new Set();
+      this.lastSelectedIndex = null;
+      this.clickedTorrents.clear();
+      this.noTorrentsNeeded = false;
+      this.providerWarning = "";
+      this.loading = false;
+      this.lastNeeded = null;
+      this.groupFilter = null;
+      this.unaired = !!show?.S1E1Unaired;
+      this.currentShow = show || null;
+      this.showName = show?.name || "";
+      this.lastAutoSearchedShowId = show?.id || show?.name || null;
     },
 
     onPaneChanged(pane) {

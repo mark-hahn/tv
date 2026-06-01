@@ -5821,6 +5821,24 @@ function flexgetIsBetterCrossRun(a, b) {
 }
 
 async function saveFlexgetHistory() {
+  const PRUNE_MS = 30 * 24 * 60 * 60 * 1000;
+  const cutoff = Date.now() - PRUNE_MS;
+  for (const key of Object.keys(flexgetHistory)) {
+    const list = flexgetHistory[key];
+    const maxSent = list.reduce((best, c) => {
+      if (!c.sent) return best;
+      const t = new Date(
+        c.sent.replace(
+          /^(\d{4})\/(\d{2})\/(\d{2})-(\d{2}):(\d{2}):(\d{2})$/,
+          "$1-$2-$3T$4:$5:$6",
+        ),
+      ).getTime();
+      return t > best ? t : best;
+    }, 0);
+    if (maxSent > 0 && maxSent < cutoff) {
+      delete flexgetHistory[key];
+    }
+  }
   await util.writeFile(FLEXGET_HISTORY_PATH, flexgetHistory);
 }
 

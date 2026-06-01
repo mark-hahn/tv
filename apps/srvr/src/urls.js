@@ -23,8 +23,11 @@ export function embyPageUrl(id) {
   `.replace(/\s*/g, "");
 }
 
-export function viewingUrl(sessionId, showId, showName) {
+export function viewingUrl(sessionId, showId, showName, episodeId) {
   const name = encodeURIComponent(showName);
+  if (episodeId) {
+    return `${hahnca}Sessions/${sessionId}/Viewing?ItemType=Episode&ItemId=${episodeId}&ItemName=${name}&api_key=${apiKey}`;
+  }
   return `${hahnca}Sessions/${sessionId}/Viewing?ItemType=Series&ItemId=${showId}&ItemName=${name}&api_key=${apiKey}`;
 }
 

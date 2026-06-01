@@ -68,14 +68,14 @@ export const getDevices = async () => {
   return await getOnDevices();
 };
 
-export const viewShowOnLivingRoomTv = async ({ showId, showName }) => {
+export const viewShowOnLivingRoomTv = async ({ showId, showName, episodeId }) => {
   const url = urls.watchingUrl();
   let resp = await fetch(url);
   if (resp.status !== 200) return { found: false };
   const sessions = await resp.json();
   const session = sessions.find((s) => s.DeviceName === "Living Room TV");
   if (!session) return { found: false };
-  const viewUrl = urls.viewingUrl(session.Id, showId, showName);
+  const viewUrl = urls.viewingUrl(session.Id, showId, showName, episodeId);
   await fetch(viewUrl, { method: "POST" });
   return { found: true };
 };

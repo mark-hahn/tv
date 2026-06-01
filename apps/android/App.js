@@ -87,6 +87,7 @@ export default function App() {
   const [episodeInfo, setEpisodeInfo] = useState(null);
   const [showSearch, setShowSearch] = useState("");
   const [sortOrder, setSortOrder] = useState("viewed");
+  const [scrollToTopOnOpen, setScrollToTopOnOpen] = useState(false);
   useEffect(() => {
     sortOrderRef.current = sortOrder;
   }, [sortOrder]);
@@ -384,14 +385,16 @@ export default function App() {
     showsListLoadedRef.current = true;
     (async () => {
       try {
-        const [res, lastViewedRes, savedName] = await Promise.all([
+        const [res, lastViewedRes, savedName, savedSE] = await Promise.all([
           fetch(`${TV_SRVR_HTTP_URL}/api/getAllTvdb?hasEmby=1`),
           fetch(`${TV_SRVR_HTTP_URL}/api/getLastViewed`),
           AsyncStorage.getItem("selectedShowName").catch(() => null),
+          AsyncStorage.getItem("selectedSE").catch(() => null),
         ]);
         const data = await res.json();
         const lastViewedData = await lastViewedRes.json();
         lastViewedRef.current = lastViewedData || {};
+        const persistedSE = savedSE ? JSON.parse(savedSE) : null;
         const list = Object.entries(data)
           .map(([name, show]) => ({ ...show, name }))
           .filter((show) => show.inEmby !== false)
@@ -417,6 +420,7 @@ export default function App() {
             );
           } else {
             setSelectedShow((prev) => prev ?? persisted ?? list[0]);
+            setSelectedSE(persistedSE);
           }
         }
       } catch (_) {}
@@ -480,20 +484,24 @@ export default function App() {
       !showShows ||
       activeTab !== "List" ||
       showsList.length === 0 ||
-      !selectedShow
+      !selectedShow ||
+      scrollToTopOnOpen
     )
       return;
-    const idx = showsList.findIndex((s) => s.name === selectedShow.name);
-    if (idx < 0) return;
-    setTimeout(() => {
-      showsFlatListRef.current?.scrollToIndex({ index: idx, animated: false });
-    }, 100);
-  }, [showShows, activeTab, selectedShow?.name, showsList.length]);
+  }, [showShows, activeTab, selectedShow?.name, showsList.length, scrollToTopOnOpen]);
 
   useEffect(() => {
     if (!selectedShow) return;
     AsyncStorage.setItem("selectedShowName", selectedShow.name).catch(() => {});
   }, [selectedShow?.name]);
+
+  useEffect(() => {
+    if (!selectedSE) {
+      AsyncStorage.removeItem("selectedSE").catch(() => {});
+      return;
+    }
+    AsyncStorage.setItem("selectedSE", JSON.stringify(selectedSE)).catch(() => {});
+  }, [selectedSE?.s, selectedSE?.e]);
 
   useEffect(() => {
     if (!selectedShow) return;
@@ -554,16 +562,13 @@ export default function App() {
   }, [activeTab, selectedSE?.s, selectedSE?.e]);
 
   useEffect(() => {
-    if (activeTab === "List" && showShows && showsFlatListRef.current) {
-      showsFlatListRef.current.scrollToOffset({ offset: 0, animated: false });
+    if (scrollToTopOnOpen && showsFlatListRef.current) {
+      setTimeout(() => {
+        showsFlatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+        setScrollToTopOnOpen(false);
+      }, 50);
     }
-  }, [activeTab, showShows]);
-
-  useEffect(() => {
-    if (activeTab === "List" && showShows && showsFlatListRef.current) {
-      showsFlatListRef.current.scrollToOffset({ offset: 0, animated: false });
-    }
-  }, [sortOrder]);
+  }, [scrollToTopOnOpen]);
 
   const flash = (btn) => {
     setFlashBtn(btn);
@@ -904,7 +909,7 @@ export default function App() {
       setActiveTab("List");
       setSortOrder("viewed");
       setFollowPlaying(true);
-      setSelectedShow(null);
+      setScrollToTopOnOpen(true);
       setShowShows(true);
     });
 
@@ -2279,6 +2284,9 @@ export default function App() {
 
     const handleTabPress = (tab) => {
       setShowSearch("");
+      if (tab === "List") {
+        setScrollToTopOnOpen(true);
+      }
       setActiveTab(tab);
     };
 
@@ -2290,10 +2298,20 @@ export default function App() {
     const handleTvClick = async () => {
       if (!show) return;
       try {
+        let episodeId = null;
+        if (selectedSE && showSeriesMap) {
+          const sm = buildSeriesMap(showSeriesMap);
+          const episodeData = sm?.[selectedSE.s]?.[selectedSE.e];
+          episodeId = episodeData?.id || null;
+        }
         const res = await fetch(`${TV_SRVR_HTTP_URL}/api/embyViewShow`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ showId: show.id, showName: show.name }),
+          body: JSON.stringify({ 
+            showId: show.id, 
+            showName: show.name,
+            episodeId: episodeId 
+          }),
         });
         const data = await res.json();
         if (!data?.found) alert("Living Room TV is not active in Emby.");
@@ -2346,6 +2364,7 @@ export default function App() {
                 const orders = ["alpha", "viewed", "added"];
                 const currentIdx = orders.indexOf(sortOrder);
                 const nextIdx = (currentIdx + 1) % orders.length;
+                setScrollToTopOnOpen(true);
                 setSortOrder(orders[nextIdx]);
               }}
               style={[

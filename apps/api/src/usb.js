@@ -136,6 +136,35 @@ function parseLeadingInt(text) {
   return Number.isFinite(n) ? Math.trunc(n) : undefined;
 }
 
+// Parses `quota` output (no -s flag, so values are raw 1K blocks).
+// Data line columns: Filesystem blocks(used) quota(soft) limit(hard) grace files ...
+// Returns { usedK, limitK } or undefined.
+function parseQuotaOutput(text) {
+  const lines = String(text ?? "")
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  for (const line of lines) {
+    // Data lines start with a filesystem path like /dev/...
+    if (!line.startsWith("/")) continue;
+    const parts = line.split(/\s+/);
+    // parts: [filesystem, blocks, quota, limit, grace?, files, ...]
+    // grace may be absent if not in grace period, making it 4+ columns
+    const usedK = Number(parts[1]);
+    // hard limit is at index 3 (or 2 if soft==hard and grace absent, but index 3 is standard)
+    const limitK = Number(parts[3]);
+    if (
+      Number.isFinite(usedK) &&
+      usedK >= 0 &&
+      Number.isFinite(limitK) &&
+      limitK > 0
+    ) {
+      return { usedK: Math.trunc(usedK), limitK: Math.trunc(limitK) };
+    }
+  }
+  return undefined;
+}
+
 function parseDfForMount(dfText, mountPoint) {
   const text = String(dfText ?? "");
   const lines = text
@@ -186,11 +215,11 @@ function parseDfForMount(dfText, mountPoint) {
 
 /**
  * Returns USB seed-box space: { usbSpaceTotal, usbSpaceUsed } in bytes.
- * Uses ssh `du -s .` on the USB server home directory; may take several seconds.
+ * Uses ssh `quota` on the USB server — reads per-user quota (instant, no directory walk).
+ * `quota` columns (1K blocks): Filesystem blocks(used) quota(soft) limit(hard) grace files ...
  */
 export async function spaceAvailUsb() {
-  const usbSpaceTotalKFallback = 2e9;
-  const usbSpaceTotal = Math.trunc(usbSpaceTotalKFallback * 1024);
+  let usbSpaceTotal = 0;
   let usbSpaceUsed = 0;
 
   try {
@@ -209,75 +238,40 @@ export async function spaceAvailUsb() {
       "UserKnownHostsFile=/dev/null",
     ];
 
-    // du may exit non-zero if it hits unreadable directories (permission denied); still emits a usable summary line.
-    // Measure home dir (.) after cd; permission denied errors go to stderr and are ignored.
-    const args = [...sshBaseArgs, qbHost, "cd; du -s ."];
+    // `quota` reports per-user quota in 1K blocks: used, soft-limit, hard-limit.
+    // This is instant and reflects the actual per-user allocation, not the shared filesystem.
+    const args = [...sshBaseArgs, qbHost, "quota 2>/dev/null"];
 
-    const runDuOnce = async () => {
-      try {
-        const du = await execFileAsync("ssh", args, {
-          timeout: 30000,
-          maxBuffer: 1024 * 1024,
-          windowsHide: true,
-        });
-        return {
-          stdout: String(du.stdout ?? ""),
-          stderr: String(du.stderr ?? ""),
-          err: null,
-        };
-      } catch (e) {
-        const stdout =
-          e && typeof e === "object" && "stdout" in e
-            ? String(e.stdout ?? "")
-            : "";
-        const stderr =
-          e && typeof e === "object" && "stderr" in e
-            ? String(e.stderr ?? "")
-            : "";
-        return { stdout, stderr, err: e };
+    let stdout = "";
+    try {
+      const result = await execFileAsync("ssh", args, {
+        timeout: 15000,
+        maxBuffer: 1024 * 1024,
+        windowsHide: true,
+      });
+      stdout = String(result.stdout ?? "");
+    } catch (e) {
+      stdout =
+        e && typeof e === "object" && "stdout" in e
+          ? String(e.stdout ?? "")
+          : "";
+      if (!stdout) {
+        console.error("spaceAvailUsb: ssh quota failed:", e);
       }
-    };
-
-    const parseDuK = (stdout, stderr) => {
-      const duLine =
-        lastLineStartingWithInt(stdout) ||
-        lastLineStartingWithInt(stderr) ||
-        lastNonEmptyLine(stdout) ||
-        lastNonEmptyLine(stderr);
-      const duK = parseLeadingInt(duLine);
-      return Number.isInteger(duK) && duK >= 0 ? duK : undefined;
-    };
-
-    // First attempt.
-    let attempt = await runDuOnce();
-    let duK = parseDuK(attempt.stdout, attempt.stderr);
-
-    // Retry once if we couldn't parse a usable summary.
-    if (!Number.isInteger(duK)) {
-      attempt = await runDuOnce();
-      duK = parseDuK(attempt.stdout, attempt.stderr);
     }
 
-    if (Number.isInteger(duK)) {
-      usbSpaceUsed = Math.trunc(duK * 1024);
-      if (attempt.err && !attempt.stdout && !attempt.stderr) {
-        console.error("spaceAvailUsb: ssh du failed (no output):", attempt.err);
-      }
+    // Parse the data line: Filesystem blocks quota limit grace files quota limit grace
+    // All values are in 1K blocks. Use hard limit (col index 3) as total.
+    const parsed = parseQuotaOutput(stdout);
+    if (parsed) {
+      usbSpaceTotal = parsed.limitK * 1024;
+      usbSpaceUsed = parsed.usedK * 1024;
     } else {
-      if (attempt.err) {
-        console.error(
-          "spaceAvailUsb: ssh du failed (unparsable output):",
-          attempt.err,
-        );
-      }
-      console.error(
-        "spaceAvailUsb: unexpected ssh du output:",
-        attempt.stdout || attempt.stderr,
-      );
+      console.error("spaceAvailUsb: unexpected quota output:", stdout);
     }
   } catch (e) {
     console.error(
-      "spaceAvailUsb: ssh space probing failed (returning usbSpaceUsed=0):",
+      "spaceAvailUsb: ssh space probing failed (returning zeros):",
       e,
     );
   }
@@ -357,7 +351,7 @@ export async function spaceAvailMedia() {
 /**
  * Returns all four space integers by running USB and media probes concurrently.
  * Units:
- * - usbSpaceTotal/usbSpaceUsed are bytes derived from `du -s` output (1K blocks)
+ * - usbSpaceTotal/usbSpaceUsed are bytes from `quota` (per-user 1K blocks)
  * - mediaSpaceTotal/mediaSpaceUsed are bytes (from `df -B1`)
  */
 export async function spaceAvail() {

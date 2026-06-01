@@ -880,60 +880,12 @@
     >
       <div
         style="
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 8px;
-          padding: 4px 8px;
-          border-bottom: 3px solid black;
-        "
-      >
-        <div
-          style="
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            min-width: 0;
-            flex: 1;
-          "
-        >
-          <div
-            v-if="displayEpisodeTitle(episodeInfo.name)"
-            style="
-              min-width: 0;
-              font-size: 16px;
-              font-weight: bold;
-              white-space: nowrap;
-              overflow: hidden;
-              text-overflow: ellipsis;
-            "
-          >
-            {{ displayEpisodeTitle(episodeInfo.name) }}
-          </div>
-          <div style="flex: 0 0 auto; font-size: 16px; white-space: nowrap">
-            {{ formatSelectedEpisode(selectedEpisode) }}
-          </div>
-        </div>
-        <div
-          style="
-            flex: 0 0 auto;
-            font-size: 14px;
-            font-weight: bold;
-            color: #555;
-            white-space: nowrap;
-          "
-        >
-          {{ formatEpisodeAired(episodeInfo.aired) }}
-        </div>
-      </div>
-      <div
-        style="
           display: grid;
           grid-template-columns: minmax(220px, 1fr) 1fr;
           gap: 0;
           padding: 7px 0;
           align-items: stretch;
-          height: min(260px, calc(45vh - 48px));
+          height: min(320px, 45vh);
           min-height: 150px;
           overflow: hidden;
         "

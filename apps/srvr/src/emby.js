@@ -68,7 +68,11 @@ export const getDevices = async () => {
   return await getOnDevices();
 };
 
-export const viewShowOnLivingRoomTv = async ({ showId, showName, episodeId }) => {
+export const viewShowOnLivingRoomTv = async ({
+  showId,
+  showName,
+  episodeId,
+}) => {
   const url = urls.watchingUrl();
   let resp = await fetch(url);
   if (resp.status !== 200) return { found: false };

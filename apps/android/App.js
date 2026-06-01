@@ -488,7 +488,13 @@ export default function App() {
       scrollToTopOnOpen
     )
       return;
-  }, [showShows, activeTab, selectedShow?.name, showsList.length, scrollToTopOnOpen]);
+  }, [
+    showShows,
+    activeTab,
+    selectedShow?.name,
+    showsList.length,
+    scrollToTopOnOpen,
+  ]);
 
   useEffect(() => {
     if (!selectedShow) return;
@@ -500,7 +506,9 @@ export default function App() {
       AsyncStorage.removeItem("selectedSE").catch(() => {});
       return;
     }
-    AsyncStorage.setItem("selectedSE", JSON.stringify(selectedSE)).catch(() => {});
+    AsyncStorage.setItem("selectedSE", JSON.stringify(selectedSE)).catch(
+      () => {},
+    );
   }, [selectedSE?.s, selectedSE?.e]);
 
   useEffect(() => {
@@ -564,7 +572,10 @@ export default function App() {
   useEffect(() => {
     if (scrollToTopOnOpen && showsFlatListRef.current) {
       setTimeout(() => {
-        showsFlatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+        showsFlatListRef.current?.scrollToOffset({
+          offset: 0,
+          animated: false,
+        });
         setScrollToTopOnOpen(false);
       }, 50);
     }
@@ -2307,10 +2318,10 @@ export default function App() {
         const res = await fetch(`${TV_SRVR_HTTP_URL}/api/embyViewShow`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            showId: show.id, 
+          body: JSON.stringify({
+            showId: show.id,
             showName: show.name,
-            episodeId: episodeId 
+            episodeId: episodeId,
           }),
         });
         const data = await res.json();

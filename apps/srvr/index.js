@@ -57,7 +57,6 @@ const QBT_CRED_PATH_FLEX = path.join(
 );
 const FLEXGET_CMD = "/root/.local/bin/flexget";
 const FLEXGET_CONFIG = path.join(SRVR_ROOT_DIR, "config", "config.yml");
-const FLEXGET_DUMP_LOG = path.join(SRVR_DATA_DIR, "flexget-dump.log");
 
 let flexgetIsRunning = false;
 
@@ -6113,7 +6112,6 @@ function parseFlexgetDumpOutput(stdout) {
   //   quality       : 720p webdl h264
   //   ...
   //   (empty line separates entries)
-  // Raw stdout is also saved to flexget-dump.log for format inspection.
   const candidates = [];
   const lines = stdout.split(/\r?\n/);
   let inAcceptedSection = false;
@@ -6202,11 +6200,6 @@ function parseFlexgetDumpOutput(stdout) {
 }
 
 async function processFlexgetOutput(stdout) {
-  try {
-    const ts = new Date().toISOString();
-    fs.appendFileSync(FLEXGET_DUMP_LOG, `\n--- ${ts} ---\n${stdout}\n`);
-  } catch {}
-
   const candidates = parseFlexgetDumpOutput(stdout);
   if (candidates.length === 0) {
     console.log("[flexget] no accepted entries");

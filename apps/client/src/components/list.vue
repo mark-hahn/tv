@@ -3770,21 +3770,20 @@ export default {
           ? payload.diskChangeShowName
           : null;
 
-      this.showReloadingShows = true;
-      this.logModalMessage("reloadingShowsModal", "Reloading Shows");
       try {
-        tvdb.clearCache();
-        await this.newShows();
-
-        // If this was triggered by a disk change, update that specific show
-        if (diskChangeShowName) {
-          console.log(
-            `[library-refresh-complete] Updating show after disk change: ${diskChangeShowName}`,
-          );
+        if (typeof onDone === "function") {
+          // Map "Not in Emby" flow: a new show was just created — full reload needed
+          this.showReloadingShows = true;
+          this.logModalMessage("reloadingShowsModal", "Reloading Shows");
+          tvdb.clearCache();
+          await this.newShows();
+        } else if (diskChangeShowName) {
+          // Disk change: targeted update only — no full reload
           await this.updateShowFromDiskChange(diskChangeShowName);
         }
+        // Manual scan: triggerEmbySync pushes tvdbUpdated WS events — no reload needed
       } catch (err) {
-        console.error("library-refresh-complete: newShows failed", err);
+        console.error("library-refresh-complete: failed", err);
       } finally {
         this.showReloadingShows = false;
         if (typeof onDone === "function") {

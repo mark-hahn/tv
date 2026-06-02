@@ -1672,6 +1672,17 @@ export default {
       if (sel) {
         this._saveChksrtHistory(sel.choiceLabel, sel.choice);
         await chksrtSelect(this.path, this._chksrtSelectedSrtPath);
+      } else if (this.activeTrack && this.activeTrackId !== "off") {
+        // Save the currently active track even if no button was clicked
+        const track = this.activeTrack;
+        const choiceLabel = this.subtitleLabelMap.get(track.id) ?? track.label;
+        let srtPath = null;
+        if (track.type === "srt" && track.file) {
+          const dir = this.path.replace(/\/[^\/]+$/, "");
+          srtPath = dir + "/" + track.file;
+        }
+        this._saveChksrtHistory(choiceLabel, track);
+        await chksrtSelect(this.path, srtPath);
       } else {
         await chksrtOk(this.path);
       }

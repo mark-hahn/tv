@@ -1049,9 +1049,10 @@ app.get("/tv/playvideo", (req, res) => {
       // Use adb to send intent directly to YouTube app
       cmd = `adb -s ${BRAVIA_TV_IP}:5555 shell am start -a android.intent.action.VIEW -d "https://www.youtube.com/watch?v=${videoId}" com.google.android.youtube.tv`;
     } else {
-      log(`playvideo: non-YouTube URL, launching with default video handler`);
-      // For IMDB or other video URLs, use generic intent
-      cmd = `adb -s ${BRAVIA_TV_IP}:5555 shell am start -a android.intent.action.VIEW -d "${url}"`;
+      log(`playvideo: non-YouTube URL, launching in VLC`);
+      // For IMDB or other video URLs, open in VLC
+      // Use single quotes in the shell to prevent & interpretation
+      cmd = `adb -s ${BRAVIA_TV_IP}:5555 shell "am start -a android.intent.action.VIEW -d '${url}' -t 'video/*' org.videolan.vlc"`;
     }
     log(`playvideo cmd: ${cmd}`);
     exec(cmd, (err, stdout, stderr) => {

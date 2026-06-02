@@ -80,10 +80,9 @@
               <button
                 @click="streamTrailer(t.url, idx)"
                 :style="{
-                  '--btn-bg':
-                    streamFlash === idx
-                      ? 'lightgreen'
-                      : 'rgba(255, 255, 255, 0.9)',
+                  backgroundColor:
+                    streamFlash === idx ? 'lightgreen' : 'whitesmoke',
+                  opacity: streamFlash === idx ? 0.95 : 0.8,
                   position: 'absolute',
                   top: '10px',
                   right: '10px',
@@ -124,10 +123,9 @@
               <button
                 @click="streamTrailer(t.url, idx)"
                 :style="{
-                  '--btn-bg':
-                    streamFlash === idx
-                      ? 'lightgreen'
-                      : 'rgba(255, 255, 255, 0.9)',
+                  backgroundColor:
+                    streamFlash === idx ? 'lightgreen' : 'whitesmoke',
+                  opacity: streamFlash === idx ? 0.95 : 0.8,
                   position: 'absolute',
                   top: '10px',
                   right: '10px',

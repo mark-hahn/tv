@@ -23,3 +23,4 @@ misc/old-reel-code
 apps/android/.build-cache
 build.apk
 build-phase
+usb-bkup/

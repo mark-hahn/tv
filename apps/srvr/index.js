@@ -5618,9 +5618,6 @@ wss.on("connection", (ws) => {
       const otherClients = [...connectedClients].filter(
         (c) => c !== ws && c.readyState === 1,
       );
-      console.log(
-        `[collision] tvRemoteAction received, broadcasting to ${otherClients.length} other clients (total=${connectedClients.size})`,
-      );
       const outMsg = JSON.stringify({
         id: 0,
         notification: "tvRemoteAction",
@@ -5637,9 +5634,6 @@ wss.on("connection", (ws) => {
         console.error("[skipIntro ws] error:", err.message),
       );
     } else if (fname === "tvRemoteCollision") {
-      console.log(
-        `[collision] tvRemoteCollision received, sending tvRemoteLock to all ${connectedClients.size} clients`,
-      );
       notifyClients("tvRemoteLock", null);
     } else if (fname === "tvRemoteUnlock") {
       const outMsg = JSON.stringify({

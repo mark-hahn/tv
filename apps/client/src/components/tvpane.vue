@@ -733,21 +733,12 @@ export default {
 
   methods: {
     notifyAction(fromSubCtrl = false) {
-      console.log(
-        `[collision] notifyAction sending tvRemoteAction fromSubCtrl=${fromSubCtrl}`,
-      );
       wsSend({ fname: "tvRemoteAction", param: { fromSubCtrl } });
     },
 
     checkBlocked() {
-      console.log(
-        `[collision] checkBlocked locked=${this.locked} avoiding=${this.avoidingCollisions}`,
-      );
       if (this.locked) return true;
       if (this.avoidingCollisions) {
-        console.log(
-          `[collision] checkBlocked -> BLOCKED (avoidingCollisions), sending tvRemoteCollision`,
-        );
         wsSend({ fname: "tvRemoteCollision" });
         return true;
       }
@@ -755,10 +746,6 @@ export default {
     },
 
     _onTvRemoteAction(data) {
-      console.log(
-        `[collision] _onTvRemoteAction received, entering avoidance 5s`,
-        data,
-      );
       const fromSubCtrl = data?.fromSubCtrl ?? false;
       this.avoidingCollisions = true;
       clearTimeout(this._avoidTimer);
@@ -771,14 +758,10 @@ export default {
     },
 
     _onTvRemoteLock() {
-      console.log(`[collision] _onTvRemoteLock received, setting locked=true`);
       this.locked = true;
     },
 
     _onTvRemoteUnlock() {
-      console.log(
-        `[collision] _onTvRemoteUnlock received, setting locked=false`,
-      );
       this.locked = false;
     },
 

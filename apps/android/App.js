@@ -543,7 +543,7 @@ export default function App() {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 tvdbId: selectedShow.tvdbId,
-                watchedEpis: selectedShow.watchedEpis ?? null,
+                watchedEpis: selectedShow.watchedEpis,
               }),
             },
           );

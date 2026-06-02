@@ -1069,7 +1069,11 @@ export const getSeriesMap = async (show, prune = false) => {
     }
     try {
       const allTvdbData = await tvdb.getAllTvdb(0);
-      const watchedEpis = allTvdbData?.[show.name]?.watchedEpis || null;
+      // Get watchedEpis if it exists, otherwise pass undefined (not null)
+      // Passing null means "unknown/cleared", passing undefined means "use default"
+      // This preserves watchedCount when watchedEpis array is not available
+      const tvdbRecord = allTvdbData?.[show.name];
+      const watchedEpis = tvdbRecord?.watchedEpis;
       const result = await srvr.getSeriesMapFromTvdb({ tvdbId, watchedEpis });
       if (result.success && result.seriesMap) {
         return result.seriesMap;
@@ -1213,7 +1217,9 @@ export const getSeriesMap = async (show, prune = false) => {
     if (tvdbId) {
       try {
         const allTvdbData = await tvdb.getAllTvdb(0);
-        const watchedEpis = allTvdbData?.[show.name]?.watchedEpis || null;
+        // Get watchedEpis without forcing null fallback
+        const tvdbRecord = allTvdbData?.[show.name];
+        const watchedEpis = tvdbRecord?.watchedEpis;
         const fallback = await srvr.getSeriesMapFromTvdb({
           tvdbId,
           watchedEpis,

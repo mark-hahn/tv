@@ -1560,9 +1560,11 @@ export default {
       const { seasonCount, episodeCount } = this.getMapCounts(seriesMap);
       if (!episodeCount || !seasonCount) return;
 
-      // Check if watchedEpis is null (unknown watch status)
+      // Check if watchedEpis is null or undefined (unknown/missing watch status)
       const tvdbData = allTvdb?.[show.name];
       const watchedEpisIsNull = tvdbData?.watchedEpis === null;
+      const watchedEpisIsUndefined = tvdbData?.watchedEpis === undefined;
+      const watchedEpisMissing = watchedEpisIsNull || watchedEpisIsUndefined;
 
       // Calculate watchedCount from seriesMap
       let watchedCount = 0;
@@ -1586,9 +1588,26 @@ export default {
         seasonCount === 1 ? "1 Season" : `${seasonCount} Seasons`;
       this.seasonsTxt = " &nbsp; " + seasonsTxt;
 
-      // If watchedEpis is null, show ? instead of calculated count
-      if (watchedEpisIsNull) {
-        this.watchedValTxt = `? of ${episodeCount}`;
+      // If watchedEpis is missing (null or undefined), preserve existing watchedCount
+      // and show it if available, rather than showing ? or overwriting with 0
+      if (watchedEpisMissing) {
+        // Preserve the existing watchedCount instead of overwriting with 0
+        const existingWatchedCount = tvdbData?.watchedCount;
+        if (
+          existingWatchedCount != null &&
+          existingWatchedCount !== undefined
+        ) {
+          // We have a stored watchedCount - use it
+          watchedCount = existingWatchedCount;
+          this.watchedValTxt =
+            existingWatchedCount === episodeCount
+              ? `all ${episodeCount} episodes`
+              : `${existingWatchedCount} of ${episodeCount}`;
+        } else {
+          // No stored count either - truly unknown
+          watchedCount = 0;
+          this.watchedValTxt = `? of ${episodeCount}`;
+        }
       } else {
         this.watchedValTxt =
           watchedCount > 0

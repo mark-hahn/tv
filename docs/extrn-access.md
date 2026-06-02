@@ -2,7 +2,7 @@
 
 ## 1) Remote server / seedbox hosts
 
-- `oracle.usbx.me` (as `xobtlu@oracle.usbx.me`)
+- `xobtlu.baron.usbx.me` (as `xobtlu@xobtlu.baron.usbx.me`)
   - Access: `ssh` shell commands and `rsync` file transfer.
   - Where: `apps/down/src/main.js`, `apps/down/src/tvJson.js`, `apps/down/src/worker.js`, `apps/srvr/index.js`.
 

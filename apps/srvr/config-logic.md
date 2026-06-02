@@ -28,7 +28,7 @@ middleStr          (from config3-middle.txt, "" if missing)
 footerStr          (from config5-footer.txt, "" if missing)
 ```
 
-The assembled file is written to `config/config.yml`, then rsynced to `xobtlu@oracle.usbx.me:/home/xobtlu/.config/flexget/config.yml`, and flexget is reloaded via `ssh xobtlu@oracle.usbx.me /home/xobtlu/reload-cmd`.
+The assembled file is written to `config/config.yml`, then rsynced to `xobtlu@xobtlu.baron.usbx.me:/home/xobtlu/.config/flexget/config.yml`, and flexget is reloaded via `ssh xobtlu@xobtlu.baron.usbx.me /home/xobtlu/reload-cmd`.
 
 ## Read on startup
 

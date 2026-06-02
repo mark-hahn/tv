@@ -9,7 +9,7 @@
 
 ## Usb server
 
-- The usb server is **xobtlu@oracle.usbx.me**.
+- The usb server is **xobtlu@xobtlu.baron.usbx.me**.
 - Use **SSH** to access the usb server (SSH keys are already available/configured).
 
 ## Where things run

@@ -3,11 +3,11 @@
 import childProcess from "node:child_process";
 import fs from "node:fs";
 
-const USB_HOST = "xobtlu@oracle.usbx.me";
+const USB_HOST = "xobtlu@xobtlu.baron.usbx.me";
 const USB_MOVIES_PATH = "/home/xobtlu/movies";
 const LOCAL_MOVIES_PATH = "/mnt/media/movies";
 
-const QB_HOST = "oracle.usbx.me";
+const QB_HOST = "xobtlu.baron.usbx.me";
 const QB_PORT = 12041;
 const QB_USER = "xobtlu";
 const QB_PASS = "90-TYUrtyasd";

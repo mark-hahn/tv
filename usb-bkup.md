@@ -5,7 +5,7 @@
 ### Live runtime code
 
 - `apps/down/src/main.js`
-  - Hard-codes `usbHost = "xobtlu@oracle.usbx.me"`.
+  - Hard-codes `usbHost = "xobtlu@xobtlu.baron.usbx.me"`.
   - TV download cycle SSHes to the USB server to:
     - list `files/` contents
     - prune old content under `~/files`
@@ -14,14 +14,14 @@
   - This is the main TV-side file transfer / prune path.
 
 - `apps/down/src/tvJson.js`
-  - Hard-codes `const usbHost = "xobtlu@oracle.usbx.me"`.
+  - Hard-codes `const usbHost = "xobtlu@xobtlu.baron.usbx.me"`.
   - Passes the USB host into worker/download lifecycle code.
 
 - `apps/down/src/movie-rsync.js`
   - Hard-codes:
-    - `USB_HOST = "xobtlu@oracle.usbx.me"`
+    - `USB_HOST = "xobtlu@xobtlu.baron.usbx.me"`
     - `USB_MOVIES_PATH = "/home/xobtlu/movies"`
-    - `QB_HOST = "oracle.usbx.me"`
+    - `QB_HOST = "xobtlu.baron.usbx.me"`
     - `QB_PORT = 12041`
     - `QB_USER = "xobtlu"`
   - Polls qBittorrent WebUI on the USB server.
@@ -30,7 +30,7 @@
   - Marks remote files done with `.tv-done` sidecars.
 
 - `apps/api/src/sshTunnel.js`
-  - Hard-codes `USB_SSH_TARGET = "xobtlu@oracle.usbx.me"`.
+  - Hard-codes `USB_SSH_TARGET = "xobtlu@xobtlu.baron.usbx.me"`.
   - Runs `ssh ... curl ...` on the USB server so outbound tracker traffic originates from the USB server IP.
 
 - `apps/api/src/search.js`
@@ -56,7 +56,7 @@
 
 - `apps/api/src/server.js`
   - Hard-codes:
-    - `USB_HOST_FOR_MEDIAINFO = "xobtlu@oracle.usbx.me"`
+    - `USB_HOST_FOR_MEDIAINFO = "xobtlu@xobtlu.baron.usbx.me"`
     - `USB_FILES_ROOT_MI = "/home/xobtlu/files"`
     - `USB_MOVIES_ROOT_MI = "/home/xobtlu/movies"`
   - `/api/usb/mediainfo` SSHes to the USB server and runs `mediainfo` there.
@@ -72,17 +72,17 @@
 ### Docs / prompt files / notes that mention the old USB server
 
 - `.github/copilot-instructions.md`
-  - Names the USB server as `xobtlu@oracle.usbx.me`.
+  - Names the USB server as `xobtlu@xobtlu.baron.usbx.me`.
 
 - `.github/prompts/api.prompt.md`
-  - Describes private-tracker requests as `ssh xobtlu@oracle.usbx.me curl ...`.
+  - Describes private-tracker requests as `ssh xobtlu@xobtlu.baron.usbx.me curl ...`.
 
 - `.github/prompts/down.prompt.md`
-  - Documents the seedbox as `xobtlu@oracle.usbx.me`.
-  - Documents qBittorrent polling at `oracle.usbx.me:12041`.
+  - Documents the seedbox as `xobtlu@xobtlu.baron.usbx.me`.
+  - Documents qBittorrent polling at `xobtlu.baron.usbx.me:12041`.
 
 - `docs/extrn-access.md`
-  - Lists `oracle.usbx.me` / `xobtlu@oracle.usbx.me`.
+  - Lists `xobtlu.baron.usbx.me` / `xobtlu@xobtlu.baron.usbx.me`.
   - Also notes `QB_HOST` from `apps/api/secrets/qbt-cred.txt`.
 
 ## Address / login / path references that will need changing later
@@ -90,7 +90,7 @@
 ### Hard-coded in repo
 
 - SSH login / host
-  - `xobtlu@oracle.usbx.me`
+  - `xobtlu@xobtlu.baron.usbx.me`
   - Found in:
     - `apps/down/src/main.js`
     - `apps/down/src/tvJson.js`
@@ -103,7 +103,7 @@
     - `docs/extrn-access.md`
 
 - qBittorrent host / port / login
-  - `oracle.usbx.me`
+  - `xobtlu.baron.usbx.me`
   - `12041`
   - `xobtlu`
   - Hard-coded in `apps/down/src/movie-rsync.js`.

@@ -34,9 +34,24 @@
           alignItems: 'center',
           gap: '12px',
           flexWrap: 'wrap',
+          justifyContent: 'space-between',
         }"
       >
         <span>{{ showName }}</span>
+        <button
+          v-if="trailers && trailers.length > 0"
+          @click="streamFirstTrailer"
+          :style="{
+            '--btn-bg': streamFlash ? 'lightgreen' : 'whitesmoke',
+            padding: '6px 12px',
+            fontSize: '13px',
+            cursor: 'pointer',
+            border: '1px solid #999',
+            borderRadius: '4px',
+          }"
+        >
+          Stream
+        </button>
       </div>
       <div
         style="
@@ -129,6 +144,7 @@
 import evtBus from "../evtBus.js";
 import { nextTick } from "vue";
 import * as util from "../util.js";
+import { config } from "../config.js";
 
 const IMDB_URL_EXPIRY_SAFETY_MS = 2 * 60 * 1000;
 
@@ -155,6 +171,7 @@ export default {
       failedVideoUrls: new Set(),
       savedTimes: new Map(), // key -> seconds
       lastPlayingKey: null, // "yt-idx" or "html-url"
+      streamFlash: false,
     };
   },
   openExternalTrailerUrl(url) {
@@ -187,6 +204,27 @@ export default {
     return false; // prevent error from bubbling up further
   },
   methods: {
+    async streamFirstTrailer() {
+      if (!this.trailers || this.trailers.length === 0) {
+        return;
+      }
+      const firstTrailer = this.trailers[0];
+      const url = firstTrailer.url;
+      if (!url) {
+        return;
+      }
+      this.streamFlash = true;
+      setTimeout(() => {
+        this.streamFlash = false;
+      }, 300);
+      try {
+        await fetch(
+          `${config.tvTvUrl}/tv/playvideo?url=${encodeURIComponent(url)}`,
+        );
+      } catch (err) {
+        console.error("Failed to stream trailer:", err);
+      }
+    },
     onPreviewMode(active) {
       this.previewMode = !!active;
       if (!this.previewMode) {

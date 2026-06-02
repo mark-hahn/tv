@@ -703,7 +703,7 @@
           text-shadow: 0 0 3px #000;
         "
       >
-        Next
+        Save
       </div>
       <!-- X close -->
       <div
@@ -1699,11 +1699,6 @@ export default {
     },
     close() {
       if (this.mode === "intro" && this.introMarkDirty) this._saveStartMark();
-      if (this.mode === "chksrt") {
-        this._submitChksrtSelection().catch((e) =>
-          console.error("[chksrt] close save error:", e),
-        );
-      }
       this._mseStop();
       const vid = this.$refs.vid;
       if (vid) {

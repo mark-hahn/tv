@@ -1042,22 +1042,25 @@ app.get("/tv/playvideo", (req, res) => {
     log(`playvideo google url=${url} from ${client(req)}`);
     // Extract YouTube video ID from URL
     const ytMatch = url.match(/[?&]v=([^&]+)/);
+    let cmd;
     if (ytMatch) {
       const videoId = ytMatch[1];
       log(`playvideo launching YouTube video ${videoId} via adb`);
       // Use adb to send intent directly to YouTube app
-      const cmd = `adb -s ${BRAVIA_TV_IP}:5555 shell am start -a android.intent.action.VIEW -d "https://www.youtube.com/watch?v=${videoId}" com.google.android.youtube.tv`;
-      log(`playvideo cmd: ${cmd}`);
-      exec(cmd, (err, stdout, stderr) => {
-        if (err) {
-          log(`playvideo adb error: ${err.message}`);
-        }
-        if (stderr) log(`playvideo adb stderr: ${stderr}`);
-        if (stdout) log(`playvideo adb stdout: ${stdout}`);
-      });
+      cmd = `adb -s ${BRAVIA_TV_IP}:5555 shell am start -a android.intent.action.VIEW -d "https://www.youtube.com/watch?v=${videoId}" com.google.android.youtube.tv`;
     } else {
-      log(`playvideo: not a YouTube URL`);
+      log(`playvideo: non-YouTube URL, launching with default video handler`);
+      // For IMDB or other video URLs, use generic intent
+      cmd = `adb -s ${BRAVIA_TV_IP}:5555 shell am start -a android.intent.action.VIEW -d "${url}"`;
     }
+    log(`playvideo cmd: ${cmd}`);
+    exec(cmd, (err, stdout, stderr) => {
+      if (err) {
+        log(`playvideo adb error: ${err.message}`);
+      }
+      if (stderr) log(`playvideo adb stderr: ${stderr}`);
+      if (stdout) log(`playvideo adb stdout: ${stdout}`);
+    });
     res.json({ ok: true });
   } else if (tvMode === "fire") {
     log(`playvideo fire url=${url} from ${client(req)}`);

@@ -38,20 +38,6 @@
         }"
       >
         <span>{{ showName }}</span>
-        <button
-          v-if="trailers && trailers.length > 0"
-          @click="streamFirstTrailer"
-          :style="{
-            '--btn-bg': streamFlash ? 'lightgreen' : 'whitesmoke',
-            padding: '6px 12px',
-            fontSize: '13px',
-            cursor: 'pointer',
-            border: '1px solid #999',
-            borderRadius: '4px',
-          }"
-        >
-          Stream
-        </button>
       </div>
       <div
         style="
@@ -89,7 +75,30 @@
             {{ t.name ? t.name.replace(/Trailer/gi, "").trim() : "" }}
           </div>
           <template v-if="getYoutubeId(t.url)">
-            <div :id="'yt-player-' + idx"></div>
+            <div style="position: relative; display: inline-block">
+              <div :id="'yt-player-' + idx"></div>
+              <button
+                @click="streamTrailer(t.url, idx)"
+                :style="{
+                  '--btn-bg':
+                    streamFlash === idx
+                      ? 'lightgreen'
+                      : 'rgba(255, 255, 255, 0.9)',
+                  position: 'absolute',
+                  top: '10px',
+                  right: '10px',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  border: '1px solid #999',
+                  borderRadius: '4px',
+                  fontWeight: 'bold',
+                  zIndex: 10,
+                }"
+              >
+                Stream
+              </button>
+            </div>
           </template>
           <template v-else-if="isHlsFile(t.url)">
             <div style="margin-top: 8px; color: #666">
@@ -102,15 +111,38 @@
             </div>
           </template>
           <template v-else-if="isVideoFile(t.url)">
-            <video
-              controls
-              ref="htmlVideos"
-              width="100%"
-              style="max-width: 560px"
-              :src="t.url"
-              :data-url="t.url"
-              @error="onHtmlVideoError(t.url)"
-            ></video>
+            <div style="position: relative; display: inline-block">
+              <video
+                controls
+                ref="htmlVideos"
+                width="100%"
+                style="max-width: 560px"
+                :src="t.url"
+                :data-url="t.url"
+                @error="onHtmlVideoError(t.url)"
+              ></video>
+              <button
+                @click="streamTrailer(t.url, idx)"
+                :style="{
+                  '--btn-bg':
+                    streamFlash === idx
+                      ? 'lightgreen'
+                      : 'rgba(255, 255, 255, 0.9)',
+                  position: 'absolute',
+                  top: '10px',
+                  right: '10px',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  border: '1px solid #999',
+                  borderRadius: '4px',
+                  fontWeight: 'bold',
+                  zIndex: 10,
+                }"
+              >
+                Stream
+              </button>
+            </div>
           </template>
           <div v-else>
             <a
@@ -171,7 +203,7 @@ export default {
       failedVideoUrls: new Set(),
       savedTimes: new Map(), // key -> seconds
       lastPlayingKey: null, // "yt-idx" or "html-url"
-      streamFlash: false,
+      streamFlash: null, // Track which video is flashing (idx)
     };
   },
   openExternalTrailerUrl(url) {
@@ -204,18 +236,13 @@ export default {
     return false; // prevent error from bubbling up further
   },
   methods: {
-    async streamFirstTrailer() {
-      if (!this.trailers || this.trailers.length === 0) {
-        return;
-      }
-      const firstTrailer = this.trailers[0];
-      const url = firstTrailer.url;
+    async streamTrailer(url, idx) {
       if (!url) {
         return;
       }
-      this.streamFlash = true;
+      this.streamFlash = idx;
       setTimeout(() => {
-        this.streamFlash = false;
+        this.streamFlash = null;
       }, 300);
       try {
         await fetch(

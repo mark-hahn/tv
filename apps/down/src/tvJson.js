@@ -47,7 +47,7 @@ const TV_ROOT = "/mnt/media/tv";
 const WORKER_URL = new URL("./worker.js", import.meta.url);
 
 const MAX_WORKERS = 8;
-const usbHost = "xobtlu@xobtlu.baron.usbx.me";
+const usbHost = "xobtlu@DISABLED-xobtlu.baron.usbx.me";
 
 const forcedTitles = new Set();
 

@@ -847,7 +847,7 @@ app.get("/api/local/movies", async (req, res) => {
   }
 });
 
-const USB_HOST_FOR_MEDIAINFO = "xobtlu@xobtlu.baron.usbx.me";
+const USB_HOST_FOR_MEDIAINFO = "xobtlu@DISABLED-xobtlu.baron.usbx.me";
 const USB_FILES_ROOT_MI = "/home/xobtlu/files";
 const USB_MOVIES_ROOT_MI = "/home/xobtlu/movies";
 

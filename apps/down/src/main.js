@@ -177,7 +177,7 @@ async function main() {
 
   rsyncDelay = 1000; // only used for TVDB error retry
 
-  usbHost = "xobtlu@xobtlu.baron.usbx.me";
+  usbHost = "xobtlu@DISABLED-xobtlu.baron.usbx.me";
 
   fs = fsNode;
   fs.mkdirpSync = function (dir) {

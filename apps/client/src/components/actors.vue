@@ -39,8 +39,9 @@
     >
       <!-- Single header: top row switches between default and actor-selected state -->
       <div style="width: 100%; display: flex; flex-direction: column; gap: 8px">
-        <!-- Top row: show name + controls (default) OR actor name + action buttons -->
+        <!-- Top row: show name + controls (default) OR actor name only (when showing credits) OR actor name + action buttons (actor selected but not showing credits) -->
         <div
+          v-if="!(selectedActor && showingCredits)"
           style="
             width: 100%;
             display: flex;
@@ -63,9 +64,7 @@
               flex-wrap: wrap;
             "
           >
-            <span v-if="!(selectedActor && showingCredits)">{{
-              showName
-            }}</span>
+            <span v-if="!selectedActor">{{ showName }}</span>
             <span v-else>{{
               selectedActor.personName || selectedActor.name
             }}</span>
@@ -121,7 +120,7 @@
               ►
             </button>
           </div>
-          <!-- Actor-selected right: action buttons + Done -->
+          <!-- Actor-selected right: action buttons + Done (when NOT showing credits) -->
           <div
             v-else
             style="
@@ -134,12 +133,6 @@
               flex-wrap: wrap;
             "
           >
-            <span
-              v-if="showingCredits && credits.length > 0"
-              style="font-size: 15.6px; font-weight: bold; color: #666"
-            >
-              {{ credits.length }} credit{{ credits.length !== 1 ? "s" : "" }}
-            </span>
             <button
               @click.stop="handleShowsButton"
               style="
@@ -161,13 +154,7 @@
                 padding: 4px 10px;
               "
             >
-              {{
-                creditsLoading
-                  ? "Loading..."
-                  : showingCredits
-                    ? "Hide Credits"
-                    : "All Credits"
-              }}
+              {{ creditsLoading ? "Loading..." : "All Credits" }}
             </button>
             <button
               @click.stop="handleVipButton"
@@ -229,8 +216,140 @@
             </button>
           </div>
         </div>
-        <!-- Bottom row: always visible -->
+        <!-- Top row when showing credits: actor name only -->
         <div
+          v-else
+          style="
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+          "
+        >
+          <div
+            style="
+              margin-left: 20px;
+              margin-right: 10px;
+              flex: 1 1 auto;
+              min-width: 0;
+              white-space: normal;
+              overflow-wrap: anywhere;
+              word-break: break-word;
+              display: flex;
+              align-items: center;
+              gap: 12px;
+              flex-wrap: wrap;
+            "
+          >
+            <span>{{ selectedActor.personName || selectedActor.name }}</span>
+          </div>
+        </div>
+        <!-- Action buttons row (only when showing credits) -->
+        <div
+          v-if="selectedActor && showingCredits"
+          style="
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 8px;
+            margin-left: 20px;
+            margin-right: 15px;
+            font-weight: normal;
+            flex-wrap: wrap;
+          "
+        >
+          <span
+            v-if="credits.length > 0"
+            style="font-size: 15.6px; font-weight: bold; color: #666"
+          >
+            {{ credits.length }} credit{{ credits.length !== 1 ? "s" : "" }}
+          </span>
+          <button
+            @click.stop="handleShowsButton"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 5px;
+              padding: 4px 10px;
+            "
+          >
+            Shows
+          </button>
+          <button
+            @click.stop="handleAllCreditsButton"
+            :disabled="creditsLoading"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 5px;
+              padding: 4px 10px;
+            "
+          >
+            {{ creditsLoading ? "Loading..." : "Hide Credits" }}
+          </button>
+          <button
+            @click.stop="handleVipButton"
+            :style="{
+              fontSize: '13px',
+              cursor: 'pointer',
+              borderRadius: '5px',
+              padding: '4px 10px',
+              '--btn-bg': isSelectedActorVip ? 'lightpink' : 'whitesmoke',
+            }"
+          >
+            VIP
+          </button>
+          <button
+            v-if="actorPageUrl"
+            @click.stop="handleImdbButton"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 5px;
+              padding: 4px 10px;
+            "
+          >
+            IMDb
+          </button>
+          <button
+            @click.stop="handleWikipediaButton"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 5px;
+              padding: 4px 10px;
+            "
+          >
+            Wikipedia
+          </button>
+          <button
+            v-if="!simpleMode"
+            @click.stop="handleMrSkinButton"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 5px;
+              padding: 4px 10px;
+            "
+          >
+            Mr. Skin
+          </button>
+          <button
+            @click.stop="handleDoneButton"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 5px;
+              padding: 4px 10px;
+            "
+          >
+            Done
+          </button>
+        </div>
+        <!-- Bottom row: Regulars/Guests buttons and season/episode inputs (hidden when showing all credits) -->
+        <div
+          v-if="!(selectedActor && showingCredits)"
           style="
             width: 100%;
             display: flex;

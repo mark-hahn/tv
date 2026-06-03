@@ -657,12 +657,9 @@ export default function App() {
   const lpStart = (shortAction, longAction, holdMs = 400) => {
     const lp = { shortAction, longAction, phase: 0 };
     lpRef.current = lp;
-    lp.debounceTimer = setTimeout(
-      () => {
-        if (lpRef.current === lp) lp.phase = 1;
-      },
-      layoutOption === "mark" ? 10 : 70,
-    );
+    lp.debounceTimer = setTimeout(() => {
+      if (lpRef.current === lp) lp.phase = 1;
+    }, 10);
     lp.longTimer = setTimeout(() => {
       if (lpRef.current !== lp) return;
       lpRef.current = null;
@@ -686,14 +683,11 @@ export default function App() {
     clearTimeout(dbRef.current?.timer);
     const db = { action };
     dbRef.current = db;
-    db.timer = setTimeout(
-      () => {
-        if (dbRef.current !== db) return;
-        dbRef.current = null;
-        action?.();
-      },
-      layoutOption === "mark" ? 10 : 70,
-    );
+    db.timer = setTimeout(() => {
+      if (dbRef.current !== db) return;
+      dbRef.current = null;
+      action?.();
+    }, 10);
   };
 
   const dbStop = () => {

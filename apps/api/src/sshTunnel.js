@@ -4,7 +4,7 @@
 
 import { spawn } from "child_process";
 
-const USB_SSH_TARGET = "xobtlu@DISABLED-xobtlu.baron.usbx.me";
+const USB_SSH_TARGET = "xobtlu@xobtlu.baron.usbx.me";
 
 function shellEsc(s) {
   return "'" + String(s).replace(/'/g, "'\\''") + "'";

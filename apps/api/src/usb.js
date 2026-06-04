@@ -624,7 +624,7 @@ function pickCookie(setCookieHeaders) {
 async function qbLogin({ baseUrl, qbUser, qbPass }) {
   const body = new URLSearchParams({ username: qbUser, password: qbPass });
 
-  const res = await fetch(new URL("/api/v2/auth/login", baseUrl), {
+  const res = await fetch(new URL("api/v2/auth/login", baseUrl), {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -674,11 +674,11 @@ async function qbLogin({ baseUrl, qbUser, qbPass }) {
  */
 export async function getQbtInfo(filter) {
   const { qbHost, qbPort, qbUser, qbPass } = await loadQbtCreds();
-  const baseUrl = `http://${qbHost}:${qbPort}`;
+  const baseUrl = `https://${qbHost}/qbittorrent/`;
 
   const cookie = await qbLogin({ baseUrl, qbUser, qbPass });
 
-  const url = new URL("/api/v2/torrents/info", baseUrl);
+  const url = new URL("api/v2/torrents/info", baseUrl);
 
   if (filter && typeof filter === "object" && !Array.isArray(filter)) {
     const { hash, category, tag, filter: state } = filter;
@@ -722,7 +722,7 @@ export async function getQbtInfo(filter) {
  */
 export async function delQbtTorrent(input) {
   const { qbHost, qbPort, qbUser, qbPass } = await loadQbtCreds();
-  const baseUrl = `http://${qbHost}:${qbPort}`;
+  const baseUrl = `https://${qbHost}/qbittorrent/`;
 
   const hashValue = input?.hash;
   const hashesArr = Array.isArray(hashValue)
@@ -743,7 +743,7 @@ export async function delQbtTorrent(input) {
     deleteFiles: input?.deleteFiles === false ? "false" : "true",
   });
 
-  const res = await fetch(new URL("/api/v2/torrents/delete", baseUrl), {
+  const res = await fetch(new URL("api/v2/torrents/delete", baseUrl), {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -794,7 +794,7 @@ export async function addQbtTorrent(input) {
     : String(tagsValue ?? "").trim();
 
   const { qbHost, qbPort, qbUser, qbPass } = await loadQbtCreds();
-  const baseUrl = `http://${qbHost}:${qbPort}`;
+  const baseUrl = `https://${qbHost}/qbittorrent/`;
 
   const cookie = await qbLogin({ baseUrl, qbUser, qbPass });
 
@@ -804,7 +804,7 @@ export async function addQbtTorrent(input) {
   if (tags) form.append("tags", tags);
   if (input?.savePath) form.append("savepath", input.savePath);
 
-  const res = await fetch(new URL("/api/v2/torrents/add", baseUrl), {
+  const res = await fetch(new URL("api/v2/torrents/add", baseUrl), {
     method: "POST",
     headers: {
       Cookie: cookie,
@@ -843,7 +843,7 @@ export async function addQbtMagnet(input) {
     : String(tagsValue ?? "").trim();
 
   const { qbHost, qbPort, qbUser, qbPass } = await loadQbtCreds();
-  const baseUrl = `http://${qbHost}:${qbPort}`;
+  const baseUrl = `https://${qbHost}/qbittorrent/`;
   const cookie = await qbLogin({ baseUrl, qbUser, qbPass });
 
   const form = new FormData();
@@ -851,7 +851,7 @@ export async function addQbtMagnet(input) {
   if (tags) form.append("tags", tags);
   if (input?.savePath) form.append("savepath", input.savePath);
 
-  const res = await fetch(new URL("/api/v2/torrents/add", baseUrl), {
+  const res = await fetch(new URL("api/v2/torrents/add", baseUrl), {
     method: "POST",
     headers: {
       Cookie: cookie,
@@ -880,7 +880,7 @@ export async function addQbtMagnet(input) {
       const hash = xtMatch[1].toLowerCase();
       try {
         const infoRes = await fetch(
-          new URL(`/api/v2/torrents/info?hashes=${hash}`, baseUrl),
+          new URL(`api/v2/torrents/info?hashes=${hash}`, baseUrl),
           { headers: { Cookie: cookie } },
         );
         const torrents = await infoRes.json().catch(() => []);
@@ -1472,7 +1472,7 @@ const USB_MOVIES_ROOT = "/home/xobtlu/movies";
 
 export async function recheckQbtTorrent(input) {
   const { qbHost, qbPort, qbUser, qbPass } = await loadQbtCreds();
-  const baseUrl = `http://${qbHost}:${qbPort}`;
+  const baseUrl = `https://${qbHost}/qbittorrent/`;
 
   const hashValue = input?.hash;
   const hashes =
@@ -1490,7 +1490,7 @@ export async function recheckQbtTorrent(input) {
 
   const cookie = await qbLogin({ baseUrl, qbUser, qbPass });
 
-  const res = await fetch(new URL("/api/v2/torrents/recheck", baseUrl), {
+  const res = await fetch(new URL("api/v2/torrents/recheck", baseUrl), {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",

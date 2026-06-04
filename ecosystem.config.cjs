@@ -56,6 +56,7 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         DISABLE_INTERNAL_CORS: "1",
+        NODE_TLS_REJECT_UNAUTHORIZED: "0",
       },
     },
     {
@@ -66,6 +67,7 @@ module.exports = {
       time: true,
       env: {
         NODE_ENV: "production",
+        NODE_TLS_REJECT_UNAUTHORIZED: "0",
       },
     },
     {
@@ -76,6 +78,7 @@ module.exports = {
       time: true,
       env: {
         NODE_ENV: "production",
+        NODE_TLS_REJECT_UNAUTHORIZED: "0",
       },
     },
     {

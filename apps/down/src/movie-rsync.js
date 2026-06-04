@@ -30,7 +30,7 @@ let _fastModeStart = 0;
 let _prevFinishedNames = new Set();
 
 async function qbLogin() {
-  const res = await fetch(`http://${QB_HOST}:${QB_PORT}/api/v2/auth/login`, {
+  const res = await fetch(`https://${QB_HOST}/qbittorrent/api/v2/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: `username=${encodeURIComponent(QB_USER)}&password=${encodeURIComponent(QB_PASS)}`,
@@ -54,9 +54,12 @@ async function getMovieTorrents() {
     _qbCookie = null;
     return [];
   }
-  const res = await fetch(`http://${QB_HOST}:${QB_PORT}/api/v2/torrents/info`, {
-    headers: { Cookie: cookie },
-  });
+  const res = await fetch(
+    `https://${QB_HOST}/qbittorrent/api/v2/torrents/info`,
+    {
+      headers: { Cookie: cookie },
+    },
+  );
   if (res.status === 403) {
     _qbCookie = null;
     return [];

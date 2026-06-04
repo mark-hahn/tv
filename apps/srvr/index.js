@@ -5698,7 +5698,7 @@ async function addUrlToQbt(torrentUrl) {
     ? qbHostRaw.split("@")[0]
     : String(creds.QB_USER || "");
   const qbPass = String(creds.QB_PASS || "");
-  const baseUrl = `http://${qbHost}:${qbPort}`;
+  const baseUrl = `https://${qbHost}/qbittorrent/`;
 
   const loginParams = new URLSearchParams({
     username: qbUser,

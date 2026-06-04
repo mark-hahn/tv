@@ -3485,23 +3485,15 @@ export default {
         this.hasSharedFilters = false;
       }
     })();
-    this._sharedFiltersPollList = setInterval(() => {
-      if (this._sharedFiltersPollListInFlight) return;
-      this._sharedFiltersPollListInFlight = true;
-      void (async () => {
-        try {
-          const shared = await srvr.getSharedFilters();
-          this.hasSharedFilters =
-            !!shared &&
-            typeof shared === "object" &&
-            Object.keys(shared).length > 0;
-        } catch {
-          this.hasSharedFilters = false;
-        } finally {
-          this._sharedFiltersPollListInFlight = false;
-        }
-      })();
-    }, 3000);
+
+    // Listen for WebSocket notifications instead of polling
+    this._onSharedFiltersChanged = (shared) => {
+      this.hasSharedFilters =
+        !!shared &&
+        typeof shared === "object" &&
+        Object.keys(shared).length > 0;
+    };
+    evtBus.on("sharedFiltersChanged", this._onSharedFiltersChanged);
 
     // Click-outside handler for actors list mode (capture phase to consume the click)
     this._actorsListClickOutside = (e) => {
@@ -3883,6 +3875,11 @@ export default {
   },
 
   beforeUnmount() {
+    if (this._onSharedFiltersChanged) {
+      evtBus.off("sharedFiltersChanged", this._onSharedFiltersChanged);
+      this._onSharedFiltersChanged = null;
+    }
+
     if (this._actorsListClickOutside) {
       document.removeEventListener("click", this._actorsListClickOutside, true);
       this._actorsListClickOutside = null;

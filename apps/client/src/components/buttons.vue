@@ -215,9 +215,9 @@ export default {
   },
 
   beforeUnmount() {
-    if (this._sharedFiltersPoll) {
-      clearInterval(this._sharedFiltersPoll);
-      this._sharedFiltersPoll = null;
+    if (this._onSharedFiltersChanged) {
+      evtBus.off("sharedFiltersChanged", this._onSharedFiltersChanged);
+      this._onSharedFiltersChanged = null;
     }
     evtBus.off("clearFilterButtons", this.onClearFilterButtons);
   },
@@ -228,22 +228,19 @@ export default {
       // When it changes, reset internal filters by emitting current button state
       // (with Custom turned off) so List recomputes from visible buttons.
       this._lastSharedFiltersRaw = "";
-      this._sharedFiltersInFlight = false;
 
-      if (this._sharedFiltersPoll) return;
-      this._sharedFiltersPoll = setInterval(() => {
-        if (this._sharedFiltersInFlight) return;
-        this._sharedFiltersInFlight = true;
-        void (async () => {
-          let shared = null;
-          try {
-            shared = await srvr.getSharedFilters();
-          } catch {
-            shared = null;
-          } finally {
-            this._sharedFiltersInFlight = false;
-          }
+      // Load initial state
+      void (async () => {
+        try {
+          const shared = await srvr.getSharedFilters();
+          this._lastSharedFiltersRaw = shared ? JSON.stringify(shared) : "";
+          await this.refreshHasSharedFilters(shared);
+        } catch {}
+      })();
 
+      // Listen for WebSocket notifications instead of polling
+      if (!this._onSharedFiltersChanged) {
+        this._onSharedFiltersChanged = async (shared) => {
           const raw = shared ? JSON.stringify(shared) : "";
           if (raw === this._lastSharedFiltersRaw) return;
           this._lastSharedFiltersRaw = raw;
@@ -251,8 +248,9 @@ export default {
           await this.refreshHasSharedFilters(shared);
           this.activeButtons["Custom"] = false;
           this.$emit("button-click", this.activeButtons);
-        })();
-      }, 3000);
+        };
+        evtBus.on("sharedFiltersChanged", this._onSharedFiltersChanged);
+      }
     },
 
     async refreshHasSharedFilters(sharedFiltersIn = undefined) {

@@ -461,6 +461,10 @@ export function requestEmbyLibraryRefresh() {
   return httpCall("/api/requestEmbyLibraryRefresh", {}, "POST");
 }
 
+export function getEmbyLibraryRefreshStatus() {
+  return httpCall("/api/embyLibraryRefreshStatus", null, "GET");
+}
+
 export function embyTaskStatus(taskId) {
   return httpCall(
     `/api/embyTaskStatus?taskId=${encodeURIComponent(taskId)}`,

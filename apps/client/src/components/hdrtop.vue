@@ -85,12 +85,15 @@
     >
       <span
         v-if="libraryProgressText && !simpleMode"
+        @click="openEmbyLibraries"
         style="
           font-size: 13px;
           font-weight: bold;
           color: #000;
           white-space: nowrap;
           margin-right: 6px;
+          cursor: pointer;
+          text-decoration: underline;
         "
       >
         {{ libraryProgressText }}
@@ -231,6 +234,13 @@ export default {
       event.stopPropagation();
       this.$emit("update:filterStr", "");
       this.$emit("filter-input");
+    },
+
+    openEmbyLibraries() {
+      window.open(
+        "https://hahnca.com:8920/web/index.html#!/librarysetup/libraries",
+        "_blank",
+      );
     },
   },
 };

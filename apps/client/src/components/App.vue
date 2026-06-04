@@ -1247,6 +1247,17 @@ export default {
         );
     },
 
+    async checkLibraryRefreshStatus() {
+      try {
+        const status = await srvr.getEmbyLibraryRefreshStatus();
+        if (status?.running && status?.progress?.pct != null) {
+          this.libraryProgressText = `${Number(status.progress.pct).toFixed(0)}%`;
+        }
+      } catch (err) {
+        console.error("checkLibraryRefreshStatus failed:", err);
+      }
+    },
+
     handleSetLibraryProgress(txt) {
       const s = String(txt || "");
       if (!s || s.includes("%")) this.libraryProgressText = s;
@@ -2037,6 +2048,9 @@ export default {
 
     // Refresh space display once on app load.
     this.requestSpaceAvailRefresh("app load");
+
+    // Check if library refresh is already running on app load
+    this.checkLibraryRefreshStatus();
 
     if (
       this.simpleMode &&

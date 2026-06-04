@@ -3606,6 +3606,13 @@ app.post(
   }),
 );
 
+app.get(
+  "/api/embyLibraryRefreshStatus",
+  apiWrapper(async () => {
+    return embyRefreshManager.getStatus();
+  }),
+);
+
 app.post(
   "/api/populateFilesOnDisk",
   apiWrapper(async () => {
@@ -7277,6 +7284,7 @@ const embyRefreshManager = (() => {
 
   let running = false;
   let lastFinishedAt = 0;
+  let currentProgress = null; // null or { pct: number }
   // pendingShowNames / pendingWaiters accumulate while a scan is running.
   // At the start of each run() they are moved into myShowNames / myWaiters so
   // that new arrivals during this scan queue into the *next* generation and
@@ -7313,6 +7321,7 @@ const embyRefreshManager = (() => {
     console.log(
       `[refreshMgr] starting library refresh (shows: ${[...myShowNames].join(", ") || "manual"})`,
     );
+    currentProgress = { pct: 0 };
     notifyClients("libraryProgress", { pct: 0 });
 
     try {
@@ -7344,6 +7353,7 @@ const embyRefreshManager = (() => {
             const task = await taskRes.json();
             const progressNum = Number(task?.CurrentProgressPercentage);
             if (Number.isFinite(progressNum)) {
+              currentProgress = { pct: progressNum };
               notifyClients("libraryProgress", { pct: progressNum });
             }
             if (task.State !== "Running") {
@@ -7362,6 +7372,7 @@ const embyRefreshManager = (() => {
 
     running = false;
     lastFinishedAt = Date.now();
+    currentProgress = null;
 
     // Resolve this generation's waiters now — they got their scan.
     const showNames = [...myShowNames];
@@ -7414,6 +7425,12 @@ const embyRefreshManager = (() => {
         }
       });
       return promise;
+    },
+    getStatus() {
+      return {
+        running,
+        progress: currentProgress,
+      };
     },
   };
 })();

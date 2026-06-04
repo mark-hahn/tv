@@ -665,7 +665,7 @@ export default {
     },
   },
   setup(props) {
-    const srchStr = ref("friends");
+    const srchStr = ref("");
     const manualSearchQuery = ref("");
 
     const handleManualSearch = async () => {
@@ -1915,7 +1915,7 @@ export default {
         }
       }
 
-      postBrowseHistory("browse", curTvdb.value);
+      // Removed: postBrowseHistory("browse", curTvdb.value) - caused spam
       if (previewMode.value) {
         handlePreview();
       }

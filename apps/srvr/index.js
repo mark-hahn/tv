@@ -3480,20 +3480,6 @@ app.use(cors());
 // strict: false allows JSON primitives (strings/numbers) as body, not just objects/arrays
 app.use(express.json({ strict: false }));
 
-// Request logging middleware
-app.use((req, res, next) => {
-  const start = Date.now();
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (duration > 100 || req.url.includes("/api/")) {
-      console.log(
-        `[HTTP] ${req.method} ${req.url} - ${res.statusCode} (${duration}ms)`,
-      );
-    }
-  });
-  next();
-});
-
 // Legacy CORS manual headers (just in case, though cors() should handle it)
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
@@ -5592,7 +5578,6 @@ wss.on("connection", (ws) => {
 
   ws.on("message", (data) => {
     const msg = data.toString();
-    const start = Date.now();
     let parsed;
     try {
       parsed = JSON.parse(msg);
@@ -5601,13 +5586,6 @@ wss.on("connection", (ws) => {
       return;
     }
     const { id, fname, param } = parsed;
-
-    const logWsCall = () => {
-      const duration = Date.now() - start;
-      if (duration > 50 || fname !== "register") {
-        console.log(`[WS] ${fname} (${duration}ms)`);
-      }
-    };
 
     if (fname == "register") {
       // client registration — no response needed
@@ -5686,7 +5664,6 @@ wss.on("connection", (ws) => {
         console.error("ws.send error:", e);
       }
     }
-    logWsCall();
   });
 
   ws.on("error", (err) => {

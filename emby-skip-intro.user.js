@@ -19,6 +19,28 @@
   let autoSkipItemId = null; // Track which item was auto-skipped
   let lastCheckedItemId = null;
   let currentIntroDur = null;
+  let currentStartMark = null;
+
+  // Format milliseconds to mm:ss.t or mm:ss
+  function formatTime(ms, showTenths = true) {
+    const totalSec = ms / 1000;
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    const secStr = showTenths ? sec.toFixed(1) : Math.floor(sec).toString();
+    return `${min}:${secStr.padStart(showTenths ? 4 : 2, "0")}`;
+  }
+
+  // Update button text with current info
+  function updateButtonText(startMark, introDur) {
+    if (!skipButton) return;
+    if (introDur == null) {
+      skipButton.textContent = "Skip Intro";
+    } else {
+      const start = formatTime(startMark ?? 0, false);
+      const dur = formatTime(Math.abs(introDur), false);
+      skipButton.textContent = `Skip ${start}, ${dur}`;
+    }
+  }
 
   // Get the device name from Emby's API
   function getDeviceName() {
@@ -114,7 +136,6 @@
           skipButton.textContent = "✓ Skipped";
           skipButton.style.background = "rgba(0, 100, 0, 0.8)";
           setTimeout(() => {
-            skipButton.textContent = "Skip Intro";
             skipButton.style.background = "rgba(0, 0, 0, 0.8)";
           }, 2000);
         } else {
@@ -129,7 +150,6 @@
           skipButton.textContent = errorText;
           skipButton.style.background = "rgba(100, 0, 0, 0.8)";
           setTimeout(() => {
-            skipButton.textContent = "Skip Intro";
             skipButton.style.background = "rgba(0, 0, 0, 0.8)";
           }, 2000);
         }
@@ -138,7 +158,6 @@
         skipButton.textContent = "Fetch Error";
         skipButton.style.background = "rgba(100, 0, 0, 0.8)";
         setTimeout(() => {
-          skipButton.textContent = "Skip Intro";
           skipButton.style.background = "rgba(0, 0, 0, 0.8)";
         }, 2000);
       }
@@ -235,18 +254,18 @@
     }
   }
 
-  // Get introDur for current show
-  async function getIntroDur(showName, showId) {
+  // Get introDur and startMark for current show
+  async function getIntroInfo(showName, showId) {
     try {
       const response = await fetch(
         `${TV_SRVR_URL}/api/introDur?showName=${encodeURIComponent(showName)}&showId=${encodeURIComponent(showId)}`,
       );
-      if (!response.ok) return null;
+      if (!response.ok) return { introDur: null, startMark: null };
       const result = await response.json();
-      return result.introDur;
+      return { introDur: result.introDur, startMark: result.startMark };
     } catch (error) {
-      console.error("[Auto Skip] Error getting introDur:", error);
-      return null;
+      console.error("[Auto Skip] Error getting intro info:", error);
+      return { introDur: null, startMark: null };
     }
   }
 
@@ -260,13 +279,19 @@
       lastCheckedItemId = playingInfo.itemId;
       autoSkipItemId = null;
       currentIntroDur = null;
+      currentStartMark = null;
 
-      // Fetch introDur for new item
-      currentIntroDur = await getIntroDur(
+      // Fetch intro info for new item
+      const introInfo = await getIntroInfo(
         playingInfo.showName,
         playingInfo.showId,
       );
+      currentIntroDur = introInfo.introDur;
+      currentStartMark = introInfo.startMark;
     }
+
+    // Update button text with intro start and end times
+    updateButtonText(currentStartMark, currentIntroDur);
 
     // Only auto-skip if introDur is negative and we haven't skipped this item yet
     if (

@@ -5282,7 +5282,7 @@ app.get("/api/introDur", async (req, res) => {
   try {
     const { showName, showId } = req.query;
     if (!showName && !showId) {
-      res.json({ introDur: null });
+      res.json({ introDur: null, startMark: null });
       return;
     }
     const allTvdb = tvdb.getAllTvdbSync();
@@ -5290,10 +5290,13 @@ app.get("/api/introDur", async (req, res) => {
     if (!record && showId) {
       record = Object.values(allTvdb).find((r) => r.id === showId);
     }
-    res.json({ introDur: record?.introDur ?? null });
+    res.json({
+      introDur: record?.introDur ?? null,
+      startMark: record?.startMark ?? null,
+    });
   } catch (err) {
     console.error("[introDur] error:", err.message);
-    res.json({ introDur: null, error: err.message });
+    res.json({ introDur: null, startMark: null, error: err.message });
   }
 });
 

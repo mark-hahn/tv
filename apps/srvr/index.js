@@ -5203,8 +5203,8 @@ app.get("/api/introNextFile", async (req, res) => {
   }
 });
 
-// Intro: skip forward by introDur on the Living Room TV
-async function doSkipIntro(pressedAt) {
+// Intro: skip forward by introDur on the specified device
+async function doSkipIntro(pressedAt, deviceName = "Living Room TV") {
   const sessRes = await fetch(
     `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
     { headers: { Accept: "application/json" } },
@@ -5215,14 +5215,23 @@ async function doSkipIntro(pressedAt) {
   }
   const sessions = await sessRes.json();
   const session = sessions.find(
-    (s) => s.NowPlayingItem && s.DeviceName === "Living Room TV",
+    (s) => s.NowPlayingItem && s.DeviceName === deviceName,
   );
   if (!session) {
     const deviceNames = sessions.map((s) => s.DeviceName).join(", ");
+    const playingDevices = sessions
+      .filter((s) => s.NowPlayingItem)
+      .map((s) => s.DeviceName);
     console.log(
-      `[skipIntro] no Living Room TV session. devices: ${deviceNames}`,
+      `[skipIntro] no ${deviceName} session. devices: ${deviceNames}`,
     );
-    return { ok: false, reason: "notPlaying" };
+    return {
+      ok: false,
+      reason: "notPlaying",
+      requestedDevice: deviceName,
+      playingDevices,
+      allDevices: sessions.map((s) => s.DeviceName),
+    };
   }
   const rawPositionTicks = session.PlayState?.PositionTicks ?? 0;
   const pressDelay = pressedAt ? Math.max(0, Date.now() - pressedAt) : 0;
@@ -5260,12 +5269,31 @@ async function doSkipIntro(pressedAt) {
 
 app.post("/api/skipIntro", async (req, res) => {
   try {
-    const { pressedAt } = req.body || {};
-    const result = await doSkipIntro(pressedAt);
+    const { pressedAt, deviceName } = req.body || {};
+    const result = await doSkipIntro(pressedAt, deviceName);
     res.json(result);
   } catch (err) {
     console.error("[skipIntro] error:", err.message);
     res.json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/api/introDur", async (req, res) => {
+  try {
+    const { showName, showId } = req.query;
+    if (!showName && !showId) {
+      res.json({ introDur: null });
+      return;
+    }
+    const allTvdb = tvdb.getAllTvdbSync();
+    let record = allTvdb[showName];
+    if (!record && showId) {
+      record = Object.values(allTvdb).find((r) => r.id === showId);
+    }
+    res.json({ introDur: record?.introDur ?? null });
+  } catch (err) {
+    console.error("[introDur] error:", err.message);
+    res.json({ introDur: null, error: err.message });
   }
 });
 

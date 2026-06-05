@@ -1680,13 +1680,25 @@ export default {
 
       if (!record || !matchesSelected) return;
       tvdb.applyTvdbPush(name, record);
+
+      // Update all infobox fields from the pushed record
       if (this.seriesReady) void this.setRemotes();
-      if (
-        Array.isArray(record.crew) &&
-        record.crew.length > 0 &&
-        this.crewLines.length === 0
-      )
-        void this.setCrewTxt(record);
+      void this.setDates(record);
+      this.setGenresTxt(record);
+      void this.setCrewTxt(record);
+      void this.setSeasonsTxt(record);
+      void this.setCntryLangTxt(record);
+      void this.setRuntimeTxt(record);
+
+      // Update poster and ensure proper sizing after layout changes
+      await this.setPoster(record);
+      await this.$nextTick();
+      const posterImg = document.querySelector("#poster img");
+      const infoBoxEl = document.getElementById("infoBox");
+      if (posterImg && infoBoxEl && infoBoxEl.clientHeight > 0) {
+        posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
+        posterImg.style.visibility = "visible";
+      }
     };
     evtBus.on("tvdbUpdated", this.onTvdbUpdated);
 

@@ -170,10 +170,6 @@ const headerLoad = readTextOrWithChosenPath(
   configReadCandidates("config/config1-header.txt"),
   "",
 );
-const middleLoad = readTextOrWithChosenPath(
-  configReadCandidates("config/config3-middle.txt"),
-  "",
-);
 const pickupLoad = readTextOrWithChosenPath(
   configReadCandidates("config/config4-pickups.json"),
   "[]",
@@ -184,7 +180,6 @@ const footerLoad = readTextOrWithChosenPath(
 );
 
 const headerStr = headerLoad.text;
-const middleStr = middleLoad.text;
 const pickupStr = pickupLoad.text;
 const footerStr = footerLoad.text;
 
@@ -2655,7 +2650,6 @@ const upload = async () => {
   str += '        - "dummy"\n';
   for (let name of pickups)
     str += '        - "' + name.replace(/"/g, "") + '"\n';
-  str += middleStr;
   str += footerStr;
   await util.writeFile(configWritePath("config.yml"), str);
   return "ok";

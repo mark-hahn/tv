@@ -3240,12 +3240,20 @@ export default {
       }
     },
 
-    watchClick() {
+    async watchClick() {
       console.log("watchClick");
       const target =
         this.lastWatchingName ??
         (this.watchingName !== "---" ? this.watchingName : null);
       if (target) {
+        // Check if show is in the current filtered list
+        const isInFilteredList = this.shows.some((s) => s.name === target);
+
+        if (!isInFilteredList) {
+          // Show is filtered out - click the All button to clear filters
+          await this.allClick();
+        }
+
         window.localStorage.setItem("lastVisShow", target);
         this.scrollToSavedShow(true);
 

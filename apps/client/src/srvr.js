@@ -429,16 +429,6 @@ export function getSubFileIds(showName) {
   return httpCall("/api/getSubFileIds", { showName }, "POST");
 }
 
-export function getRejects() {
-  return httpCall("/api/getRejects");
-}
-export function addReject(name, tvdbId) {
-  return httpCall("/api/addReject", { name, tvdbId }, "POST");
-}
-export function delReject(name, tvdbId) {
-  return httpCall("/api/delReject", { name, tvdbId }, "POST");
-}
-
 export function getNoEmbys() {
   return httpCall("/api/getNoEmbys");
 }

@@ -40,9 +40,6 @@ export async function init() {
   urls.init(cred);
 }
 
-let rejects = null;
-let rejectsSet = null;
-
 function normShowName(name) {
   if (name === undefined || name === null) return "";
   // Collapse any embedded newlines/tabs and extra spaces coming from JSON files.
@@ -67,11 +64,6 @@ function isTvdbShowRecord(record) {
   return !!recName;
 }
 
-export const isReject = (name) => {
-  if (!rejectsSet) return false;
-  return rejectsSet.has(normShowName(name));
-};
-
 // Phase 2: Helper function to sync collection flags into tvdb
 async function syncCollections(allTvdb) {
   const [toTryRes, continueRes, markRes, lindaRes] = await Promise.all([
@@ -95,20 +87,6 @@ async function syncCollections(allTvdb) {
   }
 }
 
-// Phase 2: Helper function to sync rejects into tvdb
-function syncRejects(allTvdb, rejectsIn) {
-  for (const tvdb of Object.values(allTvdb)) {
-    if (!isTvdbShowRecord(tvdb)) continue;
-    const normalizedName = normShowName(tvdb.name);
-    tvdb.reject = (rejectsIn || []).some(
-      (r) => normShowName(r) === normalizedName,
-    );
-  }
-  // Update module-level rejects for isReject()
-  rejects = (rejectsIn || []).map(normShowName).filter(Boolean);
-  rejectsSet = new Set(rejects);
-}
-
 // Thin loadAllShows - fetches tvdb from server, applies computed props
 export async function loadAllShows() {
   const loadStart = Date.now();
@@ -129,7 +107,7 @@ export async function loadAllShows() {
         rec.imdbRatings ||
         rec.remotes?.find((r) => r.name?.startsWith("IMDB"))?.ratings ||
         null;
-    rec.reject = !!rec.reject;
+    rec.reject = false;
     if (rec.notReady === undefined) rec.notReady = rec.inEmby === false;
     rec.watchGap = rec.watchGap || false;
     rec.fileGap =
@@ -298,9 +276,8 @@ async function _oldLoadAllShows() {
   };
 
   // 1. Fetch all data sources in parallel (HTTP is fast now!)
-  const [embyShows, rejectsIn, allTvdbResult] = await Promise.all([
+  const [embyShows, allTvdbResult] = await Promise.all([
     axios.get(urls.showListUrl(cred, 0, 10000)),
-    srvr.getRejects(),
     tvdb.getAllTvdb(0), // hasEmby = 0: load all shows
   ]);
 
@@ -755,9 +732,6 @@ async function _oldLoadAllShows() {
   // 6. Sync collection flags from Emby
   await syncCollections(allTvdb);
 
-  // 6.6. Sync reject flags from config arrays (authoritative source)
-  syncRejects(allTvdb, rejectsIn);
-
   // 7. Ensure computed properties are set (since nested objects are now flattened)
   for (const tvdb of Object.values(allTvdb)) {
     if (!isTvdbShowRecord(tvdb)) continue;
@@ -785,7 +759,7 @@ async function _oldLoadAllShows() {
         tvdb.remotes?.find((r) => r.name?.startsWith("IMDB"))?.ratings ||
         null;
     }
-    if (tvdb.reject && !tvdb.reject) tvdb.reject = tvdb.reject;
+    tvdb.reject = false;
     // Set notReady flag (preserve server-computed value if present)
     if (tvdb.notReady === undefined) tvdb.notReady = tvdb.inEmby === false;
 

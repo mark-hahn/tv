@@ -500,63 +500,6 @@ export default {
       }
     };
 
-    const toggleReject = async (show) => {
-      this.saveVisShow(show);
-      if (!show.reject) {
-        if (
-          show.inEmby !== false &&
-          !window.confirm(`Remove ${show.name} from emby and the disk?`)
-        )
-          return;
-        if (show.inEmby !== false) this.showRemovingFromEmby = true;
-        show.reject = true;
-        try {
-          await srvr.addReject(show.name, show.tvdbId || show.tvdbId);
-        } catch (err) {
-          console.error("addReject error:", err);
-          show.reject = false;
-          this.showRemovingFromEmby = false;
-          return;
-        }
-        if (show.inEmby !== false) {
-          try {
-            // Delete files only — do not call deleteShowFromSrvr which would
-            // also call delNoEmby and remove the tvdb record
-            const showFolder = show.path.split("/").pop();
-            await srvr.deletePath(showFolder);
-            await emby.deleteShowFromEmby(show);
-            this.showRemovingFromEmby = false;
-          } catch (err) {
-            console.error("deleteShowFromEmby after reject error:", err);
-            this.showRemovingFromEmby = false;
-          }
-          const tvdbData = allTvdb[show.name];
-          if (tvdbData) {
-            const leftEmby = util.getPstDate();
-            tvdbData.inEmby = false;
-            tvdbData.leftEmby = leftEmby;
-            tvdbData.notReady = true;
-            allTvdb[show.name] = await srvr.setTvdbFields({
-              name: show.name,
-              inEmby: false,
-              leftEmby,
-              notReady: true,
-            });
-          }
-          show.inEmby = false;
-        }
-        return;
-      }
-
-      show.reject = false;
-      try {
-        await srvr.delReject(show.name, show.tvdbId || show.tvdbId);
-      } catch (err) {
-        console.error("delReject error:", err);
-        show.reject = true;
-      }
-    };
-
     const deleteShow = async (show) => {
       allTvdb = await tvdb.getAllTvdb();
       const name = show.name;
@@ -802,18 +745,6 @@ export default {
             await toggleLinda(show);
           },
           name: "linda",
-        },
-        {
-          color: "red",
-          filter: -1,
-          icon: ["fas", "ban"],
-          cond(show) {
-            return show.reject;
-          },
-          async click(show) {
-            await toggleReject(show);
-          },
-          name: "ban",
         },
         {
           color: "#a66",
@@ -1089,7 +1020,6 @@ export default {
           (!this.filterStr || String(this.filterStr).length === 0) &&
           (this.conds || []).every((c) => {
             if (!c?.name) return true;
-            if (c.name === "ban") return c.filter === -1; // default ban behavior
             if (c.name === "hasemby") return c.filter === 1; // default hasemby behavior
             return c.filter === 0;
           });
@@ -1236,12 +1166,6 @@ export default {
 
       // Pure state-based: Sync conds to match button states
       this.conds.forEach((cond) => {
-        // Ban is always -1 in simple mode
-        if (cond.name === "ban") {
-          cond.filter = -1;
-          return;
-        }
-
         // Special handling for hasemby: default to 1 (hide trash), Trash button sets to 0 (show all)
         if (cond.name === "hasemby") {
           const trashActive = activeButtons["Trash"];
@@ -1516,13 +1440,12 @@ export default {
           : null;
 
       let show = null;
-      const reject = emby.isReject(name);
 
       const showSeed = {
         name: name,
         tvdbId: tvdbId,
         overview: overview,
-        reject: reject,
+        reject: false,
       };
 
       const paramObj = {
@@ -1667,7 +1590,6 @@ export default {
           if (show) {
             show.tvdbId = tvdbId;
             show.overview = overview;
-            show.reject = reject;
           }
         }
 
@@ -1785,7 +1707,7 @@ export default {
         ImdbId: imdbId,
         overview: overview,
         imageUrl: imageUrl,
-        reject: emby.isReject(showName),
+        reject: false,
       };
 
       // Update Map pane contents on preview (map will show TVDB data).
@@ -1877,8 +1799,6 @@ export default {
         const selectedInEmby = !selectedShow || selectedShow.inEmby !== false;
         hasembyCond.filter = selectedInEmby ? 1 : 0;
       }
-      const banCond = this.conds.find((c) => c?.name === "ban");
-      if (banCond) banCond.filter = -1;
       await this.select();
       this.sortPopped = false;
       this.fltrPopped = false;
@@ -2979,10 +2899,7 @@ export default {
           const { status, episodeCount, watchedCount } = tvdbData;
           const watchedAll = episodeCount > 0 && watchedCount == episodeCount;
           const finished =
-            status == "Ended" &&
-            watchedAll &&
-            !show.reject &&
-            show.inEmby !== false;
+            status == "Ended" && watchedAll && show.inEmby !== false;
           if (finished) filteredShows.push(show);
           continue;
         }
@@ -3361,11 +3278,6 @@ export default {
         }
       }
 
-      const banCond = this.conds.find((c) => c.name === "ban");
-      if (banCond) {
-        banCond.filter = -1;
-      }
-
       // If saved show is not in emby, disable the in-emby filter so it's visible
       const savedName = window.localStorage.getItem("lastVisShow");
       if (savedName) {
@@ -3377,7 +3289,7 @@ export default {
       }
 
       this.showAll(true);
-      await this.select(); // Apply filters including ban
+      await this.select();
       this.sortShows();
 
       let name = savedName;

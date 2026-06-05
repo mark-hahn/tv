@@ -170,10 +170,6 @@ const headerLoad = readTextOrWithChosenPath(
   configReadCandidates("config/config1-header.txt"),
   "",
 );
-const rejectLoad = readTextOrWithChosenPath(
-  configReadCandidates("config/config2-rejects.json"),
-  "[]",
-);
 const middleLoad = readTextOrWithChosenPath(
   configReadCandidates("config/config3-middle.txt"),
   "",
@@ -188,7 +184,6 @@ const footerLoad = readTextOrWithChosenPath(
 );
 
 const headerStr = headerLoad.text;
-const rejectStr = rejectLoad.text;
 const middleStr = middleLoad.text;
 const pickupStr = pickupLoad.text;
 const footerStr = footerLoad.text;
@@ -237,19 +232,6 @@ setImmediate(async () => {
     console.warn(`[subs] startup token refresh failed: ${e.message}`);
   }
 });
-
-let rejects;
-try {
-  rejects = JSON.parse(rejectStr);
-  if (!Array.isArray(rejects)) {
-    throw new Error("rejects config is not an array");
-  }
-} catch (e) {
-  console.error(
-    `[tv-srvr] FATAL: invalid JSON in rejects config at ${rejectLoad.chosenPath || "<fallback>"}: ${e.message}`,
-  );
-  process.exit(1);
-}
 
 let pickups;
 try {
@@ -2674,9 +2656,6 @@ const upload = async () => {
   for (let name of pickups)
     str += '        - "' + name.replace(/"/g, "") + '"\n';
   str += middleStr;
-  str += '        - "dummy"\n';
-  for (let name of rejects)
-    str += '        - "' + name.replace(/"/g, "") + '"\n';
   str += footerStr;
   await util.writeFile(configWritePath("config.yml"), str);
   return "ok";
@@ -2687,30 +2666,12 @@ let saving = false;
 const trySaveConfigYml = async (id, result, resolve, reject) => {
   if (saving) return ["busy", id, result, resolve, reject];
   saving = true;
-  rejects.sort((a, b) => {
-    return a.toLowerCase() > b.toLowerCase() ? +1 : -1;
-  });
   pickups.sort((a, b) => {
     const aname = a.replace(/The\s/i, "");
     const bname = b.replace(/The\s/i, "");
     return aname.toLowerCase() > bname.toLowerCase() ? +1 : -1;
   });
-  await util.writeFile(configWritePath("config2-rejects.json"), rejects);
   await util.writeFile(configWritePath("config4-pickups.json"), pickups);
-
-  // Sync tvdb.reject from config arrays (config is the authority)
-  const allTvdbForSync = tvdb.getAllTvdbSync();
-  const normalizedRejectsSet = new Set(rejects.map((r) => r.toLowerCase()));
-  for (const [recordName, record] of Object.entries(allTvdbForSync)) {
-    const norm = recordName.toLowerCase();
-    const isReject = normalizedRejectsSet.has(norm);
-    if (isReject) {
-      record.reject = true;
-    } else if (record.reject) {
-      record.reject = false;
-    }
-  }
-  await tvdb.saveTvdbSync();
 
   let errResult = null;
 
@@ -2745,120 +2706,8 @@ const saveConfigYml = async (idIn, resultIn, resolveIn, rejectIn) => {
   }
 };
 
-// Synchronize pickups and rejects from config files to tvdb.json on startup
-const startupConfigSync = () => {
-  const allTvdb = tvdb.getAllTvdbSync();
-  if (!allTvdb || typeof allTvdb !== "object" || Array.isArray(allTvdb)) {
-    throw new Error(
-      "[tv-srvr] FATAL: startupConfigSync requires object tvdb cache",
-    );
-  }
-  let changedTvdb = false;
-
-  const normalizedRejects = new Set(rejects.map((r) => r.toLowerCase()));
-
-  for (const [recordName, record] of Object.entries(allTvdb)) {
-    const norm = recordName.toLowerCase();
-    const shouldReject = normalizedRejects.has(norm);
-    if (shouldReject && !record.reject) {
-      record.reject = true;
-      changedTvdb = true;
-    }
-    if (!shouldReject && record.reject) {
-      record.reject = false;
-      changedTvdb = true;
-    }
-  }
-
-  if (changedTvdb) {
-    tvdb.saveTvdbSync().catch((err) => {
-      console.error("[sync] failed to save tvdb:", err);
-    });
-  }
-};
-
-// Run sync immediately
-startupConfigSync();
-
-const getRejects = async (_param) => {
-  return rejects;
-};
-
-const addReject = async (params) => {
-  const { name, tvdbId } = params;
-  console.log("addReject", name);
-
-  // Update rejects array (config is the authority; tvdb synced in trySaveConfigYml)
-  const existingIdx = rejects.findIndex(
-    (r) => r.toLowerCase() === name.toLowerCase(),
-  );
-  if (existingIdx !== -1) {
-    console.log(
-      "-- removing old matching reject (case fix):",
-      rejects[existingIdx],
-    );
-    rejects.splice(existingIdx, 1);
-  }
-  console.log("-- adding reject:", name);
-  rejects.push(name);
-
-  try {
-    history.addEvent({
-      tvdbId: tvdbId || tvdbIdByName(name),
-      showName: name,
-      type: "reject",
-      description: "Added to reject list",
-    });
-  } catch {}
-
-  return new Promise((resolve, reject) => {
-    saveConfigYml(
-      null,
-      "ok",
-      ([_, result]) => resolve(result),
-      ([_, error]) => reject(new Error(error)),
-    );
-  });
-};
-
-const delReject = async (params) => {
-  const { name, tvdbId } = params;
-  console.log("delReject", name);
-  let deletedOne = false;
-
-  // Update rejects array (config is the authority; tvdb synced in trySaveConfigYml)
-  for (const [idx, rejectNameStr] of rejects.entries()) {
-    if (rejectNameStr.toLowerCase() === name.toLowerCase()) {
-      console.log("-- deleting reject:", rejectNameStr);
-      rejects.splice(idx, 1);
-      deletedOne = true;
-      break;
-    }
-  }
-
-  if (!deletedOne) {
-    console.log("-- reject not deleted -- no match:", name);
-    return "delReject not deleted: " + name;
-  }
-
-  try {
-    history.addEvent({
-      tvdbId: tvdbId || tvdbIdByName(name),
-      showName: name,
-      type: "unreject",
-      description: "Removed from reject list",
-    });
-  } catch {}
-
-  return new Promise((resolve, reject) => {
-    saveConfigYml(
-      null,
-      "ok",
-      ([_, result]) => resolve(result),
-      ([_, error]) => reject(new Error(error)),
-    );
-  });
-};
+// Run sync immediately (removed reject sync)
+// No longer needed since we removed reject filter
 
 const addPickup = async (params) => {
   const name = params?.name;
@@ -3511,7 +3360,6 @@ app.get(
   }),
 );
 app.get("/api/getShowsFromDisk", apiWrapper(getShowsFromDisk));
-app.get("/api/getRejects", apiWrapper(getRejects));
 app.get("/api/getGaps", apiWrapper(getGaps));
 app.get("/api/getNoEmbys", apiWrapper(getNoEmbys));
 app.get("/api/getDevices", apiWrapper(emby.getDevices));
@@ -3842,8 +3690,6 @@ app.post(
 );
 
 // CRUD operations
-app.post("/api/addReject", apiWrapper(addReject));
-app.post("/api/delReject", apiWrapper(delReject));
 app.post("/api/addNoEmby", apiWrapper(addNoEmby));
 app.post("/api/delNoEmby", apiWrapper(delNoEmby));
 app.post("/api/addGap", apiWrapper(addGap));

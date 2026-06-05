@@ -217,6 +217,23 @@ function seriesMapToWatchedEpis(seriesMap) {
 }
 
 /**
+ * Calculate watchedCount from watchedEpis
+ * @param {Array} watchedEpis - Format: [[seasonNum, ep1, ep2, ...], ...]
+ * @returns {number} Total count of watched episodes
+ */
+function calculateWatchedCount(watchedEpis) {
+  if (!watchedEpis || !Array.isArray(watchedEpis)) return 0;
+
+  let count = 0;
+  for (const seasonEntry of watchedEpis) {
+    if (!Array.isArray(seasonEntry) || seasonEntry.length < 1) continue;
+    // First element is season number, rest are episode numbers
+    count += seasonEntry.length - 1;
+  }
+  return count;
+}
+
+/**
  * Apply watchedEpis to seriesMap (set played status)
  * @param {Array} seriesMap - Format: [[seasonNum, [[epNum, {played, ...}], ...]], ...]
  * @param {Array} watchedEpis - Format: [[seasonNum, ep1, ep2, ...], ...]
@@ -2333,6 +2350,9 @@ const tryLocalGetTvdb = async () => {
       });
       if (seriesMap && seriesMap.length > 0) {
         processRecord.watchedEpis = seriesMapToWatchedEpis(seriesMap);
+        processRecord.watchedCount = calculateWatchedCount(
+          processRecord.watchedEpis,
+        );
         await saveTvdbFiles(allTvdb);
       }
     }
@@ -3283,5 +3303,41 @@ export const updateTvdbWithGapData = async (gapData) => {
   return updatedCount;
 };
 
+/**
+ * One-time migration: recalculate watchedCount from watchedEpis for all shows
+ * Call this once to fix shows where watchedCount doesn't match watchedEpis
+ */
+export const migrateWatchedCount = async () => {
+  const allData = getAllTvdbSync();
+  let updatedCount = 0;
+
+  for (const [showName, record] of Object.entries(allData)) {
+    if (!record.watchedEpis || !Array.isArray(record.watchedEpis)) continue;
+
+    const calculatedCount = calculateWatchedCount(record.watchedEpis);
+    if (record.watchedCount !== calculatedCount) {
+      console.log(
+        `[migrateWatchedCount] ${showName}: ${record.watchedCount} -> ${calculatedCount}`,
+      );
+      record.watchedCount = calculatedCount;
+      updatedCount++;
+    }
+  }
+
+  if (updatedCount > 0) {
+    await saveTvdbSync();
+    console.log(`[migrateWatchedCount] Updated ${updatedCount} shows`);
+  } else {
+    console.log("[migrateWatchedCount] No updates needed");
+  }
+
+  return updatedCount;
+};
+
 // Export helper functions for migration and external use
-export { seriesMapToWatchedEpis, applyWatchedEpisToSeriesMap, getSeriesMap };
+export {
+  seriesMapToWatchedEpis,
+  applyWatchedEpisToSeriesMap,
+  getSeriesMap,
+  calculateWatchedCount,
+};

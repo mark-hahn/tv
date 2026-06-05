@@ -3411,6 +3411,7 @@ app.post("/api/accessTvdb", apiWrapper(tvdb.accessTvdb));
 app.post("/api/getTvmazeCrew", apiWrapper(tvdb.getTvmazeCrew_cmd));
 app.get("/api/getVipActors", apiWrapper(tvdb.getVipActors));
 app.post("/api/setVipActors", apiWrapper(tvdb.setVipActors));
+app.post("/api/migrateWatchedCount", apiWrapper(tvdb.migrateWatchedCount));
 app.get("/api/getGroupCounts", apiWrapper(groupCounts.getGroupCounts));
 app.get("/api/getBadGroups", (_req, res) => {
   try {
@@ -7391,6 +7392,7 @@ async function handleShowDiskChange(showName) {
         const freshRecord = tvdb.getAllTvdbSync()[showName];
         if (freshRecord) {
           freshRecord.watchedEpis = watchedEpis;
+          freshRecord.watchedCount = tvdb.calculateWatchedCount(watchedEpis);
           await tvdb.saveTvdbSync();
           console.log(
             `[chokidar] watchedEpis refreshed for ${showName}:`,

@@ -2083,6 +2083,10 @@ export default {
       this.handleActorsClose();
     });
 
+    evtBus.on("selectTab", (tabKey) => {
+      this.selectTab(tabKey);
+    });
+
     evtBus.on("showBrowsePane", () => {
       if (this.simpleMode) return;
       this.currentPane = "browse";

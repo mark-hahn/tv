@@ -3652,6 +3652,17 @@ export default {
       this.topClick();
     });
 
+    on("showsButtonClicked", () => {
+      // Navigate to info pane and set sort to Viewed
+      this.sortChoice = "Viewed";
+      evtBus.emit("selectTab", "info");
+      // Scroll to top of list
+      this.$nextTick(() => {
+        const listPane = this.$refs.listPane;
+        if (listPane) listPane.scrollTop = 0;
+      });
+    });
+
     on("reelSearchAction", (payload) => {
       void this.searchAction(payload);
     });

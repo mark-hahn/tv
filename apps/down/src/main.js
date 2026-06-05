@@ -2696,6 +2696,7 @@ async function main() {
     if (/2160p/i.test(src)) return 2160;
     if (/1080p/i.test(src)) return 1080;
     if (/720p/i.test(src)) return 720;
+    if (/576p/i.test(src)) return 576;
     if (/480p/i.test(src)) return 480;
     return 640;
   }

@@ -5634,6 +5634,7 @@ function flexgetResolution(quality, title) {
   if (/2160p/i.test(src)) return 2160;
   if (/1080p/i.test(src)) return 1080;
   if (/720p/i.test(src)) return 720;
+  if (/576p/i.test(src)) return 576;
   if (/480p/i.test(src)) return 480;
   return 640;
 }
@@ -5722,6 +5723,7 @@ function parseResolutionStrict(title, quality) {
   if (/2160p/i.test(src)) return 2160;
   if (/1080p/i.test(src)) return 1080;
   if (/720p/i.test(src)) return 720;
+  if (/576p/i.test(src)) return 576;
   if (/480p/i.test(src)) return 480;
   return 0; // unknown — do not fall back
 }
@@ -5740,6 +5742,7 @@ function getEpisodeDiskResolution(showPath, season, episode) {
       if (/2160p/i.test(f)) return 2160;
       if (/1080p/i.test(f)) return 1080;
       if (/720p/i.test(f)) return 720;
+      if (/576p/i.test(f)) return 576;
       if (/480p/i.test(f)) return 480;
     }
     return 0;

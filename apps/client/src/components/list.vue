@@ -2604,6 +2604,8 @@ export default {
       // Bail if a newer seriesMapAction started during any of the awaits above
       if (mapToken !== this._mapActionToken) return;
 
+      const fileQuality = allTvdb?.[show.name]?.fileQuality || {};
+
       for (const season of seriesMapIn) {
         const [seasonNum, episodes] = season;
         seriesMapSeasons[seasonNum] = seasonNum;
@@ -2613,6 +2615,7 @@ export default {
           let [episodeNum, epiObj] = episode;
           const { error, played, avail, noFile, unaired, path, id } = epiObj;
           seriesMapEpis[episodeNum] = episodeNum;
+          const epKey = `S${String(seasonNum).padStart(2, "0")}E${String(episodeNum).padStart(2, "0")}`;
           seasonMap[episodeNum] = {
             error,
             played,
@@ -2621,6 +2624,7 @@ export default {
             unaired,
             path,
             id,
+            quality: fileQuality[epKey],
           };
         }
       }
@@ -2646,10 +2650,13 @@ export default {
             }
             if (!seriesMapEpis[e]) seriesMapEpis[e] = e;
             const cell = seriesMap[s][e];
+            const diskEpKey = `S${String(s).padStart(2, "0")}E${String(e).padStart(2, "0")}`;
+            const diskQ = fileQuality[diskEpKey];
             if (cell) {
               cell.avail = true;
               cell.noFile = false;
               cell.unaired = false;
+              cell.quality = diskQ;
             } else {
               seriesMap[s][e] = {
                 avail: true,
@@ -2658,6 +2665,7 @@ export default {
                 played: filesOnDiskWatchedSet.has(`${s}.${e}`),
                 error: false,
                 path: null,
+                quality: diskQ,
               };
             }
           }

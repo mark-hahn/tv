@@ -122,6 +122,7 @@ export async function loadAllShows() {
     if (rec.date === undefined) rec.date = "2017-12-05";
     if (rec.size === undefined) rec.size = 0;
     if (rec.noFiles === undefined) rec.noFiles = false;
+    if (rec.fileQuality === undefined) rec.fileQuality = {};
 
     // DEBUG Swiss Toni
     if (rec.name === "Swiss Toni") {

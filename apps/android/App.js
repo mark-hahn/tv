@@ -1484,15 +1484,29 @@ export default function App() {
       setActiveTab("Info");
     };
 
+    const qualityChar = (q) => {
+      if (q === 2160) return "2";
+      if (q === 1080) return "1";
+      if (q === 720) return "7";
+      if (q === 576) return "5";
+      if (q === 480) return "4";
+      return "0";
+    };
+
     const getCellBg = (cell) => {
       if (!cell || cell.avail) return { backgroundColor: "white" };
       return { backgroundColor: "#fcc" };
     };
 
-    const getCellText = (cell) => {
+    const getCellText = (cell, s, ep) => {
       if (!cell) return "";
       const w = cell.unaired ? "U" : cell.played ? "W" : "";
-      return w + (cell.avail ? "+" : "-");
+      if (cell.avail) {
+        const fq = selectedShow?.fileQuality || {};
+        const key = `S${String(s).padStart(2, "0")}E${String(ep).padStart(2, "0")}`;
+        return w + qualityChar(fq[key]);
+      }
+      return w + "-";
     };
 
     const getSortedShows = (shows) => {
@@ -1851,7 +1865,7 @@ export default function App() {
                             <Text
                               style={{ fontSize: fs(17), fontWeight: "bold" }}
                             >
-                              {getCellText(cell)}
+                              {getCellText(cell, s, ep)}
                             </Text>
                           </TouchableOpacity>
                         );

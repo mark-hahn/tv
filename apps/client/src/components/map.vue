@@ -678,7 +678,9 @@
                         mapShow?.inEmby !== false
                       "
                     >
-                      +</span
+                      {{
+                        qualityChar(seriesMap[season][episode].quality)
+                      }}</span
                     ><span
                       v-if="seriesMap?.[season]?.[episode]?.noFile &amp;&amp; !seriesMap?.[season]?.[episode]?.unaired"
                     >
@@ -1247,6 +1249,15 @@ export default {
     },
 
     noop() {},
+
+    qualityChar(q) {
+      if (q === 2160) return "2";
+      if (q === 1080) return "1";
+      if (q === 720) return "7";
+      if (q === 576) return "5";
+      if (q === 480) return "4";
+      return "0";
+    },
 
     async handleNotInEmbyClick(event) {
       // Ctrl-click on "Not In Emby": create the server folder and refresh Emby.

@@ -2228,7 +2228,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         );
     const diskChanges = [];
     if (diskInfo) {
-      const [newDate, newSize, newFilesOnDisk] = diskInfo;
+      const [newDate, newSize, newFilesOnDisk, newFileQuality] = diskInfo;
       if (tvdbRecord.date !== newDate) {
         diskChanges.push(`Date:${tvdbRecord.date}->${newDate}`);
         tvdbRecord.date = newDate;
@@ -2242,11 +2242,14 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         tvdbRecord.noFiles = false;
       }
       tvdbRecord.filesOnDisk = newFilesOnDisk || [];
+      tvdbRecord.fileQuality = newFileQuality || {};
     } else if (!tvdbRecord.noFiles) {
       diskChanges.push(`NoFiles:false->true`);
       tvdbRecord.noFiles = true;
       tvdbRecord.date = null;
       tvdbRecord.size = 0;
+      tvdbRecord.filesOnDisk = [];
+      tvdbRecord.fileQuality = {};
     }
     // lastWatched
     const lastWatchedChanges = [];
@@ -2504,11 +2507,28 @@ function fmtDateWithTZ(date, utcOut = false) {
   return `${year}-${month}-${day}`;
 }
 
+function parseFileQuality(src) {
+  const text = String(src || "");
+  if (/2160p/i.test(text)) return 2160;
+  if (/1080p/i.test(text)) return 1080;
+  if (/720p/i.test(text)) return 720;
+  if (/576p/i.test(text)) return 576;
+  if (/480p/i.test(text)) return 480;
+  return null;
+}
+
+function toEpisodeKey(season, episode) {
+  return `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
+}
+
 const getShowsFromDisk = async (_params) => {
   let errFlg = null;
   const shows = {};
 
   let maxDate, totalSize;
+  let episodesBySeason;
+  let fileQuality;
+  let showFolderName;
 
   const recurs = async (path) => {
     if (errFlg || path == tvDir + "/.stfolder") return;
@@ -2523,6 +2543,28 @@ const getShowsFromDisk = async (_params) => {
       if (videoFileExtensions.includes(sfx)) {
         const date = fmtDateWithTZ(fstat.mtime);
         maxDate = Math.max(maxDate, date);
+        const fname = path.split("/").pop();
+        const folderName = path.split("/").slice(-2, -1)[0];
+        const parsed = parseFileSeasonEpisode(fname, folderName);
+        if (
+          parsed &&
+          Number.isInteger(parsed.season) &&
+          Number.isInteger(parsed.episode)
+        ) {
+          if (!episodesBySeason.has(parsed.season))
+            episodesBySeason.set(parsed.season, new Set());
+          episodesBySeason.get(parsed.season).add(parsed.episode);
+          const ptt = parseTorrentTitle(fname.replace(/\.[a-z0-9]{2,4}$/i, ""));
+          const title = parseTitleFromFilename(fname, folderName, ptt);
+          const titleMatch =
+            !title || !!smartTitleMatch(title, [showFolderName], null, false);
+          const quality = parseFileQuality(fname);
+          if (titleMatch && quality != null) {
+            const epKey = toEpisodeKey(parsed.season, parsed.episode);
+            const existing = fileQuality[epKey];
+            if (!existing || quality > existing) fileQuality[epKey] = quality;
+          }
+        }
       }
       totalSize += fstat.size;
     } catch (err) {
@@ -2536,10 +2578,20 @@ const getShowsFromDisk = async (_params) => {
     const fstat = fs.statSync(showPath);
     const maxDate = fmtDateWithTZ(fstat.mtime);
     totalSize = 0;
+    episodesBySeason = new Map();
+    fileQuality = {};
+    showFolderName = dirent;
 
     await recurs(showPath);
 
-    shows[dirent] = [maxDate, totalSize];
+    const filesOnDisk = Array.from(episodesBySeason.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([season, epSet]) => [
+        season,
+        ...Array.from(epSet).sort((a, b) => a - b),
+      ]);
+
+    shows[dirent] = [maxDate, totalSize, filesOnDisk, fileQuality];
     // if (totalSize == 0) {
     //   console.log("empty show:", dirent);
     // }
@@ -2569,7 +2621,7 @@ const showNameFromFilePath = (filePath) => {
 /**
  * Check disk for a single show folder
  * @param {string} showFolderName - The show folder name (e.g., "Breaking Bad")
- * @returns {Promise<[number, number]|null>} - [maxDate, totalSize] or null if not found
+ * @returns {Promise<[number, number, Array, Object]|null>} - [maxDate, totalSize, filesOnDisk, fileQuality] or null if not found
  */
 const getShowDiskInfo = async (showFolderName) => {
   if (!showFolderName) return null;
@@ -2579,6 +2631,7 @@ const getShowDiskInfo = async (showFolderName) => {
   let errFlg = null;
   // Track which episodes are on disk: { season -> Set<episode> }
   const episodesBySeason = new Map();
+  const fileQuality = {};
 
   const recurs = async (dirPath) => {
     if (errFlg || dirPath == tvDir + "/.stfolder") return;
@@ -2608,6 +2661,16 @@ const getShowDiskInfo = async (showFolderName) => {
           if (!episodesBySeason.has(parsed.season))
             episodesBySeason.set(parsed.season, new Set());
           episodesBySeason.get(parsed.season).add(parsed.episode);
+          const ptt = parseTorrentTitle(fname.replace(/\.[a-z0-9]{2,4}$/i, ""));
+          const title = parseTitleFromFilename(fname, folderName, ptt);
+          const titleMatch =
+            !title || !!smartTitleMatch(title, [showFolderName], null, false);
+          const quality = parseFileQuality(fname);
+          if (titleMatch && quality != null) {
+            const epKey = toEpisodeKey(parsed.season, parsed.episode);
+            const existing = fileQuality[epKey];
+            if (!existing || quality > existing) fileQuality[epKey] = quality;
+          }
         }
       }
     } catch (err) {
@@ -2638,7 +2701,7 @@ const getShowDiskInfo = async (showFolderName) => {
         ...Array.from(epSet).sort((a, b) => a - b),
       ]);
 
-    return [maxDate, totalSize, filesOnDisk];
+    return [maxDate, totalSize, filesOnDisk, fileQuality];
   } catch (err) {
     // Show folder doesn't exist or not accessible
     return null;
@@ -3469,11 +3532,13 @@ app.post(
         name;
       const diskInfo = await getShowDiskInfo(folderName);
       if (diskInfo) {
-        const [, , filesOnDisk] = diskInfo;
+        const [, , filesOnDisk, fileQuality] = diskInfo;
         tvdbRecord.filesOnDisk = filesOnDisk || [];
+        tvdbRecord.fileQuality = fileQuality || {};
         updated++;
       } else {
         tvdbRecord.filesOnDisk = [];
+        tvdbRecord.fileQuality = {};
         skipped++;
       }
     }
@@ -6897,6 +6962,7 @@ async function syncDiskData() {
       const newDate = diskInfo ? diskInfo[0] : null;
       const newSize = diskInfo ? diskInfo[1] : 0;
       const newFilesOnDisk = diskInfo ? diskInfo[2] || [] : [];
+      const newFileQuality = diskInfo ? diskInfo[3] || {} : {};
       const newNoFiles = !diskInfo;
 
       // Check if disk data changed
@@ -6906,6 +6972,7 @@ async function syncDiskData() {
         tvdbRecord.noFiles !== newNoFiles;
 
       tvdbRecord.filesOnDisk = newFilesOnDisk;
+      tvdbRecord.fileQuality = newFileQuality;
 
       if (changed) {
         tvdbRecord.date = newDate;
@@ -6976,7 +7043,7 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
         const diskInfo = await getShowDiskInfo(pathPart);
 
         if (diskInfo) {
-          const [newDate, newSize, newFilesOnDisk] = diskInfo;
+          const [newDate, newSize, newFilesOnDisk, newFileQuality] = diskInfo;
           const changed =
             tvdbRecord.date !== newDate || tvdbRecord.size !== newSize;
 
@@ -6987,6 +7054,7 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
             diskUpdateCount++;
           }
           tvdbRecord.filesOnDisk = newFilesOnDisk || [];
+          tvdbRecord.fileQuality = newFileQuality || {};
         } else {
           // Folder doesn't exist or empty
           const changed = tvdbRecord.noFiles !== true;
@@ -6997,6 +7065,7 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
             diskUpdateCount++;
           }
           tvdbRecord.filesOnDisk = [];
+          tvdbRecord.fileQuality = {};
         }
       }
 
@@ -7348,7 +7417,7 @@ async function handleShowDiskChange(showName) {
     // Update disk info for this show
     const diskInfo = await getShowDiskInfo(showName);
     if (diskInfo) {
-      const [maxDate, totalSize, filesOnDisk] = diskInfo;
+      const [maxDate, totalSize, filesOnDisk, fileQuality] = diskInfo;
 
       // Update tvdb record with new disk info
       const allTvdb = tvdb.getAllTvdbSync();
@@ -7357,6 +7426,7 @@ async function handleShowDiskChange(showName) {
         tvdbRecord.date = maxDate;
         tvdbRecord.size = totalSize;
         tvdbRecord.filesOnDisk = filesOnDisk || [];
+        tvdbRecord.fileQuality = fileQuality || {};
         await tvdb.saveTvdbSync();
         console.log(
           `[chokidar] Updated disk info for ${showName}: ${totalSize} bytes, ${maxDate}`,

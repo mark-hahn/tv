@@ -119,7 +119,7 @@
               :showsLength="shows.length"
               :allShowsLength="allShowsLength"
               v-model:filterStr="filterStr"
-              :watchingName="watchingName"
+              :watchingName="watchingNameDisplay"
               :simpleMode="simpleMode"
               :isWideLandscape="isWideLandscape"
               :statusMsg="updatingMsg"
@@ -214,7 +214,7 @@
             :showsLength="shows.length"
             :allShowsLength="allShowsLength"
             v-model:filterStr="filterStr"
-            :watchingName="watchingName"
+            :watchingName="watchingNameDisplay"
             :simpleMode="simpleMode"
             :isWideLandscape="isWideLandscape"
             :statusMsg="updatingMsg"
@@ -636,6 +636,8 @@ export default {
       seriesMap: {},
       watchingName: "---",
       lastWatchingName: null,
+      currentPlayingSeason: null,
+      currentPlayingEpisode: null,
       nowPlayingShowNames: new Set(),
       sortPopped: false,
       sortChoice: "Viewed",
@@ -861,6 +863,19 @@ export default {
       return this.actorsList.filter((a) =>
         a.displayName.toLowerCase().includes(srch),
       );
+    },
+
+    watchingNameDisplay() {
+      if (this.watchingName === "---") return "---";
+      if (
+        this.currentPlayingSeason != null &&
+        this.currentPlayingEpisode != null
+      ) {
+        const s = String(this.currentPlayingSeason).padStart(2, "0");
+        const e = String(this.currentPlayingEpisode).padStart(2, "0");
+        return `${this.watchingName} (S${s}E${e})`;
+      }
+      return this.watchingName;
     },
   },
 
@@ -2597,7 +2612,7 @@ export default {
       });
     },
 
-    async seriesMapAction(action, show) {
+    async seriesMapAction(action, show, options = {}) {
       if (
         action == "open" &&
         this.mapShow?.name === show?.name &&
@@ -2790,7 +2805,7 @@ export default {
         seriesMapEpis: this.seriesMapEpis,
         seriesMap: this.seriesMap,
         mapError: errorMessage,
-        noSwitch: isRefresh,
+        noSwitch: isRefresh || !!options.noSwitch,
       });
 
       if (action === "prune") {
@@ -3257,9 +3272,27 @@ export default {
         window.localStorage.setItem("lastVisShow", target);
         this.scrollToSavedShow(true);
 
-        // If we have episode info, open actors pane and show episode actors
-        // Changed per user request: go to series pane instead
-        evtBus.emit("showSeriesPane");
+        // If we have episode info, load map data and select that episode.
+        if (
+          this.currentPlayingSeason != null &&
+          this.currentPlayingEpisode != null
+        ) {
+          const show = this.shows.find((s) => s.name === target);
+          if (show) {
+            // Keep the full map populated, but do not switch panes.
+            await this.seriesMapAction("open", show, { noSwitch: true });
+            // Switch to info pane without clearing the background map.
+            evtBus.emit("showInfoPane");
+            // Select only the current episode inside the already-loaded map.
+            evtBus.emit("selectMapEpisode", {
+              season: this.currentPlayingSeason,
+              episode: this.currentPlayingEpisode,
+            });
+          }
+        } else {
+          // No episode info, just show info pane
+          evtBus.emit("showInfoPane");
+        }
       }
     },
 
@@ -3876,8 +3909,24 @@ export default {
       if (showName) {
         this.lastWatchingName = showName;
         this.watchingName = showName;
+        // Extract season/episode from first playing item
+        const firstPlaying =
+          Array.isArray(playing) && playing.length > 0 ? playing[0] : null;
+        if (
+          firstPlaying &&
+          firstPlaying.season != null &&
+          firstPlaying.episode != null
+        ) {
+          this.currentPlayingSeason = firstPlaying.season;
+          this.currentPlayingEpisode = firstPlaying.episode;
+        } else {
+          this.currentPlayingSeason = null;
+          this.currentPlayingEpisode = null;
+        }
       } else {
         this.watchingName = this.lastWatchingName ?? "---";
+        this.currentPlayingSeason = null;
+        this.currentPlayingEpisode = null;
       }
       this.nowPlayingShowNames = new Set(
         Array.isArray(playing) ? playing.map((p) => p.showName) : [],

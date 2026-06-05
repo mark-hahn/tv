@@ -1845,6 +1845,17 @@ export default {
         this.episodeInfo = null;
       }
     },
+    selectSingleEpisode(season, episode) {
+      if (!this.mapShow?.name || !season || !episode) return;
+      if (!this.seriesMap?.[season]?.[episode]) return;
+
+      const key = this.cellKey(season, episode);
+      this.selectedSeasons = new Set();
+      this.selectedCells = new Set([key]);
+      this.selectionSeason = String(season);
+      this.lastSelectedCell = key;
+      this.syncOpenEpisodePaneToSelection();
+    },
     buildSelectedEpisodeActionEvent(overrides = {}) {
       return {
         stopPropagation() {},

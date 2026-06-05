@@ -64,7 +64,7 @@
           font-size: 13px;
           cursor: pointer;
           margin: 5px 5px 5px 0;
-          width: 136px;
+          width: 163px;
           flex-shrink: 0;
           white-space: nowrap;
           overflow: hidden;

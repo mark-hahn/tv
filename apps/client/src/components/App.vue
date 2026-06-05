@@ -991,6 +991,7 @@ export default {
     evtBus.off("setLibraryProgress", this.handleSetLibraryProgress);
     evtBus.off("libraryProgress", this.handleLibraryProgress);
     evtBus.off("libraryRefreshDone", this.handleLibraryRefreshDone);
+    evtBus.off("selectMapEpisode");
     if (this._onAppWindowResize)
       window.removeEventListener("resize", this._onAppWindowResize);
     this.stopQbtPolling();
@@ -2074,6 +2075,11 @@ export default {
       this.handleShowTor(show);
     });
 
+    evtBus.on("showInfoPane", () => {
+      this.currentPane = "info";
+      evtBus.emit("paneChanged", this.currentPane);
+    });
+
     // Map navigation is centralized through list.vue via mapAction('open')
 
     evtBus.on("showSeriesPane", () => {
@@ -2097,6 +2103,13 @@ export default {
       if (this.simpleMode) return;
       this.currentPane = "local";
       evtBus.emit("paneChanged", this.currentPane);
+    });
+
+    // Select episode in map component (from watchClick) after map props update.
+    evtBus.on("selectMapEpisode", async ({ season, episode }) => {
+      if (season == null || episode == null) return;
+      await this.$nextTick();
+      this.$refs.mapComp?.selectSingleEpisode(season, episode);
     });
 
     // Preview mode: driven by ctrl-click in the web search dropdown.

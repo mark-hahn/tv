@@ -453,7 +453,7 @@ async function getSeriesMap(tvdbId, watchedEpis = null) {
 
 const UPDATE_DATA = true;
 
-let allTvdb = null;
+let allTvdb = {};
 try {
   allTvdb = loadTvdbAtStartup();
 } catch {
@@ -958,7 +958,9 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
         .replace(/['":.,!]/g, "")
         .replace(/\s+/g, "_");
       const url = `https://www.rottentomatoes.com/tv/${cleanName}`;
-      remotes.push({ name: "Rotten", url });
+      if (await isValidUrl(url)) {
+        remotes.push({ name: "Rotten", url });
+      }
     }
   }
 
@@ -1571,7 +1573,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
       if (canonicalName !== inputName) {
         log(
           "inf",
-          `getTvdbData canonicalized by tvdbId=${tvdbId}: input=\"${inputName}\" canonical=\"${canonicalName}\"`,
+          `getTvdbData canonicalized by tvdbId=${tvdbId}: input=" ${inputName}" canonical=" ${canonicalName}"`,
         );
       }
       break;
@@ -3341,4 +3343,16 @@ export {
   applyWatchedEpisToSeriesMap,
   getSeriesMap,
   calculateWatchedCount,
+};
+
+const isValidUrl = async (url) => {
+  try {
+    const res = await fetch(url, {
+      method: "HEAD",
+      signal: AbortSignal.timeout(5000), // 5-second timeout
+    });
+    return res.ok;
+  } catch (error) {
+    return false;
+  }
 };

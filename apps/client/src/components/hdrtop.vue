@@ -237,9 +237,8 @@ export default {
     },
 
     openEmbyLibraries() {
-      window.open(
+      util.openExternalPage(
         "https://hahnca.com:8920/web/index.html#!/librarysetup/libraries",
-        "_blank",
       );
     },
   },

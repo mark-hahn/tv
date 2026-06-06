@@ -1020,7 +1020,7 @@ export default {
     },
 
     openQbtUI() {
-      window.open("https://hahnca.com/tv-srvr/api/qbt-open", "_blank");
+      util.openExternalPage("https://hahnca.com/tv-srvr/api/qbt-open");
     },
 
     highlightShow() {

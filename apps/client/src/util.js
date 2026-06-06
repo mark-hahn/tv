@@ -236,13 +236,7 @@ export function openExternalPage(url) {
 }
 
 export function openNewTab(url) {
-  const targetUrl = String(url || "").trim();
-  if (!targetUrl) return null;
-  try {
-    return window.open(targetUrl, "_blank");
-  } catch {
-    return null;
-  }
+  return openExternalPage(url);
 }
 
 export function wrapFileName(name, maxLen = 79) {

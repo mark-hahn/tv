@@ -1991,7 +1991,7 @@ export default {
     handleSelectedEmby() {
       const id = this.firstSelectedEmbyId;
       if (!id) return;
-      window.open(urls.embyPageUrl(id), "_blank");
+      util.openExternalPage(urls.embyPageUrl(id));
     },
     async handleSelectedTv() {
       const id = this.firstSelectedEmbyId;

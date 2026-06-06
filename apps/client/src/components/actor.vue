@@ -194,7 +194,7 @@ export default {
       if (!name) return;
 
       // Open window immediately to avoid popup blocker
-      const win = window.open("", "_blank");
+      const win = util.openExternalPage("");
 
       // Get actor page URL and open it
       const actorName = actor?.personName || actor?.name;

@@ -5836,6 +5836,59 @@ function getEpisodeDiskGroup(showPath, season, episode) {
   }
 }
 
+function getFirstFilesOnDiskSeasonGap(filesOnDisk) {
+  if (!Array.isArray(filesOnDisk) || filesOnDisk.length === 0) return null;
+
+  const seasons = filesOnDisk
+    .map((row) => (Array.isArray(row) ? Number.parseInt(row[0], 10) : NaN))
+    .filter((seasonNum) => Number.isInteger(seasonNum) && seasonNum >= 0)
+    .sort((a, b) => a - b);
+
+  if (seasons.length === 0) return null;
+
+  let expectedSeason = seasons[0];
+  for (let i = 0; i < seasons.length; i += 1) {
+    const seasonNum = seasons[i];
+    if (seasonNum > expectedSeason) return expectedSeason;
+    if (seasonNum === expectedSeason) expectedSeason += 1;
+  }
+
+  return null;
+}
+
+async function storeFlexgetRejectedCandidate(
+  list,
+  histKey,
+  candidate,
+  rawTitle,
+) {
+  if (!candidate.url || list.some((entry) => entry.url === candidate.url))
+    return;
+
+  list.push({
+    title: rawTitle,
+    url: candidate.url || null,
+    quality: candidate.quality || null,
+    resolution: candidate.resolution || null,
+    content_size: candidate.content_size || null,
+    torrent_seeds: candidate.torrent_seeds || null,
+    torrent_leeches: candidate.torrent_leeches || null,
+    proper: candidate.proper || null,
+    release_group: candidate.release_group || null,
+    task: candidate.task || null,
+    regexp: candidate.regexp || null,
+    provider: String(candidate.url || "").includes("iptorrents.com")
+      ? "ipt"
+      : String(candidate.url || "").includes("torrentleech.org")
+        ? "tl"
+        : null,
+    sent: null,
+    addedAt: flexgetFmtSent(),
+  });
+  flexgetHistory[histKey] = list;
+  await saveFlexgetHistory();
+}
+
 async function processFlexgetCandidate(candidate, storeOnly = false) {
   const rawTitle = String(candidate.title || "").trim();
   if (!rawTitle) return;
@@ -5882,34 +5935,26 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
   const isWatched = watchedEpis.some(
     (row) => row[0] === season && row.slice(1).includes(episode),
   );
-  if (isWatched) {
-    if (candidate.url && !list.some((c) => c.url === candidate.url)) {
-      list.push({
-        title: rawTitle,
-        url: candidate.url || null,
-        quality: candidate.quality || null,
-        resolution: ptt?.resolution || null,
-        content_size: candidate.content_size || null,
-        torrent_seeds: candidate.torrent_seeds || null,
-        torrent_leeches: candidate.torrent_leeches || null,
-        proper: candidate.proper || null,
-        release_group: candidate.release_group || null,
-        task: candidate.task || null,
-        regexp: candidate.regexp || null,
-        provider: String(candidate.url || "").includes("iptorrents.com")
-          ? "ipt"
-          : String(candidate.url || "").includes("torrentleech.org")
-            ? "tl"
-            : null,
-        sent: null,
-        addedAt: flexgetFmtSent(),
-      });
-      flexgetHistory[histKey] = list;
-      await saveFlexgetHistory();
-    }
-    console.log(
-      `[flexget] SKIP(watched) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
+  const firstSeasonGap = getFirstFilesOnDiskSeasonGap(rec.filesOnDisk);
+  const isPastSeasonGap = firstSeasonGap !== null && season > firstSeasonGap;
+
+  if (isWatched || isPastSeasonGap) {
+    await storeFlexgetRejectedCandidate(
+      list,
+      histKey,
+      { ...candidate, resolution: ptt?.resolution || null },
+      rawTitle,
     );
+    if (isWatched) {
+      console.log(
+        `[flexget] SKIP(watched) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
+      );
+    }
+    if (isPastSeasonGap) {
+      console.log(
+        `[flexget] SKIP(season-gap-S${String(firstSeasonGap).padStart(2, "0")}) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
+      );
+    }
     return;
   }
 

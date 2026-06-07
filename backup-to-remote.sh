@@ -21,7 +21,6 @@ run_backup() {
     restic -r "$REPO" -p "$PASSWORD_FILE" backup \
         "${BACKUP_PATHS[@]}" \
         --exclude-file="$HOME/backup-ignore" \
-        --exclude="/mnt/c/Users/mark/CrossDevice" \
         --one-file-system \
         --tag "automated"
 }
@@ -50,3 +49,8 @@ run_backup
 STATUS=$?
 trap - EXIT
 finish
+
+# Put Windows to sleep
+if [ "$1" == "--sleep" ]; then
+    /mnt/c/Windows/System32/rundll32.exe powrprof.dll,SetSuspendState 0,1,0
+fi

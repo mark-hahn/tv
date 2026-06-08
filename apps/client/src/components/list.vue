@@ -2105,11 +2105,33 @@ export default {
       }
 
       if (!options.skipHistory && !this.filterInputFocused) {
-        showHistory = showHistory.slice(0, showHistoryPtr + 1);
-        showHistory = showHistory.filter((n) => n !== showName);
-        showHistory.push(showName);
-        if (showHistory.length > 100) showHistory = showHistory.slice(-100);
-        showHistoryPtr = showHistory.length - 1;
+        const currentShowName =
+          showHistory.length > 0 ? showHistory[showHistoryPtr] : null;
+        const prevShowName =
+          showHistoryPtr > 0 ? showHistory[showHistoryPtr - 1] : null;
+        const nextShowName =
+          showHistoryPtr < showHistory.length - 1
+            ? showHistory[showHistoryPtr + 1]
+            : null;
+
+        if (showName === currentShowName) {
+          // 1. Newly selected show matches the current one, do nothing.
+        } else if (showName === prevShowName) {
+          // 2. Newly selected show is the previous one, move pointer back.
+          showHistoryPtr--;
+        } else if (showName === nextShowName) {
+          // 3. Newly selected show is the next one, move pointer forward.
+          showHistoryPtr++;
+        } else {
+          // 4. New history branch.
+          showHistory = showHistory.slice(0, showHistoryPtr + 1);
+          showHistory.push(showName);
+          if (showHistory.length > 100) {
+            showHistory = showHistory.slice(-100);
+          }
+          showHistoryPtr = showHistory.length - 1;
+        }
+
         try {
           localStorage.setItem("showHistory", JSON.stringify(showHistory));
         } catch {

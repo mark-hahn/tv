@@ -5992,19 +5992,32 @@ function getEpisodeDiskGroup(showPath, season, episode) {
   }
 }
 
-function getFirstFilesOnDiskSeasonGap(filesOnDisk) {
-  if (!Array.isArray(filesOnDisk) || filesOnDisk.length === 0) return null;
+function getFirstFilesOnDiskSeasonGap(filesOnDisk, torrentSeason) {
+  const seasons = [];
 
-  const seasons = filesOnDisk
-    .map((row) => (Array.isArray(row) ? Number.parseInt(row[0], 10) : NaN))
-    .filter((seasonNum) => Number.isInteger(seasonNum) && seasonNum >= 0)
-    .sort((a, b) => a - b);
+  if (Array.isArray(filesOnDisk)) {
+    seasons.push(
+      ...filesOnDisk
+        .map((row) => (Array.isArray(row) ? Number.parseInt(row[0], 10) : NaN))
+        .filter((seasonNum) => Number.isInteger(seasonNum) && seasonNum >= 0),
+    );
+  }
+
+  if (Number.isInteger(torrentSeason) && torrentSeason >= 0) {
+    seasons.push(torrentSeason);
+  }
 
   if (seasons.length === 0) return null;
 
-  let expectedSeason = seasons[0];
-  for (let i = 0; i < seasons.length; i += 1) {
-    const seasonNum = seasons[i];
+  seasons.sort((a, b) => a - b);
+
+  const dedupedSeasons = seasons.filter(
+    (seasonNum, index) => index === 0 || seasonNum !== seasons[index - 1],
+  );
+
+  let expectedSeason = dedupedSeasons[0];
+  for (let i = 0; i < dedupedSeasons.length; i += 1) {
+    const seasonNum = dedupedSeasons[i];
     if (seasonNum > expectedSeason) return expectedSeason;
     if (seasonNum === expectedSeason) expectedSeason += 1;
   }
@@ -6091,7 +6104,7 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
   const isWatched = watchedEpis.some(
     (row) => row[0] === season && row.slice(1).includes(episode),
   );
-  const firstSeasonGap = getFirstFilesOnDiskSeasonGap(rec.filesOnDisk);
+  const firstSeasonGap = getFirstFilesOnDiskSeasonGap(rec.filesOnDisk, season);
   const isPastSeasonGap = firstSeasonGap !== null && season > firstSeasonGap;
 
   if (isWatched || isPastSeasonGap) {

@@ -535,6 +535,10 @@ export function chksrtGenSrt(videoPath) {
   return httpCall("/api/asr/chksrt/gensrt", { videoPath }, "POST");
 }
 
+export function chksrtSnooze(videoPath) {
+  return httpCall("/api/asr/chksrt/snooze", { videoPath }, "POST");
+}
+
 export function chksrtSelect(videoPath, selectedSrtPath) {
   return httpCall(
     "/api/asr/chksrt/select",

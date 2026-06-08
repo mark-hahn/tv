@@ -688,6 +688,25 @@
       </div>
       <div
         v-if="mode === 'chksrt'"
+        @click.stop="clickChksrtSnooze"
+        style="
+          color: white;
+          font-size: 13px;
+          padding: 2px 8px;
+          border-radius: 4px;
+          border: 1px solid #666;
+          cursor: pointer;
+          user-select: none;
+          background: rgba(70, 45, 0, 0.75);
+          margin-right: 8px;
+          white-space: nowrap;
+          text-shadow: 0 0 3px #000;
+        "
+      >
+        Snooze
+      </div>
+      <div
+        v-if="mode === 'chksrt'"
         @click.stop="clickChksrtNext"
         style="
           color: white;
@@ -759,6 +778,7 @@ import {
   applySubOffset,
   chksrtOk,
   chksrtGenSrt,
+  chksrtSnooze,
   chksrtSelect,
   getChksrtHistory,
   addChksrtHistory,
@@ -1692,6 +1712,15 @@ export default {
         await this._submitChksrtSelection();
       } catch (e) {
         console.error("[chksrt] next error:", e);
+      }
+      this.$emit("chksrt-next", null);
+    },
+    async clickChksrtSnooze() {
+      try {
+        await chksrtSnooze(this.path);
+      } catch (e) {
+        console.error("[chksrt] snooze error:", e);
+        return;
       }
       this.$emit("chksrt-next", null);
     },

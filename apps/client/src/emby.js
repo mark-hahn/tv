@@ -1604,7 +1604,7 @@ export const createShowFolderAndRefreshEmby = async ({
     );
   }
 
-  return { createdFolder: true, status: "ok", refreshRes };
+  return { createdFolder: true, status: "ok" };
 };
 
 export const taskStatus = async (taskId) => {

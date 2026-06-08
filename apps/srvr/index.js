@@ -914,7 +914,11 @@ function loadChksrtSnoozed() {
 }
 function persistChksrtSnoozed() {
   try {
-    fs.writeFileSync(CHKSRT_SNOOZED_PATH, JSON.stringify(chksrtSnoozed), "utf8");
+    fs.writeFileSync(
+      CHKSRT_SNOOZED_PATH,
+      JSON.stringify(chksrtSnoozed),
+      "utf8",
+    );
   } catch (e) {
     console.error("[chksrt-snoozed] persist error:", e.message);
   }
@@ -2155,7 +2159,9 @@ async function tryDownloadOpnSrtForVideo({
     }
     const resp = await fetch(url, { headers: { Accept: "*/*" } });
     if (!resp.ok) {
-      logSubtitle(`${logPrefix} fetch err ${showName} ${key}: HTTP ${resp.status}`);
+      logSubtitle(
+        `${logPrefix} fetch err ${showName} ${key}: HTTP ${resp.status}`,
+      );
       return { attempted: true, downloaded: false };
     }
     const txt = await resp.text();
@@ -2164,7 +2170,9 @@ async function tryDownloadOpnSrtForVideo({
     logSubtitle(`${logPrefix}: ${outPath}`);
     return { attempted: true, downloaded: true, outPath };
   } catch (e) {
-    logSubtitle(`${logPrefix} dl err ${showName} ${key} fid=${fileId}: ${e.message}`);
+    logSubtitle(
+      `${logPrefix} dl err ${showName} ${key} fid=${fileId}: ${e.message}`,
+    );
     return { attempted: true, downloaded: false, error: e };
   }
 }

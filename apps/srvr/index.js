@@ -1859,6 +1859,31 @@ const subsSearch = async (params) => {
   }
 };
 
+const subsCountEpisodes = async (params) => {
+  const requests = Array.isArray(params?.requests) ? params.requests : null;
+  if (!requests || requests.length === 0) {
+    throw new Error("subsCountEpisodes: requests required");
+  }
+
+  const results = [];
+  for (const request of requests) {
+    const key = String(request?.key || "");
+    try {
+      const data = await subsSearch(request || {});
+      const items = Array.isArray(data?.data) ? data.data : [];
+      results.push({ key, count: items.length, error: null });
+    } catch (e) {
+      results.push({
+        key,
+        count: 0,
+        error: e?.message || String(e),
+      });
+    }
+  }
+
+  return { results };
+};
+
 function gapEntryHasGap(gap) {
   if (!gap || typeof gap !== "object") return false;
 
@@ -4832,6 +4857,7 @@ app.post(
 
 // Subtitles
 app.post("/api/subsSearch", apiWrapper(subsSearch));
+app.post("/api/subsCountEpisodes", apiWrapper(subsCountEpisodes));
 app.post("/api/opn/search", async (req, res) => {
   const { videoPaths } = req.body || {};
   if (!Array.isArray(videoPaths) || videoPaths.length === 0) {

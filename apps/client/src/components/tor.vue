@@ -315,6 +315,21 @@
               @click.stop="torChkSubClick"
               :disabled="selectedItems.size === 0"
               :class="{ 'btn-disabled': selectedItems.size === 0 }"
+              :style="{
+                fontSize: '13px',
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px 8px',
+                border: '1px solid #bbb',
+                '--btn-bg': torSubCountBusy ? 'lightgray' : 'whitesmoke',
+              }"
+            >
+              Chk Subs
+            </button>
+            <button
+              @click.stop="torBadGrpClick"
+              :disabled="selectedItems.size === 0"
+              :class="{ 'btn-disabled': selectedItems.size === 0 }"
               style="
                 font-size: 13px;
                 cursor: pointer;
@@ -861,7 +876,12 @@
                     : 'color: rgba(0, 0, 0, 0.5) !important'
                 "
                 >&nbsp;|&nbsp;{{ formatGroup(torrent.parsed.group) }}</span
-              ></span
+              ><span
+                v-if="getTorSubSummary(torrent)"
+                style="font-size: 12px; color: #666; margin-left: 8px"
+              >
+                {{ getTorSubSummary(torrent) }}
+              </span></span
             >
           </div>
           <div
@@ -1267,6 +1287,11 @@ export default {
       torrentFiles: [],
       filesTorrentTitle: "",
 
+      torSubCountBusy: false,
+      torSubCountsVisible: false,
+      torSubCountCache: {},
+      torSubCountVisibleKeys: {},
+
       groupCounts: {},
       badGroups: new Set(),
 
@@ -1586,6 +1611,10 @@ export default {
       this.loading = false;
       this.lastNeeded = null;
       this.groupFilter = null;
+      this.torSubCountBusy = false;
+      this.torSubCountsVisible = false;
+      this.torSubCountCache = {};
+      this.torSubCountVisibleKeys = {};
       this.unaired = !!show?.S1E1Unaired;
       this.currentShow = show || null;
       this.showName = show?.name || "";
@@ -2530,6 +2559,8 @@ export default {
         return;
       }
 
+      let searchUrl = "";
+
       this.loading = true;
       this.error = null;
       this.providerWarning = "";
@@ -2556,31 +2587,33 @@ export default {
         const rawShowName = String(this.currentShow.name || "").trim();
         const showNameForSearch = rawShowName.replace(/[?.]+\s*$/g, "").trim();
 
-        let url = `${config.torrentsApiUrl}/api/search?show=${encodeURIComponent(showNameForSearch)}&limit=${this.maxResults}`;
+        searchUrl = `${config.torrentsApiUrl}/api/search?show=${encodeURIComponent(showNameForSearch)}&limit=${this.maxResults}`;
         const showTvdbId = String(
           this.currentShow.tvdbId || this.currentShow.tvdbId || "",
         ).trim();
-        if (showTvdbId) url += `&tvdbId=${encodeURIComponent(showTvdbId)}`;
+        if (showTvdbId) {
+          searchUrl += `&tvdbId=${encodeURIComponent(showTvdbId)}`;
+        }
         if (needed.length > 0) {
-          url += `&needed=${encodeURIComponent(JSON.stringify(needed))}`;
+          searchUrl += `&needed=${encodeURIComponent(JSON.stringify(needed))}`;
         }
         if (more) {
-          url += `&more=true`;
+          searchUrl += `&more=true`;
         }
         if (this.movieMode) {
-          url += `&category=movie&more=true`;
+          searchUrl += `&category=movie&more=true`;
         }
 
         // Debug info
-        this.lastSearchUrl = url;
+        this.lastSearchUrl = searchUrl;
         this.lastSearchShow = showNameForSearch;
         this.lastSearchNeeded = Array.isArray(needed)
           ? JSON.stringify(needed)
           : String(needed);
 
         // Return cached result if available
-        if (this.torSearchCache.has(url)) {
-          const cached = this.torSearchCache.get(url);
+        if (this.torSearchCache.has(searchUrl)) {
+          const cached = this.torSearchCache.get(searchUrl);
           this.torrents = cached.torrents;
           this.hasMoreProviders = cached.hasMoreProviders;
           this.providerStats = cached.providerStats
@@ -2596,7 +2629,7 @@ export default {
           return;
         }
 
-        const response = await fetch(url);
+        const response = await fetch(searchUrl);
 
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2794,8 +2827,8 @@ export default {
         this.loading = false;
 
         // Cache results by search URL
-        if (this.torrents.length > 0) {
-          this.torSearchCache.set(url, {
+        if (searchUrl && this.torrents.length > 0) {
+          this.torSearchCache.set(searchUrl, {
             torrents: this.torrents.slice(),
             providerStats: this.providerStats
               ? { ...this.providerStats }
@@ -2946,6 +2979,27 @@ export default {
         this.getTorrentCardKey(torrent, 0) ||
         ""
       );
+    },
+
+    getTorSubCountKey(torrent) {
+      return this.statusKeyForTorrent(torrent);
+    },
+
+    getTorSubSummary(torrent) {
+      const key = this.getTorSubCountKey(torrent);
+      if (
+        !key ||
+        !this.torSubCountsVisible ||
+        !this.torSubCountVisibleKeys[key]
+      ) {
+        return "";
+      }
+
+      const entry = this.torSubCountCache?.[key] || null;
+      if (!entry) return "";
+      if (entry.message) return String(entry.message);
+      if (entry.error) return "";
+      return `Subs: ${entry.minEmbCount || 0}, ${entry.minSrtCount || 0}, ${entry.minOpnCount || 0}`;
     },
 
     getDownloadStatus(torrent) {
@@ -4114,6 +4168,85 @@ export default {
       });
     },
     async torChkSubClick() {
+      if (this.torSubCountBusy) return;
+      const selected = [...this.selectedItems];
+      if (selected.length === 0) return;
+
+      if (this.torSubCountsVisible) {
+        this.torSubCountsVisible = false;
+        this.torSubCountVisibleKeys = {};
+        return;
+      }
+
+      const visibleKeys = {};
+      const pending = [];
+      const cache =
+        this.torSubCountCache && typeof this.torSubCountCache === "object"
+          ? { ...this.torSubCountCache }
+          : {};
+
+      for (const torrent of selected) {
+        const key = this.getTorSubCountKey(torrent);
+        if (!key) continue;
+        visibleKeys[key] = true;
+        if (!cache[key]) {
+          pending.push({ key, torrent });
+        }
+      }
+
+      if (pending.length === 0) {
+        this.torSubCountVisibleKeys = visibleKeys;
+        this.torSubCountsVisible = true;
+        return;
+      }
+
+      this.torSubCountBusy = true;
+      try {
+        const show = this.currentShow || this.activeShow || {};
+        const response = await this.fetchWithTimeout(
+          `${config.torrentsApiUrl}/api/tor/chk-subs`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              items: pending,
+              showContext: {
+                name: String(show?.name || this.showName || "").trim(),
+                imdbId: String(show?.imdbId || "").trim(),
+                firstAired: String(show?.firstAired || "").trim(),
+              },
+            }),
+          },
+          120000,
+        );
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data?.success) {
+          throw new Error(data?.error || `HTTP ${response.status}`);
+        }
+
+        const nextCache = { ...cache };
+        const errors = [];
+        for (const result of data?.results || []) {
+          const key = String(result?.key || "").trim();
+          if (!key) continue;
+          nextCache[key] = result;
+          if (result?.error) errors.push(String(result.error));
+        }
+
+        this.torSubCountCache = nextCache;
+        this.torSubCountVisibleKeys = visibleKeys;
+        this.torSubCountsVisible = true;
+
+        if (errors.length > 0) {
+          this.showError(errors[0]);
+        }
+      } catch (e) {
+        this.showError(this.getErrorMessage(e));
+      } finally {
+        this.torSubCountBusy = false;
+      }
+    },
+    async torBadGrpClick() {
       const first = [...this.selectedItems][0];
       const group = String(first?.parsed?.group || "").trim();
       if (!group) {

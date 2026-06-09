@@ -204,6 +204,20 @@
             >
               More
             </button>
+            <button
+              @click.stop="torSendClick"
+              :disabled="selectedItems.size === 0"
+              :class="{ 'btn-disabled': selectedItems.size === 0 }"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px 8px;
+                border: 1px solid #bbb;
+              "
+            >
+              Send
+            </button>
             <input
               v-if="movieMode"
               v-model="movieSrchText"
@@ -296,20 +310,6 @@
               "
             >
               First
-            </button>
-            <button
-              @click.stop="torSendClick"
-              :disabled="selectedItems.size === 0"
-              :class="{ 'btn-disabled': selectedItems.size === 0 }"
-              style="
-                font-size: 13px;
-                cursor: pointer;
-                border-radius: 7px;
-                padding: 4px 8px;
-                border: 1px solid #bbb;
-              "
-            >
-              Send
             </button>
             <button
               @click.stop="torForceClick"

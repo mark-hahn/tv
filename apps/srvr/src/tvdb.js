@@ -1982,6 +1982,9 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   tvdbData.anticipating =
     paramObj.anticipating ?? existing.anticipating ?? false;
   tvdbData.lastWatched = paramObj.lastWatched || existing.lastWatched || null;
+  if (existing["last-downloaded"] !== undefined) {
+    tvdbData["last-downloaded"] = existing["last-downloaded"];
+  }
   if (existing.introDur != null) tvdbData.introDur = existing.introDur;
   if (existing.startMark != null) tvdbData.startMark = existing.startMark;
 

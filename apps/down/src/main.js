@@ -132,6 +132,19 @@ async function main() {
   FAST_TEST = false;
   SKIP_DOWNLOAD = false; // Set to false to resume actual downloading
   PROCESS_INTERVAL_MS = FAST_TEST ? 30 * 1000 : 5 * 60 * 1000;
+  var videoFileExts = new Set([
+    ".mkv",
+    ".mp4",
+    ".avi",
+    ".mov",
+    ".m4v",
+    ".wmv",
+    ".ts",
+    ".m2ts",
+  ]);
+  var isVideoEpisodeFile = function (name) {
+    return videoFileExts.has(path.extname(String(name || "")).toLowerCase());
+  };
 
   var cycleTsPST = () => {
     var d = new Date();
@@ -2976,7 +2989,7 @@ async function main() {
             var _seasonFiles = fs.readdirSync(tvSeasonPath);
             _diskFile =
               _seasonFiles.find(function (f) {
-                return flexSeRe.test(f);
+                return flexSeRe.test(f) && isVideoEpisodeFile(f);
               }) || null;
           }
         } catch (e4) {
@@ -3066,7 +3079,7 @@ async function main() {
           var seasonFiles = fs.readdirSync(tvSeasonPath);
           diskFile =
             seasonFiles.find(function (f) {
-              return flexSeRe.test(f);
+              return flexSeRe.test(f) && isVideoEpisodeFile(f);
             }) || null;
         } catch (e2) {
           // Season dir doesn't exist yet — nothing to compare.

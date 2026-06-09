@@ -605,7 +605,7 @@ export default {
         "Close",
         "Alpha",
         "Viewed",
-        "Downloaded",
+        "Down",
         "Added",
         "Ratings",
         "Size",
@@ -1292,7 +1292,7 @@ export default {
           if (forSort) return lastViewed || 0;
           if (lastViewed === undefined) return "";
           return util.fmtDate(lastViewed);
-        case "Downloaded":
+        case "Down":
           lastDownloaded = Number(allTvdb?.[show.name]?.["last-downloaded"]);
           if (forSort)
             return Number.isFinite(lastDownloaded) && lastDownloaded > 0

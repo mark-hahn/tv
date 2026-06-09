@@ -250,7 +250,7 @@ export default {
       const widths = {
         Alpha: "0",
         Viewed: "75px",
-        Downloaded: "75px",
+        Down: "75px",
         Added: "75px",
         Ratings: "25px",
         Size: "25px",

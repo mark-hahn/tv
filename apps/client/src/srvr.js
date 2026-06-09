@@ -364,6 +364,9 @@ export function getGroupCounts() {
 export function getBadGroups() {
   return httpCall("/api/getBadGroups");
 }
+export function toggleBadGroup(group) {
+  return httpCall("/api/toggleBadGroup", { group }, "POST");
+}
 
 export function incrementGroupCount(group) {
   return httpCall("/api/incrementGroupCount", { group }, "POST");

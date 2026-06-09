@@ -61,6 +61,7 @@ const PANE_TIPS = {
     Search: "Search for torrents matching the current show/episode",
     More: "Search additional torrent providers",
     Force: "Force a new search ignoring cache",
+    "Bad Grp": "Toggle the selected torrent group in badGroups.txt",
     Tabs: "Open all torrent links in new tabs",
     Stream: "Toggle streaming mode for this torrent",
     Cookies: "Show/hide cookie input fields for protected sites",

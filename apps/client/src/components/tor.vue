@@ -312,6 +312,20 @@
               First
             </button>
             <button
+              @click.stop="torChkSubClick"
+              :disabled="selectedItems.size === 0"
+              :class="{ 'btn-disabled': selectedItems.size === 0 }"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px 8px;
+                border: 1px solid #bbb;
+              "
+            >
+              Bad Grp
+            </button>
+            <button
               @click.stop="torForceClick"
               :disabled="selectedItems.size === 0"
               :class="{ 'btn-disabled': selectedItems.size === 0 }"
@@ -1466,12 +1480,7 @@ export default {
       })
       .catch(() => {});
 
-    srvr
-      .getBadGroups()
-      .then((list) => {
-        if (Array.isArray(list)) this.badGroups = new Set(list);
-      })
-      .catch(() => {});
+    void this.refreshBadGroups().catch(() => {});
     void this.$nextTick(() => {
       this.scrollToBottom();
     });
@@ -1607,6 +1616,11 @@ export default {
     onRefreshSpaceAvail() {
       void this.updateSpaceAvail();
     },
+    async refreshBadGroups() {
+      const list = await srvr.getBadGroups();
+      this.badGroups = new Set(Array.isArray(list) ? list : []);
+    },
+
     openDetails() {
       const url = [...this.selectedItems][0]?.detailUrl;
       if (url) util.openExternalPage(url);
@@ -1615,6 +1629,18 @@ export default {
     showError(msg) {
       this.errorModalMsg = String(msg || "");
       this.showErrorModal = true;
+    },
+
+    getErrorMessage(err) {
+      if (!err) return "Unknown error";
+      if (typeof err === "string") return err;
+      if (typeof err?.message === "string" && err.message) return err.message;
+      if (typeof err?.error === "string" && err.error) return err.error;
+      try {
+        return JSON.stringify(err);
+      } catch {
+        return String(err);
+      }
     },
 
     closeErrorModal() {
@@ -4086,6 +4112,28 @@ export default {
         const card = cards[idx];
         if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
       });
+    },
+    async torChkSubClick() {
+      const first = [...this.selectedItems][0];
+      const group = String(first?.parsed?.group || "").trim();
+      if (!group) {
+        this.showError("Selected torrent has no group name.");
+        return;
+      }
+
+      try {
+        const result = await srvr.toggleBadGroup(group);
+        await this.refreshBadGroups();
+        if (result?.action === "added") {
+          this.infoModalMsg = `Added bad group: ${group}`;
+          this.showInfoModal = true;
+        } else if (result?.action === "removed") {
+          this.infoModalMsg = `Removed bad group: ${group}`;
+          this.showInfoModal = true;
+        }
+      } catch (e) {
+        this.showError(this.getErrorMessage(e));
+      }
     },
 
     // Show: open detail URL for first selected torrent

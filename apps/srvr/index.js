@@ -60,6 +60,36 @@ const FLEXGET_CONFIG = path.join(SRVR_ROOT_DIR, "config", "config.yml");
 
 let flexgetIsRunning = false;
 
+function readBadGroupsFromDisk() {
+  return fs
+    .readFileSync(BAD_GROUPS_PATH, "utf8")
+    .split(/\r?\n/)
+    .map((line) => line.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function syncBadGroupsFromDisk() {
+  badGroups.clear();
+  for (const group of readBadGroupsFromDisk()) badGroups.add(group);
+  return [...badGroups].sort();
+}
+
+function writeBadGroupsToDisk(groups) {
+  const list = [
+    ...new Set(
+      groups.map((group) => String(group).trim().toLowerCase()).filter(Boolean),
+    ),
+  ].sort();
+  fs.writeFileSync(
+    BAD_GROUPS_PATH,
+    list.length ? `${list.join("\n")}\n` : "",
+    "utf8",
+  );
+  badGroups.clear();
+  for (const group of list) badGroups.add(group);
+  return list;
+}
+
 function ensureDir(dir) {
   try {
     fs.mkdirSync(dir, { recursive: true });
@@ -3616,16 +3646,32 @@ app.post("/api/migrateWatchedCount", apiWrapper(tvdb.migrateWatchedCount));
 app.get("/api/getGroupCounts", apiWrapper(groupCounts.getGroupCounts));
 app.get("/api/getBadGroups", (_req, res) => {
   try {
-    const lines = fs
-      .readFileSync(BAD_GROUPS_PATH, "utf8")
-      .split(/\r?\n/)
-      .map((l) => l.trim().toLowerCase())
-      .filter(Boolean);
-    res.json(lines);
+    res.json(syncBadGroupsFromDisk());
   } catch {
     res.json([]);
   }
 });
+app.post(
+  "/api/toggleBadGroup",
+  apiWrapper(async ({ group }) => {
+    const normalizedGroup = String(group || "")
+      .trim()
+      .toLowerCase();
+    if (!normalizedGroup) throw new Error("group is required");
+
+    const groups = new Set(syncBadGroupsFromDisk());
+    let action = "added";
+    if (groups.has(normalizedGroup)) {
+      groups.delete(normalizedGroup);
+      action = "removed";
+    } else {
+      groups.add(normalizedGroup);
+    }
+
+    const list = writeBadGroupsToDisk([...groups]);
+    return { ok: true, action, group: normalizedGroup, list };
+  }),
+);
 app.post(
   "/api/incrementGroupCount",
   apiWrapper(groupCounts.incrementGroupCount),
@@ -5868,11 +5914,7 @@ function flexgetBitDepth(title) {
 const badGroups = new Set(
   (() => {
     try {
-      return fs
-        .readFileSync(BAD_GROUPS_PATH, "utf8")
-        .split(/\r?\n/)
-        .map((l) => l.trim().toLowerCase())
-        .filter(Boolean);
+      return readBadGroupsFromDisk();
     } catch {
       return [];
     }

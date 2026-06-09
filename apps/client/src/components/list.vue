@@ -605,6 +605,7 @@ export default {
         "Close",
         "Alpha",
         "Viewed",
+        "Downloaded",
         "Added",
         "Ratings",
         "Size",
@@ -1216,7 +1217,7 @@ export default {
     },
 
     getValBySortChoice(show, forSort = false) {
-      let lastViewed, ratings;
+      let lastDownloaded, lastViewed, ratings;
       switch (this.sortChoice) {
         case "Alpha":
           if (!forSort) return "";
@@ -1291,6 +1292,13 @@ export default {
           if (forSort) return lastViewed || 0;
           if (lastViewed === undefined) return "";
           return util.fmtDate(lastViewed);
+        case "Downloaded":
+          lastDownloaded = Number(allTvdb?.[show.name]?.["last-downloaded"]);
+          if (forSort)
+            return Number.isFinite(lastDownloaded) && lastDownloaded > 0
+              ? lastDownloaded
+              : 0;
+          return util.fmtUnixDatePst(lastDownloaded);
       }
     },
 

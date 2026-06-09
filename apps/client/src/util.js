@@ -31,6 +31,23 @@ export function getPstDate() {
     .slice(0, 10);
 }
 
+export function fmtUnixDatePst(unixSeconds) {
+  const ts = Number(unixSeconds);
+  if (!Number.isFinite(ts) || ts <= 0) return "";
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(ts * 1000));
+  const map = {};
+  for (const part of parts) {
+    if (part && part.type && part.value) map[part.type] = part.value;
+  }
+  if (!map.year || !map.month || !map.day) return "";
+  return `${map.year}-${map.month}-${map.day}`;
+}
+
 export function dateWithTZ(date = new Date(), utcOut = false) {
   let year, month, day;
   if (utcOut) {

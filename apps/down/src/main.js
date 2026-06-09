@@ -1924,6 +1924,7 @@ async function main() {
           continue;
         }
       }
+      await tvJson.recordShowDownloaded(showTitle, unixNow());
       console.log(`[${cycleTsPST()}] DVD: moved ${destName} → ${seasonDir}`);
     }
   };

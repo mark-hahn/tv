@@ -4,6 +4,7 @@
 // - Exports: addEntry(entry), getDownloads(), markError(), pruneMissingUsbDirs()
 
 import fs from "node:fs";
+import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
@@ -22,6 +23,7 @@ const BASEDIR = path.join(__dirname, "..");
 const APP_DIR = BASEDIR;
 const DATA_DIR = path.join(APP_DIR, "data");
 const MISC_DIR = path.join(DATA_DIR, "misc");
+const SRVR_DATA_DIR = path.join(APP_DIR, "..", "srvr", "data");
 
 function ensureDir(dir) {
   try {
@@ -36,6 +38,8 @@ ensureDir(MISC_DIR);
 const TV_DB_PATH = path.join(DATA_DIR, "tv.sqlite");
 const TV_INPROGRESS_PATH = path.join(DATA_DIR, "tv-inProgress.json");
 const TV_LOG_PATH = path.join(MISC_DIR, "tv.log");
+const TVDB_JSON_PATH = path.join(SRVR_DATA_DIR, "tvdb.json");
+const TVDB_BACKUP_PATH = path.join(SRVR_DATA_DIR, "tvdb.json.bak");
 
 const TV_DB_BACKUP_PATH = path.join(DATA_DIR, "tv.sqlite.backup");
 
@@ -43,6 +47,8 @@ const TV_DB_BACKUP_PATH = path.join(DATA_DIR, "tv.sqlite.backup");
 
 // Local TV library root for watcher assignment.
 const TV_ROOT = "/mnt/media/tv";
+const SRVR_INTERNAL_HOST = "127.0.0.1";
+const SRVR_INTERNAL_PORT = 8739;
 
 const WORKER_URL = new URL("./worker.js", import.meta.url);
 
@@ -129,6 +135,18 @@ const writeJsonAtomic = (filePath, obj) => {
   } catch {}
 };
 
+const writeTextAtomic = (filePath, text) => {
+  try {
+    const dir = path.dirname(filePath);
+    const tmp = path.join(
+      dir,
+      "." + path.basename(filePath) + ".tmp." + process.pid + "." + Date.now(),
+    );
+    fs.writeFileSync(tmp, String(text), "utf8");
+    fs.renameSync(tmp, filePath);
+  } catch {}
+};
+
 const readMap = (filePath) => {
   const obj = readJson(filePath, {});
   if (!obj || typeof obj !== "object" || Array.isArray(obj)) return {};
@@ -165,6 +183,89 @@ let stmtGetDownloads = null;
 let stmtGetTitles = null;
 
 const unixNow = () => Math.floor(Date.now() / 1000);
+
+const isUnderTvRoot = (localPath) => {
+  const lp = localPath ? String(localPath) : "";
+  return lp === TV_ROOT || lp.startsWith(TV_ROOT + "/");
+};
+
+const postSetTvdbFields = (params) => {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify(params);
+    const req = http.request(
+      {
+        host: SRVR_INTERNAL_HOST,
+        port: SRVR_INTERNAL_PORT,
+        path: "/api/setTvdbFields",
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(payload),
+        },
+      },
+      (res) => {
+        let body = "";
+        res.setEncoding("utf8");
+        res.on("data", (chunk) => {
+          body += chunk;
+        });
+        res.on("end", () => {
+          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(body);
+            return;
+          }
+          reject(
+            new Error(
+              `setTvdbFields failed: ${res.statusCode || 0} ${String(body || "").slice(0, 200)}`.trim(),
+            ),
+          );
+        });
+      },
+    );
+    req.on("error", reject);
+    req.write(payload);
+    req.end();
+  });
+};
+
+const writeLastDownloadedDirect = (showName, timestamp) => {
+  const tvdb = readJson(TVDB_JSON_PATH, null);
+  if (!tvdb || typeof tvdb !== "object" || Array.isArray(tvdb)) return false;
+  const record = tvdb[showName];
+  if (!record || typeof record !== "object" || Array.isArray(record))
+    return false;
+  record["last-downloaded"] = timestamp;
+  const data = JSON.stringify(tvdb);
+  writeTextAtomic(TVDB_JSON_PATH, data);
+  writeTextAtomic(TVDB_BACKUP_PATH, data);
+  return true;
+};
+
+const recordShowDownloadedInternal = async (showName, timestamp) => {
+  const name = String(showName || "").trim();
+  const ts = Math.trunc(Number(timestamp));
+  if (!name || !Number.isFinite(ts) || ts <= 0) return false;
+  try {
+    await postSetTvdbFields({
+      name,
+      "last-downloaded": ts,
+      dontEnqueue: true,
+    });
+    return true;
+  } catch (err) {
+    const saved = writeLastDownloadedDirect(name, ts);
+    if (!saved) {
+      appendTvLog(
+        `${dateStr(Date.now())} WARN last-downloaded update failed for ${name}: ${err && err.message ? err.message : String(err)}\n`,
+      );
+    }
+    return saved;
+  }
+};
+
+export const recordShowDownloaded = async (showName, timestamp = unixNow()) => {
+  return recordShowDownloadedInternal(showName, timestamp);
+};
 
 // ---- tvResync + chokidar watchers -----------------------------------------
 
@@ -981,6 +1082,11 @@ const handleFinish = (entry) => {
             "UPDATE tv_entries SET status='error-downloaded' WHERE title=?",
           ).run(title);
         } catch {}
+      } else if (isUnderTvRoot(lp) && entry.seriesName) {
+        recordShowDownloadedInternal(
+          entry.seriesName,
+          entry.dateEnded || unixNow(),
+        ).catch(() => {});
       }
       removeInProgress(title);
       return;

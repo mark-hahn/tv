@@ -2278,6 +2278,21 @@ export default {
         !isNaN(sVal) && sVal >= 0 && String(this.seasonFilter).trim() !== "";
 
       if (hasSeasonFilter) {
+        // Calculate needed to check if this season is actually needed
+        let needed;
+        try {
+          needed = await this.calculateNeeded(this.currentShow);
+        } catch {
+          needed = [];
+        }
+
+        // Check if needed array is empty
+        if (needed.length === 0) {
+          this.noTorrentsNeeded = true;
+          this.hasSearched = true;
+          return;
+        }
+
         this.noTorrentsNeeded = false;
         this.providerWarning = "";
         this.hasSearched = true;

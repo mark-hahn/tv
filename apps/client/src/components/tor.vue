@@ -2030,28 +2030,16 @@ export default {
 
     async getSpaceUsb() {
       const url = new URL(`${config.torrentsApiUrl}/api/space/usb`);
-      console.log("[tor space] usb request", { url: url.toString() });
       const res = await fetch(url.toString());
-      if (!res.ok) {
-        console.warn("[tor space] usb http error", { status: res.status });
-        throw new Error(`HTTP ${res.status}`);
-      }
-      const data = await res.json();
-      console.log("[tor space] usb response", data);
-      return data;
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
     },
 
     async getSpaceSrvr() {
       const url = new URL(`${config.torrentsApiUrl}/api/space/srvr`);
-      console.log("[tor space] srvr request", { url: url.toString() });
       const res = await fetch(url.toString());
-      if (!res.ok) {
-        console.warn("[tor space] srvr http error", { status: res.status });
-        throw new Error(`HTTP ${res.status}`);
-      }
-      const data = await res.json();
-      console.log("[tor space] srvr response", data);
-      return data;
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
     },
 
     pctUsed(total, used) {
@@ -2085,26 +2073,16 @@ export default {
       const hasAnyDigits = (txt) => /\d/.test(String(txt || ""));
 
       const applyUsb = (s) => {
-        console.log("[tor space] apply usb", { raw: s });
         if (
           Number.isFinite(Number(s?.usbSpaceTotal)) &&
           Number.isFinite(Number(s?.usbSpaceUsed))
         ) {
           this.spaceUsbPct = this.pctAvail(s.usbSpaceTotal, s.usbSpaceUsed);
           this.spaceUsbGb = this.fmtAvailGb(s.usbSpaceTotal, s.usbSpaceUsed);
-          console.log("[tor space] usb display", {
-            total: s?.usbSpaceTotal,
-            used: s?.usbSpaceUsed,
-            gb: this.spaceUsbGb,
-            pct: this.spaceUsbPct,
-          });
-        } else {
-          console.warn("[tor space] usb invalid payload", { raw: s });
         }
       };
 
       const applySrvr = (s) => {
-        console.log("[tor space] apply srvr", { raw: s });
         if (
           Number.isFinite(Number(s?.mediaSpaceTotal)) &&
           Number.isFinite(Number(s?.mediaSpaceUsed))
@@ -2117,44 +2095,24 @@ export default {
             s.mediaSpaceTotal,
             s.mediaSpaceUsed,
           );
-          console.log("[tor space] srvr display", {
-            total: s?.mediaSpaceTotal,
-            used: s?.mediaSpaceUsed,
-            gb: this.spaceSrvrGb,
-            pct: this.spaceSrvrPct,
-          });
-        } else {
-          console.warn("[tor space] srvr invalid payload", { raw: s });
         }
       };
 
       const usbPromise = this.getSpaceUsb()
         .then(applyUsb)
-        .catch((error) => {
-          console.warn("[tor space] usb fetch failed", {
-            error: error?.message || String(error),
-          });
-          if (!hasAnyDigits(this.spaceUsbGb)) this.spaceUsbGb = "--";
-          if (!hasAnyDigits(this.spaceUsbPct)) this.spaceUsbPct = "--%";
+        .catch(() => {
+          if (!hasAnyDigits(this.spaceUsbGb)) this.spaceUsbGb = "???";
+          if (!hasAnyDigits(this.spaceUsbPct)) this.spaceUsbPct = "???%";
         });
 
       const srvrPromise = this.getSpaceSrvr()
         .then(applySrvr)
-        .catch((error) => {
-          console.warn("[tor space] srvr fetch failed", {
-            error: error?.message || String(error),
-          });
-          if (!hasAnyDigits(this.spaceSrvrGb)) this.spaceSrvrGb = "--";
-          if (!hasAnyDigits(this.spaceSrvrPct)) this.spaceSrvrPct = "--%";
+        .catch(() => {
+          if (!hasAnyDigits(this.spaceSrvrGb)) this.spaceSrvrGb = "???";
+          if (!hasAnyDigits(this.spaceSrvrPct)) this.spaceSrvrPct = "???%";
         });
 
       await Promise.all([usbPromise, srvrPromise]);
-      console.log("[tor space] final display", {
-        usbGb: this.spaceUsbGb,
-        usbPct: this.spaceUsbPct,
-        srvrGb: this.spaceSrvrGb,
-        srvrPct: this.spaceSrvrPct,
-      });
     },
 
     saveCookies() {
@@ -2601,7 +2559,7 @@ export default {
         return;
       }
 
-      let searchUrl = "";
+      let url = "";
 
       this.loading = true;
       this.error = null;
@@ -2629,33 +2587,33 @@ export default {
         const rawShowName = String(this.currentShow.name || "").trim();
         const showNameForSearch = rawShowName.replace(/[?.]+\s*$/g, "").trim();
 
-        searchUrl = `${config.torrentsApiUrl}/api/search?show=${encodeURIComponent(showNameForSearch)}&limit=${this.maxResults}`;
+        url = `${config.torrentsApiUrl}/api/search?show=${encodeURIComponent(showNameForSearch)}&limit=${this.maxResults}`;
         const showTvdbId = String(
           this.currentShow.tvdbId || this.currentShow.tvdbId || "",
         ).trim();
         if (showTvdbId) {
-          searchUrl += `&tvdbId=${encodeURIComponent(showTvdbId)}`;
+          url += `&tvdbId=${encodeURIComponent(showTvdbId)}`;
         }
         if (needed.length > 0) {
-          searchUrl += `&needed=${encodeURIComponent(JSON.stringify(needed))}`;
+          url += `&needed=${encodeURIComponent(JSON.stringify(needed))}`;
         }
         if (more) {
-          searchUrl += `&more=true`;
+          url += `&more=true`;
         }
         if (this.movieMode) {
-          searchUrl += `&category=movie&more=true`;
+          url += `&category=movie&more=true`;
         }
 
         // Debug info
-        this.lastSearchUrl = searchUrl;
+        this.lastSearchUrl = url;
         this.lastSearchShow = showNameForSearch;
         this.lastSearchNeeded = Array.isArray(needed)
           ? JSON.stringify(needed)
           : String(needed);
 
         // Return cached result if available
-        if (this.torSearchCache.has(searchUrl)) {
-          const cached = this.torSearchCache.get(searchUrl);
+        if (this.torSearchCache.has(url)) {
+          const cached = this.torSearchCache.get(url);
           this.torrents = cached.torrents;
           this.hasMoreProviders = cached.hasMoreProviders;
           this.providerStats = cached.providerStats
@@ -2671,7 +2629,7 @@ export default {
           return;
         }
 
-        const response = await fetch(searchUrl);
+        const response = await fetch(url);
 
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2869,8 +2827,8 @@ export default {
         this.loading = false;
 
         // Cache results by search URL
-        if (searchUrl && this.torrents.length > 0) {
-          this.torSearchCache.set(searchUrl, {
+        if (url && this.torrents.length > 0) {
+          this.torSearchCache.set(url, {
             torrents: this.torrents.slice(),
             providerStats: this.providerStats
               ? { ...this.providerStats }
@@ -3040,8 +2998,8 @@ export default {
       const entry = this.torSubCountCache?.[key] || null;
       if (!entry) return "";
       if (entry.message) return ` | ${String(entry.message)}`;
-      if (entry.error) return ` | Subs err: ${String(entry.error)}`;
-      return ` | Subs: ${entry.minEmbCount || 0}, ${entry.minSrtCount || 0}, ${entry.minOpnCount || 0}`;
+      if (entry.error) return ` | Opensubs err: ${String(entry.error)}`;
+      return ` | Opensubs: ${entry.count || 0}`;
     },
 
     getDownloadStatus(torrent) {

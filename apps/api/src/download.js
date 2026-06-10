@@ -96,21 +96,6 @@ function looksLikeCloudflareChallenge(html) {
   );
 }
 
-function extractDetailPageDebug(html) {
-  const text = String(html || "");
-  const lower = text.toLowerCase();
-  const nfoHrefMatches = [...text.matchAll(/href="([^"]*\.nfo[^"]*)"/gi)].map(
-    (m) => m[1],
-  );
-  return {
-    hasNfoText: lower.includes(".nfo") || lower.includes(" nfo "),
-    hasMediaInfoText: /mediainfo|media info/i.test(text),
-    hasTextTrackMarkers: /text\s*#\d+|subtitle/i.test(text),
-    nfoHrefMatches,
-    bodyText: text,
-  };
-}
-
 function tryLoadBrowserCurlProfile() {
   // Prefer data/curl-tl.txt (primary). NO FALLBACKS.
   try {
@@ -829,7 +814,6 @@ export async function fetchTorrentFile(torrent) {
   }
 
   const html = await response.text();
-  const detailPageDebug = extractDetailPageDebug(html);
   if (looksLikeCloudflareChallenge(html)) {
     return fail(
       "fetch-detail",
@@ -842,8 +826,6 @@ export async function fetchTorrentFile(torrent) {
         cookiesSent: safeCookieNames(allCookies),
         hasCfClearance: Boolean(cfCookie),
         isCloudflare: true,
-        detailPageDebug,
-        bodyText: html,
         bodySnippet: html ? String(html).slice(0, 500) : undefined,
       },
     );
@@ -856,8 +838,6 @@ export async function fetchTorrentFile(torrent) {
     return fail("parse-detail", "No .torrent download link found in HTML", {
       provider,
       detailUrl,
-      detailPageDebug,
-      bodyText: html,
       cookiesSent: safeCookieNames(allCookies),
       hasCfClearance: Boolean(cfCookie),
     });
@@ -908,7 +888,6 @@ export async function fetchTorrentFile(torrent) {
       bytes: torrentData.length,
       cookiesSent: safeCookieNames(allCookies),
       hasCfClearance: Boolean(cfCookie),
-      bodyText: headText,
       bodySnippet: headText.slice(0, 500),
       isCloudflare: looksLikeCloudflareChallenge(headText),
     });
@@ -933,7 +912,6 @@ export async function fetchTorrentFile(torrent) {
     downloadUrl: absoluteDownloadUrl,
     bytes: torrentData.length,
     torrentData,
-    detailPageDebug,
   });
 }
 

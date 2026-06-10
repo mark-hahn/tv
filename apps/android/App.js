@@ -1991,7 +1991,7 @@ export default function App() {
                               marginHorizontal: 4,
                             }}
                           >
-                            {fmt(totalSec)}
+                            {fmt(posSec)}
                           </Text>
                           <View
                             style={{

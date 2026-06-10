@@ -724,6 +724,26 @@
       >
         Save
       </div>
+      <div
+        v-if="audioTracks.length > 1"
+        @click.stop="cycleAudioTrack"
+        :title="activeAudioLabel"
+        :style="{
+          color: 'white',
+          fontSize: '13px',
+          padding: '2px 8px',
+          borderRadius: '4px',
+          border: '1px solid #666',
+          cursor: 'pointer',
+          userSelect: 'none',
+          background: 'rgba(0, 0, 0, 0.5)',
+          marginRight: '8px',
+          whiteSpace: 'nowrap',
+          textShadow: '0 0 3px #000',
+        }"
+      >
+        Audio
+      </div>
       <!-- X close -->
       <div
         @click.stop="close"
@@ -831,6 +851,8 @@ export default {
   emits: ["close", "chksrt-next", "chksrt-sel", "intro-next"],
   data() {
     return {
+      audioTracks: [],
+      activeAudioIndex: null,
       subtitleTracks: [],
       activeTrackId: null,
       subtitleOffset: 0,
@@ -849,12 +871,32 @@ export default {
       introMarkDirty: false,
       introLocalNone: false,
       epiNext: false,
+      pendingSourceResumeTime: null,
+      pendingSourceResumePlay: false,
     };
   },
   computed: {
     streamUrl() {
       if (!this.path) return "";
-      return `${TV_SRVR_URL}/api/stream?path=${encodeURIComponent(this.path)}`;
+      return this._buildStreamUrl(
+        this.activeTrack?.type === "pgs" ? this.activeTrack.index : null,
+      );
+    },
+    activeAudioTrack() {
+      if (this.audioTracks.length === 0) return null;
+      if (this.activeAudioIndex == null) return this.audioTracks[0] || null;
+      return (
+        this.audioTracks.find(
+          (track) => track.index === this.activeAudioIndex,
+        ) ||
+        this.audioTracks[0] ||
+        null
+      );
+    },
+    activeAudioLabel() {
+      return this.activeAudioTrack
+        ? `Audio: ${this.activeAudioTrack.label}`
+        : "Audio";
     },
     activeTrack() {
       if (!this.activeTrackId || this.activeTrackId === "off") return null;
@@ -1052,14 +1094,21 @@ export default {
       this._mseStop();
       this._chksrtSelectedSrtPath = undefined;
       this._chksrtSelectedChoice = undefined;
+      this.audioTracks = [];
+      this.activeAudioIndex = null;
       this.subtitleTracks = [];
       this.activeTrackId = null;
       this.chksrtMatch = null;
       this.errorRetries = 0;
-      this.vidSrc = newVal ? this.streamUrl : "";
+      this.pendingSourceResumeTime = null;
+      this.pendingSourceResumePlay = false;
+      this.vidSrc = newVal ? this._buildStreamUrl() : "";
       if (newVal && this.mode === "intro") this._seekOnLoad = true;
       this.subtitleOffset = offsetCache.get(newVal) ?? 0;
-      if (newVal) this._fetchSubtitleList(newVal);
+      if (newVal) {
+        this._fetchSubtitleList(newVal);
+        this._fetchAudioList(newVal);
+      }
       this.introMarkDirty = false;
       this.introLocalNone = false;
       this.waitingForVideo = false;
@@ -1075,10 +1124,33 @@ export default {
     },
   },
   methods: {
-    _buildStreamUrl(subIndex = null) {
+    _buildStreamUrl(subIndex = null, audioIndex = this.activeAudioIndex) {
       let url = `${TV_SRVR_URL}/api/stream?path=${encodeURIComponent(this.path)}`;
       if (subIndex !== null) url += `&sub=${subIndex}`;
+      if (audioIndex !== null && audioIndex !== undefined)
+        url += `&audio=${audioIndex}`;
       return url;
+    },
+    async _fetchAudioList(filePath) {
+      try {
+        const resp = await fetch(
+          `${TV_SRVR_URL}/api/audio-list?path=${encodeURIComponent(filePath)}`,
+        );
+        if (!resp.ok) return;
+        const tracks = await resp.json();
+        if (this.path !== filePath) return;
+        this.audioTracks = Array.isArray(tracks) ? tracks : [];
+        if (
+          this.activeAudioIndex != null &&
+          !this.audioTracks.some(
+            (track) => track.index === this.activeAudioIndex,
+          )
+        ) {
+          this.activeAudioIndex = null;
+        }
+      } catch (e) {
+        console.error("[audio-list] fetch error:", e);
+      }
     },
     async _fetchSubtitleList(filePath) {
       try {
@@ -1099,6 +1171,34 @@ export default {
       } catch (e) {
         console.error("[subtitle-list] fetch error:", e);
       }
+    },
+    _swapStream(subIndex = null, audioIndex = this.activeAudioIndex) {
+      const vid = this.$refs.vid;
+      this.pendingSourceResumeTime =
+        vid && Number.isFinite(vid.currentTime) ? vid.currentTime : 0;
+      this.pendingSourceResumePlay = vid ? !vid.paused : false;
+      this._mseStop();
+      this.errorRetries = 0;
+      if (vid) vid.pause();
+      this.vidSrc = this._buildStreamUrl(subIndex, audioIndex);
+    },
+    cycleAudioTrack() {
+      if (this.audioTracks.length <= 1) return;
+      const currentPos =
+        this.activeAudioIndex == null
+          ? 0
+          : this.audioTracks.findIndex(
+              (track) => track.index === this.activeAudioIndex,
+            );
+      const safePos = currentPos >= 0 ? currentPos : 0;
+      const nextPos = (safePos + 1) % this.audioTracks.length;
+      const nextAudioIndex =
+        nextPos === 0 ? null : this.audioTracks[nextPos].index;
+      this.activeAudioIndex = nextAudioIndex;
+      this._swapStream(
+        this.activeTrack?.type === "pgs" ? this.activeTrack.index : null,
+        nextAudioIndex,
+      );
     },
     selectTrack(id) {
       const prevTrack = this.activeTrack;
@@ -1314,8 +1414,21 @@ export default {
     },
     onVideoLoadedMetadata() {
       this._applyIntroAudioState();
+      const vid = this.$refs.vid;
+      if (this.pendingSourceResumeTime !== null) {
+        const resumeTime = this.pendingSourceResumeTime;
+        const shouldPlay = this.pendingSourceResumePlay;
+        this.pendingSourceResumeTime = null;
+        this.pendingSourceResumePlay = false;
+        if (vid && resumeTime > 0) {
+          try {
+            vid.currentTime = resumeTime;
+          } catch {}
+        }
+        if (vid && shouldPlay) vid.play().catch(() => {});
+        return;
+      }
       if (this.mode !== "intro") {
-        const vid = this.$refs.vid;
         if (vid) vid.play().catch(() => {});
         if (this.mode === "chksrt") return;
       }
@@ -1324,7 +1437,6 @@ export default {
       const targetSec =
         this.mode === "intro" ? 0 : Math.max(0, (this.startMark - 3000) / 1000);
       this._seekWithConfirm(targetSec);
-      const vid = this.$refs.vid;
       if (vid) vid.play().catch(() => {});
     },
     onVideoVolumeChange() {
@@ -1775,9 +1887,12 @@ export default {
       const n = Number(savedVolume);
       if (Number.isFinite(n)) this.playerVolume = Math.max(0, Math.min(1, n));
     }
-    this.vidSrc = this.path ? this.streamUrl : "";
+    this.vidSrc = this.path ? this._buildStreamUrl() : "";
     this.subtitleOffset = offsetCache.get(this.path) ?? 0;
-    if (this.path) this._fetchSubtitleList(this.path);
+    if (this.path) {
+      this._fetchSubtitleList(this.path);
+      this._fetchAudioList(this.path);
+    }
     this.$nextTick(() => {
       this._applyIntroAudioState();
     });

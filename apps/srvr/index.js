@@ -4331,17 +4331,44 @@ app.get("/api/stream", async (req, res) => {
       throw new Error(probeResult.stderr?.toString() || "ffprobe failed");
     const probeOut = probeResult.stdout.toString();
     const streams = JSON.parse(probeOut).streams || [];
+    const audioStreams = streams.filter((s) => s.codec_type === "audio");
+    const defaultAudioStream = audioStreams[0] || null;
+    const rawAudio = req.query.audio;
+    const requestedAudioIndex =
+      rawAudio !== undefined ? parseInt(rawAudio, 10) : null;
+    if (rawAudio !== undefined && Number.isNaN(requestedAudioIndex)) {
+      res.status(400).json({ error: "invalid audio stream index" });
+      return;
+    }
+    const selectedAudioStream =
+      requestedAudioIndex == null
+        ? defaultAudioStream
+        : audioStreams.find((s) => s.index === requestedAudioIndex) || null;
+    if (rawAudio !== undefined && !selectedAudioStream) {
+      res.status(400).json({ error: "audio stream not found" });
+      return;
+    }
     const videoCodec = streams.find(
       (s) => s.codec_type === "video",
     )?.codec_name;
-    const audioCodec = streams.find(
-      (s) => s.codec_type === "audio",
-    )?.codec_name;
+    const audioCodec = selectedAudioStream?.codec_name;
+    const selectedAudioIndex = selectedAudioStream?.index ?? null;
+    const audioMap =
+      selectedAudioIndex != null ? `0:${selectedAudioIndex}` : null;
+    const selectedAltAudio =
+      selectedAudioIndex != null &&
+      defaultAudioStream?.index != null &&
+      selectedAudioIndex !== defaultAudioStream.index;
 
     const vCopy = videoCodec === "h264";
     const aCopy = audioCodec === "aac";
 
-    if (vCopy && aCopy && resolved.toLowerCase().endsWith(".mp4")) {
+    if (
+      vCopy &&
+      aCopy &&
+      resolved.toLowerCase().endsWith(".mp4") &&
+      !selectedAltAudio
+    ) {
       const relPath = resolved.replace("/mnt/media", "");
       const url =
         "https://hahnca.com" +
@@ -4372,8 +4399,11 @@ app.get("/api/stream", async (req, res) => {
         `[0:v][0:${subIdx}]overlay[v]`,
         "-map",
         "[v]",
-        "-map",
-        "0:a:0",
+      );
+      if (audioMap) {
+        ffmpegArgs.push("-map", audioMap);
+      }
+      ffmpegArgs.push(
         "-c:v",
         "libx264",
         "-preset",
@@ -4397,6 +4427,8 @@ app.get("/api/stream", async (req, res) => {
       // h264 video in non-MP4 container: copy the stream, ffmpeg will remux into fMP4.
       // No re-encode needed; the source GOP doesn't matter because frag_keyframe
       // will still fragment at existing keyframe boundaries (typically every 2-5s for web sources).
+      ffmpegArgs.push("-map", "0:v:0");
+      if (audioMap) ffmpegArgs.push("-map", audioMap);
       ffmpegArgs.push("-c:v", "copy");
       if (aCopy) {
         ffmpegArgs.push("-c:a", "copy");
@@ -4419,6 +4451,8 @@ app.get("/api/stream", async (req, res) => {
         "-g",
         "48",
       );
+      ffmpegArgs.push("-map", "0:v:0");
+      if (audioMap) ffmpegArgs.push("-map", audioMap);
       if (aCopy) {
         ffmpegArgs.push("-c:a", "copy");
       } else {
@@ -4461,6 +4495,61 @@ app.get("/api/stream", async (req, res) => {
   } catch (err) {
     console.error("[stream] error:", err.message);
     if (!res.headersSent) res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/audio-list", async (req, res) => {
+  const filePath = req.query.path;
+  if (!filePath) {
+    res.status(400).json({ error: "path required" });
+    return;
+  }
+  const resolved = path.resolve(filePath);
+  const moviesDir2 = "/mnt/media/movies";
+  if (
+    !resolved.startsWith(tvDir + "/") &&
+    resolved !== tvDir &&
+    !resolved.startsWith(moviesDir2 + "/") &&
+    resolved !== moviesDir2
+  ) {
+    res.status(403).json({ error: "forbidden" });
+    return;
+  }
+  if (!fs.existsSync(resolved)) {
+    res.status(404).json({ error: "file not found" });
+    return;
+  }
+  try {
+    const probeOut = cp
+      .execSync(
+        `ffprobe -v quiet -print_format json -show_streams "${resolved.replace(/"/g, '\\"')}"`,
+        { maxBuffer: 2 * 1024 * 1024 },
+      )
+      .toString();
+    const streams = JSON.parse(probeOut).streams || [];
+    const tracks = streams
+      .filter((s) => s.codec_type === "audio")
+      .map((s, idx) => {
+        const parts = [];
+        const title = String(s.tags?.title || "").trim();
+        const lang = String(s.tags?.language || "").trim();
+        const codec = String(s.codec_name || "").trim();
+        const channels = Number.isFinite(s.channels) ? `${s.channels}ch` : "";
+        if (title) parts.push(title);
+        else if (lang) parts.push(lang);
+        else parts.push(`Track ${idx + 1}`);
+        if (codec) parts.push(codec);
+        if (channels) parts.push(channels);
+        return {
+          index: s.index,
+          label: parts.join(" | "),
+          isDefault: s.disposition?.default === 1,
+        };
+      });
+    res.json(tracks);
+  } catch (e) {
+    console.error("[audio-list] probe error:", e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 

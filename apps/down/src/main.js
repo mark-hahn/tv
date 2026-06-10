@@ -1041,6 +1041,35 @@ async function main() {
     "| grep -Ev screen[0-9]+.png-[0-9]+$" +
     "| grep -Evi '\\.(srr|sfv|nfo|nzb|jpg|jpeg|png|txt|sub|idx|srt|bup|ifo|vob)-[0-9]+$'";
 
+  var FORCE_SCAN_EXCLUDED_EXTENSIONS = new Set([
+    "srr",
+    "sfv",
+    "nfo",
+    "nzb",
+    "jpg",
+    "jpeg",
+    "png",
+    "txt",
+    "sub",
+    "idx",
+    "srt",
+    "bup",
+    "ifo",
+    "vob",
+  ]);
+
+  var shouldSkipUsbLineByScanRules = function (line) {
+    var text = String(line || "").trim();
+    if (!text) return true;
+    var lineNoSize = text.split("-").slice(0, -1).join("-");
+    var relPath = lineNoSize.slice(11);
+    if (!relPath) return true;
+    if (/\.r\d\d$/i.test(relPath) || /\.rar$/i.test(relPath)) return true;
+    if (/screen\d+\.png$/i.test(relPath)) return true;
+    var ext = path.extname(relPath).toLowerCase().replace(/^\./, "");
+    return FORCE_SCAN_EXCLUDED_EXTENSIONS.has(ext);
+  };
+
   log({ findUsb });
 
   // Timestamps in tv-finished.json must be PST timezone.
@@ -1948,7 +1977,9 @@ async function main() {
     if (forcedFiles && forcedFiles.length > 0) {
       log("checking forced files...", forcedFiles.length);
       processingForced = true;
-      usbFiles = forcedFiles.filter((l) => l && l.trim().length);
+      usbFiles = forcedFiles.filter(
+        (l) => l && l.trim().length && !shouldSkipUsbLineByScanRules(l),
+      );
       forcedFiles = null;
     } else {
       processingForced = false;

@@ -905,11 +905,11 @@
             style="
               margin-top: 4px;
               font-size: 13px;
-              color: #c00;
+              color: #666;
               font-family: sans-serif;
             "
           >
-            Already downloaded
+            Sent recently
           </div>
           <button
             @click.stop="filesClick(torrent)"
@@ -3229,8 +3229,16 @@ export default {
             if (result?.ok) {
               this.setDownloadStatus(torrent, "ok", result?.message || "");
 
-              // Only mark "downloaded" after the server indicates success.
-              this.rememberDownloadedTorrent(torrent);
+              const successMessage = String(result?.message || "").trim();
+              const shouldRememberDownload =
+                !/^(Already downloaded|Already in qBittorrent|Restarting)$/i.test(
+                  successMessage,
+                );
+
+              // Only persist history when the torrent was actually sent.
+              if (shouldRememberDownload) {
+                this.rememberDownloadedTorrent(torrent);
+              }
             } else {
               const msg = result?.message || `Failed to add: ${torrentTitle}`;
               this.setDownloadStatus(torrent, "error", msg);
@@ -3858,6 +3866,22 @@ export default {
             },
             body: JSON.stringify({
               torrent,
+              ...(forceDownload ? { forceDownload: true } : {}),
+              ...(String(this.currentShow?.name || "").trim()
+                ? { showName: String(this.currentShow?.name || "").trim() }
+                : {}),
+              ...(String(
+                this.currentShow?.tvdbId || this.currentShow?.tvdbId || "",
+              ).trim()
+                ? {
+                    tvdbId: String(
+                      this.currentShow?.tvdbId ||
+                        this.currentShow?.tvdbId ||
+                        "",
+                    ).trim(),
+                  }
+                : {}),
+              ...(this.movieMode ? { savePath: "/home/xobtlu/movies" } : {}),
             }),
           },
           60000,
@@ -4302,11 +4326,6 @@ export default {
     // Send: enqueue download for each selected torrent
     async torSendClick() {
       for (const t of this.selectedItems) {
-        if (this.isDownloadedBefore(t)) {
-          const title = this.getDisplayTitleWithProvider(t);
-          this.showError(`This torrent already sent to qbt: ${title}`);
-          continue;
-        }
         void this.enqueueDownload(t, { forceDownload: false });
       }
     },

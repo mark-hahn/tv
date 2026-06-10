@@ -73,6 +73,18 @@ const VIDEO_EXTENSIONS = new Set([
   ".webm",
 ]);
 const PACKED_ARCHIVE_EXTENSIONS = new Set([".rar", ".001"]);
+const FORCE_DOWN_POLL_MS = 10000;
+const FORCE_DOWN_MAX_POLLS = 720;
+const FORCE_DOWN_SKIP_EXTENSIONS = new Set([
+  "nfo",
+  "idx",
+  "sub",
+  "txt",
+  "jpg",
+  "gif",
+  "jpeg",
+  "part",
+]);
 
 function formatPstTimestamp(date = new Date()) {
   // Match the reelgood logger behavior: approximate PST/PDT using month.
@@ -206,6 +218,140 @@ function getPackedArchiveRepresentatives(files) {
     }
   }
   return [...byStem.values()].map((entry) => entry.filePath);
+}
+
+function formatPstDateOnly(input = Date.now()) {
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Los_Angeles",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date(input));
+  } catch {
+    return new Date(input).toISOString().slice(0, 10);
+  }
+}
+
+async function handoffForcedTorrentToTvDown({
+  addTag,
+  infoHash,
+  torrentTitle,
+  tvdbId,
+  showName,
+  torrentFiles,
+}) {
+  const qbtFilter = infoHash ? { hash: infoHash } : { tag: addTag };
+  const metadataFiles = Array.isArray(torrentFiles)
+    ? torrentFiles
+        .map((file) => ({
+          path: String(file?.path || "").replace(/^\/+/, ""),
+          size:
+            typeof file?.size === "number" && Number.isFinite(file.size)
+              ? Math.max(0, Math.trunc(file.size))
+              : 0,
+        }))
+        .filter((file) => file.path)
+    : [];
+
+  console.log("[downloads] forced handoff started", {
+    addTag,
+    infoHash,
+    files: metadataFiles.length,
+  });
+
+  if (metadataFiles.length === 0) {
+    console.error("[downloads] forced handoff has no usable torrent files", {
+      addTag,
+      infoHash,
+      torrentTitle,
+    });
+    return;
+  }
+
+  for (let attempt = 0; attempt < FORCE_DOWN_MAX_POLLS; attempt += 1) {
+    try {
+      const tagged = await getQbtInfo(qbtFilter);
+      const list = Array.isArray(tagged) ? tagged : [];
+      const torrent = list[0] || null;
+      if (!torrent) {
+        await new Promise((resolve) => setTimeout(resolve, FORCE_DOWN_POLL_MS));
+        continue;
+      }
+
+      const amountLeft = Number(torrent?.amount_left);
+      const savePath = String(torrent?.save_path || "").trim();
+      if (!Number.isFinite(amountLeft) || amountLeft > 0 || !savePath) {
+        await new Promise((resolve) => setTimeout(resolve, FORCE_DOWN_POLL_MS));
+        continue;
+      }
+
+      const completedAtRaw = Number(torrent?.completion_on);
+      const completedAt =
+        Number.isFinite(completedAtRaw) && completedAtRaw > 0
+          ? completedAtRaw * 1000
+          : Date.now();
+      const datePart = formatPstDateOnly(completedAt);
+      const payload = metadataFiles
+        .map((file) => {
+          const relPath = String(file.path || "").replace(/^\/+/, "");
+          if (!relPath || relPath.startsWith("..")) return "";
+          return `${datePart}-${relPath}-${file.size}`;
+        })
+        .filter(Boolean);
+
+      if (payload.length === 0) {
+        console.error(
+          "[downloads] forced handoff could not compute metadata paths",
+          {
+            addTag,
+            infoHash,
+            savePath,
+          },
+        );
+        return;
+      }
+
+      const response = await fetch("http://127.0.0.1:3003/forceDown", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        const detail = await response.text().catch(() => "");
+        throw new Error(
+          `forceDown HTTP ${response.status}${detail ? `: ${detail}` : ""}`,
+        );
+      }
+
+      postHistory({
+        tvdbId,
+        showName: showName || torrentTitle,
+        type: "forceDown",
+        description: `${torrentTitle} | tag: ${addTag}`,
+      });
+      console.log("[downloads] forced handoff sent to tv-down", {
+        addTag,
+        infoHash,
+        count: payload.length,
+      });
+      return;
+    } catch (error) {
+      console.error("[downloads] forced handoff poll failed", {
+        addTag,
+        infoHash,
+        error: error?.message || String(error),
+      });
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, FORCE_DOWN_POLL_MS));
+  }
+
+  console.error("[downloads] forced handoff timed out", {
+    addTag,
+    infoHash,
+    torrentTitle,
+  });
 }
 
 function getYearFromShowContext(showContext) {
@@ -2003,6 +2149,19 @@ async function handleDownloadRequest(req, res) {
             description: `${tagTorTitle} | provider: ${torrent?.raw?.provider || torrent?.provider || "?"} | tag: ${addTag}`,
           });
 
+          if (!isMovieDownload) {
+            void handoffForcedTorrentToTvDown({
+              addTag,
+              infoHash: infoHash || undefined,
+              torrentTitle: tagTorTitle,
+              tvdbId: dlTvdbId,
+              showName: dlShowName || tagTorTitle,
+              torrentFiles: download.extractTorrentFileDetails(
+                fetched.torrentData,
+              ),
+            });
+          }
+
           res.json({
             ...tvProcResult,
             success: true,
@@ -2064,6 +2223,19 @@ async function handleDownloadRequest(req, res) {
               hash: infoHash || undefined,
               description: `${torTitle} | provider: ${torrent?.raw?.provider || torrent?.provider || "?"} | tag: ${addTag} | force-restart`,
             });
+
+            if (!isMovieDownload) {
+              void handoffForcedTorrentToTvDown({
+                addTag,
+                infoHash: infoHash || undefined,
+                torrentTitle: torTitle,
+                tvdbId: dlTvdbId,
+                showName: dlShowName || torTitle,
+                torrentFiles: download.extractTorrentFileDetails(
+                  fetched.torrentData,
+                ),
+              });
+            }
             res.json({
               ...tvProcResult,
               success: true,
@@ -2099,6 +2271,24 @@ async function handleDownloadRequest(req, res) {
         .toLowerCase();
     } catch {
       // ignore
+    }
+
+    const successTorTitle = String(
+      torrent?.raw?.title ||
+        torrent?.title ||
+        torrent?.clientTitle ||
+        "unknown",
+    ).trim();
+
+    if (!isMovieDownload) {
+      void handoffForcedTorrentToTvDown({
+        addTag,
+        infoHash: infoHash || undefined,
+        torrentTitle: successTorTitle,
+        tvdbId: dlTvdbId,
+        showName: dlShowName || successTorTitle,
+        torrentFiles: download.extractTorrentFileDetails(fetched.torrentData),
+      });
     }
 
     res.json({

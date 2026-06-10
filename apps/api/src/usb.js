@@ -6,6 +6,19 @@ import { parseKeyValueFile } from "./qb-cred.js";
 import { getApiSecretsDir, preferSharedReadPath } from "./tvPaths.js";
 
 const execFileAsync = promisify(execFile);
+const SPACE_DEBUG_PATH = "/root/dev/apps/tv/temp.txt";
+
+async function appendSpaceDebugLog(payload) {
+  try {
+    await fs.appendFile(
+      SPACE_DEBUG_PATH,
+      `${JSON.stringify({ ts: new Date().toISOString(), event: "space-debug", ...payload })}\n`,
+      "utf8",
+    );
+  } catch {
+    // ignore logging failures
+  }
+}
 
 const USB_FILES_ROOT = "/home/xobtlu/files";
 const USB_SPACE_TOTAL_BYTES = Math.trunc(2e9 * 1024);
@@ -224,6 +237,7 @@ export async function spaceAvailUsb() {
 
   try {
     const qbHost = await loadQbHostForSsh();
+    await appendSpaceDebugLog({ stage: "usb-start", qbHost });
 
     const sshBaseArgs = [
       "-o",
@@ -257,8 +271,19 @@ export async function spaceAvailUsb() {
           : "";
       if (!stdout) {
         console.error("spaceAvailUsb: ssh quota failed:", e);
+        await appendSpaceDebugLog({
+          stage: "usb-quota-error",
+          qbHost,
+          error: e?.message || String(e),
+        });
       }
     }
+
+    await appendSpaceDebugLog({
+      stage: "usb-quota-raw",
+      qbHost,
+      stdout,
+    });
 
     // Parse the data line: Filesystem blocks quota limit grace files quota limit grace
     // All values are in 1K blocks. Use hard limit (col index 3) as total.
@@ -266,20 +291,39 @@ export async function spaceAvailUsb() {
     if (parsed) {
       usbSpaceTotal = parsed.limitK * 1024;
       usbSpaceUsed = parsed.usedK * 1024;
+      await appendSpaceDebugLog({
+        stage: "usb-quota-parsed",
+        qbHost,
+        parsed,
+        usbSpaceTotal,
+        usbSpaceUsed,
+      });
     } else {
       console.error("spaceAvailUsb: unexpected quota output:", stdout);
+      await appendSpaceDebugLog({
+        stage: "usb-quota-unparsed",
+        qbHost,
+        stdout,
+      });
     }
   } catch (e) {
     console.error(
       "spaceAvailUsb: ssh space probing failed (returning zeros):",
       e,
     );
+    await appendSpaceDebugLog({
+      stage: "usb-fatal",
+      error: e?.message || String(e),
+      stack: e?.stack || null,
+    });
   }
 
-  return {
+  const result = {
     usbSpaceTotal: Math.trunc(usbSpaceTotal),
     usbSpaceUsed: Math.trunc(usbSpaceUsed),
   };
+  await appendSpaceDebugLog({ stage: "usb-result", result });
+  return result;
 }
 
 /**
@@ -319,6 +363,12 @@ export async function spaceAvailMedia() {
       }
     }
 
+    await appendSpaceDebugLog({
+      stage: "media-start",
+      candidateMounts,
+      mediaMount,
+    });
+
     if (mediaMount) {
       const df = await execFileAsync("df", ["-B1", "-P", mediaMount], {
         timeout: 15000,
@@ -326,26 +376,54 @@ export async function spaceAvailMedia() {
         windowsHide: true,
       });
       const dfText = String(df.stdout ?? "");
+      await appendSpaceDebugLog({
+        stage: "media-df-raw",
+        mediaMount,
+        dfText,
+      });
       const parsed = parseDfForMount(dfText, mediaMount);
       const tu = dfToTotalUsed(parsed);
       if (tu) {
         mediaSpaceUsed = tu.used;
         mediaSpaceTotal = tu.total;
+        await appendSpaceDebugLog({
+          stage: "media-df-parsed",
+          mediaMount,
+          parsed,
+          totalUsed: tu,
+        });
       } else {
         console.error("spaceAvailMedia: unexpected df output:", dfText);
+        await appendSpaceDebugLog({
+          stage: "media-df-unparsed",
+          mediaMount,
+          dfText,
+        });
       }
+    } else {
+      await appendSpaceDebugLog({
+        stage: "media-no-mount",
+        candidateMounts,
+      });
     }
   } catch (e) {
     console.error(
       "spaceAvailMedia: df failed (returning mediaSpaceTotal/mediaSpaceUsed=0):",
       e,
     );
+    await appendSpaceDebugLog({
+      stage: "media-fatal",
+      error: e?.message || String(e),
+      stack: e?.stack || null,
+    });
   }
 
-  return {
+  const result = {
     mediaSpaceTotal: Math.trunc(mediaSpaceTotal),
     mediaSpaceUsed: Math.trunc(mediaSpaceUsed),
   };
+  await appendSpaceDebugLog({ stage: "media-result", result });
+  return result;
 }
 
 /**

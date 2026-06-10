@@ -29,6 +29,7 @@ import cron from "node-cron";
 import {
   SRVR_ROOT_DIR,
   SRVR_DATA_DIR,
+  SRVR_MISC_DIR,
   SRVR_SECRETS_DIR,
 } from "./src/srvrPaths.js";
 import * as history from "./src/history.js";
@@ -57,8 +58,22 @@ const QBT_CRED_PATH_FLEX = path.join(
 );
 const FLEXGET_CMD = "/root/.local/bin/flexget";
 const FLEXGET_CONFIG = path.join(SRVR_ROOT_DIR, "config", "config.yml");
+const CHK_SUBS_LOG = path.join(SRVR_MISC_DIR, "chk-subs.log");
+const CHK_SUBS_SERVER_DUMP_PATH = "/root/dev/apps/tv/temp.txt";
 
 let flexgetIsRunning = false;
+
+function appendChkSubsSrvrLog(payload) {
+  try {
+    fs.mkdirSync(SRVR_MISC_DIR, { recursive: true });
+    const txt =
+      JSON.stringify({ ts: new Date().toISOString(), ...payload }) + "\n";
+    fs.appendFileSync(CHK_SUBS_LOG, txt, "utf8");
+    fs.appendFileSync(CHK_SUBS_SERVER_DUMP_PATH, txt, "utf8");
+  } catch {
+    // ignore logging failures
+  }
+}
 
 function readBadGroupsFromDisk() {
   return fs
@@ -1865,14 +1880,121 @@ const subsCountEpisodes = async (params) => {
     throw new Error("subsCountEpisodes: requests required");
   }
 
+  const normalizeReleaseKey = (item) => {
+    const release =
+      String(item?.attributes?.release || "").trim() ||
+      String(item?.attributes?.files?.[0]?.file_name || "").trim();
+    return release
+      .toLowerCase()
+      .replace(/\.(hi|sdh)\b/g, "")
+      .replace(/\b(hi|sdh|hearing[ ._-]?impaired)\b/g, "")
+      .replace(/[^a-z0-9]+/g, ".")
+      .replace(/^\.+|\.+$/g, "");
+  };
+
+  const isHearingImpaired = (item) => {
+    if (item?.attributes?.hearing_impaired === true) return true;
+    const release = String(item?.attributes?.release || "").toLowerCase();
+    const fileName = String(
+      item?.attributes?.files?.[0]?.file_name || "",
+    ).toLowerCase();
+    return /\bhi\b|\.hi\b|\bsdh\b|hearing[ ._-]?impaired/.test(
+      `${release} ${fileName}`,
+    );
+  };
+
   const results = [];
   for (const request of requests) {
     const key = String(request?.key || "");
     try {
-      const data = await subsSearch(request || {});
+      const query = String(request?.query || "").trim();
+      let resolvedImdbId = normalizeImdbId(request?.imdb_id);
+      if (!resolvedImdbId && query) {
+        const tvdbAll = tvdb.getAllTvdbSync?.() || {};
+        let tvdbRec =
+          tvdbAll?.[query] ||
+          Object.values(tvdbAll).find(
+            (rec) =>
+              String(rec?.name || "").toLowerCase() === query.toLowerCase(),
+          );
+        if (!tvdbRec?.imdbId) {
+          const matched = smartTitleMatch(
+            query,
+            Object.values(tvdbAll),
+            null,
+            false,
+          );
+          if (matched?.imdbId) tvdbRec = matched;
+        }
+        resolvedImdbId = normalizeImdbId(tvdbRec?.imdbId);
+      }
+
+      const searchParams = { ...request };
+      if (resolvedImdbId) {
+        searchParams.imdb_id = resolvedImdbId;
+        delete searchParams.query;
+      }
+
+      appendChkSubsSrvrLog({
+        stage: "subsCountEpisodes-request",
+        key,
+        request,
+        searchParams,
+      });
+
+      const data = await subsSearch(searchParams);
       const items = Array.isArray(data?.data) ? data.data : [];
-      results.push({ key, count: items.length, error: null });
+
+      const dedupedMap = new Map();
+      for (const item of items) {
+        const dedupeKey = normalizeReleaseKey(item);
+        if (!dedupeKey) continue;
+        const existing = dedupedMap.get(dedupeKey);
+        if (!existing) {
+          dedupedMap.set(dedupeKey, item);
+          continue;
+        }
+        if (isHearingImpaired(existing) && !isHearingImpaired(item)) {
+          dedupedMap.set(dedupeKey, item);
+        }
+      }
+      const countedItems = [...dedupedMap.values()];
+
+      appendChkSubsSrvrLog({
+        stage: "subsCountEpisodes-response",
+        key,
+        rawCount: items.length,
+        filteredCount: countedItems.length,
+        rawItems: items,
+        sample: items.slice(0, 3).map((item) => ({
+          id: item?.id ?? null,
+          type: item?.type ?? null,
+          release: item?.attributes?.release || null,
+          language: item?.attributes?.language || null,
+          hearingImpaired: item?.attributes?.hearing_impaired ?? null,
+          files: Array.isArray(item?.attributes?.files)
+            ? item.attributes.files.slice(0, 3).map((file) => ({
+                file_id: file?.file_id ?? null,
+                file_name: file?.file_name || null,
+                cd_number: file?.cd_number ?? null,
+              }))
+            : [],
+        })),
+        countedSample: countedItems.slice(0, 3).map((item) => ({
+          id: item?.id ?? null,
+          release: item?.attributes?.release || null,
+          hearingImpaired: item?.attributes?.hearing_impaired ?? null,
+          file_name: item?.attributes?.files?.[0]?.file_name || null,
+        })),
+      });
+      results.push({ key, count: countedItems.length, error: null });
     } catch (e) {
+      appendChkSubsSrvrLog({
+        stage: "subsCountEpisodes-error",
+        key,
+        request,
+        error: e?.message || String(e),
+      });
       results.push({
         key,
         count: 0,

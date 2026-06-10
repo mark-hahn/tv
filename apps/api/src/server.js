@@ -59,6 +59,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const INTERNAL_SRVR_SUBS_COUNT_URL =
   "http://127.0.0.1:8739/api/subsCountEpisodes";
+const CHK_SUBS_SERVER_DUMP_PATH = "/root/dev/apps/tv/temp.txt";
 const VIDEO_EXTENSIONS = new Set([
   ".mkv",
   ".mp4",
@@ -73,6 +74,7 @@ const VIDEO_EXTENSIONS = new Set([
   ".webm",
 ]);
 const SUBTITLE_EXTENSIONS = new Set([".srt", ".ass", ".ssa", ".sub", ".idx"]);
+const PACKED_ARCHIVE_EXTENSIONS = new Set([".rar", ".001"]);
 
 function formatPstTimestamp(date = new Date()) {
   // Match the reelgood logger behavior: approximate PST/PDT using month.
@@ -185,6 +187,48 @@ function isSubtitleSidecarPath(filePath) {
   return SUBTITLE_EXTENSIONS.has(ext);
 }
 
+function isPackedArchivePath(filePath) {
+  const text = String(filePath || "").toLowerCase();
+  const ext = path.extname(text);
+  if (PACKED_ARCHIVE_EXTENSIONS.has(ext)) return true;
+  return /\.r\d\d$/i.test(text);
+}
+
+function summarizeFileExtensions(files) {
+  const summary = {};
+  for (const file of Array.isArray(files) ? files : []) {
+    const ext =
+      path.extname(String(file?.path || "")).toLowerCase() || "(none)";
+    summary[ext] = (summary[ext] || 0) + 1;
+  }
+  return summary;
+}
+
+function isNfoPath(filePath) {
+  return path.extname(String(filePath || "")).toLowerCase() === ".nfo";
+}
+
+function getPackedArchiveStem(filePath) {
+  return String(filePath || "").replace(/\.(rar|r\d\d|001)$/i, "");
+}
+
+function getPackedArchiveRepresentatives(files) {
+  const byStem = new Map();
+  for (const file of Array.isArray(files) ? files : []) {
+    const filePath = String(file?.path || "");
+    if (!isPackedArchivePath(filePath)) continue;
+    const stem = getPackedArchiveStem(filePath);
+    if (!stem) continue;
+    const current = byStem.get(stem);
+    const ext = path.extname(filePath).toLowerCase();
+    const rank = ext === ".rar" ? 0 : ext === ".001" ? 1 : 2;
+    if (!current || rank < current.rank) {
+      byStem.set(stem, { filePath, rank });
+    }
+  }
+  return [...byStem.values()].map((entry) => entry.filePath);
+}
+
 function getYearFromShowContext(showContext) {
   const directYear = String(showContext?.year || "").trim();
   if (/^(19|20)\d{2}$/.test(directYear)) return directYear;
@@ -251,6 +295,36 @@ async function fetchEpisodeSubtitleCounts(requests) {
   }
 
   return Array.isArray(data?.results) ? data.results : [];
+}
+
+function appendChkSubsLog(payload) {
+  try {
+    const outPath = path.join(getApiMiscDir(), "temp.txt");
+    const txt = `${JSON.stringify({
+      ts: new Date().toISOString(),
+      event: "chk-subs",
+      ...payload,
+    })}\n`;
+    fs.appendFileSync(outPath, txt, "utf8");
+    fs.appendFileSync(CHK_SUBS_SERVER_DUMP_PATH, txt, "utf8");
+  } catch {
+    // ignore logging failures
+  }
+}
+
+function summarizeChkSubsItem(item) {
+  const torrent =
+    item?.torrent && typeof item.torrent === "object" ? item.torrent : null;
+  return {
+    key: String(item?.key || "").trim(),
+    title: String(torrent?.raw?.title || torrent?.title || ""),
+    provider: String(torrent?.raw?.provider || torrent?.provider || ""),
+    detailUrl: String(torrent?.detailUrl || ""),
+    rawLink: String(torrent?.raw?.link || ""),
+    rawDesc: String(torrent?.raw?.desc || ""),
+    rawFilename: String(torrent?.raw?.filename || ""),
+    rawFid: String(torrent?.raw?.fid || ""),
+  };
 }
 
 function appendDownloadsRequestLog(reqBody) {
@@ -2140,25 +2214,41 @@ app.post("/api/tor/chk-subs", async (req, res) => {
   }
 
   try {
-    const results = await Promise.all(
-      items.map(async (item) => {
-        const key = String(item?.key || "").trim();
-        const torrent = item?.torrent;
-        if (!torrent || typeof torrent !== "object") {
-          return {
-            key,
-            minEmbCount: 0,
-            minSrtCount: 0,
-            minOpnCount: 0,
-            message: "",
-            error: "torrent object required",
-            perVideo: [],
-          };
-        }
+    appendChkSubsLog({
+      stage: "request",
+      showContext,
+      itemCount: items.length,
+      items: items.map((item) => summarizeChkSubsItem(item)),
+    });
+
+    const results = [];
+    for (const item of items) {
+      const key = String(item?.key || "").trim();
+      const torrent = item?.torrent;
+      if (!torrent || typeof torrent !== "object") {
+        results.push({
+          key,
+          minEmbCount: 0,
+          minSrtCount: 0,
+          minOpnCount: 0,
+          message: "",
+          error: "torrent object required",
+          perVideo: [],
+        });
+        continue;
+      }
+
+      let files;
+      try {
+        appendChkSubsLog({
+          stage: "item-start",
+          showContext,
+          item: summarizeChkSubsItem(item),
+        });
 
         const fetched = await download.fetchTorrentFile(torrent);
         if (!fetched?.success) {
-          return {
+          const result = {
             key,
             minEmbCount: 0,
             minSrtCount: 0,
@@ -2167,124 +2257,282 @@ app.post("/api/tor/chk-subs", async (req, res) => {
             error: fetched?.error || "Failed to fetch torrent",
             perVideo: [],
           };
+          appendChkSubsLog({
+            stage: "error",
+            key,
+            showContext,
+            item: summarizeChkSubsItem(item),
+            error: result.error,
+            fetched,
+          });
+          results.push(result);
+          continue;
         }
 
-        const files = download.extractTorrentFileDetails(fetched.torrentData);
-        const videoFiles = files.filter((file) => isVideoPath(file?.path));
-        const sidecarFiles = files.filter((file) =>
-          isSubtitleSidecarPath(file?.path),
+        files = download.extractTorrentFileDetails(fetched.torrentData);
+        const nfoFiles = files.filter((file) => isNfoPath(file?.path));
+        appendChkSubsLog({
+          stage: "files",
+          key,
+          showContext,
+          item: summarizeChkSubsItem(item),
+          fetched,
+          fileCount: Array.isArray(files) ? files.length : 0,
+          first10Files: Array.isArray(files)
+            ? files.slice(0, 10).map((file) => ({
+                path: String(file?.path || ""),
+                size: file?.size ?? null,
+              }))
+            : [],
+          nfoFiles: nfoFiles.map((file) => ({
+            path: String(file?.path || ""),
+            size: file?.size ?? null,
+          })),
+        });
+      } catch (e) {
+        const result = {
+          key,
+          minEmbCount: 0,
+          minSrtCount: 0,
+          minOpnCount: 0,
+          message: "",
+          error: e?.message || String(e),
+          perVideo: [],
+        };
+        appendChkSubsLog({
+          stage: "error",
+          key,
+          showContext,
+          item: summarizeChkSubsItem(item),
+          error: result.error,
+          stack: e?.stack || null,
+        });
+        results.push(result);
+        continue;
+      }
+
+      let videoFiles = files.filter((file) => isVideoPath(file?.path));
+      const sidecarFiles = files.filter((file) =>
+        isSubtitleSidecarPath(file?.path),
+      );
+      const packedArchiveFiles = files.filter((file) =>
+        isPackedArchivePath(file?.path),
+      );
+      const nfoFiles = files.filter((file) => isNfoPath(file?.path));
+
+      const packedArchiveRepresentatives =
+        videoFiles.length === 0 && packedArchiveFiles.length > 0
+          ? getPackedArchiveRepresentatives(packedArchiveFiles).map(
+              (filePath) => ({
+                path: filePath,
+                size:
+                  files.find((file) => String(file?.path || "") === filePath)
+                    ?.size ?? null,
+                packedArchive: true,
+              }),
+            )
+          : [];
+
+      if (videoFiles.length === 0 && packedArchiveRepresentatives.length > 0) {
+        videoFiles = packedArchiveRepresentatives;
+      }
+
+      if (videoFiles.length === 0) {
+        const message =
+          packedArchiveFiles.length > 0 ? "Packed archive" : "No video files";
+        const result = {
+          key,
+          minEmbCount: 0,
+          minSrtCount: 0,
+          minOpnCount: 0,
+          message,
+          error: null,
+          perVideo: [],
+        };
+        appendChkSubsLog({
+          stage: "result",
+          key,
+          showContext,
+          torrentTitle: String(torrent?.raw?.title || torrent?.title || ""),
+          videoCount: 0,
+          sidecarCount: sidecarFiles.length,
+          nfoCount: nfoFiles.length,
+          nfoFiles: nfoFiles.map((file) => String(file?.path || "")),
+          packedArchiveCount: packedArchiveFiles.length,
+          packedArchiveRepresentativeCount: packedArchiveRepresentatives.length,
+          extensionSummary: summarizeFileExtensions(files),
+          result,
+        });
+        results.push(result);
+        continue;
+      }
+
+      let minEmbCount = Number.MAX_SAFE_INTEGER;
+      let minSrtCount = Number.MAX_SAFE_INTEGER;
+      let minOpnCount = Number.MAX_SAFE_INTEGER;
+      const perVideo = [];
+      const opnRequests = [];
+      const year = getYearFromShowContext(showContext);
+      const imdbId = String(showContext?.imdbId || "").trim();
+
+      for (const file of videoFiles) {
+        const videoPath = String(file?.path || "");
+        const seasonEpisode = getSeasonEpisodeForTorrentPath(videoPath);
+        let srtCount = 0;
+        const embCount = 0;
+        const matchingSidecars = [];
+
+        for (const sidecar of sidecarFiles) {
+          const sidecarPath = String(sidecar?.path || "");
+          const sidecarSeasonEpisode =
+            getSeasonEpisodeForTorrentPath(sidecarPath);
+          if (!sidecarSeasonEpisode) continue;
+          if (
+            sidecarSeasonEpisode.season === seasonEpisode?.season &&
+            sidecarSeasonEpisode.episode === seasonEpisode?.episode
+          ) {
+            srtCount += 1;
+            matchingSidecars.push(sidecarPath);
+          }
+        }
+
+        const perVideoEntry = {
+          path: videoPath,
+          season: Number.isInteger(seasonEpisode?.season)
+            ? seasonEpisode.season
+            : null,
+          episode: Number.isInteger(seasonEpisode?.episode)
+            ? seasonEpisode.episode
+            : null,
+          embCount,
+          srtCount,
+          opnCount: 0,
+          packedArchive: Boolean(file?.packedArchive),
+          embReason:
+            "torrent metadata does not expose embedded subtitle tracks",
+          nfoCount: nfoFiles.length,
+          nfoFiles: nfoFiles.map((file) => String(file?.path || "")),
+          providerDetailDebug: fetched?.detailPageDebug || null,
+          sidecarCount: sidecarFiles.length,
+          sidecarPaths: sidecarFiles.map((sidecar) =>
+            String(sidecar?.path || ""),
+          ),
+          matchingSidecars,
+          parseDebug: {
+            fname: path.basename(videoPath),
+            folderName: path.basename(path.dirname(videoPath)),
+            ext: path.extname(videoPath).toLowerCase(),
+          },
+          srtReason:
+            matchingSidecars.length > 0
+              ? `matched ${matchingSidecars.length} sidecars`
+              : sidecarFiles.length > 0
+                ? "sidecars present but none matched parsed season/episode"
+                : "no sidecar subtitle files in torrent",
+        };
+
+        const showName = deriveTorrentShowName(showContext, torrent, videoPath);
+        if (
+          showName &&
+          Number.isInteger(seasonEpisode?.season) &&
+          Number.isInteger(seasonEpisode?.episode)
+        ) {
+          const request = {
+            key: `${key}|${videoPath}`,
+            season: seasonEpisode.season,
+            episode: seasonEpisode.episode,
+            releaseHint: path.basename(videoPath),
+          };
+          if (imdbId) request.imdb_id = imdbId;
+          else request.query = showName;
+          if (!imdbId && year) request.year = year;
+          opnRequests.push(request);
+        }
+
+        minEmbCount = Math.min(minEmbCount, embCount);
+        minSrtCount = Math.min(minSrtCount, srtCount);
+        perVideo.push(perVideoEntry);
+
+        appendChkSubsLog({
+          stage: "zero-debug",
+          key,
+          showContext,
+          item: summarizeChkSubsItem(item),
+          perVideoEntry,
+        });
+      }
+
+      if (opnRequests.length > 0) {
+        const opnResults = await fetchEpisodeSubtitleCounts(opnRequests);
+        const opnMap = new Map(
+          opnResults.map((entry) => [String(entry?.key || ""), entry]),
         );
 
-        if (videoFiles.length === 0) {
-          return {
-            key,
-            minEmbCount: 0,
-            minSrtCount: 0,
-            minOpnCount: 0,
-            message: "No video files",
-            error: null,
-            perVideo: [],
-          };
+        for (const entry of perVideo) {
+          const opn = opnMap.get(`${key}|${entry.path}`);
+          entry.opnCount = Number.isFinite(opn?.count) ? opn.count : 0;
+          minOpnCount = Math.min(minOpnCount, entry.opnCount);
         }
 
-        let minEmbCount = Number.MAX_SAFE_INTEGER;
-        let minSrtCount = Number.MAX_SAFE_INTEGER;
-        let minOpnCount = Number.MAX_SAFE_INTEGER;
-        const perVideo = [];
-        const opnRequests = [];
-        const year = getYearFromShowContext(showContext);
-        const imdbId = String(showContext?.imdbId || "").trim();
-
-        for (const file of videoFiles) {
-          const videoPath = String(file?.path || "");
-          const seasonEpisode = getSeasonEpisodeForTorrentPath(videoPath);
-          let srtCount = 0;
-          const embCount = 0;
-
-          for (const sidecar of sidecarFiles) {
-            const sidecarPath = String(sidecar?.path || "");
-            const sidecarSeasonEpisode =
-              getSeasonEpisodeForTorrentPath(sidecarPath);
-            if (!sidecarSeasonEpisode) continue;
-            if (
-              sidecarSeasonEpisode.season === seasonEpisode?.season &&
-              sidecarSeasonEpisode.episode === seasonEpisode?.episode
-            ) {
-              srtCount += 1;
-            }
-          }
-
-          const perVideoEntry = {
-            path: videoPath,
-            season: Number.isInteger(seasonEpisode?.season)
-              ? seasonEpisode.season
-              : null,
-            episode: Number.isInteger(seasonEpisode?.episode)
-              ? seasonEpisode.episode
-              : null,
-            embCount,
-            srtCount,
-            opnCount: 0,
-          };
-
-          const showName = deriveTorrentShowName(
-            showContext,
-            torrent,
-            videoPath,
-          );
-          if (
-            showName &&
-            Number.isInteger(seasonEpisode?.season) &&
-            Number.isInteger(seasonEpisode?.episode)
-          ) {
-            const request = {
-              key: `${key}|${videoPath}`,
-              season: seasonEpisode.season,
-              episode: seasonEpisode.episode,
-            };
-            if (imdbId) request.imdb_id = imdbId;
-            else request.query = showName;
-            if (!imdbId && year) request.year = year;
-            opnRequests.push(request);
-          }
-
-          minEmbCount = Math.min(minEmbCount, embCount);
-          minSrtCount = Math.min(minSrtCount, srtCount);
-          perVideo.push(perVideoEntry);
-        }
-
-        if (opnRequests.length > 0) {
-          const opnResults = await fetchEpisodeSubtitleCounts(opnRequests);
-          const opnMap = new Map(
-            opnResults.map((entry) => [String(entry?.key || ""), entry]),
-          );
-
-          for (const entry of perVideo) {
-            const opn = opnMap.get(`${key}|${entry.path}`);
-            entry.opnCount = Number.isFinite(opn?.count) ? opn.count : 0;
-            minOpnCount = Math.min(minOpnCount, entry.opnCount);
-          }
-        } else {
-          minOpnCount = 0;
-        }
-
-        return {
+        appendChkSubsLog({
+          stage: "opn-results",
           key,
-          minEmbCount:
-            minEmbCount === Number.MAX_SAFE_INTEGER ? 0 : minEmbCount,
-          minSrtCount:
-            minSrtCount === Number.MAX_SAFE_INTEGER ? 0 : minSrtCount,
-          minOpnCount:
-            minOpnCount === Number.MAX_SAFE_INTEGER ? 0 : minOpnCount,
-          message: "",
-          error: null,
-          perVideo,
-        };
-      }),
-    );
+          showContext,
+          item: summarizeChkSubsItem(item),
+          opnRequests,
+          opnResults,
+        });
+      } else {
+        minOpnCount = 0;
+      }
+
+      const result = {
+        key,
+        minEmbCount: minEmbCount === Number.MAX_SAFE_INTEGER ? 0 : minEmbCount,
+        minSrtCount: minSrtCount === Number.MAX_SAFE_INTEGER ? 0 : minSrtCount,
+        minOpnCount: minOpnCount === Number.MAX_SAFE_INTEGER ? 0 : minOpnCount,
+        message: "",
+        error: null,
+        perVideo,
+      };
+      appendChkSubsLog({
+        stage: "result",
+        key,
+        showContext,
+        torrentTitle: String(torrent?.raw?.title || torrent?.title || ""),
+        videoCount: videoFiles.length,
+        sidecarCount: sidecarFiles.length,
+        packedArchiveCount: packedArchiveFiles.length,
+        packedArchiveRepresentativeCount: packedArchiveRepresentatives.length,
+        extensionSummary: summarizeFileExtensions(files),
+        opnRequests,
+        result,
+      });
+      results.push(result);
+    }
+
+    appendChkSubsLog({
+      stage: "response",
+      showContext,
+      itemCount: results.length,
+      results: results.map((result) => ({
+        key: result?.key,
+        message: result?.message || "",
+        error: result?.error || null,
+        minEmbCount: result?.minEmbCount ?? null,
+        minSrtCount: result?.minSrtCount ?? null,
+        minOpnCount: result?.minOpnCount ?? null,
+      })),
+    });
 
     return res.json({ success: true, results });
   } catch (e) {
+    appendChkSubsLog({
+      stage: "route-error",
+      showContext,
+      error: e?.message || String(e),
+      stack: e?.stack || null,
+    });
     return res
       .status(500)
       .json({ success: false, error: e?.message || String(e) });

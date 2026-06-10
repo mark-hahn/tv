@@ -2030,16 +2030,28 @@ export default {
 
     async getSpaceUsb() {
       const url = new URL(`${config.torrentsApiUrl}/api/space/usb`);
+      console.log("[tor space] usb request", { url: url.toString() });
       const res = await fetch(url.toString());
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
+      if (!res.ok) {
+        console.warn("[tor space] usb http error", { status: res.status });
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      console.log("[tor space] usb response", data);
+      return data;
     },
 
     async getSpaceSrvr() {
       const url = new URL(`${config.torrentsApiUrl}/api/space/srvr`);
+      console.log("[tor space] srvr request", { url: url.toString() });
       const res = await fetch(url.toString());
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
+      if (!res.ok) {
+        console.warn("[tor space] srvr http error", { status: res.status });
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      console.log("[tor space] srvr response", data);
+      return data;
     },
 
     pctUsed(total, used) {
@@ -2073,16 +2085,26 @@ export default {
       const hasAnyDigits = (txt) => /\d/.test(String(txt || ""));
 
       const applyUsb = (s) => {
+        console.log("[tor space] apply usb", { raw: s });
         if (
           Number.isFinite(Number(s?.usbSpaceTotal)) &&
           Number.isFinite(Number(s?.usbSpaceUsed))
         ) {
           this.spaceUsbPct = this.pctAvail(s.usbSpaceTotal, s.usbSpaceUsed);
           this.spaceUsbGb = this.fmtAvailGb(s.usbSpaceTotal, s.usbSpaceUsed);
+          console.log("[tor space] usb display", {
+            total: s?.usbSpaceTotal,
+            used: s?.usbSpaceUsed,
+            gb: this.spaceUsbGb,
+            pct: this.spaceUsbPct,
+          });
+        } else {
+          console.warn("[tor space] usb invalid payload", { raw: s });
         }
       };
 
       const applySrvr = (s) => {
+        console.log("[tor space] apply srvr", { raw: s });
         if (
           Number.isFinite(Number(s?.mediaSpaceTotal)) &&
           Number.isFinite(Number(s?.mediaSpaceUsed))
@@ -2095,24 +2117,44 @@ export default {
             s.mediaSpaceTotal,
             s.mediaSpaceUsed,
           );
+          console.log("[tor space] srvr display", {
+            total: s?.mediaSpaceTotal,
+            used: s?.mediaSpaceUsed,
+            gb: this.spaceSrvrGb,
+            pct: this.spaceSrvrPct,
+          });
+        } else {
+          console.warn("[tor space] srvr invalid payload", { raw: s });
         }
       };
 
       const usbPromise = this.getSpaceUsb()
         .then(applyUsb)
-        .catch(() => {
-          if (!hasAnyDigits(this.spaceUsbGb)) this.spaceUsbGb = "???";
-          if (!hasAnyDigits(this.spaceUsbPct)) this.spaceUsbPct = "???%";
+        .catch((error) => {
+          console.warn("[tor space] usb fetch failed", {
+            error: error?.message || String(error),
+          });
+          if (!hasAnyDigits(this.spaceUsbGb)) this.spaceUsbGb = "--";
+          if (!hasAnyDigits(this.spaceUsbPct)) this.spaceUsbPct = "--%";
         });
 
       const srvrPromise = this.getSpaceSrvr()
         .then(applySrvr)
-        .catch(() => {
-          if (!hasAnyDigits(this.spaceSrvrGb)) this.spaceSrvrGb = "???";
-          if (!hasAnyDigits(this.spaceSrvrPct)) this.spaceSrvrPct = "???%";
+        .catch((error) => {
+          console.warn("[tor space] srvr fetch failed", {
+            error: error?.message || String(error),
+          });
+          if (!hasAnyDigits(this.spaceSrvrGb)) this.spaceSrvrGb = "--";
+          if (!hasAnyDigits(this.spaceSrvrPct)) this.spaceSrvrPct = "--%";
         });
 
       await Promise.all([usbPromise, srvrPromise]);
+      console.log("[tor space] final display", {
+        usbGb: this.spaceUsbGb,
+        usbPct: this.spaceUsbPct,
+        srvrGb: this.spaceSrvrGb,
+        srvrPct: this.spaceSrvrPct,
+      });
     },
 
     saveCookies() {
@@ -2997,9 +3039,9 @@ export default {
 
       const entry = this.torSubCountCache?.[key] || null;
       if (!entry) return "";
-      if (entry.message) return String(entry.message);
-      if (entry.error) return "";
-      return `Subs: ${entry.minEmbCount || 0}, ${entry.minSrtCount || 0}, ${entry.minOpnCount || 0}`;
+      if (entry.message) return ` | ${String(entry.message)}`;
+      if (entry.error) return ` | Subs err: ${String(entry.error)}`;
+      return ` | Subs: ${entry.minEmbCount || 0}, ${entry.minSrtCount || 0}, ${entry.minOpnCount || 0}`;
     },
 
     getDownloadStatus(torrent) {
@@ -4172,12 +4214,6 @@ export default {
       const selected = [...this.selectedItems];
       if (selected.length === 0) return;
 
-      if (this.torSubCountsVisible) {
-        this.torSubCountsVisible = false;
-        this.torSubCountVisibleKeys = {};
-        return;
-      }
-
       const visibleKeys = {};
       const pending = [];
       const cache =
@@ -4194,8 +4230,25 @@ export default {
         }
       }
 
+      const selectedAlreadyVisible = Object.keys(visibleKeys).every(
+        (key) => this.torSubCountVisibleKeys?.[key],
+      );
+
+      if (
+        this.torSubCountsVisible &&
+        pending.length === 0 &&
+        selectedAlreadyVisible
+      ) {
+        this.torSubCountsVisible = false;
+        this.torSubCountVisibleKeys = {};
+        return;
+      }
+
       if (pending.length === 0) {
-        this.torSubCountVisibleKeys = visibleKeys;
+        this.torSubCountVisibleKeys = {
+          ...(this.torSubCountVisibleKeys || {}),
+          ...visibleKeys,
+        };
         this.torSubCountsVisible = true;
         return;
       }
@@ -4225,21 +4278,18 @@ export default {
         }
 
         const nextCache = { ...cache };
-        const errors = [];
         for (const result of data?.results || []) {
           const key = String(result?.key || "").trim();
           if (!key) continue;
           nextCache[key] = result;
-          if (result?.error) errors.push(String(result.error));
         }
 
         this.torSubCountCache = nextCache;
-        this.torSubCountVisibleKeys = visibleKeys;
+        this.torSubCountVisibleKeys = {
+          ...(this.torSubCountVisibleKeys || {}),
+          ...visibleKeys,
+        };
         this.torSubCountsVisible = true;
-
-        if (errors.length > 0) {
-          this.showError(errors[0]);
-        }
       } catch (e) {
         this.showError(this.getErrorMessage(e));
       } finally {

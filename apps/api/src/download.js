@@ -96,6 +96,21 @@ function looksLikeCloudflareChallenge(html) {
   );
 }
 
+function extractDetailPageDebug(html) {
+  const text = String(html || "");
+  const lower = text.toLowerCase();
+  const nfoHrefMatches = [...text.matchAll(/href="([^"]*\.nfo[^"]*)"/gi)].map(
+    (m) => m[1],
+  );
+  return {
+    hasNfoText: lower.includes(".nfo") || lower.includes(" nfo "),
+    hasMediaInfoText: /mediainfo|media info/i.test(text),
+    hasTextTrackMarkers: /text\s*#\d+|subtitle/i.test(text),
+    nfoHrefMatches,
+    bodyText: text,
+  };
+}
+
 function tryLoadBrowserCurlProfile() {
   // Prefer data/curl-tl.txt (primary). NO FALLBACKS.
   try {
@@ -565,6 +580,19 @@ export async function fetchTorrentFileFromSearchResult(torrent) {
     torrentData: r.stdout,
   });
 
+  const valid = validateTorrentData(r.stdout);
+  if (!valid.success) {
+    return fail(
+      "validate",
+      valid.error || valid.reason || "Invalid torrent data",
+      {
+        provider,
+        downloadUrl,
+        bytes: r.stdout.length,
+      },
+    );
+  }
+
   return ok({
     provider,
     downloadUrl,
@@ -713,6 +741,20 @@ export async function fetchTorrentFile(torrent) {
       downloadUrl: torrentDlUrl,
       torrentData,
     });
+
+    const valid = validateTorrentData(torrentData);
+    if (!valid.success) {
+      return fail(
+        "validate",
+        valid.error || valid.reason || "Invalid torrent data",
+        {
+          provider,
+          downloadUrl: torrentDlUrl,
+          bytes: torrentData.length,
+        },
+      );
+    }
+
     return ok({
       provider,
       downloadUrl: torrentDlUrl,
@@ -787,6 +829,7 @@ export async function fetchTorrentFile(torrent) {
   }
 
   const html = await response.text();
+  const detailPageDebug = extractDetailPageDebug(html);
   if (looksLikeCloudflareChallenge(html)) {
     return fail(
       "fetch-detail",
@@ -799,6 +842,8 @@ export async function fetchTorrentFile(torrent) {
         cookiesSent: safeCookieNames(allCookies),
         hasCfClearance: Boolean(cfCookie),
         isCloudflare: true,
+        detailPageDebug,
+        bodyText: html,
         bodySnippet: html ? String(html).slice(0, 500) : undefined,
       },
     );
@@ -811,6 +856,10 @@ export async function fetchTorrentFile(torrent) {
     return fail("parse-detail", "No .torrent download link found in HTML", {
       provider,
       detailUrl,
+      detailPageDebug,
+      bodyText: html,
+      cookiesSent: safeCookieNames(allCookies),
+      hasCfClearance: Boolean(cfCookie),
     });
   }
 
@@ -849,12 +898,42 @@ export async function fetchTorrentFile(torrent) {
   const torrentBuffer = await torrentResponse.arrayBuffer();
   const torrentData = Buffer.from(torrentBuffer);
 
+  const headText = torrentData.slice(0, 600).toString("utf8");
+  const looksHtml =
+    /^\s*</.test(headText) || looksLikeCloudflareChallenge(headText);
+  if (looksHtml) {
+    return fail("fetch-torrent", "HTML returned instead of torrent", {
+      provider,
+      downloadUrl: absoluteDownloadUrl,
+      bytes: torrentData.length,
+      cookiesSent: safeCookieNames(allCookies),
+      hasCfClearance: Boolean(cfCookie),
+      bodyText: headText,
+      bodySnippet: headText.slice(0, 500),
+      isCloudflare: looksLikeCloudflareChallenge(headText),
+    });
+  }
+
+  const valid = validateTorrentData(torrentData);
+  if (!valid.success) {
+    return fail(
+      "validate",
+      valid.error || valid.reason || "Invalid torrent data",
+      {
+        provider,
+        downloadUrl: absoluteDownloadUrl,
+        bytes: torrentData.length,
+      },
+    );
+  }
+
   return ok({
     provider,
     method: "fetch",
     downloadUrl: absoluteDownloadUrl,
     bytes: torrentData.length,
     torrentData,
+    detailPageDebug,
   });
 }
 

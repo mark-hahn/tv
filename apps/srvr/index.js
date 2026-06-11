@@ -2777,6 +2777,44 @@ function parseFileQuality(src) {
   return null;
 }
 
+const probedVideoQualityByPath = new Map();
+
+function normalizeVideoHeightToQuality(height) {
+  const parsedHeight = Number.parseInt(height, 10);
+  if (!Number.isFinite(parsedHeight) || parsedHeight <= 0) return null;
+  if (parsedHeight >= 1620) return 2160;
+  if (parsedHeight >= 900) return 1080;
+  if (parsedHeight >= 648) return 720;
+  if (parsedHeight >= 528) return 576;
+  if (parsedHeight >= 400) return 480;
+  return null;
+}
+
+function probeFileQuality(filePath) {
+  if (!filePath) return null;
+  if (probedVideoQualityByPath.has(filePath)) {
+    return probedVideoQualityByPath.get(filePath);
+  }
+
+  let quality = null;
+  try {
+    const escapedPath = String(filePath).replace(/"/g, '\\"');
+    const probeOut = cp
+      .execSync(
+        `ffprobe -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 \"${escapedPath}\"`,
+        { maxBuffer: 1024 * 1024 },
+      )
+      .toString()
+      .trim();
+    quality = normalizeVideoHeightToQuality(probeOut);
+  } catch {
+    quality = null;
+  }
+
+  probedVideoQualityByPath.set(filePath, quality);
+  return quality;
+}
+
 function toEpisodeKey(season, episode) {
   return `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
 }
@@ -2818,7 +2856,7 @@ const getShowsFromDisk = async (_params) => {
           const title = parseTitleFromFilename(fname, folderName, ptt);
           const titleMatch =
             !title || !!smartTitleMatch(title, [showFolderName], null, false);
-          const quality = parseFileQuality(fname);
+          const quality = parseFileQuality(fname) || probeFileQuality(path);
           if (titleMatch && quality != null) {
             const epKey = toEpisodeKey(parsed.season, parsed.episode);
             const existing = fileQuality[epKey];
@@ -2925,7 +2963,7 @@ const getShowDiskInfo = async (showFolderName) => {
           const title = parseTitleFromFilename(fname, folderName, ptt);
           const titleMatch =
             !title || !!smartTitleMatch(title, [showFolderName], null, false);
-          const quality = parseFileQuality(fname);
+          const quality = parseFileQuality(fname) || probeFileQuality(dirPath);
           if (titleMatch && quality != null) {
             const epKey = toEpisodeKey(parsed.season, parsed.episode);
             const existing = fileQuality[epKey];

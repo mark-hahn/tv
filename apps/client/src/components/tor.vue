@@ -150,20 +150,6 @@
             >
               Tab
             </button>
-            <input
-              v-if="!movieMode"
-              v-model="seasonFilter"
-              @keydown.stop
-              @click.stop
-              placeholder="Season"
-              style="
-                width: 40px;
-                font-size: 13px;
-                padding: 4px;
-                border: 1px solid #bbb;
-                border-radius: 7px;
-              "
-            />
             <button
               v-if="!movieMode"
               @click.stop="handleSearchButtonClick"
@@ -290,6 +276,20 @@
             >
               First
             </button>
+            <input
+              v-if="!movieMode"
+              v-model="seasonFilter"
+              @keydown.stop
+              @click.stop
+              placeholder="Season"
+              style="
+                width: 40px;
+                font-size: 13px;
+                padding: 4px;
+                border: 1px solid #bbb;
+                border-radius: 7px;
+              "
+            />
             <button
               @click.stop="torChkSubClick"
               :disabled="selectedItems.size === 0"
@@ -1294,14 +1294,6 @@ export default {
     active(val) {
       if (!val) this.showStream = false;
     },
-    seasonFilter(newVal, oldVal) {
-      if (this.movieMode) return;
-      if (newVal === oldVal) return;
-      const trimmed = String(newVal || "").trim();
-      if (trimmed && !/^\d+$/.test(trimmed)) return;
-      if (!this.currentShow?.name && !this.activeShow?.name) return;
-      this.resetTorResultsState();
-    },
   },
 
   computed: {
@@ -2296,35 +2288,6 @@ export default {
 
       // Reset so a fresh first search is always performed
       this.lastNeeded = null;
-
-      // Check if season filter is active
-      const sVal = parseInt(this.seasonFilter, 10);
-      const hasSeasonFilter =
-        !isNaN(sVal) && sVal >= 0 && String(this.seasonFilter).trim() !== "";
-
-      if (hasSeasonFilter) {
-        // Calculate needed to check if this season is actually needed
-        let needed;
-        try {
-          needed = await this.calculateNeeded(this.currentShow);
-        } catch {
-          needed = [];
-        }
-
-        // Check if needed array is empty
-        if (needed.length === 0) {
-          this.setTorSearchPhase("needed-none");
-          return;
-        }
-
-        this.providerWarning = "";
-        const seasonStr = `S${String(sVal).padStart(2, "0")}`;
-        const result = await this.loadTorrents([seasonStr], false, {
-          phaseOverride: "needed-results",
-        });
-        if (result) this.setTorSearchPhase("needed-results");
-        return;
-      }
 
       this.providerWarning = "";
 

@@ -2189,21 +2189,6 @@ const chkTvdbQueue = () => {
                 `tvdb push1 [${keyName}]: ${tvdbChanges.length ? tvdbChanges.join(" ") : "no field changes"}`,
               );
             }
-            if (
-              !keyName ||
-              String(keyName).trim() === "undefined" ||
-              String(keyName).trim() === ""
-            ) {
-              // log(
-              //   "err",
-              //   "[blnk rows] chkTvdbQueue: bad allTvdb key about to be written",
-              //   {
-              //     name: showName,
-              //     tvdbId: show.tvdbId,
-              //   }
-              // );
-              return;
-            }
             allTvdb[keyName] = finalData;
             finalData._hasChanges = tvdbChanges.length > 0;
             if (paramObj.suppressNotify) {
@@ -2975,23 +2960,6 @@ export const setTvdbFields = async (params) => {
         return "no tvdb";
       }
       delete allTvdb[name];
-      if (
-        !newKey ||
-        String(newKey).trim() === "undefined" ||
-        String(newKey).trim() === ""
-      ) {
-        log(
-          "err",
-          "[blnk rows] setTvdbFields $rename: bad newKey about to be written",
-          {
-            newKey,
-            show: {
-              name,
-              tvdbId: tvdb?.tvdbId,
-            },
-          },
-        );
-      }
       allTvdb[newKey] = record;
       log("inf", `setTvdbFields renamed "${name}" -> "${newKey}"`);
     } else {

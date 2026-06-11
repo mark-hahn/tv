@@ -57,6 +57,29 @@ async function tvdbFetch(pathStr, _init, retryCount = 0) {
 
 let allTvdb = null;
 
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const fetchAllTvdbWithRetry = async (hasEmby = 0) => {
+  const retryDelays = [500, 1500];
+  let lastErr = null;
+
+  for (let attempt = 0; attempt <= retryDelays.length; attempt += 1) {
+    try {
+      return await srvr.getAllTvdb(hasEmby);
+    } catch (err) {
+      lastErr = err;
+      if (attempt === retryDelays.length) break;
+      console.warn(
+        `getAllTvdb failed, retrying in ${retryDelays[attempt]}ms (attempt ${attempt + 1}/${retryDelays.length + 1})`,
+        err,
+      );
+      await delay(retryDelays[attempt]);
+    }
+  }
+
+  throw lastErr;
+};
+
 // Apply a server-pushed tvdb record into the client allTvdb cache.
 // Called by components that listen for tvdbUpdated socket events.
 export const applyTvdbPush = (name, record) => {
@@ -208,7 +231,7 @@ export const getAllTvdb = async (hasEmby = 0) => {
   // Only cache if hasEmby === 0 (all shows)
   if (hasEmby === 0 && allTvdb) return allTvdb;
 
-  const result = await srvr.getAllTvdb(hasEmby);
+  const result = await fetchAllTvdbWithRetry(hasEmby);
 
   // Only update cache if we're loading all shows
   if (hasEmby === 0) {

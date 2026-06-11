@@ -93,6 +93,8 @@ async function main() {
     scheduleNextCycle,
     season,
     seriesName,
+    titleYear,
+    folderTitleYear,
     sizeStr,
     skipPaths,
     startBuffering,
@@ -2113,10 +2115,10 @@ async function main() {
   };
 
   // Look up tvdbId from embyMap for a given series name.
-  const lookupTvdbId = (name) => {
+  const lookupTvdbId = (name, yearOverride = null) => {
     if (!embyMap || !name) return null;
     const key =
-      smartTitleMatch(name, Object.keys(embyMap), null, false) || name;
+      smartTitleMatch(name, Object.keys(embyMap), yearOverride, false) || name;
     return embyMap[key]?.tvdbId || null;
   };
 
@@ -2189,12 +2191,18 @@ async function main() {
         season = se && se.season != null ? se.season : undefined;
         episode = se && se.episode != null ? se.episode : undefined;
         type = parsed.type || "episode";
+        titleYear = Number.isInteger(parsed.year) ? parsed.year : undefined;
+        folderTitleYear = Number.isInteger(parsedFolder.year)
+          ? parsedFolder.year
+          : undefined;
       } catch (e) {
         title = null;
         folderTitle = null;
         season = undefined;
         episode = undefined;
         type = "episode";
+        titleYear = undefined;
+        folderTitleYear = undefined;
         parsed = {};
         parsedFolder = {};
       }
@@ -2344,15 +2352,23 @@ async function main() {
           var embyShowNames = Object.keys(embyMap).filter(
             (k) => embyMap[k] && embyMap[k].inEmby,
           );
-          var matchesEmby = smartTitleMatch(title, embyShowNames, null, false);
+          var matchesEmby = smartTitleMatch(
+            title,
+            embyShowNames,
+            titleYear || folderTitleYear || null,
+            false,
+          );
           if (!matchesEmby && folderTitle) {
             matchesEmby = smartTitleMatch(
               folderTitle,
               embyShowNames,
-              null,
+              folderTitleYear || titleYear || null,
               false,
             );
-            if (matchesEmby) title = folderTitle;
+            if (matchesEmby) {
+              title = folderTitle;
+              titleYear = folderTitleYear;
+            }
           }
           if (!matchesEmby) {
             log(
@@ -2538,15 +2554,27 @@ async function main() {
       );
       if (
         embyShowNamesPrecheck.length > 0 &&
-        !smartTitleMatch(title, embyShowNamesPrecheck, null, false) &&
-        smartTitleMatch(folderTitle, embyShowNamesPrecheck, null, false)
+        !smartTitleMatch(
+          title,
+          embyShowNamesPrecheck,
+          titleYear || folderTitleYear || null,
+          false,
+        ) &&
+        smartTitleMatch(
+          folderTitle,
+          embyShowNamesPrecheck,
+          folderTitleYear || titleYear || null,
+          false,
+        )
       ) {
         trace("chkTvDB: swapping to folderTitle (emby precheck)", {
           title,
           folderTitle,
         });
         title = folderTitle;
+        titleYear = folderTitleYear;
         folderTitle = null;
+        folderTitleYear = undefined;
       }
     }
 
@@ -2625,7 +2653,12 @@ async function main() {
                   : [];
               var tvdbMatchesEmby =
                 embyShowNamesForTvdb.length > 0
-                  ? smartTitleMatch(title, embyShowNamesForTvdb, null, false)
+                  ? smartTitleMatch(
+                      title,
+                      embyShowNamesForTvdb,
+                      titleYear || folderTitleYear || null,
+                      false,
+                    )
                   : null;
               if (!processingForced && !tvdbMatchesEmby) {
                 // If the filename gave an abbreviated title (e.g. "tmaws"), retry with
@@ -2636,7 +2669,9 @@ async function main() {
                     folderTitle,
                   });
                   title = folderTitle;
+                  titleYear = folderTitleYear;
                   folderTitle = null;
+                  folderTitleYear = undefined;
                   return process.nextTick(chkTvDB);
                 }
                 log(
@@ -2669,15 +2704,33 @@ async function main() {
           } else {
             // Prefer a title match across all results (basic normalization first, then aggressive).
             var results = Array.isArray(body && body.data) ? body.data : [];
-            var names = results.map((r) => r && r.name).filter((nm) => nm);
+            var resultNames = results
+              .map((r) => {
+                var resultName = r && r.name ? String(r.name) : "";
+                if (!resultName) return null;
+                var rawYear =
+                  (r && r.year != null ? String(r.year) : "") ||
+                  (r && r.firstAired ? String(r.firstAired) : "") ||
+                  (r && r.first_air_date ? String(r.first_air_date) : "") ||
+                  (r && r.first_air_time ? String(r.first_air_time) : "") ||
+                  (r && r.premiereDate ? String(r.premiereDate) : "") ||
+                  "";
+                var matchYear = rawYear.slice(0, 4);
+                return /^\d{4}$/.test(matchYear)
+                  ? `${resultName} (${matchYear})`
+                  : resultName;
+              })
+              .filter(Boolean);
 
-            // Pass null for year as we don't have it here, or extract if available
-            // existing code didn't use year, so we pass undefined/null
-            seriesName = smartTitleMatch(title, names);
+            seriesName = smartTitleMatch(
+              title,
+              resultNames,
+              titleYear || folderTitleYear || null,
+            );
             trace("chkTvDB: matched series", {
               title,
-              resultsCount: names.length,
-              topNames: names.slice(0, 10),
+              resultsCount: results.length,
+              topNames: resultNames.slice(0, 10),
               seriesName,
             });
             log("tvdb got:", { seriesName, title });
@@ -2772,10 +2825,15 @@ async function main() {
 
   checkFileExists = () => {
     var e, tvFilePath, tvSeasonPath, usbLongPath, videoPath;
+    const seriesMatchYear = titleYear || folderTitleYear || null;
     const embyKeyForFolder =
       embyMap && seriesName
-        ? smartTitleMatch(seriesName, Object.keys(embyMap), null, false) ||
-          seriesName
+        ? smartTitleMatch(
+            seriesName,
+            Object.keys(embyMap),
+            seriesMatchYear,
+            false,
+          ) || seriesName
         : seriesName;
     const embyFolderName =
       embyMap && embyKeyForFolder && embyMap[embyKeyForFolder]?.path
@@ -2946,8 +3004,12 @@ async function main() {
     // Emby filter: only download shows that are in Emby.
     if (!processingForced && embyMap && seriesName) {
       const embyKey =
-        smartTitleMatch(seriesName, Object.keys(embyMap), null, false) ||
-        seriesName;
+        smartTitleMatch(
+          seriesName,
+          Object.keys(embyMap),
+          seriesMatchYear,
+          false,
+        ) || seriesName;
       const embyEntry = embyMap[embyKey];
       if (!embyEntry || !embyEntry.inEmby) {
         log(

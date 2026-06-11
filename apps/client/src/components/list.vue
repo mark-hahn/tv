@@ -3234,8 +3234,12 @@ export default {
         ) {
           const show = this.shows.find((s) => s.name === target);
           if (show) {
-            // Keep the full map populated, but do not switch panes.
-            await this.seriesMapAction("open", show, { noSwitch: true });
+            try {
+              // Keep the full map populated, but do not switch panes.
+              await this.seriesMapAction("open", show, { noSwitch: true });
+            } catch (err) {
+              console.error("watchClick: seriesMapAction failed", err);
+            }
             // Switch to info pane without clearing the background map.
             evtBus.emit("showInfoPane");
             // Select only the current episode inside the already-loaded map.

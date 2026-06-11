@@ -1688,7 +1688,6 @@ export default {
       void this.setCrewTxt(record);
       void this.setSeasonsTxt(record);
       void this.setCntryLangTxt(record);
-      void this.setRuntimeTxt(record);
 
       // Update poster and ensure proper sizing after layout changes
       await this.setPoster(record);

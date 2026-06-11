@@ -2520,9 +2520,7 @@ export default {
             }
           }
         }
-      } catch (err) {
-        // ignore
-      }
+      } catch (err) {}
       return needed;
     },
 

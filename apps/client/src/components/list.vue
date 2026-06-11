@@ -1288,8 +1288,16 @@ export default {
           return forSort ? val.toLowerCase() : val;
         }
         case "Viewed":
+          lastViewed = show.lastWatched || "";
+          if (forSort) {
+            if (lastViewed) {
+              const [y, m, d] = lastViewed.split("-").map(Number);
+              return new Date(y, m - 1, d).getTime() || 0;
+            }
+            return srvr.lastViewedCache[show.name] || 0;
+          }
+          if (lastViewed) return lastViewed;
           lastViewed = srvr.lastViewedCache[show.name];
-          if (forSort) return lastViewed || 0;
           if (lastViewed === undefined) return "";
           return util.fmtDate(lastViewed);
         case "Down":

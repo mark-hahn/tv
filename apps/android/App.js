@@ -54,6 +54,15 @@ function formatSelectedSE(selectedSE) {
   return `(S${String(selectedSE.s).padStart(2, "0")}E${String(selectedSE.e).padStart(2, "0")})`;
 }
 
+function getViewedSortValue(show, lastViewedMap) {
+  const lastWatched = String(show?.lastWatched || "");
+  if (lastWatched) {
+    const [y, m, d] = lastWatched.split("-").map(Number);
+    return new Date(y, m - 1, d).getTime() || 0;
+  }
+  return lastViewedMap?.[show?.name] || 0;
+}
+
 const COLS = 3;
 const ROWS = 5;
 const BORDER = 13;
@@ -1516,8 +1525,8 @@ export default function App() {
           const kb = b.name.replace(/^the\s*/i, "").toLowerCase();
           return ka < kb ? -1 : ka > kb ? 1 : 0;
         } else if (sortOrder === "viewed") {
-          const lastViewedA = lastViewedRef.current[a.name] || 0;
-          const lastViewedB = lastViewedRef.current[b.name] || 0;
+          const lastViewedA = getViewedSortValue(a, lastViewedRef.current);
+          const lastViewedB = getViewedSortValue(b, lastViewedRef.current);
           return lastViewedB - lastViewedA; // Most recent first
         } else if (sortOrder === "added") {
           const dateA = a.dateCreated || "";

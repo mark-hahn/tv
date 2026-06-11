@@ -107,3 +107,5 @@ when a copilot chat is in ask mode instead of agent mode and i give you instruct
 the web client runs using vite and the console output in the browser is mirrored at apps/client/vite-console.log.
 
 don't clean up debug logging until i tell you to
+
+whenever you deploy to the server and pm2 does a restart check pm2 logs to make sure there is no server crashing and restarting

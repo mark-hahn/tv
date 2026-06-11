@@ -1692,7 +1692,7 @@ export default {
       );
 
       if (match) {
-        this.$emit("select-show", match.name);
+        this.$emit("select-show", match);
       } else {
         alert(`No show found matching folder "${folderName}"`);
       }
@@ -1790,7 +1790,7 @@ export default {
       if (this.tree && this.tree.length) {
         // Show -> Folder: forceChoice = true
         const match = util.smartTitleMatch(showName, this.tree, null, true);
-        if (match) folderName = match.name;
+        if (match) folderName = match;
       }
 
       if (!folderName) {

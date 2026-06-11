@@ -2012,22 +2012,6 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   // log('getTvdbData:', tvdbData);
   if (!paramObj.transient) {
-    if (
-      !name ||
-      String(name).trim() === "undefined" ||
-      String(name).trim() === ""
-    ) {
-      log(
-        "err",
-        "[blnk rows] getTvdbData: bad allTvdb key about to be written",
-        {
-          name,
-          inputName,
-          tvdbId,
-          stack: new Error().stack.split("\n").slice(0, 6).join(" | "),
-        },
-      );
-    }
     allTvdb[name] = tvdbData;
     if (inputName !== name && allTvdb[inputName]) {
       const inputTvdbId = String(allTvdb[inputName]?.tvdbId || "").trim();
@@ -2210,16 +2194,15 @@ const chkTvdbQueue = () => {
               String(keyName).trim() === "undefined" ||
               String(keyName).trim() === ""
             ) {
-              log(
-                "err",
-                "[blnk rows] chkTvdbQueue: bad allTvdb key about to be written",
-                {
-                  keyName,
-                  showName,
-                  finalDataName: finalData?.name,
-                  stack: new Error().stack.split("\n").slice(0, 6).join(" | "),
-                },
-              );
+              // log(
+              //   "err",
+              //   "[blnk rows] chkTvdbQueue: bad allTvdb key about to be written",
+              //   {
+              //     name: showName,
+              //     tvdbId: show.tvdbId,
+              //   }
+              // );
+              return;
             }
             allTvdb[keyName] = finalData;
             finalData._hasChanges = tvdbChanges.length > 0;
@@ -3001,9 +2984,11 @@ export const setTvdbFields = async (params) => {
           "err",
           "[blnk rows] setTvdbFields $rename: bad newKey about to be written",
           {
-            name,
             newKey,
-            stack: new Error().stack.split("\n").slice(0, 6).join(" | "),
+            show: {
+              name,
+              tvdbId: tvdb?.tvdbId,
+            },
           },
         );
       }

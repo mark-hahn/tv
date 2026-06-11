@@ -465,14 +465,6 @@ export default {
       const sig = JSON.stringify(summary);
       if (sig === this.lastBlankRowSignature) return;
       this.lastBlankRowSignature = sig;
-
-      console.warn("[blnk rows]", {
-        ...summary,
-        blankDataRows: blankDataRows.slice(0, 10),
-        duplicateIds: duplicateIds.slice(0, 10),
-        duplicateNames: duplicateNames.slice(0, 10),
-        visibleBlankRows: visibleBlankRows.slice(0, 10),
-      });
     },
   },
 };

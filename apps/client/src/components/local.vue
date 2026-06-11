@@ -1775,10 +1775,6 @@ export default {
     async selectTopLevel() {
       // 1. Get current show name
       const showName = this.show ? this.show.name : null;
-      console.log("Local.vue selectTopLevel", {
-        showProp: this.show,
-        showName,
-      });
       if (!showName) {
         // Fallback or ignore if no show selected
         console.log("No current show selected.");

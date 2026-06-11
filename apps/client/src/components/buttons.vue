@@ -186,7 +186,7 @@ export default {
         Trash: false,
         Custom: false,
         "Added Order": false,
-        "Viewed Order": false,
+        "Watched Order": false,
         "Ratings Order": false,
         "Start Order": false,
         "Ended Order": false,
@@ -197,7 +197,7 @@ export default {
       collections: ["To Try", "Continue", "Mark", "Linda"],
       sortOrders: [
         "Added Order",
-        "Viewed Order",
+        "Watched Order",
         "Ratings Order",
         "Start Order",
         "Ended Order",

@@ -2456,7 +2456,7 @@ export default function App() {
                 {sortOrder === "alpha"
                   ? "Alpha"
                   : sortOrder === "viewed"
-                    ? "Viewed"
+                    ? "Watched"
                     : "Added"}
               </Text>
             </TouchableOpacity>

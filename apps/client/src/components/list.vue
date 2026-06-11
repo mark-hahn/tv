@@ -1159,7 +1159,7 @@ export default {
       // Map order button labels to sortChoice values
       const orderToSortMap = {
         "Added Order": "Added",
-        "Viewed Order": "Viewed",
+        "Watched Order": "Viewed",
         "Ratings Order": "Ratings",
         "Ended Order": "Ended",
         "Length Order": "Length",
@@ -1296,10 +1296,11 @@ export default {
               ""
             );
           }
-          if (lastViewed) return util.fmtLastWatched(show.lastWatched);
+          if (lastViewed)
+            return util.fmtLastWatched(show.lastWatched).split(" ")[0] || "";
           lastViewed = srvr.lastViewedCache[show.name];
           if (lastViewed === undefined) return "";
-          return util.fmtLastWatched(lastViewed);
+          return util.fmtLastWatched(lastViewed).split(" ")[0] || "";
         case "Down":
           lastDownloaded = Number(allTvdb?.[show.name]?.["last-downloaded"]);
           if (forSort)

@@ -147,7 +147,7 @@
         "
         @click="$emit('sort-action', sortChoice)"
       >
-        {{ sortChoice }}
+        {{ displaySortChoice(sortChoice) }}
       </div>
     </div>
     <div
@@ -225,13 +225,19 @@ export default {
 
   computed: {
     selectedSortNbsp() {
-      return String(this.selectedSort || "").replace(/ /g, "\u00A0");
+      return this.displaySortChoice(this.selectedSort).replace(/ /g, "\u00A0");
     },
     selectedFilterNbsp() {
       return String(this.selectedFilter || "").replace(/ /g, "\u00A0");
     },
     visibleConds() {
       return this.conds.filter((c) => !c.hideIcon);
+    },
+  },
+
+  methods: {
+    displaySortChoice(sortChoice) {
+      return sortChoice === "Viewed" ? "Watched" : String(sortChoice || "");
     },
   },
 

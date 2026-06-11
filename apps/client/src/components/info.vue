@@ -583,7 +583,7 @@ export default {
 
   computed: {
     lastWatchedDate() {
-      return util.fmtLastWatched(this.show?.lastWatched) || null;
+      return util.fmtLastWatched(this.show?.lastWatched).split(" ")[0] || null;
     },
     hasVideoFiles() {
       return (
@@ -915,7 +915,8 @@ export default {
       else if (la) this.dates = `${la}`;
       else this.dates = "";
       this.statusTxt = st ? ` &nbsp; ${st}` : "";
-      this.lastWatchedTxt = util.fmtLastWatched(lastWatched);
+      this.lastWatchedTxt =
+        util.fmtLastWatched(lastWatched).split(" ")[0] || "";
     },
 
     async setSeasonsTxt(tvdbData) {

@@ -133,11 +133,6 @@
           "
         >
           <div style="display: flex; gap: 8px; align-items: center">
-            <span
-              v-if="loading"
-              style="font-size: 13px; color: #666; align-self: center"
-              >Searching</span
-            >
             <button
               v-if="selectedItems.size > 0"
               @click.stop="
@@ -171,10 +166,7 @@
             />
             <button
               v-if="!movieMode"
-              @click.stop="
-                showStream = false;
-                noTorrentsNeeded || hasSearched ? forceClick() : searchClick();
-              "
+              @click.stop="handleSearchButtonClick"
               style="
                 font-size: 13px;
                 cursor: pointer;
@@ -185,24 +177,6 @@
               "
             >
               Search
-            </button>
-            <button
-              v-if="!movieMode"
-              @click.stop="
-                showStream = false;
-                moreClick();
-              "
-              :disabled="hasMoreProviders"
-              style="
-                font-size: 13px;
-                cursor: pointer;
-                border-radius: 7px;
-                padding: 4px;
-                border: 1px solid #bbb;
-                background-color: whitesmoke;
-              "
-            >
-              More
             </button>
             <button
               @click.stop="torSendClick"
@@ -218,6 +192,11 @@
             >
               Send
             </button>
+            <span
+              v-if="loading"
+              style="font-size: 13px; color: #666; align-self: center"
+              >Searching</span
+            >
             <input
               v-if="movieMode"
               v-model="movieSrchText"
@@ -1245,6 +1224,7 @@ export default {
       _didInitialScroll: false,
 
       lastAutoSearchedShowId: null,
+      torSearchPhase: "idle",
 
       // Debug: last search request/response metadata
       showDebug: false,
@@ -1305,6 +1285,7 @@ export default {
       if (!val) {
         this.torrents = [];
         this.movieSrchText = "";
+        this.setTorSearchPhase("idle");
       }
     },
     activeShow() {
@@ -1312,6 +1293,14 @@ export default {
     },
     active(val) {
       if (!val) this.showStream = false;
+    },
+    seasonFilter(newVal, oldVal) {
+      if (this.movieMode) return;
+      if (newVal === oldVal) return;
+      const trimmed = String(newVal || "").trim();
+      if (trimmed && !/^\d+$/.test(trimmed)) return;
+      if (!this.currentShow?.name && !this.activeShow?.name) return;
+      this.resetTorResultsState();
     },
   },
 
@@ -1599,22 +1588,76 @@ export default {
       el.scrollTop = Math.max(0, Math.min(max, (el.scrollTop || 0) + scaledDy));
     },
 
-    setTorShow(show) {
+    setTorSearchPhase(phase) {
+      this.torSearchPhase = phase;
+      this.hasSearched = phase !== "idle";
+      this.noTorrentsNeeded = phase === "needed-none";
+      this.hasMoreProviders = phase === "all-results";
+    },
+
+    resetTorResultsState() {
       this.torrents = [];
       this.error = null;
-      this.hasSearched = false;
       this.selectedItems = new Set();
       this.lastSelectedIndex = null;
-      this.clickedTorrents.clear();
-      this.noTorrentsNeeded = false;
+      this.clickedTorrents = new Set();
       this.providerWarning = "";
       this.loading = false;
       this.lastNeeded = null;
       this.groupFilter = null;
+      this.providerStats = null;
+      this.lastRawProviderCounts = null;
+      this.lastReturnedProviderCounts = null;
+      this.lastApiCount = null;
+      this.lastWarningSummary = null;
+      this.resultsShowId = null;
+      this.showFilesPane = false;
+      this.filesLoading = false;
+      this.filesError = null;
+      this.torrentFiles = [];
+      this.filesTorrentTitle = "";
+      this.flashingTorrent = null;
       this.torSubCountBusy = false;
       this.torSubCountsVisible = false;
       this.torSubCountCache = {};
       this.torSubCountVisibleKeys = {};
+      this._didInitialScroll = false;
+      this.setTorSearchPhase("idle");
+    },
+
+    resolveCurrentShow() {
+      if (
+        (!this.currentShow || !this.currentShow.name) &&
+        this.activeShow?.name
+      ) {
+        this.currentShow = this.activeShow;
+        this.showName = this.activeShow?.name || this.showName;
+      }
+      return this.currentShow?.name ? this.currentShow : null;
+    },
+
+    async handleSearchButtonClick() {
+      this.showStream = false;
+      if (this.loading || this.unaired) return;
+
+      switch (this.torSearchPhase) {
+        case "idle":
+          await this.runInitialNeededSearch();
+          return;
+        case "needed-none":
+          await this.runForcedIptTlSearch();
+          return;
+        case "needed-results":
+          await this.expandToAllProviders();
+          return;
+        case "all-results":
+        default:
+          return;
+      }
+    },
+
+    setTorShow(show) {
+      this.resetTorResultsState();
       this.unaired = !!show?.S1E1Unaired;
       this.currentShow = show || null;
       this.showName = show?.name || "";
@@ -1925,11 +1968,58 @@ export default {
       return this.getTorrentHistoryKey(torrent);
     },
 
-    getTorrentCardKey(torrent, index) {
-      // Stable key to prevent DOM reuse glitches when multiple providers return the same title.
-      // Always include index as suffix to guarantee uniqueness (detailUrl may be a shared search URL).
-      const base = torrent?.detailUrl || this.getTorrentNowKey(torrent) || "";
-      return `${base}|${index}`;
+    getTorrentIdentityKey(torrent) {
+      const historyKey = this.getTorrentHistoryKey(torrent);
+      const detailUrl = String(
+        torrent?.detailUrl || torrent?.raw?.desc || "",
+      ).trim();
+      const seeds = Number(torrent?.raw?.seeds);
+      const size = String(torrent?.raw?.size || "").trim();
+      return `${historyKey}|${detailUrl}|${Number.isFinite(seeds) ? seeds : ""}|${size}`;
+    },
+
+    getTorrentCardKey(torrent) {
+      return this.getTorrentIdentityKey(torrent);
+    },
+
+    reconcileVisibleTorrents(nextTorrents) {
+      const existing = Array.isArray(this.torrents) ? this.torrents : [];
+      const incoming = Array.isArray(nextTorrents) ? nextTorrents : [];
+      const existingByKey = new Map(
+        existing.map((torrent) => [
+          this.getTorrentIdentityKey(torrent),
+          torrent,
+        ]),
+      );
+
+      const merged = incoming.map((torrent) => {
+        const key = this.getTorrentIdentityKey(torrent);
+        const current = existingByKey.get(key);
+        if (!current) return torrent;
+
+        for (const prop of Object.keys(current)) {
+          if (!(prop in torrent)) delete current[prop];
+        }
+        Object.assign(current, torrent);
+        return current;
+      });
+
+      const visibleSet = new Set(merged);
+      this.torrents = merged;
+      this.selectedItems = new Set(
+        [...this.selectedItems].filter((torrent) => visibleSet.has(torrent)),
+      );
+      this.clickedTorrents = new Set(
+        [...this.clickedTorrents].filter((torrent) => visibleSet.has(torrent)),
+      );
+      if (this.flashingTorrent && !visibleSet.has(this.flashingTorrent)) {
+        this.flashingTorrent = null;
+      }
+
+      const firstSelected = [...this.selectedItems][0] || null;
+      this.lastSelectedIndex = firstSelected
+        ? this.filteredTorrents.indexOf(firstSelected)
+        : null;
     },
 
     getDisplayTitleWithProvider(torrent) {
@@ -1980,25 +2070,16 @@ export default {
       };
     },
     resetPane() {
-      this.selectedItems = new Set();
-      this.lastSelectedIndex = null;
+      this.resetTorResultsState();
       this.showModal = false;
-      this.clickedTorrents.clear();
-      this.torrents = [];
       this.showName = "";
-      this.loading = false;
-      this.error = null;
-      this.providerWarning = "";
       this.currentShow = null;
-      this.noTorrentsNeeded = false;
       this.showCookieInputs = false;
       this.dismissCookieInputs = false;
       this.unaired = false;
       this.iptCfClearance = "";
       this.tlCfClearance = "";
-      this.groupFilter = null;
 
-      this._didInitialScroll = false;
       this.lastAutoSearchedShowId = null;
     },
 
@@ -2166,19 +2247,8 @@ export default {
       this.lastAutoSearchedShowId = show?.id || show?.name || null;
 
       // Reset state when switching shows
-      this.torrents = [];
-      this.error = null;
-      this.hasSearched = false;
-      this.selectedItems = new Set();
-      this.lastSelectedIndex = null;
-      this.clickedTorrents.clear();
-      this.noTorrentsNeeded = false;
-      this.providerWarning = "";
-      this.loading = false;
+      this.resetTorResultsState();
       this.dismissCookieInputs = false;
-      this.lastNeeded = null;
-      this._didInitialScroll = false;
-      this.groupFilter = null;
 
       // Kick off space fetch ASAP; don't wait for torrent searching.
       void this.updateSpaceAvail();
@@ -2198,47 +2268,6 @@ export default {
       if (show && show.name) {
         this.showName = show.name;
       }
-
-      // Restore cached results from preview mode if available
-      const _torPreviewKey = String(show?.tvdbId || show?.name || "");
-      if (
-        !this.previewMode &&
-        _torPreviewKey &&
-        this.previewTorCache.has(_torPreviewKey)
-      ) {
-        const cached = this.previewTorCache.get(_torPreviewKey);
-        this.previewTorCache.delete(_torPreviewKey);
-        this.torrents = cached.torrents;
-        this.providerStats = cached.providerStats;
-        this.hasMoreProviders = cached.hasMoreProviders;
-        this.lastNeeded = cached.lastNeeded;
-        this.providerWarning = cached.providerWarning || "";
-        this.lastRawProviderCounts = cached.lastRawProviderCounts || null;
-        this.lastReturnedProviderCounts =
-          cached.lastReturnedProviderCounts || null;
-        this.lastApiCount = cached.lastApiCount ?? null;
-        this.lastWarningSummary = cached.lastWarningSummary || null;
-        this.hasSearched = true;
-        this._didInitialScroll = true;
-        this.$nextTick(() => {
-          const el = this.$refs.scroller;
-          if (el) el.scrollTop = 0;
-        });
-        return;
-      }
-
-      // Get series map and calculate needed episodes
-      const needed = await this.calculateNeeded(show);
-      this.lastNeeded = needed;
-
-      // Check if needed array is truly empty (not 'loadall')
-      if (needed.length === 0) {
-        this.noTorrentsNeeded = true;
-        return;
-      }
-
-      // Kick off the actual search now that needed is ready.
-      await this.searchClick();
     },
 
     async movieSearchEnter() {
@@ -2247,20 +2276,16 @@ export default {
       this.currentShow = { name: q };
       this.showName = q;
       this.torrents = [];
-      this.hasSearched = false;
-      await this.loadTorrents([], false);
+      this.setTorSearchPhase("idle");
+      const result = await this.loadTorrents([], false, {
+        phaseOverride: "all-results",
+      });
+      if (result) this.setTorSearchPhase("all-results");
     },
 
-    async searchClick() {
-      if (
-        (!this.currentShow || !this.currentShow.name) &&
-        this.activeShow?.name
-      ) {
-        this.currentShow = this.activeShow;
-        this.showName = this.activeShow?.name || this.showName;
-      }
-
-      if (!this.currentShow || !this.currentShow.name) {
+    async runInitialNeededSearch() {
+      const currentShow = this.resolveCurrentShow();
+      if (!currentShow) {
         this.error = "No show selected";
         return;
       }
@@ -2288,60 +2313,78 @@ export default {
 
         // Check if needed array is empty
         if (needed.length === 0) {
-          this.noTorrentsNeeded = true;
-          this.hasSearched = true;
+          this.setTorSearchPhase("needed-none");
           return;
         }
 
-        this.noTorrentsNeeded = false;
         this.providerWarning = "";
-        this.hasSearched = true;
         const seasonStr = `S${String(sVal).padStart(2, "0")}`;
-        await this.loadTorrents([seasonStr]);
+        const result = await this.loadTorrents([seasonStr], false, {
+          phaseOverride: "needed-results",
+        });
+        if (result) this.setTorSearchPhase("needed-results");
         return;
       }
 
-      this.noTorrentsNeeded = false;
       this.providerWarning = "";
 
       if (!Array.isArray(this.lastNeeded)) {
         try {
-          this.lastNeeded = await this.calculateNeeded(this.currentShow);
+          this.lastNeeded = await this.calculateNeeded(currentShow);
         } catch {
           this.lastNeeded = [];
         }
       }
 
       if (Array.isArray(this.lastNeeded) && this.lastNeeded.length === 0) {
-        this.noTorrentsNeeded = true;
+        this.setTorSearchPhase("needed-none");
         return;
       }
 
-      this.hasSearched = true;
-      await this.loadTorrents(this.lastNeeded || []);
+      const result = await this.loadTorrents(this.lastNeeded || [], false, {
+        phaseOverride: "needed-results",
+      });
+      if (result) this.setTorSearchPhase("needed-results");
     },
 
-    async moreClick() {
-      if (this.hasMoreProviders) return; // already showing all providers
-      if (
-        (!this.currentShow || !this.currentShow.name) &&
-        this.activeShow?.name
-      ) {
-        this.currentShow = this.activeShow;
-        this.showName = this.activeShow?.name || this.showName;
+    async runForcedIptTlSearch() {
+      const currentShow = this.resolveCurrentShow();
+      if (!currentShow) {
+        this.error = "No show selected";
+        return;
       }
-      if (!this.currentShow?.name) return;
       if (this.unaired) return;
 
-      if (!Array.isArray(this.lastNeeded)) {
-        try {
-          this.lastNeeded = await this.calculateNeeded(this.currentShow);
-        } catch {
-          this.lastNeeded = [];
-        }
+      this.providerWarning = "";
+      const result = await this.loadTorrents(["force"], false, {
+        phaseOverride: "needed-results",
+      });
+      if (result) this.setTorSearchPhase("needed-results");
+    },
+
+    async expandToAllProviders() {
+      const currentShow = this.resolveCurrentShow();
+      if (!currentShow) {
+        this.error = "No show selected";
+        return;
       }
-      this.hasSearched = true;
-      await this.loadTorrents(this.lastNeeded || [], true);
+      if (this.unaired) return;
+
+      this.providerWarning = "";
+      const result = await this.loadTorrents(["force"], true, {
+        stagedResponse: true,
+        preserveVisible: true,
+        phaseOverride: "all-results",
+      });
+      if (result) this.setTorSearchPhase("all-results");
+    },
+
+    async searchClick() {
+      return this.runInitialNeededSearch();
+    },
+
+    async forceClick() {
+      return this.runForcedIptTlSearch();
     },
 
     openTorTabs() {
@@ -2363,29 +2406,6 @@ export default {
       for (const url of urls) {
         util.openNewTab(url);
       }
-    },
-
-    async forceClick() {
-      if (
-        (!this.currentShow || !this.currentShow.name) &&
-        this.activeShow?.name
-      ) {
-        this.currentShow = this.activeShow;
-        this.showName = this.activeShow?.name || this.showName;
-      }
-
-      if (!this.currentShow || !this.currentShow.name) {
-        this.error = "No show selected";
-        return;
-      }
-      if (this.unaired) return;
-
-      this.noTorrentsNeeded = false;
-      this.providerWarning = "";
-      this.hasSearched = true;
-      // Force search IPT/TL first, then add more providers
-      await this.loadTorrents(["force"]);
-      await this.loadTorrents(["force"], true);
     },
 
     async filesClick(torrent) {
@@ -2568,25 +2588,30 @@ export default {
       return trimmed;
     },
 
-    async loadTorrents(needed = [], more = false) {
+    async loadTorrents(needed = [], more = false, options = {}) {
       if (!this.currentShow || !this.currentShow.name) {
         this.error = "No show selected";
-        return;
+        return null;
       }
 
       let url = "";
+      let finalPayload = null;
+      const {
+        stagedResponse = false,
+        preserveVisible = false,
+        phaseOverride = null,
+      } = options;
 
       this.loading = true;
       this.error = null;
       this.providerWarning = "";
-      if (!more) {
+      if (!more && !preserveVisible) {
         this.torrents = [];
       }
-      this.noTorrentsNeeded = false;
 
       // Reset more-providers state on each new load
       this.hasMoreProviders = false;
-      if (!more) {
+      if (!more && !preserveVisible) {
         this.providerStats = null;
       }
 
@@ -2615,6 +2640,9 @@ export default {
         if (more) {
           url += `&more=true`;
         }
+        if (stagedResponse) {
+          url += `&staged=true`;
+        }
         if (this.movieMode) {
           url += `&category=movie&more=true`;
         }
@@ -2627,21 +2655,20 @@ export default {
           : String(needed);
 
         // Return cached result if available
-        if (this.torSearchCache.has(url)) {
+        if (!stagedResponse && this.torSearchCache.has(url)) {
           const cached = this.torSearchCache.get(url);
-          this.torrents = cached.torrents;
-          this.hasMoreProviders = cached.hasMoreProviders;
+          this.reconcileVisibleTorrents(cached.torrents);
           this.providerStats = cached.providerStats
             ? { ...cached.providerStats }
             : null;
           this.lastNeeded = cached.lastNeeded;
-          this.hasSearched = true;
+          this.setTorSearchPhase(cached.torSearchPhase || "needed-results");
           this._didInitialScroll = true;
           this.$nextTick(() => {
             const el = this.$refs.scroller;
             if (el) el.scrollTop = 0;
           });
-          return;
+          return { data: cached, torrents: cached.torrents.slice() };
         }
 
         const response = await fetch(url);
@@ -2659,9 +2686,23 @@ export default {
             ? data.warningSummary
             : null;
 
+        const iptTlTorrents = Array.isArray(data?.iptTlTorrents)
+          ? data.iptTlTorrents
+          : [];
+        const extraProviderTorrents = Array.isArray(data?.extraProviderTorrents)
+          ? data.extraProviderTorrents
+          : [];
+        const responseTorrents = stagedResponse
+          ? [...iptTlTorrents, ...extraProviderTorrents]
+          : data.torrents || [];
+
         // Set torrents first; some server versions may omit rawProviderCounts.
-        this.torrents = data.torrents || [];
-        if (!more) {
+        if (stagedResponse) {
+          this.reconcileVisibleTorrents(responseTorrents);
+        } else {
+          this.reconcileVisibleTorrents(responseTorrents);
+        }
+        if (!more && !preserveVisible) {
           this._didInitialScroll = true;
           this.$nextTick(() => {
             const el = this.$refs.scroller;
@@ -2691,6 +2732,9 @@ export default {
           this.providerStats = null;
         }
         this.resultsShowId = this.currentShow?.id || null;
+        const activeTorrents = Array.isArray(this.torrents)
+          ? this.torrents
+          : responseTorrents;
 
         // (debug logging removed)
 
@@ -2733,10 +2777,10 @@ export default {
         // Fallback: infer from returned torrents if counts were not provided.
         if (
           iptCount + tlCount === 0 &&
-          Array.isArray(this.torrents) &&
-          this.torrents.length > 0
+          Array.isArray(activeTorrents) &&
+          activeTorrents.length > 0
         ) {
-          for (const t of this.torrents) {
+          for (const t of activeTorrents) {
             const providerRaw = String(
               t?.raw?.provider || t?.provider || "",
             ).toLowerCase();
@@ -2764,8 +2808,8 @@ export default {
         // This typically means results exist on IPT/TL but were filtered out server-side
         // (commonly because all hits have 0 seeds, or title parsing/matching rejected them).
         if (
-          Array.isArray(this.torrents) &&
-          this.torrents.length === 0 &&
+          Array.isArray(activeTorrents) &&
+          activeTorrents.length === 0 &&
           (iptCount > 0 || tlCount > 0)
         ) {
           const parts = [];
@@ -2798,8 +2842,8 @@ export default {
         };
 
         const returnedCounts = { iptorrents: 0, torrentleech: 0, unknown: 0 };
-        if (Array.isArray(this.torrents)) {
-          for (const t of this.torrents) {
+        if (Array.isArray(activeTorrents)) {
+          for (const t of activeTorrents) {
             const p = inferProvider(t);
             if (p === "iptorrents") returnedCounts.iptorrents += 1;
             else if (p === "torrentleech") returnedCounts.torrentleech += 1;
@@ -2817,8 +2861,8 @@ export default {
         const tlHas = tlReturned > 0;
 
         if (
-          Array.isArray(this.torrents) &&
-          this.torrents.length > 0 &&
+          Array.isArray(activeTorrents) &&
+          activeTorrents.length > 0 &&
           ((iptHas && tlZero) || (tlHas && iptZero))
         ) {
           const missing = [];
@@ -2830,6 +2874,13 @@ export default {
             ? `${this.providerWarning}\n\n${cookieWarning}`
             : cookieWarning;
         }
+
+        finalPayload = {
+          data,
+          torrents: activeTorrents.slice(),
+          phase: phaseOverride || this.torSearchPhase,
+        };
+        return finalPayload;
       } catch (err) {
         // Handle both Error objects and rejected promise values
         const errorMessage =
@@ -2838,18 +2889,25 @@ export default {
           err?.error ||
           (typeof err === "string" ? err : JSON.stringify(err));
         this.error = errorMessage;
+        return null;
       } finally {
         this.loading = false;
 
         // Cache results by search URL
-        if (url && this.torrents.length > 0) {
+        if (
+          url &&
+          finalPayload &&
+          finalPayload.torrents.length > 0 &&
+          !stagedResponse
+        ) {
           this.torSearchCache.set(url, {
-            torrents: this.torrents.slice(),
+            torrents: finalPayload.torrents.slice(),
             providerStats: this.providerStats
               ? { ...this.providerStats }
               : null,
             hasMoreProviders: this.hasMoreProviders,
             lastNeeded: this.lastNeeded,
+            torSearchPhase: finalPayload.phase,
           });
         }
 
@@ -2857,9 +2915,13 @@ export default {
         const _previewCacheKey = String(
           this.currentShow?.tvdbId || this.currentShow?.name || "",
         );
-        if (_previewCacheKey && this.torrents.length > 0) {
+        if (
+          _previewCacheKey &&
+          finalPayload &&
+          finalPayload.torrents.length > 0
+        ) {
           this.previewTorCache.set(_previewCacheKey, {
-            torrents: this.torrents.slice(),
+            torrents: finalPayload.torrents.slice(),
             providerStats: this.providerStats
               ? { ...this.providerStats }
               : null,
@@ -2870,6 +2932,7 @@ export default {
             lastReturnedProviderCounts: this.lastReturnedProviderCounts || null,
             lastApiCount: this.lastApiCount ?? null,
             lastWarningSummary: this.lastWarningSummary || null,
+            torSearchPhase: finalPayload.phase,
           });
         }
       }
@@ -2877,7 +2940,10 @@ export default {
 
     async forceLoadTorrents() {
       // Force load all torrents by sending 'force' marker
-      await this.loadTorrents(["force"]);
+      const result = await this.loadTorrents(["force"], false, {
+        phaseOverride: "needed-results",
+      });
+      if (result) this.setTorSearchPhase("needed-results");
     },
 
     handleTorrentClick(event, torrent) {

@@ -1358,6 +1358,7 @@ app.get("/api/search", async (req, res) => {
   const iptCfRaw = req.query.ipt_cf;
   const tlCfRaw = req.query.tl_cf;
   const more = req.query.more === "true";
+  const staged = req.query.staged === "true";
   const category = req.query.category || "tv";
   let needed = [];
 
@@ -1399,6 +1400,7 @@ app.get("/api/search", async (req, res) => {
       tlCf,
       needed,
       more,
+      staged,
       category,
     });
     res.json(result);

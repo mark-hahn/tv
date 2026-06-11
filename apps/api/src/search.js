@@ -564,6 +564,7 @@ export async function searchTorrents({
   tlCf,
   needed = [],
   more = false,
+  staged = false,
   category = "tv",
 }) {
   const debugSearch =
@@ -1561,6 +1562,31 @@ export async function searchTorrents({
     torLog(
       `[search] return items truncated: logged ${toLog.length}/${filtered.length} (set TOR_RETURN_MAX=0 to log all)`,
     );
+  }
+
+  if (staged && more && category !== "movie") {
+    const iptTlTorrents = [];
+    const extraProviderTorrents = [];
+    for (const torrent of filtered) {
+      const code = getProviderCode(torrent?.raw?.provider || torrent?.provider);
+      if (code === "IPT" || code === "TL") {
+        iptTlTorrents.push(torrent);
+      } else {
+        extraProviderTorrents.push(torrent);
+      }
+    }
+
+    return {
+      show: showName,
+      count: filtered.length,
+      iptTlTorrents,
+      extraProviderTorrents,
+      rawProviderCounts,
+      warningSummary,
+      providerStats,
+      hasMoreProviders: more,
+      tpbError: more && tpbFailed ? true : undefined,
+    };
   }
 
   return {

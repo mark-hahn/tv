@@ -59,7 +59,6 @@ const PANE_TIPS = {
     Get: "Download the selected torrent",
     Tab: "Open torrent detail page in a new tab",
     Search: "Search for torrents matching the current show/episode",
-    More: "Search additional torrent providers",
     Force: "Force a new search ignoring cache",
     "Bad Grp": "Toggle the selected torrent group in badGroups.txt",
     Tabs: "Open all torrent links in new tabs",

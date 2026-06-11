@@ -1205,7 +1205,6 @@ export default {
   emits: [
     "reload-shows",
     "prune",
-    "set-date",
     "episode-click",
     "delete-episodes",
     "season-watched",

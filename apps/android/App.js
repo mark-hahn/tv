@@ -54,13 +54,56 @@ function formatSelectedSE(selectedSE) {
   return `(S${String(selectedSE.s).padStart(2, "0")}E${String(selectedSE.e).padStart(2, "0")})`;
 }
 
-function getViewedSortValue(show, lastViewedMap) {
-  const lastWatched = String(show?.lastWatched || "");
-  if (lastWatched) {
-    const [y, m, d] = lastWatched.split("-").map(Number);
-    return new Date(y, m - 1, d).getTime() || 0;
+function formatLaDateTime(dateIn) {
+  const date = dateIn instanceof Date ? dateIn : new Date(dateIn);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const map = {};
+  for (const part of parts) {
+    if (part && part.type && part.value) map[part.type] = part.value;
   }
-  return lastViewedMap?.[show?.name] || 0;
+  if (
+    !map.year ||
+    !map.month ||
+    !map.day ||
+    !map.hour ||
+    !map.minute ||
+    !map.second
+  ) {
+    return "";
+  }
+  const hour = map.hour === "24" ? "00" : map.hour;
+  return `${map.year}-${map.month}-${map.day}T${hour}:${map.minute}:${map.second}`;
+}
+
+function normalizeLastWatched(value) {
+  if (value === undefined || value === null || value === "") return "";
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return formatLaDateTime(value);
+  }
+  const raw = String(value).trim();
+  if (!raw) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return `${raw}T00:00:00`;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(raw)) return raw;
+  if (/^\d+$/.test(raw)) return formatLaDateTime(Number(raw));
+  return formatLaDateTime(raw);
+}
+
+function getViewedSortValue(show, lastViewedMap) {
+  return (
+    normalizeLastWatched(show?.lastWatched) ||
+    normalizeLastWatched(lastViewedMap?.[show?.name]) ||
+    ""
+  );
 }
 
 const COLS = 3;
@@ -1527,7 +1570,11 @@ export default function App() {
         } else if (sortOrder === "viewed") {
           const lastViewedA = getViewedSortValue(a, lastViewedRef.current);
           const lastViewedB = getViewedSortValue(b, lastViewedRef.current);
-          return lastViewedB - lastViewedA; // Most recent first
+          return lastViewedB > lastViewedA
+            ? 1
+            : lastViewedB < lastViewedA
+              ? -1
+              : 0;
         } else if (sortOrder === "added") {
           const dateA = a.dateCreated || "";
           const dateB = b.dateCreated || "";

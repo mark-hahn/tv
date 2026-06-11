@@ -262,7 +262,6 @@
             :sizing="activeSizing"
             @reload-shows="triggerShowReload"
             @prune="handleMapAction('prune', $event)"
-            @set-date="handleMapAction('date', $event)"
             @episode-click="handleEpisodeClick"
             @delete-episodes="handleDeleteEpisodes"
             @play-episode="handlePlayEpisode"

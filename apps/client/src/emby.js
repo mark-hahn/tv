@@ -921,7 +921,7 @@ export const editEpisode = async (
 
       const episodeId = episodeRec.Id;
       userData.Played = setWatched !== null ? setWatched : !watched;
-      if (!userData.LastPlayedDate) userData.LastPlayedDate = util.fmtDate();
+      if (userData.Played) userData.LastPlayedDate = new Date().toISOString();
       const url = urls.postUserDataUrl(cred, episodeId);
       const setDataRes = await axios({
         method: "post",
@@ -934,45 +934,6 @@ export const editEpisode = async (
       //               post_res: setDataRes
       //             });
     }
-  }
-};
-
-// reset last Watched to first unwatched episode
-export const setLastWatched = async (seriesId) => {
-  let seasonNumber;
-  let lastWatchedEpisodeRec = null;
-  const seasonsRes = await axios.get(urls.childrenUrl(cred, seriesId));
-  seasonLoop: for (let key in seasonsRes.data.Items) {
-    let seasonRec = seasonsRes.data.Items[key];
-    seasonNumber = +seasonRec.IndexNumber;
-    const seasonId = +seasonRec.Id;
-    const episodesRes = await axios.get(urls.childrenUrl(cred, seasonId));
-    for (let key in episodesRes.data.Items) {
-      const episodeRec = episodesRes.data.Items[key];
-      const userData = episodeRec?.UserData;
-      const watched = userData?.Played;
-      if (watched) lastWatchedEpisodeRec = episodeRec;
-      else if (lastWatchedEpisodeRec) break seasonLoop;
-    }
-  }
-  if (lastWatchedEpisodeRec) {
-    console.log({ lastWatchedEpisodeRec });
-    const episodeId = lastWatchedEpisodeRec.Id;
-    const episodeNumber = +lastWatchedEpisodeRec.IndexNumber;
-    const userData = lastWatchedEpisodeRec?.UserData;
-
-    userData.LastPlayedDate = util.fmtDate();
-    const url = urls.postUserDataUrl(cred, episodeId);
-    const setDateRes = await axios({
-      method: "post",
-      url: url,
-      data: userData,
-    });
-    console.log("set lastPlayedDate", {
-      seasonNumber,
-      episodeNumber,
-      post_res: setDateRes,
-    });
   }
 };
 

@@ -31,6 +31,76 @@ export function getPstDate() {
     .slice(0, 10);
 }
 
+function getLaDateTimeParts(dateIn = new Date()) {
+  const date = dateIn instanceof Date ? dateIn : new Date(dateIn);
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const map = {};
+  for (const part of parts) {
+    if (part && part.type && part.value) map[part.type] = part.value;
+  }
+  if (
+    !map.year ||
+    !map.month ||
+    !map.day ||
+    !map.hour ||
+    !map.minute ||
+    !map.second
+  ) {
+    return null;
+  }
+  return {
+    year: map.year,
+    month: map.month,
+    day: map.day,
+    hour: map.hour === "24" ? "00" : map.hour,
+    minute: map.minute,
+    second: map.second,
+  };
+}
+
+export function fmtLaDateTime(dateIn = new Date()) {
+  const parts = getLaDateTimeParts(dateIn);
+  if (!parts) return "";
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
+}
+
+export function normalizeLastWatched(value) {
+  if (value === undefined || value === null || value === "") return "";
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return fmtLaDateTime(value);
+  }
+
+  const raw = String(value).trim();
+  if (!raw) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return `${raw}T00:00:00`;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(raw)) return raw;
+  if (/^\d+$/.test(raw)) return fmtLaDateTime(Number(raw));
+  return fmtLaDateTime(raw);
+}
+
+export function fmtLastWatched(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw.replace(/-/g, "/");
+  const normalized = normalizeLastWatched(raw);
+  if (!normalized) return "";
+  const [datePart, timePart] = normalized.split("T");
+  if (!datePart) return "";
+  return timePart
+    ? `${datePart.replace(/-/g, "/")} ${timePart}`
+    : datePart.replace(/-/g, "/");
+}
+
 export function fmtUnixDatePst(unixSeconds) {
   const ts = Number(unixSeconds);
   if (!Number.isFinite(ts) || ts <= 0) return "";

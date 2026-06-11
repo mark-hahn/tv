@@ -1288,18 +1288,18 @@ export default {
           return forSort ? val.toLowerCase() : val;
         }
         case "Viewed":
-          lastViewed = show.lastWatched || "";
+          lastViewed = util.normalizeLastWatched(show.lastWatched);
           if (forSort) {
-            if (lastViewed) {
-              const [y, m, d] = lastViewed.split("-").map(Number);
-              return new Date(y, m - 1, d).getTime() || 0;
-            }
-            return srvr.lastViewedCache[show.name] || 0;
+            return (
+              lastViewed ||
+              util.normalizeLastWatched(srvr.lastViewedCache[show.name]) ||
+              ""
+            );
           }
-          if (lastViewed) return lastViewed;
+          if (lastViewed) return util.fmtLastWatched(show.lastWatched);
           lastViewed = srvr.lastViewedCache[show.name];
           if (lastViewed === undefined) return "";
-          return util.fmtDate(lastViewed);
+          return util.fmtLastWatched(lastViewed);
         case "Down":
           lastDownloaded = Number(allTvdb?.[show.name]?.["last-downloaded"]);
           if (forSort)
@@ -2582,11 +2582,6 @@ export default {
 
       // Generation token: newer calls invalidate older in-flight ones
       const mapToken = ++this._mapActionToken;
-
-      if (action == "date") {
-        console.log("setting last watched to cur date");
-        await emby.setLastWatched(show.id);
-      }
 
       const isRefresh = action === "refresh";
 

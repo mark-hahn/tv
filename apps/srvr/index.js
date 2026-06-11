@@ -2514,12 +2514,12 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
     const lastWatchedChanges = [];
     if (tvdbRecord.inEmby && tvdbRecord.id) {
       try {
-        const date = await fetchLastWatchedDate(tvdbRecord.id);
-        if (date && date !== tvdbRecord.lastWatched) {
+        const lastWatchedAt = await fetchLastWatchedDate(tvdbRecord.id);
+        if (lastWatchedAt && lastWatchedAt !== tvdbRecord.lastWatched) {
           lastWatchedChanges.push(
-            `lastWatched:${tvdbRecord.lastWatched}->${date}`,
+            `lastWatched:${tvdbRecord.lastWatched}->${lastWatchedAt}`,
           );
-          tvdbRecord.lastWatched = date;
+          tvdbRecord.lastWatched = lastWatchedAt;
         }
       } catch (e) {}
     }
@@ -7543,13 +7543,13 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
     for (const { showId, showName, tvdbRecord } of shows) {
       const t0 = Date.now();
       try {
-        const date = await fetchLastWatchedDate(showId);
+        const lastWatchedAt = await fetchLastWatchedDate(showId);
         const elapsed = Date.now() - t0;
-        if (date && date !== tvdbRecord.lastWatched) {
-          tvdbRecord.lastWatched = date;
+        if (lastWatchedAt && lastWatchedAt !== tvdbRecord.lastWatched) {
+          tvdbRecord.lastWatched = lastWatchedAt;
           lastWatchedChanged++;
           appendWatchgapLog(
-            `  lastWatched updated | ${elapsed}ms | ${showName} -> ${date}`,
+            `  lastWatched updated | ${elapsed}ms | ${showName} -> ${lastWatchedAt}`,
           );
         }
       } catch (err) {
@@ -7646,6 +7646,37 @@ const COLLECTION_IDS = {
 const DISK_SYNC_INTERVAL = 60 * 60 * 1000; // 1 hour (full disk check)
 const GAP_CHECK_INTERVAL = 6 * 60 * 1000; // 6 minutes (processes batch of 10 shows, checks disk per-show)
 
+function formatLaLastWatched(dateIn) {
+  const date = dateIn instanceof Date ? dateIn : new Date(dateIn);
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const map = {};
+  for (const part of parts) {
+    if (part && part.type && part.value) map[part.type] = part.value;
+  }
+  if (
+    !map.year ||
+    !map.month ||
+    !map.day ||
+    !map.hour ||
+    !map.minute ||
+    !map.second
+  ) {
+    return null;
+  }
+  const hour = map.hour === "24" ? "00" : map.hour;
+  return `${map.year}-${map.month}-${map.day}T${hour}:${map.minute}:${map.second}`;
+}
+
 async function fetchLastWatchedDate(showId) {
   const epUrl = `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items?api_key=${EMBY_API_KEY}&ParentId=${showId}&IncludeItemTypes=Episode&Recursive=true&IsPlayed=true&SortBy=DatePlayed&SortOrder=Descending&Limit=1`;
   const epResp = await fetch(epUrl);
@@ -7659,7 +7690,7 @@ async function fetchLastWatchedDate(showId) {
   const detail = await detailResp.json();
   const utcStr = detail.UserData?.LastPlayedDate;
   if (!utcStr) return null;
-  return utcStr.substring(0, 10);
+  return formatLaLastWatched(utcStr);
 }
 
 // NOTE: syncEmbyUserData periodic sync removed - now using immediate triggers from client

@@ -583,15 +583,7 @@ export default {
 
   computed: {
     lastWatchedDate() {
-      const d = this.show?.lastWatched;
-      if (!d) return null;
-      // d is YYYY-MM-DD already in LA timezone
-      const [y, m, day] = d.split("-");
-      return new Date(+y, +m - 1, +day).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
+      return util.fmtLastWatched(this.show?.lastWatched) || null;
     },
     hasVideoFiles() {
       return (
@@ -923,12 +915,7 @@ export default {
       else if (la) this.dates = `${la}`;
       else this.dates = "";
       this.statusTxt = st ? ` &nbsp; ${st}` : "";
-      if (lastWatched) {
-        const [y, m, d] = lastWatched.split("-");
-        this.lastWatchedTxt = `${y}/${m}/${d}`;
-      } else {
-        this.lastWatchedTxt = "";
-      }
+      this.lastWatchedTxt = util.fmtLastWatched(lastWatched);
     },
 
     async setSeasonsTxt(tvdbData) {

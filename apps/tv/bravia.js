@@ -15,6 +15,7 @@ Commands:
   down     media_player.volume_down
   mute     media_player.volume_mute (toggle)
   emby     media_player.select_source source="Emby"
+  notify   notify.send_message <message>
 `;
 
 const arg = process.argv[2];
@@ -23,7 +24,7 @@ if (!arg || arg === "--help" || arg === "-h") {
   process.exit(0);
 }
 
-const COMMANDS = ["status", "on", "off", "up", "down", "mute", "emby"];
+const COMMANDS = ["status", "on", "off", "up", "down", "mute", "emby", "notify"];
 if (!COMMANDS.includes(arg)) {
   process.stderr.write(`Unknown command: ${arg}\n${HELP}`);
   process.exit(1);
@@ -53,6 +54,8 @@ ws.on("message", (data) => {
     } else if (arg === "mute") {
       // For mute we need current state first to toggle correctly
       ws.send(JSON.stringify({ id: ++cmdId, type: "get_states" }));
+    } else if (arg === "notify") {
+      sendCommand();
     } else {
       sendCommand();
     }
@@ -114,6 +117,14 @@ function sendCommand() {
     up: ["media_player", "volume_up", {}],
     down: ["media_player", "volume_down", {}],
     emby: ["media_player", "select_source", { source: "Emby" }],
+    notify: [
+      "notify",
+      "send_message",
+      {
+        message: process.argv.slice(3).join(" "),
+        title: "Notification",
+      },
+    ],
   };
   const [domain, service, serviceData] = SERVICE_MAP[arg];
   const cmd = {
@@ -121,7 +132,7 @@ function sendCommand() {
     type: "call_service",
     domain,
     service,
-    target: { entity_id: ENTITY_ID },
+    target: { entity_id: "notify.bravia_k_65xr70" },
   };
   if (Object.keys(serviceData).length > 0) cmd.service_data = serviceData;
   ws.send(JSON.stringify(cmd));

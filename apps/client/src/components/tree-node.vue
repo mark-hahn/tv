@@ -46,8 +46,7 @@
       <span
         :style="{
           fontWeight: node.type === 'folder' ? 'bold' : 'normal',
-          whiteSpace: 'pre-wrap',
-          wordBreak: 'break-word',
+          whiteSpace: 'nowrap',
         }"
         >{{ wrapName(node.name) }}</span
       ><span

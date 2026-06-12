@@ -609,9 +609,13 @@ import evtBus from "../evtBus.js";
 import { wsSend } from "../srvr.js";
 import allServices from "../../../tv/services.json";
 
-const SCRUB_INTERVAL_FWD = 0.5; // seconds — interval for forward scrub
-const SCRUB_INTERVAL_BWD = 1.0; // seconds — interval for backward scrub
-const SCRUB_DIST = 10; // seconds — jump distance per seek
+const SCRUB_HOLD_DELAY_MS = 400;
+const SCRUB_JUMP_REPEAT_MS = 1000;
+const SCRUB_POS_UPDATE_MS = 200;
+const SCRUB_SMALL_JUMP_TICKS = 10 * 10_000_000;
+const SCRUB_LARGE_JUMP_TICKS = 30 * 10_000_000;
+const SCRUB_SMALL_JUMP_COUNT = 4;
+const SCRUB_POS_INCREMENT_TICKS = SCRUB_POS_UPDATE_MS * 10_000;
 const VOL_STEP = 5;
 const TVPANE_VERSION = 2;
 
@@ -729,6 +733,7 @@ export default {
     clearInterval(this._subPollTimer);
     clearTimeout(this._avoidTimer);
     clearTimeout(this._unlockHoldTimer);
+    clearInterval(this._embyPosTimer);
   },
 
   methods: {
@@ -776,11 +781,89 @@ export default {
       clearTimeout(this._unlockHoldTimer);
     },
 
+    _clearEmbyScrubState(ignoreUntilRelease = false) {
+      this._scrubbing = false;
+      this._scrubPausedIgnore = ignoreUntilRelease;
+      this._embyPos = null;
+      this._scrubRepeatCount = 0;
+      clearInterval(this._embyPosTimer);
+      this._embyPosTimer = null;
+    },
+
+    _startEmbyPosTimer() {
+      clearInterval(this._embyPosTimer);
+      this._embyPosTimer = setInterval(() => {
+        if (!this._scrubbing || typeof this._embyPos !== "number") return;
+        this._embyPos += SCRUB_POS_INCREMENT_TICKS;
+      }, SCRUB_POS_UPDATE_MS);
+    },
+
+    _getScrubJumpTicks(key) {
+      const jumpTicks =
+        (this._scrubRepeatCount ?? 0) < SCRUB_SMALL_JUMP_COUNT
+          ? SCRUB_SMALL_JUMP_TICKS
+          : SCRUB_LARGE_JUMP_TICKS;
+      return key === "right" ? jumpTicks : -jumpTicks;
+    },
+
+    async _performEmbyScrubJump(key) {
+      this._embyPos = Math.max(
+        0,
+        (this._embyPos ?? 0) + this._getScrubJumpTicks(key),
+      );
+      const seekRes = await fetch(`${config.tvTvUrl}/tv/emby/seek`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticks: this._embyPos }),
+      })
+        .then((r) => r.json())
+        .catch((e) => ({ ok: false, error: e.message }));
+      if (seekRes.reason === "paused") {
+        this._repeatActive = false;
+        this._clearEmbyScrubState(true);
+        return seekRes;
+      }
+      if (seekRes.ok)
+        this._scrubRepeatCount = (this._scrubRepeatCount ?? 0) + 1;
+      return seekRes;
+    },
+
+    async _startEmbyScrub(key) {
+      const posRes = await fetch(`${config.tvTvUrl}/tv/emby/position`)
+        .then((r) => r.json())
+        .catch((e) => ({ ok: false, error: e.message }));
+      if (!this._repeatActive) return { ok: false, reason: "released" };
+      if (posRes.reason === "paused" || posRes.paused) {
+        this._repeatActive = false;
+        this._clearEmbyScrubState(true);
+        return { ok: false, reason: "paused" };
+      }
+      if (!posRes.ok) return posRes;
+      this._scrubbing = true;
+      this._scrubPausedIgnore = false;
+      this._embyPos = Math.max(0, Number(posRes.ticks) || 0);
+      this._scrubRepeatCount = 0;
+      this._startEmbyPosTimer();
+      const firstJumpRes = await this._performEmbyScrubJump(key);
+      if (!firstJumpRes.ok) return firstJumpRes;
+      while (this._repeatActive && this._scrubbing) {
+        await new Promise((r) => {
+          this._repeatTimer = setTimeout(r, SCRUB_JUMP_REPEAT_MS);
+        });
+        if (!this._repeatActive || !this._scrubbing) break;
+        const jumpRes = await this._performEmbyScrubJump(key);
+        if (!jumpRes.ok) return jumpRes;
+      }
+      return { ok: true };
+    },
+
     startRepeat(key) {
       console.log(
         `[scrub] startRepeat key=${key} isOff=${this.isOff} isOther=${this.isOther}`,
       );
       if (this.isOff || this.isOther) return;
+      if (this._scrubPausedIgnore && (key === "left" || key === "right"))
+        return;
       if (this.checkBlocked()) return;
       if (!this._debounce()) return;
       this.flash(key);
@@ -800,7 +883,7 @@ export default {
         }
         console.log(`[scrub] isLR=${isLR}, waiting 400ms`);
         await new Promise((r) => {
-          this._repeatTimer = setTimeout(r, 400);
+          this._repeatTimer = setTimeout(r, SCRUB_HOLD_DELAY_MS);
         });
         if (!this._repeatActive) {
           console.log(`[scrub] stopped after 400ms wait`);
@@ -808,39 +891,12 @@ export default {
         }
         if (isLR) {
           this._pendingLRKey = null; // long press — key will not be sent on release
-          const distTicks =
-            (key === "right" ? 1 : -1) * SCRUB_DIST * 10_000_000;
-          const intervalMs =
-            (key === "right" ? SCRUB_INTERVAL_FWD : SCRUB_INTERVAL_BWD) * 1000;
-          console.log(
-            `[scrub] calling scrub/start distTicks=${distTicks} intervalMs=${intervalMs}`,
-          );
-          const startRes = await fetch(
-            `${config.tvTvUrl}/tv/emby/scrub/start`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ intervalMs, distTicks }),
-            },
-          )
-            .then((r) => r.json())
-            .catch((e) => {
-              console.log(`[scrub] scrub/start fetch error: ${e.message}`);
-              return { ok: false };
-            });
-          console.log(
-            `[scrub] scrub/start result: ${JSON.stringify(startRes)}`,
-          );
-          if (startRes.ok) {
-            this._scrubbing = true;
-            this._scrubPingTimer = setInterval(() => {
-              fetch(`${config.tvTvUrl}/tv/emby/scrub/ping`, {
-                method: "POST",
-              }).catch(() => {});
-            }, 500);
+          const scrubRes = await this._startEmbyScrub(key);
+          console.log(`[scrub] scrub result: ${JSON.stringify(scrubRes)}`);
+          if (scrubRes.ok || scrubRes.reason === "paused") {
             return;
           }
-          // Emby not playing — fall through to normal key repeat
+          if (scrubRes.reason !== "notPlaying") return;
           console.log(`[scrub] not playing, falling through to key repeat`);
         }
         let count = 0;
@@ -889,17 +945,15 @@ export default {
       console.log(`[scrub] stopRepeat _scrubbing=${this._scrubbing}`);
       this._repeatActive = false;
       clearTimeout(this._repeatTimer);
-      if (this._scrubbing) {
-        this._scrubbing = false;
-        clearInterval(this._scrubPingTimer);
-        this._scrubPingTimer = null;
-        fetch(`${config.tvTvUrl}/tv/emby/scrub/stop`, { method: "POST" }).catch(
-          () => {},
-        );
-      } else if (this._pendingLRKey) {
+      const pendingLRKey = this._pendingLRKey;
+      const ignoreUntilRelease = !!this._scrubPausedIgnore;
+      if (this._scrubbing || this._scrubPausedIgnore) {
+        this._clearEmbyScrubState(false);
+      } else if (pendingLRKey) {
         // Short press on left/right — send key on release
-        fetch(`${config.tvTvUrl}/tv/key/${this._pendingLRKey}`).catch(() => {});
+        fetch(`${config.tvTvUrl}/tv/key/${pendingLRKey}`).catch(() => {});
       }
+      if (ignoreUntilRelease) this._scrubPausedIgnore = false;
       this._pendingLRKey = null;
     },
 

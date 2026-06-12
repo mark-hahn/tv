@@ -1233,28 +1233,47 @@ app.get("/tv/emby/playing", async (req, res) => {
 
 app.get("/tv/emby/position", async (req, res) => {
   try {
-    const sessRes = await fetch(
-      `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
-      { headers: { Accept: "application/json" } },
-    );
-    if (!sessRes.ok) {
-      res.json({ ok: false, error: `sessions ${sessRes.status}` });
-      return;
-    }
-    const sessions = await sessRes.json();
-    const session = sessions.find(
-      (s) => s.NowPlayingItem && s.DeviceName === "Living Room TV",
-    );
+    const session = await getEmbyPlaybackSession();
     if (!session) {
       res.json({ ok: false, reason: "notPlaying" });
       return;
     }
-    res.json({ ok: true, ticks: session.PlayState?.PositionTicks ?? 0 });
+    res.json({
+      ok: true,
+      ticks: session.PlayState?.PositionTicks ?? 0,
+      paused: !!session.PlayState?.IsPaused,
+    });
   } catch (err) {
     loge("emby/position error:", err.message);
     res.json({ ok: false, error: err.message });
   }
 });
+
+async function getEmbyPlaybackSession(deviceName = "Living Room TV") {
+  const sessRes = await fetch(
+    `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
+    {
+      headers: { Accept: "application/json" },
+    },
+  );
+  if (!sessRes.ok) {
+    const error = new Error(`sessions ${sessRes.status}`);
+    error.status = sessRes.status;
+    throw error;
+  }
+  const sessions = await sessRes.json();
+  return (
+    sessions.find((s) => s.NowPlayingItem && s.DeviceName === deviceName) ??
+    null
+  );
+}
+
+function seekEmbySession(sessionId, ticks) {
+  return fetch(
+    `${EMBY_BASE_URL}/Sessions/${sessionId}/Playing/seek?SeekPositionTicks=${ticks}&api_key=${EMBY_API_KEY}`,
+    { method: "POST", headers: { Accept: "application/json" } },
+  );
+}
 
 app.post("/tv/emby/seek", async (req, res) => {
   const { ticks } = req.body ?? {};
@@ -1263,27 +1282,17 @@ app.post("/tv/emby/seek", async (req, res) => {
     return;
   }
   try {
-    const sessRes = await fetch(
-      `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
-      { headers: { Accept: "application/json" } },
-    );
-    if (!sessRes.ok) {
-      res.json({ ok: false, error: `sessions ${sessRes.status}` });
-      return;
-    }
-    const sessions = await sessRes.json();
-    const session = sessions.find(
-      (s) => s.NowPlayingItem && s.DeviceName === "Living Room TV",
-    );
+    const session = await getEmbyPlaybackSession();
     if (!session) {
       res.json({ ok: false, reason: "notPlaying" });
       return;
     }
-    const seekRes = await fetch(
-      `${EMBY_BASE_URL}/Sessions/${session.Id}/Playing/seek?SeekPositionTicks=${ticks}&api_key=${EMBY_API_KEY}`,
-      { method: "POST", headers: { Accept: "application/json" } },
-    );
-    res.json({ ok: seekRes.ok });
+    if (session.PlayState?.IsPaused) {
+      res.json({ ok: false, reason: "paused" });
+      return;
+    }
+    const seekRes = await seekEmbySession(session.Id, ticks);
+    res.json({ ok: seekRes.ok, reason: seekRes.ok ? undefined : "seekFailed" });
   } catch (err) {
     loge("emby/seek error:", err.message);
     res.json({ ok: false, error: err.message });
@@ -1298,18 +1307,7 @@ app.post("/tv/emby/seek2", async (req, res) => {
     return;
   }
   try {
-    const sessRes = await fetch(
-      `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
-      { headers: { Accept: "application/json" } },
-    );
-    if (!sessRes.ok) {
-      res.json({ ok: false, error: `sessions ${sessRes.status}` });
-      return;
-    }
-    const sessions = await sessRes.json();
-    const session = sessions.find(
-      (s) => s.NowPlayingItem && s.DeviceName === "Living Room TV",
-    );
+    const session = await getEmbyPlaybackSession();
     if (!session) {
       res.json({ ok: false, reason: "notPlaying" });
       return;
@@ -1319,92 +1317,19 @@ app.post("/tv/emby/seek2", async (req, res) => {
       `${EMBY_BASE_URL}/Sessions/${id}/Playing/Pause?api_key=${EMBY_API_KEY}`,
       { method: "POST" },
     );
-    const seekRes = await fetch(
-      `${EMBY_BASE_URL}/Sessions/${id}/Playing/seek?SeekPositionTicks=${ticks}&api_key=${EMBY_API_KEY}`,
-      { method: "POST", headers: { Accept: "application/json" } },
-    );
+    const seekRes = await seekEmbySession(id, ticks);
     await fetch(
       `${EMBY_BASE_URL}/Sessions/${id}/Playing/Pause?api_key=${EMBY_API_KEY}`,
       { method: "POST" },
     );
-    await new Promise((r) => setTimeout(r, d3ms));
+    await new Promise((r) => {
+      setTimeout(r, d3ms);
+    });
     res.json({ ok: seekRes.ok });
   } catch (err) {
     loge("emby/seek error:", err.message);
     res.json({ ok: false, error: err.message });
   }
-});
-
-// scrub/start: server-side loop — pause → seek → pause → [intervalMs] → repeat
-// scrub/stop:  kills the loop
-let _scrubState = null;
-
-app.post("/tv/emby/scrub/start", async (req, res) => {
-  const { intervalMs = 500, distTicks } = req.body ?? {};
-  if (!distTicks) {
-    res.status(400).json({ ok: false, error: "missing distTicks" });
-    return;
-  }
-  if (_scrubState) _scrubState.active = false;
-  try {
-    const sessRes = await fetch(
-      `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
-      { headers: { Accept: "application/json" } },
-    );
-    if (!sessRes.ok) {
-      res.json({ ok: false, error: `sessions ${sessRes.status}` });
-      return;
-    }
-    const sessions = await sessRes.json();
-    const session = sessions.find(
-      (s) => s.NowPlayingItem && s.DeviceName === "Living Room TV",
-    );
-    if (!session) {
-      res.json({ ok: false, reason: "notPlaying" });
-      return;
-    }
-    const id = session.Id;
-    let ticks = session.PlayState?.PositionTicks ?? 0;
-    const state = { active: true, lastPing: Date.now(), id };
-    _scrubState = state;
-    (async () => {
-      while (state.active) {
-        if (Date.now() - state.lastPing > 1000) {
-          log("scrub dead-man expired, stopping");
-          break;
-        }
-        // seek only — no pause, no overlay
-        ticks = Math.max(0, ticks + distTicks);
-        await fetch(
-          `${EMBY_BASE_URL}/Sessions/${id}/Playing/seek?SeekPositionTicks=${ticks}&api_key=${EMBY_API_KEY}`,
-          { method: "POST" },
-        ).catch(() => {});
-        if (!state.active) break;
-        await new Promise((r) => setTimeout(r, intervalMs));
-        if (!state.active) break;
-      }
-    })().catch((err) => {
-      loge("scrub loop error:", err.message);
-      state.active = false;
-    });
-    res.json({ ok: true });
-  } catch (err) {
-    loge("scrub/start error:", err.message);
-    res.json({ ok: false, error: err.message });
-  }
-});
-
-app.post("/tv/emby/scrub/ping", (req, res) => {
-  if (_scrubState) _scrubState.lastPing = Date.now();
-  res.json({ ok: !!_scrubState });
-});
-
-app.post("/tv/emby/scrub/stop", async (req, res) => {
-  if (_scrubState) {
-    _scrubState.active = false;
-    _scrubState = null;
-  }
-  res.json({ ok: true });
 });
 
 app.post("/tv/emby/subtitle", async (req, res) => {
@@ -1496,7 +1421,9 @@ app.post("/tv/emby/subtitle", async (req, res) => {
   for (let i = 0; i < downCount; i++) {
     await sendIrcc("Down", SUB_NAV_DOWN_DELAY_MS);
   }
-  await new Promise((r) => setTimeout(r, SUB_NAV_CONFIRM_DELAY_MS));
+  await new Promise((r) => {
+    setTimeout(r, SUB_NAV_CONFIRM_DELAY_MS);
+  });
   await sendIrcc("Confirm", SUB_NAV_BACK_DELAY_MS);
   callService("remote", "send_command", REMOTE_ENTITY_ID, {
     command: "Return",

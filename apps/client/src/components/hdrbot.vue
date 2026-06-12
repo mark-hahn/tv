@@ -235,12 +235,6 @@ export default {
     },
   },
 
-  methods: {
-    displaySortChoice(sortChoice) {
-      return sortChoice === "Viewed" ? "Watched" : String(sortChoice || "");
-    },
-  },
-
   emits: [
     "top-click",
     "prev-next-click",
@@ -253,6 +247,9 @@ export default {
   ],
 
   methods: {
+    displaySortChoice(sortChoice) {
+      return sortChoice === "Viewed" ? "Watched" : String(sortChoice || "");
+    },
     condFltrColor(cond) {
       switch (cond.filter) {
         case 0:

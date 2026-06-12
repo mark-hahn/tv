@@ -24,7 +24,16 @@ if (!arg || arg === "--help" || arg === "-h") {
   process.exit(0);
 }
 
-const COMMANDS = ["status", "on", "off", "up", "down", "mute", "emby", "notify"];
+const COMMANDS = [
+  "status",
+  "on",
+  "off",
+  "up",
+  "down",
+  "mute",
+  "emby",
+  "notify",
+];
 if (!COMMANDS.includes(arg)) {
   process.stderr.write(`Unknown command: ${arg}\n${HELP}`);
   process.exit(1);

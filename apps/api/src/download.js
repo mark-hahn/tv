@@ -393,6 +393,53 @@ export function extractTorrentFileDetails(torrentData) {
     }));
 }
 
+export function extractTorrentInfo(torrentData) {
+  const parsed = parseTorrent(torrentData);
+  const files = extractTorrentFileDetails(torrentData);
+  const trackers = Array.isArray(parsed?.announce)
+    ? Array.from(
+        new Set(
+          parsed.announce
+            .map((value) => String(value || "").trim())
+            .filter(Boolean),
+        ),
+      )
+    : [];
+  const webSeeds = Array.isArray(parsed?.urlList)
+    ? Array.from(
+        new Set(
+          parsed.urlList
+            .map((value) => String(value || "").trim())
+            .filter(Boolean),
+        ),
+      )
+    : [];
+
+  return {
+    name: String(parsed?.name || "").trim(),
+    infoHash: String(parsed?.infoHash || "")
+      .trim()
+      .toLowerCase(),
+    totalSize: typeof parsed?.length === "number" ? parsed.length : null,
+    pieceLength:
+      typeof parsed?.pieceLength === "number" ? parsed.pieceLength : null,
+    fileCount: files.length,
+    private:
+      typeof parsed?.private === "boolean"
+        ? parsed.private
+        : Boolean(parsed?.private),
+    createdAt:
+      parsed?.created instanceof Date
+        ? parsed.created.toISOString()
+        : String(parsed?.created || "").trim() || "",
+    createdBy: String(parsed?.createdBy || "").trim(),
+    comment: String(parsed?.comment || "").trim(),
+    trackers,
+    webSeeds,
+    files,
+  };
+}
+
 function normalizeProvider(rawProvider, detailUrl) {
   const p = String(rawProvider || "")
     .toLowerCase()
@@ -481,6 +528,80 @@ function sanitizeFilenameForWatch(name) {
       .replace(/[^a-zA-Z0-9._\-()\[\] ]+/g, "_")
       .trim()
   );
+}
+
+function extractBtih(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const match =
+    /xt=urn:btih:([a-fA-F0-9]{40}|[a-zA-Z2-7]{32})/i.exec(text) ||
+    /btih:([a-fA-F0-9]{40}|[a-zA-Z2-7]{32})/i.exec(text);
+  return match?.[1] ? String(match[1]).trim().toLowerCase() : "";
+}
+
+function getTorrentInfoHash(torrent) {
+  const direct =
+    torrent?.raw?.infoHash || torrent?.raw?.info_hash || torrent?.raw?.hash;
+  if (typeof direct === "string" && direct.trim()) {
+    return direct.trim().toLowerCase();
+  }
+  return extractBtih(
+    torrent?.raw?.magnet || torrent?.raw?.magnetLink || torrent?.raw?.link,
+  );
+}
+
+async function fetchTorrentFileFromInfoHash(torrent, provider) {
+  const infoHash = getTorrentInfoHash(torrent);
+  if (!infoHash) {
+    return fail("validate", "No torrent file available for this provider", {
+      provider,
+    });
+  }
+
+  const candidates = [
+    `https://itorrents.org/torrent/${infoHash.toUpperCase()}.torrent`,
+    `https://itorrents.org/torrent/${infoHash}.torrent`,
+  ];
+
+  for (const downloadUrl of candidates) {
+    try {
+      const response = await sshFetch(downloadUrl, {
+        headers: {
+          "User-Agent": DOWNLOAD_USER_AGENT,
+          Accept: "application/x-bittorrent,application/octet-stream,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.5",
+          Referer: "https://itorrents.org/",
+        },
+      });
+      if (!response.ok) continue;
+
+      const torrentData = Buffer.from(await response.arrayBuffer());
+      const valid = validateTorrentData(torrentData);
+      if (!valid.success) continue;
+
+      appendTorrentBytesLog({
+        provider,
+        method: "info-hash-cache",
+        downloadUrl,
+        torrentData,
+      });
+
+      return ok({
+        provider,
+        method: "info-hash-cache",
+        downloadUrl,
+        bytes: torrentData.length,
+        torrentData,
+      });
+    } catch {
+      // try next cache candidate
+    }
+  }
+
+  return fail("fetch-torrent", "No torrent file available for this provider", {
+    provider,
+    infoHash,
+  });
 }
 
 function buildTorrentLeechDirectUrlFromSearchResult(torrent) {
@@ -601,6 +722,10 @@ export async function fetchTorrentFile(torrent) {
 
   if (provider === "torrentleech") {
     return await fetchTorrentFileFromSearchResult(torrent);
+  }
+
+  if (provider === "thepiratebay" || provider === "eztv") {
+    return await fetchTorrentFileFromInfoHash(torrent, provider);
   }
 
   // Limetorrents: try direct CDN link (raw.link / itorrents.net), then fall

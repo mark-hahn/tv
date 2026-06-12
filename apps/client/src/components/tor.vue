@@ -306,6 +306,23 @@
               Chk Subs
             </button>
             <button
+              @click.stop="torInfoClick"
+              :disabled="selectedItems.size === 0 || torInfoBusy"
+              :class="{
+                'btn-disabled': selectedItems.size === 0 || torInfoBusy,
+              }"
+              :style="{
+                fontSize: '13px',
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px 8px',
+                border: '1px solid #bbb',
+                '--btn-bg': torInfoBusy ? 'lightgray' : 'whitesmoke',
+              }"
+            >
+              Info
+            </button>
+            <button
               @click.stop="torBadGrpClick"
               :disabled="selectedItems.size === 0"
               :class="{ 'btn-disabled': selectedItems.size === 0 }"
@@ -1100,6 +1117,220 @@
     </div>
 
     <div
+      id="info-modal"
+      v-if="showInfoModal"
+      @click.stop="closeInfoModal"
+      style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+      "
+    >
+      <div
+        id="modal-content"
+        @click.stop
+        style="
+          background: white;
+          padding: 30px;
+          border-radius: 10px;
+          max-width: 520px;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        "
+      >
+        <div
+          style="
+            font-size: 16px;
+            margin-bottom: 20px;
+            line-height: 1.5;
+            white-space: pre-line;
+          "
+        >
+          {{ infoModalMsg }}
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end">
+          <button
+            @click.stop="closeInfoModal"
+            style="
+              padding: 8px 20px;
+              font-size: 14px;
+              cursor: pointer;
+              border-radius: 5px;
+              border: 1px solid #ccc;
+              background: white;
+            "
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="torrent-info-modal"
+      v-if="showTorrentInfoModal"
+      @click.stop="closeTorrentInfoModal"
+      style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+      "
+    >
+      <div
+        id="modal-content"
+        @click.stop
+        style="
+          background: white;
+          padding: 24px;
+          border-radius: 10px;
+          width: min(720px, calc(100vw - 40px));
+          max-height: calc(100vh - 40px);
+          overflow-y: auto;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        "
+      >
+        <div style="font-size: 20px; font-weight: 600; margin-bottom: 18px">
+          Torrent Info
+        </div>
+        <div
+          v-if="torrentInfoData && torrentInfoData.info"
+          style="
+            display: grid;
+            grid-template-columns: 130px 1fr;
+            gap: 10px 14px;
+          "
+        >
+          <div style="font-weight: 600">Name</div>
+          <div style="word-break: break-word">
+            {{ torrentInfoData.info.name || "--" }}
+          </div>
+
+          <div style="font-weight: 600">Info Hash</div>
+          <div style="word-break: break-all">
+            {{ torrentInfoData.info.infoHash || "--" }}
+          </div>
+
+          <div style="font-weight: 600">Size</div>
+          <div>
+            {{ formatTorrentBytes(torrentInfoData.info.totalSize) }}
+          </div>
+
+          <div style="font-weight: 600">Files</div>
+          <div>{{ torrentInfoData.info.fileCount ?? "--" }}</div>
+
+          <div style="font-weight: 600">Piece Length</div>
+          <div>
+            {{ formatTorrentBytes(torrentInfoData.info.pieceLength) }}
+          </div>
+
+          <div style="font-weight: 600">Private</div>
+          <div>{{ torrentInfoData.info.private ? "Yes" : "No" }}</div>
+
+          <div style="font-weight: 600">Created</div>
+          <div>{{ formatTorrentDate(torrentInfoData.info.createdAt) }}</div>
+
+          <div style="font-weight: 600">Created By</div>
+          <div style="word-break: break-word">
+            {{ torrentInfoData.info.createdBy || "--" }}
+          </div>
+
+          <div style="font-weight: 600">Comment</div>
+          <div style="white-space: pre-wrap; word-break: break-word">
+            {{ torrentInfoData.info.comment || "--" }}
+          </div>
+
+          <div style="font-weight: 600">Trackers</div>
+          <div
+            style="
+              white-space: pre-wrap;
+              word-break: break-word;
+              max-height: 160px;
+              overflow-y: auto;
+            "
+          >
+            {{ (torrentInfoData.info.trackers || []).join("\n") || "--" }}
+          </div>
+
+          <div style="font-weight: 600">Web Seeds</div>
+          <div
+            style="
+              white-space: pre-wrap;
+              word-break: break-word;
+              max-height: 120px;
+              overflow-y: auto;
+            "
+          >
+            {{ (torrentInfoData.info.webSeeds || []).join("\n") || "--" }}
+          </div>
+
+          <div style="font-weight: 600">Files</div>
+          <div
+            style="
+              white-space: pre-wrap;
+              word-break: break-word;
+              max-height: 240px;
+              overflow-y: auto;
+            "
+          >
+            <div
+              v-for="file in torrentInfoData.info.files || []"
+              :key="`${file.path}-${file.size}`"
+              style="margin-bottom: 6px"
+            >
+              {{ file.path }}
+              <span style="color: #666">
+                ({{ formatTorrentBytes(file.size) }})
+              </span>
+            </div>
+            <div
+              v-if="
+                !torrentInfoData.info.files ||
+                torrentInfoData.info.files.length === 0
+              "
+            >
+              --
+            </div>
+          </div>
+        </div>
+        <div
+          style="
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+          "
+        >
+          <button
+            @click.stop="closeTorrentInfoModal"
+            style="
+              padding: 8px 20px;
+              font-size: 14px;
+              cursor: pointer;
+              border-radius: 5px;
+              border: 1px solid #ccc;
+              background: white;
+            "
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
       id="emby-loading-modal"
       v-if="embyLoadingShow"
       @click.stop
@@ -1197,6 +1428,11 @@ export default {
       showModal: false, // Show download confirmation modal
       showErrorModal: false,
       errorModalMsg: "",
+      showInfoModal: false,
+      infoModalMsg: "",
+      showTorrentInfoModal: false,
+      torrentInfoData: null,
+      torInfoBusy: false,
 
       showExistingDeleteModal: false,
       existingDeleteModalMsg: "",
@@ -1710,6 +1946,44 @@ export default {
     closeErrorModal() {
       this.showErrorModal = false;
       this.errorModalMsg = "";
+    },
+
+    showInfo(msg) {
+      this.infoModalMsg = String(msg || "");
+      this.showInfoModal = true;
+    },
+
+    closeInfoModal() {
+      this.showInfoModal = false;
+      this.infoModalMsg = "";
+    },
+
+    closeTorrentInfoModal() {
+      this.showTorrentInfoModal = false;
+      this.torrentInfoData = null;
+    },
+
+    formatTorrentBytes(value) {
+      const num = Number(value);
+      if (!Number.isFinite(num) || num < 0) return "--";
+      if (num === 0) return "0 B";
+      const units = ["B", "KB", "MB", "GB", "TB"];
+      let size = num;
+      let unitIndex = 0;
+      while (size >= 1024 && unitIndex < units.length - 1) {
+        size /= 1024;
+        unitIndex += 1;
+      }
+      const digits = size >= 100 || unitIndex === 0 ? 0 : size >= 10 ? 1 : 2;
+      return `${size.toFixed(digits)} ${units[unitIndex]}`;
+    },
+
+    formatTorrentDate(value) {
+      const raw = String(value || "").trim();
+      if (!raw) return "--";
+      const parsed = new Date(raw);
+      if (Number.isNaN(parsed.getTime())) return raw;
+      return parsed.toLocaleString();
     },
 
     confirmExistingDownloads(msg, wrapper) {
@@ -4332,14 +4606,39 @@ export default {
         const result = await srvr.toggleBadGroup(group);
         await this.refreshBadGroups();
         if (result?.action === "added") {
-          this.infoModalMsg = `Added bad group: ${group}`;
-          this.showInfoModal = true;
+          this.showInfo(`Added bad group: ${group}`);
         } else if (result?.action === "removed") {
-          this.infoModalMsg = `Removed bad group: ${group}`;
-          this.showInfoModal = true;
+          this.showInfo(`Removed bad group: ${group}`);
         }
       } catch (e) {
         this.showError(this.getErrorMessage(e));
+      }
+    },
+
+    async torInfoClick() {
+      const first = [...this.selectedItems][0];
+      if (!first) return;
+
+      this.torInfoBusy = true;
+      try {
+        const response = await fetch(`${config.torrentsApiUrl}/api/tor/info`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ torrent: first }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(result?.error || `HTTP ${response.status}`);
+        }
+        if (!result?.success || !result?.info) {
+          throw new Error(result?.error || "Failed to get torrent info.");
+        }
+        this.torrentInfoData = result;
+        this.showTorrentInfoModal = true;
+      } catch (e) {
+        this.showError(this.getErrorMessage(e));
+      } finally {
+        this.torInfoBusy = false;
       }
     },
 

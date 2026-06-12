@@ -2345,6 +2345,41 @@ app.post("/api/tor/files", async (req, res) => {
   }
 });
 
+app.post("/api/tor/info", async (req, res) => {
+  const torrent = req.body?.torrent;
+  if (!torrent || typeof torrent !== "object") {
+    return res
+      .status(400)
+      .json({ success: false, error: "torrent object required" });
+  }
+  const provider = String(torrent?.raw?.provider || torrent?.provider || "")
+    .trim()
+    .toLowerCase();
+  const publicProviders = new Set(["thepiratebay", "limetorrents", "eztv"]);
+  try {
+    const fetched = await download.fetchTorrentFile(torrent);
+    if (!fetched || !fetched.success) {
+      return res.json({
+        success: false,
+        error: publicProviders.has(provider)
+          ? "No torrent file available for this provider"
+          : fetched?.error || "Failed to fetch torrent",
+      });
+    }
+    const info = download.extractTorrentInfo(fetched.torrentData);
+    return res.json({
+      success: true,
+      provider: fetched.provider,
+      method: fetched.method,
+      downloadUrl: fetched.downloadUrl,
+      bytes: fetched.bytes,
+      info,
+    });
+  } catch (e) {
+    return res.json({ success: false, error: e?.message || String(e) });
+  }
+});
+
 app.post("/api/tor/chk-subs", async (req, res) => {
   const items = Array.isArray(req.body?.items) ? req.body.items : null;
   const showContext = req.body?.showContext || {};

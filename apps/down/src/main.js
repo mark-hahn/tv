@@ -2260,29 +2260,107 @@ async function main() {
       }
 
       if (!processingForced && tvJsonTitles && tvJsonTitles[fname]) {
-        recentCount++;
-        const skipStatus =
-          tvJsonTitles[fname].status === "finished"
-            ? "already downloaded"
-            : "already queued";
-        log(
-          "------",
-          downloadCount,
-          "/",
-          chkCount,
-          "SKIPPING",
-          skipStatus.toUpperCase() + ":",
-          fname,
-        );
-        trace("checkFile: skip " + skipStatus, { fname });
-        postHistory({
-          tvdbId: lookupTvdbId(title),
-          showName: title || fname,
-          type: "skipDown",
-          description: "skip: " + skipStatus,
-        });
-        process.nextTick(checkFile);
-        return;
+        const titleState = tvJsonTitles[fname];
+        if (titleState.status === "finished") {
+          let verifiedOnDisk = false;
+          let existingEntry = null;
+          try {
+            existingEntry = tvJson.getEntryByTitle
+              ? tvJson.getEntryByTitle(fname)
+              : null;
+          } catch (e) {
+            existingEntry = null;
+          }
+          try {
+            const localPath = existingEntry?.localPath
+              ? String(existingEntry.localPath)
+              : "";
+            if (localPath && path.isAbsolute(localPath)) {
+              const candidateNames = [];
+              if (existingEntry?.destTitle)
+                candidateNames.push(String(existingEntry.destTitle));
+              if (existingEntry?.title)
+                candidateNames.push(String(existingEntry.title));
+              for (const candidateName of candidateNames) {
+                if (!candidateName) continue;
+                if (fs.existsSync(path.join(localPath, candidateName))) {
+                  verifiedOnDisk = true;
+                  break;
+                }
+              }
+            }
+          } catch (e) {
+            verifiedOnDisk = false;
+          }
+
+          if (!verifiedOnDisk) {
+            log(
+              "------",
+              downloadCount,
+              "/",
+              chkCount,
+              "FINISHED ROW MISSING ON DISK, RECHECKING:",
+              fname,
+            );
+            trace("checkFile: stale finished row missing on disk", {
+              fname,
+              localPath: existingEntry?.localPath || "",
+              destTitle: existingEntry?.destTitle || "",
+            });
+            postHistory({
+              tvdbId: lookupTvdbId(title),
+              showName: title || fname,
+              type: "skipDown",
+              description: "finished row missing on disk: rechecking",
+            });
+            try {
+              if (tvJson.retryEntry) tvJson.retryEntry(fname);
+            } catch (e) {}
+            delete tvJsonTitles[fname];
+          } else {
+            recentCount++;
+            const skipStatus = "already downloaded";
+            log(
+              "------",
+              downloadCount,
+              "/",
+              chkCount,
+              "SKIPPING",
+              skipStatus.toUpperCase() + ":",
+              fname,
+            );
+            trace("checkFile: skip " + skipStatus, { fname });
+            postHistory({
+              tvdbId: lookupTvdbId(title),
+              showName: title || fname,
+              type: "skipDown",
+              description: "skip: " + skipStatus,
+            });
+            process.nextTick(checkFile);
+            return;
+          }
+        } else {
+          recentCount++;
+          const skipStatus = "already queued";
+          log(
+            "------",
+            downloadCount,
+            "/",
+            chkCount,
+            "SKIPPING",
+            skipStatus.toUpperCase() + ":",
+            fname,
+          );
+          trace("checkFile: skip " + skipStatus, { fname });
+          postHistory({
+            tvdbId: lookupTvdbId(title),
+            showName: title || fname,
+            type: "skipDown",
+            description: "skip: " + skipStatus,
+          });
+          process.nextTick(checkFile);
+          return;
+        }
       }
 
       if (inProgress && inProgress[fname]) {

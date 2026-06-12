@@ -122,6 +122,7 @@ const PANE_TIPS = {
   qbt: {
     "From show": "Highlight the torrent for the current show",
     Active: "Toggle showing only active downloads",
+    "Bad Grp": "Toggle the first selected torrent group in badGroups.txt",
     Clean: "Remove torrents whose files are missing from disk",
     Bottom: "Scroll to the bottom of the list",
   },

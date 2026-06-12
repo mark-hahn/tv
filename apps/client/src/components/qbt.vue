@@ -216,6 +216,21 @@
           First
         </button>
         <button
+          @click.stop="qbtBadGrpClick"
+          :disabled="selectedItems.size === 0 || qbtBadGrpBusy"
+          :class="{ 'btn-disabled': selectedItems.size === 0 || qbtBadGrpBusy }"
+          :style="{
+            fontSize: '13px',
+            cursor: 'pointer',
+            borderRadius: '7px',
+            padding: '4px 10px',
+            border: '1px solid #bbb',
+            '--btn-bg': qbtBadGrpBusy ? 'lightgray' : 'whitesmoke',
+          }"
+        >
+          Bad Grp
+        </button>
+        <button
           @click.stop="qbtForceClick"
           :disabled="selectedItems.size === 0"
           :class="{ 'btn-disabled': selectedItems.size === 0 }"
@@ -335,6 +350,7 @@
 import parseTorrentTitle from "parse-torrent-title";
 import evtBus from "../evtBus.js";
 import { config } from "../config.js";
+import * as srvr from "../srvr.js";
 import * as util from "../util.js";
 
 export default {
@@ -377,6 +393,7 @@ export default {
       matchedTitle: null,
       activeOnly: false,
       showFilter: null,
+      qbtBadGrpBusy: false,
       _knownHashes: new Set(),
       selectedItems: new Set(), // Multi-select for new button group
       lastSelectedIndex: null,
@@ -778,9 +795,9 @@ export default {
       } catch {}
     },
 
-    toParsedTitle(rawTitle) {
+    parseTorrentName(rawTitle) {
       const raw = String(rawTitle || "").trim();
-      if (!raw) return "";
+      if (!raw) return null;
       try {
         let parser = null;
         if (typeof parseTorrentTitle === "function") {
@@ -797,11 +814,17 @@ export default {
         ) {
           parser = parseTorrentTitle.default.parse;
         }
-        const parsed = parser ? parser(raw) : null;
-        return String(parsed?.title || raw).trim();
+        return parser ? parser(raw) : null;
       } catch {
-        return raw;
+        return null;
       }
+    },
+
+    toParsedTitle(rawTitle) {
+      const raw = String(rawTitle || "").trim();
+      if (!raw) return "";
+      const parsed = this.parseTorrentName(raw);
+      return String(parsed?.title || raw).trim();
     },
 
     pad2(n) {
@@ -1276,6 +1299,31 @@ export default {
         const card = container.children[idx];
         if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
       });
+    },
+
+    async qbtBadGrpClick() {
+      const first = [...this.selectedItems][0];
+      const group = String(
+        this.parseTorrentName(first?.name)?.group || "",
+      ).trim();
+      if (!group) {
+        window.alert("Selected torrent has no group name.");
+        return;
+      }
+
+      this.qbtBadGrpBusy = true;
+      try {
+        const result = await srvr.toggleBadGroup(group);
+        if (result?.action === "added") {
+          window.alert(`Added bad group: ${group}`);
+        } else if (result?.action === "removed") {
+          window.alert(`Removed bad group: ${group}`);
+        }
+      } catch (err) {
+        window.alert(`Bad group toggle failed: ${err?.message || String(err)}`);
+      } finally {
+        this.qbtBadGrpBusy = false;
+      }
     },
 
     // Force: delete each selected torrent then re-add via magnet URI

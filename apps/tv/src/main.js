@@ -949,11 +949,16 @@ app.get("/tv/mute", (req, res) => {
     res.json({ ok: false, error: "wrong mode" });
     return;
   }
+  const newMuted = !braviaHaMuted;
+  braviaHaMuted = newMuted;
   callService("media_player", "volume_mute", BRAVIA_ENTITY_ID, {
-    is_volume_muted: !braviaHaMuted,
+    is_volume_muted: newMuted,
   });
-  log(`mute sent via HA Bravia from ${client(req)}`);
-  res.json({ ok: true });
+  pushTvState().catch(() => {});
+  log(
+    `mute sent via HA Bravia from ${client(req)}: ${!newMuted} -> ${newMuted}`,
+  );
+  res.json({ ok: true, muted: newMuted });
 });
 
 async function pushTvState() {

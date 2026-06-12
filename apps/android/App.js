@@ -471,6 +471,7 @@ export default function App() {
   useEffect(() => {
     console.log("[vol] APP VERSION v23");
     pollMute();
+    const mutePollTimer = setInterval(pollMute, 5000);
     connectWs();
     AsyncStorage.getItem("layoutOption")
       .then((val) => {
@@ -494,6 +495,7 @@ export default function App() {
       clearTimeout(dbRef.current?.timer);
       dbRef.current = null;
       clearInterval(subPollRef.current);
+      clearInterval(mutePollTimer);
       clearTimeout(avoidTimerRef.current);
       clearTimeout(unlockHoldTimerRef.current);
     };

@@ -709,6 +709,7 @@ export default {
   mounted() {
     console.log(`[tvpane] version ${TVPANE_VERSION}`);
     this.pollMute();
+    this._mutePollTimer = setInterval(() => this.pollMute(), 5000);
     evtBus.on("tvMuteState", this._onTvMuteState);
     evtBus.on("paneChanged", this._onPaneChanged);
     evtBus.on("tvRemoteAction", this._onTvRemoteAction);
@@ -734,6 +735,7 @@ export default {
     clearTimeout(this._avoidTimer);
     clearTimeout(this._unlockHoldTimer);
     clearInterval(this._embyPosTimer);
+    clearInterval(this._mutePollTimer);
   },
 
   methods: {

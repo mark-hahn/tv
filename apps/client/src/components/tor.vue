@@ -1378,6 +1378,8 @@ import Stream from "./stream.vue";
 import parseTorrentTitle from "parse-torrent-title";
 import * as srvr from "../srvr.js";
 
+const BAD_GROUPS_REFRESH_MS = 3000;
+
 export default {
   name: "Torrents",
   components: { Stream },
@@ -1510,6 +1512,8 @@ export default {
 
       groupCounts: {},
       badGroups: new Set(),
+      _badGroupsPollTimer: null,
+      _badGroupsRefreshInFlight: false,
 
       groupFilter: null, // non-null = group name filter is active
       groupFilterFlash: false, // true = flash button highlight for 500ms
@@ -1723,6 +1727,7 @@ export default {
       .catch(() => {});
 
     void this.refreshBadGroups().catch(() => {});
+    this.startBadGroupsPolling();
     void this.$nextTick(() => {
       this.scrollToBottom();
     });
@@ -1735,6 +1740,7 @@ export default {
     evtBus.off("resetTorrentsPane", this.resetPane);
     evtBus.off("refreshSpaceAvail", this.onRefreshSpaceAvail);
     evtBus.off("openStream", this.onOpenStream);
+    this.stopBadGroupsPolling();
   },
 
   methods: {
@@ -1896,7 +1902,22 @@ export default {
       if (pane === "tor") {
         // Keep space info fresh whenever Tor pane is shown.
         void this.updateSpaceAvail();
+        void this.refreshBadGroups().catch(() => {});
       }
+    },
+
+    startBadGroupsPolling() {
+      if (this._badGroupsPollTimer) return;
+      this._badGroupsPollTimer = setInterval(() => {
+        if (this._badGroupsRefreshInFlight) return;
+        void this.refreshBadGroups().catch(() => {});
+      }, BAD_GROUPS_REFRESH_MS);
+    },
+
+    stopBadGroupsPolling() {
+      if (!this._badGroupsPollTimer) return;
+      clearInterval(this._badGroupsPollTimer);
+      this._badGroupsPollTimer = null;
     },
 
     async _checkSeriesMapChanged(show) {
@@ -1917,8 +1938,13 @@ export default {
       void this.updateSpaceAvail();
     },
     async refreshBadGroups() {
-      const list = await srvr.getBadGroups();
-      this.badGroups = new Set(Array.isArray(list) ? list : []);
+      this._badGroupsRefreshInFlight = true;
+      try {
+        const list = await srvr.getBadGroups();
+        this.badGroups = new Set(Array.isArray(list) ? list : []);
+      } finally {
+        this._badGroupsRefreshInFlight = false;
+      }
     },
 
     openDetails() {

@@ -612,6 +612,8 @@ import allServices from "../../../tv/services.json";
 const SCRUB_HOLD_DELAY_MS = 400;
 const SCRUB_JUMP_REPEAT_MS = 1000;
 const SCRUB_POS_UPDATE_MS = 200;
+const SCRUB_BAR_DOWN_DELAY_MS = 100;
+const SCRUB_BAR_BACK_DELAY_MS = 100;
 const SCRUB_SMALL_JUMP_TICKS = 10 * 10_000_000;
 const SCRUB_LARGE_JUMP_TICKS = 30 * 10_000_000;
 const SCRUB_SMALL_JUMP_COUNT = 4;
@@ -808,6 +810,20 @@ export default {
       return key === "right" ? jumpTicks : -jumpTicks;
     },
 
+    async _keepScrubBarVisible() {
+      if (!this._repeatActive || !this._scrubbing) return;
+      await new Promise((r) => {
+        setTimeout(r, SCRUB_BAR_DOWN_DELAY_MS);
+      });
+      if (!this._repeatActive || !this._scrubbing) return;
+      await fetch(`${config.tvTvUrl}/tv/key/down`).catch(() => {});
+      await new Promise((r) => {
+        setTimeout(r, SCRUB_BAR_BACK_DELAY_MS);
+      });
+      if (!this._repeatActive || !this._scrubbing) return;
+      await fetch(`${config.tvTvUrl}/tv/key/back`).catch(() => {});
+    },
+
     async _performEmbyScrubJump(key) {
       this._embyPos = Math.max(
         0,
@@ -825,8 +841,10 @@ export default {
         this._clearEmbyScrubState(true);
         return seekRes;
       }
-      if (seekRes.ok)
+      if (seekRes.ok) {
         this._scrubRepeatCount = (this._scrubRepeatCount ?? 0) + 1;
+        await this._keepScrubBarVisible();
+      }
       return seekRes;
     },
 

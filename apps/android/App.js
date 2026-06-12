@@ -28,6 +28,8 @@ const TV_SRVR_HTTP_URL = "https://hahnca.com/tv-srvr";
 const SCRUB_HOLD_DELAY_MS = 400;
 const SCRUB_JUMP_REPEAT_MS = 1000;
 const SCRUB_POS_UPDATE_MS = 200;
+const SCRUB_BAR_DOWN_DELAY_MS = 100;
+const SCRUB_BAR_BACK_DELAY_MS = 100;
 const SCRUB_SMALL_JUMP_TICKS = 10 * 10_000_000;
 const SCRUB_LARGE_JUMP_TICKS = 30 * 10_000_000;
 const SCRUB_SMALL_JUMP_COUNT = 4;
@@ -241,6 +243,20 @@ export default function App() {
     return key === "right" ? jumpTicks : -jumpTicks;
   };
 
+  const keepScrubBarVisible = async () => {
+    if (!repeatActiveRef.current || !scrubActiveRef.current) return;
+    await new Promise((r) => {
+      setTimeout(r, SCRUB_BAR_DOWN_DELAY_MS);
+    });
+    if (!repeatActiveRef.current || !scrubActiveRef.current) return;
+    await fetch(`${TV_TV_URL}/tv/key/down`).catch(() => {});
+    await new Promise((r) => {
+      setTimeout(r, SCRUB_BAR_BACK_DELAY_MS);
+    });
+    if (!repeatActiveRef.current || !scrubActiveRef.current) return;
+    await fetch(`${TV_TV_URL}/tv/key/back`).catch(() => {});
+  };
+
   const performEmbyScrubJump = async (key) => {
     embyPosRef.current = Math.max(
       0,
@@ -258,7 +274,10 @@ export default function App() {
       clearEmbyScrubState(true);
       return seekRes;
     }
-    if (seekRes.ok) scrubJumpCountRef.current += 1;
+    if (seekRes.ok) {
+      scrubJumpCountRef.current += 1;
+      await keepScrubBarVisible();
+    }
     return seekRes;
   };
 

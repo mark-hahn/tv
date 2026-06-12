@@ -798,7 +798,6 @@
           </div>
           <div
             v-if="getDownloadStatus(torrent)"
-            :title="getDownloadStatusTooltip(torrent)"
             style="
               position: absolute;
               bottom: 8px;
@@ -3360,15 +3359,6 @@ export default {
       if (s === "warn") return "Sent (verify pending)";
       if (s === "error") return "Error";
       return s;
-    },
-
-    getDownloadStatusTooltip(torrent) {
-      const st = this.getDownloadStatus(torrent);
-      if (!st) return "";
-      const msg = String(st.message || "").trim();
-      return msg
-        ? `${this.getDownloadStatusLabel(torrent)}: ${msg}`
-        : this.getDownloadStatusLabel(torrent);
     },
 
     setDownloadStatus(torrent, status, message) {

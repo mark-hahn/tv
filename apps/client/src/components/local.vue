@@ -1304,6 +1304,8 @@ export default {
       fixBusy: false,
       activeFixPath: null,
       ignoreFixLogs: false,
+      fixLogOffset: 0,
+      fixPollTimer: null,
 
       // Subs progress tracking
       subsPending: [],
@@ -2212,10 +2214,13 @@ export default {
         this.showOpn = false;
         this.showInfo = false;
         this.initFixState();
+      } else {
+        this.stopFixPolling();
       }
     },
     async clearFixLog() {
       this.fixLogs = "";
+      this.fixLogOffset = 0;
     },
     async startFix() {
       if (this.fixBusy) return;
@@ -2241,6 +2246,7 @@ export default {
       this.activeFixPath = startPath;
       this.ignoreFixLogs = true;
       this.fixLogs = "";
+      this.fixLogOffset = 0;
       this.showFix = true;
       this.showAsr = false;
       this.showInfo = false;
@@ -2256,6 +2262,7 @@ export default {
         if (res && res.stdout) {
           console.log("Fix Start stdout:", res.stdout);
         }
+        this.startFixPolling();
       } catch (e) {
         this.ignoreFixLogs = false;
         this.fixLogs += `Error starting ffmpeg: ${e.message}\n`;
@@ -2272,10 +2279,14 @@ export default {
         this.fixLogs += `\nError killing ffmpeg: ${e.message}\n`;
       }
       this.fixBusy = false;
+      this.stopFixPolling();
     },
-    onFixLog(msg) {
-      if (this.ignoreFixLogs) return;
-      if (!msg) return;
+    applyFixLogChunk(chunk, { replace = false } = {}) {
+      if (chunk == null || chunk === "") return;
+
+      if (replace) {
+        this.fixLogs = "";
+      }
 
       const el = this.$refs.fixScroll;
       let atBottom = true;
@@ -2283,19 +2294,36 @@ export default {
         atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50;
       }
 
-      if (msg.startsWith("\r")) {
-        // Replace the last (incomplete) line — everything after the last \n
+      let text = String(chunk);
+      while (text.length > 0) {
+        const crIdx = text.indexOf("\r");
+        if (crIdx === -1) {
+          this.fixLogs += text;
+          break;
+        }
+
+        if (crIdx > 0) {
+          this.fixLogs += text.slice(0, crIdx);
+        }
+
+        text = text.slice(crIdx + 1);
+        let nextBoundary = text.length;
+        const nextCr = text.indexOf("\r");
+        const nextNl = text.indexOf("\n");
+        if (nextCr !== -1) nextBoundary = Math.min(nextBoundary, nextCr);
+        if (nextNl !== -1) nextBoundary = Math.min(nextBoundary, nextNl + 1);
+
+        const progress = text.slice(0, nextBoundary);
         const lastNl = this.fixLogs.lastIndexOf("\n");
         if (lastNl !== -1) {
-          this.fixLogs = this.fixLogs.slice(0, lastNl + 1) + msg.slice(1);
+          this.fixLogs = this.fixLogs.slice(0, lastNl + 1) + progress;
         } else {
-          this.fixLogs = msg.slice(1);
+          this.fixLogs = progress;
         }
-      } else {
-        this.fixLogs += msg;
+        text = text.slice(nextBoundary);
       }
 
-      if (msg.includes("[fix] EXIT")) {
+      if (this.fixLogs.includes("[fix] EXIT")) {
         this.fixBusy = false;
       }
 
@@ -2305,13 +2333,67 @@ export default {
         });
       }
     },
+    onFixLog(msg) {
+      if (this.ignoreFixLogs) return;
+      if (!msg) return;
+
+      this.applyFixLogChunk(msg);
+    },
+    startFixPolling() {
+      this.stopFixPolling();
+      this.fixPollTimer = setInterval(() => {
+        if (this.showFix) {
+          this.syncFixLog();
+        }
+      }, 1000);
+    },
+    stopFixPolling() {
+      if (this.fixPollTimer) {
+        clearInterval(this.fixPollTimer);
+        this.fixPollTimer = null;
+      }
+    },
+    async syncFixLog(reset = false) {
+      try {
+        const res = await handleFix({
+          action: "tail",
+          offset: reset ? 0 : this.fixLogOffset,
+        });
+        if (reset) {
+          this.fixLogs = "";
+        }
+        if (res && typeof res.log === "string" && res.log.length > 0) {
+          this.applyFixLogChunk(res.log);
+        }
+        if (res && Number.isFinite(res.nextOffset)) {
+          this.fixLogOffset = res.nextOffset;
+        }
+        if (res && res.currentPath) {
+          this.activeFixPath = res.currentPath;
+        }
+        if (res) {
+          this.fixBusy = !!res.running;
+          if (!res.running) this.stopFixPolling();
+        }
+      } catch (e) {
+        console.error("Failed to sync Fix log", e);
+      }
+    },
     async initFixState() {
       try {
         const res = await handleFix({ action: "check" });
         if (res && res.running) {
           this.fixBusy = true;
+          this.activeFixPath = res.currentPath || this.activeFixPath;
+          await this.syncFixLog(true);
+          this.startFixPolling();
         } else {
           this.fixBusy = false;
+          if (res && (res.hasLog || res.status)) {
+            this.activeFixPath = res.currentPath || this.activeFixPath;
+            await this.syncFixLog(true);
+          }
+          this.stopFixPolling();
         }
       } catch (e) {
         console.error("Failed to init Fix State", e);

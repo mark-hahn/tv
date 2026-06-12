@@ -484,7 +484,14 @@ function chooseShow(shows, query) {
 
   // Use forceChoice=true to allow aggressive normalization and Levenshtein matching
   // This handles cases like "Sensitive Skin (CA)" matching "Sensitive Skin"
-  const result = smartTitleMatch(query, shows, year, true);
+  const matchedTitle = smartTitleMatch(query, shows, year, true);
+  const result =
+    shows.find((show) => show?.title === matchedTitle) ||
+    shows.find(
+      (show) =>
+        show?.title?.toLowerCase() === String(matchedTitle || "").toLowerCase(),
+    ) ||
+    null;
 
   if (debug && result) {
     log(`smartTitleMatch selected: "${result.title}" (${result.startyear})`);
@@ -533,9 +540,10 @@ async function findShows(page, query, timing) {
   const shows = await rows.evaluateAll((els) =>
     els.map((el) => {
       const infoName = el.querySelector('[data-qa="info-name"]');
+      const href = (infoName?.getAttribute("href") ?? "").trim();
       return {
         title: (infoName?.textContent ?? "").trim(),
-        href: (infoName?.getAttribute("href") ?? "").trim(),
+        href: href ? new URL(href, window.location.origin).toString() : "",
         releaseyear: (el?.getAttribute("releaseyear") ?? "").trim(),
         startyear: (el?.getAttribute("startyear") ?? "").trim(),
         endyear: (el?.getAttribute("endyear") ?? "").trim(),
@@ -544,7 +552,7 @@ async function findShows(page, query, timing) {
     }),
   );
   timing?.end("findShows.rows.evaluateAll", `count=${shows?.length ?? 0}`);
-  return shows;
+  return shows.filter((show) => show.title && show.href);
 }
 export async function rottenSearch(query) {
   const rottenStartTime = Date.now();
@@ -593,6 +601,10 @@ export async function rottenSearch(query) {
       return null;
     }
     const detailLink = show.href;
+    if (!detailLink) {
+      log(`Rotten: matched show missing href for "${query}"`);
+      return null;
+    }
     // console.log(`Rotten Search URL: ${queryUrl}`);
     // console.log(`Rotten Detail URL: ${detailLink}`);
     // Go to detail page

@@ -12,6 +12,9 @@ const PAGE_SIZE = 250;
 
 const RATE_WINDOW_MS = 10_000;
 const RATE_MAX_CALLS = 20;
+const TVMAZE_FETCH_TIMEOUT_MS = 20_000;
+const TVMAZE_FETCH_MAX_ATTEMPTS = 4;
+const TVMAZE_FETCH_RETRY_BASE_MS = 1_500;
 
 const DAILY_SYNC_HOUR_LOCAL = 3;
 const DAILY_SYNC_MINUTE_LOCAL = 0;
@@ -345,29 +348,61 @@ async function fetchJsonWithBackoff(url) {
     Referer: "https://www.tvmaze.com/",
   };
 
-  const res = await fetch(url, { method: "GET", headers });
-
-  if (res.status === 404) {
-    return { status: 404, json: null, headers: res.headers };
-  }
-
-  if (res.status === 429) {
-    const retryAfter = Number(res.headers.get("retry-after"));
-    const waitSeconds =
-      Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 10;
-    await sleep(waitSeconds * 1000);
-    return fetchJsonWithBackoff(url);
-  }
-
-  if (!res.ok) {
-    const bodyText = await res.text().catch(() => "");
-    throw new Error(
-      `TVmaze HTTP ${res.status} for ${url}. ${bodyText.slice(0, 200)}`,
+  for (let attempt = 1; attempt <= TVMAZE_FETCH_MAX_ATTEMPTS; attempt += 1) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      TVMAZE_FETCH_TIMEOUT_MS,
     );
+
+    try {
+      const res = await fetch(url, {
+        method: "GET",
+        headers,
+        signal: controller.signal,
+      });
+
+      if (res.status === 404) {
+        return { status: 404, json: null, headers: res.headers };
+      }
+
+      if (res.status === 429) {
+        const retryAfter = Number(res.headers.get("retry-after"));
+        const waitSeconds =
+          Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 10;
+        await sleep(waitSeconds * 1000);
+        continue;
+      }
+
+      if (res.status >= 500 && attempt < TVMAZE_FETCH_MAX_ATTEMPTS) {
+        await sleep(TVMAZE_FETCH_RETRY_BASE_MS * attempt);
+        continue;
+      }
+
+      if (!res.ok) {
+        const bodyText = await res.text().catch(() => "");
+        throw new Error(
+          `TVmaze HTTP ${res.status} for ${url}. ${bodyText.slice(0, 200)}`,
+        );
+      }
+
+      const json = await res.json();
+      return { status: res.status, json, headers: res.headers };
+    } catch (err) {
+      const isAbort = err?.name === "AbortError";
+      const isNetworkError =
+        isAbort ||
+        /fetch failed|timed out|etimedout/i.test(String(err?.message || err));
+      if (!isNetworkError || attempt >= TVMAZE_FETCH_MAX_ATTEMPTS) {
+        throw err;
+      }
+      await sleep(TVMAZE_FETCH_RETRY_BASE_MS * attempt);
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
-  const json = await res.json();
-  return { status: res.status, json, headers: res.headers };
+  throw new Error(`TVmaze fetch retry limit exceeded for ${url}`);
 }
 
 function openDb() {

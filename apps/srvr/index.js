@@ -60,6 +60,13 @@ const FLEXGET_CONFIG = path.join(SRVR_ROOT_DIR, "config", "config.yml");
 
 let flexgetIsRunning = false;
 
+function runFfprobe(args, maxBuffer = 2 * 1024 * 1024) {
+  return cp.execFileSync("ffprobe", args, {
+    maxBuffer,
+    encoding: "utf8",
+  });
+}
+
 function readBadGroupsFromDisk() {
   return fs
     .readFileSync(BAD_GROUPS_PATH, "utf8")
@@ -2798,14 +2805,20 @@ function probeFileQuality(filePath) {
 
   let quality = null;
   try {
-    const escapedPath = String(filePath).replace(/"/g, '\\"');
-    const probeOut = cp
-      .execSync(
-        `ffprobe -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 \"${escapedPath}\"`,
-        { maxBuffer: 1024 * 1024 },
-      )
-      .toString()
-      .trim();
+    const probeOut = runFfprobe(
+      [
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=height",
+        "-of",
+        "csv=p=0",
+        String(filePath),
+      ],
+      1024 * 1024,
+    ).trim();
     quality = normalizeVideoHeightToQuality(probeOut);
   } catch {
     quality = null;
@@ -3622,9 +3635,7 @@ const deletePath = async (params) => {
       }
     }
 
-    // Use rm -rf for both files and directories
-    const rmCmd = `rm -rf "${fullPath}"`;
-    cp.execSync(rmCmd);
+    fs.rmSync(fullPath, { recursive: true, force: true });
 
     // Wait for filesystem to sync
     await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -4543,12 +4554,14 @@ app.get("/api/audio-list", async (req, res) => {
     return;
   }
   try {
-    const probeOut = cp
-      .execSync(
-        `ffprobe -v quiet -print_format json -show_streams "${resolved.replace(/"/g, '\\"')}"`,
-        { maxBuffer: 2 * 1024 * 1024 },
-      )
-      .toString();
+    const probeOut = runFfprobe([
+      "-v",
+      "quiet",
+      "-print_format",
+      "json",
+      "-show_streams",
+      resolved,
+    ]);
     const streams = JSON.parse(probeOut).streams || [];
     const tracks = streams
       .filter((s) => s.codec_type === "audio")
@@ -4614,12 +4627,14 @@ app.get("/api/subtitle-list", async (req, res) => {
   const stem = path.basename(resolved).replace(/\.[^.]+$/, "");
   const tracks = [];
   try {
-    const probeOut = cp
-      .execSync(
-        `ffprobe -v quiet -print_format json -show_streams "${resolved.replace(/"/g, '\\"')}"`,
-        { maxBuffer: 2 * 1024 * 1024 },
-      )
-      .toString();
+    const probeOut = runFfprobe([
+      "-v",
+      "quiet",
+      "-print_format",
+      "json",
+      "-show_streams",
+      resolved,
+    ]);
     const streams = JSON.parse(probeOut).streams || [];
     for (const s of streams.filter((s) => s.codec_type === "subtitle")) {
       const lang = (s.tags?.language || "").toLowerCase();
@@ -4730,12 +4745,14 @@ app.get("/api/episodeSubs", async (req, res) => {
   const stem = videoFile.replace(/\.[^.]+$/, "");
   const tracks = [];
   try {
-    const probeOut = cp
-      .execSync(
-        `ffprobe -v quiet -print_format json -show_streams "${resolved.replace(/"/g, '\\"')}"`,
-        { maxBuffer: 2 * 1024 * 1024 },
-      )
-      .toString();
+    const probeOut = runFfprobe([
+      "-v",
+      "quiet",
+      "-print_format",
+      "json",
+      "-show_streams",
+      resolved,
+    ]);
     const streams = JSON.parse(probeOut).streams || [];
     for (const s of streams.filter((s) => s.codec_type === "subtitle")) {
       const lang = (s.tags?.language || "").toLowerCase();
@@ -4817,12 +4834,18 @@ app.get("/api/episodeStats", async (req, res) => {
   let hdr = null;
   let audioChannels = null;
   try {
-    const probeOut = cp
-      .execSync(
-        `ffprobe -v quiet -print_format json -show_streams -show_format "${resolved.replace(/"/g, '\\"')}"`,
-        { maxBuffer: 4 * 1024 * 1024 },
-      )
-      .toString();
+    const probeOut = runFfprobe(
+      [
+        "-v",
+        "quiet",
+        "-print_format",
+        "json",
+        "-show_streams",
+        "-show_format",
+        resolved,
+      ],
+      4 * 1024 * 1024,
+    );
     const probe = JSON.parse(probeOut);
     const fmt = probe.format || {};
     fileSize = fmt.size ? parseInt(fmt.size, 10) : null;
@@ -4962,12 +4985,14 @@ app.get("/api/subtitle", async (req, res) => {
 
   // 1. Try embedded subtitle stream first (e.g. subrip inside MKV)
   try {
-    const probeOut = cp
-      .execSync(
-        `ffprobe -v quiet -print_format json -show_streams "${resolved.replace(/"/g, '\\"')}"`,
-        { maxBuffer: 2 * 1024 * 1024 },
-      )
-      .toString();
+    const probeOut = runFfprobe([
+      "-v",
+      "quiet",
+      "-print_format",
+      "json",
+      "-show_streams",
+      resolved,
+    ]);
     const streams = JSON.parse(probeOut).streams || [];
     const subStream = streams.find((s) => s.codec_type === "subtitle");
     if (subStream) {
@@ -7304,7 +7329,7 @@ async function runEmbyFullSweep(caller = "unknown") {
         try {
           const st = fs.statSync(folderPath);
           if (st.isDirectory()) {
-            cp.execSync(`rm -rf "${folderPath}"`);
+            fs.rmSync(folderPath, { recursive: true, force: true });
             console.log(`[runEmbyFullSweep] Deleted folder: ${folderPath}`);
           }
         } catch (e) {

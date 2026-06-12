@@ -1,122 +1,61 @@
 import { spawn } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
+import { fileURLToPath } from "url";
 
 const MEDIA_ROOT = "/mnt/media/tv";
-const MAX_FIX_WS_CHUNK = 8 * 1024;
+const FIX_STATE_PATH = "/root/dev/apps/tv/apps/srvr/data/fix-state.json";
+const FIX_LOG_PATH = "/root/dev/apps/tv/apps/srvr/data/fix-log.txt";
+const FIX_RUNNER_PATH = fileURLToPath(
+  new URL("./fix-runner.js", import.meta.url),
+);
 
-let fixProc = null;
-let stderrBuf = "";
-let progressTimer = null;
-let lastProgress = "";
-const PROGRESS_INTERVAL_MS = 250;
-
-function stripAnsi(text) {
-  return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
+function ensureFixStateDir() {
+  fs.mkdirSync(path.dirname(FIX_STATE_PATH), { recursive: true });
 }
 
-function flushProgress(ws) {
-  if (lastProgress) {
-    sendFixChunks(ws, "\r" + lastProgress);
-    lastProgress = "";
+function writeJson(filePath, value) {
+  const tmpPath = `${filePath}.tmp`;
+  fs.writeFileSync(tmpPath, JSON.stringify(value, null, 2));
+  fs.renameSync(tmpPath, filePath);
+}
+
+function readJson(filePath) {
+  if (!fs.existsSync(filePath)) return null;
+  return JSON.parse(fs.readFileSync(filePath, "utf8"));
+}
+
+function isPidRunning(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
   }
 }
 
-function processStderr(ws, raw) {
-  stderrBuf += stripAnsi(raw.toString());
-
-  while (true) {
-    const nIdx = stderrBuf.indexOf("\n");
-    const rIdx = stderrBuf.indexOf("\r");
-
-    if (nIdx === -1 && rIdx === -1) break;
-
-    if (nIdx !== -1 && (rIdx === -1 || nIdx <= rIdx)) {
-      // Newline: commit the line
-      const line = stderrBuf.slice(0, nIdx + 1);
-      stderrBuf = stderrBuf.slice(nIdx + 1);
-      flushProgress(ws);
-      sendFixChunks(ws, line);
-    } else {
-      // Carriage return without newline: ffmpeg progress update
-      const line = stderrBuf.slice(0, rIdx);
-      stderrBuf = stderrBuf.slice(rIdx + 1);
-      if (line.length > 0) {
-        lastProgress = line;
-        if (!progressTimer) {
-          progressTimer = setInterval(() => {
-            if (lastProgress) {
-              flushProgress(ws);
-            } else {
-              clearInterval(progressTimer);
-              progressTimer = null;
-            }
-          }, PROGRESS_INTERVAL_MS);
-        }
-      }
-    }
-  }
+function readFixState() {
+  const state = readJson(FIX_STATE_PATH);
+  if (!state) return null;
+  const runnerAlive = isPidRunning(state.pid);
+  return {
+    ...state,
+    runnerAlive,
+    running: state.status === "running" && runnerAlive,
+  };
 }
 
-function resetStderrState() {
-  stderrBuf = "";
-  lastProgress = "";
-  if (progressTimer) {
-    clearInterval(progressTimer);
-    progressTimer = null;
-  }
+function writeFixState(state) {
+  ensureFixStateDir();
+  writeJson(FIX_STATE_PATH, state);
 }
 
-function sendFixChunks(ws, text) {
-  if (!text) return false;
-  if (!ws || ws.readyState !== 1) return false;
-  for (let i = 0; i < text.length; i += MAX_FIX_WS_CHUNK) {
-    const chunk = text.slice(i, i + MAX_FIX_WS_CHUNK);
-    try {
-      ws.send(
-        JSON.stringify({
-          id: "0",
-          status: "fix-log",
-          data: chunk,
-        }),
-      );
-    } catch (e) {
-      console.error("[FIX] ws send error", e);
-      return false;
-    }
-  }
-  return true;
-}
-
-function resolvePath(reqPath) {
-  let targetPath = reqPath || "";
-  if (targetPath && !path.isAbsolute(targetPath)) {
-    targetPath = path.resolve(MEDIA_ROOT, targetPath);
-  }
-  return targetPath;
-}
-
-function startFfmpeg(ws, id, targetPath) {
-  if (fixProc) {
-    try {
-      ws.send(
-        JSON.stringify({
-          id,
-          status: "ok",
-          data: { error: "ffmpeg is already running" },
-        }),
-      );
-    } catch (e) {}
-    return;
-  }
-
-  // targetPath can be a single file or a directory
-  // For a directory, find all video files and re-encode them
-  // For a single file, re-encode just that file
+function listVideoFiles(targetPath) {
   const isDir =
     fs.existsSync(targetPath) && fs.statSync(targetPath).isDirectory();
 
-  let filesToProcess = [];
+  const filesToProcess = [];
   const VIDEO_EXTS = new Set([
     "mkv",
     "avi",
@@ -144,116 +83,95 @@ function startFfmpeg(ws, id, targetPath) {
     filesToProcess.push(targetPath);
   }
 
-  if (filesToProcess.length === 0) {
-    try {
-      ws.send(
-        JSON.stringify({
-          id,
-          status: "ok",
-          data: { error: "No video files found in " + targetPath },
-        }),
-      );
-    } catch (e) {}
-    return;
-  }
-
-  // Reply immediately so client knows we started
-  try {
-    ws.send(
-      JSON.stringify({
-        id,
-        status: "ok",
-        data: { stdout: "Starting ffmpeg..." },
-      }),
-    );
-  } catch (e) {}
-
-  processFiles(ws, filesToProcess, 0);
+  return filesToProcess;
 }
 
-function processFiles(ws, files, idx) {
-  if (idx >= files.length) {
-    sendFixChunks(ws, "\n[fix] EXIT code=0\n");
-    fixProc = null;
+function resolvePath(reqPath) {
+  let targetPath = reqPath || "";
+  if (targetPath && !path.isAbsolute(targetPath)) {
+    targetPath = path.resolve(MEDIA_ROOT, targetPath);
+  }
+  return targetPath;
+}
+
+function sendReply(ws, id, status, data) {
+  try {
+    ws.send(JSON.stringify({ id, status, data }));
+  } catch (e) {}
+}
+
+function startFfmpeg(ws, id, targetPath) {
+  const activeState = readFixState();
+  if (activeState?.running) {
+    sendReply(ws, id, "ok", { error: "ffmpeg is already running" });
     return;
   }
 
-  const inputFile = files[idx];
-  const dir = path.dirname(inputFile);
-  const ext = path.extname(inputFile);
-  const base = path.basename(inputFile, ext);
-  const tmpFile = path.join(dir, base + ".fix-tmp.mkv");
-  const finalFile = path.join(dir, base + ".mkv");
+  const filesToProcess = listVideoFiles(targetPath);
+  if (filesToProcess.length === 0) {
+    sendReply(ws, id, "ok", {
+      error: "No video files found in " + targetPath,
+    });
+    return;
+  }
 
-  sendFixChunks(
-    ws,
-    `\n--- [${idx + 1}/${files.length}] ${path.basename(inputFile)} ---\n`,
-  );
+  ensureFixStateDir();
+  fs.writeFileSync(FIX_LOG_PATH, "");
 
-  const args = [
-    "-i",
-    inputFile,
-    "-map",
-    "0",
-    "-c:v",
-    "libx264",
-    "-preset",
-    "medium",
-    "-crf",
-    "20",
-    "-c:a",
-    "copy",
-    "-c:s",
-    "copy",
-    "-y",
-    tmpFile,
-  ];
+  const state = {
+    status: "starting",
+    pid: null,
+    startedAt: Date.now(),
+    updatedAt: Date.now(),
+    targetPath,
+    currentFile: null,
+    currentIndex: 0,
+    totalFiles: filesToProcess.length,
+    files: filesToProcess,
+    logPath: FIX_LOG_PATH,
+  };
+  writeFixState(state);
 
-  const proc = spawn("ffmpeg", args);
-  fixProc = proc;
-
-  proc.stdout.on("data", (data) => {
-    sendFixChunks(ws, data.toString());
+  const proc = spawn(process.execPath, [FIX_RUNNER_PATH, FIX_STATE_PATH], {
+    detached: true,
+    stdio: "ignore",
   });
+  proc.unref();
 
-  proc.stderr.on("data", (data) => {
-    processStderr(ws, data);
+  state.pid = proc.pid;
+  state.status = "running";
+  state.updatedAt = Date.now();
+  writeFixState(state);
+
+  sendReply(ws, id, "ok", {
+    stdout: "Starting ffmpeg...",
+    running: true,
+    currentPath: targetPath,
+    totalFiles: filesToProcess.length,
   });
+}
 
-  proc.on("error", (err) => {
-    sendFixChunks(ws, `\n[fix] ERROR: ${err.message}\n`);
-    resetStderrState();
-    fixProc = null;
-  });
+function tailFixLog(offset = 0) {
+  const state = readFixState();
+  const logExists = fs.existsSync(FIX_LOG_PATH);
+  const stat = logExists ? fs.statSync(FIX_LOG_PATH) : null;
+  const size = stat ? stat.size : 0;
+  const start =
+    Number.isFinite(offset) && offset > 0 && offset <= size ? offset : 0;
+  const log = logExists
+    ? fs.readFileSync(FIX_LOG_PATH, "utf8").slice(start)
+    : "";
 
-  proc.on("close", (code, signal) => {
-    if (fixProc !== proc) return; // killed
-
-    flushProgress(ws);
-    resetStderrState();
-
-    if (code === 0) {
-      // Keep original as .orig, put re-encoded file as .mkv
-      try {
-        fs.renameSync(inputFile, inputFile + ".orig");
-        fs.renameSync(tmpFile, finalFile);
-        sendFixChunks(
-          ws,
-          `[fix] Done ${path.basename(finalFile)} (original saved as .orig)\n`,
-        );
-      } catch (e) {
-        sendFixChunks(ws, `[fix] Rename error: ${e.message}\n`);
-      }
-      processFiles(ws, files, idx + 1);
-    } else {
-      sendFixChunks(ws, `\n[fix] EXIT code=${code} signal=${signal}\n`);
-      // Clean up temp file on failure
-      try {
-        if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
-      } catch (e) {}
-      fixProc = null;
-    }
-  });
+  return {
+    running: state?.running === true,
+    status: state?.status ?? null,
+    currentPath: state?.targetPath ?? null,
+    currentFile: state?.currentFile ?? null,
+    currentIndex: state?.currentIndex ?? 0,
+    totalFiles: state?.totalFiles ?? 0,
+    log,
+    nextOffset: size,
+  };
 }
 
 export function handleFix(ws, id, params) {
@@ -272,20 +190,25 @@ export function handleFix(ws, id, params) {
   if (action === "start") {
     startFfmpeg(ws, id, targetPath);
   } else if (action === "check") {
-    const running = fixProc !== null;
-    try {
-      ws.send(JSON.stringify({ id, status: "ok", data: { running } }));
-    } catch (e) {}
+    const state = readFixState();
+    sendReply(ws, id, "ok", {
+      running: state?.running === true,
+      status: state?.status ?? null,
+      currentPath: state?.targetPath ?? null,
+      currentFile: state?.currentFile ?? null,
+      currentIndex: state?.currentIndex ?? 0,
+      totalFiles: state?.totalFiles ?? 0,
+      hasLog: fs.existsSync(FIX_LOG_PATH) && fs.statSync(FIX_LOG_PATH).size > 0,
+    });
+  } else if (action === "tail") {
+    sendReply(ws, id, "ok", tailFixLog(Number(params?.offset) || 0));
   } else if (action === "kill") {
-    if (fixProc) {
-      fixProc.kill("SIGTERM");
-      fixProc = null;
-      resetStderrState();
+    const state = readFixState();
+    if (state?.running && Number.isInteger(state.pid)) {
+      try {
+        process.kill(state.pid, "SIGTERM");
+      } catch (e) {}
     }
-    try {
-      ws.send(
-        JSON.stringify({ id, status: "ok", data: { stdout: "Kill sent" } }),
-      );
-    } catch (e) {}
+    sendReply(ws, id, "ok", { stdout: "Kill sent" });
   }
 }

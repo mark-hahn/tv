@@ -125,7 +125,8 @@ function parseTvdbJson(text, filePath) {
 function loadTvdbAtStartup() {
   const primaryText = fs.readFileSync(TVDB_PATH, "utf8");
   const primaryParsed = parseTvdbJson(primaryText, TVDB_PATH);
-  if (primaryParsed) return migrateRemotesToFlatProps(primaryParsed);
+  if (primaryParsed)
+    return stripLegacyLastWatched(migrateRemotesToFlatProps(primaryParsed));
 
   const backupText = fs.readFileSync(TVDB_BACKUP_PATH, "utf8");
   const backupParsed = parseTvdbJson(backupText, TVDB_BACKUP_PATH);
@@ -134,7 +135,7 @@ function loadTvdbAtStartup() {
       `[tvdb] startup recovery: invalid primary JSON at ${TVDB_PATH}; restoring from backup ${TVDB_BACKUP_PATH}`,
     );
     fs.writeFileSync(TVDB_PATH, JSON.stringify(backupParsed), "utf8");
-    return migrateRemotesToFlatProps(backupParsed);
+    return stripLegacyLastWatched(migrateRemotesToFlatProps(backupParsed));
   }
 
   throw new Error(
@@ -178,7 +179,17 @@ function migrateRemotesToFlatProps(data) {
   return data;
 }
 
+function stripLegacyLastWatched(data) {
+  for (const rec of Object.values(data || {})) {
+    if (rec && typeof rec === "object" && "lastWatched" in rec) {
+      delete rec.lastWatched;
+    }
+  }
+  return data;
+}
+
 async function saveTvdbFiles(data) {
+  stripLegacyLastWatched(data);
   await util.writeFile(TVDB_PATH, data);
   await util.writeFile(TVDB_BACKUP_PATH, data);
 }
@@ -1981,7 +1992,6 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   tvdbData.haveSubs = paramObj.haveSubs ?? existing.haveSubs ?? false;
   tvdbData.anticipating =
     paramObj.anticipating ?? existing.anticipating ?? false;
-  tvdbData.lastWatched = paramObj.lastWatched || existing.lastWatched || null;
   if (existing["last-downloaded"] !== undefined) {
     tvdbData["last-downloaded"] = existing["last-downloaded"];
   }

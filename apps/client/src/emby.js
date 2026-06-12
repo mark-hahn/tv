@@ -921,7 +921,6 @@ export const editEpisode = async (
 
       const episodeId = episodeRec.Id;
       userData.Played = setWatched !== null ? setWatched : !watched;
-      if (userData.Played) userData.LastPlayedDate = new Date().toISOString();
       const url = urls.postUserDataUrl(cred, episodeId);
       const setDataRes = await axios({
         method: "post",

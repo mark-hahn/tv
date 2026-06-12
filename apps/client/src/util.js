@@ -74,7 +74,7 @@ export function fmtLaDateTime(dateIn = new Date()) {
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
 }
 
-export function normalizeLastWatched(value) {
+export function normalizePlayedDate(value) {
   if (value === undefined || value === null || value === "") return "";
   if (typeof value === "number" && Number.isFinite(value)) {
     return fmtLaDateTime(value);
@@ -88,11 +88,11 @@ export function normalizeLastWatched(value) {
   return fmtLaDateTime(raw);
 }
 
-export function fmtLastWatched(value) {
+export function fmtPlayedDate(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw.replace(/-/g, "/");
-  const normalized = normalizeLastWatched(raw);
+  const normalized = normalizePlayedDate(raw);
   if (!normalized) return "";
   const [datePart, timePart] = normalized.split("T");
   if (!datePart) return "";
@@ -100,6 +100,9 @@ export function fmtLastWatched(value) {
     ? `${datePart.replace(/-/g, "/")} ${timePart}`
     : datePart.replace(/-/g, "/");
 }
+
+export const normalizeLastWatched = normalizePlayedDate;
+export const fmtLastWatched = fmtPlayedDate;
 
 export function fmtUnixDatePst(unixSeconds) {
   const ts = Number(unixSeconds);

@@ -1288,19 +1288,15 @@ export default {
           return forSort ? val.toLowerCase() : val;
         }
         case "Viewed":
-          lastViewed = util.normalizeLastWatched(show.lastWatched);
+          lastViewed = util.normalizePlayedDate(
+            show.lastPlayedDate || allTvdb?.[show.name]?.lastPlayedDate || "",
+          );
           if (forSort) {
-            return (
-              lastViewed ||
-              util.normalizeLastWatched(srvr.lastViewedCache[show.name]) ||
-              ""
-            );
+            return lastViewed || "";
           }
           if (lastViewed)
-            return util.fmtLastWatched(show.lastWatched).split(" ")[0] || "";
-          lastViewed = srvr.lastViewedCache[show.name];
-          if (lastViewed === undefined) return "";
-          return util.fmtLastWatched(lastViewed).split(" ")[0] || "";
+            return util.fmtPlayedDate(lastViewed).split(" ")[0] || "";
+          return "";
         case "Down":
           lastDownloaded = Number(allTvdb?.[show.name]?.["last-downloaded"]);
           if (forSort)

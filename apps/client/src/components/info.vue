@@ -583,7 +583,9 @@ export default {
 
   computed: {
     lastWatchedDate() {
-      return util.fmtLastWatched(this.show?.lastWatched).split(" ")[0] || null;
+      return (
+        util.fmtPlayedDate(this.show?.lastPlayedDate).split(" ")[0] || null
+      );
     },
     hasVideoFiles() {
       return (
@@ -905,7 +907,7 @@ export default {
 
     setDates(tvdbData) {
       const show = this.show;
-      const { firstAired, lastAired, status, lastWatched } = tvdbData;
+      const { firstAired, lastAired, status, lastPlayedDate } = tvdbData;
       const fa = firstAired || "";
       const la = lastAired || "";
       const st = status || "";
@@ -916,7 +918,7 @@ export default {
       else this.dates = "";
       this.statusTxt = st ? ` &nbsp; ${st}` : "";
       this.lastWatchedTxt =
-        util.fmtLastWatched(lastWatched).split(" ")[0] || "";
+        util.fmtPlayedDate(lastPlayedDate).split(" ")[0] || "";
     },
 
     async setSeasonsTxt(tvdbData) {

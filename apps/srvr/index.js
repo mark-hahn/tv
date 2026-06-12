@@ -2517,16 +2517,19 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
       tvdbRecord.filesOnDisk = [];
       tvdbRecord.fileQuality = {};
     }
-    // lastWatched
-    const lastWatchedChanges = [];
+    // lastPlayedDate
+    const playedDateChanges = [];
     if (tvdbRecord.inEmby && tvdbRecord.id) {
       try {
-        const lastWatchedAt = await fetchLastWatchedDate(tvdbRecord.id);
-        if (lastWatchedAt && lastWatchedAt !== tvdbRecord.lastWatched) {
-          lastWatchedChanges.push(
-            `lastWatched:${tvdbRecord.lastWatched}->${lastWatchedAt}`,
+        const latestPlayed = await fetchLatestPlayedInfo(tvdbRecord.id);
+        if (
+          latestPlayed?.lastPlayedDate &&
+          latestPlayed.lastPlayedDate !== tvdbRecord.lastPlayedDate
+        ) {
+          playedDateChanges.push(
+            `lastPlayedDate:${tvdbRecord.lastPlayedDate}->${latestPlayed.lastPlayedDate}`,
           );
-          tvdbRecord.lastWatched = lastWatchedAt;
+          tvdbRecord.lastPlayedDate = latestPlayed.lastPlayedDate;
         }
       } catch (e) {}
     }
@@ -2616,7 +2619,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         }
       }
     }
-    const push2Changes = [...diskChanges, ...lastWatchedChanges, ...gapChanges];
+    const push2Changes = [...diskChanges, ...playedDateChanges, ...gapChanges];
     // History: bkgndUpdate (timer-selected) or clientUpdate (user-triggered)
     try {
       const tvdbIdVal = String(tvdbRecord.tvdbId || "").trim() || null;
@@ -5804,10 +5807,51 @@ let lastMissingEpWarning = null;
 let lastLivingRoomWasPlaying = false;
 let lastAutoSkipKey = null; // "showName|season|episode" of last auto-skipped episode
 
+async function refreshPlayedDatesForShow(showName) {
+  if (!showName) return false;
+  const allTvdb = tvdb.getAllTvdbSync?.();
+  if (!allTvdb) return false;
+  const tvdbRecord =
+    allTvdb[showName] ||
+    Object.values(allTvdb).find((record) => record?.name === showName);
+  if (!tvdbRecord?.inEmby || !tvdbRecord?.id) return false;
+
+  const latestPlayed = await fetchLatestPlayedInfo(tvdbRecord.id);
+  if (!latestPlayed?.lastPlayedDate) return false;
+
+  const lastPlayedChanged =
+    latestPlayed.lastPlayedDate !== (tvdbRecord.lastPlayedDate || null);
+  if (!lastPlayedChanged) return false;
+
+  tvdbRecord.lastPlayedDate = latestPlayed.lastPlayedDate;
+  await tvdb.saveTvdbSync();
+  notifyClients("tvdbUpdated", {
+    name: tvdbRecord.name || showName,
+    record: tvdbRecord,
+  });
+  console.log(
+    `[nowPlaying] refreshed lastPlayedDate for ${showName} -> ${latestPlayed.lastPlayedDate}`,
+  );
+  return true;
+}
+
 app.post("/internal/nowPlaying", (req, res) => {
   const { showName, playing } = req.body;
+  const prevPlayingShowNames = new Set(
+    (Array.isArray(lastNowPlayingList) ? lastNowPlayingList : [])
+      .map((item) => item?.showName)
+      .filter(Boolean),
+  );
+  const nextPlayingList = Array.isArray(playing) ? playing : [];
+  const nextPlayingShowNames = new Set(
+    nextPlayingList.map((item) => item?.showName).filter(Boolean),
+  );
+  const stoppedShowNames = [...prevPlayingShowNames].filter(
+    (name) => !nextPlayingShowNames.has(name),
+  );
+
   lastNowPlayingShowName = showName ?? null;
-  lastNowPlayingList = Array.isArray(playing) ? playing : [];
+  lastNowPlayingList = nextPlayingList;
   if (lastNowPlayingList.length === 0) lastMissingEpWarning = null;
   notifyClients("nowPlaying", {
     showName: lastNowPlayingShowName,
@@ -5840,6 +5884,14 @@ app.post("/internal/nowPlaying", (req, res) => {
   lastLivingRoomWasPlaying = isNowPlaying;
 
   checkMissingEpisodes(lastNowPlayingList).catch(() => {});
+  for (const stoppedShowName of stoppedShowNames) {
+    refreshPlayedDatesForShow(stoppedShowName).catch((err) => {
+      console.error(
+        `[nowPlaying] failed to refresh played dates for ${stoppedShowName}:`,
+        err.message,
+      );
+    });
+  }
 });
 
 async function checkMissingEpisodes(playing) {
@@ -7563,27 +7615,30 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
       }
     }
 
-    // Update lastWatched for each show in batch (2-call Emby fetch per show)
-    let lastWatchedChanged = 0;
+    // Update lastPlayedDate for each show in batch (2-call Emby fetch per show)
+    let lastPlayedChanged = 0;
     for (const { showId, showName, tvdbRecord } of shows) {
       const t0 = Date.now();
       try {
-        const lastWatchedAt = await fetchLastWatchedDate(showId);
+        const latestPlayed = await fetchLatestPlayedInfo(showId);
         const elapsed = Date.now() - t0;
-        if (lastWatchedAt && lastWatchedAt !== tvdbRecord.lastWatched) {
-          tvdbRecord.lastWatched = lastWatchedAt;
-          lastWatchedChanged++;
+        if (
+          latestPlayed?.lastPlayedDate &&
+          latestPlayed.lastPlayedDate !== tvdbRecord.lastPlayedDate
+        ) {
+          tvdbRecord.lastPlayedDate = latestPlayed.lastPlayedDate;
+          lastPlayedChanged++;
           appendWatchgapLog(
-            `  lastWatched updated | ${elapsed}ms | ${showName} -> ${lastWatchedAt}`,
+            `  lastPlayedDate updated | ${elapsed}ms | ${showName} -> ${latestPlayed.lastPlayedDate}`,
           );
         }
       } catch (err) {
-        console.error(`[lastWatched] ${showName}: ${err.message}`);
+        console.error(`[lastPlayedDate] ${showName}: ${err.message}`);
       }
     }
-    if (lastWatchedChanged > 0) {
+    if (lastPlayedChanged > 0) {
       await tvdb.saveTvdbSync();
-      console.log(`[lastWatched] Updated ${lastWatchedChanged} shows`);
+      console.log(`[lastPlayedDate] Updated ${lastPlayedChanged} shows`);
     }
 
     // Now run gap check with fresh emby and disk data
@@ -7671,38 +7726,7 @@ const COLLECTION_IDS = {
 const DISK_SYNC_INTERVAL = 60 * 60 * 1000; // 1 hour (full disk check)
 const GAP_CHECK_INTERVAL = 6 * 60 * 1000; // 6 minutes (processes batch of 10 shows, checks disk per-show)
 
-function formatLaLastWatched(dateIn) {
-  const date = dateIn instanceof Date ? dateIn : new Date(dateIn);
-  if (Number.isNaN(date.getTime())) return null;
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).formatToParts(date);
-  const map = {};
-  for (const part of parts) {
-    if (part && part.type && part.value) map[part.type] = part.value;
-  }
-  if (
-    !map.year ||
-    !map.month ||
-    !map.day ||
-    !map.hour ||
-    !map.minute ||
-    !map.second
-  ) {
-    return null;
-  }
-  const hour = map.hour === "24" ? "00" : map.hour;
-  return `${map.year}-${map.month}-${map.day}T${hour}:${map.minute}:${map.second}`;
-}
-
-async function fetchLastWatchedDate(showId) {
+async function fetchLatestPlayedInfo(showId) {
   const epUrl = `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items?api_key=${EMBY_API_KEY}&ParentId=${showId}&IncludeItemTypes=Episode&Recursive=true&IsPlayed=true&SortBy=DatePlayed&SortOrder=Descending&Limit=1`;
   const epResp = await fetch(epUrl);
   if (!epResp.ok) return null;
@@ -7715,7 +7739,9 @@ async function fetchLastWatchedDate(showId) {
   const detail = await detailResp.json();
   const utcStr = detail.UserData?.LastPlayedDate;
   if (!utcStr) return null;
-  return formatLaLastWatched(utcStr);
+  return {
+    lastPlayedDate: utcStr,
+  };
 }
 
 // NOTE: syncEmbyUserData periodic sync removed - now using immediate triggers from client

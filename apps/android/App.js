@@ -89,7 +89,7 @@ function formatLaDateTime(dateIn) {
   return `${map.year}-${map.month}-${map.day}T${hour}:${map.minute}:${map.second}`;
 }
 
-function normalizeLastWatched(value) {
+function normalizePlayedDate(value) {
   if (value === undefined || value === null || value === "") return "";
   if (typeof value === "number" && Number.isFinite(value)) {
     return formatLaDateTime(value);
@@ -103,11 +103,8 @@ function normalizeLastWatched(value) {
 }
 
 function getViewedSortValue(show, lastViewedMap) {
-  return (
-    normalizeLastWatched(show?.lastWatched) ||
-    normalizeLastWatched(lastViewedMap?.[show?.name]) ||
-    ""
-  );
+  void lastViewedMap;
+  return normalizePlayedDate(show?.lastPlayedDate) || "";
 }
 
 const COLS = 3;

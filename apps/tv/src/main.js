@@ -13,8 +13,8 @@ const REMOTE_ENTITY_ID = "remote.bravia_k_65xr70";
 const FIRE_TV_ENTITY_ID = "media_player.fire_tv_192_168_1_47";
 const FIRE_TV_REMOTE_ID = "remote.fire_tv_192_168_1_47";
 const FIRE_TV_IP = "192.168.1.47";
-const BRAVIA_TV_IP = "192.168.1.85";
-const BRAVIA_PICTURE_URL = `http://${BRAVIA_TV_IP}/sony/video`;
+const BRAVIA_TV_IP = "192.168.1.85:44531";
+const BRAVIA_PICTURE_URL = `http://192.168.1.85/sony/video`;
 const BRAVIA_PSK = "qwerty";
 
 const PIC_TARGETS = [
@@ -619,7 +619,7 @@ function spawnBraviaShell() {
   }
   braviaShellReady = false;
   braviaShellUnauthorized = false;
-  braviaShell = spawn("adb", ["-s", `${BRAVIA_TV_IP}:5555`, "shell"]);
+  braviaShell = spawn("adb", ["-s", BRAVIA_TV_IP, "shell"]);
   braviaShellStdoutBuf = "";
   let braviaShellStderrBuf = "";
   braviaShell.stdout.on("data", (chunk) => {
@@ -662,7 +662,7 @@ function spawnBraviaShell() {
 }
 
 function connectBraviaShell() {
-  exec(`adb connect ${BRAVIA_TV_IP}:5555`, (err, stdout) => {
+  exec(`adb connect ${BRAVIA_TV_IP}`, (err, stdout) => {
     if (err) {
       log(`[bravia] adb connect failed: ${err.message}, retrying in 5s...`);
       setTimeout(connectBraviaShell, 5000);
@@ -1052,12 +1052,12 @@ app.get("/tv/playvideo", (req, res) => {
       const videoId = ytMatch[1];
       log(`playvideo launching YouTube video ${videoId} via adb`);
       // Use adb to send intent directly to YouTube app
-      cmd = `adb -s ${BRAVIA_TV_IP}:5555 shell am start -a android.intent.action.VIEW -d "https://www.youtube.com/watch?v=${videoId}" com.google.android.youtube.tv`;
+      cmd = `adb -s ${BRAVIA_TV_IP} shell am start -a android.intent.action.VIEW -d "https://www.youtube.com/watch?v=${videoId}" com.google.android.youtube.tv`;
     } else {
       log(`playvideo: non-YouTube URL, launching in VLC`);
       // For IMDB or other video URLs, open in VLC
       // Use single quotes in the shell to prevent & interpretation
-      cmd = `adb -s ${BRAVIA_TV_IP}:5555 shell "am start -a android.intent.action.VIEW -d '${url}' -t 'video/*' org.videolan.vlc"`;
+      cmd = `adb -s ${BRAVIA_TV_IP} shell "am start -a android.intent.action.VIEW -d '${url}' -t 'video/*' org.videolan.vlc"`;
     }
     log(`playvideo cmd: ${cmd}`);
     exec(cmd, (err, stdout, stderr) => {

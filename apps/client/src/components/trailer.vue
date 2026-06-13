@@ -92,10 +92,11 @@
                   border: '1px solid #999',
                   borderRadius: '4px',
                   fontWeight: 'bold',
-                  zIndex: 10,
+                  zIndex: 9999,
+                  pointerEvents: 'auto',
                 }"
               >
-                Stream
+                TV
               </button>
             </div>
           </template>
@@ -138,7 +139,7 @@
                   zIndex: 10,
                 }"
               >
-                Stream
+                TV
               </button>
             </div>
           </template>

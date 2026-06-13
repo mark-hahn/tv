@@ -597,20 +597,21 @@ export default function App() {
             : null,
         }));
         setGuestActors(guests);
-        if (data?.image || data?.overview) {
-          setEpisodeInfo({
-            image: data.image ?? null,
-            overview: data.overview ?? null,
-            name: data.name ?? null,
-            aired: data.aired ?? null,
-          });
-        } else {
-          setEpisodeInfo(null);
-        }
+        setEpisodeInfo({
+          image: data?.image ?? null,
+          overview: data?.overview ?? null,
+          name: data?.name ?? null,
+          aired: data?.aired ?? null,
+        });
       } catch (_) {
         if (!cancelled) {
           setGuestActors([]);
-          setEpisodeInfo(null);
+          setEpisodeInfo({
+            image: null,
+            overview: null,
+            name: null,
+            aired: null,
+          });
         }
       }
     })();

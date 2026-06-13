@@ -1840,21 +1840,24 @@ export default {
           season,
           episode,
         });
+        console.log(`[selectEpisode] S${season}E${episode} data:`, data);
         if (reqId !== this.episodeInfoRequestId) return;
-        if (data?.image || data?.overview) {
-          this.episodeInfo = {
-            image: data.image ?? null,
-            overview: data.overview ?? null,
-            name: data.name ?? null,
-            aired: data.aired ?? null,
-          };
-        } else {
-          this.episodeInfo = null;
-        }
+        this.episodeInfo = {
+          image: data?.image ?? null,
+          overview: data?.overview ?? null,
+          name: data?.name ?? null,
+          aired: data?.aired ?? null,
+        };
+        console.log(`[selectEpisode] episodeInfo set:`, this.episodeInfo);
       } catch (err) {
         if (reqId !== this.episodeInfoRequestId) return;
         console.error("selectEpisode getTmdb error:", err);
-        this.episodeInfo = null;
+        this.episodeInfo = {
+          image: null,
+          overview: null,
+          name: null,
+          aired: null,
+        };
       }
     },
     selectSingleEpisode(season, episode) {

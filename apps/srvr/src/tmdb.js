@@ -46,13 +46,20 @@ export async function getTmdb(params) {
     const res = await moviedb.searchTv({ query: showName });
 
     // Find show with matching original_name, optionally prioritizing year
-    // TMDB ID Lookup: forceChoice = false
-    const matchingShow = smartTitleMatch(
+    const matchingTitle = smartTitleMatch(
       showName,
       res.results || [],
       year,
       false,
     );
+
+    // Find the actual show object that matches the title
+    const matchingShow = matchingTitle
+      ? res.results.find(
+          (show) =>
+            show.name === matchingTitle || show.original_name === matchingTitle,
+        )
+      : null;
 
     const showId = matchingShow?.id;
 

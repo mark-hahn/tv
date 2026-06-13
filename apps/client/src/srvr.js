@@ -376,6 +376,14 @@ export function getDevices() {
   return httpCall("/api/getDevices");
 }
 
+export function skipIntro(deviceName) {
+  return httpCall(
+    "/api/skipIntro",
+    { pressedAt: Date.now(), deviceName },
+    "POST",
+  );
+}
+
 export function embyViewShow(showId, showName) {
   return httpCall("/api/embyViewShow", { showId, showName }, "POST");
 }

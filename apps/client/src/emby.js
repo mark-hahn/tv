@@ -1385,6 +1385,19 @@ export const startStop = async (show, episodeId, watchButtonTxt) => {
         await axios({ method: "post", url, data: body });
         console.log(`playing2 ${show.name} on  ${deviceName}`);
       }, 1000);
+
+      // Auto-skip intro if introDur is negative (meaning skip from start)
+      if (show?.introDur != null && show.introDur < 0) {
+        setTimeout(async () => {
+          try {
+            const skipRes = await srvr.skipIntro(deviceName);
+            console.log(`[startStop] skip intro result:`, skipRes);
+          } catch (e) {
+            console.error(`[startStop] skip intro error:`, e);
+          }
+        }, 2500);
+      }
+
       return;
     }
   }

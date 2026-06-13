@@ -90,7 +90,23 @@ async function syncCollections(allTvdb) {
 // Thin loadAllShows - fetches tvdb from server, applies computed props
 export async function loadAllShows() {
   const loadStart = Date.now();
+  const fmtTs = () => {
+    const now = new Date();
+    const pst = new Date(
+      now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }),
+    );
+    const mm = String(pst.getMonth() + 1).padStart(2, "0");
+    const dd = String(pst.getDate()).padStart(2, "0");
+    const hh = String(pst.getHours()).padStart(2, "0");
+    const mi = String(pst.getMinutes()).padStart(2, "0");
+    const ss = String(pst.getSeconds()).padStart(2, "0");
+    return `${mm}/${dd} ${hh}:${mi}:${ss}`;
+  };
+  console.debug(`[${fmtTs()}] [loadAllShows] start`);
   const allTvdb = await tvdb.getAllTvdb(0);
+  console.debug(
+    `[${fmtTs()}] [loadAllShows] getAllTvdb done in ${Date.now() - loadStart}ms, keys=${Object.keys(allTvdb || {}).length}`,
+  );
 
   // Ensure computed properties are set
   for (const rec of Object.values(allTvdb)) {

@@ -10,23 +10,40 @@ const deviceNameByDeviceId = {
 };
 
 const deviceIsOn = async (deviceId) => {
+  const _t0 = Date.now();
+  console.log(`[emby] deviceIsOn --> ${deviceId}`);
   let resp = await fetch(urls.sessionUrl(deviceId));
   if (resp.status !== 200) {
     console.error(`error deviceIsOn resp: ${resp.statusText}`);
+    console.log(
+      `[emby] deviceIsOn <-- ${deviceId} ERROR (${Date.now() - _t0}ms)`,
+    );
     return true;
   }
   const session = await resp.json();
-  return !!session.length;
+  const isOn = !!session.length;
+  console.log(
+    `[emby] deviceIsOn <-- ${deviceId} isOn=${isOn} (${Date.now() - _t0}ms)`,
+  );
+  return isOn;
 };
 
 export const getOnDevices = async () => {
+  const _t0 = Date.now();
+  console.log(`[emby] getOnDevices --> watchingUrl`);
   const url = urls.watchingUrl();
   let resp = await fetch(url);
   if (resp.status !== 200) {
     console.error(`error getOnDevices resp: ${resp.statusText}`);
+    console.log(
+      `[emby] getOnDevices <-- ERROR status=${resp.status} (${Date.now() - _t0}ms)`,
+    );
     return [];
   }
   const respData = await resp.json();
+  console.log(
+    `[emby] getOnDevices <-- sessions=${respData?.length ?? 0} (${Date.now() - _t0}ms)`,
+  );
   if (!respData || respData.length === 0) return [];
   const devicesOn = [];
   for (const deviceState of respData) {
@@ -65,7 +82,13 @@ export const getOnDevices = async () => {
 };
 
 export const getDevices = async () => {
-  return await getOnDevices();
+  const _t0 = Date.now();
+  console.log(`[emby] getDevices start`);
+  const result = await getOnDevices();
+  console.log(
+    `[emby] getDevices done, ${result.length} devices (${Date.now() - _t0}ms)`,
+  );
+  return result;
 };
 
 export const viewShowOnLivingRoomTv = async ({

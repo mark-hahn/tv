@@ -3695,13 +3695,22 @@ app.use((req, res, next) => {
 // The handler should be: async (params) => result
 const apiWrapper = (handler) => {
   return async (req, res) => {
+    const _t0 = Date.now();
+    const route = req.url || req.path || "unknown";
+    console.log(`[api] --> ${req.method} ${route}`);
     try {
       // GET requests use query params, POST use body
       const params = req.method === "GET" ? req.query : req.body;
       const result = await handler(params);
+      console.log(
+        `[api] <-- ${req.method} ${route} OK (${Date.now() - _t0}ms)`,
+      );
       res.json(result);
     } catch (error) {
-      console.error(`[SERVER] Error in ${req.url}:`, error);
+      console.error(
+        `[api] <-- ${req.method} ${route} ERROR (${Date.now() - _t0}ms):`,
+        error,
+      );
       res.status(500).json({ error: error.message || String(error) });
     }
   };

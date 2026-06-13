@@ -3478,6 +3478,7 @@ export default {
 
   /////////////////  MOUNTED  /////////////////
   mounted() {
+    console.debug(`[list] mounted`);
     this.updateWideLandscape();
     this._onResizeWideLandscape = () => this.updateWideLandscape();
     window.addEventListener("resize", this._onResizeWideLandscape);

@@ -1564,7 +1564,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   }
 
   const inputName = show.name;
-  // log("getTvdbData: START", { name, fast });
+  const _t0getTvdb = Date.now();
+  log(`[getTvdbData] start "${inputName}" fast=${!!fast}`);
   // Use PST for added date
   const added = allTvdb[inputName]?.added ?? getPstDate();
   const showId = show.id;
@@ -1596,12 +1597,17 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   try {
     extUrl = `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`;
     token = await getToken();
+    log(`[getTvdbData] fetch extended "${inputName}" tvdbId=${tvdbId}`);
+    const _t0ext = Date.now();
     extRes = await fetch(extUrl, {
       headers: {
         "Content-Type": "application/json",
         Authorization: "Bearer " + token,
       },
     });
+    log(
+      `[getTvdbData] fetch extended done "${inputName}" status=${extRes.status} (${Date.now() - _t0ext}ms)`,
+    );
 
     if (!extRes.ok) {
       log(
@@ -1688,9 +1694,14 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   let remotes = [];
   let fetchedUrls = {};
   if (!paramObj.transient) {
+    log(`[getTvdbData] getRemotes start "${inputName}" fast=${!!fast}`);
+    const _t0rem = Date.now();
     const remoteResult = await getRemotes(show, remoteIds, fast);
     remotes = remoteResult?.remotes || [];
     fetchedUrls = remoteResult?.urls || {};
+    log(
+      `[getTvdbData] getRemotes done "${inputName}" (${Date.now() - _t0rem}ms)`,
+    );
   } else {
     // For transient/preview, extract IMDB URL directly from remoteIds (no network calls)
     // so that the reviews pane can load IMDB reviews.
@@ -2039,7 +2050,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     }
   }
   // update allTvdb & tvdb.json
-  // log("getTvdbData: END", { name, hasRemotes: !!tvdbData.remotes?.length });
+  log(`[getTvdbData] done "${inputName}" (${Date.now() - _t0getTvdb}ms)`);
   resolve(tvdbData);
 };
 
@@ -2121,6 +2132,10 @@ const chkTvdbQueue = () => {
   chkTvdbQueueRunning = true;
   const { ws, id, paramObj, resolve: resolveCb } = newTvdbQueue.pop();
   const showName = paramObj.show?.name;
+
+  log(
+    `[chkTvdbQueue] start processing "${showName}" fast=${!!paramObj.fast} transient=${!!paramObj.transient} queueLen=${newTvdbQueue.length}`,
+  );
 
   // Snapshot the old record NOW, before getTvdbData overwrites allTvdb[name].
   // getTvdbData sets allTvdb[name] = tvdbData before resolving the promise, so
@@ -2234,11 +2249,15 @@ const chkTvdbQueue = () => {
         }
         // When suppressNotify, _hasChanges/_push1Changes are preserved for the caller
       }
+      log(
+        `[chkTvdbQueue] done processing "${showName}" queueLen=${newTvdbQueue.length}`,
+      );
       chkTvdbQueueRunning = false;
       chkTvdbQueue();
     })
     .catch((err) => {
       log("err", "chkTvdbQueue: promise rejected", { err });
+      log(`[chkTvdbQueue] done (error) processing "${showName}"`);
       if (resolveCb) resolveCb(null);
       chkTvdbQueueRunning = false;
       chkTvdbQueue();
@@ -2829,6 +2848,10 @@ export const getNewTvdb = async (params) => {
   // HTTP requests are always fast mode - mark to skip slow remote fetching
   params.fast = true;
 
+  const showName = params.show?.name;
+  log(
+    `[getNewTvdb] queued "${showName}" fast=true queueLen=${newTvdbQueue.length} busy=${chkTvdbQueueRunning}`,
+  );
   return new Promise((resolve, reject) => {
     // Queue the request with appropriate callback
     newTvdbQueue.unshift({ ws: null, id: null, paramObj: params, resolve });
@@ -3135,7 +3158,8 @@ export const accessTvdb = async (params) => {
     const { path: tvdbPath, query } = paramObj;
 
     url = buildTvdbUrl(tvdbPath, query).toString();
-    // log("accessTvdb: START", { tvdbPath, url });
+    const _t0 = Date.now();
+    log(`[accessTvdb] --> ${tvdbPath}`);
 
     let token = await getToken();
 
@@ -3181,9 +3205,10 @@ export const accessTvdb = async (params) => {
         body,
       });
     }
-    // else {
-    //   log("accessTvdb: END", { ok: upstream.ok, status: upstream.status });
-    // }
+
+    log(
+      `[accessTvdb] <-- ${params?.path} status=${upstream.status} (${Date.now() - _t0}ms)`,
+    );
 
     return {
       ok: upstream.ok,

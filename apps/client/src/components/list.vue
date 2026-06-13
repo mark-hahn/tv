@@ -145,6 +145,7 @@
               :fltrChoices="fltrChoices"
               :selectedSort="actorsListMode ? '---' : sortChoice"
               :selectedFilter="fltrChoice"
+              :reversed="reversed"
               @top-click="topClick"
               @prev-next-click="prevNextClick"
               @sort-click="sortClick"
@@ -153,6 +154,7 @@
               @cond-fltr-click="condFltrClick"
               @sort-action="sortAction"
               @fltr-action="fltrAction"
+              @rev-click="revClick"
             ></HdrBot>
           </div>
           <div
@@ -240,6 +242,7 @@
             :fltrChoices="fltrChoices"
             :selectedSort="actorsListMode ? '---' : sortChoice"
             :selectedFilter="fltrChoice"
+            :reversed="reversed"
             @top-click="topClick"
             @prev-next-click="prevNextClick"
             @sort-click="sortClick"
@@ -248,6 +251,7 @@
             @cond-fltr-click="condFltrClick"
             @sort-action="sortAction"
             @fltr-action="fltrAction"
+            @rev-click="revClick"
           ></HdrBot>
         </div>
         <div
@@ -584,6 +588,7 @@ export default {
       nowPlayingShowNames: new Set(),
       sortPopped: false,
       sortChoice: "Viewed",
+      reversed: false,
       fltrPopped: false,
       fltrChoice: "All",
       showSearching: false,
@@ -2200,9 +2205,15 @@ export default {
       this.fltrPopped = false;
     },
 
+    revClick() {
+      this.reversed = !this.reversed;
+      this.sortShows();
+    },
+
     sortAction(sortChoice) {
       if (sortChoice != "Close") {
         this.sortChoice = sortChoice;
+        this.reversed = false;
         this.sortShows();
         setTimeout(() => {
           this.saveVisShow(this.shows[0], true);
@@ -2801,6 +2812,7 @@ export default {
         a = this.getValBySortChoice(a, true);
         b = this.getValBySortChoice(b, true);
         if (a == b) return 0;
+        let result;
         if (
           ["Alpha", "Length", "Creator", "Safe start"].includes(this.sortChoice)
         ) {
@@ -2808,9 +2820,11 @@ export default {
             if (a === "" && b !== "") return 1;
             if (b === "" && a !== "") return -1;
           }
-          return a > b ? +1 : -1;
+          result = a > b ? +1 : -1;
+        } else {
+          result = a > b ? -1 : +1;
         }
-        return a > b ? -1 : +1;
+        return this.reversed ? -result : result;
       });
     },
 

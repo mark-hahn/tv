@@ -14,7 +14,7 @@
   >
     <div
       id="botlft"
-      style="width: 400px; overflow: hidden"
+      style="width: 550px; overflow: hidden"
     >
       <button
         @click="$emit('top-click')"
@@ -51,6 +51,18 @@
         "
       >
         Next
+      </button>
+      <button
+        @click="$emit('rev-click')"
+        :style="{
+          marginLeft: '10px',
+          marginRight: '5px',
+          fontSize: '15px',
+          margin: '4px',
+          backgroundColor: reversed ? 'lightblue' : 'white',
+        }"
+      >
+        Rev
       </button>
       <div
         id="sortFltr"
@@ -221,6 +233,10 @@ export default {
       type: String,
       required: true,
     },
+    reversed: {
+      type: Boolean,
+      default: false,
+    },
   },
 
   computed: {
@@ -244,6 +260,7 @@ export default {
     "cond-fltr-click",
     "sort-action",
     "fltr-action",
+    "rev-click",
   ],
 
   methods: {

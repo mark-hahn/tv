@@ -49,6 +49,7 @@ function consoleToFile() {
                 day: "2-digit",
                 hour: "2-digit",
                 minute: "2-digit",
+                second: "2-digit",
                 hour12: false,
               });
               fs.appendFileSync(LOG_FILE, `[${now}] [${method}] ${message}\n`);

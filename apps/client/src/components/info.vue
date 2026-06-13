@@ -1365,14 +1365,8 @@ export default {
 
           if (this.show.name !== currentShowName) return;
 
-          // Check for two local folders on disk for this show
-          console.debug(
-            `[info] recheckTwoLocalFolders start for "${currentShowName}"`,
-          );
-          await this.recheckTwoLocalFolders();
-          console.debug(
-            `[info] recheckTwoLocalFolders done for "${currentShowName}"`,
-          );
+          // Check for two local folders on disk - fire-and-forget, only sets twoLocalFolders UI flag
+          void this.recheckTwoLocalFolders();
           let tvdbData = allTvdb[show.name];
           const currentTvdbId = String(
             show?.ProviderIds?.Tvdb ??

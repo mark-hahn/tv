@@ -1,4 +1,5 @@
 import fs from "fs";
+import fsp from "fs/promises";
 import os from "os";
 import * as cp from "child_process";
 import * as path from "node:path";
@@ -2837,7 +2838,20 @@ function toEpisodeKey(season, episode) {
   return `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
 }
 
+let diskShowsCache = null;
+export const invalidateDiskShowsCache = () => {
+  diskShowsCache = null;
+};
+
 const getShowsFromDisk = async (_params) => {
+  if (diskShowsCache) {
+    console.log(
+      `[getShowsFromDisk] returning cache (${Object.keys(diskShowsCache).length} shows)`,
+    );
+    return diskShowsCache;
+  }
+  console.log(`[getShowsFromDisk] cache miss, scanning disk...`);
+  const _t0 = Date.now();
   let errFlg = null;
   const shows = {};
 
@@ -2849,9 +2863,9 @@ const getShowsFromDisk = async (_params) => {
   const recurs = async (path) => {
     if (errFlg || path == tvDir + "/.stfolder") return;
     try {
-      const fstat = fs.statSync(path);
+      const fstat = await fsp.stat(path);
       if (fstat.isDirectory()) {
-        const dir = fs.readdirSync(path);
+        const dir = await fsp.readdir(path);
         for (const dirent of dir) await recurs(path + "/" + dirent);
         return;
       }
@@ -2888,10 +2902,10 @@ const getShowsFromDisk = async (_params) => {
     }
   };
 
-  const dir = fs.readdirSync(tvDir);
+  const dir = await fsp.readdir(tvDir);
   for (const dirent of dir) {
     const showPath = tvDir + "/" + dirent;
-    const fstat = fs.statSync(showPath);
+    const fstat = await fsp.stat(showPath);
     const maxDate = fmtDateWithTZ(fstat.mtime);
     totalSize = 0;
     episodesBySeason = new Map();
@@ -2908,13 +2922,14 @@ const getShowsFromDisk = async (_params) => {
       ]);
 
     shows[dirent] = [maxDate, totalSize, filesOnDisk, fileQuality];
-    // if (totalSize == 0) {
-    //   console.log("empty show:", dirent);
-    // }
   }
   if (errFlg) {
     throw new Error(`getShowsFromDisk: Error: ${errFlg.message}`);
   } else {
+    diskShowsCache = shows;
+    console.log(
+      `[getShowsFromDisk] scan done in ${Date.now() - _t0}ms, ${Object.keys(shows).length} shows`,
+    );
     return shows;
   }
 };
@@ -8070,6 +8085,7 @@ watcher
     const ext = filePath.split(".").pop();
     if (!videoFileExtensions.includes(ext)) return;
 
+    diskShowsCache = null; // invalidate cache on new file
     const showName = extractShowNameFromPath(filePath);
     if (!showName) return;
 

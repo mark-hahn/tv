@@ -618,7 +618,7 @@ const SCRUB_SMALL_JUMP_TICKS = 10 * 10_000_000;
 const SCRUB_LARGE_JUMP_TICKS = 30 * 10_000_000;
 const SCRUB_SMALL_JUMP_COUNT = 4;
 const SCRUB_POS_INCREMENT_TICKS = SCRUB_POS_UPDATE_MS * 10_000;
-const VOL_STEP = 5;
+const VOL_STEP = 1;
 const TVPANE_VERSION = 2;
 
 const CELL_BASE = {
@@ -1477,12 +1477,7 @@ export default {
       if (this.checkBlocked()) return;
       this.flash(dir === "down" ? "vold" : "volu");
       this.notifyAction();
-      for (let i = 0; i < VOL_STEP; i++) {
-        await fetch(`${config.tvTvUrl}/tv/vol/${dir}`).catch(() => {});
-        if (i < VOL_STEP - 1) {
-          await new Promise((r) => setTimeout(r, 40));
-        }
-      }
+      await fetch(`${config.tvTvUrl}/tv/vol/${dir}`).catch(() => {});
     },
 
     async _tvKeyRaw(key) {

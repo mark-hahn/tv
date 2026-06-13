@@ -34,7 +34,7 @@ const SCRUB_SMALL_JUMP_TICKS = 10 * 10_000_000;
 const SCRUB_LARGE_JUMP_TICKS = 30 * 10_000_000;
 const SCRUB_SMALL_JUMP_COUNT = 4;
 const SCRUB_POS_INCREMENT_TICKS = SCRUB_POS_UPDATE_MS * 10_000;
-const VOL_STEP = 5;
+const VOL_STEP = 1;
 
 function buildSeriesMap(seriesMapIn) {
   if (!seriesMapIn || seriesMapIn.length === 0) return null;
@@ -876,12 +876,7 @@ export default function App() {
       async () => {
         if (isOff || isOther) return;
         flash("vold");
-        for (let i = 0; i < VOL_STEP; i++) {
-          await fetch(`${TV_TV_URL}/tv/vol/down`).catch(() => {});
-          if (i < VOL_STEP - 1) {
-            await new Promise((r) => setTimeout(r, 40));
-          }
-        }
+        await fetch(`${TV_TV_URL}/tv/vol/down`).catch(() => {});
       },
       () => {
         flash("vold");
@@ -904,12 +899,7 @@ export default function App() {
       async () => {
         if (isOff || isOther) return;
         flash("volu");
-        for (let i = 0; i < VOL_STEP; i++) {
-          await fetch(`${TV_TV_URL}/tv/vol/up`).catch(() => {});
-          if (i < VOL_STEP - 1) {
-            await new Promise((r) => setTimeout(r, 40));
-          }
-        }
+        await fetch(`${TV_TV_URL}/tv/vol/up`).catch(() => {});
       },
       () => {
         flash("volu");

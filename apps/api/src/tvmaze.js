@@ -4,7 +4,7 @@ import process from "node:process";
 import Database from "better-sqlite3";
 import { getApiDataDir, getApiMiscDir } from "./tvPaths.js";
 
-const LOG_APPS_API_DATA_MISC_TVMAZE_SYNC_LOG = false;
+const LOG_APPS_API_DATA_MISC_TVMAZE_SYNC_LOG = true;
 
 const TVMAZE_BASE_URL = "https://api.tvmaze.com";
 const SHOW_INDEX_PATH = "/shows";

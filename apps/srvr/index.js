@@ -7969,6 +7969,12 @@ async function handleShowDiskChange(showName) {
     if (diskInfo) {
       const [maxDate, totalSize, filesOnDisk, fileQuality] = diskInfo;
 
+      // Update cache if it exists
+      if (diskShowsCache) {
+        diskShowsCache[showName] = diskInfo;
+        console.log(`[chokidar] updated cache for ${showName}`);
+      }
+
       // Update tvdb record with new disk info
       const allTvdb = tvdb.getAllTvdbSync();
       const tvdbRecord = allTvdb[showName];
@@ -7981,6 +7987,12 @@ async function handleShowDiskChange(showName) {
         console.log(
           `[chokidar] Updated disk info for ${showName}: ${totalSize} bytes, ${maxDate}`,
         );
+      }
+    } else {
+      // If we can't get disk info (e.g., folder was deleted), remove from cache
+      if (diskShowsCache && showName in diskShowsCache) {
+        delete diskShowsCache[showName];
+        console.log(`[chokidar] removed ${showName} from cache (no disk info)`);
       }
     }
 
@@ -8058,16 +8070,33 @@ const watcher = chokidar.watch(tvDir, {
 });
 
 watcher
-  .on("add", (filePath) => {
+  .on("add", async (filePath) => {
     console.log(`[chokidar] detected add: ${filePath}`);
     const ext = filePath.split(".").pop();
     if (!videoFileExtensions.includes(ext)) return;
 
-    diskShowsCache = null;
     const showName = extractShowNameFromPath(filePath);
     if (!showName) return;
 
     console.log(`[chokidar] video added: ${showName}`);
+
+    // Update only the affected show in cache instead of invalidating everything
+    if (diskShowsCache) {
+      try {
+        const showInfo = await getShowDiskInfo(showName);
+        if (showInfo) {
+          diskShowsCache[showName] = showInfo;
+          console.log(`[chokidar] updated cache for ${showName}`);
+        }
+      } catch (err) {
+        console.error(
+          `[chokidar] failed to update cache for ${showName}:`,
+          err.message,
+        );
+        // On error, invalidate entire cache to be safe
+        diskShowsCache = null;
+      }
+    }
 
     // Debounce: accumulate files per show, clear existing timeout and set new one
     const existing = changedShows.get(showName);

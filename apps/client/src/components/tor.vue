@@ -1372,6 +1372,7 @@
 import evtBus from "../evtBus.js";
 import * as emby from "../emby.js";
 import * as util from "../util.js";
+import { openExternalBlank } from "../util.js";
 import { config } from "../config.js";
 import Stream from "./stream.vue";
 import parseTorrentTitle from "parse-torrent-title";
@@ -2666,7 +2667,7 @@ export default {
         `https://www.torrentleech.org/torrents/browse/index/query/${searchQ}`,
       ];
       for (const url of urls) {
-        util.openNewTab(url);
+        openExternalBlank(url);
       }
     },
 

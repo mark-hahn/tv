@@ -325,6 +325,21 @@ export function openExternalPage(url) {
   }
 }
 
+export function openExternalBlank(url) {
+  const targetUrl = String(url || "").trim();
+  if (!targetUrl) return null;
+  try {
+    const win = window.open(targetUrl, "_blank");
+    if (!win) return null;
+    try {
+      win.focus();
+    } catch {}
+    return win;
+  } catch {
+    return null;
+  }
+}
+
 export function openNewTab(url) {
   return openExternalPage(url);
 }

@@ -949,16 +949,9 @@ app.get("/tv/mute", (req, res) => {
     res.json({ ok: false, error: "wrong mode" });
     return;
   }
-  const newMuted = !braviaHaMuted;
-  braviaHaMuted = newMuted;
-  callService("media_player", "volume_mute", BRAVIA_ENTITY_ID, {
-    is_volume_muted: newMuted,
-  });
-  pushTvState().catch(() => {});
-  log(
-    `mute sent via HA Bravia from ${client(req)}: ${!newMuted} -> ${newMuted}`,
-  );
-  res.json({ ok: true, muted: newMuted });
+  callService("remote", "send_command", REMOTE_ENTITY_ID, { command: "Mute" });
+  log(`mute sent from ${client(req)}`);
+  res.json({ ok: true });
 });
 
 async function pushTvState() {
@@ -991,7 +984,6 @@ async function pushTvState() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       power,
-      muted: power === "off" ? null : braviaHaMuted,
       mode: tvMode,
       activeDevice,
       state: braviaHaPower,
@@ -1000,19 +992,6 @@ async function pushTvState() {
     }),
   }).catch(() => {});
 }
-
-app.get("/tv/mutestate", async (req, res) => {
-  const haOn =
-    braviaHaPower !== "off" &&
-    braviaHaPower !== "unavailable" &&
-    braviaHaPower !== "unknown";
-  res.json({
-    ok: true,
-    muted: braviaHaMuted,
-    power: haOn ? "on" : "off",
-    activeDevice,
-  });
-});
 
 app.get("/tv/openapp", (req, res) => {
   const uri = req.query.uri;

@@ -115,7 +115,6 @@ const BORDER = 13;
 const SCREEN_MARGIN = 30;
 
 export default function App() {
-  const [muted, setMuted] = useState(false);
   const [cellDims, setCellDims] = useState({ w: 0, h: 0 });
   const [showStreamers, setShowStreamers] = useState(false);
   const [flashSvc, setFlashSvc] = useState(null);
@@ -390,19 +389,10 @@ export default function App() {
     if (ignoreUntilRelease) scrubIgnoreUntilReleaseRef.current = false;
   };
 
-  const applyMuteState = (data) => {
+  const applyTvState = (data) => {
     if (!data) return;
-    if (data.muted !== null && data.muted !== undefined) setMuted(data.muted);
     if (data.state !== undefined) setHaState(data.state);
     if (data.mediaTitle !== undefined) setMediaTitle(data.mediaTitle);
-  };
-
-  const pollMute = async () => {
-    try {
-      const res = await fetch(`${TV_TV_URL}/tv/mutestate`);
-      const data = await res.json();
-      if (data.ok) applyMuteState(data);
-    } catch (_) {}
   };
 
   const connectWs = () => {
@@ -415,7 +405,7 @@ export default function App() {
       try {
         const msg = JSON.parse(e.data);
         if (msg.id === 0 && msg.notification === "tvMuteState") {
-          applyMuteState(msg.data);
+          applyTvState(msg.data);
         } else if (msg.id === 0 && msg.notification === "tvRemoteAction") {
           const fromSubCtrl = msg.data?.fromSubCtrl ?? false;
           avoidingRef.current = true;
@@ -489,8 +479,6 @@ export default function App() {
 
   useEffect(() => {
     console.log("[vol] APP VERSION v23");
-    pollMute();
-    const mutePollTimer = setInterval(pollMute, 5000);
     connectWs();
     AsyncStorage.getItem("layoutOption")
       .then((val) => {
@@ -514,7 +502,6 @@ export default function App() {
       clearTimeout(dbRef.current?.timer);
       dbRef.current = null;
       clearInterval(subPollRef.current);
-      clearInterval(mutePollTimer);
       clearTimeout(avoidTimerRef.current);
       clearTimeout(unlockHoldTimerRef.current);
     };
@@ -769,9 +756,7 @@ export default function App() {
     if (!debounce()) return;
     notifyAction();
     try {
-      const res = await fetch(`${TV_TV_URL}/tv/${cmd}`);
-      const data = await res.json();
-      if (cmd === "mute" && data.ok) setMuted(data.muted);
+      await fetch(`${TV_TV_URL}/tv/${cmd}`);
     } catch (_) {}
   };
 
@@ -1287,8 +1272,7 @@ export default function App() {
   // Background color helpers (mirror Vue cellStyle / computed props)
   const cellBg = (defaultBg, key) => (flashBtn === key ? "orange" : defaultBg);
 
-  const muteBg =
-    flashBtn === "mute" ? "orange" : !isOff && muted ? "#ffb3b3" : "lightgreen";
+  const muteBg = flashBtn === "mute" ? "orange" : "lightgreen";
 
   const offBg = flashBtn === "off" ? "orange" : isOff ? "lightblue" : "white";
 

@@ -638,7 +638,6 @@ export default {
 
   data() {
     return {
-      muted: false,
       flashBtn: null,
       haState: null,
       mediaTitle: null,
@@ -671,12 +670,7 @@ export default {
       return base;
     },
     muteCellStyle() {
-      const bg =
-        this.flashBtn === "mute"
-          ? "orange"
-          : !this.isOff && this.muted
-            ? "#ffb3b3"
-            : "lightgreen";
+      const bg = this.flashBtn === "mute" ? "orange" : "lightgreen";
       return { ...CELL_BASE, backgroundColor: bg };
     },
     mode() {
@@ -710,8 +704,6 @@ export default {
 
   mounted() {
     console.log(`[tvpane] version ${TVPANE_VERSION}`);
-    this.pollMute();
-    this._mutePollTimer = setInterval(() => this.pollMute(), 5000);
     evtBus.on("tvMuteState", this._onTvMuteState);
     evtBus.on("paneChanged", this._onPaneChanged);
     evtBus.on("tvRemoteAction", this._onTvRemoteAction);
@@ -737,7 +729,6 @@ export default {
     clearTimeout(this._avoidTimer);
     clearTimeout(this._unlockHoldTimer);
     clearInterval(this._embyPosTimer);
-    clearInterval(this._mutePollTimer);
   },
 
   methods: {
@@ -1437,20 +1428,8 @@ export default {
 
     _onTvMuteState(data) {
       if (!data) return;
-      if (data.muted !== null) this.muted = data.muted;
       if (data.state !== undefined) this.haState = data.state;
       if (data.mediaTitle !== undefined) this.mediaTitle = data.mediaTitle;
-    },
-
-    async pollMute() {
-      try {
-        const data = await fetch(`${config.tvTvUrl}/tv/mutestate`).then((r) =>
-          r.json(),
-        );
-        if (data.ok) {
-          if (data.muted !== null) this.muted = data.muted;
-        }
-      } catch (_) {}
     },
 
     async openApp(svc) {

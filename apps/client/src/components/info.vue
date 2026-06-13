@@ -1106,12 +1106,7 @@ export default {
       const watchButtonTxtArr = [];
       try {
         // don't crash on device fetch fail
-        console.debug(`[info] updateWatchButtons: calling getDevices`);
-        const _t0uwb = Date.now();
         const devices = await srvr.getDevices();
-        console.debug(
-          `[info] updateWatchButtons: getDevices done in ${Date.now() - _t0uwb}ms, ${devices.length} devices`,
-        );
         for (const device of devices) {
           if (!device.showName) {
             if (readyToWatch)
@@ -1304,7 +1299,6 @@ export default {
         return;
       }
 
-      console.debug(`[info] onSetUpSeries start: "${show?.name}"`);
       this.settingUpShowName = show?.name;
       this.show = show;
       this.showHdr = true;
@@ -1352,16 +1346,9 @@ export default {
         try {
           if (this.show.name !== currentShowName) return;
 
-          console.debug(
-            `[info] setTimeout fired for "${currentShowName}" - calling getAllTvdb`,
-          );
           // Force load all shows (including no-emby) by passing hasEmby=0
           // The cache from loadAllShows might only contain emby shows (hasEmby=1)
-          const _t0getAllTvdb = Date.now();
           allTvdb = await tvdb.getAllTvdb(0);
-          console.debug(
-            `[info] getAllTvdb done for "${currentShowName}" in ${Date.now() - _t0getAllTvdb}ms`,
-          );
 
           if (this.show.name !== currentShowName) return;
 
@@ -1376,9 +1363,6 @@ export default {
               "",
           ).trim();
 
-          console.debug(
-            `[info] tvdbData from cache: ${tvdbData ? "found" : "not found"} for "${currentShowName}" tvdbId="${currentTvdbId}"`,
-          );
           if (!tvdbData && currentTvdbId) {
             for (const [key, rec] of Object.entries(allTvdb || {})) {
               const recTvdbId = String(rec?.tvdbId || rec?.tvdbId || "").trim();
@@ -1402,9 +1386,6 @@ export default {
               show?.tvdbId ??
               show?.tvdbId ??
               show?.tvdb_id;
-            console.debug(
-              `[info] no tvdbData in cache for "${currentShowName}", tvdbId=${tvdbId || "none"} — will call getNewTvdb`,
-            );
             if (tvdbId) {
               try {
                 const showSeed = {
@@ -1420,14 +1401,7 @@ export default {
                   watchedCount: 0,
                   transient: this.previewMode,
                 };
-                console.debug(
-                  `[info] getNewTvdb (1st) start for "${currentShowName}"`,
-                );
-                const _t0gnt1 = Date.now();
                 tvdbData = await srvr.getNewTvdb(paramObj);
-                console.debug(
-                  `[info] getNewTvdb (1st) done for "${currentShowName}" in ${Date.now() - _t0gnt1}ms result=${tvdbData ? "ok" : "null"}`,
-                );
                 if (tvdbData) {
                   delete tvdbData.deleted;
                   tvdb.upsertTvdbCacheRecord(allTvdb, tvdbData, show?.name);
@@ -1494,9 +1468,6 @@ export default {
 
           // If tvdbData exists but has no image, force a refresh
           if (!tvdbData.image && show.tvdbId) {
-            console.debug(
-              `[info] tvdbData has no image for "${currentShowName}", calling getNewTvdb (2nd) to refresh`,
-            );
             const showSeed = {
               name: show?.name,
               tvdbId: show.tvdbId,
@@ -1511,11 +1482,7 @@ export default {
               transient: this.previewMode,
             };
             try {
-              const _t0gnt2 = Date.now();
               const freshTvdbData = await srvr.getNewTvdb(paramObj);
-              console.debug(
-                `[info] getNewTvdb (2nd) done for "${currentShowName}" in ${Date.now() - _t0gnt2}ms result=${freshTvdbData ? "ok" : "null"}`,
-              );
               if (freshTvdbData) {
                 delete freshTvdbData.deleted;
                 tvdb.upsertTvdbCacheRecord(allTvdb, freshTvdbData, show?.name);
@@ -1527,9 +1494,6 @@ export default {
             }
           }
 
-          console.debug(
-            `[info] calling setDeleted/setPoster/setDates/setSeasonsTxt for "${currentShowName}"`,
-          );
           await this.setDeleted(tvdbData);
 
           // Don't await poster!
@@ -1557,16 +1521,8 @@ export default {
             });
             void this.setRemotes();
           } else {
-            console.debug(
-              `[info] calling setNextWatch for "${currentShowName}"`,
-            );
             await this.setNextWatch();
-            console.debug(`[info] setNextWatch done for "${currentShowName}"`);
-            console.debug(`[info] calling setRemotes for "${currentShowName}"`);
             await this.setRemotes();
-            console.debug(
-              `[info] setRemotes done for "${currentShowName}" — seriesReady=true`,
-            );
             // Only show the info box (and email input) once everything is populated.
             this.seriesReady = true;
             await this.$nextTick();
@@ -1670,7 +1626,6 @@ export default {
   // series vue component at mounted phase
   // set everything in html
   mounted() {
-    console.debug(`[info] mounted`);
     evtBus.on("setUpSeries", this.onSetUpSeries);
     evtBus.on("previewMode", this.onPreviewMode);
     evtBus.on("previewSrchChoice", this.onPreviewSrchChoice);

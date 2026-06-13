@@ -2839,19 +2839,9 @@ function toEpisodeKey(season, episode) {
 }
 
 let diskShowsCache = null;
-export const invalidateDiskShowsCache = () => {
-  diskShowsCache = null;
-};
 
 const getShowsFromDisk = async (_params) => {
-  if (diskShowsCache) {
-    console.log(
-      `[getShowsFromDisk] returning cache (${Object.keys(diskShowsCache).length} shows)`,
-    );
-    return diskShowsCache;
-  }
-  console.log(`[getShowsFromDisk] cache miss, scanning disk...`);
-  const _t0 = Date.now();
+  if (diskShowsCache) return diskShowsCache;
   let errFlg = null;
   const shows = {};
 
@@ -2927,9 +2917,6 @@ const getShowsFromDisk = async (_params) => {
     throw new Error(`getShowsFromDisk: Error: ${errFlg.message}`);
   } else {
     diskShowsCache = shows;
-    console.log(
-      `[getShowsFromDisk] scan done in ${Date.now() - _t0}ms, ${Object.keys(shows).length} shows`,
-    );
     return shows;
   }
 };
@@ -3710,22 +3697,13 @@ app.use((req, res, next) => {
 // The handler should be: async (params) => result
 const apiWrapper = (handler) => {
   return async (req, res) => {
-    const _t0 = Date.now();
-    const route = req.url || req.path || "unknown";
-    console.log(`[api] --> ${req.method} ${route}`);
     try {
       // GET requests use query params, POST use body
       const params = req.method === "GET" ? req.query : req.body;
       const result = await handler(params);
-      console.log(
-        `[api] <-- ${req.method} ${route} OK (${Date.now() - _t0}ms)`,
-      );
       res.json(result);
     } catch (error) {
-      console.error(
-        `[api] <-- ${req.method} ${route} ERROR (${Date.now() - _t0}ms):`,
-        error,
-      );
+      console.error(`[SERVER] Error in ${req.url}:`, error);
       res.status(500).json({ error: error.message || String(error) });
     }
   };
@@ -8085,7 +8063,7 @@ watcher
     const ext = filePath.split(".").pop();
     if (!videoFileExtensions.includes(ext)) return;
 
-    diskShowsCache = null; // invalidate cache on new file
+    diskShowsCache = null;
     const showName = extractShowNameFromPath(filePath);
     if (!showName) return;
 

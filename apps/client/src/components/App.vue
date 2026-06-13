@@ -1983,7 +1983,6 @@ export default {
     },
   },
   mounted() {
-    console.debug(`[App] mounted`);
     this._onAppWindowResize = () => {
       this.windowW = window.innerWidth;
       this.windowH = window.innerHeight;

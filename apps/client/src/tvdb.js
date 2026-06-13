@@ -2,19 +2,6 @@ import * as srvr from "./srvr.js";
 import * as util from "./util.js";
 import { config } from "./config.js";
 
-const fmtTs = () => {
-  const now = new Date();
-  const pst = new Date(
-    now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }),
-  );
-  const mm = String(pst.getMonth() + 1).padStart(2, "0");
-  const dd = String(pst.getDate()).padStart(2, "0");
-  const hh = String(pst.getHours()).padStart(2, "0");
-  const mi = String(pst.getMinutes()).padStart(2, "0");
-  const ss = String(pst.getSeconds()).padStart(2, "0");
-  return `${mm}/${dd} ${hh}:${mi}:${ss}`;
-};
-
 // Route TVDB calls through the local torrents server proxy via WebSocket.
 // This avoids browser-to-TVDB CORS issues (Authorization header) and keeps secrets on server.
 
@@ -30,25 +17,17 @@ async function tvdbFetch(pathStr, _init, retryCount = 0) {
     for (const [k, v] of usp) query[k] = v;
   }
 
-  const _t0 = Date.now();
-  console.debug(`[${fmtTs()}] [tvdbFetch] --> ${pathStr}`);
   try {
     // Call server
     const res = await srvr.accessTvdb({ path: pathOnly, query });
 
     if (!res.ok) {
       const errData = res.data || res.error;
-      console.debug(
-        `[${fmtTs()}] [tvdbFetch] <-- ${pathStr} ERROR status=${res.status} (${Date.now() - _t0}ms)`,
-      );
       throw new Error(
         `tvdb proxy error: ${res.status} ${typeof errData === "string" ? errData : JSON.stringify(errData)}`.trim(),
       );
     }
 
-    console.debug(
-      `[${fmtTs()}] [tvdbFetch] <-- ${pathStr} ok (${Date.now() - _t0}ms)`,
-    );
     // Mock a Response-like object for compatibility
     return {
       ok: true,
@@ -86,15 +65,7 @@ const fetchAllTvdbWithRetry = async (hasEmby = 0) => {
 
   for (let attempt = 0; attempt <= retryDelays.length; attempt += 1) {
     try {
-      const _t0 = Date.now();
-      console.debug(
-        `[${fmtTs()}] [getAllTvdb] --> request hasEmby=${hasEmby} attempt=${attempt + 1}`,
-      );
-      const result = await srvr.getAllTvdb(hasEmby);
-      console.debug(
-        `[${fmtTs()}] [getAllTvdb] <-- done (${Date.now() - _t0}ms) keys=${Object.keys(result || {}).length}`,
-      );
-      return result;
+      return await srvr.getAllTvdb(hasEmby);
     } catch (err) {
       lastErr = err;
       if (attempt === retryDelays.length) break;
@@ -258,16 +229,8 @@ export const getAllTvdb = async (hasEmby = 0) => {
   // all data in tvdb.json
   // cached in allTvdb
   // Only cache if hasEmby === 0 (all shows)
-  if (hasEmby === 0 && allTvdb) {
-    console.debug(
-      `[${fmtTs()}] [getAllTvdb] cache hit hasEmby=${hasEmby} keys=${Object.keys(allTvdb).length}`,
-    );
-    return allTvdb;
-  }
+  if (hasEmby === 0 && allTvdb) return allTvdb;
 
-  console.debug(
-    `[${fmtTs()}] [getAllTvdb] cache miss hasEmby=${hasEmby}, fetching...`,
-  );
   const result = await fetchAllTvdbWithRetry(hasEmby);
 
   // Only update cache if we're loading all shows

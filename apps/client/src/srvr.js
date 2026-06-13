@@ -117,22 +117,7 @@ const fCall = async (fname, param) => {
   return promise;
 };
 
-const fmtTs = () => {
-  const now = new Date();
-  const pst = new Date(
-    now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }),
-  );
-  const mm = String(pst.getMonth() + 1).padStart(2, "0");
-  const dd = String(pst.getDate()).padStart(2, "0");
-  const hh = String(pst.getHours()).padStart(2, "0");
-  const mi = String(pst.getMinutes()).padStart(2, "0");
-  const ss = String(pst.getSeconds()).padStart(2, "0");
-  return `${mm}/${dd} ${hh}:${mi}:${ss}`;
-};
-
 const httpCall = async (endpoint, param, method = "GET", timeoutMs = 30000) => {
-  const _t0 = Date.now();
-  console.debug(`[${fmtTs()}] [http] --> ${method} ${endpoint}`);
   let url = `${HTTP_URL}${endpoint}`;
   const TIMEOUT_MS = timeoutMs;
   const controller = new AbortController();
@@ -167,28 +152,15 @@ const httpCall = async (endpoint, param, method = "GET", timeoutMs = 30000) => {
       const error = await response
         .json()
         .catch(() => ({ error: response.statusText }));
-      console.debug(
-        `[${fmtTs()}] [http] <-- ${method} ${endpoint} status=${response.status} (${Date.now() - _t0}ms) ERROR`,
-      );
       throw error;
     }
-    const json = await response.json();
-    console.debug(
-      `[${fmtTs()}] [http] <-- ${method} ${endpoint} status=${response.status} (${Date.now() - _t0}ms)`,
-    );
-    return json;
+    return response.json();
   } catch (err) {
     if (timedOut) {
-      console.debug(
-        `[${fmtTs()}] [http] <-- ${method} ${endpoint} TIMEOUT after ${Date.now() - _t0}ms`,
-      );
       throw new Error("Request timeout");
     }
     // Add more context to network errors
     if (err instanceof TypeError && err.message === "Failed to fetch") {
-      console.debug(
-        `[${fmtTs()}] [http] <-- ${method} ${endpoint} NETWORK ERROR after ${Date.now() - _t0}ms`,
-      );
       throw new Error(`Network error: Unable to reach server at ${url}`);
     }
     throw err;

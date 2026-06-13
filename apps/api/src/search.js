@@ -1064,13 +1064,23 @@ export async function searchTorrents({
     { excludedStrings },
   );
 
-  // Do NOT filter on 0 seeds or 480p; attach warnings for the client to filter.
+  // Do NOT filter on 0 seeds or 480p/384p; attach warnings for the client to filter.
   const filtered2 = filtered1;
   let warnedZeroSeeds = 0;
   let warned480 = 0;
+  let warned384 = 0;
   filtered2.forEach((torrent) => {
     const titleLower = String(torrent?.raw?.title || "").toLowerCase();
     const res = String(torrent?.parsed?.resolution || "").toLowerCase();
+
+    if (
+      res.includes("384") ||
+      titleLower.includes("384p") ||
+      titleLower.includes(" 384 ")
+    ) {
+      warned384 += 1;
+      addTorrentWarning(torrent, "low_res_384", "Low resolution (384p)");
+    }
 
     if (
       res.includes("480") ||
@@ -1093,6 +1103,7 @@ export async function searchTorrents({
     filtered2.length,
     [],
     {
+      warned384,
       warned480,
       warnedZeroSeeds,
     },

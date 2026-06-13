@@ -2784,6 +2784,7 @@ function parseFileQuality(src) {
   if (/720p/i.test(text)) return 720;
   if (/576p/i.test(text)) return 576;
   if (/480p/i.test(text)) return 480;
+  if (/384p/i.test(text)) return 384;
   return null;
 }
 
@@ -2797,6 +2798,7 @@ function normalizeVideoHeightToQuality(height) {
   if (parsedHeight >= 648) return 720;
   if (parsedHeight >= 528) return 576;
   if (parsedHeight >= 400) return 480;
+  if (parsedHeight >= 340) return 384;
   return null;
 }
 
@@ -6185,7 +6187,8 @@ function flexgetResolution(quality, title) {
   if (/720p/i.test(src)) return 720;
   if (/576p/i.test(src)) return 576;
   if (/480p/i.test(src)) return 480;
-  return 640;
+  if (/384p/i.test(src)) return 384;
+  return 480;
 }
 
 function flexgetBitDepth(title) {
@@ -6270,6 +6273,7 @@ function parseResolutionStrict(title, quality) {
   if (/720p/i.test(src)) return 720;
   if (/576p/i.test(src)) return 576;
   if (/480p/i.test(src)) return 480;
+  if (/384p/i.test(src)) return 384;
   return 0; // unknown — do not fall back
 }
 
@@ -6289,6 +6293,7 @@ function getEpisodeDiskResolution(showPath, season, episode) {
       if (/720p/i.test(f)) return 720;
       if (/576p/i.test(f)) return 576;
       if (/480p/i.test(f)) return 480;
+      if (/384p/i.test(f)) return 384;
     }
     return 0;
   } catch {

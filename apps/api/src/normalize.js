@@ -98,6 +98,7 @@ function extractGroup(title) {
     "2160P",
     "480P",
     "576P",
+    "384P",
     "4K",
     "UHD",
   ]);

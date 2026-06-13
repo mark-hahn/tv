@@ -2874,7 +2874,8 @@ async function main() {
     if (/720p/i.test(src)) return 720;
     if (/576p/i.test(src)) return 576;
     if (/480p/i.test(src)) return 480;
-    return 640;
+    if (/384p/i.test(src)) return 384;
+    return 480;
   }
   function flexBitDepth(s) {
     return /10.?bit|hdr/i.test(String(s || "")) ? 10 : 8;

@@ -3820,6 +3820,9 @@ export default {
               if (/2160p|4k|uhd/i.test(s)) return 2160;
               if (/1080p|1080i/i.test(s)) return 1080;
               if (/720p|720i/i.test(s)) return 720;
+              if (/576p|576i/i.test(s)) return 576;
+              if (/480p|480i/i.test(s)) return 480;
+              if (/384p|384i/i.test(s)) return 384;
               return 480;
             };
             const torDepth = (t) =>

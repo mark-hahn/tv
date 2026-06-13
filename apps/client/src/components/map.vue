@@ -1256,6 +1256,7 @@ export default {
       if (q === 720) return "7";
       if (q === 576) return "5";
       if (q === 480) return "4";
+      if (q === 384) return "3";
       return "0";
     },
 

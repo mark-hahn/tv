@@ -1840,7 +1840,6 @@ export default {
           season,
           episode,
         });
-        console.log(`[selectEpisode] S${season}E${episode} data:`, data);
         if (reqId !== this.episodeInfoRequestId) return;
         this.episodeInfo = {
           image: data?.image ?? null,

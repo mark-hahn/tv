@@ -8,8 +8,11 @@ import parseTorrent from "parse-torrent";
 import * as search from "./search.js";
 import { searchTorrentsInChild } from "./searchInChild.js";
 import * as download from "./download.js";
-import "./tvmaze.js";
-import { searchShowsByName, unmarkShowBrowsed } from "./tvmaze.js";
+import {
+  start as startTvmaze,
+  searchShowsByName,
+  unmarkShowBrowsed,
+} from "./tvmaze.js";
 import {
   getQbtInfo,
   delQbtTorrent,
@@ -3033,4 +3036,7 @@ https.createServer(httpsOptions, app).listen(QBT_TEST_PORT, () => {
   //   `========== torrents server started on port ${QBT_TEST_PORT} ==========\n`,
   // );
   // process.stderr.write(`=\n`);
+
+  // Start tvmaze sync only in the api server, not when imported by other apps
+  startTvmaze();
 });

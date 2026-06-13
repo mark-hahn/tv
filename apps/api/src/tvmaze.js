@@ -1025,7 +1025,7 @@ async function syncTvmazeShows(reason = "startup") {
   }
 }
 
-async function start() {
+export async function start() {
   clearDbIfFlagExists();
 
   try {
@@ -1043,9 +1043,6 @@ async function start() {
 
   scheduleDaily3am(syncTvmazeShows);
 }
-
-// Auto-start when imported.
-start();
 
 export function getTvmazeDbPath() {
   return path.join(getApiDataDir(), DB_FILENAME);

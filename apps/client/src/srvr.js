@@ -3,7 +3,7 @@ import evtBus from "./evtBus.js";
 
 const HTTP_URL = config.tvSrvrUrl;
 const WS_URL = HTTP_URL.replace(/^https/, "wss");
-const WS_START_DELAY_MS = 5000;
+const WS_START_DELAY_MS = 0;
 const WS_RECONNECT_DELAY_MS = 10000;
 const LAST_VIEWED_START_DELAY_MS = 0;
 const LAST_VIEWED_POLL_MS = 10 * 1000;

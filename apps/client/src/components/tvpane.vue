@@ -696,7 +696,6 @@ export default {
   },
 
   mounted() {
-    console.log(`[tvpane] version ${TVPANE_VERSION}`);
     evtBus.on("tvMuteState", this._onTvMuteState);
     evtBus.on("paneChanged", this._onPaneChanged);
     evtBus.on("tvRemoteAction", this._onTvRemoteAction);

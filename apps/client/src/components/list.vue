@@ -2728,14 +2728,14 @@ export default {
         if (blankCells.length >= 12) break;
       }
       if (blankCells.length > 0) {
-        console.warn("[map-debug] blank map cells", {
-          show: this.mapShow?.name,
-          inEmby: this.mapShow?.inEmby !== false,
-          tvdbId: this.mapShow?.tvdbId || this.mapShow?.tvdbId || null,
-          seasons: this.seriesMapSeasons.length,
-          episodes: this.seriesMapEpis.length,
-          sampleBlankCells: blankCells,
-        });
+        // console.warn("[map-debug] blank map cells", {
+        //   show: this.mapShow?.name,
+        //   inEmby: this.mapShow?.inEmby !== false,
+        //   tvdbId: this.mapShow?.tvdbId || this.mapShow?.tvdbId || null,
+        //   seasons: this.seriesMapSeasons.length,
+        //   episodes: this.seriesMapEpis.length,
+        //   sampleBlankCells: blankCells,
+        // });
       }
 
       this.hideMapBottom = false;

@@ -1847,7 +1847,6 @@ export default {
           name: data?.name ?? null,
           aired: data?.aired ?? null,
         };
-        console.log(`[selectEpisode] episodeInfo set:`, this.episodeInfo);
       } catch (err) {
         if (reqId !== this.episodeInfoRequestId) return;
         console.error("selectEpisode getTmdb error:", err);

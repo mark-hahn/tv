@@ -843,11 +843,21 @@ export default {
         const newHeight = infoBoxEl.clientHeight;
         // Don't shrink the poster - only grow it or set it initially
         if (existingMaxHeight > 0 && newHeight < existingMaxHeight) {
+          console.log(
+            `[poster-shrink] setPoster: PRESERVING ${existingMaxHeight}px (infoBox=${newHeight}px) for ${this.show?.name}`,
+          );
           img.style.maxHeight = existingMaxHeight + "px";
         } else {
+          console.log(
+            `[poster-shrink] setPoster: setting ${newHeight}px (existing=${existingMaxHeight}px) for ${this.show?.name}`,
+          );
           img.style.maxHeight = newHeight + "px";
         }
         img.style.visibility = "visible";
+      } else {
+        console.log(
+          `[poster-shrink] setPoster: infoBox not ready (height=${infoBoxEl?.clientHeight}) for ${this.show?.name}`,
+        );
       }
     },
 

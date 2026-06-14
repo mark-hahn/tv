@@ -2858,7 +2858,7 @@ const getShowsFromDisk = async (_params) => {
           const ptt = parseTorrentTitle(fname.replace(/\.[a-z0-9]{2,4}$/i, ""));
           const title = parseTitleFromFilename(fname, folderName, ptt);
           const titleMatch =
-            !title || !!smartTitleMatch(title, [showFolderName], null, false);
+            !title || !!smartTitleMatch(title, [showFolderName], null, true);
           const quality = getResolution(path, { probeFileFn: probeRawHeight });
           if (titleMatch && quality != null) {
             const epKey = toEpisodeKey(parsed.season, parsed.episode);
@@ -2963,7 +2963,7 @@ const getShowDiskInfo = async (showFolderName) => {
           const ptt = parseTorrentTitle(fname.replace(/\.[a-z0-9]{2,4}$/i, ""));
           const title = parseTitleFromFilename(fname, folderName, ptt);
           const titleMatch =
-            !title || !!smartTitleMatch(title, [showFolderName], null, false);
+            !title || !!smartTitleMatch(title, [showFolderName], null, true);
           const quality = getResolution(dirPath, {
             probeFileFn: probeRawHeight,
           });

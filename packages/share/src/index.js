@@ -524,4 +524,76 @@ export function parseTitleFromFilename(fname, folderName, parsedPtt) {
   return title || null;
 }
 
+export const STANDARD_RESOLUTIONS = new Set([2160, 1080, 720, 480, 384]);
+
+export function normalizeVideoHeightToQuality(height) {
+  const parsedHeight = Number.parseInt(height, 10);
+  if (!Number.isFinite(parsedHeight) || parsedHeight <= 0) return null;
+  if (parsedHeight >= 1620) return 2160;
+  if (parsedHeight >= 900) return 1080;
+  if (parsedHeight >= 648) return 720;
+  if (parsedHeight >= 400) return 480;
+  if (parsedHeight >= 340) return 384;
+  return null;
+}
+
+export function getResolution(
+  nameOrPath,
+  { probeFileFn, findShowFileFn } = {},
+) {
+  const src = String(nameOrPath || "");
+
+  // ── Step 1: parse <N>p from the name ──────────────────────────────────────
+  let nameResolution = null;
+  const nameMatch = src.match(/\b(\d{3,4})p\b/i);
+  if (nameMatch) {
+    nameResolution = Number.parseInt(nameMatch[1], 10);
+    if (!Number.isFinite(nameResolution)) nameResolution = null;
+  }
+  if (nameResolution !== null && STANDARD_RESOLUTIONS.has(nameResolution)) {
+    return nameResolution;
+  }
+
+  // ── Step 2: probe the actual file ─────────────────────────────────────────
+  let fileResolution = null;
+  if (probeFileFn) {
+    let fullPath = null;
+    const hasSlash = src.includes("/");
+
+    if (hasSlash) {
+      fullPath = src;
+    } else if (findShowFileFn) {
+      const showName = parseTitleFromFilename(src, "", null);
+      if (showName) {
+        fullPath = findShowFileFn(showName) ?? null;
+      }
+    }
+
+    if (fullPath) {
+      try {
+        const rawHeight = probeFileFn(fullPath);
+        if (rawHeight != null) fileResolution = Number.parseInt(rawHeight, 10);
+        if (!Number.isFinite(fileResolution)) fileResolution = null;
+      } catch {
+        fileResolution = null;
+      }
+    }
+  }
+
+  if (fileResolution !== null && STANDARD_RESOLUTIONS.has(fileResolution)) {
+    return fileResolution;
+  }
+
+  // ── Step 3: normalize whichever non-null value we have ────────────────────
+  const heightToNormalize =
+    nameResolution !== null
+      ? nameResolution
+      : fileResolution !== null
+        ? fileResolution
+        : null;
+
+  if (heightToNormalize === null) return null;
+  return normalizeVideoHeightToQuality(heightToNormalize) ?? null;
+}
+
 export { postHistory } from "./history.js";

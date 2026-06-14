@@ -24,6 +24,9 @@ import {
   parseFileSeasonEpisode,
   smartTitleMatch,
   parseTitleFromFilename,
+  normalizeVideoHeightToQuality,
+  getResolution,
+  STANDARD_RESOLUTIONS,
 } from "@tv/share";
 import chokidar from "chokidar";
 import cron from "node-cron";
@@ -2778,40 +2781,17 @@ function fmtDateWithTZ(date, utcOut = false) {
   return `${year}-${month}-${day}`;
 }
 
-function parseFileQuality(src) {
-  const text = String(src || "");
-  if (/2160p/i.test(text)) return 2160;
-  if (/1080p/i.test(text)) return 1080;
-  if (/720p/i.test(text)) return 720;
-  if (/576p/i.test(text)) return 576;
-  if (/480p/i.test(text)) return 480;
-  if (/384p/i.test(text)) return 384;
-  return null;
-}
+const probedRawHeightByPath = new Map();
 
-const probedVideoQualityByPath = new Map();
-
-function normalizeVideoHeightToQuality(height) {
-  const parsedHeight = Number.parseInt(height, 10);
-  if (!Number.isFinite(parsedHeight) || parsedHeight <= 0) return null;
-  if (parsedHeight >= 1620) return 2160;
-  if (parsedHeight >= 900) return 1080;
-  if (parsedHeight >= 648) return 720;
-  if (parsedHeight >= 528) return 576;
-  if (parsedHeight >= 400) return 480;
-  if (parsedHeight >= 340) return 384;
-  return null;
-}
-
-function probeFileQuality(filePath) {
+function probeRawHeight(filePath) {
   if (!filePath) return null;
-  if (probedVideoQualityByPath.has(filePath)) {
-    return probedVideoQualityByPath.get(filePath);
+  if (probedRawHeightByPath.has(filePath)) {
+    return probedRawHeightByPath.get(filePath);
   }
 
-  let quality = null;
+  let h = null;
   try {
-    const probeOut = runFfprobe(
+    const out = runFfprobe(
       [
         "-v",
         "error",
@@ -2825,13 +2805,14 @@ function probeFileQuality(filePath) {
       ],
       1024 * 1024,
     ).trim();
-    quality = normalizeVideoHeightToQuality(probeOut);
+    const parsed = Number.parseInt(out, 10);
+    h = Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   } catch {
-    quality = null;
+    h = null;
   }
 
-  probedVideoQualityByPath.set(filePath, quality);
-  return quality;
+  probedRawHeightByPath.set(filePath, h);
+  return h;
 }
 
 function toEpisodeKey(season, episode) {
@@ -2878,7 +2859,7 @@ const getShowsFromDisk = async (_params) => {
           const title = parseTitleFromFilename(fname, folderName, ptt);
           const titleMatch =
             !title || !!smartTitleMatch(title, [showFolderName], null, false);
-          const quality = parseFileQuality(fname) || probeFileQuality(path);
+          const quality = getResolution(path, { probeFileFn: probeRawHeight });
           if (titleMatch && quality != null) {
             const epKey = toEpisodeKey(parsed.season, parsed.episode);
             const existing = fileQuality[epKey];
@@ -2983,7 +2964,9 @@ const getShowDiskInfo = async (showFolderName) => {
           const title = parseTitleFromFilename(fname, folderName, ptt);
           const titleMatch =
             !title || !!smartTitleMatch(title, [showFolderName], null, false);
-          const quality = parseFileQuality(fname) || probeFileQuality(dirPath);
+          const quality = getResolution(dirPath, {
+            probeFileFn: probeRawHeight,
+          });
           if (titleMatch && quality != null) {
             const epKey = toEpisodeKey(parsed.season, parsed.episode);
             const existing = fileQuality[epKey];
@@ -6182,17 +6165,6 @@ function flexgetFmtSent() {
   return `${get("year")}/${get("month")}/${get("day")}-${hour}:${get("minute")}:${get("second")}`;
 }
 
-function flexgetResolution(quality, title) {
-  const src = String(quality || title || "");
-  if (/2160p/i.test(src)) return 2160;
-  if (/1080p/i.test(src)) return 1080;
-  if (/720p/i.test(src)) return 720;
-  if (/576p/i.test(src)) return 576;
-  if (/480p/i.test(src)) return 480;
-  if (/384p/i.test(src)) return 384;
-  return 480;
-}
-
 function flexgetBitDepth(title) {
   if (/10.?bit|hdr/i.test(String(title || ""))) return 10;
   return 8;
@@ -6217,8 +6189,8 @@ function flexgetIsBadGroup(title) {
 
 // Same-run dedup: resolution → bit depth → seeds → bad group
 function flexgetIsBetterSameRun(a, b) {
-  const aRes = flexgetResolution(a.quality, a.title);
-  const bRes = flexgetResolution(b.quality, b.title);
+  const aRes = getResolution(a.quality || a.title || "") ?? 480;
+  const bRes = getResolution(b.quality || b.title || "") ?? 480;
   if (aRes !== bRes) return aRes > bRes;
 
   const aDepth = flexgetBitDepth(a.title);
@@ -6237,8 +6209,8 @@ function flexgetIsBetterSameRun(a, b) {
 
 // Cross-run comparison: resolution → bad group tiebreaker
 function flexgetIsBetterCrossRun(a, b) {
-  const aRes = flexgetResolution(a.quality, a.title);
-  const bRes = flexgetResolution(b.quality, b.title);
+  const aRes = getResolution(a.quality || a.title || "") ?? 480;
+  const bRes = getResolution(b.quality || b.title || "") ?? 480;
   if (aRes !== bRes) return aRes > bRes;
   const aBad = flexgetIsBadGroup(a.title);
   const bBad = flexgetIsBadGroup(b.title);

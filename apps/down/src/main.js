@@ -18,6 +18,7 @@ import {
   parseTitleFromFilename,
   postHistory,
   TV_BLOCKED,
+  getResolution,
 } from "@tv/share";
 
 const __filename = urlNode.fileURLToPath(import.meta.url);
@@ -2867,23 +2868,13 @@ async function main() {
     return tryTvdbQuery(tvdbQueryVariants);
   };
 
-  function flexResolution(s) {
-    var src = String(s || "");
-    if (/2160p/i.test(src)) return 2160;
-    if (/1080p/i.test(src)) return 1080;
-    if (/720p/i.test(src)) return 720;
-    if (/576p/i.test(src)) return 576;
-    if (/480p/i.test(src)) return 480;
-    if (/384p/i.test(src)) return 384;
-    return 480;
-  }
   function flexBitDepth(s) {
     return /10.?bit|hdr/i.test(String(s || "")) ? 10 : 8;
   }
   function flexFileIsBetterThanSent(usbFname, sentEntry) {
     var sentSrc = String(sentEntry.quality || sentEntry.title || "");
-    var usbRes = flexResolution(usbFname);
-    var sentRes = flexResolution(sentSrc);
+    var usbRes = getResolution(usbFname) ?? 480;
+    var sentRes = getResolution(sentSrc) ?? 480;
     if (usbRes !== sentRes) return usbRes > sentRes;
     var usbDepth = flexBitDepth(usbFname);
     var sentDepth = flexBitDepth(sentSrc);
@@ -3178,8 +3169,8 @@ async function main() {
           // fall through to download
         } else {
           // File is on disk. Allow if USB is better than what's on disk.
-          var _diskRes = flexResolution(_diskFile);
-          var _usbRes = flexResolution(fname);
+          var _diskRes = getResolution(_diskFile) ?? 480;
+          var _usbRes = getResolution(fname) ?? 480;
           var _diskDepth = flexBitDepth(_diskFile);
           var _usbDepth = flexBitDepth(fname);
           var _diskGroup = (
@@ -3257,8 +3248,8 @@ async function main() {
           // Season dir doesn't exist yet — nothing to compare.
         }
         if (diskFile) {
-          var diskRes = flexResolution(diskFile);
-          var usbRes = flexResolution(fname);
+          var diskRes = getResolution(diskFile) ?? 480;
+          var usbRes = getResolution(fname) ?? 480;
           var diskDepth = flexBitDepth(diskFile);
           var usbDepth = flexBitDepth(fname);
           var diskGroup = (

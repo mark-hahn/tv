@@ -53,6 +53,14 @@ const GOOGLE_EMBY_DELAY_MS = 250; // ms after TV turns on before launching Emby
 const FIRE_HOME_DELAY_MS = 0; // ms after Fire TV turns on before sending home key
 const FIRE_EMBY_DELAY_MS = 5000; // ms after Fire TV turns on before launching Emby
 
+// Scrub control
+const SCRUB_START_COUNT = 4; // number of slow keys before speeding up
+const SCRUB_RATE_FWD_SLOW = 750; // ms between right keys for first N
+const SCRUB_RATE_FWD_FAST = 100; // ms between right keys after first N
+const SCRUB_RATE_REV_SLOW = 750; // ms between left keys for first N
+const SCRUB_RATE_REV_FAST = 100; // ms between left keys after first N
+const SCRUB_DEADMAN_TIMEOUT = 2000; // ms without ping before auto-stop
+
 // Subtitle nav (IRCC key sequence) delays
 const SUB_NAV_PRE_DOWN1_DELAY_MS = 400; // after first prepend Down
 const SUB_NAV_PRE_DOWN2_DELAY_MS = 400; // after second prepend Down
@@ -270,6 +278,12 @@ let pendingGoogleHome = false;
 let pendingFireEmby = false;
 let currentShowName = null;
 const prevSessions = {};
+
+// Scrub state
+let scrubDirection = null; // 'left' or 'right'
+let scrubInterval = null;
+let scrubDeadmanTimer = null;
+let scrubKeyCount = 0;
 
 function sendCmd(cmd) {
   setTimeout(() => {
@@ -1070,6 +1084,79 @@ app.get("/tv/status", (req, res) => {
     mediaTitle: braviaMediaTitle,
     activeDevice,
   });
+});
+
+// ─── Scrub control ───────────────────────────────────────────────────────────
+
+function stopScrub() {
+  if (scrubInterval) {
+    clearInterval(scrubInterval);
+    scrubInterval = null;
+  }
+  if (scrubDeadmanTimer) {
+    clearTimeout(scrubDeadmanTimer);
+    scrubDeadmanTimer = null;
+  }
+  scrubDirection = null;
+  scrubKeyCount = 0;
+}
+
+function startScrubDeadman() {
+  if (scrubDeadmanTimer) clearTimeout(scrubDeadmanTimer);
+  scrubDeadmanTimer = setTimeout(() => {
+    log("scrub dead-man timeout — stopping scrub");
+    stopScrub();
+  }, SCRUB_DEADMAN_TIMEOUT);
+}
+
+app.post("/tv/scrub/start", (req, res) => {
+  const { direction } = req.body ?? {};
+  if (direction !== "left" && direction !== "right") {
+    res.status(400).json({ ok: false, error: "invalid direction" });
+    return;
+  }
+  log(`scrub start direction=${direction} from ${client(req)}`);
+  stopScrub();
+  scrubDirection = direction;
+  scrubKeyCount = 0;
+  const command = direction === "right" ? "Right" : "Left";
+
+  const sendKey = () => {
+    scrubKeyCount++;
+    callService("remote", "send_command", REMOTE_ENTITY_ID, { command });
+
+    // Adjust interval after SCRUB_START_COUNT keys
+    if (scrubKeyCount === SCRUB_START_COUNT) {
+      clearInterval(scrubInterval);
+      const fastRate =
+        direction === "right" ? SCRUB_RATE_FWD_FAST : SCRUB_RATE_REV_FAST;
+      scrubInterval = setInterval(sendKey, fastRate);
+    }
+  };
+
+  // Send first key immediately
+  sendKey();
+  // Start interval for subsequent keys with slow rate
+  const slowRate =
+    direction === "right" ? SCRUB_RATE_FWD_SLOW : SCRUB_RATE_REV_SLOW;
+  scrubInterval = setInterval(sendKey, slowRate);
+  startScrubDeadman();
+  res.json({ ok: true });
+});
+
+app.post("/tv/scrub/ping", (req, res) => {
+  if (!scrubDirection) {
+    res.json({ ok: false, error: "not scrubbing" });
+    return;
+  }
+  startScrubDeadman();
+  res.json({ ok: true });
+});
+
+app.post("/tv/scrub/stop", (req, res) => {
+  log(`scrub stop from ${client(req)}`);
+  stopScrub();
+  res.json({ ok: true });
 });
 
 // ─── Emby subtitle control ───────────────────────────────────────────────────

@@ -26,14 +26,7 @@ const TV_TV_URL = "https://hahnca.com/tv-tv";
 const TV_SRVR_WS_URL = "wss://hahnca.com/tv-srvr";
 const TV_SRVR_HTTP_URL = "https://hahnca.com/tv-srvr";
 const SCRUB_HOLD_DELAY_MS = 400;
-const SCRUB_JUMP_REPEAT_MS = 1000;
-const SCRUB_POS_UPDATE_MS = 200;
-const SCRUB_BAR_DOWN_DELAY_MS = 100;
-const SCRUB_BAR_BACK_DELAY_MS = 50;
-const SCRUB_SMALL_JUMP_TICKS = 10 * 10_000_000;
-const SCRUB_LARGE_JUMP_TICKS = 30 * 10_000_000;
-const SCRUB_SMALL_JUMP_COUNT = 4;
-const SCRUB_POS_INCREMENT_TICKS = SCRUB_POS_UPDATE_MS * 10_000;
+const SCRUB_PING_INTERVAL_MS = 500;
 const VOL_STEP = 1;
 
 function buildSeriesMap(seriesMapIn) {
@@ -190,11 +183,6 @@ export default function App() {
   const avoidingRef = useRef(false);
   const avoidTimerRef = useRef(null);
   const unlockHoldTimerRef = useRef(null);
-  const scrubActiveRef = useRef(false);
-  const scrubIgnoreUntilReleaseRef = useRef(false);
-  const scrubPosTimerRef = useRef(null);
-  const embyPosRef = useRef(null);
-  const scrubJumpCountRef = useRef(0);
   const pendingLRKeyRef = useRef(null);
   const homeHoldRef = useRef(null);
   const homeHoldFiredRef = useRef(false);
@@ -216,106 +204,7 @@ export default function App() {
     return ok;
   };
 
-  const clearEmbyScrubState = (ignoreUntilRelease = false) => {
-    scrubActiveRef.current = false;
-    scrubIgnoreUntilReleaseRef.current = ignoreUntilRelease;
-    embyPosRef.current = null;
-    scrubJumpCountRef.current = 0;
-    clearInterval(scrubPosTimerRef.current);
-    scrubPosTimerRef.current = null;
-  };
-
-  const startEmbyPosTimer = () => {
-    clearInterval(scrubPosTimerRef.current);
-    scrubPosTimerRef.current = setInterval(() => {
-      if (!scrubActiveRef.current || typeof embyPosRef.current !== "number")
-        return;
-      embyPosRef.current += SCRUB_POS_INCREMENT_TICKS;
-    }, SCRUB_POS_UPDATE_MS);
-  };
-
-  const getScrubJumpTicks = (key) => {
-    const jumpTicks =
-      scrubJumpCountRef.current < SCRUB_SMALL_JUMP_COUNT
-        ? SCRUB_SMALL_JUMP_TICKS
-        : SCRUB_LARGE_JUMP_TICKS;
-    return key === "right" ? jumpTicks : -jumpTicks;
-  };
-
-  const keepScrubBarVisible = async () => {
-    if (!repeatActiveRef.current || !scrubActiveRef.current) return;
-    await new Promise((r) => {
-      setTimeout(r, SCRUB_BAR_DOWN_DELAY_MS);
-    });
-    if (!repeatActiveRef.current || !scrubActiveRef.current) return;
-    await fetch(`${TV_TV_URL}/tv/key/down`).catch(() => {});
-    await new Promise((r) => {
-      setTimeout(r, SCRUB_BAR_BACK_DELAY_MS);
-    });
-    if (!repeatActiveRef.current || !scrubActiveRef.current) return;
-    await fetch(`${TV_TV_URL}/tv/key/back`).catch(() => {});
-  };
-
-  const performEmbyScrubJump = async (key) => {
-    embyPosRef.current = Math.max(
-      0,
-      (embyPosRef.current ?? 0) + getScrubJumpTicks(key),
-    );
-    const seekRes = await fetch(`${TV_TV_URL}/tv/emby/seek`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ticks: embyPosRef.current }),
-    })
-      .then((r) => r.json())
-      .catch((e) => ({ ok: false, error: e.message }));
-    if (seekRes.reason === "paused") {
-      repeatActiveRef.current = false;
-      clearEmbyScrubState(true);
-      return seekRes;
-    }
-    if (seekRes.ok) {
-      scrubJumpCountRef.current += 1;
-      await keepScrubBarVisible();
-    }
-    return seekRes;
-  };
-
-  const startEmbyScrub = async (key) => {
-    const posRes = await fetch(`${TV_TV_URL}/tv/emby/position`)
-      .then((r) => r.json())
-      .catch((e) => ({ ok: false, error: e.message }));
-    if (!repeatActiveRef.current) return { ok: false, reason: "released" };
-    if (posRes.reason === "paused" || posRes.paused) {
-      repeatActiveRef.current = false;
-      clearEmbyScrubState(true);
-      return { ok: false, reason: "paused" };
-    }
-    if (!posRes.ok) return posRes;
-    scrubActiveRef.current = true;
-    scrubIgnoreUntilReleaseRef.current = false;
-    embyPosRef.current = Math.max(0, Number(posRes.ticks) || 0);
-    scrubJumpCountRef.current = 0;
-    startEmbyPosTimer();
-    const firstJumpRes = await performEmbyScrubJump(key);
-    if (!firstJumpRes.ok) return firstJumpRes;
-    while (repeatActiveRef.current && scrubActiveRef.current) {
-      await new Promise((r) => {
-        repeatTimeoutRef.current = setTimeout(r, SCRUB_JUMP_REPEAT_MS);
-      });
-      if (!repeatActiveRef.current || !scrubActiveRef.current) break;
-      const jumpRes = await performEmbyScrubJump(key);
-      if (!jumpRes.ok) return jumpRes;
-    }
-    return { ok: true };
-  };
-
   const startRepeat = (key) => {
-    if (
-      scrubIgnoreUntilReleaseRef.current &&
-      (key === "left" || key === "right")
-    ) {
-      return;
-    }
     if (isOff || isOther) return;
     if (checkBlocked()) return;
     if (!debounce()) return;
@@ -337,12 +226,25 @@ export default function App() {
       if (!repeatActiveRef.current) return;
       if (isLR) {
         pendingLRKeyRef.current = null; // long press — key will not be sent on release
-        const scrubRes = await startEmbyScrub(key);
-        if (scrubRes.ok || scrubRes.reason === "paused") {
-          return;
+        // Start server-side scrubbing
+        await fetch(`${TV_TV_URL}/tv/scrub/start`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ direction: key }),
+        }).catch(() => {});
+        // Send ping repeatedly while holding
+        while (repeatActiveRef.current) {
+          await new Promise((r) => {
+            repeatTimeoutRef.current = setTimeout(r, SCRUB_PING_INTERVAL_MS);
+          });
+          if (!repeatActiveRef.current) break;
+          await fetch(`${TV_TV_URL}/tv/scrub/ping`, {
+            method: "POST",
+          }).catch(() => {});
         }
-        if (scrubRes.reason !== "notPlaying") return;
+        return;
       }
+      // Non-LR keys: standard repeat logic
       let count = 0;
       while (repeatActiveRef.current) {
         const isFast = count >= 4;
@@ -379,14 +281,13 @@ export default function App() {
     clearTimeout(repeatDelayRef.current);
     clearTimeout(repeatTimeoutRef.current);
     const pendingLRKey = pendingLRKeyRef.current;
-    const ignoreUntilRelease = scrubIgnoreUntilReleaseRef.current;
-    if (scrubActiveRef.current || scrubIgnoreUntilReleaseRef.current) {
-      clearEmbyScrubState(false);
-    } else if (pendingLRKey) {
+    pendingLRKeyRef.current = null;
+    // Stop server-side scrubbing
+    fetch(`${TV_TV_URL}/tv/scrub/stop`, { method: "POST" }).catch(() => {});
+    if (pendingLRKey) {
+      // Short press on left/right — send key on release
       fetch(`${TV_TV_URL}/tv/key/${pendingLRKey}`).catch(() => {});
     }
-    pendingLRKeyRef.current = null;
-    if (ignoreUntilRelease) scrubIgnoreUntilReleaseRef.current = false;
   };
 
   const applyTvState = (data) => {
@@ -491,7 +392,6 @@ export default function App() {
       wsRef.current?.close();
       repeatActiveRef.current = false;
       volActiveRef.current = false;
-      clearEmbyScrubState(false);
       pendingLRKeyRef.current = null;
       clearTimeout(repeatDelayRef.current);
       clearTimeout(repeatTimeoutRef.current);

@@ -29,12 +29,16 @@ if [[ "$CHECKSUM" == "$CACHED_CHECKSUM" && -n "$CACHED_APK" ]]; then
   fi
   echo "installing" > "$PHASE_FILE"
   echo "==> Installing on device $DEVICE..."
-  if ! timeout 15 adb -s "$DEVICE" install -r "$LOCAL_APK"; then
+  if ! timeout 120 adb -s "$DEVICE" install -r "$LOCAL_APK" 2>&1; then
     echo "==> Install timed out or failed — restarting adb and retrying..."
     adb kill-server 2>/dev/null || true
     adb start-server 2>/dev/null || true
     sleep 2
-    adb -s "$DEVICE" install -r "$LOCAL_APK"
+    timeout 120 adb -s "$DEVICE" install -r "$LOCAL_APK" 2>&1 || {
+      echo "==> Install failed after retry. Try uninstalling first:"
+      echo "    adb -s $DEVICE uninstall com.hahnca.tvremote"
+      exit 1
+    }
   fi
   rm -f "$PHASE_FILE"
   echo "==> Done (from cache)."
@@ -70,12 +74,16 @@ scp $REMOTE:$APK_PATH $LOCAL_APK
 
 echo "installing" > "$PHASE_FILE"
 echo "==> Installing on device $DEVICE..."
-if ! timeout 15 adb -s $DEVICE install -r "$LOCAL_APK"; then
+if ! timeout 120 adb -s $DEVICE install -r "$LOCAL_APK" 2>&1; then
   echo "==> Install timed out or failed — restarting adb and retrying..."
   adb kill-server 2>/dev/null || true
   adb start-server 2>/dev/null || true
   sleep 2
-  adb -s $DEVICE install -r "$LOCAL_APK"
+  timeout 120 adb -s $DEVICE install -r "$LOCAL_APK" 2>&1 || {
+    echo "==> Install failed after retry. Try uninstalling first:"
+    echo "    adb -s $DEVICE uninstall com.hahnca.tvremote"
+    exit 1
+  }
 fi
 
 echo "$CHECKSUM gradle:$APK_PATH" > "$CACHE_FILE"

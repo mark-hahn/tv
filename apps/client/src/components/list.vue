@@ -836,36 +836,14 @@ export default {
       }
     },
 
-    logModalMessage(modalName, message) {
-      console.error(`[${modalName}] ${String(message ?? "")}`);
-    },
-
     showSearchingModal(showName, status) {
       this.searchingShowName = String(showName || "");
       this.searchingStatus = String(status || "");
       this.showSearching = true;
-      this.logModalMessage(
-        "searchingModal",
-        [
-          "Searching web for information about show:",
-          this.searchingShowName,
-          this.searchingStatus || "Please wait ...",
-        ].join("\n"),
-      );
     },
 
     setSearchingModalStatus(status) {
       this.searchingStatus = String(status || "");
-      if (this.showSearching) {
-        this.logModalMessage(
-          "searchingModal",
-          [
-            "Searching web for information about show:",
-            this.searchingShowName,
-            this.searchingStatus || "Please wait ...",
-          ].join("\n"),
-        );
-      }
     },
 
     async loadAllShowsWithDialog() {
@@ -2278,7 +2256,6 @@ export default {
     },
 
     async copyNameToClipboard(show, event) {
-      console.log("copyNameToClipboard", show.name);
       const ele = event.target;
       const color = ele.style.color;
       ele.style.color = "#f00";
@@ -3225,7 +3202,6 @@ export default {
     },
 
     async watchClick() {
-      console.log("watchClick");
       const target =
         this.lastWatchingName ??
         (this.watchingName !== "---" ? this.watchingName : null);
@@ -3786,7 +3762,6 @@ export default {
         if (typeof onDone === "function") {
           // Map "Not in Emby" flow: a new show was just created — full reload needed
           this.showReloadingShows = true;
-          this.logModalMessage("reloadingShowsModal", "Reloading Shows");
           tvdb.clearCache();
           await this.newShows();
         } else if (diskChangeShowName) {

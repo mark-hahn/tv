@@ -936,7 +936,6 @@ export default {
       this.loading = true;
       this.error = null;
       try {
-        console.log("usb: fetchFiles start");
         const url = this.movieMode
           ? `${config.torrentsApiUrl}/api/usb/movies`
           : `${config.torrentsApiUrl}/api/usb/files`;

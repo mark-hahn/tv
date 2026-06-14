@@ -1367,7 +1367,6 @@ export default {
       const res = await fetch(`${config.tvTvUrl}/tv/${cmd}`);
       const data = await res.json();
       if (cmd === "mute" && data.ok) this.muted = data.muted;
-      console.log(`[TV] ${cmd} response:`, data);
     },
 
     async tvVolCmd(dir) {
@@ -1381,7 +1380,6 @@ export default {
     async _tvKeyRaw(key) {
       const res = await fetch(`${config.tvTvUrl}/tv/key/${key}`);
       const data = await res.json();
-      console.log(`[TV] key ${key} response:`, data);
     },
 
     async tvKey(key) {
@@ -1392,7 +1390,6 @@ export default {
       this.notifyAction();
       const res = await fetch(`${config.tvTvUrl}/tv/key/${key}`);
       const data = await res.json();
-      console.log(`[TV] key ${key} response:`, data);
     },
   },
 };

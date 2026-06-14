@@ -232,7 +232,6 @@ async handleTvClick() {
   const url = `${config.tvTvUrl}/tv/on`;
   const res = await fetch(url);
   const data = await res.json();
-  console.log('[TV] turn-on response:', data);
 }
 ```
 

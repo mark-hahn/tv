@@ -1728,7 +1728,7 @@ const markFinished = (titleOrEntry, localPath) => {
           status: "finished",
           inProgress: false,
           progress: 100,
-          dateEnded: now,
+          dateEnded: entry.dateEnded || now,
         });
         upsertEntry(patch);
       } else {
@@ -1745,8 +1745,8 @@ const markFinished = (titleOrEntry, localPath) => {
           status: "finished",
           inProgress: false,
           progress: 100,
-          dateEnded: now,
-          dateStarted: entry.dateStarted || now,
+          dateEnded: entry.dateEnded || now,
+          dateStarted: entry.dateStarted || entry.dateEnded || now,
           error: false,
         });
         upsertEntry(patch);

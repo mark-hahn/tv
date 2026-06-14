@@ -24,6 +24,24 @@ import {
 const __filename = urlNode.fileURLToPath(import.meta.url);
 const __dirname = pathNode.dirname(__filename);
 
+process.on("uncaughtException", (err) => {
+  console.error(
+    `[tv-down] uncaughtException: ${err && (err.stack || err.message || err)}`,
+  );
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error(
+    `[tv-down] unhandledRejection: ${reason && (reason.stack || reason.message || reason)}`,
+  );
+  process.exit(1);
+});
+
+process.on("exit", (code) => {
+  console.error(`[tv-down] process exiting with code ${code}`);
+});
+
 async function main() {
   // If non-blank, emits targeted trace logs for this show name.
   // If blank, tracing is fully disabled.
@@ -166,13 +184,11 @@ async function main() {
   };
 
   log = (...x) => {
-    if (debug) {
-      console.log("\nLOG:", ...x);
-    }
+    console.log(`[${cycleTsPST()}]`, ...x);
   };
 
   err = (...x) => {
-    return console.error("error:", ...x);
+    return console.error(`[${cycleTsPST()}] error:`, ...x);
   };
 
   sizeStr = function (n, { digits = 1, base = 1000, suffix = "" } = {}) {
@@ -1032,7 +1048,20 @@ async function main() {
         // No matching endpoint
         return json(res, 404, { status: "not found" });
       })
-      .listen(3003, "0.0.0.0");
+      .on("error", (e) => {
+        console.error(
+          `[tv-down] HTTP server error: ${e && (e.code || e.message || e)}`,
+        );
+        if (e && e.code === "EADDRINUSE") {
+          console.error(
+            `[tv-down] port 3003 already in use — exiting so pm2 can retry`,
+          );
+          process.exit(1);
+        }
+      })
+      .listen(3003, "0.0.0.0", () => {
+        console.log(`[${cycleTsPST()}] HTTP server listening on port 3003`);
+      });
 
     // Start movie rsync cycling (1 min normal, 5 sec fast after qBt finishes)
     movieRsync.startCycling();
@@ -1291,7 +1320,10 @@ async function main() {
             setTimeout(() => loginToTvDb(retryCount + 1), RETRY_DELAY_MS);
           } else {
             err("Max retries reached. Exiting.");
-            return process.exit();
+            console.error(
+              `[tv-down] TVDB login max retries reached, calling process.exit()`,
+            );
+            return process.exit(1);
           }
         } else {
           theTvDbToken = body.data.token;
@@ -2978,16 +3010,30 @@ async function main() {
         description: `skip: already on disk`,
       });
       try {
+        // Use the file's mtime on disk as the timestamp so the card shows
+        // the real download date rather than today's date.
+        let diskMtimeSec = 0;
+        try {
+          const diskFilePath = `${tvSeasonPath}/${destTitle || fname}`;
+          const st = fs.statSync(
+            fs.existsSync(diskFilePath)
+              ? diskFilePath
+              : `${tvSeasonPath}/${fname}`,
+          );
+          diskMtimeSec = Math.floor(st.mtimeMs / 1000);
+        } catch (e) {}
         tvJson.markFinished({
           title: fname,
           localPath: tvLocalDir,
           usbPath: usbPath,
-          seriesName: seriesName || undefined,
+          seriesName: embyKeyForFolder || seriesName || undefined,
           season: season || 0,
           episode: episode || 0,
           fileSize: usbFileBytes || 0,
           destTitle: destTitle || undefined,
           sequence: currentSeq || 0,
+          dateStarted: diskMtimeSec || undefined,
+          dateEnded: diskMtimeSec || undefined,
         });
       } catch (e) {}
       if (tvJsonTitles) tvJsonTitles[fname] = { error: false };

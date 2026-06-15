@@ -8,9 +8,37 @@ import express from "express";
 import cors from "cors";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const _adbLog = createWriteStream(join(__dirname, "../data/tv-adb.log"), { flags: "a" });
+const _adbLog = createWriteStream(join(__dirname, "../data/tv-adb.log"), {
+  flags: "a",
+});
 function adbLog(...args) {
-  const line = `[${new Date().toISOString()}] ${args.join(" ")}\n`;
+  const d = new Date();
+  const ye = new Intl.DateTimeFormat("en", {
+    year: "numeric",
+    timeZone: "America/Los_Angeles",
+  }).format(d);
+  const mo = new Intl.DateTimeFormat("en", {
+    month: "2-digit",
+    timeZone: "America/Los_Angeles",
+  }).format(d);
+  const da = new Intl.DateTimeFormat("en", {
+    day: "2-digit",
+    timeZone: "America/Los_Angeles",
+  }).format(d);
+  const ho = new Intl.DateTimeFormat("en", {
+    hour: "2-digit",
+    hour12: false,
+    timeZone: "America/Los_Angeles",
+  }).format(d);
+  const mi = new Intl.DateTimeFormat("en", {
+    minute: "2-digit",
+    timeZone: "America/Los_Angeles",
+  }).format(d);
+  const se = new Intl.DateTimeFormat("en", {
+    second: "2-digit",
+    timeZone: "America/Los_Angeles",
+  }).format(d);
+  const line = `[${ye}/${mo}/${da} ${ho}:${mi}:${se}] ${args.join(" ")}\n`;
   _adbLog.write(line);
 }
 
@@ -441,7 +469,10 @@ function handleMsg(raw) {
           callService("media_player", "turn_on", FIRE_TV_ENTITY_ID);
         }
         // Drive ADB connect from HA power state
-        if ((state === "off" || state === "unavailable" || state === "unknown") && braviaAdbEnabled) {
+        if (
+          (state === "off" || state === "unavailable" || state === "unknown") &&
+          braviaAdbEnabled
+        ) {
           braviaAdbEnabled = false;
           adbLog(`TV ${state} — disabling adb reconnect`);
           if (braviaShell) {
@@ -700,9 +731,14 @@ function spawnBraviaShell() {
       log(`[bravia] ${msg}`);
     } else {
       if (braviaAdbEnabled) {
-        adbLog(`adb shell closed (${code}), reconnecting in ${braviaAdbBackoff / 1000}s...`);
+        adbLog(
+          `adb shell closed (${code}), reconnecting in ${braviaAdbBackoff / 1000}s...`,
+        );
         setTimeout(connectBraviaShell, braviaAdbBackoff);
-        braviaAdbBackoff = Math.min(braviaAdbBackoff * 2, BRAVIA_ADB_BACKOFF_MAX);
+        braviaAdbBackoff = Math.min(
+          braviaAdbBackoff * 2,
+          BRAVIA_ADB_BACKOFF_MAX,
+        );
       } else {
         adbLog(`adb shell closed (${code}), TV is off — not retrying`);
       }
@@ -716,7 +752,9 @@ function connectBraviaShell() {
   exec(`adb connect ${BRAVIA_TV_IP}`, (err, stdout, stderr) => {
     if (err) {
       if (!braviaAdbEnabled) return;
-      adbLog(`adb connect failed: ${err.message}, retrying in ${braviaAdbBackoff / 1000}s...`);
+      adbLog(
+        `adb connect failed: ${err.message}, retrying in ${braviaAdbBackoff / 1000}s...`,
+      );
       setTimeout(connectBraviaShell, braviaAdbBackoff);
       braviaAdbBackoff = Math.min(braviaAdbBackoff * 2, BRAVIA_ADB_BACKOFF_MAX);
     } else {

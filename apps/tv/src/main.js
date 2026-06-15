@@ -51,7 +51,7 @@ const REMOTE_ENTITY_ID = "remote.bravia_k_65xr70";
 const FIRE_TV_ENTITY_ID = "media_player.fire_tv_192_168_1_47";
 const FIRE_TV_REMOTE_ID = "remote.fire_tv_192_168_1_47";
 const FIRE_TV_IP = "192.168.1.47";
-const BRAVIA_TV_IP = "192.168.1.85:44531";
+const BRAVIA_TV_IP = "192.168.1.85:34047";
 const BRAVIA_PICTURE_URL = `http://192.168.1.85/sony/video`;
 const BRAVIA_PSK = "qwerty";
 
@@ -390,6 +390,13 @@ function handleMsg(raw) {
         log(
           `get_states: braviaState=${st} mediaTitle=${braviaMediaTitle} tvMode=${tvMode}`,
         );
+        // Kick off ADB connect if TV is already on at startup
+        if (st === "on" && !braviaAdbEnabled) {
+          braviaAdbEnabled = true;
+          braviaAdbBackoff = 2000;
+          adbLog("TV already on at startup — starting adb connect");
+          connectBraviaShell();
+        }
       }
     }
   } else if (msg.type === "event") {
@@ -474,6 +481,7 @@ function handleMsg(raw) {
           braviaAdbEnabled
         ) {
           braviaAdbEnabled = false;
+          braviaAdbConnecting = false;
           adbLog(`TV ${state} — disabling adb reconnect`);
           if (braviaShell) {
             braviaShell.removeAllListeners();
@@ -683,8 +691,9 @@ let braviaShellPending = null;
 let braviaKeySeq = 0;
 let braviaShellUnauthorized = false;
 let braviaAdbBackoff = 2000; // ms, doubles on each failure up to max
-const BRAVIA_ADB_BACKOFF_MAX = 5 * 60 * 1000; // 5 minutes
+const BRAVIA_ADB_BACKOFF_MAX = 120000; // 2 minutes
 let braviaAdbEnabled = false; // only attempt when HA says TV is on
+let braviaAdbConnecting = false; // guard against concurrent connect attempts
 
 function spawnBraviaShell() {
   if (braviaShell) {
@@ -748,17 +757,29 @@ function spawnBraviaShell() {
 
 function connectBraviaShell() {
   if (!braviaAdbEnabled) return;
-  adbLog(`adb connect ${BRAVIA_TV_IP} (backoff=${braviaAdbBackoff / 1000}s)`);
+  if (braviaAdbConnecting) {
+    adbLog("connect already in progress, skipping");
+    return;
+  }
+  braviaAdbConnecting = true;
+  adbLog("Attempting to connect to Bravia shell...");
   exec(`adb connect ${BRAVIA_TV_IP}`, (err, stdout, stderr) => {
-    if (err) {
-      if (!braviaAdbEnabled) return;
+    braviaAdbConnecting = false;
+    if (!braviaAdbEnabled) return;
+    const out = stdout.trim();
+    const failed =
+      err ||
+      out.includes("failed") ||
+      out.includes("refused") ||
+      out.includes("unable to connect");
+    if (failed) {
+      const reason = err ? err.message : out;
       adbLog(
-        `adb connect failed: ${err.message}, retrying in ${braviaAdbBackoff / 1000}s...`,
+        `adb connect failed: ${reason}, retrying in ${braviaAdbBackoff / 1000}s...`,
       );
       setTimeout(connectBraviaShell, braviaAdbBackoff);
       braviaAdbBackoff = Math.min(braviaAdbBackoff * 2, BRAVIA_ADB_BACKOFF_MAX);
     } else {
-      const out = stdout.trim();
       adbLog(`adb connect ok: ${out}`);
       if (out) log(`[bravia] adb connect: ${out}`);
       braviaAdbBackoff = 2000; // reset on success

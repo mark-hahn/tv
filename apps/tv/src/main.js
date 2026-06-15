@@ -1,8 +1,18 @@
 import { WebSocket } from "ws";
 import { exec, spawn } from "child_process";
+import { createWriteStream } from "fs";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 
 import express from "express";
 import cors from "cors";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const _adbLog = createWriteStream(join(__dirname, "../data/tv-adb.log"), { flags: "a" });
+function adbLog(...args) {
+  const line = `[${new Date().toISOString()}] ${args.join(" ")}\n`;
+  _adbLog.write(line);
+}
 
 const HA_HOST = "hahnca.com:8123";
 const HA_ACCESS_TOKEN =
@@ -430,6 +440,23 @@ function handleMsg(raw) {
           log("HDMI 2 with no signal — waking Fire Stick");
           callService("media_player", "turn_on", FIRE_TV_ENTITY_ID);
         }
+        // Drive ADB connect from HA power state
+        if ((state === "off" || state === "unavailable" || state === "unknown") && braviaAdbEnabled) {
+          braviaAdbEnabled = false;
+          adbLog(`TV ${state} — disabling adb reconnect`);
+          if (braviaShell) {
+            braviaShell.removeAllListeners();
+            braviaShell.stdin.destroy();
+            braviaShell.kill();
+            braviaShell = null;
+            braviaShellReady = false;
+          }
+        } else if (state === "on" && !braviaAdbEnabled) {
+          braviaAdbEnabled = true;
+          braviaAdbBackoff = 2000;
+          adbLog("TV on — starting adb connect");
+          connectBraviaShell();
+        }
         // Keep tvMode in sync with what the TV is actually showing
         if (state === "off" || state === "unavailable" || state === "unknown")
           tvMode = "off";
@@ -624,6 +651,9 @@ let braviaShellStdoutBuf = "";
 let braviaShellPending = null;
 let braviaKeySeq = 0;
 let braviaShellUnauthorized = false;
+let braviaAdbBackoff = 2000; // ms, doubles on each failure up to max
+const BRAVIA_ADB_BACKOFF_MAX = 5 * 60 * 1000; // 5 minutes
+let braviaAdbEnabled = false; // only attempt when HA says TV is on
 
 function spawnBraviaShell() {
   if (braviaShell) {
@@ -654,34 +684,46 @@ function spawnBraviaShell() {
     }
   });
   braviaShell.on("spawn", () => {
-    log("[bravia] adb shell spawned");
+    adbLog("adb shell spawned");
     braviaShellReady = true;
   });
   braviaShell.on("error", (err) => {
-    log(`[bravia] adb shell error: ${err.message}`);
+    adbLog(`adb shell error: ${err.message}`);
     braviaShellReady = false;
   });
   braviaShell.on("close", (code) => {
     braviaShellReady = false;
     braviaShell = null;
     if (braviaShellUnauthorized) {
-      log(
-        `[bravia] adb shell closed (${code}) — device unauthorized, NOT retrying (accept USB debug dialog on Bravia then restart tv-tv)`,
-      );
+      const msg = `adb shell closed (${code}) — device unauthorized, NOT retrying`;
+      adbLog(msg);
+      log(`[bravia] ${msg}`);
     } else {
-      log(`[bravia] adb shell closed (${code}), reconnecting in 2s...`);
-      setTimeout(connectBraviaShell, 2000);
+      if (braviaAdbEnabled) {
+        adbLog(`adb shell closed (${code}), reconnecting in ${braviaAdbBackoff / 1000}s...`);
+        setTimeout(connectBraviaShell, braviaAdbBackoff);
+        braviaAdbBackoff = Math.min(braviaAdbBackoff * 2, BRAVIA_ADB_BACKOFF_MAX);
+      } else {
+        adbLog(`adb shell closed (${code}), TV is off — not retrying`);
+      }
     }
   });
 }
 
 function connectBraviaShell() {
-  exec(`adb connect ${BRAVIA_TV_IP}`, (err, stdout) => {
+  if (!braviaAdbEnabled) return;
+  adbLog(`adb connect ${BRAVIA_TV_IP} (backoff=${braviaAdbBackoff / 1000}s)`);
+  exec(`adb connect ${BRAVIA_TV_IP}`, (err, stdout, stderr) => {
     if (err) {
-      log(`[bravia] adb connect failed: ${err.message}, retrying in 5s...`);
-      setTimeout(connectBraviaShell, 5000);
+      if (!braviaAdbEnabled) return;
+      adbLog(`adb connect failed: ${err.message}, retrying in ${braviaAdbBackoff / 1000}s...`);
+      setTimeout(connectBraviaShell, braviaAdbBackoff);
+      braviaAdbBackoff = Math.min(braviaAdbBackoff * 2, BRAVIA_ADB_BACKOFF_MAX);
     } else {
-      log(`[bravia] adb connect: ${stdout.trim()}`);
+      const out = stdout.trim();
+      adbLog(`adb connect ok: ${out}`);
+      if (out) log(`[bravia] adb connect: ${out}`);
+      braviaAdbBackoff = 2000; // reset on success
       spawnBraviaShell();
     }
   });
@@ -690,13 +732,16 @@ function connectBraviaShell() {
 function braviaShellCmd(cmd) {
   return new Promise((resolve, reject) => {
     if (!braviaShellReady || !braviaShell) {
+      adbLog(`cmd skipped (shell not ready): ${cmd}`);
       reject(new Error("bravia shell not ready"));
       return;
     }
+    adbLog(`cmd: ${cmd}`);
     const marker = `__B${++braviaKeySeq}__`;
     braviaShellPending = { marker, resolve };
     braviaShell.stdin.write(`${cmd} && echo ${marker}\n`, (err) => {
       if (err) {
+        adbLog(`cmd write error: ${err.message}`);
         braviaShellPending = null;
         reject(err);
       }
@@ -704,7 +749,7 @@ function braviaShellCmd(cmd) {
   });
 }
 
-connectBraviaShell();
+// ADB connect is initiated by HA state_changed (TV on → connectBraviaShell)
 
 app.get("/tv/keyevent/:code", async (req, res) => {
   if (tvMode !== "google" && tvMode !== "tv") {

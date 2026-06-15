@@ -791,6 +791,30 @@ export default {
       }
     },
 
+    // Helper to set poster maxHeight while preserving larger sizes
+    applyPosterHeight(posterImg, newHeight, context = "") {
+      if (!posterImg) return;
+
+      const existingMaxHeight =
+        posterImg.style.maxHeight && posterImg.style.visibility === "visible"
+          ? parseInt(posterImg.style.maxHeight)
+          : 0;
+
+      // Don't shrink the poster - only grow it or set it initially
+      if (existingMaxHeight > 0 && newHeight < existingMaxHeight) {
+        console.log(
+          `[poster-shrink] ${context}: PRESERVING ${existingMaxHeight}px (new=${newHeight}px) for ${this.show?.name}`,
+        );
+        posterImg.style.maxHeight = existingMaxHeight + "px";
+      } else {
+        console.log(
+          `[poster-shrink] ${context}: setting ${newHeight}px (existing=${existingMaxHeight}px) for ${this.show?.name}`,
+        );
+        posterImg.style.maxHeight = newHeight + "px";
+      }
+      posterImg.style.visibility = "visible";
+    },
+
     async setPoster(tvdbData) {
       const posterEl = document.getElementById("poster");
       if (!posterEl) return;
@@ -840,20 +864,11 @@ export default {
 
       const infoBoxEl = document.getElementById("infoBox");
       if (infoBoxEl && infoBoxEl.clientHeight > 0) {
-        const newHeight = infoBoxEl.clientHeight;
-        // Don't shrink the poster - only grow it or set it initially
-        if (existingMaxHeight > 0 && newHeight < existingMaxHeight) {
-          console.log(
-            `[poster-shrink] setPoster: PRESERVING ${existingMaxHeight}px (infoBox=${newHeight}px) for ${this.show?.name}`,
-          );
+        // Restore the existing max height to the new image before applying new height
+        if (existingMaxHeight > 0) {
           img.style.maxHeight = existingMaxHeight + "px";
-        } else {
-          console.log(
-            `[poster-shrink] setPoster: setting ${newHeight}px (existing=${existingMaxHeight}px) for ${this.show?.name}`,
-          );
-          img.style.maxHeight = newHeight + "px";
         }
-        img.style.visibility = "visible";
+        this.applyPosterHeight(img, infoBoxEl.clientHeight, "setPoster");
       } else {
         console.log(
           `[poster-shrink] setPoster: infoBox not ready (height=${infoBoxEl?.clientHeight}) for ${this.show?.name}`,
@@ -1539,8 +1554,11 @@ export default {
               const infoBoxEl = document.getElementById("infoBox");
               const posterImg = document.querySelector("#poster img");
               if (infoBoxEl && posterImg) {
-                posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
-                posterImg.style.visibility = "visible";
+                this.applyPosterHeight(
+                  posterImg,
+                  infoBoxEl.clientHeight,
+                  "preview nextTick",
+                );
               }
             });
             void this.setRemotes();
@@ -1553,8 +1571,11 @@ export default {
             const infoBoxEl = document.getElementById("infoBox");
             const posterImg = document.querySelector("#poster img");
             if (infoBoxEl && posterImg) {
-              posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
-              posterImg.style.visibility = "visible";
+              this.applyPosterHeight(
+                posterImg,
+                infoBoxEl.clientHeight,
+                "seriesReady nextTick",
+              );
             }
           }
         } finally {
@@ -1709,8 +1730,11 @@ export default {
       const posterImg = document.querySelector("#poster img");
       const infoBoxEl = document.getElementById("infoBox");
       if (posterImg && infoBoxEl && infoBoxEl.clientHeight > 0) {
-        posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
-        posterImg.style.visibility = "visible";
+        this.applyPosterHeight(
+          posterImg,
+          infoBoxEl.clientHeight,
+          "tvdbUpdated",
+        );
       }
     };
     evtBus.on("tvdbUpdated", this.onTvdbUpdated);
@@ -1746,8 +1770,11 @@ export default {
         const infoBoxEl = document.getElementById("infoBox");
         const posterImg = document.querySelector("#poster img");
         if (infoBoxEl && posterImg && infoBoxEl.clientHeight > 0) {
-          posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
-          posterImg.style.visibility = "visible";
+          this.applyPosterHeight(
+            posterImg,
+            infoBoxEl.clientHeight,
+            "paneChanged",
+          );
         }
       });
     };

@@ -129,35 +129,15 @@ export async function searchPerson(params) {
 
 export async function getStreamProviders(params) {
   let { showName, year } = params;
-  console.log(
-    `[tmdb] getStreamProviders called: showName="${showName}", year=${year || "none"}`,
-  );
 
   // Strip trailing (YYYY) from show name and use as year if not already provided
   const yearMatch = String(showName || "").match(/\s*\((\d{4})\)$/);
   if (yearMatch) {
     if (!year) year = yearMatch[1];
     showName = showName.slice(0, showName.length - yearMatch[0].length).trim();
-    console.log(
-      `[tmdb] Extracted year from show name: "${showName}" (${year})`,
-    );
   }
 
   const searchRes = await moviedb.searchTv({ query: showName });
-  console.log(
-    `[tmdb] TMDB searchTv returned ${searchRes.results?.length || 0} results`,
-  );
-  if (searchRes.results?.length > 0) {
-    console.log(
-      `[tmdb] TMDB results:`,
-      searchRes.results.map((r) => ({
-        name: r.name,
-        original_name: r.original_name,
-        first_air_date: r.first_air_date,
-        id: r.id,
-      })),
-    );
-  }
 
   // smartTitleMatch returns a string (the title), not the object
   let matchingTitle = smartTitleMatch(
@@ -166,23 +146,15 @@ export async function getStreamProviders(params) {
     year,
     false,
   );
-  console.log(
-    `[tmdb] smartTitleMatch with year ${year || "none"}: ${matchingTitle ? `found "${matchingTitle}"` : "no match"}`,
-  );
   if (!matchingTitle && year) {
-    console.log("[tmdb] No match with year, retrying without year");
     matchingTitle = smartTitleMatch(
       showName,
       searchRes.results || [],
       null,
       false,
     );
-    console.log(
-      `[tmdb] smartTitleMatch without year: ${matchingTitle ? `found "${matchingTitle}"` : "no match"}`,
-    );
   }
   if (!matchingTitle) {
-    console.log(`[tmdb] No match found for "${showName}"`);
     return { providers: [], error: "show not found" };
   }
 
@@ -192,14 +164,8 @@ export async function getStreamProviders(params) {
       show.name === matchingTitle || show.original_name === matchingTitle,
   );
   if (!match?.id) {
-    console.log(
-      `[tmdb] Found title "${matchingTitle}" but couldn't find object in results`,
-    );
     return { providers: [], error: "show not found" };
   }
-  console.log(
-    `[tmdb] Matched show: "${match.name || match.original_name}" (id: ${match.id})`,
-  );
 
   const COUNTRIES = ["US", "GB", "AU"];
   const wpRes = await moviedb.tvWatchProviders({ id: match.id });
@@ -228,8 +194,5 @@ export async function getStreamProviders(params) {
 
   const tmdbLink =
     allResults.US?.link || allResults.GB?.link || allResults.AU?.link;
-  console.log(
-    `[tmdb] Returning ${providers.length} providers, tmdbLink: ${tmdbLink || "none"}, tmdbId: ${match.id}`,
-  );
   return { providers, tmdbLink, tmdbId: match.id };
 }

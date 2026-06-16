@@ -2371,7 +2371,9 @@ export default {
       const cutoff = Date.now() - this.downloadHistoryWindowMs();
       for (const k of keys) {
         const ts = Number(this.downloadedByHash?.[k]);
-        if (Number.isFinite(ts) && ts >= cutoff) return true;
+        if (Number.isFinite(ts) && ts >= cutoff) {
+          return true;
+        }
       }
       return false;
     },

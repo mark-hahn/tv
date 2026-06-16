@@ -112,9 +112,15 @@ export default {
   methods: {
     async fetchProviders() {
       const name = this.show?.name;
-      if (!name) return;
+      if (!name) {
+        console.log("[Stream] fetchProviders called but no show name");
+        return;
+      }
 
       if (this.cache[name]) {
+        console.log(
+          `[Stream] Cache hit for "${name}" - ${this.cache[name].providers.length} providers`,
+        );
         this.providers = this.cache[name].providers;
         this.tmdbLink = this.cache[name].tmdbLink;
         this.error = null;
@@ -130,7 +136,15 @@ export default {
           const y = String(this.show.firstAired).slice(0, 4);
           if (y.length === 4) params.year = y;
         }
+        console.log(
+          `[Stream] Fetching providers for "${params.showName}"${
+            params.year ? ` (${params.year})` : ""
+          }`,
+        );
         const res = await srvr.getStreamProviders(params);
+        console.log(
+          `[Stream] API response: ${res.providers?.length || 0} providers, error: ${res.error || "none"}, tmdbId: ${res.tmdbId || "none"}`,
+        );
         this.providers = res.providers || [];
         this.tmdbLink = res.tmdbLink || null;
         this.cache[name] = {
@@ -139,12 +153,16 @@ export default {
         };
         if (res.error) this.error = res.error;
       } catch (e) {
+        console.error("[Stream] API error:", e);
         this.error = e.message || "Failed to fetch providers";
       } finally {
         this.loading = false;
       }
     },
     openProvider(p) {
+      console.log(
+        `[Stream] Opening provider "${p.name}" (${p.type}) - link: ${this.tmdbLink}`,
+      );
       if (this.tmdbLink) {
         util.openExternalPage(this.tmdbLink);
       }

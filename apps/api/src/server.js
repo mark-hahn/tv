@@ -1320,35 +1320,90 @@ app.post("/api/local/mediainfo", async (req, res) => {
 });
 
 const TOR_SENT_PATH = path.join(getApiMiscDir(), "tor-sent.json");
+const RECENT_SENT_LOG_PATH = "/root/dev/apps/tv/logs/recent-sent.log";
+
+function logRecentSent(action, details = {}) {
+  try {
+    const now = new Date();
+    const pstTime = now.toLocaleString("en-US", {
+      timeZone: "America/Los_Angeles",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+    const detailsStr =
+      Object.keys(details).length > 0 ? ` | ${JSON.stringify(details)}` : "";
+    const line = `${pstTime} | ${action}${detailsStr}\n`;
+    fs.appendFileSync(RECENT_SENT_LOG_PATH, line, "utf8");
+  } catch {
+    // ignore logging errors
+  }
+}
 
 function loadTorSent() {
   try {
     if (fs.existsSync(TOR_SENT_PATH)) {
       const j = JSON.parse(fs.readFileSync(TOR_SENT_PATH, "utf8"));
-      if (j && typeof j === "object" && !Array.isArray(j)) return j;
+      if (j && typeof j === "object" && !Array.isArray(j)) {
+        logRecentSent("LOAD", { entryCount: Object.keys(j).length });
+        return j;
+      }
     }
-  } catch {
-    // ignore
+    logRecentSent("LOAD", { entryCount: 0, note: "file not found or invalid" });
+  } catch (e) {
+    logRecentSent("LOAD_ERROR", { error: e.message });
   }
   return {};
 }
 
 app.get("/api/tor/sent", (req, res) => {
-  res.json(loadTorSent());
+  const data = loadTorSent();
+  logRecentSent("GET", {
+    entryCount: Object.keys(data).length,
+    ip: req.ip || req.connection?.remoteAddress,
+  });
+  res.json(data);
 });
 
 app.post("/api/tor/sent", (req, res) => {
   const keys = Array.isArray(req.body?.keys) ? req.body.keys : [];
-  if (keys.length === 0)
+  if (keys.length === 0) {
+    logRecentSent("POST_ERROR", { error: "keys required" });
     return res.status(400).json({ error: "keys required" });
+  }
   const data = loadTorSent();
   const now = Date.now();
+  const beforeCount = Object.keys(data).length;
+  let newKeys = 0;
+  let updatedKeys = 0;
   for (const k of keys) {
-    if (k && typeof k === "string") data[k] = now;
+    if (k && typeof k === "string") {
+      if (data[k]) updatedKeys++;
+      else newKeys++;
+      data[k] = now;
+    }
   }
   try {
     fs.writeFileSync(TOR_SENT_PATH, JSON.stringify(data), "utf8");
+    const afterCount = Object.keys(data).length;
+    logRecentSent("POST", {
+      keysProvided: keys.length,
+      newKeys,
+      updatedKeys,
+      beforeCount,
+      afterCount,
+      timestamp: now,
+      ip: req.ip || req.connection?.remoteAddress,
+      sampleKeys: keys.slice(0, 3),
+    });
   } catch (e) {
+    logRecentSent("POST_WRITE_ERROR", {
+      error: e.message,
+      keysCount: keys.length,
+    });
     return res.status(500).json({ error: e.message });
   }
   res.json({ ok: true });

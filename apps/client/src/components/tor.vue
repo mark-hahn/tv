@@ -2123,11 +2123,18 @@ export default {
         if (res.ok) {
           const j = await res.json();
           if (j && typeof j === "object" && !Array.isArray(j)) {
+            const entryCount = Object.keys(j).length;
+            console.log(
+              `[tor-sent] loadDownloadedHistory: loaded ${entryCount} entries`,
+            );
             this.downloadedByHash = j;
           }
         }
-      } catch {
-        // ignore
+      } catch (e) {
+        console.log(
+          `[tor-sent] loadDownloadedHistory: fetch failed:`,
+          e.message,
+        );
       }
       this.pruneDownloadedHistory();
     },
@@ -2145,7 +2152,13 @@ export default {
         if (Number.isFinite(t) && t >= cutoff) next[k] = t;
       }
       const changed = Object.keys(next).length !== Object.keys(map).length;
-      if (changed) this.downloadedByHash = next;
+      if (changed) {
+        const removed = Object.keys(map).length - Object.keys(next).length;
+        console.log(
+          `[tor-sent] pruneDownloadedHistory: removed ${removed} old entries (older than 60 days)`,
+        );
+        this.downloadedByHash = next;
+      }
     },
 
     extractBtih(str) {
@@ -2332,6 +2345,18 @@ export default {
       for (const k of keys) next[k] = now;
       this.downloadedByHash = next;
       this.pruneDownloadedHistory();
+
+      // Log to track "Sent recently" state changes
+      const torTitle = String(
+        torrent?.raw?.title || torrent?.title || "",
+      ).trim();
+      console.log(
+        `[tor-sent] rememberDownloadedTorrent: "${torTitle}" | keys:`,
+        keys.length,
+        "| timestamp:",
+        now,
+      );
+
       // Persist to server.
       fetch(`${config.torrentsApiUrl}/api/tor/sent`, {
         method: "POST",

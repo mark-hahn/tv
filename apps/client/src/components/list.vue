@@ -139,8 +139,6 @@
             <HdrBot
               v-if="!simpleMode"
               :conds="conds"
-              :sortPopped="sortPopped"
-              :fltrPopped="fltrPopped"
               :sortChoices="sortChoices"
               :fltrChoices="fltrChoices"
               :selectedSort="actorsListMode ? '---' : sortChoice"
@@ -148,8 +146,6 @@
               :reversed="reversed"
               @top-click="topClick"
               @prev-next-click="prevNextClick"
-              @sort-click="sortClick"
-              @filter-click="filterClick"
               @all-click="allClick"
               @cond-fltr-click="condFltrClick"
               @sort-action="sortAction"
@@ -236,8 +232,6 @@
           <HdrBot
             v-if="!simpleMode"
             :conds="conds"
-            :sortPopped="sortPopped"
-            :fltrPopped="fltrPopped"
             :sortChoices="sortChoices"
             :fltrChoices="fltrChoices"
             :selectedSort="actorsListMode ? '---' : sortChoice"
@@ -245,8 +239,6 @@
             :reversed="reversed"
             @top-click="topClick"
             @prev-next-click="prevNextClick"
-            @sort-click="sortClick"
-            @filter-click="filterClick"
             @all-click="allClick"
             @cond-fltr-click="condFltrClick"
             @sort-action="sortAction"
@@ -586,10 +578,8 @@ export default {
       currentPlayingSeason: null,
       currentPlayingEpisode: null,
       nowPlayingShowNames: new Set(),
-      sortPopped: false,
       sortChoice: "Viewed",
       reversed: false,
-      fltrPopped: false,
       fltrChoice: "All",
       showSearching: false,
       searchingShowName: "",
@@ -607,7 +597,6 @@ export default {
       hasLoadedAllShows: false,
       hasSharedFilters: false,
       sortChoices: [
-        "Close",
         "Alpha",
         "Viewed",
         "Down",
@@ -620,7 +609,7 @@ export default {
         "Creator",
         "Quality",
       ],
-      fltrChoices: ["Close", "Try Drama", "Watching", "Finished", "Playing"],
+      fltrChoices: ["All", "Try Drama", "Watching", "Finished", "Playing"],
       conds: [
         {
           color: "#0cf",
@@ -2183,33 +2172,18 @@ export default {
       }
     },
 
-    sortClick() {
-      if (this.actorsListMode) return;
-      this.sortPopped = !this.sortPopped;
-      this.fltrPopped = false;
-    },
-
     revClick() {
       this.reversed = !this.reversed;
       this.sortShows();
     },
 
     sortAction(sortChoice) {
-      if (sortChoice != "Close") {
-        this.sortChoice = sortChoice;
-        this.reversed = false;
-        this.sortShows();
-        setTimeout(() => {
-          this.saveVisShow(this.shows[0], true);
-        }, 0);
-      }
-      this.sortPopped = false;
-      this.fltrPopped = false;
-    },
-
-    filterClick() {
-      this.fltrPopped = !this.fltrPopped;
-      this.sortPopped = false;
+      this.sortChoice = sortChoice;
+      this.reversed = false;
+      this.sortShows();
+      setTimeout(() => {
+        this.saveVisShow(this.shows[0], true);
+      }, 0);
     },
 
     async fltrAction(fltrChoice) {
@@ -2217,24 +2191,20 @@ export default {
       this.actorSearchParams = null;
       evtBus.emit("actorSearchCleared");
       if (fltrChoice === "All") evtBus.emit("clearDescrSearch");
-      if (fltrChoice != "Close") {
-        // Set filters first
-        window.localStorage.setItem("fltrChoice", fltrChoice);
-        this.fltrChoice = fltrChoice;
-        this.filterStr = "";
-        for (let cond of this.conds) {
-          util.setCondFltr(cond, this.fltrChoice);
-          if (cond.name === "hasemby" && !this.hasLoadedAllShows) {
-            cond.filter = 1;
-          }
+      // Set filters first
+      window.localStorage.setItem("fltrChoice", fltrChoice);
+      this.fltrChoice = fltrChoice;
+      this.filterStr = "";
+      for (let cond of this.conds) {
+        util.setCondFltr(cond, this.fltrChoice);
+        if (cond.name === "hasemby" && !this.hasLoadedAllShows) {
+          cond.filter = 1;
         }
-
-        await this.select();
-
-        // sortShows() already called in refilter(), no need to call again
       }
-      this.sortPopped = false;
-      this.fltrPopped = false;
+
+      await this.select();
+
+      // sortShows() already called in refilter(), no need to call again
     },
 
     async scrollToSavedShow(saveVis = false) {
@@ -3514,24 +3484,6 @@ export default {
     };
     document.addEventListener("click", this._actorsListClickOutside, true);
 
-    // Click-outside handler to close sort/filter dropdowns
-    this._popClickOutside = (e) => {
-      if (!this.sortPopped && !this.fltrPopped) return;
-      const sortpop = document.getElementById("sortpop");
-      const fltrpop = document.getElementById("fltrpop");
-      const sortFltr = document.getElementById("sortFltr");
-      if (
-        (sortpop && sortpop.contains(e.target)) ||
-        (fltrpop && fltrpop.contains(e.target)) ||
-        (sortFltr && sortFltr.contains(e.target))
-      ) {
-        return;
-      }
-      this.sortPopped = false;
-      this.fltrPopped = false;
-    };
-    document.addEventListener("click", this._popClickOutside);
-
     // Setup evtBus listeners cleanup
     this.evtHandlers = {};
     const on = (name, fn) => {
@@ -3910,11 +3862,6 @@ export default {
     if (this._actorsListClickOutside) {
       document.removeEventListener("click", this._actorsListClickOutside, true);
       this._actorsListClickOutside = null;
-    }
-
-    if (this._popClickOutside) {
-      document.removeEventListener("click", this._popClickOutside);
-      this._popClickOutside = null;
     }
 
     if (this.evtHandlers) {

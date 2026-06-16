@@ -66,30 +66,46 @@
       </button>
       <div
         id="sortFltr"
-        style="display: inline-flex; gap: 4px"
+        style="display: inline-flex; gap: 4px; align-items: center"
       >
-        <button
-          @click="$emit('sort-click')"
+        <select
+          :value="selectedSort"
+          @change="$emit('sort-action', $event.target.value)"
           :style="{
             fontSize: '15px',
             margin: '4px',
-            whiteSpace: 'nowrap',
-            width: '72px',
+            padding: '2px 4px',
+            cursor: 'pointer',
+            backgroundColor: 'white',
           }"
         >
-          {{ selectedSortNbsp }}
-        </button>
-        <button
-          @click="$emit('filter-click')"
+          <option
+            v-for="sortChoice in sortChoices"
+            :key="sortChoice"
+            :value="sortChoice"
+          >
+            {{ displaySortChoice(sortChoice) }}
+          </option>
+        </select>
+        <select
+          :value="selectedFilter"
+          @change="$emit('fltr-action', $event.target.value)"
           :style="{
             fontSize: '15px',
             margin: '4px',
-            whiteSpace: 'nowrap',
-            width: '100px',
+            padding: '2px 4px',
+            cursor: 'pointer',
+            backgroundColor: 'white',
           }"
         >
-          {{ selectedFilterNbsp }}
-        </button>
+          <option
+            v-for="fltrChoice in fltrChoices"
+            :key="fltrChoice"
+            :value="fltrChoice"
+          >
+            {{ fltrChoice }}
+          </option>
+        </select>
         <button
           @click="$emit('all-click')"
           :style="{
@@ -131,69 +147,6 @@
         ></font-awesome-icon>
       </div>
     </div>
-    <div
-      id="sortpop"
-      v-if="sortPopped"
-      style="
-        width: 200px;
-        background-color: #eee;
-        border: 1px solid black;
-        position: fixed;
-        display: flex;
-        flex-direction: column;
-        left: 144px;
-        top: 75px;
-        z-index: 10000;
-      "
-    >
-      <div
-        v-for="sortChoice in sortChoices"
-        style="
-          margin: 3px 10px;
-          padding: 10px;
-          background-color: white;
-          text-align: center;
-          border: 1px solid black;
-          font-weight: bold;
-          cursor: default;
-        "
-        @click="$emit('sort-action', sortChoice)"
-      >
-        {{ displaySortChoice(sortChoice) }}
-      </div>
-    </div>
-    <div
-      id="fltrpop"
-      v-if="fltrPopped"
-      style="
-        width: 200px;
-        background-color: #eee;
-        padding: 0px;
-        border: 1px solid black;
-        position: fixed;
-        display: flex;
-        flex-direction: column;
-        left: 253px;
-        top: 75px;
-        z-index: 10000;
-      "
-    >
-      <div
-        v-for="fltrChoice in fltrChoices"
-        style="
-          margin: 3px 10px;
-          padding: 10px;
-          background-color: white;
-          text-align: center;
-          border: 1px solid black;
-          font-weight: bold;
-          cursor: default;
-        "
-        @click="$emit('fltr-action', fltrChoice)"
-      >
-        {{ fltrChoice }}
-      </div>
-    </div>
   </div>
 </template>
 
@@ -208,14 +161,6 @@ export default {
     conds: {
       type: Array,
       required: true,
-    },
-    sortPopped: {
-      type: Boolean,
-      default: false,
-    },
-    fltrPopped: {
-      type: Boolean,
-      default: false,
     },
     sortChoices: {
       type: Array,
@@ -240,12 +185,6 @@ export default {
   },
 
   computed: {
-    selectedSortNbsp() {
-      return this.displaySortChoice(this.selectedSort).replace(/ /g, "\u00A0");
-    },
-    selectedFilterNbsp() {
-      return String(this.selectedFilter || "").replace(/ /g, "\u00A0");
-    },
     visibleConds() {
       return this.conds.filter((c) => !c.hideIcon);
     },
@@ -254,8 +193,6 @@ export default {
   emits: [
     "top-click",
     "prev-next-click",
-    "sort-click",
-    "filter-click",
     "all-click",
     "cond-fltr-click",
     "sort-action",

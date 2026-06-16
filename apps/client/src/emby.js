@@ -8,6 +8,32 @@ import evtBus from "./evtBus.js";
 const name = "mark";
 const pwd = "90-MNBbnmyui";
 const apiKey = "1112c1f515824d66bf2f8618fdb67312";
+
+const EMBY_REQUEST_TIMEOUT = 10000;
+const EMBY_MAX_RETRIES = 2;
+const EMBY_RETRY_DELAY = 500;
+
+async function axiosGetWithRetry(url, retries = EMBY_MAX_RETRIES) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await axios.get(url, { timeout: EMBY_REQUEST_TIMEOUT });
+    } catch (e) {
+      const isLastAttempt = attempt === retries;
+      const isNetworkError =
+        e.message === "Network Error" || e.code === "ECONNABORTED";
+
+      if (!isLastAttempt && isNetworkError) {
+        const delay = EMBY_RETRY_DELAY * (attempt + 1);
+        console.warn(
+          `Emby request failed (attempt ${attempt + 1}/${retries + 1}), retrying in ${delay}ms: ${url}`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      }
+      throw e;
+    }
+  }
+}
 const markUsrId = "894c752d448f45a3a1260ccaabd0adff";
 const authHdr =
   `UserId="${markUsrId}", ` +
@@ -67,10 +93,10 @@ function isTvdbShowRecord(record) {
 // Phase 2: Helper function to sync collection flags into tvdb
 async function syncCollections(allTvdb) {
   const [toTryRes, continueRes, markRes, lindaRes] = await Promise.all([
-    axios.get(urls.collectionListUrl(cred, toTryCollId)),
-    axios.get(urls.collectionListUrl(cred, continueCollId)),
-    axios.get(urls.collectionListUrl(cred, markCollId)),
-    axios.get(urls.collectionListUrl(cred, lindaCollId)),
+    axiosGetWithRetry(urls.collectionListUrl(cred, toTryCollId)),
+    axiosGetWithRetry(urls.collectionListUrl(cred, continueCollId)),
+    axiosGetWithRetry(urls.collectionListUrl(cred, markCollId)),
+    axiosGetWithRetry(urls.collectionListUrl(cred, lindaCollId)),
   ]);
 
   const toTryIds = new Set(toTryRes.data.Items.map((i) => i.Id));
@@ -278,7 +304,7 @@ async function _oldLoadAllShows() {
 
   // 1. Fetch all data sources in parallel (HTTP is fast now!)
   const [embyShows, allTvdbResult] = await Promise.all([
-    axios.get(urls.showListUrl(cred, 0, 10000)),
+    axiosGetWithRetry(urls.showListUrl(cred, 0, 10000)),
     tvdb.getAllTvdb(0), // hasEmby = 0: load all shows
   ]);
 
@@ -890,14 +916,16 @@ export const editEpisode = async (
 ) => {
   let lastWatchedRec = null;
 
-  const seasonsRes = await axios.get(urls.childrenUrl(cred, seriesId));
+  const seasonsRes = await axiosGetWithRetry(urls.childrenUrl(cred, seriesId));
   for (let key in seasonsRes.data.Items) {
     let seasonRec = seasonsRes.data.Items[key];
     const seasonNumber = +seasonRec.IndexNumber;
     if (seasonNumber != seasonNumIn) continue;
 
     const seasonId = seasonRec.Id;
-    const episodesRes = await axios.get(urls.childrenUrl(cred, seasonId));
+    const episodesRes = await axiosGetWithRetry(
+      urls.childrenUrl(cred, seasonId),
+    );
     for (let key in episodesRes.data.Items) {
       const episodeRec = episodesRes.data.Items[key];
       const episodeNumber = +episodeRec.IndexNumber;
@@ -943,7 +971,7 @@ export const getEpisodeCounts = async (show) => {
   let watchedCount = 0;
   if (show.inEmby === false) return { seasonCount, episodeCount, watchedCount };
   try {
-    const seasonsRes = await axios.get(urls.childrenUrl(cred, showId));
+    const seasonsRes = await axiosGetWithRetry(urls.childrenUrl(cred, showId));
     let skippedEpisodeCount = 0;
     const skippedEpisodes = [];
     for (let key in seasonsRes.data.Items) {
@@ -957,7 +985,9 @@ export const getEpisodeCounts = async (show) => {
 
       seasonCount++;
       const seasonId = seasonRec.Id;
-      const episodesRes = await axios.get(urls.childrenUrl(cred, seasonId));
+      const episodesRes = await axiosGetWithRetry(
+        urls.childrenUrl(cred, seasonId),
+      );
       for (let key in episodesRes.data.Items) {
         const episodeRec = episodesRes.data.Items[key];
         const episodeNumber = Number(episodeRec?.IndexNumber);
@@ -986,7 +1016,14 @@ export const getEpisodeCounts = async (show) => {
 
     // Intentionally no logging here; we just skip malformed items.
   } catch (e) {
-    console.error("getEpisodeCounts error:", e);
+    const showName = show.Name || show.name || "unknown";
+    console.error(
+      `getEpisodeCounts error for "${showName}" (id=${showId}):`,
+      e.message || e,
+    );
+    if (e.config?.url) {
+      console.error(`  Failed URL: ${e.config.url}`);
+    }
     return { seasonCount: 0, episodeCount: 0, watchedCount: 0 };
   }
   return { seasonCount, episodeCount, watchedCount };
@@ -1023,7 +1060,7 @@ export const getSeriesMap = async (show, prune = false) => {
 
   const seriesMap = [];
   let pruning = prune;
-  const seasonsRes = await axios.get(urls.childrenUrl(cred, seriesId));
+  const seasonsRes = await axiosGetWithRetry(urls.childrenUrl(cred, seriesId));
   const missingEpisodeNumbers = [];
   const emptySeasons = [];
 
@@ -1032,14 +1069,18 @@ export const getSeriesMap = async (show, prune = false) => {
     let seasonId = seasonRec.Id;
     const seasonNumber = +seasonRec.IndexNumber;
     const unairedObj = {};
-    const unairedRes = await axios.get(urls.childrenUrl(cred, seasonId, true));
+    const unairedRes = await axiosGetWithRetry(
+      urls.childrenUrl(cred, seasonId, true),
+    );
     for (let key in unairedRes.data.Items) {
       const episodeRec = unairedRes.data.Items[key];
       const episodeNumber = +episodeRec.IndexNumber;
       unairedObj[episodeNumber] = true;
     }
     const episodes = [];
-    const episodesRes = await axios.get(urls.childrenUrl(cred, seasonId));
+    const episodesRes = await axiosGetWithRetry(
+      urls.childrenUrl(cred, seasonId),
+    );
     for (let key in episodesRes.data.Items) {
       let episodeRec = episodesRes.data.Items[key];
       const episodeNumber = +episodeRec.IndexNumber;
@@ -1406,7 +1447,7 @@ export const startStop = async (show, episodeId, watchButtonTxt) => {
 export const afterLastWatched = async (show) => {
   if (show.inEmby === false) return { status: "noemby" };
   const showId = show.id;
-  const seasonsRes = await axios.get(urls.childrenUrl(cred, showId));
+  const seasonsRes = await axiosGetWithRetry(urls.childrenUrl(cred, showId));
   const seasonItems = seasonsRes.data.Items;
   for (let key in seasonItems) {
     let seasonRec = seasonItems[key];
@@ -1416,14 +1457,18 @@ export const afterLastWatched = async (show) => {
     if (!Number.isFinite(seasonNumber) || seasonNumber <= 0) continue;
     const seasonId = seasonRec.Id;
     const unairedObj = {};
-    const unairedRes = await axios.get(urls.childrenUrl(cred, seasonId, true));
+    const unairedRes = await axiosGetWithRetry(
+      urls.childrenUrl(cred, seasonId, true),
+    );
     for (let key in unairedRes.data.Items) {
       const episode = unairedRes.data.Items[key];
       const episodeNumber = Number(episode.IndexNumber);
       if (!Number.isFinite(episodeNumber) || episodeNumber <= 0) continue;
       unairedObj[episodeNumber] = true;
     }
-    const episodesRes = await axios.get(urls.childrenUrl(cred, seasonId));
+    const episodesRes = await axiosGetWithRetry(
+      urls.childrenUrl(cred, seasonId),
+    );
     const episodeItems = episodesRes.data.Items;
     for (let key in episodeItems) {
       const episodeRec = episodeItems[key];

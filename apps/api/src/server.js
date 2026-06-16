@@ -30,6 +30,7 @@ import {
   deleteUsbFiles,
   getUsbMovies,
   deleteUsbMovies,
+  usbCpToken,
 } from "./usb.js";
 import { getLocalFiles, renameLocalFile, moveToTrial } from "./local.js";
 import {
@@ -1194,6 +1195,15 @@ app.post("/api/usb/mediainfo", async (req, res) => {
     } catch (_) {}
 
     res.json({ output, subsCount, srtsCount });
+  } catch (err) {
+    res.status(500).json({ error: err?.message || String(err) });
+  }
+});
+
+app.get("/api/usb/cp-token", async (req, res) => {
+  try {
+    const token = await usbCpToken();
+    res.json({ token });
   } catch (err) {
     res.status(500).json({ error: err?.message || String(err) });
   }

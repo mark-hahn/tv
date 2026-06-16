@@ -3,7 +3,11 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { parseKeyValueFile } from "./qb-cred.js";
-import { getApiSecretsDir, preferSharedReadPath } from "./tvPaths.js";
+import {
+  getApiSecretsDir,
+  getApiDataDir,
+  preferSharedReadPath,
+} from "./tvPaths.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -1631,4 +1635,33 @@ export async function deleteUsbMovies(paths) {
   }
 
   return { success: true, deleted: paths.length };
+}
+
+const USB_CP_LOGIN_URL = "https://cp.ultra.cc/api/rest-auth/login/";
+
+export async function usbCpToken() {
+  const credsPath = path.join(getApiDataDir(), "usb-creds.json");
+  const raw = await fs.readFile(credsPath, "utf8");
+  const creds = JSON.parse(raw);
+  if (!creds.Email || !creds.Password) {
+    throw new Error("usb-creds.json missing Email or Password");
+  }
+
+  const body = new URLSearchParams();
+  body.append("username", creds.Email);
+  body.append("password", creds.Password);
+
+  const resp = await fetch(USB_CP_LOGIN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
+  if (!resp.ok) {
+    throw new Error(`cp.ultra.cc login failed: ${resp.status}`);
+  }
+  const data = await resp.json();
+  if (!data.key) {
+    throw new Error("cp.ultra.cc login returned no token key");
+  }
+  return data.key;
 }

@@ -524,7 +524,7 @@ export function parseTitleFromFilename(fname, folderName, parsedPtt) {
   return title || null;
 }
 
-export const STANDARD_RESOLUTIONS = new Set([2160, 1080, 720, 480, 384]);
+export const STANDARD_RESOLUTIONS = new Set([2160, 1080, 720, 576, 480, 384]);
 
 export function normalizeVideoHeightToQuality(height) {
   const parsedHeight = Number.parseInt(height, 10);
@@ -532,9 +532,28 @@ export function normalizeVideoHeightToQuality(height) {
   if (parsedHeight >= 1620) return 2160;
   if (parsedHeight >= 900) return 1080;
   if (parsedHeight >= 648) return 720;
+  if (parsedHeight >= 528) return 576;
   if (parsedHeight >= 400) return 480;
   if (parsedHeight >= 340) return 384;
   return null;
+}
+
+export function computeShowQuality(fileQuality) {
+  if (!fileQuality || Object.keys(fileQuality).length === 0) return null;
+  const counts = {};
+  for (const q of Object.values(fileQuality)) {
+    counts[q] = (counts[q] ?? 0) + 1;
+  }
+  let best = null;
+  let bestCount = 0;
+  for (const [res, cnt] of Object.entries(counts)) {
+    const r = Number(res);
+    if (cnt > bestCount || (cnt === bestCount && r > best)) {
+      best = r;
+      bestCount = cnt;
+    }
+  }
+  return best;
 }
 
 export function getResolution(

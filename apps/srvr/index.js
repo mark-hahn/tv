@@ -27,6 +27,7 @@ import {
   normalizeVideoHeightToQuality,
   getResolution,
   STANDARD_RESOLUTIONS,
+  computeShowQuality,
 } from "@tv/share";
 import chokidar from "chokidar";
 import cron from "node-cron";
@@ -2513,6 +2514,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
       }
       tvdbRecord.filesOnDisk = newFilesOnDisk || [];
       tvdbRecord.fileQuality = newFileQuality || {};
+      tvdbRecord.quality = computeShowQuality(tvdbRecord.fileQuality) ?? null;
     } else if (!tvdbRecord.noFiles) {
       diskChanges.push(`NoFiles:false->true`);
       tvdbRecord.noFiles = true;
@@ -2520,6 +2522,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
       tvdbRecord.size = 0;
       tvdbRecord.filesOnDisk = [];
       tvdbRecord.fileQuality = {};
+      tvdbRecord.quality = null;
     }
     // lastPlayedDate
     const playedDateChanges = [];
@@ -3835,10 +3838,12 @@ app.post(
         const [, , filesOnDisk, fileQuality] = diskInfo;
         tvdbRecord.filesOnDisk = filesOnDisk || [];
         tvdbRecord.fileQuality = fileQuality || {};
+        tvdbRecord.quality = computeShowQuality(tvdbRecord.fileQuality) ?? null;
         updated++;
       } else {
         tvdbRecord.filesOnDisk = [];
         tvdbRecord.fileQuality = {};
+        tvdbRecord.quality = null;
         skipped++;
       }
     }
@@ -3847,6 +3852,22 @@ app.post(
       `[populateFilesOnDisk] Done: updated=${updated} skipped=${skipped}`,
     );
     return { ok: true, updated, skipped };
+  }),
+);
+
+app.post(
+  "/api/populateShowQuality",
+  apiWrapper(async () => {
+    const allTvdb = tvdb.getAllTvdbSync();
+    let updated = 0;
+    for (const tvdbRecord of Object.values(allTvdb)) {
+      const q = computeShowQuality(tvdbRecord.fileQuality ?? {}) ?? null;
+      tvdbRecord.quality = q;
+      if (q !== null) updated++;
+    }
+    await tvdb.saveTvdbSync();
+    console.log(`[populateShowQuality] Done: updated=${updated}`);
+    return { ok: true, updated };
   }),
 );
 
@@ -7481,6 +7502,8 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
           }
           tvdbRecord.filesOnDisk = newFilesOnDisk || [];
           tvdbRecord.fileQuality = newFileQuality || {};
+          tvdbRecord.quality =
+            computeShowQuality(tvdbRecord.fileQuality) ?? null;
         } else {
           // Folder doesn't exist or empty
           const changed = tvdbRecord.noFiles !== true;
@@ -7492,6 +7515,7 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
           }
           tvdbRecord.filesOnDisk = [];
           tvdbRecord.fileQuality = {};
+          tvdbRecord.quality = null;
         }
       }
 

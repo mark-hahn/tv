@@ -1979,6 +1979,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   // Runtime-state fields set by disk scan / Emby queries — preserve from existing
   tvdbData.filesOnDisk = existing.filesOnDisk ?? null;
   tvdbData.fileQuality = existing.fileQuality ?? null;
+  tvdbData.quality = existing.quality ?? null;
   tvdbData.episodeAiredDates = existing.episodeAiredDates ?? null;
   tvdbData.watchedEpis = existing.watchedEpis ?? null;
   tvdbData.seasonPremiereDates = existing.seasonPremiereDates ?? null;

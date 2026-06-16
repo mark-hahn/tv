@@ -618,6 +618,7 @@ export default {
         "Ended",
         "Length",
         "Creator",
+        "Quality",
       ],
       fltrChoices: ["Close", "Try Drama", "Watching", "Finished", "Playing"],
       conds: [
@@ -1287,6 +1288,11 @@ export default {
               ? lastDownloaded
               : 0;
           return util.fmtUnixDatePst(lastDownloaded);
+        case "Quality": {
+          const q = show.quality ?? null;
+          if (forSort) return q !== null ? q : -1;
+          return q !== null ? String(q) : "";
+        }
       }
     },
 
@@ -2786,22 +2792,32 @@ export default {
 
     sortShows() {
       this.shows = [...this.shows].sort((a, b) => {
-        a = this.getValBySortChoice(a, true);
-        b = this.getValBySortChoice(b, true);
-        if (a == b) return 0;
-        let result;
-        if (
-          ["Alpha", "Length", "Creator", "Safe start"].includes(this.sortChoice)
-        ) {
-          if (this.sortChoice === "Creator") {
-            if (a === "" && b !== "") return 1;
-            if (b === "" && a !== "") return -1;
+        const va = this.getValBySortChoice(a, true);
+        const vb = this.getValBySortChoice(b, true);
+        if (va !== vb) {
+          let result;
+          if (
+            ["Alpha", "Length", "Creator", "Safe start"].includes(
+              this.sortChoice,
+            )
+          ) {
+            if (this.sortChoice === "Creator") {
+              if (va === "" && vb !== "") return 1;
+              if (vb === "" && va !== "") return -1;
+            }
+            result = va > vb ? +1 : -1;
+          } else {
+            result = va > vb ? -1 : +1;
           }
-          result = a > b ? +1 : -1;
-        } else {
-          result = a > b ? -1 : +1;
+          return this.reversed ? -result : result;
         }
-        return this.reversed ? -result : result;
+        // Tie-break: first aired date descending (most recent first)
+        const fa = a.firstAired || "";
+        const fb = b.firstAired || "";
+        if (fa === "" && fb === "") return 0;
+        if (fa === "") return 1; // no date goes to end
+        if (fb === "") return -1; // no date goes to end
+        return fa > fb ? -1 : fa < fb ? 1 : 0; // descending
       });
     },
 

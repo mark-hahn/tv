@@ -1724,12 +1724,25 @@ export default {
       void this.setSeasonsTxt(record);
       void this.setCntryLangTxt(record);
 
+      // Capture existing poster size before updating
+      const existingPosterImg = document.querySelector("#poster img");
+      const existingMaxHeight =
+        existingPosterImg?.style.maxHeight &&
+        existingPosterImg.style.visibility === "visible"
+          ? parseInt(existingPosterImg.style.maxHeight)
+          : 0;
+
       // Update poster and ensure proper sizing after layout changes
       await this.setPoster(record);
       await this.$nextTick();
       const posterImg = document.querySelector("#poster img");
       const infoBoxEl = document.getElementById("infoBox");
       if (posterImg && infoBoxEl && infoBoxEl.clientHeight > 0) {
+        // Restore the existing max height first if we had one
+        if (existingMaxHeight > 0) {
+          posterImg.style.maxHeight = existingMaxHeight + "px";
+          posterImg.style.visibility = "visible";
+        }
         this.applyPosterHeight(
           posterImg,
           infoBoxEl.clientHeight,

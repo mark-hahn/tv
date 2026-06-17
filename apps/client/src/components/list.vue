@@ -808,6 +808,28 @@ export default {
 
   /////////////  METHODS  ////////////
   methods: {
+    checkIfScrollNeeded(showIndex) {
+      // Check if the show at the given index is visible in the viewport
+      const show = this.shows[showIndex];
+      if (!show) return false;
+
+      const showId = this.nameHash(show.name);
+      const element = document.getElementById(showId);
+      if (!element) return true; // If element not found, scroll to be safe
+
+      const container = document.querySelector("#shows");
+      if (!container) return true;
+
+      const rect = element.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+
+      // Check if element is within the visible area of the container
+      const isVisible =
+        rect.top >= containerRect.top && rect.bottom <= containerRect.bottom;
+
+      return !isVisible; // Scroll only if not visible
+    },
+
     markShowUpdating(showName) {
       if (!showName) return;
       if (!this._updatingShows) this._updatingShows = new Set();
@@ -3484,6 +3506,48 @@ export default {
     };
     document.addEventListener("click", this._actorsListClickOutside, true);
 
+    // Arrow key navigation for show selection
+    this._onArrowKeyNav = (e) => {
+      // Skip if filter input is focused
+      if (this.filterInputFocused) return;
+
+      const isUp = e.key === "ArrowUp" || e.keyCode === 38;
+      const isDown = e.key === "ArrowDown" || e.keyCode === 40;
+
+      if (!isUp && !isDown) return;
+
+      // Skip if actors list mode is active
+      if (this.actorsListMode) return;
+
+      // Skip if no shows or no current selection
+      if (!Array.isArray(this.shows) || this.shows.length === 0) return;
+      if (!this.highlightName) return;
+
+      // Find current show index in visible shows
+      const currentIdx = this.shows.findIndex(
+        (s) => s.name === this.highlightName,
+      );
+      if (currentIdx === -1) return;
+
+      // Calculate new index
+      let newIdx = currentIdx;
+      if (isUp && currentIdx > 0) {
+        newIdx = currentIdx - 1;
+      } else if (isDown && currentIdx < this.shows.length - 1) {
+        newIdx = currentIdx + 1;
+      }
+
+      // If index changed, select the new show
+      if (newIdx !== currentIdx) {
+        e.preventDefault();
+        e.stopPropagation();
+        // Only scroll if the new item would be outside the visible viewport
+        const needsScroll = this.checkIfScrollNeeded(newIdx);
+        this.onSelectShow(this.shows[newIdx], needsScroll);
+      }
+    };
+    window.addEventListener("keydown", this._onArrowKeyNav);
+
     // Setup evtBus listeners cleanup
     this.evtHandlers = {};
     const on = (name, fn) => {
@@ -3862,6 +3926,11 @@ export default {
     if (this._actorsListClickOutside) {
       document.removeEventListener("click", this._actorsListClickOutside, true);
       this._actorsListClickOutside = null;
+    }
+
+    if (this._onArrowKeyNav) {
+      window.removeEventListener("keydown", this._onArrowKeyNav);
+      this._onArrowKeyNav = null;
     }
 
     if (this.evtHandlers) {

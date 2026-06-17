@@ -1341,44 +1341,10 @@ export default {
       this.settingUpShowName = show?.name;
       this.show = show;
       this.showHdr = true;
-      this.seriesReady = false;
 
       if (this.previewMode) {
         evtBus.emit("previewPanesLoading", true);
       }
-
-      // Clear info fields so nothing renders until ready
-      const posterEl = document.getElementById("poster");
-      if (posterEl) posterEl.replaceChildren();
-
-      this.dates = "";
-      this.statusTxt = "";
-      this.seasonsTxt = "";
-      this.watchedValTxt = "";
-      this.lastWatchedTxt = "";
-      this.cntryLangLeftTxt = "";
-      this.cntryLangRightTxt = "";
-      this.runtimeTxt = "";
-      this.nextUpValTxt = "";
-      this.nextUpSuffixTxt = "";
-      this.nextUpSeason = null;
-      this.nextUpEpisode = null;
-      this.remotes = [];
-      this.showRemotes = false;
-      this.showSpinner = false;
-      this.collectionName = "";
-      this.collectionCount = 0;
-      this.twoLocalFolders = false;
-      this.nowPlayingDevices = [];
-
-      // Set collection name(s)
-      const collections = [];
-      if (show.inToTry) collections.push("To Try");
-      if (show.inContinue) collections.push("Continue");
-      if (show.inMark) collections.push("Mark");
-      if (show.inLinda) collections.push("Linda");
-      this.collectionName = collections.join(", ");
-      this.collectionCount = collections.length;
 
       const currentShowName = show.name;
       setTimeout(async () => {
@@ -1390,6 +1356,15 @@ export default {
           allTvdb = await tvdb.getAllTvdb(0);
 
           if (this.show.name !== currentShowName) return;
+
+          // Update collection badges for the new show
+          const collections = [];
+          if (show.inToTry) collections.push("To Try");
+          if (show.inContinue) collections.push("Continue");
+          if (show.inMark) collections.push("Mark");
+          if (show.inLinda) collections.push("Linda");
+          this.collectionName = collections.join(", ");
+          this.collectionCount = collections.length;
 
           // Check for two local folders on disk - fire-and-forget, only sets twoLocalFolders UI flag
           void this.recheckTwoLocalFolders();

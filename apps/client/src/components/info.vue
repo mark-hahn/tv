@@ -791,31 +791,7 @@ export default {
       }
     },
 
-    // Helper to set poster maxHeight while preserving larger sizes
-    applyPosterHeight(posterImg, newHeight, context = "") {
-      if (!posterImg) return;
-
-      const existingMaxHeight =
-        posterImg.style.maxHeight && posterImg.style.visibility === "visible"
-          ? parseInt(posterImg.style.maxHeight)
-          : 0;
-
-      // Don't shrink the poster - only grow it or set it initially
-      if (existingMaxHeight > 0 && newHeight < existingMaxHeight) {
-        console.log(
-          `[poster-shrink] ${context}: PRESERVING ${existingMaxHeight}px (new=${newHeight}px) for ${this.show?.name}`,
-        );
-        posterImg.style.maxHeight = existingMaxHeight + "px";
-      } else {
-        console.log(
-          `[poster-shrink] ${context}: setting ${newHeight}px (existing=${existingMaxHeight}px) for ${this.show?.name}`,
-        );
-        posterImg.style.maxHeight = newHeight + "px";
-      }
-      posterImg.style.visibility = "visible";
-    },
-
-    async setPoster(tvdbData) {
+    async setPoster(tvdbData, { noAutoShow = false } = {}) {
       const posterEl = document.getElementById("poster");
       if (!posterEl) return;
 
@@ -852,27 +828,17 @@ export default {
 
       if (this.show?.name !== showNameAtStart) return;
 
-      // Check if there's already a visible poster to preserve its size
-      const existingImg = posterEl.querySelector("img");
-      const existingMaxHeight =
-        existingImg?.style.maxHeight &&
-        existingImg.style.visibility === "visible"
-          ? parseInt(existingImg.style.maxHeight)
-          : 0;
-
       posterEl.replaceChildren(img);
 
-      const infoBoxEl = document.getElementById("infoBox");
-      if (infoBoxEl && infoBoxEl.clientHeight > 0) {
-        // Restore the existing max height to the new image before applying new height
-        if (existingMaxHeight > 0) {
-          img.style.maxHeight = existingMaxHeight + "px";
+      // Only show the poster if not mid-load (settingUpShowName is cleared in finally)
+      // and not explicitly suppressed. This prevents a small→big jump when the image
+      // loads before all infoBox content is ready.
+      if (!this.settingUpShowName && !noAutoShow) {
+        const infoBoxEl = document.getElementById("infoBox");
+        if (infoBoxEl && infoBoxEl.clientHeight > 0) {
+          img.style.maxHeight = infoBoxEl.clientHeight + "px";
+          img.style.visibility = "visible";
         }
-        this.applyPosterHeight(img, infoBoxEl.clientHeight, "setPoster");
-      } else {
-        console.log(
-          `[poster-shrink] setPoster: infoBox not ready (height=${infoBoxEl?.clientHeight}) for ${this.show?.name}`,
-        );
       }
     },
 
@@ -1528,12 +1494,9 @@ export default {
             void this.$nextTick().then(() => {
               const infoBoxEl = document.getElementById("infoBox");
               const posterImg = document.querySelector("#poster img");
-              if (infoBoxEl && posterImg) {
-                this.applyPosterHeight(
-                  posterImg,
-                  infoBoxEl.clientHeight,
-                  "preview nextTick",
-                );
+              if (infoBoxEl && posterImg && infoBoxEl.clientHeight > 0) {
+                posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
+                posterImg.style.visibility = "visible";
               }
             });
             void this.setRemotes();
@@ -1545,12 +1508,9 @@ export default {
             await this.$nextTick();
             const infoBoxEl = document.getElementById("infoBox");
             const posterImg = document.querySelector("#poster img");
-            if (infoBoxEl && posterImg) {
-              this.applyPosterHeight(
-                posterImg,
-                infoBoxEl.clientHeight,
-                "seriesReady nextTick",
-              );
+            if (infoBoxEl && posterImg && infoBoxEl.clientHeight > 0) {
+              posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
+              posterImg.style.visibility = "visible";
             }
           }
         } finally {
@@ -1699,7 +1659,7 @@ export default {
       void this.setSeasonsTxt(record);
       void this.setCntryLangTxt(record);
 
-      // Capture existing poster size before updating
+      // Capture existing poster size before updating image (content changes may alter infoBox height)
       const existingPosterImg = document.querySelector("#poster img");
       const existingMaxHeight =
         existingPosterImg?.style.maxHeight &&
@@ -1707,22 +1667,20 @@ export default {
           ? parseInt(existingPosterImg.style.maxHeight)
           : 0;
 
-      // Update poster and ensure proper sizing after layout changes
-      await this.setPoster(record);
-      await this.$nextTick();
+      // Update poster image without auto-show (we'll restore the existing height)
+      await this.setPoster(record, { noAutoShow: true });
       const posterImg = document.querySelector("#poster img");
-      const infoBoxEl = document.getElementById("infoBox");
-      if (posterImg && infoBoxEl && infoBoxEl.clientHeight > 0) {
-        // Restore the existing max height first if we had one
+      if (posterImg) {
         if (existingMaxHeight > 0) {
+          // Keep the same size - don't let content changes shrink the poster
           posterImg.style.maxHeight = existingMaxHeight + "px";
-          posterImg.style.visibility = "visible";
+        } else {
+          const infoBoxEl = document.getElementById("infoBox");
+          if (infoBoxEl && infoBoxEl.clientHeight > 0) {
+            posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
+          }
         }
-        this.applyPosterHeight(
-          posterImg,
-          infoBoxEl.clientHeight,
-          "tvdbUpdated",
-        );
+        posterImg.style.visibility = "visible";
       }
     };
     evtBus.on("tvdbUpdated", this.onTvdbUpdated);
@@ -1755,14 +1713,13 @@ export default {
     this._onPaneChanged = (pane) => {
       if (pane !== "info") return;
       this.$nextTick(() => {
+        // Skip if still loading a new show - seriesReady nextTick will handle it
+        if (this.settingUpShowName) return;
         const infoBoxEl = document.getElementById("infoBox");
         const posterImg = document.querySelector("#poster img");
         if (infoBoxEl && posterImg && infoBoxEl.clientHeight > 0) {
-          this.applyPosterHeight(
-            posterImg,
-            infoBoxEl.clientHeight,
-            "paneChanged",
-          );
+          posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
+          posterImg.style.visibility = "visible";
         }
       });
     };

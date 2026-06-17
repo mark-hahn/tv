@@ -192,6 +192,7 @@ const getShowState = async (showId, showName, showMeta) => {
   let watchGap = false;
   let haveFileShow = false;
   let noFileAfterFile = false;
+  let sawUnwatchedNoFile = false;
   let fileGap = false;
   let watchGapSeason = null;
   let watchGapEpisode = null;
@@ -360,6 +361,23 @@ const getShowState = async (showId, showName, showMeta) => {
           }
           console.log(
             `[getShowState] fileGap set for ${showName} S${seasonNumber}E${episodeNumber}`,
+          );
+          fileGap = true;
+        }
+        if (!watched && !haveFile && !unaired) sawUnwatchedNoFile = true;
+        if (
+          !fileGap &&
+          sawUnwatchedNoFile &&
+          !watched &&
+          haveFile &&
+          !unaired
+        ) {
+          if (fileGapSeason === null) {
+            fileGapSeason = seasonNumber;
+            fileGapEpisode = episodeNumber;
+          }
+          console.log(
+            `[getShowState] fileGap (unwatched noFile before unwatched file) set for ${showName} S${seasonNumber}E${episodeNumber}`,
           );
           fileGap = true;
         }

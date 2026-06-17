@@ -212,6 +212,7 @@ const getShowState = async (showId, showName, showMeta) => {
   let anyAiredEpisode = false;
   let fileCount = 0;
   let firstEpisodeFileUnwatched = false;
+  let onlyFirstEpisodeHasFile = true;
   let anyEpisodeNoFile = false;
   let anyAiredEpisodeNotWatched = false;
   let anyEpisodeNeitherWatchedNorFile = false;
@@ -297,6 +298,9 @@ const getShowState = async (showId, showName, showMeta) => {
         if (firstEpisode && haveFile && !watched) {
           firstEpisodeFileUnwatched = true;
         }
+        if (!firstEpisode && (haveFile || watched)) {
+          onlyFirstEpisodeHasFile = false;
+        }
 
         let unaired = unairedFromHere || !!unairedObj[episodeNumber];
         if (watched) unaired = false;
@@ -365,21 +369,18 @@ const getShowState = async (showId, showName, showMeta) => {
           fileGap = true;
         }
         if (!watched && !haveFile && !unaired) sawUnwatchedNoFile = true;
-        if (
-          !fileGap &&
-          sawUnwatchedNoFile &&
-          !watched &&
-          haveFile &&
-          !unaired
-        ) {
-          if (fileGapSeason === null) {
-            fileGapSeason = seasonNumber;
-            fileGapEpisode = episodeNumber;
+        if (!watched && haveFile && !unaired && sawUnwatchedNoFile) {
+          if (!fileGap && !lastWatched) {
+            if (fileGapSeason === null) {
+              fileGapSeason = seasonNumber;
+              fileGapEpisode = episodeNumber;
+            }
+            console.log(
+              `[getShowState] fileGap (unwatched noFile before unwatched file) set for ${showName} S${seasonNumber}E${episodeNumber}`,
+            );
+            fileGap = true;
           }
-          console.log(
-            `[getShowState] fileGap (unwatched noFile before unwatched file) set for ${showName} S${seasonNumber}E${episodeNumber}`,
-          );
-          fileGap = true;
+          sawUnwatchedNoFile = false;
         }
         seasonNotWatchedNoFiles &&= !(haveFile || unaired || watched);
 
@@ -405,7 +406,8 @@ const getShowState = async (showId, showName, showMeta) => {
       lastSeasonWatched = allSeasonWatched;
     }
 
-    const tryingShow = !anyWatched && firstEpisodeFileUnwatched;
+    const tryingShow =
+      !anyWatched && firstEpisodeFileUnwatched && onlyFirstEpisodeHasFile;
 
     const allEpisodesUnaired = sawAnyEpisode && anyUnaired && !anyAiredEpisode;
     const showStatus = String(showMeta?.tvdbStatus || "").trim();

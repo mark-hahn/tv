@@ -2392,7 +2392,7 @@ export default {
             setWatched,
             show.name,
           );
-          await this.seriesMapAction("", show, null);
+          await this.seriesMapAction("refresh", show);
         }
       }
     },

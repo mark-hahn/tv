@@ -2980,6 +2980,31 @@ export default {
             : 0;
         this.saveVisShow(this.shows[idx]);
       }
+
+      // Check if current state matches "All" state (only for non-special fltrChoice values)
+      if (this.fltrChoice !== "Finished" && this.fltrChoice !== "Playing") {
+        const filterStrEmpty = !this.filterStr || this.filterStr.length === 0;
+        const noActorFilter = !this.actorFilter && !this.actorSearchParams;
+        const noDescrSearch =
+          !this.descrSearchStr || this.descrSearchStr.length === 0;
+
+        // Check if all conds are in "All" state (filter === 0, except hasemby which can be 0 or 1)
+        const allCondsMatchAll = this.conds.every((cond) => {
+          if (cond.name === "hasemby") {
+            return cond.filter === 0 || cond.filter === 1;
+          }
+          return cond.filter === 0;
+        });
+
+        const stateMatchesAll =
+          filterStrEmpty && noActorFilter && noDescrSearch && allCondsMatchAll;
+
+        if (stateMatchesAll && this.fltrChoice !== "All") {
+          this.fltrChoice = "All";
+          window.localStorage.setItem("fltrChoice", "All");
+        }
+      }
+
       if (scroll) this.scrollToSavedShow();
     },
 

@@ -2327,15 +2327,16 @@ async function main() {
           }
 
           if (!verifiedOnDisk) {
+            recentCount++;
             log(
               "------",
               downloadCount,
               "/",
               chkCount,
-              "FINISHED ROW MISSING ON DISK, RECHECKING:",
+              "SKIPPING ALREADY DOWNLOADED (local file deleted):",
               fname,
             );
-            trace("checkFile: stale finished row missing on disk", {
+            trace("checkFile: skip finished row local file deleted", {
               fname,
               localPath: existingEntry?.localPath || "",
               destTitle: existingEntry?.destTitle || "",
@@ -2344,12 +2345,10 @@ async function main() {
               tvdbId: lookupTvdbId(title),
               showName: title || fname,
               type: "skipDown",
-              description: "finished row missing on disk: rechecking",
+              description: "skip: already downloaded (local file deleted)",
             });
-            try {
-              if (tvJson.retryEntry) tvJson.retryEntry(fname);
-            } catch (e) {}
-            delete tvJsonTitles[fname];
+            process.nextTick(checkFile);
+            return;
           } else {
             recentCount++;
             const skipStatus = "already downloaded";

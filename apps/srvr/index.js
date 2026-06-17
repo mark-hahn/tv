@@ -7889,6 +7889,7 @@ async function handleShowDiskChange(showName) {
         tvdbRecord.filesOnDisk = filesOnDisk || [];
         tvdbRecord.fileQuality = fileQuality || {};
         await tvdb.saveTvdbSync();
+        debouncedTvdbPush(showName);
         console.log(
           `[chokidar] Updated disk info for ${showName}: ${totalSize} bytes, ${maxDate}`,
         );

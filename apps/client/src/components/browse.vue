@@ -801,6 +801,11 @@ export default {
     };
     evtBus.on("tvdbUpdated", onTvdbUpdated);
 
+    const onSnoozeListUpdated = (list) => {
+      if (Array.isArray(list)) snoozeList.value = list;
+    };
+    evtBus.on("snoozeListUpdated", onSnoozeListUpdated);
+
     const checkBrowseHasMore = () => {
       fetch(`${config.torrentsApiUrl}/api/hasBrowseShow`)
         .then((r) => r.json())
@@ -829,6 +834,7 @@ export default {
       evtBus.off("browseSearchTitle", onBrowseSearchTitle);
       evtBus.off("showSelected", onShowSelected);
       evtBus.off("tvdbUpdated", onTvdbUpdated);
+      evtBus.off("snoozeListUpdated", onSnoozeListUpdated);
     });
     const lastLoadedTvdbId = ref(null);
 

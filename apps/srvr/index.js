@@ -2052,6 +2052,11 @@ tvdb.setQueueDrainCallback(() => notifyClients("showQueueEmpty", {}));
 
 // Auto-update pickups when inEmby or status changes on a tvdb record
 const handlePickupChange = (name, inEmby, status) => {
+  if (inEmby === true) {
+    const allTvdbSync = tvdb.getAllTvdbSync();
+    const rec = allTvdbSync[name];
+    removeFromSnoozeByShow(name, rec?.tvdbId);
+  }
   if (inEmby === true && status !== "Ended") {
     // Should be in pickups
     const already = pickups.some((p) => p.toLowerCase() === name.toLowerCase());
@@ -2450,6 +2455,9 @@ async function processChksrtSnoozedForShow(showName, tvdbRecord) {
 tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
   try {
     delete tvdbRecord.haveSubs;
+    if (tvdbRecord.inEmby) {
+      removeFromSnoozeByShow(showName, tvdbRecord.tvdbId);
+    }
     // Subtitle scan for inEmby shows
     if (tvdbRecord.inEmby) {
       const showFolderName = showName.includes("/")
@@ -4042,6 +4050,29 @@ function readSnoozeList() {
 }
 function writeSnoozeList(list) {
   fs.writeFileSync(SNOOZE_FILE, JSON.stringify(list), "utf8");
+}
+
+function removeFromSnoozeByShow(showName, tvdbId) {
+  const list = readSnoozeList();
+  const normName = String(showName || "")
+    .trim()
+    .toLowerCase();
+  const normId = String(tvdbId || "").trim();
+  const next = list.filter((s) => {
+    if (normId && String(s.tvdbId || "").trim() === normId) return false;
+    if (
+      normName &&
+      String(s.name || "")
+        .trim()
+        .toLowerCase() === normName
+    )
+      return false;
+    return true;
+  });
+  if (next.length === list.length) return;
+  writeSnoozeList(next);
+  notifyClients("snoozeListUpdated", next);
+  console.log(`[snooze] removed "${showName}" from snooze list (inEmby)`);
 }
 
 app.get(

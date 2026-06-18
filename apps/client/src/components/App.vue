@@ -1981,6 +1981,46 @@ export default {
     handleSeasonDelete(e, show, season) {
       evtBus.emit("seasonDelete", { e, show, season });
     },
+    updateFaviconBadge() {
+      const shouldShowBadge =
+        this.browseTabHasMore || this.introCount > 0 || this.chksrtCount > 0;
+
+      // Create or get existing favicon link
+      let link =
+        document.querySelector("link[rel*='icon']") ||
+        document.createElement("link");
+      link.type = "image/x-icon";
+      link.rel = "shortcut icon";
+
+      if (!shouldShowBadge) {
+        // No badge needed - use default or remove badge
+        link.href = "data:,"; // Empty favicon
+        document.getElementsByTagName("head")[0].appendChild(link);
+        return;
+      }
+
+      // Create canvas to draw badge
+      const canvas = document.createElement("canvas");
+      canvas.width = 32;
+      canvas.height = 32;
+      const ctx = canvas.getContext("2d");
+
+      // Draw background circle
+      ctx.fillStyle = "#1a73e8"; // Blue background
+      ctx.beginPath();
+      ctx.arc(16, 16, 16, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Draw red badge circle in top-right
+      ctx.fillStyle = "#f00";
+      ctx.beginPath();
+      ctx.arc(24, 8, 8, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Convert canvas to data URL and set as favicon
+      link.href = canvas.toDataURL("image/png");
+      document.getElementsByTagName("head")[0].appendChild(link);
+    },
   },
   mounted() {
     this._onAppWindowResize = () => {
@@ -2045,6 +2085,21 @@ export default {
     evtBus.on("browseHasMoreChanged", this._onBrowseHasMoreChanged);
     this.fetchBrowseTabHasMore();
     this.startBrowseTabPolling();
+
+    // Watch for changes to badge-triggering states and update favicon
+    this.$watch("browseTabHasMore", () => {
+      this.updateFaviconBadge();
+    });
+    this.$watch("introCount", () => {
+      this.updateFaviconBadge();
+    });
+    this.$watch("chksrtCount", () => {
+      this.updateFaviconBadge();
+    });
+    // Initial badge update
+    this.$nextTick(() => {
+      this.updateFaviconBadge();
+    });
 
     // Refresh space display once on app load.
     this.requestSpaceAvailRefresh("app load");

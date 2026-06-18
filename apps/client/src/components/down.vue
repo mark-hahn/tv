@@ -419,18 +419,6 @@
           @mouseleave="handleMouseLeave($event)"
         >
           <div
-            v-if="showName(it)"
-            style="
-              font-size: 13px;
-              font-weight: bold;
-              color: #555;
-              font-family: sans-serif;
-              margin-bottom: 4px;
-            "
-          >
-            {{ showName(it) }}
-          </div>
-          <div
             style="
               font-weight: bold;
               font-size: 14px;

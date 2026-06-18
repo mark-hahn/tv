@@ -836,6 +836,9 @@ export default {
       if (!this.settingUpShowName && !noAutoShow) {
         const infoBoxEl = document.getElementById("infoBox");
         if (infoBoxEl && infoBoxEl.clientHeight > 0) {
+          console.log(
+            `[poster-size] setPoster auto-show: ${infoBoxEl.clientHeight}px for ${this.show?.name}`,
+          );
           img.style.maxHeight = infoBoxEl.clientHeight + "px";
           img.style.visibility = "visible";
         }
@@ -1495,6 +1498,9 @@ export default {
               const infoBoxEl = document.getElementById("infoBox");
               const posterImg = document.querySelector("#poster img");
               if (infoBoxEl && posterImg && infoBoxEl.clientHeight > 0) {
+                console.log(
+                  `[poster-size] preview nextTick: ${infoBoxEl.clientHeight}px for ${this.show?.name}`,
+                );
                 posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
                 posterImg.style.visibility = "visible";
               }
@@ -1509,6 +1515,9 @@ export default {
             const infoBoxEl = document.getElementById("infoBox");
             const posterImg = document.querySelector("#poster img");
             if (infoBoxEl && posterImg && infoBoxEl.clientHeight > 0) {
+              console.log(
+                `[poster-size] seriesReady nextTick: ${infoBoxEl.clientHeight}px for ${this.show?.name}`,
+              );
               posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
               posterImg.style.visibility = "visible";
             }
@@ -1671,13 +1680,20 @@ export default {
       await this.setPoster(record, { noAutoShow: true });
       const posterImg = document.querySelector("#poster img");
       if (posterImg) {
+        const infoBoxEl = document.getElementById("infoBox");
+        const newHeight = infoBoxEl?.clientHeight || 0;
         if (existingMaxHeight > 0) {
           // Keep the same size - don't let content changes shrink the poster
+          console.log(
+            `[poster-size] tvdbUpdated: keeping ${existingMaxHeight}px (infoBox=${newHeight}px) for ${this.show?.name}`,
+          );
           posterImg.style.maxHeight = existingMaxHeight + "px";
         } else {
-          const infoBoxEl = document.getElementById("infoBox");
-          if (infoBoxEl && infoBoxEl.clientHeight > 0) {
-            posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
+          if (infoBoxEl && newHeight > 0) {
+            console.log(
+              `[poster-size] tvdbUpdated: ${newHeight}px for ${this.show?.name}`,
+            );
+            posterImg.style.maxHeight = newHeight + "px";
           }
         }
         posterImg.style.visibility = "visible";
@@ -1718,6 +1734,9 @@ export default {
         const infoBoxEl = document.getElementById("infoBox");
         const posterImg = document.querySelector("#poster img");
         if (infoBoxEl && posterImg && infoBoxEl.clientHeight > 0) {
+          console.log(
+            `[poster-size] paneChanged: ${infoBoxEl.clientHeight}px for ${this.show?.name}`,
+          );
           posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
           posterImg.style.visibility = "visible";
         }

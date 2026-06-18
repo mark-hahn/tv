@@ -1985,39 +1985,62 @@ export default {
       const shouldShowBadge =
         this.browseTabHasMore || this.introCount > 0 || this.chksrtCount > 0;
 
-      // Create or get existing favicon link
-      let link =
-        document.querySelector("link[rel*='icon']") ||
-        document.createElement("link");
-      link.type = "image/x-icon";
-      link.rel = "shortcut icon";
+      // Remove any existing favicon links
+      const oldLinks = document.querySelectorAll("link[rel*='icon']");
+      oldLinks.forEach((oldLink) => oldLink.remove());
 
-      if (!shouldShowBadge) {
-        // No badge needed - use default or remove badge
-        link.href = "data:,"; // Empty favicon
-        document.getElementsByTagName("head")[0].appendChild(link);
-        return;
-      }
-
-      // Create canvas to draw badge
+      // Create canvas for favicon
       const canvas = document.createElement("canvas");
       canvas.width = 32;
       canvas.height = 32;
       const ctx = canvas.getContext("2d");
 
-      // Draw background circle
-      ctx.fillStyle = "#1a73e8"; // Blue background
-      ctx.beginPath();
-      ctx.arc(16, 16, 16, 0, 2 * Math.PI);
-      ctx.fill();
+      if (shouldShowBadge) {
+        // Draw background circle
+        ctx.fillStyle = "#1a73e8"; // Blue background
+        ctx.beginPath();
+        ctx.arc(16, 16, 16, 0, 2 * Math.PI);
+        ctx.fill();
 
-      // Draw red badge circle in top-right
-      ctx.fillStyle = "#f00";
-      ctx.beginPath();
-      ctx.arc(24, 8, 8, 0, 2 * Math.PI);
-      ctx.fill();
+        // Draw red badge circle in top-right
+        ctx.fillStyle = "#f00";
+        ctx.beginPath();
+        ctx.arc(24, 8, 8, 0, 2 * Math.PI);
+        ctx.fill();
+      } else {
+        // Draw TV icon
+        // TV screen (rectangle)
+        ctx.fillStyle = "#333";
+        ctx.fillRect(6, 10, 20, 16);
 
-      // Convert canvas to data URL and set as favicon
+        // TV screen inner (lighter)
+        ctx.fillStyle = "#4a9eff";
+        ctx.fillRect(8, 12, 16, 12);
+
+        // Antenna left
+        ctx.strokeStyle = "#666";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(12, 10);
+        ctx.lineTo(8, 4);
+        ctx.stroke();
+
+        // Antenna right
+        ctx.beginPath();
+        ctx.moveTo(20, 10);
+        ctx.lineTo(24, 4);
+        ctx.stroke();
+
+        // Stand base
+        ctx.fillStyle = "#333";
+        ctx.fillRect(13, 26, 6, 2);
+        ctx.fillRect(15, 24, 2, 4);
+      }
+
+      // Create new favicon link with canvas data
+      const link = document.createElement("link");
+      link.type = "image/x-icon";
+      link.rel = "shortcut icon";
       link.href = canvas.toDataURL("image/png");
       document.getElementsByTagName("head")[0].appendChild(link);
     },

@@ -1061,17 +1061,12 @@ export default {
     hdr2Parts() {
       const parts = [];
 
-      const firstAired = this.firstAiredVal;
-      const lastAired = this.lastAiredVal;
-      if (firstAired || lastAired) {
-        parts.push(
-          firstAired && lastAired
-            ? `${firstAired} / ${lastAired}`
-            : firstAired || lastAired,
-        );
-      }
       const rt = this.tvdbData?.averageRuntime;
-      if (rt) parts.push(`${rt} mins`);
+      if (rt) {
+        const introDur = this.mapShow?.introDur;
+        const introDurStr = introDur != null ? (introDur / 1000).toFixed(1) : "---";
+        parts.push(`${rt} mins | ${introDurStr}`);
+      }
 
       const status = this.statusVal;
       if (status) parts.push(status);

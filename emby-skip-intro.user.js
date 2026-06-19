@@ -33,13 +33,8 @@
   // Update button text with current info
   function updateButtonText(startMark, introDur) {
     if (!skipButton) return;
-    if (introDur == null) {
-      skipButton.textContent = "Skip Intro";
-    } else {
-      const start = formatTime(startMark ?? 0, false);
-      const dur = formatTime(Math.abs(introDur), false);
-      skipButton.textContent = `Skip ${start}, ${dur}`;
-    }
+    const durStr = introDur == null ? "--" : (introDur / 1000).toFixed(1);
+    skipButton.textContent = `Intro:${durStr}`;
   }
 
   // Get the device name from Emby's API
@@ -84,7 +79,7 @@
 
     skipButton = document.createElement("button");
     skipButton.id = "skip-intro-btn";
-    skipButton.textContent = "Skip Intro";
+    skipButton.textContent = "Intro:0.0";
     skipButton.style.cssText = `
             position: fixed;
             top: 5px;
@@ -132,8 +127,6 @@
         const result = await response.json();
 
         if (result.ok) {
-          // Show success feedback
-          skipButton.textContent = "✓ Skipped";
           skipButton.style.background = "rgba(0, 100, 0, 0.8)";
           setTimeout(() => {
             skipButton.style.background = "rgba(0, 0, 0, 0.8)";
@@ -151,6 +144,7 @@
           skipButton.style.background = "rgba(100, 0, 0, 0.8)";
           setTimeout(() => {
             skipButton.style.background = "rgba(0, 0, 0, 0.8)";
+            updateButtonText(currentStartMark, currentIntroDur);
           }, 2000);
         }
       } catch (error) {
@@ -159,6 +153,7 @@
         skipButton.style.background = "rgba(100, 0, 0, 0.8)";
         setTimeout(() => {
           skipButton.style.background = "rgba(0, 0, 0, 0.8)";
+          updateButtonText(currentStartMark, currentIntroDur);
         }, 2000);
       }
     });

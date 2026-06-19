@@ -336,20 +336,6 @@
             >
               Bad Grp
             </button>
-            <button
-              @click.stop="torForceClick"
-              :disabled="selectedItems.size === 0"
-              :class="{ 'btn-disabled': selectedItems.size === 0 }"
-              style="
-                font-size: 13px;
-                cursor: pointer;
-                border-radius: 7px;
-                padding: 4px 8px;
-                border: 1px solid #bbb;
-              "
-            >
-              Force
-            </button>
           </div>
         </div>
         <div

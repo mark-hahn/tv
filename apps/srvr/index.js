@@ -5717,7 +5717,12 @@ app.get("/api/introDur", async (req, res) => {
   try {
     const { showName, showId } = req.query;
     if (!showName && !showId) {
-      res.json({ introDur: null, startMark: null, trimPos: null, skipDur: null });
+      res.json({
+        introDur: null,
+        startMark: null,
+        trimPos: null,
+        skipDur: null,
+      });
       return;
     }
     const allTvdb = tvdb.getAllTvdbSync();

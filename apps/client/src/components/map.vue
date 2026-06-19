@@ -1923,7 +1923,8 @@ export default {
       if (
         this.mapShow?.inEmby === false ||
         this.mapShow?.inLinda ||
-        (this.mapShow?.trimPos != null || this.mapShow?.skipDur != null)
+        this.mapShow?.trimPos != null ||
+        this.mapShow?.skipDur != null
       ) {
         return null;
       }

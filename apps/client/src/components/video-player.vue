@@ -1517,10 +1517,7 @@ export default {
     _persistField(field, value) {
       if (!this.introShow?.name) return;
       this.introShow[field] = value;
-      if (
-        (field === "trimPos" || field === "skipDur") &&
-        value != null
-      ) {
+      if ((field === "trimPos" || field === "skipDur") && value != null) {
         this.introShow.needsIntro = false;
       }
       setTvdbFields({ name: this.introShow.name, [field]: value }).catch((e) =>

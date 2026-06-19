@@ -1998,6 +1998,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   }
   if (existing.introDur != null) tvdbData.introDur = existing.introDur;
   if (existing.startMark != null) tvdbData.startMark = existing.startMark;
+  if (existing.trimPos != null) tvdbData.trimPos = existing.trimPos;
+  if (existing.skipDur != null) tvdbData.skipDur = existing.skipDur;
 
   // Calculate waitStr using per-season formula (uses existing episodeAiredDates
   // since fresh series map data hasn't been fetched yet at this stage).

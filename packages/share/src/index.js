@@ -615,4 +615,23 @@ export function getResolution(
   return normalizeVideoHeightToQuality(heightToNormalize) ?? null;
 }
 
+// Format a ms time position/duration as mmm:ss.t
+// - minutes (no hours) only shown when value >= 60s
+// - leading zero of seconds suppressed when value < 10s
+// - tenths of a second always shown
+// - 0 -> "--", null/undefined -> "" (blank)
+export function fmtPos(ms) {
+  if (ms == null) return "";
+  if (ms === 0) return "--";
+  const totalSec = ms / 1000;
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec - min * 60;
+  const tenth = Math.floor((sec % 1) * 10);
+  const wholeSec = Math.floor(sec);
+  if (min > 0) {
+    return `${min}:${String(wholeSec).padStart(2, "0")}.${tenth}`;
+  }
+  return `${wholeSec}.${tenth}`;
+}
+
 export { postHistory } from "./history.js";

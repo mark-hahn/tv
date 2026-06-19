@@ -258,6 +258,63 @@
           &gt;&gt;
         </div>
         <div
+          @click.stop="clickTrimSet"
+          style="
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            color: white;
+            background: rgba(0, 80, 0, 0.6);
+            white-space: nowrap;
+            flex-shrink: 0;
+            width: 74px;
+            text-align: center;
+            margin-right: 6px;
+          "
+        >
+          {{ trimPosLabel }}
+        </div>
+        <div
+          @click.stop="clickTrimJump"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(0, 0, 100, 0.6);
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 6px;
+          "
+        >
+          Trim
+        </div>
+        <div
+          @click.stop="clickTrimClr"
+          title="clear trim"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(100, 40, 0, 0.7);
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 20px;
+          "
+        >
+          Clr
+        </div>
+        <div
           @click.stop="clickIntroPre"
           style="
             color: white;
@@ -293,10 +350,10 @@
           "
           :style="{ color: startMark < 2000 ? 'yellow' : 'white' }"
         >
-          {{ introStartLabel }}
+          {{ startMarkLabel }}
         </div>
         <div
-          @click.stop="clickIntroEnd"
+          @click.stop="clickSkipSet"
           style="
             color: white;
             font-size: 13px;
@@ -313,27 +370,10 @@
             margin-right: 6px;
           "
         >
-          {{ introEndLabel }}
+          {{ skipDurLabel }}
         </div>
         <div
-          style="
-            color: black;
-            font-size: 13px;
-            font-weight: bold;
-            padding: 2px 8px;
-            border-radius: 4px;
-            background: white;
-            white-space: nowrap;
-            flex-shrink: 0;
-            min-width: 60px;
-            text-align: center;
-            margin-right: 6px;
-          "
-        >
-          {{ introDurLabel }}
-        </div>
-        <div
-          @click.stop="clickIntroTest"
+          @click.stop="clickSkipTest"
           style="
             color: white;
             font-size: 13px;
@@ -348,10 +388,11 @@
             margin-right: 6px;
           "
         >
-          Test
+          Skip
         </div>
         <div
-          @click.stop="clickIntroClear"
+          @click.stop="clickSkipClr"
+          title="clear skip"
           style="
             color: white;
             font-size: 13px;
@@ -363,32 +404,10 @@
             background: rgba(100, 40, 0, 0.7);
             white-space: nowrap;
             flex-shrink: 0;
-            margin-right: 6px;
+            margin-right: 20px;
           "
         >
-          Clear
-        </div>
-        <div
-          @click.stop="clickIntroNone"
-          style="
-            color: white;
-            font-size: 13px;
-            padding: 2px 8px;
-            border-radius: 4px;
-            border: 1px solid #666;
-            cursor: pointer;
-            user-select: none;
-            white-space: nowrap;
-            flex-shrink: 0;
-            margin-right: 6px;
-          "
-          :style="{
-            background: isIntroNone
-              ? 'rgba(0, 90, 0, 0.9)'
-              : 'rgba(0, 0, 0, 0.5)',
-          }"
-        >
-          None
+          Clr
         </div>
         <div
           @click.stop="clickIntroAnt"
@@ -411,44 +430,6 @@
           }"
         >
           Ant
-        </div>
-        <div
-          @click.stop="introSource !== 'map' && clickIntroEpi()"
-          style="
-            color: white;
-            font-size: 13px;
-            padding: 2px 8px;
-            border-radius: 4px;
-            border: 1px solid #666;
-            white-space: nowrap;
-            flex-shrink: 0;
-            margin-right: 6px;
-          "
-          :style="{
-            background: epiNext ? 'rgba(0, 90, 0, 0.9)' : 'rgba(0, 0, 0, 0.5)',
-            cursor: introSource !== 'map' ? 'pointer' : 'default',
-            opacity: introSource !== 'map' ? 1 : 0.35,
-          }"
-        >
-          Epi
-        </div>
-        <div
-          @click.stop="clickIntroNext"
-          style="
-            color: white;
-            font-size: 13px;
-            padding: 2px 8px;
-            border-radius: 4px;
-            border: 1px solid #666;
-            cursor: pointer;
-            user-select: none;
-            background: rgba(0, 0, 0, 0.5);
-            white-space: nowrap;
-            flex-shrink: 0;
-            margin-right: 6px;
-          "
-        >
-          Next
         </div>
       </template>
       <!-- Timing slider (srt tracks only, not in chksrt/simple/intro mode) -->
@@ -805,6 +786,8 @@ import {
   setTvdbFields,
 } from "../srvr.js";
 
+import { fmtPos } from "@tv/share";
+
 const TV_SRVR_URL = config.tvSrvrUrl;
 const PLAYER_MUTE_STORAGE_KEY = "tvPlayerMuted";
 const PLAYER_VOLUME_STORAGE_KEY = "tvPlayerVolume";
@@ -860,17 +843,14 @@ export default {
       errorRetries: 0,
       chksrtMatch: null,
       startMark: 0,
-      endMark: 0,
+      trimPos: null,
+      skipDur: null,
       currentTimeSec: 0,
       seekTarget: null,
       playerMuted: false,
       playerVolume: 1,
-      introSavedMarks: {},
       waitingForVideo: false,
       waitingForVideoTarget: null,
-      introMarkDirty: false,
-      introLocalNone: false,
-      epiNext: false,
       pendingSourceResumeTime: null,
       pendingSourceResumePlay: false,
     };
@@ -993,26 +973,14 @@ export default {
         this.introShows.find((s) => s.name === this.chksrtShowName) ?? null
       );
     },
-    isIntroNone() {
-      return (
-        this.mode === "intro" &&
-        (this.introShow?.introDur === 0 || this.introLocalNone)
-      );
+    startMarkLabel() {
+      return fmtPos(this.startMark);
     },
-    introStartLabel() {
-      return this.isIntroNone ? "-" : this.fmtTime(this.startMark);
+    trimPosLabel() {
+      return fmtPos(this.trimPos);
     },
-    introEndLabel() {
-      return this.isIntroNone ? "-" : this.fmtTime(this.endMark);
-    },
-    introDurLabel() {
-      if (
-        this.mode === "intro" &&
-        (this.introShow?.introDur == null || this.isIntroNone)
-      ) {
-        return "-";
-      }
-      return this.fmtTime(Math.max(0, this.endMark - this.startMark));
+    skipDurLabel() {
+      return fmtPos(this.skipDur);
     },
     introSeasonForDisplay() {
       if (this.introSeason != null) return this.introSeason;
@@ -1036,59 +1004,11 @@ export default {
     },
   },
   watch: {
-    introShow(newVal, oldVal) {
+    introShow(newVal) {
       if (!newVal?.name) return;
-      if (newVal.name !== oldVal?.name) this.epiNext = false;
-      this.introMarkDirty = false;
-      const tvdbIntroDur = newVal?.introDur ?? null;
-      const tvdbStartMark = newVal?.startMark ?? null;
-
-      if (tvdbStartMark == null && tvdbIntroDur == null) {
-        // Case 1: nothing set — not yet configured
-        this.startMark = 0;
-        this.endMark = 0;
-        this.introLocalNone = false;
-        this._introPlayTargetSec = 0;
-        return;
-      }
-
-      if (tvdbStartMark != null && tvdbIntroDur == null) {
-        // Case 2: startMark set, no introDur — not yet configured
-        this.startMark = tvdbStartMark;
-        this.endMark = tvdbStartMark;
-        this.introLocalNone = false;
-        this._introPlayTargetSec = 0;
-        return;
-      }
-
-      this.introLocalNone = false;
-
-      if (tvdbStartMark == null) {
-        // Case 3: introDur set, no startMark
-        this.startMark = 0;
-        this.endMark = tvdbIntroDur === 0 ? 0 : Math.abs(tvdbIntroDur);
-        this._introPlayTargetSec = 0;
-        return;
-      }
-
-      // Case 4: both introDur and startMark set
-      if (tvdbIntroDur < 0) {
-        this.startMark = 0;
-        this.endMark = Math.abs(tvdbIntroDur);
-        this._introPlayTargetSec = 0;
-      } else if (tvdbIntroDur === 0) {
-        this.startMark = tvdbStartMark;
-        this.endMark = tvdbStartMark;
-        this._introPlayTargetSec = tvdbStartMark / 1000;
-      } else {
-        this.startMark = tvdbStartMark;
-        this.endMark = tvdbStartMark + tvdbIntroDur;
-        this._introPlayTargetSec = tvdbStartMark / 1000;
-      }
-      this.introSavedMarks = {
-        ...this.introSavedMarks,
-        [newVal.name]: { startMark: this.startMark, endMark: this.endMark },
-      };
+      this.startMark = newVal?.startMark ?? 0;
+      this.trimPos = newVal?.trimPos ?? null;
+      this.skipDur = newVal?.skipDur ?? null;
     },
     path(newVal) {
       this._mseStop();
@@ -1109,8 +1029,6 @@ export default {
         this._fetchSubtitleList(newVal);
         this._fetchAudioList(newVal);
       }
-      this.introMarkDirty = false;
-      this.introLocalNone = false;
       this.waitingForVideo = false;
       this.waitingForVideoTarget = null;
     },
@@ -1529,42 +1447,11 @@ export default {
     clickIntroZero() {
       if (this.waitingForVideo) this._exitWaitingForVideo();
       this._cancelSeek();
-      this.introMarkDirty = true;
-      this.startMark = 0;
       const vid = this.$refs.vid;
       if (vid) vid.currentTime = 0;
-      this._saveIntroDur();
     },
     clickIntroNone() {
-      if (!this.introShow?.name) return;
-      this.introMarkDirty = true;
-      if (this.isIntroNone) {
-        this.introLocalNone = false;
-        const saved = this.introSavedMarks[this.introShow.name];
-        if (
-          saved &&
-          Number.isFinite(saved.startMark) &&
-          Number.isFinite(saved.endMark)
-        ) {
-          this.startMark = saved.startMark;
-          this.endMark = saved.endMark;
-        } else {
-          this.startMark = 0;
-          this.endMark = 0;
-        }
-        if (this.introShow?.introDur === 0) {
-          this._saveIntroDur();
-        }
-        return;
-      }
-      this.introSavedMarks = {
-        ...this.introSavedMarks,
-        [this.introShow.name]: {
-          startMark: this.startMark,
-          endMark: this.endMark,
-        },
-      };
-      this._setIntroDur(0);
+      // removed in trim/skip redesign
     },
     clickIntroPre() {
       if (this.waitingForVideo) this._exitWaitingForVideo();
@@ -1573,77 +1460,72 @@ export default {
       this._cancelSeek();
       vid.currentTime = Math.max(0, (this.startMark - 3000) / 1000);
     },
-    _restoreIntroMarksFromSaved() {
-      if (!this.introShow?.name) return;
-      this.introLocalNone = false;
-      const saved = this.introSavedMarks[this.introShow.name];
-      if (
-        saved &&
-        Number.isFinite(saved.startMark) &&
-        Number.isFinite(saved.endMark)
-      ) {
-        this.startMark = saved.startMark;
-        this.endMark = saved.endMark;
-      } else {
-        this.startMark = 0;
-        this.endMark = 0;
-      }
-    },
     clickIntroStart() {
       const vid = this.$refs.vid;
       if (!vid) return;
       if (this.waitingForVideo) this._exitWaitingForVideo();
       this._cancelSeek();
-      if (this.isIntroNone) this._restoreIntroMarksFromSaved();
-      this.introMarkDirty = true;
-      this.startMark = vid.currentTime * 1000;
-      this._saveIntroDur();
+      this.startMark = Math.round(vid.currentTime * 1000);
+      this._persistField("startMark", this.startMark);
     },
-    clickIntroEnd() {
+    // Trimming (absolute video position)
+    clickTrimSet() {
       const vid = this.$refs.vid;
       if (!vid) return;
       if (this.waitingForVideo) this._exitWaitingForVideo();
       this._cancelSeek();
-      if (this.isIntroNone) this._restoreIntroMarksFromSaved();
-      this.introMarkDirty = true;
-      this.endMark = vid.currentTime * 1000;
-      this._saveIntroDur();
+      this.trimPos = Math.round(vid.currentTime * 1000);
+      this._persistField("trimPos", this.trimPos);
     },
-    clickIntroTest() {
+    clickTrimJump() {
       if (this.waitingForVideo) this._exitWaitingForVideo();
       const vid = this.$refs.vid;
+      if (!vid || !this.trimPos) return;
+      this._cancelSeek();
+      this._seekWithConfirm(this.trimPos / 1000);
+    },
+    clickTrimClr() {
+      // >0 -> 0, null -> 0, 0 -> null
+      this.trimPos = this.trimPos === 0 ? null : 0;
+      this._persistField("trimPos", this.trimPos);
+    },
+    // Skipping (relative duration from startMark)
+    clickSkipSet() {
+      const vid = this.$refs.vid;
       if (!vid) return;
-      if (this.startMark < 2000) {
-        vid.currentTime = 0;
-      }
-      const targetSec =
-        (this.startMark < 2000 ? 0 : vid.currentTime) +
-        Math.max(0, this.endMark - this.startMark) / 1000;
-      this._seekWithConfirm(targetSec);
-    },
-    clickIntroClear() {
-      this.introMarkDirty = true;
+      if (this.startMark == null) return;
       if (this.waitingForVideo) this._exitWaitingForVideo();
-      this._setIntroDur(null);
+      this._cancelSeek();
+      const curPos = Math.round(vid.currentTime * 1000);
+      if (curPos < this.startMark) return;
+      this.skipDur = curPos - this.startMark;
+      this._persistField("skipDur", this.skipDur);
     },
-    _saveIntroDur() {
-      if (!this.introShow) return;
-      const dur = Math.max(0, this.endMark - this.startMark);
-      // Avoid converting a mark click into None mode when start/end are equal.
-      if (dur === 0) return;
-      const introDur = this.startMark < 2000 ? -dur : dur;
-      this._setIntroDur(introDur);
+    clickSkipTest() {
+      // Seek past the intro: startMark + skipDur
+      if (this.waitingForVideo) this._exitWaitingForVideo();
+      const vid = this.$refs.vid;
+      if (!vid || !this.skipDur) return;
+      this._cancelSeek();
+      this._seekWithConfirm((this.startMark + this.skipDur) / 1000);
     },
-    _setIntroDur(introDur) {
+    clickSkipClr() {
+      // >0 -> 0, null -> 0, 0 -> null
+      this.skipDur = this.skipDur === 0 ? null : 0;
+      this._persistField("skipDur", this.skipDur);
+    },
+    _persistField(field, value) {
       if (!this.introShow?.name) return;
-      this.introShow.introDur = introDur;
-      if (introDur !== null) this.introShow.needsIntro = false;
-      setTvdbFields({ name: this.introShow.name, introDur }).catch((e) =>
-        console.error("[intro] setTvdbFields error:", e),
+      this.introShow[field] = value;
+      if (
+        (field === "trimPos" || field === "skipDur") &&
+        value != null
+      ) {
+        this.introShow.needsIntro = false;
+      }
+      setTvdbFields({ name: this.introShow.name, [field]: value }).catch((e) =>
+        console.error(`[intro] setTvdbFields ${field} error:`, e),
       );
-    },
-    clickIntroEpi() {
-      this.epiNext = !this.epiNext;
     },
     async clickIntroAnt() {
       if (!this.introShow?.name) return;
@@ -1673,21 +1555,6 @@ export default {
         console.error("clickChksrtAnt error:", e);
         show.anticipating = original;
       }
-    },
-    clickIntroNext() {
-      if (this.introMarkDirty) this._saveStartMark();
-      this.introMarkDirty = false;
-      if (this.introSeason != null) this._seekOnLoad = true;
-      this.$emit("intro-next", { epiNext: this.epiNext });
-    },
-    _saveStartMark() {
-      if (!this.introShow?.name) return;
-      const introDur = this.introShow?.introDur ?? null;
-      const markToSave =
-        introDur !== null && introDur <= 0 ? 0 : this.startMark;
-      setTvdbFields({ name: this.introShow.name, startMark: markToSave }).catch(
-        (e) => console.error("[intro] saveStartMark error:", e),
-      );
     },
     _exitWaitingForVideo() {
       this.waitingForVideo = false;
@@ -1850,7 +1717,6 @@ export default {
       this.$emit("chksrt-sel", this.path);
     },
     close() {
-      if (this.mode === "intro" && this.introMarkDirty) this._saveStartMark();
       this._mseStop();
       const vid = this.$refs.vid;
       if (vid) {

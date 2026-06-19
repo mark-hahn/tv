@@ -16,25 +16,33 @@
   const TV_SRVR_URL = "https://hahnca.com/tv-srvr";
   let skipButton = null;
   let currentDeviceName = null;
-  let autoSkipItemId = null; // Track which item was auto-skipped
+  let autoSkipItemId = null; // Track which item was auto-trimmed
   let lastCheckedItemId = null;
-  let currentIntroDur = null;
-  let currentStartMark = null;
+  let currentTrimPos = null;
+  let currentSkipDur = null;
 
-  // Format milliseconds to mm:ss.t or mm:ss
-  function formatTime(ms, showTenths = true) {
+  // Format a ms time position/duration as mmm:ss.t
+  // - minutes (no hours) only shown when value >= 60s
+  // - leading zero of seconds suppressed when value < 10s
+  // - tenths always shown; 0 -> "--"; null/undefined -> ""
+  function fmtPos(ms) {
+    if (ms == null) return "";
+    if (ms === 0) return "--";
     const totalSec = ms / 1000;
     const min = Math.floor(totalSec / 60);
-    const sec = totalSec % 60;
-    const secStr = showTenths ? sec.toFixed(1) : Math.floor(sec).toString();
-    return `${min}:${secStr.padStart(showTenths ? 4 : 2, "0")}`;
+    const sec = totalSec - min * 60;
+    const tenth = Math.floor((sec % 1) * 10);
+    const wholeSec = Math.floor(sec);
+    if (min > 0) {
+      return `${min}:${String(wholeSec).padStart(2, "0")}.${tenth}`;
+    }
+    return `${wholeSec}.${tenth}`;
   }
 
   // Update button text with current info
-  function updateButtonText(startMark, introDur) {
+  function updateButtonText(trimPos, skipDur) {
     if (!skipButton) return;
-    const durStr = introDur == null ? "--" : (introDur / 1000).toFixed(1);
-    skipButton.textContent = `Intro:${durStr}`;
+    skipButton.textContent = `${fmtPos(trimPos)} | ${fmtPos(skipDur)}`;
   }
 
   // Get the device name from Emby's API
@@ -79,7 +87,7 @@
 
     skipButton = document.createElement("button");
     skipButton.id = "skip-intro-btn";
-    skipButton.textContent = "Intro:0.0";
+    skipButton.textContent = "-- | --";
     skipButton.style.cssText = `
             position: fixed;
             top: 5px;
@@ -133,8 +141,8 @@
           }, 2000);
         } else {
           const errorText =
-            result.reason === "noIntroDur"
-              ? "No Intro"
+            result.reason === "noSkipDur"
+              ? "No Skip"
               : result.reason === "notPlaying"
                 ? "Not Playing"
                 : result.reason
@@ -144,7 +152,7 @@
           skipButton.style.background = "rgba(100, 0, 0, 0.8)";
           setTimeout(() => {
             skipButton.style.background = "rgba(0, 0, 0, 0.8)";
-            updateButtonText(currentStartMark, currentIntroDur);
+            updateButtonText(currentTrimPos, currentSkipDur);
           }, 2000);
         }
       } catch (error) {
@@ -153,7 +161,7 @@
         skipButton.style.background = "rgba(100, 0, 0, 0.8)";
         setTimeout(() => {
           skipButton.style.background = "rgba(0, 0, 0, 0.8)";
-          updateButtonText(currentStartMark, currentIntroDur);
+          updateButtonText(currentTrimPos, currentSkipDur);
         }, 2000);
       }
     });
@@ -249,75 +257,70 @@
     }
   }
 
-  // Get introDur and startMark for current show
+  // Get trimPos and skipDur for current show
   async function getIntroInfo(showName, showId) {
     try {
       const response = await fetch(
         `${TV_SRVR_URL}/api/introDur?showName=${encodeURIComponent(showName)}&showId=${encodeURIComponent(showId)}`,
       );
-      if (!response.ok) return { introDur: null, startMark: null };
+      if (!response.ok) return { trimPos: null, skipDur: null };
       const result = await response.json();
-      return { introDur: result.introDur, startMark: result.startMark };
+      return { trimPos: result.trimPos, skipDur: result.skipDur };
     } catch (error) {
       console.error("[Auto Skip] Error getting intro info:", error);
-      return { introDur: null, startMark: null };
+      return { trimPos: null, skipDur: null };
     }
   }
 
-  // Check if auto-skip should trigger
+  // Check if auto-trim should trigger
   async function checkAutoSkip(video) {
     const playingInfo = await getCurrentPlayingInfo();
     if (!playingInfo) return;
 
-    // Reset auto-skip tracking when item changes
+    // Reset auto-trim tracking when item changes
     if (playingInfo.itemId !== lastCheckedItemId) {
       lastCheckedItemId = playingInfo.itemId;
       autoSkipItemId = null;
-      currentIntroDur = null;
-      currentStartMark = null;
+      currentTrimPos = null;
+      currentSkipDur = null;
 
       // Fetch intro info for new item
       const introInfo = await getIntroInfo(
         playingInfo.showName,
         playingInfo.showId,
       );
-      currentIntroDur = introInfo.introDur;
-      currentStartMark = introInfo.startMark;
+      currentTrimPos = introInfo.trimPos;
+      currentSkipDur = introInfo.skipDur;
     }
 
-    // Update button text with intro start and end times
-    updateButtonText(currentStartMark, currentIntroDur);
+    // Update button text with trimPos | skipDur
+    updateButtonText(currentTrimPos, currentSkipDur);
 
-    // Only auto-skip if introDur is negative and we haven't skipped this item yet
+    // Only auto-trim if trimPos > 0 and we haven't trimmed this item yet
     if (
-      currentIntroDur != null &&
-      currentIntroDur < 0 &&
+      currentTrimPos != null &&
+      currentTrimPos > 0 &&
       autoSkipItemId !== playingInfo.itemId
     ) {
       const positionMs = playingInfo.positionTicks / 10000;
-      const introDurAbs = Math.abs(currentIntroDur);
 
-      // Auto-skip when we're within 5 seconds of start and before the intro end
-      if (positionMs < 5000 && positionMs < introDurAbs) {
+      // Auto-trim when we're within 5 seconds of start and before trimPos
+      if (positionMs < 5000 && positionMs < currentTrimPos) {
         autoSkipItemId = playingInfo.itemId;
 
-        // Trigger skip
-        const pressedAt = Date.now();
+        // Trigger trim (absolute seek to trimPos)
         try {
-          const response = await fetch(`${TV_SRVR_URL}/api/skipIntro`, {
+          await fetch(`${TV_SRVR_URL}/api/trimIntro`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              pressedAt,
               deviceName: currentDeviceName || getDeviceName(),
             }),
           });
-
-          const result = await response.json();
         } catch (error) {
-          console.error("[Auto Skip] Error:", error);
+          console.error("[Auto Trim] Error:", error);
         }
       }
     }

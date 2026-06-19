@@ -1171,7 +1171,8 @@ export default {
           );
         const hasNoPlayableIntroFile = !hasPlayableIntroFile;
         if (
-          s.introDur != null ||
+          s.trimPos != null ||
+          s.skipDur != null ||
           s.inEmby === false ||
           s.inLinda ||
           hasNoPlayableIntroFile

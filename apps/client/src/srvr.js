@@ -384,6 +384,10 @@ export function skipIntro(deviceName) {
   );
 }
 
+export function trimIntro(deviceName) {
+  return httpCall("/api/trimIntro", { deviceName }, "POST");
+}
+
 export function embyViewShow(showId, showName) {
   return httpCall("/api/embyViewShow", { showId, showName }, "POST");
 }

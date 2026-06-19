@@ -953,6 +953,7 @@ import * as srvr from "../srvr.js";
 import * as urls from "../urls.js";
 import * as util from "../util.js";
 import evtBus from "../evtBus.js";
+import { fmtPos } from "@tv/share";
 
 const MAP_ARROW_PAN_PX_PER_SEC = 400;
 const MAP_PAN_SMOOTH_TAU_SEC = 0.1;
@@ -1063,9 +1064,9 @@ export default {
 
       const rt = this.tvdbData?.averageRuntime;
       if (rt) {
-        const introDur = this.mapShow?.introDur;
-        const introDurStr = introDur != null ? (introDur / 1000).toFixed(1) : "---";
-        parts.push(`${rt} mins | ${introDurStr}`);
+        const trimStr = fmtPos(this.mapShow?.trimPos);
+        const skipStr = fmtPos(this.mapShow?.skipDur);
+        parts.push(`${rt} mins | ${trimStr} | ${skipStr}`);
       }
 
       const status = this.statusVal;
@@ -1922,7 +1923,7 @@ export default {
       if (
         this.mapShow?.inEmby === false ||
         this.mapShow?.inLinda ||
-        this.mapShow?.introDur != null
+        (this.mapShow?.trimPos != null || this.mapShow?.skipDur != null)
       ) {
         return null;
       }

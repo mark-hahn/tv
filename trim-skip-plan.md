@@ -24,11 +24,9 @@ existing `fmtTime`:
 Current `fmtTime` in [apps/client/src/components/video-player.vue](apps/client/src/components/video-player.vue#L813)
 always prints `mm:ss.t` and pads — it does NOT match. Plan:
 
-1. Add a new shared formatter (e.g. `fmtPos(ms)`) implementing the rules above.
-   Put it where it can be reused by `video-player.vue` and `map.vue`
-   (candidate: `packages/share/src` or a small local helper duplicated, since
-   `map.vue` and `video-player.vue` are separate components). Decision below in
-   "Open questions".
+1. Add a new shared formatter `fmtPos(ms)` implementing the rules above in
+   `packages/share/src` and import it in both `video-player.vue` and `map.vue`
+   (DECISION #6: use packages/share).
 2. Keep the existing `fmtTime` for the live current-time readout (the spec says
    "the time of the current video position same as before"), OR switch it to the
    new format. Spec item (1) says "same as before", so leave the live readout on
@@ -76,23 +74,26 @@ Rebuild the right-side button row to this exact order:
 
 1. show name (far left, flex:1) — unchanged.
 2. current video position readout — unchanged (old `fmtTime`).
-3. position controls `<<` `<` `>` `>>` — unchanged
+3. **`0` button** — to the LEFT of `<<` (DECISION #3); seeks video to position 0
+   and does nothing else (`clickIntroZero`, simplified — no introDur save).
+4. position controls `<<` `<` `>` `>>` — unchanged
    (`clickNavBack30/clickNavBack10/clickNavFwd10/clickNavFwd30`).
-4. **trimPos button** — label = `fmtPos(trimPos)`; click sets `trimPos =`
+5. **trimPos button** — label = `fmtPos(trimPos)`; click sets `trimPos =`
    current video position (ms) and persists immediately.
-5. **Trim button** (label `Trim`) — click seeks video to `trimPos`.
-6. **Clr** (clear-trim) — toggle: `>0 → 0`, `null → 0`, `0 → null`; persist.
-7. **Pre button** (label `Pre`) — unchanged; seeks to `startMark - 3s`.
-8. **startMark button** — label = `fmtPos(startMark)`; click sets `startMark =`
+6. **Trim button** (label `Trim`) — click seeks video to `trimPos`.
+7. **Clr** (clear-trim) — toggle: `>0 → 0`, `null → 0`, `0 → null`; persist.
+8. **Pre button** (label `Pre`) — unchanged; seeks to `startMark - 3s`.
+9. **startMark button** — label = `fmtPos(startMark)`; click sets `startMark =`
    current position; persist.
-9. **skipDur button** — label = `fmtPos(skipDur)`; click sets
-   `skipDur = currentPos - startMark`; ignore click if `startMark` is null/missing
-   or `currentPos < startMark`; persist.
-10. **Skip button** (label `Skip`, was `Test`) — click seeks to `startMark - 3s`.
-11. **Clr** (clear-skip) — toggle on `skipDur`: `>0 → 0`, `null → 0`, `0 → null`;
+10. **skipDur button** — label = `fmtPos(skipDur)`; click sets
+    `skipDur = currentPos - startMark`; ignore click if `startMark` is null/missing
+    or `currentPos < startMark`; persist.
+11. **Skip button** (label `Skip`, was `Test`) — click seeks PAST the intro to
+    `startMark + skipDur` (DECISION #1/#5).
+12. **Clr** (clear-skip) — toggle on `skipDur`: `>0 → 0`, `null → 0`, `0 → null`;
     persist.
-12. **Ant button** — unchanged (`clickIntroAnt`).
-13. **X** close — unchanged.
+13. **Ant button** — unchanged (`clickIntroAnt`).
+14. **X** close — unchanged.
 
 Remove from the pane:
 
@@ -104,8 +105,7 @@ Remove from the pane:
 - the old `Epi` button (`clickIntroEpi` / `epiNext`) — item (14).
 - the old `Next` button (`clickIntroNext`) — item (15).
 
-Note: the existing `0` button (`clickIntroZero`, seeks to 0) is **not mentioned**
-in the instruction list — see Open questions.
+Note: the `0` button is kept to the left of `<<` (DECISION #3).
 
 ### Persisting immediately
 
@@ -191,51 +191,29 @@ bar are web-only, so no Android change for those.
 
 ---
 
-## Ambiguities / contradictions / impossibilities
+## Resolved decisions (from trim-skip-response.md)
 
-1. **"Skip" button vs old "Test" button (item 9 in instr).** The spec says the
-   Skip button should "jump to (startMark - 3 secs)" AND that it "has identical
-   functionality to old test button". These conflict: the old Test button
-   (`clickIntroTest`) seeks _past_ the intro (to `startMark + introDur`), not to
-   `startMark - 3s`. It is also then identical to the **Pre** button (item 6),
-   which also jumps to `startMark - 3s`. Recommend clarifying: most likely the
-   Skip button should _demonstrate skipping_ by jumping `startMark + skipDur`
-   (i.e. land just past the intro), making it a true test of `skipDur`. Plan
-   currently follows the literal text (`startMark - 3s`) but flags this.
+1. **Skip button** seeks PAST the intro to `startMark + skipDur`.
+2. The two `Clr` buttons keep identical appearance.
+3. The `0` button is restored to the left of `<<`; it only seeks video to 0.
+4. A one-time migration is performed after deploy (see Migration below).
+5. **Pre** jumps to `startMark - 3s`; **Skip** seeks to `startMark + skipDur`
+   (they are different).
+6. `fmtPos` lives in `packages/share`.
+7. Auto-trim on emby: add an absolute-seek branch/helper on the server.
+8. `/api/introDur` gains `trimPos`/`skipDur` (no rename).
 
-2. **Two buttons both labeled `Clr`.** Items 5 and 10 are both `Clr`
-   (clear-trim and clear-skip). The spec acknowledges they can be confused and
-   relies on row position to differentiate. Suggest a small visual cue (e.g.
-   different tint/title attr) — otherwise kept identical per instructions.
+## One-time migration (run after deploy)
 
-3. **The existing `0` (seek-to-zero) button is unlisted.** The instruction's
-   numbered list does not mention the current `0` button. Unclear whether to keep
-   or remove it. Plan: keep it unless told otherwise (it is a useful nav aid and
-   not contradicted), but flagging for confirmation.
-
-4. **Migration of existing `introDur` shows.** Spec keeps `introDur` "for
-   backwards compatibility" and says trimPos/skipDur are new and both-null means
-   "needs to be set." With no migration, every already-configured show
-   (introDur set) will reappear as "needs intro" until reconfigured. Confirm this
-   is intended, or specify a one-time migration (e.g. old `introDur < 0` →
-   `trimPos = abs(introDur)`, old `introDur > 0` → `skipDur = introDur`).
-
-5. **Pre and Skip redundancy.** As noted in (1), with the literal reading Pre and
-   Skip perform the same jump. If Skip is meant to test `skipDur`, they differ.
-
-6. **`fmtPos` location / duplication.** `map.vue` and `video-player.vue` don't
-   share a util import today. Either add `fmtPos` to `packages/share` and import
-   in both, or duplicate a small helper. Recommend `packages/share`.
-
-7. **Auto-trim mechanism on emby.** `doSkipIntro` is a _relative_ seek; trimming
-   needs an _absolute_ seek to `trimPos`. This requires either a new server
-   endpoint/branch or extending `doSkipIntro`. Not impossible, just additional
-   surface to confirm.
-
-8. **Tampermonkey API field naming.** Renaming the endpoint/response fields would
-   break the deployed userscript until users reinstall. Recommend _adding_
-   `trimPos`/`skipDur` to `/api/introDur` rather than renaming, and updating the
-   userscript in the same change.
+- Stop all 4 servers (srvr, down, asr, api) before deploying + migrating, so
+  deploying is only copying files.
+- Migrate only shows where `inEmby` is true.
+- For each migrated show, based on its existing `introDur`:
+  - `introDur` missing/null → add no `trimPos`/`skipDur`.
+  - `introDur === 0` → `trimPos = 0`, `skipDur = 0`.
+  - `introDur > 0` → `trimPos = 0`, `skipDur = introDur`.
+  - `introDur < 0` → `trimPos = abs(introDur)`, `skipDur = 0`.
+- Keep `introDur` untouched.
 
 ## Suggestions
 

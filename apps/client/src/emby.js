@@ -1427,14 +1427,14 @@ export const startStop = async (show, episodeId, watchButtonTxt) => {
         console.log(`playing2 ${show.name} on  ${deviceName}`);
       }, 1000);
 
-      // Auto-skip intro if introDur is negative (meaning skip from start)
-      if (show?.introDur != null && show.introDur < 0) {
+      // Auto-trim: jump to absolute trimPos when playback starts
+      if (show?.trimPos != null && show.trimPos > 0) {
         setTimeout(async () => {
           try {
-            const skipRes = await srvr.skipIntro(deviceName);
-            console.log(`[startStop] skip intro result:`, skipRes);
+            const trimRes = await srvr.trimIntro(deviceName);
+            console.log(`[startStop] trim intro result:`, trimRes);
           } catch (e) {
-            console.error(`[startStop] skip intro error:`, e);
+            console.error(`[startStop] trim intro error:`, e);
           }
         }, 2500);
       }

@@ -2594,7 +2594,8 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
       const newNeedsIntro = !!(
         tvdbRecord.inEmby &&
         !tvdbRecord.inLinda &&
-        tvdbRecord.introDur == null &&
+        tvdbRecord.trimPos == null &&
+        tvdbRecord.skipDur == null &&
         Number(tvdbRecord.episodeCount ?? 0) >
           Number(tvdbRecord.watchedCount ?? 0) &&
         Array.isArray(tvdbRecord.filesOnDisk) &&
@@ -2614,6 +2615,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
           `[needsIntro dbg] ${showName}: stored=${tvdbRecord.needsIntro} computed=${newNeedsIntro}` +
             ` inEmby=${tvdbRecord.inEmby} inLinda=${tvdbRecord.inLinda}` +
             ` introDur=${tvdbRecord.introDur} epCnt=${tvdbRecord.episodeCount}` +
+            ` trimPos=${tvdbRecord.trimPos} skipDur=${tvdbRecord.skipDur}` +
             ` watchCnt=${tvdbRecord.watchedCount}` +
             ` filesOnDisk=${JSON.stringify(tvdbRecord.filesOnDisk?.slice(0, 3))}`,
         );
@@ -5582,7 +5584,7 @@ app.get("/api/introNextFile", async (req, res) => {
   }
 });
 
-// Intro: skip forward by introDur on the specified device
+// Intro: skip forward by skipDur on the specified device
 async function doSkipIntro(pressedAt, deviceName = "Living Room TV") {
   const sessRes = await fetch(
     `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
@@ -5623,17 +5625,15 @@ async function doSkipIntro(pressedAt, deviceName = "Living Room TV") {
   if (!record) {
     record = Object.values(allTvdb).find((r) => r.id === showId);
   }
-  const introDur = record?.introDur;
-  if (!introDur) {
-    console.log(`[skipIntro] no introDur for show: ${showName}`);
-    return { ok: false, reason: "noIntroDur" };
+  const skipDur = record?.skipDur;
+  if (!skipDur || skipDur <= 0) {
+    console.log(`[skipIntro] no skipDur for show: ${showName}`);
+    return { ok: false, reason: "noSkipDur" };
   }
-  const basePositionTicks = introDur < 0 ? 0 : positionTicks;
-  const newTicks = Math.round(
-    basePositionTicks + Math.max(0, Math.abs(introDur) - 1000) * 10000,
-  );
+  // Skipping: jump ahead by skipDur from current position.
+  const newTicks = Math.round(positionTicks + skipDur * 10000);
   console.log(
-    `[skipIntro] show=${showName} pressDelay=${pressDelay}ms rawPos=${Math.round(rawPositionTicks / 10000)}ms newPos=${Math.round(newTicks / 10000)}ms`,
+    `[skipIntro] show=${showName} pressDelay=${pressDelay}ms rawPos=${Math.round(rawPositionTicks / 10000)}ms skipDur=${skipDur}ms newPos=${Math.round(newTicks / 10000)}ms`,
   );
   const seekRes = await fetch(
     `${EMBY_BASE_URL}/Sessions/${session.Id}/Playing/seek?SeekPositionTicks=${newTicks}&api_key=${EMBY_API_KEY}`,
@@ -5657,11 +5657,67 @@ app.post("/api/skipIntro", async (req, res) => {
   }
 });
 
+// Intro: trimming — seek to absolute trimPos position on the specified device
+async function doTrimIntro(deviceName = "Living Room TV") {
+  const sessRes = await fetch(
+    `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
+    { headers: { Accept: "application/json" } },
+  );
+  if (!sessRes.ok) {
+    console.log(`[trimIntro] sessions fetch failed: ${sessRes.status}`);
+    return { ok: false, error: `sessions ${sessRes.status}` };
+  }
+  const sessions = await sessRes.json();
+  const session = sessions.find(
+    (s) => s.NowPlayingItem && s.DeviceName === deviceName,
+  );
+  if (!session) {
+    return { ok: false, reason: "notPlaying" };
+  }
+  const showName =
+    session.NowPlayingItem.SeriesName || session.NowPlayingItem.Name;
+  const allTvdb = tvdb.getAllTvdbSync();
+  const showId = session.NowPlayingItem.SeriesId || session.NowPlayingItem.Id;
+  let record = allTvdb[showName];
+  if (!record) {
+    record = Object.values(allTvdb).find((r) => r.id === showId);
+  }
+  const trimPos = record?.trimPos;
+  if (!trimPos || trimPos <= 0) {
+    console.log(`[trimIntro] no trimPos for show: ${showName}`);
+    return { ok: false, reason: "noTrimPos" };
+  }
+  const newTicks = Math.round(trimPos * 10000);
+  console.log(
+    `[trimIntro] show=${showName} trimPos=${trimPos}ms newPos=${Math.round(newTicks / 10000)}ms`,
+  );
+  const seekRes = await fetch(
+    `${EMBY_BASE_URL}/Sessions/${session.Id}/Playing/seek?SeekPositionTicks=${newTicks}&api_key=${EMBY_API_KEY}`,
+    { method: "POST", headers: { Accept: "application/json" } },
+  );
+  if (!seekRes.ok) {
+    console.log(`[trimIntro] seek failed: ${seekRes.status}`);
+    return { ok: false, error: `seek ${seekRes.status}` };
+  }
+  return { ok: true };
+}
+
+app.post("/api/trimIntro", async (req, res) => {
+  try {
+    const { deviceName } = req.body || {};
+    const result = await doTrimIntro(deviceName);
+    res.json(result);
+  } catch (err) {
+    console.error("[trimIntro] error:", err.message);
+    res.json({ ok: false, error: err.message });
+  }
+});
+
 app.get("/api/introDur", async (req, res) => {
   try {
     const { showName, showId } = req.query;
     if (!showName && !showId) {
-      res.json({ introDur: null, startMark: null });
+      res.json({ introDur: null, startMark: null, trimPos: null, skipDur: null });
       return;
     }
     const allTvdb = tvdb.getAllTvdbSync();
@@ -5672,10 +5728,18 @@ app.get("/api/introDur", async (req, res) => {
     res.json({
       introDur: record?.introDur ?? null,
       startMark: record?.startMark ?? null,
+      trimPos: record?.trimPos ?? null,
+      skipDur: record?.skipDur ?? null,
     });
   } catch (err) {
     console.error("[introDur] error:", err.message);
-    res.json({ introDur: null, startMark: null, error: err.message });
+    res.json({
+      introDur: null,
+      startMark: null,
+      trimPos: null,
+      skipDur: null,
+      error: err.message,
+    });
   }
 });
 
@@ -5910,11 +5974,11 @@ app.post("/internal/nowPlaying", (req, res) => {
     const skipKey = `${lrtv.showName}|${lrtv.season}|${lrtv.episode}`;
     const allTvdb = tvdb.getAllTvdbSync();
     const record = allTvdb?.[lrtv.showName];
-    if (record?.introDur < 0 && skipKey !== lastAutoSkipKey) {
+    if (record?.trimPos > 0 && skipKey !== lastAutoSkipKey) {
       lastAutoSkipKey = skipKey;
       setTimeout(() => {
-        doSkipIntro(null).catch((e) =>
-          console.error("[autoSkip] error:", e.message),
+        doTrimIntro(null).catch((e) =>
+          console.error("[autoTrim] error:", e.message),
         );
       }, 2000);
     }

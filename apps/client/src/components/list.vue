@@ -3642,6 +3642,8 @@ export default {
           show.waitStr = record.waitStr ?? show.waitStr;
           if ("introDur" in record) show.introDur = record.introDur;
           if ("startMark" in record) show.startMark = record.startMark;
+          if ("trimPos" in record) show.trimPos = record.trimPos;
+          if ("skipDur" in record) show.skipDur = record.skipDur;
         }
 
         // Update allTvdb reference

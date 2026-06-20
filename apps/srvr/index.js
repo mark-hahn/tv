@@ -5657,7 +5657,6 @@ app.post("/api/skipIntro", async (req, res) => {
 
 // Intro: trimming — seek to absolute trimPos position on the specified device
 async function doTrimIntro(deviceName = "Living Room TV") {
-  console.log(`[trimIntro] called with deviceName=${deviceName}`);
   const sessRes = await fetch(
     `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
     { headers: { Accept: "application/json" } },
@@ -5667,18 +5666,10 @@ async function doTrimIntro(deviceName = "Living Room TV") {
     return { ok: false, error: `sessions ${sessRes.status}` };
   }
   const sessions = await sessRes.json();
-  console.log(
-    `[trimIntro] found ${sessions.length} sessions, looking for device="${deviceName}"`,
-  );
   const session = sessions.find(
     (s) => s.NowPlayingItem && s.DeviceName === deviceName,
   );
   if (!session) {
-    const playing = sessions.filter((s) => s.NowPlayingItem);
-    console.log(
-      `[trimIntro] no session found for "${deviceName}". Playing devices:`,
-      playing.map((s) => s.DeviceName),
-    );
     return { ok: false, reason: "notPlaying" };
   }
   const showName =
@@ -5696,7 +5687,7 @@ async function doTrimIntro(deviceName = "Living Room TV") {
   }
   const newTicks = Math.round(trimPos * 10000);
   console.log(
-    `[trimIntro] show=${showName} trimPos=${trimPos}ms newPos=${Math.round(newTicks / 10000)}ms device=${deviceName}`,
+    `[trimIntro] show=${showName} trimPos=${trimPos}ms newPos=${Math.round(newTicks / 10000)}ms`,
   );
   const seekRes = await fetch(
     `${EMBY_BASE_URL}/Sessions/${session.Id}/Playing/seek?SeekPositionTicks=${newTicks}&api_key=${EMBY_API_KEY}`,
@@ -5706,7 +5697,6 @@ async function doTrimIntro(deviceName = "Living Room TV") {
     console.log(`[trimIntro] seek failed: ${seekRes.status}`);
     return { ok: false, error: `seek ${seekRes.status}` };
   }
-  console.log(`[trimIntro] seek successful for ${showName}`);
   return { ok: true };
 }
 
@@ -5977,21 +5967,8 @@ app.post("/internal/nowPlaying", (req, res) => {
   res.json({ ok: true });
 
   // Auto-skip: detect not-playing -> playing from start
-  console.log(
-    `[nowPlaying dbg] devices:`,
-    lastNowPlayingList.map((p) => p.device),
-  );
   const lrtv = lastNowPlayingList.find((p) => p.device === "Living Room TV");
   const isNowPlaying = !!lrtv;
-
-  // Debug logging
-  if (lrtv) {
-    const posSec = Math.round((lrtv.positionTicks ?? 0) / 10000 / 1000);
-    console.log(
-      `[autoTrim dbg] ${lrtv.showName} S${lrtv.season}E${lrtv.episode} pos=${posSec}s wasPlaying=${lastLivingRoomWasPlaying} isNowPlaying=${isNowPlaying}`,
-    );
-  }
-
   if (
     !lastLivingRoomWasPlaying &&
     isNowPlaying &&
@@ -6000,12 +5977,8 @@ app.post("/internal/nowPlaying", (req, res) => {
     const skipKey = `${lrtv.showName}|${lrtv.season}|${lrtv.episode}`;
     const allTvdb = tvdb.getAllTvdbSync();
     const record = allTvdb?.[lrtv.showName];
-    console.log(
-      `[autoTrim dbg] transition detected for ${lrtv.showName}, trimPos=${record?.trimPos ?? null}, lastKey=${lastAutoSkipKey}, thisKey=${skipKey}`,
-    );
     if (record?.trimPos > 0 && skipKey !== lastAutoSkipKey) {
       lastAutoSkipKey = skipKey;
-      console.log(`[autoTrim] triggering trim for ${lrtv.showName}`);
       setTimeout(() => {
         doTrimIntro().catch((e) =>
           console.error("[autoTrim] error:", e.message),

@@ -1431,11 +1431,7 @@ export const startStop = async (show, episodeId, watchButtonTxt) => {
       if (show?.trimPos != null && show.trimPos > 0) {
         setTimeout(async () => {
           try {
-            const trimRes = await srvr.trimIntro(deviceName);
-            console.log(`[startStop] trim intro result:`, trimRes);
-            if (!trimRes?.ok) {
-              console.warn(`[startStop] trim failed:`, trimRes);
-            }
+            await srvr.trimIntro(deviceName);
           } catch (e) {
             console.error(`[startStop] trim intro error:`, e);
           }

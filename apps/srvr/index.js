@@ -5687,7 +5687,7 @@ async function doTrimIntro(deviceName = "Living Room TV") {
   }
   const newTicks = Math.round(trimPos * 10000);
   console.log(
-    `[trimIntro] show=${showName} trimPos=${trimPos}ms newPos=${Math.round(newTicks / 10000)}ms`,
+    `[trimIntro] show=${showName} trimPos=${trimPos}ms newPos=${Math.round(newTicks / 10000)}ms device=${deviceName}`,
   );
   const seekRes = await fetch(
     `${EMBY_BASE_URL}/Sessions/${session.Id}/Playing/seek?SeekPositionTicks=${newTicks}&api_key=${EMBY_API_KEY}`,
@@ -5697,6 +5697,7 @@ async function doTrimIntro(deviceName = "Living Room TV") {
     console.log(`[trimIntro] seek failed: ${seekRes.status}`);
     return { ok: false, error: `seek ${seekRes.status}` };
   }
+  console.log(`[trimIntro] seek successful for ${showName}`);
   return { ok: true };
 }
 
@@ -5983,7 +5984,7 @@ app.post("/internal/nowPlaying", (req, res) => {
         doTrimIntro(null).catch((e) =>
           console.error("[autoTrim] error:", e.message),
         );
-      }, 2000);
+      }, 4000);
     }
   }
   if (!isNowPlaying) lastAutoSkipKey = null;

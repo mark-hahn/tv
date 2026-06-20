@@ -1433,10 +1433,13 @@ export const startStop = async (show, episodeId, watchButtonTxt) => {
           try {
             const trimRes = await srvr.trimIntro(deviceName);
             console.log(`[startStop] trim intro result:`, trimRes);
+            if (!trimRes?.ok) {
+              console.warn(`[startStop] trim failed:`, trimRes);
+            }
           } catch (e) {
             console.error(`[startStop] trim intro error:`, e);
           }
-        }, 2500);
+        }, 4000);
       }
 
       return;

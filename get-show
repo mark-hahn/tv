@@ -1,0 +1,59 @@
+#!/bin/bash
+
+# Get tvdb record for a show from server and append to temp.json
+show_name="$*"
+
+if [ -z "$show_name" ]; then
+  echo "Usage: $0 <show name>"
+  exit 1
+fi
+
+# Initialize temp.json if it doesn't exist or is empty
+if [ ! -f temp.json ] || [ ! -s temp.json ]; then
+  echo "{}" > temp.json
+fi
+
+# Fetch show from server and merge into temp.json
+ssh hahnca.com "cd /root/dev/apps/tv && node -e \"
+const fs = require('fs');
+const path = require('path');
+const tvdbPath = path.join('apps', 'srvr', 'data', 'tvdb.json');
+const tvdb = JSON.parse(fs.readFileSync(tvdbPath, 'utf8'));
+const showName = process.argv[1];
+const show = tvdb[showName];
+if (show) {
+  console.log(JSON.stringify(show));
+} else {
+  process.stderr.write('Show not found: ' + showName + '\\n');
+  process.exit(1);
+}\" \"$show_name\"" > /tmp/show-record.json
+
+if [ $? -eq 0 ]; then
+  # Merge the show into temp.json with proper formatting
+  node -e "
+const fs = require('fs');
+const temp = JSON.parse(fs.readFileSync('temp.json', 'utf8'));
+const show = JSON.parse(fs.readFileSync('/tmp/show-record.json', 'utf8'));
+const showName = process.argv[1];
+temp[showName] = show;
+
+// Format with 6 blank lines between entries
+const entries = Object.entries(temp);
+const lines = ['{'];
+entries.forEach(([key, value], idx) => {
+  const showJson = JSON.stringify(value, null, 2);
+  const indented = showJson.split('\\n').map(line => '  ' + line).join('\\n');
+  lines.push('  ' + JSON.stringify(key) + ': ' + indented.substring(2) + (idx < entries.length - 1 ? ',' : ''));
+  if (idx < entries.length - 1) {
+    lines.push('', '', '', '', '', '');
+  }
+});
+lines.push('}');
+fs.writeFileSync('temp.json', lines.join('\\n'));
+console.log('Added show to temp.json');
+" "$show_name"
+  rm -f /tmp/show-record.json
+else
+  echo "Failed to fetch show '$show_name'"
+  exit 1
+fi

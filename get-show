@@ -35,7 +35,19 @@ const fs = require('fs');
 const temp = JSON.parse(fs.readFileSync('temp.json', 'utf8'));
 const show = JSON.parse(fs.readFileSync('/tmp/show-record.json', 'utf8'));
 const showName = process.argv[1];
-temp[showName] = show;
+
+// Sort properties alphabetically
+const sortObject = (obj) => {
+  if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) {
+    return obj;
+  }
+  return Object.keys(obj).sort().reduce((sorted, key) => {
+    sorted[key] = obj[key];
+    return sorted;
+  }, {});
+};
+
+temp[showName] = sortObject(show);
 
 // Format with 6 blank lines between entries
 const entries = Object.entries(temp);

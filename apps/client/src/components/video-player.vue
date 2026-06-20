@@ -271,11 +271,12 @@
             white-space: nowrap;
             flex-shrink: 0;
             width: 74px;
+            min-width: 74px;
             text-align: center;
             margin-right: 6px;
           "
         >
-          {{ trimPosLabel }}
+          {{ trimPosLabel || "\u00a0" }}
         </div>
         <div
           @click.stop="clickTrimJump"
@@ -345,12 +346,13 @@
             white-space: nowrap;
             flex-shrink: 0;
             width: 74px;
+            min-width: 74px;
             text-align: center;
             margin-right: 6px;
           "
           :style="{ color: startMark < 2000 ? 'yellow' : 'white' }"
         >
-          {{ startMarkLabel }}
+          {{ startMarkLabel || "\u00a0" }}
         </div>
         <div
           @click.stop="clickSkipSet"
@@ -366,11 +368,12 @@
             white-space: nowrap;
             flex-shrink: 0;
             width: 74px;
+            min-width: 74px;
             text-align: center;
             margin-right: 6px;
           "
         >
-          {{ skipDurLabel }}
+          {{ skipDurLabel || "\u00a0" }}
         </div>
         <div
           @click.stop="clickSkipTest"
@@ -1502,12 +1505,12 @@ export default {
       this._persistField("skipDur", this.skipDur);
     },
     clickSkipTest() {
-      // Seek past the intro: startMark + skipDur
+      // Seek ahead by skipDur from current video position
       if (this.waitingForVideo) this._exitWaitingForVideo();
       const vid = this.$refs.vid;
       if (!vid || !this.skipDur) return;
       this._cancelSeek();
-      this._seekWithConfirm((this.startMark + this.skipDur) / 1000);
+      this._seekWithConfirm(vid.currentTime + this.skipDur / 1000);
     },
     clickSkipClr() {
       // >0 -> 0, null -> 0, 0 -> null

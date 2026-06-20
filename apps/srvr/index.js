@@ -2599,9 +2599,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         Number(tvdbRecord.episodeCount ?? 0) >
           Number(tvdbRecord.watchedCount ?? 0) &&
         Array.isArray(tvdbRecord.filesOnDisk) &&
-        tvdbRecord.filesOnDisk.some(
-          (row) => Array.isArray(row) && row.length > 1,
-        )
+        tvdbRecord.filesOnDisk.length > 0
       );
       if (!!tvdbRecord.needsIntro !== newNeedsIntro) {
         gapChanges.push(

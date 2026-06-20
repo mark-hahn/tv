@@ -1000,6 +1000,8 @@ export default {
   },
   methods: {
     handleVideoPlayerClose() {
+      const closingIntro = this.videoPlayerMode === "intro";
+      const introShow = this.videoPlayerIntroShow;
       this.videoPlayerPath = null;
       this.videoPlayerMode = null;
       this.videoPlayerIntroShow = null;
@@ -1008,6 +1010,27 @@ export default {
       this.videoPlayerMapEpisode = null;
       evtBus.emit("introPaneClosed");
       this.fetchChksrtCount();
+      if (closingIntro && introShow) {
+        const configured =
+          introShow.trimPos != null || introShow.skipDur != null;
+        if (configured) {
+          introShow.needsIntro = false;
+        } else {
+          const hasFiles =
+            Array.isArray(introShow.filesOnDisk) &&
+            introShow.filesOnDisk.length > 0;
+          const hasUnwatched =
+            Number(introShow.episodeCount ?? 0) >
+            Number(introShow.watchedCount ?? 0);
+          introShow.needsIntro = !!(
+            introShow.inEmby &&
+            !introShow.inLinda &&
+            hasFiles &&
+            hasUnwatched
+          );
+        }
+        this.introCount = this.allShows.filter((s) => s.needsIntro).length;
+      }
     },
     async handleChksrtNext() {
       try {

@@ -1439,7 +1439,7 @@ export const startStop = async (show, episodeId, watchButtonTxt) => {
           } catch (e) {
             console.error(`[startStop] trim intro error:`, e);
           }
-        }, 4000);
+        }, 2500);
       }
 
       return;

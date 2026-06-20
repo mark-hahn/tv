@@ -332,9 +332,9 @@ export function parseFileSeasonEpisode(
     }
   }
 
-  // Step 4b: NxN format at start of filename (e.g. "1x1 - Title.avi", "2x03 - Episode.avi")
+  // Step 4b: NxN format (e.g. "1x1 - Title.avi", "Show - 2x03 - Title.avi")
   if (!Number.isInteger(season) || !Number.isInteger(episode)) {
-    const m = fname.match(/^(\d{1,2})x(\d{1,2})(?:\b|[-_ ])/i);
+    const m = fname.match(/(?:^|[-_. ])(\d{1,2})x(\d{1,2})(?:\b|[-_ ])/i);
     if (m) {
       season = parseInt(m[1], 10);
       episode = parseInt(m[2], 10);

@@ -1743,6 +1743,11 @@ export default {
       });
     };
     evtBus.on("paneChanged", this._onPaneChanged);
+
+    this._onInfoDelKey = () => {
+      if (this.show && !this.previewMode) this.deleteClick();
+    };
+    evtBus.on("infoDelKey", this._onInfoDelKey);
   },
 
   beforeUnmount() {
@@ -1758,6 +1763,7 @@ export default {
       evtBus.off("showQueueEmpty", this.onShowQueueEmpty);
     evtBus.off("localFoldersChanged", this.recheckTwoLocalFolders);
     if (this._onPaneChanged) evtBus.off("paneChanged", this._onPaneChanged);
+    if (this._onInfoDelKey) evtBus.off("infoDelKey", this._onInfoDelKey);
   },
 };
 </script>

@@ -993,6 +993,7 @@ export default {
     evtBus.off("selectMapEpisode");
     if (this._onAppWindowResize)
       window.removeEventListener("resize", this._onAppWindowResize);
+    if (this._onDelKey) window.removeEventListener("keydown", this._onDelKey);
     this.stopQbtPolling();
     this.cancelDownInactiveTimer();
     this.stopChksrtPolling();
@@ -2080,6 +2081,23 @@ export default {
     };
     window.addEventListener("resize", this._onAppWindowResize);
     this._onAppWindowResize();
+
+    this._onDelKey = (e) => {
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea") return;
+      if (document.activeElement?.isContentEditable) return;
+      if (this.currentPane === "map") {
+        this.$refs.mapComp?.handleSelectedDelete();
+      } else if (this.currentPane === "info") {
+        evtBus.emit("infoDelKey");
+      } else if (this.currentPane === "down") {
+        evtBus.emit("downDelKey");
+      } else if (this.currentPane === "local") {
+        evtBus.emit("localDelKey");
+      }
+    };
+    window.addEventListener("keydown", this._onDelKey);
 
     this.loadSplitPrefs();
     this.$nextTick(() => {

@@ -740,6 +740,11 @@ export default {
     evtBus.on("paneChanged", this.onPaneChanged);
     evtBus.on("cycle-started", this.handleCycleStarted);
 
+    this._onDownDelKey = () => {
+      if (this.selectedItems.size > 0) this.downDelClick();
+    };
+    evtBus.on("downDelKey", this._onDownDelKey);
+
     // Start polling at boot so data is always fresh.
     this._polling = true;
     void this.loadTvproc();
@@ -749,6 +754,7 @@ export default {
   unmounted() {
     evtBus.off("paneChanged", this.onPaneChanged);
     evtBus.off("cycle-started", this.handleCycleStarted);
+    if (this._onDownDelKey) evtBus.off("downDelKey", this._onDownDelKey);
     this.stopPolling();
     this.stopMoviePoll();
     this.items = [];

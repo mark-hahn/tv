@@ -1423,6 +1423,12 @@ export default {
     evtBus.off("subs-progress", this.onSubsProgress);
     evtBus.on("subs-progress", this.onSubsProgress);
     this.initAsrState();
+
+    this._onLocalDelKey = () => {
+      if (!this.loading && (this.selectedName || this.selectedFiles.size > 0))
+        this.deleteSelected();
+    };
+    evtBus.on("localDelKey", this._onLocalDelKey);
   },
   unmounted() {
     evtBus.off("asr-log", this.onAsrLog);
@@ -1430,6 +1436,7 @@ export default {
     evtBus.off("fix-log", this.onFixLog);
     evtBus.off("emb-log", this.onEmbLog);
     evtBus.off("subs-progress", this.onSubsProgress);
+    if (this._onLocalDelKey) evtBus.off("localDelKey", this._onLocalDelKey);
   },
   computed: {
     sortedAsrQueue() {

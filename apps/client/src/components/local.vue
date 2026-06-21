@@ -89,7 +89,7 @@
                 color: errsMode ? '#aaa' : 'inherit',
               }"
             >
-              Emb
+              EmbSub
             </button>
 
             <button
@@ -108,7 +108,7 @@
                 color: errsMode ? '#aaa' : 'inherit',
               }"
             >
-              Open
+              OpnSub
             </button>
 
             <button
@@ -395,7 +395,7 @@
                 color: errsMode ? '#aaa' : 'inherit',
               }"
             >
-              Emb
+              EmbSub
             </button>
 
             <button
@@ -414,7 +414,7 @@
                 color: errsMode ? '#aaa' : 'inherit',
               }"
             >
-              Open
+              OpnSub
             </button>
 
             <button

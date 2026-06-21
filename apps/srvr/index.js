@@ -3743,8 +3743,54 @@ app.post(
     if (!rec?.id)
       return { success: false, error: "Show not found or no Emby id" };
     try {
-      const seriesMap = await emby.getSeriesMap({ id: rec.id });
-      return { success: true, seriesMap: seriesMap ?? [] };
+      let seriesMap = await emby.getSeriesMap({ id: rec.id });
+      seriesMap = seriesMap ?? [];
+
+      // Backfill partial seasons from TVDB for still-airing shows.
+      // Emby omits future unaired episodes from its episode list, so without
+      // this those cells would render blank instead of "u" in the map.
+      if (!rec.ended && rec.tvdbId) {
+        try {
+          const tvdbSeriesMap = await tvdb.getSeriesMap(
+            rec.tvdbId,
+            rec.watchedEpis || null,
+          );
+          if (Array.isArray(tvdbSeriesMap)) {
+            const fallbackMap = new Map(tvdbSeriesMap.map((s) => [s[0], s[1]]));
+            for (let i = 0; i < seriesMap.length; i++) {
+              const [seasonNum, episodes] = seriesMap[i];
+              const tvdbEpisodes = fallbackMap.get(seasonNum);
+              if (!Array.isArray(tvdbEpisodes) || tvdbEpisodes.length === 0)
+                continue;
+              if (episodes.length === 0) {
+                seriesMap[i] = [seasonNum, tvdbEpisodes];
+                continue;
+              }
+              const haveEpNums = new Set(episodes.map(([epNum]) => epNum));
+              let added = false;
+              for (const [epNum, tvdbEpi] of tvdbEpisodes) {
+                if (haveEpNums.has(epNum)) continue;
+                episodes.push([
+                  epNum,
+                  { ...tvdbEpi, avail: false, noFile: true, path: null },
+                ]);
+                added = true;
+              }
+              if (added) {
+                episodes.sort((a, b) => a[0] - b[0]);
+                seriesMap[i] = [seasonNum, episodes];
+              }
+            }
+          }
+        } catch (backfillErr) {
+          console.warn(
+            "[getSeriesMapFromEmby] TVDB backfill failed:",
+            backfillErr?.message,
+          );
+        }
+      }
+
+      return { success: true, seriesMap };
     } catch (err) {
       console.error("[getSeriesMapFromEmby] error:", err);
       return { success: false, error: err.message };

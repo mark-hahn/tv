@@ -1522,6 +1522,7 @@ export default function App() {
         const key = `S${String(s).padStart(2, "0")}E${String(ep).padStart(2, "0")}`;
         return w + qualityChar(fq[key]);
       }
+      if (cell.unaired) return "U";
       return w + "-";
     };
 

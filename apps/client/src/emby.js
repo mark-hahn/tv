@@ -1186,9 +1186,13 @@ export const getSeriesMap = async (show, prune = false) => {
     });
   }
 
-  // Emby can return empty seasons for some shows even when TVDB has episodes.
-  // Backfill only those empty seasons from TVDB so map cells render as missing files.
-  if (emptySeasons.length > 0) {
+  // Emby can return empty seasons, or partially-populated seasons (e.g. an
+  // airing show whose future unaired episodes Emby hasn't created yet).
+  // Backfill from TVDB so missing episodes render correctly: aired-but-absent
+  // episodes show as missing files ("-") and unaired episodes show "u".
+  // Partial-season backfill only matters for shows that are still airing.
+  const needPartialBackfill = !show?.ended;
+  if (emptySeasons.length > 0 || needPartialBackfill) {
     const tvdbId = show?.tvdbId;
     if (tvdbId) {
       try {
@@ -1205,23 +1209,42 @@ export const getSeriesMap = async (show, prune = false) => {
         );
         for (let i = 0; i < seriesMap.length; i++) {
           const [seasonNum, episodes] = seriesMap[i];
-          if (episodes.length > 0) continue;
           const tvdbEpisodes = fallbackMap.get(seasonNum);
-          if (Array.isArray(tvdbEpisodes) && tvdbEpisodes.length > 0) {
+          if (!Array.isArray(tvdbEpisodes) || tvdbEpisodes.length === 0) {
+            continue;
+          }
+          if (episodes.length === 0) {
+            // Whole season missing in Emby: use TVDB episodes as-is.
             seriesMap[i] = [seasonNum, tvdbEpisodes];
+            continue;
+          }
+          // Partial season: append episodes TVDB knows about but Emby never
+          // returned. Emby has no file for an episode it didn't return, so
+          // force avail/noFile to reflect "no file"; keep unaired from TVDB so
+          // future episodes render "u" instead of blank.
+          const haveEpNums = new Set(episodes.map(([epNum]) => epNum));
+          let added = false;
+          for (const [epNum, tvdbEpi] of tvdbEpisodes) {
+            if (haveEpNums.has(epNum)) continue;
+            episodes.push([
+              epNum,
+              { ...tvdbEpi, avail: false, noFile: true, path: null },
+            ]);
+            added = true;
+          }
+          if (added) {
+            episodes.sort((a, b) => a[0] - b[0]);
+            seriesMap[i] = [seasonNum, episodes];
           }
         }
       } catch (err) {
-        console.warn(
-          "[map-debug] failed TVDB fallback for empty Emby seasons",
-          {
-            show: show?.name,
-            showId: seriesId,
-            tvdbId,
-            emptySeasons,
-            error: err?.message || String(err),
-          },
-        );
+        console.warn("[map-debug] failed TVDB backfill for Emby seasons", {
+          show: show?.name,
+          showId: seriesId,
+          tvdbId,
+          emptySeasons,
+          error: err?.message || String(err),
+        });
       }
     }
 

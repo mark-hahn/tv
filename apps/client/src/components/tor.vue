@@ -1882,6 +1882,15 @@ export default {
       this.currentShow = show || null;
       this.showName = show?.name || "";
       this.lastAutoSearchedShowId = show?.id || show?.name || null;
+
+      // Auto-search when show is set with empty card list
+      if (
+        this.filteredTorrents.length === 0 &&
+        !this.loading &&
+        this.currentShow
+      ) {
+        void this.handleSearchButtonClick();
+      }
     },
 
     onPaneChanged(pane) {
@@ -1891,13 +1900,16 @@ export default {
         void this.refreshBadGroups().catch(() => {});
 
         // Auto-search when tor pane is selected with empty card list and no search in progress
-        if (
-          this.filteredTorrents.length === 0 &&
-          !this.loading &&
-          this.currentShow
-        ) {
-          void this.handleSearchButtonClick();
-        }
+        // Use $nextTick to ensure currentShow is set (in case setTorShow is called after paneChanged)
+        this.$nextTick(() => {
+          if (
+            this.filteredTorrents.length === 0 &&
+            !this.loading &&
+            this.currentShow
+          ) {
+            void this.handleSearchButtonClick();
+          }
+        });
       }
     },
 

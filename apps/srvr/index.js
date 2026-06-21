@@ -2194,7 +2194,7 @@ function getOpnSidecarPath(videoFilePath, fileId) {
   return `${base}.${tag}.srt`;
 }
 
-function hasSrtSidecar(videoFilePath) {
+function hasOpnSidecar(videoFilePath) {
   const base = videoFilePath.replace(/\.[^.]+$/, "");
   const dir = path.dirname(videoFilePath);
   const basename = path.basename(base);
@@ -2206,8 +2206,8 @@ function hasSrtSidecar(videoFilePath) {
   }
   return dirEntries.some(
     (entry) =>
-      entry === basename + ".mb.chosen" ||
-      (entry.startsWith(basename + ".") && entry.endsWith(".srt")),
+      entry.startsWith(basename) &&
+      /^\.opn[A-Z2-7]{5}\.srt$/i.test(entry.slice(basename.length)),
   );
 }
 
@@ -2221,7 +2221,7 @@ async function tryDownloadOpnSrtForVideo({
 }) {
   if (!tvdbRecord.inEmby || !tvdbRecord.imdbId) return { attempted: false };
   if (!fs.existsSync(videoFilePath)) return { attempted: false, missing: true };
-  if (hasSrtSidecar(videoFilePath)) {
+  if (hasOpnSidecar(videoFilePath)) {
     return { attempted: true, downloaded: false, alreadyPresent: true };
   }
 
@@ -2366,7 +2366,7 @@ async function checkAndDownloadOpnSrt(showName, tvdbRecord) {
       if (!airedStr) continue;
       const airedMs = new Date(airedStr).getTime();
       if (isNaN(airedMs) || airedMs < oneYearAgo || airedMs > now) continue;
-      if (hasSrtSidecar(fp)) continue;
+      if (hasOpnSidecar(fp)) continue;
 
       const histKey = `${showName}|||${key}`;
       const lastCheck = opnCheckHistory[histKey];

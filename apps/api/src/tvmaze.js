@@ -1089,9 +1089,18 @@ export function markShowBrowsed(tvmazeId) {
 
 export function unmarkShowBrowsed(tvdbId) {
   if (!_db) openDb();
-  _db
+  const numId = Number(tvdbId);
+  const result = _db
     .prepare("UPDATE shows SET browsed = 0 WHERE tvdb_id = ?")
-    .run(Number(tvdbId));
+    .run(numId);
+  // Fallback: tvdb_id column may be NULL/stale — also check data_json externals
+  if (result.changes === 0 && numId > 0) {
+    _db
+      .prepare(
+        "UPDATE shows SET browsed = 0 WHERE CAST(json_extract(data_json, '$.externals.thetvdb') AS INTEGER) = ?",
+      )
+      .run(numId);
+  }
 }
 
 export function getTvmazeIdByTvdbId(tvdbId) {

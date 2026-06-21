@@ -1033,12 +1033,8 @@ async function fileNeedsSubChecked(videoFilePath, showName) {
   if (
     entries.some(
       (f) =>
-        f === basename + ".asr.srt" ||
         f === basename + ".mb.chosen" ||
-        (f.startsWith(basename) &&
-          /^\.(mb\d+|opn[A-Z2-7]{5})\.srt$/i.test(f.slice(basename.length))) ||
-        (f.startsWith(basename) &&
-          /^\.(#[A-Z2-7]+)\.srt$/.test(f.slice(basename.length))),
+        (f.startsWith(basename + ".") && f.endsWith(".srt")),
     )
   )
     return false;
@@ -1503,12 +1499,8 @@ async function processSubQueueEntry() {
     }
     const hasSidecar = dirEntries.some(
       (f) =>
-        f === basename + ".asr.srt" ||
         f === basename + ".mb.chosen" ||
-        (f.startsWith(basename) &&
-          /^\.(mb\d+|opn[A-Z2-7]{5})\.srt$/i.test(f.slice(basename.length))) ||
-        (f.startsWith(basename) &&
-          /^\.(#[A-Z2-7]+)\.srt$/.test(f.slice(basename.length))),
+        (f.startsWith(basename + ".") && f.endsWith(".srt")),
     );
     if (!hasSidecar && !pgsOnly && !hasEmbText) {
       addToAsrQueue([
@@ -2202,7 +2194,7 @@ function getOpnSidecarPath(videoFilePath, fileId) {
   return `${base}.${tag}.srt`;
 }
 
-function hasOpnSidecar(videoFilePath) {
+function hasSrtSidecar(videoFilePath) {
   const base = videoFilePath.replace(/\.[^.]+$/, "");
   const dir = path.dirname(videoFilePath);
   const basename = path.basename(base);
@@ -2214,8 +2206,8 @@ function hasOpnSidecar(videoFilePath) {
   }
   return dirEntries.some(
     (entry) =>
-      entry.startsWith(basename) &&
-      /^\.opn[A-Z2-7]{5}\.srt$/i.test(entry.slice(basename.length)),
+      entry === basename + ".mb.chosen" ||
+      (entry.startsWith(basename + ".") && entry.endsWith(".srt")),
   );
 }
 
@@ -2229,7 +2221,7 @@ async function tryDownloadOpnSrtForVideo({
 }) {
   if (!tvdbRecord.inEmby || !tvdbRecord.imdbId) return { attempted: false };
   if (!fs.existsSync(videoFilePath)) return { attempted: false, missing: true };
-  if (hasOpnSidecar(videoFilePath)) {
+  if (hasSrtSidecar(videoFilePath)) {
     return { attempted: true, downloaded: false, alreadyPresent: true };
   }
 
@@ -2374,7 +2366,7 @@ async function checkAndDownloadOpnSrt(showName, tvdbRecord) {
       if (!airedStr) continue;
       const airedMs = new Date(airedStr).getTime();
       if (isNaN(airedMs) || airedMs < oneYearAgo || airedMs > now) continue;
-      if (hasOpnSidecar(fp)) continue;
+      if (hasSrtSidecar(fp)) continue;
 
       const histKey = `${showName}|||${key}`;
       const lastCheck = opnCheckHistory[histKey];
@@ -5403,12 +5395,7 @@ app.post("/api/asr/chksrt/select", (req, res) => {
     if (f.endsWith(".chosen")) continue;
     const full = path.join(dir, f);
     if (full === selectedSrtPath) continue;
-    if (
-      f.startsWith(basename + ".mb") ||
-      f.startsWith(basename + ".opn") ||
-      f === basename + ".asr.srt" ||
-      f.startsWith(basename + ".#")
-    ) {
+    if (f.startsWith(basename + ".")) {
       try {
         fs.unlinkSync(full);
       } catch {}

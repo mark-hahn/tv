@@ -1889,6 +1889,15 @@ export default {
         // Keep space info fresh whenever Tor pane is shown.
         void this.updateSpaceAvail();
         void this.refreshBadGroups().catch(() => {});
+
+        // Auto-search when tor pane is selected with empty card list and no search in progress
+        if (
+          this.filteredTorrents.length === 0 &&
+          !this.loading &&
+          this.currentShow
+        ) {
+          void this.handleSearchButtonClick();
+        }
       }
     },
 

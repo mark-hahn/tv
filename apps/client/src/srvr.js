@@ -602,6 +602,14 @@ export function introFirstFile(showName) {
   );
 }
 
+export function hasBif(videoPath) {
+  return httpCall(
+    `/api/hasBif?path=${encodeURIComponent(videoPath)}`,
+    null,
+    "GET",
+  );
+}
+
 export function introNextFile(showName, season, episode) {
   return httpCall(
     `/api/introNextFile?showName=${encodeURIComponent(showName)}&season=${season}&episode=${episode}`,

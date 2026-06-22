@@ -5568,6 +5568,30 @@ app.get("/api/introFirstFile", async (req, res) => {
   }
 });
 
+// Check whether a video file has a BIF trickplay sidecar (name-320-10.bif).
+app.get("/api/hasBif", async (req, res) => {
+  const videoPath = req.query.path;
+  if (!videoPath) {
+    res.status(400).json({ ok: false, error: "path required" });
+    return;
+  }
+  try {
+    const parsed = path.parse(videoPath);
+    const bifPath = path.join(parsed.dir, `${parsed.name}-320-10.bif`);
+    let hasBif = false;
+    try {
+      await fsp.access(bifPath);
+      hasBif = true;
+    } catch {
+      hasBif = false;
+    }
+    res.json({ ok: true, hasBif });
+  } catch (err) {
+    console.error("[hasBif] error:", err.message);
+    res.json({ ok: false, error: err.message });
+  }
+});
+
 app.get("/api/introNextFile", async (req, res) => {
   const showName = req.query.showName;
   const currentSeason = parseInt(req.query.season, 10);

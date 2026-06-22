@@ -1138,14 +1138,34 @@ export default {
       }
     },
 
-    async handleOpenIntro({ show, embyId }) {
-      // Intro editing now happens in the Emby web tab (emby-ui.user.js overlay).
-      if (!embyId) {
-        console.error("[intro] no Emby item id for", show?.name);
-        window.alert("No Emby episode found for Intro.");
+    async handleOpenIntro({ show, path, source, season, episode, embyId }) {
+      // If the video file has a .bif trickplay sidecar, edit intro in the Emby
+      // web tab (emby-ui.user.js overlay). Otherwise fall back to the built-in
+      // intro video pane.
+      let hasBif = false;
+      if (path) {
+        try {
+          const res = await srvr.hasBif(path);
+          hasBif = !!res?.hasBif;
+        } catch (e) {
+          console.error("[intro] hasBif check failed:", e);
+        }
+      }
+      if (hasBif) {
+        if (!embyId) {
+          console.error("[intro] no Emby item id for", show?.name);
+          window.alert("No Emby episode found for Intro.");
+          return;
+        }
+        util.openExternalPage(urls.embyPageUrl(embyId, "intro"));
         return;
       }
-      util.openExternalPage(urls.embyPageUrl(embyId, "intro"));
+      this.videoPlayerIntroShow = show;
+      this.videoPlayerPath = path;
+      this.videoPlayerMode = "intro";
+      this.videoPlayerSource = source || "info";
+      this.videoPlayerMapSeason = season != null ? season : null;
+      this.videoPlayerMapEpisode = episode != null ? episode : null;
     },
 
     async handleIntroNext(payload) {

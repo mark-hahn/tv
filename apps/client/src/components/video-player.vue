@@ -222,6 +222,24 @@
           &lt;
         </div>
         <div
+          @click.stop="clickNavBack3"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(0, 0, 0, 0.5);
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 6px;
+          "
+        >
+          &minus;
+        </div>
+        <div
           @click.stop="clickNavFwd10"
           style="
             color: white;
@@ -1443,6 +1461,12 @@ export default {
       this._cancelSeek();
       const vid = this.$refs.vid;
       if (vid) vid.currentTime = Math.max(0, vid.currentTime - 10);
+    },
+    clickNavBack3() {
+      if (this.waitingForVideo) this._exitWaitingForVideo();
+      this._cancelSeek();
+      const vid = this.$refs.vid;
+      if (vid) vid.currentTime = Math.max(0, vid.currentTime - 3);
     },
     clickNavFwd10() {
       if (this.waitingForVideo) this._exitWaitingForVideo();

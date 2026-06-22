@@ -60,10 +60,10 @@ export function deleteShowUrl(cred, id) {
   `.replace(/\s*/g, "");
 }
 
-export function embyPageUrl(id) {
-  return `https://hahnca.com:8920 / web / index.html #! / item
-    ?id=${id}&serverId=ae3349983dbe45d9aa1d317a7753483e
-  `.replace(/\s*/g, "");
+export function embyPageUrl(id, uiId) {
+  const base = "https://hahnca.com:8920/web/index.html";
+  const query = uiId ? `?tvui=${uiId}` : "";
+  return `${base}${query}#!/item?id=${id}&serverId=ae3349983dbe45d9aa1d317a7753483e`;
 }
 
 export function collectionListUrl(cred, collId) {

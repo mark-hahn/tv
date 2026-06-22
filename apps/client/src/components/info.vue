@@ -706,6 +706,7 @@ export default {
           source: "info",
           season: result.season,
           episode: result.episode,
+          embyId: result.id,
         });
       } catch (e) {
         console.error("introClick error:", e);

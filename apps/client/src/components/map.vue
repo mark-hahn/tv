@@ -1901,7 +1901,8 @@ export default {
       if (this.selectedCells.size === 0) return;
       const firstKey = Array.from(this.selectedCells)[0];
       const { season, episode } = this.parseCellKey(firstKey);
-      const path = this.seriesMap?.[season]?.[episode]?.path || null;
+      const cell = this.seriesMap?.[season]?.[episode];
+      const path = cell?.path || null;
       if (!path) return;
       this.$emit("open-intro", {
         show: this.mapShow,
@@ -1909,6 +1910,7 @@ export default {
         source: "map",
         season,
         episode,
+        embyId: cell?.id || null,
       });
     },
     handleMapChksrtClick() {

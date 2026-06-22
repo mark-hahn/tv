@@ -5530,6 +5530,7 @@ app.get("/api/introFirstFile", async (req, res) => {
     let fallbackPath = null;
     let fallbackSeason = null;
     let fallbackEpisode = null;
+    let fallbackId = null;
     for (const [season, episodes] of sorted) {
       const sortedEps = [...episodes].sort((a, b) => a[0] - b[0]);
       for (const [episode, ep] of sortedEps) {
@@ -5537,11 +5538,12 @@ app.get("/api/introFirstFile", async (req, res) => {
           fallbackPath = ep.path;
           fallbackSeason = season;
           fallbackEpisode = episode;
+          fallbackId = ep.id;
         }
         if (ep?.played) continue;
         hasUnwatchedEpisode = true;
         if (ep.path && !ep.noFile) {
-          res.json({ ok: true, path: ep.path, season, episode });
+          res.json({ ok: true, path: ep.path, season, episode, id: ep.id });
           return;
         }
       }
@@ -5552,6 +5554,7 @@ app.get("/api/introFirstFile", async (req, res) => {
         path: fallbackPath,
         season: fallbackSeason,
         episode: fallbackEpisode,
+        id: fallbackId,
       });
       return;
     }
@@ -5603,7 +5606,7 @@ app.get("/api/introNextFile", async (req, res) => {
           continue;
         }
         if (ep?.path && !ep?.noFile) {
-          res.json({ ok: true, path: ep.path, season, episode });
+          res.json({ ok: true, path: ep.path, season, episode, id: ep.id });
           return;
         }
       }
@@ -5743,6 +5746,199 @@ app.post("/api/trimIntro", async (req, res) => {
     res.json({ ok: false, error: err.message });
   }
 });
+
+//////////  EMBY WEB INTRO OVERLAY (tampermonkey emby-ui.user.js)  //////////
+// The intro UI lives on the Emby web page; this thin overlay sends button
+// presses over the WebSocket and the server does all logic + Emby control.
+
+// Format ms as the intro pane does: "m:ss.t" / "s.t"; 0 -> "--"; null -> ""
+function fmtIntroPos(ms) {
+  if (ms == null) return "";
+  if (ms === 0) return "--";
+  const totalSec = ms / 1000;
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec - min * 60;
+  const tenth = Math.floor((sec % 1) * 10);
+  const wholeSec = Math.floor(sec);
+  if (min > 0) return `${min}:${String(wholeSec).padStart(2, "0")}.${tenth}`;
+  return `${wholeSec}.${tenth}`;
+}
+
+function pushEmbyText(ws, textId, text) {
+  if (!ws || ws.readyState !== 1) return;
+  try {
+    ws.send(
+      JSON.stringify({
+        id: 0,
+        notification: "embyText",
+        data: { textId, text: text == null ? "" : String(text) },
+      }),
+    );
+  } catch (e) {
+    console.error("[embyText] send error:", e.message);
+  }
+}
+
+function introTitleText(record, showName, season, episode) {
+  const name = record?.name || showName || "";
+  let se = "";
+  if (season != null && episode != null) {
+    se = ` (s${String(season).padStart(2, "0")}e${String(episode).padStart(2, "0")})`;
+  }
+  const all = tvdb.getAllTvdbSync?.() || {};
+  const introCount = Object.values(all).filter((r) => r?.needsIntro).length;
+  const prefix = introCount > 0 ? `(${introCount}) ` : "";
+  return `${prefix}${name}${se}`;
+}
+
+function pushIntroState(ws, record, showName, season, episode) {
+  pushEmbyText(ws, "title", introTitleText(record, showName, season, episode));
+  pushEmbyText(ws, "startMark", fmtIntroPos(record?.startMark ?? 0));
+  pushEmbyText(ws, "trim", fmtIntroPos(record?.trimPos ?? null));
+  pushEmbyText(ws, "skip", fmtIntroPos(record?.skipDur ?? null));
+  pushEmbyText(ws, "ant", record?.anticipating ? "ANT" : "Ant");
+}
+
+async function embySeekTicks(sessionId, ticks, runtimeTicks) {
+  let t = Math.max(0, Math.round(ticks));
+  if (runtimeTicks && t > runtimeTicks) t = runtimeTicks; // past end -> seek to end
+  const res = await fetch(
+    `${EMBY_BASE_URL}/Sessions/${sessionId}/Playing/seek?SeekPositionTicks=${t}&api_key=${EMBY_API_KEY}`,
+    { method: "POST", headers: { Accept: "application/json" } },
+  );
+  if (!res.ok) console.log(`[embyUi] seek failed: ${res.status}`);
+}
+
+// Find the playing session + tvdb record for a device name
+async function getEmbyIntroContext(deviceName) {
+  if (!deviceName) return null;
+  const sessRes = await fetch(
+    `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
+    { headers: { Accept: "application/json" } },
+  );
+  if (!sessRes.ok) return null;
+  const sessions = await sessRes.json();
+  const session = sessions.find(
+    (s) => s.NowPlayingItem && s.DeviceName === deviceName,
+  );
+  if (!session) return null;
+  const showName =
+    session.NowPlayingItem.SeriesName || session.NowPlayingItem.Name;
+  const allTvdb = tvdb.getAllTvdbSync();
+  const showId = session.NowPlayingItem.SeriesId || session.NowPlayingItem.Id;
+  let record = allTvdb[showName];
+  if (!record) record = Object.values(allTvdb).find((r) => r.id === showId);
+  return {
+    session,
+    record,
+    showName,
+    season: session.NowPlayingItem.ParentIndexNumber ?? null,
+    episode: session.NowPlayingItem.IndexNumber ?? null,
+  };
+}
+
+// Seed intro labels from the emby item id (before playback starts)
+async function pushIntroStateFromItem(ws, embyItemId) {
+  if (!embyItemId) return;
+  try {
+    const res = await fetch(
+      `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${embyItemId}?api_key=${EMBY_API_KEY}`,
+      { headers: { Accept: "application/json" } },
+    );
+    if (!res.ok) return;
+    const item = await res.json();
+    const showName = item.SeriesName || item.Name;
+    const allTvdb = tvdb.getAllTvdbSync();
+    const showId = item.SeriesId || item.Id;
+    let record = allTvdb[showName];
+    if (!record) record = Object.values(allTvdb).find((r) => r.id === showId);
+    pushIntroState(
+      ws,
+      record,
+      showName,
+      item.ParentIndexNumber ?? null,
+      item.IndexNumber ?? null,
+    );
+  } catch (e) {
+    console.error("[embyUi] seed error:", e.message);
+  }
+}
+
+async function handleEmbyIntroPress(ws, btnId, pressedAt) {
+  const ctx = await getEmbyIntroContext(ws._embyUi?.deviceName);
+  if (!ctx?.session) return; // nothing playing yet
+  const { session, record, showName, season, episode } = ctx;
+  const name = record?.name;
+  const rawPositionTicks = session.PlayState?.PositionTicks ?? 0;
+  const pressDelay = pressedAt ? Math.max(0, Date.now() - pressedAt) : 0;
+  const posTicks = Math.max(0, rawPositionTicks - pressDelay * 10000);
+  const posMs = Math.round(posTicks / 10000);
+  const runtime = session.NowPlayingItem?.RunTimeTicks ?? null;
+  const sid = session.Id;
+  const startMark = record?.startMark ?? 0;
+
+  switch (btnId) {
+    case "zero":
+      await embySeekTicks(sid, 0, runtime);
+      break;
+    case "back30":
+      await embySeekTicks(sid, posTicks - 30 * 1000 * 10000, runtime);
+      break;
+    case "back10":
+      await embySeekTicks(sid, posTicks - 10 * 1000 * 10000, runtime);
+      break;
+    case "fwd10":
+      await embySeekTicks(sid, posTicks + 10 * 1000 * 10000, runtime);
+      break;
+    case "fwd30":
+      await embySeekTicks(sid, posTicks + 30 * 1000 * 10000, runtime);
+      break;
+    case "pre":
+      await embySeekTicks(sid, (startMark - 3000) * 10000, runtime);
+      break;
+    case "trimJump":
+      if (record?.trimPos)
+        await embySeekTicks(sid, record.trimPos * 10000, runtime);
+      break;
+    case "skipTest":
+      if (record?.skipDur)
+        await embySeekTicks(sid, posTicks + record.skipDur * 10000, runtime);
+      break;
+    case "startMark":
+      if (name) await tvdb.setTvdbFields({ name, startMark: posMs });
+      break;
+    case "trimSet":
+      if (name) await tvdb.setTvdbFields({ name, trimPos: posMs });
+      break;
+    case "skipSet":
+      if (name && posMs >= startMark)
+        await tvdb.setTvdbFields({ name, skipDur: posMs - startMark });
+      break;
+    case "trimClr":
+      if (name)
+        await tvdb.setTvdbFields({
+          name,
+          trimPos: record?.trimPos === 0 ? null : 0,
+        });
+      break;
+    case "skipClr":
+      if (name)
+        await tvdb.setTvdbFields({
+          name,
+          skipDur: record?.skipDur === 0 ? null : 0,
+        });
+      break;
+    case "ant":
+      if (name)
+        await tvdb.setTvdbFields({ name, anticipating: !record?.anticipating });
+      break;
+    default:
+      return;
+  }
+  // setTvdbFields mutates allTvdb[name] in place; re-read for fresh labels
+  const fresh = (name && tvdb.getAllTvdbSync()?.[name]) || record;
+  pushIntroState(ws, fresh, showName, season, episode);
+}
 
 app.get("/api/introDur", async (req, res) => {
   try {
@@ -5999,6 +6195,16 @@ app.post("/internal/nowPlaying", (req, res) => {
   view.recordNowPlaying(lastNowPlayingShowName);
   res.json({ ok: true });
 
+  // Refresh intro-overlay labels for any intro UI tab whose device is now playing
+  for (const ws of connectedClients) {
+    const ui = ws._embyUi;
+    if (!ui || ui.uiId !== "intro" || ws.readyState !== 1) continue;
+    const item = lastNowPlayingList.find((p) => p.device === ui.deviceName);
+    if (!item) continue;
+    const record = tvdb.getAllTvdbSync()?.[item.showName];
+    pushIntroState(ws, record, item.showName, item.season, item.episode);
+  }
+
   // Auto-skip: detect not-playing -> playing from start
   const lrtv = lastNowPlayingList.find((p) => p.device === "Living Room TV");
   const isNowPlaying = !!lrtv;
@@ -6202,6 +6408,22 @@ wss.on("connection", (ws) => {
       doSkipIntro(pressedAt).catch((err) =>
         console.error("[skipIntro ws] error:", err.message),
       );
+    } else if (fname === "embyHello") {
+      ws._embyUi = {
+        uiId: param?.uiId ?? null,
+        deviceName: param?.deviceName ?? null,
+      };
+      if (param?.uiId === "intro") {
+        pushIntroStateFromItem(ws, param?.embyItemId).catch((e) =>
+          console.error("[embyHello] error:", e.message),
+        );
+      }
+    } else if (fname === "embyPress") {
+      if (ws._embyUi?.uiId === "intro") {
+        handleEmbyIntroPress(ws, param?.btnId, param?.pressedAt).catch((e) =>
+          console.error("[embyPress] error:", e.message),
+        );
+      }
     } else if (fname === "tvRemoteCollision") {
       notifyClients("tvRemoteLock", null);
     } else if (fname === "tvRemoteUnlock") {

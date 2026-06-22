@@ -586,6 +586,8 @@ import * as emby from "../emby.js";
 import * as srvr from "../srvr.js";
 import { config } from "../config.js";
 import paneHelp from "../paneHelp.js";
+import * as urls from "../urls.js";
+import * as util from "../util.js";
 
 // Hardwired split percentages for simple mode.
 // These control the List pane size (and TabArea gets the rest minus divider).
@@ -1128,6 +1130,7 @@ export default {
             source: "info",
             season: result.season ?? null,
             episode: result.episode ?? null,
+            embyId: result.id ?? null,
           });
         }
       } catch (e) {
@@ -1135,13 +1138,14 @@ export default {
       }
     },
 
-    async handleOpenIntro({ show, path, source, season, episode }) {
-      this.videoPlayerIntroShow = show;
-      this.videoPlayerPath = path;
-      this.videoPlayerMode = "intro";
-      this.videoPlayerSource = source || "info";
-      this.videoPlayerMapSeason = season != null ? season : null;
-      this.videoPlayerMapEpisode = episode != null ? episode : null;
+    async handleOpenIntro({ show, embyId }) {
+      // Intro editing now happens in the Emby web tab (emby-ui.user.js overlay).
+      if (!embyId) {
+        console.error("[intro] no Emby item id for", show?.name);
+        window.alert("No Emby episode found for Intro.");
+        return;
+      }
+      util.openExternalPage(urls.embyPageUrl(embyId, "intro"));
     },
 
     async handleIntroNext(payload) {

@@ -7,7 +7,10 @@ import * as urls from "./urls.js";
 import * as emby from "./emby.js";
 import { rottenSearch } from "./rotten.js";
 import * as util from "./util.js";
-import { smartTitleMatch } from "@tv/share";
+import {
+  smartTitleMatch,
+  getSeasonIntro as getSeasonIntroShared,
+} from "@tv/share";
 const { getPstDate } = util;
 import { SRVR_DATA_DIR } from "./srvrPaths.js";
 import * as history from "./history.js";
@@ -3113,32 +3116,8 @@ const EMPTY_SEASON_INTRO = { trimPos: null, startMark: null, skipDur: null };
 // that HAS data (closest smaller first, then closest larger). When seasonIntros
 // is null/absent/empty, returns an ephemeral all-null object. Always a shallow
 // copy so callers can't mutate stored data. Uses only seasonIntros' own keys.
-export const getSeasonIntro = (record, season) => {
-  const map = record?.seasonIntros;
-  if (!map || typeof map !== "object") return { ...EMPTY_SEASON_INTRO };
-  const keys = Object.keys(map);
-  if (keys.length === 0) return { ...EMPTY_SEASON_INTRO };
-
-  const s = Number(season);
-  if (Number.isFinite(s) && map[s] != null) {
-    return { ...EMPTY_SEASON_INTRO, ...map[s] };
-  }
-  if (Number.isFinite(s)) {
-    const nums = keys
-      .map((k) => Number(k))
-      .filter((n) => Number.isFinite(n))
-      .sort((a, b) => a - b);
-    // closest smaller season that has data
-    let below = null;
-    for (const n of nums) if (n < s) below = n;
-    if (below != null) return { ...EMPTY_SEASON_INTRO, ...map[below] };
-    // else closest larger season that has data
-    for (const n of nums) {
-      if (n > s) return { ...EMPTY_SEASON_INTRO, ...map[n] };
-    }
-  }
-  return { ...EMPTY_SEASON_INTRO };
-};
+export const getSeasonIntro = (record, season) =>
+  getSeasonIntroShared(record?.seasonIntros, season);
 
 // Save a single intro field for a season. Creates the season object (other two
 // values null) when missing; deletes a season object when all three are null;

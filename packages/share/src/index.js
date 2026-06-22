@@ -634,4 +634,38 @@ export function fmtPos(ms) {
   return `${wholeSec}.${tenth}`;
 }
 
+// Return the intro-data object for a season from a sparse seasonIntros map
+// { [season]: { trimPos, startMark, skipDur } }. Falls back to the nearest
+// season that HAS data (closest smaller first, then closest larger). When
+// seasonIntros is null/absent/empty, returns an all-null object. Always a
+// shallow copy so callers can't mutate stored data.
+const EMPTY_SEASON_INTRO = { trimPos: null, startMark: null, skipDur: null };
+
+export function getSeasonIntro(seasonIntros, season) {
+  const map = seasonIntros;
+  if (!map || typeof map !== "object") return { ...EMPTY_SEASON_INTRO };
+  const keys = Object.keys(map);
+  if (keys.length === 0) return { ...EMPTY_SEASON_INTRO };
+
+  const s = Number(season);
+  if (Number.isFinite(s) && map[s] != null) {
+    return { ...EMPTY_SEASON_INTRO, ...map[s] };
+  }
+  if (Number.isFinite(s)) {
+    const nums = keys
+      .map((k) => Number(k))
+      .filter((n) => Number.isFinite(n))
+      .sort((a, b) => a - b);
+    // closest smaller season that has data
+    let below = null;
+    for (const n of nums) if (n < s) below = n;
+    if (below != null) return { ...EMPTY_SEASON_INTRO, ...map[below] };
+    // else closest larger season that has data
+    for (const n of nums) {
+      if (n > s) return { ...EMPTY_SEASON_INTRO, ...map[n] };
+    }
+  }
+  return { ...EMPTY_SEASON_INTRO };
+}
+
 export { postHistory } from "./history.js";

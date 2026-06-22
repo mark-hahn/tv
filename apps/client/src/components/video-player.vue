@@ -790,7 +790,7 @@ import {
   saveSeasonIntro,
 } from "../srvr.js";
 
-import { fmtPos } from "@tv/share";
+import { fmtPos, getSeasonIntro } from "@tv/share";
 
 const TV_SRVR_URL = config.tvSrvrUrl;
 const PLAYER_MUTE_STORAGE_KEY = "tvPlayerMuted";
@@ -1010,14 +1010,14 @@ export default {
   watch: {
     introShow(newVal) {
       if (!newVal?.name) return;
-      const si = newVal?.seasonIntros?.[this.introSeason] ?? {};
+      const si = getSeasonIntro(newVal?.seasonIntros, this.introSeason);
       this.startMark = si.startMark ?? 0;
       this.trimPos = si.trimPos ?? null;
       this.skipDur = si.skipDur ?? null;
     },
     introSeason(newVal) {
       if (!this.introShow?.name) return;
-      const si = this.introShow?.seasonIntros?.[newVal] ?? {};
+      const si = getSeasonIntro(this.introShow?.seasonIntros, newVal);
       this.startMark = si.startMark ?? 0;
       this.trimPos = si.trimPos ?? null;
       this.skipDur = si.skipDur ?? null;

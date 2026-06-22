@@ -6,16 +6,17 @@ import { createWriteStream } from "fs";
 /**
  * Create a BIF (Base Index Frames) file for video thumbnail previews
  * @param {string} videoPath - Path to the video file
- * @param {string} outputPath - Path for the output .bif file
  * @param {number} width - Width of thumbnails (height auto-calculated)
  * @param {number} interval - Interval in seconds between frames
  */
-async function createBifFile(
-  videoPath,
-  outputPath,
-  width = 320,
-  interval = 10,
-) {
+async function createBifFile(videoPath, width = 320, interval = 10) {
+  // Generate output path from video path, width, and interval
+  const parsed = path.parse(videoPath);
+  const outputPath = path.join(
+    parsed.dir,
+    `${parsed.name}-${width}-${interval}.bif`,
+  );
+
   const startTime = Date.now();
   console.log(`Creating BIF file: ${outputPath}`);
   console.log(`Video: ${videoPath}`);
@@ -56,7 +57,12 @@ async function createBifFile(
     console.log(`  Frames: ${frameFiles.length}`);
     console.log(`  Time taken: ${duration} seconds`);
 
-    return { duration, frameCount: frameFiles.length, size: stats.size };
+    return {
+      outputPath,
+      duration,
+      frameCount: frameFiles.length,
+      size: stats.size,
+    };
   } finally {
     // Cleanup temp directory
     await fs.rm(tempDir, { recursive: true, force: true });

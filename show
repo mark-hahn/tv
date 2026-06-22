@@ -19,6 +19,12 @@ fi
 # Default to tvdb.json if no file specified
 if [ -z "$json_file" ]; then
   json_file="apps/srvr/data/tvdb.json"
+else
+  # Make -file parameter relative to /root/dev/apps/tv/apps/srvr/data/
+  # If it doesn't start with /, prepend the base path
+  if [[ ! "$json_file" = /* ]]; then
+    json_file="apps/srvr/data/$json_file"
+  fi
 fi
 
 # Fetch show from server and replace temp.json contents

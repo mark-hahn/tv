@@ -6201,6 +6201,8 @@ app.post("/internal/nowPlaying", (req, res) => {
     if (!ui || ui.uiId !== "intro" || ws.readyState !== 1) continue;
     const item = lastNowPlayingList.find((p) => p.device === ui.deviceName);
     if (!item) continue;
+    // Only push to tabs viewing the same item
+    if (ui.embyItemId && item.id && ui.embyItemId !== item.id) continue;
     const record = tvdb.getAllTvdbSync()?.[item.showName];
     pushIntroState(ws, record, item.showName, item.season, item.episode);
   }
@@ -6412,6 +6414,7 @@ wss.on("connection", (ws) => {
       ws._embyUi = {
         uiId: param?.uiId ?? null,
         deviceName: param?.deviceName ?? null,
+        embyItemId: param?.embyItemId ?? null,
       };
       if (param?.uiId === "intro") {
         pushIntroStateFromItem(ws, param?.embyItemId).catch((e) =>

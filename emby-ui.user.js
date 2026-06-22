@@ -265,6 +265,16 @@
     buildOverlay();
     requestAnimationFrame(tickCurrentTime);
     connect();
+
+    // Re-send hello when hash changes (user navigates to different item in same tab)
+    let lastItemId = getEmbyItemId();
+    window.addEventListener("hashchange", () => {
+      const newItemId = getEmbyItemId();
+      if (newItemId !== lastItemId) {
+        lastItemId = newItemId;
+        hello();
+      }
+    });
   }
 
   init();

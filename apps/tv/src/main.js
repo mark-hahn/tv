@@ -247,6 +247,7 @@ function updateNowPlaying(sessions) {
       episode: s.NowPlayingItem.IndexNumber ?? null,
       positionTicks: s.PlayState?.PositionTicks ?? null,
       runtimeTicks: s.NowPlayingItem.RunTimeTicks ?? null,
+      id: s.NowPlayingItem.Id ?? null,
     }));
 
   // Dedup key excludes position so position-only changes don't suppress the send

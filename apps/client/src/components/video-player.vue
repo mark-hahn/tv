@@ -787,6 +787,7 @@ import {
   getChksrtHistory,
   addChksrtHistory,
   setTvdbFields,
+  saveSeasonIntro,
 } from "../srvr.js";
 
 import { fmtPos } from "@tv/share";
@@ -1009,9 +1010,17 @@ export default {
   watch: {
     introShow(newVal) {
       if (!newVal?.name) return;
-      this.startMark = newVal?.startMark ?? 0;
-      this.trimPos = newVal?.trimPos ?? null;
-      this.skipDur = newVal?.skipDur ?? null;
+      const si = newVal?.seasonIntros?.[this.introSeason] ?? {};
+      this.startMark = si.startMark ?? 0;
+      this.trimPos = si.trimPos ?? null;
+      this.skipDur = si.skipDur ?? null;
+    },
+    introSeason(newVal) {
+      if (!this.introShow?.name) return;
+      const si = this.introShow?.seasonIntros?.[newVal] ?? {};
+      this.startMark = si.startMark ?? 0;
+      this.trimPos = si.trimPos ?? null;
+      this.skipDur = si.skipDur ?? null;
     },
     path(newVal) {
       this._mseStop();
@@ -1519,12 +1528,18 @@ export default {
     },
     _persistField(field, value) {
       if (!this.introShow?.name) return;
-      this.introShow[field] = value;
+      const season = this.introSeason;
+      if (season == null) return;
+      // Update local reactive state for immediate UI feedback
+      if (!this.introShow.seasonIntros) this.introShow.seasonIntros = {};
+      if (!this.introShow.seasonIntros[season])
+        this.introShow.seasonIntros[season] = {};
+      this.introShow.seasonIntros[season][field] = value;
       if ((field === "trimPos" || field === "skipDur") && value != null) {
         this.introShow.needsIntro = false;
       }
-      setTvdbFields({ name: this.introShow.name, [field]: value }).catch((e) =>
-        console.error(`[intro] setTvdbFields ${field} error:`, e),
+      saveSeasonIntro(this.introShow.name, season, field, value).catch((e) =>
+        console.error(`[intro] saveSeasonIntro ${field} error:`, e),
       );
     },
     async clickIntroAnt() {

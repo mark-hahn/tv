@@ -5592,6 +5592,28 @@ app.get("/api/hasBif", async (req, res) => {
   }
 });
 
+// Save a single intro field (startMark, skipDur, trimPos) for a season.
+app.post("/api/saveSeasonIntro", async (req, res) => {
+  const { name, season, field, value } = req.body;
+  if (!name || season == null || !field) {
+    res.status(400).json({ ok: false, error: "name, season, field required" });
+    return;
+  }
+  const allTvdb = tvdb.getAllTvdbSync();
+  const record = allTvdb[name];
+  if (!record) {
+    res.status(404).json({ ok: false, error: "show not found" });
+    return;
+  }
+  try {
+    await tvdb.saveSeasonIntro(record, season, field, value);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[saveSeasonIntro] error:", err.message);
+    res.json({ ok: false, error: err.message });
+  }
+});
+
 app.get("/api/introNextFile", async (req, res) => {
   const showName = req.query.showName;
   const currentSeason = parseInt(req.query.season, 10);

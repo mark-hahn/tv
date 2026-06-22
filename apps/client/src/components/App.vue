@@ -1219,8 +1219,8 @@ export default {
           );
         const hasNoPlayableIntroFile = !hasPlayableIntroFile;
         if (
-          s.trimPos != null ||
-          s.skipDur != null ||
+          s.seasonIntros != null ||
+          !s.needsIntro ||
           s.inEmby === false ||
           s.inLinda ||
           hasNoPlayableIntroFile

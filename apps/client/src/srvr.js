@@ -610,6 +610,14 @@ export function hasBif(videoPath) {
   );
 }
 
+export function saveSeasonIntro(name, season, field, value) {
+  return httpCall(
+    "/api/saveSeasonIntro",
+    { name, season, field, value },
+    "POST",
+  );
+}
+
 export function introNextFile(showName, season, episode) {
   return httpCall(
     `/api/introNextFile?showName=${encodeURIComponent(showName)}&season=${season}&episode=${episode}`,

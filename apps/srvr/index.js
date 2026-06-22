@@ -5890,6 +5890,9 @@ async function handleEmbyIntroPress(ws, btnId, pressedAt) {
     case "back10":
       await embySeekTicks(sid, posTicks - 10 * 1000 * 10000, runtime);
       break;
+    case "back3":
+      await embySeekTicks(sid, posTicks - 3 * 1000 * 10000, runtime);
+      break;
     case "fwd10":
       await embySeekTicks(sid, posTicks + 10 * 1000 * 10000, runtime);
       break;

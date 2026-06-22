@@ -147,6 +147,7 @@
     overlay.appendChild(makeBtn("0", "zero", { width: 40 }));
     overlay.appendChild(makeBtn("\u00ab", "back30"));
     overlay.appendChild(makeBtn("\u2039", "back10"));
+    overlay.appendChild(makeBtn("-", "back3"));
     overlay.appendChild(makeBtn("\u203a", "fwd10"));
     overlay.appendChild(makeBtn("\u00bb", "fwd30", { gap: 20 }));
 

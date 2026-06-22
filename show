@@ -1,27 +1,39 @@
 #!/bin/bash
 
 # Get tvdb record for a show from server and replace temp.json contents
+
+# Parse optional -file parameter
+json_file=""
+if [ "$1" = "-file" ]; then
+  json_file="$2"
+  shift 2
+fi
+
 show_name="$*"
 
 if [ -z "$show_name" ]; then
-  echo "Usage: $0 <show name>"
+  echo "Usage: $0 [-file <json file path>] <show name>"
   exit 1
+fi
+
+# Default to tvdb.json if no file specified
+if [ -z "$json_file" ]; then
+  json_file="apps/srvr/data/tvdb.json"
 fi
 
 # Fetch show from server and replace temp.json contents
 ssh hahnca.com "cd /root/dev/apps/tv && node -e \"
 const fs = require('fs');
-const path = require('path');
-const tvdbPath = path.join('apps', 'srvr', 'data', 'tvdb.json');
+const tvdbPath = process.argv[1];
 const tvdb = JSON.parse(fs.readFileSync(tvdbPath, 'utf8'));
-const showName = process.argv[1];
+const showName = process.argv[2];
 const show = tvdb[showName];
 if (show) {
   console.log(JSON.stringify(show));
 } else {
   process.stderr.write('Show not found: ' + showName + '\\n');
   process.exit(1);
-}\" \"$show_name\"" > /tmp/show-record.json
+}\" \"$json_file\" \"$show_name\"" > /tmp/show-record.json
 
 if [ $? -eq 0 ]; then
   # Replace temp.json with just this show record

@@ -1,10 +1,10 @@
 # Plan: per-season intro data (`seasonIntros`)
 
 Goal: store `trimPos`, `startMark`, `skipDur` per **season** instead of once per show,
-in a new sparse `seasonIntros` map on the tvdb record, with a `getSeasonIntro(season)`
+in a new sparse `seasonIntros` map on the tvdb record, with a `getSeasonIntro(record, season)`
 accessor that falls back to the nearest season when a season has no data.
 
-This plan describes changes only — **no code was changed** (per instructions).
+Decisions from [season-intros-resp.md](season-intros-resp.md) are folded in (see §9).
 
 ---
 
@@ -124,14 +124,10 @@ Logic:
 ## 5. `needsIntro` recompute change
 
 Current test ([index.js#L2589-L2590](apps/srvr/index.js#L2589)) uses the flat
-`trimPos == null && skipDur == null`. Replace with a `seasonIntros`-aware test. Proposed:
-
-> a show "needs intro" when it has **no** intro data at all, i.e. `record.seasonIntros == null`
-> (plus the existing `inEmby`, `!inLinda`, unwatched-episodes, has-files conditions).
-
-Rationale: `getSeasonIntro` already makes one marked season cover all seasons via fallback, so a
-show with any `seasonIntros` entry is considered "done". (See Ambiguity A2 — alternative is
-per-season needs-intro, which is a larger change and not requested.)
+`trimPos == null && skipDur == null`. Replace with `record.seasonIntros == null`
+(plus the existing `inEmby`, `!inLinda`, unwatched-episodes, has-files conditions).
+A show with any `seasonIntros` entry is considered "done" (one marked season covers all
+seasons via `getSeasonIntro` fallback).
 
 ---
 
@@ -158,12 +154,12 @@ needed (consistent with the existing `scripts/migrate-*.js` pattern):
 
 For each record with any non-null flat intro field:
 
-- create `seasonIntros[S] = { trimPos, startMark, skipDur }` from the flat values, where `S` =
-  the show's **lowest existing season** (so fallback covers all seasons), then delete the flat
+- create `seasonIntros["1"] = { trimPos, startMark, skipDur }` from the flat values (season **1**,
+  per A4, so the fallback covers all seasons), then delete the flat
   `trimPos`/`startMark`/`skipDur` fields.
 
 Run with `tv-srvr` stopped (per repo rule about editing `tvdb.json` directly), then redeploy.
-See Ambiguity A4 for the season-number choice.
+The script logs any record that still has a flat intro field afterward.
 
 ---
 
@@ -177,32 +173,15 @@ See Ambiguity A4 for the season-number choice.
 
 ---
 
-## 9. Ambiguities / contradictions / impossibilities
+## 9. Resolved decisions (from season-intros-resp.md)
 
-- **A1 — `getSeasonIntro` signature.** The spec says "season number as param", but the function
-  also needs the show/record to read `seasonIntros`. Plan: `getSeasonIntro(record, season)`.
-- **A2 — `needsIntro` semantics.** The spec doesn't mention `needsIntro`. With per-season data a
-  show could have some seasons marked and others not. Plan treats "any `seasonIntros` entry" as
-  done (show-level), matching the fallback behavior. If per-season "needs intro" is wanted, the
-  Intro queue/count logic would need a larger redesign.
-- **A3 — Season-less display path.** `/api/introDur` (skip-button text) currently has no season.
-  Without the §6 change the displayed `trimPos|skipDur` may not match the playing season (only
-  cosmetic; the skip action is correct). Recommend doing §6.
-- **A4 — Migration season number.** Existing flat values have no recorded season. Plan seeds them
-  into the show's lowest existing season so the fallback applies them everywhere; an alternative
-  is season `1`. Either is a judgment call — confirm before migrating, since it's hard to undo.
-- **A5 — "scan smaller … if there are no seasons smaller then scan larger".** Interpreted as
-  _no smaller season has data_ (not _no smaller season numbers exist_). The result is the nearest
-  season with data, preferring the closest lower one. Confirm this is the intended tie-break.
-- **A6 — Mutation safety.** `getSeasonIntro` returns a shallow copy so callers (which previously
-  read immutable scalars) can't accidentally mutate stored season data.
-
-## 10. Suggestions
-
-- Centralize `getSeasonIntro`/`saveSeasonIntro` in `tvdb.js` so future readers can't bypass them
-  and reintroduce flat-field reads.
-- Add a debug log line in `saveSeasonIntro` (season, field, value, resulting key count, prune)
-  to match the existing intro logging style.
-- Keep `anticipating` exactly as-is (flat field) to limit blast radius.
-- After migration, add an assertion/log if any record still has a flat `trimPos`/`skipDur`/`startMark`
-  to catch stragglers.
+- **A1** — `getSeasonIntro(record, season)` (record needed to read `seasonIntros`).
+- **A2** — `needsIntro` = `record.seasonIntros == null` (replaces the old flat-field test).
+- **A3** — implement §6: add `season` to `/api/introDur` and pass it from `emby-skip-intro.user.js`.
+- **A4** — migrate flat values into season `1`. `getSeasonIntro` fallback uses **only** the
+  contents of `seasonIntros` (its own keys), never other record data.
+- **A5** — fallback tie-break = "no smaller season **has data**": nearest season with data,
+  preferring the closest lower one, else the closest higher.
+- **A6** — `getSeasonIntro` returns a shallow copy.
+- **§10 suggestions adopted** — centralize `getSeasonIntro`/`saveSeasonIntro` in `tvdb.js`;
+  debug-log in `saveSeasonIntro`; keep `anticipating` flat; migration logs stragglers.

@@ -2586,8 +2586,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
       const newNeedsIntro = !!(
         tvdbRecord.inEmby &&
         !tvdbRecord.inLinda &&
-        tvdbRecord.trimPos == null &&
-        tvdbRecord.skipDur == null &&
+        tvdbRecord.seasonIntros == null &&
         Number(tvdbRecord.episodeCount ?? 0) >
           Number(tvdbRecord.watchedCount ?? 0) &&
         Array.isArray(tvdbRecord.filesOnDisk) &&
@@ -2605,7 +2604,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
           `[needsIntro dbg] ${showName}: stored=${tvdbRecord.needsIntro} computed=${newNeedsIntro}` +
             ` inEmby=${tvdbRecord.inEmby} inLinda=${tvdbRecord.inLinda}` +
             ` introDur=${tvdbRecord.introDur} epCnt=${tvdbRecord.episodeCount}` +
-            ` trimPos=${tvdbRecord.trimPos} skipDur=${tvdbRecord.skipDur}` +
+            ` seasonIntros=${JSON.stringify(tvdbRecord.seasonIntros)}` +
             ` watchCnt=${tvdbRecord.watchedCount}` +
             ` filesOnDisk=${JSON.stringify(tvdbRecord.filesOnDisk?.slice(0, 3))}`,
         );
@@ -5659,7 +5658,8 @@ async function doSkipIntro(pressedAt, deviceName = "Living Room TV") {
   if (!record) {
     record = Object.values(allTvdb).find((r) => r.id === showId);
   }
-  const skipDur = record?.skipDur;
+  const season = session.NowPlayingItem.ParentIndexNumber ?? null;
+  const skipDur = tvdb.getSeasonIntro(record, season).skipDur;
   if (!skipDur || skipDur <= 0) {
     console.log(`[skipIntro] no skipDur for show: ${showName}`);
     return { ok: false, reason: "noSkipDur" };
@@ -5716,7 +5716,8 @@ async function doTrimIntro(deviceName = "Living Room TV") {
   if (!record) {
     record = Object.values(allTvdb).find((r) => r.id === showId);
   }
-  const trimPos = record?.trimPos;
+  const season = session.NowPlayingItem.ParentIndexNumber ?? null;
+  const trimPos = tvdb.getSeasonIntro(record, season).trimPos;
   if (!trimPos || trimPos <= 0) {
     console.log(`[trimIntro] no trimPos for show: ${showName}`);
     return { ok: false, reason: "noTrimPos" };
@@ -5792,10 +5793,11 @@ function introTitleText(record, showName, season, episode) {
 }
 
 function pushIntroState(ws, record, showName, season, episode) {
+  const si = tvdb.getSeasonIntro(record, season);
   pushEmbyText(ws, "title", introTitleText(record, showName, season, episode));
-  pushEmbyText(ws, "startMark", fmtIntroPos(record?.startMark ?? 0));
-  pushEmbyText(ws, "trim", fmtIntroPos(record?.trimPos ?? null));
-  pushEmbyText(ws, "skip", fmtIntroPos(record?.skipDur ?? null));
+  pushEmbyText(ws, "startMark", fmtIntroPos(si.startMark ?? 0));
+  pushEmbyText(ws, "trim", fmtIntroPos(si.trimPos ?? null));
+  pushEmbyText(ws, "skip", fmtIntroPos(si.skipDur ?? null));
   pushEmbyText(ws, "ant", record?.anticipating ? "ANT" : "Ant");
 }
 
@@ -5875,7 +5877,8 @@ async function handleEmbyIntroPress(ws, btnId, pressedAt) {
   const posMs = Math.round(posTicks / 10000);
   const runtime = session.NowPlayingItem?.RunTimeTicks ?? null;
   const sid = session.Id;
-  const startMark = record?.startMark ?? 0;
+  const si = tvdb.getSeasonIntro(record, season);
+  const startMark = si.startMark ?? 0;
 
   switch (btnId) {
     case "zero":
@@ -5897,36 +5900,44 @@ async function handleEmbyIntroPress(ws, btnId, pressedAt) {
       await embySeekTicks(sid, (startMark - 3000) * 10000, runtime);
       break;
     case "trimJump":
-      if (record?.trimPos)
-        await embySeekTicks(sid, record.trimPos * 10000, runtime);
+      if (si.trimPos) await embySeekTicks(sid, si.trimPos * 10000, runtime);
       break;
     case "skipTest":
-      if (record?.skipDur)
-        await embySeekTicks(sid, posTicks + record.skipDur * 10000, runtime);
+      if (si.skipDur)
+        await embySeekTicks(sid, posTicks + si.skipDur * 10000, runtime);
       break;
     case "startMark":
-      if (name) await tvdb.setTvdbFields({ name, startMark: posMs });
+      if (name) await tvdb.saveSeasonIntro(record, season, "startMark", posMs);
       break;
     case "trimSet":
-      if (name) await tvdb.setTvdbFields({ name, trimPos: posMs });
+      if (name) await tvdb.saveSeasonIntro(record, season, "trimPos", posMs);
       break;
     case "skipSet":
       if (name && posMs >= startMark)
-        await tvdb.setTvdbFields({ name, skipDur: posMs - startMark });
+        await tvdb.saveSeasonIntro(
+          record,
+          season,
+          "skipDur",
+          posMs - startMark,
+        );
       break;
     case "trimClr":
       if (name)
-        await tvdb.setTvdbFields({
-          name,
-          trimPos: record?.trimPos === 0 ? null : 0,
-        });
+        await tvdb.saveSeasonIntro(
+          record,
+          season,
+          "trimPos",
+          si.trimPos === 0 ? null : 0,
+        );
       break;
     case "skipClr":
       if (name)
-        await tvdb.setTvdbFields({
-          name,
-          skipDur: record?.skipDur === 0 ? null : 0,
-        });
+        await tvdb.saveSeasonIntro(
+          record,
+          season,
+          "skipDur",
+          si.skipDur === 0 ? null : 0,
+        );
       break;
     case "ant":
       if (name)
@@ -5942,7 +5953,7 @@ async function handleEmbyIntroPress(ws, btnId, pressedAt) {
 
 app.get("/api/introDur", async (req, res) => {
   try {
-    const { showName, showId } = req.query;
+    const { showName, showId, season } = req.query;
     if (!showName && !showId) {
       res.json({
         introDur: null,
@@ -5957,11 +5968,15 @@ app.get("/api/introDur", async (req, res) => {
     if (!record && showId) {
       record = Object.values(allTvdb).find((r) => r.id === showId);
     }
+    const si = tvdb.getSeasonIntro(
+      record,
+      season != null ? Number(season) : null,
+    );
     res.json({
       introDur: record?.introDur ?? null,
-      startMark: record?.startMark ?? null,
-      trimPos: record?.trimPos ?? null,
-      skipDur: record?.skipDur ?? null,
+      startMark: si.startMark,
+      trimPos: si.trimPos,
+      skipDur: si.skipDur,
     });
   } catch (err) {
     console.error("[introDur] error:", err.message);
@@ -6218,7 +6233,8 @@ app.post("/internal/nowPlaying", (req, res) => {
     const skipKey = `${lrtv.showName}|${lrtv.season}|${lrtv.episode}`;
     const allTvdb = tvdb.getAllTvdbSync();
     const record = allTvdb?.[lrtv.showName];
-    if (record?.trimPos > 0 && skipKey !== lastAutoSkipKey) {
+    const trimPos = tvdb.getSeasonIntro(record, lrtv.season).trimPos;
+    if (trimPos > 0 && skipKey !== lastAutoSkipKey) {
       lastAutoSkipKey = skipKey;
       setTimeout(() => {
         doTrimIntro().catch((e) =>

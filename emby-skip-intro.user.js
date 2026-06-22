@@ -253,6 +253,7 @@
         showName:
           session.NowPlayingItem.SeriesName || session.NowPlayingItem.Name,
         showId: session.NowPlayingItem.SeriesId || session.NowPlayingItem.Id,
+        season: session.NowPlayingItem.ParentIndexNumber ?? null,
         positionTicks: session.PlayState?.PositionTicks || 0,
       };
     } catch (error) {
@@ -262,10 +263,12 @@
   }
 
   // Get trimPos and skipDur for current show
-  async function getIntroInfo(showName, showId) {
+  async function getIntroInfo(showName, showId, season) {
     try {
+      const seasonParam =
+        season != null ? `&season=${encodeURIComponent(season)}` : "";
       const response = await fetch(
-        `${TV_SRVR_URL}/api/introDur?showName=${encodeURIComponent(showName)}&showId=${encodeURIComponent(showId)}`,
+        `${TV_SRVR_URL}/api/introDur?showName=${encodeURIComponent(showName)}&showId=${encodeURIComponent(showId)}${seasonParam}`,
       );
       if (!response.ok) return { trimPos: null, skipDur: null };
       const result = await response.json();
@@ -292,6 +295,7 @@
       const introInfo = await getIntroInfo(
         playingInfo.showName,
         playingInfo.showId,
+        playingInfo.season,
       );
       currentTrimPos = introInfo.trimPos;
       currentSkipDur = introInfo.skipDur;

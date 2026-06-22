@@ -116,11 +116,11 @@
     overlay.style.cssText = `
       position: fixed;
       top: 0;
-      left: 0;
-      width: 100vw;
-      height: 60px;
+      left: 120px;
+      width: calc(100vw - 120px);
+      height: 55px;
       z-index: 99999;
-      background: rgba(0, 0, 0, 0.2);
+      background: rgba(0, 0, 0, 1);
       display: flex;
       align-items: center;
       padding: 0 12px;
@@ -135,6 +135,7 @@
     title.style.overflow = "hidden";
     title.style.textOverflow = "ellipsis";
     title.style.textShadow = "0 0 3px #000";
+    title.style.fontSize = "16px";
     overlay.appendChild(title);
 
     // Live current time (read locally from the page <video>)

@@ -1997,9 +1997,6 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     tvdbData["last-downloaded"] = existing["last-downloaded"];
   }
   if (existing.introDur != null) tvdbData.introDur = existing.introDur;
-  if (existing.startMark != null) tvdbData.startMark = existing.startMark;
-  if (existing.trimPos != null) tvdbData.trimPos = existing.trimPos;
-  if (existing.skipDur != null) tvdbData.skipDur = existing.skipDur;
   if (existing.seasonIntros != null)
     tvdbData.seasonIntros = existing.seasonIntros;
 

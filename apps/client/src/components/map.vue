@@ -1064,8 +1064,13 @@ export default {
 
       const rt = this.tvdbData?.averageRuntime;
       if (rt) {
-        const trimStr = fmtPos(this.mapShow?.trimPos);
-        const skipStr = fmtPos(this.mapShow?.skipDur);
+        const si = this.mapShow?.seasonIntros;
+        const entry =
+          si &&
+          (si[1] ??
+            si[Object.keys(si).sort((a, b) => Number(a) - Number(b))[0]]);
+        const trimStr = fmtPos(entry?.trimPos ?? null);
+        const skipStr = fmtPos(entry?.skipDur ?? null);
         parts.push(`${rt} mins | ${trimStr} | ${skipStr}`);
       }
 
@@ -1925,8 +1930,7 @@ export default {
       if (
         this.mapShow?.inEmby === false ||
         this.mapShow?.inLinda ||
-        this.mapShow?.trimPos != null ||
-        this.mapShow?.skipDur != null
+        this.mapShow?.seasonIntros != null
       ) {
         return null;
       }

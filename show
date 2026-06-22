@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Get tvdb record for a show from server and append to temp.json
+# Get tvdb record for a show from server and replace temp.json contents
 show_name="$*"
 
 if [ -z "$show_name" ]; then
@@ -8,12 +8,7 @@ if [ -z "$show_name" ]; then
   exit 1
 fi
 
-# Initialize temp.json if it doesn't exist or is empty
-if [ ! -f temp.json ] || [ ! -s temp.json ]; then
-  echo "{}" > temp.json
-fi
-
-# Fetch show from server and merge into temp.json
+# Fetch show from server and replace temp.json contents
 ssh hahnca.com "cd /root/dev/apps/tv && node -e \"
 const fs = require('fs');
 const path = require('path');
@@ -29,10 +24,9 @@ if (show) {
 }\" \"$show_name\"" > /tmp/show-record.json
 
 if [ $? -eq 0 ]; then
-  # Merge the show into temp.json with proper formatting
+  # Replace temp.json with just this show record
   node -e "
 const fs = require('fs');
-const temp = JSON.parse(fs.readFileSync('temp.json', 'utf8'));
 const show = JSON.parse(fs.readFileSync('/tmp/show-record.json', 'utf8'));
 const showName = process.argv[1];
 
@@ -50,22 +44,19 @@ const sortObject = (obj) => {
   }, {});
 };
 
-temp[showName] = sortObject(show);
+const temp = { [showName]: sortObject(show) };
 
-// Format with 6 blank lines between entries
+// Format with proper indentation
 const entries = Object.entries(temp);
 const lines = ['{'];
 entries.forEach(([key, value], idx) => {
   const showJson = JSON.stringify(value, null, 2);
   const indented = showJson.split('\\n').map(line => '  ' + line).join('\\n');
   lines.push('  ' + JSON.stringify(key) + ': ' + indented.substring(2) + (idx < entries.length - 1 ? ',' : ''));
-  if (idx < entries.length - 1) {
-    lines.push('', '', '', '', '', '');
-  }
 });
 lines.push('}');
 fs.writeFileSync('temp.json', lines.join('\\n'));
-console.log('Added show to temp.json');
+console.log('Replaced temp.json with show record');
 " "$show_name"
   rm -f /tmp/show-record.json
 else

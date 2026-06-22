@@ -5524,7 +5524,7 @@ app.get("/api/introFirstFile", async (req, res) => {
       res.json({ ok: false });
       return;
     }
-    const sorted = [...seriesMap].sort((a, b) => b[0] - a[0]);
+    const sorted = [...seriesMap].sort((a, b) => a[0] - b[0]);
     let hasUnwatchedEpisode = false;
     let fallbackPath = null;
     let fallbackSeason = null;

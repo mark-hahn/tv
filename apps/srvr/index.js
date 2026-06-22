@@ -5866,14 +5866,20 @@ async function pushIntroStateFromItem(ws, embyItemId) {
   }
 }
 
-async function handleEmbyIntroPress(ws, btnId, pressedAt) {
+async function handleEmbyIntroPress(ws, btnId, pressedAt, videoTimeSec) {
   const ctx = await getEmbyIntroContext(ws._embyUi?.deviceName);
   if (!ctx?.session) return; // nothing playing yet
   const { session, record, showName, season, episode } = ctx;
   const name = record?.name;
-  const rawPositionTicks = session.PlayState?.PositionTicks ?? 0;
-  const pressDelay = pressedAt ? Math.max(0, Date.now() - pressedAt) : 0;
-  const posTicks = Math.max(0, rawPositionTicks - pressDelay * 10000);
+  let posTicks;
+  if (videoTimeSec != null) {
+    // Use the browser's live video.currentTime — always accurate, never stale
+    posTicks = Math.max(0, Math.round(videoTimeSec * 1000 * 10000));
+  } else {
+    const rawPositionTicks = session.PlayState?.PositionTicks ?? 0;
+    const pressDelay = pressedAt ? Math.max(0, Date.now() - pressedAt) : 0;
+    posTicks = Math.max(0, rawPositionTicks - pressDelay * 10000);
+  }
   const posMs = Math.round(posTicks / 10000);
   const runtime = session.NowPlayingItem?.RunTimeTicks ?? null;
   const sid = session.Id;
@@ -6442,9 +6448,12 @@ wss.on("connection", (ws) => {
       }
     } else if (fname === "embyPress") {
       if (ws._embyUi?.uiId === "intro") {
-        handleEmbyIntroPress(ws, param?.btnId, param?.pressedAt).catch((e) =>
-          console.error("[embyPress] error:", e.message),
-        );
+        handleEmbyIntroPress(
+          ws,
+          param?.btnId,
+          param?.pressedAt,
+          param?.videoTimeSec,
+        ).catch((e) => console.error("[embyPress] error:", e.message));
       }
     } else if (fname === "tvRemoteCollision") {
       notifyClients("tvRemoteLock", null);

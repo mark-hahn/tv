@@ -62,7 +62,10 @@
   }
 
   function press(btnId) {
-    send("embyPress", { btnId, pressedAt: Date.now() });
+    const video = document.querySelector("video");
+    const videoTimeSec =
+      video && isFinite(video.currentTime) ? video.currentTime : null;
+    send("embyPress", { btnId, pressedAt: Date.now(), videoTimeSec });
   }
 
   // ---- Build the overlay ----------------------------------------------------

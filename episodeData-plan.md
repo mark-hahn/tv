@@ -1,266 +1,347 @@
 # Plan: consolidate per-episode data into a single `episodeData` property
 
+> Revision 2 — incorporates `episodeData-instr-2.md`: adds `path`/`id`, keeps
+> `YYYY-MM-DD` aired strings (no unix time), compresses each episode to a
+> positional array, and makes `episodeData` the authoritative source refreshed
+> on demand by one shared function.
+
 ## 1. Goal
 
-Replace four large, separately-stored per-episode properties on each `tvdb.json`
-show record with one consolidated property, `episodeData`:
+Replace the per-episode data spread across four `tvdb.json` properties **plus**
+the live Emby/TVDB seriesMap lookups with one consolidated, authoritative
+property `episodeData`.
 
-| Old property        | Old storage shape                                  | New key   | New value                          |
-| ------------------- | -------------------------------------------------- | --------- | ---------------------------------- |
-| `filesOnDisk`       | `[[season, ep, ep, ...], ...]` (season-first rows) | `hasFile` | `true` when a video file exists    |
-| `fileQuality`       | `{ "S02E03": 1080, ... }` (object keyed `SxxExx`)  | `res`     | integer resolution (e.g. `1080`)   |
-| `episodeAiredDates` | `{ "S01E01": "2011-11-30", ... }` (date strings)   | `aired`   | unix timestamp                     |
-| `watchedEpis`       | `[[season, ep, ep, ...], ...]` (season-first rows) | `watched` | `true` when the episode is watched |
+| Old source                              | New tuple slot | Stored value                              |
+| --------------------------------------- | -------------- | ----------------------------------------- |
+| `episodeAiredDates["SxxExx"]` (string)  | `[0]` aired    | `"YYYY-MM-DD"` string (unchanged format)  |
+| `watchedEpis` season-first rows         | `[1]` watched  | `1` / `0`                                 |
+| Emby episode item id (seriesMap)        | `[2]` id       | integer Emby id (`0` = none)              |
+| disk file name (was `filesOnDisk` nums) | `[3]` file     | video **file name only** (not full path)  |
+| `fileQuality["SxxExx"]`                 | `[4]` res      | integer resolution (e.g. `1080`)          |
 
-## 2. Target on-disk (`tvdb.json`) representation
+Two former properties become **derived, not stored**:
+
+- `hasFile` ⇒ a file name is present at slot `[3]`.
+- `unaired` ⇒ aired date `[0]` is later than today (`aired > todayYMD`).
+
+## 2. On-disk (`tvdb.json`) representation — compressed positional arrays
 
 ```jsonc
 "episodeData": [
-  null,                       // season 0 (no specials) -> null
-  [                           // season 1
-    null,                     // episode 0 (unused) -> null
-    { "hasFile": true, "res": 1080, "aired": 1322611200, "watched": true },  // s01e01
-    { "aired": 1323216000, "watched": true }                                  // s01e02 (no file/res yet)
-  ],
-  null,                       // season 2 absent -> null
-  [ /* season 3 ... */ ]
+  null,                  // season 0: no specials -> null (season index is 0-based)
+  [                      // season 1 — EPISODE array is 1-BASED: element[0] = episode 1
+    ["2026-06-23", 1, 1234, "Rivals.2024.S01E01.HDR.2160p.WEB.h265-GRACE.mkv", 1080], // s01e01
+    ["2026-06-30", 1, 1235, "Rivals.2024.S01E02.HDR.2160p.WEB.h265-GRACE.mkv"],       // s01e02 (res unknown)
+    ["2026-07-07", 0, 1236],                                                          // s01e03 (in emby, no file)
+    ["2026-07-14", 1],                                                                // s01e04 (not in emby, watched)
+    ["2026-07-21"]                                                                    // s01e05 (not in emby, unwatched)
+  ]
 ]
 ```
 
-Rules:
+### Tuple slots (per episode)
 
-- `episodeData` is an array; its 0-based index is the season number (season 0..N).
-- Each season entry is an array whose 0-based index is the episode number (episode 0..N).
-- **Sparseness is encoded with `null`**, not `[]`:
-  - A season with no data is stored as `null` (e.g. `episodeData[0]` for shows
-    with no season 0).
-  - Holes inside a season array serialize as `null` (JSON has no true sparse
-    arrays, so missing slots become `null` automatically).
-  - I chose `null` over `[]` because (a) it is what a JS sparse array already
-    serializes holes to, keeping read/write code uniform, and (b) it is smaller
-    than `[]` and unambiguous.
-- Each present episode is an object containing **only the keys that have data**.
-  Absent keys mean "unknown" (e.g. an aired-but-not-downloaded episode has
-  `aired` + maybe `watched`, but no `hasFile`/`res`). This keeps records small.
-- Booleans are only ever stored as `true`. A `false`/absent `hasFile` or
-  `watched` is represented by the key being missing (matches the current model
-  where `filesOnDisk`/`watchedEpis` only list positive entries).
+| Idx | Field   | Type             | Absent meaning       |
+| --- | ------- | ---------------- | -------------------- |
+| 0   | aired   | `"YYYY-MM-DD"`   | unknown air date     |
+| 1   | watched | `1` / `0`        | `0` (unwatched)      |
+| 2   | id      | integer / `0`    | no Emby id           |
+| 3   | file    | file-name string | no file on disk      |
+| 4   | res     | integer          | resolution unknown   |
 
-## 3. Target in-memory representation
+### Compression rules (from instr-2)
 
-**Decision: the in-memory representation is identical to the on-disk structure**
-— the same nested, `null`-sparse array of plain episode objects, used directly
-off the parsed `tvdb.json`. No separate parsed/expanded form is built.
+- **`0` for false/null, `1` for true** — single-char tokens.
+- **Trailing absent slots are dropped**; tuple length encodes how much is known:
+  - `5` — in Emby, watched, file on disk, resolution known
+  - `4` — file on disk, resolution unknown
+  - `3` — in Emby, no file
+  - `2` — not in Emby, watched (non-Emby shows have no files)
+  - `1` — not in Emby, unwatched
+- A **non-trailing** null/false still occupies its position as `0`
+  (e.g. `["2026-07-07", 0, 1236]` keeps `watched=0` because `id` follows it).
+- **Path is the file name only.** Full path is reconstructed as
+  `/mnt/media/tv/<folder>/Season <season>/<file name>` (see §6 and §11.1).
+- **Season index is 0-based** (`episodeData[0]` = season 0 specials, usually
+  `null`); **episode index is 1-based** (`episodeData[s][0]` = episode 1). The
+  asymmetry is deliberate: season 0 is a real (rare) season, episode 0 never
+  exists, so 1-based episodes avoid a wasted leading `null` in every show.
+
+## 3. In-memory representation
+
+**Decision: in memory is identical to on disk** — the same compressed positional
+arrays used directly off parsed `tvdb.json`; save is a direct `JSON.stringify`.
+No decode/expand step.
 
 Rationale:
 
-- The structure is already a natural 2-D lookup (`episodeData[season][episode]`),
-  which is what almost every consumer wants. A flat `SxxExx` map or per-season
-  `Set`s would be a second representation to keep in sync.
-- Keeping one shape means the migration, the disk-scan writers, and the readers
-  all speak the same language, and total code shrinks (the current code repeatedly
-  rebuilds `Set`s/`Map`s from `watchedEpis`/`filesOnDisk`).
-- It avoids the risk the instructions warned about (more code changing, less safe)
-  only where it does not help; the few hot loops that today build a per-season
-  `Set` can keep doing so locally from `episodeData`.
+- The trailing-drop compression is awkward to round-trip through an expanded
+  object form (every save would have to re-derive which slots to drop). Keeping
+  the stored form in memory makes load/save trivial and removes a class of
+  encode bugs.
+- All positional knowledge (slot indices, 1-based episodes, trailing-drop on
+  write) is confined to the shared helpers in §4, so call sites never touch raw
+  indices and stay readable.
 
-A small set of pure helpers (see §4) is added to `packages/share/src/index.js`
-so every app reads/writes through one tested API instead of re-implementing the
-season-first row walk.
+Rejected alternative: decode each tuple to `{ aired, watched, id, file, res }` in
+memory. More readable per episode, but doubles the representation and forces a
+non-trivial compress-on-save. Not worth it given the helpers.
 
-## 4. New shared helpers (`packages/share/src/index.js`)
+## 4. Shared access / update module
 
-All helpers treat a missing season/episode/key as "unknown" and never throw.
+New module `packages/share/src/episodeData.js` (re-exported from
+`packages/share/src/index.js`) — the single API for all apps. Helpers treat a
+missing season/episode/slot as "unknown" and never throw. **Episode args are
+1-based; season args are the real season number.**
 
 ```js
 // Read accessors
-getEpisode(episodeData, season, episode); // -> episode object | null
-hasFileOnDisk(episodeData, season, episode); // -> boolean
-getEpisodeRes(episodeData, season, episode); // -> int | null
-getAired(episodeData, season, episode); // -> timestamp | null
-isWatched(episodeData, season, episode); // -> boolean
+getEp(ed, s, e);            // -> tuple | null            (ed[s]?.[e-1])
+getAired(ed, s, e);         // -> "YYYY-MM-DD" | null
+isWatched(ed, s, e);        // -> boolean
+getEmbyId(ed, s, e);        // -> int | null
+getFileName(ed, s, e);      // -> string | null
+hasFile(ed, s, e);          // -> boolean                 (file name present)
+getRes(ed, s, e);           // -> int | null
+isUnaired(ed, s, e, today); // -> boolean                 (aired > today)
+getFullPath(ed, folder, s, e); // -> reconstructed absolute path | null
 
-// Iteration
-forEachEpisode(episodeData, cb); // cb(season, episode, epObj)
-watchedKeySet(episodeData); // -> Set("S01E01", ...) (compat shim)
-diskKeySet(episodeData); // -> Set("1-1", ...)    (compat shim)
-seasonsOnDisk(episodeData); // -> sorted [season, ...] with any hasFile
+// Iteration / aggregate
+forEachEpisode(ed, cb);     // cb(season, episode/*1-based*/, tuple)
+seasonsPresent(ed);         // -> [seasonNum, ...]
+computeQuality(ed);         // -> most-common res (replaces computeShowQuality)
+countWatched(ed);           // -> number (replaces calculateWatchedCount)
+toSeriesMap(ed, folder, today); // -> legacy [[s,[[e,{...}],...]],...] (see §9)
 
-// Write helpers (mutating, used by writers/migration)
-setEpisodeFlag(episodeData, season, episode, key, value);
-setSeasonFromList(episodeData, season, eps, key); // bulk set hasFile/watched
-computeQualityFromEpisodeData(episodeData); // replaces computeShowQuality
-countWatched(episodeData); // replaces calculateWatchedCount
+// Update (mutate + re-trim)
+ensureSeason(ed, s);
+setEpisode(ed, s, e, { aired, watched, id, file, res }); // merge + trailing-trim
+clearFile(ed, s, e);        // drop file+res (file deleted)
+stripToAiredWatched(ed);    // drop id/file/res for whole show (left Emby)
 ```
 
-`computeShowQuality(fileQuality)` is replaced by `computeQualityFromEpisodeData`
-(same "most common resolution, ties → highest" logic, sourced from each
-episode's `res`).
+`setEpisode` is where the **trailing-drop / `0`-placeholder** compression logic
+(§2) lives: it merges provided fields over the existing tuple, writes `0` for
+false/null positions that have a later present field, then pops trailing absent
+slots. `computeShowQuality(fileQuality)` is replaced by `computeQuality(ed)`
+(same "most common resolution, ties → highest" logic, sourced from each tuple's
+`res`).
 
-## 5. Producers to update (writers)
+## 5. The shared refresh function (core of instr-2)
 
-| Location                                                    | Today writes                                  | Change                                                                                           |
-| ----------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `apps/srvr/index.js` `getShowsFromDisk` / `getShowDiskInfo` | returns `[date,size,filesOnDisk,fileQuality]` | return `[date,size,episodeDiskData]` where `episodeDiskData` carries `hasFile`+`res` per episode |
-| `apps/srvr/index.js` perShow disk check (~L2502-2524)       | `tvdbRecord.filesOnDisk/.fileQuality`         | merge disk `hasFile`/`res` into `tvdbRecord.episodeData` (preserve `aired`/`watched`)            |
-| `apps/srvr/index.js` `/api/populateFilesOnDisk` (~L3884)    | sets `filesOnDisk/fileQuality`                | merge disk fields into `episodeData`                                                             |
-| `apps/srvr/index.js` chokidar handlers (~L7933, ~L8319)     | sets `filesOnDisk/fileQuality`                | merge disk fields into `episodeData`                                                             |
-| `apps/srvr/index.js` chokidar watchedEpis refresh (~L8362)  | sets `watchedEpis/watchedCount`               | merge `watched` into `episodeData`; `watchedCount = countWatched(...)`                           |
-| `apps/srvr/src/tvdb.js` record build (~L1983-1987)          | preserves the four old props                  | preserve single `episodeData`                                                                    |
-| `apps/srvr/src/tvdb.js` update path (~L2341, ~L2383-2400)   | sets `watchedEpis`, `episodeAiredDates`       | merge `watched`/`aired` into `episodeData`                                                       |
+`refreshEpisodeData(showName, rec, { force, sources })` — the **single
+data-collection path** that keeps `episodeData` authoritative. It composes the
+three existing sources into `rec.episodeData`:
 
-**Merge semantics:** disk scans (`hasFile`/`res`) and Emby/TVDB scans
-(`watched`/`aired`) update _different keys_ of the same episode object. Writers
-must merge into the existing `episodeData` rather than overwrite the whole array,
-otherwise a disk scan would wipe `aired`/`watched` and vice-versa. A disk re-scan
-should also clear `hasFile`/`res` for episodes no longer present (handled by
-rebuilding the disk-derived keys for the seasons the scan covers).
+1. **TVDB seriesMap** (`tvdb.getSeriesMap`) → `aired` for every TVDB episode
+   (also refreshes `seasonPremiereDates`); adds tuple slots for aired-but-absent
+   episodes. Skipped when aired data is fresh (staleness check) unless `force`.
+2. **Emby seriesMap** (`emby.getSeriesMap`, only if `rec.inEmby && rec.id`) →
+   `watched`, `id`, and the **file name** extracted from Emby's full `Path`.
+3. **Disk scan** (`getShowDiskInfo`) → authoritative `file`/`res` for files
+   physically present (reconciled against Emby below).
 
-## 6. Consumers to update (readers)
+It then recomputes derived record fields in place: `quality = computeQuality(...)`,
+`watchedCount = countWatched(...)`, `waitStr` (string logic, §7), and the gap
+fields (§8, now computed locally from `episodeData`, no Emby).
 
-| Location                                                                         | Reads today                                     | Change                                                                                       |
-| -------------------------------------------------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `apps/srvr/src/tvdb.js` `calculateWaitStr`                                       | `episodeAiredDates`,`watchedEpis`,`filesOnDisk` | iterate `episodeData` (`aired`/`watched`/`hasFile`) — see §7                                 |
-| `apps/srvr/src/tvdb.js` `calculateWatchedCount`                                  | `watchedEpis`                                   | `countWatched(episodeData)`                                                                  |
-| `apps/srvr/src/tvdb.js` `seriesMapToWatchedEpis` / `applyWatchedEpisToSeriesMap` | array form                                      | keep producing legacy array form for the seriesMap API, fed from/into `episodeData` (see §8) |
-| `apps/srvr/src/emby.js` gap check (~L248-255)                                    | `filesOnDisk` → `S-E` set                       | `diskKeySet(episodeData)`                                                                    |
-| `apps/srvr/index.js` `checkAndDownloadOpnSrt` (~L2319-2365)                      | `watchedEpis` + `episodeAiredDates`             | `isWatched(...)` + `getAired(...)`                                                           |
-| `apps/srvr/index.js` `getFirstFilesOnDiskSeasonGap` (~L6749)                     | `filesOnDisk`                                   | `seasonsOnDisk(episodeData)`                                                                 |
-| `apps/srvr/index.js` flexget (~L6857-6963)                                       | `watchedEpis`, `filesOnDisk`                    | `isWatched(...)`, `hasFileOnDisk(...)`                                                       |
-| `apps/srvr/index.js` `needsIntro` compute (~L2592)                               | `filesOnDisk.length > 0`                        | `seasonsOnDisk(episodeData).length > 0`                                                      |
-| `apps/srvr/index.js` subtitle eligibility (~L1048) **(see §9 — current bug)**    | `watchedEpis?.[key]?.watched`                   | `isWatched(episodeData, season, episode)`                                                    |
-| `packages/share` `computeShowQuality`                                            | `fileQuality`                                   | `computeQualityFromEpisodeData`                                                              |
-| `apps/down/src/main.js` (~L3050, ~L3365)                                         | `watchedEpis` array (from emby map)             | `isWatched(...)` against `episodeData`                                                       |
-| `apps/client/src/tvdb.js`                                                        | `seriesMapToWatchedEpis` (UI only)              | unaffected if seriesMap API stays array-based (see §8)                                       |
-| `scripts/find-asr-only-for-processing.js`                                        | `watchedEpis`                                   | read `episodeData` via helper (or inline)                                                    |
+**Reconciliation (disk vs Emby):**
 
-## 7. Detail: `calculateWaitStr` + the `aired` timestamp change (IMPORTANT)
+- File **presence** is owned by the disk scan: if disk has the file, `file` is
+  set even if Emby hasn't scanned yet; if disk lacks it, `file`/`res` are cleared
+  even if Emby still lists a path.
+- `id` is owned by Emby.
+- For shows **not in Emby**, `stripToAiredWatched` drops `id`/`file`/`res`
+  (instr-2: files are deleted when a show leaves Emby; stale on-disk files are
+  ignored). `aired`/`watched` are kept so history survives a re-add.
 
-`calculateWaitStr` currently relies on `aired` being a **`YYYY-MM-DD` string**:
+**Where it is called** (replacing today's scattered collection logic):
 
-- It compares `airDate > today` lexically (string compare) to detect future eps.
-- It does `new Date(unwatchedDates[i]).getTime()` to do day math.
-- `effectiveDate = hasDiskFile && airDate > today ? today : airDate`.
+- Background loop: replaces the Emby/TVDB seriesMap blocks in `tryLocalGetTvdb`
+  and the disk-check block in `perShowCallback`.
+- Immediately before `getSeriesMapFrom*` API responses are returned.
+- Immediately before a tvdb record is pushed to the UI (`notifyCallback`).
+- On `chokidar` disk-change events (`sources: ["disk"]`).
+- During migration (§10).
 
-The instruction requires `aired` to become a **unix timestamp**, so this function
-(and the OpenSubtitles eligibility check, which does
-`new Date(airedStr).getTime()`) must be reworked to numeric comparisons:
+A `episodeDataSaved` timestamp on the record drives the staleness check so the
+refresh is cheap when already fresh.
 
-- Compare against `todayMs` (a numeric midnight-today), not a string.
-- `effectiveDate` becomes a number.
-- The `new Date(...).getTime()` calls are dropped (value is already ms/sec).
+### Writers this replaces / simplifies
 
-This is a behavioral-equivalence rewrite, not a cosmetic one, and is the
-highest-risk part of the change. It is called out so it is not missed.
+| Location                                                    | Today                                  | After                                                |
+| ----------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------- |
+| `apps/srvr/index.js` `getShowDiskInfo`                      | returns `[date,size,filesOnDisk,fileQuality]` | returns file-name+res per episode for the refresh fn |
+| `apps/srvr/index.js` perShow disk check (~L2502-2524)       | sets `filesOnDisk/fileQuality`         | `refreshEpisodeData(..., {sources:["disk"]})`         |
+| `apps/srvr/index.js` `/api/populateFilesOnDisk` (~L3884)    | sets `filesOnDisk/fileQuality`         | `refreshEpisodeData(..., {sources:["disk"]})`         |
+| `apps/srvr/index.js` chokidar handlers (~L7933, ~L8319, ~L8362) | sets disk + `watchedEpis`          | `refreshEpisodeData(..., {sources:["disk","emby"]})`  |
+| `apps/srvr/src/tvdb.js` seriesMap blocks (~L2335-2400)      | sets `watchedEpis`/`episodeAiredDates` | folded into `refreshEpisodeData`                     |
+| `apps/srvr/src/tvdb.js` record build (~L1983-1987)          | preserves four old props               | preserves single `episodeData`                       |
 
-## 8. seriesMap API boundary (`getSeriesMapFromTvdb`, client)
+## 6. Path reconstruction nuance
 
-`seriesMapToWatchedEpis` / `applyWatchedEpisToSeriesMap` exist in **both**
-`apps/srvr/src/tvdb.js` and `apps/client/src/tvdb.js`, and the
-`/api/getSeriesMapFromTvdb` request/response still passes `watchedEpis` in the
-legacy `[[season, ...eps], ...]` array form.
+Full path = `${tvDir}/${folder}/Season ${season}/${fileName}` with
+`tvDir = "/mnt/media/tv"`.
 
-Plan: **keep the seriesMap API contract (legacy array form) unchanged.** Convert
-to/from `episodeData` only at the server boundary:
+- `<folder>` is **not always the record key / show name.** It is the last
+  segment of `rec.path` (e.g. shows containing `/` like `Good Cop/Bad Cop`, or
+  where the Emby folder differs from the display name). Reconstruction must use
+  the show's folder exactly as `getShowDiskInfo` and the client's
+  `getMapShowFolder` do today. `getFullPath(ed, folder, s, e)` takes the folder
+  explicitly so callers pass the right value.
+- The reconstructed path must byte-for-byte match what the player/clipboard
+  expect today (currently Emby's `MediaSources[0].Path`). This holds when all
+  media lives under `/mnt/media/tv/<folder>/Season <n>/`. A show on a different
+  mount or season-folder convention would break — see §11.1.
 
-- When calling `getSeriesMap`, derive the legacy `watchedEpis` array from
-  `episodeData` (new helper `episodeDataToWatchedEpis`).
-- The client and its copy of the helpers need **no change**, minimizing
-  client/Android risk. (Per repo rules, client + Android UI must stay in sync; by
-  not changing the wire format we avoid touching the Android app at all.)
+## 7. `aired` stays a `YYYY-MM-DD` string (risk removed)
 
-## 9. Pre-existing bug uncovered (needs a decision)
+instr-2 keeps the human-readable `YYYY-MM-DD` string instead of a unix timestamp,
+which **removes the highest-risk item** from revision 1. `calculateWaitStr` and
+`checkAndDownloadOpnSrt` already do string / `new Date(str)` math, so they only
+change their **lookup source** (`getAired(ed, s, e)` instead of
+`episodeAiredDates[key]`), not their date logic. `isUnaired` uses the same
+lexical `aired > today` comparison the code already relies on.
 
-`apps/srvr/index.js` ~L1048:
+Other readers swap to helpers with no logic change: `calculateWatchedCount` →
+`countWatched`; `emby.js` gap set → `episodeData`; `checkAndDownloadOpnSrt` →
+`isWatched`/`getAired`; `getFirstFilesOnDiskSeasonGap` → `seasonsPresent`;
+flexget → `isWatched`/`hasFile`; `needsIntro` → `seasonsPresent(...).length`;
+L1048 → `isWatched` (see §11.6); `down/src/main.js` and the asr script →
+`isWatched`. `computeShowQuality` → `computeQuality`.
 
-```js
-if (tvdbRec.watchedEpis?.[key]?.watched) return false;
-```
+## 8. `gapCheckOne` moves off Emby onto `episodeData`
 
-`watchedEpis` is an **array of season-first rows**, but this indexes it like an
-**object keyed by `"S01E01"`** and reads `.watched`. That condition is therefore
-**always false today** (dead/broken code). Under the new model,
-`episodeData[season][episode].watched` _does_ exist, so a faithful port would make
-this check start working and begin **skipping watched episodes** for subtitle
-download — a behavior change.
+Per `docs/epi-usage.md`, every field `emby.getShowState` reads maps onto
+`episodeData`:
 
-Decision needed: port it to working `isWatched(...)` (fixes the latent bug, but
-changes subtitle behavior) **or** preserve today's effective behavior (treat as
-always-false / drop the line). My recommendation: port to `isWatched(...)`, since
-the surrounding code clearly intends to skip watched episodes, but it should be
-an explicit, logged change.
+| Emby read                   | `episodeData` source          |
+| --------------------------- | ----------------------------- |
+| season list / structure     | `seasonsPresent` / iteration  |
+| `UserData.Played`           | `isWatched`                   |
+| `LocationType != "Virtual"` | `hasFile`                     |
+| `IsUnaired=true`            | `isUnaired` (`aired > today`) |
+
+`tvdbStatus` / `firstAired` (used by `skipMissingFileGap`) are already on the
+record. So `getShowState`/`gapCheckOne` are rewritten as a **pure function over
+`episodeData`** with **zero Emby calls** — the single biggest reduction in Emby
+traffic (~`1 + 2·N_seasons` calls per show per pass eliminated). This relies on
+`episodeData.watched` being fresh, which the refresh function (§5) guarantees
+before the gap computation runs.
+
+## 9. seriesMap boundary (server + client/Android)
+
+Today the **client** (`apps/client/src/components/list.vue`) calls Emby directly
+(`import * as emby from "../emby.js"`) to build the map, then overlays
+`filesOnDisk`/`fileQuality`/`watchedEpis` from the tvdb record.
+
+Target: build the seriesMap from `episodeData` via `toSeriesMap(ed, folder,
+today)`, emitting the existing wire shape
+`[[season, [[ep, { error, played, avail, noFile, unaired, path, id, quality }]], …]]`:
+
+| seriesMap field   | from `episodeData`           |
+| ----------------- | ---------------------------- |
+| `played`          | `watched`                    |
+| `noFile`          | `!hasFile`                   |
+| `unaired`         | `aired > today`              |
+| `avail`           | `hasFile && !unaired`        |
+| `path`            | reconstructed full path (§6) |
+| `id`              | `id`                         |
+| `quality`         | `res`                        |
+| `error`,`deleted` | `false`                      |
+
+Two options for **where** this happens (decision — §11.3):
+
+- **A. Server-side, wire format unchanged.** `/api/getSeriesMapFrom*` refreshes
+  `episodeData` (§5) then returns `toSeriesMap(...)`. Client/Android untouched.
+  Lowest risk; the only direct-Emby map path stays inside the server.
+- **B. Client-side from `episodeData`.** Client builds the map from
+  `allTvdb[show].episodeData` (it already has the records), eliminating the
+  client→Emby call entirely. Bigger win, but **changes client + Android** and
+  both UIs must stay in sync (repo rule); requires the server to have refreshed
+  `episodeData` before the record reaches the client.
+
+Recommendation: ship **A first** (server authoritative, no client change), then
+optionally move to **B**. Either way the legacy `watchedEpis` array on the
+`/api/getSeriesMapFromTvdb` request is derived from `episodeData` server-side.
 
 ## 10. Migration
 
-A one-time migration script (`scripts/migrate-to-episodeData.js`, following the
-existing `scripts/migrate-*.js` pattern) converts every record:
+The old four properties **cannot** fully populate the new format: old
+`filesOnDisk` stored episode *numbers*, not file *names*, and `id`/`path` never
+existed in the record. So migration is essentially a **bulk refresh**
+(`scripts/migrate-to-episodeData.js`, following `scripts/migrate-*.js`):
 
-1. Build `episodeData` from the four old props:
-   - `watchedEpis` rows → `watched: true`
-   - `filesOnDisk` rows → `hasFile: true`
-   - `fileQuality["SxxExx"]` → `res`
-   - `episodeAiredDates["SxxExx"]` (date string) → `aired` (converted to unix
-     timestamp — see §11 for the unit decision)
-2. Delete the four old properties from the record.
-3. Recompute `quality` via `computeQualityFromEpisodeData` and `watchedCount` via
-   `countWatched` and assert they equal the previously stored values (sanity check).
+1. Seed `episodeData` from old props: `aired` (string, as-is), `watched`, `res`.
+   (`hasFile` cannot be carried — old data had no file names.)
+2. Run `refreshEpisodeData(show, rec, { force: true })` per show to fill
+   `file`/`id` (Emby + disk) and reconcile `hasFile`/`res`.
+3. Delete `episodeAiredDates`, `watchedEpis`, `filesOnDisk`, `fileQuality`.
+4. Assert `computeQuality`/`countWatched` match the previously stored
+   `quality`/`watchedCount`; log diffs (sanity check).
 
-**Operational note (repo rule):** `tv-srvr` must be **stopped** before the
-migration writes `tvdb.json` directly on disk, to avoid the running server
-overwriting it with a stale in-memory copy. Take a backup copy of `tvdb.json`
-first. Deploy the code that reads/writes `episodeData` and the migration together
-(server stays down across migrate → deploy → restart) so a restarted old/new
-server never sees a half-converted file.
+**Cost:** one disk scan per show (~30 ms) + one Emby seriesMap per in-Emby show
+(~9 local calls) + one TVDB call where aired is stale — the §5 refresh cost
+(~under 1 s/show, mostly local). For ~260 shows this is a few minutes; acceptable
+as a one-time job. Alternative (decision §11.4): seed steps 1+3 only and let the
+background loop fill `file`/`id` lazily — faster migration but gap/quality are
+degraded until each show is processed.
 
-## 11. Open decisions / ambiguities / suggestions
+**Operational (repo rule):** stop `tv-srvr` first (avoid stale overwrite of
+`tvdb.json`), back up `tvdb.json`, run migrate → deploy → restart together, then
+check `pm2 logs` for restart/crash loops.
 
-1. **`aired` timestamp unit.** The instruction says "unix timestamp" but the
-   source is date-only (`YYYY-MM-DD`). I will store **unix seconds at UTC
-   midnight** of that date (consistent with the conventional meaning of "unix
-   timestamp"). Suggestion to confirm: if you would rather avoid `*1000`
-   conversions in JS date math, store **milliseconds** instead — pick one before
-   implementation. (Impacts §7.)
+## 11. Ambiguities / contradictions / suggestions
 
-2. **`res` source is sparser than `hasFile`.** Today `fileQuality` only gets an
-   entry when the resolution probes successfully _and_ the filename title matches;
-   `filesOnDisk` lists every parsed episode file. So some episodes will have
-   `hasFile: true` with no `res`. That is expected and fine
-   (`computeQualityFromEpisodeData` ignores missing `res`), but noting it so the
-   absence of `res` is not treated as a bug.
+1. **Season-folder reconstruction edge cases.** `Season <season>` assumes
+   unpadded folders and that specials live in `Season 0`. Some libraries use
+   `Specials` or zero-padded `Season 01`. If any show deviates, reconstructed
+   paths won't resolve. Suggest: during migration, verify each reconstructed
+   path exists on disk and log mismatches before trusting reconstruction for
+   playback.
 
-3. **`aired` is the superset.** `aired` exists for every TVDB-listed episode,
-   including ones with no file and not watched. So many `episodeData` cells will
-   contain only `{ aired }`. This is by design.
+2. **`aired` may be missing.** A few episodes have no TVDB air date; slot `[0]`
+   then needs a placeholder. Since `[0]` is the always-present anchor, suggest
+   storing `0` for an unknown aired date (consistent with the "0 for null" rule)
+   and treating `0` as "unknown / not unaired". Confirm.
 
-4. **Episode 0 / season 0 slots.** Episode numbers normally start at 1, so
-   `episodeData[s][0]` is almost always `null`. Season 0 (specials) is supported
-   but usually `null`. No special handling required; just flagging the wasted
-   index-0 slot.
+3. **Server-built vs client-built seriesMap (§9).** Pick A or B. Recommendation:
+   A first (no client/Android change), B later.
 
-5. **Whole-array overwrite hazard.** As noted in §5, several writers currently do
-   `tvdbRecord.filesOnDisk = ...` (full replace). They must become merges into
-   `episodeData` so a disk scan does not erase `aired`/`watched`. This is the main
-   correctness pitfall.
+4. **Migration depth (§10).** Full bulk refresh (correct immediately) vs
+   seed-then-lazy (faster migration, temporarily degraded gap/quality).
+   Recommendation: full bulk refresh — only minutes, avoids a degraded window.
 
-6. **Two copies of the helpers.** `seriesMapToWatchedEpis` etc. are duplicated in
-   srvr and client. Keeping the seriesMap wire format unchanged (§8) means only
-   the server copy interacts with `episodeData`; the client copy stays as-is.
+5. **`id` sentinel.** `0` means "no Emby id". Emby ids are large integers, so `0`
+   is a safe sentinel. Noted, not a problem.
 
-7. **No impossibilities found.** The four old shapes map cleanly onto
-   `episodeData`. The only lossy/behavioral points are the `aired` string→timestamp
-   conversion (§7) and the latent L1048 bug (§9).
+6. **Latent bug at `apps/srvr/index.js` ~L1048.** `tvdbRec.watchedEpis?.[key]?.watched`
+   indexes the season-first array as if it were an `"SxxExx"` object — always
+   false today. Porting to `isWatched(ed, s, e)` makes it actually skip watched
+   episodes for subtitle download (a behavior change). Recommend porting it (the
+   intent is clearly to skip watched), as an explicit, logged change.
+
+7. **Direct-Emby calls remaining.** Even with option B, a live Emby call is still
+   needed when (a) the user plays an episode whose stored `id`/`path` is stale
+   (rare; fall back on playback failure), and (b) the periodic Emby full-sweep
+   that discovers added/removed shows (`runEmbyFullSweep`) — show-level, not
+   episode-level, and stays.
+
+8. **No impossibilities.** Every old shape maps onto the new tuple. The only
+   genuinely new dependencies are file-name capture (needs a disk/Emby scan, via
+   the refresh function) and path-reconstruction correctness (§6, §11.1).
 
 ## 12. Suggested implementation order
 
-1. Add shared helpers + `computeQualityFromEpisodeData` (with unit tests).
-2. Write + dry-run the migration script (no file changes; report a diff).
-3. Update writers (§5) to merge into `episodeData`.
-4. Update readers (§6), including the `calculateWaitStr`/OpenSubtitles numeric
-   rewrite (§7).
-5. Decide §9 and §11.1, apply.
-6. Stop `tv-srvr`, back up `tvdb.json`, run migration, deploy, restart, verify
-   `pm2 logs` for restart/crash loops.
-
-```
+1. `packages/share/src/episodeData.js`: helpers + `toSeriesMap` +
+   `computeQuality`/`countWatched` (unit-test the trailing-drop encode).
+2. `refreshEpisodeData` (§5) wrapping the existing TVDB/Emby/disk fetchers.
+3. Rewrite `getShowState`/`gapCheckOne` as a pure `episodeData` function (§8).
+4. Point readers at the helpers (§7), including the L1048 fix (§11.6).
+5. Replace writers with `refreshEpisodeData` (§5 table).
+6. seriesMap boundary option A (server builds from `episodeData`).
+7. Migration (§10): stop srvr, back up, bulk-refresh, drop old props, deploy,
+   restart, verify `pm2 logs`.
+8. (Optional) seriesMap option B — client/Android build from `episodeData`.
 
 ```

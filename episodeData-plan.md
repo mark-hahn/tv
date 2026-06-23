@@ -5,12 +5,12 @@
 Replace four large, separately-stored per-episode properties on each `tvdb.json`
 show record with one consolidated property, `episodeData`:
 
-| Old property         | Old storage shape                                  | New key   | New value                          |
-| -------------------- | -------------------------------------------------- | --------- | ---------------------------------- |
-| `filesOnDisk`        | `[[season, ep, ep, ...], ...]` (season-first rows) | `hasFile` | `true` when a video file exists    |
-| `fileQuality`        | `{ "S02E03": 1080, ... }` (object keyed `SxxExx`)  | `res`     | integer resolution (e.g. `1080`)   |
-| `episodeAiredDates`  | `{ "S01E01": "2011-11-30", ... }` (date strings)   | `aired`   | unix timestamp                     |
-| `watchedEpis`        | `[[season, ep, ep, ...], ...]` (season-first rows) | `watched` | `true` when the episode is watched |
+| Old property        | Old storage shape                                  | New key   | New value                          |
+| ------------------- | -------------------------------------------------- | --------- | ---------------------------------- |
+| `filesOnDisk`       | `[[season, ep, ep, ...], ...]` (season-first rows) | `hasFile` | `true` when a video file exists    |
+| `fileQuality`       | `{ "S02E03": 1080, ... }` (object keyed `SxxExx`)  | `res`     | integer resolution (e.g. `1080`)   |
+| `episodeAiredDates` | `{ "S01E01": "2011-11-30", ... }` (date strings)   | `aired`   | unix timestamp                     |
+| `watchedEpis`       | `[[season, ep, ep, ...], ...]` (season-first rows) | `watched` | `true` when the episode is watched |
 
 ## 2. Target on-disk (`tvdb.json`) representation
 
@@ -74,23 +74,23 @@ All helpers treat a missing season/episode/key as "unknown" and never throw.
 
 ```js
 // Read accessors
-getEpisode(episodeData, season, episode)      // -> episode object | null
-hasFileOnDisk(episodeData, season, episode)    // -> boolean
-getEpisodeRes(episodeData, season, episode)    // -> int | null
-getAired(episodeData, season, episode)         // -> timestamp | null
-isWatched(episodeData, season, episode)        // -> boolean
+getEpisode(episodeData, season, episode); // -> episode object | null
+hasFileOnDisk(episodeData, season, episode); // -> boolean
+getEpisodeRes(episodeData, season, episode); // -> int | null
+getAired(episodeData, season, episode); // -> timestamp | null
+isWatched(episodeData, season, episode); // -> boolean
 
 // Iteration
-forEachEpisode(episodeData, cb)                // cb(season, episode, epObj)
-watchedKeySet(episodeData)                     // -> Set("S01E01", ...) (compat shim)
-diskKeySet(episodeData)                        // -> Set("1-1", ...)    (compat shim)
-seasonsOnDisk(episodeData)                      // -> sorted [season, ...] with any hasFile
+forEachEpisode(episodeData, cb); // cb(season, episode, epObj)
+watchedKeySet(episodeData); // -> Set("S01E01", ...) (compat shim)
+diskKeySet(episodeData); // -> Set("1-1", ...)    (compat shim)
+seasonsOnDisk(episodeData); // -> sorted [season, ...] with any hasFile
 
 // Write helpers (mutating, used by writers/migration)
-setEpisodeFlag(episodeData, season, episode, key, value)
-setSeasonFromList(episodeData, season, eps, key)   // bulk set hasFile/watched
-computeQualityFromEpisodeData(episodeData)         // replaces computeShowQuality
-countWatched(episodeData)                          // replaces calculateWatchedCount
+setEpisodeFlag(episodeData, season, episode, key, value);
+setSeasonFromList(episodeData, season, eps, key); // bulk set hasFile/watched
+computeQualityFromEpisodeData(episodeData); // replaces computeShowQuality
+countWatched(episodeData); // replaces calculateWatchedCount
 ```
 
 `computeShowQuality(fileQuality)` is replaced by `computeQualityFromEpisodeData`
@@ -99,18 +99,18 @@ episode's `res`).
 
 ## 5. Producers to update (writers)
 
-| Location                                                            | Today writes                          | Change                                                                            |
-| ------------------------------------------------------------------ | ------------------------------------- | -------------------------------------------------------------------------------- |
-| `apps/srvr/index.js` `getShowsFromDisk` / `getShowDiskInfo`        | returns `[date,size,filesOnDisk,fileQuality]` | return `[date,size,episodeDiskData]` where `episodeDiskData` carries `hasFile`+`res` per episode |
-| `apps/srvr/index.js` perShow disk check (~L2502-2524)              | `tvdbRecord.filesOnDisk/.fileQuality` | merge disk `hasFile`/`res` into `tvdbRecord.episodeData` (preserve `aired`/`watched`) |
-| `apps/srvr/index.js` `/api/populateFilesOnDisk` (~L3884)          | sets `filesOnDisk/fileQuality`        | merge disk fields into `episodeData`                                              |
-| `apps/srvr/index.js` chokidar handlers (~L7933, ~L8319)           | sets `filesOnDisk/fileQuality`        | merge disk fields into `episodeData`                                              |
-| `apps/srvr/index.js` chokidar watchedEpis refresh (~L8362)        | sets `watchedEpis/watchedCount`       | merge `watched` into `episodeData`; `watchedCount = countWatched(...)`            |
-| `apps/srvr/src/tvdb.js` record build (~L1983-1987)                | preserves the four old props          | preserve single `episodeData`                                                     |
-| `apps/srvr/src/tvdb.js` update path (~L2341, ~L2383-2400)         | sets `watchedEpis`, `episodeAiredDates` | merge `watched`/`aired` into `episodeData`                                        |
+| Location                                                    | Today writes                                  | Change                                                                                           |
+| ----------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `apps/srvr/index.js` `getShowsFromDisk` / `getShowDiskInfo` | returns `[date,size,filesOnDisk,fileQuality]` | return `[date,size,episodeDiskData]` where `episodeDiskData` carries `hasFile`+`res` per episode |
+| `apps/srvr/index.js` perShow disk check (~L2502-2524)       | `tvdbRecord.filesOnDisk/.fileQuality`         | merge disk `hasFile`/`res` into `tvdbRecord.episodeData` (preserve `aired`/`watched`)            |
+| `apps/srvr/index.js` `/api/populateFilesOnDisk` (~L3884)    | sets `filesOnDisk/fileQuality`                | merge disk fields into `episodeData`                                                             |
+| `apps/srvr/index.js` chokidar handlers (~L7933, ~L8319)     | sets `filesOnDisk/fileQuality`                | merge disk fields into `episodeData`                                                             |
+| `apps/srvr/index.js` chokidar watchedEpis refresh (~L8362)  | sets `watchedEpis/watchedCount`               | merge `watched` into `episodeData`; `watchedCount = countWatched(...)`                           |
+| `apps/srvr/src/tvdb.js` record build (~L1983-1987)          | preserves the four old props                  | preserve single `episodeData`                                                                    |
+| `apps/srvr/src/tvdb.js` update path (~L2341, ~L2383-2400)   | sets `watchedEpis`, `episodeAiredDates`       | merge `watched`/`aired` into `episodeData`                                                       |
 
 **Merge semantics:** disk scans (`hasFile`/`res`) and Emby/TVDB scans
-(`watched`/`aired`) update *different keys* of the same episode object. Writers
+(`watched`/`aired`) update _different keys_ of the same episode object. Writers
 must merge into the existing `episodeData` rather than overwrite the whole array,
 otherwise a disk scan would wipe `aired`/`watched` and vice-versa. A disk re-scan
 should also clear `hasFile`/`res` for episodes no longer present (handled by
@@ -118,21 +118,21 @@ rebuilding the disk-derived keys for the seasons the scan covers).
 
 ## 6. Consumers to update (readers)
 
-| Location                                                                    | Reads today                              | Change                                                          |
-| --------------------------------------------------------------------------- | ---------------------------------------- | -------------------------------------------------------------- |
-| `apps/srvr/src/tvdb.js` `calculateWaitStr`                                   | `episodeAiredDates`,`watchedEpis`,`filesOnDisk` | iterate `episodeData` (`aired`/`watched`/`hasFile`) — see §7 |
-| `apps/srvr/src/tvdb.js` `calculateWatchedCount`                             | `watchedEpis`                            | `countWatched(episodeData)`                                     |
-| `apps/srvr/src/tvdb.js` `seriesMapToWatchedEpis` / `applyWatchedEpisToSeriesMap` | array form                          | keep producing legacy array form for the seriesMap API, fed from/into `episodeData` (see §8) |
-| `apps/srvr/src/emby.js` gap check (~L248-255)                              | `filesOnDisk` → `S-E` set                | `diskKeySet(episodeData)`                                       |
-| `apps/srvr/index.js` `checkAndDownloadOpnSrt` (~L2319-2365)               | `watchedEpis` + `episodeAiredDates`      | `isWatched(...)` + `getAired(...)`                              |
-| `apps/srvr/index.js` `getFirstFilesOnDiskSeasonGap` (~L6749)             | `filesOnDisk`                            | `seasonsOnDisk(episodeData)`                                    |
-| `apps/srvr/index.js` flexget (~L6857-6963)                               | `watchedEpis`, `filesOnDisk`             | `isWatched(...)`, `hasFileOnDisk(...)`                          |
-| `apps/srvr/index.js` `needsIntro` compute (~L2592)                       | `filesOnDisk.length > 0`                 | `seasonsOnDisk(episodeData).length > 0`                         |
-| `apps/srvr/index.js` subtitle eligibility (~L1048) **(see §9 — current bug)** | `watchedEpis?.[key]?.watched`       | `isWatched(episodeData, season, episode)`                      |
-| `packages/share` `computeShowQuality`                                     | `fileQuality`                            | `computeQualityFromEpisodeData`                                |
-| `apps/down/src/main.js` (~L3050, ~L3365)                                 | `watchedEpis` array (from emby map)      | `isWatched(...)` against `episodeData`                          |
-| `apps/client/src/tvdb.js`                                                 | `seriesMapToWatchedEpis` (UI only)       | unaffected if seriesMap API stays array-based (see §8)         |
-| `scripts/find-asr-only-for-processing.js`                                 | `watchedEpis`                            | read `episodeData` via helper (or inline)                      |
+| Location                                                                         | Reads today                                     | Change                                                                                       |
+| -------------------------------------------------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `apps/srvr/src/tvdb.js` `calculateWaitStr`                                       | `episodeAiredDates`,`watchedEpis`,`filesOnDisk` | iterate `episodeData` (`aired`/`watched`/`hasFile`) — see §7                                 |
+| `apps/srvr/src/tvdb.js` `calculateWatchedCount`                                  | `watchedEpis`                                   | `countWatched(episodeData)`                                                                  |
+| `apps/srvr/src/tvdb.js` `seriesMapToWatchedEpis` / `applyWatchedEpisToSeriesMap` | array form                                      | keep producing legacy array form for the seriesMap API, fed from/into `episodeData` (see §8) |
+| `apps/srvr/src/emby.js` gap check (~L248-255)                                    | `filesOnDisk` → `S-E` set                       | `diskKeySet(episodeData)`                                                                    |
+| `apps/srvr/index.js` `checkAndDownloadOpnSrt` (~L2319-2365)                      | `watchedEpis` + `episodeAiredDates`             | `isWatched(...)` + `getAired(...)`                                                           |
+| `apps/srvr/index.js` `getFirstFilesOnDiskSeasonGap` (~L6749)                     | `filesOnDisk`                                   | `seasonsOnDisk(episodeData)`                                                                 |
+| `apps/srvr/index.js` flexget (~L6857-6963)                                       | `watchedEpis`, `filesOnDisk`                    | `isWatched(...)`, `hasFileOnDisk(...)`                                                       |
+| `apps/srvr/index.js` `needsIntro` compute (~L2592)                               | `filesOnDisk.length > 0`                        | `seasonsOnDisk(episodeData).length > 0`                                                      |
+| `apps/srvr/index.js` subtitle eligibility (~L1048) **(see §9 — current bug)**    | `watchedEpis?.[key]?.watched`                   | `isWatched(episodeData, season, episode)`                                                    |
+| `packages/share` `computeShowQuality`                                            | `fileQuality`                                   | `computeQualityFromEpisodeData`                                                              |
+| `apps/down/src/main.js` (~L3050, ~L3365)                                         | `watchedEpis` array (from emby map)             | `isWatched(...)` against `episodeData`                                                       |
+| `apps/client/src/tvdb.js`                                                        | `seriesMapToWatchedEpis` (UI only)              | unaffected if seriesMap API stays array-based (see §8)                                       |
+| `scripts/find-asr-only-for-processing.js`                                        | `watchedEpis`                                   | read `episodeData` via helper (or inline)                                                    |
 
 ## 7. Detail: `calculateWaitStr` + the `aired` timestamp change (IMPORTANT)
 
@@ -180,7 +180,7 @@ if (tvdbRec.watchedEpis?.[key]?.watched) return false;
 `watchedEpis` is an **array of season-first rows**, but this indexes it like an
 **object keyed by `"S01E01"`** and reads `.watched`. That condition is therefore
 **always false today** (dead/broken code). Under the new model,
-`episodeData[season][episode].watched` *does* exist, so a faithful port would make
+`episodeData[season][episode].watched` _does_ exist, so a faithful port would make
 this check start working and begin **skipping watched episodes** for subtitle
 download — a behavior change.
 
@@ -222,7 +222,7 @@ server never sees a half-converted file.
    implementation. (Impacts §7.)
 
 2. **`res` source is sparser than `hasFile`.** Today `fileQuality` only gets an
-   entry when the resolution probes successfully *and* the filename title matches;
+   entry when the resolution probes successfully _and_ the filename title matches;
    `filesOnDisk` lists every parsed episode file. So some episodes will have
    `hasFile: true` with no `res`. That is expected and fine
    (`computeQualityFromEpisodeData` ignores missing `res`), but noting it so the
@@ -260,4 +260,7 @@ server never sees a half-converted file.
 5. Decide §9 and §11.1, apply.
 6. Stop `tv-srvr`, back up `tvdb.json`, run migration, deploy, restart, verify
    `pm2 logs` for restart/crash loops.
+
+```
+
 ```

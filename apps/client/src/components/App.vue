@@ -584,6 +584,7 @@ import evtBus from "../evtBus.js";
 import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
 import * as srvr from "../srvr.js";
+import * as epd from "@tv/share";
 import { config } from "../config.js";
 import paneHelp from "../paneHelp.js";
 import * as urls from "../urls.js";
@@ -1020,8 +1021,7 @@ export default {
           introShow.needsIntro = false;
         } else {
           const hasFiles =
-            Array.isArray(introShow.filesOnDisk) &&
-            introShow.filesOnDisk.length > 0;
+            epd.seasonsWithFile(introShow.episodeData).length > 0;
           const hasUnwatched =
             Number(introShow.episodeCount ?? 0) >
             Number(introShow.watchedCount ?? 0);
@@ -1213,10 +1213,7 @@ export default {
       for (let i = idx + 1; i < shows.length; i++) {
         const s = shows[i];
         const hasPlayableIntroFile =
-          Array.isArray(s?.filesOnDisk) &&
-          s.filesOnDisk.some(
-            (seasonRow) => Array.isArray(seasonRow) && seasonRow.length > 1,
-          );
+          epd.seasonsWithFile(s?.episodeData).length > 0;
         const hasNoPlayableIntroFile = !hasPlayableIntroFile;
         if (
           s.seasonIntros != null ||

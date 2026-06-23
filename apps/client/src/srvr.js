@@ -510,6 +510,14 @@ export function getSeriesMapFromTvdb(params) {
   return httpCall("/api/getSeriesMapFromTvdb", params, "POST");
 }
 
+export function getSeriesMapFromEmby(params) {
+  return httpCall("/api/getSeriesMapFromEmby", params, "POST");
+}
+
+export function setWatchedEpis(params) {
+  return httpCall("/api/setWatchedEpis", params, "POST");
+}
+
 export function handleAsr(params) {
   return fCall("handleAsr", params);
 }

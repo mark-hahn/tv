@@ -9,13 +9,14 @@
 
 1. follow your suggestion
 2. Confirmed
-3. use whichever option you want since having to deploy android is no problem and make change in step
-4.  do bulk refresh and not lazily
+3. use whichever option you want since having to deploy android is no problem
+4. do bulk refresh, not lazily
 5. noted
-6. follow your recommendation port it
+6. follow your recommendation and port it
 7. noted
 
 ## §12 follow your Suggested implementation order
 
 note: if you see any more Ambiguities or contradictions then you decide on fix unless fix would require large rewrite -- then stop and ask me -- if you see impossibility then stop and report it
 
+- implement updated plan

@@ -1,3 +1,5 @@
+export * from "./episodeData.js";
+
 export const TV_BLOCKED = {
   sample: true,
   ".sfv": true,

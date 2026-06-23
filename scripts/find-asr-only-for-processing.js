@@ -49,20 +49,20 @@ function parseSeasonEpisode(filePath) {
   return { season: parseInt(m[1], 10), episode: parseInt(m[2], 10) };
 }
 
-// Build a Set of "S01E01"-style keys that are watched for a show record
-function buildWatchedSet(watchedEpis) {
+// Build a Set of "S01E01"-style keys that are watched for a show record,
+// reading the consolidated episodeData property.
+function buildWatchedSet(episodeData) {
   const set = new Set();
-  if (!Array.isArray(watchedEpis)) return set;
-  for (const row of watchedEpis) {
-    if (!Array.isArray(row) || row.length < 2) continue;
-    const seasonNum = row[0];
-    for (let i = 1; i < row.length; i++) {
-      const epNum = row[i];
+  if (!Array.isArray(episodeData)) return set;
+  for (let s = 0; s < episodeData.length; s++) {
+    const season = episodeData[s];
+    if (!Array.isArray(season)) continue;
+    for (let i = 0; i < season.length; i++) {
+      const ep = season[i];
+      if (!Array.isArray(ep) || ep[1] !== 1) continue;
+      const epNum = i + 1;
       const key =
-        "S" +
-        String(seasonNum).padStart(2, "0") +
-        "E" +
-        String(epNum).padStart(2, "0");
+        "S" + String(s).padStart(2, "0") + "E" + String(epNum).padStart(2, "0");
       set.add(key);
     }
   }
@@ -194,7 +194,7 @@ for (const vp of allVideos) {
     String(episode).padStart(2, "0");
 
   // Skip if watched
-  const watchedSet = buildWatchedSet(tvdbRec.watchedEpis);
+  const watchedSet = buildWatchedSet(tvdbRec.episodeData);
   if (watchedSet.has(key)) {
     skippedWatched++;
     continue;

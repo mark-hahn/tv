@@ -954,6 +954,7 @@ import * as urls from "../urls.js";
 import * as util from "../util.js";
 import evtBus from "../evtBus.js";
 import { fmtPos } from "@tv/share";
+import * as epd from "@tv/share";
 
 const MAP_ARROW_PAN_PX_PER_SEC = 400;
 const MAP_PAN_SMOOTH_TAU_SEC = 0.1;
@@ -1088,19 +1089,23 @@ export default {
     seasonDateRanges() {
       const seasons = this.seriesMapSeasons;
       if (!seasons?.length) return {};
-      const ead = this.tvdbData?.episodeAiredDates;
+      const ed = this.tvdbData?.episodeData;
       const result = {};
       const firstSeason = Math.min(...seasons);
       const lastSeason = Math.max(...seasons);
-      if (ead) {
+      const hasEd =
+        Array.isArray(ed) && ed.some((s) => Array.isArray(s) && s.length);
+      if (hasEd) {
         for (const season of seasons) {
-          const padded = String(season).padStart(2, "0");
-          const prefix = `S${padded}E`;
-          const dates = Object.entries(ead)
-            .filter(([k]) => k.startsWith(prefix))
-            .map(([, v]) => v)
-            .filter(Boolean)
-            .sort();
+          const seasonArr = ed[season];
+          const dates = [];
+          if (Array.isArray(seasonArr)) {
+            for (let i = 0; i < seasonArr.length; i++) {
+              const a = epd.getAired(ed, season, i + 1);
+              if (a) dates.push(a);
+            }
+          }
+          dates.sort();
           if (dates.length > 0) {
             let endDate = dates[dates.length - 1];
             if (

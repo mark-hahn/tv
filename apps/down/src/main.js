@@ -19,6 +19,7 @@ import {
   postHistory,
   TV_BLOCKED,
   getResolution,
+  isWatched as edIsWatched,
 } from "@tv/share";
 
 const __filename = urlNode.fileURLToPath(import.meta.url);
@@ -3047,20 +3048,9 @@ async function main() {
       Number.isInteger(season) &&
       Number.isInteger(episode)
     ) {
-      const watchedEpis = embyMap[embyKeyForFolder]?.watchedEpis;
-      if (Array.isArray(watchedEpis)) {
-        let epIsWatched = false;
-        for (let wi = 0; wi < watchedEpis.length; wi++) {
-          const wRow = watchedEpis[wi];
-          if (!Array.isArray(wRow) || wRow[0] !== season) continue;
-          for (let wj = 1; wj < wRow.length; wj++) {
-            if (wRow[wj] === episode) {
-              epIsWatched = true;
-              break;
-            }
-          }
-          if (epIsWatched) break;
-        }
+      const epData = embyMap[embyKeyForFolder]?.episodeData;
+      const epIsWatched = edIsWatched(epData, season, episode);
+      {
         if (epIsWatched) {
           const seStr = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
           existsCount++;
@@ -3362,21 +3352,11 @@ async function main() {
 
       // Check if the episode is already watched.
       var embyEntryForWatched = embyMap && embyMap[embyKeyForFolder];
-      var watchedEpis = embyEntryForWatched && embyEntryForWatched.watchedEpis;
-      var epIsWatched = false;
-      if (Array.isArray(watchedEpis)) {
-        for (var wi = 0; wi < watchedEpis.length; wi++) {
-          var wRow = watchedEpis[wi];
-          if (!Array.isArray(wRow) || wRow[0] !== season) continue;
-          for (var wj = 1; wj < wRow.length; wj++) {
-            if (wRow[wj] === episode) {
-              epIsWatched = true;
-              break;
-            }
-          }
-          if (epIsWatched) break;
-        }
-      }
+      var epIsWatched = edIsWatched(
+        embyEntryForWatched && embyEntryForWatched.episodeData,
+        season,
+        episode,
+      );
       if (epIsWatched) {
         existsCount++;
         log(

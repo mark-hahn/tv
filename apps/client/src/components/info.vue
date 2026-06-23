@@ -515,6 +515,7 @@ import evtBus from "../evtBus.js";
 import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
 import * as srvr from "../srvr.js";
+import * as epd from "@tv/share";
 import * as util from "../util.js";
 
 let allTvdb = null;
@@ -588,12 +589,7 @@ export default {
       );
     },
     hasVideoFiles() {
-      return (
-        Array.isArray(this.show?.filesOnDisk) &&
-        this.show.filesOnDisk.some(
-          (seasonRow) => Array.isArray(seasonRow) && seasonRow.length > 1,
-        )
-      );
+      return epd.seasonsWithFile(this.show?.episodeData).length > 0;
     },
   },
 
@@ -687,10 +683,7 @@ export default {
 
     async introClick() {
       const hasPlayableIntroFile =
-        Array.isArray(this.show?.filesOnDisk) &&
-        this.show.filesOnDisk.some(
-          (seasonRow) => Array.isArray(seasonRow) && seasonRow.length > 1,
-        );
+        epd.seasonsWithFile(this.show?.episodeData).length > 0;
       if (!hasPlayableIntroFile) {
         return;
       }
@@ -726,15 +719,16 @@ export default {
     },
 
     playFirstUnwatched() {
-      const filesOnDisk = this.show?.filesOnDisk;
-      if (!Array.isArray(filesOnDisk) || filesOnDisk.length === 0) {
-        window.alert("No playable episode found.");
-        return;
-      }
-      const firstRow = filesOnDisk[0];
-      const season = firstRow[0];
-      const episode = firstRow[1];
-      if (!Number.isFinite(season) || !Number.isFinite(episode)) {
+      const ed = this.show?.episodeData;
+      let season = null;
+      let episode = null;
+      epd.forEachEpisode(ed, (s, e) => {
+        if (season === null && epd.hasFile(ed, s, e)) {
+          season = s;
+          episode = e;
+        }
+      });
+      if (season === null || episode === null) {
         window.alert("No playable episode found.");
         return;
       }
@@ -1540,11 +1534,9 @@ export default {
       const { seasonCount, episodeCount } = this.getMapCounts(seriesMap);
       if (!episodeCount || !seasonCount) return;
 
-      // Check if watchedEpis is null or undefined (unknown/missing watch status)
+      // Watch status is unknown only when there is no episodeData at all.
       const tvdbData = allTvdb?.[show.name];
-      const watchedEpisIsNull = tvdbData?.watchedEpis === null;
-      const watchedEpisIsUndefined = tvdbData?.watchedEpis === undefined;
-      const watchedEpisMissing = watchedEpisIsNull || watchedEpisIsUndefined;
+      const watchedEpisMissing = !Array.isArray(tvdbData?.episodeData);
 
       // Calculate watchedCount from seriesMap
       let watchedCount = 0;

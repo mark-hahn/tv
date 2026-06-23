@@ -552,31 +552,15 @@ export default function App() {
     setShowSeriesMap(null);
     (async () => {
       try {
-        let data;
-        if (selectedShow.inEmby !== false) {
-          const res = await fetch(
-            `${TV_SRVR_HTTP_URL}/api/getSeriesMapFromEmby`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ showName: selectedShow.name }),
-            },
-          );
-          data = await res.json();
-        } else {
-          const res = await fetch(
-            `${TV_SRVR_HTTP_URL}/api/getSeriesMapFromTvdb`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                tvdbId: selectedShow.tvdbId,
-                watchedEpis: selectedShow.watchedEpis,
-              }),
-            },
-          );
-          data = await res.json();
-        }
+        const res = await fetch(
+          `${TV_SRVR_HTTP_URL}/api/getSeriesMapFromEmby`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ showName: selectedShow.name }),
+          },
+        );
+        const data = await res.json();
         if (data.success && data.seriesMap) setShowSeriesMap(data.seriesMap);
       } catch (_) {}
     })();
@@ -1518,9 +1502,7 @@ export default function App() {
       if (!cell) return "";
       const w = cell.unaired ? "U" : cell.played ? "W" : "";
       if (cell.avail) {
-        const fq = selectedShow?.fileQuality || {};
-        const key = `S${String(s).padStart(2, "0")}E${String(ep).padStart(2, "0")}`;
-        return w + qualityChar(fq[key]);
+        return w + qualityChar(cell.quality);
       }
       if (cell.unaired) return "U";
       return w + "-";
@@ -1588,31 +1570,15 @@ export default function App() {
 
                 // Find first unwatched episode
                 try {
-                  let data;
-                  if (item.inEmby !== false) {
-                    const res = await fetch(
-                      `${TV_SRVR_HTTP_URL}/api/getSeriesMapFromEmby`,
-                      {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ showName: item.name }),
-                      },
-                    );
-                    data = await res.json();
-                  } else {
-                    const res = await fetch(
-                      `${TV_SRVR_HTTP_URL}/api/getSeriesMapFromTvdb`,
-                      {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          tvdbId: item.tvdbId,
-                          watchedEpis: item.watchedEpis ?? null,
-                        }),
-                      },
-                    );
-                    data = await res.json();
-                  }
+                  const res = await fetch(
+                    `${TV_SRVR_HTTP_URL}/api/getSeriesMapFromEmby`,
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ showName: item.name }),
+                    },
+                  );
+                  const data = await res.json();
 
                   if (data.success && data.seriesMap) {
                     // Find first unwatched episode

@@ -1,5 +1,6 @@
 import * as urls from "./urls.js";
 import fetch from "node-fetch";
+import * as epd from "@tv/share";
 
 const deviceNameByDeviceId = {
   "ca632bcd-7279-4fc2-b5b8-6f92ae6ddb08": "mlap2",
@@ -179,7 +180,7 @@ const safeGet = async (url, retries = 3) => {
   }
 };
 
-const getShowState = async (showId, showName, showMeta) => {
+const getShowState = (showName, showMeta) => {
   // active rows have watched with no watched at end
   // or last epi in last row watched
   let firstEpisode = true;
@@ -218,13 +219,8 @@ const getShowState = async (showId, showName, showMeta) => {
   let anyEpisodeNeitherWatchedNorFile = false;
 
   try {
-    const seasonsRes = await safeGet(urls.childrenUrl(showId));
-    const seasonsData = await seasonsRes.json();
-    const seasons = seasonsData?.Items;
-    if (!seasons) {
-      console.error("getShowState error: seasons is undefined", { showId });
-      return null;
-    }
+    const ed = showMeta?.episodeData;
+    const seasons = epd.seasonsPresent(ed);
 
     // If show has no seasons/episodes, it's not ready to watch
     if (seasons.length === 0) {
@@ -242,22 +238,13 @@ const getShowState = async (showId, showName, showMeta) => {
       };
     }
 
+    const today = toYyyyMmDd(new Date());
+
     // Once we hit an unaired episode, treat all later episodes as unaired.
     let unairedFromHere = false;
 
-    // Build a fast lookup from filesOnDisk: [[season, ep1, ep2,...], ...] -> Set of "S-E" keys
-    const diskFileSet = new Set();
-    if (Array.isArray(showMeta?.filesOnDisk)) {
-      for (const row of showMeta.filesOnDisk) {
-        const s = row[0];
-        for (let i = 1; i < row.length; i++) diskFileSet.add(`${s}-${row[i]}`);
-      }
-    }
-
-    for (let seasonIdx = 0; seasonIdx < seasons.length; seasonIdx++) {
-      const season = seasons[seasonIdx];
-      const seasonId = season.Id;
-      const seasonNumber = season.IndexNumber;
+    for (const seasonNumber of seasons) {
+      const season = ed[seasonNumber];
       let watchedSeason = false;
 
       let fileEndCount = 0;
@@ -266,32 +253,17 @@ const getShowState = async (showId, showName, showMeta) => {
       let seasonNotWatchedNoFiles = true;
       let allSeasonWatched = true;
 
-      const unairedObj = {};
-
-      const unairedRes = await safeGet(urls.childrenUrl(seasonId, true));
-      const unairedData = await unairedRes.json();
-      for (let key in unairedData.Items) {
-        const episode = unairedData.Items[key];
-        const episodeNumber = +episode.IndexNumber;
-        unairedObj[episodeNumber] = true;
-      }
-
-      const episodesRes = await safeGet(urls.childrenUrl(seasonId));
-      const episodesData = await episodesRes.json();
-      const episodes = episodesData.Items;
-      for (let episodeIdx = 0; episodeIdx < episodes.length; episodeIdx++) {
-        const episode = episodes[episodeIdx];
-        const episodeNumber = episode.IndexNumber;
-        if (episodeNumber === undefined) continue;
+      for (let i = 0; i < season.length; i++) {
+        if (!Array.isArray(season[i])) continue;
+        const episodeNumber = i + 1;
         if (firstEpisodeOfSeason === null) firstEpisodeOfSeason = episodeNumber;
         sawAnyEpisode = true;
-        const userData = episode?.UserData;
-        const watched = !!userData?.Played;
-        const embyHaveFile = episode.LocationType != "Virtual";
-        // If disk scan says the file exists, trust it even if Emby hasn't scanned yet
-        const onDisk = diskFileSet.has(`${seasonNumber}-${episodeNumber}`);
-        const haveFile = embyHaveFile || onDisk;
-        const hasPath = !!episode.Path;
+        const watched = epd.isWatched(ed, seasonNumber, episodeNumber);
+        // File on disk is authoritative; it also overrides "unaired".
+        const haveFile = epd.hasFile(ed, seasonNumber, episodeNumber);
+        const onDisk = haveFile;
+        const aired = epd.getAired(ed, seasonNumber, episodeNumber);
+        const rawUnaired = aired ? aired > today : false;
 
         // A file on disk overrides unaired — it clearly aired if we have it
         if (haveFile) fileCount++;
@@ -302,7 +274,7 @@ const getShowState = async (showId, showName, showMeta) => {
           onlyFirstEpisodeHasFile = false;
         }
 
-        let unaired = unairedFromHere || !!unairedObj[episodeNumber];
+        let unaired = unairedFromHere || rawUnaired;
         if (watched) unaired = false;
         else if (onDisk)
           unaired = false; // file on disk overrides unaired
@@ -412,7 +384,6 @@ const getShowState = async (showId, showName, showMeta) => {
     const allEpisodesUnaired = sawAnyEpisode && anyUnaired && !anyAiredEpisode;
     const showStatus = String(showMeta?.tvdbStatus || "").trim();
     const firstAired = String(showMeta?.firstAired || "").trim();
-    const today = toYyyyMmDd(new Date());
     const startDateInFuture = !!firstAired && firstAired > today;
     const skipMissingFileGap =
       allEpisodesUnaired ||
@@ -511,7 +482,7 @@ const getShowState = async (showId, showName, showMeta) => {
 export const gapCheckOne = async (showId, showName, tvdbRecord) => {
   if (!showId || !tvdbRecord) return null;
 
-  const showState = await getShowState(showId, showName, tvdbRecord);
+  const showState = getShowState(showName, tvdbRecord);
 
   if (!showState) {
     console.error(`[gapCheckOne] getShowState returned null for ${showName}`);

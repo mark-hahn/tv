@@ -2330,14 +2330,7 @@ export default {
           seriesMapArr.push([+sNum, episodes]);
         }
         const watchedEpis = tvdb.seriesMapToWatchedEpis(seriesMapArr);
-        if (allTvdb?.[show.name]) {
-          allTvdb[show.name].watchedEpis = watchedEpis;
-        }
-        await srvr.setTvdbFields({
-          name: show.name,
-          watchedEpis,
-          dontEnqueue: true,
-        });
+        await srvr.setWatchedEpis({ name: show.name, watchedEpis });
         // Re-emit to App.vue so the map prop updates
         this.$emit("show-map", {
           mapShow: this.mapShow,
@@ -2366,14 +2359,7 @@ export default {
             seriesMapArr.push([+sNum, episodes]);
           }
           const watchedEpis = tvdb.seriesMapToWatchedEpis(seriesMapArr);
-          if (allTvdb?.[show.name]) {
-            allTvdb[show.name].watchedEpis = watchedEpis;
-          }
-          await srvr.setTvdbFields({
-            name: show.name,
-            watchedEpis,
-            dontEnqueue: true,
-          });
+          await srvr.setWatchedEpis({ name: show.name, watchedEpis });
           this.$emit("show-map", {
             mapShow: this.mapShow,
             hideMapBottom: this.hideMapBottom,
@@ -2533,14 +2519,7 @@ export default {
       }
       const watchedEpis = tvdb.seriesMapToWatchedEpis(seriesMapArr);
       console.log("[seasonWatched] watchedEpis:", JSON.stringify(watchedEpis));
-      if (allTvdb?.[show.name]) {
-        allTvdb[show.name].watchedEpis = watchedEpis;
-      }
-      await srvr.setTvdbFields({
-        name: show.name,
-        watchedEpis,
-        dontEnqueue: true,
-      });
+      await srvr.setWatchedEpis({ name: show.name, watchedEpis });
       // Re-emit to App.vue so the map prop updates
       this.$emit("show-map", {
         mapShow: this.mapShow,
@@ -2575,52 +2554,39 @@ export default {
       const seriesMap = {};
       let errorMessage = "";
 
-      let seriesMapIn = null;
+      // Prune (destructive): delete watched files via Emby before rebuilding.
+      if (action === "prune") {
+        try {
+          await emby.getSeriesMap(show, true);
+        } catch (e) {
+          console.error("prune failed:", e?.message || e);
+        }
+        if (mapToken !== this._mapActionToken) return;
+      }
 
-      // Fetch fresh data from Emby/TVDB
-      seriesMapIn = await emby.getSeriesMap(show, action == "prune");
+      // Build the map from the server's authoritative episodeData. The server
+      // refreshes watched (Emby) + files (disk) and returns the seriesMap in
+      // the legacy wire shape: [[season, [[ep, {error, played, avail, noFile,
+      // unaired, path, id, quality}]], ...], ...].
+      let seriesMapIn = [];
+      try {
+        const resp = await srvr.getSeriesMapFromEmby({ showName: show.name });
+        if (resp?.success && Array.isArray(resp.seriesMap)) {
+          seriesMapIn = resp.seriesMap;
+        } else {
+          errorMessage =
+            resp?.error || "Not in emby and show not found in TVDB.";
+        }
+      } catch (e) {
+        errorMessage = e?.message || "Failed to load series map.";
+      }
 
       // Bail if a newer seriesMapAction started while we were fetching
       if (mapToken !== this._mapActionToken) return;
 
-      // Persist watchedEpis if we got data from Emby
-      if (
-        seriesMapIn &&
-        seriesMapIn.length > 0 &&
-        show.name &&
-        show.inEmby !== false &&
-        allTvdb?.[show.name]
-      ) {
-        const embySeasons = new Set(seriesMapIn.map(([sNum]) => sNum));
-        const existingWatchedEpis = allTvdb[show.name].watchedEpis || [];
-        const embyWatchedEpis = tvdb.seriesMapToWatchedEpis(seriesMapIn);
-        // Preserve watched state for seasons not in Emby (e.g. filesOnDisk-only seasons)
-        const watchedEpis = [
-          ...existingWatchedEpis.filter(([sNum]) => !embySeasons.has(sNum)),
-          ...embyWatchedEpis,
-        ];
-        allTvdb[show.name].watchedEpis = watchedEpis;
-        await srvr.setTvdbFields({
-          name: show.name,
-          watchedEpis: watchedEpis,
-          dontEnqueue: true,
-          dontNotify: true,
-        });
+      if (seriesMapIn.length === 0 && !errorMessage) {
+        errorMessage = "Not in emby and show not found in TVDB.";
       }
-
-      // If emby has no data, try tvdb as fallback
-      if (!seriesMapIn || seriesMapIn.length === 0) {
-        seriesMapIn = await tvdb.getSeriesMap(show);
-        if (!seriesMapIn || seriesMapIn.length === 0) {
-          errorMessage = "Not in emby and show not found in TVDB.";
-          seriesMapIn = []; // Keep empty for error display
-        }
-      }
-
-      // Bail if a newer seriesMapAction started during any of the awaits above
-      if (mapToken !== this._mapActionToken) return;
-
-      const fileQuality = allTvdb?.[show.name]?.fileQuality || {};
 
       for (const season of seriesMapIn) {
         const [seasonNum, episodes] = season;
@@ -2628,63 +2594,9 @@ export default {
         const seasonMap = {};
         seriesMap[seasonNum] = seasonMap;
         for (const episode of episodes) {
-          let [episodeNum, epiObj] = episode;
-          const { error, played, avail, noFile, unaired, path, id } = epiObj;
+          const [episodeNum, epiObj] = episode;
           seriesMapEpis[episodeNum] = episodeNum;
-          const epKey = `S${String(seasonNum).padStart(2, "0")}E${String(episodeNum).padStart(2, "0")}`;
-          seasonMap[episodeNum] = {
-            error,
-            played,
-            avail,
-            noFile,
-            unaired,
-            path,
-            id,
-            quality: fileQuality[epKey],
-          };
-        }
-      }
-
-      // Override avail/noFile using filesOnDisk — shows + immediately when
-      // a file lands on disk without waiting for Emby to finish scanning.
-      const diskFiles = allTvdb?.[show.name]?.filesOnDisk;
-      if (Array.isArray(diskFiles)) {
-        // Build set of watched episodes from persisted watchedEpis for filesOnDisk-only cells
-        const persistedWatchedEpis = allTvdb?.[show.name]?.watchedEpis || [];
-        const filesOnDiskWatchedSet = new Set();
-        for (const entry of persistedWatchedEpis) {
-          const [sNum, ...eps] = entry;
-          for (const ep of eps) filesOnDiskWatchedSet.add(`${sNum}.${ep}`);
-        }
-        for (const row of diskFiles) {
-          const s = row[0];
-          for (let i = 1; i < row.length; i++) {
-            const e = row[i];
-            if (!seriesMap[s]) {
-              seriesMap[s] = {};
-              seriesMapSeasons[s] = s;
-            }
-            if (!seriesMapEpis[e]) seriesMapEpis[e] = e;
-            const cell = seriesMap[s][e];
-            const diskEpKey = `S${String(s).padStart(2, "0")}E${String(e).padStart(2, "0")}`;
-            const diskQ = fileQuality[diskEpKey];
-            if (cell) {
-              cell.avail = true;
-              cell.noFile = false;
-              cell.unaired = false;
-              cell.quality = diskQ;
-            } else {
-              seriesMap[s][e] = {
-                avail: true,
-                noFile: false,
-                unaired: false,
-                played: filesOnDiskWatchedSet.has(`${s}.${e}`),
-                error: false,
-                path: null,
-                quality: diskQ,
-              };
-            }
-          }
+          seasonMap[episodeNum] = epiObj;
         }
       }
       this.seriesMapSeasons = seriesMapSeasons.filter((x) => x !== null);

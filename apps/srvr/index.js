@@ -27,8 +27,8 @@ import {
   normalizeVideoHeightToQuality,
   getResolution,
   STANDARD_RESOLUTIONS,
-  computeShowQuality,
 } from "@tv/share";
+import * as epd from "@tv/share";
 import chokidar from "chokidar";
 import cron from "node-cron";
 import {
@@ -1045,7 +1045,8 @@ async function fileNeedsSubChecked(videoFilePath, showName) {
   const parsed = parseFileSeasonEpisode(videoFilePath);
   if (!parsed) return true;
   const key = `S${String(parsed.season).padStart(2, "0")}E${String(parsed.episode).padStart(2, "0")}`;
-  if (tvdbRec.watchedEpis?.[key]?.watched) return false;
+  if (epd.isWatched(tvdbRec.episodeData, parsed.season, parsed.episode))
+    return false;
   if (tvdbRec.seriesMap) {
     const ep = tvdbRec.seriesMap[key];
     if (ep && ep.aired && new Date(ep.aired) > new Date()) return false;
@@ -2315,22 +2316,10 @@ async function checkAndDownloadOpnSrt(showName, tvdbRecord) {
   resetOpnDailyCountIfNeeded();
   if (opnDailyCount >= OPN_DAILY_LIMIT) return;
 
-  const watchedSet = new Set();
-  if (Array.isArray(tvdbRecord.watchedEpis)) {
-    for (const seasonEntry of tvdbRecord.watchedEpis) {
-      if (!Array.isArray(seasonEntry) || seasonEntry.length < 1) continue;
-      const [seasonNum, ...eps] = seasonEntry;
-      for (const ep of eps) {
-        const key = `S${String(seasonNum).padStart(2, "0")}E${String(ep).padStart(2, "0")}`;
-        watchedSet.add(key);
-      }
-    }
-  }
-
+  const ed = tvdbRecord.episodeData;
   const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
   const now = Date.now();
   const twentyFourHours = 24 * 60 * 60 * 1000;
-  const episodeAiredDates = tvdbRecord.episodeAiredDates || {};
 
   const eligible = [];
   const showFolder = path.join(tvDir, showName);
@@ -2360,9 +2349,9 @@ async function checkAndDownloadOpnSrt(showName, tvdbRecord) {
       const parsed = parseFileSeasonEpisode(fp);
       if (!parsed) continue;
       const key = `S${String(parsed.season).padStart(2, "0")}E${String(parsed.episode).padStart(2, "0")}`;
-      if (watchedSet.has(key)) continue;
+      if (epd.isWatched(ed, parsed.season, parsed.episode)) continue;
 
-      const airedStr = episodeAiredDates[key];
+      const airedStr = epd.getAired(ed, parsed.season, parsed.episode);
       if (!airedStr) continue;
       const airedMs = new Date(airedStr).getTime();
       if (isNaN(airedMs) || airedMs < oneYearAgo || airedMs > now) continue;
@@ -2486,44 +2475,10 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         );
       }
     }
-    // Disk check
-    // If the show name contains "/" (e.g. "Good Cop/Bad Cop"), path.join handles
-    // it correctly, so use the show name directly instead of the path field whose
-    // last segment could collide with a real different show (e.g. "Friends").
-    const diskInfo = showName.includes("/")
-      ? await getShowDiskInfo(showName)
-      : await getShowDiskInfo(
-          (tvdbRecord.path || tvdbRecord.emby?.path || showName)
-            .split("/")
-            .pop(),
-        );
+    // Disk check, date/size/noFiles, filesOnDisk/fileQuality/quality and
+    // episodeData are all refreshed by refreshEpisodeData (called from the tvdb
+    // loop before this callback), so no separate disk scan is needed here.
     const diskChanges = [];
-    if (diskInfo) {
-      const [newDate, newSize, newFilesOnDisk, newFileQuality] = diskInfo;
-      if (tvdbRecord.date !== newDate) {
-        diskChanges.push(`Date:${tvdbRecord.date}->${newDate}`);
-        tvdbRecord.date = newDate;
-      }
-      if (tvdbRecord.size !== newSize) {
-        diskChanges.push(`Size:${tvdbRecord.size}->${newSize}`);
-        tvdbRecord.size = newSize;
-      }
-      if (tvdbRecord.noFiles) {
-        diskChanges.push(`NoFiles:true->false`);
-        tvdbRecord.noFiles = false;
-      }
-      tvdbRecord.filesOnDisk = newFilesOnDisk || [];
-      tvdbRecord.fileQuality = newFileQuality || {};
-      tvdbRecord.quality = computeShowQuality(tvdbRecord.fileQuality) ?? null;
-    } else if (!tvdbRecord.noFiles) {
-      diskChanges.push(`NoFiles:false->true`);
-      tvdbRecord.noFiles = true;
-      tvdbRecord.date = null;
-      tvdbRecord.size = 0;
-      tvdbRecord.filesOnDisk = [];
-      tvdbRecord.fileQuality = {};
-      tvdbRecord.quality = null;
-    }
     // lastPlayedDate
     const playedDateChanges = [];
     if (tvdbRecord.inEmby && tvdbRecord.id) {
@@ -2589,8 +2544,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         tvdbRecord.seasonIntros == null &&
         Number(tvdbRecord.episodeCount ?? 0) >
           Number(tvdbRecord.watchedCount ?? 0) &&
-        Array.isArray(tvdbRecord.filesOnDisk) &&
-        tvdbRecord.filesOnDisk.length > 0
+        epd.seasonsWithFile(tvdbRecord.episodeData).length > 0
       );
       if (!!tvdbRecord.needsIntro !== newNeedsIntro) {
         gapChanges.push(
@@ -2606,7 +2560,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
             ` introDur=${tvdbRecord.introDur} epCnt=${tvdbRecord.episodeCount}` +
             ` seasonIntros=${JSON.stringify(tvdbRecord.seasonIntros)}` +
             ` watchCnt=${tvdbRecord.watchedCount}` +
-            ` filesOnDisk=${JSON.stringify(tvdbRecord.filesOnDisk?.slice(0, 3))}`,
+            ` seasonsWithFile=${JSON.stringify(epd.seasonsWithFile(tvdbRecord.episodeData))}`,
         );
       }
     } else if (!tvdbRecord.inEmby) {
@@ -2680,6 +2634,9 @@ tvdb.setPreTvdbTickCallback(async ({ isBackground } = {}) => {
     await runEmbyFullSweep(caller);
   }
 });
+
+// Wire the consolidated episodeData refresh into the tvdb background loop.
+tvdb.setRefreshEpisodeDataCallback(refreshEpisodeData);
 
 const videoFileExtensions = [
   "mp4",
@@ -2922,7 +2879,8 @@ const showNameFromFilePath = (filePath) => {
 /**
  * Check disk for a single show folder
  * @param {string} showFolderName - The show folder name (e.g., "Breaking Bad")
- * @returns {Promise<[number, number, Array, Object]|null>} - [maxDate, totalSize, filesOnDisk, fileQuality] or null if not found
+ * @returns {Promise<[number, number, Array, Object, Object]|null>} - [maxDate, totalSize, filesOnDisk, fileQuality, diskByEp] or null if not found
+ *   diskByEp: { [season]: { [episode]: { file, res } } } — per-episode file name + resolution
  */
 const getShowDiskInfo = async (showFolderName) => {
   if (!showFolderName) return null;
@@ -2933,6 +2891,8 @@ const getShowDiskInfo = async (showFolderName) => {
   // Track which episodes are on disk: { season -> Set<episode> }
   const episodesBySeason = new Map();
   const fileQuality = {};
+  // Per-episode file name + resolution: { [season]: { [episode]: { file, res } } }
+  const diskByEp = {};
 
   const recurs = async (dirPath) => {
     if (errFlg || dirPath == tvDir + "/.stfolder") return;
@@ -2969,10 +2929,21 @@ const getShowDiskInfo = async (showFolderName) => {
           const quality = getResolution(dirPath, {
             probeFileFn: probeRawHeight,
           });
-          if (titleMatch && quality != null) {
-            const epKey = toEpisodeKey(parsed.season, parsed.episode);
-            const existing = fileQuality[epKey];
-            if (!existing || quality > existing) fileQuality[epKey] = quality;
+          if (titleMatch) {
+            if (quality != null) {
+              const epKey = toEpisodeKey(parsed.season, parsed.episode);
+              const existing = fileQuality[epKey];
+              if (!existing || quality > existing) fileQuality[epKey] = quality;
+            }
+            // Track per-episode file name; prefer the higher-resolution file.
+            if (!diskByEp[parsed.season]) diskByEp[parsed.season] = {};
+            const cur = diskByEp[parsed.season][parsed.episode];
+            if (!cur || (quality != null && quality > (cur.res ?? 0))) {
+              diskByEp[parsed.season][parsed.episode] = {
+                file: fname,
+                res: quality ?? null,
+              };
+            }
           }
         }
       }
@@ -3004,12 +2975,139 @@ const getShowDiskInfo = async (showFolderName) => {
         ...Array.from(epSet).sort((a, b) => a - b),
       ]);
 
-    return [maxDate, totalSize, filesOnDisk, fileQuality];
+    return [maxDate, totalSize, filesOnDisk, fileQuality, diskByEp];
   } catch (err) {
     // Show folder doesn't exist or not accessible
     return null;
   }
 };
+
+// Single authoritative refresh of rec.episodeData from the three sources:
+// TVDB (aired), Emby (watched + episode id), disk scan (file name + resolution).
+// Transitional: also keeps the legacy watchedEpis/filesOnDisk/fileQuality/
+// episodeAiredDates props in sync so the web/Android clients keep working until
+// they are switched to episodeData. `opts.sources` limits which sources run.
+async function refreshEpisodeData(showName, rec, opts = {}) {
+  const sources = opts.sources || ["tvdb", "emby", "disk"];
+  if (!Array.isArray(rec.episodeData)) rec.episodeData = [];
+  const ed = rec.episodeData;
+
+  const folder = showName.includes("/")
+    ? showName
+    : (rec.path || rec.emby?.path || showName).split("/").pop();
+  const folderDiffers = folder !== showName;
+
+  // 1. TVDB aired dates — adds slots for every aired episode.
+  let tvdbMap = null;
+  if (sources.includes("tvdb") && rec.tvdbId) {
+    try {
+      tvdbMap = await tvdb.getSeriesMap(rec.tvdbId, null);
+      for (const [seasonNum, episodes] of tvdbMap || []) {
+        if (!Number.isInteger(seasonNum)) continue;
+        for (const [epNum, epData] of episodes) {
+          if (!Number.isInteger(epNum) || epNum < 1) continue;
+          if (epData?.aired)
+            epd.setEpisode(ed, seasonNum, epNum, { aired: epData.aired });
+        }
+      }
+    } catch (e) {
+      console.error(`[refreshEpisodeData] tvdb ${showName}: ${e.message}`);
+    }
+  }
+
+  // 2. Emby watched flag + episode id (in-emby shows only).
+  if (sources.includes("emby") && rec.inEmby && rec.id) {
+    try {
+      const embyMap = await emby.getSeriesMap({
+        id: rec.id,
+        name: showName,
+        tvdbId: rec.tvdbId,
+      });
+      for (const [seasonNum, episodes] of embyMap || []) {
+        if (!Number.isInteger(seasonNum)) continue;
+        for (const [epNum, ep] of episodes) {
+          if (!Number.isInteger(epNum) || epNum < 1) continue;
+          epd.setEpisode(ed, seasonNum, epNum, {
+            watched: !!ep.played,
+            id: ep.id ? Number(ep.id) : 0,
+          });
+        }
+      }
+    } catch (e) {
+      console.error(`[refreshEpisodeData] emby ${showName}: ${e.message}`);
+    }
+  }
+
+  // 3. Disk scan — authoritative file name + resolution, plus date/size/noFiles.
+  if (sources.includes("disk")) {
+    try {
+      const diskInfo = await getShowDiskInfo(folder);
+      if (diskInfo) {
+        const [newDate, newSize, , , diskByEp] = diskInfo;
+        rec.date = newDate;
+        rec.size = newSize;
+        rec.noFiles = false;
+        // Clear files for episodes no longer present on disk.
+        epd.forEachEpisode(ed, (s, e) => {
+          if (epd.hasFile(ed, s, e) && !diskByEp[s]?.[e])
+            epd.clearFile(ed, s, e);
+        });
+        for (const [sStr, eps] of Object.entries(diskByEp || {})) {
+          const s = Number(sStr);
+          for (const [eStr, info] of Object.entries(eps)) {
+            const e = Number(eStr);
+            const fileVal = folderDiffers
+              ? `${folder}//${info.file}`
+              : info.file;
+            epd.setEpisode(ed, s, e, { file: fileVal, res: info.res });
+          }
+        }
+      } else if (!rec.noFiles) {
+        rec.noFiles = true;
+        rec.date = null;
+        rec.size = 0;
+        // No folder on disk: clear all files.
+        epd.forEachEpisode(ed, (s, e) => {
+          if (epd.hasFile(ed, s, e)) epd.clearFile(ed, s, e);
+        });
+      }
+    } catch (e) {
+      console.error(`[refreshEpisodeData] disk ${showName}: ${e.message}`);
+    }
+  }
+
+  // Shows not in Emby never keep files — drop id/file/res, keep aired/watched.
+  if (!rec.inEmby) epd.stripToAiredWatched(ed);
+
+  // Derived record fields.
+  rec.quality = epd.computeQuality(ed) ?? null;
+  rec.watchedCount = epd.countWatched(ed);
+
+  // seasonPremiereDates: first time only, from TVDB map (month of episode 1).
+  if (!rec.seasonPremiereDates && Array.isArray(tvdbMap)) {
+    const spd = {};
+    for (const [seasonNum, episodes] of tvdbMap) {
+      const sorted = [...episodes].sort((a, b) => Number(a[0]) - Number(b[0]));
+      const first = sorted.find(([n]) => Number(n) === 1) || sorted[0];
+      if (first?.[1]?.aired) {
+        spd[String(seasonNum)] = first[1].aired.slice(0, 7).replace("-", "/");
+      }
+    }
+    if (Object.keys(spd).length > 0) rec.seasonPremiereDates = spd;
+  }
+
+  // waitStr recompute now that aired/watched/files are fresh.
+  const freshWaitStr = tvdb.calculateWaitStr(ed);
+  if (freshWaitStr !== null) rec.waitStr = freshWaitStr || null;
+
+  // episodeData supersedes these legacy per-episode props.
+  delete rec.watchedEpis;
+  delete rec.filesOnDisk;
+  delete rec.fileQuality;
+  delete rec.episodeAiredDates;
+
+  return ed;
+}
 
 const upload = async () => {
   let str = headerStr;
@@ -3739,56 +3837,17 @@ app.post(
     if (!showName) return { success: false, error: "Missing showName" };
     const allTvdb = tvdb.getAllTvdbSync();
     const rec = allTvdb?.[showName];
-    if (!rec?.id)
-      return { success: false, error: "Show not found or no Emby id" };
+    if (!rec) return { success: false, error: "Show not found" };
     try {
-      let seriesMap = await emby.getSeriesMap({ id: rec.id });
-      seriesMap = seriesMap ?? [];
-
-      // Backfill partial seasons from TVDB for still-airing shows.
-      // Emby omits future unaired episodes from its episode list, so without
-      // this those cells would render blank instead of "u" in the map.
-      if (!rec.ended && rec.tvdbId) {
-        try {
-          const tvdbSeriesMap = await tvdb.getSeriesMap(
-            rec.tvdbId,
-            rec.watchedEpis || null,
-          );
-          if (Array.isArray(tvdbSeriesMap)) {
-            const fallbackMap = new Map(tvdbSeriesMap.map((s) => [s[0], s[1]]));
-            for (let i = 0; i < seriesMap.length; i++) {
-              const [seasonNum, episodes] = seriesMap[i];
-              const tvdbEpisodes = fallbackMap.get(seasonNum);
-              if (!Array.isArray(tvdbEpisodes) || tvdbEpisodes.length === 0)
-                continue;
-              if (episodes.length === 0) {
-                seriesMap[i] = [seasonNum, tvdbEpisodes];
-                continue;
-              }
-              const haveEpNums = new Set(episodes.map(([epNum]) => epNum));
-              let added = false;
-              for (const [epNum, tvdbEpi] of tvdbEpisodes) {
-                if (haveEpNums.has(epNum)) continue;
-                episodes.push([
-                  epNum,
-                  { ...tvdbEpi, avail: false, noFile: true, path: null },
-                ]);
-                added = true;
-              }
-              if (added) {
-                episodes.sort((a, b) => a[0] - b[0]);
-                seriesMap[i] = [seasonNum, episodes];
-              }
-            }
-          }
-        } catch (backfillErr) {
-          console.warn(
-            "[getSeriesMapFromEmby] TVDB backfill failed:",
-            backfillErr?.message,
-          );
-        }
-      }
-
+      // Refresh watched/id (Emby) and file/res (disk) so the map is live-fresh.
+      // aired dates come from the periodic full refresh; skip the TVDB call here.
+      await refreshEpisodeData(showName, rec, { sources: ["emby", "disk"] });
+      await tvdb.saveTvdbSync();
+      const folder = showName.includes("/")
+        ? showName
+        : (rec.path || rec.emby?.path || showName).split("/").pop();
+      const today = new Date().toISOString().slice(0, 10);
+      const seriesMap = epd.toSeriesMap(rec.episodeData, folder, today);
       return { success: true, seriesMap };
     } catch (err) {
       console.error("[getSeriesMapFromEmby] error:", err);
@@ -3874,22 +3933,12 @@ app.post(
     let updated = 0;
     let skipped = 0;
     for (const [name, tvdbRecord] of Object.entries(allTvdb)) {
-      const folderName =
-        tvdbRecord.path?.split("/").pop() ||
-        tvdbRecord.emby?.path?.split("/").pop() ||
-        name;
-      const diskInfo = await getShowDiskInfo(folderName);
-      if (diskInfo) {
-        const [, , filesOnDisk, fileQuality] = diskInfo;
-        tvdbRecord.filesOnDisk = filesOnDisk || [];
-        tvdbRecord.fileQuality = fileQuality || {};
-        tvdbRecord.quality = computeShowQuality(tvdbRecord.fileQuality) ?? null;
+      try {
+        await refreshEpisodeData(name, tvdbRecord, { sources: ["disk"] });
         updated++;
-      } else {
-        tvdbRecord.filesOnDisk = [];
-        tvdbRecord.fileQuality = {};
-        tvdbRecord.quality = null;
+      } catch (e) {
         skipped++;
+        console.error(`[populateFilesOnDisk] ${name}: ${e.message}`);
       }
     }
     await tvdb.saveTvdbSync();
@@ -3906,13 +3955,39 @@ app.post(
     const allTvdb = tvdb.getAllTvdbSync();
     let updated = 0;
     for (const tvdbRecord of Object.values(allTvdb)) {
-      const q = computeShowQuality(tvdbRecord.fileQuality ?? {}) ?? null;
+      const q = epd.computeQuality(tvdbRecord.episodeData) ?? null;
       tvdbRecord.quality = q;
       if (q !== null) updated++;
     }
     await tvdb.saveTvdbSync();
     console.log(`[populateShowQuality] Done: updated=${updated}`);
     return { ok: true, updated };
+  }),
+);
+
+app.post(
+  "/api/refreshAllEpisodeData",
+  apiWrapper(async (params) => {
+    const onlyName = params?.name || null;
+    const allTvdb = tvdb.getAllTvdbSync();
+    const entries = onlyName
+      ? Object.entries(allTvdb).filter(([n]) => n === onlyName)
+      : Object.entries(allTvdb);
+    let done = 0;
+    let errors = 0;
+    for (const [name, rec] of entries) {
+      try {
+        await refreshEpisodeData(name, rec);
+        done++;
+      } catch (e) {
+        errors++;
+        console.error(`[refreshAllEpisodeData] ${name}: ${e.message}`);
+      }
+      if (done % 25 === 0) await tvdb.saveTvdbSync();
+    }
+    await tvdb.saveTvdbSync();
+    console.log(`[refreshAllEpisodeData] Done: done=${done} errors=${errors}`);
+    return { ok: true, done, errors };
   }),
 );
 
@@ -4144,6 +4219,42 @@ app.post("/api/delNoEmby", apiWrapper(delNoEmby));
 app.post("/api/addGap", apiWrapper(addGap));
 app.post("/api/delGap", apiWrapper(delGap));
 app.post("/api/setTvdbFields", apiWrapper(tvdb.setTvdbFields));
+
+// Persist watched state into episodeData (used by the map for non-Emby / local
+// episodes). `watchedEpis` is the legacy [[season, ep, ...], ...] array built by
+// the client from the current seriesMap.
+app.post(
+  "/api/setWatchedEpis",
+  apiWrapper(async (params) => {
+    const { name, watchedEpis } = params || {};
+    const allTvdb = tvdb.getAllTvdbSync();
+    const rec = allTvdb?.[name];
+    if (!rec) return { ok: false, error: "Show not found" };
+    if (!Array.isArray(rec.episodeData)) rec.episodeData = [];
+    const ed = rec.episodeData;
+    const watchedSet = new Set();
+    for (const row of watchedEpis || []) {
+      if (!Array.isArray(row) || row.length < 1) continue;
+      const [s, ...eps] = row;
+      for (const e of eps) watchedSet.add(`${s}.${e}`);
+    }
+    // Apply watched flag to every existing episode.
+    epd.forEachEpisode(ed, (s, e) => {
+      epd.setEpisode(ed, s, e, { watched: watchedSet.has(`${s}.${e}`) });
+    });
+    // Create slots for any watched episodes not yet present.
+    for (const row of watchedEpis || []) {
+      if (!Array.isArray(row) || row.length < 1) continue;
+      const [s, ...eps] = row;
+      for (const e of eps) {
+        if (!epd.getEp(ed, s, e)) epd.setEpisode(ed, s, e, { watched: true });
+      }
+    }
+    rec.watchedCount = epd.countWatched(ed);
+    await tvdb.saveTvdbSync();
+    return { ok: true };
+  }),
+);
 app.post("/api/setSharedFilters", apiWrapper(setSharedFilters));
 
 // History
@@ -6746,15 +6857,11 @@ function getEpisodeDiskGroup(showPath, season, episode) {
   }
 }
 
-function getFirstFilesOnDiskSeasonGap(filesOnDisk, torrentSeason) {
+function getFirstFilesOnDiskSeasonGap(diskSeasons, torrentSeason) {
   const seasons = [];
 
-  if (Array.isArray(filesOnDisk)) {
-    seasons.push(
-      ...filesOnDisk
-        .map((row) => (Array.isArray(row) ? Number.parseInt(row[0], 10) : NaN))
-        .filter((seasonNum) => Number.isInteger(seasonNum) && seasonNum >= 0),
-    );
+  if (Array.isArray(diskSeasons)) {
+    seasons.push(...diskSeasons.filter((n) => Number.isInteger(n) && n >= 0));
   }
 
   if (Number.isInteger(torrentSeason) && torrentSeason >= 0) {
@@ -6854,11 +6961,11 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
   const histKey = `${matchedName}\x00${sKey}\x00${eKey}`;
   const list = flexgetHistory[histKey] || [];
 
-  const watchedEpis = rec.watchedEpis || [];
-  const isWatched = watchedEpis.some(
-    (row) => row[0] === season && row.slice(1).includes(episode),
+  const isWatched = epd.isWatched(rec.episodeData, season, episode);
+  const firstSeasonGap = getFirstFilesOnDiskSeasonGap(
+    epd.seasonsWithFile(rec.episodeData),
+    season,
   );
-  const firstSeasonGap = getFirstFilesOnDiskSeasonGap(rec.filesOnDisk, season);
   const isPastSeasonGap = firstSeasonGap !== null && season > firstSeasonGap;
 
   if (isWatched || isPastSeasonGap) {
@@ -6959,10 +7066,7 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
     return flexgetIsBetterCrossRun(c, best) ? c : best;
   }, null);
 
-  const filesOnDisk = rec.filesOnDisk || [];
-  const episodeOnDisk = filesOnDisk.some(
-    (row) => row[0] === season && row.slice(1).includes(episode),
-  );
+  const episodeOnDisk = epd.hasFile(rec.episodeData, season, episode);
   const diskRes =
     episodeOnDisk && rec.path
       ? getEpisodeDiskResolution(rec.path, season, episode)
@@ -7913,40 +8017,9 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
     // Check disk for each show individually if requested
     if (checkDiskFirst) {
       for (const { showId, showName, tvdbRecord } of shows) {
-        // Try Path first, fall back to showName for shows without Path set
-        const embyPath = tvdbRecord.path || tvdbRecord.emby?.path || showName;
-
-        const pathPart = embyPath.split("/").pop();
-        const diskInfo = await getShowDiskInfo(pathPart);
-
-        if (diskInfo) {
-          const [newDate, newSize, newFilesOnDisk, newFileQuality] = diskInfo;
-          const changed =
-            tvdbRecord.date !== newDate || tvdbRecord.size !== newSize;
-
-          if (changed) {
-            tvdbRecord.date = newDate;
-            tvdbRecord.size = newSize;
-            tvdbRecord.noFiles = false;
-            diskUpdateCount++;
-          }
-          tvdbRecord.filesOnDisk = newFilesOnDisk || [];
-          tvdbRecord.fileQuality = newFileQuality || {};
-          tvdbRecord.quality =
-            computeShowQuality(tvdbRecord.fileQuality) ?? null;
-        } else {
-          // Folder doesn't exist or empty
-          const changed = tvdbRecord.noFiles !== true;
-          if (changed) {
-            tvdbRecord.noFiles = true;
-            tvdbRecord.date = null;
-            tvdbRecord.size = 0;
-            diskUpdateCount++;
-          }
-          tvdbRecord.filesOnDisk = [];
-          tvdbRecord.fileQuality = {};
-          tvdbRecord.quality = null;
-        }
+        // Refresh episodeData file info (also updates date/size/noFiles/quality).
+        await refreshEpisodeData(showName, tvdbRecord, { sources: ["disk"] });
+        diskUpdateCount++;
       }
 
       if (diskUpdateCount > 0) {
@@ -8302,7 +8375,7 @@ async function handleShowDiskChange(showName) {
     // Update disk info for this show
     const diskInfo = await getShowDiskInfo(showName);
     if (diskInfo) {
-      const [maxDate, totalSize, filesOnDisk, fileQuality] = diskInfo;
+      const [maxDate, totalSize] = diskInfo;
 
       // Update cache if it exists
       if (diskShowsCache) {
@@ -8314,10 +8387,8 @@ async function handleShowDiskChange(showName) {
       const allTvdb = tvdb.getAllTvdbSync();
       const tvdbRecord = allTvdb[showName];
       if (tvdbRecord) {
-        tvdbRecord.date = maxDate;
-        tvdbRecord.size = totalSize;
-        tvdbRecord.filesOnDisk = filesOnDisk || [];
-        tvdbRecord.fileQuality = fileQuality || {};
+        // Refresh episodeData file info (also sets date/size/noFiles/quality).
+        await refreshEpisodeData(showName, tvdbRecord, { sources: ["disk"] });
         await tvdb.saveTvdbSync();
         debouncedTvdbPush(showName);
         console.log(
@@ -8355,22 +8426,11 @@ async function handleShowDiskChange(showName) {
       );
       console.log(`[chokidar] Gap check refreshed for ${showName}`);
 
-      // Refresh watchedEpis from Emby
-      const show = { name: showName, id: tvdbRecord.id };
-      const seriesMap = await emby.getSeriesMap(show);
-      if (seriesMap && seriesMap.length > 0) {
-        const watchedEpis = tvdb.seriesMapToWatchedEpis(seriesMap);
-        const freshRecord = tvdb.getAllTvdbSync()[showName];
-        if (freshRecord) {
-          freshRecord.watchedEpis = watchedEpis;
-          freshRecord.watchedCount = tvdb.calculateWatchedCount(watchedEpis);
-          await tvdb.saveTvdbSync();
-          console.log(
-            `[chokidar] watchedEpis refreshed for ${showName}:`,
-            watchedEpis,
-          );
-        }
-      }
+      // Refresh watched/id in episodeData from Emby (also dual-writes
+      // watchedEpis/watchedCount).
+      await refreshEpisodeData(showName, tvdbRecord, { sources: ["emby"] });
+      await tvdb.saveTvdbSync();
+      console.log(`[chokidar] watched refreshed for ${showName}`);
     } catch (err) {
       console.error(
         `[chokidar] Post-download refresh error for ${showName}:`,

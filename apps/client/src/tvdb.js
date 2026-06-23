@@ -1,6 +1,7 @@
 import * as srvr from "./srvr.js";
 import * as util from "./util.js";
 import { config } from "./config.js";
+import { episodeDataToWatchedEpis } from "@tv/share";
 
 // Route TVDB calls through the local torrents server proxy via WebSocket.
 // This avoids browser-to-TVDB CORS issues (Authorization header) and keeps secrets on server.
@@ -640,11 +641,8 @@ export const getSeriesMapByTvdbId = async (tvdbId) => {
   if (allTvdb) {
     // Find the show with this tvdbId (coerce to string to handle number/string mismatch)
     for (const [showName, tvdbRecord] of Object.entries(allTvdb)) {
-      if (
-        String(tvdbRecord.tvdbId) === String(tvdbId) &&
-        tvdbRecord.watchedEpis
-      ) {
-        watchedEpis = tvdbRecord.watchedEpis;
+      if (String(tvdbRecord.tvdbId) === String(tvdbId)) {
+        watchedEpis = episodeDataToWatchedEpis(tvdbRecord.episodeData);
         break;
       }
     }

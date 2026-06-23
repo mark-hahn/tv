@@ -4,13 +4,13 @@ import fetch from "node-fetch";
 import { chromium } from "playwright";
 import WebSocket from "ws";
 import * as urls from "./urls.js";
-import * as emby from "./emby.js";
 import { rottenSearch } from "./rotten.js";
 import * as util from "./util.js";
 import {
   smartTitleMatch,
   getSeasonIntro as getSeasonIntroShared,
 } from "@tv/share";
+import * as epd from "@tv/share";
 const { getPstDate } = util;
 import { SRVR_DATA_DIR } from "./srvrPaths.js";
 import * as history from "./history.js";
@@ -1346,80 +1346,36 @@ async function getTmdbFallback(showName) {
 // safe_start(season) = max over all k of (airDate[k] + 2 - k)
 // waitDate = min(safe_start across all seasons with unwatched episodes).
 // Returns "{M-DD}" or "{YY-M-DD}" when future, "" when past/today, null when no data.
-const calculateWaitStr = (episodeAiredDates, watchedEpis, filesOnDisk) => {
+const calculateWaitStr = (episodeData) => {
   try {
-    if (!episodeAiredDates || typeof episodeAiredDates !== "object")
-      return null;
+    if (!Array.isArray(episodeData)) return null;
 
     const today = new Date().toISOString().slice(0, 10);
 
-    // Build per-season watched set: season -> Set of episode numbers
-    const watchedBySeason = new Map();
-    if (Array.isArray(watchedEpis)) {
-      for (const entry of watchedEpis) {
-        if (!Array.isArray(entry) || entry.length < 1) continue;
-        const seasonNum = Number(entry[0]);
-        if (!Number.isFinite(seasonNum)) continue;
-        watchedBySeason.set(
-          seasonNum,
-          new Set(
-            entry
-              .slice(1)
-              .map(Number)
-              .filter((n) => Number.isFinite(n)),
-          ),
-        );
-      }
-    }
-
-    // Build per-season disk-file set: season -> Set of episode numbers
-    const diskBySeason = new Map();
-    if (Array.isArray(filesOnDisk)) {
-      for (const entry of filesOnDisk) {
-        if (!Array.isArray(entry) || entry.length < 1) continue;
-        const seasonNum = Number(entry[0]);
-        if (!Number.isFinite(seasonNum)) continue;
-        diskBySeason.set(
-          seasonNum,
-          new Set(
-            entry
-              .slice(1)
-              .map(Number)
-              .filter((n) => Number.isFinite(n)),
-          ),
-        );
-      }
-    }
-
-    // Build per-season episode map: season -> Map(episodeNum -> airDate)
+    // Build per-season episode map: season -> Map(episodeNum -> airDate).
     // If a file is on disk and the TVDB air date is in the future (unaired),
     // treat it as available today. Already-aired episodes use their TVDB date.
     const seasonData = new Map();
-    for (const [key, airDate] of Object.entries(episodeAiredDates)) {
-      const match = /^S(\d+)E(\d+)$/i.exec(key);
-      if (!match) continue;
-      const seasonNum = Number(match[1]);
-      const episodeNum = Number(match[2]);
-      if (!Number.isFinite(seasonNum) || !Number.isFinite(episodeNum)) continue;
+    epd.forEachEpisode(episodeData, (seasonNum, episodeNum) => {
+      const airDate = epd.getAired(episodeData, seasonNum, episodeNum);
+      if (!airDate) return;
       if (!seasonData.has(seasonNum)) seasonData.set(seasonNum, new Map());
-      const hasDiskFile = diskBySeason.get(seasonNum)?.has(episodeNum) ?? false;
+      const hasDiskFile = epd.hasFile(episodeData, seasonNum, episodeNum);
       const effectiveDate =
         hasDiskFile && airDate > today ? today : airDate || "";
       seasonData.get(seasonNum).set(episodeNum, effectiveDate);
-    }
+    });
 
     if (seasonData.size === 0) return null;
 
     let minWaitDate = null;
 
     for (const [seasonNum, episodes] of seasonData) {
-      const watchedEps = watchedBySeason.get(seasonNum) || new Set();
-
       // Sort unwatched episode air dates ascending (by air date, not episode number).
       // For each rank i (0-indexed): startDate >= airDate[i] + 2 - i
       // safe_start = max over all i
       const unwatchedDates = [...episodes.entries()]
-        .filter(([ep]) => !watchedEps.has(ep))
+        .filter(([ep]) => !epd.isWatched(episodeData, seasonNum, ep))
         .map(([, d]) => d)
         .filter((d) => d)
         .sort();
@@ -1980,11 +1936,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   }
 
   // Runtime-state fields set by disk scan / Emby queries — preserve from existing
-  tvdbData.filesOnDisk = existing.filesOnDisk ?? null;
-  tvdbData.fileQuality = existing.fileQuality ?? null;
+  tvdbData.episodeData = existing.episodeData ?? null;
   tvdbData.quality = existing.quality ?? null;
-  tvdbData.episodeAiredDates = existing.episodeAiredDates ?? null;
-  tvdbData.watchedEpis = existing.watchedEpis ?? null;
   tvdbData.seasonPremiereDates = existing.seasonPremiereDates ?? null;
 
   // leftEmby timestamp (yyyy-mm-dd format) - set when show is removed from Emby
@@ -2003,13 +1956,9 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   if (existing.seasonIntros != null)
     tvdbData.seasonIntros = existing.seasonIntros;
 
-  // Calculate waitStr using per-season formula (uses existing episodeAiredDates
-  // since fresh series map data hasn't been fetched yet at this stage).
-  const calculatedWaitStr = calculateWaitStr(
-    existing.episodeAiredDates,
-    existing.watchedEpis,
-    existing.filesOnDisk,
-  );
+  // Calculate waitStr from existing episodeData (fresh series map data hasn't
+  // been fetched yet at this stage).
+  const calculatedWaitStr = calculateWaitStr(existing.episodeData);
   tvdbData.waitStr =
     calculatedWaitStr !== null
       ? calculatedWaitStr || null
@@ -2119,6 +2068,12 @@ export const setPerShowCallback = (fn) => {
 let preTvdbTickCallback = null;
 export const setPreTvdbTickCallback = (fn) => {
   preTvdbTickCallback = fn;
+};
+
+// Refreshes consolidated episodeData (set by index.js to avoid circular import).
+let refreshEpisodeDataCallback = null;
+export const setRefreshEpisodeDataCallback = (fn) => {
+  refreshEpisodeDataCallback = fn;
 };
 
 const chkTvdbQueue = () => {
@@ -2326,87 +2281,18 @@ const tryLocalGetTvdb = async () => {
     processRecord.name = minTvdb.name;
   }
 
-  // Fetch and persist series map data using the fresh record (try Emby first, fallback to TVDB)
-  try {
-    let seriesMap = null;
-
-    // Try Emby if show is in Emby
-    if (processRecord.inEmby && processRecord.id) {
-      seriesMap = await emby.getSeriesMap({
-        name: processRecord.name,
-        tvdbId: processRecord.tvdbId,
-        id: processRecord.id,
-      });
-      if (seriesMap && seriesMap.length > 0) {
-        processRecord.watchedEpis = seriesMapToWatchedEpis(seriesMap);
-        processRecord.watchedCount = calculateWatchedCount(
-          processRecord.watchedEpis,
-        );
-        await saveTvdbFiles(allTvdb);
-      }
+  // Refresh consolidated episodeData (TVDB aired + Emby watched/id + disk
+  // files). This single call also keeps the legacy watchedEpis/filesOnDisk/
+  // fileQuality/episodeAiredDates props, quality, watchedCount,
+  // seasonPremiereDates, waitStr and date/size/noFiles in sync — replacing the
+  // former separate Emby/TVDB seriesMap fetches here.
+  if (refreshEpisodeDataCallback) {
+    try {
+      await refreshEpisodeDataCallback(processRecord.name, processRecord);
+      await saveTvdbFiles(allTvdb);
+    } catch (err) {
+      log("err", "tryLocalGetTvdb refreshEpisodeData error:", err.message);
     }
-
-    // Fallback to TVDB if Emby fails or show not in Emby
-    let tvdbSeriesMap = null;
-    if (!seriesMap && processRecord.tvdbId) {
-      tvdbSeriesMap = await getSeriesMap(
-        processRecord.tvdbId,
-        processRecord.watchedEpis,
-      );
-      seriesMap = tvdbSeriesMap;
-    }
-
-    // Fetch tvdbSeriesMap to keep episodeAiredDates and seasonPremiereDates current
-    if (!tvdbSeriesMap && processRecord.tvdbId) {
-      tvdbSeriesMap = await getSeriesMap(processRecord.tvdbId, null);
-    }
-    if (tvdbSeriesMap && tvdbSeriesMap.length > 0 && processRecord.tvdbId) {
-      let needsSave = false;
-      if (!processRecord.seasonPremiereDates) {
-        const spd = {};
-        for (const [seasonNum, episodes] of tvdbSeriesMap) {
-          const sorted = [...episodes].sort(
-            (a, b) => Number(a[0]) - Number(b[0]),
-          );
-          const first = sorted.find(([n]) => Number(n) === 1) || sorted[0];
-          if (first?.[1]?.aired) {
-            spd[String(seasonNum)] = first[1].aired
-              .slice(0, 7)
-              .replace("-", "/");
-          }
-        }
-        if (Object.keys(spd).length > 0) {
-          processRecord.seasonPremiereDates = spd;
-          needsSave = true;
-        }
-      }
-      // Always update episodeAiredDates when tvdbSeriesMap is available
-      const ead = {};
-      for (const [seasonNum, episodes] of tvdbSeriesMap) {
-        for (const [episodeNum, epData] of episodes) {
-          if (epData?.aired) {
-            const key = `S${String(seasonNum).padStart(2, "0")}E${String(episodeNum).padStart(2, "0")}`;
-            ead[key] = epData.aired;
-          }
-        }
-      }
-      if (Object.keys(ead).length > 0) {
-        processRecord.episodeAiredDates = ead;
-        needsSave = true;
-        // Recalculate waitStr now that episodeAiredDates is fresh
-        const freshWaitStr = calculateWaitStr(
-          processRecord.episodeAiredDates,
-          processRecord.watchedEpis,
-          processRecord.filesOnDisk,
-        );
-        if (freshWaitStr !== null) {
-          processRecord.waitStr = freshWaitStr || null;
-        }
-      }
-      if (needsSave) await saveTvdbFiles(allTvdb);
-    }
-  } catch (err) {
-    log("err", "tryLocalGetTvdb seriesMap fetch error:", err.message);
   }
 
   // Run per-show process callback (disk check, gap check) with the up-to-date record
@@ -2945,7 +2831,7 @@ export const searchTvdbByImdbId = async (params) => {
       crew: crew,
       remotes: [], // Don't fetch remotes for preview
       inEmby: false,
-      WaitStr: calculateWaitStr(nextAired, lastAired, 0, 0),
+      WaitStr: null,
     };
 
     log(
@@ -3352,6 +3238,7 @@ export {
   applyWatchedEpisToSeriesMap,
   getSeriesMap,
   calculateWatchedCount,
+  calculateWaitStr,
 };
 
 const isValidUrl = async (url) => {

@@ -4,6 +4,7 @@ import * as srvr from "./srvr.js";
 import * as urls from "./urls.js";
 import * as util from "./util.js";
 import evtBus from "./evtBus.js";
+import { episodeDataToWatchedEpis } from "@tv/share";
 
 const name = "mark";
 const pwd = "90-MNBbnmyui";
@@ -148,7 +149,7 @@ export async function loadAllShows() {
     if (rec.date === undefined) rec.date = "2017-12-05";
     if (rec.size === undefined) rec.size = 0;
     if (rec.noFiles === undefined) rec.noFiles = false;
-    if (rec.fileQuality === undefined) rec.fileQuality = {};
+    if (rec.episodeData === undefined) rec.episodeData = [];
 
     // DEBUG Swiss Toni
     if (rec.name === "Swiss Toni") {
@@ -1045,7 +1046,7 @@ export const getSeriesMap = async (show, prune = false) => {
       // Passing null means "unknown/cleared", passing undefined means "use default"
       // This preserves watchedCount when watchedEpis array is not available
       const tvdbRecord = allTvdbData?.[show.name];
-      const watchedEpis = tvdbRecord?.watchedEpis;
+      const watchedEpis = episodeDataToWatchedEpis(tvdbRecord?.episodeData);
       const result = await srvr.getSeriesMapFromTvdb({ tvdbId, watchedEpis });
       if (result.success && result.seriesMap) {
         return result.seriesMap;
@@ -1199,7 +1200,7 @@ export const getSeriesMap = async (show, prune = false) => {
         const allTvdbData = await tvdb.getAllTvdb(0);
         // Get watchedEpis without forcing null fallback
         const tvdbRecord = allTvdbData?.[show.name];
-        const watchedEpis = tvdbRecord?.watchedEpis;
+        const watchedEpis = episodeDataToWatchedEpis(tvdbRecord?.episodeData);
         const fallback = await srvr.getSeriesMapFromTvdb({
           tvdbId,
           watchedEpis,

@@ -11,13 +11,13 @@ Replace the per-episode data spread across four `tvdb.json` properties **plus**
 the live Emby/TVDB seriesMap lookups with one consolidated, authoritative
 property `episodeData`.
 
-| Old source                              | New tuple slot | Stored value                              |
-| --------------------------------------- | -------------- | ----------------------------------------- |
-| `episodeAiredDates["SxxExx"]` (string)  | `[0]` aired    | `"YYYY-MM-DD"` string (unchanged format)  |
-| `watchedEpis` season-first rows         | `[1]` watched  | `1` / `0`                                 |
-| Emby episode item id (seriesMap)        | `[2]` id       | integer Emby id (`0` = none)              |
-| disk file name (was `filesOnDisk` nums) | `[3]` file     | video **file name only** (not full path)  |
-| `fileQuality["SxxExx"]`                 | `[4]` res      | integer resolution (e.g. `1080`)          |
+| Old source                              | New tuple slot | Stored value                             |
+| --------------------------------------- | -------------- | ---------------------------------------- |
+| `episodeAiredDates["SxxExx"]` (string)  | `[0]` aired    | `"YYYY-MM-DD"` string (unchanged format) |
+| `watchedEpis` season-first rows         | `[1]` watched  | `1` / `0`                                |
+| Emby episode item id (seriesMap)        | `[2]` id       | integer Emby id (`0` = none)             |
+| disk file name (was `filesOnDisk` nums) | `[3]` file     | video **file name only** (not full path) |
+| `fileQuality["SxxExx"]`                 | `[4]` res      | integer resolution (e.g. `1080`)         |
 
 Two former properties become **derived, not stored**:
 
@@ -41,13 +41,13 @@ Two former properties become **derived, not stored**:
 
 ### Tuple slots (per episode)
 
-| Idx | Field   | Type             | Absent meaning       |
-| --- | ------- | ---------------- | -------------------- |
-| 0   | aired   | `"YYYY-MM-DD"`   | unknown air date     |
-| 1   | watched | `1` / `0`        | `0` (unwatched)      |
-| 2   | id      | integer / `0`    | no Emby id           |
-| 3   | file    | file-name string | no file on disk      |
-| 4   | res     | integer          | resolution unknown   |
+| Idx | Field   | Type             | Absent meaning     |
+| --- | ------- | ---------------- | ------------------ |
+| 0   | aired   | `"YYYY-MM-DD"`   | unknown air date   |
+| 1   | watched | `1` / `0`        | `0` (unwatched)    |
+| 2   | id      | integer / `0`    | no Emby id         |
+| 3   | file    | file-name string | no file on disk    |
+| 4   | res     | integer          | resolution unknown |
 
 ### Compression rules (from instr-2)
 
@@ -96,28 +96,28 @@ missing season/episode/slot as "unknown" and never throw. **Episode args are
 
 ```js
 // Read accessors
-getEp(ed, s, e);            // -> tuple | null            (ed[s]?.[e-1])
-getAired(ed, s, e);         // -> "YYYY-MM-DD" | null
-isWatched(ed, s, e);        // -> boolean
-getEmbyId(ed, s, e);        // -> int | null
-getFileName(ed, s, e);      // -> string | null
-hasFile(ed, s, e);          // -> boolean                 (file name present)
-getRes(ed, s, e);           // -> int | null
+getEp(ed, s, e); // -> tuple | null            (ed[s]?.[e-1])
+getAired(ed, s, e); // -> "YYYY-MM-DD" | null
+isWatched(ed, s, e); // -> boolean
+getEmbyId(ed, s, e); // -> int | null
+getFileName(ed, s, e); // -> string | null
+hasFile(ed, s, e); // -> boolean                 (file name present)
+getRes(ed, s, e); // -> int | null
 isUnaired(ed, s, e, today); // -> boolean                 (aired > today)
 getFullPath(ed, folder, s, e); // -> reconstructed absolute path | null
 
 // Iteration / aggregate
-forEachEpisode(ed, cb);     // cb(season, episode/*1-based*/, tuple)
-seasonsPresent(ed);         // -> [seasonNum, ...]
-computeQuality(ed);         // -> most-common res (replaces computeShowQuality)
-countWatched(ed);           // -> number (replaces calculateWatchedCount)
+forEachEpisode(ed, cb); // cb(season, episode/*1-based*/, tuple)
+seasonsPresent(ed); // -> [seasonNum, ...]
+computeQuality(ed); // -> most-common res (replaces computeShowQuality)
+countWatched(ed); // -> number (replaces calculateWatchedCount)
 toSeriesMap(ed, folder, today); // -> legacy [[s,[[e,{...}],...]],...] (see §9)
 
 // Update (mutate + re-trim)
 ensureSeason(ed, s);
 setEpisode(ed, s, e, { aired, watched, id, file, res }); // merge + trailing-trim
-clearFile(ed, s, e);        // drop file+res (file deleted)
-stripToAiredWatched(ed);    // drop id/file/res for whole show (left Emby)
+clearFile(ed, s, e); // drop file+res (file deleted)
+stripToAiredWatched(ed); // drop id/file/res for whole show (left Emby)
 ```
 
 `setEpisode` is where the **trailing-drop / `0`-placeholder** compression logic
@@ -169,14 +169,14 @@ refresh is cheap when already fresh.
 
 ### Writers this replaces / simplifies
 
-| Location                                                    | Today                                  | After                                                |
-| ----------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------- |
-| `apps/srvr/index.js` `getShowDiskInfo`                      | returns `[date,size,filesOnDisk,fileQuality]` | returns file-name+res per episode for the refresh fn |
-| `apps/srvr/index.js` perShow disk check (~L2502-2524)       | sets `filesOnDisk/fileQuality`         | `refreshEpisodeData(..., {sources:["disk"]})`         |
-| `apps/srvr/index.js` `/api/populateFilesOnDisk` (~L3884)    | sets `filesOnDisk/fileQuality`         | `refreshEpisodeData(..., {sources:["disk"]})`         |
-| `apps/srvr/index.js` chokidar handlers (~L7933, ~L8319, ~L8362) | sets disk + `watchedEpis`          | `refreshEpisodeData(..., {sources:["disk","emby"]})`  |
-| `apps/srvr/src/tvdb.js` seriesMap blocks (~L2335-2400)      | sets `watchedEpis`/`episodeAiredDates` | folded into `refreshEpisodeData`                     |
-| `apps/srvr/src/tvdb.js` record build (~L1983-1987)          | preserves four old props               | preserves single `episodeData`                       |
+| Location                                                        | Today                                         | After                                                |
+| --------------------------------------------------------------- | --------------------------------------------- | ---------------------------------------------------- |
+| `apps/srvr/index.js` `getShowDiskInfo`                          | returns `[date,size,filesOnDisk,fileQuality]` | returns file-name+res per episode for the refresh fn |
+| `apps/srvr/index.js` perShow disk check (~L2502-2524)           | sets `filesOnDisk/fileQuality`                | `refreshEpisodeData(..., {sources:["disk"]})`        |
+| `apps/srvr/index.js` `/api/populateFilesOnDisk` (~L3884)        | sets `filesOnDisk/fileQuality`                | `refreshEpisodeData(..., {sources:["disk"]})`        |
+| `apps/srvr/index.js` chokidar handlers (~L7933, ~L8319, ~L8362) | sets disk + `watchedEpis`                     | `refreshEpisodeData(..., {sources:["disk","emby"]})` |
+| `apps/srvr/src/tvdb.js` seriesMap blocks (~L2335-2400)          | sets `watchedEpis`/`episodeAiredDates`        | folded into `refreshEpisodeData`                     |
+| `apps/srvr/src/tvdb.js` record build (~L1983-1987)              | preserves four old props                      | preserves single `episodeData`                       |
 
 ## 6. Path reconstruction nuance
 
@@ -268,7 +268,7 @@ optionally move to **B**. Either way the legacy `watchedEpis` array on the
 ## 10. Migration
 
 The old four properties **cannot** fully populate the new format: old
-`filesOnDisk` stored episode *numbers*, not file *names*, and `id`/`path` never
+`filesOnDisk` stored episode _numbers_, not file _names_, and `id`/`path` never
 existed in the record. So migration is essentially a **bulk refresh**
 (`scripts/migrate-to-episodeData.js`, following `scripts/migrate-*.js`):
 
@@ -343,5 +343,7 @@ check `pm2 logs` for restart/crash loops.
 7. Migration (§10): stop srvr, back up, bulk-refresh, drop old props, deploy,
    restart, verify `pm2 logs`.
 8. (Optional) seriesMap option B — client/Android build from `episodeData`.
+
+```
 
 ```

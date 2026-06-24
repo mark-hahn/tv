@@ -159,6 +159,12 @@ const OPN_CHECK_HISTORY_PATH = path.join(
 );
 const OPN_DAILY_LIMIT = 500;
 const ASR_LOG_BUFFER_MAX = 500;
+// .bif sidecar generation (see make-bifs-plan.md)
+const BIF_NEEDED_QUEUE_PATH = path.join(SRVR_DATA_DIR, "bifNeededQueue.json");
+const BIF_CREATING_PATH = path.join(SRVR_DATA_DIR, "bifCreatingData.json");
+const RUN_BIF_PATH = path.join(SRVR_ROOT_DIR, "scripts", "run-bif.js");
+let bifNeededQueue = []; // [{ showName, bifPath }, ...] persisted
+let bifCheckTimer = null; // single backoff timer handle
 let subQueue = [],
   subQueueChkSrt = [],
   asrQueue = [];
@@ -926,6 +932,191 @@ function loadQueues() {
     asrQueue = [];
   }
 }
+
+// ----------------------------------------------------------------------------
+// .bif sidecar generation queue (see make-bifs-plan.md)
+// ----------------------------------------------------------------------------
+function loadBifNeededQueue() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(BIF_NEEDED_QUEUE_PATH, "utf8"));
+    bifNeededQueue = Array.isArray(raw) ? raw : [];
+  } catch {
+    bifNeededQueue = [];
+  }
+}
+function persistBifNeededQueue() {
+  try {
+    fs.writeFileSync(
+      BIF_NEEDED_QUEUE_PATH,
+      JSON.stringify(bifNeededQueue),
+      "utf8",
+    );
+  } catch (e) {
+    console.error("[bif] persist queue error:", e.message);
+  }
+}
+
+// True when a pid is still alive (signal 0 probes without killing).
+function pidAlive(pid) {
+  if (!pid) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === "EPERM"; // exists but not ours
+  }
+}
+
+// Read the creating-lock file, or null when absent/invalid.
+function readBifCreating() {
+  try {
+    return JSON.parse(fs.readFileSync(BIF_CREATING_PATH, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+// Schedule a single (non-stacking) checkBifNeededQueue call.
+function scheduleBifCheck(ms) {
+  if (bifCheckTimer) clearTimeout(bifCheckTimer);
+  bifCheckTimer = setTimeout(() => {
+    bifCheckTimer = null;
+    checkBifNeededQueue();
+  }, ms);
+}
+
+// Pull the next bif spec off the queue and start generating it, with CPU
+// backoff and one-at-a-time serialization.
+function checkBifNeededQueue() {
+  if (bifNeededQueue.length === 0) return;
+  if (os.loadavg()[0] > 5) {
+    scheduleBifCheck(10000);
+    return;
+  }
+  const started = startBifCreate(bifNeededQueue[0]);
+  if (!started) {
+    scheduleBifCheck(5000);
+    return;
+  }
+  bifNeededQueue.shift();
+  persistBifNeededQueue();
+  setImmediate(checkBifNeededQueue);
+}
+
+// Launch a background worker process that generates the .bif file. Returns
+// true when a worker was launched, false when one is already running.
+function startBifCreate(bifNeededObj) {
+  const lock = readBifCreating();
+  if (lock) {
+    // Clear a stale lock left by a dead worker; otherwise honor it.
+    if (pidAlive(lock.pid)) return false;
+    console.log(`[bif] clearing stale lock (pid ${lock.pid} dead)`);
+    try {
+      fs.unlinkSync(BIF_CREATING_PATH);
+    } catch {}
+  }
+  let child;
+  try {
+    child = cp.spawn("node", [RUN_BIF_PATH, bifNeededObj.bifPath], {
+      detached: true, // own process group so cancel can kill ffmpeg too
+      stdio: "ignore",
+    });
+  } catch (e) {
+    console.error("[bif] spawn error:", e.message);
+    return false;
+  }
+  try {
+    fs.writeFileSync(
+      BIF_CREATING_PATH,
+      JSON.stringify({ showName: bifNeededObj.showName, pid: child.pid }),
+      "utf8",
+    );
+  } catch (e) {
+    console.error("[bif] lock write error:", e.message);
+  }
+  console.log(
+    `[bif] start ${bifNeededObj.showName} pid=${child.pid} ${bifNeededObj.bifPath}`,
+  );
+  const onDone = () => {
+    try {
+      fs.unlinkSync(BIF_CREATING_PATH);
+    } catch {}
+    console.log(`[bif] done ${bifNeededObj.showName}`);
+    checkBifNeededQueue();
+  };
+  child.on("exit", onDone);
+  child.on("error", (e) => {
+    console.error(`[bif] worker error ${bifNeededObj.showName}:`, e.message);
+    onDone();
+  });
+  child.unref();
+  return true;
+}
+
+// Abort an in-flight bif generation for a show (and clear its lock).
+function cancelBifCreate(showName) {
+  const lock = readBifCreating();
+  if (!lock || lock.showName !== showName) return;
+  try {
+    process.kill(-lock.pid, "SIGTERM"); // kill the whole process group
+  } catch {
+    try {
+      process.kill(lock.pid, "SIGTERM");
+    } catch {}
+  }
+  try {
+    fs.unlinkSync(BIF_CREATING_PATH);
+  } catch {}
+  console.log(`[bif] cancel ${showName} pid=${lock.pid}`);
+}
+
+// React to a show's needsIntro flipping. On true: maybe queue a bif. On false:
+// cancel any in-flight/queued bif for the show.
+function handleNeedsIntroChange(showName, rec, needsIntro) {
+  if (needsIntro) {
+    // A .bif already exists somewhere in the show folder.
+    if (epd.getBifEpisode(rec.episodeData) !== null) return;
+    // Need at least one unwatched episode.
+    let hasUnwatched = false;
+    epd.forEachEpisode(rec.episodeData, (s, e) => {
+      if (!epd.isWatched(rec.episodeData, s, e)) hasUnwatched = true;
+    });
+    if (!hasUnwatched) return;
+    // Need at least one video file; capture the first file's path as bifPath.
+    const fileSeasons = epd.seasonsWithFile(rec.episodeData);
+    if (fileSeasons.length === 0) return;
+    const showFolderName = showName.includes("/")
+      ? showName
+      : (rec.path || rec.emby?.path || showName).split("/").pop();
+    let bifPath = null;
+    for (const s of fileSeasons) {
+      const season = rec.episodeData[s];
+      for (let i = 0; i < season.length; i++) {
+        if (epd.hasFile(rec.episodeData, s, i + 1)) {
+          bifPath = epd.getFullPath(rec.episodeData, showFolderName, s, i + 1);
+          break;
+        }
+      }
+      if (bifPath) break;
+    }
+    if (!bifPath) return;
+    // Dedupe: skip if this show is already queued.
+    if (bifNeededQueue.some((o) => o.showName === showName)) return;
+    bifNeededQueue.push({ showName, bifPath });
+    persistBifNeededQueue();
+    console.log(`[bif] queued ${showName} ${bifPath}`);
+    checkBifNeededQueue();
+  } else {
+    cancelBifCreate(showName);
+    const before = bifNeededQueue.length;
+    bifNeededQueue = bifNeededQueue.filter((o) => o.showName !== showName);
+    if (bifNeededQueue.length !== before) {
+      persistBifNeededQueue();
+      checkBifNeededQueue();
+    }
+  }
+}
+
 function loadChksrtHistory() {
   try {
     const raw = JSON.parse(fs.readFileSync(CHKSRT_HISTORY_PATH, "utf8"));
@@ -2501,6 +2692,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
     }
     // Gap check
     let gapChanges = [];
+    const prevNeedsIntro = !!tvdbRecord.needsIntro;
     if (tvdbRecord.inEmby && tvdbRecord.id) {
       const gapData = await emby.gapCheckOne(
         tvdbRecord.id,
@@ -2577,6 +2769,15 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
           gapChanges.push(`${f}:${tvdbRecord[f]}->${v}`);
           tvdbRecord[f] = v;
         }
+      }
+    }
+    // React to needsIntro flips: queue or cancel .bif generation.
+    const nowNeedsIntro = !!tvdbRecord.needsIntro;
+    if (nowNeedsIntro !== prevNeedsIntro) {
+      try {
+        handleNeedsIntroChange(showName, tvdbRecord, nowNeedsIntro);
+      } catch (e) {
+        console.error("[bif] needsIntro change error:", showName, e.message);
       }
     }
     const push2Changes = [...diskChanges, ...playedDateChanges, ...gapChanges];
@@ -6277,6 +6478,12 @@ https.createServer(httpsOptions, app).listen(HTTP_PORT, () => {
   loadOpnCheckHistory();
   startSubQueueLoop();
   startAsrQueueLoop();
+  // .bif generation: clear any stale lock, restore queue, resume work.
+  try {
+    fs.unlinkSync(BIF_CREATING_PATH);
+  } catch {}
+  loadBifNeededQueue();
+  checkBifNeededQueue();
 });
 
 app.post("/internal/tv-state", (req, res) => {

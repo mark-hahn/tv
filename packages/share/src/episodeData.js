@@ -85,12 +85,29 @@ export function hasBif(ed, s, e) {
   return getEp(ed, s, e)?.[B] === 1;
 }
 
-// First episode number in season `s` that has a .bif sidecar, or null if none.
+// Find the first episode with a .bif sidecar.
+// When `s` is provided: returns episode number in that season, or null if none.
+// When `s` is missing: searches all seasons and returns {season, episode} or null.
 export function getBifEpisode(ed, s) {
-  const season = Array.isArray(ed) ? ed[s] : null;
-  if (!Array.isArray(season)) return null;
-  for (let i = 0; i < season.length; i++) {
-    if (Array.isArray(season[i]) && season[i][B] === 1) return i + 1;
+  // Search a specific season
+  if (s != null) {
+    const season = Array.isArray(ed) ? ed[s] : null;
+    if (!Array.isArray(season)) return null;
+    for (let i = 0; i < season.length; i++) {
+      if (Array.isArray(season[i]) && season[i][B] === 1) return i + 1;
+    }
+    return null;
+  }
+  // Search all seasons
+  if (!Array.isArray(ed)) return null;
+  for (let seasonNum = 0; seasonNum < ed.length; seasonNum++) {
+    const season = ed[seasonNum];
+    if (!Array.isArray(season)) continue;
+    for (let i = 0; i < season.length; i++) {
+      if (Array.isArray(season[i]) && season[i][B] === 1) {
+        return { season: seasonNum, episode: i + 1 };
+      }
+    }
   }
   return null;
 }

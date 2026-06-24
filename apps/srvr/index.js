@@ -2880,7 +2880,7 @@ const showNameFromFilePath = (filePath) => {
  * Check disk for a single show folder
  * @param {string} showFolderName - The show folder name (e.g., "Breaking Bad")
  * @returns {Promise<[number, number, Array, Object, Object]|null>} - [maxDate, totalSize, filesOnDisk, fileQuality, diskByEp] or null if not found
- *   diskByEp: { [season]: { [episode]: { file, res } } } — per-episode file name + resolution
+ *   diskByEp: { [season]: { [episode]: { file, res, bif } } } — per-episode file name + resolution + bif-sidecar flag
  */
 const getShowDiskInfo = async (showFolderName) => {
   if (!showFolderName) return null;
@@ -2893,6 +2893,8 @@ const getShowDiskInfo = async (showFolderName) => {
   const fileQuality = {};
   // Per-episode file name + resolution: { [season]: { [episode]: { file, res } } }
   const diskByEp = {};
+  // All .bif sidecar file names found (matched to video bases after the scan).
+  const bifFiles = [];
 
   const recurs = async (dirPath) => {
     if (errFlg || dirPath == tvDir + "/.stfolder") return;
@@ -2906,6 +2908,10 @@ const getShowDiskInfo = async (showFolderName) => {
         return;
       }
       const sfx = dirPath.split(".").pop();
+      if (sfx === "bif") {
+        bifFiles.push(path.basename(dirPath));
+        return;
+      }
       if (videoFileExtensions.includes(sfx)) {
         const date = fmtDateWithTZ(fstat.mtime);
         if (!maxDate || date > maxDate) maxDate = date;
@@ -2965,6 +2971,19 @@ const getShowDiskInfo = async (showFolderName) => {
         errFlg.message,
       );
       return null;
+    }
+
+    // Match .bif sidecars to episodes: a bif belongs to a video when its name
+    // starts with the video file's base name (name without the final extension).
+    if (bifFiles.length > 0) {
+      for (const eps of Object.values(diskByEp)) {
+        for (const info of Object.values(eps)) {
+          const base = info.file.replace(/\.[^.]+$/, "");
+          if (base && bifFiles.some((bn) => bn.startsWith(base))) {
+            info.bif = 1;
+          }
+        }
+      }
     }
 
     // Encode filesOnDisk in same format as watchedEpis: [[season, ep1, ep2, ...], ...]
@@ -3059,7 +3078,11 @@ async function refreshEpisodeData(showName, rec, opts = {}) {
             const fileVal = folderDiffers
               ? `${folder}//${info.file}`
               : info.file;
-            epd.setEpisode(ed, s, e, { file: fileVal, res: info.res });
+            epd.setEpisode(ed, s, e, {
+              file: fileVal,
+              res: info.res,
+              bif: info.bif ? 1 : 0,
+            });
           }
         }
       } else if (!rec.noFiles) {
@@ -8469,12 +8492,14 @@ watcher
   .on("add", async (filePath) => {
     console.log(`[chokidar] detected add: ${filePath}`);
     const ext = filePath.split(".").pop();
-    if (!videoFileExtensions.includes(ext)) return;
+    const isVideo = videoFileExtensions.includes(ext);
+    const isBif = ext === "bif";
+    if (!isVideo && !isBif) return;
 
     const showName = extractShowNameFromPath(filePath);
     if (!showName) return;
 
-    console.log(`[chokidar] video added: ${showName}`);
+    console.log(`[chokidar] ${isBif ? "bif" : "video"} added: ${showName}`);
 
     // Update only the affected show in cache instead of invalidating everything
     if (diskShowsCache) {
@@ -8514,6 +8539,8 @@ watcher
         if (tvdbRec && tvdbRec.inEmby) {
           let queued = false;
           for (const fp of entry.files) {
+            // Only video files are subtitle-checked; .bif sidecars just refresh disk data.
+            if (!videoFileExtensions.includes(fp.split(".").pop())) continue;
             const needs = await fileNeedsSubChecked(fp, showName);
             console.log(
               `[chokidar] fileNeedsSubChecked(${path.basename(fp)}) = ${needs}`,
@@ -8543,12 +8570,14 @@ watcher
   .on("unlink", (filePath) => {
     console.log(`[chokidar] detected unlink: ${filePath}`);
     const ext = filePath.split(".").pop();
-    if (!videoFileExtensions.includes(ext)) return;
+    if (!videoFileExtensions.includes(ext) && ext !== "bif") return;
 
     const showName = extractShowNameFromPath(filePath);
     if (!showName) return;
 
-    console.log(`[chokidar] video deleted: ${showName}`);
+    console.log(
+      `[chokidar] ${ext === "bif" ? "bif" : "video"} deleted: ${showName}`,
+    );
 
     // Debounce: clear existing timeout and set new one
     const unlinkEntry = changedShows.get(showName);

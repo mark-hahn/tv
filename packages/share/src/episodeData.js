@@ -2,13 +2,15 @@
 //
 // On-disk / in-memory shape (see episodeData-plan.md):
 //   episodeData[season][episode-1] = tuple
-//   tuple = [aired, watched, id, file, res]   (trailing absent slots dropped)
+//   tuple = [aired, watched, id, file, res, bif]   (trailing absent slots dropped)
 //     [0] aired   "YYYY-MM-DD" string (or 0 when unknown)
 //     [1] watched 1 / 0
 //     [2] id      Emby item id integer (0 = none)
 //     [3] file    file name, or "<folder>//<file name>" when the show folder
 //                 differs from the record key (marker is the "//")
-//     [4] res     integer resolution (e.g. 1080)
+//     [4] res     integer resolution (e.g. 1080); 0 = unknown
+//     [5] bif     1 when a .bif sidecar exists (absent = none, never 0). When
+//                 bif is 1 the res slot is always present (0 if unknown).
 //
 // Season index is 0-based (episodeData[0] = season 0). Episode index is 1-based
 // (episodeData[s][0] = episode 1). Helpers take a 1-based `e`.
@@ -24,6 +26,7 @@ const W = 1; // watched
 const ID = 2; // emby id
 const F = 3; // file name (possibly "<folder>//<file>")
 const R = 4; // resolution
+const B = 5; // bif sidecar present (1, or absent)
 
 export function getEp(ed, s, e) {
   if (!Array.isArray(ed)) return null;
@@ -75,6 +78,21 @@ export function hasFile(ed, s, e) {
 export function getRes(ed, s, e) {
   const r = getEp(ed, s, e)?.[R];
   return typeof r === "number" && r ? r : null;
+}
+
+// True when the episode has a .bif sidecar file on disk.
+export function hasBif(ed, s, e) {
+  return getEp(ed, s, e)?.[B] === 1;
+}
+
+// First episode number in season `s` that has a .bif sidecar, or null if none.
+export function getBifEpisode(ed, s) {
+  const season = Array.isArray(ed) ? ed[s] : null;
+  if (!Array.isArray(season)) return null;
+  for (let i = 0; i < season.length; i++) {
+    if (Array.isArray(season[i]) && season[i][B] === 1) return i + 1;
+  }
+  return null;
 }
 
 // Unaired = aired date is in the future AND there is no file on disk.
@@ -173,13 +191,14 @@ export function countWatched(ed) {
 }
 
 // Encode named fields into a trimmed positional tuple.
-function encodeTuple(aired, watched, id, file, res) {
+function encodeTuple(aired, watched, id, file, res, bif) {
   const arr = [
     aired || 0,
     watched ? 1 : 0,
     id || 0,
     file || 0,
     typeof res === "number" && res ? res : 0,
+    bif ? 1 : 0,
   ];
   let len = arr.length;
   while (len > 1 && !arr[len - 1]) len--;
@@ -192,8 +211,8 @@ export function ensureSeason(ed, s) {
 }
 
 // Merge the provided fields over an episode's existing tuple, then re-trim.
-// `fields` may contain any of: aired, watched, id, file, res. Omitted keys keep
-// their existing value. Pass file:null / res:null to clear.
+// `fields` may contain any of: aired, watched, id, file, res, bif. Omitted keys
+// keep their existing value. Pass file:null / res:null / bif:0 to clear.
 export function setEpisode(ed, s, e, fields) {
   const season = ensureSeason(ed, s);
   const i = e - 1;
@@ -204,6 +223,7 @@ export function setEpisode(ed, s, e, fields) {
   let file =
     typeof existing[F] === "string" && existing[F] ? existing[F] : null;
   let res = typeof existing[R] === "number" && existing[R] ? existing[R] : null;
+  let bif = existing[B] === 1 ? 1 : 0;
 
   if ("aired" in fields) aired = fields.aired || 0;
   if ("watched" in fields) watched = fields.watched ? 1 : 0;
@@ -211,18 +231,19 @@ export function setEpisode(ed, s, e, fields) {
   if ("file" in fields) file = fields.file || null;
   if ("res" in fields)
     res = typeof fields.res === "number" && fields.res ? fields.res : null;
+  if ("bif" in fields) bif = fields.bif ? 1 : 0;
 
-  season[i] = encodeTuple(aired, watched, id, file, res);
+  season[i] = encodeTuple(aired, watched, id, file, res, bif);
 }
 
 export function clearFile(ed, s, e) {
-  setEpisode(ed, s, e, { file: null, res: null });
+  setEpisode(ed, s, e, { file: null, res: null, bif: 0 });
 }
 
-// Drop id/file/res for every episode (used when a show leaves Emby).
+// Drop id/file/res/bif for every episode (used when a show leaves Emby).
 export function stripToAiredWatched(ed) {
   forEachEpisode(ed, (s, e) => {
-    setEpisode(ed, s, e, { id: 0, file: null, res: null });
+    setEpisode(ed, s, e, { id: 0, file: null, res: null, bif: 0 });
   });
 }
 

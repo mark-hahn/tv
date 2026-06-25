@@ -38,7 +38,9 @@ const sshCommand = `ssh hahnca.com "cd /root/dev/apps/tv && node -e \\"
   const tvdbPath = process.argv[1];
   const tvdb = JSON.parse(fs.readFileSync(tvdbPath, 'utf8'));
   const showName = process.argv[2];
-  const show = tvdb[showName];
+  const lower = showName.toLowerCase();
+  const matchedKey = Object.keys(tvdb).find(k => k.toLowerCase() === lower);
+  const show = matchedKey ? tvdb[matchedKey] : undefined;
   if (show) {
     console.log(JSON.stringify(show));
   } else {

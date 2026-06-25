@@ -580,6 +580,7 @@ export default {
       currentPlayingSeason: null,
       currentPlayingEpisode: null,
       nowPlayingShowNames: new Set(),
+      sitcomsSet: new Set(),
       sortChoice: "Viewed",
       reversed: false,
       fltrChoice: "All",
@@ -611,7 +612,14 @@ export default {
         "Creator",
         "Quality",
       ],
-      fltrChoices: ["All", "Try Drama", "Watching", "Finished", "Playing"],
+      fltrChoices: [
+        "All",
+        "Try Drama",
+        "Watching",
+        "Finished",
+        "Playing",
+        "Sitcoms",
+      ],
       conds: [
         {
           color: "#0cf",
@@ -2822,6 +2830,14 @@ export default {
         if (scroll) this.scrollToSavedShow();
         return;
       }
+
+      if (this.fltrChoice === "Sitcoms") {
+        this.shows = allShows.filter((show) => this.sitcomsSet.has(show.name));
+        this.sortShows();
+        if (scroll) this.scrollToSavedShow();
+        return;
+      }
+
       let srchStrLc;
       if (this.fltrChoice !== "Finished") {
         if (this.filterStr.length > 0) this.fltrChoice = "- - - - -";
@@ -3234,6 +3250,15 @@ export default {
       allShows = result.allShows;
       allTvdb = result.allTvdb;
       this.hasLoadedAllShows = true;
+
+      // Load sitcoms list
+      try {
+        const sitcoms = await srvr.getSitcoms();
+        this.sitcomsSet = new Set(sitcoms);
+      } catch (err) {
+        console.error("Failed to load sitcoms list:", err);
+        this.sitcomsSet = new Set();
+      }
 
       if (!allShows) {
         console.error("No shows from loadAllShows");

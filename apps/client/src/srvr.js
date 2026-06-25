@@ -751,3 +751,14 @@ export async function dumpSelectedShows(showNames) {
   }
   return await response.json();
 }
+
+export async function getSitcoms() {
+  const response = await fetch(`${HTTP_URL}/api/getSitcoms`);
+  if (!response.ok) {
+    throw new Error(
+      `getSitcoms failed: ${response.status} ${response.statusText}`,
+    );
+  }
+  const result = await response.json();
+  return result.sitcoms || [];
+}

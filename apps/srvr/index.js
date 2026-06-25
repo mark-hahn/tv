@@ -4117,6 +4117,25 @@ app.post(
     }
   }),
 );
+
+app.get(
+  "/api/getSitcoms",
+  apiWrapper(async () => {
+    try {
+      const filePath = "/root/dev/apps/tv/sitcoms.txt";
+      const content = await fsp.readFile(filePath, "utf8");
+      const sitcoms = content
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+      return { success: true, sitcoms };
+    } catch (err) {
+      console.error("[getSitcoms] error:", err);
+      return { success: false, error: err.message, sitcoms: [] };
+    }
+  }),
+);
+
 app.post(
   "/api/toggleBadGroup",
   apiWrapper(async ({ group }) => {

@@ -4098,6 +4098,25 @@ app.get("/api/getBadGroups", (_req, res) => {
     res.json([]);
   }
 });
+
+app.post(
+  "/api/dumpSelectedShows",
+  apiWrapper(async (params) => {
+    const { showNames } = params;
+    if (!Array.isArray(showNames)) {
+      return { success: false, error: "showNames must be an array" };
+    }
+    try {
+      const filePath = "/root/dev/apps/tv/selected-shows.txt";
+      const content = showNames.join("\n") + (showNames.length > 0 ? "\n" : "");
+      await fsp.writeFile(filePath, content, "utf8");
+      return { success: true, count: showNames.length, path: filePath };
+    } catch (err) {
+      console.error("[dumpSelectedShows] error:", err);
+      return { success: false, error: err.message };
+    }
+  }),
+);
 app.post(
   "/api/toggleBadGroup",
   apiWrapper(async ({ group }) => {

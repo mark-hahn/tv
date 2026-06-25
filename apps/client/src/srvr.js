@@ -737,3 +737,17 @@ export async function getImdbReviews(imdbId) {
 export function debugTvdb(params) {
   return httpCall("/api/debugTvdb", params, "POST");
 }
+
+export async function dumpSelectedShows(showNames) {
+  const response = await fetch(`${HTTP_URL}/api/dumpSelectedShows`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ showNames }),
+  });
+  if (!response.ok) {
+    throw new Error(
+      `dumpSelectedShows failed: ${response.status} ${response.statusText}`,
+    );
+  }
+  return await response.json();
+}

@@ -950,6 +950,7 @@
 import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
 import * as srvr from "../srvr.js";
+import { config } from "../config.js";
 import * as urls from "../urls.js";
 import * as util from "../util.js";
 import evtBus from "../evtBus.js";
@@ -2006,8 +2007,9 @@ export default {
     async handleSelectedTv() {
       const id = this.firstSelectedEmbyId;
       if (!id) return;
-      const result = await srvr.embyViewShow(id, this.mapShow?.name);
-      if (!result?.found) window.alert("Living Room TV is not active in Emby.");
+      fetch(
+        `${config.tvTvUrl}/tv/viewshow?showId=${encodeURIComponent(id)}&showName=${encodeURIComponent(this.mapShow?.name ?? "")}`,
+      ).catch(() => {});
     },
     handleEpisodePlainClick(event, mapShow, season, episode) {
       event?.preventDefault?.();

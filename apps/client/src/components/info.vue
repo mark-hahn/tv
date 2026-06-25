@@ -515,6 +515,7 @@ import evtBus from "../evtBus.js";
 import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
 import * as srvr from "../srvr.js";
+import { config } from "../config.js";
 import * as epd from "@tv/share";
 import * as util from "../util.js";
 
@@ -808,8 +809,9 @@ export default {
     },
 
     async tvClick() {
-      const result = await srvr.embyViewShow(this.show.id, this.show.name);
-      if (!result?.found) window.alert("Living Room TV is not active in Emby.");
+      fetch(
+        `${config.tvTvUrl}/tv/viewshow?showId=${encodeURIComponent(this.show.id)}&showName=${encodeURIComponent(this.show.name)}`,
+      ).catch(() => {});
     },
 
     deleteClick() {

@@ -88,6 +88,7 @@ const SRVR_INTERNAL_URL = "http://127.0.0.1:8739";
 
 const GOOGLE_HOME_DELAY_MS = 0; // ms after TV turns on before sending Home key
 const GOOGLE_EMBY_DELAY_MS = 250; // ms after TV turns on before launching Emby
+const VIEW_SHOW_DELAY_MS = 10000; // ms after Emby app launch before firing embyViewShow (fallback)
 const FIRE_HOME_DELAY_MS = 0; // ms after Fire TV turns on before sending home key
 const FIRE_EMBY_DELAY_MS = 5000; // ms after Fire TV turns on before launching Emby
 
@@ -201,6 +202,14 @@ function handleEmbySession(s) {
     remoteCtrl,
     paused,
   };
+
+  if (device === "google" && pendingViewShow) {
+    if (viewShowEmbyTimer) clearTimeout(viewShowEmbyTimer);
+    viewShowEmbyTimer = setTimeout(() => {
+      viewShowEmbyTimer = null;
+      firePendingViewShow("viewshow(emby-ready)");
+    }, 1000);
+  }
 }
 
 const DEVICE_PRIORITY = [
@@ -315,6 +324,8 @@ let lastOffAt = 0;
 let lastOnAt = 0;
 let pendingGoogleHome = false;
 let pendingFireEmby = false;
+let pendingViewShow = null; // { showId, showName } — queued for after Emby launches
+let viewShowEmbyTimer = null; // debounce timer: fires 1s after Living Room TV session detected
 let currentShowName = null;
 const prevSessions = {};
 
@@ -451,6 +462,10 @@ function handleMsg(raw) {
               }),
             GOOGLE_EMBY_DELAY_MS,
           );
+          setTimeout(
+            () => firePendingViewShow("viewshow(tv-on)"),
+            GOOGLE_EMBY_DELAY_MS + VIEW_SHOW_DELAY_MS,
+          );
         }
         // pendingFireEmby: launch Emby once FireTV is the active input
         if (
@@ -563,6 +578,57 @@ app.get("/tv/googlebtn", (req, res) => {
     // TV off — wait for state_changed on transition to "on"
     pendingGoogleHome = true;
     log(`googlebtn: TV not on (${braviaHaPower}), set pendingGoogleHome=true`);
+  }
+  res.json({ ok: true });
+});
+
+async function firePendingViewShow(label) {
+  if (!pendingViewShow) return;
+  if (viewShowEmbyTimer) {
+    clearTimeout(viewShowEmbyTimer);
+    viewShowEmbyTimer = null;
+  }
+  const { showId, showName } = pendingViewShow;
+  pendingViewShow = null;
+  log(`${label}: firing viewshow showId=${showId}`);
+  try {
+    const resp = await fetch(`${SRVR_INTERNAL_URL}/api/embyViewShow`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ showId, showName }),
+    });
+    const result = await resp.json();
+    log(`${label}: viewshow result=${JSON.stringify(result)}`);
+  } catch (e) {
+    log(`${label}: viewshow failed: ${e.message}`);
+  }
+}
+
+app.get("/tv/viewshow", (req, res) => {
+  const { showId, showName } = req.query;
+  log(
+    `viewshow from ${client(req)} showId=${showId} showName=${showName} braviaHaPower=${braviaHaPower}`,
+  );
+  pendingViewShow = { showId, showName };
+  callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
+  if (braviaHaPower === "on") {
+    callService("remote", "send_command", REMOTE_ENTITY_ID, {
+      command: "Home",
+    });
+    setTimeout(() => {
+      callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
+        media_content_type: "app",
+        media_content_id:
+          "com.sony.dtv.tv.emby.embyatv.tv.emby.embyatv.startup.StartupActivity",
+      });
+    }, GOOGLE_EMBY_DELAY_MS);
+    setTimeout(
+      () => firePendingViewShow("viewshow(on)"),
+      GOOGLE_EMBY_DELAY_MS + VIEW_SHOW_DELAY_MS,
+    );
+  } else {
+    pendingGoogleHome = true;
+    log(`viewshow: TV not on (${braviaHaPower}), set pendingGoogleHome=true`);
   }
   res.json({ ok: true });
 });

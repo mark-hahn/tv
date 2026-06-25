@@ -25,5 +25,11 @@
     "./apps/client",
     "."
   ],
-  "chat.agent.autoApprove": true
+  "chat.agent.autoApprove": true,
+  "[json]": {
+    "editor.formatOnSave": false
+  },
+  "[jsonc]": {
+    "editor.formatOnSave": false
+  }
 }

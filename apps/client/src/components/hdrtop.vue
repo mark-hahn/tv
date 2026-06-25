@@ -30,11 +30,11 @@
       <div
         id="nums"
         v-if="!simpleMode"
-        style="display: flex; justify-content: space-around; width: 120px"
+        style="display: flex; justify-content: space-around"
       >
         <div
           id="count"
-          style="display: inline-block; margin: 4px 5px 4px 15px; width: 75px"
+          style="display: inline-block; margin: 4px 5px 4px 15px"
         >
           {{ showsLength + "/" + allShowsLength }}
         </div>
@@ -48,7 +48,6 @@
         placeholder="Filter..."
         style="
           width: 120px;
-          margin: 5px 20px 5px 10px;
           padding: 5px;
           border: 1.5px solid black;
           background-color: #eee;

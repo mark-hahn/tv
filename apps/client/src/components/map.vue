@@ -1064,6 +1064,16 @@ export default {
     hdr2Parts() {
       const parts = [];
 
+      // Add aired date of first selected episode at the far left
+      if (this.selectedCells.size > 0) {
+        const firstKey = Array.from(this.selectedCells)[0];
+        const { season, episode } = this.parseCellKey(firstKey);
+        const aired = epd.getAired(this.tvdbData?.episodeData, season, episode);
+        if (aired) {
+          parts.push(aired);
+        }
+      }
+
       const rt = this.tvdbData?.averageRuntime;
       if (rt) {
         const si = this.mapShow?.seasonIntros;

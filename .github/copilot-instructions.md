@@ -111,3 +111,5 @@ don't clean up debug logging until i tell you to
 whenever you deploy to the server and pm2 does a restart check pm2 logs to make sure there is no server crashing and restarting
 
 when modifying tvdb.json directly on disk stop tv-srvr first to avoid stale overwrite
+
+in the map pane call the first child of the maphdr2 div the "map pane info bar"

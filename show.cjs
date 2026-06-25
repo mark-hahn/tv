@@ -83,12 +83,29 @@ exec(sshCommand, (error, stdout, stderr) => {
               (subItem) => !Array.isArray(subItem),
             );
             if (isInnermost) {
-              return `%%PLACEHOLDER_${JSON.stringify(value)}%%`;
+              const seasonNum =
+                this && this.seasonNum !== undefined ? this.seasonNum : 0;
+              const episodeNum =
+                this && this.episodeNum !== undefined ? this.episodeNum : 1;
+              return `%%PLACEHOLDER_S${seasonNum}_E${episodeNum}_${JSON.stringify(value)}%%`;
             } else {
-              const context = { inEpisodeData: true };
-              return value.map((item) =>
-                processValue.call(context, null, item),
-              );
+              if (key === "episodeData") {
+                return value.map((item, idx) => {
+                  const context = { inEpisodeData: true, seasonNum: idx };
+                  return processValue.call(context, null, item);
+                });
+              } else {
+                const seasonNum =
+                  this && this.seasonNum !== undefined ? this.seasonNum : 0;
+                return value.map((item, idx) => {
+                  const context = {
+                    inEpisodeData: true,
+                    seasonNum: seasonNum,
+                    episodeNum: idx + 1,
+                  };
+                  return processValue.call(context, null, item);
+                });
+              }
             }
           }
         }
@@ -107,19 +124,14 @@ exec(sshCommand, (error, stdout, stderr) => {
     const processedData = formatEpisodeData(finalData);
     let jsonString = JSON.stringify(processedData, null, 2);
 
-    // First, replace the placeholders with just the array content
-    jsonString = jsonString.replace(/"%%PLACEHOLDER_(.*?)%%"/g, (match, p1) => {
-      return p1.replace(/\\"/g, '"');
-    });
-
-    // Now, add the comment after the comma on lines that were placeholders
-    jsonString = jsonString.replace(/^(\s*\[.*?\],?)$/gm, (match, line) => {
-      if (line.includes("//")) return line; // Don't add twice
-      if (line.trim().endsWith(",")) {
-        return `${line} // TEST`;
-      }
-      return line;
-    });
+    // Replace placeholders with array content and add S/E comment
+    jsonString = jsonString.replace(
+      /"%%PLACEHOLDER_S(\d+)_E(\d+)_(.*?)%%"(,?)/g,
+      (match, season, episode, p1, comma) => {
+        const arr = p1.replace(/\\"/g, '"');
+        return `${arr}${comma} // S${season} E${episode}`;
+      },
+    );
 
     // 5. Write to ./show.jsonc
     fs.writeFileSync("./show.jsonc", jsonString);

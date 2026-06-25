@@ -1118,40 +1118,116 @@ export default {
       }
     },
 
+    // Select intro file using client-side episodeData (see intro-file-selection.md).
+    // Priority: 1) first episode with bif → Emby, 2) first unwatched with file → built-in,
+    // 3) first file (any watched status) → built-in, 4) error.
+    selectIntroFile(show) {
+      const ed = show?.episodeData;
+      if (!ed) return { error: "No episode data" };
+      const folder = show.path?.split("/").pop() || show.name;
+
+      // Priority 1: First episode with bif file (open in Emby)
+      const bifResult = epd.getBifEpisode(ed);
+      if (bifResult) {
+        const { season, episode } = bifResult;
+        const path = epd.getFullPath(ed, folder, season, episode);
+        const embyId = epd.getEmbyId(ed, season, episode);
+        if (!path) return { error: "No path for bif episode" };
+        if (!embyId) return { error: "No Emby ID for bif episode" };
+        return { path, season, episode, embyId, hasBif: true };
+      }
+
+      // Priority 2 & 3: First unwatched with file, or fallback to first file
+      let fallbackPath = null;
+      let fallbackSeason = null;
+      let fallbackEpisode = null;
+      let fallbackEmbyId = null;
+
+      let foundUnwatched = false;
+      epd.forEachEpisode(ed, (s, e) => {
+        if (foundUnwatched) return; // already found, skip rest
+        if (!epd.hasFile(ed, s, e)) return; // no file, skip
+
+        // Track first file as fallback
+        if (!fallbackPath) {
+          fallbackPath = epd.getFullPath(ed, folder, s, e);
+          fallbackSeason = s;
+          fallbackEpisode = e;
+          fallbackEmbyId = epd.getEmbyId(ed, s, e);
+        }
+
+        // Look for first unwatched with file
+        if (!epd.isWatched(ed, s, e)) {
+          const path = epd.getFullPath(ed, folder, s, e);
+          const embyId = epd.getEmbyId(ed, s, e);
+          if (path) {
+            foundUnwatched = true;
+            fallbackPath = path;
+            fallbackSeason = s;
+            fallbackEpisode = e;
+            fallbackEmbyId = embyId;
+          }
+        }
+      });
+
+      if (fallbackPath) {
+        return {
+          path: fallbackPath,
+          season: fallbackSeason,
+          episode: fallbackEpisode,
+          embyId: fallbackEmbyId,
+          hasBif: false,
+        };
+      }
+
+      return { error: "No playable episode found" };
+    },
+
     async clickIntro() {
       const show = this.filteredShows.find((s) => s.needsIntro);
       if (!show) return;
       try {
-        const result = await srvr.introFirstFile(show.name);
-        if (result?.ok && result.path) {
-          await this.handleOpenIntro({
-            show,
-            path: result.path,
-            source: "info",
-            season: result.season ?? null,
-            episode: result.episode ?? null,
-            embyId: result.id ?? null,
-          });
+        const result = this.selectIntroFile(show);
+        if (result.error) {
+          console.error("[clickIntro]", result.error);
+          return;
         }
+        await this.handleOpenIntro({
+          show,
+          path: result.path,
+          source: "info",
+          season: result.season ?? null,
+          episode: result.episode ?? null,
+          embyId: result.embyId ?? null,
+          hasBif: result.hasBif,
+        });
       } catch (e) {
         console.error("clickIntro error:", e);
       }
     },
 
-    async handleOpenIntro({ show, path, source, season, episode, embyId }) {
-      // If the video file has a .bif trickplay sidecar, edit intro in the Emby
-      // web tab (emby-ui.user.js overlay). Otherwise fall back to the built-in
-      // intro video pane.
-      let hasBif = false;
-      if (path) {
+    async handleOpenIntro({
+      show,
+      path,
+      source,
+      season,
+      episode,
+      embyId,
+      hasBif,
+    }) {
+      // If hasBif is explicitly provided (from selectIntroFile), use it directly.
+      // Otherwise fall back to checking via API (for backwards compatibility).
+      let useBif = hasBif;
+      if (useBif === undefined && path) {
         try {
           const res = await srvr.hasBif(path);
-          hasBif = !!res?.hasBif;
+          useBif = !!res?.hasBif;
         } catch (e) {
           console.error("[intro] hasBif check failed:", e);
+          useBif = false;
         }
       }
-      if (hasBif) {
+      if (useBif) {
         if (!embyId) {
           console.error("[intro] no Emby item id for", show?.name);
           window.alert("No Emby episode found for Intro.");
@@ -1225,14 +1301,27 @@ export default {
           continue;
         }
         try {
-          const result = await srvr.introFirstFile(s.name);
-          if (result?.ok && result.path) {
-            this.videoPlayerIntroShow = s;
-            this.videoPlayerPath = result.path;
-            this.videoPlayerMapSeason =
-              result.season != null ? result.season : null;
-            this.videoPlayerMapEpisode =
-              result.episode != null ? result.episode : null;
+          const result = this.selectIntroFile(s);
+          if (!result.error && result.path) {
+            // If opening with bif in Emby, route through handleOpenIntro
+            if (result.hasBif && result.embyId) {
+              await this.handleOpenIntro({
+                show: s,
+                path: result.path,
+                source: "info",
+                season: result.season ?? null,
+                episode: result.episode ?? null,
+                embyId: result.embyId,
+                hasBif: true,
+              });
+            } else {
+              this.videoPlayerIntroShow = s;
+              this.videoPlayerPath = result.path;
+              this.videoPlayerMapSeason =
+                result.season != null ? result.season : null;
+              this.videoPlayerMapEpisode =
+                result.episode != null ? result.episode : null;
+            }
             return;
           }
         } catch {

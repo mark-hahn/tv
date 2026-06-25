@@ -24,3 +24,4 @@ apps/android/.build-cache
 build.apk
 build-phase
 usb-bkup/
+show.jsonc

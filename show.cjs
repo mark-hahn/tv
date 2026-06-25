@@ -110,9 +110,9 @@ exec(sshCommand, (error, stdout, stderr) => {
       return p1.replace(/\\"/g, '"');
     });
 
-    // 5. Write to temp.json
-    fs.writeFileSync("temp.json", jsonString);
-    console.log("Replaced temp.json with show record");
+    // 5. Write to ./show.jsonc
+    fs.writeFileSync("./show.jsonc", jsonString);
+    console.log("Saved output to ./show.jsonc");
 
     // 6. Cleanup
     fs.unlinkSync(tempShowRecordPath);

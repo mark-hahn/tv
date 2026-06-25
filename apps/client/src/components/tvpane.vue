@@ -1227,6 +1227,7 @@ export default {
 
     async openSubCtrl() {
       this.showSubCtrl = true;
+      clearInterval(this._subPollTimer);
       await this.fetchSubPlayers();
       this._subPollTimer = setInterval(() => this.fetchSubPlayers(), 3000);
     },

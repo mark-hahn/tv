@@ -1318,7 +1318,16 @@ function subStreamInfo(stream) {
   return { name: stream.Language || "Unknown", type, label };
 }
 
+// Cache for /tv/emby/playing — avoids hammering Emby Sessions API on every poll
+let playingCache = { ts: 0, data: null };
+const PLAYING_CACHE_TTL = 3000; // ms
+
 app.get("/tv/emby/playing", async (req, res) => {
+  const now = Date.now();
+  if (playingCache.data && now - playingCache.ts < PLAYING_CACHE_TTL) {
+    res.json(playingCache.data);
+    return;
+  }
   try {
     const sessRes = await fetch(
       `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
@@ -1408,7 +1417,9 @@ app.get("/tv/emby/playing", async (req, res) => {
         chosenSubIndex,
       });
     }
-    res.json({ ok: true, playing });
+    const result = { ok: true, playing };
+    playingCache = { ts: Date.now(), data: result };
+    res.json(result);
   } catch (err) {
     loge("emby/playing error:", err.message);
     res.json({ ok: false, error: err.message });

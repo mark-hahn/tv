@@ -106,8 +106,19 @@ exec(sshCommand, (error, stdout, stderr) => {
 
     const processedData = formatEpisodeData(finalData);
     let jsonString = JSON.stringify(processedData, null, 2);
+
+    // First, replace the placeholders with just the array content
     jsonString = jsonString.replace(/"%%PLACEHOLDER_(.*?)%%"/g, (match, p1) => {
       return p1.replace(/\\"/g, '"');
+    });
+
+    // Now, add the comment after the comma on lines that were placeholders
+    jsonString = jsonString.replace(/^(\s*\[.*?\],?)$/gm, (match, line) => {
+      if (line.includes("//")) return line; // Don't add twice
+      if (line.trim().endsWith(",")) {
+        return `${line} // TEST`;
+      }
+      return line;
     });
 
     // 5. Write to ./show.jsonc

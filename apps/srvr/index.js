@@ -6548,7 +6548,7 @@ app.post("/internal/subtitle-mismatch", (req, res) => {
 
 let lastNowPlayingShowName = null;
 let lastNowPlayingList = [];
-let lastPlayingKey = null; // "showName|season|episode" of the last playing item
+let lastPlayingKeys = new Set(); // "showName|season|episode" of all currently-playing items
 let lastMissingEpWarning = null;
 let lastLivingRoomWasPlaying = false;
 let lastAutoSkipKey = null; // "showName|season|episode" of last auto-skipped episode
@@ -6598,7 +6598,16 @@ app.post("/internal/nowPlaying", (req, res) => {
 
   lastNowPlayingShowName = showName ?? null;
   lastNowPlayingList = nextPlayingList;
-  if (lastNowPlayingList.length === 0) lastMissingEpWarning = null;
+  if (lastNowPlayingList.length === 0) {
+    lastMissingEpWarning = null;
+  } else if (lastMissingEpWarning) {
+    const stillPlaying = lastNowPlayingList.some(
+      (p) =>
+        p.device === lastMissingEpWarning.device &&
+        p.showName === lastMissingEpWarning.showName,
+    );
+    if (!stillPlaying) lastMissingEpWarning = null;
+  }
   notifyClients("nowPlaying", {
     showName: lastNowPlayingShowName,
     playing: lastNowPlayingList,
@@ -6654,15 +6663,24 @@ app.post("/internal/nowPlaying", (req, res) => {
 });
 
 async function checkMissingEpisodes(playing) {
+  const currentKeys = new Set(
+    playing
+      .filter(
+        (p) => p.showName && p.device && p.season != null && p.episode != null,
+      )
+      .map((p) => `${p.showName}|${p.season}|${p.episode}`),
+  );
+  for (const k of lastPlayingKeys) {
+    if (!currentKeys.has(k)) lastPlayingKeys.delete(k);
+  }
+
   for (const item of playing) {
     const { showName, device, season, episode } = item;
     if (!showName || !device || season == null || episode == null) continue;
 
     const key = `${showName}|${season}|${episode}`;
-    const isNew = key !== lastPlayingKey;
-    lastPlayingKey = key;
-
-    if (!isNew) continue;
+    if (lastPlayingKeys.has(key)) continue;
+    lastPlayingKeys.add(key);
 
     const allTvdbData = tvdb.getAllTvdbSync();
     const tvdbRecord = allTvdbData?.[showName];

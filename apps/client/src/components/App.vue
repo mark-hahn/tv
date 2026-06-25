@@ -948,8 +948,8 @@ export default {
 
     bottomTabs() {
       return [
-        { label: "Tor", key: "tor" },
         { label: "Browse", key: "browse" },
+        { label: "Tor", key: "tor" },
         { label: "Flex", key: "flex" },
         { label: "Qbt", key: "qbt" },
         { label: "Down", key: "down" },

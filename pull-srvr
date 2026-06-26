@@ -1,0 +1,155 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SSH_HOST="hahnca.com"
+TV_REMOTE_BASE="${TV_REMOTE_BASE:-/root/dev/apps/tv}"
+IGNORE_FILE="$ROOT_DIR/pull-srvr-ignore"
+
+MODE=diff
+
+SSH_CONTROL_PATH="$HOME/.ssh/tv-pull-srvr-$$"
+TMP_IGNORE=$(mktemp)
+
+cleanup() {
+  rm -f "$TMP_IGNORE"
+  ssh -O exit -S "$SSH_CONTROL_PATH" "$SSH_HOST" 2>/dev/null || true
+}
+trap cleanup EXIT
+
+ssh -f -N -M -S "$SSH_CONTROL_PATH" "$SSH_HOST"
+
+rsync_cmd() {
+  rsync -e "ssh -S '$SSH_CONTROL_PATH'" "$@"
+}
+
+extract_section() {
+  local section="$1"
+  [[ -f "$IGNORE_FILE" ]] || return
+  awk "/^\\[$section\\]/{found=1; next} /^\\[/{found=0} found && NF && !/^#/{print}" "$IGNORE_FILE"
+}
+
+COMMON_EXCLUDES=(
+  --exclude 'node_modules/'
+  --exclude '.turbo/'
+  --exclude 'dist/'
+  --exclude 'build/'
+  --exclude '.output/'
+  --exclude '.cache/'
+  --exclude '.vite/'
+  --exclude '.nuxt/'
+  --exclude '.next/'
+  --exclude '.svelte-kit/'
+  --exclude '.parcel-cache/'
+  --exclude 'data/'
+  --exclude 'secrets/'
+  --exclude 'reel-shows.json'
+  --exclude 'reelgood-titles.json'
+  --exclude 'reelgood.log'
+  --exclude 'calls.log'
+  --exclude 'package-lock.json'
+  --exclude 'yarn.lock'
+)
+
+total_diffs=0
+
+show_or_copy_dir() {
+  local label="$1"
+  local local_dir="$2"
+  local remote_path="$3"
+  shift 3
+  local -a extra=("$@")
+
+  extract_section "$label" > "$TMP_IGNORE"
+  local -a ignore_args=()
+  if [[ -s "$TMP_IGNORE" ]]; then
+    ignore_args=(--exclude-from="$TMP_IGNORE")
+  fi
+
+  local -a args=(-az --checksum --itemize-changes "${ignore_args[@]}" "${COMMON_EXCLUDES[@]}" "${extra[@]}")
+
+  if [[ "$MODE" == "diff" ]]; then
+    local out
+    out=$(rsync_cmd --dry-run "${args[@]}" "$SSH_HOST:$remote_path/" "$local_dir/" 2>/dev/null || true)
+    local count=0
+    count=$(printf '%s\n' "$out" | grep -c '^[<>ch]' || true)
+    printf '  %-10s %d file(s) differ\n' "$label" "$count"
+    if [[ $count -gt 0 ]]; then
+      printf '%s\n' "$out" | grep '^[<>ch]' | sed 's/^/    /'
+    fi
+    total_diffs=$((total_diffs + count))
+  else
+    echo "[copy] $label <- $SSH_HOST:$remote_path/"
+    rsync_cmd "${args[@]}" "$SSH_HOST:$remote_path/" "$local_dir/"
+  fi
+}
+
+show_or_copy_root() {
+  local -a root_ignore=()
+  mapfile -t root_ignore < <(extract_section "root")
+
+  local -a all_root_files=("package.json" "pnpm-workspace.yaml" "pnpm-lock.yaml" "turbo.json" "ecosystem.config.cjs")
+  local -a src_args=()
+  for f in "${all_root_files[@]}"; do
+    local skip=0
+    for ig in "${root_ignore[@]}"; do
+      [[ "$f" == "$ig" ]] && skip=1 && break
+    done
+    [[ $skip -eq 0 ]] && src_args+=("$SSH_HOST:$TV_REMOTE_BASE/$f")
+  done
+
+  if [[ ${#src_args[@]} -eq 0 ]]; then
+    printf '  %-10s %d file(s) differ\n' "root" 0
+    return
+  fi
+
+  local -a args=(-az --checksum --itemize-changes "${src_args[@]}" "$ROOT_DIR/")
+
+  if [[ "$MODE" == "diff" ]]; then
+    local out
+    out=$(rsync_cmd --dry-run "${args[@]}" 2>/dev/null || true)
+    local count=0
+    count=$(printf '%s\n' "$out" | grep -c '^[<>ch]' || true)
+    printf '  %-10s %d file(s) differ\n' "root" "$count"
+    if [[ $count -gt 0 ]]; then
+      printf '%s\n' "$out" | grep '^[<>ch]' | sed 's/^/    /'
+    fi
+    total_diffs=$((total_diffs + count))
+  else
+    echo "[copy] root files <- $SSH_HOST:$TV_REMOTE_BASE/"
+    rsync_cmd "${args[@]}"
+  fi
+}
+
+run_sections() {
+  echo "=== root ==="
+  show_or_copy_root
+
+  echo "=== apps ==="
+  show_or_copy_dir "api"   "$ROOT_DIR/apps/api"       "$TV_REMOTE_BASE/apps/api"
+  show_or_copy_dir "down"  "$ROOT_DIR/apps/down"      "$TV_REMOTE_BASE/apps/down"
+  show_or_copy_dir "srvr"  "$ROOT_DIR/apps/srvr"      "$TV_REMOTE_BASE/apps/srvr" \
+    --exclude 'config/config2-rejects.json' \
+    --exclude 'config/config4-pickups.json'
+  show_or_copy_dir "asr"   "$ROOT_DIR/apps/asr"       "$TV_REMOTE_BASE/apps/asr"
+  show_or_copy_dir "tv"    "$ROOT_DIR/apps/tv"        "$TV_REMOTE_BASE/apps/tv"
+  show_or_copy_dir "share" "$ROOT_DIR/packages/share" "$TV_REMOTE_BASE/packages/share"
+}
+
+run_sections
+echo ""
+echo "Total: $total_diffs file(s) differ"
+if [[ $total_diffs -eq 0 ]]; then
+  echo "Nothing to copy."
+  exit 0
+fi
+echo ""
+read -r -p "Copy $total_diffs file(s) from server to local? [y/N] " reply
+if [[ "${reply,,}" != "y" ]]; then
+  echo "Aborted."
+  exit 0
+fi
+echo ""
+total_diffs=0
+MODE=copy
+run_sections

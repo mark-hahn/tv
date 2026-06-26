@@ -2598,6 +2598,11 @@ export default {
           : await srvr.getSeriesMapFromEmby({ showName: show.name });
         if (resp?.success && Array.isArray(resp.seriesMap)) {
           seriesMapIn = resp.seriesMap;
+          // Sync fresh episodeData into the in-memory cache so the Position
+          // filter reflects Emby changes that happened outside our app.
+          if (resp.episodeData && allTvdb?.[show.name]) {
+            allTvdb[show.name].episodeData = resp.episodeData;
+          }
         } else {
           errorMessage =
             resp?.error || "Not in emby and show not found in TVDB.";

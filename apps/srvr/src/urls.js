@@ -41,3 +41,7 @@ export function childrenUrl(parentId = "", unAired = false) {
     & api_key = ${apiKey}
   `.replace(/\s*/g, "");
 }
+
+export function updateUserDataUrl(itemId) {
+  return `${hahnca}Users/${markUsrId}/Items/${itemId}/UserData?api_key=${apiKey}`;
+}

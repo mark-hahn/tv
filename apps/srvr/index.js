@@ -4111,11 +4111,51 @@ app.post(
         : (rec.path || rec.emby?.path || showName).split("/").pop();
       const today = new Date().toISOString().slice(0, 10);
       const seriesMap = epd.toSeriesMap(rec.episodeData, folder, today);
-      return { success: true, seriesMap };
+      return { success: true, seriesMap, episodeData: rec.episodeData };
     } catch (err) {
       console.error("[getSeriesMapFromEmby] error:", err);
       return { success: false, error: err.message };
     }
+  }),
+);
+app.post(
+  "/api/clearEpisodePositions",
+  apiWrapper(async (params) => {
+    const { showName, cells } = params;
+    if (!showName || !Array.isArray(cells) || cells.length === 0)
+      return { ok: false, error: "Missing params" };
+    const allTvdb = tvdb.getAllTvdbSync();
+    const rec = allTvdb?.[showName];
+    if (!rec) return { ok: false, error: "Show not found" };
+    const cleared = [];
+    for (const { season, episode, id } of cells) {
+      if (!id) continue;
+      try {
+        const url = urls.updateUserDataUrl(String(id));
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ PlaybackPositionTicks: 0 }),
+        });
+        if (res.ok || res.status === 204) {
+          if (Array.isArray(rec.episodeData)) {
+            epd.setEpisode(rec.episodeData, season, episode, { pos: 0 });
+          }
+          cleared.push({ season, episode });
+        } else {
+          console.error(
+            `[clearEpisodePositions] Emby HTTP ${res.status} for id=${id}`,
+          );
+        }
+      } catch (e) {
+        console.error(
+          `[clearEpisodePositions] ${showName} S${season}E${episode}:`,
+          e.message,
+        );
+      }
+    }
+    if (cleared.length > 0) await tvdb.saveTvdbSync();
+    return { ok: true, cleared };
   }),
 );
 app.post("/api/searchActorsInNonEmby", apiWrapper(tvdb.searchActorsInNonEmby));

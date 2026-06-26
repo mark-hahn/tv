@@ -335,16 +335,22 @@
           v-if="!simpleMode"
           style="display: flex; flex-shrink: 0; align-items: center"
         >
-          <span
+          <button
             v-if="firstSelectedPosTicks > 0"
+            @click.stop="handleClearPositions"
             style="
+              font-size: 13.5px;
+              cursor: pointer;
+              margin: 4.5px 4.5px 4.5px 0;
+              max-height: 21.5px;
+              border-radius: 7px;
               white-space: nowrap;
               font-weight: bold;
               color: red;
-              margin-right: 6px;
             "
-            >Pos: {{ firstSelectedPosStr }}</span
           >
+            Pos: {{ firstSelectedPosStr }}
+          </button>
           <button
             @click.stop="handleSelectedWatch"
             :disabled="!hasMapSelection"
@@ -1207,8 +1213,14 @@ export default {
     },
     firstSelectedPosTicks() {
       if (this.selectedCells.size === 0) return 0;
-      const firstKey = Array.from(this.selectedCells)[0];
-      const { season, episode } = this.parseCellKey(firstKey);
+      // Prefer lastSelectedCell (most recently clicked) when it is still in the
+      // current selection, so the display tracks the cell the user just touched.
+      let key = this.lastSelectedCell;
+      if (!key || !this.selectedCells.has(key)) {
+        key = Array.from(this.selectedCells)[0];
+      }
+      if (!key) return 0;
+      const { season, episode } = this.parseCellKey(key);
       const pos = this.seriesMap?.[season]?.[episode]?.pos;
       return typeof pos === "number" && pos > 0 ? pos : 0;
     },
@@ -2007,6 +2019,29 @@ export default {
         this.bifFlash = false;
       }, 750);
       await srvr.enqueueBif(this.mapShow.name, paths);
+    },
+    async handleClearPositions() {
+      if (!this.mapShow?.name) return;
+      const cells = [];
+      for (const key of this.selectedCells) {
+        const { season, episode } = this.parseCellKey(key);
+        const ep = this.seriesMap?.[season]?.[episode];
+        if (!ep || !ep.pos || !ep.id) continue;
+        cells.push({ season, episode, id: ep.id });
+      }
+      if (cells.length === 0) return;
+      const resp = await srvr.clearEpisodePositions(this.mapShow.name, cells);
+      if (!resp?.ok) {
+        console.error("clearEpisodePositions failed", resp);
+        return;
+      }
+      // Update in-memory seriesMap so cells immediately drop their pos/p display.
+      for (const { season, episode } of resp.cleared || []) {
+        const ep = this.seriesMap?.[season]?.[episode];
+        if (ep) ep.pos = 0;
+      }
+      // Force re-render of the map table cells.
+      this.mapUpdateKey++;
     },
     selectNextEpisodeWithFile(currentSeason, currentEpisode) {
       if (

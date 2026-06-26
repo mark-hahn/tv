@@ -514,6 +514,10 @@ export function getSeriesMapFromEmby(params) {
   return httpCall("/api/getSeriesMapFromEmby", params, "POST");
 }
 
+export function clearEpisodePositions(showName, cells) {
+  return httpCall("/api/clearEpisodePositions", { showName, cells }, "POST");
+}
+
 export function setWatchedEpis(params) {
   return httpCall("/api/setWatchedEpis", params, "POST");
 }

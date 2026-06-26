@@ -335,6 +335,16 @@
           v-if="!simpleMode"
           style="display: flex; flex-shrink: 0; align-items: center"
         >
+          <span
+            v-if="firstSelectedPosTicks > 0"
+            style="
+              white-space: nowrap;
+              font-weight: bold;
+              color: red;
+              margin-right: 6px;
+            "
+            >Pos: {{ firstSelectedPosStr }}</span
+          >
           <button
             @click.stop="handleSelectedWatch"
             :disabled="!hasMapSelection"
@@ -688,7 +698,9 @@
                                 : 'white',
                     }"
                   >
-                    <span v-if="seriesMap?.[season]?.[episode]?.played"> w</span
+                    <span v-if="seriesMap?.[season]?.[episode]?.pos > 0">p</span
+                    ><span v-if="seriesMap?.[season]?.[episode]?.played">
+                      w</span
                     ><span
                       v-if="
                         seriesMap?.[season]?.[episode]?.avail &&
@@ -1192,6 +1204,16 @@ export default {
       const firstKey = Array.from(this.selectedCells)[0];
       const { season, episode } = this.parseCellKey(firstKey);
       return this.seriesMap?.[season]?.[episode]?.id || null;
+    },
+    firstSelectedPosTicks() {
+      if (this.selectedCells.size === 0) return 0;
+      const firstKey = Array.from(this.selectedCells)[0];
+      const { season, episode } = this.parseCellKey(firstKey);
+      const pos = this.seriesMap?.[season]?.[episode]?.pos;
+      return typeof pos === "number" && pos > 0 ? pos : 0;
+    },
+    firstSelectedPosStr() {
+      return this.fmtPosTicks(this.firstSelectedPosTicks);
     },
   },
 
@@ -1785,6 +1807,16 @@ export default {
     formatSelectedEpisode(selectedEpisode) {
       if (!selectedEpisode?.s || !selectedEpisode?.e) return "";
       return `(S${String(selectedEpisode.s).padStart(2, "0")}E${String(selectedEpisode.e).padStart(2, "0")})`;
+    },
+    // PlaybackPositionTicks (100-ns ticks) -> "mm:ss", suppressing a leading 0,
+    // a "0:" minutes part, and the "0:0" leading zero on sub-10-second values.
+    fmtPosTicks(ticks) {
+      if (!ticks || ticks <= 0) return "";
+      const totalSec = Math.floor(ticks / 10000000);
+      const min = Math.floor(totalSec / 60);
+      const sec = totalSec % 60;
+      if (min > 0) return `${min}:${String(sec).padStart(2, "0")}`;
+      return `${sec}`;
     },
     clearMapSelectionDetails() {
       this.showEpisodePane = false;

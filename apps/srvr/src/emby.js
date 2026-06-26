@@ -125,6 +125,7 @@ export const getSeriesMap = async (show) => {
 
         const path = episodeRec?.MediaSources?.[0]?.Path;
         const played = !!episodeRec?.UserData?.Played;
+        const pos = episodeRec?.UserData?.PlaybackPositionTicks || 0;
         const avail = episodeRec?.LocationType !== "Virtual";
         const unaired = avail && path ? false : !!unairedObj[episodeNumber];
 
@@ -142,6 +143,7 @@ export const getSeriesMap = async (show) => {
             deleted: false,
             path,
             id: episodeRec.Id,
+            pos,
           },
         ]);
       }

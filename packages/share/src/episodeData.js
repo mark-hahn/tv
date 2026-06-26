@@ -2,7 +2,7 @@
 //
 // On-disk / in-memory shape (see episodeData-plan.md):
 //   episodeData[season][episode-1] = tuple
-//   tuple = [aired, watched, id, file, res, bif]   (trailing absent slots dropped)
+//   tuple = [aired, watched, id, file, res, bif, pos]  (trailing absent slots dropped)
 //     [0] aired   "YYYY-MM-DD" string (or 0 when unknown)
 //     [1] watched 1 / 0
 //     [2] id      Emby item id integer (0 = none)
@@ -11,6 +11,8 @@
 //     [4] res     integer resolution (e.g. 1080); 0 = unknown
 //     [5] bif     1 when a .bif sidecar exists (absent = none, never 0). When
 //                 bif is 1 the res slot is always present (0 if unknown).
+//     [6] pos     Emby PlaybackPositionTicks (100-ns ticks); only stored when
+//                 > 0, set at the same time as the watched flag.
 //
 // Season index is 0-based (episodeData[0] = season 0). Episode index is 1-based
 // (episodeData[s][0] = episode 1). Helpers take a 1-based `e`.
@@ -27,6 +29,7 @@ const ID = 2; // emby id
 const F = 3; // file name (possibly "<folder>//<file>")
 const R = 4; // resolution
 const B = 5; // bif sidecar present (1, or absent)
+const P = 6; // PlaybackPositionTicks (only present when > 0)
 
 export function getEp(ed, s, e) {
   if (!Array.isArray(ed)) return null;
@@ -83,6 +86,28 @@ export function getRes(ed, s, e) {
 // True when the episode has a .bif sidecar file on disk.
 export function hasBif(ed, s, e) {
   return getEp(ed, s, e)?.[B] === 1;
+}
+
+// Emby playback position in 100-ns ticks, or 0 when none/absent.
+export function getPos(ed, s, e) {
+  const p = getEp(ed, s, e)?.[P];
+  return typeof p === "number" && p > 0 ? p : 0;
+}
+
+// True when any episode has a stored playback position (> 0).
+export function hasAnyPosition(ed) {
+  if (!Array.isArray(ed)) return false;
+  for (let s = 0; s < ed.length; s++) {
+    const season = ed[s];
+    if (!Array.isArray(season)) continue;
+    for (let i = 0; i < season.length; i++) {
+      const ep = season[i];
+      if (Array.isArray(ep) && typeof ep[P] === "number" && ep[P] > 0) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 // Find the first episode with a .bif sidecar.
@@ -208,7 +233,7 @@ export function countWatched(ed) {
 }
 
 // Encode named fields into a trimmed positional tuple.
-function encodeTuple(aired, watched, id, file, res, bif) {
+function encodeTuple(aired, watched, id, file, res, bif, pos) {
   const arr = [
     aired || 0,
     watched ? 1 : 0,
@@ -216,6 +241,7 @@ function encodeTuple(aired, watched, id, file, res, bif) {
     file || 0,
     typeof res === "number" && res ? res : 0,
     bif ? 1 : 0,
+    typeof pos === "number" && pos > 0 ? pos : 0,
   ];
   let len = arr.length;
   while (len > 1 && !arr[len - 1]) len--;
@@ -241,6 +267,8 @@ export function setEpisode(ed, s, e, fields) {
     typeof existing[F] === "string" && existing[F] ? existing[F] : null;
   let res = typeof existing[R] === "number" && existing[R] ? existing[R] : null;
   let bif = existing[B] === 1 ? 1 : 0;
+  let pos =
+    typeof existing[P] === "number" && existing[P] > 0 ? existing[P] : 0;
 
   if ("aired" in fields) aired = fields.aired || 0;
   if ("watched" in fields) watched = fields.watched ? 1 : 0;
@@ -249,18 +277,20 @@ export function setEpisode(ed, s, e, fields) {
   if ("res" in fields)
     res = typeof fields.res === "number" && fields.res ? fields.res : null;
   if ("bif" in fields) bif = fields.bif ? 1 : 0;
+  if ("pos" in fields)
+    pos = typeof fields.pos === "number" && fields.pos > 0 ? fields.pos : 0;
 
-  season[i] = encodeTuple(aired, watched, id, file, res, bif);
+  season[i] = encodeTuple(aired, watched, id, file, res, bif, pos);
 }
 
 export function clearFile(ed, s, e) {
   setEpisode(ed, s, e, { file: null, res: null, bif: 0 });
 }
 
-// Drop id/file/res/bif for every episode (used when a show leaves Emby).
+// Drop id/file/res/bif/pos for every episode (used when a show leaves Emby).
 export function stripToAiredWatched(ed) {
   forEachEpisode(ed, (s, e) => {
-    setEpisode(ed, s, e, { id: 0, file: null, res: null, bif: 0 });
+    setEpisode(ed, s, e, { id: 0, file: null, res: null, bif: 0, pos: 0 });
   });
 }
 
@@ -308,6 +338,7 @@ export function toSeriesMap(ed, folder, today, tvDir = TV_DIR) {
           id: getEmbyId(ed, s, e),
           quality: getRes(ed, s, e),
           aired: getAired(ed, s, e),
+          pos: getPos(ed, s, e),
         },
       ]);
     }

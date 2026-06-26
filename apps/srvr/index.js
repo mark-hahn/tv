@@ -3288,6 +3288,7 @@ async function refreshEpisodeData(showName, rec, opts = {}) {
           epd.setEpisode(ed, seasonNum, epNum, {
             watched: !!ep.played,
             id: ep.id ? Number(ep.id) : 0,
+            pos: ep.pos || 0,
           });
         }
       }

@@ -308,6 +308,7 @@ import * as emby from "../emby.js";
 import * as tvdb from "../tvdb.js";
 import * as srvr from "../srvr.js";
 import * as util from "../util.js";
+import * as epd from "@tv/share";
 
 let _vipSet = new Set();
 srvr
@@ -619,6 +620,7 @@ export default {
         "Finished",
         "Playing",
         "Sitcoms",
+        "Position",
       ],
       conds: [
         {
@@ -2846,6 +2848,15 @@ export default {
 
       if (this.fltrChoice === "Sitcoms") {
         this.shows = allShows.filter((show) => this.sitcomsSet.has(show.name));
+        this.sortShows();
+        if (scroll) this.scrollToSavedShow();
+        return;
+      }
+
+      if (this.fltrChoice === "Position") {
+        this.shows = allShows.filter((show) =>
+          epd.hasAnyPosition(show.episodeData),
+        );
         this.sortShows();
         if (scroll) this.scrollToSavedShow();
         return;

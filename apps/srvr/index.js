@@ -38,6 +38,7 @@ import {
 } from "./src/srvrPaths.js";
 import * as history from "./src/history.js";
 import * as groupCounts from "./src/groupCounts.js";
+import * as urls from "./src/urls.js";
 
 const tvdbIdByName = (name) => {
   if (!name) return null;

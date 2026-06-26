@@ -338,6 +338,7 @@
           <button
             v-if="firstSelectedPosTicks > 0"
             @click.stop="handleClearPositions"
+            :style="{ '--btn-bg': posFlash ? 'lightgray' : 'whitesmoke' }"
             style="
               font-size: 13.5px;
               cursor: pointer;
@@ -1068,6 +1069,7 @@ export default {
       mapUpdateKey: 0,
       pruneFlash: false,
       bifFlash: false,
+      posFlash: false,
       selectedSeasons: new Set(),
       selectedCells: new Set(),
       copiedSeason: null,
@@ -1213,16 +1215,24 @@ export default {
     },
     firstSelectedPosTicks() {
       if (this.selectedCells.size === 0) return 0;
-      // Prefer lastSelectedCell (most recently clicked) when it is still in the
-      // current selection, so the display tracks the cell the user just touched.
-      let key = this.lastSelectedCell;
-      if (!key || !this.selectedCells.has(key)) {
-        key = Array.from(this.selectedCells)[0];
+      // Use the lowest-numbered (season then episode) selected cell that has pos > 0.
+      let bestTicks = 0;
+      let bestSeason = Infinity;
+      let bestEpisode = Infinity;
+      for (const key of this.selectedCells) {
+        const { season, episode } = this.parseCellKey(key);
+        const pos = this.seriesMap?.[season]?.[episode]?.pos;
+        if (typeof pos !== "number" || pos <= 0) continue;
+        if (
+          season < bestSeason ||
+          (season === bestSeason && episode < bestEpisode)
+        ) {
+          bestSeason = season;
+          bestEpisode = episode;
+          bestTicks = pos;
+        }
       }
-      if (!key) return 0;
-      const { season, episode } = this.parseCellKey(key);
-      const pos = this.seriesMap?.[season]?.[episode]?.pos;
-      return typeof pos === "number" && pos > 0 ? pos : 0;
+      return bestTicks;
     },
     firstSelectedPosStr() {
       return this.fmtPosTicks(this.firstSelectedPosTicks);
@@ -2030,6 +2040,10 @@ export default {
         cells.push({ season, episode, id: ep.id });
       }
       if (cells.length === 0) return;
+      this.posFlash = true;
+      setTimeout(() => {
+        this.posFlash = false;
+      }, 750);
       const resp = await srvr.clearEpisodePositions(this.mapShow.name, cells);
       if (!resp?.ok) {
         console.error("clearEpisodePositions failed", resp);

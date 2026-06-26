@@ -133,6 +133,20 @@
             Play
           </button>
           <button
+            @click.stop="embyClick"
+            :disabled="!hasFirstUnwatchedEmbyId"
+            :style="{
+              fontSize: '13px',
+              cursor: hasFirstUnwatchedEmbyId ? 'pointer' : 'default',
+              marginTop: '3px',
+              maxHeight: '24px',
+              borderRadius: '7px',
+              opacity: hasFirstUnwatchedEmbyId ? 1 : 0.4,
+            }"
+          >
+            Emby
+          </button>
+          <button
             @click.stop="tvClick"
             :disabled="show?.inEmby === false"
             :style="{
@@ -518,6 +532,7 @@ import * as srvr from "../srvr.js";
 import { config } from "../config.js";
 import * as epd from "@tv/share";
 import * as util from "../util.js";
+import * as urls from "../urls.js";
 
 let allTvdb = null;
 let cachedDiskShows = null;
@@ -591,6 +606,21 @@ export default {
     },
     hasVideoFiles() {
       return epd.seasonsWithFile(this.show?.episodeData).length > 0;
+    },
+    hasFirstUnwatchedEmbyId() {
+      if (this.show?.inEmby === false) return false;
+      const ed = this.show?.episodeData;
+      if (!ed) return false;
+      let found = false;
+      epd.forEachEpisode(ed, (s, e) => {
+        if (!found && epd.hasFile(ed, s, e)) {
+          const embyId = epd.getEmbyId(ed, s, e);
+          if (embyId) {
+            found = true;
+          }
+        }
+      });
+      return found;
     },
   },
 
@@ -806,6 +836,21 @@ export default {
         season,
         episode,
       );
+    },
+
+    embyClick() {
+      const ed = this.show?.episodeData;
+      let embyId = null;
+      epd.forEachEpisode(ed, (s, e) => {
+        if (embyId === null && epd.hasFile(ed, s, e)) {
+          embyId = epd.getEmbyId(ed, s, e);
+        }
+      });
+      if (!embyId) {
+        window.alert("No Emby episode found.");
+        return;
+      }
+      util.openExternalPage(urls.embyPageUrl(embyId));
     },
 
     async tvClick() {

@@ -1015,8 +1015,15 @@ export default {
       evtBus.emit("introPaneClosed");
       this.fetchChksrtCount();
       if (closingIntro && introShow) {
+        const hasConfiguredSeasonIntro =
+          introShow.seasonIntros != null &&
+          Object.values(introShow.seasonIntros).some(
+            (si) => si?.trimPos != null || si?.skipDur != null,
+          );
         const configured =
-          introShow.trimPos != null || introShow.skipDur != null;
+          introShow.trimPos != null ||
+          introShow.skipDur != null ||
+          hasConfiguredSeasonIntro;
         if (configured) {
           introShow.needsIntro = false;
         } else {

@@ -2730,10 +2730,15 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         tvdbRecord.full = newFull;
       }
       // Compute needsIntro
+      const hasConfiguredIntro =
+        tvdbRecord.seasonIntros != null &&
+        Object.values(tvdbRecord.seasonIntros).some(
+          (si) => si?.trimPos != null || si?.skipDur != null,
+        );
       const newNeedsIntro = !!(
         tvdbRecord.inEmby &&
         !tvdbRecord.inLinda &&
-        tvdbRecord.seasonIntros == null &&
+        !hasConfiguredIntro &&
         Number(tvdbRecord.episodeCount ?? 0) >
           Number(tvdbRecord.watchedCount ?? 0) &&
         epd.seasonsWithFile(tvdbRecord.episodeData).length > 0
@@ -8796,14 +8801,19 @@ watcher
       try {
         const tvdbAll = tvdb.getAllTvdbSync?.();
         const tvdbRec = tvdbAll?.[showName];
+        const videoFiles = [...entry.files].filter((fp) =>
+          videoFileExtensions.includes(fp.split(".").pop()),
+        );
+        if (videoFiles.length === 0) {
+          handleShowDiskChange(showName);
+          return;
+        }
         console.log(
           `[chokidar] sub check for ${showName}: inEmby=${tvdbRec?.inEmby}, files=${[...entry.files].join(",")}`,
         );
         if (tvdbRec && tvdbRec.inEmby) {
           let queued = false;
-          for (const fp of entry.files) {
-            // Only video files are subtitle-checked; .bif sidecars just refresh disk data.
-            if (!videoFileExtensions.includes(fp.split(".").pop())) continue;
+          for (const fp of videoFiles) {
             const needs = await fileNeedsSubChecked(fp, showName);
             console.log(
               `[chokidar] fileNeedsSubChecked(${path.basename(fp)}) = ${needs}`,

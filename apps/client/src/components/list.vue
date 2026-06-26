@@ -3404,6 +3404,9 @@ export default {
           show.watchGap = show.watchGap;
           show.fileGap =
             show.fileGap || show.fileEndError || show.seasonWatchedThenNofile;
+          if (tvdbRecord.episodeData !== undefined) {
+            show.episodeData = tvdbRecord.episodeData;
+          }
           show.needsIntro = tvdbRecord.needsIntro ?? false;
           show.anticipating = tvdbRecord.anticipating ?? false;
           evtBus.emit(

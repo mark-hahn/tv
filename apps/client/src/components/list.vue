@@ -2042,7 +2042,19 @@ export default {
 
       if (!match) {
         // Fall back to fuzzy matching as last resort
-        match = util.smartTitleMatch(searchTitle, allShows, searchYear, true);
+        // smartTitleMatch returns a name string, not the show object — resolve it back
+        const fuzzyName = util.smartTitleMatch(
+          searchTitle,
+          allShows,
+          searchYear,
+          true,
+        );
+        if (fuzzyName) {
+          match =
+            allShows.find(
+              (s) => s.name === fuzzyName,
+            ) || null;
+        }
       }
 
       if (match) {

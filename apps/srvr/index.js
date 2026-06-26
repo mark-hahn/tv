@@ -2798,7 +2798,17 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
       // For shows not in emby, set error fields to known constants
       const nonEmbyConstants = [
         ["fileGap", false],
+        ["fileGapSeason", null],
+        ["fileGapEpisode", null],
         ["fileEndError", false],
+        ["fileEndErrorSeason", null],
+        ["fileEndErrorEpisode", null],
+        ["watchGap", false],
+        ["watchGapSeason", null],
+        ["watchGapEpisode", null],
+        ["seasonWatchedThenNofile", false],
+        ["seasonWatchedThenNofileSeason", null],
+        ["seasonWatchedThenNofileEpisode", null],
         ["full", false],
         ["needsIntro", false],
         ["notReady", true],

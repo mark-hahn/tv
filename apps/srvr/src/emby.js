@@ -388,6 +388,7 @@ const getShowState = (showName, showMeta) => {
     const firstAired = String(showMeta?.firstAired || "").trim();
     const startDateInFuture = !!firstAired && firstAired > today;
     const skipMissingFileGap =
+      !showMeta?.inEmby ||
       allEpisodesUnaired ||
       startDateInFuture ||
       showStatus.toLowerCase() === "upcoming";

@@ -1028,7 +1028,11 @@ function startBifCreate(bifNeededObj) {
   try {
     fs.writeFileSync(
       BIF_CREATING_PATH,
-      JSON.stringify({ showName: bifNeededObj.showName, pid: child.pid }),
+      JSON.stringify({
+        showName: bifNeededObj.showName,
+        pid: child.pid,
+        bifPath: bifNeededObj.bifPath,
+      }),
       "utf8",
     );
   } catch (e) {
@@ -5998,16 +6002,35 @@ app.get("/api/hasBif", async (req, res) => {
 
 // Enqueue one or more video files for BIF generation.
 // Body: { showName: string, paths: string[] }
-app.post("/api/bif/enqueue", (req, res) => {
+app.post("/api/bif/enqueue", async (req, res) => {
   const { showName, paths } = req.body || {};
   if (!showName || !Array.isArray(paths) || paths.length === 0) {
     res.status(400).json({ ok: false, error: "showName and paths[] required" });
     return;
   }
+  const lock = readBifCreating();
+  const inFlightPath = lock && pidAlive(lock.pid) ? lock.bifPath : null;
   let added = 0;
   for (const videoPath of paths) {
     if (!videoPath) continue;
-    if (bifNeededQueue.some((o) => o.bifPath === videoPath)) continue;
+    const base = path.basename(videoPath);
+    if (bifNeededQueue.some((o) => o.bifPath === videoPath)) {
+      console.log(`[bif] skip (queued) ${base}`);
+      continue;
+    }
+    if (inFlightPath === videoPath) {
+      console.log(`[bif] skip (in-flight) ${base}`);
+      continue;
+    }
+    const parsed = path.parse(videoPath);
+    const bifDiskPath = path.join(parsed.dir, `${parsed.name}-320-10.bif`);
+    try {
+      await fsp.access(bifDiskPath);
+      console.log(`[bif] skip (on-disk) ${base}`);
+      continue;
+    } catch {
+      /* not on disk */
+    }
     bifNeededQueue.push({ showName, bifPath: videoPath });
     added++;
   }

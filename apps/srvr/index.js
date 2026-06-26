@@ -1136,11 +1136,23 @@ function persistChksrtHistory() {
     console.error("[chksrt-history] persist error:", e.message);
   }
 }
+const CHKSRT_SNOOZE_MS = 24 * 60 * 60 * 1000;
 function loadChksrtSnoozed() {
   try {
     const raw = JSON.parse(fs.readFileSync(CHKSRT_SNOOZED_PATH, "utf8"));
-    chksrtSnoozed =
-      raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+      // normalize legacy string entries to {videoFilePath, snoozedAt}
+      for (const [show, entries] of Object.entries(raw)) {
+        if (Array.isArray(entries)) {
+          raw[show] = entries.map((e) =>
+            typeof e === "string" ? { videoFilePath: e, snoozedAt: 0 } : e,
+          );
+        }
+      }
+      chksrtSnoozed = raw;
+    } else {
+      chksrtSnoozed = {};
+    }
   } catch {
     chksrtSnoozed = {};
   }
@@ -1162,14 +1174,17 @@ function getChksrtSnoozedForShow(showName) {
 }
 function addToChksrtSnoozed(showName, videoFilePath) {
   const current = getChksrtSnoozedForShow(showName);
-  if (current.includes(videoFilePath)) return false;
-  chksrtSnoozed[showName] = [...current, videoFilePath];
+  if (current.some((e) => e.videoFilePath === videoFilePath)) return false;
+  chksrtSnoozed[showName] = [
+    ...current,
+    { videoFilePath, snoozedAt: Date.now() },
+  ];
   return true;
 }
 function removeFromChksrtSnoozed(showName, videoFilePath) {
   const current = getChksrtSnoozedForShow(showName);
   if (!current.length) return false;
-  const next = current.filter((entry) => entry !== videoFilePath);
+  const next = current.filter((entry) => entry.videoFilePath !== videoFilePath);
   if (next.length === current.length) return false;
   if (next.length > 0) chksrtSnoozed[showName] = next;
   else delete chksrtSnoozed[showName];
@@ -2575,16 +2590,27 @@ async function checkAndDownloadOpnSrt(showName, tvdbRecord) {
   if (result?.downloaded) {
     delete opnCheckHistory[histKey];
     persistOpnCheckHistory();
+    if (removeFromChksrtSnoozed(showName, filePath)) {
+      persistChksrtSnoozed();
+      enqueueSubQueueChkSrt(
+        { videoFilePath: filePath, fromUI: false, lowPriority: false },
+        false,
+      );
+      persistSubQueueChkSrt();
+      notifyClients("chksrt-count", subQueueChkSrt.length);
+      logSubtitle(`opn-bg unsnooze: ${filePath}`);
+    }
   }
 }
 
 async function processChksrtSnoozedForShow(showName, tvdbRecord) {
-  const snoozedFiles = [...getChksrtSnoozedForShow(showName)];
-  if (snoozedFiles.length === 0) return;
+  const snoozedEntries = [...getChksrtSnoozedForShow(showName)];
+  if (snoozedEntries.length === 0) return;
 
   let queueChanged = false;
   let snoozedChanged = false;
-  for (const videoFilePath of snoozedFiles) {
+  for (const { videoFilePath, snoozedAt } of snoozedEntries) {
+    if (Date.now() - snoozedAt < CHKSRT_SNOOZE_MS) continue;
     removeFromChksrtSnoozed(showName, videoFilePath);
     snoozedChanged = true;
 

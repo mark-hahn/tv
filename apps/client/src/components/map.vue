@@ -2054,6 +2054,13 @@ export default {
         const ep = this.seriesMap?.[season]?.[episode];
         if (ep) ep.pos = 0;
       }
+      // Notify list.vue to sync the Position filter.
+      if (resp.episodeData && this.mapShow?.name) {
+        evtBus.emit("episodeDataUpdated", {
+          showName: this.mapShow.name,
+          episodeData: resp.episodeData,
+        });
+      }
       // Force re-render of the map table cells.
       this.mapUpdateKey++;
     },

@@ -4132,11 +4132,12 @@ app.post(
     for (const { season, episode, id } of cells) {
       if (!id) continue;
       try {
+        const isWatched = epd.isWatched(rec.episodeData, season, episode);
         const url = urls.updateUserDataUrl(String(id));
         const res = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ PlaybackPositionTicks: 0 }),
+          body: JSON.stringify({ PlaybackPositionTicks: 0, Played: isWatched }),
         });
         if (res.ok || res.status === 204) {
           if (Array.isArray(rec.episodeData)) {
@@ -4156,7 +4157,7 @@ app.post(
       }
     }
     if (cleared.length > 0) await tvdb.saveTvdbSync();
-    return { ok: true, cleared };
+    return { ok: true, cleared, episodeData: rec.episodeData };
   }),
 );
 app.post("/api/searchActorsInNonEmby", apiWrapper(tvdb.searchActorsInNonEmby));

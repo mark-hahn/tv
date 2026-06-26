@@ -2600,8 +2600,12 @@ export default {
           seriesMapIn = resp.seriesMap;
           // Sync fresh episodeData into the in-memory cache so the Position
           // filter reflects Emby changes that happened outside our app.
-          if (resp.episodeData && allTvdb?.[show.name]) {
-            allTvdb[show.name].episodeData = resp.episodeData;
+          if (resp.episodeData) {
+            show.episodeData = resp.episodeData;
+            if (allTvdb?.[show.name]) {
+              allTvdb[show.name].episodeData = resp.episodeData;
+            }
+            if (this.fltrChoice === "Position") this.refilter();
           }
         } else {
           errorMessage =
@@ -3494,6 +3498,16 @@ export default {
     };
     evtBus.on("sharedFiltersChanged", this._onSharedFiltersChanged);
 
+    this._onEpisodeDataUpdated = ({ showName, episodeData }) => {
+      if (showName && allTvdb?.[showName]) {
+        allTvdb[showName].episodeData = episodeData;
+      }
+      const show = allShows.find((s) => s.name === showName);
+      if (show) show.episodeData = episodeData;
+      if (this.fltrChoice === "Position") this.refilter();
+    };
+    evtBus.on("episodeDataUpdated", this._onEpisodeDataUpdated);
+
     // Click-outside handler for actors list mode (capture phase to consume the click)
     this._actorsListClickOutside = (e) => {
       if (!this.actorsListMode) return;
@@ -3612,6 +3626,7 @@ export default {
           show.fileGap = record.fileGap;
           show.needsIntro = record.needsIntro ?? false;
           show.anticipating = record.anticipating ?? false;
+          if ("episodeData" in record) show.episodeData = record.episodeData;
           evtBus.emit(
             "intro-count",
             allShows.filter((s) => s.needsIntro).length,
@@ -3927,6 +3942,11 @@ export default {
     if (this._onSharedFiltersChanged) {
       evtBus.off("sharedFiltersChanged", this._onSharedFiltersChanged);
       this._onSharedFiltersChanged = null;
+    }
+
+    if (this._onEpisodeDataUpdated) {
+      evtBus.off("episodeDataUpdated", this._onEpisodeDataUpdated);
+      this._onEpisodeDataUpdated = null;
     }
 
     if (this._actorsListClickOutside) {

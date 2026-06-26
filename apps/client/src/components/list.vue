@@ -2050,10 +2050,7 @@ export default {
           true,
         );
         if (fuzzyName) {
-          match =
-            allShows.find(
-              (s) => s.name === fuzzyName,
-            ) || null;
+          match = allShows.find((s) => s.name === fuzzyName) || null;
         }
       }
 

@@ -5996,6 +5996,29 @@ app.get("/api/hasBif", async (req, res) => {
   }
 });
 
+// Enqueue one or more video files for BIF generation.
+// Body: { showName: string, paths: string[] }
+app.post("/api/bif/enqueue", (req, res) => {
+  const { showName, paths } = req.body || {};
+  if (!showName || !Array.isArray(paths) || paths.length === 0) {
+    res.status(400).json({ ok: false, error: "showName and paths[] required" });
+    return;
+  }
+  let added = 0;
+  for (const videoPath of paths) {
+    if (!videoPath) continue;
+    if (bifNeededQueue.some((o) => o.bifPath === videoPath)) continue;
+    bifNeededQueue.push({ showName, bifPath: videoPath });
+    added++;
+  }
+  if (added > 0) {
+    persistBifNeededQueue();
+    console.log(`[bif] enqueued ${added} file(s) for ${showName}`);
+    checkBifNeededQueue();
+  }
+  res.json({ ok: true, added });
+});
+
 // Save a single intro field (startMark, skipDur, trimPos) for a season.
 app.post("/api/saveSeasonIntro", async (req, res) => {
   const { name, season, field, value } = req.body;

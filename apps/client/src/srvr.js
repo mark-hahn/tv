@@ -618,6 +618,10 @@ export function hasBif(videoPath) {
   );
 }
 
+export function enqueueBif(showName, paths) {
+  return httpCall("/api/bif/enqueue", { showName, paths }, "POST");
+}
+
 export function saveSeasonIntro(name, season, field, value) {
   return httpCall(
     "/api/saveSeasonIntro",

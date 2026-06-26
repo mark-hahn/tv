@@ -387,6 +387,24 @@
             Chksrt
           </button>
           <button
+            @click.stop="handleMapBifClick"
+            :disabled="!hasMapSelection"
+            :style="{
+              '--btn-bg': bifFlash ? 'lightgray' : 'whitesmoke',
+              opacity: hasMapSelection ? 1 : 0.35,
+              cursor: hasMapSelection ? 'pointer' : 'default',
+            }"
+            style="
+              font-size: 13.5px;
+              cursor: pointer;
+              margin: 4.5px 0 4.5px 4.5px;
+              max-height: 21.5px;
+              border-radius: 7px;
+            "
+          >
+            Bif
+          </button>
+          <button
             v-if="mapShow?.inEmby !== false"
             @click.stop="onPruneClick"
             :style="{ '--btn-bg': pruneFlash ? 'lightgray' : 'whitesmoke' }"
@@ -1031,6 +1049,7 @@ export default {
       mapTouchSuppressClickUntil: 0,
       mapUpdateKey: 0,
       pruneFlash: false,
+      bifFlash: false,
       selectedSeasons: new Set(),
       selectedCells: new Set(),
       copiedSeason: null,
@@ -1941,6 +1960,21 @@ export default {
       const path = this.seriesMap?.[season]?.[episode]?.path || null;
       if (!path) return;
       evtBus.emit("openChksrt", path);
+    },
+    async handleMapBifClick() {
+      if (this.selectedCells.size === 0) return;
+      const paths = [];
+      for (const key of this.selectedCells) {
+        const { season, episode } = this.parseCellKey(key);
+        const p = this.seriesMap?.[season]?.[episode]?.path || null;
+        if (p) paths.push(p);
+      }
+      if (paths.length === 0) return;
+      this.bifFlash = true;
+      setTimeout(() => {
+        this.bifFlash = false;
+      }, 750);
+      await srvr.enqueueBif(this.mapShow.name, paths);
     },
     selectNextEpisodeWithFile(currentSeason, currentEpisode) {
       if (

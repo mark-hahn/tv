@@ -43,15 +43,17 @@ function consoleToFile() {
               segments.length >= 2 ? segments[1] : segments[0] || "log";
             const message = params.get("m") ?? "";
             if (message) {
-              const now = new Date().toLocaleString("en-US", {
-                timeZone: "America/Los_Angeles",
-                month: "2-digit",
-                day: "2-digit",
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-                hour12: false,
-              });
+              const now = new Date()
+                .toLocaleString("en-US", {
+                  timeZone: "America/Los_Angeles",
+                  month: "2-digit",
+                  day: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                  hour12: false,
+                })
+                .replace(/24:(\d+):(\d+)/, "00:$1:$2");
               fs.appendFileSync(LOG_FILE, `[${now}] [${method}] ${message}\n`);
             }
           }

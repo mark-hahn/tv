@@ -1223,7 +1223,9 @@ function logSubtitle(msg) {
     minute: "2-digit",
     hour12: false,
   });
-  const ts = now.replace(/(\d+)\/(\d+),\s*/, "$1-$2 ");
+  const ts = now
+    .replace(/(\d+)\/(\d+),\s*/, "$1-$2 ")
+    .replace(/24:(\d+)/, "00:$1");
   fs.appendFileSync(SUBTITLE_LOG_PATH, ts + " " + msg + "\n", "utf8");
 }
 async function fileNeedsSubChecked(videoFilePath, showName) {

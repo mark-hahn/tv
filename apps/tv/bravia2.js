@@ -16,7 +16,8 @@ function ts() {
       second: "2-digit",
       hour12: false,
     })
-    .replace(",", "");
+    .replace(",", "")
+    .replace(/24:(\d+):(\d+)/, "00:$1:$2");
 }
 
 const ws = new WebSocket(HA_URL, { rejectUnauthorized: false });

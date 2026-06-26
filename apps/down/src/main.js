@@ -181,7 +181,8 @@ async function main() {
     var m = {};
     for (var i = 0; i < p.length; i++)
       if (p[i].type !== "literal") m[p[i].type] = p[i].value;
-    return `${m.month}-${m.day} ${m.hour}:${m.minute}`;
+    var hour = m.hour === "24" ? "00" : m.hour;
+    return `${m.month}-${m.day} ${hour}:${m.minute}`;
   };
 
   log = (...x) => {
@@ -378,7 +379,8 @@ async function main() {
             var p = parts[i];
             if (p && p.type && p.value) m[p.type] = p.value;
           }
-          return `${m.year}/${m.month}/${m.day} ${m.hour}:${m.minute}:${m.second}`;
+          var hour = m.hour === "24" ? "00" : m.hour;
+          return `${m.year}/${m.month}/${m.day} ${hour}:${m.minute}:${m.second}`;
         } catch (e) {
           var d = new Date();
           var yy = String(d.getFullYear() % 100).padStart(2, "0");
@@ -1128,7 +1130,8 @@ async function main() {
         var p = parts[i];
         if (p && p.type && p.value) m[p.type] = p.value;
       }
-      return `${m.year}/${m.month}/${m.day}-${m.hour}:${m.minute}:${m.second}`;
+      var hour = m.hour === "24" ? "00" : m.hour;
+      return `${m.year}/${m.month}/${m.day}-${hour}:${m.minute}:${m.second}`;
     } catch (e) {
       // Fallback to local time if Intl is unavailable.
       var day, hours, minutes, month, seconds, year;

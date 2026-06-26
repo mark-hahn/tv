@@ -100,7 +100,8 @@ const dateStr = (ms) => {
     for (const p of parts) {
       if (p && p.type && p.value) m[p.type] = p.value;
     }
-    return `${m.year}/${m.month}/${m.day}-${m.hour}:${m.minute}:${m.second}`;
+    const hour = m.hour === "24" ? "00" : m.hour;
+    return `${m.year}/${m.month}/${m.day}-${hour}:${m.minute}:${m.second}`;
   } catch {
     const d = new Date(ms);
     const year = d.getFullYear();
@@ -309,9 +310,10 @@ const toPstParts = (ms) => {
     for (const p of parts) {
       if (p && p.type && p.value) m[p.type] = p.value;
     }
+    const hour = m.hour === "24" ? "00" : m.hour;
     return {
       ymd: `${m.year}-${m.month}-${m.day}`,
-      hm: `${m.hour}:${m.minute}`,
+      hm: `${hour}:${m.minute}`,
     };
   } catch {
     const d = new Date(ms);

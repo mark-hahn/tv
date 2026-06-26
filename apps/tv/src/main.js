@@ -123,7 +123,8 @@ function ts() {
       minute: "2-digit",
       hour12: false,
     })
-    .replace(",", "");
+    .replace(",", "")
+    .replace(/24:(\d+)/, "00:$1");
 }
 
 function log(...args) {

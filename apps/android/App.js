@@ -70,6 +70,7 @@ function formatLaDateTime(dateIn) {
   for (const part of parts) {
     if (part && part.type && part.value) map[part.type] = part.value;
   }
+  if (map.hour === "24") map.hour = "00";
   if (
     !map.year ||
     !map.month ||

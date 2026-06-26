@@ -1501,11 +1501,11 @@ export default function App() {
 
     const getCellText = (cell, s, ep) => {
       if (!cell) return "";
-      const w = cell.unaired ? "U" : cell.played ? "W" : "";
+      const w = cell.unaired ? "u" : cell.played ? "w" : "";
       if (cell.avail) {
         return w + qualityChar(cell.quality);
       }
-      if (cell.unaired) return "U";
+      if (cell.unaired) return "u";
       return w + "-";
     };
 

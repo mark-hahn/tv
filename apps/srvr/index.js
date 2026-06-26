@@ -2644,6 +2644,7 @@ async function processChksrtSnoozedForShow(showName, tvdbRecord) {
       { videoFilePath, fromUI: false, lowPriority: false },
       false,
     );
+    logSubtitle(`chksrt unsnooze (24h): ${videoFilePath}`);
     queueChanged = true;
   }
 
@@ -5820,6 +5821,7 @@ app.post("/api/asr/chksrt/snooze", (req, res) => {
   const idx = subQueueChkSrt.findIndex((e) => e.videoFilePath === videoPath);
   if (idx !== -1) subQueueChkSrt.splice(idx, 1);
   addToChksrtSnoozed(showName, videoPath);
+  logSubtitle(`chksrt snooze: ${videoPath}`);
   cleanChkSrtQueue();
   persistSubQueueChkSrt();
   persistChksrtSnoozed();

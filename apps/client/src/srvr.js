@@ -322,6 +322,9 @@ export function setSharedFilters(sharedFilters) {
 export function deletePath(path) {
   return httpCall("/api/deletePath", { path }, "POST");
 }
+export function deletePaths(paths) {
+  return httpCall("/api/deletePaths", { paths }, "POST");
+}
 export function delSeasonFiles(showName, showPath, season) {
   return httpCall(
     "/api/delSeasonFiles",

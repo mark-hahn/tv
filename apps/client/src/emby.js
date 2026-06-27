@@ -1061,6 +1061,7 @@ export const getSeriesMap = async (show, prune = false) => {
 
   const seriesMap = [];
   let pruning = prune;
+  const pathsToDeleteBatch = [];
   const seasonsRes = await axiosGetWithRetry(urls.childrenUrl(cred, seriesId));
   const missingEpisodeNumbers = [];
   const emptySeasons = [];
@@ -1126,16 +1127,9 @@ export const getSeriesMap = async (show, prune = false) => {
           pruning = false;
         } else {
           console.log(
-            `[prune] deleting S${seasonNumber}E${episodeNumber}: ${path}`,
+            `[prune] queuing S${seasonNumber}E${episodeNumber}: ${path}`,
           );
-          try {
-            await deleteOneFile(path);
-            console.log(`[prune] deleted ok S${seasonNumber}E${episodeNumber}`);
-          } catch (e) {
-            console.error(
-              `[prune] delete FAILED S${seasonNumber}E${episodeNumber}: ${e?.message ?? e}`,
-            );
-          }
+          if (path) pathsToDeleteBatch.push(path);
         }
       }
 
@@ -1177,6 +1171,16 @@ export const getSeriesMap = async (show, prune = false) => {
       emptySeasons.push(seasonNumber);
     }
     seriesMap.push([seasonNumber, episodes]);
+  }
+
+  if (pathsToDeleteBatch.length > 0) {
+    console.log(`[prune] batch deleting ${pathsToDeleteBatch.length} files`);
+    try {
+      await srvr.deletePaths(pathsToDeleteBatch);
+      console.log(`[prune] batch delete ok`);
+    } catch (e) {
+      console.error(`[prune] batch delete FAILED: ${e?.message ?? e}`);
+    }
   }
 
   if (missingEpisodeNumbers.length > 0) {

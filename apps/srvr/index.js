@@ -3949,12 +3949,7 @@ const getFile = async (params) => {
   return out;
 };
 
-const deletePath = async (params) => {
-  const pathParam = params?.path;
-  if (!pathParam) {
-    throw new Error("deletePath: missing path parameter");
-  }
-
+const deleteOnePath = async (pathParam) => {
   // If it's just a folder name (no slashes), construct the full path in tvDir
   // Otherwise use the path as-is (for episode file deletions)
   let fullPath =
@@ -4036,6 +4031,31 @@ const deletePath = async (params) => {
     throw new Error(`Failed to delete path: ${e.message}`);
   }
   return "ok";
+};
+
+const deletePath = async (params) => {
+  const pathParam = params?.path;
+  if (!pathParam) {
+    throw new Error("deletePath: missing path parameter");
+  }
+  return deleteOnePath(pathParam);
+};
+
+const deletePaths = async (params) => {
+  const paths = params?.paths;
+  if (!Array.isArray(paths)) {
+    throw new Error("deletePaths: missing paths array");
+  }
+  const results = [];
+  for (const pathParam of paths) {
+    try {
+      await deleteOnePath(pathParam);
+      results.push({ path: pathParam, ok: true });
+    } catch (e) {
+      results.push({ path: pathParam, ok: false, error: e.message });
+    }
+  }
+  return results;
 };
 
 const sendEmailHandler = async (params) => {
@@ -5606,6 +5626,7 @@ app.get("/api/subtitle", async (req, res) => {
 
 // File operations
 app.post("/api/deletePath", apiWrapper(deletePath));
+app.post("/api/deletePaths", apiWrapper(deletePaths));
 app.post("/api/delSeasonFiles", apiWrapper(delSeasonFiles));
 app.post("/api/createShowFolder", apiWrapper(createShowFolder));
 app.post(

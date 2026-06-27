@@ -2440,11 +2440,22 @@ export default {
 
       const failures = [];
       let deletedCount = 0;
-      for (const { path, season, episode } of deletableTargets) {
-        try {
-          await srvr.deletePath(path);
-          deletedCount += 1;
 
+      const paths = deletableTargets.map(({ path }) => path);
+      let pathResults;
+      try {
+        pathResults = await srvr.deletePaths(paths);
+      } catch (err) {
+        console.error("deleteEpisodes: deletePaths call failed", err);
+        window.alert(`Delete failed: ${err?.message || String(err)}`);
+        return;
+      }
+
+      for (let i = 0; i < deletableTargets.length; i++) {
+        const { season, episode } = deletableTargets[i];
+        const result = pathResults?.[i];
+        if (result?.ok) {
+          deletedCount += 1;
           const cell = this.seriesMap?.[season]?.[episode];
           if (cell) {
             cell.path = null;
@@ -2452,25 +2463,31 @@ export default {
             cell.avail = false;
             cell.error = false;
           }
-
-          this.$emit("show-map", {
-            mapShow: this.mapShow,
-            hideMapBottom: this.hideMapBottom,
-            seriesMapSeasons: this.seriesMapSeasons,
-            seriesMapEpis: this.seriesMapEpis,
-            seriesMap: this.seriesMap,
-            mapError: "",
-            noSwitch: true,
-          });
-        } catch (err) {
-          console.error("deleteEpisodes: deletePath failed", {
-            path,
+        } else {
+          console.error("deleteEpisodes: deletePaths failed", {
+            path: paths[i],
             season,
             episode,
-            err,
+            error: result?.error,
           });
-          failures.push({ season, episode, err });
+          failures.push({
+            season,
+            episode,
+            err: new Error(result?.error || "delete failed"),
+          });
         }
+      }
+
+      if (deletedCount > 0) {
+        this.$emit("show-map", {
+          mapShow: this.mapShow,
+          hideMapBottom: this.hideMapBottom,
+          seriesMapSeasons: this.seriesMapSeasons,
+          seriesMapEpis: this.seriesMapEpis,
+          seriesMap: this.seriesMap,
+          mapError: "",
+          noSwitch: true,
+        });
       }
 
       if (deletedCount > 0) {

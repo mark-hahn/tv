@@ -115,6 +115,7 @@
               flex-direction: column;
             "
           >
+            <HdrMsg />
             <HdrTop
               :showsLength="shows.length"
               :allShowsLength="allShowsLength"
@@ -123,7 +124,6 @@
               :simpleMode="simpleMode"
               :isWideLandscape="isWideLandscape"
               :statusMsg="updatingMsg"
-              :libraryProgressText="libraryProgressText"
               @watch-click="watchClick"
               @filter-input="select"
               @filter-focus="filterInputFocused = true"
@@ -209,6 +209,7 @@
             flex-direction: column;
           "
         >
+          <HdrMsg />
           <HdrTop
             :showsLength="shows.length"
             :allShowsLength="allShowsLength"
@@ -217,7 +218,6 @@
             :simpleMode="simpleMode"
             :isWideLandscape="isWideLandscape"
             :statusMsg="updatingMsg"
-            :libraryProgressText="libraryProgressText"
             @watch-click="watchClick"
             @filter-input="select"
             @filter-focus="filterInputFocused = true"
@@ -320,9 +320,11 @@ srvr
 import parseTorrentTitle from "parse-torrent-title";
 import evtBus from "../evtBus.js";
 import Shows from "./shows.vue";
+import HdrMsg from "./hdrmsg.vue";
 import HdrTop from "./hdrtop.vue";
 import HdrBot from "./hdrbot.vue";
 import Buttons from "./buttons.vue";
+import { setGlobalMessage } from "../globalMessages.js";
 
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { library } from "@fortawesome/fontawesome-svg-core";
@@ -388,7 +390,7 @@ let showHistoryPtr = -1;
 export default {
   name: "List",
 
-  components: { FontAwesomeIcon, Shows, HdrTop, HdrBot, Buttons },
+  components: { FontAwesomeIcon, Shows, HdrMsg, HdrTop, HdrBot, Buttons },
 
   emits: ["show-map", "all-shows", "all-tvdb", "filtered-shows"],
 
@@ -404,10 +406,6 @@ export default {
     sizing: {
       type: Object,
       default: () => ({}),
-    },
-    libraryProgressText: {
-      type: String,
-      default: "",
     },
   },
 
@@ -3848,6 +3846,11 @@ export default {
 
     on("activeQbtTitles", (titles) => {
       this.updateActiveShowNames("qbt", titles);
+      // GLOBAL-MSG: Qbt
+      const count = Array.isArray(titles) ? titles.length : 0;
+      if (count > 0)
+        setGlobalMessage({ id: "Qbt", text: String(count), position: 10 });
+      else setGlobalMessage({ id: "Qbt", action: "hide" });
     });
 
     on("activeDownTitles", (titles) => {

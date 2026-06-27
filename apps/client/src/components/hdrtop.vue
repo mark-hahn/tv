@@ -82,21 +82,6 @@
         margin-right: 15px;
       "
     >
-      <span
-        v-if="libraryProgressText && !simpleMode"
-        @click="openEmbyLibraries"
-        style="
-          font-size: 13px;
-          font-weight: bold;
-          color: #000;
-          white-space: nowrap;
-          margin-right: 6px;
-          cursor: pointer;
-          text-decoration: underline;
-        "
-      >
-        {{ libraryProgressText }}
-      </span>
       <button
         v-if="!simpleMode"
         @click="$emit('library-click', $event)"
@@ -196,10 +181,6 @@ export default {
       type: Boolean,
       default: false,
     },
-    libraryProgressText: {
-      type: String,
-      default: "",
-    },
     statusMsg: {
       type: String,
       default: "",
@@ -248,12 +229,6 @@ export default {
       event.stopPropagation();
       this.$emit("update:filterStr", "");
       this.$emit("filter-input");
-    },
-
-    openEmbyLibraries() {
-      util.openExternalPage(
-        "https://hahnca.com:8920/web/index.html#!/librarysetup/libraries",
-      );
     },
   },
 };

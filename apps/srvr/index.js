@@ -164,6 +164,11 @@ const ASR_LOG_BUFFER_MAX = 500;
 const BIF_NEEDED_QUEUE_PATH = path.join(SRVR_DATA_DIR, "bifNeededQueue.json");
 const BIF_CREATING_PATH = path.join(SRVR_DATA_DIR, "bifCreatingData.json");
 const RUN_BIF_PATH = path.join(SRVR_ROOT_DIR, "scripts", "run-bif.js");
+// GLOBAL-MSG: Bif — show name cropped to 20 chars, append "..." when cropped.
+const cropName = (name) => {
+  const s = String(name || "");
+  return s.length > 20 ? s.slice(0, 20) + "..." : s;
+};
 let bifNeededQueue = []; // [{ showName, bifPath }, ...] persisted
 let bifCheckTimer = null; // single backoff timer handle
 let subQueue = [],
@@ -1042,11 +1047,19 @@ function startBifCreate(bifNeededObj) {
   console.log(
     `[bif] start ${bifNeededObj.showName} pid=${child.pid} ${bifNeededObj.bifPath}`,
   );
+  // GLOBAL-MSG: Bif
+  setGlobalMessage({
+    id: "Bif",
+    text: cropName(bifNeededObj.showName),
+    position: 1000,
+  });
   const onDone = () => {
     try {
       fs.unlinkSync(BIF_CREATING_PATH);
     } catch {}
     console.log(`[bif] done ${bifNeededObj.showName}`);
+    // GLOBAL-MSG: Bif
+    setGlobalMessage({ id: "Bif", action: "hide" });
     checkBifNeededQueue();
   };
   child.on("exit", onDone);
@@ -1073,6 +1086,8 @@ function cancelBifCreate(showName) {
     fs.unlinkSync(BIF_CREATING_PATH);
   } catch {}
   console.log(`[bif] cancel ${showName} pid=${lock.pid}`);
+  // GLOBAL-MSG: Bif
+  setGlobalMessage({ id: "Bif", action: "hide" });
 }
 
 // React to a show's needsIntro flipping. On true: maybe queue a bif. On false:
@@ -6929,6 +6944,48 @@ export const notifyClients = (notification, data = null) => {
     }
   }
 };
+
+// GLOBAL-MSG: server-side entry point (see global-msg-instr.md). Broadcasts a
+// message object to all clients with the same signature as the client
+// setGlobalMessage(): { id, action, text, position, duration }.
+export const setGlobalMessage = (msgObj) =>
+  notifyClients("setGlobalMessage", msgObj);
+
+// GLOBAL-MSG: Down + CPU — periodic producers pushed to all clients.
+const DOWN_INPROGRESS_PATH = path.join(
+  path.dirname(SRVR_ROOT_DIR),
+  "down",
+  "data",
+  "tv-inProgress.json",
+);
+const GLOBAL_MSG_POLL_MS = 5000;
+const CPU_LOAD_THRESHOLD = 2;
+
+const pollGlobalMessages = () => {
+  // GLOBAL-MSG: CPU
+  try {
+    const load = os.loadavg()[0];
+    if (load >= CPU_LOAD_THRESHOLD)
+      setGlobalMessage({ id: "CPU", text: load.toFixed(1), position: 1001 });
+    else setGlobalMessage({ id: "CPU", action: "hide" });
+  } catch (e) {
+    console.error("[globalMsg] cpu poll error:", e.message);
+  }
+  // GLOBAL-MSG: Down
+  try {
+    let count = 0;
+    if (fs.existsSync(DOWN_INPROGRESS_PATH)) {
+      const map = JSON.parse(fs.readFileSync(DOWN_INPROGRESS_PATH, "utf8"));
+      count = map && typeof map === "object" ? Object.keys(map).length : 0;
+    }
+    if (count > 0)
+      setGlobalMessage({ id: "Down", text: String(count), position: 11 });
+    else setGlobalMessage({ id: "Down", action: "hide" });
+  } catch (e) {
+    console.error("[globalMsg] down poll error:", e.message);
+  }
+};
+setInterval(pollGlobalMessages, GLOBAL_MSG_POLL_MS);
 
 wss.on("connection", (ws) => {
   let socketName = appSocketName;

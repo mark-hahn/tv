@@ -369,7 +369,6 @@
         :simpleMode="simpleMode"
         :sizing="activeSizing"
         :hideButtonsPane="showSideButtons"
-        :libraryProgressText="libraryProgressText"
         @show-map="handleShowMap"
         @show-tor="handleShowTor"
         @all-shows="handleAllShows"
@@ -584,6 +583,7 @@ import evtBus from "../evtBus.js";
 import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
 import * as srvr from "../srvr.js";
+import { setGlobalMessage } from "../globalMessages.js";
 import * as epd from "@tv/share";
 import { config } from "../config.js";
 import paneHelp from "../paneHelp.js";
@@ -655,9 +655,6 @@ export default {
       filteredShows: [],
       allTvdb: {},
       _didRequestNotifications: false,
-
-      // Library Refresh State — progress driven by libraryProgress/libraryRefreshDone WS events
-      libraryProgressText: "",
 
       tvdbMismatchOpen: false,
       tvdbMismatchTitle: "TVDB cache mismatch detected",
@@ -1392,8 +1389,13 @@ export default {
     async checkLibraryRefreshStatus() {
       try {
         const status = await srvr.getEmbyLibraryRefreshStatus();
+        // GLOBAL-MSG: Lib
         if (status?.running && status?.progress?.pct != null) {
-          this.libraryProgressText = `${Number(status.progress.pct).toFixed(0)}%`;
+          setGlobalMessage({
+            id: "Lib",
+            text: `${Number(status.progress.pct).toFixed(0)}%`,
+            position: 0,
+          });
         }
       } catch (err) {
         console.error("checkLibraryRefreshStatus failed:", err);
@@ -1402,17 +1404,26 @@ export default {
 
     handleSetLibraryProgress(txt) {
       const s = String(txt || "");
-      if (!s || s.includes("%")) this.libraryProgressText = s;
+      // GLOBAL-MSG: Lib
+      if (s.includes("%"))
+        setGlobalMessage({ id: "Lib", text: s, position: 0 });
+      else if (!s) setGlobalMessage({ id: "Lib", action: "hide" });
     },
 
     handleLibraryProgress(data) {
+      // GLOBAL-MSG: Lib
       if (data?.pct != null) {
-        this.libraryProgressText = `${Number(data.pct).toFixed(0)}%`;
+        setGlobalMessage({
+          id: "Lib",
+          text: `${Number(data.pct).toFixed(0)}%`,
+          position: 0,
+        });
       }
     },
 
     handleLibraryRefreshDone(data) {
-      this.libraryProgressText = "";
+      // GLOBAL-MSG: Lib
+      setGlobalMessage({ id: "Lib", action: "hide" });
       const showNames = Array.isArray(data?.showNames) ? data.showNames : [];
 
       srvr

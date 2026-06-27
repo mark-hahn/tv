@@ -610,7 +610,6 @@ export default {
     Flex,
     Qbt,
     Usb,
-    Local,
     Down,
     Trailer,
     TvPane,
@@ -2258,9 +2257,18 @@ export default {
       const prev = this.chksrtCount;
       this.chksrtCount = Number(count) || 0;
       if (prev === 0 && this.chksrtCount > 0) {
-        new Notification("Chksrt", {
+        /*
+        this.showNotification({
+          title: 'Subtitles',
           body: `${this.chksrtCount} subtitle(s) ready to check`,
+          icon: '/images/srt.png',
+          requireInteraction: true,
+          onclick: {
+            action: 'navigate',
+            url: '/down?tab=chksrt'
+          }
         });
+        */
       }
     };
     evtBus.on("chksrt-count", this._onChksrtCount);

@@ -115,7 +115,6 @@
               flex-direction: column;
             "
           >
-            <HdrMsg />
             <HdrTop
               :showsLength="shows.length"
               :allShowsLength="allShowsLength"

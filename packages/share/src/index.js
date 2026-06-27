@@ -228,13 +228,15 @@ export function smartTitleMatch(title, titleArray, year, forceChoice) {
     return null;
   };
 
+  // If forceChoice is explicitly false, we stop here (strict matching).
+  // Prefix match is intentionally excluded from strict mode to avoid false positives
+  // where a longer title like "Life, Larry..." prefix-matches a short title like "Life (2007)".
+  if (forceChoice === false) return null;
+
   const mp1 = findPrefix(isSameYear);
   if (mp1 != null) return resultTitle(mp1);
   const mp2 = findPrefix(isOneMissingYear);
   if (mp2 != null) return resultTitle(mp2);
-
-  // If forceChoice is explicity false, we stop here (strict matching).
-  if (forceChoice === false) return null;
 
   const m5 = findExact(normalizeAggressive, wantAgg, isOneMissingYear);
   if (m5 != null) return resultTitle(m5);

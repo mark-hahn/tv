@@ -1895,16 +1895,20 @@ export default {
 
       if (nm) {
         // Duplicate Detection: forceChoice = false
-        const match = util.smartTitleMatch(nm, allShows, null, false);
-        if (match) {
-          // If both have tvdbIds but they differ, these are different shows
-          if (id) {
-            const matchId = String(
-              match?.tvdbId ?? match?.tvdbId ?? match?.TvdbShowId ?? "",
-            ).trim();
-            if (matchId && matchId !== id) return null;
+        // smartTitleMatch returns a name string, not a show object — resolve it.
+        const matchName = util.smartTitleMatch(nm, allShows, null, false);
+        if (matchName) {
+          const matchShow = allShows.find((s) => s.name === matchName);
+          if (matchShow) {
+            // If both have tvdbIds but they differ, these are different shows
+            if (id) {
+              const matchId = String(
+                matchShow?.tvdbId ?? matchShow?.TvdbShowId ?? "",
+              ).trim();
+              if (matchId && matchId !== id) return null;
+            }
+            return matchShow;
           }
-          return match;
         }
       }
 

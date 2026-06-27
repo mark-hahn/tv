@@ -2007,13 +2007,24 @@ export default {
         embyId: cell?.id || null,
       });
     },
-    handleMapChksrtClick() {
+    async handleMapChksrtClick() {
       if (this.selectedCells.size === 0) return;
-      const firstKey = Array.from(this.selectedCells)[0];
-      const { season, episode } = this.parseCellKey(firstKey);
-      const path = this.seriesMap?.[season]?.[episode]?.path || null;
-      if (!path) return;
-      evtBus.emit("openChksrt", path);
+      if (this.selectedCells.size === 1) {
+        const firstKey = Array.from(this.selectedCells)[0];
+        const { season, episode } = this.parseCellKey(firstKey);
+        const path = this.seriesMap?.[season]?.[episode]?.path || null;
+        if (!path) return;
+        evtBus.emit("openChksrt", path);
+        return;
+      }
+      const paths = [];
+      for (const key of this.selectedCells) {
+        const { season, episode } = this.parseCellKey(key);
+        const p = this.seriesMap?.[season]?.[episode]?.path || null;
+        if (p) paths.push(p);
+      }
+      if (paths.length === 0) return;
+      await srvr.enqueueChksrt(paths);
     },
     async handleMapBifClick() {
       if (this.selectedCells.size === 0) return;

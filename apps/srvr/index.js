@@ -5853,6 +5853,24 @@ app.get("/api/asr/chksrt/list", (req, res) => {
   });
 });
 
+app.post("/api/asr/chksrt/enqueue", (req, res) => {
+  const { videoPaths } = req.body || {};
+  if (!Array.isArray(videoPaths) || videoPaths.length === 0) {
+    res.status(400).json({ error: "videoPaths required" });
+    return;
+  }
+  for (const vp of videoPaths) {
+    enqueueSubQueueChkSrt(
+      { videoFilePath: vp, fromUI: true, lowPriority: false },
+      false,
+    );
+  }
+  cleanChkSrtQueue();
+  persistSubQueueChkSrt();
+  notifyClients("chksrt-count", subQueueChkSrt.length);
+  res.json({ ok: true, queued: videoPaths.length });
+});
+
 app.post("/api/asr/chksrt/ok", (req, res) => {
   const entry = subQueueChkSrt[0];
   if (entry) {

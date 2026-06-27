@@ -2593,11 +2593,7 @@ export default {
       // unaired, path, id, quality}]], ...], ...].
       let seriesMapIn = [];
       try {
-        const tvdbId = String(show.tvdbId || "").trim();
-        const usesTvdb = show.inEmby === false && tvdbId;
-        const resp = usesTvdb
-          ? await srvr.getSeriesMapFromTvdb({ tvdbId })
-          : await srvr.getSeriesMapFromEmby({ showName: show.name });
+        const resp = await srvr.getSeriesMapFromEmby({ showName: show.name });
         if (resp?.success && Array.isArray(resp.seriesMap)) {
           seriesMapIn = resp.seriesMap;
           // Sync fresh episodeData into the in-memory cache so the Position

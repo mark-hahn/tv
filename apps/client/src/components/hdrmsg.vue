@@ -8,7 +8,7 @@
       padding: 0 8px;
       box-sizing: border-box;
       background-color: #ddd;
-      color: rgba(0, 0, 0, 0.7);
+      color: rgba(5, 5, 5);
       font-size: 17px;
       /* font-weight: bold; */
       white-space: nowrap;

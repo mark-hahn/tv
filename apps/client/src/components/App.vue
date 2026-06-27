@@ -1394,7 +1394,7 @@ export default {
           setGlobalMessage({
             id: "Lib",
             text: `${Number(status.progress.pct).toFixed(0)}%`,
-            position: 0,
+            position: 1,
           });
         }
       } catch (err) {
@@ -1406,7 +1406,7 @@ export default {
       const s = String(txt || "");
       // GLOBAL-MSG: Lib
       if (s.includes("%"))
-        setGlobalMessage({ id: "Lib", text: s, position: 0 });
+        setGlobalMessage({ id: "Lib", text: s, position: 1 });
       else if (!s) setGlobalMessage({ id: "Lib", action: "hide" });
     },
 
@@ -1416,7 +1416,7 @@ export default {
         setGlobalMessage({
           id: "Lib",
           text: `${Number(data.pct).toFixed(0)}%`,
-          position: 0,
+          position: 1,
         });
       }
     },

@@ -115,9 +115,8 @@
               flex-direction: column;
             "
           >
+            <HdrMsg />
             <HdrTop
-              :showsLength="shows.length"
-              :allShowsLength="allShowsLength"
               v-model:filterStr="filterStr"
               :watchingName="watchingNameDisplay"
               :simpleMode="simpleMode"
@@ -211,8 +210,6 @@
         >
           <HdrMsg />
           <HdrTop
-            :showsLength="shows.length"
-            :allShowsLength="allShowsLength"
             v-model:filterStr="filterStr"
             :watchingName="watchingNameDisplay"
             :simpleMode="simpleMode"
@@ -775,6 +772,14 @@ export default {
       const show = allShows.find((s) => s.name === newName);
       if (show) await this.seriesMapAction("open", show);
     },
+
+    shows() {
+      this.updateShowsCounts();
+    },
+
+    allShowsLength() {
+      this.updateShowsCounts();
+    },
   },
 
   computed: {
@@ -819,6 +824,15 @@ export default {
 
   /////////////  METHODS  ////////////
   methods: {
+    updateShowsCounts() {
+      setGlobalMessage({
+        id: "Shows",
+        text: `${this.shows.length}/${this.allShowsLength}`,
+        position: 0,
+        duration: 0,
+      });
+    },
+
     checkIfScrollNeeded(showIndex) {
       // Check if the show at the given index is visible in the viewport
       const show = this.shows[showIndex];

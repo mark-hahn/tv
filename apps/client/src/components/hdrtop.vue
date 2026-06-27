@@ -27,18 +27,6 @@
       >
         All
       </button>
-      <div
-        id="nums"
-        v-if="!simpleMode"
-        style="display: flex; justify-content: space-around"
-      >
-        <div
-          id="count"
-          style="display: inline-block; margin: 4px 5px 4px 15px"
-        >
-          {{ showsLength + "/" + allShowsLength }}
-        </div>
-      </div>
       <input
         :value="filterStr"
         @input="handleFilterInput"
@@ -175,14 +163,6 @@ export default {
   name: "HdrTop",
 
   props: {
-    showsLength: {
-      type: Number,
-      required: true,
-    },
-    allShowsLength: {
-      type: Number,
-      required: true,
-    },
     filterStr: {
       type: String,
       default: "",

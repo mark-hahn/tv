@@ -6987,8 +6987,20 @@ export const notifyClients = (notification, data = null) => {
 // GLOBAL-MSG: server-side entry point (see global-msg-instr.md). Broadcasts a
 // message object to all clients with the same signature as the client
 // setGlobalMessage(): { id, action, text, position, duration }.
-export const setGlobalMessage = (msgObj) =>
+// Also maintains activeServerMessages so new connections can be caught up.
+const activeServerMessages = new Map(); // id -> msgObj
+
+export const setGlobalMessage = (msgObj) => {
+  if (msgObj && msgObj.id) {
+    const id = String(msgObj.id);
+    if (msgObj.action === "hide") {
+      activeServerMessages.delete(id);
+    } else {
+      activeServerMessages.set(id, msgObj);
+    }
+  }
   notifyClients("setGlobalMessage", msgObj);
+};
 
 // GLOBAL-MSG: Down + CPU — periodic producers pushed to all clients.
 const DOWN_INPROGRESS_PATH = path.join(
@@ -7047,6 +7059,19 @@ wss.on("connection", (ws) => {
         data: lastMissingEpWarning,
       }),
     );
+  }
+
+  // GLOBAL-MSG: replay all currently-active server messages to the new client.
+  for (const msgObj of activeServerMessages.values()) {
+    try {
+      ws.send(
+        JSON.stringify({
+          id: 0,
+          notification: "setGlobalMessage",
+          data: msgObj,
+        }),
+      );
+    } catch (_) {}
   }
 
   ws.on("message", (data) => {

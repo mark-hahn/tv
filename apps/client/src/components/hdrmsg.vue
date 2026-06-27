@@ -3,13 +3,14 @@
     id="hdrMsg"
     style="
       width: 100%;
-      height: 20px;
-      line-height: 20px;
+      height: 29px;
+      line-height: 29px;
       padding: 0 8px;
       box-sizing: border-box;
       background-color: #ddd;
       color: #000;
-      font-size: 12px;
+      font-size: 17px;
+      font-weight: bold;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;

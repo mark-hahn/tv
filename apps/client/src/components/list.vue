@@ -129,6 +129,7 @@
               @filter-blur="onFilterBlur"
               @send-filters="sendSharedFilters"
               @library-click="libraryClick"
+              @opn-lib-click="opnLibClick"
               @all-click="allClick"
               @custom-click="customClick"
               :hasSharedFilters="hasSharedFilters"
@@ -223,6 +224,7 @@
             @filter-blur="onFilterBlur"
             @send-filters="sendSharedFilters"
             @library-click="libraryClick"
+            @opn-lib-click="opnLibClick"
             @all-click="allClick"
             @custom-click="customClick"
             :hasSharedFilters="hasSharedFilters"
@@ -911,13 +913,13 @@ export default {
     },
 
     libraryClick(evt) {
-      if (evt && evt.ctrlKey) {
-        util.openExternalPage(
-          "https://hahnca.com:8920/web/index.html#!/librarysetup/libraries",
-        );
-        return;
-      }
       evtBus.emit("startLibraryRefresh");
+    },
+
+    opnLibClick() {
+      util.openExternalPage(
+        "https://hahnca.com:8920/web/index.html#!/librarysetup/libraries",
+      );
     },
 
     async customClick() {

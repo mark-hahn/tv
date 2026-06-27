@@ -94,7 +94,21 @@
           margin: 0 0 0 10px;
         "
       >
-        Library
+        Scan Lib
+      </button>
+      <button
+        v-if="!simpleMode"
+        @click="$emit('opn-lib-click')"
+        style="
+          height: 24px;
+          background-color: white;
+          font-size: 13px;
+          cursor: pointer;
+          border-radius: 7px;
+          margin: 0 0 0 10px;
+        "
+      >
+        Opn Lib
       </button>
       <button
         v-if="!simpleMode"
@@ -207,6 +221,7 @@ export default {
     "filter-blur",
     "send-filters",
     "library-click",
+    "opn-lib-click",
     "all-click",
     "custom-click",
     "actors-click",

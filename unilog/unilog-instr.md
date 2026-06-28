@@ -45,7 +45,9 @@
   - you can decide if it is a good feature
   - if you don't like it you can ignore these instructions
 - a new table log_groups should be added to the db
-- most log_sites table entries will reference a group. groups represent these types of collections of call sites:
+- log_sites table entries can reference multiple groups
+  - agroup field has group ids separated bu commas
+- groups represent these types of collections of call sites:
   - sites added from one copilot prompt
   - sites added from one copilot conversation
   - sites that track program flow
@@ -97,14 +99,22 @@
 
 ## remove large logging before rollout
 - remove the legacy code that writes existing large log lines 
-  - remove every log line mentioned in Long Log-Line Report in temp2.md
+  - remove every log line mentioned in Long Log-Line Report in unilog/unilog-large-lines.md
     - these log lines will not be replaced by new logging
   - be careful to not break code
   - do this one-time operation later as first Rollout step
 - we will remove the rest of the legacy console.*/appendFile writes later. 
 
+## removing log lines
+- one delete specification is a group id which deletes all log lines that reference the group
+  this replaces delete all in this conversation	and delete all in a flow
+
+## notes
+- level field should be in log_sites table, not log_events  table
+
+
 # responses to specific questions in unilog/univ-log-agent-plan.md
-0. use a thin AI agent over a deterministic CLI
+0. create a thin AI agent that uses a new deterministic CLI
 0.1 the [tag] should not be inside the stored message text. the tag should be a different db field just for backwards compatibilty. eventually tags will be unused since we have id's and short descriptions. tags have often been insufficient and poorly chosen.
 
 ## What the agent must do 

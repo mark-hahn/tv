@@ -8,6 +8,7 @@ import {
   getApiDataDir,
   preferSharedReadPath,
 } from "./tvPaths.js";
+import { unilog } from "@tv/share";
 
 const execFileAsync = promisify(execFile);
 
@@ -260,7 +261,7 @@ export async function spaceAvailUsb() {
           ? String(e.stdout ?? "")
           : "";
       if (!stdout) {
-        console.error("spaceAvailUsb: ssh quota failed:", e);
+        unilog(278, "spaceAvailUsb: ssh quota failed:", e);
       }
     }
 
@@ -271,13 +272,10 @@ export async function spaceAvailUsb() {
       usbSpaceTotal = parsed.limitK * 1024;
       usbSpaceUsed = parsed.usedK * 1024;
     } else {
-      console.error("spaceAvailUsb: unexpected quota output:", stdout);
+      unilog(279, "spaceAvailUsb: unexpected quota output:", stdout);
     }
   } catch (e) {
-    console.error(
-      "spaceAvailUsb: ssh space probing failed (returning zeros):",
-      e,
-    );
+    unilog(280, "spaceAvailUsb: ssh space probing failed (returning zeros):", e);
   }
 
   return {
@@ -336,14 +334,11 @@ export async function spaceAvailMedia() {
         mediaSpaceUsed = tu.used;
         mediaSpaceTotal = tu.total;
       } else {
-        console.error("spaceAvailMedia: unexpected df output:", dfText);
+        unilog(281, "spaceAvailMedia: unexpected df output:", dfText);
       }
     }
   } catch (e) {
-    console.error(
-      "spaceAvailMedia: df failed (returning mediaSpaceTotal/mediaSpaceUsed=0):",
-      e,
-    );
+    unilog(282, "spaceAvailMedia: df failed (returning mediaSpaceTotal/mediaSpaceUsed=0):", e);
   }
 
   return {
@@ -1000,7 +995,7 @@ export async function getUsbFiles() {
 
     return tree;
   } catch (e) {
-    console.error("getUsbFiles failed", e);
+    unilog(283, "getUsbFiles failed", e);
     throw new Error(`Failed to list USB files: ${e.message}`);
   }
 }
@@ -1175,9 +1170,7 @@ done
           fmtGbPad(runningDeletedBytes),
           folder.folderName,
         ].join(" | ");
-        console.log(
-          `usb prune ${PRUNE_DRY_RUN ? "[dry-run]" : "[delete]"}: ${logLine}`,
-        );
+        unilog(284, `usb prune ${PRUNE_DRY_RUN ? "[dry-run]" : "[delete]"}: ${logLine}`);
 
         if (!PRUNE_DRY_RUN) {
           const rmCmd = `rm -rf -- ${shellQuote(folder.folderPath)}`;
@@ -1600,7 +1593,7 @@ export async function getUsbMovies() {
 
     return tree;
   } catch (e) {
-    console.error("getUsbMovies failed", e);
+    unilog(285, "getUsbMovies failed", e);
     throw new Error(`Failed to list USB movies: ${e.message}`);
   }
 }

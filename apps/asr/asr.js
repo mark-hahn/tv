@@ -19,6 +19,7 @@ import { fileURLToPath } from "url";
 import { setTimeout as sleep } from "timers/promises";
 import axios from "axios";
 import FormData from "form-data";
+import { unilog } from "@tv/share";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,7 +33,7 @@ try {
     fs.mkdirSync(tmpDir, { recursive: true });
   }
 } catch (e) {
-  console.error(`❌ Unable to create temp directory ${tmpDir}: ${e.message}`);
+  unilog(343, `❌ Unable to create temp directory ${tmpDir}: ${e.message}`);
   // fall back to /tmp if local creation fails
   if (!process.env.ASR_TMPDIR) {
     const fallback = path.join("/tmp", "asr-fallback-" + Date.now());
@@ -60,7 +61,7 @@ let apiKey;
 try {
   apiKey = fs.readFileSync(keyPath, "utf8").trim();
 } catch (e) {
-  console.error(`❌ Unable to read API key from ${keyPath}: ${e.message}`);
+  unilog(344, `❌ Unable to read API key from ${keyPath}: ${e.message}`);
   process.exit(1);
 }
 
@@ -169,9 +170,7 @@ async function getSubtitleStreams(videoPath) {
       return lang === "" || ENGLISH_LANG_TAGS.has(lang);
     });
   } catch (e) {
-    console.warn(
-      `Warning: could not probe ${path.basename(videoPath)} for subtitles: ${e.message}`,
-    );
+    unilog(345, `Warning: could not probe ${path.basename(videoPath)} for subtitles: ${e.message}`);
     return null;
   }
 }
@@ -216,13 +215,9 @@ async function extractTextSubtitles(videoPath, subtitleStreams) {
       text = text.replace(/<\/font>/gi, "");
       text = text.replace(/<\/?(b|i|u)>/gi, "");
       await fsp.writeFile(srtPath, text, "utf8");
-      console.log(
-        `[asr] extracted text sub stream ${stream.index} → ${path.basename(srtPath)}`,
-      );
+      unilog(346, `extracted text sub stream ${stream.index} → ${path.basename(srtPath)}`);
     } catch (e) {
-      console.warn(
-        `[asr] failed to extract stream ${stream.index} from ${path.basename(videoPath)}: ${e.message}`,
-      );
+      unilog(347, `failed to extract stream ${stream.index} from ${path.basename(videoPath)}: ${e.message}`);
     }
   }
 }
@@ -241,7 +236,7 @@ async function getDurationSec(file) {
     const sec = parseFloat(out.trim());
     return Number.isFinite(sec) ? Math.floor(sec) : 0;
   } catch (e) {
-    console.warn(`Warning: Could not get duration for ${file}: ${e.message}`);
+    unilog(348, `Warning: Could not get duration for ${file}: ${e.message}`);
     return 0;
   }
 }
@@ -412,14 +407,12 @@ async function callApi(uploadInfo) {
       // err may be an AxiosError with response data
       const status = err?.response?.status || err.message || "unknown";
       const body = err?.response?.data || err?.toString();
-      console.error(
-        `[${ts()}] API request failed (attempt ${attempt}): ${status}`,
-      );
-      if (body) console.error(JSON.stringify(body));
+      unilog(349, `API request failed (attempt ${attempt}): ${status}`);
+      if (body) unilog(350, JSON.stringify(body));
       if (attempt > MAX_RETRIES) {
         throw new Error(`max retries reached after ${attempt} attempts`);
       }
-      console.error(`[${ts()}] Retrying...`);
+      unilog(351, `Retrying...`);
       const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
       await sleep(delay);
       continue;
@@ -430,14 +423,9 @@ async function callApi(uploadInfo) {
     }
     // Non-200 but no exception (unlikely) — log and retry
     const status = response?.status || "unknown";
-    console.error(`[${ts()}] API error: ${status}, retrying`);
+    unilog(352, `API error: ${status}, retrying`);
     if (attempt == 1)
-      console.log(
-        "chunk, size:",
-        uploadInfo.size,
-        "- file:",
-        uploadInfo.filename,
-      );
+      unilog(353, "chunk, size:", uploadInfo.size, "- file:", uploadInfo.filename);
     const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
     await sleep(delay);
     continue;
@@ -452,10 +440,7 @@ function processSegments(segments, chunkInfo) {
       segment.end === undefined ||
       !segment.text?.trim()
     ) {
-      console.warn(
-        `[warn] skipping invalid segment in chunk ${chunkInfo.chunkIndex}:`,
-        JSON.stringify(segment),
-      );
+      unilog(354, `skipping invalid segment in chunk ${chunkInfo.chunkIndex}:`, JSON.stringify(segment));
       continue;
     }
     const start = chunkInfo.chunkStart + segment.start;
@@ -714,7 +699,7 @@ function writeSRT(segments, outputPath) {
     srtContent += `${seg.text}\n\n`;
   }
   fs.writeFileSync(outputPath, srtContent, "utf8");
-  console.log(`\n[${ts()}] Wrote: ${path.basename(outputPath)}`);
+  unilog(355, `\n[${ts()}] Wrote: ${path.basename(outputPath)}`);
 }
 
 /* ---------------- VAD-based chunking ---------------- */
@@ -799,28 +784,26 @@ async function vadChunks(wavPath, initBPS, totalDur) {
   }
   chunks.push({ start: segStart, end: totalDur });
   const maxEst = Math.max(...chunks.map((c) => (c.end - c.start) * initBPS));
-  console.log(
-    `[${ts()}] VAD: threshold=${bestThreshold.toFixed(1)}dB, ` +
+  unilog(356, `[${ts()}] VAD: threshold=${bestThreshold.toFixed(1)}dB, ` +
       `${bestMidpoints.length} silences → ${chunks.length} chunks ` +
-      `(max est ${(maxEst / 1e6).toFixed(1)}MB)`,
-  );
+      `(max est ${(maxEst / 1e6).toFixed(1)}MB)`);
   return chunks;
 }
 
 /* ---------------- Main processing function ---------------- */
 async function processOneVideo(videoPath) {
   const fileStart = Date.now();
-  console.log(`\n[${ts()}] Processing: ${path.basename(videoPath)}`);
+  unilog(357, `\n[${ts()}] Processing: ${path.basename(videoPath)}`);
   const videoName = path.basename(videoPath, path.extname(videoPath));
   const rawWavFile = path.join(tmpDir, "audio_raw.wav");
   const processedWavFile = path.join(tmpDir, "audio_processed.wav");
   try {
     await extractAudio(videoPath, rawWavFile);
-    console.log(`[${ts()}] Preprocessing audio...`);
+    unilog(358, `Preprocessing audio...`);
     await preprocessAudio(rawWavFile, processedWavFile);
     const finalWavFile = processedWavFile;
     const totalDur = await getDurationSec(finalWavFile);
-    console.log(`[${ts()}] Duration: ${totalDur.toFixed(0)}s, VAD chunking`);
+    unilog(359, `Duration: ${totalDur.toFixed(0)}s, VAD chunking`);
     const allSegments = [];
     let adaptiveBPS = ADAPTIVE_INITIAL_BPS;
     let retryCount = 0;
@@ -846,9 +829,7 @@ async function processOneVideo(videoPath) {
           const measuredBPS = e.size / dur;
           const newEnd =
             chunkStart + Math.floor((FILE_LIMIT_BYTES / measuredBPS) * 0.8);
-          console.log(
-            `[${ts()}] Chunk ${chunkIndex} oversize: ${(e.size / 1e6).toFixed(2)}MB → retry ${(newEnd - chunkStart).toFixed(0)}s (-20%)`,
-          );
+          unilog(360, `Chunk ${chunkIndex} oversize: ${(e.size / 1e6).toFixed(2)}MB → retry ${(newEnd - chunkStart).toFixed(0)}s (-20%)`);
           adaptiveBPS = adaptiveBPS * 0.5 + measuredBPS * 0.5;
           chunkEnd = Math.min(newEnd, chunkEndVad);
           await extractChunkWav(finalWavFile, chunkStart, chunkEnd, wavPath);
@@ -862,11 +843,9 @@ async function processOneVideo(videoPath) {
       const measuredBPS = uploadInfo.size / actualDur;
       const prevBPS = adaptiveBPS;
       adaptiveBPS = adaptiveBPS * 0.5 + measuredBPS * 0.5;
-      console.log(
-        `[${ts()}] Chunk ${chunkIndex}: ${chunkStart.toFixed(0)}s-${chunkEnd.toFixed(0)}s ` +
+      unilog(361, `[${ts()}] Chunk ${chunkIndex}: ${chunkStart.toFixed(0)}s-${chunkEnd.toFixed(0)}s ` +
           `${(uploadInfo.size / 1e6).toFixed(2)}MB, ${measuredBPS.toFixed(0)}B/s ` +
-          `(est ${prevBPS.toFixed(0)}→${adaptiveBPS.toFixed(0)})`,
-      );
+          `(est ${prevBPS.toFixed(0)}→${adaptiveBPS.toFixed(0)})`);
       // No trim/overlap needed — cuts are at silence midpoints
       const chunkInfo = {
         wavPath,
@@ -883,28 +862,24 @@ async function processOneVideo(videoPath) {
         if (apiData.segments && apiData.segments.length > 0) {
           allSegments.push(...processSegments(apiData.segments, chunkInfo));
         } else {
-          console.log(`[${ts()}] Chunk ${chunkIndex}: ⚠️ no segments`);
+          unilog(362, `Chunk ${chunkIndex}: ⚠️ no segments`);
         }
       } catch (err) {
-        console.log(
-          `[${ts()}] Chunk ${chunkIndex}: ${chunkStart.toFixed(0)}s-${chunkEnd.toFixed(0)}s ❌ ${err.message}`,
-        );
+        unilog(363, `Chunk ${chunkIndex}: ${chunkStart.toFixed(0)}s-${chunkEnd.toFixed(0)}s ❌ ${err.message}`);
       }
     }
     if (allSegments.length === 0) {
       throw new Error("No transcription segments found");
     }
     if (retryCount > 0) {
-      console.log(`[${ts()}] VAD chunking: ${retryCount} oversize retries`);
+      unilog(364, `VAD chunking: ${retryCount} oversize retries`);
     }
     const outputPath = getSrtPath(videoPath);
     writeSRT(allSegments, outputPath);
   } catch (err) {
-    console.error(
-      `[${ts()}] ❌ Failed to process: ${path.basename(
+    unilog(365, `❌ Failed to process: ${path.basename(
         videoPath,
-      )}, ${err.message}`,
-    );
+      )}, ${err.message}`);
     throw err;
   } finally {
     // Cleanup
@@ -919,16 +894,14 @@ async function processOneVideo(videoPath) {
   const eSecTotal = Math.floor(elapsed / 1000);
   const eMin = Math.floor(eSecTotal / 60);
   const eSec = eSecTotal % 60;
-  console.log(
-    `Elapsed: ${String(eMin).padStart(2, "0")}:${String(eSec).padStart(2, "0")}`,
-  );
+  unilog(366, `Elapsed: ${String(eMin).padStart(2, "0")}:${String(eSec).padStart(2, "0")}`);
 }
 
 /* ---------------- Entry point ---------------- */
 
 const inputPath = process.argv[2];
 if (!inputPath) {
-  console.error("No input file");
+  unilog(367, "No input file");
   process.exit(1);
 }
 (async () => {
@@ -936,6 +909,6 @@ if (!inputPath) {
   await run("ffprobe", ["-version"]);
   await processOneVideo(path.resolve(inputPath));
 })().catch((err) => {
-  console.error(err.message);
+  unilog(368, err.message);
   process.exit(1);
 });

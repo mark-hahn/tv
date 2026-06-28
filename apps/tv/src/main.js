@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 
 import express from "express";
 import cors from "cors";
+import { unilog } from "@tv/share";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const _adbLog = createWriteStream(join(__dirname, "../data/tv-adb.log"), {
@@ -128,10 +129,10 @@ function ts() {
 }
 
 function log(...args) {
-  console.log(`[TV ${ts()}]`, ...args);
+  unilog(369, ``, ...args);
 }
 function loge(...args) {
-  console.error(`[TV ${ts()}] ERROR`, ...args);
+  unilog(370, `ERROR`, ...args);
 }
 
 function client(req) {
@@ -193,7 +194,7 @@ function handleEmbySession(s) {
       prev.paused !== paused;
     if (changed) {
       activeDevice = device;
-      log(`activeDevice: ${device}`);
+      unilog(371, `activeDevice: ${device}`);
     }
   }
 
@@ -278,11 +279,11 @@ function updateNowPlaying(sessions) {
 function connectEmby() {
   const deviceId = "tv-server";
   const url = `ws://127.0.0.1:8096/embywebsocket?api_key=${EMBY_API_KEY}&deviceId=${deviceId}`;
-  log("connecting to Emby WebSocket...");
+  unilog(372, "connecting to Emby WebSocket...");
   const embyWs = new WebSocket(url, { rejectUnauthorized: false });
 
   embyWs.on("open", () => {
-    log("emby ws opened");
+    unilog(373, "emby ws opened");
     embyWs.send(
       JSON.stringify({ MessageType: "SessionsStart", Data: "0,1500" }),
     );
@@ -302,9 +303,9 @@ function connectEmby() {
     }
   });
 
-  embyWs.on("error", (err) => loge("emby ws error:", err.message));
+  embyWs.on("error", (err) => unilog(374, "emby ws error:", err.message));
   embyWs.on("close", () => {
-    log("emby ws closed, reconnecting in 5s");
+    unilog(375, "emby ws closed, reconnecting in 5s");
     setTimeout(connectEmby, 5000);
   });
 }
@@ -341,7 +342,7 @@ function sendCmd(cmd) {
     if (!cmd.noId) cmd.id = ++cmdId;
     delete cmd.noId;
     if (ws) ws.send(JSON.stringify(cmd));
-    else loge("sendCmd with no ws");
+    else unilog(376, "sendCmd with no ws");
   }, 100);
 }
 
@@ -354,7 +355,7 @@ function callService(domain, service, entityId, serviceData = {}) {
   };
   if (Object.keys(serviceData).length > 0) cmd.service_data = serviceData;
   sendCmd(cmd);
-  log(`callService ${domain}.${service} -> ${entityId}`);
+  unilog(377, `callService ${domain}.${service} -> ${entityId}`);
 }
 
 function handleMsg(raw) {
@@ -362,24 +363,24 @@ function handleMsg(raw) {
   try {
     msg = JSON.parse(raw);
   } catch (e) {
-    loge("JSON parse error:", raw);
+    unilog(378, "JSON parse error:", raw);
     return;
   }
 
   if (msg.type === "auth_required") {
-    log("ws: auth_required");
+    unilog(379, "ws: auth_required");
     sendCmd({ noId: true, type: "auth", access_token: HA_ACCESS_TOKEN });
   } else if (msg.type === "auth_ok") {
-    log("ws: auth_ok");
+    unilog(380, "ws: auth_ok");
     authenticated = true;
     sendCmd({ type: "get_states" });
     sendCmd({ type: "subscribe_events", event_type: "state_changed" });
   } else if (msg.type === "auth_invalid") {
-    loge("ws: auth_invalid");
+    unilog(381, "ws: auth_invalid");
     process.exit(1);
   } else if (msg.type === "result") {
     if (!msg.success) {
-      loge("command failed id:", msg.id, msg.error);
+      unilog(382, "command failed id:", msg.id, msg.error);
       return;
     }
     if (Array.isArray(msg.result)) {
@@ -400,9 +401,7 @@ function handleMsg(raw) {
         )
           tvMode = "fire";
         else tvMode = "other";
-        log(
-          `get_states: braviaState=${st} mediaTitle=${braviaMediaTitle} tvMode=${tvMode}`,
-        );
+        unilog(383, `get_states: braviaState=${st} mediaTitle=${braviaMediaTitle} tvMode=${tvMode}`);
         // Bravia ADB disabled — not needed for normal operation (remote/volume/power all go via HA).
         // To re-enable: uncomment this block and the state_changed block below, the variables, and
         // the spawnBraviaShell/connectBraviaShell/braviaShellCmd functions, and the /tv/keyevent
@@ -428,14 +427,12 @@ function handleMsg(raw) {
         BRAVIA_ENTITY_ID,
       ]);
       if (WATCHED.has(id) && state !== prev) {
-        log(`HA state: ${id} ${prev} -> ${state}`);
+        unilog(384, `HA state: ${id} ${prev} -> ${state}`);
       }
       if (id === FIRE_TV_ENTITY_ID) fireTvState = state;
       if (id === BRAVIA_ENTITY_ID) {
         const attrs = event.data?.new_state?.attributes;
-        log(
-          `BRAVIA attrs: title=${attrs?.media_title ?? "null"} mediaType=${attrs?.media_content_type ?? "null"} muted=${attrs?.is_volume_muted ?? "null"} pendingGoogleHome=${pendingGoogleHome} pendingFireEmby=${pendingFireEmby}`,
-        );
+        unilog(385, `BRAVIA attrs: title=${attrs?.media_title ?? "null"} mediaType=${attrs?.media_content_type ?? "null"} muted=${attrs?.is_volume_muted ?? "null"} pendingGoogleHome=${pendingGoogleHome} pendingFireEmby=${pendingFireEmby}`);
         const prevPower = braviaHaPower;
         braviaHaPower = state;
         if (attrs) {
@@ -447,9 +444,9 @@ function handleMsg(raw) {
         const wasGooglePending = pendingGoogleHome;
         if (pendingGoogleHome && prevPower !== "on" && state === "on") {
           pendingGoogleHome = false;
-          log("googlebtn: TV on — sending Home in 5s");
+          unilog(386, "googlebtn: TV on — sending Home in 5s");
           setTimeout(() => {
-            log("googlebtn: sending Home");
+            unilog(387, "googlebtn: sending Home");
             callService("remote", "send_command", REMOTE_ENTITY_ID, {
               command: "Home",
             });
@@ -475,7 +472,7 @@ function handleMsg(raw) {
             braviaMediaTitle === "HDMI 2")
         ) {
           pendingFireEmby = false;
-          log("firebtn: FireTV active — launching Emby");
+          unilog(388, "firebtn: FireTV active — launching Emby");
           setTimeout(
             () =>
               adbExec(
@@ -492,7 +489,7 @@ function handleMsg(raw) {
           braviaMediaContentType === null &&
           !wasGooglePending
         ) {
-          log("HDMI 2 with no signal — waking Fire Stick");
+          unilog(389, "HDMI 2 with no signal — waking Fire Stick");
           callService("media_player", "turn_on", FIRE_TV_ENTITY_ID);
         }
         // Drive ADB connect from HA power state — disabled (see startup block above for re-enable notes)
@@ -534,16 +531,16 @@ function handleMsg(raw) {
 }
 
 function connectHa() {
-  log("connecting to HA WebSocket...");
+  unilog(390, "connecting to HA WebSocket...");
   ws = new WebSocket(`wss://${HA_HOST}/api/websocket`, {
     rejectUnauthorized: false,
   });
 
-  ws.on("open", () => log("ws opened"));
+  ws.on("open", () => unilog(391, "ws opened"));
   ws.on("message", (data) => handleMsg(data.toString()));
-  ws.on("error", (err) => loge("ws error:", err.message));
+  ws.on("error", (err) => unilog(392, "ws error:", err.message));
   ws.on("close", () => {
-    log("ws closed, reconnecting in 5s");
+    unilog(393, "ws closed, reconnecting in 5s");
     authenticated = false;
     ws = null;
     setTimeout(connectHa, 5000);
@@ -557,18 +554,16 @@ app.use(cors());
 app.use(express.json());
 
 app.get("/tv/googlebtn", (req, res) => {
-  log(
-    `googlebtn from ${client(req)} braviaHaPower=${braviaHaPower} mediaTitle=${braviaMediaTitle}`,
-  );
+  unilog(394, `googlebtn from ${client(req)} braviaHaPower=${braviaHaPower} mediaTitle=${braviaMediaTitle}`);
   callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
   if (braviaHaPower === "on") {
     // TV already on — send home immediately
-    log("googlebtn: TV already on, sending Home now");
+    unilog(395, "googlebtn: TV already on, sending Home now");
     callService("remote", "send_command", REMOTE_ENTITY_ID, {
       command: "Home",
     });
     setTimeout(() => {
-      log("googlebtn: +10s launching Emby via play_media");
+      unilog(396, "googlebtn: +10s launching Emby via play_media");
       callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
         media_content_type: "app",
         media_content_id:
@@ -578,7 +573,7 @@ app.get("/tv/googlebtn", (req, res) => {
   } else {
     // TV off — wait for state_changed on transition to "on"
     pendingGoogleHome = true;
-    log(`googlebtn: TV not on (${braviaHaPower}), set pendingGoogleHome=true`);
+    unilog(397, `googlebtn: TV not on (${braviaHaPower}), set pendingGoogleHome=true`);
   }
   res.json({ ok: true });
 });
@@ -591,7 +586,7 @@ async function firePendingViewShow(label) {
   }
   const { showId, showName } = pendingViewShow;
   pendingViewShow = null;
-  log(`${label}: firing viewshow showId=${showId}`);
+  unilog(398, `${label}: firing viewshow showId=${showId}`);
   try {
     const resp = await fetch(`${SRVR_INTERNAL_URL}/api/embyViewShow`, {
       method: "POST",
@@ -599,17 +594,15 @@ async function firePendingViewShow(label) {
       body: JSON.stringify({ showId, showName }),
     });
     const result = await resp.json();
-    log(`${label}: viewshow result=${JSON.stringify(result)}`);
+    unilog(399, `${label}: viewshow result=${JSON.stringify(result)}`);
   } catch (e) {
-    log(`${label}: viewshow failed: ${e.message}`);
+    unilog(400, `${label}: viewshow failed: ${e.message}`);
   }
 }
 
 app.get("/tv/viewshow", (req, res) => {
   const { showId, showName } = req.query;
-  log(
-    `viewshow from ${client(req)} showId=${showId} showName=${showName} braviaHaPower=${braviaHaPower}`,
-  );
+  unilog(401, `viewshow from ${client(req)} showId=${showId} showName=${showName} braviaHaPower=${braviaHaPower}`);
   pendingViewShow = { showId, showName };
   callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
   if (braviaHaPower === "on") {
@@ -629,7 +622,7 @@ app.get("/tv/viewshow", (req, res) => {
     );
   } else {
     pendingGoogleHome = true;
-    log(`viewshow: TV not on (${braviaHaPower}), set pendingGoogleHome=true`);
+    unilog(402, `viewshow: TV not on (${braviaHaPower}), set pendingGoogleHome=true`);
   }
   res.json({ ok: true });
 });
@@ -670,22 +663,20 @@ function spawnFireShell() {
     }
   });
   fireShell.on("spawn", () => {
-    log("[fire] adb shell spawned");
+    unilog(403, "adb shell spawned");
     fireShellReady = true;
   });
   fireShell.on("error", (err) => {
-    log(`[fire] adb shell error: ${err.message}`);
+    unilog(404, `adb shell error: ${err.message}`);
     fireShellReady = false;
   });
   fireShell.on("close", (code) => {
     fireShellReady = false;
     fireShell = null;
     if (fireShellUnauthorized) {
-      log(
-        `[fire] adb shell closed (${code}) — device unauthorized, NOT retrying (accept USB debug dialog on FireTV then restart tv-tv)`,
-      );
+      unilog(405, `adb shell closed (${code}) — device unauthorized, NOT retrying (accept USB debug dialog on FireTV then restart tv-tv)`);
     } else {
-      log(`[fire] adb shell closed (${code}), reconnecting in 2s...`);
+      unilog(406, `adb shell closed (${code}), reconnecting in 2s...`);
       setTimeout(connectFireShell, 2000);
     }
   });
@@ -694,10 +685,10 @@ function spawnFireShell() {
 function connectFireShell() {
   exec(`adb connect ${FIRE_TV_IP}:5555`, (err, stdout) => {
     if (err) {
-      log(`[fire] adb connect failed: ${err.message}, retrying in 5s...`);
+      unilog(407, `adb connect failed: ${err.message}, retrying in 5s...`);
       setTimeout(connectFireShell, 5000);
     } else {
-      log(`[fire] adb connect: ${stdout.trim()}`);
+      unilog(408, `adb connect: ${stdout.trim()}`);
       spawnFireShell();
     }
   });
@@ -728,20 +719,20 @@ function adbExecP(cmd, label) {
   return new Promise((resolve) => {
     exec(`adb -s ${FIRE_TV_IP}:5555 ${cmd}`, (err, stdout, stderr) => {
       if (err && stderr && stderr.includes("not found")) {
-        log(`[fire] adb ${label}: device not found, connecting...`);
+        unilog(409, `adb ${label}: device not found, connecting...`);
         exec(`adb connect ${FIRE_TV_IP}:5555`, () => {
           exec(`adb -s ${FIRE_TV_IP}:5555 ${cmd}`, (err2) => {
             if (err2)
-              log(`[fire] adb ${label} error after connect: ${err2.message}`);
-            else log(`[fire] adb ${label} ok (after connect)`);
+              unilog(410, `adb ${label} error after connect: ${err2.message}`);
+            else unilog(411, `adb ${label} ok (after connect)`);
             resolve();
           });
         });
       } else if (err) {
-        log(`[fire] adb ${label} error: ${err.message}`);
+        unilog(412, `adb ${label} error: ${err.message}`);
         resolve();
       } else {
-        log(`[fire] adb ${label} ok`);
+        unilog(413, `adb ${label} ok`);
         resolve();
       }
     });
@@ -931,13 +922,13 @@ connectFireShell();
 // });
 
 app.get("/tv/firebtn", (req, res) => {
-  log(`firebtn from ${client(req)} braviaHaPower=${braviaHaPower}`);
+  unilog(414, `firebtn from ${client(req)} braviaHaPower=${braviaHaPower}`);
   callService("media_player", "turn_on", FIRE_TV_ENTITY_ID);
   if (braviaHaPower !== "on") {
     // TV display is off — turn it on and wait for FireTV CEC before launching Emby
     callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
     pendingFireEmby = true;
-    log("firebtn: TV off — turning on Bravia, set pendingFireEmby=true");
+    unilog(415, "firebtn: TV off — turning on Bravia, set pendingFireEmby=true");
   } else {
     // TV already on — send home and launch Emby with fixed delays
     setTimeout(
@@ -957,7 +948,7 @@ app.get("/tv/firebtn", (req, res) => {
 });
 
 app.get("/tv/on", (req, res) => {
-  log(`on from ${client(req)}`);
+  unilog(416, `on from ${client(req)}`);
   callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
   res.json({ ok: true });
 });
@@ -968,7 +959,7 @@ app.get("/tv/mode/:mode", (req, res) => {
     res.status(400).json({ ok: false, error: "unknown mode" });
     return;
   }
-  log(`mode set to ${mode} from ${client(req)} (legacy route)`);
+  unilog(417, `mode set to ${mode} from ${client(req)} (legacy route)`);
   if (mode === "fire") {
     callService("media_player", "turn_on", FIRE_TV_ENTITY_ID);
     setTimeout(
@@ -1021,7 +1012,7 @@ app.get("/tv/emby", (req, res) => {
         "com.sony.dtv.tv.emby.embyatv.tv.emby.embyatv.startup.StartupActivity",
     });
   } else {
-    log(`emby ignored — tvMode=${tvMode}`);
+    unilog(418, `emby ignored — tvMode=${tvMode}`);
     res.json({ ok: false, error: "wrong mode" });
     return;
   }
@@ -1029,7 +1020,7 @@ app.get("/tv/emby", (req, res) => {
 });
 
 app.get("/tv/off", (req, res) => {
-  log(`off from ${client(req)} (mode: ${tvMode})`);
+  unilog(419, `off from ${client(req)} (mode: ${tvMode})`);
   callService("media_player", "turn_off", BRAVIA_ENTITY_ID);
   callService("remote", "turn_off", REMOTE_ENTITY_ID);
   lastOffAt = Date.now();
@@ -1075,7 +1066,7 @@ app.get("/tv/key/:key", async (req, res) => {
   }
 
   if (tvMode !== "fire" && tvMode !== "google" && tvMode !== "tv") {
-    log(`key ignored — tvMode=${tvMode}`);
+    unilog(420, `key ignored — tvMode=${tvMode}`);
     res.json({ ok: false, error: "wrong mode" });
     return;
   }
@@ -1085,10 +1076,10 @@ app.get("/tv/key/:key", async (req, res) => {
     const keys = Array(n).fill(command).join(" ");
     if (fireShellReady) {
       await fireKeyevent(keys);
-      log(`[fire] keyevent ${command}×${n} via shell from ${client(req)}`);
+      unilog(421, `keyevent ${command}×${n} via shell from ${client(req)}`);
     } else {
       await adbExecP(`shell input keyevent ${keys}`, `keyevent ${keys}`);
-      log(`[fire] adb keyevent ${keys} from ${client(req)}`);
+      unilog(422, `adb keyevent ${keys} from ${client(req)}`);
     }
     res.json({ ok: true, command, mode: tvMode });
     return;
@@ -1102,16 +1093,14 @@ app.get("/tv/key/:key", async (req, res) => {
     service_data: { command },
   };
   const isArrow = ["up", "down", "left", "right"].includes(req.params.key);
-  log(
-    `[key-debug] key=${req.params.key} command=${command} mode=${tvMode} entity=${remoteId} isArrow=${isArrow} haCmd=${JSON.stringify(cmd)}`,
-  );
+  unilog(423, `key=${req.params.key} command=${command} mode=${tvMode} entity=${remoteId} isArrow=${isArrow} haCmd=${JSON.stringify(cmd)}`);
   if (isArrow) {
     cmd.id = ++cmdId;
     if (ws) ws.send(JSON.stringify(cmd));
   } else {
     sendCmd(cmd);
   }
-  log(`[${tvMode}] remote.send_command ${command} from ${client(req)}`);
+  unilog(424, `remote.send_command ${command} from ${client(req)}`);
   res.json({ ok: true, command, mode: tvMode });
 });
 
@@ -1126,25 +1115,25 @@ app.get("/tv/vol/:dir", (req, res) => {
     return;
   }
   if (tvMode !== "google" && tvMode !== "fire" && tvMode !== "tv") {
-    log(`vol ignored — tvMode=${tvMode}`);
+    unilog(425, `vol ignored — tvMode=${tvMode}`);
     res.json({ ok: false, error: "wrong mode" });
     return;
   }
   callService("remote", "send_command", REMOTE_ENTITY_ID, {
     command: dir === "up" ? "VolumeUp" : "VolumeDown",
   });
-  log(`vol ${dir} sent from ${client(req)}`);
+  unilog(426, `vol ${dir} sent from ${client(req)}`);
   res.json({ ok: true });
 });
 
 app.get("/tv/mute", (req, res) => {
   if (tvMode !== "google" && tvMode !== "fire" && tvMode !== "tv") {
-    log(`mute ignored — tvMode=${tvMode}`);
+    unilog(427, `mute ignored — tvMode=${tvMode}`);
     res.json({ ok: false, error: "wrong mode" });
     return;
   }
   callService("remote", "send_command", REMOTE_ENTITY_ID, { command: "Mute" });
-  log(`mute sent from ${client(req)}`);
+  unilog(428, `mute sent from ${client(req)}`);
   res.json({ ok: true });
 });
 
@@ -1194,18 +1183,18 @@ app.get("/tv/openapp", (req, res) => {
     return;
   }
   if (tvMode === "google") {
-    log(`openapp google uri=${uri} from ${client(req)}`);
+    unilog(429, `openapp google uri=${uri} from ${client(req)}`);
     callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
       media_content_type: "app",
       media_content_id: uri,
     });
     res.json({ ok: true });
   } else if (tvMode === "fire") {
-    log(`openapp fire uri=${uri} from ${client(req)}`);
+    unilog(430, `openapp fire uri=${uri} from ${client(req)}`);
     adbExecP(`shell am start -n ${uri}`, "openapp");
     res.json({ ok: true });
   } else {
-    log(`openapp ignored — tvMode=${tvMode}`);
+    unilog(431, `openapp ignored — tvMode=${tvMode}`);
     res.json({ ok: false, error: "wrong mode" });
   }
 });
@@ -1217,39 +1206,39 @@ app.get("/tv/playvideo", (req, res) => {
     return;
   }
   if (tvMode === "google") {
-    log(`playvideo google url=${url} from ${client(req)}`);
+    unilog(432, `playvideo google url=${url} from ${client(req)}`);
     // Extract YouTube video ID from URL
     const ytMatch = url.match(/[?&]v=([^&]+)/);
     let cmd;
     if (ytMatch) {
       const videoId = ytMatch[1];
-      log(`playvideo launching YouTube video ${videoId} via adb`);
+      unilog(433, `playvideo launching YouTube video ${videoId} via adb`);
       // Use adb to send intent directly to YouTube app
       cmd = `adb -s ${BRAVIA_TV_IP} shell am start -a android.intent.action.VIEW -d "https://www.youtube.com/watch?v=${videoId}" com.google.android.youtube.tv`;
     } else {
-      log(`playvideo: non-YouTube URL, launching in VLC`);
+      unilog(434, `playvideo: non-YouTube URL, launching in VLC`);
       // For IMDB or other video URLs, open in VLC
       // Use single quotes in the shell to prevent & interpretation
       cmd = `adb -s ${BRAVIA_TV_IP} shell "am start -a android.intent.action.VIEW -d '${url}' -t 'video/*' org.videolan.vlc"`;
     }
-    log(`playvideo cmd: ${cmd}`);
+    unilog(435, `playvideo cmd: ${cmd}`);
     exec(cmd, (err, stdout, stderr) => {
       if (err) {
-        log(`playvideo adb error: ${err.message}`);
+        unilog(436, `playvideo adb error: ${err.message}`);
       }
-      if (stderr) log(`playvideo adb stderr: ${stderr}`);
-      if (stdout) log(`playvideo adb stdout: ${stdout}`);
+      if (stderr) unilog(437, `playvideo adb stderr: ${stderr}`);
+      if (stdout) unilog(438, `playvideo adb stdout: ${stdout}`);
     });
     res.json({ ok: true });
   } else if (tvMode === "fire") {
-    log(`playvideo fire url=${url} from ${client(req)}`);
+    unilog(439, `playvideo fire url=${url} from ${client(req)}`);
     adbExecP(
       `shell am start -a android.intent.action.VIEW -d "${url}"`,
       "playvideo",
     );
     res.json({ ok: true });
   } else {
-    log(`playvideo ignored — tvMode=${tvMode}`);
+    unilog(440, `playvideo ignored — tvMode=${tvMode}`);
     res.json({ ok: false, error: "wrong mode" });
   }
 });
@@ -1284,7 +1273,7 @@ function stopScrub() {
 function startScrubDeadman() {
   if (scrubDeadmanTimer) clearTimeout(scrubDeadmanTimer);
   scrubDeadmanTimer = setTimeout(() => {
-    log("scrub dead-man timeout — stopping scrub");
+    unilog(441, "scrub dead-man timeout — stopping scrub");
     stopScrub();
   }, SCRUB_DEADMAN_TIMEOUT);
 }
@@ -1295,7 +1284,7 @@ app.post("/tv/scrub/start", (req, res) => {
     res.status(400).json({ ok: false, error: "invalid direction" });
     return;
   }
-  log(`scrub start direction=${direction} from ${client(req)}`);
+  unilog(442, `scrub start direction=${direction} from ${client(req)}`);
   stopScrub();
   scrubDirection = direction;
   scrubKeyCount = 0;
@@ -1334,7 +1323,7 @@ app.post("/tv/scrub/ping", (req, res) => {
 });
 
 app.post("/tv/scrub/stop", (req, res) => {
-  log(`scrub stop from ${client(req)}`);
+  unilog(443, `scrub stop from ${client(req)}`);
   stopScrub();
   res.json({ ok: true });
 });
@@ -1488,7 +1477,7 @@ app.get("/tv/emby/playing", async (req, res) => {
     playingCache = { ts: Date.now(), data: result };
     res.json(result);
   } catch (err) {
-    loge("emby/playing error:", err.message);
+    unilog(444, "emby/playing error:", err.message);
     res.json({ ok: false, error: err.message });
   }
 });
@@ -1506,7 +1495,7 @@ app.get("/tv/emby/position", async (req, res) => {
       paused: !!session.PlayState?.IsPaused,
     });
   } catch (err) {
-    loge("emby/position error:", err.message);
+    unilog(445, "emby/position error:", err.message);
     res.json({ ok: false, error: err.message });
   }
 });
@@ -1556,7 +1545,7 @@ app.post("/tv/emby/seek", async (req, res) => {
     const seekRes = await seekEmbySession(session.Id, ticks);
     res.json({ ok: seekRes.ok, reason: seekRes.ok ? undefined : "seekFailed" });
   } catch (err) {
-    loge("emby/seek error:", err.message);
+    unilog(446, "emby/seek error:", err.message);
     res.json({ ok: false, error: err.message });
   }
 });
@@ -1589,7 +1578,7 @@ app.post("/tv/emby/seek2", async (req, res) => {
     });
     res.json({ ok: seekRes.ok });
   } catch (err) {
-    loge("emby/seek error:", err.message);
+    unilog(447, "emby/seek error:", err.message);
     res.json({ ok: false, error: err.message });
   }
 });
@@ -1650,14 +1639,12 @@ app.post("/tv/emby/subtitle", async (req, res) => {
       downCount = pos + 1;
     }
   } catch (err) {
-    loge("emby/subtitle lookup error:", err.message);
+    unilog(448, "emby/subtitle lookup error:", err.message);
     res.json({ ok: false, error: err.message });
     return;
   }
 
-  log(
-    `[emby] subtitle nav: index=${index} downCount=${downCount} rightCount=${rightCount}`,
-  );
+  unilog(449, `subtitle nav: index=${index} downCount=${downCount} rightCount=${rightCount}`);
   const navMs =
     SUB_NAV_PRE_DOWN1_DELAY_MS +
     SUB_NAV_PRE_DOWN2_DELAY_MS +
@@ -1669,7 +1656,7 @@ app.post("/tv/emby/subtitle", async (req, res) => {
     SUB_NAV_CONFIRM_DELAY_MS +
     SUB_NAV_BACK_DELAY_MS;
   const waitMs = navMs + SUB_NAV_POLL_MS;
-  log(`[emby] subtitle nav waitMs=${waitMs}`);
+  unilog(450, `subtitle nav waitMs=${waitMs}`);
   res.json({ ok: true, waitMs, navMs });
 
   await sendIrcc("Down", SUB_NAV_PRE_DOWN1_DELAY_MS);
@@ -1710,12 +1697,10 @@ app.post("/tv/emby/subtitle-offset", async (req, res) => {
         }),
       },
     );
-    log(
-      `[emby] SetSubtitleDelay ${offsetMs}ms session=${sessionId} -> ${r.status}`,
-    );
+    unilog(451, `SetSubtitleDelay ${offsetMs}ms session=${sessionId} -> ${r.status}`);
     res.json({ ok: r.ok });
   } catch (err) {
-    loge("emby/subtitle-offset error:", err.message);
+    unilog(452, "emby/subtitle-offset error:", err.message);
     res.json({ ok: false, error: err.message });
   }
 });
@@ -1796,7 +1781,7 @@ app.post("/tv/picture", async (req, res) => {
       res.json({ ok: false, error: JSON.stringify(data.error) });
       return;
     }
-    log(`picture set ${target}=${value}`);
+    unilog(453, `picture set ${target}=${value}`);
     res.json({ ok: true });
   } catch (err) {
     res.json({ ok: false, error: err.message });
@@ -1864,21 +1849,19 @@ async function checkSubtitleMismatch(sessions) {
     }
     if (chosenSubIndex === null) return;
     if (currentSubIndex === chosenSubIndex) return;
-    log(
-      `[subMismatch] ${showName} ${episodeCode}: current=${currentSubIndex} chosen=${chosenSubIndex}`,
-    );
+    unilog(454, `${showName} ${episodeCode}: current=${currentSubIndex} chosen=${chosenSubIndex}`);
     await fetch(`${SRVR_INTERNAL_URL}/internal/subtitle-mismatch`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ showName, episodeCode }),
     });
   } catch (err) {
-    loge("checkSubtitleMismatch error:", err.message);
+    unilog(455, "checkSubtitleMismatch error:", err.message);
   }
 }
 
 app.listen(TV_PORT, () => {
-  log(`listening on port ${TV_PORT}`);
+  unilog(456, `listening on port ${TV_PORT}`);
 });
 
 setInterval(pushTvState, 2000);

@@ -3,6 +3,7 @@ import path from "node:path";
 import process from "node:process";
 import Database from "better-sqlite3";
 import { getApiDataDir, getApiMiscDir } from "./tvPaths.js";
+import { unilog } from "@tv/share";
 
 const LOG_APPS_API_DATA_MISC_TVMAZE_SYNC_LOG = false;
 
@@ -210,7 +211,7 @@ function appendSyncLog(entry) {
     fs.appendFileSync(outPath, line + "\n", "utf8");
   } catch (err) {
     if (entry === "SYNC STARTED") {
-      console.error("[tvmaze] failed to append SYNC STARTED log", err);
+      unilog(269, "failed to append SYNC STARTED log", err);
     }
     // ignore logging failures
   }
@@ -296,7 +297,7 @@ function clearDbIfFlagExists() {
     message: "db cleared (flag found)",
     details: { flag: hit, deleted, pid: process.pid },
   });
-  console.error("[tvmaze] db cleared (flag found)", { flag: hit, deleted });
+  unilog(270, "db cleared (flag found)", { flag: hit, deleted });
   return { cleared: true, flag: hit, deleted };
 }
 
@@ -318,7 +319,7 @@ function logDbIssue(message, details) {
     message: String(message || "DB issue"),
     details: details ?? null,
   };
-  console.error("[tvmaze] fatal", payload);
+  unilog(271, "fatal", payload);
   appendSyncLog(payload);
 }
 
@@ -572,13 +573,13 @@ function scheduleDaily3am(runFn) {
     try {
       await runFn("daily");
     } catch (e) {
-      console.error("[tvmaze] daily sync failed", e);
+      unilog(272, "daily sync failed", e);
     }
 
     setInterval(
       () => {
         runFn("daily").catch((e) =>
-          console.error("[tvmaze] daily sync failed", e),
+          unilog(273, "daily sync failed", e),
         );
       },
       24 * 60 * 60 * 1000,
@@ -950,14 +951,14 @@ async function syncTvmazeShows(reason = "startup") {
                   count: updateCount,
                 });
               } catch (err) {
-                console.error(`[tvmaze] failed to update show ${id}`, err);
+                unilog(274, `failed to update show ${id}`, err);
               }
             }
           }
         }
       }
     } catch (e) {
-      console.error("[tvmaze] failed to fetch updates", e);
+      unilog(275, "failed to fetch updates", e);
     }
 
     const endedAt = nowMs();
@@ -1017,7 +1018,7 @@ async function syncTvmazeShows(reason = "startup") {
       },
     };
 
-    console.error("[tvmaze] sync failed", errPayload);
+    unilog(276, "sync failed", errPayload);
     appendSyncLog(errPayload);
     throw e;
   } finally {
@@ -1038,7 +1039,7 @@ export async function start() {
   }
 
   syncTvmazeShows("startup").catch((e) => {
-    console.error("[tvmaze] startup sync failed", e);
+    unilog(277, "startup sync failed", e);
   });
 
   scheduleDaily3am(syncTvmazeShows);

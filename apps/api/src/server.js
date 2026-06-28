@@ -49,6 +49,7 @@ import {
   parseTitleFromFilename,
   TV_BLOCKED,
 } from "@tv/share";
+import { unilog } from "@tv/share";
 import parseTorrentTitlePkg from "parse-torrent-title";
 import {
   getApiCookiesDir,
@@ -187,7 +188,7 @@ function appendReviewCallsLog({
     const txt = `==========\n${JSON.stringify(payload, null, 2)}\n`;
     fs.appendFileSync(outPath, txt, "utf8");
   } catch (err) {
-    console.error("Review logging failed", err);
+    unilog(203, "Review logging failed", err);
   }
 }
 
@@ -258,14 +259,14 @@ async function handoffForcedTorrentToTvDown({
         .filter((file) => file.path)
     : [];
 
-  console.log("[downloads] forced handoff started", {
+  unilog(204, "forced handoff started", {
     addTag,
     infoHash,
     files: metadataFiles.length,
   });
 
   if (metadataFiles.length === 0) {
-    console.error("[downloads] forced handoff has no usable torrent files", {
+    unilog(205, "forced handoff has no usable torrent files", {
       addTag,
       infoHash,
       torrentTitle,
@@ -305,14 +306,11 @@ async function handoffForcedTorrentToTvDown({
         .filter(Boolean);
 
       if (payload.length === 0) {
-        console.error(
-          "[downloads] forced handoff could not compute metadata paths",
-          {
+        unilog(206, "forced handoff could not compute metadata paths", {
             addTag,
             infoHash,
             savePath,
-          },
-        );
+          });
         return;
       }
 
@@ -334,14 +332,14 @@ async function handoffForcedTorrentToTvDown({
         type: "forceDown",
         description: `${torrentTitle} | tag: ${addTag}`,
       });
-      console.log("[downloads] forced handoff sent to tv-down", {
+      unilog(207, "forced handoff sent to tv-down", {
         addTag,
         infoHash,
         count: payload.length,
       });
       return;
     } catch (error) {
-      console.error("[downloads] forced handoff poll failed", {
+      unilog(208, "forced handoff poll failed", {
         addTag,
         infoHash,
         error: error?.message || String(error),
@@ -351,7 +349,7 @@ async function handoffForcedTorrentToTvDown({
     await new Promise((resolve) => setTimeout(resolve, FORCE_DOWN_POLL_MS));
   }
 
-  console.error("[downloads] forced handoff timed out", {
+  unilog(209, "forced handoff timed out", {
     addTag,
     infoHash,
     torrentTitle,
@@ -767,7 +765,7 @@ app.post("/api/cf_clearance", async (req, res) => {
       JSON.stringify(current, null, 2) + "\n",
       "utf8",
     );
-    console.error("[cf_clearance] saved", {
+    unilog(210, "saved", {
       path: outPath,
       keys: Object.keys(current),
       iptLen: current.iptorrents ? String(current.iptorrents).length : 0,
@@ -776,7 +774,7 @@ app.post("/api/cf_clearance", async (req, res) => {
 
     res.json({ ok: true, path: outPath, keys: Object.keys(current) });
   } catch (error) {
-    console.error("[cf_clearance] error", error);
+    unilog(211, "error", error);
     res.status(500).json({ ok: false, error: error?.message || String(error) });
   }
 });
@@ -806,11 +804,9 @@ if (
       );
       fs.mkdirSync(path.dirname(outPath), { recursive: true });
       fs.writeFileSync(outPath, JSON.stringify(info, null, 2), "utf8");
-      console.log(
-        `qbt startup dump wrote ${Array.isArray(info) ? info.length : 0} torrents -> ${outPath}`,
-      );
+      unilog(212, `qbt startup dump wrote ${Array.isArray(info) ? info.length : 0} torrents -> ${outPath}`);
     } catch (e) {
-      console.error("qbt startup dump error:", e);
+      unilog(213, "qbt startup dump error:", e);
     }
   })();
 }
@@ -829,7 +825,7 @@ app.post("/api/tvproc/startProc", async (req, res) => {
       res.json({ ok: true, path: jsonPath, cleared: true });
       return;
     }
-    console.error("tvproc clear error:", error);
+    unilog(214, "tvproc clear error:", error);
     res
       .status(500)
       .json({ error: error?.message || String(error), path: jsonPath });
@@ -847,7 +843,7 @@ app.get("/api/tvproc/startProc", async (req, res) => {
     const data = await response.json();
     res.json(data);
   } catch (error) {
-    console.error("startProc proxy error:", error);
+    unilog(215, "startProc proxy error:", error);
     res.status(500).json({ error: error?.message || String(error) });
   }
 });
@@ -889,7 +885,7 @@ app.post("/api/tvproc/forceDown", async (req, res) => {
     const result = await response.json();
     res.json(result);
   } catch (err) {
-    console.error("forceDown proxy error:", err);
+    unilog(216, "forceDown proxy error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -920,13 +916,13 @@ app.get("/api/qbt/info", async (req, res) => {
         fs.mkdirSync(path.dirname(outPath), { recursive: true });
         fs.writeFileSync(outPath, JSON.stringify(info, null, 2), "utf8");
       } catch (e) {
-        console.error("qbt info dump error:", e);
+        unilog(217, "qbt info dump error:", e);
       }
     }
 
     res.json(info);
   } catch (error) {
-    console.error("qbt info error:", error);
+    unilog(218, "qbt info error:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -955,7 +951,7 @@ app.post("/api/qbt/delTorrent", async (req, res) => {
     const result = await delQbtTorrent({ hash, deleteFiles });
     res.json(result);
   } catch (error) {
-    console.error("qbt delTorrent error:", error);
+    unilog(219, "qbt delTorrent error:", error);
     res.status(500).json({ error: error?.message || String(error) });
   }
 });
@@ -967,7 +963,7 @@ app.post("/api/qbt/recheck", async (req, res) => {
     const result = await recheckQbtTorrent({ hash });
     res.json(result);
   } catch (error) {
-    console.error("qbt recheck error:", error);
+    unilog(220, "qbt recheck error:", error);
     res.status(500).json({ error: error?.message || String(error) });
   }
 });
@@ -983,7 +979,7 @@ app.post("/api/qbt/addMagnet", async (req, res) => {
     const result = await addQbtMagnet({ magnetUrl });
     res.json(result);
   } catch (error) {
-    console.error("qbt addMagnet error:", error);
+    unilog(221, "qbt addMagnet error:", error);
     res.status(500).json({ error: error?.message || String(error) });
   }
 });
@@ -993,7 +989,7 @@ app.get("/api/space/avail", async (req, res) => {
     const info = await spaceAvail();
     res.json(info);
   } catch (error) {
-    console.error("spaceAvail error:", error);
+    unilog(222, "spaceAvail error:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1003,7 +999,7 @@ app.get("/api/space/usb", async (req, res) => {
     const info = await spaceAvailUsb();
     res.json(info);
   } catch (error) {
-    console.error("spaceAvailUsb error:", error);
+    unilog(223, "spaceAvailUsb error:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1013,7 +1009,7 @@ app.get("/api/space/srvr", async (req, res) => {
     const info = await spaceAvailMedia();
     res.json(info);
   } catch (error) {
-    console.error("spaceAvailMedia error:", error);
+    unilog(224, "spaceAvailMedia error:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1023,7 +1019,7 @@ app.get("/api/flexget", async (req, res) => {
     const txt = await flexget();
     res.type("text/plain").send(txt);
   } catch (error) {
-    console.error("flexget error:", error);
+    unilog(225, "flexget error:", error);
     res.status(500).json({ error: error?.message || String(error) });
   }
 });
@@ -1042,7 +1038,7 @@ app.post("/api/usb/prune", async (req, res) => {
     const result = await pruneUsbFiles();
     res.json(result);
   } catch (err) {
-    console.error("usb prune error:", err);
+    unilog(226, "usb prune error:", err);
     res.status(500).json({ error: err?.message || String(err) });
   }
 });
@@ -1052,7 +1048,7 @@ app.get("/api/usb/prune/status", async (req, res) => {
     const status = getUsbPruneStatus();
     res.json(status);
   } catch (err) {
-    console.error("usb prune status error:", err);
+    unilog(227, "usb prune status error:", err);
     res.status(500).json({ error: err?.message || String(err) });
   }
 });
@@ -1066,7 +1062,7 @@ app.post("/api/usb/rename", async (req, res) => {
     const result = await renameUsbFile(oldPath, newName);
     res.json(result);
   } catch (err) {
-    console.error("usb rename error:", err);
+    unilog(228, "usb rename error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -1081,7 +1077,7 @@ app.post("/api/usb/deleteFiles", async (req, res) => {
     const result = await deleteUsbFiles(paths);
     res.json(result);
   } catch (err) {
-    console.error("usb deleteFiles error:", err);
+    unilog(229, "usb deleteFiles error:", err);
     res.status(500).json({ error: err?.message || String(err) });
   }
 });
@@ -1105,7 +1101,7 @@ app.post("/api/usb/deleteMovies", async (req, res) => {
     const result = await deleteUsbMovies(paths);
     res.json(result);
   } catch (err) {
-    console.error("usb deleteMovies error:", err);
+    unilog(230, "usb deleteMovies error:", err);
     res.status(500).json({ error: err?.message || String(err) });
   }
 });
@@ -1218,7 +1214,7 @@ app.post("/api/local/rename", async (req, res) => {
     const result = await renameLocalFile(oldPath, newName, !!errsMode);
     res.json(result);
   } catch (err) {
-    console.error("local rename error:", err);
+    unilog(231, "local rename error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -1250,7 +1246,7 @@ app.post("/api/local/move-to-trial", async (req, res) => {
     const result = await moveToTrial(relPath);
     res.json(result);
   } catch (err) {
-    console.error("move-to-trial error:", err);
+    unilog(232, "move-to-trial error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -1324,7 +1320,7 @@ app.post("/api/local/mediainfo", async (req, res) => {
 
     res.json({ output, fileName, subsCount, srtsCount });
   } catch (err) {
-    console.error("mediainfo error:", err);
+    unilog(233, "mediainfo error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -1437,7 +1433,7 @@ app.get("/api/search", async (req, res) => {
     try {
       needed = JSON.parse(req.query.needed);
     } catch (err) {
-      console.error("Error parsing needed array:", err);
+      unilog(234, "Error parsing needed array:", err);
     }
   }
 
@@ -1475,7 +1471,7 @@ app.get("/api/search", async (req, res) => {
     });
     res.json(result);
   } catch (error) {
-    console.error("Search error:", error);
+    unilog(235, "Search error:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1562,7 +1558,7 @@ app.get("/api/subs/search", async (req, res) => {
 
     res.json(resp.data);
   } catch (error) {
-    console.error("[subs] search error:", error);
+    unilog(236, "search error:", error);
     res.status(500).json({ error: error?.message || String(error) });
   }
 });
@@ -1587,7 +1583,7 @@ async function handleDownloadRequest(req, res) {
     appendDownloadsRequestLog(body);
 
     if (debug) {
-      console.log("[downloads] request", {
+      unilog(237, "request", {
         forceDownload,
         provider: torrent?.provider || torrent?.raw?.provider || undefined,
         id: torrent?.raw?.id || torrent?.id || undefined,
@@ -1686,7 +1682,7 @@ async function handleDownloadRequest(req, res) {
           const badPath = `/root/dev/apps/tv/bad-torrent-${safeTitle}.txt`;
           fs.writeFileSync(badPath, fetched.torrentData);
         } catch (e) {
-          console.error("[downloads] failed to save bad torrent file", e);
+          unilog(238, "failed to save bad torrent file", e);
         }
         postTorErr("validate", valid.error || "invalid torrent bytes");
         res.json({ ...baseWrapper, ...valid });
@@ -1792,7 +1788,7 @@ async function handleDownloadRequest(req, res) {
       const errorTitles = tvEntriesErrorTitles(tvProcResult?.tvEntries);
       if (existingTitles.length > 0 || errorTitles.length > 0) {
         if (debug)
-          console.log("[downloads] blocked by tv-proc", {
+          unilog(239, "blocked by tv-proc", {
             existingTitles: existingTitles.length,
             errorTitles: errorTitles.length,
           });
@@ -1822,7 +1818,7 @@ async function handleDownloadRequest(req, res) {
         });
       } catch (e) {
         if (debug)
-          console.log("[downloads] qbt add threw", {
+          unilog(240, "qbt add threw", {
             addTag,
             error: e?.message || String(e),
           });
@@ -1853,7 +1849,7 @@ async function handleDownloadRequest(req, res) {
       }
 
       if (debug)
-        console.log("[downloads] qbt add response", {
+        unilog(241, "qbt add response", {
           addTag,
           ok: addRes.ok,
           status: addRes.status,
@@ -1885,10 +1881,7 @@ async function handleDownloadRequest(req, res) {
           const list = Array.isArray(tagged) ? tagged : [];
           if (list.length > 0) {
             if (debug)
-              console.log(
-                "[downloads] qbt add disambiguated as success via tag",
-                { addTag, count: list.length },
-              );
+              unilog(242, "qbt add disambiguated as success via tag", { addTag, count: list.length });
             let tagInfoHash = "";
             try {
               const parsed = parseTorrent(fetched.torrentData);
@@ -1946,10 +1939,7 @@ async function handleDownloadRequest(req, res) {
               ).trim();
               const title = existingName || fallbackTitle || infoHash;
               if (debug)
-                console.log(
-                  "[downloads] qbt add disambiguated as duplicate via hash",
-                  { addTag, infoHash, title },
-                );
+                unilog(243, "qbt add disambiguated as duplicate via hash", { addTag, infoHash, title });
               res.json({
                 ...tvProcResult,
                 success: false,
@@ -2010,7 +2000,7 @@ async function handleDownloadRequest(req, res) {
         description: `${torTitle} | provider: ${torrent?.raw?.provider || torrent?.provider || "?"} | tag: ${addTag}`,
       });
       if (debug) {
-        console.log("[downloads] qbt add success", { addTag });
+        unilog(244, "qbt add success", { addTag });
         appendDownloadsResultLog({
           stage: "qbt-add-success",
           addTag,
@@ -2166,7 +2156,7 @@ async function handleDownloadRequest(req, res) {
       });
     } catch (e) {
       if (debug)
-        console.error("[downloads] qbt add threw (force)", {
+        unilog(245, "qbt add threw (force)", {
           addTag,
           error: e?.message || String(e),
         });
@@ -2180,7 +2170,7 @@ async function handleDownloadRequest(req, res) {
     }
 
     if (debug)
-      console.error("[downloads] qbt add response (force)", {
+      unilog(246, "qbt add response (force)", {
         addTag,
         ok: addRes.ok,
         status: addRes.status,
@@ -2194,10 +2184,7 @@ async function handleDownloadRequest(req, res) {
         const list = Array.isArray(tagged) ? tagged : [];
         if (list.length > 0) {
           if (debug)
-            console.error(
-              "[downloads] qbt add disambiguated as success via tag (force)",
-              { addTag, count: list.length },
-            );
+            unilog(247, "qbt add disambiguated as success via tag (force)", { addTag, count: list.length });
           let infoHash = "";
           try {
             const parsed = parseTorrent(fetched.torrentData);
@@ -2375,7 +2362,7 @@ async function handleDownloadRequest(req, res) {
       debug,
     });
   } catch (error) {
-    console.error("Download error:", error);
+    unilog(248, "Download error:", error);
     res.status(500).json({
       existingTitles: [],
       existingProcids: [],
@@ -2593,7 +2580,7 @@ app.get("/api/torrent-file", async (req, res) => {
     // use it directly instead of doing a fresh search that may return the wrong torrent.
     const magnetUrl = String(req.query.magnet || "").trim();
     if (magnetUrl.startsWith("magnet:")) {
-      console.log("[torrent-file] using provided magnet for:", showName);
+      unilog(249, "using provided magnet for:", showName);
       const magRes = await addQbtMagnet({ magnetUrl, savePath });
       if (!magRes.ok) {
         postHistory({
@@ -2642,28 +2629,20 @@ app.get("/api/torrent-file", async (req, res) => {
         return res.json({ success: true, filename: "(magnet)", bytes: 0 });
       }
       // No hash in URL — fall through to getTorrentFile search
-      console.log(
-        "[torrent-file] no hash in link URL, falling through to search:",
-        linkUrl,
-      );
+      unilog(250, "no hash in link URL, falling through to search:", linkUrl);
     }
 
     const fileBuffer = await search.getTorrentFile(showName);
     if (!fileBuffer) {
       return res.status(404).json({ error: "No torrent file found for show" });
     }
-    console.log(
-      "[torrent-file] adding via qbt WebAPI for:",
-      showName,
-      "bytes:",
-      fileBuffer.length,
-    );
+    unilog(251, "adding via qbt WebAPI for:", showName, "bytes:", fileBuffer.length);
     const addRes = await addQbtTorrent({
       torrentData: fileBuffer,
       filename: showName,
       savePath,
     });
-    console.log("[torrent-file] qbt add result:", {
+    unilog(252, "qbt add result:", {
       ok: addRes.ok,
       status: addRes.status,
       text: addRes.text,
@@ -2689,7 +2668,7 @@ app.get("/api/torrent-file", async (req, res) => {
       bytes: fileBuffer.length,
     });
   } catch (err) {
-    console.error("torrent-file error:", err);
+    unilog(253, "torrent-file error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -2705,7 +2684,7 @@ app.get("/api/getBrowseShow", async (req, res) => {
     });
     res.json({ titles, pendingBrowsedId });
   } catch (error) {
-    console.error("getBrowseShow error:", error);
+    unilog(254, "getBrowseShow error:", error);
     appendCallsLog({
       endpoint: "/api/getBrowseShow",
       method: "GET",
@@ -2729,7 +2708,7 @@ app.get("/api/getAllBrowse", async (req, res) => {
     // });
     res.json(result);
   } catch (error) {
-    console.error("getAllBrowse error:", error);
+    unilog(255, "getAllBrowse error:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -2762,7 +2741,7 @@ app.get("/api/browseSearch", (req, res) => {
     });
     res.json(results);
   } catch (error) {
-    console.error("browseSearch error:", error);
+    unilog(256, "browseSearch error:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -2778,7 +2757,7 @@ app.post("/api/getBrowseShow", async (req, res) => {
     });
     res.json({ titles, pendingBrowsedId });
   } catch (error) {
-    console.error("getBrowseShow error:", error);
+    unilog(257, "getBrowseShow error:", error);
     appendCallsLog({
       endpoint: "/api/getBrowseShow",
       method: "POST",
@@ -2828,7 +2807,7 @@ app.post("/api/getActorPage", async (req, res) => {
     const searchResp = await fetch(searchUrl);
 
     if (!searchResp.ok) {
-      console.error("getActorPage IMDb search failed:", searchResp.status);
+      unilog(258, "getActorPage IMDb search failed:", searchResp.status);
       const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, "_")}`;
       res.json(wikiUrl);
       return;
@@ -2864,7 +2843,7 @@ app.post("/api/getActorPage", async (req, res) => {
     const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, "_")}`;
     res.json(wikiUrl);
   } catch (err) {
-    console.error("getActorPage error:", err.message);
+    unilog(259, "getActorPage error:", err.message);
     const wikiUrl = `https://en.wikipedia.org/wiki/${actorName.replace(/\s+/g, "_")}`;
     res.json(wikiUrl);
   }
@@ -2913,40 +2892,32 @@ const inFlightRequests = new Map();
 
 app.post("/api/getActorCredits", async (req, res) => {
   const requestId = Math.random().toString(36).substr(2, 9);
-  console.log(
-    `[SERVER ${requestId}] /api/getActorCredits received at ${new Date().toISOString()}`,
-  );
+  unilog(260, `/api/getActorCredits received at ${new Date().toISOString()}`);
   let actorName = req.body;
   if (typeof actorName === "object" && actorName !== null && actorName.name) {
     actorName = actorName.name;
   }
-  console.log(`[SERVER ${requestId}] Actor name: ${actorName}`);
+  unilog(261, `Actor name: ${actorName}`);
   try {
     const cacheKey = actorName.toLowerCase().trim();
     const cached = actorCreditsCache.get(cacheKey);
 
     // Check if cached and not expired
     if (cached && Date.now() - cached.timestamp < ACTOR_CREDITS_CACHE_TTL) {
-      console.log(
-        `[SERVER ${requestId}] Returning cached credits for actor: ${actorName}`,
-      );
+      unilog(262, `Returning cached credits for actor: ${actorName}`);
       return res.json(cached.data);
     }
 
     // Check if request is already in-flight for this actor
     if (inFlightRequests.has(cacheKey)) {
-      console.log(
-        `[SERVER ${requestId}] Waiting for in-flight request for actor: ${actorName}`,
-      );
+      unilog(263, `Waiting for in-flight request for actor: ${actorName}`);
       const result = await inFlightRequests.get(cacheKey);
-      console.log(`[SERVER ${requestId}] In-flight request completed`);
+      unilog(264, `In-flight request completed`);
       return res.json(result);
     }
 
     // Create promise for this request to allow others to wait
-    console.log(
-      `[SERVER ${requestId}] Fetching credits for actor: ${actorName}`,
-    );
+    unilog(265, `Fetching credits for actor: ${actorName}`);
     const fetchPromise = browserQueue
       .enqueue(() =>
         getActorCredits(actorName, {
@@ -2972,7 +2943,7 @@ app.post("/api/getActorCredits", async (req, res) => {
     const result = await fetchPromise;
     res.json(result);
   } catch (err) {
-    console.error("getActorCredits error:", err.message);
+    unilog(266, "getActorCredits error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -3005,7 +2976,7 @@ app.get("/api/reviews/getReviews", async (req, res) => {
     });
     res.json(result);
   } catch (error) {
-    console.error("getReviews error:", error);
+    unilog(267, "getReviews error:", error);
     appendCallsLog({
       endpoint: "/api/reviews/getReviews",
       method: "GET",
@@ -3062,7 +3033,7 @@ app.get("/api/reviews/getImdbReviews", async (req, res) => {
     });
     res.json(result);
   } catch (error) {
-    console.error("getImdbReviews error:", error);
+    unilog(268, "getImdbReviews error:", error);
     appendCallsLog({
       endpoint: "/api/reviews/getImdbReviews",
       method: "GET",

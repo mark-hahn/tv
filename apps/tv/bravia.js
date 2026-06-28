@@ -1,4 +1,5 @@
 import { WebSocket } from "ws";
+import { unilog } from "@tv/share";
 
 const HA_URL = "wss://hahnca.com:8123/api/websocket";
 const HA_TOKEN =
@@ -83,9 +84,9 @@ ws.on("message", (data) => {
         process.stderr.write(`Entity ${ENTITY_ID} not found\n`);
         process.exit(1);
       }
-      console.log("state:", entity.state);
+      unilog(457, "state:", entity.state);
       for (const [k, v] of Object.entries(entity.attributes ?? {})) {
-        console.log(`  ${k}: ${JSON.stringify(v)}`);
+        unilog(458, `  ${k}: ${JSON.stringify(v)}`);
       }
       ws.close();
       process.exit(0);
@@ -108,7 +109,7 @@ ws.on("message", (data) => {
     }
 
     // Response to a call_service
-    console.log("ok");
+    unilog(459, "ok");
     ws.close();
     process.exit(0);
   }

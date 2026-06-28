@@ -7,6 +7,7 @@ import { patchProviderWithSshTunnel } from "./sshTunnel.js";
 
 import TorrentSearchApi from "torrent-search-api";
 import os from "os";
+import { unilog } from "@tv/share";
 
 // When true and the show name contains a year, TPB/LIM/EZT are first searched with the
 // year included. If that yields >20 results the no-year search is skipped; otherwise
@@ -53,16 +54,12 @@ async function searchTpbDirect(query, limit = 100) {
     );
     clearTimeout(timer);
     if (!res.ok) {
-      console.warn(
-        `[searchTpbDirect] apibay HTTP ${res.status} for "${query}"`,
-      );
+      unilog(169, `apibay HTTP ${res.status} for "${query}"`);
       return [];
     }
     const data = await res.json().catch(() => null);
     if (!Array.isArray(data)) {
-      console.warn(
-        `[searchTpbDirect] apibay non-array response for "${query}"`,
-      );
+      unilog(170, `apibay non-array response for "${query}"`);
       return [];
     }
     const real = data.filter((r) => String(r.id) !== "0");
@@ -81,7 +78,7 @@ async function searchTpbDirect(query, limit = 100) {
       category: r.category,
     }));
   } catch (e) {
-    console.warn(`[searchTpbDirect] failed for "${query}": ${e.message}`);
+    unilog(171, `failed for "${query}": ${e.message}`);
     return [];
   }
 }
@@ -96,16 +93,12 @@ async function searchTpbDirectMovie(query, limit = 100) {
     );
     clearTimeout(timer);
     if (!res.ok) {
-      console.warn(
-        `[searchTpbDirectMovie] apibay HTTP ${res.status} for "${query}"`,
-      );
+      unilog(172, `apibay HTTP ${res.status} for "${query}"`);
       return [];
     }
     const data = await res.json().catch(() => null);
     if (!Array.isArray(data)) {
-      console.warn(
-        `[searchTpbDirectMovie] apibay non-array response for "${query}"`,
-      );
+      unilog(173, `apibay non-array response for "${query}"`);
       return [];
     }
     const real = data.filter((r) => String(r.id) !== "0");
@@ -124,7 +117,7 @@ async function searchTpbDirectMovie(query, limit = 100) {
       category: r.category,
     }));
   } catch (e) {
-    console.warn(`[searchTpbDirectMovie] failed for "${query}": ${e.message}`);
+    unilog(174, `failed for "${query}": ${e.message}`);
     return [];
   }
 }
@@ -209,7 +202,7 @@ function torLog(line) {
   const ts = new Date().toISOString();
   appendTorResultsLog(`[${ts}] ${String(line || "")}`);
   if (process.env.TOR_LOG_STDOUT === "1") {
-    console.log(String(line || ""));
+    unilog(175, String(line || ""));
   }
 }
 
@@ -481,8 +474,8 @@ export function initializeProviders() {
   tlCookies = loadCookiesFromCurl("curl-tl.txt");
 
   // Warn if missing (effectively failing initialization for that provider)
-  if (!iptCookies) console.log("IPTorrents disabled: (curl-ipt.txt missing)");
-  if (!tlCookies) console.log("TorrentLeech disabled: (curl-tl.txt missing)");
+  if (!iptCookies) unilog(176, "IPTorrents disabled: (curl-ipt.txt missing)");
+  if (!tlCookies) unilog(177, "TorrentLeech disabled: (curl-tl.txt missing)");
 
   if (iptCookies) {
     try {
@@ -504,14 +497,12 @@ export function initializeProviders() {
 
         TorrentSearchApi.loadProvider(customIptConfig);
       } else {
-        console.error(
-          `IPTorrents custom config missing: ${IPTORRENTS_CUSTOM_PATH} (using default provider config)`,
-        );
+        unilog(178, `IPTorrents custom config missing: ${IPTORRENTS_CUSTOM_PATH} (using default provider config)`);
       }
       TorrentSearchApi.enableProvider("IpTorrents", iptCookies);
       patchProviderWithSshTunnel(TorrentSearchApi.getProvider("IpTorrents"));
     } catch (e) {
-      console.error("Failed to enable IPTorrents:", e.message);
+      unilog(179, "Failed to enable IPTorrents:", e.message);
     }
   }
 
@@ -520,7 +511,7 @@ export function initializeProviders() {
       TorrentSearchApi.enableProvider("TorrentLeech", tlCookies);
       patchProviderWithSshTunnel(TorrentSearchApi.getProvider("TorrentLeech"));
     } catch (e) {
-      console.error("Failed to enable TorrentLeech:", e.message);
+      unilog(180, "Failed to enable TorrentLeech:", e.message);
     }
   }
 
@@ -528,17 +519,17 @@ export function initializeProviders() {
   try {
     TorrentSearchApi.enableProvider("ThePirateBay");
   } catch (e) {
-    console.error("Failed to enable ThePirateBay:", e.message);
+    unilog(181, "Failed to enable ThePirateBay:", e.message);
   }
   try {
     TorrentSearchApi.enableProvider("Limetorrents");
   } catch (e) {
-    console.error("Failed to enable Limetorrents:", e.message);
+    unilog(182, "Failed to enable Limetorrents:", e.message);
   }
   try {
     TorrentSearchApi.enableProvider("Eztv");
   } catch (e) {
-    console.error("Failed to enable Eztv:", e.message);
+    unilog(183, "Failed to enable Eztv:", e.message);
   }
 }
 
@@ -575,8 +566,8 @@ export async function searchTorrents({
 
   const activeProvidersRaw = TorrentSearchApi.getActiveProviders();
   const activeProviders = formatActiveProviders(activeProvidersRaw);
-  console.log(`\nSearching for: ${showName} (limit: ${limit})`);
-  console.log("Enabled providers:", activeProviders.join(", "));
+  unilog(184, `\nSearching for: ${showName} (limit: ${limit})`);
+  unilog(185, "Enabled providers:", activeProviders.join(", "));
 
   torLog(`========== search: ${showName} (limit=${limit}) ==========`);
 
@@ -617,18 +608,13 @@ export async function searchTorrents({
 
         TorrentSearchApi.loadProvider(customIptConfig);
       } else {
-        console.error(
-          `IPTorrents custom config missing: ${IPTORRENTS_CUSTOM_PATH} (cf_clearance override will use default provider config)`,
-        );
+        unilog(186, `IPTorrents custom config missing: ${IPTORRENTS_CUSTOM_PATH} (cf_clearance override will use default provider config)`);
       }
       TorrentSearchApi.enableProvider("IpTorrents", filtered);
       patchProviderWithSshTunnel(TorrentSearchApi.getProvider("IpTorrents"));
-      console.log("Using provided IPTorrents cf_clearance");
+      unilog(187, "Using provided IPTorrents cf_clearance");
     } catch (e) {
-      console.error(
-        "Failed to apply IPTorrents cf_clearance override:",
-        e.message,
-      );
+      unilog(188, "Failed to apply IPTorrents cf_clearance override:", e.message);
     }
   }
 
@@ -640,7 +626,7 @@ export async function searchTorrents({
     filtered.push(`cf_clearance=${tlCf}`);
     TorrentSearchApi.enableProvider("TorrentLeech", filtered);
     patchProviderWithSshTunnel(TorrentSearchApi.getProvider("TorrentLeech"));
-    console.log("Using provided TorrentLeech cf_clearance");
+    unilog(189, "Using provided TorrentLeech cf_clearance");
   }
 
   // Provider search:
@@ -692,7 +678,7 @@ export async function searchTorrents({
           PROVIDER_TIMEOUT_MS,
           "IpTorrents",
         ).catch((e) => {
-          console.warn(`[search/movie] IpTorrents: ${e.message}`);
+          unilog(190, `IpTorrents: ${e.message}`);
           return [];
         }),
         withTimeout(
@@ -700,7 +686,7 @@ export async function searchTorrents({
           PROVIDER_TIMEOUT_MS,
           "TorrentLeech",
         ).catch((e) => {
-          console.warn(`[search/movie] TorrentLeech: ${e.message}`);
+          unilog(191, `TorrentLeech: ${e.message}`);
           return [];
         }),
         searchTpbDirectMovie(q, limit),
@@ -709,7 +695,7 @@ export async function searchTorrents({
           PROVIDER_TIMEOUT_MS,
           "Limetorrents",
         ).catch((e) => {
-          console.warn(`[search/movie] Limetorrents: ${e.message}`);
+          unilog(192, `Limetorrents: ${e.message}`);
           return [];
         }),
       ]),
@@ -724,7 +710,7 @@ export async function searchTorrents({
           PROVIDER_TIMEOUT_MS,
           "IpTorrents",
         ).catch((e) => {
-          console.warn(`[search] IpTorrents: ${e.message}`);
+          unilog(193, `IpTorrents: ${e.message}`);
           return [];
         }),
         withTimeout(
@@ -732,7 +718,7 @@ export async function searchTorrents({
           PROVIDER_TIMEOUT_MS,
           "TorrentLeech",
         ).catch((e) => {
-          console.warn(`[search] TorrentLeech: ${e.message}`);
+          unilog(194, `TorrentLeech: ${e.message}`);
           return [];
         }),
       ]),
@@ -759,7 +745,7 @@ export async function searchTorrents({
               PROVIDER_TIMEOUT_MS,
               "Limetorrents",
             ).catch((e) => {
-              console.warn(`[searchTpbLimEzt] Limetorrents: ${e.message}`);
+              unilog(195, `Limetorrents: ${e.message}`);
               return [];
             }),
             withTimeout(
@@ -767,7 +753,7 @@ export async function searchTorrents({
               PROVIDER_TIMEOUT_MS,
               "Eztv",
             ).catch((e) => {
-              console.warn(`[searchTpbLimEzt] Eztv: ${e.message}`);
+              unilog(196, `Eztv: ${e.message}`);
               return [];
             }),
           ]),
@@ -868,13 +854,11 @@ export async function searchTorrents({
 
   // Normalize and filter torrents
   if (debugSearch) {
-    console.log(
-      `[DEBUG_SEARCH] pre-filter raw titles (${torrents.length} total):`,
-    );
+    unilog(197, `pre-filter raw titles (${torrents.length} total):`);
     torrents.forEach((t, i) => {
       const title = t?.title || t?.raw?.title || "(no title)";
       const provider = t?.provider || "?";
-      console.log(`[DEBUG_SEARCH]  [${i + 1}] [${provider}] ${title}`);
+      unilog(198, `[${i + 1}] [${provider}] ${title}`);
     });
   }
   const normalized = torrents.map((t) => normalize(t, showName));
@@ -1633,7 +1617,7 @@ export async function getTorrentFile(showName) {
       PROVIDER_TIMEOUT_MS,
       "Limetorrents",
     ).catch((e) => {
-      console.warn(`[getTorrentFile] Limetorrents: ${e.message}`);
+      unilog(199, `Limetorrents: ${e.message}`);
       return [];
     }),
     withTimeout(
@@ -1641,7 +1625,7 @@ export async function getTorrentFile(showName) {
       PROVIDER_TIMEOUT_MS,
       "Eztv",
     ).catch((e) => {
-      console.warn(`[getTorrentFile] Eztv: ${e.message}`);
+      unilog(200, `Eztv: ${e.message}`);
       return [];
     }),
   ]);

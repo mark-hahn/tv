@@ -3,7 +3,7 @@ import path from "node:path";
 import { franc } from "franc-min";
 import { getApiDataDir } from "./tvPaths.js";
 import { getCandidateShows, markShowBrowsed } from "./tvmaze.js";
-import { smartTitleMatch } from "@tv/share";
+import { smartTitleMatch, unilog} from "@tv/share"
 
 // --- Constants & Config ---
 
@@ -147,7 +147,7 @@ function atomicWriteTextFile(outPath, content) {
     try {
       fs.unlinkSync(tmpPath);
     } catch {}
-    console.error(`Error saving ${outPath}:`, err);
+    unilog(132, `Error saving ${outPath}:`, err);
   }
 }
 
@@ -167,7 +167,7 @@ function loadResultTitles() {
           .filter((t) => !t.startsWith("Reality|") && !t.startsWith("reality|"))
       : [];
   } catch (err) {
-    console.error("Error loading browse-cards.json:", err);
+    unilog(133, "Error loading browse-cards.json:", err);
     return [];
   }
 }

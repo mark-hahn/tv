@@ -5,6 +5,7 @@
 import { fork } from "child_process";
 import { fileURLToPath } from "url";
 import path from "path";
+import { unilog } from "@tv/share";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -30,7 +31,7 @@ export async function searchTorrentsInChild(params) {
 
     const timer = setTimeout(() => {
       settle(() => {
-        console.error("searchTorrentsInChild: worker timed out — killing");
+        unilog(201, "searchTorrentsInChild: worker timed out — killing");
         child.kill("SIGKILL");
         reject(new Error("search timed out after 3 minutes"));
       });
@@ -48,9 +49,7 @@ export async function searchTorrentsInChild(params) {
 
     child.on("exit", (code, signal) => {
       settle(() => {
-        console.error(
-          `searchTorrentsInChild: worker exited unexpectedly (code=${code}, signal=${signal})`,
-        );
+        unilog(202, `searchTorrentsInChild: worker exited unexpectedly (code=${code}, signal=${signal})`);
         reject(
           new Error(
             `search worker crashed (code=${code ?? "null"}, signal=${signal ?? "none"})`,

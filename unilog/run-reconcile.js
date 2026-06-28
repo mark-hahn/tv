@@ -91,6 +91,42 @@ const PROJECT_FILES = {
       "apps/client/src/evtBus.js",
     ],
   },
+  api: {
+    include: [
+      "apps/api/src/browse.js",
+      "apps/api/src/download.js",
+      "apps/api/src/imdb-credits.js",
+      "apps/api/src/local.js",
+      "apps/api/src/normalize.js",
+      "apps/api/src/reviews.js",
+      "apps/api/src/search-worker.js",
+      "apps/api/src/search.js",
+      "apps/api/src/searchInChild.js",
+      "apps/api/src/server.js",
+      "apps/api/src/sshTunnel.js",
+      "apps/api/src/tv-proc.js",
+      "apps/api/src/tvmaze.js",
+      "apps/api/src/usb.js",
+    ],
+    exclude: ["apps/api/src/tvPaths.js"],
+  },
+  down: {
+    include: [
+      "apps/down/src/main.js",
+      "apps/down/src/movie-rsync.js",
+      "apps/down/src/tvJson.js",
+      "apps/down/src/worker.js",
+    ],
+    exclude: [],
+  },
+  asr: {
+    include: ["apps/asr/asr.js"],
+    exclude: [],
+  },
+  tv: {
+    include: ["apps/tv/src/main.js", "apps/tv/bravia.js", "apps/tv/bravia2.js"],
+    exclude: ["apps/tv/usb-cp-tampermonkey.user.js"],
+  },
 };
 
 const project = process.argv[2];
@@ -294,8 +330,9 @@ function injectUnilogImport(text, file) {
     ? `import { unilog } from "${clientLogImport(file)}";`
     : 'import { unilog } from "@tv/share";';
 
-  // Case 1: named import from @tv/share — add unilog to it.
-  const lastShareIdx = lastIndexOf(lines, (l) => /@tv\/share/.test(l));
+  // Case 1: named import from @tv/share — add unilog to it. Only match real
+  // import statements (not comments/strings that mention the package).
+  const lastShareIdx = lastIndexOf(lines, (l) => /^\s*import\b.*@tv\/share/.test(l));
   if (lastShareIdx >= 0 && !isClient) {
     const existing = lines[lastShareIdx];
     const namedMatch = /^(import\s*\{)([^}]+)(\}\s*from\s*"@tv\/share")/.exec(
@@ -310,10 +347,10 @@ function injectUnilogImport(text, file) {
     return lines.join("\n");
   }
 
-  // Case 2: insert after last import STATEMENT end (handles multi-line imports).
+  // Case 2: insert after last import STATEMENT (line must start with import).
   const lastImportIdx = lastIndexOf(
     lines,
-    (l) => /\bfrom\s+["']/.test(l) || /^import\s+["']/.test(l),
+    (l) => /^\s*import\b/.test(l) && /from\s+["']/.test(l),
   );
   const insertAt = lastImportIdx >= 0 ? lastImportIdx + 1 : 0;
   lines.splice(insertAt, 0, importLine);

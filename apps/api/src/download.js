@@ -12,6 +12,7 @@ import {
   getApiSecretsDir,
   preferSharedReadPath,
 } from "./tvPaths.js";
+import { unilog } from "@tv/share";
 
 const LOG_APPS_API_DATA_MISC_TEMP_TXT = false;
 
@@ -330,10 +331,10 @@ function validateTorrentData(torrentData) {
         try {
           fs.writeFileSync("/root/dev/apps/tv/temp.torrent", torrentData);
         } catch (e) {
-          console.error("Failed to dump torrent", e);
+          unilog(134, "Failed to dump torrent", e);
         }
       } catch (err) {
-        console.error("Failed to write debug info to temp.txt", err);
+        unilog(135, "Failed to write debug info to temp.txt", err);
       }
 
       return fail(
@@ -732,7 +733,7 @@ export async function fetchTorrentFile(torrent) {
   // back to scraping the per-torrent detail page (raw.desc).
   if (provider === "limetorrents") {
     const directLink = String(torrent?.raw?.link || "").trim();
-    console.log("[lim] directLink:", directLink);
+    unilog(136, "directLink:", directLink);
     if (
       directLink &&
       (directLink.startsWith("http://") || directLink.startsWith("https://"))
@@ -746,16 +747,11 @@ export async function fetchTorrentFile(torrent) {
           Referer: `${dlOrigin}/`,
         };
         const dlResp = await sshFetch(directLink, { headers: torHeaders });
-        console.log("[lim] directLink fetch ok:", dlResp.ok);
+        unilog(137, "directLink fetch ok:", dlResp.ok);
         if (dlResp.ok) {
           const torrentData = Buffer.from(await dlResp.arrayBuffer());
           const valid = validateTorrentData(torrentData);
-          console.log(
-            "[lim] directLink valid:",
-            valid.success,
-            "bytes:",
-            torrentData.length,
-          );
+          unilog(138, "directLink valid:", valid.success, "bytes:", torrentData.length);
           if (valid.success) {
             appendTorrentBytesLog({
               provider,
@@ -773,14 +769,14 @@ export async function fetchTorrentFile(torrent) {
           }
         }
       } catch (e) {
-        console.log("[lim] directLink exception:", e?.message);
+        unilog(139, "directLink exception:", e?.message);
         // fall through to detail page
       }
     }
 
     // Fall back to scraping the per-torrent detail page
     const pageUrl = String(torrent?.raw?.desc || "").trim();
-    console.log("[lim] pageUrl:", pageUrl);
+    unilog(140, "pageUrl:", pageUrl);
     if (!pageUrl) {
       return fail(
         "validate",
@@ -795,7 +791,7 @@ export async function fetchTorrentFile(torrent) {
       Referer: `${new URL(pageUrl).origin}/`,
     };
     const pageResp = await sshFetch(pageUrl, { headers: pageHeaders });
-    console.log("[lim] pageResp ok:", pageResp.ok);
+    unilog(141, "pageResp ok:", pageResp.ok);
     if (!pageResp.ok) {
       return fail("fetch-detail", "Failed to fetch limetorrents detail page", {
         provider,

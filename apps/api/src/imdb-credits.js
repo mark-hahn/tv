@@ -4,6 +4,7 @@
  */
 
 import { chromium } from "playwright";
+import { unilog } from "@tv/share";
 
 // Words to filter out from roles (case-insensitive)
 const FILTER_WORDS = [
@@ -170,10 +171,10 @@ async function getActorCredits(actorName, options = {}) {
   const { headless = true, verbose = false } = options;
 
   const log = (...args) => {
-    if (verbose) console.log(...args);
+    if (verbose) unilog(142, ...args);
   };
 
-  log(`Scraping IMDb credits for: ${actorName}`);
+  unilog(143, `Scraping IMDb credits for: ${actorName}`);
 
   let browser;
   try {
@@ -183,7 +184,7 @@ async function getActorCredits(actorName, options = {}) {
 
     try {
       // Navigate to IMDb
-      log("Navigating to IMDb...");
+      unilog(144, "Navigating to IMDb...");
       await page.goto("https://www.imdb.com", {
         waitUntil: "domcontentloaded",
         timeout: 30000,
@@ -191,7 +192,7 @@ async function getActorCredits(actorName, options = {}) {
       await page.waitForTimeout(2000);
 
       // Search for actor
-      log("Searching for actor...");
+      unilog(145, "Searching for actor...");
       try {
         const searchInput = await page.locator("#suggestion-search");
         await searchInput.waitFor({ state: "visible", timeout: 30000 });
@@ -205,7 +206,7 @@ async function getActorCredits(actorName, options = {}) {
       await page.waitForTimeout(1000);
 
       // Find best matching actor
-      log("Finding best actor match...");
+      unilog(146, "Finding best actor match...");
       await page.waitForTimeout(500);
 
       let actorLinks = await page
@@ -224,7 +225,7 @@ async function getActorCredits(actorName, options = {}) {
       for (const link of actorLinks) {
         const linkText = await link.textContent();
         if (linkText && linkText.trim() && matchActor(linkText, actorName)) {
-          log(`✓ Found match: ${linkText.trim()}`);
+          unilog(147, `✓ Found match: ${linkText.trim()}`);
           bestMatchLink = link;
           break;
         }
@@ -252,7 +253,7 @@ async function getActorCredits(actorName, options = {}) {
       }
 
       // Click on actor name
-      log("Clicking on actor...");
+      unilog(148, "Clicking on actor...");
       try {
         await bestMatchLink.click();
         await page.waitForLoadState("domcontentloaded");
@@ -265,7 +266,7 @@ async function getActorCredits(actorName, options = {}) {
       const actorPageUrl = page.url();
 
       // Find Actor filmography filter button
-      log("Looking for Actor filmography filter...");
+      unilog(149, "Looking for Actor filmography filter...");
       const filterButtons = await page
         .locator('button[id*="imdb.concept.name_credit_category"]')
         .all();
@@ -286,7 +287,7 @@ async function getActorCredits(actorName, options = {}) {
               (buttonClass.includes("selected") ||
                 buttonClass.includes("active"))
             ) {
-              log("✓ Actor filter is already active");
+              unilog(150, "✓ Actor filter is already active");
               actorButton = button;
               break;
             }
@@ -311,16 +312,16 @@ async function getActorCredits(actorName, options = {}) {
             await page.waitForTimeout(1000);
           }
         } else {
-          log("No Actor/Actress filter found, will scrape all visible credits");
+          unilog(151, "No Actor/Actress filter found, will scrape all visible credits");
           await page.waitForTimeout(1000);
         }
       } else {
-        log("No filter buttons found, will scrape all visible credits");
+        unilog(152, "No filter buttons found, will scrape all visible credits");
         await page.waitForTimeout(1000);
       }
 
       // Click "See all" button to expand full filmography
-      log("Looking for 'See all' button...");
+      unilog(153, "Looking for 'See all' button...");
       try {
         const seeAllButton = await page
           .locator('button:has-text("See all")')
@@ -328,18 +329,18 @@ async function getActorCredits(actorName, options = {}) {
         const isVisible = await seeAllButton.isVisible({ timeout: 3000 });
 
         if (isVisible) {
-          log("✓ Clicking 'See all' button");
+          unilog(154, "✓ Clicking 'See all' button");
           await seeAllButton.scrollIntoViewIfNeeded();
           await page.waitForTimeout(300);
           await seeAllButton.click();
           await page.waitForTimeout(2000);
         }
       } catch (e) {
-        log("  'See all' button not found");
+        unilog(155, "  'See all' button not found");
       }
 
       // Scroll to load all content
-      log("Scrolling to load all content...");
+      unilog(156, "Scrolling to load all content...");
       let previousCardCount = 0;
       let unchangedCount = 0;
 
@@ -356,7 +357,7 @@ async function getActorCredits(actorName, options = {}) {
         if (currentCardCount === previousCardCount) {
           unchangedCount++;
           if (unchangedCount >= 3) {
-            log(`✓ Loaded ${currentCardCount} cards`);
+            unilog(157, `✓ Loaded ${currentCardCount} cards`);
             break;
           }
         } else {
@@ -366,7 +367,7 @@ async function getActorCredits(actorName, options = {}) {
       }
 
       // Extract cards
-      log("Extracting and parsing cards...");
+      unilog(158, "Extracting and parsing cards...");
       const allCards = await page
         .locator(".ipc-metadata-list-summary-item")
         .all();
@@ -387,26 +388,26 @@ async function getActorCredits(actorName, options = {}) {
         }
       }
 
-      log(`✓ Parsed ${cards.length} cards`);
+      unilog(159, `✓ Parsed ${cards.length} cards`);
 
       // Filter out non-acting roles
       const actingCredits = cards.filter((card) => {
         if (!card.role || !shouldFilterOut(card.role)) {
           return true;
         }
-        log(`  Filtering out: ${card.title} (${card.role})`);
+        unilog(160, `  Filtering out: ${card.title} (${card.role})`);
         return false;
       });
 
-      log(`✓ Final count: ${actingCredits.length} acting credits`);
+      unilog(161, `✓ Final count: ${actingCredits.length} acting credits`);
 
       return { credits: actingCredits, actorPageUrl };
     } catch (error) {
-      console.error("Error scraping IMDb:", error.message);
+      unilog(162, "Error scraping IMDb:", error.message);
       throw error;
     }
   } catch (error) {
-    console.error("Error scraping IMDb:", error.message);
+    unilog(163, "Error scraping IMDb:", error.message);
     throw error;
   } finally {
     if (browser) {
@@ -421,12 +422,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
   getActorCredits(actorName, { headless: false, verbose: true })
     .then((credits) => {
-      console.log("\n=== RESULTS ===");
-      console.log(JSON.stringify(credits, null, 2));
+      unilog(164, "\n=== RESULTS ===");
+      unilog(165, JSON.stringify(credits, null, 2));
       process.exit(0);
     })
     .catch((error) => {
-      console.error("Failed:", error);
+      unilog(166, "Failed:", error);
       process.exit(1);
     });
 }

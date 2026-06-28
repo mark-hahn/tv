@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright";
 import { franc } from "franc-min";
+import { unilog } from "@tv/share";
 
 // Singleton browser (contexts/pages are per-request to avoid concurrent navigation issues).
 let browser = null;
@@ -312,7 +313,7 @@ export async function getReviews(rottenUrl, buttonName) {
       }
     }
   } catch (e) {
-    console.error("[reviews] Processing error:", e);
+    unilog(168, "Processing error:", e);
     // If we hit a hard Playwright/browser failure, reset so next request relaunches cleanly.
     try {
       if (browser) await browser.close();

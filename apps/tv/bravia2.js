@@ -1,4 +1,5 @@
 import { WebSocket } from "ws";
+import { unilog } from "@tv/share";
 
 const HA_URL = "wss://hahnca.com:8123/api/websocket";
 const HA_TOKEN =
@@ -31,7 +32,7 @@ ws.on("message", (data) => {
   }
 
   if (msg.type === "auth_invalid") {
-    console.error("auth_invalid");
+    unilog(460, "auth_invalid");
     process.exit(1);
   }
 
@@ -43,7 +44,7 @@ ws.on("message", (data) => {
         event_type: "state_changed",
       }),
     );
-    console.log(`[${ts()}] subscribed — waiting for ${ENTITY_ID} changes...`);
+    unilog(461, `subscribed — waiting for ${ENTITY_ID} changes...`);
     return;
   }
 
@@ -59,11 +60,11 @@ ws.on("message", (data) => {
       `media_content_type: ${attrs.media_content_type ?? "null"}`,
       `is_volume_muted: ${attrs.is_volume_muted ?? "null"}`,
     ];
-    console.log(`[${ts()}] ${parts.join("  |  ")}`);
+    unilog(462, `${parts.join("  |  ")}`);
   }
 });
 
 ws.on("error", (err) => {
-  console.error("error:", err.message);
+  unilog(463, "error:", err.message);
   process.exit(1);
 });

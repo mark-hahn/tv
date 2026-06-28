@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { rename, readdir } from "node:fs/promises";
 import parseTorrentTitleLib from "parse-torrent-title";
+import { unilog } from "@tv/share";
 
 const execFileAsync = promisify(execFile);
 
@@ -88,7 +89,7 @@ export async function getLocalFiles(root = TV_ROOT) {
 
     return tree;
   } catch (e) {
-    console.error("getLocalFiles failed", e);
+    unilog(167, "getLocalFiles failed", e);
     throw new Error(`Failed to list local files: ${e.message}`);
   }
 }

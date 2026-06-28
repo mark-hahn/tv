@@ -307,6 +307,7 @@ import * as tvdb from "../tvdb.js";
 import * as srvr from "../srvr.js";
 import * as util from "../util.js";
 import * as epd from "@tv/share";
+import { unilog } from "../log.js";
 
 let _vipSet = new Set();
 srvr
@@ -885,11 +886,11 @@ export default {
 
     async loadAllShowsWithDialog() {
       if (this.hasLoadedAllShows) {
-        console.log("All shows already loaded, skipping");
+        unilog(151, "All shows already loaded, skipping"); // log-id: 151
         return;
       }
 
-      console.log("Loading all shows...");
+      unilog(152, "Loading all shows..."); // log-id: 152
 
       this.hasLoadedAllShows = true;
 
@@ -907,7 +908,7 @@ export default {
       );
       allShows.push(...newShows);
 
-      console.log(`Added ${newShows.length} shows (total: ${allShows.length})`);
+      unilog(153, `Added ${newShows.length} shows (total: ${allShows.length})`); // log-id: 153
     },
 
     updateWideLandscape() {
@@ -1060,7 +1061,7 @@ export default {
     async debugClick() {
       try {
         if (!this.highlightName) {
-          console.log("No show selected");
+          unilog(154, "No show selected"); // log-id: 154
           return;
         }
 
@@ -2115,7 +2116,7 @@ export default {
 
     async saveVisShow(show, scroll = false, opts = null) {
       if (!show) {
-        console.error("saveVisShow show param null");
+        unilog(155, "saveVisShow show param null"); // log-id: 155
         return;
       }
       const options = opts && typeof opts === "object" ? opts : {};
@@ -2271,7 +2272,7 @@ export default {
       let show = null;
       const name = window.localStorage.getItem("lastVisShow");
       if (!name) {
-        console.log("scrollToSavedShow: lastVisShow missing, ignoring");
+        unilog(156, "scrollToSavedShow: lastVisShow missing, ignoring"); // log-id: 156
         show = allShows[0];
       } else {
         show = allShows.find((shw) => shw.name == name);
@@ -3091,7 +3092,7 @@ export default {
       try {
         const showNames = this.shows.map((show) => show.name);
         await srvr.dumpSelectedShows(showNames);
-        console.log(`Dumped ${showNames.length} shows to selected-shows.txt`);
+        unilog(157, `Dumped ${showNames.length} shows to selected-shows.txt`); // log-id: 157
       } catch (error) {
         console.error("Failed to dump shows:", error);
       }
@@ -3324,7 +3325,7 @@ export default {
       }
 
       if (!allShows) {
-        console.error("No shows from loadAllShows");
+        unilog(158, "No shows from loadAllShows"); // log-id: 158
         return;
       }
       this.shows = [...allShows];
@@ -3623,7 +3624,7 @@ export default {
     on("tvdbUpdated", async (data) => {
       const { name, record } = data || {};
       if (!name || !record) {
-        console.warn("[tvdbUpdated] Missing name or record in push data");
+        unilog(159, "Missing name or record in push data"); // log-id: 159
         return;
       }
       if (!allTvdb || !allShows) return; // loadAllShows not yet complete, ignore early push
@@ -3699,7 +3700,7 @@ export default {
     on("showDiskChanged", (data) => {
       const { showName } = data || {};
       if (!showName) return;
-      console.log(`[showDiskChanged] Disk changed for: ${showName}`);
+      unilog(160, `Disk changed for: ${showName}`); // log-id: 160
       // Progress and reload driven by libraryProgress/libraryRefreshDone WS events via App.vue
     });
 

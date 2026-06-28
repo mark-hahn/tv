@@ -1251,6 +1251,7 @@ import {
 import evtBus from "../evtBus.js";
 import * as util from "../util.js";
 import parseTorrentTitle from "parse-torrent-title";
+import { unilog } from "../log.js";
 
 // --- smartTitleMatch Helpers (copied from packages/share) ---
 
@@ -1687,7 +1688,7 @@ export default {
       }
 
       if (!this.allShows || !this.allShows.length) {
-        console.warn("No shows loaded.");
+        unilog(161, "No shows loaded."); // log-id: 161
         return;
       }
 
@@ -1786,7 +1787,7 @@ export default {
       const showName = this.show ? this.show.name : null;
       if (!showName) {
         // Fallback or ignore if no show selected
-        console.log("No current show selected.");
+        unilog(162, "No current show selected."); // log-id: 162
         return;
       }
 
@@ -1799,13 +1800,13 @@ export default {
       }
 
       if (!folderName) {
-        console.log(`Folder "${showName}" not found in tree.`);
+        unilog(163, `Folder "${showName}" not found in tree.`); // log-id: 163
         return;
       }
 
       const nodeIndex = this.tree.findIndex((n) => n.name === folderName);
       if (nodeIndex === -1) {
-        console.log(`Folder "${folderName}" not found in tree.`);
+        unilog(164, `Folder "${folderName}" not found in tree.`); // log-id: 164
         return;
       }
       const node = this.tree[nodeIndex];

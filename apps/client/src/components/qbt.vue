@@ -352,6 +352,7 @@ import evtBus from "../evtBus.js";
 import { config } from "../config.js";
 import * as srvr from "../srvr.js";
 import * as util from "../util.js";
+import { unilog } from "../log.js";
 
 export default {
   name: "History",
@@ -1187,7 +1188,7 @@ export default {
     forceFile(title) {
       console.log("history: forceFile button clicked, title:", title);
       if (!title) return;
-      console.log("history: emitting forceFile event");
+      unilog(166, "history: emitting forceFile event"); // log-id: 166
       evtBus.emit("forceFile", title);
     },
 

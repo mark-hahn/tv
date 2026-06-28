@@ -530,6 +530,7 @@ import {
   parseFileSeasonEpisode,
   parseTitleFromFilename,
 } from "../util.js";
+import { unilog } from "../log.js";
 
 export default {
   name: "Usb",
@@ -934,10 +935,10 @@ export default {
             if (comp && comp.$el) {
               comp.$el.scrollIntoView({ behavior: "smooth", block: "center" });
             } else {
-              console.warn("usb: could not find component ref for match");
+              unilog(167, "usb: could not find component ref for match"); // log-id: 167
             }
           } else {
-            console.warn("usb: refs.treeNodes is missing");
+            unilog(168, "usb: refs.treeNodes is missing"); // log-id: 168
           }
         });
       }

@@ -10,6 +10,7 @@
 
 <script>
 import evtBus from "../evtBus.js";
+import { unilog } from "../log.js";
 
 const images = ["/poster.jpg", "/landscape.jpg", "/clearlogo.png"];
 
@@ -38,7 +39,7 @@ export default {
       img.onerror = () => {
         console.log("Meta: no img:", images[imgIdx]);
         if (++imgIdx == images.length) {
-          console.log("Meta: no image found");
+          unilog(165, "Meta: no image found"); // log-id: 165
           return;
         }
         tryImg();

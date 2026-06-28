@@ -641,6 +641,7 @@ import * as emby from "../emby.js";
 import * as tvdb from "../tvdb.js";
 import * as util from "../util.js";
 import * as srvr from "../srvr.js";
+import { unilog } from "../log.js";
 
 const DEBUG_ACTORS_MERGE_LOG = false;
 
@@ -926,19 +927,19 @@ export default {
 
       // Prevent duplicate requests
       if (this.creditsLoading) {
-        console.log("[ACTORS] Already loading, returning");
+        unilog(145, "Already loading, returning"); // log-id: 145
         return;
       }
 
       // Check cache first
       if (this.creditsCache[name]) {
-        console.log("[ACTORS] Using cached credits");
+        unilog(146, "Using cached credits"); // log-id: 146
         this.showingCredits = true;
         this.credits = this.creditsCache[name].credits || [];
         this.actorPageUrl = this.creditsCache[name].actorPageUrl || null;
         return;
       }
-      console.log("[ACTORS] No cache, fetching from server");
+      unilog(147, "No cache, fetching from server"); // log-id: 147
 
       this.showingCredits = true;
       this.creditsLoading = true;
@@ -947,9 +948,9 @@ export default {
       this.actorPageUrl = null;
 
       try {
-        console.log("[ACTORS] Calling srvr.getActorCredits...");
+        unilog(148, "Calling srvr.getActorCredits..."); // log-id: 148
         const result = await srvr.getActorCredits(name);
-        console.log("[ACTORS] Received result from srvr.getActorCredits");
+        unilog(149, "Received result from srvr.getActorCredits"); // log-id: 149
         this.credits = result?.credits || [];
         this.actorPageUrl = result?.actorPageUrl || null;
         this.creditsLoading = false;

@@ -541,6 +541,7 @@ import evtBus from "../evtBus.js";
 import { config } from "../config.js";
 import * as util from "../util.js";
 import { parseTitleFromFilename } from "../util.js";
+import { unilog } from "../log.js";
 
 export default {
   name: "TvProc",
@@ -1380,7 +1381,7 @@ export default {
       // and scroll to it.
 
       if (!this.show) {
-        console.warn("showFirstDownloading: No show selected context");
+        unilog(150, "showFirstDownloading: No show selected context"); // log-id: 150
         return;
       }
 

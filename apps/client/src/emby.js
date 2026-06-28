@@ -5,6 +5,7 @@ import * as urls from "./urls.js";
 import * as util from "./util.js";
 import evtBus from "./evtBus.js";
 import { episodeDataToWatchedEpis } from "@tv/share";
+import { unilog } from "./log.js";
 
 const name = "mark";
 const pwd = "90-MNBbnmyui";
@@ -420,7 +421,7 @@ async function _oldLoadAllShows() {
     const tvdbId = embyShow?.ProviderIds?.Tvdb || embyShow?.TvdbId;
 
     if (!tvdbId || tvdbId == "0") {
-      console.warn(`loadAllShows: no tvdbId for ${name}, skipping`);
+      unilog(132, `loadAllShows: no tvdbId for ${name}, skipping`); // log-id: 132
       continue;
     }
 
@@ -733,7 +734,7 @@ async function _oldLoadAllShows() {
         const recTvdbId = String(tvdbRecord?.tvdbId || "").trim();
         return !!(sTvdbId && recTvdbId && sTvdbId === recTvdbId);
       });
-      console.log(`loadAllShows: updating tvdb id for ${name}`);
+      unilog(133, `loadAllShows: updating tvdb id for ${name}`); // log-id: 133
       const updatedRecord = await srvr.setTvdbFields({
         name,
         id: embyShow.Id,
@@ -827,7 +828,7 @@ async function _oldLoadAllShows() {
     // Log details of duplicates - find their keys in allTvdb
     for (const dupName of duplicateNames) {
       const dupes = showRecords.filter((s) => s.name === dupName);
-      console.error(`  "${dupName}" appears ${dupes.length} times:`);
+      unilog(134, `  "${dupName}" appears ${dupes.length} times:`); // log-id: 134
       dupes.forEach((d, i) => {
         console.error(
           `    [${i}] id="${d.id}" inEmby=${d.inEmby} tvdbId=${d.tvdbId}`,
@@ -835,7 +836,7 @@ async function _oldLoadAllShows() {
       });
 
       // Find which keys in allTvdb have this name
-      console.error(`  Keys in allTvdb with name="${dupName}":`);
+      unilog(135, `  Keys in allTvdb with name="${dupName}":`); // log-id: 135
       for (const [key, value] of Object.entries(allTvdb)) {
         if (!isTvdbShowRecord(value)) continue;
         if (value.name === dupName) {
@@ -1023,7 +1024,7 @@ export const getEpisodeCounts = async (show) => {
       e.message || e,
     );
     if (e.config?.url) {
-      console.error(`  Failed URL: ${e.config.url}`);
+      unilog(136, `  Failed URL: ${e.config.url}`); // log-id: 136
     }
     return { seasonCount: 0, episodeCount: 0, watchedCount: 0 };
   }
@@ -1037,7 +1038,7 @@ export const getSeriesMap = async (show, prune = false) => {
   if (show.inEmby === false) {
     const tvdbId = show.tvdbId;
     if (!tvdbId) {
-      console.warn("getSeriesMap: Preview show has no tvdbId");
+      unilog(137, "getSeriesMap: Preview show has no tvdbId"); // log-id: 137
       return [];
     }
     try {
@@ -1174,12 +1175,12 @@ export const getSeriesMap = async (show, prune = false) => {
   }
 
   if (pathsToDeleteBatch.length > 0) {
-    console.log(`[prune] batch deleting ${pathsToDeleteBatch.length} files`);
+    unilog(138, `batch deleting ${pathsToDeleteBatch.length} files`); // log-id: 138
     try {
       await srvr.deletePaths(pathsToDeleteBatch);
-      console.log(`[prune] batch delete ok`);
+      unilog(139, `batch delete ok`); // log-id: 139
     } catch (e) {
-      console.error(`[prune] batch delete FAILED: ${e?.message ?? e}`);
+      unilog(140, `batch delete FAILED: ${e?.message ?? e}`); // log-id: 140
     }
   }
 
@@ -1438,10 +1439,10 @@ export const startStop = async (show, episodeId, watchButtonTxt) => {
       if (buttonDeviceName != deviceName) continue;
       const { url, body } = urls.stopUrl(sessionId);
       await axios({ method: "post", url, data: body });
-      console.log(`stopped1 ${deviceName}`);
+      unilog(141, `stopped1 ${deviceName}`); // log-id: 141
       setTimeout(async () => {
         await axios({ method: "post", url, data: body });
-        console.log(`stopped2 ${deviceName}`);
+        unilog(142, `stopped2 ${deviceName}`); // log-id: 142
       }, 1000);
       return;
     } else {
@@ -1449,10 +1450,10 @@ export const startStop = async (show, episodeId, watchButtonTxt) => {
       if (buttonDeviceName != deviceName) continue;
       const { url, body } = urls.playUrl(sessionId, episodeId);
       await axios({ method: "post", url, data: body });
-      console.log(`playing1 ${show.name} on  ${deviceName}`);
+      unilog(143, `playing1 ${show.name} on  ${deviceName}`); // log-id: 143
       setTimeout(async () => {
         await axios({ method: "post", url, data: body });
-        console.log(`playing2 ${show.name} on  ${deviceName}`);
+        unilog(144, `playing2 ${show.name} on  ${deviceName}`); // log-id: 144
       }, 1000);
 
       // Auto-trim: jump to absolute trimPos when playback starts

@@ -2623,11 +2623,6 @@ app.get("/api/torrent-file", async (req, res) => {
         const infoHash = hashMatch[1].toUpperCase();
         const dn = encodeURIComponent(showName);
         const magnet = `magnet:?xt=urn:btih:${infoHash}&dn=${dn}`;
-        console.log(
-          "[torrent-file] using magnet from link hash for:",
-          showName,
-          infoHash,
-        );
         const magRes = await addQbtMagnet({ magnetUrl: magnet, savePath });
         if (!magRes.ok) {
           postHistory({

@@ -39,6 +39,7 @@ import {
 import * as history from "./src/history.js";
 import * as groupCounts from "./src/groupCounts.js";
 import * as urls from "./src/urls.js";
+import * as unilogDb from "./src/unilogDb.js";
 
 const tvdbIdByName = (name) => {
   if (!name) return null;
@@ -1044,9 +1045,6 @@ function startBifCreate(bifNeededObj) {
   } catch (e) {
     console.error("[bif] lock write error:", e.message);
   }
-  console.log(
-    `[bif] start ${bifNeededObj.showName} pid=${child.pid} ${bifNeededObj.bifPath}`,
-  );
   // GLOBAL-MSG: Bif
   setGlobalMessage({
     id: "Bif",
@@ -1499,7 +1497,6 @@ async function generateEmbSrts(
             const sanitized = sanitizeSrt(stdout);
             if (sanitized !== null) {
               fs.writeFileSync(outPath, sanitized, "utf8");
-              logSubtitle(`emb: ${outPath}`);
               if (fromUI) notifyClients("emb-log", `extracted ${outPath}`);
             } else {
               const fname = path.basename(outPath);
@@ -1597,7 +1594,6 @@ async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
       const txt = await resp.text();
       await fs.promises.writeFile(outPath, stripSrtFormatting(txt), "utf8");
       dlCount++;
-      logSubtitle(`opensubs: ${outPath}`);
       // TEMP: log api filename for release matching
     } catch (e) {
       logSubtitle(`opensubs dl err ${fid}: ${e.message}`);
@@ -2797,17 +2793,6 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
           `needsIntro:${tvdbRecord.needsIntro}->${newNeedsIntro}`,
         );
         tvdbRecord.needsIntro = newNeedsIntro;
-      } else if (newNeedsIntro || tvdbRecord.needsIntro === undefined) {
-        // Log when needsIntro should be true but isn't changing, or when it
-        // stays undefined/false silently — helps diagnose stale-state bugs
-        console.log(
-          `[needsIntro dbg] ${showName}: stored=${tvdbRecord.needsIntro} computed=${newNeedsIntro}` +
-            ` inEmby=${tvdbRecord.inEmby} inLinda=${tvdbRecord.inLinda}` +
-            ` introDur=${tvdbRecord.introDur} epCnt=${tvdbRecord.episodeCount}` +
-            ` seasonIntros=${JSON.stringify(tvdbRecord.seasonIntros)}` +
-            ` watchCnt=${tvdbRecord.watchedCount}` +
-            ` seasonsWithFile=${JSON.stringify(epd.seasonsWithFile(tvdbRecord.episodeData))}`,
-        );
       }
     } else if (!tvdbRecord.inEmby) {
       // For shows not in emby, set error fields to known constants
@@ -3957,8 +3942,6 @@ const deleteOnePath = async (pathParam) => {
       ? pathParam
       : path.join(tvDir, pathParam);
 
-  console.log("deletePath: deleting", fullPath);
-
   try {
     // Check if path exists
     let stats;
@@ -4024,8 +4007,6 @@ const deleteOnePath = async (pathParam) => {
         throw e;
       }
     }
-
-    console.log("deletePath success:", fullPath);
   } catch (e) {
     console.error("error removing path:", fullPath, e.message);
     throw new Error(`Failed to delete path: ${e.message}`);
@@ -4083,6 +4064,35 @@ app.use(express.json({ strict: false }));
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   next();
+});
+
+//////////////////  UNILOG  //////////////////
+
+// tv-srvr is the single DB writer. Register the in-process sink so unilog()
+// calls inside srvr write directly; other processes/clients use POST /api/log.
+epd.setUnilogSink(({ logId, message }) =>
+  unilogDb.insertEvent({ logId, pid: "tv-srvr", message }),
+);
+
+// Central log collector endpoint. Accepts a single event or a batch array.
+// pid identifies the EMITTING process/client; ts is stamped by the writer.
+app.post("/api/log", (req, res) => {
+  try {
+    const body = req.body;
+    const events = Array.isArray(body) ? body : [body];
+    for (const e of events) {
+      if (!e || e.logId == null) continue;
+      unilogDb.insertEvent({
+        logId: e.logId,
+        pid: e.pid || "unknown",
+        message: e.message,
+      });
+    }
+    res.json({ ok: true, count: events.length });
+  } catch (error) {
+    console.error("[unilog] /api/log error:", error); // no-unilog
+    res.status(500).json({ error: String(error?.message || error) });
+  }
 });
 
 // Helper to wrap async business logic functions for Express
@@ -5078,10 +5088,6 @@ app.get("/api/stream", async (req, res) => {
       "-movflags",
       "frag_keyframe+empty_moov+default_base_moof",
       "pipe:1",
-    );
-
-    console.log(
-      `[stream] transcode video=${videoCodec}→h264, audio=${audioCodec}→aac${usePgsSub ? ` +pgs:${subIdx}` : ""}: ${resolved}`,
     );
 
     res.setHeader("Content-Type", "video/mp4");
@@ -7620,9 +7626,7 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
   const newIsBadGroup = flexgetIsBadGroup(rawTitle);
 
   if (storeOnly) {
-    console.log(
-      `[flexget] SKIP(run-loser) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
-    );
+    /* skip: store-only (run-loser) */
   } else if (episodeOnDisk) {
     if (!newRes) {
       console.log(
@@ -8413,10 +8417,6 @@ async function runEmbyFullSweep(caller = "unknown") {
       }
       tvdbRecord.path = embyPath;
       tvdbRecord.genres = embyShow.Genres || [];
-      if (name === "Amandaland")
-        console.log(
-          `[overview] embyFullSweep: tvdb=${JSON.stringify(tvdbRecord.overview?.substring(0, 80))} emby=${JSON.stringify((embyShow.Overview || "").substring(0, 80))}`,
-        );
       tvdbRecord.overview = embyShow.Overview || "";
       tvdbRecord.dateCreated = util.toPstDateTime(embyShow.DateCreated);
       tvdbRecord.premiereDate = embyShow.PremiereDate?.substring(0, 10);
@@ -9008,7 +9008,6 @@ const watcher = chokidar.watch(tvDir, {
 
 watcher
   .on("add", async (filePath) => {
-    console.log(`[chokidar] detected add: ${filePath}`);
     const ext = filePath.split(".").pop();
     const isVideo = videoFileExtensions.includes(ext);
     const isBif = ext === "bif";
@@ -9058,9 +9057,6 @@ watcher
           handleShowDiskChange(showName);
           return;
         }
-        console.log(
-          `[chokidar] sub check for ${showName}: inEmby=${tvdbRec?.inEmby}, files=${[...entry.files].join(",")}`,
-        );
         if (tvdbRec && tvdbRec.inEmby) {
           let queued = false;
           for (const fp of videoFiles) {
@@ -9091,7 +9087,6 @@ watcher
     }, DISK_CHANGE_DEBOUNCE_MS);
   })
   .on("unlink", (filePath) => {
-    console.log(`[chokidar] detected unlink: ${filePath}`);
     const ext = filePath.split(".").pop();
     if (!videoFileExtensions.includes(ext) && ext !== "bif") return;
 

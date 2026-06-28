@@ -23,7 +23,8 @@ unilog has **two parts**:
 - **unilog tooling** — edits source code to add/upgrade/remove log calls.
   - Copilot chat adds log sites from prompts.
   - A dedicated **unilog agent** automates the actual editing.
-  - **Reconciliation** runs at (a) code deployment and (b) process start on the server.
+  - **Reconciliation** runs at **code deployment only** (never on process start, so the
+    deployed source can never diverge from the authoritative local source).
 - **unilog logging** — the runtime. When app code runs, log sites are calls into the
   central `unilog(...)` routine. Client and server routines funnel every event into
   the DB.
@@ -81,6 +82,7 @@ CREATE INDEX IF NOT EXISTS idx_events_ts    ON log_events(ts);
 
 CREATE TABLE IF NOT EXISTS log_groups (  -- one row per logical group (§5)
   group_id    INTEGER PRIMARY KEY,         -- unique integer id (allocated by srvr endpoint; never reused)
+  group_type  TEXT,                         -- kind of group: prompt|conversation|flow|file|source file|task (not limited to these)
   ts          TEXT NOT NULL,               -- 'yyyy/mm/dd hh:mm:ss' PST, when group was created
   description TEXT                          -- prompt / conversation summary / flow name / file / task name
 );
@@ -134,7 +136,7 @@ Every place logging can exist is in exactly one of these states:
    // unilog-stub: unilog(/*level*/ 'info', `queued ${showName}`);
    ```
 
-   The stub is inert until reconciliation. On deploy or process start, reconciliation
+   The stub is inert until reconciliation. On the next deploy, reconciliation
    **activates** it by removing the `// unilog-stub: ` prefix, allocating a `log_id`,
    appending `// log-id: N`, and inserting the `log_sites` row. This guarantees the DB
    always matches the **active** calls. (instr type 3.)
@@ -326,8 +328,9 @@ If invoked via `runSubagent` instead, the same body becomes the subagent prompt.
 ## 7. Reconciliation — keeping the DB in sync with active calls
 
 Reconciliation is the bridge between edited source and the DB. It runs at **code
-deployment** and at **process start**, and operates on **changed files only** — it does
-**not** reconcile everything (instr 6). The **same logic/code** is used for the one-time
+deployment only** and operates on **changed files only** — it does
+**not** reconcile everything (instr 6), and it **never runs on process start**. The
+**same logic/code** is used for the one-time
 upgrade scan and for ongoing changed-file reconciliation (instr 10.4).
 
 ### 7.1 Per changed file, reconciliation:
@@ -350,18 +353,18 @@ upgrade scan and for ongoing changed-file reconciliation (instr 10.4).
 5. **Upserts** all affected rows into `log_sites` / `site_groups` via the single DB owner.
 6. Requests any needed **`group_id`s** from the srvr endpoint and writes `log_groups` rows.
 
-### 7.2 Where it runs (deploy vs. process start)
+### 7.2 Where it runs (deploy only)
 
-- **Deploy (`./srvr*`) — primary activation point (confirmed).** The deploy invokes the
+- **Deploy (`./srvr*`) — the only activation point.** The deploy invokes the
   local reconciler in `/root/apps/tv/unilog/` **before** the rsync push, so the
   source files it edits (stub activation: prefix removal + `// log-id: N`) are included
   in that same deploy and local ↔ remote stay identical. **All id and group-id
   allocation goes through a single `tv-srvr` endpoint** — the owner is the only place any
   type of id is generated (instr 10.3) — so there is still exactly one writer.
-- **Process start (remote, defensive):** when `tv-srvr` starts it runs the same
-  changed-file reconciliation as a **safety net** — upserting any active `// log-id:`
-  site whose row is missing/stale and activating any stub that slipped past deploy. It
-  does not rescan everything.
+- **No process-start reconciliation.** Reconciliation **never** runs when a process
+  starts. If it did, a restart could edit the deployed source and make it diverge from
+  the authoritative **local** source. The local workspace is the single source of truth;
+  the remote is only ever written by a deploy. (response2.)
 
 ### 7.3 Detecting changed files
 
@@ -532,9 +535,10 @@ The full triage (33 location-families, longest-first, with counts and sample tex
 - **All ids (log_id and group_id) are allocated by a single `tv-srvr` endpoint** — the
   owner is the only id generator; allocated once, **never reused**; removed sites
   **tombstoned**.
-- DB writes happen at **reconciliation** (deploy / process start on changed files), not
-  during editing; **deploy is the primary activation point**, editing source before the
-  rsync push.
+- DB writes happen at **reconciliation** (deploy only, on changed files), not
+  during editing; **deploy is the only activation point**, editing source before the
+  rsync push. Reconciliation **never runs on process start** (keeps deployed source from
+  diverging from the authoritative local source).
 - Change detection uses a **flat checksum file**, not git (remote has no `.git`; deploys
   are rsync-only via `./srvr`).
 - Reconciliation refreshes **`src_file` and `src_line`** (code can move between files).
@@ -553,10 +557,11 @@ The full triage (33 location-families, longest-first, with counts and sample tex
 The major open questions from the prior draft are now **resolved** by
 `unilog-plan-response`:
 
-1. **Stub activation — resolved.** Deploy is the **primary activation point**:
+1. **Stub activation — resolved.** Deploy is the **only activation point**:
    reconciliation edits source (stub → active + `// log-id: N`) **before** the rsync
-   push, so those edits ship in the same deploy. Process-start reconciliation is
-   **defensive only**. (response 1.)
+   push, so those edits ship in the same deploy. Reconciliation **never runs on process
+   start**, so the deployed source can never diverge from the authoritative local
+   source. (response 1 / response2.)
 2. **Id allocation — resolved.** A single **`tv-srvr` endpoint** generates every id
    (log_id and group_id); nothing else allocates ids. (response 2.)
 3. **Group membership — resolved.** Use the **`site_groups(log_id, group_id)` join

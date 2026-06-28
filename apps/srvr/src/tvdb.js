@@ -2015,8 +2015,6 @@ export const enqueueShowProcess = (showName, opts = {}) => {
     showName !== currentlyProcessingShow &&
     !showProcessQueue.some((item) => item.name === showName)
   ) {
-    const stack = new Error().stack.split("\n").slice(1, 5).join(" | ");
-    log(`[tvdb loop] enqueue [${showName}] from: ${stack}`);
     const wasEmpty = showProcessQueue.length === 0;
     const item = {
       name: showName,
@@ -2311,12 +2309,9 @@ const tryLocalGetTvdb = async () => {
 
   // Combined push1+push2 notify (one notification instead of two)
   const push1HasChanges = processRecord._hasChanges ?? false;
-  const push1Changes = processRecord._push1Changes ?? [];
   delete processRecord._hasChanges;
   delete processRecord._push1Changes;
-  const allPushChanges = [...push1Changes, ...push2Result.changes];
   if (push1HasChanges || push2Result.hasChanges) {
-    log(`tvdb push [${processRecord.name}]: ${allPushChanges.join(" ")}`);
     if (notifyCallback)
       notifyCallback(processRecord.name, allTvdb[processRecord.name]);
   } else {
@@ -2447,14 +2442,6 @@ export const getRemotesCmd = async (params) => {
       show,
       tvdbRemotes,
       fast,
-    );
-
-    const existing = allTvdb?.[show.name];
-    log(
-      `getRemotesCmd [${show.name}] fast=${fast}` +
-        ` fetched={imdb:${fetchedUrls.imdbRatings ?? "-"},rotten:${fetchedUrls.rottenRatings ?? "-"}}` +
-        ` existing={imdb:${existing?.imdbRatings ?? "-"},rotten:${existing?.rottenRatings ?? "-"}}` +
-        ` inAllTvdb=${!!existing}`,
     );
 
     // When fetching fresh data (fast=false), save remotes and flat url props
@@ -2983,10 +2970,6 @@ export const setTvdbFields = async (params) => {
   }
   // Queue a full per-show refresh (disk + gap) for changes that matter
   if (name && !paramObj.$delTvdb && !paramObj.dontEnqueue) {
-    const paramKeys = Object.keys(paramObj).filter((k) => k !== "name");
-    log(
-      `[tvdb loop2] setTvdbFields enqueue [${name}] params=${JSON.stringify(paramKeys)} dontSave=${!!paramObj.dontSave} dontEnqueue=${!!paramObj.dontEnqueue}`,
-    );
     enqueueShowProcess(name);
   }
   return tvdb ?? "ok";

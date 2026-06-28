@@ -1,0 +1,157 @@
+// unilog DB owner — runs ONLY inside tv-srvr (the single writer).
+// All other processes/clients reach the DB via POST /api/log (see index.js).
+// Tooling code here uses traditional console writes with the `// no-unilog`
+// blocking comment so unilog never instruments its own plumbing.
+
+import fs from "fs";
+import path from "node:path";
+import Database from "better-sqlite3";
+
+// Hard-wired remote location (no env vars per repo convention).
+const UNILOG_DIR = "/root/dev/apps/tv/unilog";
+const UNILOG_DB_PATH = path.join(UNILOG_DIR, "unilog.sqlite");
+
+fs.mkdirSync(UNILOG_DIR, { recursive: true });
+
+const db = new Database(UNILOG_DB_PATH);
+db.pragma("journal_mode = WAL");
+db.pragma("busy_timeout = 5000");
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS log_sites (
+  log_id      INTEGER PRIMARY KEY,
+  tag         TEXT,
+  description TEXT,
+  level       TEXT NOT NULL,
+  src_file    TEXT,
+  src_line    INTEGER,
+  old_log     TEXT,
+  project     TEXT,
+  created_at  TEXT,
+  removed_at  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS log_events (
+  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  log_id    INTEGER,
+  pid       TEXT,
+  ts        TEXT NOT NULL,
+  message   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_events_logid ON log_events(log_id);
+CREATE INDEX IF NOT EXISTS idx_events_ts    ON log_events(ts);
+
+CREATE TABLE IF NOT EXISTS log_groups (
+  group_id    INTEGER PRIMARY KEY,
+  group_type  TEXT,
+  ts          TEXT NOT NULL,
+  description TEXT
+);
+
+CREATE TABLE IF NOT EXISTS site_groups (
+  log_id   INTEGER NOT NULL,
+  group_id INTEGER NOT NULL,
+  PRIMARY KEY (log_id, group_id)
+);
+CREATE INDEX IF NOT EXISTS idx_site_groups_group ON site_groups(group_id);
+`);
+
+// PST 'yyyy/mm/dd hh:mm:ss'; hour 24 normalized to 00 (repo convention).
+export function nowPst() {
+  const d = new Date();
+  const date = d
+    .toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" })
+    .replace(/-/g, "/");
+  let time = d.toLocaleTimeString("en-GB", {
+    timeZone: "America/Los_Angeles",
+    hour12: false,
+  });
+  if (time.startsWith("24:")) time = "00:" + time.slice(3);
+  return `${date} ${time}`;
+}
+
+const insEvent = db.prepare(
+  "INSERT INTO log_events (log_id, pid, ts, message) VALUES (?, ?, ?, ?)",
+);
+
+// One runtime emission. ts stamped here (the collector), not the caller.
+export function insertEvent({ logId, pid, message }) {
+  insEvent.run(
+    logId == null ? null : Number(logId),
+    String(pid || "unknown"),
+    nowPst(),
+    String(message ?? ""),
+  );
+}
+
+const insGroup = db.prepare(
+  "INSERT INTO log_groups (group_id, group_type, ts, description) VALUES (?, ?, ?, ?)",
+);
+const maxGroup = db.prepare(
+  "SELECT COALESCE(MAX(group_id), 0) + 1 AS next FROM log_groups",
+);
+
+// Allocate + create a group atomically. Returns new group_id.
+export const createGroup = db.transaction(({ groupType, description }) => {
+  const id = maxGroup.get().next;
+  insGroup.run(id, groupType || null, nowPst(), description || null);
+  return id;
+});
+
+const insSite = db.prepare(`
+  INSERT INTO log_sites
+    (log_id, tag, description, level, src_file, src_line, old_log, project, created_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+`);
+const maxSite = db.prepare(
+  "SELECT COALESCE(MAX(log_id), 0) + 1 AS next FROM log_sites",
+);
+const insSiteGroup = db.prepare(
+  "INSERT OR IGNORE INTO site_groups (log_id, group_id) VALUES (?, ?)",
+);
+
+// Allocate + create a site (and its group links) atomically. Returns new log_id.
+export const createSite = db.transaction((site) => {
+  const id = maxSite.get().next;
+  insSite.run(
+    id,
+    site.tag || null,
+    site.description || null,
+    site.level || "info",
+    site.srcFile || null,
+    site.srcLine == null ? null : Number(site.srcLine),
+    site.oldLog || null,
+    site.project || null,
+    nowPst(),
+  );
+  for (const gid of site.groupIds || []) insSiteGroup.run(id, Number(gid));
+  return id;
+});
+
+const updSiteLoc = db.prepare(
+  "UPDATE log_sites SET src_file = ?, src_line = ? WHERE log_id = ?",
+);
+export function refreshSite({ logId, srcFile, srcLine }) {
+  updSiteLoc.run(
+    srcFile || null,
+    srcLine == null ? null : Number(srcLine),
+    Number(logId),
+  );
+}
+
+const tombstone = db.prepare(
+  "UPDATE log_sites SET removed_at = ? WHERE log_id = ? AND removed_at IS NULL",
+);
+export function tombstoneSite(logId) {
+  tombstone.run(nowPst(), Number(logId));
+}
+
+export function dbInfo() {
+  const counts = {};
+  for (const t of ["log_sites", "log_events", "log_groups", "site_groups"]) {
+    counts[t] = db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n;
+  }
+  return { path: UNILOG_DB_PATH, counts };
+}
+
+export { UNILOG_DB_PATH, db };

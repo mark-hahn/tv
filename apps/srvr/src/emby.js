@@ -449,11 +449,6 @@ const getShowState = (showName, showMeta) => {
     console.error("getShowState error:", error.message);
     return null;
   }
-  if (fileEndError || fileGap || seasonWatchedThenNofile) {
-    console.log(
-      `[getShowState] ${showName} result: fileEndError=${fileEndError} fileGap=${fileGap} seasonWatchedThenNofile=${seasonWatchedThenNofile} fileGapSeason=${fileGapSeason} fileGapEpisode=${fileGapEpisode}`,
-    );
-  }
   return {
     notReady: !ready,
     anyWatched,

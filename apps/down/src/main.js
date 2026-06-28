@@ -1105,8 +1105,6 @@ async function main() {
     return FORCE_SCAN_EXCLUDED_EXTENSIONS.has(ext);
   };
 
-  log({ findUsb });
-
   // Timestamps in tv-finished.json must be PST timezone.
   // Use America/Los_Angeles so DST is handled correctly.
   var PST_TZ = "America/Los_Angeles";
@@ -2284,7 +2282,6 @@ async function main() {
         tvJsonTitles[fname].error
       ) {
         recentCount++;
-        log("------", downloadCount, "/", chkCount, "SKIPPING *ERROR*:", fname);
         trace("checkFile: skip tvJsonTitles error", { fname });
         postHistory({
           tvdbId: lookupTvdbId(title),
@@ -2332,14 +2329,6 @@ async function main() {
 
           if (!verifiedOnDisk) {
             recentCount++;
-            log(
-              "------",
-              downloadCount,
-              "/",
-              chkCount,
-              "SKIPPING ALREADY DOWNLOADED (local file deleted):",
-              fname,
-            );
             trace("checkFile: skip finished row local file deleted", {
               fname,
               localPath: existingEntry?.localPath || "",
@@ -2356,15 +2345,6 @@ async function main() {
           } else {
             recentCount++;
             const skipStatus = "already downloaded";
-            log(
-              "------",
-              downloadCount,
-              "/",
-              chkCount,
-              "SKIPPING",
-              skipStatus.toUpperCase() + ":",
-              fname,
-            );
             trace("checkFile: skip " + skipStatus, { fname });
             postHistory({
               tvdbId: lookupTvdbId(title),
@@ -2378,15 +2358,6 @@ async function main() {
         } else {
           recentCount++;
           const skipStatus = "already queued";
-          log(
-            "------",
-            downloadCount,
-            "/",
-            chkCount,
-            "SKIPPING",
-            skipStatus.toUpperCase() + ":",
-            fname,
-          );
           trace("checkFile: skip " + skipStatus, { fname });
           postHistory({
             tvdbId: lookupTvdbId(title),
@@ -2401,14 +2372,6 @@ async function main() {
 
       if (inProgress && inProgress[fname]) {
         recentCount++;
-        log(
-          "------",
-          downloadCount,
-          "/",
-          chkCount,
-          "SKIPPING IN-PROGRESS:",
-          fname,
-        );
         trace("checkFile: skip in-progress", { fname });
         postHistory({
           tvdbId: lookupTvdbId(title),
@@ -2434,7 +2397,6 @@ async function main() {
           return;
         }
       }
-      log("not blocked", usbLine);
 
       // file passed all block tests, process it
       currentSeq = ++cycleSeq;

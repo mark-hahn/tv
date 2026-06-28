@@ -11,6 +11,7 @@ import {
   getSeasonIntro as getSeasonIntroShared,
 } from "@tv/share";
 import * as epd from "@tv/share";
+import { unilog } from "@tv/share";
 const { getPstDate } = util;
 import { SRVR_DATA_DIR } from "./srvrPaths.js";
 import * as history from "./history.js";
@@ -485,7 +486,7 @@ if (
   fs.existsSync(lastViewedPath) &&
   !fs.existsSync(lastViewedPath + ".backup")
 ) {
-  log("Phase 5.3: Migrating lastViewed.json into tvdb.json");
+  unilog(116, "Phase 5.3: Migrating lastViewed.json into tvdb.json"); // log-id: 116
   try {
     const lastViewed = util.jParse(fs.readFileSync(lastViewedPath, "utf8"));
     let viewedCount = 0;
@@ -509,10 +510,10 @@ if (
 
 // Save Phase 5 migrations
 if (phase5MigrationNeeded) {
-  log("Phase 5: Saving tvdb.json with migrated data from separate files");
+  unilog(117, "Phase 5: Saving tvdb.json with migrated data from separate files"); // log-id: 117
   saveTvdbFiles(allTvdb)
     .then(() => {
-      log("Phase 5: Migration complete - backup files created");
+      unilog(118, "Phase 5: Migration complete - backup files created"); // log-id: 118
     })
     .catch((e) => {
       log("err", "Phase 5: Migration save failed:", e);
@@ -2029,9 +2030,9 @@ export const enqueueShowProcess = (showName, opts = {}) => {
     if (_kickProcessQueue) setTimeout(_kickProcessQueue, 0);
   } else if (showName) {
     if (showName === currentlyProcessingShow) {
-      log(`[tvdb loop] enqueue [${showName}] skipped — currently processing`);
+      unilog(119, `enqueue [${showName}] skipped — currently processing`); // log-id: 119
     } else if (showProcessQueue.some((item) => item.name === showName)) {
-      log(`[tvdb loop] enqueue [${showName}] skipped — already queued`);
+      unilog(120, `enqueue [${showName}] skipped — already queued`); // log-id: 120
     }
   }
 };
@@ -2246,8 +2247,8 @@ const tryLocalGetTvdb = async () => {
     minTvdb.name = requestedName;
   }
 
-  log("");
-  log(`processing [${minTvdb.name}]`);
+  unilog(121, ""); // log-id: 121
+  unilog(122, `processing [${minTvdb.name}]`); // log-id: 122
   // Notify clients which show is being processed
   if (enqueueCallback) enqueueCallback(minTvdb.name);
   const show = {
@@ -2315,7 +2316,7 @@ const tryLocalGetTvdb = async () => {
     if (notifyCallback)
       notifyCallback(processRecord.name, allTvdb[processRecord.name]);
   } else {
-    log(`tvdb push [${processRecord.name}]: no changes`);
+    unilog(123, `tvdb push [${processRecord.name}]: no changes`); // log-id: 123
   }
 
   // Fetch TVmaze crew for shows that don't have it yet (null = not fetched; [] = fetched but none)
@@ -2363,7 +2364,7 @@ const tryLocalGetTvdb = async () => {
         );
         if (notifyCallback) notifyCallback(processRecord.name, rec);
       } else {
-        log(`tvdb push3 [${processRecord.name}]: Rotten no result`);
+        unilog(124, `tvdb push3 [${processRecord.name}]: Rotten no result`); // log-id: 124
       }
     } catch (e) {
       log("err", "tryLocalGetTvdb push3 rotten:", e.message);
@@ -2465,7 +2466,7 @@ export const getRemotesCmd = async (params) => {
         existing.remotes = remotes;
         Object.assign(existing, fetchedUrls);
         if (changes.length)
-          log(`getRemotes [${show.name}]: ${changes.join(" ")}`);
+          unilog(125, `getRemotes [${show.name}]: ${changes.join(" ")}`); // log-id: 125
         saveTvdbSync().catch((err) => {
           log("err", "getRemotesCmd: saveTvdbSync failed:", err.message);
         });
@@ -2658,7 +2659,7 @@ export const getAllTvdb = async (params) => {
       fileEndError: swissToni.fileEndError,
     });
   } else {
-    console.log("[DEBUG getAllTvdb] Swiss Toni NOT FOUND in allTvdb");
+    unilog(126, "Swiss Toni NOT FOUND in allTvdb"); // log-id: 126
   }
 
   // Filter based on hasEmby parameter
@@ -3060,7 +3061,7 @@ export const accessTvdb = async (params) => {
     });
 
     if (upstream.status === 401) {
-      log("accessTvdb: 401, refreshing token");
+      unilog(127, "accessTvdb: 401, refreshing token"); // log-id: 127
       cachedToken = null;
       token = await getToken();
       upstream = await fetch(url, {
@@ -3177,7 +3178,7 @@ export const updateTvdbWithGapData = async (gapData) => {
   if (processedCount > 0) {
     await saveTvdbSync();
     if (updatedCount > 0) {
-      console.log(`[updateTvdbWithGapData] Updated ${updatedCount} shows`);
+      unilog(128, `Updated ${updatedCount} shows`); // log-id: 128
     }
   }
 
@@ -3207,9 +3208,9 @@ export const migrateWatchedCount = async () => {
 
   if (updatedCount > 0) {
     await saveTvdbSync();
-    console.log(`[migrateWatchedCount] Updated ${updatedCount} shows`);
+    unilog(129, `Updated ${updatedCount} shows`); // log-id: 129
   } else {
-    console.log("[migrateWatchedCount] No updates needed");
+    unilog(130, "No updates needed"); // log-id: 130
   }
 
   return updatedCount;

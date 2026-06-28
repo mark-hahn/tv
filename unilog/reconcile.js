@@ -20,9 +20,11 @@ export function sha256(text) {
 }
 
 export function projectOf(file) {
-  const m =
-    /apps\/([A-Za-z0-9_-]+)\//.exec(file) ||
-    /packages\/([A-Za-z0-9_-]+)\//.exec(file);
+  // Use the LAST `apps/<name>` match so absolute paths like
+  // `/root/apps/tv/apps/srvr/index.js` resolve to "srvr", not "tv".
+  const appMatches = [...file.matchAll(/apps\/([A-Za-z0-9_-]+)\//g)];
+  if (appMatches.length > 0) return appMatches[appMatches.length - 1][1];
+  const m = /packages\/([A-Za-z0-9_-]+)\//.exec(file);
   return m ? m[1] : null;
 }
 
@@ -98,11 +100,20 @@ export function reconcileText(text, srcFile, nextId) {
   return { ...r, text: r.lines.join(nl) };
 }
 
-// DB-backed driver (remote only — tv-srvr owns the DB). Lazily imports the DB
-// module so the pure core above stays importable without opening the DB.
-export async function reconcileFilesWithDb(files, { dryRun = false } = {}) {
+// DB-backed driver. `createSiteFn(siteData)` must return a Promise<logId>.
+// When running ON the remote, pass a wrapper around unilogDb.createSite.
+// When running locally, pass a function that POSTs to the srvr HTTPS endpoint.
+export async function reconcileFilesWithDb(
+  files,
+  { dryRun = false, createSiteFn = null, groupIds = [] } = {},
+) {
   const fs = await import("node:fs");
-  const unilogDb = dryRun ? null : await import("../apps/srvr/src/unilogDb.js");
+
+  if (!dryRun && !createSiteFn) {
+    // Default: direct DB access (only works when unilog.sqlite is accessible).
+    const unilogDb = await import("../apps/srvr/src/unilogDb.js");
+    createSiteFn = (s) => Promise.resolve(unilogDb.createSite(s));
+  }
 
   const summary = [];
   for (const file of files) {
@@ -114,34 +125,30 @@ export async function reconcileFilesWithDb(files, { dryRun = false } = {}) {
       continue;
     }
 
-    // Allocate real ids by creating the rows now (atomic alloc+insert),
-    // in the same order scanLines produced them.
     const project = projectOf(file);
-    const realIds = dryRun
-      ? creates.map((_, i) => i + 1)
-      : creates.map((c) =>
-          unilogDb.createSite({
-            level: c.level,
-            tag: c.tag,
-            description: null,
-            srcFile: file,
-            srcLine: c.srcLine,
-            project,
-            groupIds: [],
-          }),
-        );
+    let realIds;
+    if (dryRun) {
+      realIds = creates.map((_, i) => i + 1);
+    } else {
+      // Allocate all ids sequentially (atomic alloc+insert per site).
+      realIds = [];
+      for (const c of creates) {
+        const id = await createSiteFn({
+          level: c.level,
+          tag: c.tag,
+          description: null,
+          srcFile: file,
+          srcLine: c.srcLine,
+          project,
+          groupIds,
+        });
+        realIds.push(id);
+      }
+    }
 
     let k = 0;
     const r = reconcileText(text, file, () => realIds[k++]);
-    if (!dryRun) {
-      fs.writeFileSync(file, r.text, "utf8");
-      for (const rf of r.refreshes)
-        unilogDb.refreshSite({
-          logId: rf.logId,
-          srcFile: file,
-          srcLine: rf.srcLine,
-        });
-    }
+    if (!dryRun) fs.writeFileSync(file, r.text, "utf8");
     summary.push({
       file,
       changed: r.changed,

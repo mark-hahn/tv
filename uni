@@ -1,0 +1,115 @@
+#!/usr/bin/env node
+// ./uni — unilog CLI viewer
+// Usage: ./uni [groups] [sites] [events] [<param>]
+// Actions can be combined. If the last argument is not an action word it is
+// treated as a parameter for future actions that need one (none yet).
+
+import { spawnSync } from "node:child_process";
+
+const SSH_HOST = "hahnca.com";
+const DB = "/root/dev/apps/tv/unilog/unilog.sqlite";
+const ACTIONS = new Set(["groups", "sites", "events"]);
+
+const argv = process.argv.slice(2);
+if (argv.length === 0) {
+  console.log("usage: ./uni [groups] [sites] [events]");
+  process.exit(0);
+}
+
+const lastIsParam = argv.length > 0 && !ACTIONS.has(argv[argv.length - 1]);
+const param = lastIsParam ? argv[argv.length - 1] : null; // reserved for future use
+const actionWords = (lastIsParam ? argv.slice(0, -1) : argv).filter((a) =>
+  ACTIONS.has(a),
+);
+
+if (actionWords.length === 0) {
+  console.error("no recognized actions — use: groups, sites, events");
+  process.exit(1);
+}
+
+function query(sql) {
+  const r = spawnSync("ssh", [SSH_HOST, `sqlite3 -json ${DB}`], {
+    input: sql,
+    encoding: "utf8",
+    timeout: 10000,
+  });
+  if (r.status !== 0) {
+    console.error((r.stderr || "").trim() || "ssh/sqlite3 failed");
+    process.exit(1);
+  }
+  const out = (r.stdout || "").trim();
+  return out ? JSON.parse(out) : [];
+}
+
+function printTable(rows, cols) {
+  if (rows.length === 0) {
+    console.log("  (none)");
+    return;
+  }
+  const widths = cols.map(([hdr]) => hdr.length);
+  for (const row of rows) {
+    cols.forEach(([, key, fmt], i) => {
+      const v = fmt ? fmt(row[key]) : String(row[key] ?? "");
+      if (v.length > widths[i]) widths[i] = v.length;
+    });
+  }
+  console.log(cols.map(([hdr], i) => hdr.padEnd(widths[i])).join("  "));
+  console.log(cols.map((_, i) => "-".repeat(widths[i])).join("  "));
+  for (const row of rows) {
+    console.log(
+      cols
+        .map(([, key, fmt], i) => {
+          const v = fmt ? fmt(row[key]) : String(row[key] ?? "");
+          return v.padEnd(widths[i]);
+        })
+        .join("  "),
+    );
+  }
+}
+
+for (const action of actionWords) {
+  if (action === "groups") {
+    console.log("=== groups ===");
+    const rows = query(
+      "SELECT group_id, group_type, description FROM log_groups ORDER BY group_id;",
+    );
+    printTable(rows, [
+      ["id", "group_id"],
+      ["type", "group_type"],
+      ["description", "description"],
+    ]);
+    console.log();
+  }
+
+  if (action === "sites") {
+    console.log("=== sites ===");
+    const rows = query(
+      "SELECT log_id, project, src_file, src_line, level, tag, removed_at FROM log_sites ORDER BY log_id;",
+    );
+    const hasRemoved = rows.some((r) => r.removed_at != null);
+    const colDefs = [
+      ["id", "log_id"],
+      ["project", "project"],
+      ["src_file", "src_file"],
+      ["line", "src_line"],
+      ["level", "level"],
+      ["tag", "tag"],
+    ];
+    if (hasRemoved) colDefs.push(["removed", "removed_at"]);
+    printTable(rows, colDefs);
+    console.log();
+  }
+
+  if (action === "events") {
+    console.log("=== events ===");
+    const rows = query(
+      "SELECT ts, log_id, message FROM log_events ORDER BY id;",
+    );
+    printTable(rows, [
+      ["ts", "ts", (v) => String(v ?? "").slice(-8)], // hh:mm:ss from yyyy/mm/dd hh:mm:ss
+      ["id", "log_id"],
+      ["message", "message"],
+    ]);
+    console.log();
+  }
+}

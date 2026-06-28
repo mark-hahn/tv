@@ -3,6 +3,7 @@ import fsp from "fs/promises";
 import * as path from "node:path";
 import date from "date-and-time";
 import { SRVR_MISC_DIR } from "./srvrPaths.js";
+import { unilog } from "@tv/share";
 
 const LOG_APPS_SRVR_DATA_MISC_SRVR_LOG = false;
 
@@ -100,7 +101,7 @@ const chkWriteFile = async () => {
       delete dataByPath[path];
       anyWritten = true;
     } catch (e) {
-      console.error(`[util] writeFile failed for ${path}: ${e.message}`);
+      unilog(131, `writeFile failed for ${path}: ${e.message}`); // log-id: 131
       fsp.unlink(tmpPath).catch(() => {});
       resolvesByPath[path].forEach((resolve) => resolve());
       resolvesByPath[path] = [];

@@ -1,4 +1,5 @@
 import { MailtrapClient } from "mailtrap";
+import { unilog } from "@tv/share";
 
 const MAILTRAP_TOKEN = "2cd4e5572bfb0060be9f60af3d0ef4b2";
 const SENDER = {
@@ -21,7 +22,7 @@ export const sendEmail = async (bodyText) => {
     };
 
     await client.send(emailData);
-    console.log("✓ Email sent successfully");
+    unilog(103, "✓ Email sent successfully"); // log-id: 103
     return "ok";
   } catch (error) {
     console.error("✗ Failed to send email:", error.message);

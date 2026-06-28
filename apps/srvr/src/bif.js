@@ -2,6 +2,7 @@ import { spawn } from "child_process";
 import fs from "fs/promises";
 import path from "path";
 import { createWriteStream } from "fs";
+import { unilog } from "@tv/share";
 
 /**
  * Create a BIF (Base Index Frames) file for video thumbnail previews
@@ -18,9 +19,9 @@ async function createBifFile(videoPath, width = 320, interval = 10) {
   );
 
   const startTime = Date.now();
-  console.log(`Creating BIF file: ${outputPath}`);
-  console.log(`Video: ${videoPath}`);
-  console.log(`Settings: ${width}px width, ${interval}s interval`);
+  unilog(92, `Creating BIF file: ${outputPath}`); // log-id: 92
+  unilog(93, `Video: ${videoPath}`); // log-id: 93
+  unilog(94, `Settings: ${width}px width, ${interval}s interval`); // log-id: 94
 
   // Create temp directory for frames
   const tempDir = `/tmp/bif-temp-${Date.now()}`;
@@ -28,7 +29,7 @@ async function createBifFile(videoPath, width = 320, interval = 10) {
 
   try {
     // Extract frames using ffmpeg
-    console.log("\nExtracting frames...");
+    unilog(95, "\nExtracting frames..."); // log-id: 95
     await extractFrames(videoPath, tempDir, width, interval);
 
     // Get all frame files
@@ -41,21 +42,21 @@ async function createBifFile(videoPath, width = 320, interval = 10) {
         return numA - numB;
       });
 
-    console.log(`\nExtracted ${frameFiles.length} frames`);
+    unilog(96, `\nExtracted ${frameFiles.length} frames`); // log-id: 96
 
     // Create BIF file
-    console.log("Creating BIF file...");
+    unilog(97, "Creating BIF file..."); // log-id: 97
     await writeBifFile(tempDir, frameFiles, outputPath, interval);
 
     const endTime = Date.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
 
     const stats = await fs.stat(outputPath);
-    console.log(`\n✓ BIF file created successfully`);
-    console.log(`  Output: ${outputPath}`);
-    console.log(`  Size: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
-    console.log(`  Frames: ${frameFiles.length}`);
-    console.log(`  Time taken: ${duration} seconds`);
+    unilog(98, `\n✓ BIF file created successfully`); // log-id: 98
+    unilog(99, `  Output: ${outputPath}`); // log-id: 99
+    unilog(100, `  Size: ${(stats.size / 1024 / 1024).toFixed(2)} MB`); // log-id: 100
+    unilog(101, `  Frames: ${frameFiles.length}`); // log-id: 101
+    unilog(102, `  Time taken: ${duration} seconds`); // log-id: 102
 
     return {
       outputPath,

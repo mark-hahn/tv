@@ -3,7 +3,7 @@
 import { chromium } from "playwright";
 import fs from "fs"; // Added for saving HTML
 import * as util from "./util.js";
-import { smartTitleMatch } from "@tv/share";
+import { smartTitleMatch, unilog} from "@tv/share"
 const { log, start, end } = util.getLog("rott");
 
 const MAX_STR_DIST = 10;
@@ -194,7 +194,7 @@ async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
     // 1. Try "Reject All" (force click)
     const reject = page.locator("#onetrust-reject-all-handler");
     if ((await reject.count()) > 0) {
-      console.log("Clicking OneTrust Reject All (Force)");
+      unilog(108, "Clicking OneTrust Reject All (Force)"); // log-id: 108
       await reject.click({ force: true }).catch(() => {});
       await delay(200);
     }
@@ -202,7 +202,7 @@ async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
     else {
       const accept = page.locator("#onetrust-accept-btn-handler");
       if ((await accept.count()) > 0) {
-        console.log("Clicking OneTrust Accept All (Force)");
+        unilog(109, "Clicking OneTrust Accept All (Force)"); // log-id: 109
         await accept.click({ force: true }).catch(() => {});
         await delay(200);
       }
@@ -494,7 +494,7 @@ function chooseShow(shows, query) {
     null;
 
   if (debug && result) {
-    log(`smartTitleMatch selected: "${result.title}" (${result.startyear})`);
+    unilog(110, `smartTitleMatch selected: "${result.title}" (${result.startyear})`); // log-id: 110
   }
   return result;
 }
@@ -597,12 +597,12 @@ export async function rottenSearch(query) {
     const show = chooseShow(shows, query);
     timing.end("chooseShow", `candidates=${shows?.length ?? 0}`);
     if (!show) {
-      log(`Rotten: No matching show found for "${query}"`);
+      unilog(111, `Rotten: No matching show found for "${query}"`); // log-id: 111
       return null;
     }
     const detailLink = show.href;
     if (!detailLink) {
-      log(`Rotten: matched show missing href for "${query}"`);
+      unilog(112, `Rotten: matched show missing href for "${query}"`); // log-id: 112
       return null;
     }
     // console.log(`Rotten Search URL: ${queryUrl}`);
@@ -718,7 +718,7 @@ export async function rottenSearch(query) {
                  
                  return `Tag: ${card.tagName}\nHTML: ${card.innerHTML.substring(0, 1000)}\nChildren:\n${children}`;
              });
-             console.log(`DEBUG STRUCT ${slot}:\n${debugInfo}`);
+             unilog(113, `DEBUG STRUCT ${slot}:\n${debugInfo}`); // log-id: 113
         } catch(dx) { console.log('Debug inspect failed:', dx.message); }
         */
 
@@ -727,7 +727,7 @@ export async function rottenSearch(query) {
         try {
           const html = await page.content();
           fs.writeFileSync(`rotten-error-${slot}.html`, html);
-          console.log(`Saved page content to rotten-error-${slot}.html`);
+          unilog(114, `Saved page content to rotten-error-${slot}.html`); // log-id: 114
         } catch {}
         */
 
@@ -789,7 +789,7 @@ export async function rottenSearch(query) {
       await timing.time("browser.close", () => browser.close());
     }
     const elapsed = ((Date.now() - rottenStartTime) / 1000).toFixed(0);
-    log(`finished rottenSearch: ${elapsed} secs, "${query}"`);
+    unilog(115, `finished rottenSearch: ${elapsed} secs, "${query}"`); // log-id: 115
     timing.report(12);
   }
 }

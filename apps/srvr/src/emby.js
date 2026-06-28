@@ -1,6 +1,7 @@
 import * as urls from "./urls.js";
 import fetch from "node-fetch";
 import * as epd from "@tv/share";
+import { unilog } from "@tv/share";
 
 const deviceNameByDeviceId = {
   "ca632bcd-7279-4fc2-b5b8-6f92ae6ddb08": "mlap2",
@@ -13,7 +14,7 @@ const deviceNameByDeviceId = {
 const deviceIsOn = async (deviceId) => {
   let resp = await fetch(urls.sessionUrl(deviceId));
   if (resp.status !== 200) {
-    console.error(`error deviceIsOn resp: ${resp.statusText}`);
+    unilog(104, `error deviceIsOn resp: ${resp.statusText}`); // log-id: 104
     return true;
   }
   const session = await resp.json();
@@ -24,7 +25,7 @@ export const getOnDevices = async () => {
   const url = urls.watchingUrl();
   let resp = await fetch(url);
   if (resp.status !== 200) {
-    console.error(`error getOnDevices resp: ${resp.statusText}`);
+    unilog(105, `error getOnDevices resp: ${resp.statusText}`); // log-id: 105
     return [];
   }
   const respData = await resp.json();
@@ -175,7 +176,7 @@ const safeGet = async (url, retries = 3) => {
       // Don't retry on 404
       if (error.message && error.message.includes("404")) throw error;
 
-      console.warn(`safeGet retry ${i + 1}/${retries} for ${url} - ${msg}`);
+      unilog(106, `safeGet retry ${i + 1}/${retries} for ${url} - ${msg}`); // log-id: 106
       if (i === retries - 1) throw error;
       await new Promise((r) => setTimeout(r, 500 * (i + 1)));
     }
@@ -483,7 +484,7 @@ export const gapCheckOne = async (showId, showName, tvdbRecord) => {
   const showState = getShowState(showName, tvdbRecord);
 
   if (!showState) {
-    console.error(`[gapCheckOne] getShowState returned null for ${showName}`);
+    unilog(107, `getShowState returned null for ${showName}`); // log-id: 107
     return null;
   }
 

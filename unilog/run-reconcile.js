@@ -332,7 +332,9 @@ function injectUnilogImport(text, file) {
 
   // Case 1: named import from @tv/share — add unilog to it. Only match real
   // import statements (not comments/strings that mention the package).
-  const lastShareIdx = lastIndexOf(lines, (l) => /^\s*import\b.*@tv\/share/.test(l));
+  const lastShareIdx = lastIndexOf(lines, (l) =>
+    /^\s*import\b.*@tv\/share/.test(l),
+  );
   if (lastShareIdx >= 0 && !isClient) {
     const existing = lines[lastShareIdx];
     const namedMatch = /^(import\s*\{)([^}]+)(\}\s*from\s*"@tv\/share")/.exec(

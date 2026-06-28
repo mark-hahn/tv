@@ -1,0 +1,26 @@
+
+# responses to unilog/unilog-plan.md
+
+## notes
+- log_sites.src_file not just log_sites.src_line may change during reconciliation if code moved between files
+- do not Use git to list files changed since the last deploy. this project allows commits at any time and many deploys will happen without commits. use a flat file with checksums at appropriate location.
+- remote server tv project folder has no .git. deploys are by rsync push only using ./srvr. git is only used locally for backup, restores, and monitoring source changes for debugging.
+
+## Ambiguities / contradictions / impossibilities
+1. Confirmed: deploy is the primary activation point
+  - unilog call edits will be made by deploy before actual rsync pushes.  source files edited by deploy will be included in deploy.
+2. id's are allocated by a srvr endpoint. the owner (tv-srvr) is the only place any type of id is generated.
+3. use site_groups(log_id, group_id) join table, not csv.
+4. keep a group_id in session memory (/memories/session/). when used by log-viewer that viewer will have responsibility of combining conversations. when used for deleting the deleting param must allow multiple conversations
+5. anchor handling method is confirmed
+6. test scripts will be needed to develop and test Auto-upgrades and sanity-checks before rollout.
+7. old_log usage is confirmed
+
+## follow all Suggestions
+
+## final notes
+- update unilog/unilog-plan.md to match spec changes
+- don't update old plans
+- make no changes other than writing to unilog-plan.md
+- describe any ambiguities, contradictions, or impossibilities
+- feel free to make suggestions

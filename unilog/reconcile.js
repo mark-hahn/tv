@@ -11,9 +11,11 @@ import crypto from "node:crypto";
 import {
   parseStub,
   activateStub,
-  upgradeLine,
   parseLogId,
+  levelForCall,
+  extractLeadingTag,
 } from "./unilog-lib.js";
+import { findLogCalls } from "./parse.js";
 
 export function sha256(text) {
   return crypto.createHash("sha256").update(text, "utf8").digest("hex");
@@ -28,32 +30,73 @@ export function projectOf(file) {
   return m ? m[1] : null;
 }
 
-// Phase 1: read-only scan. Returns new sites to CREATE (top-to-bottom order)
-// and existing sites to REFRESH — without modifying anything.
-export function scanLines(lines, srcFile, { vueFile = false } = {}) {
-  const creates = [];
-  const refreshes = [];
-  let inScript = !vueFile; // non-vue files are always "in script"
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (vueFile) {
-      if (/^<script[\s>]/.test(line) || line === "<script>") {
-        inScript = true;
-        continue;
-      }
-      if (/^<\/script>/.test(line)) {
-        inScript = false;
-        continue;
-      }
-    }
-    if (!inScript) continue;
-    const existingId = parseLogId(line);
-    if (existingId != null) {
-      refreshes.push({ logId: existingId, srcFile, srcLine: i + 1 });
+// Strip a leading [tag] from an AST literal and return { tag, argExpr }.
+// Build args expression: copy ALL args verbatim; strip a leading [tag] from
+// the first literal arg. Returns { tag, argExpr }.
+function buildArgs(argsText, firstLiteral) {
+  let tag = null;
+  const parts = argsText.slice();
+  if (firstLiteral && parts.length) {
+    const a = parts[0];
+    const q = a[0];
+    const ex = extractLeadingTag(a.slice(1, -1));
+    tag = ex.tag;
+    parts[0] = `${q}${ex.content}${q}`;
+  }
+  return { tag, argExpr: parts.join(", ") };
+}
+
+// From the AST: upgrades (old-style calls) and actives (existing unilog calls).
+function astSites(text, vue) {
+  const calls = findLogCalls(text, { vue });
+  const lineArr = text.split(/\r?\n/);
+  const upgrades = [];
+  const actives = [];
+  for (const c of calls) {
+    if (c.kind === "active") {
+      actives.push({
+        logId: c.logId,
+        startLine: c.line,
+        endLine: text.slice(0, c.end).split(/\r?\n/).length,
+      });
       continue;
     }
+    if (/\/\/\s*no-unilog\s*$/.test(lineArr[c.line - 1] || "")) continue; // opt-out
+    const endLine = text.slice(0, c.end).split(/\r?\n/).length;
+    const { tag, argExpr } = buildArgs(c.argsText, c.firstLiteral);
+    upgrades.push({
+      start: c.start,
+      end: c.end,
+      startLine: c.line,
+      endLine,
+      level: levelForCall(c.callee, c.method),
+      tag,
+      argExpr,
+    });
+  }
+  return { upgrades, actives };
+}
+
+// Phase 1: read-only scan. Returns new sites to CREATE (top-to-bottom order)
+// and existing sites to REFRESH — without modifying anything.
+export function scanText(text, srcFile, { vue = false } = {}) {
+  const { upgrades, actives } = astSites(text, vue);
+  const creates = upgrades.map((u) => ({
+    kind: "upgrade",
+    level: u.level,
+    tag: u.tag,
+    argExpr: u.argExpr,
+    srcLine: u.startLine,
+  }));
+  const refreshes = actives.map((a) => ({
+    logId: a.logId,
+    srcFile,
+    srcLine: a.startLine,
+  }));
+  // stubs (comments — not seen by AST)
+  text.split(/\r?\n/).forEach((line, i) => {
     const stub = parseStub(line);
-    if (stub) {
+    if (stub)
       creates.push({
         kind: "stub",
         level: stub.level,
@@ -61,72 +104,74 @@ export function scanLines(lines, srcFile, { vueFile = false } = {}) {
         argExpr: stub.argExpr,
         srcLine: i + 1,
       });
-      continue;
-    }
-    const up = upgradeLine(line);
-    if (up.upgradeable)
-      creates.push({
-        kind: "upgrade",
-        level: up.level,
-        tag: up.tag,
-        argExpr: up.argExpr,
-        srcLine: i + 1,
-      });
-  }
+  });
+  creates.sort((a, b) => a.srcLine - b.srcLine);
   return { creates, refreshes };
 }
 
-// Phase 2: rewrite pass. `nextId()` MUST return ids in the same top-to-bottom
-// order as scanLines() produced `creates`, so ids line up with their sites.
+// Phase 2: rewrite. `nextId()` returns ids in source order. Old-style calls are
+// replaced by exact AST byte offsets (bullet-proof for calls inside any
+// expression); stubs are activated by line. Applied end-to-start so offsets stay
+// valid.
+export function reconcileText(text, srcFile, nextId, { vue = false } = {}) {
+  const nl = text.includes("\r\n") ? "\r\n" : "\n";
+  const { upgrades, actives } = astSites(text, vue);
+  const refreshes = actives.map((a) => ({
+    logId: a.logId,
+    srcFile,
+    srcLine: a.startLine,
+  }));
+
+  // Allocate ids in source order (upgrades + stubs interleaved by start line).
+  const lines = text.split(/\r?\n/);
+  const stubs = [];
+  lines.forEach((line, i) => {
+    if (parseStub(line)) stubs.push(i);
+  });
+
+  const ordered = [
+    ...upgrades.map((u) => ({ kind: "u", line: u.startLine, u })),
+    ...stubs.map((i) => ({ kind: "s", line: i + 1, i })),
+  ].sort((a, b) => a.line - b.line);
+  const idFor = new Map();
+  for (const item of ordered) idFor.set(item, nextId());
+
+  let changed = false;
+  // Stubs by line first (doesn't shift offsets used below since we rebuild text).
+  for (const item of ordered) {
+    if (item.kind !== "s") continue;
+    lines[item.i] = activateStub(lines[item.i], idFor.get(item)).line;
+    changed = true;
+  }
+  let out = lines.join(nl);
+
+  // Old-style by offsets, end-to-start.
+  const ups = ordered
+    .filter((o) => o.kind === "u")
+    .map((o) => ({ ...o.u, id: idFor.get(o) }));
+  ups.sort((a, b) => b.start - a.start);
+  for (const u of ups) {
+    out =
+      out.slice(0, u.start) +
+      `unilog(${u.id}, ${u.argExpr})` +
+      out.slice(u.end);
+    changed = true;
+  }
+  return { lines: out.split(nl), refreshes, changed, text: out };
+}
+
+// Back-compat wrappers (line-array based) used by older callers/tests.
+export function scanLines(lines, srcFile, { vueFile = false } = {}) {
+  return scanText(lines.join("\n"), srcFile, { vue: vueFile });
+}
 export function reconcileLines(
   lines,
   srcFile,
   nextId,
   { vueFile = false } = {},
 ) {
-  const out = lines.slice();
-  const refreshes = [];
-  let inScript = !vueFile;
-  let changed = false;
-  for (let i = 0; i < out.length; i++) {
-    const line = out[i];
-    if (vueFile) {
-      if (/^<script[\s>]/.test(line) || line === "<script>") {
-        inScript = true;
-        continue;
-      }
-      if (/^<\/script>/.test(line)) {
-        inScript = false;
-        continue;
-      }
-    }
-    if (!inScript) continue;
-    const existingId = parseLogId(line);
-    if (existingId != null) {
-      refreshes.push({ logId: existingId, srcFile, srcLine: i + 1 });
-      continue;
-    }
-    const stub = parseStub(line);
-    if (stub) {
-      out[i] = activateStub(line, nextId()).line;
-      changed = true;
-      continue;
-    }
-    const up = upgradeLine(line);
-    if (up.upgradeable) {
-      const indent = /^(\s*)/.exec(line)[1];
-      const id = nextId();
-      out[i] = `${indent}unilog(${id}, ${up.argExpr}); // log-id: ${id}`;
-      changed = true;
-    }
-  }
-  return { lines: out, refreshes, changed };
-}
-
-export function reconcileText(text, srcFile, nextId, { vueFile = false } = {}) {
-  const nl = text.includes("\r\n") ? "\r\n" : "\n";
-  const r = reconcileLines(text.split(/\r?\n/), srcFile, nextId, { vueFile });
-  return { ...r, text: r.lines.join(nl) };
+  const r = reconcileText(lines.join("\n"), srcFile, nextId, { vue: vueFile });
+  return { lines: r.lines, refreshes: r.refreshes, changed: r.changed };
 }
 
 // DB-backed driver. `createSiteFn(siteData)` must return a Promise<logId>.
@@ -146,10 +191,9 @@ export async function reconcileFilesWithDb(
 
   const summary = [];
   for (const file of files) {
-    const vueFile = file.endsWith(".vue");
+    const vue = file.endsWith(".vue");
     const text = fs.readFileSync(file, "utf8");
-    const lines = text.split(/\r?\n/);
-    const { creates, refreshes } = scanLines(lines, file, { vueFile });
+    const { creates, refreshes } = scanText(text, file, { vue });
     if (creates.length === 0 && refreshes.length === 0) {
       summary.push({ file, changed: false, created: 0, refreshed: 0 });
       continue;
@@ -182,7 +226,7 @@ export async function reconcileFilesWithDb(
     }
 
     let k = 0;
-    const r = reconcileText(text, file, () => realIds[k++], { vueFile });
+    const r = reconcileText(text, file, () => realIds[k++], { vue });
     if (!dryRun) fs.writeFileSync(file, r.text, "utf8");
     summary.push({
       file,

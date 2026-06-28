@@ -11,14 +11,29 @@ export function setUnilogSink(fn) {
   _sink = typeof fn === "function" ? fn : null;
 }
 
-// The single call every active log site invokes at runtime.
-// `level` is intentionally NOT looked up here: it lives on log_sites and is
-// resolved later (read/display time) by the log viewer, so the hot write path
-// only carries { logId, message }.
-export function unilog(logId, message) {
+// Join multiple args the way console.* does: strings as-is, objects as JSON,
+// separated by spaces. So `unilog(5, "a", obj, n)` -> one message string.
+export function unilogJoin(parts) {
+  return parts
+    .map((p) => {
+      if (typeof p === "string") return p;
+      try {
+        return typeof p === "object" ? JSON.stringify(p) : String(p);
+      } catch {
+        return String(p);
+      }
+    })
+    .join(" ");
+}
+
+// The single call every active log site invokes at runtime. Variadic so
+// multi-arg legacy calls copy through unchanged: unilog(id, a, b, c).
+// `level` is NOT looked up here: it lives on log_sites and is resolved later
+// (read/display time) by the log viewer, so the hot write path is minimal.
+export function unilog(logId, ...parts) {
   if (!_sink) return;
   try {
-    _sink({ logId, message });
+    _sink({ logId, message: unilogJoin(parts) });
   } catch {
     // best-effort: never break the app because logging failed
   }

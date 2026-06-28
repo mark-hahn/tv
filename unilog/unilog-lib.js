@@ -45,6 +45,74 @@ export function extractLeadingTag(content) {
 const SINGLE_LITERAL_RE =
   /^(\s*)(?:(console)\.(log|info|debug|warn|error)|(log|loge|logSubtitle))\((`(?:\\.|\$\{[^}]*\}|[^`\\])*`|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\)\s*;?\s*$/;
 
+// Shared literal pattern reused by the multi-line matcher below.
+const LITERAL_ONLY_RE =
+  /^\s*(`(?:\\.|\$\{[^}]*\}|[^`\\])*`|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'),?\s*$/;
+
+const OPEN_CALL_RE =
+  /^(\s*)(?:(console)\.(log|info|debug|warn|error)|(log|loge|logSubtitle))\(\s*$/;
+
+const CLOSE_CALL_RE = /^\s*\);\s*$/;
+
+// Match an old-style log call that spans multiple lines:
+//   console.log(          ← line at startIdx; nothing after the `(`
+//     `any literal`,      ← one or more lines of a single literal argument
+//   );                    ← first line matching `);` after the open
+//
+// Returns { indent, callee, method, quote, content, lineCount } or null.
+// `lineCount` is the total number of source lines consumed (open + arg + close).
+// The caller should advance its loop index by (lineCount - 1) after a match.
+export function matchMultiLineOldStyle(lines, startIdx) {
+  const line0 = lines[startIdx];
+  if (!line0) return null;
+  if (/\/\/\s*no-unilog\s*$/.test(line0)) return null;
+  const m0 = OPEN_CALL_RE.exec(line0);
+  if (!m0) return null;
+
+  // Find the first `);` within a reasonable window.
+  const MAX_WINDOW = 15;
+  let closeIdx = -1;
+  for (
+    let j = startIdx + 1;
+    j <= Math.min(startIdx + MAX_WINDOW, lines.length - 1);
+    j++
+  ) {
+    if (CLOSE_CALL_RE.test(lines[j])) {
+      closeIdx = j;
+      break;
+    }
+  }
+  if (closeIdx < 0) return null;
+
+  // Collect argument lines, join them, strip trailing comma.
+  const argLines = lines.slice(startIdx + 1, closeIdx);
+  if (argLines.length === 0) return null;
+  const joined = argLines
+    .map((l) => l.trim())
+    .join("\n")
+    .replace(/,\s*$/, "")
+    .trim();
+
+  // Must be a single literal: starts and ends with the same quote character.
+  const quote = joined[0];
+  if (quote !== "`" && quote !== '"' && quote !== "'") return null;
+  const trimmed = joined.trimEnd();
+  if (trimmed[trimmed.length - 1] !== quote) return null;
+
+  const content = joined.slice(1, trimmed.length - 1);
+  const indent = m0[1];
+  const callee = m0[2] ? "console" : m0[4];
+  const method = m0[3] || m0[4];
+  return {
+    indent,
+    callee,
+    method,
+    quote,
+    content,
+    lineCount: closeIdx - startIdx + 1,
+  };
+}
+
 // Returns null when the line is not an upgradeable old-style single-literal call.
 export function matchOldStyle(line) {
   const m = SINGLE_LITERAL_RE.exec(line);
@@ -119,11 +187,12 @@ export function upgradeLine(line) {
 // ---- stub activation (reconciler) ----------------------------------------
 
 // Turn a stub line into an active call line with the allocated id.
+// No trailing comment: the id is the first arg, read back via the AST.
 export function activateStub(line, logId) {
   const s = parseStub(line);
   if (!s) return null;
   return {
-    line: `${s.indent}unilog(${logId}, ${s.argExpr}); // log-id: ${logId}`,
+    line: `${s.indent}unilog(${logId}, ${s.argExpr});`,
     level: s.level,
     tag: s.tag,
     argExpr: s.argExpr,

@@ -200,6 +200,16 @@ remote_pm2_restart_project() {
 remote_deploy_one_no_restart() {
   local project="$1"
 
+  # unilog: reconcile (instrument) BEFORE any build/rsync so the modified
+  # source files are deployed exactly once, together with everything else.
+  if [[ "$project" == "srvr" || "$project" == "client" ]]; then
+    echo "[local] unilog reconcile: $project"
+    if ! node "$ROOT_DIR/unilog/run-reconcile.js" "$project"; then
+      echo "Error: unilog reconcile failed for $project" >&2
+      exit 1
+    fi
+  fi
+
   # Special handling for client build (local)
   if [[ "$project" == "client" ]]; then
     echo "[local] build: $project (vite)"

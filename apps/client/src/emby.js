@@ -167,9 +167,10 @@ export async function loadAllShows() {
 
   const showRecords = Object.values(allTvdb).filter((r) => isTvdbShowRecord(r));
   const elapsed = Date.now() - loadStart;
-  console.log(
+  unilog(
+    169,
     `loadAllShows completed in ${elapsed}ms, ${showRecords.length} shows`,
-  );
+  ); // log-id: 169
   allShows = showRecords;
   return { allShows: showRecords, allTvdb };
 }
@@ -849,9 +850,10 @@ async function _oldLoadAllShows() {
   }
 
   const elapsed = Date.now() - loadStart;
-  console.log(
+  unilog(
+    170,
     `loadAllShows completed in ${elapsed}ms, ${showRecords.length} shows`,
-  );
+  ); // log-id: 170
   allShows = showRecords;
   return { allShows: showRecords, allTvdb };
 }

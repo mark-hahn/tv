@@ -37,10 +37,24 @@ function flush() {
   });
 }
 
-// The single call every active client log site invokes at runtime.
-export function unilog(logId, message) {
+// Join multiple args the way console.* does so multi-arg calls copy through.
+function unilogJoin(parts) {
+  return parts
+    .map((p) => {
+      if (typeof p === "string") return p;
+      try {
+        return typeof p === "object" ? JSON.stringify(p) : String(p);
+      } catch {
+        return String(p);
+      }
+    })
+    .join(" ");
+}
+
+// The single call every active client log site invokes at runtime (variadic).
+export function unilog(logId, ...parts) {
   try {
-    queue.push({ logId, pid: PID, message: String(message ?? "") });
+    queue.push({ logId, pid: PID, message: unilogJoin(parts) });
     if (queue.length >= MAX_BATCH) flush();
     else scheduleFlush();
   } catch {

@@ -12,9 +12,12 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { reconcileFilesWithDb, projectOf } from "./reconcile.js";
 
 const SRVR_HTTPS_URL = "https://hahnca.com/tv-srvr";
+const SSH_HOST = "hahnca.com";
+const REMOTE_DB = "/root/dev/apps/tv/unilog/unilog.sqlite";
 
 // Hard-wired project → source file globs (no env vars per repo convention).
 const PROJECT_FILES = {
@@ -98,7 +101,15 @@ if (!project || !PROJECT_FILES[project]) {
   process.exit(1);
 }
 
-// ---- create an instrumentation group on the remote DB --------------------
+// ---- id allocation: HTTPS endpoint, fall back to direct ssh+sqlite3 -------
+//
+// Normal path: POST to the running tv-srvr (the single DB writer). If srvr is
+// down/unreachable, fall back to talking to the DB directly over ssh. With srvr
+// stopped there is exactly one writer, so no locking is needed — so we stop the
+// tv-srvr pm2 task before the first direct write (it restarts on deploy anyway).
+
+let useSsh = false;
+let srvrStopped = false;
 
 async function postJson(path, body) {
   const r = await fetch(`${SRVR_HTTPS_URL}${path}`, {
@@ -106,27 +117,102 @@ async function postJson(path, body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) {
-    const text = await r.text();
-    throw new Error(`POST ${path} → ${r.status}: ${text}`);
-  }
+  if (!r.ok) throw new Error(`POST ${path} → ${r.status}: ${await r.text()}`);
   return r.json();
+}
+
+function sqlOne(sql) {
+  const r = spawnSync(
+    "ssh",
+    [SSH_HOST, `sqlite3 ${REMOTE_DB} ${JSON.stringify(sql)}`],
+    { encoding: "utf8" },
+  );
+  if (r.status !== 0)
+    throw new Error((r.stderr || "ssh sqlite3 failed").trim());
+  return (r.stdout || "").trim();
+}
+
+const q = (v) => (v == null ? "NULL" : `'${String(v).replace(/'/g, "''")}'`);
+
+function ensureSrvrStopped() {
+  if (srvrStopped) return;
+  console.log(
+    "[run-reconcile] srvr endpoint unavailable — stopping tv-srvr and writing DB over ssh",
+  ); // no-unilog
+  spawnSync("ssh", [SSH_HOST, "pm2 stop tv-srvr"], { encoding: "utf8" });
+  srvrStopped = true;
+}
+
+function nowPst() {
+  // Identical format to apps/srvr/src/unilogDb.js nowPst(): yyyy/mm/dd hh:mm:ss,
+  // hour 24 -> 00, so all ts/created_at fields match across tables.
+  const d = new Date();
+  const date = d
+    .toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" })
+    .replace(/-/g, "/");
+  let time = d.toLocaleTimeString("en-GB", {
+    timeZone: "America/Los_Angeles",
+    hour12: false,
+  });
+  if (time.startsWith("24:")) time = "00:" + time.slice(3);
+  return `${date} ${time}`;
 }
 
 const now = new Date()
   .toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" })
   .replace(/-/g, "/");
-const { id: groupId } = await postJson("/api/unilog/group", {
-  groupType: "task",
-  description: `${project} step4 instrumentation ${now}`,
-});
-console.log(`[run-reconcile] created group id=${groupId}`); // no-unilog
 
-// ---- createSiteFn: calls srvr endpoint -----------------------------------
+let groupId = null;
+async function ensureGroup() {
+  if (groupId != null) return groupId;
+  const desc = `${project} instrumentation ${now}`;
+  if (!useSsh) {
+    try {
+      groupId = (
+        await postJson("/api/unilog/group", {
+          groupType: "task",
+          description: desc,
+        })
+      ).id;
+      console.log(`[run-reconcile] created group id=${groupId}`); // no-unilog
+      return groupId;
+    } catch {
+      useSsh = true; // switch to ssh fallback for the rest of the run
+    }
+  }
+  ensureSrvrStopped();
+  sqlOne(
+    `INSERT INTO log_groups (group_id, group_type, ts, description) ` +
+      `VALUES ((SELECT COALESCE(MAX(group_id),0)+1 FROM log_groups), 'task', ${q(nowPst())}, ${q(desc)});`,
+  );
+  groupId = Number(sqlOne("SELECT MAX(group_id) FROM log_groups;"));
+  console.log(`[run-reconcile] created group id=${groupId} (ssh)`); // no-unilog
+  return groupId;
+}
 
 async function createSiteFn(site) {
-  const { ids } = await postJson("/api/unilog/sites", [site]);
-  return ids[0];
+  const gid = await ensureGroup();
+  if (!useSsh) {
+    try {
+      const { ids } = await postJson("/api/unilog/sites", [
+        { ...site, groupIds: [gid] },
+      ]);
+      return ids[0];
+    } catch {
+      useSsh = true;
+      ensureSrvrStopped();
+    }
+  }
+  sqlOne(
+    `INSERT INTO log_sites (log_id, tag, description, level, src_file, src_line, old_log, project, created_at) ` +
+      `VALUES ((SELECT COALESCE(MAX(log_id),0)+1 FROM log_sites), ${q(site.tag)}, ${q(site.description)}, ` +
+      `${q(site.level || "info")}, ${q(site.srcFile)}, ${site.srcLine ?? "NULL"}, NULL, ${q(site.project)}, ${q(nowPst())});`,
+  );
+  const id = Number(sqlOne("SELECT MAX(log_id) FROM log_sites;"));
+  sqlOne(
+    `INSERT OR IGNORE INTO site_groups (log_id, group_id) VALUES (${id}, ${gid});`,
+  );
+  return id;
 }
 
 // ---- file list -----------------------------------------------------------
@@ -145,7 +231,6 @@ const REPO_ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 
 const summary = await reconcileFilesWithDb(files, {
   createSiteFn,
-  groupIds: [groupId],
   repoRoot: REPO_ROOT,
 });
 

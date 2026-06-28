@@ -93,11 +93,14 @@ const files = include
 
 console.log(`[run-reconcile] ${project}: ${files.length} files to process`); // no-unilog
 
+const REPO_ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+
 // ---- reconcile -----------------------------------------------------------
 
 const summary = await reconcileFilesWithDb(files, {
   createSiteFn,
   groupIds: [groupId],
+  repoRoot: REPO_ROOT,
 });
 
 // ---- inject unilog import into files that got new calls ------------------

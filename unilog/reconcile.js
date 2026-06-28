@@ -105,12 +105,12 @@ export function reconcileText(text, srcFile, nextId) {
 // When running locally, pass a function that POSTs to the srvr HTTPS endpoint.
 export async function reconcileFilesWithDb(
   files,
-  { dryRun = false, createSiteFn = null, groupIds = [] } = {},
+  { dryRun = false, createSiteFn = null, groupIds = [], repoRoot = null } = {},
 ) {
   const fs = await import("node:fs");
+  const pathMod = await import("node:path");
 
   if (!dryRun && !createSiteFn) {
-    // Default: direct DB access (only works when unilog.sqlite is accessible).
     const unilogDb = await import("../apps/srvr/src/unilogDb.js");
     createSiteFn = (s) => Promise.resolve(unilogDb.createSite(s));
   }
@@ -125,19 +125,24 @@ export async function reconcileFilesWithDb(
       continue;
     }
 
-    const project = projectOf(file);
+    // src_file stored relative to repoRoot so DB entries are portable and
+    // match the deployed remote path structure (e.g. "apps/srvr/index.js").
+    const srcFile = repoRoot
+      ? pathMod.relative(pathMod.resolve(repoRoot), pathMod.resolve(file))
+      : file;
+    const project = projectOf(srcFile);
+
     let realIds;
     if (dryRun) {
       realIds = creates.map((_, i) => i + 1);
     } else {
-      // Allocate all ids sequentially (atomic alloc+insert per site).
       realIds = [];
       for (const c of creates) {
         const id = await createSiteFn({
           level: c.level,
           tag: c.tag,
           description: null,
-          srcFile: file,
+          srcFile,
           srcLine: c.srcLine,
           project,
           groupIds,

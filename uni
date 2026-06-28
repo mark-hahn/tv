@@ -27,13 +27,14 @@ if (actionWords.length === 0) {
   process.exit(1);
 }
 
-function query(sql) {
+function query(sql, { tolerateError = false } = {}) {
   const r = spawnSync("ssh", [SSH_HOST, `sqlite3 -json ${DB}`], {
     input: sql,
     encoding: "utf8",
     timeout: 10000,
   });
   if (r.status !== 0) {
+    if (tolerateError) return null;
     console.error((r.stderr || "").trim() || "ssh/sqlite3 failed");
     process.exit(1);
   }
@@ -99,17 +100,66 @@ for (const action of actionWords) {
     printTable(rows, colDefs);
     console.log();
   }
+}
 
-  if (action === "events") {
-    console.log("=== events ===");
-    const rows = query(
-      "SELECT ts, log_id, message FROM log_events ORDER BY id;",
+// events tails — runs last, keeps process alive with setInterval.
+if (actionWords.includes("events")) {
+  const EVENT_COLS = [
+    ["ts", "ts", (v) => String(v ?? "").slice(-8)],
+    ["message", "message"],
+    ["id", "log_id"],
+    ["tag", "tag"],
+    ["project", "project"],
+    ["src_file", "src_file"],
+    ["line", "src_line"],
+  ];
+  const POLL_MS = 2000;
+
+  function fetchEvents(afterId) {
+    const where = afterId != null ? `WHERE e.id > ${Number(afterId)}` : "";
+    return query(
+      `SELECT e.id, e.ts, e.log_id, s.tag, s.project, s.src_file, s.src_line,
+              e.message
+       FROM log_events e
+       LEFT JOIN log_sites s ON s.log_id = e.log_id
+       ${where}
+       ORDER BY e.id;`,
+      { tolerateError: true },
     );
-    printTable(rows, [
-      ["ts", "ts", (v) => String(v ?? "").slice(-8)], // hh:mm:ss from yyyy/mm/dd hh:mm:ss
-      ["id", "log_id"],
-      ["message", "message"],
-    ]);
-    console.log();
   }
+
+  // Initial load — print header + all existing rows.
+  const initial = fetchEvents(null) || [];
+  if (initial.length > 0) printTable(initial, EVENT_COLS);
+  else console.log("(no events yet — tailing…)");
+
+  // Track column widths so appended rows align with the initial table.
+  const widths = EVENT_COLS.map(([hdr]) => hdr.length);
+  for (const row of initial) {
+    EVENT_COLS.forEach(([, key, fmt], i) => {
+      const v = fmt ? fmt(row[key]) : String(row[key] ?? "");
+      if (v.length > widths[i]) widths[i] = v.length;
+    });
+  }
+
+  let lastId = initial.length > 0 ? initial[initial.length - 1].id : 0;
+
+  function printRow(row) {
+    console.log(
+      EVENT_COLS.map(([, key, fmt], i) => {
+        const v = fmt ? fmt(row[key]) : String(row[key] ?? "");
+        return v.padEnd(widths[i]);
+      }).join("  "),
+    );
+  }
+
+  const poll = () => {
+    const rows = fetchEvents(lastId);
+    if (rows && rows.length > 0) {
+      for (const row of rows) printRow(row);
+      lastId = rows[rows.length - 1].id;
+    }
+    setTimeout(poll, POLL_MS);
+  };
+  setTimeout(poll, POLL_MS);
 }

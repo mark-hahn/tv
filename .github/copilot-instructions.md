@@ -113,3 +113,5 @@ whenever you deploy to the server and pm2 does a restart check pm2 logs to make 
 when modifying tvdb.json directly on disk stop tv-srvr first to avoid stale overwrite
 
 in the map pane call the first child of the maphdr2 div the "map pane info bar"
+
+never touch git for read or commit unless i tell you to

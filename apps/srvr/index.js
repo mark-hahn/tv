@@ -4109,7 +4109,6 @@ app.post("/api/unilog/group", (req, res) => {
   }
 });
 
-// Accepts a batch array of site descriptors; returns { ids: [logId, ...] }.
 app.post("/api/unilog/sites", (req, res) => {
   try {
     const sites = Array.isArray(req.body) ? req.body : [req.body];

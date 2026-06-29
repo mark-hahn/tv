@@ -47,21 +47,27 @@ function printTable(rows, cols) {
     console.log("  (none)");
     return;
   }
+  const MAX_MSG = 80;
   const widths = cols.map(([hdr]) => hdr.length);
   for (const row of rows) {
     cols.forEach(([, key, fmt], i) => {
-      const v = fmt ? fmt(row[key]) : String(row[key] ?? "");
+      let v = fmt ? fmt(row[key]) : String(row[key] ?? "");
+      if (key === "message" && v.length > MAX_MSG)
+        v = v.slice(0, MAX_MSG - 1) + "…";
       if (v.length > widths[i]) widths[i] = v.length;
     });
   }
   console.log(cols.map(([hdr], i) => hdr.padEnd(widths[i])).join("  "));
   console.log(cols.map((_, i) => "-".repeat(widths[i])).join("  "));
+  const last = cols.length - 1;
   for (const row of rows) {
     console.log(
       cols
         .map(([, key, fmt], i) => {
-          const v = fmt ? fmt(row[key]) : String(row[key] ?? "");
-          return v.padEnd(widths[i]);
+          let v = fmt ? fmt(row[key]) : String(row[key] ?? "");
+          if (key === "message" && v.length > MAX_MSG)
+            v = v.slice(0, MAX_MSG - 1) + "…";
+          return i === last ? v : v.padEnd(widths[i]);
         })
         .join("  "),
     );
@@ -104,6 +110,7 @@ for (const action of actionWords) {
 
 // events tails — runs last, keeps process alive with setInterval.
 if (actionWords.includes("events")) {
+  const MAX_MSG = 80;
   const EVENT_COLS = [
     ["ts", "ts", (v) => String(v ?? "").slice(-8)],
     ["message", "message"],
@@ -137,18 +144,24 @@ if (actionWords.includes("events")) {
   const widths = EVENT_COLS.map(([hdr]) => hdr.length);
   for (const row of initial) {
     EVENT_COLS.forEach(([, key, fmt], i) => {
-      const v = fmt ? fmt(row[key]) : String(row[key] ?? "");
+      let v = fmt ? fmt(row[key]) : String(row[key] ?? "");
+      if (key === "message" && v.length > MAX_MSG)
+        v = v.slice(0, MAX_MSG - 1) + "…";
       if (v.length > widths[i]) widths[i] = v.length;
     });
   }
 
   let lastId = initial.length > 0 ? initial[initial.length - 1].id : 0;
 
+  const lastCol = EVENT_COLS.length - 1;
+
   function printRow(row) {
     console.log(
       EVENT_COLS.map(([, key, fmt], i) => {
-        const v = fmt ? fmt(row[key]) : String(row[key] ?? "");
-        return v.padEnd(widths[i]);
+        let v = fmt ? fmt(row[key]) : String(row[key] ?? "");
+        if (key === "message" && v.length > MAX_MSG)
+          v = v.slice(0, MAX_MSG - 1) + "…";
+        return i === lastCol ? v : v.padEnd(widths[i]);
       }).join("  "),
     );
   }

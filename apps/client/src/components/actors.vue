@@ -789,7 +789,7 @@ export default {
       const searchText = this.actorSearchText.trim();
       if (!searchText) return;
 
-      console.log("Actor search:", searchText);
+      unilog(904, "Actor search:", searchText);
 
       // Normalize search text
       const normalizedSearch = this.normalizeSearchText(searchText);
@@ -907,10 +907,7 @@ export default {
     },
 
     async handleAllCreditsButton() {
-      console.log(
-        "[ACTORS] handleAllCreditsButton called",
-        new Date().toISOString(),
-      );
+      unilog(905, "handleAllCreditsButton called", new Date().toISOString());
       if (!this.selectedActor) return;
 
       // Toggle off if already showing
@@ -923,7 +920,7 @@ export default {
         this.selectedActor?.personName || this.selectedActor?.name || "",
       ).trim();
       if (!name) return;
-      console.log("[ACTORS] Actor name:", name);
+      unilog(906, "Actor name:", name);
 
       // Prevent duplicate requests
       if (this.creditsLoading) {
@@ -960,7 +957,7 @@ export default {
           actorPageUrl: this.actorPageUrl,
         };
       } catch (e) {
-        console.error("Failed to load actor credits:", e);
+        unilog(907, "Failed to load actor credits:", e);
         this.creditsError = e.message || "Failed to load credits";
         this.creditsLoading = false;
       }
@@ -986,7 +983,7 @@ export default {
             win?.close();
           }
         } catch (e) {
-          console.error("handleWikipediaButton error:", e);
+          unilog(908, "handleWikipediaButton error:", e);
           win?.close();
         }
       } else {
@@ -1462,9 +1459,7 @@ export default {
       const seasonStr = String(season).padStart(2, "0");
       const episodeStr = String(episode).padStart(2, "0");
       if (DEBUG_ACTORS_MERGE_LOG) {
-        console.debug(
-          `${this.showName} S${seasonStr}E${episodeStr} | TVDB: ${mergeResult.tvdbBefore}, ${tvdbAfter} | TMDB: ${mergeResult.tmdbBefore}, ${tmdbAfter}`,
-        );
+        unilog(909, `${this.showName} S${seasonStr}E${episodeStr} | TVDB: ${mergeResult.tvdbBefore}, ${tvdbAfter} | TMDB: ${mergeResult.tmdbBefore}, ${tmdbAfter}`);
       }
     },
 
@@ -2015,9 +2010,7 @@ export default {
       const tvdbAfter = this.actors.filter((a) => a.source === "tvdb").length;
       const tmdbAfter = this.actors.filter((a) => a.source === "tmdb").length;
       if (DEBUG_ACTORS_MERGE_LOG) {
-        console.debug(
-          `${this.showName} | TVDB: ${mergeResult.tvdbBefore}, ${tvdbAfter} | TMDB: ${mergeResult.tmdbBefore}, ${tmdbAfter}`,
-        );
+        unilog(910, `${this.showName} | TVDB: ${mergeResult.tvdbBefore}, ${tvdbAfter} | TMDB: ${mergeResult.tmdbBefore}, ${tmdbAfter}`);
       }
     },
   },

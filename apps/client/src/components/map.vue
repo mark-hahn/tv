@@ -991,7 +991,7 @@ import { config } from "../config.js";
 import * as urls from "../urls.js";
 import * as util from "../util.js";
 import evtBus from "../evtBus.js";
-import { fmtPos } from "@tv/share";
+import { fmtPos, unilog} from "@tv/share"
 import * as epd from "@tv/share";
 
 const MAP_ARROW_PAN_PX_PER_SEC = 400;
@@ -1360,7 +1360,7 @@ export default {
 
       if (!showName) return;
       if (!tvdbId) {
-        console.error("Map: Not In Emby ctrl-click missing tvdbId", {
+        unilog(1016, "Map: Not In Emby ctrl-click missing tvdbId", {
           mapShow: this.mapShow,
           tvdbData: this.tvdbData,
         });
@@ -1379,7 +1379,7 @@ export default {
         typeof this.tvdbData === "object" &&
         Object.keys(this.tvdbData).length > 0;
       if (!hasTvdbData) {
-        console.error("Map: Not In Emby ctrl-click missing tvdbData", {
+        unilog(1017, "Map: Not In Emby ctrl-click missing tvdbData", {
           showName,
           tvdbId,
           tvdbData: this.tvdbData,
@@ -1400,11 +1400,7 @@ export default {
 
       const setStatus = (txt) => {
         this.mapWorkingStatus = String(txt || "");
-        console.log(
-          "Map: Not In Emby progress:",
-          showName,
-          this.mapWorkingStatus,
-        );
+        unilog(1018, "Map: Not In Emby progress:", showName, this.mapWorkingStatus);
         evtBus.emit("setLibraryProgress", this.mapWorkingStatus);
       };
 
@@ -1424,7 +1420,7 @@ export default {
             `The folder for "${showName}" was created, but the Emby library refresh timed out.\nThe show should appear after Emby finishes scanning on its own.`,
           );
         } else if (!res?.createdFolder) {
-          console.error("Map: createShowFolderAndRefreshEmby failed", {
+          unilog(1019, "Map: createShowFolderAndRefreshEmby failed", {
             showName,
             tvdbId,
             res,
@@ -1446,9 +1442,7 @@ export default {
 
           const timeoutMs = 60000;
           const t = setTimeout(() => {
-            console.warn(
-              "Map: timed out waiting for show reload after library-refresh-complete",
-            );
+            unilog(1020, "Map: timed out waiting for show reload after library-refresh-complete");
             finish();
           }, timeoutMs);
 
@@ -1463,7 +1457,7 @@ export default {
         // Enqueue just the new show for processing
         await srvr
           .triggerShowSelect(showName)
-          .catch((err) => console.error("triggerShowSelect failed:", err));
+          .catch((err) => unilog(1021, "triggerShowSelect failed:", err));
       } finally {
         this.mapWorking = false;
         this.mapWorkingTitle = "";
@@ -1738,7 +1732,7 @@ export default {
           this.tvdbData = this.allTvdb[this.mapShow.name];
         }
       } catch (err) {
-        console.error("loadTvdbData error:", err);
+        unilog(1022, "loadTvdbData error:", err);
       }
     },
     formatEpisodeAired(aired) {
@@ -1802,7 +1796,7 @@ export default {
         await navigator.clipboard.writeText(text);
         return true;
       } catch (err) {
-        console.error("Copy failed", err);
+        unilog(1023, "Copy failed", err);
         return false;
       }
     },
@@ -1939,7 +1933,7 @@ export default {
         };
       } catch (err) {
         if (reqId !== this.episodeInfoRequestId) return;
-        console.error("selectEpisode getTmdb error:", err);
+        unilog(1024, "selectEpisode getTmdb error:", err);
         this.episodeInfo = {
           image: null,
           overview: null,
@@ -2057,7 +2051,7 @@ export default {
       }, 750);
       const resp = await srvr.clearEpisodePositions(this.mapShow.name, cells);
       if (!resp?.ok) {
-        console.error("clearEpisodePositions failed", resp);
+        unilog(1025, "clearEpisodePositions failed", resp);
         return;
       }
       // Update in-memory seriesMap so cells immediately drop their pos/p display.

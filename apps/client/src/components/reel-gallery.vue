@@ -66,6 +66,7 @@
 <script>
 import { ref, watch, onMounted, nextTick } from "vue";
 import { srchTvdbData } from "../tvdb.js";
+import { unilog } from "../log.js";
 
 export default {
   name: "ReelGallery",
@@ -201,7 +202,7 @@ export default {
           }
         } catch (e) {
           // Log errors for debugging
-          console.error("checkImages error:", e);
+          unilog(1032, "checkImages error:", e);
         }
       }
     };
@@ -253,14 +254,14 @@ export default {
           emit("search-complete", null);
         }
       } catch (err) {
-        console.error("Error loading tvdb data:", err);
+        unilog(1033, "Error loading tvdb data:", err);
         tvdbList.value = [];
         emit("search-complete", null);
       }
     };
 
     const handleImageError = (event) => {
-      console.error("Image failed to load:", event.target.src);
+      unilog(1034, "Image failed to load:", event.target.src);
     };
 
     // Watch for srchStr changes

@@ -27,17 +27,17 @@ export default {
       const img = new Image();
       let imgIdx = 0;
       const tryImg = () => {
-        console.log("Meta: trying img:", images[imgIdx]);
+        unilog(1026, "Meta: trying img:", images[imgIdx]);
         img.src =
           "https://hahnca.com/tv/" + encodeURI(this.show.name) + images[imgIdx];
       };
       tryImg();
       img.onload = () => {
-        console.log("Meta: showing img:", images[imgIdx]);
+        unilog(1027, "Meta: showing img:", images[imgIdx]);
         document.getElementById("poster").replaceChildren(img);
       };
       img.onerror = () => {
-        console.log("Meta: no img:", images[imgIdx]);
+        unilog(1028, "Meta: no img:", images[imgIdx]);
         if (++imgIdx == images.length) {
           unilog(165, "Meta: no image found"); // log-id: 165
           return;
@@ -49,7 +49,7 @@ export default {
 
   mounted() {
     evtBus.on("showSelected", (show) => {
-      console.log("Meta: showSelected:", show.name);
+      unilog(1029, "Meta: showSelected:", show.name);
       this.show = show;
       this.setPoster();
     });

@@ -414,7 +414,7 @@ export default {
       // If the flag doesn't exist yet, treat it as false and set to true.
       show[flagName] = !show[flagName];
       await srvr.addNoEmby(show).catch((err) => {
-        console.error(`late addNoEmby error (${flagName}):`, err);
+        unilog(951, `late addNoEmby error (${flagName}):`, err);
       });
     };
 
@@ -429,7 +429,7 @@ export default {
       try {
         await emby.saveToTry(show.id, show.inToTry, show.name);
       } catch (err) {
-        console.error("toggleToTry error:", err);
+        unilog(952, "toggleToTry error:", err);
         show.inToTry = originalValue; // Revert on error
       }
     };
@@ -443,7 +443,7 @@ export default {
           anticipating: show.anticipating,
         });
       } catch (err) {
-        console.error("toggleAnticipating error:", err);
+        unilog(953, "toggleAnticipating error:", err);
         show.anticipating = originalValue;
       }
     };
@@ -459,7 +459,7 @@ export default {
       try {
         await emby.saveContinue(show.id, show.inContinue, show.name);
       } catch (err) {
-        console.error("toggleContinue error:", err);
+        unilog(954, "toggleContinue error:", err);
         show.inContinue = originalValue; // Revert on error
       }
     };
@@ -475,7 +475,7 @@ export default {
       try {
         await emby.saveMark(show.id, show.inMark, show.name);
       } catch (err) {
-        console.error("toggleMark error:", err);
+        unilog(955, "toggleMark error:", err);
         show.inMark = originalValue;
       }
     };
@@ -491,7 +491,7 @@ export default {
       try {
         await emby.saveLinda(show.id, show.inLinda, show.name);
       } catch (err) {
-        console.error("toggleLinda error:", err);
+        unilog(956, "toggleLinda error:", err);
         show.inLinda = originalValue; // Revert on error
       }
     };
@@ -962,7 +962,7 @@ export default {
           }
         }
       } catch (e) {
-        console.error("customClick sharedFilters apply failed:", e);
+        unilog(957, "customClick sharedFilters apply failed:", e);
       }
       await this.select();
       this.sortShows();
@@ -985,7 +985,7 @@ export default {
           try {
             shared = await srvr.getSharedFilters();
           } catch (err) {
-            console.error("ctrl-send: getSharedFilters failed", err);
+            unilog(958, "ctrl-send: getSharedFilters failed", err);
             shared = null;
           }
 
@@ -1054,7 +1054,7 @@ export default {
           this.hasSharedFilters = true;
         }
       } catch (e) {
-        console.error("sendSharedFilters failed:", e);
+        unilog(959, "sendSharedFilters failed:", e);
       }
     },
 
@@ -1067,31 +1067,26 @@ export default {
 
         const currentShow = allShows.find((s) => s.name === this.highlightName);
         if (!currentShow) {
-          console.log("Could not find show:", this.highlightName);
+          unilog(960, "Could not find show:", this.highlightName);
           return;
         }
 
         const tvdbId = currentShow.tvdbId || currentShow.tvdbId;
         if (!tvdbId) {
-          console.log("Show has no TvdbId:", this.highlightName);
+          unilog(961, "Show has no TvdbId:", this.highlightName);
           return;
         }
 
-        console.log(
-          "Fetching TVDB API data for:",
-          this.highlightName,
-          "TvdbId:",
-          tvdbId,
-        );
+        unilog(962, "Fetching TVDB API data for:", this.highlightName, "TvdbId:", tvdbId);
 
         const result = await srvr.debugTvdb({
           name: currentShow.name,
           tvdbId: tvdbId,
         });
 
-        console.log("Debug result:", result);
+        unilog(963, "Debug result:", result);
       } catch (e) {
-        console.error("debugClick failed:", e);
+        unilog(964, "debugClick failed:", e);
       }
     },
 
@@ -1123,7 +1118,7 @@ export default {
             }
           }
         } catch (e) {
-          console.error("Custom sharedFilters parse/apply failed:", e);
+          unilog(965, "Custom sharedFilters parse/apply failed:", e);
         }
 
         // Apply sortChoice from sharedFilters if present.
@@ -1363,14 +1358,14 @@ export default {
         return;
       }
 
-      console.log("addRow", show.name);
+      unilog(966, "addRow", show.name);
       this.shows.unshift(show);
       if (allShows !== this.shows) allShows.unshift(show);
       this.saveVisShow(show, true);
     },
 
     removeRow(show) {
-      console.log("removeRow", show.name);
+      unilog(967, "removeRow", show.name);
       const id = show.id;
       const newShow = this.setHighlightAfterDel(id);
       this.shows = this.shows.filter((show) => show.id != id);
@@ -1431,7 +1426,7 @@ export default {
         tvdbId,
       });
       if (matchShow && matchShow.inEmby !== false) {
-        console.log(matchShow.name + " already exists.");
+        unilog(968, matchShow.name + " already exists.");
         if (!this.shows.some((sh) => sh?.name === matchShow.name)) {
           await this.fltrAction("All");
         }
@@ -1526,7 +1521,7 @@ export default {
           }
         } catch (e) {
           seriesMapSeasons = [];
-          console.error("web add: failed to fetch series map", {
+          unilog(969, "web add: failed to fetch series map", {
             name,
             tvdbId,
             err: e?.message || e,
@@ -1542,15 +1537,12 @@ export default {
         let createResult = null;
         if (!hasMapData) {
           createdFolder = false;
-          console.error(
-            "web add: missing map data; skipping createShowFolder",
-            {
+          unilog(970, "web add: missing map data; skipping createShowFolder", {
               name,
               tvdbId,
               seriesMapSeasons,
               tvdbData,
-            },
-          );
+            });
           alert(`No map data for new show ${name}`);
         } else {
           const res = await emby.createShowFolderAndRefreshEmby({
@@ -1569,7 +1561,7 @@ export default {
               `The folder for "${name}" was created, but the Emby library refresh timed out.\nThe show should appear after Emby finishes scanning on its own.`,
             );
           } else if (!createdFolder) {
-            console.error("web add: createShowFolderAndRefreshEmby failed", {
+            unilog(971, "web add: createShowFolderAndRefreshEmby failed", {
               name,
               tvdbId,
               res,
@@ -1589,7 +1581,7 @@ export default {
               await srvr
                 .triggerShowGapCheck(newShow.id, name)
                 .catch((err) =>
-                  console.error("triggerShowGapCheck failed:", err),
+                  unilog(972, "triggerShowGapCheck failed:", err),
                 );
             }
           } catch {
@@ -1633,7 +1625,7 @@ export default {
         }
 
         if (!show) {
-          console.error("web add: aborted without creating noemby fallback", {
+          unilog(973, "web add: aborted without creating noemby fallback", {
             name,
             tvdbId,
             createdFolder,
@@ -1684,7 +1676,7 @@ export default {
 
         ok = true;
       } catch (e) {
-        console.error("web add: failed", {
+        unilog(974, "web add: failed", {
           name,
           tvdbId,
           err: e?.message || e,
@@ -2209,7 +2201,7 @@ export default {
         if (show.name) {
           srvr
             .triggerShowSelect(show.name)
-            .catch((err) => console.error("triggerShowSelect failed:", err));
+            .catch((err) => unilog(975, "triggerShowSelect failed:", err));
         }
       }
 
@@ -2277,7 +2269,7 @@ export default {
       } else {
         show = allShows.find((shw) => shw.name == name);
         if (!show) {
-          console.log("scrollToSavedShow: show not found", name);
+          unilog(976, "scrollToSavedShow: show not found", name);
           show = allShows[0];
         }
       }
@@ -2317,7 +2309,7 @@ export default {
         try {
           await srvr.deletePath(path);
         } catch (err) {
-          console.error("episodeClick: deletePath failed", { path, err });
+          unilog(977, "episodeClick: deletePath failed", { path, err });
           window.alert(err?.message || String(err));
           return;
         }
@@ -2343,7 +2335,7 @@ export default {
         this.markShowUpdating(show.name);
         await srvr
           .refreshEmbyItem(show.id, show.name)
-          .catch((err) => console.error("refreshEmbyItem failed:", err));
+          .catch((err) => unilog(978, "refreshEmbyItem failed:", err));
 
         // Refresh the Map grid now that Emby has updated.
         await this.seriesMapAction("refresh", show, null);
@@ -2462,7 +2454,7 @@ export default {
       try {
         pathResults = await srvr.deletePaths(paths);
       } catch (err) {
-        console.error("deleteEpisodes: deletePaths call failed", err);
+        unilog(979, "deleteEpisodes: deletePaths call failed", err);
         window.alert(`Delete failed: ${err?.message || String(err)}`);
         return;
       }
@@ -2480,7 +2472,7 @@ export default {
             cell.error = false;
           }
         } else {
-          console.error("deleteEpisodes: deletePaths failed", {
+          unilog(980, "deleteEpisodes: deletePaths failed", {
             path: paths[i],
             season,
             episode,
@@ -2510,7 +2502,7 @@ export default {
         this.markShowUpdating(show.name);
         await srvr
           .refreshEmbyItem(show.id, show.name)
-          .catch((err) => console.error("refreshEmbyItem failed:", err));
+          .catch((err) => unilog(981, "refreshEmbyItem failed:", err));
 
         await this.seriesMapAction("refresh", show, null);
       }
@@ -2537,12 +2529,7 @@ export default {
       const seasonMap = this.seriesMap?.[season];
       if (!seasonMap) return;
 
-      console.log(
-        "[seasonWatched] season:",
-        season,
-        "episodeStates:",
-        JSON.stringify(episodeStates),
-      );
+      unilog(982, "season:", season, "episodeStates:", JSON.stringify(episodeStates));
 
       // Apply all episode states at once
       for (const [episodeNum, watched] of Object.entries(episodeStates)) {
@@ -2556,10 +2543,7 @@ export default {
         const playedEps = Object.entries(eps)
           .filter(([, c]) => c.played)
           .map(([e]) => e);
-        console.log(
-          `[seasonWatched] S${sNum} played:`,
-          playedEps.length > 0 ? playedEps.join(",") : "none",
-        );
+        unilog(983, `S${sNum} played:`, playedEps.length > 0 ? playedEps.join(",") : "none");
       }
 
       // Convert this.seriesMap to array format and persist once
@@ -2574,7 +2558,7 @@ export default {
         seriesMapArr.push([+sNum, episodes]);
       }
       const watchedEpis = tvdb.seriesMapToWatchedEpis(seriesMapArr);
-      console.log("[seasonWatched] watchedEpis:", JSON.stringify(watchedEpis));
+      unilog(984, "watchedEpis:", JSON.stringify(watchedEpis));
       await srvr.setWatchedEpis({ name: show.name, watchedEpis });
       // Re-emit to App.vue so the map prop updates
       this.$emit("show-map", {
@@ -2615,7 +2599,7 @@ export default {
         try {
           await emby.getSeriesMap(show, true);
         } catch (e) {
-          console.error("prune failed:", e?.message || e);
+          unilog(985, "prune failed:", e?.message || e);
         }
         if (mapToken !== this._mapActionToken) return;
       }
@@ -2733,7 +2717,7 @@ export default {
         this.markShowUpdating(show.name);
         await srvr
           .refreshEmbyItem(show.id, show.name)
-          .catch((err) => console.error("refreshEmbyItem failed:", err));
+          .catch((err) => unilog(986, "refreshEmbyItem failed:", err));
         await this.seriesMapAction("refresh", show);
       }
     },
@@ -3094,7 +3078,7 @@ export default {
         await srvr.dumpSelectedShows(showNames);
         unilog(157, `Dumped ${showNames.length} shows to selected-shows.txt`); // log-id: 157
       } catch (error) {
-        console.error("Failed to dump shows:", error);
+        unilog(987, "Failed to dump shows:", error);
       }
     },
 
@@ -3126,12 +3110,7 @@ export default {
           .replace(/\s+/g, " ");
 
       const targetActorName = normName(actorName);
-      console.log(
-        "Filtering by actor:",
-        actorName,
-        "normalized:",
-        targetActorName,
-      );
+      unilog(988, "Filtering by actor:", actorName, "normalized:", targetActorName);
 
       // Get TVDB data for all shows to check their actors
       if (!allTvdb) allTvdb = await tvdb.getAllTvdb();
@@ -3157,9 +3136,7 @@ export default {
         return crew.some((c) => normName(c?.name) === targetActorName);
       });
 
-      console.log(
-        `Found ${filteredShows.length} shows with actor ${actorName}`,
-      );
+      unilog(989, `Found ${filteredShows.length} shows with actor ${actorName}`);
 
       // Update the shows list and UI
       this.shows = filteredShows;
@@ -3217,7 +3194,7 @@ export default {
             filteredShows = allShows.filter(checkShowForActorMatch);
           }
         } catch (error) {
-          console.error("Error searching non-emby shows:", error);
+          unilog(990, "Error searching non-emby shows:", error);
         }
       }
 
@@ -3265,7 +3242,7 @@ export default {
               // Keep the full map populated, but do not switch panes.
               await this.seriesMapAction("open", show, { noSwitch: true });
             } catch (err) {
-              console.error("watchClick: seriesMapAction failed", err);
+              unilog(991, "watchClick: seriesMapAction failed", err);
             }
             // Switch to info pane without clearing the background map.
             evtBus.emit("showInfoPane");
@@ -3302,9 +3279,7 @@ export default {
     async addGapToShow(event) {
       // Gap data now comes from server-side tvdb records
       // This method kept for compatibility but deprecated
-      console.warn(
-        "addGapToShow called - gap checking now handled server-side",
-      );
+      unilog(992, "addGapToShow called - gap checking now handled server-side");
     },
 
     async newShows(isInitialLoad = false) {
@@ -3320,7 +3295,7 @@ export default {
         const sitcoms = await srvr.getSitcoms();
         this.sitcomsSet = new Set(sitcoms);
       } catch (err) {
-        console.error("Failed to load sitcoms list:", err);
+        unilog(993, "Failed to load sitcoms list:", err);
         this.sitcomsSet = new Set();
       }
 
@@ -3436,9 +3411,7 @@ export default {
         ).record;
 
         if (!tvdbRecord) {
-          console.warn(
-            `[updateShowFromDiskChange] No tvdb record found for ${showName}`,
-          );
+          unilog(994, `No tvdb record found for ${showName}`);
           return;
         }
 
@@ -3483,9 +3456,7 @@ export default {
 
           // If this show is currently displayed on the map, refresh it
           if (this.mapShow && this.mapShow.name === showName) {
-            console.log(
-              `[updateShowFromDiskChange] Refreshing map for ${showName}`,
-            );
+            unilog(995, `Refreshing map for ${showName}`);
             await this.seriesMapAction("refresh", show, null);
           }
 
@@ -3493,10 +3464,7 @@ export default {
           await this.refilter(false);
         }
       } catch (err) {
-        console.error(
-          `[updateShowFromDiskChange] Error updating ${showName}:`,
-          err,
-        );
+        unilog(996, `Error updating ${showName}:`, err);
       }
     },
   },
@@ -3683,7 +3651,7 @@ export default {
         // Refresh UI
         await this.refilter(false);
       } catch (err) {
-        console.error("[tvdbUpdated] Failed to handle tvdb push:", err);
+        unilog(997, "Failed to handle tvdb push:", err);
       }
     });
 
@@ -3815,7 +3783,7 @@ export default {
       try {
         await srvr.delSeasonFiles(showName, showPath, season);
       } catch (err) {
-        console.error("seasonDelete: delSeasonFiles failed", {
+        unilog(998, "seasonDelete: delSeasonFiles failed", {
           showName,
           showPath,
           season,
@@ -3829,7 +3797,7 @@ export default {
       this.markShowUpdating(show.name);
       await srvr
         .refreshEmbyItem(show.id, show.name)
-        .catch((err) => console.error("refreshEmbyItem failed:", err));
+        .catch((err) => unilog(999, "refreshEmbyItem failed:", err));
       await this.seriesMapAction("refresh", show, null);
     });
 
@@ -3854,7 +3822,7 @@ export default {
         }
         // Manual scan: triggerEmbySync pushes tvdbUpdated WS events — no reload needed
       } catch (err) {
-        console.error("library-refresh-complete: failed", err);
+        unilog(1000, "library-refresh-complete: failed", err);
       } finally {
         this.showReloadingShows = false;
         if (typeof onDone === "function") {
@@ -3969,7 +3937,7 @@ export default {
       try {
         await this.newShows(true);
       } catch (err) {
-        console.error("Mounted:", err);
+        unilog(1001, "Mounted:", err);
       }
     })();
   },

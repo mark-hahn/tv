@@ -836,12 +836,9 @@ export default {
 
         // Do not request permission automatically (may require user gesture).
         // If user wants notifications, they can grant it in browser/site settings.
-        console.log(
-          "Desktop notification not shown (permission:",
-          Notification.permission + ")",
-        );
+        unilog(917, "Desktop notification not shown (permission:", Notification.permission + ")");
       } catch (e) {
-        console.log("notifyAllUsbFinished failed:", e?.message || String(e));
+        unilog(918, "notifyAllUsbFinished failed:", e?.message || String(e));
       }
     },
 
@@ -1311,7 +1308,7 @@ export default {
           body: JSON.stringify({ title }),
         });
       } catch (e) {
-        console.error("retryDownload failed:", e);
+        unilog(919, "retryDownload failed:", e);
         delete this.retryingTitles[title];
       }
     },
@@ -1372,7 +1369,7 @@ export default {
         });
         await this.loadTvproc();
       } catch (e) {
-        console.error("clearErrorRecords failed:", e);
+        unilog(920, "clearErrorRecords failed:", e);
       }
     },
 
@@ -1534,7 +1531,7 @@ export default {
           this.isChecking = false;
         }, 5000);
       } catch (e) {
-        console.error("startCheck error", e);
+        unilog(921, "startCheck error", e);
         this.isChecking = false;
       }
     },

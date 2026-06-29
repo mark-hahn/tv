@@ -792,7 +792,7 @@ export default {
         this.lastSelectedFile = null;
         await this.fetchFiles();
       } catch (e) {
-        console.error("Rename failed", e);
+        unilog(1045, "Rename failed", e);
         this.error = e.message || "Rename failed";
         this.loading = false; // ensure loading is off on error
       }
@@ -866,7 +866,7 @@ export default {
         }
         // console.log("usb: parser resolved:", !!parser);
       } catch (e) {
-        console.error("usb: parser resolution error:", e);
+        unilog(1046, "usb: parser resolution error:", e);
       }
 
       const allMatches = [];

@@ -2,6 +2,7 @@ import * as srvr from "./srvr.js";
 import * as util from "./util.js";
 import { config } from "./config.js";
 import { episodeDataToWatchedEpis } from "@tv/share";
+import { unilog } from "./log.js";
 
 // Route TVDB calls through the local torrents server proxy via WebSocket.
 // This avoids browser-to-TVDB CORS issues (Authorization header) and keeps secrets on server.
@@ -43,11 +44,7 @@ async function tvdbFetch(pathStr, _init, retryCount = 0) {
     // Retry on network errors
     if (retryCount < MAX_RETRIES) {
       const delay = RETRY_DELAYS[retryCount];
-      console.warn(
-        `tvdbFetch: network error, retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES}):`,
-        pathStr,
-        e?.message || e,
-      );
+      unilog(882, `tvdbFetch: network error, retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES}):`, pathStr, e?.message || e);
       await new Promise((resolve) => setTimeout(resolve, delay));
       return tvdbFetch(pathStr, _init, retryCount + 1);
     }
@@ -70,10 +67,7 @@ const fetchAllTvdbWithRetry = async (hasEmby = 0) => {
     } catch (err) {
       lastErr = err;
       if (attempt === retryDelays.length) break;
-      console.warn(
-        `getAllTvdb failed, retrying in ${retryDelays[attempt]}ms (attempt ${attempt + 1}/${retryDelays.length + 1})`,
-        err,
-      );
+      unilog(883, `getAllTvdb failed, retrying in ${retryDelays[attempt]}ms (attempt ${attempt + 1}/${retryDelays.length + 1})`, err);
       await delay(retryDelays[attempt]);
     }
   }
@@ -321,7 +315,7 @@ export const getRemotes = async (
 
       return results;
     } catch (err) {
-      console.error("getRemotes:", err);
+      unilog(884, "getRemotes:", err);
       return [];
     } finally {
       activeRemotesRequests.delete(key);
@@ -425,7 +419,7 @@ export const getEpisode = async (showName, seasonNum, episodeNum) => {
   const tvdbData = getTvdbRecordByNameOrId(allTvdb, showName, null).record;
 
   if (!tvdbData || !tvdbData.tvdbId) {
-    console.error("getEpisode: no tvdbId found for show:", showName);
+    unilog(885, "getEpisode: no tvdbId found for show:", showName);
     return null;
   }
 
@@ -439,7 +433,7 @@ export const getEpisode = async (showName, seasonNum, episodeNum) => {
   const episodes = episodeResObj.data?.episodes;
 
   if (!episodes || episodes.length === 0) {
-    console.error("getEpisode: no episode found for:", {
+    unilog(886, "getEpisode: no episode found for:", {
       showName,
       seasonNum,
       episodeNum,
@@ -526,7 +520,7 @@ export const getEpisodeGuests = async (showName, seasonNum, episodeNum) => {
 
     return guests;
   } catch (error) {
-    console.error("getEpisodeGuests error:", error);
+    unilog(887, "getEpisodeGuests error:", error);
     return [];
   }
 };
@@ -597,7 +591,7 @@ export const getSeriesMap = async (show) => {
   // Search for the show on tvdb
   const searchResults = await srchTvdbData(showNameStr);
   if (!searchResults || searchResults.length === 0) {
-    console.error("getSeriesMap: no results found for:", showNameStr);
+    unilog(888, "getSeriesMap: no results found for:", showNameStr);
     return [];
   }
 
@@ -618,13 +612,13 @@ export const getSeriesMap = async (show) => {
   }
 
   if (!bestMatch) {
-    console.error("getSeriesMap: no matching show found for:", showNameStr);
+    unilog(889, "getSeriesMap: no matching show found for:", showNameStr);
     return [];
   }
 
   const tvdbId = bestMatch.tvdb_id || bestMatch.id;
   if (!tvdbId) {
-    console.error("getSeriesMap: no tvdb_id in best match for:", showNameStr);
+    unilog(890, "getSeriesMap: no tvdb_id in best match for:", showNameStr);
     return [];
   }
 
@@ -666,7 +660,7 @@ export const getSeriesMapByTvdbId = async (tvdbId) => {
     try {
       episodesRes = await tvdbFetch(episodesUrl);
     } catch (e) {
-      console.error("getSeriesMap: failed to fetch episodes. Aborting.", {
+      unilog(891, "getSeriesMap: failed to fetch episodes. Aborting.", {
         tvdbId,
         page,
         url: episodesUrl,

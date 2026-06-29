@@ -732,7 +732,7 @@ export default {
               (h) => h && !curDownloading.includes(h),
             );
             if (missing.length > 0) {
-              console.log("History: download finished, starting tvproc cycle", {
+              unilog(1030, "History: download finished, starting tvproc cycle", {
                 finishedHashes: missing,
               });
               for (const h of missing) {
@@ -1186,7 +1186,7 @@ export default {
     },
 
     forceFile(title) {
-      console.log("history: forceFile button clicked, title:", title);
+      unilog(1031, "history: forceFile button clicked, title:", title);
       if (!title) return;
       unilog(166, "history: emitting forceFile event"); // log-id: 166
       evtBus.emit("forceFile", title);

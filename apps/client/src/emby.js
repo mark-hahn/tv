@@ -26,9 +26,7 @@ async function axiosGetWithRetry(url, retries = EMBY_MAX_RETRIES) {
 
       if (!isLastAttempt && isNetworkError) {
         const delay = EMBY_RETRY_DELAY * (attempt + 1);
-        console.warn(
-          `Emby request failed (attempt ${attempt + 1}/${retries + 1}), retrying in ${delay}ms: ${url}`,
-        );
+        unilog(810, `Emby request failed (attempt ${attempt + 1}/${retries + 1}), retrying in ${delay}ms: ${url}`);
         await new Promise((resolve) => setTimeout(resolve, delay));
         continue;
       }
@@ -201,9 +199,7 @@ async function _oldLoadAllShows() {
       ...record.remotes[embyRemoteIndex],
       url: expectedUrl,
     };
-    console.warn(
-      `[loadAllShows] Fixed Emby remote URL mismatch for key=\"${key}\": id=${recordId} oldUrl=\"${currentUrl}\" newUrl=\"${expectedUrl}\"`,
-    );
+    unilog(811, `Fixed Emby remote URL mismatch for key=\"${key}\": id=${recordId} oldUrl=\"${currentUrl}\" newUrl=\"${expectedUrl}\"`);
 
     try {
       const updated = await srvr.setTvdbFields({
@@ -215,10 +211,7 @@ async function _oldLoadAllShows() {
         return updated;
       }
     } catch (e) {
-      console.error(
-        `[loadAllShows] Failed to persist fixed Emby remote URL for key=\"${key}\"`,
-        e,
-      );
+      unilog(812, `Failed to persist fixed Emby remote URL for key=\"${key}\"`, e);
     }
 
     return record;
@@ -244,9 +237,7 @@ async function _oldLoadAllShows() {
       const embyTvdbId = String(s?.ProviderIds?.Tvdb || s?.TvdbId || "").trim();
       const matchedByTvdbId = embyTvdbId && embyTvdbId === recordTvdbId;
       if (matchedByTvdbId && keyName && embyName && embyName !== keyName) {
-        console.info(
-          `[loadAllShows] hasEmby matched by tvdbId=${recordTvdbId} with name variant: emby="${embyName}" cacheKey="${keyName}"`,
-        );
+        unilog(813, `hasEmby matched by tvdbId=${recordTvdbId} with name variant: emby="${embyName}" cacheKey="${keyName}"`);
       }
       return matchedByTvdbId;
     });
@@ -321,10 +312,7 @@ async function _oldLoadAllShows() {
   const keysToRename = []; // { oldKey, newKey }
   for (const [key, show] of Object.entries(allTvdb)) {
     if (!isTvdbShowRecord(show)) {
-      console.warn(
-        `[loadAllShows] Ignoring non-show TVDB entry at key="${key}"`,
-        show,
-      );
+      unilog(814, `Ignoring non-show TVDB entry at key="${key}"`, show);
       continue;
     }
 
@@ -334,23 +322,17 @@ async function _oldLoadAllShows() {
     }
 
     if (key !== properName) {
-      console.warn(
-        `[loadAllShows] Key/Name mismatch found - key="${key}" Name="${properName}"`,
-      );
+      unilog(815, `Key/Name mismatch found - key="${key}" Name="${properName}"`);
 
       // Check if there's already an entry with the correct key
       const correctEntry = allTvdb[properName];
       if (correctEntry && correctEntry !== show) {
         // Both entries exist - prefer the one with the correct key, delete the mismatched one
-        console.warn(
-          `[loadAllShows] Duplicate detected. Deleting mismatched entry with key="${key}"`,
-        );
+        unilog(816, `Duplicate detected. Deleting mismatched entry with key="${key}"`);
         keysToDelete.push(key);
       } else if (!correctEntry) {
         // No entry with correct key - move this one to the correct key
-        console.warn(
-          `[loadAllShows] Moving entry from key="${key}" to key="${properName}"`,
-        );
+        unilog(817, `Moving entry from key="${key}" to key="${properName}"`);
         allTvdb[properName] = show;
         keysToRename.push({ oldKey: key, newKey: properName });
       }
@@ -366,22 +348,15 @@ async function _oldLoadAllShows() {
   }
 
   if (keysToDelete.length > 0 || keysToRename.length > 0) {
-    console.log(
-      `[loadAllShows] Cleaned up ${keysToDelete.length} deleted + ${keysToRename.length} renamed keys`,
-    );
+    unilog(818, `Cleaned up ${keysToDelete.length} deleted + ${keysToRename.length} renamed keys`);
 
     // Persist renames to server (move record from old key to new key)
     for (const { oldKey, newKey } of keysToRename) {
       try {
         await srvr.setTvdbFields({ name: oldKey, $rename: newKey });
-        console.log(
-          `[loadAllShows] Renamed key="${oldKey}" -> "${newKey}" on server`,
-        );
+        unilog(819, `Renamed key="${oldKey}" -> "${newKey}" on server`);
       } catch (e) {
-        console.error(
-          `[loadAllShows] Failed to rename key="${oldKey}" -> "${newKey}" on server:`,
-          e,
-        );
+        unilog(820, `Failed to rename key="${oldKey}" -> "${newKey}" on server:`, e);
       }
     }
 
@@ -389,14 +364,9 @@ async function _oldLoadAllShows() {
     for (const badKey of keysToDelete) {
       try {
         await srvr.setTvdbFields({ name: badKey, $delTvdb: true });
-        console.log(
-          `[loadAllShows] Deleted key="${badKey}" from server tvdb.json`,
-        );
+        unilog(821, `Deleted key="${badKey}" from server tvdb.json`);
       } catch (e) {
-        console.error(
-          `[loadAllShows] Failed to delete key="${badKey}" from server:`,
-          e,
-        );
+        unilog(822, `Failed to delete key="${badKey}" from server:`, e);
       }
     }
   }
@@ -406,13 +376,10 @@ async function _oldLoadAllShows() {
   const embyShowNames = new Map();
   for (const embyShow of embyShows.data.Items) {
     if (embyShowNames.has(embyShow.Name)) {
-      console.warn(
-        `[loadAllShows] DUPLICATE Emby show name detected: "${embyShow.Name}"`,
-        {
+      unilog(823, `DUPLICATE Emby show name detected: "${embyShow.Name}"`, {
           first: { Id: embyShowNames.get(embyShow.Name), Name: embyShow.Name },
           second: { Id: embyShow.Id, Name: embyShow.Name },
-        },
-      );
+        });
     }
     embyShowNames.set(embyShow.Name, embyShow.Id);
   }
@@ -438,9 +405,7 @@ async function _oldLoadAllShows() {
         tvdbKey = byTvdbId.key;
         tvdbRecord = byTvdbId.record;
         if (tvdbKey !== name) {
-          console.info(
-            `[loadAllShows] Name variant matched by tvdbId=${tvdbId}: emby="${name}" cacheKey="${tvdbKey}"`,
-          );
+          unilog(824, `Name variant matched by tvdbId=${tvdbId}: emby="${name}" cacheKey="${tvdbKey}"`);
         }
       }
     }
@@ -473,9 +438,7 @@ async function _oldLoadAllShows() {
         );
         if (likelyCandidate) {
           const existing = likelyCandidate.record;
-          console.error(
-            `[loadAllShows] Blocked tvdb record create for emby="${name}"; likely same-show candidate exists: cacheKey="${likelyCandidate.key}"`,
-          );
+          unilog(825, `Blocked tvdb record create for emby="${name}"; likely same-show candidate exists: cacheKey="${likelyCandidate.key}"`);
           evtBus.emit("tvdb-mismatch", {
             reason: "likely-same-show-candidate",
             action: "blocked-create",
@@ -546,18 +509,14 @@ async function _oldLoadAllShows() {
             mismatchType: showIdMismatch ? "showId" : "tvdbId",
           },
         });
-        console.error(
-          `[loadAllShows] Blocked create/update on cache mismatch: emby=\"${name}\" cacheKey=\"${tvdbKey}\" embyId=${embyShow.Id} cacheId=${tvdbRecord.id} embyTvdbId=${tvdbId} cacheTvdbId=${tvdbRecord.tvdbId}`,
-        );
+        unilog(826, `Blocked create/update on cache mismatch: emby=\"${name}\" cacheKey=\"${tvdbKey}\" embyId=${embyShow.Id} cacheId=${tvdbRecord.id} embyTvdbId=${tvdbId} cacheTvdbId=${tvdbRecord.tvdbId}`);
         continue;
       }
 
       // Existing cache record + same tvdbId + missing Id: link/update this record directly.
       // Do not call getNewTvdb here to avoid create-style behavior.
       if (tvdbRecord && !hasCachedShowId && incomingShowId !== "") {
-        console.log(
-          `[loadAllShows] Linking existing tvdb record to Emby Id: key=\"${tvdbKey}\" tvdbId=${incomingTvdbId} embyId=${incomingShowId}`,
-        );
+        unilog(827, `Linking existing tvdb record to Emby Id: key=\"${tvdbKey}\" tvdbId=${incomingTvdbId} embyId=${incomingShowId}`);
         const linkedRecord = await srvr.setTvdbFields({
           name: tvdbKey,
           id: incomingShowId,
@@ -575,10 +534,7 @@ async function _oldLoadAllShows() {
           allTvdb[tvdbKey] = linkedRecord;
           await ensureEmbyRemoteUrlMatchesRecordId(tvdbKey, linkedRecord);
         } else {
-          console.warn(
-            `[loadAllShows] setTvdbFields link response was not a show record for key=\"${tvdbKey}\"`,
-            linkedRecord,
-          );
+          unilog(828, `setTvdbFields link response was not a show record for key=\"${tvdbKey}\"`, linkedRecord);
         }
         continue;
       }
@@ -663,7 +619,7 @@ async function _oldLoadAllShows() {
       const tvdbRecord = allTvdb[name];
       if (tvdbRecord?.id && tvdbRecord.inEmby === true) {
         // Show upgraded to Emby - copy collection flags
-        console.log("upgrading noEmby to Emby:", name);
+        unilog(829, "upgrading noEmby to Emby:", name);
 
         try {
           if (noEmbyShow.inToTry) {
@@ -683,7 +639,7 @@ async function _oldLoadAllShows() {
             tvdbRecord.inLinda = true;
           }
         } catch (e) {
-          console.error("loadAllShows: upgrade noEmby flags failed", name, e);
+          unilog(830, "loadAllShows: upgrade noEmby flags failed", name, e);
         }
 
         // Mark as not in emby anymore in old record
@@ -703,9 +659,7 @@ async function _oldLoadAllShows() {
     const hasNoEmby = noEmbys.some((s) => s.name === name);
 
     if (!hasEmby && !hasNoEmby) {
-      console.log(
-        `loadAllShows: marking ${name} as not in Emby (no show found)`,
-      );
+      unilog(831, `loadAllShows: marking ${name} as not in Emby (no show found)`);
       const updatedRecord = await srvr.setTvdbFields({
         name,
         inEmby: false,
@@ -715,17 +669,11 @@ async function _oldLoadAllShows() {
         allTvdb[name] = updatedRecord;
         await ensureEmbyRemoteUrlMatchesRecordId(name, updatedRecord);
       } else {
-        console.warn(
-          `[loadAllShows] Ignoring non-show setTvdbFields response while marking not-in-Emby for "${name}"`,
-          updatedRecord,
-        );
+        unilog(832, `Ignoring non-show setTvdbFields response while marking not-in-Emby for "${name}"`, updatedRecord);
       }
       // Diagnostic: check if we just created an undefined key
       if (name === undefined) {
-        console.error(
-          `[loadAllShows] BUG: setTvdbFields called with name=undefined at line 355`,
-          { name, tvdbRecord },
-        );
+        unilog(833, `BUG: setTvdbFields called with name=undefined at line 355`, { name, tvdbRecord });
       }
     } else if (hasEmby && !tvdbRecord.id) {
       // Has Emby show but tvdb missing id - update it
@@ -744,17 +692,11 @@ async function _oldLoadAllShows() {
       if (isTvdbShowRecord(updatedRecord)) {
         allTvdb[name] = updatedRecord;
       } else {
-        console.warn(
-          `[loadAllShows] Ignoring non-show setTvdbFields response while updating Id for "${name}"`,
-          updatedRecord,
-        );
+        unilog(834, `Ignoring non-show setTvdbFields response while updating Id for "${name}"`, updatedRecord);
       }
       // Diagnostic: check if we just created an undefined key
       if (name === undefined) {
-        console.error(
-          `[loadAllShows] BUG: setTvdbFields called with name=undefined at line 368`,
-          { name, tvdbRecord, embyShow },
-        );
+        unilog(835, `BUG: setTvdbFields called with name=undefined at line 368`, { name, tvdbRecord, embyShow });
       }
     }
   }
@@ -822,18 +764,13 @@ async function _oldLoadAllShows() {
     nameSet.add(show.name);
   }
   if (duplicateNames.length > 0) {
-    console.error(
-      `[loadAllShows] DUPLICATE name properties in showRecords:`,
-      duplicateNames,
-    );
+    unilog(836, `DUPLICATE name properties in showRecords:`, duplicateNames);
     // Log details of duplicates - find their keys in allTvdb
     for (const dupName of duplicateNames) {
       const dupes = showRecords.filter((s) => s.name === dupName);
       unilog(134, `  "${dupName}" appears ${dupes.length} times:`); // log-id: 134
       dupes.forEach((d, i) => {
-        console.error(
-          `    [${i}] id="${d.id}" inEmby=${d.inEmby} tvdbId=${d.tvdbId}`,
-        );
+        unilog(837, `    [${i}] id="${d.id}" inEmby=${d.inEmby} tvdbId=${d.tvdbId}`);
       });
 
       // Find which keys in allTvdb have this name
@@ -841,9 +778,7 @@ async function _oldLoadAllShows() {
       for (const [key, value] of Object.entries(allTvdb)) {
         if (!isTvdbShowRecord(value)) continue;
         if (value.name === dupName) {
-          console.error(
-            `    key="${key}" id="${value.id}" inEmby=${value.inEmby} sameObject=${value === allTvdb[value.name]}`,
-          );
+          unilog(838, `    key="${key}" id="${value.id}" inEmby=${value.inEmby} sameObject=${value === allTvdb[value.name]}`);
         }
       }
     }
@@ -880,19 +815,19 @@ export async function deleteShowFromEmby(show) {
     const res = delRes.status;
     if (res != 204) {
       const err = `unable to delete ${show.name} from emby: ${delRes.data}`;
-      console.error(err);
+      unilog(839, err);
       return;
     }
-    console.log("deleted show from emby:", show.name);
+    unilog(840, "deleted show from emby:", show.name);
   } catch (error) {
     const errData = error.response?.data || "";
     if (errData.includes("Directory not empty")) {
       const msg = `Cannot delete "${show.name}" - directory still has files. Delete files from disk first.`;
-      console.error(msg);
+      unilog(841, msg);
       alert(msg);
     } else {
-      console.error("deleteShowFromEmby error:", error);
-      console.error("Response data:", errData);
+      unilog(842, "deleteShowFromEmby error:", error);
+      unilog(843, "Response data:", errData);
     }
     throw error;
   }
@@ -900,11 +835,11 @@ export async function deleteShowFromEmby(show) {
 
 const deleteOneFile = async (path) => {
   if (!path) return;
-  console.log("deleting file:", path);
+  unilog(844, "deleting file:", path);
   try {
     await srvr.deletePath(path);
   } catch (e) {
-    console.error("deletePath:", path, e);
+    unilog(845, "deletePath:", path, e);
     throw e;
   }
 };
@@ -946,7 +881,7 @@ export const editEpisode = async (
         try {
           await srvr.deletePath(path);
         } catch (e) {
-          console.error("deleteOneFile:", path, e);
+          unilog(846, "deleteOneFile:", path, e);
           throw e;
         }
       }
@@ -1021,10 +956,7 @@ export const getEpisodeCounts = async (show) => {
     // Intentionally no logging here; we just skip malformed items.
   } catch (e) {
     const showName = show.Name || show.name || "unknown";
-    console.error(
-      `getEpisodeCounts error for "${showName}" (id=${showId}):`,
-      e.message || e,
-    );
+    unilog(847, `getEpisodeCounts error for "${showName}" (id=${showId}):`, e.message || e);
     if (e.config?.url) {
       unilog(136, `  Failed URL: ${e.config.url}`); // log-id: 136
     }
@@ -1054,10 +986,10 @@ export const getSeriesMap = async (show, prune = false) => {
       if (result.success && result.seriesMap) {
         return result.seriesMap;
       }
-      console.error("getSeriesMap: Failed to fetch from TVDB:", result.error);
+      unilog(848, "getSeriesMap: Failed to fetch from TVDB:", result.error);
       return [];
     } catch (err) {
-      console.error("getSeriesMap: Error fetching from TVDB:", err);
+      unilog(849, "getSeriesMap: Error fetching from TVDB:", err);
       return [];
     }
   }
@@ -1109,29 +1041,20 @@ export const getSeriesMap = async (show, prune = false) => {
       const unaired = avail && path ? false : !!unairedObj[episodeNumber];
 
       if (prune) {
-        console.log(
-          `[prune] S${seasonNumber}E${episodeNumber}: played=${played} avail=${avail} locationType=${episodeRec?.LocationType ?? "MISSING"} path=${path ?? "(none)"} pruning=${pruning}`,
-        );
+        unilog(850, `S${seasonNumber}E${episodeNumber}: played=${played} avail=${avail} locationType=${episodeRec?.LocationType ?? "MISSING"} path=${path ?? "(none)"} pruning=${pruning}`);
       }
 
       if (avail && !path) {
-        console.error(
-          "avail without path",
-          `S${seasonNumber}E${episodeNumber}`,
-        );
+        unilog(851, "avail without path", `S${seasonNumber}E${episodeNumber}`);
         continue;
       }
 
       if (pruning) {
         if (!played && avail) {
-          console.log(
-            `[prune] STOP at S${seasonNumber}E${episodeNumber}: not watched, has file`,
-          );
+          unilog(852, `STOP at S${seasonNumber}E${episodeNumber}: not watched, has file`);
           pruning = false;
         } else {
-          console.log(
-            `[prune] queuing S${seasonNumber}E${episodeNumber}: ${path}`,
-          );
+          unilog(853, `queuing S${seasonNumber}E${episodeNumber}: ${path}`);
           if (path) pathsToDeleteBatch.push(path);
         }
       }
@@ -1152,9 +1075,7 @@ export const getSeriesMap = async (show, prune = false) => {
 
       const noFileVal = !path; // noFile is true when there's no path
       if (show.name === "Pluribus" && unaired) {
-        console.log(
-          `Pluribus S${seasonNumber}E${episodeNumber}: path=${path}, unaired=${unaired}, noFile=${noFileVal}, played=${played}, avail=${avail}`,
-        );
+        unilog(854, `Pluribus S${seasonNumber}E${episodeNumber}: path=${path}, unaired=${unaired}, noFile=${noFileVal}, played=${played}, avail=${avail}`);
       }
 
       episodes.push([
@@ -1187,7 +1108,7 @@ export const getSeriesMap = async (show, prune = false) => {
   }
 
   if (missingEpisodeNumbers.length > 0) {
-    console.warn("[map-debug] episodes missing numeric IndexNumber", {
+    unilog(855, "episodes missing numeric IndexNumber", {
       show: show?.name,
       showId: seriesId,
       sample: missingEpisodeNumbers,
@@ -1246,7 +1167,7 @@ export const getSeriesMap = async (show, prune = false) => {
           }
         }
       } catch (err) {
-        console.warn("[map-debug] failed TVDB backfill for Emby seasons", {
+        unilog(856, "failed TVDB backfill for Emby seasons", {
           show: show?.name,
           showId: seriesId,
           tvdbId,
@@ -1293,7 +1214,7 @@ export const getSeriesMap = async (show, prune = false) => {
         synthesized.push(seasonNum);
       }
       if (synthesized.length > 0) {
-        console.warn("[map-debug] synthesized episodes for empty seasons", {
+        unilog(857, "synthesized episodes for empty seasons", {
           show: show?.name,
           showId: seriesId,
           seasons: synthesized,
@@ -1315,7 +1236,7 @@ export async function saveToTry(id, inToTry, showName) {
   try {
     toTryRes = await axios(config);
   } catch (e) {
-    console.error(`saveToTry error, id:${id}, inToTry:${inToTry}`, e);
+    unilog(858, `saveToTry error, id:${id}, inToTry:${inToTry}`, e);
     throw e;
   }
   if (toTryRes.status !== 204) {
@@ -1324,7 +1245,7 @@ export async function saveToTry(id, inToTry, showName) {
       toTryRes.status +
       ", data=" +
       JSON.stringify(toTryRes.data);
-    console.error(err);
+    unilog(859, err);
     throw new Error(err);
   }
 }
@@ -1338,7 +1259,7 @@ export async function saveContinue(id, inContinue, showName) {
   try {
     continueRes = await axios(config);
   } catch (e) {
-    console.error(`saveContinue error, id:${id}, inContinue:${inContinue}`, e);
+    unilog(860, `saveContinue error, id:${id}, inContinue:${inContinue}`, e);
     throw e;
   }
   if (continueRes.status !== 204) {
@@ -1347,7 +1268,7 @@ export async function saveContinue(id, inContinue, showName) {
       continueRes.status +
       ", data=" +
       JSON.stringify(continueRes.data);
-    console.error(err);
+    unilog(861, err);
     throw new Error(err);
   }
 }
@@ -1361,7 +1282,7 @@ export async function saveMark(id, inMark, showName) {
   try {
     markRes = await axios(config);
   } catch (e) {
-    console.error(`saveMark error, id:${id}, inMark:${inMark}`, e);
+    unilog(862, `saveMark error, id:${id}, inMark:${inMark}`, e);
     throw e;
   }
   if (markRes.status !== 204) {
@@ -1370,7 +1291,7 @@ export async function saveMark(id, inMark, showName) {
       markRes.status +
       ", data=" +
       JSON.stringify(markRes.data);
-    console.error(err);
+    unilog(863, err);
     throw new Error(err);
   }
 }
@@ -1384,7 +1305,7 @@ export async function saveLinda(id, inLinda, showName) {
   try {
     lindaRes = await axios(config);
   } catch (e) {
-    console.error(`saveLinda error, id:${id}, inLinda:${inLinda}`, e);
+    unilog(864, `saveLinda error, id:${id}, inLinda:${inLinda}`, e);
     throw e;
   }
   if (lindaRes.status !== 204) {
@@ -1393,7 +1314,7 @@ export async function saveLinda(id, inLinda, showName) {
       lindaRes.status +
       ", data=" +
       JSON.stringify(lindaRes.data);
-    console.error(err);
+    unilog(865, err);
     throw new Error(err);
   }
 }
@@ -1413,7 +1334,7 @@ export const createNoemby = async (show) => {
 };
 
 export const deleteNoemby = async (name) => {
-  console.log("deleteNoemby:", name);
+  unilog(866, "deleteNoemby:", name);
   await srvr.delNoEmby(name);
 };
 
@@ -1432,7 +1353,7 @@ export const getTvdbIdFromEmbyItem = async (embyId) => {
 };
 
 export const startStop = async (show, episodeId, watchButtonTxt) => {
-  console.log("startStop:", show, episodeId, watchButtonTxt);
+  unilog(867, "startStop:", show, episodeId, watchButtonTxt);
   const devices = await srvr.getDevices();
   for (const device of devices) {
     const { deviceName, sessionId } = device;
@@ -1464,7 +1385,7 @@ export const startStop = async (show, episodeId, watchButtonTxt) => {
           try {
             await srvr.trimIntro(deviceName);
           } catch (e) {
-            console.error(`[startStop] trim intro error:`, e);
+            unilog(868, `trim intro error:`, e);
           }
         }, 2500);
       }
@@ -1646,10 +1567,7 @@ export const createShowFolderAndRefreshEmby = async ({
     if (typeof onStatus === "function") onStatus("Syncing...");
     await srvr.embySync();
   } catch (e) {
-    console.error(
-      "createShowFolderAndRefreshEmby: embySync failed",
-      e?.message || e,
-    );
+    unilog(869, "createShowFolderAndRefreshEmby: embySync failed", e?.message || e);
   }
 
   return { createdFolder: true, status: "ok" };

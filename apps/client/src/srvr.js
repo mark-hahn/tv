@@ -1,5 +1,6 @@
 import { config } from "./config.js";
 import evtBus from "./evtBus.js";
+import { unilog } from "./log.js";
 
 const HTTP_URL = config.tvSrvrUrl;
 const WS_URL = HTTP_URL.replace(/^https/, "wss");
@@ -87,7 +88,7 @@ const attachWsHandlers = () => {
 
 setTimeout(() => {
   ensureWs().catch((err) => {
-    console.error("Failed to start WebSocket", err);
+    unilog(870, "Failed to start WebSocket", err);
   });
 }, WS_START_DELAY_MS);
 
@@ -97,7 +98,7 @@ export const wsSend = (obj) => {
       if (ready) ws.send(JSON.stringify(obj));
     })
     .catch((err) => {
-      console.error("WebSocket send failed", err);
+      unilog(871, "WebSocket send failed", err);
     });
 };
 
@@ -180,7 +181,7 @@ handleMsg = async (msg) => {
   try {
     parts = JSON.parse(msg);
   } catch (e) {
-    console.error("skipping bad message:", msg);
+    unilog(872, "skipping bad message:", msg);
     return;
   }
 
@@ -215,14 +216,14 @@ handleMsg = async (msg) => {
   // Handle responses to client->server calls
   const callIdx = calls.findIndex((call) => call.id == id);
   if (callIdx < 0) {
-    console.error("no matching id from msg:", id);
+    unilog(873, "no matching id from msg:", id);
     return;
   }
   const call = calls[callIdx];
   calls.splice(callIdx, 1);
   const { fname, param, resolve, reject } = call;
   if (status != "ok" && result !== "cancelled")
-    console.error("Reject from server:", { id, fname, param, status, result });
+    unilog(874, "Reject from server:", { id, fname, param, status, result });
 
   // console.log("parsing ws result:", {id, result});
   // const res = JSON.parse(result);
@@ -250,14 +251,9 @@ export async function deleteShowFromSrvr(show) {
   // Delete entire show folder from disk
   // Extract just the folder name from the Emby path (e.g., "/tv/ShowName" -> "ShowName")
   const showFolder = show.path.split("/").pop();
-  console.log(
-    "deleteShowFromSrvr: deleting folder:",
-    showFolder,
-    "for show:",
-    show.name,
-  );
+  unilog(875, "deleteShowFromSrvr: deleting folder:", showFolder, "for show:", show.name);
   const result = await deletePath(showFolder);
-  console.log("deleteShowFromSrvr: deletePath result:", result);
+  unilog(876, "deleteShowFromSrvr: deletePath result:", result);
 
   if (result !== "ok") {
     throw new Error(`Failed to delete folder: ${result}`);
@@ -266,7 +262,7 @@ export async function deleteShowFromSrvr(show) {
   // don't ever delete from remotes
   // don't ever delete from rejects
   // don't ever delete from tvdb
-  console.log("deleted show from server:", show.name);
+  unilog(877, "deleted show from server:", show.name);
 }
 
 export const lastViewedCache = {};
@@ -292,7 +288,7 @@ const updateLastViewedCache = async () => {
       lastViewedCacheFailureCount === 1 ||
       lastViewedCacheFailureCount % 10 === 0
     ) {
-      console.warn("Failed to update lastViewed cache", err);
+      unilog(878, "Failed to update lastViewed cache", err);
     }
   } finally {
     lastViewedCacheUpdating = false;
@@ -667,17 +663,13 @@ export async function getActorPage(params) {
 }
 
 export async function getActorCredits(params) {
-  console.log(
-    "[SRVR.JS] getActorCredits called with:",
-    params,
-    new Date().toISOString(),
-  );
+  unilog(879, "getActorCredits called with:", params, new Date().toISOString());
   const response = await fetch(`${config.torrentsApiUrl}/api/getActorCredits`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name: params }),
   });
-  console.log("[SRVR.JS] fetch completed with status:", response.status);
+  unilog(880, "fetch completed with status:", response.status);
   if (!response.ok) {
     throw new Error(
       `getActorCredits failed: ${response.status} ${response.statusText}`,
@@ -708,7 +700,7 @@ export async function getFile(path) {
     const res = await httpCall("/api/getFile", { path }, "POST");
     return res;
   } catch (err) {
-    console.error("HTTP getFile error:", err);
+    unilog(881, "HTTP getFile error:", err);
     throw err;
   }
 }

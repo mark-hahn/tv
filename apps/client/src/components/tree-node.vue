@@ -77,6 +77,7 @@
 
 <script>
 import * as util from "../util.js";
+import { unilog } from "../log.js";
 
 export default {
   name: "TreeNode",
@@ -131,7 +132,7 @@ export default {
       if (event.altKey) {
         navigator.clipboard
           .writeText(this.fullPath)
-          .catch((err) => console.error("Copy failed", err));
+          .catch((err) => unilog(1044, "Copy failed", err));
         this.highlighted = true;
         setTimeout(() => {
           this.highlighted = false;

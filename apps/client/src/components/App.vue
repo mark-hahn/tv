@@ -585,6 +585,7 @@ import * as emby from "../emby.js";
 import * as srvr from "../srvr.js";
 import { setGlobalMessage } from "../globalMessages.js";
 import * as epd from "@tv/share";
+import { unilog } from "../log.js";
 import { config } from "../config.js";
 import paneHelp from "../paneHelp.js";
 import * as urls from "../urls.js";
@@ -1117,7 +1118,7 @@ export default {
           this.videoPlayerPath = list.path;
         }
       } catch (e) {
-        console.error("clickChksrt error:", e);
+        unilog(893, "clickChksrt error:", e);
       }
     },
 
@@ -1192,7 +1193,7 @@ export default {
       try {
         const result = this.selectIntroFile(show);
         if (result.error) {
-          console.error("[clickIntro]", result.error);
+          unilog(894, "", result.error);
           return;
         }
         await this.handleOpenIntro({
@@ -1205,7 +1206,7 @@ export default {
           hasBif: result.hasBif,
         });
       } catch (e) {
-        console.error("clickIntro error:", e);
+        unilog(895, "clickIntro error:", e);
       }
     },
 
@@ -1226,13 +1227,13 @@ export default {
           const res = await srvr.hasBif(path);
           useBif = !!res?.hasBif;
         } catch (e) {
-          console.error("[intro] hasBif check failed:", e);
+          unilog(896, "hasBif check failed:", e);
           useBif = false;
         }
       }
       if (useBif) {
         if (!embyId) {
-          console.error("[intro] no Emby item id for", show?.name);
+          unilog(897, "no Emby item id for", show?.name);
           window.alert("No Emby episode found for Intro.");
           return;
         }
@@ -1344,11 +1345,9 @@ export default {
       this.tvdbMismatchText = text == null ? "" : String(text);
       this.tvdbMismatchOpen = true;
 
-      console.error(
-        `[tvdbMismatchModal] title="${this.tvdbMismatchTitle}"\n${this.tvdbMismatchText}`,
-      );
+      unilog(898, `title="${this.tvdbMismatchTitle}"\n${this.tvdbMismatchText}`);
       if (payload !== null && payload !== undefined) {
-        console.error("[tvdbMismatchModal] payload:", payload);
+        unilog(899, "payload:", payload);
       }
     },
 
@@ -1381,7 +1380,7 @@ export default {
       srvr
         .requestEmbyLibraryRefresh()
         .catch((err) =>
-          console.error("requestEmbyLibraryRefresh failed:", err),
+          unilog(900, "requestEmbyLibraryRefresh failed:", err),
         );
     },
 
@@ -1397,7 +1396,7 @@ export default {
           });
         }
       } catch (err) {
-        console.error("checkLibraryRefreshStatus failed:", err);
+        unilog(901, "checkLibraryRefreshStatus failed:", err);
       }
     },
 
@@ -1427,7 +1426,7 @@ export default {
 
       srvr
         .triggerEmbySync()
-        .catch((err) => console.error("triggerEmbySync failed:", err));
+        .catch((err) => unilog(902, "triggerEmbySync failed:", err));
 
       if (showNames.length > 0) {
         evtBus.emit("library-refresh-complete", {
@@ -1435,7 +1434,7 @@ export default {
         });
         srvr
           .triggerShowSelect(showNames[0])
-          .catch((err) => console.error("triggerShowSelect failed:", err));
+          .catch((err) => unilog(903, "triggerShowSelect failed:", err));
       } else {
         evtBus.emit("library-refresh-complete");
       }

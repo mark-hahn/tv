@@ -644,6 +644,7 @@ import {
   srchTvdbData,
   getGenresByTvdbId,
 } from "../tvdb.js";
+import { unilog } from "../log.js";
 
 export default {
   name: "BrowsePane",
@@ -739,13 +740,13 @@ export default {
       try {
         allTvdbData.value = await getAllTvdb();
       } catch (e) {
-        console.error("Failed to load allTvdbData:", e);
+        unilog(911, "Failed to load allTvdbData:", e);
       }
       try {
         const res = await fetch(`${config.tvSrvrUrl}/api/snooze-list`);
         if (res.ok) snoozeList.value = await res.json();
       } catch (e) {
-        console.error("Failed to load snooze list:", e);
+        unilog(912, "Failed to load snooze list:", e);
       }
     });
 
@@ -1169,7 +1170,7 @@ export default {
           });
           if (res.ok) snoozeList.value = await res.json();
         } catch (e) {
-          console.error("handleSnooze unsnooze error:", e);
+          unilog(913, "handleSnooze unsnooze error:", e);
         }
         const unsnoozeTitle = String(curTvdb.value?.name || "")
           .trim()
@@ -1218,7 +1219,7 @@ export default {
         });
         if (res.ok) snoozeList.value = await res.json();
       } catch (e) {
-        console.error("handleSnooze error:", e);
+        unilog(914, "handleSnooze error:", e);
       }
       // Remove from browse-cards.json on api server so it won't reappear as a fresh card
       fetch(`${config.torrentsApiUrl}/api/removeBrowseCard`, {
@@ -1402,7 +1403,7 @@ export default {
       try {
         util.openExternalPage(u);
       } catch (e) {
-        console.log("openUrl failed:", e?.message || String(e));
+        unilog(915, "openUrl failed:", e?.message || String(e));
       }
     };
 
@@ -1521,7 +1522,7 @@ export default {
         }
       } catch (e) {
         if (e !== "cancelled")
-          console.log("getRemotes failed:", e?.message || String(e));
+          unilog(916, "getRemotes failed:", e?.message || String(e));
         if (_lastRemotesKey.value === key) {
           getRemotesResults.value = [];
         }

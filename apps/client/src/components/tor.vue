@@ -1363,6 +1363,7 @@ import { config } from "../config.js";
 import Stream from "./stream.vue";
 import parseTorrentTitle from "parse-torrent-title";
 import * as srvr from "../srvr.js";
+import { unilog } from "../log.js";
 
 const BAD_GROUPS_REFRESH_MS = 3000;
 
@@ -2131,17 +2132,12 @@ export default {
           const j = await res.json();
           if (j && typeof j === "object" && !Array.isArray(j)) {
             const entryCount = Object.keys(j).length;
-            console.log(
-              `[tor-sent] loadDownloadedHistory: loaded ${entryCount} entries`,
-            );
+            unilog(1035, `loadDownloadedHistory: loaded ${entryCount} entries`);
             this.downloadedByHash = j;
           }
         }
       } catch (e) {
-        console.log(
-          `[tor-sent] loadDownloadedHistory: fetch failed:`,
-          e.message,
-        );
+        unilog(1036, `loadDownloadedHistory: fetch failed:`, e.message);
       }
       this.pruneDownloadedHistory();
     },
@@ -2161,9 +2157,7 @@ export default {
       const changed = Object.keys(next).length !== Object.keys(map).length;
       if (changed) {
         const removed = Object.keys(map).length - Object.keys(next).length;
-        console.log(
-          `[tor-sent] pruneDownloadedHistory: removed ${removed} old entries (older than 60 days)`,
-        );
+        unilog(1037, `pruneDownloadedHistory: removed ${removed} old entries (older than 60 days)`);
         this.downloadedByHash = next;
       }
     },
@@ -2357,12 +2351,7 @@ export default {
       const torTitle = String(
         torrent?.raw?.title || torrent?.title || "",
       ).trim();
-      console.log(
-        `[tor-sent] rememberDownloadedTorrent: "${torTitle}" | keys:`,
-        keys.length,
-        "| timestamp:",
-        now,
-      );
+      unilog(1038, `rememberDownloadedTorrent: "${torTitle}" | keys:`, keys.length, "| timestamp:", now);
 
       // Persist to server.
       fetch(`${config.torrentsApiUrl}/api/tor/sent`, {
@@ -3964,7 +3953,7 @@ export default {
           try {
             downloadsBody = JSON.stringify(downloadsPayload);
           } catch (e) {
-            console.log("downloads request JSON stringify failed", {
+            unilog(1039, "downloads request JSON stringify failed", {
               error: e?.message || String(e),
             });
             throw e;

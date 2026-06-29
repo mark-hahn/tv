@@ -1745,7 +1745,7 @@ export default {
         this.lastSelectedFile = null;
         await this.fetchFiles();
       } catch (e) {
-        console.error("Rename failed", e);
+        unilog(1002, "Rename failed", e);
         this.error = e.message || "Rename failed";
         this.loading = false;
       }
@@ -1920,7 +1920,7 @@ export default {
         evtBus.emit("localFoldersChanged");
         await this.refresh();
       } catch (e) {
-        console.error("Error deleting files:", e);
+        unilog(1003, "Error deleting files:", e);
         alert(`Error deleting files: ${e.message}`);
         this.error = e.message;
       } finally {
@@ -2070,7 +2070,7 @@ export default {
         if (!this.subsPending.includes(p)) this.subsPending.push(p);
       }
       enqueueSubs(videoPaths, true).catch((e) =>
-        console.error("enqueueSubs", e),
+        unilog(1004, "enqueueSubs", e),
       );
     },
     onSubsProgress({ path }) {
@@ -2171,7 +2171,7 @@ export default {
           this.asrBusy = queueRes.running ?? false;
         }
       } catch (e) {
-        console.error("Failed to init Asr State", e);
+        unilog(1005, "Failed to init Asr State", e);
       }
     },
     onAsrQueueUpdate({ count, running, entries }) {
@@ -2190,7 +2190,7 @@ export default {
         const res = await getAsrLog();
         if (res?.lines != null) this.asrLogs = res.lines;
       } catch (e) {
-        console.error("fetchAsrLog error", e);
+        unilog(1006, "fetchAsrLog error", e);
       }
     },
     async fetchAsrQueue() {
@@ -2202,7 +2202,7 @@ export default {
           this.asrBusy = res.running ?? this.asrBusy;
         }
       } catch (e) {
-        console.error("fetchAsrQueue error", e);
+        unilog(1007, "fetchAsrQueue error", e);
       }
     },
     async removeFromQueue(videoPath) {
@@ -2211,7 +2211,7 @@ export default {
         await removeFromAsrQueue(videoPath);
         await this.fetchAsrQueue();
       } catch (e) {
-        console.error("removeFromQueue error", e);
+        unilog(1008, "removeFromQueue error", e);
       }
     },
     clickFix() {
@@ -2268,7 +2268,7 @@ export default {
           return;
         }
         if (res && res.stdout) {
-          console.log("Fix Start stdout:", res.stdout);
+          unilog(1009, "Fix Start stdout:", res.stdout);
         }
         this.startFixPolling();
       } catch (e) {
@@ -2384,7 +2384,7 @@ export default {
           if (!res.running) this.stopFixPolling();
         }
       } catch (e) {
-        console.error("Failed to sync Fix log", e);
+        unilog(1010, "Failed to sync Fix log", e);
       }
     },
     async initFixState() {
@@ -2404,14 +2404,14 @@ export default {
           this.stopFixPolling();
         }
       } catch (e) {
-        console.error("Failed to init Fix State", e);
+        unilog(1011, "Failed to init Fix State", e);
       }
     },
     async initEmbState() {
       try {
         await handleEmb({ action: "tail" });
       } catch (e) {
-        console.error("Failed to init Emb state", e);
+        unilog(1012, "Failed to init Emb state", e);
       }
     },
     clickEmb() {
@@ -2470,7 +2470,7 @@ export default {
       try {
         await handleEmb({ action: "clear" });
       } catch (e) {
-        console.error("Failed to clear emb log", e);
+        unilog(1013, "Failed to clear emb log", e);
       }
     },
     async clearEmbLog() {
@@ -2478,7 +2478,7 @@ export default {
       try {
         await handleEmb({ action: "clear" });
       } catch (e) {
-        console.error("Failed to clear emb log", e);
+        unilog(1014, "Failed to clear emb log", e);
       }
     },
     onEmbLog(msg) {
@@ -2892,7 +2892,7 @@ export default {
           });
         }
       } catch (e) {
-        console.error("Error moving file:", e);
+        unilog(1015, "Error moving file:", e);
         alert(`Error moving file: ${e.message}`);
       } finally {
         this.loading = false;

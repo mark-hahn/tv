@@ -50,6 +50,7 @@
 
 <script>
 import { config } from "../config.js";
+import { unilog } from "../log.js";
 
 export default {
   name: "KeyboardPane",
@@ -71,12 +72,12 @@ export default {
       try {
         await fetch(config.tvTvUrl + "/tv/text?t=" + encodeURIComponent(text));
       } catch (e) {
-        console.error("[keybd] text error:", e);
+        unilog(948, "text error:", e);
       }
       try {
         await fetch(config.tvTvUrl + "/tv/keyevent/KEYCODE_ENTER");
       } catch (e) {
-        console.error("[keybd] enter error:", e);
+        unilog(949, "enter error:", e);
       }
       this.history = [text, ...this.history.filter((i) => i !== text)];
       this.inputText = "";
@@ -85,7 +86,7 @@ export default {
       try {
         await fetch(config.tvTvUrl + "/tv/keyevent/" + code);
       } catch (e) {
-        console.error("[keybd] keyevent error:", e);
+        unilog(950, "keyevent error:", e);
       }
     },
     recallHistory(item) {

@@ -531,6 +531,7 @@ import * as emby from "../emby.js";
 import * as srvr from "../srvr.js";
 import { config } from "../config.js";
 import * as epd from "@tv/share";
+import { unilog } from "../log.js";
 import * as util from "../util.js";
 import * as urls from "../urls.js";
 
@@ -799,7 +800,7 @@ export default {
           hasBif: result.hasBif,
         });
       } catch (e) {
-        console.error("introClick error:", e);
+        unilog(922, "introClick error:", e);
         window.alert("Intro failed to open.");
       }
     },
@@ -860,7 +861,7 @@ export default {
     },
 
     deleteClick() {
-      console.log("Series, deleteClick:", this.show.name);
+      unilog(923, "Series, deleteClick:", this.show.name);
       evtBus.emit("deleteShow", this.show);
     },
 
@@ -921,11 +922,9 @@ export default {
       }
 
       if (!tvdbData) {
-        console.warn(
-          "setPoster: tvdbData missing, using show.imageUrl or placeholder",
-        );
+        unilog(924, "setPoster: tvdbData missing, using show.imageUrl or placeholder");
       } else if (!tvdbData.image) {
-        console.error("image missing from tvdbData", tvdbData.name);
+        unilog(925, "image missing from tvdbData", tvdbData.name);
       }
 
       await new Promise((resolve) => {
@@ -944,9 +943,7 @@ export default {
       if (!this.settingUpShowName && !noAutoShow) {
         const infoBoxEl = document.getElementById("infoBox");
         if (infoBoxEl && infoBoxEl.clientHeight > 0) {
-          console.log(
-            `[poster-size] setPoster auto-show: ${infoBoxEl.clientHeight}px for ${this.show?.name}`,
-          );
+          unilog(926, `setPoster auto-show: ${infoBoxEl.clientHeight}px for ${this.show?.name}`);
           img.style.maxHeight = infoBoxEl.clientHeight + "px";
           img.style.visibility = "visible";
         }
@@ -1039,7 +1036,7 @@ export default {
 
     async setSeasonsTxt(tvdbData) {
       if (!(tvdbData instanceof Object)) {
-        console.error("setSeasonsTxt, tvdbData:", name, { tvdbData });
+        unilog(927, "setSeasonsTxt, tvdbData:", name, { tvdbData });
         return;
       }
       this.seasonsTxt = "";
@@ -1074,7 +1071,7 @@ export default {
           epiCounts.watchedCount !== prev.watchedCount
         ) {
           const fields = Object.assign({ name, dontEnqueue: true }, epiCounts);
-          srvr.setTvdbFields(fields).catch((e) => console.error(e));
+          srvr.setTvdbFields(fields).catch((e) => unilog(928, e));
         }
       }
 
@@ -1231,7 +1228,7 @@ export default {
         }
         this.watchButtonTxtArr = watchButtonTxtArr.sort();
       } catch (e) {
-        console.error("updateWatchButtons Error:", e.message || e);
+        unilog(929, "updateWatchButtons Error:", e.message || e);
       }
     },
 
@@ -1285,7 +1282,7 @@ export default {
         // Reset fetch mode after use
         this.remoteFetchMode = "fast";
       } catch (err) {
-        console.error("setRemotes:", err);
+        unilog(930, "setRemotes:", err);
         this.showRemotes = false;
       }
     },
@@ -1305,9 +1302,7 @@ export default {
       if (!tvdbId && show?.id) {
         tvdbId = await emby.getTvdbIdFromEmbyItem(show.id);
         if (tvdbId)
-          console.log(
-            `loadIntoEmby: resolved tvdbId ${tvdbId} from Emby for "${name}"`,
-          );
+          unilog(931, `loadIntoEmby: resolved tvdbId ${tvdbId} from Emby for "${name}"`);
       }
       if (!tvdbId) {
         try {
@@ -1321,13 +1316,11 @@ export default {
             const candidate = String(match?.tvdb_id || match?.id || "").trim();
             if (candidate) {
               tvdbId = candidate;
-              console.log(
-                `loadIntoEmby: resolved tvdbId ${tvdbId} from TVDB search for "${name}"`,
-              );
+              unilog(932, `loadIntoEmby: resolved tvdbId ${tvdbId} from TVDB search for "${name}"`);
             }
           }
         } catch (e) {
-          console.error(`loadIntoEmby: TVDB search failed for "${name}":`, e);
+          unilog(933, `loadIntoEmby: TVDB search failed for "${name}":`, e);
         }
       }
       const srchChoice = {
@@ -1351,7 +1344,7 @@ export default {
           anticipating: this.show.anticipating,
         });
       } catch (e) {
-        console.error("antClick error:", e);
+        unilog(934, "antClick error:", e);
         this.show.anticipating = original;
       }
     },
@@ -1460,9 +1453,7 @@ export default {
               if (recTvdbId && recTvdbId === currentTvdbId) {
                 tvdbData = rec;
                 if (key !== show.name) {
-                  console.info(
-                    `Series: resolved tvdbData by tvdbId=${currentTvdbId} key=\"${key}\" for show=\"${show.name}\"`,
-                  );
+                  unilog(935, `Series: resolved tvdbData by tvdbId=${currentTvdbId} key=\"${key}\" for show=\"${show.name}\"`);
                 }
                 break;
               }
@@ -1498,7 +1489,7 @@ export default {
                   tvdb.upsertTvdbCacheRecord(allTvdb, tvdbData, show?.name);
                 }
               } catch (e) {
-                console.error("Series: getNewTvdb failed (preview)", {
+                unilog(936, "Series: getNewTvdb failed (preview)", {
                   name: show?.name,
                   tvdbId,
                   err: e?.message || e,
@@ -1516,13 +1507,10 @@ export default {
               show?.imdb_id;
             if (imdbId) {
               try {
-                console.log("Series: Trying IMDb ID search for", imdbId);
+                unilog(937, "Series: Trying IMDb ID search for", imdbId);
                 tvdbData = await srvr.searchTvdbByImdbId({ imdbId });
                 if (tvdbData) {
-                  console.log(
-                    "Series: Found tvdb data via IMDb ID:",
-                    tvdbData.name,
-                  );
+                  unilog(938, "Series: Found tvdb data via IMDb ID:", tvdbData.name);
                   delete tvdbData.deleted;
                   // Don't cache this in allTvdb since it's not a full record
                   // But update the show with the tvdbId we found
@@ -1531,7 +1519,7 @@ export default {
                   }
                 }
               } catch (e) {
-                console.error("Series: searchTvdbByImdbId failed", {
+                unilog(939, "Series: searchTvdbByImdbId failed", {
                   name: show?.name,
                   imdbId,
                   err: e?.message || e,
@@ -1544,7 +1532,7 @@ export default {
           evtBus.emit("tvdbDataReady", { show, tvdbData }); // Send to App.vue
 
           if (!tvdbData) {
-            console.warn("Series: no tvdbData available for", show?.name);
+            unilog(940, "Series: no tvdbData available for", show?.name);
             // Still show the infobox even without tvdbData, just with limited info
             // Try to set poster from show.imageUrl if available
             void this.setPoster(null);
@@ -1581,7 +1569,7 @@ export default {
                 this.currentTvdbData = freshTvdbData;
               }
             } catch (e) {
-              console.error("Series: getNewTvdb image refresh failed:", e);
+              unilog(941, "Series: getNewTvdb image refresh failed:", e);
             }
           }
 
@@ -1606,9 +1594,7 @@ export default {
               const infoBoxEl = document.getElementById("infoBox");
               const posterImg = document.querySelector("#poster img");
               if (infoBoxEl && posterImg && infoBoxEl.clientHeight > 0) {
-                console.log(
-                  `[poster-size] preview nextTick: ${infoBoxEl.clientHeight}px for ${this.show?.name}`,
-                );
+                unilog(942, `preview nextTick: ${infoBoxEl.clientHeight}px for ${this.show?.name}`);
                 posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
                 posterImg.style.visibility = "visible";
               }
@@ -1623,9 +1609,7 @@ export default {
             const infoBoxEl = document.getElementById("infoBox");
             const posterImg = document.querySelector("#poster img");
             if (infoBoxEl && posterImg && infoBoxEl.clientHeight > 0) {
-              console.log(
-                `[poster-size] seriesReady nextTick: ${infoBoxEl.clientHeight}px for ${this.show?.name}`,
-              );
+              unilog(943, `seriesReady nextTick: ${infoBoxEl.clientHeight}px for ${this.show?.name}`);
               posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
               posterImg.style.visibility = "visible";
             }
@@ -1666,7 +1650,7 @@ export default {
           }
         }
       } catch (e) {
-        console.error("Error calculating watchedCount from seriesMap:", e);
+        unilog(944, "Error calculating watchedCount from seriesMap:", e);
       }
 
       const seasonsTxt =
@@ -1790,15 +1774,11 @@ export default {
         const newHeight = infoBoxEl?.clientHeight || 0;
         if (existingMaxHeight > 0) {
           // Keep the same size - don't let content changes shrink the poster
-          console.log(
-            `[poster-size] tvdbUpdated: keeping ${existingMaxHeight}px (infoBox=${newHeight}px) for ${this.show?.name}`,
-          );
+          unilog(945, `tvdbUpdated: keeping ${existingMaxHeight}px (infoBox=${newHeight}px) for ${this.show?.name}`);
           posterImg.style.maxHeight = existingMaxHeight + "px";
         } else {
           if (infoBoxEl && newHeight > 0) {
-            console.log(
-              `[poster-size] tvdbUpdated: ${newHeight}px for ${this.show?.name}`,
-            );
+            unilog(946, `tvdbUpdated: ${newHeight}px for ${this.show?.name}`);
             posterImg.style.maxHeight = newHeight + "px";
           }
         }
@@ -1840,9 +1820,7 @@ export default {
         const infoBoxEl = document.getElementById("infoBox");
         const posterImg = document.querySelector("#poster img");
         if (infoBoxEl && posterImg && infoBoxEl.clientHeight > 0) {
-          console.log(
-            `[poster-size] paneChanged: ${infoBoxEl.clientHeight}px for ${this.show?.name}`,
-          );
+          unilog(947, `paneChanged: ${infoBoxEl.clientHeight}px for ${this.show?.name}`);
           posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
           posterImg.style.visibility = "visible";
         }

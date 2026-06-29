@@ -176,6 +176,7 @@ import evtBus from "../evtBus.js";
 import { nextTick } from "vue";
 import * as util from "../util.js";
 import { config } from "../config.js";
+import { unilog } from "../log.js";
 
 const IMDB_URL_EXPIRY_SAFETY_MS = 2 * 60 * 1000;
 
@@ -248,7 +249,7 @@ export default {
           `${config.tvTvUrl}/tv/playvideo?url=${encodeURIComponent(url)}`,
         );
       } catch (err) {
-        console.error("Failed to stream trailer:", err);
+        unilog(1040, "Failed to stream trailer:", err);
       }
     },
     onPreviewMode(active) {
@@ -334,7 +335,7 @@ export default {
           const key = "html-" + url;
           if (key === this.lastPlayingKey && this.savedTimes.has(key)) {
             v.currentTime = this.savedTimes.get(key);
-            v.play().catch((e) => console.log("Resume blocked", e));
+            v.play().catch((e) => unilog(1041, "Resume blocked", e));
           }
         });
       }
@@ -375,7 +376,7 @@ export default {
               // We can style the container or just let it be.
             }
           } catch (e) {
-            console.error("YT init error", e);
+            unilog(1042, "YT init error", e);
           }
         }
       });
@@ -527,7 +528,7 @@ export default {
             }
           }
         } catch (err) {
-          console.error("Failed to fetch IMDB video:", err);
+          unilog(1043, "Failed to fetch IMDB video:", err);
         } finally {
           this.loadingImdb = false;
         }

@@ -808,7 +808,7 @@ import {
   saveSeasonIntro,
 } from "../srvr.js";
 
-import { fmtPos, getSeasonIntro } from "@tv/share";
+import { fmtPos, getSeasonIntro, unilog} from "@tv/share"
 
 const TV_SRVR_URL = config.tvSrvrUrl;
 const PLAYER_MUTE_STORAGE_KEY = "tvPlayerMuted";
@@ -1097,7 +1097,7 @@ export default {
           this.activeAudioIndex = null;
         }
       } catch (e) {
-        console.error("[audio-list] fetch error:", e);
+        unilog(1047, "fetch error:", e);
       }
     },
     async _fetchSubtitleList(filePath) {
@@ -1117,7 +1117,7 @@ export default {
         if (this.mode === "chksrt")
           await this._loadChksrtHistoryAndCompare(filePath);
       } catch (e) {
-        console.error("[subtitle-list] fetch error:", e);
+        unilog(1048, "fetch error:", e);
       }
     },
     _swapStream(subIndex = null, audioIndex = this.activeAudioIndex) {
@@ -1198,16 +1198,12 @@ export default {
       const err = vid.error;
       if (!err) return;
       if (this.errorRetries >= 3) {
-        console.log(
-          `[video] error code=${err.code}, giving up after ${this.errorRetries} retries`,
-        );
+        unilog(1049, `error code=${err.code}, giving up after ${this.errorRetries} retries`);
         return;
       }
       this.errorRetries++;
       const resumeAt = vid.currentTime;
-      console.log(
-        `[video] error code=${err.code} at ${resumeAt.toFixed(1)}s, retry ${this.errorRetries}`,
-      );
+      unilog(1050, `error code=${err.code} at ${resumeAt.toFixed(1)}s, retry ${this.errorRetries}`);
       this._mseStop();
       setTimeout(() => {
         const v = this.$refs.vid;
@@ -1281,7 +1277,7 @@ export default {
               });
             }
           } catch (e) {
-            if (!abort.signal.aborted) console.error("[mse]", e);
+            if (!abort.signal.aborted) unilog(1051, "", e);
           }
           if (abort.signal.aborted) reader.cancel().catch(() => {});
         },
@@ -1358,7 +1354,7 @@ export default {
             ? (choice.index ?? null)
             : null,
         srtFile: choice && choice.type === "srt" ? (choice.file ?? null) : null,
-      }).catch((e) => console.error("[chksrt] addChksrtHistory error:", e));
+      }).catch((e) => unilog(1052, "addChksrtHistory error:", e));
     },
     onVideoLoadedMetadata() {
       this._applyIntroAudioState();
@@ -1563,7 +1559,7 @@ export default {
         this.introShow.needsIntro = false;
       }
       saveSeasonIntro(this.introShow.name, season, field, value).catch((e) =>
-        console.error(`[intro] saveSeasonIntro ${field} error:`, e),
+        unilog(1053, `saveSeasonIntro ${field} error:`, e),
       );
     },
     async clickIntroAnt() {
@@ -1576,7 +1572,7 @@ export default {
           anticipating: this.introShow.anticipating,
         });
       } catch (e) {
-        console.error("clickIntroAnt error:", e);
+        unilog(1054, "clickIntroAnt error:", e);
         this.introShow.anticipating = original;
       }
     },
@@ -1591,7 +1587,7 @@ export default {
           anticipating: show.anticipating,
         });
       } catch (e) {
-        console.error("clickChksrtAnt error:", e);
+        unilog(1055, "clickChksrtAnt error:", e);
         show.anticipating = original;
       }
     },
@@ -1653,7 +1649,7 @@ export default {
         offsetCache.set(this.path, 0);
         this.subtitleOffset = 0;
       } catch (e) {
-        console.error("[applySliderOffset]", e);
+        unilog(1056, "", e);
       }
     },
     async clickOk() {
@@ -1661,7 +1657,7 @@ export default {
         await chksrtOk(this.path);
         this.$emit("chksrt-next", null);
       } catch (e) {
-        console.error("[chksrt] clickOk error:", e);
+        unilog(1057, "clickOk error:", e);
       }
     },
     async clickGenSrt() {
@@ -1676,7 +1672,7 @@ export default {
           await chksrtGenSrt(this.path);
           this.$emit("chksrt-next", null);
         } catch (e) {
-          console.error("[chksrt] clickGenSrt error:", e);
+          unilog(1058, "clickGenSrt error:", e);
         }
       }
     },
@@ -1729,7 +1725,7 @@ export default {
       try {
         await this._submitChksrtSelection();
       } catch (e) {
-        console.error("[chksrt] next error:", e);
+        unilog(1059, "next error:", e);
       }
       this.$emit("chksrt-next", null);
     },
@@ -1737,7 +1733,7 @@ export default {
       try {
         await chksrtSnooze(this.path);
       } catch (e) {
-        console.error("[chksrt] snooze error:", e);
+        unilog(1060, "snooze error:", e);
         return;
       }
       this.$emit("chksrt-next", null);

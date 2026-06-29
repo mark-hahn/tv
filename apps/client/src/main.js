@@ -1,5 +1,6 @@
 import { createApp } from "vue";
 import App from "./components/App.vue";
+import { unilog } from "./log.js";
 
 const DEBUG_CLICKS = true;
 
@@ -11,7 +12,7 @@ if (DEBUG_CLICKS) {
       const tag = t.tagName.toLowerCase();
       const id = t.id ? `#${t.id}` : "";
       const text = t.textContent?.trim().slice(0, 40) ?? "";
-      console.log(`[click] ${tag}${id}`, text ? `"${text}"` : "");
+      unilog(892, `${tag}${id}`, text ? `"${text}"` : "");
     },
     true,
   );

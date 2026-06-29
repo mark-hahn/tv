@@ -6,11 +6,9 @@
 // (uses console with `// no-unilog`; this is unilog's own plumbing)
 
 import {
-  upgradeLine,
   buildStub,
   parseStub,
   activateStub,
-  parseLogId,
   sanityCheckDescription,
 } from "../unilog-lib.js";
 import { reconcileText, scanLines, projectOf } from "../reconcile.js";
@@ -24,77 +22,6 @@ function eq(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-// ---- auto-upgrade transform ----------------------------------------------
-
-{
-  const r = upgradeLine(
-    "    console.log(`[chokidar] detected add: ${filePath}`);",
-  );
-  check(
-    "upgrade",
-    "console.log template + tag",
-    r.upgradeable &&
-      r.level === "info" &&
-      r.tag === "chokidar" &&
-      r.argExpr === "`detected add: ${filePath}`",
-    JSON.stringify(r),
-  );
-}
-{
-  const r = upgradeLine('  console.warn("low disk space");');
-  check(
-    "upgrade",
-    "console.warn string",
-    r.upgradeable && r.level === "warn" && r.tag === null,
-    JSON.stringify(r),
-  );
-}
-{
-  const r = upgradeLine("loge(`boom ${e.message}`);");
-  check(
-    "upgrade",
-    "loge -> error",
-    r.upgradeable && r.level === "error",
-    JSON.stringify(r),
-  );
-}
-{
-  const r = upgradeLine("logSubtitle(`[subs] asr done: ${p}`);");
-  check(
-    "upgrade",
-    "logSubtitle tag subs",
-    r.upgradeable && r.tag === "subs" && r.level === "info",
-    JSON.stringify(r),
-  );
-}
-{
-  const r = upgradeLine('      log("not blocked", usbLine);');
-  check(
-    "upgrade",
-    "multi-arg NOT upgradeable",
-    !r.upgradeable,
-    JSON.stringify(r),
-  );
-}
-{
-  const r = upgradeLine('  console.log("deletePath: deleting", fullPath);');
-  check(
-    "upgrade",
-    "console multi-arg NOT upgradeable",
-    !r.upgradeable,
-    JSON.stringify(r),
-  );
-}
-{
-  const r = upgradeLine("  console.log(`x`); // no-unilog");
-  check(
-    "upgrade",
-    "no-unilog blocks upgrade",
-    !r.upgradeable && /no-unilog/.test(r.reason),
-    JSON.stringify(r),
-  );
-}
-
 // ---- stub round-trip ------------------------------------------------------
 
 {
@@ -106,14 +33,12 @@ function eq(a, b) {
   });
   const p = parseStub(stub);
   const a = activateStub(stub, 42);
-  const idOk = parseLogId(a.line) === 42;
   const pass =
     p &&
     p.level === "info" &&
     p.tag === "chokidar" &&
     a &&
-    a.line === "    unilog(42, `detected add: ${filePath}`); // log-id: 42" &&
-    idOk;
+    a.line === "    unilog(42, `detected add: ${filePath}`);";
   check(
     "stub",
     "build -> parse -> activate",

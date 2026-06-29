@@ -4082,6 +4082,16 @@ app.post("/api/unilog/refresh-sites", (req, res) => {
   }
 });
 
+app.post("/api/unilog/query-sites", (req, res) => {
+  try {
+    const ids = Array.isArray(req.body) ? req.body : (req.body?.ids ?? []);
+    res.json(unilogDb.querySites(ids));
+  } catch (error) {
+    console.error("[unilog] /api/unilog/query-sites error:", error); // no-unilog
+    res.status(500).json({ error: String(error?.message || error) });
+  }
+});
+
 // The handler should be: async (params) => result
 const apiWrapper = (handler) => {
   return async (req, res) => {

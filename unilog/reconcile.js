@@ -11,7 +11,6 @@ import crypto from "node:crypto";
 import {
   parseStub,
   activateStub,
-  parseLogId,
   levelForCall,
   extractLeadingTag,
 } from "./unilog-lib.js";

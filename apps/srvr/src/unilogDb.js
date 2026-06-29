@@ -139,6 +139,19 @@ export function refreshSite({ logId, srcFile, srcLine }) {
   );
 }
 
+export function querySites(logIds) {
+  if (!logIds.length) return {};
+  const placeholders = logIds.map(() => "?").join(",");
+  const rows = db
+    .prepare(
+      `SELECT log_id, src_line FROM log_sites WHERE log_id IN (${placeholders})`,
+    )
+    .all(...logIds.map(Number));
+  const result = {};
+  for (const r of rows) result[r.log_id] = r.src_line ?? null;
+  return result;
+}
+
 const tombstone = db.prepare(
   "UPDATE log_sites SET removed_at = ? WHERE log_id = ? AND removed_at IS NULL",
 );

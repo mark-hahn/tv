@@ -20,123 +20,68 @@ const SRVR_HTTPS_URL = "https://hahnca.com/tv-srvr";
 const SSH_HOST = "hahnca.com";
 const REMOTE_DB = "/root/dev/apps/tv/unilog/unilog.sqlite";
 
-// Hard-wired project → source file globs (no env vars per repo convention).
-const PROJECT_FILES = {
-  srvr: {
-    include: [
-      "apps/srvr/index.js",
-      "apps/srvr/src/asr.js",
-      "apps/srvr/src/bif.js",
-      "apps/srvr/src/email.js",
-      "apps/srvr/src/emb.js",
-      "apps/srvr/src/emby.js",
-      "apps/srvr/src/fix.js",
-      "apps/srvr/src/groupCounts.js",
-      "apps/srvr/src/history.js",
-      "apps/srvr/src/lastViewed.js",
-      "apps/srvr/src/rotten.js",
-      "apps/srvr/src/tmdb.js",
-      "apps/srvr/src/tvdb.js",
-      "apps/srvr/src/util.js",
-    ],
-    // unilogDb.js uses `// no-unilog` throughout; safe to skip explicitly.
-    exclude: [
-      "apps/srvr/src/unilogDb.js",
-      "apps/srvr/src/srvrPaths.js",
-      "apps/srvr/src/urls.js",
-    ],
-  },
-  client: {
-    include: [
-      "apps/client/src/emby.js",
-      "apps/client/src/srvr.js",
-      "apps/client/src/tvdb.js",
-      "apps/client/src/main.js",
-      "apps/client/src/mapUtil.js",
-      "apps/client/src/util.js",
-      "apps/client/src/globalMessages.js",
-      "apps/client/src/paneHelp.js",
-      "apps/client/src/components/App.vue",
-      "apps/client/src/components/actor.vue",
-      "apps/client/src/components/actors.vue",
-      "apps/client/src/components/browse.vue",
-      "apps/client/src/components/buttons.vue",
-      "apps/client/src/components/down.vue",
-      "apps/client/src/components/flex.vue",
-      "apps/client/src/components/hdrbot.vue",
-      "apps/client/src/components/hdrmsg.vue",
-      "apps/client/src/components/hdrtop.vue",
-      "apps/client/src/components/info.vue",
-      "apps/client/src/components/keyboard-pane.vue",
-      "apps/client/src/components/list.vue",
-      "apps/client/src/components/local.vue",
-      "apps/client/src/components/map.vue",
-      "apps/client/src/components/meta.vue",
-      "apps/client/src/components/qbt.vue",
-      "apps/client/src/components/reel-gallery.vue",
-      "apps/client/src/components/reviews.vue",
-      "apps/client/src/components/shows.vue",
-      "apps/client/src/components/stream.vue",
-      "apps/client/src/components/tor.vue",
-      "apps/client/src/components/trailer.vue",
-      "apps/client/src/components/tree-node.vue",
-      "apps/client/src/components/tvpane.vue",
-      "apps/client/src/components/usb.vue",
-      "apps/client/src/components/video-player.vue",
-    ],
-    // log.js is the client unilog facade itself — never instrument it.
-    exclude: [
-      "apps/client/src/log.js",
-      "apps/client/src/config.js",
-      "apps/client/src/urls.js",
-      "apps/client/src/evtBus.js",
-    ],
-  },
-  api: {
-    include: [
-      "apps/api/src/browse.js",
-      "apps/api/src/download.js",
-      "apps/api/src/imdb-credits.js",
-      "apps/api/src/local.js",
-      "apps/api/src/normalize.js",
-      "apps/api/src/reviews.js",
-      "apps/api/src/search-worker.js",
-      "apps/api/src/search.js",
-      "apps/api/src/searchInChild.js",
-      "apps/api/src/server.js",
-      "apps/api/src/sshTunnel.js",
-      "apps/api/src/tv-proc.js",
-      "apps/api/src/tvmaze.js",
-      "apps/api/src/usb.js",
-    ],
-    exclude: ["apps/api/src/tvPaths.js"],
-  },
-  down: {
-    include: [
-      "apps/down/src/main.js",
-      "apps/down/src/movie-rsync.js",
-      "apps/down/src/tvJson.js",
-      "apps/down/src/worker.js",
-    ],
-    exclude: [],
-  },
-  asr: {
-    include: ["apps/asr/asr.js"],
-    exclude: [],
-  },
-  tv: {
-    include: ["apps/tv/src/main.js", "apps/tv/bravia.js", "apps/tv/bravia2.js"],
-    exclude: ["apps/tv/usb-cp-tampermonkey.user.js"],
-  },
+// Per-project source roots. Each entry lists directories to walk recursively
+// plus any individual files that live outside the src/ tree.
+// New source files are picked up automatically without touching this config.
+const PROJECT_DIRS = {
+  srvr: { roots: ["apps/srvr/src"], extras: ["apps/srvr/index.js"] },
+  api: { roots: ["apps/api/src"] },
+  down: { roots: ["apps/down/src"] },
+  asr: { roots: ["apps/asr"] },
+  tv: { roots: ["apps/tv"] },
+  client: { roots: ["apps/client/src"] },
 };
 
-const project = process.argv[2];
-if (!project || !PROJECT_FILES[project]) {
+// Basenames that are unilog plumbing or path constants — never instrument.
+const EXCLUDE_BASENAMES = new Set([
+  "unilogDb.js",
+  "srvrPaths.js",
+  "tvPaths.js",
+  "urls.js",
+  "config.js",
+  "evtBus.js",
+  "log.js",
+]);
+
+// Directory names to skip when walking source roots.
+const SKIP_DIRS = new Set(["node_modules", "data", "tmp", "test", "scripts"]);
+
+function findProjectFiles(proj) {
+  const { roots = [], extras = [] } = PROJECT_DIRS[proj];
+  const found = [];
+  function walk(dir) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        if (!SKIP_DIRS.has(entry.name)) walk(path.join(dir, entry.name));
+      } else if (entry.isFile()) {
+        const name = entry.name;
+        if (!name.endsWith(".js") && !name.endsWith(".vue")) continue;
+        if (name.endsWith(".user.js")) continue;
+        if (EXCLUDE_BASENAMES.has(name)) continue;
+        found.push(path.resolve(dir, name));
+      }
+    }
+  }
+  for (const root of roots) {
+    const abs = path.resolve(root);
+    if (fs.existsSync(abs)) walk(abs);
+  }
+  for (const extra of extras) {
+    const abs = path.resolve(extra);
+    if (fs.existsSync(abs)) found.push(abs);
+  }
+  return found;
+}
+
+const forceAll = process.argv.includes("--force");
+const projectArg = process.argv.filter((a) => !a.startsWith("-"))[2];
+if (!projectArg || (!PROJECT_DIRS[projectArg] && projectArg !== "all")) {
   console.error(
-    `usage: node unilog/run-reconcile.js <project>  (known: ${Object.keys(PROJECT_FILES).join(", ")})`,
+    `usage: node unilog/run-reconcile.js <project|all> [--force]  (known: ${Object.keys(PROJECT_DIRS).join(", ")})`,
   ); // no-unilog
   process.exit(1);
 }
+const project = projectArg; // may be "all" — handled in file-list block below
 
 // ---- id allocation: HTTPS endpoint, fall back to direct ssh+sqlite3 -------
 //
@@ -254,16 +199,50 @@ async function createSiteFn(site) {
 
 async function flushRefreshes() {
   if (pendingRefreshes.length === 0) return;
+
+  // Query current DB values, filter to only stale entries, then write.
+  // All via API if available; all via SSH if srvr is stopped.
+  async function queryDbLines(logIds) {
+    if (!useSsh) {
+      try {
+        return await postJson("/api/unilog/query-sites", logIds);
+      } catch {
+        useSsh = true;
+        ensureSrvrStopped();
+      }
+    }
+    const ids = logIds.join(",");
+    const qr = spawnSync("ssh", [SSH_HOST, `sqlite3 ${REMOTE_DB}`], {
+      input: `SELECT log_id, src_line FROM log_sites WHERE log_id IN (${ids});`,
+      encoding: "utf8",
+    });
+    const result = {};
+    for (const row of (qr.stdout || "").trim().split("\n").filter(Boolean)) {
+      const [id, val] = row.split("|");
+      result[Number(id)] = val === "" || val === "NULL" ? null : Number(val);
+    }
+    return result;
+  }
+
+  const logIds = pendingRefreshes.map((s) => Number(s.logId));
+  const dbLines = await queryDbLines(logIds);
+  const toWrite = pendingRefreshes.filter(
+    (s) => dbLines[Number(s.logId)] !== s.srcLine,
+  );
+  dbChangedCount = toWrite.length;
+  if (toWrite.length === 0) return;
+
   if (!useSsh) {
     try {
-      await postJson("/api/unilog/refresh-sites", pendingRefreshes);
+      await postJson("/api/unilog/refresh-sites", toWrite);
+      console.log(`[run-reconcile] wrote ${toWrite.length} via API`); // no-unilog
       return;
     } catch {
       useSsh = true;
       ensureSrvrStopped();
     }
   }
-  const statements = pendingRefreshes.map(
+  const statements = toWrite.map(
     (s) =>
       `UPDATE log_sites SET src_file = ${q(s.srcFile)}, src_line = ${s.srcLine ?? "NULL"} WHERE log_id = ${Number(s.logId)};`,
   );
@@ -274,6 +253,7 @@ async function flushRefreshes() {
   });
   if (r.status !== 0)
     throw new Error((r.stderr || "batch refresh failed").trim());
+  console.log(`[run-reconcile] wrote ${toWrite.length} via SSH`); // no-unilog
 }
 
 // ---- file hash + site-location cache (skip unchanged files / lines) ----
@@ -298,16 +278,15 @@ function fileHash(absPath) {
 
 // ---- file list -----------------------------------------------------------
 
-const { include, exclude = [] } = PROJECT_FILES[project];
-const excSet = new Set(exclude.map((f) => path.resolve(f)));
-const allFiles = include
-  .map((f) => path.resolve(f))
-  .filter((f) => !excSet.has(f) && fs.existsSync(f));
+const projectList = project === "all" ? Object.keys(PROJECT_DIRS) : [project];
+const allFiles = [...new Set(projectList.flatMap(findProjectFiles))];
 
-const files = allFiles.filter((f) => {
-  const rel = path.relative(REPO_ROOT, f);
-  return fileHash(f) !== hashCache[rel]?.hash;
-});
+const files = forceAll
+  ? allFiles
+  : allFiles.filter((f) => {
+      const rel = path.relative(REPO_ROOT, f);
+      return fileHash(f) !== hashCache[rel]?.hash;
+    });
 
 console.log(
   `[run-reconcile] ${project}: ${files.length}/${allFiles.length} files to process`,
@@ -315,16 +294,28 @@ console.log(
 
 // ---- reconcile -----------------------------------------------------------
 
-// pendingRefreshes: only sites whose srcLine actually changed (for DB write).
-// currentSitesByFile: all current sites in processed files (for cache update).
+// pendingRefreshes: sites to write to DB (all in --force, changed-only otherwise).
+// actuallyChangedByFile: sites whose line number differs from cache (for reporting).
+// seenLogIds: detect cross-project log_id collisions.
 const pendingRefreshes = [];
+const actuallyChangedByFile = {};
 const currentSitesByFile = {};
+const seenLogIds = {}; // logId -> srcFile (first seen)
+const collisions = []; // { logId, file1, file2 }
 function refreshSiteFn({ logId, srcFile, srcLine }) {
   if (!currentSitesByFile[srcFile]) currentSitesByFile[srcFile] = {};
   currentSitesByFile[srcFile][String(logId)] = srcLine;
+  if (seenLogIds[logId] && seenLogIds[logId] !== srcFile) {
+    collisions.push({ logId, file1: seenLogIds[logId], file2: srcFile });
+    return; // skip — collision would cause oscillation
+  }
+  seenLogIds[logId] = srcFile;
   const cached = hashCache[srcFile]?.sites?.[String(logId)];
-  if (cached === srcLine) return; // line number unchanged — skip DB write
-  pendingRefreshes.push({ logId, srcFile, srcLine });
+  const changed = cached !== srcLine;
+  if (changed) {
+    actuallyChangedByFile[srcFile] = (actuallyChangedByFile[srcFile] ?? 0) + 1;
+  }
+  if (forceAll || changed) pendingRefreshes.push({ logId, srcFile, srcLine });
 }
 
 const summary = await reconcileFilesWithDb(files, {
@@ -332,6 +323,9 @@ const summary = await reconcileFilesWithDb(files, {
   refreshSiteFn,
   repoRoot: REPO_ROOT,
 });
+
+// dbChangedCount is set inside flushRefreshes after comparing against DB.
+let dbChangedCount = 0;
 
 await flushRefreshes();
 
@@ -363,16 +357,19 @@ for (const s of summary) {
 
 // ---- report --------------------------------------------------------------
 
-// Count actually-changed line numbers per file from pendingRefreshes.
-const changedByFile = {};
-for (const r of pendingRefreshes) {
-  changedByFile[r.srcFile] = (changedByFile[r.srcFile] ?? 0) + 1;
-}
+const totalChecked = Object.values(currentSitesByFile).reduce(
+  (n, s) => n + Object.keys(s).length,
+  0,
+);
+const totalCacheMisses = Object.values(actuallyChangedByFile).reduce(
+  (n, c) => n + c,
+  0,
+);
 
 let totalCreated = 0;
 for (const s of summary) {
   const rel = path.relative(REPO_ROOT, s.file).replace(/\\/g, "/");
-  const changed = changedByFile[rel] ?? 0;
+  const changed = actuallyChangedByFile[rel] ?? 0;
   if (s.created || changed)
     console.log(
       `  ${rel.replace(/^.*apps\//, "apps/")}  +${s.created} sites, ${changed} lines moved`,
@@ -380,8 +377,20 @@ for (const s of summary) {
   totalCreated += s.created || 0;
 }
 console.log(
-  `[run-reconcile] done. ${totalCreated} new sites created in group ${groupId}.`,
+  `[run-reconcile] files processed: ${files.length}/${allFiles.length}`,
 ); // no-unilog
+console.log(`[run-reconcile] sites checked:   ${totalChecked}`); // no-unilog
+console.log(`[run-reconcile] cache misses:    ${totalCacheMisses}`); // no-unilog
+console.log(`[run-reconcile] written to db:   ${dbChangedCount}`); // no-unilog
+console.log(`[run-reconcile] new sites:       ${totalCreated}`); // no-unilog
+if (collisions.length > 0) {
+  console.log(
+    `[run-reconcile] WARNING: ${collisions.length} log_id collision(s) — same id in multiple files (skipped):`,
+  ); // no-unilog
+  for (const c of collisions) {
+    console.log(`  log_id=${c.logId}  ${c.file1}  ><  ${c.file2}`); // no-unilog
+  }
+}
 
 // ---- helpers -------------------------------------------------------------
 

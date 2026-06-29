@@ -2284,7 +2284,6 @@ const tryLocalGetTvdb = async () => {
     minTvdb.name = requestedName;
   }
 
-  unilog(121, ""); // log-id: 121
   unilog(122, `processing [${minTvdb.name}]`); // log-id: 122
   // Notify clients which show is being processed
   if (enqueueCallback) enqueueCallback(minTvdb.name);

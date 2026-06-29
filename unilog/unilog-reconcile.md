@@ -178,14 +178,44 @@ normalized to `00`, matching `apps/srvr/src/unilogDb.js` so all tables agree.
 
 ---
 
-## 8. Scope
+## 8. File inclusion rules
 
-Reconciled projects: `srvr`, `api`, `down`, `asr`, `tv`, `client`. Within each, only
-the hard-wired `include` list is processed and the `exclude` list is skipped.
+A file is reconciled if and only if it passes **all** of the following checks,
+evaluated in order by `findProjectFiles` in [run-reconcile.js](run-reconcile.js):
 
-Never reconciled (logged old-style or not at all): `apps/android/**`, Tampermonkey
-`*.user.js`, the `unilog/` tooling itself (uses `// no-unilog`), build output,
-`temp*`, `node_modules`, `scripts/`, `apps/*/scripts/`, and ad-hoc root files.
+**1. It lives under a known project source root.**
+
+| project  | source roots walked recursively | extra individual files |
+| -------- | ------------------------------- | ---------------------- |
+| `srvr`   | `apps/srvr/src/`                | `apps/srvr/index.js`   |
+| `api`    | `apps/api/src/`                 | —                      |
+| `down`   | `apps/down/src/`                | —                      |
+| `asr`    | `apps/asr/`                     | —                      |
+| `tv`     | `apps/tv/`                      | —                      |
+| `client` | `apps/client/src/`              | —                      |
+
+Files anywhere else in the workspace are never touched.
+
+**2. Its extension is `.js` or `.vue`.** Other extensions (`.mjs`, `.cjs`, `.ts`,
+`.json`, `.sh`, …) are ignored.
+
+**3. Its filename does not end in `.user.js`.** This excludes Tampermonkey scripts.
+
+**4. Its basename is not in the excluded-basename set.** These are unilog plumbing
+files and path-constant modules that must never be instrumented:
+
+`unilogDb.js`, `srvrPaths.js`, `tvPaths.js`, `urls.js`, `config.js`, `evtBus.js`, `log.js`
+
+**5. None of its ancestor directories (within the source root) are in the
+skipped-directory set.** The walker never descends into:
+
+`node_modules/`, `data/`, `tmp/`, `test/`, `scripts/`
+
+Any file nested inside one of these directories is excluded regardless of its name
+or extension.
+
+**Additionally, within a reconciled file**, individual lines are opt-out with
+`// no-unilog` at the end of the line — that line is left completely untouched.
 
 ---
 

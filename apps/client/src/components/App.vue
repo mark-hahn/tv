@@ -612,6 +612,7 @@ export default {
     Qbt,
     Usb,
     Down,
+    Local,
     Trailer,
     TvPane,
     VideoPlayer,
@@ -1345,7 +1346,10 @@ export default {
       this.tvdbMismatchText = text == null ? "" : String(text);
       this.tvdbMismatchOpen = true;
 
-      unilog(898, `title="${this.tvdbMismatchTitle}"\n${this.tvdbMismatchText}`);
+      unilog(
+        898,
+        `title="${this.tvdbMismatchTitle}"\n${this.tvdbMismatchText}`,
+      );
       if (payload !== null && payload !== undefined) {
         unilog(899, "payload:", payload);
       }
@@ -1379,9 +1383,7 @@ export default {
     startLibraryRefresh() {
       srvr
         .requestEmbyLibraryRefresh()
-        .catch((err) =>
-          unilog(900, "requestEmbyLibraryRefresh failed:", err),
-        );
+        .catch((err) => unilog(900, "requestEmbyLibraryRefresh failed:", err));
     },
 
     async checkLibraryRefreshStatus() {

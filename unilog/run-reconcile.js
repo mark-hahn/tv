@@ -14,7 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { reconcileFilesWithDb, projectOf } from "./reconcile.js";
+import { reconcileFilesWithDb, projectOf, scanText } from "./reconcile.js";
 
 const SRVR_HTTPS_URL = "https://hahnca.com/tv-srvr";
 const SSH_HOST = "hahnca.com";
@@ -327,6 +327,36 @@ const summary = await reconcileFilesWithDb(files, {
 // dbChangedCount is set inside flushRefreshes after comparing against DB.
 let dbChangedCount = 0;
 
+// ---- inject unilog import BEFORE flushing --------------------------------
+// Injection adds a line at the top, shifting every subsequent line by 1.
+// Must happen before flushRefreshes so the DB gets the final line numbers.
+
+for (const s of summary) {
+  if (!s.created) continue;
+  const text = fs.readFileSync(s.file, "utf8");
+  if (hasUnilogInScope(text)) continue;
+  const patched = injectUnilogImport(text, s.file);
+  if (patched !== text) {
+    fs.writeFileSync(s.file, patched, "utf8");
+    console.log(`[run-reconcile] injected unilog import: ${s.file}`); // no-unilog
+  }
+}
+
+// Re-scan all processed files to capture post-injection line numbers.
+// This replaces the pre-injection positions buffered by refreshSiteFn.
+pendingRefreshes.length = 0;
+const postSeenIds = {};
+for (const f of files) {
+  const rel = path.relative(REPO_ROOT, f);
+  const text = fs.readFileSync(f, "utf8");
+  const { refreshes } = scanText(text, rel, { vue: f.endsWith(".vue") });
+  for (const r of refreshes) {
+    if (postSeenIds[r.logId] && postSeenIds[r.logId] !== rel) continue; // collision
+    postSeenIds[r.logId] = rel;
+    pendingRefreshes.push({ logId: r.logId, srcFile: rel, srcLine: r.srcLine });
+  }
+}
+
 await flushRefreshes();
 
 // Update cache: processed files get new hash + current site locations;
@@ -341,19 +371,6 @@ for (const f of allFiles) {
   if (!hashCache[rel]) hashCache[rel] = { hash: fileHash(f), sites: {} };
 }
 fs.writeFileSync(CACHE_FILE, JSON.stringify(hashCache, null, 2) + "\n", "utf8");
-
-// ---- inject unilog import into files that got new calls ------------------
-
-for (const s of summary) {
-  if (!s.created) continue;
-  const text = fs.readFileSync(s.file, "utf8");
-  if (hasUnilogInScope(text)) continue;
-  const patched = injectUnilogImport(text, s.file);
-  if (patched !== text) {
-    fs.writeFileSync(s.file, patched, "utf8");
-    console.log(`[run-reconcile] injected unilog import: ${s.file}`); // no-unilog
-  }
-}
 
 // ---- report --------------------------------------------------------------
 

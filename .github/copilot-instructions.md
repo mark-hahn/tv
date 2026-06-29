@@ -116,11 +116,17 @@ in the map pane call the first child of the maphdr2 div the "map pane info bar"
 
 never touch git for read or commit unless i tell you to
 
-## Unilog — finding logs for a code location
+## Unilog Debugging
 
-- unilog is a universal logging system with db at `hahnca.com:/root/dev/apps/tv/unilog/unilog.sqlite`
-- log sites (locations in code) are in table `log_sites` with unique `log_id`
-- log events (execution records) are in table `log_events` referencing `log_id`
-- to find logs for a specific code location:
-  1. find the log_id from the `unilog(<log_id>, ...)` call in source code
-  2. ssh to remote and query: `ssh hahnca.com "sqlite3 -json /root/dev/apps/tv/unilog/unilog.sqlite 'SELECT * FROM log_events WHERE log_id = <log_id> ORDER BY id;'"`
+Use `unilog/query.js` (runs locally, SSHes to remote DB) to answer questions about log output:
+
+```bash
+node unilog/query.js --file srvr/index.js --last 100          # recent events from a file
+node unilog/query.js --file srvr/index.js --line 311 --last 100  # specific source line
+node unilog/query.js --file tvdb.js --sites                   # list log_ids for a file
+node unilog/query.js --id 42 --last 50                        # by log_id
+node unilog/query.js --pid tv-down --level error --last 20    # by process / level
+node unilog/query.js --since "-1 hour" --pid tv-srvr --asc    # time-bounded
+```
+
+Output: `MM-DD HH:MM  pid  file:line  [tag]  message`. See `.github/agents/unilog.agent.md` for full reference including how to add/remove log instrumentation.

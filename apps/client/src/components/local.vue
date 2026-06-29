@@ -1688,7 +1688,7 @@ export default {
       }
 
       if (!this.allShows || !this.allShows.length) {
-        unilog(161, "No shows loaded."); // log-id: 161
+        unilog(161, "No shows loaded.");
         return;
       }
 
@@ -1787,7 +1787,7 @@ export default {
       const showName = this.show ? this.show.name : null;
       if (!showName) {
         // Fallback or ignore if no show selected
-        unilog(162, "No current show selected."); // log-id: 162
+        unilog(162, "No current show selected.");
         return;
       }
 
@@ -1800,13 +1800,13 @@ export default {
       }
 
       if (!folderName) {
-        unilog(163, `Folder "${showName}" not found in tree.`); // log-id: 163
+        unilog(163, `Folder "${showName}" not found in tree.`);
         return;
       }
 
       const nodeIndex = this.tree.findIndex((n) => n.name === folderName);
       if (nodeIndex === -1) {
-        unilog(164, `Folder "${folderName}" not found in tree.`); // log-id: 164
+        unilog(164, `Folder "${folderName}" not found in tree.`);
         return;
       }
       const node = this.tree[nodeIndex];

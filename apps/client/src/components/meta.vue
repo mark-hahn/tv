@@ -39,7 +39,7 @@ export default {
       img.onerror = () => {
         unilog(1028, "Meta: no img:", images[imgIdx]);
         if (++imgIdx == images.length) {
-          unilog(165, "Meta: no image found"); // log-id: 165
+          unilog(165, "Meta: no image found");
           return;
         }
         tryImg();

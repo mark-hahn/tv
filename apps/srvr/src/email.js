@@ -22,7 +22,7 @@ export const sendEmail = async (bodyText) => {
     };
 
     await client.send(emailData);
-    unilog(103, "✓ Email sent successfully"); // log-id: 103
+    unilog(103, "✓ Email sent successfully");
     return "ok";
   } catch (error) {
     unilog(689, "✗ Failed to send email:", error.message);

@@ -19,9 +19,9 @@ async function createBifFile(videoPath, width = 320, interval = 10) {
   );
 
   const startTime = Date.now();
-  unilog(92, `Creating BIF file: ${outputPath}`); // log-id: 92
-  unilog(93, `Video: ${videoPath}`); // log-id: 93
-  unilog(94, `Settings: ${width}px width, ${interval}s interval`); // log-id: 94
+  unilog(92, `Creating BIF file: ${outputPath}`);
+  unilog(93, `Video: ${videoPath}`);
+  unilog(94, `Settings: ${width}px width, ${interval}s interval`);
 
   // Create temp directory for frames
   const tempDir = `/tmp/bif-temp-${Date.now()}`;
@@ -29,7 +29,7 @@ async function createBifFile(videoPath, width = 320, interval = 10) {
 
   try {
     // Extract frames using ffmpeg
-    unilog(95, "\nExtracting frames..."); // log-id: 95
+    unilog(95, "\nExtracting frames...");
     await extractFrames(videoPath, tempDir, width, interval);
 
     // Get all frame files
@@ -42,21 +42,21 @@ async function createBifFile(videoPath, width = 320, interval = 10) {
         return numA - numB;
       });
 
-    unilog(96, `\nExtracted ${frameFiles.length} frames`); // log-id: 96
+    unilog(96, `\nExtracted ${frameFiles.length} frames`);
 
     // Create BIF file
-    unilog(97, "Creating BIF file..."); // log-id: 97
+    unilog(97, "Creating BIF file...");
     await writeBifFile(tempDir, frameFiles, outputPath, interval);
 
     const endTime = Date.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
 
     const stats = await fs.stat(outputPath);
-    unilog(98, `\n✓ BIF file created successfully`); // log-id: 98
-    unilog(99, `  Output: ${outputPath}`); // log-id: 99
-    unilog(100, `  Size: ${(stats.size / 1024 / 1024).toFixed(2)} MB`); // log-id: 100
-    unilog(101, `  Frames: ${frameFiles.length}`); // log-id: 101
-    unilog(102, `  Time taken: ${duration} seconds`); // log-id: 102
+    unilog(98, `\n✓ BIF file created successfully`);
+    unilog(99, `  Output: ${outputPath}`);
+    unilog(100, `  Size: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+    unilog(101, `  Frames: ${frameFiles.length}`);
+    unilog(102, `  Time taken: ${duration} seconds`);
 
     return {
       outputPath,

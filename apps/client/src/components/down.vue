@@ -1378,7 +1378,7 @@ export default {
       // and scroll to it.
 
       if (!this.show) {
-        unilog(150, "showFirstDownloading: No show selected context"); // log-id: 150
+        unilog(150, "showFirstDownloading: No show selected context");
         return;
       }
 

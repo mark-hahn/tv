@@ -277,9 +277,9 @@ setImmediate(async () => {
     const login = loadSubsLogin();
     const newToken = await openSubtitlesLogin(login);
     await persistSubsToken(newToken);
-    unilog(1, "token refreshed on startup"); // log-id: 1
+    unilog(1, "token refreshed on startup");
   } catch (e) {
-    unilog(2, `startup token refresh failed: ${e.message}`); // log-id: 2
+    unilog(2, `startup token refresh failed: ${e.message}`);
   }
 });
 
@@ -1015,7 +1015,7 @@ function startBifCreate(bifNeededObj) {
   if (lock) {
     // Clear a stale lock left by a dead worker; otherwise honor it.
     if (pidAlive(lock.pid)) return false;
-    unilog(3, `clearing stale lock (pid ${lock.pid} dead)`); // log-id: 3
+    unilog(3, `clearing stale lock (pid ${lock.pid} dead)`);
     try {
       fs.unlinkSync(BIF_CREATING_PATH);
     } catch {}
@@ -1053,7 +1053,7 @@ function startBifCreate(bifNeededObj) {
     try {
       fs.unlinkSync(BIF_CREATING_PATH);
     } catch {}
-    unilog(4, `done ${bifNeededObj.showName}`); // log-id: 4
+    unilog(4, `done ${bifNeededObj.showName}`);
     // GLOBAL-MSG: Bif
     setGlobalMessage({ id: "Bif", action: "hide" });
     checkBifNeededQueue();
@@ -1081,7 +1081,7 @@ function cancelBifCreate(showName) {
   try {
     fs.unlinkSync(BIF_CREATING_PATH);
   } catch {}
-  unilog(5, `cancel ${showName} pid=${lock.pid}`); // log-id: 5
+  unilog(5, `cancel ${showName} pid=${lock.pid}`);
   // GLOBAL-MSG: Bif
   setGlobalMessage({ id: "Bif", action: "hide" });
 }
@@ -1120,7 +1120,7 @@ function handleNeedsIntroChange(showName, rec, needsIntro) {
     if (bifNeededQueue.some((o) => o.showName === showName)) return;
     bifNeededQueue.push({ showName, bifPath });
     persistBifNeededQueue();
-    unilog(6, `queued ${showName} ${bifPath}`); // log-id: 6
+    unilog(6, `queued ${showName} ${bifPath}`);
     checkBifNeededQueue();
   } else {
     cancelBifCreate(showName);
@@ -1525,7 +1525,7 @@ async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
     try {
       results = await subsSearch({ query: title, year });
     } catch (e) {
-      unilog(7, `opensubs search err: ${e.message}`); // log-id: 7
+      unilog(7, `opensubs search err: ${e.message}`);
       return;
     }
   } else {
@@ -1533,7 +1533,7 @@ async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
     if (!tvdbAll) return;
     const tvdbRec = tvdbAll[showname];
     if (!tvdbRec?.imdbId) {
-      unilog(8, `opensubs skip no imdb: ${videoFilePath}`); // log-id: 8
+      unilog(8, `opensubs skip no imdb: ${videoFilePath}`);
       return;
     }
     try {
@@ -1543,13 +1543,13 @@ async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
         episode,
       });
     } catch (e) {
-      unilog(9, `opensubs search err: ${e.message}`); // log-id: 9
+      unilog(9, `opensubs search err: ${e.message}`);
       return;
     }
   }
   const items = Array.isArray(results?.data) ? results.data : [];
   if (items.length === 0) {
-    unilog(10, `opensubs no results: ${path.basename(videoFilePath)}`); // log-id: 10
+    unilog(10, `opensubs no results: ${path.basename(videoFilePath)}`);
     return;
   }
   unilog(
@@ -1595,7 +1595,7 @@ async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
       dlCount++;
       // TEMP: log api filename for release matching
     } catch (e) {
-      unilog(11, `opensubs dl err ${fid}: ${e.message}`); // log-id: 11
+      unilog(11, `opensubs dl err ${fid}: ${e.message}`);
     }
   }
 }
@@ -1607,14 +1607,14 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
     appendAsrLog(
       `=== Skipped: ${path.basename(videoFilePath)} (srt already exists) ===`,
     );
-    unilog(12, `asr skip exists: ${videoFilePath}`); // log-id: 12
-    unilog(13, `skipped (srt exists): ${videoFilePath}`); // log-id: 13
+    unilog(12, `asr skip exists: ${videoFilePath}`);
+    unilog(13, `skipped (srt exists): ${videoFilePath}`);
     return;
   }
   asrLogBuffer = [];
   appendAsrLog("");
   appendAsrLog(`=== Starting: ${path.basename(videoFilePath)} ===`);
-  unilog(14, `asr start: ${videoFilePath}`); // log-id: 14
+  unilog(14, `asr start: ${videoFilePath}`);
   genSrtRunning = true;
   notifyClients("asr-queue-update", { count: asrQueue.length, running: true });
   try {
@@ -1640,7 +1640,7 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
         else reject(new Error(`asr.js exited ${code}`));
       });
     });
-    unilog(15, `asr done: ${videoFilePath}`); // log-id: 15
+    unilog(15, `asr done: ${videoFilePath}`);
     appendAsrLog(`=== Done: ${path.basename(videoFilePath)} ===`);
     if (fromUI)
       notifyClients("subs-progress", {
@@ -1648,7 +1648,7 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
         status: "asr-done",
       });
   } catch (e) {
-    unilog(16, `asr error: ${e.message}`); // log-id: 16
+    unilog(16, `asr error: ${e.message}`);
     if (e.message === "__cancelled__") {
       appendAsrLog(
         `File ${path.basename(videoFilePath)} processing cancelled.`,
@@ -2430,7 +2430,7 @@ async function tryDownloadOpnSrtForVideo({
 
   resetOpnDailyCountIfNeeded();
   if (opnDailyCount >= OPN_DAILY_LIMIT) {
-    unilog(17, `${logPrefix} quota exceeded for ${showName} ${key}`); // log-id: 17
+    unilog(17, `${logPrefix} quota exceeded for ${showName} ${key}`);
     return { attempted: true, downloaded: false, quotaExceeded: true };
   }
 
@@ -2444,23 +2444,23 @@ async function tryDownloadOpnSrtForVideo({
     });
   } catch (e) {
     if (e?.message?.includes("406") || e?.details?.status === 406) {
-      unilog(18, `${logPrefix} quota exceeded for ${showName} ${key}`); // log-id: 18
+      unilog(18, `${logPrefix} quota exceeded for ${showName} ${key}`);
     } else {
-      unilog(19, `${logPrefix} search err ${showName} ${key}: ${e.message}`); // log-id: 19
+      unilog(19, `${logPrefix} search err ${showName} ${key}: ${e.message}`);
     }
     return { attempted: true, downloaded: false, error: e };
   }
 
   const items = Array.isArray(results?.data) ? results.data : [];
   if (items.length === 0) {
-    unilog(20, `${logPrefix} no results: ${showName} ${key}`); // log-id: 20
+    unilog(20, `${logPrefix} no results: ${showName} ${key}`);
     return { attempted: true, downloaded: false };
   }
 
   const result = items[0];
   const fileId = result.file_id || result.attributes?.files?.[0]?.file_id;
   if (!fileId) {
-    unilog(21, `${logPrefix} missing file id: ${showName} ${key}`); // log-id: 21
+    unilog(21, `${logPrefix} missing file id: ${showName} ${key}`);
     return { attempted: true, downloaded: false };
   }
 
@@ -2478,7 +2478,7 @@ async function tryDownloadOpnSrtForVideo({
     });
     if (!dl?.resp?.ok) {
       if (dl?.resp?.status === 406) {
-        unilog(22, `${logPrefix} quota exceeded (dl) for ${showName} ${key}`); // log-id: 22
+        unilog(22, `${logPrefix} quota exceeded (dl) for ${showName} ${key}`);
       } else {
         unilog(
           536,
@@ -2489,7 +2489,7 @@ async function tryDownloadOpnSrtForVideo({
     }
     const url = typeof dl.body?.link === "string" ? dl.body.link.trim() : "";
     if (!url) {
-      unilog(23, `${logPrefix} missing download link: ${showName} ${key}`); // log-id: 23
+      unilog(23, `${logPrefix} missing download link: ${showName} ${key}`);
       return { attempted: true, downloaded: false };
     }
     const resp = await fetch(url, { headers: { Accept: "*/*" } });
@@ -2503,7 +2503,7 @@ async function tryDownloadOpnSrtForVideo({
     const txt = await resp.text();
     await fs.promises.writeFile(outPath, stripSrtFormatting(txt), "utf8");
     opnDailyCount++;
-    unilog(24, `${logPrefix}: ${outPath}`); // log-id: 24
+    unilog(24, `${logPrefix}: ${outPath}`);
     return { attempted: true, downloaded: true, outPath };
   } catch (e) {
     unilog(
@@ -2597,7 +2597,7 @@ async function checkAndDownloadOpnSrt(showName, tvdbRecord) {
       );
       persistSubQueueChkSrt();
       notifyClients("chksrt-count", subQueueChkSrt.length);
-      unilog(25, `opn-bg unsnooze: ${filePath}`); // log-id: 25
+      unilog(25, `opn-bg unsnooze: ${filePath}`);
     }
   }
 }
@@ -2632,14 +2632,14 @@ async function processChksrtSnoozedForShow(showName, tvdbRecord) {
         logPrefix: "opn-snooze",
       });
     } else {
-      unilog(26, `opn-snooze parse err ${showName}: ${videoFilePath}`); // log-id: 26
+      unilog(26, `opn-snooze parse err ${showName}: ${videoFilePath}`);
     }
 
     enqueueSubQueueChkSrt(
       { videoFilePath, fromUI: false, lowPriority: false },
       false,
     );
-    unilog(27, `chksrt unsnooze (24h): ${videoFilePath}`); // log-id: 27
+    unilog(27, `chksrt unsnooze (24h): ${videoFilePath}`);
     queueChanged = true;
   }
 
@@ -2830,12 +2830,12 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
     if (push2Changes.length) {
       await tvdb.saveTvdbSync();
       if (!options?.suppressNotify) {
-        unilog(28, `${showName}: ${push2Changes.join(" ")}`); // log-id: 28
+        unilog(28, `${showName}: ${push2Changes.join(" ")}`);
         debouncedTvdbPush(showName);
       }
     } else {
       if (!options?.suppressNotify) {
-        unilog(29, `${showName}: no changes`); // log-id: 29
+        unilog(29, `${showName}: no changes`);
       }
     }
     // Background OpenSubtitles check: download one missing .opnXXXXX.srt per show
@@ -3253,7 +3253,7 @@ async function refreshEpisodeData(showName, rec, opts = {}) {
         }
       }
     } catch (e) {
-      unilog(30, `tvdb ${showName}: ${e.message}`); // log-id: 30
+      unilog(30, `tvdb ${showName}: ${e.message}`);
     }
   }
 
@@ -3277,7 +3277,7 @@ async function refreshEpisodeData(showName, rec, opts = {}) {
         }
       }
     } catch (e) {
-      unilog(31, `emby ${showName}: ${e.message}`); // log-id: 31
+      unilog(31, `emby ${showName}: ${e.message}`);
     }
   }
 
@@ -3319,7 +3319,7 @@ async function refreshEpisodeData(showName, rec, opts = {}) {
         });
       }
     } catch (e) {
-      unilog(32, `disk ${showName}: ${e.message}`); // log-id: 32
+      unilog(32, `disk ${showName}: ${e.message}`);
     }
   }
 
@@ -3707,7 +3707,7 @@ const delSeasonFiles = async (params) => {
   }
 
   for (const seasonDir of seasonDirs) {
-    unilog(33, `${showName}: ${seasonDir}`); // log-id: 33
+    unilog(33, `${showName}: ${seasonDir}`);
 
     let entries = [];
     try {
@@ -3718,7 +3718,7 @@ const delSeasonFiles = async (params) => {
 
     for (const entry of entries) {
       const entryPath = path.join(seasonDir, entry);
-      unilog(34, `deleting: ${entryPath}`); // log-id: 34
+      unilog(34, `deleting: ${entryPath}`);
       try {
         await rimraf(entryPath);
       } catch (e) {
@@ -3939,7 +3939,7 @@ const deleteOnePath = async (pathParam) => {
       }
 
       if (!stats) {
-        unilog(35, "deletePath: path doesn't exist"); // log-id: 35
+        unilog(35, "deletePath: path doesn't exist");
         return "ok";
       }
     }
@@ -4291,7 +4291,7 @@ app.post(
 app.post(
   "/api/triggerEmbySync",
   apiWrapper(async () => {
-    unilog(36, "Running full Emby sweep"); // log-id: 36
+    unilog(36, "Running full Emby sweep");
     runEmbyFullSweep("triggerEmbySync").catch((e) =>
       unilog(575, "sweep error:", e?.message || e),
     );
@@ -4327,7 +4327,7 @@ app.post(
         updated++;
       } catch (e) {
         skipped++;
-        unilog(37, `${name}: ${e.message}`); // log-id: 37
+        unilog(37, `${name}: ${e.message}`);
       }
     }
     await tvdb.saveTvdbSync();
@@ -4347,7 +4347,7 @@ app.post(
       if (q !== null) updated++;
     }
     await tvdb.saveTvdbSync();
-    unilog(38, `Done: updated=${updated}`); // log-id: 38
+    unilog(38, `Done: updated=${updated}`);
     return { ok: true, updated };
   }),
 );
@@ -4368,12 +4368,12 @@ app.post(
         done++;
       } catch (e) {
         errors++;
-        unilog(39, `${name}: ${e.message}`); // log-id: 39
+        unilog(39, `${name}: ${e.message}`);
       }
       if (done % 25 === 0) await tvdb.saveTvdbSync();
     }
     await tvdb.saveTvdbSync();
-    unilog(40, `Done: done=${done} errors=${errors}`); // log-id: 40
+    unilog(40, `Done: done=${done} errors=${errors}`);
     return { ok: true, done, errors };
   }),
 );
@@ -4499,7 +4499,7 @@ app.post(
   apiWrapper(async (params) => {
     const { showId, showName } = params;
     if (!showId || !showName) {
-      unilog(41, "Missing showId or showName"); // log-id: 41
+      unilog(41, "Missing showId or showName");
       return { success: false };
     }
     unilog(585, `Client requested gap check for: ${showName}`);
@@ -4513,7 +4513,7 @@ app.post(
   apiWrapper(async (params) => {
     const { showName } = params;
     if (!showName) {
-      unilog(42, "Missing showName"); // log-id: 42
+      unilog(42, "Missing showName");
       return { success: false };
     }
     tvdb.enqueueShowProcess(showName, { skipRotten: true });
@@ -4552,7 +4552,7 @@ function removeFromSnoozeByShow(showName, tvdbId) {
   if (next.length === list.length) return;
   writeSnoozeList(next);
   notifyClients("snoozeListUpdated", next);
-  unilog(43, `removed "${showName}" from snooze list (inEmby)`); // log-id: 43
+  unilog(43, `removed "${showName}" from snooze list (inEmby)`);
 }
 
 app.get(
@@ -4670,7 +4670,7 @@ app.get("/api/flexget-run-stream", (req, res) => {
   }
 
   flexgetIsRunning = true;
-  unilog(44, "stream run started"); // log-id: 44
+  unilog(44, "stream run started");
 
   const args = [
     "-c",
@@ -4900,7 +4900,7 @@ app.get("/api/stream", async (req, res) => {
           .split("/")
           .map((seg) => encodeURIComponent(seg))
           .join("/");
-      unilog(45, `redirect to nginx: ${url}`); // log-id: 45
+      unilog(45, `redirect to nginx: ${url}`);
       res.redirect(302, url);
       return;
     }
@@ -5008,7 +5008,7 @@ app.get("/api/stream", async (req, res) => {
     req.on("close", killFfmpeg);
     res.on("close", killFfmpeg);
     ffmpeg.on("exit", (code) => {
-      if (code !== 0 && code !== null) unilog(46, `ffmpeg exit code ${code}`); // log-id: 46
+      if (code !== 0 && code !== null) unilog(46, `ffmpeg exit code ${code}`);
       if (!res.writableEnded) res.end();
     });
   } catch (err) {
@@ -5837,7 +5837,7 @@ app.post("/api/asr/chksrt/snooze", (req, res) => {
   const idx = subQueueChkSrt.findIndex((e) => e.videoFilePath === videoPath);
   if (idx !== -1) subQueueChkSrt.splice(idx, 1);
   addToChksrtSnoozed(showName, videoPath);
-  unilog(47, `chksrt snooze: ${videoPath}`); // log-id: 47
+  unilog(47, `chksrt snooze: ${videoPath}`);
   cleanChkSrtQueue();
   persistSubQueueChkSrt();
   persistChksrtSnoozed();
@@ -6033,18 +6033,18 @@ app.post("/api/bif/enqueue", async (req, res) => {
     if (!videoPath) continue;
     const base = path.basename(videoPath);
     if (bifNeededQueue.some((o) => o.bifPath === videoPath)) {
-      unilog(48, `skip (queued) ${base}`); // log-id: 48
+      unilog(48, `skip (queued) ${base}`);
       continue;
     }
     if (inFlightPath === videoPath) {
-      unilog(49, `skip (in-flight) ${base}`); // log-id: 49
+      unilog(49, `skip (in-flight) ${base}`);
       continue;
     }
     const parsed = path.parse(videoPath);
     const bifDiskPath = path.join(parsed.dir, `${parsed.name}-320-10.bif`);
     try {
       await fsp.access(bifDiskPath);
-      unilog(50, `skip (on-disk) ${base}`); // log-id: 50
+      unilog(50, `skip (on-disk) ${base}`);
       continue;
     } catch {
       /* not on disk */
@@ -6054,7 +6054,7 @@ app.post("/api/bif/enqueue", async (req, res) => {
   }
   if (added > 0) {
     persistBifNeededQueue();
-    unilog(51, `enqueued ${added} file(s) for ${showName}`); // log-id: 51
+    unilog(51, `enqueued ${added} file(s) for ${showName}`);
     checkBifNeededQueue();
   }
   res.json({ ok: true, added });
@@ -6138,7 +6138,7 @@ async function doSkipIntro(pressedAt, deviceName = "Living Room TV") {
     { headers: { Accept: "application/json" } },
   );
   if (!sessRes.ok) {
-    unilog(52, `sessions fetch failed: ${sessRes.status}`); // log-id: 52
+    unilog(52, `sessions fetch failed: ${sessRes.status}`);
     return { ok: false, error: `sessions ${sessRes.status}` };
   }
   const sessions = await sessRes.json();
@@ -6173,7 +6173,7 @@ async function doSkipIntro(pressedAt, deviceName = "Living Room TV") {
   const season = session.NowPlayingItem.ParentIndexNumber ?? null;
   const skipDur = tvdb.getSeasonIntro(record, season).skipDur;
   if (!skipDur || skipDur <= 0) {
-    unilog(53, `no skipDur for show: ${showName}`); // log-id: 53
+    unilog(53, `no skipDur for show: ${showName}`);
     return { ok: false, reason: "noSkipDur" };
   }
   // Skipping: jump ahead by skipDur from current position.
@@ -6187,7 +6187,7 @@ async function doSkipIntro(pressedAt, deviceName = "Living Room TV") {
     { method: "POST", headers: { Accept: "application/json" } },
   );
   if (!seekRes.ok) {
-    unilog(54, `seek failed: ${seekRes.status}`); // log-id: 54
+    unilog(54, `seek failed: ${seekRes.status}`);
     return { ok: false, error: `seek ${seekRes.status}` };
   }
   return { ok: true };
@@ -6211,7 +6211,7 @@ async function doTrimIntro(deviceName = "Living Room TV") {
     { headers: { Accept: "application/json" } },
   );
   if (!sessRes.ok) {
-    unilog(55, `sessions fetch failed: ${sessRes.status}`); // log-id: 55
+    unilog(55, `sessions fetch failed: ${sessRes.status}`);
     return { ok: false, error: `sessions ${sessRes.status}` };
   }
   const sessions = await sessRes.json();
@@ -6232,7 +6232,7 @@ async function doTrimIntro(deviceName = "Living Room TV") {
   const season = session.NowPlayingItem.ParentIndexNumber ?? null;
   const trimPos = tvdb.getSeasonIntro(record, season).trimPos;
   if (!trimPos || trimPos <= 0) {
-    unilog(56, `no trimPos for show: ${showName}`); // log-id: 56
+    unilog(56, `no trimPos for show: ${showName}`);
     return { ok: false, reason: "noTrimPos" };
   }
   const newTicks = Math.round(trimPos * 10000);
@@ -6245,7 +6245,7 @@ async function doTrimIntro(deviceName = "Living Room TV") {
     { method: "POST", headers: { Accept: "application/json" } },
   );
   if (!seekRes.ok) {
-    unilog(57, `seek failed: ${seekRes.status}`); // log-id: 57
+    unilog(57, `seek failed: ${seekRes.status}`);
     return { ok: false, error: `seek ${seekRes.status}` };
   }
   return { ok: true };
@@ -6604,7 +6604,7 @@ const httpsOptions = {
 };
 
 https.createServer(httpsOptions, app).listen(HTTP_PORT, () => {
-  unilog(58, `HTTPS API listening on port ${HTTP_PORT}`); // log-id: 58
+  unilog(58, `HTTPS API listening on port ${HTTP_PORT}`);
   loadQueues();
   loadChksrtHistory();
   loadChksrtSnoozed();
@@ -6859,13 +6859,13 @@ async function checkMissingEpisodes(playing) {
 }
 
 http.createServer(app).listen(SRVR_INTERNAL_PORT, "127.0.0.1", () => {
-  unilog(59, `Internal HTTP listening on port ${SRVR_INTERNAL_PORT}`); // log-id: 59
+  unilog(59, `Internal HTTP listening on port ${SRVR_INTERNAL_PORT}`);
 });
 
 //////////////////  WEBSOCKET SERVER  //////////////////
 
 const wss = new WebSocketServer({ port: 8736 });
-unilog(60, "wss listening on port 8736"); // log-id: 60
+unilog(60, "wss listening on port 8736");
 
 const appSocketName = "web app websocket";
 const connectedClients = new Set();
@@ -7680,10 +7680,10 @@ function parseFlexgetDumpOutput(stdout) {
 async function processFlexgetOutput(stdout) {
   const candidates = parseFlexgetDumpOutput(stdout);
   if (candidates.length === 0) {
-    unilog(61, "no accepted entries"); // log-id: 61
+    unilog(61, "no accepted entries");
     return;
   }
-  unilog(62, `processing ${candidates.length} accepted candidates`); // log-id: 62
+  unilog(62, `processing ${candidates.length} accepted candidates`);
 
   const runGroups = new Map();
   for (let i = 0; i < candidates.length; i++) {
@@ -7730,7 +7730,7 @@ async function runFlexgetAndProcess() {
   flexgetIsRunning = true;
   try {
     const cmd = `"${FLEXGET_CMD}" -c "${FLEXGET_CONFIG}" execute --tasks fetch-feeds --dump accepted 2>&1`;
-    unilog(63, `running flexget execute --tasks fetch-feeds`); // log-id: 63
+    unilog(63, `running flexget execute --tasks fetch-feeds`);
     let stdout = "";
     try {
       const result = await exec(cmd, {
@@ -7763,15 +7763,15 @@ async function runFlexgetAndProcess() {
 // - /api/triggerShowSelect (single-show processing)
 // This function remains for reference but is not called.
 async function syncEmbyUserData() {
-  unilog(64, "CALLED - function executing"); // log-id: 64
+  unilog(64, "CALLED - function executing");
   try {
-    unilog(65, "Starting..."); // log-id: 65
+    unilog(65, "Starting...");
 
     // Get all tvdb records
     const allTvdb = tvdb.getAllTvdbSync();
     const changedShows = []; // Track which shows changed
     if (!allTvdb || Object.keys(allTvdb).length === 0) {
-      unilog(66, "syncEmbyUserData: No tvdb records to sync"); // log-id: 66
+      unilog(66, "syncEmbyUserData: No tvdb records to sync");
       return;
     }
 
@@ -7808,7 +7808,7 @@ async function syncEmbyUserData() {
         ),
       ]);
 
-    unilog(67, "Fetches completed"); // log-id: 67
+    unilog(67, "Fetches completed");
 
     if (!embyResp.ok) {
       unilog(640, "syncEmbyUserData: Emby fetch failed:", embyResp.status);
@@ -8067,10 +8067,10 @@ async function runEmbyFullSweep(caller = "unknown") {
   if (embyFullSweepRunning) {
     embyFullSweepQueued = true;
     embyFullSweepQueuedCaller = caller;
-    unilog(68, `queued from: ${caller}`); // log-id: 68
+    unilog(68, `queued from: ${caller}`);
     return;
   }
-  unilog(69, `starting from: ${caller}`); // log-id: 69
+  unilog(69, `starting from: ${caller}`);
   embyFullSweepRunning = true;
   try {
     const allTvdb = tvdb.getAllTvdbSync();
@@ -8236,7 +8236,7 @@ async function runEmbyFullSweep(caller = "unknown") {
         };
         try {
           await tvdb.getNewTvdb(param);
-          unilog(70, `Created tvdb record: ${name}`); // log-id: 70
+          unilog(70, `Created tvdb record: ${name}`);
         } catch (e) {
           unilog(653, `getNewTvdb failed for "${name}":`, e.message);
         }
@@ -8328,7 +8328,7 @@ async function runEmbyFullSweep(caller = "unknown") {
         embyNameSet.has(name) ||
         (rec.tvdbId && embyTvdbIdSet.has(String(rec.tvdbId)));
       if (!stillInEmby) {
-        unilog(71, `Marking ${name} as not in Emby`); // log-id: 71
+        unilog(71, `Marking ${name} as not in Emby`);
         // Delete show folder from disk so Emby cannot re-add it on next scan
         const folderName =
           typeof rec.path === "string" &&
@@ -8342,7 +8342,7 @@ async function runEmbyFullSweep(caller = "unknown") {
           const st = fs.statSync(folderPath);
           if (st.isDirectory()) {
             fs.rmSync(folderPath, { recursive: true, force: true });
-            unilog(72, `Deleted folder: ${folderPath}`); // log-id: 72
+            unilog(72, `Deleted folder: ${folderPath}`);
           }
         } catch (e) {
           if (e.code !== "ENOENT") {
@@ -8460,12 +8460,12 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
           );
         }
       } catch (err) {
-        unilog(73, `${showName}: ${err.message}`); // log-id: 73
+        unilog(73, `${showName}: ${err.message}`);
       }
     }
     if (lastPlayedChanged > 0) {
       await tvdb.saveTvdbSync();
-      unilog(74, `Updated ${lastPlayedChanged} shows`); // log-id: 74
+      unilog(74, `Updated ${lastPlayedChanged} shows`);
     }
 
     // Now run gap check with fresh emby and disk data
@@ -8486,7 +8486,7 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
     const updatedCount = await tvdb.updateTvdbWithGapData(gapData);
 
     const elapsed = Math.round((Date.now() - startTime) / 1000);
-    unilog(75, `finished, ${elapsed} secs, ${shows.length} shows`); // log-id: 75
+    unilog(75, `finished, ${elapsed} secs, ${shows.length} shows`);
   } catch (err) {
     unilog(663, "error:", err.message);
   }
@@ -8641,7 +8641,7 @@ const embyRefreshManager = (() => {
       );
       if (res.ok) {
         taskId = await getLibraryTaskId();
-        unilog(76, `taskId: ${taskId || "none"}`); // log-id: 76
+        unilog(76, `taskId: ${taskId || "none"}`);
       } else {
         unilog(669, `Library/Refresh failed: ${res.status} ${res.statusText}`);
       }
@@ -8665,7 +8665,7 @@ const embyRefreshManager = (() => {
               notifyClients("libraryProgress", { pct: progressNum });
             }
             if (task.State !== "Running") {
-              unilog(77, `scan finished (State=${task.State})`); // log-id: 77
+              unilog(77, `scan finished (State=${task.State})`);
               break;
             }
           }
@@ -8674,7 +8674,7 @@ const embyRefreshManager = (() => {
         }
       }
     } else {
-      unilog(78, `no taskId, waiting 90s`); // log-id: 78
+      unilog(78, `no taskId, waiting 90s`);
       await new Promise((r) => setTimeout(r, 90 * 1000));
     }
 
@@ -8774,12 +8774,12 @@ const pendingDiskChanges = new Set();
 async function handleShowDiskChange(showName) {
   if (inFlightDiskChanges.has(showName)) {
     pendingDiskChanges.add(showName);
-    unilog(79, `${showName} already in flight, queued retry`); // log-id: 79
+    unilog(79, `${showName} already in flight, queued retry`);
     return;
   }
   inFlightDiskChanges.add(showName);
   try {
-    unilog(80, `Processing disk change for: ${showName}`); // log-id: 80
+    unilog(80, `Processing disk change for: ${showName}`);
 
     // Update disk info for this show
     const diskInfo = await getShowDiskInfo(showName);
@@ -8789,7 +8789,7 @@ async function handleShowDiskChange(showName) {
       // Update cache if it exists
       if (diskShowsCache) {
         diskShowsCache[showName] = diskInfo;
-        unilog(81, `updated cache for ${showName}`); // log-id: 81
+        unilog(81, `updated cache for ${showName}`);
       }
 
       // Update tvdb record with new disk info
@@ -8809,7 +8809,7 @@ async function handleShowDiskChange(showName) {
       // If we can't get disk info (e.g., folder was deleted), remove from cache
       if (diskShowsCache && showName in diskShowsCache) {
         delete diskShowsCache[showName];
-        unilog(82, `removed ${showName} from cache (no disk info)`); // log-id: 82
+        unilog(82, `removed ${showName} from cache (no disk info)`);
       }
     }
 
@@ -8818,9 +8818,9 @@ async function handleShowDiskChange(showName) {
     unilog(678, `Notified clients about disk change for ${showName}`);
 
     // Trigger Emby library refresh through manager (throttled, deduped, pushes WS progress)
-    unilog(83, `Requesting Emby library refresh for ${showName}`); // log-id: 83
+    unilog(83, `Requesting Emby library refresh for ${showName}`);
     await embyRefreshManager.request(`chokidar:${showName}`, showName);
-    unilog(84, `Library refresh done for ${showName}`); // log-id: 84
+    unilog(84, `Library refresh done for ${showName}`);
 
     try {
       const allTvdb = tvdb.getAllTvdbSync();
@@ -8832,13 +8832,13 @@ async function handleShowDiskChange(showName) {
         [{ showId: tvdbRecord.id, showName, tvdbRecord }],
         false,
       );
-      unilog(85, `Gap check refreshed for ${showName}`); // log-id: 85
+      unilog(85, `Gap check refreshed for ${showName}`);
 
       // Refresh watched/id in episodeData from Emby (also dual-writes
       // watchedEpis/watchedCount).
       await refreshEpisodeData(showName, tvdbRecord, { sources: ["emby"] });
       await tvdb.saveTvdbSync();
-      unilog(86, `watched refreshed for ${showName}`); // log-id: 86
+      unilog(86, `watched refreshed for ${showName}`);
     } catch (err) {
       unilog(679, `Post-download refresh error for ${showName}:`, err.message);
     }
@@ -8848,7 +8848,7 @@ async function handleShowDiskChange(showName) {
     inFlightDiskChanges.delete(showName);
     if (pendingDiskChanges.has(showName)) {
       pendingDiskChanges.delete(showName);
-      unilog(87, `Re-running queued disk change for ${showName}`); // log-id: 87
+      unilog(87, `Re-running queued disk change for ${showName}`);
       setTimeout(() => handleShowDiskChange(showName), 1000);
     }
   }
@@ -8877,7 +8877,7 @@ watcher
     const showName = extractShowNameFromPath(filePath);
     if (!showName) return;
 
-    unilog(88, `${isBif ? "bif" : "video"} added: ${showName}`); // log-id: 88
+    unilog(88, `${isBif ? "bif" : "video"} added: ${showName}`);
 
     // Update only the affected show in cache instead of invalidating everything
     if (diskShowsCache) {
@@ -8885,7 +8885,7 @@ watcher
         const showInfo = await getShowDiskInfo(showName);
         if (showInfo) {
           diskShowsCache[showName] = showInfo;
-          unilog(89, `updated cache for ${showName}`); // log-id: 89
+          unilog(89, `updated cache for ${showName}`);
         }
       } catch (err) {
         unilog(681, `failed to update cache for ${showName}:`, err.message);
@@ -8965,7 +8965,7 @@ watcher
     unilog(685, "Watcher error:", error);
   })
   .on("ready", () => {
-    unilog(90, "Initial scan complete. Ready for changes."); // log-id: 90
+    unilog(90, "Initial scan complete. Ready for changes.");
   });
 
-unilog(91, `Watching ${tvDir} for file changes...`); // log-id: 91
+unilog(91, `Watching ${tvDir} for file changes...`);

@@ -190,7 +190,7 @@ async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
     // 1. Try "Reject All" (force click)
     const reject = page.locator("#onetrust-reject-all-handler");
     if ((await reject.count()) > 0) {
-      unilog(108, "Clicking OneTrust Reject All (Force)"); // log-id: 108
+      unilog(108, "Clicking OneTrust Reject All (Force)");
       await reject.click({ force: true }).catch(() => {});
       await delay(200);
     }
@@ -198,7 +198,7 @@ async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
     else {
       const accept = page.locator("#onetrust-accept-btn-handler");
       if ((await accept.count()) > 0) {
-        unilog(109, "Clicking OneTrust Accept All (Force)"); // log-id: 109
+        unilog(109, "Clicking OneTrust Accept All (Force)");
         await accept.click({ force: true }).catch(() => {});
         await delay(200);
       }
@@ -488,7 +488,7 @@ function chooseShow(shows, query) {
     null;
 
   if (debug && result) {
-    unilog(110, `smartTitleMatch selected: "${result.title}" (${result.startyear})`); // log-id: 110
+    unilog(110, `smartTitleMatch selected: "${result.title}" (${result.startyear})`);
   }
   return result;
 }
@@ -591,12 +591,12 @@ export async function rottenSearch(query) {
     const show = chooseShow(shows, query);
     timing.end("chooseShow", `candidates=${shows?.length ?? 0}`);
     if (!show) {
-      unilog(111, `Rotten: No matching show found for "${query}"`); // log-id: 111
+      unilog(111, `Rotten: No matching show found for "${query}"`);
       return null;
     }
     const detailLink = show.href;
     if (!detailLink) {
-      unilog(112, `Rotten: matched show missing href for "${query}"`); // log-id: 112
+      unilog(112, `Rotten: matched show missing href for "${query}"`);
       return null;
     }
     // console.log(`Rotten Search URL: ${queryUrl}`);
@@ -710,7 +710,7 @@ export async function rottenSearch(query) {
                  
                  return `Tag: ${card.tagName}\nHTML: ${card.innerHTML.substring(0, 1000)}\nChildren:\n${children}`;
              });
-             unilog(113, `DEBUG STRUCT ${slot}:\n${debugInfo}`); // log-id: 113
+             unilog(113, `DEBUG STRUCT ${slot}:\n${debugInfo}`);
         } catch(dx) { console.log('Debug inspect failed:', dx.message); }
         */
 
@@ -719,7 +719,7 @@ export async function rottenSearch(query) {
         try {
           const html = await page.content();
           fs.writeFileSync(`rotten-error-${slot}.html`, html);
-          unilog(114, `Saved page content to rotten-error-${slot}.html`); // log-id: 114
+          unilog(114, `Saved page content to rotten-error-${slot}.html`);
         } catch {}
         */
 
@@ -779,7 +779,7 @@ export async function rottenSearch(query) {
       await timing.time("browser.close", () => browser.close());
     }
     const elapsed = ((Date.now() - rottenStartTime) / 1000).toFixed(0);
-    unilog(115, `finished rottenSearch: ${elapsed} secs, "${query}"`); // log-id: 115
+    unilog(115, `finished rottenSearch: ${elapsed} secs, "${query}"`);
     timing.report(12);
   }
 }

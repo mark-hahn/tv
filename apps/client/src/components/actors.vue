@@ -924,19 +924,19 @@ export default {
 
       // Prevent duplicate requests
       if (this.creditsLoading) {
-        unilog(145, "Already loading, returning"); // log-id: 145
+        unilog(145, "Already loading, returning");
         return;
       }
 
       // Check cache first
       if (this.creditsCache[name]) {
-        unilog(146, "Using cached credits"); // log-id: 146
+        unilog(146, "Using cached credits");
         this.showingCredits = true;
         this.credits = this.creditsCache[name].credits || [];
         this.actorPageUrl = this.creditsCache[name].actorPageUrl || null;
         return;
       }
-      unilog(147, "No cache, fetching from server"); // log-id: 147
+      unilog(147, "No cache, fetching from server");
 
       this.showingCredits = true;
       this.creditsLoading = true;
@@ -945,9 +945,9 @@ export default {
       this.actorPageUrl = null;
 
       try {
-        unilog(148, "Calling srvr.getActorCredits..."); // log-id: 148
+        unilog(148, "Calling srvr.getActorCredits...");
         const result = await srvr.getActorCredits(name);
-        unilog(149, "Received result from srvr.getActorCredits"); // log-id: 149
+        unilog(149, "Received result from srvr.getActorCredits");
         this.credits = result?.credits || [];
         this.actorPageUrl = result?.actorPageUrl || null;
         this.creditsLoading = false;

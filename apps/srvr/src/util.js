@@ -99,7 +99,7 @@ const chkWriteFile = async () => {
       delete dataByPath[path];
       anyWritten = true;
     } catch (e) {
-      unilog(131, `writeFile failed for ${path}: ${e.message}`); // log-id: 131
+      unilog(131, `writeFile failed for ${path}: ${e.message}`);
       fsp.unlink(tmpPath).catch(() => {});
       resolvesByPath[path].forEach((resolve) => resolve());
       resolvesByPath[path] = [];

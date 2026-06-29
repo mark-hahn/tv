@@ -1188,7 +1188,7 @@ export default {
     forceFile(title) {
       unilog(1031, "history: forceFile button clicked, title:", title);
       if (!title) return;
-      unilog(166, "history: emitting forceFile event"); // log-id: 166
+      unilog(166, "history: emitting forceFile event");
       evtBus.emit("forceFile", title);
     },
 

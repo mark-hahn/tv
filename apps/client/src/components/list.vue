@@ -886,11 +886,11 @@ export default {
 
     async loadAllShowsWithDialog() {
       if (this.hasLoadedAllShows) {
-        unilog(151, "All shows already loaded, skipping"); // log-id: 151
+        unilog(151, "All shows already loaded, skipping");
         return;
       }
 
-      unilog(152, "Loading all shows..."); // log-id: 152
+      unilog(152, "Loading all shows...");
 
       this.hasLoadedAllShows = true;
 
@@ -908,7 +908,7 @@ export default {
       );
       allShows.push(...newShows);
 
-      unilog(153, `Added ${newShows.length} shows (total: ${allShows.length})`); // log-id: 153
+      unilog(153, `Added ${newShows.length} shows (total: ${allShows.length})`);
     },
 
     updateWideLandscape() {
@@ -1061,7 +1061,7 @@ export default {
     async debugClick() {
       try {
         if (!this.highlightName) {
-          unilog(154, "No show selected"); // log-id: 154
+          unilog(154, "No show selected");
           return;
         }
 
@@ -2114,7 +2114,7 @@ export default {
 
     async saveVisShow(show, scroll = false, opts = null) {
       if (!show) {
-        unilog(155, "saveVisShow show param null"); // log-id: 155
+        unilog(155, "saveVisShow show param null");
         return;
       }
       const options = opts && typeof opts === "object" ? opts : {};
@@ -2270,7 +2270,7 @@ export default {
       let show = null;
       const name = window.localStorage.getItem("lastVisShow");
       if (!name) {
-        unilog(156, "scrollToSavedShow: lastVisShow missing, ignoring"); // log-id: 156
+        unilog(156, "scrollToSavedShow: lastVisShow missing, ignoring");
         show = allShows[0];
       } else {
         show = allShows.find((shw) => shw.name == name);
@@ -3102,7 +3102,7 @@ export default {
       try {
         const showNames = this.shows.map((show) => show.name);
         await srvr.dumpSelectedShows(showNames);
-        unilog(157, `Dumped ${showNames.length} shows to selected-shows.txt`); // log-id: 157
+        unilog(157, `Dumped ${showNames.length} shows to selected-shows.txt`);
       } catch (error) {
         unilog(987, "Failed to dump shows:", error);
       }
@@ -3335,7 +3335,7 @@ export default {
       }
 
       if (!allShows) {
-        unilog(158, "No shows from loadAllShows"); // log-id: 158
+        unilog(158, "No shows from loadAllShows");
         return;
       }
       this.shows = [...allShows];
@@ -3627,7 +3627,7 @@ export default {
     on("tvdbUpdated", async (data) => {
       const { name, record } = data || {};
       if (!name || !record) {
-        unilog(159, "Missing name or record in push data"); // log-id: 159
+        unilog(159, "Missing name or record in push data");
         return;
       }
       if (!allTvdb || !allShows) return; // loadAllShows not yet complete, ignore early push
@@ -3703,7 +3703,7 @@ export default {
     on("showDiskChanged", (data) => {
       const { showName } = data || {};
       if (!showName) return;
-      unilog(160, `Disk changed for: ${showName}`); // log-id: 160
+      unilog(160, `Disk changed for: ${showName}`);
       // Progress and reload driven by libraryProgress/libraryRefreshDone WS events via App.vue
     });
 

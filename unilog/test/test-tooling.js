@@ -86,7 +86,7 @@ function eq(a, b) {
     "  console.log(`[chokidar] detected add: ${p}`);",
     "  // unilog-stub {level=warn,tag=disk} unilog(`low ${n}`);",
     '  console.log("multi", x);',
-    "  unilog(7, `already`); // log-id: 7",
+    "  unilog(7, `already`);",
     "}",
   ].join("\n");
 
@@ -105,10 +105,10 @@ function eq(a, b) {
   const out = r.text.split("\n");
   const pass =
     r.changed &&
-    out[1] === "  unilog(100, `detected add: ${p}`); // log-id: 100" &&
-    out[2] === "  unilog(101, `low ${n}`); // log-id: 101" &&
+    out[1] === "  unilog(100, `detected add: ${p}`);" &&
+    out[2] === "  unilog(101, `low ${n}`);" &&
     out[3] === '  console.log("multi", x);' &&
-    out[4] === "  unilog(7, `already`); // log-id: 7" &&
+    out[4] === "  unilog(7, `already`);" &&
     r.refreshes.length === 1 &&
     r.refreshes[0].srcLine === 5;
   check(

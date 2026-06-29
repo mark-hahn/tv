@@ -489,7 +489,7 @@ if (
   fs.existsSync(lastViewedPath) &&
   !fs.existsSync(lastViewedPath + ".backup")
 ) {
-  unilog(116, "Phase 5.3: Migrating lastViewed.json into tvdb.json"); // log-id: 116
+  unilog(116, "Phase 5.3: Migrating lastViewed.json into tvdb.json");
   try {
     const lastViewed = util.jParse(fs.readFileSync(lastViewedPath, "utf8"));
     let viewedCount = 0;
@@ -517,10 +517,10 @@ if (phase5MigrationNeeded) {
   unilog(
     117,
     "Phase 5: Saving tvdb.json with migrated data from separate files",
-  ); // log-id: 117
+  );
   saveTvdbFiles(allTvdb)
     .then(() => {
-      unilog(118, "Phase 5: Migration complete - backup files created"); // log-id: 118
+      unilog(118, "Phase 5: Migration complete - backup files created");
     })
     .catch((e) => {
       unilog(720, "err", "Phase 5: Migration save failed:", e);
@@ -2062,9 +2062,9 @@ export const enqueueShowProcess = (showName, opts = {}) => {
     if (_kickProcessQueue) setTimeout(_kickProcessQueue, 0);
   } else if (showName) {
     if (showName === currentlyProcessingShow) {
-      unilog(119, `enqueue [${showName}] skipped — currently processing`); // log-id: 119
+      unilog(119, `enqueue [${showName}] skipped — currently processing`);
     } else if (showProcessQueue.some((item) => item.name === showName)) {
-      unilog(120, `enqueue [${showName}] skipped — already queued`); // log-id: 120
+      unilog(120, `enqueue [${showName}] skipped — already queued`);
     }
   }
 };
@@ -2284,7 +2284,7 @@ const tryLocalGetTvdb = async () => {
     minTvdb.name = requestedName;
   }
 
-  unilog(122, `processing [${minTvdb.name}]`); // log-id: 122
+  unilog(122, `processing [${minTvdb.name}]`);
   // Notify clients which show is being processed
   if (enqueueCallback) enqueueCallback(minTvdb.name);
   const show = {
@@ -2357,7 +2357,7 @@ const tryLocalGetTvdb = async () => {
     if (notifyCallback)
       notifyCallback(processRecord.name, allTvdb[processRecord.name]);
   } else {
-    unilog(123, `tvdb push [${processRecord.name}]: no changes`); // log-id: 123
+    unilog(123, `tvdb push [${processRecord.name}]: no changes`);
   }
 
   // Fetch TVmaze crew for shows that don't have it yet (null = not fetched; [] = fetched but none)
@@ -2407,7 +2407,7 @@ const tryLocalGetTvdb = async () => {
         );
         if (notifyCallback) notifyCallback(processRecord.name, rec);
       } else {
-        unilog(124, `tvdb push3 [${processRecord.name}]: Rotten no result`); // log-id: 124
+        unilog(124, `tvdb push3 [${processRecord.name}]: Rotten no result`);
       }
     } catch (e) {
       unilog(755, "err", "tryLocalGetTvdb push3 rotten:", e.message);
@@ -2510,7 +2510,7 @@ export const getRemotesCmd = async (params) => {
         existing.remotes = remotes;
         Object.assign(existing, fetchedUrls);
         if (changes.length)
-          unilog(125, `getRemotes [${show.name}]: ${changes.join(" ")}`); // log-id: 125
+          unilog(125, `getRemotes [${show.name}]: ${changes.join(" ")}`);
         saveTvdbSync().catch((err) => {
           unilog(
             758,
@@ -2712,7 +2712,7 @@ export const getAllTvdb = async (params) => {
       fileEndError: swissToni.fileEndError,
     });
   } else {
-    unilog(126, "Swiss Toni NOT FOUND in allTvdb"); // log-id: 126
+    unilog(126, "Swiss Toni NOT FOUND in allTvdb");
   }
 
   // Filter based on hasEmby parameter
@@ -3121,7 +3121,7 @@ export const accessTvdb = async (params) => {
     });
 
     if (upstream.status === 401) {
-      unilog(127, "accessTvdb: 401, refreshing token"); // log-id: 127
+      unilog(127, "accessTvdb: 401, refreshing token");
       cachedToken = null;
       token = await getToken();
       upstream = await fetch(url, {
@@ -3238,7 +3238,7 @@ export const updateTvdbWithGapData = async (gapData) => {
   if (processedCount > 0) {
     await saveTvdbSync();
     if (updatedCount > 0) {
-      unilog(128, `Updated ${updatedCount} shows`); // log-id: 128
+      unilog(128, `Updated ${updatedCount} shows`);
     }
   }
 
@@ -3266,9 +3266,9 @@ export const migrateWatchedCount = async () => {
 
   if (updatedCount > 0) {
     await saveTvdbSync();
-    unilog(129, `Updated ${updatedCount} shows`); // log-id: 129
+    unilog(129, `Updated ${updatedCount} shows`);
   } else {
-    unilog(130, "No updates needed"); // log-id: 130
+    unilog(130, "No updates needed");
   }
 
   return updatedCount;

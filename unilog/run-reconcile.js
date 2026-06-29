@@ -12,6 +12,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { reconcileFilesWithDb, projectOf } from "./reconcile.js";
 
@@ -251,24 +252,101 @@ async function createSiteFn(site) {
   return id;
 }
 
+async function flushRefreshes() {
+  if (pendingRefreshes.length === 0) return;
+  if (!useSsh) {
+    try {
+      await postJson("/api/unilog/refresh-sites", pendingRefreshes);
+      return;
+    } catch {
+      useSsh = true;
+      ensureSrvrStopped();
+    }
+  }
+  const statements = pendingRefreshes.map(
+    (s) =>
+      `UPDATE log_sites SET src_file = ${q(s.srcFile)}, src_line = ${s.srcLine ?? "NULL"} WHERE log_id = ${Number(s.logId)};`,
+  );
+  const script = "BEGIN;\n" + statements.join("\n") + "\nCOMMIT;";
+  const r = spawnSync("ssh", [SSH_HOST, `sqlite3 ${REMOTE_DB}`], {
+    input: script,
+    encoding: "utf8",
+  });
+  if (r.status !== 0)
+    throw new Error((r.stderr || "batch refresh failed").trim());
+}
+
+// ---- file hash + site-location cache (skip unchanged files / lines) ----
+
+const REPO_ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const CACHE_FILE = new URL("./reconcile-cache.json", import.meta.url).pathname;
+
+// Cache shape: { [relPath]: { hash: string, sites: { [logId]: srcLine } } }
+let hashCache = {};
+try {
+  hashCache = JSON.parse(fs.readFileSync(CACHE_FILE, "utf8"));
+} catch {
+  /* first run or missing */
+}
+
+function fileHash(absPath) {
+  return crypto
+    .createHash("sha256")
+    .update(fs.readFileSync(absPath))
+    .digest("hex");
+}
+
 // ---- file list -----------------------------------------------------------
 
 const { include, exclude = [] } = PROJECT_FILES[project];
 const excSet = new Set(exclude.map((f) => path.resolve(f)));
-const files = include
+const allFiles = include
   .map((f) => path.resolve(f))
   .filter((f) => !excSet.has(f) && fs.existsSync(f));
 
-console.log(`[run-reconcile] ${project}: ${files.length} files to process`); // no-unilog
+const files = allFiles.filter((f) => {
+  const rel = path.relative(REPO_ROOT, f);
+  return fileHash(f) !== hashCache[rel]?.hash;
+});
 
-const REPO_ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+console.log(
+  `[run-reconcile] ${project}: ${files.length}/${allFiles.length} files to process`,
+); // no-unilog
 
 // ---- reconcile -----------------------------------------------------------
 
+// pendingRefreshes: only sites whose srcLine actually changed (for DB write).
+// currentSitesByFile: all current sites in processed files (for cache update).
+const pendingRefreshes = [];
+const currentSitesByFile = {};
+function refreshSiteFn({ logId, srcFile, srcLine }) {
+  if (!currentSitesByFile[srcFile]) currentSitesByFile[srcFile] = {};
+  currentSitesByFile[srcFile][String(logId)] = srcLine;
+  const cached = hashCache[srcFile]?.sites?.[String(logId)];
+  if (cached === srcLine) return; // line number unchanged — skip DB write
+  pendingRefreshes.push({ logId, srcFile, srcLine });
+}
+
 const summary = await reconcileFilesWithDb(files, {
   createSiteFn,
+  refreshSiteFn,
   repoRoot: REPO_ROOT,
 });
+
+await flushRefreshes();
+
+// Update cache: processed files get new hash + current site locations;
+// unprocessed files just keep their existing cache entry (already correct).
+for (const f of files) {
+  const rel = path.relative(REPO_ROOT, f);
+  hashCache[rel] = { hash: fileHash(f), sites: currentSitesByFile[rel] ?? {} };
+}
+// Ensure every file has a cache entry (first run after adding new files).
+for (const f of allFiles) {
+  const rel = path.relative(REPO_ROOT, f);
+  if (!hashCache[rel]) hashCache[rel] = { hash: fileHash(f), sites: {} };
+}
+fs.writeFileSync(CACHE_FILE, JSON.stringify(hashCache, null, 2) + "\n", "utf8");
 
 // ---- inject unilog import into files that got new calls ------------------
 
@@ -285,18 +363,25 @@ for (const s of summary) {
 
 // ---- report --------------------------------------------------------------
 
+// Count actually-changed line numbers per file from pendingRefreshes.
+const changedByFile = {};
+for (const r of pendingRefreshes) {
+  changedByFile[r.srcFile] = (changedByFile[r.srcFile] ?? 0) + 1;
+}
+
 let totalCreated = 0;
 for (const s of summary) {
-  if (s.created || s.refreshed)
+  const rel = path.relative(REPO_ROOT, s.file).replace(/\\/g, "/");
+  const changed = changedByFile[rel] ?? 0;
+  if (s.created || changed)
     console.log(
-      `  ${s.file.replace(/^.*apps\//, "apps/")}  +${s.created} sites, ${s.refreshed} refreshed`,
+      `  ${rel.replace(/^.*apps\//, "apps/")}  +${s.created} sites, ${changed} lines moved`,
     ); // no-unilog
   totalCreated += s.created || 0;
 }
 console.log(
   `[run-reconcile] done. ${totalCreated} new sites created in group ${groupId}.`,
 ); // no-unilog
-console.log(`[run-reconcile] now run: ./srvr ${project}`); // no-unilog
 
 // ---- helpers -------------------------------------------------------------
 

@@ -21,6 +21,7 @@ misc/old-reel-code
 *cred.js
 *cred.txt
 apps/android/.build-cache
+unilog/reconcile-cache.json
 build.apk
 build-phase
 usb-bkup/

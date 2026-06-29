@@ -179,7 +179,13 @@ export function reconcileLines(
 // When running locally, pass a function that POSTs to the srvr HTTPS endpoint.
 export async function reconcileFilesWithDb(
   files,
-  { dryRun = false, createSiteFn = null, groupIds = [], repoRoot = null } = {},
+  {
+    dryRun = false,
+    createSiteFn = null,
+    refreshSiteFn = null,
+    groupIds = [],
+    repoRoot = null,
+  } = {},
 ) {
   const fs = await import("node:fs");
   const pathMod = await import("node:path");
@@ -187,6 +193,7 @@ export async function reconcileFilesWithDb(
   if (!dryRun && !createSiteFn) {
     const unilogDb = await import("../apps/srvr/src/unilogDb.js");
     createSiteFn = (s) => Promise.resolve(unilogDb.createSite(s));
+    refreshSiteFn = (s) => Promise.resolve(unilogDb.refreshSite(s));
   }
 
   const summary = [];
@@ -222,6 +229,11 @@ export async function reconcileFilesWithDb(
           groupIds,
         });
         realIds.push(id);
+      }
+      if (refreshSiteFn) {
+        for (const r of refreshes) {
+          await refreshSiteFn({ logId: r.logId, srcFile, srcLine: r.srcLine });
+        }
       }
     }
 

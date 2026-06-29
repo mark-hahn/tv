@@ -166,7 +166,7 @@ export async function loadAllShows() {
   const showRecords = Object.values(allTvdb).filter((r) => isTvdbShowRecord(r));
   const elapsed = Date.now() - loadStart;
   unilog(
-    169,
+    1075,
     `loadAllShows completed in ${elapsed}ms, ${showRecords.length} shows`,
   );
   allShows = showRecords;
@@ -389,7 +389,7 @@ async function _oldLoadAllShows() {
     const tvdbId = embyShow?.ProviderIds?.Tvdb || embyShow?.TvdbId;
 
     if (!tvdbId || tvdbId == "0") {
-      unilog(132, `loadAllShows: no tvdbId for ${name}, skipping`);
+      unilog(1074, `loadAllShows: no tvdbId for ${name}, skipping`);
       continue;
     }
 
@@ -683,7 +683,7 @@ async function _oldLoadAllShows() {
         const recTvdbId = String(tvdbRecord?.tvdbId || "").trim();
         return !!(sTvdbId && recTvdbId && sTvdbId === recTvdbId);
       });
-      unilog(133, `loadAllShows: updating tvdb id for ${name}`);
+      unilog(1073, `loadAllShows: updating tvdb id for ${name}`);
       const updatedRecord = await srvr.setTvdbFields({
         name,
         id: embyShow.Id,
@@ -768,13 +768,13 @@ async function _oldLoadAllShows() {
     // Log details of duplicates - find their keys in allTvdb
     for (const dupName of duplicateNames) {
       const dupes = showRecords.filter((s) => s.name === dupName);
-      unilog(134, `  "${dupName}" appears ${dupes.length} times:`);
+      unilog(1072, `  "${dupName}" appears ${dupes.length} times:`);
       dupes.forEach((d, i) => {
         unilog(837, `    [${i}] id="${d.id}" inEmby=${d.inEmby} tvdbId=${d.tvdbId}`);
       });
 
       // Find which keys in allTvdb have this name
-      unilog(135, `  Keys in allTvdb with name="${dupName}":`);
+      unilog(1071, `  Keys in allTvdb with name="${dupName}":`);
       for (const [key, value] of Object.entries(allTvdb)) {
         if (!isTvdbShowRecord(value)) continue;
         if (value.name === dupName) {
@@ -786,7 +786,7 @@ async function _oldLoadAllShows() {
 
   const elapsed = Date.now() - loadStart;
   unilog(
-    170,
+    1070,
     `loadAllShows completed in ${elapsed}ms, ${showRecords.length} shows`,
   );
   allShows = showRecords;
@@ -958,7 +958,7 @@ export const getEpisodeCounts = async (show) => {
     const showName = show.Name || show.name || "unknown";
     unilog(847, `getEpisodeCounts error for "${showName}" (id=${showId}):`, e.message || e);
     if (e.config?.url) {
-      unilog(136, `  Failed URL: ${e.config.url}`);
+      unilog(1069, `  Failed URL: ${e.config.url}`);
     }
     return { seasonCount: 0, episodeCount: 0, watchedCount: 0 };
   }
@@ -972,7 +972,7 @@ export const getSeriesMap = async (show, prune = false) => {
   if (show.inEmby === false) {
     const tvdbId = show.tvdbId;
     if (!tvdbId) {
-      unilog(137, "getSeriesMap: Preview show has no tvdbId");
+      unilog(1068, "getSeriesMap: Preview show has no tvdbId");
       return [];
     }
     try {
@@ -1098,12 +1098,12 @@ export const getSeriesMap = async (show, prune = false) => {
   }
 
   if (pathsToDeleteBatch.length > 0) {
-    unilog(138, `batch deleting ${pathsToDeleteBatch.length} files`);
+    unilog(1067, `batch deleting ${pathsToDeleteBatch.length} files`);
     try {
       await srvr.deletePaths(pathsToDeleteBatch);
-      unilog(139, `batch delete ok`);
+      unilog(1066, `batch delete ok`);
     } catch (e) {
-      unilog(140, `batch delete FAILED: ${e?.message ?? e}`);
+      unilog(1065, `batch delete FAILED: ${e?.message ?? e}`);
     }
   }
 
@@ -1362,10 +1362,10 @@ export const startStop = async (show, episodeId, watchButtonTxt) => {
       if (buttonDeviceName != deviceName) continue;
       const { url, body } = urls.stopUrl(sessionId);
       await axios({ method: "post", url, data: body });
-      unilog(141, `stopped1 ${deviceName}`);
+      unilog(1064, `stopped1 ${deviceName}`);
       setTimeout(async () => {
         await axios({ method: "post", url, data: body });
-        unilog(142, `stopped2 ${deviceName}`);
+        unilog(1063, `stopped2 ${deviceName}`);
       }, 1000);
       return;
     } else {
@@ -1373,10 +1373,10 @@ export const startStop = async (show, episodeId, watchButtonTxt) => {
       if (buttonDeviceName != deviceName) continue;
       const { url, body } = urls.playUrl(sessionId, episodeId);
       await axios({ method: "post", url, data: body });
-      unilog(143, `playing1 ${show.name} on  ${deviceName}`);
+      unilog(1062, `playing1 ${show.name} on  ${deviceName}`);
       setTimeout(async () => {
         await axios({ method: "post", url, data: body });
-        unilog(144, `playing2 ${show.name} on  ${deviceName}`);
+        unilog(1061, `playing2 ${show.name} on  ${deviceName}`);
       }, 1000);
 
       // Auto-trim: jump to absolute trimPos when playback starts

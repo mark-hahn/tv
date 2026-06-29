@@ -11,8 +11,19 @@ import {
   activateStub,
   sanityCheckDescription,
 } from "../unilog-lib.js";
-import { reconcileText, scanLines, projectOf } from "../reconcile.js";
-import { db, nowPst } from "../../apps/srvr/src/unilogDb.js";
+import {
+  reconcileText,
+  scanLines,
+  projectOf,
+  findDuplicateIds,
+} from "../reconcile.js";
+import {
+  db,
+  nowPst,
+  createSite,
+  createGroup,
+  createDuplicateSite,
+} from "../../apps/srvr/src/unilogDb.js";
 
 const results = [];
 function check(suite, name, pass, detail) {
@@ -124,6 +135,97 @@ function eq(a, b) {
     "projectOf srvr",
     projectOf("apps/srvr/index.js") === "srvr",
     projectOf("apps/srvr/index.js") || "null",
+  );
+}
+
+// ---- duplicate id detection ----------------------------------------------
+
+{
+  const sites = [
+    { rel: "a.js", line: 10, logId: 5, changed: true },
+    { rel: "b.js", line: 20, logId: 5, changed: false }, // unchanged keeper
+    { rel: "a.js", line: 30, logId: 9, changed: true }, // unique — ignored
+    { rel: "a.js", line: 40, logId: 7, changed: true },
+    { rel: "a.js", line: 50, logId: 7, changed: true },
+  ];
+  const { groups, reassign } = findDuplicateIds(sites);
+  const ids = reassign.map((r) => `${r.rel}:${r.line}`).sort();
+  // group 5: unchanged b.js kept -> a.js:10 reassigned.
+  // group 7: both changed -> first (a.js:40) kept -> a.js:50 reassigned.
+  const pass =
+    groups === 2 &&
+    reassign.length === 2 &&
+    ids[0] === "a.js:10" &&
+    ids[1] === "a.js:50";
+  check(
+    "dedup",
+    "detect + keeper selection",
+    pass,
+    JSON.stringify({ groups, ids }),
+  );
+}
+
+// ---- createDuplicateSite (copy + stub fallback) --------------------------
+
+{
+  const gid = createGroup({ groupType: "test", description: "dup test" });
+  const oldId = createSite({
+    level: "warn",
+    tag: "dup",
+    description: "orig",
+    srcFile: "x.js",
+    srcLine: 1,
+    project: "srvr",
+    groupIds: [gid],
+  });
+  const newId = createDuplicateSite({
+    oldLogId: oldId,
+    project: "client",
+    srcFile: "y.js",
+    srcLine: 2,
+  });
+  const row = db.prepare("SELECT * FROM log_sites WHERE log_id = ?").get(newId);
+  const grp = db
+    .prepare("SELECT group_id FROM site_groups WHERE log_id = ?")
+    .all(newId)
+    .map((r) => r.group_id);
+  const pass =
+    newId !== oldId &&
+    row.tag === "dup" &&
+    row.description === "orig" &&
+    row.level === "warn" &&
+    row.project === "client" &&
+    row.src_file === "y.js" &&
+    row.src_line === 2 &&
+    grp.includes(gid);
+  check(
+    "dedup",
+    "createDuplicateSite copies row + groups",
+    pass,
+    JSON.stringify({ oldId, newId, row, grp }),
+  );
+}
+
+{
+  // Bogus id (no original row) -> fresh stub-like site.
+  const newId = createDuplicateSite({
+    oldLogId: 99990001,
+    project: "srvr",
+    srcFile: "z.js",
+    srcLine: 3,
+  });
+  const row = db.prepare("SELECT * FROM log_sites WHERE log_id = ?").get(newId);
+  const pass =
+    !!row &&
+    row.level === "info" &&
+    row.tag === null &&
+    row.src_file === "z.js" &&
+    row.project === "srvr";
+  check(
+    "dedup",
+    "createDuplicateSite stub fallback for bogus id",
+    pass,
+    JSON.stringify({ newId, row }),
   );
 }
 

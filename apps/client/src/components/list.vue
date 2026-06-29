@@ -886,11 +886,11 @@ export default {
 
     async loadAllShowsWithDialog() {
       if (this.hasLoadedAllShows) {
-        unilog(151, "All shows already loaded, skipping");
+        unilog(1091, "All shows already loaded, skipping");
         return;
       }
 
-      unilog(152, "Loading all shows...");
+      unilog(1090, "Loading all shows...");
 
       this.hasLoadedAllShows = true;
 
@@ -908,7 +908,7 @@ export default {
       );
       allShows.push(...newShows);
 
-      unilog(153, `Added ${newShows.length} shows (total: ${allShows.length})`);
+      unilog(1089, `Added ${newShows.length} shows (total: ${allShows.length})`);
     },
 
     updateWideLandscape() {
@@ -1061,7 +1061,7 @@ export default {
     async debugClick() {
       try {
         if (!this.highlightName) {
-          unilog(154, "No show selected");
+          unilog(1088, "No show selected");
           return;
         }
 
@@ -2114,7 +2114,7 @@ export default {
 
     async saveVisShow(show, scroll = false, opts = null) {
       if (!show) {
-        unilog(155, "saveVisShow show param null");
+        unilog(1087, "saveVisShow show param null");
         return;
       }
       const options = opts && typeof opts === "object" ? opts : {};
@@ -2270,7 +2270,7 @@ export default {
       let show = null;
       const name = window.localStorage.getItem("lastVisShow");
       if (!name) {
-        unilog(156, "scrollToSavedShow: lastVisShow missing, ignoring");
+        unilog(1086, "scrollToSavedShow: lastVisShow missing, ignoring");
         show = allShows[0];
       } else {
         show = allShows.find((shw) => shw.name == name);
@@ -3102,7 +3102,7 @@ export default {
       try {
         const showNames = this.shows.map((show) => show.name);
         await srvr.dumpSelectedShows(showNames);
-        unilog(157, `Dumped ${showNames.length} shows to selected-shows.txt`);
+        unilog(1085, `Dumped ${showNames.length} shows to selected-shows.txt`);
       } catch (error) {
         unilog(987, "Failed to dump shows:", error);
       }
@@ -3335,7 +3335,7 @@ export default {
       }
 
       if (!allShows) {
-        unilog(158, "No shows from loadAllShows");
+        unilog(1084, "No shows from loadAllShows");
         return;
       }
       this.shows = [...allShows];
@@ -3627,7 +3627,7 @@ export default {
     on("tvdbUpdated", async (data) => {
       const { name, record } = data || {};
       if (!name || !record) {
-        unilog(159, "Missing name or record in push data");
+        unilog(1083, "Missing name or record in push data");
         return;
       }
       if (!allTvdb || !allShows) return; // loadAllShows not yet complete, ignore early push
@@ -3703,7 +3703,7 @@ export default {
     on("showDiskChanged", (data) => {
       const { showName } = data || {};
       if (!showName) return;
-      unilog(160, `Disk changed for: ${showName}`);
+      unilog(1082, `Disk changed for: ${showName}`);
       // Progress and reload driven by libraryProgress/libraryRefreshDone WS events via App.vue
     });
 

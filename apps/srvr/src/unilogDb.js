@@ -128,13 +128,62 @@ export const createSite = db.transaction((site) => {
   return id;
 });
 
-const updSiteLoc = db.prepare(
-  "UPDATE log_sites SET src_file = ?, src_line = ? WHERE log_id = ?",
+const getSite = db.prepare("SELECT * FROM log_sites WHERE log_id = ?");
+const getSiteGroupIds = db.prepare(
+  "SELECT group_id FROM site_groups WHERE log_id = ?",
 );
-export function refreshSite({ logId, srcFile, srcLine }) {
+
+// Split a duplicate log_id into a fresh one. When the old id has a DB row, the
+// new row is a copy of it (overriding only project/src_file/src_line) and the
+// new id inherits the same site_groups rows. When the old id has NO row (a
+// hand-typed/bogus id), create a fresh stub-like site instead, linking it to
+// any provided groupIds. old_log is preserved/left null (not removed). Returns
+// the new log_id. Transactional.
+export const createDuplicateSite = db.transaction(
+  ({ oldLogId, project, srcFile, srcLine, groupIds = [] }) => {
+    const id = maxSite.get().next;
+    const orig = oldLogId == null ? null : getSite.get(Number(oldLogId));
+    const line = srcLine == null ? null : Number(srcLine);
+    if (orig) {
+      insSite.run(
+        id,
+        orig.tag,
+        orig.description,
+        orig.level || "info",
+        srcFile || null,
+        line,
+        orig.old_log,
+        project || null,
+        nowPst(),
+      );
+      for (const r of getSiteGroupIds.all(Number(oldLogId)))
+        insSiteGroup.run(id, r.group_id);
+    } else {
+      insSite.run(
+        id,
+        null,
+        null,
+        "info",
+        srcFile || null,
+        line,
+        null,
+        project || null,
+        nowPst(),
+      );
+      for (const gid of groupIds) insSiteGroup.run(id, Number(gid));
+    }
+    return id;
+  },
+);
+
+const updSiteLoc = db.prepare(
+  "UPDATE log_sites SET src_file = ?, src_line = ?, project = COALESCE(?, project) WHERE log_id = ?",
+);
+export function refreshSite({ logId, srcFile, srcLine, project }) {
   updSiteLoc.run(
     srcFile || null,
     srcLine == null ? null : Number(srcLine),
+    project || null,
     Number(logId),
   );
 }

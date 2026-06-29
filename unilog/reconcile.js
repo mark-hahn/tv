@@ -159,6 +159,38 @@ export function reconcileText(text, srcFile, nextId, { vue = false } = {}) {
   return { lines: out.split(nl), refreshes, changed, text: out };
 }
 
+// Given every active site across the codebase, decide which occurrences must be
+// re-id'd so each log_id is unique. A duplicate group is any log_id with >1
+// occurrence. Keeper rule: prefer an occurrence in an UNCHANGED file (its source
+// is never rewritten); otherwise the first by (file, line). Only occurrences in
+// CHANGED files are reassignable; unchanged source is never modified.
+//   sites: [{ rel, line, logId, changed, ...extra }] (extra preserved on output)
+//   returns: { groups, reassign } where reassign is the subset to re-id.
+export function findDuplicateIds(sites) {
+  const byId = new Map();
+  for (const s of sites) {
+    if (!byId.has(s.logId)) byId.set(s.logId, []);
+    byId.get(s.logId).push(s);
+  }
+  const reassign = [];
+  let groups = 0;
+  for (const list of byId.values()) {
+    if (list.length < 2) continue;
+    groups++;
+    const sorted = [...list].sort((a, b) =>
+      a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : a.line - b.line,
+    );
+    let keeper = sorted.findIndex((o) => !o.changed);
+    if (keeper < 0) keeper = 0;
+    sorted.forEach((o, i) => {
+      if (i === keeper) return;
+      if (!o.changed) return; // never rewrite unchanged source
+      reassign.push(o);
+    });
+  }
+  return { groups, reassign };
+}
+
 // Back-compat wrappers (line-array based) used by older callers/tests.
 export function scanLines(lines, srcFile, { vueFile = false } = {}) {
   return scanText(lines.join("\n"), srcFile, { vue: vueFile });
@@ -231,7 +263,12 @@ export async function reconcileFilesWithDb(
       }
       if (refreshSiteFn) {
         for (const r of refreshes) {
-          await refreshSiteFn({ logId: r.logId, srcFile, srcLine: r.srcLine });
+          await refreshSiteFn({
+            logId: r.logId,
+            srcFile,
+            srcLine: r.srcLine,
+            project,
+          });
         }
       }
     }

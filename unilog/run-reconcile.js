@@ -14,7 +14,13 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { reconcileFilesWithDb, projectOf, scanText } from "./reconcile.js";
+import {
+  reconcileFilesWithDb,
+  projectOf,
+  scanText,
+  findDuplicateIds,
+} from "./reconcile.js";
+import { findLogCalls } from "./parse.js";
 
 const SRVR_HTTPS_URL = "https://hahnca.com/tv-srvr";
 const SSH_HOST = "hahnca.com";
@@ -197,6 +203,57 @@ async function createSiteFn(site) {
   return id;
 }
 
+// Split a duplicate id into a fresh one. API first, ssh fallback. When the old
+// id has a DB row the new row is a copy of it (with new location) and inherits
+// its groups; otherwise a fresh stub-like row is created and linked to the run
+// group. Returns the new log_id.
+async function createDuplicateSiteFn({ oldLogId, project, srcFile, srcLine }) {
+  const gid = await ensureGroup();
+  if (!useSsh) {
+    try {
+      const { id } = await postJson("/api/unilog/duplicate-site", {
+        oldLogId,
+        project,
+        srcFile,
+        srcLine,
+        groupIds: [gid],
+      });
+      return id;
+    } catch {
+      useSsh = true;
+      ensureSrvrStopped();
+    }
+  }
+  const hasOrig =
+    oldLogId != null &&
+    sqlOne(
+      `SELECT COUNT(*) FROM log_sites WHERE log_id = ${Number(oldLogId)};`,
+    ) !== "0";
+  const newId = Number(
+    sqlOne("SELECT COALESCE(MAX(log_id),0)+1 FROM log_sites;"),
+  );
+  if (hasOrig) {
+    sqlOne(
+      `INSERT INTO log_sites (log_id, tag, description, level, src_file, src_line, old_log, project, created_at) ` +
+        `SELECT ${newId}, tag, description, level, ${q(srcFile)}, ${srcLine ?? "NULL"}, old_log, ${q(project)}, ${q(nowPst())} ` +
+        `FROM log_sites WHERE log_id = ${Number(oldLogId)};`,
+    );
+    sqlOne(
+      `INSERT OR IGNORE INTO site_groups (log_id, group_id) ` +
+        `SELECT ${newId}, group_id FROM site_groups WHERE log_id = ${Number(oldLogId)};`,
+    );
+  } else {
+    sqlOne(
+      `INSERT INTO log_sites (log_id, tag, description, level, src_file, src_line, old_log, project, created_at) ` +
+        `VALUES (${newId}, NULL, NULL, 'info', ${q(srcFile)}, ${srcLine ?? "NULL"}, NULL, ${q(project)}, ${q(nowPst())});`,
+    );
+    sqlOne(
+      `INSERT OR IGNORE INTO site_groups (log_id, group_id) VALUES (${newId}, ${gid});`,
+    );
+  }
+  return newId;
+}
+
 async function flushRefreshes() {
   if (pendingRefreshes.length === 0) return;
 
@@ -244,7 +301,7 @@ async function flushRefreshes() {
   }
   const statements = toWrite.map(
     (s) =>
-      `UPDATE log_sites SET src_file = ${q(s.srcFile)}, src_line = ${s.srcLine ?? "NULL"} WHERE log_id = ${Number(s.logId)};`,
+      `UPDATE log_sites SET src_file = ${q(s.srcFile)}, src_line = ${s.srcLine ?? "NULL"}, project = COALESCE(${q(s.project ?? null)}, project) WHERE log_id = ${Number(s.logId)};`,
   );
   const script = "BEGIN;\n" + statements.join("\n") + "\nCOMMIT;";
   const r = spawnSync("ssh", [SSH_HOST, `sqlite3 ${REMOTE_DB}`], {
@@ -261,12 +318,41 @@ async function flushRefreshes() {
 const REPO_ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const CACHE_FILE = new URL("./reconcile-cache.json", import.meta.url).pathname;
 
-// Cache shape: { [relPath]: { hash: string, sites: { [logId]: srcLine } } }
+// Cache shape (v2): { version: 2, [relPath]: { hash, sites: { [srcLine]: logId } } }
+// v1 was keyed { [logId]: srcLine } per file — auto-migrated on load so a file
+// with two lines sharing one id is representable (line keys are always unique).
 let hashCache = {};
 try {
   hashCache = JSON.parse(fs.readFileSync(CACHE_FILE, "utf8"));
 } catch {
   /* first run or missing */
+}
+hashCache = normalizeCache(hashCache);
+
+function normalizeCache(c) {
+  if (c.version === 2) return c;
+  const out = { version: 2 };
+  for (const [rel, entry] of Object.entries(c)) {
+    if (rel === "version" || !entry || typeof entry !== "object") continue;
+    const sites = {};
+    for (const [logId, line] of Object.entries(entry.sites ?? {}))
+      sites[String(line)] = Number(logId); // id->line  =>  line->id
+    out[rel] = { hash: entry.hash, sites };
+  }
+  return out;
+}
+
+// Memoized reverse lookup (logId -> cached line) over the inverted cache.
+const reverseCache = new Map();
+function cachedLineFor(srcFile, logId) {
+  let m = reverseCache.get(srcFile);
+  if (!m) {
+    m = new Map();
+    for (const [line, id] of Object.entries(hashCache[srcFile]?.sites ?? {}))
+      m.set(Number(id), Number(line));
+    reverseCache.set(srcFile, m);
+  }
+  return m.has(Number(logId)) ? m.get(Number(logId)) : null;
 }
 
 function fileHash(absPath) {
@@ -296,27 +382,99 @@ console.log(
 
 // pendingRefreshes: sites to write to DB (all in --force, changed-only otherwise).
 // actuallyChangedByFile: sites whose line number differs from cache (for reporting).
-// seenLogIds: detect cross-project log_id collisions.
 const pendingRefreshes = [];
 const actuallyChangedByFile = {};
 const currentSitesByFile = {};
-const seenLogIds = {}; // logId -> srcFile (first seen)
-const collisions = []; // { logId, file1, file2 }
-function refreshSiteFn({ logId, srcFile, srcLine }) {
+function refreshSiteFn({ logId, srcFile, srcLine, project }) {
   if (!currentSitesByFile[srcFile]) currentSitesByFile[srcFile] = {};
-  currentSitesByFile[srcFile][String(logId)] = srcLine;
-  if (seenLogIds[logId] && seenLogIds[logId] !== srcFile) {
-    collisions.push({ logId, file1: seenLogIds[logId], file2: srcFile });
-    return; // skip — collision would cause oscillation
-  }
-  seenLogIds[logId] = srcFile;
-  const cached = hashCache[srcFile]?.sites?.[String(logId)];
-  const changed = cached !== srcLine;
+  currentSitesByFile[srcFile][String(srcLine)] = logId; // inverted: line -> id
+  const changed = cachedLineFor(srcFile, logId) !== srcLine;
   if (changed) {
     actuallyChangedByFile[srcFile] = (actuallyChangedByFile[srcFile] ?? 0) + 1;
   }
-  if (forceAll || changed) pendingRefreshes.push({ logId, srcFile, srcLine });
+  if (forceAll || changed)
+    pendingRefreshes.push({ logId, srcFile, srcLine, project });
 }
+
+// ---- duplicate log_id repair (runs BEFORE the main pass) ------------------
+// Collect every active site across the whole codebase: a fresh source scan for
+// the files we're about to process (with id byte offsets for rewriting) plus the
+// cached {line: id} entries for unchanged files. Any id appearing more than once
+// is a duplicate; all-but-one occurrence in a CHANGED file gets a fresh id
+// (createDuplicateSiteFn) and its `unilog(<id>` is rewritten in place. After this
+// every id is unique, so the main pass emits clean, non-oscillating refreshes.
+async function repairDuplicates() {
+  const changedSet = new Set(files.map((f) => path.relative(REPO_ROOT, f)));
+  const sites = [];
+  const hitIndex = new Map(); // `${rel}#${line}` -> { abs, idStart, idEnd }
+  for (const abs of files) {
+    const rel = path.relative(REPO_ROOT, abs);
+    const text = fs.readFileSync(abs, "utf8");
+    for (const h of findLogCalls(text, { vue: abs.endsWith(".vue") })) {
+      if (h.kind !== "active") continue;
+      sites.push({ rel, line: h.line, logId: h.logId, changed: true });
+      hitIndex.set(`${rel}#${h.line}`, {
+        abs,
+        idStart: h.idStart,
+        idEnd: h.idEnd,
+      });
+    }
+  }
+  for (const [rel, entry] of Object.entries(hashCache)) {
+    if (rel === "version" || changedSet.has(rel)) continue;
+    for (const [line, logId] of Object.entries(entry.sites ?? {}))
+      sites.push({
+        rel,
+        line: Number(line),
+        logId: Number(logId),
+        changed: false,
+      });
+  }
+
+  const { groups, reassign } = findDuplicateIds(sites);
+  if (reassign.length === 0) {
+    if (groups)
+      console.log(
+        `[run-reconcile] ${groups} duplicate id group(s) — no rewritable occurrence`,
+      ); // no-unilog
+    return;
+  }
+
+  const byAbs = new Map(); // abs -> [{ logId, line, idStart, idEnd }]
+  for (const o of reassign) {
+    const hit = hitIndex.get(`${o.rel}#${o.line}`);
+    if (!hit) continue; // occurrence lives in an unchanged file — never rewritten
+    if (!byAbs.has(hit.abs)) byAbs.set(hit.abs, []);
+    byAbs.get(hit.abs).push({ logId: o.logId, line: o.line, ...hit });
+  }
+
+  let total = 0;
+  for (const [abs, list] of byAbs) {
+    const rel = path.relative(REPO_ROOT, abs);
+    const proj = projectOf(rel);
+    let text = fs.readFileSync(abs, "utf8");
+    list.sort((a, b) => b.idStart - a.idStart); // end-to-start: keep offsets valid
+    for (const r of list) {
+      const newId = await createDuplicateSiteFn({
+        oldLogId: r.logId,
+        project: proj,
+        srcFile: rel,
+        srcLine: r.line,
+      });
+      text = text.slice(0, r.idStart) + String(newId) + text.slice(r.idEnd);
+      console.log(
+        `[run-reconcile] duplicate id ${r.logId} -> ${newId}  ${rel}:${r.line}`,
+      ); // no-unilog
+      total++;
+    }
+    fs.writeFileSync(abs, text, "utf8");
+  }
+  console.log(
+    `[run-reconcile] repaired ${total} duplicate id(s) in ${byAbs.size} file(s)`,
+  ); // no-unilog
+}
+
+await repairDuplicates();
 
 const summary = await reconcileFilesWithDb(files, {
   createSiteFn,
@@ -343,17 +501,23 @@ for (const s of summary) {
 }
 
 // Re-scan all processed files to capture post-injection line numbers.
-// This replaces the pre-injection positions buffered by refreshSiteFn.
+// This replaces the pre-injection positions buffered by refreshSiteFn and
+// rebuilds currentSitesByFile (inverted line -> id) for the cache write below.
 pendingRefreshes.length = 0;
-const postSeenIds = {};
 for (const f of files) {
   const rel = path.relative(REPO_ROOT, f);
+  const proj = projectOf(rel);
   const text = fs.readFileSync(f, "utf8");
   const { refreshes } = scanText(text, rel, { vue: f.endsWith(".vue") });
+  currentSitesByFile[rel] = {};
   for (const r of refreshes) {
-    if (postSeenIds[r.logId] && postSeenIds[r.logId] !== rel) continue; // collision
-    postSeenIds[r.logId] = rel;
-    pendingRefreshes.push({ logId: r.logId, srcFile: rel, srcLine: r.srcLine });
+    currentSitesByFile[rel][String(r.srcLine)] = r.logId;
+    pendingRefreshes.push({
+      logId: r.logId,
+      srcFile: rel,
+      srcLine: r.srcLine,
+      project: proj,
+    });
   }
 }
 
@@ -400,14 +564,6 @@ console.log(`[run-reconcile] sites checked:   ${totalChecked}`); // no-unilog
 console.log(`[run-reconcile] cache misses:    ${totalCacheMisses}`); // no-unilog
 console.log(`[run-reconcile] written to db:   ${dbChangedCount}`); // no-unilog
 console.log(`[run-reconcile] new sites:       ${totalCreated}`); // no-unilog
-if (collisions.length > 0) {
-  console.log(
-    `[run-reconcile] WARNING: ${collisions.length} log_id collision(s) — same id in multiple files (skipped):`,
-  ); // no-unilog
-  for (const c of collisions) {
-    console.log(`  log_id=${c.logId}  ${c.file1}  ><  ${c.file2}`); // no-unilog
-  }
-}
 
 // ---- helpers -------------------------------------------------------------
 

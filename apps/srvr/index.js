@@ -4082,6 +4082,19 @@ app.post("/api/unilog/refresh-sites", (req, res) => {
   }
 });
 
+// Split a duplicate log_id: create a fresh row (copied from the old id's row, or
+// stub-like if the old id has no row) and return the new id. Used by the
+// deploy-time reconciler when it finds the same id on more than one source line.
+app.post("/api/unilog/duplicate-site", (req, res) => {
+  try {
+    const id = unilogDb.createDuplicateSite(req.body || {});
+    res.json({ id });
+  } catch (error) {
+    console.error("[unilog] /api/unilog/duplicate-site error:", error); // no-unilog
+    res.status(500).json({ error: String(error?.message || error) });
+  }
+});
+
 app.post("/api/unilog/query-sites", (req, res) => {
   try {
     const ids = Array.isArray(req.body) ? req.body : (req.body?.ids ?? []);

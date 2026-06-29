@@ -114,6 +114,8 @@ export function findLogCalls(code, { vue = false } = {}) {
           logId: a0.value,
           line,
           end: n.end + offset,
+          idStart: a0.start + offset,
+          idEnd: a0.end + offset,
           argsText,
         });
       }

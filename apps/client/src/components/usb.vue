@@ -935,10 +935,10 @@ export default {
             if (comp && comp.$el) {
               comp.$el.scrollIntoView({ behavior: "smooth", block: "center" });
             } else {
-              unilog(167, "usb: could not find component ref for match");
+              unilog(1099, "usb: could not find component ref for match");
             }
           } else {
-            unilog(168, "usb: refs.treeNodes is missing");
+            unilog(1098, "usb: refs.treeNodes is missing");
           }
         });
       }

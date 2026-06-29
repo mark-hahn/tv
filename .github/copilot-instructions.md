@@ -115,3 +115,17 @@ when modifying tvdb.json directly on disk stop tv-srvr first to avoid stale over
 in the map pane call the first child of the maphdr2 div the "map pane info bar"
 
 never touch git for read or commit unless i tell you to
+
+## Unilog — finding logs for a code location
+
+- unilog is a universal logging system with db at `hahnca.com:/root/dev/apps/tv/unilog/unilog.sqlite`
+- log sites (locations in code) are in table `log_sites` with unique `log_id`
+- log events (execution records) are in table `log_events` referencing `log_id`
+- use `./uni` CLI to query logs:
+  - `./uni sites` — list all log sites (shows log_id, file, line, tag)
+  - `./uni events` — tail all log events (shows timestamp, message, log_id, file, line)
+  - `./uni sites events` — show both tables
+- to find logs for a specific code location:
+  1. find the log_id from the `unilog(<log_id>, ...)` call in source code or from `./uni sites`
+  2. ssh to remote and query: `ssh hahnca.com "sqlite3 -json /root/dev/apps/tv/unilog/unilog.sqlite 'SELECT * FROM log_events WHERE log_id = <log_id> ORDER BY id;'"`
+  3. or grep the live tail: `./uni events | grep "id-value"` where id-value is the log_id

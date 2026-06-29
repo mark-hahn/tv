@@ -1077,7 +1077,13 @@ export default {
           return;
         }
 
-        unilog(962, "Fetching TVDB API data for:", this.highlightName, "TvdbId:", tvdbId);
+        unilog(
+          962,
+          "Fetching TVDB API data for:",
+          this.highlightName,
+          "TvdbId:",
+          tvdbId,
+        );
 
         const result = await srvr.debugTvdb({
           name: currentShow.name,
@@ -1538,11 +1544,11 @@ export default {
         if (!hasMapData) {
           createdFolder = false;
           unilog(970, "web add: missing map data; skipping createShowFolder", {
-              name,
-              tvdbId,
-              seriesMapSeasons,
-              tvdbData,
-            });
+            name,
+            tvdbId,
+            seriesMapSeasons,
+            tvdbData,
+          });
           alert(`No map data for new show ${name}`);
         } else {
           const res = await emby.createShowFolderAndRefreshEmby({
@@ -2529,7 +2535,13 @@ export default {
       const seasonMap = this.seriesMap?.[season];
       if (!seasonMap) return;
 
-      unilog(982, "season:", season, "episodeStates:", JSON.stringify(episodeStates));
+      unilog(
+        982,
+        "season:",
+        season,
+        "episodeStates:",
+        JSON.stringify(episodeStates),
+      );
 
       // Apply all episode states at once
       for (const [episodeNum, watched] of Object.entries(episodeStates)) {
@@ -2543,7 +2555,11 @@ export default {
         const playedEps = Object.entries(eps)
           .filter(([, c]) => c.played)
           .map(([e]) => e);
-        unilog(983, `S${sNum} played:`, playedEps.length > 0 ? playedEps.join(",") : "none");
+        unilog(
+          983,
+          `S${sNum} played:`,
+          playedEps.length > 0 ? playedEps.join(",") : "none",
+        );
       }
 
       // Convert this.seriesMap to array format and persist once
@@ -2610,7 +2626,17 @@ export default {
       // unaired, path, id, quality}]], ...], ...].
       let seriesMapIn = [];
       try {
-        const resp = await srvr.getSeriesMapFromEmby({ showName: show.name });
+        let resp;
+        if (show.inEmby === false) {
+          const tvdbId = show.tvdbId;
+          if (!tvdbId) {
+            errorMessage = "Preview show has no tvdbId.";
+          } else {
+            resp = await srvr.getSeriesMapFromTvdb({ tvdbId });
+          }
+        } else {
+          resp = await srvr.getSeriesMapFromEmby({ showName: show.name });
+        }
         if (resp?.success && Array.isArray(resp.seriesMap)) {
           seriesMapIn = resp.seriesMap;
           // Sync fresh episodeData into the in-memory cache so the Position
@@ -2622,7 +2648,7 @@ export default {
             }
             if (this.fltrChoice === "Position") this.refilter();
           }
-        } else {
+        } else if (resp) {
           errorMessage =
             resp?.error || "Not in emby and show not found in TVDB.";
         }
@@ -3110,7 +3136,13 @@ export default {
           .replace(/\s+/g, " ");
 
       const targetActorName = normName(actorName);
-      unilog(988, "Filtering by actor:", actorName, "normalized:", targetActorName);
+      unilog(
+        988,
+        "Filtering by actor:",
+        actorName,
+        "normalized:",
+        targetActorName,
+      );
 
       // Get TVDB data for all shows to check their actors
       if (!allTvdb) allTvdb = await tvdb.getAllTvdb();
@@ -3136,7 +3168,10 @@ export default {
         return crew.some((c) => normName(c?.name) === targetActorName);
       });
 
-      unilog(989, `Found ${filteredShows.length} shows with actor ${actorName}`);
+      unilog(
+        989,
+        `Found ${filteredShows.length} shows with actor ${actorName}`,
+      );
 
       // Update the shows list and UI
       this.shows = filteredShows;

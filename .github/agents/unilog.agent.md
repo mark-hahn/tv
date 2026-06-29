@@ -38,12 +38,19 @@ node unilog/query.js --file tvdb.js --sites
 node unilog/query.js --file srvr/index.js --line 311 --dry-run
 ```
 
-Output format: `MM-DD HH:MM  pid  file:line  [tag]  message`
+Output format: `YYYY/MM/DD HH:MM:SS  pid  file:line  [tag]  message`
+
+**Reading the log_id directly from source:** Active unilog calls have the log_id as the first argument — `unilog(42, ...)`. When you can see the call in source, grab that id and use `--id` directly:
+
+```bash
+node unilog/query.js --id 42 --last 100
+```
 
 **Workflow for "show me logs from line 311 in srvr/index.js":**
 
-1. Run `node unilog/query.js --file srvr/index.js --line 311 --last 100`
-2. If no results, run `--sites` to check if the line has a registered log_id at all
+1. If the line contains an active `unilog(N, ...)` call, use `--id N` directly
+2. Otherwise run `node unilog/query.js --file srvr/index.js --line 311 --last 100`
+3. If no results, run `--sites` to check if the line has a registered log_id at all
 
 ### 2. `unilog/unilog-cli.js` — add/remove log sites in source files
 
@@ -83,6 +90,6 @@ log_events (id, log_id, pid, ts, message)
 
 - All source files are local at `/root/apps/tv/` — remote runtime is at `hahnca.com:/root/dev/apps/tv/`
 - Never use environment variables — hard-wired constants at top of file in UPPERCASE
-- All timestamps in PST LA `MM-DD HH:mm`
+- All timestamps use the DB format `YYYY/MM/DD HH:MM:SS` (PST LA)
 - `// no-unilog` at end of a log line means unilog should not touch it
 - `// unilog-stub:` prefix means it's waiting for reconciler to activate

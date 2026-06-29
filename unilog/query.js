@@ -100,16 +100,11 @@ function fmt(raw, isSites) {
       // id | ts | pid | src_file | src_line | tag | level | message
       const [id, ts, pid, file, line, tag, level, ...msgParts] = cols;
       const msg = msgParts.join("|");
-      // convert ts from 'YYYY/MM/DD HH:MM:SS' to 'MM-DD HH:MM'
-      const tsShort = ts.replace(
-        /^\d{4}\/(\d{2})\/(\d{2}) (\d{2}):(\d{2}):\d{2}$/,
-        "$1-$2 $3:$4",
-      );
       const loc = `${file}:${line}`;
       const meta = [tag && `[${tag}]`, level !== "info" && level]
         .filter(Boolean)
         .join(" ");
-      const prefix = `${tsShort} ${pid} ${loc}${meta ? " " + meta : ""}`;
+      const prefix = `${ts} ${pid} ${loc}${meta ? " " + meta : ""}`;
       console.log(`${prefix}  ${msg}`); // no-unilog
     }
   }

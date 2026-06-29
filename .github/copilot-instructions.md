@@ -129,4 +129,4 @@ node unilog/query.js --pid tv-down --level error --last 20    # by process / lev
 node unilog/query.js --since "-1 hour" --pid tv-srvr --asc    # time-bounded
 ```
 
-Output: `MM-DD HH:MM  pid  file:line  [tag]  message`. See `.github/agents/unilog.agent.md` for full reference including how to add/remove log instrumentation.
+Output: `YYYY/MM/DD HH:MM:SS  pid  file:line  [tag]  message`. See `.github/agents/unilog.agent.md` for full reference including how to add/remove log instrumentation.

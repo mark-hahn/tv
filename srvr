@@ -174,7 +174,7 @@ remote_install_app_deps() {
   run_ssh "$SSH_HOST" "cd '$TV_REMOTE_BASE' \
     && if command -v pnpm >/dev/null 2>&1; then \
          pnpm install; \
-         if [[ \"$project\" == \"down\" ]]; then pnpm rebuild better-sqlite3 --filter @tv/down; fi; \
+         pnpm rebuild better-sqlite3; \
        else echo 'pnpm not found on remote PATH' >&2; exit 1; fi"
 }
 

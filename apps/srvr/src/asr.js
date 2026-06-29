@@ -1,5 +1,6 @@
 import { spawn, execFile } from "child_process";
 import * as path from "path";
+import { unilog } from "@tv/share";
 
 const ASR_BIN = "/root/dev/apps/tv/apps/asr/asr.sh";
 const MEDIA_ROOT = "/mnt/media/tv";
@@ -20,7 +21,7 @@ function sendAsrChunks(ws, text) {
         }),
       );
     } catch (e) {
-      console.error("[ASR TAIL] ws send error", e);
+      unilog(686, "ws send error", e);
       return false;
     }
   }
@@ -88,7 +89,7 @@ export function handleAsr(ws, id, params) {
       try {
         ws.send(JSON.stringify({ id, status: "ok", data: result }));
       } catch (e) {
-        console.error("asr start send error", e);
+        unilog(687, "asr start send error", e);
       }
     });
   } else if (action === "tail") {
@@ -128,7 +129,7 @@ export function handleAsr(ws, id, params) {
       try {
         ws.send(JSON.stringify({ id, status: "ok", data: result }));
       } catch (e) {
-        console.error("asr kill send error", e);
+        unilog(688, "asr kill send error", e);
       }
     });
   }

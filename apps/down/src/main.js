@@ -16,7 +16,6 @@ import {
   smartTitleMatch,
   parseFileSeasonEpisode,
   parseTitleFromFilename,
-  postHistory,
   TV_BLOCKED,
   getResolution,
   isWatched as edIsWatched,
@@ -1516,12 +1515,7 @@ async function main() {
           showTitle,
           ")",
         );
-        postHistory({
-          tvdbId: embyEntry?.tvdbId || null,
-          showName: showTitle,
-          type: "skipDown",
-          description: `DVD skip: not in Emby (${showTitle})`,
-        });
+        unilog(472, "history", "skipDown", showTitle, `DVD skip: not in Emby (${showTitle})`);
         continue;
       }
       dvdTorrentFolders.add(torrentFolder);
@@ -1849,12 +1843,7 @@ async function main() {
 
     if (outputMkvs.length === 0) {
       unilog(311, `DVD: makemkvcon produced no MKVs for ${vtsDirRelative}`);
-      postHistory({
-        tvdbId,
-        showName: showTitle,
-        type: "errorSync",
-        description: `makemkv no output for ${vtsDirRelative}`,
-      });
+      unilog(473, "history", "errorSync", showTitle, `makemkv no output for ${vtsDirRelative}`);
       return;
     }
 
@@ -1878,12 +1867,7 @@ async function main() {
       await execAsync(`rm -rf "${makemkvOutDir}"`, { timeout: 60000 });
     } catch (e) {}
 
-    postHistory({
-      tvdbId,
-      showName: showTitle,
-      type: "dvdProc",
-      description: `${outputMkvs.length} MKV(s) from ${vtsDirRelative} → ${seasonDir}`,
-    });
+    unilog(474, "history", "dvdProc", showTitle, `${outputMkvs.length} MKV(s) from ${vtsDirRelative} → ${seasonDir}`);
   };
 
   const moveMkvsToSeason = async (
@@ -2257,12 +2241,7 @@ async function main() {
 
       if (!ALLOWED_EXTS.has(fext)) {
         trace("checkFile: skip extension", { fname, fext });
-        postHistory({
-          tvdbId: lookupTvdbId(title),
-          showName: title || fname,
-          type: "skipDown",
-          description: `skip extension: .${fext}`,
-        });
+        unilog(475, "history", "skipDown", title || fname, `skip extension: .${fext}`);
         process.nextTick(checkFile);
         return;
       }
@@ -2274,12 +2253,7 @@ async function main() {
       ) {
         recentCount++;
         trace("checkFile: skip tvJsonTitles error", { fname });
-        postHistory({
-          tvdbId: lookupTvdbId(title),
-          showName: title || fname,
-          type: "skipDown",
-          description: "skip: previous error",
-        });
+        unilog(476, "history", "skipDown", title || fname, "skip: previous error");
         process.nextTick(checkFile);
         return;
       }
@@ -2325,24 +2299,14 @@ async function main() {
               localPath: existingEntry?.localPath || "",
               destTitle: existingEntry?.destTitle || "",
             });
-            postHistory({
-              tvdbId: lookupTvdbId(title),
-              showName: title || fname,
-              type: "skipDown",
-              description: "skip: already downloaded (local file deleted)",
-            });
+            unilog(477, "history", "skipDown", title || fname, "skip: already downloaded (local file deleted)");
             process.nextTick(checkFile);
             return;
           } else {
             recentCount++;
             const skipStatus = "already downloaded";
             trace("checkFile: skip " + skipStatus, { fname });
-            postHistory({
-              tvdbId: lookupTvdbId(title),
-              showName: title || fname,
-              type: "skipDown",
-              description: "skip: " + skipStatus,
-            });
+            unilog(478, "history", "skipDown", title || fname, "skip: " + skipStatus);
             process.nextTick(checkFile);
             return;
           }
@@ -2350,12 +2314,7 @@ async function main() {
           recentCount++;
           const skipStatus = "already queued";
           trace("checkFile: skip " + skipStatus, { fname });
-          postHistory({
-            tvdbId: lookupTvdbId(title),
-            showName: title || fname,
-            type: "skipDown",
-            description: "skip: " + skipStatus,
-          });
+          unilog(479, "history", "skipDown", title || fname, "skip: " + skipStatus);
           process.nextTick(checkFile);
           return;
         }
@@ -2364,12 +2323,7 @@ async function main() {
       if (inProgress && inProgress[fname]) {
         recentCount++;
         trace("checkFile: skip in-progress", { fname });
-        postHistory({
-          tvdbId: lookupTvdbId(title),
-          showName: title || fname,
-          type: "skipDown",
-          description: "skip: in-progress",
-        });
+        unilog(480, "history", "skipDown", title || fname, "skip: in-progress");
         process.nextTick(checkFile);
         return;
       }
@@ -2378,12 +2332,7 @@ async function main() {
           blockedCount++;
           unilog(319, "-- BLOCKED:", { blkName, fname });
           trace("checkFile: blocked", { blkName, fname });
-          postHistory({
-            tvdbId: lookupTvdbId(title),
-            showName: title || fname,
-            type: "skipDown",
-            description: `skip: blocked by ${blkName}`,
-          });
+          unilog(481, "history", "skipDown", title || fname, `skip: blocked by ${blkName}`);
           process.nextTick(checkFile);
           return;
         }
@@ -2448,12 +2397,7 @@ async function main() {
               fname,
             );
             trace("checkFile: not a tv show, skipping", { fname, title });
-            postHistory({
-              tvdbId: lookupTvdbId(title),
-              showName: title || fname,
-              type: "skipDown",
-              description: `skip: not a TV show (title: ${title})`,
-            });
+            unilog(482, "history", "skipDown", title || fname, `skip: not a TV show (title: ${title})`);
             return process.nextTick(checkFile);
           }
         }
@@ -2580,12 +2524,7 @@ async function main() {
     if (title in tvdbCache) {
       if (tvdbCache[title] === null) {
         // Previously determined this title is not resolvable — skip without hitting TVDB.
-        postHistory({
-          tvdbId: lookupTvdbId(title),
-          showName: title || fname,
-          type: "skipDown",
-          description: "skip: not resolvable (cached)",
-        });
+        unilog(483, "history", "skipDown", title || fname, "skip: not resolvable (cached)");
         return process.nextTick(checkFile);
       }
       seriesName = tvdbCache[title];
@@ -2598,12 +2537,7 @@ async function main() {
     if (folderTitle && folderTitle in tvdbCache) {
       if (tvdbCache[folderTitle] === null) {
         tvdbCache[title] = null;
-        postHistory({
-          tvdbId: lookupTvdbId(title),
-          showName: title || fname,
-          type: "skipDown",
-          description: "skip: not resolvable (folder cached)",
-        });
+        unilog(484, "history", "skipDown", title || fname, "skip: not resolvable (folder cached)");
         return process.nextTick(checkFile);
       }
       seriesName = tvdbCache[folderTitle];
@@ -2759,12 +2693,7 @@ async function main() {
                   fname,
                   title,
                 });
-                postHistory({
-                  tvdbId: lookupTvdbId(title),
-                  showName: title || fname,
-                  type: "skipDown",
-                  description: "skip: no TVDB match, not in Emby",
-                });
+                unilog(485, "history", "skipDown", title || fname, "skip: no TVDB match, not in Emby");
                 // Cache null so remaining episodes from the same folder skip TVDB this cycle.
                 tvdbCache[title] = null;
                 if (titleBeforeRetry && titleBeforeRetry !== title)
@@ -2836,12 +2765,7 @@ async function main() {
                 fname,
                 title,
               });
-              postHistory({
-                tvdbId: lookupTvdbId(title),
-                showName: title || fname,
-                type: "skipDown",
-                description: "skip: no series match on TVDB",
-              });
+              unilog(486, "history", "skipDown", title || fname, "skip: no series match on TVDB");
               // Cache null so remaining episodes from the same folder skip TVDB this cycle.
               tvdbCache[title] = null;
               if (titleBeforeRetry && titleBeforeRetry !== title)
@@ -2974,12 +2898,7 @@ async function main() {
         fname,
       );
       trace("checkFileExists: already on disk", { fname, tvSeasonPath });
-      postHistory({
-        tvdbId: lookupTvdbId(seriesName),
-        showName: seriesName || fname,
-        type: "skipDown",
-        description: `skip: already on disk`,
-      });
+      unilog(487, "history", "skipDown", seriesName || fname, `skip: already on disk`);
       try {
         // Use the file's mtime on disk as the timestamp so the card shows
         // the real download date rather than today's date.
@@ -3036,12 +2955,7 @@ async function main() {
             seStr,
           );
           trace("checkFileExists: skip episode watched", { fname, seStr });
-          postHistory({
-            tvdbId: lookupTvdbId(seriesName),
-            showName: seriesName || fname,
-            type: "skipDown",
-            description: `skip: ${seStr} already watched`,
-          });
+          unilog(488, "history", "skipDown", seriesName || fname, `skip: ${seStr} already watched`);
           return process.nextTick(checkFile);
         }
       }
@@ -3052,12 +2966,7 @@ async function main() {
     if (!processingForced && inProgress && inProgress[fname]) {
       existsCount++;
       trace("checkFileExists: already in-progress", { fname });
-      postHistory({
-        tvdbId: lookupTvdbId(seriesName),
-        showName: seriesName || fname,
-        type: "skipDown",
-        description: "skip: already in-progress",
-      });
+      unilog(489, "history", "skipDown", seriesName || fname, "skip: already in-progress");
       return process.nextTick(checkFile);
     }
 
@@ -3069,12 +2978,7 @@ async function main() {
           ? "already downloaded"
           : "already queued";
       trace("checkFileExists: " + skipStatus + " (tv.json)", { fname });
-      postHistory({
-        tvdbId: lookupTvdbId(seriesName),
-        showName: seriesName || fname,
-        type: "skipDown",
-        description: "skip: " + skipStatus,
-      });
+      unilog(490, "history", "skipDown", seriesName || fname, "skip: " + skipStatus);
       return process.nextTick(checkFile);
     }
 
@@ -3102,12 +3006,7 @@ async function main() {
           ")",
         );
         trace("checkFileExists: not in emby", { fname, seriesName });
-        postHistory({
-          tvdbId: lookupTvdbId(seriesName),
-          showName: seriesName || fname,
-          type: "skipDown",
-          description: `skip: not in Emby (${seriesName})`,
-        });
+        unilog(491, "history", "skipDown", seriesName || fname, `skip: not in Emby (${seriesName})`);
         return process.nextTick(checkFile);
       }
     }
@@ -3214,12 +3113,7 @@ async function main() {
               flexSeStr,
               _diskFile,
             });
-            postHistory({
-              tvdbId: lookupTvdbId(seriesName),
-              showName: seriesName || fname,
-              type: "skipDown",
-              description: `flex skip: ${flexSeStr} disk file same/better quality`,
-            });
+            unilog(492, "history", "skipDown", seriesName || fname, `flex skip: ${flexSeStr} disk file same/better quality`);
             return process.nextTick(checkFile);
           }
           // USB is better than disk — rename disk file to .old before downloading.
@@ -3297,12 +3191,7 @@ async function main() {
               flexSeStr,
               diskFile,
             });
-            postHistory({
-              tvdbId: lookupTvdbId(seriesName),
-              showName: seriesName || fname,
-              type: "skipDown",
-              description: `flex skip: ${flexSeStr} disk file same/better quality`,
-            });
+            unilog(493, "history", "skipDown", seriesName || fname, `flex skip: ${flexSeStr} disk file same/better quality`);
             return process.nextTick(checkFile);
           }
           // USB is better — rename the worse disk file to .old before downloading.
@@ -3352,12 +3241,7 @@ async function main() {
           fname,
           flexSeStr,
         });
-        postHistory({
-          tvdbId: lookupTvdbId(seriesName),
-          showName: seriesName || fname,
-          type: "skipDown",
-          description: `flex skip: ${flexSeStr} already watched`,
-        });
+        unilog(494, "history", "skipDown", seriesName || fname, `flex skip: ${flexSeStr} already watched`);
         return process.nextTick(checkFile);
       }
     }
@@ -3423,13 +3307,7 @@ async function main() {
             "(keeping",
             _cycleExistingFname + ")",
           );
-          postHistory({
-            tvdbId: lookupTvdbId(seriesName),
-            showName: seriesName || fname,
-            type: "skipDown",
-            description:
-              "skip: same S/E already queued this cycle " + _cycleExistingFname,
-          });
+          unilog(495, "history", "skipDown", seriesName || fname, "skip: same S/E already queued this cycle " + _cycleExistingFname);
           return process.nextTick(checkFile);
         }
       }
@@ -3484,12 +3362,7 @@ async function main() {
         fileSize: usbFileBytes || 0,
       });
 
-      postHistory({
-        tvdbId: lookupTvdbId(seriesName),
-        showName: seriesName || fname,
-        type: "acceptDown",
-        description: `${fname} S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")} → ${tvLocalDir}`,
-      });
+      unilog(496, "history", "acceptDown", seriesName || fname, `${fname} S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")} → ${tvLocalDir}`);
     } catch (e) {
       // keep going
       trace("checkFileExists: addEntry threw", {
@@ -3504,12 +3377,7 @@ async function main() {
   badFile = (reason) => {
     errCount++;
     writeRejectLog(fname, reason);
-    postHistory({
-      tvdbId: lookupTvdbId(seriesName),
-      showName: seriesName || fname,
-      type: "rejDown",
-      description: `${reason || "unknown"} | file: ${fname}`,
-    });
+    unilog(497, "history", "rejDown", seriesName || fname, `${reason || "unknown"} | file: ${fname}`);
     trace("badFile: marking error", {
       reason: reason || "unknown",
       fname,

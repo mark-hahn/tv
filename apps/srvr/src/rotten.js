@@ -136,13 +136,9 @@ function createTiming(log, enabled, label) {
     if (!enabled) return;
     const totalMs = Number(nowNs() - t0) / 1e6;
     const sorted = [...spans].sort((a, b) => b.ms - a.ms);
-    log(
-      `timings for ${label}: total=${totalMs.toFixed(0)}ms, spans=${spans.length}`,
-    );
+    unilog(695, `timings for ${label}: total=${totalMs.toFixed(0)}ms, spans=${spans.length}`);
     for (const s of sorted.slice(0, topN)) {
-      log(
-        `timing: ${String(s.ms.toFixed(0)).padStart(5, " ")}ms  ${s.name}${s.meta ? "  " + s.meta : ""}`,
-      );
+      unilog(696, `timing: ${String(s.ms.toFixed(0)).padStart(5, " ")}ms  ${s.name}${s.meta ? "  " + s.meta : ""}`);
     }
   };
 
@@ -165,7 +161,7 @@ async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
       fs.writeFileSync("rotten-overlays.html", html);
       // console.log('Saved page content to rotten-overlays.html');
     } catch (e) {
-      console.log("Failed to save rotten-overlays.html", e.message);
+      unilog(697, "Failed to save rotten-overlays.html", e.message);
     }
   }
 
@@ -221,7 +217,7 @@ async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
       await delay(200);
     }
   } catch (e) {
-    console.log("OneTrust click error:", e.message);
+    unilog(698, "OneTrust click error:", e.message);
   }
 
   // 4. Polling for the stubborn popup at 853, 160
@@ -332,7 +328,7 @@ async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
               }
             }
           } catch (e) {
-            console.error("Delete script error:", e.message);
+            unilog(699, "Delete script error:", e.message);
           }
           return false;
         });
@@ -346,7 +342,7 @@ async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
       await delay(200);
     }
   } catch (err) {
-    console.log("Polling error:", err.message);
+    unilog(700, "Polling error:", err.message);
   }
 
   // Check if we are incorrectly clicking the navbar
@@ -477,9 +473,7 @@ function chooseShow(shows, query) {
   }
 
   if (debug) {
-    log(
-      `smartTitleMatch: query="${query}", year="${year}" against ${shows.length} shows`,
-    );
+    unilog(701, `smartTitleMatch: query="${query}", year="${year}" against ${shows.length} shows`);
   }
 
   // Use forceChoice=true to allow aggressive normalization and Levenshtein matching
@@ -563,7 +557,7 @@ export async function rottenSearch(query) {
 
   const headless = !headed || !HAS_DISPLAY;
   if (headed && !HAS_DISPLAY) {
-    log("err", "ROTTEN_HEADED requested but no $DISPLAY; forcing headless");
+    unilog(702, "err", "ROTTEN_HEADED requested but no $DISPLAY; forcing headless");
   }
   let browser;
   let context;
@@ -630,9 +624,7 @@ export async function rottenSearch(query) {
             await page.goto(detailLink, { waitUntil: "domcontentloaded" });
             return;
           } catch (e) {
-            console.log(
-              `rotten detail.goto failed (attempt ${i}): ${e.message}`,
-            );
+            unilog(703, `rotten detail.goto failed (attempt ${i}): ${e.message}`);
             if (i === 3) throw e;
             await new Promise((r) => setTimeout(r, 1000));
           }
@@ -690,7 +682,7 @@ export async function rottenSearch(query) {
               // console.log(`Saved page screenshot to rotten-page-${slot}.png`);
             }
           } catch (err) {
-            console.log("rotten screnshot error", err.message);
+            unilog(704, "rotten screnshot error", err.message);
           }
         }
 
@@ -749,13 +741,11 @@ export async function rottenSearch(query) {
     );
 
     if (debug)
-      log(
-        `rotten: "${query}" => "${show.title}" ${show.startyear} ${
+      unilog(705, `rotten: "${query}" => "${show.title}" ${show.startyear} ${
           show.endyear
         } ${criticsScore}/${audienceScore} ${show.sentiment}\n    ${
           queryUrl
-        }\n    ${detailLink}`,
-      );
+        }\n    ${detailLink}`);
 
     return { url: detailLink, criticsScore, audienceScore };
   };
@@ -776,7 +766,7 @@ export async function rottenSearch(query) {
     );
     return await runOnce(page);
   } catch (err) {
-    log("err", "rottenSearch error", query, err.message);
+    unilog(706, "err", "rottenSearch error", query, err.message);
     return null;
   } finally {
     if (page && usingShared && !REUSE_PAGE) {

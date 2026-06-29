@@ -673,4 +673,3 @@ export function getSeasonIntro(seasonIntros, season) {
   return { ...EMPTY_SEASON_INTRO };
 }
 
-export { postHistory } from "./history.js";

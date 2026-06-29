@@ -1,4 +1,4 @@
-import { smartTitleMatch } from "@tv/share";
+import { smartTitleMatch, unilog} from "@tv/share"
 import { MovieDb } from "moviedb-promise";
 const moviedb = new MovieDb("327192a334da700f65b882c7a69cb927");
 
@@ -23,9 +23,7 @@ export async function getTmdb(params) {
           creditsData = await moviedb.tvAggregateCredits({ id: seriesId });
         } catch (methodError) {
           // If method doesn't exist, use direct fetch to TMDB API
-          console.log(
-            "[tmdb] tvAggregateCredits method not found, using direct API call",
-          );
+          unilog(707, "tvAggregateCredits method not found, using direct API call");
           const response = await fetch(
             `https://api.themoviedb.org/3/tv/${seriesId}/aggregate_credits?api_key=327192a334da700f65b882c7a69cb927`,
           );
@@ -38,7 +36,7 @@ export async function getTmdb(params) {
         }
         return creditsData;
       } catch (error) {
-        console.error("[tmdb] aggregate_credits error:", error.message);
+        unilog(708, "aggregate_credits error:", error.message);
         throw new Error(`aggregate_credits error: ${error.message}`);
       }
     }
@@ -88,15 +86,12 @@ export async function getTmdb(params) {
         });
         actorInfo.images = personImages;
       } catch (error) {
-        console.error(
-          `[tmdb] Failed to fetch images for ${actorInfo.name}:`,
-          error.message,
-        );
+        unilog(709, `Failed to fetch images for ${actorInfo.name}:`, error.message);
         actorInfo.images = null;
       }
     }
 
-    console.log("[tmdb] Guest actor list with images:", guestActorList);
+    unilog(710, "Guest actor list with images:", guestActorList);
 
     return {
       guests: guestActorList,
@@ -108,7 +103,7 @@ export async function getTmdb(params) {
       aired: episodeInfo.air_date ?? null,
     };
   } catch (error) {
-    console.error("[tmdb] getTmdb error:", error);
+    unilog(711, "getTmdb error:", error);
     throw new Error(`getTmdb error: ${error.message}`);
   }
 }
@@ -122,7 +117,7 @@ export async function searchPerson(params) {
     if (!person?.profile_path) return null;
     return `https://image.tmdb.org/t/p/w185${person.profile_path}`;
   } catch (error) {
-    console.error("[tmdb] searchPerson error:", error.message);
+    unilog(712, "searchPerson error:", error.message);
     return null;
   }
 }

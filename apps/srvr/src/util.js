@@ -18,9 +18,7 @@ export const jParse = (str, label) => {
   try {
     obj = JSON.parse(str);
   } catch (e) {
-    console.error(
-      `JSON parse error${label ? " at " + label : ""}, ${e.message}`,
-    );
+    unilog(785, `JSON parse error${label ? " at " + label : ""}, ${e.message}`);
     return null;
   }
   return obj;
@@ -68,8 +66,8 @@ export const log = (msg, err = false, spacing = false) => {
     (repeatCount ? ("" + repeatCount).padStart(4, " ") : "    ") +
     " " +
     msg;
-  if (err) console.error(msg);
-  else console.log(msg);
+  if (err) unilog(786, msg);
+  else unilog(787, msg);
   if (LOG_APPS_SRVR_DATA_MISC_SRVR_LOG)
     try {
       if (spacing) fs.appendFileSync(SRVR_LOG_PATH, "\n");
@@ -130,19 +128,19 @@ export function getLog(module) {
     timers[name] = Date.now();
     if (hide) return;
     const line = `[${module}]: ${name} started${msg ? ", " + msg : ""}`;
-    console.log(line);
+    unilog(788, line);
   };
 
   const end = function (name, onlySlow = false, msg = "") {
     if (!timers[name]) {
       const line = `[${module}]: ${name} ended${msg ? ", " + msg : ""}`;
-      console.log(line);
+      unilog(789, line);
       return;
     }
     const duration = Date.now() - timers[name];
     if (onlySlow && duration < 100) return;
     const line = `[${module}]: ${name} ended, ${duration}ms${msg ? ", " + msg : ""}`;
-    console.log(line);
+    unilog(790, line);
   };
 
   const log = function (...args) {
@@ -190,9 +188,9 @@ export function getLog(module) {
     // Temporary: trace calls that produce empty error lines
     if (errFlag && par.length === 0) {
       const stack = new Error().stack.split("\n").slice(1, 6).join(" | ");
-      console.error(line + " [TRACE] " + stack);
-    } else if (errFlag) console.error(line);
-    else console.log(line);
+      unilog(791, line + " [TRACE] " + stack);
+    } else if (errFlag) unilog(792, line);
+    else unilog(793, line);
   };
 
   return { log, start, end };

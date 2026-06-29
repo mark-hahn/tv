@@ -25,7 +25,7 @@ export const sendEmail = async (bodyText) => {
     unilog(103, "✓ Email sent successfully"); // log-id: 103
     return "ok";
   } catch (error) {
-    console.error("✗ Failed to send email:", error.message);
+    unilog(689, "✗ Failed to send email:", error.message);
     throw error;
   }
 };

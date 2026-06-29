@@ -153,7 +153,7 @@ export const getSeriesMap = async (show) => {
 
     return seriesMap;
   } catch (err) {
-    console.error("getSeriesMap error:", err);
+    unilog(690, "getSeriesMap error:", err);
     return null;
   }
 };
@@ -338,9 +338,7 @@ const getShowState = (showName, showMeta) => {
             fileGapSeason = seasonNumber;
             fileGapEpisode = episodeNumber;
           }
-          console.log(
-            `[getShowState] fileGap set for ${showName} S${seasonNumber}E${episodeNumber}`,
-          );
+          unilog(691, `fileGap set for ${showName} S${seasonNumber}E${episodeNumber}`);
           fileGap = true;
         }
         if (!watched && !haveFile && !unaired) sawUnwatchedNoFile = true;
@@ -350,9 +348,7 @@ const getShowState = (showName, showMeta) => {
               fileGapSeason = seasonNumber;
               fileGapEpisode = episodeNumber;
             }
-            console.log(
-              `[getShowState] fileGap (unwatched noFile before unwatched file) set for ${showName} S${seasonNumber}E${episodeNumber}`,
-            );
+            unilog(692, `fileGap (unwatched noFile before unwatched file) set for ${showName} S${seasonNumber}E${episodeNumber}`);
             fileGap = true;
           }
           sawUnwatchedNoFile = false;
@@ -362,9 +358,7 @@ const getShowState = (showName, showMeta) => {
         lastWatched = watched;
       }
       if (!seasonNotWatchedNoFiles && fileEndCount > 2) {
-        console.log(
-          `[getShowState] fileEndError set for ${showName} S${seasonNumber}: fileEndCount=${fileEndCount} fileCount=${fileCount}`,
-        );
+        unilog(693, `fileEndError set for ${showName} S${seasonNumber}: fileEndCount=${fileEndCount} fileCount=${fileCount}`);
         fileEndError = true;
         if (fileEndErrorSeason === null) {
           fileEndErrorSeason = seasonNumber;
@@ -447,7 +441,7 @@ const getShowState = (showName, showMeta) => {
       watchGapEpisode = null;
     }
   } catch (error) {
-    console.error("getShowState error:", error.message);
+    unilog(694, "getShowState error:", error.message);
     return null;
   }
   return {

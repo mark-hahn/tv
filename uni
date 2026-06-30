@@ -121,22 +121,25 @@ if (actionWords.includes("events")) {
     ["line", "src_line"],
   ];
   const POLL_MS = 2000;
+  const INITIAL_ROWS = 50;
 
-  function fetchEvents(afterId) {
+  function fetchEvents(afterId, limit) {
     const where = afterId != null ? `WHERE e.id > ${Number(afterId)}` : "";
+    const lim = limit != null ? `LIMIT ${Number(limit)}` : "";
     return query(
       `SELECT e.id, e.ts, e.log_id, s.tag, s.project, s.src_file, s.src_line,
               e.message
        FROM log_events e
        LEFT JOIN log_sites s ON s.log_id = e.log_id
        ${where}
-       ORDER BY e.id;`,
+       ORDER BY e.id DESC ${lim};`,
       { tolerateError: true },
     );
   }
 
-  // Initial load — print header + all existing rows.
-  const initial = fetchEvents(null) || [];
+  // Initial load — last INITIAL_ROWS events (descending then re-sorted asc).
+  const initialDesc = fetchEvents(null, INITIAL_ROWS) || [];
+  const initial = initialDesc.slice().reverse();
   if (initial.length > 0) printTable(initial, EVENT_COLS);
   else console.log("(no events yet — tailing…)");
 
@@ -167,10 +170,13 @@ if (actionWords.includes("events")) {
   }
 
   const poll = () => {
-    const rows = fetchEvents(lastId);
+    const rows = fetchEvents(lastId, null);
     if (rows && rows.length > 0) {
-      for (const row of rows) printRow(row);
-      lastId = rows[rows.length - 1].id;
+      // fetchEvents returns DESC when given a limit; for polling we get all new
+      // rows ascending — re-reverse since afterId+DESC gives newest-first.
+      const asc = rows.slice().reverse();
+      for (const row of asc) printRow(row);
+      lastId = asc[asc.length - 1].id;
     }
     setTimeout(poll, POLL_MS);
   };

@@ -686,19 +686,13 @@ export default {
 
           for (const h of curHashes) {
             if (!this._knownHashes.has(h)) {
-              const t = torrentByHash[h];
-              this.postQbtHistory(
-                "addQbt",
-                nameOf(t),
-                h,
-                `new: ${nameOf(t)} state=${t?.state || "?"}`,
-              );
+              // new torrent appeared
             }
           }
           if (this._didLoadOnce) {
             for (const h of this._knownHashes) {
               if (!curHashes.has(h)) {
-                this.postQbtHistory("remQbt", h, h, `removed: ${h}`);
+                // torrent removed
               }
             }
           }
@@ -732,16 +726,15 @@ export default {
               (h) => h && !curDownloading.includes(h),
             );
             if (missing.length > 0) {
-              unilog(1030, "History: download finished, starting tvproc cycle", {
-                finishedHashes: missing,
-              });
+              unilog(
+                1030,
+                "History: download finished, starting tvproc cycle",
+                {
+                  finishedHashes: missing,
+                },
+              );
               for (const h of missing) {
-                this.postQbtHistory(
-                  "qbtFinished",
-                  h,
-                  h,
-                  `finished downloading: ${h}`,
-                );
+                // torrent finished downloading
               }
               try {
                 await fetch(`${config.tvDownUrl}/startProc`, {
@@ -779,21 +772,6 @@ export default {
     sep() {
       // Replace spaces around '|' with two non-breaking spaces.
       return "\u00A0\u00A0|\u00A0\u00A0";
-    },
-
-    postQbtHistory(type, showName, hash, description) {
-      try {
-        fetch(`${config.tvSrvrUrl}/api/history`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            showName: showName || "unknown",
-            type,
-            hash: hash || undefined,
-            description,
-          }),
-        }).catch(() => {});
-      } catch {}
     },
 
     parseTorrentName(rawTitle) {

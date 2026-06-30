@@ -660,7 +660,7 @@ app.post("/tv/toggleres", async (req, res) => {
       const session = await getEmbyPlaybackSession("Living Room TV");
       const item = session?.NowPlayingItem;
       if (!item) {
-        logHere("warn", `[toggleres] nothing playing on Living Room TV`);
+        unilog(1115, `nothing playing on Living Room TV`);
         return res.json({ ok: false, error: "nothing playing" });
       }
       knownEpisodeId = item.Id;
@@ -669,11 +669,11 @@ app.post("/tv/toggleres", async (req, res) => {
       toggleArg.season = item.ParentIndexNumber;
       toggleArg.episode = item.IndexNumber;
     }
-    logHere(`[toggleres] from ${client(req)} ${JSON.stringify(toggleArg)}`);
+    unilog(1116, `from ${client(req)} ${JSON.stringify(toggleArg)}`);
     res.json({ ok: true });
     runToggleResSequence(toggleArg, knownEpisodeId);
   } catch (e) {
-    logHere("error", `[toggleres] error: ${e.message}`);
+    unilog(1117, `error: ${e.message}`);
     if (!res.headersSent) res.json({ ok: false, error: e.message });
   }
 });
@@ -693,7 +693,7 @@ async function runToggleResSequence(toggleArg, knownEpisodeId) {
       },
     );
     const result = await toggleResp.json();
-    logHere(`[toggleres] toggle result=${JSON.stringify(result)}`);
+    unilog(1118, `toggle result=${JSON.stringify(result)}`);
     if (!result?.ok) return;
     pendingViewShow = {
       showId: result.showId,
@@ -707,7 +707,7 @@ async function runToggleResSequence(toggleArg, knownEpisodeId) {
     });
     setTimeout(() => firePendingViewShow("toggleres"), VIEW_SHOW_DELAY_MS);
   } catch (e) {
-    logHere("error", `[toggleres] sequence error: ${e.message}`);
+    unilog(1119, `sequence error: ${e.message}`);
   }
 }
 

@@ -688,26 +688,6 @@ export default {
     const curTitle = ref("");
     const curTvdb = ref(null);
 
-    const postBrowseHistory = (type, tvdbObj, extra) => {
-      try {
-        const id = String(
-          tvdbObj?.tvdb_id || tvdbObj?.tvdbId || tvdbObj?.id || "",
-        );
-        const name = String(tvdbObj?.name || "");
-        if (!name) return;
-        fetch(`${config.tvSrvrUrl}/api/history`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            tvdbId: id || null,
-            showName: name,
-            type,
-            description: extra || name,
-          }),
-        }).catch(() => {});
-      } catch {}
-    };
-
     const shouldAutoAdvance = ref(false);
     const getRemotesResults = ref([]);
     const _lastRemotesKey = ref("");
@@ -1586,11 +1566,6 @@ export default {
     const handlePreview = () => {
       const srchChoice = handleLoad();
       if (srchChoice) {
-        postBrowseHistory(
-          "preview",
-          curTvdb.value,
-          `preview: ${curTvdb.value?.name || ""}`,
-        );
         evtBus.emit("reelSearchAction", { srchChoice, action: "preview" });
       }
     };

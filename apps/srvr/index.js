@@ -187,16 +187,50 @@ let genSrtRunning = false,
   subQueuePendingNow = false;
 let asrLogBuffer = [];
 
-// Single queue for all batch ffmpeg jobs (subtitle extraction, re-encode).
-// Video streaming (line ~5054) and BIF generation are managed separately.
+// Single queue for all batch ffmpeg jobs (subtitle extraction, re-encode, BIF).
+// Video streaming is managed separately.
 const ffmpegQueue = (() => {
   let tail = Promise.resolve();
-  return function run(fn) {
-    const next = tail.then(() => fn());
+  let _pending = 0;
+  function run(fn) {
+    _pending++;
+    const next = tail.then(() => fn()).finally(() => _pending--);
     tail = next.catch(() => {});
     return next;
+  }
+  // pending includes the currently-running job
+  return {
+    run,
+    get pending() {
+      return _pending;
+    },
   };
 })();
+// Append queue depth to a batch label: "Show S01E04 (3 queued)" when >1 pending.
+function batchLabel(text) {
+  const n = ffmpegQueue.pending;
+  return n > 1 ? `${text} (${n} queued)` : text;
+}
+
+// Counters for active real-time streaming ffmpegs — shown in hdrMsg.
+let _activeVideoStreams = 0;
+let _activeSubStreams = 0;
+function _updateStreamMsg() {
+  if (_activeVideoStreams > 0)
+    setGlobalMessage({
+      id: "Stream",
+      text: String(_activeVideoStreams),
+      position: 998,
+    });
+  else setGlobalMessage({ id: "Stream", action: "hide" });
+  if (_activeSubStreams > 0)
+    setGlobalMessage({
+      id: "SubStream",
+      text: String(_activeSubStreams),
+      position: 999,
+    });
+  else setGlobalMessage({ id: "SubStream", action: "hide" });
+}
 const exec = utilNode.promisify(cp.exec);
 
 function readTextOr(filePathOrPaths, fallback) {
@@ -1057,7 +1091,7 @@ function startBifCreate(bifNeededObj) {
   // GLOBAL-MSG: Bif
   setGlobalMessage({
     id: "Bif",
-    text: cropName(bifNeededObj.showName),
+    text: batchLabel(cropName(bifNeededObj.showName)),
     position: 1000,
   });
   // Hold the batch ffmpeg queue for the duration of the BIF child process so
@@ -1454,6 +1488,12 @@ async function generateEmbSrts(
   fromUI,
 ) {
   const base = videoFilePath.replace(/\.[^.]+$/, "");
+  // GLOBAL-MSG: EmbSub
+  setGlobalMessage({
+    id: "EmbSub",
+    text: batchLabel(cropName(showname)),
+    position: 1003,
+  });
   let probeStreams = [];
   await new Promise((resolve) => {
     cp.execFile(
@@ -1493,7 +1533,7 @@ async function generateEmbSrts(
       if (fromUI) notifyClients("emb-log", `exists: ${path.basename(outPath)}`);
       continue;
     }
-    await ffmpegQueue(
+    await ffmpegQueue.run(
       () =>
         new Promise((resolve) => {
           cp.execFile(
@@ -1535,6 +1575,8 @@ async function generateEmbSrts(
   const hasNonText = subStreams.some((s) => !textCodecs.includes(s.codec_name));
   const pgsOnly = hasNonText && textStreams.length === 0;
   const hasEmbText = textStreams.length > 0;
+  // GLOBAL-MSG: EmbSub
+  setGlobalMessage({ id: "EmbSub", action: "hide" });
   return { pgsOnly, hasEmbText };
 }
 async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
@@ -5059,6 +5101,8 @@ app.get("/api/stream", async (req, res) => {
     res.setHeader("Cache-Control", "no-cache");
 
     const ffmpeg = cp.spawn("ffmpeg", ffmpegArgs);
+    _activeVideoStreams++;
+    _updateStreamMsg();
     ffmpeg.stdout.pipe(res);
     ffmpeg.stderr.on("data", () => {});
     ffmpeg.on("error", (err) => {
@@ -5071,6 +5115,8 @@ app.get("/api/stream", async (req, res) => {
     req.on("close", killFfmpeg);
     res.on("close", killFfmpeg);
     ffmpeg.on("exit", (code) => {
+      _activeVideoStreams--;
+      _updateStreamMsg();
       if (code !== 0 && code !== null) unilog(46, `ffmpeg exit code ${code}`);
       if (!res.writableEnded) res.end();
     });
@@ -5490,11 +5536,18 @@ app.get("/api/subtitle", async (req, res) => {
       "webvtt",
       "pipe:1",
     ]);
+    _activeSubStreams++;
+    _updateStreamMsg();
     ff.stdout.pipe(res);
     ff.stderr.on("data", () => {});
     req.on("close", () => ff.kill("SIGTERM"));
-    ff.on("error", () => {});
+    ff.on("error", () => {
+      _activeSubStreams--;
+      _updateStreamMsg();
+    });
     ff.on("exit", () => {
+      _activeSubStreams--;
+      _updateStreamMsg();
       if (!res.writableEnded) res.end();
     });
     return;
@@ -5557,11 +5610,18 @@ app.get("/api/subtitle", async (req, res) => {
         "webvtt",
         "pipe:1",
       ]);
+      _activeSubStreams++;
+      _updateStreamMsg();
       ff.stdout.pipe(res);
       ff.stderr.on("data", () => {});
       req.on("close", () => ff.kill("SIGTERM"));
-      ff.on("error", () => {});
+      ff.on("error", () => {
+        _activeSubStreams--;
+        _updateStreamMsg();
+      });
       ff.on("exit", () => {
+        _activeSubStreams--;
+        _updateStreamMsg();
         if (!res.writableEnded) res.end();
       });
       return;
@@ -9243,7 +9303,7 @@ async function reencodeOneTo1080(entry) {
     unilog(1107, `could not remove stale temp ${tmpPath}: ${e.message}`);
   }
   unilog(1108, `reencode 2160->1080 start: ${srcName}`);
-  await ffmpegQueue(
+  await ffmpegQueue.run(
     () =>
       new Promise((resolve, reject) => {
         // H.264 8-bit, 1080p, <=10 Mbit/s video; all other tracks copied unchanged.
@@ -9302,6 +9362,13 @@ async function processReencodeQueue() {
   const entry = reencodeQueue[0];
   if (!entry) return;
   reencodeRunning = true;
+  const seLabel = `S${String(entry.season).padStart(2, "0")}E${String(entry.episode).padStart(2, "0")}`;
+  // GLOBAL-MSG: Reencode
+  setGlobalMessage({
+    id: "Reencode",
+    text: batchLabel(`${cropName(entry.showName)} ${seLabel}`),
+    position: 1002,
+  });
   try {
     await reencodeOneTo1080(entry);
   } catch (e) {
@@ -9312,6 +9379,10 @@ async function processReencodeQueue() {
       persistReencodeQueue();
     }
     reencodeRunning = false;
+    // GLOBAL-MSG: Reencode
+    if (reencodeQueue.length === 0) {
+      setGlobalMessage({ id: "Reencode", action: "hide" });
+    }
     if (reencodeQueue.length > 0) setTimeout(processReencodeQueue, 1000);
   }
 }

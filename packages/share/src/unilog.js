@@ -38,3 +38,11 @@ export function unilog(logId, ...parts) {
     // best-effort: never break the app because logging failed
   }
 }
+
+// Author placeholder. Code authors write `logHere("error", `msg ${e.message}`)`
+// at the spot a log belongs (it uses `e`, so it satisfies no-empty / no-unused
+// in an otherwise-empty catch). It is a runtime NO-OP; the deploy reconciler
+// rewrites it into a real `unilog(<id>, ...)` with the given level. The first
+// arg is an optional level literal (info|warn|error|debug); the rest is the
+// message. Never write `unilog(...)` or stub comments by hand — use this.
+export function logHere() {}

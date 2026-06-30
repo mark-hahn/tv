@@ -37,10 +37,14 @@ export function extractLeadingTag(content) {
 
 // ---- stub grammar ---------------------------------------------------------
 //
-//   // unilog-stub {level=info,tag=chokidar} unilog(`detected add: ${p}`);
-//   // unilog-stub {level=warn} unilog("low disk");
+//   // unilog-stub {level=info,tag=chokidar} `detected add: ${p}`
+//   // unilog-stub {level=warn} "low disk"
 //
-// `tag` is optional. The argument is the (tag-stripped) message expression.
+// `tag` is optional. The text after the `{...}` meta block is the message
+// expression (string or template literal) — NOT wrapped in `unilog(...)`, so a
+// stub never looks like a real call. Legacy stubs that DID wrap the message as
+// `unilog(<expr>);` are still parsed (the wrapper is stripped) so old stubs in
+// source continue to activate.
 
 export function buildStub({
   indent = "",
@@ -49,10 +53,11 @@ export function buildStub({
   argExpr,
 }) {
   const meta = tag ? `level=${level},tag=${tag}` : `level=${level}`;
-  return `${indent}// unilog-stub {${meta}} unilog(${argExpr});`;
+  return `${indent}// unilog-stub {${meta}} ${argExpr}`;
 }
 
-const STUB_RE = /^(\s*)\/\/ unilog-stub \{([^}]*)\} unilog\(([\s\S]*)\);\s*$/;
+const STUB_RE = /^(\s*)\/\/ unilog-stub \{([^}]*)\}\s+([\s\S]*?)\s*$/;
+const LEGACY_WRAP_RE = /^unilog\(([\s\S]*)\)\s*;?\s*$/;
 
 export function parseStub(line) {
   const m = STUB_RE.exec(line);
@@ -63,11 +68,15 @@ export function parseStub(line) {
     const [k, v] = part.split("=");
     if (k) meta[k.trim()] = (v || "").trim();
   }
+  let argExpr = m[3].trim();
+  const legacy = LEGACY_WRAP_RE.exec(argExpr); // strip old `unilog(...)` wrapper
+  if (legacy) argExpr = legacy[1].trim();
+  if (!argExpr) return null;
   return {
     indent,
     level: meta.level || "info",
     tag: meta.tag || null,
-    argExpr: m[3].trim(),
+    argExpr,
   };
 }
 

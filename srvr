@@ -202,13 +202,17 @@ remote_deploy_one_no_restart() {
 
   # unilog: reconcile (instrument) BEFORE any build/rsync so the modified
   # source files are deployed exactly once, together with everything else.
-  if [[ "$project" == "srvr" || "$project" == "client" ]]; then
-    echo "[local] unilog reconcile: $project"
-    if ! node "$ROOT_DIR/unilog/run-reconcile.js" "$project"; then
-      echo "Error: unilog reconcile failed for $project" >&2
-      exit 1
-    fi
-  fi
+  # Runs for every instrumented project (run-reconcile.js knows them all);
+  # only the non-app `share` package has no source to reconcile.
+  case "$project" in
+    srvr | client | api | down | asr | tv)
+      echo "[local] unilog reconcile: $project"
+      if ! node "$ROOT_DIR/unilog/run-reconcile.js" "$project"; then
+        echo "Error: unilog reconcile failed for $project" >&2
+        exit 1
+      fi
+      ;;
+  esac
 
   # Special handling for client build (local)
   if [[ "$project" == "client" ]]; then

@@ -118,26 +118,45 @@ never touch git for read or commit unless i tell you to
 
 ## Unilog Debugging
 
-Logging is added ONLY by the **unilog** agent (`.github/agents/unilog.agent.md`).
-As the coding agent you must NOT add logging yourself:
+You must NOT hand-write `unilog(id, ...)` calls, never pick/assign log ids, and
+never write `// unilog-stub ...` lines — those are the **unilog** agent's /
+reconciler's job (`.github/agents/unilog.agent.md`).
 
-- Never write active `unilog(id, ...)` calls and never pick/assign ids.
-- Never write `// unilog-stub ...` lines either. Stubs are the unilog agent's
-  internal mechanism. They are documented in the agent file only so you recognize
-  them — not so you write them.
+To add a log, you have two sanctioned options:
 
-When code you write needs logging, decide WHERE each log belongs and WHAT it
-should say, then hand that off to the unilog agent as a plain instruction, e.g.:
+1. **Drop a `logHere(...)` placeholder** (preferred for inline cases). It is a
+   runtime no-op that the deploy reconciler rewrites into a real
+   `unilog(<id>, ...)` — you never see or choose the id. It is lint-safe: it uses
+   `e`, so an otherwise-empty `catch` is no longer empty.
 
-> add an error log in `apps/srvr/index.js`, in the `catch` after
-> `fs.copyFileSync(... dstSubPath)`, message: `` `sub copy failed for ${dstSubName}: ${e.message}` ``
+   ```js
+   } catch (e) {
+     logHere("error", `sub copy failed for ${dstSubName}: ${e.message}`);
+   }
+   ```
 
-Give the agent, for each log: the file, the location (a line number or a short
-nearby code snippet), the level (`info|warn|error`), and the exact message
-expression. Leave the catch binding (`catch (e) {`) in place so the message can
-use `e`. Do not leave `catch { /* ignore */ }` or vague "logging goes here"
-comments — describe the need to the agent instead. The agent handles everything
-else.
+   - First arg is the level: `info | warn | error | debug` (optional — omit it for
+     `info`, e.g. `logHere(`queued ${name}`)`).
+   - A leading `[tag]` in the message becomes the site tag, e.g.
+     `logHere("warn", "[disk] low space")`.
+   - Import it once per file: `import { logHere } from "@tv/share"` (server apps)
+     or from the client log module (`apps/client/src/log.js`) in the client.
+   - Reconciliation runs automatically on every `./srvr <project>` deploy (all
+     projects), so the placeholder becomes a real site without any extra step.
+
+2. **Hand the need to the unilog agent** as a plain instruction (use when you want
+   a curated description/tag, or are unsure where it belongs), e.g.:
+
+   > add an error log in `apps/srvr/index.js`, in the `catch` after
+   > `fs.copyFileSync(... dstSubPath)`, message: `` `sub copy failed for ${dstSubName}: ${e.message}` ``
+
+   Give the agent: the file, the location (line number or a short nearby snippet),
+   the level, and the exact message expression.
+
+Either way: keep the `catch (e) {` binding so the message can use `e`. Do not leave
+`catch { /* ignore */ }` or a bare `void e;` — use `logHere(...)` instead. You can
+validate before deploy with `node unilog/check.js <project|all>` (reports duplicate
+ids and malformed stubs).
 
 Use `unilog/query.js` (runs locally, SSHes to remote DB) to answer questions about log output:
 

@@ -68,3 +68,110 @@ before touching the stub grammar / adding repo-wide ESLint rules.
 
 - Do 1–3 now?
 - Tackle the stub-grammar/ESLint redesign (A/B/C/E), or leave for a separate pass?
+
+---
+
+# UPDATE — attempted fixes to temp.md (later than everything above)
+
+The section above was the *triage*. What follows is the *implementation* — the
+changes actually made to address the problems in `temp.md`. Everything below was
+done and validated (syntax checks pass, `node unilog/check.js all` is clean, the
+`srvr` bash script parses). The only `temp.md` item intentionally NOT done is the
+ESLint rule (E) — see "Skipped" at the end.
+
+## What was fixed
+
+### 1. Deploy reconciles every project (temp.md #7 / D — the real bug)
+
+`srvr` previously ran the reconciler only for `srvr` and `client`. It now runs for
+every instrumented project (`srvr, client, api, down, asr, tv`). This was the
+actual cause of complaint #7: stubs added to `tv`/`down`/`api`/`asr` never
+activated, so the agent's conclusion was correct and the "reconciliation is
+automatic everywhere" model is now genuinely true.
+
+- File: `srvr` (the deploy script), reconcile gate widened to a `case` over all
+  known projects.
+
+### 2. `node unilog/check.js <project|all>` — offline validator (temp.md #9 / F)
+
+New tool that reports, without deploying or touching the DB:
+
+- duplicate `log_id`s (same id on more than one source line),
+- unparseable `// unilog-stub` lines,
+- counts of pending stubs / active sites. Exit code 1 on problems.
+
+Verified output: `70 files, 1095 active sites, 20 pending stub(s) — OK`.
+
+- New files: `unilog/check.js`, plus `unilog/projects.js` (shared
+  `PROJECT_DIRS`/`findProjectFiles`, now imported by both `run-reconcile.js` and
+  `check.js` so the two can't drift).
+
+### 3. Stub grammar no longer looks like a call (temp.md #5 / A)
+
+The stub dropped its `unilog(...)` wrapper. New form:
+
+```js
+// unilog-stub {level=error,tag=resfb} `failed: ${e.message}`
+```
+
+Legacy wrapped stubs (`... unilog(<expr>);`) still parse, so the 20 existing stubs
+in source are unaffected.
+
+- File: `unilog/unilog-lib.js` (`buildStub` / `parseStub`, with back-compat).
+
+### 4. `logHere(...)` placeholder — lint-safe, ids never exposed (temp.md #6 / C / B)
+
+The one sanctioned thing a coding agent writes for "a log goes here":
+
+```js
+} catch (e) {
+  logHere("error", `sub copy failed for ${name}: ${e.message}`);
+}
+```
+
+It is a runtime no-op that the deploy reconciler rewrites into a real
+`unilog(<id>, ...)`. It uses `e` (kills the empty-catch / `void e;` lint fight),
+and the author never sees or picks an id (kills the collision/imitation problem).
+First arg is an optional level (`info|warn|error|debug`); a leading `[tag]` in the
+message becomes the site tag.
+
+- Files: no-op exports in `packages/share/src/unilog.js` and
+  `apps/client/src/log.js`; `unilog/parse.js` recognizes `logHere(...)`;
+  `unilog/reconcile.js` uses its parsed level on upgrade.
+- Verified: `logHere("error", \`x ${e.message}\`)` → `unilog(<id>, \`x ${e.message}\`)`
+  (level error); `logHere(\`plain ${x}\`)` → level info;
+  `logHere("warn", "[disk] low space")` → level warn, tag `disk`.
+
+### 5. Docs corrected (temp.md #1/4/5/8/G + the misleading deploy line)
+
+- `.github/copilot-instructions.md` Unilog section rewritten around the two
+  sanctioned paths: drop a `logHere(...)` placeholder (preferred) or hand the need
+  to the unilog agent. Reconciliation stated as automatic on every deploy.
+- `.github/agents/unilog.agent.md`: new stub grammar, per-project reconciliation,
+  how to take `logHere` placeholders, and the `check.js` step.
+
+### Bonus (found while fixing): `refreshSite` now updates `project`
+
+A site moved to a different file used to keep its old `project`. `refreshSite`
+now updates `project` too (via `COALESCE`), so cross-project moves self-correct.
+
+## Skipped — ESLint rule (temp.md E), intentionally
+
+Per "don't worry about lint for now," and because it is counterproductive here:
+there are **3964** bare `console.*` calls (an ESLint rule would emit ~4000
+warnings), and flagging `unilog(<number>,` produces false positives since the
+reconciler legitimately writes those. `unilog/check.js` is the false-positive-free
+guardrail instead.
+
+## Net
+
+temp.md's four root fixes — (1) stubs that don't look like calls, (2) ids never
+exposed to authors, (3) one lint-safe "log here" placeholder, (4) uniform,
+invisible reconciliation — are all in. The remaining suggestion (E, the lint rule)
+was deliberately skipped in favor of the `check` tool.
+
+## Status / optional next step
+
+No deploy is required for correctness (no source uses `logHere` yet). When wanted:
+`./srvr` ships the `logHere` export (share/client) and `./srvr tv` would finally
+activate the long-stuck `toggleres` stubs in `apps/tv/src/main.js`.

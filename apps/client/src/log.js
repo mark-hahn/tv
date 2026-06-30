@@ -62,6 +62,12 @@ export function unilog(logId, ...parts) {
   }
 }
 
+// Author placeholder — runtime NO-OP, rewritten to a real `unilog(<id>, ...)` by
+// the deploy reconciler. Write `logHere("error", `msg ${e.message}`)` where a log
+// belongs; never hand-write `unilog(...)` or stub comments. First arg is an
+// optional level literal (info|warn|error|debug); the rest is the message.
+export function logHere() {}
+
 if (typeof window !== "undefined") {
   window.addEventListener("beforeunload", () => {
     if (queue.length === 0) return;

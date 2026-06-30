@@ -73,12 +73,34 @@ node unilog/unilog-cli.js --file apps/srvr/index.js --anchor "text" \
   --message '"msg"' --dry-run
 ```
 
-**After adding stubs**, deploy the file (e.g. `./srvr srvr`) so the reconciler activates them.
+**After adding stubs**, deploy the project (e.g. `./srvr tv`) so the reconciler
+activates them. Reconciliation runs automatically on **every** project's deploy
+(`srvr`, `client`, `api`, `down`, `asr`, `tv`) — you never run it by hand.
+
+### 3. `unilog/check.js` — offline validation (no deploy, no DB)
+
+```bash
+node unilog/check.js <project|all>
+```
+
+Reports duplicate `log_id`s (same id on >1 source line) and unparseable
+`// unilog-stub` lines, plus a count of pending stubs / active sites. Exit code 1
+if any problem is found. Run it after adding stubs and before telling the user to
+deploy.
 
 ## Taking logging requests from the coding agent
 
 The coding (Copilot) agent must NOT write `unilog(...)` calls **or** `// unilog-stub`
-lines — that is YOUR job. It hands you plain requests instead, e.g.:
+lines — that is YOUR job. It hands you work in one of two forms:
+
+**(a) A `logHere(...)` placeholder already in the source.** The coding agent may
+drop `logHere("level", `msg ${e.message}`)` at the spot a log belongs (it is a
+runtime no-op the reconciler upgrades to `unilog(<id>, ...)` on deploy). You do
+NOT have to touch these — a plain deploy activates them. Only convert a `logHere`
+to an explicit stub when you want a curated `tag`/`description` the bare
+placeholder can't carry; otherwise leave it.
+
+**(b) A plain request**, e.g.:
 
 > add an error log in `apps/srvr/index.js`, in the `catch` after
 > `fs.copyFileSync(... dstSubPath)`, message: `` `sub copy failed for ${dstSubName}: ${e.message}` ``
@@ -87,19 +109,23 @@ Each request gives you: the **file**, a **location** (a line number or a short
 nearby code snippet to anchor on), the **level** (`info|warn|error`), and the
 exact **message** expression. Turn each one into a stub (below) via
 `unilog-cli.js` (use `--anchor` for the snippet or `--line` for a line number,
-and `--position before|after`). If the coding agent left a `void e;` placeholder
-in an otherwise-empty `catch`, replace it with the stub. Then validate and tell
+and `--position before|after`). Then run `node unilog/check.js <project>` and tell
 the user to deploy.
 
 ## Stub format (reference — only the unilog agent writes these)
 
-A stub is a comment the deploy reconciler activates into `unilog(<allocated-id>, ...)`:
+A stub is a comment the deploy reconciler activates into `unilog(<allocated-id>, ...)`.
+The message is written directly after the `{...}` meta block — it is NOT wrapped in
+`unilog(...)`, so a stub never looks like a real call:
 
 ```js
-// unilog-stub {level=info,tag=mytag} unilog(`some message ${var}`);
-// unilog-stub {level=error,tag=mytag} unilog(`failed: ${e.message}`);
-// unilog-stub {level=warn} unilog("low disk");          // tag optional
+// unilog-stub {level=info,tag=mytag} `some message ${var}`
+// unilog-stub {level=error,tag=mytag} `failed: ${e.message}`
+// unilog-stub {level=warn} "low disk"          // tag optional
 ```
+
+(Legacy stubs that wrapped the message as `unilog(<expr>);` still activate — but
+write the new bare-message form.)
 
 Rules:
 

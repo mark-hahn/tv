@@ -68,7 +68,7 @@ function astSites(text, vue) {
       end: c.end,
       startLine: c.line,
       endLine,
-      level: levelForCall(c.callee, c.method),
+      level: c.level ?? levelForCall(c.callee, c.method),
       tag,
       argExpr,
     });

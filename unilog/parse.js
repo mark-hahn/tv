@@ -122,6 +122,36 @@ export function findLogCalls(code, { vue = false } = {}) {
       return;
     }
 
+    // logHere("level", ...message) — the author placeholder. Upgrade to a real
+    // unilog site using the given level; the level literal is dropped and the
+    // remaining args become the message. A leading level literal is optional:
+    // logHere(`msg ${x}`) is treated as level "info".
+    if (n.callee.type === "Identifier" && n.callee.name === "logHere") {
+      const LEVELS = ["info", "warn", "error", "debug"];
+      const a0 = n.arguments[0];
+      let level = "info";
+      let msgArgs = n.arguments;
+      if (a0 && a0.type === "StringLiteral" && LEVELS.includes(a0.value)) {
+        level = a0.value;
+        msgArgs = n.arguments.slice(1);
+      }
+      const m0 = msgArgs[0];
+      const firstLiteral =
+        m0 && (m0.type === "StringLiteral" || m0.type === "TemplateLiteral");
+      hits.push({
+        kind: "old",
+        start: n.start + offset,
+        end: n.end + offset,
+        line,
+        callee: "logHere",
+        method: "logHere",
+        level,
+        argsText: msgArgs.map((a) => src.slice(a.start, a.end)),
+        firstLiteral: !!firstLiteral,
+      });
+      return;
+    }
+
     const info = calleeInfo(n.callee);
     if (!info) return;
     const argsText = n.arguments.map((a) => src.slice(a.start, a.end));

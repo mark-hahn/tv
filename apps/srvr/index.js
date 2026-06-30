@@ -9217,6 +9217,7 @@ async function reencodeOneTo1080(entry) {
   unilog(1108, `reencode 2160->1080 start: ${srcName}`);
   await new Promise((resolve, reject) => {
     // H.264 8-bit, 1080p, <=10 Mbit/s video; all other tracks copied unchanged.
+    const REENCODE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes max
     const args = [
       "-y",
       "-i",
@@ -9236,7 +9237,7 @@ async function reencodeOneTo1080(entry) {
       "-level",
       "4.1",
       "-preset",
-      "medium",
+      "ultrafast",
       "-b:v",
       "8M",
       "-maxrate",
@@ -9246,9 +9247,16 @@ async function reencodeOneTo1080(entry) {
       tmpPath,
     ];
     const ff = cp.spawn("ffmpeg", args);
+    const killTimer = setTimeout(() => {
+      ff.kill("SIGKILL");
+    }, REENCODE_TIMEOUT_MS);
     ff.stderr.on("data", () => {});
-    ff.on("error", reject);
+    ff.on("error", (err) => {
+      clearTimeout(killTimer);
+      reject(err);
+    });
     ff.on("close", (code) => {
+      clearTimeout(killTimer);
       if (code === 0) resolve();
       else reject(new Error(`ffmpeg exit ${code}`));
     });

@@ -5481,41 +5481,22 @@ app.get("/api/subtitle", async (req, res) => {
     const idx = parseInt(req.query.index, 10);
     res.setHeader("Content-Type", "text/vtt");
     res.setHeader("Cache-Control", "no-cache");
-    await ffmpegQueue(
-      () =>
-        new Promise((resolve) => {
-          const ff = cp.spawn("nice", [
-            "-n",
-            "15",
-            "ffmpeg",
-            "-i",
-            resolved,
-            "-map",
-            `0:${idx}`,
-            "-f",
-            "webvtt",
-            "pipe:1",
-          ]);
-          ff.stdout.pipe(res);
-          ff.stderr.on("data", () => {});
-          let done = false;
-          const finish = () => {
-            if (!done) {
-              done = true;
-              resolve();
-            }
-          };
-          req.on("close", () => {
-            ff.kill("SIGTERM");
-            finish();
-          });
-          ff.on("error", finish);
-          ff.on("exit", () => {
-            finish();
-            if (!res.writableEnded) res.end();
-          });
-        }),
-    );
+    const ff = cp.spawn("ffmpeg", [
+      "-i",
+      resolved,
+      "-map",
+      `0:${idx}`,
+      "-f",
+      "webvtt",
+      "pipe:1",
+    ]);
+    ff.stdout.pipe(res);
+    ff.stderr.on("data", () => {});
+    req.on("close", () => ff.kill("SIGTERM"));
+    ff.on("error", () => {});
+    ff.on("exit", () => {
+      if (!res.writableEnded) res.end();
+    });
     return;
   }
 
@@ -5567,41 +5548,22 @@ app.get("/api/subtitle", async (req, res) => {
       const idx = subStream.index;
       res.setHeader("Content-Type", "text/vtt");
       res.setHeader("Cache-Control", "no-cache");
-      await ffmpegQueue(
-        () =>
-          new Promise((resolve) => {
-            const ff = cp.spawn("nice", [
-              "-n",
-              "15",
-              "ffmpeg",
-              "-i",
-              resolved,
-              "-map",
-              `0:${idx}`,
-              "-f",
-              "webvtt",
-              "pipe:1",
-            ]);
-            ff.stdout.pipe(res);
-            ff.stderr.on("data", () => {});
-            let done2 = false;
-            const finish2 = () => {
-              if (!done2) {
-                done2 = true;
-                resolve();
-              }
-            };
-            req.on("close", () => {
-              ff.kill("SIGTERM");
-              finish2();
-            });
-            ff.on("error", finish2);
-            ff.on("exit", () => {
-              finish2();
-              if (!res.writableEnded) res.end();
-            });
-          }),
-      );
+      const ff = cp.spawn("ffmpeg", [
+        "-i",
+        resolved,
+        "-map",
+        `0:${idx}`,
+        "-f",
+        "webvtt",
+        "pipe:1",
+      ]);
+      ff.stdout.pipe(res);
+      ff.stderr.on("data", () => {});
+      req.on("close", () => ff.kill("SIGTERM"));
+      ff.on("error", () => {});
+      ff.on("exit", () => {
+        if (!res.writableEnded) res.end();
+      });
       return;
     }
   } catch (e) {

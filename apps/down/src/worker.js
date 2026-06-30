@@ -189,17 +189,6 @@ const main = () => {
   entry.dateEnded = null;
   postUpdate("update");
 
-  if (entry.forced) {
-    const { dst } = makeSrcDst();
-    try {
-      if (fs.existsSync(dst)) {
-        fs.unlinkSync(dst);
-      }
-    } catch (e) {
-      // ignore
-    }
-  }
-
   // Rename any existing same-SxxExx video file to .old right before rsync writes.
   // This is the only place the rename happens — done iff a higher-quality file
   // is actually about to replace it (we already passed the quality gate in main.js).
@@ -207,7 +196,7 @@ const main = () => {
     const { dst } = makeSrcDst();
     const localDir = path.dirname(dst);
     const seMatch = (entry.destTitle || title).match(/S(\d{2})E(\d{2})/i);
-    if (seMatch && !entry.forced) {
+    if (seMatch) {
       const seRe = new RegExp(`S${seMatch[1]}E${seMatch[2]}`, "i");
       const videoExts = new Set([
         "mkv",
@@ -226,7 +215,6 @@ const main = () => {
           const ext = f.split(".").pop().toLowerCase();
           if (!videoExts.has(ext)) continue;
           const fPath = path.join(localDir, f);
-          if (fPath === dst) continue; // same file — rsync will overwrite
           let oldDst = fPath + ".old";
           while (fs.existsSync(oldDst)) oldDst = oldDst + ".old";
           try {

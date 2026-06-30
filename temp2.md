@@ -73,7 +73,7 @@ before touching the stub grammar / adding repo-wide ESLint rules.
 
 # UPDATE — attempted fixes to temp.md (later than everything above)
 
-The section above was the *triage*. What follows is the *implementation* — the
+The section above was the _triage_. What follows is the _implementation_ — the
 changes actually made to address the problems in `temp.md`. Everything below was
 done and validated (syntax checks pass, `node unilog/check.js all` is clean, the
 `srvr` bash script parses). The only `temp.md` item intentionally NOT done is the
@@ -138,9 +138,7 @@ message becomes the site tag.
 - Files: no-op exports in `packages/share/src/unilog.js` and
   `apps/client/src/log.js`; `unilog/parse.js` recognizes `logHere(...)`;
   `unilog/reconcile.js` uses its parsed level on upgrade.
-- Verified: `logHere("error", \`x ${e.message}\`)` → `unilog(<id>, \`x ${e.message}\`)`
-  (level error); `logHere(\`plain ${x}\`)` → level info;
-  `logHere("warn", "[disk] low space")` → level warn, tag `disk`.
+- Verified: `logHere("error", \`x ${e.message}\`)`→`unilog(<id>, \`x ${e.message}\`)`(level error);`logHere(\`plain ${x}\`)`→ level info;`logHere("warn", "[disk] low space")`→ level warn, tag`disk`.
 
 ### 5. Docs corrected (temp.md #1/4/5/8/G + the misleading deploy line)
 
@@ -175,3 +173,57 @@ was deliberately skipped in favor of the `check` tool.
 No deploy is required for correctness (no source uses `logHere` yet). When wanted:
 `./srvr` ships the `logHere` export (share/client) and `./srvr tv` would finally
 activate the long-stuck `toggleres` stubs in `apps/tv/src/main.js`.
+
+---
+
+# RESPONSE — from the coding agent (reply to the fixes above)
+
+This is the coding agent that hit the original problems in `temp.md`, replying
+after reading everything above and verifying the new pieces are really in place
+(`logHere()` is exported from `packages/share/src/unilog.js` and re-exported via
+`@tv/share`, also in `apps/client/src/log.js`; `unilog/check.js` exists).
+
+## Will it fix my problems? Yes — nearly all of them.
+
+| Original problem                                     | Fixed?                                                                               | How                                                                                                 |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- | ----- |
+| #1 wrote active `unilog(id,…)` by imitation          | yes                                                                                  | instructions now forbid it; point to `logHere`                                                      |
+| #2/#3 hand-picked / colliding ids                    | yes                                                                                  | `logHere` never exposes an id; `check.js` reports dupes offline                                     |
+| #4 coding-agent vs unilog-agent boundary             | yes                                                                                  | two clearly-labeled sanctioned paths                                                                |
+| #5 stubs look like calls                             | yes                                                                                  | stub grammar dropped the `unilog(...)` wrapper, and authors write `logHere`, not stubs              |
+| #6 empty-catch / `void e;` / lint fight              | yes                                                                                  | `logHere("error", …e.message)` uses `e`, lint-safe; docs say don't use `void e;`                    |
+| #7 deploy only reconciled srvr/client (the real bug) | yes                                                                                  | deploy now reconciles every project — the big one, and confirms the original conclusion was correct |
+| #8 docs pulled me into internals                     | yes                                                                                  | instructions are self-contained; reconciliation stated as automatic                                 |
+| #9 validation needed internal APIs                   | yes                                                                                  | `node unilog/check.js <project                                                                      | all>` |
+| #10 awkward anchors for the agent                    | yes (preferred path)                                                                 | `logHere` is inline where I want it — no anchor needed                                              |
+| E ESLint nudge                                       | skipped (justified: ~4000 `console.*`, false positives); `check.js` is the guardrail |
+
+Only residual: with no ESLint rule, a fresh agent could still copy the
+`unilog(<n>, …)` form from existing code — but the instructions now clearly say
+not to, so it's a discoverability risk, not a tooling gap. Reasonable tradeoff.
+
+## Is "who writes what" now clear? Yes — and it corrects my own framing.
+
+The canonical answer is NOT "write stubs." It is:
+
+- Don't hand-write `unilog(id, …)` calls.
+- Don't write `// unilog-stub …` lines either (reconciler/agent internal form).
+- DO write a `logHere(...)` placeholder inline (preferred). The reconciler rewrites
+  it into a real `unilog(<id>, …)` on deploy.
+- Verbal hand-off to the unilog agent remains as option 2 (curated tags / unsure
+  where it belongs).
+
+So the thing the coding agent authors is `logHere(...)` — neither a stub nor a
+hand-picked call. The instructions state this clearly (import, level/tag
+conventions, lint-safety, `check.js`). Had this existed at the start, it would have
+skipped the entire active-call → stub → verbal churn.
+
+Tiny polish suggestion (optional): a one-liner at the very top of the Unilog
+section — "you write `logHere(...)`; the agent/reconciler produces stubs and ids" —
+would remove any lingering stub-vs-`logHere` ambiguity.
+
+## Follow-up done
+
+Per the user's instruction, the resolution-toggle feature's logging was converted
+from the 20 `// unilog-stub` lines to `logHere(...)` placeholders to match the new
+preferred style (`apps/srvr/index.js` + `apps/tv/src/main.js`).

@@ -29,7 +29,7 @@ import {
   STANDARD_RESOLUTIONS,
 } from "@tv/share";
 import * as epd from "@tv/share";
-import { unilog } from "@tv/share";
+import { unilog, logHere } from "@tv/share";
 import chokidar from "chokidar";
 import cron from "node-cron";
 import {
@@ -2693,7 +2693,10 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
       try {
         await scanShowForResFallback(showName, tvdbRecord);
       } catch (e) {
-        // unilog-stub {level=error,tag=resfb} unilog(`res fallback scan failed for ${showName}: ${e.message}`);
+        logHere(
+          "error",
+          `[resfb] res fallback scan failed for ${showName}: ${e.message}`,
+        );
       }
     }
     // Disk check, date/size/noFiles, filesOnDisk/fileQuality/quality and
@@ -4151,7 +4154,10 @@ app.post(
         await scanShowForResFallback(showName, rec);
         scanned++;
       } catch (e) {
-        // unilog-stub {level=error,tag=resfb} unilog(`resFallbackScanAll failed for ${showName}: ${e.message}`);
+        logHere(
+          "error",
+          `[resfb] resFallbackScanAll failed for ${showName}: ${e.message}`,
+        );
       }
     }
     return { ok: true, scanned, reencodeQueued: reencodeQueue.length };
@@ -9149,7 +9155,10 @@ function res1080SubtitlesAndChksrt(seasonDir, src2160Name, dst1080Name) {
     try {
       fs.copyFileSync(path.join(seasonDir, name), dstSubPath);
     } catch (e) {
-      // unilog-stub {level=error,tag=resfb} unilog(`sub copy failed for ${dstSubName}: ${e.message}`);
+      logHere(
+        "error",
+        `[resfb] sub copy failed for ${dstSubName}: ${e.message}`,
+      );
     }
   }
   // Enqueue the new (hidden) 1080 video for subtitle check.
@@ -9183,7 +9192,7 @@ function persistReencodeQueue() {
       "utf8",
     );
   } catch (e) {
-    // unilog-stub {level=error,tag=resfb} unilog(`reencode queue persist failed: ${e.message}`);
+    logHere("error", `[resfb] reencode queue persist failed: ${e.message}`);
   }
 }
 function enqueueReencode(entry) {
@@ -9191,14 +9200,14 @@ function enqueueReencode(entry) {
   if (reencodeQueue.some((e) => e.srcPath === entry.srcPath)) return;
   reencodeQueue.push(entry);
   persistReencodeQueue();
-  // unilog-stub {level=info,tag=resfb} unilog(`reencode queued: ${path.basename(entry.srcPath)}`);
+  logHere(`[resfb] reencode queued: ${path.basename(entry.srcPath)}`);
   setTimeout(processReencodeQueue, 0);
 }
 
 async function reencodeOneTo1080(entry) {
   const { srcPath, season, episode } = entry;
   if (!fs.existsSync(srcPath)) {
-    // unilog-stub {level=warn,tag=resfb} unilog(`reencode skip — source gone: ${srcPath}`);
+    logHere("warn", `[resfb] reencode skip — source gone: ${srcPath}`);
     return;
   }
   const seasonDir = path.dirname(srcPath);
@@ -9207,7 +9216,7 @@ async function reencodeOneTo1080(entry) {
   if (
     resFindEpisodeVideos(seasonDir, season, episode).some((f) => f.res === 1080)
   ) {
-    // unilog-stub {level=info,tag=resfb} unilog(`reencode skip — 1080 already present: ${srcName}`);
+    logHere(`[resfb] reencode skip — 1080 already present: ${srcName}`);
     return;
   }
   const dst1080Name = srcName.replace(/2160/g, "1080"); // e.g. Show.S01E01.1080p.mkv
@@ -9218,9 +9227,12 @@ async function reencodeOneTo1080(entry) {
   try {
     if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
   } catch (e) {
-    // unilog-stub {level=warn,tag=resfb} unilog(`could not remove stale temp ${tmpPath}: ${e.message}`);
+    logHere(
+      "warn",
+      `[resfb] could not remove stale temp ${tmpPath}: ${e.message}`,
+    );
   }
-  // unilog-stub {level=info,tag=resfb} unilog(`reencode 2160->1080 start: ${srcName}`);
+  logHere(`[resfb] reencode 2160->1080 start: ${srcName}`);
   await new Promise((resolve, reject) => {
     // H.264 8-bit, 1080p, <=10 Mbit/s video; all other tracks copied unchanged.
     const args = [
@@ -9260,7 +9272,7 @@ async function reencodeOneTo1080(entry) {
     });
   });
   fs.renameSync(tmpPath, dstPath);
-  // unilog-stub {level=info,tag=resfb} unilog(`reencode 2160->1080 done: ${dst1080Name}.alt`);
+  logHere(`[resfb] reencode 2160->1080 done: ${dst1080Name}.alt`);
   res1080SubtitlesAndChksrt(seasonDir, srcName, dst1080Name);
 }
 
@@ -9272,7 +9284,10 @@ async function processReencodeQueue() {
   try {
     await reencodeOneTo1080(entry);
   } catch (e) {
-    // unilog-stub {level=error,tag=resfb} unilog(`reencode failed for ${entry.srcPath}: ${e.message}`);
+    logHere(
+      "error",
+      `[resfb] reencode failed for ${entry.srcPath}: ${e.message}`,
+    );
   } finally {
     if (reencodeQueue[0]?.srcPath === entry.srcPath) {
       reencodeQueue.shift();
@@ -9308,13 +9323,16 @@ async function res1080NeededAndAcquire(
         path.join(seasonDir, oldName),
         path.join(seasonDir, altName),
       );
-      // unilog-stub {level=info,tag=resfb} unilog(`reused kept 1080 .old->.alt: ${altName}`);
+      logHere(`[resfb] reused kept 1080 .old->.alt: ${altName}`);
       const src2160 = res2160FileName(seasonDir, season, episode);
       if (src2160) {
         res1080SubtitlesAndChksrt(seasonDir, src2160, resStripAlt(altName));
       }
     } catch (e) {
-      // unilog-stub {level=error,tag=resfb} unilog(`.old->.alt rename failed for ${altName}: ${e.message}`);
+      logHere(
+        "error",
+        `[resfb] .old->.alt rename failed for ${altName}: ${e.message}`,
+      );
     }
     return;
   }
@@ -9426,7 +9444,9 @@ async function handleToggleResolution(params) {
   const tvdbRecord = tvdb.getAllTvdbSync()[showName];
 
   const { newActiveRes } = resToggleFiles(seasonDir, season, episode);
-  // unilog-stub {level=info,tag=resfb} unilog(`toggled ${showName} S${season}E${episode} -> ${newActiveRes}p`);
+  logHere(
+    `[resfb] toggled ${showName} S${season}E${episode} -> ${newActiveRes}p`,
+  );
 
   // Trigger an Emby library refresh and wait for it to finish.
   await embyRefreshManager.request(`resToggle:${showName}`, showName);
@@ -9439,7 +9459,10 @@ async function handleToggleResolution(params) {
       const epEntry = seasonEntry?.[1]?.find(([e]) => e === episode);
       episodeId = epEntry?.[1]?.id || null;
     } catch (e) {
-      // unilog-stub {level=warn,tag=resfb} unilog(`resolve episodeId failed for ${showName}: ${e.message}`);
+      logHere(
+        "warn",
+        `[resfb] resolve episodeId failed for ${showName}: ${e.message}`,
+      );
     }
   }
 

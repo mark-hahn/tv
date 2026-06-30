@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 
 import express from "express";
 import cors from "cors";
-import { unilog } from "@tv/share";
+import { unilog, logHere } from "@tv/share";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const _adbLog = createWriteStream(join(__dirname, "../data/tv-adb.log"), {
@@ -660,7 +660,7 @@ app.post("/tv/toggleres", async (req, res) => {
       const session = await getEmbyPlaybackSession("Living Room TV");
       const item = session?.NowPlayingItem;
       if (!item) {
-        // unilog-stub {level=warn,tag=toggleres} unilog(`toggleres: nothing playing on Living Room TV`);
+        logHere("warn", `[toggleres] nothing playing on Living Room TV`);
         return res.json({ ok: false, error: "nothing playing" });
       }
       knownEpisodeId = item.Id;
@@ -669,11 +669,11 @@ app.post("/tv/toggleres", async (req, res) => {
       toggleArg.season = item.ParentIndexNumber;
       toggleArg.episode = item.IndexNumber;
     }
-    // unilog-stub {level=info,tag=toggleres} unilog(`toggleres from ${client(req)} ${JSON.stringify(toggleArg)}`);
+    logHere(`[toggleres] from ${client(req)} ${JSON.stringify(toggleArg)}`);
     res.json({ ok: true });
     runToggleResSequence(toggleArg, knownEpisodeId);
   } catch (e) {
-    // unilog-stub {level=error,tag=toggleres} unilog(`toggleres error: ${e.message}`);
+    logHere("error", `[toggleres] error: ${e.message}`);
     if (!res.headersSent) res.json({ ok: false, error: e.message });
   }
 });
@@ -693,7 +693,7 @@ async function runToggleResSequence(toggleArg, knownEpisodeId) {
       },
     );
     const result = await toggleResp.json();
-    // unilog-stub {level=info,tag=toggleres} unilog(`toggleres: toggle result=${JSON.stringify(result)}`);
+    logHere(`[toggleres] toggle result=${JSON.stringify(result)}`);
     if (!result?.ok) return;
     pendingViewShow = {
       showId: result.showId,
@@ -707,7 +707,7 @@ async function runToggleResSequence(toggleArg, knownEpisodeId) {
     });
     setTimeout(() => firePendingViewShow("toggleres"), VIEW_SHOW_DELAY_MS);
   } catch (e) {
-    // unilog-stub {level=error,tag=toggleres} unilog(`toggleres sequence error: ${e.message}`);
+    logHere("error", `[toggleres] sequence error: ${e.message}`);
   }
 }
 

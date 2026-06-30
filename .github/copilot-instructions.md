@@ -118,6 +118,27 @@ never touch git for read or commit unless i tell you to
 
 ## Unilog Debugging
 
+Logging is added ONLY by the **unilog** agent (`.github/agents/unilog.agent.md`).
+As the coding agent you must NOT add logging yourself:
+
+- Never write active `unilog(id, ...)` calls and never pick/assign ids.
+- Never write `// unilog-stub ...` lines either. Stubs are the unilog agent's
+  internal mechanism. They are documented in the agent file only so you recognize
+  them — not so you write them.
+
+When code you write needs logging, decide WHERE each log belongs and WHAT it
+should say, then hand that off to the unilog agent as a plain instruction, e.g.:
+
+> add an error log in `apps/srvr/index.js`, in the `catch` after
+> `fs.copyFileSync(... dstSubPath)`, message: `` `sub copy failed for ${dstSubName}: ${e.message}` ``
+
+Give the agent, for each log: the file, the location (a line number or a short
+nearby code snippet), the level (`info|warn|error`), and the exact message
+expression. Leave the catch binding (`catch (e) {`) in place so the message can
+use `e`. Do not leave `catch { /* ignore */ }` or vague "logging goes here"
+comments — describe the need to the agent instead. The agent handles everything
+else.
+
 Use `unilog/query.js` (runs locally, SSHes to remote DB) to answer questions about log output:
 
 ```bash

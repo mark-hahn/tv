@@ -921,18 +921,39 @@ export default function App() {
 
   const stopShowsHold = () => dbStop();
 
-  const startSkipHold = () => {
-    const pressedAt = Date.now();
-    dbStart(() => {
-      flash("skip");
-      const ws = wsRef.current;
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ fname: "skipIntro", param: { pressedAt } }));
-      }
-    });
+  // Long-press skip toggles the playing episode between 2160 and 1080.
+  const toggleResolution = async () => {
+    if (isOff || isOther) return;
+    if (!showPlayingRef.current) return; // only while a video is playing
+    flash("skip");
+    try {
+      await fetch(`${TV_TV_URL}/tv/toggleres`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+    } catch (_) {}
   };
 
-  const stopSkipHold = () => dbStop();
+  const startSkipHold = () => {
+    const pressedAt = Date.now();
+    lpStart(
+      () => {
+        // short press → skip intro
+        flash("skip");
+        const ws = wsRef.current;
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ fname: "skipIntro", param: { pressedAt } }));
+        }
+      },
+      () => {
+        // long press → toggle resolution
+        toggleResolution();
+      },
+    );
+  };
+
+  const stopSkipHold = () => lpStop();
 
   const toggleLayoutOption = async () => {
     const next = layoutOption === "mark" ? "linda" : "mark";

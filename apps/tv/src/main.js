@@ -401,7 +401,10 @@ function handleMsg(raw) {
         )
           tvMode = "fire";
         else tvMode = "other";
-        unilog(383, `get_states: braviaState=${st} mediaTitle=${braviaMediaTitle} tvMode=${tvMode}`);
+        unilog(
+          383,
+          `get_states: braviaState=${st} mediaTitle=${braviaMediaTitle} tvMode=${tvMode}`,
+        );
         // Bravia ADB disabled — not needed for normal operation (remote/volume/power all go via HA).
         // To re-enable: uncomment this block and the state_changed block below, the variables, and
         // the spawnBraviaShell/connectBraviaShell/braviaShellCmd functions, and the /tv/keyevent
@@ -432,7 +435,10 @@ function handleMsg(raw) {
       if (id === FIRE_TV_ENTITY_ID) fireTvState = state;
       if (id === BRAVIA_ENTITY_ID) {
         const attrs = event.data?.new_state?.attributes;
-        unilog(385, `BRAVIA attrs: title=${attrs?.media_title ?? "null"} mediaType=${attrs?.media_content_type ?? "null"} muted=${attrs?.is_volume_muted ?? "null"} pendingGoogleHome=${pendingGoogleHome} pendingFireEmby=${pendingFireEmby}`);
+        unilog(
+          385,
+          `BRAVIA attrs: title=${attrs?.media_title ?? "null"} mediaType=${attrs?.media_content_type ?? "null"} muted=${attrs?.is_volume_muted ?? "null"} pendingGoogleHome=${pendingGoogleHome} pendingFireEmby=${pendingFireEmby}`,
+        );
         const prevPower = braviaHaPower;
         braviaHaPower = state;
         if (attrs) {
@@ -554,7 +560,10 @@ app.use(cors());
 app.use(express.json());
 
 app.get("/tv/googlebtn", (req, res) => {
-  unilog(394, `googlebtn from ${client(req)} braviaHaPower=${braviaHaPower} mediaTitle=${braviaMediaTitle}`);
+  unilog(
+    394,
+    `googlebtn from ${client(req)} braviaHaPower=${braviaHaPower} mediaTitle=${braviaMediaTitle}`,
+  );
   callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
   if (braviaHaPower === "on") {
     // TV already on — send home immediately
@@ -573,7 +582,10 @@ app.get("/tv/googlebtn", (req, res) => {
   } else {
     // TV off — wait for state_changed on transition to "on"
     pendingGoogleHome = true;
-    unilog(397, `googlebtn: TV not on (${braviaHaPower}), set pendingGoogleHome=true`);
+    unilog(
+      397,
+      `googlebtn: TV not on (${braviaHaPower}), set pendingGoogleHome=true`,
+    );
   }
   res.json({ ok: true });
 });
@@ -584,14 +596,14 @@ async function firePendingViewShow(label) {
     clearTimeout(viewShowEmbyTimer);
     viewShowEmbyTimer = null;
   }
-  const { showId, showName } = pendingViewShow;
+  const { showId, showName, episodeId } = pendingViewShow;
   pendingViewShow = null;
   unilog(398, `${label}: firing viewshow showId=${showId}`);
   try {
     const resp = await fetch(`${SRVR_INTERNAL_URL}/api/embyViewShow`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ showId, showName }),
+      body: JSON.stringify({ showId, showName, episodeId }),
     });
     const result = await resp.json();
     unilog(399, `${label}: viewshow result=${JSON.stringify(result)}`);
@@ -602,7 +614,10 @@ async function firePendingViewShow(label) {
 
 app.get("/tv/viewshow", (req, res) => {
   const { showId, showName } = req.query;
-  unilog(401, `viewshow from ${client(req)} showId=${showId} showName=${showName} braviaHaPower=${braviaHaPower}`);
+  unilog(
+    401,
+    `viewshow from ${client(req)} showId=${showId} showName=${showName} braviaHaPower=${braviaHaPower}`,
+  );
   pendingViewShow = { showId, showName };
   callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
   if (braviaHaPower === "on") {
@@ -622,10 +637,79 @@ app.get("/tv/viewshow", (req, res) => {
     );
   } else {
     pendingGoogleHome = true;
-    unilog(402, `viewshow: TV not on (${braviaHaPower}), set pendingGoogleHome=true`);
+    unilog(
+      402,
+      `viewshow: TV not on (${braviaHaPower}), set pendingGoogleHome=true`,
+    );
   }
   res.json({ ok: true });
 });
+
+// Toggle the playing/selected episode between its 2160 and 1080 versions, then
+// reload it in Emby. Sequence: Home → swap files + library refresh (await) →
+// relaunch Emby → load episode. Body: { relPath } from the web local pane, or
+// empty from the Android remote (uses the Living Room TV now-playing episode).
+app.post("/tv/toggleres", async (req, res) => {
+  try {
+    const body = req.body ?? {};
+    const toggleArg = {};
+    let knownEpisodeId = null;
+    if (body.relPath) {
+      toggleArg.relPath = body.relPath;
+    } else {
+      const session = await getEmbyPlaybackSession("Living Room TV");
+      const item = session?.NowPlayingItem;
+      if (!item) {
+        // unilog-stub {level=warn,tag=toggleres} unilog(`toggleres: nothing playing on Living Room TV`);
+        return res.json({ ok: false, error: "nothing playing" });
+      }
+      knownEpisodeId = item.Id;
+      toggleArg.episodeId = item.Id;
+      toggleArg.showName = item.SeriesName;
+      toggleArg.season = item.ParentIndexNumber;
+      toggleArg.episode = item.IndexNumber;
+    }
+    // unilog-stub {level=info,tag=toggleres} unilog(`toggleres from ${client(req)} ${JSON.stringify(toggleArg)}`);
+    res.json({ ok: true });
+    runToggleResSequence(toggleArg, knownEpisodeId);
+  } catch (e) {
+    // unilog-stub {level=error,tag=toggleres} unilog(`toggleres error: ${e.message}`);
+    if (!res.headersSent) res.json({ ok: false, error: e.message });
+  }
+});
+
+// Home → swap files + await library refresh → relaunch Emby → load episode.
+async function runToggleResSequence(toggleArg, knownEpisodeId) {
+  try {
+    callService("remote", "send_command", REMOTE_ENTITY_ID, {
+      command: "Home",
+    });
+    const toggleResp = await fetch(
+      `${SRVR_INTERNAL_URL}/api/toggleResolution`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(toggleArg),
+      },
+    );
+    const result = await toggleResp.json();
+    // unilog-stub {level=info,tag=toggleres} unilog(`toggleres: toggle result=${JSON.stringify(result)}`);
+    if (!result?.ok) return;
+    pendingViewShow = {
+      showId: result.showId,
+      showName: result.showName,
+      episodeId: result.episodeId || knownEpisodeId || null,
+    };
+    callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
+      media_content_type: "app",
+      media_content_id:
+        "com.sony.dtv.tv.emby.embyatv.tv.emby.embyatv.startup.StartupActivity",
+    });
+    setTimeout(() => firePendingViewShow("toggleres"), VIEW_SHOW_DELAY_MS);
+  } catch (e) {
+    // unilog-stub {level=error,tag=toggleres} unilog(`toggleres sequence error: ${e.message}`);
+  }
+}
 
 // ─── Persistent adb shell ────────────────────────────────────────────────────
 let fireShell = null;
@@ -674,7 +758,10 @@ function spawnFireShell() {
     fireShellReady = false;
     fireShell = null;
     if (fireShellUnauthorized) {
-      unilog(405, `adb shell closed (${code}) — device unauthorized, NOT retrying (accept USB debug dialog on FireTV then restart tv-tv)`);
+      unilog(
+        405,
+        `adb shell closed (${code}) — device unauthorized, NOT retrying (accept USB debug dialog on FireTV then restart tv-tv)`,
+      );
     } else {
       unilog(406, `adb shell closed (${code}), reconnecting in 2s...`);
       setTimeout(connectFireShell, 2000);
@@ -928,7 +1015,10 @@ app.get("/tv/firebtn", (req, res) => {
     // TV display is off — turn it on and wait for FireTV CEC before launching Emby
     callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
     pendingFireEmby = true;
-    unilog(415, "firebtn: TV off — turning on Bravia, set pendingFireEmby=true");
+    unilog(
+      415,
+      "firebtn: TV off — turning on Bravia, set pendingFireEmby=true",
+    );
   } else {
     // TV already on — send home and launch Emby with fixed delays
     setTimeout(
@@ -1093,7 +1183,10 @@ app.get("/tv/key/:key", async (req, res) => {
     service_data: { command },
   };
   const isArrow = ["up", "down", "left", "right"].includes(req.params.key);
-  unilog(423, `key=${req.params.key} command=${command} mode=${tvMode} entity=${remoteId} isArrow=${isArrow} haCmd=${JSON.stringify(cmd)}`);
+  unilog(
+    423,
+    `key=${req.params.key} command=${command} mode=${tvMode} entity=${remoteId} isArrow=${isArrow} haCmd=${JSON.stringify(cmd)}`,
+  );
   if (isArrow) {
     cmd.id = ++cmdId;
     if (ws) ws.send(JSON.stringify(cmd));
@@ -1644,7 +1737,10 @@ app.post("/tv/emby/subtitle", async (req, res) => {
     return;
   }
 
-  unilog(449, `subtitle nav: index=${index} downCount=${downCount} rightCount=${rightCount}`);
+  unilog(
+    449,
+    `subtitle nav: index=${index} downCount=${downCount} rightCount=${rightCount}`,
+  );
   const navMs =
     SUB_NAV_PRE_DOWN1_DELAY_MS +
     SUB_NAV_PRE_DOWN2_DELAY_MS +
@@ -1697,7 +1793,10 @@ app.post("/tv/emby/subtitle-offset", async (req, res) => {
         }),
       },
     );
-    unilog(451, `SetSubtitleDelay ${offsetMs}ms session=${sessionId} -> ${r.status}`);
+    unilog(
+      451,
+      `SetSubtitleDelay ${offsetMs}ms session=${sessionId} -> ${r.status}`,
+    );
     res.json({ ok: r.ok });
   } catch (err) {
     unilog(452, "emby/subtitle-offset error:", err.message);
@@ -1849,7 +1948,10 @@ async function checkSubtitleMismatch(sessions) {
     }
     if (chosenSubIndex === null) return;
     if (currentSubIndex === chosenSubIndex) return;
-    unilog(454, `${showName} ${episodeCode}: current=${currentSubIndex} chosen=${chosenSubIndex}`);
+    unilog(
+      454,
+      `${showName} ${episodeCode}: current=${currentSubIndex} chosen=${chosenSubIndex}`,
+    );
     await fetch(`${SRVR_INTERNAL_URL}/internal/subtitle-mismatch`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -2689,6 +2689,12 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
       } catch (e) {
         unilog(539, `subtitle scan error for ${showName}: ${e.message}`);
       }
+      // Resolution fallback: keep a hidden 1080 .alt next to unwatched 2160s.
+      try {
+        await scanShowForResFallback(showName, tvdbRecord);
+      } catch (e) {
+        // unilog-stub {level=error,tag=resfb} unilog(`res fallback scan failed for ${showName}: ${e.message}`);
+      }
     }
     // Disk check, date/size/noFiles, filesOnDisk/fileQuality/quality and
     // episodeData are all refreshed by refreshEpisodeData (called from the tvdb
@@ -4133,6 +4139,24 @@ app.get("/api/getGaps", apiWrapper(getGaps));
 app.get("/api/getNoEmbys", apiWrapper(getNoEmbys));
 app.get("/api/getDevices", apiWrapper(emby.getDevices));
 app.post("/api/embyViewShow", apiWrapper(emby.viewShowOnLivingRoomTv));
+app.post("/api/toggleResolution", apiWrapper(handleToggleResolution));
+app.post(
+  "/api/resFallbackScanAll",
+  apiWrapper(async () => {
+    const all = tvdb.getAllTvdbSync();
+    let scanned = 0;
+    for (const [showName, rec] of Object.entries(all)) {
+      if (!rec?.inEmby) continue;
+      try {
+        await scanShowForResFallback(showName, rec);
+        scanned++;
+      } catch (e) {
+        // unilog-stub {level=error,tag=resfb} unilog(`resFallbackScanAll failed for ${showName}: ${e.message}`);
+      }
+    }
+    return { ok: true, scanned, reencodeQueued: reencodeQueue.length };
+  }),
+);
 app.get("/api/getLastViewed", apiWrapper(view.getLastViewed));
 app.get("/api/getSharedFilters", apiWrapper(getSharedFilters));
 
@@ -5122,7 +5146,7 @@ app.get("/api/subtitle-list", async (req, res) => {
     return;
   }
   const dir = path.dirname(resolved);
-  const stem = path.basename(resolved).replace(/\.[^.]+$/, "");
+  const stem = resStripAlt(path.basename(resolved)).replace(/\.[^.]+$/, "");
   const tracks = [];
   try {
     const probeOut = runFfprobe([
@@ -5424,7 +5448,7 @@ app.get("/api/subtitle", async (req, res) => {
     return;
   }
   const dir = path.dirname(resolved);
-  const stem = path.basename(resolved).replace(/\.[^.]+$/, "");
+  const stem = resStripAlt(path.basename(resolved)).replace(/\.[^.]+$/, "");
 
   // Explicit embedded stream by index
   if (req.query.index !== undefined) {
@@ -5794,7 +5818,7 @@ app.post("/api/asr/chksrt/enqueue", (req, res) => {
 app.post("/api/asr/chksrt/ok", (req, res) => {
   const entry = subQueueChkSrt[0];
   if (entry) {
-    const base = entry.videoFilePath.replace(/\.[^.]+$/, "");
+    const base = resStripAlt(entry.videoFilePath).replace(/\.[^.]+$/, "");
     const dir = path.dirname(entry.videoFilePath);
     const basename = path.basename(base);
     let hasSrt = false;
@@ -5864,7 +5888,7 @@ app.post("/api/asr/chksrt/select", (req, res) => {
     res.status(400).json({ error: "videoPath required" });
     return;
   }
-  const base = videoPath.replace(/\.[^.]+$/, "");
+  const base = resStripAlt(videoPath).replace(/\.[^.]+$/, "");
   const dir = path.dirname(videoPath);
   let entries;
   try {
@@ -8946,6 +8970,9 @@ watcher
             doSubQueueNow();
           }
         }
+        if (tvdbRec && tvdbRec.inEmby) {
+          await scanShowForResFallback(showName, tvdbRec);
+        }
       } catch (err) {
         unilog(683, `sub check error for ${showName}:`, err.message);
       }
@@ -8982,3 +9009,448 @@ watcher
   });
 
 unilog(91, `Watching ${tvDir} for file changes...`);
+
+//////////////////  RESOLUTION FALLBACK (2160 ↔ 1080)  //////////////////
+// Keep a hidden 1080 ".alt" fallback next to each unwatched 2160 episode so
+// playback can switch resolution (slow wifi can't stream 2160). See
+// toggle-resolution-instr.md / toggle-resolution-plan.md.
+//
+// File convention (Emby ignores any name whose final extension is not a video
+// extension, so ".alt" hides a file):
+//   active 2160:  Show.S01E01.2160p.mkv
+//   hidden 1080:  Show.S01E01.1080p.mkv.alt
+// Toggling swaps which member carries the ".alt" suffix.
+
+const RES_SUBTITLE_EXTS = new Set([
+  ".srt",
+  ".ass",
+  ".ssa",
+  ".sub",
+  ".idx",
+  ".sup",
+  ".vtt",
+  ".smi",
+]);
+const DOWN_INPROGRESS_PATH = path.join(
+  path.dirname(SRVR_ROOT_DIR),
+  "down",
+  "data",
+  "tv-inProgress.json",
+);
+const REENCODE_QUEUE_PATH = path.join(
+  SRVR_ROOT_DIR,
+  "data",
+  "reencode-queue.json",
+);
+
+function resHasAlt(name) {
+  return name.toLowerCase().endsWith(".alt");
+}
+function resStripAlt(name) {
+  return resHasAlt(name) ? name.slice(0, -4) : name;
+}
+// Resolution implied by a filename substring (0 = unknown).
+function resOfName(name) {
+  if (/2160p/i.test(name)) return 2160;
+  if (/1080p/i.test(name)) return 1080;
+  return 0;
+}
+// True when name (after stripping a trailing .alt) is a real video file.
+function resIsVideoName(name) {
+  const ext = resStripAlt(name).split(".").pop().toLowerCase();
+  return videoFileExtensions.includes(ext);
+}
+
+// All episode video files in a season dir (includes hidden .alt copies).
+function resFindEpisodeVideos(seasonDir, season, episode) {
+  let files;
+  try {
+    files = fs.readdirSync(seasonDir);
+  } catch {
+    return [];
+  }
+  const out = [];
+  for (const name of files) {
+    if (!resIsVideoName(name)) continue;
+    const parsed = parseFileSeasonEpisode(
+      resStripAlt(name),
+      path.basename(seasonDir),
+    );
+    if (parsed?.season !== season || parsed?.episode !== episode) continue;
+    out.push({ name, res: resOfName(name), alt: resHasAlt(name) });
+  }
+  return out;
+}
+
+// Active (non-.alt) 2160 file name for an episode, if any.
+function res2160FileName(seasonDir, season, episode) {
+  const vids = resFindEpisodeVideos(seasonDir, season, episode);
+  const f =
+    vids.find((v) => v.res === 2160 && !v.alt) ||
+    vids.find((v) => v.res === 2160);
+  return f ? f.name : null;
+}
+
+// A kept-aside 1080 ".old" file for an episode (preferred fallback source).
+function res1080OldFileName(seasonDir, season, episode) {
+  let files;
+  try {
+    files = fs.readdirSync(seasonDir);
+  } catch {
+    return null;
+  }
+  for (const name of files) {
+    if (!/\.old$/i.test(name)) continue;
+    if (!/1080p/i.test(name)) continue;
+    const base = name.replace(/\.old$/i, "");
+    if (!resIsVideoName(base)) continue;
+    const parsed = parseFileSeasonEpisode(base, path.basename(seasonDir));
+    if (parsed?.season === season && parsed?.episode === episode) return name;
+  }
+  return null;
+}
+
+// Best-effort cross-app guard: is the downloader already fetching a 1080 for
+// this episode? Optional — if the map can't be read, assume not in progress.
+function res1080DownloadInProgress(season, episode) {
+  let map;
+  try {
+    map = JSON.parse(fs.readFileSync(DOWN_INPROGRESS_PATH, "utf8"));
+  } catch {
+    return false;
+  }
+  const sKey = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
+  const re = new RegExp(sKey, "i");
+  for (const key of Object.keys(map || {})) {
+    if (/1080p/i.test(key) && re.test(key)) return true;
+  }
+  return false;
+}
+
+// Duplicate every 2160 sidecar subtitle under the 1080 basename, then enqueue
+// the new 1080 video for a subtitle check (chksrt).
+function res1080SubtitlesAndChksrt(seasonDir, src2160Name, dst1080Name) {
+  const src2160Base = src2160Name.replace(/\.[^.]+$/, "");
+  const dst1080Base = dst1080Name.replace(/\.[^.]+$/, "");
+  let files;
+  try {
+    files = fs.readdirSync(seasonDir);
+  } catch {
+    files = [];
+  }
+  for (const name of files) {
+    const ext = path.extname(name).toLowerCase();
+    if (!RES_SUBTITLE_EXTS.has(ext)) continue;
+    if (!name.startsWith(src2160Base)) continue;
+    const suffix = name.slice(src2160Base.length); // e.g. ".en.srt"
+    const dstSubName = dst1080Base + suffix;
+    const dstSubPath = path.join(seasonDir, dstSubName);
+    if (fs.existsSync(dstSubPath)) continue;
+    try {
+      fs.copyFileSync(path.join(seasonDir, name), dstSubPath);
+    } catch (e) {
+      // unilog-stub {level=error,tag=resfb} unilog(`sub copy failed for ${dstSubName}: ${e.message}`);
+    }
+  }
+  // Enqueue the new (hidden) 1080 video for subtitle check.
+  const chkPath = path.join(seasonDir, dst1080Name + ".alt");
+  if (fs.existsSync(chkPath)) {
+    enqueueSubQueueChkSrt(
+      { videoFilePath: chkPath, fromUI: false, lowPriority: true },
+      false,
+    );
+    persistSubQueueChkSrt();
+  }
+}
+
+//////  re-encode queue (single ffmpeg worker)  //////
+let reencodeQueue = [];
+let reencodeRunning = false;
+
+function loadReencodeQueue() {
+  try {
+    reencodeQueue = JSON.parse(fs.readFileSync(REENCODE_QUEUE_PATH, "utf8"));
+    if (!Array.isArray(reencodeQueue)) reencodeQueue = [];
+  } catch {
+    reencodeQueue = [];
+  }
+}
+function persistReencodeQueue() {
+  try {
+    fs.writeFileSync(
+      REENCODE_QUEUE_PATH,
+      JSON.stringify(reencodeQueue),
+      "utf8",
+    );
+  } catch (e) {
+    // unilog-stub {level=error,tag=resfb} unilog(`reencode queue persist failed: ${e.message}`);
+  }
+}
+function enqueueReencode(entry) {
+  // entry: { srcPath, showName, season, episode }
+  if (reencodeQueue.some((e) => e.srcPath === entry.srcPath)) return;
+  reencodeQueue.push(entry);
+  persistReencodeQueue();
+  // unilog-stub {level=info,tag=resfb} unilog(`reencode queued: ${path.basename(entry.srcPath)}`);
+  setTimeout(processReencodeQueue, 0);
+}
+
+async function reencodeOneTo1080(entry) {
+  const { srcPath, season, episode } = entry;
+  if (!fs.existsSync(srcPath)) {
+    // unilog-stub {level=warn,tag=resfb} unilog(`reencode skip — source gone: ${srcPath}`);
+    return;
+  }
+  const seasonDir = path.dirname(srcPath);
+  const srcName = path.basename(srcPath);
+  // Re-check: a 1080 may have appeared since this was queued.
+  if (
+    resFindEpisodeVideos(seasonDir, season, episode).some((f) => f.res === 1080)
+  ) {
+    // unilog-stub {level=info,tag=resfb} unilog(`reencode skip — 1080 already present: ${srcName}`);
+    return;
+  }
+  const dst1080Name = srcName.replace(/2160/g, "1080"); // e.g. Show.S01E01.1080p.mkv
+  // Hidden dotfile temp keeps the real extension so ffmpeg picks the muxer and
+  // chokidar/Emby ignore it while encoding.
+  const tmpPath = path.join(seasonDir, ".restmp-" + dst1080Name);
+  const dstPath = path.join(seasonDir, dst1080Name + ".alt");
+  try {
+    if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+  } catch (e) {
+    // unilog-stub {level=warn,tag=resfb} unilog(`could not remove stale temp ${tmpPath}: ${e.message}`);
+  }
+  // unilog-stub {level=info,tag=resfb} unilog(`reencode 2160->1080 start: ${srcName}`);
+  await new Promise((resolve, reject) => {
+    // H.264 8-bit, 1080p, <=10 Mbit/s video; all other tracks copied unchanged.
+    const args = [
+      "-y",
+      "-i",
+      srcPath,
+      "-map",
+      "0",
+      "-c",
+      "copy",
+      "-c:v",
+      "libx264",
+      "-vf",
+      "scale=-2:1080",
+      "-pix_fmt",
+      "yuv420p",
+      "-profile:v",
+      "high",
+      "-level",
+      "4.1",
+      "-preset",
+      "medium",
+      "-b:v",
+      "8M",
+      "-maxrate",
+      "10M",
+      "-bufsize",
+      "16M",
+      tmpPath,
+    ];
+    const ff = cp.spawn("ffmpeg", args);
+    ff.stderr.on("data", () => {});
+    ff.on("error", reject);
+    ff.on("close", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`ffmpeg exit ${code}`));
+    });
+  });
+  fs.renameSync(tmpPath, dstPath);
+  // unilog-stub {level=info,tag=resfb} unilog(`reencode 2160->1080 done: ${dst1080Name}.alt`);
+  res1080SubtitlesAndChksrt(seasonDir, srcName, dst1080Name);
+}
+
+async function processReencodeQueue() {
+  if (reencodeRunning) return;
+  const entry = reencodeQueue[0];
+  if (!entry) return;
+  reencodeRunning = true;
+  try {
+    await reencodeOneTo1080(entry);
+  } catch (e) {
+    // unilog-stub {level=error,tag=resfb} unilog(`reencode failed for ${entry.srcPath}: ${e.message}`);
+  } finally {
+    if (reencodeQueue[0]?.srcPath === entry.srcPath) {
+      reencodeQueue.shift();
+      persistReencodeQueue();
+    }
+    reencodeRunning = false;
+    if (reencodeQueue.length > 0) setTimeout(processReencodeQueue, 1000);
+  }
+}
+
+// Evaluate one episode and, if a 1080 fallback is needed, rename a kept .old
+// copy to .alt (preferred) or queue an ffmpeg re-encode of the 2160 file.
+async function res1080NeededAndAcquire(
+  showName,
+  tvdbRecord,
+  season,
+  episode,
+  seasonDir,
+) {
+  if (!tvdbRecord?.inEmby) return;
+  if (epd.isWatched(tvdbRecord.episodeData, season, episode)) return;
+  const vids = resFindEpisodeVideos(seasonDir, season, episode);
+  if (!vids.some((f) => f.res === 2160)) return;
+  if (vids.some((f) => f.res === 1080)) return;
+  if (res1080DownloadInProgress(season, episode)) return;
+
+  // Preferred: reuse a kept-aside 1080 .old → rename to .alt.
+  const oldName = res1080OldFileName(seasonDir, season, episode);
+  if (oldName) {
+    const altName = oldName.replace(/\.old$/i, ".alt");
+    try {
+      fs.renameSync(
+        path.join(seasonDir, oldName),
+        path.join(seasonDir, altName),
+      );
+      // unilog-stub {level=info,tag=resfb} unilog(`reused kept 1080 .old->.alt: ${altName}`);
+      const src2160 = res2160FileName(seasonDir, season, episode);
+      if (src2160) {
+        res1080SubtitlesAndChksrt(seasonDir, src2160, resStripAlt(altName));
+      }
+    } catch (e) {
+      // unilog-stub {level=error,tag=resfb} unilog(`.old->.alt rename failed for ${altName}: ${e.message}`);
+    }
+    return;
+  }
+
+  // Otherwise re-encode from the 2160 file.
+  const src2160 = res2160FileName(seasonDir, season, episode);
+  if (!src2160) return;
+  enqueueReencode({
+    srcPath: path.join(seasonDir, src2160),
+    showName,
+    season,
+    episode,
+  });
+}
+
+// Scan every season of a show for episodes that need a 1080 fallback.
+async function scanShowForResFallback(showName, tvdbRecord) {
+  if (!tvdbRecord?.inEmby) return;
+  const showFolderName = showName.includes("/")
+    ? showName
+    : (tvdbRecord.path || tvdbRecord.emby?.path || showName).split("/").pop();
+  const showFolder = path.join(tvDir, showFolderName);
+  let seasonDirs;
+  try {
+    seasonDirs = fs.readdirSync(showFolder);
+  } catch {
+    return;
+  }
+  for (const seasonDirName of seasonDirs) {
+    const seasonDir = path.join(showFolder, seasonDirName);
+    try {
+      if (!fs.statSync(seasonDir).isDirectory()) continue;
+    } catch {
+      continue;
+    }
+    let files;
+    try {
+      files = fs.readdirSync(seasonDir);
+    } catch {
+      continue;
+    }
+    const seen = new Set();
+    for (const name of files) {
+      if (!resIsVideoName(name)) continue;
+      if (resOfName(name) !== 2160) continue;
+      const parsed = parseFileSeasonEpisode(resStripAlt(name), seasonDirName);
+      if (parsed?.season == null || parsed?.episode == null) continue;
+      const key = `${parsed.season}E${parsed.episode}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      await res1080NeededAndAcquire(
+        showName,
+        tvdbRecord,
+        parsed.season,
+        parsed.episode,
+        seasonDir,
+      );
+    }
+  }
+}
+
+// Swap the ".alt" marker between the active and hidden video for an episode.
+function resToggleFiles(seasonDir, season, episode) {
+  const vids = resFindEpisodeVideos(seasonDir, season, episode);
+  const active = vids.find((v) => !v.alt && (v.res === 2160 || v.res === 1080));
+  const alt = vids.find((v) => v.alt && (v.res === 2160 || v.res === 1080));
+  if (!active || !alt) {
+    throw new Error(
+      `resToggle needs one active + one alt (active=${active?.name}, alt=${alt?.name})`,
+    );
+  }
+  const newAltPath = path.join(seasonDir, active.name) + ".alt";
+  const newActivePath = path.join(seasonDir, resStripAlt(alt.name));
+  fs.renameSync(path.join(seasonDir, active.name), newAltPath);
+  fs.renameSync(path.join(seasonDir, alt.name), newActivePath);
+  return { newActiveRes: alt.res, newActiveName: resStripAlt(alt.name) };
+}
+
+// POST /api/toggleResolution — swap .alt, refresh Emby (await), return episode.
+async function handleToggleResolution(params) {
+  let { relPath, showName, season, episode, episodeId } = params || {};
+  let seasonDir = null;
+  if (relPath) {
+    const abs = path.join(tvDir, relPath);
+    seasonDir = path.dirname(abs);
+    showName = showNameFromFilePath(abs);
+    const parsed = parseFileSeasonEpisode(
+      resStripAlt(path.basename(abs)),
+      path.basename(seasonDir),
+    );
+    season = parsed?.season;
+    episode = parsed?.episode;
+  } else if (showName != null && season != null && episode != null) {
+    season = Number(season);
+    episode = Number(episode);
+    const rec = tvdb.getAllTvdbSync()[showName];
+    const showFolderName = showName.includes("/")
+      ? showName
+      : (rec?.path || rec?.emby?.path || showName).split("/").pop();
+    seasonDir = path.join(tvDir, showFolderName, `Season ${season}`);
+  } else {
+    return { ok: false, error: "missing relPath or show/season/episode" };
+  }
+  if (season == null || episode == null) {
+    return { ok: false, error: "could not determine season/episode" };
+  }
+  season = Number(season);
+  episode = Number(episode);
+  const tvdbRecord = tvdb.getAllTvdbSync()[showName];
+
+  const { newActiveRes } = resToggleFiles(seasonDir, season, episode);
+  // unilog-stub {level=info,tag=resfb} unilog(`toggled ${showName} S${season}E${episode} -> ${newActiveRes}p`);
+
+  // Trigger an Emby library refresh and wait for it to finish.
+  await embyRefreshManager.request(`resToggle:${showName}`, showName);
+
+  // Resolve the Emby episode id if the caller didn't supply one.
+  if (!episodeId && tvdbRecord?.id) {
+    try {
+      const seriesMap = await emby.getSeriesMap({ id: tvdbRecord.id });
+      const seasonEntry = (seriesMap || []).find(([s]) => s === season);
+      const epEntry = seasonEntry?.[1]?.find(([e]) => e === episode);
+      episodeId = epEntry?.[1]?.id || null;
+    } catch (e) {
+      // unilog-stub {level=warn,tag=resfb} unilog(`resolve episodeId failed for ${showName}: ${e.message}`);
+    }
+  }
+
+  return {
+    ok: true,
+    showId: tvdbRecord?.id || null,
+    showName,
+    episodeId: episodeId || null,
+    resolution: newActiveRes,
+  };
+}
+
+loadReencodeQueue();
+if (reencodeQueue.length > 0) setTimeout(processReencodeQueue, 5000);

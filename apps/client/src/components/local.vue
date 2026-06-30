@@ -144,16 +144,19 @@
             </button>
 
             <button
-              @click="toggleErrs"
+              @click="clickRes"
+              :disabled="!resToggleReady"
+              title="Switch this episode between 2160 and 1080"
               :style="{
-                cursor: 'pointer',
+                cursor: resToggleReady ? 'pointer' : 'default',
                 borderRadius: '7px',
                 padding: '4px 10px',
                 border: '1px solid #bbb',
-                backgroundColor: errsMode ? 'lightgray' : 'white',
+                '--btn-bg': resToggleReady ? 'whitesmoke' : '#e8e8e8',
+                color: resToggleReady ? 'inherit' : '#aaa',
               }"
             >
-              Errs
+              Res
             </button>
 
             <button
@@ -311,6 +314,19 @@
               }"
             >
               First
+            </button>
+
+            <button
+              @click="toggleErrs"
+              :style="{
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg': errsMode ? 'lightgray' : 'whitesmoke',
+              }"
+            >
+              Errs
             </button>
 
             <button
@@ -1445,6 +1461,12 @@ export default {
         (a, b) => (a.addedAt ?? 0) - (b.addedAt ?? 0),
       );
     },
+    resToggleReady() {
+      if (this.errsMode) return false;
+      if (this.selectedFolders.size > 0) return false;
+      if (this.selectedFiles.size !== 1) return false;
+      return !!this.resPairForRelPath([...this.selectedFiles][0]);
+    },
     infoLines() {
       if (!this.infoText) return [];
       const lines = this.infoText.split("\n");
@@ -1466,6 +1488,61 @@ export default {
   methods: {
     wrapFileName(name) {
       return util.wrapFileName(name);
+    },
+    // Returns pair info when relPath is one of exactly two episode videos (a
+    // 2160 + a 1080) in the same folder, exactly one hidden as ".alt".
+    resPairForRelPath(relPath) {
+      if (!relPath) return null;
+      const stripAlt = (n) =>
+        n.toLowerCase().endsWith(".alt") ? n.slice(0, -4) : n;
+      const hasAlt = (n) => n.toLowerCase().endsWith(".alt");
+      const resOf = (n) =>
+        /2160p/i.test(n) ? 2160 : /1080p/i.test(n) ? 1080 : 0;
+      const isVideo = (n) =>
+        /\.(mkv|mp4|avi|m4v|mov|wmv|ts|webm)$/i.test(stripAlt(n));
+      const epKey = (n) => {
+        const m = stripAlt(n).match(/S(\d{1,2})[ ._-]?E(\d{1,2})/i);
+        return m ? `S${parseInt(m[1])}E${parseInt(m[2])}` : null;
+      };
+      const parts = relPath.split("/");
+      const baseName = parts[parts.length - 1];
+      const parentPath = parts.slice(0, -1).join("/");
+      if (!isVideo(baseName)) return null;
+      const selRes = resOf(baseName);
+      if (selRes !== 2160 && selRes !== 1080) return null;
+      const selEp = epKey(baseName);
+      if (!selEp) return null;
+      const siblings = this.getSiblings(parentPath) || [];
+      const epVids = siblings.filter(
+        (n) => n.type === "file" && isVideo(n.name) && epKey(n.name) === selEp,
+      );
+      const has2160 = epVids.some((n) => resOf(n.name) === 2160);
+      const has1080 = epVids.some((n) => resOf(n.name) === 1080);
+      const altCount = epVids.filter((n) => hasAlt(n.name)).length;
+      if (epVids.length === 2 && has2160 && has1080 && altCount === 1) {
+        return { relPath, parentPath, selEp };
+      }
+      return null;
+    },
+    async clickRes() {
+      if (!this.resToggleReady) return;
+      const relPath = [...this.selectedFiles][0];
+      try {
+        const res = await fetch(`${config.tvTvUrl}/tv/toggleres`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ relPath }),
+        });
+        const data = await res.json();
+        if (!data?.ok) {
+          alert(`Resolution toggle failed: ${data?.error || "unknown error"}`);
+          return;
+        }
+        // The server renames the files immediately; refresh the list to show it.
+        setTimeout(() => this.fetchFiles(), 1500);
+      } catch (e) {
+        alert(`Resolution toggle error: ${e.message}`);
+      }
     },
     formatAsrTime(ts) {
       if (!ts) return "";

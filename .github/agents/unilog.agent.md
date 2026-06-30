@@ -75,6 +75,43 @@ node unilog/unilog-cli.js --file apps/srvr/index.js --anchor "text" \
 
 **After adding stubs**, deploy the file (e.g. `./srvr srvr`) so the reconciler activates them.
 
+## Taking logging requests from the coding agent
+
+The coding (Copilot) agent must NOT write `unilog(...)` calls **or** `// unilog-stub`
+lines — that is YOUR job. It hands you plain requests instead, e.g.:
+
+> add an error log in `apps/srvr/index.js`, in the `catch` after
+> `fs.copyFileSync(... dstSubPath)`, message: `` `sub copy failed for ${dstSubName}: ${e.message}` ``
+
+Each request gives you: the **file**, a **location** (a line number or a short
+nearby code snippet to anchor on), the **level** (`info|warn|error`), and the
+exact **message** expression. Turn each one into a stub (below) via
+`unilog-cli.js` (use `--anchor` for the snippet or `--line` for a line number,
+and `--position before|after`). If the coding agent left a `void e;` placeholder
+in an otherwise-empty `catch`, replace it with the stub. Then validate and tell
+the user to deploy.
+
+## Stub format (reference — only the unilog agent writes these)
+
+A stub is a comment the deploy reconciler activates into `unilog(<allocated-id>, ...)`:
+
+```js
+// unilog-stub {level=info,tag=mytag} unilog(`some message ${var}`);
+// unilog-stub {level=error,tag=mytag} unilog(`failed: ${e.message}`);
+// unilog-stub {level=warn} unilog("low disk");          // tag optional
+```
+
+Rules:
+
+- Place the stub on its own line, indented to match the surrounding code, at the
+  exact point the log should fire (inside the `catch`, before the early `return`,
+  after the state change, etc.).
+- `level` is one of `info|warn|error`. `tag` is optional but recommended.
+- The message is any JS expression (string or template literal) — it becomes the
+  `unilog(...)` argument verbatim.
+- Never invent an id; the reconciler assigns it on deploy.
+- `unilog-cli.js` produces these exact lines.
+
 ## Database Schema (reference)
 
 ```sql

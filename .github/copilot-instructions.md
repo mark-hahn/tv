@@ -130,3 +130,12 @@ node unilog/query.js --since "-1 hour" --pid tv-srvr --asc    # time-bounded
 ```
 
 Output: `YYYY/MM/DD HH:MM:SS  pid  file:line  [tag]  message`. See `.github/agents/unilog.agent.md` for full reference including how to add/remove log instrumentation.
+
+## Debugging on the remote server
+
+When you have a VS Code window open directly on **hahnca.com** (via Remote SSH),
+use the **server-debug** agent (`.github/agents/server-debug.agent.md`). It covers:
+
+- querying the unilog DB with `sqlite3` directly (no SSH hop)
+- what unilog is and how the old `console.log`/`log`/`loge` calls were replaced
+- pm2 process names, key paths, and common query patterns

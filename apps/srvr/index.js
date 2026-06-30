@@ -186,6 +186,17 @@ let genSrtRunning = false,
   genSrtChild = null,
   subQueuePendingNow = false;
 let asrLogBuffer = [];
+
+// Single queue for all batch ffmpeg jobs (subtitle extraction, re-encode).
+// Video streaming (line ~5054) and BIF generation are managed separately.
+const ffmpegQueue = (() => {
+  let tail = Promise.resolve();
+  return function run(fn) {
+    const next = tail.then(() => fn());
+    tail = next.catch(() => {});
+    return next;
+  };
+})();
 const exec = utilNode.promisify(cp.exec);
 
 function readTextOr(filePathOrPaths, fallback) {
@@ -994,10 +1005,6 @@ function scheduleBifCheck(ms) {
 // backoff and one-at-a-time serialization.
 function checkBifNeededQueue() {
   if (bifNeededQueue.length === 0) return;
-  if (os.loadavg()[0] > 5) {
-    scheduleBifCheck(10000);
-    return;
-  }
   const started = startBifCreate(bifNeededQueue[0]);
   if (!started) {
     scheduleBifCheck(5000);
@@ -1022,10 +1029,14 @@ function startBifCreate(bifNeededObj) {
   }
   let child;
   try {
-    child = cp.spawn("node", [RUN_BIF_PATH, bifNeededObj.bifPath], {
-      detached: true, // own process group so cancel can kill ffmpeg too
-      stdio: "ignore",
-    });
+    child = cp.spawn(
+      "nice",
+      ["-n", "15", "node", RUN_BIF_PATH, bifNeededObj.bifPath],
+      {
+        detached: true, // own process group so cancel can kill ffmpeg too
+        stdio: "ignore",
+      },
+    );
   } catch (e) {
     unilog(510, "spawn error:", e.message);
     return false;
@@ -1049,20 +1060,29 @@ function startBifCreate(bifNeededObj) {
     text: cropName(bifNeededObj.showName),
     position: 1000,
   });
-  const onDone = () => {
-    try {
-      fs.unlinkSync(BIF_CREATING_PATH);
-    } catch {}
-    unilog(4, `done ${bifNeededObj.showName}`);
-    // GLOBAL-MSG: Bif
-    setGlobalMessage({ id: "Bif", action: "hide" });
-    checkBifNeededQueue();
-  };
-  child.on("exit", onDone);
-  child.on("error", (e) => {
-    unilog(512, `worker error ${bifNeededObj.showName}:`, e.message);
-    onDone();
-  });
+  // Hold the batch ffmpeg queue for the duration of the BIF child process so
+  // BIF and other batch ffmpeg jobs (subtitle extraction, re-encode) never
+  // run concurrently.
+  ffmpegQueue.run(
+    () =>
+      new Promise((resolve) => {
+        const onDone = () => {
+          try {
+            fs.unlinkSync(BIF_CREATING_PATH);
+          } catch {}
+          unilog(4, `done ${bifNeededObj.showName}`);
+          // GLOBAL-MSG: Bif
+          setGlobalMessage({ id: "Bif", action: "hide" });
+          checkBifNeededQueue();
+          resolve();
+        };
+        child.on("exit", onDone);
+        child.on("error", (e) => {
+          unilog(512, `worker error ${bifNeededObj.showName}:`, e.message);
+          onDone();
+        });
+      }),
+  );
   child.unref();
   return true;
 }
@@ -1473,38 +1493,44 @@ async function generateEmbSrts(
       if (fromUI) notifyClients("emb-log", `exists: ${path.basename(outPath)}`);
       continue;
     }
-    await new Promise((resolve) => {
-      cp.execFile(
-        "ffmpeg",
-        [
-          "-v",
-          "quiet",
-          "-i",
-          videoFilePath,
-          "-map",
-          `0:${s.index}`,
-          "-c:s",
-          "srt",
-          "-f",
-          "srt",
-          "pipe:1",
-        ],
-        { maxBuffer: 4 * 1024 * 1024 },
-        (err, stdout) => {
-          if (!err && stdout) {
-            const sanitized = sanitizeSrt(stdout);
-            if (sanitized !== null) {
-              fs.writeFileSync(outPath, sanitized, "utf8");
-              if (fromUI) notifyClients("emb-log", `extracted ${outPath}`);
-            } else {
-              const fname = path.basename(outPath);
-              if (fromUI) notifyClients("emb-log", `No change: ${fname}`);
-            }
-          }
-          resolve();
-        },
-      );
-    });
+    await ffmpegQueue(
+      () =>
+        new Promise((resolve) => {
+          cp.execFile(
+            "nice",
+            [
+              "-n",
+              "15",
+              "ffmpeg",
+              "-v",
+              "quiet",
+              "-i",
+              videoFilePath,
+              "-map",
+              `0:${s.index}`,
+              "-c:s",
+              "srt",
+              "-f",
+              "srt",
+              "pipe:1",
+            ],
+            { maxBuffer: 4 * 1024 * 1024 },
+            (err, stdout) => {
+              if (!err && stdout) {
+                const sanitized = sanitizeSrt(stdout);
+                if (sanitized !== null) {
+                  fs.writeFileSync(outPath, sanitized, "utf8");
+                  if (fromUI) notifyClients("emb-log", `extracted ${outPath}`);
+                } else {
+                  const fname = path.basename(outPath);
+                  if (fromUI) notifyClients("emb-log", `No change: ${fname}`);
+                }
+              }
+              resolve();
+            },
+          );
+        }),
+    );
   }
   const hasNonText = subStreams.some((s) => !textCodecs.includes(s.codec_name));
   const pgsOnly = hasNonText && textStreams.length === 0;
@@ -5455,21 +5481,41 @@ app.get("/api/subtitle", async (req, res) => {
     const idx = parseInt(req.query.index, 10);
     res.setHeader("Content-Type", "text/vtt");
     res.setHeader("Cache-Control", "no-cache");
-    const ff = cp.spawn("ffmpeg", [
-      "-i",
-      resolved,
-      "-map",
-      `0:${idx}`,
-      "-f",
-      "webvtt",
-      "pipe:1",
-    ]);
-    ff.stdout.pipe(res);
-    ff.stderr.on("data", () => {});
-    req.on("close", () => ff.kill("SIGTERM"));
-    ff.on("exit", () => {
-      if (!res.writableEnded) res.end();
-    });
+    await ffmpegQueue(
+      () =>
+        new Promise((resolve) => {
+          const ff = cp.spawn("nice", [
+            "-n",
+            "15",
+            "ffmpeg",
+            "-i",
+            resolved,
+            "-map",
+            `0:${idx}`,
+            "-f",
+            "webvtt",
+            "pipe:1",
+          ]);
+          ff.stdout.pipe(res);
+          ff.stderr.on("data", () => {});
+          let done = false;
+          const finish = () => {
+            if (!done) {
+              done = true;
+              resolve();
+            }
+          };
+          req.on("close", () => {
+            ff.kill("SIGTERM");
+            finish();
+          });
+          ff.on("error", finish);
+          ff.on("exit", () => {
+            finish();
+            if (!res.writableEnded) res.end();
+          });
+        }),
+    );
     return;
   }
 
@@ -5521,21 +5567,41 @@ app.get("/api/subtitle", async (req, res) => {
       const idx = subStream.index;
       res.setHeader("Content-Type", "text/vtt");
       res.setHeader("Cache-Control", "no-cache");
-      const ff = cp.spawn("ffmpeg", [
-        "-i",
-        resolved,
-        "-map",
-        `0:${idx}`,
-        "-f",
-        "webvtt",
-        "pipe:1",
-      ]);
-      ff.stdout.pipe(res);
-      ff.stderr.on("data", () => {});
-      req.on("close", () => ff.kill("SIGTERM"));
-      ff.on("exit", () => {
-        if (!res.writableEnded) res.end();
-      });
+      await ffmpegQueue(
+        () =>
+          new Promise((resolve) => {
+            const ff = cp.spawn("nice", [
+              "-n",
+              "15",
+              "ffmpeg",
+              "-i",
+              resolved,
+              "-map",
+              `0:${idx}`,
+              "-f",
+              "webvtt",
+              "pipe:1",
+            ]);
+            ff.stdout.pipe(res);
+            ff.stderr.on("data", () => {});
+            let done2 = false;
+            const finish2 = () => {
+              if (!done2) {
+                done2 = true;
+                resolve();
+              }
+            };
+            req.on("close", () => {
+              ff.kill("SIGTERM");
+              finish2();
+            });
+            ff.on("error", finish2);
+            ff.on("exit", () => {
+              finish2();
+              if (!res.writableEnded) res.end();
+            });
+          }),
+      );
       return;
     }
   } catch (e) {
@@ -9215,52 +9281,55 @@ async function reencodeOneTo1080(entry) {
     unilog(1107, `could not remove stale temp ${tmpPath}: ${e.message}`);
   }
   unilog(1108, `reencode 2160->1080 start: ${srcName}`);
-  await new Promise((resolve, reject) => {
-    // H.264 8-bit, 1080p, <=10 Mbit/s video; all other tracks copied unchanged.
-    const REENCODE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes max
-    const args = [
-      "-y",
-      "-i",
-      srcPath,
-      "-map",
-      "0",
-      "-c",
-      "copy",
-      "-c:v",
-      "libx264",
-      "-vf",
-      "scale=-2:1080",
-      "-pix_fmt",
-      "yuv420p",
-      "-profile:v",
-      "high",
-      "-level",
-      "4.1",
-      "-preset",
-      "ultrafast",
-      "-b:v",
-      "8M",
-      "-maxrate",
-      "10M",
-      "-bufsize",
-      "16M",
-      tmpPath,
-    ];
-    const ff = cp.spawn("ffmpeg", args);
-    const killTimer = setTimeout(() => {
-      ff.kill("SIGKILL");
-    }, REENCODE_TIMEOUT_MS);
-    ff.stderr.on("data", () => {});
-    ff.on("error", (err) => {
-      clearTimeout(killTimer);
-      reject(err);
-    });
-    ff.on("close", (code) => {
-      clearTimeout(killTimer);
-      if (code === 0) resolve();
-      else reject(new Error(`ffmpeg exit ${code}`));
-    });
-  });
+  await ffmpegQueue(
+    () =>
+      new Promise((resolve, reject) => {
+        // H.264 8-bit, 1080p, <=10 Mbit/s video; all other tracks copied unchanged.
+        const REENCODE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes max
+        const args = [
+          "-y",
+          "-i",
+          srcPath,
+          "-map",
+          "0",
+          "-c",
+          "copy",
+          "-c:v",
+          "libx264",
+          "-vf",
+          "scale=-2:1080",
+          "-pix_fmt",
+          "yuv420p",
+          "-profile:v",
+          "high",
+          "-level",
+          "4.1",
+          "-preset",
+          "ultrafast",
+          "-b:v",
+          "8M",
+          "-maxrate",
+          "10M",
+          "-bufsize",
+          "16M",
+          tmpPath,
+        ];
+        const ff = cp.spawn("nice", ["-n", "15", "ffmpeg", ...args]);
+        const killTimer = setTimeout(() => {
+          ff.kill("SIGKILL");
+        }, REENCODE_TIMEOUT_MS);
+        ff.stderr.on("data", () => {});
+        ff.on("error", (err) => {
+          clearTimeout(killTimer);
+          reject(err);
+        });
+        ff.on("close", (code) => {
+          clearTimeout(killTimer);
+          if (code === 0) resolve();
+          else reject(new Error(`ffmpeg exit ${code}`));
+        });
+      }),
+  );
   fs.renameSync(tmpPath, dstPath);
   unilog(1109, `reencode 2160->1080 done: ${dst1080Name}.alt`);
   res1080SubtitlesAndChksrt(seasonDir, srcName, dst1080Name);

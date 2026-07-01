@@ -163,10 +163,10 @@ const ASR_LOG_BUFFER_MAX = 500;
 const BIF_NEEDED_QUEUE_PATH = path.join(SRVR_DATA_DIR, "bifNeededQueue.json");
 const BIF_CREATING_PATH = path.join(SRVR_DATA_DIR, "bifCreatingData.json");
 const RUN_BIF_PATH = path.join(SRVR_ROOT_DIR, "scripts", "run-bif.js");
-// GLOBAL-MSG: Bif — show name cropped to 20 chars, append "..." when cropped.
+// GLOBAL-MSG: Bif — show name cropped to 10 chars, append "..." when cropped.
 const cropName = (name) => {
   const s = String(name || "");
-  return s.length > 20 ? s.slice(0, 20) + "..." : s;
+  return s.length > 10 ? s.slice(0, 10) + "..." : s;
 };
 let bifNeededQueue = []; // [{ showName, bifPath }, ...] persisted
 let bifCheckTimer = null; // single backoff timer handle
@@ -206,10 +206,12 @@ const ffmpegQueue = (() => {
     },
   };
 })();
-// Append queue depth to a batch label: "Show S01E04 (3 queued)" when >1 pending.
-function batchLabel(text) {
+// Format a batch hdrMsg label: code + optional (N) when queue > 1 + show name.
+// e.g.  batchLabel(">", "Show Name") → ">: Show Name"  or  ">(3): Show Name"
+function batchLabel(code, showName) {
   const n = ffmpegQueue.pending;
-  return n > 1 ? `${text} (${n} queued)` : text;
+  const prefix = n > 1 ? `${code}(${n})` : code;
+  return `${prefix}: ${cropName(showName)}`;
 }
 
 // Counters for active real-time streaming ffmpegs — shown in hdrMsg.
@@ -219,15 +221,15 @@ function _updateStreamMsg() {
   if (_activeVideoStreams > 0)
     setGlobalMessage({
       id: "Stream",
-      text: String(_activeVideoStreams),
-      position: 998,
+      text: _activeVideoStreams > 1 ? `V(${_activeVideoStreams})` : "V",
+      position: 2000,
     });
   else setGlobalMessage({ id: "Stream", action: "hide" });
   if (_activeSubStreams > 0)
     setGlobalMessage({
       id: "SubStream",
-      text: String(_activeSubStreams),
-      position: 999,
+      text: _activeSubStreams > 1 ? `S(${_activeSubStreams})` : "S",
+      position: 2001,
     });
   else setGlobalMessage({ id: "SubStream", action: "hide" });
 }
@@ -1091,8 +1093,8 @@ function startBifCreate(bifNeededObj) {
   // GLOBAL-MSG: Bif
   setGlobalMessage({
     id: "Bif",
-    text: batchLabel(cropName(bifNeededObj.showName)),
-    position: 1000,
+    text: batchLabel("B", bifNeededObj.showName),
+    position: 2002,
   });
   // Hold the batch ffmpeg queue for the duration of the BIF child process so
   // BIF and other batch ffmpeg jobs (subtitle extraction, re-encode) never
@@ -1491,8 +1493,8 @@ async function generateEmbSrts(
   // GLOBAL-MSG: EmbSub
   setGlobalMessage({
     id: "EmbSub",
-    text: batchLabel(cropName(showname)),
-    position: 1003,
+    text: batchLabel(">", showname),
+    position: 2004,
   });
   let probeStreams = [];
   await new Promise((resolve) => {
@@ -5107,6 +5109,8 @@ app.get("/api/stream", async (req, res) => {
     ffmpeg.stderr.on("data", () => {});
     ffmpeg.on("error", (err) => {
       unilog(589, "ffmpeg spawn error:", err.message);
+      _activeVideoStreams--;
+      _updateStreamMsg();
     });
     const killFfmpeg = () => {
       if (ffmpeg.killed) return;
@@ -5540,14 +5544,18 @@ app.get("/api/subtitle", async (req, res) => {
     _updateStreamMsg();
     ff.stdout.pipe(res);
     ff.stderr.on("data", () => {});
-    req.on("close", () => ff.kill("SIGTERM"));
-    ff.on("error", () => {
-      _activeSubStreams--;
-      _updateStreamMsg();
-    });
+    let _subDone1 = false;
+    const _subDec1 = () => {
+      if (!_subDone1) {
+        _subDone1 = true;
+        _activeSubStreams--;
+        _updateStreamMsg();
+      }
+    };
+    req.on("close", () => ff.kill("SIGKILL"));
+    ff.on("error", _subDec1);
     ff.on("exit", () => {
-      _activeSubStreams--;
-      _updateStreamMsg();
+      _subDec1();
       if (!res.writableEnded) res.end();
     });
     return;
@@ -5614,14 +5622,18 @@ app.get("/api/subtitle", async (req, res) => {
       _updateStreamMsg();
       ff.stdout.pipe(res);
       ff.stderr.on("data", () => {});
-      req.on("close", () => ff.kill("SIGTERM"));
-      ff.on("error", () => {
-        _activeSubStreams--;
-        _updateStreamMsg();
-      });
+      let _subDone2 = false;
+      const _subDec2 = () => {
+        if (!_subDone2) {
+          _subDone2 = true;
+          _activeSubStreams--;
+          _updateStreamMsg();
+        }
+      };
+      req.on("close", () => ff.kill("SIGKILL"));
+      ff.on("error", _subDec2);
       ff.on("exit", () => {
-        _activeSubStreams--;
-        _updateStreamMsg();
+        _subDec2();
         if (!res.writableEnded) res.end();
       });
       return;
@@ -7049,7 +7061,11 @@ const pollGlobalMessages = () => {
   try {
     const load = os.loadavg()[0];
     if (load >= CPU_LOAD_THRESHOLD)
-      setGlobalMessage({ id: "CPU", text: load.toFixed(1), position: 1001 });
+      setGlobalMessage({
+        id: "CPU",
+        text: `CPU: ${load.toFixed(1)}`,
+        position: 1001,
+      });
     else setGlobalMessage({ id: "CPU", action: "hide" });
   } catch (e) {
     unilog(616, "cpu poll error:", e.message);
@@ -7062,7 +7078,7 @@ const pollGlobalMessages = () => {
       count = map && typeof map === "object" ? Object.keys(map).length : 0;
     }
     if (count > 0)
-      setGlobalMessage({ id: "Down", text: String(count), position: 11 });
+      setGlobalMessage({ id: "Down", text: `Down: ${count}`, position: 11 });
     else setGlobalMessage({ id: "Down", action: "hide" });
   } catch (e) {
     unilog(617, "down poll error:", e.message);
@@ -9366,8 +9382,8 @@ async function processReencodeQueue() {
   // GLOBAL-MSG: Reencode
   setGlobalMessage({
     id: "Reencode",
-    text: batchLabel(`${cropName(entry.showName)} ${seLabel}`),
-    position: 1002,
+    text: batchLabel("E", `${cropName(entry.showName)} ${seLabel}`),
+    position: 2003,
   });
   try {
     await reencodeOneTo1080(entry);

@@ -70,7 +70,7 @@ export function setGlobalMessage(msg) {
 export function globalMessageText() {
   return [...globalMessages.values()]
     .sort((a, b) => a.position - b.position || a.timeAdded - b.timeAdded)
-    .map((m) => `${m.id}: ${m.text}`)
+    .map((m) => m.text)
     .join(", ");
 }
 

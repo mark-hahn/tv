@@ -9425,6 +9425,8 @@ async function reencodeOneTo1080(entry) {
           "4.1",
           "-preset",
           "ultrafast",
+          "-x264-params",
+          "cabac=1:8x8dct=1",
           "-b:v",
           "8M",
           "-maxrate",

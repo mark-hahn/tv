@@ -206,10 +206,23 @@ const ffmpegQueue = (() => {
     },
   };
 })();
-// Format a batch hdrMsg label: code + optional (N) when queue > 1 + show name.
-// e.g.  batchLabel(">", "Show Name") → ">: Show Name"  or  ">(3): Show Name"
+// Total batch jobs pending across all three queues combined.
+function batchJobsTotal() {
+  // reencodeQueue includes the currently-running entry (shifted only on success).
+  // subQueue entry is shifted before generateEmbSrts runs (+1 if busy).
+  // bifNeededQueue entry is shifted after startBifCreate (+1 if lock file exists).
+  return (
+    reencodeQueue.length +
+    subQueue.length +
+    (subQueueBusy ? 1 : 0) +
+    bifNeededQueue.length +
+    (readBifCreating() ? 1 : 0)
+  );
+}
+
+// Format a batch hdrMsg label: code + optional (N) when total > 1 + show name.
 function batchLabel(code, showName) {
-  const n = ffmpegQueue.pending;
+  const n = batchJobsTotal();
   const prefix = n > 1 ? `${code}(${n})` : code;
   return `${prefix}: ${cropName(showName)}`;
 }
@@ -1301,6 +1314,19 @@ async function fileNeedsSubChecked(videoFilePath, showName) {
   if (subQueueChkSrt.some((e) => e.videoFilePath === videoFilePath))
     return false;
   if (asrQueue.some((e) => e.videoPath === videoFilePath)) return false;
+  // A 1080 resolution-fallback file inherits the 2160's subtitles (they are
+  // copied at generation), so it is never sub-checked / extracted on its own.
+  if (/1080p/i.test(path.basename(videoFilePath))) {
+    const parsedRes = parseFileSeasonEpisode(videoFilePath);
+    if (parsedRes?.season != null && parsedRes?.episode != null) {
+      const sibs = resFindEpisodeVideos(
+        path.dirname(videoFilePath),
+        parsedRes.season,
+        parsedRes.episode,
+      );
+      if (sibs.some((v) => v.res === 2160)) return false;
+    }
+  }
   const base = videoFilePath.replace(/\.[^.]+$/, "");
   const dir = path.dirname(videoFilePath);
   let entries;
@@ -9169,6 +9195,7 @@ function resFindEpisodeVideos(seasonDir, season, episode) {
   }
   const out = [];
   for (const name of files) {
+    if (name.startsWith(".")) continue; // skip dotfiles (.restmp-* etc)
     if (!resIsVideoName(name)) continue;
     const parsed = parseFileSeasonEpisode(
       resStripAlt(name),
@@ -9227,7 +9254,11 @@ function res1080DownloadInProgress(season, episode) {
 
 // Duplicate every 2160 sidecar subtitle under the 1080 basename, then enqueue
 // the new 1080 video for a subtitle check (chksrt).
-function res1080SubtitlesAndChksrt(seasonDir, src2160Name, dst1080Name) {
+// Copy the 2160 episode's subtitle sidecars AND its chksrt result (the
+// `.mb.chosen` marker) onto the generated 1080 basename. The 1080 has identical
+// tracks, so the subtitles and the subtitle-check outcome are reused directly —
+// no extraction and no re-check are needed.
+function res1080CopySubtitles(seasonDir, src2160Name, dst1080Name) {
   const src2160Base = src2160Name.replace(/\.[^.]+$/, "");
   const dst1080Base = dst1080Name.replace(/\.[^.]+$/, "");
   let files;
@@ -9237,27 +9268,20 @@ function res1080SubtitlesAndChksrt(seasonDir, src2160Name, dst1080Name) {
     files = [];
   }
   for (const name of files) {
-    const ext = path.extname(name).toLowerCase();
-    if (!RES_SUBTITLE_EXTS.has(ext)) continue;
     if (!name.startsWith(src2160Base)) continue;
-    const suffix = name.slice(src2160Base.length); // e.g. ".en.srt"
-    const dstSubName = dst1080Base + suffix;
-    const dstSubPath = path.join(seasonDir, dstSubName);
-    if (fs.existsSync(dstSubPath)) continue;
+    const ext = path.extname(name).toLowerCase();
+    const isSub = RES_SUBTITLE_EXTS.has(ext);
+    const isChosen = name.endsWith(".mb.chosen"); // chksrt result marker
+    if (!isSub && !isChosen) continue;
+    const suffix = name.slice(src2160Base.length); // e.g. ".en.srt" or ".mb.chosen"
+    const dstName = dst1080Base + suffix;
+    const dstPath = path.join(seasonDir, dstName);
+    if (fs.existsSync(dstPath)) continue;
     try {
-      fs.copyFileSync(path.join(seasonDir, name), dstSubPath);
+      fs.copyFileSync(path.join(seasonDir, name), dstPath);
     } catch (e) {
-      unilog(1102, `sub copy failed for ${dstSubName}: ${e.message}`);
+      unilog(1102, `sub copy failed for ${dstName}: ${e.message}`);
     }
-  }
-  // Enqueue the new (hidden) 1080 video for subtitle check.
-  const chkPath = path.join(seasonDir, dst1080Name + ".alt");
-  if (fs.existsSync(chkPath)) {
-    enqueueSubQueueChkSrt(
-      { videoFilePath: chkPath, fromUI: false, lowPriority: true },
-      false,
-    );
-    persistSubQueueChkSrt();
   }
 }
 
@@ -9370,7 +9394,7 @@ async function reencodeOneTo1080(entry) {
   );
   fs.renameSync(tmpPath, dstPath);
   unilog(1109, `reencode 2160->1080 done: ${dst1080Name}.alt`);
-  res1080SubtitlesAndChksrt(seasonDir, srcName, dst1080Name);
+  res1080CopySubtitles(seasonDir, srcName, dst1080Name);
 }
 
 async function processReencodeQueue() {
@@ -9385,12 +9409,22 @@ async function processReencodeQueue() {
     text: batchLabel("E", `${cropName(entry.showName)} ${seLabel}`),
     position: 2003,
   });
+  let encodeSucceeded = false;
   try {
     await reencodeOneTo1080(entry);
+    encodeSucceeded = true;
   } catch (e) {
     unilog(1110, `reencode failed for ${entry.srcPath}: ${e.message}`);
+    // Clean up stale temp file so it doesn't fool the scanner.
+    const tmpPath = path.join(
+      path.dirname(entry.srcPath),
+      ".restmp-" + path.basename(entry.srcPath).replace(/2160/g, "1080"),
+    );
+    try {
+      if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+    } catch {}
   } finally {
-    if (reencodeQueue[0]?.srcPath === entry.srcPath) {
+    if (encodeSucceeded && reencodeQueue[0]?.srcPath === entry.srcPath) {
       reencodeQueue.shift();
       persistReencodeQueue();
     }
@@ -9431,7 +9465,7 @@ async function res1080NeededAndAcquire(
       unilog(1111, `reused kept 1080 .old->.alt: ${altName}`);
       const src2160 = res2160FileName(seasonDir, season, episode);
       if (src2160) {
-        res1080SubtitlesAndChksrt(seasonDir, src2160, resStripAlt(altName));
+        res1080CopySubtitles(seasonDir, src2160, resStripAlt(altName));
       }
     } catch (e) {
       unilog(1112, `.old->.alt rename failed for ${altName}: ${e.message}`);

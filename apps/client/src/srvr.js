@@ -300,6 +300,15 @@ setInterval(updateLastViewedCache, LAST_VIEWED_POLL_MS);
 export function getShowsFromDisk() {
   return httpCall("/api/getShowsFromDisk");
 }
+export function getUnilogEvents(params) {
+  return httpCall("/api/unilog/events", params, "GET", 15000);
+}
+export function unilogSubscribe() {
+  wsSend({ id: 0, fname: "unilogSubscribe" });
+}
+export function unilogUnsubscribe() {
+  wsSend({ id: 0, fname: "unilogUnsubscribe" });
+}
 export function createShowFolder(params) {
   return httpCall("/api/createShowFolder", params, "POST");
 }

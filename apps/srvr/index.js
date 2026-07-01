@@ -4173,10 +4173,30 @@ app.use((req, res, next) => {
 
 //////////////////  UNILOG  //////////////////
 
+// Live-tail subscribers for the web client Log pane. Populated by the ws
+// message handler (fname unilogSubscribe/unilogUnsubscribe) far below; declared
+// here so the DB sink can broadcast to it. Empty until a client subscribes.
+const unilogSubscribers = new Set();
+function broadcastUnilog(row) {
+  if (!row || unilogSubscribers.size === 0) return;
+  const msg = JSON.stringify({
+    id: 0,
+    notification: "unilog-event",
+    data: row,
+  });
+  for (const ws of unilogSubscribers) {
+    if (ws.readyState === 1) {
+      try {
+        ws.send(msg);
+      } catch (_) {} // no-unilog
+    }
+  }
+}
+
 // tv-srvr is the single DB writer. Register the in-process sink so unilog()
 // calls inside srvr write directly; other processes/clients use POST /api/log.
 epd.setUnilogSink(({ logId, message }) =>
-  unilogDb.insertEvent({ logId, pid: "tv-srvr", message }),
+  broadcastUnilog(unilogDb.insertEvent({ logId, pid: "tv-srvr", message })),
 );
 
 // Central log collector endpoint. Accepts a single event or a batch array.
@@ -4187,11 +4207,13 @@ app.post("/api/log", (req, res) => {
     const events = Array.isArray(body) ? body : [body];
     for (const e of events) {
       if (!e || e.logId == null) continue;
-      unilogDb.insertEvent({
-        logId: e.logId,
-        pid: e.pid || "unknown",
-        message: e.message,
-      });
+      broadcastUnilog(
+        unilogDb.insertEvent({
+          logId: e.logId,
+          pid: e.pid || "unknown",
+          message: e.message,
+        }),
+      );
     }
     res.json({ ok: true, count: events.length });
   } catch (error) {
@@ -4254,6 +4276,21 @@ app.post("/api/unilog/query-sites", (req, res) => {
     res.json(unilogDb.querySites(ids));
   } catch (error) {
     console.error("[unilog] /api/unilog/query-sites error:", error); // no-unilog
+    res.status(500).json({ error: String(error?.message || error) });
+  }
+});
+
+// Read-back for the web client log viewer (Log tab). Returns recent events
+// (newest first) joined with their sites, plus the distinct pid list.
+app.get("/api/unilog/events", (req, res) => {
+  try {
+    const { pid, level, file, msg, limit, beforeId } = req.query;
+    res.json({
+      events: unilogDb.queryEvents({ pid, level, file, msg, limit, beforeId }),
+      pids: unilogDb.listPids(),
+    });
+  } catch (error) {
+    console.error("[unilog] /api/unilog/events error:", error); // no-unilog
     res.status(500).json({ error: String(error?.message || error) });
   }
 });
@@ -7283,6 +7320,10 @@ wss.on("connection", (ws) => {
       }
     } else if (fname === "tvRemoteCollision") {
       notifyClients("tvRemoteLock", null);
+    } else if (fname === "unilogSubscribe") {
+      unilogSubscribers.add(ws);
+    } else if (fname === "unilogUnsubscribe") {
+      unilogSubscribers.delete(ws);
     } else if (fname === "tvRemoteUnlock") {
       const outMsg = JSON.stringify({
         id: 0,
@@ -7315,12 +7356,14 @@ wss.on("connection", (ws) => {
   ws.on("error", (err) => {
     unilog(624, socketName, "error:", err.message);
     connectedClients.delete(ws);
+    unilogSubscribers.delete(ws);
     socketName = "unknown websocket";
   });
 
   ws.on("close", () => {
     // log(socketName + ' closed');
     connectedClients.delete(ws);
+    unilogSubscribers.delete(ws);
     socketName = "unknown websocket";
   });
 });

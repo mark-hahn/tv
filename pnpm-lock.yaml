@@ -132,6 +132,9 @@ importers:
       sweetalert2:
         specifier: ^11.14.5
         version: 11.26.17
+      tabulator-tables:
+        specifier: ^6.3.1
+        version: 6.5.2
       vue:
         specifier: ^3.0.0
         version: 3.5.26(typescript@5.9.3)
@@ -3069,6 +3072,9 @@ packages:
 
   sweetalert2@11.26.17:
     resolution: {integrity: sha512-kkaySn1IRfwNlf9AkZVqDmBINDWw9NRR6Ij0O5dBRBOD1+mbtZJWxxR9/pA90nce9E5tIIkJ7SWij4rMWXtA1g==}
+
+  tabulator-tables@6.5.2:
+    resolution: {integrity: sha512-cRL3xsaaf5RzND8KPbn4C9Ce5tzyiQUE01E/10zN50MjdRKl/Gl5nXkzLN6cvEyRfWHCPuqBF92y50CBw20WYA==}
 
   tar-fs@2.1.4:
     resolution: {integrity: sha512-mDAjwmZdh7LTT6pNleZ05Yt65HC3E+NiQzl672vQG38jIrehtJk/J3mNwIg+vShQPcLF/LV7CMnDW6vjj6sfYQ==}
@@ -6309,6 +6315,8 @@ snapshots:
   supports-preserve-symlinks-flag@1.0.0: {}
 
   sweetalert2@11.26.17: {}
+
+  tabulator-tables@6.5.2: {}
 
   tar-fs@2.1.4:
     dependencies:

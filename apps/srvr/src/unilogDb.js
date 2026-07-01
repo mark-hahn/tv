@@ -74,14 +74,40 @@ const insEvent = db.prepare(
   "INSERT INTO log_events (log_id, pid, ts, message) VALUES (?, ?, ?, ?)",
 );
 
+// Full joined row for one event (event + its site). Used for the live tail
+// broadcast and for enriching newly inserted events with their metadata.
+const getEventRow = db.prepare(`
+  SELECT e.id, e.ts, e.pid, s.log_id, s.src_file, s.src_line,
+         s.tag, s.level, e.message
+    FROM log_events e JOIN log_sites s ON e.log_id = s.log_id
+   WHERE e.id = ?
+`);
+
+// Comma-joined group descriptions for a site (via site_groups -> log_groups).
+const getGroupsStr = db.prepare(`
+  SELECT GROUP_CONCAT(lg.description, ', ') AS groups
+    FROM site_groups sg JOIN log_groups lg ON sg.group_id = lg.group_id
+   WHERE sg.log_id = ? AND lg.description IS NOT NULL
+`);
+export function groupsForSite(logId) {
+  if (logId == null) return "";
+  return getGroupsStr.get(Number(logId))?.groups || "";
+}
+
 // One runtime emission. ts stamped here (the collector), not the caller.
+// Returns the full joined row (event + site + groups) so callers can broadcast
+// it to live-tail subscribers. Returns null when the event has no matching site
+// (e.g. a null/unknown logId).
 export function insertEvent({ logId, pid, message }) {
-  insEvent.run(
+  const info = insEvent.run(
     logId == null ? null : Number(logId),
     String(pid || "unknown"),
     nowPst(),
     String(message ?? ""),
   );
+  const row = getEventRow.get(Number(info.lastInsertRowid));
+  if (row) row.groups = groupsForSite(row.log_id);
+  return row || null;
 }
 
 const insGroup = db.prepare(
@@ -214,6 +240,58 @@ export function dbInfo() {
     counts[t] = db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n;
   }
   return { path: UNILOG_DB_PATH, counts };
+}
+
+// Read-back for the web client log viewer. Returns recent events joined with
+// their sites, newest first. Optional filters: pid, level, file (partial),
+// msg (partial). beforeId returns only events older than that event id (for
+// upward paging). limit is clamped to a sane range.
+export function queryEvents({ pid, level, file, msg, limit, beforeId } = {}) {
+  const where = [];
+  const params = [];
+  if (beforeId) {
+    where.push("e.id < ?");
+    params.push(Number(beforeId));
+  }
+  if (pid) {
+    where.push("e.pid = ?");
+    params.push(String(pid));
+  }
+  if (level) {
+    where.push("s.level = ?");
+    params.push(String(level));
+  }
+  if (file) {
+    where.push("s.src_file LIKE ?");
+    params.push(`%${String(file)}%`);
+  }
+  if (msg) {
+    where.push("e.message LIKE ?");
+    params.push(`%${String(msg)}%`);
+  }
+  const w = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  const lim = Math.min(Math.max(Number(limit) || 500, 1), 5000);
+  return db
+    .prepare(
+      `SELECT e.id, e.ts, e.pid, s.log_id, s.src_file, s.src_line,
+              s.tag, s.level, e.message,
+              (SELECT GROUP_CONCAT(lg.description, ', ')
+                 FROM site_groups sg JOIN log_groups lg
+                   ON sg.group_id = lg.group_id
+                WHERE sg.log_id = s.log_id
+                  AND lg.description IS NOT NULL) AS groups
+         FROM log_events e JOIN log_sites s ON e.log_id = s.log_id
+         ${w} ORDER BY e.id DESC LIMIT ${lim}`,
+    )
+    .all(...params);
+}
+
+// Distinct process names seen in events (for the viewer's pid filter).
+export function listPids() {
+  return db
+    .prepare("SELECT DISTINCT pid FROM log_events ORDER BY pid")
+    .all()
+    .map((r) => r.pid);
 }
 
 export { UNILOG_DB_PATH, db };

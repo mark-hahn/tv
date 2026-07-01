@@ -9393,10 +9393,10 @@ async function reencodeOneTo1080(entry) {
   // tmpPath: hidden dotfile so chokidar/Emby ignore it while encoding.
   // vidTmpPath: intermediate video-only MP4. Re-encoding through a separate
   // container and remuxing strips the DoVi configuration record that ffmpeg
-  // would otherwise copy from the HEVC source into the MKV video track (which
-  // makes Emby/Bravia spin on playback). MP4 is used rather than a raw .h264
-  // elementary stream because raw H.264 carries no timing, so it would be read
-  // back at ffmpeg's default 25 fps and desync the audio on non-25fps sources.
+  // would otherwise copy from the source into the MKV video track (which makes
+  // Emby/Bravia spin on playback). MP4 is used rather than a raw elementary
+  // stream because raw video carries no timing, so it would be read back at
+  // ffmpeg's default 25 fps and desync the audio on non-25fps sources.
   const tmpPath = path.join(seasonDir, ".restmp-" + dst1080Name);
   const vidTmpPath = tmpPath.replace(/\.mkv$/i, ".mp4");
   const dstPath = path.join(seasonDir, dst1080Name + ".alt");
@@ -9414,34 +9414,39 @@ async function reencodeOneTo1080(entry) {
   await ffmpegQueue.run(
     () =>
       new Promise((resolve, reject) => {
-        const REENCODE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes max
+        const REENCODE_TIMEOUT_MS = 60 * 60 * 1000; // 60 minutes max
         // Step 1: encode video only to a video-only MP4 (preserves timing).
+        // HEVC Main 10 keeps the source's 10-bit depth + HDR at a ~10 Mbit/s
+        // cap (the bandwidth fallback target); the Bravia hardware-decodes it
+        // just like the 4K HEVC sources, so it direct-plays.
+        // The encode runs on the AMD VCN hardware encoder via VAAPI
+        // (hevc_vaapi) — ~3.7x realtime, offloading the encode off the CPU.
+        // Decode + scale stay on the CPU on purpose: full-GPU scale_vaapi leaks
+        // GPU surfaces and crashes ("Cannot allocate memory") on long files.
         const args1 = [
           "-y",
+          "-vaapi_device",
+          "/dev/dri/renderD128",
           "-i",
           srcPath,
           "-map",
           "0:v:0",
-          "-c:v",
-          "libx264",
           "-vf",
-          "scale=-2:1080",
-          "-pix_fmt",
-          "yuv420p",
+          "scale=-2:1080,format=p010,hwupload",
+          "-c:v",
+          "hevc_vaapi",
           "-profile:v",
-          "high",
-          "-level",
-          "4.1",
-          "-preset",
-          "ultrafast",
-          "-x264-params",
-          "cabac=1:8x8dct=1",
+          "main10",
+          "-rc_mode",
+          "VBR",
           "-b:v",
           "8M",
           "-maxrate",
           "10M",
           "-bufsize",
           "16M",
+          "-tag:v",
+          "hvc1",
           vidTmpPath,
         ];
         const ff1 = cp.spawn(BATCH_SCHED[0], [

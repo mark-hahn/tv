@@ -681,6 +681,24 @@ app.post("/tv/toggleres", async (req, res) => {
 // Home → swap files + await library refresh → relaunch Emby → load episode.
 async function runToggleResSequence(toggleArg, knownEpisodeId) {
   try {
+    // Stop any live Emby playback session before renaming the file. When a
+    // video is actively playing (the Android skip long-press path), Emby keeps
+    // a server-side PlayState bound to the current MediaSource; renaming that
+    // file out from under it leaves the session stale, so the next OK/play just
+    // flashes and bounces back to the play button in an unbreakable loop. A real
+    // Stop clears that state. (The web res-button path is used from a stopped
+    // state, so there is usually nothing to stop.)
+    try {
+      const live = await getEmbyPlaybackSession("Living Room TV");
+      if (live?.Id) {
+        await fetch(
+          `${EMBY_BASE_URL}/Sessions/${live.Id}/Playing/Stop?api_key=${EMBY_API_KEY}`,
+          { method: "POST", headers: { Accept: "application/json" } },
+        );
+      }
+    } catch (e) {
+      unilog(1120, `stop live session failed: ${e.message}`);
+    }
     callService("remote", "send_command", REMOTE_ENTITY_ID, {
       command: "Home",
     });

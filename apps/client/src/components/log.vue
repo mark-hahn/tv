@@ -28,24 +28,69 @@
         ↓ Bottom
       </button>
 
-      <select v-model="pickerSel.mo" class="logSel" @change="onPickerChange">
+      <select
+        v-model="pickerSel.mo"
+        class="logSel"
+        @change="onPickerChange"
+      >
         <option value=""></option>
-        <option v-for="m in 12" :key="m" :value="m">{{ String(m).padStart(2,'0') }}</option>
+        <option
+          v-for="m in 12"
+          :key="m"
+          :value="m"
+        >
+          {{ String(m).padStart(2, "0") }}
+        </option>
       </select>
-      <select v-model="pickerSel.da" class="logSel" @change="onPickerChange">
+      <select
+        v-model="pickerSel.da"
+        class="logSel"
+        @change="onPickerChange"
+      >
         <option value=""></option>
-        <option v-for="d in 31" :key="d" :value="d">{{ String(d).padStart(2,'0') }}</option>
+        <option
+          v-for="d in 31"
+          :key="d"
+          :value="d"
+        >
+          {{ String(d).padStart(2, "0") }}
+        </option>
       </select>
-      <select v-model="pickerSel.hr" class="logSel" @change="onPickerChange">
+      <select
+        v-model="pickerSel.hr"
+        class="logSel"
+        @change="onPickerChange"
+      >
         <option value=""></option>
-        <option v-for="h in 24" :key="h-1" :value="h-1">{{ String(h-1).padStart(2,'0') }}</option>
+        <option
+          v-for="h in 24"
+          :key="h - 1"
+          :value="h - 1"
+        >
+          {{ String(h - 1).padStart(2, "0") }}
+        </option>
       </select>
-      <select v-model="pickerSel.mi" class="logSel" @change="onPickerChange">
+      <select
+        v-model="pickerSel.mi"
+        class="logSel"
+        @change="onPickerChange"
+      >
         <option value=""></option>
-        <option v-for="m in 60" :key="m-1" :value="m-1">{{ String(m-1).padStart(2,'0') }}</option>
+        <option
+          v-for="m in 60"
+          :key="m - 1"
+          :value="m - 1"
+        >
+          {{ String(m - 1).padStart(2, "0") }}
+        </option>
       </select>
 
-      <button class="logBtn" @click="clearPicker">Clr</button>
+      <button
+        class="logBtn"
+        @click="clearPicker"
+      >
+        Clr
+      </button>
 
       <span style="font-size: 12px; color: #666">
         <span v-if="loading">loading…</span>
@@ -87,7 +132,14 @@ function tsToMs(s) {
 // pickerToMs from individual dropdown values (year=2026, sec=0).
 function selToMs({ mo, da, hr, mi }) {
   if (mo === "" || da === "" || hr === "" || mi === "") return null;
-  return new Date(2026, Number(mo) - 1, Number(da), Number(hr), Number(mi), 0).getTime();
+  return new Date(
+    2026,
+    Number(mo) - 1,
+    Number(da),
+    Number(hr),
+    Number(mi),
+    0,
+  ).getTime();
 }
 
 export default {
@@ -161,8 +213,20 @@ export default {
           width: 280,
           headerFilter: "input",
         },
-        { title: "Tag", field: "tag", width: 55, hozAlign: "center", headerFilter: "input" },
-        { title: "Level", field: "level", width: 50, hozAlign: "center", headerFilter: "input" },
+        {
+          title: "Tag",
+          field: "tag",
+          width: 55,
+          hozAlign: "center",
+          headerFilter: "input",
+        },
+        {
+          title: "Level",
+          field: "level",
+          width: 50,
+          hozAlign: "center",
+          headerFilter: "input",
+        },
         {
           title: "Proj",
           field: "pid",

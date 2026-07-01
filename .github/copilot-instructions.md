@@ -158,6 +158,26 @@ Either way: keep the `catch (e) {` binding so the message can use `e`. Do not le
 validate before deploy with `node unilog/check.js <project|all>` (reports duplicate
 ids and malformed stubs).
 
+### `// no-unilog` — opt-out suffix
+
+Append `// no-unilog` to the end of any log line to tell the reconciler to leave it
+completely untouched. The reconciler detects log calls using an AST parse, so it
+catches every form of debug statement:
+
+| call shape         | examples                                                                                       |
+| ------------------ | ---------------------------------------------------------------------------------------------- |
+| `console.*`        | `console.log(…)`, `console.info(…)`, `console.debug(…)`, `console.warn(…)`, `console.error(…)` |
+| standalone helpers | `log(…)`, `loge(…)`, `logSubtitle(…)`                                                          |
+| stubs              | `// unilog-stub …` comment lines                                                               |
+
+Any of those forms ending in `// no-unilog` is skipped — never upgraded, never
+activated, never assigned an id. Use it for unilog's own plumbing files and any
+debug statement that must stay as plain `console.*` output.
+
+```js
+console.log("[reseed] done."); // no-unilog
+```
+
 Use `unilog/query.js` (runs locally, SSHes to remote DB) to answer questions about log output:
 
 ```bash

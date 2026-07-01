@@ -251,7 +251,13 @@ export async function deleteShowFromSrvr(show) {
   // Delete entire show folder from disk
   // Extract just the folder name from the Emby path (e.g., "/tv/ShowName" -> "ShowName")
   const showFolder = show.path.split("/").pop();
-  unilog(875, "deleteShowFromSrvr: deleting folder:", showFolder, "for show:", show.name);
+  unilog(
+    875,
+    "deleteShowFromSrvr: deleting folder:",
+    showFolder,
+    "for show:",
+    show.name,
+  );
   const result = await deletePath(showFolder);
   unilog(876, "deleteShowFromSrvr: deletePath result:", result);
 

@@ -294,4 +294,8 @@ export function listPids() {
     .map((r) => r.pid);
 }
 
+export function countEvents() {
+  return db.prepare("SELECT COUNT(*) AS n FROM log_events").get().n;
+}
+
 export { UNILOG_DB_PATH, db };

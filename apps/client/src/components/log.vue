@@ -31,7 +31,7 @@
       <select
         v-model="pickerSel.mo"
         class="logSel"
-        @change="onPickerChange"
+        @change="onPickerChangeMo"
       >
         <option value="">Month</option>
         <option
@@ -45,7 +45,7 @@
       <select
         v-model="pickerSel.da"
         class="logSel"
-        @change="onPickerChange"
+        @change="onPickerChangeDa"
       >
         <option value="">Day</option>
         <option
@@ -59,7 +59,7 @@
       <select
         v-model="pickerSel.hr"
         class="logSel"
-        @change="onPickerChange"
+        @change="onPickerChangeHr"
       >
         <option value="">Hrs</option>
         <option
@@ -92,14 +92,34 @@
         Clr
       </button>
 
-      <span style="font-size: 12px; color: #666">
+      <button
+        class="logBtn"
+        @click="scrollLeft"
+      >
+        ←
+      </button>
+      <button
+        class="logBtn"
+        @click="scrollRight"
+      >
+        →
+      </button>
+
+      <span
+        style="
+          margin-left: auto;
+          font-size: 12px;
+          color: #666;
+          white-space: nowrap;
+        "
+      >
         <span v-if="loading">loading…</span>
         <span
           v-else-if="error"
           style="color: #c00"
           >{{ error }}</span
         >
-        <span v-else>{{ rowCount }} rows{{ atBottom ? " · live" : "" }}</span>
+        <span v-else>{{ displayedCount }}/{{ rowCount }}/{{ dbTotal }}</span>
       </span>
     </div>
 
@@ -120,6 +140,12 @@ import { unilog } from "../log.js";
 
 const MAX_ROWS = 5000;
 const PAGE = 500;
+
+// Format a Date as "MM/DD HH:mm:ss" for the live clock.
+function fmtClock(d) {
+  const p = (n) => String(n).padStart(2, "0");
+  return `${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
 
 // "2026/07/01 11:44:43" -> epoch ms (local).
 function tsToMs(s) {
@@ -150,6 +176,10 @@ export default {
       table: null,
       holder: null,
       rowCount: 0,
+      displayedCount: 0,
+      dbTotal: 0,
+      clockStr: "",
+      clockTimer: null,
       loading: false,
       error: "",
       loadedOnce: false,
@@ -188,12 +218,27 @@ export default {
         }
         if (!this.loadedOnce) this.loadLogs();
       });
+      this.clockStr = fmtClock(new Date());
+      this.clockTimer = setInterval(() => {
+        this.clockStr = fmtClock(new Date());
+        // Redraw the Time column header so the live clock shows.
+        if (this.table) {
+          const col = this.table.getColumn("ts");
+          if (col)
+            col.getElement().querySelector(".tabulator-col-title").textContent =
+              this.clockStr;
+        }
+      }, 1000);
     },
     deactivate() {
       if (this.subscribed) {
         evtBus.off("unilog-event", this.onUnilogEvent);
         srvr.unilogUnsubscribe();
         this.subscribed = false;
+      }
+      if (this.clockTimer) {
+        clearInterval(this.clockTimer);
+        this.clockTimer = null;
       }
     },
     columns() {
@@ -203,6 +248,7 @@ export default {
           field: "ts",
           width: 105,
           hozAlign: "center",
+          titleFormatter: () => this.clockStr,
           formatter: (cell) => (cell.getValue() || "").replace(/^\d{4}\//, ""),
         },
         {
@@ -286,6 +332,9 @@ export default {
         },
       });
       this.table.on("cellClick", this.onCellClick);
+      this.table.on("dataFiltered", (filters, rows) => {
+        this.displayedCount = rows.length;
+      });
       this.table.on("tableBuilt", () => {
         this.holder = this.$refs.tableEl.querySelector(
           ".tabulator-tableholder",
@@ -306,6 +355,17 @@ export default {
       if (this.holder.scrollTop < 80) this.loadOlder();
     },
     onCellClick(e, cell) {
+      if (e.altKey) {
+        const val = String(cell.getValue() ?? "");
+        navigator.clipboard.writeText(val).catch(() => {});
+        const el = cell.getElement();
+        const prev = el.style.backgroundColor;
+        el.style.backgroundColor = "#ffb6c1";
+        setTimeout(() => {
+          el.style.backgroundColor = prev;
+        }, 300);
+        return;
+      }
       const def = cell.getColumn().getDefinition();
       if (!def.headerFilter) return;
       this.table.setHeaderFilterValue(
@@ -337,6 +397,7 @@ export default {
         // the virtual-scroll offset and causes the blank-table flash.
         await this.table.addData(older, true);
         this.rowCount = this.table.getDataCount();
+        this.displayedCount = this.table.getDataCount("active");
         if (older.length < pageLimit) this.exhausted = true;
       } catch (err) {
         this.error = err?.message || String(err);
@@ -349,6 +410,34 @@ export default {
       this.$nextTick(() => {
         if (this.holder) this.holder.scrollTop = this.holder.scrollHeight;
       });
+    },
+    scrollLeft() {
+      if (this.holder) this.holder.scrollLeft = 0;
+    },
+    scrollRight() {
+      if (this.holder) this.holder.scrollLeft = this.holder.scrollWidth;
+    },
+    onPickerChangeMo() {
+      if (this.pickerSel.mo !== "") {
+        const now = new Date();
+        this.pickerSel.da = now.getDate();
+        this.pickerSel.hr = 0;
+        this.pickerSel.mi = 0;
+      }
+      this.onPickerChange();
+    },
+    onPickerChangeDa() {
+      if (this.pickerSel.da !== "") {
+        this.pickerSel.hr = 0;
+        this.pickerSel.mi = 0;
+      }
+      this.onPickerChange();
+    },
+    onPickerChangeHr() {
+      if (this.pickerSel.hr !== "") {
+        this.pickerSel.mi = 0;
+      }
+      this.onPickerChange();
     },
     onPickerChange() {
       this.scrollToTime(selToMs(this.pickerSel));
@@ -420,6 +509,8 @@ export default {
         // server returns newest-first; display oldest-first (ascending).
         const events = (res?.events || []).slice().reverse();
         this.rowCount = events.length;
+        this.displayedCount = events.length;
+        this.dbTotal = res?.total ?? 0;
         this.oldestId = events.length ? events[0].id : null;
         this.exhausted = events.length < PAGE;
         this.loadedOnce = true;

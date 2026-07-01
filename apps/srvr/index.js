@@ -165,7 +165,7 @@ const RUN_BIF_PATH = path.join(SRVR_ROOT_DIR, "scripts", "run-bif.js");
 // GLOBAL-MSG: Bif — show name cropped to 10 chars, append "..." when cropped.
 const cropName = (name) => {
   const s = String(name || "");
-  return s.length > 10 ? s.slice(0, 10) + "..." : s;
+  return s.length > 20 ? s.slice(0, 20) + "..." : s;
 };
 let bifNeededQueue = []; // [{ showName, bifPath }, ...] persisted
 let bifCheckTimer = null; // single backoff timer handle
@@ -214,26 +214,71 @@ const ffmpegQueue = (() => {
   };
 })();
 // Total batch jobs pending across all three queues combined.
-function batchJobsTotal() {
-  // reencodeQueue includes the currently-running entry (shifted only on success).
-  // subQueue entry is shifted before generateEmbSrts runs (+1 if busy).
-  // bifNeededQueue entry is shifted after startBifCreate (+1 if lock file exists).
-  // asrQueue includes the currently-running entry (shifted after it completes).
-  return (
-    reencodeQueue.length +
-    subQueue.length +
-    (subQueueBusy ? 1 : 0) +
-    bifNeededQueue.length +
-    (readBifCreating() ? 1 : 0) +
-    asrQueue.length
-  );
-}
-
-// Format a batch hdrMsg label: code + optional (N) when total > 1 + show name.
-function batchLabel(code, showName) {
-  const n = batchJobsTotal();
+// Format a batch hdrMsg label: code + (N) when queue > 1 + show name.
+function batchLabel(code, showName, n) {
   const prefix = n > 1 ? `${code}(${n})` : code;
   return `${prefix}: ${cropName(showName)}`;
+}
+
+// Track current BIF show name since the entry is shifted before onDone fires.
+let _currentBifShowName = null;
+
+// Refresh all four batch hdrMsg entries from live queue state.
+// Call this whenever any batch queue changes so every pending type is visible.
+function syncBatchMsgs() {
+  // Reencode (E)
+  if (reencodeQueue.length > 0) {
+    const e = reencodeQueue[0];
+    const se = `S${String(e.season).padStart(2, "0")}E${String(e.episode).padStart(2, "0")}`;
+    setGlobalMessage({
+      id: "Reencode",
+      text: batchLabel(
+        "E",
+        `${cropName(e.showName)} ${se}`,
+        reencodeQueue.length,
+      ),
+      position: 2003,
+    });
+  } else {
+    setGlobalMessage({ id: "Reencode", action: "hide" });
+  }
+  // EmbSub (>)
+  const embCount = subQueue.length + (subQueueBusy ? 1 : 0);
+  if (embCount > 0) {
+    const name = subQueueBusy
+      ? showNameFromFilePath(currentlyProcessingSubPath || "")
+      : showNameFromFilePath(subQueue[0]?.videoFilePath || "");
+    setGlobalMessage({
+      id: "EmbSub",
+      text: batchLabel(">", name, embCount),
+      position: 2004,
+    });
+  } else {
+    setGlobalMessage({ id: "EmbSub", action: "hide" });
+  }
+  // BIF (B)
+  const bifCount = bifNeededQueue.length + (_currentBifShowName ? 1 : 0);
+  if (bifCount > 0) {
+    const name = _currentBifShowName || bifNeededQueue[0]?.showName || "";
+    setGlobalMessage({
+      id: "Bif",
+      text: batchLabel("B", name, bifCount),
+      position: 2002,
+    });
+  } else {
+    setGlobalMessage({ id: "Bif", action: "hide" });
+  }
+  // ASR (+)
+  if (asrQueue.length > 0) {
+    const name = showNameFromFilePath(asrQueue[0]?.videoPath || "");
+    setGlobalMessage({
+      id: "Asr",
+      text: batchLabel("+", name, asrQueue.length),
+      position: 2005,
+    });
+  } else {
+    setGlobalMessage({ id: "Asr", action: "hide" });
+  }
 }
 
 // Counters for active real-time streaming ffmpegs — shown in hdrMsg.
@@ -943,6 +988,7 @@ function addToAsrQueue(entries) {
       count: asrQueue.length,
       running: genSrtRunning,
     });
+    syncBatchMsgs();
     asrQueueDelay = 500;
   }
 }
@@ -965,6 +1011,7 @@ function enqueueSubQueue(entry, toFront) {
   }
   if (toFront) subQueue.unshift(entry);
   else subQueue.push(entry);
+  syncBatchMsgs();
 }
 function enqueueSubQueueChkSrt(entry, toFront) {
   const idx = subQueueChkSrt.findIndex(
@@ -1112,12 +1159,8 @@ function startBifCreate(bifNeededObj) {
   } catch (e) {
     unilog(511, "lock write error:", e.message);
   }
-  // GLOBAL-MSG: Bif
-  setGlobalMessage({
-    id: "Bif",
-    text: batchLabel("B", bifNeededObj.showName),
-    position: 2002,
-  });
+  _currentBifShowName = bifNeededObj.showName;
+  syncBatchMsgs();
   // Hold the batch ffmpeg queue for the duration of the BIF child process so
   // BIF and other batch ffmpeg jobs (subtitle extraction, re-encode) never
   // run concurrently.
@@ -1129,8 +1172,8 @@ function startBifCreate(bifNeededObj) {
             fs.unlinkSync(BIF_CREATING_PATH);
           } catch {}
           unilog(4, `done ${bifNeededObj.showName}`);
-          // GLOBAL-MSG: Bif
-          setGlobalMessage({ id: "Bif", action: "hide" });
+          _currentBifShowName = null;
+          syncBatchMsgs();
           checkBifNeededQueue();
           resolve();
         };
@@ -1160,8 +1203,8 @@ function cancelBifCreate(showName) {
     fs.unlinkSync(BIF_CREATING_PATH);
   } catch {}
   unilog(5, `cancel ${showName} pid=${lock.pid}`);
-  // GLOBAL-MSG: Bif
-  setGlobalMessage({ id: "Bif", action: "hide" });
+  _currentBifShowName = null;
+  syncBatchMsgs();
 }
 
 // React to a show's needsIntro flipping. On true: maybe queue a bif. On false:
@@ -1199,6 +1242,7 @@ function handleNeedsIntroChange(showName, rec, needsIntro) {
     bifNeededQueue.push({ showName, bifPath });
     persistBifNeededQueue();
     unilog(6, `queued ${showName} ${bifPath}`);
+    syncBatchMsgs();
     checkBifNeededQueue();
   } else {
     cancelBifCreate(showName);
@@ -1525,12 +1569,7 @@ async function generateEmbSrts(
   fromUI,
 ) {
   const base = videoFilePath.replace(/\.[^.]+$/, "");
-  // GLOBAL-MSG: EmbSub
-  setGlobalMessage({
-    id: "EmbSub",
-    text: batchLabel(">", showname),
-    position: 2004,
-  });
+  syncBatchMsgs();
   let probeStreams = [];
   await new Promise((resolve) => {
     cp.execFile(
@@ -1611,8 +1650,7 @@ async function generateEmbSrts(
   const hasNonText = subStreams.some((s) => !textCodecs.includes(s.codec_name));
   const pgsOnly = hasNonText && textStreams.length === 0;
   const hasEmbText = textStreams.length > 0;
-  // GLOBAL-MSG: EmbSub
-  setGlobalMessage({ id: "EmbSub", action: "hide" });
+  syncBatchMsgs();
   return { pgsOnly, hasEmbText };
 }
 async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
@@ -1721,12 +1759,7 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
   unilog(14, `asr start: ${videoFilePath}`);
   genSrtRunning = true;
   notifyClients("asr-queue-update", { count: asrQueue.length, running: true });
-  // GLOBAL-MSG: Asr (part of the shared batch queue, shown with the `+` code)
-  setGlobalMessage({
-    id: "Asr",
-    text: batchLabel("+", showNameFromFilePath(videoFilePath)),
-    position: 2005,
-  });
+  syncBatchMsgs();
   try {
     await ffmpegQueue.run(
       () =>
@@ -1776,8 +1809,7 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
   } finally {
     genSrtRunning = false;
     genSrtChild = null;
-    // GLOBAL-MSG: Asr
-    setGlobalMessage({ id: "Asr", action: "hide" });
+    syncBatchMsgs();
     notifyClients("asr-queue-update", {
       count: asrQueue.length,
       running: false,
@@ -7111,18 +7143,17 @@ const pollGlobalMessages = () => {
     const psi = fs.readFileSync("/proc/pressure/cpu", "utf8");
     const m = /full\s+avg10=([\d.]+)/.exec(psi);
     const full10 = m ? parseFloat(m[1]) : 0;
-    if (full10 >= CPU_STALL_THRESHOLD)
-      setGlobalMessage({
-        id: "CPU",
-        text: `cpu-stall: ${full10.toFixed(0)}%`,
-        position: 1001,
-      });
-    else setGlobalMessage({ id: "CPU", action: "hide" });
+    setGlobalMessage({
+      id: "CPU",
+      text: `Cpu:${Math.round(full10)}`,
+      position: 1001,
+    });
   } catch (e) {
     unilog(616, "cpu psi error:", e.message);
   }
   // GLOBAL-MSG: Down
   try {
+    syncBatchMsgs(); // safety refresh in case any queue update was missed
     let count = 0;
     if (fs.existsSync(DOWN_INPROGRESS_PATH)) {
       const map = JSON.parse(fs.readFileSync(DOWN_INPROGRESS_PATH, "utf8"));
@@ -9339,6 +9370,7 @@ function enqueueReencode(entry) {
   reencodeQueue.push(entry);
   persistReencodeQueue();
   unilog(1104, `reencode queued: ${path.basename(entry.srcPath)}`);
+  syncBatchMsgs();
   setTimeout(processReencodeQueue, 0);
 }
 
@@ -9431,13 +9463,7 @@ async function processReencodeQueue() {
   const entry = reencodeQueue[0];
   if (!entry) return;
   reencodeRunning = true;
-  const seLabel = `S${String(entry.season).padStart(2, "0")}E${String(entry.episode).padStart(2, "0")}`;
-  // GLOBAL-MSG: Reencode
-  setGlobalMessage({
-    id: "Reencode",
-    text: batchLabel("E", `${cropName(entry.showName)} ${seLabel}`),
-    position: 2003,
-  });
+  syncBatchMsgs();
   let encodeSucceeded = false;
   try {
     await reencodeOneTo1080(entry);
@@ -9458,10 +9484,7 @@ async function processReencodeQueue() {
       persistReencodeQueue();
     }
     reencodeRunning = false;
-    // GLOBAL-MSG: Reencode
-    if (reencodeQueue.length === 0) {
-      setGlobalMessage({ id: "Reencode", action: "hide" });
-    }
+    syncBatchMsgs();
     if (reencodeQueue.length > 0) setTimeout(processReencodeQueue, 1000);
   }
 }

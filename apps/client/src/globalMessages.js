@@ -71,7 +71,7 @@ export function globalMessageText() {
   return [...globalMessages.values()]
     .sort((a, b) => a.position - b.position || a.timeAdded - b.timeAdded)
     .map((m) => m.text)
-    .join(", ");
+    .join(" | ");
 }
 
 // Server pushes arrive here via notifyClients("setGlobalMessage", msgObj).

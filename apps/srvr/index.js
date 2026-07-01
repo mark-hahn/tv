@@ -1,6 +1,5 @@
 import fs from "fs";
 import fsp from "fs/promises";
-import os from "os";
 import * as cp from "child_process";
 import * as path from "node:path";
 import express from "express";
@@ -187,6 +186,14 @@ let genSrtRunning = false,
   subQueuePendingNow = false;
 let asrLogBuffer = [];
 
+// Batch ffmpeg/jobs run under SCHED_IDLE (`chrt -i 0`) + idle I/O class
+// (`ionice -c 3`). SCHED_IDLE means the kernel only gives them CPU when no
+// normal-priority task wants it, so Emby transcodes and live streaming (both
+// normal priority) run at full speed and instantly preempt batch work — while
+// batch still uses every idle core to finish fast. This is why CPU load average
+// is not a useful health signal; PSI `full` pressure is (see pollGlobalMessages).
+const BATCH_SCHED = ["chrt", "-i", "0", "ionice", "-c", "3"];
+
 // Single queue for all batch ffmpeg jobs (subtitle extraction, re-encode, BIF).
 // Video streaming is managed separately.
 const ffmpegQueue = (() => {
@@ -211,12 +218,14 @@ function batchJobsTotal() {
   // reencodeQueue includes the currently-running entry (shifted only on success).
   // subQueue entry is shifted before generateEmbSrts runs (+1 if busy).
   // bifNeededQueue entry is shifted after startBifCreate (+1 if lock file exists).
+  // asrQueue includes the currently-running entry (shifted after it completes).
   return (
     reencodeQueue.length +
     subQueue.length +
     (subQueueBusy ? 1 : 0) +
     bifNeededQueue.length +
-    (readBifCreating() ? 1 : 0)
+    (readBifCreating() ? 1 : 0) +
+    asrQueue.length
   );
 }
 
@@ -1079,8 +1088,8 @@ function startBifCreate(bifNeededObj) {
   let child;
   try {
     child = cp.spawn(
-      "nice",
-      ["-n", "15", "node", RUN_BIF_PATH, bifNeededObj.bifPath],
+      BATCH_SCHED[0],
+      [...BATCH_SCHED.slice(1), "node", RUN_BIF_PATH, bifNeededObj.bifPath],
       {
         detached: true, // own process group so cancel can kill ffmpeg too
         stdio: "ignore",
@@ -1565,10 +1574,9 @@ async function generateEmbSrts(
       () =>
         new Promise((resolve) => {
           cp.execFile(
-            "nice",
+            BATCH_SCHED[0],
             [
-              "-n",
-              "15",
+              ...BATCH_SCHED.slice(1),
               "ffmpeg",
               "-v",
               "quiet",
@@ -1713,29 +1721,42 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
   unilog(14, `asr start: ${videoFilePath}`);
   genSrtRunning = true;
   notifyClients("asr-queue-update", { count: asrQueue.length, running: true });
+  // GLOBAL-MSG: Asr (part of the shared batch queue, shown with the `+` code)
+  setGlobalMessage({
+    id: "Asr",
+    text: batchLabel("+", showNameFromFilePath(videoFilePath)),
+    position: 2005,
+  });
   try {
-    await new Promise((resolve, reject) => {
-      const child = cp.spawn("node", [ASR_JS_PATH, videoFilePath], {
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-      genSrtChild = child;
-      child.stdout.on("data", (d) => {
-        const line = d.toString().trimEnd();
-        unilog(517, line);
-        appendAsrLog(line);
-      });
-      child.stderr.on("data", (d) => {
-        const line = d.toString().trimEnd();
-        unilog(518, line);
-        appendAsrLog(line);
-      });
-      child.on("close", (code) => {
-        genSrtChild = null;
-        if (code === 0) resolve();
-        else if (code === null) reject(new Error(`__cancelled__`));
-        else reject(new Error(`asr.js exited ${code}`));
-      });
-    });
+    await ffmpegQueue.run(
+      () =>
+        new Promise((resolve, reject) => {
+          const child = cp.spawn(
+            BATCH_SCHED[0],
+            [...BATCH_SCHED.slice(1), "node", ASR_JS_PATH, videoFilePath],
+            {
+              stdio: ["ignore", "pipe", "pipe"],
+            },
+          );
+          genSrtChild = child;
+          child.stdout.on("data", (d) => {
+            const line = d.toString().trimEnd();
+            unilog(517, line);
+            appendAsrLog(line);
+          });
+          child.stderr.on("data", (d) => {
+            const line = d.toString().trimEnd();
+            unilog(518, line);
+            appendAsrLog(line);
+          });
+          child.on("close", (code) => {
+            genSrtChild = null;
+            if (code === 0) resolve();
+            else if (code === null) reject(new Error(`__cancelled__`));
+            else reject(new Error(`asr.js exited ${code}`));
+          });
+        }),
+    );
     unilog(15, `asr done: ${videoFilePath}`);
     appendAsrLog(`=== Done: ${path.basename(videoFilePath)} ===`);
     if (fromUI)
@@ -1755,6 +1776,8 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
   } finally {
     genSrtRunning = false;
     genSrtChild = null;
+    // GLOBAL-MSG: Asr
+    setGlobalMessage({ id: "Asr", action: "hide" });
     notifyClients("asr-queue-update", {
       count: asrQueue.length,
       running: false,
@@ -1866,24 +1889,20 @@ function startAsrQueueLoop() {
   const loop = async () => {
     if (!genSrtRunning && asrQueue.length > 0) {
       const entry = asrQueue[0];
-      if (entry.lowPriority && os.loadavg()[0] > 2) {
-        asrQueueDelay = 10_000;
-      } else {
-        asrQueueDelay = 500;
-        generateSrtWithAsr(entry.videoPath, entry.fromUI)
-          .catch((e) => unilog(522, "", e.message))
-          .finally(() => {
-            if (asrQueue[0]?.videoPath === entry.videoPath) {
-              asrQueue.shift();
-              persistAsrQueue();
-              notifyClients("asr-queue-update", {
-                count: asrQueue.length,
-                running: false,
-                entries: asrQueue,
-              });
-            }
-          });
-      }
+      asrQueueDelay = 500;
+      generateSrtWithAsr(entry.videoPath, entry.fromUI)
+        .catch((e) => unilog(522, "", e.message))
+        .finally(() => {
+          if (asrQueue[0]?.videoPath === entry.videoPath) {
+            asrQueue.shift();
+            persistAsrQueue();
+            notifyClients("asr-queue-update", {
+              count: asrQueue.length,
+              running: false,
+              entries: asrQueue,
+            });
+          }
+        });
     }
     if (asrQueue.length === 0) asrQueueDelay = 10_000;
     setTimeout(loop, asrQueueDelay);
@@ -7080,21 +7099,27 @@ const DOWN_INPROGRESS_PATH = path.join(
   "tv-inProgress.json",
 );
 const GLOBAL_MSG_POLL_MS = 5000;
-const CPU_LOAD_THRESHOLD = 2;
+const CPU_STALL_THRESHOLD = 1; // percent; below this, nothing important is starved
 
 const pollGlobalMessages = () => {
-  // GLOBAL-MSG: CPU
+  // GLOBAL-MSG: CPU stall — PSI "full" avg10 from /proc/pressure/cpu. This is the
+  // % of the last 10s that even normal-priority work (Emby transcodes, live
+  // streaming) was stalled waiting for CPU. It stays 0 while streaming has the
+  // CPU it needs (batch work runs SCHED_IDLE and yields), and only climbs when
+  // the box is genuinely oversubscribed. Far more meaningful than load average.
   try {
-    const load = os.loadavg()[0];
-    if (load >= CPU_LOAD_THRESHOLD)
+    const psi = fs.readFileSync("/proc/pressure/cpu", "utf8");
+    const m = /full\s+avg10=([\d.]+)/.exec(psi);
+    const full10 = m ? parseFloat(m[1]) : 0;
+    if (full10 >= CPU_STALL_THRESHOLD)
       setGlobalMessage({
         id: "CPU",
-        text: `CPU: ${load.toFixed(1)}`,
+        text: `cpu-stall: ${full10.toFixed(0)}%`,
         position: 1001,
       });
     else setGlobalMessage({ id: "CPU", action: "hide" });
   } catch (e) {
-    unilog(616, "cpu poll error:", e.message);
+    unilog(616, "cpu psi error:", e.message);
   }
   // GLOBAL-MSG: Down
   try {
@@ -9376,7 +9401,11 @@ async function reencodeOneTo1080(entry) {
           "16M",
           tmpPath,
         ];
-        const ff = cp.spawn("nice", ["-n", "15", "ffmpeg", ...args]);
+        const ff = cp.spawn(BATCH_SCHED[0], [
+          ...BATCH_SCHED.slice(1),
+          "ffmpeg",
+          ...args,
+        ]);
         const killTimer = setTimeout(() => {
           ff.kill("SIGKILL");
         }, REENCODE_TIMEOUT_MS);

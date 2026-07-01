@@ -9390,29 +9390,38 @@ async function reencodeOneTo1080(entry) {
     return;
   }
   const dst1080Name = srcName.replace(/2160/g, "1080"); // e.g. Show.S01E01.1080p.mkv
-  // Hidden dotfile temp keeps the real extension so ffmpeg picks the muxer and
-  // chokidar/Emby ignore it while encoding.
+  // tmpPath: hidden dotfile so chokidar/Emby ignore it while encoding.
+  // vidTmpPath: intermediate video-only MP4. Re-encoding through a separate
+  // container and remuxing strips the DoVi configuration record that ffmpeg
+  // would otherwise copy from the HEVC source into the MKV video track (which
+  // makes Emby/Bravia spin on playback). MP4 is used rather than a raw .h264
+  // elementary stream because raw H.264 carries no timing, so it would be read
+  // back at ffmpeg's default 25 fps and desync the audio on non-25fps sources.
   const tmpPath = path.join(seasonDir, ".restmp-" + dst1080Name);
+  const vidTmpPath = tmpPath.replace(/\.mkv$/i, ".mp4");
   const dstPath = path.join(seasonDir, dst1080Name + ".alt");
   try {
     if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
   } catch (e) {
     unilog(1107, `could not remove stale temp ${tmpPath}: ${e.message}`);
   }
+  try {
+    if (fs.existsSync(vidTmpPath)) fs.unlinkSync(vidTmpPath);
+  } catch (e) {
+    unilog(1121, `could not remove stale vid temp: ${e.message}`);
+  }
   unilog(1108, `reencode 2160->1080 start: ${srcName}`);
   await ffmpegQueue.run(
     () =>
       new Promise((resolve, reject) => {
-        // H.264 8-bit, 1080p, <=10 Mbit/s video; all other tracks copied unchanged.
         const REENCODE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes max
-        const args = [
+        // Step 1: encode video only to a video-only MP4 (preserves timing).
+        const args1 = [
           "-y",
           "-i",
           srcPath,
           "-map",
-          "0",
-          "-c",
-          "copy",
+          "0:v:0",
           "-c:v",
           "libx264",
           "-vf",
@@ -9433,25 +9442,62 @@ async function reencodeOneTo1080(entry) {
           "10M",
           "-bufsize",
           "16M",
-          tmpPath,
+          vidTmpPath,
         ];
-        const ff = cp.spawn(BATCH_SCHED[0], [
+        const ff1 = cp.spawn(BATCH_SCHED[0], [
           ...BATCH_SCHED.slice(1),
           "ffmpeg",
-          ...args,
+          ...args1,
         ]);
         const killTimer = setTimeout(() => {
-          ff.kill("SIGKILL");
+          ff1.kill("SIGKILL");
         }, REENCODE_TIMEOUT_MS);
-        ff.stderr.on("data", () => {});
-        ff.on("error", (err) => {
+        ff1.stderr.on("data", () => {});
+        ff1.on("error", (err) => {
           clearTimeout(killTimer);
           reject(err);
         });
-        ff.on("close", (code) => {
+        ff1.on("close", (code) => {
           clearTimeout(killTimer);
-          if (code === 0) resolve();
-          else reject(new Error(`ffmpeg exit ${code}`));
+          if (code !== 0) {
+            reject(new Error(`ffmpeg step1 exit ${code}`));
+            return;
+          }
+          // Step 2: remux MP4 video + all non-video streams from source into MKV.
+          // -map 0:v:0  = re-encoded H.264 video from step 1
+          // -map 1      = everything from source (audio, subs, attachments)
+          // -map -1:v   = remove source video (we already have it from step 1)
+          const args2 = [
+            "-y",
+            "-i",
+            vidTmpPath,
+            "-i",
+            srcPath,
+            "-map",
+            "0:v:0",
+            "-map",
+            "1",
+            "-map",
+            "-1:v",
+            "-c",
+            "copy",
+            tmpPath,
+          ];
+          const ff2 = cp.spawn("ffmpeg", args2);
+          ff2.stderr.on("data", () => {});
+          ff2.on("error", (err) => {
+            try {
+              fs.unlinkSync(vidTmpPath);
+            } catch {}
+            reject(err);
+          });
+          ff2.on("close", (code2) => {
+            try {
+              fs.unlinkSync(vidTmpPath);
+            } catch {}
+            if (code2 === 0) resolve();
+            else reject(new Error(`ffmpeg step2 exit ${code2}`));
+          });
         });
       }),
   );
@@ -9472,13 +9518,17 @@ async function processReencodeQueue() {
     encodeSucceeded = true;
   } catch (e) {
     unilog(1110, `reencode failed for ${entry.srcPath}: ${e.message}`);
-    // Clean up stale temp file so it doesn't fool the scanner.
+    // Clean up stale temp files so they don't fool the scanner.
     const tmpPath = path.join(
       path.dirname(entry.srcPath),
       ".restmp-" + path.basename(entry.srcPath).replace(/2160/g, "1080"),
     );
     try {
       if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+    } catch {}
+    const vidTmpPath = tmpPath.replace(/\.mkv$/i, ".mp4");
+    try {
+      if (fs.existsSync(vidTmpPath)) fs.unlinkSync(vidTmpPath);
     } catch {}
   } finally {
     if (encodeSucceeded && reencodeQueue[0]?.srcPath === entry.srcPath) {

@@ -33,7 +33,7 @@
         class="logSel"
         @change="onPickerChange"
       >
-        <option value=""></option>
+        <option value="">Month</option>
         <option
           v-for="m in 12"
           :key="m"
@@ -47,7 +47,7 @@
         class="logSel"
         @change="onPickerChange"
       >
-        <option value=""></option>
+        <option value="">Day</option>
         <option
           v-for="d in 31"
           :key="d"
@@ -61,7 +61,7 @@
         class="logSel"
         @change="onPickerChange"
       >
-        <option value=""></option>
+        <option value="">Hrs</option>
         <option
           v-for="h in 24"
           :key="h - 1"
@@ -75,7 +75,7 @@
         class="logSel"
         @change="onPickerChange"
       >
-        <option value=""></option>
+        <option value="">Mins</option>
         <option
           v-for="m in 60"
           :key="m - 1"
@@ -130,16 +130,14 @@ function tsToMs(s) {
   return new Date(Y, (Mo || 1) - 1, Da || 1, H, Mi, Se).getTime();
 }
 // pickerToMs from individual dropdown values (year=2026, sec=0).
+// Any blank field falls back to the corresponding value from `now`.
 function selToMs({ mo, da, hr, mi }) {
-  if (mo === "" || da === "" || hr === "" || mi === "") return null;
-  return new Date(
-    2026,
-    Number(mo) - 1,
-    Number(da),
-    Number(hr),
-    Number(mi),
-    0,
-  ).getTime();
+  const now = new Date();
+  const M = mo !== "" ? Number(mo) - 1 : now.getMonth();
+  const D = da !== "" ? Number(da) : now.getDate();
+  const H = hr !== "" ? Number(hr) : now.getHours();
+  const Mi = mi !== "" ? Number(mi) : now.getMinutes();
+  return new Date(2026, M, D, H, Mi, 0).getTime();
 }
 
 export default {
@@ -255,6 +253,12 @@ export default {
           hozAlign: "right",
           headerFilter: "input",
         },
+        {
+          title: "Id",
+          field: "id",
+          width: 45,
+          hozAlign: "right",
+        },
       ];
     },
     ensureTable() {
@@ -329,11 +333,10 @@ export default {
           return;
         }
         this.oldestId = older[0].id;
-        const firstId = existing.length ? existing[0].id : null;
-        const combined = older.concat(existing);
-        await this.table.replaceData(combined);
-        this.rowCount = combined.length;
-        if (firstId != null) this.table.scrollToRow(firstId, "top", false);
+        // Prepend via addData(rows, true) to avoid replaceData which resets
+        // the virtual-scroll offset and causes the blank-table flash.
+        await this.table.addData(older, true);
+        this.rowCount = this.table.getDataCount();
         if (older.length < pageLimit) this.exhausted = true;
       } catch (err) {
         this.error = err?.message || String(err);
@@ -348,23 +351,28 @@ export default {
       });
     },
     onPickerChange() {
-      const target = selToMs(this.pickerSel);
-      if (target != null) this.scrollToTime(target);
+      this.scrollToTime(selToMs(this.pickerSel));
     },
     clearPicker() {
       this.pickerSel = { mo: "", da: "", hr: "", mi: "" };
+      // Clear all column header filters.
+      if (this.table) {
+        for (const col of this.table.getColumns()) {
+          this.table.setHeaderFilterValue(col, "");
+        }
+      }
       this.scrollToBottom(true);
     },
     async scrollToTime(target) {
       if (!this.table || target == null) return;
-      // If the target time is older than the oldest loaded row, page in older
-      // data until it's within range (or we hit the 5000-row cap / run out).
+      // Page in older rows until the target time is within the loaded range
+      // (or we hit the 5000-row cap / run out of history).
       let guard = 0;
       while (guard++ < 20) {
         const rows = this.table.getRows();
         if (!rows.length) return;
-        if (tsToMs(rows[0].getData().ts) <= target) break; // in range
-        if (rows.length >= MAX_ROWS || this.exhausted) break; // cap / no more
+        if (tsToMs(rows[0].getData().ts) <= target) break;
+        if (rows.length >= MAX_ROWS || this.exhausted) break;
         await this.loadOlder();
       }
       const rows = this.table.getRows();

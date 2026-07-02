@@ -6,9 +6,18 @@ import { fileURLToPath } from "url";
 
 import express from "express";
 import cors from "cors";
-import { unilog, logHere } from "@tv/share";
+import { unilog, logHere, setUnilogSink } from "@tv/share";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+const SRVR_LOG_URL = "http://127.0.0.1:8739/api/log";
+setUnilogSink(({ logId, message }) => {
+  fetch(SRVR_LOG_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ logId, pid: "tv-tv", message }),
+  }).catch(() => {});
+});
 const _adbLog = createWriteStream(join(__dirname, "../data/tv-adb.log"), {
   flags: "a",
 });

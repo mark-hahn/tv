@@ -48,7 +48,7 @@ import {
   parseTitleFromFilename,
   TV_BLOCKED,
 } from "@tv/share";
-import { unilog } from "@tv/share";
+import { unilog, setUnilogSink } from "@tv/share";
 import parseTorrentTitlePkg from "parse-torrent-title";
 import {
   getApiCookiesDir,
@@ -63,6 +63,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const INTERNAL_SRVR_SUBS_COUNT_URL =
   "http://127.0.0.1:8739/api/subsCountEpisodes";
+const INTERNAL_SRVR_LOG_URL = "http://127.0.0.1:8739/api/log";
+
+setUnilogSink(({ logId, message }) => {
+  fetch(INTERNAL_SRVR_LOG_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ logId, pid: "tv-api", message }),
+  }).catch(() => {});
+});
 const VIDEO_EXTENSIONS = new Set([
   ".mkv",
   ".mp4",
@@ -306,10 +315,10 @@ async function handoffForcedTorrentToTvDown({
 
       if (payload.length === 0) {
         unilog(206, "forced handoff could not compute metadata paths", {
-            addTag,
-            infoHash,
-            savePath,
-          });
+          addTag,
+          infoHash,
+          savePath,
+        });
         return;
       }
 
@@ -325,7 +334,13 @@ async function handoffForcedTorrentToTvDown({
         );
       }
 
-      unilog(794, "history", "forceDown", showName || torrentTitle, `${torrentTitle} | tag: ${addTag}`);
+      unilog(
+        794,
+        "history",
+        "forceDown",
+        showName || torrentTitle,
+        `${torrentTitle} | tag: ${addTag}`,
+      );
       unilog(207, "forced handoff sent to tv-down", {
         addTag,
         infoHash,
@@ -798,7 +813,10 @@ if (
       );
       fs.mkdirSync(path.dirname(outPath), { recursive: true });
       fs.writeFileSync(outPath, JSON.stringify(info, null, 2), "utf8");
-      unilog(212, `qbt startup dump wrote ${Array.isArray(info) ? info.length : 0} torrents -> ${outPath}`);
+      unilog(
+        212,
+        `qbt startup dump wrote ${Array.isArray(info) ? info.length : 0} torrents -> ${outPath}`,
+      );
     } catch (e) {
       unilog(213, "qbt startup dump error:", e);
     }
@@ -1431,7 +1449,13 @@ app.get("/api/search", async (req, res) => {
     return res.status(400).json({ error: "Show name is required" });
   }
 
-  unilog(796, "history", more ? "torMore" : "torSrch", showName, `search: ${showName}`);
+  unilog(
+    796,
+    "history",
+    more ? "torMore" : "torSrch",
+    showName,
+    `search: ${showName}`,
+  );
 
   try {
     // If the client doesn't pass cf_clearance values, fall back to the local persisted file.
@@ -1593,7 +1617,13 @@ async function handleDownloadRequest(req, res) {
       ).trim();
 
     const postTorErr = (stage, errorMsg) => {
-      unilog(797, "history", "torErr", dlShowName || torTitle(), `${stage}: ${errorMsg} | ${torTitle()}`);
+      unilog(
+        797,
+        "history",
+        "torErr",
+        dlShowName || torTitle(),
+        `${stage}: ${errorMsg} | ${torTitle()}`,
+      );
     };
 
     if (!torrent) {
@@ -1813,7 +1843,13 @@ async function handleDownloadRequest(req, res) {
             torrent?.clientTitle ||
             "unknown",
         ).trim();
-        unilog(798, "history", "torErr", dlShowName || errTorTitle, `qbt add threw: ${e?.message || String(e)} | ${errTorTitle}`);
+        unilog(
+          798,
+          "history",
+          "torErr",
+          dlShowName || errTorTitle,
+          `qbt add threw: ${e?.message || String(e)} | ${errTorTitle}`,
+        );
         res.json({
           ...tvProcResult,
           success: false,
@@ -1856,7 +1892,10 @@ async function handleDownloadRequest(req, res) {
           const list = Array.isArray(tagged) ? tagged : [];
           if (list.length > 0) {
             if (debug)
-              unilog(242, "qbt add disambiguated as success via tag", { addTag, count: list.length });
+              unilog(242, "qbt add disambiguated as success via tag", {
+                addTag,
+                count: list.length,
+              });
             let tagInfoHash = "";
             try {
               const parsed = parseTorrent(fetched.torrentData);
@@ -1872,7 +1911,13 @@ async function handleDownloadRequest(req, res) {
                 torrent?.clientTitle ||
                 "unknown",
             ).trim();
-            unilog(799, "history", "torSent", dlShowName || tagTorTitle, `${tagTorTitle} | provider: ${torrent?.raw?.provider || torrent?.provider || "?"} | tag: ${addTag}`);
+            unilog(
+              799,
+              "history",
+              "torSent",
+              dlShowName || tagTorTitle,
+              `${tagTorTitle} | provider: ${torrent?.raw?.provider || torrent?.provider || "?"} | tag: ${addTag}`,
+            );
             if (debug) {
               res.json({
                 ...tvProcResult,
@@ -1908,7 +1953,11 @@ async function handleDownloadRequest(req, res) {
               ).trim();
               const title = existingName || fallbackTitle || infoHash;
               if (debug)
-                unilog(243, "qbt add disambiguated as duplicate via hash", { addTag, infoHash, title });
+                unilog(243, "qbt add disambiguated as duplicate via hash", {
+                  addTag,
+                  infoHash,
+                  title,
+                });
               res.json({
                 ...tvProcResult,
                 success: false,
@@ -1944,7 +1993,13 @@ async function handleDownloadRequest(req, res) {
             torrent?.clientTitle ||
             "unknown",
         ).trim();
-        unilog(800, "history", "torErr", dlShowName || failTorTitle, `qbt add failed: ${addRes.text || "Fails."} | ${failTorTitle}`);
+        unilog(
+          800,
+          "history",
+          "torErr",
+          dlShowName || failTorTitle,
+          `qbt add failed: ${addRes.text || "Fails."} | ${failTorTitle}`,
+        );
         return;
       }
 
@@ -1955,7 +2010,13 @@ async function handleDownloadRequest(req, res) {
           torrent?.clientTitle ||
           "unknown",
       ).trim();
-      unilog(801, "history", "torSent", dlShowName || torTitle, `${torTitle} | provider: ${torrent?.raw?.provider || torrent?.provider || "?"} | tag: ${addTag}`);
+      unilog(
+        801,
+        "history",
+        "torSent",
+        dlShowName || torTitle,
+        `${torTitle} | provider: ${torrent?.raw?.provider || torrent?.provider || "?"} | tag: ${addTag}`,
+      );
       if (debug) {
         unilog(244, "qbt add success", { addTag });
         appendDownloadsResultLog({
@@ -2141,7 +2202,10 @@ async function handleDownloadRequest(req, res) {
         const list = Array.isArray(tagged) ? tagged : [];
         if (list.length > 0) {
           if (debug)
-            unilog(247, "qbt add disambiguated as success via tag (force)", { addTag, count: list.length });
+            unilog(247, "qbt add disambiguated as success via tag (force)", {
+              addTag,
+              count: list.length,
+            });
           let infoHash = "";
           try {
             const parsed = parseTorrent(fetched.torrentData);
@@ -2157,7 +2221,13 @@ async function handleDownloadRequest(req, res) {
               torrent?.clientTitle ||
               "unknown",
           ).trim();
-          unilog(802, "history", "torSent", dlShowName || tagTorTitle, `${tagTorTitle} | provider: ${torrent?.raw?.provider || torrent?.provider || "?"} | tag: ${addTag}`);
+          unilog(
+            802,
+            "history",
+            "torSent",
+            dlShowName || tagTorTitle,
+            `${tagTorTitle} | provider: ${torrent?.raw?.provider || torrent?.provider || "?"} | tag: ${addTag}`,
+          );
 
           if (!isMovieDownload) {
             void handoffForcedTorrentToTvDown({
@@ -2226,7 +2296,13 @@ async function handleDownloadRequest(req, res) {
                 torrent?.clientTitle ||
                 "unknown",
             ).trim();
-            unilog(803, "history", "torSent", dlShowName || torTitle, `${torTitle} | provider: ${torrent?.raw?.provider || torrent?.provider || "?"} | tag: ${addTag} | force-restart`);
+            unilog(
+              803,
+              "history",
+              "torSent",
+              dlShowName || torTitle,
+              `${torTitle} | provider: ${torrent?.raw?.provider || torrent?.provider || "?"} | tag: ${addTag} | force-restart`,
+            );
 
             if (!isMovieDownload) {
               void handoffForcedTorrentToTvDown({
@@ -2528,7 +2604,13 @@ app.get("/api/torrent-file", async (req, res) => {
       unilog(249, "using provided magnet for:", showName);
       const magRes = await addQbtMagnet({ magnetUrl, savePath });
       if (!magRes.ok) {
-        unilog(804, "history", "torErr", showName, `magnet add failed: ${magRes.text} | ${showName}`);
+        unilog(
+          804,
+          "history",
+          "torErr",
+          showName,
+          `magnet add failed: ${magRes.text} | ${showName}`,
+        );
         return res
           .status(500)
           .json({ error: `Magnet add failed: ${magRes.text}` });
@@ -2549,12 +2631,24 @@ app.get("/api/torrent-file", async (req, res) => {
         const magnet = `magnet:?xt=urn:btih:${infoHash}&dn=${dn}`;
         const magRes = await addQbtMagnet({ magnetUrl: magnet, savePath });
         if (!magRes.ok) {
-          unilog(806, "history", "torErr", showName, `magnet add failed: ${magRes.text} | ${showName}`);
+          unilog(
+            806,
+            "history",
+            "torErr",
+            showName,
+            `magnet add failed: ${magRes.text} | ${showName}`,
+          );
           return res
             .status(500)
             .json({ error: `Magnet add failed: ${magRes.text}` });
         }
-        unilog(807, "history", "torSent", showName, `magnet from link hash | ${showName}`);
+        unilog(
+          807,
+          "history",
+          "torSent",
+          showName,
+          `magnet from link hash | ${showName}`,
+        );
         return res.json({ success: true, filename: "(magnet)", bytes: 0 });
       }
       // No hash in URL — fall through to getTorrentFile search
@@ -2565,7 +2659,13 @@ app.get("/api/torrent-file", async (req, res) => {
     if (!fileBuffer) {
       return res.status(404).json({ error: "No torrent file found for show" });
     }
-    unilog(251, "adding via qbt WebAPI for:", showName, "bytes:", fileBuffer.length);
+    unilog(
+      251,
+      "adding via qbt WebAPI for:",
+      showName,
+      "bytes:",
+      fileBuffer.length,
+    );
     const addRes = await addQbtTorrent({
       torrentData: fileBuffer,
       filename: showName,
@@ -2577,7 +2677,13 @@ app.get("/api/torrent-file", async (req, res) => {
       text: addRes.text,
     });
     if (!addRes.ok) {
-      unilog(808, "history", "torErr", showName, `qbt add failed: ${addRes.text || "Fails."} | ${showName}`);
+      unilog(
+        808,
+        "history",
+        "torErr",
+        showName,
+        `qbt add failed: ${addRes.text || "Fails."} | ${showName}`,
+      );
       return res
         .status(500)
         .json({ error: `qBittorrent add failed: ${addRes.text || "Fails."}` });

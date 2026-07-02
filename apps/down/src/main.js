@@ -20,10 +20,20 @@ import {
   getResolution,
   isWatched as edIsWatched,
   unilog,
+  setUnilogSink,
 } from "@tv/share";
 
 const __filename = urlNode.fileURLToPath(import.meta.url);
 const __dirname = pathNode.dirname(__filename);
+
+const SRVR_LOG_URL = "http://127.0.0.1:8739/api/log";
+setUnilogSink(({ logId, message }) => {
+  fetch(SRVR_LOG_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ logId, pid: "tv-down", message }),
+  }).catch(() => {});
+});
 
 process.on("uncaughtException", (err) => {
   unilog(286, `uncaughtException: ${err && (err.stack || err.message || err)}`);

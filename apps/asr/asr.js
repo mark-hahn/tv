@@ -19,10 +19,19 @@ import { fileURLToPath } from "url";
 import { setTimeout as sleep } from "timers/promises";
 import axios from "axios";
 import FormData from "form-data";
-import { unilog } from "@tv/share";
+import { unilog, setUnilogSink } from "@tv/share";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const SRVR_LOG_URL = "http://127.0.0.1:8739/api/log";
+setUnilogSink(({ logId, message }) => {
+  fetch(SRVR_LOG_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ logId, pid: "tv-asr", message }),
+  }).catch(() => {});
+});
 let tmpDir = process.env.ASR_TMPDIR
   ? process.env.ASR_TMPDIR
   : path.join(__dirname, "tmp");
@@ -170,7 +179,10 @@ async function getSubtitleStreams(videoPath) {
       return lang === "" || ENGLISH_LANG_TAGS.has(lang);
     });
   } catch (e) {
-    unilog(345, `Warning: could not probe ${path.basename(videoPath)} for subtitles: ${e.message}`);
+    unilog(
+      345,
+      `Warning: could not probe ${path.basename(videoPath)} for subtitles: ${e.message}`,
+    );
     return null;
   }
 }
@@ -215,9 +227,15 @@ async function extractTextSubtitles(videoPath, subtitleStreams) {
       text = text.replace(/<\/font>/gi, "");
       text = text.replace(/<\/?(b|i|u)>/gi, "");
       await fsp.writeFile(srtPath, text, "utf8");
-      unilog(346, `extracted text sub stream ${stream.index} → ${path.basename(srtPath)}`);
+      unilog(
+        346,
+        `extracted text sub stream ${stream.index} → ${path.basename(srtPath)}`,
+      );
     } catch (e) {
-      unilog(347, `failed to extract stream ${stream.index} from ${path.basename(videoPath)}: ${e.message}`);
+      unilog(
+        347,
+        `failed to extract stream ${stream.index} from ${path.basename(videoPath)}: ${e.message}`,
+      );
     }
   }
 }
@@ -425,7 +443,13 @@ async function callApi(uploadInfo) {
     const status = response?.status || "unknown";
     unilog(352, `API error: ${status}, retrying`);
     if (attempt == 1)
-      unilog(353, "chunk, size:", uploadInfo.size, "- file:", uploadInfo.filename);
+      unilog(
+        353,
+        "chunk, size:",
+        uploadInfo.size,
+        "- file:",
+        uploadInfo.filename,
+      );
     const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
     await sleep(delay);
     continue;
@@ -440,7 +464,11 @@ function processSegments(segments, chunkInfo) {
       segment.end === undefined ||
       !segment.text?.trim()
     ) {
-      unilog(354, `skipping invalid segment in chunk ${chunkInfo.chunkIndex}:`, JSON.stringify(segment));
+      unilog(
+        354,
+        `skipping invalid segment in chunk ${chunkInfo.chunkIndex}:`,
+        JSON.stringify(segment),
+      );
       continue;
     }
     const start = chunkInfo.chunkStart + segment.start;
@@ -784,9 +812,12 @@ async function vadChunks(wavPath, initBPS, totalDur) {
   }
   chunks.push({ start: segStart, end: totalDur });
   const maxEst = Math.max(...chunks.map((c) => (c.end - c.start) * initBPS));
-  unilog(356, `[${ts()}] VAD: threshold=${bestThreshold.toFixed(1)}dB, ` +
+  unilog(
+    356,
+    `[${ts()}] VAD: threshold=${bestThreshold.toFixed(1)}dB, ` +
       `${bestMidpoints.length} silences → ${chunks.length} chunks ` +
-      `(max est ${(maxEst / 1e6).toFixed(1)}MB)`);
+      `(max est ${(maxEst / 1e6).toFixed(1)}MB)`,
+  );
   return chunks;
 }
 
@@ -829,7 +860,10 @@ async function processOneVideo(videoPath) {
           const measuredBPS = e.size / dur;
           const newEnd =
             chunkStart + Math.floor((FILE_LIMIT_BYTES / measuredBPS) * 0.8);
-          unilog(360, `Chunk ${chunkIndex} oversize: ${(e.size / 1e6).toFixed(2)}MB → retry ${(newEnd - chunkStart).toFixed(0)}s (-20%)`);
+          unilog(
+            360,
+            `Chunk ${chunkIndex} oversize: ${(e.size / 1e6).toFixed(2)}MB → retry ${(newEnd - chunkStart).toFixed(0)}s (-20%)`,
+          );
           adaptiveBPS = adaptiveBPS * 0.5 + measuredBPS * 0.5;
           chunkEnd = Math.min(newEnd, chunkEndVad);
           await extractChunkWav(finalWavFile, chunkStart, chunkEnd, wavPath);
@@ -843,9 +877,12 @@ async function processOneVideo(videoPath) {
       const measuredBPS = uploadInfo.size / actualDur;
       const prevBPS = adaptiveBPS;
       adaptiveBPS = adaptiveBPS * 0.5 + measuredBPS * 0.5;
-      unilog(361, `[${ts()}] Chunk ${chunkIndex}: ${chunkStart.toFixed(0)}s-${chunkEnd.toFixed(0)}s ` +
+      unilog(
+        361,
+        `[${ts()}] Chunk ${chunkIndex}: ${chunkStart.toFixed(0)}s-${chunkEnd.toFixed(0)}s ` +
           `${(uploadInfo.size / 1e6).toFixed(2)}MB, ${measuredBPS.toFixed(0)}B/s ` +
-          `(est ${prevBPS.toFixed(0)}→${adaptiveBPS.toFixed(0)})`);
+          `(est ${prevBPS.toFixed(0)}→${adaptiveBPS.toFixed(0)})`,
+      );
       // No trim/overlap needed — cuts are at silence midpoints
       const chunkInfo = {
         wavPath,
@@ -865,7 +902,10 @@ async function processOneVideo(videoPath) {
           unilog(362, `Chunk ${chunkIndex}: ⚠️ no segments`);
         }
       } catch (err) {
-        unilog(363, `Chunk ${chunkIndex}: ${chunkStart.toFixed(0)}s-${chunkEnd.toFixed(0)}s ❌ ${err.message}`);
+        unilog(
+          363,
+          `Chunk ${chunkIndex}: ${chunkStart.toFixed(0)}s-${chunkEnd.toFixed(0)}s ❌ ${err.message}`,
+        );
       }
     }
     if (allSegments.length === 0) {
@@ -877,9 +917,10 @@ async function processOneVideo(videoPath) {
     const outputPath = getSrtPath(videoPath);
     writeSRT(allSegments, outputPath);
   } catch (err) {
-    unilog(365, `❌ Failed to process: ${path.basename(
-        videoPath,
-      )}, ${err.message}`);
+    unilog(
+      365,
+      `❌ Failed to process: ${path.basename(videoPath)}, ${err.message}`,
+    );
     throw err;
   } finally {
     // Cleanup
@@ -894,7 +935,10 @@ async function processOneVideo(videoPath) {
   const eSecTotal = Math.floor(elapsed / 1000);
   const eMin = Math.floor(eSecTotal / 60);
   const eSec = eSecTotal % 60;
-  unilog(366, `Elapsed: ${String(eMin).padStart(2, "0")}:${String(eSec).padStart(2, "0")}`);
+  unilog(
+    366,
+    `Elapsed: ${String(eMin).padStart(2, "0")}:${String(eSec).padStart(2, "0")}`,
+  );
 }
 
 /* ---------------- Entry point ---------------- */

@@ -9308,12 +9308,12 @@ function resFindEpisodeVideos(seasonDir, season, episode) {
   return out;
 }
 
-// Active (non-.alt) 2160 file name for an episode, if any.
+// Active (non-.alt) 2160 file name for an episode, if any. Never returns a
+// hidden .alt copy — the re-encoder must only process a real active 2160 video
+// file (an .alt source would produce a broken temp filename and fail).
 function res2160FileName(seasonDir, season, episode) {
   const vids = resFindEpisodeVideos(seasonDir, season, episode);
-  const f =
-    vids.find((v) => v.res === 2160 && !v.alt) ||
-    vids.find((v) => v.res === 2160);
+  const f = vids.find((v) => v.res === 2160 && !v.alt);
   return f ? f.name : null;
 }
 
@@ -9477,7 +9477,7 @@ async function reencodeOneTo1080(entry) {
           "-map",
           "0:v:0",
           "-vf",
-          "scale=-16:1080,format=p010,hwupload",
+          "scale=-16:1080,crop=iw:1072,format=p010,hwupload",
           "-c:v",
           "hevc_vaapi",
           "-profile:v",
@@ -9581,7 +9581,7 @@ async function processReencodeQueue() {
       if (fs.existsSync(vidTmpPath)) fs.unlinkSync(vidTmpPath);
     } catch {}
   } finally {
-    if (encodeSucceeded && reencodeQueue[0]?.srcPath === entry.srcPath) {
+    if (reencodeQueue[0]?.srcPath === entry.srcPath) {
       reencodeQueue.shift();
       persistReencodeQueue();
     }

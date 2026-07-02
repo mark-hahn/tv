@@ -98,6 +98,18 @@
       </button>
       <button
         class="logBtn"
+        @click="scrollPageUp"
+      >
+        ↑
+      </button>
+      <button
+        class="logBtn"
+        @click="scrollPageDown"
+      >
+        ↓
+      </button>
+      <button
+        class="logBtn"
         @click="scrollToBottom(true)"
       >
         ↓ Bottom
@@ -312,9 +324,18 @@ export default {
         },
         {
           title: "Id",
-          field: "id",
-          width: 65,
-          hozAlign: "center",
+          field: "log_id",
+          width: 55,
+          hozAlign: "right",
+          headerFilter: "input",
+          headerFilterFunc: (headerValue, rowValue) => {
+            if (headerValue === "" || headerValue == null) return true;
+            return String(rowValue) === String(headerValue).trim();
+          },
+          formatter: (cell) => {
+            cell.getElement().style.paddingRight = "20px";
+            return String(cell.getValue() ?? "");
+          },
         },
       ];
     },
@@ -444,6 +465,36 @@ export default {
     },
     scrollRight() {
       if (this.holder) this.holder.scrollLeft = this.holder.scrollWidth;
+    },
+    pageRowHeight() {
+      // Measure the height of an actual rendered row (reliable even with
+      // Tabulator's virtual DOM). Falls back to 24 if none rendered yet.
+      const rowEl = this.$refs.tableEl?.querySelector(".tabulator-row");
+      return rowEl && rowEl.offsetHeight ? rowEl.offsetHeight : 24;
+    },
+    pageStep() {
+      const rowH = this.pageRowHeight();
+      const n = Math.max(3, Math.floor(this.holder.clientHeight / rowH));
+      return { rowH, step: n - 2 };
+    },
+    scrollPageUp() {
+      if (!this.holder || !this.table) return;
+      const rows = this.table.getRows();
+      if (!rows.length) return;
+      const { rowH, step } = this.pageStep();
+      const topIdx = Math.round(this.holder.scrollTop / rowH);
+      const targetIdx = Math.max(0, topIdx - step);
+      this.atBottom = false;
+      this.table.scrollToRow(rows[targetIdx], "top", true);
+    },
+    scrollPageDown() {
+      if (!this.holder || !this.table) return;
+      const rows = this.table.getRows();
+      if (!rows.length) return;
+      const { rowH, step } = this.pageStep();
+      const topIdx = Math.round(this.holder.scrollTop / rowH);
+      const targetIdx = Math.min(rows.length - 1, topIdx + step);
+      this.table.scrollToRow(rows[targetIdx], "top", true);
     },
     onPickerChangeMo() {
       if (this.pickerSel.mo !== "") {

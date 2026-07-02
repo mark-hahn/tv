@@ -125,6 +125,10 @@
         <option value="clear">Clear Selections</option>
         <option value="hide">Hide Sites</option>
         <option value="unhide">Unhide Sites</option>
+        <option value="setInfo">Set Info</option>
+        <option value="setDebug">Set Debug</option>
+        <option value="setWarn">Set Warn</option>
+        <option value="setError">Set Error</option>
       </select>
       <span
         v-if="flashMsg"
@@ -146,7 +150,11 @@
           style="color: #c00"
           >{{ error }}</span
         >
-        <span v-else>{{ displayedCount }}/{{ rowCount }}/{{ dbTotal }}</span>
+        <span v-else
+          >{{ selectedCount }}/{{ displayedCount }}/{{ rowCount }}/{{
+            dbTotal
+          }}</span
+        >
       </span>
     </div>
 
@@ -222,9 +230,11 @@ export default {
       flushTimer: null,
       selectedIds: new Set(),
       selAnchorId: null,
+      selectedCount: 0,
       actionSel: "",
       flashMsg: "",
       flashTimer: null,
+      appending: false,
     };
   },
   watch: {
@@ -421,10 +431,11 @@ export default {
       // Hysteresis so bursts of appended rows don't transiently unpin us.
       if (gap > 60) this.atBottom = false;
       else if (gap < 24) this.atBottom = true;
-      // Guard: skip loadOlder during initial data load — replaceData briefly
-      // resets scrollTop to 0, which would otherwise trigger a premature
-      // loadOlder that resolves ~3s later and shifts the view.
-      if (this.holder.scrollTop < 80 && !this.loading) this.loadOlder();
+      // Guard: skip loadOlder during initial data load (replaceData resets
+      // scrollTop to 0) and during live row appends (addData also briefly
+      // resets virtual-scroll position to 0, causing spurious triggers).
+      if (this.holder.scrollTop < 80 && !this.loading && !this.appending)
+        this.loadOlder();
     },
     onCellClick(e, cell) {
       const row = cell.getRow();
@@ -475,6 +486,7 @@ export default {
     setSelection(newSet) {
       const touched = new Set([...this.selectedIds, ...newSet]);
       this.selectedIds = newSet;
+      this.selectedCount = newSet.size;
       this.reformatRows(touched);
     },
     selectOnly(row) {
@@ -536,6 +548,10 @@ export default {
       else if (act === "clear") this.setSelection(new Set());
       else if (act === "hide") await this.hideSites();
       else if (act === "unhide") await this.unhideSites();
+      else if (act === "setInfo") await this.setSiteLevel("info");
+      else if (act === "setDebug") await this.setSiteLevel("debug");
+      else if (act === "setWarn") await this.setSiteLevel("warn");
+      else if (act === "setError") await this.setSiteLevel("error");
     },
     gotoSelection() {
       const first = this.table
@@ -587,6 +603,33 @@ export default {
       // No confirmation; does not change selection or scroll.
       await this.postSites("/__unilog/unhide", sites, "unhid");
     },
+    async setSiteLevel(level) {
+      const sites = this.selectedSites();
+      if (!sites.length) {
+        this.flash("no sites selected");
+        return;
+      }
+      const ids = sites.map((s) => s.id);
+      try {
+        const res = await srvr.setUnilogSiteLevel(ids, level);
+        if (res?.ok) {
+          this.flash(
+            `set ${res.changed} site${res.changed === 1 ? "" : "s"} to ${level}`,
+          );
+          // Update level field in loaded rows so coloring reflects the change.
+          for (const r of this.table.getRows()) {
+            const d = r.getData();
+            if (ids.includes(d.log_id)) {
+              r.update({ level });
+            }
+          }
+        } else {
+          this.flash(`failed: ${res?.error ?? "unknown error"}`);
+        }
+      } catch (err) {
+        this.flash(`failed: ${err?.message || err}`);
+      }
+    },
     async postSites(url, sites, verb) {
       try {
         const res = await fetch(url, {
@@ -627,7 +670,12 @@ export default {
         this.oldestId = older[0].id;
         // Prepend via addData(rows, true) to avoid replaceData which resets
         // the virtual-scroll offset and causes the blank-table flash.
-        await this.table.addData(older, true);
+        this.appending = true;
+        try {
+          await this.table.addData(older, true);
+        } finally {
+          this.appending = false;
+        }
         this.rowCount = this.table.getDataCount();
         this.displayedCount = this.table.getDataCount("active");
         if (older.length < pageLimit) this.exhausted = true;
@@ -781,7 +829,12 @@ export default {
     async appendRows(rows) {
       if (!this.table || !rows.length) return;
       const stick = this.atBottom;
-      await this.table.addData(rows, false);
+      this.appending = true;
+      try {
+        await this.table.addData(rows, false);
+      } finally {
+        this.appending = false;
+      }
       if (stick) {
         const all = this.table.getRows();
         if (all.length > MAX_ROWS) {

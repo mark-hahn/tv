@@ -2970,13 +2970,13 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         push2Changes.length > 0 ? JSON.stringify(push2Changes) : null;
       const descVal =
         push2Changes.length > 0 ? push2Changes.join(" ") : "No fields changed";
-      unilog(
-        464,
-        "history",
-        options?.isBackground ? "bkgndUpdate" : "clientUpdate",
-        showName,
-        descVal,
-      );
+      // deleted       unilog(
+      // deleted         464,
+      // deleted         "history",
+      // deleted         options?.isBackground ? "bkgndUpdate" : "clientUpdate",
+      // deleted         showName,
+      // deleted         descVal,
+      // deleted       );
     } catch (e) {
       unilog(542, "bkgndUpdate/clientUpdate error:", showName, e.message);
     }
@@ -4276,6 +4276,19 @@ app.post("/api/unilog/query-sites", (req, res) => {
     res.json(unilogDb.querySites(ids));
   } catch (error) {
     console.error("[unilog] /api/unilog/query-sites error:", error); // no-unilog
+    res.status(500).json({ error: String(error?.message || error) });
+  }
+});
+
+app.post("/api/unilog/set-level", (req, res) => {
+  try {
+    const { ids, level } = req.body || {};
+    if (!Array.isArray(ids) || !ids.length)
+      return res.status(400).json({ error: "ids required" });
+    const changed = unilogDb.setSiteLevel(ids, level);
+    res.json({ ok: true, changed });
+  } catch (error) {
+    console.error("[unilog] /api/unilog/set-level error:", error); // no-unilog
     res.status(500).json({ error: String(error?.message || error) });
   }
 });

@@ -309,6 +309,9 @@ export function getShowsFromDisk() {
 export function getUnilogEvents(params) {
   return httpCall("/api/unilog/events", params, "GET", 15000);
 }
+export function setUnilogSiteLevel(ids, level) {
+  return httpCall("/api/unilog/set-level", { ids, level }, "POST");
+}
 export function unilogSubscribe() {
   wsSend({ id: 0, fname: "unilogSubscribe" });
 }

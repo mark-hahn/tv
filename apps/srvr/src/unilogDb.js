@@ -234,6 +234,19 @@ export function tombstoneSite(logId) {
   tombstone.run(nowPst(), Number(logId));
 }
 
+const VALID_LEVELS = new Set(["info", "debug", "warn", "error"]);
+const updLevel = db.prepare("UPDATE log_sites SET level = ? WHERE log_id = ?");
+// Set the level field for a list of site ids. Returns count of rows changed.
+export function setSiteLevel(logIds, level) {
+  if (!VALID_LEVELS.has(level)) throw new Error(`invalid level: ${level}`);
+  let changed = 0;
+  const run = db.transaction(() => {
+    for (const id of logIds) changed += updLevel.run(level, Number(id)).changes;
+  });
+  run();
+  return changed;
+}
+
 export function dbInfo() {
   const counts = {};
   for (const t of ["log_sites", "log_events", "log_groups", "site_groups"]) {

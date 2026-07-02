@@ -227,6 +227,7 @@ export default {
       flashMsg: "",
       flashTimer: null,
       appending: false,
+      suppressHeaderClick: false,
     };
   },
   watch: {
@@ -387,6 +388,13 @@ export default {
           this.holder.addEventListener("scroll", this.onScroll, {
             passive: true,
           });
+        // Header-filter interactions: ctrl-click clears a column's filter; a
+        // second click on an open list dropdown closes it.
+        const headerEl = this.$refs.tableEl.querySelector(".tabulator-header");
+        if (headerEl) {
+          headerEl.addEventListener("mousedown", this.onHeaderMouseDown, true);
+          headerEl.addEventListener("click", this.onHeaderClick, true);
+        }
         // Inject live clock into the Time column header at the bottom.
         const tsCol = this.table.getColumn("ts");
         if (tsCol) {
@@ -445,17 +453,14 @@ export default {
       else if (e.ctrlKey) this.toggleRow(row);
       else this.selectOnly(row);
     },
-    // Paint a row: selection bg on whole row for info/debug; level cell always
-    // shows warn/error color regardless of selection.
+    // Paint a row: all selected rows get blue row bg; warn/error level cell
+    // always shows its level color (on top of the row bg).
     paintRow(row) {
       const data = row.getData();
       const el = row.getElement();
       if (!el) return;
       const selected = this.selectedIds.has(data.id);
-      const isLevelRow = data.level === "error" || data.level === "warn";
-      // Row background: blue when selected (only if not a warn/error row, where
-      // we let the level-cell color carry the identity and keep the row neutral).
-      el.style.backgroundColor = selected && !isLevelRow ? "#b3d4fc" : "";
+      el.style.backgroundColor = selected ? "#b3d4fc" : "";
       for (const cell of row.getCells()) {
         if (cell.getColumn().getField() !== "level") continue;
         const cel = cell.getElement();
@@ -478,6 +483,47 @@ export default {
       const label = ts.replace(/^\d{4}\//, "").replace(/:\d{2}$/, "");
       const el = this.$refs.tableEl?.querySelector(".tsClock");
       if (el) el.textContent = label;
+    },
+    // Map a header DOM event target to its Tabulator column.
+    columnFromEvent(target) {
+      if (!this.table) return null;
+      for (const col of this.table.getColumns()) {
+        const el = col.getElement();
+        if (el && el.contains(target)) return col;
+      }
+      return null;
+    },
+    onHeaderMouseDown(e) {
+      const hf = e.target.closest(".tabulator-header-filter");
+      if (!hf) return;
+      // ctrl-click clears the filter on that column.
+      if (e.ctrlKey) {
+        const col = this.columnFromEvent(e.target);
+        if (col) {
+          e.preventDefault();
+          e.stopPropagation();
+          this.suppressHeaderClick = true;
+          this.table.setHeaderFilterValue(col, "");
+        }
+        return;
+      }
+      // Second click on an already-open list dropdown closes it (no reopen).
+      const listOpen = document.querySelector(".tabulator-edit-list");
+      if (listOpen && hf.contains(document.activeElement)) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.suppressHeaderClick = true;
+        document.activeElement.blur();
+      }
+    },
+    // Swallow the click that follows a handled mousedown so the list editor
+    // doesn't reopen after we close it (or after a ctrl-clear).
+    onHeaderClick(e) {
+      if (this.suppressHeaderClick) {
+        this.suppressHeaderClick = false;
+        e.preventDefault();
+        e.stopPropagation();
+      }
     },
     reformatRows(ids) {
       if (!this.table) return;
@@ -806,7 +852,7 @@ export default {
         width: Math.round(c.getWidth()),
       }));
       // eslint-disable-next-line no-console
-      console.log("log column widths:", JSON.stringify(widths));
+      unilog(1126, "log column widths:", JSON.stringify(widths));
     },
     async onUnilogEvent(row) {
       if (!this.table || !row) return;

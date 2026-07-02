@@ -189,6 +189,8 @@ export default {
       pickerSel: { mo: "", da: "", hr: "", mi: "" },
       filterLevels: [],
       filterPids: [],
+      pendingRows: [],
+      flushTimer: null,
     };
   },
   watch: {
@@ -237,6 +239,10 @@ export default {
       if (this.clockTimer) {
         clearInterval(this.clockTimer);
         this.clockTimer = null;
+      }
+      if (this.flushTimer) {
+        clearInterval(this.flushTimer);
+        this.flushTimer = null;
       }
     },
     columns() {
@@ -512,12 +518,40 @@ export default {
     },
     async onUnilogEvent(row) {
       if (!this.table || !row) return;
+      // A header-filter list dropdown is open: buffer the row instead of
+      // mutating the table, which would scroll/redraw and close the dropdown.
+      if (document.querySelector(".tabulator-edit-list")) {
+        this.pendingRows.push(row);
+        this.scheduleFlush();
+        return;
+      }
+      await this.appendRows([row]);
+    },
+    scheduleFlush() {
+      if (this.flushTimer) return;
+      this.flushTimer = setInterval(() => {
+        if (
+          !document.querySelector(".tabulator-edit-list") &&
+          this.pendingRows.length
+        ) {
+          const buffered = this.pendingRows;
+          this.pendingRows = [];
+          this.appendRows(buffered);
+        }
+        if (!this.pendingRows.length) {
+          clearInterval(this.flushTimer);
+          this.flushTimer = null;
+        }
+      }, 500);
+    },
+    async appendRows(rows) {
+      if (!this.table || !rows.length) return;
       const stick = this.atBottom;
-      await this.table.addData([row], false);
+      await this.table.addData(rows, false);
       if (stick) {
-        const rows = this.table.getRows();
-        if (rows.length > MAX_ROWS) {
-          for (let i = 0; i < rows.length - MAX_ROWS; i++) rows[i].delete();
+        const all = this.table.getRows();
+        if (all.length > MAX_ROWS) {
+          for (let i = 0; i < all.length - MAX_ROWS; i++) all[i].delete();
         }
         this.scrollToBottom();
       }
@@ -540,7 +574,18 @@ export default {
         this.loadedOnce = true;
 
         this.ensureTable();
-        if (this.table) await this.table.replaceData(events);
+        if (this.table) {
+          // Header filters were built (in ensureTable) before the level/pid
+          // lists arrived; refresh those two column defs so the list
+          // dropdowns pick up the now-populated values.
+          this.table.updateColumnDefinition("level", {
+            headerFilterParams: { values: this.filterLevels, clearable: true },
+          });
+          this.table.updateColumnDefinition("pid", {
+            headerFilterParams: { values: this.filterPids, clearable: true },
+          });
+          await this.table.replaceData(events);
+        }
         this.scrollToBottom(true);
       } catch (err) {
         this.error = err?.message || String(err);

@@ -9211,7 +9211,9 @@ watcher
     }, DISK_CHANGE_DEBOUNCE_MS);
   })
   .on("unlink", (filePath) => {
-    const ext = filePath.split(".").pop();
+    // Strip a trailing `.alt` so hidden 1080 fallbacks (…​.mkv.alt) are seen as
+    // video deletions rather than extension "alt" (which would be ignored).
+    const ext = resStripAlt(filePath).split(".").pop();
     if (!videoFileExtensions.includes(ext) && ext !== "bif") return;
 
     const showName = extractShowNameFromPath(filePath);
@@ -9223,8 +9225,21 @@ watcher
     const unlinkEntry = changedShows.get(showName);
     if (unlinkEntry) clearTimeout(unlinkEntry.timeout);
 
-    const unlinkTimeout = setTimeout(() => {
+    const unlinkTimeout = setTimeout(async () => {
       changedShows.delete(showName);
+      // Deleting a video (e.g. a 1080 .alt fallback) can leave an unwatched
+      // 2160 without its fallback — re-scan so it gets regenerated.
+      try {
+        const tvdbRec = tvdb.getAllTvdbSync?.()?.[showName];
+        if (tvdbRec && tvdbRec.inEmby) {
+          await scanShowForResFallback(showName, tvdbRec);
+        }
+      } catch (err) {
+        unilog(
+          1124,
+          `res scan on delete failed for ${showName}: ${err.message}`,
+        );
+      }
       handleShowDiskChange(showName);
     }, DISK_CHANGE_DEBOUNCE_MS);
 

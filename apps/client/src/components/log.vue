@@ -568,7 +568,14 @@ export default {
         this.displayedCount = events.length;
         this.dbTotal = res?.total ?? 0;
         if (Array.isArray(res?.levels)) this.filterLevels = ["", ...res.levels];
-        if (Array.isArray(res?.pids)) this.filterPids = ["", ...res.pids];
+        if (Array.isArray(res?.pids))
+          this.filterPids = [
+            "",
+            ...res.pids.map((p) => ({
+              label: p.replace(/^tv-/, ""),
+              value: p,
+            })),
+          ];
         this.oldestId = events.length ? events[0].id : null;
         this.exhausted = events.length < PAGE;
         this.loadedOnce = true;

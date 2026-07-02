@@ -141,10 +141,10 @@ import { unilog } from "../log.js";
 const MAX_ROWS = 5000;
 const PAGE = 500;
 
-// Format a Date as "MM/DD HH:mm:ss" for the live clock.
+// Format a Date as "MM/DD HH:mm" (no seconds) for the live clock.
 function fmtClock(d) {
   const p = (n) => String(n).padStart(2, "0");
-  return `${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  return `${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 // "2026/07/01 11:44:43" -> epoch ms (local).
@@ -209,6 +209,7 @@ export default {
   },
   methods: {
     activate() {
+      this.clockStr = fmtClock(new Date());
       this.$nextTick(() => {
         this.ensureTable();
         if (!this.subscribed) {
@@ -218,16 +219,13 @@ export default {
         }
         if (!this.loadedOnce) this.loadLogs();
       });
-      this.clockStr = fmtClock(new Date());
       this.clockTimer = setInterval(() => {
-        this.clockStr = fmtClock(new Date());
-        // Redraw the Time column header so the live clock shows.
-        if (this.table) {
-          const col = this.table.getColumn("ts");
-          if (col)
-            col.getElement().querySelector(".tabulator-col-title").textContent =
-              this.clockStr;
-        }
+        const s = fmtClock(new Date());
+        if (s === this.clockStr) return;
+        this.clockStr = s;
+        // Update just the clock text in the Time header (no layout change).
+        const el = this.$refs.tableEl?.querySelector(".tsClock");
+        if (el) el.textContent = s;
       }, 1000);
     },
     deactivate() {
@@ -248,7 +246,6 @@ export default {
           field: "ts",
           width: 105,
           hozAlign: "center",
-          titleFormatter: () => this.clockStr,
           formatter: (cell) => (cell.getValue() || "").replace(/^\d{4}\//, ""),
         },
         {
@@ -343,6 +340,18 @@ export default {
           this.holder.addEventListener("scroll", this.onScroll, {
             passive: true,
           });
+        // Inject live clock into the Time column header at the bottom.
+        const tsCol = this.table.getColumn("ts");
+        if (tsCol) {
+          const hdr = tsCol.getElement();
+          hdr.style.position = "relative";
+          const clock = document.createElement("div");
+          clock.className = "tsClock";
+          clock.style.cssText =
+            "position:absolute;bottom:5px;left:9px;font-weight:normal;pointer-events:none;white-space:nowrap";
+          clock.textContent = this.clockStr;
+          hdr.appendChild(clock);
+        }
       });
     },
     onScroll() {
@@ -351,8 +360,13 @@ export default {
         this.holder.scrollHeight -
         this.holder.scrollTop -
         this.holder.clientHeight;
-      this.atBottom = gap < 24;
-      if (this.holder.scrollTop < 80) this.loadOlder();
+      // Hysteresis so bursts of appended rows don't transiently unpin us.
+      if (gap > 60) this.atBottom = false;
+      else if (gap < 24) this.atBottom = true;
+      // Guard: skip loadOlder during initial data load — replaceData briefly
+      // resets scrollTop to 0, which would otherwise trigger a premature
+      // loadOlder that resolves ~3s later and shifts the view.
+      if (this.holder.scrollTop < 80 && !this.loading) this.loadOlder();
     },
     onCellClick(e, cell) {
       if (e.altKey) {

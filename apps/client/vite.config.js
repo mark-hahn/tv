@@ -23,6 +23,58 @@ function pruneLog() {
   } catch (_) {}
 }
 
+function readJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    req.on("data", (c) => (data += c));
+    req.on("end", () => {
+      try {
+        resolve(data ? JSON.parse(data) : {});
+      } catch (e) {
+        reject(e);
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
+// Dev-only endpoint behind the log viewer's Hide/Unhide Sites actions. Edits the
+// local source tree (source of truth) by commenting/uncommenting unilog() calls.
+function unilogHideEndpoint() {
+  return {
+    name: "unilog-hide-endpoint",
+    configureServer(server) {
+      server.middlewares.use("/__unilog", async (req, res, next) => {
+        const url = req.url || "";
+        const mode = url.startsWith("/hide")
+          ? "hide"
+          : url.startsWith("/unhide")
+            ? "unhide"
+            : null;
+        if (mode === null || req.method !== "POST") return next();
+        try {
+          const body = await readJsonBody(req);
+          const sites = Array.isArray(body?.sites)
+            ? body.sites
+            : Array.isArray(body?.ids)
+              ? body.ids
+              : [];
+          const { applySites } = await import("../../unilog/hide.js");
+          const { changed } = applySites(sites, mode);
+          res.setHeader("content-type", "application/json");
+          res.end(JSON.stringify({ ok: true, changed }));
+        } catch (err) {
+          res.statusCode = 500;
+          res.setHeader("content-type", "application/json");
+          res.end(
+            JSON.stringify({ ok: false, error: String(err?.message || err) }),
+          );
+        }
+      });
+    },
+  };
+}
+
 function consoleToFile() {
   return {
     name: "console-to-file",
@@ -68,6 +120,7 @@ function consoleToFile() {
 export default defineConfig(({ command }) => ({
   plugins: [
     consoleToFile(),
+    unilogHideEndpoint(),
     vue(),
     ...(command === "serve"
       ? [Terminal({ console: "terminal", output: ["terminal", "console"] })]

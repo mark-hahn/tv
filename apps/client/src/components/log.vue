@@ -112,8 +112,25 @@
         class="logBtn"
         @click="scrollToBottom(true)"
       >
-        ↓ Bottom
+        ⇊
       </button>
+      <select
+        v-model="actionSel"
+        class="logSel"
+        @change="onAction"
+      >
+        <option value="">Actions</option>
+        <option value="goto">Go To Selection</option>
+        <option value="selectSites">Select Sites</option>
+        <option value="clear">Clear Selections</option>
+        <option value="hide">Hide Sites</option>
+        <option value="unhide">Unhide Sites</option>
+      </select>
+      <span
+        v-if="flashMsg"
+        style="font-size: 12px; color: #2a7d2a; white-space: nowrap"
+        >{{ flashMsg }}</span
+      >
 
       <span
         style="
@@ -203,6 +220,11 @@ export default {
       filterPids: [],
       pendingRows: [],
       flushTimer: null,
+      selectedIds: new Set(),
+      selAnchorId: null,
+      actionSel: "",
+      flashMsg: "",
+      flashTimer: null,
     };
   },
   watch: {
@@ -255,6 +277,10 @@ export default {
       if (this.flushTimer) {
         clearInterval(this.flushTimer);
         this.flushTimer = null;
+      }
+      if (this.flashTimer) {
+        clearTimeout(this.flashTimer);
+        this.flashTimer = null;
       }
     },
     columns() {
@@ -348,13 +374,10 @@ export default {
         height: "100%",
         placeholder: "no log events",
         columnDefaults: { headerSort: false },
+        selectableRows: false,
         columns: this.columns(),
         rowFormatter: (row) => {
-          const data = row.getData();
-          const el = row.getElement();
-          if (data.level === "error") el.style.backgroundColor = "#ffe5e5";
-          else if (data.level === "warn") el.style.backgroundColor = "#fff6d9";
-          else el.style.backgroundColor = "";
+          this.paintRow(row);
           // native tooltip: full value on hover (cells are cropped to one line).
           for (const cell of row.getCells()) {
             cell
@@ -404,6 +427,18 @@ export default {
       if (this.holder.scrollTop < 80 && !this.loading) this.loadOlder();
     },
     onCellClick(e, cell) {
+      const row = cell.getRow();
+      // ctrl+alt: load cell value into that column's header filter.
+      if (e.ctrlKey && e.altKey) {
+        const def = cell.getColumn().getDefinition();
+        if (!def.headerFilter) return;
+        this.table.setHeaderFilterValue(
+          cell.getColumn(),
+          String(cell.getValue() ?? ""),
+        );
+        return;
+      }
+      // alt: copy cell value to clipboard (pink flash).
       if (e.altKey) {
         const val = String(cell.getValue() ?? "");
         navigator.clipboard.writeText(val).catch(() => {});
@@ -415,12 +450,160 @@ export default {
         }, 300);
         return;
       }
-      const def = cell.getColumn().getDefinition();
-      if (!def.headerFilter) return;
-      this.table.setHeaderFilterValue(
-        cell.getColumn(),
-        String(cell.getValue() ?? ""),
-      );
+      // selection gestures (standard mouse selection).
+      if (e.shiftKey) this.selectRange(row);
+      else if (e.ctrlKey) this.toggleRow(row);
+      else this.selectOnly(row);
+    },
+    // Paint a row's background: selection wins over level coloring.
+    paintRow(row) {
+      const data = row.getData();
+      const el = row.getElement();
+      if (!el) return;
+      if (this.selectedIds.has(data.id)) el.style.backgroundColor = "#b3d4fc";
+      else if (data.level === "error") el.style.backgroundColor = "#ffe5e5";
+      else if (data.level === "warn") el.style.backgroundColor = "#fff6d9";
+      else el.style.backgroundColor = "";
+    },
+    reformatRows(ids) {
+      if (!this.table) return;
+      for (const id of ids) {
+        const r = this.table.getRow(id);
+        if (r) r.reformat();
+      }
+    },
+    setSelection(newSet) {
+      const touched = new Set([...this.selectedIds, ...newSet]);
+      this.selectedIds = newSet;
+      this.reformatRows(touched);
+    },
+    selectOnly(row) {
+      const id = row.getData().id;
+      this.selAnchorId = id;
+      this.setSelection(new Set([id]));
+    },
+    toggleRow(row) {
+      const id = row.getData().id;
+      const next = new Set(this.selectedIds);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      this.selAnchorId = id;
+      this.setSelection(next);
+    },
+    selectRange(row) {
+      if (this.selAnchorId == null) {
+        this.selectOnly(row);
+        return;
+      }
+      const ids = this.table.getRows("active").map((r) => r.getData().id);
+      const aIdx = ids.indexOf(this.selAnchorId);
+      const tIdx = ids.indexOf(row.getData().id);
+      if (aIdx === -1 || tIdx === -1) {
+        this.selectOnly(row);
+        return;
+      }
+      const [lo, hi] = aIdx <= tIdx ? [aIdx, tIdx] : [tIdx, aIdx];
+      this.setSelection(new Set(ids.slice(lo, hi + 1)));
+    },
+    // Unique sites across the selected rows, as { id, srcFile } pairs.
+    selectedSites() {
+      const seen = new Map(); // log_id -> src_file
+      for (const r of this.table.getRows()) {
+        const d = r.getData();
+        if (
+          this.selectedIds.has(d.id) &&
+          d.log_id != null &&
+          !seen.has(d.log_id)
+        )
+          seen.set(d.log_id, d.src_file);
+      }
+      return [...seen.entries()].map(([id, srcFile]) => ({ id, srcFile }));
+    },
+    flash(msg) {
+      this.flashMsg = msg;
+      if (this.flashTimer) clearTimeout(this.flashTimer);
+      this.flashTimer = setTimeout(() => {
+        this.flashMsg = "";
+        this.flashTimer = null;
+      }, 2500);
+    },
+    async onAction() {
+      const act = this.actionSel;
+      this.actionSel = ""; // reset selector back to "Actions"
+      if (!act || !this.table) return;
+      if (act === "goto") this.gotoSelection();
+      else if (act === "selectSites") this.selectSites();
+      else if (act === "clear") this.setSelection(new Set());
+      else if (act === "hide") await this.hideSites();
+      else if (act === "unhide") await this.unhideSites();
+    },
+    gotoSelection() {
+      const first = this.table
+        .getRows("active")
+        .find((r) => this.selectedIds.has(r.getData().id));
+      if (!first) return;
+      this.atBottom = false;
+      this.table.scrollToRow(first, "top", false);
+    },
+    selectSites() {
+      const siteIds = new Set(this.selectedSites().map((s) => s.id));
+      if (!siteIds.size) return;
+      const next = new Set();
+      for (const r of this.table.getRows()) {
+        const d = r.getData();
+        if (siteIds.has(d.log_id)) next.add(d.id);
+      }
+      this.setSelection(next);
+    },
+    async hideSites() {
+      const sites = this.selectedSites();
+      if (!sites.length) {
+        this.flash("no sites selected");
+        return;
+      }
+      if (!import.meta.env.DEV) {
+        this.flash("hide only works in vite dev");
+        return;
+      }
+      const n = sites.length;
+      if (
+        !window.confirm(
+          `Hide ${n} site${n === 1 ? "" : "s"}? This comments out the unilog() call(s) in source.`,
+        )
+      )
+        return;
+      await this.postSites("/__unilog/hide", sites, "hid");
+    },
+    async unhideSites() {
+      const sites = this.selectedSites();
+      if (!sites.length) {
+        this.flash("no sites selected");
+        return;
+      }
+      if (!import.meta.env.DEV) {
+        this.flash("unhide only works in vite dev");
+        return;
+      }
+      // No confirmation; does not change selection or scroll.
+      await this.postSites("/__unilog/unhide", sites, "unhid");
+    },
+    async postSites(url, sites, verb) {
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ sites }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          const c = data.changed.length;
+          this.flash(`${verb} ${c} site${c === 1 ? "" : "s"}`);
+        } else {
+          this.flash(`failed: ${data.error}`);
+        }
+      } catch (err) {
+        this.flash(`failed: ${err?.message || err}`);
+      }
     },
     async loadOlder() {
       if (this.loadingOlder || this.exhausted || !this.table) return;
@@ -682,6 +865,9 @@ export default {
 }
 .logTable :deep(.tabulator) {
   font-size: 12px;
+}
+.logTable :deep(.tabulator-row) {
+  user-select: none;
 }
 .logTable :deep(.tabulator-cell) {
   white-space: nowrap;

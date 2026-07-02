@@ -1409,14 +1409,14 @@ export default {
             /^Height\s+:\s+(\d[\d\s]*)pixels/m,
           );
           if (widthMatch) widthStr = widthMatch[1].replace(/\s/g, "") + " px";
-          const bitrateMatch = this.infoText.match(
-            /^Bit rate\s+:\s+([\d\s]+kb\/s)/m,
-          );
-          if (bitrateMatch)
-            rateStr = bitrateMatch[1].replace(/\s(?=\d)/g, "").trim();
           const vSecs = this.infoText.split(/\n\n+/);
           const vSec = vSecs.find((s) => /^Video\b/.test(s.trim()));
           if (vSec) {
+            const bitrateMatch = vSec.match(
+              /^Bit rate\s+:\s+([\d\s\.]+(?:kb|Mb)\/s)/m,
+            );
+            if (bitrateMatch)
+              rateStr = bitrateMatch[1].replace(/\s(?=\d)/g, "").trim();
             const durLine = vSec.match(/^Duration\s+:\s+(.+)/m);
             if (durLine) {
               const raw = durLine[1];

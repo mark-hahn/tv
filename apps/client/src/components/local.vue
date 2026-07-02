@@ -2710,10 +2710,6 @@ export default {
           dateStr = (node.date || "").replace(/:\d+\.\d+$|:\d+$/, "");
           this.infoFileMeta = dateStr ? `${sizeStr} | ${dateStr}` : sizeStr;
         }
-        if (!VIDEO_EXTS.has(getExt(fileName))) {
-          this.infoLoading = false;
-          return;
-        }
         try {
           const url = `${config.torrentsApiUrl}/api/local/mediainfo`;
           const res = await fetch(url, {
@@ -2739,16 +2735,16 @@ export default {
           if (widthMatch) {
             widthStr = widthMatch[1].replace(/\s/g, "") + " px";
           }
-          const bitrateMatch = this.infoText.match(
-            /^Bit rate\s+:\s+([\d\s]+kb\/s)/m,
-          );
-          if (bitrateMatch) {
-            rateStr = bitrateMatch[1].replace(/\s(?=\d)/g, "").trim();
-          }
           let bitDepthStr = "";
           const videoSecs = this.infoText.split(/\n\n+/);
           const videoSec = videoSecs.find((s) => /^Video\b/.test(s.trim()));
           if (videoSec) {
+            const bitrateMatch = videoSec.match(
+              /^Bit rate\s+:\s+([\d\s\.]+(?:kb|Mb)\/s)/m,
+            );
+            if (bitrateMatch) {
+              rateStr = bitrateMatch[1].replace(/\s(?=\d)/g, "").trim();
+            }
             const durLine = videoSec.match(/^Duration\s+:\s+(.+)/m);
             if (durLine) {
               const raw = durLine[1];
@@ -2793,60 +2789,54 @@ export default {
           }
           let rStr = "";
           let dStr = "";
-          if (VIDEO_EXTS.has(getExt(fileName))) {
-            try {
-              const url = `${config.torrentsApiUrl}/api/local/mediainfo`;
-              const res = await fetch(url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  relPath,
-                  errsMode: this.errsMode,
-                  movieMode: this.movieMode,
-                }),
-              });
-              const data = await res.json();
-              let bdStr = "";
-              if (res.ok && data.output) {
-                const wm = data.output.match(
-                  /^Height\s+:\s+(\d[\d\s]*)pixels/m,
+          let wStr = "";
+          try {
+            const url = `${config.torrentsApiUrl}/api/local/mediainfo`;
+            const res = await fetch(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                relPath,
+                errsMode: this.errsMode,
+                movieMode: this.movieMode,
+              }),
+            });
+            const data = await res.json();
+            let bdStr = "";
+            if (res.ok && data.output) {
+              const wm = data.output.match(/^Height\s+:\s+(\d[\d\s]*)pixels/m);
+              if (wm) wStr = wm[1].replace(/\s/g, "") + " px";
+              const vSecs = data.output.split(/\n\n+/);
+              const vSec = vSecs.find((s) => /^Video\b/.test(s.trim()));
+              if (vSec) {
+                const bm = vSec.match(
+                  /^Bit rate\s+:\s+([\d\s\.]+(?:kb|Mb)\/s)/m,
                 );
-                if (wm) wStr = wm[1].replace(/\s/g, "") + " px";
-                const bm = data.output.match(/^Bit rate\s+:\s+([\d\s]+kb\/s)/m);
                 if (bm) rStr = bm[1].replace(/\s(?=\d)/g, "").trim();
-                const vSecs = data.output.split(/\n\n+/);
-                const vSec = vSecs.find((s) => /^Video\b/.test(s.trim()));
-                if (vSec) {
-                  const durLine = vSec.match(/^Duration\s+:\s+(.+)/m);
-                  if (durLine) {
-                    const raw = durLine[1];
-                    const hm = raw.match(/(\d+)\s*h/);
-                    const mm = raw.match(/(\d+)\s*min/);
-                    const total =
-                      (hm ? parseInt(hm[1]) : 0) * 60 +
-                      (mm ? parseInt(mm[1]) : 0);
-                    if (total > 0) dStr = total + " min";
-                  }
-                  const bdLine = vSec.match(/^Bit depth\s+:\s+(\d+)\s*bits/m);
-                  if (bdLine) bdStr = bdLine[1] + " bits";
+                const durLine = vSec.match(/^Duration\s+:\s+(.+)/m);
+                if (durLine) {
+                  const raw = durLine[1];
+                  const hm = raw.match(/(\d+)\s*h/);
+                  const mm = raw.match(/(\d+)\s*min/);
+                  const total =
+                    (hm ? parseInt(hm[1]) : 0) * 60 +
+                    (mm ? parseInt(mm[1]) : 0);
+                  if (total > 0) dStr = total + " min";
                 }
+                const bdLine = vSec.match(/^Bit depth\s+:\s+(\d+)\s*bits/m);
+                if (bdLine) bdStr = bdLine[1] + " bits";
               }
-              const subsCount = data.subsCount ?? 0;
-              const srtsCount = data.srtsCount ?? 0;
-              const subsPart = `${subsCount} sub`;
-              const srtsPart = `${srtsCount} srt`;
-              const meta =
-                [sizeStr, dStr, dateStr, wStr, bdStr, rStr]
-                  .filter(Boolean)
-                  .join(" | ") + ` | ${subsPart} | ${srtsPart}`;
-              entries.push({ name: fileName, meta });
-            } catch (_) {
-              const meta = [sizeStr, dateStr].filter(Boolean).join(" | ");
-              entries.push({ name: fileName, meta });
             }
-            continue;
-          }
-          {
+            const subsCount = data.subsCount ?? 0;
+            const srtsCount = data.srtsCount ?? 0;
+            const subsPart = `${subsCount} sub`;
+            const srtsPart = `${srtsCount} srt`;
+            const meta =
+              [sizeStr, dStr, dateStr, wStr, bdStr, rStr]
+                .filter(Boolean)
+                .join(" | ") + ` | ${subsPart} | ${srtsPart}`;
+            entries.push({ name: fileName, meta });
+          } catch (_) {
             const meta = [sizeStr, dateStr].filter(Boolean).join(" | ");
             entries.push({ name: fileName, meta });
           }

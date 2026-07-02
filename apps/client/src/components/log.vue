@@ -176,12 +176,6 @@ import { unilog } from "../log.js";
 const MAX_ROWS = 5000;
 const PAGE = 500;
 
-// Format a Date as "MM/DD HH:mm" (no seconds) for the live clock.
-function fmtClock(d) {
-  const p = (n) => String(n).padStart(2, "0");
-  return `${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-
 // "2026/07/01 11:44:43" -> epoch ms (local).
 function tsToMs(s) {
   if (!s) return 0;
@@ -213,8 +207,6 @@ export default {
       rowCount: 0,
       displayedCount: 0,
       dbTotal: 0,
-      clockStr: "",
-      clockTimer: null,
       loading: false,
       error: "",
       loadedOnce: false,
@@ -255,7 +247,6 @@ export default {
   },
   methods: {
     activate() {
-      this.clockStr = fmtClock(new Date());
       this.$nextTick(() => {
         this.ensureTable();
         if (!this.subscribed) {
@@ -265,24 +256,12 @@ export default {
         }
         if (!this.loadedOnce) this.loadLogs();
       });
-      this.clockTimer = setInterval(() => {
-        const s = fmtClock(new Date());
-        if (s === this.clockStr) return;
-        this.clockStr = s;
-        // Update just the clock text in the Time header (no layout change).
-        const el = this.$refs.tableEl?.querySelector(".tsClock");
-        if (el) el.textContent = s;
-      }, 1000);
     },
     deactivate() {
       if (this.subscribed) {
         evtBus.off("unilog-event", this.onUnilogEvent);
         srvr.unilogUnsubscribe();
         this.subscribed = false;
-      }
-      if (this.clockTimer) {
-        clearInterval(this.clockTimer);
-        this.clockTimer = null;
       }
       if (this.flushTimer) {
         clearInterval(this.flushTimer);
@@ -417,7 +396,7 @@ export default {
           clock.className = "tsClock";
           clock.style.cssText =
             "position:absolute;bottom:5px;left:9px;font-weight:normal;pointer-events:none;white-space:nowrap";
-          clock.textContent = this.clockStr;
+          clock.textContent = "";
           hdr.appendChild(clock);
         }
       });
@@ -466,15 +445,39 @@ export default {
       else if (e.ctrlKey) this.toggleRow(row);
       else this.selectOnly(row);
     },
-    // Paint a row's background: selection wins over level coloring.
+    // Paint a row: selection bg on whole row for info/debug; level cell always
+    // shows warn/error color regardless of selection.
     paintRow(row) {
       const data = row.getData();
       const el = row.getElement();
       if (!el) return;
-      if (this.selectedIds.has(data.id)) el.style.backgroundColor = "#b3d4fc";
-      else if (data.level === "error") el.style.backgroundColor = "#ffe5e5";
-      else if (data.level === "warn") el.style.backgroundColor = "#fff6d9";
-      else el.style.backgroundColor = "";
+      const selected = this.selectedIds.has(data.id);
+      const isLevelRow = data.level === "error" || data.level === "warn";
+      // Row background: blue when selected (only if not a warn/error row, where
+      // we let the level-cell color carry the identity and keep the row neutral).
+      el.style.backgroundColor = selected && !isLevelRow ? "#b3d4fc" : "";
+      for (const cell of row.getCells()) {
+        if (cell.getColumn().getField() !== "level") continue;
+        const cel = cell.getElement();
+        if (data.level === "error") {
+          cel.style.backgroundColor = "#ffe5e5";
+        } else if (data.level === "warn") {
+          cel.style.backgroundColor = "#fff6d9";
+        } else {
+          cel.style.backgroundColor = selected ? "#b3d4fc" : "";
+        }
+        break;
+      }
+    },
+    updateOldestTs() {
+      if (!this.table) return;
+      const rows = this.table.getRows();
+      if (!rows.length) return;
+      const ts = rows[0].getData().ts || "";
+      // "2026/MM/DD HH:mm:ss" -> "MM/DD HH:mm"
+      const label = ts.replace(/^\d{4}\//, "").replace(/:\d{2}$/, "");
+      const el = this.$refs.tableEl?.querySelector(".tsClock");
+      if (el) el.textContent = label;
     },
     reformatRows(ids) {
       if (!this.table) return;
@@ -491,6 +494,12 @@ export default {
     },
     selectOnly(row) {
       const id = row.getData().id;
+      // Plain-click on the sole selected row deselects it.
+      if (this.selectedIds.size === 1 && this.selectedIds.has(id)) {
+        this.selAnchorId = null;
+        this.setSelection(new Set());
+        return;
+      }
       this.selAnchorId = id;
       this.setSelection(new Set([id]));
     },
@@ -676,6 +685,7 @@ export default {
         } finally {
           this.appending = false;
         }
+        this.updateOldestTs();
         this.rowCount = this.table.getDataCount();
         this.displayedCount = this.table.getDataCount("active");
         if (older.length < pageLimit) this.exhausted = true;
@@ -879,6 +889,7 @@ export default {
             headerFilterParams: { values: this.filterPids, clearable: true },
           });
           await this.table.replaceData(events);
+          this.updateOldestTs();
         }
         this.scrollToBottom(true);
       } catch (err) {

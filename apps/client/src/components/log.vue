@@ -21,13 +21,6 @@
         padding-bottom: 6px;
       "
     >
-      <button
-        class="logBtn"
-        @click="scrollToBottom(true)"
-      >
-        ↓ Bottom
-      </button>
-
       <select
         v-model="pickerSel.mo"
         class="logSel"
@@ -91,7 +84,6 @@
       >
         Clr
       </button>
-
       <button
         class="logBtn"
         @click="scrollLeft"
@@ -103,6 +95,12 @@
         @click="scrollRight"
       >
         →
+      </button>
+      <button
+        class="logBtn"
+        @click="scrollToBottom(true)"
+      >
+        ↓ Bottom
       </button>
 
       <span
@@ -189,6 +187,8 @@ export default {
       loadingOlder: false,
       exhausted: false,
       pickerSel: { mo: "", da: "", hr: "", mi: "" },
+      filterLevels: [],
+      filterPids: [],
     };
   },
   watch: {
@@ -266,7 +266,11 @@ export default {
           field: "level",
           width: 50,
           hozAlign: "center",
-          headerFilter: "input",
+          headerFilter: "list",
+          headerFilterParams: {
+            values: this.filterLevels,
+            clearable: true,
+          },
         },
         {
           title: "Proj",
@@ -274,7 +278,11 @@ export default {
           width: 71,
           hozAlign: "center",
           formatter: (cell) => (cell.getValue() || "").replace(/^tv-/, ""),
-          headerFilter: "input",
+          headerFilter: "list",
+          headerFilterParams: {
+            values: this.filterPids,
+            clearable: true,
+          },
         },
         {
           title: "Groups",
@@ -299,8 +307,8 @@ export default {
         {
           title: "Id",
           field: "id",
-          width: 45,
-          hozAlign: "right",
+          width: 65,
+          hozAlign: "center",
         },
       ];
     },
@@ -525,6 +533,8 @@ export default {
         this.rowCount = events.length;
         this.displayedCount = events.length;
         this.dbTotal = res?.total ?? 0;
+        if (Array.isArray(res?.levels)) this.filterLevels = ["", ...res.levels];
+        if (Array.isArray(res?.pids)) this.filterPids = ["", ...res.pids];
         this.oldestId = events.length ? events[0].id : null;
         this.exhausted = events.length < PAGE;
         this.loadedOnce = true;

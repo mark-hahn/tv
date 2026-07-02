@@ -4288,6 +4288,7 @@ app.get("/api/unilog/events", (req, res) => {
     res.json({
       events: unilogDb.queryEvents({ pid, level, file, msg, limit, beforeId }),
       pids: unilogDb.listPids(),
+      levels: unilogDb.listLevels(),
       total: unilogDb.countEvents(),
     });
   } catch (error) {

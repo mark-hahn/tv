@@ -298,4 +298,13 @@ export function countEvents() {
   return db.prepare("SELECT COUNT(*) AS n FROM log_events").get().n;
 }
 
+export function listLevels() {
+  return db
+    .prepare(
+      "SELECT DISTINCT level FROM log_sites WHERE level IS NOT NULL ORDER BY level",
+    )
+    .all()
+    .map((r) => r.level);
+}
+
 export { UNILOG_DB_PATH, db };

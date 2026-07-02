@@ -9477,7 +9477,7 @@ async function reencodeOneTo1080(entry) {
           "-map",
           "0:v:0",
           "-vf",
-          "scale=-2:1080,format=p010,hwupload",
+          "scale=-16:1080,format=p010,hwupload",
           "-c:v",
           "hevc_vaapi",
           "-profile:v",

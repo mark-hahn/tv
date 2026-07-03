@@ -688,10 +688,13 @@ export default {
       if (e.ctrlKey) {
         const col = this.columnFromEvent(e.target);
         if (col) {
-          e.preventDefault();
-          e.stopPropagation();
-          this.suppressHeaderClick = true;
-          this.table.setHeaderFilterValue(col, "");
+          const def = col.getDefinition();
+          if (def.headerFilter) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.suppressHeaderClick = true;
+            this.table.setHeaderFilterValue(col, "");
+          }
         }
         return;
       }
@@ -1007,7 +1010,10 @@ export default {
       // Clear all column header filters.
       if (this.table) {
         for (const col of this.table.getColumns()) {
-          this.table.setHeaderFilterValue(col, "");
+          const def = col.getDefinition();
+          if (def.headerFilter) {
+            this.table.setHeaderFilterValue(col, "");
+          }
         }
       }
       this.scrollToBottom(true);

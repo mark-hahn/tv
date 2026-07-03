@@ -2707,7 +2707,7 @@ async function main() {
     // Remember the title we started with so we can cache it after a folderTitle retry.
     var titleBeforeRetry = title;
 
-    unilog(325, "search:", title);
+// hidden     unilog(325, "search:", title);
 
     // Some shows use "&" on TVDB where the filename has "and" (e.g. "Jam & Jerusalem").
     // Build a list of query variants to try in order.
@@ -2861,7 +2861,7 @@ async function main() {
               topNames: resultNames.slice(0, 10),
               seriesName,
             });
-            unilog(327, "tvdb got:", { seriesName, title });
+// hidden             unilog(327, "tvdb got:", { seriesName, title });
             if (map[seriesName]) {
               unilog(328, "Mapping", seriesName, "to", map[seriesName]);
               seriesName = map[seriesName];

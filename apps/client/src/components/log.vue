@@ -130,6 +130,12 @@
         <option value="setWarn">Set Warn</option>
         <option value="setError">Set Error</option>
       </select>
+      <button
+        class="logBtn"
+        @click="toggleGroupsPane"
+      >
+        Groups
+      </button>
       <span
         v-if="flashMsg"
         style="font-size: 12px; color: #2a7d2a; white-space: nowrap"
@@ -163,6 +169,138 @@
       class="logTable"
       style="flex: 1; min-height: 0"
     ></div>
+
+    <Teleport to="body">
+      <div
+        v-show="showGroupsPane"
+        class="groupsPane"
+        :style="groupPaneStyle"
+      >
+        <div class="groupsCol groupsListCol">
+          <div class="groupsTitle">Groups</div>
+          <select
+            v-model="selectedGroupIds"
+            class="groupsList"
+            multiple
+          >
+            <option
+              v-for="g in groups"
+              :key="g.group_id"
+              :value="g.group_id"
+            >
+              {{ groupLabel(g) }}
+            </option>
+          </select>
+        </div>
+
+        <div class="groupsCol groupsCtrlCol">
+          <label
+            class="groupsRow"
+            :class="{ groupsDisabled: !selectedGroupIds.length }"
+          >
+            <input
+              type="checkbox"
+              v-model="filterByGroups"
+              :disabled="!selectedGroupIds.length"
+              @change="applyGroupFilter"
+            />
+            Filter
+          </label>
+
+          <button
+            class="logBtn"
+            @click="selectOrphans"
+          >
+            Orphans
+          </button>
+
+          <div class="groupsRow">
+            <input
+              v-model="newGroupName"
+              class="logInput groupsInput"
+              placeholder="new group name"
+              @keyup.enter="addGroup"
+            />
+            <button
+              class="logBtn"
+              :disabled="!newGroupName.trim()"
+              @click="addGroup"
+            >
+              Add Group
+            </button>
+          </div>
+
+          <button
+            class="logBtn"
+            :disabled="!selectedGroupIds.length"
+            @click="deleteGroupsAction"
+          >
+            Delete Selected
+          </button>
+
+          <div class="groupsRow">
+            <button
+              class="logBtn"
+              :disabled="!selectedGroupIds.length || !selectedSiteCount"
+              @click="assignGroups"
+            >
+              Assign
+            </button>
+            <button
+              class="logBtn"
+              :disabled="!selectedGroupIds.length || !selectedSiteCount"
+              @click="removeGroups"
+            >
+              Remove
+            </button>
+          </div>
+
+          <div class="groupsRow">
+            <input
+              v-model="setGroupType"
+              class="logInput groupsInput"
+              placeholder="type"
+              @keyup.enter="applySetType"
+            />
+            <button
+              class="logBtn"
+              :disabled="!selectedGroupIds.length || !setGroupType.trim()"
+              @click="applySetType"
+            >
+              Set Type
+            </button>
+          </div>
+
+          <button
+            class="logBtn"
+            :disabled="!selectedGroupIds.length"
+            @click="applyClearType"
+          >
+            Clear Type
+          </button>
+
+          <div class="groupsRow">
+            <input
+              v-model="setGroupName"
+              class="logInput groupsInput"
+              placeholder="name"
+              @keyup.enter="applySetName"
+            />
+            <button
+              class="logBtn"
+              :disabled="
+                selectedGroupIds.length !== 1 ||
+                !setGroupName.trim() ||
+                groupNameExists
+              "
+              @click="applySetName"
+            >
+              Set Name
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -171,8 +309,7 @@ import { TabulatorFull as Tabulator } from "tabulator-tables";
 import "tabulator-tables/dist/css/tabulator.min.css";
 import evtBus from "../evtBus.js";
 import * as srvr from "../srvr.js";
-import { unilog } from "../log.js";
-
+import { unilog, logHere } from "../log.js";
 const MAX_ROWS = 5000;
 const PAGE = 500;
 
@@ -230,12 +367,39 @@ export default {
       appending: false,
       suppressHeaderClick: false,
       prunedWhileClosed: false,
+      showGroupsPane: false,
+      groups: [],
+      selectedGroupIds: [],
+      selectedSiteCount: 0,
+      newGroupName: "",
+      setGroupType: "",
+      setGroupName: "",
+      filterByGroups: false,
+      groupFilterIds: new Set(),
+      groupFilterFn: null,
+      groupPaneStyle: {},
     };
+  },
+  computed: {
+    // True when another group already uses the Set-name input value.
+    groupNameExists() {
+      const name = this.setGroupName.trim().toLowerCase();
+      if (!name) return false;
+      const selId = this.selectedGroupIds[0];
+      return this.groups.some(
+        (g) =>
+          g.group_id !== selId && (g.description || "").toLowerCase() === name,
+      );
+    },
   },
   watch: {
     active(now) {
       if (now) this.activate();
       else this.deactivate();
+    },
+    selectedGroupIds() {
+      if (!this.selectedGroupIds.length) this.filterByGroups = false;
+      this.applyGroupFilter();
     },
   },
   mounted() {
@@ -270,6 +434,9 @@ export default {
         }
         if (!this.loadedOnce) this.loadLogs();
       });
+      // Groups pane is hidden whenever the log pane is opened.
+      this.showGroupsPane = false;
+      window.addEventListener("resize", this.positionGroupsPane);
     },
     deactivate() {
       if (this.subscribed) {
@@ -286,6 +453,10 @@ export default {
         clearTimeout(this.flashTimer);
         this.flashTimer = null;
       }
+      // Groups pane is hidden whenever the log pane is closed; stop filtering.
+      this.showGroupsPane = false;
+      window.removeEventListener("resize", this.positionGroupsPane);
+      this.applyGroupFilter();
     },
     columns() {
       return [
@@ -553,6 +724,7 @@ export default {
       const touched = new Set([...this.selectedIds, ...newSet]);
       this.selectedIds = newSet;
       this.selectedCount = newSet.size;
+      this.selectedSiteCount = this.selectedSites().length;
       this.reformatRows(touched);
     },
     selectOnly(row) {
@@ -999,6 +1171,246 @@ export default {
         this.loading = false;
       }
     },
+    // ---- Groups pane ------------------------------------------------------
+    groupLabel(g) {
+      const type = (g.group_type || "").trim();
+      return type ? `${g.description} (${type})` : g.description;
+    },
+    // Fixed-position overlay: right edge aligned to #list, vertically centered.
+    positionGroupsPane() {
+      const list = document.getElementById("list");
+      if (!list) return;
+      const rect = list.getBoundingClientRect();
+      const width = Math.min(380, Math.max(260, rect.width - 16));
+      this.groupPaneStyle = {
+        position: "fixed",
+        right: `${Math.max(4, window.innerWidth - rect.right + 8)}px`,
+        top: "50%",
+        transform: "translateY(-50%)",
+        width: `${width}px`,
+      };
+    },
+    toggleGroupsPane() {
+      this.showGroupsPane = !this.showGroupsPane;
+      if (this.showGroupsPane) {
+        this.positionGroupsPane();
+        this.loadGroups();
+      }
+      this.applyGroupFilter();
+    },
+    async loadGroups() {
+      try {
+        const res = await srvr.getUnilogGroups();
+        this.groups = res?.groups || [];
+        // Drop selections that no longer exist.
+        const ids = new Set(this.groups.map((g) => g.group_id));
+        this.selectedGroupIds = this.selectedGroupIds.filter((id) =>
+          ids.has(id),
+        );
+      } catch (e) {
+        logHere("error", `loadGroups failed: ${e.message}`);
+        this.flash("failed to load groups");
+      }
+    },
+    selectedSiteIds() {
+      return this.selectedSites().map((s) => s.id);
+    },
+    async selectOrphans() {
+      try {
+        const res = await srvr.getUnilogOrphanGroups();
+        const orphan = new Set(res?.groupIds || []);
+        this.selectedGroupIds = this.groups
+          .map((g) => g.group_id)
+          .filter((id) => orphan.has(id));
+        this.flash(`selected ${this.selectedGroupIds.length} orphan groups`);
+      } catch (e) {
+        logHere("error", `selectOrphans failed: ${e.message}`);
+        this.flash("failed to find orphans");
+      }
+    },
+    async addGroup() {
+      const name = this.newGroupName.trim();
+      if (!name) return;
+      const siteIds = this.selectedSiteIds();
+      try {
+        const res = await srvr.createUnilogGroup(name, siteIds);
+        if (res?.created === false) {
+          this.flash("group exists");
+          return;
+        }
+        this.newGroupName = "";
+        await this.loadGroups();
+        await this.refreshRowGroups(siteIds);
+        this.flash(`added group (${res?.linked ?? 0} sites)`);
+      } catch (e) {
+        logHere("error", `addGroup failed: ${e.message}`);
+        this.flash("failed to add group");
+      }
+    },
+    async assignGroups() {
+      const siteIds = this.selectedSiteIds();
+      if (!this.selectedGroupIds.length || !siteIds.length) return;
+      try {
+        const res = await srvr.assignUnilogGroups(
+          this.selectedGroupIds,
+          siteIds,
+        );
+        await this.refreshRowGroups(siteIds);
+        await this.applyGroupFilter();
+        this.flash(`assigned ${res?.added ?? 0} links`);
+      } catch (e) {
+        logHere("error", `assignGroups failed: ${e.message}`);
+        this.flash("failed to assign");
+      }
+    },
+    async removeGroups() {
+      const siteIds = this.selectedSiteIds();
+      if (!this.selectedGroupIds.length || !siteIds.length) return;
+      try {
+        const res = await srvr.removeUnilogGroups(
+          this.selectedGroupIds,
+          siteIds,
+        );
+        await this.refreshRowGroups(siteIds);
+        await this.applyGroupFilter();
+        this.flash(`removed ${res?.removed ?? 0} links`);
+      } catch (e) {
+        logHere("error", `removeGroups failed: ${e.message}`);
+        this.flash("failed to remove");
+      }
+    },
+    async deleteGroupsAction() {
+      if (!this.selectedGroupIds.length) return;
+      let siteCount = 0;
+      try {
+        const res = await srvr.getUnilogGroupSiteIds(this.selectedGroupIds);
+        siteCount = (res?.logIds || []).length;
+      } catch (e) {
+        logHere("error", `delete stats failed: ${e.message}`);
+      }
+      const x = this.selectedGroupIds.length;
+      if (
+        !window.confirm(
+          `Is it ok to remove ${x} groups from ${siteCount} sites?`,
+        )
+      )
+        return;
+      const affected = this.selectedGroupIds.slice();
+      try {
+        const res = await srvr.deleteUnilogGroups(affected);
+        this.selectedGroupIds = [];
+        await this.loadGroups();
+        // Refresh every loaded row (any could have lost a group).
+        await this.refreshRowGroups(this.allLoadedSiteIds());
+        await this.applyGroupFilter();
+        this.flash(
+          `deleted ${res?.groups ?? 0} groups from ${res?.sites ?? 0} sites`,
+        );
+      } catch (e) {
+        logHere("error", `deleteGroups failed: ${e.message}`);
+        this.flash("failed to delete");
+      }
+    },
+    async applySetType() {
+      if (!this.selectedGroupIds.length || !this.setGroupType.trim()) return;
+      try {
+        const res = await srvr.setUnilogGroupType(
+          this.selectedGroupIds,
+          this.setGroupType.trim(),
+        );
+        this.setGroupType = "";
+        await this.loadGroups();
+        this.flash(`set type on ${res?.changed ?? 0} groups`);
+      } catch (e) {
+        logHere("error", `setGroupType failed: ${e.message}`);
+        this.flash("failed to set type");
+      }
+    },
+    async applyClearType() {
+      if (!this.selectedGroupIds.length) return;
+      try {
+        const res = await srvr.setUnilogGroupType(this.selectedGroupIds, "");
+        await this.loadGroups();
+        this.flash(`cleared type on ${res?.changed ?? 0} groups`);
+      } catch (e) {
+        logHere("error", `clearGroupType failed: ${e.message}`);
+        this.flash("failed to clear type");
+      }
+    },
+    async applySetName() {
+      if (this.selectedGroupIds.length !== 1) return;
+      const name = this.setGroupName.trim();
+      if (!name || this.groupNameExists) return;
+      const gid = this.selectedGroupIds[0];
+      try {
+        const res = await srvr.setUnilogGroupName(gid, name);
+        if (res?.renamed === false) {
+          this.flash("name exists");
+          return;
+        }
+        this.setGroupName = "";
+        await this.loadGroups();
+        await this.refreshRowGroups(this.allLoadedSiteIds());
+        this.flash("renamed group");
+      } catch (e) {
+        logHere("error", `setGroupName failed: ${e.message}`);
+        this.flash("failed to rename");
+      }
+    },
+    // Distinct log_ids among all currently loaded rows.
+    allLoadedSiteIds() {
+      if (!this.table) return [];
+      const seen = new Set();
+      for (const r of this.table.getRows()) {
+        const id = r.getData().log_id;
+        if (id != null) seen.add(id);
+      }
+      return [...seen];
+    },
+    // Update the Groups column for the given sites after a mutation.
+    async refreshRowGroups(logIds) {
+      if (!this.table || !logIds.length) return;
+      try {
+        const map = await srvr.getUnilogGroupsForSites(logIds);
+        for (const r of this.table.getRows()) {
+          const d = r.getData();
+          if (Object.prototype.hasOwnProperty.call(map, d.log_id)) {
+            r.update({ groups: map[d.log_id] || "" });
+          }
+        }
+      } catch (e) {
+        logHere("error", `refreshRowGroups failed: ${e.message}`);
+      }
+    },
+    // Layered group filter (in addition to header/string filters). Active only
+    // while the pane is open, Filter is checked, and groups are selected.
+    async applyGroupFilter() {
+      if (!this.table) return;
+      const on =
+        this.showGroupsPane &&
+        this.filterByGroups &&
+        this.selectedGroupIds.length > 0;
+      if (!on) {
+        if (this.groupFilterFn) {
+          this.table.removeFilter(this.groupFilterFn);
+          this.groupFilterFn = null;
+        }
+        return;
+      }
+      try {
+        const res = await srvr.getUnilogGroupSiteIds(this.selectedGroupIds);
+        this.groupFilterIds = new Set(res?.logIds || []);
+      } catch (e) {
+        logHere("error", `group filter fetch failed: ${e.message}`);
+        this.groupFilterIds = new Set();
+      }
+      if (!this.groupFilterFn) {
+        this.groupFilterFn = (data) => this.groupFilterIds.has(data.log_id);
+        this.table.addFilter(this.groupFilterFn);
+      } else {
+        this.table.refreshFilter();
+      }
+    },
   },
 };
 </script>
@@ -1043,5 +1455,60 @@ export default {
   height: 64%;
   padding: 0 3px;
   box-sizing: border-box;
+}
+.groupsPane {
+  display: flex;
+  gap: 10px;
+  box-sizing: border-box;
+  max-height: 80vh;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid #999;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  z-index: 3000;
+  font-size: 13px;
+}
+.groupsCol {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+.groupsListCol {
+  flex: 1;
+  min-width: 0;
+}
+.groupsCtrlCol {
+  flex: 0 0 auto;
+  width: 120px;
+}
+.groupsTitle {
+  font-weight: bold;
+  text-align: center;
+}
+.groupsList {
+  flex: 1;
+  min-height: 220px;
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 12px;
+}
+.groupsRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.groupsInput {
+  width: 100%;
+  box-sizing: border-box;
+}
+.groupsDisabled {
+  color: #aaa;
+}
+.groupsPane .logBtn:disabled,
+.groupsPane input:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 </style>

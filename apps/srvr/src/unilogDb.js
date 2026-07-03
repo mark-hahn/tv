@@ -355,4 +355,170 @@ export function getOldestTimestamp() {
   return row?.ts || "";
 }
 
+// ---------------------------------------------------------------------------
+// Groups management (web client Groups pane).
+// tv-srvr is the single writer; all group_id allocation flows through here.
+// ---------------------------------------------------------------------------
+
+// One-time cleanup: any group whose description is NULL or shares its
+// description with another group is renamed to `Group <group_id>` (unique).
+// Idempotent — safe to run on every startup (no-op once names are unique).
+function cleanupGroupDescriptions() {
+  const run = db.transaction(() => {
+    const upd = db.prepare(
+      "UPDATE log_groups SET description = ? WHERE group_id = ?",
+    );
+    const nulls = db
+      .prepare("SELECT group_id FROM log_groups WHERE description IS NULL")
+      .all();
+    for (const r of nulls) upd.run(`Group ${r.group_id}`, r.group_id);
+    const dups = db
+      .prepare(
+        `SELECT group_id FROM log_groups
+          WHERE description IS NOT NULL
+            AND description COLLATE NOCASE IN (
+              SELECT description FROM log_groups
+               WHERE description IS NOT NULL
+               GROUP BY description COLLATE NOCASE
+              HAVING COUNT(*) > 1
+            )`,
+      )
+      .all();
+    for (const r of dups) upd.run(`Group ${r.group_id}`, r.group_id);
+  });
+  run();
+}
+cleanupGroupDescriptions();
+
+// All named groups, alphabetical (case-insensitive).
+export function listGroups() {
+  return db
+    .prepare(
+      `SELECT group_id, group_type, description FROM log_groups
+        WHERE description IS NOT NULL ORDER BY description COLLATE NOCASE`,
+    )
+    .all();
+}
+
+const delSiteGroup = db.prepare(
+  "DELETE FROM site_groups WHERE log_id = ? AND group_id = ?",
+);
+
+// Create a named group (group_type 'manual') and link it to the given sites.
+// If a group with that description already exists, do nothing.
+export const createGroupWithSites = db.transaction(
+  ({ description, logIds = [] }) => {
+    const exists = db
+      .prepare("SELECT 1 FROM log_groups WHERE description = ? COLLATE NOCASE")
+      .get(description);
+    if (exists) return { created: false };
+    const id = maxGroup.get().next;
+    insGroup.run(id, "manual", nowPst(), description);
+    for (const logId of logIds) insSiteGroup.run(Number(logId), id);
+    return { created: true, groupId: id, linked: logIds.length };
+  },
+);
+
+// Link every (groupId × logId) pair. Returns rows actually added.
+export const assignGroupsToSites = db.transaction(
+  ({ groupIds = [], logIds = [] }) => {
+    let added = 0;
+    for (const gid of groupIds)
+      for (const logId of logIds)
+        added += insSiteGroup.run(Number(logId), Number(gid)).changes;
+    return { added };
+  },
+);
+
+// Unlink every (groupId × logId) pair. Returns rows actually removed.
+export const removeGroupsFromSites = db.transaction(
+  ({ groupIds = [], logIds = [] }) => {
+    let removed = 0;
+    for (const gid of groupIds)
+      for (const logId of logIds)
+        removed += delSiteGroup.run(Number(logId), Number(gid)).changes;
+    return { removed };
+  },
+);
+
+// Delete groups and all their site links. Returns pre-delete stats.
+export const deleteGroups = db.transaction((groupIds = []) => {
+  if (!groupIds.length) return { groups: 0, sites: 0 };
+  const nums = groupIds.map(Number);
+  const ph = nums.map(() => "?").join(",");
+  const sites = db
+    .prepare(
+      `SELECT COUNT(DISTINCT log_id) AS n FROM site_groups WHERE group_id IN (${ph})`,
+    )
+    .get(...nums).n;
+  db.prepare(`DELETE FROM site_groups WHERE group_id IN (${ph})`).run(...nums);
+  db.prepare(`DELETE FROM log_groups WHERE group_id IN (${ph})`).run(...nums);
+  return { groups: nums.length, sites };
+});
+
+// Distinct site (log_id) ids linked to any of the given groups.
+export function siteIdsForGroups(groupIds) {
+  if (!groupIds.length) return [];
+  const nums = groupIds.map(Number);
+  const ph = nums.map(() => "?").join(",");
+  return db
+    .prepare(
+      `SELECT DISTINCT log_id FROM site_groups WHERE group_id IN (${ph})`,
+    )
+    .all(...nums)
+    .map((r) => r.log_id);
+}
+
+// Current comma-joined group string for each given site (for row refresh).
+export function groupsForSites(logIds = []) {
+  const result = {};
+  for (const id of logIds) result[id] = groupsForSite(id);
+  return result;
+}
+
+// Groups not linked to any site that appears in an event (orphaned groups).
+export function orphanGroupIds() {
+  return db
+    .prepare(
+      `SELECT group_id FROM log_groups
+        WHERE description IS NOT NULL
+          AND group_id NOT IN (
+            SELECT DISTINCT sg.group_id FROM site_groups sg
+             WHERE sg.log_id IN (SELECT DISTINCT log_id FROM log_events)
+          )`,
+    )
+    .all()
+    .map((r) => r.group_id);
+}
+
+const updGroupType = db.prepare(
+  "UPDATE log_groups SET group_type = ? WHERE group_id = ?",
+);
+// Set group_type on the given groups (empty string clears it). Returns count.
+export function setGroupType(groupIds = [], groupType = "") {
+  const val = groupType || "";
+  let changed = 0;
+  const run = db.transaction(() => {
+    for (const id of groupIds)
+      changed += updGroupType.run(val, Number(id)).changes;
+  });
+  run();
+  return changed;
+}
+
+const updGroupName = db.prepare(
+  "UPDATE log_groups SET description = ? WHERE group_id = ?",
+);
+// Rename one group. Refuses if another group already has that name.
+export const setGroupName = db.transaction(({ groupId, description }) => {
+  const clash = db
+    .prepare(
+      "SELECT 1 FROM log_groups WHERE description = ? COLLATE NOCASE AND group_id != ?",
+    )
+    .get(description, Number(groupId));
+  if (clash) return { renamed: false };
+  updGroupName.run(description, Number(groupId));
+  return { renamed: true };
+});
+
 export { UNILOG_DB_PATH, db };

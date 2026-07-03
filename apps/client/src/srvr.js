@@ -316,6 +316,44 @@ export function getUnilogOldestTs() {
 export function setUnilogSiteLevel(ids, level) {
   return httpCall("/api/unilog/set-level", { ids, level }, "POST");
 }
+export function getUnilogGroups() {
+  return httpCall("/api/unilog/groups", {}, "GET");
+}
+export function getUnilogOrphanGroups() {
+  return httpCall("/api/unilog/groups/orphans", {}, "GET");
+}
+export function createUnilogGroup(description, logIds) {
+  return httpCall("/api/unilog/groups/create", { description, logIds }, "POST");
+}
+export function assignUnilogGroups(groupIds, logIds) {
+  return httpCall("/api/unilog/groups/assign", { groupIds, logIds }, "POST");
+}
+export function removeUnilogGroups(groupIds, logIds) {
+  return httpCall("/api/unilog/groups/remove", { groupIds, logIds }, "POST");
+}
+export function deleteUnilogGroups(groupIds) {
+  return httpCall("/api/unilog/groups/delete", { groupIds }, "POST");
+}
+export function getUnilogGroupSiteIds(groupIds) {
+  return httpCall("/api/unilog/groups/site-ids", { groupIds }, "POST");
+}
+export function getUnilogGroupsForSites(logIds) {
+  return httpCall("/api/unilog/groups/for-sites", { logIds }, "POST");
+}
+export function setUnilogGroupType(groupIds, groupType) {
+  return httpCall(
+    "/api/unilog/groups/set-type",
+    { groupIds, groupType },
+    "POST",
+  );
+}
+export function setUnilogGroupName(groupId, description) {
+  return httpCall(
+    "/api/unilog/groups/set-name",
+    { groupId, description },
+    "POST",
+  );
+}
 export function unilogSubscribe() {
   wsSend({ id: 0, fname: "unilogSubscribe" });
 }

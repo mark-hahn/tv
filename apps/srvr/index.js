@@ -4342,6 +4342,139 @@ app.get("/api/unilog/oldest-ts", (req, res) => {
   }
 });
 
+// Groups management (web client Groups pane).
+app.get("/api/unilog/groups", (req, res) => {
+  try {
+    res.json({ groups: unilogDb.listGroups() });
+  } catch (error) {
+    console.error("[unilog] /api/unilog/groups error:", error); // no-unilog
+    res.status(500).json({ error: String(error?.message || error) });
+  }
+});
+
+app.get("/api/unilog/groups/orphans", (req, res) => {
+  try {
+    res.json({ groupIds: unilogDb.orphanGroupIds() });
+  } catch (error) {
+    console.error("[unilog] /api/unilog/groups/orphans error:", error); // no-unilog
+    res.status(500).json({ error: String(error?.message || error) });
+  }
+});
+
+app.post("/api/unilog/groups/create", (req, res) => {
+  try {
+    const { description, logIds } = req.body || {};
+    if (!description || !String(description).trim())
+      return res.status(400).json({ error: "description required" });
+    res.json(
+      unilogDb.createGroupWithSites({
+        description: String(description).trim(),
+        logIds: Array.isArray(logIds) ? logIds : [],
+      }),
+    );
+  } catch (error) {
+    console.error("[unilog] /api/unilog/groups/create error:", error); // no-unilog
+    res.status(500).json({ error: String(error?.message || error) });
+  }
+});
+
+app.post("/api/unilog/groups/assign", (req, res) => {
+  try {
+    const { groupIds, logIds } = req.body || {};
+    res.json(
+      unilogDb.assignGroupsToSites({
+        groupIds: Array.isArray(groupIds) ? groupIds : [],
+        logIds: Array.isArray(logIds) ? logIds : [],
+      }),
+    );
+  } catch (error) {
+    console.error("[unilog] /api/unilog/groups/assign error:", error); // no-unilog
+    res.status(500).json({ error: String(error?.message || error) });
+  }
+});
+
+app.post("/api/unilog/groups/remove", (req, res) => {
+  try {
+    const { groupIds, logIds } = req.body || {};
+    res.json(
+      unilogDb.removeGroupsFromSites({
+        groupIds: Array.isArray(groupIds) ? groupIds : [],
+        logIds: Array.isArray(logIds) ? logIds : [],
+      }),
+    );
+  } catch (error) {
+    console.error("[unilog] /api/unilog/groups/remove error:", error); // no-unilog
+    res.status(500).json({ error: String(error?.message || error) });
+  }
+});
+
+app.post("/api/unilog/groups/delete", (req, res) => {
+  try {
+    const { groupIds } = req.body || {};
+    res.json(unilogDb.deleteGroups(Array.isArray(groupIds) ? groupIds : []));
+  } catch (error) {
+    console.error("[unilog] /api/unilog/groups/delete error:", error); // no-unilog
+    res.status(500).json({ error: String(error?.message || error) });
+  }
+});
+
+app.post("/api/unilog/groups/site-ids", (req, res) => {
+  try {
+    const { groupIds } = req.body || {};
+    res.json({
+      logIds: unilogDb.siteIdsForGroups(
+        Array.isArray(groupIds) ? groupIds : [],
+      ),
+    });
+  } catch (error) {
+    console.error("[unilog] /api/unilog/groups/site-ids error:", error); // no-unilog
+    res.status(500).json({ error: String(error?.message || error) });
+  }
+});
+
+app.post("/api/unilog/groups/for-sites", (req, res) => {
+  try {
+    const { logIds } = req.body || {};
+    res.json(unilogDb.groupsForSites(Array.isArray(logIds) ? logIds : []));
+  } catch (error) {
+    console.error("[unilog] /api/unilog/groups/for-sites error:", error); // no-unilog
+    res.status(500).json({ error: String(error?.message || error) });
+  }
+});
+
+app.post("/api/unilog/groups/set-type", (req, res) => {
+  try {
+    const { groupIds, groupType } = req.body || {};
+    const changed = unilogDb.setGroupType(
+      Array.isArray(groupIds) ? groupIds : [],
+      typeof groupType === "string" ? groupType : "",
+    );
+    res.json({ ok: true, changed });
+  } catch (error) {
+    console.error("[unilog] /api/unilog/groups/set-type error:", error); // no-unilog
+    res.status(500).json({ error: String(error?.message || error) });
+  }
+});
+
+app.post("/api/unilog/groups/set-name", (req, res) => {
+  try {
+    const { groupId, description } = req.body || {};
+    if (groupId == null || !description || !String(description).trim())
+      return res
+        .status(400)
+        .json({ error: "groupId and description required" });
+    res.json(
+      unilogDb.setGroupName({
+        groupId,
+        description: String(description).trim(),
+      }),
+    );
+  } catch (error) {
+    console.error("[unilog] /api/unilog/groups/set-name error:", error); // no-unilog
+    res.status(500).json({ error: String(error?.message || error) });
+  }
+});
+
 // The handler should be: async (params) => result
 const apiWrapper = (handler) => {
   return async (req, res) => {

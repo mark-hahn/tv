@@ -4177,6 +4177,21 @@ app.use((req, res, next) => {
 // message handler (fname unilogSubscribe/unilogUnsubscribe) far below; declared
 // here so the DB sink can broadcast to it. Empty until a client subscribes.
 const unilogSubscribers = new Set();
+let unilogLastPruneTime = 0;
+const UNILOG_PRUNE_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+
+// Prune oldest log_events to keep table under 90_000 rows.
+// Only runs when no subscribers have the log pane open and at least 1 hour
+// has elapsed since the last prune.
+function maybeUnilogPrune() {
+  if (unilogSubscribers.size > 0) return;
+  if (Date.now() - unilogLastPruneTime < UNILOG_PRUNE_INTERVAL_MS) return;
+  const deleted = unilogDb.pruneEvents();
+  if (deleted > 0) {
+    unilogLastPruneTime = Date.now();
+    notifyClients("unilog-pruned", null);
+  }
+}
 function broadcastUnilog(row) {
   if (!row || unilogSubscribers.size === 0) return;
   const msg = JSON.stringify({
@@ -7347,6 +7362,7 @@ wss.on("connection", (ws) => {
       unilogSubscribers.add(ws);
     } else if (fname === "unilogUnsubscribe") {
       unilogSubscribers.delete(ws);
+      maybeUnilogPrune();
     } else if (fname === "tvRemoteUnlock") {
       const outMsg = JSON.stringify({
         id: 0,
@@ -7380,6 +7396,7 @@ wss.on("connection", (ws) => {
     unilog(624, socketName, "error:", err.message);
     connectedClients.delete(ws);
     unilogSubscribers.delete(ws);
+    maybeUnilogPrune();
     socketName = "unknown websocket";
   });
 
@@ -7387,6 +7404,7 @@ wss.on("connection", (ws) => {
     // log(socketName + ' closed');
     connectedClients.delete(ws);
     unilogSubscribers.delete(ws);
+    maybeUnilogPrune();
     socketName = "unknown websocket";
   });
 });

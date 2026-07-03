@@ -325,6 +325,20 @@ export function countEvents() {
   return db.prepare("SELECT COUNT(*) AS n FROM log_events").get().n;
 }
 
+const PRUNE_TARGET = 90000;
+
+// Delete oldest events so row count stays at or below PRUNE_TARGET.
+// Returns the number of rows deleted (0 if no pruning was needed).
+export function pruneEvents() {
+  const n = countEvents();
+  if (n <= PRUNE_TARGET) return 0;
+  const toDelete = n - PRUNE_TARGET;
+  db.prepare(
+    "DELETE FROM log_events WHERE id IN (SELECT id FROM log_events ORDER BY id ASC LIMIT ?)",
+  ).run(toDelete);
+  return toDelete;
+}
+
 export function listLevels() {
   return db
     .prepare(

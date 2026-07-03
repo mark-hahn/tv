@@ -229,6 +229,7 @@ export default {
       flashTimer: null,
       appending: false,
       suppressHeaderClick: false,
+      prunedWhileClosed: false,
     };
   },
   watch: {
@@ -238,9 +239,11 @@ export default {
     },
   },
   mounted() {
+    evtBus.on("unilog-pruned", this.onUnilogPruned);
     if (this.active) this.activate();
   },
   beforeUnmount() {
+    evtBus.off("unilog-pruned", this.onUnilogPruned);
     this.deactivate();
     if (this.table) {
       this.table.destroy();
@@ -256,6 +259,14 @@ export default {
           evtBus.on("ws-reconnected", this.onWsReconnected);
           srvr.unilogSubscribe();
           this.subscribed = true;
+        }
+        if (this.prunedWhileClosed) {
+          this.prunedWhileClosed = false;
+          this.loadedOnce = false;
+          this.oldestId = null;
+          this.newestId = null;
+          this.exhausted = false;
+          if (this.table) this.table.replaceData([]);
         }
         if (!this.loadedOnce) this.loadLogs();
       });
@@ -859,6 +870,11 @@ export default {
       if (!this.subscribed) return;
       srvr.unilogSubscribe();
       if (this.newestId != null) await this.loadMissed();
+    },
+    // Server pruned the log_events table while pane was closed; mark so
+    // activate() will flush stale rows and do a fresh load.
+    onUnilogPruned() {
+      if (!this.active) this.prunedWhileClosed = true;
     },
     async loadMissed() {
       if (!this.table || this.newestId == null) return;

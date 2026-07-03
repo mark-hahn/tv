@@ -2729,12 +2729,12 @@ export const getAllTvdb = async (params) => {
   // DEBUG Swiss Toni
   const swissToni = allTvdb["Swiss Toni"];
   if (swissToni) {
-    unilog(766, "Swiss Toni:", {
-      notReady: swissToni.notReady,
-      inEmby: swissToni.inEmby,
-      fileGap: swissToni.fileGap,
-      fileEndError: swissToni.fileEndError,
-    });
+// hidden     unilog(766, "Swiss Toni:", {
+// hidden       notReady: swissToni.notReady,
+// hidden       inEmby: swissToni.inEmby,
+// hidden       fileGap: swissToni.fileGap,
+// hidden       fileEndError: swissToni.fileEndError,
+// hidden     });
   } else {
     unilog(126, "Swiss Toni NOT FOUND in allTvdb");
   }

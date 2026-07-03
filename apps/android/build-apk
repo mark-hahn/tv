@@ -13,6 +13,52 @@ CACHE_FILE="$SCRIPT_DIR/.build-cache"
 
 PHASE_FILE=/root/apps/tv/build-phase
 
+# Install APK using WiFi ADB (avoids USB-IP bandwidth issues for large files).
+# Falls back to USB if WiFi connect fails.
+do_install() {
+  local device=$1
+  local apk=$2
+
+  # Get WiFi IP BEFORE switching to TCP mode (tcpip 5555 disconnects USB adb)
+  local phone_ip
+  phone_ip=$(adb -s "$device" shell ip route 2>/dev/null \
+    | awk '/wlan/ && /src/{print $NF; exit}')
+  # Fallback: try ip addr on any wlan interface
+  if [[ -z "$phone_ip" ]]; then
+    phone_ip=$(adb -s "$device" shell ip addr 2>/dev/null \
+      | awk '/wlan/{found=1} found && /inet /{print $2; exit}' | cut -d/ -f1)
+  fi
+
+  local install_device="$device"
+  if [[ -n "$phone_ip" ]]; then
+    echo "==> Enabling WiFi ADB on device ($phone_ip)..."
+    adb -s "$device" tcpip 5555 2>/dev/null || true
+    sleep 3
+    echo "==> Connecting via WiFi ($phone_ip:5555)..."
+    adb connect "$phone_ip:5555" 2>/dev/null || true
+    sleep 2
+    if adb -s "$phone_ip:5555" get-state &>/dev/null; then
+      install_device="$phone_ip:5555"
+    else
+      echo "==> WiFi connect failed — falling back to USB."
+    fi
+  else
+    echo "==> Could not get WiFi IP — using USB."
+  fi
+
+  echo "==> Installing on $install_device..."
+  if ! timeout 300 adb -s "$install_device" install -r "$apk" 2>&1; then
+    echo "==> Install failed — uninstalling old version and retrying..."
+    adb -s "$install_device" uninstall com.hahnca.tvremote 2>/dev/null || true
+    sleep 2
+    timeout 300 adb -s "$install_device" install "$apk" 2>&1 || {
+      echo "==> Install failed after uninstall+reinstall."
+      return 1
+    }
+  fi
+  return 0
+}
+
 CHECKSUM=$(md5sum "$SCRIPT_DIR/App.js" "$SCRIPT_DIR/app.json" "$SCRIPT_DIR/package.json" "$SCRIPT_DIR/babel.config.js" "$SCRIPT_DIR/eas.json" "$SCRIPT_DIR/index.js" | md5sum | cut -d' ' -f1)
 CACHED_CHECKSUM=$(cut -d' ' -f1 "$CACHE_FILE" 2>/dev/null || echo "")
 CACHED_APK=$(cut -d' ' -f2 "$CACHE_FILE" 2>/dev/null || echo "")
@@ -36,16 +82,7 @@ if [[ "$CHECKSUM" == "$CACHED_CHECKSUM" && -n "$CACHED_APK" ]]; then
       sleep 3
     fi
   fi
-  echo "==> Installing on device $DEVICE..."
-  if ! timeout 600 adb -s "$DEVICE" install -r "$LOCAL_APK" 2>&1; then
-    echo "==> Install failed — uninstalling old version and retrying..."
-    adb -s "$DEVICE" uninstall com.hahnca.tvremote 2>/dev/null || true
-    sleep 2
-    timeout 600 adb -s "$DEVICE" install "$LOCAL_APK" 2>&1 || {
-      echo "==> Install failed after uninstall+reinstall."
-      exit 1
-    }
-  fi
+  do_install "$DEVICE" "$LOCAL_APK" || exit 1
   rm -f "$PHASE_FILE"
   echo "==> Done (from cache)."
   exit 0
@@ -87,16 +124,7 @@ if ! adb -s "$DEVICE" get-state &>/dev/null; then
     sleep 3
   fi
 fi
-echo "==> Installing on device $DEVICE..."
-if ! timeout 600 adb -s $DEVICE install -r "$LOCAL_APK" 2>&1; then
-  echo "==> Install failed — uninstalling old version and retrying..."
-  adb -s $DEVICE uninstall com.hahnca.tvremote 2>/dev/null || true
-  sleep 2
-  timeout 600 adb -s $DEVICE install "$LOCAL_APK" 2>&1 || {
-    echo "==> Install failed after uninstall+reinstall."
-    exit 1
-  }
-fi
+do_install "$DEVICE" "$LOCAL_APK" || exit 1
 
 echo "$CHECKSUM gradle:$APK_PATH" > "$CACHE_FILE"
 rm -f "$PHASE_FILE"

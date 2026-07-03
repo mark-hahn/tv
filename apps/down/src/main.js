@@ -2377,13 +2377,13 @@ async function main() {
               localPath: existingEntry?.localPath || "",
               destTitle: existingEntry?.destTitle || "",
             });
-            unilog(
-              477,
-              "history",
-              "skipDown",
-              title || fname,
-              "skip: already downloaded (local file deleted)",
-            );
+// deleted             unilog(
+// deleted               477,
+// deleted               "history",
+// deleted               "skipDown",
+// deleted               title || fname,
+// deleted               "skip: already downloaded (local file deleted)",
+// deleted             );
             process.nextTick(checkFile);
             return;
           } else {

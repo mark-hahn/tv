@@ -28,15 +28,21 @@ if [[ "$CHECKSUM" == "$CACHED_CHECKSUM" && -n "$CACHED_APK" ]]; then
     curl -L "$CACHED_APK" -o "$LOCAL_APK"
   fi
   echo "installing" > "$PHASE_FILE"
+  if ! adb -s "$DEVICE" get-state &>/dev/null; then
+    echo "==> Device lost — re-attaching via usbipd..."
+    BUSID=$(powershell.exe -Command "usbipd list" 2>/dev/null | awk '/Shared/{print $1; exit}')
+    if [[ -n "$BUSID" ]]; then
+      powershell.exe -Command "usbipd attach --wsl --busid $BUSID" 2>/dev/null || true
+      sleep 3
+    fi
+  fi
   echo "==> Installing on device $DEVICE..."
-  if ! timeout 120 adb -s "$DEVICE" install -r "$LOCAL_APK" 2>&1; then
-    echo "==> Install timed out or failed — restarting adb and retrying..."
-    adb kill-server 2>/dev/null || true
-    adb start-server 2>/dev/null || true
+  if ! timeout 600 adb -s "$DEVICE" install -r "$LOCAL_APK" 2>&1; then
+    echo "==> Install failed — uninstalling old version and retrying..."
+    adb -s "$DEVICE" uninstall com.hahnca.tvremote 2>/dev/null || true
     sleep 2
-    timeout 120 adb -s "$DEVICE" install -r "$LOCAL_APK" 2>&1 || {
-      echo "==> Install failed after retry. Try uninstalling first:"
-      echo "    adb -s $DEVICE uninstall com.hahnca.tvremote"
+    timeout 600 adb -s "$DEVICE" install "$LOCAL_APK" 2>&1 || {
+      echo "==> Install failed after uninstall+reinstall."
       exit 1
     }
   fi
@@ -73,15 +79,21 @@ echo "==> Downloading APK..."
 scp $REMOTE:$APK_PATH $LOCAL_APK
 
 echo "installing" > "$PHASE_FILE"
+if ! adb -s "$DEVICE" get-state &>/dev/null; then
+  echo "==> Device lost — re-attaching via usbipd..."
+  BUSID=$(powershell.exe -Command "usbipd list" 2>/dev/null | awk '/Shared/{print $1; exit}')
+  if [[ -n "$BUSID" ]]; then
+    powershell.exe -Command "usbipd attach --wsl --busid $BUSID" 2>/dev/null || true
+    sleep 3
+  fi
+fi
 echo "==> Installing on device $DEVICE..."
-if ! timeout 120 adb -s $DEVICE install -r "$LOCAL_APK" 2>&1; then
-  echo "==> Install timed out or failed — restarting adb and retrying..."
-  adb kill-server 2>/dev/null || true
-  adb start-server 2>/dev/null || true
+if ! timeout 600 adb -s $DEVICE install -r "$LOCAL_APK" 2>&1; then
+  echo "==> Install failed — uninstalling old version and retrying..."
+  adb -s $DEVICE uninstall com.hahnca.tvremote 2>/dev/null || true
   sleep 2
-  timeout 120 adb -s $DEVICE install -r "$LOCAL_APK" 2>&1 || {
-    echo "==> Install failed after retry. Try uninstalling first:"
-    echo "    adb -s $DEVICE uninstall com.hahnca.tvremote"
+  timeout 600 adb -s $DEVICE install "$LOCAL_APK" 2>&1 || {
+    echo "==> Install failed after uninstall+reinstall."
     exit 1
   }
 fi

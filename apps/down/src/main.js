@@ -1584,6 +1584,31 @@ async function main() {
           fs.mkdirSync(localVtsDir, { recursive: true });
         } catch (e) {}
 
+        // Determine season from vtsDirRelative path (same logic as processDvdDisc).
+        const vtsPathParts = vtsDirRelative.split("/");
+        let detectedSeason = 1;
+        for (let i = 0; i < vtsPathParts.length; i++) {
+          const part = vtsPathParts[i];
+          // Match: S02D01, S2D1 (Season + Disc format)
+          let sm = part.match(/[Ss](\d{1,2})[Dd]\d+/);
+          if (!sm) {
+            // Match: S02, S2 (standalone season marker)
+            sm = part.match(/[Ss](\d{1,2})(?![0-9a-zA-Z])/);
+          }
+          if (!sm) {
+            // Match: Season 1, season1 (with optional whitespace)
+            sm = part.match(/[Ss](?:eason)?\s*(\d+)/);
+          }
+          if (!sm) {
+            // Match: trailing number like "NORMS1"
+            sm = part.match(/(\d+)\s*$/);
+          }
+          if (sm) {
+            detectedSeason = parseInt(sm[1], 10);
+            break;
+          }
+        }
+
         for (const { relPath, fileBytes } of missingFiles) {
           const fileName = path.basename(relPath);
           const localDir =
@@ -1612,7 +1637,7 @@ async function main() {
             eta: null,
             speed: 0,
             fileSize: fileBytes,
-            season: 0,
+            season: detectedSeason,
             episode: 0,
             dateStarted: 0,
             dateEnded: null,
@@ -1642,12 +1667,25 @@ async function main() {
     const localVtsDir = path.join(DVD_STAGE_DIR, vtsDirRelative);
     const unixNow = () => Math.floor(Date.now() / 1000);
 
-    // Determine season from path components (e.g. NORMS1 → 1, Disc 2 → use parent).
+    // Determine season from path components (e.g. NORMS1 → 1, S02D01 → 2, Disc 2 → use parent).
     const parts = vtsDirRelative.split("/");
     let dvdSeason = 1;
-    for (let i = 1; i < parts.length; i++) {
-      const sm =
-        parts[i].match(/[Ss](?:eason)?\s*(\d+)/) || parts[i].match(/(\d+)\s*$/);
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      // Match: S02D01, S2D1 (Season + Disc format)
+      let sm = part.match(/[Ss](\d{1,2})[Dd]\d+/);
+      if (!sm) {
+        // Match: S02, S2 (standalone season marker)
+        sm = part.match(/[Ss](\d{1,2})(?![0-9a-zA-Z])/);
+      }
+      if (!sm) {
+        // Match: Season 1, season1 (with optional whitespace)
+        sm = part.match(/[Ss](?:eason)?\s*(\d+)/);
+      }
+      if (!sm) {
+        // Match: trailing number like "NORMS1"
+        sm = part.match(/(\d+)\s*$/);
+      }
       if (sm) {
         dvdSeason = parseInt(sm[1], 10);
         break;
@@ -2352,13 +2390,13 @@ async function main() {
             recentCount++;
             const skipStatus = "already downloaded";
             trace("checkFile: skip " + skipStatus, { fname });
-// deleted             unilog(
-// deleted               478,
-// deleted               "history",
-// deleted               "skipDown",
-// deleted               title || fname,
-// deleted               "skip: " + skipStatus,
-// deleted             );
+            // deleted             unilog(
+            // deleted               478,
+            // deleted               "history",
+            // deleted               "skipDown",
+            // deleted               title || fname,
+            // deleted               "skip: " + skipStatus,
+            // deleted             );
             process.nextTick(checkFile);
             return;
           }

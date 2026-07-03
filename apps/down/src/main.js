@@ -2878,15 +2878,15 @@ async function main() {
                 folderTitle = null;
                 return process.nextTick(chkTvDB);
               }
-              unilog(
-                329,
-                "------",
-                downloadCount,
-                "/",
-                chkCount,
-                "NO SERIES MATCH, SKIPPING:",
-                fname,
-              );
+// deleted               unilog(
+// deleted                 329,
+// deleted                 "------",
+// deleted                 downloadCount,
+// deleted                 "/",
+// deleted                 chkCount,
+// deleted                 "NO SERIES MATCH, SKIPPING:",
+// deleted                 fname,
+// deleted               );
               trace("chkTvDB: smartTitleMatch returned null, skipping", {
                 fname,
                 title,
@@ -3149,18 +3149,18 @@ async function main() {
         ) || seriesName;
       const embyEntry = embyMap[embyKey];
       if (!embyEntry || !embyEntry.inEmby) {
-        unilog(
-          332,
-          "------",
-          downloadCount,
-          "/",
-          chkCount,
-          "NOT IN EMBY, SKIPPING:",
-          fname,
-          "(",
-          seriesName,
-          ")",
-        );
+// deleted         unilog(
+// deleted           332,
+// deleted           "------",
+// deleted           downloadCount,
+// deleted           "/",
+// deleted           chkCount,
+// deleted           "NOT IN EMBY, SKIPPING:",
+// deleted           fname,
+// deleted           "(",
+// deleted           seriesName,
+// deleted           ")",
+// deleted         );
         trace("checkFileExists: not in emby", { fname, seriesName });
 // deleted         unilog(
 // deleted           491,

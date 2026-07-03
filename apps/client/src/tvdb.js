@@ -44,7 +44,12 @@ async function tvdbFetch(pathStr, _init, retryCount = 0) {
     // Retry on network errors
     if (retryCount < MAX_RETRIES) {
       const delay = RETRY_DELAYS[retryCount];
-      unilog(882, `tvdbFetch: network error, retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES}):`, pathStr, e?.message || e);
+      unilog(
+        882,
+        `tvdbFetch: network error, retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES}):`,
+        pathStr,
+        e?.message || e,
+      );
       await new Promise((resolve) => setTimeout(resolve, delay));
       return tvdbFetch(pathStr, _init, retryCount + 1);
     }
@@ -67,7 +72,11 @@ const fetchAllTvdbWithRetry = async (hasEmby = 0) => {
     } catch (err) {
       lastErr = err;
       if (attempt === retryDelays.length) break;
-      unilog(883, `getAllTvdb failed, retrying in ${retryDelays[attempt]}ms (attempt ${attempt + 1}/${retryDelays.length + 1})`, err);
+      unilog(
+        883,
+        `getAllTvdb failed, retrying in ${retryDelays[attempt]}ms (attempt ${attempt + 1}/${retryDelays.length + 1})`,
+        err,
+      );
       await delay(retryDelays[attempt]);
     }
   }
@@ -761,6 +770,30 @@ export const getSeriesMapByTvdbId = async (tvdbId) => {
         aired: epData.aired || null, // Include aired date for WaitStr
       },
     ]);
+  }
+
+  // Fix unaired status: episodes with null aired dates that come after unaired episodes
+  // should also be marked as unaired (can't air E03 before E01 airs)
+  for (const seasonNum of Object.keys(seasonMap)) {
+    const episodes = seasonMap[seasonNum];
+
+    // Sort by episode number to process in order
+    episodes.sort((a, b) => a[0] - b[0]);
+
+    // Track if we've encountered an unaired episode
+    let hasUnairedEarlier = false;
+
+    for (const [episodeNum, episodeObj] of episodes) {
+      // If this episode is marked unaired (has future air date), set the flag
+      if (episodeObj.unaired) {
+        hasUnairedEarlier = true;
+      }
+      // If no aired date and an earlier episode is unaired, mark this as unaired too
+      else if (hasUnairedEarlier && !episodeObj.aired) {
+        episodeObj.unaired = true;
+        episodeObj.avail = false;
+      }
+    }
   }
 
   // Convert to seriesMap format (season number sorted)

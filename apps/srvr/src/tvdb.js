@@ -440,6 +440,30 @@ async function getSeriesMap(tvdbId, watchedEpis = null) {
     ]);
   }
 
+  // Fix unaired status: episodes with null aired dates that come after unaired episodes
+  // should also be marked as unaired (can't air E03 before E01 airs)
+  for (const seasonNum of Object.keys(seasonMap)) {
+    const episodes = seasonMap[seasonNum];
+
+    // Sort by episode number to process in order
+    episodes.sort((a, b) => a[0] - b[0]);
+
+    // Track if we've encountered an unaired episode
+    let hasUnairedEarlier = false;
+
+    for (const [episodeNum, episodeObj] of episodes) {
+      // If this episode is marked unaired (has future air date), set the flag
+      if (episodeObj.unaired) {
+        hasUnairedEarlier = true;
+      }
+      // If no aired date and an earlier episode is unaired, mark this as unaired too
+      else if (hasUnairedEarlier && !episodeObj.aired) {
+        episodeObj.unaired = true;
+        episodeObj.avail = false;
+      }
+    }
+  }
+
   // Convert to seriesMap format
   const seasonNums = Object.keys(seasonMap)
     .map(Number)

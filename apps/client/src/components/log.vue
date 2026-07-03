@@ -747,7 +747,9 @@ export default {
     scrollToBottom(force = false) {
       if (force) this.atBottom = true;
       this.$nextTick(() => {
-        if (this.holder) this.holder.scrollTop = this.holder.scrollHeight;
+        if (this.holder) {
+          this.holder.scrollTop = this.holder.scrollHeight;
+        }
       });
     },
     scrollLeft() {
@@ -774,8 +776,10 @@ export default {
       const { rowH, step } = this.pageStep();
       const topIdx = Math.round(this.holder.scrollTop / rowH);
       const targetIdx = Math.max(0, topIdx - step);
+      const savedScrollLeft = this.holder.scrollLeft;
       this.atBottom = false;
       this.table.scrollToRow(rows[targetIdx], "top", true);
+      this.holder.scrollLeft = savedScrollLeft;
     },
     scrollPageDown() {
       if (!this.holder || !this.table) return;
@@ -784,11 +788,9 @@ export default {
       const { rowH, step } = this.pageStep();
       const topIdx = Math.round(this.holder.scrollTop / rowH);
       const targetIdx = Math.min(rows.length - 1, topIdx + step);
-      if (targetIdx >= rows.length - 1) {
-        this.scrollToBottom(true);
-      } else {
-        this.table.scrollToRow(rows[targetIdx], "top", true);
-      }
+      const savedScrollLeft = this.holder.scrollLeft;
+      this.table.scrollToRow(rows[targetIdx], "top", true);
+      this.holder.scrollLeft = savedScrollLeft;
     },
     onPickerChangeMo() {
       if (this.pickerSel.mo !== "") {

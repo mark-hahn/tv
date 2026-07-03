@@ -2426,7 +2426,7 @@ async function main() {
       for (blkName in blocked) {
         if (fname.indexOf(blkName) > -1) {
           blockedCount++;
-          unilog(319, "-- BLOCKED:", { blkName, fname });
+// deleted           unilog(319, "-- BLOCKED:", { blkName, fname });
           trace("checkFile: blocked", { blkName, fname });
 // deleted           unilog(
 // deleted             481,
@@ -3082,16 +3082,16 @@ async function main() {
         if (epIsWatched) {
           const seStr = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
           existsCount++;
-          unilog(
-            331,
-            "------",
-            downloadCount,
-            "/",
-            chkCount,
-            "SKIP (episode watched):",
-            fname,
-            seStr,
-          );
+// deleted           unilog(
+// deleted             331,
+// deleted             "------",
+// deleted             downloadCount,
+// deleted             "/",
+// deleted             chkCount,
+// deleted             "SKIP (episode watched):",
+// deleted             fname,
+// deleted             seStr,
+// deleted           );
           trace("checkFileExists: skip episode watched", { fname, seStr });
 // deleted           unilog(
 // deleted             488,

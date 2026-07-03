@@ -2404,13 +2404,13 @@ async function main() {
           recentCount++;
           const skipStatus = "already queued";
           trace("checkFile: skip " + skipStatus, { fname });
-          unilog(
-            479,
-            "history",
-            "skipDown",
-            title || fname,
-            "skip: " + skipStatus,
-          );
+// deleted           unilog(
+// deleted             479,
+// deleted             "history",
+// deleted             "skipDown",
+// deleted             title || fname,
+// deleted             "skip: " + skipStatus,
+// deleted           );
           process.nextTick(checkFile);
           return;
         }
@@ -2428,13 +2428,13 @@ async function main() {
           blockedCount++;
           unilog(319, "-- BLOCKED:", { blkName, fname });
           trace("checkFile: blocked", { blkName, fname });
-          unilog(
-            481,
-            "history",
-            "skipDown",
-            title || fname,
-            `skip: blocked by ${blkName}`,
-          );
+// deleted           unilog(
+// deleted             481,
+// deleted             "history",
+// deleted             "skipDown",
+// deleted             title || fname,
+// deleted             `skip: blocked by ${blkName}`,
+// deleted           );
           process.nextTick(checkFile);
           return;
         }
@@ -3093,13 +3093,13 @@ async function main() {
             seStr,
           );
           trace("checkFileExists: skip episode watched", { fname, seStr });
-          unilog(
-            488,
-            "history",
-            "skipDown",
-            seriesName || fname,
-            `skip: ${seStr} already watched`,
-          );
+// deleted           unilog(
+// deleted             488,
+// deleted             "history",
+// deleted             "skipDown",
+// deleted             seriesName || fname,
+// deleted             `skip: ${seStr} already watched`,
+// deleted           );
           return process.nextTick(checkFile);
         }
       }
@@ -3162,13 +3162,13 @@ async function main() {
           ")",
         );
         trace("checkFileExists: not in emby", { fname, seriesName });
-        unilog(
-          491,
-          "history",
-          "skipDown",
-          seriesName || fname,
-          `skip: not in Emby (${seriesName})`,
-        );
+// deleted         unilog(
+// deleted           491,
+// deleted           "history",
+// deleted           "skipDown",
+// deleted           seriesName || fname,
+// deleted           `skip: not in Emby (${seriesName})`,
+// deleted         );
         return process.nextTick(checkFile);
       }
     }

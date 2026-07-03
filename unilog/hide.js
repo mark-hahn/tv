@@ -75,13 +75,32 @@ export function unhideInText(text, ids, vue = false) {
   let lines = text.split(/\r?\n/);
   const unhidden = [];
   for (const id of ids) {
-    // Locate the commented start line: `// deleted unilog(<id>, ...`.
-    const startRe = new RegExp(`^unilog\\(\\s*${id}\\s*,`);
-    const startIdx = lines.findIndex(
-      (l) =>
-        l.startsWith(PREFIX) &&
-        startRe.test(l.slice(PREFIX.length).trimStart()),
-    );
+    // Locate the start of the hidden block containing unilog(<id>,...).
+    // Handles single-line: `// deleted   unilog(<id>, ...)`
+    // and multi-line:      `// deleted   unilog(\n// deleted     <id>,\n...`
+    const inlineRe = new RegExp(`^unilog\\(\\s*${id}\\s*,`);
+    const idArgRe = new RegExp(`^${id}\\s*,`);
+    let startIdx = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (!lines[i].startsWith(PREFIX)) continue;
+      const content = lines[i].slice(PREFIX.length).trimStart();
+      if (inlineRe.test(content)) {
+        startIdx = i;
+        break;
+      }
+      if (idArgRe.test(content)) {
+        // id is on its own line; walk backward within the // deleted block
+        // to find the unilog( opening line.
+        for (let j = i - 1; j >= 0; j--) {
+          if (!lines[j].startsWith(PREFIX)) break;
+          if (/^unilog\(/.test(lines[j].slice(PREFIX.length).trimStart())) {
+            startIdx = j;
+            break;
+          }
+        }
+        break;
+      }
+    }
     if (startIdx === -1) continue;
     // Maximal contiguous run of `// deleted ` lines from the start. A run is a
     // sequence of complete (once-live) unilog statements, so stripping it is

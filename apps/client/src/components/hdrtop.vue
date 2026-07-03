@@ -80,6 +80,7 @@
           cursor: pointer;
           border-radius: 7px;
           margin: 0 0 0 10px;
+          width: 76px;
         "
       >
         Scan Lib
@@ -94,6 +95,7 @@
           cursor: pointer;
           border-radius: 7px;
           margin: 0 0 0 10px;
+          width: 65px;
         "
       >
         Opn Lib

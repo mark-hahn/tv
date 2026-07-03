@@ -498,7 +498,7 @@ export default {
         const el = this.$refs.tableEl?.querySelector(".tsClock");
         if (el) el.textContent = label;
       } catch (e) {
-        console.error("updateOldestTs failed:", e);
+        unilog(1127, "updateOldestTs failed:", e);
       }
     },
     // Map a header DOM event target to its Tabulator column.

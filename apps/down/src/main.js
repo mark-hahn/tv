@@ -3344,28 +3344,28 @@ async function main() {
               !usbIsBad);
           if (!usbIsBetter) {
             existsCount++;
-            unilog(
-              336,
-              "------",
-              downloadCount,
-              "/",
-              chkCount,
-              "FLEX SKIP (disk file same/better quality):",
-              fname,
-              flexSeStr,
-            );
+// hidden             unilog(
+// hidden               336,
+// hidden               "------",
+// hidden               downloadCount,
+// hidden               "/",
+// hidden               chkCount,
+// hidden               "FLEX SKIP (disk file same/better quality):",
+// hidden               fname,
+// hidden               flexSeStr,
+// hidden             );
             trace("checkFileExists: flex skip disk file same/better quality", {
               fname,
               flexSeStr,
               diskFile,
             });
-            unilog(
-              493,
-              "history",
-              "skipDown",
-              seriesName || fname,
-              `flex skip: ${flexSeStr} disk file same/better quality`,
-            );
+// hidden             unilog(
+// hidden               493,
+// hidden               "history",
+// hidden               "skipDown",
+// hidden               seriesName || fname,
+// hidden               `flex skip: ${flexSeStr} disk file same/better quality`,
+// hidden             );
             return process.nextTick(checkFile);
           }
           // USB is better — rename the worse disk file to .old before downloading.

@@ -348,4 +348,11 @@ export function listLevels() {
     .map((r) => r.level);
 }
 
+export function getOldestTimestamp() {
+  const row = db
+    .prepare("SELECT ts FROM log_events ORDER BY id ASC LIMIT 1")
+    .get();
+  return row?.ts || "";
+}
+
 export { UNILOG_DB_PATH, db };

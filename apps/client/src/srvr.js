@@ -310,6 +310,9 @@ export function getShowsFromDisk() {
 export function getUnilogEvents(params) {
   return httpCall("/api/unilog/events", params, "GET", 15000);
 }
+export function getUnilogOldestTs() {
+  return httpCall("/api/unilog/oldest-ts", {}, "GET");
+}
 export function setUnilogSiteLevel(ids, level) {
   return httpCall("/api/unilog/set-level", { ids, level }, "POST");
 }

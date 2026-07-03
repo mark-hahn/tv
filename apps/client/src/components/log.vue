@@ -488,15 +488,18 @@ export default {
         break;
       }
     },
-    updateOldestTs() {
+    async updateOldestTs() {
       if (!this.table) return;
-      const rows = this.table.getRows();
-      if (!rows.length) return;
-      const ts = rows[0].getData().ts || "";
-      // "2026/MM/DD HH:mm:ss" -> "MM/DD HH:mm"
-      const label = ts.replace(/^\d{4}\//, "").replace(/:\d{2}$/, "");
-      const el = this.$refs.tableEl?.querySelector(".tsClock");
-      if (el) el.textContent = label;
+      try {
+        const res = await srvr.getUnilogOldestTs();
+        const ts = res.ts || "";
+        // "2026/MM/DD HH:mm:ss" -> "MM/DD HH:mm"
+        const label = ts.replace(/^\d{4}\//, "").replace(/:\d{2}$/, "");
+        const el = this.$refs.tableEl?.querySelector(".tsClock");
+        if (el) el.textContent = label;
+      } catch (e) {
+        console.error("updateOldestTs failed:", e);
+      }
     },
     // Map a header DOM event target to its Tabulator column.
     columnFromEvent(target) {
@@ -745,7 +748,6 @@ export default {
         } finally {
           this.appending = false;
         }
-        this.updateOldestTs();
         this.rowCount = this.table.getDataCount();
         this.displayedCount = this.table.getDataCount("active");
         if (older.length < pageLimit) this.exhausted = true;

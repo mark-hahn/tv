@@ -4333,6 +4333,15 @@ app.get("/api/unilog/events", (req, res) => {
   }
 });
 
+app.get("/api/unilog/oldest-ts", (req, res) => {
+  try {
+    res.json({ ts: unilogDb.getOldestTimestamp() });
+  } catch (error) {
+    console.error("[unilog] /api/unilog/oldest-ts error:", error); // no-unilog
+    res.status(500).json({ error: String(error?.message || error) });
+  }
+});
+
 // The handler should be: async (params) => result
 const apiWrapper = (handler) => {
   return async (req, res) => {

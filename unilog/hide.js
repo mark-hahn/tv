@@ -123,6 +123,32 @@ export function unhideInText(text, ids, vue = false) {
   return { text: lines.join(nl), unhidden };
 }
 
+// Delete the given site ids from `text`. Completely removes the lines.
+// Returns { text, deleted: number[] }.
+export function deleteInText(text, ids, vue = false) {
+  const nl = newlineOf(text);
+  const lines = text.split(/\r?\n/);
+  const spans = activeSpans(text, vue);
+  const deleted = [];
+  // Collect all line indices to delete, then delete in reverse order
+  const toDelete = [];
+  for (const id of ids) {
+    const span = spans.get(id);
+    if (!span) continue; // not an active call (already hidden / gone)
+    if (NO_UNILOG.test(lines[span.start - 1] || "")) continue; // opt-out
+    for (let ln = span.start; ln <= span.end; ln++) {
+      toDelete.push(ln - 1); // convert to 0-based index
+    }
+    deleted.push(id);
+  }
+  // Sort and deduplicate line indices, then delete in reverse order
+  const uniqueIndices = [...new Set(toDelete)].sort((a, b) => b - a);
+  for (const idx of uniqueIndices) {
+    lines.splice(idx, 1);
+  }
+  return { text: lines.join(nl), deleted };
+}
+
 function groupByFile(sites, map) {
   const byFile = new Map();
   for (const s of sites) {
@@ -139,7 +165,7 @@ function groupByFile(sites, map) {
   return byFile;
 }
 
-// Apply hide/unhide to real files on disk. `mode` is "hide" | "unhide".
+// Apply hide/unhide/delete to real files on disk. `mode` is "hide" | "unhide" | "delete".
 // `sites` is an array of ids or `{ id, srcFile }` objects.
 // Returns { changed: number[] } — the ids actually modified.
 export function applySites(
@@ -157,8 +183,15 @@ export function applySites(
     const res =
       mode === "hide"
         ? hideInText(text, fileIds, vue)
-        : unhideInText(text, fileIds, vue);
-    const done = mode === "hide" ? res.hidden : res.unhidden;
+        : mode === "unhide"
+          ? unhideInText(text, fileIds, vue)
+          : deleteInText(text, fileIds, vue);
+    const done =
+      mode === "hide"
+        ? res.hidden
+        : mode === "unhide"
+          ? res.unhidden
+          : res.deleted;
     if (done.length && res.text !== text) fs.writeFileSync(abs, res.text);
     changed.push(...done);
   }

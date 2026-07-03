@@ -125,6 +125,7 @@
         <option value="clear">Clear Selections</option>
         <option value="hide">Hide Sites</option>
         <option value="unhide">Unhide Sites</option>
+        <option value="delete">Delete</option>
         <option value="setInfo">Set Info</option>
         <option value="setDebug">Set Debug</option>
         <option value="setWarn">Set Warn</option>
@@ -795,6 +796,7 @@ export default {
       else if (act === "clear") this.setSelection(new Set());
       else if (act === "hide") await this.hideSites();
       else if (act === "unhide") await this.unhideSites();
+      else if (act === "delete") await this.deleteSites();
       else if (act === "setInfo") await this.setSiteLevel("info");
       else if (act === "setDebug") await this.setSiteLevel("debug");
       else if (act === "setWarn") await this.setSiteLevel("warn");
@@ -849,6 +851,25 @@ export default {
       }
       // No confirmation; does not change selection or scroll.
       await this.postSites("/__unilog/unhide", sites, "unhid");
+    },
+    async deleteSites() {
+      const sites = this.selectedSites();
+      if (!sites.length) {
+        this.flash("no sites selected");
+        return;
+      }
+      if (!import.meta.env.DEV) {
+        this.flash("delete only works in vite dev");
+        return;
+      }
+      const n = sites.length;
+      if (
+        !window.confirm(
+          `Is it ok to PERMANENTLY DELETE ${n} site${n === 1 ? "" : "s"}?`,
+        )
+      )
+        return;
+      await this.postSites("/__unilog/delete", sites, "deleted");
     },
     async setSiteLevel(level) {
       const sites = this.selectedSites();

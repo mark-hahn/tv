@@ -8516,10 +8516,8 @@ async function runEmbyFullSweep(caller = "unknown") {
   if (embyFullSweepRunning) {
     embyFullSweepQueued = true;
     embyFullSweepQueuedCaller = caller;
-    unilog(68, `queued from: ${caller}`);
     return;
   }
-  unilog(69, `starting from: ${caller}`);
   embyFullSweepRunning = true;
   try {
     const allTvdb = tvdb.getAllTvdbSync();

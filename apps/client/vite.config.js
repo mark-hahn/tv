@@ -50,7 +50,9 @@ function unilogHideEndpoint() {
           ? "hide"
           : url.startsWith("/unhide")
             ? "unhide"
-            : null;
+            : url.startsWith("/delete")
+              ? "delete"
+              : null;
         if (mode === null || req.method !== "POST") return next();
         try {
           const body = await readJsonBody(req);

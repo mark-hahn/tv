@@ -781,7 +781,11 @@ export default {
       const { rowH, step } = this.pageStep();
       const topIdx = Math.round(this.holder.scrollTop / rowH);
       const targetIdx = Math.min(rows.length - 1, topIdx + step);
-      this.table.scrollToRow(rows[targetIdx], "top", true);
+      if (targetIdx >= rows.length - 1) {
+        this.scrollToBottom(true);
+      } else {
+        this.table.scrollToRow(rows[targetIdx], "top", true);
+      }
     },
     onPickerChangeMo() {
       if (this.pickerSel.mo !== "") {

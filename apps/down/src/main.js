@@ -2352,13 +2352,13 @@ async function main() {
             recentCount++;
             const skipStatus = "already downloaded";
             trace("checkFile: skip " + skipStatus, { fname });
-            unilog(
-              478,
-              "history",
-              "skipDown",
-              title || fname,
-              "skip: " + skipStatus,
-            );
+// deleted             unilog(
+// deleted               478,
+// deleted               "history",
+// deleted               "skipDown",
+// deleted               title || fname,
+// deleted               "skip: " + skipStatus,
+// deleted             );
             process.nextTick(checkFile);
             return;
           }

@@ -28,7 +28,8 @@ export function siteFileMap(cachePath = CACHE_PATH) {
   const map = new Map();
   for (const [file, entry] of Object.entries(cache)) {
     if (file === "version" || !entry || !entry.sites) continue;
-    for (const idStr of Object.keys(entry.sites)) map.set(Number(idStr), file);
+    for (const logId of Object.values(entry.sites))
+      map.set(Number(logId), file);
   }
   return map;
 }

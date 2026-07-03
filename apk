@@ -2,17 +2,9 @@
 # Build APK on hahnca.com and install on connected device
 set -e
 
-PHONE_IP=192.168.1.172
-
 DEVICE=$(adb devices | awk '/\tdevice$/{print $1; exit}')
 if [[ -z "$DEVICE" ]]; then
-  echo "No device found — trying WiFi ADB ($PHONE_IP:5555)..."
-  adb connect "$PHONE_IP:5555" 2>/dev/null || true
-  sleep 2
-  DEVICE=$(adb devices | awk '/\tdevice$/{print $1; exit}')
-fi
-if [[ -z "$DEVICE" ]]; then
-  echo "WiFi ADB failed — trying usbipd attach..."
+  echo "No device found — trying usbipd attach..."
   BUSID=$(powershell.exe -Command "usbipd list" 2>/dev/null | awk '/Shared/{print $1; exit}')
   if [[ -z "$BUSID" ]]; then
     echo "No shared USB device found in usbipd. Share the device first."

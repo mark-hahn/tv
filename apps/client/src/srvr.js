@@ -69,6 +69,7 @@ const attachWsHandlers = () => {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
     }
+    evtBus.emit("ws-reconnected");
   };
 
   ws.onclose = () => {

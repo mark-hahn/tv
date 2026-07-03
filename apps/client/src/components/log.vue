@@ -213,6 +213,7 @@ export default {
       subscribed: false,
       atBottom: true,
       oldestId: null,
+      newestId: null,
       loadingOlder: false,
       exhausted: false,
       pickerSel: { mo: "", da: "", hr: "", mi: "" },
@@ -252,6 +253,7 @@ export default {
         this.ensureTable();
         if (!this.subscribed) {
           evtBus.on("unilog-event", this.onUnilogEvent);
+          evtBus.on("ws-reconnected", this.onWsReconnected);
           srvr.unilogSubscribe();
           this.subscribed = true;
         }
@@ -261,6 +263,7 @@ export default {
     deactivate() {
       if (this.subscribed) {
         evtBus.off("unilog-event", this.onUnilogEvent);
+        evtBus.off("ws-reconnected", this.onWsReconnected);
         srvr.unilogUnsubscribe();
         this.subscribed = false;
       }
@@ -849,6 +852,28 @@ export default {
       this.atBottom = false;
       this.table.scrollToRow(found, "top", false);
     },
+    // Re-subscribe and fill any gap after a WebSocket reconnect.
+    async onWsReconnected() {
+      if (!this.subscribed) return;
+      srvr.unilogSubscribe();
+      if (this.newestId != null) await this.loadMissed();
+    },
+    async loadMissed() {
+      if (!this.table || this.newestId == null) return;
+      try {
+        const res = await srvr.getUnilogEvents({
+          limit: PAGE,
+          afterId: this.newestId,
+        });
+        // afterId returns oldest-first (ascending) — no need to reverse.
+        const missed = res?.events || [];
+        if (!missed.length) return;
+        await this.appendRows(missed);
+        this.dbTotal = res?.total ?? this.dbTotal;
+      } catch (err) {
+        this.error = err?.message || String(err);
+      }
+    },
     dumpWidths() {
       if (!this.table) return;
       const widths = this.table.getColumns().map((c) => ({
@@ -902,6 +927,10 @@ export default {
         }
         this.scrollToBottom();
       }
+      // Track newest id for reconnect gap-fill.
+      for (const r of rows) {
+        if (this.newestId == null || r.id > this.newestId) this.newestId = r.id;
+      }
       this.rowCount = this.table.getDataCount();
     },
     async loadLogs() {
@@ -924,6 +953,7 @@ export default {
             })),
           ];
         this.oldestId = events.length ? events[0].id : null;
+        this.newestId = events.length ? events[events.length - 1].id : null;
         this.exhausted = events.length < PAGE;
         this.loadedOnce = true;
 

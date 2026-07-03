@@ -258,13 +258,26 @@ export function dbInfo() {
 // Read-back for the web client log viewer. Returns recent events joined with
 // their sites, newest first. Optional filters: pid, level, file (partial),
 // msg (partial). beforeId returns only events older than that event id (for
-// upward paging). limit is clamped to a sane range.
-export function queryEvents({ pid, level, file, msg, limit, beforeId } = {}) {
+// upward paging). afterId returns events newer than that id (for gap-fill after
+// reconnect), returned oldest-first. limit is clamped to a sane range.
+export function queryEvents({
+  pid,
+  level,
+  file,
+  msg,
+  limit,
+  beforeId,
+  afterId,
+} = {}) {
   const where = [];
   const params = [];
   if (beforeId) {
     where.push("e.id < ?");
     params.push(Number(beforeId));
+  }
+  if (afterId) {
+    where.push("e.id > ?");
+    params.push(Number(afterId));
   }
   if (pid) {
     where.push("e.pid = ?");
@@ -284,6 +297,7 @@ export function queryEvents({ pid, level, file, msg, limit, beforeId } = {}) {
   }
   const w = where.length ? `WHERE ${where.join(" AND ")}` : "";
   const lim = Math.min(Math.max(Number(limit) || 500, 1), 5000);
+  const order = afterId ? "ASC" : "DESC";
   return db
     .prepare(
       `SELECT e.id, e.ts, e.pid, s.log_id, s.src_file, s.src_line,
@@ -294,7 +308,7 @@ export function queryEvents({ pid, level, file, msg, limit, beforeId } = {}) {
                 WHERE sg.log_id = s.log_id
                   AND lg.description IS NOT NULL) AS groups
          FROM log_events e JOIN log_sites s ON e.log_id = s.log_id
-         ${w} ORDER BY e.id DESC LIMIT ${lim}`,
+         ${w} ORDER BY e.id ${order} LIMIT ${lim}`,
     )
     .all(...params);
 }

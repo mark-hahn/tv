@@ -4297,9 +4297,17 @@ app.post("/api/unilog/set-level", (req, res) => {
 // (newest first) joined with their sites, plus the distinct pid list.
 app.get("/api/unilog/events", (req, res) => {
   try {
-    const { pid, level, file, msg, limit, beforeId } = req.query;
+    const { pid, level, file, msg, limit, beforeId, afterId } = req.query;
     res.json({
-      events: unilogDb.queryEvents({ pid, level, file, msg, limit, beforeId }),
+      events: unilogDb.queryEvents({
+        pid,
+        level,
+        file,
+        msg,
+        limit,
+        beforeId,
+        afterId,
+      }),
       pids: unilogDb.listPids(),
       levels: unilogDb.listLevels(),
       total: unilogDb.countEvents(),

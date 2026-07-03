@@ -21,7 +21,7 @@ function ok(name, cond) {
   ok("single: reports id", h.length === 1 && h[0] === 42);
   ok(
     "single: line commented",
-    hidden.includes("// deleted   unilog(42, `hi ${x}`);"),
+    hidden.includes("// hidden   unilog(42, `hi ${x}`);"),
   );
   const { text: back, unhidden: u } = unhideInText(hidden, [42]);
   ok("single: unhide reports id", u.length === 1 && u[0] === 42);
@@ -41,9 +41,9 @@ function ok(name, cond) {
   ].join("\n");
   const { text: hidden } = hideInText(src, [7]);
   const lines = hidden.split("\n");
-  ok("multi: line1 commented", lines[1].startsWith("// deleted   unilog(7,"));
-  ok("multi: line2 commented", lines[2].startsWith("// deleted "));
-  ok("multi: line3 commented", lines[3].startsWith("// deleted "));
+  ok("multi: line1 commented", lines[1].startsWith("// hidden   unilog(7,"));
+  ok("multi: line2 commented", lines[2].startsWith("// hidden "));
+  ok("multi: line3 commented", lines[3].startsWith("// hidden "));
   ok("multi: after-line untouched", lines[4] === "  const after = 1;");
   const { text: back } = unhideInText(hidden, [7]);
   ok("multi: round-trips", back === src);
@@ -77,7 +77,7 @@ function ok(name, cond) {
   const { text: hidden } = hideInText(src, [1, 2]);
   const { text: back } = unhideInText(hidden, [2]);
   const lines = back.split("\n");
-  ok("adjacent: id1 stays hidden", lines[0].startsWith("// deleted "));
+  ok("adjacent: id1 stays hidden", lines[0].startsWith("// hidden "));
   ok("adjacent: id2 restored", lines[1] === "  unilog(2, `b`);");
 }
 

@@ -2377,26 +2377,26 @@ async function main() {
               localPath: existingEntry?.localPath || "",
               destTitle: existingEntry?.destTitle || "",
             });
-// deleted             unilog(
-// deleted               477,
-// deleted               "history",
-// deleted               "skipDown",
-// deleted               title || fname,
-// deleted               "skip: already downloaded (local file deleted)",
-// deleted             );
+// hidden             unilog(
+// hidden               477,
+// hidden               "history",
+// hidden               "skipDown",
+// hidden               title || fname,
+// hidden               "skip: already downloaded (local file deleted)",
+// hidden             );
             process.nextTick(checkFile);
             return;
           } else {
             recentCount++;
             const skipStatus = "already downloaded";
             trace("checkFile: skip " + skipStatus, { fname });
-            // deleted             unilog(
-            // deleted               478,
-            // deleted               "history",
-            // deleted               "skipDown",
-            // deleted               title || fname,
-            // deleted               "skip: " + skipStatus,
-            // deleted             );
+            // hidden             unilog(
+            // hidden               478,
+            // hidden               "history",
+            // hidden               "skipDown",
+            // hidden               title || fname,
+            // hidden               "skip: " + skipStatus,
+            // hidden             );
             process.nextTick(checkFile);
             return;
           }
@@ -2404,13 +2404,13 @@ async function main() {
           recentCount++;
           const skipStatus = "already queued";
           trace("checkFile: skip " + skipStatus, { fname });
-// deleted           unilog(
-// deleted             479,
-// deleted             "history",
-// deleted             "skipDown",
-// deleted             title || fname,
-// deleted             "skip: " + skipStatus,
-// deleted           );
+// hidden           unilog(
+// hidden             479,
+// hidden             "history",
+// hidden             "skipDown",
+// hidden             title || fname,
+// hidden             "skip: " + skipStatus,
+// hidden           );
           process.nextTick(checkFile);
           return;
         }
@@ -2426,15 +2426,15 @@ async function main() {
       for (blkName in blocked) {
         if (fname.indexOf(blkName) > -1) {
           blockedCount++;
-// deleted           unilog(319, "-- BLOCKED:", { blkName, fname });
+// hidden           unilog(319, "-- BLOCKED:", { blkName, fname });
           trace("checkFile: blocked", { blkName, fname });
-// deleted           unilog(
-// deleted             481,
-// deleted             "history",
-// deleted             "skipDown",
-// deleted             title || fname,
-// deleted             `skip: blocked by ${blkName}`,
-// deleted           );
+// hidden           unilog(
+// hidden             481,
+// hidden             "history",
+// hidden             "skipDown",
+// hidden             title || fname,
+// hidden             `skip: blocked by ${blkName}`,
+// hidden           );
           process.nextTick(checkFile);
           return;
         }
@@ -2878,15 +2878,15 @@ async function main() {
                 folderTitle = null;
                 return process.nextTick(chkTvDB);
               }
-// deleted               unilog(
-// deleted                 329,
-// deleted                 "------",
-// deleted                 downloadCount,
-// deleted                 "/",
-// deleted                 chkCount,
-// deleted                 "NO SERIES MATCH, SKIPPING:",
-// deleted                 fname,
-// deleted               );
+// hidden               unilog(
+// hidden                 329,
+// hidden                 "------",
+// hidden                 downloadCount,
+// hidden                 "/",
+// hidden                 chkCount,
+// hidden                 "NO SERIES MATCH, SKIPPING:",
+// hidden                 fname,
+// hidden               );
               trace("chkTvDB: smartTitleMatch returned null, skipping", {
                 fname,
                 title,
@@ -3082,24 +3082,24 @@ async function main() {
         if (epIsWatched) {
           const seStr = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
           existsCount++;
-// deleted           unilog(
-// deleted             331,
-// deleted             "------",
-// deleted             downloadCount,
-// deleted             "/",
-// deleted             chkCount,
-// deleted             "SKIP (episode watched):",
-// deleted             fname,
-// deleted             seStr,
-// deleted           );
+// hidden           unilog(
+// hidden             331,
+// hidden             "------",
+// hidden             downloadCount,
+// hidden             "/",
+// hidden             chkCount,
+// hidden             "SKIP (episode watched):",
+// hidden             fname,
+// hidden             seStr,
+// hidden           );
           trace("checkFileExists: skip episode watched", { fname, seStr });
-// deleted           unilog(
-// deleted             488,
-// deleted             "history",
-// deleted             "skipDown",
-// deleted             seriesName || fname,
-// deleted             `skip: ${seStr} already watched`,
-// deleted           );
+// hidden           unilog(
+// hidden             488,
+// hidden             "history",
+// hidden             "skipDown",
+// hidden             seriesName || fname,
+// hidden             `skip: ${seStr} already watched`,
+// hidden           );
           return process.nextTick(checkFile);
         }
       }
@@ -3149,26 +3149,26 @@ async function main() {
         ) || seriesName;
       const embyEntry = embyMap[embyKey];
       if (!embyEntry || !embyEntry.inEmby) {
-// deleted         unilog(
-// deleted           332,
-// deleted           "------",
-// deleted           downloadCount,
-// deleted           "/",
-// deleted           chkCount,
-// deleted           "NOT IN EMBY, SKIPPING:",
-// deleted           fname,
-// deleted           "(",
-// deleted           seriesName,
-// deleted           ")",
-// deleted         );
+// hidden         unilog(
+// hidden           332,
+// hidden           "------",
+// hidden           downloadCount,
+// hidden           "/",
+// hidden           chkCount,
+// hidden           "NOT IN EMBY, SKIPPING:",
+// hidden           fname,
+// hidden           "(",
+// hidden           seriesName,
+// hidden           ")",
+// hidden         );
         trace("checkFileExists: not in emby", { fname, seriesName });
-// deleted         unilog(
-// deleted           491,
-// deleted           "history",
-// deleted           "skipDown",
-// deleted           seriesName || fname,
-// deleted           `skip: not in Emby (${seriesName})`,
-// deleted         );
+// hidden         unilog(
+// hidden           491,
+// hidden           "history",
+// hidden           "skipDown",
+// hidden           seriesName || fname,
+// hidden           `skip: not in Emby (${seriesName})`,
+// hidden         );
         return process.nextTick(checkFile);
       }
     }

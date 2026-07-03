@@ -3,11 +3,11 @@
 // viewer's "Hide Sites" / "Unhide Sites" actions.
 //
 // The local workspace is the source of truth; the reconciler runs locally at
-// `./srvr` deploy. A hidden site is a `unilog(...)` call with `// deleted `
+// `./srvr` deploy. A hidden site is a `unilog(...)` call with `// hidden `
 // prepended to every line of the call, turning it into a comment. Because it is
 // a comment, the AST-based reconciler (parse.js) no longer sees it, so the
 // deploy conversion naturally ignores hidden sites — no reconciler change
-// needed. Unhiding strips the `// deleted ` prefix, restoring the live call.
+// needed. Unhiding strips the `// hidden ` prefix, restoring the live call.
 // (unilog plumbing — uses console with `// no-unilog`.)
 
 import fs from "node:fs";
@@ -18,7 +18,7 @@ import { findLogCalls } from "./parse.js";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, ".."); // /root/apps/tv
 const CACHE_PATH = path.join(HERE, "reconcile-cache.json");
-const PREFIX = "// deleted ";
+const PREFIX = "// hidden ";
 const NO_UNILOG = /\/\/\s*no-unilog\s*$/;
 
 // Build { id -> srcFile } from reconcile-cache.json — the authoritative
@@ -76,8 +76,8 @@ export function unhideInText(text, ids, vue = false) {
   const unhidden = [];
   for (const id of ids) {
     // Locate the start of the hidden block containing unilog(<id>,...).
-    // Handles single-line: `// deleted   unilog(<id>, ...)`
-    // and multi-line:      `// deleted   unilog(\n// deleted     <id>,\n...`
+    // Handles single-line: `// hidden   unilog(<id>, ...)`
+    // and multi-line:      `// hidden   unilog(\n// hidden     <id>,\n...`
     const inlineRe = new RegExp(`^unilog\\(\\s*${id}\\s*,`);
     const idArgRe = new RegExp(`^${id}\\s*,`);
     let startIdx = -1;
@@ -89,7 +89,7 @@ export function unhideInText(text, ids, vue = false) {
         break;
       }
       if (idArgRe.test(content)) {
-        // id is on its own line; walk backward within the // deleted block
+        // id is on its own line; walk backward within the // hidden block
         // to find the unilog( opening line.
         for (let j = i - 1; j >= 0; j--) {
           if (!lines[j].startsWith(PREFIX)) break;
@@ -102,7 +102,7 @@ export function unhideInText(text, ids, vue = false) {
       }
     }
     if (startIdx === -1) continue;
-    // Maximal contiguous run of `// deleted ` lines from the start. A run is a
+    // Maximal contiguous run of `// hidden ` lines from the start. A run is a
     // sequence of complete (once-live) unilog statements, so stripping it is
     // valid JS and the AST can then report the exact span for this id.
     let runEnd = startIdx;

@@ -2970,13 +2970,13 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         push2Changes.length > 0 ? JSON.stringify(push2Changes) : null;
       const descVal =
         push2Changes.length > 0 ? push2Changes.join(" ") : "No fields changed";
-      // deleted       unilog(
-      // deleted         464,
-      // deleted         "history",
-      // deleted         options?.isBackground ? "bkgndUpdate" : "clientUpdate",
-      // deleted         showName,
-      // deleted         descVal,
-      // deleted       );
+      // hidden       unilog(
+      // hidden         464,
+      // hidden         "history",
+      // hidden         options?.isBackground ? "bkgndUpdate" : "clientUpdate",
+      // hidden         showName,
+      // hidden         descVal,
+      // hidden       );
     } catch (e) {
       unilog(542, "bkgndUpdate/clientUpdate error:", showName, e.message);
     }

@@ -104,7 +104,6 @@ fs.writeFileSync(
   [
     "function demo(p, n) {",
     "  console.log(`[smoke] reconciled add: ${p}`);",
-    "  // unilog-stub {level=warn,tag=smoke} unilog(`low ${n}`);",
     '  console.log("multi", n); // stays old-style (multi-arg)',
     "}",
     "",
@@ -114,13 +113,10 @@ const before = db.prepare("SELECT COUNT(*) n FROM log_sites").get().n;
 const summary = await reconcileFilesWithDb([tmp]);
 const after = db.prepare("SELECT COUNT(*) n FROM log_sites").get().n;
 const rewritten = fs.readFileSync(tmp, "utf8");
-const activeCalls = (rewritten.match(/\/\/ log-id: \d+/g) || []).length;
 note(
-  "reconciler created 2 sites + rewrote source",
-  after - before === 2 &&
-    activeCalls === 2 &&
-    /unilog\(\d+, `reconciled add/.test(rewritten),
-  JSON.stringify({ summary, activeCalls }),
+  "reconciler created 1 site + rewrote source",
+  after - before === 1 && /unilog\(\d+, `reconciled add/.test(rewritten),
+  JSON.stringify({ summary }),
 );
 note(
   "reconciler left multi-arg console.log",

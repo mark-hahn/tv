@@ -118,45 +118,34 @@ never touch git for read or commit unless i tell you to
 
 ## Unilog Debugging
 
-You must NOT hand-write `unilog(id, ...)` calls, never pick/assign log ids, and
-never write `// unilog-stub ...` lines — those are the **unilog** agent's /
-reconciler's job (`.github/agents/unilog.agent.md`).
+You must NOT hand-write `unilog(id, ...)` calls and never pick/assign log ids.
 
-To add a log, you have two sanctioned options:
+To add a log, drop a `logHere(...)` placeholder.
 
-1. **Drop a `logHere(...)` placeholder** (preferred for inline cases). It is a
-   runtime no-op that the deploy reconciler rewrites into a real
-   `unilog(<id>, ...)` — you never see or choose the id. It is lint-safe: it uses
-   `e`, so an otherwise-empty `catch` is no longer empty.
+**Drop a `logHere(...)` placeholder.** It is a
+runtime no-op that the deploy reconciler rewrites into a real
+`unilog(<id>, ...)` — you never see or choose the id. It is lint-safe: it uses
+`e`, so an otherwise-empty `catch` is no longer empty.
 
-   ```js
-   } catch (e) {
-     logHere("error", `sub copy failed for ${dstSubName}: ${e.message}`);
-   }
-   ```
+```js
+} catch (e) {
+  logHere("error", `sub copy failed for ${dstSubName}: ${e.message}`);
+}
+```
 
-   - First arg is the level: `info | warn | error | debug` (optional — omit it for
-     `info`, e.g. `logHere(`queued ${name}`)`).
-   - A leading `[tag]` in the message becomes the site tag, e.g.
-     `logHere("warn", "[disk] low space")`.
-   - Import it once per file: `import { logHere } from "@tv/share"` (server apps)
-     or from the client log module (`apps/client/src/log.js`) in the client.
-   - Reconciliation runs automatically on every `./srvr <project>` deploy (all
-     projects), so the placeholder becomes a real site without any extra step.
+- First arg is the level: `info | warn | error | debug` (optional — omit it for
+  `info`, e.g. `logHere(`queued ${name}`)`).
+- A leading `[tag]` in the message becomes the site tag, e.g.
+  `logHere("warn", "[disk] low space")`.
+- Import it once per file: `import { logHere } from "@tv/share"` (server apps)
+  or from the client log module (`apps/client/src/log.js`) in the client.
+- Reconciliation runs automatically on every `./srvr <project>` deploy (all
+  projects), so the placeholder becomes a real site without any extra step.
 
-2. **Hand the need to the unilog agent** as a plain instruction (use when you want
-   a curated description/tag, or are unsure where it belongs), e.g.:
-
-   > add an error log in `apps/srvr/index.js`, in the `catch` after
-   > `fs.copyFileSync(... dstSubPath)`, message: `` `sub copy failed for ${dstSubName}: ${e.message}` ``
-
-   Give the agent: the file, the location (line number or a short nearby snippet),
-   the level, and the exact message expression.
-
-Either way: keep the `catch (e) {` binding so the message can use `e`. Do not leave
+Keep the `catch (e) {` binding so the message can use `e`. Do not leave
 `catch { /* ignore */ }` or a bare `void e;` — use `logHere(...)` instead. You can
 validate before deploy with `node unilog/check.js <project|all>` (reports duplicate
-ids and malformed stubs).
+ids).
 
 ### `// no-unilog` — opt-out suffix
 
@@ -168,7 +157,6 @@ catches every form of debug statement:
 | ------------------ | ---------------------------------------------------------------------------------------------- |
 | `console.*`        | `console.log(…)`, `console.info(…)`, `console.debug(…)`, `console.warn(…)`, `console.error(…)` |
 | standalone helpers | `log(…)`, `loge(…)`, `logSubtitle(…)`                                                          |
-| stubs              | `// unilog-stub …` comment lines                                                               |
 
 Any of those forms ending in `// no-unilog` is skipped — never upgraded, never
 activated, never assigned an id. Use it for unilog's own plumbing files and any
@@ -189,7 +177,7 @@ node unilog/query.js --pid tv-down --level error --last 20    # by process / lev
 node unilog/query.js --since "-1 hour" --pid tv-srvr --asc    # time-bounded
 ```
 
-Output: `YYYY/MM/DD HH:MM:SS  pid  file:line  [tag]  message`. See `.github/agents/unilog.agent.md` for full reference including how to add/remove log instrumentation.
+Output: `YYYY/MM/DD HH:MM:SS  pid  file:line  [tag]  message`
 
 ## Debugging on the remote server
 

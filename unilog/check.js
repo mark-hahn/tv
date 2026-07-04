@@ -2,23 +2,20 @@
 // unilog/check.js — offline validator. Reports problems WITHOUT deploying or
 // touching the DB:
 //   - duplicate log_ids (same id on more than one source line)
-//   - unparseable `// unilog-stub` lines (malformed stub the reconciler would skip)
-//   - (info) count of pending stubs and active sites per project
+//   - (info) count of active sites per project
 //
 // Usage: node unilog/check.js <project|all>
 //   e.g. node unilog/check.js tv      node unilog/check.js all
 //
-// Exit code 1 if any duplicate ids or unparseable stubs are found, else 0.
+// Exit code 1 if any duplicate ids are found, else 0.
 // (unilog plumbing — console with `// no-unilog`.)
 
 import fs from "node:fs";
 import path from "node:path";
 import { findLogCalls } from "./parse.js";
-import { parseStub } from "./unilog-lib.js";
 import { PROJECT_DIRS, findProjectFiles } from "./projects.js";
 
 const REPO_ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
-const STUB_MARKER = /\/\/\s*unilog-stub\b/;
 
 const projectArg = process.argv.filter((a) => !a.startsWith("-"))[2];
 if (!projectArg || (!PROJECT_DIRS[projectArg] && projectArg !== "all")) {
@@ -35,8 +32,6 @@ const files = [
 ];
 
 const sites = []; // { rel, line, logId }
-const badStubs = []; // { rel, line, text }
-let stubCount = 0;
 
 for (const abs of files) {
   const rel = path.relative(REPO_ROOT, abs);
@@ -45,12 +40,6 @@ for (const abs of files) {
   for (const h of findLogCalls(text, { vue: abs.endsWith(".vue") })) {
     if (h.kind === "active") sites.push({ rel, line: h.line, logId: h.logId });
   }
-
-  text.split(/\r?\n/).forEach((line, i) => {
-    if (!STUB_MARKER.test(line)) return;
-    if (parseStub(line)) stubCount++;
-    else badStubs.push({ rel, line: i + 1, text: line.trim() });
-  });
 }
 
 // ---- duplicate ids -------------------------------------------------------
@@ -65,7 +54,7 @@ const dupes = [...byId.entries()]
 
 // ---- report --------------------------------------------------------------
 console.log(
-  `[check] ${projectArg}: ${files.length} files, ${sites.length} active sites, ${stubCount} pending stub(s)`,
+  `[check] ${projectArg}: ${files.length} files, ${sites.length} active sites`,
 ); // no-unilog
 
 if (dupes.length > 0) {
@@ -76,11 +65,6 @@ if (dupes.length > 0) {
   }
 }
 
-if (badStubs.length > 0) {
-  console.log(`\n[check] UNPARSEABLE stub(s): ${badStubs.length}`); // no-unilog
-  for (const b of badStubs) console.log(`  ${b.rel}:${b.line}  ${b.text}`); // no-unilog
-}
-
-const problems = dupes.length + badStubs.length;
+const problems = dupes.length;
 if (problems === 0) console.log("[check] OK — no problems"); // no-unilog
 process.exit(problems > 0 ? 1 : 0);

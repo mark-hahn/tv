@@ -1,19 +1,14 @@
 // unilog reconciler — runs at DEPLOY ONLY (never on process start) on changed
-// files. It activates `// unilog-stub` lines, auto-upgrades leftover old-style
-// single-literal logs, refreshes src_file/src_line for existing `// log-id:`
-// sites, and reports the site rows to upsert via the single DB owner (tv-srvr).
+// files. It auto-upgrades old-style single-literal logs, refreshes src_file/src_line
+// for existing active sites, and reports site rows to upsert via the single DB
+// owner (tv-srvr).
 //
 // The pure core (reconcileLines / reconcileText) takes an id allocator callback
 // so it can be unit-tested without a DB. The DB-backed driver is separate.
 // (unilog plumbing — uses console with `// no-unilog`.)
 
 import crypto from "node:crypto";
-import {
-  parseStub,
-  activateStub,
-  levelForCall,
-  extractLeadingTag,
-} from "./unilog-lib.js";
+import { levelForCall, extractLeadingTag } from "./unilog-lib.js";
 import { findLogCalls } from "./parse.js";
 
 export function sha256(text) {
@@ -92,18 +87,6 @@ export function scanText(text, srcFile, { vue = false } = {}) {
     srcFile,
     srcLine: a.startLine,
   }));
-  // stubs (comments — not seen by AST)
-  text.split(/\r?\n/).forEach((line, i) => {
-    const stub = parseStub(line);
-    if (stub)
-      creates.push({
-        kind: "stub",
-        level: stub.level,
-        tag: stub.tag,
-        argExpr: stub.argExpr,
-        srcLine: i + 1,
-      });
-  });
   creates.sort((a, b) => a.srcLine - b.srcLine);
   return { creates, refreshes };
 }
@@ -121,27 +104,16 @@ export function reconcileText(text, srcFile, nextId, { vue = false } = {}) {
     srcLine: a.startLine,
   }));
 
-  // Allocate ids in source order (upgrades + stubs interleaved by start line).
+  // Allocate ids in source order.
   const lines = text.split(/\r?\n/);
-  const stubs = [];
-  lines.forEach((line, i) => {
-    if (parseStub(line)) stubs.push(i);
-  });
 
-  const ordered = [
-    ...upgrades.map((u) => ({ kind: "u", line: u.startLine, u })),
-    ...stubs.map((i) => ({ kind: "s", line: i + 1, i })),
-  ].sort((a, b) => a.line - b.line);
+  const ordered = upgrades
+    .map((u) => ({ kind: "u", line: u.startLine, u }))
+    .sort((a, b) => a.line - b.line);
   const idFor = new Map();
   for (const item of ordered) idFor.set(item, nextId());
 
   let changed = false;
-  // Stubs by line first (doesn't shift offsets used below since we rebuild text).
-  for (const item of ordered) {
-    if (item.kind !== "s") continue;
-    lines[item.i] = activateStub(lines[item.i], idFor.get(item)).line;
-    changed = true;
-  }
   let out = lines.join(nl);
 
   // Old-style by offsets, end-to-start.

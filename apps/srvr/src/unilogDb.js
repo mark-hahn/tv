@@ -442,7 +442,7 @@ export const createGroupWithSites = db.transaction(
       .get(description);
     if (exists) return { created: false };
     const id = maxGroup.get().next;
-    insGroup.run(id, "manual", nowPst(), description);
+    insGroup.run(id, "", nowPst(), description);
     for (const logId of logIds) insSiteGroup.run(Number(logId), id);
     return { created: true, groupId: id, linked: logIds.length };
   },

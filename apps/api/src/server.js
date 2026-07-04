@@ -1338,22 +1338,9 @@ const RECENT_SENT_LOG_PATH = "/root/dev/apps/tv/logs/recent-sent.log";
 
 function logRecentSent(action, details = {}) {
   try {
-    const now = new Date();
-    const pstTime = now
-      .toLocaleString("en-US", {
-        timeZone: "America/Los_Angeles",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false,
-      })
-      .replace(/24:(\d+):(\d+)/, "00:$1:$2");
     const detailsStr =
       Object.keys(details).length > 0 ? ` | ${JSON.stringify(details)}` : "";
-    const line = `${pstTime} | ${action}${detailsStr}\n`;
-    fs.appendFileSync(RECENT_SENT_LOG_PATH, line, "utf8");
+    logHere({ grp: "recent-sent" }, `${action}${detailsStr}`);
   } catch {
     // ignore logging errors
   }

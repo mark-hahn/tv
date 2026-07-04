@@ -2581,16 +2581,14 @@ async function main() {
       // (logging moved to workers)
       return process.nextTick(chkTvDB);
     } else {
-      unilog(322, ".... done ....");
-
       if (
         deleteCount + existsCount + errCount + downloadCount + blockedCount >
         0
       ) {
-        unilog(
-          323,
-          "***********************************************************",
-        );
+// hidden         unilog(
+// hidden           323,
+// hidden           "***********************************************************",
+// hidden         );
       }
       if (_cycleTiming) {
         _cycleTiming.cycleEnd = Date.now();

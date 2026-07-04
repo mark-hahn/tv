@@ -506,8 +506,8 @@ export default {
         {
           title: "File",
           field: "src_file",
-          width: 123,
-          formatter: (cell) => (cell.getValue() || "").replace(/^apps\//, ""),
+          width: 300,
+          formatter: (cell) => `/root/apps/tv/${cell.getValue() || ""}`,
           headerFilter: "input",
         },
         {
@@ -617,7 +617,11 @@ export default {
       }
       // alt: copy cell value to clipboard (pink flash).
       if (e.altKey) {
-        const val = String(cell.getValue() ?? "");
+        let val = String(cell.getValue() ?? "");
+        // For File column, prepend full path.
+        if (cell.getColumn().getField() === "src_file") {
+          val = `/root/apps/tv/${val}`;
+        }
         navigator.clipboard.writeText(val).catch(() => {});
         const el = cell.getElement();
         const prev = el.style.backgroundColor;

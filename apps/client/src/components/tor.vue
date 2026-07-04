@@ -1363,7 +1363,7 @@ import { config } from "../config.js";
 import Stream from "./stream.vue";
 import parseTorrentTitle from "parse-torrent-title";
 import * as srvr from "../srvr.js";
-import { unilog } from "../log.js";
+import { unilog, logHere } from "../log.js";
 
 const BAD_GROUPS_REFRESH_MS = 3000;
 
@@ -2157,7 +2157,10 @@ export default {
       const changed = Object.keys(next).length !== Object.keys(map).length;
       if (changed) {
         const removed = Object.keys(map).length - Object.keys(next).length;
-        unilog(1037, `pruneDownloadedHistory: removed ${removed} old entries (older than 60 days)`);
+        unilog(
+          1037,
+          `pruneDownloadedHistory: removed ${removed} old entries (older than 60 days)`,
+        );
         this.downloadedByHash = next;
       }
     },
@@ -2351,7 +2354,13 @@ export default {
       const torTitle = String(
         torrent?.raw?.title || torrent?.title || "",
       ).trim();
-      unilog(1038, `rememberDownloadedTorrent: "${torTitle}" | keys:`, keys.length, "| timestamp:", now);
+      unilog(
+        1038,
+        `rememberDownloadedTorrent: "${torTitle}" | keys:`,
+        keys.length,
+        "| timestamp:",
+        now,
+      );
 
       // Persist to server.
       fetch(`${config.torrentsApiUrl}/api/tor/sent`, {
@@ -3903,6 +3912,12 @@ export default {
                         !qBad &&
                         newBad);
                     if (qIsHigherQuality) {
+                      const showName =
+                        this.currentShow?.name || newShow || "unknown show";
+                      unilog(
+                        1186,
+                        `Client: qBittorrent has higher quality ${seStr} (${qRes}p vs ${newRes}p) for ${showName}: "${newTitle}"`,
+                      );
                       this.showError(
                         `qBittorrent already has a higher quality version of ${seStr}:\n${qName}`,
                       );

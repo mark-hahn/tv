@@ -48,7 +48,7 @@ import {
   parseTitleFromFilename,
   TV_BLOCKED,
 } from "@tv/share";
-import { unilog, setUnilogSink } from "@tv/share";
+import { unilog, setUnilogSink, logHere } from "@tv/share";
 import parseTorrentTitlePkg from "parse-torrent-title";
 import {
   getApiCookiesDir,
@@ -1642,6 +1642,7 @@ async function handleDownloadRequest(req, res) {
       const title = torTitle();
       const blockedKey = Object.keys(TV_BLOCKED).find((k) => title.includes(k));
       if (blockedKey) {
+        unilog(1170, `API: TV_BLOCKED substring "${blockedKey}" in "${title}"`);
         postTorErr("tv-blocked", `title matches blocked key: ${blockedKey}`);
         res.json({
           ...baseWrapper,
@@ -1657,6 +1658,10 @@ async function handleDownloadRequest(req, res) {
     if (!forceDownload) {
       const fetched = await download.fetchTorrentFile(torrent);
       if (!fetched || typeof fetched !== "object") {
+        unilog(
+          1171,
+          `API: fetch-torrent failed (unexpected result) for "${torTitle()}"`,
+        );
         postTorErr("fetch-torrent", "Unexpected fetchTorrentFile result");
         res.json({
           ...baseWrapper,
@@ -1667,6 +1672,10 @@ async function handleDownloadRequest(req, res) {
         return;
       }
       if (!fetched.success) {
+        unilog(
+          1172,
+          `API: fetch-torrent failed: ${fetched.error || "fetch failed"} for "${torTitle()}"`,
+        );
         postTorErr("fetch-torrent", fetched.error || "fetch failed");
         res.json({ ...baseWrapper, ...fetched });
         return;
@@ -1679,6 +1688,10 @@ async function handleDownloadRequest(req, res) {
         ? { success: true }
         : download.validateTorrentBytes(fetched.torrentData);
       if (!valid.success) {
+        unilog(
+          1173,
+          `API: invalid torrent bytes: ${valid.error || "unknown"} for "${torTitle()}"`,
+        );
         try {
           const rawTitle = String(
             torrent?.raw?.title ||
@@ -1721,6 +1734,10 @@ async function handleDownloadRequest(req, res) {
                 torrent?.clientTitle ||
                 "",
             ).trim();
+            unilog(
+              1174,
+              `API: year mismatch (requested ${expectedYear}, torrent says ${actualYear}) for "${requestedTitle}"`,
+            );
             postTorErr(
               "validate-torrent-metadata",
               `year mismatch (requested ${expectedYear}, torrent says ${actualYear})`,
@@ -1748,6 +1765,10 @@ async function handleDownloadRequest(req, res) {
       try {
         titles = download.extractTorrentFileTitles(fetched.torrentData);
       } catch (e) {
+        unilog(
+          1175,
+          `API: parse-torrent failed: ${e?.message || String(e)} for "${torTitle()}"`,
+        );
         postTorErr("parse-torrent", e?.message || String(e));
         res.json({
           ...baseWrapper,
@@ -1797,6 +1818,10 @@ async function handleDownloadRequest(req, res) {
         : [];
       const errorTitles = tvEntriesErrorTitles(tvProcResult?.tvEntries);
       if (existingTitles.length > 0 || errorTitles.length > 0) {
+        unilog(
+          1176,
+          `API: tv-proc blocked (${existingTitles.length} existing, ${errorTitles.length} errors) for "${torTitle()}"`,
+        );
         if (debug)
           unilog(239, "blocked by tv-proc", {
             existingTitles: existingTitles.length,

@@ -21,6 +21,7 @@ import {
   isWatched as edIsWatched,
   unilog,
   setUnilogSink,
+  logHere,
 } from "@tv/share";
 
 const __filename = urlNode.fileURLToPath(import.meta.url);
@@ -2426,6 +2427,10 @@ async function main() {
       for (blkName in blocked) {
         if (fname.indexOf(blkName) > -1) {
           blockedCount++;
+// hidden           unilog(
+// hidden             1185,
+// hidden             `Down: TV_BLOCKED substring "${blkName}" in file "${fname}" (${title || "unknown show"})`,
+// hidden           );
           // hidden           unilog(319, "-- BLOCKED:", { blkName, fname });
           trace("checkFile: blocked", { blkName, fname });
           // hidden           unilog(

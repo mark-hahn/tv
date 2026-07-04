@@ -152,8 +152,10 @@ logHere({ grp: ["playback", "errors"], typ: "feature" }, `crash in ${fn}`);
 logHere({}); // no message → logs "<missing>"
 ```
 
-- Use a **template string** for the message. Do not use `[tag]` prefixes in the
-  message — use `grp` instead to categorize sites.
+- Use a **template string** for the message. 
+- Do not use `[tag]` prefixes in the message — use `grp` instead to categorize sites.
+- do not use the pid or project fields like `down` in the message
+  - they are already included in other displayed fields 
 - A site is linked to every named group in `grp`. A group is looked up by name
   (case-insensitive); if it doesn't exist it is created with `typ`. Existing
   groups keep their `group_type` — `typ` never changes it.

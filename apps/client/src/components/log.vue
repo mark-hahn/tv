@@ -500,7 +500,7 @@ export default {
         {
           title: "Groups",
           field: "groups",
-          width: 278,
+          width: 139,
           headerFilter: "input",
         },
         {
@@ -519,6 +519,17 @@ export default {
         },
         {
           title: "Id",
+          field: "id",
+          width: 55,
+          hozAlign: "right",
+          headerFilter: "input",
+          headerFilterFunc: (headerValue, rowValue) => {
+            if (headerValue === "" || headerValue == null) return true;
+            return String(rowValue) === String(headerValue).trim();
+          },
+        },
+        {
+          title: "Log Id",
           field: "log_id",
           width: 55,
           hozAlign: "right",

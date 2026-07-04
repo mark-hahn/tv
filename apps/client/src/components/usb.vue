@@ -48,6 +48,18 @@
             <span>USB Files</span>
           </div>
 
+          <span
+            v-if="oldestShowDate"
+            style="
+              font-size: 13px;
+              font-weight: normal;
+              color: #666;
+              margin-right: 8px;
+            "
+          >
+            {{ oldestShowDate }}
+          </span>
+
           <button
             @click="usbCp"
             style="
@@ -582,6 +594,37 @@ export default {
       if (this.pruneBusy) return this.pruneLiveLine || "Pruning...";
       return this.pruneSummaryLine || "";
     },
+    oldestShowDate() {
+      if (!this.tree || this.tree.length === 0) return "";
+
+      // Find oldest date from all top-level folders
+      let oldest = null;
+
+      const findOldestInNode = (node) => {
+        if (node.date) {
+          const d = new Date(node.date);
+          if (!isNaN(d.getTime()) && (!oldest || d < oldest)) {
+            oldest = d;
+          }
+        }
+        if (node.children) {
+          for (const child of node.children) {
+            findOldestInNode(child);
+          }
+        }
+      };
+
+      for (const topNode of this.tree) {
+        findOldestInNode(topNode);
+      }
+
+      if (!oldest) return "";
+
+      // Format as mm/dd with leading zero suppression
+      const month = oldest.getMonth() + 1;
+      const day = oldest.getDate();
+      return `${month}/${day}`;
+    },
   },
   watch: {
     show: {
@@ -959,7 +1002,9 @@ export default {
           const txt = await res.text();
           throw new Error(`HTTP ${res.status}: ${txt}`);
         }
-        const rootTree = await res.json();
+        const data = await res.json();
+        // API returns { tree, oldestShowDate } or just an array for backwards compat
+        const rootTree = Array.isArray(data) ? data : data.tree || [];
         this.tree = this.processTree(rootTree);
         this.hasLoaded = true;
         await this.updateUsbSpaceAvail();

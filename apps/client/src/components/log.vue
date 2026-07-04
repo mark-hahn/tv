@@ -447,7 +447,7 @@ export default {
         this.subscribed = false;
       }
       if (this.flushTimer) {
-        clearInterval(this.flushTimer);
+        clearTimeout(this.flushTimer);
         this.flushTimer = null;
       }
       if (this.flashTimer) {
@@ -472,13 +472,6 @@ export default {
           title: "Message",
           field: "message",
           width: 280,
-          headerFilter: "input",
-        },
-        {
-          title: "Tag",
-          field: "tag",
-          width: 55,
-          hozAlign: "center",
           headerFilter: "input",
         },
         {
@@ -1104,18 +1097,17 @@ export default {
     },
     async onUnilogEvent(row) {
       if (!this.table || !row) return;
-      // A header-filter list dropdown is open: buffer the row instead of
-      // mutating the table, which would scroll/redraw and close the dropdown.
-      if (document.querySelector(".tabulator-edit-list")) {
-        this.pendingRows.push(row);
-        this.scheduleFlush();
-        return;
-      }
-      await this.appendRows([row]);
+      // Always buffer incoming rows and batch-flush them to avoid blocking
+      // JavaScript execution with individual DOM updates for every log event.
+      this.pendingRows.push(row);
+      this.scheduleFlush();
     },
     scheduleFlush() {
       if (this.flushTimer) return;
-      this.flushTimer = setInterval(() => {
+      // Use a short timeout to batch multiple log events together.
+      // Don't flush while a header-filter dropdown is open (would close it).
+      this.flushTimer = setTimeout(() => {
+        this.flushTimer = null;
         if (
           !document.querySelector(".tabulator-edit-list") &&
           this.pendingRows.length
@@ -1124,9 +1116,9 @@ export default {
           this.pendingRows = [];
           this.appendRows(buffered);
         }
-        if (!this.pendingRows.length) {
-          clearInterval(this.flushTimer);
-          this.flushTimer = null;
+        // If dropdown is still open, reschedule to try again.
+        if (this.pendingRows.length) {
+          this.scheduleFlush();
         }
       }, 500);
     },

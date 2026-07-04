@@ -7,7 +7,6 @@
 //   --file F        partial src_file match (e.g. server.js or apps/srvr)
 //   --line N        exact src_line — requires --file
 //   --id N          log_id (can repeat: --id 3 --id 7)
-//   --tag T         tag filter (exact match)
 //   --level L       level filter: info|warn|error|debug
 //   --pid P         process name filter (e.g. tv-srvr)
 //   --msg TXT       message contains TXT (case-insensitive)

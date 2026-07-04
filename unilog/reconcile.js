@@ -24,20 +24,21 @@ export function projectOf(file) {
   return m ? m[1] : null;
 }
 
-// Strip a leading [tag] from an AST literal and return { tag, argExpr }.
+// Strip a leading [tag] from an AST literal and return { grpName, argExpr }.
 // Build args expression: copy ALL args verbatim; strip a leading [tag] from
-// the first literal arg. Returns { tag, argExpr }.
+// the first literal arg. Returns { grpName, argExpr } where grpName is the
+// extracted tag now used as a group name, or null.
 function buildArgs(argsText, firstLiteral) {
-  let tag = null;
+  let grpName = null;
   const parts = argsText.slice();
   if (firstLiteral && parts.length) {
     const a = parts[0];
     const q = a[0];
     const ex = extractLeadingTag(a.slice(1, -1));
-    tag = ex.tag;
+    grpName = ex.tag;
     parts[0] = `${q}${ex.content}${q}`;
   }
-  return { tag, argExpr: parts.join(", ") };
+  return { grpName, argExpr: parts.join(", ") };
 }
 
 // From the AST: upgrades (old-style calls) and actives (existing unilog calls).
@@ -62,18 +63,19 @@ function astSites(text, vue) {
     let grpNames = [];
     let grpTyp = null;
     if (c.callee === "logHere") {
-      // logHere carries its own tag / groups in the param object — no [tag]
-      // stripping. Empty message args become the "<missing>" sentinel.
+      // logHere carries its groups in the param object. Single message arg only.
+      // Empty message arg becomes the "<missing>" sentinel.
       level = c.level;
-      tag = c.tag ?? null;
+      tag = null;
       grpNames = c.grpNames || [];
       grpTyp = c.grpTyp ?? null;
-      argExpr = c.argsText.length ? c.argsText.join(", ") : '"<missing>"';
+      argExpr = c.argsText.length ? c.argsText[0] : '"<missing>"';
     } else {
       // console.*, log(), loge(), logSubtitle(): strip a leading [tag] from the
-      // first literal into the tag field; derive level from the method.
+      // first literal into a group; derive level from the method.
       const b = buildArgs(c.argsText, c.firstLiteral);
-      tag = b.tag;
+      tag = null;
+      grpNames = b.grpName ? [b.grpName] : [];
       argExpr = b.argExpr;
       level = c.level ?? levelForCall(c.callee, c.method);
     }

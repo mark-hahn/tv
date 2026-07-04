@@ -123,20 +123,18 @@ export function findLogCalls(code, { vue = false } = {}) {
       return;
     }
 
-    // logHere({ lvl, tag, grp, typ }, ...msgArgs) — the author placeholder.
+    // logHere({ lvl, grp, typ }, <msg>) — the author placeholder.
     // Upgrade to a real unilog site. The first arg MUST be an object literal
-    // (the param block); the remaining args are the message. All param values
-    // must be static string literals (or an array of string literals for grp);
-    // anything dynamic is ignored and the default is used.
+    // (the param block); the second arg is the message template string. All
+    // param values must be static string literals (or an array of string
+    // literals for grp); anything dynamic is ignored and the default is used.
     //   lvl → level  (default "info")
-    //   tag → tag    (default null)
     //   grp → group name(s): string or array of strings (default [])
     //   typ → group_type applied only to newly-created groups (default null)
     if (n.callee.type === "Identifier" && n.callee.name === "logHere") {
       const LEVELS = ["info", "warn", "error", "debug"];
       const a0 = n.arguments[0];
       let level = "info";
-      let tag = null;
       let grpNames = [];
       let grpTyp = null;
       if (a0 && a0.type === "ObjectExpression") {
@@ -147,8 +145,6 @@ export function findLogCalls(code, { vue = false } = {}) {
           if (key === "lvl") {
             if (v.type === "StringLiteral" && LEVELS.includes(v.value))
               level = v.value;
-          } else if (key === "tag") {
-            if (v.type === "StringLiteral") tag = v.value;
           } else if (key === "typ") {
             if (v.type === "StringLiteral") grpTyp = v.value;
           } else if (key === "grp") {
@@ -169,7 +165,6 @@ export function findLogCalls(code, { vue = false } = {}) {
         callee: "logHere",
         method: "logHere",
         level,
-        tag,
         grpNames,
         grpTyp,
         argsText: msgArgs.map((a) => src.slice(a.start, a.end)),

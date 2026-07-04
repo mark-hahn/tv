@@ -133,26 +133,27 @@ runtime no-op that the deploy reconciler rewrites into a real
 }
 ```
 
-The first arg is a **param object**; the remaining args are the message (joined
-like `console.log`). All param values must be **static string literals** (or an
-array of string literals for `grp`) — anything dynamic is ignored and the default
-is used.
+The first arg is a **param object**; the second arg is the message as a single
+template string. All param values must be **static string literals** (or an
+array of string literals for `grp`) — anything dynamic is ignored and the
+default is used.
 
 | key   | meaning                                       | default |
 | ----- | --------------------------------------------- | ------- |
 | `lvl` | level: `info` \| `warn` \| `error` \| `debug` | `info`  |
-| `tag` | category string                               | none    |
 | `grp` | group name, or array of names                 | none    |
 | `typ` | `group_type`, applied only to **new** groups  | none    |
 
 ```js
-logHere({}, "message"); // minimal (info, no tag)
-logHere({ lvl: "warn", tag: "disk" }, "low space"); // level + tag
+logHere({}, "message"); // minimal
+logHere({ lvl: "warn" }, `low space on ${drive}`); // warn level
 logHere({ grp: "playback" }, `started ${showId}`); // one named group
 logHere({ grp: ["playback", "errors"], typ: "feature" }, `crash in ${fn}`);
 logHere({}); // no message → logs "<missing>"
 ```
 
+- Use a **template string** for the message. Do not use `[tag]` prefixes in the
+  message — use `grp` instead to categorize sites.
 - A site is linked to every named group in `grp`. A group is looked up by name
   (case-insensitive); if it doesn't exist it is created with `typ`. Existing
   groups keep their `group_type` — `typ` never changes it.
@@ -184,25 +185,3 @@ debug statement that must stay as plain `console.*` output.
 ```js
 console.log("[reseed] done."); // no-unilog
 ```
-
-Use `unilog/query.js` (runs locally, SSHes to remote DB) to answer questions about log output:
-
-```bash
-node unilog/query.js --file srvr/index.js --last 100          # recent events from a file
-node unilog/query.js --file srvr/index.js --line 311 --last 100  # specific source line
-node unilog/query.js --file tvdb.js --sites                   # list log_ids for a file
-node unilog/query.js --id 42 --last 50                        # by log_id
-node unilog/query.js --pid tv-down --level error --last 20    # by process / level
-node unilog/query.js --since "-1 hour" --pid tv-srvr --asc    # time-bounded
-```
-
-Output: `YYYY/MM/DD HH:MM:SS  pid  file:line  [tag]  message`
-
-## Debugging on the remote server
-
-When you have a VS Code window open directly on **hahnca.com** (via Remote SSH),
-use the **server-debug** agent (`.github/agents/server-debug.agent.md`). It covers:
-
-- querying the unilog DB with `sqlite3` directly (no SSH hop)
-- what unilog is and how the old `console.log`/`log`/`loge` calls were replaced
-- pm2 process names, key paths, and common query patterns

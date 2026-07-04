@@ -18,7 +18,7 @@ One row per instrumentation point in source. Populated at **deploy time** by the
 | Column        | Type       | Description                                                                                                                                                      |
 | ------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `log_id`      | INTEGER PK | Numeric id used as the first arg of every `unilog(id, …)` call. Auto-incremented by the reconciler (never reused).                                               |
-| `tag`         | TEXT       | Optional category string, e.g. `chokidar`, `ws`. Extracted from a leading `[tag]` in the message or from the stub `{tag=…}` field.                               |
+| `tag`         | TEXT       | Unused dead column (kept for historical rows). No longer set by new sites.                                                                                       |
 | `description` | TEXT       | Human-readable note set when the site is created. Falls back to a generated snippet of the message expression if the prompt is absent or fails the sanity check. |
 | `level`       | TEXT       | `info` \| `warn` \| `error` \| `debug`. Derived from the call method at creation time.                                                                           |
 | `src_file`    | TEXT       | Relative path to the source file, e.g. `apps/srvr/index.js`. Refreshed every deploy even when the id is unchanged.                                               |
@@ -95,7 +95,7 @@ Use [unilog/query.js](../query.js) locally — it SSHes to the remote and runs `
 node unilog/query.js --file srvr/index.js --last 100          # recent events from a file
 node unilog/query.js --file srvr/index.js --line 311 --last 5 # specific source line
 node unilog/query.js --id 42 --last 50                        # by log_id
-node unilog/query.js --tag chokidar --last 20                  # by tag
+node unilog/query.js --level error --last 20                  # by level
 node unilog/query.js --pid tv-down --level error --last 20    # by process / level
 node unilog/query.js --msg "intro" --last 30                   # message substring
 node unilog/query.js --since "-1 hour" --pid tv-srvr --asc    # time-bounded
@@ -103,6 +103,6 @@ node unilog/query.js --file srvr/index.js --sites             # list log_sites r
 node unilog/query.js --dry-run --file srvr/index.js           # print SQL only
 ```
 
-Output format — events: `YYYY/MM/DD HH:MM:SS  pid  file:line  [tag]  message`
+Output format — events: `YYYY/MM/DD HH:MM:SS  pid  file:line  message`
 
-Output format — `--sites`: `id=N  file:line  [tag]  level  description`
+Output format — `--sites`: `id=N  file:line  level  description`

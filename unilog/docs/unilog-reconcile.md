@@ -41,7 +41,7 @@ like `console.log(")")` or multi-line templates are handled by the grammar.
 
 | kind                           | shape in source                                               | what reconcile does                                 |
 | ------------------------------ | ------------------------------------------------------------- | --------------------------------------------------- |
-| **logHere placeholder**        | `logHere({ lvl, tag, grp, typ }, ...msg)`                     | upgrade → `unilog(<id>, …)`, create `log_sites` row |
+| **logHere placeholder**        | `logHere({ lvl, grp, typ }, \`<msg>\`)`                       | upgrade → `unilog(<id>, …)`, create `log_sites` row |
 | **old-style (single literal)** | `console.log(\`…\`)`, `log('…')`, `loge(…)`, `logSubtitle(…)` | upgrade → `unilog(<id>, …)`, create `log_sites` row |
 | **active**                     | `unilog(412, \`…\`)`                                          | refresh `src_line` only (id read from first arg)    |
 | **blocked**                    | any log line ending in `// no-unilog`                         | left untouched (opt-out)                            |
@@ -50,12 +50,14 @@ Notes:
 
 - An **active** site is identified purely by `unilog(<NumericLiteral>, …)` — the id
   _is_ the first argument, read back from the AST.
-- A `logHere(...)` placeholder carries its `tag`, groups (`grp`) and group type
-  (`typ`) in the leading param object; all param values must be static string
-  literals. With no message args the site logs the `"<missing>"` sentinel.
+- A `logHere(...)` placeholder carries its groups (`grp`) and group type (`typ`) in
+  the leading param object; all param values must be static string literals. The
+  second arg is the message as a single template string; with no message the site
+  logs the `"<missing>"` sentinel. Do not use `[tag]` prefixes in the message —
+  use `grp` to categorize sites instead.
 - Only **single-literal** old-style calls auto-upgrade (one string/template argument).
   Multi-arg or non-literal calls are left alone. A leading `[tag]` in an upgraded
-  old-style message is stripped into the site's `tag` field.
+  old-style message is stripped and the tag name is linked as a group on the site.
 - `// no-unilog` on the source line blocks upgrade/replacement everywhere.
 
 ---

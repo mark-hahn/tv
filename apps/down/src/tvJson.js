@@ -11,7 +11,7 @@ import { Worker } from "node:worker_threads";
 import { execFile } from "node:child_process";
 import Database from "better-sqlite3";
 import chokidar from "chokidar";
-import { unilog } from "@tv/share";
+import { unilog, logHere } from "@tv/share";
 
 const LOG_APPS_DOWN_DATA_MISC_TV_LOG = false;
 
@@ -60,27 +60,18 @@ const forcedTitles = new Set();
 // PST/PDT formatting
 const PST_TZ = "America/Los_Angeles";
 
-const appendTvLog = (line) => {
-  if (!LOG_APPS_DOWN_DATA_MISC_TV_LOG) return;
-  try {
-    fs.mkdirSync(path.dirname(TV_LOG_PATH), { recursive: true });
-  } catch {}
-  try {
-    fs.appendFileSync(TV_LOG_PATH, line);
-  } catch {}
-};
-
 const logTvEntryAdded = (title, errorMsg) => {
   try {
     const t = title ? String(title) : "";
     if (!t) return;
-    const tsStr = dateStr(Date.now());
     if (errorMsg) {
-      appendTvLog(`${tsStr} ===> ERROR: ${t} ${String(errorMsg)}\n`);
+      unilog(1188, `ERROR: ${t} ${String(errorMsg)}`);
     } else {
-      appendTvLog(`${tsStr} ${t}\n`);
+      unilog(1189, `${t}`);
     }
-  } catch {}
+  } catch (e) {
+    unilog(1190, "<missing>");
+  }
 };
 
 const dateStr = (ms) => {
@@ -256,9 +247,7 @@ const recordShowDownloadedInternal = async (showName, timestamp) => {
   } catch (err) {
     const saved = writeLastDownloadedDirect(name, ts);
     if (!saved) {
-      appendTvLog(
-        `${dateStr(Date.now())} WARN last-downloaded update failed for ${name}: ${err && err.message ? err.message : String(err)}\n`,
-      );
+      unilog(1191, `last-downloaded update failed for ${name}: ${err && err.message ? err.message : String(err)}`);
     }
     return saved;
   }
@@ -1095,7 +1084,7 @@ const handleFinish = (entry) => {
     }
 
     if (status && status !== "downloading" && status !== "waiting") {
-      appendTvLog(`${tsStr} ERROR ${title}: ${status}\n`);
+      unilog(1192, `${title}: ${status}`);
 
       // Mark the entry as error in SQLite.
       try {
@@ -1364,14 +1353,13 @@ const markError = (titleOrEntry, reason) => {
     if (!t) return;
     ensureMapsLoaded();
 
-    const tsStr = dateStr(Date.now());
     const msg =
       entry && entry.reason
         ? String(entry.reason)
         : reason
           ? String(reason)
           : "error";
-    appendTvLog(`${tsStr} ERROR ${t}: ${msg}\n`);
+    unilog(1193, `${t}: ${msg}`);
 
     openDb();
     const existing = rowToEntry(stmtGetByTitle.get(t));

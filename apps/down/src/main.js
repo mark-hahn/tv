@@ -68,7 +68,6 @@ async function main() {
   var FAST_TEST,
     PROCESS_INTERVAL_MS,
     SKIP_DOWNLOAD,
-    appendTvLog,
     badFile,
     blocked,
     blockedCount,
@@ -284,16 +283,6 @@ async function main() {
 
   // State is stored under apps/down/data.
 
-  try {
-    fs.mkdirpSync(path.dirname(TV_LOG_PATH));
-  } catch (e) {}
-
-  appendTvLog = function (line) {
-    try {
-      return fs.appendFileSync(TV_LOG_PATH, line);
-    } catch (error1) {}
-  };
-
   var writeRejectLog = function (rejectFname, reason) {
     try {
       var ts = dateStr(Date.now());
@@ -363,9 +352,6 @@ async function main() {
     try {
       unilog(292, msg);
     } catch (e) {}
-    try {
-      appendTvLog(msg + "\n");
-    } catch (e) {}
   };
 
   // Startup marker (tv.log only)
@@ -403,15 +389,9 @@ async function main() {
         }
       };
 
-      var prefix = "";
       try {
-        if (fs.existsSync(TV_LOG_PATH)) {
-          var st = fs.statSync(TV_LOG_PATH);
-          if (st && st.size > 0) prefix = "\n";
-        }
+        unilog(1187, `tv-down started ${fmt()}`);
       } catch (e) {}
-
-      appendTvLog(`${prefix}==== tv-down started ${fmt()} ====`);
       unilog(293, `tv-down started`);
     } catch (e) {}
   })();
@@ -2427,10 +2407,10 @@ async function main() {
       for (blkName in blocked) {
         if (fname.indexOf(blkName) > -1) {
           blockedCount++;
-// hidden           unilog(
-// hidden             1185,
-// hidden             `Down: TV_BLOCKED substring "${blkName}" in file "${fname}" (${title || "unknown show"})`,
-// hidden           );
+          // hidden           unilog(
+          // hidden             1185,
+          // hidden             `Down: TV_BLOCKED substring "${blkName}" in file "${fname}" (${title || "unknown show"})`,
+          // hidden           );
           // hidden           unilog(319, "-- BLOCKED:", { blkName, fname });
           trace("checkFile: blocked", { blkName, fname });
           // hidden           unilog(
@@ -2585,10 +2565,10 @@ async function main() {
         deleteCount + existsCount + errCount + downloadCount + blockedCount >
         0
       ) {
-// hidden         unilog(
-// hidden           323,
-// hidden           "***********************************************************",
-// hidden         );
+        // hidden         unilog(
+        // hidden           323,
+        // hidden           "***********************************************************",
+        // hidden         );
       }
       if (_cycleTiming) {
         _cycleTiming.cycleEnd = Date.now();

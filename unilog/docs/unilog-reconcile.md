@@ -41,7 +41,7 @@ like `console.log(")")` or multi-line templates are handled by the grammar.
 
 | kind                           | shape in source                                               | what reconcile does                                 |
 | ------------------------------ | ------------------------------------------------------------- | --------------------------------------------------- |
-| **logHere placeholder**        | `logHere("error", \`msg ${e.message}\`)`                      | upgrade → `unilog(<id>, …)`, create `log_sites` row |
+| **logHere placeholder**        | `logHere({ lvl, tag, grp, typ }, ...msg)`                     | upgrade → `unilog(<id>, …)`, create `log_sites` row |
 | **old-style (single literal)** | `console.log(\`…\`)`, `log('…')`, `loge(…)`, `logSubtitle(…)` | upgrade → `unilog(<id>, …)`, create `log_sites` row |
 | **active**                     | `unilog(412, \`…\`)`                                          | refresh `src_line` only (id read from first arg)    |
 | **blocked**                    | any log line ending in `// no-unilog`                         | left untouched (opt-out)                            |
@@ -50,8 +50,12 @@ Notes:
 
 - An **active** site is identified purely by `unilog(<NumericLiteral>, …)` — the id
   _is_ the first argument, read back from the AST.
+- A `logHere(...)` placeholder carries its `tag`, groups (`grp`) and group type
+  (`typ`) in the leading param object; all param values must be static string
+  literals. With no message args the site logs the `"<missing>"` sentinel.
 - Only **single-literal** old-style calls auto-upgrade (one string/template argument).
-  Multi-arg or non-literal calls are left alone.
+  Multi-arg or non-literal calls are left alone. A leading `[tag]` in an upgraded
+  old-style message is stripped into the site's `tag` field.
 - `// no-unilog` on the source line blocks upgrade/replacement everywhere.
 
 ---
@@ -102,8 +106,11 @@ Steps:
 2. **Skip unchanged files.** A sha256 of each file is compared against
    [unilog/reconcile-cache.json](../unilog/reconcile-cache.json); only changed files
    are processed. `--force` processes all files in the project.
-3. **Allocate ids + create the group.** A `task`-kind `log_groups` row is created for
-   the run, then each new site is created under it. Both go through `tv-srvr`.
+3. **Allocate ids + resolve named groups.** Each new site gets a fresh `log_id`
+   from `tv-srvr`. If a `logHere(...)` declared `grp` names, each name is resolved
+   to a group (looked up case-insensitively, or created with its `typ` if absent),
+   and the new site is linked to those groups. There is **no** per-run "task"
+   group — a site belongs only to the groups it declares.
 4. **Refresh moved sites.** For existing active calls whose line changed, the new
    `src_line` is written back (only stale rows are updated — current values are
    queried first and unchanged ones skipped).

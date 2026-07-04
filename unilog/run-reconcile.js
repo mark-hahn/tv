@@ -94,44 +94,63 @@ function nowPst() {
   return `${date} ${time}`;
 }
 
-const now = new Date()
-  .toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" })
-  .replace(/-/g, "/");
-
-let groupId = null;
-async function ensureGroup() {
-  if (groupId != null) return groupId;
-  const desc = `${project} instrumentation ${now}`;
+// ---- named groups (from logHere `grp`) ------------------------------------
+// A site is linked only to the named groups it declares — there is no per-run
+// "task" group. Each name is resolved to a group_id once (memoized). A `typ`
+// only applies when the group is newly created; existing groups keep their type.
+const namedGroupIds = new Map(); // name -> group_id
+async function ensureNamedGroup(name, typ) {
+  if (namedGroupIds.has(name)) return namedGroupIds.get(name);
+  let id;
   if (!useSsh) {
     try {
-      groupId = (
-        await postJson("/api/unilog/group", {
-          groupType: "task",
-          description: desc,
+      id = (
+        await postJson("/api/unilog/find-or-create-group", {
+          description: name,
+          groupType: typ || null,
         })
       ).id;
-      console.log(`[run-reconcile] created group id=${groupId}`); // no-unilog
-      return groupId;
     } catch {
-      useSsh = true; // switch to ssh fallback for the rest of the run
+      useSsh = true;
+      ensureSrvrStopped();
     }
   }
-  ensureSrvrStopped();
-  sqlOne(
-    `INSERT INTO log_groups (group_id, group_type, ts, description) ` +
-      `VALUES ((SELECT COALESCE(MAX(group_id),0)+1 FROM log_groups), 'task', ${q(nowPst())}, ${q(desc)});`,
-  );
-  groupId = Number(sqlOne("SELECT MAX(group_id) FROM log_groups;"));
-  console.log(`[run-reconcile] created group id=${groupId} (ssh)`); // no-unilog
-  return groupId;
+  if (id == null) {
+    const existing = sqlOne(
+      `SELECT group_id FROM log_groups WHERE description = ${q(name)} COLLATE NOCASE;`,
+    );
+    if (existing) {
+      id = Number(existing);
+    } else {
+      sqlOne(
+        `INSERT INTO log_groups (group_id, group_type, ts, description) ` +
+          `VALUES ((SELECT COALESCE(MAX(group_id),0)+1 FROM log_groups), ${q(typ || null)}, ${q(nowPst())}, ${q(name)});`,
+      );
+      id = Number(
+        sqlOne(
+          `SELECT group_id FROM log_groups WHERE description = ${q(name)} COLLATE NOCASE;`,
+        ),
+      );
+    }
+  }
+  namedGroupIds.set(name, id);
+  return id;
+}
+
+// Resolve a site's declared group names to ids.
+async function resolveGroupIds(site) {
+  const ids = [];
+  for (const name of site.grpNames || [])
+    ids.push(await ensureNamedGroup(name, site.grpTyp));
+  return ids;
 }
 
 async function createSiteFn(site) {
-  const gid = await ensureGroup();
+  const groupIds = await resolveGroupIds(site);
   if (!useSsh) {
     try {
       const { ids } = await postJson("/api/unilog/sites", [
-        { ...site, groupIds: [gid] },
+        { ...site, groupIds },
       ]);
       return ids[0];
     } catch {
@@ -139,24 +158,25 @@ async function createSiteFn(site) {
       ensureSrvrStopped();
     }
   }
+  // Group ids resolved above are valid regardless of transport (same DB).
   sqlOne(
     `INSERT INTO log_sites (log_id, tag, description, level, src_file, src_line, old_log, project, created_at) ` +
       `VALUES ((SELECT COALESCE(MAX(log_id),0)+1 FROM log_sites), ${q(site.tag)}, ${q(site.description)}, ` +
       `${q(site.level || "info")}, ${q(site.srcFile)}, ${site.srcLine ?? "NULL"}, NULL, ${q(site.project)}, ${q(nowPst())});`,
   );
   const id = Number(sqlOne("SELECT MAX(log_id) FROM log_sites;"));
-  sqlOne(
-    `INSERT OR IGNORE INTO site_groups (log_id, group_id) VALUES (${id}, ${gid});`,
-  );
+  for (const gid of groupIds)
+    sqlOne(
+      `INSERT OR IGNORE INTO site_groups (log_id, group_id) VALUES (${id}, ${gid});`,
+    );
   return id;
 }
 
 // Split a duplicate id into a fresh one. API first, ssh fallback. When the old
 // id has a DB row the new row is a copy of it (with new location) and inherits
-// its groups; otherwise a fresh stub-like row is created and linked to the run
-// group. Returns the new log_id.
+// its groups; otherwise a fresh row is created with no group links. Returns the
+// new log_id.
 async function createDuplicateSiteFn({ oldLogId, project, srcFile, srcLine }) {
-  const gid = await ensureGroup();
   if (!useSsh) {
     try {
       const { id } = await postJson("/api/unilog/duplicate-site", {
@@ -164,7 +184,6 @@ async function createDuplicateSiteFn({ oldLogId, project, srcFile, srcLine }) {
         project,
         srcFile,
         srcLine,
-        groupIds: [gid],
       });
       return id;
     } catch {
@@ -194,9 +213,6 @@ async function createDuplicateSiteFn({ oldLogId, project, srcFile, srcLine }) {
     sqlOne(
       `INSERT INTO log_sites (log_id, tag, description, level, src_file, src_line, old_log, project, created_at) ` +
         `VALUES (${newId}, NULL, NULL, 'info', ${q(srcFile)}, ${srcLine ?? "NULL"}, NULL, ${q(project)}, ${q(nowPst())});`,
-    );
-    sqlOne(
-      `INSERT OR IGNORE INTO site_groups (log_id, group_id) VALUES (${newId}, ${gid});`,
     );
   }
   return newId;

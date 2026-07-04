@@ -129,14 +129,33 @@ runtime no-op that the deploy reconciler rewrites into a real
 
 ```js
 } catch (e) {
-  logHere("error", `sub copy failed for ${dstSubName}: ${e.message}`);
+  logHere({ lvl: "error" }, `sub copy failed for ${dstSubName}: ${e.message}`);
 }
 ```
 
-- First arg is the level: `info | warn | error | debug` (optional — omit it for
-  `info`, e.g. `logHere(`queued ${name}`)`).
-- A leading `[tag]` in the message becomes the site tag, e.g.
-  `logHere("warn", "[disk] low space")`.
+The first arg is a **param object**; the remaining args are the message (joined
+like `console.log`). All param values must be **static string literals** (or an
+array of string literals for `grp`) — anything dynamic is ignored and the default
+is used.
+
+| key   | meaning                                       | default |
+| ----- | --------------------------------------------- | ------- |
+| `lvl` | level: `info` \| `warn` \| `error` \| `debug` | `info`  |
+| `tag` | category string                               | none    |
+| `grp` | group name, or array of names                 | none    |
+| `typ` | `group_type`, applied only to **new** groups  | none    |
+
+```js
+logHere({}, "message"); // minimal (info, no tag)
+logHere({ lvl: "warn", tag: "disk" }, "low space"); // level + tag
+logHere({ grp: "playback" }, `started ${showId}`); // one named group
+logHere({ grp: ["playback", "errors"], typ: "feature" }, `crash in ${fn}`);
+logHere({}); // no message → logs "<missing>"
+```
+
+- A site is linked to every named group in `grp`. A group is looked up by name
+  (case-insensitive); if it doesn't exist it is created with `typ`. Existing
+  groups keep their `group_type` — `typ` never changes it.
 - Import it once per file: `import { logHere } from "@tv/share"` (server apps)
   or from the client log module (`apps/client/src/log.js`) in the client.
 - Reconciliation runs automatically on every `./srvr <project>` deploy (all

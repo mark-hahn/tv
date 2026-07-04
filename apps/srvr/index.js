@@ -4250,6 +4250,21 @@ app.post("/api/unilog/group", (req, res) => {
   }
 });
 
+// Find a named group by description, or create it if absent. Never changes the
+// group_type of an existing group. Used by the reconciler to resolve logHere
+// `grp` names to group ids.
+app.post("/api/unilog/find-or-create-group", (req, res) => {
+  try {
+    const { description, groupType } = req.body || {};
+    if (!description)
+      return res.status(400).json({ error: "description required" });
+    res.json(unilogDb.findOrCreateGroup({ description, groupType }));
+  } catch (error) {
+    console.error("[unilog] /api/unilog/find-or-create-group error:", error); // no-unilog
+    res.status(500).json({ error: String(error?.message || error) });
+  }
+});
+
 app.post("/api/unilog/sites", (req, res) => {
   try {
     const sites = Array.isArray(req.body) ? req.body : [req.body];

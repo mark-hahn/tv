@@ -360,7 +360,7 @@ export function getOldestTimestamp() {
 // tv-srvr is the single writer; all group_id allocation flows through here.
 // ---------------------------------------------------------------------------
 
-// One-time cleanup: any group whose description is NULL or shares its
+// One-time cleanup: any group whose description is NULL, blank, or shares its
 // description with another group is renamed to `Group <group_id>` (unique).
 // Idempotent — safe to run on every startup (no-op once names are unique).
 function cleanupGroupDescriptions() {
@@ -368,10 +368,12 @@ function cleanupGroupDescriptions() {
     const upd = db.prepare(
       "UPDATE log_groups SET description = ? WHERE group_id = ?",
     );
-    const nulls = db
-      .prepare("SELECT group_id FROM log_groups WHERE description IS NULL")
+    const blanks = db
+      .prepare(
+        "SELECT group_id FROM log_groups WHERE description IS NULL OR TRIM(description) = ''",
+      )
       .all();
-    for (const r of nulls) upd.run(`Group ${r.group_id}`, r.group_id);
+    for (const r of blanks) upd.run(`Group ${r.group_id}`, r.group_id);
     const dups = db
       .prepare(
         `SELECT group_id FROM log_groups
@@ -389,6 +391,33 @@ function cleanupGroupDescriptions() {
   run();
 }
 cleanupGroupDescriptions();
+
+// Enforce unique group names at the DB level (case-insensitive). Runs after the
+// cleanup above so it can never fail on legacy duplicate/blank names.
+db.exec(
+  "CREATE UNIQUE INDEX IF NOT EXISTS idx_groups_desc ON log_groups(description COLLATE NOCASE)",
+);
+
+// Look up a group by exact (case-insensitive) name. Returns group_id or null.
+const getGroupByDesc = db.prepare(
+  "SELECT group_id FROM log_groups WHERE description = ? COLLATE NOCASE",
+);
+export function findGroupByDescription(description) {
+  if (description == null) return null;
+  return getGroupByDesc.get(String(description))?.group_id ?? null;
+}
+
+// Find a named group or create it. Never changes the group_type of an existing
+// group. Returns { id, created }.
+export const findOrCreateGroup = db.transaction(
+  ({ description, groupType }) => {
+    const existing = findGroupByDescription(description);
+    if (existing != null) return { id: existing, created: false };
+    const id = maxGroup.get().next;
+    insGroup.run(id, groupType || null, nowPst(), description);
+    return { id, created: true };
+  },
+);
 
 // All named groups, alphabetical (case-insensitive).
 export function listGroups() {

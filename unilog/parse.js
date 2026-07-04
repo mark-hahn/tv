@@ -75,6 +75,7 @@ function calleeInfo(callee) {
 // Find all log call sites + existing active `unilog(N, ...)` sites in `code`.
 // Offsets are absolute into the original `code` (vue offset added back).
 //   old-style: { kind:"old", start, end, line, callee, method, argsText[], firstLiteral }
+//   logHere:   old-style with callee:"logHere", plus level, tag, grpNames[], grpTyp
 //   active:    { kind:"active", logId, line, end }
 export function findLogCalls(code, { vue = false } = {}) {
   let src = code;
@@ -122,22 +123,44 @@ export function findLogCalls(code, { vue = false } = {}) {
       return;
     }
 
-    // logHere("level", ...message) — the author placeholder. Upgrade to a real
-    // unilog site using the given level; the level literal is dropped and the
-    // remaining args become the message. A leading level literal is optional:
-    // logHere(`msg ${x}`) is treated as level "info".
+    // logHere({ lvl, tag, grp, typ }, ...msgArgs) — the author placeholder.
+    // Upgrade to a real unilog site. The first arg MUST be an object literal
+    // (the param block); the remaining args are the message. All param values
+    // must be static string literals (or an array of string literals for grp);
+    // anything dynamic is ignored and the default is used.
+    //   lvl → level  (default "info")
+    //   tag → tag    (default null)
+    //   grp → group name(s): string or array of strings (default [])
+    //   typ → group_type applied only to newly-created groups (default null)
     if (n.callee.type === "Identifier" && n.callee.name === "logHere") {
       const LEVELS = ["info", "warn", "error", "debug"];
       const a0 = n.arguments[0];
       let level = "info";
-      let msgArgs = n.arguments;
-      if (a0 && a0.type === "StringLiteral" && LEVELS.includes(a0.value)) {
-        level = a0.value;
-        msgArgs = n.arguments.slice(1);
+      let tag = null;
+      let grpNames = [];
+      let grpTyp = null;
+      if (a0 && a0.type === "ObjectExpression") {
+        for (const prop of a0.properties) {
+          if (prop.type !== "ObjectProperty" || prop.computed) continue;
+          const key = prop.key.name || prop.key.value;
+          const v = prop.value;
+          if (key === "lvl") {
+            if (v.type === "StringLiteral" && LEVELS.includes(v.value))
+              level = v.value;
+          } else if (key === "tag") {
+            if (v.type === "StringLiteral") tag = v.value;
+          } else if (key === "typ") {
+            if (v.type === "StringLiteral") grpTyp = v.value;
+          } else if (key === "grp") {
+            if (v.type === "StringLiteral") grpNames = [v.value];
+            else if (v.type === "ArrayExpression")
+              grpNames = v.elements
+                .filter((e) => e && e.type === "StringLiteral")
+                .map((e) => e.value);
+          }
+        }
       }
-      const m0 = msgArgs[0];
-      const firstLiteral =
-        m0 && (m0.type === "StringLiteral" || m0.type === "TemplateLiteral");
+      const msgArgs = n.arguments.slice(1);
       hits.push({
         kind: "old",
         start: n.start + offset,
@@ -146,8 +169,11 @@ export function findLogCalls(code, { vue = false } = {}) {
         callee: "logHere",
         method: "logHere",
         level,
+        tag,
+        grpNames,
+        grpTyp,
         argsText: msgArgs.map((a) => src.slice(a.start, a.end)),
-        firstLiteral: !!firstLiteral,
+        firstLiteral: false,
       });
       return;
     }

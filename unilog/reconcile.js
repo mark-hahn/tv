@@ -57,15 +57,36 @@ function astSites(text, vue) {
     }
     if (/\/\/\s*no-unilog\s*$/.test(lineArr[c.line - 1] || "")) continue; // opt-out
     const endLine = text.slice(0, c.end).split(/\r?\n/).length;
-    const { tag, argExpr } = buildArgs(c.argsText, c.firstLiteral);
+
+    let level, tag, argExpr;
+    let grpNames = [];
+    let grpTyp = null;
+    if (c.callee === "logHere") {
+      // logHere carries its own tag / groups in the param object — no [tag]
+      // stripping. Empty message args become the "<missing>" sentinel.
+      level = c.level;
+      tag = c.tag ?? null;
+      grpNames = c.grpNames || [];
+      grpTyp = c.grpTyp ?? null;
+      argExpr = c.argsText.length ? c.argsText.join(", ") : '"<missing>"';
+    } else {
+      // console.*, log(), loge(), logSubtitle(): strip a leading [tag] from the
+      // first literal into the tag field; derive level from the method.
+      const b = buildArgs(c.argsText, c.firstLiteral);
+      tag = b.tag;
+      argExpr = b.argExpr;
+      level = c.level ?? levelForCall(c.callee, c.method);
+    }
     upgrades.push({
       start: c.start,
       end: c.end,
       startLine: c.line,
       endLine,
-      level: c.level ?? levelForCall(c.callee, c.method),
+      level,
       tag,
       argExpr,
+      grpNames,
+      grpTyp,
     });
   }
   return { upgrades, actives };
@@ -80,6 +101,8 @@ export function scanText(text, srcFile, { vue = false } = {}) {
     level: u.level,
     tag: u.tag,
     argExpr: u.argExpr,
+    grpNames: u.grpNames,
+    grpTyp: u.grpTyp,
     srcLine: u.startLine,
   }));
   const refreshes = actives.map((a) => ({
@@ -93,8 +116,7 @@ export function scanText(text, srcFile, { vue = false } = {}) {
 
 // Phase 2: rewrite. `nextId()` returns ids in source order. Old-style calls are
 // replaced by exact AST byte offsets (bullet-proof for calls inside any
-// expression); stubs are activated by line. Applied end-to-start so offsets stay
-// valid.
+// expression), applied end-to-start so offsets stay valid.
 export function reconcileText(text, srcFile, nextId, { vue = false } = {}) {
   const nl = text.includes("\r\n") ? "\r\n" : "\n";
   const { upgrades, actives } = astSites(text, vue);
@@ -186,7 +208,6 @@ export async function reconcileFilesWithDb(
     dryRun = false,
     createSiteFn = null,
     refreshSiteFn = null,
-    groupIds = [],
     repoRoot = null,
   } = {},
 ) {
@@ -195,7 +216,15 @@ export async function reconcileFilesWithDb(
 
   if (!dryRun && !createSiteFn) {
     const unilogDb = await import("../apps/srvr/src/unilogDb.js");
-    createSiteFn = (s) => Promise.resolve(unilogDb.createSite(s));
+    // Resolve any declared group names to ids (find-or-create) before insert.
+    createSiteFn = (s) => {
+      const groupIds = (s.grpNames || []).map(
+        (name) =>
+          unilogDb.findOrCreateGroup({ description: name, groupType: s.grpTyp })
+            .id,
+      );
+      return Promise.resolve(unilogDb.createSite({ ...s, groupIds }));
+    };
     refreshSiteFn = (s) => Promise.resolve(unilogDb.refreshSite(s));
   }
 
@@ -229,7 +258,8 @@ export async function reconcileFilesWithDb(
           srcFile,
           srcLine: c.srcLine,
           project,
-          groupIds,
+          grpNames: c.grpNames || [],
+          grpTyp: c.grpTyp ?? null,
         });
         realIds.push(id);
       }

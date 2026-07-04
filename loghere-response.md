@@ -17,6 +17,12 @@
   - create no group other than named ones specified in logHere call
 9.in reconciliation upgrading old-style call upgrades (console.log, log(), loge()) should strip the `[tag]` from the beginning of the message and add that tag value to the site record like the way the tag property is handled in a logHere param object
 
+## Suggestions
 - do not add a // unilog-stub syntax extension
+- do not expose findGroupByDescription function as a CLI query
+  - unilog agent and cli have been removed
+- usage of ensureSrvrStopped is noted
 
-implement loghere-plan.md after making these changes
+# final notes
+- update .github/copilot-instructions.md and any other docs for these changes
+- implement loghere-plan.md after making these changes

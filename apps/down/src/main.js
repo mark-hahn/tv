@@ -1353,10 +1353,10 @@ async function main() {
     var PRUNE_DAYS, PRUNE_INTERVAL_MS;
     PRUNE_INTERVAL_MS = 60 * 60 * 1000;
     if (Date.now() - lastPruneAt >= PRUNE_INTERVAL_MS) {
-      // Inline prune.sh behavior: delete files older than 44 days on the USB host.
+      // Inline prune.sh behavior: delete files older than 60 days on the USB host.
       // Run async so it doesn't block the cycle — proceed to checkFiles immediately.
       unilog(304, ".... deleting old files in usb ~/files (async) ....");
-      PRUNE_DAYS = 44;
+      PRUNE_DAYS = 60;
       lastPruneAt = Date.now();
       (async () => {
         try {
@@ -2377,13 +2377,13 @@ async function main() {
               localPath: existingEntry?.localPath || "",
               destTitle: existingEntry?.destTitle || "",
             });
-// hidden             unilog(
-// hidden               477,
-// hidden               "history",
-// hidden               "skipDown",
-// hidden               title || fname,
-// hidden               "skip: already downloaded (local file deleted)",
-// hidden             );
+            // hidden             unilog(
+            // hidden               477,
+            // hidden               "history",
+            // hidden               "skipDown",
+            // hidden               title || fname,
+            // hidden               "skip: already downloaded (local file deleted)",
+            // hidden             );
             process.nextTick(checkFile);
             return;
           } else {
@@ -2404,13 +2404,13 @@ async function main() {
           recentCount++;
           const skipStatus = "already queued";
           trace("checkFile: skip " + skipStatus, { fname });
-// hidden           unilog(
-// hidden             479,
-// hidden             "history",
-// hidden             "skipDown",
-// hidden             title || fname,
-// hidden             "skip: " + skipStatus,
-// hidden           );
+          // hidden           unilog(
+          // hidden             479,
+          // hidden             "history",
+          // hidden             "skipDown",
+          // hidden             title || fname,
+          // hidden             "skip: " + skipStatus,
+          // hidden           );
           process.nextTick(checkFile);
           return;
         }
@@ -2426,15 +2426,15 @@ async function main() {
       for (blkName in blocked) {
         if (fname.indexOf(blkName) > -1) {
           blockedCount++;
-// hidden           unilog(319, "-- BLOCKED:", { blkName, fname });
+          // hidden           unilog(319, "-- BLOCKED:", { blkName, fname });
           trace("checkFile: blocked", { blkName, fname });
-// hidden           unilog(
-// hidden             481,
-// hidden             "history",
-// hidden             "skipDown",
-// hidden             title || fname,
-// hidden             `skip: blocked by ${blkName}`,
-// hidden           );
+          // hidden           unilog(
+          // hidden             481,
+          // hidden             "history",
+          // hidden             "skipDown",
+          // hidden             title || fname,
+          // hidden             `skip: blocked by ${blkName}`,
+          // hidden           );
           process.nextTick(checkFile);
           return;
         }
@@ -2707,7 +2707,7 @@ async function main() {
     // Remember the title we started with so we can cache it after a folderTitle retry.
     var titleBeforeRetry = title;
 
-// hidden     unilog(325, "search:", title);
+    // hidden     unilog(325, "search:", title);
 
     // Some shows use "&" on TVDB where the filename has "and" (e.g. "Jam & Jerusalem").
     // Build a list of query variants to try in order.
@@ -2861,7 +2861,7 @@ async function main() {
               topNames: resultNames.slice(0, 10),
               seriesName,
             });
-// hidden             unilog(327, "tvdb got:", { seriesName, title });
+            // hidden             unilog(327, "tvdb got:", { seriesName, title });
             if (map[seriesName]) {
               unilog(328, "Mapping", seriesName, "to", map[seriesName]);
               seriesName = map[seriesName];
@@ -2878,15 +2878,15 @@ async function main() {
                 folderTitle = null;
                 return process.nextTick(chkTvDB);
               }
-// hidden               unilog(
-// hidden                 329,
-// hidden                 "------",
-// hidden                 downloadCount,
-// hidden                 "/",
-// hidden                 chkCount,
-// hidden                 "NO SERIES MATCH, SKIPPING:",
-// hidden                 fname,
-// hidden               );
+              // hidden               unilog(
+              // hidden                 329,
+              // hidden                 "------",
+              // hidden                 downloadCount,
+              // hidden                 "/",
+              // hidden                 chkCount,
+              // hidden                 "NO SERIES MATCH, SKIPPING:",
+              // hidden                 fname,
+              // hidden               );
               trace("chkTvDB: smartTitleMatch returned null, skipping", {
                 fname,
                 title,
@@ -3082,24 +3082,24 @@ async function main() {
         if (epIsWatched) {
           const seStr = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
           existsCount++;
-// hidden           unilog(
-// hidden             331,
-// hidden             "------",
-// hidden             downloadCount,
-// hidden             "/",
-// hidden             chkCount,
-// hidden             "SKIP (episode watched):",
-// hidden             fname,
-// hidden             seStr,
-// hidden           );
+          // hidden           unilog(
+          // hidden             331,
+          // hidden             "------",
+          // hidden             downloadCount,
+          // hidden             "/",
+          // hidden             chkCount,
+          // hidden             "SKIP (episode watched):",
+          // hidden             fname,
+          // hidden             seStr,
+          // hidden           );
           trace("checkFileExists: skip episode watched", { fname, seStr });
-// hidden           unilog(
-// hidden             488,
-// hidden             "history",
-// hidden             "skipDown",
-// hidden             seriesName || fname,
-// hidden             `skip: ${seStr} already watched`,
-// hidden           );
+          // hidden           unilog(
+          // hidden             488,
+          // hidden             "history",
+          // hidden             "skipDown",
+          // hidden             seriesName || fname,
+          // hidden             `skip: ${seStr} already watched`,
+          // hidden           );
           return process.nextTick(checkFile);
         }
       }
@@ -3149,26 +3149,26 @@ async function main() {
         ) || seriesName;
       const embyEntry = embyMap[embyKey];
       if (!embyEntry || !embyEntry.inEmby) {
-// hidden         unilog(
-// hidden           332,
-// hidden           "------",
-// hidden           downloadCount,
-// hidden           "/",
-// hidden           chkCount,
-// hidden           "NOT IN EMBY, SKIPPING:",
-// hidden           fname,
-// hidden           "(",
-// hidden           seriesName,
-// hidden           ")",
-// hidden         );
+        // hidden         unilog(
+        // hidden           332,
+        // hidden           "------",
+        // hidden           downloadCount,
+        // hidden           "/",
+        // hidden           chkCount,
+        // hidden           "NOT IN EMBY, SKIPPING:",
+        // hidden           fname,
+        // hidden           "(",
+        // hidden           seriesName,
+        // hidden           ")",
+        // hidden         );
         trace("checkFileExists: not in emby", { fname, seriesName });
-// hidden         unilog(
-// hidden           491,
-// hidden           "history",
-// hidden           "skipDown",
-// hidden           seriesName || fname,
-// hidden           `skip: not in Emby (${seriesName})`,
-// hidden         );
+        // hidden         unilog(
+        // hidden           491,
+        // hidden           "history",
+        // hidden           "skipDown",
+        // hidden           seriesName || fname,
+        // hidden           `skip: not in Emby (${seriesName})`,
+        // hidden         );
         return process.nextTick(checkFile);
       }
     }
@@ -3344,28 +3344,28 @@ async function main() {
               !usbIsBad);
           if (!usbIsBetter) {
             existsCount++;
-// hidden             unilog(
-// hidden               336,
-// hidden               "------",
-// hidden               downloadCount,
-// hidden               "/",
-// hidden               chkCount,
-// hidden               "FLEX SKIP (disk file same/better quality):",
-// hidden               fname,
-// hidden               flexSeStr,
-// hidden             );
+            // hidden             unilog(
+            // hidden               336,
+            // hidden               "------",
+            // hidden               downloadCount,
+            // hidden               "/",
+            // hidden               chkCount,
+            // hidden               "FLEX SKIP (disk file same/better quality):",
+            // hidden               fname,
+            // hidden               flexSeStr,
+            // hidden             );
             trace("checkFileExists: flex skip disk file same/better quality", {
               fname,
               flexSeStr,
               diskFile,
             });
-// hidden             unilog(
-// hidden               493,
-// hidden               "history",
-// hidden               "skipDown",
-// hidden               seriesName || fname,
-// hidden               `flex skip: ${flexSeStr} disk file same/better quality`,
-// hidden             );
+            // hidden             unilog(
+            // hidden               493,
+            // hidden               "history",
+            // hidden               "skipDown",
+            // hidden               seriesName || fname,
+            // hidden               `flex skip: ${flexSeStr} disk file same/better quality`,
+            // hidden             );
             return process.nextTick(checkFile);
           }
           // USB is better — rename the worse disk file to .old before downloading.

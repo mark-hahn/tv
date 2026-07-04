@@ -2287,14 +2287,11 @@ async function main() {
       ]);
 
       if (!ALLOWED_EXTS.has(fext)) {
-        trace("checkFile: skip extension", { fname, fext });
         unilog(
-          475,
-          "history",
-          "skipDown",
-          title || fname,
-          `skip extension: .${fext}`,
+          1195,
+          `Down: invalid extension .${fext} for "${fname}" (${title || "unknown show"})`,
         );
+        trace("checkFile: skip extension", { fname, fext });
         process.nextTick(checkFile);
         return;
       }
@@ -2305,14 +2302,11 @@ async function main() {
         tvJsonTitles[fname].error
       ) {
         recentCount++;
-        trace("checkFile: skip tvJsonTitles error", { fname });
         unilog(
-          476,
-          "history",
-          "skipDown",
-          title || fname,
-          "skip: previous error",
+          1196,
+          `Down: previous error in tvJson for "${fname}" (${title || "unknown show"})`,
         );
+        trace("checkFile: skip tvJsonTitles error", { fname });
         process.nextTick(checkFile);
         return;
       }
@@ -2475,6 +2469,10 @@ async function main() {
           }
           if (!matchesEmby) {
             unilog(
+              1197,
+              `Down: not a TV show "${fname}" (${title || "unknown show"})`,
+            );
+            unilog(
               320,
               "------",
               downloadCount,
@@ -2484,13 +2482,6 @@ async function main() {
               fname,
             );
             trace("checkFile: not a tv show, skipping", { fname, title });
-            unilog(
-              482,
-              "history",
-              "skipDown",
-              title || fname,
-              `skip: not a TV show (title: ${title})`,
-            );
             return process.nextTick(checkFile);
           }
         }
@@ -2616,11 +2607,8 @@ async function main() {
       if (tvdbCache[title] === null) {
         // Previously determined this title is not resolvable — skip without hitting TVDB.
         unilog(
-          483,
-          "history",
-          "skipDown",
-          title || fname,
-          "skip: not resolvable (cached)",
+          1198,
+          `Down: not resolvable (cached) "${fname}" (${title || "unknown show"})`,
         );
         return process.nextTick(checkFile);
       }
@@ -2635,11 +2623,8 @@ async function main() {
       if (tvdbCache[folderTitle] === null) {
         tvdbCache[title] = null;
         unilog(
-          484,
-          "history",
-          "skipDown",
-          title || fname,
-          "skip: not resolvable (folder cached)",
+          1199,
+          `Down: not resolvable (folder cached) "${fname}" (${title || "unknown show"})`,
         );
         return process.nextTick(checkFile);
       }
@@ -2797,11 +2782,8 @@ async function main() {
                   title,
                 });
                 unilog(
-                  485,
-                  "history",
-                  "skipDown",
-                  title || fname,
-                  "skip: no TVDB match, not in Emby",
+                  1200,
+                  `Down: no TVDB match, not in Emby "${fname}" (${title || "unknown show"})`,
                 );
                 // Cache null so remaining episodes from the same folder skip TVDB this cycle.
                 tvdbCache[title] = null;
@@ -2875,11 +2857,8 @@ async function main() {
                 title,
               });
               unilog(
-                486,
-                "history",
-                "skipDown",
-                title || fname,
-                "skip: no series match on TVDB",
+                1201,
+                `Down: no series match on TVDB "${fname}" (${title || "unknown show"})`,
               );
               // Cache null so remaining episodes from the same folder skip TVDB this cycle.
               tvdbCache[title] = null;
@@ -3004,6 +2983,10 @@ async function main() {
     ) {
       existsCount++;
       unilog(
+        1202,
+        `Down: already on disk "${fname}" (${seriesName || "unknown show"})`,
+      );
+      unilog(
         330,
         "------",
         downloadCount,
@@ -3013,13 +2996,6 @@ async function main() {
         fname,
       );
       trace("checkFileExists: already on disk", { fname, tvSeasonPath });
-      unilog(
-        487,
-        "history",
-        "skipDown",
-        seriesName || fname,
-        `skip: already on disk`,
-      );
       try {
         // Use the file's mtime on disk as the timestamp so the card shows
         // the real download date rather than today's date.
@@ -3092,14 +3068,11 @@ async function main() {
     // for files already queued/downloading).
     if (!processingForced && inProgress && inProgress[fname]) {
       existsCount++;
-      trace("checkFileExists: already in-progress", { fname });
       unilog(
-        489,
-        "history",
-        "skipDown",
-        seriesName || fname,
-        "skip: already in-progress",
+        1203,
+        `Down: already in-progress "${fname}" (${seriesName || "unknown show"})`,
       );
+      trace("checkFileExists: already in-progress", { fname });
       return process.nextTick(checkFile);
     }
 
@@ -3110,14 +3083,11 @@ async function main() {
         tvJsonTitles[fname].status === "finished"
           ? "already downloaded"
           : "already queued";
-      trace("checkFileExists: " + skipStatus + " (tv.json)", { fname });
       unilog(
-        490,
-        "history",
-        "skipDown",
-        seriesName || fname,
-        "skip: " + skipStatus,
+        1204,
+        `Down: ${skipStatus} in tvJson "${fname}" (${seriesName || "unknown show"})`,
       );
+      trace("checkFileExists: " + skipStatus + " (tv.json)", { fname });
       return process.nextTick(checkFile);
     }
 
@@ -3245,6 +3215,10 @@ async function main() {
           if (!_usbBetterThanDisk) {
             existsCount++;
             unilog(
+              1205,
+              `Down: flex skip, disk file same/better quality ${flexSeStr} "${fname}" (${seriesName || "unknown show"})`,
+            );
+            unilog(
               333,
               "------",
               downloadCount,
@@ -3258,13 +3232,6 @@ async function main() {
               flexSeStr,
               _diskFile,
             });
-            unilog(
-              492,
-              "history",
-              "skipDown",
-              seriesName || fname,
-              `flex skip: ${flexSeStr} disk file same/better quality`,
-            );
             return process.nextTick(checkFile);
           }
           // USB is better than disk — rename disk file to .old before downloading.

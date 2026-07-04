@@ -7872,16 +7872,11 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
         1178,
         `Flexget: episode watched ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
       );
-      unilog(625, `SKIP(watched) ${matchedName} ${sKey}${eKey} "${rawTitle}"`);
     }
     if (isPastSeasonGap) {
       unilog(
         1179,
         `Flexget: past season gap S${String(firstSeasonGap).padStart(2, "0")} ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
-      );
-      unilog(
-        626,
-        `SKIP(season-gap-S${String(firstSeasonGap).padStart(2, "0")}) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
       );
     }
     return;
@@ -7927,18 +7922,10 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
         1180,
         `Flexget: same file, better seeds updated ${matchedName} ${sKey}${eKey} "${rawTitle}" (${eSeeds}->${cSeeds} seeds)`,
       );
-      unilog(
-        627,
-        `SKIP(same-file better-seeds) ${matchedName} ${sKey}${eKey} "${rawTitle}" seeds ${eSeeds}->${cSeeds}`,
-      );
     } else {
       unilog(
         1181,
         `Flexget: same file from different provider ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
-      );
-      unilog(
-        628,
-        `SKIP(same-file) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
       );
     }
     return;
@@ -7995,10 +7982,6 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
         1182,
         `Flexget: no resolution parsed ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
       );
-      unilog(
-        629,
-        `SKIP(no-resolution) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
-      );
     } else if (
       diskRes > newRes ||
       (diskRes === newRes && (!diskIsBadGroup || newIsBadGroup))
@@ -8006,10 +7989,6 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
       unilog(
         1183,
         `Flexget: disk quality ${diskRes}p >= new ${newRes}p ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
-      );
-      unilog(
-        630,
-        `SKIP(disk-${diskRes}p>=new-${newRes}p) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
       );
     } else if (newCandidate.url) {
       try {
@@ -8051,7 +8030,6 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
       1184,
       `Flexget: worse quality than last sent ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
     );
-    unilog(637, `SKIP(worse) ${matchedName} ${sKey}${eKey} "${rawTitle}"`);
   }
 }
 

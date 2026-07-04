@@ -1630,7 +1630,6 @@ async function handleDownloadRequest(req, res) {
       const blockedKey = Object.keys(TV_BLOCKED).find((k) => title.includes(k));
       if (blockedKey) {
         unilog(1170, `API: TV_BLOCKED substring "${blockedKey}" in "${title}"`);
-        postTorErr("tv-blocked", `title matches blocked key: ${blockedKey}`);
         res.json({
           ...baseWrapper,
           success: false,
@@ -1649,7 +1648,6 @@ async function handleDownloadRequest(req, res) {
           1171,
           `API: fetch-torrent failed (unexpected result) for "${torTitle()}"`,
         );
-        postTorErr("fetch-torrent", "Unexpected fetchTorrentFile result");
         res.json({
           ...baseWrapper,
           success: false,
@@ -1663,7 +1661,6 @@ async function handleDownloadRequest(req, res) {
           1172,
           `API: fetch-torrent failed: ${fetched.error || "fetch failed"} for "${torTitle()}"`,
         );
-        postTorErr("fetch-torrent", fetched.error || "fetch failed");
         res.json({ ...baseWrapper, ...fetched });
         return;
       }
@@ -1694,7 +1691,6 @@ async function handleDownloadRequest(req, res) {
         } catch (e) {
           unilog(238, "failed to save bad torrent file", e);
         }
-        postTorErr("validate", valid.error || "invalid torrent bytes");
         res.json({ ...baseWrapper, ...valid });
         return;
       }
@@ -1725,10 +1721,6 @@ async function handleDownloadRequest(req, res) {
               1174,
               `API: year mismatch (requested ${expectedYear}, torrent says ${actualYear}) for "${requestedTitle}"`,
             );
-            postTorErr(
-              "validate-torrent-metadata",
-              `year mismatch (requested ${expectedYear}, torrent says ${actualYear})`,
-            );
             res.json({
               ...baseWrapper,
               success: false,
@@ -1756,7 +1748,6 @@ async function handleDownloadRequest(req, res) {
           1175,
           `API: parse-torrent failed: ${e?.message || String(e)} for "${torTitle()}"`,
         );
-        postTorErr("parse-torrent", e?.message || String(e));
         res.json({
           ...baseWrapper,
           success: false,
@@ -1789,7 +1780,6 @@ async function handleDownloadRequest(req, res) {
           result: null,
           error: e,
         });
-        postTorErr("tv-proc", e?.message || String(e));
         res.json({
           ...baseWrapper,
           success: false,

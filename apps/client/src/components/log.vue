@@ -310,7 +310,7 @@ import { TabulatorFull as Tabulator } from "tabulator-tables";
 import "tabulator-tables/dist/css/tabulator.min.css";
 import evtBus from "../evtBus.js";
 import * as srvr from "../srvr.js";
-import { unilog, logHere } from "../log.js";
+import { unilog } from "../log.js";
 const MAX_ROWS = 5000;
 const PAGE = 500;
 
@@ -1235,7 +1235,7 @@ export default {
           ids.has(id),
         );
       } catch (e) {
-        console.error("[log.vue]", `loadGroups failed: ${e.message}`);
+        console.error("[log.vue]", `loadGroups failed: ${e.message}`); // no-unilog
         this.flash("failed to load groups");
       }
     },
@@ -1251,7 +1251,7 @@ export default {
           .filter((id) => orphan.has(id));
         this.flash(`selected ${this.selectedGroupIds.length} orphan groups`);
       } catch (e) {
-        console.error("[log.vue]", `selectOrphans failed: ${e.message}`);
+        console.error("[log.vue]", `selectOrphans failed: ${e.message}`); // no-unilog
         this.flash("failed to find orphans");
       }
     },
@@ -1270,7 +1270,7 @@ export default {
         await this.refreshRowGroups(siteIds);
         this.flash(`added group (${res?.linked ?? 0} sites)`);
       } catch (e) {
-        console.error("[log.vue]", `addGroup failed: ${e.message}`);
+        console.error("[log.vue]", `addGroup failed: ${e.message}`); // no-unilog
         this.flash("failed to add group");
       }
     },
@@ -1286,7 +1286,7 @@ export default {
         await this.applyGroupFilter();
         this.flash(`assigned ${res?.added ?? 0} links`);
       } catch (e) {
-        console.error("[log.vue]", `assignGroups failed: ${e.message}`);
+        console.error("[log.vue]", `assignGroups failed: ${e.message}`); // no-unilog
         this.flash("failed to assign");
       }
     },
@@ -1302,7 +1302,7 @@ export default {
         await this.applyGroupFilter();
         this.flash(`removed ${res?.removed ?? 0} links`);
       } catch (e) {
-        console.error("[log.vue]", `removeGroups failed: ${e.message}`);
+        console.error("[log.vue]", `removeGroups failed: ${e.message}`); // no-unilog
         this.flash("failed to remove");
       }
     },
@@ -1313,7 +1313,7 @@ export default {
         const res = await srvr.getUnilogGroupSiteIds(this.selectedGroupIds);
         siteCount = (res?.logIds || []).length;
       } catch (e) {
-        console.error("[log.vue]", `delete stats failed: ${e.message}`);
+        console.error("[log.vue]", `delete stats failed: ${e.message}`); // no-unilog
       }
       const x = this.selectedGroupIds.length;
       if (
@@ -1334,7 +1334,7 @@ export default {
           `deleted ${res?.groups ?? 0} groups from ${res?.sites ?? 0} sites`,
         );
       } catch (e) {
-        console.error("[log.vue]", `deleteGroups failed: ${e.message}`);
+        console.error("[log.vue]", `deleteGroups failed: ${e.message}`); // no-unilog
         this.flash("failed to delete");
       }
     },
@@ -1349,7 +1349,7 @@ export default {
         await this.loadGroups();
         this.flash(`set type on ${res?.changed ?? 0} groups`);
       } catch (e) {
-        console.error("[log.vue]", `setGroupType failed: ${e.message}`);
+        console.error("[log.vue]", `setGroupType failed: ${e.message}`); // no-unilog
         this.flash("failed to set type");
       }
     },
@@ -1360,7 +1360,7 @@ export default {
         await this.loadGroups();
         this.flash(`cleared type on ${res?.changed ?? 0} groups`);
       } catch (e) {
-        console.error("[log.vue]", `clearGroupType failed: ${e.message}`);
+        console.error("[log.vue]", `clearGroupType failed: ${e.message}`); // no-unilog
         this.flash("failed to clear type");
       }
     },
@@ -1380,7 +1380,7 @@ export default {
         await this.refreshRowGroups(this.allLoadedSiteIds());
         this.flash("renamed group");
       } catch (e) {
-        console.error("[log.vue]", `setGroupName failed: ${e.message}`);
+        console.error("[log.vue]", `setGroupName failed: ${e.message}`); // no-unilog
         this.flash("failed to rename");
       }
     },
@@ -1406,7 +1406,7 @@ export default {
           }
         }
       } catch (e) {
-        console.error("[log.vue]", `refreshRowGroups failed: ${e.message}`);
+        console.error("[log.vue]", `refreshRowGroups failed: ${e.message}`); // no-unilog
       }
     },
     // Layered group filter (in addition to header/string filters). Active only
@@ -1428,7 +1428,7 @@ export default {
         const res = await srvr.getUnilogGroupSiteIds(this.selectedGroupIds);
         this.groupFilterIds = new Set(res?.logIds || []);
       } catch (e) {
-        console.error("[log.vue]", `group filter fetch failed: ${e.message}`);
+        console.error("[log.vue]", `group filter fetch failed: ${e.message}`); // no-unilog
         this.groupFilterIds = new Set();
       }
       if (!this.groupFilterFn) {

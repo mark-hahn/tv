@@ -1340,7 +1340,7 @@ function logRecentSent(action, details = {}) {
   try {
     const detailsStr =
       Object.keys(details).length > 0 ? ` | ${JSON.stringify(details)}` : "";
-    logHere({ grp: "recent-sent" }, `${action}${detailsStr}`);
+    unilog(1194, `${action}${detailsStr}`);
   } catch {
     // ignore logging errors
   }

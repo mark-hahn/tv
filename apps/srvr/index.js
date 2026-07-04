@@ -957,13 +957,6 @@ function cleanChkSrtQueue() {
     persistSubQueueChkSrt();
   }
 }
-function persistSubQueueGenSrt() {
-  fs.writeFileSync(
-    "/root/dev/apps/tv/apps/asr/data/subQueueGenSrt.json",
-    JSON.stringify([]),
-    "utf8",
-  );
-}
 function persistAsrQueue() {
   fs.writeFileSync(ASR_QUEUE_PATH, JSON.stringify(asrQueue), "utf8");
 }
@@ -1347,20 +1340,6 @@ function persistOpnCheckHistory() {
   } catch (e) {
     unilog(515, "persist error:", e.message);
   }
-}
-function logSubtitle(msg) {
-  const now = new Date().toLocaleString("en-US", {
-    timeZone: "America/Los_Angeles",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-  const ts = now
-    .replace(/(\d+)\/(\d+),\s*/, "$1-$2 ")
-    .replace(/24:(\d+)/, "00:$1");
-  fs.appendFileSync(SUBTITLE_LOG_PATH, ts + " " + msg + "\n", "utf8");
 }
 async function fileNeedsSubChecked(videoFilePath, showName) {
   if (subQueue.some((e) => e.videoFilePath === videoFilePath)) return false;

@@ -158,6 +158,7 @@ logHere({}); // no message → logs "<missing>"
   - they are already included in other displayed fields 
 - do not put timestamp in the message
   - it is in ts field
+- do not put anything that is redundant with a group name in the message
 - A site is linked to every named group in `grp`. A group is looked up by name
   (case-insensitive); if it doesn't exist it is created with `typ`. Existing
   groups keep their `group_type` — `typ` never changes it.

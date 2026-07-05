@@ -9659,31 +9659,32 @@ async function reencodeOneTo1080(entry) {
   await ffmpegQueue.run(
     () =>
       new Promise((resolve, reject) => {
-        const REENCODE_TIMEOUT_MS = 60 * 60 * 1000; // 60 minutes max
+        const REENCODE_TIMEOUT_MS = 3 * 60 * 60 * 1000; // 3 hours max (SW encode ~1x realtime)
         // Step 1: encode video only to a video-only MP4 (preserves timing).
-        // HEVC Main 10 keeps the source's 10-bit depth + HDR at a ~10 Mbit/s
-        // cap (the bandwidth fallback target); the Bravia hardware-decodes it
-        // just like the 4K HEVC sources, so it direct-plays.
-        // The encode runs on the AMD VCN hardware encoder via VAAPI
-        // (hevc_vaapi) — ~3.7x realtime, offloading the encode off the CPU.
-        // Decode + scale stay on the CPU on purpose: full-GPU scale_vaapi leaks
-        // GPU surfaces and crashes ("Cannot allocate memory") on long files.
+        // HEVC Main 10 keeps the source's 10-bit depth + HDR; the Bravia
+        // hardware-decodes it just like the 4K HEVC sources, so it direct-plays.
+        // SW encode (libx265) is used instead of VAAPI: the GPU encoder pads
+        // surfaces to a 16-pixel alignment boundary, causing a right-edge
+        // stretching artifact on non-standard-aspect sources (e.g. 1.85:1
+        // 3840x2076). libx265 accepts any even dimension cleanly.
+        // scale=-2:1080 produces the mathematically correct width (e.g. 1998px
+        // for 1.85:1) with no padding or edge replication.
         const args1 = [
           "-y",
-          "-vaapi_device",
-          "/dev/dri/renderD128",
           "-i",
           srcPath,
           "-map",
           "0:v:0",
           "-vf",
-          "scale=-2:1080,crop=iw:1072,format=p010,hwupload",
+          "scale=-2:1080,crop=iw:1072",
           "-c:v",
-          "hevc_vaapi",
+          "libx265",
+          "-pix_fmt",
+          "yuv420p10le",
           "-profile:v",
           "main10",
-          "-rc_mode",
-          "VBR",
+          "-preset",
+          "medium",
           "-b:v",
           "8M",
           "-maxrate",

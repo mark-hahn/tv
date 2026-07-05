@@ -1799,11 +1799,6 @@ async function handleDownloadRequest(req, res) {
           1176,
           `API: tv-proc blocked (${existingTitles.length} existing, ${errorTitles.length} errors) for "${torTitle()}"`,
         );
-        if (debug)
-          unilog(239, "blocked by tv-proc", {
-            existingTitles: existingTitles.length,
-            errorTitles: errorTitles.length,
-          });
         appendDownloadsResultLog({
           stage: "tv-proc-blocked",
           existingTitles,
@@ -1829,11 +1824,10 @@ async function handleDownloadRequest(req, res) {
           ...(dlSavePath ? { savePath: dlSavePath } : {}),
         });
       } catch (e) {
-        if (debug)
-          unilog(240, "qbt add threw", {
-            addTag,
-            error: e?.message || String(e),
-          });
+        unilog(240, "qbt add threw", {
+          addTag,
+          error: e?.message || String(e),
+        });
         appendDownloadsResultLog({
           stage: "qbt-add-threw",
           addTag,
@@ -1861,13 +1855,12 @@ async function handleDownloadRequest(req, res) {
         return;
       }
 
-      if (debug)
-        unilog(241, "qbt add response", {
-          addTag,
-          ok: addRes.ok,
-          status: addRes.status,
-          text: addRes.text,
-        });
+      unilog(241, "qbt add response", {
+        addTag,
+        ok: addRes.ok,
+        status: addRes.status,
+        text: addRes.text,
+      });
       appendDownloadsResultLog({
         stage: "qbt-add-response",
         addTag,
@@ -1893,11 +1886,10 @@ async function handleDownloadRequest(req, res) {
           const tagged = await getQbtInfo({ tag: addTag });
           const list = Array.isArray(tagged) ? tagged : [];
           if (list.length > 0) {
-            if (debug)
-              unilog(242, "qbt add disambiguated as success via tag", {
-                addTag,
-                count: list.length,
-              });
+            unilog(242, "qbt add disambiguated as success via tag", {
+              addTag,
+              count: list.length,
+            });
             let tagInfoHash = "";
             try {
               const parsed = parseTorrent(fetched.torrentData);
@@ -1954,12 +1946,11 @@ async function handleDownloadRequest(req, res) {
                   "",
               ).trim();
               const title = existingName || fallbackTitle || infoHash;
-              if (debug)
-                unilog(243, "qbt add disambiguated as duplicate via hash", {
-                  addTag,
-                  infoHash,
-                  title,
-                });
+              unilog(243, "qbt add disambiguated as duplicate via hash", {
+                addTag,
+                infoHash,
+                title,
+              });
               res.json({
                 ...tvProcResult,
                 success: false,
@@ -2175,11 +2166,10 @@ async function handleDownloadRequest(req, res) {
         ...(dlSavePath ? { savePath: dlSavePath } : {}),
       });
     } catch (e) {
-      if (debug)
-        unilog(245, "qbt add threw (force)", {
-          addTag,
-          error: e?.message || String(e),
-        });
+      unilog(245, "qbt add threw (force)", {
+        addTag,
+        error: e?.message || String(e),
+      });
       res.json({
         ...tvProcResult,
         success: false,
@@ -2189,13 +2179,12 @@ async function handleDownloadRequest(req, res) {
       return;
     }
 
-    if (debug)
-      unilog(246, "qbt add response (force)", {
-        addTag,
-        ok: addRes.ok,
-        status: addRes.status,
-        text: addRes.text,
-      });
+    unilog(246, "qbt add response (force)", {
+      addTag,
+      ok: addRes.ok,
+      status: addRes.status,
+      text: addRes.text,
+    });
 
     if (!addRes.ok) {
       // Same as non-force mode: if the torrent shows up with our unique tag, the add succeeded.
@@ -2203,11 +2192,10 @@ async function handleDownloadRequest(req, res) {
         const tagged = await getQbtInfo({ tag: addTag });
         const list = Array.isArray(tagged) ? tagged : [];
         if (list.length > 0) {
-          if (debug)
-            unilog(247, "qbt add disambiguated as success via tag (force)", {
-              addTag,
-              count: list.length,
-            });
+          unilog(247, "qbt add disambiguated as success via tag (force)", {
+            addTag,
+            count: list.length,
+          });
           let infoHash = "";
           try {
             const parsed = parseTorrent(fetched.torrentData);

@@ -4190,7 +4190,9 @@ function broadcastUnilog(row) {
 // tv-srvr is the single DB writer. Register the in-process sink so unilog()
 // calls inside srvr write directly; other processes/clients use POST /api/log.
 epd.setUnilogSink(({ logId, message }) =>
-  broadcastUnilog(unilogDb.insertEvent({ logId, pid: "tv-srvr", message })),
+  broadcastUnilog(
+    unilogDb.insertEventDedup({ logId, pid: "tv-srvr", message }),
+  ),
 );
 
 // Central log collector endpoint. Accepts a single event or a batch array.
@@ -4202,7 +4204,7 @@ app.post("/api/log", (req, res) => {
     for (const e of events) {
       if (!e || e.logId == null) continue;
       broadcastUnilog(
-        unilogDb.insertEvent({
+        unilogDb.insertEventDedup({
           logId: e.logId,
           pid: e.pid || "unknown",
           message: e.message,
@@ -4320,6 +4322,7 @@ app.get("/api/unilog/events", (req, res) => {
       pids: unilogDb.listPids(),
       levels: unilogDb.listLevels(),
       total: unilogDb.countEvents(),
+      dedupDropped: unilogDb.getDedupDropped(),
     });
   } catch (error) {
     console.error("[unilog] /api/unilog/events error:", error); // no-unilog

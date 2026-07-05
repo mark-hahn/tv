@@ -160,7 +160,7 @@
         <span v-else
           >{{ selectedCount }}/{{ displayedCount }}/{{ rowCount }}/{{
             dbTotal
-          }}</span
+          }}/{{ dedupDropped }}</span
         >
       </span>
     </div>
@@ -345,6 +345,7 @@ export default {
       rowCount: 0,
       displayedCount: 0,
       dbTotal: 0,
+      dedupDropped: 0,
       loading: false,
       error: "",
       loadedOnce: false,
@@ -1097,6 +1098,7 @@ export default {
         if (!missed.length) return;
         await this.appendRows(missed);
         this.dbTotal = res?.total ?? this.dbTotal;
+        this.dedupDropped = res?.dedupDropped ?? this.dedupDropped;
       } catch (err) {
         this.error = err?.message || String(err);
       }
@@ -1169,6 +1171,7 @@ export default {
         this.rowCount = events.length;
         this.displayedCount = events.length;
         this.dbTotal = res?.total ?? 0;
+        this.dedupDropped = res?.dedupDropped ?? 0;
         if (Array.isArray(res?.levels)) this.filterLevels = ["", ...res.levels];
         if (Array.isArray(res?.pids))
           this.filterPids = [

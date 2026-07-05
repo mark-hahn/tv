@@ -2405,15 +2405,7 @@ async function main() {
           // hidden             1185,
           // hidden             `Down: TV_BLOCKED substring "${blkName}" in file "${fname}" (${title || "unknown show"})`,
           // hidden           );
-          // hidden           unilog(319, "-- BLOCKED:", { blkName, fname });
           trace("checkFile: blocked", { blkName, fname });
-          // hidden           unilog(
-          // hidden             481,
-          // hidden             "history",
-          // hidden             "skipDown",
-          // hidden             title || fname,
-          // hidden             `skip: blocked by ${blkName}`,
-          // hidden           );
           process.nextTick(checkFile);
           return;
         }
@@ -2471,15 +2463,6 @@ async function main() {
             unilog(
               1197,
               `Down: not a TV show "${fname}" (${title || "unknown show"})`,
-            );
-            unilog(
-              320,
-              "------",
-              downloadCount,
-              "/",
-              chkCount,
-              "NOT A TV SHOW, SKIPPING:",
-              fname,
             );
             trace("checkFile: not a tv show, skipping", { fname, title });
             return process.nextTick(checkFile);
@@ -2769,19 +2752,6 @@ async function main() {
                   return process.nextTick(chkTvDB);
                 }
                 unilog(
-                  326,
-                  "------",
-                  downloadCount,
-                  "/",
-                  chkCount,
-                  "NOT A TV SHOW, SKIPPING:",
-                  fname,
-                );
-                trace("chkTvDB: no series match, not in emby, skipping", {
-                  fname,
-                  title,
-                });
-                unilog(
                   1200,
                   `Down: no TVDB match, not in Emby "${fname}" (${title || "unknown show"})`,
                 );
@@ -2985,15 +2955,6 @@ async function main() {
       unilog(
         1202,
         `Down: already on disk "${fname}" (${seriesName || "unknown show"})`,
-      );
-      unilog(
-        330,
-        "------",
-        downloadCount,
-        "/",
-        chkCount,
-        "ALREADY ON DISK:",
-        fname,
       );
       trace("checkFileExists: already on disk", { fname, tvSeasonPath });
       try {
@@ -3217,15 +3178,6 @@ async function main() {
             unilog(
               1205,
               `Down: flex skip, disk file same/better quality ${flexSeStr} "${fname}" (${seriesName || "unknown show"})`,
-            );
-            unilog(
-              333,
-              "------",
-              downloadCount,
-              "/",
-              chkCount,
-              "FLEX SKIP (disk file same/better quality):",
-              fname,
             );
             trace("checkFileExists: flex skip disk file same/better quality", {
               fname,

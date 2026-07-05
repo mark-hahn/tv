@@ -3,7 +3,7 @@
 import { chromium } from "playwright";
 import fs from "fs"; // Added for saving HTML
 import * as util from "./util.js";
-import { smartTitleMatch, unilog} from "@tv/share"
+import { smartTitleMatch, unilog } from "@tv/share";
 const { log, start, end } = util.getLog("rott");
 
 const MAX_STR_DIST = 10;
@@ -136,9 +136,15 @@ function createTiming(log, enabled, label) {
     if (!enabled) return;
     const totalMs = Number(nowNs() - t0) / 1e6;
     const sorted = [...spans].sort((a, b) => b.ms - a.ms);
-    unilog(695, `timings for ${label}: total=${totalMs.toFixed(0)}ms, spans=${spans.length}`);
+    unilog(
+      695,
+      `timings for ${label}: total=${totalMs.toFixed(0)}ms, spans=${spans.length}`,
+    );
     for (const s of sorted.slice(0, topN)) {
-      unilog(696, `timing: ${String(s.ms.toFixed(0)).padStart(5, " ")}ms  ${s.name}${s.meta ? "  " + s.meta : ""}`);
+      unilog(
+        696,
+        `timing: ${String(s.ms.toFixed(0)).padStart(5, " ")}ms  ${s.name}${s.meta ? "  " + s.meta : ""}`,
+      );
     }
   };
 
@@ -473,7 +479,10 @@ function chooseShow(shows, query) {
   }
 
   if (debug) {
-    unilog(701, `smartTitleMatch: query="${query}", year="${year}" against ${shows.length} shows`);
+    unilog(
+      701,
+      `smartTitleMatch: query="${query}", year="${year}" against ${shows.length} shows`,
+    );
   }
 
   // Use forceChoice=true to allow aggressive normalization and Levenshtein matching
@@ -488,7 +497,10 @@ function chooseShow(shows, query) {
     null;
 
   if (debug && result) {
-    unilog(110, `smartTitleMatch selected: "${result.title}" (${result.startyear})`);
+    unilog(
+      110,
+      `smartTitleMatch selected: "${result.title}" (${result.startyear})`,
+    );
   }
   return result;
 }
@@ -557,7 +569,11 @@ export async function rottenSearch(query) {
 
   const headless = !headed || !HAS_DISPLAY;
   if (headed && !HAS_DISPLAY) {
-    unilog(702, "err", "ROTTEN_HEADED requested but no $DISPLAY; forcing headless");
+    unilog(
+      702,
+      "err",
+      "ROTTEN_HEADED requested but no $DISPLAY; forcing headless",
+    );
   }
   let browser;
   let context;
@@ -624,7 +640,10 @@ export async function rottenSearch(query) {
             await page.goto(detailLink, { waitUntil: "domcontentloaded" });
             return;
           } catch (e) {
-            unilog(703, `rotten detail.goto failed (attempt ${i}): ${e.message}`);
+            unilog(
+              703,
+              `rotten detail.goto failed (attempt ${i}): ${e.message}`,
+            );
             if (i === 3) throw e;
             await new Promise((r) => setTimeout(r, 1000));
           }
@@ -740,12 +759,14 @@ export async function rottenSearch(query) {
       getScore("audienceScore"),
     );
 
-    if (debug)
-      unilog(705, `rotten: "${query}" => "${show.title}" ${show.startyear} ${
-          show.endyear
-        } ${criticsScore}/${audienceScore} ${show.sentiment}\n    ${
-          queryUrl
-        }\n    ${detailLink}`);
+    unilog(
+      705,
+      `rotten: "${query}" => "${show.title}" ${show.startyear} ${
+        show.endyear
+      } ${criticsScore}/${audienceScore} ${show.sentiment}\n    ${
+        queryUrl
+      }\n    ${detailLink}`,
+    );
 
     return { url: detailLink, criticsScore, audienceScore };
   };

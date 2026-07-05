@@ -56,9 +56,8 @@ CREATE TABLE IF NOT EXISTS site_groups (
 CREATE INDEX IF NOT EXISTS idx_site_groups_group ON site_groups(group_id);
 `);
 
-// PST 'yyyy/mm/dd hh:mm:ss'; hour 24 normalized to 00 (repo convention).
-export function nowPst() {
-  const d = new Date();
+// PST 'yyyy/mm/dd hh:mm:ss' for a given Date; hour 24 normalized to 00.
+function pstStr(d = new Date()) {
   const date = d
     .toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" })
     .replace(/-/g, "/");
@@ -68,6 +67,11 @@ export function nowPst() {
   });
   if (time.startsWith("24:")) time = "00:" + time.slice(3);
   return `${date} ${time}`;
+}
+
+// PST 'yyyy/mm/dd hh:mm:ss' for now (repo convention).
+export function nowPst() {
+  return pstStr();
 }
 
 const insEvent = db.prepare(
@@ -108,6 +112,82 @@ export function insertEvent({ logId, pid, message }) {
   const row = getEventRow.get(Number(info.lastInsertRowid));
   if (row) row.groups = groupsForSite(row.log_id);
   return row || null;
+}
+
+// ---------------------------------------------------------------------------
+// down-blocked dedup — the "down blocked" group covers the whole tor/flex → qbt
+// → down flow. The same file gets blocked every processing cycle, producing
+// identical redundant events. Drop events whose (log_id + message) was already
+// seen within the last ~hour so the viewer isn't flooded. Only group-members
+// are deduped; all other events pass through untouched.
+// ---------------------------------------------------------------------------
+const DEDUP_TTL_MS = 60 * 60 * 1000; // ~1 hour
+const DEDUP_GROUP = "down blocked";
+const dedupCache = new Map(); // `${logId}\u0000${message}` -> insertedAtMs
+let dedupIds = new Set(); // log_ids in the down-blocked group
+let dedupDropped = 0; // running count of suppressed redundant events
+
+function loadDedupIds() {
+  dedupIds = new Set();
+  const g = db
+    .prepare("SELECT group_id FROM log_groups WHERE description = ?")
+    .get(DEDUP_GROUP);
+  if (!g) return;
+  for (const r of db
+    .prepare("SELECT log_id FROM site_groups WHERE group_id = ?")
+    .all(g.group_id))
+    dedupIds.add(Number(r.log_id));
+}
+
+function pruneDedupCache(now) {
+  for (const [k, t] of dedupCache)
+    if (now - t > DEDUP_TTL_MS) dedupCache.delete(k);
+}
+
+// Seed the cache from DB rows in the last hour so a file blocked just before a
+// restart isn't immediately re-logged after. ts is a PST wall-clock string, so
+// a lexicographic `ts >= cutoff` compare is timezone-correct. Seeded entries
+// expire ~1h from startup (mild over-retention, harmless).
+function seedDedupCache() {
+  if (dedupIds.size === 0) return;
+  const now = Date.now();
+  const cutoff = pstStr(new Date(now - DEDUP_TTL_MS));
+  const placeholders = [...dedupIds].map(() => "?").join(",");
+  const rows = db
+    .prepare(
+      `SELECT DISTINCT log_id, message FROM log_events
+        WHERE ts >= ? AND log_id IN (${placeholders})`,
+    )
+    .all(cutoff, ...[...dedupIds]);
+  for (const r of rows) dedupCache.set(`${r.log_id}\u0000${r.message}`, now);
+}
+
+loadDedupIds();
+seedDedupCache();
+
+// Running count of redundant down-blocked events dropped since startup.
+export function getDedupDropped() {
+  return dedupDropped;
+}
+
+// Dedup wrapper used by BOTH the in-process srvr sink and POST /api/log, so
+// local and remote emitters are covered. Returns the joined event row to
+// broadcast, or null when the event is a redundant down-blocked event (dropped,
+// never inserted, never broadcast). A cache hit does NOT refresh the entry, so a
+// still-blocking file re-appears at most once per hour as a heartbeat.
+export function insertEventDedup({ logId, pid, message }) {
+  const id = logId == null ? null : Number(logId);
+  if (id != null && dedupIds.has(id)) {
+    const now = Date.now();
+    pruneDedupCache(now);
+    const key = `${id}\u0000${String(message ?? "")}`;
+    if (dedupCache.has(key)) {
+      dedupDropped++;
+      return null;
+    }
+    dedupCache.set(key, now);
+  }
+  return insertEvent({ logId, pid, message });
 }
 
 const insGroup = db.prepare(

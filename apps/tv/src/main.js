@@ -61,8 +61,8 @@ const REMOTE_ENTITY_ID = "remote.bravia_k_65xr70";
 const FIRE_TV_ENTITY_ID = "media_player.fire_tv_192_168_1_47";
 const FIRE_TV_REMOTE_ID = "remote.fire_tv_192_168_1_47";
 const FIRE_TV_IP = "192.168.1.47";
-const BRAVIA_TV_IP = "192.168.1.85:34047";
-const BRAVIA_PICTURE_URL = `http://192.168.1.85/sony/video`;
+const BRAVIA_TV_IP = "192.168.1.86:34047";
+const BRAVIA_PICTURE_URL = `http://192.168.1.86/sony/video`;
 const BRAVIA_PSK = "qwerty";
 
 const PIC_TARGETS = [

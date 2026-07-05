@@ -330,6 +330,18 @@
             </button>
 
             <button
+              @click="badGrpClick"
+              :style="{
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+              }"
+            >
+              Bad Grp
+            </button>
+
+            <button
               @click="clickInfo"
               :style="{
                 cursor: 'pointer',
@@ -1242,6 +1254,27 @@
         </template>
       </div>
     </div>
+
+    <!-- Toast -->
+    <div
+      v-if="toastMessage"
+      :style="{
+        position: 'fixed',
+        top: '20px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        backgroundColor: '#333',
+        color: '#fff',
+        padding: '12px 24px',
+        borderRadius: '8px',
+        fontSize: '15px',
+        fontWeight: 'bold',
+        zIndex: 10000,
+        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+      }"
+    >
+      {{ toastMessage }}
+    </div>
   </div>
 </template>
 
@@ -1263,6 +1296,7 @@ import {
   removeFromAsrQueue,
   killAsrProcess,
   searchOpn,
+  toggleBadGroup,
 } from "../srvr.js";
 import evtBus from "../evtBus.js";
 import * as util from "../util.js";
@@ -1340,6 +1374,10 @@ export default {
       infoMultiFiles: [], // [{name, meta}] for multi-file display
       infoMultiTitle: "", // common prefix of multi-file names
       infoMultiMeta: "", // aggregated size | oldest date | newest date
+
+      // Toast
+      toastMessage: "",
+      toastTimer: null,
     };
   },
   created() {
@@ -1486,6 +1524,22 @@ export default {
     },
   },
   methods: {
+    showToastError(msg) {
+      this.toastMessage = `❌ ${String(msg || "")}`;
+      if (this.toastTimer) clearTimeout(this.toastTimer);
+      this.toastTimer = setTimeout(() => {
+        this.toastMessage = "";
+        this.toastTimer = null;
+      }, 5000);
+    },
+    showToastInfo(msg) {
+      this.toastMessage = String(msg || "");
+      if (this.toastTimer) clearTimeout(this.toastTimer);
+      this.toastTimer = setTimeout(() => {
+        this.toastMessage = "";
+        this.toastTimer = null;
+      }, 5000);
+    },
     wrapFileName(name) {
       return util.wrapFileName(name);
     },
@@ -2621,6 +2675,50 @@ export default {
       this.selectedName = null;
       this.selectedFiles = new Set();
       this.fetchFiles();
+    },
+    async badGrpClick() {
+      // Check if exactly one file is selected
+      if (this.selectedFiles.size === 0) {
+        this.showToastError("No file selected.");
+        return;
+      }
+      if (this.selectedFiles.size > 1) {
+        this.showToastError("More than one file selected.");
+        return;
+      }
+
+      // Get the file path and extract the filename
+      const filePath = Array.from(this.selectedFiles)[0];
+      const parts = filePath.split("/");
+      const fileName = parts[parts.length - 1];
+
+      // Parse the filename to extract the group (strip extension first, same as server isBadGroup)
+      let parsed = null;
+      try {
+        const nameNoExt = fileName.replace(/\.[a-z0-9]{2,4}$/i, "");
+        parsed = parseTorrentTitle.parse(nameNoExt);
+      } catch (e) {
+        this.showToastError("Failed to parse filename.");
+        return;
+      }
+
+      const group = String(parsed?.group || "").trim();
+      if (!group) {
+        this.showToastError("Selected file has no group name.");
+        return;
+      }
+
+      // Call toggleBadGroup
+      try {
+        const result = await toggleBadGroup(group);
+        if (result?.action === "added") {
+          this.showToastInfo(`Added bad group: ${group}`);
+        } else if (result?.action === "removed") {
+          this.showToastInfo(`Removed bad group: ${group}`);
+        }
+      } catch (e) {
+        this.showToastError(e?.message || String(e));
+      }
     },
     async clickInfo() {
       if (this.showInfo) {

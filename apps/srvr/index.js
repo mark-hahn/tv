@@ -39,6 +39,54 @@ import {
 import * as groupCounts from "./src/groupCounts.js";
 import * as urls from "./src/urls.js";
 import * as unilogDb from "./src/unilogDb.js";
+import {
+  srtTimeToMs,
+  msToSrtTime,
+  stripSrtFormatting,
+  sanitizeSrt,
+} from "./src/srt.js";
+import {
+  CONFIG_DIR,
+  ensureDir,
+  configReadCandidates,
+  readTextOrWithChosenPath,
+  configWritePath,
+} from "./src/config.js";
+import {
+  videoFileExtensions,
+  resStripAlt,
+  resOfName,
+  resIsVideoName,
+  resFindEpisodeVideos,
+  res2160FileName,
+  res1080OldFileName,
+} from "./src/videoFiles.js";
+import {
+  syncBadGroupsFromDisk,
+  writeBadGroupsToDisk,
+  hasBadGroup,
+  isBadGroup,
+} from "./src/badGroups.js";
+import {
+  flexgetFmtSent,
+  flexgetIsBetterSameRun,
+  flexgetIsBetterCrossRun,
+  parseResolutionStrict,
+  getFirstFilesOnDiskSeasonGap,
+} from "./src/flexgetScore.js";
+import {
+  getSubsToken,
+  loadSubsLogin,
+  openSubtitlesDownloadWithRetry,
+  subsSearch,
+  subsCountEpisodes,
+} from "./src/opensubtitles.js";
+import {
+  encodeFileIdBase32,
+  deleteSubFiles,
+  getSubFileIds,
+  offsetSubFiles,
+} from "./src/subFiles.js";
 
 const tvdbIdByName = (name) => {
   if (!name) return null;
@@ -51,10 +99,8 @@ const tvdbIdByName = (name) => {
   return String(rec?.tvdbId || "").trim() || null;
 };
 
-const CONFIG_DIR = path.join(SRVR_ROOT_DIR, "config");
 const SECRETS_DIR = SRVR_SECRETS_DIR;
 const FLEXGET_HISTORY_PATH = path.join(SRVR_DATA_DIR, "flexget-history.json");
-const BAD_GROUPS_PATH = path.join(SRVR_DATA_DIR, "badGroups.txt");
 const QBT_CRED_PATH_FLEX = path.join(
   path.dirname(SRVR_ROOT_DIR),
   "api",
@@ -71,69 +117,6 @@ function runFfprobe(args, maxBuffer = 2 * 1024 * 1024) {
     maxBuffer,
     encoding: "utf8",
   });
-}
-
-function readBadGroupsFromDisk() {
-  return fs
-    .readFileSync(BAD_GROUPS_PATH, "utf8")
-    .split(/\r?\n/)
-    .map((line) => line.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-function syncBadGroupsFromDisk() {
-  badGroups.clear();
-  for (const group of readBadGroupsFromDisk()) badGroups.add(group);
-  return [...badGroups].sort();
-}
-
-function writeBadGroupsToDisk(groups) {
-  const list = [
-    ...new Set(
-      groups.map((group) => String(group).trim().toLowerCase()).filter(Boolean),
-    ),
-  ].sort();
-  fs.writeFileSync(
-    BAD_GROUPS_PATH,
-    list.length ? `${list.join("\n")}\n` : "",
-    "utf8",
-  );
-  badGroups.clear();
-  for (const group of list) badGroups.add(group);
-  return list;
-}
-
-function ensureDir(dir) {
-  try {
-    fs.mkdirSync(dir, { recursive: true });
-  } catch (e) {
-    unilog(504, `FATAL: cannot create dir: ${dir}`, e?.message || e);
-    process.exit(1);
-  }
-}
-
-function ensureFile(filePath, defaultStr) {
-  try {
-    if (fs.existsSync(filePath)) return;
-    ensureDir(path.dirname(filePath));
-    fs.writeFileSync(filePath, defaultStr, "utf8");
-  } catch (e) {
-    unilog(
-      505,
-      `FATAL: cannot create required file: ${filePath}`,
-      e?.message || e,
-    );
-    process.exit(1);
-  }
-}
-
-function firstExistingPath(paths) {
-  for (const p of paths) {
-    try {
-      if (p && fs.existsSync(p)) return p;
-    } catch {}
-  }
-  return paths && paths[0] ? paths[0] : null;
 }
 
 ensureDir(SRVR_DATA_DIR);
@@ -302,39 +285,6 @@ function _updateStreamMsg() {
 }
 const exec = utilNode.promisify(cp.exec);
 
-function readTextOr(filePathOrPaths, fallback) {
-  const paths = Array.isArray(filePathOrPaths)
-    ? filePathOrPaths
-    : [filePathOrPaths];
-  for (const p of paths) {
-    try {
-      return fs.readFileSync(p, "utf8");
-    } catch {}
-  }
-  return fallback;
-}
-
-function configReadCandidates(relativePath) {
-  // Config is owned by this app under apps/srvr/config.
-  return [path.join(SRVR_ROOT_DIR, relativePath)];
-}
-
-function readTextOrWithChosenPath(filePathOrPaths, fallback) {
-  const paths = Array.isArray(filePathOrPaths)
-    ? filePathOrPaths
-    : [filePathOrPaths];
-  for (const p of paths) {
-    try {
-      return { text: fs.readFileSync(p, "utf8"), chosenPath: p };
-    } catch {}
-  }
-  return { text: fallback, chosenPath: null };
-}
-
-function configWritePath(fileName) {
-  return path.join(CONFIG_DIR, fileName);
-}
-
 const headerLoad = readTextOrWithChosenPath(
   configReadCandidates("config/config1-header.txt"),
   "",
@@ -351,51 +301,6 @@ const footerLoad = readTextOrWithChosenPath(
 const headerStr = headerLoad.text;
 const pickupStr = pickupLoad.text;
 const footerStr = footerLoad.text;
-
-// Strict: shared secrets are checkout-independent under TV_DATA_DIR/secrets.
-const subsLoginPath = path.join(SECRETS_DIR, "subs-login.txt");
-const subsTokenReadPath = path.join(SECRETS_DIR, "subs-token.txt");
-const subsTokenWritePath = path.join(SECRETS_DIR, "subs-token.txt");
-
-// OpenSubtitles requires a real app User-Agent; it will 403 on generic ones (e.g. node-fetch).
-const openSubtitlesUserAgent = "tv-srvr v1.0.0";
-
-let subsTokenCache = null;
-try {
-  const token = fs.readFileSync(subsTokenReadPath, "utf8");
-  subsTokenCache =
-    typeof token === "string" && token.trim() ? token.trim() : null;
-} catch {
-  subsTokenCache = null;
-}
-
-function isSubsTokenExpired(token) {
-  if (!token) return true;
-  try {
-    const payload = JSON.parse(
-      Buffer.from(token.split(".")[1], "base64").toString("utf8"),
-    );
-    const exp = payload?.exp;
-    if (!Number.isFinite(exp)) return true;
-    // Refresh if expired or within 24h of expiry
-    return Date.now() / 1000 > exp - 86400;
-  } catch {
-    return true;
-  }
-}
-
-// Proactively refresh token on startup if missing or expired
-setImmediate(async () => {
-  if (!isSubsTokenExpired(subsTokenCache)) return;
-  try {
-    const login = loadSubsLogin();
-    const newToken = await openSubtitlesLogin(login);
-    await persistSubsToken(newToken);
-    unilog(1, "token refreshed on startup");
-  } catch (e) {
-    unilog(2, `startup token refresh failed: ${e.message}`);
-  }
-});
 
 let pickups;
 try {
@@ -422,476 +327,6 @@ try {
     process.exit(1);
   }
 }
-
-function encodeFileIdBase32(fileId) {
-  // base-32 using RFC4648 alphabet: A-Z then 2-7.
-  // Output is always exactly 5 chars, left-padded with 'A' (the zero char).
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-  let n = Number(fileId);
-  if (!Number.isFinite(n) || n < 0) n = 0;
-  n = Math.floor(n);
-
-  let out = "";
-  do {
-    const digit = n % 32;
-    out = alphabet[digit] + out;
-    n = Math.floor(n / 32);
-  } while (n > 0);
-  out = out.padStart(5, "A");
-  // Prefix with '#' so these can be uniquely identified for later deletion.
-  return "#" + out;
-}
-
-function encodeFileIdBase32Legacy(fileId) {
-  // Legacy base-32 encoding used by older subtitle filenames:
-  // alphabet: A-P then a-p.
-  // Output is minimal-length (no left padding).
-  const alphabet = "ABCDEFGHIJKLMNOPabcdefghijklmnop";
-  let n = Number(fileId);
-  if (!Number.isFinite(n) || n < 0) n = 0;
-  n = Math.floor(n);
-
-  let out = "";
-  do {
-    const digit = n % 32;
-    out = alphabet[digit] + out;
-    n = Math.floor(n / 32);
-  } while (n > 0);
-  return "#" + out;
-}
-
-function encodeFileIdBase32LegacyAZ05(fileId) {
-  // Legacy base-32 encoding used briefly:
-  // alphabet: A-Z then 0-5.
-  // Output is minimal-length (no left padding).
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ012345";
-  let n = Number(fileId);
-  if (!Number.isFinite(n) || n < 0) n = 0;
-  n = Math.floor(n);
-
-  let out = "";
-  do {
-    const digit = n % 32;
-    out = alphabet[digit] + out;
-    n = Math.floor(n / 32);
-  } while (n > 0);
-  return "#" + out;
-}
-
-const deleteSubFiles = async (params) => {
-  if (params === undefined || params === null || params === "") {
-    throw new Error("deleteSubFiles: missing params");
-  }
-
-  const fileIdObjs = params;
-  if (!Array.isArray(fileIdObjs) || fileIdObjs.length === 0) {
-    throw new Error("deleteSubFiles: expected non-empty array");
-  }
-
-  const showName =
-    typeof fileIdObjs[0]?.showName === "string" ? fileIdObjs[0].showName : "";
-  if (!showName || showName.trim() === "") {
-    throw new Error("deleteSubFiles: missing showName");
-  }
-  if (showName.includes("/") || showName.includes("\\")) {
-    throw new Error("deleteSubFiles: invalid showName");
-  }
-  for (const entry of fileIdObjs) {
-    if (typeof entry?.showName !== "string" || entry.showName !== showName) {
-      throw new Error("deleteSubFiles: all entries must have same showName");
-    }
-  }
-
-  const localShowPath = path.join(tvDir, showName);
-  try {
-    const st = fs.statSync(localShowPath);
-    if (!st.isDirectory()) {
-      throw new Error(`Show directory missing: ${localShowPath} (n/a)`);
-    }
-  } catch {
-    throw new Error(`Show directory missing: ${localShowPath} (n/a)`);
-  }
-
-  const searchTags = new Set();
-  const fileIdsByTag = new Map();
-  const fidToNewTag = new Map();
-  for (const entry of fileIdObjs) {
-    const file_id = entry?.file_id;
-    if (!Number.isFinite(Number(file_id))) {
-      throw new Error("deleteSubFiles: invalid file_id");
-    }
-    const fid = Number(file_id);
-    const tagNew = encodeFileIdBase32(fid);
-    const tagLegacy = encodeFileIdBase32Legacy(fid);
-    const tagLegacy2 = encodeFileIdBase32LegacyAZ05(fid);
-    fidToNewTag.set(fid, tagNew);
-
-    for (const tag of [tagNew, tagLegacy, tagLegacy2]) {
-      searchTags.add(tag);
-      if (!fileIdsByTag.has(tag)) fileIdsByTag.set(tag, new Set());
-      fileIdsByTag.get(tag).add(fid);
-    }
-  }
-
-  const deletedFids = new Set();
-  const deleted = [];
-  const appliedSet = new Set();
-  const failures = [];
-
-  const recurs = async (dirPath) => {
-    if (dirPath === tvDir + "/.stfolder") return;
-    let dirents;
-    try {
-      dirents = fs.readdirSync(dirPath, { withFileTypes: true });
-    } catch (e) {
-      failures.push({ path: dirPath, error: `readdir failed: ${e.message}` });
-      return;
-    }
-
-    for (const d of dirents) {
-      if (d.isSymbolicLink && d.isSymbolicLink()) continue;
-      const p = path.join(dirPath, d.name);
-      if (d.isDirectory()) {
-        await recurs(p);
-        continue;
-      }
-      if (!d.isFile()) continue;
-      if (!d.name || !d.name.toLowerCase().endsWith(".srt")) continue;
-
-      const noExt = d.name.slice(0, -4); // remove .srt
-      const lastDot = noExt.lastIndexOf(".");
-      if (lastDot < 0) continue;
-      const tag = noExt.slice(lastDot + 1);
-      if (!searchTags.has(tag)) continue;
-
-      try {
-        fs.unlinkSync(p);
-        deleted.push(p);
-        const fids = fileIdsByTag.get(tag);
-        if (fids) {
-          for (const fid of fids) {
-            appliedSet.add(fid);
-            deletedFids.add(fid);
-          }
-        }
-      } catch (e) {
-        failures.push({ path: p, tag, error: `unlink failed: ${e.message}` });
-      }
-    }
-  };
-
-  await recurs(localShowPath);
-
-  // Report notFound in terms of the *new* tag, but consider legacy deletions as found.
-  const notFound = [];
-  for (const fid of fidToNewTag.keys()) {
-    if (!deletedFids.has(fid)) notFound.push(fidToNewTag.get(fid));
-  }
-
-  return {
-    ok: true,
-    applied: Array.from(appliedSet),
-    deletedCount: deleted.length,
-    notFoundCount: notFound.length,
-    notFound,
-    failures,
-  };
-};
-
-const getSubFileIds = async (params) => {
-  const showName = (params?.showName || "").trim();
-  if (!showName) {
-    throw new Error("getSubFileIds: missing showName");
-  }
-  if (showName.includes("/") || showName.includes("\\")) {
-    throw new Error("getSubFileIds: invalid showName");
-  }
-
-  const localShowPath = path.join(tvDir, showName);
-  try {
-    const st = fs.statSync(localShowPath);
-    if (!st.isDirectory()) {
-      throw new Error(`Show directory missing: ${localShowPath} (n/a)`);
-    }
-  } catch {
-    throw new Error(`Show directory missing: ${localShowPath} (n/a)`);
-  }
-
-  // Match current Base32 tag style: .#<A-Z2-7>.srt
-  const tagRe = /\.\#([A-Z2-7]+)\.srt$/;
-  const foundSet = new Set();
-  const found = [];
-
-  const recurs = (dirPath) => {
-    if (dirPath === tvDir + "/.stfolder") return;
-    let dirents;
-    try {
-      dirents = fs.readdirSync(dirPath, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const d of dirents) {
-      if (d.isSymbolicLink && d.isSymbolicLink()) continue;
-      const p = path.join(dirPath, d.name);
-      if (d.isDirectory()) {
-        recurs(p);
-        continue;
-      }
-      if (!d.isFile()) continue;
-      const name = d.name;
-      if (!name || !name.toLowerCase().endsWith(".srt")) continue;
-      const m = tagRe.exec(name);
-      if (!m) continue;
-      const tag = m[1];
-      if (foundSet.has(tag)) continue;
-      foundSet.add(tag);
-      found.push(tag);
-    }
-  };
-
-  recurs(localShowPath);
-  return found;
-};
-
-function srtTimeToMs(timeStr) {
-  // "hh:mm:ss,mmm" -> ms
-  const m = /^([0-9]{2}):([0-9]{2}):([0-9]{2}),([0-9]{3})$/.exec(
-    String(timeStr || "").trim(),
-  );
-  if (!m) return null;
-  const hh = Number(m[1]);
-  const mm = Number(m[2]);
-  const ss = Number(m[3]);
-  const ms = Number(m[4]);
-  if (![hh, mm, ss, ms].every((n) => Number.isFinite(n))) return null;
-  return ((hh * 60 + mm) * 60 + ss) * 1000 + ms;
-}
-
-function msToSrtTime(msTotal) {
-  let ms = Number(msTotal);
-  if (!Number.isFinite(ms) || ms < 0) ms = 0;
-  ms = Math.floor(ms);
-  const hh = Math.floor(ms / 3600000);
-  ms -= hh * 3600000;
-  const mm = Math.floor(ms / 60000);
-  ms -= mm * 60000;
-  const ss = Math.floor(ms / 1000);
-  ms -= ss * 1000;
-  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")},${String(ms).padStart(3, "0")}`;
-}
-
-const offsetSubFiles = async (fileIdObjs) => {
-  if (!Array.isArray(fileIdObjs) || fileIdObjs.length === 0) {
-    throw new Error("offsetSubFiles: expected non-empty array");
-  }
-
-  const showName =
-    typeof fileIdObjs[0]?.showName === "string" ? fileIdObjs[0].showName : "";
-  if (!showName || showName.trim() === "") {
-    throw new Error("offsetSubFiles: missing showName");
-  }
-  if (showName.includes("/") || showName.includes("\\")) {
-    throw new Error("offsetSubFiles: invalid showName");
-  }
-  for (const entry of fileIdObjs) {
-    if (typeof entry?.showName !== "string" || entry.showName !== showName) {
-      throw new Error("offsetSubFiles: all entries must have same showName");
-    }
-  }
-
-  const localShowPath = path.join(tvDir, showName);
-  try {
-    const st = fs.statSync(localShowPath);
-    if (!st.isDirectory()) {
-      throw new Error(`Show directory missing: ${localShowPath} (n/a)`);
-    }
-  } catch {
-    throw new Error(`Show directory missing: ${localShowPath} (n/a)`);
-  }
-
-  // Validate offset is present on every entry and identical.
-  const offsetRaw = fileIdObjs[0]?.offset;
-  const offsetMs = Math.trunc(Number(offsetRaw));
-  if (!Number.isFinite(offsetMs)) {
-    throw new Error("offsetSubFiles: invalid offset");
-  }
-  for (const entry of fileIdObjs) {
-    const o = Math.trunc(Number(entry?.offset));
-    if (!Number.isFinite(o) || o !== offsetMs) {
-      throw new Error("offsetSubFiles: offset must be the same on every entry");
-    }
-  }
-
-  const failures = [];
-  const appliedSet = new Set();
-
-  const addFailure = (cand, stage, status, details, error) => {
-    const fid = Number(cand?.file_id);
-    const showName =
-      typeof cand?.showName === "string" ? cand.showName : undefined;
-    const season = cand?.season;
-    const episode = cand?.episode;
-
-    let reason = "";
-    if (status !== undefined && status !== null)
-      reason = `${stage} HTTP ${status}`;
-    else if (error) reason = `${stage}: ${error}`;
-    else reason = stage;
-
-    const rec = {
-      file_id: fid,
-      showName,
-      season,
-      episode,
-      reason,
-      stage,
-      status,
-    };
-    if (details !== undefined) rec.details = details;
-    failures.push(rec);
-  };
-
-  // Build tag set and scan show folder once for all matching SRTs.
-  const searchTags = new Set();
-  for (const entry of fileIdObjs) {
-    const fid = Number(entry?.file_id);
-    if (!Number.isFinite(fid)) {
-      addFailure(entry, "input", undefined, undefined, "invalid file_id");
-      continue;
-    }
-    searchTags.add(encodeFileIdBase32(fid));
-    searchTags.add(encodeFileIdBase32Legacy(fid));
-    searchTags.add(encodeFileIdBase32LegacyAZ05(fid));
-  }
-
-  const pathsByTag = new Map();
-  const recurs = (dirPath) => {
-    if (dirPath === tvDir + "/.stfolder") return;
-    let dirents;
-    try {
-      dirents = fs.readdirSync(dirPath, { withFileTypes: true });
-    } catch (e) {
-      failures.push({ path: dirPath, error: `readdir failed: ${e.message}` });
-      return;
-    }
-    for (const d of dirents) {
-      if (d.isSymbolicLink && d.isSymbolicLink()) continue;
-      const p = path.join(dirPath, d.name);
-      if (d.isDirectory()) {
-        recurs(p);
-        continue;
-      }
-      if (!d.isFile()) continue;
-      if (!d.name || !d.name.toLowerCase().endsWith(".srt")) continue;
-      const noExt = d.name.slice(0, -4);
-      const lastDot = noExt.lastIndexOf(".");
-      if (lastDot < 0) continue;
-      const tag = noExt.slice(lastDot + 1);
-      if (!searchTags.has(tag)) continue;
-      if (!pathsByTag.has(tag)) pathsByTag.set(tag, []);
-      pathsByTag.get(tag).push(p);
-    }
-  };
-
-  recurs(localShowPath);
-
-  const timeLineRe =
-    /^([0-9]{2}:[0-9]{2}:[0-9]{2},[0-9]{3})(\s*-->\s*)([0-9]{2}:[0-9]{2}:[0-9]{2},[0-9]{3})(.*)$/;
-
-  for (const entry of fileIdObjs) {
-    const fid = Number(entry?.file_id);
-    if (!Number.isFinite(fid)) {
-      addFailure(entry, "input", undefined, undefined, "invalid file_id");
-      continue;
-    }
-
-    const tags = [
-      encodeFileIdBase32(fid),
-      encodeFileIdBase32Legacy(fid),
-      encodeFileIdBase32LegacyAZ05(fid),
-    ];
-    const srtPaths = [];
-    const seen = new Set();
-    for (const t of tags) {
-      const arr = pathsByTag.get(t);
-      if (!arr) continue;
-      for (const p of arr) {
-        if (seen.has(p)) continue;
-        seen.add(p);
-        srtPaths.push(p);
-      }
-    }
-
-    if (srtPaths.length === 0) {
-      addFailure(entry, "find", undefined, { tags }, "subtitle .srt not found");
-      continue;
-    }
-
-    let anyUpdated = false;
-    for (const srtPath of srtPaths) {
-      let text;
-      try {
-        text = fs.readFileSync(srtPath, "utf8");
-      } catch (e) {
-        addFailure(entry, "read", undefined, { path: srtPath }, e.message);
-        continue;
-      }
-
-      const lines = String(text).split(/\r?\n/);
-      let changed = false;
-      let matched = 0;
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const m = timeLineRe.exec(line);
-        if (!m) continue;
-        const startMs = srtTimeToMs(m[1]);
-        const endMs = srtTimeToMs(m[3]);
-        if (startMs === null || endMs === null) continue;
-        matched++;
-        const newStart = Math.max(0, startMs + offsetMs);
-        const newEnd = Math.max(0, endMs + offsetMs);
-        lines[i] =
-          `${msToSrtTime(newStart)}${m[2]}${msToSrtTime(newEnd)}${m[4] || ""}`;
-        changed = true;
-      }
-
-      if (matched === 0) {
-        addFailure(
-          entry,
-          "parse",
-          undefined,
-          { path: srtPath },
-          "no timing lines found",
-        );
-        continue;
-      }
-      if (!changed) {
-        // Shouldn't happen if matched>0, but keep it safe.
-        addFailure(
-          entry,
-          "parse",
-          undefined,
-          { path: srtPath },
-          "no changes applied",
-        );
-        continue;
-      }
-
-      try {
-        fs.writeFileSync(srtPath, lines.join("\n"), "utf8");
-        anyUpdated = true;
-      } catch (e) {
-        addFailure(entry, "write", undefined, { path: srtPath }, e.message);
-      }
-    }
-
-    if (anyUpdated) {
-      appliedSet.add(fid);
-    }
-  }
-
-  return { ok: true, applied: Array.from(appliedSet), failures };
-};
 
 function parseSeasonEpisodeFromFilename(fileName, folderName) {
   // Returns { season, episode } or null.
@@ -924,14 +359,6 @@ function sleep(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
-}
-
-function normalizeImdbId(imdbId) {
-  if (imdbId === undefined || imdbId === null) return "";
-  const s = String(imdbId).trim();
-  if (!s) return "";
-  // remove leading tt and any non-digits
-  return s.replace(/^tt/i, "").replace(/\D/g, "");
 }
 
 function persistSubQueue() {
@@ -1391,155 +818,6 @@ async function fileNeedsSubChecked(videoFilePath, showName) {
   }
   return true;
 }
-function stripSrtFormatting(srt) {
-  return srt
-    .replace(/\{[^}]*\}/g, "")
-    .replace(/<[^>]+>/g, "")
-    .replace(/\\h/g, " ")
-    .replace(/\\N/g, "\n")
-    .replace(/\\n/g, "\n");
-}
-
-function parseSrtTimeMs(t) {
-  const m = /(\d+):(\d+):(\d+)[,.](\d+)/.exec(t);
-  if (!m) return 0;
-  return (
-    parseInt(m[1]) * 3600000 +
-    parseInt(m[2]) * 60000 +
-    parseInt(m[3]) * 1000 +
-    parseInt(m[4])
-  );
-}
-function formatSrtTimeMs(ms) {
-  const h = Math.floor(ms / 3600000);
-  const m = Math.floor((ms % 3600000) / 60000);
-  const s = Math.floor((ms % 60000) / 1000);
-  const mm = ms % 1000;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")},${String(mm).padStart(3, "0")}`;
-}
-function parseSrt(srt) {
-  const entries = [];
-  const blocks = srt.trim().split(/\r?\n\r?\n+/);
-  for (const block of blocks) {
-    const lines = block.trim().split(/\r?\n/);
-    const timeLine = lines.find((l) => /-->/.test(l));
-    if (!timeLine) continue;
-    const tm = /(\d+:\d+:\d+[,.]\d+)\s*-->\s*(\d+:\d+:\d+[,.]\d+)/.exec(
-      timeLine,
-    );
-    if (!tm) continue;
-    const startMs = parseSrtTimeMs(tm[1]);
-    const endMs = parseSrtTimeMs(tm[2]);
-    const timeIdx = lines.indexOf(timeLine);
-    const text = lines
-      .slice(timeIdx + 1)
-      .join("\n")
-      .trim();
-    if (!text) continue;
-    entries.push({ startMs, endMs, text });
-  }
-  return entries;
-}
-function serializeSrt(entries) {
-  return (
-    entries
-      .map(
-        (e, i) =>
-          `${i + 1}\n${formatSrtTimeMs(e.startMs)} --> ${formatSrtTimeMs(e.endMs)}\n${e.text}`,
-      )
-      .join("\n\n") + "\n"
-  );
-}
-// Fix "rolling/scrolling" subtitle format that causes on-screen flashing.
-// Pattern: the same text appears in back-to-back entries with a tiny gap, and
-// short (<250 ms) transitional entries carry one line from the previous cue
-// and one from the next. Emby renders each entry independently so the 40 ms
-// gap causes a visible blink.
-function derollSrt(entries) {
-  if (entries.length === 0) return entries;
-
-  // Pass 1: merge consecutive identical-text entries where the gap is < 250 ms.
-  let merged = [];
-  let cur = { ...entries[0] };
-  for (let i = 1; i < entries.length; i++) {
-    const next = entries[i];
-    if (next.text === cur.text && next.startMs - cur.endMs < 250) {
-      cur = { ...cur, endMs: next.endMs };
-    } else {
-      merged.push(cur);
-      cur = { ...next };
-    }
-  }
-  merged.push(cur);
-
-  // Detect rolling format: >15 % of merged entries are very short (<250 ms).
-  const shortCount = merged.filter((e) => e.endMs - e.startMs < 250).length;
-  if (shortCount < 3 || shortCount / merged.length <= 0.15) return merged;
-
-  // Pass 2: remove short (<250 ms) transitional entries that share at least one
-  // text line with an immediately adjacent entry (gap < 500 ms on either side).
-  const result = [];
-  for (let i = 0; i < merged.length; i++) {
-    const e = merged[i];
-    if (e.endMs - e.startMs >= 250) {
-      result.push(e);
-      continue;
-    }
-    const eLines = new Set(
-      e.text
-        .split("\n")
-        .map((l) => l.trim())
-        .filter(Boolean),
-    );
-    const prevGap = i > 0 ? e.startMs - merged[i - 1].endMs : Infinity;
-    const nextGap =
-      i < merged.length - 1 ? merged[i + 1].startMs - e.endMs : Infinity;
-
-    let shared = false;
-    if (prevGap < 500 && i > 0) {
-      const prevLines = merged[i - 1].text
-        .split("\n")
-        .map((l) => l.trim())
-        .filter(Boolean);
-      if (prevLines.some((l) => eLines.has(l))) shared = true;
-    }
-    if (!shared && nextGap < 500 && i < merged.length - 1) {
-      const nextLines = merged[i + 1].text
-        .split("\n")
-        .map((l) => l.trim())
-        .filter(Boolean);
-      if (nextLines.some((l) => eLines.has(l))) shared = true;
-    }
-    if (!shared) result.push(e);
-  }
-  return result;
-}
-// Returns sanitized SRT string if anything changed, null if unchanged.
-function sanitizeSrt(raw) {
-  const stripped = stripSrtFormatting(raw);
-  const entries = parseSrt(stripped);
-  // Sort by start time to fix out-of-order entries from embedded extraction
-  const sorted = [...entries].sort((a, b) => a.startMs - b.startMs);
-  // Merge entries with identical timestamps (two cues at same time → one entry)
-  const merged = [];
-  for (const e of sorted) {
-    const prev = merged[merged.length - 1];
-    if (prev && prev.startMs === e.startMs && prev.endMs === e.endMs) {
-      prev.text = prev.text + "\n" + e.text;
-    } else {
-      merged.push({ ...e });
-    }
-  }
-  const reordered = sorted.some((e, i) => e !== entries[i]);
-  const changed =
-    reordered || merged.length !== entries.length || stripped !== raw;
-  const derolled = derollSrt(merged);
-  if (changed || derolled.length !== merged.length) {
-    return serializeSrt(derolled);
-  }
-  return null;
-}
-
 async function generateEmbSrts(
   videoFilePath,
   showname,
@@ -1703,7 +981,7 @@ async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
       const login = loadSubsLogin();
       let dl = await openSubtitlesDownloadWithRetry({
         apiKey: login.apiKey,
-        token: subsTokenCache,
+        token: getSubsToken(),
         fileId: fid,
       });
       if (!dl?.resp?.ok) continue;
@@ -1943,362 +1221,6 @@ cron.schedule(
   },
   { timezone: "America/Los_Angeles" },
 );
-
-function loadSubsLogin() {
-  let loginStr;
-  try {
-    loginStr = fs.readFileSync(subsLoginPath, "utf8");
-  } catch (e) {
-    throw new Error(`subsSearch: missing ${subsLoginPath}`);
-  }
-
-  let login;
-  try {
-    login = JSON.parse(loginStr);
-  } catch (e) {
-    throw new Error(`subsSearch: invalid JSON in ${subsLoginPath}`);
-  }
-
-  const apiKey = typeof login?.apiKey === "string" ? login.apiKey.trim() : "";
-  const username =
-    typeof login?.username === "string" ? login.username.trim() : "";
-  const password =
-    typeof login?.password === "string" ? login.password.trim() : "";
-
-  if (!apiKey) throw new Error("subsSearch: missing apiKey");
-  // username/password only required for login refresh path
-
-  return { apiKey, username, password };
-}
-
-async function persistSubsToken(token) {
-  const t = typeof token === "string" ? token.trim() : "";
-  if (!t) throw new Error("subsSearch: empty token");
-  subsTokenCache = t;
-  try {
-    fs.mkdirSync(path.dirname(subsTokenWritePath), { recursive: true });
-  } catch {}
-  await util.writeFile(subsTokenWritePath, t);
-}
-
-async function openSubtitlesLogin({ apiKey, username, password }) {
-  if (!username || !password) {
-    throw new Error("subsSearch: cannot login (missing username/password)");
-  }
-
-  const url = "https://api.opensubtitles.com/api/v1/login";
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Api-Key": apiKey,
-      "User-Agent": openSubtitlesUserAgent,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({ username, password }),
-  });
-
-  let body;
-  try {
-    body = await resp.json();
-  } catch {
-    const text = await resp.text().catch(() => "");
-    body = { error: (text || "").slice(0, 500) };
-  }
-
-  if (!resp.ok) {
-    const msg =
-      body?.message ||
-      body?.error ||
-      `OpenSubtitles login failed (${resp.status})`;
-    throw new Error(`subsSearch: ${msg}`);
-  }
-
-  const token = typeof body?.token === "string" ? body.token.trim() : "";
-  if (!token)
-    throw new Error("subsSearch: login succeeded but no token returned");
-  return token;
-}
-
-async function openSubtitlesSubtitles({
-  apiKey,
-  token,
-  imdbDigits,
-  query,
-  year,
-  page,
-  season,
-  episode,
-}) {
-  const url = new URL("https://api.opensubtitles.com/api/v1/subtitles");
-  const params = {
-    page: String(page),
-    languages: "en",
-  };
-  if (query) {
-    params.query = query;
-    params.type = "movie";
-    if (year) params.year = String(year);
-  } else {
-    params.parent_imdb_id = imdbDigits;
-    if (season !== undefined && season !== null) {
-      params.season_number = String(season);
-    }
-    if (episode !== undefined && episode !== null) {
-      params.episode_number = String(episode);
-    }
-  }
-
-  url.search = new URLSearchParams(params).toString();
-
-  const headers = {
-    "Api-Key": apiKey,
-    "User-Agent": openSubtitlesUserAgent,
-    Accept: "application/json",
-  };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-
-  const resp = await fetch(url.toString(), { headers });
-
-  let body;
-  try {
-    body = await resp.json();
-  } catch {
-    const text = await resp.text().catch(() => "");
-    body = {
-      error: text || `OpenSubtitles non-JSON response (${resp.status})`,
-    };
-  }
-
-  return { resp, body };
-}
-
-async function openSubtitlesDownload({ apiKey, token, fileId }) {
-  const url = "https://api.opensubtitles.com/api/v1/download";
-  const headers = {
-    "Api-Key": apiKey,
-    "User-Agent": openSubtitlesUserAgent,
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-
-  const resp = await fetch(url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ file_id: fileId }),
-  });
-
-  let body;
-  try {
-    body = await resp.json();
-  } catch {
-    const text = await resp.text().catch(() => "");
-    body = { error: (text || "").slice(0, 500) };
-  }
-
-  return { resp, body };
-}
-
-async function openSubtitlesDownloadWithRetry({
-  apiKey,
-  token,
-  fileId,
-  maxAttempts = 3,
-}) {
-  // Retry transient upstream errors.
-  const retryStatus = new Set([502, 503, 504]);
-  let last;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      last = await openSubtitlesDownload({ apiKey, token, fileId });
-      if (last?.resp?.ok) return last;
-      const status = last?.resp?.status;
-      if (retryStatus.has(status)) {
-        unilog(
-          525,
-          `OpenSubtitles /download HTTP ${status} (file_id=${fileId}, attempt=${attempt}/${maxAttempts})`,
-        );
-      }
-      if (retryStatus.has(status) && attempt < maxAttempts) {
-        await sleep(400 * attempt);
-        continue;
-      }
-      return last;
-    } catch (e) {
-      // Network error / fetch throw: retry.
-      if (attempt < maxAttempts) {
-        await sleep(400 * attempt);
-        continue;
-      }
-      throw e;
-    }
-  }
-  return last;
-}
-
-const subsSearch = async (params) => {
-  const imdbDigits = normalizeImdbId(params?.imdb_id);
-  const query = params?.query || null;
-  const year = params?.year || null;
-  let page = params?.page;
-  const season = params?.season;
-  const episode = params?.episode;
-
-  if (!imdbDigits && !query) {
-    throw new Error("subsSearch: missing imdb_id or query");
-  }
-
-  if (page === undefined || page === null || page === "") page = 1;
-  page = Number(page);
-  if (!Number.isFinite(page) || page < 1) page = 1;
-
-  const login = loadSubsLogin();
-
-  // First attempt with existing token (if any)
-  try {
-    const { resp, body } = await openSubtitlesSubtitles({
-      apiKey: login.apiKey,
-      token: subsTokenCache,
-      imdbDigits,
-      query,
-      year,
-      page,
-      season,
-      episode,
-    });
-
-    if (resp.ok) {
-      return body;
-    }
-
-    // Refresh token on auth failure and retry once.
-    if (resp.status === 401 || resp.status === 403) {
-      const newToken = await openSubtitlesLogin(login);
-      await persistSubsToken(newToken);
-
-      const retry = await openSubtitlesSubtitles({
-        apiKey: login.apiKey,
-        token: subsTokenCache,
-        imdbDigits,
-        query,
-        year,
-        page,
-        season,
-        episode,
-      });
-
-      if (retry.resp.ok) {
-        return retry.body;
-      }
-
-      const err = new Error(
-        `subsSearch: OpenSubtitles HTTP ${retry.resp.status}`,
-      );
-      err.details = retry.body;
-      throw err;
-    }
-
-    const err = new Error(`subsSearch: OpenSubtitles HTTP ${resp.status}`);
-    err.details = body;
-    throw err;
-  } catch (e) {
-    if (e instanceof Error && e.message.startsWith("subsSearch:")) throw e;
-    throw new Error(`subsSearch: ${e.message}`);
-  }
-};
-
-const subsCountEpisodes = async (params) => {
-  const requests = Array.isArray(params?.requests) ? params.requests : null;
-  if (!requests || requests.length === 0) {
-    throw new Error("subsCountEpisodes: requests required");
-  }
-
-  const normalizeReleaseKey = (item) => {
-    const release =
-      String(item?.attributes?.release || "").trim() ||
-      String(item?.attributes?.files?.[0]?.file_name || "").trim();
-    return release
-      .toLowerCase()
-      .replace(/\.(hi|sdh)\b/g, "")
-      .replace(/\b(hi|sdh|hearing[ ._-]?impaired)\b/g, "")
-      .replace(/[^a-z0-9]+/g, ".")
-      .replace(/^\.+|\.+$/g, "");
-  };
-
-  const isHearingImpaired = (item) => {
-    if (item?.attributes?.hearing_impaired === true) return true;
-    const release = String(item?.attributes?.release || "").toLowerCase();
-    const fileName = String(
-      item?.attributes?.files?.[0]?.file_name || "",
-    ).toLowerCase();
-    return /\bhi\b|\.hi\b|\bsdh\b|hearing[ ._-]?impaired/.test(
-      `${release} ${fileName}`,
-    );
-  };
-
-  const results = [];
-  for (const request of requests) {
-    const key = String(request?.key || "");
-    try {
-      const query = String(request?.query || "").trim();
-      let resolvedImdbId = normalizeImdbId(request?.imdb_id);
-      if (!resolvedImdbId && query) {
-        const tvdbAll = tvdb.getAllTvdbSync?.() || {};
-        let tvdbRec =
-          tvdbAll?.[query] ||
-          Object.values(tvdbAll).find(
-            (rec) =>
-              String(rec?.name || "").toLowerCase() === query.toLowerCase(),
-          );
-        if (!tvdbRec?.imdbId) {
-          const matched = smartTitleMatch(
-            query,
-            Object.values(tvdbAll),
-            null,
-            false,
-          );
-          if (matched?.imdbId) tvdbRec = matched;
-        }
-        resolvedImdbId = normalizeImdbId(tvdbRec?.imdbId);
-      }
-
-      const searchParams = { ...request };
-      if (resolvedImdbId) {
-        searchParams.imdb_id = resolvedImdbId;
-        delete searchParams.query;
-      }
-
-      const data = await subsSearch(searchParams);
-      const items = Array.isArray(data?.data) ? data.data : [];
-
-      const dedupedMap = new Map();
-      for (const item of items) {
-        const dedupeKey = normalizeReleaseKey(item);
-        if (!dedupeKey) continue;
-        const existing = dedupedMap.get(dedupeKey);
-        if (!existing) {
-          dedupedMap.set(dedupeKey, item);
-          continue;
-        }
-        if (isHearingImpaired(existing) && !isHearingImpaired(item)) {
-          dedupedMap.set(dedupeKey, item);
-        }
-      }
-      const countedItems = [...dedupedMap.values()];
-
-      results.push({ key, count: countedItems.length, error: null });
-    } catch (e) {
-      results.push({
-        key,
-        count: 0,
-        error: e?.message || String(e),
-      });
-    }
-  }
-
-  return { results };
-};
 
 function gapEntryHasGap(gap) {
   if (!gap || typeof gap !== "object") return false;
@@ -2599,7 +1521,7 @@ async function tryDownloadOpnSrtForVideo({
     const login = loadSubsLogin();
     const dl = await openSubtitlesDownloadWithRetry({
       apiKey: login.apiKey,
-      token: subsTokenCache,
+      token: getSubsToken(),
       fileId,
     });
     if (!dl?.resp?.ok) {
@@ -2995,23 +1917,6 @@ tvdb.setPreTvdbTickCallback(async ({ isBackground } = {}) => {
 
 // Wire the consolidated episodeData refresh into the tvdb background loop.
 tvdb.setRefreshEpisodeDataCallback(refreshEpisodeData);
-
-const videoFileExtensions = [
-  "mp4",
-  "mkv",
-  "avi",
-  "mov",
-  "wmv",
-  "flv",
-  "mpeg",
-  "3gp",
-  "m4v",
-  "ts",
-  "rm",
-  "vob",
-  "ogv",
-  "divx",
-];
 
 function safeShowFolderName(rawName) {
   if (typeof rawName !== "string") return null;
@@ -7601,77 +6506,6 @@ async function addUrlToQbt(torrentUrl) {
   }
 }
 
-function flexgetFmtSent() {
-  const now = new Date();
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-    hourCycle: "h23",
-  }).formatToParts(now);
-  const get = (t) => parts.find((p) => p.type === t)?.value || "";
-  const hour = get("hour") === "24" ? "00" : get("hour");
-  return `${get("year")}/${get("month")}/${get("day")}-${hour}:${get("minute")}:${get("second")}`;
-}
-
-function flexgetBitDepth(title) {
-  if (/10.?bit|hdr/i.test(String(title || ""))) return 10;
-  return 8;
-}
-
-const badGroups = new Set(
-  (() => {
-    try {
-      return readBadGroupsFromDisk();
-    } catch {
-      return [];
-    }
-  })(),
-);
-
-function flexgetIsBadGroup(title) {
-  const parsed = parseTorrentTitle(
-    String(title || "").replace(/\.[a-z0-9]{2,4}$/i, ""),
-  );
-  return badGroups.has((parsed?.group || "").toLowerCase());
-}
-
-// Same-run dedup: resolution → bit depth → seeds → bad group
-function flexgetIsBetterSameRun(a, b) {
-  const aRes = getResolution(a.quality || a.title || "") ?? 480;
-  const bRes = getResolution(b.quality || b.title || "") ?? 480;
-  if (aRes !== bRes) return aRes > bRes;
-
-  const aDepth = flexgetBitDepth(a.title);
-  const bDepth = flexgetBitDepth(b.title);
-  if (aDepth !== bDepth) return aDepth > bDepth;
-
-  const aSeeds = parseInt(String(a.torrent_seeds || "0"), 10) || 0;
-  const bSeeds = parseInt(String(b.torrent_seeds || "0"), 10) || 0;
-  if (aSeeds !== bSeeds) return aSeeds > bSeeds;
-
-  const aBad = flexgetIsBadGroup(a.title);
-  const bBad = flexgetIsBadGroup(b.title);
-  if (aBad !== bBad) return bBad; // b is bad group → a is better
-  return false;
-}
-
-// Cross-run comparison: resolution → bad group tiebreaker
-function flexgetIsBetterCrossRun(a, b) {
-  const aRes = getResolution(a.quality || a.title || "") ?? 480;
-  const bRes = getResolution(b.quality || b.title || "") ?? 480;
-  if (aRes !== bRes) return aRes > bRes;
-  const aBad = flexgetIsBadGroup(a.title);
-  const bBad = flexgetIsBadGroup(b.title);
-  if (aBad !== bBad) return bBad; // b is bad group → a is better
-  return false;
-}
-
 async function saveFlexgetHistory() {
   const PRUNE_MS = 30 * 24 * 60 * 60 * 1000;
   const cutoff = Date.now() - PRUNE_MS;
@@ -7692,17 +6526,6 @@ async function saveFlexgetHistory() {
     }
   }
   await util.writeFile(FLEXGET_HISTORY_PATH, flexgetHistory);
-}
-
-function parseResolutionStrict(title, quality) {
-  const src = String(title || "") + " " + String(quality || "");
-  if (/2160p/i.test(src)) return 2160;
-  if (/1080p/i.test(src)) return 1080;
-  if (/720p/i.test(src)) return 720;
-  if (/576p/i.test(src)) return 576;
-  if (/480p/i.test(src)) return 480;
-  if (/384p/i.test(src)) return 384;
-  return 0; // unknown — do not fall back
 }
 
 function getEpisodeDiskResolution(showPath, season, episode) {
@@ -7747,35 +6570,6 @@ function getEpisodeDiskGroup(showPath, season, episode) {
   } catch {
     return "";
   }
-}
-
-function getFirstFilesOnDiskSeasonGap(diskSeasons, torrentSeason) {
-  const seasons = [];
-
-  if (Array.isArray(diskSeasons)) {
-    seasons.push(...diskSeasons.filter((n) => Number.isInteger(n) && n >= 0));
-  }
-
-  if (Number.isInteger(torrentSeason) && torrentSeason >= 0) {
-    seasons.push(torrentSeason);
-  }
-
-  if (seasons.length === 0) return null;
-
-  seasons.sort((a, b) => a - b);
-
-  const dedupedSeasons = seasons.filter(
-    (seasonNum, index) => index === 0 || seasonNum !== seasons[index - 1],
-  );
-
-  let expectedSeason = dedupedSeasons[0];
-  for (let i = 0; i < dedupedSeasons.length; i += 1) {
-    const seasonNum = dedupedSeasons[i];
-    if (seasonNum > expectedSeason) return expectedSeason;
-    if (seasonNum === expectedSeason) expectedSeason += 1;
-  }
-
-  return null;
 }
 
 async function storeFlexgetRejectedCandidate(
@@ -7974,8 +6768,8 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
     episodeOnDisk && rec.path
       ? getEpisodeDiskGroup(rec.path, season, episode)
       : "";
-  const diskIsBadGroup = diskGroup ? badGroups.has(diskGroup) : false;
-  const newIsBadGroup = flexgetIsBadGroup(rawTitle);
+  const diskIsBadGroup = diskGroup ? hasBadGroup(diskGroup) : false;
+  const newIsBadGroup = isBadGroup(rawTitle);
 
   if (storeOnly) {
     /* skip: store-only (run-loser) */
@@ -9467,74 +8261,6 @@ const REENCODE_QUEUE_PATH = path.join(
   "data",
   "reencode-queue.json",
 );
-
-function resHasAlt(name) {
-  return name.toLowerCase().endsWith(".alt");
-}
-function resStripAlt(name) {
-  return resHasAlt(name) ? name.slice(0, -4) : name;
-}
-// Resolution implied by a filename substring (0 = unknown).
-function resOfName(name) {
-  if (/2160p/i.test(name)) return 2160;
-  if (/1080p/i.test(name)) return 1080;
-  return 0;
-}
-// True when name (after stripping a trailing .alt) is a real video file.
-function resIsVideoName(name) {
-  const ext = resStripAlt(name).split(".").pop().toLowerCase();
-  return videoFileExtensions.includes(ext);
-}
-
-// All episode video files in a season dir (includes hidden .alt copies).
-function resFindEpisodeVideos(seasonDir, season, episode) {
-  let files;
-  try {
-    files = fs.readdirSync(seasonDir);
-  } catch {
-    return [];
-  }
-  const out = [];
-  for (const name of files) {
-    if (name.startsWith(".")) continue; // skip dotfiles (.restmp-* etc)
-    if (!resIsVideoName(name)) continue;
-    const parsed = parseFileSeasonEpisode(
-      resStripAlt(name),
-      path.basename(seasonDir),
-    );
-    if (parsed?.season !== season || parsed?.episode !== episode) continue;
-    out.push({ name, res: resOfName(name), alt: resHasAlt(name) });
-  }
-  return out;
-}
-
-// Active (non-.alt) 2160 file name for an episode, if any. Never returns a
-// hidden .alt copy — the re-encoder must only process a real active 2160 video
-// file (an .alt source would produce a broken temp filename and fail).
-function res2160FileName(seasonDir, season, episode) {
-  const vids = resFindEpisodeVideos(seasonDir, season, episode);
-  const f = vids.find((v) => v.res === 2160 && !v.alt);
-  return f ? f.name : null;
-}
-
-// A kept-aside 1080 ".old" file for an episode (preferred fallback source).
-function res1080OldFileName(seasonDir, season, episode) {
-  let files;
-  try {
-    files = fs.readdirSync(seasonDir);
-  } catch {
-    return null;
-  }
-  for (const name of files) {
-    if (!/\.old$/i.test(name)) continue;
-    if (!/1080p/i.test(name)) continue;
-    const base = name.replace(/\.old$/i, "");
-    if (!resIsVideoName(base)) continue;
-    const parsed = parseFileSeasonEpisode(base, path.basename(seasonDir));
-    if (parsed?.season === season && parsed?.episode === episode) return name;
-  }
-  return null;
-}
 
 // Best-effort cross-app guard: is the downloader already fetching a 1080 for
 // this episode? Optional — if the map can't be read, assume not in progress.

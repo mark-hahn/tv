@@ -5,11 +5,25 @@
 // (This plumbing uses plain console with `// no-unilog`.)
 
 import { config } from "./config.js";
+import { setGlobalMessage } from "./globalMessages.js";
+import { ref } from "vue";
 
 const LOG_URL = `${config.tvSrvrUrl}/api/log`;
 const FLUSH_MS = 2000;
 const MAX_BATCH = 50;
 const PID = "client";
+
+// Generate a unique GUID for this client instance to detect multiple clients.
+function generateGuid() {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+const CLIENT_HASH = generateGuid();
+export const loggingDisabled = ref(false);
 
 let queue = [];
 let timer = null;
@@ -25,6 +39,10 @@ function flush() {
     timer = null;
   }
   if (queue.length === 0) return;
+  if (loggingDisabled.value) {
+    queue = [];
+    return;
+  }
   const batch = queue;
   queue = [];
   fetch(LOG_URL, {
@@ -32,9 +50,22 @@ function flush() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(batch),
     keepalive: true,
-  }).catch(() => {
-    // best-effort: never break the app because logging failed
-  });
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      if (data && data.loggingDisabled) {
+        loggingDisabled.value = true;
+        setGlobalMessage({
+          id: "logging-disabled",
+          text: "Logging disabled",
+          position: 0,
+          duration: 0,
+        });
+      }
+    })
+    .catch(() => {
+      // best-effort: never break the app because logging failed
+    });
 }
 
 // Join multiple args the way console.* does so multi-arg calls copy through.
@@ -54,7 +85,13 @@ function unilogJoin(parts) {
 // The single call every active client log site invokes at runtime (variadic).
 export function unilog(logId, ...parts) {
   try {
-    queue.push({ logId, pid: PID, message: unilogJoin(parts) });
+    if (loggingDisabled.value) return;
+    queue.push({
+      logId,
+      pid: PID,
+      message: unilogJoin(parts),
+      clientHash: CLIENT_HASH,
+    });
     if (queue.length >= MAX_BATCH) flush();
     else scheduleFlush();
   } catch {

@@ -11,6 +11,36 @@ const unilogSubscribers = new Set();
 let unilogLastPruneTime = 0;
 const UNILOG_PRUNE_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
+// Client collision tracking: map client hash -> client ID, and current active ID.
+const clientHashMap = new Map();
+let curClientLogId = 0;
+let nextClientId = 1;
+let newClientSiteId = null;
+
+// Initialize the "New client" log site at startup.
+function initNewClientSite() {
+  try {
+    const clientsGroup = unilogDb.findOrCreateGroup({
+      description: "clients",
+      groupType: "feature",
+    });
+    newClientSiteId = unilogDb.createSite({
+      tag: null,
+      description: "New client",
+      level: "warn",
+      srcFile: "routes/unilog.js",
+      srcLine: 0,
+      oldLog: null,
+      project: "srvr",
+      groupIds: [clientsGroup.id],
+    });
+  } catch (error) {
+    console.error("[unilog] Failed to init new client site:", error); // no-unilog
+  }
+}
+
+initNewClientSite();
+
 // Prune oldest log_events to keep table under 90_000 rows.
 // Only runs when no subscribers have the log pane open and at least 1 hour
 // has elapsed since the last prune.
@@ -56,6 +86,37 @@ export function registerUnilogRoutes(app) {
     try {
       const body = req.body;
       const events = Array.isArray(body) ? body : [body];
+
+      // Check for client collision (only for client events with clientHash).
+      const firstEvent = events[0];
+      if (firstEvent && firstEvent.clientHash && firstEvent.pid === "client") {
+        const hash = firstEvent.clientHash;
+        const existingId = clientHashMap.get(hash);
+
+        if (existingId === undefined) {
+          // New client: assign ID, log "New client", update current, add to map.
+          const newId = nextClientId++;
+          clientHashMap.set(hash, newId);
+          curClientLogId = newId;
+
+          // Insert the "New client <id>" event using the pre-created site.
+          if (newClientSiteId) {
+            broadcastUnilog(
+              unilogDb.insertEventDedup({
+                logId: newClientSiteId,
+                pid: "srvr",
+                message: `New client ${newId}`,
+              }),
+            );
+          }
+        } else if (existingId !== curClientLogId) {
+          // Old client but not the active one: reject and tell it to stop logging.
+          return res.json({ ok: false, loggingDisabled: true });
+        }
+        // else: existing client and is current, proceed normally below.
+      }
+
+      // Process all events normally.
       for (const e of events) {
         if (!e || e.logId == null) continue;
         broadcastUnilog(

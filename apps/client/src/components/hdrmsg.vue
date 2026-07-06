@@ -1,21 +1,20 @@
 <template>
   <div
     id="hdrMsg"
-    style="
-      width: 100%;
-      height: 29px;
-      line-height: 29px;
-      padding: 0 8px;
-      box-sizing: border-box;
-      background-color: #ddd;
-      color: rgba(5, 5, 5);
-      font-size: 17px;
-      /* font-weight: bold; */
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 100%;
-    "
+    :style="{
+      width: '100%',
+      height: '29px',
+      lineHeight: '29px',
+      padding: '0 8px',
+      boxSizing: 'border-box',
+      backgroundColor: loggingDisabled ? '#ffcccc' : '#ddd',
+      color: 'rgba(5, 5, 5)',
+      fontSize: '17px',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      maxWidth: '100%',
+    }"
   >
     {{ text }}
   </div>
@@ -23,11 +22,15 @@
 
 <script>
 import { globalMessages, globalMessageText } from "../globalMessages.js";
+import { loggingDisabled } from "../log.js";
 
 export default {
   name: "HdrMsg",
 
   computed: {
+    loggingDisabled() {
+      return loggingDisabled.value;
+    },
     text() {
       // Touch the reactive Map so this computed re-runs on any change.
       void globalMessages.size;

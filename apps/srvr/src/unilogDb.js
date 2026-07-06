@@ -32,11 +32,12 @@ CREATE TABLE IF NOT EXISTS log_sites (
 );
 
 CREATE TABLE IF NOT EXISTS log_events (
-  id        INTEGER PRIMARY KEY AUTOINCREMENT,
-  log_id    INTEGER,
-  pid       TEXT,
-  ts        TEXT NOT NULL,
-  message   TEXT NOT NULL
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  log_id       INTEGER,
+  pid          TEXT,
+  ts           TEXT NOT NULL,
+  message      TEXT NOT NULL,
+  is_duplicate INTEGER DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_events_logid ON log_events(log_id);
 CREATE INDEX IF NOT EXISTS idx_events_ts    ON log_events(ts);
@@ -55,6 +56,19 @@ CREATE TABLE IF NOT EXISTS site_groups (
 );
 CREATE INDEX IF NOT EXISTS idx_site_groups_group ON site_groups(group_id);
 `);
+
+// Migration: Add is_duplicate column if it doesn't exist
+try {
+  const columns = db.pragma("table_info(log_events)");
+  if (!columns.some((col) => col.name === "is_duplicate")) {
+    db.exec("ALTER TABLE log_events ADD COLUMN is_duplicate INTEGER DEFAULT 0");
+    console.log(
+      "[unilogDb] migration: added is_duplicate column to log_events",
+    ); // no-unilog
+  }
+} catch (err) {
+  console.error("[unilogDb] migration failed:", err); // no-unilog
+}
 
 // PST 'yyyy/mm/dd hh:mm:ss' for a given Date; hour 24 normalized to 00.
 function pstStr(d = new Date()) {
@@ -75,7 +89,7 @@ export function nowPst() {
 }
 
 const insEvent = db.prepare(
-  "INSERT INTO log_events (log_id, pid, ts, message) VALUES (?, ?, ?, ?)",
+  "INSERT INTO log_events (log_id, pid, ts, message, is_duplicate) VALUES (?, ?, ?, ?, ?)",
 );
 
 // Full joined row for one event (event + its site). Used for the live tail
@@ -102,12 +116,13 @@ export function groupsForSite(logId) {
 // Returns the full joined row (event + site + groups) so callers can broadcast
 // it to live-tail subscribers. Returns null when the event has no matching site
 // (e.g. a null/unknown logId).
-export function insertEvent({ logId, pid, message }) {
+export function insertEvent({ logId, pid, message, isDuplicate = false }) {
   const info = insEvent.run(
     logId == null ? null : Number(logId),
     String(pid || "unknown"),
     nowPst(),
     String(message ?? ""),
+    isDuplicate ? 1 : 0,
   );
   const row = getEventRow.get(Number(info.lastInsertRowid));
   if (row) row.groups = groupsForSite(row.log_id);
@@ -183,7 +198,7 @@ export function insertEventDedup({ logId, pid, message }) {
     const key = `${id}\u0000${String(message ?? "")}`;
     if (dedupCache.has(key)) {
       dedupDropped++;
-      insertEvent({ logId, pid, message }); // Insert to DB for debugging
+      insertEvent({ logId, pid, message, isDuplicate: true }); // Mark as duplicate in DB
       return null; // But don't broadcast to clients
     }
     dedupCache.set(key, now);
@@ -350,7 +365,7 @@ export function queryEvents({
   beforeId,
   afterId,
 } = {}) {
-  const where = [];
+  const where = ["(e.is_duplicate IS NULL OR e.is_duplicate = 0)"];
   const params = [];
   if (beforeId) {
     where.push("e.id < ?");

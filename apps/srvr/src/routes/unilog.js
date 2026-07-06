@@ -367,6 +367,20 @@ export function registerUnilogRoutes(app) {
     }
   });
 
+  app.post("/api/unilog/groups/site-info", (req, res) => {
+    try {
+      const { groupIds } = req.body || {};
+      res.json({
+        sites: unilogDb.siteInfoForGroups(
+          Array.isArray(groupIds) ? groupIds : [],
+        ),
+      });
+    } catch (error) {
+      console.error("[unilog] /api/unilog/groups/site-info error:", error); // no-unilog
+      res.status(500).json({ error: String(error?.message || error) });
+    }
+  });
+
   app.post("/api/unilog/groups/for-sites", (req, res) => {
     try {
       const { logIds } = req.body || {};

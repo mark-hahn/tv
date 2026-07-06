@@ -259,6 +259,23 @@
           </div>
 
           <div class="groupsRow">
+            <button
+              class="logBtn"
+              :disabled="!selectedGroupIds.length"
+              @click="hideGroupSites"
+            >
+              Hide
+            </button>
+            <button
+              class="logBtn"
+              :disabled="!selectedGroupIds.length"
+              @click="unhideGroupSites"
+            >
+              Unhide
+            </button>
+          </div>
+
+          <div class="groupsRow">
             <input
               v-model="setGroupType"
               class="logInput groupsInput"
@@ -864,6 +881,58 @@ export default {
       }
       // No confirmation; does not change selection or scroll.
       await this.postSites("/__unilog/unhide", sites, "unhid");
+    },
+    async hideGroupSites() {
+      if (!this.selectedGroupIds.length) {
+        this.flash("no groups selected");
+        return;
+      }
+      if (!import.meta.env.DEV) {
+        this.flash("hide only works in vite dev");
+        return;
+      }
+      try {
+        const res = await srvr.getUnilogGroupSiteInfo(this.selectedGroupIds);
+        const sites = res?.sites || [];
+        if (!sites.length) {
+          this.flash("no sites in selected groups");
+          return;
+        }
+        const n = sites.length;
+        if (
+          !window.confirm(
+            `Hide ${n} site${n === 1 ? "" : "s"} from selected groups? This comments out the unilog() call(s) in source.`,
+          )
+        )
+          return;
+        await this.postSites("/__unilog/hide", sites, "hid");
+      } catch (e) {
+        console.error("[log.vue]", `hideGroupSites failed: ${e.message}`); // no-unilog
+        this.flash("failed to hide sites");
+      }
+    },
+    async unhideGroupSites() {
+      if (!this.selectedGroupIds.length) {
+        this.flash("no groups selected");
+        return;
+      }
+      if (!import.meta.env.DEV) {
+        this.flash("unhide only works in vite dev");
+        return;
+      }
+      try {
+        const res = await srvr.getUnilogGroupSiteInfo(this.selectedGroupIds);
+        const sites = res?.sites || [];
+        if (!sites.length) {
+          this.flash("no sites in selected groups");
+          return;
+        }
+        // No confirmation; does not change selection or scroll.
+        await this.postSites("/__unilog/unhide", sites, "unhid");
+      } catch (e) {
+        console.error("[log.vue]", `unhideGroupSites failed: ${e.message}`); // no-unilog
+        this.flash("failed to unhide sites");
+      }
     },
     async deleteSites() {
       const sites = this.selectedSites();

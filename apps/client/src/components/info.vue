@@ -1609,7 +1609,7 @@ export default {
             const infoBoxEl = document.getElementById("infoBox");
             const posterImg = document.querySelector("#poster img");
             if (infoBoxEl && posterImg && infoBoxEl.clientHeight > 0) {
-              unilog(943, `seriesReady nextTick: ${infoBoxEl.clientHeight}px for ${this.show?.name}`);
+// hidden               unilog(943, `seriesReady nextTick: ${infoBoxEl.clientHeight}px for ${this.show?.name}`);
               posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
               posterImg.style.visibility = "visible";
             }
@@ -1774,7 +1774,7 @@ export default {
         const newHeight = infoBoxEl?.clientHeight || 0;
         if (existingMaxHeight > 0) {
           // Keep the same size - don't let content changes shrink the poster
-          unilog(945, `tvdbUpdated: keeping ${existingMaxHeight}px (infoBox=${newHeight}px) for ${this.show?.name}`);
+// hidden           unilog(945, `tvdbUpdated: keeping ${existingMaxHeight}px (infoBox=${newHeight}px) for ${this.show?.name}`);
           posterImg.style.maxHeight = existingMaxHeight + "px";
         } else {
           if (infoBoxEl && newHeight > 0) {

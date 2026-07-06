@@ -114,7 +114,8 @@ when modifying tvdb.json directly on disk stop tv-srvr first to avoid stale over
 
 in the map pane call the first child of the maphdr2 div the "map pane info bar"
 
-never touch git for read or commit unless i tell you to
+- never do git commits unless i tell you to
+- you can do git reads without permission
 
 ## Unilog Debugging
 

@@ -283,6 +283,23 @@
           </div>
 
           <div class="groupsRow">
+            <button
+              class="logBtn"
+              :disabled="!selectedGroupIds.length"
+              @click="showGroupEvents"
+            >
+              Show
+            </button>
+            <button
+              class="logBtn"
+              :disabled="!selectedGroupIds.length"
+              @click="unshowGroupEvents"
+            >
+              Unshow
+            </button>
+          </div>
+
+          <div class="groupsRow">
             <input
               v-model="setGroupType"
               class="logInput groupsInput"
@@ -939,6 +956,40 @@ export default {
       } catch (e) {
         console.error("[log.vue]", `unhideGroupSites failed: ${e.message}`); // no-unilog
         this.flash("failed to unhide sites");
+      }
+    },
+    async showGroupEvents() {
+      if (!this.selectedGroupIds.length) {
+        this.flash("no groups selected");
+        return;
+      }
+      try {
+        const res = await srvr.showUnilogEvents(this.selectedGroupIds);
+        if (res?.ok) {
+          this.flash(`showed ${res.changed || 0} events`);
+        } else {
+          this.flash("failed to show events");
+        }
+      } catch (e) {
+        console.error("[log.vue]", `showGroupEvents failed: ${e.message}`); // no-unilog
+        this.flash("failed to show events");
+      }
+    },
+    async unshowGroupEvents() {
+      if (!this.selectedGroupIds.length) {
+        this.flash("no groups selected");
+        return;
+      }
+      try {
+        const res = await srvr.unshowUnilogEvents(this.selectedGroupIds);
+        if (res?.ok) {
+          this.flash(`unshowed ${res.changed || 0} events`);
+        } else {
+          this.flash("failed to unshow events");
+        }
+      } catch (e) {
+        console.error("[log.vue]", `unshowGroupEvents failed: ${e.message}`); // no-unilog
+        this.flash("failed to unshow events");
       }
     },
     async deleteSites() {

@@ -319,6 +319,12 @@ export function setUnilogSiteLevel(ids, level) {
 export function deleteUnilogEvents(eventIds) {
   return httpCall("/api/unilog/delete-events", { eventIds }, "POST");
 }
+export function showUnilogEvents(groupIds) {
+  return httpCall("/api/unilog/show-events", { groupIds }, "POST");
+}
+export function unshowUnilogEvents(groupIds) {
+  return httpCall("/api/unilog/unshow-events", { groupIds }, "POST");
+}
 export function getUnilogGroups() {
   return httpCall("/api/unilog/groups", {}, "GET");
 }

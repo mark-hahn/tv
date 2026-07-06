@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS log_events (
   pid          TEXT,
   ts           TEXT NOT NULL,
   message      TEXT NOT NULL,
-  is_duplicate INTEGER DEFAULT 0
+  hide INTEGER DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_events_logid ON log_events(log_id);
 CREATE INDEX IF NOT EXISTS idx_events_ts    ON log_events(ts);
@@ -57,14 +57,17 @@ CREATE TABLE IF NOT EXISTS site_groups (
 CREATE INDEX IF NOT EXISTS idx_site_groups_group ON site_groups(group_id);
 `);
 
-// Migration: Add is_duplicate column if it doesn't exist
+// Migration: Rename is_duplicate to hide if needed
 try {
   const columns = db.pragma("table_info(log_events)");
-  if (!columns.some((col) => col.name === "is_duplicate")) {
-    db.exec("ALTER TABLE log_events ADD COLUMN is_duplicate INTEGER DEFAULT 0");
+  if (columns.some((col) => col.name === "is_duplicate")) {
+    db.exec("ALTER TABLE log_events RENAME COLUMN is_duplicate TO hide");
     console.log(
-      "[unilogDb] migration: added is_duplicate column to log_events",
+      "[unilogDb] migration: renamed is_duplicate to hide in log_events",
     ); // no-unilog
+  } else if (!columns.some((col) => col.name === "hide")) {
+    db.exec("ALTER TABLE log_events ADD COLUMN hide INTEGER DEFAULT 0");
+    console.log("[unilogDb] migration: added hide column to log_events"); // no-unilog
   }
 } catch (err) {
   console.error("[unilogDb] migration failed:", err); // no-unilog
@@ -89,7 +92,7 @@ export function nowPst() {
 }
 
 const insEvent = db.prepare(
-  "INSERT INTO log_events (log_id, pid, ts, message, is_duplicate) VALUES (?, ?, ?, ?, ?)",
+  "INSERT INTO log_events (log_id, pid, ts, message, hide) VALUES (?, ?, ?, ?, ?)",
 );
 
 // Full joined row for one event (event + its site). Used for the live tail
@@ -116,13 +119,13 @@ export function groupsForSite(logId) {
 // Returns the full joined row (event + site + groups) so callers can broadcast
 // it to live-tail subscribers. Returns null when the event has no matching site
 // (e.g. a null/unknown logId).
-export function insertEvent({ logId, pid, message, isDuplicate = false }) {
+export function insertEvent({ logId, pid, message, isHidden = false }) {
   const info = insEvent.run(
     logId == null ? null : Number(logId),
     String(pid || "unknown"),
     nowPst(),
     String(message ?? ""),
-    isDuplicate ? 1 : 0,
+    isHidden ? 1 : 0,
   );
   const row = getEventRow.get(Number(info.lastInsertRowid));
   if (row) row.groups = groupsForSite(row.log_id);
@@ -198,7 +201,7 @@ export function insertEventDedup({ logId, pid, message }) {
     const key = `${id}\u0000${String(message ?? "")}`;
     if (dedupCache.has(key)) {
       dedupDropped++;
-      insertEvent({ logId, pid, message, isDuplicate: true }); // Mark as duplicate in DB
+      insertEvent({ logId, pid, message, isHidden: true }); // Mark as hidden in DB
       return null; // But don't broadcast to clients
     }
     dedupCache.set(key, now);
@@ -365,7 +368,7 @@ export function queryEvents({
   beforeId,
   afterId,
 } = {}) {
-  const where = ["(e.is_duplicate IS NULL OR e.is_duplicate = 0)"];
+  const where = ["(e.hide IS NULL OR e.hide = 0)"];
   const params = [];
   if (beforeId) {
     where.push("e.id < ?");
@@ -443,6 +446,32 @@ export function deleteEvents(eventIds) {
   const result = db
     .prepare(`DELETE FROM log_events WHERE id IN (${placeholders})`)
     .run(...eventIds);
+  return result.changes || 0;
+}
+
+// Show events (set hide = 0) for all events in the given group IDs.
+// Returns the number of rows changed.
+export function showEventsInGroups(groupIds) {
+  if (!Array.isArray(groupIds) || groupIds.length === 0) return 0;
+  const logIds = siteIdsForGroups(groupIds);
+  if (logIds.length === 0) return 0;
+  const placeholders = logIds.map(() => "?").join(",");
+  const result = db
+    .prepare(`UPDATE log_events SET hide = 0 WHERE log_id IN (${placeholders})`)
+    .run(...logIds);
+  return result.changes || 0;
+}
+
+// Unshow events (set hide = 1) for all events in the given group IDs.
+// Returns the number of rows changed.
+export function unshowEventsInGroups(groupIds) {
+  if (!Array.isArray(groupIds) || groupIds.length === 0) return 0;
+  const logIds = siteIdsForGroups(groupIds);
+  if (logIds.length === 0) return 0;
+  const placeholders = logIds.map(() => "?").join(",");
+  const result = db
+    .prepare(`UPDATE log_events SET hide = 1 WHERE log_id IN (${placeholders})`)
+    .run(...logIds);
   return result.changes || 0;
 }
 

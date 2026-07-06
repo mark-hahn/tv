@@ -2035,6 +2035,9 @@ epd.setUnilogSink(({ logId, message }) =>
 );
 registerUnilogRoutes(app);
 
+// Log server startup.
+unilog(1215, "Started t-srvr");
+
 // The handler should be: async (params) => result
 const apiWrapper = (handler) => {
   return async (req, res) => {

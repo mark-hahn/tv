@@ -1,6 +1,6 @@
 import { createApp } from "vue";
 import App from "./components/App.vue";
-import { unilog } from "./log.js";
+import { unilog, logHere } from "./log.js";
 
 const DEBUG_CLICKS = true;
 
@@ -12,7 +12,7 @@ if (DEBUG_CLICKS) {
       const tag = t.tagName.toLowerCase();
       const id = t.id ? `#${t.id}` : "";
       const text = t.textContent?.trim().slice(0, 40) ?? "";
-// hidden       unilog(892, `${tag}${id}`, text ? `"${text}"` : "");
+      // hidden       unilog(892, `${tag}${id}`, text ? `"${text}"` : "");
     },
     true,
   );
@@ -20,3 +20,6 @@ if (DEBUG_CLICKS) {
 
 const app = createApp(App);
 app.mount("#app");
+
+// Log client startup.
+unilog(1216, "Started client ~~~");

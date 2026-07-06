@@ -89,6 +89,7 @@ export function registerUnilogRoutes(app) {
 
       // Check for client collision (only for client events with clientHash).
       const firstEvent = events[0];
+      let currentClientId = null;
       if (firstEvent && firstEvent.clientHash && firstEvent.pid === "client") {
         const hash = firstEvent.clientHash;
         const existingId = clientHashMap.get(hash);
@@ -98,6 +99,7 @@ export function registerUnilogRoutes(app) {
           const newId = nextClientId++;
           clientHashMap.set(hash, newId);
           curClientLogId = newId;
+          currentClientId = newId;
 
           // Insert the "New client <id>" event using the pre-created site.
           if (newClientSiteId) {
@@ -112,6 +114,8 @@ export function registerUnilogRoutes(app) {
         } else if (existingId !== curClientLogId) {
           // Old client but not the active one: reject and tell it to stop logging.
           return res.json({ ok: false, loggingDisabled: true });
+        } else {
+          currentClientId = existingId;
         }
         // else: existing client and is current, proceed normally below.
       }
@@ -119,11 +123,16 @@ export function registerUnilogRoutes(app) {
       // Process all events normally.
       for (const e of events) {
         if (!e || e.logId == null) continue;
+        let message = e.message;
+        // Replace ~~~ with client ID if present.
+        if (currentClientId && message && message.includes("~~~")) {
+          message = message.replace(/~~~/g, currentClientId);
+        }
         broadcastUnilog(
           unilogDb.insertEventDedup({
             logId: e.logId,
             pid: e.pid || "unknown",
-            message: e.message,
+            message,
           }),
         );
       }

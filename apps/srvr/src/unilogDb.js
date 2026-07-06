@@ -420,6 +420,17 @@ export function pruneEvents() {
   return toDelete;
 }
 
+// Delete specific events by their IDs.
+// Returns the number of rows actually deleted.
+export function deleteEvents(eventIds) {
+  if (!Array.isArray(eventIds) || eventIds.length === 0) return 0;
+  const placeholders = eventIds.map(() => "?").join(",");
+  const result = db
+    .prepare(`DELETE FROM log_events WHERE id IN (${placeholders})`)
+    .run(...eventIds);
+  return result.changes || 0;
+}
+
 export function listLevels() {
   return db
     .prepare(

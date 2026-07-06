@@ -229,6 +229,19 @@ export function registerUnilogRoutes(app) {
     }
   });
 
+  app.post("/api/unilog/delete-events", (req, res) => {
+    try {
+      const { eventIds } = req.body || {};
+      if (!Array.isArray(eventIds) || !eventIds.length)
+        return res.status(400).json({ error: "eventIds required" });
+      const deleted = unilogDb.deleteEvents(eventIds);
+      res.json({ ok: true, deleted });
+    } catch (error) {
+      console.error("[unilog] /api/unilog/delete-events error:", error); // no-unilog
+      res.status(500).json({ error: String(error?.message || error) });
+    }
+  });
+
   // Read-back for the web client log viewer (Log tab). Returns recent events
   // (newest first) joined with their sites, plus the distinct pid list.
   app.get("/api/unilog/events", (req, res) => {

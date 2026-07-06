@@ -316,6 +316,9 @@ export function getUnilogOldestTs() {
 export function setUnilogSiteLevel(ids, level) {
   return httpCall("/api/unilog/set-level", { ids, level }, "POST");
 }
+export function deleteUnilogEvents(eventIds) {
+  return httpCall("/api/unilog/delete-events", { eventIds }, "POST");
+}
 export function getUnilogGroups() {
   return httpCall("/api/unilog/groups", {}, "GET");
 }

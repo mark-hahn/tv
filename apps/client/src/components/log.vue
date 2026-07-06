@@ -121,11 +121,12 @@
       >
         <option value="">Actions</option>
         <option value="goto">Go To Selection</option>
-        <option value="selectSites">Select Sites</option>
         <option value="clear">Clear Selections</option>
+        <option value="selectSites">Select Sites</option>
         <option value="hide">Hide Sites</option>
         <option value="unhide">Unhide Sites</option>
-        <option value="delete">Delete</option>
+        <option value="delete">Delete Sites</option>
+        <option value="deleteEvents">Delete Events</option>
         <option value="editor">Editor</option>
         <option value="setInfo">Set Info</option>
         <option value="setDebug">Set Debug</option>
@@ -807,6 +808,7 @@ export default {
       else if (act === "hide") await this.hideSites();
       else if (act === "unhide") await this.unhideSites();
       else if (act === "delete") await this.deleteSites();
+      else if (act === "deleteEvents") await this.deleteEvents();
       else if (act === "editor") await this.openInEditor();
       else if (act === "setInfo") await this.setSiteLevel("info");
       else if (act === "setDebug") await this.setSiteLevel("debug");
@@ -881,6 +883,51 @@ export default {
       )
         return;
       await this.postSites("/__unilog/delete", sites, "deleted");
+    },
+    async deleteEvents() {
+      const selected = this.table
+        .getRows()
+        .filter((r) => this.selectedIds.has(r.getData().id))
+        .map((r) => r.getData());
+
+      if (!selected.length) {
+        this.flash("no events selected");
+        return;
+      }
+
+      const n = selected.length;
+      if (
+        !window.confirm(
+          `Is it ok to PERMANENTLY DELETE ${n} event${n === 1 ? "" : "s"}?`,
+        )
+      )
+        return;
+
+      const eventIds = selected.map((e) => e.id);
+      try {
+        const res = await srvr.deleteUnilogEvents(eventIds);
+        if (res?.ok) {
+          this.flash(
+            `deleted ${res.deleted} event${res.deleted === 1 ? "" : "s"}`,
+          );
+          // Remove deleted events from table
+          for (const row of this.table.getRows()) {
+            const d = row.getData();
+            if (eventIds.includes(d.id)) {
+              row.delete();
+            }
+          }
+          // Clear selection
+          this.setSelection(new Set());
+          // Update counts
+          this.rowCount = this.table.getDataCount("active");
+          this.displayedCount = this.table.getRows("active").length;
+        } else {
+          this.flash(`failed: ${res?.error ?? "unknown error"}`);
+        }
+      } catch (err) {
+        this.flash(`failed: ${err?.message || err}`);
+      }
     },
     async setSiteLevel(level) {
       const sites = this.selectedSites();

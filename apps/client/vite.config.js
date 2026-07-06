@@ -52,8 +52,54 @@ function unilogHideEndpoint() {
             ? "unhide"
             : url.startsWith("/delete")
               ? "delete"
-              : null;
+              : url.startsWith("/open-editor")
+                ? "open-editor"
+                : null;
         if (mode === null || req.method !== "POST") return next();
+
+        // Handle open-editor mode separately
+        if (mode === "open-editor") {
+          try {
+            const body = await readJsonBody(req);
+            const { file, line } = body;
+
+            if (!file || line == null) {
+              res.statusCode = 400;
+              res.setHeader("content-type", "application/json");
+              res.end(
+                JSON.stringify({ ok: false, error: "Missing file or line" }),
+              );
+              return;
+            }
+
+            // Build absolute path
+            const { spawn } = await import("node:child_process");
+            const filePath = `/root/apps/tv/${file}`;
+
+            // Use VS Code CLI: code --goto file:line
+            const proc = spawn("code", ["--goto", `${filePath}:${line}`], {
+              stdio: "ignore",
+              detached: true,
+            });
+
+            proc.unref(); // Don't wait for VS Code to exit
+
+            res.setHeader("content-type", "application/json");
+            res.end(JSON.stringify({ ok: true }));
+          } catch (err) {
+            res.statusCode = 500;
+            res.setHeader("content-type", "application/json");
+            res.end(
+              JSON.stringify({
+                ok: false,
+                error: String(err?.message || err),
+              }),
+            );
+          }
+          return;
+        }
+
+        // Handle hide/unhide/delete modes
         try {
           const body = await readJsonBody(req);
           const sites = Array.isArray(body?.sites)

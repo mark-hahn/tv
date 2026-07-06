@@ -713,35 +713,6 @@ export async function rottenSearch(query) {
           return getScore(slot, true);
         }
 
-        // console.log(`rotten getScore ${slot} error: ${e.message}`);
-
-        // DEBUG: Thorough DOM Inspection
-        /*
-        try {
-             const debugInfo = await page.evaluate(() => {
-                 const card = document.querySelector('media-scorecard, score-board, score-board-m');
-                 if (!card) return 'No scorecard element found in DOM';
-                 
-                 // Get all children and their attributes
-                 const children = Array.from(card.children).map(c => {
-                     return `<${c.tagName.toLowerCase()} slot="${c.getAttribute('slot') || ''}" class="${c.className}">`;
-                 }).join('\n');
-                 
-                 return `Tag: ${card.tagName}\nHTML: ${card.innerHTML.substring(0, 1000)}\nChildren:\n${children}`;
-             });
-             unilog(113, `DEBUG STRUCT ${slot}:\n${debugInfo}`);
-        } catch(dx) { console.log('Debug inspect failed:', dx.message); }
-        */
-
-        // Capture HTML snapshot on error
-        /*
-        try {
-          const html = await page.content();
-          fs.writeFileSync(`rotten-error-${slot}.html`, html);
-          unilog(114, `Saved page content to rotten-error-${slot}.html`);
-        } catch {}
-        */
-
         // Capture screenshot on error too
         try {
           await page.screenshot({ path: `rotten-error-${slot}.png` });

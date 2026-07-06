@@ -126,6 +126,7 @@
         <option value="hide">Hide Sites</option>
         <option value="unhide">Unhide Sites</option>
         <option value="delete">Delete</option>
+        <option value="editor">Editor</option>
         <option value="setInfo">Set Info</option>
         <option value="setDebug">Set Debug</option>
         <option value="setWarn">Set Warn</option>
@@ -806,6 +807,7 @@ export default {
       else if (act === "hide") await this.hideSites();
       else if (act === "unhide") await this.unhideSites();
       else if (act === "delete") await this.deleteSites();
+      else if (act === "editor") await this.openInEditor();
       else if (act === "setInfo") await this.setSiteLevel("info");
       else if (act === "setDebug") await this.setSiteLevel("debug");
       else if (act === "setWarn") await this.setSiteLevel("warn");
@@ -923,6 +925,53 @@ export default {
         }
       } catch (err) {
         this.flash(`failed: ${err?.message || err}`);
+      }
+    },
+    async openInEditor() {
+      // Get selected events
+      const selected = this.table
+        .getRows()
+        .filter((r) => this.selectedIds.has(r.getData().id))
+        .map((r) => r.getData());
+
+      // Validate: exactly one event selected
+      if (selected.length === 0) {
+        this.flash("No event selected");
+        return;
+      }
+      if (selected.length > 1) {
+        this.flash("Only one event should be selected");
+        return;
+      }
+
+      const event = selected[0];
+      const { src_file, src_line, log_id } = event;
+
+      // Validate: must have file and line
+      if (!src_file || src_line == null) {
+        this.flash("Event missing source location");
+        return;
+      }
+
+      // Call Vite endpoint
+      try {
+        const res = await fetch("/__unilog/open-editor", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            file: src_file,
+            line: src_line,
+            logId: log_id,
+          }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          this.flash(`Opened ${src_file}:${src_line}`);
+        } else {
+          this.flash(`Failed: ${data.error}`);
+        }
+      } catch (err) {
+        this.flash(`Failed: ${err?.message || err}`);
       }
     },
     async loadOlder() {

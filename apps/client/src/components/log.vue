@@ -208,6 +208,13 @@
               @change="applyGroupFilter"
             />
             Filter
+            <button
+              class="logBtn"
+              style="margin-left: auto"
+              @click="showGroupsPane = false"
+            >
+              X
+            </button>
           </label>
 
           <button

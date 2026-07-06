@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# (Re)start the tv-watchdog pm2 task on the remote server.
+kill $(pgrep -f "tv-watchdog") 2> /dev/null
+cd /root/dev/apps/tv/apps/watchdog
+pm2 flush  tv-watchdog 2> /dev/null
+pm2 delete tv-watchdog 2> /dev/null
+pm2 start  watchdog.js --watch watchdog.js -f --name tv-watchdog
+pm2 save

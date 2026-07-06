@@ -1,0 +1,8 @@
+{
+  "name": "tv-watchdog",
+  "version": "1.0.0",
+  "description": "Independent background monitor for tv-srvr (liveness + error-rate).",
+  "type": "module",
+  "main": "watchdog.js",
+  "private": true
+}

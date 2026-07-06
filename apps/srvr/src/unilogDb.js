@@ -172,8 +172,8 @@ export function getDedupDropped() {
 
 // Dedup wrapper used by BOTH the in-process srvr sink and POST /api/log, so
 // local and remote emitters are covered. Returns the joined event row to
-// broadcast, or null when the event is a redundant down-blocked event (dropped,
-// never inserted, never broadcast). A cache hit does NOT refresh the entry, so a
+// broadcast, or null when the event is a redundant down-blocked event (inserted
+// to DB but NOT broadcast). A cache hit does NOT refresh the entry, so a
 // still-blocking file re-appears at most once per hour as a heartbeat.
 export function insertEventDedup({ logId, pid, message }) {
   const id = logId == null ? null : Number(logId);
@@ -183,7 +183,8 @@ export function insertEventDedup({ logId, pid, message }) {
     const key = `${id}\u0000${String(message ?? "")}`;
     if (dedupCache.has(key)) {
       dedupDropped++;
-      return null;
+      insertEvent({ logId, pid, message }); // Insert to DB for debugging
+      return null; // But don't broadcast to clients
     }
     dedupCache.set(key, now);
   }

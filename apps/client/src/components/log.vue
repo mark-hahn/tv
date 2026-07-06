@@ -1037,6 +1037,8 @@ export default {
     },
     clearPicker() {
       this.pickerSel = { mo: "", da: "", hr: "", mi: "" };
+      this.filterByGroups = false;
+      this.applyGroupFilter();
       // Clear all column header filters.
       if (this.table) {
         for (const col of this.table.getColumns()) {

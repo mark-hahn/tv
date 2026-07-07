@@ -185,6 +185,7 @@ catches every form of debug statement:
 Any of those forms ending in `// no-unilog` is skipped — never upgraded, never
 activated, never assigned an id. Use it for unilog's own plumbing files and any
 debug statement that must stay as plain `console.*` output.
+- do not use no-unilog unless you have my permission
 
 ```js
 console.log("[reseed] done."); // no-unilog

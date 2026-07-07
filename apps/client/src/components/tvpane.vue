@@ -1183,20 +1183,40 @@ export default {
       this._lpStop();
     },
 
-    startSkipHold() {
-      const pressedAt = Date.now();
-      this._dbStart(() => {
-        this.flash("skip");
-        fetch(`${config.tvSrvrUrl}/api/skipIntro`, {
+    // Long-press skip toggles the playing episode between 2160 and 1080.
+    async toggleResolution() {
+      if (this.isOff || this.isOther) return;
+      this.flash("skip");
+      try {
+        await fetch(`${config.tvTvUrl}/tv/toggleres`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pressedAt }),
-        }).catch(() => {});
-      });
+          body: JSON.stringify({}),
+        });
+      } catch (_) {}
+    },
+
+    startSkipHold() {
+      const pressedAt = Date.now();
+      this._lpStart(
+        () => {
+          // short press → skip intro
+          this.flash("skip");
+          fetch(`${config.tvSrvrUrl}/api/skipIntro`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pressedAt }),
+          }).catch(() => {});
+        },
+        () => {
+          // long press → toggle resolution
+          this.toggleResolution();
+        },
+      );
     },
 
     stopSkipHold() {
-      this._dbStop();
+      this._lpStop();
     },
 
     async fetchSubPlayers() {

@@ -301,30 +301,6 @@
 
           <div class="groupsRow">
             <input
-              v-model="setGroupType"
-              class="logInput groupsInput"
-              placeholder="type"
-              @keyup.enter="applySetType"
-            />
-            <button
-              class="logBtn"
-              :disabled="!selectedGroupIds.length || !setGroupType.trim()"
-              @click="applySetType"
-            >
-              Set Type
-            </button>
-          </div>
-
-          <button
-            class="logBtn"
-            :disabled="!selectedGroupIds.length"
-            @click="applyClearType"
-          >
-            Clear Type
-          </button>
-
-          <div class="groupsRow">
-            <input
               v-model="setGroupName"
               class="logInput groupsInput"
               placeholder="name"
@@ -417,7 +393,6 @@ export default {
       selectedGroupIds: [],
       selectedSiteCount: 0,
       newGroupName: "",
-      setGroupType: "",
       setGroupName: "",
       filterByGroups: false,
       groupFilterIds: new Set(),
@@ -967,6 +942,7 @@ export default {
         const res = await srvr.showUnilogEvents(this.selectedGroupIds);
         if (res?.ok) {
           this.flash(`showed ${res.changed || 0} events`);
+          await this.loadLogs();
         } else {
           this.flash("failed to show events");
         }
@@ -984,6 +960,7 @@ export default {
         const res = await srvr.unshowUnilogEvents(this.selectedGroupIds);
         if (res?.ok) {
           this.flash(`unshowed ${res.changed || 0} events`);
+          await this.loadLogs();
         } else {
           this.flash("failed to unshow events");
         }
@@ -1435,8 +1412,7 @@ export default {
     },
     // ---- Groups pane ------------------------------------------------------
     groupLabel(g) {
-      const type = (g.group_type || "").trim();
-      return type ? `${g.description} (${type})` : g.description;
+      return g.description;
     },
     // Fixed-position overlay: right edge aligned to #list, vertically centered.
     positionGroupsPane() {
@@ -1571,32 +1547,6 @@ export default {
       } catch (e) {
         console.error("[log.vue]", `deleteGroups failed: ${e.message}`); // no-unilog
         this.flash("failed to delete");
-      }
-    },
-    async applySetType() {
-      if (!this.selectedGroupIds.length || !this.setGroupType.trim()) return;
-      try {
-        const res = await srvr.setUnilogGroupType(
-          this.selectedGroupIds,
-          this.setGroupType.trim(),
-        );
-        this.setGroupType = "";
-        await this.loadGroups();
-        this.flash(`set type on ${res?.changed ?? 0} groups`);
-      } catch (e) {
-        console.error("[log.vue]", `setGroupType failed: ${e.message}`); // no-unilog
-        this.flash("failed to set type");
-      }
-    },
-    async applyClearType() {
-      if (!this.selectedGroupIds.length) return;
-      try {
-        const res = await srvr.setUnilogGroupType(this.selectedGroupIds, "");
-        await this.loadGroups();
-        this.flash(`cleared type on ${res?.changed ?? 0} groups`);
-      } catch (e) {
-        console.error("[log.vue]", `clearGroupType failed: ${e.message}`); // no-unilog
-        this.flash("failed to clear type");
       }
     },
     async applySetName() {

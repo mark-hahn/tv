@@ -101,13 +101,12 @@ export function unilog(logId, ...parts) {
 
 // Author placeholder — runtime NO-OP, rewritten to a real `unilog(<id>, ...)` by
 // the deploy reconciler. Write
-//   logHere({ lvl, tag, grp, typ }, ...msgArgs)
+//   logHere({ lvl, tag, grp }, ...msgArgs)
 // where a log belongs; never hand-write `unilog(...)`. The first arg is a param
 // object (all values must be static string literals):
 //   lvl: "info" | "warn" | "error" | "debug"  (default "info")
 //   tag: category string                        (default none)
 //   grp: group name or array of names           (default none)
-//   typ: group_type applied only to new groups  (default none)
 // The remaining args are the message; with none the site logs "<missing>".
 export function logHere() {}
 

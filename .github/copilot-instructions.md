@@ -143,26 +143,24 @@ default is used.
 | ----- | --------------------------------------------- | ------- |
 | `lvl` | level: `info` \| `warn` \| `error` \| `debug` | `info`  |
 | `grp` | group name, or array of names                 | none    |
-| `typ` | `group_type`, applied only to **new** groups  | none    |
 
 ```js
 logHere({}, "message"); // minimal
 logHere({ lvl: "warn" }, `low space on ${drive}`); // warn level
 logHere({ grp: "playback" }, `started ${showId}`); // one named group
-logHere({ grp: ["playback", "errors"], typ: "feature" }, `crash in ${fn}`);
+logHere({ grp: ["playback", "errors"] }, `crash in ${fn}`);
 logHere({}); // no message → logs "<missing>"
 ```
 
-- Use a **template string** for the message. 
+- Use a **template string** for the message.
 - Do not use `[tag]` prefixes in the message — use `grp` instead to categorize sites.
 - do not use the pid or project fields like `down` in the message
-  - they are already included in other displayed fields 
+  - they are already included in other displayed fields
 - do not put timestamp in the message
   - it is in ts field
 - do not put anything that is redundant with a group name in the message
 - A site is linked to every named group in `grp`. A group is looked up by name
-  (case-insensitive); if it doesn't exist it is created with `typ`. Existing
-  groups keep their `group_type` — `typ` never changes it.
+  (case-insensitive); if it doesn't exist it is created.
 - Import it once per file: `import { logHere } from "@tv/share"` (server apps)
   or from the client log module (`apps/client/src/log.js`) in the client.
 - Reconciliation runs automatically on every `./srvr <project>` deploy (all

@@ -47,12 +47,12 @@ Indexes: `idx_events_logid` on `(log_id)`, `idx_events_ts` on `(ts)`.
 Named groups used to cluster related sites. A `logHere(...)` placeholder declares
 its groups via the `grp` param; the reconciler resolves each name to a group here.
 
-| Column        | Type       | Description                                                                   |
-| ------------- | ---------- | ----------------------------------------------------------------------------- |
-| `group_id`    | INTEGER PK | Auto-incremented by `MAX(group_id)+1` inside a transaction.                   |
-| `group_type`  | TEXT       | Free-form category string (optional). Set only when a group is first created. |
-| `ts`          | TEXT       | PST timestamp when the group was created.                                     |
-| `description` | TEXT       | Group name. **Unique** (case-insensitive) via `idx_groups_desc`.              |
+| Column        | Type       | Description                                                                  |
+| ------------- | ---------- | ---------------------------------------------------------------------------- |
+| `group_id`    | INTEGER PK | Auto-incremented by `MAX(group_id)+1` inside a transaction.                  |
+| `hide`        | INTEGER    | Hide flag (0/1). When 1, new events for the group's sites default to hidden. |
+| `ts`          | TEXT       | PST timestamp when the group was created.                                    |
+| `description` | TEXT       | Group name. **Unique** (case-insensitive) via `idx_groups_desc`.             |
 
 Group names are unique: `idx_groups_desc` is a `UNIQUE INDEX` on
 `description COLLATE NOCASE`. On startup `cleanupGroupDescriptions()` renames any
@@ -73,17 +73,17 @@ Primary key: `(log_id, group_id)`. Index: `idx_site_groups_group` on `(group_id)
 
 ## Key operations (unilogDb.js exports)
 
-| Function                                        | Description                                                                                                 |
-| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `insertEvent({ logId, pid, message })`          | Insert one log event. `ts` is stamped here.                                                                 |
-| `createSite(site)`                              | Allocate next `log_id`, insert into `log_sites`, link to any `groupIds`. Returns the new id. Transactional. |
-| `refreshSite({ logId, srcFile, srcLine })`      | Update `src_file` / `src_line` for an existing active site.                                                 |
-| `querySites(logIds[])`                          | Return `{ logId → srcLine }` map for a set of ids.                                                          |
-| `tombstoneSite(logId)`                          | Set `removed_at` on a site whose source line was deleted.                                                   |
-| `createGroup({ groupType, description })`       | Allocate + insert a `log_groups` row. Returns new `group_id`. Transactional.                                |
-| `findGroupByDescription(description)`           | Return the `group_id` for a name (case-insensitive), or null.                                               |
-| `findOrCreateGroup({ description, groupType })` | Find a named group or create it. Never changes an existing group's `group_type`. Returns `{ id, created }`. |
-| `dbInfo()`                                      | Return `{ path, counts }` with row counts for all four tables.                                              |
+| Function                                   | Description                                                                                                 |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `insertEvent({ logId, pid, message })`     | Insert one log event. `ts` is stamped here.                                                                 |
+| `createSite(site)`                         | Allocate next `log_id`, insert into `log_sites`, link to any `groupIds`. Returns the new id. Transactional. |
+| `refreshSite({ logId, srcFile, srcLine })` | Update `src_file` / `src_line` for an existing active site.                                                 |
+| `querySites(logIds[])`                     | Return `{ logId → srcLine }` map for a set of ids.                                                          |
+| `tombstoneSite(logId)`                     | Set `removed_at` on a site whose source line was deleted.                                                   |
+| `createGroup({ description })`             | Allocate + insert a `log_groups` row. Returns new `group_id`. Transactional.                                |
+| `findGroupByDescription(description)`      | Return the `group_id` for a name (case-insensitive), or null.                                               |
+| `findOrCreateGroup({ description })`       | Find a named group or create it. Returns `{ id, created }`.                                                 |
+| `dbInfo()`                                 | Return `{ path, counts }` with row counts for all four tables.                                              |
 
 ---
 

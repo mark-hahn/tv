@@ -24,7 +24,6 @@ const note = (name, pass, detail) =>
 
 // 1) groups + sites (direct DB owner path)
 const groupId = createGroup({
-  groupType: "conversation",
   description: "unilog smoke run",
 });
 note(

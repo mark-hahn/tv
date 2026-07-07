@@ -44,7 +44,7 @@ CREATE INDEX IF NOT EXISTS idx_events_ts    ON log_events(ts);
 
 CREATE TABLE IF NOT EXISTS log_groups (
   group_id    INTEGER PRIMARY KEY,
-  group_type  TEXT,
+  hide        INTEGER DEFAULT 0,
   ts          TEXT NOT NULL,
   description TEXT
 );
@@ -71,6 +71,25 @@ try {
   }
 } catch (err) {
   console.error("[unilogDb] migration failed:", err); // no-unilog
+}
+
+// Migration: repurpose log_groups.group_type (string) as a numeric hide flag.
+// One-time: adding the fresh hide column clears every group's flag to 0.
+try {
+  const gcols = db.pragma("table_info(log_groups)");
+  const hadGroupType = gcols.some((col) => col.name === "group_type");
+  const hasHide = gcols.some((col) => col.name === "hide");
+  if (!hasHide) {
+    db.exec("ALTER TABLE log_groups ADD COLUMN hide INTEGER DEFAULT 0");
+    db.exec("UPDATE log_groups SET hide = 0"); // one-time clear
+    console.log("[unilogDb] migration: added hide column to log_groups"); // no-unilog
+  }
+  if (hadGroupType) {
+    db.exec("ALTER TABLE log_groups DROP COLUMN group_type");
+    console.log("[unilogDb] migration: dropped group_type from log_groups"); // no-unilog
+  }
+} catch (err) {
+  console.error("[unilogDb] log_groups hide migration failed:", err); // no-unilog
 }
 
 // PST 'yyyy/mm/dd hh:mm:ss' for a given Date; hour 24 normalized to 00.
@@ -117,15 +136,27 @@ export function groupsForSite(logId) {
 
 // One runtime emission. ts stamped here (the collector), not the caller.
 // Returns the full joined row (event + site + groups) so callers can broadcast
+// True when any group linked to this site has its hide flag set. New events for
+// the site are hidden by default when this is true.
+const anyGroupHidden = db.prepare(
+  `SELECT 1 FROM site_groups sg JOIN log_groups lg ON sg.group_id = lg.group_id
+    WHERE sg.log_id = ? AND lg.hide = 1 LIMIT 1`,
+);
+function groupHideForSite(logId) {
+  if (logId == null) return false;
+  return !!anyGroupHidden.get(Number(logId));
+}
+
 // it to live-tail subscribers. Returns null when the event has no matching site
 // (e.g. a null/unknown logId).
 export function insertEvent({ logId, pid, message, isHidden = false }) {
+  const hidden = isHidden || groupHideForSite(logId);
   const info = insEvent.run(
     logId == null ? null : Number(logId),
     String(pid || "unknown"),
     nowPst(),
     String(message ?? ""),
-    isHidden ? 1 : 0,
+    hidden ? 1 : 0,
   );
   const row = getEventRow.get(Number(info.lastInsertRowid));
   if (row) row.groups = groupsForSite(row.log_id);
@@ -210,16 +241,16 @@ export function insertEventDedup({ logId, pid, message }) {
 }
 
 const insGroup = db.prepare(
-  "INSERT INTO log_groups (group_id, group_type, ts, description) VALUES (?, ?, ?, ?)",
+  "INSERT INTO log_groups (group_id, hide, ts, description) VALUES (?, 0, ?, ?)",
 );
 const maxGroup = db.prepare(
   "SELECT COALESCE(MAX(group_id), 0) + 1 AS next FROM log_groups",
 );
 
 // Allocate + create a group atomically. Returns new group_id.
-export const createGroup = db.transaction(({ groupType, description }) => {
+export const createGroup = db.transaction(({ description }) => {
   const id = maxGroup.get().next;
-  insGroup.run(id, groupType || null, nowPst(), description || null);
+  insGroup.run(id, nowPst(), description || null);
   return id;
 });
 
@@ -449,10 +480,12 @@ export function deleteEvents(eventIds) {
   return result.changes || 0;
 }
 
-// Show events (set hide = 0) for all events in the given group IDs.
-// Returns the number of rows changed.
+// Show events (set hide = 0) for all events in the given group IDs and clear the
+// groups' own hide flag so future events default to visible.
+// Returns the number of event rows changed.
 export function showEventsInGroups(groupIds) {
   if (!Array.isArray(groupIds) || groupIds.length === 0) return 0;
+  setGroupHide(groupIds, 0);
   const logIds = siteIdsForGroups(groupIds);
   if (logIds.length === 0) return 0;
   const placeholders = logIds.map(() => "?").join(",");
@@ -462,10 +495,12 @@ export function showEventsInGroups(groupIds) {
   return result.changes || 0;
 }
 
-// Unshow events (set hide = 1) for all events in the given group IDs.
-// Returns the number of rows changed.
+// Unshow events (set hide = 1) for all events in the given group IDs and set the
+// groups' own hide flag so future events default to hidden.
+// Returns the number of event rows changed.
 export function unshowEventsInGroups(groupIds) {
   if (!Array.isArray(groupIds) || groupIds.length === 0) return 0;
+  setGroupHide(groupIds, 1);
   const logIds = siteIdsForGroups(groupIds);
   if (logIds.length === 0) return 0;
   const placeholders = logIds.map(() => "?").join(",");
@@ -543,23 +578,20 @@ export function findGroupByDescription(description) {
   return getGroupByDesc.get(String(description))?.group_id ?? null;
 }
 
-// Find a named group or create it. Never changes the group_type of an existing
-// group. Returns { id, created }.
-export const findOrCreateGroup = db.transaction(
-  ({ description, groupType }) => {
-    const existing = findGroupByDescription(description);
-    if (existing != null) return { id: existing, created: false };
-    const id = maxGroup.get().next;
-    insGroup.run(id, groupType || null, nowPst(), description);
-    return { id, created: true };
-  },
-);
+// Find a named group or create it. Returns { id, created }.
+export const findOrCreateGroup = db.transaction(({ description }) => {
+  const existing = findGroupByDescription(description);
+  if (existing != null) return { id: existing, created: false };
+  const id = maxGroup.get().next;
+  insGroup.run(id, nowPst(), description);
+  return { id, created: true };
+});
 
 // All named groups, alphabetical (case-insensitive).
 export function listGroups() {
   return db
     .prepare(
-      `SELECT group_id, group_type, description FROM log_groups
+      `SELECT group_id, hide, description FROM log_groups
         WHERE description IS NOT NULL ORDER BY description COLLATE NOCASE`,
     )
     .all();
@@ -569,7 +601,7 @@ const delSiteGroup = db.prepare(
   "DELETE FROM site_groups WHERE log_id = ? AND group_id = ?",
 );
 
-// Create a named group (group_type 'manual') and link it to the given sites.
+// Create a named group and link it to the given sites.
 // If a group with that description already exists, do nothing.
 export const createGroupWithSites = db.transaction(
   ({ description, logIds = [] }) => {
@@ -578,7 +610,7 @@ export const createGroupWithSites = db.transaction(
       .get(description);
     if (exists) return { created: false };
     const id = maxGroup.get().next;
-    insGroup.run(id, "", nowPst(), description);
+    insGroup.run(id, nowPst(), description);
     for (const logId of logIds) insSiteGroup.run(Number(logId), id);
     return { created: true, groupId: id, linked: logIds.length };
   },
@@ -672,16 +704,16 @@ export function orphanGroupIds() {
     .map((r) => r.group_id);
 }
 
-const updGroupType = db.prepare(
-  "UPDATE log_groups SET group_type = ? WHERE group_id = ?",
+const updGroupHide = db.prepare(
+  "UPDATE log_groups SET hide = ? WHERE group_id = ?",
 );
-// Set group_type on the given groups (empty string clears it). Returns count.
-export function setGroupType(groupIds = [], groupType = "") {
-  const val = groupType || "";
+// Set the hide flag (0 or 1) on the given groups. Returns count.
+export function setGroupHide(groupIds = [], hide = 0) {
+  const val = hide ? 1 : 0;
   let changed = 0;
   const run = db.transaction(() => {
     for (const id of groupIds)
-      changed += updGroupType.run(val, Number(id)).changes;
+      changed += updGroupHide.run(val, Number(id)).changes;
   });
   run();
   return changed;

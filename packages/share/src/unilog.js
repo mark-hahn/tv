@@ -40,13 +40,12 @@ export function unilog(logId, ...parts) {
 }
 
 // Author placeholder. Code authors write
-//   logHere({ lvl, grp, typ }, `<msg>`)
+//   logHere({ lvl, grp }, `<msg>`)
 // at the spot a log belongs (it uses `e`, so it satisfies no-empty / no-unused
 // in an otherwise-empty catch). It is a runtime NO-OP; the deploy reconciler
 // rewrites it into a real `unilog(<id>, ...)`. The first arg is a param object:
 //   lvl: "info" | "warn" | "error" | "debug"  (default "info")
 //   grp: group name or array of names           (default none)
-//   typ: group_type applied only to new groups  (default none)
 // All param values must be static string literals. The second arg is the message
 // as a single template string; with no message the site logs "<missing>".
 // Minimal call: logHere({}, "message"). Never write `unilog(...)` by hand — use this.

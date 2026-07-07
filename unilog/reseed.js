@@ -170,7 +170,6 @@ if (!useSsh) {
   try {
     groupId = (
       await postJson("/api/unilog/group", {
-        groupType: "task",
         description: desc,
       })
     ).id;
@@ -180,7 +179,7 @@ if (!useSsh) {
 }
 if (useSsh) {
   sqlRun(
-    `INSERT INTO log_groups (group_id, group_type, ts, description) VALUES ((SELECT COALESCE(MAX(group_id),0)+1 FROM log_groups),'task',${q(ts)},${q(desc)});`,
+    `INSERT INTO log_groups (group_id, ts, description) VALUES ((SELECT COALESCE(MAX(group_id),0)+1 FROM log_groups),${q(ts)},${q(desc)});`,
   );
   groupId = Number(sqlRun("SELECT MAX(group_id) FROM log_groups;"));
 }

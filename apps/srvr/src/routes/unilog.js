@@ -22,7 +22,6 @@ function initNewClientSite() {
   try {
     const clientsGroup = unilogDb.findOrCreateGroup({
       description: "clients",
-      groupType: "feature",
     });
     newClientSiteId = unilogDb.createSite({
       tag: null,
@@ -56,6 +55,7 @@ export function maybeUnilogPrune() {
 
 export function broadcastUnilog(row) {
   if (!row || unilogSubscribers.size === 0) return;
+  if (row.hide) return; // don't broadcast hidden events
   const msg = JSON.stringify({
     id: 0,
     notification: "unilog-event",
@@ -156,15 +156,14 @@ export function registerUnilogRoutes(app) {
     }
   });
 
-  // Find a named group by description, or create it if absent. Never changes the
-  // group_type of an existing group. Used by the reconciler to resolve logHere
-  // `grp` names to group ids.
+  // Find a named group by description, or create it if absent. Used by the
+  // reconciler to resolve logHere `grp` names to group ids.
   app.post("/api/unilog/find-or-create-group", (req, res) => {
     try {
-      const { description, groupType } = req.body || {};
+      const { description } = req.body || {};
       if (!description)
         return res.status(400).json({ error: "description required" });
-      res.json(unilogDb.findOrCreateGroup({ description, groupType }));
+      res.json(unilogDb.findOrCreateGroup({ description }));
     } catch (error) {
       console.error("[unilog] /api/unilog/find-or-create-group error:", error); // no-unilog
       res.status(500).json({ error: String(error?.message || error) });
@@ -413,20 +412,6 @@ export function registerUnilogRoutes(app) {
       res.json(unilogDb.groupsForSites(Array.isArray(logIds) ? logIds : []));
     } catch (error) {
       console.error("[unilog] /api/unilog/groups/for-sites error:", error); // no-unilog
-      res.status(500).json({ error: String(error?.message || error) });
-    }
-  });
-
-  app.post("/api/unilog/groups/set-type", (req, res) => {
-    try {
-      const { groupIds, groupType } = req.body || {};
-      const changed = unilogDb.setGroupType(
-        Array.isArray(groupIds) ? groupIds : [],
-        typeof groupType === "string" ? groupType : "",
-      );
-      res.json({ ok: true, changed });
-    } catch (error) {
-      console.error("[unilog] /api/unilog/groups/set-type error:", error); // no-unilog
       res.status(500).json({ error: String(error?.message || error) });
     }
   });

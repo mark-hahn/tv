@@ -75,7 +75,7 @@ function calleeInfo(callee) {
 // Find all log call sites + existing active `unilog(N, ...)` sites in `code`.
 // Offsets are absolute into the original `code` (vue offset added back).
 //   old-style: { kind:"old", start, end, line, callee, method, argsText[], firstLiteral }
-//   logHere:   old-style with callee:"logHere", plus level, tag, grpNames[], grpTyp
+//   logHere:   old-style with callee:"logHere", plus level, tag, grpNames[]
 //   active:    { kind:"active", logId, line, end }
 export function findLogCalls(code, { vue = false } = {}) {
   let src = code;
@@ -123,20 +123,18 @@ export function findLogCalls(code, { vue = false } = {}) {
       return;
     }
 
-    // logHere({ lvl, grp, typ }, <msg>) — the author placeholder.
+    // logHere({ lvl, grp }, <msg>) — the author placeholder.
     // Upgrade to a real unilog site. The first arg MUST be an object literal
     // (the param block); the second arg is the message template string. All
     // param values must be static string literals (or an array of string
     // literals for grp); anything dynamic is ignored and the default is used.
     //   lvl → level  (default "info")
     //   grp → group name(s): string or array of strings (default [])
-    //   typ → group_type applied only to newly-created groups (default null)
     if (n.callee.type === "Identifier" && n.callee.name === "logHere") {
       const LEVELS = ["info", "warn", "error", "debug"];
       const a0 = n.arguments[0];
       let level = "info";
       let grpNames = [];
-      let grpTyp = null;
       if (a0 && a0.type === "ObjectExpression") {
         for (const prop of a0.properties) {
           if (prop.type !== "ObjectProperty" || prop.computed) continue;
@@ -145,8 +143,6 @@ export function findLogCalls(code, { vue = false } = {}) {
           if (key === "lvl") {
             if (v.type === "StringLiteral" && LEVELS.includes(v.value))
               level = v.value;
-          } else if (key === "typ") {
-            if (v.type === "StringLiteral") grpTyp = v.value;
           } else if (key === "grp") {
             if (v.type === "StringLiteral") grpNames = [v.value];
             else if (v.type === "ArrayExpression")
@@ -166,7 +162,6 @@ export function findLogCalls(code, { vue = false } = {}) {
         method: "logHere",
         level,
         grpNames,
-        grpTyp,
         argsText: msgArgs.map((a) => src.slice(a.start, a.end)),
         firstLiteral: false,
       });

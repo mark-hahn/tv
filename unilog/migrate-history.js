@@ -78,7 +78,7 @@ function nowPst() {
 
 const ts = nowPst();
 sqlRun(
-  `INSERT INTO log_groups (group_id, group_type, ts, description) VALUES ((SELECT COALESCE(MAX(group_id),0)+1 FROM log_groups),'history',${q(ts)},'history migration');`,
+  `INSERT INTO log_groups (group_id, ts, description) VALUES ((SELECT COALESCE(MAX(group_id),0)+1 FROM log_groups),${q(ts)},'history migration');`,
 );
 const groupId = Number(sqlRun("SELECT MAX(group_id) FROM log_groups;"));
 console.log(`[migrate-history] created group id=${groupId}`); // no-unilog

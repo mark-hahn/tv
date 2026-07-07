@@ -352,13 +352,6 @@ export function getUnilogGroupSiteInfo(groupIds) {
 export function getUnilogGroupsForSites(logIds) {
   return httpCall("/api/unilog/groups/for-sites", { logIds }, "POST");
 }
-export function setUnilogGroupType(groupIds, groupType) {
-  return httpCall(
-    "/api/unilog/groups/set-type",
-    { groupIds, groupType },
-    "POST",
-  );
-}
 export function setUnilogGroupName(groupId, description) {
   return httpCall(
     "/api/unilog/groups/set-name",

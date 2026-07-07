@@ -61,14 +61,12 @@ function astSites(text, vue) {
 
     let level, tag, argExpr;
     let grpNames = [];
-    let grpTyp = null;
     if (c.callee === "logHere") {
       // logHere carries its groups in the param object. Single message arg only.
       // Empty message arg becomes the "<missing>" sentinel.
       level = c.level;
       tag = null;
       grpNames = c.grpNames || [];
-      grpTyp = c.grpTyp ?? null;
       argExpr = c.argsText.length ? c.argsText[0] : '"<missing>"';
     } else {
       // console.*, log(), loge(), logSubtitle(): strip a leading [tag] from the
@@ -88,7 +86,6 @@ function astSites(text, vue) {
       tag,
       argExpr,
       grpNames,
-      grpTyp,
     });
   }
   return { upgrades, actives };
@@ -104,7 +101,6 @@ export function scanText(text, srcFile, { vue = false } = {}) {
     tag: u.tag,
     argExpr: u.argExpr,
     grpNames: u.grpNames,
-    grpTyp: u.grpTyp,
     srcLine: u.startLine,
   }));
   const refreshes = actives.map((a) => ({
@@ -221,9 +217,7 @@ export async function reconcileFilesWithDb(
     // Resolve any declared group names to ids (find-or-create) before insert.
     createSiteFn = (s) => {
       const groupIds = (s.grpNames || []).map(
-        (name) =>
-          unilogDb.findOrCreateGroup({ description: name, groupType: s.grpTyp })
-            .id,
+        (name) => unilogDb.findOrCreateGroup({ description: name }).id,
       );
       return Promise.resolve(unilogDb.createSite({ ...s, groupIds }));
     };
@@ -261,7 +255,6 @@ export async function reconcileFilesWithDb(
           srcLine: c.srcLine,
           project,
           grpNames: c.grpNames || [],
-          grpTyp: c.grpTyp ?? null,
         });
         realIds.push(id);
       }

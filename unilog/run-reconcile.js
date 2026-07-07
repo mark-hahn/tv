@@ -96,10 +96,9 @@ function nowPst() {
 
 // ---- named groups (from logHere `grp`) ------------------------------------
 // A site is linked only to the named groups it declares — there is no per-run
-// "task" group. Each name is resolved to a group_id once (memoized). A `typ`
-// only applies when the group is newly created; existing groups keep their type.
+// "task" group. Each name is resolved to a group_id once (memoized).
 const namedGroupIds = new Map(); // name -> group_id
-async function ensureNamedGroup(name, typ) {
+async function ensureNamedGroup(name) {
   if (namedGroupIds.has(name)) return namedGroupIds.get(name);
   let id;
   if (!useSsh) {
@@ -107,7 +106,6 @@ async function ensureNamedGroup(name, typ) {
       id = (
         await postJson("/api/unilog/find-or-create-group", {
           description: name,
-          groupType: typ || null,
         })
       ).id;
     } catch {
@@ -123,8 +121,8 @@ async function ensureNamedGroup(name, typ) {
       id = Number(existing);
     } else {
       sqlOne(
-        `INSERT INTO log_groups (group_id, group_type, ts, description) ` +
-          `VALUES ((SELECT COALESCE(MAX(group_id),0)+1 FROM log_groups), ${q(typ || null)}, ${q(nowPst())}, ${q(name)});`,
+        `INSERT INTO log_groups (group_id, ts, description) ` +
+          `VALUES ((SELECT COALESCE(MAX(group_id),0)+1 FROM log_groups), ${q(nowPst())}, ${q(name)});`,
       );
       id = Number(
         sqlOne(
@@ -141,7 +139,7 @@ async function ensureNamedGroup(name, typ) {
 async function resolveGroupIds(site) {
   const ids = [];
   for (const name of site.grpNames || [])
-    ids.push(await ensureNamedGroup(name, site.grpTyp));
+    ids.push(await ensureNamedGroup(name));
   return ids;
 }
 

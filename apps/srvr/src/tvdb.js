@@ -890,7 +890,16 @@ const getRemote = async (id, type, showName) => {
             signal: AbortSignal.timeout(8000),
           });
           if (!resp.ok) {
-            unilog(725, "err", `reddit search ${resp.status} for ${showName}`);
+            let errDetail = "";
+            try {
+              const body = await resp.text();
+              errDetail = body ? ` body=${body.slice(0, 200)}` : "";
+            } catch {}
+            unilog(
+              725,
+              "err",
+              `reddit search ${resp.status} for ${showName}${errDetail}`,
+            );
             break;
           }
           const json = await resp.json();

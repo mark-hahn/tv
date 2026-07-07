@@ -5,6 +5,7 @@
 
 import fs from "fs";
 import * as path from "node:path";
+import * as cp from "child_process";
 import { rimraf } from "rimraf";
 import { unilog } from "@tv/share";
 import {
@@ -334,6 +335,13 @@ export const createShowFolder = async (params) => {
     } catch (e) {
       throw new Error(`createShowFolder: write nfo failed: ${e.message}`);
     }
+  }
+
+  // Set ownership to emby:emby for entire show tree so Emby can properly scan
+  try {
+    cp.execSync(`chown -R emby:emby "${showPath}"`);
+  } catch (e) {
+    unilog(1238, "chown -R failed (non-fatal):", e.message);
   }
 
   try {

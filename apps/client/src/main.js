@@ -12,7 +12,7 @@ if (DEBUG_CLICKS) {
       const tag = t.tagName.toLowerCase();
       const id = t.id ? `#${t.id}` : "";
       const text = t.textContent?.trim().slice(0, 40) ?? "";
-      // hidden       unilog(892, `${tag}${id}`, text ? `"${text}"` : "");
+      unilog(892, `${tag}${id}`, text ? `"${text}"` : "");
     },
     true,
   );

@@ -1420,11 +1420,13 @@ export default {
       if (!list) return;
       const rect = list.getBoundingClientRect();
       const width = Math.min(380, Math.max(260, rect.width - 16));
+      const hdrTop = document.getElementById("hdrtop");
+      const top = hdrTop ? hdrTop.getBoundingClientRect().top : 20;
       this.groupPaneStyle = {
         position: "fixed",
         right: `${Math.max(4, window.innerWidth - rect.right + 8)}px`,
-        top: "50%",
-        transform: "translateY(-50%)",
+        top: `${top}px`,
+        transform: "translateY(0)",
         width: `${width}px`,
       };
     },
@@ -1672,7 +1674,7 @@ export default {
   display: flex;
   gap: 10px;
   box-sizing: border-box;
-  max-height: 80vh;
+  max-height: 95vh;
   padding: 10px;
   background: #fff;
   border: 1px solid #999;
@@ -1701,7 +1703,7 @@ export default {
 }
 .groupsList {
   flex: 1;
-  min-height: 220px;
+  min-height: 372px;
   width: 100%;
   box-sizing: border-box;
   font-size: 12px;

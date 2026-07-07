@@ -91,8 +91,6 @@ export async function getTmdb(params) {
       }
     }
 
-    unilog(710, "Guest actor list with images:", guestActorList);
-
     return {
       guests: guestActorList,
       image: episodeInfo.still_path

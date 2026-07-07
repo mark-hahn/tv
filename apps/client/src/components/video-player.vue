@@ -746,19 +746,46 @@
       >
         Audio
       </div>
-      <!-- X close -->
+      <!-- Intro mode: None (checked, no intro) — sits just left of the X -->
       <div
-        @click.stop="close"
+        v-if="mode === 'intro'"
+        @click.stop="clickIntroNone"
+        title="checked, no intro"
         style="
           margin-left: auto;
           color: white;
-          font-size: 28px;
-          line-height: 1;
+          font-size: 13px;
+          padding: 2px 8px;
+          border-radius: 4px;
+          border: 1px solid #666;
           cursor: pointer;
           user-select: none;
-          text-shadow: 0 0 4px #000;
-          padding-left: 14px;
+          white-space: nowrap;
+          flex-shrink: 0;
+          margin-right: 14px;
+          text-shadow: 0 0 3px #000;
         "
+        :style="{
+          background: introNone
+            ? 'rgba(180, 50, 50, 0.9)'
+            : 'rgba(0, 0, 0, 0.5)',
+        }"
+      >
+        None
+      </div>
+      <!-- X close -->
+      <div
+        @click.stop="close"
+        :style="{
+          marginLeft: mode === 'intro' ? '0' : 'auto',
+          color: 'white',
+          fontSize: '28px',
+          lineHeight: '1',
+          cursor: 'pointer',
+          userSelect: 'none',
+          textShadow: '0 0 4px #000',
+          paddingLeft: '14px',
+        }"
       >
         ✕
       </div>
@@ -808,7 +835,7 @@ import {
   saveSeasonIntro,
 } from "../srvr.js";
 
-import { fmtPos, getSeasonIntro, unilog} from "@tv/share"
+import { fmtPos, getSeasonIntro, unilog } from "@tv/share";
 
 const TV_SRVR_URL = config.tvSrvrUrl;
 const PLAYER_MUTE_STORAGE_KEY = "tvPlayerMuted";
@@ -867,6 +894,7 @@ export default {
       startMark: 0,
       trimPos: null,
       skipDur: null,
+      introNone: false,
       currentTimeSec: 0,
       seekTarget: null,
       playerMuted: false,
@@ -1032,6 +1060,7 @@ export default {
       this.startMark = si.startMark ?? 0;
       this.trimPos = si.trimPos ?? null;
       this.skipDur = si.skipDur ?? null;
+      this.introNone = si.none === true;
     },
     introSeason(newVal) {
       if (!this.introShow?.name) return;
@@ -1039,6 +1068,7 @@ export default {
       this.startMark = si.startMark ?? 0;
       this.trimPos = si.trimPos ?? null;
       this.skipDur = si.skipDur ?? null;
+      this.introNone = si.none === true;
     },
     path(newVal) {
       this._mseStop();
@@ -1198,12 +1228,18 @@ export default {
       const err = vid.error;
       if (!err) return;
       if (this.errorRetries >= 3) {
-        unilog(1049, `error code=${err.code}, giving up after ${this.errorRetries} retries`);
+        unilog(
+          1049,
+          `error code=${err.code}, giving up after ${this.errorRetries} retries`,
+        );
         return;
       }
       this.errorRetries++;
       const resumeAt = vid.currentTime;
-      unilog(1050, `error code=${err.code} at ${resumeAt.toFixed(1)}s, retry ${this.errorRetries}`);
+      unilog(
+        1050,
+        `error code=${err.code} at ${resumeAt.toFixed(1)}s, retry ${this.errorRetries}`,
+      );
       this._mseStop();
       setTimeout(() => {
         const v = this.$refs.vid;
@@ -1546,6 +1582,12 @@ export default {
       this.skipDur = this.skipDur === 0 ? null : 0;
       this._persistField("skipDur", this.skipDur);
     },
+    // None: toggle "checked, no intro" so needsIntro stays false with no
+    // trim/skip configured.
+    clickIntroNone() {
+      this.introNone = !this.introNone;
+      this._persistField("none", this.introNone ? true : null);
+    },
     _persistField(field, value) {
       if (!this.introShow?.name) return;
       const season = this.introSeason;
@@ -1556,6 +1598,9 @@ export default {
         this.introShow.seasonIntros[season] = {};
       this.introShow.seasonIntros[season][field] = value;
       if ((field === "trimPos" || field === "skipDur") && value != null) {
+        this.introShow.needsIntro = false;
+      }
+      if (field === "none" && value === true) {
         this.introShow.needsIntro = false;
       }
       saveSeasonIntro(this.introShow.name, season, field, value).catch((e) =>

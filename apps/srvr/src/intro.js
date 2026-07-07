@@ -4,8 +4,9 @@
 // lives here; index.js wires the routes and the WebSocket press dispatch.
 
 import fetch from "node-fetch";
-import { unilog } from "@tv/share";
+import { unilog, logHere } from "@tv/share";
 import * as tvdb from "./tvdb.js";
+import * as bifQueue from "./bifQueue.js";
 import { EMBY_BASE_URL, EMBY_API_KEY, EMBY_USER_ID } from "./embyConfig.js";
 
 export async function doSkipIntro(pressedAt, deviceName = "Living Room TV") {
@@ -163,6 +164,30 @@ export function pushIntroState(ws, record, showName, season, episode) {
   pushEmbyText(ws, "trim", fmtIntroPos(si.trimPos ?? null));
   pushEmbyText(ws, "skip", fmtIntroPos(si.skipDur ?? null));
   pushEmbyText(ws, "ant", record?.anticipating ? "ANT" : "Ant");
+  pushEmbyText(ws, "none", si.none ? "NONE" : "None");
+}
+
+// After a season-intro save, if the show now has a configured intro (trimPos,
+// skipDur, or an explicit "none"), clear needsIntro and cancel any pending .bif
+// job. Called from every save path (client endpoint + emby overlay press) so
+// the flag never lingers. One-directional (only clears); the background update
+// re-sets needsIntro when a show becomes unconfigured again.
+export async function reconcileNeedsIntro(name) {
+  const rec = name && tvdb.getAllTvdbSync()?.[name];
+  if (!rec) return;
+  const hasConfiguredIntro =
+    rec.seasonIntros != null &&
+    Object.values(rec.seasonIntros).some(
+      (si) => si?.trimPos != null || si?.skipDur != null || si?.none === true,
+    );
+  if (hasConfiguredIntro && rec.needsIntro) {
+    await tvdb.setTvdbFields({ name, needsIntro: false });
+    try {
+      bifQueue.handleNeedsIntroChange(name, rec, false);
+    } catch (e) {
+      unilog(1248, `needsIntro clear failed for ${name}: ${e.message}`);
+    }
+  }
 }
 
 async function embySeekTicks(sessionId, ticks, runtimeTicks) {
@@ -316,10 +341,21 @@ export async function handleEmbyIntroPress(ws, btnId, pressedAt, videoTimeSec) {
       if (name)
         await tvdb.setTvdbFields({ name, anticipating: !record?.anticipating });
       break;
+    case "none":
+      // Toggle "checked, no intro": keeps needsIntro false with no trim/skip.
+      if (name)
+        await tvdb.saveSeasonIntro(
+          record,
+          season,
+          "none",
+          si.none ? null : true,
+        );
+      break;
     default:
       return;
   }
   // setTvdbFields mutates allTvdb[name] in place; re-read for fresh labels
+  if (name) await reconcileNeedsIntro(name);
   const fresh = (name && tvdb.getAllTvdbSync()?.[name]) || record;
   pushIntroState(ws, fresh, showName, season, episode);
 }

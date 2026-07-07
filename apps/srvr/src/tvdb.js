@@ -3086,7 +3086,12 @@ export const setTvdbFields = async (params) => {
 // seasonIntros is a sparse map { [season]: { trimPos, startMark, skipDur } } on
 // the tvdb record, or null/absent when no season has been edited.
 
-const EMPTY_SEASON_INTRO = { trimPos: null, startMark: null, skipDur: null };
+const EMPTY_SEASON_INTRO = {
+  trimPos: null,
+  startMark: null,
+  skipDur: null,
+  none: false,
+};
 
 // Return the intro-data object for a season. Falls back to the nearest season
 // that HAS data (closest smaller first, then closest larger). When seasonIntros
@@ -3107,7 +3112,12 @@ export const saveSeasonIntro = async (record, season, field, value) => {
       : {};
   const obj = map[s] ? { ...map[s] } : { ...EMPTY_SEASON_INTRO };
   obj[field] = value;
-  if (obj.trimPos == null && obj.startMark == null && obj.skipDur == null) {
+  if (
+    obj.trimPos == null &&
+    obj.startMark == null &&
+    obj.skipDur == null &&
+    !obj.none
+  ) {
     delete map[s];
   } else {
     map[s] = obj;

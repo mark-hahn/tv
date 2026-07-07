@@ -195,7 +195,11 @@
     );
 
     // Anticipating toggle
-    overlay.appendChild(makeBtn("Ant", "ant", { slot: "ant", gap: 0 }));
+    overlay.appendChild(makeBtn("Ant", "ant", { slot: "ant" }));
+
+    // None: mark "checked, no intro" so needsIntro stays false without
+    // a trim/skip. Sits at the right end (next to Emby's own close control).
+    overlay.appendChild(makeBtn("None", "none", { slot: "none", gap: 0 }));
 
     document.body.appendChild(overlay);
   }
@@ -208,6 +212,10 @@
     if (textId === "ant") {
       el.style.background =
         text === "ANT" ? "rgba(180,50,50,0.9)" : "rgba(0,0,0,0.5)";
+    }
+    if (textId === "none") {
+      el.style.background =
+        text === "NONE" ? "rgba(180,50,50,0.9)" : "rgba(0,0,0,0.5)";
     }
   }
 

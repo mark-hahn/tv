@@ -644,7 +644,12 @@ export function fmtPos(ms) {
 // season that HAS data (closest smaller first, then closest larger). When
 // seasonIntros is null/absent/empty, returns an all-null object. Always a
 // shallow copy so callers can't mutate stored data.
-const EMPTY_SEASON_INTRO = { trimPos: null, startMark: null, skipDur: null };
+const EMPTY_SEASON_INTRO = {
+  trimPos: null,
+  startMark: null,
+  skipDur: null,
+  none: false,
+};
 
 export function getSeasonIntro(seasonIntros, season) {
   const map = seasonIntros;
@@ -672,4 +677,3 @@ export function getSeasonIntro(seasonIntros, season) {
   }
   return { ...EMPTY_SEASON_INTRO };
 }
-

@@ -625,11 +625,13 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         gapChanges.push(`full:${tvdbRecord.full}->${newFull}`);
         tvdbRecord.full = newFull;
       }
-      // Compute needsIntro
+      // Compute needsIntro. A season with trimPos/skipDur OR one explicitly
+      // marked "none" (checked, no intro) counts as configured.
       const hasConfiguredIntro =
         tvdbRecord.seasonIntros != null &&
         Object.values(tvdbRecord.seasonIntros).some(
-          (si) => si?.trimPos != null || si?.skipDur != null,
+          (si) =>
+            si?.trimPos != null || si?.skipDur != null || si?.none === true,
         );
       const newNeedsIntro = !!(
         tvdbRecord.inEmby &&
@@ -2297,6 +2299,10 @@ app.post("/api/saveSeasonIntro", async (req, res) => {
   }
   try {
     await tvdb.saveSeasonIntro(record, season, field, value);
+    // Once the show has a configured intro (trimPos, skipDur, or an explicit
+    // "none"), it no longer needsIntro. Clear the flag and cancel any pending
+    // .bif job immediately instead of waiting for the next background update.
+    await intro.reconcileNeedsIntro(name);
     res.json({ ok: true });
   } catch (err) {
     unilog(601, "error:", err.message);

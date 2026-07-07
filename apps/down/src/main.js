@@ -2793,7 +2793,10 @@ async function main() {
                   (r && r.premiereDate ? String(r.premiereDate) : "") ||
                   "";
                 var matchYear = rawYear.slice(0, 4);
-                return /^\d{4}$/.test(matchYear)
+                var alreadyHasYear = new RegExp(
+                  "\\(" + matchYear + "\\)\\s*$",
+                ).test(resultName);
+                return /^\d{4}$/.test(matchYear) && !alreadyHasYear
                   ? `${resultName} (${matchYear})`
                   : resultName;
               })

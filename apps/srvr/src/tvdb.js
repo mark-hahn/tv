@@ -320,7 +320,7 @@ async function getSeriesMap(tvdbId, watchedEpis = null) {
       });
 
       if (!res.ok) {
-        unilog(715, "err", "getSeriesMap: failed to fetch episodes", {
+        unilog(715, "getSeriesMap: failed to fetch episodes", {
           tvdbId,
           page,
           status: res.status,
@@ -328,7 +328,7 @@ async function getSeriesMap(tvdbId, watchedEpis = null) {
         break;
       }
     } catch (e) {
-      unilog(716, "err", "getSeriesMap: fetch error", {
+      unilog(716, "getSeriesMap: fetch error", {
         tvdbId,
         page,
         error: e.message,
@@ -532,7 +532,7 @@ if (
     );
     fs.renameSync(lastViewedPath, lastViewedPath + ".backup");
   } catch (e) {
-    unilog(719, "err", "Phase 5.3: lastViewed.json migration failed:", e);
+    unilog(719, "Phase 5.3: lastViewed.json migration failed:", e);
   }
 }
 
@@ -547,7 +547,7 @@ if (phase5MigrationNeeded) {
       unilog(118, "Phase 5: Migration complete - backup files created");
     })
     .catch((e) => {
-      unilog(720, "err", "Phase 5: Migration save failed:", e);
+      unilog(720, "Phase 5: Migration save failed:", e);
     });
 }
 
@@ -831,7 +831,7 @@ const getUrlAndRatings = async (type, url, name) => {
 
       if (!result || result.challenge) {
         if (result?.challenge)
-          unilog(723, "err", `getUrlAndRatings imdb challenge page: ${url}`);
+          unilog(723, `getUrlAndRatings imdb challenge page: ${url}`);
         return { ratings: null, video: null };
       }
 
@@ -1394,7 +1394,7 @@ async function getTmdbFallback(showName) {
 
     return result;
   } catch (err) {
-    unilog(732, "err", "getTmdbFallback error for", showName, err.message);
+    unilog(732, "getTmdbFallback error for", showName, err.message);
     return null;
   }
 }
@@ -1580,7 +1580,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   // Defensive check - ensure show object exists
   if (!show || !show.name) {
-    unilog(733, "err", "getTvdbData: Invalid paramObj - missing show.name", {
+    unilog(733, "getTvdbData: Invalid paramObj - missing show.name", {
       paramObj,
     });
     if (resolve) resolve(null);
@@ -1594,7 +1594,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   const showId = show.id;
   const tvdbId = show.tvdbId;
   if (!tvdbId) {
-    unilog(734, "err", "getTvdbData no tvdbId:", show);
+    unilog(734, "getTvdbData no tvdbId:", show);
     resolve(inputName);
     return;
   }
@@ -1641,7 +1641,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
       return;
     }
   } catch (err) {
-    unilog(737, "err", "getTvdbData extended catch error:", name, {
+    unilog(737, "getTvdbData extended catch error:", name, {
       extUrl,
       extRes,
       err,
@@ -2254,7 +2254,7 @@ const chkTvdbQueue = () => {
         finalData.saved = Date.now();
         // Save to disk so timestamp persists across restarts
         saveTvdbFiles(allTvdb).catch((err) => {
-          unilog(745, "err", "chkTvdbQueue: save error:", err.message);
+          unilog(745, "chkTvdbQueue: save error:", err.message);
         });
         // Push updated record to clients only when fields actually changed
         if (!paramObj.suppressNotify) {
@@ -2268,7 +2268,7 @@ const chkTvdbQueue = () => {
       chkTvdbQueue();
     })
     .catch((err) => {
-      unilog(746, "err", "chkTvdbQueue: promise rejected", { err });
+      unilog(746, "chkTvdbQueue: promise rejected", { err });
       if (resolveCb) resolveCb(null);
       chkTvdbQueueRunning = false;
       chkTvdbQueue();
@@ -2292,7 +2292,7 @@ const tryLocalGetTvdb = async () => {
     try {
       await preTvdbTickCallback({ isBackground: !!nextItem?.isBackground });
     } catch (e) {
-      unilog(747, "err", "tryLocalGetTvdb preTick:", e.message);
+      unilog(747, "tryLocalGetTvdb preTick:", e.message);
     }
   }
 
@@ -2347,7 +2347,7 @@ const tryLocalGetTvdb = async () => {
   try {
     updatedRecord = await tvdbDonePromise;
   } catch (e) {
-    unilog(749, "err", "tryLocalGetTvdb: tvdb update failed:", e?.message);
+    unilog(749, "tryLocalGetTvdb: tvdb update failed:", e?.message);
   }
   const processRecord = updatedRecord || allTvdb[minTvdb.name] || minTvdb;
   if (!processRecord.name) {
@@ -2383,7 +2383,7 @@ const tryLocalGetTvdb = async () => {
       });
       if (result) push2Result = result;
     } catch (e) {
-      unilog(751, "err", "tryLocalGetTvdb perShow:", e.message);
+      unilog(751, "tryLocalGetTvdb perShow:", e.message);
     }
   }
 
@@ -2417,7 +2417,7 @@ const tryLocalGetTvdb = async () => {
         if (notifyCallback)
           notifyCallback(processRecord.name, allTvdb[processRecord.name]);
       } catch (e) {
-        unilog(753, "err", "tryLocalGetTvdb crew:", e.message);
+        unilog(753, "tryLocalGetTvdb crew:", e.message);
       }
     }
   }
@@ -2448,7 +2448,7 @@ const tryLocalGetTvdb = async () => {
         unilog(124, `tvdb push3 [${processRecord.name}]: Rotten no result`);
       }
     } catch (e) {
-      unilog(755, "err", "tryLocalGetTvdb push3 rotten:", e.message);
+      unilog(755, "tryLocalGetTvdb push3 rotten:", e.message);
     }
   }
 
@@ -2457,7 +2457,7 @@ const tryLocalGetTvdb = async () => {
     try {
       queueDrainCallback();
     } catch (e) {
-      unilog(756, "err", "tryLocalGetTvdb queueDrain:", e.message);
+      unilog(756, "tryLocalGetTvdb queueDrain:", e.message);
     }
   }
 
@@ -2612,7 +2612,7 @@ export const debugTvdb = async (params) => {
       path: samplePath,
     };
   } catch (err) {
-    unilog(762, "err", "debugTvdb: ERROR", { error: err.message });
+    unilog(762, "debugTvdb: ERROR", { error: err.message });
     throw new Error(`debugTvdb error: ${err.message}`);
   }
 };
@@ -2639,7 +2639,7 @@ export const getActorPage = async (params) => {
         }
       }
     } catch (err) {
-      unilog(763, "err", "getActorPage TVDB person lookup error:", err.message);
+      unilog(763, "getActorPage TVDB person lookup error:", err.message);
     }
   }
 
@@ -2676,7 +2676,7 @@ export const getActorPage = async (params) => {
 
     return null;
   } catch (err) {
-    unilog(764, "err", "getActorPage error:", err.message);
+    unilog(764, "getActorPage error:", err.message);
     return null;
   }
 };
@@ -2787,7 +2787,7 @@ export const saveTvdbSync = async () => {
   try {
     await saveTvdbFiles(allTvdb);
   } catch (err) {
-    unilog(767, "err", "saveTvdbSync error:", err.message);
+    unilog(767, "saveTvdbSync error:", err.message);
     throw err;
   }
 };
@@ -2809,7 +2809,7 @@ export const getNewTvdb = async (params) => {
 export const searchTvdbByImdbId = async (params) => {
   const imdbId = params?.imdbId;
   if (!imdbId) {
-    unilog(768, "err", "searchTvdbByImdbId: missing imdbId");
+    unilog(768, "searchTvdbByImdbId: missing imdbId");
     return null;
   }
 
@@ -2883,7 +2883,7 @@ export const searchTvdbByImdbId = async (params) => {
     const extResObj = await extRes.json();
     const extData = extResObj?.data;
     if (!extData) {
-      unilog(774, "err", `searchTvdbByImdbId: no extended data for ${tvdbId}`);
+      unilog(774, `searchTvdbByImdbId: no extended data for ${tvdbId}`);
       return null;
     }
 
@@ -2949,7 +2949,7 @@ export const setTvdbFields = async (params) => {
       const newKey = paramObj.$rename;
       const record = allTvdb[name];
       if (!record) {
-        unilog(777, "err", "setTvdbFields $rename no tvdb for", name);
+        unilog(777, "setTvdbFields $rename no tvdb for", name);
         return "no tvdb";
       }
       delete allTvdb[name];
@@ -2958,7 +2958,7 @@ export const setTvdbFields = async (params) => {
     } else {
       tvdb = allTvdb[name];
       if (!tvdb) {
-        unilog(779, "err", "setTvdbFields no tvdb for", name);
+        unilog(779, "setTvdbFields no tvdb for", name);
         return "no tvdb";
       }
       if (paramObj.$delete) {

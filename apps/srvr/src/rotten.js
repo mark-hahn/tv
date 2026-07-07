@@ -758,7 +758,7 @@ export async function rottenSearch(query) {
     );
     return await runOnce(page);
   } catch (err) {
-    unilog(706, "err", "rottenSearch error", query, err.message);
+    unilog(706, "rottenSearch error", query, err.message);
     return null;
   } finally {
     if (page && usingShared && !REUSE_PAGE) {

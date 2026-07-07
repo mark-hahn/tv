@@ -118,7 +118,7 @@ const insEvent = db.prepare(
 // broadcast and for enriching newly inserted events with their metadata.
 const getEventRow = db.prepare(`
   SELECT e.id, e.ts, e.pid, s.log_id, s.src_file, s.src_line,
-         s.tag, s.level, e.message
+         s.tag, s.level, e.message, e.hide
     FROM log_events e JOIN log_sites s ON e.log_id = s.log_id
    WHERE e.id = ?
 `);

@@ -35,6 +35,7 @@
         @blur="$emit('filter-blur')"
         placeholder="Filter..."
         style="
+          margin: 0 15px 0 15px;
           width: 120px;
           padding: 5px;
           border: 1.5px solid black;

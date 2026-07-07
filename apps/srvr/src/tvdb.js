@@ -2739,20 +2739,6 @@ export const searchActorsInNonEmby = async (params) => {
 
 export const getAllTvdb = async (params) => {
   const hasEmby = params?.hasEmby ?? 0;
-
-  // DEBUG Swiss Toni
-  const swissToni = allTvdb["Swiss Toni"];
-  if (swissToni) {
-    // hidden     unilog(766, "Swiss Toni:", {
-    // hidden       notReady: swissToni.notReady,
-    // hidden       inEmby: swissToni.inEmby,
-    // hidden       fileGap: swissToni.fileGap,
-    // hidden       fileEndError: swissToni.fileEndError,
-    // hidden     });
-  } else {
-    unilog(126, "Swiss Toni NOT FOUND in allTvdb");
-  }
-
   // Filter based on hasEmby parameter
   if (hasEmby === 0) {
     // Return all shows

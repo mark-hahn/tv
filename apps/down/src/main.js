@@ -2087,10 +2087,24 @@ async function main() {
 
     // Load Emby membership map from srvr's tvdb.json once per cycle.
     // Keys are series names; value.inEmby is true if the show is in Emby.
-    try {
-      embyMap = JSON.parse(fs.readFileSync(TVDB_JSON_PATH, "utf8"));
-    } catch (e) {
-      embyMap = null;
+    // Retry a few times: srvr rewrites tvdb.json frequently, and a transient
+    // read/parse failure must not leave embyMap null (a null map bypasses the
+    // Emby download gate and lets non-Emby shows download).
+    embyMap = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        embyMap = JSON.parse(fs.readFileSync(TVDB_JSON_PATH, "utf8"));
+        break;
+      } catch (e) {
+        if (attempt === 4) {
+          unilog(
+            1243,
+            `failed to load embyMap from ${TVDB_JSON_PATH}: ${e.message}`,
+          );
+        } else {
+          await new Promise((r) => setTimeout(r, 50));
+        }
+      }
     }
 
     // Reset TVDB cache each cycle so embyMap changes (inEmby toggled) take effect.
@@ -3053,7 +3067,17 @@ async function main() {
     }
 
     // Emby filter: only download shows that are in Emby.
-    if (!processingForced && embyMap && seriesName) {
+    // Fail closed: if embyMap failed to load this cycle, skip the download
+    // rather than letting it through. A null embyMap previously bypassed this
+    // entire check, so non-Emby shows downloaded anyway.
+    if (!processingForced && seriesName) {
+      if (!embyMap) {
+        unilog(
+          1244,
+          `skip: embyMap not loaded, cannot verify Emby membership for ${fname} (${seriesName})`,
+        );
+        return process.nextTick(checkFile);
+      }
       const embyKey =
         smartTitleMatch(
           seriesName,

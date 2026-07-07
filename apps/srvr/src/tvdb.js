@@ -893,7 +893,7 @@ const getRemote = async (id, type, showName) => {
             let errDetail = "";
             try {
               const body = await resp.text();
-              errDetail = body ? ` body=${body.slice(0, 200)}` : "";
+              errDetail = body ? ` body=${body.slice(0, 800)}` : "";
             } catch {}
             unilog(
               725,

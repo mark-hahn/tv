@@ -1870,6 +1870,11 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     ? true
     : (show.inEmby ?? existing.inEmby ?? false);
 
+  unilog(
+    1226,
+    `getNewTvdb setting inEmby=${newInEmby} for ${name} (fromEmbySync=${isSyncingFromEmby}, show.inEmby=${show.inEmby}, existing.inEmby=${existing.inEmby})`,
+  );
+
   // Ensure Emby button is correct in fresh remotes based on inEmby status
   const embyBtnIdx = tvdbData.remotes.findIndex((r) => r.name === "Emby");
   const embyUrl = urls.embyPageUrl(showId || tvdbData.id);
@@ -2729,12 +2734,12 @@ export const getAllTvdb = async (params) => {
   // DEBUG Swiss Toni
   const swissToni = allTvdb["Swiss Toni"];
   if (swissToni) {
-// hidden     unilog(766, "Swiss Toni:", {
-// hidden       notReady: swissToni.notReady,
-// hidden       inEmby: swissToni.inEmby,
-// hidden       fileGap: swissToni.fileGap,
-// hidden       fileEndError: swissToni.fileEndError,
-// hidden     });
+    // hidden     unilog(766, "Swiss Toni:", {
+    // hidden       notReady: swissToni.notReady,
+    // hidden       inEmby: swissToni.inEmby,
+    // hidden       fileGap: swissToni.fileGap,
+    // hidden       fileEndError: swissToni.fileEndError,
+    // hidden     });
   } else {
     unilog(126, "Swiss Toni NOT FOUND in allTvdb");
   }
@@ -2995,6 +3000,15 @@ export const setTvdbFields = async (params) => {
       // Record history when a show is removed from Emby
       if (wasInEmby && tvdb.inEmby === false) {
         unilog(503, "history", "delEmby", name, "Deleted from Emby");
+        unilog(
+          1227,
+          `setTvdbFields: inEmby changed ${wasInEmby} -> ${tvdb.inEmby} for ${name}`,
+        );
+      } else if (wasInEmby !== tvdb.inEmby) {
+        unilog(
+          1228,
+          `setTvdbFields: inEmby changed ${wasInEmby} -> ${tvdb.inEmby} for ${name}`,
+        );
       }
 
       // Keep Emby button in sync with final inEmby/Id values (after field updates).

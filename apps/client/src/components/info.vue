@@ -922,7 +922,10 @@ export default {
       }
 
       if (!tvdbData) {
-        unilog(924, "setPoster: tvdbData missing, using show.imageUrl or placeholder");
+        unilog(
+          924,
+          "setPoster: tvdbData missing, using show.imageUrl or placeholder",
+        );
       } else if (!tvdbData.image) {
         unilog(925, "image missing from tvdbData", tvdbData.name);
       }
@@ -943,7 +946,10 @@ export default {
       if (!this.settingUpShowName && !noAutoShow) {
         const infoBoxEl = document.getElementById("infoBox");
         if (infoBoxEl && infoBoxEl.clientHeight > 0) {
-          unilog(926, `setPoster auto-show: ${infoBoxEl.clientHeight}px for ${this.show?.name}`);
+          unilog(
+            926,
+            `setPoster auto-show: ${infoBoxEl.clientHeight}px for ${this.show?.name}`,
+          );
           img.style.maxHeight = infoBoxEl.clientHeight + "px";
           img.style.visibility = "visible";
         }
@@ -1298,11 +1304,15 @@ export default {
       const show = this.show;
       const name = String(show?.name || "").trim();
       if (!name) return;
+      unilog(1231, `Load button clicked for ${name}`);
       let tvdbId = String(show?.tvdbId || show?.tvdbId || "").trim();
       if (!tvdbId && show?.id) {
         tvdbId = await emby.getTvdbIdFromEmbyItem(show.id);
         if (tvdbId)
-          unilog(931, `loadIntoEmby: resolved tvdbId ${tvdbId} from Emby for "${name}"`);
+          unilog(
+            931,
+            `loadIntoEmby: resolved tvdbId ${tvdbId} from Emby for "${name}"`,
+          );
       }
       if (!tvdbId) {
         try {
@@ -1316,7 +1326,10 @@ export default {
             const candidate = String(match?.tvdb_id || match?.id || "").trim();
             if (candidate) {
               tvdbId = candidate;
-              unilog(932, `loadIntoEmby: resolved tvdbId ${tvdbId} from TVDB search for "${name}"`);
+              unilog(
+                932,
+                `loadIntoEmby: resolved tvdbId ${tvdbId} from TVDB search for "${name}"`,
+              );
             }
           }
         } catch (e) {
@@ -1453,7 +1466,10 @@ export default {
               if (recTvdbId && recTvdbId === currentTvdbId) {
                 tvdbData = rec;
                 if (key !== show.name) {
-                  unilog(935, `Series: resolved tvdbData by tvdbId=${currentTvdbId} key=\"${key}\" for show=\"${show.name}\"`);
+                  unilog(
+                    935,
+                    `Series: resolved tvdbData by tvdbId=${currentTvdbId} key=\"${key}\" for show=\"${show.name}\"`,
+                  );
                 }
                 break;
               }
@@ -1510,7 +1526,11 @@ export default {
                 unilog(937, "Series: Trying IMDb ID search for", imdbId);
                 tvdbData = await srvr.searchTvdbByImdbId({ imdbId });
                 if (tvdbData) {
-                  unilog(938, "Series: Found tvdb data via IMDb ID:", tvdbData.name);
+                  unilog(
+                    938,
+                    "Series: Found tvdb data via IMDb ID:",
+                    tvdbData.name,
+                  );
                   delete tvdbData.deleted;
                   // Don't cache this in allTvdb since it's not a full record
                   // But update the show with the tvdbId we found
@@ -1594,7 +1614,10 @@ export default {
               const infoBoxEl = document.getElementById("infoBox");
               const posterImg = document.querySelector("#poster img");
               if (infoBoxEl && posterImg && infoBoxEl.clientHeight > 0) {
-                unilog(942, `preview nextTick: ${infoBoxEl.clientHeight}px for ${this.show?.name}`);
+                unilog(
+                  942,
+                  `preview nextTick: ${infoBoxEl.clientHeight}px for ${this.show?.name}`,
+                );
                 posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
                 posterImg.style.visibility = "visible";
               }
@@ -1609,7 +1632,7 @@ export default {
             const infoBoxEl = document.getElementById("infoBox");
             const posterImg = document.querySelector("#poster img");
             if (infoBoxEl && posterImg && infoBoxEl.clientHeight > 0) {
-// hidden               unilog(943, `seriesReady nextTick: ${infoBoxEl.clientHeight}px for ${this.show?.name}`);
+              // hidden               unilog(943, `seriesReady nextTick: ${infoBoxEl.clientHeight}px for ${this.show?.name}`);
               posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
               posterImg.style.visibility = "visible";
             }
@@ -1774,7 +1797,7 @@ export default {
         const newHeight = infoBoxEl?.clientHeight || 0;
         if (existingMaxHeight > 0) {
           // Keep the same size - don't let content changes shrink the poster
-// hidden           unilog(945, `tvdbUpdated: keeping ${existingMaxHeight}px (infoBox=${newHeight}px) for ${this.show?.name}`);
+          // hidden           unilog(945, `tvdbUpdated: keeping ${existingMaxHeight}px (infoBox=${newHeight}px) for ${this.show?.name}`);
           posterImg.style.maxHeight = existingMaxHeight + "px";
         } else {
           if (infoBoxEl && newHeight > 0) {
@@ -1820,7 +1843,10 @@ export default {
         const infoBoxEl = document.getElementById("infoBox");
         const posterImg = document.querySelector("#poster img");
         if (infoBoxEl && posterImg && infoBoxEl.clientHeight > 0) {
-          unilog(947, `paneChanged: ${infoBoxEl.clientHeight}px for ${this.show?.name}`);
+          unilog(
+            947,
+            `paneChanged: ${infoBoxEl.clientHeight}px for ${this.show?.name}`,
+          );
           posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
           posterImg.style.visibility = "visible";
         }

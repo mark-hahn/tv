@@ -340,5 +340,10 @@ export const createShowFolder = async (params) => {
     unilog(469, "history", "addEmby", showName, `Created folder: ${showPath}`);
   } catch {}
 
+  unilog(
+    1225,
+    `createShowFolder completed for ${showName}: existed=${existed} path=${showPath}`,
+  );
+
   return { ok: true, created: !existed, path: showPath };
 };

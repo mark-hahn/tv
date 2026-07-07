@@ -908,7 +908,10 @@ export default {
       );
       allShows.push(...newShows);
 
-      unilog(1089, `Added ${newShows.length} shows (total: ${allShows.length})`);
+      unilog(
+        1089,
+        `Added ${newShows.length} shows (total: ${allShows.length})`,
+      );
     },
 
     updateWideLandscape() {
@@ -1551,6 +1554,10 @@ export default {
           });
           alert(`No map data for new show ${name}`);
         } else {
+          unilog(
+            1232,
+            `Calling createShowFolderAndRefreshEmby for ${name} tvdbId=${tvdbId}`,
+          );
           const res = await emby.createShowFolderAndRefreshEmby({
             showName: name,
             tvdbId,
@@ -1562,6 +1569,10 @@ export default {
           });
           createResult = res;
           createdFolder = !!res?.createdFolder;
+          unilog(
+            1233,
+            `createShowFolderAndRefreshEmby result for ${name}: createdFolder=${createdFolder} status=${res?.status}`,
+          );
           if (res?.status === "refreshfailed") {
             alert(
               `The folder for "${name}" was created, but the Emby library refresh timed out.\nThe show should appear after Emby finishes scanning on its own.`,

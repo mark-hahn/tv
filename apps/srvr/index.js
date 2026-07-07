@@ -3234,6 +3234,10 @@ async function runEmbyFullSweep(caller = "unknown") {
       tvdbRecord.inMark = markIds.has(showId);
       tvdbRecord.inLinda = lindaIds.has(showId);
       if (!tvdbRecord.inEmby) {
+        unilog(
+          1229,
+          `embyFullSweep setting inEmby=true for ${name} (was ${tvdbRecord.inEmby})`,
+        );
         tvdbRecord.inEmby = true;
         handlePickupChange(name, true, tvdbRecord.status);
       }
@@ -3251,6 +3255,10 @@ async function runEmbyFullSweep(caller = "unknown") {
         (rec.tvdbId && embyTvdbIdSet.has(String(rec.tvdbId)));
       if (!stillInEmby) {
         unilog(71, `Marking ${name} as not in Emby`);
+        unilog(
+          1230,
+          `embyFullSweep setting inEmby=false for ${name} (was ${rec.inEmby})`,
+        );
         // Delete show folder from disk so Emby cannot re-add it on next scan
         const folderName =
           typeof rec.path === "string" &&

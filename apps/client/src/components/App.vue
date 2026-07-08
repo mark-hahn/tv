@@ -98,43 +98,6 @@
             </button>
             <!-- Preview controls: in top row -->
             <template v-if="previewMode">
-              <button
-                @click.stop="addShowFromPreview"
-                :disabled="previewAddBusy || !previewSrchChoice"
-                :style="{
-                  fontSize: '13px',
-                  cursor:
-                    previewAddBusy || !previewSrchChoice
-                      ? 'default'
-                      : 'pointer',
-                  borderRadius: '7px',
-                  padding: '4px 10px',
-                  marginTop: '4px',
-                  marginLeft: '20px',
-                  border: '1px solid #bbb',
-                  backgroundColor:
-                    previewAddBusy || !previewSrchChoice
-                      ? '#eee'
-                      : 'whitesmoke',
-                }"
-              >
-                Add show to Emby
-              </button>
-              <button
-                @click.stop="exitPreview"
-                :style="{
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  borderRadius: '7px',
-                  padding: '4px 10px',
-                  marginTop: '4px',
-                  marginLeft: '4px',
-                  border: '1px solid #bbb',
-                  backgroundColor: 'whitesmoke',
-                }"
-              >
-                Exit Preview
-              </button>
               <span
                 class="pane-header-title"
                 style="margin-left: 10px"

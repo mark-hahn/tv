@@ -2008,6 +2008,7 @@ export default {
         this.currentPane = "browse";
         evtBus.emit("paneChanged", this.currentPane);
         evtBus.emit("browseTabClicked");
+        evtBus.emit("previewMode", false);
         return;
       }
       if (k === "tor") {

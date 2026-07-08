@@ -39,10 +39,18 @@ const sshCommand = `ssh hahnca.com "cd /root/dev/apps/tv && node -e \\"
   const tvdb = JSON.parse(fs.readFileSync(tvdbPath, 'utf8'));
   const showName = process.argv[2];
   const lower = showName.toLowerCase();
-  const matchedKey = Object.keys(tvdb).find(k => k.toLowerCase() === lower);
-  const show = matchedKey ? tvdb[matchedKey] : undefined;
-  if (show) {
-    console.log(JSON.stringify(show));
+  const keys = Object.keys(tvdb);
+  let matchedKey = keys.find(k => k.toLowerCase() === lower);
+  if (!matchedKey) {
+    const matches = keys.filter(k => k.toLowerCase().includes(lower));
+    if (matches.length === 1) matchedKey = matches[0];
+    else if (matches.length > 1) {
+      process.stderr.write('Multiple matches for ' + showName + ':\\\\n' + matches.join('\\\\n') + '\\\\n');
+      process.exit(1);
+    }
+  }
+  if (matchedKey) {
+    console.log(JSON.stringify({ key: matchedKey, show: tvdb[matchedKey] }));
   } else {
     process.stderr.write('Show not found: ' + showName + '\\\\n');
     process.exit(1);
@@ -58,7 +66,9 @@ exec(sshCommand, (error, stdout, stderr) => {
 
   // 3. Process the fetched data
   try {
-    const showData = JSON.parse(fs.readFileSync(tempShowRecordPath, "utf8"));
+    const { key: matchedName, show: showData } = JSON.parse(
+      fs.readFileSync(tempShowRecordPath, "utf8"),
+    );
 
     // Sort properties alphabetically
     const sortObject = (obj) => {
@@ -72,7 +82,7 @@ exec(sshCommand, (error, stdout, stderr) => {
         }, {});
     };
 
-    let finalData = { [showName]: sortObject(showData) };
+    let finalData = { [matchedName]: sortObject(showData) };
 
     // 4. Integrate and apply formatting from format-episodes.cjs
     function formatEpisodeData(data) {

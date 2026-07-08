@@ -392,16 +392,16 @@ export function registerUnilogRoutes(app) {
     }
   });
 
-  app.post("/api/unilog/groups/site-info", (req, res) => {
+  app.post("/api/unilog/groups/ids-for-sites", (req, res) => {
     try {
-      const { groupIds } = req.body || {};
+      const { logIds } = req.body || {};
       res.json({
-        sites: unilogDb.siteInfoForGroups(
-          Array.isArray(groupIds) ? groupIds : [],
+        groupIds: unilogDb.groupIdsForSites(
+          Array.isArray(logIds) ? logIds : [],
         ),
       });
     } catch (error) {
-      console.error("[unilog] /api/unilog/groups/site-info error:", error); // no-unilog
+      console.error("[unilog] /api/unilog/groups/ids-for-sites error:", error); // no-unilog
       res.status(500).json({ error: String(error?.message || error) });
     }
   });

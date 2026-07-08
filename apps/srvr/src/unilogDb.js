@@ -666,20 +666,17 @@ export function siteIdsForGroups(groupIds) {
     .map((r) => r.log_id);
 }
 
-// Full site info (log_id and src_file) for all sites linked to any of the given groups.
-export function siteInfoForGroups(groupIds) {
-  if (!groupIds.length) return [];
-  const nums = groupIds.map(Number);
+// Distinct group ids linked to any of the given sites.
+export function groupIdsForSites(logIds = []) {
+  if (!logIds.length) return [];
+  const nums = logIds.map(Number);
   const ph = nums.map(() => "?").join(",");
   return db
     .prepare(
-      `SELECT DISTINCT s.log_id, s.src_file
-       FROM site_groups sg
-       JOIN log_sites s ON sg.log_id = s.log_id
-       WHERE sg.group_id IN (${ph})`,
+      `SELECT DISTINCT group_id FROM site_groups WHERE log_id IN (${ph})`,
     )
     .all(...nums)
-    .map((r) => ({ id: r.log_id, srcFile: r.src_file }));
+    .map((r) => r.group_id);
 }
 
 // Current comma-joined group string for each given site (for row refresh).

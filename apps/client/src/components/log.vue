@@ -123,9 +123,9 @@
         <option value="refresh">Refresh</option>
         <option value="goto">Go To Selection</option>
         <option value="clear">Clear Selections</option>
+        <option value="showEvents">Show Events</option>
+        <option value="hideEvents">Hide Events</option>
         <option value="selectSites">Select Sites</option>
-        <option value="hide">Hide Sites</option>
-        <option value="unhide">Unhide Sites</option>
         <option value="delete">Delete Sites</option>
         <option value="deleteEvents">Delete Events</option>
         <option value="editor">Editor</option>
@@ -270,23 +270,6 @@
             <button
               class="logBtn"
               :disabled="!selectedGroupIds.length"
-              @click="hideGroupSites"
-            >
-              Hide
-            </button>
-            <button
-              class="logBtn"
-              :disabled="!selectedGroupIds.length"
-              @click="unhideGroupSites"
-            >
-              Unhide
-            </button>
-          </div>
-
-          <div class="groupsRow">
-            <button
-              class="logBtn"
-              :disabled="!selectedGroupIds.length"
               @click="showGroupEvents"
             >
               Show
@@ -296,7 +279,7 @@
               :disabled="!selectedGroupIds.length"
               @click="unshowGroupEvents"
             >
-              Unshow
+              Hide
             </button>
           </div>
 
@@ -330,7 +313,7 @@ import { TabulatorFull as Tabulator } from "tabulator-tables";
 import "tabulator-tables/dist/css/tabulator.min.css";
 import evtBus from "../evtBus.js";
 import * as srvr from "../srvr.js";
-import { unilog } from "../log.js";
+import { unilog, logHere } from "../log.js";
 const MAX_ROWS = 5000;
 const PAGE = 500;
 
@@ -823,8 +806,8 @@ export default {
       else if (act === "goto") this.gotoSelection();
       else if (act === "selectSites") this.selectSites();
       else if (act === "clear") this.setSelection(new Set());
-      else if (act === "hide") await this.hideSites();
-      else if (act === "unhide") await this.unhideSites();
+      else if (act === "showEvents") await this.showSelectedEvents();
+      else if (act === "hideEvents") await this.hideSelectedEvents();
       else if (act === "delete") await this.deleteSites();
       else if (act === "deleteEvents") await this.deleteEvents();
       else if (act === "editor") await this.openInEditor();
@@ -851,88 +834,51 @@ export default {
       }
       this.setSelection(next);
     },
-    async hideSites() {
+    // Distinct group ids linked to the sites of the selected events.
+    async selectedEventGroupIds() {
       const sites = this.selectedSites();
       if (!sites.length) {
-        this.flash("no sites selected");
-        return;
+        this.flash("no events selected");
+        return null;
       }
-      if (!import.meta.env.DEV) {
-        this.flash("hide only works in vite dev");
-        return;
+      const res = await srvr.getUnilogGroupIdsForSites(sites.map((s) => s.id));
+      const groupIds = res?.groupIds || [];
+      if (!groupIds.length) {
+        this.flash("no groups linked to selected events");
+        return null;
       }
-      const n = sites.length;
-      if (
-        !window.confirm(
-          `Hide ${n} site${n === 1 ? "" : "s"}? This comments out the unilog() call(s) in source.`,
-        )
-      )
-        return;
-      await this.postSites("/__unilog/hide", sites, "hid");
+      return groupIds;
     },
-    async unhideSites() {
-      const sites = this.selectedSites();
-      if (!sites.length) {
-        this.flash("no sites selected");
-        return;
-      }
-      if (!import.meta.env.DEV) {
-        this.flash("unhide only works in vite dev");
-        return;
-      }
-      // No confirmation; does not change selection or scroll.
-      await this.postSites("/__unilog/unhide", sites, "unhid");
-    },
-    async hideGroupSites() {
-      if (!this.selectedGroupIds.length) {
-        this.flash("no groups selected");
-        return;
-      }
-      if (!import.meta.env.DEV) {
-        this.flash("hide only works in vite dev");
-        return;
-      }
+    async showSelectedEvents() {
       try {
-        const res = await srvr.getUnilogGroupSiteInfo(this.selectedGroupIds);
-        const sites = res?.sites || [];
-        if (!sites.length) {
-          this.flash("no sites in selected groups");
-          return;
+        const groupIds = await this.selectedEventGroupIds();
+        if (!groupIds) return;
+        const res = await srvr.showUnilogEvents(groupIds);
+        if (res?.ok) {
+          this.flash(`showed ${res.changed || 0} events`);
+          await this.loadLogs();
+        } else {
+          this.flash("failed to show events");
         }
-        const n = sites.length;
-        if (
-          !window.confirm(
-            `Hide ${n} site${n === 1 ? "" : "s"} from selected groups? This comments out the unilog() call(s) in source.`,
-          )
-        )
-          return;
-        await this.postSites("/__unilog/hide", sites, "hid");
       } catch (e) {
-        console.error("[log.vue]", `hideGroupSites failed: ${e.message}`); // no-unilog
-        this.flash("failed to hide sites");
+        unilog(1258, `showSelectedEvents failed: ${e.message}`);
+        this.flash("failed to show events");
       }
     },
-    async unhideGroupSites() {
-      if (!this.selectedGroupIds.length) {
-        this.flash("no groups selected");
-        return;
-      }
-      if (!import.meta.env.DEV) {
-        this.flash("unhide only works in vite dev");
-        return;
-      }
+    async hideSelectedEvents() {
       try {
-        const res = await srvr.getUnilogGroupSiteInfo(this.selectedGroupIds);
-        const sites = res?.sites || [];
-        if (!sites.length) {
-          this.flash("no sites in selected groups");
-          return;
+        const groupIds = await this.selectedEventGroupIds();
+        if (!groupIds) return;
+        const res = await srvr.unshowUnilogEvents(groupIds);
+        if (res?.ok) {
+          this.flash(`hid ${res.changed || 0} events`);
+          await this.loadLogs();
+        } else {
+          this.flash("failed to hide events");
         }
-        // No confirmation; does not change selection or scroll.
-        await this.postSites("/__unilog/unhide", sites, "unhid");
       } catch (e) {
-        console.error("[log.vue]", `unhideGroupSites failed: ${e.message}`); // no-unilog
-        this.flash("failed to unhide sites");
+        unilog(1259, `hideSelectedEvents failed: ${e.message}`);
+        this.flash("failed to hide events");
       }
     },
     async showGroupEvents() {

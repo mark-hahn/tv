@@ -38,23 +38,19 @@ function readJsonBody(req) {
   });
 }
 
-// Dev-only endpoint behind the log viewer's Hide/Unhide Sites actions. Edits the
-// local source tree (source of truth) by commenting/uncommenting unilog() calls.
-function unilogHideEndpoint() {
+// Dev-only endpoint behind the log viewer's Delete Sites action. Edits the
+// local source tree (source of truth) by removing unilog() calls.
+function unilogSitesEndpoint() {
   return {
-    name: "unilog-hide-endpoint",
+    name: "unilog-sites-endpoint",
     configureServer(server) {
       server.middlewares.use("/__unilog", async (req, res, next) => {
         const url = req.url || "";
-        const mode = url.startsWith("/hide")
-          ? "hide"
-          : url.startsWith("/unhide")
-            ? "unhide"
-            : url.startsWith("/delete")
-              ? "delete"
-              : url.startsWith("/open-editor")
-                ? "open-editor"
-                : null;
+        const mode = url.startsWith("/delete")
+          ? "delete"
+          : url.startsWith("/open-editor")
+            ? "open-editor"
+            : null;
         if (mode === null || req.method !== "POST") return next();
 
         // Handle open-editor mode separately
@@ -99,7 +95,7 @@ function unilogHideEndpoint() {
           return;
         }
 
-        // Handle hide/unhide/delete modes
+        // Handle delete mode
         try {
           const body = await readJsonBody(req);
           const sites = Array.isArray(body?.sites)
@@ -107,8 +103,8 @@ function unilogHideEndpoint() {
             : Array.isArray(body?.ids)
               ? body.ids
               : [];
-          const { applySites } = await import("../../unilog/hide.js");
-          const { changed } = applySites(sites, mode);
+          const { deleteSites } = await import("../../unilog/delete.js");
+          const { changed } = deleteSites(sites);
           res.setHeader("content-type", "application/json");
           res.end(JSON.stringify({ ok: true, changed }));
         } catch (err) {
@@ -168,7 +164,7 @@ function consoleToFile() {
 export default defineConfig(({ command }) => ({
   plugins: [
     consoleToFile(),
-    unilogHideEndpoint(),
+    unilogSitesEndpoint(),
     vue(),
     ...(command === "serve"
       ? [Terminal({ console: "terminal", output: ["terminal", "console"] })]

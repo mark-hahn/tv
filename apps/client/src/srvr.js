@@ -346,8 +346,8 @@ export function deleteUnilogGroups(groupIds) {
 export function getUnilogGroupSiteIds(groupIds) {
   return httpCall("/api/unilog/groups/site-ids", { groupIds }, "POST");
 }
-export function getUnilogGroupSiteInfo(groupIds) {
-  return httpCall("/api/unilog/groups/site-info", { groupIds }, "POST");
+export function getUnilogGroupIdsForSites(logIds) {
+  return httpCall("/api/unilog/groups/ids-for-sites", { logIds }, "POST");
 }
 export function getUnilogGroupsForSites(logIds) {
   return httpCall("/api/unilog/groups/for-sites", { logIds }, "POST");

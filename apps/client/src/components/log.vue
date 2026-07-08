@@ -120,6 +120,7 @@
         @change="onAction"
       >
         <option value="">Actions</option>
+        <option value="refresh">Refresh</option>
         <option value="goto">Go To Selection</option>
         <option value="clear">Clear Selections</option>
         <option value="selectSites">Select Sites</option>
@@ -818,7 +819,8 @@ export default {
       const act = this.actionSel;
       this.actionSel = ""; // reset selector back to "Actions"
       if (!act || !this.table) return;
-      if (act === "goto") this.gotoSelection();
+      if (act === "refresh") await this.loadLogs();
+      else if (act === "goto") this.gotoSelection();
       else if (act === "selectSites") this.selectSites();
       else if (act === "clear") this.setSelection(new Set());
       else if (act === "hide") await this.hideSites();

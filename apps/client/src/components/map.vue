@@ -974,6 +974,9 @@
             line-height: 22px;
           "
         >
+          <div v-if="selectedEpisodeAired" style="font-weight: bold">
+            {{ selectedEpisodeAired }}
+          </div>
           <div v-if="episodeInfo.overview">
             {{ episodeInfo.overview }}
           </div>
@@ -1098,6 +1101,18 @@ export default {
     },
     statusVal() {
       return this.tvdbData?.status || "";
+    },
+
+    selectedEpisodeAired() {
+      if (!this.selectedEpisode) return "";
+      const aired =
+        this.episodeInfo?.aired ||
+        epd.getAired(
+          this.tvdbData?.episodeData,
+          this.selectedEpisode.s,
+          this.selectedEpisode.e,
+        );
+      return this.formatEpisodeAired(aired);
     },
 
     hdr2Parts() {

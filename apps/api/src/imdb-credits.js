@@ -168,10 +168,10 @@ function shouldFilterOut(role) {
 }
 
 async function getActorCredits(actorName, options = {}) {
-  const { headless = true, verbose = false } = options;
+  const { headless = true } = options;
 
   const log = (...args) => {
-    if (verbose) unilog(142, ...args);
+    unilog(142, ...args);
   };
 
   unilog(143, `Scraping IMDb credits for: ${actorName}`);
@@ -420,7 +420,7 @@ async function getActorCredits(actorName, options = {}) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const actorName = process.argv[2] || "Bryan Cranston";
 
-  getActorCredits(actorName, { headless: false, verbose: true })
+  getActorCredits(actorName, { headless: false })
     .then((credits) => {
       unilog(164, "\n=== RESULTS ===");
       unilog(165, JSON.stringify(credits, null, 2));

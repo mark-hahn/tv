@@ -54,17 +54,6 @@ process.on("exit", (code) => {
 });
 
 async function main() {
-  // If non-blank, emits targeted trace logs for this show name.
-  // If blank, tracing is fully disabled.
-  const DEBUG_SHOW = "";
-
-  // ---------------------------------------------------------------------------
-  // Targeted tracing (hard-wired; no env vars)
-  // Logs only when the show name appears in stage/details/fname/title/paths.
-  var TRACE_ENABLED = Boolean(DEBUG_SHOW && String(DEBUG_SHOW).trim());
-  var TRACE_SHOW = TRACE_ENABLED ? String(DEBUG_SHOW).trim() : "";
-  var TRACE_SHOW_KEY = TRACE_ENABLED ? TRACE_SHOW.toLowerCase() : "";
-
   var FAST_TEST,
     PROCESS_INTERVAL_MS,
     SKIP_DOWNLOAD,
@@ -305,54 +294,6 @@ async function main() {
 
   // tvJson.js owns tv.json cache and all worker lifecycle.
   const tvJson = tvJsonMod;
-
-  // Targeted trace helper. Only emits when TRACE_SHOW_KEY is present.
-  var safeInspect = function (x) {
-    try {
-      return util.inspect(x, {
-        depth: 4,
-        breakLength: 160,
-        maxArrayLength: 25,
-      });
-    } catch (e) {
-      try {
-        return JSON.stringify(x);
-      } catch (e2) {
-        return String(x);
-      }
-    }
-  };
-
-  var trace = function (stage, details) {
-    if (!TRACE_ENABLED) return;
-    var hay = "";
-    try {
-      hay = (
-        String(stage || "") +
-        " " +
-        safeInspect(details || {}) +
-        " " +
-        String(fname || "") +
-        " " +
-        String(title || "") +
-        " " +
-        String(seriesName || "") +
-        " " +
-        String(usbFilePath || "")
-      ).toLowerCase();
-    } catch (e) {
-      hay = "";
-    }
-    if (hay.indexOf(TRACE_SHOW_KEY) === -1) return;
-
-    var msg = `[TRACE ${TRACE_SHOW}] ${String(stage || "")}`;
-    if (details !== void 0) {
-      msg += " " + safeInspect(details);
-    }
-    try {
-      unilog(292, msg);
-    } catch (e) {}
-  };
 
   // Startup marker (tv.log only)
   (function writeStartupMarker() {
@@ -2052,21 +1993,6 @@ async function main() {
       if (_cycleTiming) _cycleTiming.afterFind = Date.now();
     }
 
-    // Trace if the target show appears anywhere in the USB list.
-    if (TRACE_ENABLED) {
-      try {
-        var traceCandidates = usbFiles.filter(
-          (l) => l && l.toLowerCase().indexOf(TRACE_SHOW_KEY) !== -1,
-        );
-        if (traceCandidates.length) {
-          trace("checkFiles: found target on USB", {
-            count: traceCandidates.length,
-            examples: traceCandidates.slice(0, 5),
-          });
-        }
-      } catch (e) {}
-    }
-
     // Load inProgress map once per cycle, immediately after
     // the USB file list is available.
     try {
@@ -2216,17 +2142,11 @@ async function main() {
         suffix: "B",
       });
 
-      trace("checkFile: considering", {
-        usbFilePath,
-        fname: null,
-        usbFileBytes,
-      });
 
       for (j = 0, len = skipPaths.length; j < len; j++) {
         skipPath = skipPaths[j];
         if (usbFilePath.startsWith(skipPath)) {
           unilog(318, `skipping locked ${usbFilePath}`);
-          trace("checkFile: skip locked", { usbFilePath, skipPath });
           process.nextTick(checkFile);
           return;
         }
@@ -2278,7 +2198,6 @@ async function main() {
         parsedFolder = {};
       }
 
-      trace("checkFile: filename", { fname, usbFilePath, usbFileBytes });
 
       parts = fname.split(".");
       fext = parts[parts.length - 1].toLowerCase();
@@ -2305,7 +2224,6 @@ async function main() {
           1195,
           `Down: invalid extension .${fext} for "${fname}" (${title || "unknown show"})`,
         );
-        trace("checkFile: skip extension", { fname, fext });
         process.nextTick(checkFile);
         return;
       }
@@ -2320,7 +2238,6 @@ async function main() {
           1196,
           `Down: previous error in tvJson for "${fname}" (${title || "unknown show"})`,
         );
-        trace("checkFile: skip tvJsonTitles error", { fname });
         process.nextTick(checkFile);
         return;
       }
@@ -2361,11 +2278,6 @@ async function main() {
 
           if (!verifiedOnDisk) {
             recentCount++;
-            trace("checkFile: skip finished row local file deleted", {
-              fname,
-              localPath: existingEntry?.localPath || "",
-              destTitle: existingEntry?.destTitle || "",
-            });
             unilog(
               477,
               "history",
@@ -2378,7 +2290,6 @@ async function main() {
           } else {
             recentCount++;
             const skipStatus = "already downloaded";
-            trace("checkFile: skip " + skipStatus, { fname });
             unilog(
               478,
               "history",
@@ -2392,7 +2303,6 @@ async function main() {
         } else {
           recentCount++;
           const skipStatus = "already queued";
-          trace("checkFile: skip " + skipStatus, { fname });
           unilog(
             479,
             "history",
@@ -2407,7 +2317,6 @@ async function main() {
 
       if (inProgress && inProgress[fname]) {
         recentCount++;
-        trace("checkFile: skip in-progress", { fname });
         unilog(480, "history", "skipDown", title || fname, "skip: in-progress");
         process.nextTick(checkFile);
         return;
@@ -2419,7 +2328,6 @@ async function main() {
             1185,
             `Down: TV_BLOCKED substring "${blkName}" in file "${fname}" (${title || "unknown show"})`,
           );
-          trace("checkFile: blocked", { blkName, fname });
           process.nextTick(checkFile);
           return;
         }
@@ -2429,7 +2337,6 @@ async function main() {
       currentSeq = ++cycleSeq;
       downloadTime = Date.now();
 
-      trace("checkFile: parsed", { fname, title, season, episode, type });
 
       // Provide a clear reason when the parser can't produce S/E.
       if (!title || !Number.isInteger(season) || !Number.isInteger(episode)) {
@@ -2478,7 +2385,6 @@ async function main() {
               1197,
               `Down: not a TV show "${fname}" (${title || "unknown show"})`,
             );
-            trace("checkFile: not a tv show, skipping", { fname, title });
             return process.nextTick(checkFile);
           }
         }
@@ -2504,7 +2410,6 @@ async function main() {
       }
       if (type !== "episode") {
         unilog(321, "\nskipping non-episode:", fname);
-        trace("checkFile: skip non-episode", { fname, title, type });
         badFile("non-episode");
         return;
       }
@@ -2589,7 +2494,6 @@ async function main() {
   chkTvDB = () => {
     // smartTitleMatch() is provided by the shared @tv/share package.
 
-    trace("chkTvDB: start", { fname, title });
 
     if (title in tvdbCache) {
       if (tvdbCache[title] === null) {
@@ -2601,7 +2505,6 @@ async function main() {
         return process.nextTick(checkFile);
       }
       seriesName = tvdbCache[title];
-      trace("chkTvDB: cache hit", { title, seriesName });
       return process.nextTick(checkFileExists);
     }
 
@@ -2618,11 +2521,6 @@ async function main() {
       }
       seriesName = tvdbCache[folderTitle];
       tvdbCache[title] = seriesName;
-      trace("chkTvDB: folderTitle cache hit", {
-        title,
-        folderTitle,
-        seriesName,
-      });
       return process.nextTick(checkFileExists);
     }
 
@@ -2649,10 +2547,6 @@ async function main() {
           false,
         )
       ) {
-        trace("chkTvDB: swapping to folderTitle (emby precheck)", {
-          title,
-          folderTitle,
-        });
         title = folderTitle;
         titleYear = folderTitleYear;
         folderTitle = null;
@@ -2696,10 +2590,6 @@ async function main() {
 
           // If no results and we have a variant to try, retry with the next variant.
           if (noResults && remaining.length > 0) {
-            trace("chkTvDB: no results, trying variant", {
-              query,
-              next: remaining[0],
-            });
             return tryTvdbQuery(remaining);
           }
 
@@ -2708,13 +2598,6 @@ async function main() {
             !((ref = body && body.data) != null ? ref[0] : void 0) ||
             (response != null ? response.statusCode : void 0) !== 200
           ) {
-            trace("chkTvDB: tvdb error/no data", {
-              fname,
-              title,
-              tvdburl,
-              statusCode: response && response.statusCode,
-              error: error ? error.message || String(error) : null,
-            });
             if (error) {
               err(
                 `tvdb search error: ${error && error.message ? error.message : error} | status: ${response && response.statusCode} | fname: ${fname}`,
@@ -2746,10 +2629,6 @@ async function main() {
                 // If the filename gave an abbreviated title (e.g. "tmaws"), retry with
                 // the folder-derived title before giving up.
                 if (folderTitle && folderTitle !== title) {
-                  trace("chkTvDB: retrying with folderTitle", {
-                    title,
-                    folderTitle,
-                  });
                   title = folderTitle;
                   titleYear = folderTitleYear;
                   folderTitle = null;
@@ -2798,25 +2677,14 @@ async function main() {
               resultNames,
               titleYear || folderTitleYear || null,
             );
-            trace("chkTvDB: matched series", {
-              title,
-              resultsCount: results.length,
-              topNames: resultNames.slice(0, 10),
-              seriesName,
-            });
             unilog(327, "tvdb got:", { seriesName, title });
             if (map[seriesName]) {
               unilog(328, "Mapping", seriesName, "to", map[seriesName]);
               seriesName = map[seriesName];
             }
-            trace("chkTvDB: post-map", { title, seriesName });
             if (!seriesName) {
               // If the filename gave an abbreviated title, retry with the folder-derived title.
               if (folderTitle && folderTitle !== title) {
-                trace("chkTvDB: no TVDB match, retrying with folderTitle", {
-                  title,
-                  folderTitle,
-                });
                 title = folderTitle;
                 folderTitle = null;
                 return process.nextTick(chkTvDB);
@@ -2830,10 +2698,6 @@ async function main() {
                 "NO SERIES MATCH, SKIPPING:",
                 fname,
               );
-              trace("chkTvDB: smartTitleMatch returned null, skipping", {
-                fname,
-                title,
-              });
               unilog(
                 1201,
                 `Down: no series match on TVDB "${fname}" (${title || "unknown show"})`,
@@ -2921,15 +2785,6 @@ async function main() {
       destTitle = `${embyFolderName} ${seStr}${fext}`;
     }
 
-    trace("checkFileExists: start", {
-      fname,
-      title,
-      seriesName,
-      season,
-      episode,
-      tvSeasonPath,
-      usbFilePath,
-    });
 
     // usbPath is the folder containing the file on the USB host.
     // Example: "~/files/<torrent-folder>/"
@@ -2946,7 +2801,6 @@ async function main() {
 
     if (SKIP_DOWNLOAD) {
       // Skip download mode: no-op in the new model.
-      trace("checkFileExists: SKIP_DOWNLOAD true", { fname });
       return process.nextTick(checkFile);
     }
 
@@ -2964,7 +2818,6 @@ async function main() {
         1202,
         `Down: already on disk "${fname}" (${seriesName || "unknown show"})`,
       );
-      trace("checkFileExists: already on disk", { fname, tvSeasonPath });
       try {
         // Use the file's mtime on disk as the timestamp so the card shows
         // the real download date rather than today's date.
@@ -3020,7 +2873,6 @@ async function main() {
             fname,
             seStr,
           );
-          trace("checkFileExists: skip episode watched", { fname, seStr });
           unilog(
             488,
             "history",
@@ -3041,7 +2893,6 @@ async function main() {
         1203,
         `Down: already in-progress "${fname}" (${seriesName || "unknown show"})`,
       );
-      trace("checkFileExists: already in-progress", { fname });
       return process.nextTick(checkFile);
     }
 
@@ -3056,7 +2907,6 @@ async function main() {
         1204,
         `Down: ${skipStatus} in tvJson "${fname}" (${seriesName || "unknown show"})`,
       );
-      trace("checkFileExists: " + skipStatus + " (tv.json)", { fname });
       return process.nextTick(checkFile);
     }
 
@@ -3093,7 +2943,6 @@ async function main() {
           seriesName,
           ")",
         );
-        trace("checkFileExists: not in emby", { fname, seriesName });
         unilog(
           491,
           "history",
@@ -3163,10 +3012,6 @@ async function main() {
 
         if (!_epOnDisk) {
           // File was sent but never landed on disk — allow download regardless of quality.
-          trace("checkFileExists: flex sent but not on disk, allowing", {
-            fname,
-            flexSeStr,
-          });
           // fall through to download
         } else {
           // File is on disk. Allow if USB is better than what's on disk.
@@ -3197,11 +3042,6 @@ async function main() {
               1205,
               `Down: flex skip, disk file same/better quality ${flexSeStr} "${fname}" (${seriesName || "unknown show"})`,
             );
-            trace("checkFileExists: flex skip disk file same/better quality", {
-              fname,
-              flexSeStr,
-              _diskFile,
-            });
             return process.nextTick(checkFile);
           }
           // USB is better than disk — rename disk file to .old before downloading.
@@ -3274,11 +3114,6 @@ async function main() {
               fname,
               flexSeStr,
             );
-            trace("checkFileExists: flex skip disk file same/better quality", {
-              fname,
-              flexSeStr,
-              diskFile,
-            });
             unilog(
               493,
               "history",
@@ -3331,10 +3166,6 @@ async function main() {
           fname,
           flexSeStr,
         );
-        trace("checkFileExists: flex skip episode watched", {
-          fname,
-          flexSeStr,
-        });
         unilog(
           494,
           "history",
@@ -3375,10 +3206,6 @@ async function main() {
             tvJson.deleteProcids([_oldEntry.procId]);
           }
           if (tvJsonTitles) delete tvJsonTitles[_cycleExistingFname];
-          trace("checkFileExists: cycle-dedup replacing bad-group", {
-            replaced: _cycleExistingFname,
-            winner: fname,
-          });
           unilog(
             340,
             "------",
@@ -3392,10 +3219,6 @@ async function main() {
           );
         } else {
           // Old file is at least as good — skip the new one.
-          trace("checkFileExists: cycle-dedup skip duplicate S/E", {
-            fname,
-            existing: _cycleExistingFname,
-          });
           unilog(
             341,
             "------",
@@ -3457,16 +3280,6 @@ async function main() {
         cycleSeMap[(seriesName || "") + "\x00" + flexSeStr] = fname;
       }
 
-      trace("checkFileExists: queued tv.json entry", {
-        fname,
-        seriesName,
-        season,
-        episode,
-        usbPath,
-        localPath: tvLocalDir,
-        sequence: currentSeq || 0,
-        fileSize: usbFileBytes || 0,
-      });
 
       unilog(
         496,
@@ -3477,10 +3290,6 @@ async function main() {
       );
     } catch (e) {
       // keep going
-      trace("checkFileExists: addEntry threw", {
-        fname,
-        error: e && e.message ? e.message : String(e),
-      });
     }
 
     return process.nextTick(checkFile);
@@ -3496,14 +3305,6 @@ async function main() {
       seriesName || fname,
       `${reason || "unknown"} | file: ${fname}`,
     );
-    trace("badFile: marking error", {
-      reason: reason || "unknown",
-      fname,
-      title,
-      season,
-      episode,
-      usbFilePath,
-    });
     err("marking tv.json error:", {
       reason: reason || "unknown",
       fname,

@@ -13,17 +13,16 @@ const NAV_TIMEOUT = 15_000;
 const BASE = "https://www.rottentomatoes.com";
 const argv = process.argv.slice(2);
 
-const ROTTEN_DEBUG = false;
 const ROTTEN_HEADED = false;
-const ROTTEN_TIMING = false;
+// Gates only file dumps (HTML snapshots and screenshots), not log lines.
+const ROTTEN_SAVE_FILES = false;
 const ROTTEN_REUSE = true;
 const ROTTEN_REUSE_PAGE = true;
 const HAS_DISPLAY = !!process.env.DISPLAY;
 
-const debug = argv.includes("--debug") || ROTTEN_DEBUG;
 const headed = argv.includes("--headed") || ROTTEN_HEADED;
 const cliQuery = argv.find((a) => !a.startsWith("-"));
-const TIMING_ENABLED = ROTTEN_TIMING;
+const TIMING_ENABLED = true;
 const REUSE_BROWSER = ROTTEN_REUSE;
 const REUSE_PAGE = ROTTEN_REUSE_PAGE;
 
@@ -161,11 +160,10 @@ async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
   timing?.start(spanName);
 
   // Save HTML snapshot before any dismissal attempts
-  if (debug) {
+  if (ROTTEN_SAVE_FILES) {
     try {
       const html = await page.content();
       fs.writeFileSync("rotten-overlays.html", html);
-      // console.log('Saved page content to rotten-overlays.html');
     } catch (e) {
       unilog(697, "Failed to save rotten-overlays.html", e.message);
     }
@@ -478,12 +476,10 @@ function chooseShow(shows, query) {
     query = query.replace(match[0], "").trim();
   }
 
-  if (debug) {
-    unilog(
-      701,
-      `smartTitleMatch: query="${query}", year="${year}" against ${shows.length} shows`,
-    );
-  }
+  unilog(
+    701,
+    `smartTitleMatch: query="${query}", year="${year}" against ${shows.length} shows`,
+  );
 
   // Use forceChoice=true to allow aggressive normalization and Levenshtein matching
   // This handles cases like "Sensitive Skin (CA)" matching "Sensitive Skin"
@@ -496,7 +492,7 @@ function chooseShow(shows, query) {
     ) ||
     null;
 
-  if (debug && result) {
+  if (result) {
     unilog(
       110,
       `smartTitleMatch selected: "${result.title}" (${result.startyear})`,
@@ -689,16 +685,14 @@ export async function rottenSearch(query) {
         // Take screenshot of the scorecard area
 
         // Take screenshot of the scorecard area
-        if (debug) {
+        if (ROTTEN_SAVE_FILES) {
           try {
             const card = page.locator("media-scorecard");
             if ((await card.count()) > 0) {
               await card.screenshot({ path: `rotten-scorecard-${slot}.png` });
-              // console.log(`Saved screenshot to rotten-scorecard-${slot}.png`);
             } else {
               // fallback if media-scorecard not found, screenshot whole page
               await page.screenshot({ path: `rotten-page-${slot}.png` });
-              // console.log(`Saved page screenshot to rotten-page-${slot}.png`);
             }
           } catch (err) {
             unilog(704, "rotten screnshot error", err.message);

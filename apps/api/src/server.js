@@ -1573,19 +1573,15 @@ async function handleDownloadRequest(req, res) {
     const dlShowName = String(body.showName || "").trim() || null;
     const dlTvdbId = String(body.tvdbId || "").trim() || null;
     const dlSavePath = body.savePath ? String(body.savePath).trim() : null;
-    // Temporary: hardwire debug on so we always return/emit extra diagnostics.
-    const debug = true;
 
     appendDownloadsRequestLog(body);
 
-    if (debug) {
-      unilog(237, "request", {
-        forceDownload,
-        provider: torrent?.provider || torrent?.raw?.provider || undefined,
-        id: torrent?.raw?.id || torrent?.id || undefined,
-        title: torrent?.raw?.title || torrent?.title || undefined,
-      });
-    }
+    unilog(237, "request", {
+      forceDownload,
+      provider: torrent?.provider || torrent?.raw?.provider || undefined,
+      id: torrent?.raw?.id || torrent?.id || undefined,
+      title: torrent?.raw?.title || torrent?.title || undefined,
+    });
 
     // Standard wrapper shape returned to the client.
     const baseWrapper = {
@@ -1912,17 +1908,13 @@ async function handleDownloadRequest(req, res) {
               dlShowName || tagTorTitle,
               `${tagTorTitle} | provider: ${torrent?.raw?.provider || torrent?.provider || "?"} | tag: ${addTag}`,
             );
-            if (debug) {
-              res.json({
-                ...tvProcResult,
-                success: true,
-                stage: "qbt-add",
-                qbAdd: addRes,
-                qbtTag: addTag,
-              });
-              return;
-            }
-            res.json(tvProcResult);
+            res.json({
+              ...tvProcResult,
+              success: true,
+              stage: "qbt-add",
+              qbAdd: addRes,
+              qbtTag: addTag,
+            });
             return;
           }
         } catch {
@@ -2010,23 +2002,19 @@ async function handleDownloadRequest(req, res) {
         dlShowName || torTitle,
         `${torTitle} | provider: ${torrent?.raw?.provider || torrent?.provider || "?"} | tag: ${addTag}`,
       );
-      if (debug) {
-        unilog(244, "qbt add success", { addTag });
-        appendDownloadsResultLog({
-          stage: "qbt-add-success",
-          addTag,
-          qbAdd: addRes,
-        });
-        res.json({
-          ...tvProcResult,
-          success: true,
-          stage: "qbt-add",
-          qbAdd: addRes,
-          qbtTag: addTag,
-        });
-        return;
-      }
-      res.json(tvProcResult);
+      unilog(244, "qbt add success", { addTag });
+      appendDownloadsResultLog({
+        stage: "qbt-add-success",
+        addTag,
+        qbAdd: addRes,
+      });
+      res.json({
+        ...tvProcResult,
+        success: true,
+        stage: "qbt-add",
+        qbAdd: addRes,
+        qbtTag: addTag,
+      });
       return;
     }
 
@@ -2085,7 +2073,7 @@ async function handleDownloadRequest(req, res) {
             torrentName: parsedName || undefined,
             downloadUrl: fetched?.downloadUrl || undefined,
             provider: fetched?.provider || undefined,
-            debug,
+            debug: true,
           });
           return;
         }
@@ -2242,7 +2230,7 @@ async function handleDownloadRequest(req, res) {
             bytes: fetched.bytes,
             hash: infoHash || undefined,
             qbtTag: addTag,
-            debug,
+            debug: true,
           });
           return;
         }
@@ -2314,7 +2302,7 @@ async function handleDownloadRequest(req, res) {
               downloadUrl: fetched.downloadUrl,
               bytes: fetched.bytes,
               hash: infoHash || undefined,
-              debug,
+              debug: true,
             });
             return;
           }
@@ -2370,7 +2358,7 @@ async function handleDownloadRequest(req, res) {
       qbAdd: addRes,
       bytes: fetched.bytes,
       hash: infoHash || undefined,
-      debug,
+      debug: true,
     });
   } catch (error) {
     unilog(248, "Download error:", error);
@@ -2939,7 +2927,6 @@ app.post("/api/getActorCredits", async (req, res) => {
       .enqueue(() =>
         getActorCredits(actorName, {
           headless: false,
-          verbose: false,
         }),
       )
       .then((result) => {

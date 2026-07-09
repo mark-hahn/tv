@@ -544,10 +544,6 @@ export function initializeProviders() {
  * @param {boolean} params.more - If true, add TPB/LIM/EZT results on top of cached IPT/TL results
  * @returns {Object} Search results with torrents array
  */
-// When non-blank, logs all raw torrent titles (before any filtering) for searches
-// whose show name contains this string (case-insensitive).
-const DEBUG_SEARCH = "";
-
 export async function searchTorrents({
   showName,
   limit = 1000,
@@ -558,12 +554,6 @@ export async function searchTorrents({
   staged = false,
   category = "tv",
 }) {
-  const debugSearch =
-    Boolean(DEBUG_SEARCH) &&
-    String(showName || "")
-      .toLowerCase()
-      .includes(DEBUG_SEARCH.toLowerCase());
-
   const activeProvidersRaw = TorrentSearchApi.getActiveProviders();
   const activeProviders = formatActiveProviders(activeProvidersRaw);
   unilog(184, `\nSearching for: ${showName} (limit: ${limit})`);
@@ -853,14 +843,12 @@ export async function searchTorrents({
   }
 
   // Normalize and filter torrents
-  if (debugSearch) {
-    unilog(197, `pre-filter raw titles (${torrents.length} total):`);
-    torrents.forEach((t, i) => {
-      const title = t?.title || t?.raw?.title || "(no title)";
-      const provider = t?.provider || "?";
-      unilog(198, `[${i + 1}] [${provider}] ${title}`);
-    });
-  }
+  unilog(197, `pre-filter raw titles (${torrents.length} total):`);
+  torrents.forEach((t, i) => {
+    const title = t?.title || t?.raw?.title || "(no title)";
+    const provider = t?.provider || "?";
+    unilog(198, `[${i + 1}] [${provider}] ${title}`);
+  });
   const normalized = torrents.map((t) => normalize(t, showName));
   logFilterStage("normalize", torrents.length, normalized.length, []);
 

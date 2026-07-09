@@ -643,8 +643,6 @@ import * as util from "../util.js";
 import * as srvr from "../srvr.js";
 import { unilog } from "../log.js";
 
-const DEBUG_ACTORS_MERGE_LOG = false;
-
 const theMan = atob("bXJza2lu");
 
 const CREW_TYPE_ORDER = [
@@ -1458,9 +1456,7 @@ export default {
       const tmdbAfter = this.actors.filter((a) => a.source === "tmdb").length;
       const seasonStr = String(season).padStart(2, "0");
       const episodeStr = String(episode).padStart(2, "0");
-      if (DEBUG_ACTORS_MERGE_LOG) {
-        unilog(909, `${this.showName} S${seasonStr}E${episodeStr} | TVDB: ${mergeResult.tvdbBefore}, ${tvdbAfter} | TMDB: ${mergeResult.tmdbBefore}, ${tmdbAfter}`);
-      }
+      unilog(909, `${this.showName} S${seasonStr}E${episodeStr} | TVDB: ${mergeResult.tvdbBefore}, ${tvdbAfter} | TMDB: ${mergeResult.tmdbBefore}, ${tmdbAfter}`);
     },
 
     handleRegularClick() {
@@ -2009,9 +2005,7 @@ export default {
       // Log summary with before/after counts
       const tvdbAfter = this.actors.filter((a) => a.source === "tvdb").length;
       const tmdbAfter = this.actors.filter((a) => a.source === "tmdb").length;
-      if (DEBUG_ACTORS_MERGE_LOG) {
-        unilog(910, `${this.showName} | TVDB: ${mergeResult.tvdbBefore}, ${tvdbAfter} | TMDB: ${mergeResult.tmdbBefore}, ${tmdbAfter}`);
-      }
+      unilog(910, `${this.showName} | TVDB: ${mergeResult.tvdbBefore}, ${tvdbAfter} | TMDB: ${mergeResult.tmdbBefore}, ${tmdbAfter}`);
     },
   },
 

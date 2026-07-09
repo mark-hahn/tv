@@ -2302,12 +2302,16 @@ export default {
     },
 
     async copyNameToClipboard(show, event) {
-      const ele = event.target;
-      const color = ele.style.color;
-      ele.style.color = "#f00";
+      const cell = event.target.closest(".show-name-cell");
+      const flexWrap = cell?.firstElementChild;
+      const eles = flexWrap
+        ? [flexWrap.children[0], flexWrap.children[1]].filter(Boolean)
+        : [event.target];
+      const saved = eles.map((el) => el.style.backgroundColor);
+      for (const el of eles) el.style.backgroundColor = "#f88";
       await navigator.clipboard.writeText(show.name);
-      this.saveVisShow(show);
-      ele.style.color = color;
+      await new Promise((res) => setTimeout(res, 400));
+      eles.forEach((el, i) => (el.style.backgroundColor = saved[i]));
     },
 
     async episodeClick(e, show, season, episode, setWatched = null) {

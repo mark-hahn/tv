@@ -39,37 +39,11 @@
         class="show-row"
         :style="{
           cursor: 'default',
+          marginLeft: '10px',
           backgroundColor: hilite(show),
         }"
         :id="nameHash(show.name)"
       >
-        <div
-          v-if="!simpleMode"
-          class="show-cell"
-          style="width: 30px; flex-shrink: 0"
-          @click="$emit('copy-name', show, $event)"
-        >
-          <font-awesome-icon
-            class="cpbrd"
-            icon="copy"
-            style="color: #ccc"
-          ></font-awesome-icon>
-        </div>
-        <div
-          v-if="!simpleMode"
-          class="show-cell"
-          style="width: 30px; flex-shrink: 0"
-        >
-          <div
-            v-show="show.inEmby !== false"
-            @click="$emit('open-map', show)"
-          >
-            <font-awesome-icon
-              icon="border-all"
-              style="color: #ccc"
-            ></font-awesome-icon>
-          </div>
-        </div>
         <div
           class="show-cell"
           @click="$emit('select-show', show, false)"
@@ -94,7 +68,7 @@
             backgroundColor:
               highlightName === show.name ? 'yellow' : 'transparent',
           }"
-          @click="$emit('select-show', show, false, true)"
+          @click="nameClick(show, $event)"
         >
           <div
             style="
@@ -116,7 +90,7 @@
                 flexShrink: 1,
                 minWidth: 0,
               }"
-              @click="$emit('select-show', show, false, true)"
+              @click="nameClick(show, $event)"
             >
               {{ show.name }}
             </div>
@@ -127,7 +101,7 @@
                 fontsize: 16px;
                 font-weight: bold;
               "
-              @click="$emit('select-show', show, false, true)"
+              @click="nameClick(show, $event)"
             ></div>
             <div
               v-if="sortChoice === 'Creator' && getSortDisplayValue(show)"
@@ -304,6 +278,15 @@ export default {
   },
 
   methods: {
+    nameClick(show, event) {
+      if (event.altKey) {
+        event.stopPropagation();
+        this.$emit("copy-name", show, event);
+        return;
+      }
+      this.$emit("select-show", show, false, true);
+    },
+
     scrollToShow(showName) {
       const index = this.shows.findIndex((s) => s.name === showName);
       if (index !== -1 && this.$refs.scroller) {

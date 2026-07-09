@@ -396,6 +396,8 @@ export default {
       showFilter: null,
       qbtBadGrpBusy: false,
       _knownHashes: new Set(),
+      _rateHistory: {},
+      _lastSeeds: {},
       selectedItems: new Set(), // Multi-select for new button group
       lastSelectedIndex: null,
       flashingHash: null,
@@ -697,6 +699,29 @@ export default {
             }
           }
           this._knownHashes = curHashes;
+
+          // Record a bitrate sample for each downloading torrent, computed
+          // from the same remaining-bytes/eta data used for time remaining.
+          for (const t of torrents) {
+            const h = hashOf(t);
+            if (!h) continue;
+            const seeds = Number(t?.num_seeds);
+            if (Number.isFinite(seeds) && seeds > 0) this._lastSeeds[h] = seeds;
+            if (String(t?.state || "").trim() !== "downloading") continue;
+            const rate = this.calcRateMb(t);
+            if (rate === null) continue;
+            const hist = this._rateHistory[h] || (this._rateHistory[h] = []);
+            hist.push(rate);
+            // Only the last 12 samples are ever needed (last 10 skipping 2).
+            if (hist.length > 12) hist.splice(0, hist.length - 12);
+          }
+          for (const h of Object.keys(this._rateHistory)) {
+            if (!curHashes.has(h)) delete this._rateHistory[h];
+          }
+          for (const h of Object.keys(this._lastSeeds)) {
+            if (!curHashes.has(h)) delete this._lastSeeds[h];
+          }
+
           const downloadingTitles = torrents
             .filter((t) => {
               const st = String(t?.state || "")
@@ -884,6 +909,34 @@ export default {
 
     fmtSize(bytesOrHumanString) {
       return util.fmtBytesSize(bytesOrHumanString);
+    },
+
+    calcRateMb(t) {
+      const size = Number(t?.size_bytes ?? t?.total_size_bytes ?? t?.size);
+      const completed = Number(t?.completed);
+      const eta = Number(t?.eta);
+      if (
+        !Number.isFinite(size) ||
+        !Number.isFinite(completed) ||
+        !Number.isFinite(eta) ||
+        eta <= 0
+      )
+        return null;
+      const remBytes = Math.max(0, size - completed);
+      return (remBytes * 8) / 1e6 / eta;
+    },
+
+    fmtRateMb(t) {
+      if (t?.state === "downloading") {
+        const rate = this.calcRateMb(t);
+        return rate === null ? "" : `${rate.toFixed(0)} mb`;
+      }
+      const hist = this._rateHistory[String(t?.hash || "").trim()];
+      if (!hist) return "";
+      const samples = hist.slice(0, -2).slice(-10);
+      if (samples.length === 0) return "";
+      const avg = samples.reduce((a, b) => a + b, 0) / samples.length;
+      return `${avg.toFixed(0)} mb`;
     },
 
     fmtProgPc(completedBytes, sizeBytes) {
@@ -1146,21 +1199,28 @@ export default {
           : this.fmtSize(remBytes)
         : "";
 
+      const rate = this.fmtRateMb(t);
+      const rateSeg = rate ? `${rate}${sep}` : "";
+
       if (t?.state === "downloading") {
         const prog = this.fmtProgPc(t?.completed, t?.size);
         const seeds = Number.isFinite(Number(t?.num_seeds))
           ? Number(t?.num_seeds)
           : 0;
         const eta = this.fmtEtaMmSs(t?.eta);
-        return `${size}${sep}${remaining}${sep}${added}${sep}${seeds}${sep}${prog}%${sep}${eta}${sep}Getting`;
+        return `${size}${sep}${remaining}${sep}${added}${sep}${seeds}${sep}${prog}%${sep}${rateSeg}${eta}${sep}Getting`;
       }
 
-      const seeds = Number.isFinite(Number(t?.num_seeds))
+      const curSeeds = Number.isFinite(Number(t?.num_seeds))
         ? Number(t?.num_seeds)
         : 0;
+      const seeds =
+        curSeeds > 0
+          ? curSeeds
+          : (this._lastSeeds[String(t?.hash || "").trim()] ?? curSeeds);
       const elapsed = this.fmtElapsedMmSs(t?.added_on, t?.completion_on);
       const state = this.fmtState(t?.state);
-      return `${size}${sep}${remaining}${sep}${added}${sep}${seeds}${sep}${elapsed}${sep}${state}`;
+      return `${size}${sep}${remaining}${sep}${added}${sep}${seeds}${sep}${rateSeg}${elapsed}${sep}${state}`;
     },
 
     forceFile(title) {

@@ -112,6 +112,8 @@ whenever you deploy to the server and pm2 does a restart check pm2 logs to make 
 
 stop tv-srvr first before running anything that modifies tvdb.json, to avoid stale overwrite. this includes any `node -e` or script that requires/imports `src/tvdb.js` (or anything that loads it) — loading tvdb.js starts its periodic save machinery, so the process keeps rewriting tvdb.json with its stale in-memory snapshot and never exits on its own. make sure the process has exited before restarting tv-srvr (a forgotten July 2 debug one-liner silently corrupted tvdb.json for days)
 
+ warning: tvdb.json is one very long line so be careful with grep -- use jq to search it
+
 in the map pane call the first child of the maphdr2 div the "map pane info bar"
 
 - never do git commits unless i tell you to

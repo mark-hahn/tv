@@ -108,10 +108,17 @@ export default {
       el.scrollTop = Math.max(0, Math.min(max, (el.scrollTop || 0) + scaledDy));
     };
 
+    const TVDB_MISSING_IMAGE_PATH = "/images/missing/";
+
     const getImageUrl = (tvdb) => {
       if (!tvdb) return null;
-      // TVDB search results use `image_url` (full) and `thumbnail` (smaller)
-      return tvdb.image_url || tvdb.thumbnail || tvdb.image || null;
+      // TVDB search results use `image_url` (full) and `thumbnail` (smaller).
+      // Upcoming shows return the missing-image placeholder as image_url while
+      // thumbnail can still hold a real poster — skip placeholder urls.
+      for (const url of [tvdb.image_url, tvdb.thumbnail, tvdb.image]) {
+        if (url && !String(url).includes(TVDB_MISSING_IMAGE_PATH)) return url;
+      }
+      return null;
     };
 
     const getPremiereDate = (tvdb) => {

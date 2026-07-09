@@ -11,7 +11,7 @@ import {
   getSeasonIntro as getSeasonIntroShared,
 } from "@tv/share";
 import * as epd from "@tv/share";
-import { unilog } from "@tv/share";
+import { unilog, logHere } from "@tv/share";
 const { getPstDate } = util;
 import { SRVR_DATA_DIR } from "./srvrPaths.js";
 import { MovieDb } from "moviedb-promise";
@@ -1284,6 +1284,31 @@ function getTvdbImageUrl(extResObj) {
   return extResObj?.data?.image || "";
 }
 
+// Upcoming/in-development shows often have no extended artwork, but the TVDB
+// search index can still carry a real poster thumbnail for them.
+async function getTvdbSearchThumbnail(name, tvdbId, token) {
+  try {
+    const url = `https://api4.thetvdb.com/v4/search?type=series&query=${encodeURIComponent(name)}`;
+    const res = await fetch(url, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + token,
+      },
+    });
+    if (!res.ok) return "";
+    const obj = await res.json();
+    const match = (obj?.data || []).find(
+      (d) => String(d.tvdb_id) === String(tvdbId),
+    );
+    const thumb = match?.thumbnail || "";
+    if (!thumb || thumb.includes("/images/missing/")) return "";
+    return thumb;
+  } catch (e) {
+    unilog(1263, `search thumbnail fetch failed for ${name}: ${e.message}`);
+    return "";
+  }
+}
+
 function getTvdbCharacters(extResObj) {
   const characters = extResObj?.data?.characters;
   if (!characters || !Array.isArray(characters)) {
@@ -1687,6 +1712,10 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   // Preserve existing non-empty values when API returns empty
   const existing = allTvdb[name] || {};
+  if (!allTvdb[name] && !paramObj.transient) {
+    const stack = new Error().stack?.split("\n").slice(1, 6).join(" | ") || "";
+    unilog(1261, `new persistent tvdb record for "${name}" tvdbId=${tvdbId} fast=${fast} stack: ${stack}`);
+  }
   const apiCounts = getApiCounts(extResObj?.data);
   if (!toPositiveInt(apiCounts.episodeCount)) {
     const defaultCounts = await getDefaultOrderCounts(tvdbId, token);
@@ -1765,6 +1794,13 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     tmdbData = await getTmdbFallback(name);
   }
 
+  // Last-resort poster: TVDB search thumbnail (upcoming shows often have one
+  // even when extended artwork and TMDB are empty).
+  let searchThumb = "";
+  if (!image && !existing.image && !tmdbData?.image) {
+    searchThumb = await getTvdbSearchThumbnail(name, tvdbId, token);
+  }
+
   const preserve = (newVal, existingVal, tmdbVal) => {
     if (newVal !== undefined && newVal !== null && newVal !== "") return newVal;
     if (existingVal !== undefined && existingVal !== null && existingVal !== "")
@@ -1785,7 +1821,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     seasonCount: finalSeasonCount,
     episodeCount: finalEpisodeCount,
     watchedCount,
-    image: preserve(image, existing.image, tmdbData?.image),
+    image: preserve(image, existing.image, tmdbData?.image || searchThumb),
     score: preserve(score, existing.score, tmdbData?.score),
     overview: preserve(overview, existing.overview, tmdbData?.overview),
     firstAired: preserve(firstAired, existing.firstAired, tmdbData?.firstAired),

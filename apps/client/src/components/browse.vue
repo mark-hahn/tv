@@ -30,7 +30,7 @@
         :srchStr="srchStr"
         :imdbid="curImdbId"
         :tvdbid="curTvdbId"
-        :fallbackImage="curFallbackImage"
+        :fallbackImage="manualSearchQuery ? null : curFallbackImage"
         :explicitList="
           creditShowList !== null
             ? creditShowList

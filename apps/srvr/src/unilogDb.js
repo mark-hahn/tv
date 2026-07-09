@@ -390,6 +390,8 @@ export function dbInfo() {
 // msg (partial). beforeId returns only events older than that event id (for
 // upward paging). afterId returns events newer than that id (for gap-fill after
 // reconnect), returned oldest-first. limit is clamped to a sane range.
+// errors: error-mode read-back — only error-level sites, only the last week,
+// and hidden events are INCLUDED (the hide filter is skipped).
 export function queryEvents({
   pid,
   level,
@@ -398,9 +400,17 @@ export function queryEvents({
   limit,
   beforeId,
   afterId,
+  errors,
 } = {}) {
-  const where = ["(e.hide IS NULL OR e.hide = 0)"];
+  const where = [];
   const params = [];
+  if (errors) {
+    where.push("s.level = 'error'");
+    where.push("e.ts >= ?");
+    params.push(pstStr(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)));
+  } else {
+    where.push("(e.hide IS NULL OR e.hide = 0)");
+  }
   if (beforeId) {
     where.push("e.id < ?");
     params.push(Number(beforeId));

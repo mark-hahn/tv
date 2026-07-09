@@ -126,6 +126,7 @@
         <option value="clear">Clear Selections</option>
         <option value="showEvents">Show Events</option>
         <option value="hideEvents">Hide Events</option>
+        <option value="showErrors">Show Errors</option>
         <option value="selectSites">Select Sites</option>
         <option value="delete">Delete Sites</option>
         <option value="deleteEvents">Delete Events</option>
@@ -390,6 +391,8 @@ export default {
       groupFilterFn: null,
       groupPaneStyle: {},
       groupStats: null,
+      errorMode: false,
+      errorFilterFn: null,
     };
   },
   computed: {
@@ -470,6 +473,8 @@ export default {
       this.showGroupsPane = false;
       window.removeEventListener("resize", this.positionGroupsPane);
       this.applyGroupFilter();
+      // Hiding the pane by tab button leaves error mode (reload on next open).
+      this.exitErrorMode(false);
     },
     columns() {
       return [
@@ -581,6 +586,17 @@ export default {
       this.table.on("cellClick", this.onCellClick);
       this.table.on("dataFiltered", (filters, rows) => {
         this.displayedCount = rows.length;
+      });
+      // Typing in any column header filter leaves error mode (error mode
+      // itself only clears header filters, which never trips this).
+      this.table.on("dataFiltering", () => {
+        if (
+          this.errorMode &&
+          this.table
+            .getHeaderFilters()
+            .some((f) => f.value != null && f.value !== "")
+        )
+          this.exitErrorMode();
       });
       this.table.on("tableBuilt", () => {
         this.holder = this.$refs.tableEl.querySelector(
@@ -811,12 +827,16 @@ export default {
       const act = this.actionSel;
       this.actionSel = ""; // reset selector back to "Actions"
       if (!act || !this.table) return;
+      // Any action except Editor (and Show Errors itself) leaves error mode.
+      if (act !== "editor" && act !== "showErrors")
+        await this.exitErrorMode(act !== "refresh");
       if (act === "refresh") await this.loadLogs();
       else if (act === "goto") this.gotoSelection();
       else if (act === "selectSites") this.selectSites();
       else if (act === "clear") this.setSelection(new Set());
       else if (act === "showEvents") await this.showSelectedEvents();
       else if (act === "hideEvents") await this.hideSelectedEvents();
+      else if (act === "showErrors") await this.enterErrorMode();
       else if (act === "delete") await this.deleteSites();
       else if (act === "deleteEvents") await this.deleteEvents();
       else if (act === "editor") await this.openInEditor();
@@ -889,6 +909,37 @@ export default {
         unilog(1259, `hideSelectedEvents failed: ${e.message}`);
         this.flash("failed to hide events");
       }
+    },
+    // Error mode: one filter only — error-level events from the last week,
+    // hidden events included (server skips the hide filter when errors is set).
+    async enterErrorMode() {
+      if (!this.table) return;
+      this.errorMode = true;
+      this.showGroupsPane = false;
+      this.filterByGroups = false;
+      await this.applyGroupFilter();
+      for (const col of this.table.getColumns()) {
+        if (col.getDefinition().headerFilter)
+          this.table.setHeaderFilterValue(col, "");
+      }
+      if (!this.errorFilterFn) {
+        const weekAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        this.errorFilterFn = (data) =>
+          data.level === "error" && tsToMs(data.ts) >= weekAgoMs;
+        this.table.addFilter(this.errorFilterFn);
+      }
+      await this.loadLogs();
+    },
+    // Leave error mode and return to normal filtering. reload=false skips the
+    // immediate reload but marks the data stale so the next activate reloads.
+    async exitErrorMode(reload = true) {
+      if (!this.errorMode) return;
+      this.errorMode = false;
+      if (this.table && this.errorFilterFn)
+        this.table.removeFilter(this.errorFilterFn);
+      this.errorFilterFn = null;
+      if (reload) await this.loadLogs();
+      else this.loadedOnce = false;
     },
     async showGroupEvents() {
       if (!this.selectedGroupIds.length) {
@@ -1091,10 +1142,9 @@ export default {
       this.loadingOlder = true;
       try {
         const pageLimit = Math.min(PAGE, room);
-        const res = await srvr.getUnilogEvents({
-          limit: pageLimit,
-          beforeId: this.oldestId,
-        });
+        const params = { limit: pageLimit, beforeId: this.oldestId };
+        if (this.errorMode) params.errors = 1;
+        const res = await srvr.getUnilogEvents(params);
         // server returns newest-first; display oldest-first (ascending).
         const older = (res?.events || []).slice().reverse();
         if (!older.length) {
@@ -1193,6 +1243,7 @@ export default {
       this.scrollToTime(selToMs(this.pickerSel));
     },
     clearPicker() {
+      this.exitErrorMode();
       this.pickerSel = { mo: "", da: "", hr: "", mi: "" };
       this.filterByGroups = false;
       this.applyGroupFilter();
@@ -1248,10 +1299,9 @@ export default {
     async loadMissed() {
       if (!this.table || this.newestId == null) return;
       try {
-        const res = await srvr.getUnilogEvents({
-          limit: PAGE,
-          afterId: this.newestId,
-        });
+        const params = { limit: PAGE, afterId: this.newestId };
+        if (this.errorMode) params.errors = 1;
+        const res = await srvr.getUnilogEvents(params);
         // afterId returns oldest-first (ascending) — no need to reverse.
         const missed = res?.events || [];
         if (!missed.length) return;
@@ -1324,7 +1374,9 @@ export default {
       this.loading = true;
       this.error = "";
       try {
-        const res = await srvr.getUnilogEvents({ limit: PAGE });
+        const params = { limit: PAGE };
+        if (this.errorMode) params.errors = 1;
+        const res = await srvr.getUnilogEvents(params);
         // server returns newest-first; display oldest-first (ascending).
         const events = (res?.events || []).slice().reverse();
         this.rowCount = events.length;
@@ -1388,6 +1440,7 @@ export default {
       };
     },
     toggleGroupsPane() {
+      this.exitErrorMode();
       this.showGroupsPane = !this.showGroupsPane;
       if (this.showGroupsPane) {
         this.positionGroupsPane();

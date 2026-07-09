@@ -892,12 +892,34 @@ const getRemote = async (id, type, showName) => {
           if (!resp.ok) {
             let errDetail = "";
             try {
-              const body = await resp.text();
-              errDetail = body ? ` body=${body.slice(0, 800)}` : "";
+              const body = (await resp.text()).trim();
+              if (body.startsWith("{") || body.startsWith("[")) {
+                try {
+                  const j = JSON.parse(body);
+                  const parts = [j.reason, j.message, j.explanation].filter(
+                    (p) => typeof p === "string",
+                  );
+                  errDetail = parts.length
+                    ? ` cause: ${parts.join(" - ")}`
+                    : ` cause: json error ${j.error ?? body.slice(0, 120)}`;
+                } catch {
+                  errDetail = ` cause: bad json ${body.slice(0, 120)}`;
+                }
+              } else if (/whoa there, pardner|blocked/i.test(body)) {
+                errDetail = " cause: blocked by reddit (ip/user-agent ban)";
+              } else if (/<title>([^<]*)<\/title>/i.test(body)) {
+                const title = body.match(/<title>([^<]*)<\/title>/i)[1].trim();
+                errDetail = ` cause: html page "${title}"`;
+              } else if (body) {
+                errDetail = ` cause: ${body.slice(0, 120)}`;
+              }
+              if (resp.status === 429) {
+                const retry = resp.headers.get("retry-after");
+                errDetail += ` (rate limited${retry ? `, retry-after ${retry}s` : ""})`;
+              }
             } catch {}
             unilog(
               725,
-              "err",
               `reddit search ${resp.status} for ${showName}${errDetail}`,
             );
             break;

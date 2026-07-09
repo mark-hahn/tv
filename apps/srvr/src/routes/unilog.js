@@ -271,7 +271,8 @@ export function registerUnilogRoutes(app) {
   // (newest first) joined with their sites, plus the distinct pid list.
   app.get("/api/unilog/events", (req, res) => {
     try {
-      const { pid, level, file, msg, limit, beforeId, afterId } = req.query;
+      const { pid, level, file, msg, limit, beforeId, afterId, errors } =
+        req.query;
       res.json({
         events: unilogDb.queryEvents({
           pid,
@@ -281,6 +282,7 @@ export function registerUnilogRoutes(app) {
           limit,
           beforeId,
           afterId,
+          errors,
         }),
         pids: unilogDb.listPids(),
         levels: unilogDb.listLevels(),

@@ -3050,9 +3050,7 @@ export const setTvdbFields = async (params) => {
         tvdb[key] = value;
       }
 
-      // Record history when a show is removed from Emby
       if (wasInEmby && tvdb.inEmby === false) {
-        unilog(503, "history", "delEmby", name, "Deleted from Emby");
         unilog(
           1227,
           `setTvdbFields: inEmby changed ${wasInEmby} -> ${tvdb.inEmby} for ${name}`,

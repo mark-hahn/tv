@@ -683,22 +683,6 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
       }
     }
     const push2Changes = [...diskChanges, ...playedDateChanges, ...gapChanges];
-    // History: bkgndUpdate (timer-selected) or clientUpdate (user-triggered)
-    try {
-      const tvdbIdVal = String(tvdbRecord.tvdbId || "").trim() || null;
-      const fieldsVal =
-        push2Changes.length > 0 ? JSON.stringify(push2Changes) : null;
-      const descVal =
-        push2Changes.length > 0 ? push2Changes.join(" ") : "No fields changed";
-      unilog(
-        464,
-        options?.isBackground ? "bkgndUpdate" : "clientUpdate",
-        showName,
-        descVal,
-      );
-    } catch (e) {
-      unilog(542, "bkgndUpdate/clientUpdate error:", showName, e.message);
-    }
     if (push2Changes.length) {
       await tvdb.saveTvdbSync();
       if (!options?.suppressNotify) {
@@ -836,9 +820,6 @@ const addPickup = async (params) => {
   }
   unilog(549, "-- adding pickup:", name);
   pickups.push(name);
-  try {
-    unilog(465, "history", "pickup", name, "Added to pickup list");
-  } catch {}
   await new Promise((resolve, reject) =>
     saveConfigYml(null, "ok", resolve, reject),
   );
@@ -867,9 +848,6 @@ const delPickup = async (params) => {
     unilog(552, "pickup not deleted, no match:", name);
     return "delPickup no match: " + name;
   }
-  try {
-    unilog(466, "history", "unpickup", name, "Removed from pickup list");
-  } catch {}
   await new Promise((resolve, reject) =>
     saveConfigYml(null, "ok", resolve, reject),
   );
@@ -934,16 +912,6 @@ const addNoEmby = async (params) => {
   }
   allTvdb[name] = nextRecord;
   await tvdb.saveTvdbSync();
-  try {
-    const id = String(nextRecord.tvdbId || "").trim() || null;
-    unilog(
-      467,
-      "history",
-      "addEmby",
-      name,
-      `Added (inEmby=${nextRecord.inEmby})`,
-    );
-  } catch {}
   return "ok";
 };
 
@@ -969,14 +937,9 @@ const delNoEmby = async (params) => {
     return "delNoEmby no match:" + name;
   }
 
-  const deletedRecord = allTvdb[deleteKey];
   unilog(557, "deleting no-emby record:", deleteKey);
   delete allTvdb[deleteKey];
   await tvdb.saveTvdbSync();
-  try {
-    const delTvdbId = String(deletedRecord?.tvdbId || "").trim() || null;
-    unilog(468, "history", "remEmby", deleteKey, "Deleted non-Emby show");
-  } catch {}
   return "ok";
 };
 
@@ -3287,9 +3250,6 @@ async function runEmbyFullSweep(caller = "unknown") {
         rec.inEmby = false;
         rec.notReady = true;
         handlePickupChange(name, false, rec.status);
-        try {
-          unilog(471, "history", "remEmby", name, "Disappeared from Emby");
-        } catch {}
       }
     }
 

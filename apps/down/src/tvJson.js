@@ -1127,14 +1127,6 @@ const startWorkerForTitle = (title) => {
   // Persist immediately so /downloads reflects the procId.
   upsertEntry(entry);
 
-  unilog(
-    498,
-    "history",
-    "startDown",
-    entry.seriesName || entry.title,
-    `procId=${entry.procId} ${entry.title} → ${entry.localPath}`,
-  );
-
   workerCount++;
 
   const w = new Worker(WORKER_URL, {
@@ -1161,24 +1153,6 @@ const startWorkerForTitle = (title) => {
       const doneEntry = { ...msg.entry, inProgress: false };
       replaceByProcId(doneEntry);
       workerCount = Math.max(0, workerCount - 1);
-
-      if (doneEntry.status === "finished") {
-        unilog(
-          499,
-          "history",
-          "endDown",
-          doneEntry.seriesName || doneEntry.title,
-          `${doneEntry.title} → ${doneEntry.localPath}`,
-        );
-      } else {
-        unilog(
-          500,
-          "history",
-          "errorSync",
-          doneEntry.seriesName || doneEntry.title,
-          `${doneEntry.status} | ${doneEntry.title}`,
-        );
-      }
 
       handleFinish(doneEntry);
 
@@ -1208,13 +1182,6 @@ const startWorkerForTitle = (title) => {
     };
     replaceByProcId(errEntry);
     workerCount = Math.max(0, workerCount - 1);
-    unilog(
-      501,
-      "history",
-      "errorSync",
-      errEntry.seriesName || errEntry.title,
-      `worker error: ${errEntry.status} | ${errEntry.title}`,
-    );
     handleFinish(errEntry);
 
     const nextTitle = findOldestWaitingIndex();
@@ -1241,13 +1208,6 @@ const startWorkerForTitle = (title) => {
     };
     replaceByProcId(errEntry);
     workerCount = Math.max(0, workerCount - 1);
-    unilog(
-      502,
-      "history",
-      "errorSync",
-      errEntry.seriesName || errEntry.title,
-      `${errEntry.status} | ${errEntry.title}`,
-    );
     handleFinish(errEntry);
 
     const nextTitle = findOldestWaitingIndex();

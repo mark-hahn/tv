@@ -2,9 +2,7 @@
 
 import { chromium } from "playwright";
 import fs from "fs"; // Added for saving HTML
-import * as util from "./util.js";
 import { smartTitleMatch, unilog } from "@tv/share";
-const { log, start, end } = util.getLog("rott");
 
 const MAX_STR_DIST = 10;
 const USER_AGENT =
@@ -22,7 +20,6 @@ const HAS_DISPLAY = !!process.env.DISPLAY;
 
 const headed = argv.includes("--headed") || ROTTEN_HEADED;
 const cliQuery = argv.find((a) => !a.startsWith("-"));
-const TIMING_ENABLED = true;
 const REUSE_BROWSER = ROTTEN_REUSE;
 const REUSE_PAGE = ROTTEN_REUSE_PAGE;
 
@@ -88,66 +85,14 @@ async function getSharedBrowserContext({ headless }) {
   return { browser: _shared.browser, context: _shared.context };
 }
 
-async function withSerializedSharedPage(timing, fn) {
+async function withSerializedSharedPage(fn) {
   const run = async () => {
     const page =
-      _shared.page ||
-      (_shared.page = await timing.time("context.newPage", () =>
-        _shared.context.newPage(),
-      ));
+      _shared.page || (_shared.page = await _shared.context.newPage());
     return await fn(page);
   };
   _shared.queue = _shared.queue.then(run, run);
   return await _shared.queue;
-}
-
-function createTiming(log, enabled, label) {
-  const starts = new Map();
-  const spans = [];
-  const t0 = process.hrtime.bigint();
-  const nowNs = () => process.hrtime.bigint();
-
-  const start = (name) => {
-    if (!enabled) return;
-    starts.set(name, nowNs());
-  };
-
-  const end = (name, meta = "") => {
-    if (!enabled) return;
-    const tStart = starts.get(name);
-    if (!tStart) return;
-    const ms = Number(nowNs() - tStart) / 1e6;
-    spans.push({ name, ms, meta });
-    starts.delete(name);
-  };
-
-  const time = async (name, fn, meta = "") => {
-    if (!enabled) return await fn();
-    start(name);
-    try {
-      return await fn();
-    } finally {
-      end(name, meta);
-    }
-  };
-
-  const report = (topN = 10) => {
-    if (!enabled) return;
-    const totalMs = Number(nowNs() - t0) / 1e6;
-    const sorted = [...spans].sort((a, b) => b.ms - a.ms);
-    unilog(
-      695,
-      `timings for ${label}: total=${totalMs.toFixed(0)}ms, spans=${spans.length}`,
-    );
-    for (const s of sorted.slice(0, topN)) {
-      unilog(
-        696,
-        `timing: ${String(s.ms.toFixed(0)).padStart(5, " ")}ms  ${s.name}${s.meta ? "  " + s.meta : ""}`,
-      );
-    }
-  };
-
-  return { enabled, start, end, time, report, spans };
 }
 
 function delay(ms) {
@@ -156,9 +101,7 @@ function delay(ms) {
   });
 }
 
-async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
-  timing?.start(spanName);
-
+async function dismissOverlays(page) {
   // Save HTML snapshot before any dismissal attempts
   if (ROTTEN_SAVE_FILES) {
     try {
@@ -434,7 +377,6 @@ async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
 
   const perSelectorTimeoutMs = 350;
   const maxPasses = 3;
-  const clickedSelectors = [];
 
   const tryClickAny = async () => {
     const attempts = selectors.map(async (sel) => {
@@ -448,8 +390,7 @@ async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
     });
 
     try {
-      const sel = await Promise.any(attempts);
-      clickedSelectors.push(sel);
+      await Promise.any(attempts);
       return true;
     } catch {
       return false;
@@ -461,11 +402,6 @@ async function dismissOverlays(page, timing, spanName = "dismissOverlays") {
     if (!clicked) break;
     await page.waitForTimeout(120);
   }
-
-  timing?.end(
-    spanName,
-    clickedSelectors.length ? `clicked=${clickedSelectors.join(" | ")}` : "",
-  );
 }
 
 function chooseShow(shows, query) {
@@ -503,18 +439,15 @@ function chooseShow(shows, query) {
 
 let queryUrl;
 
-async function findShows(page, query, timing) {
+async function findShows(page, query) {
   const srchQuery = query.replace(/[^\d](19|20)\d{2}\)?$/, "").trim();
   queryUrl = `${BASE}/search?search=${encodeURIComponent(srchQuery)}`;
-  timing?.start("findShows.goto");
   await page.goto(queryUrl, { waitUntil: "domcontentloaded" });
-  timing?.end("findShows.goto", queryUrl);
 
-  await dismissOverlays(page, timing, "dismissOverlays.search");
+  await dismissOverlays(page);
   const rows = page.locator(
     'search-page-result[type="tvSeries"] search-page-media-row',
   );
-  timing?.start("findShows.wait.firstRow");
   const fastTimeoutMs = 2500;
   const slowTimeoutMs = 15000;
   const gotFast = await rows
@@ -528,17 +461,10 @@ async function findShows(page, query, timing) {
       .waitFor({ state: "attached", timeout: slowTimeoutMs })
       .catch(() => {});
   }
-  timing?.end(
-    "findShows.wait.firstRow",
-    gotFast ? `fast=${fastTimeoutMs}ms` : `slow=${slowTimeoutMs}ms`,
-  );
 
-  timing?.start("findShows.rows.count");
   const count = await rows.count();
-  timing?.end("findShows.rows.count", `count=${count}`);
   if (!count || count === 0) return [];
 
-  timing?.start("findShows.rows.evaluateAll");
   const shows = await rows.evaluateAll((els) =>
     els.map((el) => {
       const infoName = el.querySelector('[data-qa="info-name"]');
@@ -553,15 +479,12 @@ async function findShows(page, query, timing) {
       };
     }),
   );
-  timing?.end("findShows.rows.evaluateAll", `count=${shows?.length ?? 0}`);
   return shows.filter((show) => show.title && show.href);
 }
 export async function rottenSearch(query) {
   const rottenStartTime = Date.now();
   // log(`starting rottenSearch, query: "${query}"`);
   query = query.toLowerCase().trim();
-
-  const timing = createTiming(log, TIMING_ENABLED, `rottenSearch("${query}")`);
 
   const headless = !headed || !HAS_DISPLAY;
   if (headed && !HAS_DISPLAY) {
@@ -577,31 +500,17 @@ export async function rottenSearch(query) {
   const usingShared = REUSE_BROWSER;
 
   if (usingShared) {
-    ({ browser, context } = await timing.time("shared.getBrowserContext", () =>
-      getSharedBrowserContext({ headless }),
-    ));
-    if (_shared.headless !== null && _shared.headless !== headless) {
-      timing.end(
-        "shared.getBrowserContext",
-        `note=headless-mismatch shared=${_shared.headless} requested=${headless}`,
-      );
-    }
+    ({ browser, context } = await getSharedBrowserContext({ headless }));
   } else {
-    browser = await timing.time("chromium.launch", () =>
-      chromium.launch({ headless }),
-    );
+    browser = await chromium.launch({ headless });
   }
 
   const runOnce = async (page) => {
     page.setDefaultTimeout(NAV_TIMEOUT);
     page.setDefaultNavigationTimeout(NAV_TIMEOUT);
     // get best show from show rows
-    const shows = await timing.time("findShows", () =>
-      findShows(page, query, timing),
-    );
-    timing.start("chooseShow");
+    const shows = await findShows(page, query);
     const show = chooseShow(shows, query);
-    timing.end("chooseShow", `candidates=${shows?.length ?? 0}`);
     if (!show) {
       unilog(111, `Rotten: No matching show found for "${query}"`);
       return null;
@@ -614,40 +523,31 @@ export async function rottenSearch(query) {
     // console.log(`Rotten Search URL: ${queryUrl}`);
     // console.log(`Rotten Detail URL: ${detailLink}`);
     // Go to detail page
-    await timing.time(
-      "detail.goto",
-      async () => {
-        // Prepare cookie to suppress cookie consent banner if possible
-        try {
-          const domain = new URL(BASE).hostname;
-          await context.addCookies([
-            {
-              name: "OptanonAlertBoxClosed",
-              value: new Date().toISOString(),
-              domain: domain.startsWith("www.") ? domain.slice(4) : domain, // .rottentomatoes.com or rottentomatoes.com
-              path: "/",
-              expires: Date.now() / 1000 + 365 * 24 * 3600, // 1 year
-            },
-          ]);
-        } catch {}
+    // Prepare cookie to suppress cookie consent banner if possible
+    try {
+      const domain = new URL(BASE).hostname;
+      await context.addCookies([
+        {
+          name: "OptanonAlertBoxClosed",
+          value: new Date().toISOString(),
+          domain: domain.startsWith("www.") ? domain.slice(4) : domain, // .rottentomatoes.com or rottentomatoes.com
+          path: "/",
+          expires: Date.now() / 1000 + 365 * 24 * 3600, // 1 year
+        },
+      ]);
+    } catch {}
 
-        for (let i = 1; i <= 3; i++) {
-          try {
-            await page.goto(detailLink, { waitUntil: "domcontentloaded" });
-            return;
-          } catch (e) {
-            unilog(
-              703,
-              `rotten detail.goto failed (attempt ${i}): ${e.message}`,
-            );
-            if (i === 3) throw e;
-            await new Promise((r) => setTimeout(r, 1000));
-          }
-        }
-      },
-      detailLink,
-    );
-    await dismissOverlays(page, timing, "dismissOverlays.detail");
+    for (let i = 1; i <= 3; i++) {
+      try {
+        await page.goto(detailLink, { waitUntil: "domcontentloaded" });
+        break;
+      } catch (e) {
+        unilog(703, `rotten detail.goto failed (attempt ${i}): ${e.message}`);
+        if (i === 3) throw e;
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    }
+    await dismissOverlays(page);
 
     const getScore = async (slot, retrying = false) => {
       // Version Marker
@@ -703,7 +603,7 @@ export async function rottenSearch(query) {
       } catch (e) {
         if (!retrying) {
           // console.log(`rotten getScore ${slot} failed, attempting to dismiss overlays and retry.`);
-          await dismissOverlays(page, timing, "dismissOverlays.retry");
+          await dismissOverlays(page);
           return getScore(slot, true);
         }
 
@@ -717,12 +617,8 @@ export async function rottenSearch(query) {
       }
     };
 
-    const criticsScore = await timing.time("detail.criticsScore", () =>
-      getScore("criticsScore"),
-    );
-    const audienceScore = await timing.time("detail.audienceScore", () =>
-      getScore("audienceScore"),
-    );
+    const criticsScore = await getScore("criticsScore");
+    const audienceScore = await getScore("audienceScore");
 
     unilog(
       705,
@@ -739,34 +635,29 @@ export async function rottenSearch(query) {
   try {
     if (usingShared) {
       if (REUSE_PAGE) {
-        return await timing.time("shared.page.serial", () =>
-          withSerializedSharedPage(timing, runOnce),
-        );
+        return await withSerializedSharedPage(runOnce);
       }
-      page = await timing.time("context.newPage", () => context.newPage());
+      page = await context.newPage();
       return await runOnce(page);
     }
 
-    page = await timing.time("browser.newPage", () =>
-      browser.newPage({ userAgent: USER_AGENT }),
-    );
+    page = await browser.newPage({ userAgent: USER_AGENT });
     return await runOnce(page);
   } catch (err) {
     unilog(706, "rottenSearch error", query, err.message);
     return null;
   } finally {
     if (page && usingShared && !REUSE_PAGE) {
-      await timing.time("page.close", () => page.close());
+      await page.close();
     }
     if (page && !usingShared) {
       // page is closed as part of browser.close
     }
     if (!usingShared && browser) {
-      await timing.time("browser.close", () => browser.close());
+      await browser.close();
     }
     const elapsed = ((Date.now() - rottenStartTime) / 1000).toFixed(0);
     unilog(115, `finished rottenSearch: ${elapsed} secs, "${query}"`);
-    timing.report(12);
   }
 }
 

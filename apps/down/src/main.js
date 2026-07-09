@@ -28,7 +28,32 @@ const __filename = urlNode.fileURLToPath(import.meta.url);
 const __dirname = pathNode.dirname(__filename);
 
 const SRVR_LOG_URL = "http://127.0.0.1:8739/api/log";
+
+// Scan-cycle log sites (checkFile → chkTvDB → checkFileExists → badFile).
+// Every cycle re-logs the same verdict for every unchanged file, flooding
+// unilog with exact duplicates. Suppress a cycle-site event when the same
+// (id, message) was already sent this cycle or the previous one, so a verdict
+// logs once and stays silent until it changes or disappears for a full cycle.
+const CYCLE_LOG_IDS = new Set([
+  318, 321, 324, 325, 327, 328, 329, 331, 332, 334, 335, 336, 337, 338, 339,
+  340, 341, 1185, 1195, 1196, 1197, 1198, 1199, 1200, 1201, 1202, 1203, 1204,
+  1205, 1244,
+]);
+let prevCycleLogKeys = new Set();
+let curCycleLogKeys = new Set();
+
+function rotateCycleLogDedup() {
+  prevCycleLogKeys = curCycleLogKeys;
+  curCycleLogKeys = new Set();
+}
+
 setUnilogSink(({ logId, message }) => {
+  if (CYCLE_LOG_IDS.has(logId)) {
+    const key = `${logId}\0${message}`;
+    const dup = prevCycleLogKeys.has(key) || curCycleLogKeys.has(key);
+    curCycleLogKeys.add(key);
+    if (dup) return;
+  }
   fetch(SRVR_LOG_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -412,6 +437,7 @@ async function main() {
     }
     cycleRunning = true;
 
+    rotateCycleLogDedup();
     reloadState();
     resetCycleState();
     return process.nextTick(delOldFiles);
@@ -1447,13 +1473,6 @@ async function main() {
           showTitle,
           ")",
         );
-        unilog(
-          472,
-          "history",
-          "skipDown",
-          showTitle,
-          `DVD skip: not in Emby (${showTitle})`,
-        );
         continue;
       }
       dvdTorrentFolders.add(torrentFolder);
@@ -1819,13 +1838,6 @@ async function main() {
 
     if (outputMkvs.length === 0) {
       unilog(311, `DVD: makemkvcon produced no MKVs for ${vtsDirRelative}`);
-      unilog(
-        473,
-        "history",
-        "errorSync",
-        showTitle,
-        `makemkv no output for ${vtsDirRelative}`,
-      );
       return;
     }
 
@@ -1848,14 +1860,6 @@ async function main() {
     try {
       await execAsync(`rm -rf "${makemkvOutDir}"`, { timeout: 60000 });
     } catch (e) {}
-
-    unilog(
-      474,
-      "history",
-      "dvdProc",
-      showTitle,
-      `${outputMkvs.length} MKV(s) from ${vtsDirRelative} → ${seasonDir}`,
-    );
   };
 
   const moveMkvsToSeason = async (
@@ -2243,81 +2247,13 @@ async function main() {
       }
 
       if (!processingForced && tvJsonTitles && tvJsonTitles[fname]) {
-        const titleState = tvJsonTitles[fname];
-        if (titleState.status === "finished") {
-          let verifiedOnDisk = false;
-          let existingEntry = null;
-          try {
-            existingEntry = tvJson.getEntryByTitle
-              ? tvJson.getEntryByTitle(fname)
-              : null;
-          } catch (e) {
-            existingEntry = null;
-          }
-          try {
-            const localPath = existingEntry?.localPath
-              ? String(existingEntry.localPath)
-              : "";
-            if (localPath && path.isAbsolute(localPath)) {
-              const candidateNames = [];
-              if (existingEntry?.destTitle)
-                candidateNames.push(String(existingEntry.destTitle));
-              if (existingEntry?.title)
-                candidateNames.push(String(existingEntry.title));
-              for (const candidateName of candidateNames) {
-                if (!candidateName) continue;
-                if (fs.existsSync(path.join(localPath, candidateName))) {
-                  verifiedOnDisk = true;
-                  break;
-                }
-              }
-            }
-          } catch (e) {
-            verifiedOnDisk = false;
-          }
-
-          if (!verifiedOnDisk) {
-            recentCount++;
-            unilog(
-              477,
-              "history",
-              "skipDown",
-              title || fname,
-              "skip: already downloaded (local file deleted)",
-            );
-            process.nextTick(checkFile);
-            return;
-          } else {
-            recentCount++;
-            const skipStatus = "already downloaded";
-            unilog(
-              478,
-              "history",
-              "skipDown",
-              title || fname,
-              "skip: " + skipStatus,
-            );
-            process.nextTick(checkFile);
-            return;
-          }
-        } else {
-          recentCount++;
-          const skipStatus = "already queued";
-          unilog(
-            479,
-            "history",
-            "skipDown",
-            title || fname,
-            "skip: " + skipStatus,
-          );
-          process.nextTick(checkFile);
-          return;
-        }
+        recentCount++;
+        process.nextTick(checkFile);
+        return;
       }
 
       if (inProgress && inProgress[fname]) {
         recentCount++;
-        unilog(480, "history", "skipDown", title || fname, "skip: in-progress");
         process.nextTick(checkFile);
         return;
       }
@@ -2873,13 +2809,6 @@ async function main() {
             fname,
             seStr,
           );
-          unilog(
-            488,
-            "history",
-            "skipDown",
-            seriesName || fname,
-            `skip: ${seStr} already watched`,
-          );
           return process.nextTick(checkFile);
         }
       }
@@ -2942,13 +2871,6 @@ async function main() {
           "(",
           seriesName,
           ")",
-        );
-        unilog(
-          491,
-          "history",
-          "skipDown",
-          seriesName || fname,
-          `skip: not in Emby (${seriesName})`,
         );
         return process.nextTick(checkFile);
       }
@@ -3114,13 +3036,6 @@ async function main() {
               fname,
               flexSeStr,
             );
-            unilog(
-              493,
-              "history",
-              "skipDown",
-              seriesName || fname,
-              `flex skip: ${flexSeStr} disk file same/better quality`,
-            );
             return process.nextTick(checkFile);
           }
           // USB is better — rename the worse disk file to .old before downloading.
@@ -3165,13 +3080,6 @@ async function main() {
           "FLEX SKIP (episode watched):",
           fname,
           flexSeStr,
-        );
-        unilog(
-          494,
-          "history",
-          "skipDown",
-          seriesName || fname,
-          `flex skip: ${flexSeStr} already watched`,
         );
         return process.nextTick(checkFile);
       }
@@ -3230,13 +3138,6 @@ async function main() {
             "(keeping",
             _cycleExistingFname + ")",
           );
-          unilog(
-            495,
-            "history",
-            "skipDown",
-            seriesName || fname,
-            "skip: same S/E already queued this cycle " + _cycleExistingFname,
-          );
           return process.nextTick(checkFile);
         }
       }
@@ -3281,13 +3182,6 @@ async function main() {
       }
 
 
-      unilog(
-        496,
-        "history",
-        "acceptDown",
-        seriesName || fname,
-        `${fname} S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")} → ${tvLocalDir}`,
-      );
     } catch (e) {
       // keep going
     }
@@ -3298,13 +3192,6 @@ async function main() {
   badFile = (reason) => {
     errCount++;
     writeRejectLog(fname, reason);
-    unilog(
-      497,
-      "history",
-      "rejDown",
-      seriesName || fname,
-      `${reason || "unknown"} | file: ${fname}`,
-    );
     err("marking tv.json error:", {
       reason: reason || "unknown",
       fname,

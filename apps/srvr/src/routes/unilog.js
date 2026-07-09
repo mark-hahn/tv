@@ -10,6 +10,7 @@ import { notifyClients } from "../messaging.js";
 const unilogSubscribers = new Set();
 let unilogLastPruneTime = 0;
 const UNILOG_PRUNE_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+const UNILOG_PRUNE_CHECK_MS = 10 * 60 * 1000; // 10 minutes
 
 // Client collision tracking: map client hash -> client ID, and current active ID.
 const clientHashMap = new Map();
@@ -52,6 +53,11 @@ export function maybeUnilogPrune() {
     notifyClients("unilog-pruned", null);
   }
 }
+
+// Periodic prune check — without this, maybeUnilogPrune only ran when a log
+// pane closed, so the table grew without bound while no pane was ever opened.
+// The guards above (no open log panes, 1 hour since last prune) still apply.
+setInterval(maybeUnilogPrune, UNILOG_PRUNE_CHECK_MS);
 
 export function broadcastUnilog(row) {
   if (!row || unilogSubscribers.size === 0) return;

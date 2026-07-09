@@ -8,7 +8,11 @@
       "Bash(ssh hahnca.com \"pm2 list | grep tv-srvr\")",
       "Bash(ssh hahnca.com 'node -e \" *)",
       "Bash(ssh hahnca.com 'sqlite3 /root/dev/apps/tv/unilog/unilog.sqlite \" *)",
-      "Bash(ssh hahnca.com \"sqlite3 /root/dev/apps/tv/unilog/unilog.sqlite \\\\\"SELECT ts, log_id, message FROM log_events WHERE message LIKE '%seasonIntro%' ORDER BY id DESC LIMIT 15;\\\\\"\")"
+      "Bash(ssh hahnca.com \"sqlite3 /root/dev/apps/tv/unilog/unilog.sqlite \\\\\"SELECT ts, log_id, message FROM log_events WHERE message LIKE '%seasonIntro%' ORDER BY id DESC LIMIT 15;\\\\\"\")",
+      "Bash(ssh hahnca.com *)",
+      "Bash(ssh xobtlu@xobtlu.baron.usbx.me *)",
+      "Bash(node --check *)",
+      "Bash(./srvr *)"
     ]
   }
 }

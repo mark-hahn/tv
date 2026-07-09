@@ -378,6 +378,18 @@ export function registerUnilogRoutes(app) {
     }
   });
 
+  app.get("/api/unilog/groups/stats", (req, res) => {
+    try {
+      const groupId = Number(req.query.groupId);
+      if (!Number.isFinite(groupId))
+        return res.status(400).json({ error: "groupId required" });
+      res.json(unilogDb.groupStats(groupId));
+    } catch (error) {
+      console.error("[unilog] /api/unilog/groups/stats error:", error); // no-unilog
+      res.status(500).json({ error: String(error?.message || error) });
+    }
+  });
+
   app.post("/api/unilog/groups/site-ids", (req, res) => {
     try {
       const { groupIds } = req.body || {};

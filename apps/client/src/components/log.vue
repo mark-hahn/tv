@@ -121,6 +121,7 @@
       >
         <option value="">Actions</option>
         <option value="refresh">Refresh</option>
+        <option value="editor">Editor</option>
         <option value="goto">Go To Selection</option>
         <option value="clear">Clear Selections</option>
         <option value="showEvents">Show Events</option>
@@ -128,7 +129,6 @@
         <option value="selectSites">Select Sites</option>
         <option value="delete">Delete Sites</option>
         <option value="deleteEvents">Delete Events</option>
-        <option value="editor">Editor</option>
         <option value="setInfo">Set Info</option>
         <option value="setDebug">Set Debug</option>
         <option value="setWarn">Set Warn</option>
@@ -302,6 +302,13 @@
               Set Name
             </button>
           </div>
+
+          <div
+            v-if="groupStats"
+            class="groupsRow"
+          >
+            Sites: {{ groupStats.sites }}, Events: {{ groupStats.events }}
+          </div>
         </div>
       </div>
     </Teleport>
@@ -382,6 +389,7 @@ export default {
       groupFilterIds: new Set(),
       groupFilterFn: null,
       groupPaneStyle: {},
+      groupStats: null,
     };
   },
   computed: {
@@ -404,6 +412,7 @@ export default {
     selectedGroupIds() {
       if (!this.selectedGroupIds.length) this.filterByGroups = false;
       this.applyGroupFilter();
+      this.refreshGroupStats();
     },
   },
   mounted() {
@@ -1403,6 +1412,23 @@ export default {
     selectedSiteIds() {
       return this.selectedSites().map((s) => s.id);
     },
+    // Site/event totals shown when exactly one group is selected.
+    async refreshGroupStats() {
+      if (this.selectedGroupIds.length !== 1) {
+        this.groupStats = null;
+        return;
+      }
+      const gid = this.selectedGroupIds[0];
+      try {
+        const res = await srvr.getUnilogGroupStats(gid);
+        // Selection may have changed while the request was in flight.
+        if (this.selectedGroupIds.length === 1 && this.selectedGroupIds[0] === gid)
+          this.groupStats = res;
+      } catch (e) {
+        console.error("[log.vue]", `groupStats failed: ${e.message}`); // no-unilog
+        this.groupStats = null;
+      }
+    },
     async selectOrphans() {
       try {
         const res = await srvr.getUnilogOrphanGroups();
@@ -1445,6 +1471,7 @@ export default {
         );
         await this.refreshRowGroups(siteIds);
         await this.applyGroupFilter();
+        this.refreshGroupStats();
         this.flash(`assigned ${res?.added ?? 0} links`);
       } catch (e) {
         console.error("[log.vue]", `assignGroups failed: ${e.message}`); // no-unilog
@@ -1461,6 +1488,7 @@ export default {
         );
         await this.refreshRowGroups(siteIds);
         await this.applyGroupFilter();
+        this.refreshGroupStats();
         this.flash(`removed ${res?.removed ?? 0} links`);
       } catch (e) {
         console.error("[log.vue]", `removeGroups failed: ${e.message}`); // no-unilog

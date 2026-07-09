@@ -331,6 +331,9 @@ export function getUnilogGroups() {
 export function getUnilogOrphanGroups() {
   return httpCall("/api/unilog/groups/orphans", {}, "GET");
 }
+export function getUnilogGroupStats(groupId) {
+  return httpCall("/api/unilog/groups/stats", { groupId }, "GET");
+}
 export function createUnilogGroup(description, logIds) {
   return httpCall("/api/unilog/groups/create", { description, logIds }, "POST");
 }

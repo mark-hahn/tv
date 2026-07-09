@@ -666,6 +666,22 @@ export function siteIdsForGroups(groupIds) {
     .map((r) => r.log_id);
 }
 
+// Site and event totals for one group: sites joined to the group, and events
+// belonging to those sites.
+export function groupStats(groupId) {
+  const id = Number(groupId);
+  const sites = db
+    .prepare("SELECT COUNT(*) AS n FROM site_groups WHERE group_id = ?")
+    .get(id).n;
+  const events = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM log_events
+        WHERE log_id IN (SELECT log_id FROM site_groups WHERE group_id = ?)`,
+    )
+    .get(id).n;
+  return { sites, events };
+}
+
 // Distinct group ids linked to any of the given sites.
 export function groupIdsForSites(logIds = []) {
   if (!logIds.length) return [];

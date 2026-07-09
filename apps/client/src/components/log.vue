@@ -1360,7 +1360,7 @@ export default {
     },
     // ---- Groups pane ------------------------------------------------------
     groupLabel(g) {
-      return g.description;
+      return g.hide === 1 ? `${g.description} (h)` : g.description;
     },
     // Fixed-position overlay: right edge aligned to #list, vertically centered.
     positionGroupsPane() {

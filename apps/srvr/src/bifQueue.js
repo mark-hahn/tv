@@ -160,7 +160,7 @@ function startBifCreate(bifNeededObj) {
           try {
             fs.unlinkSync(BIF_CREATING_PATH);
           } catch {}
-          unilog(4, `done ${bifNeededObj.showName}`);
+          unilog(4, `bif done ${bifNeededObj.showName}`);
           currentBifShowName = null;
           syncBatchMsgs();
           checkBifNeededQueue();

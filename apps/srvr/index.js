@@ -4024,7 +4024,7 @@ async function reencodeOneTo1080(entry) {
   } catch (e) {
     unilog(1121, `could not remove stale vid temp: ${e.message}`);
   }
-  unilog(1108, `reencode 2160->1080 start: ${srcName}`);
+  unilog(1108, `start reencode 2160->1080: ${srcName}`);
   await ffmpegQueue.run(
     () =>
       new Promise((resolve, reject) => {
@@ -4122,7 +4122,7 @@ async function reencodeOneTo1080(entry) {
       }),
   );
   fs.renameSync(tmpPath, dstPath);
-  unilog(1109, `reencode 2160->1080 done: ${dst1080Name}.alt`);
+  unilog(1109, `reencode done 2160->1080: ${dst1080Name}.alt`);
   res1080CopySubtitles(seasonDir, srcName, dst1080Name);
 }
 

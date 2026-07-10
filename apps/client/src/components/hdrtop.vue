@@ -81,7 +81,7 @@
           cursor: pointer;
           border-radius: 7px;
           margin: 0 0 0 10px;
-          width: 76px;
+          width: 68px;
         "
       >
         Scan Lib
@@ -99,7 +99,7 @@
           width: 65px;
         "
       >
-        Opn Lib
+        Open Lib
       </button>
       <button
         v-if="!simpleMode"
@@ -142,20 +142,6 @@
         }"
       >
         Actors
-      </button>
-      <button
-        v-if="!simpleMode"
-        @click="$emit('dump-click')"
-        style="
-          height: 24px;
-          background-color: white;
-          font-size: 13px;
-          cursor: pointer;
-          border-radius: 7px;
-          margin: 0 0 0 10px;
-        "
-      >
-        Dump
       </button>
     </div>
   </div>
@@ -208,7 +194,6 @@ export default {
     "all-click",
     "custom-click",
     "actors-click",
-    "dump-click",
   ],
 
   methods: {

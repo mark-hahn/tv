@@ -2493,7 +2493,7 @@ async function main() {
     // Remember the title we started with so we can cache it after a folderTitle retry.
     var titleBeforeRetry = title;
 
-    unilog(325, "search:", title);
+    unilog(325, "search tvdb:", title);
 
     // Some shows use "&" on TVDB where the filename has "and" (e.g. "Jam & Jerusalem").
     // Build a list of query variants to try in order.

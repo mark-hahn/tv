@@ -251,7 +251,7 @@ function tsToMs(ts) {
 
 // Sites with more than BURST_COUNT error events inside one BURST_WINDOW_MS
 // span. Runs over all new events together; every site appearing in an
-// offending window is returned (log_id -> "file:line(idN)" label).
+// offending window is returned (log_id -> "file:line, site: N" label).
 function burstSites(events) {
   const out = new Map();
   const evs = events
@@ -262,7 +262,7 @@ function burstSites(events) {
       for (let j = i; j <= i + BURST_COUNT; j++)
         out.set(
           evs[j].log_id,
-          `${evs[j].src_file}:${evs[j].src_line}(id${evs[j].log_id})`,
+          `${evs[j].src_file}:${evs[j].src_line}, site: ${evs[j].log_id}`,
         );
     }
   }
@@ -299,7 +299,7 @@ async function flushEmail(burstLabels) {
   for (const e of pendingErrors.values()) {
     total += e.count;
     lines.push(
-      `${e.count}x ${[...e.sites].join(", ")} ev${e.firstId}${e.count > 1 ? ` ... ev${e.lastId}` : ""}`,
+      `${e.count}x ${[...e.sites].join(", ")}, event: ${e.firstId}${e.count > 1 ? ` ... ${e.lastId}` : ""}`,
     );
     lines.push(`   ${e.firstTs}${e.count > 1 ? ` ... ${e.lastTs}` : ""}`);
     lines.push(`   ${e.example}`);
@@ -378,7 +378,7 @@ async function checkErrors() {
     e.count++;
     e.lastTs = ev.ts;
     e.lastId = ev.id;
-    e.sites.add(`${ev.src_file}:${ev.src_line}(id${ev.log_id})`);
+    e.sites.add(`${ev.src_file}:${ev.src_line}, site: ${ev.log_id}`);
     pendingErrors.set(key, e);
   }
 

@@ -134,7 +134,6 @@
               :hasSharedFilters="hasSharedFilters"
               :actorsListMode="actorsListMode"
               @actors-click="startActorsListMode"
-              @dump-click="dumpShows"
             ></HdrTop>
             <HdrBot
               v-if="!simpleMode"
@@ -227,7 +226,6 @@
             :hasSharedFilters="hasSharedFilters"
             :actorsListMode="actorsListMode"
             @actors-click="startActorsListMode"
-            @dump-click="dumpShows"
           ></HdrTop>
           <HdrBot
             v-if="!simpleMode"
@@ -3110,16 +3108,6 @@ export default {
       if (this.savedSortChoice !== null) {
         this.sortChoice = this.savedSortChoice;
         this.savedSortChoice = null;
-      }
-    },
-
-    async dumpShows() {
-      try {
-        const showNames = this.shows.map((show) => show.name);
-        await srvr.dumpSelectedShows(showNames);
-        unilog(1085, `Dumped ${showNames.length} shows to selected-shows.txt`);
-      } catch (error) {
-        unilog(987, "Failed to dump shows:", error);
       }
     },
 

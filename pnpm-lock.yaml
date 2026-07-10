@@ -285,6 +285,12 @@ importers:
         specifier: ^8.14.2
         version: 8.19.0
 
+  apps/watchdog:
+    dependencies:
+      '@tv/share':
+        specifier: workspace:*
+        version: link:../../packages/share
+
   packages/share: {}
 
 packages:

@@ -5,6 +5,7 @@ packages:
   - "apps/down"
   - "apps/srvr"
   - "apps/tv"
+  - "apps/watchdog"
   - "packages/*"
 
 onlyBuiltDependencies:

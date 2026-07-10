@@ -88,5 +88,15 @@ module.exports = {
         NODE_ENV: "production",
       },
     },
+    {
+      name: "tv-watchdog",
+      cwd: appCwd("watchdog"),
+      script: "watchdog.js",
+      interpreter: nodeInterpreter,
+      time: true,
+      env: {
+        NODE_ENV: "production",
+      },
+    },
   ],
 };

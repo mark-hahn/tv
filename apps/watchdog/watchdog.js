@@ -96,7 +96,10 @@ function stripNums(s) {
 const activeAlerts = new Map(); // key -> { skel, message }
 function emit(kind, level, message) {
   const line = `${pstStr()} [${level}] ${kind}: ${message}`;
-  console.log(line);
+  // stdout.write, NOT console.log: the deploy reconciler upgrades console.*
+  // into unilog(), and the watchdog's own alert stream must stay independent
+  // of unilog (no sink registered here — it would silently drop the line).
+  process.stdout.write(line + "\n");
   try {
     fs.appendFileSync(ALERT_LOG_PATH, line + "\n");
   } catch {}
@@ -237,7 +240,7 @@ let errorCursor = null; // last log_events.id already processed
 let hourKey = null; // PST "yyyy/mm/dd hh" the running tally belongs to
 let hourTally = 0; // error events seen in that hour
 let hourSites = new Map(); // log_id -> { file, line, n }
-const pendingErrors = new Map(); // stripped msg -> {count,sites,example,firstTs,lastTs}
+const pendingErrors = new Map(); // stripped msg -> {count,sites,example,firstTs,lastTs,firstId,lastId}
 let lastEmailMs = 0; // last email send time (1/hour throttle)
 
 // Epoch ms from a PST "yyyy/mm/dd hh:mm:ss" string. Parsed with a fixed UTC
@@ -295,7 +298,9 @@ async function flushEmail(burstLabels) {
   const lines = [];
   for (const e of pendingErrors.values()) {
     total += e.count;
-    lines.push(`${e.count}x ${[...e.sites].join(", ")}`);
+    lines.push(
+      `${e.count}x ${[...e.sites].join(", ")} ev${e.firstId}${e.count > 1 ? ` ... ev${e.lastId}` : ""}`,
+    );
     lines.push(`   ${e.firstTs}${e.count > 1 ? ` ... ${e.lastTs}` : ""}`);
     lines.push(`   ${e.example}`);
     lines.push("");
@@ -367,9 +372,12 @@ async function checkErrors() {
       example: ev.message,
       firstTs: ev.ts,
       lastTs: ev.ts,
+      firstId: ev.id,
+      lastId: ev.id,
     };
     e.count++;
     e.lastTs = ev.ts;
+    e.lastId = ev.id;
     e.sites.add(`${ev.src_file}:${ev.src_line}(id${ev.log_id})`);
     pendingErrors.set(key, e);
   }
@@ -504,8 +512,9 @@ async function runChecks() {
   }
 }
 
-console.log(
-  `${pstStr()} [info] tv-watchdog started — every ${CHECK_INTERVAL_MS / 1000}s, db ${UNILOG_DB_PATH}`,
+// stdout.write, NOT console.log — see emit() above.
+process.stdout.write(
+  `${pstStr()} [info] tv-watchdog started — every ${CHECK_INTERVAL_MS / 1000}s, db ${UNILOG_DB_PATH}\n`,
 );
 runChecks();
 setInterval(runChecks, CHECK_INTERVAL_MS);

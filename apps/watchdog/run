@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# (Re)start the tv-watchdog pm2 task on the remote server.
-kill $(pgrep -f "tv-watchdog") 2> /dev/null
-cd /root/dev/apps/tv/apps/watchdog
-pm2 flush  tv-watchdog 2> /dev/null
+# (Re)register the tv-watchdog pm2 task from ecosystem.config.cjs on the
+# remote server. Normally not needed — ./srvr deploys reload it — only run
+# this if pm2's process list was wiped.
+cd /root/dev/apps/tv
 pm2 delete tv-watchdog 2> /dev/null
-pm2 start  watchdog.js --watch watchdog.js -f --name tv-watchdog
+pm2 start ecosystem.config.cjs --only tv-watchdog --env production
 pm2 save

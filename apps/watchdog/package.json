@@ -4,5 +4,8 @@
   "description": "Independent background monitor for tv-srvr (liveness + error-rate).",
   "type": "module",
   "main": "watchdog.js",
-  "private": true
+  "private": true,
+  "dependencies": {
+    "@tv/share": "workspace:*"
+  }
 }

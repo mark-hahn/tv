@@ -16,6 +16,7 @@ export const PROJECT_DIRS = {
   asr: { roots: ["apps/asr"] },
   tv: { roots: ["apps/tv"] },
   client: { roots: ["apps/client/src"] },
+  watchdog: { roots: ["apps/watchdog"] },
 };
 
 // Basenames that are unilog plumbing or path constants — never instrument.

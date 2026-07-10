@@ -163,14 +163,17 @@ function groupHideForSite(logId) {
 
 // it to live-tail subscribers. Returns null when the event has no matching site
 // (e.g. a null/unknown logId).
-export function insertEvent({ logId, pid, message, isHidden = false }) {
-  const hidden = isHidden || groupHideForSite(logId);
+// hide values on log_events: 0 = visible, 1 = group/manual hidden,
+// 2 = dedup-suppressed (kept in the DB for debugging queries; never broadcast
+// and never flipped by group Show/Unshow).
+export function insertEvent({ logId, pid, message, isHidden = false, isDup = false }) {
+  const hide = isDup ? 2 : isHidden || groupHideForSite(logId) ? 1 : 0;
   const info = insEvent.run(
     logId == null ? null : Number(logId),
     String(pid || "unknown"),
     nowPst(),
     String(message ?? ""),
-    hidden ? 1 : 0,
+    hide,
   );
   const row = getEventRow.get(Number(info.lastInsertRowid));
   if (row) row.groups = groupsForSite(row.log_id);
@@ -181,10 +184,10 @@ export function insertEvent({ logId, pid, message, isHidden = false }) {
 // down-blocked dedup — the "down blocked" group covers the whole tor/flex → qbt
 // → down flow. The same file gets blocked every processing cycle, producing
 // identical redundant events. Drop events whose (log_id + message) was already
-// seen within the last ~hour so the viewer isn't flooded. Only group-members
+// seen within the last ~24 hours so the viewer isn't flooded. Only group-members
 // are deduped; all other events pass through untouched.
 // ---------------------------------------------------------------------------
-const DEDUP_TTL_MS = 60 * 60 * 1000; // ~1 hour
+const DEDUP_TTL_MS = 24 * 60 * 60 * 1000; // ~24 hours
 const DEDUP_GROUP = "down blocked";
 const dedupCache = new Map(); // `${logId}\u0000${message}` -> insertedAtMs
 let dedupIds = new Set(); // log_ids in the down-blocked group
@@ -207,10 +210,10 @@ function pruneDedupCache(now) {
     if (now - t > DEDUP_TTL_MS) dedupCache.delete(k);
 }
 
-// Seed the cache from DB rows in the last hour so a file blocked just before a
-// restart isn't immediately re-logged after. ts is a PST wall-clock string, so
-// a lexicographic `ts >= cutoff` compare is timezone-correct. Seeded entries
-// expire ~1h from startup (mild over-retention, harmless).
+// Seed the cache from DB rows in the last TTL window so a file blocked just
+// before a restart isn't immediately re-logged after. ts is a PST wall-clock
+// string, so a lexicographic `ts >= cutoff` compare is timezone-correct. Seeded
+// entries expire one TTL from startup (mild over-retention, harmless).
 function seedDedupCache() {
   if (dedupIds.size === 0) return;
   const now = Date.now();
@@ -242,8 +245,9 @@ const getBlockedUntil = db.prepare(
 // Dedup wrapper used by BOTH the in-process srvr sink and POST /api/log, so
 // local and remote emitters are covered. Returns the joined event row to
 // broadcast, or null when the event is a redundant down-blocked event (inserted
-// to DB but NOT broadcast). A cache hit does NOT refresh the entry, so a
-// still-blocking file re-appears at most once per hour as a heartbeat.
+// to DB with hide = 2 but NOT broadcast). A cache hit does NOT refresh the
+// entry, so a still-blocking file re-appears at most once per day as a
+// heartbeat.
 export function insertEventDedup({ logId, pid, message }) {
   const id = logId == null ? null : Number(logId);
   if (id != null) {
@@ -256,7 +260,7 @@ export function insertEventDedup({ logId, pid, message }) {
     const key = `${id}\u0000${String(message ?? "")}`;
     if (dedupCache.has(key)) {
       dedupDropped++;
-      insertEvent({ logId, pid, message, isHidden: true }); // Mark as hidden in DB
+      insertEvent({ logId, pid, message, isDup: true }); // kept in DB as hide = 2
       return null; // But don't broadcast to clients
     }
     dedupCache.set(key, now);
@@ -515,7 +519,8 @@ export function deleteEvents(eventIds) {
 }
 
 // Show events (set hide = 0) for all events in the given group IDs and clear the
-// groups' own hide flag so future events default to visible.
+// groups' own hide flag so future events default to visible. Only group-hidden
+// rows (hide = 1) are unhidden — dedup-suppressed rows (hide = 2) stay hidden.
 // Returns the number of event rows changed.
 export function showEventsInGroups(groupIds) {
   if (!Array.isArray(groupIds) || groupIds.length === 0) return 0;
@@ -524,13 +529,17 @@ export function showEventsInGroups(groupIds) {
   if (logIds.length === 0) return 0;
   const placeholders = logIds.map(() => "?").join(",");
   const result = db
-    .prepare(`UPDATE log_events SET hide = 0 WHERE log_id IN (${placeholders})`)
+    .prepare(
+      `UPDATE log_events SET hide = 0
+        WHERE log_id IN (${placeholders}) AND hide = 1`,
+    )
     .run(...logIds);
   return result.changes || 0;
 }
 
 // Unshow events (set hide = 1) for all events in the given group IDs and set the
-// groups' own hide flag so future events default to hidden.
+// groups' own hide flag so future events default to hidden. Dedup-suppressed
+// rows (hide = 2) keep their marker.
 // Returns the number of event rows changed.
 export function unshowEventsInGroups(groupIds) {
   if (!Array.isArray(groupIds) || groupIds.length === 0) return 0;
@@ -539,7 +548,10 @@ export function unshowEventsInGroups(groupIds) {
   if (logIds.length === 0) return 0;
   const placeholders = logIds.map(() => "?").join(",");
   const result = db
-    .prepare(`UPDATE log_events SET hide = 1 WHERE log_id IN (${placeholders})`)
+    .prepare(
+      `UPDATE log_events SET hide = 1
+        WHERE log_id IN (${placeholders}) AND hide = 0`,
+    )
     .run(...logIds);
   return result.changes || 0;
 }

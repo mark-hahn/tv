@@ -220,41 +220,118 @@ const postSetTvdbFields = (params) => {
   });
 };
 
-const writeLastDownloadedDirect = (showName, timestamp) => {
+// seriesName from TVDB search usually has a "(YYYY)" year suffix while
+// tvdb.json keys usually don't, so build candidate names and try each.
+const stripYearSuffix = (name) => name.replace(/\s*\(\d{4}\)\s*$/, "");
+
+const showFolderFromLocalPath = (localPath) => {
+  const lp = localPath ? String(localPath) : "";
+  if (!lp.startsWith(TV_ROOT + "/")) return "";
+  return lp.slice(TV_ROOT.length + 1).split("/")[0] || "";
+};
+
+const buildNameCandidates = (showName, localPath) => {
+  const name = String(showName || "").trim();
+  const folder = showFolderFromLocalPath(localPath).trim();
+  const candidates = [];
+  for (const cand of [
+    name,
+    stripYearSuffix(name),
+    folder,
+    stripYearSuffix(folder),
+  ]) {
+    if (cand && !candidates.includes(cand)) candidates.push(cand);
+  }
+  return candidates;
+};
+
+const isTvdbRecord = (v) => v && typeof v === "object" && !Array.isArray(v);
+
+// Resolve a tvdb.json key from candidates: exact, then case-insensitive,
+// then year-stripped keys (tvdb key "Rivals (2024)" vs candidate "Rivals").
+// Ambiguous year-stripped matches (two keys strip to the same name) are
+// skipped rather than guessed.
+const resolveTvdbKey = (tvdb, candidates) => {
+  for (const cand of candidates) if (isTvdbRecord(tvdb[cand])) return cand;
+  const lowerKeys = new Map();
+  const strippedKeys = new Map();
+  for (const key of Object.keys(tvdb)) {
+    if (!isTvdbRecord(tvdb[key])) continue;
+    lowerKeys.set(key.toLowerCase(), key);
+    const stripped = stripYearSuffix(key).toLowerCase();
+    strippedKeys.set(stripped, strippedKeys.has(stripped) ? false : key);
+  }
+  for (const cand of candidates) {
+    const hit = lowerKeys.get(cand.toLowerCase());
+    if (hit) return hit;
+  }
+  for (const cand of candidates) {
+    const hit = strippedKeys.get(stripYearSuffix(cand).toLowerCase());
+    if (hit) return hit;
+  }
+  return null;
+};
+
+const resolveTvdbKeyFromFile = (candidates) => {
+  const tvdb = readJson(TVDB_JSON_PATH, null);
+  if (!tvdb || typeof tvdb !== "object" || Array.isArray(tvdb)) return null;
+  return resolveTvdbKey(tvdb, candidates);
+};
+
+const writeLastDownloadedDirect = (candidates, timestamp) => {
   const tvdb = readJson(TVDB_JSON_PATH, null);
   if (!tvdb || typeof tvdb !== "object" || Array.isArray(tvdb)) return false;
-  const record = tvdb[showName];
-  if (!record || typeof record !== "object" || Array.isArray(record))
-    return false;
-  record["last-downloaded"] = timestamp;
+  const key = resolveTvdbKey(tvdb, candidates);
+  if (!key) return false;
+  tvdb[key]["last-downloaded"] = timestamp;
   const data = JSON.stringify(tvdb);
   writeTextAtomic(TVDB_JSON_PATH, data);
   writeTextAtomic(TVDB_BACKUP_PATH, data);
   return true;
 };
 
-const recordShowDownloadedInternal = async (showName, timestamp) => {
-  const name = String(showName || "").trim();
+const recordShowDownloadedInternal = async (showName, timestamp, localPath) => {
+  const candidates = buildNameCandidates(showName, localPath);
   const ts = Math.trunc(Number(timestamp));
-  if (!name || !Number.isFinite(ts) || ts <= 0) return false;
+  if (candidates.length === 0 || !Number.isFinite(ts) || ts <= 0) return false;
   try {
-    await postSetTvdbFields({
-      name,
-      "last-downloaded": ts,
-      dontEnqueue: true,
-    });
-    return true;
+    for (const name of candidates) {
+      const body = await postSetTvdbFields({
+        name,
+        "last-downloaded": ts,
+        dontEnqueue: true,
+      });
+      // setTvdbFields returns the string "no tvdb" (HTTP 200) on a key miss.
+      if (String(body || "").trim() !== '"no tvdb"') return true;
+    }
+    // All exact candidates missed — resolve fuzzily (case, year suffix)
+    // against tvdb.json keys and retry with the real key.
+    const key = resolveTvdbKeyFromFile(candidates);
+    if (key && !candidates.includes(key)) {
+      const body = await postSetTvdbFields({
+        name: key,
+        "last-downloaded": ts,
+        dontEnqueue: true,
+      });
+      if (String(body || "").trim() !== '"no tvdb"') return true;
+    }
+    unilog(1286, `last-downloaded: no tvdb record matched ${candidates.join(" | ")}`);
+    return false;
   } catch (err) {
-    const saved = writeLastDownloadedDirect(name, ts);
+    const saved = writeLastDownloadedDirect(candidates, ts);
     if (!saved) {
-      unilog(1191, `last-downloaded update failed for ${name}: ${err && err.message ? err.message : String(err)}`);
+      unilog(1191, `last-downloaded update failed for ${candidates[0]}: ${err && err.message ? err.message : String(err)}`);
     }
     return saved;
   }
 };
 
-export const recordShowDownloaded = async (showName, timestamp = unixNow()) => {
-  return recordShowDownloadedInternal(showName, timestamp);
+export const recordShowDownloaded = async (
+  showName,
+  timestamp = unixNow(),
+  localPath = "",
+) => {
+  return recordShowDownloadedInternal(showName, timestamp, localPath);
 };
 
 // ---- tvResync + chokidar watchers -----------------------------------------
@@ -1077,6 +1154,7 @@ const handleFinish = (entry) => {
         recordShowDownloadedInternal(
           entry.seriesName,
           entry.dateEnded || unixNow(),
+          lp,
         ).catch(() => {});
       }
       removeInProgress(title);

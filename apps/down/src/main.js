@@ -1970,7 +1970,7 @@ async function main() {
           continue;
         }
       }
-      await tvJson.recordShowDownloaded(showTitle, unixNow());
+      await tvJson.recordShowDownloaded(showTitle, unixNow(), seasonDir);
       unilog(315, `DVD: moved ${destName} → ${seasonDir}`);
     }
   };

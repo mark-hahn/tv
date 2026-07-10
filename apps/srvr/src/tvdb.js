@@ -2482,6 +2482,7 @@ const tryLocalGetTvdb = async () => {
 
   // Push 3: Rotten Tomatoes scrape (slow, runs separately after push1 & push2)
   if (!skipRotten && processRecord.name && allTvdb[processRecord.name]) {
+    const rottenStartMs = Date.now();
     try {
       const rottenRemote = await getRemote(null, 99, processRecord.name);
       if (rottenRemote) {
@@ -2508,6 +2509,8 @@ const tryLocalGetTvdb = async () => {
     } catch (e) {
       unilog(755, "tryLocalGetTvdb push3 rotten:", e.message);
     }
+    const rottenSecs = ((Date.now() - rottenStartMs) / 1000).toFixed(1);
+    unilog(1277, `tvdb push3 [${processRecord.name}]: rotten took ${rottenSecs}s`);
   }
 
   // If queue is now empty, notify clients

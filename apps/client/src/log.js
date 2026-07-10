@@ -12,6 +12,9 @@ const LOG_URL = `${config.tvSrvrUrl}/api/log`;
 const FLUSH_MS = 2000;
 const MAX_BATCH = 50;
 const PID = "client";
+// Unilog is only for the vite dev client; built (non-vite) clients must stay
+// silent so their traffic never steals the "current client" slot on the server.
+const VITE_DEV = import.meta.env.DEV;
 
 // Generate a unique GUID for this client instance to detect multiple clients.
 function generateGuid() {
@@ -85,7 +88,7 @@ function unilogJoin(parts) {
 // The single call every active client log site invokes at runtime (variadic).
 export function unilog(logId, ...parts) {
   try {
-    if (loggingDisabled.value) return;
+    if (!VITE_DEV || loggingDisabled.value) return;
     queue.push({
       logId,
       pid: PID,
@@ -110,7 +113,7 @@ export function unilog(logId, ...parts) {
 // The remaining args are the message; with none the site logs "<missing>".
 export function logHere() {}
 
-if (typeof window !== "undefined") {
+if (VITE_DEV && typeof window !== "undefined") {
   window.addEventListener("beforeunload", () => {
     if (queue.length === 0) return;
     try {

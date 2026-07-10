@@ -2801,10 +2801,6 @@ async function main() {
           existsCount++;
           unilog(
             331,
-            "------",
-            downloadCount,
-            "/",
-            chkCount,
             "SKIP (episode watched):",
             fname,
             seStr,

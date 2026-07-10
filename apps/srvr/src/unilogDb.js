@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS log_sites (
   old_log     TEXT,
   project     TEXT,
   created_at  TEXT,
-  removed_at  TEXT
+  removed_at  TEXT,
+  blocked_until TEXT
 );
 
 CREATE TABLE IF NOT EXISTS log_events (
@@ -90,6 +91,19 @@ try {
   }
 } catch (err) {
   console.error("[unilogDb] log_groups hide migration failed:", err); // no-unilog
+}
+
+// Migration: add log_sites.blocked_until. tv-watchdog stamps a PST
+// "yyyy/mm/dd hh:mm:ss" here when an error burst blocks a site; events from a
+// blocked site are dropped on insert until the stamp expires.
+try {
+  const scols = db.pragma("table_info(log_sites)");
+  if (!scols.some((col) => col.name === "blocked_until")) {
+    db.exec("ALTER TABLE log_sites ADD COLUMN blocked_until TEXT");
+    console.log("[unilogDb] migration: added blocked_until to log_sites"); // no-unilog
+  }
+} catch (err) {
+  console.error("[unilogDb] blocked_until migration failed:", err); // no-unilog
 }
 
 // PST 'yyyy/mm/dd hh:mm:ss' for a given Date; hour 24 normalized to 00.
@@ -219,6 +233,12 @@ export function getDedupDropped() {
   return dedupDropped;
 }
 
+// Watchdog burst-block: a site whose blocked_until stamp is still in the
+// future has its events dropped entirely (not inserted, not broadcast).
+const getBlockedUntil = db.prepare(
+  "SELECT blocked_until FROM log_sites WHERE log_id = ?",
+);
+
 // Dedup wrapper used by BOTH the in-process srvr sink and POST /api/log, so
 // local and remote emitters are covered. Returns the joined event row to
 // broadcast, or null when the event is a redundant down-blocked event (inserted
@@ -226,6 +246,10 @@ export function getDedupDropped() {
 // still-blocking file re-appears at most once per hour as a heartbeat.
 export function insertEventDedup({ logId, pid, message }) {
   const id = logId == null ? null : Number(logId);
+  if (id != null) {
+    const bu = getBlockedUntil.get(id)?.blocked_until;
+    if (bu && bu > nowPst()) return null; // site blocked by tv-watchdog
+  }
   if (id != null && dedupIds.has(id)) {
     const now = Date.now();
     pruneDedupCache(now);

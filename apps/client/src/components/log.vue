@@ -477,6 +477,17 @@ export default {
       this.exitErrorMode(false);
     },
     columns() {
+      // "-" alone in a header filter box matches only blank values.
+      const isBlank = (rowValue) =>
+        rowValue == null || String(rowValue).trim() === "";
+      const likeOrBlank = (headerValue, rowValue) => {
+        const hv = String(headerValue ?? "").trim();
+        if (hv === "") return true;
+        if (hv === "-") return isBlank(rowValue);
+        return String(rowValue ?? "")
+          .toLowerCase()
+          .includes(hv.toLowerCase());
+      };
       return [
         {
           title: "Time",
@@ -490,6 +501,7 @@ export default {
           field: "message",
           width: 280,
           headerFilter: "input",
+          headerFilterFunc: likeOrBlank,
         },
         {
           title: "Level",
@@ -519,6 +531,7 @@ export default {
           field: "groups",
           width: 139,
           headerFilter: "input",
+          headerFilterFunc: likeOrBlank,
         },
         {
           title: "File",
@@ -526,6 +539,7 @@ export default {
           width: 300,
           formatter: (cell) => `/root/apps/tv/${cell.getValue() || ""}`,
           headerFilter: "input",
+          headerFilterFunc: likeOrBlank,
         },
         {
           title: "Line",
@@ -533,6 +547,7 @@ export default {
           width: 45,
           hozAlign: "right",
           headerFilter: "input",
+          headerFilterFunc: likeOrBlank,
         },
         {
           title: "Id",
@@ -542,6 +557,7 @@ export default {
           headerFilter: "input",
           headerFilterFunc: (headerValue, rowValue) => {
             if (headerValue === "" || headerValue == null) return true;
+            if (String(headerValue).trim() === "-") return isBlank(rowValue);
             return String(rowValue) === String(headerValue).trim();
           },
         },
@@ -553,6 +569,7 @@ export default {
           headerFilter: "input",
           headerFilterFunc: (headerValue, rowValue) => {
             if (headerValue === "" || headerValue == null) return true;
+            if (String(headerValue).trim() === "-") return isBlank(rowValue);
             return String(rowValue) === String(headerValue).trim();
           },
           formatter: (cell) => {
@@ -885,7 +902,7 @@ export default {
         const res = await srvr.showUnilogEvents(groupIds);
         if (res?.ok) {
           this.flash(`showed ${res.changed || 0} events`);
-          await this.loadLogs();
+          await Promise.all([this.loadLogs(), this.loadGroups()]);
         } else {
           this.flash("failed to show events");
         }
@@ -901,7 +918,7 @@ export default {
         const res = await srvr.unshowUnilogEvents(groupIds);
         if (res?.ok) {
           this.flash(`hid ${res.changed || 0} events`);
-          await this.loadLogs();
+          await Promise.all([this.loadLogs(), this.loadGroups()]);
         } else {
           this.flash("failed to hide events");
         }
@@ -950,7 +967,7 @@ export default {
         const res = await srvr.showUnilogEvents(this.selectedGroupIds);
         if (res?.ok) {
           this.flash(`showed ${res.changed || 0} events`);
-          await this.loadLogs();
+          await Promise.all([this.loadLogs(), this.loadGroups()]);
         } else {
           this.flash("failed to show events");
         }
@@ -968,7 +985,7 @@ export default {
         const res = await srvr.unshowUnilogEvents(this.selectedGroupIds);
         if (res?.ok) {
           this.flash(`unshowed ${res.changed || 0} events`);
-          await this.loadLogs();
+          await Promise.all([this.loadLogs(), this.loadGroups()]);
         } else {
           this.flash("failed to unshow events");
         }

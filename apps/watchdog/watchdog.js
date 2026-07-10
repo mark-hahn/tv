@@ -1,9 +1,11 @@
 // tv-watchdog — an independent background monitor (pm2 task: tv-watchdog).
 //
-// It reads the unilog SQLite DB READ-ONLY and pm2's process status, and raises
+// It reads the unilog SQLite DB and pm2's process status, and raises
 // tier-1 (liveness) + tier-2 (error-rate) alerts to its OWN log stream and a
-// persistent alert file. It never writes to the app DB and shares no code with
-// tv-srvr, so a bug in tv-srvr cannot take the watchdog down with it.
+// persistent alert file, plus emails error summaries (throttled, deduped). It
+// shares no code with tv-srvr, so a bug in tv-srvr cannot take the watchdog
+// down with it. Its ONLY write to the app DB is stamping log_sites.blocked_until
+// when an error burst blocks a site (tv-srvr enforces the block on insert).
 //
 // Data sources:
 //   - pm2 jlist            -> is tv-srvr online? crash-looping?
@@ -18,6 +20,7 @@ import { createRequire } from "module";
 
 const require = createRequire("/root/dev/apps/tv/apps/srvr/index.js");
 const Database = require("better-sqlite3");
+const { MailtrapClient } = require("mailtrap");
 
 // ---- config (hard-wired constants, no env vars per repo convention) ----
 const UNILOG_DB_PATH = "/root/dev/apps/tv/unilog/unilog.sqlite";
@@ -26,8 +29,13 @@ const PM2_TARGET = "tv-srvr";
 
 const CHECK_INTERVAL_MS = 60 * 1000; // run all checks every 60s
 const HEARTBEAT_MAX_AGE_MS = 6 * 60 * 1000; // no "hb" event in 6m => stuck/dead
-const ERROR_WINDOW_MS = 60 * 60 * 1000; // error-rate window: 1 hour
-const ERROR_COUNT_WARN = 30; // > this many error events in window => warn
+const ERROR_COUNT_WARN = 30; // > this many error events in one clock hour => warn
+const EMAIL_MIN_INTERVAL_MS = 60 * 60 * 1000; // at most one error email per hour
+const BURST_COUNT = 5; // more than this many errors ...
+const BURST_WINDOW_MS = 5 * 1000; // ... within this span => burst
+const BURST_BLOCK_MS = 60 * 60 * 1000; // burst blocks the emitting site(s) 1h
+const MAILTRAP_TOKEN_PATH =
+  "/root/dev/apps/tv/apps/watchdog/mailtrap-token.txt";
 const RESTART_SPIKE = 3; // >= this many restarts between cycles => crash loop
 const HEALTHY_UPTIME_MS = 5 * 60 * 1000; // uptime past this clears crash-loop
 // Tier-3 "stuck queue" detection from the heartbeat's queue depths + the
@@ -57,8 +65,35 @@ function pstCutoff(msAgo) {
   return pstStr(new Date(Date.now() - msAgo));
 }
 
-// ---- alert sink (dedup: only emit on state change, not every cycle) ----
-const activeAlerts = new Map(); // key -> message
+// ---- email (mailtrap, same pattern as bkupall/mailer.js) ----
+const MAIL_TOKEN = fs.readFileSync(MAILTRAP_TOKEN_PATH, "utf8").trim();
+const mailClient = new MailtrapClient({
+  endpoint: "https://send.api.mailtrap.io/",
+  token: MAIL_TOKEN,
+});
+async function sendMail(subject, text) {
+  try {
+    await mailClient.send({
+      from: { email: "mark@hahnca.com", name: "tv-watchdog" },
+      to: [{ email: "mark@hahnca.com" }],
+      subject,
+      text: text || subject,
+      category: "tv-watchdog",
+    });
+    emit("EMAIL", "info", `sent: ${subject}`);
+  } catch (err) {
+    emit("EMAIL", "warn", `send failed: ${err.message}`);
+  }
+}
+
+// ---- alert sink ----
+// Dedup ignores dates/timestamps/counts: every digit run is stripped before
+// comparing, so "49 error events ... x49" and "45 error events ... x45" are the
+// SAME alert and neither the alert log nor the pm2 out log gets re-emissions.
+function stripNums(s) {
+  return String(s).replace(/\d+/g, "#");
+}
+const activeAlerts = new Map(); // key -> { skel, message }
 function emit(kind, level, message) {
   const line = `${pstStr()} [${level}] ${kind}: ${message}`;
   console.log(line);
@@ -67,15 +102,16 @@ function emit(kind, level, message) {
   } catch {}
 }
 function raise(key, level, message) {
-  if (activeAlerts.get(key) === message) return; // already active, unchanged
-  activeAlerts.set(key, message);
+  const skel = stripNums(message);
+  if (activeAlerts.get(key)?.skel === skel) return; // dupe (numbers ignored)
+  activeAlerts.set(key, { skel, message });
   emit("ALERT", level, `[${key}] ${message}`);
 }
 function clear(key) {
-  if (!activeAlerts.has(key)) return;
   const was = activeAlerts.get(key);
+  if (!was) return;
   activeAlerts.delete(key);
-  emit("RESOLVED", "info", `[${key}] cleared (was: ${was})`);
+  emit("RESOLVED", "info", `[${key}] cleared (was: ${was.message})`);
 }
 
 // ---- data sources ----
@@ -142,34 +178,31 @@ function lastHeartbeatTs() {
     return null;
   }
 }
-function errorCountSince(cutoffPst) {
+function maxEventId() {
+  const d = getDb();
+  if (!d) return null;
+  try {
+    return d.prepare("SELECT COALESCE(MAX(id), 0) AS m FROM log_events").get()
+      .m;
+  } catch {
+    return null;
+  }
+}
+// Error-level events newer than afterId, oldest first, joined with their site.
+function errorEventsAfter(afterId) {
   const d = getDb();
   if (!d) return null;
   try {
     return d
       .prepare(
-        `SELECT count(*) AS n FROM log_events e JOIN log_sites s ON e.log_id = s.log_id
-          WHERE s.level = 'error' AND e.ts > ?`,
+        `SELECT e.id, e.ts, e.message, s.log_id, s.src_file, s.src_line
+           FROM log_events e JOIN log_sites s ON e.log_id = s.log_id
+          WHERE s.level = 'error' AND e.id > ?
+          ORDER BY e.id`,
       )
-      .get(cutoffPst).n;
+      .all(afterId);
   } catch {
     return null;
-  }
-}
-function topErrorSites(cutoffPst, limit = 5) {
-  const d = getDb();
-  if (!d) return [];
-  try {
-    return d
-      .prepare(
-        `SELECT s.log_id, s.src_file, s.src_line, count(*) AS n
-           FROM log_events e JOIN log_sites s ON e.log_id = s.log_id
-          WHERE s.level = 'error' AND e.ts > ?
-          GROUP BY s.log_id ORDER BY n DESC LIMIT ?`,
-      )
-      .all(cutoffPst, limit);
-  } catch {
-    return [];
   }
 }
 
@@ -197,9 +230,178 @@ function recentHeartbeats(limit) {
   }
 }
 
+// ---- error stream: hourly tally, burst block, deduped + throttled email ----
+// A cursor (last processed log_events.id) makes every error event count exactly
+// once: hourly tallies never overlap, and no error is reported in two hours.
+let errorCursor = null; // last log_events.id already processed
+let hourKey = null; // PST "yyyy/mm/dd hh" the running tally belongs to
+let hourTally = 0; // error events seen in that hour
+let hourSites = new Map(); // log_id -> { file, line, n }
+const pendingErrors = new Map(); // stripped msg -> {count,sites,example,firstTs,lastTs}
+let lastEmailMs = 0; // last email send time (1/hour throttle)
+
+// Epoch ms from a PST "yyyy/mm/dd hh:mm:ss" string. Parsed with a fixed UTC
+// suffix — absolute value is offset, but diffs between two stamps are correct.
+function tsToMs(ts) {
+  return Date.parse(ts.replace(/\//g, "-").replace(" ", "T") + "Z");
+}
+
+// Sites with more than BURST_COUNT error events inside one BURST_WINDOW_MS
+// span. Runs over all new events together; every site appearing in an
+// offending window is returned (log_id -> "file:line(idN)" label).
+function burstSites(events) {
+  const out = new Map();
+  const evs = events
+    .map((e) => ({ ...e, ms: tsToMs(e.ts) }))
+    .sort((a, b) => a.ms - b.ms);
+  for (let i = 0; i + BURST_COUNT < evs.length; i++) {
+    if (evs[i + BURST_COUNT].ms - evs[i].ms <= BURST_WINDOW_MS) {
+      for (let j = i; j <= i + BURST_COUNT; j++)
+        out.set(
+          evs[j].log_id,
+          `${evs[j].src_file}:${evs[j].src_line}(id${evs[j].log_id})`,
+        );
+    }
+  }
+  return out;
+}
+
+// The watchdog's ONLY app-DB write: stamp log_sites.blocked_until so tv-srvr
+// drops the site's events until the stamp expires. Short-lived rw connection.
+function blockSites(logIds, untilPst) {
+  let wdb = null;
+  try {
+    wdb = new Database(UNILOG_DB_PATH);
+    wdb.pragma("busy_timeout = 4000");
+    const upd = wdb.prepare(
+      "UPDATE log_sites SET blocked_until = ? WHERE log_id = ?",
+    );
+    for (const id of logIds) upd.run(untilPst, id);
+    return true;
+  } catch (e) {
+    emit("ALERT", "warn", `[burst-block] block write failed: ${e.message}`);
+    return false;
+  } finally {
+    try {
+      wdb?.close();
+    } catch {}
+  }
+}
+
+// Send everything accumulated since the last email, then reset the throttle.
+// burstLabels (array) switches to the burst subject + blocked-sites section.
+async function flushEmail(burstLabels) {
+  let total = 0;
+  const lines = [];
+  for (const e of pendingErrors.values()) {
+    total += e.count;
+    lines.push(`${e.count}x ${[...e.sites].join(", ")}`);
+    lines.push(`   ${e.firstTs}${e.count > 1 ? ` ... ${e.lastTs}` : ""}`);
+    lines.push(`   ${e.example}`);
+    lines.push("");
+  }
+  let subject;
+  if (burstLabels) {
+    subject = `tv-watchdog: error burst — blocked ${burstLabels.length} site(s) for 1h`;
+    lines.push(
+      `blocked for 1h (> ${BURST_COUNT} errors in ${BURST_WINDOW_MS / 1000}s):`,
+    );
+    for (const l of burstLabels) lines.push(`   ${l}`);
+  } else {
+    subject = `tv-watchdog: ${total} error event(s), ${pendingErrors.size} unique`;
+  }
+  pendingErrors.clear();
+  lastEmailMs = Date.now();
+  await sendMail(subject, lines.join("\n"));
+}
+
+async function checkErrors() {
+  const max = maxEventId();
+  if (max == null) return; // db unreadable — the "db" alert already covers it
+  if (errorCursor == null) {
+    errorCursor = max; // first run: only report errors from now on
+    return;
+  }
+  const events = errorEventsAfter(errorCursor);
+  if (events == null) return;
+  errorCursor = max;
+
+  // non-overlapping hourly tally -> error-rate alert
+  const hk = pstStr().slice(0, 13);
+  if (hk !== hourKey) {
+    hourKey = hk;
+    hourTally = 0;
+    hourSites = new Map();
+  }
+  hourTally += events.length;
+  for (const ev of events) {
+    const s = hourSites.get(ev.log_id) || {
+      file: ev.src_file,
+      line: ev.src_line,
+      n: 0,
+    };
+    s.n++;
+    hourSites.set(ev.log_id, s);
+  }
+  if (hourTally > ERROR_COUNT_WARN) {
+    const top = [...hourSites.entries()]
+      .sort((a, b) => b[1].n - a[1].n)
+      .slice(0, 5)
+      .map(([id, s]) => `${s.file}:${s.line}(id${id})x${s.n}`)
+      .join(", ");
+    raise(
+      "error-rate",
+      "warn",
+      `${hourTally} error events in hour ${hourKey} — top: ${top}`,
+    );
+  } else {
+    clear("error-rate");
+  }
+
+  // dedupe into the pending email queue (numbers/timestamps stripped)
+  for (const ev of events) {
+    const key = stripNums(ev.message);
+    const e = pendingErrors.get(key) || {
+      count: 0,
+      sites: new Set(),
+      example: ev.message,
+      firstTs: ev.ts,
+      lastTs: ev.ts,
+    };
+    e.count++;
+    e.lastTs = ev.ts;
+    e.sites.add(`${ev.src_file}:${ev.src_line}(id${ev.log_id})`);
+    pendingErrors.set(key, e);
+  }
+
+  // burst: block the site(s) for 1h and email immediately — this bypasses the
+  // hourly email throttle and restarts it.
+  const bursts = burstSites(events);
+  if (bursts.size > 0) {
+    const until = pstStr(new Date(Date.now() + BURST_BLOCK_MS));
+    blockSites([...bursts.keys()], until);
+    const labels = [...bursts.values()];
+    emit(
+      "ALERT",
+      "warn",
+      `[burst-block] blocked until ${until}: ${labels.join(", ")}`,
+    );
+    await flushEmail(labels);
+    return;
+  }
+
+  // routine path: at most one email per hour, only when errors are pending
+  if (
+    pendingErrors.size > 0 &&
+    Date.now() - lastEmailMs >= EMAIL_MIN_INTERVAL_MS
+  ) {
+    await flushEmail(null);
+  }
+}
+
 // ---- checks ----
 let lastRestarts = null;
-function runChecks() {
+async function runChecks() {
   // 1 + 2. pm2 online + crash loop
   const p = pm2Status(PM2_TARGET);
   let srvrUptimeMs = null;
@@ -245,22 +447,8 @@ function runChecks() {
     }
   }
 
-  // 4. error-rate (tier 2)
-  const errs = errorCountSince(pstCutoff(ERROR_WINDOW_MS));
-  if (errs != null) {
-    if (errs > ERROR_COUNT_WARN) {
-      const top = topErrorSites(pstCutoff(ERROR_WINDOW_MS))
-        .map((r) => `${r.src_file}:${r.src_line}(id${r.log_id})x${r.n}`)
-        .join(", ");
-      raise(
-        "error-rate",
-        "warn",
-        `${errs} error events in last ${ERROR_WINDOW_MS / 60000}m — top: ${top}`,
-      );
-    } else {
-      clear("error-rate");
-    }
-  }
+  // 4. error-rate (tier 2) + error emails: cursor-based, burst block, throttle
+  await checkErrors();
 
   // 5. stuck queues / stuck sweep (tier 3). Uses heartbeat queue depths plus
   // the monotonic subDone/asrDone completion counters. A restart resets the

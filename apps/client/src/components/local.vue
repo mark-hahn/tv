@@ -1285,7 +1285,6 @@ import {
   deletePath,
   handleAsr,
   handleFix,
-  handleEmb,
   embApply,
   enqueueSubs,
   enqueueGenSrt,
@@ -2538,13 +2537,6 @@ export default {
         unilog(1011, "Failed to init Fix State", e);
       }
     },
-    async initEmbState() {
-      try {
-        await handleEmb({ action: "tail" });
-      } catch (e) {
-        unilog(1012, "Failed to init Emb state", e);
-      }
-    },
     clickEmb() {
       this.showEmb = !this.showEmb;
       if (this.showEmb) {
@@ -2552,7 +2544,6 @@ export default {
         this.showOpn = false;
         this.showFix = false;
         this.showInfo = false;
-        this.initEmbState();
       }
     },
     async applyEmb() {
@@ -2589,28 +2580,9 @@ export default {
       }
 
       this.embBusy = false;
-
-      try {
-        await handleEmb({ action: "tail" });
-      } catch (e) {
-        this.embLogs += `[Tail error: ${e.message}]\n`;
-      }
     },
-    async clearEmbLog() {
+    clearEmbLog() {
       this.embLogs = "";
-      try {
-        await handleEmb({ action: "clear" });
-      } catch (e) {
-        unilog(1013, "Failed to clear emb log", e);
-      }
-    },
-    async clearEmbLog() {
-      this.embLogs = "";
-      try {
-        await handleEmb({ action: "clear" });
-      } catch (e) {
-        unilog(1014, "Failed to clear emb log", e);
-      }
     },
     onEmbLog(msg) {
       if (!msg) return;

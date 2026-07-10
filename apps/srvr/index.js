@@ -16,7 +16,6 @@ import * as util from "./src/util.js";
 import * as email from "./src/email.js";
 import * as tmdb from "./src/tmdb.js";
 import { handleFix } from "./src/fix.js";
-import { handleEmb } from "./src/emb.js";
 import fetch from "node-fetch";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
 import {
@@ -2866,8 +2865,6 @@ wss.on("connection", (ws) => {
       }
     } else if (fname == "handleFix") {
       handleFix(ws, id, param);
-    } else if (fname == "handleEmb") {
-      handleEmb(ws, id, param);
     } else if (fname === "tvRemoteAction") {
       // Broadcast to other clients only; sender handles its own avoidance locally
       const otherClients = [...connectedClients].filter(

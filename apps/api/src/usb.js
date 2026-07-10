@@ -3,11 +3,7 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { parseKeyValueFile } from "./qb-cred.js";
-import {
-  getApiSecretsDir,
-  getApiDataDir,
-  preferSharedReadPath,
-} from "./tvPaths.js";
+import { getApiSecretsDir, getApiDataDir } from "./tvPaths.js";
 import { unilog } from "@tv/share";
 
 const execFileAsync = promisify(execFile);
@@ -275,7 +271,11 @@ export async function spaceAvailUsb() {
       unilog(279, "spaceAvailUsb: unexpected quota output:", stdout);
     }
   } catch (e) {
-    unilog(280, "spaceAvailUsb: ssh space probing failed (returning zeros):", e);
+    unilog(
+      280,
+      "spaceAvailUsb: ssh space probing failed (returning zeros):",
+      e,
+    );
   }
 
   return {
@@ -338,7 +338,11 @@ export async function spaceAvailMedia() {
       }
     }
   } catch (e) {
-    unilog(282, "spaceAvailMedia: df failed (returning mediaSpaceTotal/mediaSpaceUsed=0):", e);
+    unilog(
+      282,
+      "spaceAvailMedia: df failed (returning mediaSpaceTotal/mediaSpaceUsed=0):",
+      e,
+    );
   }
 
   return {
@@ -1170,7 +1174,10 @@ done
           fmtGbPad(runningDeletedBytes),
           folder.folderName,
         ].join(" | ");
-        unilog(284, `usb prune ${PRUNE_DRY_RUN ? "[dry-run]" : "[delete]"}: ${logLine}`);
+        unilog(
+          284,
+          `usb prune ${PRUNE_DRY_RUN ? "[dry-run]" : "[delete]"}: ${logLine}`,
+        );
 
         if (!PRUNE_DRY_RUN) {
           const rmCmd = `rm -rf -- ${shellQuote(folder.folderPath)}`;

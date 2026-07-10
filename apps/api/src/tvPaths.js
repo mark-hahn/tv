@@ -20,25 +20,6 @@ export function ensureDir(dirPath) {
   }
 }
 
-export function getSecretsDir() {
-  const dirPath = API_SECRETS_DIR;
-  ensureDir(dirPath);
-  return dirPath;
-}
-
-export function getApiBaseDir() {
-  const dirPath = API_ROOT_DIR;
-  ensureDir(dirPath);
-  return dirPath;
-}
-
-export function getApiCookiesDir() {
-  // Historical name: cookie-related files now live under data/.
-  const dirPath = API_DATA_DIR;
-  ensureDir(dirPath);
-  return dirPath;
-}
-
 export function getApiDataDir() {
   const dirPath = API_DATA_DIR;
   ensureDir(dirPath);
@@ -61,16 +42,4 @@ export function getApiMiscDir() {
   const dirPath = API_MISC_DIR;
   ensureDir(dirPath);
   return dirPath;
-}
-
-export function preferSharedReadPath(sharedPath, legacyPath) {
-  // Compatibility shim: callers may provide a current-path and an old-path.
-  // Prefer the current-path if present, otherwise fall back.
-  try {
-    if (sharedPath && fs.existsSync(sharedPath)) return sharedPath;
-  } catch {}
-  try {
-    if (legacyPath && fs.existsSync(legacyPath)) return legacyPath;
-  } catch {}
-  return sharedPath;
 }

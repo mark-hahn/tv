@@ -19,6 +19,7 @@ misc/old-reel-code
 **/secrets/
 **/cookies/
 *cred.js
+!apps/api/src/qb-cred.js
 *cred.txt
 apps/android/.build-cache
 unilog/reconcile-cache.json

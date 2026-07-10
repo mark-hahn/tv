@@ -170,10 +170,6 @@ function shouldFilterOut(role) {
 async function getActorCredits(actorName, options = {}) {
   const { headless = true } = options;
 
-  const log = (...args) => {
-    unilog(142, ...args);
-  };
-
   unilog(143, `Scraping IMDb credits for: ${actorName}`);
 
   let browser;
@@ -281,16 +277,6 @@ async function getActorCredits(actorName, options = {}) {
             buttonText &&
             (buttonText.includes("Actor") || buttonText.includes("Actress"))
           ) {
-            const buttonClass = await button.getAttribute("class");
-            if (
-              buttonClass &&
-              (buttonClass.includes("selected") ||
-                buttonClass.includes("active"))
-            ) {
-              unilog(150, "✓ Actor filter is already active");
-              actorButton = button;
-              break;
-            }
             actorButton = button;
             break;
           }
@@ -312,7 +298,10 @@ async function getActorCredits(actorName, options = {}) {
             await page.waitForTimeout(1000);
           }
         } else {
-          unilog(151, "No Actor/Actress filter found, will scrape all visible credits");
+          unilog(
+            151,
+            "No Actor/Actress filter found, will scrape all visible credits",
+          );
           await page.waitForTimeout(1000);
         }
       } else {

@@ -3,7 +3,7 @@ import path from "node:path";
 import { franc } from "franc-min";
 import { getApiDataDir } from "./tvPaths.js";
 import { getCandidateShows, markShowBrowsed } from "./tvmaze.js";
-import { smartTitleMatch, unilog} from "@tv/share"
+import { smartTitleMatch, unilog } from "@tv/share";
 
 // --- Constants & Config ---
 
@@ -132,7 +132,6 @@ const resultTitlesPath = path.join(DATA_DIR, "browse-cards.json");
 // --- State ---
 
 let resultTitles = [];
-let resultTitlesLoaded = false;
 
 // --- Persistence Helpers ---
 
@@ -173,8 +172,6 @@ function loadResultTitles() {
 }
 
 function saveResultTitles() {
-  // If we haven't loaded yet, don't overwrite with empty
-  if (!resultTitlesLoaded) return;
   atomicWriteJson(resultTitlesPath, resultTitles);
 }
 
@@ -207,21 +204,22 @@ function parseResultTitle(entry) {
 
 // --- Initialization ---
 
-try {
-  resultTitles = loadResultTitles();
-  resultTitlesLoaded = true;
-} catch (e) {
-  resultTitles = [];
-}
+// loadResultTitles never throws (all failure paths return []).
+resultTitles = loadResultTitles();
 
 // --- Filtering ---
 
-function buildShowTitle(show) {
+// show.premiered comes from the raw TVMaze record (data_json) where it is a
+// date string like "2013-06-24"; older callers passed epoch seconds.
+export function buildShowTitle(show) {
   let title = (show.name || "Unknown").trim();
   if (show.premiered) {
-    const d = new Date(show.premiered * 1000);
-    const y = d.getUTCFullYear();
-    if (y && !Number.isNaN(y)) title = `${title} (${y})`;
+    const ms =
+      typeof show.premiered === "number"
+        ? show.premiered * 1000
+        : Date.parse(show.premiered);
+    const y = new Date(ms).getUTCFullYear();
+    if (!Number.isNaN(y)) title = `${title} (${y})`;
   }
   return title;
 }

@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "node:path";
 import { getApiDataDir } from "./tvPaths.js";
-import { logHere, unilog} from "@tv/share"
+import { unilog } from "@tv/share";
 
 const STATS_PATH = path.join(getApiDataDir(), "qbt-stats.json");
 const MIN_SAMPLE_INTERVAL_MS = 4000;
@@ -88,8 +88,7 @@ export async function enrichQbtStats(torrents) {
       } else if (Array.isArray(entry.rateHist)) {
         const samples = entry.rateHist.slice(0, -2).slice(-10);
         if (samples.length > 0) {
-          entry.avgRateMb =
-            samples.reduce((a, b) => a + b, 0) / samples.length;
+          entry.avgRateMb = samples.reduce((a, b) => a + b, 0) / samples.length;
         }
         delete entry.rateHist;
         changed = true;

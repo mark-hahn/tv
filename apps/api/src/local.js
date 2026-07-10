@@ -18,12 +18,24 @@ export async function getLocalFiles(root = TV_ROOT) {
   // %P: file's name relative to start point
   // %s: size in bytes
   // %CY-%Cm-%Cd %CH:%CM:%CS: datetime (YYYY-MM-DD HH:MM:SS)
-  const cmd = `find ${root} -maxdepth 5 -not -path '*/.*' -printf "%y|%P|%s|%CY-%Cm-%Cd %CH:%CM:%CS\\n" | sort`;
-
+  // No shell and no `| sort` — sortNodes below fully sorts the tree.
   try {
-    const { stdout } = await execFileAsync("bash", ["-c", cmd], {
-      maxBuffer: 10 * 1024 * 1024, // 10MB
-    });
+    const { stdout } = await execFileAsync(
+      "find",
+      [
+        root,
+        "-maxdepth",
+        "5",
+        "-not",
+        "-path",
+        "*/.*",
+        "-printf",
+        "%y|%P|%s|%CY-%Cm-%Cd %CH:%CM:%CS\\n",
+      ],
+      {
+        maxBuffer: 10 * 1024 * 1024, // 10MB
+      },
+    );
 
     const lines = (stdout || "").split("\n").filter(Boolean);
     const tree = [];
@@ -68,7 +80,7 @@ export async function getLocalFiles(root = TV_ROOT) {
       }
     }
 
-    // Sort tree? linux sort on paths helps, but maybe we want folders first?
+    // Folders first, then case-insensitive name (numeric-aware for folders).
     const sortNodes = (nodes) => {
       nodes.sort((a, b) => {
         if (a.type !== b.type) return a.type === "folder" ? -1 : 1;

@@ -40,6 +40,7 @@ import {
   hasBrowseShow,
   ackBrowsed,
   removeResultTitleByTvdbId,
+  buildShowTitle,
 } from "./browse.js";
 import * as reviews from "./reviews.js";
 import { checkFiles as tvProcCheckFiles } from "./tv-proc.js";
@@ -52,12 +53,10 @@ import {
 import { unilog, setUnilogSink, logHere } from "@tv/share";
 import parseTorrentTitlePkg from "parse-torrent-title";
 import {
-  getApiCookiesDir,
+  getApiDataDir,
   getTvprocJsonPath,
   getApiMiscDir,
   getApiSecretsDir,
-  getSecretsDir,
-  preferSharedReadPath,
 } from "./tvPaths.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -608,7 +607,7 @@ const OPENSUBTITLES_BASE_URL = "https://api.opensubtitles.com/api/v1";
 
 function getRootSecretsDir() {
   // Checkout-independent shared secrets directory (created if missing).
-  return getSecretsDir();
+  return getApiSecretsDir();
 }
 
 function getSubsLoginPath() {
@@ -732,7 +731,7 @@ async function loadLocalCfClearance(provider) {
   try {
     const p = String(provider || "").trim();
     if (!p) return "";
-    const inPath = path.join(getApiCookiesDir(), "cf_clearance-cookies.json");
+    const inPath = path.join(getApiDataDir(), "cf_clearance-cookies.json");
     const raw = await fs.promises.readFile(inPath, "utf8");
     const j = JSON.parse(raw);
     const v = j && typeof j === "object" && !Array.isArray(j) ? j[p] : "";
@@ -750,7 +749,7 @@ app.post("/api/cf_clearance", async (req, res) => {
     const ipt = typeof body.ipt_cf === "string" ? body.ipt_cf.trim() : "";
     const tl = typeof body.tl_cf === "string" ? body.tl_cf.trim() : "";
 
-    const outPath = path.join(getApiCookiesDir(), "cf_clearance-cookies.json");
+    const outPath = path.join(getApiDataDir(), "cf_clearance-cookies.json");
     let current = {};
     try {
       const raw = await fs.promises.readFile(outPath, "utf8");
@@ -2593,21 +2592,13 @@ app.get("/api/browseSearch", (req, res) => {
     const q = String(req.query.q || "").trim();
     if (!q) return res.json([]);
     const shows = searchShowsByName(q);
-    const results = shows.map((show) => {
-      let title = (show.name || "Unknown").trim();
-      if (show.premiered) {
-        const d = new Date(show.premiered * 1000);
-        const y = d.getUTCFullYear();
-        if (y && !Number.isNaN(y)) title = `${title} (${y})`;
-      }
-      return {
-        status: "ok",
-        title,
-        imdbid: show.externals?.imdb,
-        tvdbid: show.externals?.thetvdb,
-        data: show,
-      };
-    });
+    const results = shows.map((show) => ({
+      status: "ok",
+      title: buildShowTitle(show),
+      imdbid: show.externals?.imdb,
+      tvdbid: show.externals?.thetvdb,
+      data: show,
+    }));
     res.json(results);
   } catch (error) {
     unilog(256, "browseSearch error:", error);

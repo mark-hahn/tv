@@ -33,7 +33,9 @@ export async function searchTorrentsInChild(params) {
       settle(() => {
         unilog(201, "searchTorrentsInChild: worker timed out — killing");
         child.kill("SIGKILL");
-        reject(new Error("search timed out after 3 minutes"));
+        reject(
+          new Error(`search timed out after ${SEARCH_TIMEOUT_MS / 1000}s`),
+        );
       });
     }, SEARCH_TIMEOUT_MS);
 
@@ -49,7 +51,10 @@ export async function searchTorrentsInChild(params) {
 
     child.on("exit", (code, signal) => {
       settle(() => {
-        unilog(202, `searchTorrentsInChild: worker exited unexpectedly (code=${code}, signal=${signal})`);
+        unilog(
+          202,
+          `searchTorrentsInChild: worker exited unexpectedly (code=${code}, signal=${signal})`,
+        );
         reject(
           new Error(
             `search worker crashed (code=${code ?? "null"}, signal=${signal ?? "none"})`,

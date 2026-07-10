@@ -28,7 +28,17 @@ export async function sshCurlFetch(
     // malformed URL — pass as-is and let curl fail
   }
 
-  const args = ["-sS", "-L", "--globoff", "--compressed", "--max-time", "60"];
+  // --fail makes curl exit 22 on HTTP >= 400 so error pages don't parse as
+  // success (the error body is suppressed; stderr carries the status line).
+  const args = [
+    "-sS",
+    "--fail",
+    "-L",
+    "--globoff",
+    "--compressed",
+    "--max-time",
+    "60",
+  ];
 
   for (const [k, v] of Object.entries(headers || {})) {
     if (!k) continue;
@@ -82,7 +92,7 @@ export async function sshCurlFetch(
     child.on("close", (code) => {
       const stdout = Buffer.concat(stdoutChunks);
       const stderr = Buffer.concat(stderrChunks);
-      resolve({ ok: code === 0 && stdout.length > 0, code, stdout, stderr });
+      resolve({ ok: code === 0, code, stdout, stderr });
     });
   });
 }
@@ -114,7 +124,10 @@ export function patchProviderWithSshTunnel(provider) {
     try {
       const jar = provider.cookieJar;
       if (typeof jar.getCookieString === "function") {
-        cookieHeader = String(jar.getCookieString(urlStr) || "");
+        // tough-cookie jars return a Promise here; request jars are sync.
+        let cs = jar.getCookieString(urlStr);
+        if (cs && typeof cs.then === "function") cs = await cs;
+        cookieHeader = String(cs || "");
       } else if (typeof jar.getCookies === "function") {
         const cookies = jar.getCookies(urlStr) || [];
         if (Array.isArray(cookies)) {

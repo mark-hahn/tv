@@ -50,8 +50,8 @@ async function getTvdbToken() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ apikey: TVDB_APIKEY, pin: TVDB_PIN }),
   });
-  const json = await res.json();
   if (!res.ok) throw new Error(`TVDB login failed: ${res.status}`);
+  const json = await res.json();
   _tvdbToken = json?.data?.token;
   if (!_tvdbToken) throw new Error("TVDB login: missing token");
   _tvdbTokenFetchedAt = now;
@@ -218,6 +218,7 @@ function appendSyncLog(entry) {
 }
 
 function appendSyncBlankLine() {
+  if (!LOG_APPS_API_DATA_MISC_TVMAZE_SYNC_LOG) return;
   try {
     const outPath = path.join(getApiMiscDir(), SYNC_LOG_FILENAME);
     const dir = path.dirname(outPath);
@@ -240,7 +241,6 @@ try {
       cwd: process.cwd(),
     },
   };
-  // console.log("[tvmaze] module loaded", payload);
   appendSyncBlankLine();
   appendSyncLog(payload);
 } catch {
@@ -575,13 +575,8 @@ function scheduleDaily3am(runFn) {
     } catch (e) {
       unilog(272, "daily sync failed", e);
     }
-
-    setInterval(
-      () => {
-        runFn("daily").catch((e) => unilog(273, "daily sync failed", e));
-      },
-      24 * 60 * 60 * 1000,
-    );
+    // Re-arm for the next 3am so run duration and DST never drift the time.
+    scheduleDaily3am(runFn);
   }, delay);
 }
 
@@ -623,9 +618,6 @@ async function syncTvmazeShows(reason = "startup") {
   let lastOkPage = null;
   let lastTvmazeIdSeen = startMaxId ?? null;
 
-  // We are now doing the transaction inline inside the loop to capture new shows correctly
-  // const perPageTx = db.transaction((rows) => { ... }); -- removed
-
   let endBy404 = false;
   let end404Page = null;
 
@@ -650,25 +642,6 @@ async function syncTvmazeShows(reason = "startup") {
 
       pagesFetched++;
       lastOkPage = page;
-
-      // We want to log each show added individually.
-      // We capture the "newly inserted" shows by tracking the inserted count
-      // inside perPageTx, but simplest is to modify perPageTx to return the
-      // list of inserted shows. However, perPageTx is a transaction wrapper.
-      // Instead, we can iterate json here to detect new ones, but we need
-      // the Tx for atomicity.
-      //
-      // Modified approach: The user wants "log line for every show added".
-      // We'll hook into perPageTx logic by checking existence before calling it,
-      // or we can just iterate "json" again? No, we need to know what was *actually* inserted.
-      //
-      // Let's modify perPageTx to log directly or return the inserted names.
-      // But perPageTx is defined above. Let's redefine the transaction logic inline
-      // or pass a callback.
-      //
-      // Actually, let's just inspect the logic. The current implementation uses perPageTx.
-      // We will perform the logging *inside* the loop if possible, or collect
-      // loggable items.
 
       const newShows = [];
       const nullPremieredInserts = [];
@@ -906,9 +879,6 @@ async function syncTvmazeShows(reason = "startup") {
                 // Force the higher timestamp into the record we are about to save
                 if (Number.isFinite(remoteTs) && remoteTs > showTs) {
                   showJson.updated = remoteTs;
-                  // console.error(
-                  //   `[tvmaze] repairing timestamp for ${id}: API=${showTs} -> UpdateAPI=${remoteTs}`,
-                  // );
                 }
 
                 // Use a transaction for the single update
@@ -917,7 +887,10 @@ async function syncTvmazeShows(reason = "startup") {
                   fillPremieredFromTvdb(db, id, showJson.name).catch(() => {});
                 }
 
-                if (!updatesHeaderPrinted) {
+                if (
+                  LOG_APPS_API_DATA_MISC_TVMAZE_SYNC_LOG &&
+                  !updatesHeaderPrinted
+                ) {
                   try {
                     const miscDir = getApiMiscDir();
                     const logPath = path.join(miscDir, SYNC_LOG_FILENAME);
@@ -990,7 +963,6 @@ async function syncTvmazeShows(reason = "startup") {
       },
     };
 
-    // console.log("[tvmaze] sync summary", summary);
     dumpSyncSummaryJson(summary);
     appendSyncLog(summary);
 

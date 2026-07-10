@@ -6,62 +6,11 @@ import { loadCreds } from "./qb-cred.js";
 import parseTorrent from "parse-torrent";
 import parseTorrentTitle from "parse-torrent-title";
 
-import {
-  getApiDataDir,
-  getApiMiscDir,
-  getApiSecretsDir,
-  preferSharedReadPath,
-} from "./tvPaths.js";
+import { getApiDataDir, getApiSecretsDir } from "./tvPaths.js";
 import { unilog } from "@tv/share";
-
-const LOG_APPS_API_DATA_MISC_TEMP_TXT = false;
 
 const DOWNLOAD_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-
-function appendTorrentBytesLog({ provider, method, downloadUrl, torrentData }) {
-  if (!LOG_APPS_API_DATA_MISC_TEMP_TXT) return;
-  try {
-    const outPath = path.join(getApiMiscDir(), "temp.txt");
-    const buf = Buffer.isBuffer(torrentData)
-      ? torrentData
-      : Buffer.from(torrentData || []);
-
-    let parsed = null;
-    try {
-      parsed = parseTorrent(buf);
-    } catch {
-      parsed = null;
-    }
-
-    const maxBytes = (() => {
-      const raw = String(process.env.TOR_LOG_TORRENT_MAX_BYTES || "").trim();
-      const n = raw ? Number(raw) : 200_000;
-      return Number.isFinite(n) && n > 0 ? Math.floor(n) : 200_000;
-    })();
-
-    const truncated = buf.length > maxBytes;
-    const slice = truncated ? buf.subarray(0, maxBytes) : buf;
-
-    const payload = {
-      ts: new Date().toISOString(),
-      event: "torrent-bytes",
-      provider: provider || undefined,
-      method: method || undefined,
-      downloadUrl: downloadUrl || undefined,
-      bytes: buf.length,
-      truncated,
-      loggedBytes: slice.length,
-      infoHash: parsed?.infoHash || undefined,
-      name: parsed?.name || undefined,
-      torrentBase64: slice.toString("base64"),
-    };
-
-    fs.appendFileSync(outPath, JSON.stringify(payload) + "\n", "utf8");
-  } catch {
-    // ignore logging failures
-  }
-}
 
 function safeCookieNames(cookiePairs) {
   return (cookiePairs || [])
@@ -98,11 +47,9 @@ function looksLikeCloudflareChallenge(html) {
 }
 
 function tryLoadBrowserCurlProfile() {
-  // Prefer data/curl-tl.txt (primary). NO FALLBACKS.
   try {
-    const candidates = [path.join(getApiDataDir(), "curl-tl.txt")];
-    const p = candidates.find((x) => fs.existsSync(x));
-    if (!p) return null;
+    const p = path.join(getApiDataDir(), "curl-tl.txt");
+    if (!fs.existsSync(p)) return null;
     const raw = fs.readFileSync(p, "utf8");
 
     const headers = {};
@@ -318,25 +265,6 @@ function validateTorrentData(torrentData) {
     }
 
     if (!anyHasSE) {
-      try {
-        const debugInfo = {
-          message: "Validation failed",
-          files: allPaths,
-          checkedFiles: checkedFiles,
-        };
-        fs.writeFileSync(
-          "/root/dev/apps/tv/temp.txt",
-          JSON.stringify(debugInfo, null, 2),
-        );
-        try {
-          fs.writeFileSync("/root/dev/apps/tv/temp.torrent", torrentData);
-        } catch (e) {
-          unilog(134, "Failed to dump torrent", e);
-        }
-      } catch (err) {
-        unilog(135, "Failed to write debug info to temp.txt", err);
-      }
-
       return fail(
         "validate-torrent-files",
         "Torrent file name is missing a season or episode number.",
@@ -580,13 +508,6 @@ async function fetchTorrentFileFromInfoHash(torrent, provider) {
       const valid = validateTorrentData(torrentData);
       if (!valid.success) continue;
 
-      appendTorrentBytesLog({
-        provider,
-        method: "info-hash-cache",
-        downloadUrl,
-        torrentData,
-      });
-
       return ok({
         provider,
         method: "info-hash-cache",
@@ -649,8 +570,6 @@ export async function fetchTorrentFileFromSearchResult(torrent) {
   const headers = profile?.headers || {};
   let cookieHeader = profile?.cookieHeader || "";
 
-  // Source of truth: cf-clearance.local.json (written by client Save Cookies).
-  // req-browser.txt is treated as an immutable template; we only patch an in-memory copy.
   const localCf = await loadLocalCfClearance(provider);
   if (localCf) {
     cookieHeader = upsertCookieValue(cookieHeader, "cf_clearance", localCf);
@@ -678,14 +597,6 @@ export async function fetchTorrentFileFromSearchResult(torrent) {
       },
     );
   }
-
-  // Debug support: persist the fetched torrent bytes (base64; truncated by TOR_LOG_TORRENT_MAX_BYTES).
-  appendTorrentBytesLog({
-    provider,
-    method: "curl",
-    downloadUrl,
-    torrentData: r.stdout,
-  });
 
   const valid = validateTorrentData(r.stdout);
   if (!valid.success) {
@@ -751,14 +662,14 @@ export async function fetchTorrentFile(torrent) {
         if (dlResp.ok) {
           const torrentData = Buffer.from(await dlResp.arrayBuffer());
           const valid = validateTorrentData(torrentData);
-          unilog(138, "directLink valid:", valid.success, "bytes:", torrentData.length);
+          unilog(
+            138,
+            "directLink valid:",
+            valid.success,
+            "bytes:",
+            torrentData.length,
+          );
           if (valid.success) {
-            appendTorrentBytesLog({
-              provider,
-              method: "direct-link",
-              downloadUrl: directLink,
-              torrentData,
-            });
             return ok({
               provider,
               downloadUrl: directLink,
@@ -841,13 +752,6 @@ export async function fetchTorrentFile(torrent) {
       );
     }
     const torrentData = Buffer.from(await torResp.arrayBuffer());
-    appendTorrentBytesLog({
-      provider,
-      method: "detail-page",
-      downloadUrl: torrentDlUrl,
-      torrentData,
-    });
-
     const valid = validateTorrentData(torrentData);
     if (!valid.success) {
       return fail(
@@ -889,7 +793,6 @@ export async function fetchTorrentFile(torrent) {
     }
   }
 
-  // Source of truth for cf_clearance is the local file written by the client Save Cookies.
   // We intentionally do not rely on any client-sent cfClearance.
   const cfCookie = await loadLocalCfClearance(provider);
   if (cfCookie) allCookies.push(`cf_clearance=${cfCookie}`);
@@ -1108,11 +1011,9 @@ export async function download(torrent) {
     return fail("validate", "Torrent data is required");
   }
 
+  // fetchTorrentFile already validates the torrent bytes in every branch.
   const fetched = await fetchTorrentFile(torrent);
   if (!fetched.success) return fetched;
-
-  const valid = validateTorrentData(fetched.torrentData);
-  if (!valid.success) return valid;
 
   const hint =
     torrent?.raw?.filename || torrent?.raw?.title || "download.torrent";

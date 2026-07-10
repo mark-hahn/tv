@@ -33,6 +33,7 @@ import {
   usbCpToken,
 } from "./usb.js";
 import { getLocalFiles, renameLocalFile, moveToTrial } from "./local.js";
+import { enrichQbtStats } from "./qbt-stats.js";
 import {
   getBrowseShow,
   getAllBrowse,
@@ -886,6 +887,8 @@ app.get("/api/qbt/info", async (req, res) => {
 
     const useFilter = Object.keys(filterObj).length > 0 ? filterObj : undefined;
     const info = await getQbtInfo(useFilter);
+    // Only the full unfiltered list drives stat sampling/pruning.
+    if (!useFilter) await enrichQbtStats(info);
 
     if (DUMP_INFO) {
       try {

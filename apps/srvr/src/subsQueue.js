@@ -810,6 +810,13 @@ function hasOpnSidecar(videoFilePath) {
   );
 }
 
+// A saved chksrt decision (`<base>.mb.chosen`) means no sidecar srt is
+// wanted for this video — never download opn srts once it exists.
+function hasChosenMarker(videoFilePath) {
+  const base = videoFilePath.replace(/\.[^.]+$/, "");
+  return fs.existsSync(`${base}.mb.chosen`);
+}
+
 async function tryDownloadOpnSrtForVideo({
   showName,
   tvdbRecord,
@@ -820,6 +827,7 @@ async function tryDownloadOpnSrtForVideo({
 }) {
   if (!tvdbRecord.inEmby || !tvdbRecord.imdbId) return { attempted: false };
   if (!fs.existsSync(videoFilePath)) return { attempted: false, missing: true };
+  if (hasChosenMarker(videoFilePath)) return { attempted: false, chosen: true };
   if (hasOpnSidecar(videoFilePath)) {
     return { attempted: true, downloaded: false, alreadyPresent: true };
   }
@@ -957,6 +965,7 @@ async function checkAndDownloadOpnSrt(showName, tvdbRecord) {
       const airedMs = new Date(airedStr).getTime();
       if (isNaN(airedMs) || airedMs < oneYearAgo || airedMs > now) continue;
       if (hasOpnSidecar(fp)) continue;
+      if (hasChosenMarker(fp)) continue;
 
       const histKey = `${showName}|||${key}`;
       const lastCheck = subsState.opnCheckHistory[histKey];

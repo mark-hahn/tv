@@ -1,0 +1,26 @@
+__Host-1PLSID	o.mail.google.com|s.youtube:g.a0007Ai2W9XUkBwk3vUnGNjN-0bh0THod3eY8TgGc1wLwU_rqH2PHkBsn_zNCmEyO2g4dhmfVQACgYKARUSARASFQHGX2MikT5gh3duR1jmjIr_FlAj5xoVAUF8yKpzmNMlTeqTZloibk-4kSXA0076	accounts.google.com	/	2027-03-30T21:53:51.775Z	194	✓	✓				High	
+__Host-3PLSID	o.mail.google.com|s.youtube:g.a0007Ai2W9XUkBwk3vUnGNjN-0bh0THod3eY8TgGc1wLwU_rqH2PPruf6MI8Cqqim2B3zcGhjwACgYKAdISARASFQHGX2Mi8Obx4tr65-_Xxowl4FARWxoVAUF8yKqbVqyeI19ZoJ-VmIyV2AyV0076	accounts.google.com	/	2027-03-30T21:53:51.775Z	194	✓	✓	None			High	
+__Host-GAPS	1:a_WB8oMQ1byV2aeEGjBDUpQerNWKVRJglXYEcRKDj85OQbYxDHChrwl3Wl5U93W1LHZjQm5JyWTXvf0Cx77XV_X5qf_syQ:Dp5LnbzYV-WLIzdV	accounts.google.com	/	2027-03-30T21:53:40.847Z	124	✓	✓				High	
+__Secure-1PAPISID	RSg9cJIOZjqeaDis/AEHrw3juZIBpGRiHN	.google.com	/	2027-08-14T04:01:36.011Z	51		✓				High	
+__Secure-1PSID	g.a000_wi2WyvNANY-L7vuYMQnzV5ARFBzoiYAaf_l0wVRFQBVt9_gtm4ctaiyVqwqBI0OznuKFQACgYKARcSARASFQHGX2MiJuwIYMcCXBryFDYPbV9eKRoVAUF8yKqI3tWgErG5jG7IlXCTxm-20076	.google.com	/	2027-08-14T04:01:36.011Z	167	✓	✓				High	
+__Secure-1PSIDCC	AKEyXzW2P20hmv6j5n9p5oAXw2NnAPQ-h3PCmRFe-RhEW3wsCl2sypKFm8qdkMjUguTCDh1R1Q	.google.com	/	2027-07-10T04:01:36.220Z	90	✓	✓				High	
+__Secure-1PSIDTS	sidts-CjEBBj1CYtfsiUKs0low9MrjeQGLa7W45JjPglLGIZoPOg6CV8kw81Yy19_xc9LV-hnqEAA	.google.com	/	2027-02-23T22:03:59.159Z	93	✓	✓				High	
+__Secure-3PAPISID	RSg9cJIOZjqeaDis/AEHrw3juZIBpGRiHN	.google.com	/	2027-08-14T04:01:36.011Z	51		✓	None			High	
+__Secure-3PSID	g.a000_wi2WyvNANY-L7vuYMQnzV5ARFBzoiYAaf_l0wVRFQBVt9_g5wKQI9ZITxX9v5xSF4pgHQACgYKAScSARASFQHGX2Mief6fq4j3LjnAWZ1RHC68XBoVAUF8yKot1rxy6zaAvNNyIujXEyd-0076	.google.com	/	2027-08-14T04:01:36.011Z	167	✓	✓	None			High	
+__Secure-3PSIDCC	AKEyXzX2Wg1src3zShpexR41dOkaefV5NWXnTkDD5RKJ4EV4cyOat15vO9v8ipvVVKiJGhdPKQ	.google.com	/	2027-07-10T04:42:52.976Z	90	✓	✓	None			High	
+__Secure-3PSIDTS	sidts-CjEBBj1CYtfsiUKs0low9MrjeQGLa7W45JjPglLGIZoPOg6CV8kw81Yy19_xc9LV-hnqEAA	.google.com	/	2027-02-23T22:03:59.159Z	93	✓	✓	None			High	
+__Secure-BUCKET	CKwB	.google.com	/	2026-07-16T20:12:28.908Z	19	✓	✓				Medium	
+ACCOUNT_CHOOSER	AFx_qI5Pw6FqJ26jihc0VHJVrp6u2yzL-b4YStQYSfVgW0NPksTcEe-1inxWkdU9YzTGn9D5zJUk5Yu6KOd1-3tKjHjZgFO6VYZKPPjDQXQMfw_z4KjIhYKf_hGixhfVvnAnUl23MVzx	accounts.google.com	/	2026-11-14T09:00:20.145Z	155	✓	✓				High	
+ads_cookie	1	www.reddit.com	/	2027-08-14T04:42:42.307Z	11			Strict			Medium	
+AEC	AdJVEauA2wlh1_3n5yRb416Nwjt2gZlmwOdHlBxWrhHKIPHLHeU6_Y_RLw	.google.com	/	2026-11-12T05:31:32.243Z	61	✓	✓	Lax			Medium	
+APISID	xl_yMm6gpLSutPYQ/AHSFjM0oQFamqwWZ0	.google.com	/	2027-08-14T04:01:36.010Z	40						High	
+csrf_token	f7391ad72742e1c52685db3edfb12543	.reddit.com	/	Session	42		✓	Strict			Medium	
+csv	2	.reddit.com	/	2027-08-14T04:42:41.542Z	4		✓	None			Medium	
+edgebucket	4VZJ4gRd4lsNMcTgCE	.reddit.com	/	2027-08-14T04:42:41.267Z	28		✓				Medium	
+g_state	{"i_l":0,"i_ll":1783658571150,"i_b":"saHjdEFvMoBMzaLik5hAQNZweQxd5rYStSbvUhkt1Zs","i_e":{"enable_itp_optimization":24},"i_et":1783658571150}	www.reddit.com	/	2027-01-06T04:42:51.000Z	147						Medium	
+HSID	At3M3dBPnA8qrnx3f	.google.com	/	2027-08-14T04:01:36.010Z	21	✓					High	
+loid	000000002i8o0y3o69.2.1783658561530.Z0FBQUFBQnFVSGhCQkllUFRQdWlLYWFSZmNRVUlDRjRwaGZ2MVBPeWhLN2RhYUtzZHdlM1FCMVdLRnZDWFV0WWE3Sm9MYXBoRDN6NFVYZGNaUTdyeHh4OVRVUmpUQjBBek1ydDVIaXdIV2dPTGtkY05mVno0bkk3d01jSkdfWXdlRUZHYUxZWFQ4aGU	.reddit.com	/	2027-08-14T04:42:41.541Z	226		✓	None			Medium	
+LSID	o.mail.google.com|s.youtube:g.a0007Ai2W9XUkBwk3vUnGNjN-0bh0THod3eY8TgGc1wLwU_rqH2PgmvlDHcOcU93UVMxzOJvRgACgYKAaESARASFQHGX2MionskmKcdYhpJ5YLULgMqwRoVAUF8yKpOz4B98JTxZSDICOseSuiy0076	accounts.google.com	/	2027-03-30T21:53:51.775Z	185	✓	✓				High	
+NID	532=MeLwwB97dy9fQFw1OvCcRMOpEcDzdY4uHuzfcCL6Hk-X_scjPoTOMauYg4VhShqEAh1WZ6vqD7RGixlU5KgPCI6jLdshPAyq3o6mupUGpkGQm9sxAepqsSEgCSIk4xNEUUiZ8hYkTqovA-sZ8mtcScIGJ4fuLEz5088jqrmBmz2w_lcnMOdU1EHXsEo4z9CJ0OciwAs-Yk-aZLuKyvLcxiww4sbeMYd5UGlfDDDTP3mq7YWo8OUlXlrNsf4XAgJt2HuwfaPA2g9umWO4-sBzsjvatPgVE920GVBZWPReCNCFyUQ0kliUeciVGxXQIhT3Bfuh9UCr0urkfdGdclGbI6MErzZwq2DdhMBtzuqPQPRiVYfmWuDvA2Qfcor3T1vo3El6S3b6wu45UbHK5RNv73mj6F9V3FA10K9k364Ao6RTUxF4u_aLzVB2qOX0BKOwLayLi3OKQ83Fq71eEY8FIpW5qJ8F_m4IaK4KSnYPsFNQiDnIP3hdYpefuM00NTM8RZQFbRSqjwdHygrnuIxqs-SrpNhGdmdpAWAhBem4VwLDzVQieKbtqwjv3xP6cg9IJ_X6gIMp7jfPj0wFBG7fYe9et92N1KhvYP8uKu7tihWx1NQokXm-1S6yZqsGktwArMQt1EywJY0-pfbHvt2aL0zf9GNh7UIhmBOm0F9ANDy1uj6b--RxVdgeHYgx3FCPICpwArXJtLaJpYXyhtP9J7rBMUAiBXc8Qq8OgXTVGbzY9gBfYmmH	.google.com	/	2027-01-09T04:01:26.887Z	763	✓	✓	None			Medium	
+rdt	ed25f9dbec14308d82ee0606de9ed462	.reddit.com	/	Session	35		✓	None			Medium	
+reddit_supported_media_codecs	video/avc%2Cvideo/vp9	www.reddit.com	/	2027-07-10T04:42:51.000Z	50						Medium	

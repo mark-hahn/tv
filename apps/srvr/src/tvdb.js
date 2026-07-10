@@ -5,6 +5,7 @@ import { chromium } from "playwright";
 import WebSocket from "ws";
 import * as urls from "./urls.js";
 import { rottenSearch } from "./rotten.js";
+import * as loid from "./loid.js";
 import * as util from "./util.js";
 import {
   smartTitleMatch,
@@ -882,11 +883,13 @@ const getRemote = async (id, type, showName) => {
     case 7:
       name = "Reddit";
       {
+        if (loid.isLoidNeeded()) break; // waiting on a new loid cookie
         const escShow = encodeURIComponent(showName);
         const redditApiUrl = `https://www.reddit.com/subreddits/search.json?q=${escShow}&limit=10`;
         try {
+          const loidVal = await loid.getLoid();
           const resp = await fetch(redditApiUrl, {
-            headers: { "User-Agent": "tv-app/1.0" },
+            headers: { "User-Agent": "tv-app/1.0", Cookie: `loid=${loidVal}` },
             signal: AbortSignal.timeout(8000),
           });
           if (!resp.ok) {
@@ -922,6 +925,7 @@ const getRemote = async (id, type, showName) => {
               725,
               `reddit search ${resp.status} for ${showName}${errDetail}`,
             );
+            if (resp.status === 403) loid.loidFailed();
             break;
           }
           const json = await resp.json();
@@ -2590,7 +2594,8 @@ export const getRemotesCmd = async (params) => {
 
     // When fetching fresh data (fast=false), save remotes and flat url props
     if (!fast && show.name && allTvdb) {
-      if (allTvdb[show.name]) {
+      const existing = allTvdb[show.name];
+      if (existing) {
         const changes = [];
         if (
           fetchedUrls.imdbRatings !== undefined &&

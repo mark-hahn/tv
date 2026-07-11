@@ -10,16 +10,21 @@ import * as bifQueue from "./bifQueue.js";
 import { EMBY_BASE_URL, EMBY_API_KEY, EMBY_USER_ID } from "./embyConfig.js";
 
 // Commands (seek etc.) must go to the device's remote-controllable session.
-// The Emby Android app reports playback on one session (SupportsRemoteControl
-// false, silently ignores commands) and receives commands on a second session
-// with the same DeviceId.
+// The Emby Android TV app reports playback on one session but only accepts
+// seek/playstate commands on a companion controller session with the same
+// DeviceId. Seeking the playback session itself returns HTTP 500 — and that
+// session now (mis)reports SupportsRemoteControl:true, so we can't trust that
+// flag. Always prefer a same-DeviceId sibling; fall back to the playback
+// session for single-session devices (web player, etc.).
 function controlSessionId(sessions, playSession) {
   if (!playSession) return null;
-  if (playSession.SupportsRemoteControl) return playSession.Id;
-  const ctrl = sessions.find(
-    (s) => s.DeviceId === playSession.DeviceId && s.SupportsRemoteControl,
+  const sibling = sessions.find(
+    (s) =>
+      s.Id !== playSession.Id &&
+      s.DeviceId === playSession.DeviceId &&
+      s.SupportsRemoteControl,
   );
-  return ctrl?.Id ?? playSession.Id;
+  return sibling?.Id ?? playSession.Id;
 }
 
 export async function doSkipIntro(pressedAt, deviceName = "Living Room TV") {
@@ -102,6 +107,8 @@ export async function doTrimIntro(deviceName = "Living Room TV") {
   );
   const session = matches.find((s) => s.SupportsRemoteControl) ?? matches[0];
   if (!session) {
+    const devs = sessions.map((s) => s.DeviceName).join(", ");
+    unilog(1332, `doTrimIntro: no ${deviceName} session. devices: ${devs}`);
     return { ok: false, reason: "notPlaying" };
   }
   const showName =

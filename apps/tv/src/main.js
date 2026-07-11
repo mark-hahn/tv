@@ -185,20 +185,33 @@ function handleEmbySession(s) {
   if (s.DeviceName === "Living Room TV") device = "google";
   if (!device) return;
   const playing = s.NowPlayingItem?.Name ?? null;
+  // Episodes carry the show in SeriesName; movies only have Name.
+  const showName = s.NowPlayingItem?.SeriesName ?? playing;
   const itemId = s.NowPlayingItem?.Id ?? null;
   const remoteCtrl = s.SupportsRemoteControl ?? false;
   const paused = s.PlayState?.IsPaused ?? null;
   const prev = prevSessions[device];
-  const prevItemId = prev?.itemId ?? null;
 
   if (prev) {
     const changed =
       (prev.playing === null && playing !== null) ||
       (!prev.remoteCtrl && remoteCtrl) ||
       prev.paused !== paused;
-    if (changed) {
-      activeDevice = device;
-      unilog(371, `activeDevice: ${device}`);
+    if (changed) activeDevice = device;
+  }
+
+  // Emby broadcasts alternate between full and partial "Living Room TV"
+  // sessions, so itemId toggles real-id <-> null every ~second. Only act on
+  // the real playback session (non-null itemId) and log when the show changes
+  // or it pauses/resumes.
+  if (itemId !== null) {
+    const showChanged = itemId !== lastShowItem[device];
+    const pausedChanged = paused !== lastPaused[device];
+    if (showChanged || pausedChanged) {
+      lastShowItem[device] = itemId;
+      lastPaused[device] = paused;
+      const state = paused ? "paused" : "playing";
+      unilog(371, `activeDevice: ${device} ${state}: ${showName}`);
     }
   }
 
@@ -334,6 +347,8 @@ let pendingViewShow = null; // { showId, showName } — queued for after Emby la
 let viewShowEmbyTimer = null; // debounce timer: fires 1s after Living Room TV session detected
 let currentShowName = null;
 const prevSessions = {};
+const lastShowItem = {}; // last real (non-null) NowPlayingItem id per device
+const lastPaused = {}; // last pause state of the real playback session per device
 
 // Scrub state
 let scrubDirection = null; // 'left' or 'right'

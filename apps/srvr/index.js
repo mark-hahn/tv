@@ -2639,16 +2639,15 @@ app.post("/internal/nowPlaying", (req, res) => {
   // Auto-skip: detect not-playing -> playing from start
   const lrtv = lastNowPlayingList.find((p) => p.device === "Living Room TV");
   const isNowPlaying = !!lrtv;
-  if (
-    !lastLivingRoomWasPlaying &&
-    isNowPlaying &&
-    (lrtv.positionTicks ?? 0) < 3 * 1000 * 10000
-  ) {
+  if (!lastLivingRoomWasPlaying && isNowPlaying) {
+    const posMs = Math.round((lrtv.positionTicks ?? 0) / 10000);
+    const fresh = (lrtv.positionTicks ?? 0) < 3 * 1000 * 10000;
     const skipKey = `${lrtv.showName}|${lrtv.season}|${lrtv.episode}`;
     const allTvdb = tvdb.getAllTvdbSync();
     const record = allTvdb?.[lrtv.showName];
     const trimPos = tvdb.getSeasonIntro(record, lrtv.season).trimPos;
-    if (trimPos > 0 && skipKey !== lastAutoSkipKey) {
+    unilog(1333, `rise ${skipKey} posMs=${posMs} fresh=${fresh} trimPos=${trimPos} lastKey=${lastAutoSkipKey}`);
+    if (fresh && trimPos > 0 && skipKey !== lastAutoSkipKey) {
       lastAutoSkipKey = skipKey;
       setTimeout(() => {
         intro.doTrimIntro().catch((e) => unilog(613, "error:", e.message));

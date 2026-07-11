@@ -128,6 +128,28 @@ function probeRawHeight(filePath) {
   return h;
 }
 
+// Index the tvdb records by the media folder they live in. The folder is the
+// last segment of the record's path, which can differ from the record's name.
+const folderToRecord = () => {
+  const index = new Map();
+  for (const [name, rec] of Object.entries(tvdb.getAllTvdbSync() || {})) {
+    const folder = name.includes("/")
+      ? name
+      : (rec.path || rec.emby?.path || name).split("/").pop();
+    if (folder) index.set(folder, rec);
+  }
+  return index;
+};
+
+// A probed height is already persisted in the record's episodeData (res slot)
+// next to the file it came from, so reuse it instead of running ffprobe again.
+// probedRawHeightByPath is empty after a restart; without this, every file whose
+// name carries no <N>p tag gets re-probed, and execFileSync stalls the server.
+const savedRes = (ed, season, episode, fname) =>
+  ed && epd.getFileName(ed, season, episode) === fname
+    ? epd.getRes(ed, season, episode)
+    : null;
+
 function toEpisodeKey(season, episode) {
   return `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
 }
@@ -179,6 +201,7 @@ export const getShowsFromDisk = async (_params) => {
   let episodesBySeason;
   let fileQuality;
   let showFolderName;
+  let showEpisodeData;
 
   const recurs = async (path) => {
     if (errFlg || path == tvDir + "/.stfolder") return;
@@ -208,7 +231,9 @@ export const getShowsFromDisk = async (_params) => {
           const title = parseTitleFromFilename(fname, folderName, ptt);
           const titleMatch =
             !title || !!smartTitleMatch(title, [showFolderName], null, true);
-          const quality = getResolution(path, { probeFileFn: probeRawHeight });
+          const quality =
+            savedRes(showEpisodeData, parsed.season, parsed.episode, fname) ??
+            getResolution(path, { probeFileFn: probeRawHeight });
           if (titleMatch && quality != null) {
             const epKey = toEpisodeKey(parsed.season, parsed.episode);
             const existing = fileQuality[epKey];
@@ -222,6 +247,7 @@ export const getShowsFromDisk = async (_params) => {
     }
   };
 
+  const folderIndex = folderToRecord();
   const dir = await fsp.readdir(tvDir);
   for (const dirent of dir) {
     const showPath = tvDir + "/" + dirent;
@@ -231,6 +257,7 @@ export const getShowsFromDisk = async (_params) => {
     episodesBySeason = new Map();
     fileQuality = {};
     showFolderName = dirent;
+    showEpisodeData = folderIndex.get(dirent)?.episodeData ?? null;
 
     await recurs(showPath);
 
@@ -285,6 +312,9 @@ export const getShowDiskInfo = async (showFolderName) => {
   const diskByEp = {};
   // All .bif sidecar file names found (matched to video bases after the scan).
   const bifFiles = [];
+  // Read before the caller overwrites it, so already-probed files keep their res.
+  const showEpisodeData =
+    folderToRecord().get(showFolderName)?.episodeData ?? null;
 
   const recurs = async (dirPath) => {
     if (errFlg || dirPath == tvDir + "/.stfolder") return;
@@ -322,9 +352,11 @@ export const getShowDiskInfo = async (showFolderName) => {
           const title = parseTitleFromFilename(fname, folderName, ptt);
           const titleMatch =
             !title || !!smartTitleMatch(title, [showFolderName], null, true);
-          const quality = getResolution(dirPath, {
-            probeFileFn: probeRawHeight,
-          });
+          const quality =
+            savedRes(showEpisodeData, parsed.season, parsed.episode, fname) ??
+            getResolution(dirPath, {
+              probeFileFn: probeRawHeight,
+            });
           if (titleMatch) {
             if (quality != null) {
               const epKey = toEpisodeKey(parsed.season, parsed.episode);

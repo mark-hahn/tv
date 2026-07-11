@@ -92,7 +92,7 @@ const chkWriteFile = async () => {
     const waiters = waitersByPath[path] || [];
     waitersByPath[path] = [];
     let data = pending;
-    if (typeof data != "string") data = JSON.stringify(data);
+    if (typeof data != "string") data = JSON.stringify(data, null, 2);
     // Atomic write: write to a temp file in the same directory, then rename.
     // fs.rename() on Linux is a single syscall — if the process is killed
     // mid-write the original file is untouched.

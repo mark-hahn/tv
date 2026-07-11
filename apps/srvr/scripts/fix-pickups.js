@@ -48,8 +48,8 @@ pickups.sort((a, b) => {
 });
 
 // Write updated tvdb.json (with pickup fields removed)
-fs.writeFileSync(TVDB_PATH, JSON.stringify(allTvdb), "utf8");
-fs.writeFileSync(TVDB_BACKUP_PATH, JSON.stringify(allTvdb), "utf8");
+fs.writeFileSync(TVDB_PATH, JSON.stringify(allTvdb, null, 2), "utf8");
+fs.writeFileSync(TVDB_BACKUP_PATH, JSON.stringify(allTvdb, null, 2), "utf8");
 console.log(`Removed ${pickupFieldsRemoved} pickup fields from tvdb records`);
 
 // Write pickups config

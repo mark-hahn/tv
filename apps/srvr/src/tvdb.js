@@ -139,7 +139,7 @@ function loadTvdbAtStartup() {
       713,
       `startup recovery: invalid primary JSON at ${TVDB_PATH}; restoring from backup ${TVDB_BACKUP_PATH}`,
     );
-    fs.writeFileSync(TVDB_PATH, JSON.stringify(backupParsed), "utf8");
+    fs.writeFileSync(TVDB_PATH, JSON.stringify(backupParsed, null, 2), "utf8");
     return stripLegacyLastWatched(migrateRemotesToFlatProps(backupParsed));
   }
 
@@ -1740,7 +1740,10 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   const existing = allTvdb[name] || {};
   if (!allTvdb[name] && !paramObj.transient) {
     const stack = new Error().stack?.split("\n").slice(1, 6).join(" | ") || "";
-    unilog(1261, `new persistent tvdb record for "${name}" tvdbId=${tvdbId} fast=${fast} stack: ${stack}`);
+    unilog(
+      1261,
+      `new persistent tvdb record for "${name}" tvdbId=${tvdbId} fast=${fast} stack: ${stack}`,
+    );
   }
   const apiCounts = getApiCounts(extResObj?.data);
   if (!toPositiveInt(apiCounts.episodeCount)) {
@@ -2514,7 +2517,10 @@ const tryLocalGetTvdb = async () => {
       unilog(755, "tryLocalGetTvdb push3 rotten:", e.message);
     }
     const rottenSecs = ((Date.now() - rottenStartMs) / 1000).toFixed(1);
-    unilog(1277, `tvdb push3 [${processRecord.name}]: rotten took ${rottenSecs}s`);
+    unilog(
+      1277,
+      `tvdb push3 [${processRecord.name}]: rotten took ${rottenSecs}s`,
+    );
   }
 
   // If queue is now empty, notify clients

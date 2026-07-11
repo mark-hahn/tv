@@ -10,6 +10,13 @@ const LAST_VIEWED_START_DELAY_MS = 0;
 const LAST_VIEWED_POLL_MS = 10 * 1000;
 const LAST_VIEWED_TIMEOUT_MS = 8000;
 
+// Stable per-page client id, used to ignore our own echoed remote actions
+// (a live duplicate socket — e.g. a Vite HMR leftover — would otherwise make a
+// single UI collide with itself). Stored on globalThis so it survives HMR.
+export const clientId =
+  globalThis.__tvClientId ||
+  (globalThis.__tvClientId = Math.random().toString(36).slice(2));
+
 let ws;
 let reconnectTimer = null;
 let wsWanted = false;
@@ -289,7 +296,7 @@ const updateLastViewedCache = async () => {
       lastViewedCacheFailureCount === 1 ||
       lastViewedCacheFailureCount % 10 === 0
     ) {
-      unilog(878, "Failed to update lastViewed cache", err);
+      unilog(878, "Failed to update lastViewed cache", err.message || String(err));
     }
   } finally {
     lastViewedCacheUpdating = false;

@@ -108,6 +108,11 @@ const ROWS = 5;
 const BORDER = 13;
 const SCREEN_MARGIN = 30;
 
+// Stable per-instance client id, used to ignore our own echoed remote actions
+// (a live duplicate socket would otherwise make this UI collide with itself on
+// the next key). Module scope so it survives Fast Refresh re-renders.
+const CLIENT_ID = Math.random().toString(36).slice(2);
+
 export default function App() {
   const [cellDims, setCellDims] = useState({ w: 0, h: 0 });
   const [showStreamers, setShowStreamers] = useState(false);
@@ -309,6 +314,8 @@ export default function App() {
         if (msg.id === 0 && msg.notification === "tvMuteState") {
           applyTvState(msg.data);
         } else if (msg.id === 0 && msg.notification === "tvRemoteAction") {
+          // Ignore our own action echoed back via a duplicate socket.
+          if (msg.data?.senderId && msg.data.senderId === CLIENT_ID) return;
           const fromSubCtrl = msg.data?.fromSubCtrl ?? false;
           avoidingRef.current = true;
           clearTimeout(avoidTimerRef.current);
@@ -603,7 +610,10 @@ export default function App() {
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(
-        JSON.stringify({ fname: "tvRemoteAction", param: { fromSubCtrl } }),
+        JSON.stringify({
+          fname: "tvRemoteAction",
+          param: { fromSubCtrl, senderId: CLIENT_ID },
+        }),
       );
     }
   };
@@ -1089,12 +1099,10 @@ export default function App() {
     if (!player) return;
     if (subNavigatingRef.current) return;
     if (checkBlocked()) return;
-    notifyAction(true);
     const gen = ++subGenRef.current;
     clearInterval(subPollRef.current);
     subPollRef.current = null;
     subPendingRef.current = { deviceName: subDeviceName, index };
-    subNavigatingRef.current = true;
     setSubPlayers((prev) => {
       const idx = prev.findIndex(
         (p) => (p.deviceName || p.sessionId) === subDeviceName,
@@ -1117,6 +1125,10 @@ export default function App() {
       navMs = data.navMs ?? waitMs;
     } catch (_) {}
     if (subGenRef.current !== gen) return;
+    if (navMs > 0) {
+      notifyAction(true);
+      subNavigatingRef.current = true;
+    }
     await new Promise((r) => setTimeout(r, navMs));
     subNavigatingRef.current = false;
     if (subGenRef.current !== gen) return;

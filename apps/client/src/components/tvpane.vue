@@ -606,7 +606,7 @@
 <script>
 import { config } from "../config.js";
 import evtBus from "../evtBus.js";
-import { wsSend } from "../srvr.js";
+import { wsSend, clientId } from "../srvr.js";
 import allServices from "../../../tv/services.json";
 
 const SCRUB_HOLD_DELAY_MS = 400;
@@ -725,7 +725,10 @@ export default {
 
   methods: {
     notifyAction(fromSubCtrl = false) {
-      wsSend({ fname: "tvRemoteAction", param: { fromSubCtrl } });
+      wsSend({
+        fname: "tvRemoteAction",
+        param: { fromSubCtrl, senderId: clientId },
+      });
     },
 
     checkBlocked() {
@@ -738,6 +741,9 @@ export default {
     },
 
     _onTvRemoteAction(data) {
+      // Ignore our own action echoed back via a duplicate socket (would
+      // otherwise make this UI collide with itself on the next key).
+      if (data?.senderId && data.senderId === clientId) return;
       const fromSubCtrl = data?.fromSubCtrl ?? false;
       this.avoidingCollisions = true;
       clearTimeout(this._avoidTimer);
@@ -1273,7 +1279,6 @@ export default {
       );
       if (!player) return;
       if (this.checkBlocked()) return;
-      this.notifyAction(true);
       // optimistic update
       this.subPlayers = this.subPlayers.map((p) =>
         (p.deviceName || p.sessionId) === this.subDeviceName
@@ -1282,6 +1287,7 @@ export default {
       );
       clearInterval(this._subPollTimer);
       let waitMs = 5000;
+      let acted = true;
       try {
         const res = await fetch(`${config.tvTvUrl}/tv/emby/subtitle`, {
           method: "POST",
@@ -1289,9 +1295,13 @@ export default {
           body: JSON.stringify({ sessionId: player.sessionId, index }),
         });
         const data = await res.json();
-        if (data.waitMs) waitMs = data.waitMs;
+        waitMs = data.waitMs ?? 5000;
+        acted = waitMs > 0;
       } catch (_) {}
-      await new Promise((r) => setTimeout(r, waitMs));
+      if (acted) {
+        this.notifyAction(true);
+        await new Promise((r) => setTimeout(r, waitMs));
+      }
       await this.fetchSubPlayers();
       this._subPollTimer = setInterval(() => this.fetchSubPlayers(), 3000);
     },

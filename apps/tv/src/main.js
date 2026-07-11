@@ -113,16 +113,8 @@ const SCRUB_RATE_REV_SLOW = 750; // ms between left keys for first N
 const SCRUB_RATE_REV_FAST = 100; // ms between left keys after first N
 const SCRUB_DEADMAN_TIMEOUT = 2000; // ms without ping before auto-stop
 
-// Subtitle nav (IRCC key sequence) delays
-const SUB_NAV_PRE_DOWN1_DELAY_MS = 400; // after first prepend Down
-const SUB_NAV_PRE_DOWN2_DELAY_MS = 400; // after second prepend Down
-const SUB_NAV_PRE_RETURN_DELAY_MS = 600; // after prepend Return
-const SUB_NAV_DOWN_OPEN_DELAY_MS = 1000; // after initial Down to open OSD
-const SUB_NAV_RIGHT_DELAY_MS = 200; // after each Right arrow
-const SUB_NAV_OPEN_DELAY_MS = 500; // after Confirm to open subtitle menu
-const SUB_NAV_DOWN_DELAY_MS = 50; // after each Down arrow in subtitle menu
-const SUB_NAV_CONFIRM_DELAY_MS = 200; // after last Down arrow before Confirm
-const SUB_NAV_BACK_DELAY_MS = 500; // after final Confirm before sending Back
+// Subtitle nav (IRCC key sequence) delay
+const SUB_KEY_DELAY   = 400; // ms between each key send in subtitle nav sequence
 const SUB_NAV_POLL_MS = 10_000; // fast-poll window after nav completes
 
 // PST LA timestamp  MM-DD HH:mm
@@ -1723,11 +1715,9 @@ app.post("/tv/emby/subtitle", async (req, res) => {
     return;
   }
 
-  // Fetch streams to determine downCount and audio track count.
-  // Menu order: None (0 downs), then each subtitle in stream order (+1 per track).
-  // Right arrow count: 2 when single audio track, 3 when multiple audio tracks.
-  let downCount;
-  let rightCount = 2;
+  // List position: None = 0, then each subtitle in stream order (+1 per track).
+  let oldIndex;
+  let targetIndex;
   try {
     const sessRes = await fetch(
       `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
@@ -1757,19 +1747,19 @@ app.post("/tv/emby/subtitle", async (req, res) => {
     } catch (_) {}
     if (!streams) streams = item.MediaSources?.[0]?.MediaStreams ?? [];
 
-    const audioStreams = streams.filter((s) => s.Type === "Audio");
-    if (audioStreams.length > 1) rightCount = 3;
+    const subStreams = streams.filter((s) => s.Type === "Subtitle");
+    const listPosition = (subIndex) => {
+      if (subIndex === -1) return 0;
+      const pos = subStreams.findIndex((s) => s.Index === subIndex);
+      return pos === -1 ? -1 : pos + 1;
+    };
 
-    if (index === -1) {
-      downCount = 0;
-    } else {
-      const subStreams = streams.filter((s) => s.Type === "Subtitle");
-      const pos = subStreams.findIndex((s) => s.Index === index);
-      if (pos === -1) {
-        res.json({ ok: false, error: "subtitle index not found in list" });
-        return;
-      }
-      downCount = pos + 1;
+    const currentSubIndex = session.PlayState?.SubtitleStreamIndex ?? -1;
+    oldIndex = listPosition(currentSubIndex);
+    targetIndex = listPosition(index);
+    if (oldIndex === -1 || targetIndex === -1) {
+      res.json({ ok: false, error: "subtitle index not found in list" });
+      return;
     }
   } catch (err) {
     unilog(448, "emby/subtitle lookup error:", err.message);
@@ -1777,42 +1767,32 @@ app.post("/tv/emby/subtitle", async (req, res) => {
     return;
   }
 
+  const count = Math.abs(targetIndex - oldIndex);
   unilog(
     449,
-    `subtitle nav: index=${index} downCount=${downCount} rightCount=${rightCount}`,
+    `subtitle nav: index=${index} oldIndex=${oldIndex} targetIndex=${targetIndex} count=${count}`,
   );
-  const navMs =
-    SUB_NAV_PRE_DOWN1_DELAY_MS +
-    SUB_NAV_PRE_DOWN2_DELAY_MS +
-    SUB_NAV_PRE_RETURN_DELAY_MS +
-    SUB_NAV_DOWN_OPEN_DELAY_MS +
-    rightCount * SUB_NAV_RIGHT_DELAY_MS +
-    SUB_NAV_OPEN_DELAY_MS +
-    downCount * SUB_NAV_DOWN_DELAY_MS +
-    SUB_NAV_CONFIRM_DELAY_MS +
-    SUB_NAV_BACK_DELAY_MS;
+
+  if (count === 0) {
+    res.json({ ok: true, waitMs: 0, navMs: 0 });
+    return;
+  }
+
+  const navMs = (6 + count) * SUB_KEY_DELAY;
   const waitMs = navMs + SUB_NAV_POLL_MS;
   unilog(450, `subtitle nav waitMs=${waitMs}`);
   res.json({ ok: true, waitMs, navMs });
 
-  await sendIrcc("Down", SUB_NAV_PRE_DOWN1_DELAY_MS);
-  await sendIrcc("Down", SUB_NAV_PRE_DOWN2_DELAY_MS);
-  await sendIrcc("Return", SUB_NAV_PRE_RETURN_DELAY_MS);
-  await sendIrcc("Down", SUB_NAV_DOWN_OPEN_DELAY_MS);
-  for (let i = 0; i < rightCount; i++) {
-    await sendIrcc("Right", SUB_NAV_RIGHT_DELAY_MS);
+  const dir = targetIndex < oldIndex ? "Up" : "Down";
+  await sendIrcc("Confirm", SUB_KEY_DELAY);
+  await sendIrcc("Up", SUB_KEY_DELAY);
+  await sendIrcc("Confirm", SUB_KEY_DELAY);
+  for (let i = 0; i < count; i++) {
+    await sendIrcc(dir, SUB_KEY_DELAY);
   }
-  await sendIrcc("Confirm", SUB_NAV_OPEN_DELAY_MS);
-  for (let i = 0; i < downCount; i++) {
-    await sendIrcc("Down", SUB_NAV_DOWN_DELAY_MS);
-  }
-  await new Promise((r) => {
-    setTimeout(r, SUB_NAV_CONFIRM_DELAY_MS);
-  });
-  await sendIrcc("Confirm", SUB_NAV_BACK_DELAY_MS);
-  callService("remote", "send_command", REMOTE_ENTITY_ID, {
-    command: "Return",
-  });
+  await sendIrcc("Confirm", SUB_KEY_DELAY);
+  await sendIrcc("Down", SUB_KEY_DELAY);
+  await sendIrcc("Confirm", SUB_KEY_DELAY);
 });
 
 app.post("/tv/emby/subtitle-offset", async (req, res) => {

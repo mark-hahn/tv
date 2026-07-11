@@ -16,16 +16,24 @@ PHASE_FILE=/root/apps/tv/build-phase
 do_install() {
   local device=$1
   local apk=$2
+  local remote_apk=/data/local/tmp/tv-remote.apk
+  echo "==> Pushing APK to device $device..."
+  if ! adb -s "$device" push "$apk" "$remote_apk" 2>&1; then
+    echo "==> Push failed."
+    return 1
+  fi
   echo "==> Installing on device $device..."
-  if ! timeout 600 adb -s "$device" install -r "$apk" 2>&1; then
+  if ! adb -s "$device" shell pm install -r "$remote_apk" 2>&1; then
     echo "==> Install failed — uninstalling old version and retrying..."
     adb -s "$device" uninstall com.hahnca.tvremote 2>/dev/null || true
     sleep 2
-    timeout 600 adb -s "$device" install "$apk" 2>&1 || {
+    adb -s "$device" shell pm install "$remote_apk" 2>&1 || {
       echo "==> Install failed after uninstall+reinstall."
+      adb -s "$device" shell rm -f "$remote_apk"
       return 1
     }
   fi
+  adb -s "$device" shell rm -f "$remote_apk"
   return 0
 }
 

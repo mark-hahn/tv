@@ -94,6 +94,9 @@ const EMBY_HOST = "hahnca.com:8920";
 const EMBY_API_KEY = "1c399bd079d549cba8c916244d3add2b";
 const EMBY_USER_ID = "894c752d448f45a3a1260ccaabd0adff";
 const EMBY_BASE_URL = "http://127.0.0.1:8096/emby";
+// Emby app launch id on the Bravia Google-TV (Sony appControl uri for com.mb.android)
+const EMBY_APP_URI =
+  "com.sony.dtv.com.mb.android.com.mb.android.MainActivity";
 const SRVR_INTERNAL_URL = "http://127.0.0.1:8739";
 
 const GOOGLE_HOME_DELAY_MS = 0; // ms after TV turns on before sending Home key
@@ -235,7 +238,7 @@ const DEVICE_PRIORITY = [
     pri: 2,
   },
   {
-    match: (s) => s.Client === "AndroidTv",
+    match: (s) => s.Client === "AndroidTv" || s.Client === "Emby for Android",
     label: (s) => s.DeviceName,
     pri: 3,
   },
@@ -470,8 +473,7 @@ function handleMsg(raw) {
             () =>
               callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
                 media_content_type: "app",
-                media_content_id:
-                  "com.sony.dtv.tv.emby.embyatv.tv.emby.embyatv.startup.StartupActivity",
+                media_content_id: EMBY_APP_URI,
               }),
             GOOGLE_EMBY_DELAY_MS,
           );
@@ -585,7 +587,7 @@ app.get("/tv/googlebtn", (req, res) => {
       callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
         media_content_type: "app",
         media_content_id:
-          "com.sony.dtv.tv.emby.embyatv.tv.emby.embyatv.startup.StartupActivity",
+          EMBY_APP_URI,
       });
     }, GOOGLE_EMBY_DELAY_MS);
   } else {
@@ -637,7 +639,7 @@ app.get("/tv/viewshow", (req, res) => {
       callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
         media_content_type: "app",
         media_content_id:
-          "com.sony.dtv.tv.emby.embyatv.tv.emby.embyatv.startup.StartupActivity",
+          EMBY_APP_URI,
       });
     }, GOOGLE_EMBY_DELAY_MS);
     setTimeout(
@@ -701,7 +703,7 @@ async function runToggleResSequence(toggleArg, knownEpisodeId) {
       const live = await getEmbyPlaybackSession("Living Room TV");
       if (live?.Id) {
         await fetch(
-          `${EMBY_BASE_URL}/Sessions/${live.Id}/Playing/Stop?api_key=${EMBY_API_KEY}`,
+          `${EMBY_BASE_URL}/Sessions/${live.ControlSessionId}/Playing/Stop?api_key=${EMBY_API_KEY}`,
           { method: "POST", headers: { Accept: "application/json" } },
         );
       }
@@ -730,7 +732,7 @@ async function runToggleResSequence(toggleArg, knownEpisodeId) {
     callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
       media_content_type: "app",
       media_content_id:
-        "com.sony.dtv.tv.emby.embyatv.tv.emby.embyatv.startup.StartupActivity",
+        EMBY_APP_URI,
     });
     setTimeout(() => firePendingViewShow("toggleres"), VIEW_SHOW_DELAY_MS);
   } catch (e) {
@@ -1102,7 +1104,7 @@ app.get("/tv/mode/:mode", (req, res) => {
         callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
           media_content_type: "app",
           media_content_id:
-            "com.sony.dtv.tv.emby.embyatv.tv.emby.embyatv.startup.StartupActivity",
+            EMBY_APP_URI,
         }),
       GOOGLE_EMBY_DELAY_MS,
     );
@@ -1126,7 +1128,7 @@ app.get("/tv/emby", (req, res) => {
     callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
       media_content_type: "app",
       media_content_id:
-        "com.sony.dtv.tv.emby.embyatv.tv.emby.embyatv.startup.StartupActivity",
+        EMBY_APP_URI,
     });
   } else {
     unilog(418, `emby ignored — tvMode=${tvMode}`);
@@ -1633,10 +1635,21 @@ async function getEmbyPlaybackSession(deviceName = "Living Room TV") {
     throw error;
   }
   const sessions = await sessRes.json();
-  return (
-    sessions.find((s) => s.NowPlayingItem && s.DeviceName === deviceName) ??
-    null
+  const matches = sessions.filter(
+    (s) => s.NowPlayingItem && s.DeviceName === deviceName,
   );
+  const session = matches.find((s) => s.SupportsRemoteControl) ?? matches[0];
+  if (!session) return null;
+  // Commands (seek/pause/stop) must go to the device's remote-controllable
+  // session. The Emby Android app reports playback on one session
+  // (SupportsRemoteControl false, silently ignores commands) and receives
+  // commands on a second session with the same DeviceId.
+  session.ControlSessionId = session.SupportsRemoteControl
+    ? session.Id
+    : (sessions.find(
+        (s) => s.DeviceId === session.DeviceId && s.SupportsRemoteControl,
+      )?.Id ?? session.Id);
+  return session;
 }
 
 function seekEmbySession(sessionId, ticks) {
@@ -1662,7 +1675,7 @@ app.post("/tv/emby/seek", async (req, res) => {
       res.json({ ok: false, reason: "paused" });
       return;
     }
-    const seekRes = await seekEmbySession(session.Id, ticks);
+    const seekRes = await seekEmbySession(session.ControlSessionId, ticks);
     res.json({ ok: seekRes.ok, reason: seekRes.ok ? undefined : "seekFailed" });
   } catch (err) {
     unilog(446, "emby/seek error:", err.message);
@@ -1683,7 +1696,7 @@ app.post("/tv/emby/seek2", async (req, res) => {
       res.json({ ok: false, reason: "notPlaying" });
       return;
     }
-    const id = session.Id;
+    const id = session.ControlSessionId;
     await fetch(
       `${EMBY_BASE_URL}/Sessions/${id}/Playing/Pause?api_key=${EMBY_API_KEY}`,
       { method: "POST" },

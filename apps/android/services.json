@@ -68,7 +68,7 @@
     },
     {
       "name": "Emby",
-      "uri": "com.sony.dtv.tv.emby.embyatv.tv.emby.embyatv.startup.StartupActivity",
+      "uri": "com.sony.dtv.com.mb.android.com.mb.android.MainActivity",
       "color": "52B54B",
       "logo": "emby.png"
     },

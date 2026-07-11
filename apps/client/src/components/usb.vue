@@ -90,23 +90,8 @@
           </button>
 
           <button
-            @click="prune"
-            :disabled="loading || pruneBusy"
-            :style="{
-              cursor: loading || pruneBusy ? 'default' : 'pointer',
-              borderRadius: '7px',
-              padding: '4px 10px',
-              border: '1px solid #bbb',
-              backgroundColor: pruneBusy ? 'lightgray' : 'whitesmoke',
-              marginRight: '8px',
-            }"
-          >
-            Prune
-          </button>
-
-          <button
             @click="refresh"
-            :disabled="loading || pruneBusy"
+            :disabled="loading"
             style="
               cursor: pointer;
               border-radius: 7px;
@@ -340,40 +325,6 @@
           </div>
         </div>
 
-        <div
-          v-if="showPruneLine && pruneLineText"
-          style="
-            margin-top: 6px;
-            display: flex;
-            align-items: center;
-            font-weight: normal;
-            color: #666;
-            font-size: 13px;
-          "
-        >
-          <span
-            style="
-              overflow: hidden;
-              text-overflow: ellipsis;
-              white-space: nowrap;
-              margin-right: auto;
-            "
-            >{{ pruneLineText }}</span
-          >
-          <button
-            @click="clearPruneLine"
-            style="
-              cursor: pointer;
-              border-radius: 7px;
-              padding: 2px 8px;
-              border: 1px solid #bbb;
-              background-color: whitesmoke;
-              margin-left: 8px;
-            "
-          >
-            Clr
-          </button>
-        </div>
       </div>
 
       <!-- Tree -->
@@ -568,11 +519,6 @@ export default {
       searchInput: "",
       usbAvailGb: "---",
       usbAvailPct: "--%",
-      pruneBusy: false,
-      pruneLiveLine: "",
-      pruneSummaryLine: "",
-      showPruneLine: false,
-      _prunePollTimer: null,
       showInfo: false,
       infoFileName: "",
       infoFileMeta: "",
@@ -589,10 +535,6 @@ export default {
       const hasName = this.selectedFolders.size > 0;
       const hasFiles = this.selectedFiles.size > 0;
       return hasName || hasFiles;
-    },
-    pruneLineText() {
-      if (this.pruneBusy) return this.pruneLiveLine || "Pruning...";
-      return this.pruneSummaryLine || "";
     },
     oldestShowDate() {
       if (!this.tree || this.tree.length === 0) return "";
@@ -661,63 +603,8 @@ export default {
       this.fetchFiles();
     }
     this.updateUsbSpaceAvail();
-    this.fetchPruneStatus();
-  },
-  unmounted() {
-    this.stopPrunePolling();
   },
   methods: {
-    clearPruneLine() {
-      this.showPruneLine = false;
-      this.pruneLiveLine = "";
-      this.pruneSummaryLine = "";
-    },
-    startPrunePolling() {
-      if (this._prunePollTimer) return;
-      this._prunePollTimer = setInterval(() => {
-        void this.fetchPruneStatus();
-      }, 400);
-    },
-    stopPrunePolling() {
-      if (this._prunePollTimer) {
-        clearInterval(this._prunePollTimer);
-        this._prunePollTimer = null;
-      }
-    },
-    async fetchPruneStatus() {
-      try {
-        const url = `${config.torrentsApiUrl}/api/usb/prune/status`;
-        const res = await fetch(url);
-        if (!res.ok) return;
-        const status = await res.json();
-        const latest = String(status?.latestLogLine || "").trim();
-        const summary = String(status?.summaryLine || "").trim();
-        const running = status?.running === true;
-        const phase = String(status?.phase || "").trim();
-
-        if (running && phase === "delete" && latest) {
-          this.pruneLiveLine = latest;
-          this.showPruneLine = true;
-        }
-
-        if (running && phase !== "delete") {
-          this.showPruneLine = false;
-          this.pruneLiveLine = "";
-        }
-
-        if (!running) {
-          if (summary) {
-            this.pruneSummaryLine = summary;
-            this.showPruneLine = true;
-          }
-          if (!this.pruneBusy) {
-            this.stopPrunePolling();
-          }
-        }
-      } catch {
-        // Keep current line unchanged.
-      }
-    },
     pctAvail(total, used) {
       const t = Number(total);
       const u = Number(used);
@@ -748,46 +635,6 @@ export default {
         }
       } catch {
         // Keep last shown values.
-      }
-    },
-    async prune() {
-      if (this.loading || this.pruneBusy) return;
-      this.pruneBusy = true;
-      this.error = null;
-      this.showPruneLine = false;
-      this.pruneSummaryLine = "";
-      this.pruneLiveLine = "";
-      this.startPrunePolling();
-      try {
-        const url = `${config.torrentsApiUrl}/api/usb/prune`;
-        const res = await fetch(url, { method: "POST" });
-        if (!res.ok) {
-          const txt = await res.text();
-          throw new Error(txt || `HTTP ${res.status}`);
-        }
-        const result = await res.json();
-        if (
-          Number.isFinite(Number(result?.usbSpaceTotal)) &&
-          Number.isFinite(Number(result?.usbSpaceUsedAfter))
-        ) {
-          this.usbAvailPct = this.pctAvail(
-            result.usbSpaceTotal,
-            result.usbSpaceUsedAfter,
-          );
-          this.usbAvailGb = this.fmtAvailGb(
-            result.usbSpaceTotal,
-            result.usbSpaceUsedAfter,
-          );
-        }
-        await this.fetchPruneStatus();
-      } catch (e) {
-        this.error = e?.message || "Prune failed";
-        this.pruneSummaryLine = this.error;
-        this.showPruneLine = true;
-      } finally {
-        this.pruneBusy = false;
-        await this.fetchPruneStatus();
-        this.stopPrunePolling();
       }
     },
     onRenameFocus() {

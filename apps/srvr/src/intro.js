@@ -9,6 +9,19 @@ import * as tvdb from "./tvdb.js";
 import * as bifQueue from "./bifQueue.js";
 import { EMBY_BASE_URL, EMBY_API_KEY, EMBY_USER_ID } from "./embyConfig.js";
 
+// Commands (seek etc.) must go to the device's remote-controllable session.
+// The Emby Android app reports playback on one session (SupportsRemoteControl
+// false, silently ignores commands) and receives commands on a second session
+// with the same DeviceId.
+function controlSessionId(sessions, playSession) {
+  if (!playSession) return null;
+  if (playSession.SupportsRemoteControl) return playSession.Id;
+  const ctrl = sessions.find(
+    (s) => s.DeviceId === playSession.DeviceId && s.SupportsRemoteControl,
+  );
+  return ctrl?.Id ?? playSession.Id;
+}
+
 export async function doSkipIntro(pressedAt, deviceName = "Living Room TV") {
   const sessRes = await fetch(
     `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
@@ -19,9 +32,12 @@ export async function doSkipIntro(pressedAt, deviceName = "Living Room TV") {
     return { ok: false, error: `sessions ${sessRes.status}` };
   }
   const sessions = await sessRes.json();
-  const session = sessions.find(
+  const matches = sessions.filter(
     (s) => s.NowPlayingItem && s.DeviceName === deviceName,
   );
+  // Prefer the remote-controllable session — the Emby app registers a second
+  // "Living Room TV" session that silently ignores seek commands.
+  const session = matches.find((s) => s.SupportsRemoteControl) ?? matches[0];
   if (!session) {
     const deviceNames = sessions.map((s) => s.DeviceName).join(", ");
     const playingDevices = sessions
@@ -60,7 +76,7 @@ export async function doSkipIntro(pressedAt, deviceName = "Living Room TV") {
     `show=${showName} pressDelay=${pressDelay}ms rawPos=${Math.round(rawPositionTicks / 10000)}ms skipDur=${skipDur}ms newPos=${Math.round(newTicks / 10000)}ms`,
   );
   const seekRes = await fetch(
-    `${EMBY_BASE_URL}/Sessions/${session.Id}/Playing/seek?SeekPositionTicks=${newTicks}&api_key=${EMBY_API_KEY}`,
+    `${EMBY_BASE_URL}/Sessions/${controlSessionId(sessions, session)}/Playing/seek?SeekPositionTicks=${newTicks}&api_key=${EMBY_API_KEY}`,
     { method: "POST", headers: { Accept: "application/json" } },
   );
   if (!seekRes.ok) {
@@ -81,9 +97,10 @@ export async function doTrimIntro(deviceName = "Living Room TV") {
     return { ok: false, error: `sessions ${sessRes.status}` };
   }
   const sessions = await sessRes.json();
-  const session = sessions.find(
+  const matches = sessions.filter(
     (s) => s.NowPlayingItem && s.DeviceName === deviceName,
   );
+  const session = matches.find((s) => s.SupportsRemoteControl) ?? matches[0];
   if (!session) {
     return { ok: false, reason: "notPlaying" };
   }
@@ -107,7 +124,7 @@ export async function doTrimIntro(deviceName = "Living Room TV") {
     `show=${showName} trimPos=${trimPos}ms newPos=${Math.round(newTicks / 10000)}ms`,
   );
   const seekRes = await fetch(
-    `${EMBY_BASE_URL}/Sessions/${session.Id}/Playing/seek?SeekPositionTicks=${newTicks}&api_key=${EMBY_API_KEY}`,
+    `${EMBY_BASE_URL}/Sessions/${controlSessionId(sessions, session)}/Playing/seek?SeekPositionTicks=${newTicks}&api_key=${EMBY_API_KEY}`,
     { method: "POST", headers: { Accept: "application/json" } },
   );
   if (!seekRes.ok) {
@@ -209,9 +226,10 @@ async function getEmbyIntroContext(deviceName) {
   );
   if (!sessRes.ok) return null;
   const sessions = await sessRes.json();
-  const session = sessions.find(
+  const matches = sessions.filter(
     (s) => s.NowPlayingItem && s.DeviceName === deviceName,
   );
+  const session = matches.find((s) => s.SupportsRemoteControl) ?? matches[0];
   if (!session) return null;
   const showName =
     session.NowPlayingItem.SeriesName || session.NowPlayingItem.Name;
@@ -221,6 +239,7 @@ async function getEmbyIntroContext(deviceName) {
   if (!record) record = Object.values(allTvdb).find((r) => r.id === showId);
   return {
     session,
+    controlId: controlSessionId(sessions, session),
     record,
     showName,
     season: session.NowPlayingItem.ParentIndexNumber ?? null,
@@ -258,7 +277,7 @@ export async function pushIntroStateFromItem(ws, embyItemId) {
 export async function handleEmbyIntroPress(ws, btnId, pressedAt, videoTimeSec) {
   const ctx = await getEmbyIntroContext(ws._embyUi?.deviceName);
   if (!ctx?.session) return; // nothing playing yet
-  const { session, record, showName, season, episode } = ctx;
+  const { session, controlId, record, showName, season, episode } = ctx;
   const name = record?.name;
   let posTicks;
   if (videoTimeSec != null) {
@@ -271,7 +290,7 @@ export async function handleEmbyIntroPress(ws, btnId, pressedAt, videoTimeSec) {
   }
   const posMs = Math.round(posTicks / 10000);
   const runtime = session.NowPlayingItem?.RunTimeTicks ?? null;
-  const sid = session.Id;
+  const sid = controlId ?? session.Id;
   const si = tvdb.getSeasonIntro(record, season);
   const startMark = si.startMark ?? 0;
 

@@ -179,8 +179,13 @@ export function handleFix(ws, id, params) {
 
   let targetPath = resolvePath(reqPath);
 
-  // Security check: ensure we are within MEDIA_ROOT
-  if (targetPath && !targetPath.startsWith(MEDIA_ROOT)) {
+  // Security check: ensure we are within MEDIA_ROOT (the trailing slash
+  // keeps siblings like /mnt/media/tv-errors from passing).
+  if (
+    targetPath &&
+    targetPath !== MEDIA_ROOT &&
+    !targetPath.startsWith(MEDIA_ROOT + "/")
+  ) {
     try {
       ws.send(JSON.stringify({ id, status: "error", error: "Invalid path" }));
     } catch (e) {}

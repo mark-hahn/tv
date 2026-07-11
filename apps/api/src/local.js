@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { rename, readdir } from "node:fs/promises";
 import parseTorrentTitleLib from "parse-torrent-title";
+import { buildFileTree } from "./fileTree.js";
 import { unilog } from "@tv/share";
 
 const execFileAsync = promisify(execFile);
@@ -37,69 +38,7 @@ export async function getLocalFiles(root = TV_ROOT) {
       },
     );
 
-    const lines = (stdout || "").split("\n").filter(Boolean);
-    const tree = [];
-
-    // Helper to find or create child node in list
-    const findOrCreate = (list, name, type, size, date) => {
-      let node = list.find((n) => n.name === name);
-      if (!node) {
-        node = { name, type, children: [] };
-        if (type === "file") {
-          node.size = size;
-          node.date = date;
-        }
-        list.push(node);
-      }
-      return node;
-    };
-
-    for (const line of lines) {
-      const parts = line.split("|");
-      if (parts.length < 4) continue;
-      const type = parts[0]; // f or d
-      const relPath = parts[1];
-      const size = parseInt(parts[2], 10) || 0;
-      const date = parts[3];
-
-      if (!relPath) continue;
-
-      const segments = relPath.split("/");
-      let currentLevel = tree;
-
-      for (let i = 0; i < segments.length; i++) {
-        const seg = segments[i];
-        const isLast = i === segments.length - 1;
-        const segType = isLast ? (type === "d" ? "folder" : "file") : "folder";
-
-        const node = findOrCreate(currentLevel, seg, segType, size, date);
-        if (segType === "folder") {
-          if (!node.children) node.children = [];
-          currentLevel = node.children;
-        }
-      }
-    }
-
-    // Folders first, then case-insensitive name (numeric-aware for folders).
-    const sortNodes = (nodes) => {
-      nodes.sort((a, b) => {
-        if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
-        const nameA = a.name.toLowerCase().replace(/^the\s+/, "");
-        const nameB = b.name.toLowerCase().replace(/^the\s+/, "");
-
-        // Only use strict sorting (Season 9 before Season 10) for folders
-        if (a.type === "folder" && b.type === "folder") {
-          return nameA.localeCompare(nameB, undefined, { numeric: true });
-        }
-        return nameA.localeCompare(nameB);
-      });
-      nodes.forEach((n) => {
-        if (n.children) sortNodes(n.children);
-      });
-    };
-    sortNodes(tree);
-
-    return tree;
+    return buildFileTree(stdout);
   } catch (e) {
     unilog(167, "getLocalFiles failed", e);
     throw new Error(`Failed to list local files: ${e.message}`);

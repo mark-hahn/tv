@@ -4,40 +4,45 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { parseKeyValueFile } from "./qb-cred.js";
 import { getApiSecretsDir, getApiDataDir } from "./tvPaths.js";
+import { buildFileTree } from "./fileTree.js";
 import { unilog } from "@tv/share";
 
 const execFileAsync = promisify(execFile);
 
 const USB_FILES_ROOT = "/home/xobtlu/files";
-const USB_SPACE_TOTAL_BYTES = Math.trunc(2e9 * 1024);
-const PRUNE_DELETE_TARGET_BYTES = 100 * 1_000_000_000;
-const PRUNE_DRY_RUN = true;
+const USB_MOVIES_ROOT = "/home/xobtlu/movies";
 
-const USB_PRUNE_STATE = {
-  running: false,
-  phase: "idle",
-  latestLogLine: "",
-  summaryLine: "",
-  dryRun: PRUNE_DRY_RUN,
-  foldersScanned: 0,
-  deletedCount: 0,
-  runningDeletedBytes: 0,
-  startedAt: 0,
-  finishedAt: 0,
-  updatedAt: Date.now(),
-  error: "",
-};
+// Common ssh options for every USB-server command.
+const SSH_BASE_ARGS = [
+  "-o",
+  "BatchMode=yes",
+  "-o",
+  "ConnectTimeout=20",
+  "-o",
+  "LogLevel=ERROR",
+  "-o",
+  "StrictHostKeyChecking=no",
+  "-o",
+  "UserKnownHostsFile=/dev/null",
+];
 
-let usbPruneInFlight = null;
-
-function setUsbPruneState(patch) {
-  Object.assign(USB_PRUNE_STATE, patch, { updatedAt: Date.now() });
+function shellQuote(s) {
+  if (typeof s !== "string") return "''";
+  return "'" + s.replace(/'/g, "'\\''") + "'";
 }
 
-export function getUsbPruneStatus() {
-  return {
-    ...USB_PRUNE_STATE,
-  };
+// Run one command on the USB server; returns stdout.
+async function runUsbSsh(
+  cmd,
+  { timeout = 120000, maxBuffer = 10 * 1024 * 1024 } = {},
+) {
+  const qbHost = await loadQbHostForSsh();
+  const out = await execFileAsync("ssh", [...SSH_BASE_ARGS, qbHost, cmd], {
+    timeout,
+    maxBuffer,
+    windowsHide: true,
+  });
+  return String(out?.stdout ?? "");
 }
 
 function resolveCredPath() {
@@ -55,12 +60,10 @@ async function loadQbtCreds() {
   const creds = parseKeyValueFile(text);
 
   let qbHost = creds.QB_HOST;
-  const qbPortRaw = creds.QB_PORT;
   let qbUser = creds.QB_USER;
   const qbPass = creds.QB_PASS;
 
   if (!qbHost) throw new Error(`Missing QB_HOST in ${credPath}`);
-  if (!qbPortRaw) throw new Error(`Missing QB_PORT in ${credPath}`);
   if (!qbPass) throw new Error(`Missing QB_PASS in ${credPath}`);
 
   // If QB_HOST is user@host, derive QB_USER if missing and strip user for HTTP host.
@@ -75,12 +78,7 @@ async function loadQbtCreds() {
       `Missing QB_USER in ${credPath} (or set QB_HOST as user@host)`,
     );
 
-  const qbPort = Number(qbPortRaw);
-  if (!Number.isInteger(qbPort) || qbPort <= 0 || qbPort > 65535) {
-    throw new Error(`Invalid QB_PORT in ${credPath}: ${qbPortRaw}`);
-  }
-
-  return { qbHost, qbPort, qbUser, qbPass };
+  return { qbHost, qbUser, qbPass };
 }
 
 async function loadQbHostForSsh() {
@@ -108,33 +106,6 @@ async function loadFlexgetOverridesForSsh() {
     flexgetBin: flexgetBin || null,
     credPath,
   };
-}
-
-function lastNonEmptyLine(text) {
-  const lines = String(text ?? "")
-    .split(/\r?\n/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return lines.length ? lines[lines.length - 1] : "";
-}
-
-function lastLineStartingWithInt(text) {
-  const lines = String(text ?? "")
-    .split(/\r?\n/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  for (let i = lines.length - 1; i >= 0; i -= 1) {
-    if (/^\d+/.test(lines[i])) return lines[i];
-  }
-  return "";
-}
-
-function parseLeadingInt(text) {
-  const line = String(text ?? "").trim();
-  const m = line.match(/^(\d+)/);
-  if (!m) return undefined;
-  const n = Number(m[1]);
-  return Number.isFinite(n) ? Math.trunc(n) : undefined;
 }
 
 // Parses `quota` output (no -s flag, so values are raw 1K blocks).
@@ -226,22 +197,9 @@ export async function spaceAvailUsb() {
   try {
     const qbHost = await loadQbHostForSsh();
 
-    const sshBaseArgs = [
-      "-o",
-      "BatchMode=yes",
-      "-o",
-      "ConnectTimeout=10",
-      "-o",
-      "LogLevel=ERROR",
-      "-o",
-      "StrictHostKeyChecking=no",
-      "-o",
-      "UserKnownHostsFile=/dev/null",
-    ];
-
     // `quota` reports per-user quota in 1K blocks: used, soft-limit, hard-limit.
     // This is instant and reflects the actual per-user allocation, not the shared filesystem.
-    const args = [...sshBaseArgs, qbHost, "quota 2>/dev/null"];
+    const args = [...SSH_BASE_ARGS, qbHost, "quota 2>/dev/null"];
 
     let stdout = "";
     try {
@@ -252,6 +210,7 @@ export async function spaceAvailUsb() {
       });
       stdout = String(result.stdout ?? "");
     } catch (e) {
+      // quota exits non-zero on some hosts but still prints the table.
       stdout =
         e && typeof e === "object" && "stdout" in e
           ? String(e.stdout ?? "")
@@ -362,241 +321,90 @@ export async function spaceAvail() {
   return { ...usb, ...media };
 }
 
+// FlexGet renders a table using box drawing chars; strip any noise before
+// the header line.
+function extractHistoryTable(text) {
+  const s = String(text ?? "");
+  if (!s) return { text: "", ok: false };
+
+  const lines = s.split(/\r?\n/);
+  const isHeaderLine = (line) => {
+    const l = String(line ?? "");
+    if (l.includes("│Task│") || l.includes("|Task|")) return true;
+    // Some installs output without box chars or leading pipes, e.g. "Task   |ipt".
+    return /^\s*Task\s*\|/.test(l);
+  };
+
+  const headerIdx = lines.findIndex(isHeaderLine);
+  if (headerIdx >= 0)
+    return { text: lines.slice(headerIdx).join("\n"), ok: true };
+  return { text: s, ok: false };
+}
+
+function formatRemoteTail(stdout, stderr) {
+  const s = String(stdout ?? "").trim();
+  const e = String(stderr ?? "").trim();
+  const pickTail = (t) => {
+    const lines = String(t ?? "")
+      .split(/\r?\n/)
+      .filter(Boolean);
+    return lines.slice(Math.max(0, lines.length - 8)).join("\n");
+  };
+  const parts = [];
+  if (s) parts.push(`stdout tail:\n${pickTail(s)}`);
+  if (e) parts.push(`stderr tail:\n${pickTail(e)}`);
+  return parts.join("\n\n");
+}
+
 /**
  * Runs `flexget history --limit 1000` on the USB server via ssh.
  * Uses apps/api/secrets/qbt-cred.txt QB_HOST (user@host) as the SSH target.
+ * FLEXGET_CMD/FLEXGET_BIN in the creds file override the default binary path
+ * (the same fixed path flexgetStatus uses).
  * Returns raw stdout (text table).
  */
 export async function flexgetHistory() {
   const qbHost = await loadQbHostForSsh();
-
   const { flexgetCmd, flexgetBin } = await loadFlexgetOverridesForSsh();
 
-  const sshBaseArgs = [
-    "-o",
-    "BatchMode=yes",
-    "-o",
-    "ConnectTimeout=10",
-    "-o",
-    "LogLevel=ERROR",
-    "-o",
-    "StrictHostKeyChecking=no",
-    "-o",
-    "UserKnownHostsFile=/dev/null",
+  const cmdLine = flexgetCmd
+    ? flexgetCmd
+    : `"${(flexgetBin || "$HOME/flexget/bin/flexget").replace(/"/g, '\\"')}" history --limit 1000`;
+
+  const args = [
+    ...SSH_BASE_ARGS,
+    qbHost,
+    "bash",
+    "-lc",
+    `cd "$HOME" || exit 1\n${cmdLine}`,
   ];
 
-  const extractHistoryTable = (text) => {
-    const s = String(text ?? "");
-    if (!s) return { text: "", ok: false };
-
-    // FlexGet renders a table using box drawing chars; when we run via an interactive shell
-    // we may get MOTD/prompt noise. Strip everything before the header.
-    const lines = s.split(/\r?\n/);
-    const isHeaderLine = (line) => {
-      const l = String(line ?? "");
-      if (l.includes("│Task│") || l.includes("|Task|")) return true;
-      // Some installs output without box chars or leading pipes, e.g. "Task   |ipt".
-      return /^\s*Task\s*\|/.test(l);
-    };
-
-    const headerIdx = lines.findIndex(isHeaderLine);
-    if (headerIdx >= 0)
-      return { text: lines.slice(headerIdx).join("\n"), ok: true };
-    return { text: s, ok: false };
-  };
-
-  const runSsh = async (args) => {
-    try {
-      const out = await execFileAsync("ssh", args, {
-        timeout: 30000,
-        maxBuffer: 10 * 1024 * 1024,
-        windowsHide: true,
-      });
-      return {
-        stdout: String(out.stdout ?? ""),
-        stderr: String(out.stderr ?? ""),
-        err: null,
-      };
-    } catch (e) {
-      const stdout =
-        e && typeof e === "object" && "stdout" in e
-          ? String(e.stdout ?? "")
-          : "";
-      const stderr =
-        e && typeof e === "object" && "stderr" in e
-          ? String(e.stderr ?? "")
-          : "";
-      return { stdout, stderr, err: e };
-    }
-  };
-
-  const formatRemoteTail = (stdout, stderr) => {
-    const s = String(stdout ?? "").trim();
-    const e = String(stderr ?? "").trim();
-    const pickTail = (t) => {
-      const lines = String(t ?? "")
-        .split(/\r?\n/)
-        .filter(Boolean);
-      return lines.slice(Math.max(0, lines.length - 8)).join("\n");
-    };
-    const parts = [];
-    if (s) parts.push(`stdout tail:\n${pickTail(s)}`);
-    if (e) parts.push(`stderr tail:\n${pickTail(e)}`);
-    return parts.join("\n\n");
-  };
-
-  const looksLikeFlexgetNotFound = (stdout, stderr) => {
-    const combined = `${stdout || ""}\n${stderr || ""}`.toLowerCase();
-    return (
-      combined.includes("command not found") ||
-      combined.includes("flexget not found")
-    );
-  };
-
-  // If configured, prefer explicit command or binary path.
-  // - FLEXGET_CMD should be a full command that prints history (e.g. "flexget history --limit 1000").
-  // - FLEXGET_BIN should be an absolute path to the flexget executable (we append "history --limit 1000").
-  if (flexgetCmd || flexgetBin) {
-    const cmdLine = flexgetCmd
-      ? flexgetCmd
-      : `"${flexgetBin.replace(/\"/g, '\\"')}" history --limit 1000`;
-
-    const args = [
-      ...sshBaseArgs,
-      qbHost,
-      "bash",
-      "-lc",
-      `cd "$HOME" || exit 1\n${cmdLine}`,
-    ];
-
-    const r = await runSsh(args);
-    if (r.stdout) {
-      const extracted = extractHistoryTable(r.stdout);
-      if (extracted.ok) return extracted.text;
-    }
-    if (r.err) throw r.err;
-    throw new Error(
-      `flexget history did not return expected table header.\n${formatRemoteTail(r.stdout, r.stderr)}`,
-    );
-  }
-
-  // Try to find flexget in typical locations; fall back to python module.
-  // Run in a login shell so user PATH/profile is loaded.
-  const remoteScript = [
-    'cd "$HOME" || exit 1',
-    // Common local install used on this box (often exposed via an alias in interactive shells).
-    'if [ -x "$HOME/flexget/bin/flexget" ]; then',
-    '  "$HOME/flexget/bin/flexget" history --limit 1000',
-    "  exit $?",
-    "fi",
-    'FLEXGET_BIN="$(command -v flexget 2>/dev/null || true)"',
-    'if [ -n "$FLEXGET_BIN" ] && [ -x "$FLEXGET_BIN" ]; then',
-    '  "$FLEXGET_BIN" history --limit 1000',
-    "  exit $?",
-    "fi",
-    'if [ -x "$HOME/.local/bin/flexget" ]; then',
-    '  "$HOME/.local/bin/flexget" history --limit 1000',
-    "  exit $?",
-    "fi",
-    'if [ -x "/usr/local/bin/flexget" ]; then',
-    '  "/usr/local/bin/flexget" history --limit 1000',
-    "  exit $?",
-    "fi",
-    'if [ -x "/usr/bin/flexget" ]; then',
-    '  "/usr/bin/flexget" history --limit 1000',
-    "  exit $?",
-    "fi",
-    "if command -v python3 >/dev/null 2>&1; then",
-    '  PY_SCRIPTS="$(python3 -c \'import sysconfig; print(sysconfig.get_path("scripts") or "")\' 2>/dev/null || true)"',
-    '  if [ -n "$PY_SCRIPTS" ] && [ -x "$PY_SCRIPTS/flexget" ]; then',
-    '    "$PY_SCRIPTS/flexget" history --limit 1000',
-    "    exit $?",
-    "  fi",
-    '  PY_USERBASE="$(python3 -c \'import site; print(site.getuserbase() or "")\' 2>/dev/null || true)"',
-    '  if [ -n "$PY_USERBASE" ] && [ -x "$PY_USERBASE/bin/flexget" ]; then',
-    '    "$PY_USERBASE/bin/flexget" history --limit 1000',
-    "    exit $?",
-    "  fi",
-    "fi",
-    'echo "flexget not found (no flexget executable found)" 1>&2',
-    "exit 127",
-  ].join("\n");
-
-  // First, try a non-interactive login shell (clean output).
-  // This will NOT pick up aliases/functions defined only in ~/.bashrc.
-  const argsLogin = [...sshBaseArgs, qbHost, "bash", "-lc", remoteScript];
-  const r1 = await runSsh(argsLogin);
-  if (r1.stdout) {
-    const extracted = extractHistoryTable(r1.stdout);
-    if (extracted.ok) return extracted.text;
-  }
-
-  // If that failed due to "flexget not found", fall back to an interactive shell.
-  // This matches the "ssh, then run flexget" behavior you described (loads ~/.bashrc).
-  if (looksLikeFlexgetNotFound(r1.stdout, r1.stderr)) {
-    // Figure out the remote account's login shell; many setups use zsh and only
-    // configure PATH/aliases in interactive rc files.
-    const shellQuery = [
-      'u="$(id -un 2>/dev/null || echo "$USER")"',
-      // Prefer getent, but fall back to /etc/passwd to avoid dependency on getent.
-      'sh="$(getent passwd "$u" 2>/dev/null | cut -d: -f7)"',
-      'if [ -z "$sh" ] && [ -r /etc/passwd ]; then',
-      '  sh="$(awk -F: -v u="$u" \"$1==u{print $7}\" /etc/passwd 2>/dev/null | head -n 1)"',
-      "fi",
-      'printf "%s" "$sh"',
-    ].join("\n");
-
-    const shellQueryArgs = [...sshBaseArgs, qbHost, "sh", "-lc", shellQuery];
-
-    const shellRes = await runSsh(shellQueryArgs);
-    const shellPath = String(shellRes.stdout ?? "").trim();
-    const shellName = shellPath ? path.posix.basename(shellPath) : "bash";
-
-    const interactiveScript = [
-      // Suppress prompt/noise as much as possible.
-      'export PS1=""',
-      'export PROMPT_COMMAND=""',
-      'export PROMPT=""',
-      'cd "$HOME" || exit 1',
-      'if [ -x "$HOME/flexget/bin/flexget" ]; then "$HOME/flexget/bin/flexget" history --limit 1000; else flexget history --limit 1000; fi',
-    ].join("\n");
-
-    // Prefer the user's actual shell if it supports login+interactive modes.
-    // For bash/zsh, use -ilc to approximate an actual interactive login session.
-    const shellToRun = shellName || "bash";
-    const shellArgs =
-      shellToRun === "zsh" || shellToRun === "bash"
-        ? ["-ilc", interactiveScript]
-        : ["-ic", interactiveScript];
-
-    const argsInteractive = [
-      ...sshBaseArgs,
-      // Force a pseudo-tty so interactive rc files are loaded and job control warnings are avoided.
-      "-tt",
-      qbHost,
-      shellToRun,
-      ...shellArgs,
-    ];
-
-    const r2 = await runSsh(argsInteractive);
-    if (r2.stdout) {
-      const extracted = extractHistoryTable(r2.stdout);
-      if (extracted.ok) return extracted.text;
-    }
-    if (r2.err) {
+  let stdout = "";
+  let stderr = "";
+  try {
+    const out = await execFileAsync("ssh", args, {
+      timeout: 30000,
+      maxBuffer: 10 * 1024 * 1024,
+      windowsHide: true,
+    });
+    stdout = String(out.stdout ?? "");
+    stderr = String(out.stderr ?? "");
+  } catch (e) {
+    stdout =
+      e && typeof e === "object" && "stdout" in e ? String(e.stdout ?? "") : "";
+    stderr =
+      e && typeof e === "object" && "stderr" in e ? String(e.stderr ?? "") : "";
+    if (!stdout) {
       throw new Error(
-        `flexget history ssh (interactive) failed.\n${formatRemoteTail(r2.stdout, r2.stderr)}`,
+        `flexget history ssh failed.\n${formatRemoteTail(stdout, stderr)}`,
       );
     }
   }
 
-  if (r1.err) {
-    throw new Error(
-      `flexget history ssh (login) failed.\n${formatRemoteTail(r1.stdout, r1.stderr)}`,
-    );
-  }
+  const extracted = extractHistoryTable(stdout);
+  if (extracted.ok) return extracted.text;
   throw new Error(
-    `flexget history did not return expected table header.\n${formatRemoteTail(r1.stdout, r1.stderr)}`,
+    `flexget history did not return expected table header.\n${formatRemoteTail(stdout, stderr)}`,
   );
 }
 
@@ -656,6 +464,34 @@ async function qbLogin({ baseUrl, qbUser, qbPass }) {
   return cookie;
 }
 
+// Cached qBittorrent session cookie. The qbt pane polls torrents/info
+// continuously; logging in on every call doubled the round trips and churned
+// sessions, so the SID is reused and refreshed once on a 403 (expired).
+let qbtSessionCookie = "";
+
+async function getQbtSession() {
+  const { qbHost, qbUser, qbPass } = await loadQbtCreds();
+  const baseUrl = `https://${qbHost}/qbittorrent/`;
+  if (!qbtSessionCookie) {
+    qbtSessionCookie = await qbLogin({ baseUrl, qbUser, qbPass });
+  }
+  return { baseUrl, cookie: qbtSessionCookie };
+}
+
+// Run a qBittorrent WebUI request with the cached session cookie.
+// makeRequest(baseUrl, cookie) must build and send the request itself (so a
+// retry re-creates any FormData body). On 403 the session is refreshed once.
+async function qbtRequest(makeRequest) {
+  let session = await getQbtSession();
+  let res = await makeRequest(session.baseUrl, session.cookie);
+  if (res.status === 403) {
+    qbtSessionCookie = "";
+    session = await getQbtSession();
+    res = await makeRequest(session.baseUrl, session.cookie);
+  }
+  return res;
+}
+
 /**
  * Query qBittorrent WebUI /api/v2/torrents/info using creds from apps/api/secrets/qbt-cred.txt.
  *
@@ -676,33 +512,30 @@ async function qbLogin({ baseUrl, qbUser, qbPass }) {
  * @returns {Promise<any>} Parsed JSON returned by qBittorrent (typically an array of torrent objects)
  */
 export async function getQbtInfo(filter) {
-  const { qbHost, qbPort, qbUser, qbPass } = await loadQbtCreds();
-  const baseUrl = `https://${qbHost}/qbittorrent/`;
+  const res = await qbtRequest((baseUrl, cookie) => {
+    const url = new URL("api/v2/torrents/info", baseUrl);
 
-  const cookie = await qbLogin({ baseUrl, qbUser, qbPass });
+    if (filter && typeof filter === "object" && !Array.isArray(filter)) {
+      const { hash, category, tag, filter: state } = filter;
 
-  const url = new URL("api/v2/torrents/info", baseUrl);
-
-  if (filter && typeof filter === "object" && !Array.isArray(filter)) {
-    const { hash, category, tag, filter: state } = filter;
-
-    if (hash) {
-      const hashes = Array.isArray(hash) ? hash.join("|") : String(hash);
-      if (hashes.trim()) url.searchParams.set("hashes", hashes);
+      if (hash) {
+        const hashes = Array.isArray(hash) ? hash.join("|") : String(hash);
+        if (hashes.trim()) url.searchParams.set("hashes", hashes);
+      }
+      if (category) url.searchParams.set("category", String(category));
+      if (tag) url.searchParams.set("tag", String(tag));
+      if (state) url.searchParams.set("filter", String(state));
     }
-    if (category) url.searchParams.set("category", String(category));
-    if (tag) url.searchParams.set("tag", String(tag));
-    if (state) url.searchParams.set("filter", String(state));
-  }
 
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      Accept: "application/json",
-      Cookie: cookie,
-      Origin: baseUrl,
-      Referer: `${baseUrl}/`,
-    },
+    return fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Cookie: cookie,
+        Origin: baseUrl,
+        Referer: `${baseUrl}/`,
+      },
+    });
   });
 
   if (!res.ok) {
@@ -724,9 +557,6 @@ export async function getQbtInfo(filter) {
  * @returns {Promise<{ ok: true, hashes: string[] }>} basic success payload
  */
 export async function delQbtTorrent(input) {
-  const { qbHost, qbPort, qbUser, qbPass } = await loadQbtCreds();
-  const baseUrl = `https://${qbHost}/qbittorrent/`;
-
   const hashValue = input?.hash;
   const hashesArr = Array.isArray(hashValue)
     ? hashValue
@@ -739,23 +569,21 @@ export async function delQbtTorrent(input) {
     throw new Error("delQbtTorrent requires hash");
   }
 
-  const cookie = await qbLogin({ baseUrl, qbUser, qbPass });
-
-  const body = new URLSearchParams({
-    hashes: hashesArr.join("|"),
-    deleteFiles: input?.deleteFiles === false ? "false" : "true",
-  });
-
-  const res = await fetch(new URL("api/v2/torrents/delete", baseUrl), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Cookie: cookie,
-      Origin: baseUrl,
-      Referer: `${baseUrl}/`,
-    },
-    body,
-  });
+  const res = await qbtRequest((baseUrl, cookie) =>
+    fetch(new URL("api/v2/torrents/delete", baseUrl), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Cookie: cookie,
+        Origin: baseUrl,
+        Referer: `${baseUrl}/`,
+      },
+      body: new URLSearchParams({
+        hashes: hashesArr.join("|"),
+        deleteFiles: input?.deleteFiles === false ? "false" : "true",
+      }),
+    }),
+  );
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -796,25 +624,22 @@ export async function addQbtTorrent(input) {
         .join(",")
     : String(tagsValue ?? "").trim();
 
-  const { qbHost, qbPort, qbUser, qbPass } = await loadQbtCreds();
-  const baseUrl = `https://${qbHost}/qbittorrent/`;
+  const res = await qbtRequest((baseUrl, cookie) => {
+    const form = new FormData();
+    const blob = new Blob([torrentData], { type: "application/x-bittorrent" });
+    form.append("torrents", blob, filename);
+    if (tags) form.append("tags", tags);
+    if (input?.savePath) form.append("savepath", input.savePath);
 
-  const cookie = await qbLogin({ baseUrl, qbUser, qbPass });
-
-  const form = new FormData();
-  const blob = new Blob([torrentData], { type: "application/x-bittorrent" });
-  form.append("torrents", blob, filename);
-  if (tags) form.append("tags", tags);
-  if (input?.savePath) form.append("savepath", input.savePath);
-
-  const res = await fetch(new URL("api/v2/torrents/add", baseUrl), {
-    method: "POST",
-    headers: {
-      Cookie: cookie,
-      Origin: baseUrl,
-      Referer: `${baseUrl}/`,
-    },
-    body: form,
+    return fetch(new URL("api/v2/torrents/add", baseUrl), {
+      method: "POST",
+      headers: {
+        Cookie: cookie,
+        Origin: baseUrl,
+        Referer: `${baseUrl}/`,
+      },
+      body: form,
+    });
   });
 
   const text = await res.text().catch(() => "");
@@ -845,23 +670,21 @@ export async function addQbtMagnet(input) {
         .join(",")
     : String(tagsValue ?? "").trim();
 
-  const { qbHost, qbPort, qbUser, qbPass } = await loadQbtCreds();
-  const baseUrl = `https://${qbHost}/qbittorrent/`;
-  const cookie = await qbLogin({ baseUrl, qbUser, qbPass });
+  const res = await qbtRequest((baseUrl, cookie) => {
+    const form = new FormData();
+    form.append("urls", magnetUrl);
+    if (tags) form.append("tags", tags);
+    if (input?.savePath) form.append("savepath", input.savePath);
 
-  const form = new FormData();
-  form.append("urls", magnetUrl);
-  if (tags) form.append("tags", tags);
-  if (input?.savePath) form.append("savepath", input.savePath);
-
-  const res = await fetch(new URL("api/v2/torrents/add", baseUrl), {
-    method: "POST",
-    headers: {
-      Cookie: cookie,
-      Origin: baseUrl,
-      Referer: `${baseUrl}/`,
-    },
-    body: form,
+    return fetch(new URL("api/v2/torrents/add", baseUrl), {
+      method: "POST",
+      headers: {
+        Cookie: cookie,
+        Origin: baseUrl,
+        Referer: `${baseUrl}/`,
+      },
+      body: form,
+    });
   });
 
   const text = await res.text().catch(() => "");
@@ -882,9 +705,10 @@ export async function addQbtMagnet(input) {
     if (xtMatch) {
       const hash = xtMatch[1].toLowerCase();
       try {
-        const infoRes = await fetch(
-          new URL(`api/v2/torrents/info?hashes=${hash}`, baseUrl),
-          { headers: { Cookie: cookie } },
+        const infoRes = await qbtRequest((baseUrl, cookie) =>
+          fetch(new URL(`api/v2/torrents/info?hashes=${hash}`, baseUrl), {
+            headers: { Cookie: cookie },
+          }),
         );
         const torrents = await infoRes.json().catch(() => []);
         if (Array.isArray(torrents) && torrents.length > 0) {
@@ -904,344 +728,69 @@ export async function addQbtMagnet(input) {
   return { ok, status: res.status, text: t };
 }
 
+export async function recheckQbtTorrent(input) {
+  const hashValue = input?.hash;
+  const hashes =
+    hashValue === "all"
+      ? "all"
+      : Array.isArray(hashValue)
+        ? hashValue
+            .map(String)
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .join("|")
+        : String(hashValue ?? "").trim();
+
+  if (!hashes) throw new Error("recheckQbtTorrent requires hash");
+
+  const res = await qbtRequest((baseUrl, cookie) =>
+    fetch(new URL("api/v2/torrents/recheck", baseUrl), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Cookie: cookie,
+        Origin: baseUrl,
+        Referer: `${baseUrl}/`,
+      },
+      body: new URLSearchParams({ hashes }),
+    }),
+  );
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `qBittorrent recheck failed: HTTP ${res.status}${text ? `: ${text}` : ""}`,
+    );
+  }
+
+  return { ok: true, hashes };
+}
+
+// Fetch a file tree from a USB-server directory.
+// find -printf: %y type (f/d), %P relative path, %s size, %CY-%Cm-%Cd date.
+async function getUsbTree(root, label) {
+  const cmd = `find ${root} -maxdepth 5 -not -path '*/.*' -printf "%y|%P|%s|%CY-%Cm-%Cd\\n"`;
+  try {
+    const stdout = await runUsbSsh(cmd);
+    return buildFileTree(stdout);
+  } catch (e) {
+    unilog(283, `getUsbTree ${label} failed`, e);
+    throw new Error(`Failed to list USB ${label}: ${e.message}`);
+  }
+}
+
 /**
  * Returns a file tree of /home/xobtlu/files from the USB server.
  */
 export async function getUsbFiles() {
-  const qbHost = await loadQbHostForSsh();
-  const root = USB_FILES_ROOT;
-
-  const sshBaseArgs = [
-    "-o",
-    "BatchMode=yes",
-    "-o",
-    "ConnectTimeout=20",
-    "-o",
-    "LogLevel=ERROR",
-    "-o",
-    "StrictHostKeyChecking=no",
-    "-o",
-    "UserKnownHostsFile=/dev/null",
-  ];
-
-  // using find with -printf to get type, path, size, and date
-  // %y: type (f=file, d=directory)
-  // %P: file's name relative to start point
-  // %s: size in bytes
-  // %CY-%Cm-%Cd: date (YYYY-MM-DD)
-  const cmd = `find ${root} -maxdepth 5 -not -path '*/.*' -printf "%y|%P|%s|%CY-%Cm-%Cd\\n" | sort`;
-
-  try {
-    const { stdout } = await execFileAsync(
-      "ssh",
-      [...sshBaseArgs, qbHost, cmd],
-      {
-        maxBuffer: 10 * 1024 * 1024, // 10MB
-      },
-    );
-
-    const lines = (stdout || "").split("\n").filter(Boolean);
-    const tree = [];
-
-    // Helper to find or create child node in list
-    const findOrCreate = (list, name, type, size, date) => {
-      let node = list.find((n) => n.name === name);
-      if (!node) {
-        node = { name, type, children: [] };
-        if (type === "file") {
-          node.size = size;
-          node.date = date;
-        }
-        list.push(node);
-      }
-      return node;
-    };
-
-    for (const line of lines) {
-      const parts = line.split("|");
-      if (parts.length < 4) continue;
-      const type = parts[0]; // f or d
-      const relPath = parts[1];
-      const size = parseInt(parts[2], 10) || 0;
-      const date = parts[3];
-
-      if (!relPath) continue;
-
-      const segments = relPath.split("/");
-      let currentLevel = tree;
-
-      for (let i = 0; i < segments.length; i++) {
-        const seg = segments[i];
-        const isLast = i === segments.length - 1;
-        const segType = isLast ? (type === "d" ? "folder" : "file") : "folder";
-
-        const node = findOrCreate(currentLevel, seg, segType, size, date);
-        if (segType === "folder") {
-          if (!node.children) node.children = [];
-          currentLevel = node.children;
-        }
-      }
-    }
-
-    // Sort tree? linux sort on paths helps, but maybe we want folders first?
-    const sortNodes = (nodes) => {
-      nodes.sort((a, b) => {
-        if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
-        const nameA = a.name.toLowerCase().replace(/^the\s+/, "");
-        const nameB = b.name.toLowerCase().replace(/^the\s+/, "");
-        return nameA.localeCompare(nameB);
-      });
-      nodes.forEach((n) => {
-        if (n.children) sortNodes(n.children);
-      });
-    };
-    sortNodes(tree);
-
-    return tree;
-  } catch (e) {
-    unilog(283, "getUsbFiles failed", e);
-    throw new Error(`Failed to list USB files: ${e.message}`);
-  }
+  return getUsbTree(USB_FILES_ROOT, "files");
 }
 
-function fmtIsoMinute(tsMs) {
-  const d = new Date(Number(tsMs) || 0);
-  if (Number.isNaN(d.getTime())) return "1970-01-01-00:00";
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  const hh = String(d.getHours()).padStart(2, "0");
-  const min = String(d.getMinutes()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}-${hh}:${min}`;
-}
-
-function fmtGb3(bytes) {
-  const n = Number(bytes);
-  if (!Number.isFinite(n) || n <= 0) return "0.000 GB";
-  return `${(n / 1_000_000_000).toFixed(3)} GB`;
-}
-
-function fmtGbInt(bytes) {
-  const n = Number(bytes);
-  if (!Number.isFinite(n) || n <= 0) return "0 GB";
-  return `${Math.round(n / 1_000_000_000)} GB`;
-}
-
-function fmtGbPad(bytes) {
-  const n = Number(bytes);
-  if (!Number.isFinite(n) || n <= 0) return "  0 GB";
-  const gb = Math.round(n / 1_000_000_000);
-  return `${String(gb).padStart(3, " ")} GB`;
-}
-
-export async function pruneUsbFiles() {
-  if (usbPruneInFlight) {
-    return usbPruneInFlight;
-  }
-
-  usbPruneInFlight = (async () => {
-    const qbHost = await loadQbHostForSsh();
-
-    const sshBaseArgs = [
-      "-o",
-      "BatchMode=yes",
-      "-o",
-      "ConnectTimeout=20",
-      "-o",
-      "LogLevel=ERROR",
-      "-o",
-      "StrictHostKeyChecking=no",
-      "-o",
-      "UserKnownHostsFile=/dev/null",
-    ];
-
-    const runUsbSsh = async (cmd, maxBuffer = 16 * 1024 * 1024) => {
-      const out = await execFileAsync("ssh", [...sshBaseArgs, qbHost, cmd], {
-        maxBuffer,
-        timeout: 120000,
-        windowsHide: true,
-      });
-      return String(out?.stdout || "");
-    };
-
-    setUsbPruneState({
-      running: true,
-      phase: "scan",
-      latestLogLine: "",
-      summaryLine: "",
-      foldersScanned: 0,
-      deletedCount: 0,
-      runningDeletedBytes: 0,
-      startedAt: Date.now(),
-      finishedAt: 0,
-      error: "",
-    });
-
-    try {
-      const folders = [];
-      let totalUsedBytes = 0;
-      let usbUsedBeforeBytes = 0;
-
-      const scanScript = `
-set -e
-    du_k="$(cd; du -s | awk 'NR==1{print $1}')"
-    printf '__DUK__|%s\\n' "$du_k"
-cd ${USB_FILES_ROOT}
-find . -mindepth 1 -maxdepth 1 -type d -print0 | sort -z | while IFS= read -r -d '' d; do
-  data="$(find "$d" -type f -printf '%T@|%s\\n')"
-  if [ -n "$data" ]; then
-    newest="$(printf '%s\\n' "$data" | awk -F'|' 'BEGIN{m=0}{if(($1+0)>m)m=$1+0}END{printf "%.3f",m}')"
-    size="$(printf '%s\\n' "$data" | awk -F'|' 'BEGIN{s=0}{s+=($2+0)}END{printf "%.0f",s}')"
-  else
-    newest="$(find "$d" -maxdepth 0 -printf '%T@')"
-    size="0"
-  fi
-  name="\${d#./}"
-  printf '%s|%s|%s\\n' "$name" "$newest" "$size"
-done
-`;
-      const scanCmd = `bash -lc ${shellQuote(scanScript)}`;
-      const scanText = await runUsbSsh(scanCmd, 64 * 1024 * 1024);
-      const scanLines = scanText
-        .split(/\r?\n/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-
-      for (const line of scanLines) {
-        if (line.startsWith("__DUK__|")) {
-          const duKRaw = Number(line.slice("__DUK__|".length));
-          if (Number.isFinite(duKRaw) && duKRaw > 0) {
-            usbUsedBeforeBytes = Math.trunc(duKRaw * 1024);
-          }
-          continue;
-        }
-
-        const [folderNameRaw, tsRaw, sizeRaw] = line.split("|");
-        const folderName = String(folderNameRaw || "").trim();
-        if (!folderName) continue;
-
-        const tsSeconds = Number(tsRaw);
-        const folderSizeIn = Number(sizeRaw);
-        const folderSizeBytes =
-          Number.isFinite(folderSizeIn) && folderSizeIn > 0
-            ? Math.trunc(folderSizeIn)
-            : 0;
-        const folderTimeMs =
-          Number.isFinite(tsSeconds) && tsSeconds > 0
-            ? Math.trunc(tsSeconds * 1000)
-            : 0;
-
-        totalUsedBytes += folderSizeBytes;
-        folders.push({
-          folderName,
-          folderPath: `${USB_FILES_ROOT}/${folderName}`,
-          folderTimeMs,
-          folderSizeBytes,
-        });
-      }
-
-      setUsbPruneState({
-        foldersScanned: folders.length,
-      });
-
-      folders.sort((a, b) => {
-        if (a.folderTimeMs !== b.folderTimeMs)
-          return a.folderTimeMs - b.folderTimeMs;
-        return a.folderName.localeCompare(b.folderName);
-      });
-
-      const deleted = [];
-      let runningDeletedBytes = 0;
-      let usedAfterBytes =
-        usbUsedBeforeBytes > 0 ? usbUsedBeforeBytes : totalUsedBytes;
-      let latestDeletedTimeMs = 0;
-
-      setUsbPruneState({
-        phase: "delete",
-        latestLogLine: "Prune pass starting...",
-      });
-
-      for (const folder of folders) {
-        if (runningDeletedBytes >= PRUNE_DELETE_TARGET_BYTES) break;
-
-        const deleteSizeBytes = folder.folderSizeBytes;
-        runningDeletedBytes += deleteSizeBytes;
-        usedAfterBytes = Math.max(0, usedAfterBytes - deleteSizeBytes);
-
-        const logLine = [
-          fmtIsoMinute(folder.folderTimeMs),
-          fmtGbPad(deleteSizeBytes),
-          fmtGbPad(runningDeletedBytes),
-          folder.folderName,
-        ].join(" | ");
-        unilog(
-          284,
-          `usb prune ${PRUNE_DRY_RUN ? "[dry-run]" : "[delete]"}: ${logLine}`,
-        );
-
-        if (!PRUNE_DRY_RUN) {
-          const rmCmd = `rm -rf -- ${shellQuote(folder.folderPath)}`;
-          await runUsbSsh(rmCmd);
-        }
-
-        deleted.push({
-          folderName: folder.folderName,
-          folderTime: fmtIsoMinute(folder.folderTimeMs),
-          folderSizeBytes: deleteSizeBytes,
-          runningDeletedBytes,
-        });
-        if (folder.folderTimeMs > latestDeletedTimeMs) {
-          latestDeletedTimeMs = folder.folderTimeMs;
-        }
-
-        setUsbPruneState({
-          latestLogLine: logLine,
-          deletedCount: deleted.length,
-          runningDeletedBytes,
-        });
-      }
-
-      const latestDeletedTimeText =
-        latestDeletedTimeMs > 0 ? fmtIsoMinute(latestDeletedTimeMs) : "none";
-      const summaryLine = `Done ${PRUNE_DRY_RUN ? "dry-run" : "delete"}: ${folders.length} scanned, ${deleted.length} folders, ${fmtGbInt(runningDeletedBytes)}, ${latestDeletedTimeText}`;
-      setUsbPruneState({
-        running: false,
-        phase: "done",
-        summaryLine,
-        latestLogLine: summaryLine,
-        finishedAt: Date.now(),
-      });
-
-      return {
-        ok: true,
-        dryRun: PRUNE_DRY_RUN,
-        deleteTargetBytes: PRUNE_DELETE_TARGET_BYTES,
-        usbSpaceTotal: USB_SPACE_TOTAL_BYTES,
-        usbSpaceUsedBefore:
-          usbUsedBeforeBytes > 0 ? usbUsedBeforeBytes : totalUsedBytes,
-        usbSpaceUsedAfter: usedAfterBytes,
-        foldersScanned: folders.length,
-        deletedCount: deleted.length,
-        deleted,
-      };
-    } catch (e) {
-      const msg = e?.message || String(e);
-      const summaryLine = `Prune failed: ${msg}`;
-      setUsbPruneState({
-        running: false,
-        phase: "error",
-        latestLogLine: summaryLine,
-        summaryLine,
-        error: msg,
-        finishedAt: Date.now(),
-      });
-      throw e;
-    } finally {
-      usbPruneInFlight = null;
-    }
-  })();
-
-  return usbPruneInFlight;
+/**
+ * Returns a file tree of /home/xobtlu/movies from the USB server.
+ */
+export async function getUsbMovies() {
+  return getUsbTree(USB_MOVIES_ROOT, "movies");
 }
 
 /**
@@ -1255,18 +804,7 @@ async function flexgetStatus() {
   const cmd =
     "echo \"__DATES__|$(date '+%Y-%m-%d %H:%M:%S')|$(date +%s)\" && ~/flexget/bin/flexget status";
 
-  const sshBaseArgs = [
-    "-o",
-    "BatchMode=yes",
-    "-o",
-    "ConnectTimeout=10",
-    "-o",
-    "StrictHostKeyChecking=no",
-    "-o",
-    "UserKnownHostsFile=/dev/null",
-  ];
-
-  const args = [...sshBaseArgs, qbHost, cmd];
+  const args = [...SSH_BASE_ARGS, qbHost, cmd];
 
   try {
     const { stdout } = await execFileAsync("ssh", args, {
@@ -1318,26 +856,12 @@ export async function checkFlexgetStatus() {
 
     // Some formats have leading/trailing pipes, some might not.
     // e.g. "│ ipt │ ..." or "ipt | ..."
+    // Expected content columns: Task, Last execution, Last success, Produced,
+    // Accepted, Rejected, Failed, Duration — 8 columns.
     const parts = line.split(separator).map((s) => s.trim());
-
-    // If splitting by | resulted in empty first/last elements (due to surrounding pipes), remove them if they are empty
-    // But be careful about index matching.
-    // Let's filter out empty strings to find the content.
-    // Expected content columns: Task, Last execution, Last success, Produced, Accepted, Rejected, Failed, Duration
-    // That's 8 columns.
-
-    // Filter out purely empty parts distinct from legitimate empty columns?
-    // Flexget status columns are unlikely to be empty strings.
     const nonBlankParts = parts.filter((p) => p !== "");
 
     if (nonBlankParts.length < 8) continue;
-
-    // Map nonBlankParts indices to our needs:
-    // 0: Task Name (ipt)
-    // 1: Last Execution
-    // 2: Last Success
-    // ...
-    // 6: Failed
 
     const name = nonBlankParts[0];
     if (name === "Task" || name.startsWith("----")) continue;
@@ -1395,14 +919,8 @@ export async function checkFlexgetStatus() {
   return true;
 }
 
-function shellQuote(s) {
-  if (typeof s !== "string") return "''";
-  return "'" + s.replace(/'/g, "'\\''") + "'";
-}
-
 export async function renameUsbFile(oldPath, newName) {
-  const qbHost = await loadQbHostForSsh();
-  const root = "/home/xobtlu/files";
+  const root = USB_FILES_ROOT;
 
   if (
     oldPath.includes("..") ||
@@ -1423,218 +941,33 @@ export async function renameUsbFile(oldPath, newName) {
     ? `${root}/${dirPath}/${newName}`
     : `${root}/${newName}`;
 
-  const cmd = `mv ${shellQuote(fullOldPath)} ${shellQuote(fullNewPath)}`;
-
-  const sshBaseArgs = [
-    "-o",
-    "BatchMode=yes",
-    "-o",
-    "ConnectTimeout=10",
-    "-o",
-    "StrictHostKeyChecking=no",
-    "-o",
-    "UserKnownHostsFile=/dev/null",
-  ];
-
-  await execFileAsync("ssh", [...sshBaseArgs, qbHost, cmd]);
+  await runUsbSsh(`mv ${shellQuote(fullOldPath)} ${shellQuote(fullNewPath)}`);
   return { success: true };
 }
 
-export async function deleteUsbFiles(paths) {
+// Recursively delete paths (relative to root) on the USB server.
+async function deleteUsbPaths(root, paths) {
   if (!Array.isArray(paths) || paths.length === 0) {
     throw new Error("paths must be a non-empty array");
   }
-
-  const qbHost = await loadQbHostForSsh();
-  const root = "/home/xobtlu/files";
-
-  const sshBaseArgs = [
-    "-o",
-    "BatchMode=yes",
-    "-o",
-    "ConnectTimeout=10",
-    "-o",
-    "StrictHostKeyChecking=no",
-    "-o",
-    "UserKnownHostsFile=/dev/null",
-  ];
 
   for (const p of paths) {
     const str = String(p || "").trim();
     if (!str || str.includes("..")) {
       throw new Error(`Invalid path: ${str}`);
     }
-    const fullPath = `${root}/${str}`;
-    const cmd = `rm -rf -- ${shellQuote(fullPath)}`;
-    await execFileAsync("ssh", [...sshBaseArgs, qbHost, cmd]);
+    await runUsbSsh(`rm -rf -- ${shellQuote(`${root}/${str}`)}`);
   }
 
   return { success: true, deleted: paths.length };
 }
 
-const USB_MOVIES_ROOT = "/home/xobtlu/movies";
-
-export async function recheckQbtTorrent(input) {
-  const { qbHost, qbPort, qbUser, qbPass } = await loadQbtCreds();
-  const baseUrl = `https://${qbHost}/qbittorrent/`;
-
-  const hashValue = input?.hash;
-  const hashes =
-    hashValue === "all"
-      ? "all"
-      : Array.isArray(hashValue)
-        ? hashValue
-            .map(String)
-            .map((s) => s.trim())
-            .filter(Boolean)
-            .join("|")
-        : String(hashValue ?? "").trim();
-
-  if (!hashes) throw new Error("recheckQbtTorrent requires hash");
-
-  const cookie = await qbLogin({ baseUrl, qbUser, qbPass });
-
-  const res = await fetch(new URL("api/v2/torrents/recheck", baseUrl), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Cookie: cookie,
-      Origin: baseUrl,
-      Referer: `${baseUrl}/`,
-    },
-    body: new URLSearchParams({ hashes }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(
-      `qBittorrent recheck failed: HTTP ${res.status}${text ? `: ${text}` : ""}`,
-    );
-  }
-
-  return { ok: true, hashes };
-}
-
-/**
- * Returns a file tree of /home/xobtlu/movies from the USB server.
- */
-export async function getUsbMovies() {
-  const qbHost = await loadQbHostForSsh();
-  const root = USB_MOVIES_ROOT;
-
-  const sshBaseArgs = [
-    "-o",
-    "BatchMode=yes",
-    "-o",
-    "ConnectTimeout=20",
-    "-o",
-    "LogLevel=ERROR",
-    "-o",
-    "StrictHostKeyChecking=no",
-    "-o",
-    "UserKnownHostsFile=/dev/null",
-  ];
-
-  const cmd = `find ${root} -maxdepth 5 -not -path '*/.*' -printf "%y|%P|%s|%CY-%Cm-%Cd\\n" | sort`;
-
-  try {
-    const { stdout } = await execFileAsync(
-      "ssh",
-      [...sshBaseArgs, qbHost, cmd],
-      { maxBuffer: 10 * 1024 * 1024 },
-    );
-
-    const lines = (stdout || "").split("\n").filter(Boolean);
-    const tree = [];
-
-    const findOrCreate = (list, name, type, size, date) => {
-      let node = list.find((n) => n.name === name);
-      if (!node) {
-        node = { name, type, children: [] };
-        if (type === "file") {
-          node.size = size;
-          node.date = date;
-        }
-        list.push(node);
-      }
-      return node;
-    };
-
-    for (const line of lines) {
-      const parts = line.split("|");
-      if (parts.length < 4) continue;
-      const type = parts[0];
-      const relPath = parts[1];
-      const size = parseInt(parts[2], 10) || 0;
-      const date = parts[3];
-
-      if (!relPath) continue;
-
-      const segments = relPath.split("/");
-      let currentLevel = tree;
-
-      for (let i = 0; i < segments.length; i++) {
-        const seg = segments[i];
-        const isLast = i === segments.length - 1;
-        const segType = isLast ? (type === "d" ? "folder" : "file") : "folder";
-        const node = findOrCreate(currentLevel, seg, segType, size, date);
-        if (segType === "folder") {
-          if (!node.children) node.children = [];
-          currentLevel = node.children;
-        }
-      }
-    }
-
-    const sortNodes = (nodes) => {
-      nodes.sort((a, b) => {
-        if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
-        const nameA = a.name.toLowerCase().replace(/^the\s+/, "");
-        const nameB = b.name.toLowerCase().replace(/^the\s+/, "");
-        return nameA.localeCompare(nameB);
-      });
-      nodes.forEach((n) => {
-        if (n.children) sortNodes(n.children);
-      });
-    };
-    sortNodes(tree);
-
-    return tree;
-  } catch (e) {
-    unilog(285, "getUsbMovies failed", e);
-    throw new Error(`Failed to list USB movies: ${e.message}`);
-  }
+export async function deleteUsbFiles(paths) {
+  return deleteUsbPaths(USB_FILES_ROOT, paths);
 }
 
 export async function deleteUsbMovies(paths) {
-  if (!Array.isArray(paths) || paths.length === 0) {
-    throw new Error("paths must be a non-empty array");
-  }
-
-  const qbHost = await loadQbHostForSsh();
-  const root = USB_MOVIES_ROOT;
-
-  const sshBaseArgs = [
-    "-o",
-    "BatchMode=yes",
-    "-o",
-    "ConnectTimeout=10",
-    "-o",
-    "StrictHostKeyChecking=no",
-    "-o",
-    "UserKnownHostsFile=/dev/null",
-  ];
-
-  for (const p of paths) {
-    const str = String(p || "").trim();
-    if (!str || str.includes("..")) {
-      throw new Error(`Invalid path: ${str}`);
-    }
-    const fullPath = `${root}/${str}`;
-    const cmd = `rm -rf -- ${shellQuote(fullPath)}`;
-    await execFileAsync("ssh", [...sshBaseArgs, qbHost, cmd]);
-  }
-
-  return { success: true, deleted: paths.length };
+  return deleteUsbPaths(USB_MOVIES_ROOT, paths);
 }
 
 const USB_CP_LOGIN_URL = "https://cp.ultra.cc/api/rest-auth/login/";

@@ -50,7 +50,7 @@
 
 <script>
 import { globalMessages, globalMessageText } from "../globalMessages.js";
-import { loggingDisabled, logHere } from "../log.js";
+import { loggingDisabled, logHere, unilog} from "../log.js"
 import { loidNeeded } from "../loid.js";
 import { setLoidCookie } from "../srvr.js";
 
@@ -93,7 +93,7 @@ export default {
         }
       } catch (e) {
         this.loidError = e?.error || e?.message || "verify failed";
-        logHere({ lvl: "warn" }, `loid cookie submit failed: ${this.loidError}`);
+        unilog(1303, `loid cookie submit failed: ${this.loidError}`);
       }
     },
   },

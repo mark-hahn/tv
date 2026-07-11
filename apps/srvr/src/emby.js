@@ -79,7 +79,12 @@ export const viewShowOnLivingRoomTv = async ({
   let resp = await fetch(url);
   if (resp.status !== 200) return { found: false };
   const sessions = await resp.json();
-  const session = sessions.find((s) => s.DeviceName === "Living Room TV");
+  // The Emby app registers two "Living Room TV" sessions; commands sent to the
+  // one without SupportsRemoteControl are silently ignored — prefer the live one.
+  const session =
+    sessions.find(
+      (s) => s.DeviceName === "Living Room TV" && s.SupportsRemoteControl,
+    ) ?? sessions.find((s) => s.DeviceName === "Living Room TV");
   if (!session) return { found: false };
   const viewUrl = urls.viewingUrl(session.Id, showId, showName, episodeId);
   await fetch(viewUrl, { method: "POST" });

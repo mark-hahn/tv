@@ -2,7 +2,6 @@ import express from "express";
 import https from "https";
 import fs from "fs";
 import path from "node:path";
-import process from "node:process";
 import { fileURLToPath } from "node:url";
 import parseTorrent from "parse-torrent";
 import * as search from "./search.js";
@@ -24,8 +23,6 @@ import {
   addQbtTorrent,
   addQbtMagnet,
   getUsbFiles,
-  getUsbPruneStatus,
-  pruneUsbFiles,
   renameUsbFile,
   deleteUsbFiles,
   getUsbMovies,
@@ -50,7 +47,7 @@ import {
   parseTitleFromFilename,
   TV_BLOCKED,
 } from "@tv/share";
-import { unilog, setUnilogSink, logHere } from "@tv/share";
+import { unilog, setUnilogSink } from "@tv/share";
 import parseTorrentTitlePkg from "parse-torrent-title";
 import {
   getApiDataDir,
@@ -88,17 +85,6 @@ const VIDEO_EXTENSIONS = new Set([
 const PACKED_ARCHIVE_EXTENSIONS = new Set([".rar", ".001"]);
 const FORCE_DOWN_POLL_MS = 10000;
 const FORCE_DOWN_MAX_POLLS = 720;
-const FORCE_DOWN_SKIP_EXTENSIONS = new Set([
-  "nfo",
-  "idx",
-  "sub",
-  "txt",
-  "jpg",
-  "gif",
-  "jpeg",
-  "part",
-]);
-
 function formatPstTimestamp(date = new Date()) {
   // Match the reelgood logger behavior: approximate PST/PDT using month.
   const now = date instanceof Date ? date : new Date();
@@ -250,8 +236,6 @@ async function handoffForcedTorrentToTvDown({
   addTag,
   infoHash,
   torrentTitle,
-  tvdbId,
-  showName,
   torrentFiles,
 }) {
   const qbtFilter = infoHash ? { hash: infoHash } : { tag: addTag };
@@ -535,22 +519,15 @@ function readRequiredFile(filePath, label) {
   }
 }
 
-function readRequiredTextFile(filePath, label) {
-  try {
-    return String(fs.readFileSync(filePath, "utf8") || "").trim();
-  } catch (e) {
-    const msg = e && e.message ? e.message : String(e);
-    throw new Error(`Missing required ${label} at ${filePath}. (${msg})`);
-  }
-}
-
 const app = express();
 
-const QBT_TEST_PORT = 3001;
+const API_PORT = 3001;
 const DUMP_INFO = false;
-const FILTER_TORRENTS = false;
+// Hard-wired (no env vars per repo convention): emit CORS headers for direct
+// (non-proxied) browser requests. nginx injects them on the proxied path.
+const INTERNAL_CORS = true;
 
-// Load SSL certificate (prefer shared cookie store)
+// Load SSL certificate
 const httpsOptions = {
   key: readRequiredFile(
     path.join(getApiSecretsDir(), "localhost-key.pem"),
@@ -573,14 +550,13 @@ const httpsOptions = {
 app.use((req, res, next) => {
   const hasOrigin =
     typeof req.headers.origin === "string" && req.headers.origin.length > 0;
-  const disableInternalCors = process.env.DISABLE_INTERNAL_CORS === "1";
   const behindProxy = Boolean(
     req.headers["x-forwarded-host"] ||
     req.headers["x-forwarded-proto"] ||
     req.headers["x-forwarded-for"],
   );
 
-  if (hasOrigin && !behindProxy && !disableInternalCors) {
+  if (hasOrigin && !behindProxy && INTERNAL_CORS) {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
     const reqHeaders = req.headers["access-control-request-headers"];
@@ -605,21 +581,12 @@ app.use(express.json());
 
 const OPENSUBTITLES_BASE_URL = "https://api.opensubtitles.com/api/v1";
 
-function getRootSecretsDir() {
-  // Checkout-independent shared secrets directory (created if missing).
-  return getApiSecretsDir();
-}
-
 function getSubsLoginPath() {
-  return path.join(getRootSecretsDir(), "subs-login.txt");
+  return path.join(getApiSecretsDir(), "subs-login.txt");
 }
 
-function getSubsTokenReadPath() {
-  return path.join(getRootSecretsDir(), "subs-token.txt");
-}
-
-function getSubsTokenWritePath() {
-  return path.join(getRootSecretsDir(), "subs-token.txt");
+function getSubsTokenPath() {
+  return path.join(getApiSecretsDir(), "subs-token.txt");
 }
 
 async function readTextIfExists(filePath) {
@@ -715,7 +682,7 @@ async function osLoginAndPersistToken() {
   if (!token) {
     throw new Error("OpenSubtitles login response missing token");
   }
-  await writeTextFile(getSubsTokenWritePath(), token);
+  await writeTextFile(getSubsTokenPath(), token);
   return { apiKey, token };
 }
 
@@ -781,43 +748,8 @@ app.post("/api/cf_clearance", async (req, res) => {
   }
 });
 
-async function flexget() {
-  return flexgetHistory();
-}
-
 // Initialize torrent search providers
 search.initializeProviders();
-
-if (
-  FILTER_TORRENTS &&
-  typeof FILTER_TORRENTS === "object" &&
-  !Array.isArray(FILTER_TORRENTS)
-) {
-  (async () => {
-    try {
-      const info = await getQbtInfo(FILTER_TORRENTS);
-      const outPath = path.resolve(
-        __dirname,
-        "..",
-        "..",
-        "samples",
-        "sample-qbt",
-        "qbt-info.json",
-      );
-      fs.mkdirSync(path.dirname(outPath), { recursive: true });
-      fs.writeFileSync(outPath, JSON.stringify(info, null, 2), "utf8");
-      unilog(
-        212,
-        `qbt startup dump wrote ${Array.isArray(info) ? info.length : 0} torrents -> ${outPath}`,
-      );
-    } catch (e) {
-      unilog(213, "qbt startup dump error:", e);
-    }
-  })();
-}
-
-// API endpoint
-// app.get("/api/tvdb/*", tvdbProxyGet);
 
 app.post("/api/tvproc/startProc", async (req, res) => {
   const jsonPath = getTvprocJsonPath();
@@ -1002,7 +934,7 @@ app.get("/api/space/srvr", async (req, res) => {
 
 app.get("/api/flexget", async (req, res) => {
   try {
-    const txt = await flexget();
+    const txt = await flexgetHistory();
     res.type("text/plain").send(txt);
   } catch (error) {
     unilog(225, "flexget error:", error);
@@ -1016,26 +948,6 @@ app.get("/api/usb/files", async (req, res) => {
     res.json(tree);
   } catch (err) {
     res.status(500).json({ error: err.message });
-  }
-});
-
-app.post("/api/usb/prune", async (req, res) => {
-  try {
-    const result = await pruneUsbFiles();
-    res.json(result);
-  } catch (err) {
-    unilog(226, "usb prune error:", err);
-    res.status(500).json({ error: err?.message || String(err) });
-  }
-});
-
-app.get("/api/usb/prune/status", async (req, res) => {
-  try {
-    const status = getUsbPruneStatus();
-    res.json(status);
-  } catch (err) {
-    unilog(227, "usb prune status error:", err);
-    res.status(500).json({ error: err?.message || String(err) });
   }
 });
 
@@ -1151,16 +1063,18 @@ app.post("/api/usb/mediainfo", async (req, res) => {
       if (lang === "" || ENGLISH_LANG_TAGS.has(lang)) subsCount++;
     }
 
-    // Count .srt sidecar files on USB server
+    // Count .srt sidecar files for this specific file (same base name prefix,
+    // matching the /api/local/mediainfo behavior).
     const fileName = str.split("/").pop();
     const dirPath = `${root}/${str.substring(0, str.lastIndexOf("/"))}`.replace(
       /\/$/,
       "",
     );
-    const baseName = fileName
-      .replace(/\.[^.]+$/, "")
-      .replace(/'/g, "'\\''")
-      .toLowerCase();
+    const baseNoExt = fileName.replace(/\.[^.]+$/, "");
+    // Escape glob metacharacters for find -iname, then shell-quote.
+    const basePattern = baseNoExt
+      .replace(/[[\]*?\\]/g, "\\$&")
+      .replace(/'/g, "'\\''");
     const escapedDir = dirPath.replace(/'/g, "'\\''");
     let srtsCount = 0;
     try {
@@ -1169,7 +1083,7 @@ app.post("/api/usb/mediainfo", async (req, res) => {
         [
           ...sshArgs,
           USB_HOST_FOR_MEDIAINFO,
-          `find '${escapedDir}' -maxdepth 1 -iname '*.srt' -not -iname '*.chosen' | wc -l`,
+          `find '${escapedDir}' -maxdepth 1 -iname '${basePattern}*.srt' | wc -l`,
         ],
         { maxBuffer: 64 * 1024 },
       );
@@ -1256,9 +1170,6 @@ app.post("/api/local/mediainfo", async (req, res) => {
       maxBuffer: 5 * 1024 * 1024,
     });
 
-    // Extract subtitle (Text) sections from mediainfo output
-    const sections = stdout.split(/\n\n+/);
-
     const output = stdout
       .split("\n")
       .filter((l) => !/^Encoding settings\s*:/i.test(l))
@@ -1292,13 +1203,10 @@ app.post("/api/local/mediainfo", async (req, res) => {
       const dir = path.dirname(fullPath);
       const baseName = fileName.replace(/\.[^.]+$/, "").toLowerCase();
       const entries = await readdir(dir);
+      // (chosen markers are `<base>.mb.chosen` — they never end in .srt)
       srtsCount = entries.filter((e) => {
         const el = e.toLowerCase();
-        return (
-          el.startsWith(baseName) &&
-          el.endsWith(".srt") &&
-          !el.endsWith(".chosen")
-        );
+        return el.startsWith(baseName) && el.endsWith(".srt");
       }).length;
     } catch (_) {
       // ignore read errors
@@ -1312,7 +1220,6 @@ app.post("/api/local/mediainfo", async (req, res) => {
 });
 
 const TOR_SENT_PATH = path.join(getApiMiscDir(), "tor-sent.json");
-const RECENT_SENT_LOG_PATH = "/root/dev/apps/tv/logs/recent-sent.log";
 
 function logRecentSent(action, details = {}) {
   try {
@@ -1392,7 +1299,6 @@ app.post("/api/tor/sent", (req, res) => {
 
 app.get("/api/search", async (req, res) => {
   const showName = req.query.show;
-  const tvdbId = req.query.tvdbId || null;
   const limit = parseInt(req.query.limit) || 100;
   const iptCfRaw = req.query.ipt_cf;
   const tlCfRaw = req.query.tl_cf;
@@ -1467,7 +1373,7 @@ app.get("/api/subs/search", async (req, res) => {
       return res.status(500).json({ error: `Missing apiKey in ${loginPath}` });
     }
 
-    let token = await readTextIfExists(getSubsTokenReadPath());
+    let token = await readTextIfExists(getSubsTokenPath());
 
     const url = new URL(`${OPENSUBTITLES_BASE_URL}/subtitles`);
     if (qRaw) {
@@ -1540,8 +1446,6 @@ async function handleDownloadRequest(req, res) {
         : tlBody
       : body.torrent;
     const forceDownload = body.forceDownload === true;
-    const dlShowName = String(body.showName || "").trim() || null;
-    const dlTvdbId = String(body.tvdbId || "").trim() || null;
     const dlSavePath = body.savePath ? String(body.savePath).trim() : null;
 
     appendDownloadsRequestLog(body);
@@ -1595,339 +1499,17 @@ async function handleDownloadRequest(req, res) {
       }
     }
 
-    // Default behavior: consult tv-proc before uploading.
-    if (!forceDownload) {
-      const fetched = await download.fetchTorrentFile(torrent);
-      if (!fetched || typeof fetched !== "object") {
-        unilog(
-          1171,
-          `API: fetch-torrent failed (unexpected result) for "${torTitle()}"`,
-        );
-        res.json({
-          ...baseWrapper,
-          success: false,
-          stage: "fetch-torrent",
-          error: "Unexpected fetchTorrentFile result",
-        });
-        return;
-      }
-      if (!fetched.success) {
-        unilog(
-          1172,
-          `API: fetch-torrent failed: ${fetched.error || "fetch failed"} for "${torTitle()}"`,
-        );
-        res.json({ ...baseWrapper, ...fetched });
-        return;
-      }
-
-      const isMovieDownload =
-        dlSavePath &&
-        String(dlSavePath).replace(/\/+$/, "").endsWith("/movies");
-      const valid = isMovieDownload
-        ? { success: true }
-        : download.validateTorrentBytes(fetched.torrentData);
-      if (!valid.success) {
-        unilog(
-          1173,
-          `API: invalid torrent bytes: ${valid.error || "unknown"} for "${torTitle()}"`,
-        );
-        try {
-          const rawTitle = String(
-            torrent?.raw?.title ||
-              torrent?.title ||
-              torrent?.clientTitle ||
-              "unknown",
-          ).trim();
-          const safeTitle = rawTitle
-            .replace(/[^a-zA-Z0-9._-]/g, "_")
-            .slice(0, 80);
-          const badPath = `/root/dev/apps/tv/bad-torrent-${safeTitle}.txt`;
-          fs.writeFileSync(badPath, fetched.torrentData);
-        } catch (e) {
-          unilog(238, "failed to save bad torrent file", e);
-        }
-        res.json({ ...baseWrapper, ...valid });
-        return;
-      }
-
-      // Guardrail: if the request implies a specific year, and the torrent's internal name
-      // includes a conflicting year, refuse to upload (prevents "wrong show" mismatches).
-      try {
-        const expectedYear =
-          (Number.isFinite(Number(torrent?.raw?.year))
-            ? Number(torrent?.raw?.year)
-            : null) ||
-          extractYearFromString(
-            torrent?.raw?.title || torrent?.title || torrent?.clientTitle,
-          );
-
-        if (expectedYear && expectedYear >= 1950 && expectedYear <= 2050) {
-          const parsed = parseTorrent(fetched.torrentData);
-          const parsedName = String(parsed?.name || "").trim();
-          const actualYear = extractYearFromString(parsedName);
-          if (actualYear && actualYear !== expectedYear) {
-            const requestedTitle = String(
-              torrent?.raw?.title ||
-                torrent?.title ||
-                torrent?.clientTitle ||
-                "",
-            ).trim();
-            unilog(
-              1174,
-              `API: year mismatch (requested ${expectedYear}, torrent says ${actualYear}) for "${requestedTitle}"`,
-            );
-            res.json({
-              ...baseWrapper,
-              success: false,
-              stage: "validate-torrent-metadata",
-              error: `Torrent year mismatch (requested ${expectedYear}, torrent says ${actualYear})`,
-              yearError: `${actualYear}|${expectedYear}|${requestedTitle}`,
-              expectedYear,
-              actualYear,
-              torrentName: parsedName || undefined,
-              downloadUrl: fetched?.downloadUrl || undefined,
-              provider: fetched?.provider || undefined,
-            });
-            return;
-          }
-        }
-      } catch {
-        // ignore metadata validation failures
-      }
-
-      let titles = [];
-      try {
-        titles = download.extractTorrentFileTitles(fetched.torrentData);
-      } catch (e) {
-        unilog(
-          1175,
-          `API: parse-torrent failed: ${e?.message || String(e)} for "${torTitle()}"`,
-        );
-        res.json({
-          ...baseWrapper,
-          success: false,
-          stage: "parse-torrent",
-          error: e?.message || String(e),
-        });
-        return;
-      }
-
-      let tvProcResult = baseWrapper;
-      try {
-        appendCallsLog({
-          endpoint: "tv-proc:/checkFiles request",
-          method: "POST",
-          ok: true,
-          result: titles,
-        });
-        tvProcResult = await tvProcCheckFiles(titles);
-        appendCallsLog({
-          endpoint: "tv-proc:/checkFiles response",
-          method: "POST",
-          ok: true,
-          result: tvProcResult,
-        });
-      } catch (e) {
-        appendCallsLog({
-          endpoint: "tv-proc:/checkFiles",
-          method: "POST",
-          ok: false,
-          result: null,
-          error: e,
-        });
-        res.json({
-          ...baseWrapper,
-          success: false,
-          stage: "tv-proc",
-          error: e?.message || String(e),
-        });
-        return;
-      }
-
-      // If any file titles are already present, do NOT send to qBittorrent.
-      const existingTitles = Array.isArray(tvProcResult?.existingTitles)
-        ? tvProcResult.existingTitles
-        : [];
-      const errorTitles = tvEntriesErrorTitles(tvProcResult?.tvEntries);
-      if (existingTitles.length > 0 || errorTitles.length > 0) {
-        unilog(
-          1176,
-          `API: tv-proc blocked (${existingTitles.length} existing, ${errorTitles.length} errors) for "${torTitle()}"`,
-        );
-        appendDownloadsResultLog({
-          stage: "tv-proc-blocked",
-          existingTitles,
-          errorTitles,
-        });
-        res.json(
-          errorTitles.length > 0
-            ? { ...tvProcResult, errorTitles }
-            : tvProcResult,
-        );
-        return;
-      }
-
-      const hint =
-        torrent?.raw?.filename || torrent?.raw?.title || "download.torrent";
-      let addRes;
-      const addTag = `tapi_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-      try {
-        addRes = await addQbtTorrent({
-          torrentData: fetched.torrentData,
-          filename: hint,
-          tags: addTag,
-          ...(dlSavePath ? { savePath: dlSavePath } : {}),
-        });
-      } catch (e) {
-        unilog(240, "qbt add threw", {
-          addTag,
-          error: e?.message || String(e),
-        });
-        appendDownloadsResultLog({
-          stage: "qbt-add-threw",
-          addTag,
-          error: e?.message || String(e),
-        });
-        res.json({
-          ...tvProcResult,
-          success: false,
-          stage: "qbt-add",
-          error: e?.message || String(e),
-        });
-        return;
-      }
-
-      unilog(241, "qbt add response", {
-        addTag,
-        ok: addRes.ok,
-        status: addRes.status,
-        text: addRes.text,
-      });
-      appendDownloadsResultLog({
-        stage: "qbt-add-response",
-        addTag,
-        ok: addRes.ok,
-        status: addRes.status,
-        text: addRes.text,
-      });
-
-      let infoHash = "";
-      try {
-        const parsed = parseTorrent(fetched.torrentData);
-        infoHash = String(parsed?.infoHash || "")
-          .trim()
-          .toLowerCase();
-      } catch {
-        // ignore
-      }
-
-      if (!addRes.ok) {
-        // qB sometimes returns "Fails." but still adds the torrent. If we can find a torrent
-        // with the unique tag we used for this request, treat it as success.
-        try {
-          const tagged = await getQbtInfo({ tag: addTag });
-          const list = Array.isArray(tagged) ? tagged : [];
-          if (list.length > 0) {
-            unilog(242, "qbt add disambiguated as success via tag", {
-              addTag,
-              count: list.length,
-            });
-            let tagInfoHash = "";
-            try {
-              const parsed = parseTorrent(fetched.torrentData);
-              tagInfoHash = String(parsed?.infoHash || "")
-                .trim()
-                .toLowerCase();
-            } catch {
-              // ignore
-            }
-            res.json({
-              ...tvProcResult,
-              success: true,
-              stage: "qbt-add",
-              qbAdd: addRes,
-              qbtTag: addTag,
-            });
-            return;
-          }
-        } catch {
-          // ignore
-        }
-
-        // qB uses 200 OK with body "Fails." for duplicates and other add failures.
-        // Disambiguate by checking whether the torrent exists after the add attempt.
-
-        if (infoHash) {
-          try {
-            const qbtInfo = await getQbtInfo({ hash: infoHash });
-            const list = Array.isArray(qbtInfo) ? qbtInfo : [];
-            if (list.length > 0) {
-              const existing = list[0] || {};
-              const existingName = String(existing?.name || "").trim();
-              const fallbackTitle = String(
-                torrent?.raw?.title ||
-                  torrent?.title ||
-                  torrent?.clientTitle ||
-                  "",
-              ).trim();
-              const title = existingName || fallbackTitle || infoHash;
-              unilog(243, "qbt add disambiguated as duplicate via hash", {
-                addTag,
-                infoHash,
-                title,
-              });
-              res.json({
-                ...tvProcResult,
-                success: false,
-                stage: "qbt",
-                error: `QbitTorrent already has torrent ${title}`,
-                hash: infoHash,
-                qbt: {
-                  name: existingName || undefined,
-                  state: existing?.state || undefined,
-                  progress:
-                    typeof existing?.progress === "number"
-                      ? existing.progress
-                      : undefined,
-                },
-              });
-              return;
-            }
-          } catch {
-            // ignore
-          }
-        }
-
-        res.json({
-          ...tvProcResult,
-          success: false,
-          stage: "qbt-add",
-          error: `qBittorrent add failed: ${addRes.text || "Fails."}`,
-          qbAdd: addRes,
-        });
-        return;
-      }
-
-      // In this mode, always return the tv-proc wrapper unchanged.
-      unilog(244, "qbt add success", { addTag });
-      appendDownloadsResultLog({
-        stage: "qbt-add-success",
-        addTag,
-        qbAdd: addRes,
-      });
-      res.json({
-        ...tvProcResult,
-        success: true,
-        stage: "qbt-add",
-        qbAdd: addRes,
-        qbtTag: addTag,
-      });
-      return;
-    }
-
-    // Force mode: still run tv-proc; skip only the qBittorrent hash pre-check.
+    // Shared pipeline for both modes: fetch → validate → year guardrail →
+    // tv-proc → qbt add. Force mode differences: TV_BLOCKED is skipped
+    // (above), an existing duplicate is deleted and re-added instead of
+    // reported, the finished torrent is handed off to tv-down, and success
+    // responses carry provider/method/downloadUrl/bytes/hash + debug:true.
     const fetched = await download.fetchTorrentFile(torrent);
     if (!fetched || typeof fetched !== "object") {
+      unilog(
+        1171,
+        `API: fetch-torrent failed (unexpected result) for "${torTitle()}"`,
+      );
       res.json({
         ...baseWrapper,
         success: false,
@@ -1937,6 +1519,10 @@ async function handleDownloadRequest(req, res) {
       return;
     }
     if (!fetched.success) {
+      unilog(
+        1172,
+        `API: fetch-torrent failed: ${fetched.error || "fetch failed"} for "${torTitle()}"`,
+      );
       res.json({ ...baseWrapper, ...fetched });
       return;
     }
@@ -1947,52 +1533,71 @@ async function handleDownloadRequest(req, res) {
       ? { success: true }
       : download.validateTorrentBytes(fetched.torrentData);
     if (!valid.success) {
+      unilog(
+        1173,
+        `API: invalid torrent bytes: ${valid.error || "unknown"} for "${torTitle()}"`,
+      );
       res.json({ ...baseWrapper, ...valid });
       return;
     }
 
-    // Same guardrail in force mode.
-    try {
-      const expectedYear =
-        (Number.isFinite(Number(torrent?.raw?.year))
-          ? Number(torrent?.raw?.year)
-          : null) ||
-        extractYearFromString(
-          torrent?.raw?.title || torrent?.title || torrent?.clientTitle,
-        );
+    // Guardrail: if the request implies a specific year, and the torrent's internal name
+    // includes a conflicting year, refuse to upload (prevents "wrong show" mismatches).
+    const yearMismatch = (() => {
+      try {
+        const expectedYear =
+          (Number.isFinite(Number(torrent?.raw?.year))
+            ? Number(torrent?.raw?.year)
+            : null) ||
+          extractYearFromString(
+            torrent?.raw?.title || torrent?.title || torrent?.clientTitle,
+          );
+        if (!expectedYear || expectedYear < 1950 || expectedYear > 2050)
+          return null;
 
-      if (expectedYear && expectedYear >= 1950 && expectedYear <= 2050) {
         const parsed = parseTorrent(fetched.torrentData);
         const parsedName = String(parsed?.name || "").trim();
         const actualYear = extractYearFromString(parsedName);
-        if (actualYear && actualYear !== expectedYear) {
-          const requestedTitle = String(
-            torrent?.raw?.title || torrent?.title || torrent?.clientTitle || "",
-          ).trim();
-          res.json({
-            ...baseWrapper,
-            success: false,
-            stage: "validate-torrent-metadata",
-            error: `Torrent year mismatch (requested ${expectedYear}, torrent says ${actualYear})`,
-            yearError: `${actualYear}|${expectedYear}|${requestedTitle}`,
-            expectedYear,
-            actualYear,
-            torrentName: parsedName || undefined,
-            downloadUrl: fetched?.downloadUrl || undefined,
-            provider: fetched?.provider || undefined,
-            debug: true,
-          });
-          return;
-        }
+        if (!actualYear || actualYear === expectedYear) return null;
+
+        const requestedTitle = String(
+          torrent?.raw?.title || torrent?.title || torrent?.clientTitle || "",
+        ).trim();
+        unilog(
+          1174,
+          `API: year mismatch (requested ${expectedYear}, torrent says ${actualYear}) for "${requestedTitle}"`,
+        );
+        return {
+          ...baseWrapper,
+          success: false,
+          stage: "validate-torrent-metadata",
+          error: `Torrent year mismatch (requested ${expectedYear}, torrent says ${actualYear})`,
+          yearError: `${actualYear}|${expectedYear}|${requestedTitle}`,
+          expectedYear,
+          actualYear,
+          torrentName: parsedName || undefined,
+          downloadUrl: fetched?.downloadUrl || undefined,
+          provider: fetched?.provider || undefined,
+          ...(forceDownload ? { debug: true } : {}),
+        };
+      } catch {
+        // ignore metadata validation failures
+        return null;
       }
-    } catch {
-      // ignore metadata validation failures
+    })();
+    if (yearMismatch) {
+      res.json(yearMismatch);
+      return;
     }
 
     let titles = [];
     try {
       titles = download.extractTorrentFileTitles(fetched.torrentData);
     } catch (e) {
+      unilog(
+        1175,
+        `API: parse-torrent failed: ${e?.message || String(e)} for "${torTitle()}"`,
+      );
       res.json({
         ...baseWrapper,
         success: false,
@@ -2041,6 +1646,15 @@ async function handleDownloadRequest(req, res) {
       : [];
     const errorTitles = tvEntriesErrorTitles(tvProcResult?.tvEntries);
     if (existingTitles.length > 0 || errorTitles.length > 0) {
+      unilog(
+        1176,
+        `API: tv-proc blocked (${existingTitles.length} existing, ${errorTitles.length} errors) for "${torTitle()}"`,
+      );
+      appendDownloadsResultLog({
+        stage: "tv-proc-blocked",
+        existingTitles,
+        errorTitles,
+      });
       res.json(
         errorTitles.length > 0
           ? { ...tvProcResult, errorTitles }
@@ -2051,8 +1665,55 @@ async function handleDownloadRequest(req, res) {
 
     const hint =
       torrent?.raw?.filename || torrent?.raw?.title || "download.torrent";
-    let addRes;
     const addTag = `tapi_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+
+    const infoHashOf = (data) => {
+      try {
+        return String(parseTorrent(data)?.infoHash || "")
+          .trim()
+          .toLowerCase();
+      } catch {
+        return "";
+      }
+    };
+    const infoHash = infoHashOf(fetched.torrentData);
+
+    // Force mode: hand the completed torrent's files to tv-down for pickup.
+    const handoffToTvDown = () => {
+      if (!forceDownload || isMovieDownload) return;
+      void handoffForcedTorrentToTvDown({
+        addTag,
+        infoHash: infoHash || undefined,
+        torrentTitle: torTitle(),
+        torrentFiles: download.extractTorrentFileDetails(fetched.torrentData),
+      });
+    };
+
+    // Success payload differs by mode (kept exactly as the old two paths).
+    const successPayload = (extra = {}) =>
+      forceDownload
+        ? {
+            ...tvProcResult,
+            success: true,
+            provider: fetched.provider,
+            method: fetched.method,
+            downloadUrl: fetched.downloadUrl,
+            qbAdd: addRes,
+            bytes: fetched.bytes,
+            hash: infoHash || undefined,
+            debug: true,
+            ...extra,
+          }
+        : {
+            ...tvProcResult,
+            success: true,
+            stage: "qbt-add",
+            qbAdd: addRes,
+            qbtTag: addTag,
+            ...extra,
+          };
+
+    let addRes;
     try {
       addRes = await addQbtTorrent({
         torrentData: fetched.torrentData,
@@ -2061,7 +1722,13 @@ async function handleDownloadRequest(req, res) {
         ...(dlSavePath ? { savePath: dlSavePath } : {}),
       });
     } catch (e) {
-      unilog(245, "qbt add threw (force)", {
+      unilog(240, "qbt add threw", {
+        addTag,
+        force: forceDownload,
+        error: e?.message || String(e),
+      });
+      appendDownloadsResultLog({
+        stage: "qbt-add-threw",
         addTag,
         error: e?.message || String(e),
       });
@@ -2074,7 +1741,15 @@ async function handleDownloadRequest(req, res) {
       return;
     }
 
-    unilog(246, "qbt add response (force)", {
+    unilog(241, "qbt add response", {
+      addTag,
+      force: forceDownload,
+      ok: addRes.ok,
+      status: addRes.status,
+      text: addRes.text,
+    });
+    appendDownloadsResultLog({
+      stage: "qbt-add-response",
       addTag,
       ok: addRes.ok,
       status: addRes.status,
@@ -2082,120 +1757,78 @@ async function handleDownloadRequest(req, res) {
     });
 
     if (!addRes.ok) {
-      // Same as non-force mode: if the torrent shows up with our unique tag, the add succeeded.
+      // qB sometimes returns "Fails." but still adds the torrent. If we can find a torrent
+      // with the unique tag we used for this request, treat it as success.
       try {
         const tagged = await getQbtInfo({ tag: addTag });
         const list = Array.isArray(tagged) ? tagged : [];
         if (list.length > 0) {
-          unilog(247, "qbt add disambiguated as success via tag (force)", {
+          unilog(242, "qbt add disambiguated as success via tag", {
             addTag,
+            force: forceDownload,
             count: list.length,
           });
-          let infoHash = "";
-          try {
-            const parsed = parseTorrent(fetched.torrentData);
-            infoHash = String(parsed?.infoHash || "")
-              .trim()
-              .toLowerCase();
-          } catch {
-            // ignore
-          }
-          const tagTorTitle = String(
-            torrent?.raw?.title ||
-              torrent?.title ||
-              torrent?.clientTitle ||
-              "unknown",
-          ).trim();
-
-          if (!isMovieDownload) {
-            void handoffForcedTorrentToTvDown({
-              addTag,
-              infoHash: infoHash || undefined,
-              torrentTitle: tagTorTitle,
-              tvdbId: dlTvdbId,
-              showName: dlShowName || tagTorTitle,
-              torrentFiles: download.extractTorrentFileDetails(
-                fetched.torrentData,
-              ),
-            });
-          }
-
-          res.json({
-            ...tvProcResult,
-            success: true,
-            provider: fetched.provider,
-            method: fetched.method,
-            downloadUrl: fetched.downloadUrl,
-            qbAdd: addRes,
-            bytes: fetched.bytes,
-            hash: infoHash || undefined,
-            qbtTag: addTag,
-            debug: true,
-          });
+          handoffToTvDown();
+          res.json(successPayload(forceDownload ? { qbtTag: addTag } : {}));
           return;
         }
       } catch {
         // ignore
       }
 
-      let infoHash = "";
-      try {
-        const parsed = parseTorrent(fetched.torrentData);
-        infoHash = String(parsed?.infoHash || "")
-          .trim()
-          .toLowerCase();
-      } catch {
-        // ignore
-      }
-
+      // qB uses 200 OK with body "Fails." for duplicates and other add failures.
+      // Disambiguate by checking whether the torrent exists after the add attempt.
       if (infoHash) {
         try {
           const qbtInfo = await getQbtInfo({ hash: infoHash });
           const list = Array.isArray(qbtInfo) ? qbtInfo : [];
           if (list.length > 0) {
-            // Force mode: delete existing torrent and re-add
-            try {
-              await delQbtTorrent({ hash: infoHash, deleteFiles: true });
-            } catch {
-              // ignore delete error
+            if (forceDownload) {
+              // Force mode: delete existing torrent and re-add
+              try {
+                await delQbtTorrent({ hash: infoHash, deleteFiles: true });
+              } catch {
+                // ignore delete error
+              }
+              try {
+                await addQbtTorrent({
+                  torrentData: fetched.torrentData,
+                  filename: hint,
+                  tags: addTag,
+                });
+              } catch {
+                // ignore re-add error
+              }
+              handoffToTvDown();
+              // No qbAdd in this response (the original add failed).
+              const payload = successPayload();
+              delete payload.qbAdd;
+              res.json(payload);
+              return;
             }
-            try {
-              await addQbtTorrent({
-                torrentData: fetched.torrentData,
-                filename: hint,
-                tags: addTag,
-              });
-            } catch {
-              // ignore re-add error
-            }
-            const torTitle = String(
-              torrent?.raw?.title ||
-                torrent?.title ||
-                torrent?.clientTitle ||
-                "unknown",
-            ).trim();
 
-            if (!isMovieDownload) {
-              void handoffForcedTorrentToTvDown({
-                addTag,
-                infoHash: infoHash || undefined,
-                torrentTitle: torTitle,
-                tvdbId: dlTvdbId,
-                showName: dlShowName || torTitle,
-                torrentFiles: download.extractTorrentFileDetails(
-                  fetched.torrentData,
-                ),
-              });
-            }
+            const existing = list[0] || {};
+            const existingName = String(existing?.name || "").trim();
+            const title = existingName || torTitle() || infoHash;
+            unilog(243, "qbt add disambiguated as duplicate via hash", {
+              addTag,
+              infoHash,
+              title,
+            });
             res.json({
               ...tvProcResult,
-              success: true,
-              provider: fetched.provider,
-              method: fetched.method,
-              downloadUrl: fetched.downloadUrl,
-              bytes: fetched.bytes,
-              hash: infoHash || undefined,
-              debug: true,
+              success: false,
+              stage: "qbt",
+              error: `QbitTorrent already has torrent ${title}`,
+              hash: infoHash,
+              qbt: {
+                name: existingName || undefined,
+                state: existing?.state || undefined,
+                progress:
+                  typeof existing?.progress === "number"
+                    ? existing.progress
+                    : undefined,
+              },
             });
             return;
           }
@@ -2214,45 +1847,14 @@ async function handleDownloadRequest(req, res) {
       return;
     }
 
-    let infoHash = "";
-    try {
-      const parsed = parseTorrent(fetched.torrentData);
-      infoHash = String(parsed?.infoHash || "")
-        .trim()
-        .toLowerCase();
-    } catch {
-      // ignore
-    }
-
-    const successTorTitle = String(
-      torrent?.raw?.title ||
-        torrent?.title ||
-        torrent?.clientTitle ||
-        "unknown",
-    ).trim();
-
-    if (!isMovieDownload) {
-      void handoffForcedTorrentToTvDown({
-        addTag,
-        infoHash: infoHash || undefined,
-        torrentTitle: successTorTitle,
-        tvdbId: dlTvdbId,
-        showName: dlShowName || successTorTitle,
-        torrentFiles: download.extractTorrentFileDetails(fetched.torrentData),
-      });
-    }
-
-    res.json({
-      ...tvProcResult,
-      success: true,
-      provider: fetched.provider,
-      method: fetched.method,
-      downloadUrl: fetched.downloadUrl,
+    unilog(244, "qbt add success", { addTag, force: forceDownload });
+    appendDownloadsResultLog({
+      stage: "qbt-add-success",
+      addTag,
       qbAdd: addRes,
-      bytes: fetched.bytes,
-      hash: infoHash || undefined,
-      debug: true,
     });
+    handoffToTvDown();
+    res.json(successPayload());
   } catch (error) {
     unilog(248, "Download error:", error);
     res.status(500).json({
@@ -2751,7 +2353,6 @@ const ACTOR_CREDITS_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
 const inFlightRequests = new Map();
 
 app.post("/api/getActorCredits", async (req, res) => {
-  const requestId = Math.random().toString(36).substr(2, 9);
   unilog(260, `/api/getActorCredits received at ${new Date().toISOString()}`);
   let actorName = req.body;
   if (typeof actorName === "object" && actorName !== null && actorName.name) {
@@ -2781,6 +2382,8 @@ app.post("/api/getActorCredits", async (req, res) => {
     const fetchPromise = browserQueue
       .enqueue(() =>
         getActorCredits(actorName, {
+          // Headed reduces IMDb bot detection. Only works because pm2 runs
+          // tv-api under xvfb-run (see the pm2 config on the remote server).
           headless: false,
         }),
       )
@@ -2921,14 +2524,7 @@ app.get("/api/reviews/getImdbReviews", async (req, res) => {
   }
 });
 
-https.createServer(httpsOptions, app).listen(QBT_TEST_PORT, () => {
-  // Always print a startup line, even when TORRENTS_DEBUG disables console.log.
-  // process.stderr.write(`=\n`);
-  // process.stderr.write(
-  //   `========== torrents server started on port ${QBT_TEST_PORT} ==========\n`,
-  // );
-  // process.stderr.write(`=\n`);
-
+https.createServer(httpsOptions, app).listen(API_PORT, () => {
   // Start tvmaze sync only in the api server, not when imported by other apps
   startTvmaze();
 });

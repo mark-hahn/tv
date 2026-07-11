@@ -78,14 +78,20 @@ export const log = (msg, err = false, spacing = false) => {
 
 let busyByPath = {};
 let dataByPath = {};
-let resolvesByPath = {};
+let waitersByPath = {};
 
 const chkWriteFile = async () => {
-  let anyWritten = false;
   for (let path in dataByPath) {
     if (busyByPath[path]) continue;
     busyByPath[path] = true;
-    let data = dataByPath[path];
+    // Snapshot the pending value and its waiters before writing. A newer
+    // value queued during the write stays in dataByPath (with its own
+    // waiters) and is written by the re-scan below — it must never be
+    // dropped by this write's cleanup.
+    const pending = dataByPath[path];
+    const waiters = waitersByPath[path] || [];
+    waitersByPath[path] = [];
+    let data = pending;
     if (typeof data != "string") data = JSON.stringify(data);
     // Atomic write: write to a temp file in the same directory, then rename.
     // fs.rename() on Linux is a single syscall — if the process is killed
@@ -94,28 +100,31 @@ const chkWriteFile = async () => {
     try {
       await fsp.writeFile(tmpPath, data);
       await fsp.rename(tmpPath, path);
-      resolvesByPath[path].forEach((resolve) => resolve());
-      resolvesByPath[path] = [];
-      delete dataByPath[path];
-      anyWritten = true;
+      if (dataByPath[path] === pending) delete dataByPath[path];
+      waiters.forEach((w) => w.resolve());
     } catch (e) {
       unilog(131, `writeFile failed for ${path}: ${e.message}`);
       fsp.unlink(tmpPath).catch(() => {});
-      resolvesByPath[path].forEach((resolve) => resolve());
-      resolvesByPath[path] = [];
-      delete dataByPath[path];
+      if (dataByPath[path] === pending) delete dataByPath[path];
+      // Die fast: a failed write must not look like a success to callers.
+      waiters.forEach((w) => w.reject(e));
     } finally {
       busyByPath[path] = false;
     }
   }
-  if (anyWritten) await chkWriteFile();
+  // Re-scan for values queued while a write was in flight. Only recurse when
+  // there is a non-busy entry this pass can process (a busy entry belongs to
+  // another in-flight pass, which will do its own re-scan).
+  if (Object.keys(dataByPath).some((p) => !busyByPath[p])) {
+    await chkWriteFile();
+  }
 };
 
 export const writeFile = (path, data) => {
   dataByPath[path] = data;
-  if (!resolvesByPath[path]) resolvesByPath[path] = [];
-  const promise = new Promise((resolve) => {
-    resolvesByPath[path].push(resolve);
+  if (!waitersByPath[path]) waitersByPath[path] = [];
+  const promise = new Promise((resolve, reject) => {
+    waitersByPath[path].push({ resolve, reject });
   });
   chkWriteFile();
   return promise;

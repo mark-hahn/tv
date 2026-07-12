@@ -574,6 +574,20 @@
       >
         Apply
       </div>
+      <!-- Waiting for first cue (chksrt mode only) -->
+      <div
+        v-if="waitingForFirstCue"
+        style="
+          color: red;
+          font-size: 13px;
+          margin-right: 8px;
+          white-space: nowrap;
+          user-select: none;
+          text-shadow: 0 0 3px #000;
+        "
+      >
+        Waiting for first title
+      </div>
       <!-- Chksrt OK / Bad buttons -->
       <div
         v-if="mode === 'chksrt'"
@@ -816,6 +830,7 @@
         label="subtitles"
         :src="activeTrackUrl"
         default
+        @load="onSubTrackLoad"
       />
     </video>
   </div>
@@ -886,6 +901,7 @@ export default {
       audioTracks: [],
       activeAudioIndex: null,
       subtitleTracks: [],
+      firstCueSec: null,
       activeTrackId: null,
       subtitleOffset: 0,
       vidSrc: "",
@@ -984,6 +1000,13 @@ export default {
       if (this.subtitleTracks.length === 0) return [];
       return [...this.subtitleTracks, { id: "off", label: "off" }];
     },
+    waitingForFirstCue() {
+      return (
+        this.mode === "chksrt" &&
+        this.firstCueSec !== null &&
+        this.currentTimeSec < this.firstCueSec
+      );
+    },
     subtitleLabelMap() {
       const map = new Map();
       let n = 1;
@@ -1078,6 +1101,7 @@ export default {
       this.activeAudioIndex = null;
       this.subtitleTracks = [];
       this.activeTrackId = null;
+      this.firstCueSec = null;
       this.chksrtMatch = null;
       this.errorRetries = 0;
       this.pendingSourceResumeTime = null;
@@ -1093,6 +1117,7 @@ export default {
       this.waitingForVideoTarget = null;
     },
     activeTrackUrl(newVal) {
+      this.firstCueSec = null;
       if (newVal) {
         this.$nextTick(() => {
           const vid = this.$refs.vid;
@@ -1177,6 +1202,10 @@ export default {
         this.activeTrack?.type === "pgs" ? this.activeTrack.index : null,
         nextAudioIndex,
       );
+    },
+    onSubTrackLoad(e) {
+      const cues = e.target.track?.cues;
+      this.firstCueSec = cues && cues.length > 0 ? cues[0].startTime : null;
     },
     selectTrack(id) {
       const prevTrack = this.activeTrack;

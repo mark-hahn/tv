@@ -8,9 +8,10 @@ import fs from "fs";
 import * as cp from "child_process";
 import * as path from "node:path";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
-import { unilog } from "@tv/share";
+import { unilog, logHere } from "@tv/share";
 import { setGlobalMessage } from "../messaging.js";
 import { resStripAlt } from "../videoFiles.js";
+import { mpfourValid } from "../mpfour.js";
 
 const tvDir = "/mnt/media/tv";
 
@@ -77,6 +78,30 @@ export function registerMediaRoutes(app) {
     if (!fs.existsSync(resolved)) {
       res.status(404).json({ error: "file not found" });
       return;
+    }
+
+    // mpfour fast path: a pre-encoded seekable mirror exists — redirect to
+    // nginx for Range-request seeking. Only for the plain stream (PGS burn-in,
+    // alternate audio, and mid-stream MSE recovery still need ffmpeg on the
+    // original).
+    if (
+      req.query.sub === undefined &&
+      req.query.audio === undefined &&
+      !(parseInt(req.query.start) > 0)
+    ) {
+      const mirror = await mpfourValid(resolved);
+      if (mirror) {
+        const url =
+          "https://hahnca.com" +
+          mirror
+            .replace("/mnt/media", "")
+            .split("/")
+            .map((seg) => encodeURIComponent(seg))
+            .join("/");
+        unilog(1411, `redirect to mpfour: ${url}`);
+        res.redirect(302, url);
+        return;
+      }
     }
 
     try {

@@ -85,6 +85,7 @@ import {
 import { BATCH_SCHED, ffmpegQueue } from "./src/batchQueue.js";
 import * as bifQueue from "./src/bifQueue.js";
 import * as subsQueue from "./src/subsQueue.js";
+import * as mpfour from "./src/mpfour.js";
 import * as intro from "./src/intro.js";
 import * as flexget from "./src/flexget.js";
 import * as disk from "./src/disk.js";
@@ -2513,6 +2514,8 @@ https.createServer(httpsOptions, app).listen(HTTP_PORT, () => {
   startAsrQueueLoop();
   // .bif generation: clear any stale lock, restore queue, resume work.
   bifQueue.resumeOnStartup();
+  // seekable-mp4 mirrors for the chksrt queue (own loop, not ffmpegQueue)
+  mpfour.start();
 });
 
 app.post("/internal/tv-state", (req, res) => {

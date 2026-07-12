@@ -178,10 +178,14 @@ const cropName = (name) => {
 };
 
 // Total batch jobs pending across all three queues combined.
-// Format a batch hdrMsg label: code + (N) when queue > 1 + show name.
-function batchLabel(code, showName, n) {
+// Format a batch hdrMsg label: code + (N) when queue > 1 + show name. The label
+// names only the head job, so "++" is appended when the queue spans more than
+// one show — otherwise the count reads as if it were all for that one show.
+function batchLabel(code, showName, n, queueShowNames) {
   const prefix = n > 1 ? `${code}(${n})` : code;
-  return `${prefix}: ${cropName(showName)}`;
+  const shows = new Set((queueShowNames || []).filter(Boolean));
+  const more = shows.size > 1 ? "++" : "";
+  return `${prefix}: ${cropName(showName)}${more}`;
 }
 
 // Refresh all four batch hdrMsg entries from live queue state.
@@ -197,6 +201,7 @@ function syncBatchMsgs() {
         "E",
         `${cropName(e.showName)} ${se}`,
         reencodeQueue.length,
+        reencodeQueue.map((r) => r.showName),
       ),
       position: 2003,
     });
@@ -206,12 +211,18 @@ function syncBatchMsgs() {
   // EmbSub (>)
   const embCount = subsState.subQueue.length + (subsState.subQueueBusy ? 1 : 0);
   if (embCount > 0) {
+    const embNames = [
+      ...(subsState.subQueueBusy
+        ? [showNameFromFilePath(subsState.currentlyProcessingSubPath || "")]
+        : []),
+      ...subsState.subQueue.map((e) => showNameFromFilePath(e.videoFilePath)),
+    ];
     const name = subsState.subQueueBusy
       ? showNameFromFilePath(subsState.currentlyProcessingSubPath || "")
       : showNameFromFilePath(subsState.subQueue[0]?.videoFilePath || "");
     setGlobalMessage({
       id: "EmbSub",
-      text: batchLabel(">", name, embCount),
+      text: batchLabel(">", name, embCount, embNames),
       position: 2004,
     });
   } else {
@@ -223,7 +234,7 @@ function syncBatchMsgs() {
     const name = bifQueue.getBifHeadName();
     setGlobalMessage({
       id: "Bif",
-      text: batchLabel("B", name, bifCount),
+      text: batchLabel("B", name, bifCount, bifQueue.getBifShowNames()),
       position: 2002,
     });
   } else {
@@ -234,7 +245,12 @@ function syncBatchMsgs() {
     const name = showNameFromFilePath(subsState.asrQueue[0]?.videoPath || "");
     setGlobalMessage({
       id: "Asr",
-      text: batchLabel("+", name, subsState.asrQueue.length),
+      text: batchLabel(
+        "+",
+        name,
+        subsState.asrQueue.length,
+        subsState.asrQueue.map((e) => showNameFromFilePath(e.videoPath)),
+      ),
       position: 2005,
     });
   } else {
@@ -354,7 +370,6 @@ function stripGapTransientFields(gap) {
 
   return changed;
 }
-
 
 // Emby DeviceNames reported by the Emby app on each TV
 const TV_DEVICE_NAMES = ["Living Room TV", "Mark's Fire TV"];
@@ -576,7 +591,10 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
           tvdbRecord.lastPlayedDate = latestPlayed.lastPlayedDate;
         }
       } catch (e) {
-        unilog(1362, `lastPlayedDate fetch failed for ${showName}: ${e.message}`);
+        unilog(
+          1362,
+          `lastPlayedDate fetch failed for ${showName}: ${e.message}`,
+        );
       }
     }
     // Fix compact-NNN episode mis-indexing (e.g. "101-Title.avi" parsed as E101)
@@ -2006,7 +2024,10 @@ app.post("/api/asr/chksrt/ok", (req, res) => {
       try {
         fs.writeFileSync(path.join(dir, basename + ".mb.chosen"), "", "utf8");
       } catch (e) {
-        unilog(1368, `chosen marker write failed for ${basename}: ${e.message}`);
+        unilog(
+          1368,
+          `chosen marker write failed for ${basename}: ${e.message}`,
+        );
       }
     }
   }

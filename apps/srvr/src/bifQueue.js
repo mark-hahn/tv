@@ -35,6 +35,10 @@ export function getBifCount() {
 export function getBifHeadName() {
   return currentBifShowName || bifNeededQueue[0]?.showName || "";
 }
+// Every show represented in the queue — the label appends "++" when >1.
+export function getBifShowNames() {
+  return [currentBifShowName, ...bifNeededQueue.map((e) => e.showName)];
+}
 
 export function loadBifNeededQueue() {
   try {

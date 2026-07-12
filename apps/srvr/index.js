@@ -284,13 +284,17 @@ function parseSeasonEpisodeFromFilename(fileName, folderName) {
   let parsedPttFolder = null;
   try {
     parsedPtt = parseTorrentTitle(base.replace(/\.[a-z0-9]{2,4}$/i, ""));
-  } catch {}
+  } catch (e) {
+    unilog(1360, `title parse threw for ${base}: ${e.message}`);
+  }
   try {
     if (folderName)
       parsedPttFolder = parseTorrentTitle(
         String(folderName).replace(/\.[a-z0-9]{2,4}$/i, ""),
       );
-  } catch {}
+  } catch (e) {
+    unilog(1361, `title parse threw for folder ${folderName}: ${e.message}`);
+  }
 
   const result = parseFileSeasonEpisode(
     base,
@@ -571,7 +575,9 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
           );
           tvdbRecord.lastPlayedDate = latestPlayed.lastPlayedDate;
         }
-      } catch (e) {}
+      } catch (e) {
+        unilog(1362, `lastPlayedDate fetch failed for ${showName}: ${e.message}`);
+      }
     }
     // Fix compact-NNN episode mis-indexing (e.g. "101-Title.avi" parsed as E101)
     if (tvdbRecord.inEmby && tvdbRecord.id) {
@@ -1198,7 +1204,8 @@ app.get("/api/getGroupCounts", apiWrapper(groupCounts.getGroupCounts));
 app.get("/api/getBadGroups", (_req, res) => {
   try {
     res.json(syncBadGroupsFromDisk());
-  } catch {
+  } catch (e) {
+    unilog(1363, `getBadGroups failed: ${e.message}`);
     res.json([]);
   }
 });
@@ -1641,7 +1648,9 @@ app.get("/api/flexget-run-stream", async (req, res) => {
       let out = line.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} /, "");
       if (/^(VERBOSE|WARNING)  /.test(out)) out = out.slice(39);
       res.write(`data: ${out}\n\n`);
-    } catch {}
+    } catch (e) {
+      unilog(1364, `flexget SSE write failed: ${e.message}`);
+    }
   };
 
   const started = await flexget.runFlexgetStream(sendLine);
@@ -1651,7 +1660,9 @@ app.get("/api/flexget-run-stream", async (req, res) => {
   if (!clientGone) {
     try {
       res.end();
-    } catch {}
+    } catch (e) {
+      unilog(1365, `flexget SSE end failed: ${e.message}`);
+    }
   }
 });
 
@@ -1898,7 +1909,10 @@ app.post("/api/asr/subs/enqueue", (req, res) => {
     const chosenPath = vp.replace(/\.[^.]+$/, "") + ".mb.chosen";
     try {
       fs.unlinkSync(chosenPath);
-    } catch {}
+    } catch (e) {
+      if (e.code !== "ENOENT")
+        unilog(1366, `chosen marker delete failed: ${e.message}`);
+    }
     enqueueSubQueue(
       { videoFilePath: vp, fromUI: !!fromUI, lowPriority: false },
       true,
@@ -1985,11 +1999,15 @@ app.post("/api/asr/chksrt/ok", (req, res) => {
       hasSrt = fs
         .readdirSync(dir)
         .some((f) => f.startsWith(basename) && f.endsWith(".srt"));
-    } catch {}
+    } catch (e) {
+      unilog(1367, `srt scan failed for ${dir}: ${e.message}`);
+    }
     if (!hasSrt) {
       try {
         fs.writeFileSync(path.join(dir, basename + ".mb.chosen"), "", "utf8");
-      } catch {}
+      } catch (e) {
+        unilog(1368, `chosen marker write failed for ${basename}: ${e.message}`);
+      }
     }
   }
   subsState.subQueueChkSrt.shift();
@@ -2067,13 +2085,17 @@ app.post("/api/asr/chksrt/select", (req, res) => {
     if (f.startsWith(basename + ".")) {
       try {
         fs.unlinkSync(full);
-      } catch {}
+      } catch (e) {
+        unilog(1369, `srt delete failed for ${f}: ${e.message}`);
+      }
     }
   }
   if (!selectedSrtPath) {
     try {
       fs.writeFileSync(path.join(dir, basename + ".mb.chosen"), "", "utf8");
-    } catch {}
+    } catch (e) {
+      unilog(1370, `chosen marker write failed for ${basename}: ${e.message}`);
+    }
   }
   const idx = subsState.subQueueChkSrt.findIndex(
     (e) => e.videoFilePath === videoPath,
@@ -2643,7 +2665,9 @@ app.post("/internal/nowPlaying", (req, res) => {
     lastAutoSkipKey = null;
   }
 
-  checkMissingEpisodes(lastNowPlayingList).catch(() => {});
+  checkMissingEpisodes(lastNowPlayingList).catch((e) => {
+    unilog(1371, `checkMissingEpisodes failed: ${e.message}`);
+  });
   for (const stoppedShowName of stoppedShowNames) {
     refreshPlayedDatesForShow(stoppedShowName).catch((err) => {
       unilog(
@@ -2797,7 +2821,9 @@ wss.on("connection", (ws) => {
   if (loid.isLoidNeeded()) {
     try {
       ws.send(JSON.stringify({ id: 0, notification: "loidNeeded", data: {} }));
-    } catch (_) {}
+    } catch (e) {
+      unilog(1372, `ws send loidNeeded failed: ${e.message}`);
+    }
   }
 
   // GLOBAL-MSG: replay all currently-active server messages to the new client.
@@ -2810,7 +2836,9 @@ wss.on("connection", (ws) => {
           data: msgObj,
         }),
       );
-    } catch (_) {}
+    } catch (e) {
+      unilog(1373, `ws send setGlobalMessage failed: ${e.message}`);
+    }
   }
 
   ws.on("message", (data) => {
@@ -2835,18 +2863,24 @@ wss.on("connection", (ws) => {
             ws.send(
               JSON.stringify({ id, status: "ok", data: { killed: true } }),
             );
-          } catch (_) {}
+          } catch (e) {
+            unilog(1374, `ws send asr reply failed: ${e.message}`);
+          }
         } else {
           try {
             ws.send(
               JSON.stringify({ id, status: "ok", data: { killed: false } }),
             );
-          } catch (_) {}
+          } catch (e) {
+            unilog(1375, `ws send asr reply failed: ${e.message}`);
+          }
         }
       } else {
         try {
           ws.send(JSON.stringify({ id, status: "ok", data: null }));
-        } catch (_) {}
+        } catch (e) {
+          unilog(1376, `ws send asr ack failed: ${e.message}`);
+        }
       }
     } else if (fname == "handleFix") {
       handleFix(ws, id, param);
@@ -2863,7 +2897,9 @@ wss.on("connection", (ws) => {
       for (const client of otherClients) {
         try {
           client.send(outMsg);
-        } catch (_) {}
+        } catch (e) {
+          unilog(1377, `ws broadcast tvRemoteAction failed: ${e.message}`);
+        }
       }
     } else if (fname === "skipIntro") {
       const pressedAt = param?.pressedAt;
@@ -2908,7 +2944,9 @@ wss.on("connection", (ws) => {
         if (client !== ws && client.readyState === 1) {
           try {
             client.send(outMsg);
-          } catch (_) {}
+          } catch (e) {
+            unilog(1378, `ws broadcast tvRemoteUnlock failed: ${e.message}`);
+          }
         }
       }
     } else {
@@ -3074,7 +3112,9 @@ async function runEmbyFullSweep(caller = "unknown") {
       delete allTvdb[key];
       try {
         await tvdb.setTvdbFields({ name: key, $delTvdb: true });
-      } catch (e) {}
+      } catch (e) {
+        unilog(1379, `tvdb delete failed for ${key}: ${e.message}`);
+      }
     }
 
     // Step 2: Sync Emby shows into tvdb
@@ -3505,7 +3545,8 @@ const embyRefreshManager = (() => {
         );
       });
       return task?.Id || null;
-    } catch {
+    } catch (e) {
+      unilog(1380, `emby scheduled tasks fetch failed: ${e.message}`);
       return null;
     }
   }
@@ -3916,7 +3957,8 @@ function res1080CopySubtitles(seasonDir, src2160Name, dst1080Name) {
   let files;
   try {
     files = fs.readdirSync(seasonDir);
-  } catch {
+  } catch (e) {
+    unilog(1381, `sub copy scan failed for ${seasonDir}: ${e.message}`);
     files = [];
   }
   for (const name of files) {
@@ -3945,7 +3987,10 @@ function loadReencodeQueue() {
   try {
     reencodeQueue = JSON.parse(fs.readFileSync(REENCODE_QUEUE_PATH, "utf8"));
     if (!Array.isArray(reencodeQueue)) reencodeQueue = [];
-  } catch {
+  } catch (e) {
+    // Missing file is normal on first run; anything else is data loss.
+    if (e.code !== "ENOENT")
+      unilog(1382, `reencode queue load failed: ${e.message}`);
     reencodeQueue = [];
   }
 }
@@ -4090,13 +4135,19 @@ async function reencodeOneTo1080(entry) {
           ff2.on("error", (err) => {
             try {
               fs.unlinkSync(vidTmpPath);
-            } catch {}
+            } catch (e) {
+              if (e.code !== "ENOENT")
+                unilog(1383, `temp cleanup failed: ${e.message}`);
+            }
             reject(err);
           });
           ff2.on("close", (code2) => {
             try {
               fs.unlinkSync(vidTmpPath);
-            } catch {}
+            } catch (e) {
+              if (e.code !== "ENOENT")
+                unilog(1384, `temp cleanup failed: ${e.message}`);
+            }
             if (code2 === 0) resolve();
             else reject(new Error(`ffmpeg step2 exit ${code2}`));
           });
@@ -4127,11 +4178,15 @@ async function processReencodeQueue() {
     );
     try {
       if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-    } catch {}
+    } catch (e) {
+      unilog(1385, `stale temp cleanup failed for ${tmpPath}: ${e.message}`);
+    }
     const vidTmpPath = tmpPath.replace(/\.mkv$/i, ".mp4");
     try {
       if (fs.existsSync(vidTmpPath)) fs.unlinkSync(vidTmpPath);
-    } catch {}
+    } catch (e) {
+      unilog(1386, `stale temp cleanup failed for ${vidTmpPath}: ${e.message}`);
+    }
   } finally {
     if (reencodeQueue[0]?.srcPath === entry.srcPath) {
       reencodeQueue.shift();

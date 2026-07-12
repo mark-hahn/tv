@@ -106,6 +106,7 @@ const SRVR_INTERNAL_URL = "http://127.0.0.1:8739";
 const GOOGLE_HOME_DELAY_MS = 0; // ms after TV turns on before sending Home key
 const GOOGLE_EMBY_DELAY_MS = 250; // ms after TV turns on before launching Emby
 const VIEW_SHOW_DELAY_MS = 10000; // ms after Emby app launch before firing embyViewShow (fallback)
+const PENDING_VIEW_SHOW_MAX_AGE_MS = 120000; // ms before an unsent pending viewshow is dropped
 const FIRE_HOME_DELAY_MS = 0; // ms after Fire TV turns on before sending home key
 const FIRE_EMBY_DELAY_MS = 5000; // ms after Fire TV turns on before launching Emby
 
@@ -612,14 +613,21 @@ app.get("/tv/googlebtn", (req, res) => {
   res.json({ ok: true });
 });
 
+// Sends the show to Emby's live session on the TV. Returns true when Emby
+// accepted it; the pending show is only cleared on success so a later trigger
+// (emby-ready session broadcast, or the fallback timer) can try again.
 async function firePendingViewShow(label) {
-  if (!pendingViewShow) return;
+  if (!pendingViewShow) return false;
   if (viewShowEmbyTimer) {
     clearTimeout(viewShowEmbyTimer);
     viewShowEmbyTimer = null;
   }
-  const { showId, showName, episodeId } = pendingViewShow;
-  pendingViewShow = null;
+  const { showId, showName, episodeId, at } = pendingViewShow;
+  if (Date.now() - at > PENDING_VIEW_SHOW_MAX_AGE_MS) {
+    pendingViewShow = null;
+    unilog(1390, `${label}: pending viewshow ${showId} too old, dropped`);
+    return false;
+  }
   unilog(398, `${label}: firing viewshow showId=${showId}`);
   try {
     const resp = await fetch(`${SRVR_INTERNAL_URL}/api/embyViewShow`, {
@@ -629,42 +637,48 @@ async function firePendingViewShow(label) {
     });
     const result = await resp.json();
     unilog(399, `${label}: viewshow result=${JSON.stringify(result)}`);
+    if (!result.found) return false;
+    pendingViewShow = null;
+    return true;
   } catch (e) {
     unilog(400, `${label}: viewshow failed: ${e.message}`);
+    return false;
   }
 }
 
-app.get("/tv/viewshow", (req, res) => {
+app.get("/tv/viewshow", async (req, res) => {
   const { showId, showName } = req.query;
   unilog(
     401,
     `viewshow from ${client(req)} showId=${showId} showName=${showName} braviaHaPower=${braviaHaPower}`,
   );
-  pendingViewShow = { showId, showName };
+  pendingViewShow = { showId, showName, at: Date.now() };
   callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
-  if (braviaHaPower === "on") {
-    callService("remote", "send_command", REMOTE_ENTITY_ID, {
-      command: "Home",
-    });
-    setTimeout(() => {
-      callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
-        media_content_type: "app",
-        media_content_id:
-          EMBY_APP_URI,
-      });
-    }, GOOGLE_EMBY_DELAY_MS);
-    setTimeout(
-      () => firePendingViewShow("viewshow(on)"),
-      GOOGLE_EMBY_DELAY_MS + VIEW_SHOW_DELAY_MS,
-    );
-  } else {
+  res.json({ ok: true });
+
+  if (braviaHaPower !== "on") {
     pendingGoogleHome = true;
     unilog(
       402,
       `viewshow: TV not on (${braviaHaPower}), set pendingGoogleHome=true`,
     );
+    return;
   }
-  res.json({ ok: true });
+  // Emby is normally already the foreground app, so send the show straight to
+  // its live session — no Home key and no app relaunch, so nothing flashes.
+  if (await firePendingViewShow("viewshow(on)")) return;
+
+  // Emby has no live session, so it isn't running — launch it and try again
+  // once it is up.
+  unilog(1391, `no live Emby session, launching Emby app`);
+  callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
+    media_content_type: "app",
+    media_content_id: EMBY_APP_URI,
+  });
+  setTimeout(
+    () => firePendingViewShow("viewshow(launched)"),
+    VIEW_SHOW_DELAY_MS,
+  );
 });
 
 // Toggle the playing/selected episode between its 2160 and 1080 versions, then
@@ -739,6 +753,7 @@ async function runToggleResSequence(toggleArg, knownEpisodeId) {
       showId: result.showId,
       showName: result.showName,
       episodeId: result.episodeId || knownEpisodeId || null,
+      at: Date.now(),
     };
     callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
       media_content_type: "app",

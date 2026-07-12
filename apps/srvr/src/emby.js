@@ -1,7 +1,7 @@
 import * as urls from "./urls.js";
 import fetch from "node-fetch";
 import * as epd from "@tv/share";
-import { unilog } from "@tv/share";
+import { unilog, logHere } from "@tv/share";
 
 const deviceNameByDeviceId = {
   "ca632bcd-7279-4fc2-b5b8-6f92ae6ddb08": "mlap2",
@@ -79,16 +79,19 @@ export const viewShowOnLivingRoomTv = async ({
   let resp = await fetch(url);
   if (resp.status !== 200) return { found: false };
   const sessions = await resp.json();
-  // The Emby app registers two "Living Room TV" sessions; commands sent to the
-  // one without SupportsRemoteControl are silently ignored — prefer the live one.
-  const session =
-    sessions.find(
-      (s) => s.DeviceName === "Living Room TV" && s.SupportsRemoteControl,
-    ) ?? sessions.find((s) => s.DeviceName === "Living Room TV");
-  if (!session) return { found: false };
-  const viewUrl = urls.viewingUrl(session.Id, showId, showName, episodeId);
-  await fetch(viewUrl, { method: "POST" });
-  return { found: true };
+  // The Emby app registers more than one "Living Room TV" session (same
+  // DeviceId, different Client names) and they all claim SupportsRemoteControl,
+  // but only one is live — the dead ones answer the Viewing POST with a 500
+  // "NotFound". So try each in turn and keep the first that actually accepts it.
+  const candidates = sessions.filter((s) => s.DeviceName === "Living Room TV");
+  if (candidates.length === 0) return { found: false };
+  for (const session of candidates) {
+    const viewUrl = urls.viewingUrl(session.Id, showId, showName, episodeId);
+    const viewResp = await fetch(viewUrl, { method: "POST" });
+    if (viewResp.ok) return { found: true, client: session.Client };
+    unilog(1388, `Viewing rejected by ${session.Client} session ${session.Id}: ${viewResp.status}`);
+  }
+  return { found: false };
 };
 
 // Fetch series map from Emby server

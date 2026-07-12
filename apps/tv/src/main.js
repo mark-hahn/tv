@@ -97,6 +97,10 @@ const EMBY_BASE_URL = "http://127.0.0.1:8096/emby";
 // Emby app launch id on the Bravia Google-TV (Sony appControl uri for com.mb.android)
 const EMBY_APP_URI =
   "com.sony.dtv.com.mb.android.com.mb.android.MainActivity";
+// Emby app launch activity on the Fire TV (adb am start -n)
+const EMBY_FIRE_ACTIVITY = "com.mb.android/.MainActivity";
+// Emby DeviceNames reported by the Emby app on each TV
+const TV_DEVICE_NAMES = ["Living Room TV", "Mark's Fire TV"];
 const SRVR_INTERNAL_URL = "http://127.0.0.1:8739";
 
 const GOOGLE_HOME_DELAY_MS = 0; // ms after TV turns on before sending Home key
@@ -500,7 +504,7 @@ function handleMsg(raw) {
           setTimeout(
             () =>
               adbExec(
-                "shell am start -n tv.emby.embyatv/.startup.StartupActivity",
+                `shell am start -n ${EMBY_FIRE_ACTIVITY}`,
                 "emby launch",
               ),
             FIRE_EMBY_DELAY_MS,
@@ -675,10 +679,10 @@ app.post("/tv/toggleres", async (req, res) => {
     if (body.relPath) {
       toggleArg.relPath = body.relPath;
     } else {
-      const session = await getEmbyPlaybackSession("Living Room TV");
+      const session = await getEmbyPlaybackSession();
       const item = session?.NowPlayingItem;
       if (!item) {
-        unilog(1115, `nothing playing on Living Room TV`);
+        unilog(1115, `nothing playing on either TV`);
         return res.json({ ok: false, error: "nothing playing" });
       }
       knownEpisodeId = item.Id;
@@ -707,7 +711,7 @@ async function runToggleResSequence(toggleArg, knownEpisodeId) {
     // Stop clears that state. (The web res-button path is used from a stopped
     // state, so there is usually nothing to stop.)
     try {
-      const live = await getEmbyPlaybackSession("Living Room TV");
+      const live = await getEmbyPlaybackSession();
       if (live?.Id) {
         await fetch(
           `${EMBY_BASE_URL}/Sessions/${live.ControlSessionId}/Playing/Stop?api_key=${EMBY_API_KEY}`,
@@ -1064,7 +1068,7 @@ app.get("/tv/firebtn", (req, res) => {
     setTimeout(
       () =>
         adbExec(
-          "shell am start -n tv.emby.embyatv/.startup.StartupActivity",
+          `shell am start -n ${EMBY_FIRE_ACTIVITY}`,
           "emby launch",
         ),
       FIRE_EMBY_DELAY_MS,
@@ -1091,7 +1095,7 @@ app.get("/tv/mode/:mode", (req, res) => {
     setTimeout(
       () =>
         adbExec(
-          "shell am start -n tv.emby.embyatv/.startup.StartupActivity",
+          `shell am start -n ${EMBY_FIRE_ACTIVITY}`,
           "emby launch",
         ),
       5000,
@@ -1128,7 +1132,7 @@ app.get("/tv/mode/:mode", (req, res) => {
 app.get("/tv/emby", (req, res) => {
   if (tvMode === "fire") {
     adbExec(
-      "shell am start -n tv.emby.embyatv/.startup.StartupActivity",
+      `shell am start -n ${EMBY_FIRE_ACTIVITY}`,
       "emby",
     );
   } else if (tvMode === "google") {
@@ -1629,7 +1633,7 @@ app.get("/tv/emby/position", async (req, res) => {
   }
 });
 
-async function getEmbyPlaybackSession(deviceName = "Living Room TV") {
+async function getEmbyPlaybackSession(deviceName = null) {
   const sessRes = await fetch(
     `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
     {
@@ -1643,19 +1647,26 @@ async function getEmbyPlaybackSession(deviceName = "Living Room TV") {
   }
   const sessions = await sessRes.json();
   const matches = sessions.filter(
-    (s) => s.NowPlayingItem && s.DeviceName === deviceName,
+    (s) =>
+      s.NowPlayingItem &&
+      (deviceName
+        ? s.DeviceName === deviceName
+        : TV_DEVICE_NAMES.includes(s.DeviceName)),
   );
   const session = matches.find((s) => s.SupportsRemoteControl) ?? matches[0];
   if (!session) return null;
   // Commands (seek/pause/stop) must go to the device's remote-controllable
-  // session. The Emby Android app reports playback on one session
-  // (SupportsRemoteControl false, silently ignores commands) and receives
-  // commands on a second session with the same DeviceId.
-  session.ControlSessionId = session.SupportsRemoteControl
-    ? session.Id
-    : (sessions.find(
-        (s) => s.DeviceId === session.DeviceId && s.SupportsRemoteControl,
-      )?.Id ?? session.Id);
+  // session. The Emby app reports playback on one session but only accepts
+  // commands on a companion session with the same DeviceId, so always prefer a
+  // same-DeviceId sibling; fall back to the playback session for single-session
+  // devices.
+  const sibling = sessions.find(
+    (s) =>
+      s.Id !== session.Id &&
+      s.DeviceId === session.DeviceId &&
+      s.SupportsRemoteControl,
+  );
+  session.ControlSessionId = sibling?.Id ?? session.Id;
   return session;
 }
 

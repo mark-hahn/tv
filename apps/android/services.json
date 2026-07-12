@@ -268,7 +268,7 @@
     },
     {
       "name": "Emby",
-      "uri": "tv.emby.embyatv/.startup.StartupActivity",
+      "uri": "com.mb.android/.MainActivity",
       "color": "52B54B",
       "logo": "emby.png"
     },

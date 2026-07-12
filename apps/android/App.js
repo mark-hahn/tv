@@ -28,6 +28,8 @@ const TV_SRVR_HTTP_URL = "https://hahnca.com/tv-srvr";
 const SCRUB_HOLD_DELAY_MS = 400;
 const SCRUB_PING_INTERVAL_MS = 500;
 const VOL_STEP = 1;
+const PIC_VAL_MAX_CHARS = 20;
+const PIC_VAL_EDGE_CHARS = 8;
 
 function buildSeriesMap(seriesMapIn) {
   if (!seriesMapIn || seriesMapIn.length === 0) return null;
@@ -826,6 +828,13 @@ export default function App() {
         });
       }
     } catch (_) {}
+  };
+
+  // long option names push the arrow buttons off the edge of the screen
+  const picValText = (v) => {
+    const s = String(v);
+    if (s.length <= PIC_VAL_MAX_CHARS) return s;
+    return `${s.slice(0, PIC_VAL_EDGE_CHARS)}...${s.slice(-PIC_VAL_EDGE_CHARS)}`;
   };
 
   const picNextValue = (setting, dir) => {
@@ -2491,7 +2500,9 @@ export default function App() {
                   returnKeyType="done"
                 />
               ) : (
-                <Text style={picCtrlStyles.value}>{s.value}</Text>
+                <Text style={picCtrlStyles.value} numberOfLines={1}>
+                  {picValText(s.value)}
+                </Text>
               )}
               <TouchableOpacity
                 onPress={() => picAdjust(s, 1)}

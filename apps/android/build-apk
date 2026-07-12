@@ -37,7 +37,7 @@ do_install() {
   return 0
 }
 
-CHECKSUM=$(md5sum "$SCRIPT_DIR/App.js" "$SCRIPT_DIR/app.json" "$SCRIPT_DIR/package.json" "$SCRIPT_DIR/babel.config.js" "$SCRIPT_DIR/eas.json" "$SCRIPT_DIR/index.js" | md5sum | cut -d' ' -f1)
+CHECKSUM=$(md5sum "$SCRIPT_DIR/App.js" "$SCRIPT_DIR/app.json" "$SCRIPT_DIR/package.json" "$SCRIPT_DIR/babel.config.js" "$SCRIPT_DIR/eas.json" "$SCRIPT_DIR/index.js" "$SCRIPT_DIR/services.json" | md5sum | cut -d' ' -f1)
 CACHED_CHECKSUM=$(cut -d' ' -f1 "$CACHE_FILE" 2>/dev/null || echo "")
 CACHED_APK=$(cut -d' ' -f2 "$CACHE_FILE" 2>/dev/null || echo "")
 
@@ -85,9 +85,11 @@ echo "downloading" > "$PHASE_FILE"
 echo "==> Downloading APK..."
 scp $REMOTE:$APK_PATH $LOCAL_APK
 
+# cache the build before installing, so a failed push doesn't force a rebuild
+echo "$CHECKSUM gradle:$APK_PATH" > "$CACHE_FILE"
+
 echo "installing" > "$PHASE_FILE"
 do_install "$DEVICE" "$LOCAL_APK" || exit 1
 
-echo "$CHECKSUM gradle:$APK_PATH" > "$CACHE_FILE"
 rm -f "$PHASE_FILE"
 echo "==> Done."

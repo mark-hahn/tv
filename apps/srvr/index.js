@@ -371,6 +371,9 @@ try {
   }
 } catch {}
 
+// Emby DeviceNames reported by the Emby app on each TV
+const TV_DEVICE_NAMES = ["Living Room TV", "Mark's Fire TV"];
+
 // Debounced per-show push so rapid tvdb changes coalesce into one notification
 const PUSH_DEBOUNCE_MS = 500;
 const pendingPushes = new Map();
@@ -2636,8 +2639,10 @@ app.post("/internal/nowPlaying", (req, res) => {
     intro.pushIntroState(ws, record, item.showName, item.season, item.episode);
   }
 
-  // Auto-skip: detect not-playing -> playing from start
-  const lrtv = lastNowPlayingList.find((p) => p.device === "Living Room TV");
+  // Auto-skip: detect not-playing -> playing from start (either TV)
+  const lrtv = lastNowPlayingList.find((p) =>
+    TV_DEVICE_NAMES.includes(p.device),
+  );
   const isNowPlaying = !!lrtv;
   if (!lastLivingRoomWasPlaying && isNowPlaying) {
     const posMs = Math.round((lrtv.positionTicks ?? 0) / 10000);
@@ -2650,7 +2655,9 @@ app.post("/internal/nowPlaying", (req, res) => {
     if (fresh && trimPos > 0 && skipKey !== lastAutoSkipKey) {
       lastAutoSkipKey = skipKey;
       setTimeout(() => {
-        intro.doTrimIntro().catch((e) => unilog(613, "error:", e.message));
+        intro
+          .doTrimIntro(lrtv.device)
+          .catch((e) => unilog(613, "error:", e.message));
       }, 2000);
     }
   }

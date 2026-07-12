@@ -408,7 +408,7 @@
               font-size: 18px;
               font-weight: bold;
             "
-            >{{ s.value }}</span
+            >{{ picValText(s.value) }}</span
           >
           <button
             @mousedown.prevent="picAdjust(s, +1)"
@@ -612,6 +612,8 @@ import allServices from "../../../tv/services.json";
 const SCRUB_HOLD_DELAY_MS = 400;
 const SCRUB_PING_INTERVAL_MS = 500;
 const VOL_STEP = 1;
+const PIC_VAL_MAX_CHARS = 20;
+const PIC_VAL_EDGE_CHARS = 8;
 const TVPANE_VERSION = 2;
 
 const CELL_BASE = {
@@ -1048,6 +1050,15 @@ export default {
 
     picInputVal(s) {
       return this.picInputs[s.target]?.raw ?? s.value;
+    },
+
+    // long option names push the arrow buttons off the edge of the screen
+    picValText(v) {
+      const s = String(v);
+      if (s.length <= PIC_VAL_MAX_CHARS) return s;
+      return `${s.slice(0, PIC_VAL_EDGE_CHARS)}...${s.slice(
+        -PIC_VAL_EDGE_CHARS,
+      )}`;
     },
 
     picKeydown(e, s) {

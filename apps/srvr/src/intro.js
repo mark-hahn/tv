@@ -27,7 +27,22 @@ function controlSessionId(sessions, playSession) {
   return sibling?.Id ?? playSession.Id;
 }
 
-export async function doSkipIntro(pressedAt, deviceName = "Living Room TV") {
+// Emby DeviceNames reported by the Emby app on each TV. With no explicit
+// deviceName, skip/trim act on whichever TV is currently playing.
+const TV_DEVICE_NAMES = ["Living Room TV", "Mark's Fire TV"];
+
+function findTvPlaySession(sessions, deviceName) {
+  const matches = sessions.filter(
+    (s) =>
+      s.NowPlayingItem &&
+      (deviceName
+        ? s.DeviceName === deviceName
+        : TV_DEVICE_NAMES.includes(s.DeviceName)),
+  );
+  return matches.find((s) => s.SupportsRemoteControl) ?? matches[0] ?? null;
+}
+
+export async function doSkipIntro(pressedAt, deviceName = null) {
   const sessRes = await fetch(
     `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
     { headers: { Accept: "application/json" } },
@@ -37,12 +52,7 @@ export async function doSkipIntro(pressedAt, deviceName = "Living Room TV") {
     return { ok: false, error: `sessions ${sessRes.status}` };
   }
   const sessions = await sessRes.json();
-  const matches = sessions.filter(
-    (s) => s.NowPlayingItem && s.DeviceName === deviceName,
-  );
-  // Prefer the remote-controllable session — the Emby app registers a second
-  // "Living Room TV" session that silently ignores seek commands.
-  const session = matches.find((s) => s.SupportsRemoteControl) ?? matches[0];
+  const session = findTvPlaySession(sessions, deviceName);
   if (!session) {
     const deviceNames = sessions.map((s) => s.DeviceName).join(", ");
     const playingDevices = sessions
@@ -92,7 +102,7 @@ export async function doSkipIntro(pressedAt, deviceName = "Living Room TV") {
 }
 
 // Intro: trimming — seek to absolute trimPos position on the specified device
-export async function doTrimIntro(deviceName = "Living Room TV") {
+export async function doTrimIntro(deviceName = null) {
   const sessRes = await fetch(
     `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
     { headers: { Accept: "application/json" } },
@@ -102,10 +112,7 @@ export async function doTrimIntro(deviceName = "Living Room TV") {
     return { ok: false, error: `sessions ${sessRes.status}` };
   }
   const sessions = await sessRes.json();
-  const matches = sessions.filter(
-    (s) => s.NowPlayingItem && s.DeviceName === deviceName,
-  );
-  const session = matches.find((s) => s.SupportsRemoteControl) ?? matches[0];
+  const session = findTvPlaySession(sessions, deviceName);
   if (!session) {
     const devs = sessions.map((s) => s.DeviceName).join(", ");
     unilog(1332, `doTrimIntro: no ${deviceName} session. devices: ${devs}`);

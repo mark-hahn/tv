@@ -735,6 +735,7 @@ async function processSubQueueEntry() {
       cleanChkSrtQueue();
       persistSubQueueChkSrt();
       notifyClients("chksrt-count", subsState.subQueueChkSrt.length);
+      syncBatchMsgs();
       if (entry.fromUI)
         notifyClients("subs-progress", {
           path: entry.videoFilePath,
@@ -1036,6 +1037,7 @@ async function checkAndDownloadOpnSrt(showName, tvdbRecord) {
       );
       persistSubQueueChkSrt();
       notifyClients("chksrt-count", subsState.subQueueChkSrt.length);
+      syncBatchMsgs();
       unilog(25, `opn-bg unsnooze: ${filePath}`);
     }
   }
@@ -1086,6 +1088,7 @@ async function processChksrtSnoozedForShow(showName, tvdbRecord) {
   if (queueChanged) {
     persistSubQueueChkSrt();
     notifyClients("chksrt-count", subsState.subQueueChkSrt.length);
+    syncBatchMsgs();
   }
 }
 

@@ -6,30 +6,38 @@
 // h264/aac +faststart mp4 under /mnt/media/mpfour — a tree mirroring
 // /mnt/media/tv that emby never scans and nginx serves with Range support —
 // letting the player jump anywhere instantly. h264 sources are remuxed
-// (-c:v copy, lossless); hevc is transcoded. Mirrors persist so chksrt can be
-// re-run later; a sidecar .src.json records the original's path/mtime/size for
-// staleness checks, and a daily sweep removes mirrors whose original is gone.
+// (-c:v copy, lossless); hevc is transcoded. Mirrors are kept forever — even
+// after the original is deleted — so chksrt can be re-run at any time; a
+// sidecar .src.json records the original's mtime/size so a replaced release
+// re-encodes.
 //
-// This runs on its own single-file loop, deliberately NOT on the shared
-// serialized ffmpegQueue (batchQueue.js) — chksrt playback is needed before
-// other recoding work and must not sit behind long re-encode/BIF jobs.
+// This runs on its own loop, deliberately NOT on the shared serialized
+// ffmpegQueue (batchQueue.js) — chksrt playback is needed before other recoding
+// work and must not sit behind long re-encode/BIF jobs. The same loop keeps
+// hevc (slow-transcode) entries at the tail of subQueueChkSrt.
 
 import fs from "fs";
 import fsp from "fs/promises";
 import * as cp from "child_process";
 import * as path from "node:path";
 import { logHere, unilog} from "@tv/share"
-import { subsState } from "./subsQueue.js";
+import { subsState, persistSubQueueChkSrt } from "./subsQueue.js";
 
 const TV_DIR = "/mnt/media/tv";
 const MPFOUR_DIR = "/mnt/media/mpfour";
-const SCAN_INTERVAL_MS = 30_000;
+const SCAN_INTERVAL_MS = 5_000;
 const FAIL_RETRY_MS = 60 * 60 * 1000;
-const SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 let busy = false;
+let reordering = false;
 let currentTmpPath = null;
+// { videoFilePath, child, aborted } while an encode is running, else null
+let currentEncode = null;
+let syncBatchMsgs = () => {};
 const failedAt = new Map(); // videoFilePath -> last failure timestamp
+// videoFilePath -> { mtimeMs, size, videoCodec, audioCodec } — avoids
+// re-probing every entry on every 5s scan.
+const codecCache = new Map();
 
 // Mirror path for a tv-library video, or null when the path is outside the
 // tv tree (movies etc. never get mirrors).
@@ -94,9 +102,57 @@ function ffprobeCodecs(videoFilePath) {
   });
 }
 
-function runFfmpeg(args) {
+// Cached codecs, invalidated when the original's mtime/size changes.
+async function getCodecs(videoFilePath) {
+  const stat = await fsp.stat(videoFilePath);
+  const hit = codecCache.get(videoFilePath);
+  if (hit && hit.mtimeMs === stat.mtimeMs && hit.size === stat.size) return hit;
+  const codecs = await ffprobeCodecs(videoFilePath);
+  const entry = { mtimeMs: stat.mtimeMs, size: stat.size, ...codecs };
+  codecCache.set(videoFilePath, entry);
+  return entry;
+}
+
+// h264 sources are remuxed (seconds); anything else (hevc) needs a full
+// transcode (many minutes).
+async function needsTranscode(videoFilePath) {
+  const { videoCodec } = await getCodecs(videoFilePath);
+  return videoCodec !== "h264";
+}
+
+// Keep files that need a slow transcode at the tail of subQueueChkSrt, so the
+// files you review first are the ones already mirrored (or quick to mirror) and
+// the hevc encodes get more time to finish before you reach them. Stable within
+// each group, so a newly-added hevc file still lands behind the fast ones.
+async function reorderChkSrtQueue() {
+  const queue = subsState.subQueueChkSrt;
+  if (queue.length < 2) return;
+  const fast = [];
+  const slow = [];
+  for (const entry of queue) {
+    const videoFilePath = entry?.videoFilePath;
+    let slowOne = false;
+    if (videoFilePath && fs.existsSync(videoFilePath)) {
+      try {
+        slowOne = await needsTranscode(videoFilePath);
+      } catch (e) {
+        unilog(1413, `probe failed for ${path.basename(videoFilePath)}: ${e.message}`);
+      }
+    }
+    (slowOne ? slow : fast).push(entry);
+  }
+  const next = [...fast, ...slow];
+  if (next.every((entry, i) => entry === queue[i])) return; // already ordered
+  subsState.subQueueChkSrt = next;
+  persistSubQueueChkSrt();
+  syncBatchMsgs();
+  unilog(1414, `reordered chksrt queue: ${fast.length} ready/fast ahead of ${slow.length} needing transcode`);
+}
+
+function runFfmpeg(args, onSpawn) {
   return new Promise((resolve, reject) => {
     const ffmpeg = cp.spawn("ffmpeg", args);
+    onSpawn?.(ffmpeg);
     let lastErr = "";
     ffmpeg.stderr.on("data", (d) => {
       lastErr = d.toString();
@@ -109,12 +165,25 @@ function runFfmpeg(args) {
   });
 }
 
+// Called when a chksrt result is saved: the mirror for that file is no longer
+// needed, so kill its ffmpeg if it happens to be the one running. A pending
+// (not yet started) file needs nothing — the save already removed it from
+// subQueueChkSrt, which is the only thing the encode loop draws from.
+export function cancelEncode(videoFilePath) {
+  const resolved = path.resolve(videoFilePath);
+  if (!currentEncode || currentEncode.videoFilePath !== resolved) return false;
+  currentEncode.aborted = true;
+  currentEncode.child?.kill("SIGKILL");
+  unilog(1416, `aborted encode, chksrt result saved: ${path.basename(resolved)}`);
+  return true;
+}
+
 async function encodeOne(videoFilePath) {
   const mirror = mpfourPathFor(videoFilePath);
   const tmp = mirror.replace(/\.mp4$/, ".tmp.mp4");
   const startedAt = Date.now();
   const srcStat = await fsp.stat(videoFilePath);
-  const { videoCodec, audioCodec } = await ffprobeCodecs(videoFilePath);
+  const { videoCodec, audioCodec } = await getCodecs(videoFilePath);
   const args = ["-y", "-i", videoFilePath, "-map", "0:v:0", "-map", "0:a:0?"];
   if (videoCodec === "h264") {
     args.push("-c:v", "copy");
@@ -139,8 +208,22 @@ async function encodeOne(videoFilePath) {
   args.push("-sn", "-dn", "-movflags", "+faststart", tmp);
   await fsp.mkdir(path.dirname(mirror), { recursive: true });
   currentTmpPath = tmp;
+  currentEncode = {
+    videoFilePath: path.resolve(videoFilePath),
+    child: null,
+    aborted: false,
+  };
   try {
-    await runFfmpeg(args);
+    try {
+      await runFfmpeg(args, (child) => {
+        currentEncode.child = child;
+      });
+    } catch (e) {
+      // A kill from cancelEncode() is an intentional abort, not a failure —
+      // rethrowing would mark the file failed and skip it for FAIL_RETRY_MS.
+      if (currentEncode.aborted) return "aborted";
+      throw e;
+    }
     await fsp.rename(tmp, mirror);
     await fsp.writeFile(
       sidecarPathFor(mirror),
@@ -153,11 +236,13 @@ async function encodeOne(videoFilePath) {
     );
   } finally {
     currentTmpPath = null;
+    currentEncode = null;
     await fsp.rm(tmp, { force: true });
   }
   const secs = Math.round((Date.now() - startedAt) / 1000);
   const mode = videoCodec === "h264" ? "remux" : "transcode";
   unilog(1405, `${mode} done in ${secs}s: ${path.basename(mirror)}`);
+  return "done";
 }
 
 async function nextNeedingEncode() {
@@ -175,6 +260,16 @@ async function nextNeedingEncode() {
 }
 
 async function scanPass() {
+  // Reorder on every tick, even while an encode is running — a file added
+  // during a long transcode must still be sorted into place promptly.
+  if (!reordering) {
+    reordering = true;
+    try {
+      await reorderChkSrtQueue();
+    } finally {
+      reordering = false;
+    }
+  }
   if (busy) return;
   busy = true;
   try {
@@ -194,9 +289,11 @@ async function scanPass() {
   }
 }
 
-// Remove mirrors whose original is gone, orphan sidecars, stale tmp files,
-// and any empty directories left behind.
-async function sweep() {
+// Mirrors are never removed — they persist so chksrt can be re-run at any time,
+// even after the original is deleted. The only cleanup is .tmp.mp4 left behind
+// by an encode that was killed mid-write (e.g. a pm2 restart), done once at
+// startup while nothing of ours is running.
+async function removeStaleTmpFiles() {
   let entries;
   try {
     entries = await fsp.readdir(MPFOUR_DIR, {
@@ -208,58 +305,24 @@ async function sweep() {
   }
   let removed = 0;
   for (const ent of entries) {
-    if (!ent.isFile()) continue;
-    const full = path.join(ent.parentPath, ent.name);
-    if (full === currentTmpPath) continue;
-    if (ent.name.endsWith(".tmp.mp4")) {
-      await fsp.rm(full, { force: true });
-      removed++;
-      continue;
-    }
-    if (ent.name.endsWith(".src.json")) continue; // handled with its mp4
-    if (!ent.name.endsWith(".mp4")) continue;
-    let src = null;
-    try {
-      src = JSON.parse(await fsp.readFile(sidecarPathFor(full), "utf8")).src;
-    } catch {
-      // no readable sidecar -> orphan mirror
-    }
-    if (!src || !fs.existsSync(src)) {
-      await fsp.rm(full, { force: true });
-      await fsp.rm(sidecarPathFor(full), { force: true });
-      removed++;
-    }
-  }
-  // prune empty dirs (deepest first)
-  const dirs = entries
-    .filter((e) => e.isDirectory())
-    .map((e) => path.join(e.parentPath, e.name))
-    .sort((a, b) => b.length - a.length);
-  for (const dir of dirs) {
-    try {
-      await fsp.rmdir(dir);
-    } catch {
-      // not empty — keep
-    }
+    if (!ent.isFile() || !ent.name.endsWith(".tmp.mp4")) continue;
+    await fsp.rm(path.join(ent.parentPath, ent.name), { force: true });
+    removed++;
   }
   if (removed > 0) {
-    unilog(1407, `sweep removed ${removed} stale mirror file(s)`);
+    unilog(1407, `removed ${removed} stale tmp file(s) from a killed encode`);
   }
 }
 
-export function start() {
+export function start(deps) {
+  if (deps?.syncBatchMsgs) syncBatchMsgs = deps.syncBatchMsgs;
   fs.mkdirSync(MPFOUR_DIR, { recursive: true });
-  sweep().catch((e) => {
-    unilog(1408, `sweep error: ${e.message}`);
+  removeStaleTmpFiles().catch((e) => {
+    unilog(1408, `tmp cleanup error: ${e.message}`);
   });
   setInterval(() => {
     scanPass().catch((e) => {
       unilog(1409, `scan error: ${e.message}`);
     });
   }, SCAN_INTERVAL_MS);
-  setInterval(() => {
-    sweep().catch((e) => {
-      unilog(1410, `sweep error: ${e.message}`);
-    });
-  }, SWEEP_INTERVAL_MS);
 }

@@ -257,6 +257,26 @@ function syncBatchMsgs() {
   } else {
     setGlobalMessage({ id: "Asr", action: "hide" });
   }
+  // ChkSrt (M)
+  if (subsState.subQueueChkSrt.length > 0) {
+    const name = showNameFromFilePath(
+      subsState.subQueueChkSrt[0]?.videoFilePath || "",
+    );
+    setGlobalMessage({
+      id: "ChkSrt",
+      text: batchLabel(
+        "M",
+        name,
+        subsState.subQueueChkSrt.length,
+        subsState.subQueueChkSrt.map((e) =>
+          showNameFromFilePath(e.videoFilePath),
+        ),
+      ),
+      position: 2006,
+    });
+  } else {
+    setGlobalMessage({ id: "ChkSrt", action: "hide" });
+  }
 }
 
 const exec = utilNode.promisify(cp.exec);
@@ -1983,6 +2003,7 @@ app.post("/api/asr/emb/generate", async (req, res) => {
 app.get("/api/asr/chksrt/list", (req, res) => {
   cleanChkSrtQueue();
   notifyClients("chksrt-count", subsState.subQueueChkSrt.length);
+  syncBatchMsgs();
   res.json({
     count: subsState.subQueueChkSrt.length,
     path: subsState.subQueueChkSrt[0]?.videoFilePath,
@@ -2004,11 +2025,14 @@ app.post("/api/asr/chksrt/enqueue", (req, res) => {
   cleanChkSrtQueue();
   persistSubQueueChkSrt();
   notifyClients("chksrt-count", subsState.subQueueChkSrt.length);
+  syncBatchMsgs();
   res.json({ ok: true, queued: videoPaths.length });
 });
 
 app.post("/api/asr/chksrt/ok", (req, res) => {
   const entry = subsState.subQueueChkSrt[0];
+  // result saved — this file no longer needs a seekable mirror
+  mpfour.cancelEncode(req.body?.videoPath || entry?.videoFilePath || "");
   if (entry) {
     const base = resStripAlt(entry.videoFilePath).replace(/\.[^.]+$/, "");
     const dir = path.dirname(entry.videoFilePath);
@@ -2036,6 +2060,7 @@ app.post("/api/asr/chksrt/ok", (req, res) => {
   cleanChkSrtQueue();
   persistSubQueueChkSrt();
   notifyClients("chksrt-count", subsState.subQueueChkSrt.length);
+  syncBatchMsgs();
   res.json({ ok: true });
 });
 
@@ -2060,6 +2085,7 @@ app.post("/api/asr/chksrt/gensrt", (req, res) => {
   cleanChkSrtQueue();
   persistSubQueueChkSrt();
   notifyClients("chksrt-count", subsState.subQueueChkSrt.length);
+  syncBatchMsgs();
   res.json({ ok: true });
 });
 
@@ -2080,6 +2106,7 @@ app.post("/api/asr/chksrt/snooze", (req, res) => {
   persistSubQueueChkSrt();
   persistChksrtSnoozed();
   notifyClients("chksrt-count", subsState.subQueueChkSrt.length);
+  syncBatchMsgs();
   res.json({ ok: true });
 });
 
@@ -2123,9 +2150,12 @@ app.post("/api/asr/chksrt/select", (req, res) => {
     (e) => e.videoFilePath === videoPath,
   );
   if (idx !== -1) subsState.subQueueChkSrt.splice(idx, 1);
+  // result saved — this file no longer needs a seekable mirror
+  mpfour.cancelEncode(videoPath);
   cleanChkSrtQueue();
   persistSubQueueChkSrt();
   notifyClients("chksrt-count", subsState.subQueueChkSrt.length);
+  syncBatchMsgs();
   res.json({ ok: true });
 });
 
@@ -2515,7 +2545,7 @@ https.createServer(httpsOptions, app).listen(HTTP_PORT, () => {
   // .bif generation: clear any stale lock, restore queue, resume work.
   bifQueue.resumeOnStartup();
   // seekable-mp4 mirrors for the chksrt queue (own loop, not ffmpegQueue)
-  mpfour.start();
+  mpfour.start({ syncBatchMsgs });
 });
 
 app.post("/internal/tv-state", (req, res) => {

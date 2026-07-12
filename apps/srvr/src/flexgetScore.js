@@ -2,7 +2,7 @@
 // formatting, bit-depth/resolution parsing, same-run and cross-run "is better"
 // comparators, and first-season-gap detection. No shared state.
 
-import { getResolution } from "@tv/share";
+import { getResolution, isHevc } from "@tv/share";
 import { isBadGroup } from "./badGroups.js";
 
 export function flexgetFmtSent() {
@@ -28,7 +28,7 @@ export function flexgetBitDepth(title) {
   return 8;
 }
 
-// Same-run dedup: resolution → bit depth → seeds → bad group
+// Same-run dedup: resolution → bit depth → hevc → seeds → bad group
 export function flexgetIsBetterSameRun(a, b) {
   const aRes = getResolution(a.quality || a.title || "") ?? 480;
   const bRes = getResolution(b.quality || b.title || "") ?? 480;
@@ -37,6 +37,10 @@ export function flexgetIsBetterSameRun(a, b) {
   const aDepth = flexgetBitDepth(a.title);
   const bDepth = flexgetBitDepth(b.title);
   if (aDepth !== bDepth) return aDepth > bDepth;
+
+  const aHevc = isHevc(a.title);
+  const bHevc = isHevc(b.title);
+  if (aHevc !== bHevc) return bHevc; // b needs transcoding → a is better
 
   const aSeeds = parseInt(String(a.torrent_seeds || "0"), 10) || 0;
   const bSeeds = parseInt(String(b.torrent_seeds || "0"), 10) || 0;
@@ -48,11 +52,14 @@ export function flexgetIsBetterSameRun(a, b) {
   return false;
 }
 
-// Cross-run comparison: resolution → bad group tiebreaker
+// Cross-run comparison: resolution → hevc → bad group tiebreaker
 export function flexgetIsBetterCrossRun(a, b) {
   const aRes = getResolution(a.quality || a.title || "") ?? 480;
   const bRes = getResolution(b.quality || b.title || "") ?? 480;
   if (aRes !== bRes) return aRes > bRes;
+  const aHevc = isHevc(a.title);
+  const bHevc = isHevc(b.title);
+  if (aHevc !== bHevc) return bHevc; // b needs transcoding → a is better
   const aBad = isBadGroup(a.title);
   const bBad = isBadGroup(b.title);
   if (aBad !== bBad) return bBad; // b is bad group → a is better

@@ -531,6 +531,15 @@ export function parseTitleFromFilename(fname, folderName, parsedPtt) {
 
 export const STANDARD_RESOLUTIONS = new Set([2160, 1080, 720, 576, 480, 384]);
 
+// True when a title/filename is hevc (x265/h265). Browsers can't play hevc, so
+// chksrt has to fully transcode these to get a seekable mp4 mirror (minutes of
+// cpu), while h264 only needs a lossless remux (seconds). Everywhere download
+// priority is decided, an hevc release therefore loses to an equal-quality
+// non-hevc one — see mpfour.js.
+export function isHevc(nameOrTitle) {
+  return /(x\.?265|h\.?[ .]?265|hevc)/i.test(String(nameOrTitle || ""));
+}
+
 export function normalizeVideoHeightToQuality(height) {
   const parsedHeight = Number.parseInt(height, 10);
   if (!Number.isFinite(parsedHeight) || parsedHeight <= 0) return null;

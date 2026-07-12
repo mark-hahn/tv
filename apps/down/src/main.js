@@ -18,6 +18,7 @@ import {
   parseTitleFromFilename,
   TV_BLOCKED,
   getResolution,
+  isHevc,
   isWatched as edIsWatched,
   unilog,
   setUnilogSink,
@@ -2670,6 +2671,9 @@ async function main() {
     var usbDepth = flexBitDepth(usbFname);
     var sentDepth = flexBitDepth(sentSrc);
     if (usbDepth !== sentDepth) return usbDepth > sentDepth;
+    var usbHevc = isHevc(usbFname);
+    var sentHevc = isHevc(sentSrc);
+    if (usbHevc !== sentHevc) return sentHevc; // sent needs transcoding → usb is better
     var usbGroup = (
       parseTorrentTitle(usbFname.replace(/\.[a-z0-9]{2,4}$/i, ""))?.group || ""
     ).toLowerCase();
@@ -2947,11 +2951,18 @@ async function main() {
           ).toLowerCase();
           var _diskIsBad = badGroupsSet.has(_diskGroup);
           var _usbIsBad = badGroupsSet.has(_usbGroup);
+          var _diskIsHevc = isHevc(_diskFile);
+          var _usbIsHevc = isHevc(fname);
           var _usbBetterThanDisk =
             _usbRes > _diskRes ||
             (_usbRes === _diskRes && _usbDepth > _diskDepth) ||
             (_usbRes === _diskRes &&
               _usbDepth === _diskDepth &&
+              _diskIsHevc &&
+              !_usbIsHevc) ||
+            (_usbRes === _diskRes &&
+              _usbDepth === _diskDepth &&
+              _diskIsHevc === _usbIsHevc &&
               _diskIsBad &&
               !_usbIsBad);
           if (!_usbBetterThanDisk) {
@@ -3013,11 +3024,18 @@ async function main() {
           ).toLowerCase();
           var diskIsBad = badGroupsSet.has(diskGroup);
           var usbIsBad = badGroupsSet.has(usbGroup);
+          var diskIsHevc = isHevc(diskFile);
+          var usbIsHevc = isHevc(fname);
           var usbIsBetter =
             usbRes > diskRes ||
             (usbRes === diskRes && usbDepth > diskDepth) ||
             (usbRes === diskRes &&
               usbDepth === diskDepth &&
+              diskIsHevc &&
+              !usbIsHevc) ||
+            (usbRes === diskRes &&
+              usbDepth === diskDepth &&
+              diskIsHevc === usbIsHevc &&
               diskIsBad &&
               !usbIsBad);
           if (!usbIsBetter) {

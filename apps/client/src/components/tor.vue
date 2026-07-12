@@ -1363,6 +1363,7 @@ import { config } from "../config.js";
 import Stream from "./stream.vue";
 import parseTorrentTitle from "parse-torrent-title";
 import * as srvr from "../srvr.js";
+import { isHevc } from "@tv/share";
 import { unilog, logHere } from "../log.js";
 
 const BAD_GROUPS_REFRESH_MS = 3000;
@@ -1662,6 +1663,12 @@ export default {
         const rA = resNum(a);
         const rB = resNum(b);
         if (rA !== rB) return rB - rA;
+
+        // 5b. At equal resolution, hevc loses — it needs a full transcode for
+        // chksrt, where h264 only needs a remux.
+        const hA = this.torrentIsHevc(a) ? 1 : 0;
+        const hB = this.torrentIsHevc(b) ? 1 : 0;
+        if (hA !== hB) return hA - hB;
 
         // 6. Rest of priorities (Seeds -> Title)
         const sd = asNumber(b?.raw?.seeds) - asNumber(a?.raw?.seeds);
@@ -2331,9 +2338,13 @@ export default {
         : null;
     },
 
+    torrentIsHevc(torrent) {
+      return isHevc(String(torrent?.raw?.title || torrent?.title || ""));
+    },
+
     getDisplayTitleWithProvider(torrent) {
       const title = String(torrent?.raw?.title || torrent?.title || "").trim();
-      return title;
+      return this.torrentIsHevc(torrent) ? `${title} (hevc)` : title;
     },
 
     rememberDownloadedTorrent(torrent) {
@@ -3879,6 +3890,7 @@ export default {
             const newRes = torRes(newTitle);
             const newDepth = torDepth(newTitle);
             const newBad = torBadGroup(newTitle);
+            const newHevc = isHevc(newTitle);
             const newShow = showName(newTitle);
             try {
               const qbtInfoUrl = new URL(
@@ -3904,11 +3916,17 @@ export default {
                     const qRes = torRes(qName);
                     const qDepth = torDepth(qName);
                     const qBad = torBadGroup(qName);
+                    const qHevc = isHevc(qName);
                     const qIsHigherQuality =
                       qRes > newRes ||
                       (qRes === newRes && qDepth > newDepth) ||
                       (qRes === newRes &&
                         qDepth === newDepth &&
+                        !qHevc &&
+                        newHevc) ||
+                      (qRes === newRes &&
+                        qDepth === newDepth &&
+                        qHevc === newHevc &&
                         !qBad &&
                         newBad);
                     if (qIsHigherQuality) {

@@ -2081,7 +2081,6 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     paramObj.leftEmby || existing.leftEmby || existing.emby?.leftEmby || null;
 
   // Additional flags
-  tvdbData.reject = paramObj.reject ?? existing.reject ?? false;
   tvdbData.haveSubs = paramObj.haveSubs ?? existing.haveSubs ?? false;
   tvdbData.anticipating =
     paramObj.anticipating ?? existing.anticipating ?? false;

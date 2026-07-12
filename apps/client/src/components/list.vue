@@ -418,7 +418,7 @@ export default {
 
     const toggleToTry = async (show) => {
       if (show.inEmby === false) {
-        await toggleNoEmbyFlag(show, "InToTry");
+        await toggleNoEmbyFlag(show, "inToTry");
         return;
       }
       this.saveVisShow(show);
@@ -448,7 +448,7 @@ export default {
 
     const toggleContinue = async (show) => {
       if (show.inEmby === false) {
-        await toggleNoEmbyFlag(show, "InContinue");
+        await toggleNoEmbyFlag(show, "inContinue");
         return;
       }
       this.saveVisShow(show);
@@ -464,7 +464,7 @@ export default {
 
     const toggleMark = async (show) => {
       if (show.inEmby === false) {
-        await toggleNoEmbyFlag(show, "InMark");
+        await toggleNoEmbyFlag(show, "inMark");
         return;
       }
       this.saveVisShow(show);
@@ -480,7 +480,7 @@ export default {
 
     const toggleLinda = async (show) => {
       if (show.inEmby === false) {
-        await toggleNoEmbyFlag(show, "InLinda");
+        await toggleNoEmbyFlag(show, "inLinda");
         return;
       }
       this.saveVisShow(show);
@@ -1486,7 +1486,6 @@ export default {
         name: name,
         tvdbId: tvdbId,
         overview: overview,
-        reject: false,
       };
 
       const paramObj = {
@@ -1753,7 +1752,6 @@ export default {
         ImdbId: imdbId,
         overview: overview,
         imageUrl: imageUrl,
-        reject: false,
       };
 
       // Update Map pane contents on preview (map will show TVDB data).

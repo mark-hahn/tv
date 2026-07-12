@@ -1490,7 +1490,6 @@ export default {
                   name: show?.name,
                   tvdbId: tvdbId,
                   overview: show?.overview,
-                  reject: false,
                 };
                 const paramObj = {
                   show: showSeed,
@@ -1571,7 +1570,6 @@ export default {
               name: show?.name,
               tvdbId: show.tvdbId,
               overview: show?.overview,
-              reject: false,
             };
             const paramObj = {
               show: showSeed,

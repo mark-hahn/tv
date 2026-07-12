@@ -268,7 +268,6 @@ export async function deleteShowFromSrvr(show) {
   }
 
   // don't ever delete from remotes
-  // don't ever delete from rejects
   // don't ever delete from tvdb
   unilog(877, "deleted show from server:", show.name);
 }

@@ -351,25 +351,6 @@ function stripGapTransientFields(gap) {
   return changed;
 }
 
-// Prune gaps on load: only keep shows that currently have gaps.
-try {
-  if (gaps && typeof gaps === "object" && !Array.isArray(gaps)) {
-    let changed = false;
-    for (const [gapId, gap] of Object.entries(gaps)) {
-      // Never persist transient/removed fields.
-      if (stripGapTransientFields(gap)) changed = true;
-      if (!gapEntryHasGap(gap)) {
-        delete gaps[gapId];
-        changed = true;
-      }
-    }
-    if (changed) {
-      try {
-        fs.writeFileSync(gapsPath, JSON.stringify(gaps), "utf8");
-      } catch {}
-    }
-  }
-} catch {}
 
 // Emby DeviceNames reported by the Emby app on each TV
 const TV_DEVICE_NAMES = ["Living Room TV", "Mark's Fire TV"];
@@ -809,9 +790,6 @@ const saveConfigYml = async (idIn, resultIn, resolveIn, rejectIn) => {
   }
 };
 
-// Run sync immediately (removed reject sync)
-// No longer needed since we removed reject filter
-
 const addPickup = async (params) => {
   const name = params?.name;
   const tvdbId = params?.tvdbId;
@@ -897,9 +875,6 @@ const addNoEmby = async (params) => {
     }
   }
 
-  const rejectFromList = rejects.some(
-    (r) => r.toLowerCase() === name.toLowerCase(),
-  );
   const nextRecord = {
     ...(existing || {}),
     ...(show || {}),
@@ -910,13 +885,7 @@ const addNoEmby = async (params) => {
     inContinue: show?.inContinue ?? existing?.inContinue ?? false,
     inMark: show?.inMark ?? existing?.inMark ?? false,
     inLinda: show?.inLinda ?? existing?.inLinda ?? false,
-    reject: show?.reject ?? existing?.reject ?? false,
   };
-
-  if (rejectFromList && !nextRecord.reject) {
-    nextRecord.reject = true;
-    unilog(554, "-- sync: inherited Reject=true from global list:", name);
-  }
 
   if (existingKey && existingKey !== name) {
     delete allTvdb[existingKey];
@@ -1090,8 +1059,9 @@ const apiWrapper = (handler) => {
       const result = await handler(params);
       res.json(result);
     } catch (error) {
-      unilog(568, `Error in ${req.url}:`, error);
-      res.status(500).json({ error: error.message || String(error) });
+      const msg = error?.message || String(error);
+      unilog(568, `Error in ${req.url}: ${msg}\n${error?.stack || ""}`);
+      res.status(500).json({ error: msg });
     }
   };
 };

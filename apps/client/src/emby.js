@@ -133,7 +133,6 @@ export async function loadAllShows() {
         rec.imdbRatings ||
         rec.remotes?.find((r) => r.name?.startsWith("IMDB"))?.ratings ||
         null;
-    rec.reject = false;
     if (rec.notReady === undefined) rec.notReady = rec.inEmby === false;
     rec.watchGap = rec.watchGap || false;
     rec.fileGap =
@@ -731,7 +730,6 @@ async function _oldLoadAllShows() {
         tvdb.remotes?.find((r) => r.name?.startsWith("IMDB"))?.ratings ||
         null;
     }
-    tvdb.reject = false;
     // Set notReady flag (preserve server-computed value if present)
     if (tvdb.notReady === undefined) tvdb.notReady = tvdb.inEmby === false;
 

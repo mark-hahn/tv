@@ -9,6 +9,26 @@ import * as tvdb from "./tvdb.js";
 import * as bifQueue from "./bifQueue.js";
 import { EMBY_BASE_URL, EMBY_API_KEY, EMBY_USER_ID } from "./embyConfig.js";
 
+// A seek sent while the TV player is still starting up is silently dropped:
+// Emby accepts the command (204) but the position never moves. So the trim seek
+// is verified and retried until the position actually lands.
+const TRIM_SEEK_ATTEMPTS = 4;
+const TRIM_SEEK_VERIFY_MS = 1200; // wait before re-reading the position
+const TRIM_SEEK_LAND_TOL_MS = 1500; // seeks snap back to the nearest keyframe
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Current playback position (ms) of the TV's playing session, or null.
+async function playbackPosMs(deviceName) {
+  const res = await fetch(`${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) return null;
+  const s = findTvPlaySession(await res.json(), deviceName);
+  if (!s) return null;
+  return Math.round((s.PlayState?.PositionTicks ?? 0) / 10000);
+}
+
 // Commands (seek etc.) must go to the device's remote-controllable session.
 // The Emby Android TV app reports playback on one session but only accepts
 // seek/playstate commands on a companion controller session with the same
@@ -137,15 +157,25 @@ export async function doTrimIntro(deviceName = null) {
     606,
     `show=${showName} trimPos=${trimPos}ms newPos=${Math.round(newTicks / 10000)}ms`,
   );
-  const seekRes = await fetch(
-    `${EMBY_BASE_URL}/Sessions/${controlSessionId(sessions, session)}/Playing/seek?SeekPositionTicks=${newTicks}&api_key=${EMBY_API_KEY}`,
-    { method: "POST", headers: { Accept: "application/json" } },
-  );
-  if (!seekRes.ok) {
-    unilog(57, `seek failed: ${seekRes.status}`);
-    return { ok: false, error: `seek ${seekRes.status}` };
+  const sid = controlSessionId(sessions, session);
+  for (let attempt = 1; attempt <= TRIM_SEEK_ATTEMPTS; attempt++) {
+    const seekRes = await fetch(
+      `${EMBY_BASE_URL}/Sessions/${sid}/Playing/seek?SeekPositionTicks=${newTicks}&api_key=${EMBY_API_KEY}`,
+      { method: "POST", headers: { Accept: "application/json" } },
+    );
+    if (!seekRes.ok) {
+      unilog(57, `seek failed: ${seekRes.status}`);
+      return { ok: false, error: `seek ${seekRes.status}` };
+    }
+    await sleep(TRIM_SEEK_VERIFY_MS);
+    const posMs = await playbackPosMs(deviceName);
+    if (posMs != null && posMs >= trimPos - TRIM_SEEK_LAND_TOL_MS) {
+      unilog(1350, `trim seek landed on attempt ${attempt}: pos=${posMs}ms target=${Math.round(trimPos)}ms`);
+      return { ok: true };
+    }
+    unilog(1351, `trim seek did not land (attempt ${attempt}/${TRIM_SEEK_ATTEMPTS}): pos=${posMs}ms target=${Math.round(trimPos)}ms`);
   }
-  return { ok: true };
+  return { ok: false, reason: "seekDidNotLand" };
 }
 
 // Format ms as the intro pane does: "m:ss.t" / "s.t"; 0 -> "--"; null -> ""

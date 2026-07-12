@@ -2561,7 +2561,6 @@ let lastNowPlayingShowName = null;
 let lastNowPlayingList = [];
 let lastPlayingKeys = new Set(); // "showName|season|episode" of all currently-playing items
 let lastMissingEpWarning = null;
-let lastLivingRoomWasPlaying = false;
 let lastAutoSkipKey = null; // "showName|season|episode" of last auto-skipped episode
 
 async function refreshPlayedDatesForShow(showName) {
@@ -2639,30 +2638,35 @@ app.post("/internal/nowPlaying", (req, res) => {
     intro.pushIntroState(ws, record, item.showName, item.season, item.episode);
   }
 
-  // Auto-skip: detect not-playing -> playing from start (either TV)
+  // Auto-skip: fire when an episode is near its start (either TV). Keyed on the
+  // episode rather than a not-playing -> playing edge: the TV session keeps its
+  // NowPlayingItem across show changes and while paused at the Emby home screen,
+  // so that edge frequently never happens again after the first play.
   const lrtv = lastNowPlayingList.find((p) =>
     TV_DEVICE_NAMES.includes(p.device),
   );
   const isNowPlaying = !!lrtv;
-  if (!lastLivingRoomWasPlaying && isNowPlaying) {
+  if (isNowPlaying) {
     const posMs = Math.round((lrtv.positionTicks ?? 0) / 10000);
     const fresh = (lrtv.positionTicks ?? 0) < 3 * 1000 * 10000;
     const skipKey = `${lrtv.showName}|${lrtv.season}|${lrtv.episode}`;
-    const allTvdb = tvdb.getAllTvdbSync();
-    const record = allTvdb?.[lrtv.showName];
-    const trimPos = tvdb.getSeasonIntro(record, lrtv.season).trimPos;
-    unilog(1333, `rise ${skipKey} posMs=${posMs} fresh=${fresh} trimPos=${trimPos} lastKey=${lastAutoSkipKey}`);
-    if (fresh && trimPos > 0 && skipKey !== lastAutoSkipKey) {
+    if (fresh && skipKey !== lastAutoSkipKey) {
       lastAutoSkipKey = skipKey;
-      setTimeout(() => {
-        intro
-          .doTrimIntro(lrtv.device)
-          .catch((e) => unilog(613, "error:", e.message));
-      }, 2000);
+      const allTvdb = tvdb.getAllTvdbSync();
+      const record = allTvdb?.[lrtv.showName];
+      const trimPos = tvdb.getSeasonIntro(record, lrtv.season).trimPos;
+      unilog(1333, `start ${skipKey} posMs=${posMs} trimPos=${trimPos}`);
+      if (trimPos > 0) {
+        setTimeout(() => {
+          intro
+            .doTrimIntro(lrtv.device)
+            .catch((e) => unilog(613, "error:", e.message));
+        }, 2000);
+      }
     }
+  } else {
+    lastAutoSkipKey = null;
   }
-  if (!isNowPlaying) lastAutoSkipKey = null;
-  lastLivingRoomWasPlaying = isNowPlaying;
 
   checkMissingEpisodes(lastNowPlayingList).catch(() => {});
   for (const stoppedShowName of stoppedShowNames) {

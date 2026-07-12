@@ -374,6 +374,11 @@ try {
 // Emby DeviceNames reported by the Emby app on each TV
 const TV_DEVICE_NAMES = ["Living Room TV", "Mark's Fire TV"];
 
+// Delay before the auto-skip trim seek. Kept short so none of the intro plays;
+// the player often isn't ready to seek this early, which doTrimIntro handles by
+// verifying the position landed and retrying.
+const AUTO_SKIP_DELAY_MS = 250;
+
 // Debounced per-show push so rapid tvdb changes coalesce into one notification
 const PUSH_DEBOUNCE_MS = 500;
 const pendingPushes = new Map();
@@ -2661,7 +2666,7 @@ app.post("/internal/nowPlaying", (req, res) => {
           intro
             .doTrimIntro(lrtv.device)
             .catch((e) => unilog(613, "error:", e.message));
-        }, 2000);
+        }, AUTO_SKIP_DELAY_MS);
       }
     }
   } else {

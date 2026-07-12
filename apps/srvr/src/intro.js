@@ -12,7 +12,7 @@ import { EMBY_BASE_URL, EMBY_API_KEY, EMBY_USER_ID } from "./embyConfig.js";
 // A seek sent while the TV player is still starting up is silently dropped:
 // Emby accepts the command (204) but the position never moves. So the trim seek
 // is verified and retried until the position actually lands.
-const TRIM_SEEK_ATTEMPTS = 4;
+const TRIM_SEEK_ATTEMPTS = 6;
 const TRIM_SEEK_VERIFY_MS = 1200; // wait before re-reading the position
 const TRIM_SEEK_LAND_TOL_MS = 1500; // seeks snap back to the nearest keyframe
 

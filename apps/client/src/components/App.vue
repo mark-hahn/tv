@@ -2183,7 +2183,7 @@ export default {
     this._onAppWindowResize();
 
     this._onDelKey = (e) => {
-      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      if (e.key !== "Delete") return;
       const tag = document.activeElement?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea") return;
       if (document.activeElement?.isContentEditable) return;

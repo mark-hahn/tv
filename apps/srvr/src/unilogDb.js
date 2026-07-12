@@ -119,6 +119,10 @@ function pstStr(d = new Date()) {
   return `${date} ${time}`;
 }
 
+// An emitter-supplied ts is only honored in this exact shape; anything else
+// falls back to nowPst() at insert time.
+const TS_RE = /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/;
+
 // PST 'yyyy/mm/dd hh:mm:ss' for now (repo convention).
 export function nowPst() {
   return pstStr();
@@ -148,7 +152,9 @@ export function groupsForSite(logId) {
   return getGroupsStr.get(Number(logId))?.groups || "";
 }
 
-// One runtime emission. ts stamped here (the collector), not the caller.
+// One runtime emission. ts is stamped here unless the emitter supplied its own
+// (the client does, at unilog() call time, so a blocking dialog or a slow batch
+// flush can't backdate an event to its arrival time).
 // Returns the full joined row (event + site + groups) so callers can broadcast
 // True when any group linked to this site has its hide flag set. New events for
 // the site are hidden by default when this is true.
@@ -166,12 +172,19 @@ function groupHideForSite(logId) {
 // hide values on log_events: 0 = visible, 1 = group/manual hidden,
 // 2 = dedup-suppressed (kept in the DB for debugging queries; never broadcast
 // and never flipped by group Show/Unshow).
-export function insertEvent({ logId, pid, message, isHidden = false, isDup = false }) {
+export function insertEvent({
+  logId,
+  pid,
+  message,
+  ts,
+  isHidden = false,
+  isDup = false,
+}) {
   const hide = isDup ? 2 : isHidden || groupHideForSite(logId) ? 1 : 0;
   const info = insEvent.run(
     logId == null ? null : Number(logId),
     String(pid || "unknown"),
-    nowPst(),
+    TS_RE.test(String(ts ?? "")) ? String(ts) : nowPst(),
     String(message ?? ""),
     hide,
   );
@@ -248,7 +261,7 @@ const getBlockedUntil = db.prepare(
 // to DB with hide = 2 but NOT broadcast). A cache hit does NOT refresh the
 // entry, so a still-blocking file re-appears at most once per day as a
 // heartbeat.
-export function insertEventDedup({ logId, pid, message }) {
+export function insertEventDedup({ logId, pid, message, ts }) {
   const id = logId == null ? null : Number(logId);
   if (id != null) {
     const bu = getBlockedUntil.get(id)?.blocked_until;
@@ -260,12 +273,12 @@ export function insertEventDedup({ logId, pid, message }) {
     const key = `${id}\u0000${String(message ?? "")}`;
     if (dedupCache.has(key)) {
       dedupDropped++;
-      insertEvent({ logId, pid, message, isDup: true }); // kept in DB as hide = 2
+      insertEvent({ logId, pid, message, ts, isDup: true }); // kept in DB as hide = 2
       return null; // But don't broadcast to clients
     }
     dedupCache.set(key, now);
   }
-  return insertEvent({ logId, pid, message });
+  return insertEvent({ logId, pid, message, ts });
 }
 
 const insGroup = db.prepare(

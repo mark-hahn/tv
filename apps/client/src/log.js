@@ -1,4 +1,6 @@
 // unilog client routine. Active client log sites call `unilog(logId, message)`.
+// Each event carries a PST ts stamped at call time (see pstNow), so the batching
+// below never shifts an event to its arrival time on the server.
 // Events are batched and POSTed fire-and-forget to tv-srvr's /api/log; on unload
 // the queue is flushed with sendBeacon so tail events are not lost. It still
 // calls console.* so the browser console and vite-console.log mirror are intact.
@@ -27,6 +29,22 @@ function generateGuid() {
 
 const CLIENT_HASH = generateGuid();
 export const loggingDisabled = ref(false);
+
+// PST 'yyyy/mm/dd hh:mm:ss', the shape tv-srvr stores in log_events.ts. Stamped
+// at call time: batching (and a blocking window.confirm, which stalls the flush
+// timer) would otherwise date an event to whenever the server received it.
+function pstNow() {
+  const d = new Date();
+  const date = d
+    .toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" })
+    .replace(/-/g, "/");
+  let time = d.toLocaleTimeString("en-GB", {
+    timeZone: "America/Los_Angeles",
+    hour12: false,
+  });
+  if (time.startsWith("24:")) time = "00:" + time.slice(3);
+  return `${date} ${time}`;
+}
 
 let queue = [];
 let timer = null;
@@ -92,6 +110,7 @@ export function unilog(logId, ...parts) {
     queue.push({
       logId,
       pid: PID,
+      ts: pstNow(),
       message: unilogJoin(parts),
       clientHash: CLIENT_HASH,
     });

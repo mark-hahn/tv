@@ -87,7 +87,8 @@ export function removeUnilogSubscriber(ws) {
 
 export function registerUnilogRoutes(app) {
   // Central log collector endpoint. Accepts a single event or a batch array.
-  // pid identifies the EMITTING process/client; ts is stamped by the writer.
+  // pid identifies the EMITTING process/client. An event may carry its own ts
+  // (PST "yyyy/mm/dd hh:mm:ss"); without one the writer stamps arrival time.
   app.post("/api/log", (req, res) => {
     try {
       const body = req.body;
@@ -139,6 +140,7 @@ export function registerUnilogRoutes(app) {
             logId: e.logId,
             pid: e.pid || "unknown",
             message,
+            ts: e.ts,
           }),
         );
       }

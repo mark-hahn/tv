@@ -101,12 +101,15 @@ const EMBY_APP_URI =
 const EMBY_FIRE_ACTIVITY = "com.mb.android/.MainActivity";
 // Emby DeviceNames reported by the Emby app on each TV
 const TV_DEVICE_NAMES = ["Living Room TV", "Mark's Fire TV"];
+const LIVING_ROOM_DEVICE_NAME = "Living Room TV";
 const SRVR_INTERNAL_URL = "http://127.0.0.1:8739";
 
 const GOOGLE_HOME_DELAY_MS = 0; // ms after TV turns on before sending Home key
 const GOOGLE_EMBY_DELAY_MS = 250; // ms after TV turns on before launching Emby
 const VIEW_SHOW_DELAY_MS = 10000; // ms after Emby app launch before firing embyViewShow (fallback)
 const PENDING_VIEW_SHOW_MAX_AGE_MS = 120000; // ms before an unsent pending viewshow is dropped
+const EMBY_LAUNCH_DELAY_MS = 1500; // ms after launching Emby before sending it the show
+const VIEW_SHOW_RESEND_MS = 2000; // ms between show resends while Emby boots
 const FIRE_HOME_DELAY_MS = 0; // ms after Fire TV turns on before sending home key
 const FIRE_EMBY_DELAY_MS = 5000; // ms after Fire TV turns on before launching Emby
 
@@ -226,14 +229,6 @@ function handleEmbySession(s) {
     remoteCtrl,
     paused,
   };
-
-  if (device === "google" && pendingViewShow) {
-    if (viewShowEmbyTimer) clearTimeout(viewShowEmbyTimer);
-    viewShowEmbyTimer = setTimeout(() => {
-      viewShowEmbyTimer = null;
-      firePendingViewShow("viewshow(emby-ready)");
-    }, 1000);
-  }
 }
 
 const DEVICE_PRIORITY = [
@@ -349,7 +344,6 @@ let lastOnAt = 0;
 let pendingGoogleHome = false;
 let pendingFireEmby = false;
 let pendingViewShow = null; // { showId, showName } — queued for after Emby launches
-let viewShowEmbyTimer = null; // debounce timer: fires 1s after Living Room TV session detected
 let currentShowName = null;
 const prevSessions = {};
 const lastShowItem = {}; // last real (non-null) NowPlayingItem id per device
@@ -613,15 +607,33 @@ app.get("/tv/googlebtn", (req, res) => {
   res.json({ ok: true });
 });
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Newest LastActivityDate across the TV's Emby sessions. Emby stamps it on
+// every api call the app makes, so a change means the app is talking to the
+// server — which is what a restarting Emby ui does and an idle one does not.
+async function embyTvLastActivity() {
+  try {
+    const resp = await fetch(`${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`, {
+      headers: { Accept: "application/json" },
+    });
+    const sessions = await resp.json();
+    const dates = sessions
+      .filter((s) => s.DeviceName === LIVING_ROOM_DEVICE_NAME)
+      .map((s) => s.LastActivityDate)
+      .sort();
+    return dates.at(-1) ?? null;
+  } catch (e) {
+    unilog(1395, `could not read Emby sessions: ${e.message}`);
+    return null;
+  }
+}
+
 // Sends the show to Emby's live session on the TV. Returns true when Emby
 // accepted it; the pending show is only cleared on success so a later trigger
-// (emby-ready session broadcast, or the fallback timer) can try again.
+// (like the TV-off fallback timer) can try again.
 async function firePendingViewShow(label) {
   if (!pendingViewShow) return false;
-  if (viewShowEmbyTimer) {
-    clearTimeout(viewShowEmbyTimer);
-    viewShowEmbyTimer = null;
-  }
   const { showId, showName, episodeId, at } = pendingViewShow;
   if (Date.now() - at > PENDING_VIEW_SHOW_MAX_AGE_MS) {
     pendingViewShow = null;
@@ -646,8 +658,11 @@ async function firePendingViewShow(label) {
   }
 }
 
+let viewShowSeq = 0; // invalidates older button presses still resending
+
 app.get("/tv/viewshow", async (req, res) => {
   const { showId, showName } = req.query;
+  const seq = ++viewShowSeq;
   unilog(
     401,
     `viewshow from ${client(req)} showId=${showId} showName=${showName} braviaHaPower=${braviaHaPower}`,
@@ -664,21 +679,36 @@ app.get("/tv/viewshow", async (req, res) => {
     );
     return;
   }
-  // Emby is normally already the foreground app, so send the show straight to
-  // its live session — no Home key and no app relaunch, so nothing flashes.
-  if (await firePendingViewShow("viewshow(on)")) return;
-
-  // Emby has no live session, so it isn't running — launch it and try again
-  // once it is up.
-  unilog(1391, `no live Emby session, launching Emby app`);
+  // Bring Emby to the front. When Emby is already the foreground app this does
+  // nothing at all — no flash — so it is safe to send every time. No Home key:
+  // that is what used to make Emby blink out and reload.
+  const activityBefore = await embyTvLastActivity();
   callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
     media_content_type: "app",
     media_content_id: EMBY_APP_URI,
   });
-  setTimeout(
-    () => firePendingViewShow("viewshow(launched)"),
-    VIEW_SHOW_DELAY_MS,
-  );
+  await sleep(EMBY_LAUNCH_DELAY_MS);
+
+  // Emby's session keeps accepting shows with a 204 even while its ui is
+  // restarting (the android process stays alive in the background), so the
+  // send itself cannot tell us whether Emby is ready. Its api calls can: a
+  // restarting ui talks to the server, an already-open one sits silent.
+  const starting = (await embyTvLastActivity()) !== activityBefore;
+  if (!starting) {
+    await firePendingViewShow("viewshow(open)");
+    return;
+  }
+  // Emby is starting up. It silently drops anything sent while it boots and
+  // gives no honest ready signal, so resend the show every couple seconds:
+  // boot-time sends are dropped, the first send after the ui is up loads the
+  // show, and later resends just re-open the same page.
+  const deadline = Date.now() + VIEW_SHOW_DELAY_MS;
+  while (Date.now() < deadline) {
+    await sleep(VIEW_SHOW_RESEND_MS);
+    if (seq !== viewShowSeq) return; // a newer press owns the tv now
+    pendingViewShow = { showId, showName, at: Date.now() };
+    await firePendingViewShow("viewshow(booting)");
+  }
 });
 
 // Toggle the playing/selected episode between its 2160 and 1080 versions, then

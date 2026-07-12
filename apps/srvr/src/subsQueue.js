@@ -16,7 +16,7 @@ import fs from "fs";
 import * as path from "node:path";
 import * as cp from "child_process";
 import fetch from "node-fetch";
-import { unilog, parseFileSeasonEpisode } from "@tv/share";
+import { unilog, logHere, parseFileSeasonEpisode } from "@tv/share";
 import * as epd from "@tv/share";
 import { SRVR_DATA_DIR } from "./srvrPaths.js";
 import cron from "node-cron";
@@ -374,17 +374,29 @@ async function generateEmbSrts(
 ) {
   const base = videoFilePath.replace(/\.[^.]+$/, "");
   syncBatchMsgs();
-  let probeStreams = [];
-  await new Promise((resolve) => {
+  // A failed probe must never look like "this video has no subtitle streams" —
+  // that would route a file with embedded subs straight to ASR. Throw instead;
+  // processSubQueueEntry drops the entry and the next show scan re-queues it.
+  let probeStreams;
+  await new Promise((resolve, reject) => {
     cp.execFile(
       "ffprobe",
       ["-v", "quiet", "-print_format", "json", "-show_streams", videoFilePath],
       { maxBuffer: 4 * 1024 * 1024 },
       (err, stdout) => {
-        if (!err) {
-          try {
-            probeStreams = JSON.parse(stdout).streams || [];
-          } catch {}
+        if (err) {
+          reject(
+            new Error(`ffprobe failed for ${videoFilePath}: ${err.message}`),
+          );
+          return;
+        }
+        try {
+          probeStreams = JSON.parse(stdout).streams || [];
+        } catch (e) {
+          reject(
+            new Error(`ffprobe bad json for ${videoFilePath}: ${e.message}`),
+          );
+          return;
         }
         resolve();
       },
@@ -548,6 +560,14 @@ async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
 async function generateSrtWithAsr(videoFilePath, fromUI) {
   const base = videoFilePath.replace(/\.[^.]+$/, "");
   const srtPath = base + ".asr.srt";
+  if (!fs.existsSync(videoFilePath)) {
+    subsState.asrLogBuffer = [];
+    appendAsrLog(
+      `=== Skipped: ${path.basename(videoFilePath)} (video file gone) ===`,
+    );
+    unilog(1400, `dropping asr queue entry, file gone: ${videoFilePath}`);
+    return;
+  }
   if (fs.existsSync(srtPath)) {
     subsState.asrLogBuffer = [];
     appendAsrLog(
@@ -559,7 +579,7 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
   }
   subsState.asrLogBuffer = [];
   appendAsrLog("");
-  appendAsrLog(`=== Starting: ${path.basename(videoFilePath)} ===`);
+  appendAsrLog(`=== Queued: ${path.basename(videoFilePath)} ===`);
   unilog(14, `asr start: ${videoFilePath}`);
   subsState.genSrtRunning = true;
   notifyClients("asr-queue-update", {
@@ -567,10 +587,18 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
     running: true,
   });
   syncBatchMsgs();
+  // asr.js runs on the single serialized batch queue, so a long re-encode ahead
+  // of it can delay the start by hours. Say so — otherwise the pane looks hung.
+  if (ffmpegQueue.pending > 0) {
+    appendAsrLog(
+      `=== Waiting for batch queue: ${ffmpegQueue.pending} job(s) ahead ===`,
+    );
+  }
   try {
     await ffmpegQueue.run(
       () =>
         new Promise((resolve, reject) => {
+          appendAsrLog(`=== Starting: ${path.basename(videoFilePath)} ===`);
           const child = cp.spawn(
             BATCH_SCHED[0],
             [...BATCH_SCHED.slice(1), "node", ASR_JS_PATH, videoFilePath],
@@ -648,6 +676,12 @@ async function processSubQueueEntry() {
   subsState.subQueueBusy = true;
   subsState.currentlyProcessingSubPath = entry.videoFilePath;
   try {
+    // The file can vanish between enqueue and now — most often a 1080 demoted to
+    // a hidden `.mkv.alt` fallback, which already inherits the 2160's subtitles.
+    if (!fs.existsSync(entry.videoFilePath)) {
+      unilog(1401, `dropping sub queue entry, file gone: ${entry.videoFilePath}`);
+      return;
+    }
     const parsed = parseFileSeasonEpisode(entry.videoFilePath);
     const showName = showNameFromFilePath(entry.videoFilePath);
     const { pgsOnly, hasEmbText } =

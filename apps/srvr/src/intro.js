@@ -115,7 +115,7 @@ export async function doSkipIntro(pressedAt, deviceName = null) {
     { method: "POST", headers: { Accept: "application/json" } },
   );
   if (!seekRes.ok) {
-    unilog(54, `seek failed: ${seekRes.status}`);
+    unilog(54, `seek failed for ${showName}: ${seekRes.status}`);
     return { ok: false, error: `seek ${seekRes.status}` };
   }
   return { ok: true };
@@ -164,7 +164,7 @@ export async function doTrimIntro(deviceName = null) {
       { method: "POST", headers: { Accept: "application/json" } },
     );
     if (!seekRes.ok) {
-      unilog(57, `seek failed: ${seekRes.status}`);
+      unilog(57, `seek failed for ${showName}: ${seekRes.status}`);
       return { ok: false, error: `seek ${seekRes.status}` };
     }
     await sleep(TRIM_SEEK_VERIFY_MS);

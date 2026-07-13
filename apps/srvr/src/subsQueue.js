@@ -31,7 +31,7 @@ import {
   subsSearch,
 } from "./opensubtitles.js";
 import { encodeFileIdBase32 } from "./subFiles.js";
-import { BATCH_SCHED, ffmpegQueue } from "./batchQueue.js";
+import { BATCH_SCHED, subExtractQueue } from "./batchQueue.js";
 import * as tvdb from "./tvdb.js";
 
 // ---- hard-wired constants (no env vars per repo convention) ----
@@ -425,7 +425,7 @@ async function generateEmbSrts(
       if (fromUI) notifyClients("emb-log", `exists: ${path.basename(outPath)}`);
       continue;
     }
-    await ffmpegQueue.run(
+    await subExtractQueue.run(
       () =>
         new Promise((resolve) => {
           cp.execFile(
@@ -587,44 +587,37 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
     running: true,
   });
   syncBatchMsgs();
-  // asr.js runs on the single serialized batch queue, so a long re-encode ahead
-  // of it can delay the start by hours. Say so — otherwise the pane looks hung.
-  if (ffmpegQueue.pending > 0) {
-    appendAsrLog(
-      `=== Waiting for batch queue: ${ffmpegQueue.pending} job(s) ahead ===`,
-    );
-  }
+  // Not on ffmpegQueue: transcription is a remote API call and the local ffmpeg
+  // work is audio-only, so it never competes with the re-encodes for cores.
+  // startAsrQueueLoop's genSrtRunning guard already keeps this to one at a time.
   try {
-    await ffmpegQueue.run(
-      () =>
-        new Promise((resolve, reject) => {
-          appendAsrLog(`=== Starting: ${path.basename(videoFilePath)} ===`);
-          const child = cp.spawn(
-            BATCH_SCHED[0],
-            [...BATCH_SCHED.slice(1), "node", ASR_JS_PATH, videoFilePath],
-            {
-              stdio: ["ignore", "pipe", "pipe"],
-            },
-          );
-          subsState.genSrtChild = child;
-          child.stdout.on("data", (d) => {
-            const line = d.toString().trimEnd();
-            unilog(517, line);
-            appendAsrLog(line);
-          });
-          child.stderr.on("data", (d) => {
-            const line = d.toString().trimEnd();
-            unilog(518, line);
-            appendAsrLog(line);
-          });
-          child.on("close", (code) => {
-            subsState.genSrtChild = null;
-            if (code === 0) resolve();
-            else if (code === null) reject(new Error(`__cancelled__`));
-            else reject(new Error(`asr.js exited ${code}`));
-          });
-        }),
-    );
+    await new Promise((resolve, reject) => {
+      appendAsrLog(`=== Starting: ${path.basename(videoFilePath)} ===`);
+      const child = cp.spawn(
+        BATCH_SCHED[0],
+        [...BATCH_SCHED.slice(1), "node", ASR_JS_PATH, videoFilePath],
+        {
+          stdio: ["ignore", "pipe", "pipe"],
+        },
+      );
+      subsState.genSrtChild = child;
+      child.stdout.on("data", (d) => {
+        const line = d.toString().trimEnd();
+        unilog(517, line);
+        appendAsrLog(line);
+      });
+      child.stderr.on("data", (d) => {
+        const line = d.toString().trimEnd();
+        unilog(518, line);
+        appendAsrLog(line);
+      });
+      child.on("close", (code) => {
+        subsState.genSrtChild = null;
+        if (code === 0) resolve();
+        else if (code === null) reject(new Error(`__cancelled__`));
+        else reject(new Error(`asr.js exited ${code}`));
+      });
+    });
     unilog(15, `asr done: ${videoFilePath}`);
     appendAsrLog(`=== Done: ${path.basename(videoFilePath)} ===`);
     if (fromUI)

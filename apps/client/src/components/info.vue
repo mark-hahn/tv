@@ -1077,7 +1077,11 @@ export default {
           epiCounts.watchedCount !== prev.watchedCount
         ) {
           const fields = Object.assign({ name, dontEnqueue: true }, epiCounts);
-          srvr.setTvdbFields(fields).catch((e) => unilog(928, e));
+          srvr
+            .setTvdbFields(fields)
+            .catch((e) =>
+              unilog(928, `setTvdbFields ${name}: ${e.message || e}`),
+            );
         }
       }
 
@@ -1234,7 +1238,10 @@ export default {
         }
         this.watchButtonTxtArr = watchButtonTxtArr.sort();
       } catch (e) {
-        unilog(929, "updateWatchButtons Error:", e.message || e);
+        unilog(
+          929,
+          `updateWatchButtons Error (${this.show?.name}): ${e.message || e}`,
+        );
       }
     },
 

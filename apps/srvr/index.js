@@ -1095,17 +1095,33 @@ registerUnilogRoutes(app);
 // Log server startup.
 unilog(1215, "Started t-srvr");
 
+// Show/file name from an api call's params, when one of the usual fields is
+// there — so an api error log names what it was working on.
+const paramName = (params) => {
+  const name =
+    params?.show?.name ||
+    params?.show?.Name ||
+    params?.name ||
+    params?.showName ||
+    params?.file ||
+    params?.fileName;
+  return name ? ` (${name})` : "";
+};
+
 // The handler should be: async (params) => result
 const apiWrapper = (handler) => {
   return async (req, res) => {
+    // GET requests use query params, POST use body
+    const params = req.method === "GET" ? req.query : req.body;
     try {
-      // GET requests use query params, POST use body
-      const params = req.method === "GET" ? req.query : req.body;
       const result = await handler(params);
       res.json(result);
     } catch (error) {
       const msg = error?.message || String(error);
-      unilog(568, `Error in ${req.url}: ${msg}\n${error?.stack || ""}`);
+      unilog(
+        568,
+        `Error in ${req.url}${paramName(params)}: ${msg}\n${error?.stack || ""}`,
+      );
       res.status(500).json({ error: msg });
     }
   };

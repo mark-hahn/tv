@@ -101,14 +101,17 @@ function delay(ms) {
   });
 }
 
-async function dismissOverlays(page) {
+async function dismissOverlays(page, query) {
   // Save HTML snapshot before any dismissal attempts
   if (ROTTEN_SAVE_FILES) {
     try {
       const html = await page.content();
       fs.writeFileSync("rotten-overlays.html", html);
     } catch (e) {
-      unilog(697, "Failed to save rotten-overlays.html", e.message);
+      unilog(
+        697,
+        `Failed to save rotten-overlays.html for ${query}: ${e.message}`,
+      );
     }
   }
 
@@ -164,7 +167,7 @@ async function dismissOverlays(page) {
       await delay(200);
     }
   } catch (e) {
-    unilog(698, "OneTrust click error:", e.message);
+    unilog(698, `OneTrust click error for ${query}: ${e.message}`);
   }
 
   // 4. Polling for the stubborn popup at 853, 160
@@ -275,7 +278,7 @@ async function dismissOverlays(page) {
               }
             }
           } catch (e) {
-            unilog(699, "Delete script error:", e.message);
+            unilog(699, `Delete script error for ${query}: ${e.message}`);
           }
           return false;
         });
@@ -289,7 +292,7 @@ async function dismissOverlays(page) {
       await delay(200);
     }
   } catch (err) {
-    unilog(700, "Polling error:", err.message);
+    unilog(700, `Polling error for ${query}: ${err.message}`);
   }
 
   // Check if we are incorrectly clicking the navbar
@@ -444,7 +447,7 @@ async function findShows(page, query) {
   queryUrl = `${BASE}/search?search=${encodeURIComponent(srchQuery)}`;
   await page.goto(queryUrl, { waitUntil: "domcontentloaded" });
 
-  await dismissOverlays(page);
+  await dismissOverlays(page, query);
   const rows = page.locator(
     'search-page-result[type="tvSeries"] search-page-media-row',
   );
@@ -542,12 +545,15 @@ export async function rottenSearch(query) {
         await page.goto(detailLink, { waitUntil: "domcontentloaded" });
         break;
       } catch (e) {
-        unilog(703, `rotten detail.goto failed (attempt ${i}): ${e.message}`);
+        unilog(
+          703,
+          `rotten detail.goto failed for ${query} (attempt ${i}): ${e.message}`,
+        );
         if (i === 3) throw e;
         await new Promise((r) => setTimeout(r, 1000));
       }
     }
-    await dismissOverlays(page);
+    await dismissOverlays(page, query);
 
     const getScore = async (slot, retrying = false) => {
       // Version Marker
@@ -603,7 +609,7 @@ export async function rottenSearch(query) {
       } catch (e) {
         if (!retrying) {
           // console.log(`rotten getScore ${slot} failed, attempting to dismiss overlays and retry.`);
-          await dismissOverlays(page);
+          await dismissOverlays(page, query);
           return getScore(slot, true);
         }
 

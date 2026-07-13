@@ -324,7 +324,7 @@ export const getRemotes = async (
 
       return results;
     } catch (err) {
-      unilog(884, "getRemotes:", err);
+      unilog(884, `getRemotes: ${showName}: ${err.message || err}`);
       return [];
     } finally {
       activeRemotesRequests.delete(key);

@@ -681,7 +681,7 @@ const getUrlAndRatings = async (type, url, name) => {
       unilog(
         721,
         "err",
-        `getUrlAndRatings imdb playwright error: ${url}, ${e.message}`,
+        `getUrlAndRatings imdb playwright error for ${name}: ${url}, ${e.message}`,
       );
       try {
         await page?.close();
@@ -694,7 +694,7 @@ const getUrlAndRatings = async (type, url, name) => {
       unilog(
         722,
         "err",
-        `getUrlAndRatings imdb fetch error: ${url}, status=${status}`,
+        `getUrlAndRatings imdb fetch error for ${name}: ${url}, status=${status}`,
       );
       try {
         await page?.close();
@@ -832,7 +832,7 @@ const getUrlAndRatings = async (type, url, name) => {
 
       if (!result || result.challenge) {
         if (result?.challenge)
-          unilog(723, `getUrlAndRatings imdb challenge page: ${url}`);
+          unilog(723, `getUrlAndRatings imdb challenge page for ${name}: ${url}`);
         return { ratings: null, video: null };
       }
 
@@ -843,7 +843,7 @@ const getUrlAndRatings = async (type, url, name) => {
       unilog(
         724,
         "err",
-        `getUrlAndRatings imdb parse error: ${url}, ${e.message}`,
+        `getUrlAndRatings imdb parse error for ${name}: ${url}, ${e.message}`,
       );
       try {
         await page?.close();
@@ -2623,9 +2623,7 @@ export const getRemotesCmd = async (params) => {
         saveTvdbSync().catch((err) => {
           unilog(
             758,
-            "err",
-            "getRemotesCmd: saveTvdbSync failed:",
-            err.message,
+            `getRemotesCmd: saveTvdbSync failed for ${show.name}: ${err.message}`,
           );
         });
       }
@@ -2633,7 +2631,7 @@ export const getRemotesCmd = async (params) => {
 
     return remotes;
   } catch (err) {
-    unilog(759, "getRemotesCmd: ERROR", { error: err.message });
+    unilog(759, `getRemotesCmd: ERROR for ${show.name}: ${err.message}`);
     throw new Error(`getRemotes error: ${err.message}`);
   }
 };

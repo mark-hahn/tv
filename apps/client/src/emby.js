@@ -970,7 +970,7 @@ export const getSeriesMap = async (show, prune = false) => {
   if (show.inEmby === false) {
     const tvdbId = show.tvdbId;
     if (!tvdbId) {
-      unilog(1068, "getSeriesMap: Preview show has no tvdbId");
+      unilog(1068, `getSeriesMap: Preview show ${show.name} has no tvdbId`);
       return [];
     }
     try {
@@ -984,10 +984,16 @@ export const getSeriesMap = async (show, prune = false) => {
       if (result.success && result.seriesMap) {
         return result.seriesMap;
       }
-      unilog(848, "getSeriesMap: Failed to fetch from TVDB:", result.error);
+      unilog(
+        848,
+        `getSeriesMap: Failed to fetch ${show.name} from TVDB: ${result.error}`,
+      );
       return [];
     } catch (err) {
-      unilog(849, "getSeriesMap: Error fetching from TVDB:", err);
+      unilog(
+        849,
+        `getSeriesMap: Error fetching ${show.name} from TVDB: ${err.message || err}`,
+      );
       return [];
     }
   }

@@ -869,6 +869,10 @@ const getRemote = async (id, type, showName) => {
   switch (type) {
     case 2:
       name = "IMDB";
+      if (!id) {
+        unilog(1441, `getRemote IMDB missing id for ${showName}`);
+        return { name, url: null, ratings: null, video: null };
+      }
       url = `https://www.imdb.com/title/${id}`;
       urlRatings = await getUrlAndRatings(2, url, name);
       ratings = urlRatings?.ratings;
@@ -1112,6 +1116,7 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
     if (tvdbRemote.type == 18) continue;
     if (tvdbRemote.type == 7) continue;
     if (tvdbRemote.type == 2) continue;
+    if (!tvdbRemote.id) continue;
     parallelTasks.push(
       getRemote(tvdbRemote.id, tvdbRemote.type, tvdbRemote.sourceName).then(
         (remote) => {
@@ -1140,7 +1145,7 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
       parallelTasks.push(
         (async () => {
           const imdbTvdbRemote = tvdbRemotes.find((r) => r.type === 2);
-          if (imdbTvdbRemote) {
+          if (imdbTvdbRemote && imdbTvdbRemote.id) {
             const remote = await getRemote(
               imdbTvdbRemote.id,
               2,

@@ -4446,6 +4446,14 @@ async function handleToggleResolution(params) {
 }
 
 loadReencodeQueue();
+if (!RECODE_TO_1080 && reencodeQueue.length > 0) {
+  // Drain entries persisted before RECODE_TO_1080 was turned off — otherwise
+  // processReencodeQueue's early return leaves them stuck forever, showing a
+  // permanent "pending" hdrMsg for jobs that will never run.
+  unilog(1435, `dropped ${reencodeQueue.length} stale reencode queue entries (RECODE_TO_1080 is off)`);
+  reencodeQueue = [];
+  persistReencodeQueue();
+}
 if (reencodeQueue.length > 0) setTimeout(processReencodeQueue, 5000);
 
 // Watchdog heartbeat: a periodic status beat (queue depths + running flags) so

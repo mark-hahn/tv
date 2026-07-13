@@ -70,6 +70,8 @@ async function createBifFile(videoPath, width = 320, interval = 10) {
   }
 }
 
+const MAX_BIF_SECONDS = 15 * 60;
+
 function extractFrames(videoPath, outputDir, width, interval) {
   return new Promise((resolve, reject) => {
     // `-skip_frame nokey` decodes only keyframes (I-frames) instead of the whole
@@ -81,6 +83,8 @@ function extractFrames(videoPath, outputDir, width, interval) {
       "nokey",
       "-i",
       videoPath,
+      "-t",
+      String(MAX_BIF_SECONDS),
       "-vf",
       `fps=1/${interval},scale=${width}:-1`,
       "-vsync",

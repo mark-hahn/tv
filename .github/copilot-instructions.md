@@ -1,5 +1,11 @@
 # Workspace Instructions (Read First)
 
+## Response style
+
+- When asked to do a simple one-off action (generate a file, run a command), just do it and report completion in 1-2 lines.
+- Don't produce research/investigation reports, format/byte-level breakdowns, or step-by-step narration of what you checked unless something went wrong or the user asked to see it.
+- Save deep technical detail for when the user explicitly asks to understand or explain something.
+
 ## Remote server
 
 - The remote server is **hahnca.com**.

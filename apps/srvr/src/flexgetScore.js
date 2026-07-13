@@ -52,14 +52,11 @@ export function flexgetIsBetterSameRun(a, b) {
   return false;
 }
 
-// Cross-run comparison: resolution → hevc → bad group tiebreaker
+// Cross-run comparison: resolution → bad group tiebreaker
 export function flexgetIsBetterCrossRun(a, b) {
   const aRes = getResolution(a.quality || a.title || "") ?? 480;
   const bRes = getResolution(b.quality || b.title || "") ?? 480;
   if (aRes !== bRes) return aRes > bRes;
-  const aHevc = isHevc(a.title);
-  const bHevc = isHevc(b.title);
-  if (aHevc !== bHevc) return bHevc; // b needs transcoding → a is better
   const aBad = isBadGroup(a.title);
   const bBad = isBadGroup(b.title);
   if (aBad !== bBad) return bBad; // b is bad group → a is better

@@ -8,7 +8,7 @@ import * as path from "node:path";
 import * as cp from "child_process";
 import { promisify } from "util";
 import fetch from "node-fetch";
-import { unilog, smartTitleMatch, isHevc } from "@tv/share";
+import { unilog, smartTitleMatch } from "@tv/share";
 import * as epd from "@tv/share";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
 import { SRVR_ROOT_DIR, SRVR_DATA_DIR } from "./srvrPaths.js";
@@ -173,25 +173,6 @@ function getEpisodeDiskResolution(showPath, season, episode) {
     return 0;
   } catch {
     return 0;
-  }
-}
-
-function getEpisodeDiskIsHevc(showPath, season, episode) {
-  try {
-    const sKey = `S${String(season).padStart(2, "0")}`;
-    const eKey = `E${String(episode).padStart(2, "0")}`;
-    const seasonDir = path.join(TV_DIR, showPath, `Season ${season}`);
-    const files = fs.readdirSync(seasonDir);
-    const videoExts = new Set([".mkv", ".mp4", ".avi", ".m4v"]);
-    const epRe = new RegExp(`${sKey}${eKey}`, "i");
-    for (const f of files) {
-      if (!epRe.test(f)) continue;
-      if (!videoExts.has(path.extname(f).toLowerCase())) continue;
-      return isHevc(f);
-    }
-    return false;
-  } catch {
-    return false;
   }
 }
 
@@ -413,11 +394,6 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
       : "";
   const diskIsBadGroup = diskGroup ? hasBadGroup(diskGroup) : false;
   const newIsBadGroup = isBadGroup(rawTitle);
-  const diskIsHevc =
-    episodeOnDisk && rec.path
-      ? getEpisodeDiskIsHevc(rec.path, season, episode)
-      : false;
-  const newIsHevc = isHevc(rawTitle);
 
   if (storeOnly) {
     /* skip: store-only (run-loser) */
@@ -429,10 +405,7 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
       );
     } else if (
       diskRes > newRes ||
-      (diskRes === newRes &&
-        (diskIsHevc !== newIsHevc
-          ? newIsHevc // new needs transcoding → disk is better
-          : !diskIsBadGroup || newIsBadGroup))
+      (diskRes === newRes && (!diskIsBadGroup || newIsBadGroup))
     ) {
       unilog(
         1183,

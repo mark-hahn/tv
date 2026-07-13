@@ -31,6 +31,19 @@ function shellQuote(s) {
   return "'" + s.replace(/'/g, "'\\''") + "'";
 }
 
+function remotePathUnderRoot(root, relPath) {
+  const rel = String(relPath || "").trim();
+  if (
+    !rel ||
+    path.posix.isAbsolute(rel) ||
+    rel.includes("\0") ||
+    rel.split(/[\\/]+/).includes("..")
+  ) {
+    throw new Error(`Invalid path: ${rel}`);
+  }
+  return path.posix.join(root, rel.replace(/\\/g, "/"));
+}
+
 // Run one command on the USB server; returns stdout.
 async function runUsbSsh(
   cmd,
@@ -923,23 +936,19 @@ export async function renameUsbFile(oldPath, newName) {
   const root = USB_FILES_ROOT;
 
   if (
-    oldPath.includes("..") ||
-    newName.includes("..") ||
-    newName.includes("/")
+    !newName ||
+    path.posix.isAbsolute(String(newName)) ||
+    /[\\/]/.test(String(newName)) ||
+    String(newName).includes("\0")
   ) {
     throw new Error("Invalid path or name");
   }
 
-  const parts = oldPath.split("/");
-  const fileName = parts.pop();
-  const dirPath = parts.join("/");
-
-  const fullOldPath = dirPath
-    ? `${root}/${dirPath}/${fileName}`
-    : `${root}/${fileName}`;
-  const fullNewPath = dirPath
-    ? `${root}/${dirPath}/${newName}`
-    : `${root}/${newName}`;
+  const fullOldPath = remotePathUnderRoot(root, oldPath);
+  const fullNewPath = path.posix.join(
+    path.posix.dirname(fullOldPath),
+    String(newName).trim(),
+  );
 
   await runUsbSsh(`mv ${shellQuote(fullOldPath)} ${shellQuote(fullNewPath)}`);
   return { success: true };
@@ -952,11 +961,8 @@ async function deleteUsbPaths(root, paths) {
   }
 
   for (const p of paths) {
-    const str = String(p || "").trim();
-    if (!str || str.includes("..")) {
-      throw new Error(`Invalid path: ${str}`);
-    }
-    await runUsbSsh(`rm -rf -- ${shellQuote(`${root}/${str}`)}`);
+    const fullPath = remotePathUnderRoot(root, p);
+    await runUsbSsh(`rm -rf -- ${shellQuote(fullPath)}`);
   }
 
   return { success: true, deleted: paths.length };

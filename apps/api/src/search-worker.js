@@ -4,13 +4,23 @@ import { initializeProviders, searchTorrents } from "./search.js";
 
 initializeProviders();
 
+function sendAndExit(message, exitCode) {
+  if (typeof process.send !== "function" || !process.connected) {
+    process.exit(exitCode);
+    return;
+  }
+  try {
+    process.send(message, () => process.exit(exitCode));
+  } catch {
+    process.exit(exitCode);
+  }
+}
+
 process.once("message", async (params) => {
   try {
     const result = await searchTorrents(params);
-    process.send({ ok: true, result }, () => process.exit(0));
+    sendAndExit({ ok: true, result }, 0);
   } catch (err) {
-    process.send({ ok: false, error: err?.message || String(err) }, () =>
-      process.exit(1),
-    );
+    sendAndExit({ ok: false, error: err?.message || String(err) }, 1);
   }
 });

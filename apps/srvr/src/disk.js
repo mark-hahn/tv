@@ -94,6 +94,7 @@ function fmtDateWithTZ(date, utcOut = false) {
   return `${year}-${month}-${day}`;
 }
 
+const MAX_PROBED_RAW_HEIGHT_CACHE = 10000;
 const probedRawHeightByPath = new Map();
 
 function probeRawHeight(filePath) {
@@ -124,6 +125,10 @@ function probeRawHeight(filePath) {
     h = null;
   }
 
+  if (probedRawHeightByPath.size >= MAX_PROBED_RAW_HEIGHT_CACHE) {
+    const oldestKey = probedRawHeightByPath.keys().next().value;
+    if (oldestKey !== undefined) probedRawHeightByPath.delete(oldestKey);
+  }
   probedRawHeightByPath.set(filePath, h);
   return h;
 }

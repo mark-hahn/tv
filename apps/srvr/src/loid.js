@@ -5,7 +5,7 @@
 import fs from "fs";
 import * as path from "node:path";
 import fetch from "node-fetch";
-import { logHere, unilog} from "@tv/share"
+import { logHere, unilog } from "@tv/share";
 import { SRVR_DATA_DIR } from "./srvrPaths.js";
 
 const LOID_COOKIE_PATH = path.join(SRVR_DATA_DIR, "loid-cookie.txt");
@@ -48,12 +48,20 @@ export async function saveAndVerifyLoid(cookie) {
     .trim();
   if (!value) return { error: "empty cookie" };
 
-  await fs.promises.writeFile(LOID_COOKIE_PATH, value + "\n");
-
-  const resp = await fetch(VERIFY_URL, {
-    headers: { "User-Agent": USER_AGENT, Cookie: `loid=${value}` },
-    signal: AbortSignal.timeout(8000),
-  });
+  let resp;
+  try {
+    await fs.promises.writeFile(LOID_COOKIE_PATH, value + "\n");
+    resp = await fetch(VERIFY_URL, {
+      headers: { "User-Agent": USER_AGENT, Cookie: `loid=${value}` },
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch (e) {
+    logHere(
+      { lvl: "warn", grp: "loid" },
+      `loid cookie save or verify failed: ${e.message}`,
+    );
+    return { error: e?.message || String(e) };
+  }
   if (!resp.ok) {
     unilog(1291, `loid cookie verify failed: reddit returned ${resp.status}`);
     return { error: `reddit returned ${resp.status}` };

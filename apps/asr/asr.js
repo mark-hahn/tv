@@ -47,6 +47,7 @@ try {
   if (!process.env.ASR_TMPDIR) {
     const fallback = path.join("/tmp", "asr-fallback-" + Date.now());
     fs.mkdirSync(fallback, { recursive: true });
+    tmpDir = fallback;
   }
 }
 

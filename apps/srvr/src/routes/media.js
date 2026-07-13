@@ -270,20 +270,32 @@ export function registerMediaRoutes(app) {
       _updateStreamMsg();
       ffmpeg.stdout.pipe(res);
       ffmpeg.stderr.on("data", () => {});
-      ffmpeg.on("error", (err) => {
-        unilog(589, "ffmpeg spawn error:", err.message);
+      let videoDone = false;
+      const decVideoStream = () => {
+        if (videoDone) return;
+        videoDone = true;
         _activeVideoStreams--;
         _updateStreamMsg();
+      };
+      ffmpeg.on("error", (err) => {
+        unilog(589, "ffmpeg spawn error:", err.message);
+        decVideoStream();
       });
       const killFfmpeg = () => {
         if (ffmpeg.killed) return;
         ffmpeg.kill("SIGKILL");
       };
+      ffmpeg.stdout.on("error", (err) => {
+        logHere(
+          { lvl: "warn", grp: "stream" },
+          `ffmpeg stdout error: ${err.message}`,
+        );
+        killFfmpeg();
+      });
       req.on("close", killFfmpeg);
       res.on("close", killFfmpeg);
       ffmpeg.on("exit", (code) => {
-        _activeVideoStreams--;
-        _updateStreamMsg();
+        decVideoStream();
         if (code !== 0 && code !== null) unilog(46, `ffmpeg exit code ${code}`);
         if (!res.writableEnded) res.end();
       });

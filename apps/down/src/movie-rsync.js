@@ -18,9 +18,28 @@ const FAST_MODE_MAX_MS = 60 * 1000;
 const N_STREAMS = 8;
 const BLOCK_SIZE_MB = 1;
 const PROGRESS_INTERVAL_MS = 2000;
+const FINISHED_JOB_RETENTION_MS = 10 * 60 * 1000;
+const MAX_FINISHED_JOBS = 50;
 
 // Map: filePath → job object
 const jobs = new Map();
+
+function pruneFinishedJobs() {
+  const now = Date.now();
+  const finished = [];
+  for (const [filePath, job] of jobs.entries()) {
+    if (job.status === "Downloading") continue;
+    const endedAt = job._endedAt || now;
+    job._endedAt = endedAt;
+    if (now - endedAt >= FINISHED_JOB_RETENTION_MS) jobs.delete(filePath);
+    else finished.push([filePath, endedAt]);
+  }
+  finished.sort((a, b) => a[1] - b[1]);
+  while (finished.length > MAX_FINISHED_JOBS) {
+    const [filePath] = finished.shift();
+    jobs.delete(filePath);
+  }
+}
 
 let _qbCookie = null;
 let _cycleTimer = null;
@@ -77,6 +96,7 @@ async function getMovieTorrents() {
 
 // Returns true if a new download job was started, false if skipped.
 function startCopyFile(filePath, totalBytes) {
+  pruneFinishedJobs();
   if (jobs.has(filePath)) return false;
   const nameParts = filePath.split("/");
   const basename = nameParts[nameParts.length - 1];
@@ -109,7 +129,11 @@ function startCopyFile(filePath, totalBytes) {
   jobs.set(filePath, job);
 
   runParallelDd(filePath, basename, destPath, totalBytes, job).catch(() => {
-    if (job.status === "Downloading") job.status = "Error";
+    if (job.status === "Downloading") {
+      job.status = "Error";
+      job._endedAt = Date.now();
+    }
+    pruneFinishedJobs();
   });
 
   return true;
@@ -207,11 +231,15 @@ async function runParallelDd(filePath, basename, destPath, totalBytes, job) {
 
   if (errorStream !== null) {
     job.status = `Error (stream ${errorStream})`;
+    job._endedAt = Date.now();
+    pruneFinishedJobs();
     return;
   }
 
   job.percent = 100;
   job.status = "Finished";
+  job._endedAt = Date.now();
+  pruneFinishedJobs();
   childProcess.spawn("ssh", [
     USB_HOST,
     `touch -- '${filePath}.tv-done'; rm -f -- '${filePath}.lftp-pget-status'`,
@@ -315,6 +343,7 @@ export async function triggerCycle() {
 }
 
 export function getMovieDownJobs() {
+  pruneFinishedJobs();
   return {
     cycling: _cycling,
     jobs: Array.from(jobs.values()).map((j) => ({
@@ -341,5 +370,7 @@ export function killAll() {
     }
     job._procs = [];
     if (job.status === "Downloading") job.status = "Killed";
+    job._endedAt = Date.now();
   }
+  pruneFinishedJobs();
 }

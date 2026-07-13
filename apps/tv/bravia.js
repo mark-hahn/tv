@@ -142,7 +142,9 @@ function sendCommand() {
     type: "call_service",
     domain,
     service,
-    target: { entity_id: "notify.bravia_k_65xr70" },
+    target: {
+      entity_id: domain === "notify" ? "notify.bravia_k_65xr70" : ENTITY_ID,
+    },
   };
   if (Object.keys(serviceData).length > 0) cmd.service_data = serviceData;
   ws.send(JSON.stringify(cmd));

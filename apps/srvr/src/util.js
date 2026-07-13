@@ -24,6 +24,12 @@ export const jParse = (str, label) => {
   return obj;
 };
 
+function normalizePstTime(timePart) {
+  return String(timePart || "").startsWith("24:")
+    ? "00:" + String(timePart).slice(3)
+    : timePart;
+}
+
 // Convert an ISO/UTC date string to PST YYYY-MM-DD HH:mm:ss
 export function toPstDateTime(isoStr) {
   if (!isoStr) return null;
@@ -36,7 +42,7 @@ export function toPstDateTime(isoStr) {
     timeZone: "America/Los_Angeles",
     hour12: false,
   });
-  return datePart + " " + timePart;
+  return datePart + " " + normalizePstTime(timePart);
 }
 
 // Get current date/time in PST timezone as YYYY-MM-DD HH:mm:ss string
@@ -49,7 +55,7 @@ export function getPstDate() {
     timeZone: "America/Los_Angeles",
     hour12: false,
   });
-  return date + " " + time;
+  return date + " " + normalizePstTime(time);
 }
 
 let lastMsg = null;

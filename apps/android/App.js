@@ -384,6 +384,8 @@ export default function App() {
       } catch (_) {}
     };
     ws.onclose = () => {
+      if (wsRef.current !== ws) return;
+      wsRef.current = null;
       setTimeout(connectWs, 2000);
     };
   };

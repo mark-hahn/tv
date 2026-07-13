@@ -15,6 +15,27 @@ import {
 } from "./disk.js";
 
 const tvDir = "/mnt/media/tv";
+const tvRoot = path.resolve(tvDir);
+
+function resolveUnderTvDir(pathParam, label = "path") {
+  if (typeof pathParam !== "string") {
+    throw new Error(`${label}: path must be string`);
+  }
+  const rawPath = pathParam.trim();
+  if (!rawPath || rawPath.includes("\0")) {
+    throw new Error(`${label}: invalid path`);
+  }
+  if (!path.isAbsolute(rawPath) && rawPath.split(/[\\/]+/).includes("..")) {
+    throw new Error(`${label}: path not allowed: ${rawPath}`);
+  }
+  const targetPath = path.isAbsolute(rawPath)
+    ? path.resolve(rawPath)
+    : path.resolve(tvRoot, rawPath);
+  if (!(targetPath === tvRoot || targetPath.startsWith(tvRoot + path.sep))) {
+    throw new Error(`${label}: path not allowed: ${rawPath}`);
+  }
+  return targetPath;
+}
 
 export const getFile = async (params) => {
   // Param is usually an object { path: "..." }
@@ -90,12 +111,10 @@ export const getFile = async (params) => {
 };
 
 const deleteOnePath = async (pathParam) => {
-  // If it's just a folder name (no slashes), construct the full path in tvDir
-  // Otherwise use the path as-is (for episode file deletions)
-  let fullPath =
-    pathParam.includes("/") || pathParam.includes("\\")
-      ? pathParam
-      : path.join(tvDir, pathParam);
+  let fullPath = resolveUnderTvDir(pathParam, "deletePath");
+  if (fullPath === tvRoot) {
+    throw new Error("deletePath: refusing to delete tv root");
+  }
 
   try {
     // Check if path exists
@@ -204,10 +223,10 @@ export const delSeasonFiles = async (params) => {
     throw new Error("delSeasonFiles: requires showName, showPath, season");
   }
 
-  const showPath =
-    showPathParam.includes("/") || showPathParam.includes("\\")
-      ? showPathParam
-      : path.join(tvDir, showPathParam);
+  const showPath = resolveUnderTvDir(showPathParam, "delSeasonFiles");
+  if (showPath === tvRoot) {
+    throw new Error("delSeasonFiles: refusing to use tv root as showPath");
+  }
 
   const seasonStr = String(season).trim();
   const parsedSeason = Number.parseInt(seasonStr, 10);

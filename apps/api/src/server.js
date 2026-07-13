@@ -1157,12 +1157,25 @@ app.post("/api/local/mediainfo", async (req, res) => {
     if (!relPath) {
       return res.status(400).json({ error: "Missing relPath" });
     }
+    const relPathStr = String(relPath).trim();
+    if (
+      !relPathStr ||
+      path.isAbsolute(relPathStr) ||
+      relPathStr.includes("\0") ||
+      relPathStr.split(/[\\/]+/).includes("..")
+    ) {
+      return res.status(400).json({ error: "Invalid relPath" });
+    }
     const root = movieMode
       ? "/mnt/media/movies"
       : errsMode
         ? "/mnt/media/tv-errors"
         : "/mnt/media/tv";
-    const fullPath = path.join(root, relPath);
+    const rootPath = path.resolve(root);
+    const fullPath = path.resolve(rootPath, relPathStr);
+    if (!(fullPath === rootPath || fullPath.startsWith(rootPath + path.sep))) {
+      return res.status(400).json({ error: "Invalid relPath" });
+    }
     const { execFile } = await import("node:child_process");
     const { promisify } = await import("node:util");
     const execAsync = promisify(execFile);
@@ -1175,7 +1188,7 @@ app.post("/api/local/mediainfo", async (req, res) => {
       .filter((l) => !/^Encoding settings\s*:/i.test(l))
       .join("\n");
 
-    const fileName = relPath.split("/").pop();
+    const fileName = relPathStr.split("/").pop();
 
     // Count subtitle streams that are English or have no language tag (mirrors getSubtitleStreams in asr.js).
     const ENGLISH_LANG_TAGS = new Set(["eng", "en", "english"]);

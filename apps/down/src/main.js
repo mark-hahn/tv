@@ -2147,7 +2147,6 @@ async function main() {
         suffix: "B",
       });
 
-
       for (j = 0, len = skipPaths.length; j < len; j++) {
         skipPath = skipPaths[j];
         if (usbFilePath.startsWith(skipPath)) {
@@ -2202,7 +2201,6 @@ async function main() {
         parsed = {};
         parsedFolder = {};
       }
-
 
       parts = fname.split(".");
       fext = parts[parts.length - 1].toLowerCase();
@@ -2273,7 +2271,6 @@ async function main() {
       // file passed all block tests, process it
       currentSeq = ++cycleSeq;
       downloadTime = Date.now();
-
 
       // Provide a clear reason when the parser can't produce S/E.
       if (!title || !Number.isInteger(season) || !Number.isInteger(episode)) {
@@ -2431,7 +2428,6 @@ async function main() {
   chkTvDB = () => {
     // smartTitleMatch() is provided by the shared @tv/share package.
 
-
     if (title in tvdbCache) {
       if (tvdbCache[title] === null) {
         // Previously determined this title is not resolvable — skip without hitting TVDB.
@@ -2539,9 +2535,9 @@ async function main() {
               err(
                 `tvdb search error: ${error && error.message ? error.message : error} | status: ${response && response.statusCode} | fname: ${fname}`,
               );
-              if (++tvDbErrCount === 15) {
+              if (++tvDbErrCount >= 15) {
                 err("giving up, downloaded:", downloadCount);
-                return;
+                return process.nextTick(checkFile);
               }
               err("tvdb err retry, waiting one minute");
               return setTimeout(chkTvDB, rsyncDelay);
@@ -2725,7 +2721,6 @@ async function main() {
       destTitle = `${embyFolderName} ${seStr}${fext}`;
     }
 
-
     // usbPath is the folder containing the file on the USB host.
     // Example: "~/files/<torrent-folder>/"
     var usbDir = "";
@@ -2803,12 +2798,7 @@ async function main() {
         if (epIsWatched) {
           const seStr = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
           existsCount++;
-          unilog(
-            331,
-            "SKIP (episode watched):",
-            fname,
-            seStr,
-          );
+          unilog(331, "SKIP (episode watched):", fname, seStr);
           return process.nextTick(checkFile);
         }
       }
@@ -3194,8 +3184,6 @@ async function main() {
       ) {
         cycleSeMap[(seriesName || "") + "\x00" + flexSeStr] = fname;
       }
-
-
     } catch (e) {
       // keep going
     }

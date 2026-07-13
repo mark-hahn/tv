@@ -1,6 +1,6 @@
 import { WebSocket } from "ws";
 import { exec, spawn } from "child_process";
-import { createWriteStream } from "fs";
+import { createWriteStream, mkdirSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -18,6 +18,7 @@ setUnilogSink(({ logId, message }) => {
     body: JSON.stringify({ logId, pid: "tv-tv", message }),
   }).catch(() => {});
 });
+mkdirSync(join(__dirname, "../data"), { recursive: true });
 const _adbLog = createWriteStream(join(__dirname, "../data/tv-adb.log"), {
   flags: "a",
 });
@@ -49,7 +50,8 @@ function adbLog(...args) {
     timeZone: "America/Los_Angeles",
   }).format(d);
   const line = `[${ye}/${mo}/${da} ${ho}:${mi}:${se}] ${args.join(" ")}\n`;
-  _adbLog.write(line);
+  const fixedLine = line.replace(/ 24:(\d{2}:\d{2})\]/, " 00:$1]");
+  _adbLog.write(fixedLine);
 }
 
 const HA_HOST = "hahnca.com:8123";
@@ -96,8 +98,7 @@ const EMBY_API_KEY = "1c399bd079d549cba8c916244d3add2b";
 const EMBY_USER_ID = "894c752d448f45a3a1260ccaabd0adff";
 const EMBY_BASE_URL = "http://127.0.0.1:8096/emby";
 // Emby app launch id on the Bravia Google-TV (Sony appControl uri for com.mb.android)
-const EMBY_APP_URI =
-  "com.sony.dtv.com.mb.android.com.mb.android.MainActivity";
+const EMBY_APP_URI = "com.sony.dtv.com.mb.android.com.mb.android.MainActivity";
 // Emby app launch activity on the Fire TV (adb am start -n)
 const EMBY_FIRE_ACTIVITY = "com.mb.android/.MainActivity";
 // Emby DeviceNames reported by the Emby app on each TV
@@ -123,7 +124,7 @@ const SCRUB_RATE_REV_FAST = 100; // ms between left keys after first N
 const SCRUB_DEADMAN_TIMEOUT = 2000; // ms without ping before auto-stop
 
 // Subtitle nav (IRCC key sequence) delay
-const SUB_KEY_DELAY   = 400; // ms between each key send in subtitle nav sequence
+const SUB_KEY_DELAY = 400; // ms between each key send in subtitle nav sequence
 const SUB_NAV_POLL_MS = 10_000; // fast-poll window after nav completes
 
 // PST LA timestamp  MM-DD HH:mm
@@ -499,10 +500,7 @@ function handleMsg(raw) {
           unilog(388, "firebtn: FireTV active — launching Emby");
           setTimeout(
             () =>
-              adbExec(
-                `shell am start -n ${EMBY_FIRE_ACTIVITY}`,
-                "emby launch",
-              ),
+              adbExec(`shell am start -n ${EMBY_FIRE_ACTIVITY}`, "emby launch"),
             FIRE_EMBY_DELAY_MS,
           );
         }
@@ -593,8 +591,7 @@ app.get("/tv/googlebtn", (req, res) => {
       unilog(396, "googlebtn: +10s launching Emby via play_media");
       callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
         media_content_type: "app",
-        media_content_id:
-          EMBY_APP_URI,
+        media_content_id: EMBY_APP_URI,
       });
     }, GOOGLE_EMBY_DELAY_MS);
   } else {
@@ -615,9 +612,12 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // server — which is what a restarting Emby ui does and an idle one does not.
 async function embyTvLastActivity() {
   try {
-    const resp = await fetch(`${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`, {
-      headers: { Accept: "application/json" },
-    });
+    const resp = await fetch(
+      `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
+      {
+        headers: { Accept: "application/json" },
+      },
+    );
     const sessions = await resp.json();
     const dates = sessions
       .filter((s) => s.DeviceName === LIVING_ROOM_DEVICE_NAME)
@@ -788,8 +788,7 @@ async function runToggleResSequence(toggleArg, knownEpisodeId) {
     };
     callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
       media_content_type: "app",
-      media_content_id:
-        EMBY_APP_URI,
+      media_content_id: EMBY_APP_URI,
     });
     setTimeout(() => firePendingViewShow("toggleres"), VIEW_SHOW_DELAY_MS);
   } catch (e) {
@@ -889,7 +888,10 @@ function fireKeyeventOnce(keycode) {
     // never fires. Without this the request would hang forever.
     const timer = setTimeout(() => {
       clearPending();
-      unilog(1424, `adb shell did not echo ${marker} within ${FIRE_KEY_TIMEOUT_MS}ms — respawning shell`);
+      unilog(
+        1424,
+        `adb shell did not echo ${marker} within ${FIRE_KEY_TIMEOUT_MS}ms — respawning shell`,
+      );
       fireShellReady = false;
       spawnFireShell();
       reject(new Error("fire shell timeout"));
@@ -1151,11 +1153,7 @@ app.get("/tv/firebtn", (req, res) => {
       FIRE_HOME_DELAY_MS,
     );
     setTimeout(
-      () =>
-        adbExec(
-          `shell am start -n ${EMBY_FIRE_ACTIVITY}`,
-          "emby launch",
-        ),
+      () => adbExec(`shell am start -n ${EMBY_FIRE_ACTIVITY}`, "emby launch"),
       FIRE_EMBY_DELAY_MS,
     );
   }
@@ -1178,11 +1176,7 @@ app.get("/tv/mode/:mode", (req, res) => {
   if (mode === "fire") {
     callService("media_player", "turn_on", FIRE_TV_ENTITY_ID);
     setTimeout(
-      () =>
-        adbExec(
-          `shell am start -n ${EMBY_FIRE_ACTIVITY}`,
-          "emby launch",
-        ),
+      () => adbExec(`shell am start -n ${EMBY_FIRE_ACTIVITY}`, "emby launch"),
       5000,
     );
   } else {
@@ -1199,8 +1193,7 @@ app.get("/tv/mode/:mode", (req, res) => {
       () =>
         callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
           media_content_type: "app",
-          media_content_id:
-            EMBY_APP_URI,
+          media_content_id: EMBY_APP_URI,
         }),
       GOOGLE_EMBY_DELAY_MS,
     );
@@ -1216,15 +1209,11 @@ app.get("/tv/mode/:mode", (req, res) => {
 
 app.get("/tv/emby", (req, res) => {
   if (tvMode === "fire") {
-    adbExec(
-      `shell am start -n ${EMBY_FIRE_ACTIVITY}`,
-      "emby",
-    );
+    adbExec(`shell am start -n ${EMBY_FIRE_ACTIVITY}`, "emby");
   } else if (tvMode === "google") {
     callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
       media_content_type: "app",
-      media_content_id:
-        EMBY_APP_URI,
+      media_content_id: EMBY_APP_URI,
     });
   } else {
     unilog(418, `emby ignored — tvMode=${tvMode}`);
@@ -1296,7 +1285,10 @@ app.get("/tv/key/:key", async (req, res) => {
         unilog(421, `keyevent ${command}×${n} via shell from ${client(req)}`);
         sentViaShell = true;
       } catch (e) {
-        unilog(1425, `shell keyevent ${keys} failed (${e.message}) — falling back to adb exec`);
+        unilog(
+          1425,
+          `shell keyevent ${keys} failed (${e.message}) — falling back to adb exec`,
+        );
       }
     }
     if (!sentViaShell) {

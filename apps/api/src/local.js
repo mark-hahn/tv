@@ -10,6 +10,24 @@ const execFileAsync = promisify(execFile);
 const TV_ROOT = "/mnt/media/tv";
 const TV_ERRORS_ROOT = "/mnt/media/tv-errors";
 
+function resolveUnderRoot(root, relPath) {
+  const rel = String(relPath || "").trim();
+  if (
+    !rel ||
+    path.isAbsolute(rel) ||
+    rel.includes("\0") ||
+    rel.split(/[\\/]+/).includes("..")
+  ) {
+    throw new Error("Invalid path");
+  }
+  const rootPath = path.resolve(root);
+  const fullPath = path.resolve(rootPath, rel);
+  if (!(fullPath === rootPath || fullPath.startsWith(rootPath + path.sep))) {
+    throw new Error("Invalid path");
+  }
+  return fullPath;
+}
+
 /**
  * Returns a file tree of /mnt/media/tv from the local file system.
  */
@@ -49,23 +67,25 @@ export async function renameLocalFile(oldPath, newName, isErrs = false) {
   const root = isErrs ? TV_ERRORS_ROOT : TV_ROOT;
 
   if (
-    oldPath.includes("..") ||
-    newName.includes("..") ||
-    newName.includes("/")
+    !newName ||
+    path.isAbsolute(newName) ||
+    /[\\/]/.test(newName) ||
+    newName.includes("\0")
   ) {
     throw new Error("Invalid path or name");
   }
 
-  const parts = oldPath.split("/");
-  const fileName = parts.pop();
-  const dirPath = parts.join("/");
-
-  const fullOldPath = dirPath
-    ? `${root}/${dirPath}/${fileName}`
-    : `${root}/${fileName}`;
-  const fullNewPath = dirPath
-    ? `${root}/${dirPath}/${newName}`
-    : `${root}/${newName}`;
+  const fullOldPath = resolveUnderRoot(root, oldPath);
+  const fullNewPath = path.resolve(
+    path.dirname(fullOldPath),
+    String(newName).trim(),
+  );
+  const rootPath = path.resolve(root);
+  if (
+    !(fullNewPath === rootPath || fullNewPath.startsWith(rootPath + path.sep))
+  ) {
+    throw new Error("Invalid path or name");
+  }
 
   await rename(fullOldPath, fullNewPath);
   return { success: true };
@@ -74,11 +94,7 @@ export async function renameLocalFile(oldPath, newName, isErrs = false) {
 const TRIAL_ERROR_DIR = "/mnt/media/tv/Trial & Error/Season 1";
 
 export async function moveToTrial(relPath) {
-  if (!relPath || relPath.includes("..")) {
-    throw new Error("Invalid path");
-  }
-
-  const srcPath = `${TV_ERRORS_ROOT}/${relPath}`;
+  const srcPath = resolveUnderRoot(TV_ERRORS_ROOT, relPath);
 
   // Extract filename and extension
   const fileName = relPath.split("/").pop();

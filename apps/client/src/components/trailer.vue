@@ -391,11 +391,12 @@ export default {
       const firstScriptTag = document.getElementsByTagName("script")[0];
       firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
-      window.onYouTubeIframeAPIReady = () => {
+      this._onYouTubeIframeAPIReady = () => {
         if (this.active && this.showContent) {
           this.initPlayers();
         }
       };
+      window.onYouTubeIframeAPIReady = this._onYouTubeIframeAPIReady;
     },
 
     getOrigin() {
@@ -552,6 +553,10 @@ export default {
     evtBus.off("previewMode", this.onPreviewMode);
     evtBus.off("previewSrchChoice", this.onPreviewSrchChoice);
     evtBus.off("addPreviewShowDone", this.onAddPreviewShowDone);
+    this.saveState();
+    if (window.onYouTubeIframeAPIReady === this._onYouTubeIframeAPIReady) {
+      delete window.onYouTubeIframeAPIReady;
+    }
   },
 };
 </script>

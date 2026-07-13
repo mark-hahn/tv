@@ -73,6 +73,7 @@ const rejectAllPending = (reason) => {
 };
 
 const attachWsHandlers = () => {
+  const currentSocket = ws;
   ws.onmessage = (event) => {
     handleMsg(event.data);
   };
@@ -86,6 +87,8 @@ const attachWsHandlers = () => {
   };
 
   ws.onclose = () => {
+    if (ws !== currentSocket) return;
+    ws = null;
     rejectAllPending({ error: "websocket closed" });
     if (wsWanted && !reconnectTimer) {
       reconnectTimer = setTimeout(() => {
@@ -96,6 +99,7 @@ const attachWsHandlers = () => {
   };
 
   ws.onerror = (err) => {
+    if (ws !== currentSocket) return;
     rejectAllPending({ error: "websocket error", details: err });
   };
 };
@@ -167,7 +171,10 @@ const httpCall = async (endpoint, param, method = "GET", timeoutMs = 30000) => {
     const response = await fetch(url, options);
     const ms = Math.round(performance.now() - startedAt);
     if (ms >= SLOW_REQUEST_MS) {
-      unilog(1426, `slow ${method} ${endpoint} took ${ms}ms status=${response.status} inFlight=${inFlight}`);
+      unilog(
+        1426,
+        `slow ${method} ${endpoint} took ${ms}ms status=${response.status} inFlight=${inFlight}`,
+      );
     }
 
     if (!response.ok) {
@@ -180,12 +187,18 @@ const httpCall = async (endpoint, param, method = "GET", timeoutMs = 30000) => {
   } catch (err) {
     const ms = Math.round(performance.now() - startedAt);
     if (timedOut) {
-      unilog(1427, `timeout ${method} ${endpoint} after ${ms}ms of ${TIMEOUT_MS}ms inFlight=${inFlight}`);
+      unilog(
+        1427,
+        `timeout ${method} ${endpoint} after ${ms}ms of ${TIMEOUT_MS}ms inFlight=${inFlight}`,
+      );
       throw new Error("Request timeout");
     }
     // Add more context to network errors
     if (err instanceof TypeError && err.message === "Failed to fetch") {
-      unilog(1428, `unreachable ${method} ${endpoint} after ${ms}ms inFlight=${inFlight}`);
+      unilog(
+        1428,
+        `unreachable ${method} ${endpoint} after ${ms}ms inFlight=${inFlight}`,
+      );
       throw new Error(`Network error: Unable to reach server at ${url}`);
     }
     throw err;
@@ -312,7 +325,11 @@ const updateLastViewedCache = async () => {
       lastViewedCacheFailureCount === 1 ||
       lastViewedCacheFailureCount % 10 === 0
     ) {
-      unilog(878, "Failed to update lastViewed cache", err.message || String(err));
+      unilog(
+        878,
+        "Failed to update lastViewed cache",
+        err.message || String(err),
+      );
     }
   } finally {
     lastViewedCacheUpdating = false;

@@ -286,10 +286,7 @@ export function registerMediaRoutes(app) {
         ffmpeg.kill("SIGKILL");
       };
       ffmpeg.stdout.on("error", (err) => {
-        logHere(
-          { lvl: "warn", grp: "stream" },
-          `ffmpeg stdout error: ${err.message}`,
-        );
+        unilog(1439, `ffmpeg stdout error: ${err.message}`);
         killFfmpeg();
       });
       req.on("close", killFfmpeg);

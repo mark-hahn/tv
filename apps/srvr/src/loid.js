@@ -56,10 +56,7 @@ export async function saveAndVerifyLoid(cookie) {
       signal: AbortSignal.timeout(8000),
     });
   } catch (e) {
-    logHere(
-      { lvl: "warn", grp: "loid" },
-      `loid cookie save or verify failed: ${e.message}`,
-    );
+    unilog(1438, `loid cookie save or verify failed: ${e.message}`);
     return { error: e?.message || String(e) };
   }
   if (!resp.ok) {

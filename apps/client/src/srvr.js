@@ -9,6 +9,9 @@ const WS_RECONNECT_DELAY_MS = 10000;
 const LAST_VIEWED_START_DELAY_MS = 0;
 const LAST_VIEWED_POLL_MS = 10 * 1000;
 const LAST_VIEWED_TIMEOUT_MS = 8000;
+// A server restart or a machine sleep/wake can only ever kill one poll, so a
+// lone failure is noise; only a real outage fails consecutively.
+const LAST_VIEWED_FAIL_LOG_AFTER = 3;
 const SLOW_REQUEST_MS = 3000;
 
 // In-flight count is the tell for a stall that never reaches the server: if
@@ -322,13 +325,12 @@ const updateLastViewedCache = async () => {
   } catch (err) {
     lastViewedCacheFailureCount += 1;
     if (
-      lastViewedCacheFailureCount === 1 ||
+      lastViewedCacheFailureCount === LAST_VIEWED_FAIL_LOG_AFTER ||
       lastViewedCacheFailureCount % 10 === 0
     ) {
       unilog(
         878,
-        "Failed to update lastViewed cache",
-        err.message || String(err),
+        `lastViewed cache NetworkError: ${err.message || String(err)}`,
       );
     }
   } finally {

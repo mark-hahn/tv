@@ -61,6 +61,7 @@ const REMOTE_ENTITY_ID = "remote.bravia_k_65xr70";
 const FIRE_TV_ENTITY_ID = "media_player.fire_tv_192_168_1_47";
 const FIRE_TV_REMOTE_ID = "remote.fire_tv_192_168_1_47";
 const FIRE_TV_IP = "192.168.1.47";
+const FIRE_KEY_TIMEOUT_MS = 5000;
 const BRAVIA_TV_IP = "192.168.1.86:34047";
 const BRAVIA_PICTURE_URL = `http://192.168.1.86/sony/video`;
 const BRAVIA_PSK = "qwerty";
@@ -822,6 +823,7 @@ function spawnFireShell() {
     ) {
       const { resolve } = fireShellPending;
       fireShellPending = null;
+      fireShellStdoutBuf = "";
       resolve();
     }
   });
@@ -867,24 +869,62 @@ function connectFireShell() {
 }
 
 let fireKeySeq = 0;
-function fireKeyevent(keycode) {
+let fireKeyChain = Promise.resolve();
+
+function fireKeyeventOnce(keycode) {
   return new Promise((resolve, reject) => {
     if (!fireShellReady || !fireShell) {
       reject(new Error("fire shell not ready"));
       return;
     }
     const marker = `__K${++fireKeySeq}__`;
-    fireShellPending = { marker, resolve };
+    const clearPending = () => {
+      if (fireShellPending && fireShellPending.marker === marker) {
+        fireShellPending = null;
+      }
+    };
+
+    // The device can stop echoing markers while staying connected (e.g. waking
+    // up, or launching an app), and that leaves the shell alive so 'close'
+    // never fires. Without this the request would hang forever.
+    const timer = setTimeout(() => {
+      clearPending();
+      unilog(1424, `adb shell did not echo ${marker} within ${FIRE_KEY_TIMEOUT_MS}ms — respawning shell`);
+      fireShellReady = false;
+      spawnFireShell();
+      reject(new Error("fire shell timeout"));
+    }, FIRE_KEY_TIMEOUT_MS);
+
+    fireShellPending = {
+      marker,
+      resolve: () => {
+        clearTimeout(timer);
+        resolve();
+      },
+    };
     fireShell.stdin.write(
       `input keyevent ${keycode} && echo ${marker}\n`,
       (err) => {
         if (err) {
-          fireShellPending = null;
+          clearTimeout(timer);
+          clearPending();
           reject(err);
         }
       },
     );
   });
+}
+
+// The shell tracks one marker at a time, so overlapping presses must be
+// serialized — otherwise a later press overwrites fireShellPending and the
+// earlier promise is never settled, hanging that request until nginx gives up.
+function fireKeyevent(keycode) {
+  const run = fireKeyChain.then(
+    () => fireKeyeventOnce(keycode),
+    () => fireKeyeventOnce(keycode),
+  );
+  fireKeyChain = run.catch(() => {});
+  return run;
 }
 
 function adbExecP(cmd, label) {
@@ -1249,10 +1289,17 @@ app.get("/tv/key/:key", async (req, res) => {
   if (tvMode === "fire") {
     const n = Math.min(parseInt(req.query.n) || 1, 20);
     const keys = Array(n).fill(command).join(" ");
+    let sentViaShell = false;
     if (fireShellReady) {
-      await fireKeyevent(keys);
-      unilog(421, `keyevent ${command}×${n} via shell from ${client(req)}`);
-    } else {
+      try {
+        await fireKeyevent(keys);
+        unilog(421, `keyevent ${command}×${n} via shell from ${client(req)}`);
+        sentViaShell = true;
+      } catch (e) {
+        unilog(1425, `shell keyevent ${keys} failed (${e.message}) — falling back to adb exec`);
+      }
+    }
+    if (!sentViaShell) {
       await adbExecP(`shell input keyevent ${keys}`, `keyevent ${keys}`);
       unilog(422, `adb keyevent ${keys} from ${client(req)}`);
     }

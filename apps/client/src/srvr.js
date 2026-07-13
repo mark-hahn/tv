@@ -1,6 +1,6 @@
 import { config } from "./config.js";
 import evtBus from "./evtBus.js";
-import { unilog } from "./log.js";
+import { unilog, logHere } from "./log.js";
 
 const HTTP_URL = config.tvSrvrUrl;
 const WS_URL = HTTP_URL.replace(/^https/, "wss");
@@ -9,6 +9,12 @@ const WS_RECONNECT_DELAY_MS = 10000;
 const LAST_VIEWED_START_DELAY_MS = 0;
 const LAST_VIEWED_POLL_MS = 10 * 1000;
 const LAST_VIEWED_TIMEOUT_MS = 8000;
+const SLOW_REQUEST_MS = 3000;
+
+// In-flight count is the tell for a stall that never reaches the server: if
+// requests time out while this is high, they were queued in the browser behind
+// other requests rather than being served slowly.
+let inFlight = 0;
 
 // Stable per-page client id, used to ignore our own echoed remote actions
 // (a live duplicate socket — e.g. a Vite HMR leftover — would otherwise make a
@@ -154,8 +160,15 @@ const httpCall = async (endpoint, param, method = "GET", timeoutMs = 30000) => {
     controller.abort();
   }, TIMEOUT_MS);
 
+  const startedAt = performance.now();
+  inFlight += 1;
+
   try {
     const response = await fetch(url, options);
+    const ms = Math.round(performance.now() - startedAt);
+    if (ms >= SLOW_REQUEST_MS) {
+      unilog(1426, `slow ${method} ${endpoint} took ${ms}ms status=${response.status} inFlight=${inFlight}`);
+    }
 
     if (!response.ok) {
       const error = await response
@@ -165,16 +178,20 @@ const httpCall = async (endpoint, param, method = "GET", timeoutMs = 30000) => {
     }
     return response.json();
   } catch (err) {
+    const ms = Math.round(performance.now() - startedAt);
     if (timedOut) {
+      unilog(1427, `timeout ${method} ${endpoint} after ${ms}ms of ${TIMEOUT_MS}ms inFlight=${inFlight}`);
       throw new Error("Request timeout");
     }
     // Add more context to network errors
     if (err instanceof TypeError && err.message === "Failed to fetch") {
+      unilog(1428, `unreachable ${method} ${endpoint} after ${ms}ms inFlight=${inFlight}`);
       throw new Error(`Network error: Unable to reach server at ${url}`);
     }
     throw err;
   } finally {
     clearTimeout(timeoutId);
+    inFlight -= 1;
   }
 };
 

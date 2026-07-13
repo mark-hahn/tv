@@ -3982,6 +3982,12 @@ unilog(91, `Watching ${tvDir} for file changes...`);
 //   hidden 1080:  Show.S01E01.1080p.mkv.alt
 // Toggling swaps which member carries the ".alt" suffix.
 
+// When false, block new ffmpeg 2160->1080 re-encodes; kept-aside 1080 .old
+// files are still renamed to .alt (no ffmpeg involved). 1080 alt files
+// already on disk keep working for resolution switching either way. Off by
+// default: the 2160 player-overload problem this was built for hasn't
+// recurred recently.
+const RECODE_TO_1080 = false;
 const RES_SUBTITLE_EXTS = new Set([
   ".srt",
   ".ass",
@@ -4230,6 +4236,7 @@ async function reencodeOneTo1080(entry) {
 }
 
 async function processReencodeQueue() {
+  if (!RECODE_TO_1080) return; // also blocks any stale entries persisted before this was disabled
   if (reencodeRunning) return;
   const entry = reencodeQueue[0];
   if (!entry) return;
@@ -4305,6 +4312,7 @@ async function res1080NeededAndAcquire(
   }
 
   // Otherwise re-encode from the 2160 file.
+  if (!RECODE_TO_1080) return;
   const src2160 = res2160FileName(seasonDir, season, episode);
   if (!src2160) return;
   enqueueReencode({

@@ -499,7 +499,7 @@ export default {
         {
           title: "Message",
           field: "message",
-          width: 280,
+          width: 400,
           headerFilter: "input",
           headerFilterFunc: likeOrBlank,
         },

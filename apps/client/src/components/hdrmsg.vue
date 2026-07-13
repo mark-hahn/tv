@@ -11,7 +11,7 @@
       boxSizing: 'border-box',
       backgroundColor: loggingDisabled ? '#ffcccc' : '#ddd',
       color: 'rgba(5, 5, 5)',
-      fontSize: '17px',
+      fontSize: '15px',
       whiteSpace: 'nowrap',
       maxWidth: '100%',
     }"

@@ -641,7 +641,7 @@ import * as emby from "../emby.js";
 import * as tvdb from "../tvdb.js";
 import * as util from "../util.js";
 import * as srvr from "../srvr.js";
-import { unilog } from "../log.js";
+import { unilog, logHere } from "../log.js";
 
 const theMan = atob("bXJza2lu");
 
@@ -1366,52 +1366,47 @@ export default {
         return;
       }
 
-      // Load guests from TMDB
-      let tmdbList = [];
-      try {
-        const params = {
+      // TMDB and TVDB guests are independent lookups — fetch both at once.
+      const startedAt = performance.now();
+      const [tmdbRes, tvdbRes] = await Promise.allSettled([
+        srvr.getTmdb({
           showName: this.showName,
           year: null,
           season: season,
           episode: episode,
-        };
+        }),
+        tvdb.getEpisodeGuests(this.showName, season, episode),
+      ]);
+      const guestsMs = Math.round(performance.now() - startedAt);
 
-        const guestActors = await srvr.getTmdb(params);
+      // getTmdb returns { guests, image, overview, name, aired } for an episode
+      let tmdbList = [];
+      const tmdbGuests = tmdbRes.value?.guests;
+      if (tmdbRes.status === "rejected") {
+        unilog(1444, `guests getTmdb failed for ${this.showName} S${season}E${episode}: ${tmdbRes.reason?.message || tmdbRes.reason}`);
+      } else if (Array.isArray(tmdbGuests) && tmdbGuests.length) {
+        tmdbList = tmdbGuests.map((actor) => {
+          const imageUrl = actor.profile_path
+            ? `https://image.tmdb.org/t/p/w185${actor.profile_path}`
+            : null;
 
-        if (Array.isArray(guestActors) && guestActors.length) {
-          tmdbList = guestActors.map((actor) => {
-            const imageUrl = actor.profile_path
-              ? `https://image.tmdb.org/t/p/w185${actor.profile_path}`
-              : null;
-
-            return {
-              name: actor.character,
-              personName: actor.name,
-              image: imageUrl,
-              personImgURL: imageUrl,
-              url: null,
-              sort: actor.order,
-              isFeatured: false,
-            };
-          });
-        }
-      } catch (error) {
-        // Silent error handling
+          return {
+            name: actor.character,
+            personName: actor.name,
+            image: imageUrl,
+            personImgURL: imageUrl,
+            url: null,
+            sort: actor.order,
+            isFeatured: false,
+          };
+        });
       }
 
-      // Load guests from TVDB
       let tvdbList = [];
-      try {
-        const tvdbGuests = await tvdb.getEpisodeGuests(
-          this.showName,
-          season,
-          episode,
-        );
-        if (Array.isArray(tvdbGuests) && tvdbGuests.length) {
-          tvdbList = tvdbGuests;
-        }
-      } catch (error) {
-        // Silent error handling
+      if (tvdbRes.status === "rejected") {
+        unilog(1445, `guests getEpisodeGuests failed for ${this.showName} S${season}E${episode}: ${tvdbRes.reason?.message || tvdbRes.reason}`);
+      } else if (Array.isArray(tvdbRes.value) && tvdbRes.value.length) {
+        tvdbList = tvdbRes.value;
       }
 
       // Remove regulars from both guest lists before merging
@@ -1456,7 +1451,7 @@ export default {
       const tmdbAfter = this.actors.filter((a) => a.source === "tmdb").length;
       const seasonStr = String(season).padStart(2, "0");
       const episodeStr = String(episode).padStart(2, "0");
-      unilog(909, `${this.showName} S${seasonStr}E${episodeStr} | TVDB: ${mergeResult.tvdbBefore}, ${tvdbAfter} | TMDB: ${mergeResult.tmdbBefore}, ${tmdbAfter}`);
+      unilog(909, `${this.showName} S${seasonStr}E${episodeStr} | TVDB: ${mergeResult.tvdbBefore}, ${tvdbAfter} | TMDB: ${mergeResult.tmdbBefore}, ${tmdbAfter} | guests fetch ${guestsMs}ms`);
     },
 
     handleRegularClick() {

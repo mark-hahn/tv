@@ -19,6 +19,48 @@ const SLOW_REQUEST_MS = 3000;
 // other requests rather than being served slowly.
 let inFlight = 0;
 
+// Browser main-thread lag, the mirror of the server's loop-lag monitor. A fetch
+// resolves on the main thread, so a blocked main thread makes a fast response
+// look like a slow request. Reporting lag alongside every slow/timed-out call
+// separates "the server was slow" from "we were too busy to notice it answer".
+const LAG_SAMPLE_MS = 500;
+// A single block at or above this gets its own timestamped log the instant the
+// main thread frees up — so a multi-second freeze is pinned to the click that
+// caused it, not just summarized on the next slow request.
+const LAG_REPORT_MS = 1000;
+let maxLoopLagMs = 0;
+let lagLastAt = performance.now();
+// A backgrounded tab gets its timers throttled by the browser to save power,
+// which produces the exact same symptom as real jank: this interval fires
+// late. Track visibility so a throttled-while-hidden gap can be told apart
+// from an actual main-thread freeze that happened while the tab was in front.
+let wasHiddenSinceLastTick = document.hidden;
+const onVisibilityChange = () => {
+  if (document.hidden) wasHiddenSinceLastTick = true;
+};
+document.addEventListener("visibilitychange", onVisibilityChange);
+const lagTimer = setInterval(() => {
+  const now = performance.now();
+  const lag = Math.round(now - lagLastAt - LAG_SAMPLE_MS);
+  lagLastAt = now;
+  if (lag > maxLoopLagMs) maxLoopLagMs = lag;
+  if (lag >= LAG_REPORT_MS) {
+    const cause = wasHiddenSinceLastTick
+      ? "tab backgrounded (browser timer throttling, not jank)"
+      : "tab stayed visible — real main-thread block";
+    unilog(1452, `browser main thread blocked ${lag}ms: ${cause}`);
+  }
+  wasHiddenSinceLastTick = document.hidden;
+}, LAG_SAMPLE_MS);
+
+// Worst main-thread block seen since the last call, then reset — so each slow
+// request reports the lag that happened during it, not a stale high-water mark.
+const takeMaxLoopLag = () => {
+  const lag = maxLoopLagMs;
+  maxLoopLagMs = 0;
+  return lag;
+};
+
 // Stable per-page client id, used to ignore our own echoed remote actions
 // (a live duplicate socket — e.g. a Vite HMR leftover — would otherwise make a
 // single UI collide with itself). Stored on globalThis so it survives HMR.
@@ -107,7 +149,7 @@ const attachWsHandlers = () => {
   };
 };
 
-setTimeout(() => {
+const wsStartTimer = setTimeout(() => {
   ensureWs().catch((err) => {
     unilog(870, "Failed to start WebSocket", err);
   });
@@ -176,7 +218,7 @@ const httpCall = async (endpoint, param, method = "GET", timeoutMs = 30000) => {
     if (ms >= SLOW_REQUEST_MS) {
       unilog(
         1426,
-        `slow ${method} ${endpoint} took ${ms}ms status=${response.status} inFlight=${inFlight}`,
+        `slow ${method} ${endpoint} took ${ms}ms status=${response.status} inFlight=${inFlight} loopLag=${takeMaxLoopLag()}ms`,
       );
     }
 
@@ -192,15 +234,18 @@ const httpCall = async (endpoint, param, method = "GET", timeoutMs = 30000) => {
     if (timedOut) {
       unilog(
         1427,
-        `timeout ${method} ${endpoint} after ${ms}ms of ${TIMEOUT_MS}ms inFlight=${inFlight}`,
+        `timeout ${method} ${endpoint} after ${ms}ms of ${TIMEOUT_MS}ms inFlight=${inFlight} loopLag=${takeMaxLoopLag()}ms`,
       );
       throw new Error("Request timeout");
     }
-    // Add more context to network errors
-    if (err instanceof TypeError && err.message === "Failed to fetch") {
+    // Add more context to network errors. A dead fetch is a TypeError in every
+    // browser, but the message differs ("Failed to fetch" in Chrome,
+    // "NetworkError when attempting to fetch resource." in Firefox), so match
+    // on the type — matching the Chrome text alone made this log dead in Firefox.
+    if (err instanceof TypeError) {
       unilog(
         1428,
-        `unreachable ${method} ${endpoint} after ${ms}ms inFlight=${inFlight}`,
+        `unreachable ${method} ${endpoint} after ${ms}ms inFlight=${inFlight} loopLag=${takeMaxLoopLag()}ms: ${err.message}`,
       );
       throw new Error(`Network error: Unable to reach server at ${url}`);
     }
@@ -337,8 +382,46 @@ const updateLastViewedCache = async () => {
     lastViewedCacheUpdating = false;
   }
 };
-setTimeout(updateLastViewedCache, LAST_VIEWED_START_DELAY_MS);
-setInterval(updateLastViewedCache, LAST_VIEWED_POLL_MS);
+const lastViewedStartTimer = setTimeout(
+  updateLastViewedCache,
+  LAST_VIEWED_START_DELAY_MS,
+);
+const lastViewedPollTimer = setInterval(
+  updateLastViewedCache,
+  LAST_VIEWED_POLL_MS,
+);
+
+// Vite HMR re-executes this module on every edit while the previous instance's
+// module-level side effects keep running — each edit stacked another lag
+// monitor, lastViewed poller, and websocket in the long-lived dev tab (seen as
+// duplicate "blocked" log pairs and doubled broadcast handling). Tear the old
+// instance down when it is replaced. Dev-only: vite strips this from builds.
+//
+// Only this module needs the hook: main.js imports log.js directly and never
+// self-accepts, so editing log.js forces a full page reload. Nothing outside a
+// component imports srvr.js, so its edits stop at the component boundary and
+// hot-swap instead — which is why this is the one module that could stack.
+//
+// The live-instance count is the safety net: a new module-level timer added
+// later without extending dispose() shows up here as a warning instead of
+// silently doubling the app's work again.
+if (import.meta.hot) {
+  globalThis.__tvSrvrLive = (globalThis.__tvSrvrLive || 0) + 1;
+  if (globalThis.__tvSrvrLive > 1) {
+    unilog(1453, `stacked srvr.js instances: ${globalThis.__tvSrvrLive} — an HMR side effect is not being disposed`);
+  }
+  import.meta.hot.dispose(() => {
+    clearInterval(lagTimer);
+    clearTimeout(wsStartTimer);
+    clearTimeout(lastViewedStartTimer);
+    clearInterval(lastViewedPollTimer);
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+    wsWanted = false;
+    ws?.close();
+    globalThis.__tvSrvrLive -= 1;
+  });
+}
 
 export function getShowsFromDisk() {
   return httpCall("/api/getShowsFromDisk");

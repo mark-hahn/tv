@@ -1,6 +1,10 @@
-import { smartTitleMatch, unilog} from "@tv/share"
+import { smartTitleMatch, unilog, logHere } from "@tv/share"
 import { MovieDb } from "moviedb-promise";
 const moviedb = new MovieDb("327192a334da700f65b882c7a69cb927");
+
+// A getTmdb call slower than this gets logged with a per-round-trip breakdown,
+// so a slow map/actors pane load names the TMDB call that caused it.
+const SLOW_TMDB_MS = 1000;
 
 /**
  * Get TMDB data for a TV show
@@ -41,7 +45,9 @@ export async function getTmdb(params) {
       }
     }
 
+    const startedAt = Date.now();
     const res = await moviedb.searchTv({ query: showName });
+    const searchMs = Date.now() - startedAt;
 
     // Find show with matching original_name, optionally prioritizing year
     const matchingTitle = smartTitleMatch(
@@ -62,15 +68,21 @@ export async function getTmdb(params) {
     const showId = matchingShow?.id;
 
     if (!showId || !season || !episode) {
+      if (Date.now() - startedAt >= SLOW_TMDB_MS) {
+        unilog(1446, `slow getTmdb series ${showName}: ${Date.now() - startedAt}ms (searchTv ${searchMs}ms)`);
+      }
       return matchingShow || null;
     }
 
-    // Get episode information
+    // Get episode information. guest_stars comes back inside this one response,
+    // so guests cost no extra round trip.
+    const episodeStartedAt = Date.now();
     const episodeInfo = await moviedb.episodeInfo({
       id: showId,
       season_number: parseInt(season),
       episode_number: parseInt(episode),
     });
+    const episodeMs = Date.now() - episodeStartedAt;
 
     // Get guest actors (filter by known_for_department === "Acting")
     const guestActorList =
@@ -78,17 +90,10 @@ export async function getTmdb(params) {
         (actor) => actor.known_for_department === "Acting",
       ) || [];
 
-    // Fetch images for each guest actor and add to their object
-    for (const actorInfo of guestActorList) {
-      try {
-        const personImages = await moviedb.personImages({
-          id: actorInfo.id,
-        });
-        actorInfo.images = personImages;
-      } catch (error) {
-        unilog(709, `Failed to fetch images for ${actorInfo.name}:`, error.message);
-        actorInfo.images = null;
-      }
+    const totalMs = Date.now() - startedAt;
+    if (totalMs >= SLOW_TMDB_MS) {
+      unilog(1447, `slow getTmdb ${showName} S${season}E${episode}: ${totalMs}ms ` +
+          `(searchTv ${searchMs}ms, episodeInfo ${episodeMs}ms, ${guestActorList.length} guests)`);
     }
 
     return {

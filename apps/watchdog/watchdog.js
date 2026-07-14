@@ -38,6 +38,12 @@ const MAILTRAP_TOKEN_PATH =
   "/root/dev/apps/tv/apps/watchdog/mailtrap-token.txt";
 const RESTART_SPIKE = 3; // >= this many restarts between cycles => crash loop
 const HEALTHY_UPTIME_MS = 5 * 60 * 1000; // uptime past this clears crash-loop
+// Sites that email the moment they fire, instead of waiting for the throttled
+// hourly error digest. For a site that means "the app is silently doing double
+// work", an hour-late digest is too late to be useful.
+//   1453 - client srvr.js: stacked HMR instances (dispose hook not cleaning up)
+const WATCH_SITES = [1453];
+const WATCH_EMAIL_MIN_INTERVAL_MS = 10 * 60 * 1000; // per-site email throttle
 // Tier-3 "stuck queue" detection from the heartbeat's queue depths + the
 // monotonic completion counters (subDone/asrDone). A queue is stuck if its
 // depth stays > 0 across the whole window while its completion counter never
@@ -209,6 +215,25 @@ function errorEventsAfter(afterId) {
   }
 }
 
+// Events from the WATCH_SITES list newer than afterId, oldest first.
+function watchedEventsAfter(afterId, siteIds) {
+  const d = getDb();
+  if (!d) return null;
+  try {
+    const marks = siteIds.map(() => "?").join(",");
+    return d
+      .prepare(
+        `SELECT e.id, e.ts, e.message, s.log_id, s.src_file, s.src_line
+           FROM log_events e JOIN log_sites s ON e.log_id = s.log_id
+          WHERE s.log_id IN (${marks}) AND e.id > ?
+          ORDER BY e.id`,
+      )
+      .all(...siteIds, afterId);
+  } catch {
+    return null;
+  }
+}
+
 // The most recent `limit` heartbeats, newest first, each parsed into a
 // { subQ, chkQ, asrQ, bif, renc, flex, sweep, clients, subDone, asrDone } map.
 function recentHeartbeats(limit) {
@@ -320,6 +345,56 @@ async function flushEmail(burstLabels) {
   await sendMail(subject, lines.join("\n"));
 }
 
+// Watched sites email immediately (own cursor + own per-site throttle, so this
+// is independent of the hourly error digest and its throttle).
+let watchCursor = null;
+const watchLastEmailMs = new Map(); // log_id -> last email ms
+
+async function checkWatchedSites() {
+  const max = maxEventId();
+  if (max == null) return;
+  if (watchCursor == null) {
+    watchCursor = max; // first run: only report firings from now on
+    return;
+  }
+  const events = watchedEventsAfter(watchCursor, WATCH_SITES);
+  if (events == null) return;
+  watchCursor = max;
+  if (events.length === 0) return;
+
+  const bySite = new Map();
+  for (const ev of events) {
+    const g = bySite.get(ev.log_id) || { count: 0, first: ev, last: ev };
+    g.count++;
+    g.last = ev;
+    bySite.set(ev.log_id, g);
+  }
+
+  for (const [logId, g] of bySite) {
+    const where = `${g.first.src_file}:${g.first.src_line}`;
+    raise(
+      `watch-site-${logId}`,
+      "warn",
+      `site ${logId} fired ${g.count}x at ${where}: ${g.last.message}`,
+    );
+    const last = watchLastEmailMs.get(logId) || 0;
+    if (Date.now() - last < WATCH_EMAIL_MIN_INTERVAL_MS) continue;
+    watchLastEmailMs.set(logId, Date.now());
+    await sendMail(
+      `tv-watchdog: site ${logId} fired (${where})`,
+      [
+        `site ${logId} fired ${g.count}x`,
+        `${where}`,
+        "",
+        `first: ${g.first.ts}  event ${g.first.id}`,
+        `last:  ${g.last.ts}  event ${g.last.id}`,
+        "",
+        g.last.message,
+      ].join("\n"),
+    );
+  }
+}
+
 async function checkErrors() {
   const max = maxEventId();
   if (max == null) return; // db unreadable — the "db" alert already covers it
@@ -387,7 +462,12 @@ async function checkErrors() {
   const bursts = burstSites(events);
   if (bursts.size > 0) {
     const until = pstStr(new Date(Date.now() + BURST_BLOCK_MS));
-    blockSites([...bursts.keys()], until);
+    // Never block a watched site: the burst IS the signal we want emailed, so
+    // muting it for an hour would silence the alarm it is meant to raise.
+    blockSites(
+      [...bursts.keys()].filter((id) => !WATCH_SITES.includes(id)),
+      until,
+    );
     const labels = [...bursts.values()];
     emit(
       "ALERT",
@@ -457,6 +537,9 @@ async function runChecks() {
 
   // 4. error-rate (tier 2) + error emails: cursor-based, burst block, throttle
   await checkErrors();
+
+  // 4b. watched sites (WATCH_SITES): email as soon as one fires
+  await checkWatchedSites();
 
   // 5. stuck queues / stuck sweep (tier 3). Uses heartbeat queue depths plus
   // the monotonic subDone/asrDone completion counters. A restart resets the

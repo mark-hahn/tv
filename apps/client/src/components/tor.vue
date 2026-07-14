@@ -1868,6 +1868,11 @@ export default {
       this.showStream = false;
       if (this.loading || this.unaired) return;
 
+      if (this.previewMode) {
+        await this.runFullProviderSearch();
+        return;
+      }
+
       switch (this.torSearchPhase) {
         case "idle":
           await this.runInitialNeededSearch();
@@ -2666,6 +2671,21 @@ export default {
         phaseOverride: "needed-results",
       });
       if (result) this.setTorSearchPhase("needed-results");
+    },
+
+    async runFullProviderSearch() {
+      const currentShow = this.resolveCurrentShow();
+      if (!currentShow) {
+        this.error = "No show selected";
+        return;
+      }
+      if (this.unaired) return;
+
+      this.providerWarning = "";
+      const result = await this.loadTorrents(["force"], true, {
+        phaseOverride: "all-results",
+      });
+      if (result) this.setTorSearchPhase("all-results");
     },
 
     async expandToAllProviders() {

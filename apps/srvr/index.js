@@ -1067,6 +1067,24 @@ const sendEmailHandler = async (params) => {
 
 //////////////////  HTTP REST API  //////////////////
 
+// Event-loop lag monitor. A timer that should fire every LAG_SAMPLE_MS; how
+// late it actually fires is how long the loop was blocked by sync work. This is
+// the difference between "a handler was slow" and "the whole process stalled",
+// which no request-level timing can tell you.
+const LAG_SAMPLE_MS = 500;
+const LAG_REPORT_MS = 1000;
+let maxLoopLagMs = 0;
+let lagLastAt = Date.now();
+setInterval(() => {
+  const now = Date.now();
+  const lag = now - lagLastAt - LAG_SAMPLE_MS;
+  lagLastAt = now;
+  if (lag > maxLoopLagMs) maxLoopLagMs = lag;
+  if (lag >= LAG_REPORT_MS) {
+    unilog(1448, `event loop blocked ${lag}ms — all requests stalled for that long`);
+  }
+}, LAG_SAMPLE_MS);
+
 const app = express();
 
 // Use standard CORS middleware
@@ -1078,6 +1096,22 @@ app.use(express.json({ strict: false }));
 // Legacy CORS manual headers (just in case, though cors() should handle it)
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
+  next();
+});
+
+// Server-side request timing. The client already logs how long a call took from
+// its side; this logs how long the same call took from ours. When the client
+// reports a slow/timed-out call and nothing shows up here, the time was spent
+// off-server (network/nginx), not in a handler.
+const SLOW_API_MS = 1000;
+app.use((req, res, next) => {
+  const startedAt = Date.now();
+  res.on("finish", () => {
+    const ms = Date.now() - startedAt;
+    if (ms >= SLOW_API_MS) {
+      unilog(1449, `slow ${req.method} ${req.path} took ${ms}ms status=${res.statusCode} loopLag=${maxLoopLagMs}ms`);
+    }
+  });
   next();
 });
 
@@ -4467,6 +4501,8 @@ setInterval(() => {
       `asrQ=${subsState.asrQueue.length} bif=${bifQueue.getBifCount()} ` +
       `renc=${reencodeQueue.length} flex=${flexget.isFlexgetRunning() ? 1 : 0} ` +
       `sweep=${embyFullSweepRunning ? 1 : 0} clients=${connectedClients.size} ` +
-      `subDone=${subsState.subDone} asrDone=${subsState.asrDone}`,
+      `subDone=${subsState.subDone} asrDone=${subsState.asrDone} ` +
+      `maxLoopLag=${maxLoopLagMs}ms`,
   );
+  maxLoopLagMs = 0; // report the worst lag per beat, not since boot
 }, WATCHDOG_HEARTBEAT_MS);

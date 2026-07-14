@@ -41,8 +41,8 @@ const HEALTHY_UPTIME_MS = 5 * 60 * 1000; // uptime past this clears crash-loop
 // Sites that email the moment they fire, instead of waiting for the throttled
 // hourly error digest. For a site that means "the app is silently doing double
 // work", an hour-late digest is too late to be useful.
-//   1453 - client srvr.js: stacked HMR instances (dispose hook not cleaning up)
-const WATCH_SITES = [1453];
+//   1455 - client srvr.js: stacked HMR instances (a side effect escaped teardown)
+const WATCH_SITES = [1455];
 const WATCH_EMAIL_MIN_INTERVAL_MS = 10 * 60 * 1000; // per-site email throttle
 // Tier-3 "stuck queue" detection from the heartbeat's queue depths + the
 // monotonic completion counters (subDone/asrDone). A queue is stuck if its

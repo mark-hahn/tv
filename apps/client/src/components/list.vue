@@ -3886,7 +3886,7 @@ export default {
       // GLOBAL-MSG: Qbt
       const count = Array.isArray(titles) ? titles.length : 0;
       if (count > 0)
-        setGlobalMessage({ id: "Qbt", text: String(count), position: 10 });
+        setGlobalMessage({ id: "Qbt", text: `Qbt:${count}`, position: 10 });
       else setGlobalMessage({ id: "Qbt", action: "hide" });
     });
 

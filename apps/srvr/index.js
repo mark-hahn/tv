@@ -2891,7 +2891,7 @@ const pollGlobalMessages = () => {
       count = map && typeof map === "object" ? Object.keys(map).length : 0;
     }
     if (count > 0)
-      setGlobalMessage({ id: "Down", text: `Down: ${count}`, position: 11 });
+      setGlobalMessage({ id: "Down", text: `Dwn:${count}`, position: 11 });
     else setGlobalMessage({ id: "Down", action: "hide" });
   } catch (e) {
     unilog(617, "down poll error:", e.message);

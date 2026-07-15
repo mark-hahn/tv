@@ -60,9 +60,14 @@ const lagTimer = setInterval(() => {
   const now = performance.now();
   const lag = Math.round(now - lagLastAt - LAG_SAMPLE_MS);
   lagLastAt = now;
-  if (lag > maxLoopLagMs) maxLoopLagMs = lag;
-  if (lag >= LAG_REPORT_MS && !wasHiddenSinceLastTick) {
-    unilog(1452, `browser main thread blocked ${lag}ms`);
+  // A backgrounded-tab lag must never enter maxLoopLagMs: it's not jank (see
+  // above), so it has nothing to say about the browser being busy. Left in,
+  // it would sit here as a stale high-water mark until some unrelated later
+  // request happened to read and reset it via loopLagSuffix(), making that
+  // request look jank-related when it wasn't.
+  if (!wasHiddenSinceLastTick) {
+    if (lag > maxLoopLagMs) maxLoopLagMs = lag;
+    if (lag >= LAG_REPORT_MS) unilog(1452, `browser main thread blocked ${lag}ms`);
   }
   wasHiddenSinceLastTick = document.hidden;
 }, LAG_SAMPLE_MS);
@@ -203,17 +208,18 @@ const fCall = async (fname, param) => {
   return promise;
 };
 
+// A deploy reloads tv-srvr in ~1-2s; a fetch that fails as fully unreachable
+// (connection refused, not a timeout) during that window is not a real outage.
+// Retrying once after this delay tells the two apart: the retry succeeds for a
+// deploy blip and nothing gets logged, while a real outage still fails and is
+// reported as before — just ~1.5s later.
+const UNREACHABLE_RETRY_DELAY_MS = 1500;
+
 const httpCall = async (endpoint, param, method = "GET", timeoutMs = 30000) => {
   let url = `${HTTP_URL}${endpoint}`;
   const TIMEOUT_MS = timeoutMs;
-  const controller = new AbortController();
-  let timedOut = false;
 
-  const options = {
-    method,
-    headers: { "Content-Type": "application/json" },
-    signal: controller.signal,
-  };
+  const options = { method, headers: { "Content-Type": "application/json" } };
 
   if (method === "GET" && param) {
     const params = new URLSearchParams(
@@ -226,17 +232,67 @@ const httpCall = async (endpoint, param, method = "GET", timeoutMs = 30000) => {
     }
   }
 
-  const timeoutId = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, TIMEOUT_MS);
+  // One fetch attempt with its own abort timer. Returns {response} on success,
+  // or {err, timedOut} on failure — never throws, so the caller can decide
+  // whether to retry without a try/catch per attempt.
+  const attempt = async () => {
+    const controller = new AbortController();
+    let timedOut = false;
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, TIMEOUT_MS);
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      return { response };
+    } catch (err) {
+      return { err, timedOut };
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  };
 
   const startedAt = performance.now();
   inFlight += 1;
 
   try {
-    const response = await fetch(url, options);
+    let { response, err, timedOut } = await attempt();
+    let retried = false;
+
+    // Only a fully unreachable fetch is worth a retry — a timeout or an HTTP
+    // error status both mean the server WAS reached, so retrying tells us
+    // nothing new there.
+    if (err instanceof TypeError && !timedOut) {
+      await new Promise((r) => setTimeout(r, UNREACHABLE_RETRY_DELAY_MS));
+      retried = true;
+      ({ response, err, timedOut } = await attempt());
+    }
+
     const ms = Math.round(performance.now() - startedAt);
+
+    if (err) {
+      if (timedOut) {
+        unilog(
+          1427,
+          `timeout ${method} ${endpoint} after ${ms}ms of ${TIMEOUT_MS}ms inFlight=${inFlight}${loopLagSuffix()}`,
+        );
+        throw new Error("Request timeout");
+      }
+      // Add more context to network errors. A dead fetch is a TypeError in
+      // every browser, but the message differs ("Failed to fetch" in Chrome,
+      // "NetworkError when attempting to fetch resource." in Firefox), so
+      // match on the type — matching the Chrome text alone made this log dead
+      // in Firefox.
+      if (err instanceof TypeError) {
+        unilog(
+          1428,
+          `unreachable ${method} ${endpoint}${retried ? " (after retry)" : ""} after ${ms}ms inFlight=${inFlight}${loopLagSuffix()}: ${err.message}`,
+        );
+        throw new Error(`Network error: Unable to reach server at ${url}`);
+      }
+      throw err;
+    }
+
     if (ms >= SLOW_REQUEST_MS) {
       unilog(
         1426,
@@ -251,29 +307,7 @@ const httpCall = async (endpoint, param, method = "GET", timeoutMs = 30000) => {
       throw error;
     }
     return response.json();
-  } catch (err) {
-    const ms = Math.round(performance.now() - startedAt);
-    if (timedOut) {
-      unilog(
-        1427,
-        `timeout ${method} ${endpoint} after ${ms}ms of ${TIMEOUT_MS}ms inFlight=${inFlight}${loopLagSuffix()}`,
-      );
-      throw new Error("Request timeout");
-    }
-    // Add more context to network errors. A dead fetch is a TypeError in every
-    // browser, but the message differs ("Failed to fetch" in Chrome,
-    // "NetworkError when attempting to fetch resource." in Firefox), so match
-    // on the type — matching the Chrome text alone made this log dead in Firefox.
-    if (err instanceof TypeError) {
-      unilog(
-        1428,
-        `unreachable ${method} ${endpoint} after ${ms}ms inFlight=${inFlight}${loopLagSuffix()}: ${err.message}`,
-      );
-      throw new Error(`Network error: Unable to reach server at ${url}`);
-    }
-    throw err;
   } finally {
-    clearTimeout(timeoutId);
     inFlight -= 1;
   }
 };

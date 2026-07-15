@@ -324,6 +324,13 @@ import * as srvr from "../srvr.js";
 import { unilog, logHere } from "../log.js";
 const MAX_ROWS = 5000;
 const PAGE = 500;
+// Let the table drift this far past MAX_ROWS before trimming, then trim the
+// whole overflow in one batched delete. Trimming a few rows on every 500ms
+// live-append flush made each flush do several full Tabulator redraws of the
+// (up to MAX_ROWS) table — the multi-second main-thread blocks seen while
+// sitting in the log pane, self-sustained because those blocks log events
+// that stream right back into this same table.
+const TRIM_MARGIN = 250;
 
 // "2026/07/01 11:44:43" -> epoch ms (local).
 function tsToMs(s) {
@@ -1375,9 +1382,14 @@ export default {
         this.appending = false;
       }
       if (stick) {
+        // Trim only once the table has drifted TRIM_MARGIN past the cap, and
+        // remove the whole overflow in a single deleteRow() so it costs one
+        // redraw instead of one per row on every flush. getRows() is oldest
+        // first (ascending display), so the slice off the front is the oldest.
         const all = this.table.getRows();
-        if (all.length > MAX_ROWS) {
-          for (let i = 0; i < all.length - MAX_ROWS; i++) all[i].delete();
+        if (all.length > MAX_ROWS + TRIM_MARGIN) {
+          const doomed = all.slice(0, all.length - MAX_ROWS);
+          await this.table.deleteRow(doomed.map((r) => r.getData().id));
         }
         this.scrollToBottom();
       }

@@ -71,6 +71,9 @@ export function parseResolutionStrict(title, quality) {
   if (/576p/i.test(src)) return 576;
   if (/480p/i.test(src)) return 480;
   if (/384p/i.test(src)) return 384;
+  // NTSC/PAL are SD source tags, not a <N>p resolution — map them directly.
+  if (/\bntsc\b/i.test(src)) return 480;
+  if (/\bpal\b/i.test(src)) return 576;
   return 0; // unknown — do not fall back
 }
 

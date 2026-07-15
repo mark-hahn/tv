@@ -135,6 +135,13 @@ export function normalize(torrent, showName) {
   const trimmedTitle = torrent.title.trim();
   const parsed = parseTorrentTitle.parse(trimmedTitle);
 
+  // parse-torrent-title doesn't recognize NTSC/PAL as a resolution tag —
+  // map them directly since they're standard SD source resolutions.
+  if (!parsed.resolution) {
+    if (/\bntsc\b/i.test(trimmedTitle)) parsed.resolution = "480p";
+    else if (/\bpal\b/i.test(trimmedTitle)) parsed.resolution = "576p";
+  }
+
   // Extract season range if present
   const seasonRange = extractSeasonRange(trimmedTitle);
 

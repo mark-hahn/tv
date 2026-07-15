@@ -588,6 +588,10 @@ export function getResolution(
     return nameResolution;
   }
 
+  // NTSC/PAL are SD source tags, not a <N>p resolution — map them directly.
+  if (/\bntsc\b/i.test(src)) return 480;
+  if (/\bpal\b/i.test(src)) return 576;
+
   // ── Step 2: probe the actual file ─────────────────────────────────────────
   let fileResolution = null;
   if (probeFileFn) {

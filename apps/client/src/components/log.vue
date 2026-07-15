@@ -1195,10 +1195,18 @@ export default {
     },
     scrollToBottom(force = false) {
       if (force) this.atBottom = true;
+      // Go through Tabulator's own scrollToRow rather than setting
+      // holder.scrollTop = holder.scrollHeight directly: scrollHeight only
+      // reflects however much of the virtual DOM Tabulator has rendered so
+      // far, so a raw scrollTop jump lands at the edge of the current render
+      // window (~one screenful) instead of the true bottom — each click only
+      // advanced a page at a time. scrollToRow is virtual-DOM aware and is
+      // the same API already used correctly by scrollPageUp/scrollPageDown.
       this.$nextTick(() => {
-        if (this.holder) {
-          this.holder.scrollTop = this.holder.scrollHeight;
-        }
+        if (!this.table) return;
+        const rows = this.table.getRows();
+        if (!rows.length) return;
+        this.table.scrollToRow(rows[rows.length - 1], "bottom", true);
       });
     },
     scrollLeft() {

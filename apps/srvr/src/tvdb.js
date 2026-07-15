@@ -677,6 +677,14 @@ const getUrlAndRatings = async (type, url, name) => {
           { timeout: 10000 },
         )
         .catch(() => {});
+      // The rating score (and its sibling reviewer-count div) hydrate later
+      // than h1/JSON-LD on deferred pages, so give it its own short wait.
+      await page
+        .waitForSelector(
+          '[data-testid="hero-rating-bar__aggregate-rating__score"]',
+          { timeout: 5000 },
+        )
+        .catch(() => {});
     } catch (e) {
       unilog(
         721,
@@ -686,7 +694,7 @@ const getUrlAndRatings = async (type, url, name) => {
       try {
         await page?.close();
       } catch {}
-      return { ratings: null, video: null };
+      return { ratings: null, reviewers: null, video: null };
     }
 
     if (!resp || !resp.ok()) {
@@ -699,7 +707,7 @@ const getUrlAndRatings = async (type, url, name) => {
       try {
         await page?.close();
       } catch {}
-      return { ratings: null, video: null };
+      return { ratings: null, reviewers: null, video: null };
     }
 
     try {
@@ -802,6 +810,24 @@ const getUrlAndRatings = async (type, url, name) => {
               );
             if (m?.[1]) rating = m[1];
           }
+
+          // --- Reviewer count extraction (sibling div of the rating score,
+          // under the score's immediate parent, e.g. score/spacer/count) ---
+          let reviewers = null;
+          const scoreEl = document.querySelector(
+            '[data-testid="hero-rating-bar__aggregate-rating__score"]',
+          );
+          if (scoreEl?.parentElement) {
+            const divs = Array.from(scoreEl.parentElement.children).filter(
+              (el) => el.tagName === "DIV",
+            );
+            const countText = (
+              divs[divs.length - 1]?.textContent || ""
+            ).trim();
+            if (/^[\d,.]+[KMB]?$/i.test(countText))
+              reviewers = countText.toLowerCase();
+          }
+
           // --- Video extraction ---
           let video = null;
           let m =
@@ -822,7 +848,7 @@ const getUrlAndRatings = async (type, url, name) => {
             }
           }
 
-          return { rating, video };
+          return { rating, reviewers, video };
         })
         .catch(() => null);
 
@@ -833,12 +859,16 @@ const getUrlAndRatings = async (type, url, name) => {
       if (!result || result.challenge) {
         if (result?.challenge)
           unilog(723, `getUrlAndRatings imdb challenge page for ${name}: ${url}`);
-        return { ratings: null, video: null };
+        return { ratings: null, reviewers: null, video: null };
       }
 
       if (!result.rating && !result.video)
-        return { ratings: null, video: null };
-      return { ratings: result.rating, video: result.video };
+        return { ratings: null, reviewers: null, video: null };
+      return {
+        ratings: result.rating,
+        reviewers: result.reviewers,
+        video: result.video,
+      };
     } catch (e) {
       unilog(
         724,
@@ -848,7 +878,7 @@ const getUrlAndRatings = async (type, url, name) => {
       try {
         await page?.close();
       } catch {}
-      return { ratings: null, video: null };
+      return { ratings: null, reviewers: null, video: null };
     }
   }
 
@@ -863,6 +893,7 @@ const getUrlAndRatings = async (type, url, name) => {
 const getRemote = async (id, type, showName) => {
   let url = null;
   let ratings = null;
+  let reviewers = null;
   let video = null;
   let urlRatings, name, escShow;
 
@@ -871,11 +902,12 @@ const getRemote = async (id, type, showName) => {
       name = "IMDB";
       if (!id) {
         unilog(1441, `getRemote IMDB missing id for ${showName}`);
-        return { name, url: null, ratings: null, video: null };
+        return { name, url: null, ratings: null, reviewers: null, video: null };
       }
       url = `https://www.imdb.com/title/${id}`;
       urlRatings = await getUrlAndRatings(2, url, name);
       ratings = urlRatings?.ratings;
+      reviewers = urlRatings?.reviewers;
       video = urlRatings?.video;
       break;
 
@@ -1020,7 +1052,7 @@ const getRemote = async (id, type, showName) => {
     return null;
   }
   // console.log(`getRemote`, { name, url, ratings });
-  return { name, url, ratings, video };
+  return { name, url, ratings, reviewers, video };
 };
 
 ///////////// get remotes  //////////////
@@ -1139,6 +1171,7 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
     if (useCachedImdb) {
       const imdbEntry = { name: "IMDB", url: cachedShow.imdbUrl };
       imdbEntry.ratings = cachedShow.imdbRatings;
+      if (cachedShow.imdbReviewers) imdbEntry.reviewers = cachedShow.imdbReviewers;
       if (cachedShow.imdbVideo) imdbEntry.video = cachedShow.imdbVideo;
       remotesByName["IMDB"] = imdbEntry;
     } else {
@@ -1282,10 +1315,14 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
   const imdbRemote = remotesByName["IMDB"];
   if (imdbRemote) {
     imdbRemote.name += imdbRemote.ratings
-      ? " (" + imdbRemote.ratings + ")"
+      ? " (" +
+        imdbRemote.ratings +
+        (imdbRemote.reviewers ? "/" + imdbRemote.reviewers : "") +
+        ")"
       : "";
     flatUrls.imdbUrl = imdbRemote.url || null;
     flatUrls.imdbRatings = imdbRemote.ratings || null;
+    flatUrls.imdbReviewers = imdbRemote.reviewers || null;
     flatUrls.imdbVideo = imdbRemote.video || null;
     remotes.push(imdbRemote);
   }
@@ -1888,6 +1925,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     redditUrl: fetchedUrls.redditUrl ?? existing.redditUrl ?? null,
     imdbUrl: fetchedUrls.imdbUrl ?? existing.imdbUrl ?? null,
     imdbRatings: fetchedUrls.imdbRatings ?? existing.imdbRatings ?? null,
+    imdbReviewers: fetchedUrls.imdbReviewers ?? existing.imdbReviewers ?? null,
     imdbVideo: fetchedUrls.imdbVideo ?? existing.imdbVideo ?? null,
     rottenUrl: fetchedUrls.rottenUrl ?? existing.rottenUrl ?? null,
     rottenRatings: fetchedUrls.rottenRatings ?? existing.rottenRatings ?? null,

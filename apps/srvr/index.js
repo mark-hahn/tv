@@ -3389,6 +3389,10 @@ async function runEmbyFullSweep(caller = "unknown") {
         }
         rec.inEmby = false;
         rec.notReady = true;
+        rec.inContinue = false;
+        rec.inLinda = false;
+        rec.inMark = false;
+        rec.inToTry = false;
         handlePickupChange(name, false, rec.status);
       }
     }
@@ -3401,6 +3405,10 @@ async function runEmbyFullSweep(caller = "unknown") {
           ["fileEndError", false],
           ["full", false],
           ["notReady", true],
+          ["inContinue", false],
+          ["inLinda", false],
+          ["inMark", false],
+          ["inToTry", false],
         ];
         for (const [f, v] of nonEmbyConstants) {
           if (rec[f] !== v) {

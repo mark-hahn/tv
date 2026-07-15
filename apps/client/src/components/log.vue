@@ -1202,11 +1202,18 @@ export default {
       // window (~one screenful) instead of the true bottom — each click only
       // advanced a page at a time. scrollToRow is virtual-DOM aware and is
       // the same API already used correctly by scrollPageUp/scrollPageDown.
+      // Position "top", not "bottom": scrollToRow's "bottom" alignment first
+      // renders the last row into view (landing scrollTop at the true bottom,
+      // since the bottom pad collapses to 0 for the final row) and then
+      // subtracts a viewport back up, stranding us ~one screen short — and
+      // since that spot is stable, repeat clicks did nothing. "top" sets
+      // scrollTop past the end for the last row, which clamps to the true
+      // bottom. This is the same position the working scrollPageDown uses.
       this.$nextTick(() => {
         if (!this.table) return;
         const rows = this.table.getRows();
         if (!rows.length) return;
-        this.table.scrollToRow(rows[rows.length - 1], "bottom", true);
+        this.table.scrollToRow(rows[rows.length - 1], "top", true);
       });
     },
     scrollLeft() {

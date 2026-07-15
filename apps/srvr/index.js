@@ -1081,7 +1081,10 @@ setInterval(() => {
   lagLastAt = now;
   if (lag > maxLoopLagMs) maxLoopLagMs = lag;
   if (lag >= LAG_REPORT_MS) {
-    unilog(1448, `event loop blocked ${lag}ms — all requests stalled for that long`);
+    unilog(
+      1448,
+      `event loop blocked ${lag}ms — all requests stalled for that long`,
+    );
   }
 }, LAG_SAMPLE_MS);
 
@@ -1109,7 +1112,10 @@ app.use((req, res, next) => {
   res.on("finish", () => {
     const ms = Date.now() - startedAt;
     if (ms >= SLOW_API_MS) {
-      unilog(1449, `slow ${req.method} ${req.path} took ${ms}ms status=${res.statusCode} loopLag=${maxLoopLagMs}ms`);
+      unilog(
+        1449,
+        `slow ${req.method} ${req.path} took ${ms}ms status=${res.statusCode} loopLag=${maxLoopLagMs}ms`,
+      );
     }
   });
   next();
@@ -2136,6 +2142,19 @@ app.post("/api/asr/chksrt/gensrt", (req, res) => {
   persistSubQueueChkSrt();
   notifyClients("chksrt-count", subsState.subQueueChkSrt.length);
   syncBatchMsgs();
+  res.json({ ok: true });
+});
+
+app.post("/api/asr/chksrt/unsnooze", (req, res) => {
+  const { videoPath } = req.body || {};
+  if (!videoPath) {
+    res.status(400).json({ error: "videoPath required" });
+    return;
+  }
+  const showName = showNameFromFilePath(videoPath);
+  if (removeFromChksrtSnoozed(showName, videoPath)) {
+    persistChksrtSnoozed();
+  }
   res.json({ ok: true });
 });
 
@@ -4492,7 +4511,10 @@ if (!RECODE_TO_1080 && reencodeQueue.length > 0) {
   // Drain entries persisted before RECODE_TO_1080 was turned off — otherwise
   // processReencodeQueue's early return leaves them stuck forever, showing a
   // permanent "pending" hdrMsg for jobs that will never run.
-  unilog(1435, `dropped ${reencodeQueue.length} stale reencode queue entries (RECODE_TO_1080 is off)`);
+  unilog(
+    1435,
+    `dropped ${reencodeQueue.length} stale reencode queue entries (RECODE_TO_1080 is off)`,
+  );
   reencodeQueue = [];
   persistReencodeQueue();
 }

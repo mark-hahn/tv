@@ -842,6 +842,7 @@ import {
   applySubOffset,
   chksrtOk,
   chksrtGenSrt,
+  chksrtUnsnooze,
   chksrtSnooze,
   chksrtSelect,
   getChksrtHistory,
@@ -1796,6 +1797,11 @@ export default {
       }
     },
     async clickChksrtNext() {
+      try {
+        await chksrtUnsnooze(this.path);
+      } catch (e) {
+        unilog(1061, "unsnooze error:", e);
+      }
       try {
         await this._submitChksrtSelection();
       } catch (e) {

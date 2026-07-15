@@ -67,7 +67,8 @@ const lagTimer = setInterval(() => {
   // request look jank-related when it wasn't.
   if (!wasHiddenSinceLastTick) {
     if (lag > maxLoopLagMs) maxLoopLagMs = lag;
-    if (lag >= LAG_REPORT_MS) unilog(1452, `browser main thread blocked ${lag}ms`);
+    if (lag >= LAG_REPORT_MS)
+      unilog(1452, `browser main thread blocked ${lag}ms`);
   }
   wasHiddenSinceLastTick = document.hidden;
 }, LAG_SAMPLE_MS);
@@ -243,7 +244,10 @@ const httpCall = async (endpoint, param, method = "GET", timeoutMs = 30000) => {
       controller.abort();
     }, TIMEOUT_MS);
     try {
-      const response = await fetch(url, { ...options, signal: controller.signal });
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
       return { response };
     } catch (err) {
       return { err, timedOut };
@@ -478,7 +482,10 @@ if (import.meta.hot) {
   // the work. Watchdog emails on this site.
   globalThis.__tvSrvrLive = (globalThis.__tvSrvrLive || 0) + 1;
   if (globalThis.__tvSrvrLive > 1) {
-    unilog(1455, `stacked srvr.js instances: ${globalThis.__tvSrvrLive} — a side effect escaped teardown`);
+    unilog(
+      1455,
+      `stacked srvr.js instances: ${globalThis.__tvSrvrLive} — a side effect escaped teardown`,
+    );
   }
 }
 
@@ -810,6 +817,10 @@ export function chksrtOk(videoPath) {
 
 export function chksrtGenSrt(videoPath) {
   return httpCall("/api/asr/chksrt/gensrt", { videoPath }, "POST");
+}
+
+export function chksrtUnsnooze(videoPath) {
+  return httpCall("/api/asr/chksrt/unsnooze", { videoPath }, "POST");
 }
 
 export function chksrtSnooze(videoPath) {

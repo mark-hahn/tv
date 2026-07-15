@@ -1317,8 +1317,8 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
     imdbRemote.name += imdbRemote.ratings
       ? " (" +
         imdbRemote.ratings +
-        (imdbRemote.reviewers ? "/" + imdbRemote.reviewers : "") +
-        ")"
+        ")" +
+        (imdbRemote.reviewers ? " (" + imdbRemote.reviewers + ")" : "")
       : "";
     flatUrls.imdbUrl = imdbRemote.url || null;
     flatUrls.imdbRatings = imdbRemote.ratings || null;

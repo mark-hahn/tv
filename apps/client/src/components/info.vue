@@ -1288,8 +1288,11 @@ export default {
           if (!rating) return remote;
           if (remote.name.includes("(")) return remote;
           const reviewers = remote.reviewers || tvdbData?.imdbReviewers || null;
-          const suffix = reviewers ? `${rating}/${reviewers}` : `${rating}`;
-          return { ...remote, name: `${remote.name} (${suffix})` };
+          const reviewersSuffix = reviewers ? ` (${reviewers})` : "";
+          return {
+            ...remote,
+            name: `${remote.name} (${rating})${reviewersSuffix}`,
+          };
         };
 
         this.remotes = results.map(normalizeImdbRemoteName);

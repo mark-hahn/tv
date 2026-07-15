@@ -1800,7 +1800,7 @@ export default {
       try {
         await chksrtUnsnooze(this.path);
       } catch (e) {
-        unilog(1061, "unsnooze error:", e);
+        unilog(1476, "unsnooze error:", e);
       }
       try {
         await this._submitChksrtSelection();

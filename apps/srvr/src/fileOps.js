@@ -7,7 +7,7 @@ import fs from "fs";
 import * as path from "node:path";
 import * as cp from "child_process";
 import { rimraf } from "rimraf";
-import { unilog } from "@tv/share";
+import { unilog, resolveShowFolderName, logHere } from "@tv/share";
 import {
   safeShowFolderName,
   seasonFolderName,
@@ -311,10 +311,17 @@ export const createShowFolder = async (params) => {
     seriesMapSeasons,
   });
 
-  const showName = safeShowFolderName(showNameRaw);
-  if (!showName) {
+  const safeName = safeShowFolderName(showNameRaw);
+  if (!safeName) {
     unilog(559, "invalid showName", { showNameRaw });
     throw new Error("createShowFolder: invalid showName");
+  }
+
+  // Reuse an existing case-variant folder rather than creating a duplicate
+  // that differs only by case (ext4 is case-sensitive).
+  const showName = resolveShowFolderName(tvDir, safeName);
+  if (showName !== safeName) {
+    unilog(1467, `reusing existing case-variant folder "${showName}" instead of "${safeName}"`);
   }
 
   const showPath = path.join(tvDir, showName);

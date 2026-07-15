@@ -1,5 +1,6 @@
 export * from "./episodeData.js";
 export * from "./unilog.js";
+export * from "./showFolder.js";
 
 export const TV_BLOCKED = {
   sample: true,

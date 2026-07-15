@@ -23,6 +23,7 @@ import {
   unilog,
   setUnilogSink,
   logHere,
+  resolveShowFolderName,
 } from "@tv/share";
 
 const __filename = urlNode.fileURLToPath(import.meta.url);
@@ -1634,7 +1635,13 @@ async function main() {
       }
     }
 
-    const seasonDir = `${tvPath}${embyFolderName}/Season ${dvdSeason}`;
+    // Reuse an existing case-variant folder rather than creating a duplicate
+    // that differs only by case (ext4 is case-sensitive).
+    const dvdFolderName = resolveShowFolderName(tvPath, embyFolderName);
+    if (dvdFolderName !== embyFolderName) {
+      unilog(1469, `reusing existing case-variant folder "${dvdFolderName}" instead of "${embyFolderName}"`);
+    }
+    const seasonDir = `${tvPath}${dvdFolderName}/Season ${dvdSeason}`;
     const makemkvOutDir = path.join(
       DVD_STAGE_DIR,
       torrentFolder,
@@ -2696,10 +2703,16 @@ async function main() {
             false,
           ) || seriesName
         : seriesName;
-    const embyFolderName =
+    const embyFolderNameRaw =
       embyMap && embyKeyForFolder && embyMap[embyKeyForFolder]?.path
         ? embyMap[embyKeyForFolder].path
         : embyKeyForFolder || seriesName;
+    // Reuse an existing case-variant folder rather than creating a duplicate
+    // that differs only by case (ext4 is case-sensitive).
+    const embyFolderName = resolveShowFolderName(tvPath, embyFolderNameRaw);
+    if (embyFolderName !== embyFolderNameRaw) {
+      unilog(1470, `reusing existing case-variant folder "${embyFolderName}" instead of "${embyFolderNameRaw}"`);
+    }
     tvSeasonPath = `${tvPath}${embyFolderName}/Season ${season}`;
     tvFilePath = `${tvSeasonPath}/${fname}`;
     videoPath = `files/${usbFilePath}`;

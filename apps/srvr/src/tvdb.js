@@ -821,9 +821,7 @@ const getUrlAndRatings = async (type, url, name) => {
             const divs = Array.from(scoreEl.parentElement.children).filter(
               (el) => el.tagName === "DIV",
             );
-            const countText = (
-              divs[divs.length - 1]?.textContent || ""
-            ).trim();
+            const countText = (divs[divs.length - 1]?.textContent || "").trim();
             if (/^[\d,.]+[KMB]?$/i.test(countText))
               reviewers = countText.toLowerCase();
           }
@@ -858,7 +856,10 @@ const getUrlAndRatings = async (type, url, name) => {
 
       if (!result || result.challenge) {
         if (result?.challenge)
-          unilog(723, `getUrlAndRatings imdb challenge page for ${name}: ${url}`);
+          unilog(
+            723,
+            `getUrlAndRatings imdb challenge page for ${name}: ${url}`,
+          );
         return { ratings: null, reviewers: null, video: null };
       }
 
@@ -1171,7 +1172,8 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
     if (useCachedImdb) {
       const imdbEntry = { name: "IMDB", url: cachedShow.imdbUrl };
       imdbEntry.ratings = cachedShow.imdbRatings;
-      if (cachedShow.imdbReviewers) imdbEntry.reviewers = cachedShow.imdbReviewers;
+      if (cachedShow.imdbReviewers)
+        imdbEntry.reviewers = cachedShow.imdbReviewers;
       if (cachedShow.imdbVideo) imdbEntry.video = cachedShow.imdbVideo;
       remotesByName["IMDB"] = imdbEntry;
     } else {
@@ -1509,6 +1511,7 @@ const calculateWaitStr = (episodeData) => {
     if (!Array.isArray(episodeData)) return null;
 
     const today = new Date().toISOString().slice(0, 10);
+    const FILE_AVAILABLE_DATE = "2000-01-01";
 
     // Build per-season episode map: season -> Map(episodeNum -> airDate).
     // If a file is on disk and the TVDB air date is in the future (unaired),
@@ -1519,8 +1522,7 @@ const calculateWaitStr = (episodeData) => {
       if (!airDate) return;
       if (!seasonData.has(seasonNum)) seasonData.set(seasonNum, new Map());
       const hasDiskFile = epd.hasFile(episodeData, seasonNum, episodeNum);
-      const effectiveDate =
-        hasDiskFile && airDate > today ? today : airDate || "";
+      const effectiveDate = hasDiskFile ? FILE_AVAILABLE_DATE : airDate || "";
       seasonData.get(seasonNum).set(episodeNum, effectiveDate);
     });
 

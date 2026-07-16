@@ -196,3 +196,5 @@ debug statement that must stay as plain `console.*` output.
 ```js
 console.log("[reseed] done."); // no-unilog
 ```
+
+- when a problem is reported with wrong data like a show not having data fields correct then only work on fixing the problem/bug -- don't fix the wrong data unless i ask you to

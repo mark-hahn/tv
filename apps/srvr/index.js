@@ -689,7 +689,6 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         );
       const newNeedsIntro = !!(
         tvdbRecord.inEmby &&
-        !tvdbRecord.inLinda &&
         !hasConfiguredIntro &&
         Number(tvdbRecord.episodeCount ?? 0) >
           Number(tvdbRecord.watchedCount ?? 0) &&

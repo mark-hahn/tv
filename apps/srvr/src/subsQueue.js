@@ -320,6 +320,12 @@ async function fileNeedsSubChecked(videoFilePath, showName) {
     return false;
   if (subsState.asrQueue.some((e) => e.videoPath === videoFilePath))
     return false;
+  if (
+    getChksrtSnoozedForShow(showName).some(
+      (e) => e.videoFilePath === videoFilePath,
+    )
+  )
+    return false;
   // A 1080 resolution-fallback file inherits the 2160's subtitles (they are
   // copied at generation), so it is never sub-checked / extracted on its own.
   if (/1080p/i.test(path.basename(videoFilePath))) {

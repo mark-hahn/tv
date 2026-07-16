@@ -257,7 +257,7 @@ function syncBatchMsgs() {
   } else {
     setGlobalMessage({ id: "Asr", action: "hide" });
   }
-  // ChkSrt (M)
+  // ChkSrt (Chk) — files awaiting human srt review
   if (subsState.subQueueChkSrt.length > 0) {
     const name = showNameFromFilePath(
       subsState.subQueueChkSrt[0]?.videoFilePath || "",
@@ -265,7 +265,7 @@ function syncBatchMsgs() {
     setGlobalMessage({
       id: "ChkSrt",
       text: batchLabel(
-        "M",
+        "Chk",
         name,
         subsState.subQueueChkSrt.length,
         subsState.subQueueChkSrt.map((e) =>
@@ -276,6 +276,23 @@ function syncBatchMsgs() {
     });
   } else {
     setGlobalMessage({ id: "ChkSrt", action: "hide" });
+  }
+  // Mp4 — mpfour seekable-mirror encode backlog
+  const mp4Pending = mpfour.getMp4Pending();
+  if (mp4Pending.length > 0) {
+    const name = showNameFromFilePath(mp4Pending[0] || "");
+    setGlobalMessage({
+      id: "Mp4",
+      text: batchLabel(
+        "Mp4",
+        name,
+        mp4Pending.length,
+        mp4Pending.map((p) => showNameFromFilePath(p)),
+      ),
+      position: 2007,
+    });
+  } else {
+    setGlobalMessage({ id: "Mp4", action: "hide" });
   }
 }
 

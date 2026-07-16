@@ -30,6 +30,8 @@ const FAIL_RETRY_MS = 60 * 60 * 1000;
 
 let busy = false;
 let reordering = false;
+// videoFilePaths in subQueueChkSrt still awaiting a mirror, in queue order.
+let mp4Pending = [];
 let currentTmpPath = null;
 // { videoFilePath, child, aborted } while an encode is running, else null
 let currentEncode = null;
@@ -202,8 +204,10 @@ async function encodeOne(videoFilePath) {
   if (audioCodec === "aac") {
     args.push("-c:a", "copy");
   } else {
-    // -ac 2: downmix to stereo — browsers require stereo AAC
-    args.push("-c:a", "aac", "-b:a", "128k", "-ac", "2");
+    // -ac 2: downmix to stereo — browsers require stereo AAC.
+    // -aac_coder fast: ~2x faster than the default twoloop and the audio encode
+    // is nearly the whole job here; quality is moot for a throwaway review mirror.
+    args.push("-c:a", "aac", "-aac_coder", "fast", "-b:a", "128k", "-ac", "2");
   }
   args.push("-sn", "-dn", "-movflags", "+faststart", tmp);
   await fsp.mkdir(path.dirname(mirror), { recursive: true });
@@ -245,18 +249,52 @@ async function encodeOne(videoFilePath) {
   return "done";
 }
 
+// True when this file still needs an mp4 mirror built: a tv-tree path, not in
+// its FAIL_RETRY_MS cooldown, still on disk, and with no valid mirror yet.
+async function needsEncode(videoFilePath) {
+  if (!videoFilePath) return false;
+  if (!mpfourPathFor(videoFilePath)) return false;
+  const failed = failedAt.get(videoFilePath);
+  if (failed && Date.now() - failed < FAIL_RETRY_MS) return false;
+  if (!fs.existsSync(videoFilePath)) return false;
+  if (await mpfourValid(videoFilePath)) return false;
+  return true;
+}
+
 async function nextNeedingEncode() {
   for (const entry of subsState.subQueueChkSrt) {
-    const videoFilePath = entry?.videoFilePath;
-    if (!videoFilePath) continue;
-    if (!mpfourPathFor(videoFilePath)) continue;
-    const failed = failedAt.get(videoFilePath);
-    if (failed && Date.now() - failed < FAIL_RETRY_MS) continue;
-    if (!fs.existsSync(videoFilePath)) continue;
-    if (await mpfourValid(videoFilePath)) continue;
-    return videoFilePath;
+    if (await needsEncode(entry?.videoFilePath)) return entry.videoFilePath;
   }
   return null;
+}
+
+// chksrt-queue files still awaiting an mp4 mirror (the encode backlog,
+// including the one currently encoding), in queue order. Drives the "Mp4"
+// hdrMsg — [0] is the head show, length is the count.
+async function computePending() {
+  const pending = [];
+  for (const entry of subsState.subQueueChkSrt) {
+    if (await needsEncode(entry?.videoFilePath)) pending.push(entry.videoFilePath);
+  }
+  return pending;
+}
+
+// Live encode backlog (videoFilePaths, queue order) for the header.
+export function getMp4Pending() {
+  return mp4Pending;
+}
+
+// Recompute the backlog and, when it changes, refresh the hdrMsgs so the "Mp4"
+// count/head tick as each mirror completes.
+async function refreshMp4Count() {
+  const pending = await computePending();
+  const changed =
+    pending.length !== mp4Pending.length ||
+    pending.some((p, i) => p !== mp4Pending[i]);
+  if (changed) {
+    mp4Pending = pending;
+    syncBatchMsgs();
+  }
 }
 
 async function scanPass() {
@@ -270,6 +308,9 @@ async function scanPass() {
       reordering = false;
     }
   }
+  // Refresh every tick, even while an encode from a prior tick is running, so
+  // the count drops promptly when the user clears chksrt entries mid-encode.
+  await refreshMp4Count();
   if (busy) return;
   busy = true;
   try {
@@ -283,6 +324,7 @@ async function scanPass() {
         failedAt.set(videoFilePath, Date.now());
         unilog(1406, `encode failed for ${path.basename(videoFilePath)}: ${e.message}`);
       }
+      await refreshMp4Count();
     }
   } finally {
     busy = false;

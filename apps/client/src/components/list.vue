@@ -3892,6 +3892,11 @@ export default {
 
     on("activeDownTitles", (titles) => {
       this.updateActiveShowNames("down", titles);
+      // GLOBAL-MSG: Down
+      const count = Array.isArray(titles) ? titles.length : 0;
+      if (count > 0)
+        setGlobalMessage({ id: "Down", text: `Dwn:${count}`, position: 11 });
+      else setGlobalMessage({ id: "Down", action: "hide" });
     });
 
     // Filter shows by actor (Shows button in actors pane)

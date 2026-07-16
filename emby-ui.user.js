@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Emby Intro UI Overlay
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.1
 // @description  Intro editing overlay for the Emby web player (thin client; all logic on tv-srvr)
 // @author       You
 // @match        http://hahnca.com:8920/*
@@ -196,6 +196,10 @@
 
     // Anticipating toggle
     overlay.appendChild(makeBtn("Ant", "ant", { slot: "ant" }));
+
+    // Sel: select the show in the web client's list pane (same as the
+    // chksrt video pane's Sel button)
+    overlay.appendChild(makeBtn("Sel", "sel", { bg: "rgba(0,0,100,0.5)" }));
 
     // None: mark "checked, no intro" so needsIntro stays false without
     // a trim/skip. Sits at the right end (next to Emby's own close control).

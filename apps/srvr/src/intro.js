@@ -7,6 +7,7 @@ import fetch from "node-fetch";
 import { unilog, logHere } from "@tv/share";
 import * as tvdb from "./tvdb.js";
 import * as bifQueue from "./bifQueue.js";
+import { notifyClients } from "./messaging.js";
 import { EMBY_BASE_URL, EMBY_API_KEY, EMBY_USER_ID } from "./embyConfig.js";
 
 // A seek sent while the TV player is still starting up is silently dropped:
@@ -318,7 +319,40 @@ export async function pushIntroStateFromItem(ws, embyItemId) {
   }
 }
 
+// Sel: select the show in the web client's list pane (same as the chksrt
+// video pane's Sel button). Falls back to the overlay's emby item id so it
+// works before playback starts.
+async function handleEmbySelPress(ws) {
+  const ctx = await getEmbyIntroContext(ws._embyUi?.deviceName);
+  let name = ctx?.record?.name ?? ctx?.showName ?? null;
+  if (!name && ws._embyUi?.embyItemId) {
+    try {
+      const res = await fetch(
+        `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${ws._embyUi.embyItemId}?api_key=${EMBY_API_KEY}`,
+        { headers: { Accept: "application/json" } },
+      );
+      if (res.ok) {
+        const item = await res.json();
+        const showName = item.SeriesName || item.Name;
+        const allTvdb = tvdb.getAllTvdbSync();
+        const showId = item.SeriesId || item.Id;
+        const record =
+          allTvdb[showName] ??
+          Object.values(allTvdb).find((r) => r.id === showId);
+        name = record?.name ?? showName ?? null;
+      }
+    } catch (e) {
+      unilog(1488, `sel item lookup failed: ${e.message}`);
+    }
+  }
+  if (name) notifyClients("selectShowFromCardTitle", name);
+}
+
 export async function handleEmbyIntroPress(ws, btnId, pressedAt, videoTimeSec) {
+  if (btnId === "sel") {
+    await handleEmbySelPress(ws);
+    return;
+  }
   const ctx = await getEmbyIntroContext(ws._embyUi?.deviceName);
   if (!ctx?.session) return; // nothing playing yet
   const { session, controlId, record, showName, season, episode } = ctx;

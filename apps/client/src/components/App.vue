@@ -359,6 +359,7 @@
       @chksrt-next="handleChksrtNext"
       @chksrt-sel="handleChksrtSel"
       @intro-next="handleIntroNext"
+      @intro-sel="handleIntroSel"
     />
     <!-- Help dialog -->
     <div
@@ -1038,6 +1039,12 @@ export default {
         : null;
       if (showName) {
         evtBus.emit("selectShowFromCardTitle", showName);
+      }
+    },
+    handleIntroSel(name) {
+      this.handleVideoPlayerClose();
+      if (name) {
+        evtBus.emit("selectShowFromCardTitle", name);
       }
     },
     async fetchChksrtCount() {

@@ -452,6 +452,24 @@
         >
           Ant
         </div>
+        <div
+          @click.stop="clickIntroSel"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(0, 0, 100, 0.5);
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 6px;
+          "
+        >
+          Sel
+        </div>
       </template>
       <!-- Timing slider (srt tracks only, not in chksrt/simple/intro mode) -->
       <div
@@ -896,7 +914,7 @@ export default {
     introEpisode: { type: Number, default: null },
     introSource: { type: String, default: null },
   },
-  emits: ["close", "chksrt-next", "chksrt-sel", "intro-next"],
+  emits: ["close", "chksrt-next", "chksrt-sel", "intro-next", "intro-sel"],
   data() {
     return {
       audioTracks: [],
@@ -1650,6 +1668,20 @@ export default {
         unilog(1054, "clickIntroAnt error:", e);
         this.introShow.anticipating = original;
       }
+    },
+    clickIntroSel() {
+      const name = this.introShow?.name;
+      this._mseStop();
+      this.vidSrc = "";
+      const vid = this.$refs.vid;
+      if (vid) {
+        vid.pause();
+        vid.src = "";
+      }
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+      this.$emit("intro-sel", name);
     },
     async clickChksrtAnt() {
       const show = this.chksrtShowObj;

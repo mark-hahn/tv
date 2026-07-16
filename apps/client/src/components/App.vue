@@ -1371,7 +1371,7 @@ export default {
         if (status?.running && status?.progress?.pct != null) {
           setGlobalMessage({
             id: "Lib",
-            text: `${Number(status.progress.pct).toFixed(0)}%`,
+            text: `Scan: ${Number(status.progress.pct).toFixed(0)}%`,
             position: 1,
           });
         }
@@ -1393,7 +1393,7 @@ export default {
       if (data?.pct != null) {
         setGlobalMessage({
           id: "Lib",
-          text: `${Number(data.pct).toFixed(0)}%`,
+          text: `Scan: ${Number(data.pct).toFixed(0)}%`,
           position: 1,
         });
       }

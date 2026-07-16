@@ -1547,7 +1547,7 @@ export const createShowFolderAndRefreshEmby = async ({
 
       function onProgress(data) {
         if (typeof onStatus !== "function") return;
-        if (data?.pct != null) onStatus(`${Number(data.pct).toFixed(0)}%`);
+        if (data?.pct != null) onStatus(`Scan: ${Number(data.pct).toFixed(0)}%`);
         else if (data?.status) onStatus(String(data.status));
       }
 

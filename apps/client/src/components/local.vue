@@ -1875,7 +1875,10 @@ export default {
         this.lastSelectedFile = null;
         await this.fetchFiles();
       } catch (e) {
-        unilog(1002, "Rename failed", e);
+        unilog(
+          1002,
+          `Rename failed for ${oldName} -> ${newName}: ${e?.message || String(e)}`,
+        );
         this.error = e.message || "Rename failed";
         this.loading = false;
       }

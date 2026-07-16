@@ -952,15 +952,22 @@ app.get("/api/usb/files", async (req, res) => {
 });
 
 app.post("/api/usb/rename", async (req, res) => {
+  const { oldPath, newName } = req.body || {};
   try {
-    const { oldPath, newName } = req.body;
     if (!oldPath || !newName) {
       return res.status(400).json({ error: "Missing oldPath or newName" });
     }
     const result = await renameUsbFile(oldPath, newName);
     res.json(result);
   } catch (err) {
-    unilog(228, "usb rename error:", err);
+    const oldName =
+      String(oldPath || "")
+        .split("/")
+        .pop() || String(oldPath);
+    unilog(
+      228,
+      `usb rename error for ${oldName} -> ${newName}: ${err?.message || String(err)}`,
+    );
     res.status(500).json({ error: err.message });
   }
 });
@@ -1106,15 +1113,22 @@ app.get("/api/usb/cp-token", async (req, res) => {
 });
 
 app.post("/api/local/rename", async (req, res) => {
+  const { oldPath, newName, errsMode } = req.body || {};
   try {
-    const { oldPath, newName, errsMode } = req.body;
     if (!oldPath || !newName) {
       return res.status(400).json({ error: "Missing oldPath or newName" });
     }
     const result = await renameLocalFile(oldPath, newName, !!errsMode);
     res.json(result);
   } catch (err) {
-    unilog(231, "local rename error:", err);
+    const oldName =
+      String(oldPath || "")
+        .split("/")
+        .pop() || String(oldPath);
+    unilog(
+      231,
+      `local rename error for ${oldName} -> ${newName}: ${err?.message || String(err)}`,
+    );
     res.status(500).json({ error: err.message });
   }
 });

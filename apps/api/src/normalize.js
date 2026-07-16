@@ -197,6 +197,20 @@ export function normalize(torrent, showName) {
       applyBase(
         title.replace(/\([^)]+\)\s*$/, "").replace(/[^a-zA-Z0-9\s]/g, ""),
       ),
+
+      // 7) Replace non alphanum chars with spaces (so "Five-Star" -> "Five Star",
+      //    matching how providers/parsers turn punctuation into spaces)
+      applyBase(title.replace(/[^a-zA-Z0-9\s]/g, " ")),
+
+      // 8) Change 2 and replace non alphanum chars with spaces
+      applyBase(
+        title.replace(/\(([^)]+)\)\s*$/, "$1").replace(/[^a-zA-Z0-9\s]/g, " "),
+      ),
+
+      // 9) Change 3 and replace non alphanum chars with spaces
+      applyBase(
+        title.replace(/\([^)]+\)\s*$/, "").replace(/[^a-zA-Z0-9\s]/g, " "),
+      ),
     ];
   };
 

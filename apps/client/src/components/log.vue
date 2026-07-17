@@ -323,11 +323,23 @@
       <div
         v-if="showChannelsPane"
         class="groupsPane"
-        style="width: 520px; max-height: 70vh; overflow: auto"
+        style="
+          position: fixed;
+          top: 70px;
+          right: 12px;
+          width: 560px;
+          max-height: 70vh;
+          overflow: auto;
+        "
       >
-        <div class="groupsCol" style="width: 100%">
+        <div
+          class="groupsCol"
+          style="width: 100%"
+        >
           <div class="groupsTitle">Channels</div>
-          <pre style="font-size: 12px; margin: 0; white-space: pre-wrap">{{ channelsDebugText }}</pre>
+          <pre style="font-size: 12px; margin: 0; white-space: pre-wrap">{{
+            channelsDebugText
+          }}</pre>
         </div>
       </div>
     </Teleport>
@@ -1584,7 +1596,10 @@ export default {
       try {
         const res = await srvr.getUnilogGroupStats(gid);
         // Selection may have changed while the request was in flight.
-        if (this.selectedGroupIds.length === 1 && this.selectedGroupIds[0] === gid)
+        if (
+          this.selectedGroupIds.length === 1 &&
+          this.selectedGroupIds[0] === gid
+        )
           this.groupStats = res;
       } catch (e) {
         console.error("[log.vue]", `groupStats failed: ${e.message}`); // no-unilog

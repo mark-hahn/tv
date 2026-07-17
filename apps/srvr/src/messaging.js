@@ -60,7 +60,8 @@ function queueChannelsDebugUpdate() {
       op: "delta",
       data: getChannelDebugSnapshot(),
     };
-    for (const ws of channelClients.get("channelsDebug") || []) sendJson(ws, msg);
+    for (const ws of channelClients.get("channelsDebug") || [])
+      sendJson(ws, msg);
   }, 0);
 }
 

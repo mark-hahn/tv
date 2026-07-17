@@ -728,7 +728,10 @@ async function processSubQueueEntry() {
     // The file can vanish between enqueue and now — most often a 1080 demoted to
     // a hidden `.mkv.alt` fallback, which already inherits the 2160's subtitles.
     if (!fs.existsSync(entry.videoFilePath)) {
-      unilog(1401, `dropping sub queue entry, file gone: ${entry.videoFilePath}`);
+      unilog(
+        1401,
+        `dropping sub queue entry, file gone: ${entry.videoFilePath}`,
+      );
       return;
     }
     const parsed = parseFileSeasonEpisode(entry.videoFilePath);

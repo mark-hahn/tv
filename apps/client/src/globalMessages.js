@@ -73,7 +73,9 @@ function applyServerMessage(msg) {
 
 function applyServerMessagesSnapshot(payload) {
   const messages = Array.isArray(payload?.messages) ? payload.messages : [];
-  const nextIds = new Set(messages.map((msg) => String(msg?.id || "")).filter(Boolean));
+  const nextIds = new Set(
+    messages.map((msg) => String(msg?.id || "")).filter(Boolean),
+  );
   for (const id of serverMessageIds) {
     if (!nextIds.has(id)) setGlobalMessage({ id, action: "hide" });
   }

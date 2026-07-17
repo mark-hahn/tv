@@ -8,7 +8,7 @@ const WS_START_DELAY_MS = 0;
 const WS_RECONNECT_DELAY_MS = 10000;
 const LAST_VIEWED_START_DELAY_MS = 0;
 const LAST_VIEWED_POLL_MS = 10 * 1000;
-const LAST_VIEWED_TIMEOUT_MS = 8000;
+const LAST_VIEWED_TIMEOUT_MS = 30000;
 // A server restart or a machine sleep/wake can only ever kill one poll, so a
 // lone failure is noise; only a real outage fails consecutively.
 const LAST_VIEWED_FAIL_LOG_AFTER = 3;

@@ -9,6 +9,7 @@ import mkdirpPkg from "mkdirp";
 import requestPkg from "request";
 import rimrafPkg from "rimraf";
 import parseTorrentTitlePkg from "parse-torrent-title";
+import { ChannelPeer } from "@tv/share/channelPeer";
 
 import * as tvJsonMod from "./tvJson.js";
 import * as movieRsync from "./movie-rsync.js";
@@ -30,6 +31,104 @@ const __filename = urlNode.fileURLToPath(import.meta.url);
 const __dirname = pathNode.dirname(__filename);
 
 const SRVR_LOG_URL = "http://127.0.0.1:8739/api/log";
+const DOWNLOADS_CHANNEL_POLL_MS = 1000;
+const MOVIE_DOWNLOADS_CHANNEL_POLL_MS = 2000;
+
+let downChannelPeer = null;
+let downloadsChannelPollTimer = null;
+let downloadsChannelLastJson = "";
+let movieDownloadsChannelPollTimer = null;
+let movieDownloadsChannelLastJson = "";
+
+const getDownloadsSnapshot = () => tvJsonMod.getDownloads();
+
+const getMovieDownloadsSnapshot = () => movieRsync.getMovieDownJobs();
+
+const snapshotJson = (value) => JSON.stringify(value ?? null);
+
+const publishDownloadsChannel = () => {
+  const snapshot = getDownloadsSnapshot();
+  const json = snapshotJson(snapshot);
+  if (json === downloadsChannelLastJson) return;
+  downloadsChannelLastJson = json;
+  downChannelPeer?.publishDelta("downloads", snapshot);
+};
+
+const publishMovieDownloadsChannel = () => {
+  const snapshot = getMovieDownloadsSnapshot();
+  const json = snapshotJson(snapshot);
+  if (json === movieDownloadsChannelLastJson) return;
+  movieDownloadsChannelLastJson = json;
+  downChannelPeer?.publishDelta("movieDownloads", snapshot);
+};
+
+const getDownloadsChannelSnapshot = () => {
+  const snapshot = getDownloadsSnapshot();
+  downloadsChannelLastJson = snapshotJson(snapshot);
+  return snapshot;
+};
+
+const getMovieDownloadsChannelSnapshot = () => {
+  const snapshot = getMovieDownloadsSnapshot();
+  movieDownloadsChannelLastJson = snapshotJson(snapshot);
+  return snapshot;
+};
+
+const startDownloadsChannelPolling = () => {
+  if (downloadsChannelPollTimer) return;
+  downloadsChannelPollTimer = setInterval(() => {
+    try {
+      publishDownloadsChannel();
+    } catch (e) {
+      unilog(1503, `downloads poll failed: ${e.message}`);
+    }
+  }, DOWNLOADS_CHANNEL_POLL_MS);
+};
+
+const stopDownloadsChannelPolling = () => {
+  if (!downloadsChannelPollTimer) return;
+  clearInterval(downloadsChannelPollTimer);
+  downloadsChannelPollTimer = null;
+  downloadsChannelLastJson = "";
+};
+
+const startMovieDownloadsChannelPolling = () => {
+  if (movieDownloadsChannelPollTimer) return;
+  movieDownloadsChannelPollTimer = setInterval(() => {
+    try {
+      publishMovieDownloadsChannel();
+    } catch (e) {
+      unilog(1504, `movieDownloads poll failed: ${e.message}`);
+    }
+  }, MOVIE_DOWNLOADS_CHANNEL_POLL_MS);
+};
+
+const stopMovieDownloadsChannelPolling = () => {
+  if (!movieDownloadsChannelPollTimer) return;
+  clearInterval(movieDownloadsChannelPollTimer);
+  movieDownloadsChannelPollTimer = null;
+  movieDownloadsChannelLastJson = "";
+};
+
+const startDownChannelPeer = () => {
+  if (downChannelPeer) return;
+  downChannelPeer = new ChannelPeer({
+    channels: {
+      downloads: {
+        snapshot: getDownloadsChannelSnapshot,
+        onFirstSubscriber: startDownloadsChannelPolling,
+        onLastUnsubscriber: stopDownloadsChannelPolling,
+      },
+      movieDownloads: {
+        snapshot: getMovieDownloadsChannelSnapshot,
+        onFirstSubscriber: startMovieDownloadsChannelPolling,
+        onLastUnsubscriber: stopMovieDownloadsChannelPolling,
+      },
+    },
+    log: (message) => unilog(1505, `${message}`),
+  });
+  downChannelPeer.start();
+};
 
 // Scan-cycle log sites (checkFile → chkTvDB → checkFileExists → badFile).
 // Every cycle re-logs the same verdict for every unchanged file, flooding
@@ -1022,6 +1121,7 @@ async function main() {
       })
       .listen(3003, "0.0.0.0", () => {
         unilog(301, `HTTP server listening on port 3003`);
+        startDownChannelPeer();
       });
 
     // Start movie rsync cycling (1 min normal, 5 sec fast after qBt finishes)
@@ -1639,7 +1739,10 @@ async function main() {
     // that differs only by case (ext4 is case-sensitive).
     const dvdFolderName = resolveShowFolderName(tvPath, embyFolderName);
     if (dvdFolderName !== embyFolderName) {
-      unilog(1469, `reusing existing case-variant folder "${dvdFolderName}" instead of "${embyFolderName}"`);
+      unilog(
+        1469,
+        `reusing existing case-variant folder "${dvdFolderName}" instead of "${embyFolderName}"`,
+      );
     }
     const seasonDir = `${tvPath}${dvdFolderName}/Season ${dvdSeason}`;
     const makemkvOutDir = path.join(
@@ -2711,7 +2814,10 @@ async function main() {
     // that differs only by case (ext4 is case-sensitive).
     const embyFolderName = resolveShowFolderName(tvPath, embyFolderNameRaw);
     if (embyFolderName !== embyFolderNameRaw) {
-      unilog(1470, `reusing existing case-variant folder "${embyFolderName}" instead of "${embyFolderNameRaw}"`);
+      unilog(
+        1470,
+        `reusing existing case-variant folder "${embyFolderName}" instead of "${embyFolderNameRaw}"`,
+      );
     }
     tvSeasonPath = `${tvPath}${embyFolderName}/Season ${season}`;
     tvFilePath = `${tvSeasonPath}/${fname}`;

@@ -38,6 +38,16 @@ const FLEXGET_CONFIG = path.join(SRVR_ROOT_DIR, "config", "config.yml");
 
 let flexgetIsRunning = false;
 let flexgetHistory = {};
+const flexgetChangeListeners = new Set();
+
+export function onFlexgetChange(listener) {
+  flexgetChangeListeners.add(listener);
+  return () => flexgetChangeListeners.delete(listener);
+}
+
+function notifyFlexgetChange() {
+  for (const listener of flexgetChangeListeners) listener();
+}
 
 // Load flexget-history.json at startup — create empty {} if missing (first run).
 export function loadFlexgetHistory() {
@@ -150,6 +160,7 @@ async function saveFlexgetHistory() {
     }
   }
   await util.writeFile(FLEXGET_HISTORY_PATH, flexgetHistory);
+  notifyFlexgetChange();
 }
 
 function getEpisodeDiskResolution(showPath, season, episode) {
@@ -601,6 +612,7 @@ async function processFlexgetOutput(stdout) {
 export async function runFlexgetAndProcess() {
   if (flexgetIsRunning) return;
   flexgetIsRunning = true;
+  notifyFlexgetChange();
   try {
     const cmd = `"${FLEXGET_CMD}" -c "${FLEXGET_CONFIG}" execute --tasks fetch-feeds --dump accepted 2>&1`;
     unilog(63, `running flexget execute --tasks fetch-feeds`);
@@ -618,6 +630,7 @@ export async function runFlexgetAndProcess() {
     await processFlexgetOutput(stdout);
   } finally {
     flexgetIsRunning = false;
+    notifyFlexgetChange();
   }
 }
 
@@ -627,6 +640,7 @@ export async function runFlexgetAndProcess() {
 export async function runFlexgetStream(onLine) {
   if (flexgetIsRunning) return false;
   flexgetIsRunning = true;
+  notifyFlexgetChange();
   unilog(44, "stream run started");
   try {
     const args = [
@@ -673,6 +687,7 @@ export async function runFlexgetStream(onLine) {
     return true;
   } finally {
     flexgetIsRunning = false;
+    notifyFlexgetChange();
   }
 }
 

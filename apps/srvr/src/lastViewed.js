@@ -36,6 +36,17 @@ export const getLastViewed = async (_params) => {
 
 export const getLastViewedSync = () => lastViewed;
 
+const lastViewedChangeListeners = new Set();
+
+export const onLastViewedChange = (listener) => {
+  lastViewedChangeListeners.add(listener);
+  return () => lastViewedChangeListeners.delete(listener);
+};
+
+const notifyLastViewedChange = () => {
+  for (const listener of lastViewedChangeListeners) listener(lastViewed);
+};
+
 let lastRecordedShowName = null;
 export const recordNowPlaying = async (showName) => {
   if (!showName || showName === lastRecordedShowName) return;
@@ -43,4 +54,5 @@ export const recordNowPlaying = async (showName) => {
   lastViewed[showName] = Date.now();
   await fsp.mkdir(path.dirname(LAST_VIEWED_PATH), { recursive: true });
   await fsp.writeFile(LAST_VIEWED_PATH, JSON.stringify(lastViewed));
+  notifyLastViewedChange();
 };

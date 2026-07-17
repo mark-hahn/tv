@@ -380,8 +380,7 @@ export default {
     return {
       torrents: [],
       activeDownLoads: [],
-      _pollTimer: null,
-      _polling: false,
+      _qbtChannel: null,
       _active: false,
       useStaticSamples: false,
       _didInitialScroll: false,
@@ -409,8 +408,8 @@ export default {
       this.lastSelectedIndex = null;
     },
     movieMode() {
-      this.torrents = [];
-      this.pollOnce();
+      this.selectedItems = new Set();
+      this.lastSelectedIndex = null;
     },
   },
 
@@ -476,8 +475,8 @@ export default {
     // a torrent completing while the tab is hidden wouldn't trigger startProc
     // until the user returns and the next throttled poll fires.
     this._onVisibilityChange = () => {
-      if (document.visibilityState === "visible" && this._polling) {
-        this.scheduleNextPoll(0);
+      if (document.visibilityState === "visible" && this._qbtChannel) {
+        this.scrollToBottom();
       }
     };
     document.addEventListener("visibilitychange", this._onVisibilityChange);
@@ -555,18 +554,25 @@ export default {
     },
 
     startPolling() {
-      if (this._polling) return;
-      this._polling = true;
-      // First call immediately on history pane load.
-      this.scheduleNextPoll(0);
+      if (this._qbtChannel) return;
+      this.startLoadingDelay();
+      const apply = async (torrents) => {
+        try {
+          await this.applyQbtInfo(torrents);
+        } finally {
+          this.finishLoadingDelay();
+        }
+      };
+      this._qbtChannel = srvr.openChannel("qbtInfo", {
+        onSnapshot: apply,
+        onDelta: apply,
+        onUnavailable: () => this.finishLoadingDelay(),
+      });
     },
 
     stopPolling() {
-      this._polling = false;
-      if (this._pollTimer) {
-        clearTimeout(this._pollTimer);
-        this._pollTimer = null;
-      }
+      this._qbtChannel?.close();
+      this._qbtChannel = null;
       this._inFlight = false;
       this._showLoading = false;
       if (this._loadingTimer) {
@@ -602,23 +608,6 @@ export default {
       }
     },
 
-    scheduleNextPoll(delayMs) {
-      if (!this._polling) return;
-      if (this._pollTimer) {
-        clearTimeout(this._pollTimer);
-        this._pollTimer = null;
-      }
-      this._pollTimer = setTimeout(
-        async () => {
-          if (!this._polling) return;
-          await this.pollOnce();
-          // Poll again 5 seconds after the last call completed.
-          this.scheduleNextPoll(5000);
-        },
-        Math.max(0, Number(delayMs) || 0),
-      );
-    },
-
     async getQbtInfo(filterObj) {
       const url = new URL(`${config.torrentsApiUrl}/api/qbt/info`);
       if (filterObj && typeof filterObj === "object") {
@@ -633,135 +622,127 @@ export default {
       return res.json();
     },
 
+    async applyQbtInfo(torrents) {
+      if (!Array.isArray(torrents)) return;
+      const hashOf = (t) => String(t?.hash || "").trim();
+
+      // Re-map selectedItems to new torrent objects by hash so selection survives updates
+      if (this.selectedItems.size > 0) {
+        const selectedHashes = new Set(
+          [...this.selectedItems].map(hashOf).filter(Boolean),
+        );
+        const newByHash = new Map(
+          torrents.map((t) => [hashOf(t), t]).filter(([h]) => h),
+        );
+        const remapped = new Set();
+        for (const h of selectedHashes) {
+          const newT = newByHash.get(h);
+          if (newT) remapped.add(newT);
+        }
+        this.selectedItems = remapped;
+        // Re-map lastSelectedIndex
+        if (this.lastSelectedIndex !== null) {
+          const sorted = [...(torrents || [])].sort((a, b) => {
+            // Use same sort logic as computed sortedTorrents
+            const stA = String(a?.state || "").trim();
+            const stB = String(b?.state || "").trim();
+            const dl = (s) => (s === "downloading" ? 0 : 1);
+            if (dl(stA) !== dl(stB)) return dl(stA) - dl(stB);
+            return (a?.name || "").localeCompare(b?.name || "");
+          });
+          if (remapped.size > 0) {
+            const lastRemapped = [...remapped][remapped.size - 1];
+            this.lastSelectedIndex = sorted.indexOf(lastRemapped);
+          }
+        }
+      }
+
+      // Track new and removed hashes for history events.
+      const curHashes = new Set(torrents.map(hashOf).filter(Boolean));
+      const torrentByHash = {};
+      for (const t of torrents) {
+        const h = hashOf(t);
+        if (h) torrentByHash[h] = t;
+      }
+
+      for (const h of curHashes) {
+        if (!this._knownHashes.has(h)) {
+          // new torrent appeared
+        }
+      }
+      if (this._didLoadOnce) {
+        for (const h of this._knownHashes) {
+          if (!curHashes.has(h)) {
+            // torrent removed
+          }
+        }
+      }
+      this._knownHashes = curHashes;
+      const downloadingTitles = torrents
+        .filter((t) => {
+          const st = String(t?.state || "")
+            .trim()
+            .toLowerCase();
+          return st === "downloading";
+        })
+        .map((t) => this.toParsedTitle(t?.name))
+        .filter(Boolean);
+      evtBus.emit("activeQbtTitles", downloadingTitles);
+
+      const curDownloading = torrents
+        .filter((t) => String(t?.state || "").trim() === "downloading")
+        .map(hashOf)
+        .filter(Boolean);
+
+      // Once the Qbt pane has loaded any cards, track currently-downloading titles.
+      if (!this._didLoadOnce && torrents.length > 0) {
+        this.activeDownLoads = curDownloading;
+      } else {
+        // On each update: if any previously-downloading title is no longer downloading,
+        // kick tvproc to start the next cycle.
+        const prev = Array.isArray(this.activeDownLoads)
+          ? this.activeDownLoads
+          : [];
+        const missing = prev.filter((h) => h && !curDownloading.includes(h));
+        if (missing.length > 0) {
+          unilog(1030, "History: download finished, starting tvproc cycle", {
+            finishedHashes: missing,
+          });
+          for (const h of missing) {
+            // torrent finished downloading
+          }
+          try {
+            await fetch(`${config.tvDownUrl}/startProc`, {
+              method: "POST",
+            });
+          } catch {
+            // ignore
+          }
+        }
+        // Always refresh activeDownLoads after the check.
+        this.activeDownLoads = curDownloading;
+      }
+
+      this.torrents = torrents;
+      this._didLoadOnce = true;
+
+      await this.$nextTick();
+      // On app load, establish an initial "bottom" baseline even if the pane
+      // is not currently visible (v-show preserves scroll position).
+      if (!this._didInitialScroll) {
+        this.scrollToBottom();
+        this._didInitialScroll = true;
+        this._stickToBottom = true;
+      } else if (this._active && this._stickToBottom) {
+        this.scrollToBottom();
+      }
+    },
+
     async pollOnce() {
       this.startLoadingDelay();
       try {
-        const scroller = this.getScroller();
-        // Update stickiness based on current scroll position at the start of the poll.
-        if (scroller) this._stickToBottom = this.isAtBottom(scroller);
-
         const torrents = await this.getQbtInfo({});
-        if (Array.isArray(torrents)) {
-          const hashOf = (t) => String(t?.hash || "").trim();
-          const nameOf = (t) => String(t?.name || "").trim();
-
-          // Re-map selectedItems to new torrent objects by hash so selection survives polling
-          if (this.selectedItems.size > 0) {
-            const selectedHashes = new Set(
-              [...this.selectedItems].map(hashOf).filter(Boolean),
-            );
-            const newByHash = new Map(
-              torrents.map((t) => [hashOf(t), t]).filter(([h]) => h),
-            );
-            const remapped = new Set();
-            for (const h of selectedHashes) {
-              const newT = newByHash.get(h);
-              if (newT) remapped.add(newT);
-            }
-            this.selectedItems = remapped;
-            // Re-map lastSelectedIndex
-            if (this.lastSelectedIndex !== null) {
-              const sorted = [...(torrents || [])].sort((a, b) => {
-                // Use same sort logic as computed sortedTorrents
-                const stA = String(a?.state || "").trim();
-                const stB = String(b?.state || "").trim();
-                const dl = (s) => (s === "downloading" ? 0 : 1);
-                if (dl(stA) !== dl(stB)) return dl(stA) - dl(stB);
-                return (a?.name || "").localeCompare(b?.name || "");
-              });
-              if (remapped.size > 0) {
-                const lastRemapped = [...remapped][remapped.size - 1];
-                this.lastSelectedIndex = sorted.indexOf(lastRemapped);
-              }
-            }
-          }
-
-          // Track new and removed hashes for history events.
-          const curHashes = new Set(torrents.map(hashOf).filter(Boolean));
-          const torrentByHash = {};
-          for (const t of torrents) {
-            const h = hashOf(t);
-            if (h) torrentByHash[h] = t;
-          }
-
-          for (const h of curHashes) {
-            if (!this._knownHashes.has(h)) {
-              // new torrent appeared
-            }
-          }
-          if (this._didLoadOnce) {
-            for (const h of this._knownHashes) {
-              if (!curHashes.has(h)) {
-                // torrent removed
-              }
-            }
-          }
-          this._knownHashes = curHashes;
-          const downloadingTitles = torrents
-            .filter((t) => {
-              const st = String(t?.state || "")
-                .trim()
-                .toLowerCase();
-              return st === "downloading";
-            })
-            .map((t) => this.toParsedTitle(t?.name))
-            .filter(Boolean);
-          evtBus.emit("activeQbtTitles", downloadingTitles);
-
-          const curDownloading = torrents
-            .filter((t) => String(t?.state || "").trim() === "downloading")
-            .map(hashOf)
-            .filter(Boolean);
-
-          // Once the Qbt pane has loaded any cards, track currently-downloading titles.
-          if (!this._didLoadOnce && torrents.length > 0) {
-            this.activeDownLoads = curDownloading;
-          } else {
-            // On each poll: if any previously-downloading title is no longer downloading,
-            // kick tvproc to start the next cycle.
-            const prev = Array.isArray(this.activeDownLoads)
-              ? this.activeDownLoads
-              : [];
-            const missing = prev.filter(
-              (h) => h && !curDownloading.includes(h),
-            );
-            if (missing.length > 0) {
-              unilog(
-                1030,
-                "History: download finished, starting tvproc cycle",
-                {
-                  finishedHashes: missing,
-                },
-              );
-              for (const h of missing) {
-                // torrent finished downloading
-              }
-              try {
-                await fetch(`${config.tvDownUrl}/startProc`, {
-                  method: "POST",
-                });
-              } catch {
-                // ignore
-              }
-            }
-            // Always refresh activeDownLoads after the check.
-            this.activeDownLoads = curDownloading;
-          }
-
-          this.torrents = torrents;
-          this._didLoadOnce = true;
-
-          await this.$nextTick();
-          // On app load, establish an initial "bottom" baseline even if the pane
-          // is not currently visible (v-show preserves scroll position).
-          if (!this._didInitialScroll) {
-            this.scrollToBottom();
-            this._didInitialScroll = true;
-            this._stickToBottom = true;
-          } else if (this._active && this._stickToBottom) {
-            this.scrollToBottom();
-          }
-        }
+        await this.applyQbtInfo(torrents);
       } catch {
         // ignore transient errors
       } finally {

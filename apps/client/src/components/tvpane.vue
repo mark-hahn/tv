@@ -606,7 +606,7 @@
 <script>
 import { config } from "../config.js";
 import evtBus from "../evtBus.js";
-import { wsSend, clientId } from "../srvr.js";
+import { wsSend, clientId, openChannel } from "../srvr.js";
 import allServices from "../../../tv/services.json";
 
 const SCRUB_HOLD_DELAY_MS = 400;
@@ -646,6 +646,8 @@ export default {
       showPicCtrl: false,
       picSettings: [],
       picInputs: {}, // target -> { typing: bool, raw: string }
+      _picChannel: null,
+      _subChannel: null,
     };
   },
 
@@ -719,7 +721,8 @@ export default {
     clearTimeout(this._dbTimer);
     this._db = null;
     clearTimeout(this._googleTimer);
-    clearInterval(this._subPollTimer);
+    this.closePicCtrl();
+    this.subClose();
     clearTimeout(this._avoidTimer);
     clearTimeout(this._unlockHoldTimer);
     clearInterval(this._embyPosTimer);
@@ -1022,13 +1025,28 @@ export default {
 
     openPicCtrl() {
       this.showPicCtrl = true;
-      this.fetchPicSettings();
-      this._picPollTimer = setInterval(() => this.fetchPicSettings(), 3000);
+      if (this._picChannel) return;
+      this._picChannel = openChannel("tvPicture", {
+        onSnapshot: this.applyPicSettings,
+        onDelta: this.applyPicSettings,
+      });
     },
 
     closePicCtrl() {
-      clearInterval(this._picPollTimer);
+      this._picChannel?.close();
+      this._picChannel = null;
       this.showPicCtrl = false;
+    },
+
+    applyPicSettings(data) {
+      if (!data?.ok) return;
+      this.picSettings = data.settings;
+      // clear typing state for any setting that was updated
+      for (const s of data.settings) {
+        const inp = this.picInputs[s.target];
+        if (inp && inp.typing) continue; // don't override while user is typing
+        this.picInputs[s.target] = { typing: false, raw: s.value };
+      }
     },
 
     async fetchPicSettings() {
@@ -1036,15 +1054,7 @@ export default {
         const data = await fetch(`${config.tvTvUrl}/tv/picture`).then((r) =>
           r.json(),
         );
-        if (data.ok) {
-          this.picSettings = data.settings;
-          // clear typing state for any setting that was updated
-          for (const s of data.settings) {
-            const inp = this.picInputs[s.target];
-            if (inp && inp.typing) continue; // don't override while user is typing
-            this.picInputs[s.target] = { typing: false, raw: s.value };
-          }
-        }
+        this.applyPicSettings(data);
       } catch (_) {}
     },
 
@@ -1241,36 +1251,40 @@ export default {
         const data = await fetch(`${config.tvTvUrl}/tv/emby/playing`).then(
           (r) => r.json(),
         );
-        if (data.ok) {
-          this.subPlayers = data.playing;
-          if (
-            !this.subDeviceName ||
-            !data.playing.find(
-              (p) => (p.deviceName || p.sessionId) === this.subDeviceName,
-            )
-          ) {
-            const lrtv = data.playing.find(
-              (p) => p.deviceName === "Living Room TV",
-            );
-            this.subDeviceName = lrtv
-              ? lrtv.deviceName
-              : (data.playing[0]?.deviceName ??
-                data.playing[0]?.sessionId ??
-                null);
-          }
-        }
+        this.applySubPlayers(data);
       } catch (_) {}
+    },
+
+    applySubPlayers(data) {
+      if (!data?.ok) return;
+      this.subPlayers = data.playing;
+      if (
+        !this.subDeviceName ||
+        !data.playing.find(
+          (p) => (p.deviceName || p.sessionId) === this.subDeviceName,
+        )
+      ) {
+        const lrtv = data.playing.find(
+          (p) => p.deviceName === "Living Room TV",
+        );
+        this.subDeviceName = lrtv
+          ? lrtv.deviceName
+          : (data.playing[0]?.deviceName ?? data.playing[0]?.sessionId ?? null);
+      }
     },
 
     async openSubCtrl() {
       this.showSubCtrl = true;
-      clearInterval(this._subPollTimer);
-      await this.fetchSubPlayers();
-      this._subPollTimer = setInterval(() => this.fetchSubPlayers(), 3000);
+      if (this._subChannel) return;
+      this._subChannel = openChannel("embyPlaying", {
+        onSnapshot: this.applySubPlayers,
+        onDelta: this.applySubPlayers,
+      });
     },
 
     subClose() {
-      clearInterval(this._subPollTimer);
+      this._subChannel?.close();
+      this._subChannel = null;
       this.showSubCtrl = false;
     },
 
@@ -1296,7 +1310,6 @@ export default {
           ? { ...p, subtitleStreamIndex: index }
           : p,
       );
-      clearInterval(this._subPollTimer);
       let waitMs = 5000;
       let acted = true;
       try {
@@ -1314,7 +1327,6 @@ export default {
         await new Promise((r) => setTimeout(r, waitMs));
       }
       await this.fetchSubPlayers();
-      this._subPollTimer = setInterval(() => this.fetchSubPlayers(), 3000);
     },
 
     modeBtnStyle(m) {

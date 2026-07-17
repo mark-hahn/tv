@@ -6,12 +6,6 @@ const HTTP_URL = config.tvSrvrUrl;
 const WS_URL = HTTP_URL.replace(/^https/, "wss");
 const WS_START_DELAY_MS = 0;
 const WS_RECONNECT_DELAY_MS = 10000;
-const LAST_VIEWED_START_DELAY_MS = 0;
-const LAST_VIEWED_POLL_MS = 10 * 1000;
-const LAST_VIEWED_TIMEOUT_MS = 30000;
-// A server restart or a machine sleep/wake can only ever kill one poll, so a
-// lone failure is noise; only a real outage fails consecutively.
-const LAST_VIEWED_FAIL_LOG_AFTER = 3;
 const SLOW_REQUEST_MS = 3000;
 
 // Vite re-executes this module on every edit, but it will NOT dispose the old
@@ -133,6 +127,55 @@ const ensureWs = async ({ waitMs = 0 } = {}) => {
 const calls = [];
 let nextId = 0;
 
+const channelSubscribers = new Map();
+
+const sendChannelControl = (ch, op) => {
+  wsSend({ ch, op });
+};
+
+export const openChannel = (name, handlers = {}) => {
+  let entry = channelSubscribers.get(name);
+  if (!entry) {
+    entry = { subscribers: new Set() };
+    channelSubscribers.set(name, entry);
+    sendChannelControl(name, "sub");
+  }
+
+  const subscriber = {
+    onSnapshot: handlers.onSnapshot,
+    onDelta: handlers.onDelta,
+    onUnavailable: handlers.onUnavailable,
+  };
+  entry.subscribers.add(subscriber);
+
+  let closed = false;
+  return {
+    close() {
+      if (closed) return;
+      closed = true;
+      const current = channelSubscribers.get(name);
+      if (!current) return;
+      current.subscribers.delete(subscriber);
+      if (current.subscribers.size === 0) {
+        channelSubscribers.delete(name);
+        sendChannelControl(name, "unsub");
+      }
+    },
+  };
+};
+
+const handleChannelFrame = (frame) => {
+  const entry = channelSubscribers.get(frame.ch);
+  if (!entry) return true;
+
+  for (const subscriber of [...entry.subscribers]) {
+    if (frame.op === "snapshot") subscriber.onSnapshot?.(frame.data);
+    else if (frame.op === "delta") subscriber.onDelta?.(frame.data);
+    else if (frame.op === "unavailable") subscriber.onUnavailable?.();
+  }
+  return true;
+};
+
 const rejectAllPending = (reason) => {
   const err = reason || { error: "websocket disconnected" };
   while (calls.length) {
@@ -157,6 +200,8 @@ const attachWsHandlers = () => {
       reconnectTimer = null;
     }
     evtBus.emit("ws-reconnected");
+    for (const name of channelSubscribers.keys())
+      sendChannelControl(name, "sub");
   };
 
   ws.onclose = () => {
@@ -333,6 +378,11 @@ handleMsg = async (msg) => {
 
   const { id, notification, status, data: result } = parts;
 
+  if (parts.ch) {
+    handleChannelFrame(parts);
+    return;
+  }
+
   // Handle ASR logs (server->client push)
   if (status === "asr-log") {
     evtBus.emit("asr-log", result);
@@ -412,44 +462,15 @@ export async function deleteShowFromSrvr(show) {
 
 export const lastViewedCache = {};
 
-let lastViewedCacheUpdating = false;
-let lastViewedCacheFailureCount = 0;
-
-const updateLastViewedCache = async () => {
-  if (lastViewedCacheUpdating) return;
-  lastViewedCacheUpdating = true;
-  try {
-    const lastViewed = await httpCall(
-      "/api/getLastViewed",
-      null,
-      "GET",
-      LAST_VIEWED_TIMEOUT_MS,
-    );
-    Object.assign(lastViewedCache, lastViewed);
-    lastViewedCacheFailureCount = 0;
-  } catch (err) {
-    lastViewedCacheFailureCount += 1;
-    if (
-      lastViewedCacheFailureCount === LAST_VIEWED_FAIL_LOG_AFTER ||
-      lastViewedCacheFailureCount % 10 === 0
-    ) {
-      unilog(
-        878,
-        `lastViewed cache NetworkError: ${err.message || String(err)}`,
-      );
-    }
-  } finally {
-    lastViewedCacheUpdating = false;
-  }
+const applyLastViewedCache = (lastViewed) => {
+  if (!lastViewed || typeof lastViewed !== "object") return;
+  Object.assign(lastViewedCache, lastViewed);
 };
-const lastViewedStartTimer = setTimeout(
-  updateLastViewedCache,
-  LAST_VIEWED_START_DELAY_MS,
-);
-const lastViewedPollTimer = setInterval(
-  updateLastViewedCache,
-  LAST_VIEWED_POLL_MS,
-);
+
+const lastViewedChannel = openChannel("lastViewed", {
+  onSnapshot: applyLastViewedCache,
+  onDelta: applyLastViewedCache,
+});
 
 // Everything this module starts at module scope, torn down as one unit. The
 // call at the top of this file runs the PREVIOUS instance's copy of this before
@@ -466,8 +487,11 @@ if (import.meta.hot) {
     torndown = true;
     clearInterval(lagTimer);
     clearTimeout(wsStartTimer);
-    clearTimeout(lastViewedStartTimer);
-    clearInterval(lastViewedPollTimer);
+    lastViewedChannel.close();
+    for (const handle of [...channelSubscribers.values()]) {
+      handle.subscribers.clear();
+    }
+    channelSubscribers.clear();
     if (reconnectTimer) clearTimeout(reconnectTimer);
     document.removeEventListener("visibilitychange", onVisibilityChange);
     wsWanted = false;

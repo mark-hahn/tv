@@ -166,6 +166,7 @@ export default function App() {
   const [mediaTitle, setMediaTitle] = useState(null);
 
   const wsRef = useRef(null);
+  const channelsRef = useRef(new Map());
   const repeatDelayRef = useRef(null);
   const repeatTimeoutRef = useRef(null);
   const repeatActiveRef = useRef(false);
@@ -181,10 +182,8 @@ export default function App() {
   const lpRef = useRef(null);
   const volDownHoldRef = useRef(null);
   const volDownHoldFiredRef = useRef(false);
-  const picPollRef = useRef(null);
   const picCommitTimersRef = useRef({});
   const picInputsRef = useRef({});
-  const subPollRef = useRef(null);
   const subPendingRef = useRef(null); // { deviceName, index } while optimistic highlight is active
   const subGenRef = useRef(0);
   const subNavigatingRef = useRef(false);
@@ -304,15 +303,40 @@ export default function App() {
     if (data.mediaTitle !== undefined) setMediaTitle(data.mediaTitle);
   };
 
+  const openChannel = (ch, handlers) => {
+    if (channelsRef.current.has(ch)) return;
+    channelsRef.current.set(ch, handlers);
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ ch, op: "sub" }));
+    }
+  };
+
+  const closeChannel = (ch) => {
+    if (!channelsRef.current.has(ch)) return;
+    channelsRef.current.delete(ch);
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ ch, op: "unsub" }));
+    }
+  };
+
   const connectWs = () => {
     const ws = new WebSocket(TV_SRVR_WS_URL);
     wsRef.current = ws;
     ws.onopen = () => {
       ws.send(JSON.stringify({ id: 0, fname: "register" }));
+      for (const ch of channelsRef.current.keys()) {
+        ws.send(JSON.stringify({ ch, op: "sub" }));
+      }
     };
     ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
+        if (msg.ch) {
+          const handlers = channelsRef.current.get(msg.ch);
+          if (msg.op === "snapshot") handlers?.onSnapshot?.(msg.data);
+          else if (msg.op === "delta") handlers?.onDelta?.(msg.data);
+          return;
+        }
         if (msg.id === 0 && msg.notification === "tvMuteState") {
           applyTvState(msg.data);
         } else if (msg.id === 0 && msg.notification === "tvRemoteAction") {
@@ -340,10 +364,10 @@ export default function App() {
           if (layoutOptionRef.current === "linda") return;
           setSubMismatchWarning(true);
           setShowSubCtrl(true);
-          fetchSubPlayers().catch(() => {});
-          if (!subPollRef.current) {
-            subPollRef.current = setInterval(fetchSubPlayers, 3000);
-          }
+          openChannel("embyPlaying", {
+            onSnapshot: applySubPlayers,
+            onDelta: applySubPlayers,
+          });
         } else if (msg.id === 0 && msg.notification === "nowPlaying") {
           const { showName, playing } = msg.data ?? {};
           const s = playing?.[0]?.season ?? null;
@@ -413,7 +437,8 @@ export default function App() {
       lpRef.current = null;
       clearTimeout(dbRef.current?.timer);
       dbRef.current = null;
-      clearInterval(subPollRef.current);
+      closeChannel("embyPlaying");
+      closeChannel("tvPicture");
       clearTimeout(avoidTimerRef.current);
       clearTimeout(unlockHoldTimerRef.current);
     };
@@ -789,8 +814,10 @@ export default function App() {
   const openPicCtrl = () => {
     if (layoutOptionRef.current === "linda") return;
     setShowPicCtrl(true);
-    fetchPicSettings();
-    picPollRef.current = setInterval(() => fetchPicSettings(), 3000);
+    openChannel("tvPicture", {
+      onSnapshot: applyPicSettings,
+      onDelta: applyPicSettings,
+    });
   };
 
   const startVolUpHold = () => {
@@ -810,25 +837,28 @@ export default function App() {
   const stopVolUpHold = () => lpStop();
 
   const closePicCtrl = () => {
-    clearInterval(picPollRef.current);
+    closeChannel("tvPicture");
     setShowPicCtrl(false);
+  };
+
+  const applyPicSettings = (data) => {
+    if (!data?.ok) return;
+    setPicSettings(data.settings);
+    setPicInputs((prev) => {
+      const next = { ...prev };
+      for (const s of data.settings) {
+        if (picCommitTimersRef.current[s.target]) continue; // actively typing
+        next[s.target] = { raw: s.value, resetNext: true };
+      }
+      picInputsRef.current = next;
+      return next;
+    });
   };
 
   const fetchPicSettings = async () => {
     try {
       const data = await fetch(`${TV_TV_URL}/tv/picture`).then((r) => r.json());
-      if (data.ok) {
-        setPicSettings(data.settings);
-        setPicInputs((prev) => {
-          const next = { ...prev };
-          for (const s of data.settings) {
-            if (picCommitTimersRef.current[s.target]) continue; // actively typing
-            next[s.target] = { raw: s.value, resetNext: true };
-          }
-          picInputsRef.current = next;
-          return next;
-        });
-      }
+      applyPicSettings(data);
     } catch (_) {}
   };
 
@@ -1004,42 +1034,48 @@ export default function App() {
       const data = await fetch(`${TV_TV_URL}/tv/emby/playing`).then((r) =>
         r.json(),
       );
-      if (data.ok) {
-        const pending = subPendingRef.current;
-        let players = data.playing;
-        if (pending) {
-          players = players.map((p) => {
-            if ((p.deviceName || p.sessionId) === pending.deviceName) {
-              if (p.subtitleStreamIndex === pending.index) {
-                subPendingRef.current = null; // Emby confirmed
-              } else {
-                return { ...p, subtitleStreamIndex: pending.index }; // keep optimistic
-              }
+      applySubPlayers(data);
+    } catch (_) {}
+  };
+
+  const applySubPlayers = (data) => {
+    if (data?.ok) {
+      const pending = subPendingRef.current;
+      let players = data.playing;
+      if (pending) {
+        players = players.map((p) => {
+          if ((p.deviceName || p.sessionId) === pending.deviceName) {
+            if (p.subtitleStreamIndex === pending.index) {
+              subPendingRef.current = null; // Emby confirmed
+            } else {
+              return { ...p, subtitleStreamIndex: pending.index }; // keep optimistic
             }
-            return p;
-          });
-        }
-        setSubPlayers(players);
-        subPlayersRef.current = players;
-        setSubDeviceName((prev) => {
-          const hasCurrentPlayer =
-            prev && players.find((p) => (p.deviceName || p.sessionId) === prev);
-          if (!hasCurrentPlayer) {
-            const lrtv = players.find((p) => p.deviceName === "Living Room TV");
-            if (lrtv) return "Living Room TV";
           }
-          return prev;
+          return p;
         });
       }
-    } catch (_) {}
+      setSubPlayers(players);
+      subPlayersRef.current = players;
+      setSubDeviceName((prev) => {
+        const hasCurrentPlayer =
+          prev && players.find((p) => (p.deviceName || p.sessionId) === prev);
+        if (!hasCurrentPlayer) {
+          const lrtv = players.find((p) => p.deviceName === "Living Room TV");
+          if (lrtv) return "Living Room TV";
+        }
+        return prev;
+      });
+    }
   };
 
   const openSubCtrl = async () => {
     if (mode !== "google" && mode !== "fire") return;
     if (layoutOptionRef.current === "linda") return;
     setShowSubCtrl(true);
-    await fetchSubPlayers();
-    subPollRef.current = setInterval(fetchSubPlayers, 3000);
+    openChannel("embyPlaying", {
+      onSnapshot: applySubPlayers,
+      onDelta: applySubPlayers,
+    });
   };
 
   const subTypeChar = (type) => {
@@ -1079,7 +1115,7 @@ export default function App() {
   };
 
   const subClose = () => {
-    clearInterval(subPollRef.current);
+    closeChannel("embyPlaying");
     setShowSubCtrl(false);
     setSubMismatchWarning(false);
   };
@@ -1111,8 +1147,6 @@ export default function App() {
     if (subNavigatingRef.current) return;
     if (checkBlocked()) return;
     const gen = ++subGenRef.current;
-    clearInterval(subPollRef.current);
-    subPollRef.current = null;
     subPendingRef.current = { deviceName: subDeviceName, index };
     setSubPlayers((prev) => {
       const idx = prev.findIndex(
@@ -1152,7 +1186,6 @@ export default function App() {
       if (subGenRef.current !== gen) return;
     }
     subPendingRef.current = null;
-    subPollRef.current = setInterval(fetchSubPlayers, 2000);
     await fetchSubPlayers();
   };
 

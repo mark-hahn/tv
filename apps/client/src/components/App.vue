@@ -600,8 +600,10 @@ export default {
       videoPlayerMapSeason: null,
       videoPlayerMapEpisode: null,
       chksrtCount: 0,
+      _chksrtChannel: null,
       introCount: 0,
       browseTabHasMore: false,
+      _browseHasMoreChannel: null,
       currentPane: "info", // 'info', 'map', 'actors', 'reviews', 'trailer', 'tor', 'flex', 'qbt', 'down'
       movieMode: false,
       savedPane: null,
@@ -640,8 +642,7 @@ export default {
       _downActiveDown: false,
       _downActive: false,
       _downInactiveTimer: null,
-      _qbtPollTimer: null,
-      _qbtPolling: false,
+      _qbtChannel: null,
       // TABLET SIZING CONFIGURATION - SIMPLE MODE - Tweak these values
       sizing: {
         // List pane
@@ -1055,37 +1056,33 @@ export default {
         this.chksrtCount = 0;
       }
     },
-    fetchBrowseTabHasMore() {
-      fetch(`${config.torrentsApiUrl}/api/hasBrowseShow`)
-        .then((r) => r.json())
-        .then((d) => {
-          this.browseTabHasMore = !!d.available;
-        })
-        .catch(() => {});
-    },
     startBrowseTabPolling() {
-      this.stopBrowseTabPolling();
-      this._browseTabPollTimer = setInterval(() => {
-        this.fetchBrowseTabHasMore();
-      }, 60000);
+      if (this._browseHasMoreChannel) return;
+      const applyBrowseHasMore = (payload) => {
+        this.browseTabHasMore = !!payload?.available;
+      };
+      this._browseHasMoreChannel = srvr.openChannel("browseHasMore", {
+        onSnapshot: applyBrowseHasMore,
+        onDelta: applyBrowseHasMore,
+      });
     },
     stopBrowseTabPolling() {
-      if (this._browseTabPollTimer) {
-        clearInterval(this._browseTabPollTimer);
-        this._browseTabPollTimer = null;
-      }
+      this._browseHasMoreChannel?.close();
+      this._browseHasMoreChannel = null;
     },
     startChksrtPolling() {
-      this.stopChksrtPolling();
-      this._chksrtPollTimer = setInterval(() => {
-        this.fetchChksrtCount();
-      }, 60000);
+      if (this._chksrtChannel) return;
+      const applyChksrt = (payload) => {
+        this.chksrtCount = payload?.count ?? 0;
+      };
+      this._chksrtChannel = srvr.openChannel("chksrt", {
+        onSnapshot: applyChksrt,
+        onDelta: applyChksrt,
+      });
     },
     stopChksrtPolling() {
-      if (this._chksrtPollTimer) {
-        clearInterval(this._chksrtPollTimer);
-        this._chksrtPollTimer = null;
-      }
+      this._chksrtChannel?.close();
+      this._chksrtChannel = null;
     },
     async clickChksrt() {
       if (this.chksrtCount === 0) return;
@@ -1850,14 +1847,10 @@ export default {
       }
     },
 
-    async pollQbtActiveOnce() {
-      try {
-        const url = new URL(`${config.torrentsApiUrl}/api/qbt/info`);
-        const res = await fetch(url.toString());
-        if (!res.ok) return;
-        const torrents = await res.json();
+    startQbtPolling() {
+      if (this._qbtChannel || this.simpleMode) return;
+      const applyQbtInfo = (torrents) => {
         if (!Array.isArray(torrents)) return;
-
         const active = torrents.some((t) => {
           const st = String(t?.state || "")
             .trim()
@@ -1869,39 +1862,16 @@ export default {
           this._downActiveQbt = active;
           this.recomputeDownActive();
         }
-      } catch {
-        // ignore
-      }
-    },
-
-    scheduleNextQbtPoll(delayMs) {
-      if (!this._qbtPolling) return;
-      if (this._qbtPollTimer) {
-        clearTimeout(this._qbtPollTimer);
-        this._qbtPollTimer = null;
-      }
-      this._qbtPollTimer = setTimeout(
-        async () => {
-          if (!this._qbtPolling) return;
-          await this.pollQbtActiveOnce();
-          this.scheduleNextQbtPoll(5000);
-        },
-        Math.max(0, Number(delayMs) || 0),
-      );
-    },
-
-    startQbtPolling() {
-      if (this._qbtPolling || this.simpleMode) return;
-      this._qbtPolling = true;
-      this.scheduleNextQbtPoll(0);
+      };
+      this._qbtChannel = srvr.openChannel("qbtInfo", {
+        onSnapshot: applyQbtInfo,
+        onDelta: applyQbtInfo,
+      });
     },
 
     stopQbtPolling() {
-      this._qbtPolling = false;
-      if (this._qbtPollTimer) {
-        clearTimeout(this._qbtPollTimer);
-        this._qbtPollTimer = null;
-      }
+      this._qbtChannel?.close();
+      this._qbtChannel = null;
     },
     requestNotificationsOnce() {
       try {
@@ -2256,7 +2226,6 @@ export default {
       this.introCount = Number(count) || 0;
     };
     evtBus.on("intro-count", this._onIntroCount);
-    this.fetchChksrtCount();
     this.startChksrtPolling();
     this.startQbtPolling();
 
@@ -2264,7 +2233,6 @@ export default {
       this.browseTabHasMore = !!val;
     };
     evtBus.on("browseHasMoreChanged", this._onBrowseHasMoreChanged);
-    this.fetchBrowseTabHasMore();
     this.startBrowseTabPolling();
 
     // Watch for changes to badge-triggering states and update favicon

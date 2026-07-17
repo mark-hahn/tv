@@ -6,11 +6,19 @@ import { fileURLToPath } from "url";
 
 import express from "express";
 import cors from "cors";
+import { ChannelPeer } from "@tv/share/channelPeer";
 import { unilog, logHere, setUnilogSink } from "@tv/share";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const SRVR_LOG_URL = "http://127.0.0.1:8739/api/log";
+const TV_PICTURE_CHANNEL_POLL_MS = 3000;
+const EMBY_PLAYING_CHANNEL_POLL_MS = 3000;
+let tvChannelPeer = null;
+let tvPictureChannelPollTimer = null;
+let tvPictureChannelLastJson = "";
+let embyPlayingChannelPollTimer = null;
+let embyPlayingChannelLastJson = "";
 setUnilogSink(({ logId, message }) => {
   fetch(SRVR_LOG_URL, {
     method: "POST",
@@ -1595,11 +1603,10 @@ function subStreamInfo(stream) {
 let playingCache = { ts: 0, data: null };
 const PLAYING_CACHE_TTL = 3000; // ms
 
-app.get("/tv/emby/playing", async (req, res) => {
+const getEmbyPlayingPayload = async () => {
   const now = Date.now();
   if (playingCache.data && now - playingCache.ts < PLAYING_CACHE_TTL) {
-    res.json(playingCache.data);
-    return;
+    return playingCache.data;
   }
   try {
     const sessRes = await fetch(
@@ -1607,8 +1614,7 @@ app.get("/tv/emby/playing", async (req, res) => {
       { headers: { Accept: "application/json" } },
     );
     if (!sessRes.ok) {
-      res.json({ ok: false, error: `sessions ${sessRes.status}` });
-      return;
+      return { ok: false, error: `sessions ${sessRes.status}` };
     }
     const sessions = await sessRes.json();
     const playing = [];
@@ -1692,11 +1698,15 @@ app.get("/tv/emby/playing", async (req, res) => {
     }
     const result = { ok: true, playing };
     playingCache = { ts: Date.now(), data: result };
-    res.json(result);
+    return result;
   } catch (err) {
     unilog(444, "emby/playing error:", err.message);
-    res.json({ ok: false, error: err.message });
+    return { ok: false, error: err.message };
   }
+};
+
+app.get("/tv/emby/playing", async (req, res) => {
+  res.json(await getEmbyPlayingPayload());
 });
 
 app.get("/tv/emby/position", async (req, res) => {
@@ -1936,7 +1946,7 @@ app.post("/tv/emby/subtitle-offset", async (req, res) => {
 
 // ─── Bravia picture quality settings ─────────────────────────────────────────
 
-app.get("/tv/picture", async (req, res) => {
+const getTvPicturePayload = async () => {
   try {
     const resp = await fetch(BRAVIA_PICTURE_URL, {
       method: "POST",
@@ -1982,11 +1992,97 @@ app.get("/tv/picture", async (req, res) => {
       .sort(
         (a, b) => PIC_TARGETS.indexOf(a.target) - PIC_TARGETS.indexOf(b.target),
       );
-    res.json({ ok: true, settings });
+    return { ok: true, settings };
   } catch (err) {
-    res.json({ ok: false, error: err.message });
+    return { ok: false, error: err.message };
   }
+};
+
+app.get("/tv/picture", async (req, res) => {
+  res.json(await getTvPicturePayload());
 });
+
+const snapshotJson = (value) => JSON.stringify(value ?? null);
+
+const getTvPictureChannelSnapshot = async () => {
+  const payload = await getTvPicturePayload();
+  tvPictureChannelLastJson = snapshotJson(payload);
+  return payload;
+};
+
+const getEmbyPlayingChannelSnapshot = async () => {
+  const payload = await getEmbyPlayingPayload();
+  embyPlayingChannelLastJson = snapshotJson(payload);
+  return payload;
+};
+
+const publishTvPictureChannel = async () => {
+  const payload = await getTvPicturePayload();
+  const json = snapshotJson(payload);
+  if (json === tvPictureChannelLastJson) return;
+  tvPictureChannelLastJson = json;
+  tvChannelPeer?.publishDelta("tvPicture", payload);
+};
+
+const publishEmbyPlayingChannel = async () => {
+  const payload = await getEmbyPlayingPayload();
+  const json = snapshotJson(payload);
+  if (json === embyPlayingChannelLastJson) return;
+  embyPlayingChannelLastJson = json;
+  tvChannelPeer?.publishDelta("embyPlaying", payload);
+};
+
+const startTvPictureChannelPolling = () => {
+  if (tvPictureChannelPollTimer) return;
+  tvPictureChannelPollTimer = setInterval(() => {
+    publishTvPictureChannel().catch((e) => {
+      unilog(1507, `tvPicture poll failed: ${e.message}`);
+    });
+  }, TV_PICTURE_CHANNEL_POLL_MS);
+};
+
+const stopTvPictureChannelPolling = () => {
+  if (!tvPictureChannelPollTimer) return;
+  clearInterval(tvPictureChannelPollTimer);
+  tvPictureChannelPollTimer = null;
+  tvPictureChannelLastJson = "";
+};
+
+const startEmbyPlayingChannelPolling = () => {
+  if (embyPlayingChannelPollTimer) return;
+  embyPlayingChannelPollTimer = setInterval(() => {
+    publishEmbyPlayingChannel().catch((e) => {
+      unilog(1508, `embyPlaying poll failed: ${e.message}`);
+    });
+  }, EMBY_PLAYING_CHANNEL_POLL_MS);
+};
+
+const stopEmbyPlayingChannelPolling = () => {
+  if (!embyPlayingChannelPollTimer) return;
+  clearInterval(embyPlayingChannelPollTimer);
+  embyPlayingChannelPollTimer = null;
+  embyPlayingChannelLastJson = "";
+};
+
+const startTvChannelPeer = () => {
+  if (tvChannelPeer) return;
+  tvChannelPeer = new ChannelPeer({
+    channels: {
+      tvPicture: {
+        snapshot: getTvPictureChannelSnapshot,
+        onFirstSubscriber: startTvPictureChannelPolling,
+        onLastUnsubscriber: stopTvPictureChannelPolling,
+      },
+      embyPlaying: {
+        snapshot: getEmbyPlayingChannelSnapshot,
+        onFirstSubscriber: startEmbyPlayingChannelPolling,
+        onLastUnsubscriber: stopEmbyPlayingChannelPolling,
+      },
+    },
+    log: (message) => unilog(1509, `${message}`),
+  });
+  tvChannelPeer.start();
+};
 
 app.post("/tv/picture", async (req, res) => {
   const { target, value } = req.body ?? {};
@@ -2011,6 +2107,9 @@ app.post("/tv/picture", async (req, res) => {
       return;
     }
     unilog(453, `picture set ${target}=${value}`);
+    publishTvPictureChannel().catch((e) => {
+      unilog(1510, `tvPicture publish failed: ${e.message}`);
+    });
     res.json({ ok: true });
   } catch (err) {
     res.json({ ok: false, error: err.message });
@@ -2094,6 +2193,7 @@ async function checkSubtitleMismatch(sessions) {
 
 app.listen(TV_PORT, () => {
   unilog(456, `listening on port ${TV_PORT}`);
+  startTvChannelPeer();
 });
 
 setInterval(pushTvState, 2000);

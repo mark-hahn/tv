@@ -359,6 +359,7 @@
 <script>
 import evtBus from "../evtBus.js";
 import { config } from "../config.js";
+import * as srvr from "../srvr.js";
 import * as util from "../util.js";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
 
@@ -510,8 +511,7 @@ export default {
       selectedRows: new Set(), // Multi-select; From button is the only source of multiple
       lastSelectedIndex: null,
       dialogRow: null,
-      _pollTimer: null,
-      _polling: false,
+      _flexgetChannel: null,
       forcing: false,
       flexRunning: false,
       _didInitialScroll: false,
@@ -580,7 +580,6 @@ export default {
 
   mounted() {
     evtBus.on("paneChanged", this.onPaneChanged);
-    void this.pollOnce();
     void this.$nextTick(() => {
       this.scrollToBottom();
     });
@@ -643,7 +642,11 @@ export default {
         padding: "2px 4px",
         cursor: "pointer",
         borderRadius: "3px",
-        background: isFlashing ? "#ffcccc" : isHighlighted ? "#fffacd" : "transparent",
+        background: isFlashing
+          ? "#ffcccc"
+          : isHighlighted
+            ? "#fffacd"
+            : "transparent",
         whiteSpace: "pre",
       };
     },
@@ -655,7 +658,9 @@ export default {
         const text = row.line ? String(row.line).trim() : "";
         navigator.clipboard.writeText(text).catch(() => {});
         this.flashingRowKey = row.key;
-        setTimeout(() => { this.flashingRowKey = null; }, 300);
+        setTimeout(() => {
+          this.flashingRowKey = null;
+        }, 300);
         return;
       }
       const rows = this.rows.filter((r) => !r.isHeader);
@@ -731,17 +736,25 @@ export default {
     },
 
     startPolling() {
-      if (this._polling) return;
-      this._polling = true;
-      this.scheduleNextPoll(0);
+      if (this._flexgetChannel) return;
+      this.startLoadingDelay();
+      const apply = async (payload) => {
+        try {
+          await this.applyFlexgetPayload(payload);
+        } finally {
+          this.finishLoadingDelay();
+        }
+      };
+      this._flexgetChannel = srvr.openChannel("flexget", {
+        onSnapshot: apply,
+        onDelta: apply,
+        onUnavailable: () => this.finishLoadingDelay(),
+      });
     },
 
     stopPolling() {
-      this._polling = false;
-      if (this._pollTimer) {
-        clearTimeout(this._pollTimer);
-        this._pollTimer = null;
-      }
+      this._flexgetChannel?.close();
+      this._flexgetChannel = null;
       this._inFlight = false;
       this._showLoading = false;
       if (this._loadingTimer) {
@@ -771,22 +784,6 @@ export default {
         clearTimeout(this._loadingTimer);
         this._loadingTimer = null;
       }
-    },
-
-    scheduleNextPoll(delayMs) {
-      if (!this._polling) return;
-      if (this._pollTimer) {
-        clearTimeout(this._pollTimer);
-        this._pollTimer = null;
-      }
-      this._pollTimer = setTimeout(
-        async () => {
-          if (!this._polling) return;
-          await this.pollOnce();
-          this.scheduleNextPoll(10000);
-        },
-        Math.max(0, Number(delayMs) || 0),
-      );
     },
 
     showFirstDownloading() {
@@ -880,7 +877,6 @@ export default {
         this.forcing = false;
         this.flexRunning = false;
         this._runAbortCtrl = null;
-        this.scheduleNextPoll(1000);
       }
     },
 
@@ -991,64 +987,39 @@ export default {
       this.dialogRow = row;
     },
 
-    async pollOnce() {
-      this.startLoadingDelay();
-      try {
-        const scroller = this.getScroller();
-        const wasAtBottom = this.isAtBottom(scroller);
+    async applyFlexgetPayload(payload) {
+      const scroller = this.getScroller();
+      const wasAtBottom = this.isAtBottom(scroller);
+      const entries = Array.isArray(payload?.history) ? payload.history : [];
 
-        const url = `${config.tvSrvrUrl}/api/flexget-history`;
-        const res = await fetch(url);
-        if (!res.ok) return;
-        const entries = await res.json();
+      const newRows = buildRows(entries);
 
-        const newRows = buildRows(Array.isArray(entries) ? entries : []);
-
-        // Re-map selectedRows to new row objects by key so selection survives polling
-        if (this.selectedRows.size > 0) {
-          const selectedKeys = new Set(
-            [...this.selectedRows].map((r) => r.key),
-          );
-          const newKeyMap = new Map(newRows.map((r) => [r.key, r]));
-          const remapped = new Set();
-          for (const k of selectedKeys) {
-            const newRow = newKeyMap.get(k);
-            if (newRow) remapped.add(newRow);
-          }
-          this.selectedRows = remapped;
-          // Update highlightKey to first still-selected row
-          if (this.highlightKey && !newKeyMap.has(this.highlightKey)) {
-            this.highlightKey = remapped.size > 0 ? [...remapped][0].key : null;
-          }
+      // Re-map selectedRows to new row objects by key so selection survives updates
+      if (this.selectedRows.size > 0) {
+        const selectedKeys = new Set([...this.selectedRows].map((r) => r.key));
+        const newKeyMap = new Map(newRows.map((r) => [r.key, r]));
+        const remapped = new Set();
+        for (const k of selectedKeys) {
+          const newRow = newKeyMap.get(k);
+          if (newRow) remapped.add(newRow);
         }
-
-        // Also fetch running status
-        try {
-          const statusRes = await fetch(
-            `${config.tvSrvrUrl}/api/flexget-status`,
-          );
-          if (statusRes.ok) {
-            const statusJson = await statusRes.json();
-            this.flexRunning = Boolean(statusJson?.running);
-          }
-        } catch {
-          // ignore
+        this.selectedRows = remapped;
+        // Update highlightKey to first still-selected row
+        if (this.highlightKey && !newKeyMap.has(this.highlightKey)) {
+          this.highlightKey = remapped.size > 0 ? [...remapped][0].key : null;
         }
+      }
 
-        this.rows = newRows;
-        this._didLoadOnce = true;
+      this.flexRunning = Boolean(payload?.status?.running);
+      this.rows = newRows;
+      this._didLoadOnce = true;
 
-        await this.$nextTick();
-        if (!this._didInitialScroll) {
-          this.scrollToBottom();
-          this._didInitialScroll = true;
-        } else if (wasAtBottom) {
-          this.scrollToBottom();
-        }
-      } catch {
-        // ignore transient errors
-      } finally {
-        this.finishLoadingDelay();
+      await this.$nextTick();
+      if (!this._didInitialScroll) {
+        this.scrollToBottom();
+        this._didInitialScroll = true;
+      } else if (wasAtBottom) {
+        this.scrollToBottom();
       }
     },
   },

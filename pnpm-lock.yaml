@@ -291,7 +291,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/share
 
-  packages/share: {}
+  packages/share:
+    dependencies:
+      ws:
+        specifier: ^8.18.0
+        version: 8.19.0
 
 packages:
 

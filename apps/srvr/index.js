@@ -79,13 +79,56 @@ import {
   wss,
   connectedClients,
   activeServerMessages,
+  handleChannelFrame,
   notifyClients,
+  publishChannelDelta,
+  registerLocalChannel,
   setGlobalMessage,
+  unsubscribeAllChannels,
 } from "./src/messaging.js";
 import { BATCH_SCHED, ffmpegQueue } from "./src/batchQueue.js";
 import * as bifQueue from "./src/bifQueue.js";
 import * as subsQueue from "./src/subsQueue.js";
 import * as mpfour from "./src/mpfour.js";
+
+registerLocalChannel("badGroups", {
+  snapshot: () => syncBadGroupsFromDisk(),
+});
+
+registerLocalChannel("lastViewed", {
+  snapshot: () => view.getLastViewedSync(),
+});
+view.onLastViewedChange((lastViewed) => {
+  publishChannelDelta("lastViewed", lastViewed);
+});
+
+const getChksrtSnapshot = () => ({
+  count: subsState.subQueueChkSrt.length,
+  path: subsState.subQueueChkSrt[0]?.videoFilePath,
+});
+
+const publishChksrtState = () => {
+  const snapshot = getChksrtSnapshot();
+  notifyClients("chksrt-count", snapshot.count);
+  publishChannelDelta("chksrt", snapshot);
+  return snapshot;
+};
+
+registerLocalChannel("chksrt", {
+  snapshot: getChksrtSnapshot,
+});
+
+const getFlexgetSnapshot = () => ({
+  history: flexget.getSentHistoryRows(),
+  status: { running: flexget.isFlexgetRunning() },
+});
+
+registerLocalChannel("flexget", {
+  snapshot: getFlexgetSnapshot,
+});
+flexget.onFlexgetChange(() => {
+  publishChannelDelta("flexget", getFlexgetSnapshot());
+});
 import * as intro from "./src/intro.js";
 import * as flexget from "./src/flexget.js";
 import * as disk from "./src/disk.js";
@@ -1376,6 +1419,7 @@ app.post(
     }
 
     const list = writeBadGroupsToDisk([...groups]);
+    publishChannelDelta("badGroups", list);
     return { ok: true, action, group: normalizedGroup, list };
   }),
 );
@@ -2074,12 +2118,9 @@ app.post("/api/asr/emb/generate", async (req, res) => {
 
 app.get("/api/asr/chksrt/list", (req, res) => {
   cleanChkSrtQueue();
-  notifyClients("chksrt-count", subsState.subQueueChkSrt.length);
+  const snapshot = publishChksrtState();
   syncBatchMsgs();
-  res.json({
-    count: subsState.subQueueChkSrt.length,
-    path: subsState.subQueueChkSrt[0]?.videoFilePath,
-  });
+  res.json(snapshot);
 });
 
 app.post("/api/asr/chksrt/enqueue", (req, res) => {
@@ -2096,7 +2137,7 @@ app.post("/api/asr/chksrt/enqueue", (req, res) => {
   }
   cleanChkSrtQueue();
   persistSubQueueChkSrt();
-  notifyClients("chksrt-count", subsState.subQueueChkSrt.length);
+  publishChksrtState();
   syncBatchMsgs();
   res.json({ ok: true, queued: videoPaths.length });
 });
@@ -2131,7 +2172,7 @@ app.post("/api/asr/chksrt/ok", (req, res) => {
   subsState.subQueueChkSrt.shift();
   cleanChkSrtQueue();
   persistSubQueueChkSrt();
-  notifyClients("chksrt-count", subsState.subQueueChkSrt.length);
+  publishChksrtState();
   syncBatchMsgs();
   res.json({ ok: true });
 });
@@ -2156,7 +2197,7 @@ app.post("/api/asr/chksrt/gensrt", (req, res) => {
   }
   cleanChkSrtQueue();
   persistSubQueueChkSrt();
-  notifyClients("chksrt-count", subsState.subQueueChkSrt.length);
+  publishChksrtState();
   syncBatchMsgs();
   res.json({ ok: true });
 });
@@ -2190,7 +2231,7 @@ app.post("/api/asr/chksrt/snooze", (req, res) => {
   cleanChkSrtQueue();
   persistSubQueueChkSrt();
   persistChksrtSnoozed();
-  notifyClients("chksrt-count", subsState.subQueueChkSrt.length);
+  publishChksrtState();
   syncBatchMsgs();
   res.json({ ok: true });
 });
@@ -2239,7 +2280,7 @@ app.post("/api/asr/chksrt/select", (req, res) => {
   mpfour.cancelEncode(videoPath);
   cleanChkSrtQueue();
   persistSubQueueChkSrt();
-  notifyClients("chksrt-count", subsState.subQueueChkSrt.length);
+  publishChksrtState();
   syncBatchMsgs();
   res.json({ ok: true });
 });
@@ -2989,6 +3030,7 @@ wss.on("connection", (ws) => {
       unilog(618, "ignoring bad message:", msg);
       return;
     }
+    if (parsed.ch && handleChannelFrame(ws, parsed)) return;
     const { id, fname, param } = parsed;
 
     if (fname == "register") {
@@ -3106,6 +3148,7 @@ wss.on("connection", (ws) => {
 
   ws.on("error", (err) => {
     unilog(624, socketName, "error:", err.message);
+    unsubscribeAllChannels(ws);
     connectedClients.delete(ws);
     unilogRoutes.removeUnilogSubscriber(ws);
     socketName = "unknown websocket";
@@ -3113,6 +3156,7 @@ wss.on("connection", (ws) => {
 
   ws.on("close", () => {
     // log(socketName + ' closed');
+    unsubscribeAllChannels(ws);
     connectedClients.delete(ws);
     unilogRoutes.removeUnilogSubscriber(ws);
     socketName = "unknown websocket";

@@ -47,7 +47,8 @@ import {
   parseTitleFromFilename,
   TV_BLOCKED,
 } from "@tv/share";
-import { unilog, setUnilogSink } from "@tv/share";
+import { ChannelPeer } from "@tv/share/channelPeer";
+import { unilog, setUnilogSink, logHere } from "@tv/share";
 import parseTorrentTitlePkg from "parse-torrent-title";
 import {
   getApiDataDir,
@@ -61,6 +62,8 @@ const __dirname = path.dirname(__filename);
 const INTERNAL_SRVR_SUBS_COUNT_URL =
   "http://127.0.0.1:8739/api/subsCountEpisodes";
 const INTERNAL_SRVR_LOG_URL = "http://127.0.0.1:8739/api/log";
+const QBT_CHANNEL_POLL_MS = 5000;
+const BROWSE_HAS_MORE_CHANNEL_POLL_MS = 60000;
 
 setUnilogSink(({ logId, message }) => {
   fetch(INTERNAL_SRVR_LOG_URL, {
@@ -523,6 +526,11 @@ const app = express();
 
 const API_PORT = 3001;
 const DUMP_INFO = false;
+let qbtChannelPeer = null;
+let qbtChannelPollTimer = null;
+let qbtChannelLastJson = "";
+let browseHasMoreChannelPollTimer = null;
+let browseHasMoreChannelLastJson = "";
 // Hard-wired (no env vars per repo convention): emit CORS headers for direct
 // (non-proxied) browser requests. nginx injects them on the proxied path.
 const INTERNAL_CORS = true;
@@ -806,39 +814,111 @@ app.post("/api/tvproc/forceDown", async (req, res) => {
   }
 });
 
+const getQbtInfoPayload = async (query = {}) => {
+  const filterObj = {};
+  if (typeof query.hash === "string" && query.hash) filterObj.hash = query.hash;
+  if (typeof query.category === "string" && query.category)
+    filterObj.category = query.category;
+  if (typeof query.tag === "string" && query.tag) filterObj.tag = query.tag;
+  if (typeof query.filter === "string" && query.filter)
+    filterObj.filter = query.filter;
+
+  const useFilter = Object.keys(filterObj).length > 0 ? filterObj : undefined;
+  const info = await getQbtInfo(useFilter);
+  // Only the full unfiltered list drives stat sampling/pruning.
+  if (!useFilter) await enrichQbtStats(info);
+
+  if (DUMP_INFO) {
+    try {
+      const outPath = path.resolve(
+        __dirname,
+        "..",
+        "..",
+        "samples",
+        "sample-qbt",
+        "qbt-info.json",
+      );
+      fs.mkdirSync(path.dirname(outPath), { recursive: true });
+      fs.writeFileSync(outPath, JSON.stringify(info, null, 2), "utf8");
+    } catch (e) {
+      unilog(217, "qbt info dump error:", e);
+    }
+  }
+
+  return info;
+};
+
+const getQbtChannelSnapshot = async () => {
+  const info = await getQbtInfoPayload();
+  qbtChannelLastJson = JSON.stringify(info);
+  return info;
+};
+
+const pollQbtChannel = async () => {
+  try {
+    const info = await getQbtInfoPayload();
+    const json = JSON.stringify(info);
+    if (json === qbtChannelLastJson) return;
+    qbtChannelLastJson = json;
+    qbtChannelPeer?.publishDelta("qbtInfo", info);
+  } catch (e) {
+    unilog(1498, `qbtInfo poll failed: ${e.message}`);
+  }
+};
+
+const startQbtChannelPolling = () => {
+  if (qbtChannelPollTimer) return;
+  qbtChannelPollTimer = setInterval(() => {
+    pollQbtChannel().catch((e) => {
+      unilog(1499, `qbtInfo poll crashed: ${e.message}`);
+    });
+  }, QBT_CHANNEL_POLL_MS);
+};
+
+const stopQbtChannelPolling = () => {
+  if (!qbtChannelPollTimer) return;
+  clearInterval(qbtChannelPollTimer);
+  qbtChannelPollTimer = null;
+  qbtChannelLastJson = "";
+};
+
+const getBrowseHasMorePayload = () => ({ available: hasBrowseShow() });
+
+const getBrowseHasMoreChannelSnapshot = () => {
+  const payload = getBrowseHasMorePayload();
+  browseHasMoreChannelLastJson = JSON.stringify(payload);
+  return payload;
+};
+
+const publishBrowseHasMoreChannel = () => {
+  const payload = getBrowseHasMorePayload();
+  const json = JSON.stringify(payload);
+  if (json === browseHasMoreChannelLastJson) return;
+  browseHasMoreChannelLastJson = json;
+  qbtChannelPeer?.publishDelta("browseHasMore", payload);
+};
+
+const startBrowseHasMoreChannelPolling = () => {
+  if (browseHasMoreChannelPollTimer) return;
+  browseHasMoreChannelPollTimer = setInterval(() => {
+    try {
+      publishBrowseHasMoreChannel();
+    } catch (e) {
+      unilog(1500, `browseHasMore poll failed: ${e.message}`);
+    }
+  }, BROWSE_HAS_MORE_CHANNEL_POLL_MS);
+};
+
+const stopBrowseHasMoreChannelPolling = () => {
+  if (!browseHasMoreChannelPollTimer) return;
+  clearInterval(browseHasMoreChannelPollTimer);
+  browseHasMoreChannelPollTimer = null;
+  browseHasMoreChannelLastJson = "";
+};
+
 app.get("/api/qbt/info", async (req, res) => {
   try {
-    const q = req.query || {};
-    const filterObj = {};
-    if (typeof q.hash === "string" && q.hash) filterObj.hash = q.hash;
-    if (typeof q.category === "string" && q.category)
-      filterObj.category = q.category;
-    if (typeof q.tag === "string" && q.tag) filterObj.tag = q.tag;
-    if (typeof q.filter === "string" && q.filter) filterObj.filter = q.filter;
-
-    const useFilter = Object.keys(filterObj).length > 0 ? filterObj : undefined;
-    const info = await getQbtInfo(useFilter);
-    // Only the full unfiltered list drives stat sampling/pruning.
-    if (!useFilter) await enrichQbtStats(info);
-
-    if (DUMP_INFO) {
-      try {
-        const outPath = path.resolve(
-          __dirname,
-          "..",
-          "..",
-          "samples",
-          "sample-qbt",
-          "qbt-info.json",
-        );
-        fs.mkdirSync(path.dirname(outPath), { recursive: true });
-        fs.writeFileSync(outPath, JSON.stringify(info, null, 2), "utf8");
-      } catch (e) {
-        unilog(217, "qbt info dump error:", e);
-      }
-    }
-
-    res.json(info);
+    res.json(await getQbtInfoPayload(req.query || {}));
   } catch (error) {
     unilog(218, "qbt info error:", error);
     res.status(500).json({ error: error.message });
@@ -2212,7 +2292,7 @@ app.get("/api/getAllBrowse", async (req, res) => {
 
 // GET /api/hasBrowseShow — lightweight check whether a candidate show exists
 app.get("/api/hasBrowseShow", (req, res) => {
-  res.json({ available: hasBrowseShow() });
+  res.json(getBrowseHasMorePayload());
 });
 
 // GET /api/browseSearch?q=text — search tvmaze.sqlite by name (ignores browsed status)
@@ -2264,6 +2344,7 @@ app.post("/api/ackBrowsed", (req, res) => {
   if (!Number.isFinite(tvmazeId))
     return res.status(400).json({ error: "invalid tvmazeId" });
   ackBrowsed(tvmazeId);
+  publishBrowseHasMoreChannel();
   res.json({ ok: true });
 });
 
@@ -2273,6 +2354,7 @@ app.post("/api/removeBrowseCard", (req, res) => {
   if (!tvdbId && !name)
     return res.status(400).json({ error: "missing tvdbId or name" });
   removeResultTitleByTvdbId(tvdbId || null, name || null);
+  publishBrowseHasMoreChannel();
   res.json({ ok: true });
 });
 
@@ -2282,6 +2364,7 @@ app.post("/api/unackBrowsed", (req, res) => {
   if (!tvdbId) return res.status(400).json({ error: "missing tvdbId" });
   unmarkShowBrowsed(tvdbId);
   removeResultTitleByTvdbId(tvdbId);
+  publishBrowseHasMoreChannel();
   res.json({ ok: true });
 });
 
@@ -2554,4 +2637,20 @@ app.get("/api/reviews/getImdbReviews", async (req, res) => {
 https.createServer(httpsOptions, app).listen(API_PORT, () => {
   // Start tvmaze sync only in the api server, not when imported by other apps
   startTvmaze();
+  qbtChannelPeer = new ChannelPeer({
+    channels: {
+      qbtInfo: {
+        snapshot: getQbtChannelSnapshot,
+        onFirstSubscriber: startQbtChannelPolling,
+        onLastUnsubscriber: stopQbtChannelPolling,
+      },
+      browseHasMore: {
+        snapshot: getBrowseHasMoreChannelSnapshot,
+        onFirstSubscriber: startBrowseHasMoreChannelPolling,
+        onLastUnsubscriber: stopBrowseHasMoreChannelPolling,
+      },
+    },
+    log: (message) => unilog(1501, `${message}`),
+  });
+  qbtChannelPeer.start();
 });

@@ -539,6 +539,7 @@
 import parseTorrentTitle from "parse-torrent-title";
 import evtBus from "../evtBus.js";
 import { config } from "../config.js";
+import * as srvr from "../srvr.js";
 import * as util from "../util.js";
 import { parseTitleFromFilename } from "../util.js";
 import { unilog } from "../log.js";
@@ -571,8 +572,7 @@ export default {
       error: null,
       retryingTitles: {},
       aborting: false,
-      _pollTimer: null,
-      _polling: false,
+      _downloadsChannel: null,
       _active: false,
       _firstLoad: false,
       _didLoadOnce: false,
@@ -602,7 +602,7 @@ export default {
       lastSelectedIndex: null,
       movieDownJobs: [],
       movieCycling: false,
-      _moviePollTimer: null,
+      _movieDownloadsChannel: null,
     };
   },
 
@@ -746,10 +746,8 @@ export default {
     };
     evtBus.on("downDelKey", this._onDownDelKey);
 
-    // Start polling at boot so data is always fresh.
-    this._polling = true;
-    void this.loadTvproc();
-    this.scheduleNextPoll(5000);
+    // Subscribe at boot so data is always fresh.
+    this.startPolling();
   },
 
   unmounted() {
@@ -780,33 +778,22 @@ export default {
     },
 
     startMoviePoll() {
-      if (this._moviePollTimer) return;
-      const poll = async () => {
-        if (!this.movieMode) return;
-        try {
-          const res = await fetch(`${config.tvDownUrl}/movieDownloads`);
-          if (res.ok) {
-            const data = await res.json().catch(() => null);
-            if (data && Array.isArray(data.jobs)) {
-              this.movieDownJobs = data.jobs;
-              this.movieCycling = data.cycling === true;
-            }
-          }
-        } catch {
-          /* ignore */
-        }
-        if (this.movieMode) {
-          this._moviePollTimer = setTimeout(poll, 2000);
+      if (this._movieDownloadsChannel) return;
+      const applyMovieDownloads = (data) => {
+        if (Array.isArray(data?.jobs)) {
+          this.movieDownJobs = data.jobs;
+          this.movieCycling = !!data.cycling;
         }
       };
-      poll();
+      this._movieDownloadsChannel = srvr.openChannel("movieDownloads", {
+        onSnapshot: applyMovieDownloads,
+        onDelta: applyMovieDownloads,
+      });
     },
 
     stopMoviePoll() {
-      if (this._moviePollTimer) {
-        clearTimeout(this._moviePollTimer);
-        this._moviePollTimer = null;
-      }
+      this._movieDownloadsChannel?.close();
+      this._movieDownloadsChannel = null;
     },
 
     handleScaledWheel(event) {
@@ -836,7 +823,11 @@ export default {
 
         // Do not request permission automatically (may require user gesture).
         // If user wants notifications, they can grant it in browser/site settings.
-        unilog(917, "Desktop notification not shown (permission:", Notification.permission + ")");
+        unilog(
+          917,
+          "Desktop notification not shown (permission:",
+          Notification.permission + ")",
+        );
       } catch (e) {
         unilog(918, "notifyAllUsbFinished failed:", e?.message || String(e));
       }
@@ -844,7 +835,7 @@ export default {
 
     handleCycleStarted() {
       if (this.pollingStopped) return;
-      // Start fast polling when a cycle starts
+      // Channel updates now arrive from tv-down; keep this as state bookkeeping.
       this._fastPollStartTime = Date.now();
       this._oldDownloadingCount = this.items.filter((it) => {
         const st = String(it?.status || "")
@@ -854,10 +845,6 @@ export default {
         const ended = Number(it?.dateEnded);
         return !Number.isFinite(ended) || ended === 0;
       }).length;
-      // Start polling immediately, even if pane is not active.
-      // Do not call loadTvproc() synchronously here; cycle-started can be emitted
-      // from inside loadTvproc(), which would cause re-entrant loops.
-      this.scheduleNextPoll(1000);
     },
 
     onPaneChanged(pane) {
@@ -892,34 +879,34 @@ export default {
     togglePolling() {
       if (this.pollingStopped) {
         this.pollingStopped = false;
-        this._polling = true;
-        if (!this._pollTimer) {
-          this.scheduleNextPoll(5000);
-        }
+        this.startPolling();
       } else {
         this.pollingStopped = true;
         this.stopPolling();
       }
     },
 
+    startPolling() {
+      if (this._downloadsChannel) return;
+      this.startLoadingDelay();
+      const applyDownloads = async (items) => {
+        await this.loadTvproc({ channelItems: items });
+      };
+      this._downloadsChannel = srvr.openChannel("downloads", {
+        onSnapshot: applyDownloads,
+        onDelta: applyDownloads,
+        onUnavailable: () => this.finishLoadingDelay(),
+      });
+    },
+
     stopPolling() {
-      this._polling = false;
-      if (this._pollTimer) {
-        clearTimeout(this._pollTimer);
-        this._pollTimer = null;
-      }
+      this._downloadsChannel?.close();
+      this._downloadsChannel = null;
       this._inFlight = false;
       this._showLoading = false;
       if (this._loadingTimer) {
         clearTimeout(this._loadingTimer);
         this._loadingTimer = null;
-      }
-    },
-
-    clearPollTimer() {
-      if (this._pollTimer) {
-        clearTimeout(this._pollTimer);
-        this._pollTimer = null;
       }
     },
 
@@ -944,37 +931,6 @@ export default {
         clearTimeout(this._loadingTimer);
         this._loadingTimer = null;
       }
-    },
-
-    scheduleNextPoll(ms) {
-      if (!this._polling) return;
-      // Only clear the poll timer; do not reset loading state here.
-      // Poll cadence is defined as: wait N ms AFTER the previous poll completes.
-      this.clearPollTimer();
-
-      // Determine if we should use fast polling
-      let pollDelay = ms;
-      if (this._fastPollStartTime) {
-        const elapsed = Date.now() - this._fastPollStartTime;
-        if (elapsed < 30000) {
-          // Still within 30-second fast polling window
-          pollDelay = 1000;
-        } else {
-          // Timeout reached, go back to normal polling
-          this._fastPollStartTime = null;
-          pollDelay = 5000;
-        }
-      }
-
-      this._pollTimer = setTimeout(
-        async () => {
-          await this.loadTvproc();
-          // Default to a 5-second delay after completion; scheduleNextPoll will
-          // override to 1s if the fast window is still active.
-          this.scheduleNextPoll(5000);
-        },
-        Math.max(0, Number(pollDelay) || 0),
-      );
     },
 
     isNearBottom(el) {
@@ -1582,23 +1538,26 @@ export default {
           !opts.isInitialPaneSwitch && el && this.isNearBottom(el);
         const shouldStick = Boolean(opts.forceScrollToBottom) || wasNearBottom;
 
-        const res = await fetch(`${config.tvDownUrl}/downloads`);
-        if (!res.ok) {
-          let detail = "";
-          try {
-            const ct = res.headers.get("content-type") || "";
-            if (ct.includes("application/json")) {
-              const j = await res.json();
-              detail = j?.error ? String(j.error) : JSON.stringify(j);
-            } else {
-              detail = await res.text();
+        let arr = Array.isArray(opts.channelItems) ? opts.channelItems : null;
+        if (!arr) {
+          const res = await fetch(`${config.tvDownUrl}/downloads`);
+          if (!res.ok) {
+            let detail = "";
+            try {
+              const ct = res.headers.get("content-type") || "";
+              if (ct.includes("application/json")) {
+                const j = await res.json();
+                detail = j?.error ? String(j.error) : JSON.stringify(j);
+              } else {
+                detail = await res.text();
+              }
+            } catch {
+              // ignore
             }
-          } catch {
-            // ignore
+            throw new Error(`HTTP ${res.status}: ${detail || res.statusText}`);
           }
-          throw new Error(`HTTP ${res.status}: ${detail || res.statusText}`);
+          arr = await res.json();
         }
-        const arr = await res.json();
 
         try {
           const toParsedTitle = (rawTitle) => {

@@ -141,6 +141,12 @@
       >
         Groups
       </button>
+      <button
+        class="logBtn"
+        @click="toggleChannelsPane"
+      >
+        Channels
+      </button>
       <span
         v-if="flashMsg"
         style="font-size: 12px; color: #2a7d2a; white-space: nowrap"
@@ -313,6 +319,18 @@
         </div>
       </div>
     </Teleport>
+    <Teleport to="body">
+      <div
+        v-if="showChannelsPane"
+        class="groupsPane"
+        style="width: 520px; max-height: 70vh; overflow: auto"
+      >
+        <div class="groupsCol" style="width: 100%">
+          <div class="groupsTitle">Channels</div>
+          <pre style="font-size: 12px; margin: 0; white-space: pre-wrap">{{ channelsDebugText }}</pre>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -400,9 +418,30 @@ export default {
       groupStats: null,
       errorMode: false,
       errorFilterFn: null,
+      showChannelsPane: false,
+      channelsDebug: [],
+      channelsDebugHandle: null,
     };
   },
   computed: {
+    channelsDebugText() {
+      if (!Array.isArray(this.channelsDebug) || this.channelsDebug.length === 0)
+        return "No channels.";
+      const fmtTs = (ts) => {
+        if (!ts) return "-";
+        const d = new Date(ts);
+        const hh = String(d.getHours()).padStart(2, "0");
+        const mm = String(d.getMinutes()).padStart(2, "0");
+        const ss = String(d.getSeconds()).padStart(2, "0");
+        return `${hh}:${mm}:${ss}`;
+      };
+      return this.channelsDebug
+        .map(
+          (c) =>
+            `${c.name.padEnd(18)} owner=${String(c.owner).padEnd(5)} subs=${String(c.subscribers).padStart(2)} peer=${c.peerOpen === null ? "-" : c.peerOpen ? "open" : "closed"} sub=${fmtTs(c.lastSubAt)} snap=${fmtTs(c.lastSnapshotAt)} delta=${fmtTs(c.lastDeltaAt)}`,
+        )
+        .join("\n");
+    },
     // True when another group already uses the Set-name input value.
     groupNameExists() {
       const name = this.setGroupName.trim().toLowerCase();
@@ -431,6 +470,7 @@ export default {
   },
   beforeUnmount() {
     evtBus.off("unilog-pruned", this.onUnilogPruned);
+    this.stopChannelsDebug();
     this.deactivate();
     if (this.table) {
       this.table.destroy();
@@ -438,6 +478,29 @@ export default {
     }
   },
   methods: {
+    toggleChannelsPane() {
+      this.showChannelsPane = !this.showChannelsPane;
+      if (this.showChannelsPane) {
+        this.showGroupsPane = false;
+        this.startChannelsDebug();
+      } else {
+        this.stopChannelsDebug();
+      }
+    },
+    startChannelsDebug() {
+      if (this.channelsDebugHandle) return;
+      const apply = (payload) => {
+        this.channelsDebug = Array.isArray(payload) ? payload : [];
+      };
+      this.channelsDebugHandle = srvr.openChannel("channelsDebug", {
+        onSnapshot: apply,
+        onDelta: apply,
+      });
+    },
+    stopChannelsDebug() {
+      this.channelsDebugHandle?.close();
+      this.channelsDebugHandle = null;
+    },
     activate() {
       this.$nextTick(() => {
         this.ensureTable();
@@ -478,6 +541,8 @@ export default {
       }
       // Groups pane is hidden whenever the log pane is closed; stop filtering.
       this.showGroupsPane = false;
+      this.showChannelsPane = false;
+      this.stopChannelsDebug();
       window.removeEventListener("resize", this.positionGroupsPane);
       this.applyGroupFilter();
       // Hiding the pane by tab button leaves error mode (reload on next open).

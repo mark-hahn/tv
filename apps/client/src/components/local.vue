@@ -1292,6 +1292,7 @@ import {
   getAsrLog,
   getAsrQueue,
   addToAsrQueue,
+  openChannel,
   removeFromAsrQueue,
   killAsrProcess,
   searchOpn,
@@ -1336,11 +1337,14 @@ export default {
       asrQueueMode: false,
       asrQueueEntries: [],
       asrQueueLen: 0,
+      asrLogChannel: null,
+      asrQueueChannel: null,
 
       // Emb
       showEmb: false,
       embLogs: "",
       embBusy: false,
+      embLogChannel: null,
 
       // Open (OpenSubtitles search)
       showOpn: false,
@@ -1355,10 +1359,11 @@ export default {
       activeFixPath: null,
       ignoreFixLogs: false,
       fixLogOffset: 0,
-      fixPollTimer: null,
+      fixLogChannel: null,
 
       // Subs progress tracking
       subsPending: [],
+      subsProgressChannel: null,
 
       // Errs mode
       errsMode: false,
@@ -1466,17 +1471,13 @@ export default {
     if (this.active && !this.hasLoaded) {
       this.fetchFiles();
     }
-    evtBus.off("asr-log", this.onAsrLog);
-    evtBus.off("asr-queue-update", this.onAsrQueueUpdate);
-    evtBus.on("asr-log", this.onAsrLog);
-    evtBus.on("asr-queue-update", this.onAsrQueueUpdate);
     evtBus.off("fix-log", this.onFixLog);
     evtBus.on("fix-log", this.onFixLog);
-    evtBus.off("emb-log", this.onEmbLog);
-    evtBus.on("emb-log", this.onEmbLog);
-    evtBus.off("subs-progress", this.onSubsProgress);
-    evtBus.on("subs-progress", this.onSubsProgress);
     this.initAsrState();
+    this.startAsrLogChannel();
+    this.startAsrQueueChannel();
+    this.startEmbLogChannel();
+    this.startSubsProgressChannel();
 
     this._onLocalDelKey = () => {
       if (!this.loading && (this.selectedName || this.selectedFiles.size > 0))
@@ -1485,11 +1486,12 @@ export default {
     evtBus.on("localDelKey", this._onLocalDelKey);
   },
   unmounted() {
-    evtBus.off("asr-log", this.onAsrLog);
-    evtBus.off("asr-queue-update", this.onAsrQueueUpdate);
     evtBus.off("fix-log", this.onFixLog);
-    evtBus.off("emb-log", this.onEmbLog);
-    evtBus.off("subs-progress", this.onSubsProgress);
+    this.stopFixPolling();
+    this.stopAsrLogChannel();
+    this.stopAsrQueueChannel();
+    this.stopEmbLogChannel();
+    this.stopSubsProgressChannel();
     if (this._onLocalDelKey) evtBus.off("localDelKey", this._onLocalDelKey);
   },
   computed: {
@@ -2215,6 +2217,16 @@ export default {
         }
       }
     },
+    startSubsProgressChannel() {
+      if (this.subsProgressChannel) return;
+      this.subsProgressChannel = openChannel("subsProgress", {
+        onDelta: this.onSubsProgress,
+      });
+    },
+    stopSubsProgressChannel() {
+      this.subsProgressChannel?.close();
+      this.subsProgressChannel = null;
+    },
     clickAsr() {
       this.showAsr = !this.showAsr;
       if (this.showAsr) {
@@ -2292,6 +2304,19 @@ export default {
         });
       }
     },
+    startAsrLogChannel() {
+      if (this.asrLogChannel) return;
+      this.asrLogChannel = openChannel("asrLog", {
+        onSnapshot: (payload) => {
+          if (payload?.lines != null) this.asrLogs = payload.lines;
+        },
+        onDelta: (payload) => this.onAsrLog(payload?.line),
+      });
+    },
+    stopAsrLogChannel() {
+      this.asrLogChannel?.close();
+      this.asrLogChannel = null;
+    },
     async initAsrState() {
       try {
         const [logRes, queueRes] = await Promise.all([
@@ -2311,6 +2336,17 @@ export default {
       this.asrQueueLen = count ?? 0;
       if (running !== undefined) this.asrBusy = running;
       if (entries !== undefined) this.asrQueueEntries = entries;
+    },
+    startAsrQueueChannel() {
+      if (this.asrQueueChannel) return;
+      this.asrQueueChannel = openChannel("asrQueue", {
+        onSnapshot: this.onAsrQueueUpdate,
+        onDelta: this.onAsrQueueUpdate,
+      });
+    },
+    stopAsrQueueChannel() {
+      this.asrQueueChannel?.close();
+      this.asrQueueChannel = null;
     },
     async clickQueue() {
       this.asrQueueMode = !this.asrQueueMode;
@@ -2480,19 +2516,32 @@ export default {
 
       this.applyFixLogChunk(msg);
     },
-    startFixPolling() {
+    startFixPolling({ reset = true } = {}) {
       this.stopFixPolling();
-      this.fixPollTimer = setInterval(() => {
-        if (this.showFix) {
-          this.syncFixLog();
+      const applyFixLogPayload = (res, options = {}) => {
+        if (!res) return;
+        const replace = options.replace === true;
+        if (replace) this.fixLogs = "";
+        if (typeof res.log === "string" && res.log.length > 0) {
+          this.applyFixLogChunk(res.log);
         }
-      }, 1000);
+        if (Number.isFinite(res.nextOffset)) {
+          this.fixLogOffset = res.nextOffset;
+        }
+        if (res.currentPath) {
+          this.activeFixPath = res.currentPath;
+        }
+        this.fixBusy = !!res.running;
+        if (!res.running) this.stopFixPolling();
+      };
+      this.fixLogChannel = openChannel("fixLog", {
+        onSnapshot: (res) => applyFixLogPayload(res, { replace: reset }),
+        onDelta: (res) => applyFixLogPayload(res),
+      });
     },
     stopFixPolling() {
-      if (this.fixPollTimer) {
-        clearInterval(this.fixPollTimer);
-        this.fixPollTimer = null;
-      }
+      this.fixLogChannel?.close();
+      this.fixLogChannel = null;
     },
     async syncFixLog(reset = false) {
       try {
@@ -2598,6 +2647,19 @@ export default {
           if (el) el.scrollTop = el.scrollHeight;
         });
       }
+    },
+    startEmbLogChannel() {
+      if (this.embLogChannel) return;
+      this.embLogChannel = openChannel("embLog", {
+        onSnapshot: (payload) => {
+          if (payload?.lines != null) this.embLogs = payload.lines;
+        },
+        onDelta: (payload) => this.onEmbLog(payload?.line),
+      });
+    },
+    stopEmbLogChannel() {
+      this.embLogChannel?.close();
+      this.embLogChannel = null;
     },
     clickOpn() {
       this.showOpn = !this.showOpn;

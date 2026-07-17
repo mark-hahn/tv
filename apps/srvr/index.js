@@ -15,7 +15,7 @@ import * as loid from "./src/loid.js";
 import * as util from "./src/util.js";
 import * as email from "./src/email.js";
 import * as tmdb from "./src/tmdb.js";
-import { handleFix } from "./src/fix.js";
+import { handleFix, readFixState, tailFixLog } from "./src/fix.js";
 import fetch from "node-fetch";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
 import {
@@ -91,6 +91,8 @@ import * as bifQueue from "./src/bifQueue.js";
 import * as subsQueue from "./src/subsQueue.js";
 import * as mpfour from "./src/mpfour.js";
 
+const FIX_LOG_CHANNEL_POLL_MS = 1000;
+
 registerLocalChannel("badGroups", {
   snapshot: () => syncBadGroupsFromDisk(),
 });
@@ -128,6 +130,86 @@ registerLocalChannel("flexget", {
 });
 flexget.onFlexgetChange(() => {
   publishChannelDelta("flexget", getFlexgetSnapshot());
+});
+
+let fixLogPollTimer = null;
+let fixLogOffset = 0;
+let fixLogLastStateJson = "";
+
+const fixLogStateJson = (payload) =>
+  JSON.stringify({
+    running: payload?.running === true,
+    status: payload?.status ?? null,
+    currentPath: payload?.currentPath ?? null,
+    currentFile: payload?.currentFile ?? null,
+    currentIndex: payload?.currentIndex ?? 0,
+    totalFiles: payload?.totalFiles ?? 0,
+    nextOffset: payload?.nextOffset ?? 0,
+  });
+
+const getFixLogSnapshot = () => {
+  const payload = tailFixLog(0);
+  fixLogOffset = payload.nextOffset ?? 0;
+  fixLogLastStateJson = fixLogStateJson(payload);
+  return payload;
+};
+
+const pollFixLogChannel = () => {
+  const payload = tailFixLog(fixLogOffset);
+  const stateJson = fixLogStateJson(payload);
+  if (!payload.log && stateJson === fixLogLastStateJson) return;
+  fixLogOffset = payload.nextOffset ?? fixLogOffset;
+  fixLogLastStateJson = stateJson;
+  publishChannelDelta("fixLog", payload);
+  if (!payload.running && readFixState()?.running !== true) {
+    clearInterval(fixLogPollTimer);
+    fixLogPollTimer = null;
+  }
+};
+
+const startFixLogChannel = () => {
+  if (fixLogPollTimer) return;
+  fixLogPollTimer = setInterval(pollFixLogChannel, FIX_LOG_CHANNEL_POLL_MS);
+};
+
+const stopFixLogChannel = () => {
+  if (!fixLogPollTimer) return;
+  clearInterval(fixLogPollTimer);
+  fixLogPollTimer = null;
+};
+
+registerLocalChannel("fixLog", {
+  snapshot: getFixLogSnapshot,
+  onFirstSubscriber: startFixLogChannel,
+  onLastUnsubscriber: stopFixLogChannel,
+});
+
+registerLocalChannel("asrLog", {
+  snapshot: () => ({ lines: subsState.asrLogBuffer.join("\n") }),
+});
+subsQueue.onAsrLog((line) => {
+  publishChannelDelta("asrLog", { line });
+});
+
+registerLocalChannel("asrQueue", {
+  snapshot: () => subsQueue.getAsrQueueSnapshot(),
+});
+subsQueue.onAsrQueueChange((payload) => {
+  publishChannelDelta("asrQueue", payload);
+});
+
+registerLocalChannel("embLog", {
+  snapshot: () => ({ lines: subsState.embLogBuffer.join("\n") }),
+});
+subsQueue.onEmbLog((line) => {
+  publishChannelDelta("embLog", { line });
+});
+
+registerLocalChannel("subsProgress", {
+  snapshot: () => null,
+});
+subsQueue.onSubsProgress((payload) => {
+  publishChannelDelta("subsProgress", payload);
 });
 import * as intro from "./src/intro.js";
 import * as flexget from "./src/flexget.js";
@@ -2617,10 +2699,7 @@ app.post("/api/asr/queue/remove", (req, res) => {
   if (idx !== -1) {
     subsState.asrQueue.splice(idx, 1);
     persistAsrQueue();
-    notifyClients("asr-queue-update", {
-      count: subsState.asrQueue.length,
-      running: subsState.genSrtRunning,
-    });
+    subsQueue.publishAsrQueueUpdate();
   }
   if (isProcessing && subsState.genSrtChild) {
     subsState.genSrtChild.kill("SIGTERM");
@@ -3030,7 +3109,11 @@ wss.on("connection", (ws) => {
       unilog(618, "ignoring bad message:", msg);
       return;
     }
-    if (parsed.ch && handleChannelFrame(ws, parsed)) return;
+    if (
+      (parsed.ch || parsed.op === "register") &&
+      handleChannelFrame(ws, parsed)
+    )
+      return;
     const { id, fname, param } = parsed;
 
     if (fname == "register") {
@@ -3755,6 +3838,7 @@ const embyRefreshManager = (() => {
     );
     currentProgress = { pct: 0 };
     notifyClients("libraryProgress", { pct: 0 });
+    publishChannelDelta("libraryRefresh", { type: "progress", pct: 0 });
 
     try {
       const res = await fetch(
@@ -3785,6 +3869,10 @@ const embyRefreshManager = (() => {
             if (Number.isFinite(progressNum)) {
               currentProgress = { pct: progressNum };
               notifyClients("libraryProgress", { pct: progressNum });
+              publishChannelDelta("libraryRefresh", {
+                type: "progress",
+                pct: progressNum,
+              });
             }
             if (task.State !== "Running") {
               unilog(77, `scan finished (State=${task.State})`);
@@ -3811,6 +3899,7 @@ const embyRefreshManager = (() => {
       `done, notifying clients (shows: ${showNames.join(", ") || "manual"})`,
     );
     notifyClients("libraryRefreshDone", { showNames });
+    publishChannelDelta("libraryRefresh", { type: "done", showNames });
     for (const { resolve } of myWaiters) resolve(showNames);
 
     // If new requests arrived during this scan, start another run for them.
@@ -3867,6 +3956,10 @@ const embyRefreshManager = (() => {
     },
   };
 })();
+
+registerLocalChannel("libraryRefresh", {
+  snapshot: () => embyRefreshManager.getStatus(),
+});
 
 //////////////////  CHOKIDAR FILE WATCHER  //////////////////
 

@@ -643,6 +643,7 @@ export default {
       _downActive: false,
       _downInactiveTimer: null,
       _qbtChannel: null,
+      _libraryRefreshChannel: null,
       // TABLET SIZING CONFIGURATION - SIMPLE MODE - Tweak these values
       sizing: {
         // List pane
@@ -962,8 +963,7 @@ export default {
     evtBus.off("addPreviewShowDone", this.onAddPreviewShowDone);
     evtBus.off("previewPanesLoading", this.onPreviewPanesLoading);
     evtBus.off("setLibraryProgress", this.handleSetLibraryProgress);
-    evtBus.off("libraryProgress", this.handleLibraryProgress);
-    evtBus.off("libraryRefreshDone", this.handleLibraryRefreshDone);
+    this.stopLibraryRefreshChannel();
     evtBus.off("selectMapEpisode");
     if (this._onAppWindowResize)
       window.removeEventListener("resize", this._onAppWindowResize);
@@ -1394,6 +1394,35 @@ export default {
           position: 1,
         });
       }
+    },
+
+    handleLibraryRefreshChannel(data) {
+      if (data?.type === "done") {
+        this.handleLibraryRefreshDone(data);
+        return;
+      }
+      if (data?.type === "progress") {
+        this.handleLibraryProgress(data);
+        return;
+      }
+      if (data?.running && data?.progress?.pct != null) {
+        this.handleLibraryProgress(data.progress);
+      } else if (data && data.running === false) {
+        setGlobalMessage({ id: "Lib", action: "hide" });
+      }
+    },
+
+    startLibraryRefreshChannel() {
+      if (this._libraryRefreshChannel) return;
+      this._libraryRefreshChannel = srvr.openChannel("libraryRefresh", {
+        onSnapshot: this.handleLibraryRefreshChannel,
+        onDelta: this.handleLibraryRefreshChannel,
+      });
+    },
+
+    stopLibraryRefreshChannel() {
+      this._libraryRefreshChannel?.close();
+      this._libraryRefreshChannel = null;
     },
 
     handleLibraryRefreshDone(data) {
@@ -2371,8 +2400,7 @@ export default {
 
     evtBus.on("startLibraryRefresh", this.startLibraryRefresh);
     evtBus.on("setLibraryProgress", this.handleSetLibraryProgress);
-    evtBus.on("libraryProgress", this.handleLibraryProgress);
-    evtBus.on("libraryRefreshDone", this.handleLibraryRefreshDone);
+    this.startLibraryRefreshChannel();
 
     evtBus.on("showStreamPane", (show) => {
       this.currentPane = "tor";

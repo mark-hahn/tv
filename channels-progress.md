@@ -20,3 +20,18 @@ final local validation: node --check all touched servers, unilog/check all, apps
 deployed: srvr, api, down, tv
 pm2 verified: touched apps online, recent logs empty
 post-deploy validation: node --check all touched servers, unilog/check all, apps/client build
+bugfix register-gate: apps/srvr/index.js — peer register frame had no ch, gate skipped it; peer channels never registered
+bugfix showsButton sort: apps/client/src/components/list.vue — stop forcing sortChoice=Viewed on shows button
+bugfix deployed: srvr; verified qbtInfo/embyPlaying/tvPicture/browseHasMore snapshots route
+fixLog: apps/srvr/src/fix.js, apps/srvr/index.js, apps/client/src/components/local.vue
+fixLog validated: apps/client build, apps/srvr node --check, unilog/check srvr
+fixLog deployed: srvr; verified fixLog snapshot routes through broker
+fixLog post-deploy validation: apps/client build, apps/srvr node --check, unilog/check srvr
+asrLog/asrQueue: apps/srvr/src/subsQueue.js, apps/srvr/index.js, apps/client/src/components/local.vue
+asrLog/asrQueue validated: apps/client build, apps/srvr node --check
+embLog/subsProgress: apps/srvr/src/subsQueue.js, apps/srvr/index.js, apps/client/src/components/local.vue
+globalMessages/libraryRefresh/channelsDebug: apps/srvr/src/messaging.js, apps/srvr/index.js, apps/client/src/globalMessages.js, apps/client/src/components/App.vue, apps/client/src/components/log.vue
+remaining channels validated: apps/client build, apps/srvr node --check, unilog/check srvr
+remaining channels deployed: srvr
+remaining channels remote verified: asrLog, asrQueue, embLog, subsProgress, globalMessages, libraryRefresh, channelsDebug snapshots route
+remaining channels post-deploy validation: apps/client build, apps/srvr node --check, unilog/check srvr

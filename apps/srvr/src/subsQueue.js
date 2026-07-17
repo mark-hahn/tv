@@ -51,6 +51,7 @@ const OPN_CHECK_HISTORY_PATH = path.join(
 );
 const OPN_DAILY_LIMIT = 500;
 const ASR_LOG_BUFFER_MAX = 500;
+const EMB_LOG_BUFFER_MAX = 500;
 const CHKSRT_SNOOZE_MS = 24 * 60 * 60 * 1000;
 
 // ---- shared mutable state (single authoritative reference) ----
@@ -71,6 +72,7 @@ export const subsState = {
   genSrtChild: null,
   subQueuePendingNow: false,
   asrLogBuffer: [],
+  embLogBuffer: [],
   // monotonic completion counters — the watchdog uses these to tell a stuck
   // queue (depth>0 but counter flat) apart from a merely idle one.
   subDone: 0,
@@ -79,8 +81,65 @@ export const subsState = {
 
 // ---- injected hub (set by init) ----
 let syncBatchMsgs = () => {};
+const asrLogListeners = new Set();
+const asrQueueListeners = new Set();
+const embLogListeners = new Set();
+const subsProgressListeners = new Set();
 export function init(deps) {
   if (deps?.syncBatchMsgs) syncBatchMsgs = deps.syncBatchMsgs;
+}
+
+export function onAsrLog(listener) {
+  asrLogListeners.add(listener);
+  return () => asrLogListeners.delete(listener);
+}
+
+function notifyAsrLogListeners(line) {
+  for (const listener of asrLogListeners) listener(line);
+}
+
+export function onEmbLog(listener) {
+  embLogListeners.add(listener);
+  return () => embLogListeners.delete(listener);
+}
+
+function publishEmbLog(line) {
+  subsState.embLogBuffer.push(line);
+  if (subsState.embLogBuffer.length > EMB_LOG_BUFFER_MAX) {
+    subsState.embLogBuffer = subsState.embLogBuffer.slice(-EMB_LOG_BUFFER_MAX);
+  }
+  notifyClients("emb-log", line);
+  for (const listener of embLogListeners) listener(line);
+}
+
+export function onSubsProgress(listener) {
+  subsProgressListeners.add(listener);
+  return () => subsProgressListeners.delete(listener);
+}
+
+function publishSubsProgress(payload) {
+  notifyClients("subs-progress", payload);
+  for (const listener of subsProgressListeners) listener(payload);
+}
+
+export function getAsrQueueSnapshot() {
+  return {
+    count: subsState.asrQueue.length,
+    running: subsState.genSrtRunning,
+    entries: subsState.asrQueue,
+  };
+}
+
+export function onAsrQueueChange(listener) {
+  asrQueueListeners.add(listener);
+  return () => asrQueueListeners.delete(listener);
+}
+
+export function publishAsrQueueUpdate(extra = {}) {
+  const payload = { ...getAsrQueueSnapshot(), ...extra };
+  notifyClients("asr-queue-update", payload);
+  for (const listener of asrQueueListeners) listener(payload);
+  return payload;
 }
 
 // ---- status getters for the watchdog heartbeat / header ----
@@ -138,6 +197,7 @@ function appendAsrLog(line) {
     subsState.asrLogBuffer = subsState.asrLogBuffer.slice(-ASR_LOG_BUFFER_MAX);
   }
   notifyClients("asr-log", line);
+  notifyAsrLogListeners(line);
 }
 function addToAsrQueue(entries) {
   let added = 0;
@@ -149,10 +209,7 @@ function addToAsrQueue(entries) {
   }
   if (added > 0) {
     persistAsrQueue();
-    notifyClients("asr-queue-update", {
-      count: subsState.asrQueue.length,
-      running: subsState.genSrtRunning,
-    });
+    publishAsrQueueUpdate();
     syncBatchMsgs();
     subsState.asrQueueDelay = 500;
   }
@@ -428,7 +485,7 @@ async function generateEmbSrts(
   for (const s of textStreams) {
     const outPath = `${base}.mb${s.index}.srt`;
     if (fs.existsSync(outPath)) {
-      if (fromUI) notifyClients("emb-log", `exists: ${path.basename(outPath)}`);
+      if (fromUI) publishEmbLog(`exists: ${path.basename(outPath)}`);
       continue;
     }
     await subExtractQueue.run(
@@ -457,10 +514,10 @@ async function generateEmbSrts(
                 const sanitized = sanitizeSrt(stdout);
                 if (sanitized !== null) {
                   fs.writeFileSync(outPath, sanitized, "utf8");
-                  if (fromUI) notifyClients("emb-log", `extracted ${outPath}`);
+                  if (fromUI) publishEmbLog(`extracted ${outPath}`);
                 } else {
                   const fname = path.basename(outPath);
-                  if (fromUI) notifyClients("emb-log", `No change: ${fname}`);
+                  if (fromUI) publishEmbLog(`No change: ${fname}`);
                 }
               }
               resolve();
@@ -588,10 +645,7 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
   appendAsrLog(`=== Queued: ${path.basename(videoFilePath)} ===`);
   unilog(14, `asr start: ${videoFilePath}`);
   subsState.genSrtRunning = true;
-  notifyClients("asr-queue-update", {
-    count: subsState.asrQueue.length,
-    running: true,
-  });
+  publishAsrQueueUpdate({ running: true });
   syncBatchMsgs();
   // Not on ffmpegQueue: transcription is a remote API call and the local ffmpeg
   // work is audio-only, so it never competes with the re-encodes for cores.
@@ -627,7 +681,7 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
     unilog(15, `asr done: ${videoFilePath}`);
     appendAsrLog(`=== Done: ${path.basename(videoFilePath)} ===`);
     if (fromUI)
-      notifyClients("subs-progress", {
+      publishSubsProgress({
         path: videoFilePath,
         status: "asr-done",
       });
@@ -644,11 +698,7 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
     subsState.genSrtRunning = false;
     subsState.genSrtChild = null;
     syncBatchMsgs();
-    notifyClients("asr-queue-update", {
-      count: subsState.asrQueue.length,
-      running: false,
-      entries: subsState.asrQueue,
-    });
+    publishAsrQueueUpdate({ running: false });
   }
 }
 function doSubQueueNow() {
@@ -736,7 +786,7 @@ async function processSubQueueEntry() {
       notifyClients("chksrt-count", subsState.subQueueChkSrt.length);
       syncBatchMsgs();
       if (entry.fromUI)
-        notifyClients("subs-progress", {
+        publishSubsProgress({
           path: entry.videoFilePath,
           status: "chksrt",
         });
@@ -771,11 +821,7 @@ function startAsrQueueLoop() {
             subsState.asrQueue.shift();
             persistAsrQueue();
             subsState.asrDone++;
-            notifyClients("asr-queue-update", {
-              count: subsState.asrQueue.length,
-              running: false,
-              entries: subsState.asrQueue,
-            });
+            publishAsrQueueUpdate({ running: false });
           }
         });
     }

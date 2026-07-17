@@ -35,7 +35,7 @@ function isPidRunning(pid) {
   }
 }
 
-function readFixState() {
+export function readFixState() {
   const state = readJson(FIX_STATE_PATH);
   if (!state) return null;
   const runnerAlive = isPidRunning(state.pid);
@@ -151,7 +151,7 @@ function startFfmpeg(ws, id, targetPath) {
   });
 }
 
-function tailFixLog(offset = 0) {
+export function tailFixLog(offset = 0) {
   const state = readFixState();
   const logExists = fs.existsSync(FIX_LOG_PATH);
   const stat = logExists ? fs.statSync(FIX_LOG_PATH) : null;

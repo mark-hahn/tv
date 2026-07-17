@@ -3718,8 +3718,7 @@ export default {
     });
 
     on("showsButtonClicked", () => {
-      // Navigate to info pane and set sort to Viewed
-      this.sortChoice = "Viewed";
+      // Navigate to info pane without changing the current sort.
       evtBus.emit("selectTab", "info");
       // Scroll to top of list
       this.$nextTick(() => {

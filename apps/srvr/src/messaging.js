@@ -17,7 +17,52 @@ const channelClients = new Map();
 const channelPeers = new Map();
 const peerChannels = new Map();
 const pendingSnapshotRequests = new Map();
+const channelMeta = new Map();
 let nextSnapshotRequestId = 0;
+
+const touchChannelMeta = (name, field) => {
+  if (!name) return;
+  const meta = channelMeta.get(name) || {};
+  meta[field] = Date.now();
+  channelMeta.set(name, meta);
+  if (name !== "channelsDebug") queueChannelsDebugUpdate();
+};
+
+const getChannelDebugSnapshot = () => {
+  const names = new Set([
+    ...localChannelSources.keys(),
+    ...channelPeers.keys(),
+    ...channelClients.keys(),
+  ]);
+  return [...names].sort().map((name) => {
+    const local = localChannelSources.has(name);
+    const peer = channelPeers.get(name);
+    const meta = channelMeta.get(name) || {};
+    return {
+      name,
+      owner: local ? "local" : peer ? "peer" : "none",
+      peerOpen: peer ? peer.readyState === WebSocket.OPEN : null,
+      subscribers: channelClients.get(name)?.size || 0,
+      lastSnapshotAt: meta.lastSnapshotAt || null,
+      lastDeltaAt: meta.lastDeltaAt || null,
+      lastSubAt: meta.lastSubAt || null,
+    };
+  });
+};
+
+let channelsDebugUpdateTimer = null;
+function queueChannelsDebugUpdate() {
+  if (channelsDebugUpdateTimer) return;
+  channelsDebugUpdateTimer = setTimeout(() => {
+    channelsDebugUpdateTimer = null;
+    const msg = {
+      ch: "channelsDebug",
+      op: "delta",
+      data: getChannelDebugSnapshot(),
+    };
+    for (const ws of channelClients.get("channelsDebug") || []) sendJson(ws, msg);
+  }, 0);
+}
 
 const sendJson = (ws, obj) => {
   if (ws.readyState !== WebSocket.OPEN) return false;
@@ -38,6 +83,7 @@ export const registerLocalChannel = (name, source) => {
 };
 
 export const publishChannelSnapshot = (name, data, targetWs = null) => {
+  touchChannelMeta(name, "lastSnapshotAt");
   const msg = { ch: name, op: "snapshot", data };
   if (targetWs) {
     sendJson(targetWs, msg);
@@ -47,6 +93,7 @@ export const publishChannelSnapshot = (name, data, targetWs = null) => {
 };
 
 export const publishChannelDelta = (name, data) => {
+  touchChannelMeta(name, "lastDeltaAt");
   const msg = { ch: name, op: "delta", data };
   for (const ws of channelClients.get(name) || []) sendJson(ws, msg);
 };
@@ -77,6 +124,7 @@ const registerPeerChannels = (ws, channels) => {
     }
     channelPeers.set(name, ws);
     owned.add(name);
+    queueChannelsDebugUpdate();
     if ((channelClients.get(name)?.size || 0) > 0) {
       sendPeerControl(name, "sub");
     }
@@ -128,6 +176,7 @@ export const unsubscribeAllChannels = (ws) => {
   for (const name of owned) {
     if (channelPeers.get(name) !== ws) continue;
     channelPeers.delete(name);
+    queueChannelsDebugUpdate();
     notifyChannelUnavailable(name);
   }
 };
@@ -150,6 +199,7 @@ export const handleChannelFrame = (ws, frame) => {
     }
     const wasEmpty = clients.size === 0;
     clients.add(ws);
+    touchChannelMeta(name, "lastSubAt");
     if (source) {
       if (wasEmpty) source.onFirstSubscriber?.();
       publishChannelSnapshot(name, source.snapshot(), ws);
@@ -178,6 +228,10 @@ export const handleChannelFrame = (ws, frame) => {
   return false;
 };
 
+registerLocalChannel("channelsDebug", {
+  snapshot: () => getChannelDebugSnapshot(),
+});
+
 // Broadcast notification to all connected clients
 export const notifyClients = (notification, data = null) => {
   if (connectedClients.size === 0) return;
@@ -205,6 +259,10 @@ export const notifyClients = (notification, data = null) => {
 // Also maintains activeServerMessages so new connections can be caught up.
 export const activeServerMessages = new Map(); // id -> msgObj
 
+registerLocalChannel("globalMessages", {
+  snapshot: () => ({ messages: [...activeServerMessages.values()] }),
+});
+
 export const setGlobalMessage = (msgObj) => {
   if (msgObj && msgObj.id) {
     const id = String(msgObj.id);
@@ -215,4 +273,5 @@ export const setGlobalMessage = (msgObj) => {
     }
   }
   notifyClients("setGlobalMessage", msgObj);
+  publishChannelDelta("globalMessages", msgObj);
 };

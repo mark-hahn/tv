@@ -5,13 +5,14 @@
 // in the client via setGlobalMessage(), or pushed from the server which arrives
 // as a "setGlobalMessage" notification on the event bus.
 import { reactive } from "vue";
-import evtBus from "./evtBus.js";
+import { openChannel } from "./srvr.js";
 
 // id -> { id, text, position, duration, timeAdded }
 export const globalMessages = reactive(new Map());
 
 // id -> setTimeout handle (non-reactive bookkeeping)
 const expireTimers = new Map();
+const serverMessageIds = new Set();
 
 const clearExpireTimer = (id) => {
   const t = expireTimers.get(id);
@@ -65,6 +66,21 @@ export function setGlobalMessage(msg) {
   }
 }
 
+function applyServerMessage(msg) {
+  if (msg?.id) serverMessageIds.add(String(msg.id));
+  setGlobalMessage(msg);
+}
+
+function applyServerMessagesSnapshot(payload) {
+  const messages = Array.isArray(payload?.messages) ? payload.messages : [];
+  const nextIds = new Set(messages.map((msg) => String(msg?.id || "")).filter(Boolean));
+  for (const id of serverMessageIds) {
+    if (!nextIds.has(id)) setGlobalMessage({ id, action: "hide" });
+  }
+  serverMessageIds.clear();
+  for (const msg of messages) applyServerMessage(msg);
+}
+
 // Concatenated "<id>: <text>" for the hdrMsg row, sorted by position then
 // timeAdded (lower position = further left; ties: oldest leftmost).
 export function globalMessageText() {
@@ -74,5 +90,14 @@ export function globalMessageText() {
     .join("   ");
 }
 
-// Server pushes arrive here via notifyClients("setGlobalMessage", msgObj).
-evtBus.on("setGlobalMessage", setGlobalMessage);
+// Deferred so this runs after the whole module graph has initialized. srvr.js
+// imports log.js, log.js imports this module, and this module imports srvr.js —
+// calling openChannel at top level lands in that cycle and hits a temporal dead
+// zone ("can't access 'openChannel' before initialization"). A microtask runs
+// after top-level module evaluation completes, when the export is ready.
+queueMicrotask(() => {
+  openChannel("globalMessages", {
+    onSnapshot: applyServerMessagesSnapshot,
+    onDelta: applyServerMessage,
+  });
+});

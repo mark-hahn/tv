@@ -176,10 +176,21 @@
     </div>
 
     <div
+      v-show="!showChannelsPane"
       ref="tableEl"
       class="logTable"
       style="flex: 1; min-height: 0"
     ></div>
+
+    <div
+      v-if="showChannelsPane"
+      class="channelsPane"
+      style="flex: 1; min-height: 0; overflow: auto"
+    >
+      <pre style="font-size: 13px; margin: 0; white-space: pre-wrap">{{
+        channelsDebugText
+      }}</pre>
+    </div>
 
     <Teleport to="body">
       <div
@@ -316,30 +327,6 @@
           >
             Sites: {{ groupStats.sites }}, Events: {{ groupStats.events }}
           </div>
-        </div>
-      </div>
-    </Teleport>
-    <Teleport to="body">
-      <div
-        v-if="showChannelsPane"
-        class="groupsPane"
-        style="
-          position: fixed;
-          top: 70px;
-          right: 12px;
-          width: 560px;
-          max-height: 70vh;
-          overflow: auto;
-        "
-      >
-        <div
-          class="groupsCol"
-          style="width: 100%"
-        >
-          <div class="groupsTitle">Channels</div>
-          <pre style="font-size: 12px; margin: 0; white-space: pre-wrap">{{
-            channelsDebugText
-          }}</pre>
         </div>
       </div>
     </Teleport>
@@ -1835,6 +1822,11 @@ export default {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
   z-index: 3000;
   font-size: 13px;
+}
+.channelsPane {
+  box-sizing: border-box;
+  padding: 8px 10px;
+  background: #fff;
 }
 .groupsCol {
   display: flex;

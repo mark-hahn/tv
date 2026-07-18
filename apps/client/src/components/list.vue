@@ -2758,17 +2758,6 @@ export default {
         noSwitch: isRefresh || !!options.noSwitch,
       });
 
-      // The fast paint above used cached data. Kick a live refresh in the
-      // background so any Emby-side changes since the last sweep propagate,
-      // updating the map in place without blocking the initial render.
-      if (useStale && mapToken === this._mapActionToken) {
-        setTimeout(() => {
-          if (mapToken === this._mapActionToken) {
-            void this.seriesMapAction("refresh", show, { noSwitch: true });
-          }
-        }, 0);
-      }
-
       if (action === "prune") {
         this.markShowUpdating(show.name);
         await srvr

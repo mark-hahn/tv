@@ -2434,6 +2434,28 @@ const tryLocalGetTvdb = async () => {
   unilog(122, `processing [${minTvdb.name}]`);
   // Notify clients which show is being processed
   if (enqueueCallback) enqueueCallback(minTvdb.name);
+
+  // Foreground (user-selected) shows: refresh the map-relevant data (Emby
+  // watched/id + disk files) and push it right away, BEFORE the slow TVDB API
+  // scrape below. The open map only needs emby+disk (not Rotten/TVDB/IMDB), so
+  // this lets it update within a moment instead of waiting for the full
+  // refresh. Skipped for background sweeps to avoid doubling Emby load. No disk
+  // save here — the map's stale rebuild reads the in-memory record, and the
+  // full refresh below persists to tvdb.json.
+  if (!isBackground && refreshEpisodeDataCallback && minTvdb.inEmby !== false) {
+    try {
+      await refreshEpisodeDataCallback(minTvdb.name, minTvdb, {
+        sources: ["emby", "disk"],
+      });
+      if (notifyCallback) notifyCallback(minTvdb.name);
+    } catch (e) {
+      unilog(
+        1523,
+        `early map refresh failed for ${minTvdb.name}: ${e.message}`,
+      );
+    }
+  }
+
   const show = {
     name: minTvdb.name,
     tvdbId: minTvdb.tvdbId,

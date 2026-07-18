@@ -2615,9 +2615,12 @@ export default {
       const isRefresh = action === "refresh";
       // Fast first paint: for a plain open of an in-Emby show, load from the
       // server's cached episodeData (no live Emby/disk access) so the map
-      // renders immediately, then refresh live in the background below.
+      // renders immediately. Also used for refreshes driven by a tvdbUpdated
+      // push, whose record already carries fresh episodeData — no need for a
+      // redundant live Emby/disk scan.
       const useStale =
-        action === "open" && show.inEmby !== false && !options.noSwitch;
+        (action === "open" && show.inEmby !== false && !options.noSwitch) ||
+        options.stale === true;
 
       this.hideMapBottom = true;
       this.mapShow = show;
@@ -3686,10 +3689,12 @@ export default {
         // Update allTvdb reference
         allTvdb[name] = record;
 
-        // If this show is currently in the map pane, refetch series map so
-        // map cells (noFile/avail/etc.) update after disk/download changes.
+        // If this show is currently in the map pane, rebuild the series map.
+        // The pushed record already carries fresh episodeData (the server
+        // refreshed emby+disk before pushing), so rebuild from that cached
+        // data rather than issuing a redundant live Emby/disk scan.
         if (this.mapShow && this.mapShow.name === name && show) {
-          await this.seriesMapAction("refresh", show, null);
+          await this.seriesMapAction("refresh", show, { stale: true });
         }
 
         // Refresh UI

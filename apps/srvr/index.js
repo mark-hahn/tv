@@ -1367,21 +1367,47 @@ app.post("/api/getActorPage", apiWrapper(tvdb.getActorPage));
 app.post(
   "/api/getSeriesMapFromEmby",
   apiWrapper(async (params) => {
-    const { showName } = params;
+    const { showName, stale } = params;
     if (!showName) return { success: false, error: "Missing showName" };
     const allTvdb = tvdb.getAllTvdbSync();
     const rec = allTvdb?.[showName];
     if (!rec) return { success: false, error: "Show not found" };
     try {
-      // Refresh watched/id (Emby) and file/res (disk) so the map is live-fresh.
-      // aired dates come from the periodic full refresh; skip the TVDB call here.
-      await refreshEpisodeData(showName, rec, { sources: ["emby", "disk"] });
-      await tvdb.saveTvdbSync();
       const folder = showName.includes("/")
         ? showName
         : (rec.path || rec.emby?.path || showName).split("/").pop();
       const today = new Date().toISOString().slice(0, 10);
+
+      // Fast path: build the map from the already-cached episodeData in
+      // tvdb.json (populated by the periodic full refresh) with no live Emby
+      // or disk access. The client paints this instantly, then requests a
+      // live refresh (stale omitted) in the background to catch any changes
+      // made in Emby since the last sweep.
+      if (stale) {
+        const seriesMap = epd.toSeriesMap(rec.episodeData, folder, today);
+        return {
+          success: true,
+          seriesMap,
+          episodeData: rec.episodeData,
+          stale: true,
+        };
+      }
+
+      // Refresh watched/id (Emby) and file/res (disk) so the map is live-fresh.
+      // aired dates come from the periodic full refresh; skip the TVDB call here.
+      const t0 = Date.now();
+      await refreshEpisodeData(showName, rec, { sources: ["emby", "disk"] });
+      const tRefresh = Date.now();
+      await tvdb.saveTvdbSync();
+      const tSave = Date.now();
       const seriesMap = epd.toSeriesMap(rec.episodeData, folder, today);
+      const total = Date.now() - t0;
+      if (total > 1500) {
+        unilog(
+          1520,
+          `slow getSeriesMapFromEmby ${showName}: refresh=${tRefresh - t0}ms save=${tSave - tRefresh}ms build=${Date.now() - tSave}ms total=${total}ms`,
+        );
+      }
       return { success: true, seriesMap, episodeData: rec.episodeData };
     } catch (err) {
       unilog(570, "error:", err);

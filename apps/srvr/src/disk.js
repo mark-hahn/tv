@@ -8,7 +8,7 @@ import fs from "fs";
 import fsp from "fs/promises";
 import * as cp from "child_process";
 import * as path from "node:path";
-import { unilog } from "@tv/share";
+import { unilog, logHere } from "@tv/share";
 import {
   parseFileSeasonEpisode,
   parseTitleFromFilename,
@@ -457,7 +457,9 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
   }
 
   // 2. Emby watched flag + episode id (in-emby shows only).
+  let embyMs = 0;
   if (sources.includes("emby") && rec.inEmby && rec.id) {
+    const embyStart = Date.now();
     try {
       const embyMap = await emby.getSeriesMap({
         id: rec.id,
@@ -478,10 +480,13 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
     } catch (e) {
       unilog(31, `emby ${showName}: ${e.message}`);
     }
+    embyMs = Date.now() - embyStart;
   }
 
   // 3. Disk scan — authoritative file name + resolution, plus date/size/noFiles.
+  let diskMs = 0;
   if (sources.includes("disk")) {
+    const diskStart = Date.now();
     try {
       const diskInfo = await getShowDiskInfo(folder);
       if (diskInfo) {
@@ -520,6 +525,14 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
     } catch (e) {
       unilog(32, `disk ${showName}: ${e.message}`);
     }
+    diskMs = Date.now() - diskStart;
+  }
+
+  // Slow-path diagnostic: the map pane refresh (sources emby+disk) has been
+  // seen taking several seconds; log the breakdown when a single refresh is
+  // slow so the culprit phase is captured without flooding the periodic sweep.
+  if (embyMs + diskMs > 1500) {
+    unilog(1519, `slow refreshEpisodeData ${showName}: emby=${embyMs}ms disk=${diskMs}ms sources=${sources.join("+")}`);
   }
 
   // Shows not in Emby never keep files — drop id/file/res, keep aired/watched.

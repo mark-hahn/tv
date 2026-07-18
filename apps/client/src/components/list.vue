@@ -2613,6 +2613,11 @@ export default {
       const mapToken = ++this._mapActionToken;
 
       const isRefresh = action === "refresh";
+      // Fast first paint: for a plain open of an in-Emby show, load from the
+      // server's cached episodeData (no live Emby/disk access) so the map
+      // renders immediately, then refresh live in the background below.
+      const useStale =
+        action === "open" && show.inEmby !== false && !options.noSwitch;
 
       this.hideMapBottom = true;
       this.mapShow = show;
@@ -2646,7 +2651,10 @@ export default {
             resp = await srvr.getSeriesMapFromTvdb({ tvdbId });
           }
         } else {
-          resp = await srvr.getSeriesMapFromEmby({ showName: show.name });
+          resp = await srvr.getSeriesMapFromEmby({
+            showName: show.name,
+            stale: useStale,
+          });
         }
         if (resp?.success && Array.isArray(resp.seriesMap)) {
           seriesMapIn = resp.seriesMap;
@@ -2670,7 +2678,7 @@ export default {
       // Bail if a newer seriesMapAction started while we were fetching
       if (mapToken !== this._mapActionToken) return;
 
-      if (seriesMapIn.length === 0 && !errorMessage) {
+      if (seriesMapIn.length === 0 && !errorMessage && !useStale) {
         errorMessage = "Not in emby and show not found in TVDB.";
       }
 
@@ -2749,6 +2757,17 @@ export default {
         mapError: errorMessage,
         noSwitch: isRefresh || !!options.noSwitch,
       });
+
+      // The fast paint above used cached data. Kick a live refresh in the
+      // background so any Emby-side changes since the last sweep propagate,
+      // updating the map in place without blocking the initial render.
+      if (useStale && mapToken === this._mapActionToken) {
+        setTimeout(() => {
+          if (mapToken === this._mapActionToken) {
+            void this.seriesMapAction("refresh", show, { noSwitch: true });
+          }
+        }, 0);
+      }
 
       if (action === "prune") {
         this.markShowUpdating(show.name);

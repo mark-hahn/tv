@@ -923,8 +923,8 @@ export default {
         { label: "Tor", key: "tor" },
         { label: "Flex", key: "flex" },
         { label: "Qbt", key: "qbt" },
-        { label: "Down", key: "down" },
         { label: "Usb", key: "usb" },
+        { label: "Down", key: "down" },
         { label: "Local", key: "local" },
         { label: "Log", key: "log" },
       ];

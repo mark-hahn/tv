@@ -791,8 +791,16 @@ export function getSeriesMapFromTvdb(params) {
   return httpCall("/api/getSeriesMapFromTvdb", params, "POST");
 }
 
-export function getSeriesMapFromEmby(params) {
-  return httpCall("/api/getSeriesMapFromEmby", params, "POST");
+export async function getSeriesMapFromEmby(params) {
+  const t0 = performance.now();
+  const res = await httpCall("/api/getSeriesMapFromEmby", params, "POST");
+  const ms = Math.round(performance.now() - t0);
+  if (ms > 1500)
+    logHere(
+      { lvl: "warn", grp: "map-timing" },
+      `slow getSeriesMapFromEmby round-trip ${params?.showName}: ${ms}ms`,
+    );
+  return res;
 }
 
 export function clearEpisodePositions(showName, cells) {

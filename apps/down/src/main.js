@@ -4,6 +4,7 @@ import pathNode from "node:path";
 import childProcess from "node:child_process";
 import httpNode from "node:http";
 import urlNode from "node:url";
+import Database from "better-sqlite3";
 
 import mkdirpPkg from "mkdirp";
 import requestPkg from "request";
@@ -368,7 +369,23 @@ async function main() {
   var REJECT_LOG_PATH = dataPath("reject.log");
   var TV_INPROGRESS_PATH = dataPath("tv-inProgress.json");
   var TV_MAP_PATH = dataPath("tv-map");
-  var TVDB_JSON_PATH = path.join(APP_DIR, "..", "srvr", "data", "tvdb.json");
+  var TVDB_DB_PATH = path.join(APP_DIR, "..", "srvr", "data", "tvdb.db");
+  var tvdbDb = null;
+  var loadEmbyMapFromDb = function () {
+    var out = {};
+    if (!tvdbDb) {
+      tvdbDb = new Database(TVDB_DB_PATH, {
+        readonly: true,
+        fileMustExist: true,
+      });
+      tvdbDb.pragma("busy_timeout = 5000");
+    }
+    var rows = tvdbDb.prepare("SELECT name, json FROM shows").all();
+    for (var row of rows) {
+      out[row.name] = JSON.parse(row.json);
+    }
+    return out;
+  };
   var FLEXGET_HISTORY_PATH = path.join(
     APP_DIR,
     "..",
@@ -2126,26 +2143,13 @@ async function main() {
     }
     cycleSeMap = {};
 
-    // Load Emby membership map from srvr's tvdb.json once per cycle.
+    // Load Emby membership map from srvr's tvdb db once per cycle.
     // Keys are series names; value.inEmby is true if the show is in Emby.
-    // Retry a few times: srvr rewrites tvdb.json frequently, and a transient
-    // read/parse failure must not leave embyMap null (a null map bypasses the
-    // Emby download gate and lets non-Emby shows download).
     embyMap = null;
-    for (let attempt = 0; attempt < 5; attempt++) {
-      try {
-        embyMap = JSON.parse(fs.readFileSync(TVDB_JSON_PATH, "utf8"));
-        break;
-      } catch (e) {
-        if (attempt === 4) {
-          unilog(
-            1243,
-            `failed to load embyMap from ${TVDB_JSON_PATH}: ${e.message}`,
-          );
-        } else {
-          await new Promise((r) => setTimeout(r, 50));
-        }
-      }
+    try {
+      embyMap = loadEmbyMapFromDb();
+    } catch (e) {
+      unilog(1243, `failed to load embyMap from ${TVDB_DB_PATH}: ${e.message}`);
     }
 
     // Reset TVDB cache each cycle so embyMap changes (inEmby toggled) take effect.

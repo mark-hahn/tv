@@ -15,11 +15,16 @@ import * as epd from "@tv/share";
 import { unilog, logHere } from "@tv/share";
 const { getPstDate } = util;
 import { SRVR_DATA_DIR } from "./srvrPaths.js";
+import {
+  backupDb,
+  deleteShow,
+  loadAllShows,
+  saveAllShows,
+  saveShow,
+} from "./tvdbDb.js";
 import { MovieDb } from "moviedb-promise";
 import { getTvmazeIdByTvdbId } from "../../api/src/tvmaze.js";
 const { log, start, end } = util.getLog("tvdb");
-const TVDB_PATH = path.join(SRVR_DATA_DIR, "tvdb.json");
-const TVDB_BACKUP_PATH = path.join(SRVR_DATA_DIR, "tvdb.json.bak");
 const TVDB_TEMPLATE_PATH = path.join(SRVR_DATA_DIR, "tvdbTemplate.json");
 const VIP_ACTORS_PATH = path.join(SRVR_DATA_DIR, "vip-actors.json");
 
@@ -83,16 +88,6 @@ function buildTvdbUrl(tvdbPath, query) {
   return url;
 }
 
-function ensureDir(dir) {
-  fs.mkdirSync(dir, { recursive: true });
-}
-
-function ensureFile(filePath, defaultStr) {
-  if (fs.existsSync(filePath)) return;
-  ensureDir(path.dirname(filePath));
-  fs.writeFileSync(filePath, defaultStr, "utf8");
-}
-
 function setImdbId(tvdb) {
   // Prefer flat prop (set when remotes are fetched)
   if (tvdb?.imdbUrl) {
@@ -112,40 +107,6 @@ function setImdbId(tvdb) {
       }
     }
   }
-}
-
-ensureDir(SRVR_DATA_DIR);
-ensureFile(TVDB_PATH, "{}");
-ensureFile(TVDB_BACKUP_PATH, "{}");
-
-const isRecordObject = (v) => v && typeof v === "object" && !Array.isArray(v);
-
-function parseTvdbJson(text, filePath) {
-  const parsed = util.jParse(text, filePath);
-  if (!isRecordObject(parsed)) return null;
-  return parsed;
-}
-
-function loadTvdbAtStartup() {
-  const primaryText = fs.readFileSync(TVDB_PATH, "utf8");
-  const primaryParsed = parseTvdbJson(primaryText, TVDB_PATH);
-  if (primaryParsed)
-    return stripLegacyLastWatched(migrateRemotesToFlatProps(primaryParsed));
-
-  const backupText = fs.readFileSync(TVDB_BACKUP_PATH, "utf8");
-  const backupParsed = parseTvdbJson(backupText, TVDB_BACKUP_PATH);
-  if (backupParsed) {
-    unilog(
-      713,
-      `startup recovery: invalid primary JSON at ${TVDB_PATH}; restoring from backup ${TVDB_BACKUP_PATH}`,
-    );
-    fs.writeFileSync(TVDB_PATH, JSON.stringify(backupParsed, null, 2), "utf8");
-    return stripLegacyLastWatched(migrateRemotesToFlatProps(backupParsed));
-  }
-
-  throw new Error(
-    `[tvdb] FATAL: invalid JSON in both ${TVDB_PATH} and ${TVDB_BACKUP_PATH}`,
-  );
 }
 
 // One-time migration: extract flat url props from legacy remotes arrays on startup.
@@ -189,12 +150,6 @@ function stripLegacyLastWatched(data) {
     }
   }
   return data;
-}
-
-async function saveTvdbFiles(data) {
-  stripLegacyLastWatched(data);
-  await util.writeFile(TVDB_PATH, data);
-  await util.writeFile(TVDB_BACKUP_PATH, data);
 }
 
 // Helper functions for watchedEpis format
@@ -498,59 +453,34 @@ const UPDATE_DATA = true;
 
 let allTvdb = {};
 try {
-  allTvdb = loadTvdbAtStartup();
-} catch {
+  allTvdb = loadAllShows();
+  stripLegacyLastWatched(migrateRemotesToFlatProps(allTvdb));
+  saveAllShows(allTvdb);
+} catch (e) {
   throw new Error(
-    `[tvdb] startup aborted: cannot load valid tvdb data from ${TVDB_PATH}`,
+    `[tvdb] startup aborted: cannot load valid tvdb data from sqlite: ${e.message}`,
   );
 }
 
-// Phase 5: Migrate separate JSON files into tvdb.json
-let phase5MigrationNeeded = false;
-
-// 5.3: Migrate lastViewed.json
-const lastViewedPath = path.join(SRVR_DATA_DIR, "lastViewed.json");
-if (
-  fs.existsSync(lastViewedPath) &&
-  !fs.existsSync(lastViewedPath + ".backup")
-) {
-  unilog(116, "Phase 5.3: Migrating lastViewed.json into tvdb.json");
+const runTvdbSweep = () => {
   try {
-    const lastViewed = util.jParse(fs.readFileSync(lastViewedPath, "utf8"));
-    let viewedCount = 0;
-
-    for (const [showName, timestamp] of Object.entries(lastViewed)) {
-      if (allTvdb[showName] && !allTvdb[showName].lastViewed) {
-        allTvdb[showName].lastViewed = timestamp;
-        viewedCount++;
-        phase5MigrationNeeded = true;
-      }
-    }
-
-    unilog(
-      718,
-      `Phase 5.3: Migrated ${viewedCount} lastViewed timestamps into tvdb.json`,
-    );
-    fs.renameSync(lastViewedPath, lastViewedPath + ".backup");
+    saveAllShows(allTvdb);
   } catch (e) {
-    unilog(719, "Phase 5.3: lastViewed.json migration failed:", e);
+    unilog(1525, `tvdb sweep failed: ${e.message}`);
   }
-}
+};
 
-// Save Phase 5 migrations
-if (phase5MigrationNeeded) {
-  unilog(
-    117,
-    "Phase 5: Saving tvdb.json with migrated data from separate files",
-  );
-  saveTvdbFiles(allTvdb)
-    .then(() => {
-      unilog(118, "Phase 5: Migration complete - backup files created");
-    })
-    .catch((e) => {
-      unilog(720, "Phase 5: Migration save failed:", e);
-    });
-}
+const runTvdbBackup = () => {
+  try {
+    backupDb();
+  } catch (e) {
+    unilog(1526, `tvdb backup failed: ${e.message}`);
+  }
+};
+
+setInterval(runTvdbSweep, 5 * 60 * 1000);
+runTvdbBackup();
+setInterval(runTvdbBackup, 24 * 60 * 60 * 1000);
 
 ///////////// get theTvdbToken //////////////
 // this is a duplicate of the client
@@ -1497,7 +1427,7 @@ async function getTmdbFallback(showName) {
 //////////// GET TVDB DATA //////////////
 // fetch data from tvdb.com
 // create tvdbData object
-// update allTvdb & tvdb.json
+// update allTvdb & persisted tvdb db rows
 // Calculate waitStr: earliest date when you can start watching any season and
 // always have an episode ready (viewer watches 1/day, no air-date cadence assumed).
 // For each episode ranked k (0-indexed by air date), you watch it on day startDate+k.
@@ -2161,6 +2091,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
       const inputTvdbId = String(allTvdb[inputName]?.tvdbId || "").trim();
       if (inputTvdbId && inputTvdbId === String(tvdbId).trim()) {
         delete allTvdb[inputName];
+        deleteShow(inputName);
       }
     }
     // Auto-update pickups when inEmby or status changes
@@ -2172,14 +2103,14 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
       }
     }
   }
-  // update allTvdb & tvdb.json
+  // update allTvdb & persisted tvdb db rows
   // log("getTvdbData: END", { name, hasRemotes: !!tvdbData.remotes?.length });
   resolve(tvdbData);
 };
 
 /////////  GET/UPDATE TVDB FOR WEB AND LOCAL //////
 // each tvdb request from web waits in queue
-// every result updates json file tvdb.json
+// every result updates the persisted tvdb db row
 const newTvdbQueue = [];
 let chkTvdbQueueRunning = false;
 
@@ -2361,10 +2292,13 @@ const chkTvdbQueue = () => {
 
       if (finalData && !paramObj.transient) {
         finalData.saved = Date.now();
-        // Save to disk so timestamp persists across restarts
-        saveTvdbFiles(allTvdb).catch((err) => {
+        // Save to db so timestamp persists across restarts
+        try {
+          const keyName = String(finalData.name || showName || "").trim();
+          if (keyName) saveShow(keyName, finalData);
+        } catch (err) {
           unilog(745, "chkTvdbQueue: save error:", err.message);
-        });
+        }
         // Push updated record to clients only when fields actually changed
         if (!paramObj.suppressNotify) {
           if (notifyCallback && finalData.name && finalData._hasChanges)
@@ -2387,7 +2321,7 @@ const chkTvdbQueue = () => {
 
 //////////// UPDATE TVDB LOOP ////////////////
 // get imdb data continuously to update data
-// allTvdb is in memory copy of tvdb.json
+// allTvdb is the in-memory copy of tvdb db rows
 // only one sequential request can be busy at a time
 let tryLocalGetTvdbBusy = false;
 const tryLocalGetTvdb = async () => {
@@ -2439,9 +2373,9 @@ const tryLocalGetTvdb = async () => {
   // watched/id + disk files) and push it right away, BEFORE the slow TVDB API
   // scrape below. The open map only needs emby+disk (not Rotten/TVDB/IMDB), so
   // this lets it update within a moment instead of waiting for the full
-  // refresh. Skipped for background sweeps to avoid doubling Emby load. No disk
+  // refresh. Skipped for background sweeps to avoid doubling Emby load. No db
   // save here — the map's stale rebuild reads the in-memory record, and the
-  // full refresh below persists to tvdb.json.
+  // full refresh below persists to tvdb db.
   if (!isBackground && refreshEpisodeDataCallback && minTvdb.inEmby !== false) {
     try {
       await refreshEpisodeDataCallback(minTvdb.name, minTvdb, {
@@ -2466,7 +2400,7 @@ const tryLocalGetTvdb = async () => {
     seasonCount: minTvdb.seasonCount ?? 0,
     episodeCount: minTvdb.episodeCount ?? 0,
     watchedCount: minTvdb.watchedCount ?? 0,
-    fast: false, // Background loop: scrape Rotten and IMDB to refresh tvdb.json cache.
+    fast: false, // Background loop: scrape Rotten and IMDB to refresh tvdb db cache.
     suppressNotify: true, // Combined push1+push2 notify is sent after perShowCallback
   };
   // Await TVDB refresh completion so the updated record is available for further processing
@@ -2493,7 +2427,7 @@ const tryLocalGetTvdb = async () => {
   if (refreshEpisodeDataCallback) {
     try {
       await refreshEpisodeDataCallback(processRecord.name, processRecord);
-      await saveTvdbFiles(allTvdb);
+      saveShow(processRecord.name, allTvdb[processRecord.name]);
     } catch (err) {
       unilog(
         750,
@@ -2540,7 +2474,7 @@ const tryLocalGetTvdb = async () => {
       try {
         const tvmazeCrew = await getTvmazeCrew(processRecord.tvdbId);
         rec.crew = tvmazeCrew;
-        await saveTvdbFiles(allTvdb);
+        saveShow(processRecord.name, rec);
         unilog(
           752,
           `tvdb crew [${processRecord.name}]: ${tvmazeCrew.length} from TVmaze`,
@@ -2570,7 +2504,7 @@ const tryLocalGetTvdb = async () => {
         ];
         rec.rottenUrl = rottenRemote.url || null;
         rec.rottenRatings = rottenRemote.ratings || null;
-        await saveTvdbFiles(allTvdb);
+        saveShow(processRecord.name, rec);
         unilog(
           754,
           `tvdb push3 [${processRecord.name}]: Rotten ${rottenRemote.ratings || "no ratings"}`,
@@ -2687,12 +2621,14 @@ export const getRemotesCmd = async (params) => {
         Object.assign(existing, fetchedUrls);
         if (changes.length)
           unilog(125, `getRemotes [${show.name}]: ${changes.join(" ")}`);
-        saveTvdbSync().catch((err) => {
+        try {
+          saveShow(show.name, existing);
+        } catch (err) {
           unilog(
             758,
             `getRemotesCmd: saveTvdbSync failed for ${show.name}: ${err.message}`,
           );
-        });
+        }
       }
     }
 
@@ -2907,7 +2843,7 @@ export const getAllTvdbSync = () => allTvdb;
 
 export const saveTvdbSync = async () => {
   try {
-    await saveTvdbFiles(allTvdb);
+    saveAllShows(allTvdb);
   } catch (err) {
     unilog(767, "saveTvdbSync error:", err.message);
     throw err;
@@ -2935,7 +2871,7 @@ export const searchTvdbByImdbId = async (params) => {
     return null;
   }
 
-  // First check local tvdb.json for a match
+  // First check local tvdb cache for a match
   for (const [name, tvdb] of Object.entries(allTvdb)) {
     if (tvdb.imdbId === imdbId) {
       unilog(
@@ -3063,6 +2999,8 @@ export const setTvdbFields = async (params) => {
   const paramObj = params;
   if (!paramObj) return null;
   let tvdb = null;
+  let renamedTvdbName = null;
+  let renamedTvdbRecord = null;
   const name = paramObj.name;
   if (name) {
     if (paramObj.$delTvdb) {
@@ -3076,6 +3014,8 @@ export const setTvdbFields = async (params) => {
       }
       delete allTvdb[name];
       allTvdb[newKey] = record;
+      renamedTvdbName = newKey;
+      renamedTvdbRecord = record;
       unilog(778, "inf", `setTvdbFields renamed "${name}" -> "${newKey}"`);
     } else {
       tvdb = allTvdb[name];
@@ -3191,7 +3131,14 @@ export const setTvdbFields = async (params) => {
     }
   }
   if (!paramObj.dontSave) {
-    await saveTvdbFiles(allTvdb);
+    if (paramObj.$delTvdb) {
+      deleteShow(name);
+    } else if (paramObj.$rename) {
+      deleteShow(name);
+      saveShow(renamedTvdbName, renamedTvdbRecord);
+    } else {
+      saveShow(name, allTvdb[name]);
+    }
     if (notifyCallback && name && !paramObj.$delTvdb && !paramObj.dontNotify)
       notifyCallback(name);
   }
@@ -3413,7 +3360,7 @@ export const updateTvdbWithGapData = async (gapData) => {
   }
 
   if (processedCount > 0) {
-    await saveTvdbSync();
+    saveAllShows(allTvdb);
     if (updatedCount > 0) {
       unilog(128, `Updated ${updatedCount} shows`);
     }
@@ -3442,7 +3389,7 @@ export const migrateWatchedCount = async () => {
   }
 
   if (updatedCount > 0) {
-    await saveTvdbSync();
+    saveAllShows(allTvdb);
     unilog(129, `Updated ${updatedCount} shows`);
   } else {
     unilog(130, "No updates needed");

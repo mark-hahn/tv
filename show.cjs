@@ -17,29 +17,40 @@ if (args[0] === "-file") {
 }
 
 if (!showName) {
-  console.log("Usage: ./show.js [-file <json file path>] <show name>");
+  console.log("Usage: ./show.js [-file <db or json file>] <show name>");
   process.exit(1);
 }
 
-// Default to tvdb.json if no file specified
+// Default to the SQLite show DB if no file specified. Relative paths are
+// resolved against apps/srvr on the remote (where better-sqlite3 resolves).
 if (!jsonFile) {
-  jsonFile = "apps/srvr/data/tvdb.json";
+  jsonFile = "data/tvdb.db";
 } else {
   if (!path.isAbsolute(jsonFile)) {
-    jsonFile = `apps/srvr/data/${jsonFile}`;
+    jsonFile = `data/${jsonFile}`;
   }
 }
 
 const tempShowRecordPath = "/tmp/show-record.json";
 
-// 2. SSH Command to fetch show data
-const sshCommand = `ssh hahnca.com "cd /root/dev/apps/tv && node -e \\"
-  const fs = require('fs');
-  const tvdbPath = process.argv[1];
-  const tvdb = JSON.parse(fs.readFileSync(tvdbPath, 'utf8'));
+// 2. SSH Command to fetch show data. A ".db" file is read from SQLite
+// (table shows(name, json)); anything else is read as a legacy JSON archive.
+const sshCommand = `ssh hahnca.com "cd /root/dev/apps/tv/apps/srvr && node -e \\"
+  const file = process.argv[1];
   const showName = process.argv[2];
   const lower = showName.toLowerCase();
-  const keys = Object.keys(tvdb);
+  let keys, getShow;
+  if (file.endsWith('.db')) {
+    const Database = require('better-sqlite3');
+    const db = new Database(file, { readonly: true });
+    keys = db.prepare('SELECT name FROM shows').all().map(r => r.name);
+    getShow = (k) => JSON.parse(db.prepare('SELECT json FROM shows WHERE name = ?').get(k).json);
+  } else {
+    const fs = require('fs');
+    const tvdb = JSON.parse(fs.readFileSync(file, 'utf8'));
+    keys = Object.keys(tvdb);
+    getShow = (k) => tvdb[k];
+  }
   let matchedKey = keys.find(k => k.toLowerCase() === lower);
   if (!matchedKey) {
     const matches = keys.filter(k => k.toLowerCase().includes(lower));
@@ -50,7 +61,7 @@ const sshCommand = `ssh hahnca.com "cd /root/dev/apps/tv && node -e \\"
     }
   }
   if (matchedKey) {
-    console.log(JSON.stringify({ key: matchedKey, show: tvdb[matchedKey] }));
+    console.log(JSON.stringify({ key: matchedKey, show: getShow(matchedKey) }));
   } else {
     process.stderr.write('Show not found: ' + showName + '\\\\n');
     process.exit(1);

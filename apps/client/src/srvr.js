@@ -796,10 +796,7 @@ export async function getSeriesMapFromEmby(params) {
   const res = await httpCall("/api/getSeriesMapFromEmby", params, "POST");
   const ms = Math.round(performance.now() - t0);
   if (ms > 1500)
-    logHere(
-      { lvl: "warn", grp: "map-timing" },
-      `slow getSeriesMapFromEmby round-trip ${params?.showName}: ${ms}ms`,
-    );
+    unilog(1533, `slow getSeriesMapFromEmby round-trip ${params?.showName}: ${ms}ms`);
   return res;
 }
 

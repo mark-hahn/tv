@@ -38,8 +38,12 @@ ensureDir(MISC_DIR);
 const TV_DB_PATH = path.join(DATA_DIR, "tv.sqlite");
 const TV_INPROGRESS_PATH = path.join(DATA_DIR, "tv-inProgress.json");
 const TV_LOG_PATH = path.join(MISC_DIR, "tv.log");
-const TVDB_JSON_PATH = path.join(SRVR_DATA_DIR, "tvdb.json");
-const TVDB_BACKUP_PATH = path.join(SRVR_DATA_DIR, "tvdb.json.bak");
+const TVDB_DB_PATH = path.join(SRVR_DATA_DIR, "tvdb.db");
+const PENDING_TVDB_FIELDS_PATH = path.join(
+  DATA_DIR,
+  "pending-tvdb-fields.json",
+);
+const PENDING_TVDB_FIELDS_RETRY_MS = 60 * 1000;
 
 const TV_DB_BACKUP_PATH = path.join(DATA_DIR, "tv.sqlite.backup");
 
@@ -127,18 +131,6 @@ const writeJsonAtomic = (filePath, obj) => {
   } catch {}
 };
 
-const writeTextAtomic = (filePath, text) => {
-  try {
-    const dir = path.dirname(filePath);
-    const tmp = path.join(
-      dir,
-      "." + path.basename(filePath) + ".tmp." + process.pid + "." + Date.now(),
-    );
-    fs.writeFileSync(tmp, String(text), "utf8");
-    fs.renameSync(tmp, filePath);
-  } catch {}
-};
-
 const readMap = (filePath) => {
   const obj = readJson(filePath, {});
   if (!obj || typeof obj !== "object" || Array.isArray(obj)) return {};
@@ -153,6 +145,7 @@ const writeMap = (filePath, mapObj) => {
 // ---- SQLite-backed state (single authority) --------------------------------
 
 let db = null;
+let tvdbDb = null;
 let workerCount = 0;
 let nextProcId = 0;
 
@@ -173,6 +166,17 @@ let stmtFindOldestWaitingTitle = null;
 let stmtGetMaxProcId = null;
 let stmtGetDownloads = null;
 let stmtGetTitles = null;
+
+const getTvdbDb = () => {
+  if (!tvdbDb) {
+    tvdbDb = new Database(TVDB_DB_PATH, {
+      readonly: true,
+      fileMustExist: true,
+    });
+    tvdbDb.pragma("busy_timeout = 5000");
+  }
+  return tvdbDb;
+};
 
 const unixNow = () => Math.floor(Date.now() / 1000);
 
@@ -221,7 +225,7 @@ const postSetTvdbFields = (params) => {
 };
 
 // seriesName from TVDB search usually has a "(YYYY)" year suffix while
-// tvdb.json keys usually don't, so build candidate names and try each.
+// tvdb keys usually don't, so build candidate names and try each.
 const stripYearSuffix = (name) => name.replace(/\s*\(\d{4}\)\s*$/, "");
 
 const showFolderFromLocalPath = (localPath) => {
@@ -247,7 +251,7 @@ const buildNameCandidates = (showName, localPath) => {
 
 const isTvdbRecord = (v) => v && typeof v === "object" && !Array.isArray(v);
 
-// Resolve a tvdb.json key from candidates: exact, then case-insensitive,
+// Resolve a tvdb key from candidates: exact, then case-insensitive,
 // then year-stripped keys (tvdb key "Rivals (2024)" vs candidate "Rivals").
 // Ambiguous year-stripped matches (two keys strip to the same name) are
 // skipped rather than guessed.
@@ -273,58 +277,118 @@ const resolveTvdbKey = (tvdb, candidates) => {
 };
 
 const resolveTvdbKeyFromFile = (candidates) => {
-  const tvdb = readJson(TVDB_JSON_PATH, null);
-  if (!tvdb || typeof tvdb !== "object" || Array.isArray(tvdb)) return null;
+  const tvdb = {};
+  const rows = getTvdbDb().prepare(`SELECT name FROM shows`).all();
+  for (const row of rows) tvdb[row.name] = {};
   return resolveTvdbKey(tvdb, candidates);
 };
 
-const writeLastDownloadedDirect = (candidates, timestamp) => {
-  const tvdb = readJson(TVDB_JSON_PATH, null);
-  if (!tvdb || typeof tvdb !== "object" || Array.isArray(tvdb)) return false;
-  const key = resolveTvdbKey(tvdb, candidates);
-  if (!key) return false;
-  tvdb[key]["last-downloaded"] = timestamp;
-  const data = JSON.stringify(tvdb);
-  writeTextAtomic(TVDB_JSON_PATH, data);
-  writeTextAtomic(TVDB_BACKUP_PATH, data);
-  return true;
+let pendingTvdbFields = null;
+
+const loadPendingTvdbFields = () => {
+  if (!pendingTvdbFields) {
+    pendingTvdbFields = readMap(PENDING_TVDB_FIELDS_PATH);
+  }
+  return pendingTvdbFields;
 };
 
-const recordShowDownloadedInternal = async (showName, timestamp, localPath) => {
+const persistPendingTvdbFields = () => {
+  writeJsonAtomic(PENDING_TVDB_FIELDS_PATH, loadPendingTvdbFields());
+};
+
+const queuePendingTvdbFields = (showName, timestamp, localPath, err) => {
+  const key = String(showName || "").trim();
+  if (!key) return;
+  const queue = loadPendingTvdbFields();
+  queue[key] = { timestamp, localPath: String(localPath || "") };
+  persistPendingTvdbFields();
+  unilog(
+    1528,
+    `queued last-downloaded update for ${key}: ${err?.message || String(err)}`,
+  );
+};
+
+const postLastDownloadedToSrvr = async (showName, timestamp, localPath) => {
   const candidates = buildNameCandidates(showName, localPath);
   const ts = Math.trunc(Number(timestamp));
   if (candidates.length === 0 || !Number.isFinite(ts) || ts <= 0) return false;
+
+  for (const name of candidates) {
+    const body = await postSetTvdbFields({
+      name,
+      "last-downloaded": ts,
+      dontEnqueue: true,
+    });
+    // setTvdbFields returns the string "no tvdb" (HTTP 200) on a key miss.
+    if (String(body || "").trim() !== '"no tvdb"') return true;
+  }
+
+  // All exact candidates missed — resolve fuzzily (case, year suffix)
+  // against tvdb db keys and retry with the real key.
+  const key = resolveTvdbKeyFromFile(candidates);
+  if (key && !candidates.includes(key)) {
+    const body = await postSetTvdbFields({
+      name: key,
+      "last-downloaded": ts,
+      dontEnqueue: true,
+    });
+    if (String(body || "").trim() !== '"no tvdb"') return true;
+  }
+
+  unilog(
+    1286,
+    `last-downloaded: no tvdb record matched ${candidates.join(" | ")}`,
+  );
+  return false;
+};
+
+const recordShowDownloadedInternal = async (showName, timestamp, localPath) => {
+  const ts = Math.trunc(Number(timestamp));
   try {
-    for (const name of candidates) {
-      const body = await postSetTvdbFields({
-        name,
-        "last-downloaded": ts,
-        dontEnqueue: true,
-      });
-      // setTvdbFields returns the string "no tvdb" (HTTP 200) on a key miss.
-      if (String(body || "").trim() !== '"no tvdb"') return true;
-    }
-    // All exact candidates missed — resolve fuzzily (case, year suffix)
-    // against tvdb.json keys and retry with the real key.
-    const key = resolveTvdbKeyFromFile(candidates);
-    if (key && !candidates.includes(key)) {
-      const body = await postSetTvdbFields({
-        name: key,
-        "last-downloaded": ts,
-        dontEnqueue: true,
-      });
-      if (String(body || "").trim() !== '"no tvdb"') return true;
-    }
-    unilog(1286, `last-downloaded: no tvdb record matched ${candidates.join(" | ")}`);
-    return false;
+    return await postLastDownloadedToSrvr(showName, ts, localPath);
   } catch (err) {
-    const saved = writeLastDownloadedDirect(candidates, ts);
-    if (!saved) {
-      unilog(1191, `last-downloaded update failed for ${candidates[0]}: ${err && err.message ? err.message : String(err)}`);
-    }
-    return saved;
+    queuePendingTvdbFields(showName, ts, localPath, err);
+    return false;
   }
 };
+
+const retryPendingTvdbFields = async () => {
+  const queue = loadPendingTvdbFields();
+  const entries = Object.entries(queue);
+  if (entries.length === 0) return;
+
+  let changed = false;
+  for (const [showName, entry] of entries) {
+    try {
+      const saved = await postLastDownloadedToSrvr(
+        showName,
+        entry?.timestamp,
+        entry?.localPath || "",
+      );
+      if (saved) {
+        delete queue[showName];
+        changed = true;
+      }
+    } catch (e) {
+      unilog(
+        1529,
+        `pending last-downloaded retry failed for ${showName}: ${e?.message || String(e)}`,
+      );
+    }
+  }
+
+  if (changed) persistPendingTvdbFields();
+};
+
+loadPendingTvdbFields();
+setInterval(() => {
+  retryPendingTvdbFields().catch((e) => {
+    unilog(
+      1530,
+      `pending last-downloaded retry loop failed: ${e?.message || String(e)}`,
+    );
+  });
+}, PENDING_TVDB_FIELDS_RETRY_MS);
 
 export const recordShowDownloaded = async (
   showName,

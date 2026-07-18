@@ -116,7 +116,11 @@ don't clean up debug logging until i tell you to
 
 whenever you deploy to the server and pm2 does a restart check pm2 logs to make sure there is no server crashing and restarting
 
-stop tv-srvr first before running anything that modifies tvdb.json, to avoid stale overwrite. this includes any `node -e` or script that requires/imports `src/tvdb.js` (or anything that loads it) — loading tvdb.js starts its periodic save machinery, so the process keeps rewriting tvdb.json with its stale in-memory snapshot and never exits on its own. make sure the process has exited before restarting tv-srvr (a forgotten July 2 debug one-liner silently corrupted tvdb.json for days)
+show data lives in `/root/dev/apps/tv/apps/srvr/data/tvdb.db`, table `shows(name, json)`. Inspect with e.g. `sqlite3 -readonly /root/dev/apps/tv/apps/srvr/data/tvdb.db "SELECT json FROM shows WHERE name='X'" | jq .`
+
+tv-srvr is the single writer of tvdb.db. Every other process, including down, debug scripts, and one-liners, must open it with `-readonly` / `{ readonly: true }`; field changes go through the HTTP `setTvdbFields` API. For a bulk offline edit, stop tv-srvr first — srvr holds the dataset in memory and its saves/sweep will overwrite rows written behind its back. Read-only inspection while running is fine. This includes any `node -e` or script that requires/imports `src/tvdb.js` (or anything that loads it) — loading tvdb.js starts its periodic save machinery and the process does not exit on its own, so make sure it has exited before restarting tv-srvr.
+
+one-off scripts referencing tvdb.json (`scripts/*.js`, `apps/srvr/scripts/fix-pickups.js`) are obsolete and must not be run.
 
 in the map pane call the first child of the maphdr2 div the "map pane info bar"
 
@@ -191,6 +195,7 @@ catches every form of debug statement:
 Any of those forms ending in `// no-unilog` is skipped — never upgraded, never
 activated, never assigned an id. Use it for unilog's own plumbing files and any
 debug statement that must stay as plain `console.*` output.
+
 - do not use no-unilog unless you have my permission
 
 ```js

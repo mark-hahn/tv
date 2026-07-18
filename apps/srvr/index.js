@@ -4141,6 +4141,22 @@ watcher
         if (tvdbRec && tvdbRec.inEmby) {
           let queued = false;
           for (const fp of videoFiles) {
+            // Enforce one active video per episode before chksrt: a replacement
+            // download that raced the old file can leave two active files. Demote
+            // the lower-res one; if fp itself was the loser, skip enqueuing it.
+            const fpSeasonDir = path.dirname(fp);
+            const fpSe = parseFileSeasonEpisode(
+              resStripAlt(path.basename(fp)),
+              path.basename(fpSeasonDir),
+            );
+            if (fpSe?.season != null && fpSe?.episode != null) {
+              const demoted = reconcileDuplicateEpisodeVideos(
+                fpSeasonDir,
+                fpSe.season,
+                fpSe.episode,
+              );
+              if (demoted.has(fp)) continue;
+            }
             const needs = await fileNeedsSubChecked(fp, showName);
             unilog(682, `fileNeedsSubChecked(${path.basename(fp)}) = ${needs}`);
             if (needs) {
@@ -4564,6 +4580,53 @@ async function res1080NeededAndAcquire(
 }
 
 // Scan every season of a show for episodes that need a 1080 fallback.
+// Enforce one active (non-.alt, non-.old) video file per episode. A replacement
+// download that races the file it replaces can leave two active videos: worker.js
+// renames the pre-existing SxxExx file to .old only once, at rsync start, so a
+// same-episode file that lands mid-download is never demoted. When that happens the
+// lower-resolution active file is demoted to .old (matching the fallback convention
+// res1080NeededAndAcquire expects) and its chksrt entry / mp4 mirror are dropped, so
+// chksrt only ever resolves against the surviving active file. Returns the Set of
+// absolute paths that were demoted. See down-coll-plan.md.
+function reconcileDuplicateEpisodeVideos(seasonDir, season, episode) {
+  const demoted = new Set();
+  const actives = resFindEpisodeVideos(seasonDir, season, episode).filter(
+    (v) => !v.alt,
+  );
+  if (actives.length < 2) return demoted;
+  // Only act when there is a strictly-higher known resolution to keep; never guess
+  // on same-resolution ties or when any active file's resolution is unknown.
+  if (actives.some((v) => v.res <= 0)) return demoted;
+  const bestRes = Math.max(...actives.map((v) => v.res));
+  const losers = actives.filter((v) => v.res < bestRes);
+  if (losers.length === 0) return demoted;
+  for (const loser of losers) {
+    const src = path.join(seasonDir, loser.name);
+    let dst = src + ".old";
+    while (fs.existsSync(dst)) dst += ".old";
+    try {
+      fs.renameSync(src, dst);
+    } catch (e) {
+      unilog(1537, `demote duplicate episode video failed for ${loser.name}: ${e.message}`);
+      continue;
+    }
+    demoted.add(src);
+    unilog(1538, `demoted duplicate ${loser.res}p episode video to .old (keeping ${bestRes}p): ${loser.name}`);
+    const idx = subsState.subQueueChkSrt.findIndex(
+      (e) => e.videoFilePath === src,
+    );
+    if (idx !== -1) subsState.subQueueChkSrt.splice(idx, 1);
+    mpfour.cancelEncode(src);
+  }
+  if (demoted.size > 0) {
+    cleanChkSrtQueue();
+    persistSubQueueChkSrt();
+    publishChksrtState();
+    syncBatchMsgs();
+  }
+  return demoted;
+}
+
 async function scanShowForResFallback(showName, tvdbRecord) {
   if (!tvdbRecord?.inEmby) return;
   const showFolderName = showName.includes("/")

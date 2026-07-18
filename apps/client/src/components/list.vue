@@ -2600,6 +2600,8 @@ export default {
     },
 
     async seriesMapAction(action, show, options = {}) {
+      // Callers may pass null explicitly, which bypasses the default above.
+      options = options || {};
       if (
         action == "open" &&
         this.mapShow?.name === show?.name &&

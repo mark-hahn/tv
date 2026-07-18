@@ -1309,6 +1309,10 @@ async function main() {
   var tvJsonTitles = null;
   // Per-cycle S/E dedup map for fromFlex: key = seriesName+"\x00"+SeStr → fname already queued
   var cycleSeMap = null;
+  // Per-cycle index of in-flight downloads: key = seasonDir+"\x00"+SeStr → best resolution.
+  // Blocks queuing a stale same/worse-quality candidate for an episode already downloading
+  // under a different filename (see down-coll-plan.md).
+  var inProgressSeIndex = null;
 
   blocked = null;
   map = {};
@@ -2142,6 +2146,33 @@ async function main() {
       tvJsonTitles = {};
     }
     cycleSeMap = {};
+
+    // Build an index of in-flight downloads keyed by season dir + SxxExx → best res.
+    // Active downloads (waiting/downloading) occupy an episode even though no live
+    // file is on disk yet (old file renamed to .old, new file still in .rsync-tmp),
+    // so this lets the fromFlex check skip a stale same/worse-quality candidate for
+    // the same episode instead of racing it (see down-coll-plan.md).
+    inProgressSeIndex = {};
+    try {
+      var _activeDownloads = tvJson.getDownloads ? tvJson.getDownloads() : [];
+      for (var _di = 0; _di < _activeDownloads.length; _di++) {
+        var _de = _activeDownloads[_di];
+        if (!_de || _de.error || _de.status === "finished") continue;
+        var _deTitle = _de.destTitle || _de.title || "";
+        var _deSeMatch = _deTitle.match(/S(\d{2})E(\d{2})/i);
+        if (!_deSeMatch) continue;
+        var _deSeStr = "S" + _deSeMatch[1] + "E" + _deSeMatch[2];
+        var _deDir = String(_de.localPath || "").replace(/\/+$/, "");
+        if (!_deDir) continue;
+        var _deKey = _deDir + "\x00" + _deSeStr.toUpperCase();
+        var _deRes = getResolution(_deTitle) ?? 480;
+        if (!(_deKey in inProgressSeIndex) || _deRes > inProgressSeIndex[_deKey]) {
+          inProgressSeIndex[_deKey] = _deRes;
+        }
+      }
+    } catch (e) {
+      inProgressSeIndex = {};
+    }
 
     // Load Emby membership map from srvr's tvdb db once per cycle.
     // Keys are series names; value.inEmby is true if the show is in Emby.
@@ -3004,6 +3035,23 @@ async function main() {
     ) {
       var flexSeStr = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
       var flexSeRe = new RegExp(flexSeStr, "i");
+
+      // Skip if a same-or-better-quality download for this exact episode is already
+      // in flight under a different filename. During a higher-quality replacement the
+      // old file is renamed to .old and the new file lives in .rsync-tmp, so the disk
+      // check below sees no live file — without this guard a stale same/worse-quality
+      // USB candidate gets queued and races the in-flight download, leaving a duplicate
+      // live file on disk (see down-coll-plan.md).
+      if (inProgressSeIndex) {
+        var _ipKey =
+          String(tvSeasonPath).replace(/\/+$/, "") + "\x00" + flexSeStr;
+        var _ipRes = inProgressSeIndex[_ipKey];
+        if (_ipRes != null && _ipRes >= (getResolution(fname) ?? 480)) {
+          existsCount++;
+          unilog(1535, `skip: same/better quality already downloading for ${seriesName || "unknown show"} ${flexSeStr}`);
+          return process.nextTick(checkFile);
+        }
+      }
 
       // Check flexget-history.json: only allow the most-recently-sent candidate.
       var flexHistKeyExists = false;

@@ -751,8 +751,8 @@ export default {
     },
 
     sep() {
-      // Replace spaces around '|' with two non-breaking spaces.
-      return "\u00A0\u00A0|\u00A0\u00A0";
+      // Two non-breaking spaces between data fields (no pipe).
+      return "\u00A0\u00A0";
     },
 
     parseTorrentName(rawTitle) {
@@ -793,14 +793,28 @@ export default {
 
     fmtMmDd_HhMm(epochSeconds) {
       const n = Number(epochSeconds);
-      if (!Number.isFinite(n) || n <= 0) return "??/?? ??:??:??";
+      if (!Number.isFinite(n) || n <= 0) return "";
       const d = new Date(Math.floor(n) * 1000);
       const mm = this.pad2(d.getMonth() + 1);
       const dd = this.pad2(d.getDate());
-      const hh = this.pad2(d.getHours());
+      let hh = this.pad2(d.getHours());
+      if (hh === "24") hh = "00";
       const mi = this.pad2(d.getMinutes());
       const ss = this.pad2(d.getSeconds());
-      return `${mm}/${dd} ${hh}:${mi}:${ss}`;
+      return `${mm}/${dd}.${hh}:${mi}:${ss}`;
+    },
+
+    // Duration in mm:ss, or h:mm:ss when >= 1 hour.
+    fmtDuration(seconds) {
+      const n = Number(seconds);
+      if (!Number.isFinite(n) || n < 0) return "";
+      const s = Math.floor(n);
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sec = s % 60;
+      return h > 0
+        ? `${h}:${this.pad2(m)}:${this.pad2(sec)}`
+        : `${m}:${this.pad2(sec)}`;
     },
 
     fmtCompletionMmDd_HhMm(epochSeconds) {
@@ -836,33 +850,6 @@ export default {
       return lower.charAt(0).toUpperCase() + lower.slice(1);
     },
 
-    fmtEtaMmSs(seconds) {
-      const n = Number(seconds);
-      if (!Number.isFinite(n) || n < 0) return String(seconds);
-      const s = Math.floor(n);
-      const mm = Math.floor(s / 60);
-      const ss = s % 60;
-      // Remove any leading 0 from minutes; keep seconds 2-digit.
-      return `${mm}:${this.pad2(ss)}`;
-    },
-
-    fmtElapsedMmSs(startEpoch, endEpoch) {
-      const start = Number(startEpoch);
-      const end = Number(endEpoch);
-      if (
-        !Number.isFinite(start) ||
-        start <= 0 ||
-        !Number.isFinite(end) ||
-        end <= 0
-      ) {
-        return "??:??";
-      }
-      const elapsedSeconds = Math.max(0, end - start);
-      const mm = Math.floor(elapsedSeconds / 60);
-      const ss = Math.floor(elapsedSeconds % 60);
-      return `${mm}:${this.pad2(ss)}`;
-    },
-
     fmtSize(bytesOrHumanString) {
       return util.fmtBytesSize(bytesOrHumanString);
     },
@@ -885,10 +872,10 @@ export default {
     fmtRateMb(t) {
       if (t?.state === "downloading") {
         const rate = this.calcRateMb(t);
-        return rate === null ? "" : `${rate.toFixed(0)} mb`;
+        return rate === null ? "" : `${rate.toFixed(0)} Mb`;
       }
       const avg = Number(t?.avg_rate_mb);
-      return Number.isFinite(avg) ? `${avg.toFixed(0)} mb` : "";
+      return Number.isFinite(avg) ? `${avg.toFixed(0)} Mb` : "";
     },
 
     fmtProgPc(completedBytes, sizeBytes) {
@@ -1135,34 +1122,31 @@ export default {
     },
 
     infoLine(t) {
+      const sep = this.sep();
       const added = this.fmtMmDd_HhMm(t?.added_on);
       const bytes =
         (t && (t.size_bytes ?? t.total_size_bytes ?? t.size)) ?? undefined;
       const size =
         this.fmtSize(bytes) || this.fmtSize(t?.size) || String(t?.size ?? "");
-      const sep = this.sep();
-      const remBytes =
-        Number.isFinite(Number(bytes)) && Number.isFinite(Number(t?.completed))
-          ? Number(bytes) - Number(t.completed)
-          : NaN;
-      const remaining = Number.isFinite(remBytes)
-        ? remBytes <= 0
-          ? "0"
-          : this.fmtSize(remBytes)
-        : "";
-
-      const rate = this.fmtRateMb(t);
-      const rateSeg = rate ? `${rate}${sep}` : "";
+      const prog = this.fmtProgPc(t?.completed, t?.size);
 
       if (t?.state === "downloading") {
-        const prog = this.fmtProgPc(t?.completed, t?.size);
+        // added  size  seeds  rate  prog%  eta  Downloading
         const seeds = Number.isFinite(Number(t?.num_seeds))
           ? Number(t?.num_seeds)
           : 0;
-        const eta = this.fmtEtaMmSs(t?.eta);
-        return `${size}${sep}${remaining}${sep}${added}${sep}${seeds}${sep}${prog}%${sep}${rateSeg}${eta}${sep}Getting`;
+        const rate = this.fmtRateMb(t);
+        const eta = this.fmtDuration(t?.eta);
+        const fields = [added, size, `${seeds} seeds`];
+        if (rate) fields.push(rate);
+        fields.push(`${prog}%`);
+        if (eta) fields.push(eta);
+        fields.push("Downloading");
+        return fields.join(sep);
       }
 
+      // Not downloading (finished / stalled / stopped / etc.):
+      // added  size  seeds  rate  prog%  [elapsed]  status
       const curSeeds = Number.isFinite(Number(t?.num_seeds))
         ? Number(t?.num_seeds)
         : 0;
@@ -1173,9 +1157,17 @@ export default {
           : Number.isFinite(lastSeeds)
             ? lastSeeds
             : curSeeds;
-      const elapsed = this.fmtElapsedMmSs(t?.added_on, t?.completion_on);
+      const rate = this.fmtRateMb(t) || "0 Mb";
+      const completion = Number(t?.completion_on);
+      const elapsed =
+        Number.isFinite(completion) && completion > 0
+          ? this.fmtDuration(completion - Number(t?.added_on))
+          : "";
       const state = this.fmtState(t?.state);
-      return `${size}${sep}${remaining}${sep}${added}${sep}${seeds}${sep}${rateSeg}${elapsed}${sep}${state}`;
+      const fields = [added, size, `${seeds} seeds`, rate, `${prog}%`];
+      if (elapsed) fields.push(elapsed);
+      fields.push(state);
+      return fields.join(sep);
     },
 
     forceFile(title) {

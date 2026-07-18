@@ -801,15 +801,27 @@ const openDb = () => {
   try {
     db.prepare("ALTER TABLE tv_entries ADD COLUMN fromFlex INTEGER").run();
   } catch {}
+  // dateAdded: when the item entered processing (file pulled from USB by the
+  // down cycle). Set once at creation and never overwritten afterward.
+  try {
+    db.prepare("ALTER TABLE tv_entries ADD COLUMN dateAdded INTEGER").run();
+  } catch {}
+  // Backfill legacy rows that predate dateAdded: dateStarted is the closest
+  // proxy we have (leaves not-yet-started rows at 0 → blank timestamp).
+  try {
+    db.prepare(
+      "UPDATE tv_entries SET dateAdded=dateStarted WHERE dateAdded IS NULL",
+    ).run();
+  } catch {}
 
   stmtUpsertByTitle = db.prepare(`
     INSERT INTO tv_entries (
       title, procId, usbPath, localPath, status, progress, eta, speed,
-      sequence, fileSize, season, episode, dateStarted, dateEnded,
+      sequence, fileSize, season, episode, dateStarted, dateEnded, dateAdded,
       inProgress, error, reason, seriesName, destTitle, fromFlex
     ) VALUES (
       @title, @procId, @usbPath, @localPath, @status, @progress, @eta, @speed,
-      @sequence, @fileSize, @season, @episode, @dateStarted, @dateEnded,
+      @sequence, @fileSize, @season, @episode, @dateStarted, @dateEnded, @dateAdded,
       @inProgress, @error, @reason, @seriesName, @destTitle, @fromFlex
     )
     ON CONFLICT(title) DO UPDATE SET
@@ -826,6 +838,7 @@ const openDb = () => {
       episode=excluded.episode,
       dateStarted=CASE WHEN excluded.dateStarted > 0 THEN excluded.dateStarted ELSE dateStarted END,
       dateEnded=excluded.dateEnded,
+      dateAdded=CASE WHEN dateAdded > 0 THEN dateAdded ELSE excluded.dateAdded END,
       inProgress=excluded.inProgress,
       error=excluded.error,
       reason=excluded.reason,
@@ -930,6 +943,12 @@ const rowToEntry = (row) => {
           ? 0
           : Number(row.dateStarted),
     dateEnded: row.dateEnded == null ? null : Number(row.dateEnded),
+    dateAdded:
+      typeof row.dateAdded === "number"
+        ? row.dateAdded
+        : row.dateAdded == null
+          ? 0
+          : Number(row.dateAdded),
     inProgress: !!row.inProgress,
     error: !!row.error,
     reason: row.reason || undefined,
@@ -983,6 +1002,14 @@ const normalizeEntryForDb = (entry) => {
       : 0;
   const dateEnded =
     e.dateEnded == null ? null : Math.trunc(Number(e.dateEnded));
+  // Set once at creation; existing value is preserved by the upsert's
+  // dateAdded CASE, so a fresh default here only sticks for brand-new rows.
+  const dateAdded =
+    typeof e.dateAdded === "number" &&
+    Number.isFinite(e.dateAdded) &&
+    e.dateAdded > 0
+      ? Math.trunc(e.dateAdded)
+      : unixNow();
 
   return {
     title,
@@ -999,6 +1026,7 @@ const normalizeEntryForDb = (entry) => {
     episode,
     dateStarted,
     dateEnded,
+    dateAdded,
     inProgress: e.inProgress ? 1 : 0,
     error: e.error ? 1 : 0,
     reason: e.reason

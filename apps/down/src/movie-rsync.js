@@ -123,6 +123,7 @@ function startCopyFile(filePath, totalBytes) {
     total_bytes: totalBytes || 0,
     rate: "",
     eta: "",
+    startTime: Date.now(),
     _procs: [],
     _pollTimer: null,
   };
@@ -353,6 +354,8 @@ export function getMovieDownJobs() {
       total_bytes: j.total_bytes,
       rate: j.rate,
       eta: j.eta,
+      startTime: j.startTime || null,
+      endTime: j._endedAt || null,
     })),
   };
 }

@@ -475,7 +475,7 @@
             ><span
               v-if="line2(it).rest"
               style="color: rgba(0, 0, 0, 0.5) !important"
-              ><span v-if="line2(it).seasonEpisode">&nbsp;|&nbsp;</span
+              ><span v-if="line2(it).seasonEpisode">&nbsp;&nbsp;</span
               ><span style="color: rgba(0, 0, 0, 0.5) !important">{{
                 line2(it).rest
               }}</span></span
@@ -525,10 +525,7 @@
           {{ job.name }}
         </div>
         <div style="font-size: 12px; color: #555">
-          {{ fmtSize(job.total_bytes) }} | {{ job.percent }}% |
-          {{ fmtMovieRsyncRate(job.rate) }} | Rem: {{ job.eta }} | Eta:
-          {{ fmtMovieEta(job.eta) }} |
-          {{ job.status }}
+          {{ movieLine(job) }}
         </div>
       </div>
     </div>
@@ -955,10 +952,53 @@ export default {
 
       const month = String(d.getMonth() + 1).padStart(2, "0");
       const day = String(d.getDate()).padStart(2, "0");
-      const hh = String(d.getHours()).padStart(2, "0");
+      let hh = String(d.getHours()).padStart(2, "0");
+      if (hh === "24") hh = "00";
       const mm = String(d.getMinutes()).padStart(2, "0");
       const ss = String(d.getSeconds()).padStart(2, "0");
-      return `${month}/${day} ${hh}:${mm}:${ss}`;
+      return `${month}/${day}.${hh}:${mm}:${ss}`;
+    },
+
+    // Duration in mm:ss, or h:mm:ss when >= 1 hour. Blank for null/invalid.
+    fmtDuration(seconds) {
+      if (seconds == null) return "";
+      const n = Number(seconds);
+      if (!Number.isFinite(n) || n < 0) return "";
+      const s = Math.floor(n);
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sec = s % 60;
+      return h > 0
+        ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
+        : `${m}:${String(sec).padStart(2, "0")}`;
+    },
+
+    // Bit rate in integer megabits/sec with a "Mb" unit. Input is bits/sec.
+    fmtRateMb(bitsPerSec) {
+      const n = Number(bitsPerSec);
+      if (!Number.isFinite(n) || n < 0) return "";
+      return `${Math.round(n / 1e6)} Mb`;
+    },
+
+    // Remaining seconds from an eta that may be a duration or a unix timestamp.
+    etaRemainingSeconds(eta) {
+      const n = Number(eta);
+      if (!Number.isFinite(n) || n <= 0) return null;
+      const now = Math.floor(Date.now() / 1000);
+      return n > 10000000 ? Math.max(0, n - now) : n;
+    },
+
+    // Parse "h:mm:ss" / "mm:ss" / "ss" into total seconds.
+    parseDurationStr(str) {
+      const parts = String(str || "")
+        .split(":")
+        .map(Number);
+      if (parts.length === 0 || parts.some((x) => !Number.isFinite(x)))
+        return null;
+      if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+      if (parts.length === 2) return parts[0] * 60 + parts[1];
+      if (parts.length === 1) return parts[0];
+      return null;
     },
 
     fmtHhmm(ts) {
@@ -988,14 +1028,6 @@ export default {
       return `${Math.round(mbps)} mb`;
     },
 
-    fmtElapsedMmSs(seconds) {
-      const n = Number(seconds);
-      if (seconds == null || !Number.isFinite(n) || n <= 0) return "";
-      const mins = Math.floor(n / 60);
-      const secs = Math.floor(n % 60);
-      return `${mins}:${String(secs).padStart(2, "0")}`;
-    },
-
     fmtMovieTotalBytes(job) {
       if (!job.bytes_done || !job.percent) return 0;
       return Math.round(job.bytes_done / (job.percent / 100));
@@ -1009,49 +1041,9 @@ export default {
       if (unit === "KB") mbps = (mbps * 8) / 1024;
       else if (unit === "MB") mbps = mbps * 8;
       else if (unit === "GB") mbps = mbps * 8 * 1024;
-      return `${Math.round(mbps)} mb`;
+      return `${Math.round(mbps)} Mb`;
     },
 
-    fmtMovieEta(remStr) {
-      const parts = String(remStr || "")
-        .split(":")
-        .map(Number);
-      if (parts.length < 2 || parts.some(isNaN)) return "";
-      let secs = 0;
-      if (parts.length === 3) secs = parts[0] * 3600 + parts[1] * 60 + parts[2];
-      else secs = parts[0] * 60 + parts[1];
-      if (secs <= 0) return "";
-      const eta = new Date(Date.now() + secs * 1000);
-      return `${String(eta.getHours()).padStart(2, "0")}:${String(eta.getMinutes()).padStart(2, "0")}`;
-    },
-
-    fmtEtaRemaining(eta) {
-      const n = Number(eta);
-      if (!Number.isFinite(n) || n <= 0) return "";
-
-      // If it's a large number (Unix timestamp), calculate remaining time from now
-      const now = Math.floor(Date.now() / 1000);
-      const remaining = n > 10000000 ? Math.max(0, n - now) : n;
-
-      const mins = Math.floor(remaining / 60);
-      const secs = Math.floor(remaining % 60);
-      return `${mins}:${String(secs).padStart(2, "0")}`;
-    },
-
-    fmtEtaTimestamp(eta) {
-      const n = Number(eta);
-      if (!Number.isFinite(n) || n <= 0) return "";
-
-      // If it's a large number (Unix timestamp), format as time only
-      if (n > 10000000) {
-        const d = new Date(n * 1000);
-        const hh = String(d.getHours()).padStart(2, "0");
-        const mm = String(d.getMinutes()).padStart(2, "0");
-        const ss = String(d.getSeconds()).padStart(2, "0");
-        return `${hh}:${mm}:${ss}`;
-      }
-      return "";
-    },
 
     elapsedSeconds(it) {
       const started = Number(it?.dateStarted);
@@ -1094,83 +1086,99 @@ export default {
       return result;
     },
     line2(it) {
+      const sep = "\u00A0\u00A0";
       const s = Number(it?.season);
       const e = Number(it?.episode);
       const seasonEpisode =
         Number.isFinite(s) && Number.isFinite(e) ? `S${s}:E${e}` : "";
 
+      const added = this.fmtMdhm(it?.dateAdded);
       const size = this.fmtSize(it?.fileSize);
-      const started = this.fmtMdhm(it?.dateStarted);
-      const speed = this.fmtGbPerSec(it?.speed);
       const status = String(it?.status || "").trim();
       const statusLower = status.toLowerCase();
       const progress = Number(it?.progress);
+      const progPc =
+        Number.isFinite(progress) && progress >= 0 && progress <= 100
+          ? `${progress}%`
+          : "";
+      const rate = this.fmtRateMb(it?.speed);
+      const eta = this.fmtDuration(this.etaRemainingSeconds(it?.eta));
 
-      // Error-downloaded: show original error reason + suffix
+      const out = (arr) => ({
+        seasonEpisode,
+        rest: arr.filter(Boolean).join(sep),
+      });
+
+      // Error-downloaded: preserve original error reason + suffix.
       if (statusLower === "error-downloaded") {
         const reason = String(it?.reason || "error").trim();
-        const parts2 = [];
-        if (size) parts2.push(size);
-        parts2.push(`${reason} (downloaded to tv-errors)`);
-        return { seasonEpisode, rest: parts2.join(" | ") };
+        return out([added, size, `${reason} (downloaded to tv-errors)`]);
       }
 
-      // For waiting status (formerly "future"), only show size
+      // Waiting: added  size  0 Mb  0%  Waiting
       if (statusLower === "waiting" || statusLower === "future") {
-        const parts = [];
-        if (size) parts.push(size);
-        parts.push("Waiting");
-        return { seasonEpisode, rest: parts.join(" | ") };
+        return out([added, size, "0 Mb", "0%", "Waiting"]);
       }
 
-      const parts = [];
-      if (size) parts.push(size);
-      if (started) parts.push(started);
+      // Downloading: added  size  rate  prog%  eta  Downloading
+      if (statusLower === "downloading") {
+        return out([added, size, rate, progPc, eta, "Downloading"]);
+      }
 
+      // Encoding (write phase, has eta): added  size  prog%  eta  Encoding
+      // Scanning (encoding, no eta yet): added  size  Scanning
+      if (statusLower === "encoding") {
+        if (eta) return out([added, size, progPc, eta, "Encoding"]);
+        return out([added, size, "Scanning"]);
+      }
+
+      // Finished: added  size  rate  100%  elapsed  Finished
       if (statusLower === "finished") {
-        const elapsed = this.fmtElapsedMmSs(this.elapsedSeconds(it));
-        if (elapsed) parts.push(elapsed);
-        if (speed) parts.push(speed);
-        parts.push("Finished");
-        return { seasonEpisode, rest: parts.join(" | ") };
+        const elapsed = this.fmtDuration(this.elapsedSeconds(it));
+        return out([added, size, rate, "100%", elapsed, "Finished"]);
       }
+
+      // Other / unknown: added  size  status
+      return out([added, size, status || "Unknown"]);
+    },
+
+    // Movie rsync card line — mirrors the down downloading / finished formats.
+    movieLine(job) {
+      const sep = "\u00A0\u00A0";
+      const added = this.fmtMdhm(job?.startTime);
+      const size = this.fmtSize(job?.total_bytes);
+      const status = String(job?.status || "").trim();
+      const statusLower = status.toLowerCase();
+      const join = (arr) => arr.filter(Boolean).join(sep);
 
       if (statusLower === "downloading") {
-        if (speed) parts.push(speed);
-        const eta = this.fmtEtaRemaining(it?.eta);
-        if (eta) parts.push(eta);
-        const etaTimestamp = this.fmtEtaTimestamp(it?.eta);
-        if (etaTimestamp) parts.push(etaTimestamp);
-        if (Number.isFinite(progress) && progress >= 0 && progress <= 100) {
-          parts.push(`${progress}%`);
-        }
-        parts.push("Downloading");
-        return { seasonEpisode, rest: parts.join(" | ") };
+        // added  size  rate  prog%  eta  Downloading
+        const rate = this.fmtMovieRsyncRate(job?.rate);
+        const pct = Number(job?.percent);
+        const progPc = Number.isFinite(pct) ? `${pct}%` : "";
+        const eta = this.fmtDuration(this.parseDurationStr(job?.eta));
+        return join([added, size, rate, progPc, eta, "Downloading"]);
       }
 
-      if (statusLower === "encoding") {
-        if (Number.isFinite(progress) && progress >= 0 && progress <= 100) {
-          parts.push(`${progress}%`);
-        }
-        const eta = this.fmtEtaRemaining(it?.eta);
-        const etaTimestamp = this.fmtEtaTimestamp(it?.eta);
-        if (eta) {
-          // Write phase: show ETA
-          parts.push(eta);
-          if (etaTimestamp) parts.push(etaTimestamp);
-        } else {
-          // Scan phase (no PRGV yet)
-          const elapsed = this.fmtElapsedMmSs(this.elapsedSeconds(it));
-          parts.push(elapsed ? `Scanning ${elapsed}` : "Scanning");
-        }
-        parts.push("Encoding");
-        return { seasonEpisode, rest: parts.join(" | ") };
+      if (statusLower === "finished") {
+        // added  size  rate(avg)  100%  elapsed  Finished
+        const startMs = Number(job?.startTime);
+        const endMs = Number(job?.endTime);
+        const elapsedSec =
+          Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs
+            ? (endMs - startMs) / 1000
+            : null;
+        const elapsed = this.fmtDuration(elapsedSec);
+        const bytes = Number(job?.total_bytes);
+        const avgMb =
+          Number.isFinite(bytes) && elapsedSec && elapsedSec > 0
+            ? `${Math.round((bytes * 8) / 1e6 / elapsedSec)} Mb`
+            : "";
+        return join([added, size, avgMb, "100%", elapsed, "Finished"]);
       }
 
-      if (speed) parts.push(speed);
-      if (status) parts.push(status);
-      else parts.push("Unknown");
-      return { seasonEpisode, rest: parts.join(" | ") };
+      // Error / Killed / other: added  size  status
+      return join([added, size, status || "Unknown"]);
     },
 
     getCardStyle(it) {

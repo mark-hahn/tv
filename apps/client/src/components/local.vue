@@ -582,6 +582,7 @@
           :key="node.name"
           :node="node"
           :ref="(el) => setNodeRef(el, node.name)"
+          :copy-path="true"
           :selected="selectedFolders.has(node.name)"
           :selected-files="selectedFiles"
           @node-click="handleNodeClick"

@@ -370,3 +370,22 @@ export function wrapFileName(name, maxLen = 79) {
   if (remaining) lines.push(remaining);
   return lines.join("\n");
 }
+
+// Quote a name/path for pasting into a bash CLI, matching how
+// `ls -al` (shell-escape style) renders a filename:
+//   - bare when every char is shell-safe
+//     (A-Za-z0-9 # % + , - . / : @ ] _ { } ~, no leading # or ~)
+//   - a name containing a single quote -> wrap in double quotes,
+//     e.g.  A Good Girl's ...  ->  "A Good Girl's ..."
+//   - otherwise -> wrap in single quotes.
+export function shellQuote(str) {
+  const s = String(str ?? "");
+  if (s === "") return "''";
+  const allSafe = /^[A-Za-z0-9#%+,\-./:@\]_{}~]+$/.test(s);
+  const leadUnsafe = /^[#~]/.test(s);
+  if (allSafe && !leadUnsafe) return s;
+  // ls uses double quotes when the name has a single quote but nothing that is
+  // special inside double quotes; keeps it clean instead of '\'' escaping.
+  if (s.includes("'") && !/["$`\\]/.test(s)) return '"' + s + '"';
+  return "'" + s.replace(/'/g, "'\\''") + "'";
+}

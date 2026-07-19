@@ -1064,9 +1064,9 @@ export default {
       const isCtrlClick = Boolean(event?.ctrlKey || event?.metaKey);
       const isShiftClick = Boolean(event?.shiftKey);
 
-      // Alt-click: copy torrent name to clipboard
+      // Alt-click: copy torrent name to clipboard (bash-quoted if needed)
       if (isAltClick) {
-        const title = String(t?.name || "");
+        const title = util.shellQuote(t?.name || "");
         navigator.clipboard.writeText(title).catch(() => {});
         this.flashingHash = String(t?.hash || "");
         setTimeout(() => {

@@ -67,6 +67,7 @@
         :node="child"
         :depth="depth + 1"
         :path-prefix="fullPath"
+        :copy-path="copyPath"
         :selected="false"
         :selected-files="selectedFiles"
         @node-click="$emit('node-click', $event)"
@@ -87,6 +88,8 @@ export default {
     selected: { type: Boolean, default: false },
     selectedFiles: { type: Object, default: () => new Set() },
     pathPrefix: { type: String, default: "" },
+    // false: alt-copy just the node name; true: alt-copy the full relative path.
+    copyPath: { type: Boolean, default: false },
   },
   emits: ["node-click"],
   data() {
@@ -130,8 +133,9 @@ export default {
     },
     handleClick(event) {
       if (event.altKey) {
+        const text = this.copyPath ? this.fullPath : this.node.name;
         navigator.clipboard
-          .writeText(this.fullPath)
+          .writeText(util.shellQuote(text))
           .catch((err) => unilog(1044, "Copy failed", err));
         this.highlighted = true;
         setTimeout(() => {

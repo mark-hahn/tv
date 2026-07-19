@@ -3275,9 +3275,9 @@ export default {
       const isCtrlClick = Boolean(event?.ctrlKey || event?.metaKey);
       const isShiftClick = Boolean(event?.shiftKey);
 
-      // Alt-click copies raw torrent title to clipboard.
+      // Alt-click copies raw torrent title to clipboard (bash-quoted if needed).
       if (isAltClick) {
-        const title = torrent.raw?.title ?? "";
+        const title = util.shellQuote(torrent.raw?.title ?? "");
         navigator.clipboard.writeText(title).catch(() => {});
         this.flashingTorrent = torrent;
         setTimeout(() => {

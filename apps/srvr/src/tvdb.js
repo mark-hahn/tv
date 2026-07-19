@@ -997,7 +997,13 @@ const getRemote = async (id, type, showName) => {
 
 ///////////// wiki / reddit url verification //////////////
 
-const collapseAlpha = (s) => (s || "").toLowerCase().replace(/[^a-z]/g, "");
+// collapse a name for comparison: strip html escapes (&amp; &nbsp; &#39; ...)
+// first so they don't inject junk letters, then keep only lower-case alpha.
+const collapseAlpha = (s) =>
+  (s || "")
+    .replace(/&[a-z0-9#]+;/gi, "")
+    .toLowerCase()
+    .replace(/[^a-z]/g, "");
 
 function levenshtein(a, b) {
   const m = a.length,
@@ -1054,8 +1060,9 @@ function redditNameFromHtml(html) {
 const toOldReddit = (u) => u.replace(/:\/\/(www\.)?reddit\.com/, "://old.reddit.com");
 
 // Load the page for a wiki/reddit url and confirm it is really about `showName`.
-// Returns false only on a definite name mismatch; a fetch/parse error returns
-// true so a transient failure never hides an otherwise-good button.
+// A 404 means the article/subreddit does not exist (e.g. a banned sub) -> fail.
+// Other non-2xx (5xx/429) and unparseable pages are transient/inconclusive and
+// return true so a passing failure never hides an otherwise-good button.
 async function verifyRemoteName(kind, showName, url) {
   try {
     const fetchUrl = kind === "reddit" ? toOldReddit(url) : url;
@@ -1065,23 +1072,27 @@ async function verifyRemoteName(kind, showName, url) {
       redirect: "follow",
       signal: AbortSignal.timeout(15000),
     });
-    if (!resp.ok) return true; // inconclusive -> keep button
+    // transient server errors (5xx / 429 / 403) -> inconclusive, keep the button
+    if (!resp.ok && resp.status !== 404) return true;
     const html = await resp.text();
     const pageName =
       kind === "reddit" ? redditNameFromHtml(html) : wikiNameFromHtml(html);
-    if (!pageName) return true; // inconclusive -> keep button
-    const sim = nameSimilarity(showName, pageName);
+    // reachable 200 page we couldn't parse a name from -> inconclusive, keep
+    if (resp.ok && !pageName) return true;
+    const sim = pageName ? nameSimilarity(showName, pageName) : 0;
     const min = kind === "reddit" ? REDDIT_SIMILARITY_MIN : WIKI_SIMILARITY_MIN;
-    const pass = sim > min;
-    const detail = `${kind}: show="${showName}" page="${pageName}" sim=${sim.toFixed(3)}`;
+    // a 404 (banned/missing) can never pass, regardless of any parsed name
+    const pass = resp.ok && sim > min;
+    const shown = pageName ?? `(http ${resp.status})`;
+    const detail = `${kind}: show="${showName}" page="${shown}" sim=${sim.toFixed(3)}`;
     if (pass) {
-      unilog(1549, `Pass ${detail}`);
+      unilog(1552, `Pass ${detail}`);
     } else {
-      unilog(1550, `Fail ${detail}`);
+      unilog(1553, `Fail ${detail}`);
     }
     return pass;
   } catch (e) {
-    unilog(1543, `verify ${kind} error for ${showName}: ${e.message}`);
+    unilog(1554, `verify ${kind} error for ${showName}: ${e.message}`);
     return true; // inconclusive -> keep button
   }
 }

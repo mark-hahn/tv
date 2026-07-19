@@ -262,7 +262,7 @@
         v-else
         style="
           padding: 10px;
-          font-size: 16px;
+          font-size: 13px;
           font-family: monospace;
           font-weight: normal;
         "
@@ -273,9 +273,11 @@
           @click="handleRowClick(row, $event)"
           @mousedown="$event.shiftKey && $event.preventDefault()"
           :style="getRowStyle(row)"
-        >
-          {{ row.line }}
-        </div>
+        ><span
+            v-if="!row.isHeader && row.se"
+            style="color: blue !important"
+            >{{ row.se }}</span
+          >{{ row.isHeader ? row.line : (row.se ? " " : "") + row.rest }}</div>
       </div>
     </div>
 
@@ -401,6 +403,18 @@ function fmtGroupTs(ms) {
 const RUN_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 const GROUP_GAP_MS = RUN_INTERVAL_MS / 2; // 7.5 minutes
 
+// Blue season/episode string, matching the tor/qbt panes:
+// single episode -> "2/1", single season -> "2". Derived from the
+// server's seasonKey ("S02") and episodeKey ("E01").
+function fmtSeasonEpisode(seasonKey, episodeKey) {
+  const sMatch = String(seasonKey || "").match(/(\d+)/);
+  if (!sMatch) return "";
+  const season = parseInt(sMatch[1], 10);
+  const eMatch = String(episodeKey || "").match(/(\d+)/);
+  const episode = eMatch ? parseInt(eMatch[1], 10) : null;
+  return episode !== null ? `${season}/${episode}` : String(season);
+}
+
 function buildRows(entries) {
   if (entries.length === 0) return [];
 
@@ -468,13 +482,21 @@ function buildRows(entries) {
 
     // Entry rows (no timestamp)
     for (const { e, epKey, idx } of withIdx) {
-      const idxSuffix = idx > 1 ? " *" : "";
-      const seKey = `${e.seasonKey || "?"}${e.episodeKey || "?"}`;
-      const resSuffix = e.resolution ? ` ${e.resolution}` : "";
-      const line = `${e.showName || "?"} (${seKey})${resSuffix}${idxSuffix}`;
+      // Blue label: "2/1 - 720p" (resolution omitted when unknown or mixed).
+      const seBase = fmtSeasonEpisode(e.seasonKey, e.episodeKey);
+      const res = String(e.resolution || "").trim();
+      const se =
+        seBase && res && res.toLowerCase() !== "mixed"
+          ? `${seBase} - ${res}`
+          : seBase;
+      const dupePart = idx > 1 ? " (dupe)" : "";
+      const rest = `${e.showName || "?"}${dupePart}`;
+      const line = se ? `${se} ${rest}` : rest;
       rows.push({
         key: `${epKey}\x00${e.sent}\x00${idx}`,
         line,
+        se,
+        rest,
         showName: e.showName || "",
         entry: e,
         isHeader: false,

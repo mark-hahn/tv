@@ -331,14 +331,15 @@
             {{ t.name || t.hash }}
           </div>
           <div
-            style="
-              margin-top: 8px;
-              font-size: 14px;
-              font-weight: normal;
-              color: rgba(0, 0, 0, 0.5) !important;
-            "
+            style="margin-top: 8px; font-size: 13px; font-weight: normal"
           >
-            {{ infoLine(t) }}
+            <span
+              v-if="!movieMode && blueLabel(t)"
+              style="color: blue !important"
+              >{{ blueLabel(t) }}{{ sep() }}</span
+            ><span style="color: rgba(0, 0, 0, 0.5) !important">{{
+              infoLine(t)
+            }}</span>
           </div>
         </div>
       </div>
@@ -785,6 +786,93 @@ export default {
       if (!raw) return "";
       const parsed = this.parseTorrentName(raw);
       return String(parsed?.title || raw).trim();
+    },
+
+    // Extract season range from a title (e.g., S01-S02, Seasons 1-5).
+    // Mirrors the server normalize.js logic used by the tor pane.
+    extractSeasonRange(title) {
+      const patterns = [
+        /s(\d{1,2})\s*-\s*(?:s\s*)?(\d{1,2})/i,
+        /seasons?\s+(\d{1,2})\s*-\s*(\d{1,2})/i,
+      ];
+      for (const pattern of patterns) {
+        const match = title.match(pattern);
+        if (match) {
+          return {
+            startSeason: parseInt(match[1], 10),
+            endSeason: parseInt(match[2], 10),
+            isRange: true,
+          };
+        }
+      }
+      const listMatch = title.match(/seasons?\s+(\d{1,2}(?:\s+\d{1,2})+)/i);
+      if (listMatch) {
+        const nums = listMatch[1].split(/\s+/).map(Number);
+        return {
+          startSeason: Math.min(...nums),
+          endSeason: Math.max(...nums),
+          isRange: true,
+        };
+      }
+      return null;
+    },
+
+    // Convert S01E02 to 1/2, S01 to 1, without leading zeros. Mirrors tor pane.
+    formatSeasonEpisode(seasonEpisode) {
+      if (!seasonEpisode) return "";
+      const match = seasonEpisode.match(/S(\d+)(?:E(\d+))?/);
+      if (!match) return seasonEpisode;
+      const season = parseInt(match[1], 10);
+      const episode = match[2] ? parseInt(match[2], 10) : null;
+      return episode !== null ? `${season}/${episode}` : String(season);
+    },
+
+    // Blue season/episode string shown in the tor pane before sending to qbt.
+    // Multiple seasons -> "1...4", single season -> "2", single episode -> "2/1".
+    // Derived here from the qbt torrent name (same for tor- and flex-originated
+    // downloads, since the qbt name is the torrent title in both cases).
+    getDisplaySeasonEpisode(t) {
+      const name = String(t?.name || "").trim();
+      if (!name) return "";
+
+      // Season range takes priority (e.g., "1...4").
+      const seasonRange = this.extractSeasonRange(name);
+      if (seasonRange && seasonRange.isRange) {
+        const start = Number(seasonRange.startSeason);
+        const end = Number(seasonRange.endSeason);
+        if (!Number.isNaN(start) && !Number.isNaN(end) && end >= start) {
+          return `${start}...${end}`;
+        }
+      }
+
+      const parsed = this.parseTorrentName(name);
+      if (!parsed) return "";
+
+      if (parsed.seasonEpisode) {
+        return this.formatSeasonEpisode(parsed.seasonEpisode);
+      }
+
+      const season = parsed.season;
+      const episode = parsed.episode;
+      if (season !== undefined && season !== null) {
+        let result = `S${String(season).padStart(2, "0")}`;
+        if (episode !== undefined && episode !== null) {
+          result += `E${String(episode).padStart(2, "0")}`;
+        }
+        return this.formatSeasonEpisode(result);
+      }
+      return "";
+    },
+
+    // Full blue label at the start of the info line, e.g. "2/1 - 720p".
+    // Resolution is appended from the torrent name, omitting unknown or mixed.
+    blueLabel(t) {
+      const se = this.getDisplaySeasonEpisode(t);
+      if (!se) return "";
+      const parsed = this.parseTorrentName(String(t?.name || ""));
+      const res = String(parsed?.resolution || "").trim();
+      if (!res || res.toLowerCase() === "mixed") return se;
+      return `${se} - ${res}`;
     },
 
     pad2(n) {

@@ -843,8 +843,10 @@
               style="color: blue !important"
               >&nbsp;-&nbsp;{{ torrent.parsed.resolution }}</span
             ><span style="color: rgba(0, 0, 0, 0.5) !important"
-              >:
-              {{ fmtSize(torrent.raw?.size) || torrent.raw?.size || "N/A" }} |
+              >&nbsp;&nbsp;{{
+                fmtSize(torrent.raw?.size) || torrent.raw?.size || "N/A"
+              }}
+              |
               {{ torrent.raw?.seeds || 0 }} seeds<span
                 v-if="torrent.raw?.provider"
                 style="color: rgba(0, 0, 0, 0.5) !important"

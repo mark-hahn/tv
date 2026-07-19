@@ -36,6 +36,15 @@ const moviedb = new MovieDb("327192a334da700f65b882c7a69cb927");
 const TVDB_APIKEY = "d7fa8c90-36e3-4335-a7c0-6cbb7b0320df";
 const TVDB_PIN = "HXEVSDFF";
 
+// Wiki/Reddit button verification: load the page and confirm it is really
+// about the show before returning the button. Similarity is
+// 1 - (levenshtein / max-length) after collapsing to lower-case alpha chars.
+const REDDIT_SIMILARITY_MIN = 0.5; // reddit button kept if similarity > this
+const WIKI_SIMILARITY_MIN = 0.8; // wikipedia button kept if similarity > this
+const VERIFY_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+  "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36";
+
 // cache token relative to file scope
 let cachedToken = null;
 let cachedAtMs = 0;
@@ -986,6 +995,97 @@ const getRemote = async (id, type, showName) => {
   return { name, url, ratings, reviewers, video };
 };
 
+///////////// wiki / reddit url verification //////////////
+
+const collapseAlpha = (s) => (s || "").toLowerCase().replace(/[^a-z]/g, "");
+
+function levenshtein(a, b) {
+  const m = a.length,
+    n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  let cur = new Array(n + 1);
+  for (let i = 1; i <= m; i++) {
+    cur[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+    }
+    [prev, cur] = [cur, prev];
+  }
+  return prev[n];
+}
+
+// similarity of two show names, collapsed to lower-case alpha chars
+function nameSimilarity(a, b) {
+  const x = collapseAlpha(a),
+    y = collapseAlpha(b);
+  const max = Math.max(x.length, y.length);
+  if (!max) return 0;
+  return 1 - levenshtein(x, y) / max;
+}
+
+// wikipedia page name: <title>NAME - Wikipedia</title>, then drop a trailing
+// "(...)" disambiguator like "(TV series)" / "(2024 TV series)".
+function wikiNameFromHtml(html) {
+  const m = html.match(/<title>([^<]*)<\/title>/i);
+  if (!m) return null;
+  return m[1]
+    .replace(/\s*-\s*Wikipedia\s*$/i, "")
+    .replace(/\s*\([^)]*\)\s*$/, "")
+    .trim();
+}
+
+// reddit page name (old.reddit): og:title is "<community title> • r/<slug>";
+// the slug is what the user's match examples compare against.
+function redditNameFromHtml(html) {
+  const og = html.match(/property="og:title"\s+content="([^"]*)"/i);
+  if (og) {
+    const slug = og[1].match(/r\/([A-Za-z0-9_]+)\s*$/);
+    if (slug) return slug[1];
+    return og[1];
+  }
+  const t = html.match(/<title>([^<]*)<\/title>/i);
+  return t ? t[1].trim() : null;
+}
+
+// www.reddit.com serves a JS-challenge wall to plain fetches; old.reddit does not
+const toOldReddit = (u) => u.replace(/:\/\/(www\.)?reddit\.com/, "://old.reddit.com");
+
+// Load the page for a wiki/reddit url and confirm it is really about `showName`.
+// Returns false only on a definite name mismatch; a fetch/parse error returns
+// true so a transient failure never hides an otherwise-good button.
+async function verifyRemoteName(kind, showName, url) {
+  try {
+    const fetchUrl = kind === "reddit" ? toOldReddit(url) : url;
+    // use global fetch (undici): old.reddit 403s the node-fetch client
+    const resp = await globalThis.fetch(fetchUrl, {
+      headers: { "User-Agent": VERIFY_UA },
+      redirect: "follow",
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!resp.ok) return true; // inconclusive -> keep button
+    const html = await resp.text();
+    const pageName =
+      kind === "reddit" ? redditNameFromHtml(html) : wikiNameFromHtml(html);
+    if (!pageName) return true; // inconclusive -> keep button
+    const sim = nameSimilarity(showName, pageName);
+    const min = kind === "reddit" ? REDDIT_SIMILARITY_MIN : WIKI_SIMILARITY_MIN;
+    const pass = sim > min;
+    const detail = `${kind}: show="${showName}" page="${pageName}" sim=${sim.toFixed(3)}`;
+    if (pass) {
+      unilog(1549, `Pass ${detail}`);
+    } else {
+      unilog(1550, `Fail ${detail}`);
+    }
+    return pass;
+  } catch (e) {
+    unilog(1543, `verify ${kind} error for ${showName}: ${e.message}`);
+    return true; // inconclusive -> keep button
+  }
+}
+
 ///////////// get remotes  //////////////
 // use tvdb remotes data to find complete remote data
 
@@ -1044,35 +1144,55 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
   // Build parallel tasks for uncached remotes
   const parallelTasks = [];
 
-  // Wikipedia
-  const cachedWikiUrl = allTvdb[name]?.wikiUrl;
-  if (cachedWikiUrl) {
-    remotes.push({ name: "Wikipedia", url: cachedWikiUrl });
-  } else {
-    parallelTasks.push(
-      getRemote(null, 18, name).then((r) => {
-        if (r?.url) {
-          remotes.push({ name: "Wikipedia", url: r.url });
-          flatUrls.wikiUrl = r.url;
-        }
-      }),
-    );
-  }
+  // Wikipedia + Reddit: build the url (cached or fresh), then verify the loaded
+  // page is really about this show before returning the button. Verification runs
+  // on both the fast and background paths (not gated by fast, unlike Rotten), but
+  // each url is only tested once: the true/false result is cached in the
+  // `${x}Verified` flat prop and persisted, so later calls reuse it without
+  // re-fetching. A url with no verified flag yet (legacy/unchecked) is still shown
+  // until its one test runs; only an explicit false hides the button.
+  const addVerifiedRemote = async ({
+    kind,
+    type,
+    buttonName,
+    urlKey,
+    verifiedKey,
+  }) => {
+    const rec = allTvdb[name];
+    let url = rec?.[urlKey] || null;
+    let verified = rec?.[verifiedKey]; // true | false; null/undefined = not yet tested
+    if (!url) {
+      const r = await getRemote(null, type, name);
+      url = r?.url || null;
+      verified = undefined;
+    }
+    if (!url) return;
+    flatUrls[urlKey] = url;
+    if (verified == null) {
+      verified = await verifyRemoteName(kind, name, url);
+      flatUrls[verifiedKey] = verified;
+    }
+    if (verified !== false) remotes.push({ name: buttonName, url });
+  };
 
-  // Reddit
-  const cachedRedditUrl = allTvdb[name]?.redditUrl;
-  if (cachedRedditUrl) {
-    remotes.push({ name: "Reddit", url: cachedRedditUrl });
-  } else {
-    parallelTasks.push(
-      getRemote(null, 7, name).then((r) => {
-        if (r?.url) {
-          remotes.push({ name: "Reddit", url: r.url });
-          flatUrls.redditUrl = r.url;
-        }
-      }),
-    );
-  }
+  parallelTasks.push(
+    addVerifiedRemote({
+      kind: "wiki",
+      type: 18,
+      buttonName: "Wikipedia",
+      urlKey: "wikiUrl",
+      verifiedKey: "wikiVerified",
+    }),
+  );
+  parallelTasks.push(
+    addVerifiedRemote({
+      kind: "reddit",
+      type: 7,
+      buttonName: "Reddit",
+      urlKey: "redditUrl",
+      verifiedKey: "redditVerified",
+    }),
+  );
 
   // Other tvdbRemotes (excluding Wikipedia/Reddit/IMDB handled separately)
   for (const tvdbRemote of tvdbRemotes) {
@@ -1855,6 +1975,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     // Remote URL flat props — persisted so Google/scrape calls are skipped on subsequent refreshes
     wikiUrl: fetchedUrls.wikiUrl ?? existing.wikiUrl ?? null,
     redditUrl: fetchedUrls.redditUrl ?? existing.redditUrl ?? null,
+    wikiVerified: fetchedUrls.wikiVerified ?? existing.wikiVerified ?? null,
+    redditVerified: fetchedUrls.redditVerified ?? existing.redditVerified ?? null,
     imdbUrl: fetchedUrls.imdbUrl ?? existing.imdbUrl ?? null,
     imdbRatings: fetchedUrls.imdbRatings ?? existing.imdbRatings ?? null,
     imdbReviewers: fetchedUrls.imdbReviewers ?? existing.imdbReviewers ?? null,
@@ -2598,36 +2720,59 @@ export const getRemotesCmd = async (params) => {
       fast,
     );
 
-    // When fetching fresh data (fast=false), save remotes and flat url props
-    if (!fast && show.name && allTvdb) {
+    if (show.name && allTvdb) {
       const existing = allTvdb[show.name];
       if (existing) {
-        const changes = [];
-        if (
-          fetchedUrls.imdbRatings !== undefined &&
-          fetchedUrls.imdbRatings !== existing.imdbRatings
-        )
-          changes.push(
-            `imdb:${existing.imdbRatings ?? "none"}->${fetchedUrls.imdbRatings ?? "none"}`,
-          );
-        if (
-          fetchedUrls.rottenRatings !== undefined &&
-          fetchedUrls.rottenRatings !== existing.rottenRatings
-        )
-          changes.push(
-            `rotten:${existing.rottenRatings ?? "none"}->${fetchedUrls.rottenRatings ?? "none"}`,
-          );
-        existing.remotes = remotes;
-        Object.assign(existing, fetchedUrls);
-        if (changes.length)
-          unilog(125, `getRemotes [${show.name}]: ${changes.join(" ")}`);
-        try {
-          saveShow(show.name, existing);
-        } catch (err) {
-          unilog(
-            758,
-            `getRemotesCmd: saveTvdbSync failed for ${show.name}: ${err.message}`,
-          );
+        let changed = false;
+
+        // Persist wiki/reddit url + verify results on every path (fast too) so
+        // each url is only tested once, even when the fast info-pane path is the
+        // first to test it.
+        for (const k of [
+          "wikiUrl",
+          "redditUrl",
+          "wikiVerified",
+          "redditVerified",
+        ]) {
+          if (fetchedUrls[k] !== undefined && existing[k] !== fetchedUrls[k]) {
+            existing[k] = fetchedUrls[k];
+            changed = true;
+          }
+        }
+
+        // Full refresh (fast=false) also saves the freshly-scraped remotes/ratings.
+        if (!fast) {
+          const changes = [];
+          if (
+            fetchedUrls.imdbRatings !== undefined &&
+            fetchedUrls.imdbRatings !== existing.imdbRatings
+          )
+            changes.push(
+              `imdb:${existing.imdbRatings ?? "none"}->${fetchedUrls.imdbRatings ?? "none"}`,
+            );
+          if (
+            fetchedUrls.rottenRatings !== undefined &&
+            fetchedUrls.rottenRatings !== existing.rottenRatings
+          )
+            changes.push(
+              `rotten:${existing.rottenRatings ?? "none"}->${fetchedUrls.rottenRatings ?? "none"}`,
+            );
+          existing.remotes = remotes;
+          Object.assign(existing, fetchedUrls);
+          changed = true;
+          if (changes.length)
+            unilog(125, `getRemotes [${show.name}]: ${changes.join(" ")}`);
+        }
+
+        if (changed) {
+          try {
+            saveShow(show.name, existing);
+          } catch (err) {
+            unilog(
+              758,
+              `getRemotesCmd: saveTvdbSync failed for ${show.name}: ${err.message}`,
+            );
+          }
         }
       }
     }

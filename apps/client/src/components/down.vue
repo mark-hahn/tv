@@ -1085,12 +1085,38 @@ export default {
       }
       return result;
     },
+    // Resolution parsed from a download's filename/title (e.g. "1080p"),
+    // omitting unknown or mixed values.
+    parseResolution(title) {
+      const raw = String(title || "").trim();
+      if (!raw) return "";
+      let parser = null;
+      if (typeof parseTorrentTitle === "function") parser = parseTorrentTitle;
+      else if (parseTorrentTitle?.parse) parser = parseTorrentTitle.parse;
+      else if (parseTorrentTitle?.default?.parse)
+        parser = parseTorrentTitle.default.parse;
+      let res = "";
+      try {
+        res = String(parser?.(raw)?.resolution || "").trim();
+      } catch {
+        res = "";
+      }
+      if (!res || res.toLowerCase() === "mixed") return "";
+      return res;
+    },
+
     line2(it) {
       const sep = "\u00A0\u00A0";
       const s = Number(it?.season);
       const e = Number(it?.episode);
-      const seasonEpisode =
-        Number.isFinite(s) && Number.isFinite(e) ? `S${s}:E${e}` : "";
+      // Blue label: "2/1 - 720p" (single season "2", resolution omitted if
+      // unknown or mixed). Matches the tor/qbt/flex panes.
+      let seasonEpisode = "";
+      if (Number.isFinite(s)) {
+        seasonEpisode = Number.isFinite(e) ? `${s}/${e}` : String(s);
+        const res = this.parseResolution(it?.title);
+        if (res) seasonEpisode = `${seasonEpisode} - ${res}`;
+      }
 
       const added = this.fmtMdhm(it?.dateAdded);
       const size = this.fmtSize(it?.fileSize);

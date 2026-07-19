@@ -539,7 +539,17 @@ import { config } from "../config.js";
 import * as srvr from "../srvr.js";
 import * as util from "../util.js";
 import { parseTitleFromFilename } from "../util.js";
-import { unilog } from "../log.js";
+import { unilog, logHere } from "../log.js";
+
+// Audible alert played alongside the desktop notification when the laptop lid
+// is closed and the notification can't be seen.
+const BEEP_HZ = 880;
+const BEEP_MS = 250;
+const BEEP_GAP_MS = 150;
+const BEEP_COUNT = 1;
+const BEEP_VOLUME = 0.25;
+const LID_URL = "/__lid";
+const LID_TIMEOUT_MS = 6000;
 
 export default {
   name: "TvProc",
@@ -803,7 +813,48 @@ export default {
       el.scrollTop = Math.max(0, Math.min(max, (el.scrollTop || 0) + scaledDy));
     },
 
-    notifyAllUsbFinished(lastTitle) {
+    // True when Windows reports no active display panel, meaning the lid is
+    // shut. Only the vite dev server answers this; anywhere else we can't tell
+    // and report open so no beep is emitted.
+    async lidIsClosed() {
+      try {
+        const res = await fetch(LID_URL, {
+          signal: AbortSignal.timeout(LID_TIMEOUT_MS),
+        });
+        if (!res.ok) return false;
+        const body = await res.json();
+        return body?.closed === true;
+      } catch (e) {
+        logHere({ grp: "down" }, `lid state check failed: ${e?.message || e}`);
+        return false;
+      }
+    },
+
+    async beep() {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      try {
+        if (ctx.state === "suspended") await ctx.resume();
+        for (let i = 0; i < BEEP_COUNT; i++) {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.value = BEEP_HZ;
+          gain.gain.value = BEEP_VOLUME;
+          osc.connect(gain).connect(ctx.destination);
+          const start = ctx.currentTime + i * ((BEEP_MS + BEEP_GAP_MS) / 1000);
+          osc.start(start);
+          osc.stop(start + BEEP_MS / 1000);
+        }
+        const totalMs = BEEP_COUNT * (BEEP_MS + BEEP_GAP_MS);
+        await new Promise((r) => setTimeout(r, totalMs));
+      } finally {
+        void ctx.close();
+      }
+    },
+
+    async notifyAllUsbFinished(lastTitle) {
       try {
         if (typeof window === "undefined") return;
         if (!("Notification" in window)) return;
@@ -815,6 +866,7 @@ export default {
 
         if (Notification.permission === "granted") {
           new Notification(msg);
+          if (await this.lidIsClosed()) await this.beep();
           return;
         }
 

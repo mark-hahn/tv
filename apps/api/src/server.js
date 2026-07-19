@@ -1326,6 +1326,73 @@ app.post("/api/local/mediainfo", async (req, res) => {
   }
 });
 
+const TEXT_PROBE_BYTES = 100;
+const TEXT_PROBE_MAX_NON_ASCII = 10;
+const TEXT_VIEW_MAX_BYTES = 2 * 1024 * 1024;
+
+// printable ascii plus tab, cr and lf
+function isAsciiByte(b) {
+  return (b >= 0x20 && b <= 0x7e) || b === 9 || b === 10 || b === 13;
+}
+
+// probe:true returns only size/isText, used to enable the View button
+app.post("/api/local/textfile", async (req, res) => {
+  try {
+    const { relPath, errsMode, movieMode, probe } = req.body;
+    if (!relPath) {
+      return res.status(400).json({ error: "Missing relPath" });
+    }
+    const relPathStr = String(relPath).trim();
+    if (
+      !relPathStr ||
+      path.isAbsolute(relPathStr) ||
+      relPathStr.includes("\0") ||
+      relPathStr.split(/[\\/]+/).includes("..")
+    ) {
+      return res.status(400).json({ error: "Invalid relPath" });
+    }
+    const root = movieMode
+      ? "/mnt/media/movies"
+      : errsMode
+        ? "/mnt/media/tv-errors"
+        : "/mnt/media/tv";
+    const rootPath = path.resolve(root);
+    const fullPath = path.resolve(rootPath, relPathStr);
+    if (!fullPath.startsWith(rootPath + path.sep)) {
+      return res.status(400).json({ error: "Invalid relPath" });
+    }
+    const { open, stat, readFile } = await import("node:fs/promises");
+    const st = await stat(fullPath);
+    if (!st.isFile()) {
+      return res.status(400).json({ error: "Not a file" });
+    }
+
+    const buf = Buffer.alloc(TEXT_PROBE_BYTES);
+    const fh = await open(fullPath, "r");
+    let bytesRead = 0;
+    try {
+      ({ bytesRead } = await fh.read(buf, 0, TEXT_PROBE_BYTES, 0));
+    } finally {
+      await fh.close();
+    }
+    let nonAscii = 0;
+    for (const b of buf.subarray(0, bytesRead)) {
+      if (!isAsciiByte(b)) nonAscii++;
+    }
+    const isText = nonAscii <= TEXT_PROBE_MAX_NON_ASCII;
+    const tooBig = st.size > TEXT_VIEW_MAX_BYTES;
+
+    if (probe || !isText || tooBig) {
+      return res.json({ size: st.size, isText, tooBig });
+    }
+    const content = await readFile(fullPath, "utf8");
+    res.json({ size: st.size, isText, tooBig, content });
+  } catch (err) {
+    unilog(1564, `textfile error: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const TOR_SENT_PATH = path.join(getApiMiscDir(), "tor-sent.json");
 
 function logRecentSent(action, details = {}) {

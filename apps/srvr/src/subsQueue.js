@@ -196,6 +196,11 @@ function appendAsrLog(line) {
   if (subsState.asrLogBuffer.length > ASR_LOG_BUFFER_MAX) {
     subsState.asrLogBuffer = subsState.asrLogBuffer.slice(-ASR_LOG_BUFFER_MAX);
   }
+  try {
+    fs.appendFileSync(SUBTITLE_LOG_PATH, line + "\n", "utf8");
+  } catch (e) {
+    unilog(1556, `subtitle.log append failed: ${e.message}`);
+  }
   notifyClients("asr-log", line);
   notifyAsrLogListeners(line);
 }
@@ -662,14 +667,10 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
       );
       subsState.genSrtChild = child;
       child.stdout.on("data", (d) => {
-        const line = d.toString().trimEnd();
-        unilog(517, line);
-        appendAsrLog(line);
+        appendAsrLog(d.toString().trimEnd());
       });
       child.stderr.on("data", (d) => {
-        const line = d.toString().trimEnd();
-        unilog(518, line);
-        appendAsrLog(line);
+        appendAsrLog(d.toString().trimEnd());
       });
       child.on("close", (code) => {
         subsState.genSrtChild = null;

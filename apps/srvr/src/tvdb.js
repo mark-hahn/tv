@@ -41,6 +41,9 @@ const TVDB_PIN = "HXEVSDFF";
 // 1 - (levenshtein / max-length) after collapsing to lower-case alpha chars.
 const REDDIT_SIMILARITY_MIN = 0.5; // reddit button kept if similarity > this
 const WIKI_SIMILARITY_MIN = 0.8; // wikipedia button kept if similarity > this
+// reddit rate-limits by IP and answers 403/429 when it wants us to stop.
+// After one of those, make no reddit requests at all for this long.
+const REDDIT_BLOCK_MS = 24 * 60 * 60 * 1000;
 const VERIFY_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
   "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36";
@@ -1059,11 +1062,19 @@ function redditNameFromHtml(html) {
 // www.reddit.com serves a JS-challenge wall to plain fetches; old.reddit does not
 const toOldReddit = (u) => u.replace(/:\/\/(www\.)?reddit\.com/, "://old.reddit.com");
 
+// Set when reddit answers 403/429; until this time no reddit request is made at
+// all. In memory only -- after a restart the first 403 re-arms it immediately.
+let redditBlockedUntilMs = 0;
+
 // Load the page for a wiki/reddit url and confirm it is really about `showName`.
-// A 404 means the article/subreddit does not exist (e.g. a banned sub) -> fail.
-// Other non-2xx (5xx/429) and unparseable pages are transient/inconclusive and
-// return true so a passing failure never hides an otherwise-good button.
+// Returns true (matches), false (definite mismatch, or a 404 meaning the article
+// /subreddit does not exist, e.g. a banned sub), or null when the check is
+// inconclusive (transient 5xx/429/403, unparseable page, network error). A null
+// must never be cached as a result -- the caller keeps the button and retries
+// later -- otherwise a rate-limit window silently stamps everything as verified.
 async function verifyRemoteName(kind, showName, url) {
+  // reddit told us to back off -- make no request at all until the block expires
+  if (kind === "reddit" && Date.now() < redditBlockedUntilMs) return null;
   try {
     const fetchUrl = kind === "reddit" ? toOldReddit(url) : url;
     // use global fetch (undici): old.reddit 403s the node-fetch client
@@ -1072,13 +1083,22 @@ async function verifyRemoteName(kind, showName, url) {
       redirect: "follow",
       signal: AbortSignal.timeout(15000),
     });
-    // transient server errors (5xx / 429 / 403) -> inconclusive, keep the button
-    if (!resp.ok && resp.status !== 404) return true;
+    // 403/429 from reddit = rate limited -> stop hitting it for 24h
+    if (kind === "reddit" && (resp.status === 403 || resp.status === 429)) {
+      redditBlockedUntilMs = Date.now() + REDDIT_BLOCK_MS;
+      unilog(1561, `reddit http=${resp.status} rate limited -- skipping all reddit checks for 24h`);
+      return null;
+    }
+    // transient server errors (5xx) -> inconclusive, keep the button
+    if (!resp.ok && resp.status !== 404) {
+      unilog(1562, `Skip ${kind}: show="${showName}" http=${resp.status} (inconclusive, button kept)`);
+      return null;
+    }
     const html = await resp.text();
     const pageName =
       kind === "reddit" ? redditNameFromHtml(html) : wikiNameFromHtml(html);
     // reachable 200 page we couldn't parse a name from -> inconclusive, keep
-    if (resp.ok && !pageName) return true;
+    if (resp.ok && !pageName) return null;
     const sim = pageName ? nameSimilarity(showName, pageName) : 0;
     const min = kind === "reddit" ? REDDIT_SIMILARITY_MIN : WIKI_SIMILARITY_MIN;
     // a 404 (banned/missing) can never pass, regardless of any parsed name
@@ -1093,7 +1113,7 @@ async function verifyRemoteName(kind, showName, url) {
     return pass;
   } catch (e) {
     unilog(1554, `verify ${kind} error for ${showName}: ${e.message}`);
-    return true; // inconclusive -> keep button
+    return null; // inconclusive -> keep button, do not cache a result
   }
 }
 
@@ -1156,12 +1176,13 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
   const parallelTasks = [];
 
   // Wikipedia + Reddit: build the url (cached or fresh), then verify the loaded
-  // page is really about this show before returning the button. Verification runs
-  // on both the fast and background paths (not gated by fast, unlike Rotten), but
-  // each url is only tested once: the true/false result is cached in the
-  // `${x}Verified` flat prop and persisted, so later calls reuse it without
-  // re-fetching. A url with no verified flag yet (legacy/unchecked) is still shown
-  // until its one test runs; only an explicit false hides the button.
+  // page is really about this show before returning the button. The true/false
+  // result is cached in the `${x}Verified` flat prop and persisted. On the fast
+  // path a url is tested only once and the stored result is reused; the
+  // background path (fast=false) re-checks every time regardless of what is
+  // stored, so a page that changed (sub banned, article renamed) is caught.
+  // A url with no verified flag yet is still shown until its first test runs;
+  // only an explicit false hides the button.
   const addVerifiedRemote = async ({
     kind,
     type,
@@ -1179,9 +1200,18 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
     }
     if (!url) return;
     flatUrls[urlKey] = url;
-    if (verified == null) {
-      verified = await verifyRemoteName(kind, name, url);
-      flatUrls[verifiedKey] = verified;
+    // fast=true: test once and reuse the stored result.
+    // fast=false (background): always re-check, even when a result is already
+    // stored, so a page that changed (sub banned, article renamed) is caught.
+    if (!fast || verified == null) {
+      const result = await verifyRemoteName(kind, name, url);
+      // null = inconclusive (rate limit / transient): keep whatever was stored
+      // and persist nothing, so it is re-checked later instead of being
+      // silently cached as verified.
+      if (result != null) {
+        verified = result;
+        flatUrls[verifiedKey] = result;
+      }
     }
     if (verified !== false) remotes.push({ name: buttonName, url });
   };

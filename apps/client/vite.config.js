@@ -119,6 +119,51 @@ function unilogSitesEndpoint() {
   };
 }
 
+// Dev-only endpoint reporting whether the laptop lid is closed. Asks Windows
+// (from WSL) for the Active flag of every attached panel; when nothing is
+// active the display is off, i.e. the lid is shut. Any failure reports
+// closed:false so callers stay silent rather than guessing.
+const POWERSHELL = "/mnt/c/WINDOWS/System32/WindowsPowerShell/v1.0/powershell.exe";
+const LID_QUERY =
+  "(Get-CimInstance -Namespace root\\wmi -ClassName WmiMonitorBasicDisplayParams" +
+  " -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Active) -join ','";
+const LID_TIMEOUT_MS = 5000;
+
+function lidStateEndpoint() {
+  return {
+    name: "lid-state-endpoint",
+    configureServer(server) {
+      server.middlewares.use("/__lid", async (req, res, next) => {
+        if (req.method !== "GET") return next();
+        res.setHeader("content-type", "application/json");
+        try {
+          const { execFile } = await import("node:child_process");
+          const stdout = await new Promise((resolve, reject) => {
+            execFile(
+              POWERSHELL,
+              ["-NoProfile", "-NonInteractive", "-Command", LID_QUERY],
+              { timeout: LID_TIMEOUT_MS },
+              (err, out) => (err ? reject(err) : resolve(out)),
+            );
+          });
+          const active = stdout
+            .trim()
+            .split(",")
+            .map((s) => s.trim().toLowerCase());
+          res.end(JSON.stringify({ closed: !active.includes("true") }));
+        } catch (err) {
+          res.end(
+            JSON.stringify({
+              closed: false,
+              error: String(err?.message || err),
+            }),
+          );
+        }
+      });
+    },
+  };
+}
+
 function consoleToFile() {
   return {
     name: "console-to-file",
@@ -165,6 +210,7 @@ export default defineConfig(({ command }) => ({
   plugins: [
     consoleToFile(),
     unilogSitesEndpoint(),
+    lidStateEndpoint(),
     vue(),
     ...(command === "serve"
       ? [Terminal({ console: "terminal", output: ["terminal", "console"] })]

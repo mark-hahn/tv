@@ -17,11 +17,11 @@
         flexDirection: 'column',
         overflow: 'hidden',
         flex:
-          showAsr || showEmb || showFix || showInfo || showOpn
+          showAsr || showEmb || showFix || showInfo || showOpn || showText
             ? '0 0 50%'
             : '1 1 auto',
         borderBottom:
-          showAsr || showEmb || showFix || showInfo || showOpn
+          showAsr || showEmb || showFix || showInfo || showOpn || showText
             ? '1px solid #ddd'
             : 'none',
       }"
@@ -197,6 +197,26 @@
               }"
             >
               Play
+            </button>
+
+            <button
+              @click="clickView"
+              :disabled="!viewReady"
+              title="View text file"
+              :style="{
+                cursor: viewReady ? 'pointer' : 'default',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg': !viewReady
+                  ? '#e8e8e8'
+                  : showText
+                    ? '#ddd'
+                    : 'whitesmoke',
+                color: viewReady ? 'inherit' : '#aaa',
+              }"
+            >
+              View
             </button>
 
             <button
@@ -506,6 +526,26 @@
               }"
             >
               Play
+            </button>
+
+            <button
+              @click="clickView"
+              :disabled="!viewReady"
+              title="View text file"
+              :style="{
+                cursor: viewReady ? 'pointer' : 'default',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg': !viewReady
+                  ? '#e8e8e8'
+                  : showText
+                    ? '#ddd'
+                    : 'whitesmoke',
+                color: viewReady ? 'inherit' : '#aaa',
+              }"
+            >
+              View
             </button>
 
             <button
@@ -1088,6 +1128,36 @@
       </div>
     </div>
 
+    <!-- Text View Pane -->
+    <div
+      id="textViewPane"
+      v-show="showText"
+      :style="{
+        flex: '1 1 50%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        backgroundColor: '#fafafa',
+        color: '#000',
+        fontFamily: 'monospace',
+        padding: '10px',
+        borderLeft: '1px solid #ddd',
+      }"
+    >
+      <div
+        style="
+          flex: 1 1 auto;
+          overflow: auto;
+          white-space: pre;
+          background-color: #fff;
+          border: 1px solid #eee;
+          padding: 4px;
+        "
+      >
+        {{ textLoading ? "Loading..." : textContent }}
+      </div>
+    </div>
+
     <!-- Info Pane -->
     <div
       id="infoPane"
@@ -1302,7 +1372,9 @@ import {
 import evtBus from "../evtBus.js";
 import * as util from "../util.js";
 import parseTorrentTitle from "parse-torrent-title";
-import { unilog } from "../log.js";
+import { unilog, logHere } from "../log.js";
+
+const TEXT_VIEW_MAX_BYTES = 2 * 1024 * 1024;
 
 // --- smartTitleMatch Helpers (copied from packages/share) ---
 
@@ -1379,6 +1451,12 @@ export default {
       infoMultiFiles: [], // [{name, meta}] for multi-file display
       infoMultiTitle: "", // common prefix of multi-file names
       infoMultiMeta: "", // aggregated size | oldest date | newest date
+
+      // Text view pane
+      showText: false,
+      textContent: "",
+      textLoading: false,
+      textProbeOk: false, // selected file passed the is-text probe
 
       // Toast
       toastMessage: "",
@@ -1506,6 +1584,22 @@ export default {
       if (this.selectedFolders.size > 0) return false;
       if (this.selectedFiles.size !== 1) return false;
       return !!this.resPairForRelPath([...this.selectedFiles][0]);
+    },
+    // relPath of the single selected file, or null
+    singleSelectedFile() {
+      if (this.selectedFolders.size > 0) return null;
+      if (this.selectedFiles.size !== 1) return null;
+      const relPath = [...this.selectedFiles][0];
+      const node = this.findNodeByPath(relPath);
+      if (!node || node.type !== "file") return null;
+      return relPath;
+    },
+    viewReady() {
+      const relPath = this.singleSelectedFile;
+      if (!relPath) return false;
+      const node = this.findNodeByPath(relPath);
+      if (node.size == null || node.size > TEXT_VIEW_MAX_BYTES) return false;
+      return this.textProbeOk;
     },
     infoLines() {
       if (!this.infoText) return [];
@@ -2235,6 +2329,7 @@ export default {
         this.showOpn = false;
         this.showFix = false;
         this.showInfo = false;
+        this.showText = false;
       }
     },
     async clearAsrLog() {
@@ -2391,6 +2486,7 @@ export default {
         this.showEmb = false;
         this.showOpn = false;
         this.showInfo = false;
+        this.showText = false;
         this.initFixState();
       } else {
         this.stopFixPolling();
@@ -2597,6 +2693,7 @@ export default {
         this.showOpn = false;
         this.showFix = false;
         this.showInfo = false;
+        this.showText = false;
       }
     },
     async applyEmb() {
@@ -2669,6 +2766,7 @@ export default {
         this.showEmb = false;
         this.showFix = false;
         this.showInfo = false;
+        this.showText = false;
       }
     },
     async applyOpn() {
@@ -2768,7 +2866,79 @@ export default {
       this.showEmb = false;
       this.showOpn = false;
       this.showFix = false;
+      this.showText = false;
       await this.loadInfo();
+    },
+    async clickView() {
+      if (this.showText) {
+        this.showText = false;
+        return;
+      }
+      if (!this.viewReady) return;
+      this.showText = true;
+      this.showAsr = false;
+      this.showEmb = false;
+      this.showOpn = false;
+      this.showFix = false;
+      this.showInfo = false;
+      await this.loadTextFile();
+    },
+    // probe:true asks only whether the file is viewable text
+    async fetchTextFile(relPath, probe) {
+      try {
+        const url = `${config.torrentsApiUrl}/api/local/textfile`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            relPath,
+            errsMode: this.errsMode,
+            movieMode: this.movieMode,
+            probe: !!probe,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        return data;
+      } catch (e) {
+        logHere({ lvl: "error" }, `textfile fetch failed: ${e.message}`);
+        return null;
+      }
+    },
+    // enable/disable the View button for the current selection
+    async probeTextFile() {
+      this.textProbeOk = false;
+      const relPath = this.singleSelectedFile;
+      const node = relPath ? this.findNodeByPath(relPath) : null;
+      if (!node || node.size == null || node.size > TEXT_VIEW_MAX_BYTES) {
+        this.showText = false;
+        return;
+      }
+      this._textPath = relPath;
+      const data = await this.fetchTextFile(relPath, true);
+      if (this._textPath !== relPath) return; // selection changed while fetching
+      this.textProbeOk = !!(data && data.isText && !data.tooBig);
+      if (!this.showText) return;
+      if (this.textProbeOk) await this.loadTextFile();
+      else this.showText = false;
+    },
+    async loadTextFile() {
+      const relPath = this.singleSelectedFile;
+      if (!relPath) {
+        this.showText = false;
+        return;
+      }
+      this.textContent = "";
+      this.textLoading = true;
+      this._textPath = relPath;
+      const data = await this.fetchTextFile(relPath, false);
+      if (this._textPath !== relPath) return; // selection changed while fetching
+      this.textLoading = false;
+      if (!data || data.content == null) {
+        this.showText = false;
+        return;
+      }
+      this.textContent = data.content;
     },
     // Collect all file paths from a selection (handles folders recursively)
     collectFilePaths() {
@@ -3108,6 +3278,10 @@ export default {
           this.refreshInfo();
         }, 300);
       }
+      if (this._textProbeTimer) clearTimeout(this._textProbeTimer);
+      this._textProbeTimer = setTimeout(() => {
+        this.probeTextFile();
+      }, 300);
     },
     async refreshInfo() {
       // Re-run loadInfo without toggling off

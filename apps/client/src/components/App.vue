@@ -2189,6 +2189,10 @@ export default {
     this._onAppWindowResize();
 
     this._onDelKey = (e) => {
+      if (e.key === "Enter" && this.missingEpWarning) {
+        this.missingEpWarning = null;
+        return;
+      }
       if (e.key !== "Delete") return;
       const tag = document.activeElement?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea") return;

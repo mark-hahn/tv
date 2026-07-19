@@ -262,7 +262,7 @@
         v-else
         style="
           padding: 10px;
-          font-size: 13px;
+          font-size: 15.6px;
           font-family: monospace;
           font-weight: normal;
         "

@@ -522,6 +522,9 @@ export function getUnilogEvents(params) {
 export function getUnilogOldestTs() {
   return httpCall("/api/unilog/oldest-ts", {}, "GET");
 }
+export function getUnilogPlotDays(plot) {
+  return httpCall("/api/unilog/plot-days", { plot }, "GET");
+}
 export function setUnilogSiteLevel(ids, level) {
   return httpCall("/api/unilog/set-level", { ids, level }, "POST");
 }

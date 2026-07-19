@@ -299,6 +299,11 @@
             style="width: 100%; height: 100%"
             :active="currentPane === 'log'"
           ></Log>
+          <Plot
+            v-show="!simpleMode && currentPane === 'plot'"
+            style="width: 100%; height: 100%"
+            :active="currentPane === 'plot'"
+          ></Plot>
           <Usb
             v-show="!simpleMode && currentPane === 'usb'"
             style="width: 100%; height: 100%"
@@ -547,6 +552,7 @@ import Down from "./down.vue";
 import Usb from "./usb.vue";
 import Local from "./local.vue";
 import Log from "./log.vue";
+import Plot from "./plot.vue";
 import Trailer from "./trailer.vue";
 import TvPane from "./tvpane.vue";
 import evtBus from "../evtBus.js";
@@ -584,6 +590,7 @@ export default {
     Down,
     Local,
     Log,
+    Plot,
     Trailer,
     TvPane,
     VideoPlayer,
@@ -927,6 +934,7 @@ export default {
         { label: "Down", key: "down" },
         { label: "Local", key: "local" },
         { label: "Log", key: "log" },
+        { label: "Plot", key: "plot" },
       ];
     },
 

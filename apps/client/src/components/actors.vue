@@ -2000,7 +2000,6 @@ export default {
       // Log summary with before/after counts
       const tvdbAfter = this.actors.filter((a) => a.source === "tvdb").length;
       const tmdbAfter = this.actors.filter((a) => a.source === "tmdb").length;
-      unilog(910, `${this.showName} | TVDB: ${mergeResult.tvdbBefore}, ${tvdbAfter} | TMDB: ${mergeResult.tmdbBefore}, ${tmdbAfter}`);
     },
   },
 

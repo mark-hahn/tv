@@ -586,6 +586,39 @@ export function getOldestTimestamp() {
 }
 
 // ---------------------------------------------------------------------------
+// Plot pane day-count queries. Each returns [{ day: "yyyy/mm/dd", count }]
+// ascending by day (PST prefix of ts). Counts include hidden/dedup rows — a
+// hidden event still represents a real download.
+// ---------------------------------------------------------------------------
+
+// Site in apps/down/src/tvJson.js (logTvEntryAdded, no-error branch): one
+// event per file queued for download from the usb server.
+const DOWN_ENTRY_LOG_ID = 1189;
+
+export function plotDayCounts(plot) {
+  if (plot === "down") {
+    return db
+      .prepare(
+        `SELECT substr(ts, 1, 10) AS day, COUNT(*) AS count
+           FROM log_events WHERE log_id = ? GROUP BY day ORDER BY day`,
+      )
+      .all(DOWN_ENTRY_LOG_ID);
+  }
+  if (plot === "flex") {
+    // Every SENT(first|better|upgrade-...) emitted by flexget.js.
+    return db
+      .prepare(
+        `SELECT substr(e.ts, 1, 10) AS day, COUNT(*) AS count
+           FROM log_events e JOIN log_sites s ON e.log_id = s.log_id
+          WHERE s.src_file LIKE '%flexget.js' AND e.message LIKE 'SENT(%'
+          GROUP BY day ORDER BY day`,
+      )
+      .all();
+  }
+  throw new Error(`unknown plot: ${plot}`);
+}
+
+// ---------------------------------------------------------------------------
 // Groups management (web client Groups pane).
 // tv-srvr is the single writer; all group_id allocation flows through here.
 // ---------------------------------------------------------------------------

@@ -825,7 +825,7 @@ export default {
         const body = await res.json();
         return body?.closed === true;
       } catch (e) {
-        logHere({ grp: "down" }, `lid state check failed: ${e?.message || e}`);
+        unilog(1567, `lid state check failed: ${e?.message || e}`);
         return false;
       }
     },

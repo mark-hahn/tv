@@ -2901,7 +2901,7 @@ export default {
         if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
         return data;
       } catch (e) {
-        logHere({ lvl: "error" }, `textfile fetch failed: ${e.message}`);
+        unilog(1568, `textfile fetch failed: ${e.message}`);
         return null;
       }
     },

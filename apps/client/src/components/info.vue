@@ -537,6 +537,14 @@ import * as urls from "../urls.js";
 
 let allTvdb = null;
 let cachedDiskShows = null;
+
+// Remote button display order; unlisted buttons sort just before "Official Website".
+const REMOTE_BUTTON_ORDER = ["Emby", "IMDB", "Rotten", "Google", "Wikipedia"];
+const remoteSortKey = (name) => {
+  if (name === "Official Website") return REMOTE_BUTTON_ORDER.length + 1;
+  const idx = REMOTE_BUTTON_ORDER.findIndex((prefix) => name?.startsWith(prefix));
+  return idx === -1 ? REMOTE_BUTTON_ORDER.length : idx;
+};
 export default {
   name: "Series",
 
@@ -1291,7 +1299,9 @@ export default {
           };
         };
 
-        this.remotes = results.map(normalizeImdbRemoteName);
+        this.remotes = results
+          .map(normalizeImdbRemoteName)
+          .sort((a, b) => remoteSortKey(a?.name) - remoteSortKey(b?.name));
         this.showRemotes = results.length > 0;
         // Reset fetch mode after use
         this.remoteFetchMode = "fast";

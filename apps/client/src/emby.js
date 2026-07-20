@@ -121,45 +121,7 @@ export async function loadAllShows() {
   // Ensure computed properties are set
   for (const rec of Object.values(allTvdb)) {
     if (!isTvdbShowRecord(rec)) continue;
-    if (!rec.name && rec.Name) rec.name = rec.Name;
-    if (!rec.tvdbId && rec.TvdbId) rec.tvdbId = rec.TvdbId;
-    if (!rec.id) rec.id = `noemby-${rec.tvdbId}`;
-    if (rec.genres && !Array.isArray(rec.genres)) rec.genres = [];
-    else if (rec.genres)
-      rec.genres = rec.genres.map((g) => (typeof g === "string" ? g : g.name));
-    if (rec.status === "Ended") rec.ended = true;
-    if (!rec.ratings)
-      rec.ratings =
-        rec.imdbRatings ||
-        rec.remotes?.find((r) => r.name?.startsWith("IMDB"))?.ratings ||
-        null;
-    if (rec.notReady === undefined) rec.notReady = rec.inEmby === false;
-    rec.watchGap = rec.watchGap || false;
-    rec.fileGap =
-      rec.fileGap || rec.fileEndError || rec.seasonWatchedThenNofile;
-    if (rec.inToTry === undefined) rec.inToTry = false;
-    if (rec.inContinue === undefined) rec.inContinue = false;
-    if (rec.inMark === undefined) rec.inMark = false;
-    if (rec.inLinda === undefined) rec.inLinda = false;
-    if (rec.anticipating === undefined) rec.anticipating = false;
-    if (rec.played === undefined) rec.played = false;
-    if (rec.playCount === undefined) rec.playCount = 0;
-    if (rec.date === undefined) rec.date = "2017-12-05";
-    if (rec.size === undefined) rec.size = 0;
-    if (rec.noFiles === undefined) rec.noFiles = false;
-    if (rec.episodeData === undefined) rec.episodeData = [];
-
-    // DEBUG Swiss Toni
-    if (rec.name === "Swiss Toni") {
-      void {
-        notReady: rec.notReady,
-        inEmby: rec.inEmby,
-        fileGap: rec.fileGap,
-        fileEndError: rec.fileEndError,
-        seasonWatchedThenNofile: rec.seasonWatchedThenNofile,
-        inToTry: rec.inToTry,
-      };
-    }
+    tvdb.applyComputedProps(rec);
   }
 
   const showRecords = Object.values(allTvdb).filter((r) => isTvdbShowRecord(r));
@@ -887,16 +849,11 @@ export const editEpisode = async (
       const episodeId = episodeRec.Id;
       userData.Played = setWatched !== null ? setWatched : !watched;
       const url = urls.postUserDataUrl(cred, episodeId);
-      const setDataRes = await axios({
+      await axios({
         method: "post",
         url: url,
         data: userData,
       });
-      // console.log("toggled watched", {
-      //               episode: `S${seasonNumber}E${episodeNumber}`,
-      //               post_url: url,
-      //               post_res: setDataRes
-      //             });
     }
   }
 };
@@ -1078,9 +1035,6 @@ export const getSeriesMap = async (show, prune = false) => {
           show.seasonWatchedThenNofile);
 
       const noFileVal = !path; // noFile is true when there's no path
-      if (show.name === "Pluribus" && unaired) {
-        unilog(854, `Pluribus S${seasonNumber}E${episodeNumber}: path=${path}, unaired=${unaired}, noFile=${noFileVal}, played=${played}, avail=${avail}`);
-      }
 
       episodes.push([
         episodeNumber,

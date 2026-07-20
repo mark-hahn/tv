@@ -1837,16 +1837,6 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   }
   const extResObj = await extRes.json();
 
-  // DEBUG: Log remoteIds for debugging
-  if (name.toLowerCase().includes("boomer")) {
-    unilog(738, `${name} - TVDB API remoteIds:`, extResObj.data?.remoteIds);
-    unilog(
-      739,
-      `${name} - Full extResObj.data:`,
-      JSON.stringify(extResObj.data, null, 2),
-    );
-  }
-
   const {
     firstAired,
     lastAired: lastAiredIn,
@@ -2222,6 +2212,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   tvdbData.haveSubs = paramObj.haveSubs ?? existing.haveSubs ?? false;
   tvdbData.anticipating =
     paramObj.anticipating ?? existing.anticipating ?? false;
+  tvdbData.sitcom = paramObj.sitcom ?? existing.sitcom ?? false;
   if (existing["last-downloaded"] !== undefined) {
     tvdbData["last-downloaded"] = existing["last-downloaded"];
   }

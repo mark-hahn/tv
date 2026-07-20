@@ -29,7 +29,7 @@ import {
   deleteUsbMovies,
   usbCpToken,
 } from "./usb.js";
-import { getLocalFiles, renameLocalFile, moveToTrial } from "./local.js";
+import { getLocalFiles, renameLocalFile } from "./local.js";
 import { enrichQbtStats } from "./qbt-stats.js";
 import {
   getBrowseShow,
@@ -1193,12 +1193,12 @@ app.get("/api/usb/cp-token", async (req, res) => {
 });
 
 app.post("/api/local/rename", async (req, res) => {
-  const { oldPath, newName, errsMode } = req.body || {};
+  const { oldPath, newName } = req.body || {};
   try {
     if (!oldPath || !newName) {
       return res.status(400).json({ error: "Missing oldPath or newName" });
     }
-    const result = await renameLocalFile(oldPath, newName, !!errsMode);
+    const result = await renameLocalFile(oldPath, newName);
     res.json(result);
   } catch (err) {
     const oldName =
@@ -1222,32 +1222,9 @@ app.get("/api/local/files", async (req, res) => {
   }
 });
 
-app.get("/api/local/error-files", async (req, res) => {
-  try {
-    const tree = await getLocalFiles("/mnt/media/tv-errors");
-    res.json(tree);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post("/api/local/move-to-trial", async (req, res) => {
-  try {
-    const { relPath } = req.body;
-    if (!relPath) {
-      return res.status(400).json({ error: "Missing relPath" });
-    }
-    const result = await moveToTrial(relPath);
-    res.json(result);
-  } catch (err) {
-    unilog(232, "move-to-trial error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
 app.post("/api/local/mediainfo", async (req, res) => {
   try {
-    const { relPath, errsMode, movieMode } = req.body;
+    const { relPath, movieMode } = req.body;
     if (!relPath) {
       return res.status(400).json({ error: "Missing relPath" });
     }
@@ -1260,11 +1237,7 @@ app.post("/api/local/mediainfo", async (req, res) => {
     ) {
       return res.status(400).json({ error: "Invalid relPath" });
     }
-    const root = movieMode
-      ? "/mnt/media/movies"
-      : errsMode
-        ? "/mnt/media/tv-errors"
-        : "/mnt/media/tv";
+    const root = movieMode ? "/mnt/media/movies" : "/mnt/media/tv";
     const rootPath = path.resolve(root);
     const fullPath = path.resolve(rootPath, relPathStr);
     if (!(fullPath === rootPath || fullPath.startsWith(rootPath + path.sep))) {
@@ -1338,7 +1311,7 @@ function isAsciiByte(b) {
 // probe:true returns only size/isText, used to enable the View button
 app.post("/api/local/textfile", async (req, res) => {
   try {
-    const { relPath, errsMode, movieMode, probe } = req.body;
+    const { relPath, movieMode, probe } = req.body;
     if (!relPath) {
       return res.status(400).json({ error: "Missing relPath" });
     }
@@ -1351,11 +1324,7 @@ app.post("/api/local/textfile", async (req, res) => {
     ) {
       return res.status(400).json({ error: "Invalid relPath" });
     }
-    const root = movieMode
-      ? "/mnt/media/movies"
-      : errsMode
-        ? "/mnt/media/tv-errors"
-        : "/mnt/media/tv";
+    const root = movieMode ? "/mnt/media/movies" : "/mnt/media/tv";
     const rootPath = path.resolve(root);
     const fullPath = path.resolve(rootPath, relPathStr);
     if (!fullPath.startsWith(rootPath + path.sep)) {

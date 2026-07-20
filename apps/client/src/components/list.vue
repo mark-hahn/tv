@@ -305,7 +305,7 @@ import * as tvdb from "../tvdb.js";
 import * as srvr from "../srvr.js";
 import * as util from "../util.js";
 import * as epd from "@tv/share";
-import { unilog } from "../log.js";
+import { unilog, logHere } from "../log.js";
 
 let _vipSet = new Set();
 srvr
@@ -426,6 +426,8 @@ export default {
       show.inToTry = !show.inToTry;
       try {
         await emby.saveToTry(show.id, show.inToTry, show.name);
+        // Mirror into the tvdb record now so pushes/other tabs agree
+        await srvr.setTvdbFields({ name: show.name, inToTry: show.inToTry });
       } catch (err) {
         unilog(952, "toggleToTry error:", err);
         show.inToTry = originalValue; // Revert on error
@@ -446,6 +448,20 @@ export default {
       }
     };
 
+    const toggleSitcom = async (show) => {
+      const originalValue = !!show.sitcom;
+      show.sitcom = !originalValue;
+      try {
+        await srvr.setTvdbFields({
+          name: show.name,
+          sitcom: show.sitcom,
+        });
+      } catch (e) {
+        logHere({ lvl: "error" }, `toggleSitcom error: ${e.message || e}`);
+        show.sitcom = originalValue;
+      }
+    };
+
     const toggleContinue = async (show) => {
       if (show.inEmby === false) {
         await toggleNoEmbyFlag(show, "inContinue");
@@ -456,6 +472,11 @@ export default {
       show.inContinue = !show.inContinue;
       try {
         await emby.saveContinue(show.id, show.inContinue, show.name);
+        // Mirror into the tvdb record now so pushes/other tabs agree
+        await srvr.setTvdbFields({
+          name: show.name,
+          inContinue: show.inContinue,
+        });
       } catch (err) {
         unilog(954, "toggleContinue error:", err);
         show.inContinue = originalValue; // Revert on error
@@ -472,6 +493,8 @@ export default {
       show.inMark = !show.inMark;
       try {
         await emby.saveMark(show.id, show.inMark, show.name);
+        // Mirror into the tvdb record now so pushes/other tabs agree
+        await srvr.setTvdbFields({ name: show.name, inMark: show.inMark });
       } catch (err) {
         unilog(955, "toggleMark error:", err);
         show.inMark = originalValue;
@@ -488,6 +511,8 @@ export default {
       show.inLinda = !show.inLinda;
       try {
         await emby.saveLinda(show.id, show.inLinda, show.name);
+        // Mirror into the tvdb record now so pushes/other tabs agree
+        await srvr.setTvdbFields({ name: show.name, inLinda: show.inLinda });
       } catch (err) {
         unilog(956, "toggleLinda error:", err);
         show.inLinda = originalValue; // Revert on error
@@ -519,12 +544,17 @@ export default {
           tvdbData.leftEmby = leftEmby;
           tvdbData.notReady = true;
         }
-        allTvdb[name] = await srvr.setTvdbFields({
+        const updated = await srvr.setTvdbFields({
           name,
           inEmby: false,
           leftEmby,
           notReady: true,
         });
+        // Merge in place so the allShows entry (same object) stays current
+        if (updated && typeof updated === "object") {
+          if (tvdbData) tvdb.mergeTvdbRecord(tvdbData, updated);
+          else allTvdb[name] = tvdb.applyComputedProps(updated);
+        }
         // Capture the next visible show before refilter removes this one from the list.
         const delIdx = this.shows.findIndex((s) => s.id == show.id);
         const nextShow =
@@ -576,7 +606,6 @@ export default {
       currentPlayingSeason: null,
       currentPlayingEpisode: null,
       nowPlayingShowNames: new Set(),
-      sitcomsSet: new Set(),
       sortChoice: "Viewed",
       reversed: false,
       fltrChoice: "All",
@@ -614,7 +643,6 @@ export default {
         "Watching",
         "Finished",
         "Playing",
-        "Sitcoms",
         "Position",
       ],
       conds: [
@@ -678,6 +706,18 @@ export default {
           },
           click() {},
           name: "drama",
+        },
+        {
+          color: "lime",
+          filter: 0,
+          icon: ["far", "laugh-beam"],
+          cond(show) {
+            return !!show.sitcom;
+          },
+          async click(show) {
+            await toggleSitcom(show);
+          },
+          name: "sitcom",
         },
         {
           color: "#88f",
@@ -895,8 +935,13 @@ export default {
       // Load full dataset
       const additionalShows = await tvdb.getAllTvdb(0);
 
-      // Merge into allTvdb
-      Object.assign(allTvdb, additionalShows);
+      // Merge into allTvdb — in place for records we already hold so the
+      // allShows entries (same objects) stay current
+      for (const [recName, rec] of Object.entries(additionalShows)) {
+        const existing = allTvdb[recName];
+        if (existing && existing !== rec) tvdb.mergeTvdbRecord(existing, rec);
+        else if (!existing) allTvdb[recName] = rec;
+      }
 
       // Add to allShows array, avoiding duplicates
       const additionalShowsArray = Object.values(additionalShows);
@@ -2702,28 +2747,6 @@ export default {
       this.seriesMapEpis = seriesMapEpis.filter((x) => x !== null);
       this.seriesMap = seriesMap;
 
-      // Debug aid: detect cells that will render blank because no episode object exists.
-      const blankCells = [];
-      for (const season of this.seriesMapSeasons) {
-        for (const episode of this.seriesMapEpis) {
-          if (!this.seriesMap?.[season]?.[episode]) {
-            blankCells.push(`S${season}E${episode}`);
-            if (blankCells.length >= 12) break;
-          }
-        }
-        if (blankCells.length >= 12) break;
-      }
-      if (blankCells.length > 0) {
-        // console.warn("[map-debug] blank map cells", {
-        //   show: this.mapShow?.name,
-        //   inEmby: this.mapShow?.inEmby !== false,
-        //   tvdbId: this.mapShow?.tvdbId || this.mapShow?.tvdbId || null,
-        //   seasons: this.seriesMapSeasons.length,
-        //   episodes: this.seriesMapEpis.length,
-        //   sampleBlankCells: blankCells,
-        // });
-      }
-
       this.hideMapBottom = false;
 
       // If a newer seriesMapAction started while we were loading, discard this stale result
@@ -2915,13 +2938,6 @@ export default {
       if (this.fltrChoice === "Playing") {
         const playing = this.nowPlayingShowNames;
         this.shows = allShows.filter((show) => playing.has(show.name));
-        this.sortShows();
-        if (scroll) this.scrollToSavedShow();
-        return;
-      }
-
-      if (this.fltrChoice === "Sitcoms") {
-        this.shows = allShows.filter((show) => this.sitcomsSet.has(show.name));
         this.sortShows();
         if (scroll) this.scrollToSavedShow();
         return;
@@ -3339,15 +3355,6 @@ export default {
       allTvdb = result.allTvdb;
       this.hasLoadedAllShows = true;
 
-      // Load sitcoms list
-      try {
-        const sitcoms = await srvr.getSitcoms();
-        this.sitcomsSet = new Set(sitcoms);
-      } catch (err) {
-        unilog(993, "Failed to load sitcoms list:", err);
-        this.sitcomsSet = new Set();
-      }
-
       if (!allShows) {
         unilog(1084, "No shows from loadAllShows");
         return;
@@ -3450,9 +3457,7 @@ export default {
           this.hasLoadedAllShows ? 0 : 1,
         );
         const show = allShows.find((s) => s.name === showName);
-        const showTvdbId = String(
-          show?.tvdbId || show?.tvdbId || show?.tvdb_id || "",
-        ).trim();
+        const showTvdbId = String(show?.tvdbId || show?.tvdb_id || "").trim();
         const tvdbRecord = tvdb.getTvdbRecordByNameOrId(
           updatedTvdb,
           showName,
@@ -3464,44 +3469,14 @@ export default {
           return;
         }
 
-        // Update the show in allShows
+        // Merge the full record IN PLACE (see tvdbUpdated handler)
         if (show) {
-          // Update disk-related fields
-          if (tvdbRecord.diskMaxDate !== undefined) {
-            show.diskMaxDate = tvdbRecord.diskMaxDate;
-          }
-          if (tvdbRecord.diskSize !== undefined) {
-            show.diskSize = tvdbRecord.diskSize;
-          }
-
-          // Update gap-related fields
-          show.notReady = tvdbRecord.notReady;
-          show.anyWatched = tvdbRecord.anyWatched;
-          show.watchGap = tvdbRecord.watchGap;
-          show.watchGapSeason = tvdbRecord.watchGapSeason;
-          show.watchGapEpisode = tvdbRecord.watchGapEpisode;
-          show.fileGap = tvdbRecord.fileGap;
-          show.fileGapSeason = tvdbRecord.fileGapSeason;
-          show.fileGapEpisode = tvdbRecord.fileGapEpisode;
-          show.fileEndError = tvdbRecord.fileEndError;
-          show.seasonWatchedThenNofile = tvdbRecord.seasonWatchedThenNofile;
-
-          // Update computed fields (uppercase properties)
-          show.watchGap = show.watchGap;
-          show.fileGap =
-            show.fileGap || show.fileEndError || show.seasonWatchedThenNofile;
-          if (tvdbRecord.episodeData !== undefined) {
-            show.episodeData = tvdbRecord.episodeData;
-          }
-          show.needsIntro = tvdbRecord.needsIntro ?? false;
-          show.anticipating = tvdbRecord.anticipating ?? false;
+          tvdb.mergeTvdbRecord(show, tvdbRecord);
+          if (allTvdb) allTvdb[show.name] = show;
           evtBus.emit(
             "intro-count",
             allShows.filter((s) => s.needsIntro).length,
           );
-
-          // Update allTvdb cache
-          tvdb.upsertTvdbCacheRecord(allTvdb, tvdbRecord, showName);
 
           // If this show is currently displayed on the map, refresh it
           if (this.mapShow && this.mapShow.name === showName) {
@@ -3646,50 +3621,21 @@ export default {
       }
       if (!allTvdb || !allShows) return; // loadAllShows not yet complete, ignore early push
       try {
-        // Apply computed props to the pushed record
-        record.watchGap = record.watchGap || false;
-        record.watchGapSeason = record.watchGapSeason;
-        record.watchGapEpisode = record.watchGapEpisode;
-        record.fileGap =
-          record.fileGap ||
-          record.fileEndError ||
-          record.seasonWatchedThenNofile;
-
-        // Merge fields into the existing show in allShows
+        // Merge the full pushed record IN PLACE so the allTvdb map and the
+        // allShows array keep sharing one object — no field whitelist.
         const show = allShows.find((s) => s.name === name);
         if (show) {
-          show.notReady = record.notReady;
-          show.anyWatched = record.anyWatched;
-          show.watchGap = record.watchGap;
-          show.watchGapSeason = record.watchGapSeason;
-          show.watchGapEpisode = record.watchGapEpisode;
-          show.fileGap = record.fileGap;
-          show.fileGapSeason = record.fileGapSeason;
-          show.fileGapEpisode = record.fileGapEpisode;
-          show.fileEndError = record.fileEndError;
-          show.seasonWatchedThenNofile = record.seasonWatchedThenNofile;
-          show.watchGap = record.watchGap;
-          show.watchGapSeason = record.watchGapSeason;
-          show.watchGapEpisode = record.watchGapEpisode;
-          show.fileGap = record.fileGap;
-          show.needsIntro = record.needsIntro ?? false;
-          show.anticipating = record.anticipating ?? false;
-          if ("episodeData" in record) show.episodeData = record.episodeData;
+          tvdb.mergeTvdbRecord(show, record);
+          allTvdb[name] = show; // heal identity if the map had diverged
           evtBus.emit(
             "intro-count",
             allShows.filter((s) => s.needsIntro).length,
           );
-          show.notReady = record.notReady;
-          show.date = record.date ?? show.date;
-          show.size = record.size ?? show.size;
-          show.noFiles = record.noFiles ?? show.noFiles;
-          show.waitStr = record.waitStr ?? show.waitStr;
-          if ("introDur" in record) show.introDur = record.introDur;
-          if ("seasonIntros" in record) show.seasonIntros = record.seasonIntros;
+        } else if (allTvdb[name]) {
+          tvdb.mergeTvdbRecord(allTvdb[name], record);
+        } else {
+          allTvdb[name] = tvdb.applyComputedProps(record);
         }
-
-        // Update allTvdb reference
-        allTvdb[name] = record;
 
         // If this show is currently in the map pane, rebuild the series map.
         // The pushed record already carries fresh episodeData (the server

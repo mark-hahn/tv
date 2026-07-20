@@ -506,13 +506,6 @@ export default {
     onTvdbDataReady(data) {
       this.checkedRemotes = true;
       const tvdbData = data?.tvdbData;
-      void {
-        hasData: !!tvdbData,
-        imdbUrl: tvdbData?.imdbUrl,
-        imdbId: tvdbData?.imdbId,
-        rottenUrl: tvdbData?.rottenUrl,
-        remotesLen: tvdbData?.remotes?.length,
-      };
 
       if (tvdbData) {
         // First try the runtime-built remotes array (populated when show is freshly fetched)

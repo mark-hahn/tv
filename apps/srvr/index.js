@@ -773,12 +773,6 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         showName,
         tvdbRecord,
       );
-      if (showName === "Swiss Toni") {
-        unilog(
-          540,
-          `gapData=${JSON.stringify(gapData)} tvdbRecord.notReady=${tvdbRecord.notReady}`,
-        );
-      }
       if (gapData) {
         const gapFields = [
           "watchGap",
@@ -1487,24 +1481,6 @@ app.post(
     } catch (err) {
       unilog(573, "error:", err);
       return { success: false, error: err.message };
-    }
-  }),
-);
-
-app.get(
-  "/api/getSitcoms",
-  apiWrapper(async () => {
-    try {
-      const filePath = "/root/dev/apps/tv/sitcoms.txt";
-      const content = await fsp.readFile(filePath, "utf8");
-      const sitcoms = content
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean);
-      return { success: true, sitcoms };
-    } catch (err) {
-      unilog(574, "error:", err);
-      return { success: false, error: err.message, sitcoms: [] };
     }
   }),
 );
@@ -3703,9 +3679,6 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
     const gapData = await emby.gapCheckBatch(shows);
     for (const { showId, showName } of shows) {
       const g = gapData?.[showId];
-      if (showName === "Swiss Toni") {
-        unilog(662, `showId=${showId} g=${JSON.stringify(g)}`);
-      }
       if (g) {
         appendWatchgapLog(
           `  ${showName}: notReady=${g.notReady} fileGap=${g.fileGap} anyWatched=${g.anyWatched}${g.fileEndError ? " fileEndError=true" : ""}${g.seasonWatchedThenNofile ? " sWTNF=true" : ""}`,

@@ -775,7 +775,6 @@ export default {
       const recordId = String(record.tvdbId || record.tvdb_id || "").trim();
       const matches =
         name === curName || (curId && recordId && curId === recordId);
-      void (name, matches, selectedTitleIdx.value, titleStrings.value.length);
       if (!matches) return;
       _lastRemotesKey.value = "";
       await loadRemotesForTvdb(cur);
@@ -828,7 +827,6 @@ export default {
       const max = Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0));
       const before = el.scrollTop || 0;
       el.scrollTop = Math.max(0, Math.min(max, before + scaledDy));
-      void (dy, before, el.scrollTop, max);
     };
 
     const NO_MORE_ENTRY = "msg|-- no more titles --";
@@ -1929,9 +1927,6 @@ export default {
             justFetchedNext.value ||
             selectedTitleIdx.value >= titleStrings.value.length - 2
           ) {
-            void (justFetchedNext.value,
-            selectedTitleIdx.value,
-            titleStrings.value.length);
             titlesPane.value.scrollTop = titlesPane.value.scrollHeight + 1000;
             justFetchedNext.value = false;
           }

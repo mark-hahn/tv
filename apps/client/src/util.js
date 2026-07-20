@@ -219,6 +219,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.ended = 0;
       tmp.waiting = 0;
       tmp.drama = 0;
+      tmp.sitcom = 0;
       tmp.foreign = 0;
       tmp.totry = 0;
       tmp.continue = 0;
@@ -237,6 +238,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.ended = 0;
       tmp.waiting = -1;
       tmp.drama = 1;
+      tmp.sitcom = 0;
       tmp.foreign = 0;
       tmp.totry = 1;
       tmp.continue = 0;
@@ -254,6 +256,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.ended = 0;
       tmp.waiting = -1;
       tmp.drama = 0;
+      tmp.sitcom = 0;
       tmp.foreign = 0;
       tmp.totry = -1;
       tmp.continue = -1;
@@ -271,6 +274,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.ended = 0;
       tmp.waiting = 0;
       tmp.drama = 0;
+      tmp.sitcom = 0;
       tmp.foreign = 0;
       tmp.totry = 0;
       tmp.continue = 0;

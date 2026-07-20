@@ -84,11 +84,61 @@ const fetchAllTvdbWithRetry = async (hasEmby = 0) => {
   throw lastErr;
 };
 
+// Computed/default props applied to every tvdb show record on the client.
+// Must be re-applied after merging a fresh server record (mergeTvdbRecord
+// does this automatically).
+export const applyComputedProps = (rec) => {
+  if (!rec.name && rec.Name) rec.name = rec.Name;
+  if (!rec.tvdbId && rec.TvdbId) rec.tvdbId = rec.TvdbId;
+  if (!rec.id) rec.id = `noemby-${rec.tvdbId}`;
+  if (rec.genres && !Array.isArray(rec.genres)) rec.genres = [];
+  else if (rec.genres)
+    rec.genres = rec.genres.map((g) => (typeof g === "string" ? g : g.name));
+  if (rec.status === "Ended") rec.ended = true;
+  if (!rec.ratings)
+    rec.ratings =
+      rec.imdbRatings ||
+      rec.remotes?.find((r) => r.name?.startsWith("IMDB"))?.ratings ||
+      null;
+  if (rec.notReady === undefined) rec.notReady = rec.inEmby === false;
+  rec.watchGap = rec.watchGap || false;
+  rec.fileGap = rec.fileGap || rec.fileEndError || rec.seasonWatchedThenNofile;
+  if (rec.inToTry === undefined) rec.inToTry = false;
+  if (rec.inContinue === undefined) rec.inContinue = false;
+  if (rec.inMark === undefined) rec.inMark = false;
+  if (rec.inLinda === undefined) rec.inLinda = false;
+  if (rec.anticipating === undefined) rec.anticipating = false;
+  if (rec.sitcom === undefined) rec.sitcom = false;
+  if (rec.played === undefined) rec.played = false;
+  if (rec.playCount === undefined) rec.playCount = 0;
+  if (rec.date === undefined) rec.date = "2017-12-05";
+  if (rec.size === undefined) rec.size = 0;
+  if (rec.noFiles === undefined) rec.noFiles = false;
+  if (rec.episodeData === undefined) rec.episodeData = [];
+  return rec;
+};
+
+// Merge a full server record into an existing client record IN PLACE so that
+// every reference to the object (allTvdb map, allShows array, this.shows)
+// sees the fresh data — never replace the object. Keys missing from the
+// incoming record were deleted server-side, so drop them.
+export const mergeTvdbRecord = (target, record) => {
+  if (target !== record) {
+    for (const key of Object.keys(target)) {
+      if (!(key in record)) delete target[key];
+    }
+    Object.assign(target, record);
+  }
+  return applyComputedProps(target);
+};
+
 // Apply a server-pushed tvdb record into the client allTvdb cache.
 // Called by components that listen for tvdbUpdated socket events.
 export const applyTvdbPush = (name, record) => {
   if (!allTvdb || !name || !record) return;
-  allTvdb[name] = record;
+  const existing = allTvdb[name];
+  if (existing) mergeTvdbRecord(existing, record);
+  else allTvdb[name] = applyComputedProps(record);
 };
 
 export const clearCache = () => {
@@ -147,7 +197,9 @@ export const upsertTvdbCacheRecord = (tvdbMap, tvdbData, preferredKey = "") => {
     tvdbData = { ...tvdbData, remotes: existing.remotes };
   }
 
-  tvdbMap[targetKey] = tvdbData;
+  // Merge in place so references held elsewhere (allShows) stay current
+  if (existing) mergeTvdbRecord(existing, tvdbData);
+  else tvdbMap[targetKey] = applyComputedProps(tvdbData);
 
   if (recordId) {
     for (const key of Object.keys(tvdbMap)) {

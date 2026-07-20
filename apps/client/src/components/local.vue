@@ -74,57 +74,39 @@
             </button>
 
             <button
-              @click="errsMode || clickEmb()"
-              :disabled="errsMode"
+              @click="clickEmb"
               :style="{
-                cursor: errsMode ? 'default' : 'pointer',
+                cursor: 'pointer',
                 borderRadius: '7px',
                 padding: '4px 10px',
                 border: '1px solid #bbb',
-                backgroundColor: errsMode
-                  ? '#e8e8e8'
-                  : showEmb
-                    ? '#ddd'
-                    : 'whitesmoke',
-                color: errsMode ? '#aaa' : 'inherit',
+                backgroundColor: showEmb ? '#ddd' : 'whitesmoke',
               }"
             >
               EmbSub
             </button>
 
             <button
-              @click="errsMode || clickOpn()"
-              :disabled="errsMode"
+              @click="clickOpn"
               :style="{
-                cursor: errsMode ? 'default' : 'pointer',
+                cursor: 'pointer',
                 borderRadius: '7px',
                 padding: '4px 10px',
                 border: '1px solid #bbb',
-                backgroundColor: errsMode
-                  ? '#e8e8e8'
-                  : showOpn
-                    ? '#ddd'
-                    : 'whitesmoke',
-                color: errsMode ? '#aaa' : 'inherit',
+                backgroundColor: showOpn ? '#ddd' : 'whitesmoke',
               }"
             >
               OpnSub
             </button>
 
             <button
-              @click="errsMode || clickAsr()"
-              :disabled="errsMode"
+              @click="clickAsr"
               :style="{
-                cursor: errsMode ? 'default' : 'pointer',
+                cursor: 'pointer',
                 borderRadius: '7px',
                 padding: '4px 10px',
                 border: '1px solid #bbb',
-                backgroundColor: errsMode
-                  ? '#e8e8e8'
-                  : showAsr
-                    ? '#ddd'
-                    : 'whitesmoke',
-                color: errsMode ? '#aaa' : 'inherit',
+                backgroundColor: showAsr ? '#ddd' : 'whitesmoke',
               }"
             >
               Asr
@@ -157,24 +139,6 @@
               }"
             >
               Res
-            </button>
-
-            <button
-              @click="moveSelected"
-              :disabled="!errsMode || loading || selectedFiles.size === 0"
-              title="Move selected error file to Trial &amp; Error"
-              :style="{
-                cursor:
-                  errsMode && selectedFiles.size > 0 ? 'pointer' : 'default',
-                borderRadius: '7px',
-                padding: '4px 10px',
-                border: '1px solid #bbb',
-                '--btn-bg':
-                  errsMode && selectedFiles.size > 0 ? 'whitesmoke' : '#e8e8e8',
-                color: errsMode && selectedFiles.size > 0 ? 'inherit' : '#aaa',
-              }"
-            >
-              Move
             </button>
 
             <button
@@ -274,41 +238,35 @@
               >Sel: {{ selectedFiles.size }}</span
             >
             <button
-              @click="errsMode || toShow()"
-              :disabled="
-                errsMode || (!selectedName && selectedFiles.size === 0)
-              "
+              @click="toShow"
+              :disabled="!selectedName && selectedFiles.size === 0"
               :style="{
                 cursor:
-                  !errsMode && (selectedName || selectedFiles.size > 0)
+                  selectedName || selectedFiles.size > 0
                     ? 'pointer'
                     : 'default',
                 borderRadius: '7px',
                 padding: '4px 10px',
                 border: '1px solid #bbb',
                 '--btn-bg':
-                  !errsMode && (selectedName || selectedFiles.size > 0)
+                  selectedName || selectedFiles.size > 0
                     ? 'whitesmoke'
                     : '#e8e8e8',
                 color:
-                  !errsMode && (selectedName || selectedFiles.size > 0)
-                    ? 'inherit'
-                    : '#aaa',
+                  selectedName || selectedFiles.size > 0 ? 'inherit' : '#aaa',
               }"
             >
               Sel
             </button>
 
             <button
-              @click="errsMode || selectTopLevel()"
-              :disabled="errsMode"
+              @click="selectTopLevel"
               :style="{
-                cursor: errsMode ? 'default' : 'pointer',
+                cursor: 'pointer',
                 borderRadius: '7px',
                 padding: '4px 10px',
                 border: '1px solid #bbb',
-                '--btn-bg': errsMode ? '#e8e8e8' : 'whitesmoke',
-                color: errsMode ? '#aaa' : 'inherit',
+                '--btn-bg': 'whitesmoke',
               }"
             >
               From
@@ -334,19 +292,6 @@
               }"
             >
               First
-            </button>
-
-            <button
-              @click="toggleErrs"
-              :style="{
-                cursor: 'pointer',
-                borderRadius: '7px',
-                padding: '4px 10px',
-                border: '1px solid #bbb',
-                '--btn-bg': errsMode ? 'lightgray' : 'whitesmoke',
-              }"
-            >
-              Errs
             </button>
 
             <button
@@ -428,57 +373,39 @@
             </button>
 
             <button
-              @click="errsMode || clickEmb()"
-              :disabled="errsMode"
+              @click="clickEmb"
               :style="{
-                cursor: errsMode ? 'default' : 'pointer',
+                cursor: 'pointer',
                 borderRadius: '7px',
                 padding: '4px 10px',
                 border: '1px solid #bbb',
-                backgroundColor: errsMode
-                  ? '#e8e8e8'
-                  : showEmb
-                    ? '#ddd'
-                    : 'whitesmoke',
-                color: errsMode ? '#aaa' : 'inherit',
+                backgroundColor: showEmb ? '#ddd' : 'whitesmoke',
               }"
             >
               EmbSub
             </button>
 
             <button
-              @click="errsMode || clickOpn()"
-              :disabled="errsMode"
+              @click="clickOpn"
               :style="{
-                cursor: errsMode ? 'default' : 'pointer',
+                cursor: 'pointer',
                 borderRadius: '7px',
                 padding: '4px 10px',
                 border: '1px solid #bbb',
-                backgroundColor: errsMode
-                  ? '#e8e8e8'
-                  : showOpn
-                    ? '#ddd'
-                    : 'whitesmoke',
-                color: errsMode ? '#aaa' : 'inherit',
+                backgroundColor: showOpn ? '#ddd' : 'whitesmoke',
               }"
             >
               OpnSub
             </button>
 
             <button
-              @click="errsMode || clickAsr()"
-              :disabled="errsMode"
+              @click="clickAsr"
               :style="{
-                cursor: errsMode ? 'default' : 'pointer',
+                cursor: 'pointer',
                 borderRadius: '7px',
                 padding: '4px 10px',
                 border: '1px solid #bbb',
-                backgroundColor: errsMode
-                  ? '#e8e8e8'
-                  : showAsr
-                    ? '#ddd'
-                    : 'whitesmoke',
-                color: errsMode ? '#aaa' : 'inherit',
+                backgroundColor: showAsr ? '#ddd' : 'whitesmoke',
               }"
             >
               Asr
@@ -1438,9 +1365,6 @@ export default {
       subsPending: [],
       subsProgressChannel: null,
 
-      // Errs mode
-      errsMode: false,
-
       // Info pane
       showInfo: false,
       infoText: "",
@@ -1580,7 +1504,6 @@ export default {
       );
     },
     resToggleReady() {
-      if (this.errsMode) return false;
       if (this.selectedFolders.size > 0) return false;
       if (this.selectedFiles.size !== 1) return false;
       return !!this.resPairForRelPath([...this.selectedFiles][0]);
@@ -1740,9 +1663,7 @@ export default {
       try {
         const endpoint = this.movieMode
           ? "/api/local/movies"
-          : this.errsMode
-            ? "/api/local/error-files"
-            : "/api/local/files";
+          : "/api/local/files";
         const url = `${config.torrentsApiUrl}${endpoint}`;
         const res = await fetch(url);
         if (!res.ok) {
@@ -1961,7 +1882,7 @@ export default {
         const res = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ oldPath, newName, errsMode: this.errsMode }),
+          body: JSON.stringify({ oldPath, newName }),
         });
         if (!res.ok) {
           const txt = await res.text();
@@ -2134,9 +2055,7 @@ export default {
       try {
         const root = this.movieMode
           ? "/mnt/media/movies"
-          : this.errsMode
-            ? "/mnt/media/tv-errors"
-            : "/mnt/media/tv";
+          : "/mnt/media/tv";
         for (const relPath of pathsToDelete) {
           const fullPath = `${root}/${relPath}`;
           await deletePath(fullPath);
@@ -2257,7 +2176,7 @@ export default {
     getSiblings(parentPath) {
       // Traverse tree to find the array of children for this path
       // parentPath e.g. "ShowName/Season 1"
-      if (!parentPath) return this.tree; // depth-0 items (errs mode)
+      if (!parentPath) return this.tree; // depth-0 items
       const parts = parentPath.split("/");
       // First part is top level
       let current = this.tree.find((n) => n.name === parts[0]);
@@ -2274,9 +2193,7 @@ export default {
     clickPlay() {
       const mediaRoot = this.movieMode
         ? "/mnt/media/movies"
-        : this.errsMode
-          ? "/mnt/media/tv-errors"
-          : "/mnt/media/tv";
+        : "/mnt/media/tv";
       const videoPath = this.collectFilePaths()
         .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
         .map((p) => `${mediaRoot}/${p}`)[0];
@@ -2286,9 +2203,7 @@ export default {
     clickSubs() {
       const mediaRoot = this.movieMode
         ? "/mnt/media/movies"
-        : this.errsMode
-          ? "/mnt/media/tv-errors"
-          : "/mnt/media/tv";
+        : "/mnt/media/tv";
       const videoPaths = this.collectFilePaths()
         .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
         .map((p) => `${mediaRoot}/${p}`);
@@ -2339,9 +2254,7 @@ export default {
     async startAsr() {
       const mediaRoot = this.movieMode
         ? "/mnt/media/movies"
-        : this.errsMode
-          ? "/mnt/media/tv-errors"
-          : "/mnt/media/tv";
+        : "/mnt/media/tv";
       const videoPaths = this.collectFilePaths()
         .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
         .map((p) => `${mediaRoot}/${p}`);
@@ -2708,9 +2621,7 @@ export default {
       try {
         const mediaRoot = this.movieMode
           ? "/mnt/media/movies"
-          : this.errsMode
-            ? "/mnt/media/tv-errors"
-            : "/mnt/media/tv";
+          : "/mnt/media/tv";
         const videoPaths = this.collectFilePaths()
           .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
           .map((p) => `${mediaRoot}/${p}`);
@@ -2773,9 +2684,7 @@ export default {
       if (this.opnBusy) return;
       const mediaRoot = this.movieMode
         ? "/mnt/media/movies"
-        : this.errsMode
-          ? "/mnt/media/tv-errors"
-          : "/mnt/media/tv";
+        : "/mnt/media/tv";
       const videoPaths = this.collectFilePaths()
         .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
         .map((p) => `${mediaRoot}/${p}`);
@@ -2800,17 +2709,6 @@ export default {
     clearOpn() {
       this.opnResults = [];
       this.opnSearched = false;
-    },
-    toggleErrs() {
-      this.errsMode = !this.errsMode;
-      if (this.errsMode) {
-        this.showAsr = false;
-        this.showOpn = false;
-        this.showInfo = false;
-      }
-      this.selectedName = null;
-      this.selectedFiles = new Set();
-      this.fetchFiles();
     },
     async badGrpClick() {
       // Check if exactly one file is selected
@@ -2892,7 +2790,6 @@ export default {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             relPath,
-            errsMode: this.errsMode,
             movieMode: this.movieMode,
             probe: !!probe,
           }),
@@ -3023,7 +2920,6 @@ export default {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               relPath,
-              errsMode: this.errsMode,
               movieMode: this.movieMode,
             }),
           });
@@ -3103,7 +2999,6 @@ export default {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 relPath,
-                errsMode: this.errsMode,
                 movieMode: this.movieMode,
               }),
             });
@@ -3218,57 +3113,6 @@ export default {
         }
 
         this.infoLoading = false;
-      }
-    },
-    async moveSelected() {
-      if (!this.errsMode || this.selectedFiles.size === 0) return;
-      const relPath = Array.from(this.selectedFiles)[0];
-      this.loading = true;
-      try {
-        const url = `${config.torrentsApiUrl}/api/local/move-to-trial`;
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ relPath }),
-        });
-        if (!res.ok) {
-          const txt = await res.text();
-          throw new Error(`HTTP ${res.status}: ${txt}`);
-        }
-        // Select Trial & Error in the shows list first
-        this.$emit("select-show", "Trial & Error");
-        // Exit errs mode and refresh local pane
-        this.errsMode = false;
-        this.selectedName = null;
-        this.selectedFiles = new Set();
-        await this.fetchFiles();
-        // Switch back to local pane (select-show may have navigated away)
-        evtBus.emit("showLocalPane");
-        // Expand and show Trial & Error/Season 1
-        const trialFolder = this.tree.find((n) => n.name === "Trial & Error");
-        if (trialFolder) {
-          this.selectedName = trialFolder.name;
-          this.$nextTick(() => {
-            this.nodeRefs.forEach((cmp, name) => {
-              if (name !== "Trial & Error") {
-                if (typeof cmp.collapse === "function") cmp.collapse();
-              } else {
-                if (typeof cmp.expand === "function") cmp.expand();
-              }
-            });
-            this.$nextTick(() => {
-              const cmp = this.nodeRefs.get("Trial & Error");
-              if (cmp && cmp.$el) {
-                cmp.$el.scrollIntoView({ behavior: "smooth", block: "start" });
-              }
-            });
-          });
-        }
-      } catch (e) {
-        unilog(1015, "Error moving file:", e);
-        alert(`Error moving file: ${e.message}`);
-      } finally {
-        this.loading = false;
       }
     },
     handleSelectionChanged() {

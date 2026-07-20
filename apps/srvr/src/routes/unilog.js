@@ -322,6 +322,16 @@ export function registerUnilogRoutes(app) {
     }
   });
 
+  // Average downloads per whole day, for the Down pane header.
+  app.get("/api/unilog/downs-per-day", (req, res) => {
+    try {
+      res.json({ avg: unilogDb.downsPerDay() });
+    } catch (error) {
+      console.error("[unilog] /api/unilog/downs-per-day error:", error); // no-unilog
+      res.status(500).json({ error: String(error?.message || error) });
+    }
+  });
+
   // Groups management (web client Groups pane).
   app.get("/api/unilog/groups", (req, res) => {
     try {

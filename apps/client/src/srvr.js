@@ -525,6 +525,9 @@ export function getUnilogOldestTs() {
 export function getUnilogPlotDays(plot) {
   return httpCall("/api/unilog/plot-days", { plot }, "GET");
 }
+export function getUnilogDownsPerDay() {
+  return httpCall("/api/unilog/downs-per-day", {}, "GET");
+}
 export function getUsbFileDays() {
   return httpCall("/api/usb/file-days", {}, "GET", 60000);
 }
@@ -626,22 +629,6 @@ export function accessTvdb(params) {
 
 export function getTvmazeCrew(params) {
   return httpCall("/api/getTvmazeCrew", params, "POST");
-}
-
-let _vipCache = null;
-export async function getVipActors() {
-  if (_vipCache) return _vipCache;
-  _vipCache = httpCall("/api/getVipActors", null, "GET")
-    .then((list) => {
-      return Array.isArray(list) ? new Set(list) : new Set();
-    })
-    .catch(() => new Set());
-  return _vipCache;
-}
-
-export async function setVipActors(list) {
-  _vipCache = Promise.resolve(new Set(list));
-  return httpCall("/api/setVipActors", { list }, "POST");
 }
 
 export function getGroupCounts() {

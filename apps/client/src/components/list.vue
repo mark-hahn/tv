@@ -190,6 +190,7 @@
               :simpleMode="simpleMode"
               :sortChoice="sortChoice"
               @copy-name="copyNameToClipboard"
+              @copy-sort="copySortValToClipboard"
               @open-map="(show) =&gt; seriesMapAction('open', show)"
               @select-show="onSelectShow"
             ></Shows>
@@ -290,6 +291,7 @@
             :sortChoice="sortChoice"
             :activeDownloadShowNames="activeDownloadShowNames"
             @copy-name="copyNameToClipboard"
+            @copy-sort="copySortValToClipboard"
             @open-map="(show) =&gt; seriesMapAction('open', show)"
             @select-show="onSelectShow"
           ></Shows>
@@ -307,13 +309,6 @@ import * as util from "../util.js";
 import * as epd from "@tv/share";
 import { unilog, logHere } from "../log.js";
 
-let _vipSet = new Set();
-srvr
-  .getVipActors()
-  .then((s) => {
-    _vipSet = s;
-  })
-  .catch(() => {});
 import parseTorrentTitle from "parse-torrent-title";
 import evtBus from "../evtBus.js";
 import Shows from "./shows.vue";
@@ -1335,12 +1330,6 @@ export default {
           const crewArr = Array.isArray(allTvdb?.[show.name]?.crew)
             ? allTvdb[show.name].crew
             : [];
-          const vipSet = _vipSet;
-          const vip = crewArr.find((c) => vipSet.has(c.name));
-          if (vip) {
-            const val = vip.name;
-            return forSort ? val.toLowerCase() : val;
-          }
           const CREW_PREF = [
             "Creator",
             "Producer",
@@ -2353,6 +2342,15 @@ export default {
       await navigator.clipboard.writeText(show.name);
       await new Promise((res) => setTimeout(res, 400));
       eles.forEach((el, i) => (el.style.backgroundColor = saved[i]));
+    },
+
+    async copySortValToClipboard(show, event) {
+      const cell = event.currentTarget;
+      const saved = cell.style.backgroundColor;
+      cell.style.backgroundColor = "lightpink"; // flash on alt-click copy
+      await navigator.clipboard.writeText(String(this.getValBySortChoice(show)));
+      await new Promise((res) => setTimeout(res, 400));
+      cell.style.backgroundColor = saved;
     },
 
     async episodeClick(e, show, season, episode, setWatched = null) {
@@ -3606,10 +3604,6 @@ export default {
     on("deleteShow", async (show) => {
       if (!show) return;
       await this.deleteShow(show);
-    });
-
-    on("vipActorsChanged", (updatedSet) => {
-      _vipSet = updatedSet instanceof Set ? updatedSet : new Set(updatedSet);
     });
 
     // Listen for server notifications about tvdb updates

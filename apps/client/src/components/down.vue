@@ -249,21 +249,34 @@
           margin-right: 20px;
         "
       >
-        <input
-          v-model="fileSearch"
-          type="text"
-          placeholder="Search"
-          style="
-            font-size: 13px;
-            border-radius: 7px;
-            padding: 4px 8px;
-            border: 1px solid #bbb;
-            background-color: white;
-            width: 120px;
-            margin-left: 20px;
-            outline: none;
-          "
-        />
+        <div style="display: flex; align-items: center">
+          <input
+            v-model="fileSearch"
+            type="text"
+            placeholder="Search"
+            style="
+              font-size: 13px;
+              border-radius: 7px;
+              padding: 4px 8px;
+              border: 1px solid #bbb;
+              background-color: white;
+              width: 120px;
+              margin-left: 20px;
+              outline: none;
+            "
+          />
+          <span
+            v-if="downsPerDay !== null"
+            style="
+              margin-left: 20px;
+              font-size: 13px;
+              color: #555;
+              white-space: nowrap;
+              font-weight: normal;
+            "
+            >Downs/Day: {{ downsPerDay.toFixed(1) }}</span
+          >
+        </div>
         <div style="display: flex; gap: 10px; align-items: center">
           <span
             v-if="selectedItems.size > 0"
@@ -604,6 +617,7 @@ export default {
       showFilter: null,
       pollingStopped: false,
       fileSearch: "",
+      downsPerDay: null,
       flashingItem: null, // Item flashing after alt-click copy
       selectedItems: new Set(), // Multi-select for new button group
       lastSelectedIndex: null,
@@ -755,6 +769,7 @@ export default {
 
     // Subscribe at boot so data is always fresh.
     this.startPolling();
+    this.loadDownsPerDay();
   },
 
   unmounted() {
@@ -768,6 +783,15 @@ export default {
   },
 
   methods: {
+    async loadDownsPerDay() {
+      try {
+        const res = await srvr.getUnilogDownsPerDay();
+        this.downsPerDay = Number(res?.avg) || 0;
+      } catch (e) {
+        unilog(1586, `downs/day load failed: ${e.message}`);
+      }
+    },
+
     async startMovieCycle() {
       try {
         await fetch(`${config.tvDownUrl}/movieCycle`, { method: "POST" });

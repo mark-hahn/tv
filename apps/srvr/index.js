@@ -1455,8 +1455,6 @@ app.post("/api/getFile", apiWrapper(getFile));
 app.post("/api/getSubFileIds", apiWrapper(getSubFileIds));
 app.post("/api/accessTvdb", apiWrapper(tvdb.accessTvdb));
 app.post("/api/getTvmazeCrew", apiWrapper(tvdb.getTvmazeCrew_cmd));
-app.get("/api/getVipActors", apiWrapper(tvdb.getVipActors));
-app.post("/api/setVipActors", apiWrapper(tvdb.setVipActors));
 app.post("/api/migrateWatchedCount", apiWrapper(tvdb.migrateWatchedCount));
 app.get("/api/getGroupCounts", apiWrapper(groupCounts.getGroupCounts));
 app.get("/api/getBadGroups", (_req, res) => {

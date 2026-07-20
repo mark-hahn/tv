@@ -979,14 +979,10 @@ export default {
         }
       }
       if (!Array.isArray(crew) || crew.length === 0) return;
-      const vipSet = await srvr.getVipActors().catch(() => new Set());
       const CREW_PREF = ["Creator", "Producer", "Executive Producer", "Writer"];
-      const sorted = [...crew].sort((a, b) => {
-        const aVip = vipSet.has(a.name) ? 0 : 1;
-        const bVip = vipSet.has(b.name) ? 0 : 1;
-        if (aVip !== bVip) return aVip - bVip;
-        return CREW_PREF.indexOf(a.type) - CREW_PREF.indexOf(b.type);
-      });
+      const sorted = [...crew].sort(
+        (a, b) => CREW_PREF.indexOf(a.type) - CREW_PREF.indexOf(b.type),
+      );
       const picked = [];
       const seenNames = new Set();
       for (const c of sorted) {

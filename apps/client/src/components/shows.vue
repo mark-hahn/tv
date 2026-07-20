@@ -45,8 +45,8 @@
         :id="nameHash(show.name)"
       >
         <div
-          class="show-cell"
-          @click="$emit('select-show', show, false)"
+          class="show-cell show-sort-cell"
+          @click="sortCellClick(show, $event)"
           :style="{
             width: sortColumnWidth,
             flexShrink: 0,
@@ -285,6 +285,15 @@ export default {
         return;
       }
       this.$emit("select-show", show, false, true);
+    },
+
+    sortCellClick(show, event) {
+      if (event.altKey) {
+        event.stopPropagation();
+        this.$emit("copy-sort", show, event);
+        return;
+      }
+      this.$emit("select-show", show, false);
     },
 
     scrollToShow(showName) {

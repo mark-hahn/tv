@@ -625,6 +625,38 @@ export function plotDayCounts(plot) {
   throw new Error(`unknown plot: ${plot}`);
 }
 
+// Average downloads per day over whole days only. The log's first and last
+// days are partial (retention trim at the start, today still running at the
+// end), so both are dropped. Days inside the range with no downloads count as
+// zero, which is why the span comes from all events, not just download events.
+export function downsPerDay() {
+  const span = db
+    .prepare(
+      "SELECT substr(min(ts), 1, 10) AS first, substr(max(ts), 1, 10) AS last FROM log_events",
+    )
+    .get();
+  if (!span?.first || !span?.last) return 0;
+
+  const dayMs = 24 * 60 * 60 * 1000;
+  const toMs = (day) => Date.parse(day.replace(/\//g, "-") + "T00:00:00Z");
+  const firstWhole = toMs(span.first) + dayMs;
+  const lastWhole = toMs(span.last) - dayMs;
+  const days = Math.round((lastWhole - firstWhole) / dayMs) + 1;
+  if (days < 1) return 0;
+
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS count FROM log_events
+        WHERE log_id = ? AND substr(ts, 1, 10) BETWEEN ? AND ?`,
+    )
+    .get(
+      DOWN_ENTRY_LOG_ID,
+      new Date(firstWhole).toISOString().slice(0, 10).replace(/-/g, "/"),
+      new Date(lastWhole).toISOString().slice(0, 10).replace(/-/g, "/"),
+    );
+  return (row?.count || 0) / days;
+}
+
 // ---------------------------------------------------------------------------
 // Groups management (web client Groups pane).
 // tv-srvr is the single writer; all group_id allocation flows through here.

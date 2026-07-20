@@ -3130,7 +3130,7 @@ async function main() {
             existsCount++;
             unilog(
               1205,
-              `Down: flex skip, disk file same/better quality ${flexSeStr} "${fname}" (${seriesName || "unknown show"})`,
+              `Down: skip, disk file same/better quality ${flexSeStr} "${fname}" (${seriesName || "unknown show"})`,
             );
             return process.nextTick(checkFile);
           }
@@ -3142,7 +3142,7 @@ async function main() {
             fs.renameSync(_oldPath, _oldDst);
             unilog(
               334,
-              "flex: renamed worse disk file to .old:",
+              "renamed worse disk file to .old:",
               _diskFile,
               "→",
               path.basename(_oldDst),
@@ -3150,7 +3150,7 @@ async function main() {
           } catch (renameErr3) {
             unilog(
               335,
-              "flex: rename worse disk file to .old failed:",
+              "rename worse disk file to .old failed:",
               _diskFile,
               renameErr3.message,
             );
@@ -3207,7 +3207,7 @@ async function main() {
               downloadCount,
               "/",
               chkCount,
-              "FLEX SKIP (disk file same/better quality):",
+              "SKIP (disk file same/better quality):",
               fname,
               flexSeStr,
             );
@@ -3221,7 +3221,7 @@ async function main() {
             fs.renameSync(oldPath, oldDst);
             unilog(
               337,
-              "flex: renamed worse disk file to .old:",
+              "renamed worse disk file to .old:",
               diskFile,
               "→",
               path.basename(oldDst),
@@ -3229,7 +3229,7 @@ async function main() {
           } catch (renameErr2) {
             unilog(
               338,
-              "flex: rename worse disk file to .old failed:",
+              "rename worse disk file to .old failed:",
               diskFile,
               renameErr2.message,
             );
@@ -3252,7 +3252,7 @@ async function main() {
           downloadCount,
           "/",
           chkCount,
-          "FLEX SKIP (episode watched):",
+          "SKIP (episode watched):",
           fname,
           flexSeStr,
         );

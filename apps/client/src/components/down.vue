@@ -160,7 +160,7 @@
               background-color: whitesmoke;
             "
           >
-            Bot
+            Bottom
           </button>
           <button
             v-if="!movieMode"

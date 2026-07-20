@@ -313,25 +313,19 @@ const postLastDownloadedToSrvr = async (showName, timestamp, localPath) => {
   const ts = Math.trunc(Number(timestamp));
   if (candidates.length === 0 || !Number.isFinite(ts) || ts <= 0) return false;
 
-  for (const name of candidates) {
+  // Resolve the real tvdb key locally (read-only db) before posting so we
+  // don't probe srvr with names that miss and log spurious "no tvdb" events.
+  // Candidates remain as fallback for records too new to be in the db file.
+  const key = resolveTvdbKeyFromFile(candidates);
+  const names = key ? [key, ...candidates.filter((c) => c !== key)] : candidates;
+
+  for (const name of names) {
     const body = await postSetTvdbFields({
       name,
       "last-downloaded": ts,
       dontEnqueue: true,
     });
     // setTvdbFields returns the string "no tvdb" (HTTP 200) on a key miss.
-    if (String(body || "").trim() !== '"no tvdb"') return true;
-  }
-
-  // All exact candidates missed — resolve fuzzily (case, year suffix)
-  // against tvdb db keys and retry with the real key.
-  const key = resolveTvdbKeyFromFile(candidates);
-  if (key && !candidates.includes(key)) {
-    const body = await postSetTvdbFields({
-      name: key,
-      "last-downloaded": ts,
-      dontEnqueue: true,
-    });
     if (String(body || "").trim() !== '"no tvdb"') return true;
   }
 

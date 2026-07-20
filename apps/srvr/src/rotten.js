@@ -167,7 +167,7 @@ async function dismissOverlays(page, query) {
       await delay(200);
     }
   } catch (e) {
-    unilog(698, `OneTrust click error for ${query}: ${e.message}`);
+    unilog(698, `Rotten: OneTrust click error for ${query}: ${e.message}`);
   }
 
   // 4. Polling for the stubborn popup at 853, 160
@@ -278,7 +278,7 @@ async function dismissOverlays(page, query) {
               }
             }
           } catch (e) {
-            unilog(699, `Delete script error for ${query}: ${e.message}`);
+            unilog(699, `Rotten: Delete script error for ${query}: ${e.message}`);
           }
           return false;
         });
@@ -292,7 +292,7 @@ async function dismissOverlays(page, query) {
       await delay(200);
     }
   } catch (err) {
-    unilog(700, `Polling error for ${query}: ${err.message}`);
+    unilog(700, `Rotten: Polling error for ${query}: ${err.message}`);
   }
 
   // Check if we are incorrectly clicking the navbar

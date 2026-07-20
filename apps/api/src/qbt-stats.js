@@ -46,7 +46,8 @@ function calcRateMb(t) {
 }
 
 // Track per-torrent download stats and add them to each torrent object:
-//   last_seeds  — last non-zero num_seeds seen
+//   last_seeds       — last non-zero num_seeds seen
+//   last_total_seeds — last non-zero num_complete seen
 //   avg_rate_mb — average Mb/s of the last 10 samples skipping the final 2,
 //                 computed when the torrent stops downloading
 // Only call with the full unfiltered torrent list (stale hashes are pruned).
@@ -68,6 +69,15 @@ export async function enrichQbtStats(torrents) {
       const seeds = Number(t?.num_seeds);
       if (Number.isFinite(seeds) && seeds > 0 && entry.lastSeeds !== seeds) {
         entry.lastSeeds = seeds;
+        changed = true;
+      }
+      const totalSeeds = Number(t?.num_complete);
+      if (
+        Number.isFinite(totalSeeds) &&
+        totalSeeds > 0 &&
+        entry.lastTotalSeeds !== totalSeeds
+      ) {
+        entry.lastTotalSeeds = totalSeeds;
         changed = true;
       }
       const downloading = String(t?.state || "").trim() === "downloading";
@@ -95,6 +105,8 @@ export async function enrichQbtStats(torrents) {
       }
     }
     if (entry.lastSeeds !== undefined) t.last_seeds = entry.lastSeeds;
+    if (entry.lastTotalSeeds !== undefined)
+      t.last_total_seeds = entry.lastTotalSeeds;
     if (entry.avgRateMb !== undefined) t.avg_rate_mb = entry.avgRateMb;
   }
 

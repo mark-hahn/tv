@@ -1219,13 +1219,16 @@ export default {
       const prog = this.fmtProgPc(t?.completed, t?.size);
 
       if (t?.state === "downloading") {
-        // added  size  seeds  rate  prog%  eta  Downloading
+        // added  size  active/total seeds  rate  prog%  eta  Downloading
         const seeds = Number.isFinite(Number(t?.num_seeds))
           ? Number(t?.num_seeds)
           : 0;
+        const totalSeeds = Number.isFinite(Number(t?.num_complete))
+          ? Number(t?.num_complete)
+          : 0;
         const rate = this.fmtRateMb(t);
         const eta = this.fmtDuration(t?.eta);
-        const fields = [added, size, `${seeds} seeds`];
+        const fields = [added, size, `${seeds}/${totalSeeds} seeds`];
         if (rate) fields.push(rate);
         fields.push(`${prog}%`);
         if (eta) fields.push(eta);
@@ -1234,7 +1237,7 @@ export default {
       }
 
       // Not downloading (finished / stalled / stopped / etc.):
-      // added  size  seeds  rate  prog%  [elapsed]  status
+      // added  size  active/total seeds  rate  prog%  [elapsed]  status
       const curSeeds = Number.isFinite(Number(t?.num_seeds))
         ? Number(t?.num_seeds)
         : 0;
@@ -1245,6 +1248,16 @@ export default {
           : Number.isFinite(lastSeeds)
             ? lastSeeds
             : curSeeds;
+      const curTotal = Number.isFinite(Number(t?.num_complete))
+        ? Number(t?.num_complete)
+        : 0;
+      const lastTotal = Number(t?.last_total_seeds);
+      const totalSeeds =
+        curTotal > 0
+          ? curTotal
+          : Number.isFinite(lastTotal)
+            ? lastTotal
+            : curTotal;
       const rate = this.fmtRateMb(t) || "0 Mb";
       const completion = Number(t?.completion_on);
       const elapsed =
@@ -1252,7 +1265,7 @@ export default {
           ? this.fmtDuration(completion - Number(t?.added_on))
           : "";
       const state = this.fmtState(t?.state);
-      const fields = [added, size, `${seeds} seeds`, rate, `${prog}%`];
+      const fields = [added, size, `${seeds}/${totalSeeds} seeds`, rate, `${prog}%`];
       if (elapsed) fields.push(elapsed);
       fields.push(state);
       return fields.join(sep);

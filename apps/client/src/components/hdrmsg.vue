@@ -26,75 +26,24 @@
     >
       {{ text }}
     </div>
-    <input
-      v-if="loidNeeded"
-      v-model="loidInput"
-      placeholder="Reddit loid cookie"
-      spellcheck="false"
-      :style="{
-        flex: 'none',
-        width: '220px',
-        height: '21px',
-        marginLeft: '8px',
-        fontSize: '13px',
-        border: loidError ? '1px solid red' : '1px solid #999',
-        borderRadius: '3px',
-        padding: '0 4px',
-        boxSizing: 'border-box',
-      }"
-      :title="loidError"
-      @keyup.enter="submitLoid"
-    />
   </div>
 </template>
 
 <script>
 import { globalMessages, globalMessageText } from "../globalMessages.js";
-import { loggingDisabled, logHere, unilog} from "../log.js"
-import { loidNeeded } from "../loid.js";
-import { setLoidCookie } from "../srvr.js";
+import { loggingDisabled } from "../log.js";
 
 export default {
   name: "HdrMsg",
-
-  data() {
-    return {
-      loidInput: "",
-      loidError: "",
-    };
-  },
 
   computed: {
     loggingDisabled() {
       return loggingDisabled.value;
     },
-    loidNeeded() {
-      return loidNeeded.value;
-    },
     text() {
       // Touch the reactive Map so this computed re-runs on any change.
       void globalMessages.size;
       return globalMessageText();
-    },
-  },
-
-  methods: {
-    async submitLoid() {
-      const cookie = this.loidInput.trim();
-      if (!cookie) return;
-      this.loidError = "";
-      try {
-        const res = await setLoidCookie(cookie);
-        if (res?.ok) {
-          // Server broadcasts loidVerified which hides the box everywhere.
-          this.loidInput = "";
-        } else {
-          this.loidError = res?.error || "verify failed";
-        }
-      } catch (e) {
-        this.loidError = e?.error || e?.message || "verify failed";
-        unilog(1303, `loid cookie submit failed: ${this.loidError}`);
-      }
     },
   },
 };

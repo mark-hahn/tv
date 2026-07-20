@@ -11,7 +11,6 @@ import * as view from "./src/lastViewed.js";
 import * as utilNode from "util";
 import * as emby from "./src/emby.js";
 import * as tvdb from "./src/tvdb.js";
-import * as loid from "./src/loid.js";
 import * as util from "./src/util.js";
 import * as email from "./src/email.js";
 import * as tmdb from "./src/tmdb.js";
@@ -566,9 +565,6 @@ const debouncedTvdbPush = (name) => {
 tvdb.setNotifyCallback((name) => debouncedTvdbPush(name));
 tvdb.setEnqueueCallback((name) => notifyClients("showUpdating", { name }));
 tvdb.setQueueDrainCallback(() => notifyClients("showQueueEmpty", {}));
-loid.setLoidNotifyCallback((needed) =>
-  notifyClients(needed ? "loidNeeded" : "loidVerified", {}),
-);
 
 // Auto-update pickups when inEmby or status changes on a tvdb record
 const handlePickupChange = (name, inEmby, status) => {
@@ -1847,10 +1843,6 @@ app.post(
   }),
 );
 app.post("/api/setSharedFilters", apiWrapper(setSharedFilters));
-app.post(
-  "/api/setLoidCookie",
-  apiWrapper((params) => loid.saveAndVerifyLoid(params?.cookie)),
-);
 
 app.get("/api/flexget-history", (req, res) => {
   try {
@@ -3079,14 +3071,6 @@ wss.on("connection", (ws) => {
         data: lastMissingEpWarning,
       }),
     );
-  }
-
-  if (loid.isLoidNeeded()) {
-    try {
-      ws.send(JSON.stringify({ id: 0, notification: "loidNeeded", data: {} }));
-    } catch (e) {
-      unilog(1372, `ws send loidNeeded failed: ${e.message}`);
-    }
   }
 
   // GLOBAL-MSG: replay all currently-active server messages to the new client.

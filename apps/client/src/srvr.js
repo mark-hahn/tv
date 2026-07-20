@@ -600,11 +600,6 @@ export function embySync() {
   return httpCall("/api/embySync", {}, "POST");
 }
 
-// Save and verify a new reddit loid cookie on the server
-export function setLoidCookie(cookie) {
-  return httpCall("/api/setLoidCookie", { cookie }, "POST");
-}
-
 // Shared filters (cross-computer)
 export function getSharedFilters() {
   return httpCall("/api/getSharedFilters", null, "GET", 8000);

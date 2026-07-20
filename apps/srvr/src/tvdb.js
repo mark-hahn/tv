@@ -2083,10 +2083,12 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     ? true
     : (show.inEmby ?? existing.inEmby ?? false);
 
-  unilog(
-    1226,
-    `getNewTvdb setting inEmby=${newInEmby} for ${name} (fromEmbySync=${isSyncingFromEmby}, show.inEmby=${show.inEmby}, existing.inEmby=${existing.inEmby})`,
-  );
+  if (newInEmby !== existing.inEmby) {
+    unilog(
+      1226,
+      `getNewTvdb inEmby ${existing.inEmby} -> ${newInEmby} for ${name} (fromEmbySync=${isSyncingFromEmby}, show.inEmby=${show.inEmby})`,
+    );
+  }
 
   // Ensure Emby button is correct in fresh remotes based on inEmby status
   const embyBtnIdx = tvdbData.remotes.findIndex((r) => r.name === "Emby");

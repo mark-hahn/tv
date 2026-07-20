@@ -457,7 +457,7 @@ export default {
           sitcom: show.sitcom,
         });
       } catch (e) {
-        logHere({ lvl: "error" }, `toggleSitcom error: ${e.message || e}`);
+        unilog(1575, `toggleSitcom error: ${e.message || e}`);
         show.sitcom = originalValue;
       }
     };

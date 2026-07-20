@@ -227,7 +227,6 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.linda = 0;
       tmp.hasemby = 0; // Show both emby and non-emby shows by default
       tmp.needsIntro = 0;
-      tmp.haveSubs = 0;
       tmp.anticipating = 0;
       break;
 
@@ -246,7 +245,6 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.linda = -1;
       tmp.hasemby = 1;
       tmp.needsIntro = 0;
-      tmp.haveSubs = 0;
       tmp.anticipating = 0;
       break;
 
@@ -264,7 +262,6 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.linda = -1;
       tmp.hasemby = 0;
       tmp.needsIntro = 0;
-      tmp.haveSubs = 0;
       tmp.anticipating = 0;
       break;
 
@@ -282,7 +279,6 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.linda = 0;
       tmp.hasemby = 1;
       tmp.needsIntro = 0;
-      tmp.haveSubs = 0;
       tmp.anticipating = 0;
       break;
   }

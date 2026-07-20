@@ -13,7 +13,6 @@ import {
 } from "@tv/share";
 import * as epd from "@tv/share";
 import { unilog, logHere } from "@tv/share";
-const { getPstDate } = util;
 import { SRVR_DATA_DIR } from "./srvrPaths.js";
 import {
   backupDb,
@@ -160,6 +159,57 @@ function stripLegacyLastWatched(data) {
     if (rec && typeof rec === "object" && "lastWatched" in rec) {
       delete rec.lastWatched;
     }
+  }
+  return data;
+}
+
+// Dead fields no code reads plus junk keys leaked from API params or internal
+// change-tracking flags. Stripped from every record at startup.
+const DEAD_TVDB_FIELDS = [
+  "downloadStatus",
+  "downloadLastCheck",
+  "tvmazeStatus",
+  "lastDiskCheck",
+  "lastMetadataUpdate",
+  "introDur",
+  "score",
+  "added",
+  "allWatchedOrHaveFile",
+  "haveSubs",
+  "lastEmbySync",
+  "type",
+  "tagline",
+  "homepage",
+  "backdrop",
+  "createdBy",
+  "inProduction",
+  "spokenLanguages",
+  "productionCompanies",
+  "numberOfSeasons",
+  "numberOfEpisodes",
+  "_hasChanges",
+  "_push1Changes",
+  "dontEnqueue",
+  "dontNotify",
+  "ratings",
+  "notes",
+];
+
+function stripDeadFields(data) {
+  let cleaned = 0;
+  for (const rec of Object.values(data || {})) {
+    if (!rec || typeof rec !== "object") continue;
+    let hit = false;
+    for (const field of DEAD_TVDB_FIELDS) {
+      if (field in rec) {
+        delete rec[field];
+        hit = true;
+      }
+    }
+    if (hit) cleaned++;
+  }
+  if (cleaned > 0) {
+    unilog(1577, `stripped dead fields from ${cleaned} records`);
   }
   return data;
 }
@@ -466,7 +516,7 @@ const UPDATE_DATA = true;
 let allTvdb = {};
 try {
   allTvdb = loadAllShows();
-  stripLegacyLastWatched(migrateRemotesToFlatProps(allTvdb));
+  stripDeadFields(stripLegacyLastWatched(migrateRemotesToFlatProps(allTvdb)));
   saveAllShows(allTvdb);
 } catch (e) {
   throw new Error(
@@ -1775,8 +1825,6 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   const inputName = show.name;
   // log("getTvdbData: START", { name, fast });
-  // Use PST for added date
-  const added = allTvdb[inputName]?.added ?? getPstDate();
   const showId = show.id;
   const tvdbId = show.tvdbId;
   if (!tvdbId) {
@@ -1841,7 +1889,6 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     firstAired,
     lastAired: lastAiredIn,
     nextAired: nextAiredIn,
-    score,
     overview,
     remoteIds,
     averageRuntime,
@@ -1976,7 +2023,6 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     episodeCount: finalEpisodeCount,
     watchedCount,
     image: preserve(image, existing.image, tmdbData?.image || searchThumb),
-    score: preserve(score, existing.score, tmdbData?.score),
     overview: preserve(overview, existing.overview, tmdbData?.overview),
     firstAired: preserve(firstAired, existing.firstAired, tmdbData?.firstAired),
     lastAired: preserve(lastAired, existing.lastAired, tmdbData?.lastAired),
@@ -2001,7 +2047,6 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     remotes, // computed display array - not persisted to disk; rebuilt from flat url props
     characters, // Don't preserve arrays - they accumulate
     crew,
-    added,
     saved,
     // Remote URL flat props — persisted so Google/scrape calls are skipped on subsequent refreshes
     wikiUrl: fetchedUrls.wikiUrl ?? existing.wikiUrl ?? null,
@@ -2018,48 +2063,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
       genresIn?.map((g) => g.name).filter(Boolean) || existing.genres || [],
   };
 
-  // Add optional TMDB-only fields if available
-  if (tmdbData?.backdrop)
-    tvdbData.backdrop = preserve(null, existing.backdrop, tmdbData.backdrop);
   if (tmdbData?.genres?.length) tvdbData.genres = tmdbData.genres; // TMDB genre names preferred over TVDB extended
-  if (tmdbData?.homepage)
-    tvdbData.homepage = preserve(null, existing.homepage, tmdbData.homepage);
-  if (tmdbData?.tagline)
-    tvdbData.tagline = preserve(null, existing.tagline, tmdbData.tagline);
-  if (tmdbData?.type)
-    tvdbData.type = preserve(null, existing.type, tmdbData.type);
-  if (tmdbData?.numberOfSeasons)
-    tvdbData.numberOfSeasons = preserve(
-      null,
-      existing.numberOfSeasons,
-      tmdbData.numberOfSeasons,
-    );
-  if (tmdbData?.numberOfEpisodes)
-    tvdbData.numberOfEpisodes = preserve(
-      null,
-      existing.numberOfEpisodes,
-      tmdbData.numberOfEpisodes,
-    );
-  if (tmdbData?.inProduction !== undefined)
-    tvdbData.inProduction = preserve(
-      null,
-      existing.inProduction,
-      tmdbData.inProduction,
-    );
-  if (tmdbData?.createdBy)
-    tvdbData.createdBy = preserve(null, existing.createdBy, tmdbData.createdBy);
-  if (tmdbData?.productionCompanies)
-    tvdbData.productionCompanies = preserve(
-      null,
-      existing.productionCompanies,
-      tmdbData.productionCompanies,
-    );
-  if (tmdbData?.spokenLanguages)
-    tvdbData.spokenLanguages = preserve(
-      null,
-      existing.spokenLanguages,
-      tmdbData.spokenLanguages,
-    );
 
   if (finalTrailers && finalTrailers.length > 0)
     tvdbData.trailers = finalTrailers;
@@ -2135,26 +2139,9 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   tvdbData.noFiles =
     paramObj.noFiles ?? existing.noFiles ?? existing.disk?.noFiles ?? false;
 
-  // Flattened Download tracking (no nested object)
-  tvdbData.downloadStatus =
-    paramObj.downloadStatus ||
-    existing.downloadStatus ||
-    existing.download?.status ||
-    null;
-  tvdbData.downloadLastCheck =
-    paramObj.downloadLastCheck ||
-    existing.downloadLastCheck ||
-    existing.download?.lastCheck ||
-    null;
-
   // Flattened TVMaze reference (no nested object)
   tvdbData.tvmazeId =
     paramObj.tvmazeId || existing.tvmazeId || existing.tvmaze?.id || null;
-  tvdbData.tvmazeStatus =
-    paramObj.tvmazeStatus ||
-    existing.tvmazeStatus ||
-    existing.tvmaze?.status ||
-    null;
 
   // Gap tracking (already flat - spread from gap object if exists)
   if (paramObj.gap) {
@@ -2209,14 +2196,12 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     paramObj.leftEmby || existing.leftEmby || existing.emby?.leftEmby || null;
 
   // Additional flags
-  tvdbData.haveSubs = paramObj.haveSubs ?? existing.haveSubs ?? false;
   tvdbData.anticipating =
     paramObj.anticipating ?? existing.anticipating ?? false;
   tvdbData.sitcom = paramObj.sitcom ?? existing.sitcom ?? false;
   if (existing["last-downloaded"] !== undefined) {
     tvdbData["last-downloaded"] = existing["last-downloaded"];
   }
-  if (existing.introDur != null) tvdbData.introDur = existing.introDur;
   if (existing.seasonIntros != null)
     tvdbData.seasonIntros = existing.seasonIntros;
 
@@ -2227,14 +2212,6 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     calculatedWaitStr !== null
       ? calculatedWaitStr || null
       : (existing.waitStr ?? null);
-
-  // Flattened Sync timestamps (no nested object)
-  tvdbData.lastDiskCheck =
-    paramObj.lastDiskCheck ||
-    existing.lastDiskCheck ||
-    existing.sync?.lastDiskCheck ||
-    null;
-  tvdbData.lastMetadataUpdate = Date.now();
 
   setImdbId(tvdbData);
 
@@ -2425,9 +2402,6 @@ const chkTvdbQueue = () => {
             }
             allTvdb[keyName] = finalData;
             finalData._hasChanges = tvdbChanges.length > 0;
-            if (paramObj.suppressNotify) {
-              finalData._push1Changes = tvdbChanges;
-            }
           }
         } else if (typeof tvdbData === "string") {
           finalData = allTvdb[tvdbData];
@@ -2446,6 +2420,9 @@ const chkTvdbQueue = () => {
 
       if (finalData && !paramObj.transient) {
         finalData.saved = Date.now();
+        // Strip the transient flag before saving so it never reaches the db
+        const hasChanges = finalData._hasChanges ?? false;
+        delete finalData._hasChanges;
         // Save to db so timestamp persists across restarts
         try {
           const keyName = String(finalData.name || showName || "").trim();
@@ -2455,11 +2432,12 @@ const chkTvdbQueue = () => {
         }
         // Push updated record to clients only when fields actually changed
         if (!paramObj.suppressNotify) {
-          if (notifyCallback && finalData.name && finalData._hasChanges)
+          if (notifyCallback && finalData.name && hasChanges)
             notifyCallback(finalData.name, finalData);
-          delete finalData._hasChanges;
+        } else {
+          // suppressNotify callers read _hasChanges from the in-memory record
+          finalData._hasChanges = hasChanges;
         }
-        // When suppressNotify, _hasChanges/_push1Changes are preserved for the caller
       }
       chkTvdbQueueRunning = false;
       chkTvdbQueue();
@@ -2609,7 +2587,6 @@ const tryLocalGetTvdb = async () => {
   // Combined push1+push2 notify (one notification instead of two)
   const push1HasChanges = processRecord._hasChanges ?? false;
   delete processRecord._hasChanges;
-  delete processRecord._push1Changes;
   if (push1HasChanges || push2Result.hasChanges) {
     if (notifyCallback)
       notifyCallback(processRecord.name, allTvdb[processRecord.name]);
@@ -3142,7 +3119,6 @@ export const searchTvdbByImdbId = async (params) => {
       lastAired: lastAired,
       nextAired: nextAired,
       status: status,
-      score: extData.score || null,
       originalCountry: extData.originalCountry || "",
       originalLanguage: extData.originalLanguage || "",
       originalNetwork: originalNetwork,
@@ -3209,7 +3185,14 @@ export const setTvdbFields = async (params) => {
 
       // Handle nested field updates for Phase 1 new structure
       for (const [key, value] of Object.entries(paramObj)) {
-        if (key === "dontSave" || key === "$delete" || key === "name") continue;
+        if (
+          key === "dontSave" ||
+          key === "$delete" ||
+          key === "name" ||
+          key === "dontNotify" ||
+          key === "dontEnqueue"
+        )
+          continue;
 
         // Handle nested emby fields (e.g., inToTry)
         if (key.startsWith("emby") && typeof key === "string") {

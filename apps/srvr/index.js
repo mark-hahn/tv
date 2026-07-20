@@ -691,7 +691,6 @@ const fixCompactEpisodeNaming = async (showId, showName) => {
 
 tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
   try {
-    delete tvdbRecord.haveSubs;
     if (tvdbRecord.inEmby) {
       removeFromSnoozeByShow(showName, tvdbRecord.tvdbId);
     }
@@ -791,6 +790,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         tvdbRecord.lastGapCheck = Date.now();
         delete tvdbRecord.allAiredHaveFile;
         delete tvdbRecord.allAiredWatched;
+        delete tvdbRecord.allWatchedOrHaveFile;
       }
       // Compute full: every episode is either watched or has a file
       const newFull = !!(tvdbRecord.inEmby && gapData.allWatchedOrHaveFile);
@@ -2614,6 +2614,8 @@ app.post("/api/trimIntro", async (req, res) => {
   }
 });
 
+// Used by emby-skip-intro.user.js (tampermonkey) — only trimPos/skipDur are
+// consumed; introDur is kept at null for response-shape compatibility.
 app.get("/api/introDur", async (req, res) => {
   try {
     const { showName, showId, season } = req.query;
@@ -2636,19 +2638,19 @@ app.get("/api/introDur", async (req, res) => {
       season != null ? Number(season) : null,
     );
     res.json({
-      introDur: record?.introDur ?? null,
+      introDur: null,
       startMark: si.startMark,
       trimPos: si.trimPos,
       skipDur: si.skipDur,
     });
-  } catch (err) {
-    unilog(611, "error:", err.message);
+  } catch (e) {
+    unilog(1579, `introDur error: ${e.message}`);
     res.json({
       introDur: null,
       startMark: null,
       trimPos: null,
       skipDur: null,
-      error: err.message,
+      error: e.message,
     });
   }
 });

@@ -449,7 +449,11 @@ export async function deleteShowFromSrvr(show) {
     show.name,
   );
   const result = await deletePath(showFolder);
-  unilog(876, "deleteShowFromSrvr: deletePath result:", result);
+  unilog(
+    876,
+    `deleteShowFromSrvr: deletePath result for ${show.name}:`,
+    result,
+  );
 
   if (result !== "ok") {
     throw new Error(`Failed to delete folder: ${result}`);
@@ -792,7 +796,10 @@ export async function getSeriesMapFromEmby(params) {
   const res = await httpCall("/api/getSeriesMapFromEmby", params, "POST");
   const ms = Math.round(performance.now() - t0);
   if (ms > 1500)
-    unilog(1533, `slow getSeriesMapFromEmby round-trip ${params?.showName}: ${ms}ms`);
+    unilog(
+      1533,
+      `slow getSeriesMapFromEmby round-trip ${params?.showName}: ${ms}ms`,
+    );
   return res;
 }
 

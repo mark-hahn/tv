@@ -1121,7 +1121,7 @@ export async function getTorrentFile(showName) {
       PROVIDER_TIMEOUT_MS,
       "Limetorrents",
     ).catch((e) => {
-      unilog(199, `Limetorrents: ${e.message}`);
+      unilog(199, `Limetorrents for ${showName}: ${e.message}`);
       return [];
     }),
     withTimeout(
@@ -1129,7 +1129,7 @@ export async function getTorrentFile(showName) {
       PROVIDER_TIMEOUT_MS,
       "Eztv",
     ).catch((e) => {
-      unilog(200, `Eztv: ${e.message}`);
+      unilog(200, `Eztv for ${showName}: ${e.message}`);
       return [];
     }),
   ]);

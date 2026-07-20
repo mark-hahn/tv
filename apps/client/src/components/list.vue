@@ -407,7 +407,11 @@ export default {
       // If the flag doesn't exist yet, treat it as false and set to true.
       show[flagName] = !show[flagName];
       await srvr.addNoEmby(show).catch((err) => {
-        unilog(951, `late addNoEmby error (${flagName}):`, err);
+        unilog(
+          951,
+          `late addNoEmby error for ${show.name} (${flagName}):`,
+          err,
+        );
       });
     };
 
@@ -424,7 +428,7 @@ export default {
         // Mirror into the tvdb record now so pushes/other tabs agree
         await srvr.setTvdbFields({ name: show.name, inToTry: show.inToTry });
       } catch (err) {
-        unilog(952, "toggleToTry error:", err);
+        unilog(952, `toggleToTry error for ${show.name}:`, err);
         show.inToTry = originalValue; // Revert on error
       }
     };
@@ -438,7 +442,7 @@ export default {
           anticipating: show.anticipating,
         });
       } catch (err) {
-        unilog(953, "toggleAnticipating error:", err);
+        unilog(953, `toggleAnticipating error for ${show.name}:`, err);
         show.anticipating = originalValue;
       }
     };
@@ -452,7 +456,7 @@ export default {
           sitcom: show.sitcom,
         });
       } catch (e) {
-        unilog(1575, `toggleSitcom error: ${e.message || e}`);
+        unilog(1575, `toggleSitcom error for ${show.name}: ${e.message || e}`);
         show.sitcom = originalValue;
       }
     };
@@ -473,7 +477,7 @@ export default {
           inContinue: show.inContinue,
         });
       } catch (err) {
-        unilog(954, "toggleContinue error:", err);
+        unilog(954, `toggleContinue error for ${show.name}:`, err);
         show.inContinue = originalValue; // Revert on error
       }
     };
@@ -491,7 +495,7 @@ export default {
         // Mirror into the tvdb record now so pushes/other tabs agree
         await srvr.setTvdbFields({ name: show.name, inMark: show.inMark });
       } catch (err) {
-        unilog(955, "toggleMark error:", err);
+        unilog(955, `toggleMark error for ${show.name}:`, err);
         show.inMark = originalValue;
       }
     };
@@ -509,7 +513,7 @@ export default {
         // Mirror into the tvdb record now so pushes/other tabs agree
         await srvr.setTvdbFields({ name: show.name, inLinda: show.inLinda });
       } catch (err) {
-        unilog(956, "toggleLinda error:", err);
+        unilog(956, `toggleLinda error for ${show.name}:`, err);
         show.inLinda = originalValue; // Revert on error
       }
     };
@@ -1131,9 +1135,9 @@ export default {
           tvdbId: tvdbId,
         });
 
-        unilog(963, "Debug result:", result);
+        unilog(963, `Debug result for ${currentShow.name}:`, result);
       } catch (e) {
-        unilog(964, "debugClick failed:", e);
+        unilog(964, `debugClick failed for ${this.highlightName}:`, e);
       }
     },
 
@@ -1629,7 +1633,7 @@ export default {
               await srvr
                 .triggerShowGapCheck(newShow.id, name)
                 .catch((err) =>
-                  unilog(972, "triggerShowGapCheck failed:", err),
+                  unilog(972, `triggerShowGapCheck failed for ${name}:`, err),
                 );
             }
           } catch {
@@ -2248,7 +2252,9 @@ export default {
         if (show.name) {
           srvr
             .triggerShowSelect(show.name)
-            .catch((err) => unilog(975, "triggerShowSelect failed:", err));
+            .catch((err) =>
+              unilog(975, `triggerShowSelect failed for ${show.name}:`, err),
+            );
         }
       }
 
@@ -2348,7 +2354,9 @@ export default {
       const cell = event.currentTarget;
       const saved = cell.style.backgroundColor;
       cell.style.backgroundColor = "lightpink"; // flash on alt-click copy
-      await navigator.clipboard.writeText(String(this.getValBySortChoice(show)));
+      await navigator.clipboard.writeText(
+        String(this.getValBySortChoice(show)),
+      );
       await new Promise((res) => setTimeout(res, 400));
       cell.style.backgroundColor = saved;
     },
@@ -2369,7 +2377,10 @@ export default {
         try {
           await srvr.deletePath(path);
         } catch (err) {
-          unilog(977, "episodeClick: deletePath failed", { path, err });
+          unilog(977, `episodeClick: deletePath failed for ${show.name}`, {
+            path,
+            err,
+          });
           window.alert(err?.message || String(err));
           return;
         }
@@ -2395,7 +2406,9 @@ export default {
         this.markShowUpdating(show.name);
         await srvr
           .refreshEmbyItem(show.id, show.name)
-          .catch((err) => unilog(978, "refreshEmbyItem failed:", err));
+          .catch((err) =>
+            unilog(978, `refreshEmbyItem failed for ${show.name}:`, err),
+          );
 
         // Refresh the Map grid now that Emby has updated.
         await this.seriesMapAction("refresh", show, null);
@@ -2514,7 +2527,11 @@ export default {
       try {
         pathResults = await srvr.deletePaths(paths);
       } catch (err) {
-        unilog(979, "deleteEpisodes: deletePaths call failed", err);
+        unilog(
+          979,
+          `deleteEpisodes: deletePaths call failed for ${show.name}`,
+          err,
+        );
         window.alert(`Delete failed: ${err?.message || String(err)}`);
         return;
       }
@@ -2532,7 +2549,7 @@ export default {
             cell.error = false;
           }
         } else {
-          unilog(980, "deleteEpisodes: deletePaths failed", {
+          unilog(980, `deleteEpisodes: deletePaths failed for ${show.name}`, {
             path: paths[i],
             season,
             episode,
@@ -2562,7 +2579,9 @@ export default {
         this.markShowUpdating(show.name);
         await srvr
           .refreshEmbyItem(show.id, show.name)
-          .catch((err) => unilog(981, "refreshEmbyItem failed:", err));
+          .catch((err) =>
+            unilog(981, `refreshEmbyItem failed for ${show.name}:`, err),
+          );
 
         await this.seriesMapAction("refresh", show, null);
       }
@@ -2591,6 +2610,8 @@ export default {
 
       unilog(
         982,
+        "show:",
+        show.name,
         "season:",
         season,
         "episodeStates:",
@@ -2611,7 +2632,7 @@ export default {
           .map(([e]) => e);
         unilog(
           983,
-          `S${sNum} played:`,
+          `${show.name} S${sNum} played:`,
           playedEps.length > 0 ? playedEps.join(",") : "none",
         );
       }
@@ -2628,7 +2649,7 @@ export default {
         seriesMapArr.push([+sNum, episodes]);
       }
       const watchedEpis = tvdb.seriesMapToWatchedEpis(seriesMapArr);
-      unilog(984, "watchedEpis:", JSON.stringify(watchedEpis));
+      unilog(984, `watchedEpis for ${show.name}:`, JSON.stringify(watchedEpis));
       await srvr.setWatchedEpis({ name: show.name, watchedEpis });
       // Re-emit to App.vue so the map prop updates
       this.$emit("show-map", {
@@ -2679,7 +2700,7 @@ export default {
         try {
           await emby.getSeriesMap(show, true);
         } catch (e) {
-          unilog(985, "prune failed:", e?.message || e);
+          unilog(985, `prune failed for ${show.name}:`, e?.message || e);
         }
         if (mapToken !== this._mapActionToken) return;
       }
@@ -2788,7 +2809,9 @@ export default {
         this.markShowUpdating(show.name);
         await srvr
           .refreshEmbyItem(show.id, show.name)
-          .catch((err) => unilog(986, "refreshEmbyItem failed:", err));
+          .catch((err) =>
+            unilog(986, `refreshEmbyItem failed for ${show.name}:`, err),
+          );
         await this.seriesMapAction("refresh", show);
       }
     },
@@ -3305,7 +3328,11 @@ export default {
               // Keep the full map populated, but do not switch panes.
               await this.seriesMapAction("open", show, { noSwitch: true });
             } catch (err) {
-              unilog(991, "watchClick: seriesMapAction failed", err);
+              unilog(
+                991,
+                `watchClick: seriesMapAction failed for ${show.name}`,
+                err,
+              );
             }
             // Switch to info pane without clearing the background map.
             evtBus.emit("showInfoPane");
@@ -3642,7 +3669,7 @@ export default {
         // Refresh UI
         await this.refilter(false);
       } catch (err) {
-        unilog(997, "Failed to handle tvdb push:", err);
+        unilog(997, `Failed to handle tvdb push for ${name}:`, err);
       }
     });
 

@@ -529,7 +529,11 @@ export default {
             }
           }
         } catch (err) {
-          unilog(1043, "Failed to fetch IMDB video:", err);
+          unilog(
+            1043,
+            `Failed to fetch IMDB video for ${data.show.name}:`,
+            err,
+          );
         } finally {
           this.loadingImdb = false;
         }

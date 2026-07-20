@@ -663,10 +663,10 @@ const fixCompactEpisodeNaming = async (showId, showName) => {
         if (oldPath === newPath) continue;
         try {
           fs.renameSync(oldPath, newPath);
-          unilog(531, `Renamed: ${filename} → ${newFilename}`);
+          unilog(531, `Renamed for ${showName}: ${filename} → ${newFilename}`);
           anyFixed = true;
         } catch (e) {
-          unilog(532, `Rename failed for ${oldPath}:`, e.message);
+          unilog(532, `Rename failed for ${showName}: ${oldPath}:`, e.message);
         }
       }
     }
@@ -679,7 +679,7 @@ const fixCompactEpisodeNaming = async (showId, showName) => {
           { method: "POST" },
         );
       } catch (e) {
-        unilog(534, `Emby refresh error:`, e.message);
+        unilog(534, `Emby refresh error for ${showName}:`, e.message);
       }
       // Give Emby time to process before gap check reads updated data
       await new Promise((r) => setTimeout(r, 8000));
@@ -4582,11 +4582,17 @@ function reconcileDuplicateEpisodeVideos(seasonDir, season, episode) {
     try {
       fs.renameSync(src, dst);
     } catch (e) {
-      unilog(1537, `demote duplicate episode video failed for ${loser.name}: ${e.message}`);
+      unilog(
+        1537,
+        `demote duplicate episode video failed for ${loser.name}: ${e.message}`,
+      );
       continue;
     }
     demoted.add(src);
-    unilog(1538, `demoted duplicate ${loser.res}p episode video to .old (keeping ${bestRes}p): ${loser.name}`);
+    unilog(
+      1538,
+      `demoted duplicate ${loser.res}p episode video to .old (keeping ${bestRes}p): ${loser.name}`,
+    );
     const idx = subsState.subQueueChkSrt.findIndex(
       (e) => e.videoFilePath === src,
     );

@@ -800,7 +800,7 @@ export default {
           hasBif: result.hasBif,
         });
       } catch (e) {
-        unilog(922, "introClick error:", e);
+        unilog(922, `introClick error for ${this.show.name}:`, e);
         window.alert("Intro failed to open.");
       }
     },
@@ -924,7 +924,7 @@ export default {
       if (!tvdbData) {
         unilog(
           924,
-          "setPoster: tvdbData missing, using show.imageUrl or placeholder",
+          `setPoster: tvdbData missing for ${this.show?.name}, using show.imageUrl or placeholder`,
         );
       } else if (!tvdbData.image) {
         unilog(925, "image missing from tvdbData", tvdbData.name);
@@ -1365,7 +1365,7 @@ export default {
           anticipating: this.show.anticipating,
         });
       } catch (e) {
-        unilog(934, "antClick error:", e);
+        unilog(934, `antClick error for ${this.show.name}:`, e);
         this.show.anticipating = original;
       }
     },
@@ -1530,7 +1530,11 @@ export default {
               show?.imdb_id;
             if (imdbId) {
               try {
-                unilog(937, "Series: Trying IMDb ID search for", imdbId);
+                unilog(
+                  937,
+                  `Series: Trying IMDb ID search for ${show.name}`,
+                  imdbId,
+                );
                 tvdbData = await srvr.searchTvdbByImdbId({ imdbId });
                 if (tvdbData) {
                   unilog(
@@ -1595,7 +1599,11 @@ export default {
                 this.currentTvdbData = freshTvdbData;
               }
             } catch (e) {
-              unilog(941, "Series: getNewTvdb image refresh failed:", e);
+              unilog(
+                941,
+                `Series: getNewTvdb image refresh failed for ${show.name}:`,
+                e,
+              );
             }
           }
 
@@ -1682,7 +1690,11 @@ export default {
           }
         }
       } catch (e) {
-        unilog(944, "Error calculating watchedCount from seriesMap:", e);
+        unilog(
+          944,
+          `Error calculating watchedCount from seriesMap for ${show.name}:`,
+          e,
+        );
       }
 
       const seasonsTxt =

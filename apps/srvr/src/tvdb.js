@@ -1109,7 +1109,8 @@ function redditNameFromHtml(html) {
 }
 
 // www.reddit.com serves a JS-challenge wall to plain fetches; old.reddit does not
-const toOldReddit = (u) => u.replace(/:\/\/(www\.)?reddit\.com/, "://old.reddit.com");
+const toOldReddit = (u) =>
+  u.replace(/:\/\/(www\.)?reddit\.com/, "://old.reddit.com");
 
 // Set when reddit answers 403/429; until this time no reddit request is made at
 // all. In memory only -- after a restart the first 403 re-arms it immediately.
@@ -1135,12 +1136,18 @@ async function verifyRemoteName(kind, showName, url) {
     // 403/429 from reddit = rate limited -> stop hitting it for 24h
     if (kind === "reddit" && (resp.status === 403 || resp.status === 429)) {
       redditBlockedUntilMs = Date.now() + REDDIT_BLOCK_MS;
-      unilog(1561, `reddit http=${resp.status} rate limited -- skipping all reddit checks for 24h`);
+      unilog(
+        1561,
+        `reddit http=${resp.status} rate limited -- skipping all reddit checks for 24h`,
+      );
       return null;
     }
     // transient server errors (5xx) -> inconclusive, keep the button
     if (!resp.ok && resp.status !== 404) {
-      unilog(1562, `Skip ${kind}: show="${showName}" http=${resp.status} (inconclusive, button kept)`);
+      unilog(
+        1562,
+        `Skip ${kind}: show="${showName}" http=${resp.status} (inconclusive, button kept)`,
+      );
       return null;
     }
     const html = await resp.text();
@@ -2051,7 +2058,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     wikiUrl: fetchedUrls.wikiUrl ?? existing.wikiUrl ?? null,
     redditUrl: fetchedUrls.redditUrl ?? existing.redditUrl ?? null,
     wikiVerified: fetchedUrls.wikiVerified ?? existing.wikiVerified ?? null,
-    redditVerified: fetchedUrls.redditVerified ?? existing.redditVerified ?? null,
+    redditVerified:
+      fetchedUrls.redditVerified ?? existing.redditVerified ?? null,
     imdbUrl: fetchedUrls.imdbUrl ?? existing.imdbUrl ?? null,
     imdbRatings: fetchedUrls.imdbRatings ?? existing.imdbRatings ?? null,
     imdbReviewers: fetchedUrls.imdbReviewers ?? existing.imdbReviewers ?? null,
@@ -2644,7 +2652,11 @@ const tryLocalGetTvdb = async () => {
         unilog(124, `tvdb push3 [${processRecord.name}]: Rotten no result`);
       }
     } catch (e) {
-      unilog(755, "tryLocalGetTvdb push3 rotten:", e.message);
+      unilog(
+        755,
+        `tryLocalGetTvdb push3 rotten for ${processRecord.name}:`,
+        e.message,
+      );
     }
     const rottenSecs = ((Date.now() - rottenStartMs) / 1000).toFixed(1);
     unilog(

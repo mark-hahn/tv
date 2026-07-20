@@ -27,19 +27,23 @@ export default {
       const img = new Image();
       let imgIdx = 0;
       const tryImg = () => {
-        unilog(1026, "Meta: trying img:", images[imgIdx]);
+        unilog(1026, `Meta: trying img for ${this.show.name}:`, images[imgIdx]);
         img.src =
           "https://hahnca.com/tv/" + encodeURI(this.show.name) + images[imgIdx];
       };
       tryImg();
       img.onload = () => {
-        unilog(1027, "Meta: showing img:", images[imgIdx]);
+        unilog(
+          1027,
+          `Meta: showing img for ${this.show.name}:`,
+          images[imgIdx],
+        );
         document.getElementById("poster").replaceChildren(img);
       };
       img.onerror = () => {
-        unilog(1028, "Meta: no img:", images[imgIdx]);
+        unilog(1028, `Meta: no img for ${this.show.name}:`, images[imgIdx]);
         if (++imgIdx == images.length) {
-          unilog(1096, "Meta: no image found");
+          unilog(1096, `Meta: no image found for ${this.show.name}`);
           return;
         }
         tryImg();

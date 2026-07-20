@@ -974,7 +974,10 @@
             line-height: 22px;
           "
         >
-          <div v-if="selectedEpisodeAired" style="font-weight: bold">
+          <div
+            v-if="selectedEpisodeAired"
+            style="font-weight: bold"
+          >
             {{ selectedEpisodeAired }}
           </div>
           <div v-if="episodeInfo.overview">
@@ -994,7 +997,7 @@ import { config } from "../config.js";
 import * as urls from "../urls.js";
 import * as util from "../util.js";
 import evtBus from "../evtBus.js";
-import { fmtPos, unilog} from "@tv/share"
+import { fmtPos, unilog } from "@tv/share";
 import * as epd from "@tv/share";
 
 const MAP_ARROW_PAN_PX_PER_SEC = 400;
@@ -1375,10 +1378,14 @@ export default {
 
       if (!showName) return;
       if (!tvdbId) {
-        unilog(1016, "Map: Not In Emby ctrl-click missing tvdbId", {
-          mapShow: this.mapShow,
-          tvdbData: this.tvdbData,
-        });
+        unilog(
+          1016,
+          `Map: Not In Emby ctrl-click missing tvdbId for ${showName}`,
+          {
+            mapShow: this.mapShow,
+            tvdbData: this.tvdbData,
+          },
+        );
         window.alert("Missing TvdbId; cannot create show folder.");
         return;
       }
@@ -1394,11 +1401,15 @@ export default {
         typeof this.tvdbData === "object" &&
         Object.keys(this.tvdbData).length > 0;
       if (!hasTvdbData) {
-        unilog(1017, "Map: Not In Emby ctrl-click missing tvdbData", {
-          showName,
-          tvdbId,
-          tvdbData: this.tvdbData,
-        });
+        unilog(
+          1017,
+          `Map: Not In Emby ctrl-click missing tvdbData for ${showName}`,
+          {
+            showName,
+            tvdbId,
+            tvdbData: this.tvdbData,
+          },
+        );
         window.alert("Missing TVDB data; cannot create show folder.");
         return;
       }
@@ -1415,7 +1426,12 @@ export default {
 
       const setStatus = (txt) => {
         this.mapWorkingStatus = String(txt || "");
-        unilog(1018, "Map: Not In Emby progress:", showName, this.mapWorkingStatus);
+        unilog(
+          1018,
+          "Map: Not In Emby progress:",
+          showName,
+          this.mapWorkingStatus,
+        );
         evtBus.emit("setLibraryProgress", this.mapWorkingStatus);
       };
 
@@ -1457,7 +1473,10 @@ export default {
 
           const timeoutMs = 60000;
           const t = setTimeout(() => {
-            unilog(1020, "Map: timed out waiting for show reload after library-refresh-complete");
+            unilog(
+              1020,
+              "Map: timed out waiting for show reload after library-refresh-complete",
+            );
             finish();
           }, timeoutMs);
 
@@ -1747,7 +1766,7 @@ export default {
           this.tvdbData = this.allTvdb[this.mapShow.name];
         }
       } catch (err) {
-        unilog(1022, "loadTvdbData error:", err);
+        unilog(1022, `loadTvdbData error for ${this.mapShow?.name}:`, err);
       }
     },
     formatEpisodeAired(aired) {
@@ -1948,7 +1967,11 @@ export default {
         };
       } catch (err) {
         if (reqId !== this.episodeInfoRequestId) return;
-        unilog(1024, "selectEpisode getTmdb error:", err);
+        unilog(
+          1024,
+          `selectEpisode getTmdb error for ${this.mapShow?.name}:`,
+          err,
+        );
         this.episodeInfo = {
           image: null,
           overview: null,
@@ -2066,7 +2089,11 @@ export default {
       }, 750);
       const resp = await srvr.clearEpisodePositions(this.mapShow.name, cells);
       if (!resp?.ok) {
-        unilog(1025, "clearEpisodePositions failed", resp);
+        unilog(
+          1025,
+          `clearEpisodePositions failed for ${this.mapShow.name}`,
+          resp,
+        );
         return;
       }
       // Update in-memory seriesMap so cells immediately drop their pos/p display.

@@ -89,7 +89,10 @@ export const viewShowOnLivingRoomTv = async ({
     const viewUrl = urls.viewingUrl(session.Id, showId, showName, episodeId);
     const viewResp = await fetch(viewUrl, { method: "POST" });
     if (viewResp.ok) return { found: true, client: session.Client };
-    unilog(1388, `Viewing rejected by ${session.Client} session ${session.Id}: ${viewResp.status}`);
+    unilog(
+      1388,
+      `Viewing rejected by ${session.Client} session ${session.Id}: ${viewResp.status}`,
+    );
   }
   return { found: false };
 };
@@ -346,7 +349,10 @@ const getShowState = (showName, showMeta) => {
             fileGapSeason = seasonNumber;
             fileGapEpisode = episodeNumber;
           }
-          unilog(691, `fileGap set for ${showName} S${seasonNumber}E${episodeNumber}`);
+          unilog(
+            691,
+            `fileGap set for ${showName} S${seasonNumber}E${episodeNumber}`,
+          );
           fileGap = true;
         }
         if (!watched && !haveFile && !unaired) sawUnwatchedNoFile = true;
@@ -356,7 +362,10 @@ const getShowState = (showName, showMeta) => {
               fileGapSeason = seasonNumber;
               fileGapEpisode = episodeNumber;
             }
-            unilog(692, `fileGap (unwatched noFile before unwatched file) set for ${showName} S${seasonNumber}E${episodeNumber}`);
+            unilog(
+              692,
+              `fileGap (unwatched noFile before unwatched file) set for ${showName} S${seasonNumber}E${episodeNumber}`,
+            );
             fileGap = true;
           }
           sawUnwatchedNoFile = false;
@@ -366,7 +375,10 @@ const getShowState = (showName, showMeta) => {
         lastWatched = watched;
       }
       if (!seasonNotWatchedNoFiles && fileEndCount > 2) {
-        unilog(693, `fileEndError set for ${showName} S${seasonNumber}: fileEndCount=${fileEndCount} fileCount=${fileCount}`);
+        unilog(
+          693,
+          `fileEndError set for ${showName} S${seasonNumber}: fileEndCount=${fileEndCount} fileCount=${fileCount}`,
+        );
         fileEndError = true;
         if (fileEndErrorSeason === null) {
           fileEndErrorSeason = seasonNumber;
@@ -449,7 +461,7 @@ const getShowState = (showName, showMeta) => {
       watchGapEpisode = null;
     }
   } catch (error) {
-    unilog(694, "getShowState error:", error.message);
+    unilog(694, `getShowState error for ${showName}:`, error.message);
     return null;
   }
   return {

@@ -1177,7 +1177,7 @@ export default {
       try {
         const result = this.selectIntroFile(show);
         if (result.error) {
-          unilog(894, "", result.error);
+          unilog(894, `clickIntro error for ${show.name}:`, result.error);
           return;
         }
         await this.handleOpenIntro({

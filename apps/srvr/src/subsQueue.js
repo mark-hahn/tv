@@ -1087,7 +1087,7 @@ async function checkAndDownloadOpnSrt(showName, tvdbRecord) {
       persistSubQueueChkSrt();
       notifyClients("chksrt-count", subsState.subQueueChkSrt.length);
       syncBatchMsgs();
-      unilog(25, `opn-bg unsnooze: ${filePath}`);
+      unilog(25, `opn-bg unsnooze ${showName}: ${filePath}`);
     }
   }
 }
@@ -1129,7 +1129,7 @@ async function processChksrtSnoozedForShow(showName, tvdbRecord) {
       { videoFilePath, fromUI: false, lowPriority: false },
       false,
     );
-    unilog(27, `chksrt unsnooze (24h): ${videoFilePath}`);
+    unilog(27, `chksrt unsnooze (24h) ${showName}: ${videoFilePath}`);
     queueChanged = true;
   }
 

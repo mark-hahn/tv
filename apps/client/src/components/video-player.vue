@@ -1694,7 +1694,7 @@ export default {
           anticipating: show.anticipating,
         });
       } catch (e) {
-        unilog(1055, "clickChksrtAnt error:", e);
+        unilog(1055, `clickChksrtAnt error for ${show.name}:`, e);
         show.anticipating = original;
       }
     },

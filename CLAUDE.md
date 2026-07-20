@@ -201,3 +201,7 @@ debug statement that must stay as plain `console.*` output.
 ```js
 console.log("[reseed] done."); // no-unilog
 ```
+
+log messages should contain the show name when the log specifically and unambiguously refers to a show.
+
+- when a problem is reported with wrong data like a show not having data fields correct then only work on fixing the problem/bug -- don't fix the wrong data unless i ask you to

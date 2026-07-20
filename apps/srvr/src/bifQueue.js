@@ -192,18 +192,18 @@ export async function enqueueBif(showName, paths) {
     if (!videoPath) continue;
     const base = path.basename(videoPath);
     if (bifNeededQueue.some((o) => o.bifPath === videoPath)) {
-      unilog(48, `skip (queued) ${base}`);
+      unilog(48, `skip (queued) ${showName}: ${base}`);
       continue;
     }
     if (inFlightPath === videoPath) {
-      unilog(49, `skip (in-flight) ${base}`);
+      unilog(49, `skip (in-flight) ${showName}: ${base}`);
       continue;
     }
     const parsed = path.parse(videoPath);
     const bifDiskPath = path.join(parsed.dir, `${parsed.name}-320-10.bif`);
     try {
       await fsp.access(bifDiskPath);
-      unilog(50, `skip (on-disk) ${base}`);
+      unilog(50, `skip (on-disk) ${showName}: ${base}`);
       continue;
     } catch {
       /* not on disk */

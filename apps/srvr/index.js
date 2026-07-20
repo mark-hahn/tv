@@ -218,6 +218,7 @@ import * as fileOps from "./src/fileOps.js";
 const { getFile, deletePath, deletePaths, delSeasonFiles, createShowFolder } =
   fileOps;
 import { registerMediaRoutes } from "./src/routes/media.js";
+import { registerUsbRoutes } from "./src/routes/usb.js";
 import * as unilogRoutes from "./src/routes/unilog.js";
 const { broadcastUnilog } = unilogRoutes;
 const registerUnilogRoutes = unilogRoutes.registerUnilogRoutes;
@@ -1266,6 +1267,7 @@ epd.setUnilogSink(({ logId, message }) =>
   ),
 );
 registerUnilogRoutes(app);
+registerUsbRoutes(app);
 
 // Log server startup.
 unilog(1215, "Started t-srvr");

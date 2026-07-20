@@ -74,20 +74,48 @@
 <script>
 import * as echarts from "echarts/core";
 import { BarChart } from "echarts/charts";
-import { GridComponent, TooltipComponent } from "echarts/components";
+import {
+  GridComponent,
+  LegendComponent,
+  TooltipComponent,
+} from "echarts/components";
 import { CanvasRenderer } from "echarts/renderers";
 import * as srvr from "../srvr.js";
 import { logHere, unilog} from "../log.js"
 
-echarts.use([BarChart, GridComponent, TooltipComponent, CanvasRenderer]);
+echarts.use([
+  BarChart,
+  GridComponent,
+  LegendComponent,
+  TooltipComponent,
+  CanvasRenderer,
+]);
 
-// One entry per radio button; add new plots here.
+// Categorical slots, assigned in fixed order (blue, green).
+const SERIES_COLORS = ["#2a78d6", "#008300"];
+const SURFACE = "#fafafa"; // pane background — draws the gap between segments
+
+// One entry per radio button; add new plots here. `series` lists the per-day
+// fields the server returns; more than one stacks them. `usb` plots scan the
+// usb server instead of querying the unilog db.
 const PLOTS = [
-  { key: "down", label: "Down", title: "Downloads per day" },
-  { key: "flex", label: "Flex", title: "Flex downloads per day" },
+  {
+    key: "down",
+    label: "Down",
+    title: "Downloads per day",
+    series: [
+      { field: "tor", name: "Tor" },
+      { field: "flex", name: "Flex" },
+    ],
+  },
+  {
+    key: "shows",
+    label: "Shows",
+    title: "Usb shows per day",
+    usb: true,
+    series: [{ field: "count", name: "Shows" }],
+  },
 ];
-
-const BAR_COLOR = "#2a78d6";
 
 // "yyyy/mm/dd" for today in PST.
 function todayPst() {
@@ -97,9 +125,9 @@ function todayPst() {
 }
 
 // Fill missing days with zero counts from the first data day through today.
-function fillDays(days) {
+function fillDays(days, fields) {
   if (!days.length) return [];
-  const counts = new Map(days.map((d) => [d.day, d.count]));
+  const byDay = new Map(days.map((d) => [d.day, d]));
   const [y, m, d] = days[0].day.split("/").map(Number);
   const cur = new Date(y, m - 1, d);
   const last = todayPst();
@@ -109,7 +137,10 @@ function fillDays(days) {
       `${cur.getFullYear()}/` +
       `${String(cur.getMonth() + 1).padStart(2, "0")}/` +
       `${String(cur.getDate()).padStart(2, "0")}`;
-    out.push({ day, count: counts.get(day) ?? 0 });
+    const row = byDay.get(day);
+    const filled = { day };
+    for (const f of fields) filled[f] = row?.[f] ?? 0;
+    out.push(filled);
     if (day >= last) break;
     cur.setDate(cur.getDate() + 1);
   }
@@ -164,10 +195,14 @@ export default {
       this.loading = true;
       this.error = "";
       try {
-        const res = await srvr.getUnilogPlotDays(this.plotSel);
-        const days = fillDays(res?.days || []);
+        const plot = this.plots.find((p) => p.key === this.plotSel);
+        const res = plot?.usb
+          ? await srvr.getUsbFileDays()
+          : await srvr.getUnilogPlotDays(this.plotSel);
+        const fields = plot.series.map((s) => s.field);
+        const days = fillDays(res?.days || [], fields);
         this.ensureChart();
-        this.renderChart(days);
+        this.renderChart(days, plot.series);
       } catch (e) {
         this.error = e?.message || String(e);
         unilog(1569, `plot load failed: ${e.message}`);
@@ -175,17 +210,32 @@ export default {
         this.loading = false;
       }
     },
-    renderChart(days) {
+    renderChart(days, series) {
       if (!this.chart) return;
+      const stacked = series.length > 1;
       this.chart.setOption(
         {
-          grid: { left: 45, right: 20, top: 20, bottom: 40 },
+          grid: { left: 45, right: 20, top: stacked ? 40 : 20, bottom: 40 },
+          legend: stacked
+            ? {
+                top: 8,
+                itemWidth: 10,
+                itemHeight: 10,
+                textStyle: { color: "#666", fontSize: 12 },
+              }
+            : { show: false },
           tooltip: {
             trigger: "axis",
             axisPointer: { type: "shadow" },
             formatter: (params) => {
-              const p = Array.isArray(params) ? params[0] : params;
-              return `${p.name}<br/>${this.plotTitle}: <b>${p.value}</b>`;
+              const ps = Array.isArray(params) ? params : [params];
+              if (!stacked)
+                return `${ps[0].name}<br/>${this.plotTitle}: <b>${ps[0].value}</b>`;
+              const rows = ps
+                .map((p) => `${p.marker}${p.seriesName}: <b>${p.value}</b>`)
+                .join("<br/>");
+              const total = ps.reduce((n, p) => n + (p.value || 0), 0);
+              return `${ps[0].name}<br/>${rows}<br/>Total: <b>${total}</b>`;
             },
           },
           xAxis: {
@@ -201,17 +251,21 @@ export default {
             axisLabel: { color: "#666", fontSize: 11 },
             splitLine: { lineStyle: { color: "#e8e8e8" } },
           },
-          series: [
-            {
-              type: "bar",
-              data: days.map((d) => d.count),
-              barMaxWidth: 28,
-              itemStyle: {
-                color: BAR_COLOR,
-                borderRadius: [4, 4, 0, 0],
-              },
+          series: series.map((s, i) => ({
+            name: s.name,
+            type: "bar",
+            stack: stacked ? "total" : undefined,
+            data: days.map((d) => d[s.field]),
+            barMaxWidth: 28,
+            itemStyle: {
+              color: SERIES_COLORS[i],
+              // Round only the top of the stack; a surface-colored border
+              // leaves a gap between stacked segments.
+              borderRadius: i === series.length - 1 ? [4, 4, 0, 0] : 0,
+              borderColor: SURFACE,
+              borderWidth: stacked ? 2 : 0,
             },
-          ],
+          })),
         },
         true,
       );

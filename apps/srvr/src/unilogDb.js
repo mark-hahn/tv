@@ -586,27 +586,27 @@ export function getOldestTimestamp() {
 }
 
 // ---------------------------------------------------------------------------
-// Plot pane day-count queries. Each returns [{ day: "yyyy/mm/dd", count }]
-// ascending by day (PST prefix of ts). Counts include hidden/dedup rows — a
-// hidden event still represents a real download.
+// Plot pane day-count queries, ascending by day (PST prefix of ts). Counts
+// include hidden/dedup rows — a hidden event still represents a real download.
 // ---------------------------------------------------------------------------
 
 // Site in apps/down/src/tvJson.js (logTvEntryAdded, no-error branch): one
-// event per file queued for download from the usb server.
+// event per file queued for download from the usb server. This is every
+// download regardless of where it came from.
 const DOWN_ENTRY_LOG_ID = 1189;
 
 export function plotDayCounts(plot) {
   if (plot === "down") {
-    return db
+    // Stacked bars: total downloads split into flexget-originated and the
+    // remainder (sent by hand from the tor pane).
+    const total = db
       .prepare(
         `SELECT substr(ts, 1, 10) AS day, COUNT(*) AS count
            FROM log_events WHERE log_id = ? GROUP BY day ORDER BY day`,
       )
       .all(DOWN_ENTRY_LOG_ID);
-  }
-  if (plot === "flex") {
     // Every SENT(first|better|upgrade-...) emitted by flexget.js.
-    return db
+    const flexRows = db
       .prepare(
         `SELECT substr(e.ts, 1, 10) AS day, COUNT(*) AS count
            FROM log_events e JOIN log_sites s ON e.log_id = s.log_id
@@ -614,6 +614,13 @@ export function plotDayCounts(plot) {
           GROUP BY day ORDER BY day`,
       )
       .all();
+    const flexByDay = new Map(flexRows.map((r) => [r.day, r.count]));
+    return total.map((r) => {
+      // Flexget sends can outrun the downloads they trigger; cap so the two
+      // segments always sum to the day's download total.
+      const flex = Math.min(flexByDay.get(r.day) || 0, r.count);
+      return { day: r.day, tor: r.count - flex, flex };
+    });
   }
   throw new Error(`unknown plot: ${plot}`);
 }

@@ -953,7 +953,7 @@ export async function getActorPage(params) {
 }
 
 export async function getActorCredits(params) {
-  unilog(879, "getActorCredits called with:", params, new Date().toISOString());
+  unilog(879, "getActorCredits called with:", params);
   const response = await fetch(`${config.torrentsApiUrl}/api/getActorCredits`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

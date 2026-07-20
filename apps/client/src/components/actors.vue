@@ -905,7 +905,7 @@ export default {
     },
 
     async handleAllCreditsButton() {
-      unilog(905, "handleAllCreditsButton called", new Date().toISOString());
+      unilog(905, "handleAllCreditsButton called");
       if (!this.selectedActor) return;
 
       // Toggle off if already showing

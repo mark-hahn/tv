@@ -2499,7 +2499,7 @@ const ACTOR_CREDITS_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
 const inFlightRequests = new Map();
 
 app.post("/api/getActorCredits", async (req, res) => {
-  unilog(260, `/api/getActorCredits received at ${new Date().toISOString()}`);
+  unilog(260, `/api/getActorCredits received`);
   let actorName = req.body;
   if (typeof actorName === "object" && actorName !== null && actorName.name) {
     actorName = actorName.name;

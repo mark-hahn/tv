@@ -398,6 +398,21 @@ export function registerUnilogRoutes(app) {
     }
   });
 
+  app.post("/api/unilog/groups/replace", (req, res) => {
+    try {
+      const { groupIds, logIds } = req.body || {};
+      res.json(
+        unilogDb.replaceGroupsOnSites({
+          groupIds: Array.isArray(groupIds) ? groupIds : [],
+          logIds: Array.isArray(logIds) ? logIds : [],
+        }),
+      );
+    } catch (error) {
+      console.error("[unilog] /api/unilog/groups/replace error:", error); // no-unilog
+      res.status(500).json({ error: String(error?.message || error) });
+    }
+  });
+
   app.post("/api/unilog/groups/delete", (req, res) => {
     try {
       const { groupIds } = req.body || {};

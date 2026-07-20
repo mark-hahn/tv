@@ -561,6 +561,9 @@ export function assignUnilogGroups(groupIds, logIds) {
 export function removeUnilogGroups(groupIds, logIds) {
   return httpCall("/api/unilog/groups/remove", { groupIds, logIds }, "POST");
 }
+export function replaceUnilogGroups(groupIds, logIds) {
+  return httpCall("/api/unilog/groups/replace", { groupIds, logIds }, "POST");
+}
 export function deleteUnilogGroups(groupIds) {
   return httpCall("/api/unilog/groups/delete", { groupIds }, "POST");
 }

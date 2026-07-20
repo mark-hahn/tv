@@ -1433,10 +1433,10 @@ async function main() {
         try {
           await execAsync(
             `ssh ${usbHost} "find ~/files -mtime +${PRUNE_DAYS} -exec rm -rf {} \\; >/dev/null 2>&1"`,
-            { timeout: 15 * 60 * 1000 },
+            { timeout: 5 * 60 * 1000 },
           );
         } catch (e) {
-          // Non-fatal.
+          unilog(1590, `usb prune failed: ${e.message}`);
         }
         // After prune completes, scan dirs and prune DB entries.
         try {
@@ -3203,7 +3203,6 @@ async function main() {
             existsCount++;
             unilog(
               336,
-              "------",
               downloadCount,
               "/",
               chkCount,

@@ -287,6 +287,16 @@
           <div class="groupsRow">
             <button
               class="logBtn"
+              :disabled="!selectedGroupIds.length || !selectedSiteCount"
+              @click="replaceGroups"
+            >
+              Replace
+            </button>
+          </div>
+
+          <div class="groupsRow">
+            <button
+              class="logBtn"
               :disabled="!selectedGroupIds.length"
               @click="showGroupEvents"
             >
@@ -1654,6 +1664,25 @@ export default {
       } catch (e) {
         console.error("[log.vue]", `removeGroups failed: ${e.message}`); // no-unilog
         this.flash("failed to remove");
+      }
+    },
+    async replaceGroups() {
+      const siteIds = this.selectedSiteIds();
+      if (!this.selectedGroupIds.length || !siteIds.length) return;
+      try {
+        const res = await srvr.replaceUnilogGroups(
+          this.selectedGroupIds,
+          siteIds,
+        );
+        await this.refreshRowGroups(siteIds);
+        await this.applyGroupFilter();
+        this.refreshGroupStats();
+        this.flash(
+          `replaced: -${res?.removed ?? 0} +${res?.added ?? 0} links`,
+        );
+      } catch (e) {
+        console.error("[log.vue]", `replaceGroups failed: ${e.message}`); // no-unilog
+        this.flash("failed to replace");
       }
     },
     async deleteGroupsAction() {

@@ -732,6 +732,10 @@ const delSiteGroup = db.prepare(
   "DELETE FROM site_groups WHERE log_id = ? AND group_id = ?",
 );
 
+const delAllSiteGroups = db.prepare(
+  "DELETE FROM site_groups WHERE log_id = ?",
+);
+
 // Create a named group and link it to the given sites.
 // If a group with that description already exists, do nothing.
 export const createGroupWithSites = db.transaction(
@@ -766,6 +770,21 @@ export const removeGroupsFromSites = db.transaction(
       for (const logId of logIds)
         removed += delSiteGroup.run(Number(logId), Number(gid)).changes;
     return { removed };
+  },
+);
+
+// Drop every group link on each site, then link only the given groups.
+// Returns rows removed and rows added.
+export const replaceGroupsOnSites = db.transaction(
+  ({ groupIds = [], logIds = [] }) => {
+    let removed = 0;
+    let added = 0;
+    for (const logId of logIds) {
+      removed += delAllSiteGroups.run(Number(logId)).changes;
+      for (const gid of groupIds)
+        added += insSiteGroup.run(Number(logId), Number(gid)).changes;
+    }
+    return { removed, added };
   },
 );
 

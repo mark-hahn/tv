@@ -720,6 +720,9 @@ export function getSubFileIds(showName) {
   return httpCall("/api/getSubFileIds", { showName }, "POST");
 }
 
+export function tvRemoteKey(params) {
+  return httpCall("/api/tvRemoteKey", params, "POST");
+}
 export function getNoEmbys() {
   return httpCall("/api/getNoEmbys");
 }

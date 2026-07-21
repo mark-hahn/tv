@@ -48,8 +48,9 @@
           font-weight: bold;
         "
       >
-        A remote collision has been detected and the remote has been locked.
-        Press and hold unlock button to continue.
+        A remote collision has been detected: "{{ lockInfo?.sentKey }}" was
+        sent, "{{ lockInfo?.blockedKey }}" was not. The remote has been
+        locked. Press and hold unlock button to continue.
       </div>
       <div
         @mousedown.prevent="startUnlockHold"
@@ -606,7 +607,7 @@
 <script>
 import { config } from "../config.js";
 import evtBus from "../evtBus.js";
-import { wsSend, clientId, openChannel } from "../srvr.js";
+import { wsSend, clientId, openChannel, tvRemoteKey } from "../srvr.js";
 import allServices from "../../../tv/services.json";
 
 const SCRUB_HOLD_DELAY_MS = 400;
@@ -641,8 +642,8 @@ export default {
       showSubCtrl: false,
       subPlayers: [],
       subDeviceName: null,
-      avoidingCollisions: false,
       locked: false,
+      lockInfo: null,
       showPicCtrl: false,
       picSettings: [],
       picInputs: {}, // target -> { typing: bool, raw: string }
@@ -702,7 +703,6 @@ export default {
   mounted() {
     evtBus.on("tvMuteState", this._onTvMuteState);
     evtBus.on("paneChanged", this._onPaneChanged);
-    evtBus.on("tvRemoteAction", this._onTvRemoteAction);
     evtBus.on("tvRemoteLock", this._onTvRemoteLock);
     evtBus.on("tvRemoteUnlock", this._onTvRemoteUnlock);
   },
@@ -710,7 +710,6 @@ export default {
   beforeUnmount() {
     evtBus.off("tvMuteState", this._onTvMuteState);
     evtBus.off("paneChanged", this._onPaneChanged);
-    evtBus.off("tvRemoteAction", this._onTvRemoteAction);
     evtBus.off("tvRemoteLock", this._onTvRemoteLock);
     evtBus.off("tvRemoteUnlock", this._onTvRemoteUnlock);
     this.stopRepeat();
@@ -723,54 +722,39 @@ export default {
     clearTimeout(this._googleTimer);
     this.closePicCtrl();
     this.subClose();
-    clearTimeout(this._avoidTimer);
     clearTimeout(this._unlockHoldTimer);
     clearInterval(this._embyPosTimer);
   },
 
   methods: {
-    notifyAction(fromSubCtrl = false) {
-      wsSend({
-        fname: "tvRemoteAction",
-        param: { fromSubCtrl, senderId: clientId },
-      });
-    },
-
-    checkBlocked() {
-      if (this.locked) return true;
-      if (this.avoidingCollisions) {
-        wsSend({ fname: "tvRemoteCollision" });
-        return true;
+    // Single choke point for every key/command this pane sends — the server's
+    // keySendWithChk checks it against the other remote's last press before
+    // forwarding to the tv/ha, so no client-side collision bookkeeping is
+    // needed here. path=null just arms the collision window without sending
+    // anything (used for the arrow-scrub button-down, whose actual send is
+    // decided later by hold-duration).
+    async sendKeyThrough(key, path, { method = "GET", body, fromSubCtrl = false } = {}) {
+      try {
+        return await tvRemoteKey({ key, senderId: clientId, fromSubCtrl, method, path, body });
+      } catch (_) {
+        return { blocked: false, result: null };
       }
-      return false;
     },
 
-    _onTvRemoteAction(data) {
-      // Ignore our own action echoed back via a duplicate socket (would
-      // otherwise make this UI collide with itself on the next key).
-      if (data?.senderId && data.senderId === clientId) return;
-      const fromSubCtrl = data?.fromSubCtrl ?? false;
-      this.avoidingCollisions = true;
-      clearTimeout(this._avoidTimer);
-      this._avoidTimer = setTimeout(
-        () => {
-          this.avoidingCollisions = false;
-        },
-        fromSubCtrl ? 5000 : 1500,
-      );
-    },
-
-    _onTvRemoteLock() {
+    _onTvRemoteLock(data) {
       this.locked = true;
+      this.lockInfo = data;
     },
 
     _onTvRemoteUnlock() {
       this.locked = false;
+      this.lockInfo = null;
     },
 
     startUnlockHold() {
       this._unlockHoldTimer = setTimeout(() => {
         this.locked = false;
+        this.lockInfo = null;
         wsSend({ fname: "tvRemoteUnlock" });
       }, 500);
     },
@@ -781,18 +765,20 @@ export default {
 
     startRepeat(key) {
       if (this.isOff || this.isOther) return;
-      if (this.checkBlocked()) return;
       if (!this._debounce()) return;
       this.flash(key);
-      this.notifyAction();
       this._repeatActive = true;
       this._pendingLRKey = null;
       const isLR = key === "left" || key === "right";
       (async () => {
         if (!isLR) {
-          await fetch(`${config.tvTvUrl}/tv/key/${key}`).catch(() => {});
+          await this.sendKeyThrough(key, `/tv/key/${key}`);
           if (!this._repeatActive) return;
         } else {
+          // Only arms the collision window here — the actual send (tap
+          // release below, or scrub start/ping) happens once we know
+          // whether this is a short tap or a long-press scrub.
+          await this.sendKeyThrough(key, null);
           this._pendingLRKey = key;
         }
         await new Promise((r) => {
@@ -1303,29 +1289,23 @@ export default {
         (p) => (p.deviceName || p.sessionId) === this.subDeviceName,
       );
       if (!player) return;
-      if (this.checkBlocked()) return;
       // optimistic update
       this.subPlayers = this.subPlayers.map((p) =>
         (p.deviceName || p.sessionId) === this.subDeviceName
           ? { ...p, subtitleStreamIndex: index }
           : p,
       );
-      let waitMs = 5000;
-      let acted = true;
-      try {
-        const res = await fetch(`${config.tvTvUrl}/tv/emby/subtitle`, {
+      const { blocked, result } = await this.sendKeyThrough(
+        `subtitle:${index}`,
+        `/tv/emby/subtitle`,
+        {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId: player.sessionId, index }),
-        });
-        const data = await res.json();
-        waitMs = data.waitMs ?? 5000;
-        acted = waitMs > 0;
-      } catch (_) {}
-      if (acted) {
-        this.notifyAction(true);
-        await new Promise((r) => setTimeout(r, waitMs));
-      }
+          body: { sessionId: player.sessionId, index },
+          fromSubCtrl: true,
+        },
+      );
+      const waitMs = blocked ? 0 : (result?.waitMs ?? 5000);
+      if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
       await this.fetchSubPlayers();
     },
 
@@ -1351,24 +1331,20 @@ export default {
     },
 
     async googleBtn() {
-      if (this.checkBlocked()) return;
       if (this.mode === "google") {
         this.tvCmd("off");
       } else {
         this.flash("google");
-        this.notifyAction();
-        fetch(`${config.tvTvUrl}/tv/googlebtn`).catch(() => {});
+        this.sendKeyThrough("googlebtn", `/tv/googlebtn`);
       }
     },
 
     async fireBtn() {
-      if (this.checkBlocked()) return;
       if (this.mode === "fire") {
         this.tvCmd("off");
       } else {
         this.flash("fire");
-        this.notifyAction();
-        fetch(`${config.tvTvUrl}/tv/firebtn`).catch(() => {});
+        this.sendKeyThrough("firebtn", `/tv/firebtn`);
       }
     },
 
@@ -1386,16 +1362,13 @@ export default {
 
     async openApp(svc) {
       if (this.isOff) return;
-      if (this.checkBlocked()) return;
-      this.notifyAction();
       setTimeout(() => {
         this.showStreamers = false;
       }, 1000);
-      try {
-        await fetch(
-          `${config.tvTvUrl}/tv/openapp?uri=${encodeURIComponent(svc.uri)}`,
-        );
-      } catch (_) {}
+      await this.sendKeyThrough(
+        `openapp:${svc.name}`,
+        `/tv/openapp?uri=${encodeURIComponent(svc.uri)}`,
+      );
     },
 
     flashSvcName(name) {
@@ -1414,21 +1387,17 @@ export default {
 
     async tvCmd(cmd) {
       if (this.isOff || this.isOther) return;
-      if (this.checkBlocked()) return;
       this.flash(cmd);
       if (!this._debounce()) return;
-      this.notifyAction();
-      const res = await fetch(`${config.tvTvUrl}/tv/${cmd}`);
-      const data = await res.json();
-      if (cmd === "mute" && data.ok) this.muted = data.muted;
+      const { result } = await this.sendKeyThrough(cmd, `/tv/${cmd}`);
+      if (cmd === "mute" && result?.ok) this.muted = result.muted;
     },
 
     async tvVolCmd(dir) {
       if (this.isOff || this.isOther) return;
-      if (this.checkBlocked()) return;
-      this.flash(dir === "down" ? "vold" : "volu");
-      this.notifyAction();
-      await fetch(`${config.tvTvUrl}/tv/vol/${dir}`).catch(() => {});
+      const key = dir === "down" ? "vold" : "volu";
+      this.flash(key);
+      await this.sendKeyThrough(key, `/tv/vol/${dir}`);
     },
 
     async _tvKeyRaw(key) {
@@ -1438,12 +1407,9 @@ export default {
 
     async tvKey(key) {
       if (this.isOff || this.isOther) return;
-      if (this.checkBlocked()) return;
       if (!this._debounce()) return;
       this.flash(key);
-      this.notifyAction();
-      const res = await fetch(`${config.tvTvUrl}/tv/key/${key}`);
-      const data = await res.json();
+      await this.sendKeyThrough(key, `/tv/key/${key}`);
     },
   },
 };

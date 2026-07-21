@@ -126,6 +126,7 @@ export default function App() {
   const [picSettings, setPicSettings] = useState([]);
   const [picInputs, setPicInputs] = useState({}); // target -> { typing, raw }
   const [locked, setLocked] = useState(false);
+  const [lockInfo, setLockInfo] = useState(null);
   const [missingEpWarning, setMissingEpWarning] = useState(null);
   const [subMismatchWarning, setSubMismatchWarning] = useState(false);
   const [layoutOption, setLayoutOption] = useState("mark");
@@ -187,8 +188,6 @@ export default function App() {
   const subPendingRef = useRef(null); // { deviceName, index } while optimistic highlight is active
   const subGenRef = useRef(0);
   const subNavigatingRef = useRef(false);
-  const avoidingRef = useRef(false);
-  const avoidTimerRef = useRef(null);
   const unlockHoldTimerRef = useRef(null);
   const pendingLRKeyRef = useRef(null);
   const homeHoldRef = useRef(null);
@@ -213,18 +212,20 @@ export default function App() {
 
   const startRepeat = (key) => {
     if (isOff || isOther) return;
-    if (checkBlocked()) return;
     if (!debounce()) return;
     flash(key);
-    notifyAction();
     repeatActiveRef.current = true;
     pendingLRKeyRef.current = null;
     const isLR = key === "left" || key === "right";
     (async () => {
       if (!isLR) {
-        await fetch(`${TV_TV_URL}/tv/key/${key}`).catch(() => {});
+        await sendKeyThrough(key, `/tv/key/${key}`);
         if (!repeatActiveRef.current) return;
       } else {
+        // Only arms the collision window here — the actual send (tap
+        // release below, or scrub start/ping) happens once we know
+        // whether this is a short tap or a long-press scrub.
+        await sendKeyThrough(key, null);
         pendingLRKeyRef.current = key;
       }
       await new Promise((r) => {
@@ -339,22 +340,12 @@ export default function App() {
         }
         if (msg.id === 0 && msg.notification === "tvMuteState") {
           applyTvState(msg.data);
-        } else if (msg.id === 0 && msg.notification === "tvRemoteAction") {
-          // Ignore our own action echoed back via a duplicate socket.
-          if (msg.data?.senderId && msg.data.senderId === CLIENT_ID) return;
-          const fromSubCtrl = msg.data?.fromSubCtrl ?? false;
-          avoidingRef.current = true;
-          clearTimeout(avoidTimerRef.current);
-          avoidTimerRef.current = setTimeout(
-            () => {
-              avoidingRef.current = false;
-            },
-            fromSubCtrl ? 5000 : 1500,
-          );
         } else if (msg.id === 0 && msg.notification === "tvRemoteLock") {
           setLocked(true);
+          setLockInfo(msg.data ?? null);
         } else if (msg.id === 0 && msg.notification === "tvRemoteUnlock") {
           setLocked(false);
+          setLockInfo(null);
         } else if (
           msg.id === 0 &&
           msg.notification === "missingEpisodeWarning"
@@ -439,7 +430,6 @@ export default function App() {
       dbRef.current = null;
       closeChannel("embyPlaying");
       closeChannel("tvPicture");
-      clearTimeout(avoidTimerRef.current);
       clearTimeout(unlockHoldTimerRef.current);
     };
   }, []);
@@ -635,33 +625,40 @@ export default function App() {
     setTimeout(() => setFlashBtn(null), 300);
   };
 
-  const notifyAction = (fromSubCtrl = false) => {
-    const ws = wsRef.current;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(
-        JSON.stringify({
-          fname: "tvRemoteAction",
-          param: { fromSubCtrl, senderId: CLIENT_ID },
+  // Single choke point for every key/command this app sends — the server's
+  // keySendWithChk checks it against the other remote's last press before
+  // forwarding to the tv/ha, so no client-side collision bookkeeping is
+  // needed here. path=null just arms the collision window without sending
+  // anything (used for the arrow-scrub button-down, whose actual send is
+  // decided later by hold-duration).
+  const sendKeyThrough = async (
+    key,
+    path,
+    { method = "GET", body, fromSubCtrl = false } = {},
+  ) => {
+    try {
+      const res = await fetch(`${TV_SRVR_HTTP_URL}/api/tvRemoteKey`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key,
+          senderId: CLIENT_ID,
+          fromSubCtrl,
+          method,
+          path,
+          body,
         }),
-      );
+      });
+      return await res.json();
+    } catch (_) {
+      return { blocked: false, result: null };
     }
-  };
-
-  const checkBlocked = () => {
-    if (locked) return true;
-    if (avoidingRef.current) {
-      const ws = wsRef.current;
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ fname: "tvRemoteCollision" }));
-      }
-      return true;
-    }
-    return false;
   };
 
   const startUnlockHold = () => {
     unlockHoldTimerRef.current = setTimeout(() => {
       setLocked(false);
+      setLockInfo(null);
       const ws = wsRef.current;
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ fname: "tvRemoteUnlock" }));
@@ -675,24 +672,16 @@ export default function App() {
 
   const tvCmd = async (cmd) => {
     if (isOff || isOther) return;
-    if (checkBlocked()) return;
     flash(cmd);
     if (!debounce()) return;
-    notifyAction();
-    try {
-      await fetch(`${TV_TV_URL}/tv/${cmd}`);
-    } catch (_) {}
+    await sendKeyThrough(cmd, `/tv/${cmd}`);
   };
 
   const tvKey = async (key) => {
     if (isOff || isOther) return;
-    if (checkBlocked()) return;
     if (!debounce()) return;
     flash(key);
-    notifyAction();
-    try {
-      await fetch(`${TV_TV_URL}/tv/key/${key}`);
-    } catch (_) {}
+    await sendKeyThrough(key, `/tv/key/${key}`);
   };
 
   const startHold = (action) => {
@@ -747,24 +736,20 @@ export default function App() {
   };
 
   const googleBtn = async () => {
-    if (checkBlocked()) return;
     if (mode === "google") {
       tvCmd("off");
     } else {
       flash("google");
-      notifyAction();
-      fetch(`${TV_TV_URL}/tv/googlebtn`).catch(() => {});
+      sendKeyThrough("googlebtn", `/tv/googlebtn`);
     }
   };
 
   const fireBtn = async () => {
-    if (checkBlocked()) return;
     if (mode === "fire") {
       tvCmd("off");
     } else {
       flash("fire");
-      notifyAction();
-      fetch(`${TV_TV_URL}/tv/firebtn`).catch(() => {});
+      sendKeyThrough("firebtn", `/tv/firebtn`);
     }
   };
 
@@ -800,7 +785,7 @@ export default function App() {
       async () => {
         if (isOff || isOther) return;
         flash("vold");
-        await fetch(`${TV_TV_URL}/tv/vol/down`).catch(() => {});
+        await sendKeyThrough("vold", `/tv/vol/down`);
       },
       () => {
         flash("vold");
@@ -825,7 +810,7 @@ export default function App() {
       async () => {
         if (isOff || isOther) return;
         flash("volu");
-        await fetch(`${TV_TV_URL}/tv/vol/up`).catch(() => {});
+        await sendKeyThrough("volu", `/tv/vol/up`);
       },
       () => {
         flash("volu");
@@ -1145,7 +1130,6 @@ export default function App() {
     );
     if (!player) return;
     if (subNavigatingRef.current) return;
-    if (checkBlocked()) return;
     const gen = ++subGenRef.current;
     subPendingRef.current = { deviceName: subDeviceName, index };
     setSubPlayers((prev) => {
@@ -1157,21 +1141,19 @@ export default function App() {
       next[idx] = { ...next[idx], subtitleStreamIndex: index };
       return next;
     });
-    let waitMs = 4000;
-    let navMs = waitMs;
-    try {
-      const resp = await fetch(`${TV_TV_URL}/tv/emby/subtitle`, {
+    const { blocked, result } = await sendKeyThrough(
+      `subtitle:${index}`,
+      `/tv/emby/subtitle`,
+      {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: player.sessionId, index }),
-      });
-      const data = await resp.json();
-      waitMs = data.waitMs ?? 4000;
-      navMs = data.navMs ?? waitMs;
-    } catch (_) {}
+        body: { sessionId: player.sessionId, index },
+        fromSubCtrl: true,
+      },
+    );
+    const waitMs = blocked ? 0 : (result?.waitMs ?? 4000);
+    const navMs = blocked ? 0 : (result?.navMs ?? waitMs);
     if (subGenRef.current !== gen) return;
     if (navMs > 0) {
-      notifyAction(true);
       subNavigatingRef.current = true;
     }
     await new Promise((r) => setTimeout(r, navMs));
@@ -1196,12 +1178,11 @@ export default function App() {
 
   const openApp = async (svc) => {
     if (isOff) return;
-    if (checkBlocked()) return;
-    notifyAction();
     setTimeout(() => setShowStreamers(false), 1000);
-    try {
-      await fetch(`${TV_TV_URL}/tv/openapp?uri=${encodeURIComponent(svc.uri)}`);
-    } catch (_) {}
+    await sendKeyThrough(
+      `openapp:${svc.name}`,
+      `/tv/openapp?uri=${encodeURIComponent(svc.uri)}`,
+    );
   };
 
   const isOff =
@@ -1510,8 +1491,9 @@ export default function App() {
               }}
             >
               <Text style={lockStyles.message}>
-                A remote collision has been detected and the remote has been
-                locked. Press and hold unlock button to continue.
+                A remote collision has been detected: "{lockInfo?.sentKey}"
+                was sent, "{lockInfo?.blockedKey}" was not. The remote has
+                been locked. Press and hold unlock button to continue.
               </Text>
             </View>
             <TouchableOpacity
@@ -2687,7 +2669,8 @@ export default function App() {
             }}
           >
             <Text style={lockStyles.message}>
-              A remote collision has been detected and the remote has been
+              A remote collision has been detected: "{lockInfo?.sentKey}" was
+              sent, "{lockInfo?.blockedKey}" was not. The remote has been
               locked. Press and hold unlock button to continue.
             </Text>
           </View>

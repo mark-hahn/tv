@@ -85,6 +85,7 @@ import {
   setGlobalMessage,
   unsubscribeAllChannels,
 } from "./src/messaging.js";
+import { keySendWithChk, tvRemoteUnlock } from "./src/tvRemoteKey.js";
 import { BATCH_SCHED, ffmpegQueue } from "./src/batchQueue.js";
 import * as bifQueue from "./src/bifQueue.js";
 import * as subsQueue from "./src/subsQueue.js";
@@ -1452,6 +1453,7 @@ app.post("/api/getSubFileIds", apiWrapper(getSubFileIds));
 app.post("/api/accessTvdb", apiWrapper(tvdb.accessTvdb));
 app.post("/api/getTvmazeCrew", apiWrapper(tvdb.getTvmazeCrew_cmd));
 app.post("/api/migrateWatchedCount", apiWrapper(tvdb.migrateWatchedCount));
+app.post("/api/tvRemoteKey", apiWrapper(keySendWithChk));
 app.get("/api/getGroupCounts", apiWrapper(groupCounts.getGroupCounts));
 app.get("/api/getBadGroups", (_req, res) => {
   try {
@@ -3136,23 +3138,6 @@ wss.on("connection", (ws) => {
       }
     } else if (fname == "handleFix") {
       handleFix(ws, id, param);
-    } else if (fname === "tvRemoteAction") {
-      // Broadcast to other clients only; sender handles its own avoidance locally
-      const otherClients = [...connectedClients].filter(
-        (c) => c !== ws && c.readyState === 1,
-      );
-      const outMsg = JSON.stringify({
-        id: 0,
-        notification: "tvRemoteAction",
-        data: param,
-      });
-      for (const client of otherClients) {
-        try {
-          client.send(outMsg);
-        } catch (e) {
-          unilog(1377, `ws broadcast tvRemoteAction failed: ${e.message}`);
-        }
-      }
     } else if (fname === "skipIntro") {
       const pressedAt = param?.pressedAt;
       intro
@@ -3180,13 +3165,12 @@ wss.on("connection", (ws) => {
           )
           .catch((e) => unilog(621, "error:", e.message));
       }
-    } else if (fname === "tvRemoteCollision") {
-      notifyClients("tvRemoteLock", null);
     } else if (fname === "unilogSubscribe") {
       unilogRoutes.addUnilogSubscriber(ws);
     } else if (fname === "unilogUnsubscribe") {
       unilogRoutes.removeUnilogSubscriber(ws);
     } else if (fname === "tvRemoteUnlock") {
+      tvRemoteUnlock();
       const outMsg = JSON.stringify({
         id: 0,
         notification: "tvRemoteUnlock",

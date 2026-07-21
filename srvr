@@ -11,6 +11,31 @@ if [[ ! -d "$ROOT_DIR/apps" ]]; then
   exit 1
 fi
 
+# Android (Metro) isn't in the pnpm workspace and can't resolve packages/share,
+# so this small data file is kept as a synced copy instead — only overwritten
+# when it actually differs from the web client's copy (the source of truth).
+sync_android_key_labels() {
+  local src="$ROOT_DIR/apps/client/src/keyLabels.js"
+  local dst="$ROOT_DIR/apps/android/keyLabels.js"
+  if [[ ! -f "$src" ]]; then
+    echo "Error: missing $src" >&2
+    exit 1
+  fi
+  if ! cmp -s "$src" "$dst" 2>/dev/null; then
+    cp "$src" "$dst"
+    echo "[local] keyLabels.js differed -- synced web client copy -> apps/android"
+  else
+    echo "[local] keyLabels.js already in sync with apps/android"
+  fi
+}
+
+# Purely local, no server involved -- handle before the ssh ControlMaster
+# setup below so it doesn't pay for an unneeded connection.
+if [[ "${1:-all}" == "android" ]]; then
+  sync_android_key_labels
+  exit 0
+fi
+
 SSH_CONTROL_PATH="$HOME/.ssh/tv-srvr-$$"
 
 cleanup_ssh() {
@@ -26,7 +51,7 @@ trap cleanup_ssh EXIT
 ssh -f -N -M -S "$SSH_CONTROL_PATH" "$SSH_HOST"
 
 usage() {
-  echo "Usage: $(basename "$0") [api|down|srvr|client|share|asr|watchdog|all]" >&2
+  echo "Usage: $(basename "$0") [api|down|srvr|client|share|asr|watchdog|android|all]" >&2
   echo "Env: TV_REMOTE_BASE (default: /root/dev/apps/tv on remote)" >&2
   exit 1
 }
@@ -237,6 +262,7 @@ SHARE_DEPENDENTS="api down srvr client"
 case "${1:-all}" in
   client)
     remote_deploy_one_no_restart client
+    sync_android_key_labels
     ;;
   api|down|srvr|tv|share|asr|watchdog)
     if [[ "$1" != "share" && $SHARE_DEPENDENTS == *"$1"* ]]; then
@@ -262,7 +288,8 @@ case "${1:-all}" in
     fi
     
     remote_deploy_one_no_restart client
-    
+    sync_android_key_labels
+
     remote_pm2_restart_all_silent
     ;;
   *)

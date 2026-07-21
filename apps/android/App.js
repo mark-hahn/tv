@@ -18,9 +18,21 @@ import {
 import { MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import allServices from "./services.json";
+import { keyLabels } from "./keyLabels.js";
 
 // Normalize font sizes so system font scale doesn't affect the app
 const fs = (size) => size / PixelRatio.getFontScale();
+
+// Human-readable label for the lockout message. openapp:/subtitle: keys
+// carry their own readable suffix already, everything else looks up
+// ./keyLabels.json (see that file to change wording).
+const keyLabel = (key) => {
+  if (!key) return key;
+  if (key.startsWith("openapp:")) return key.slice("openapp:".length);
+  if (key.startsWith("subtitle:"))
+    return `Subtitle ${key.slice("subtitle:".length)}`;
+  return keyLabels[key] ?? key;
+};
 
 const TV_TV_URL = "https://hahnca.com/tv-tv";
 const TV_SRVR_WS_URL = "wss://hahnca.com/tv-srvr";
@@ -219,13 +231,15 @@ export default function App() {
     const isLR = key === "left" || key === "right";
     (async () => {
       if (!isLR) {
-        await sendKeyThrough(key, `/tv/key/${key}`);
+        const r = await sendKeyThrough(key, `/tv/key/${key}`);
+        if (r.blocked) return stopRepeat();
         if (!repeatActiveRef.current) return;
       } else {
         // Only arms the collision window here — the actual send (tap
         // release below, or scrub start/ping) happens once we know
         // whether this is a short tap or a long-press scrub.
-        await sendKeyThrough(key, null);
+        const r = await sendKeyThrough(key, null);
+        if (r.blocked) return stopRepeat();
         pendingLRKeyRef.current = key;
       }
       await new Promise((r) => {
@@ -234,21 +248,24 @@ export default function App() {
       if (!repeatActiveRef.current) return;
       if (isLR) {
         pendingLRKeyRef.current = null; // long press — key will not be sent on release
-        // Start server-side scrubbing
-        await fetch(`${TV_TV_URL}/tv/scrub/start`, {
+        // Start server-side scrubbing (repeating: a held scrub owns the floor)
+        const r = await sendKeyThrough(key, `/tv/scrub/start`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ direction: key }),
-        }).catch(() => {});
+          body: { direction: key },
+          repeating: true,
+        });
+        if (r.blocked) return stopRepeat();
         // Send ping repeatedly while holding
         while (repeatActiveRef.current) {
           await new Promise((r) => {
             repeatTimeoutRef.current = setTimeout(r, SCRUB_PING_INTERVAL_MS);
           });
           if (!repeatActiveRef.current) break;
-          await fetch(`${TV_TV_URL}/tv/scrub/ping`, {
+          const p = await sendKeyThrough(key, `/tv/scrub/ping`, {
             method: "POST",
-          }).catch(() => {});
+            repeating: true,
+          });
+          if (p.blocked) return stopRepeat();
         }
         return;
       }
@@ -268,11 +285,10 @@ export default function App() {
               : isFast && mode === "fire"
                 ? 3
                 : 1;
-        const url =
-          n > 1
-            ? `${TV_TV_URL}/tv/key/${key}?n=${n}`
-            : `${TV_TV_URL}/tv/key/${key}`;
-        await fetch(url).catch(() => {});
+        const path =
+          n > 1 ? `/tv/key/${key}?n=${n}` : `/tv/key/${key}`;
+        const r = await sendKeyThrough(key, path, { repeating: true });
+        if (r.blocked) return stopRepeat();
         if (!repeatActiveRef.current) break;
         const FAST_REPEAT_MS = 100;
         const delay =
@@ -290,11 +306,13 @@ export default function App() {
     clearTimeout(repeatTimeoutRef.current);
     const pendingLRKey = pendingLRKeyRef.current;
     pendingLRKeyRef.current = null;
-    // Stop server-side scrubbing
+    // Stop server-side scrubbing. This is a gesture-end cleanup, not a
+    // keypress, and must fire even when locked (else the tv keeps scrubbing),
+    // so it goes direct rather than through the collision gate.
     fetch(`${TV_TV_URL}/tv/scrub/stop`, { method: "POST" }).catch(() => {});
     if (pendingLRKey) {
-      // Short press on left/right — send key on release
-      fetch(`${TV_TV_URL}/tv/key/${pendingLRKey}`).catch(() => {});
+      // Short press on left/right — send key on release (through the gate)
+      sendKeyThrough(pendingLRKey, `/tv/key/${pendingLRKey}`);
     }
   };
 
@@ -627,14 +645,15 @@ export default function App() {
 
   // Single choke point for every key/command this app sends — the server's
   // keySendWithChk checks it against the other remote's last press before
-  // forwarding to the tv/ha, so no client-side collision bookkeeping is
-  // needed here. path=null just arms the collision window without sending
-  // anything (used for the arrow-scrub button-down, whose actual send is
-  // decided later by hold-duration).
+  // forwarding to the tv (base "tv") or to srvr's own api (base "srvr", for
+  // skip-intro). path=null just arms the collision window without sending
+  // anything (the arrow button-down, whose real send is decided later by
+  // hold-duration). repeating=true marks a held/scrub send so it wins the
+  // floor over another remote's key.
   const sendKeyThrough = async (
     key,
     path,
-    { method = "GET", body, fromSubCtrl = false } = {},
+    { method = "GET", body, fromSubCtrl = false, repeating = false, base = "tv" } = {},
   ) => {
     try {
       const res = await fetch(`${TV_SRVR_HTTP_URL}/api/tvRemoteKey`, {
@@ -644,6 +663,8 @@ export default function App() {
           key,
           senderId: CLIENT_ID,
           fromSubCtrl,
+          repeating,
+          base,
           method,
           path,
           body,
@@ -962,25 +983,23 @@ export default function App() {
     if (isOff || isOther) return;
     if (!showPlayingRef.current) return; // only while a video is playing
     flash("skip");
-    try {
-      await fetch(`${TV_TV_URL}/tv/toggleres`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-    } catch (_) {}
+    await sendKeyThrough("resToggle", `/tv/toggleres`, {
+      method: "POST",
+      body: {},
+    });
   };
 
   const startSkipHold = () => {
     const pressedAt = Date.now();
     lpStart(
       () => {
-        // short press → skip intro
+        // short press → skip intro (a srvr feature, not a tv/ha command)
         flash("skip");
-        const ws = wsRef.current;
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ fname: "skipIntro", param: { pressedAt } }));
-        }
+        sendKeyThrough("skip", `/api/skipIntro`, {
+          method: "POST",
+          body: { pressedAt },
+          base: "srvr",
+        });
       },
       () => {
         // long press → toggle resolution
@@ -1491,11 +1510,20 @@ export default function App() {
               }}
             >
               <Text style={lockStyles.message}>
-                A remote collision has been detected: "{lockInfo?.sentKey}"
-                was sent, "{lockInfo?.blockedKey}" was not. The remote has
-                been locked. Press and hold unlock button to continue.
+                A remote collision has been detected. The remote has been
+                locked. Press and hold unlock button to continue.
               </Text>
             </View>
+            {lockInfo && (
+              <View style={lockStyles.keyStatus}>
+                <Text style={lockStyles.keyStatusText}>
+                  {keyLabel(lockInfo.sentKey)} sent
+                </Text>
+                <Text style={lockStyles.keyStatusText}>
+                  {keyLabel(lockInfo.blockedKey)} ignored
+                </Text>
+              </View>
+            )}
             <TouchableOpacity
               onPressIn={startUnlockHold}
               onPressOut={stopUnlockHold}
@@ -2669,11 +2697,20 @@ export default function App() {
             }}
           >
             <Text style={lockStyles.message}>
-              A remote collision has been detected: "{lockInfo?.sentKey}" was
-              sent, "{lockInfo?.blockedKey}" was not. The remote has been
+              A remote collision has been detected. The remote has been
               locked. Press and hold unlock button to continue.
             </Text>
           </View>
+          {lockInfo && (
+            <View style={lockStyles.keyStatus}>
+              <Text style={lockStyles.keyStatusText}>
+                {keyLabel(lockInfo.sentKey)} sent
+              </Text>
+              <Text style={lockStyles.keyStatusText}>
+                {keyLabel(lockInfo.blockedKey)} ignored
+              </Text>
+            </View>
+          )}
           <TouchableOpacity
             onPressIn={startUnlockHold}
             onPressOut={stopUnlockHold}
@@ -3035,6 +3072,16 @@ const lockStyles = StyleSheet.create({
     fontSize: fs(25),
     fontWeight: "bold",
     textAlign: "center",
+  },
+  keyStatus: {
+    marginLeft: 20,
+    paddingBottom: 10,
+  },
+  keyStatusText: {
+    color: "red",
+    textAlign: "left",
+    fontSize: fs(22),
+    fontWeight: "bold",
   },
   unlockBtn: {
     backgroundColor: "lightgreen",

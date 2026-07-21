@@ -94,6 +94,10 @@ function unilogJoin(parts) {
   return parts
     .map((p) => {
       if (typeof p === "string") return p;
+      // An Error has no enumerable own props, so JSON.stringify renders it as
+      // "{}" — pull out the fields that say what actually went wrong. The log
+      // site's own file:line is already recorded, so the stack adds little.
+      if (p instanceof Error) return `${p.name}: ${p.message}`;
       try {
         return typeof p === "object" ? JSON.stringify(p) : String(p);
       } catch {

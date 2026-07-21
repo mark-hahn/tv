@@ -37,7 +37,7 @@ do_install() {
   return 0
 }
 
-CHECKSUM=$(md5sum "$SCRIPT_DIR/App.js" "$SCRIPT_DIR/app.json" "$SCRIPT_DIR/package.json" "$SCRIPT_DIR/babel.config.js" "$SCRIPT_DIR/eas.json" "$SCRIPT_DIR/index.js" "$SCRIPT_DIR/services.json" | md5sum | cut -d' ' -f1)
+CHECKSUM=$(md5sum "$SCRIPT_DIR/App.js" "$SCRIPT_DIR/app.json" "$SCRIPT_DIR/package.json" "$SCRIPT_DIR/babel.config.js" "$SCRIPT_DIR/eas.json" "$SCRIPT_DIR/index.js" "$SCRIPT_DIR/services.json" "$SCRIPT_DIR/keyLabels.js" | md5sum | cut -d' ' -f1)
 CACHED_CHECKSUM=$(cut -d' ' -f1 "$CACHE_FILE" 2>/dev/null || echo "")
 CACHED_APK=$(cut -d' ' -f2 "$CACHE_FILE" 2>/dev/null || echo "")
 

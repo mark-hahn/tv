@@ -1636,29 +1636,18 @@ app.get(
   }),
 );
 
+// Emby's per-item refresh is fire-and-forget — 4.8 exposes no completion signal
+// for it (DateLastRefreshed/DateLastSaved are not returned by any endpoint), so
+// give it a short settle window before reprocessing instead of polling.
+const EMBY_REFRESH_SETTLE_MS = 4000;
+
 app.post(
   "/api/refreshEmbyItem",
   apiWrapper(async (params) => {
     const { showId, showName } = params;
     if (!showId) return { success: false, error: "missing showId" };
     unilog(577, `Refreshing Emby item for ${showName} (${showId})`);
-    // Read DateLastRefreshed and DateLastSaved before triggering so we can detect when either changes
-    let refreshedBefore = null;
-    let savedBefore = null;
-    try {
-      const beforeRes = await fetch(
-        `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${showId}?Fields=DateLastRefreshed,DateLastSaved&api_key=${EMBY_API_KEY}`,
-      );
-      if (beforeRes.ok) {
-        const beforeData = await beforeRes.json();
-        refreshedBefore = beforeData.DateLastRefreshed || null;
-        savedBefore = beforeData.DateLastSaved || null;
-      }
-    } catch (e) {
-      unilog(578, `pre-fetch error for ${showName}:`, e.message);
-    }
 
-    const triggerTime = Date.now();
     try {
       const res = await fetch(
         `${EMBY_BASE_URL}/Items/${showId}/Refresh?Recursive=true&MetadataRefreshMode=Default&api_key=${EMBY_API_KEY}`,
@@ -1669,46 +1658,9 @@ app.post(
       unilog(580, `fetch error for ${showName}:`, e.message);
     }
 
-    // Poll until DateLastRefreshed or DateLastSaved changes (max 30s, poll every 1s)
-    const POLL_INTERVAL_MS = 1000;
-    const POLL_TIMEOUT_MS = 30 * 1000;
-    const pollStart = Date.now();
-    let refreshDone = false;
-    unilog(581, `Polling for refresh completion of ${showName}`);
-    while (Date.now() - pollStart < POLL_TIMEOUT_MS) {
-      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-      try {
-        const pollRes = await fetch(
-          `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${showId}?Fields=DateLastRefreshed,DateLastSaved&api_key=${EMBY_API_KEY}`,
-        );
-        if (pollRes.ok) {
-          const pollData = await pollRes.json();
-          const refreshedAfter = pollData.DateLastRefreshed || null;
-          const savedAfter = pollData.DateLastSaved || null;
-          const refreshedChanged =
-            refreshedAfter &&
-            refreshedAfter !== refreshedBefore &&
-            new Date(refreshedAfter).getTime() >= triggerTime;
-          const savedChanged =
-            savedAfter &&
-            savedAfter !== savedBefore &&
-            new Date(savedAfter).getTime() >= triggerTime;
-          if (refreshedChanged || savedChanged) {
-            unilog(
-              582,
-              `Refresh complete for ${showName} (DateLastRefreshed=${refreshedAfter}, DateLastSaved=${savedAfter})`,
-            );
-            refreshDone = true;
-            break;
-          }
-        }
-      } catch (pollErr) {
-        unilog(583, `poll error for ${showName}:`, pollErr.message);
-      }
-    }
-    if (!refreshDone) {
-      unilog(584, `Poll timed out for ${showName}, enqueuing anyway`);
-    }
+    await new Promise((r) => {
+      setTimeout(r, EMBY_REFRESH_SETTLE_MS);
+    });
 
     tvdb.enqueueShowProcess(showName);
     return { success: true };

@@ -292,6 +292,13 @@
             >
               Replace
             </button>
+            <button
+              class="logBtn"
+              :disabled="!selectedSiteCount"
+              @click="selectEventGroups"
+            >
+              Sel
+            </button>
           </div>
 
           <div class="groupsRow">
@@ -1683,6 +1690,19 @@ export default {
       } catch (e) {
         console.error("[log.vue]", `replaceGroups failed: ${e.message}`); // no-unilog
         this.flash("failed to replace");
+      }
+    },
+    // Select every group linked to the currently selected log events.
+    async selectEventGroups() {
+      this.selectedGroupIds = [];
+      try {
+        const groupIds = await this.selectedEventGroupIds();
+        if (!groupIds) return;
+        this.selectedGroupIds = groupIds;
+        this.flash(`selected ${groupIds.length} groups`);
+      } catch (e) {
+        logHere({ grp: "groups" }, `selectEventGroups failed: ${e.message}`);
+        this.flash("failed to select groups");
       }
     },
     async deleteGroupsAction() {

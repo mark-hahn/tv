@@ -696,6 +696,9 @@ export default {
         index: "id",
         layout: "fitData",
         height: "100%",
+        // The log rows are fixed-height; using the basic renderer avoids the
+        // virtual DOM's top-padding estimates that made upward scroll jump.
+        renderVertical: "basic",
         placeholder: "no log events",
         columnDefaults: { headerSort: false },
         selectableRows: false,
@@ -752,10 +755,15 @@ export default {
       // Hysteresis so bursts of appended rows don't transiently unpin us.
       if (gap > 60) this.atBottom = false;
       else if (gap < 24) this.atBottom = true;
-      // Guard: skip loadOlder during initial data load (replaceData resets
-      // scrollTop to 0) and during live row appends (addData also briefly
-      // resets virtual-scroll position to 0, causing spurious triggers).
-      if (this.holder.scrollTop < 80 && !this.loading && !this.appending)
+      // Guard: skip loadOlder during initial data load and live appends, when
+      // table mutations can briefly reset scrollTop to 0.
+      const canScroll = this.holder.scrollHeight > this.holder.clientHeight + 1;
+      if (
+        canScroll &&
+        this.holder.scrollTop < 80 &&
+        !this.loading &&
+        !this.appending
+      )
         this.loadOlder();
     },
     onCellClick(e, cell) {
@@ -788,7 +796,10 @@ export default {
       }
       // selection gestures (standard mouse selection).
       const gesture = e.shiftKey ? "shift" : e.ctrlKey ? "ctrl" : "plain";
-      unilog(1618, `${gesture} click row ${row.getData().id}, anchor ${this.selAnchorId}, sel ${this.selIdsStr(this.selectedIds)}, hist idx ${this.selHistoryIdx} of sizes [${this.selHistory.map((a) => a.length).join(",")}]`);
+      unilog(
+        1618,
+        `${gesture} click row ${row.getData().id}, anchor ${this.selAnchorId}, sel ${this.selIdsStr(this.selectedIds)}, hist idx ${this.selHistoryIdx} of sizes [${this.selHistory.map((a) => a.length).join(",")}]`,
+      );
       if (e.shiftKey) this.selectRange(row);
       else if (e.ctrlKey) this.toggleRow(row);
       else this.selectOnly(row);
@@ -887,7 +898,10 @@ export default {
       // Caller name pins down any setSelection we did not expect after a click.
       const via =
         (new Error().stack || "").split("\n")[2]?.trim().split(" ")[1] || "?";
-      unilog(1619, `setSelection via ${via} ${fromHistory ? "fromHistory" : "direct"}, new ${this.selIdsStr(newSet)}, old ${this.selIdsStr(this.selectedIds)}, hist idx ${this.selHistoryIdx} of ${this.selHistory.length}`);
+      unilog(
+        1619,
+        `setSelection via ${via} ${fromHistory ? "fromHistory" : "direct"}, new ${this.selIdsStr(newSet)}, old ${this.selIdsStr(this.selectedIds)}, hist idx ${this.selHistoryIdx} of ${this.selHistory.length}`,
+      );
       const touched = new Set([...this.selectedIds, ...newSet]);
       this.selectedIds = newSet;
       this.selectedCount = newSet.size;
@@ -914,7 +928,10 @@ export default {
       const changed =
         newIds.length !== this.selectedIds.size ||
         newIds.some((id) => !this.selectedIds.has(id));
-      unilog(1620, `history nav to idx ${this.selHistoryIdx} of ${this.selHistory.length}, restoring ${this.selIdsStr(newIds)}, changed ${changed}`);
+      unilog(
+        1620,
+        `history nav to idx ${this.selHistoryIdx} of ${this.selHistory.length}, restoring ${this.selIdsStr(newIds)}, changed ${changed}`,
+      );
       // Re-anchor to the restored selection; a stale anchor left over from the
       // last manual click would make the next shift-click span the wrong range.
       this.selAnchorId = newIds.length ? newIds[0] : null;
@@ -1141,6 +1158,8 @@ export default {
       const existing = this.table.getData();
       const room = MAX_ROWS - existing.length;
       if (room <= 0) return;
+      const savedScrollTop = this.holder?.scrollTop ?? 0;
+      const rowH = this.pageRowHeight();
       this.loadingOlder = true;
       try {
         const pageLimit = Math.min(PAGE, room);
@@ -1160,6 +1179,9 @@ export default {
           await this.table.addData(older, true);
         } finally {
           this.appending = false;
+        }
+        if (this.holder) {
+          this.holder.scrollTop = savedScrollTop + older.length * rowH;
         }
         this.rowCount = this.table.getDataCount();
         this.displayedCount = this.table.getDataCount("active");
@@ -1364,6 +1386,7 @@ export default {
     async appendRows(rows) {
       if (!this.table || !rows.length) return;
       const stick = this.atBottom;
+      const savedScrollTop = this.holder?.scrollTop ?? 0;
       this.appending = true;
       try {
         await this.table.addData(rows, false);
@@ -1381,6 +1404,8 @@ export default {
           await this.table.deleteRow(doomed.map((r) => r.getData().id));
         }
         this.scrollToBottom();
+      } else if (this.holder) {
+        this.holder.scrollTop = savedScrollTop;
       }
       // Track newest id for reconnect gap-fill.
       for (const r of rows) {
@@ -1577,9 +1602,7 @@ export default {
         await this.refreshRowGroups(siteIds);
         await this.applyGroupFilter();
         this.refreshGroupStats();
-        this.flash(
-          `replaced: -${res?.removed ?? 0} +${res?.added ?? 0} links`,
-        );
+        this.flash(`replaced: -${res?.removed ?? 0} +${res?.added ?? 0} links`);
       } catch (e) {
         console.error("[log.vue]", `replaceGroups failed: ${e.message}`); // no-unilog
         this.flash("failed to replace");

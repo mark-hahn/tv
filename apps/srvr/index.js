@@ -85,7 +85,7 @@ import {
   setGlobalMessage,
   unsubscribeAllChannels,
 } from "./src/messaging.js";
-import { keySendWithChk, tvRemoteUnlock } from "./src/tvRemoteKey.js";
+import { keySendWithChk, tvRemoteUnlock, tvTvGet } from "./src/tvRemoteKey.js";
 import { BATCH_SCHED, ffmpegQueue } from "./src/batchQueue.js";
 import * as bifQueue from "./src/bifQueue.js";
 import * as subsQueue from "./src/subsQueue.js";
@@ -2541,6 +2541,10 @@ app.post("/api/skipIntro", async (req, res) => {
   try {
     const { pressedAt, deviceName } = req.body || {};
     const result = await intro.doSkipIntro(pressedAt, deviceName);
+    // Nothing playing: the skip key doubles as "select the show to resume".
+    // tv-tv answers as soon as it knows the target, so this does not wait out
+    // the key sequence.
+    if (result?.reason === "notPlaying") tvTvGet("/tv/selectshow");
     res.json(result);
   } catch (err) {
     unilog(605, "error:", err.message);

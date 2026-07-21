@@ -1,5 +1,5 @@
 import fetch from "node-fetch";
-import { logHere, unilog} from "@tv/share"
+import { logHere, unilog } from "@tv/share";
 import { notifyClients } from "./messaging.js";
 
 // tv-tv runs on the same box as tv-srvr, so "tv" is a loopback call to the
@@ -37,6 +37,12 @@ async function forward(base, method, path, body) {
     unilog(1600, `forward ${path} failed: ${e.message}`);
     return null;
   }
+}
+
+// Bare GET at tv-tv for callers that aren't remote key presses and so skip the
+// collision check (the skip-key show-select trigger). Never rejects.
+export function tvTvGet(path) {
+  return forward("tv", "GET", path);
 }
 
 // Single choke point for every remote (web + android) key/command send. Checks

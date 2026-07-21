@@ -127,13 +127,19 @@ const FIRE_EMBY_DELAY_MS = 5000; // ms after Fire TV turns on before launching E
 const SCRUB_START_COUNT = 4; // number of slow keys before speeding up
 const SCRUB_RATE_FWD_SLOW = 750; // ms between right keys for first N
 const SCRUB_RATE_FWD_FAST = 100; // ms between right keys after first N
-const SCRUB_RATE_REV_SLOW = 750; // ms between left keys for first N
+const SCRUB_RATE_REV_SLOW = 100; // ms between left keys for first N
 const SCRUB_RATE_REV_FAST = 100; // ms between left keys after first N
 const SCRUB_DEADMAN_TIMEOUT = 2000; // ms without ping before auto-stop
 
 // Subtitle nav (IRCC key sequence) delay
 const SUB_KEY_DELAY = 400; // ms between each key send in subtitle nav sequence
 const SUB_NAV_POLL_MS = 10_000; // fast-poll window after nav completes
+
+// Automatic show selection (Emby home-screen key sequence)
+const SHOW_SEL_KEY_DELAY = 50; // ms between keys in the show-select sequence
+const SHOW_SEL_KEY_FAST_DELAY = 50; // ms between keys in the fast runs
+const SHOW_SEL_EPISODE_SCAN = 400; // played episodes fetched when ranking shows
+const SHOW_SEL_TZ = "America/Los_Angeles"; // zone "today" is judged in
 
 // PST LA timestamp  MM-DD HH:mm
 function ts() {
@@ -1249,26 +1255,27 @@ app.get("/tv/off", (req, res) => {
   }).catch(() => {});
 });
 
+const GOOGLE_KEY_MAP = {
+  ok: "Confirm",
+  up: "Up",
+  down: "Down",
+  left: "Left",
+  right: "Right",
+  home: "Home",
+  back: "Return",
+  captions: "ClosedCaption",
+};
+const FIRE_KEY_MAP = {
+  ok: "23", // KEYCODE_DPAD_CENTER
+  up: "19", // KEYCODE_DPAD_UP
+  down: "20", // KEYCODE_DPAD_DOWN
+  left: "21", // KEYCODE_DPAD_LEFT
+  right: "22", // KEYCODE_DPAD_RIGHT
+  home: "3", // KEYCODE_HOME
+  back: "4", // KEYCODE_BACK
+};
+
 app.get("/tv/key/:key", async (req, res) => {
-  const GOOGLE_KEY_MAP = {
-    ok: "Confirm",
-    up: "Up",
-    down: "Down",
-    left: "Left",
-    right: "Right",
-    home: "Home",
-    back: "Return",
-    captions: "ClosedCaption",
-  };
-  const FIRE_KEY_MAP = {
-    ok: "23", // KEYCODE_DPAD_CENTER
-    up: "19", // KEYCODE_DPAD_UP
-    down: "20", // KEYCODE_DPAD_DOWN
-    left: "21", // KEYCODE_DPAD_LEFT
-    right: "22", // KEYCODE_DPAD_RIGHT
-    home: "3", // KEYCODE_HOME
-    back: "4", // KEYCODE_BACK
-  };
   const keyMap = tvMode === "fire" ? FIRE_KEY_MAP : GOOGLE_KEY_MAP;
   const remoteId = REMOTE_ENTITY_ID;
   const command = keyMap[req.params.key];
@@ -1327,6 +1334,160 @@ app.get("/tv/key/:key", async (req, res) => {
   }
   unilog(424, `remote.send_command ${command} from ${client(req)}`);
   res.json({ ok: true, command, mode: tvMode });
+});
+
+// ─── Automatic show selection ───────────────────────────────────────────────
+// Walks the Emby home screen to the show most likely wanted next: the most
+// recently played show from before today. That row is ordered most-recent-first
+// from the left, so the prefix sequence parks focus on the leftmost show and a
+// run of right keys counts over to the target.
+
+const SHOW_SEL_PREFIX_SLOW = ["back", "down", "down", "left", "down"];
+const SHOW_SEL_PREFIX_LEFTS = 6; // sent fast — walks off the left end of the row
+const SHOW_SEL_PREFIX_TAIL = ["right"];
+
+let showSelRunning = false;
+
+// One key through whichever transport the current tvMode uses, then wait.
+async function sendSelKey(key, delayAfterMs) {
+  if (tvMode !== "fire") {
+    await sendIrcc(GOOGLE_KEY_MAP[key], delayAfterMs);
+    return;
+  }
+  const code = FIRE_KEY_MAP[key];
+  let sent = false;
+  if (fireShellReady) {
+    try {
+      await fireKeyevent(code);
+      sent = true;
+    } catch (e) {
+      unilog(1605, `shell keyevent ${key} failed (${e.message}) — falling back to adb exec`);
+    }
+  }
+  if (!sent) await adbExecP(`shell input keyevent ${code}`, `showsel ${key}`);
+  await sleep(delayAfterMs);
+}
+
+// Shows ranked by when they were last played, most recent first. Emby keeps
+// LastPlayedDate on episodes only — Series items always return null — so rank
+// episodes and keep each show's newest.
+async function showsByLastPlayed() {
+  const url =
+    `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items` +
+    `?IncludeItemTypes=Episode&Recursive=true` +
+    `&SortBy=DatePlayed&SortOrder=Descending&Limit=${SHOW_SEL_EPISODE_SCAN}` +
+    `&Fields=UserDataLastPlayedDate,SeriesName&api_key=${EMBY_API_KEY}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`emby items ${r.status}`);
+  const items = (await r.json()).Items ?? [];
+  const newest = new Map();
+  for (const it of items) {
+    const played = it?.UserData?.LastPlayedDate;
+    const show = it?.SeriesName;
+    if (!played || !show) continue;
+    if (!newest.has(show) || played > newest.get(show))
+      newest.set(show, played);
+  }
+  return [...newest.entries()]
+    .map(([name, played]) => ({ name, played }))
+    .sort((a, b) => b.played.localeCompare(a.played));
+}
+
+// "YYYY-MM-DD" in SHOW_SEL_TZ, so comparing days is a plain string compare.
+function showSelDay(when) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: SHOW_SEL_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(when));
+}
+
+// The most recently played show from before today, and its offset from the
+// leftmost (most recently played) show in the row.
+async function findShowToSelect() {
+  const shows = await showsByLastPlayed();
+  const today = showSelDay(Date.now());
+  const offset = shows.findIndex((s) => showSelDay(s.played) < today);
+  if (offset === -1) return null;
+  return { ...shows[offset], offset };
+}
+
+async function runShowSelect(offset) {
+  for (const key of SHOW_SEL_PREFIX_SLOW) {
+    await sendSelKey(key, SHOW_SEL_KEY_DELAY);
+  }
+  for (let i = 0; i < SHOW_SEL_PREFIX_LEFTS; i++) {
+    await sendSelKey("left", SHOW_SEL_KEY_FAST_DELAY);
+  }
+  for (const key of SHOW_SEL_PREFIX_TAIL) {
+    await sendSelKey(key, SHOW_SEL_KEY_DELAY);
+  }
+  for (let i = 0; i < offset; i++) {
+    await sendSelKey("right", SHOW_SEL_KEY_FAST_DELAY);
+  }
+}
+
+// ?offset=N forces the right-key count (skips the Emby lookup); ?dry reports
+// the target and sends no keys. Both are for ./sel testing.
+app.get("/tv/selectshow", async (req, res) => {
+  if (tvMode !== "fire" && tvMode !== "google" && tvMode !== "tv") {
+    unilog(1606, `select ignored — tvMode=${tvMode}`);
+    res.json({ ok: false, error: "wrong mode" });
+    return;
+  }
+  if (showSelRunning) {
+    unilog(1607, `select already running`);
+    res.json({ ok: false, error: "already running" });
+    return;
+  }
+
+  let target;
+  if (req.query.offset !== undefined) {
+    target = {
+      name: "(forced)",
+      played: null,
+      offset: Number(req.query.offset),
+    };
+  } else {
+    try {
+      target = await findShowToSelect();
+    } catch (e) {
+      unilog(1608, `emby lookup failed: ${e.message}`);
+      res.json({ ok: false, error: e.message });
+      return;
+    }
+  }
+  if (!target || !Number.isInteger(target.offset) || target.offset < 0) {
+    unilog(1609, `no show played before today — nothing to select`);
+    res.json({ ok: false, error: "no target show" });
+    return;
+  }
+
+  const keyCount =
+    SHOW_SEL_PREFIX_SLOW.length +
+    SHOW_SEL_PREFIX_LEFTS +
+    SHOW_SEL_PREFIX_TAIL.length +
+    target.offset;
+  unilog(1610, `selecting ${target.name} offset=${target.offset} keys=${keyCount} mode=${tvMode} from ${client(req)}`);
+
+  if (req.query.dry !== undefined) {
+    res.json({ ok: true, dry: true, ...target, keyCount });
+    return;
+  }
+
+  // Answer before driving the keys — the sequence outlasts a sane HTTP wait.
+  res.json({ ok: true, ...target, keyCount });
+
+  showSelRunning = true;
+  try {
+    await runShowSelect(target.offset);
+    unilog(1611, `done selecting ${target.name}`);
+  } catch (e) {
+    unilog(1612, `key sequence failed for ${target.name}: ${e.message}`);
+  } finally {
+    showSelRunning = false;
+  }
 });
 
 // ─── Bravia (via HA Sony Bravia integration) ─────────────────────────────────

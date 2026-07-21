@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# ./sel — fast-deploy apps/tv/src/main.js and trigger automatic show selection
+# (the same sequence the skip key fires when nothing is playing).
+#
+# Usage:
+#   ./sel          select the most recently played show from before today
+#   ./sel 3        force 3 right keys after the prefix (skips the Emby lookup)
+#   ./sel --dry    report the target show and key count, send no keys
+#
+# Every run copies apps/tv/src/main.js to the server and restarts tv-tv, so the
+# timing constants take effect without a full ./srvr tv:
+#   SHOW_SEL_KEY_DELAY       ms between keys in the prefix sequence
+#   SHOW_SEL_KEY_FAST_DELAY  ms between keys in the fast runs
+#
+# This copies the file as-is and does NOT run the unilog reconciler, so a newly
+# added logHere() stays a runtime no-op until a real ./srvr tv deploy.
+set -euo pipefail
+
+SSH_HOST="hahnca.com"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOCAL_MAIN="$ROOT_DIR/apps/tv/src/main.js"
+REMOTE_MAIN="/root/dev/apps/tv/apps/tv/src/main.js"
+TV_TV_URL="http://127.0.0.1:3004"
+READY_TRIES=100        # tv-tv is normally ready ~0.5s after restart
+READY_POLL_SEC=0.2
+
+query=""
+for arg in "$@"; do
+  case "$arg" in
+    --dry)
+      query="${query}&dry=1"
+      ;;
+    '' | *[!0-9]*)
+      echo "usage: ./sel [offset] [--dry]" >&2
+      exit 1
+      ;;
+    *)
+      query="${query}&offset=${arg}"
+      ;;
+  esac
+done
+
+query="${query#&}"
+if [[ -n "$query" ]]; then
+  query="?${query}"
+fi
+
+if [[ ! -f "$LOCAL_MAIN" ]]; then
+  echo "Error: missing $LOCAL_MAIN" >&2
+  exit 1
+fi
+
+SSH_CONTROL_PATH="$HOME/.ssh/tv-sel-$$"
+SSH_OPTS=(-S "$SSH_CONTROL_PATH")
+
+cleanup_ssh() {
+  ssh -O exit -S "$SSH_CONTROL_PATH" "$SSH_HOST" 2>/dev/null || true
+}
+trap cleanup_ssh EXIT
+
+# One shared connection for the copy, the restart, the readiness poll and the
+# trigger — each extra call after this is a few ms.
+ssh -f -N -M -S "$SSH_CONTROL_PATH" "$SSH_HOST"
+
+ssh "${SSH_OPTS[@]}" "$SSH_HOST" "cat > '$REMOTE_MAIN'" < "$LOCAL_MAIN"
+echo "[sel] copied main.js -> $SSH_HOST"
+
+ssh "${SSH_OPTS[@]}" "$SSH_HOST" "pm2 restart tv-tv >/dev/null 2>&1"
+
+# tvMode resets to "off" on restart and only becomes real once Home Assistant
+# pushes state — /tv/selectshow rejects "off", so wait for a usable mode.
+mode=""
+for _ in $(seq 1 "$READY_TRIES"); do
+  mode="$(
+    ssh "${SSH_OPTS[@]}" "$SSH_HOST" \
+      "curl -s --max-time 2 $TV_TV_URL/tv/status" 2>/dev/null |
+      grep -oE '"mode":"[a-z]+"' | cut -d'"' -f4 || true
+  )"
+  case "$mode" in
+    fire | google | tv) break ;;
+  esac
+  mode=""
+  sleep "$READY_POLL_SEC"
+done
+
+if [[ -z "$mode" ]]; then
+  echo "[sel] tv-tv never reported a usable mode -- is the TV on?" >&2
+  exit 1
+fi
+echo "[sel] tv-tv restarted, mode=$mode"
+
+ssh "${SSH_OPTS[@]}" "$SSH_HOST" "curl -s '${TV_TV_URL}/tv/selectshow${query}'"
+echo

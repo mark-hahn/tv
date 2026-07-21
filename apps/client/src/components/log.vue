@@ -787,6 +787,8 @@ export default {
         return;
       }
       // selection gestures (standard mouse selection).
+      const gesture = e.shiftKey ? "shift" : e.ctrlKey ? "ctrl" : "plain";
+      unilog(1618, `${gesture} click row ${row.getData().id}, anchor ${this.selAnchorId}, sel ${this.selIdsStr(this.selectedIds)}, hist idx ${this.selHistoryIdx} of sizes [${this.selHistory.map((a) => a.length).join(",")}]`);
       if (e.shiftKey) this.selectRange(row);
       else if (e.ctrlKey) this.toggleRow(row);
       else this.selectOnly(row);
@@ -876,7 +878,16 @@ export default {
         if (r) r.reformat();
       }
     },
+    // Compact id-list rendering for the evnt-sel-bug debug logs.
+    selIdsStr(ids) {
+      const arr = [...ids];
+      return `${arr.length}[${arr.slice(0, 8).join(",")}${arr.length > 8 ? ",..." : ""}]`;
+    },
     setSelection(newSet, { fromHistory = false } = {}) {
+      // Caller name pins down any setSelection we did not expect after a click.
+      const via =
+        (new Error().stack || "").split("\n")[2]?.trim().split(" ")[1] || "?";
+      unilog(1619, `setSelection via ${via} ${fromHistory ? "fromHistory" : "direct"}, new ${this.selIdsStr(newSet)}, old ${this.selIdsStr(this.selectedIds)}, hist idx ${this.selHistoryIdx} of ${this.selHistory.length}`);
       const touched = new Set([...this.selectedIds, ...newSet]);
       this.selectedIds = newSet;
       this.selectedCount = newSet.size;
@@ -903,6 +914,10 @@ export default {
       const changed =
         newIds.length !== this.selectedIds.size ||
         newIds.some((id) => !this.selectedIds.has(id));
+      unilog(1620, `history nav to idx ${this.selHistoryIdx} of ${this.selHistory.length}, restoring ${this.selIdsStr(newIds)}, changed ${changed}`);
+      // Re-anchor to the restored selection; a stale anchor left over from the
+      // last manual click would make the next shift-click span the wrong range.
+      this.selAnchorId = newIds.length ? newIds[0] : null;
       this.setSelection(new Set(newIds), { fromHistory: true });
       if (changed) this.gotoSelection();
     },
@@ -1579,7 +1594,7 @@ export default {
         this.selectedGroupIds = groupIds;
         this.flash(`selected ${groupIds.length} groups`);
       } catch (e) {
-        logHere({ grp: "groups" }, `selectEventGroups failed: ${e.message}`);
+        unilog(1621, `selectEventGroups failed: ${e.message}`);
         this.flash("failed to select groups");
       }
     },

@@ -10,6 +10,8 @@
       box-sizing: border-box;
       padding: 6px;
     "
+    @click.capture="onLogPaneCaptureWhileChannelsOpen"
+    @change.capture="onLogPaneCaptureWhileChannelsOpen"
   >
     <div
       class="logToolbar"
@@ -124,12 +126,8 @@
         <option value="editor">Editor</option>
         <option value="goto">Go To Selection</option>
         <option value="clear">Clear Selections</option>
-        <option value="showEvents">Show Events</option>
-        <option value="hideEvents">Hide Events</option>
-        <option value="showErrors">Show Errors</option>
         <option value="selectSites">Select Sites</option>
-        <option value="delete">Delete Sites</option>
-        <option value="deleteEvents">Delete Events</option>
+        <option value="channels">Channels</option>
         <option value="setInfo">Set Info</option>
         <option value="setDebug">Set Debug</option>
         <option value="setWarn">Set Warn</option>
@@ -140,12 +138,6 @@
         @click="toggleGroupsPane"
       >
         Groups
-      </button>
-      <button
-        class="logBtn"
-        @click="toggleChannelsPane"
-      >
-        Channels
       </button>
       <span
         v-if="flashMsg"
@@ -431,9 +423,8 @@ export default {
       groupFilterFn: null,
       groupPaneStyle: {},
       groupStats: null,
-      errorMode: false,
-      errorFilterFn: null,
       showChannelsPane: false,
+      ignorePaneEvent: false,
       channelsDebug: [],
       channelsDebugHandle: null,
     };
@@ -493,14 +484,33 @@ export default {
     }
   },
   methods: {
-    toggleChannelsPane() {
-      this.showChannelsPane = !this.showChannelsPane;
-      if (this.showChannelsPane) {
-        this.showGroupsPane = false;
-        this.startChannelsDebug();
-      } else {
-        this.stopChannelsDebug();
+    // Any click or dropdown change while the channels pane is open just
+    // closes it — it must never also perform the click's/change's own action.
+    onLogPaneCaptureWhileChannelsOpen(e) {
+      if (!this.showChannelsPane) return;
+      // Skip the trailing click of the dropdown pick that opened the pane.
+      if (this.ignorePaneEvent) {
+        this.ignorePaneEvent = false;
+        return;
       }
+      e.preventDefault();
+      e.stopPropagation();
+      this.closeChannelsPane();
+    },
+    openChannelsPane() {
+      this.showGroupsPane = false;
+      this.showChannelsPane = true;
+      // Picking the option fires change (which lands here) and then click on
+      // the same select; that click must not close the pane we just opened.
+      this.ignorePaneEvent = true;
+      setTimeout(() => {
+        this.ignorePaneEvent = false;
+      }, 0);
+      this.startChannelsDebug();
+    },
+    closeChannelsPane() {
+      this.showChannelsPane = false;
+      this.stopChannelsDebug();
     },
     startChannelsDebug() {
       if (this.channelsDebugHandle) return;
@@ -556,12 +566,9 @@ export default {
       }
       // Groups pane is hidden whenever the log pane is closed; stop filtering.
       this.showGroupsPane = false;
-      this.showChannelsPane = false;
-      this.stopChannelsDebug();
+      this.closeChannelsPane();
       window.removeEventListener("resize", this.positionGroupsPane);
       this.applyGroupFilter();
-      // Hiding the pane by tab button leaves error mode (reload on next open).
-      this.exitErrorMode(false);
     },
     columns() {
       // "-" alone in a header filter box matches only blank values.
@@ -690,17 +697,6 @@ export default {
       this.table.on("cellClick", this.onCellClick);
       this.table.on("dataFiltered", (filters, rows) => {
         this.displayedCount = rows.length;
-      });
-      // Typing in any column header filter leaves error mode (error mode
-      // itself only clears header filters, which never trips this).
-      this.table.on("dataFiltering", () => {
-        if (
-          this.errorMode &&
-          this.table
-            .getHeaderFilters()
-            .some((f) => f.value != null && f.value !== "")
-        )
-          this.exitErrorMode();
       });
       this.table.on("tableBuilt", () => {
         this.holder = this.$refs.tableEl.querySelector(
@@ -931,18 +927,11 @@ export default {
       const act = this.actionSel;
       this.actionSel = ""; // reset selector back to "Actions"
       if (!act || !this.table) return;
-      // Any action except Editor (and Show Errors itself) leaves error mode.
-      if (act !== "editor" && act !== "showErrors")
-        await this.exitErrorMode(act !== "refresh");
       if (act === "refresh") await this.loadLogs();
       else if (act === "goto") this.gotoSelection();
       else if (act === "selectSites") this.selectSites();
+      else if (act === "channels") this.openChannelsPane();
       else if (act === "clear") this.setSelection(new Set());
-      else if (act === "showEvents") await this.showSelectedEvents();
-      else if (act === "hideEvents") await this.hideSelectedEvents();
-      else if (act === "showErrors") await this.enterErrorMode();
-      else if (act === "delete") await this.deleteSites();
-      else if (act === "deleteEvents") await this.deleteEvents();
       else if (act === "editor") await this.openInEditor();
       else if (act === "setInfo") await this.setSiteLevel("info");
       else if (act === "setDebug") await this.setSiteLevel("debug");
@@ -982,69 +971,6 @@ export default {
       }
       return groupIds;
     },
-    async showSelectedEvents() {
-      try {
-        const groupIds = await this.selectedEventGroupIds();
-        if (!groupIds) return;
-        const res = await srvr.showUnilogEvents(groupIds);
-        if (res?.ok) {
-          this.flash(`showed ${res.changed || 0} events`);
-          await Promise.all([this.loadLogs(), this.loadGroups()]);
-        } else {
-          this.flash("failed to show events");
-        }
-      } catch (e) {
-        unilog(1258, `showSelectedEvents failed: ${e.message}`);
-        this.flash("failed to show events");
-      }
-    },
-    async hideSelectedEvents() {
-      try {
-        const groupIds = await this.selectedEventGroupIds();
-        if (!groupIds) return;
-        const res = await srvr.unshowUnilogEvents(groupIds);
-        if (res?.ok) {
-          this.flash(`hid ${res.changed || 0} events`);
-          await Promise.all([this.loadLogs(), this.loadGroups()]);
-        } else {
-          this.flash("failed to hide events");
-        }
-      } catch (e) {
-        unilog(1259, `hideSelectedEvents failed: ${e.message}`);
-        this.flash("failed to hide events");
-      }
-    },
-    // Error mode: one filter only — error-level events from the last week,
-    // hidden events included (server skips the hide filter when errors is set).
-    async enterErrorMode() {
-      if (!this.table) return;
-      this.errorMode = true;
-      this.showGroupsPane = false;
-      this.filterByGroups = false;
-      await this.applyGroupFilter();
-      for (const col of this.table.getColumns()) {
-        if (col.getDefinition().headerFilter)
-          this.table.setHeaderFilterValue(col, "");
-      }
-      if (!this.errorFilterFn) {
-        const weekAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
-        this.errorFilterFn = (data) =>
-          data.level === "error" && tsToMs(data.ts) >= weekAgoMs;
-        this.table.addFilter(this.errorFilterFn);
-      }
-      await this.loadLogs();
-    },
-    // Leave error mode and return to normal filtering. reload=false skips the
-    // immediate reload but marks the data stale so the next activate reloads.
-    async exitErrorMode(reload = true) {
-      if (!this.errorMode) return;
-      this.errorMode = false;
-      if (this.table && this.errorFilterFn)
-        this.table.removeFilter(this.errorFilterFn);
-      this.errorFilterFn = null;
-      if (reload) await this.loadLogs();
-      else this.loadedOnce = false;
-    },
     async showGroupEvents() {
       if (!this.selectedGroupIds.length) {
         this.flash("no groups selected");
@@ -1081,70 +1007,6 @@ export default {
         this.flash("failed to unshow events");
       }
     },
-    async deleteSites() {
-      const sites = this.selectedSites();
-      if (!sites.length) {
-        this.flash("no sites selected");
-        return;
-      }
-      if (!import.meta.env.DEV) {
-        this.flash("delete only works in vite dev");
-        return;
-      }
-      const n = sites.length;
-      if (
-        !window.confirm(
-          `Is it ok to PERMANENTLY DELETE ${n} site${n === 1 ? "" : "s"}?`,
-        )
-      )
-        return;
-      await this.postSites("/__unilog/delete", sites, "deleted");
-    },
-    async deleteEvents() {
-      const selected = this.table
-        .getRows()
-        .filter((r) => this.selectedIds.has(r.getData().id))
-        .map((r) => r.getData());
-
-      if (!selected.length) {
-        this.flash("no events selected");
-        return;
-      }
-
-      const n = selected.length;
-      if (
-        !window.confirm(
-          `Is it ok to PERMANENTLY DELETE ${n} event${n === 1 ? "" : "s"}?`,
-        )
-      )
-        return;
-
-      const eventIds = selected.map((e) => e.id);
-      try {
-        const res = await srvr.deleteUnilogEvents(eventIds);
-        if (res?.ok) {
-          this.flash(
-            `deleted ${res.deleted} event${res.deleted === 1 ? "" : "s"}`,
-          );
-          // Remove deleted events from table
-          for (const row of this.table.getRows()) {
-            const d = row.getData();
-            if (eventIds.includes(d.id)) {
-              row.delete();
-            }
-          }
-          // Clear selection
-          this.setSelection(new Set());
-          // Update counts
-          this.rowCount = this.table.getDataCount("active");
-          this.displayedCount = this.table.getRows("active").length;
-        } else {
-          this.flash(`failed: ${res?.error ?? "unknown error"}`);
-        }
-      } catch (err) {
-        this.flash(`failed: ${err?.message || err}`);
-      }
-    },
     async setSiteLevel(level) {
       const sites = this.selectedSites();
       if (!sites.length) {
@@ -1167,24 +1029,6 @@ export default {
           }
         } else {
           this.flash(`failed: ${res?.error ?? "unknown error"}`);
-        }
-      } catch (err) {
-        this.flash(`failed: ${err?.message || err}`);
-      }
-    },
-    async postSites(url, sites, verb) {
-      try {
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ sites }),
-        });
-        const data = await res.json();
-        if (data.ok) {
-          const c = data.changed.length;
-          this.flash(`${verb} ${c} site${c === 1 ? "" : "s"}`);
-        } else {
-          this.flash(`failed: ${data.error}`);
         }
       } catch (err) {
         this.flash(`failed: ${err?.message || err}`);
@@ -1247,7 +1091,6 @@ export default {
       try {
         const pageLimit = Math.min(PAGE, room);
         const params = { limit: pageLimit, beforeId: this.oldestId };
-        if (this.errorMode) params.errors = 1;
         const res = await srvr.getUnilogEvents(params);
         // server returns newest-first; display oldest-first (ascending).
         const older = (res?.events || []).slice().reverse();
@@ -1362,7 +1205,6 @@ export default {
       this.scrollToTime(selToMs(this.pickerSel));
     },
     clearPicker() {
-      this.exitErrorMode();
       this.pickerSel = { mo: "", da: "", hr: "", mi: "" };
       this.filterByGroups = false;
       this.applyGroupFilter();
@@ -1419,7 +1261,6 @@ export default {
       if (!this.table || this.newestId == null) return;
       try {
         const params = { limit: PAGE, afterId: this.newestId };
-        if (this.errorMode) params.errors = 1;
         const res = await srvr.getUnilogEvents(params);
         // afterId returns oldest-first (ascending) — no need to reverse.
         const missed = res?.events || [];
@@ -1498,7 +1339,6 @@ export default {
       this.error = "";
       try {
         const params = { limit: PAGE };
-        if (this.errorMode) params.errors = 1;
         const res = await srvr.getUnilogEvents(params);
         // server returns newest-first; display oldest-first (ascending).
         const events = (res?.events || []).slice().reverse();
@@ -1562,7 +1402,6 @@ export default {
       };
     },
     toggleGroupsPane() {
-      this.exitErrorMode();
       this.showGroupsPane = !this.showGroupsPane;
       if (this.showGroupsPane) {
         this.positionGroupsPane();

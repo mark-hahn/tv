@@ -139,6 +139,20 @@
       >
         Groups
       </button>
+      <button
+        class="logBtn"
+        :disabled="selHistoryIdx <= 0"
+        @click="selHistoryPrev"
+      >
+        Prv
+      </button>
+      <button
+        class="logBtn"
+        :disabled="selHistoryIdx >= selHistory.length - 1"
+        @click="selHistoryNext"
+      >
+        Nxt
+      </button>
       <span
         v-if="flashMsg"
         style="font-size: 12px; color: #2a7d2a; white-space: nowrap"
@@ -406,6 +420,8 @@ export default {
       selectedIds: new Set(),
       selAnchorId: null,
       selectedCount: 0,
+      selHistory: [[]],
+      selHistoryIdx: 0,
       actionSel: "",
       flashMsg: "",
       flashTimer: null,
@@ -860,12 +876,35 @@ export default {
         if (r) r.reformat();
       }
     },
-    setSelection(newSet) {
+    setSelection(newSet, { fromHistory = false } = {}) {
       const touched = new Set([...this.selectedIds, ...newSet]);
       this.selectedIds = newSet;
       this.selectedCount = newSet.size;
       this.selectedSiteCount = this.selectedSites().length;
       this.reformatRows(touched);
+      if (!fromHistory) {
+        this.selHistory = this.selHistory.slice(0, this.selHistoryIdx + 1);
+        this.selHistory.push([...newSet]);
+        this.selHistoryIdx = this.selHistory.length - 1;
+      }
+    },
+    selHistoryPrev() {
+      if (this.selHistoryIdx <= 0) return;
+      this.selHistoryIdx--;
+      this.applyHistorySelection();
+    },
+    selHistoryNext() {
+      if (this.selHistoryIdx >= this.selHistory.length - 1) return;
+      this.selHistoryIdx++;
+      this.applyHistorySelection();
+    },
+    applyHistorySelection() {
+      const newIds = this.selHistory[this.selHistoryIdx];
+      const changed =
+        newIds.length !== this.selectedIds.size ||
+        newIds.some((id) => !this.selectedIds.has(id));
+      this.setSelection(new Set(newIds), { fromHistory: true });
+      if (changed) this.gotoSelection();
     },
     selectOnly(row) {
       const id = row.getData().id;

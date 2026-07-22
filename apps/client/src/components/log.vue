@@ -358,12 +358,17 @@
 </template>
 
 <script>
+import { markRaw } from "vue";
 import { TabulatorFull as Tabulator } from "tabulator-tables";
 import "tabulator-tables/dist/css/tabulator.min.css";
 import evtBus from "../evtBus.js";
 import * as srvr from "../srvr.js";
 import { unilog, logHere } from "../log.js";
-const MAX_ROWS = 5000;
+// renderVertical "basic" (see ensureTable) keeps every loaded row in the DOM,
+// so the cost of rebuilding the table grows faster than linearly with this cap
+// and it bounds how long a groups-pane Show/Hide takes. Measured reload times
+// at this row count: 500 -> 0.4s, 1000 -> 0.8s, 2000 -> 2.8s, 5000 -> 20s.
+const MAX_ROWS = 1000;
 const PAGE = 500;
 // Let the table drift this far past MAX_ROWS before trimming, then trim the
 // whole overflow in one batched delete. Trimming a few rows on every 500ms
@@ -692,28 +697,34 @@ export default {
     },
     ensureTable() {
       if (this.table || !this.$refs.tableEl) return;
-      this.table = new Tabulator(this.$refs.tableEl, {
-        data: [],
-        index: "id",
-        layout: "fitData",
-        height: "100%",
-        // The log rows are fixed-height; using the basic renderer avoids the
-        // virtual DOM's top-padding estimates that made upward scroll jump.
-        renderVertical: "basic",
-        placeholder: "no log events",
-        columnDefaults: { headerSort: false },
-        selectableRows: false,
-        columns: this.columns(),
-        rowFormatter: (row) => {
-          this.paintRow(row);
-          // native tooltip: full value on hover (cells are cropped to one line).
-          for (const cell of row.getCells()) {
-            cell
-              .getElement()
-              .setAttribute("title", String(cell.getValue() ?? ""));
-          }
-        },
-      });
+      // markRaw: without it Vue's data() reactivity wraps the Tabulator
+      // instance — and every row, cell and column reached through it — in
+      // reactive Proxies, which made every rebuild ~6x slower (measured at
+      // MAX_ROWS: 5.4s wrapped vs 0.8s raw).
+      this.table = markRaw(
+        new Tabulator(this.$refs.tableEl, {
+          data: [],
+          index: "id",
+          layout: "fitData",
+          height: "100%",
+          // The log rows are fixed-height; using the basic renderer avoids the
+          // virtual DOM's top-padding estimates that made upward scroll jump.
+          renderVertical: "basic",
+          placeholder: "no log events",
+          columnDefaults: { headerSort: false },
+          selectableRows: false,
+          columns: this.columns(),
+          rowFormatter: (row) => {
+            this.paintRow(row);
+            // native tooltip: full value on hover (cells are cropped to one line).
+            for (const cell of row.getCells()) {
+              cell
+                .getElement()
+                .setAttribute("title", String(cell.getValue() ?? ""));
+            }
+          },
+        }),
+      );
       this.table.on("cellClick", this.onCellClick);
       this.table.on("dataFiltered", (filters, rows) => {
         this.displayedCount = rows.length;

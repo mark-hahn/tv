@@ -1011,7 +1011,9 @@ export default {
         return;
       }
       const [lo, hi] = aIdx <= tIdx ? [aIdx, tIdx] : [tIdx, aIdx];
-      this.setSelection(new Set(ids.slice(lo, hi + 1)));
+      const next = new Set(this.selectedIds);
+      for (const id of ids.slice(lo, hi + 1)) next.add(id);
+      this.setSelection(next);
     },
     // Unique sites across the selected rows, as { id, srcFile } pairs.
     selectedSites() {

@@ -901,6 +901,10 @@ export function setTvdbFields(params) {
   return httpCall("/api/setTvdbFields", params, "POST");
 }
 
+export function hideShow(name) {
+  return httpCall("/api/hideShow", { name }, "POST");
+}
+
 export function introFirstFile(showName) {
   return httpCall(
     `/api/introFirstFile?showName=${encodeURIComponent(showName)}`,

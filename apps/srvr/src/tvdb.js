@@ -2195,6 +2195,13 @@ export const setRefreshEpisodeDataCallback = (fn) => {
   refreshEpisodeDataCallback = fn;
 };
 
+// Fires when a show's waitStr goes from set to unset, i.e. it just became
+// watchable (set by index.js to avoid circular import).
+let waitStrClearedCallback = null;
+export const setWaitStrClearedCallback = (fn) => {
+  waitStrClearedCallback = fn;
+};
+
 const chkTvdbQueue = () => {
   if (chkTvdbQueueRunning || newTvdbQueue.length == 0) return;
   chkTvdbQueueRunning = true;
@@ -2376,6 +2383,10 @@ const tryLocalGetTvdb = async () => {
     minTvdb.name = requestedName;
   }
 
+  // Captured before any waitStr recalculation below so a show that just became
+  // watchable can be brought back to the top of the emby lists.
+  const waitStrBefore = minTvdb.waitStr;
+
   unilog(122, `processing [${minTvdb.name}]`);
   // Notify clients which show is being processed
   if (enqueueCallback) enqueueCallback(minTvdb.name);
@@ -2446,6 +2457,20 @@ const tryLocalGetTvdb = async () => {
         "tryLocalGetTvdb refreshEpisodeData error:",
         err.message,
       );
+    }
+  }
+
+  // waitStr just cleared — the show became watchable, so undo any hiding by
+  // moving its emby dates back to now.
+  const waitStrAfter = allTvdb[processRecord.name]?.waitStr;
+  if (waitStrBefore && !waitStrAfter && waitStrClearedCallback) {
+    try {
+      await waitStrClearedCallback(
+        processRecord.name,
+        allTvdb[processRecord.name],
+      );
+    } catch (e) {
+      unilog(1645, `waitStr cleared callback failed for ${processRecord.name}: ${e.message}`);
     }
   }
 

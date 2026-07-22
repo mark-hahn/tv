@@ -891,6 +891,20 @@ tvdb.setPreTvdbTickCallback(async ({ isBackground } = {}) => {
 // Wire the consolidated episodeData refresh into the tvdb background loop.
 tvdb.setRefreshEpisodeDataCallback(disk.refreshEpisodeData);
 
+// A show whose waitStr just cleared is watchable again — move its emby dates
+// up to now so it comes back to the left of the continue/latest lists.
+tvdb.setWaitStrClearedCallback(async (showName, tvdbRecord) => {
+  if (!tvdbRecord?.inEmby || !tvdbRecord?.id) return;
+  const changed = await setEmbyShowDates(
+    tvdbRecord.id,
+    new Date().toISOString(),
+  );
+  unilog(
+    1646,
+    `waitStr cleared for ${showName}: ${changed.length ? changed.join(", ") : "nothing to change"}`,
+  );
+});
+
 function rpcParamToString(param) {
   // Param is usually a raw string, but tolerate JSON-stringified strings.
   if (param === undefined || param === null) return "";
@@ -1528,6 +1542,35 @@ app.post(
     // Fire and forget — manager throttles, dedupes, polls, and pushes WS progress
     embyRefreshManager.request("api");
     return { ok: true };
+  }),
+);
+
+// Push a show to the far right of the emby "continue watching" / "latest tv"
+// lists by backdating its dates a month, effectively hiding it.
+app.post(
+  "/api/hideShow",
+  apiWrapper(async (params) => {
+    const showName = params?.name;
+    if (!showName) return { ok: false, error: "Missing name" };
+    const rec = tvdb.getAllTvdbSync()?.[showName];
+    if (!rec?.id) return { ok: false, error: "Show not in emby" };
+
+    const monthAgoMs = Date.now() - HIDE_MONTH_MS;
+    const changed = await setEmbyShowDates(
+      rec.id,
+      new Date(monthAgoMs).toISOString(),
+      monthAgoMs,
+    );
+    unilog(
+      1647,
+      `hide ${showName}: ${changed.length ? changed.join(", ") : "nothing to change"}`,
+    );
+    if (changed.length > 0) {
+      embyRefreshManager
+        .request(`hideShow:${showName}`, showName)
+        .catch((e) => unilog(1648, `refresh failed: ${e.message}`));
+    }
+    return { ok: true, changed };
   }),
 );
 
@@ -3696,7 +3739,117 @@ async function fetchLatestPlayedInfo(showId) {
   if (!utcStr) return null;
   return {
     lastPlayedDate: utcStr,
+    episodeId: epId,
+    userData: detail.UserData,
   };
+}
+
+//////////////////  EMBY SHOW DATE SHIFTING  //////////////////
+// A show is "hidden" by pushing its Emby dates a month into the past so it
+// falls to the far right of the "continue watching" and "latest tv" lists, and
+// is brought back by setting them to now.
+//
+// Neither date lives on the series item. Emby gives a series no LastPlayedDate
+// at all (its UserData holds only aggregates), and "latest tv" is ordered by
+// episode DateCreated — a series' own DateCreated has no effect on its position.
+// So both dates are written on episodes: lastPlayed on the most recently played
+// one, DateCreated on every episode still inside the recent window.
+
+const HIDE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+
+// Emby's item update overwrites every field from the posted body, so the item
+// must be fetched whole, modified, and posted back whole.
+async function setItemDateCreated(itemId, targetIso) {
+  const itemUrl = `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${itemId}?api_key=${EMBY_API_KEY}`;
+  const itemResp = await fetch(itemUrl);
+  if (!itemResp.ok) return false;
+  const item = await itemResp.json();
+  if (!item?.DateCreated) return false;
+  item.DateCreated = targetIso;
+  const res = await fetch(
+    `${EMBY_BASE_URL}/Items/${itemId}?api_key=${EMBY_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(item),
+    },
+  );
+  return res.ok || res.status === 204;
+}
+
+// Hiding (skipOlderThanMs set) has to backdate every episode still newer than
+// the cutoff — moving only the newest would just drop the show onto its
+// second-newest episode. Un-hiding only needs the newest episode moved up,
+// since that alone decides where the show lands in "latest tv".
+async function setEmbyDateCreated(showId, targetIso, skipOlderThanMs) {
+  const epUrl =
+    `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items?api_key=${EMBY_API_KEY}` +
+    `&ParentId=${showId}&IncludeItemTypes=Episode&Recursive=true` +
+    `&Fields=DateCreated&SortBy=DateCreated&SortOrder=Descending&Limit=10000`;
+  const resp = await fetch(epUrl);
+  const items = resp.ok ? (await resp.json())?.Items || [] : [];
+
+  const epIds = [];
+  for (const ep of items) {
+    if (!ep?.Id || !ep.DateCreated) continue;
+    if (!skipOlderThanMs) {
+      epIds.push(ep.Id); // newest only — list is sorted descending
+      break;
+    }
+    if (new Date(ep.DateCreated).getTime() < skipOlderThanMs) continue;
+    epIds.push(ep.Id);
+  }
+
+  // Only episodes are touched. The series' own DateCreated is deliberately left
+  // alone so the show list keeps showing when the show was really added.
+  let count = 0;
+  for (const epId of epIds) {
+    if (await setItemDateCreated(epId, targetIso)) count++;
+  }
+  return count;
+}
+
+async function setEmbyLastPlayed(showId, targetIso, skipOlderThanMs) {
+  const latest = await fetchLatestPlayedInfo(showId);
+  if (!latest?.lastPlayedDate || !latest.episodeId) return false;
+  if (
+    skipOlderThanMs &&
+    new Date(latest.lastPlayedDate).getTime() < skipOlderThanMs
+  ) {
+    return false;
+  }
+  const userData = { ...latest.userData, LastPlayedDate: targetIso };
+  const res = await fetch(urls.updateUserDataUrl(String(latest.episodeId)), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(userData),
+  });
+  return res.ok || res.status === 204;
+}
+
+// Sets both dates to targetIso. Either date is left alone when it doesn't
+// exist in Emby, or when skipOlderThanMs is given and it is already older.
+// Returns the names of the dates that were actually changed.
+async function setEmbyShowDates(showId, targetIso, skipOlderThanMs = null) {
+  const changed = [];
+  try {
+    if (await setEmbyLastPlayed(showId, targetIso, skipOlderThanMs)) {
+      changed.push("lastPlayed");
+    }
+  } catch (e) {
+    unilog(1649, `lastPlayed set failed: ${e.message}`);
+  }
+  try {
+    const epCount = await setEmbyDateCreated(
+      showId,
+      targetIso,
+      skipOlderThanMs,
+    );
+    if (epCount > 0) changed.push(`dateCreated(${epCount} epis)`);
+  } catch (e) {
+    unilog(1650, `dateCreated set failed: ${e.message}`);
+  }
+  return changed;
 }
 
 // NOTE: syncEmbyUserData periodic sync removed - now using immediate triggers from client

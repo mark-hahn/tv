@@ -174,6 +174,20 @@
             Load
           </button>
           <button
+            @click.stop="hideClick"
+            :disabled="show?.inEmby === false"
+            :style="{
+              fontSize: '13px',
+              cursor: show?.inEmby !== false ? 'pointer' : 'default',
+              marginTop: '3px',
+              maxHeight: '24px',
+              borderRadius: '7px',
+              opacity: show?.inEmby !== false ? 1 : 0.4,
+            }"
+          >
+            Hide
+          </button>
+          <button
             @click.stop="deleteClick"
             style="
               font-size: 13px;
@@ -866,6 +880,16 @@ export default {
       fetch(
         `${config.tvTvUrl}/tv/viewshow?showId=${encodeURIComponent(this.show.id)}&showName=${encodeURIComponent(this.show.name)}`,
       ).catch(() => {});
+    },
+
+    async hideClick() {
+      const showName = this.show?.name;
+      if (!showName) return;
+      try {
+        await srvr.hideShow(showName);
+      } catch (e) {
+        unilog(1644, `hide failed for ${showName}: ${e.message}`);
+      }
     },
 
     deleteClick() {

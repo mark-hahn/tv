@@ -89,7 +89,10 @@ Primary key: `(log_id, group_id)`. Index: `idx_site_groups_group` on `(group_id)
 
 ## Querying
 
-Use [unilog/query.js](../query.js) locally — it SSHes to the remote and runs `sqlite3`:
+**Always use [unilog/query.js](../query.js).** Never open the DB directly and never
+hand-roll an `ssh … sqlite3` one-liner — query.js already knows the host, the DB
+path, and the schema, and it always passes `-readonly` so it cannot disturb
+tv-srvr (the single writer).
 
 ```bash
 node unilog/query.js --file srvr/index.js --last 100          # recent events from a file
@@ -97,12 +100,68 @@ node unilog/query.js --file srvr/index.js --line 311 --last 5 # specific source 
 node unilog/query.js --id 42 --last 50                        # by log_id
 node unilog/query.js --level error --last 20                  # by level
 node unilog/query.js --pid tv-down --level error --last 20    # by process / level
-node unilog/query.js --msg "intro" --last 30                   # message substring
+node unilog/query.js --project down --last 30                 # by project column
+node unilog/query.js --group "tv play" --last 30              # by group name (partial, no case)
+node unilog/query.js --msg "intro" --last 30                  # message substring
 node unilog/query.js --since "-1 hour" --pid tv-srvr --asc    # time-bounded
+node unilog/query.js --level error --last 50 --visible        # only unhidden events
 node unilog/query.js --file srvr/index.js --sites             # list log_sites rows
+node unilog/query.js --groups                                 # all groups + counts
+node unilog/query.js --json --id 42                           # raw JSON rows
 node unilog/query.js --dry-run --file srvr/index.js           # print SQL only
 ```
 
-Output format — events: `YYYY/MM/DD HH:MM:SS  pid  file:line  message`
+Filters combine with AND. At least one filter is required, except for `--groups`
+and `--sql`.
 
-Output format — `--sites`: `id=N  file:line  level  description`
+### Anything the flags don't cover — `--sql`
+
+`--sql` is the escape hatch for aggregates, joins, `DISTINCT`, `GROUP BY`, and
+one-off shapes. It runs against the same read-only connection, so there is never
+a reason to reach for the DB directly:
+
+```bash
+node unilog/query.js --sql "SELECT s.project, s.level, COUNT(*) n
+  FROM log_events e JOIN log_sites s ON s.log_id = e.log_id
+  WHERE e.ts >= datetime('now','-1 day') GROUP BY 1,2 ORDER BY n DESC"
+```
+
+Writes fail with `attempt to write a readonly database`. Field changes go through
+tv-srvr, not here.
+
+### Hidden events
+
+`log_events.hide`: `0` = visible, `1` = group-hidden (the site belongs to a group
+with `hide = 1`), `2` = dedup-suppressed duplicate.
+
+**query.js includes hidden events by default.** Hiding is a client log pane
+concern — it keeps the live view readable — but the hidden events are usually the
+ones worth reading when debugging, and they are the large majority of the table
+(~85%: 56k group-hidden and 20k dedup, against 14k visible). Filtering them out
+by default would make most targeted queries silently return nothing.
+
+Hidden rows are marked `hidden` (hide=1) or `dup` (hide=2) in the output so the
+distinction is never lost. To narrow:
+
+| Flag        | Effect                                               |
+| ----------- | ---------------------------------------------------- |
+| _(default)_ | everything                                           |
+| `--nodup`   | drops dedup repeats (hide=2), keeps group-hidden     |
+| `--visible` | only hide=0 — exactly what the client log pane shows |
+
+`--sites` and `--groups` listings are never hide-filtered: a group with `hide = 1`
+still lists, marked `HIDE`, and its sites still show their event counts. That
+makes them the reliable way in when you don't know what to filter on yet.
+
+### Output formats
+
+| Mode       | Format                                                                          |
+| ---------- | ------------------------------------------------------------------------------- |
+| events     | `YYYY/MM/DD HH:MM:SS  pid  file:line [level] [hidden\|dup]  message`            |
+| `--sites`  | `id=N  project  n=events  file:line  [level] [{groups}] [REMOVED]  description` |
+| `--groups` | `id  name  sites=N  events=N  [HIDE]`                                           |
+| `--sql`    | pipe-joined column header, then one pipe-joined row per result                  |
+
+`--last N` always returns the **newest** N matches; `--asc` only flips the print
+order. Multi-line messages are indented under their first line rather than being
+split into separate rows.

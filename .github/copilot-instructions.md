@@ -207,3 +207,51 @@ log messages should contain the show name when the log specifically and unambigu
 - when a problem is reported with wrong data like a show not having data fields correct then only work on fixing the problem/bug -- don't fix the wrong data unless i ask you to
 
 - when a loghere logging site is added to a client source file in ./apps/client then run unilog/run-reconcile.js to change the loghere calls to unilog calls so vite hmr updates will have reconciled unilog calls
+
+### Reading the log database
+
+To read unilog data **always use `unilog/query.js`**. Never open `unilog.sqlite`
+directly, never write your own `ssh … sqlite3` one-liner, and never go looking for
+the server port, port constants, DB path, or schema — query.js already has all of
+that and always connects `-readonly`, so it cannot disturb tv-srvr (the single
+writer).
+
+```bash
+node unilog/query.js --level error --last 20             # by level
+node unilog/query.js --pid tv-down --since "-1 hour"     # by process, time-bounded
+node unilog/query.js --file srvr/index.js --last 100     # by source file
+node unilog/query.js --file srvr/index.js --line 311     # by source line
+node unilog/query.js --id 42                             # by log_id
+node unilog/query.js --project down --last 30            # by project
+node unilog/query.js --group "tv play" --last 30         # by group name (partial, no case)
+node unilog/query.js --msg "intro" --last 30             # message substring
+node unilog/query.js --sites --file srvr/index.js        # log_sites rows + event counts
+node unilog/query.js --groups                            # all group names + counts
+node unilog/query.js --group blocking --visible          # only unhidden events
+```
+
+- Filters combine with AND; at least one is required (except `--groups` / `--sql`).
+- `--last N` returns the **newest** N; `--asc` only flips print order. Default 50.
+- Hidden events are **included by default** — hiding is a log pane concern, and
+  the hidden ones (~85% of the table) are usually what you are debugging. They
+  are marked `hidden` / `dup` in the output. `--nodup` drops dedup repeats;
+  `--visible` narrows to only what the pane shows.
+- `--sites` and `--groups` are never hide-filtered, so they are the way in when
+  you don't yet know what to filter on: `--groups` to see group names and
+  counts, then `--sites --group X` for its sites and per-site event counts,
+  then `--id N` for that site's events.
+- `--json` for raw rows, `--dry-run` to see the SQL.
+- Anything the flags don't cover — aggregates, `GROUP BY`, `DISTINCT`, custom
+  joins — use the `--sql` escape hatch instead of touching the DB:
+
+```bash
+node unilog/query.js --sql "SELECT s.project, COUNT(*) n FROM log_events e
+  JOIN log_sites s ON s.log_id = e.log_id GROUP BY 1 ORDER BY n DESC"
+```
+
+- If query.js still can't express the query you need — even with `--sql` — **stop
+  and tell me what is missing**. Do not work around it by opening the DB directly,
+  writing a one-off script, or silently settling for a query that doesn't answer
+  the question. Say which flag or capability is missing and what you were trying
+  to find out; I will pass that on so query.js gets extended.
+- Schema reference: `unilog/docs/unilog-db.md`.

@@ -17,11 +17,23 @@
         flexDirection: 'column',
         overflow: 'hidden',
         flex:
-          showAsr || showEmb || showFix || showInfo || showOpn || showText
+          showAsr ||
+          showEmb ||
+          showFix ||
+          showInfo ||
+          showOpn ||
+          showText ||
+          showHist
             ? '0 0 50%'
             : '1 1 auto',
         borderBottom:
-          showAsr || showEmb || showFix || showInfo || showOpn || showText
+          showAsr ||
+          showEmb ||
+          showFix ||
+          showInfo ||
+          showOpn ||
+          showText ||
+          showHist
             ? '1px solid #ddd'
             : 'none',
       }"
@@ -161,6 +173,26 @@
               }"
             >
               Play
+            </button>
+
+            <button
+              @click="clickHist"
+              :disabled="!historyReady"
+              title="Show activity history"
+              :style="{
+                cursor: historyReady ? 'pointer' : 'default',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg': !historyReady
+                  ? '#e8e8e8'
+                  : showHist
+                    ? '#ddd'
+                    : 'whitesmoke',
+                color: historyReady ? 'inherit' : '#aaa',
+              }"
+            >
+              Hist
             </button>
 
             <button
@@ -453,6 +485,26 @@
               }"
             >
               Play
+            </button>
+
+            <button
+              @click="clickHist"
+              :disabled="!historyReady"
+              title="Show activity history"
+              :style="{
+                cursor: historyReady ? 'pointer' : 'default',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg': !historyReady
+                  ? '#e8e8e8'
+                  : showHist
+                    ? '#ddd'
+                    : 'whitesmoke',
+                color: historyReady ? 'inherit' : '#aaa',
+              }"
+            >
+              Hist
             </button>
 
             <button
@@ -1099,6 +1151,36 @@
       </div>
     </div>
 
+    <!-- History Pane -->
+    <div
+      id="historyPane"
+      v-show="showHist"
+      :style="{
+        flex: '1 1 50%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        backgroundColor: '#fafafa',
+        color: '#000',
+        fontFamily: 'monospace',
+        padding: '10px',
+        borderLeft: '1px solid #ddd',
+      }"
+    >
+      <div
+        style="
+          flex: 1 1 auto;
+          overflow: auto;
+          white-space: pre;
+          background-color: #fff;
+          border: 1px solid #eee;
+          padding: 4px;
+        "
+      >
+        {{ histLoading ? "Loading..." : histContent }}
+      </div>
+    </div>
+
     <!-- Info Pane -->
     <div
       id="infoPane"
@@ -1303,6 +1385,7 @@ import {
   generateEmb,
   getAsrLog,
   getAsrQueue,
+  getLocalHistory,
   addToAsrQueue,
   openChannel,
   removeFromAsrQueue,
@@ -1396,6 +1479,11 @@ export default {
       textContent: "",
       textLoading: false,
       textProbeOk: false, // selected file passed the is-text probe
+
+      // History pane
+      showHist: false,
+      histContent: "",
+      histLoading: false,
 
       // Toast
       toastMessage: "",
@@ -1546,6 +1634,13 @@ export default {
       const node = this.findNodeByPath(relPath);
       if (node.size == null || node.size > TEXT_VIEW_MAX_BYTES) return false;
       return this.textProbeOk;
+    },
+    historyReady() {
+      const relPath = this.singleSelectedFile;
+      return (
+        !!relPath &&
+        /\.(mkv|mp4|avi|m4v|mov|wmv|mpg|mpeg|ts|m2ts|webm)$/i.test(relPath)
+      );
     },
     infoLines() {
       if (!this.infoText) return [];
@@ -2076,9 +2171,7 @@ export default {
 
       this.loading = true;
       try {
-        const root = this.movieMode
-          ? "/mnt/media/movies"
-          : "/mnt/media/tv";
+        const root = this.movieMode ? "/mnt/media/movies" : "/mnt/media/tv";
         for (const relPath of pathsToDelete) {
           const fullPath = `${root}/${relPath}`;
           await deletePath(fullPath);
@@ -2214,9 +2307,7 @@ export default {
     },
     // Subtitles logic
     clickPlay() {
-      const mediaRoot = this.movieMode
-        ? "/mnt/media/movies"
-        : "/mnt/media/tv";
+      const mediaRoot = this.movieMode ? "/mnt/media/movies" : "/mnt/media/tv";
       const videoPath = this.collectFilePaths()
         .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
         .map((p) => `${mediaRoot}/${p}`)[0];
@@ -2224,9 +2315,7 @@ export default {
       evtBus.emit("playEpisodePath", videoPath);
     },
     clickSubs() {
-      const mediaRoot = this.movieMode
-        ? "/mnt/media/movies"
-        : "/mnt/media/tv";
+      const mediaRoot = this.movieMode ? "/mnt/media/movies" : "/mnt/media/tv";
       const videoPaths = this.collectFilePaths()
         .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
         .map((p) => `${mediaRoot}/${p}`);
@@ -2268,6 +2357,7 @@ export default {
         this.showFix = false;
         this.showInfo = false;
         this.showText = false;
+        this.showHist = false;
       }
     },
     pushAsrLine(text) {
@@ -2278,9 +2368,7 @@ export default {
       this.asrQueueMode = false;
     },
     async startAsr() {
-      const mediaRoot = this.movieMode
-        ? "/mnt/media/movies"
-        : "/mnt/media/tv";
+      const mediaRoot = this.movieMode ? "/mnt/media/movies" : "/mnt/media/tv";
       const videoPaths = this.collectFilePaths()
         .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
         .map((p) => `${mediaRoot}/${p}`);
@@ -2435,6 +2523,7 @@ export default {
         this.showOpn = false;
         this.showInfo = false;
         this.showText = false;
+        this.showHist = false;
         this.initFixState();
       } else {
         this.stopFixPolling();
@@ -2642,6 +2731,7 @@ export default {
         this.showFix = false;
         this.showInfo = false;
         this.showText = false;
+        this.showHist = false;
       }
     },
     async applyEmb() {
@@ -2713,13 +2803,12 @@ export default {
         this.showFix = false;
         this.showInfo = false;
         this.showText = false;
+        this.showHist = false;
       }
     },
     async applyOpn() {
       if (this.opnBusy) return;
-      const mediaRoot = this.movieMode
-        ? "/mnt/media/movies"
-        : "/mnt/media/tv";
+      const mediaRoot = this.movieMode ? "/mnt/media/movies" : "/mnt/media/tv";
       const videoPaths = this.collectFilePaths()
         .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
         .map((p) => `${mediaRoot}/${p}`);
@@ -2800,7 +2889,23 @@ export default {
       this.showOpn = false;
       this.showFix = false;
       this.showText = false;
+      this.showHist = false;
       await this.loadInfo();
+    },
+    async clickHist() {
+      if (this.showHist) {
+        this.showHist = false;
+        return;
+      }
+      if (!this.historyReady) return;
+      this.showHist = true;
+      this.showAsr = false;
+      this.showEmb = false;
+      this.showOpn = false;
+      this.showFix = false;
+      this.showInfo = false;
+      this.showText = false;
+      await this.loadHistory();
     },
     async clickView() {
       if (this.showText) {
@@ -2814,7 +2919,31 @@ export default {
       this.showOpn = false;
       this.showFix = false;
       this.showInfo = false;
+      this.showHist = false;
       await this.loadTextFile();
+    },
+    async loadHistory() {
+      const relPath = this.singleSelectedFile;
+      if (!relPath || !this.historyReady) {
+        this.showHist = false;
+        return;
+      }
+      this.histContent = "";
+      this.histLoading = true;
+      this._histPath = relPath;
+      try {
+        const data = await getLocalHistory({
+          relPath,
+          movieMode: this.movieMode,
+        });
+        if (this._histPath !== relPath) return;
+        this.histContent = data?.text || "No timestamped history found.";
+      } catch (e) {
+        if (this._histPath !== relPath) return;
+        this.histContent = `History error: ${e?.message || String(e)}`;
+      } finally {
+        if (this._histPath === relPath) this.histLoading = false;
+      }
     },
     // probe:true asks only whether the file is viewable text
     async fetchTextFile(relPath, probe) {
@@ -3161,6 +3290,16 @@ export default {
       this._textProbeTimer = setTimeout(() => {
         this.probeTextFile();
       }, 300);
+      if (this.showHist) {
+        if (!this.historyReady) {
+          this.showHist = false;
+        } else {
+          if (this._histRefreshTimer) clearTimeout(this._histRefreshTimer);
+          this._histRefreshTimer = setTimeout(() => {
+            this.loadHistory();
+          }, 300);
+        }
+      }
     },
     async refreshInfo() {
       // Re-run loadInfo without toggling off

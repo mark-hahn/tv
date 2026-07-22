@@ -672,6 +672,10 @@ export function getLastViewed() {
   return httpCall("/api/getLastViewed");
 }
 
+export function getLocalHistory(params) {
+  return httpCall("/api/local/history", params, "POST", 60000);
+}
+
 // OpenSubtitles (server-side search)
 // tv-srvr should implement this endpoint.
 // params: { imdb_id?: string, q?: string, page?: number }

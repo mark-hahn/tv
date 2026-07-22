@@ -215,6 +215,7 @@ import * as intro from "./src/intro.js";
 import * as flexget from "./src/flexget.js";
 import * as disk from "./src/disk.js";
 import * as fileOps from "./src/fileOps.js";
+import * as localHistory from "./src/localHistory.js";
 const { getFile, deletePath, deletePaths, delSeasonFiles, createShowFolder } =
   fileOps;
 import { registerMediaRoutes } from "./src/routes/media.js";
@@ -1334,6 +1335,7 @@ app.post(
 );
 app.get("/api/getLastViewed", apiWrapper(view.getLastViewed));
 app.get("/api/getSharedFilters", apiWrapper(getSharedFilters));
+app.post("/api/local/history", apiWrapper(localHistory.getLocalHistory));
 
 // Endpoints with parameters
 app.post("/api/getRemotes", apiWrapper(tvdb.getRemotesCmd));

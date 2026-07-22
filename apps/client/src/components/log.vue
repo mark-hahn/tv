@@ -138,7 +138,7 @@
         class="logBtn"
         @click="toggleGroupsPane"
       >
-        Groups
+        Grp
       </button>
       <button
         class="logBtn"
@@ -154,6 +154,16 @@
       >
         Nxt
       </button>
+      <span
+        v-if="selectedCount"
+        style="
+          font-size: 16px;
+          font-weight: bold;
+          color: lightcoral;
+          white-space: nowrap;
+        "
+        >Sel: {{ selectedCount }}</span
+      >
       <span
         v-if="flashMsg"
         style="font-size: 14.4px; color: #c0392b; white-space: nowrap"

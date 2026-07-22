@@ -861,6 +861,20 @@
             Start
           </button>
           <button
+            @click="toggleAsrTail"
+            title="Tail detailed ASR progress into the output above"
+            :style="{
+              cursor: 'pointer',
+              borderRadius: '4px',
+              padding: '2px 8px',
+              border: '1px solid #bbb',
+              '--btn-bg': asrTailOn ? 'lightgray' : 'whitesmoke',
+              marginRight: '5px',
+            }"
+          >
+            Tail
+          </button>
+          <button
             @click="clearAsrLog"
             :style="{
               cursor: 'pointer',
@@ -902,7 +916,7 @@
           padding: 4px;
         "
       >
-        {{ asrLogs }}
+        {{ asrDisplay }}
       </div>
       <div
         v-else
@@ -1330,7 +1344,7 @@ export default {
 
       // Asr
       showAsr: false,
-      asrLogs: "",
+      asrLineObjs: [], // { text, detail } — detail lines are the Tail progress
       asrBusy: false,
       activeAsrPath: null,
       ignoreLogs: false,
@@ -1339,6 +1353,7 @@ export default {
       asrQueueLen: 0,
       asrLogChannel: null,
       asrQueueChannel: null,
+      asrTailOn: false,
 
       // Emb
       showEmb: false,
@@ -1416,7 +1431,7 @@ export default {
         this.fetchFiles();
       }
     },
-    asrLogs() {
+    asrDisplay() {
       const el = this.$refs.asrScroll;
       if (!el) return;
       // Auto-scroll only if we are already near the bottom
@@ -1498,6 +1513,14 @@ export default {
     if (this._onLocalDelKey) evtBus.off("localDelKey", this._onLocalDelKey);
   },
   computed: {
+    // Rendered ASR output. Detail lines (the Tail progress) are kept in
+    // asrLineObjs at all times but only shown while asrTailOn is on.
+    asrDisplay() {
+      return this.asrLineObjs
+        .filter((e) => this.asrTailOn || !e?.detail)
+        .map((e) => (typeof e === "string" ? e : (e?.text ?? "")))
+        .join("\n");
+    },
     sortedAsrQueue() {
       return [...this.asrQueueEntries].sort(
         (a, b) => (a.addedAt ?? 0) - (b.addedAt ?? 0),
@@ -2247,8 +2270,11 @@ export default {
         this.showText = false;
       }
     },
+    pushAsrLine(text) {
+      this.asrLineObjs.push({ text, detail: false });
+    },
     async clearAsrLog() {
-      this.asrLogs = "";
+      this.asrLineObjs = [];
       this.asrQueueMode = false;
     },
     async startAsr() {
@@ -2259,28 +2285,31 @@ export default {
         .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
         .map((p) => `${mediaRoot}/${p}`);
       if (videoPaths.length === 0) {
-        this.asrLogs += "[Error] No video files selected.\n";
+        this.pushAsrLine("[Error] No video files selected.");
         return;
       }
       this.asrQueueMode = false;
       try {
         await addToAsrQueue(videoPaths);
-        this.asrLogs += `Queued ${videoPaths.length} file(s) for ASR.\n`;
+        this.pushAsrLine(`Queued ${videoPaths.length} file(s) for ASR.`);
       } catch (e) {
-        this.asrLogs += `Error: ${e.message}\n`;
+        this.pushAsrLine(`Error: ${e.message}`);
       }
     },
     async killAsr() {
       try {
         await killAsrProcess();
-        this.asrLogs += `\n[Kill command sent]\n`;
+        this.pushAsrLine(`[Kill command sent]`);
       } catch (e) {
-        this.asrLogs += `\nError killing ASR: ${e.message}\n`;
+        this.pushAsrLine(`Error killing ASR: ${e.message}`);
       }
     },
-    onAsrLog(msg) {
+    onAsrLog(entry) {
       if (this.ignoreLogs) return;
-      if (!msg) return; // ignore empty
+      const line =
+        typeof entry === "string" ? { text: entry, detail: false } : entry;
+      if (!line?.text) return; // ignore empty
+      const msg = line.text;
 
       const el = this.$refs.asrScroll;
       let atBottom = true;
@@ -2288,7 +2317,7 @@ export default {
         atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50;
       }
 
-      this.asrLogs += msg.endsWith("\n") ? msg : msg + "\n";
+      this.asrLineObjs.push(line);
 
       // Auto-detect running state from logs if we missed initial state
       if (msg.includes("matches (running)")) {
@@ -2307,7 +2336,8 @@ export default {
         this.activeAsrPath = match[1].trim();
       }
 
-      if (atBottom) {
+      // Only scroll if this line is actually visible in the current view.
+      if (atBottom && (this.asrTailOn || !line.detail)) {
         this.$nextTick(() => {
           if (el) el.scrollTop = el.scrollHeight;
         });
@@ -2317,7 +2347,7 @@ export default {
       if (this.asrLogChannel) return;
       this.asrLogChannel = openChannel("asrLog", {
         onSnapshot: (payload) => {
-          if (payload?.lines != null) this.asrLogs = payload.lines;
+          if (payload?.lines != null) this.asrLineObjs = payload.lines;
         },
         onDelta: (payload) => this.onAsrLog(payload?.line),
       });
@@ -2332,7 +2362,7 @@ export default {
           getAsrLog(),
           getAsrQueue(),
         ]);
-        if (logRes?.lines) this.asrLogs = logRes.lines;
+        if (logRes?.lines) this.asrLineObjs = logRes.lines;
         if (queueRes) {
           this.asrQueueLen = queueRes.count ?? 0;
           this.asrBusy = queueRes.running ?? false;
@@ -2357,6 +2387,11 @@ export default {
       this.asrQueueChannel?.close();
       this.asrQueueChannel = null;
     },
+    toggleAsrTail() {
+      // Detail lines are always received and stored; toggling only controls
+      // whether asrDisplay includes them.
+      this.asrTailOn = !this.asrTailOn;
+    },
     async clickQueue() {
       this.asrQueueMode = !this.asrQueueMode;
       if (this.asrQueueMode) {
@@ -2366,7 +2401,7 @@ export default {
     async fetchAsrLog() {
       try {
         const res = await getAsrLog();
-        if (res?.lines != null) this.asrLogs = res.lines;
+        if (res?.lines != null) this.asrLineObjs = res.lines;
       } catch (e) {
         unilog(1006, "fetchAsrLog error", e);
       }

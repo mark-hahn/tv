@@ -6,6 +6,7 @@
 
 import * as unilogDb from "../unilogDb.js";
 import { notifyClients } from "../messaging.js";
+import { appendAsrTail } from "../subsQueue.js";
 
 const unilogSubscribers = new Set();
 let unilogLastPruneTime = 0;
@@ -135,14 +136,19 @@ export function registerUnilogRoutes(app) {
         if (currentClientId && message && message.includes("~~~")) {
           message = message.replace(/~~~/g, currentClientId);
         }
-        broadcastUnilog(
-          unilogDb.insertEventDedup({
-            logId: e.logId,
-            pid: e.pid || "unknown",
-            message,
-            ts: e.ts,
-          }),
-        );
+        const row = unilogDb.insertEventDedup({
+          logId: e.logId,
+          pid: e.pid || "unknown",
+          message,
+          ts: e.ts,
+        });
+        broadcastUnilog(row);
+        // Detailed asr.js progress (unilog-only, never on the child's stdout)
+        // is mirrored into the asr log buffer so the ASR pane's Tail toggle can
+        // show/hide it interleaved with the Queued/Starting/Done lines.
+        if (row && !row.hide && row.pid === "tv-asr") {
+          appendAsrTail(row.message);
+        }
       }
       res.json({ ok: true, count: events.length });
     } catch (error) {

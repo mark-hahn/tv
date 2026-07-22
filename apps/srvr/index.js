@@ -185,10 +185,10 @@ registerLocalChannel("fixLog", {
 });
 
 registerLocalChannel("asrLog", {
-  snapshot: () => ({ lines: subsState.asrLogBuffer.join("\n") }),
+  snapshot: () => ({ lines: subsState.asrLogBuffer }),
 });
-subsQueue.onAsrLog((line) => {
-  publishChannelDelta("asrLog", { line });
+subsQueue.onAsrLog((entry) => {
+  publishChannelDelta("asrLog", { line: entry });
 });
 
 registerLocalChannel("asrQueue", {
@@ -2662,7 +2662,7 @@ app.post("/api/asr/queue/remove", (req, res) => {
 });
 
 app.get("/api/asr/log", (req, res) => {
-  res.json({ lines: subsState.asrLogBuffer.join("\n") });
+  res.json({ lines: subsState.asrLogBuffer });
 });
 
 app.post("/api/asr/kill", (req, res) => {

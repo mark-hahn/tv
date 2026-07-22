@@ -191,18 +191,32 @@ function cleanChkSrtQueue() {
 function persistAsrQueue() {
   fs.writeFileSync(ASR_QUEUE_PATH, JSON.stringify(subsState.asrQueue), "utf8");
 }
-function appendAsrLog(line) {
-  subsState.asrLogBuffer.push(line);
+// The asr log buffer holds tagged entries { text, detail }. detail:false is the
+// normal Queued/Starting/Done output; detail:true is the per-chunk asr.js
+// progress that the pane's Tail toggle shows/hides. Both live in one buffer so
+// they stay interleaved in true arrival order.
+function appendAsrLog(text, detail = false) {
+  const entry = { text, detail };
+  subsState.asrLogBuffer.push(entry);
   if (subsState.asrLogBuffer.length > ASR_LOG_BUFFER_MAX) {
     subsState.asrLogBuffer = subsState.asrLogBuffer.slice(-ASR_LOG_BUFFER_MAX);
   }
-  try {
-    fs.appendFileSync(SUBTITLE_LOG_PATH, line + "\n", "utf8");
-  } catch (e) {
-    unilog(1556, `subtitle.log append failed: ${e.message}`);
+  if (!detail) {
+    try {
+      fs.appendFileSync(SUBTITLE_LOG_PATH, text + "\n", "utf8");
+    } catch (e) {
+      unilog(1556, `subtitle.log append failed: ${e.message}`);
+    }
+    notifyClients("asr-log", text);
   }
-  notifyClients("asr-log", line);
-  notifyAsrLogListeners(line);
+  notifyAsrLogListeners(entry);
+}
+
+// Detailed asr.js progress arrives out-of-band via the unilog collector
+// (routes/unilog.js), not on the child's stdout. Mirror it into the same buffer
+// as a detail entry so it interleaves and rides the same asrLog channel.
+function appendAsrTail(text) {
+  appendAsrLog(text, true);
 }
 function addToAsrQueue(entries) {
   let added = 0;
@@ -1153,6 +1167,7 @@ export {
   cleanChkSrtQueue,
   persistAsrQueue,
   appendAsrLog,
+  appendAsrTail,
   addToAsrQueue,
   enqueueSubQueue,
   enqueueSubQueueChkSrt,

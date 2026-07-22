@@ -102,7 +102,7 @@ function currentPaths(inputFile) {
   const base = path.basename(inputFile, ext);
   return {
     tmpFile: path.join(dir, base + ".fix-tmp.mkv"),
-    finalFile: path.join(dir, base + ".mkv"),
+    finalFile: path.join(dir, base + ".mkv.fixed"),
   };
 }
 
@@ -168,10 +168,9 @@ async function encodeFile(inputFile, idx, totalFiles) {
 
       if (code === 0) {
         try {
-          fs.renameSync(inputFile, inputFile + ".orig");
           fs.renameSync(tmpFile, finalFile);
           appendLog(
-            `[fix] Done ${path.basename(finalFile)} (original saved as .orig)\n`,
+            `[fix] Done ${path.basename(finalFile)} (original untouched)\n`,
           );
           resolve();
         } catch (err) {

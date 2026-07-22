@@ -1175,6 +1175,7 @@
           background-color: #fff;
           border: 1px solid #eee;
           padding: 4px;
+          font-size: 14.3px;
         "
       >
         {{ histLoading ? "Loading..." : histContent }}

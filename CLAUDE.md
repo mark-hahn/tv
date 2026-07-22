@@ -205,3 +205,5 @@ console.log("[reseed] done."); // no-unilog
 log messages should contain the show name when the log specifically and unambiguously refers to a show.
 
 - when a problem is reported with wrong data like a show not having data fields correct then only work on fixing the problem/bug -- don't fix the wrong data unless i ask you to
+
+- when a loghere logging site is added to a client source file in ./apps/client then run unilog/run-reconcile.js to change the loghere calls to unilog calls so vite hmr updates will have reconciled unilog calls

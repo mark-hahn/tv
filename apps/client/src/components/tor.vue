@@ -2483,12 +2483,13 @@ export default {
       const hasAnyDigits = (txt) => /\d/.test(String(txt || ""));
 
       const applyUsb = (s) => {
-        if (
-          Number.isFinite(Number(s?.usbSpaceTotal)) &&
-          Number.isFinite(Number(s?.usbSpaceUsed))
-        ) {
-          this.spaceUsbPct = this.pctAvail(s.usbSpaceTotal, s.usbSpaceUsed);
-          this.spaceUsbGb = this.fmtAvailGb(s.usbSpaceTotal, s.usbSpaceUsed);
+        const t = Number(s?.usbSpaceTotal);
+        const u = Number(s?.usbSpaceUsed);
+        // total <= 0 means the probe failed server-side (ssh/quota error) —
+        // keep whatever was last displayed rather than flashing "--".
+        if (Number.isFinite(t) && Number.isFinite(u) && t > 0) {
+          this.spaceUsbPct = this.pctAvail(t, u);
+          this.spaceUsbGb = this.fmtAvailGb(t, u);
         }
       };
 

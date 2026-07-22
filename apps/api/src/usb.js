@@ -230,6 +230,7 @@ export async function spaceAvailUsb() {
           : "";
       if (!stdout) {
         unilog(278, "spaceAvailUsb: ssh quota failed:", e);
+        return { usbSpaceTotal: 0, usbSpaceUsed: 0 };
       }
     }
 

@@ -125,6 +125,7 @@
         <option value="refresh">Refresh</option>
         <option value="editor">Editor</option>
         <option value="goto">Go To Selection</option>
+        <option value="copyIds">Copy Select Ids</option>
         <option value="clear">Clear Selections</option>
         <option value="selectSites">Select Sites</option>
         <option value="channels">Channels</option>
@@ -155,7 +156,7 @@
       </button>
       <span
         v-if="flashMsg"
-        style="font-size: 12px; color: #2a7d2a; white-space: nowrap"
+        style="font-size: 14.4px; color: #c0392b; white-space: nowrap"
         >{{ flashMsg }}</span
       >
 
@@ -800,6 +801,7 @@ export default {
         1618,
         `${gesture} click row ${row.getData().id}, anchor ${this.selAnchorId}, sel ${this.selIdsStr(this.selectedIds)}, hist idx ${this.selHistoryIdx} of sizes [${this.selHistory.map((a) => a.length).join(",")}]`,
       );
+      unilog(1633, `at click, row ${row.getData().id} ${this.selectedIds.has(row.getData().id) ? "IS" : "is NOT"} selected in state, ${this.paintedVsState()}`);
       if (e.shiftKey) this.selectRange(row);
       else if (e.ctrlKey) this.toggleRow(row);
       else this.selectOnly(row);
@@ -893,6 +895,24 @@ export default {
     selIdsStr(ids) {
       const arr = [...ids];
       return `${arr.length}[${arr.slice(0, 8).join(",")}${arr.length > 8 ? ",..." : ""}]`;
+    },
+    // What is actually painted blue on screen vs what selectedIds says is
+    // selected. A stale highlight makes ctrl-click toggle the opposite way
+    // from what the user sees, so any mismatch here explains the bug.
+    paintedVsState() {
+      const painted = [];
+      const onscreenSel = [];
+      for (const r of this.table.getRows("active")) {
+        const el = r.getElement();
+        if (!el || !el.isConnected) continue;
+        const id = r.getData().id;
+        if (el.style.backgroundColor === "rgb(179, 212, 252)") painted.push(id);
+        if (this.selectedIds.has(id)) onscreenSel.push(id);
+      }
+      const mismatch =
+        painted.length !== onscreenSel.length ||
+        painted.some((id) => !this.selectedIds.has(id));
+      return `painted ${this.selIdsStr(painted)}, onscreen sel ${this.selIdsStr(onscreenSel)}, mismatch ${mismatch}`;
     },
     setSelection(newSet, { fromHistory = false } = {}) {
       // Caller name pins down any setSelection we did not expect after a click.
@@ -988,11 +1008,12 @@ export default {
     },
     flash(msg) {
       this.flashMsg = msg;
+      unilog(1631, `flash shown: ${msg}`);
       if (this.flashTimer) clearTimeout(this.flashTimer);
       this.flashTimer = setTimeout(() => {
         this.flashMsg = "";
         this.flashTimer = null;
-      }, 2500);
+      }, 625);
     },
     async onAction() {
       const act = this.actionSel;
@@ -1000,6 +1021,7 @@ export default {
       if (!act || !this.table) return;
       if (act === "refresh") await this.loadLogs();
       else if (act === "goto") this.gotoSelection();
+      else if (act === "copyIds") await this.copySelectedIds();
       else if (act === "selectSites") this.selectSites();
       else if (act === "channels") this.openChannelsPane();
       else if (act === "clear") this.setSelection(new Set());
@@ -1017,6 +1039,19 @@ export default {
       this.atBottom = false;
       this.table.scrollToRow(first, "top", false);
     },
+    async copySelectedIds() {
+      const ids = this.table
+        .getRows()
+        .map((r) => r.getData())
+        .filter((d) => this.selectedIds.has(d.id))
+        .map((d) => d.id);
+      if (!ids.length) {
+        this.flash("no events");
+        return;
+      }
+      await navigator.clipboard.writeText(ids.join(",")).catch(() => {});
+      this.flash(`copied ${ids.length} id${ids.length > 1 ? "s" : ""}`);
+    },
     selectSites() {
       const siteIds = new Set(this.selectedSites().map((s) => s.id));
       if (!siteIds.size) return;
@@ -1031,7 +1066,7 @@ export default {
     async selectedEventGroupIds() {
       const sites = this.selectedSites();
       if (!sites.length) {
-        this.flash("no events selected");
+        this.flash("no events");
         return null;
       }
       const res = await srvr.getUnilogGroupIdsForSites(sites.map((s) => s.id));

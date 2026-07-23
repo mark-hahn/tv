@@ -175,17 +175,18 @@
           </button>
           <button
             @click.stop="hideClick"
-            :disabled="show?.inEmby === false"
+            :disabled="show?.inEmby === false || !hasVideoFiles"
             :style="{
               fontSize: '13px',
-              cursor: show?.inEmby !== false ? 'pointer' : 'default',
+              cursor:
+                show?.inEmby !== false && hasVideoFiles ? 'pointer' : 'default',
               marginTop: '3px',
               maxHeight: '24px',
               borderRadius: '7px',
-              opacity: show?.inEmby !== false ? 1 : 0.4,
+              opacity: show?.inEmby !== false && hasVideoFiles ? 1 : 0.4,
             }"
           >
-            Hide
+            {{ show?.hiddenFromRow ? "Unhide" : "Hide" }}
           </button>
           <button
             @click.stop="deleteClick"
@@ -885,10 +886,14 @@ export default {
     async hideClick() {
       const showName = this.show?.name;
       if (!showName) return;
+      // Toggle: server hides when not hidden, unhides both rows when hidden.
+      const original = !!this.show.hiddenFromRow;
+      this.show.hiddenFromRow = !original;
       try {
         await srvr.hideShow(showName);
       } catch (e) {
-        unilog(1644, `hide failed for ${showName}: ${e.message}`);
+        unilog(1644, `hide toggle failed for ${showName}: ${e.message}`);
+        this.show.hiddenFromRow = original;
       }
     },
 

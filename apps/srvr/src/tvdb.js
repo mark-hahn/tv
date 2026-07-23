@@ -2078,6 +2078,9 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   tvdbData.anticipating =
     paramObj.anticipating ?? existing.anticipating ?? false;
   tvdbData.sitcom = paramObj.sitcom ?? existing.sitcom ?? false;
+  // Row-hidden state must survive a rebuild or auto/toggle hiding breaks.
+  tvdbData.hiddenFromRow =
+    paramObj.hiddenFromRow ?? existing.hiddenFromRow ?? false;
   if (existing["last-downloaded"] !== undefined) {
     tvdbData["last-downloaded"] = existing["last-downloaded"];
   }
@@ -2195,11 +2198,12 @@ export const setRefreshEpisodeDataCallback = (fn) => {
   refreshEpisodeDataCallback = fn;
 };
 
-// Fires when a show's waitStr goes from set to unset, i.e. it just became
-// watchable (set by index.js to avoid circular import).
-let waitStrClearedCallback = null;
-export const setWaitStrClearedCallback = (fn) => {
-  waitStrClearedCallback = fn;
+// Fires when a show's waitStr flips between empty and non-empty during a
+// refresh. index.js reads before/after to drive show hide/unhide (set by
+// index.js to avoid circular import).
+let waitStrChangedCallback = null;
+export const setWaitStrChangedCallback = (fn) => {
+  waitStrChangedCallback = fn;
 };
 
 const chkTvdbQueue = () => {
@@ -2460,17 +2464,17 @@ const tryLocalGetTvdb = async () => {
     }
   }
 
-  // waitStr just cleared — the show became watchable, so undo any hiding by
-  // moving its emby dates back to now.
+  // waitStr flipped between empty and non-empty — let index.js hide/unhide.
   const waitStrAfter = allTvdb[processRecord.name]?.waitStr;
-  if (waitStrBefore && !waitStrAfter && waitStrClearedCallback) {
+  if (!!waitStrBefore !== !!waitStrAfter && waitStrChangedCallback) {
     try {
-      await waitStrClearedCallback(
+      await waitStrChangedCallback(
         processRecord.name,
         allTvdb[processRecord.name],
+        { before: waitStrBefore, after: waitStrAfter },
       );
     } catch (e) {
-      unilog(1645, `waitStr cleared callback failed for ${processRecord.name}: ${e.message}`);
+      unilog(1660, `waitStr changed callback failed for ${processRecord.name}: ${e.message}`);
     }
   }
 

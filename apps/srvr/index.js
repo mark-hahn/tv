@@ -3949,6 +3949,23 @@ async function hideShowIfNeeded(showName, rec, refreshCaller) {
   }
 }
 
+// Re-apply backdating to a show that is already hidden. A newly downloaded
+// episode enters Emby with DateCreated=now regardless of hiddenFromRow, so a
+// still-hidden show needs this every time a new episode lands or the new
+// episode alone would surface it at the left of "latest tv". hideShowInEmby
+// only touches episodes still newer than the cutoff, so this is a no-op for
+// episodes already backdated by a previous hide.
+async function reapplyHideIfAlreadyHidden(showName, rec) {
+  if (!rec.hiddenFromRow) return;
+  const changed = await hideShowInEmby(rec);
+  unilog(1667, `re-hiding new episode(s) for ${showName}: ${changed.length ? changed.join(", ") : "no date change"}`);
+  if (changed.length > 0) {
+    embyRefreshManager
+      .request(`chokidarRehide:${showName}`, showName)
+      .catch((e) => unilog(1668, `refresh failed: ${e.message}`));
+  }
+}
+
 // Bring a hidden show back to the latest tv row and clear hiddenFromRow.
 async function unhideLatestTvIfNeeded(showName, rec) {
   if (!rec.hiddenFromRow) return;
@@ -4262,7 +4279,11 @@ async function handleShowDiskChange(showName) {
       const hasEpisodesNow = hasEpisodesOnDisk(tvdbRecord);
       const waitStrJustSet = !waitStrBefore && waitStrAfter;
       const firstEpisodesJustLanded = !hadEpisodesOnDiskBefore && hasEpisodesNow;
-      if (
+      if (tvdbRecord.hiddenFromRow) {
+        // Already hidden: this new episode needs the same backdating, or it
+        // would show up fresh at the left of "latest tv" on its own.
+        if (hasEpisodesNow) await reapplyHideIfAlreadyHidden(showName, tvdbRecord);
+      } else if (
         hasEpisodesNow &&
         waitStrAfter &&
         (waitStrJustSet || firstEpisodesJustLanded)

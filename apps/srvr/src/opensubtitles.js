@@ -232,34 +232,22 @@ export async function openSubtitlesDownloadWithRetry({
       if (last?.resp?.ok) return last;
       const status = last?.resp?.status;
       if (retryStatus.has(status) && attempt < maxAttempts) {
-        logHere(
-          { lvl: "warn", grp: "opensubtitles download" },
-          `OpenSubtitles /download HTTP ${status} (file_id=${fileId}, attempt=${attempt}/${maxAttempts}), retrying`,
-        );
+        unilog(1732, `OpenSubtitles /download HTTP ${status} (file_id=${fileId}, attempt=${attempt}/${maxAttempts}), retrying`);
         await sleep(400 * attempt);
         continue;
       }
       if (retryStatus.has(status)) {
-        logHere(
-          { lvl: "error", grp: "opensubtitles download" },
-          `OpenSubtitles /download gave up with HTTP ${status} for file_id=${fileId} after ${attempt} attempts`,
-        );
+        unilog(1733, `OpenSubtitles /download gave up with HTTP ${status} for file_id=${fileId} after ${attempt} attempts`);
       }
       return last;
     } catch (e) {
       // Network error / fetch throw: retry.
       if (attempt < maxAttempts) {
-        logHere(
-          { lvl: "warn", grp: "opensubtitles download" },
-          `OpenSubtitles /download failed for file_id=${fileId} (attempt=${attempt}/${maxAttempts}): ${e?.message || String(e)}, retrying`,
-        );
+        unilog(1734, `OpenSubtitles /download failed for file_id=${fileId} (attempt=${attempt}/${maxAttempts}): ${e?.message || String(e)}, retrying`);
         await sleep(400 * attempt);
         continue;
       }
-      logHere(
-        { lvl: "error", grp: "opensubtitles download" },
-        `OpenSubtitles /download gave up for file_id=${fileId} after ${attempt} attempts: ${e?.message || String(e)}`,
-      );
+      unilog(1735, `OpenSubtitles /download gave up for file_id=${fileId} after ${attempt} attempts: ${e?.message || String(e)}`);
       throw e;
     }
   }

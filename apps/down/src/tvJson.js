@@ -366,10 +366,7 @@ const retryPendingTvdbFields = async () => {
         changed = true;
       }
     } catch (e) {
-      logHere(
-        { lvl: "warn", grp: "tvdb fields" },
-        `pending last-downloaded retry failed for ${showName}: ${e?.message || String(e)}`,
-      );
+      unilog(1750, `pending last-downloaded retry failed for ${showName}: ${e?.message || String(e)}`);
     }
   }
 
@@ -379,10 +376,7 @@ const retryPendingTvdbFields = async () => {
 loadPendingTvdbFields();
 setInterval(() => {
   retryPendingTvdbFields().catch((e) => {
-    logHere(
-      { lvl: "warn", grp: "tvdb fields" },
-      `pending last-downloaded retry loop failed: ${e?.message || String(e)}`,
-    );
+    unilog(1751, `pending last-downloaded retry loop failed: ${e?.message || String(e)}`);
   });
 }, PENDING_TVDB_FIELDS_RETRY_MS);
 

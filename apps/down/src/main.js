@@ -1395,16 +1395,10 @@ async function main() {
           const message = error?.message || String(error || `HTTP ${status}`);
 
           if (retryCount < MAX_RETRIES) {
-            logHere(
-              { lvl: "warn", grp: "tvdb login" },
-              `theTvDb login failed (attempt ${retryCount + 1}/${MAX_RETRIES + 1}): ${message}; status=${status}; retrying in ${RETRY_DELAY_MS}ms`,
-            );
+            unilog(1746, `theTvDb login failed (attempt ${retryCount + 1}/${MAX_RETRIES + 1}): ${message}; status=${status}; retrying in ${RETRY_DELAY_MS}ms`);
             setTimeout(() => loginToTvDb(retryCount + 1), RETRY_DELAY_MS);
           } else {
-            logHere(
-              { lvl: "error", grp: "tvdb login" },
-              `theTvDb login gave up after ${retryCount + 1} attempts: ${message}; status=${status}; calling process.exit()`,
-            );
+            unilog(1747, `theTvDb login gave up after ${retryCount + 1} attempts: ${message}; status=${status}; calling process.exit()`);
             return process.exit(1);
           }
         } else {
@@ -2683,16 +2677,10 @@ async function main() {
               const message = error && error.message ? error.message : error;
               const status = response && response.statusCode;
               if (++tvDbErrCount >= 15) {
-                logHere(
-                  { lvl: "error", grp: "tvdb search" },
-                  `tvdb search gave up for ${fname} after ${tvDbErrCount} failures: ${message} | status: ${status} | downloaded=${downloadCount}`,
-                );
+                unilog(1748, `tvdb search gave up for ${fname} after ${tvDbErrCount} failures: ${message} | status: ${status} | downloaded=${downloadCount}`);
                 return process.nextTick(checkFile);
               }
-              logHere(
-                { lvl: "warn", grp: "tvdb search" },
-                `tvdb search failed for ${fname}: ${message} | status: ${status}; retrying in ${rsyncDelay}ms (failure ${tvDbErrCount}/15)`,
-              );
+              unilog(1749, `tvdb search failed for ${fname}: ${message} | status: ${status}; retrying in ${rsyncDelay}ms (failure ${tvDbErrCount}/15)`);
               return setTimeout(chkTvDB, rsyncDelay);
             } else {
               err(`tvdb no results: fname: ${fname} | url: ${tvdburl}`);

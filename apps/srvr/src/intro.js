@@ -178,16 +178,10 @@ export async function doTrimIntro(deviceName = null) {
       return { ok: true };
     }
     if (attempt < TRIM_SEEK_ATTEMPTS) {
-      logHere(
-        { lvl: "warn", grp: "trim seek" },
-        `trim seek did not land (attempt ${attempt}/${TRIM_SEEK_ATTEMPTS}): pos=${posMs}ms target=${Math.round(trimPos)}ms`,
-      );
+      unilog(1730, `trim seek did not land (attempt ${attempt}/${TRIM_SEEK_ATTEMPTS}): pos=${posMs}ms target=${Math.round(trimPos)}ms`);
     }
   }
-  logHere(
-    { lvl: "error", grp: "trim seek" },
-    `trim seek gave up for ${showName} after ${TRIM_SEEK_ATTEMPTS} attempts: target=${Math.round(trimPos)}ms`,
-  );
+  unilog(1731, `trim seek gave up for ${showName} after ${TRIM_SEEK_ATTEMPTS} attempts: target=${Math.round(trimPos)}ms`);
   return { ok: false, reason: "seekDidNotLand" };
 }
 

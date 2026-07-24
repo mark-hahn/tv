@@ -1276,18 +1276,12 @@ export default {
       const err = vid.error;
       if (!err) return;
       if (this.errorRetries >= 3) {
-        logHere(
-          { lvl: "error", grp: "video player" },
-          `error code=${err.code}, giving up after ${this.errorRetries} retries`,
-        );
+        unilog(1759, `error code=${err.code}, giving up after ${this.errorRetries} retries`);
         return;
       }
       this.errorRetries++;
       const resumeAt = vid.currentTime;
-      logHere(
-        { lvl: "warn", grp: "video player" },
-        `error code=${err.code} at ${resumeAt.toFixed(1)}s, retry ${this.errorRetries}`,
-      );
+      unilog(1760, `error code=${err.code} at ${resumeAt.toFixed(1)}s, retry ${this.errorRetries}`);
       this._mseStop();
       setTimeout(() => {
         const v = this.$refs.vid;

@@ -44,18 +44,12 @@ async function tvdbFetch(pathStr, _init, retryCount = 0) {
     // Retry on network errors
     if (retryCount < MAX_RETRIES) {
       const delay = RETRY_DELAYS[retryCount];
-      logHere(
-        { lvl: "warn", grp: "tvdb fetch" },
-        `tvdbFetch: network error, retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES}): ${pathStr}: ${e?.message || String(e)}`,
-      );
+      unilog(1765, `tvdbFetch: network error, retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES}): ${pathStr}: ${e?.message || String(e)}`);
       await new Promise((resolve) => setTimeout(resolve, delay));
       return tvdbFetch(pathStr, _init, retryCount + 1);
     }
     // Max retries exceeded
-    logHere(
-      { lvl: "error", grp: "tvdb fetch" },
-      `tvdbFetch: network error, gave up after ${MAX_RETRIES + 1} attempts: ${pathStr}: ${e?.message || String(e)}`,
-    );
+    unilog(1766, `tvdbFetch: network error, gave up after ${MAX_RETRIES + 1} attempts: ${pathStr}: ${e?.message || String(e)}`);
     throw e;
   }
 }
@@ -74,18 +68,12 @@ const fetchAllTvdbWithRetry = async (hasEmby = 0) => {
     } catch (err) {
       lastErr = err;
       if (attempt === retryDelays.length) break;
-      logHere(
-        { lvl: "warn", grp: "tvdb fetch" },
-        `getAllTvdb failed, retrying in ${retryDelays[attempt]}ms (attempt ${attempt + 1}/${retryDelays.length + 1}): ${err?.message || String(err)}`,
-      );
+      unilog(1767, `getAllTvdb failed, retrying in ${retryDelays[attempt]}ms (attempt ${attempt + 1}/${retryDelays.length + 1}): ${err?.message || String(err)}`);
       await delay(retryDelays[attempt]);
     }
   }
 
-  logHere(
-    { lvl: "error", grp: "tvdb fetch" },
-    `getAllTvdb gave up after ${retryDelays.length + 1} attempts: ${lastErr?.message || String(lastErr)}`,
-  );
+  unilog(1768, `getAllTvdb gave up after ${retryDelays.length + 1} attempts: ${lastErr?.message || String(lastErr)}`);
   throw lastErr;
 };
 

@@ -427,17 +427,11 @@ async function callApi(uploadInfo) {
       const status = err?.response?.status || err.message || "unknown";
       const body = err?.response?.data || err?.toString();
       if (attempt > MAX_RETRIES) {
-        logHere(
-          { lvl: "error", grp: "asr api" },
-          `API request gave up after ${attempt} attempts: ${status}${body ? ` body=${JSON.stringify(body)}` : ""}`,
-        );
+        unilog(1738, `API request gave up after ${attempt} attempts: ${status}${body ? ` body=${JSON.stringify(body)}` : ""}`);
         throw new Error(`max retries reached after ${attempt} attempts`);
       }
       const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
-      logHere(
-        { lvl: "warn", grp: "asr api" },
-        `API request failed (attempt ${attempt}/${MAX_RETRIES + 1}): ${status}${body ? ` body=${JSON.stringify(body)}` : ""}, retrying in ${delay}ms`,
-      );
+      unilog(1739, `API request failed (attempt ${attempt}/${MAX_RETRIES + 1}): ${status}${body ? ` body=${JSON.stringify(body)}` : ""}, retrying in ${delay}ms`);
       await sleep(delay);
       continue;
     }
@@ -448,17 +442,11 @@ async function callApi(uploadInfo) {
     // Non-200 but no exception (unlikely) — log and retry
     const status = response?.status || "unknown";
     if (attempt > MAX_RETRIES) {
-      logHere(
-        { lvl: "error", grp: "asr api" },
-        `API response gave up after ${attempt} attempts: ${status}`,
-      );
+      unilog(1740, `API response gave up after ${attempt} attempts: ${status}`);
       throw new Error(`max retries reached after ${attempt} attempts`);
     }
     const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
-    logHere(
-      { lvl: "warn", grp: "asr api" },
-      `API response failed (attempt ${attempt}/${MAX_RETRIES + 1}): ${status}, retrying in ${delay}ms`,
-    );
+    unilog(1741, `API response failed (attempt ${attempt}/${MAX_RETRIES + 1}): ${status}, retrying in ${delay}ms`);
     await sleep(delay);
     continue;
   }

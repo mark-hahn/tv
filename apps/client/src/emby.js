@@ -26,17 +26,11 @@ async function axiosGetWithRetry(url, retries = EMBY_MAX_RETRIES) {
 
       if (!isLastAttempt && isNetworkError) {
         const delay = EMBY_RETRY_DELAY * (attempt + 1);
-        logHere(
-          { lvl: "warn", grp: "emby request" },
-          `Emby request failed (attempt ${attempt + 1}/${retries + 1}), retrying in ${delay}ms: ${url}: ${e?.message || String(e)}`,
-        );
+        unilog(1761, `Emby request failed (attempt ${attempt + 1}/${retries + 1}), retrying in ${delay}ms: ${url}: ${e?.message || String(e)}`);
         await new Promise((resolve) => setTimeout(resolve, delay));
         continue;
       }
-      logHere(
-        { lvl: "error", grp: "emby request" },
-        `Emby request gave up (attempt ${attempt + 1}/${retries + 1}): ${url}: ${e?.message || String(e)}`,
-      );
+      unilog(1762, `Emby request gave up (attempt ${attempt + 1}/${retries + 1}): ${url}: ${e?.message || String(e)}`);
       throw e;
     }
   }

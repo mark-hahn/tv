@@ -549,17 +549,11 @@ export async function rottenSearch(query) {
         break;
       } catch (e) {
         if (i < 3) {
-          logHere(
-            { lvl: "warn", grp: "rotten" },
-            `rotten detail.goto failed for ${query} (attempt ${i}): ${e.message}`,
-          );
+          unilog(1736, `rotten detail.goto failed for ${query} (attempt ${i}): ${e.message}`);
           await new Promise((r) => setTimeout(r, 1000));
           continue;
         }
-        logHere(
-          { lvl: "error", grp: "rotten" },
-          `rotten detail.goto gave up for ${query} after ${i} attempts: ${e.message}`,
-        );
+        unilog(1737, `rotten detail.goto gave up for ${query} after ${i} attempts: ${e.message}`);
         throw e;
       }
     }

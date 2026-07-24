@@ -372,35 +372,23 @@ async function fetchJsonWithBackoff(url) {
         const waitSeconds =
           Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 10;
         if (attempt >= TVMAZE_FETCH_MAX_ATTEMPTS) {
-          logHere(
-            { lvl: "error", grp: "tvmaze fetch" },
-            `TVmaze fetch gave up with HTTP 429 for ${url} after ${attempt} attempts`,
-          );
+          unilog(1720, `TVmaze fetch gave up with HTTP 429 for ${url} after ${attempt} attempts`);
           throw new Error(`TVmaze HTTP 429 for ${url}`);
         }
-        logHere(
-          { lvl: "warn", grp: "tvmaze fetch" },
-          `TVmaze fetch HTTP 429 for ${url} (attempt ${attempt}/${TVMAZE_FETCH_MAX_ATTEMPTS}), retrying in ${waitSeconds}s`,
-        );
+        unilog(1721, `TVmaze fetch HTTP 429 for ${url} (attempt ${attempt}/${TVMAZE_FETCH_MAX_ATTEMPTS}), retrying in ${waitSeconds}s`);
         await sleep(waitSeconds * 1000);
         continue;
       }
 
       if (res.status >= 500 && attempt < TVMAZE_FETCH_MAX_ATTEMPTS) {
-        logHere(
-          { lvl: "warn", grp: "tvmaze fetch" },
-          `TVmaze fetch HTTP ${res.status} for ${url} (attempt ${attempt}/${TVMAZE_FETCH_MAX_ATTEMPTS}), retrying`,
-        );
+        unilog(1722, `TVmaze fetch HTTP ${res.status} for ${url} (attempt ${attempt}/${TVMAZE_FETCH_MAX_ATTEMPTS}), retrying`);
         await sleep(TVMAZE_FETCH_RETRY_BASE_MS * attempt);
         continue;
       }
 
       if (!res.ok) {
         const bodyText = await res.text().catch(() => "");
-        logHere(
-          { lvl: "error", grp: "tvmaze fetch" },
-          `TVmaze fetch gave up with HTTP ${res.status} for ${url}: ${bodyText.slice(0, 200)}`,
-        );
+        unilog(1723, `TVmaze fetch gave up with HTTP ${res.status} for ${url}: ${bodyText.slice(0, 200)}`);
         throw new Error(
           `TVmaze HTTP ${res.status} for ${url}. ${bodyText.slice(0, 200)}`,
         );
@@ -415,17 +403,11 @@ async function fetchJsonWithBackoff(url) {
         /fetch failed|timed out|etimedout/i.test(String(err?.message || err));
       if (!isNetworkError || attempt >= TVMAZE_FETCH_MAX_ATTEMPTS) {
         if (isNetworkError) {
-          logHere(
-            { lvl: "error", grp: "tvmaze fetch" },
-            `TVmaze fetch gave up for ${url} after ${attempt} attempts: ${err?.message || String(err)}`,
-          );
+          unilog(1724, `TVmaze fetch gave up for ${url} after ${attempt} attempts: ${err?.message || String(err)}`);
         }
         throw err;
       }
-      logHere(
-        { lvl: "warn", grp: "tvmaze fetch" },
-        `TVmaze fetch failed for ${url} (attempt ${attempt}/${TVMAZE_FETCH_MAX_ATTEMPTS}): ${err?.message || String(err)}, retrying`,
-      );
+      unilog(1725, `TVmaze fetch failed for ${url} (attempt ${attempt}/${TVMAZE_FETCH_MAX_ATTEMPTS}): ${err?.message || String(err)}, retrying`);
       await sleep(TVMAZE_FETCH_RETRY_BASE_MS * attempt);
     } finally {
       clearTimeout(timeoutId);

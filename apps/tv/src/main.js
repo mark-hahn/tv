@@ -338,10 +338,7 @@ function connectEmby() {
 
   embyWs.on("error", (err) => unilog(374, "emby ws error:", err.message));
   embyWs.on("close", () => {
-    logHere(
-      { lvl: "warn", grp: "emby websocket" },
-      `emby ws closed, reconnecting in 5s`,
-    );
+    unilog(1742, `emby ws closed, reconnecting in 5s`);
     setTimeout(connectEmby, 5000);
   });
 }
@@ -579,10 +576,7 @@ function connectHa() {
   ws.on("message", (data) => handleMsg(data.toString()));
   ws.on("error", (err) => unilog(392, "ws error:", err.message));
   ws.on("close", () => {
-    logHere(
-      { lvl: "warn", grp: "home assistant" },
-      `ws closed, reconnecting in 5s`,
-    );
+    unilog(1743, `ws closed, reconnecting in 5s`);
     authenticated = false;
     ws = null;
     setTimeout(connectHa, 5000);
@@ -869,10 +863,7 @@ function spawnFireShell() {
         `adb shell closed (${code}) — device unauthorized, NOT retrying (accept USB debug dialog on FireTV then restart tv-tv)`,
       );
     } else {
-      logHere(
-        { lvl: "warn", grp: "fire tv adb" },
-        `adb shell closed (${code}), reconnecting in 2s`,
-      );
+      unilog(1744, `adb shell closed (${code}), reconnecting in 2s`);
       setTimeout(connectFireShell, 2000);
     }
   });
@@ -881,10 +872,7 @@ function spawnFireShell() {
 function connectFireShell() {
   exec(`adb connect ${FIRE_TV_IP}:5555`, (err, stdout) => {
     if (err) {
-      logHere(
-        { lvl: "warn", grp: "fire tv adb" },
-        `adb connect failed: ${err.message}, retrying in 5s`,
-      );
+      unilog(1745, `adb connect failed: ${err.message}, retrying in 5s`);
       setTimeout(connectFireShell, 5000);
     } else {
       unilog(408, `adb connect: ${stdout.trim()}`);

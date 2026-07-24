@@ -357,10 +357,7 @@ const main = () => {
             try {
               const newUsbPath = await locateUsbPathByTitle(usbHost, title);
               if (newUsbPath && newUsbPath !== usbPath2) {
-                logHere(
-                  { lvl: "warn", grp: "rsync worker" },
-                  `rsync missing remote folder for ${title} on attempt ${attempt}: ${missingDir}; retrying with ${newUsbPath}`,
-                );
+                unilog(1752, `rsync missing remote folder for ${title} on attempt ${attempt}: ${missingDir}; retrying with ${newUsbPath}`);
                 entry.usbPath = newUsbPath;
                 entry.status = "downloading";
                 entry.progress = 0;
@@ -374,10 +371,7 @@ const main = () => {
               // ignore and fall through to final error
             }
 
-            logHere(
-              { lvl: "error", grp: "rsync worker" },
-              `rsync gave up for ${title} after ${attempt} attempts: remote folder not found: ${missingDir}`,
-            );
+            unilog(1753, `rsync gave up for ${title} after ${attempt} attempts: remote folder not found: ${missingDir}`);
             finish(`Missing: remote folder not found: ${missingDir}`);
             return;
           }
@@ -385,25 +379,16 @@ const main = () => {
           // Keep Missing errors short and actionable.
           const { src: srcNow } = makeSrcDst();
           if (missingDir) {
-            logHere(
-              { lvl: "error", grp: "rsync worker" },
-              `rsync gave up for ${title} after ${attempt} attempts: remote folder not found: ${missingDir}`,
-            );
+            unilog(1754, `rsync gave up for ${title} after ${attempt} attempts: remote folder not found: ${missingDir}`);
             finish(`Missing: remote folder not found: ${missingDir}`);
             return;
           }
           if (/No such file or directory/i.test(stderrBuf)) {
-            logHere(
-              { lvl: "error", grp: "rsync worker" },
-              `rsync gave up for ${title} after ${attempt} attempts: remote file not found: ${srcNow}`,
-            );
+            unilog(1755, `rsync gave up for ${title} after ${attempt} attempts: remote file not found: ${srcNow}`);
             finish(`Missing: remote file not found: ${srcNow}`);
             return;
           }
-          logHere(
-            { lvl: "error", grp: "rsync worker" },
-            `rsync gave up for ${title} after ${attempt} attempts: ${stderrSummary || "Missing"}`,
-          );
+          unilog(1756, `rsync gave up for ${title} after ${attempt} attempts: ${stderrSummary || "Missing"}`);
           finish(stderrSummary ? `Missing: ${stderrSummary}` : "Missing");
           return;
         }

@@ -26,7 +26,7 @@ const { log, start, end } = util.getLog("tvdb");
 const TVDB_TEMPLATE_PATH = path.join(SRVR_DATA_DIR, "tvdbTemplate.json");
 
 const FAST_UPDATE = false;
-const TVDB_UPDATE_DELAY_MS = FAST_UPDATE ? 5 * 1000 : 2 * 60 * 1000;
+const TVDB_UPDATE_DELAY_MS = FAST_UPDATE ? 5 * 1000 : 5 * 60 * 1000;
 const moviedb = new MovieDb("327192a334da700f65b882c7a69cb927");
 
 // TVDB API Credentials
@@ -593,6 +593,16 @@ async function getImdbContext() {
   return imdbContext;
 }
 
+// drop the context (and its cookies) so the next request starts clean
+async function resetImdbContext() {
+  try {
+    await imdbContext?.close();
+  } catch (e) {
+    unilog(1677, `imdb context close: ${e.message}`);
+  }
+  imdbContext = null;
+}
+
 const extractImdbRating = (html) => {
   if (!html) return null;
 
@@ -642,54 +652,77 @@ const getUrlAndRatings = async (type, url, name) => {
   if (+type === 2) {
     let page = null;
     let resp = null;
-    try {
-      const ctx = await getImdbContext();
-      page = await ctx.newPage();
-      resp = await page.goto(url, {
-        waitUntil: "domcontentloaded",
-        timeout: 15000,
-      });
-      // IMDB sometimes returns HTTP 202 (deferred/CSR render) with an empty
-      // skeleton. Wait for JSON-LD or <h1> to appear so the rating is present.
-      // For SSR pages (200) this resolves instantly; for deferred pages it waits.
-      await page
-        .waitForFunction(
-          () =>
-            document.querySelectorAll('script[type="application/ld+json"]')
-              .length > 0 || !!document.querySelector("h1"),
-          { timeout: 10000 },
-        )
-        .catch(() => {});
-      // The rating score (and its sibling reviewer-count div) hydrate later
-      // than h1/JSON-LD on deferred pages, so give it its own short wait.
-      await page
-        .waitForSelector(
-          '[data-testid="hero-rating-bar__aggregate-rating__score"]',
-          { timeout: 5000 },
-        )
-        .catch(() => {});
-    } catch (e) {
-      unilog(
-        721,
-        "err",
-        `getUrlAndRatings imdb playwright error for ${name}: ${url}, ${e.message}`,
-      );
+    let ctx = null;
+
+    // Once IMDB/CloudFront flags a browser context it answers every later
+    // request from that context with a 405 "Human Verification" page, and the
+    // cached context never recovers on its own. A brand new context (no
+    // cookies) is served normally again, so on a bad status throw the context
+    // away and retry once.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        ctx = await getImdbContext();
+        page = await ctx.newPage();
+        resp = await page.goto(url, {
+          waitUntil: "domcontentloaded",
+          timeout: 15000,
+        });
+        if (resp?.ok()) {
+          // IMDB sometimes returns HTTP 202 (deferred/CSR render) with an empty
+          // skeleton. Wait for JSON-LD or <h1> to appear so the rating is present.
+          // For SSR pages (200) this resolves instantly; for deferred pages it waits.
+          await page
+            .waitForFunction(
+              () =>
+                document.querySelectorAll('script[type="application/ld+json"]')
+                  .length > 0 || !!document.querySelector("h1"),
+              { timeout: 10000 },
+            )
+            .catch(() => {});
+          // The rating score (and its sibling reviewer-count div) hydrate later
+          // than h1/JSON-LD on deferred pages, so give it its own short wait.
+          await page
+            .waitForSelector(
+              '[data-testid="hero-rating-bar__aggregate-rating__score"]',
+              { timeout: 5000 },
+            )
+            .catch(() => {});
+        }
+      } catch (e) {
+        unilog(
+          721,
+          "err",
+          `getUrlAndRatings imdb playwright error for ${name}: ${url}, ${e.message}`,
+        );
+        try {
+          await page?.close();
+        } catch {}
+        return { ratings: null, reviewers: null, video: null };
+      }
+
+      if (resp?.ok()) break;
+
+      const status = resp ? resp.status() : null;
       try {
         await page?.close();
       } catch {}
-      return { ratings: null, reviewers: null, video: null };
-    }
+      page = null;
 
-    if (!resp || !resp.ok()) {
-      const status = resp ? resp.status() : null;
+      if (attempt === 0) {
+        unilog(
+          1678,
+          "err",
+          `imdb status=${status} for ${name}, retrying on a fresh context`,
+        );
+        await resetImdbContext();
+        continue;
+      }
+
       unilog(
         722,
         "err",
         `getUrlAndRatings imdb fetch error for ${name}: ${url}, status=${status}`,
       );
-      try {
-        await page?.close();
-      } catch {}
       return { ratings: null, reviewers: null, video: null };
     }
 
@@ -1126,7 +1159,12 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
   // (fast=false) re-checks every time regardless of what is stored, so a page
   // that changed (article renamed) is caught. A url with no verified flag yet is
   // still shown until its first test runs; only an explicit false hides the button.
-  const addVerifiedRemote = async ({ type, buttonName, urlKey, verifiedKey }) => {
+  const addVerifiedRemote = async ({
+    type,
+    buttonName,
+    urlKey,
+    verifiedKey,
+  }) => {
     const rec = allTvdb[name];
     let url = rec?.[urlKey] || null;
     let verified = rec?.[verifiedKey]; // true | false; null/undefined = not yet tested
@@ -2474,7 +2512,10 @@ const tryLocalGetTvdb = async () => {
         { before: waitStrBefore, after: waitStrAfter },
       );
     } catch (e) {
-      unilog(1660, `waitStr changed callback failed for ${processRecord.name}: ${e.message}`);
+      unilog(
+        1660,
+        `waitStr changed callback failed for ${processRecord.name}: ${e.message}`,
+      );
     }
   }
 

@@ -1254,7 +1254,7 @@ app.use((req, res, next) => {
 // its side; this logs how long the same call took from ours. When the client
 // reports a slow/timed-out call and nothing shows up here, the time was spent
 // off-server (network/nginx), not in a handler.
-const SLOW_API_MS = 1000;
+const SLOW_API_MS = 3000;
 app.use((req, res, next) => {
   const startedAt = Date.now();
   res.on("finish", () => {
@@ -1411,7 +1411,7 @@ app.post(
       const tSave = Date.now();
       const seriesMap = epd.toSeriesMap(rec.episodeData, folder, today);
       const total = Date.now() - t0;
-      if (total > 1500) {
+      if (total > 3000) {
         unilog(
           1520,
           `slow getSeriesMapFromEmby ${showName}: refresh=${tRefresh - t0}ms save=${tSave - tRefresh}ms build=${Date.now() - tSave}ms total=${total}ms`,

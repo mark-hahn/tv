@@ -132,6 +132,74 @@ or desktop app, which don't run your shell's rc files. Use the settings-file met
 
 ---
 
+## VSCode extension: a separate, higher-priority override
+
+Everything above governs the native `claude` binary's own settings resolution. The **VSCode
+extension launches that binary itself**, and it does so with an explicit CLI flag:
+
+```
+claude ... --permission-mode default ...
+```
+
+A CLI flag beats `permissions.defaultMode` in any settings.json — user, project, or local. So
+even with `~/.claude/settings.json` fully configured per above, the extension can still silently
+force prompts back on. This is not the root guard; `IS_SANDBOX` has nothing to do with it.
+
+Confirm this is what's happening by checking the running process's argv:
+
+```bash
+ps -eo pid,args | grep '/claude ' | grep -v grep
+```
+
+If you see `--permission-mode default`, the extension is overriding you. The flag's value comes
+from two VSCode settings that live in **VSCode's own settings.json, not Claude's**:
+
+```json
+{
+  "claudeCode.allowDangerouslySkipPermissions": true,
+  "claudeCode.initialPermissionMode": "bypassPermissions"
+}
+```
+
+`allowDangerouslySkipPermissions` must be `true` or bypass is unavailable regardless of the mode
+value. These can also carry the env var, sparing you the settings.json `env` block on this path:
+
+```json
+{
+  "claudeCode.environmentVariables": [
+    { "name": "IS_SANDBOX", "value": "1" }
+  ]
+}
+```
+
+### Where to put it
+
+VSCode settings resolve per-scope like Claude's do — Machine (all WSL/remote projects) vs.
+Workspace (this folder only). For WSL, the file that applies machine-wide is:
+
+```
+~/.vscode-server/data/Machine/settings.json
+```
+
+(There is no `%USERPROFILE%` equivalent to check for native Windows VSCode — that installation
+uses the regular User/Workspace settings UI or `settings.json` under
+`%APPDATA%\Code\User\`.)
+
+**`initialPermissionMode` only applies to new conversations.** A resumed/already-open
+conversation keeps whatever mode it started with — reloading the window is not enough; start a
+fresh conversation to see the effect.
+
+### These settings do not reliably stay set
+
+Observed in practice: these two keys reverted to `false` / `"default"` on their own (most likely
+an extension update or a Settings Sync pull from the Windows side overwriting the WSL-side file).
+`~/.claude/settings.json` was untouched and still correct — only the VSCode-side keys drifted.
+If prompts resume after previously being fixed, re-check this file before re-diagnosing the root
+guard from scratch; the `ps` argv check above tells you which layer regressed in about five
+seconds.
+
+---
+
 ## Notes and caveats
 
 - **This is not a patch.** `IS_SANDBOX` is a branch Anthropic put in the guard deliberately so

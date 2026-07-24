@@ -4246,12 +4246,18 @@ async function handleShowDiskChange(showName) {
       await tvdb.saveTvdbSync();
       unilog(86, `watched refreshed for ${showName}`);
 
-      // The new episode(s) are now in Emby and waitStr is freshly recomputed,
-      // so apply the same hide/unhide the background loop would — now, before
-      // the show lingers in "latest tv" until the loop catches up. Hide when the
-      // show newly enters the "waiting, with episodes on disk" state: either
-      // waitStr just appeared, or the first episode(s) landed while waitStr was
-      // already set (that case has no waitStr flip for the loop to catch).
+      // Hide immediately when the show newly enters the "waiting, with
+      // episodes on disk" state: either waitStr just appeared, or the first
+      // episode(s) landed while waitStr was already set (that case has no
+      // waitStr flip for the loop to catch). This is deliberately HIDE-only —
+      // an early hide is harmless (the next full loop tick corrects it if
+      // wrong) but an early UNHIDE is not: this handler only refreshes
+      // disk/emby, never re-scrapes TVDB, so a newly-downloaded episode can
+      // make waitStr transiently read as cleared even though TVDB simply
+      // hasn't announced the next episode's air date yet. Trusting that here
+      // would flip a show back into "latest tv" every time an episode lands,
+      // undoing a hide the moment it was set. Unhiding on a real waitStr clear
+      // is left entirely to the background loop, which re-scrapes TVDB first.
       const waitStrAfter = tvdbRecord.waitStr;
       const hasEpisodesNow = hasEpisodesOnDisk(tvdbRecord);
       const waitStrJustSet = !waitStrBefore && waitStrAfter;
@@ -4262,8 +4268,6 @@ async function handleShowDiskChange(showName) {
         (waitStrJustSet || firstEpisodesJustLanded)
       ) {
         await hideShowIfNeeded(showName, tvdbRecord, `chokidarHide:${showName}`);
-      } else if (waitStrBefore && !waitStrAfter && hasEpisodesNow) {
-        await unhideLatestTvIfNeeded(showName, tvdbRecord);
       }
     } catch (err) {
       unilog(679, `Post-download refresh error for ${showName}:`, err.message);

@@ -30,6 +30,8 @@ const PM2_TARGET = "tv-srvr";
 const CHECK_INTERVAL_MS = 60 * 1000; // run all checks every 60s
 const HEARTBEAT_MAX_AGE_MS = 6 * 60 * 1000; // no "hb" event in 6m => stuck/dead
 const ERROR_COUNT_WARN = 30; // > this many error events in one clock hour => warn
+const WARN_RATE_THRESHOLD = 10; // > this many warn events in the trailing hour => alert + email
+const WARN_RATE_CHECK_MS = 10 * 60 * 1000; // re-measure the rolling warn rate every 10m
 const EMAIL_MIN_INTERVAL_MS = 60 * 60 * 1000; // at most one error email per hour
 const BURST_COUNT = 5; // more than this many errors ...
 const BURST_WINDOW_MS = 5 * 1000; // ... within this span => burst
@@ -215,6 +217,26 @@ function errorEventsAfter(afterId) {
   }
 }
 
+// Rolling-window count of level='warn' events in the trailing 60 minutes,
+// including hidden/group-blocked rows (same query tv-srvr runs for the log
+// pane's live display — computed independently here so a tv-srvr bug can't
+// take alerting down with it).
+function warnCountLastHour() {
+  const d = getDb();
+  if (!d) return null;
+  try {
+    return d
+      .prepare(
+        `SELECT count(*) AS n FROM log_events e
+           JOIN log_sites s ON e.log_id = s.log_id
+          WHERE s.level = 'warn' AND e.ts > ?`,
+      )
+      .get(pstCutoff(60 * 60 * 1000)).n;
+  } catch {
+    return null;
+  }
+}
+
 // Events from the WATCH_SITES list newer than afterId, oldest first.
 function watchedEventsAfter(afterId, siteIds) {
   const d = getDb();
@@ -267,6 +289,7 @@ let hourTally = 0; // error events seen in that hour
 let hourSites = new Map(); // log_id -> { file, line, n }
 const pendingErrors = new Map(); // stripped msg -> {count,sites,example,firstTs,lastTs,firstId,lastId}
 let lastEmailMs = 0; // last email send time (1/hour throttle)
+let lastWarnCheckMs = 0; // last time the rolling warn rate was re-measured
 
 // Epoch ms from a PST "yyyy/mm/dd hh:mm:ss" string. Parsed with a fixed UTC
 // suffix — absolute value is offset, but diffs between two stamps are correct.
@@ -392,6 +415,35 @@ async function checkWatchedSites() {
         g.last.message,
       ].join("\n"),
     );
+  }
+}
+
+// Tier-2 rolling warn-rate alert. Re-measured every WARN_RATE_CHECK_MS
+// (not every CHECK_INTERVAL_MS cycle). A breach is queued into pendingErrors
+// exactly like an error event, so it rides the same dedup + 1-email/hour
+// throttle and shows up in the same digest as the error summary.
+async function checkWarnRate() {
+  if (Date.now() - lastWarnCheckMs < WARN_RATE_CHECK_MS) return;
+  lastWarnCheckMs = Date.now();
+  const n = warnCountLastHour();
+  if (n == null) return;
+  const key = "warn-rate";
+  if (n > WARN_RATE_THRESHOLD) {
+    const message = `${n} warn events in the past hour (> ${WARN_RATE_THRESHOLD})`;
+    raise(key, "warn", message);
+    const id = maxEventId() ?? 0;
+    pendingErrors.set(key, {
+      count: n,
+      sites: new Set(["warn-rate monitor"]),
+      example: message,
+      firstTs: pstStr(),
+      lastTs: pstStr(),
+      firstId: id,
+      lastId: id,
+    });
+  } else {
+    clear(key);
+    pendingErrors.delete(key);
   }
 }
 
@@ -536,6 +588,7 @@ async function runChecks() {
   }
 
   // 4. error-rate (tier 2) + error emails: cursor-based, burst block, throttle
+  await checkWarnRate();
   await checkErrors();
 
   // 4b. watched sites (WATCH_SITES): email as soon as one fires

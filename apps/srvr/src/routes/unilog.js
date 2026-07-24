@@ -309,6 +309,18 @@ export function registerUnilogRoutes(app) {
     }
   });
 
+  // Live count of level='warn' events in the trailing 60 minutes (rolling
+  // window, hidden included). Polled by the log pane's always-visible rate
+  // display; tv-watchdog re-derives the same count independently for alerts.
+  app.get("/api/unilog/warn-rate", (req, res) => {
+    try {
+      res.json({ count: unilogDb.warnCountLastHour() });
+    } catch (error) {
+      console.error("[unilog] /api/unilog/warn-rate error:", error); // no-unilog
+      res.status(500).json({ error: String(error?.message || error) });
+    }
+  });
+
   app.get("/api/unilog/oldest-ts", (req, res) => {
     try {
       res.json({ ts: unilogDb.getOldestTimestamp() });

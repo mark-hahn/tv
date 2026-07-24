@@ -506,6 +506,20 @@ export function countEvents() {
   return db.prepare("SELECT COUNT(*) AS n FROM log_events").get().n;
 }
 
+// Rolling-window count of level='warn' events in the trailing 60 minutes,
+// including hidden/group-blocked rows. Backs the log pane's live rate
+// display; tv-watchdog independently re-derives the same count for alerting.
+export function warnCountLastHour() {
+  const cutoff = pstStr(new Date(Date.now() - 60 * 60 * 1000));
+  return db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM log_events e
+        JOIN log_sites s ON e.log_id = s.log_id
+        WHERE s.level = 'warn' AND e.ts > ?`,
+    )
+    .get(cutoff).n;
+}
+
 const PRUNE_TARGET = 90000;
 
 // Delete oldest events so row count stays at or below PRUNE_TARGET.

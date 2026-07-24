@@ -173,11 +173,22 @@
       <span
         style="
           margin-left: auto;
-          font-size: 12px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-size: 13.8px;
+          font-weight: bold;
           color: #666;
           white-space: nowrap;
         "
       >
+        <span
+          v-if="warnRate !== null"
+          :style="
+            warnRate > 10 ? { fontSize: '15.9px', color: 'red' } : null
+          "
+          >Warn: {{ warnRate }}</span
+        >
         <span v-if="loading">loading…</span>
         <span
           v-else-if="error"
@@ -387,6 +398,7 @@ const PAGE = 500;
 // sitting in the log pane, self-sustained because those blocks log events
 // that stream right back into this same table.
 const TRIM_MARGIN = 250;
+const WARN_RATE_POLL_MS = 10 * 60 * 1000;
 
 // "2026/07/01 11:44:43" -> epoch ms (local).
 function tsToMs(s) {
@@ -459,6 +471,8 @@ export default {
       ignorePaneEvent: false,
       channelsDebug: [],
       channelsDebugHandle: null,
+      warnRate: null,
+      warnRateTimer: null,
     };
   },
   computed: {
@@ -580,6 +594,10 @@ export default {
       // Groups pane is hidden whenever the log pane is opened.
       this.showGroupsPane = false;
       window.addEventListener("resize", this.positionGroupsPane);
+      this.loadWarnRate();
+      if (!this.warnRateTimer) {
+        this.warnRateTimer = setInterval(this.loadWarnRate, WARN_RATE_POLL_MS);
+      }
     },
     deactivate() {
       if (this.subscribed) {
@@ -595,6 +613,10 @@ export default {
       if (this.flashTimer) {
         clearTimeout(this.flashTimer);
         this.flashTimer = null;
+      }
+      if (this.warnRateTimer) {
+        clearInterval(this.warnRateTimer);
+        this.warnRateTimer = null;
       }
       // Groups pane is hidden whenever the log pane is closed; stop filtering.
       this.showGroupsPane = false;
@@ -1470,6 +1492,14 @@ export default {
         if (this.newestId == null || r.id > this.newestId) this.newestId = r.id;
       }
       this.rowCount = this.table.getDataCount();
+    },
+    async loadWarnRate() {
+      try {
+        const res = await srvr.getUnilogWarnRate();
+        this.warnRate = res?.count ?? null;
+      } catch (e) {
+        console.error("[log.vue]", `loadWarnRate failed: ${e.message}`); // no-unilog
+      }
     },
     async loadLogs() {
       this.loading = true;

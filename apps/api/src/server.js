@@ -328,21 +328,19 @@ async function handoffForcedTorrentToTvDown({
       });
       return;
     } catch (error) {
-      unilog(208, "forced handoff poll failed", {
-        addTag,
-        infoHash,
-        error: error?.message || String(error),
-      });
+      logHere(
+        { lvl: "warn", grp: "forced handoff" },
+        `forced handoff poll failed for ${infoHash || addTag || torrentTitle}: ${error?.message || String(error)}`,
+      );
     }
 
     await new Promise((resolve) => setTimeout(resolve, FORCE_DOWN_POLL_MS));
   }
 
-  unilog(209, "forced handoff timed out", {
-    addTag,
-    infoHash,
-    torrentTitle,
-  });
+  logHere(
+    { lvl: "error", grp: "forced handoff" },
+    `forced handoff timed out for ${infoHash || addTag || torrentTitle}`,
+  );
 }
 
 function getYearFromShowContext(showContext) {
@@ -1539,6 +1537,11 @@ app.get("/api/subs/search", async (req, res) => {
         last = await osFetchJson(url.toString(), { apiKey, token });
         if (last.ok) return last;
         if (!transientStatuses.has(last.status)) return last;
+        if (attempt === 4) return last;
+        logHere(
+          { lvl: "warn", grp: "opensubtitles search" },
+          `OpenSubtitles subtitles request failed with HTTP ${last.status} for ${qRaw || imdbIdDigits} (attempt ${attempt + 1}/5), retrying`,
+        );
         await sleep(300 * (attempt + 1) * (attempt + 1));
       }
       return last;
@@ -1554,6 +1557,10 @@ app.get("/api/subs/search", async (req, res) => {
     }
 
     if (!resp.ok) {
+      logHere(
+        { lvl: "error", grp: "opensubtitles search" },
+        `OpenSubtitles subtitles request gave up with HTTP ${resp.status} for ${qRaw || imdbIdDigits}`,
+      );
       let detail = resp.data || resp.text;
       if (typeof detail === "string") {
         const s = detail.trim();

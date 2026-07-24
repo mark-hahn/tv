@@ -2,7 +2,7 @@
 
 import { chromium } from "playwright";
 import fs from "fs"; // Added for saving HTML
-import { smartTitleMatch, unilog } from "@tv/share";
+import { logHere, smartTitleMatch, unilog } from "@tv/share";
 
 const MAX_STR_DIST = 10;
 const USER_AGENT =
@@ -278,7 +278,10 @@ async function dismissOverlays(page, query) {
               }
             }
           } catch (e) {
-            unilog(699, `Rotten: Delete script error for ${query}: ${e.message}`);
+            unilog(
+              699,
+              `Rotten: Delete script error for ${query}: ${e.message}`,
+            );
           }
           return false;
         });
@@ -545,12 +548,19 @@ export async function rottenSearch(query) {
         await page.goto(detailLink, { waitUntil: "domcontentloaded" });
         break;
       } catch (e) {
-        unilog(
-          703,
-          `rotten detail.goto failed for ${query} (attempt ${i}): ${e.message}`,
+        if (i < 3) {
+          logHere(
+            { lvl: "warn", grp: "rotten" },
+            `rotten detail.goto failed for ${query} (attempt ${i}): ${e.message}`,
+          );
+          await new Promise((r) => setTimeout(r, 1000));
+          continue;
+        }
+        logHere(
+          { lvl: "error", grp: "rotten" },
+          `rotten detail.goto gave up for ${query} after ${i} attempts: ${e.message}`,
         );
-        if (i === 3) throw e;
-        await new Promise((r) => setTimeout(r, 1000));
+        throw e;
       }
     }
     await dismissOverlays(page, query);

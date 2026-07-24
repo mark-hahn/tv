@@ -338,7 +338,10 @@ function connectEmby() {
 
   embyWs.on("error", (err) => unilog(374, "emby ws error:", err.message));
   embyWs.on("close", () => {
-    unilog(375, "emby ws closed, reconnecting in 5s");
+    logHere(
+      { lvl: "warn", grp: "emby websocket" },
+      `emby ws closed, reconnecting in 5s`,
+    );
     setTimeout(connectEmby, 5000);
   });
 }
@@ -576,7 +579,10 @@ function connectHa() {
   ws.on("message", (data) => handleMsg(data.toString()));
   ws.on("error", (err) => unilog(392, "ws error:", err.message));
   ws.on("close", () => {
-    unilog(393, "ws closed, reconnecting in 5s");
+    logHere(
+      { lvl: "warn", grp: "home assistant" },
+      `ws closed, reconnecting in 5s`,
+    );
     authenticated = false;
     ws = null;
     setTimeout(connectHa, 5000);
@@ -863,7 +869,10 @@ function spawnFireShell() {
         `adb shell closed (${code}) — device unauthorized, NOT retrying (accept USB debug dialog on FireTV then restart tv-tv)`,
       );
     } else {
-      unilog(406, `adb shell closed (${code}), reconnecting in 2s...`);
+      logHere(
+        { lvl: "warn", grp: "fire tv adb" },
+        `adb shell closed (${code}), reconnecting in 2s`,
+      );
       setTimeout(connectFireShell, 2000);
     }
   });
@@ -872,7 +881,10 @@ function spawnFireShell() {
 function connectFireShell() {
   exec(`adb connect ${FIRE_TV_IP}:5555`, (err, stdout) => {
     if (err) {
-      unilog(407, `adb connect failed: ${err.message}, retrying in 5s...`);
+      logHere(
+        { lvl: "warn", grp: "fire tv adb" },
+        `adb connect failed: ${err.message}, retrying in 5s`,
+      );
       setTimeout(connectFireShell, 5000);
     } else {
       unilog(408, `adb connect: ${stdout.trim()}`);
@@ -1361,7 +1373,10 @@ async function sendSelKey(key, delayAfterMs) {
       await fireKeyevent(code);
       sent = true;
     } catch (e) {
-      unilog(1605, `shell keyevent ${key} failed (${e.message}) — falling back to adb exec`);
+      unilog(
+        1605,
+        `shell keyevent ${key} failed (${e.message}) — falling back to adb exec`,
+      );
     }
   }
   if (!sent) await adbExecP(`shell input keyevent ${code}`, `showsel ${key}`);
@@ -1469,7 +1484,10 @@ app.get("/tv/selectshow", async (req, res) => {
     SHOW_SEL_PREFIX_LEFTS +
     SHOW_SEL_PREFIX_TAIL.length +
     target.offset;
-  unilog(1610, `selecting ${target.name} offset=${target.offset} keys=${keyCount} mode=${tvMode} from ${client(req)}`);
+  unilog(
+    1610,
+    `selecting ${target.name} offset=${target.offset} keys=${keyCount} mode=${tvMode} from ${client(req)}`,
+  );
 
   if (req.query.dry !== undefined) {
     res.json({ ok: true, dry: true, ...target, keyCount });

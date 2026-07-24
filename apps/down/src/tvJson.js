@@ -317,7 +317,9 @@ const postLastDownloadedToSrvr = async (showName, timestamp, localPath) => {
   // don't probe srvr with names that miss and log spurious "no tvdb" events.
   // Candidates remain as fallback for records too new to be in the db file.
   const key = resolveTvdbKeyFromFile(candidates);
-  const names = key ? [key, ...candidates.filter((c) => c !== key)] : candidates;
+  const names = key
+    ? [key, ...candidates.filter((c) => c !== key)]
+    : candidates;
 
   for (const name of names) {
     const body = await postSetTvdbFields({
@@ -364,8 +366,8 @@ const retryPendingTvdbFields = async () => {
         changed = true;
       }
     } catch (e) {
-      unilog(
-        1529,
+      logHere(
+        { lvl: "warn", grp: "tvdb fields" },
         `pending last-downloaded retry failed for ${showName}: ${e?.message || String(e)}`,
       );
     }
@@ -377,8 +379,8 @@ const retryPendingTvdbFields = async () => {
 loadPendingTvdbFields();
 setInterval(() => {
   retryPendingTvdbFields().catch((e) => {
-    unilog(
-      1530,
+    logHere(
+      { lvl: "warn", grp: "tvdb fields" },
       `pending last-downloaded retry loop failed: ${e?.message || String(e)}`,
     );
   });

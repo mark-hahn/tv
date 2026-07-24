@@ -1655,6 +1655,10 @@ export default {
               await this.newShows(false);
               show = findShowByTvdbIdOrName({ requireInEmby: true });
               if (show) break;
+              logHere(
+                { lvl: "warn", grp: "emby scan discovery" },
+                `Emby scan discovery did not find ${name} (tvdbId=${tvdbId}) on attempt ${attempt}/4${attempt < 4 ? ", retrying" : ""}`,
+              );
               setWebAddStatus(`Waiting for Emby scan... (${attempt}/4)`);
             }
           }
@@ -1665,6 +1669,10 @@ export default {
             show = findShowByTvdbIdOrName({ requireInEmby: false });
           }
           if (!show) {
+            logHere(
+              { lvl: "error", grp: "emby scan discovery" },
+              `Emby scan discovery gave up for ${name} (tvdbId=${tvdbId}) after refresh retries`,
+            );
             throw new Error(
               `Created in Emby but not found after refresh: ${name} (tvdbId=${tvdbId})`,
             );

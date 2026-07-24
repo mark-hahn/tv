@@ -1391,19 +1391,19 @@ async function main() {
       },
       (error, response, body) => {
         if (error || response?.statusCode !== 200) {
-          err("theTvDb login error:", error);
-          err("theTvDb statusCode:", response && response.statusCode);
+          const status = response?.statusCode || "unknown";
+          const message = error?.message || String(error || `HTTP ${status}`);
 
           if (retryCount < MAX_RETRIES) {
-            err(
-              `Retrying in ${RETRY_DELAY_MS}ms (attempt ${retryCount + 1}/${MAX_RETRIES})...`,
+            logHere(
+              { lvl: "warn", grp: "tvdb login" },
+              `theTvDb login failed (attempt ${retryCount + 1}/${MAX_RETRIES + 1}): ${message}; status=${status}; retrying in ${RETRY_DELAY_MS}ms`,
             );
             setTimeout(() => loginToTvDb(retryCount + 1), RETRY_DELAY_MS);
           } else {
-            err("Max retries reached. Exiting.");
-            unilog(
-              302,
-              `TVDB login max retries reached, calling process.exit()`,
+            logHere(
+              { lvl: "error", grp: "tvdb login" },
+              `theTvDb login gave up after ${retryCount + 1} attempts: ${message}; status=${status}; calling process.exit()`,
             );
             return process.exit(1);
           }
@@ -2166,7 +2166,10 @@ async function main() {
         if (!_deDir) continue;
         var _deKey = _deDir + "\x00" + _deSeStr.toUpperCase();
         var _deRes = getResolution(_deTitle) ?? 480;
-        if (!(_deKey in inProgressSeIndex) || _deRes > inProgressSeIndex[_deKey]) {
+        if (
+          !(_deKey in inProgressSeIndex) ||
+          _deRes > inProgressSeIndex[_deKey]
+        ) {
           inProgressSeIndex[_deKey] = _deRes;
         }
       }
@@ -2677,14 +2680,19 @@ async function main() {
             (response != null ? response.statusCode : void 0) !== 200
           ) {
             if (error) {
-              err(
-                `tvdb search error: ${error && error.message ? error.message : error} | status: ${response && response.statusCode} | fname: ${fname}`,
-              );
+              const message = error && error.message ? error.message : error;
+              const status = response && response.statusCode;
               if (++tvDbErrCount >= 15) {
-                err("giving up, downloaded:", downloadCount);
+                logHere(
+                  { lvl: "error", grp: "tvdb search" },
+                  `tvdb search gave up for ${fname} after ${tvDbErrCount} failures: ${message} | status: ${status} | downloaded=${downloadCount}`,
+                );
                 return process.nextTick(checkFile);
               }
-              err("tvdb err retry, waiting one minute");
+              logHere(
+                { lvl: "warn", grp: "tvdb search" },
+                `tvdb search failed for ${fname}: ${message} | status: ${status}; retrying in ${rsyncDelay}ms (failure ${tvDbErrCount}/15)`,
+              );
               return setTimeout(chkTvDB, rsyncDelay);
             } else {
               err(`tvdb no results: fname: ${fname} | url: ${tvdburl}`);
@@ -3048,7 +3056,10 @@ async function main() {
         var _ipRes = inProgressSeIndex[_ipKey];
         if (_ipRes != null && _ipRes >= (getResolution(fname) ?? 480)) {
           existsCount++;
-          unilog(1535, `skip: same/better quality already downloading for ${seriesName || "unknown show"} ${flexSeStr}`);
+          unilog(
+            1535,
+            `skip: same/better quality already downloading for ${seriesName || "unknown show"} ${flexSeStr}`,
+          );
           return process.nextTick(checkFile);
         }
       }

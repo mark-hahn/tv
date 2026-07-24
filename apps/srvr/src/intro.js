@@ -171,11 +171,23 @@ export async function doTrimIntro(deviceName = null) {
     await sleep(TRIM_SEEK_VERIFY_MS);
     const posMs = await playbackPosMs(deviceName);
     if (posMs != null && posMs >= trimPos - TRIM_SEEK_LAND_TOL_MS) {
-      unilog(1350, `trim seek landed on attempt ${attempt}: pos=${posMs}ms target=${Math.round(trimPos)}ms`);
+      unilog(
+        1350,
+        `trim seek landed on attempt ${attempt}: pos=${posMs}ms target=${Math.round(trimPos)}ms`,
+      );
       return { ok: true };
     }
-    unilog(1351, `trim seek did not land (attempt ${attempt}/${TRIM_SEEK_ATTEMPTS}): pos=${posMs}ms target=${Math.round(trimPos)}ms`);
+    if (attempt < TRIM_SEEK_ATTEMPTS) {
+      logHere(
+        { lvl: "warn", grp: "trim seek" },
+        `trim seek did not land (attempt ${attempt}/${TRIM_SEEK_ATTEMPTS}): pos=${posMs}ms target=${Math.round(trimPos)}ms`,
+      );
+    }
   }
+  logHere(
+    { lvl: "error", grp: "trim seek" },
+    `trim seek gave up for ${showName} after ${TRIM_SEEK_ATTEMPTS} attempts: target=${Math.round(trimPos)}ms`,
+  );
   return { ok: false, reason: "seekDidNotLand" };
 }
 

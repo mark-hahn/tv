@@ -869,7 +869,7 @@ import {
   saveSeasonIntro,
 } from "../srvr.js";
 
-import { fmtPos, getSeasonIntro, unilog } from "@tv/share";
+import { fmtPos, getSeasonIntro, logHere, unilog } from "@tv/share";
 
 const TV_SRVR_URL = config.tvSrvrUrl;
 const PLAYER_MUTE_STORAGE_KEY = "tvPlayerMuted";
@@ -1276,16 +1276,16 @@ export default {
       const err = vid.error;
       if (!err) return;
       if (this.errorRetries >= 3) {
-        unilog(
-          1049,
+        logHere(
+          { lvl: "error", grp: "video player" },
           `error code=${err.code}, giving up after ${this.errorRetries} retries`,
         );
         return;
       }
       this.errorRetries++;
       const resumeAt = vid.currentTime;
-      unilog(
-        1050,
+      logHere(
+        { lvl: "warn", grp: "video player" },
         `error code=${err.code} at ${resumeAt.toFixed(1)}s, retry ${this.errorRetries}`,
       );
       this._mseStop();

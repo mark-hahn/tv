@@ -5,7 +5,7 @@ import * as urls from "./urls.js";
 import * as util from "./util.js";
 import evtBus from "./evtBus.js";
 import { episodeDataToWatchedEpis } from "@tv/share";
-import { unilog } from "./log.js";
+import { logHere, unilog } from "./log.js";
 
 const name = "mark";
 const pwd = "90-MNBbnmyui";
@@ -26,13 +26,17 @@ async function axiosGetWithRetry(url, retries = EMBY_MAX_RETRIES) {
 
       if (!isLastAttempt && isNetworkError) {
         const delay = EMBY_RETRY_DELAY * (attempt + 1);
-        unilog(
-          810,
-          `Emby request failed (attempt ${attempt + 1}/${retries + 1}), retrying in ${delay}ms: ${url}`,
+        logHere(
+          { lvl: "warn", grp: "emby request" },
+          `Emby request failed (attempt ${attempt + 1}/${retries + 1}), retrying in ${delay}ms: ${url}: ${e?.message || String(e)}`,
         );
         await new Promise((resolve) => setTimeout(resolve, delay));
         continue;
       }
+      logHere(
+        { lvl: "error", grp: "emby request" },
+        `Emby request gave up (attempt ${attempt + 1}/${retries + 1}): ${url}: ${e?.message || String(e)}`,
+      );
       throw e;
     }
   }

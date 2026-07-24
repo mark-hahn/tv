@@ -9,6 +9,16 @@ import { parentPort, workerData } from "node:worker_threads";
 import { spawn, execFile } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs";
+import { logHere, setUnilogSink, unilog } from "@tv/share";
+
+const SRVR_LOG_URL = "http://127.0.0.1:8739/api/log";
+setUnilogSink(({ logId, message }) => {
+  fetch(SRVR_LOG_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ logId, pid: "tv-down-worker", message }),
+  }).catch(() => {});
+});
 
 const unixNow = () => Math.floor(Date.now() / 1000);
 
@@ -347,6 +357,10 @@ const main = () => {
             try {
               const newUsbPath = await locateUsbPathByTitle(usbHost, title);
               if (newUsbPath && newUsbPath !== usbPath2) {
+                logHere(
+                  { lvl: "warn", grp: "rsync worker" },
+                  `rsync missing remote folder for ${title} on attempt ${attempt}: ${missingDir}; retrying with ${newUsbPath}`,
+                );
                 entry.usbPath = newUsbPath;
                 entry.status = "downloading";
                 entry.progress = 0;
@@ -360,6 +374,10 @@ const main = () => {
               // ignore and fall through to final error
             }
 
+            logHere(
+              { lvl: "error", grp: "rsync worker" },
+              `rsync gave up for ${title} after ${attempt} attempts: remote folder not found: ${missingDir}`,
+            );
             finish(`Missing: remote folder not found: ${missingDir}`);
             return;
           }
@@ -367,13 +385,25 @@ const main = () => {
           // Keep Missing errors short and actionable.
           const { src: srcNow } = makeSrcDst();
           if (missingDir) {
+            logHere(
+              { lvl: "error", grp: "rsync worker" },
+              `rsync gave up for ${title} after ${attempt} attempts: remote folder not found: ${missingDir}`,
+            );
             finish(`Missing: remote folder not found: ${missingDir}`);
             return;
           }
           if (/No such file or directory/i.test(stderrBuf)) {
+            logHere(
+              { lvl: "error", grp: "rsync worker" },
+              `rsync gave up for ${title} after ${attempt} attempts: remote file not found: ${srcNow}`,
+            );
             finish(`Missing: remote file not found: ${srcNow}`);
             return;
           }
+          logHere(
+            { lvl: "error", grp: "rsync worker" },
+            `rsync gave up for ${title} after ${attempt} attempts: ${stderrSummary || "Missing"}`,
+          );
           finish(stderrSummary ? `Missing: ${stderrSummary}` : "Missing");
           return;
         }

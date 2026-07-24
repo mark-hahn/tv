@@ -2,7 +2,7 @@ import * as srvr from "./srvr.js";
 import * as util from "./util.js";
 import { config } from "./config.js";
 import { episodeDataToWatchedEpis } from "@tv/share";
-import { unilog } from "./log.js";
+import { logHere, unilog } from "./log.js";
 
 // Route TVDB calls through the local torrents server proxy via WebSocket.
 // This avoids browser-to-TVDB CORS issues (Authorization header) and keeps secrets on server.
@@ -44,16 +44,18 @@ async function tvdbFetch(pathStr, _init, retryCount = 0) {
     // Retry on network errors
     if (retryCount < MAX_RETRIES) {
       const delay = RETRY_DELAYS[retryCount];
-      unilog(
-        882,
-        `tvdbFetch: network error, retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES}):`,
-        pathStr,
-        e?.message || e,
+      logHere(
+        { lvl: "warn", grp: "tvdb fetch" },
+        `tvdbFetch: network error, retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES}): ${pathStr}: ${e?.message || String(e)}`,
       );
       await new Promise((resolve) => setTimeout(resolve, delay));
       return tvdbFetch(pathStr, _init, retryCount + 1);
     }
     // Max retries exceeded
+    logHere(
+      { lvl: "error", grp: "tvdb fetch" },
+      `tvdbFetch: network error, gave up after ${MAX_RETRIES + 1} attempts: ${pathStr}: ${e?.message || String(e)}`,
+    );
     throw e;
   }
 }
@@ -72,15 +74,18 @@ const fetchAllTvdbWithRetry = async (hasEmby = 0) => {
     } catch (err) {
       lastErr = err;
       if (attempt === retryDelays.length) break;
-      unilog(
-        883,
-        `getAllTvdb failed, retrying in ${retryDelays[attempt]}ms (attempt ${attempt + 1}/${retryDelays.length + 1})`,
-        err,
+      logHere(
+        { lvl: "warn", grp: "tvdb fetch" },
+        `getAllTvdb failed, retrying in ${retryDelays[attempt]}ms (attempt ${attempt + 1}/${retryDelays.length + 1}): ${err?.message || String(err)}`,
       );
       await delay(retryDelays[attempt]);
     }
   }
 
+  logHere(
+    { lvl: "error", grp: "tvdb fetch" },
+    `getAllTvdb gave up after ${retryDelays.length + 1} attempts: ${lastErr?.message || String(lastErr)}`,
+  );
   throw lastErr;
 };
 

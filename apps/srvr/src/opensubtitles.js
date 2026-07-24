@@ -5,7 +5,7 @@
 import fs from "fs";
 import * as path from "node:path";
 import fetch from "node-fetch";
-import { unilog, smartTitleMatch } from "@tv/share";
+import { logHere, unilog, smartTitleMatch } from "@tv/share";
 import { SRVR_SECRETS_DIR } from "./srvrPaths.js";
 import * as util from "./util.js";
 import * as tvdb from "./tvdb.js";
@@ -231,23 +231,35 @@ export async function openSubtitlesDownloadWithRetry({
       last = await openSubtitlesDownload({ apiKey, token, fileId });
       if (last?.resp?.ok) return last;
       const status = last?.resp?.status;
-      if (retryStatus.has(status)) {
-        unilog(
-          525,
-          `OpenSubtitles /download HTTP ${status} (file_id=${fileId}, attempt=${attempt}/${maxAttempts})`,
-        );
-      }
       if (retryStatus.has(status) && attempt < maxAttempts) {
+        logHere(
+          { lvl: "warn", grp: "opensubtitles download" },
+          `OpenSubtitles /download HTTP ${status} (file_id=${fileId}, attempt=${attempt}/${maxAttempts}), retrying`,
+        );
         await sleep(400 * attempt);
         continue;
+      }
+      if (retryStatus.has(status)) {
+        logHere(
+          { lvl: "error", grp: "opensubtitles download" },
+          `OpenSubtitles /download gave up with HTTP ${status} for file_id=${fileId} after ${attempt} attempts`,
+        );
       }
       return last;
     } catch (e) {
       // Network error / fetch throw: retry.
       if (attempt < maxAttempts) {
+        logHere(
+          { lvl: "warn", grp: "opensubtitles download" },
+          `OpenSubtitles /download failed for file_id=${fileId} (attempt=${attempt}/${maxAttempts}): ${e?.message || String(e)}, retrying`,
+        );
         await sleep(400 * attempt);
         continue;
       }
+      logHere(
+        { lvl: "error", grp: "opensubtitles download" },
+        `OpenSubtitles /download gave up for file_id=${fileId} after ${attempt} attempts: ${e?.message || String(e)}`,
+      );
       throw e;
     }
   }

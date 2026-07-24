@@ -312,6 +312,10 @@ const httpCall = async (endpoint, param, method = "GET", timeoutMs = 30000) => {
     // error status both mean the server WAS reached, so retrying tells us
     // nothing new there.
     if (err instanceof TypeError && !timedOut) {
+      logHere(
+        { lvl: "warn", grp: "server request" },
+        `unreachable ${method} ${endpoint}, retrying in ${UNREACHABLE_RETRY_DELAY_MS}ms: ${err.message}`,
+      );
       await new Promise((r) => setTimeout(r, UNREACHABLE_RETRY_DELAY_MS));
       retried = true;
       ({ response, err, timedOut } = await attempt());
@@ -333,8 +337,8 @@ const httpCall = async (endpoint, param, method = "GET", timeoutMs = 30000) => {
       // match on the type — matching the Chrome text alone made this log dead
       // in Firefox.
       if (err instanceof TypeError) {
-        unilog(
-          1428,
+        logHere(
+          { lvl: "error", grp: "server request" },
           `unreachable ${method} ${endpoint}${retried ? " (after retry)" : ""} after ${ms}ms inFlight=${inFlight}${loopLagSuffix()}: ${err.message}`,
         );
         throw new Error(`Network error: Unable to reach server at ${url}`);

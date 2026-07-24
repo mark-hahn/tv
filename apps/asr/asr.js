@@ -19,7 +19,7 @@ import { fileURLToPath } from "url";
 import { setTimeout as sleep } from "timers/promises";
 import axios from "axios";
 import FormData from "form-data";
-import { unilog, setUnilogSink } from "@tv/share";
+import { logHere, unilog, setUnilogSink } from "@tv/share";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -426,13 +426,18 @@ async function callApi(uploadInfo) {
       // err may be an AxiosError with response data
       const status = err?.response?.status || err.message || "unknown";
       const body = err?.response?.data || err?.toString();
-      unilog(349, `API request failed (attempt ${attempt}): ${status}`);
-      if (body) unilog(350, JSON.stringify(body));
       if (attempt > MAX_RETRIES) {
+        logHere(
+          { lvl: "error", grp: "asr api" },
+          `API request gave up after ${attempt} attempts: ${status}${body ? ` body=${JSON.stringify(body)}` : ""}`,
+        );
         throw new Error(`max retries reached after ${attempt} attempts`);
       }
-      unilog(351, `Retrying...`);
       const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
+      logHere(
+        { lvl: "warn", grp: "asr api" },
+        `API request failed (attempt ${attempt}/${MAX_RETRIES + 1}): ${status}${body ? ` body=${JSON.stringify(body)}` : ""}, retrying in ${delay}ms`,
+      );
       await sleep(delay);
       continue;
     }
@@ -442,16 +447,18 @@ async function callApi(uploadInfo) {
     }
     // Non-200 but no exception (unlikely) — log and retry
     const status = response?.status || "unknown";
-    unilog(352, `API error: ${status}, retrying`);
-    if (attempt == 1)
-      unilog(
-        353,
-        "chunk, size:",
-        uploadInfo.size,
-        "- file:",
-        uploadInfo.filename,
+    if (attempt > MAX_RETRIES) {
+      logHere(
+        { lvl: "error", grp: "asr api" },
+        `API response gave up after ${attempt} attempts: ${status}`,
       );
+      throw new Error(`max retries reached after ${attempt} attempts`);
+    }
     const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
+    logHere(
+      { lvl: "warn", grp: "asr api" },
+      `API response failed (attempt ${attempt}/${MAX_RETRIES + 1}): ${status}, retrying in ${delay}ms`,
+    );
     await sleep(delay);
     continue;
   }

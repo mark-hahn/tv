@@ -206,7 +206,11 @@ log messages should contain the show name when the log specifically and unambigu
 
 - when a problem is reported with wrong data like a show not having data fields correct then only work on fixing the problem/bug -- don't fix the wrong data unless i ask you to
 
-- when a loghere logging site is added to a client source file in ./apps/client then run unilog/run-reconcile.js to change the loghere calls to unilog calls so vite hmr updates will have reconciled unilog calls
+## Never Run Unilog Reconciliation
+
+- Only add or change source logging sites with `logHere(...)` placeholders.
+- If an existing `unilog(id, ...)` site needs to change, replace that source call with `logHere(...)`; do not preserve, choose, edit, or reason from the numeric id.
+- Do not run `unilog/run-reconcile.js`, do not edit `unilog/reconcile-cache.json`, and do not write to `unilog.sqlite` / the unilog DB. The `./srvr` deploy/release flow owns reconciliation, cache updates, ids, and DB metadata.
 
 ### Reading the log database
 

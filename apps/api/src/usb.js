@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 import { parseKeyValueFile } from "./qb-cred.js";
 import { getApiSecretsDir, getApiDataDir } from "./tvPaths.js";
 import { buildFileTree } from "./fileTree.js";
-import { unilog } from "@tv/share";
+import { logHere, unilog } from "@tv/share";
 
 const execFileAsync = promisify(execFile);
 
@@ -499,9 +499,19 @@ async function qbtRequest(makeRequest) {
   let session = await getQbtSession();
   let res = await makeRequest(session.baseUrl, session.cookie);
   if (res.status === 403) {
+    logHere(
+      { lvl: "warn", grp: "qbt request" },
+      `qBittorrent request returned HTTP 403, refreshing session and retrying`,
+    );
     qbtSessionCookie = "";
     session = await getQbtSession();
     res = await makeRequest(session.baseUrl, session.cookie);
+    if (res.status === 403) {
+      logHere(
+        { lvl: "error", grp: "qbt request" },
+        `qBittorrent request gave up after session refresh with HTTP 403`,
+      );
+    }
   }
   return res;
 }

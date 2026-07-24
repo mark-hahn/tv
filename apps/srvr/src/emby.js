@@ -187,8 +187,17 @@ const safeGet = async (url, retries = 3) => {
       // Don't retry on 404
       if (error.message && error.message.includes("404")) throw error;
 
-      unilog(106, `safeGet retry ${i + 1}/${retries} for ${url} - ${msg}`);
-      if (i === retries - 1) throw error;
+      if (i === retries - 1) {
+        logHere(
+          { lvl: "error", grp: "emby safeGet" },
+          `safeGet gave up for ${url} after ${retries} attempts: ${msg}`,
+        );
+        throw error;
+      }
+      logHere(
+        { lvl: "warn", grp: "emby safeGet" },
+        `safeGet failed for ${url} (attempt ${i + 1}/${retries}): ${msg}, retrying`,
+      );
       await new Promise((r) => setTimeout(r, 500 * (i + 1)));
     }
   }

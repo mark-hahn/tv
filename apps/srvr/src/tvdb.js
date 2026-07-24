@@ -13,6 +13,7 @@ import {
 import * as epd from "@tv/share";
 import { unilog, logHere } from "@tv/share";
 import { SRVR_DATA_DIR } from "./srvrPaths.js";
+import { getImdbRating, startImdbRatings } from "./imdbRatings.js";
 import {
   backupDb,
   deleteShow,
@@ -534,6 +535,7 @@ const runTvdbBackup = () => {
 setInterval(runTvdbSweep, 5 * 60 * 1000);
 runTvdbBackup();
 setInterval(runTvdbBackup, 24 * 60 * 60 * 1000);
+startImdbRatings();
 
 ///////////// get theTvdbToken //////////////
 // this is a duplicate of the client
@@ -548,8 +550,10 @@ setInterval(runTvdbBackup, 24 * 60 * 60 * 1000);
 
 const IMDB_USER_AGENT =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+const IMDB_BLOCK_COOLDOWN_MS = 12 * 60 * 60 * 1000;
 let imdbBrowser = null;
 let imdbContext = null;
+let imdbFetchesGatedUntil = 0;
 
 async function getImdbBrowser() {
   try {
@@ -603,6 +607,15 @@ async function resetImdbContext() {
   imdbContext = null;
 }
 
+// Once the WAF starts challenging it stays hostile for a long while, and every
+// further attempt is another strike against us, so stop poking it for half a
+// day. Ratings are unaffected — they come from the dataset, not the page.
+async function gateImdbFetches() {
+  imdbFetchesGatedUntil = Date.now() + IMDB_BLOCK_COOLDOWN_MS;
+  await resetImdbContext();
+  return util.toPstDateTime(new Date(imdbFetchesGatedUntil))?.slice(5, 16);
+}
+
 const extractImdbRating = (html) => {
   if (!html) return null;
 
@@ -654,74 +667,64 @@ const getUrlAndRatings = async (type, url, name) => {
     let resp = null;
     let ctx = null;
 
-    // Once IMDB/CloudFront flags a browser context it answers every later
-    // request from that context with a 405 "Human Verification" page, and the
-    // cached context never recovers on its own. A brand new context (no
-    // cookies) is served normally again, so on a bad status throw the context
-    // away and retry once.
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        ctx = await getImdbContext();
-        page = await ctx.newPage();
-        resp = await page.goto(url, {
-          waitUntil: "domcontentloaded",
-          timeout: 15000,
-        });
-        if (resp?.ok()) {
-          // IMDB sometimes returns HTTP 202 (deferred/CSR render) with an empty
-          // skeleton. Wait for JSON-LD or <h1> to appear so the rating is present.
-          // For SSR pages (200) this resolves instantly; for deferred pages it waits.
-          await page
-            .waitForFunction(
-              () =>
-                document.querySelectorAll('script[type="application/ld+json"]')
-                  .length > 0 || !!document.querySelector("h1"),
-              { timeout: 10000 },
-            )
-            .catch(() => {});
-          // The rating score (and its sibling reviewer-count div) hydrate later
-          // than h1/JSON-LD on deferred pages, so give it its own short wait.
-          await page
-            .waitForSelector(
-              '[data-testid="hero-rating-bar__aggregate-rating__score"]',
-              { timeout: 5000 },
-            )
-            .catch(() => {});
-        }
-      } catch (e) {
-        unilog(
-          721,
-          "err",
-          `getUrlAndRatings imdb playwright error for ${name}: ${url}, ${e.message}`,
-        );
-        try {
-          await page?.close();
-        } catch {}
-        return { ratings: null, reviewers: null, video: null };
+    // Ratings come from the published dataset (see imdbRatings.js) — this fetch
+    // is only for the trailer video. IMDB fronts the site with an AWS WAF
+    // CAPTCHA that a headless browser cannot solve, and an unsolved challenge
+    // leaves an aws-waf-token cookie that turns every later request into a 405,
+    // so a block gates every attempt for the next 12 hours.
+    if (Date.now() < imdbFetchesGatedUntil)
+      return { ratings: null, reviewers: null, video: null };
+
+    try {
+      ctx = await getImdbContext();
+      page = await ctx.newPage();
+      resp = await page.goto(url, {
+        waitUntil: "domcontentloaded",
+        timeout: 15000,
+      });
+      if (resp?.ok()) {
+        // IMDB sometimes returns HTTP 202 (deferred/CSR render) with an empty
+        // skeleton. Wait for JSON-LD or <h1> to appear so the rating is present.
+        // For SSR pages (200) this resolves instantly; for deferred pages it waits.
+        await page
+          .waitForFunction(
+            () =>
+              document.querySelectorAll('script[type="application/ld+json"]')
+                .length > 0 || !!document.querySelector("h1"),
+            { timeout: 10000 },
+          )
+          .catch(() => {});
+        // The rating score (and its sibling reviewer-count div) hydrate later
+        // than h1/JSON-LD on deferred pages, so give it its own short wait.
+        await page
+          .waitForSelector(
+            '[data-testid="hero-rating-bar__aggregate-rating__score"]',
+            { timeout: 5000 },
+          )
+          .catch(() => {});
       }
+    } catch (e) {
+      unilog(
+        721,
+        "err",
+        `getUrlAndRatings imdb playwright error for ${name}: ${url}, ${e.message}`,
+      );
+      try {
+        await page?.close();
+      } catch {}
+      return { ratings: null, reviewers: null, video: null };
+    }
 
-      if (resp?.ok()) break;
-
+    if (!resp?.ok()) {
       const status = resp ? resp.status() : null;
       try {
         await page?.close();
       } catch {}
-      page = null;
-
-      if (attempt === 0) {
-        unilog(
-          1678,
-          "err",
-          `imdb status=${status} for ${name}, retrying on a fresh context`,
-        );
-        await resetImdbContext();
-        continue;
-      }
-
+      const until = await gateImdbFetches();
       unilog(
         722,
         "err",
-        `getUrlAndRatings imdb fetch error for ${name}: ${url}, status=${status}`,
+        `getUrlAndRatings imdb fetch error for ${name}: ${url}, status=${status}, trailer fetches gated until ${until}`,
       );
       return { ratings: null, reviewers: null, video: null };
     }
@@ -733,8 +736,11 @@ const getUrlAndRatings = async (type, url, name) => {
           const html = document.documentElement.outerHTML;
           const compact = html.replace(/\r?\n/gm, "").replace(/\s+/gm, " ");
 
+          // The AWS WAF challenge injects its visible text ("Let's confirm you
+          // are human") from challenge.js, so match the plumbing that is in the
+          // served HTML from the start as well as the rendered wording.
           const hasChallengeMarkers =
-            /verify you are human|please verify you are a human|enter the characters you see below|type the characters you see/i.test(
+            /awsWafCookieDomainList|gokuProps|token\.awswaf\.com|id="challenge-container"|verify you are human|please verify you are a human|confirm you are human|human verification|enter the characters you see below|type the characters you see/i.test(
               compact,
             );
           const hasRatingEvidence =
@@ -871,11 +877,14 @@ const getUrlAndRatings = async (type, url, name) => {
       } catch {}
 
       if (!result || result.challenge) {
-        if (result?.challenge)
+        if (result?.challenge) {
+          const until = await gateImdbFetches();
           unilog(
             723,
-            `getUrlAndRatings imdb challenge page for ${name}: ${url}`,
+            "err",
+            `getUrlAndRatings imdb challenge page for ${name}: ${url}, trailer fetches gated until ${until}`,
           );
+        }
         return { ratings: null, reviewers: null, video: null };
       }
 
@@ -912,7 +921,7 @@ const getRemote = async (id, type, showName) => {
   let ratings = null;
   let reviewers = null;
   let video = null;
-  let urlRatings, name, escShow;
+  let urlRatings, dataset, name, escShow;
 
   switch (type) {
     case 2:
@@ -922,10 +931,17 @@ const getRemote = async (id, type, showName) => {
         return { name, url: null, ratings: null, reviewers: null, video: null };
       }
       url = `https://www.imdb.com/title/${id}`;
+      // ratings come from the published dataset, which is never CAPTCHA-blocked;
+      // the page fetch is only for the trailer and may come back empty
+      dataset = await getImdbRating(id);
+      ratings = dataset?.ratings ?? null;
+      reviewers = dataset?.reviewers ?? null;
       urlRatings = await getUrlAndRatings(2, url, name);
-      ratings = urlRatings?.ratings;
-      reviewers = urlRatings?.reviewers;
       video = urlRatings?.video;
+      if (!ratings) {
+        ratings = urlRatings?.ratings ?? null;
+        reviewers = urlRatings?.reviewers ?? null;
+      }
       break;
 
     case 4:

@@ -68,6 +68,45 @@ function q(s) {
   return String(s).replace(/'/g, "''");
 }
 
+// e.ts is stamped as PST 'YYYY/MM/DD HH:MM:SS' (see unilog/docs/unilog-db.md).
+// sqlite's datetime('now', modifier) is UTC and uses '-' separators, so
+// comparing it directly against e.ts was both wrong timezone AND a string
+// format mismatch ('/' > '-' in ASCII, so the WHERE clause always matched).
+// Instead resolve --since to the same PST '/'-separated format in JS.
+function pstTimestamp(d) {
+  const date = d
+    .toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" })
+    .replace(/-/g, "/");
+  let time = d.toLocaleTimeString("en-GB", {
+    timeZone: "America/Los_Angeles",
+    hour12: false,
+  });
+  if (time.startsWith("24:")) time = "00:" + time.slice(3);
+  return `${date} ${time}`;
+}
+
+function resolveSince(since) {
+  if (/^\d{4}\//.test(since)) return since;
+  const m = since
+    .trim()
+    .match(/^([+-]?\d+)\s*(second|minute|hour|day|week|month|year)s?$/i);
+  if (!m) {
+    console.error(`error: unrecognized --since value: ${since}`); // no-unilog
+    process.exit(1);
+  }
+  const n = Number(m[1]);
+  const unit = m[2].toLowerCase();
+  const d = new Date();
+  if (unit === "second") d.setSeconds(d.getSeconds() + n);
+  else if (unit === "minute") d.setMinutes(d.getMinutes() + n);
+  else if (unit === "hour") d.setHours(d.getHours() + n);
+  else if (unit === "day") d.setDate(d.getDate() + n);
+  else if (unit === "week") d.setDate(d.getDate() + n * 7);
+  else if (unit === "month") d.setMonth(d.getMonth() + n);
+  else if (unit === "year") d.setFullYear(d.getFullYear() + n);
+  return pstTimestamp(d);
+}
+
 // --- SQL builders -----------------------------------------------------------
 
 function siteWhere(o) {
@@ -126,12 +165,7 @@ function buildSql(o) {
   // the client log pane's view; --nodup drops only dedup-suppressed repeats.
   if (o.visible) evWhere.push(`(e.hide IS NULL OR e.hide = 0)`);
   else if (o.nodup) evWhere.push(`(e.hide IS NULL OR e.hide <> 2)`);
-  if (o.since) {
-    const ts = o.since.match(/^\d{4}\//)
-      ? `'${q(o.since)}'`
-      : `datetime('now','${q(o.since)}')`;
-    evWhere.push(`e.ts >= ${ts}`);
-  }
+  if (o.since) evWhere.push(`e.ts >= '${q(resolveSince(o.since))}'`);
 
   const w = evWhere.length ? `WHERE ${evWhere.join(" AND ")}` : "";
   // Always take the newest N; --asc only flips the print order (see fmt).

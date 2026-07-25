@@ -27,6 +27,9 @@ const TV_DIR = "/mnt/media/tv";
 const MPFOUR_DIR = "/mnt/media/mpfour";
 const SCAN_INTERVAL_MS = 5_000;
 const FAIL_RETRY_MS = 60 * 60 * 1000;
+// Mirrors only back chksrt subtitle review, never full playback, so 10 minutes
+// is plenty to check sync — cutting encodes short here saves real time on hevc.
+const MIRROR_MAX_SECS = 600;
 
 let busy = false;
 let reordering = false;
@@ -209,7 +212,15 @@ async function encodeOne(videoFilePath) {
     // is nearly the whole job here; quality is moot for a throwaway review mirror.
     args.push("-c:a", "aac", "-aac_coder", "fast", "-b:a", "128k", "-ac", "2");
   }
-  args.push("-sn", "-dn", "-movflags", "+faststart", tmp);
+  args.push(
+    "-sn",
+    "-dn",
+    "-t",
+    String(MIRROR_MAX_SECS),
+    "-movflags",
+    "+faststart",
+    tmp,
+  );
   await fsp.mkdir(path.dirname(mirror), { recursive: true });
   currentTmpPath = tmp;
   currentEncode = {

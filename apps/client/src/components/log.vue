@@ -647,6 +647,17 @@ export default {
           field: "level",
           width: 50,
           hozAlign: "center",
+          // Tint warn/error cells here (not in rowFormatter): the column
+          // formatter re-runs on every cell render, so the tint survives the
+          // horizontal virtual-DOM re-renders that discard rowFormatter styling.
+          formatter: (cell) => {
+            const lvl = cell.getValue();
+            const el = cell.getElement();
+            if (lvl === "error") el.style.backgroundColor = "#ffe5e5";
+            else if (lvl === "warn") el.style.backgroundColor = "#fff6d9";
+            else el.style.backgroundColor = "";
+            return lvl ?? "";
+          },
           headerFilter: "list",
           headerFilterParams: {
             values: this.filterLevels,
@@ -840,26 +851,14 @@ export default {
       else if (e.ctrlKey) this.toggleRow(row);
       else this.selectOnly(row);
     },
-    // Paint a row: all selected rows get blue row bg; warn/error level cell
-    // always shows its level color (on top of the row bg).
+    // Paint a row: selected rows get a blue row bg (shows through the
+    // transparent cells). The warn/error level-cell tint is handled by the
+    // Level column formatter, not here.
     paintRow(row) {
       const data = row.getData();
       const el = row.getElement();
       if (!el) return;
-      const selected = this.selectedIds.has(data.id);
-      el.style.backgroundColor = selected ? "#b3d4fc" : "";
-      for (const cell of row.getCells()) {
-        if (cell.getColumn().getField() !== "level") continue;
-        const cel = cell.getElement();
-        if (data.level === "error") {
-          cel.style.backgroundColor = "#ffe5e5";
-        } else if (data.level === "warn") {
-          cel.style.backgroundColor = "#fff6d9";
-        } else {
-          cel.style.backgroundColor = selected ? "#b3d4fc" : "";
-        }
-        break;
-      }
+      el.style.backgroundColor = this.selectedIds.has(data.id) ? "#b3d4fc" : "";
     },
     async updateOldestTs() {
       if (!this.table) return;

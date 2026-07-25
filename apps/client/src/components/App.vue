@@ -2122,7 +2122,8 @@ export default {
     },
     updateFaviconBadge() {
       const shouldShowBadge =
-        this.browseTabHasMore || this.introCount > 0 || this.chksrtCount > 0;
+        !this.simpleMode &&
+        (this.browseTabHasMore || this.introCount > 0 || this.chksrtCount > 0);
 
       // Remove any existing favicon links
       const oldLinks = document.querySelectorAll("link[rel*='icon']");

@@ -31,5 +31,6 @@
   },
   "[jsonc]": {
     "editor.formatOnSave": false
-  }
+  },
+  "window.title": "tv wsl"
 }

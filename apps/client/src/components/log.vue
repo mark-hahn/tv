@@ -176,7 +176,7 @@
         <span
           v-if="warnRate !== null"
           :style="
-            warnRate > 10 ? { fontSize: '15.9px', color: 'red' } : null
+            warnRate > 30 ? { fontSize: '15.9px', color: 'red' } : null
           "
           >Warn: {{ warnRate }}</span
         >

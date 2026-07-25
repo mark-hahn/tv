@@ -162,7 +162,7 @@ const deleteOnePath = async (pathParam) => {
       }
 
       if (!stats) {
-        unilog(35, "deletePath: path doesn't exist");
+        unilog(35, `deletePath: path doesn't exist: ${baseName}`);
         return "ok";
       }
     }

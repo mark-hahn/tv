@@ -31,9 +31,11 @@ let inFlight = 0;
 // look like a slow request. Reporting lag alongside every slow/timed-out call
 // separates "the server was slow" from "we were too busy to notice it answer".
 const LAG_SAMPLE_MS = 500;
-// A single block at or above this gets its own timestamped log the instant the
-// main thread frees up — so a multi-second freeze is pinned to the click that
-// caused it, not just summarized on the next slow request.
+// Below this a block isn't worth mentioning: loopLagSuffix() only appends
+// " loopLag=Nms" to a slow/timed-out request when the worst block during it
+// reached this, so plain network latency (loopLag≈0) doesn't get tagged. The
+// old standalone freeze log (site 1452) fired off this too but was removed —
+// see the Event Timing observer below for why.
 const LAG_REPORT_MS = 1000;
 let maxLoopLagMs = 0;
 let lagLastAt = performance.now();
@@ -61,8 +63,6 @@ const lagTimer = setInterval(() => {
   // request look jank-related when it wasn't.
   if (!wasHiddenSinceLastTick) {
     if (lag > maxLoopLagMs) maxLoopLagMs = lag;
-    if (lag >= LAG_REPORT_MS)
-      unilog(1452, `browser main thread blocked ${lag}ms`);
   }
   wasHiddenSinceLastTick = document.hidden;
 }, LAG_SAMPLE_MS);
@@ -82,6 +82,32 @@ const loopLagSuffix = () => {
   const lag = takeMaxLoopLag();
   return lag >= LAG_REPORT_MS ? ` loopLag=${lag}ms` : "";
 };
+
+// Delay the user actually feels. The timer-lag probe above can't tell a real
+// freeze from an idle/asleep/occluded tab — document.hidden only flips on tab
+// switch or minimize, not on OS sleep or window occlusion — so it fired
+// constantly with no delay anyone experienced. The Event Timing API measures
+// the real thing: the gap between a genuine input (click/tap/key) and the next
+// paint. It only records when the user actually interacts, so idle, sleep, and
+// background gaps can never inflate it. durationThreshold filters to entries at
+// or above the report threshold. Feature-gated for safety, but every current
+// browser supports "event" (Baseline 2025, Firefox included since v114), so
+// this runs everywhere; a browser too old to have it simply gets no perf
+// logging, which beats the interaction-less noise a fallback probe would add.
+const RESPONSE_REPORT_MS = 300;
+let eventTimingObserver = null;
+if (window.PerformanceObserver?.supportedEntryTypes?.includes("event")) {
+  eventTimingObserver = new PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) {
+      unilog(1776, `${entry.name} took ${Math.round(entry.duration)}ms to respond`);
+    }
+  });
+  eventTimingObserver.observe({
+    type: "event",
+    durationThreshold: RESPONSE_REPORT_MS,
+    buffered: true,
+  });
+}
 
 // Stable per-page client id, used to ignore our own echoed remote actions
 // (a live duplicate socket — e.g. a Vite HMR leftover — would otherwise make a
@@ -488,6 +514,7 @@ if (import.meta.hot) {
     if (torndown) return;
     torndown = true;
     clearInterval(lagTimer);
+    eventTimingObserver?.disconnect();
     clearTimeout(wsStartTimer);
     lastViewedChannel.close();
     for (const handle of [...channelSubscribers.values()]) {

@@ -881,8 +881,7 @@ const getUrlAndRatings = async (type, url, name) => {
           const until = await gateImdbFetches();
           unilog(
             723,
-            "err",
-            `getUrlAndRatings imdb challenge page for ${name}: ${url}, trailer fetches gated until ${until}`,
+            `imdb trailer fetches gated until ${until}`,
           );
         }
         return { ratings: null, reviewers: null, video: null };

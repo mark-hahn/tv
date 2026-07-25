@@ -30,7 +30,7 @@ const PM2_TARGET = "tv-srvr";
 const CHECK_INTERVAL_MS = 60 * 1000; // run all checks every 60s
 const HEARTBEAT_MAX_AGE_MS = 6 * 60 * 1000; // no "hb" event in 6m => stuck/dead
 const ERROR_COUNT_WARN = 30; // > this many error events in one clock hour => warn
-const WARN_RATE_THRESHOLD = 10; // > this many warn events in the trailing hour => alert + email
+const WARN_RATE_THRESHOLD = 50; // > this many warn events in the trailing hour => alert + email
 const WARN_RATE_CHECK_MS = 10 * 60 * 1000; // re-measure the rolling warn rate every 10m
 const EMAIL_MIN_INTERVAL_MS = 60 * 60 * 1000; // at most one error email per hour
 const BURST_COUNT = 5; // more than this many errors ...
@@ -290,6 +290,7 @@ let hourSites = new Map(); // log_id -> { file, line, n }
 const pendingErrors = new Map(); // stripped msg -> {count,sites,example,firstTs,lastTs,firstId,lastId}
 let lastEmailMs = 0; // last email send time (1/hour throttle)
 let lastWarnCheckMs = 0; // last time the rolling warn rate was re-measured
+let lastWarnEmailMs = 0; // last warn-rate email (own 1/hour throttle)
 
 // Epoch ms from a PST "yyyy/mm/dd hh:mm:ss" string. Parsed with a fixed UTC
 // suffix — absolute value is offset, but diffs between two stamps are correct.
@@ -418,33 +419,26 @@ async function checkWatchedSites() {
   }
 }
 
-// Tier-2 rolling warn-rate alert. Re-measured every WARN_RATE_CHECK_MS
-// (not every CHECK_INTERVAL_MS cycle). A breach is queued into pendingErrors
-// exactly like an error event, so it rides the same dedup + 1-email/hour
-// throttle and shows up in the same digest as the error summary.
+// Tier-2 rolling warn-rate alert. Re-measured every WARN_RATE_CHECK_MS (not
+// every CHECK_INTERVAL_MS cycle). On a breach it emails directly under its OWN
+// 1-hour throttle (lastWarnEmailMs), independent of the error digest's shared
+// throttle — otherwise an unrelated error email could consume the hourly slot
+// and silence the warn alert (exactly what happened the first time).
 async function checkWarnRate() {
   if (Date.now() - lastWarnCheckMs < WARN_RATE_CHECK_MS) return;
   lastWarnCheckMs = Date.now();
   const n = warnCountLastHour();
   if (n == null) return;
   const key = "warn-rate";
-  if (n > WARN_RATE_THRESHOLD) {
-    const message = `${n} warn events in the past hour (> ${WARN_RATE_THRESHOLD})`;
-    raise(key, "warn", message);
-    const id = maxEventId() ?? 0;
-    pendingErrors.set(key, {
-      count: n,
-      sites: new Set(["warn-rate monitor"]),
-      example: message,
-      firstTs: pstStr(),
-      lastTs: pstStr(),
-      firstId: id,
-      lastId: id,
-    });
-  } else {
+  if (n <= WARN_RATE_THRESHOLD) {
     clear(key);
-    pendingErrors.delete(key);
+    return;
   }
+  const message = `${n} warn events in the past hour (> ${WARN_RATE_THRESHOLD})`;
+  raise(key, "warn", message);
+  if (Date.now() - lastWarnEmailMs < EMAIL_MIN_INTERVAL_MS) return;
+  lastWarnEmailMs = Date.now();
+  await sendMail(`tv-watchdog: ${message}`, message);
 }
 
 async function checkErrors() {

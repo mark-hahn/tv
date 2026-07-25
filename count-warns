@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OUT_FILE="$ROOT_DIR/temp.txt"
+DAYS=4
+
+SINCE=$(TZ=America/Los_Angeles date -d "-${DAYS} days" "+%Y/%m/%d %H:%M:%S")
+
+node "$ROOT_DIR/unilog/query.js" --sql "
+  SELECT substr(e.ts,1,13) AS hour, COUNT(*) AS cnt
+  FROM log_events e
+  JOIN log_sites s ON e.log_id = s.log_id
+  WHERE s.level = 'warn' AND e.ts >= '$SINCE'
+  GROUP BY hour
+  ORDER BY hour;
+" --json | node -e '
+  let input = "";
+  process.stdin.on("data", d => (input += d));
+  process.stdin.on("end", () => {
+    const rows = JSON.parse(input);
+    let total = 0;
+    const lines = rows.map(r => {
+      total += r.cnt;
+      return `${r.hour}:00  ${r.cnt}`;
+    });
+    lines.push(`total: ${total}`);
+    require("fs").writeFileSync(process.argv[1], lines.join("\n") + "\n");
+  });
+' "$OUT_FILE"
+
+echo "wrote $OUT_FILE"

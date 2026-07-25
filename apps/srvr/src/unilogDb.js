@@ -262,6 +262,7 @@ const getBlockedUntil = db.prepare(
 // last RECENT_DUP_WINDOW rows (not a global scan) for an exact message+ts
 // match and drop the insert entirely when found, rather than storing every
 // copy of what is really one moment.
+const RECENT_DUP_CHECK_ENABLED = false;
 const RECENT_DUP_WINDOW = 40;
 const checkRecentDup = db.prepare(
   `SELECT 1 FROM (
@@ -286,7 +287,7 @@ export function insertEventDedup({ logId, pid, message, ts }) {
     const bu = getBlockedUntil.get(id)?.blocked_until;
     if (bu && bu > nowPst()) return null; // site blocked by tv-watchdog
   }
-  if (id != null) {
+  if (id != null && RECENT_DUP_CHECK_ENABLED) {
     const stampedTs = resolveTs(ts);
     if (checkRecentDup.get(id, String(message ?? ""), stampedTs)) return null;
   }

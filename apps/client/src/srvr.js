@@ -95,10 +95,28 @@ const loopLagSuffix = () => {
 // this runs everywhere; a browser too old to have it simply gets no perf
 // logging, which beats the interaction-less noise a fallback probe would add.
 const RESPONSE_REPORT_MS = 300;
+// The browser fires an "event" entry for every event type above the duration
+// threshold, not just discrete input — hover/move types (mouseenter, mouseover,
+// pointerout, etc.) qualify too, and one hover motion can dispatch a separate
+// mouseenter/mouseleave per nested element, flooding the log with entries that
+// aren't a "genuine input" per the comment above. Restrict to the click/tap/key
+// types that comment actually means.
+const REPORTED_EVENT_NAMES = new Set([
+  "click",
+  "auxclick",
+  "dblclick",
+  "keydown",
+  "keyup",
+  "touchstart",
+  "touchend",
+  "pointerdown",
+  "pointerup",
+]);
 let eventTimingObserver = null;
 if (window.PerformanceObserver?.supportedEntryTypes?.includes("event")) {
   eventTimingObserver = new PerformanceObserver((list) => {
     for (const entry of list.getEntries()) {
+      if (!REPORTED_EVENT_NAMES.has(entry.name)) continue;
       unilog(
         1776,
         `${entry.name} took ${Math.round(entry.duration)}ms to respond`,

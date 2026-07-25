@@ -184,7 +184,7 @@ export function insertEvent({
   const info = insEvent.run(
     logId == null ? null : Number(logId),
     String(pid || "unknown"),
-    TS_RE.test(String(ts ?? "")) ? String(ts) : nowPst(),
+    resolveTs(ts),
     String(message ?? ""),
     hide,
   );
@@ -255,17 +255,40 @@ const getBlockedUntil = db.prepare(
   "SELECT blocked_until FROM log_sites WHERE log_id = ?",
 );
 
+// Exact-repeat guard: ts only has 1-second resolution (see TS_RE), so a burst
+// of events from one site fired within the same second — e.g. a main-thread
+// stall delaying several queued browser events, all reported with the same
+// name+duration — reads as identical rows. Look back over just that site's
+// last RECENT_DUP_WINDOW rows (not a global scan) for an exact message+ts
+// match and drop the insert entirely when found, rather than storing every
+// copy of what is really one moment.
+const RECENT_DUP_WINDOW = 40;
+const checkRecentDup = db.prepare(
+  `SELECT 1 FROM (
+     SELECT message, ts FROM log_events WHERE log_id = ? ORDER BY id DESC LIMIT ${RECENT_DUP_WINDOW}
+   ) WHERE message = ? AND ts = ? LIMIT 1`,
+);
+
+function resolveTs(ts) {
+  return TS_RE.test(String(ts ?? "")) ? String(ts) : nowPst();
+}
+
 // Dedup wrapper used by BOTH the in-process srvr sink and POST /api/log, so
 // local and remote emitters are covered. Returns the joined event row to
-// broadcast, or null when the event is a redundant down-blocked event (inserted
-// to DB with hide = 2 but NOT broadcast). A cache hit does NOT refresh the
-// entry, so a still-blocking file re-appears at most once per day as a
-// heartbeat.
+// broadcast, or null when the event is dropped: either an exact repeat of a
+// recent event at the same site (never inserted at all), or a redundant
+// down-blocked event (inserted to DB with hide = 2 but NOT broadcast). A
+// down-blocked cache hit does NOT refresh the entry, so a still-blocking file
+// re-appears at most once per day as a heartbeat.
 export function insertEventDedup({ logId, pid, message, ts }) {
   const id = logId == null ? null : Number(logId);
   if (id != null) {
     const bu = getBlockedUntil.get(id)?.blocked_until;
     if (bu && bu > nowPst()) return null; // site blocked by tv-watchdog
+  }
+  if (id != null) {
+    const stampedTs = resolveTs(ts);
+    if (checkRecentDup.get(id, String(message ?? ""), stampedTs)) return null;
   }
   if (id != null && dedupIds.has(id)) {
     const now = Date.now();

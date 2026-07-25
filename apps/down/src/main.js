@@ -1420,15 +1420,31 @@ async function main() {
     if (Date.now() - lastPruneAt >= PRUNE_INTERVAL_MS) {
       // Inline prune.sh behavior: delete files older than 60 days on the USB host.
       // Run async so it doesn't block the cycle — proceed to checkFiles immediately.
-      unilog(304, ".... deleting old files in usb ~/files (async) ....");
       PRUNE_DAYS = 60;
       lastPruneAt = Date.now();
       (async () => {
+        var folderCount = 0;
+        var fileCount = 0;
+        try {
+          var { stdout: typesOut } = await execAsync(
+            `ssh ${usbHost} "find ~/files -mtime +${PRUNE_DAYS} -printf '%y\\n' 2>/dev/null"`,
+            { timeout: 5 * 60 * 1000 },
+          );
+          var types = typesOut
+            .split("\n")
+            .map((s) => s.trim())
+            .filter(Boolean);
+          folderCount = types.filter((t) => t === "d").length;
+          fileCount = types.filter((t) => t === "f").length;
+        } catch (e) {
+          // Non-fatal; counts stay 0.
+        }
         try {
           await execAsync(
             `ssh ${usbHost} "find ~/files -mtime +${PRUNE_DAYS} -exec rm -rf {} \\; >/dev/null 2>&1"`,
             { timeout: 5 * 60 * 1000 },
           );
+          unilog(1779, `usb prune: deleted ${folderCount} folders, ${fileCount} files (older than ${PRUNE_DAYS} days)`);
         } catch (e) {
           unilog(1590, `usb prune failed: ${e.message}`);
         }

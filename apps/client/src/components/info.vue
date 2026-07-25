@@ -994,12 +994,14 @@ export default {
     },
 
     async setCrewTxt(tvdbData) {
-      this.crewLines = [];
       let crew = null;
       if (Array.isArray(tvdbData?.crew)) {
         crew = tvdbData.crew;
       } else {
-        // crew field absent — fetch from TVDB and store back
+        // crew field absent — clear now (this show has no crew yet, so don't
+        // keep showing the previous show's crew) then fetch from TVDB and store
+        // back. The common path (crew present) skips this and updates atomically.
+        this.crewLines = [];
         const tvdbId = tvdbData?.tvdbId || this.show?.tvdbId;
         if (tvdbId) {
           try {
@@ -1015,7 +1017,10 @@ export default {
           }
         }
       }
-      if (!Array.isArray(crew) || crew.length === 0) return;
+      if (!Array.isArray(crew) || crew.length === 0) {
+        this.crewLines = [];
+        return;
+      }
       const CREW_PREF = ["Creator", "Producer", "Executive Producer", "Writer"];
       const sorted = [...crew].sort(
         (a, b) => CREW_PREF.indexOf(a.type) - CREW_PREF.indexOf(b.type),
@@ -1078,8 +1083,10 @@ export default {
         unilog(927, "setSeasonsTxt, tvdbData:", name, { tvdbData });
         return;
       }
-      this.seasonsTxt = "";
-      this.watchedValTxt = "";
+      // Do NOT clear seasonsTxt/watchedValTxt here. There is an await below
+      // (emby.getEpisodeCounts); clearing first would render an empty infobox
+      // row during the await and make the row flicker. Compute the new values
+      // into locals and assign the reactive props once, after the await.
       const show = this.show;
       const name = show.name;
 
@@ -1124,38 +1131,41 @@ export default {
         tvdbData,
         name || this.show?.name || "",
       );
-      let seasonsTxt;
       const { episodeCount, seasonCount, watchedCount } = tvdbData;
 
-      // Set watched text first (before potential early return)
+      // Compute watched text into a local (no reactive write yet).
+      let newWatchedValTxt = "";
       if (episodeCount > 0) {
         if (watchedCountIsNull) {
           // Show "?" when watchedCount is null for non-emby shows
-          this.watchedValTxt = `? of ${episodeCount}`;
+          newWatchedValTxt = `? of ${episodeCount}`;
         } else {
-          this.watchedValTxt =
+          newWatchedValTxt =
             watchedCount === episodeCount
               ? `all ${episodeCount} episodes`
               : `${watchedCount} of ${episodeCount}`;
         }
       } else if (show.inEmby === false) {
         // For non-emby shows with no episode count yet, still show watched status
-        this.watchedValTxt = watchedCountIsNull ? "?" : "0";
-      } else {
-        this.watchedValTxt = "";
+        newWatchedValTxt = watchedCountIsNull ? "?" : "0";
       }
 
-      // Now handle seasons text
+      // Compute seasons text into a local.
+      let newSeasonsTxt = "";
       switch (seasonCount) {
         case 0:
-          return;
+          break;
         case 1:
-          seasonsTxt = "1 Season";
+          newSeasonsTxt = ` &nbsp; 1 Season`;
           break;
         default:
-          seasonsTxt = `${seasonCount} Seasons`;
+          newSeasonsTxt = ` &nbsp; ${seasonCount} Seasons`;
       }
-      this.seasonsTxt = ` &nbsp; ${seasonsTxt}`;
+
+      // Assign both reactive props at once, after all awaits, so the rows
+      // transition old value -> new value without an empty flash in between.
+      this.watchedValTxt = newWatchedValTxt;
+      this.seasonsTxt = newSeasonsTxt;
     },
 
     setCntryLangTxt(tvdbData) {
@@ -1471,6 +1481,10 @@ export default {
       this.settingUpShowName = show?.name;
       this.show = show;
       this.showHdr = true;
+      // Hide the infobox for the whole update instead of leaving it visible while
+      // individual fields (dates, seasons, watched, etc.) are cleared and
+      // recomputed one at a time — that caused rows to flicker in/out rapidly.
+      this.seriesReady = false;
 
       if (this.previewMode) {
         evtBus.emit("previewPanesLoading", true);
@@ -1855,20 +1869,27 @@ export default {
       if (posterImg) {
         const infoBoxEl = document.getElementById("infoBox");
         const newHeight = infoBoxEl?.clientHeight || 0;
+        // Pick the constrained height first; only reveal the image once we have
+        // one. Making it visible with no maxHeight (both heights 0, e.g. the
+        // infobox is hidden mid-setup) shows the poster at full natural size for
+        // a frame before it gets shrunk — the flash the user sees. When no
+        // height is known, leave it hidden; onSetUpSeries's reveal will size it.
+        let appliedMaxHeight = 0;
         if (existingMaxHeight > 0) {
           // Keep the same size - don't let content changes shrink the poster
           unilog(
             945,
             `tvdbUpdated: keeping ${existingMaxHeight}px (infoBox=${newHeight}px) for ${this.show?.name}`,
           );
-          posterImg.style.maxHeight = existingMaxHeight + "px";
-        } else {
-          if (infoBoxEl && newHeight > 0) {
-            unilog(946, `tvdbUpdated: ${newHeight}px for ${this.show?.name}`);
-            posterImg.style.maxHeight = newHeight + "px";
-          }
+          appliedMaxHeight = existingMaxHeight;
+        } else if (infoBoxEl && newHeight > 0) {
+          unilog(946, `tvdbUpdated: ${newHeight}px for ${this.show?.name}`);
+          appliedMaxHeight = newHeight;
         }
-        posterImg.style.visibility = "visible";
+        if (appliedMaxHeight > 0) {
+          posterImg.style.maxHeight = appliedMaxHeight + "px";
+          posterImg.style.visibility = "visible";
+        }
       }
     };
     evtBus.on("tvdbUpdated", this.onTvdbUpdated);

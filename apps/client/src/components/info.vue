@@ -82,7 +82,7 @@
           }}</span>
         </div>
         <div
-          v-if="!previewMode"
+          v-if="!previewMode && !simpleMode"
           :style="{
             gridColumn: '4 / span 2',
             justifySelf: 'end',

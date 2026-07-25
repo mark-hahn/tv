@@ -115,7 +115,7 @@
               flex-direction: column;
             "
           >
-            <HdrMsg />
+            <HdrMsg v-if="!simpleMode" />
             <HdrTop
               v-model:filterStr="filterStr"
               :watchingName="watchingNameDisplay"
@@ -208,7 +208,7 @@
             flex-direction: column;
           "
         >
-          <HdrMsg />
+          <HdrMsg v-if="!simpleMode" />
           <HdrTop
             v-model:filterStr="filterStr"
             :watchingName="watchingNameDisplay"

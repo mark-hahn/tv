@@ -1355,6 +1355,7 @@ app.post("/api/local/textfile", async (req, res) => {
 });
 
 const TOR_SENT_PATH = path.join(getApiMiscDir(), "tor-sent.json");
+const TOR_SENT_HISTORY_WINDOW_MS = 60 * 24 * 60 * 60 * 1000;
 
 function logRecentSent(action, details = {}) {
   try {
@@ -1371,8 +1372,24 @@ function loadTorSent() {
     if (fs.existsSync(TOR_SENT_PATH)) {
       const j = JSON.parse(fs.readFileSync(TOR_SENT_PATH, "utf8"));
       if (j && typeof j === "object" && !Array.isArray(j)) {
-        logRecentSent("LOAD", { entryCount: Object.keys(j).length });
-        return j;
+        const cutoff = Date.now() - TOR_SENT_HISTORY_WINDOW_MS;
+        const pruned = {};
+        let removed = 0;
+        for (const [k, ts] of Object.entries(j)) {
+          const t = Number(ts);
+          if (Number.isFinite(t) && t >= cutoff) pruned[k] = t;
+          else removed++;
+        }
+        if (removed > 0) {
+          fs.writeFileSync(TOR_SENT_PATH, JSON.stringify(pruned), "utf8");
+          logRecentSent("LOAD", {
+            entryCount: Object.keys(pruned).length,
+            removed,
+          });
+        } else {
+          logRecentSent("LOAD", { entryCount: Object.keys(pruned).length });
+        }
+        return pruned;
       }
     }
     logRecentSent("LOAD", { entryCount: 0, note: "file not found or invalid" });

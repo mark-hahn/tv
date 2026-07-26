@@ -455,6 +455,7 @@ export function dbInfo() {
 // msg (partial). beforeId returns only events older than that event id (for
 // upward paging). afterId returns events newer than that id (for gap-fill after
 // reconnect), returned oldest-first. limit is clamped to a sane range.
+// includeHidden skips the normal log-pane hide filter for whole-DB searches.
 // errors: error-mode read-back — only error-level sites, only the last week,
 // and hidden events are INCLUDED (the hide filter is skipped).
 export function queryEvents({
@@ -466,6 +467,7 @@ export function queryEvents({
   beforeId,
   afterId,
   errors,
+  includeHidden,
 } = {}) {
   const where = [];
   const params = [];
@@ -473,7 +475,7 @@ export function queryEvents({
     where.push("s.level = 'error'");
     where.push("e.ts >= ?");
     params.push(pstStr(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)));
-  } else {
+  } else if (!includeHidden) {
     where.push("(e.hide IS NULL OR e.hide = 0)");
   }
   if (beforeId) {
@@ -770,9 +772,7 @@ const delSiteGroup = db.prepare(
   "DELETE FROM site_groups WHERE log_id = ? AND group_id = ?",
 );
 
-const delAllSiteGroups = db.prepare(
-  "DELETE FROM site_groups WHERE log_id = ?",
-);
+const delAllSiteGroups = db.prepare("DELETE FROM site_groups WHERE log_id = ?");
 
 // Create a named group and link it to the given sites.
 // If a group with that description already exists, do nothing.

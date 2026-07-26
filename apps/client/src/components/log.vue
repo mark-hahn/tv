@@ -175,9 +175,7 @@
         <span v-if="selectedCount">Sel: {{ selectedCount }}</span>
         <span
           v-if="warnRate !== null"
-          :style="
-            warnRate > 30 ? { fontSize: '15.9px', color: 'red' } : null
-          "
+          :style="warnRate > 30 ? { fontSize: '15.9px', color: 'red' } : null"
           >Warn: {{ warnRate }}</span
         >
         <span v-if="loading">loading…</span>
@@ -464,6 +462,10 @@ export default {
       channelsDebugHandle: null,
       warnRate: null,
       warnRateTimer: null,
+      globalMsgSearchMode: false,
+      globalMsgSearch: "",
+      messageFilterInput: null,
+      messageFilterHandlers: null,
     };
   },
   computed: {
@@ -515,6 +517,7 @@ export default {
     evtBus.off("unilog-pruned", this.onUnilogPruned);
     this.stopChannelsDebug();
     this.deactivate();
+    this.unwireMessageHeaderFilter();
     if (this.table) {
       this.table.destroy();
       this.table = null;
@@ -620,12 +623,24 @@ export default {
       const isBlank = (rowValue) =>
         rowValue == null || String(rowValue).trim() === "";
       const likeOrBlank = (headerValue, rowValue) => {
+        if (this.globalMsgSearchMode) return true;
         const hv = String(headerValue ?? "").trim();
         if (hv === "") return true;
         if (hv === "-") return isBlank(rowValue);
         return String(rowValue ?? "")
           .toLowerCase()
           .includes(hv.toLowerCase());
+      };
+      const messageFilter = (headerValue, rowValue) => {
+        const hv = String(headerValue ?? "").trim();
+        if (hv.startsWith("+")) return true;
+        return likeOrBlank(headerValue, rowValue);
+      };
+      const exactOrBlank = (headerValue, rowValue) => {
+        if (this.globalMsgSearchMode) return true;
+        if (headerValue === "" || headerValue == null) return true;
+        if (String(headerValue).trim() === "-") return isBlank(rowValue);
+        return String(rowValue) === String(headerValue).trim();
       };
       return [
         {
@@ -640,7 +655,7 @@ export default {
           field: "message",
           width: 400,
           headerFilter: "input",
-          headerFilterFunc: likeOrBlank,
+          headerFilterFunc: messageFilter,
         },
         {
           title: "Level",
@@ -663,6 +678,7 @@ export default {
             values: this.filterLevels,
             clearable: true,
           },
+          headerFilterFunc: exactOrBlank,
         },
         {
           title: "Proj",
@@ -675,6 +691,7 @@ export default {
             values: this.filterPids,
             clearable: true,
           },
+          headerFilterFunc: exactOrBlank,
         },
         {
           title: "Groups",
@@ -705,11 +722,7 @@ export default {
           width: 55,
           hozAlign: "right",
           headerFilter: "input",
-          headerFilterFunc: (headerValue, rowValue) => {
-            if (headerValue === "" || headerValue == null) return true;
-            if (String(headerValue).trim() === "-") return isBlank(rowValue);
-            return String(rowValue) === String(headerValue).trim();
-          },
+          headerFilterFunc: exactOrBlank,
         },
         {
           title: "Log Id",
@@ -717,11 +730,7 @@ export default {
           width: 55,
           hozAlign: "right",
           headerFilter: "input",
-          headerFilterFunc: (headerValue, rowValue) => {
-            if (headerValue === "" || headerValue == null) return true;
-            if (String(headerValue).trim() === "-") return isBlank(rowValue);
-            return String(rowValue) === String(headerValue).trim();
-          },
+          headerFilterFunc: exactOrBlank,
           formatter: (cell) => {
             cell.getElement().style.paddingRight = "20px";
             return String(cell.getValue() ?? "");
@@ -778,6 +787,8 @@ export default {
           headerEl.addEventListener("mousedown", this.onHeaderMouseDown, true);
           headerEl.addEventListener("click", this.onHeaderClick, true);
         }
+        this.wireMessageHeaderFilter();
+        this.applyGlobalSearchHeaderUi();
         // Inject live clock into the Time column header at the bottom.
         const tsCol = this.table.getColumn("ts");
         if (tsCol) {
@@ -846,7 +857,10 @@ export default {
         1618,
         `${gesture} click row ${row.getData().id}, anchor ${this.selAnchorId}, sel ${this.selIdsStr(this.selectedIds)}, hist idx ${this.selHistoryIdx} of sizes [${this.selHistory.map((a) => a.length).join(",")}]`,
       );
-      unilog(1633, `at click, row ${row.getData().id} ${this.selectedIds.has(row.getData().id) ? "IS" : "is NOT"} selected in state, ${this.paintedVsState()}`);
+      unilog(
+        1633,
+        `at click, row ${row.getData().id} ${this.selectedIds.has(row.getData().id) ? "IS" : "is NOT"} selected in state, ${this.paintedVsState()}`,
+      );
       if (e.shiftKey) this.selectRange(row);
       else if (e.ctrlKey) this.toggleRow(row);
       else this.selectOnly(row);
@@ -916,6 +930,138 @@ export default {
         e.preventDefault();
         e.stopPropagation();
       }
+    },
+    wireMessageHeaderFilter() {
+      this.unwireMessageHeaderFilter();
+      const input = this.messageHeaderFilterInput();
+      if (!input) return;
+      const onInput = () => {
+        this.onMessageHeaderInput().catch((err) => {
+          this.error = err?.message || String(err);
+        });
+      };
+      const onBlur = () => {
+        this.commitMessageHeaderFilter().catch((err) => {
+          this.error = err?.message || String(err);
+        });
+      };
+      const onKeyDown = (event) => {
+        if (event.key !== "Enter") return;
+        this.commitMessageHeaderFilter().catch((err) => {
+          this.error = err?.message || String(err);
+        });
+      };
+      input.addEventListener("input", onInput);
+      input.addEventListener("blur", onBlur);
+      input.addEventListener("keydown", onKeyDown);
+      this.messageFilterInput = input;
+      this.messageFilterHandlers = { onInput, onBlur, onKeyDown };
+    },
+    unwireMessageHeaderFilter() {
+      if (!this.messageFilterInput || !this.messageFilterHandlers) return;
+      const { onInput, onBlur, onKeyDown } = this.messageFilterHandlers;
+      this.messageFilterInput.removeEventListener("input", onInput);
+      this.messageFilterInput.removeEventListener("blur", onBlur);
+      this.messageFilterInput.removeEventListener("keydown", onKeyDown);
+      this.messageFilterInput = null;
+      this.messageFilterHandlers = null;
+    },
+    messageHeaderFilterInput() {
+      const col = this.table?.getColumn("message");
+      return col?.getElement()?.querySelector(".tabulator-header-filter input");
+    },
+    messageHeaderFilterText() {
+      return String(this.messageHeaderFilterInput()?.value ?? "");
+    },
+    async onMessageHeaderInput() {
+      const text = this.messageHeaderFilterText();
+      if (this.globalMsgSearchMode && !text.startsWith("+")) {
+        await this.exitGlobalMsgSearch();
+        return;
+      }
+      this.applyGlobalSearchHeaderUi();
+    },
+    async commitMessageHeaderFilter() {
+      const text = this.messageHeaderFilterText();
+      if (!text.startsWith("+")) {
+        if (this.globalMsgSearchMode) await this.exitGlobalMsgSearch();
+        return;
+      }
+      await this.enterGlobalMsgSearch(text.slice(1).trim());
+    },
+    clearNonMessageHeaderFilters() {
+      if (!this.table) return;
+      for (const col of this.table.getColumns()) {
+        const def = col.getDefinition();
+        if (def.headerFilter && col.getField() !== "message") {
+          this.table.setHeaderFilterValue(col, "");
+        }
+      }
+    },
+    applyGlobalSearchHeaderUi() {
+      if (!this.table) return;
+      for (const col of this.table.getColumns()) {
+        const field = col.getField();
+        const filter = col
+          .getElement()
+          ?.querySelector(".tabulator-header-filter");
+        if (!filter) continue;
+        for (const control of filter.querySelectorAll(
+          "input, select, textarea",
+        )) {
+          if (field === "message") {
+            control.disabled = false;
+            control.classList.toggle(
+              "globalMsgSearchInput",
+              this.globalMsgSearchMode,
+            );
+          } else {
+            control.disabled = this.globalMsgSearchMode;
+          }
+        }
+      }
+    },
+    eventQueryParams(extra = {}) {
+      const params = { ...extra };
+      if (this.globalMsgSearchMode) {
+        params.includeHidden = 1;
+        if (this.globalMsgSearch) params.msg = this.globalMsgSearch;
+      }
+      return params;
+    },
+    async clearLogRowsForReload() {
+      this.pendingRows = [];
+      this.oldestId = null;
+      this.newestId = null;
+      this.exhausted = false;
+      this.rowCount = 0;
+      this.displayedCount = 0;
+      this.selectedIds = new Set();
+      this.selAnchorId = null;
+      this.selectedCount = 0;
+      this.selectedSiteCount = 0;
+      if (this.table) await this.table.replaceData([]);
+    },
+    async enterGlobalMsgSearch(searchText) {
+      this.globalMsgSearchMode = true;
+      this.globalMsgSearch = searchText;
+      this.filterByGroups = false;
+      this.showGroupsPane = false;
+      await this.applyGroupFilter();
+      this.clearNonMessageHeaderFilters();
+      this.applyGlobalSearchHeaderUi();
+      if (this.table) this.table.refreshFilter();
+      await this.clearLogRowsForReload();
+      await this.loadLogs();
+    },
+    async exitGlobalMsgSearch() {
+      if (!this.globalMsgSearchMode) return;
+      this.globalMsgSearchMode = false;
+      this.globalMsgSearch = "";
+      this.applyGlobalSearchHeaderUi();
+      if (this.table) this.table.refreshFilter();
+      await this.clearLogRowsForReload();
+      await this.loadLogs();
     },
     reformatRows(ids) {
       if (!this.table) return;
@@ -1233,7 +1379,10 @@ export default {
       this.loadingOlder = true;
       try {
         const pageLimit = Math.min(PAGE, room);
-        const params = { limit: pageLimit, beforeId: this.oldestId };
+        const params = this.eventQueryParams({
+          limit: pageLimit,
+          beforeId: this.oldestId,
+        });
         const res = await srvr.getUnilogEvents(params);
         // server returns newest-first; display oldest-first (ascending).
         const older = (res?.events || []).slice().reverse();
@@ -1404,6 +1553,7 @@ export default {
       if (!this.active) this.prunedWhileClosed = true;
     },
     async loadMissed() {
+      if (this.globalMsgSearchMode) return;
       if (!this.table || this.newestId == null) return;
       try {
         const params = { limit: PAGE, afterId: this.newestId };
@@ -1428,6 +1578,7 @@ export default {
     },
     async onUnilogEvent(row) {
       if (!this.table || !row) return;
+      if (this.globalMsgSearchMode) return;
       // Always buffer incoming rows and batch-flush them to avoid blocking
       // JavaScript execution with individual DOM updates for every log event.
       this.pendingRows.push(row);
@@ -1439,6 +1590,10 @@ export default {
       // Don't flush while a header-filter dropdown is open (would close it).
       this.flushTimer = setTimeout(() => {
         this.flushTimer = null;
+        if (this.globalMsgSearchMode) {
+          this.pendingRows = [];
+          return;
+        }
         if (
           !document.querySelector(".tabulator-edit-list") &&
           this.pendingRows.length
@@ -1455,6 +1610,7 @@ export default {
     },
     async appendRows(rows) {
       if (!this.table || !rows.length) return;
+      if (this.globalMsgSearchMode) return;
       const stick = this.atBottom;
       const savedScrollTop = this.holder?.scrollTop ?? 0;
       this.appending = true;
@@ -1495,7 +1651,7 @@ export default {
       this.loading = true;
       this.error = "";
       try {
-        const params = { limit: PAGE };
+        const params = this.eventQueryParams({ limit: PAGE });
         const res = await srvr.getUnilogEvents(params);
         // server returns newest-first; display oldest-first (ascending).
         const events = (res?.events || []).slice().reverse();
@@ -1527,7 +1683,10 @@ export default {
           this.table.updateColumnDefinition("pid", {
             headerFilterParams: { values: this.filterPids, clearable: true },
           });
+          this.applyGlobalSearchHeaderUi();
           await this.table.replaceData(events);
+          this.rowCount = this.table.getDataCount();
+          this.displayedCount = this.table.getDataCount("active");
           this.updateOldestTs();
         }
         this.scrollToBottom(true);
@@ -1781,6 +1940,7 @@ export default {
     async applyGroupFilter() {
       if (!this.table) return;
       const on =
+        !this.globalMsgSearchMode &&
         this.showGroupsPane &&
         this.filterByGroups &&
         this.selectedGroupIds.length > 0;
@@ -1849,6 +2009,15 @@ export default {
   height: 64%;
   padding: 0 3px;
   box-sizing: border-box;
+}
+.logTable :deep(.tabulator-header-filter .globalMsgSearchInput) {
+  background-color: #ffdede;
+}
+.logTable :deep(.tabulator-header-filter input:disabled),
+.logTable :deep(.tabulator-header-filter select:disabled),
+.logTable :deep(.tabulator-header-filter textarea:disabled) {
+  opacity: 0.55;
+  cursor: default;
 }
 .groupsPane {
   display: flex;

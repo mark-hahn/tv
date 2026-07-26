@@ -131,6 +131,8 @@ in the map pane call the first child of the maphdr2 div the "map pane info bar"
 
 You must NOT hand-write `unilog(id, ...)` calls and never pick/assign log ids.
 
+- to find a unilog site in the workspace search for `unilog(<site id>,`
+
 To add a log, drop a `logHere(...)` placeholder.
 
 **Drop a `logHere(...)` placeholder.** It is a

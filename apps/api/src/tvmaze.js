@@ -64,6 +64,72 @@ function sanitizeForTvdbMatch(name) {
     .replace(/[^a-z0-9]/g, "");
 }
 
+/**
+ * Returns the TVDB overview text for a show, or "" when TVDB has no record
+ * or no overview. This is the same text the browse pane displays, so it is
+ * what the description-language filter has to test.
+ *
+ * The result is cached in the shows table so repeated browse scans do not
+ * re-hit TVDB. A NULL column means "never looked up"; an empty string means
+ * "looked up, TVDB had no overview" and is not retried.
+ */
+export async function getTvdbOverview(tvmazeId, tvdbId, name) {
+  if (!_db) openDb();
+  if (tvmazeId) {
+    const row = _db
+      .prepare("SELECT tvdb_overview FROM shows WHERE tvmaze_id = ?")
+      .get(tvmazeId);
+    if (row?.tvdb_overview != null) return row.tvdb_overview;
+  }
+  const overview = await fetchTvdbOverview(tvdbId, name);
+  // null means the lookup itself failed — leave the column NULL so it is
+  // retried, rather than caching "no overview" and never testing again.
+  if (overview === null) return "";
+  if (tvmazeId) {
+    _db
+      .prepare("UPDATE shows SET tvdb_overview = ? WHERE tvmaze_id = ?")
+      .run(overview, tvmazeId);
+  }
+  return overview;
+}
+
+/**
+ * Returns the overview text, "" when TVDB answered but has no overview for
+ * the show, or null when the lookup failed and should be retried later.
+ */
+async function fetchTvdbOverview(tvdbId, name) {
+  try {
+    const token = await getTvdbToken();
+    const headers = { Authorization: `Bearer ${token}` };
+    if (tvdbId) {
+      const res = await fetch(
+        `https://api4.thetvdb.com/v4/series/${encodeURIComponent(tvdbId)}`,
+        { headers },
+      );
+      if (!res.ok) return res.status === 404 ? "" : null;
+      const json = await res.json();
+      return String(json?.data?.overview || "");
+    }
+    if (!name) return "";
+    const res = await fetch(
+      `https://api4.thetvdb.com/v4/search?query=${encodeURIComponent(name)}&type=series&limit=5`,
+      { headers },
+    );
+    if (!res.ok) return null;
+    const json = await res.json();
+    const results = json?.data;
+    if (!results?.length) return "";
+    const sanName = sanitizeForTvdbMatch(name);
+    const match =
+      results.find((r) => sanitizeForTvdbMatch(r.name) === sanName) ||
+      results[0];
+    return String(match?.overview || "");
+  } catch (e) {
+    unilog(1803, `tvdb overview lookup failed for ${name}: ${e.message}`);
+    return null;
+  }
+}
+
 async function fillPremieredFromTvdb(db, tvmazeId, name) {
   try {
     const token = await getTvdbToken();
@@ -509,6 +575,9 @@ function openDb() {
     }
     if (!names.includes("browsed")) {
       db.exec("ALTER TABLE shows ADD COLUMN browsed INTEGER DEFAULT 0");
+    }
+    if (!names.includes("tvdb_overview")) {
+      db.exec("ALTER TABLE shows ADD COLUMN tvdb_overview TEXT");
     }
   } catch {
     // ignore migration failures

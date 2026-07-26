@@ -2,7 +2,11 @@ import fs from "fs";
 import path from "node:path";
 import { franc } from "franc-min";
 import { getApiDataDir } from "./tvPaths.js";
-import { getCandidateShows, markShowBrowsed } from "./tvmaze.js";
+import {
+  getCandidateShows,
+  getTvdbOverview,
+  markShowBrowsed,
+} from "./tvmaze.js";
 import { smartTitleMatch, unilog } from "@tv/share";
 
 // --- Constants & Config ---
@@ -36,6 +40,7 @@ const IGNORED_COUNTRIES = new Set(
     "France",
     "French Polynesia",
     "Georgia",
+    "Germany",
     "Greece",
     "Hong Kong",
     "Hungary",
@@ -256,14 +261,37 @@ function getShowRejectionReason(show, title) {
   const rejectedGenre = lowerGenres.find((g) => avoidGenres.includes(g));
   if (rejectedGenre) return rejectedGenre;
 
-  const summary = (show.summary || "").replace(/<[^>]*>/g, " ").trim();
-  if (summary.length > 50) {
-    const detected = franc(summary);
-    if (detected !== "eng" && detected !== "und" && detected !== "sco")
-      return "desc-language";
-  }
+  if (isNonEnglishText(show.summary)) return "desc-language";
 
   return null;
+}
+
+/**
+ * True when the text is long enough to identify and is not English.
+ * "und" is franc's undetermined result and "sco" (Scots) is close enough
+ * to English to keep.
+ */
+function isNonEnglishText(text) {
+  const cleaned = String(text || "")
+    .replace(/<[^>]*>/g, " ")
+    .trim();
+  if (cleaned.length <= 50) return false;
+  const detected = franc(cleaned);
+  return detected !== "eng" && detected !== "und" && detected !== "sco";
+}
+
+/**
+ * Async half of the filtering: the browse pane displays the TVDB overview,
+ * not the tvmaze summary, and many tvmaze records carry no summary at all,
+ * so the description-language test has to run on the TVDB text as well.
+ */
+async function getTvdbDescRejection(show) {
+  const overview = await getTvdbOverview(
+    show.tvmaze_id,
+    show.externals?.thetvdb,
+    show.name,
+  );
+  return isNonEnglishText(overview) ? "desc-language" : null;
 }
 
 // --- Exports ---
@@ -282,7 +310,8 @@ export async function getBrowseShow() {
     const title = buildShowTitle(show);
     const tvmazeId = show.tvmaze_id;
 
-    const rejection = getShowRejectionReason(show, title);
+    let rejection = getShowRejectionReason(show, title);
+    if (rejection === null) rejection = await getTvdbDescRejection(show);
     if (rejection !== null) {
       markShowBrowsed(tvmazeId);
       // Only add a rejected card for genre rejections (except reality which is silent)

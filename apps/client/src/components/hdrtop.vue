@@ -131,6 +131,23 @@
         Custom
       </button>
       <button
+        v-if="simpleMode"
+        @click="$emit('tv-click')"
+        :disabled="tvDisabled"
+        :style="{
+          height: '24px',
+          width: '60px',
+          backgroundColor: 'white',
+          fontSize: '13px',
+          cursor: tvDisabled ? 'default' : 'pointer',
+          borderRadius: '7px',
+          margin: '0 0 0 10px',
+          opacity: tvDisabled ? 0.4 : 1,
+        }"
+      >
+        TV
+      </button>
+      <button
         @click="$emit('actors-click')"
         :style="{
           height: '24px',
@@ -180,6 +197,10 @@ export default {
       type: Boolean,
       default: false,
     },
+    tvDisabled: {
+      type: Boolean,
+      default: true,
+    },
   },
 
   emits: [
@@ -194,6 +215,7 @@ export default {
     "all-click",
     "custom-click",
     "actors-click",
+    "tv-click",
   ],
 
   methods: {

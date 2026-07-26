@@ -133,7 +133,9 @@
               @custom-click="customClick"
               :hasSharedFilters="hasSharedFilters"
               :actorsListMode="actorsListMode"
+              :tvDisabled="tvDisabled"
               @actors-click="startActorsListMode"
+              @tv-click="handleTvClick"
             ></HdrTop>
             <HdrBot
               v-if="!simpleMode"
@@ -226,7 +228,9 @@
             @custom-click="customClick"
             :hasSharedFilters="hasSharedFilters"
             :actorsListMode="actorsListMode"
+            :tvDisabled="tvDisabled"
             @actors-click="startActorsListMode"
+            @tv-click="handleTvClick"
           ></HdrTop>
           <HdrBot
             v-if="!simpleMode"
@@ -308,6 +312,7 @@ import * as srvr from "../srvr.js";
 import * as util from "../util.js";
 import * as epd from "@tv/share";
 import { unilog, logHere } from "../log.js";
+import { config } from "../config.js";
 
 import parseTorrentTitle from "parse-torrent-title";
 import evtBus from "../evtBus.js";
@@ -823,6 +828,19 @@ export default {
   computed: {
     displayHighlightName() {
       return this.highlightName;
+    },
+
+    highlightShow() {
+      // Read both reactive deps unconditionally — allShows is a plain module
+      // array, so without them this computed tracks nothing and caches forever.
+      const name = this.highlightName;
+      const count = this.allShowsLength;
+      if (!name || !count) return null;
+      return allShows.find((s) => s.name === name) || null;
+    },
+
+    tvDisabled() {
+      return !this.highlightShow || this.highlightShow.inEmby === false;
     },
 
     activeDownloadShowNames() {
@@ -1887,6 +1905,14 @@ export default {
       this.sortPopped = false;
       this.fltrPopped = false;
     },
+    async handleTvClick() {
+      const show = this.highlightShow;
+      if (!show || show.inEmby === false) return;
+      fetch(
+        `${config.tvTvUrl}/tv/viewshow?showId=${encodeURIComponent(show.id)}&showName=${encodeURIComponent(show.name)}`,
+      ).catch(() => {});
+    },
+
     onSelectShow(show, scroll = false) {
       const wasPreview = !!this.previewMode;
       const wasAlreadySelected = show?.name === this.highlightName;

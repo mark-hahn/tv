@@ -396,6 +396,7 @@ export default {
       showFilter: null,
       qbtBadGrpBusy: false,
       _knownHashes: new Set(),
+      _lastSeedsByHash: {},
       selectedItems: new Set(), // Multi-select for new button group
       lastSelectedIndex: null,
       flashingHash: null,
@@ -679,6 +680,30 @@ export default {
         }
       }
       this._knownHashes = curHashes;
+
+      // Remember the active/total seed counts last seen while a torrent was
+      // downloading, so finished cards can keep showing that peak instead of
+      // qBittorrent's post-completion live num_seeds (which is often just 1).
+      for (const t of torrents) {
+        const h = hashOf(t);
+        if (!h) continue;
+        const st = String(t?.state || "").trim();
+        if (st === "downloading") {
+          this._lastSeedsByHash[h] = {
+            seeds: Number(t?.num_seeds) || 0,
+            total: Number(t?.num_complete) || 0,
+          };
+        }
+        const last = this._lastSeedsByHash[h];
+        if (last) {
+          t.last_seeds = last.seeds;
+          t.last_total_seeds = last.total;
+        }
+      }
+      for (const h of Object.keys(this._lastSeedsByHash)) {
+        if (!curHashes.has(h)) delete this._lastSeedsByHash[h];
+      }
+
       const downloadingTitles = torrents
         .filter((t) => {
           const st = String(t?.state || "")
@@ -1242,12 +1267,9 @@ export default {
         ? Number(t?.num_seeds)
         : 0;
       const lastSeeds = Number(t?.last_seeds);
-      const seeds =
-        curSeeds > 0
-          ? curSeeds
-          : Number.isFinite(lastSeeds)
-            ? lastSeeds
-            : curSeeds;
+      const seeds = Number.isFinite(lastSeeds)
+        ? Math.max(lastSeeds, curSeeds)
+        : curSeeds;
       const curTotal = Number.isFinite(Number(t?.num_complete))
         ? Number(t?.num_complete)
         : 0;

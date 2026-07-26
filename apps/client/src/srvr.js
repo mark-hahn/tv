@@ -94,7 +94,7 @@ const loopLagSuffix = () => {
 // browser supports "event" (Baseline 2025, Firefox included since v114), so
 // this runs everywhere; a browser too old to have it simply gets no perf
 // logging, which beats the interaction-less noise a fallback probe would add.
-const RESPONSE_REPORT_MS = 300;
+const RESPONSE_REPORT_MS = 1000;
 // The browser fires an "event" entry for every event type above the duration
 // threshold, not just discrete input — hover/move types (mouseenter, mouseover,
 // pointerout, etc.) qualify too, and one hover motion can dispatch a separate

@@ -106,7 +106,13 @@ export async function getTmdb(params) {
       aired: episodeInfo.air_date ?? null,
     };
   } catch (error) {
-    unilog(711, "getTmdb error:", error);
+    if (error.status === 404) {
+      const s = String(season).padStart(2, "0");
+      const e = String(episode).padStart(2, "0");
+      logHere({ lvl: "error" }, `tmdb 404, episode not found: ${showName} S${s}E${e}`);
+    } else {
+      logHere({ lvl: "error" }, `getTmdb error: ${error.message}`);
+    }
     throw new Error(`getTmdb error: ${error.message}`);
   }
 }

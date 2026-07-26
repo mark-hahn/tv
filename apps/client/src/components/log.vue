@@ -1048,7 +1048,7 @@ export default {
       this.flashTimer = setTimeout(() => {
         this.flashMsg = "";
         this.flashTimer = null;
-      }, 625);
+      }, 2000);
     },
     async onAction() {
       const act = this.actionSel;

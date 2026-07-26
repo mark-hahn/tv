@@ -2389,29 +2389,20 @@ export default function App() {
       setShowShows(false);
     };
 
-    const handleTvClick = async () => {
+    const handleTvClick = () => {
       if (!show) return;
-      try {
-        let episodeId = null;
-        if (selectedSE && showSeriesMap) {
-          const sm = buildSeriesMap(showSeriesMap);
-          const episodeData = sm?.[selectedSE.s]?.[selectedSE.e];
-          episodeId = episodeData?.id || null;
-        }
-        const res = await fetch(`${TV_SRVR_HTTP_URL}/api/embyViewShow`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            showId: show.id,
-            showName: show.name,
-            episodeId: episodeId,
-          }),
-        });
-        const data = await res.json();
-        if (!data?.found) alert("Living Room TV is not active in Emby.");
-      } catch (_) {
-        alert("TV request failed.");
+      let episodeId = null;
+      if (selectedSE && showSeriesMap) {
+        const sm = buildSeriesMap(showSeriesMap);
+        const episodeData = sm?.[selectedSE.s]?.[selectedSE.e];
+        episodeId = episodeData?.id || null;
       }
+      const params = new URLSearchParams({
+        showId: show.id,
+        showName: show.name,
+      });
+      if (episodeId) params.set("episodeId", episodeId);
+      fetch(`${TV_TV_URL}/tv/viewshow?${params.toString()}`).catch(() => {});
       handleClose();
     };
 

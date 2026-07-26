@@ -116,8 +116,8 @@ const SRVR_INTERNAL_URL = "http://127.0.0.1:8739";
 
 const GOOGLE_HOME_DELAY_MS = 0; // ms after TV turns on before sending Home key
 const GOOGLE_EMBY_DELAY_MS = 250; // ms after TV turns on before launching Emby
-const VIEW_SHOW_DELAY_MS = 10000; // ms after Emby app launch before firing embyViewShow (fallback)
-const PENDING_VIEW_SHOW_MAX_AGE_MS = 120000; // ms before an unsent pending viewshow is dropped
+const VIEW_SHOW_DELAY_MS = 1000; // ms after Emby app launch before firing embyViewShow (fallback)
+const PENDING_VIEW_SHOW_MAX_AGE_MS = 10000; // ms before an unsent pending viewshow is dropped
 const EMBY_LAUNCH_DELAY_MS = 1500; // ms after launching Emby before sending it the show
 const VIEW_SHOW_RESEND_MS = 2000; // ms between show resends while Emby boots
 const FIRE_HOME_DELAY_MS = 0; // ms after Fire TV turns on before sending home key
@@ -676,13 +676,13 @@ async function firePendingViewShow(label) {
 let viewShowSeq = 0; // invalidates older button presses still resending
 
 app.get("/tv/viewshow", async (req, res) => {
-  const { showId, showName } = req.query;
+  const { showId, showName, episodeId } = req.query;
   const seq = ++viewShowSeq;
   unilog(
     401,
     `viewshow from ${client(req)} showId=${showId} showName=${showName} braviaHaPower=${braviaHaPower}`,
   );
-  pendingViewShow = { showId, showName, at: Date.now() };
+  pendingViewShow = { showId, showName, episodeId, at: Date.now() };
   callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
   res.json({ ok: true });
 
@@ -721,7 +721,7 @@ app.get("/tv/viewshow", async (req, res) => {
   while (Date.now() < deadline) {
     await sleep(VIEW_SHOW_RESEND_MS);
     if (seq !== viewShowSeq) return; // a newer press owns the tv now
-    pendingViewShow = { showId, showName, at: Date.now() };
+    pendingViewShow = { showId, showName, episodeId, at: Date.now() };
     await firePendingViewShow("viewshow(booting)");
   }
 });

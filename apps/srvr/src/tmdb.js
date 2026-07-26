@@ -109,9 +109,9 @@ export async function getTmdb(params) {
     if (error.status === 404) {
       const s = String(season).padStart(2, "0");
       const e = String(episode).padStart(2, "0");
-      logHere({ lvl: "error" }, `tmdb 404, episode not found: ${showName} S${s}E${e}`);
+      unilog(1795, `tmdb 404, episode not found: ${showName} S${s}E${e}`);
     } else {
-      logHere({ lvl: "error" }, `getTmdb error: ${error.message}`);
+      unilog(1796, `getTmdb error: ${error.message}`);
     }
     throw new Error(`getTmdb error: ${error.message}`);
   }

@@ -1109,10 +1109,11 @@ export function getCandidateShows(limit = 100) {
   const rows = _db
     .prepare(
       `
-    SELECT tvmaze_id, data_json 
-    FROM shows 
+    SELECT tvmaze_id, data_json
+    FROM shows
     WHERE (browsed IS NULL OR browsed = 0)
-    ORDER BY premiered DESC 
+      AND (status IS NULL OR status != 'In Development')
+    ORDER BY premiered DESC
     LIMIT ?
   `,
     )

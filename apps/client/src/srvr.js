@@ -1056,25 +1056,6 @@ export async function getFile(path) {
 }
 
 // Reviews
-export async function getReviews(url, buttonName) {
-  // Use http fetch to call the backend api, not fCall (websocket)
-  // Construct the query parameters
-  const params = new URLSearchParams({
-    url: url || "",
-    btn: buttonName || "",
-  });
-
-  const response = await fetch(
-    `${config.torrentsApiUrl}/api/reviews/getReviews?` + params.toString(),
-  );
-  if (!response.ok) {
-    throw new Error(
-      `getReviews failed: ${response.status} ${response.statusText}`,
-    );
-  }
-  return await response.json();
-}
-
 export async function getImdbReviews(imdbId) {
   const params = new URLSearchParams({
     imdbId: imdbId || "",

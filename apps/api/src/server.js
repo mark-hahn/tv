@@ -2568,64 +2568,6 @@ app.post("/api/getActorCredits", async (req, res) => {
   }
 });
 
-app.get("/api/reviews/getReviews", async (req, res) => {
-  const rottenUrl = req.query.url;
-  const buttonName = req.query.btn;
-  const args = { rottenUrl, buttonName };
-  try {
-    appendReviewCallsLog({
-      endpoint: "/api/reviews/getReviews",
-      method: "GET",
-      event: "START",
-      args,
-    });
-    const result = await reviews.getReviews(rottenUrl, buttonName);
-    appendCallsLog({
-      endpoint: "/api/reviews/getReviews",
-      method: "GET",
-      ok: true,
-      result,
-    });
-    appendReviewCallsLog({
-      endpoint: "/api/reviews/getReviews",
-      method: "GET",
-      event: "END",
-      ok: true,
-      args,
-      result,
-    });
-    res.json(result);
-  } catch (error) {
-    unilog(267, "getReviews error:", error);
-    appendCallsLog({
-      endpoint: "/api/reviews/getReviews",
-      method: "GET",
-      ok: false,
-      result: null,
-      error,
-    });
-    appendReviewCallsLog({
-      endpoint: "/api/reviews/getReviews",
-      method: "GET",
-      event: "END",
-      ok: false,
-      args,
-      result: null,
-      error,
-    });
-    // Treat scraper errors as non-fatal so the client can keep working.
-    res.json({
-      ok: false,
-      error: error?.message || String(error),
-      numChecked: 0,
-      notEnglishCount: 0,
-      noReviewCount: 0,
-      smallTextCount: 0,
-      reviews: [],
-    });
-  }
-});
-
 app.get("/api/reviews/getImdbReviews", async (req, res) => {
   const imdbId = req.query.imdbId;
   const args = { imdbId };

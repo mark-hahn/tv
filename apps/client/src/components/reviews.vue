@@ -87,7 +87,7 @@
             &lt;Loading&gt;
           </div>
           <div
-            v-if="(imdbStats || rottenStats) &amp;&amp; !simpleMode"
+            v-if="imdbStats &amp;&amp; !simpleMode"
             style="
               font-size: 13px;
               color: #555;
@@ -97,12 +97,7 @@
               white-space: nowrap;
             "
           >
-            <span v-if="imdbStats"
-              >Imdb {{ imdbStats.accepted }}/{{ imdbStats.checked }}</span
-            >
-            <span v-if="rottenStats"
-              >Rotten {{ rottenStats.accepted }}/{{ rottenStats.checked }}</span
-            >
+            <span>Imdb {{ imdbStats.accepted }}/{{ imdbStats.checked }}</span>
           </div>
         </div>
       </div>
@@ -196,7 +191,7 @@
       "
     >
       <div
-        v-if="checkedRemotes && !rottenUrl && !imdbId"
+        v-if="checkedRemotes && !imdbId"
         style="
           width: 100%;
           text-align: center;
@@ -205,7 +200,7 @@
           font-size: 16px;
         "
       >
-        Show not found at Rotten Tomatoes or IMDB.
+        Show not found at IMDB.
       </div>
       <div
         v-else-if="!isLoading &amp;&amp; stats &amp;&amp; reviews.length === 0"
@@ -366,10 +361,7 @@ export default {
       reviews: [],
       stats: null,
       imdbStats: null,
-      rottenStats: null,
       showName: "",
-      rottenUrl: "",
-      rottenLabel: "",
       imdbId: "",
       imdbUrl: "",
       previewMode: false,
@@ -459,7 +451,7 @@ export default {
     // Listen for show changes
     evtBus.on("setUpSeries", this.onSetUpSeries);
 
-    // Listen for TVDB details to get existing Remotes (including Rotten button URL)
+    // Listen for TVDB details to get existing Remotes (including IMDB URL)
     evtBus.on("tvdbDataReady", this.onTvdbDataReady);
 
     evtBus.on("previewMode", this.onPreviewMode);
@@ -491,14 +483,11 @@ export default {
       this.showName = show?.name || "";
       this.reviews = [];
       this.stats = null;
-      this.rottenUrl = "";
-      this.rottenLabel = "";
       this.imdbId = "";
       this.imdbUrl = "";
       this.checkedRemotes = false;
       this.pendingLoad = false;
       this.imdbStats = null;
-      this.rottenStats = null;
       this.errorMessage = "";
       this.scrollReviewPanesToTop();
     },
@@ -510,14 +499,6 @@ export default {
       if (tvdbData) {
         // First try the runtime-built remotes array (populated when show is freshly fetched)
         if (tvdbData.remotes && tvdbData.remotes.length > 0) {
-          const rottenRemote = tvdbData.remotes.find(
-            (r) => r.name && r.name.toLowerCase().includes("rotten"),
-          );
-          if (rottenRemote) {
-            this.rottenLabel = rottenRemote.name;
-            this.rottenUrl = rottenRemote.url;
-          }
-
           const imdbRemote = tvdbData.remotes.find(
             (r) =>
               r.name &&
@@ -535,10 +516,6 @@ export default {
         }
 
         // Fall back to persisted flat url props when remotes array is empty
-        if (!this.rottenUrl && tvdbData.rottenUrl) {
-          this.rottenUrl = tvdbData.rottenUrl;
-          this.rottenLabel = "Rotten Tomatoes";
-        }
         if (!this.imdbUrl && tvdbData.imdbUrl) {
           this.imdbUrl = tvdbData.imdbUrl;
           const match = tvdbData.imdbUrl.match(/\/title\/(tt\d+)/);
@@ -551,7 +528,7 @@ export default {
         }
 
         // Defer load until the reviews pane is actually visible
-        if (this.imdbId || this.rottenUrl) {
+        if (this.imdbId) {
           this.pendingLoad = true;
         }
       }
@@ -611,52 +588,30 @@ export default {
       this.reviews = [];
       this.stats = null;
       this.imdbStats = null;
-      this.rottenStats = null;
       this.errorMessage = "";
       this.isLoading = true;
       try {
-        const [imdbResult, rottenResult] = await Promise.allSettled([
-          this.imdbId
-            ? srvr.getImdbReviews(this.imdbId)
-            : Promise.resolve(null),
-          this.rottenUrl
-            ? srvr.getReviews(this.rottenUrl, "Audience")
-            : Promise.resolve(null),
-        ]);
-
         const errors = [];
         const allReviews = [];
 
-        if (imdbResult.status === "fulfilled" && imdbResult.value) {
-          const data = imdbResult.value;
-          this.imdbStats = {
-            accepted: (data.reviews || []).length,
-            checked: data.numChecked || 0,
-          };
-          for (const r of data.reviews || []) {
-            allReviews.push({ ...r, author: r.author + " (i)" });
+        if (this.imdbId) {
+          try {
+            const data = await srvr.getImdbReviews(this.imdbId);
+            // The server answers 200 with ok:false when the fetch failed, so
+            // show that instead of a silent empty result.
+            if (data.ok === false && data.error) {
+              errors.push("IMDB: " + data.error);
+            }
+            this.imdbStats = {
+              accepted: (data.reviews || []).length,
+              checked: data.numChecked || 0,
+            };
+            for (const r of data.reviews || []) {
+              allReviews.push({ ...r, author: r.author + " (i)" });
+            }
+          } catch (e) {
+            errors.push("IMDB: " + (e?.message || "failed"));
           }
-        } else if (imdbResult.status === "rejected" && this.imdbId) {
-          errors.push("IMDB: " + (imdbResult.reason?.message || "failed"));
-        }
-
-        if (rottenResult.status === "fulfilled" && rottenResult.value) {
-          const data = rottenResult.value;
-          // The server answers 200 with ok:false when the scrape failed or was
-          // blocked, so show that instead of a silent empty result.
-          if (data.ok === false && data.error) {
-            errors.push("Rotten: " + data.error);
-          }
-          this.rottenStats = {
-            accepted: (data.reviews || []).length,
-            checked: data.numChecked || 0,
-          };
-          for (const r of data.reviews || []) {
-            const seasonTag = r.season ? ` (S${r.season})` : "";
-            allReviews.push({ ...r, author: r.author + " (r)" + seasonTag });
-          }
-        } else if (rottenResult.status === "rejected" && this.rottenUrl) {
-          errors.push("Rotten: " + (rottenResult.reason?.message || "failed"));
         }
 
         this.errorMessage = errors.join("\n");

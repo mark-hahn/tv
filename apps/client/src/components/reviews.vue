@@ -642,12 +642,18 @@ export default {
 
         if (rottenResult.status === "fulfilled" && rottenResult.value) {
           const data = rottenResult.value;
+          // The server answers 200 with ok:false when the scrape failed or was
+          // blocked, so show that instead of a silent empty result.
+          if (data.ok === false && data.error) {
+            errors.push("Rotten: " + data.error);
+          }
           this.rottenStats = {
             accepted: (data.reviews || []).length,
             checked: data.numChecked || 0,
           };
           for (const r of data.reviews || []) {
-            allReviews.push({ ...r, author: r.author + " (r)" });
+            const seasonTag = r.season ? ` (S${r.season})` : "";
+            allReviews.push({ ...r, author: r.author + " (r)" + seasonTag });
           }
         } else if (rottenResult.status === "rejected" && this.rottenUrl) {
           errors.push("Rotten: " + (rottenResult.reason?.message || "failed"));

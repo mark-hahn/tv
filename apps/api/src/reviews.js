@@ -1,7 +1,7 @@
 /* global document */
 import { chromium } from "playwright";
 import { franc } from "franc-min";
-import { unilog } from "@tv/share";
+import { logHere, unilog } from "@tv/share";
 
 // Singleton browser (contexts/pages are per-request to avoid concurrent navigation issues).
 let browser = null;
@@ -21,6 +21,31 @@ function capCache(map) {
 
 const DEFAULT_UA =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+// Review content lives on these light-DOM host elements as named-slot children.
+// The .card-wrap markup once used for extraction is now only an empty
+// shadow-root template on these hosts and carries no review data.
+const CARD_SELECTOR = "review-card-audience, review-card-critic, review-card";
+
+// A season page can take a few seconds to render its cards.
+const CARD_WAIT_MS = 5000;
+
+// The page loads its reviews from this JSON API. It answers 401 when Rotten
+// Tomatoes is refusing us, which is how a block is told apart from a season
+// that genuinely has no reviews (both render zero cards).
+const REVIEWS_API_RE = /\/napi\/.*reviews/i;
+
+// After a block, stop scraping entirely for this long so things can cool down.
+const BLOCK_COOLDOWN_MS = 10 * 60 * 1000;
+let blockedUntilMs = 0;
+
+// Counters for working out how much scraping it takes to trip a block, and
+// whether the past-the-last-season 404 probes are implicated. They ride along
+// in the thrown message so every block is analysable from the logs.
+let seasonLoadsSinceBlock = 0;
+let notFoundLoadsSinceBlock = 0;
+let lastBlockMs = 0;
+let blockCount = 0;
 
 async function getBrowser() {
   try {
@@ -48,7 +73,7 @@ async function getBrowser() {
 // and click "Load More" until the season yields >= 50 reviews or no more load.
 // Returns that season's stats { numChecked, notEnglishCount, noReviewCount,
 // smallTextCount, reviews }.
-async function scrapeSeasonReviews(page) {
+async function scrapeSeasonReviews(page, season) {
   let seasonStats = {
     numChecked: 0,
     notEnglishCount: 0,
@@ -59,93 +84,49 @@ async function scrapeSeasonReviews(page) {
 
   const MAX_CLICKS = 100; // Cap loop to prevent infinite loops, logical stop is reviews >= 50
 
+  const cardsLocator = page.locator(CARD_SELECTOR);
+
   for (let i = 0; i < MAX_CLICKS; i++) {
     // 1. Extract Reviews
-    const rawReviews = await page.evaluate(() => {
-      const oldCards = Array.from(
-        document.querySelectorAll(".reviews-cards .card-wrap"),
-      );
-      const newCards = Array.from(document.querySelectorAll("review-card"));
-      const cards = [...oldCards, ...newCards];
+    const rawReviews = await cardsLocator.evaluateAll((cards) => {
       const results = [];
 
       cards.forEach((card) => {
-        let author = "";
-        let publication = "";
+        const nameEl = card.querySelector('[slot="name"]');
+        const author = nameEl ? nameEl.innerText.trim() : "";
+
+        const pubEl = card.querySelector('[slot="publication"]');
+        const publication = pubEl ? pubEl.innerText.trim() : "";
+
+        // Text: audience reviews nest the actual text in a [slot="content"]
+        // span inside a <drawer-more>; critic reviews put it directly on the
+        // [slot="review"] element.
         let text = "";
+        const reviewSlot = card.querySelector('[slot="review"]');
+        if (reviewSlot) {
+          const contentEl = reviewSlot.querySelector('[slot="content"]');
+          text = (contentEl || reviewSlot).innerText.trim();
+        }
+
+        // NumStars: audience reviews carry a numeric `score` attribute
+        // directly on the [slot="rating"] element; critic reviews now mostly
+        // show a fresh/rotten sentiment icon with no numeric score, but keep
+        // the old "n/d" text fallback in case one is still rendered.
         let numStars = -1;
-        let urlStr = undefined;
-
-        if (card.tagName.toLowerCase() === "review-card") {
-          // --- NEW STRUCTURE ---
-
-          // Author
-          const nameEl = card.querySelector('[slot="name"]');
-          author = nameEl ? nameEl.innerText.trim() : "";
-
-          // Publication
-          const pubEl = card.querySelector('[slot="publication"]');
-          publication = pubEl ? pubEl.innerText.trim() : "";
-
-          // Text
-          const textEl = card.querySelector('[slot="content"]');
-          text = textEl ? textEl.innerText.trim() : "";
-
-          // NumStars
-          const ratingSlot = card.querySelector('[slot="rating"]');
-          if (ratingSlot) {
-            // Check for 'score' attribute (common in audience reviews)
-            if (ratingSlot.hasAttribute("score")) {
-              const val = parseFloat(ratingSlot.getAttribute("score"));
-              if (!isNaN(val)) numStars = val;
-            }
-
-            // Fallback: Try to find text that looks like a score (common in critic reviews)
-            if (numStars === -1) {
-              const fullRatingText = ratingSlot.innerText.trim();
-              if (fullRatingText) {
-                const parts = fullRatingText.split("/");
-                if (parts.length === 2) {
-                  const n = parseFloat(parts[0]);
-                  const d = parseFloat(parts[1]);
-                  if (!isNaN(n) && !isNaN(d) && d !== 0) {
-                    numStars = Math.round((n / d) * 10) / 2;
-                  }
-                }
-              }
-            }
-          }
-
-          // URL
-          const linkEl = card.querySelector('[slot="reviewLink"]');
-          if (linkEl) urlStr = linkEl.href;
-        } else {
-          // --- OLD STRUCTURE ---
-          // Author
-          const authorEl = card.querySelector(".name-wrap");
-          author = authorEl ? authorEl.innerText.trim() : "";
-
-          // Publication
-          const pubEl = card.querySelector(".publication-wrap");
-          publication = pubEl ? pubEl.innerText.trim() : "";
-
-          // Text
-          const spanSlot = card.querySelector("span[slot]");
-          text = spanSlot ? spanSlot.innerText.trim() : "";
-
-          // NumStars
-          const starGroup = card.querySelector("rating-stars-group");
-          if (starGroup && starGroup.hasAttribute("score")) {
-            const val = parseFloat(starGroup.getAttribute("score"));
+        const ratingEl = card.querySelector('[slot="rating"]');
+        if (ratingEl) {
+          const scoreEl = ratingEl.hasAttribute("score")
+            ? ratingEl
+            : ratingEl.querySelector("[score]");
+          if (scoreEl) {
+            const val = parseFloat(scoreEl.getAttribute("score"));
             if (!isNaN(val)) numStars = val;
           }
 
           if (numStars === -1) {
-            const spans = Array.from(card.querySelectorAll("span"));
-            const ratingSpan = spans.find((s) => s.style.marginTop === "1.4px");
-            if (ratingSpan) {
-              const content = ratingSpan.innerText.trim();
-              const parts = content.split("/");
+            const fullRatingText = ratingEl.innerText.trim();
+            if (fullRatingText) {
+              const parts = fullRatingText.split("/");
               if (parts.length === 2) {
                 const n = parseFloat(parts[0]);
                 const d = parseFloat(parts[1]);
@@ -155,14 +136,13 @@ async function scrapeSeasonReviews(page) {
               }
             }
           }
-
-          // URL
-          const anchors = Array.from(card.querySelectorAll("a"));
-          const fullLink = anchors.find((a) =>
-            a.innerText.includes("Go to Full Review"),
-          );
-          if (fullLink) urlStr = fullLink.href;
         }
+
+        // URL: critic reviews link out via [slot="review-link"]; audience
+        // reviews have no external link.
+        let urlStr;
+        const linkEl = card.querySelector('[slot="review-link"]');
+        if (linkEl) urlStr = linkEl.getAttribute("href") || undefined;
 
         results.push({
           author,
@@ -209,6 +189,7 @@ async function scrapeSeasonReviews(page) {
           text: r.text,
           numStars: noReview ? -1 : r.numStars,
           url: r.url,
+          season,
         });
       }
     }
@@ -228,11 +209,7 @@ async function scrapeSeasonReviews(page) {
 
     // Force click if obscured by overlays (cookies/GDPR)
     if (await loadMoreBtn.isVisible()) {
-      const previousCount = await page.evaluate(
-        () =>
-          document.querySelectorAll("review-card, .reviews-cards .card-wrap")
-            .length,
-      );
+      const previousCount = await cardsLocator.count();
 
       try {
         // Try force click first
@@ -242,16 +219,20 @@ async function scrapeSeasonReviews(page) {
         await loadMoreBtn.dispatchEvent("click");
       }
 
-      // Wait for items to actually be added
-      try {
-        await page.waitForFunction(
-          (prev) =>
-            document.querySelectorAll("review-card, .reviews-cards .card-wrap")
-              .length > prev,
-          previousCount,
-          { timeout: 3000 },
-        );
-      } catch (e) {
+      // Wait for items to actually be added (poll via the shadow-piercing
+      // locator; page.waitForFunction can't see into the shadow root either).
+      const loadMoreTimeoutMs = 3000;
+      const pollIntervalMs = 100;
+      const start = Date.now();
+      let grew = false;
+      while (Date.now() - start < loadMoreTimeoutMs) {
+        if ((await cardsLocator.count()) > previousCount) {
+          grew = true;
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+      }
+      if (!grew) {
         // If no new items loaded, break out
         break;
       }
@@ -279,6 +260,14 @@ export async function getReviews(rottenUrl, buttonName) {
     return reviewsCache.get(cacheKey);
   }
 
+  // Already-cached shows are still served above; only new scrapes are held off.
+  if (Date.now() < blockedUntilMs) {
+    const secsLeft = Math.ceil((blockedUntilMs - Date.now()) / 1000);
+    throw new Error(
+      `Rotten Tomatoes blocked review requests; cooling down for ${secsLeft}s`,
+    );
+  }
+
   const b = await getBrowser();
   const context = await b.newContext({
     userAgent: DEFAULT_UA,
@@ -289,11 +278,22 @@ export async function getReviews(rottenUrl, buttonName) {
   });
   const page = await context.newPage();
 
+  let sawBlocked = false;
+  let blockedAtSeason = 0;
+  page.on("response", (resp) => {
+    if (resp.status() === 401 && REVIEWS_API_RE.test(resp.url())) {
+      sawBlocked = true;
+    }
+  });
+
   const finalStats = {
     numChecked: 0,
     notEnglishCount: 0,
     noReviewCount: 0,
     smallTextCount: 0,
+    // Page loads this scrape cost, so blocks can be correlated with volume.
+    // review-calls.log records the whole result, so this lands in the log.
+    seasonsScanned: 0,
     reviews: [],
   };
 
@@ -301,13 +301,14 @@ export async function getReviews(rottenUrl, buttonName) {
 
   try {
     // Scan season review pages incrementally (s01, s02, ...) until a season
-    // fails to load or yields no review cards; only the last 50 reviews found
-    // are returned.
+    // fails to load or 404s (past the last season); only the last 50 reviews
+    // found are returned.
     for (let season = 1; season <= MAX_SEASONS; season++) {
       const seasonUrl = `${cleanUrl}/s${String(season).padStart(2, "0")}/reviews/${sfxButtonName}`;
 
+      let response;
       try {
-        await page.goto(seasonUrl, {
+        response = await page.goto(seasonUrl, {
           waitUntil: "domcontentloaded",
           timeout: 20000,
         });
@@ -315,6 +316,17 @@ export async function getReviews(rottenUrl, buttonName) {
         if (season === 1) {
           throw new Error(`Failed to load ${seasonUrl}: ${err.message}`);
         }
+        break;
+      }
+
+      seasonLoadsSinceBlock++;
+
+      // 404 means there is no such season, so the show has ended — stop here.
+      // A season that loads fine but has no review cards is NOT the end: shows
+      // routinely have a season with no reviews followed by seasons that do,
+      // so keep scanning instead of stopping on an empty one.
+      if (response && response.status() === 404) {
+        notFoundLoadsSinceBlock++;
         break;
       }
 
@@ -331,14 +343,17 @@ export async function getReviews(rottenUrl, buttonName) {
 
       // Wait for at least one card to appear
       await page
-        .waitForSelector("review-card, .reviews-cards .card-wrap", {
-          timeout: 3000,
-        })
+        .waitForSelector(CARD_SELECTOR, { timeout: CARD_WAIT_MS })
         .catch(() => {});
 
-      const seasonStats = await scrapeSeasonReviews(page);
-      // No cards at all = bad response (past the last season) — stop scanning.
-      if (seasonStats.numChecked === 0) break;
+      // Refused: stop now rather than scanning more seasons while blocked.
+      if (sawBlocked) {
+        blockedAtSeason = season;
+        break;
+      }
+
+      const seasonStats = await scrapeSeasonReviews(page, season);
+      finalStats.seasonsScanned++;
 
       finalStats.numChecked += seasonStats.numChecked;
       finalStats.notEnglishCount += seasonStats.notEnglishCount;
@@ -358,6 +373,36 @@ export async function getReviews(rottenUrl, buttonName) {
     try {
       await context.close();
     } catch {}
+  }
+
+  // Being blocked yields zero cards, which is indistinguishable from a show
+  // with no reviews. Caching that would pin the show to "no reviews" for the
+  // life of the process, so start a cooldown and fail instead of caching.
+  if (sawBlocked) {
+    blockCount++;
+    const sinceLast = lastBlockMs
+      ? `${Math.round((Date.now() - lastBlockMs) / 60000)} min since previous block`
+      : "first block this process";
+    // How much scraping preceded this block, and how much of it was the
+    // past-the-last-season 404 probe, so the cooldown can be tuned and the
+    // "404s look suspicious" theory checked against real numbers.
+    const detail =
+      `block #${blockCount} at season ${blockedAtSeason}, after ` +
+      `${seasonLoadsSinceBlock} season loads (${notFoundLoadsSinceBlock} of them 404), ` +
+      sinceLast;
+
+    blockedUntilMs = Date.now() + BLOCK_COOLDOWN_MS;
+    lastBlockMs = Date.now();
+    seasonLoadsSinceBlock = 0;
+    notFoundLoadsSinceBlock = 0;
+
+    logHere(
+      { lvl: "warn", grp: "rotten blocking" },
+      `rotten reviews refused (401) for ${cleanUrl}: ${detail}; pausing scraping for ${BLOCK_COOLDOWN_MS / 60000} min`,
+    );
+    throw new Error(
+      `Rotten Tomatoes blocked review requests (${detail}); cooling down for ${BLOCK_COOLDOWN_MS / 60000} min`,
+    );
   }
 
   // Only the most recent 50 reviews (later seasons win).

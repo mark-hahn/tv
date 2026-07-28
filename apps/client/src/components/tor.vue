@@ -3392,9 +3392,15 @@ export default {
 
       const entry = this.torSubCountCache?.[key] || null;
       if (!entry) return "";
-      if (entry.message) return ` | ${String(entry.message)}`;
-      if (entry.error) return ` | Opensubs err: ${String(entry.error)}`;
-      return ` | Opensubs: ${entry.count || 0}`;
+      const parts = [];
+      const providerSubs = entry.providerSubs || null;
+      if (providerSubs?.status) {
+        parts.push(`Provider subs: ${providerSubs.status}`);
+      }
+      if (entry.message) parts.push(String(entry.message));
+      else if (entry.error) parts.push(`OpenSubs err: ${String(entry.error)}`);
+      else parts.push(`OpenSubs: ${entry.count || 0}`);
+      return parts.length ? ` | ${parts.join(" | ")}` : "";
     },
 
     getDownloadStatus(torrent) {

@@ -8,6 +8,10 @@ import * as search from "./search.js";
 import { searchTorrentsInChild } from "./searchInChild.js";
 import * as download from "./download.js";
 import {
+  detectTorrentSubtitlesByUrl,
+  detectTorrentSubtitlesForTorrent,
+} from "./torrentSubtitles.js";
+import {
   start as startTvmaze,
   searchShowsByName,
   unmarkShowBrowsed,
@@ -2134,6 +2138,10 @@ app.post("/api/tor/chk-subs", async (req, res) => {
         continue;
       }
 
+      const providerSubs = await detectTorrentSubtitlesForTorrent(torrent, {
+        files,
+      });
+
       let videoFiles = files.filter((file) => isVideoPath(file?.path));
       const packedArchiveFiles = files.filter((file) =>
         isPackedArchivePath(file?.path),
@@ -2164,6 +2172,7 @@ app.post("/api/tor/chk-subs", async (req, res) => {
           count: 0,
           message,
           error: null,
+          providerSubs,
         });
         continue;
       }
@@ -2199,14 +2208,30 @@ app.post("/api/tor/chk-subs", async (req, res) => {
           .map((entry) => Number(entry?.count))
           .filter((count) => Number.isFinite(count));
         const count = counts.length > 0 ? Math.min(...counts) : 0;
-        results.push({ key, count, message: "", error: null });
+        results.push({ key, count, message: "", error: null, providerSubs });
         continue;
       }
 
-      results.push({ key, count: 0, message: "", error: null });
+      results.push({ key, count: 0, message: "", error: null, providerSubs });
     }
 
     return res.json({ success: true, results });
+  } catch (e) {
+    return res
+      .status(500)
+      .json({ success: false, error: e?.message || String(e) });
+  }
+});
+
+app.get("/api/tor/subs", async (req, res) => {
+  const detailUrl = String(req.query.url || "").trim();
+  if (!detailUrl) {
+    return res.status(400).json({ success: false, error: "url query required" });
+  }
+
+  try {
+    const result = await detectTorrentSubtitlesByUrl(detailUrl);
+    return res.json({ success: true, result });
   } catch (e) {
     return res
       .status(500)

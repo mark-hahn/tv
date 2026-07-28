@@ -539,7 +539,7 @@ export default {
         // Now delete from Emby (DELETE /Items/{id} removes it directly, no library scan needed)
         await emby.deleteShowFromEmby(show);
         // Set inEmby to false to mark as deleted and set leftEmby timestamp
-        const leftEmby = util.getPstDate();
+        const leftEmby = util.getPstDateTimeMs();
         // Re-fetch allTvdb in case async ops replaced the cached reference
         allTvdb = await tvdb.getAllTvdb();
         const tvdbData = allTvdb[name];
@@ -1313,7 +1313,7 @@ export default {
         case "Added":
           if (forSort) {
             const a = show.dateCreated || "";
-            return a.length > 10 ? a : a + " 00:00:00";
+            return a.length > 10 ? a : a + " 00:00:00.000";
           }
           return (show.dateCreated || "").slice(0, 10);
         case "Ended":
@@ -1377,12 +1377,10 @@ export default {
             return util.fmtPlayedDate(lastViewed).split(" ")[0] || "";
           return "";
         case "Down":
-          lastDownloaded = Number(allTvdb?.[show.name]?.["last-downloaded"]);
+          lastDownloaded = allTvdb?.[show.name]?.["last-downloaded"] || "";
           if (forSort)
-            return Number.isFinite(lastDownloaded) && lastDownloaded > 0
-              ? lastDownloaded
-              : 0;
-          return util.fmtUnixDatePst(lastDownloaded);
+            return lastDownloaded ? util.normalizeTimestamp(lastDownloaded) : "";
+          return util.fmtDbDate(lastDownloaded);
         case "Quality": {
           const q = show.quality ?? null;
           if (forSort) return q !== null ? q : -1;

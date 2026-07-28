@@ -1176,12 +1176,13 @@ export default {
           dates.sort();
           if (dates.length > 0) {
             let endDate = dates[dates.length - 1];
+            const lastAired = this.tvdbData?.lastAired?.replace(/\//g, "-");
             if (
               season === lastSeason &&
-              this.tvdbData?.lastAired &&
-              this.tvdbData.lastAired > endDate
+              lastAired &&
+              lastAired > endDate
             ) {
-              endDate = this.tvdbData.lastAired;
+              endDate = lastAired;
             }
             result[season] = {
               start: dates[0].replace(/-/g, "/"),

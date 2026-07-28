@@ -104,7 +104,7 @@ export const applyComputedProps = (rec) => {
   if (rec.sitcom === undefined) rec.sitcom = false;
   if (rec.played === undefined) rec.played = false;
   if (rec.playCount === undefined) rec.playCount = 0;
-  if (rec.date === undefined) rec.date = "2017-12-05";
+  if (rec.date === undefined) rec.date = "2017/12/05 00:00:00.000";
   if (rec.size === undefined) rec.size = 0;
   if (rec.noFiles === undefined) rec.noFiles = false;
   if (rec.episodeData === undefined) rec.episodeData = [];

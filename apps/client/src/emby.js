@@ -408,8 +408,10 @@ async function _oldLoadAllShows() {
       embyPath,
       "emby.genres": embyShow.Genres || [],
       "emby.overview": embyShow.Overview || "",
-      dateCreated: embyShow.DateCreated?.substring(0, 10),
-      premiereDate: embyShow.PremiereDate?.substring(0, 10),
+      dateCreated: embyShow.DateCreated
+        ? util.getPstDateTimeMs(embyShow.DateCreated)
+        : null,
+      premiereDate: embyShow.PremiereDate?.substring(0, 10).replace(/-/g, "/"),
       fromEmbySync: true,
       // Include UserData properties for new record creation
       isPlayed: embyShow.UserData?.Played || false,
@@ -766,7 +768,7 @@ async function _oldLoadAllShows() {
     if (tvdb.inLinda === undefined) tvdb.inLinda = false;
     if (tvdb.played === undefined) tvdb.played = false;
     if (tvdb.playCount === undefined) tvdb.playCount = 0;
-    if (tvdb.date === undefined) tvdb.date = "2017-12-05";
+    if (tvdb.date === undefined) tvdb.date = "2017/12/05 00:00:00.000";
     if (tvdb.size === undefined) tvdb.size = 0;
     if (tvdb.noFiles === undefined) tvdb.noFiles = false;
   }

@@ -180,6 +180,12 @@ const getTvdbDb = () => {
 
 const unixNow = () => Math.floor(Date.now() / 1000);
 
+const tvdbTimestampSec = (unixSeconds) => {
+  const seconds = Math.trunc(Number(unixSeconds));
+  if (!Number.isFinite(seconds) || seconds <= 0) return null;
+  return dateStr(seconds * 1000).replace("-", " ");
+};
+
 const isUnderTvRoot = (localPath) => {
   const lp = localPath ? String(localPath) : "";
   return lp === TV_ROOT || lp.startsWith(TV_ROOT + "/");
@@ -310,8 +316,8 @@ const queuePendingTvdbFields = (showName, timestamp, localPath, err) => {
 
 const postLastDownloadedToSrvr = async (showName, timestamp, localPath) => {
   const candidates = buildNameCandidates(showName, localPath);
-  const ts = Math.trunc(Number(timestamp));
-  if (candidates.length === 0 || !Number.isFinite(ts) || ts <= 0) return false;
+  const ts = tvdbTimestampSec(timestamp);
+  if (candidates.length === 0 || !ts) return false;
 
   // Resolve the real tvdb key locally (read-only db) before posting so we
   // don't probe srvr with names that miss and log spurious "no tvdb" events.

@@ -102,6 +102,7 @@ function parseLaDateTime(
   hour = "00",
   minute = "00",
   second = "00",
+  milli = "000",
 ) {
   const localUtc = Date.UTC(
     Number(year),
@@ -112,9 +113,13 @@ function parseLaDateTime(
     Number(second),
   );
   let offset = laOffsetMinutes(localUtc);
-  let ms = localUtc - offset * 60 * 1000;
+  const milliMs = Number(String(milli || "000").slice(0, 3).padEnd(3, "0"));
+  let ms =
+    localUtc -
+    offset * 60 * 1000 +
+    milliMs;
   const offset2 = laOffsetMinutes(ms);
-  if (offset2 !== offset) ms = localUtc - offset2 * 60 * 1000;
+  if (offset2 !== offset) ms = localUtc - offset2 * 60 * 1000 + milliMs;
   return ms;
 }
 
@@ -127,17 +132,23 @@ function parseAnyTimestamp(value) {
   if (!raw) return null;
   if (/^\d+$/.test(raw)) return parseAnyTimestamp(Number(raw));
 
-  let m = raw.match(/^(\d{4})\/(\d{2})\/(\d{2})[- T](\d{2}):(\d{2}):(\d{2})$/);
-  if (m) return parseLaDateTime(m[1], m[2], m[3], m[4], m[5], m[6]);
+  let m = raw.match(
+    /^(\d{4})\/(\d{2})\/(\d{2})[- T](\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,}))?$/,
+  );
+  if (m) return parseLaDateTime(m[1], m[2], m[3], m[4], m[5], m[6], m[7]);
 
-  m = raw.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/);
-  if (m) return parseLaDateTime(m[1], m[2], m[3], m[4], m[5], m[6]);
+  m = raw.match(
+    /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,}))?$/,
+  );
+  if (m) return parseLaDateTime(m[1], m[2], m[3], m[4], m[5], m[6], m[7]);
 
-  m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  m = raw.match(/^(\d{4})[-/](\d{2})[-/](\d{2})$/);
   if (m) return parseLaDateTime(m[1], m[2], m[3]);
 
-  m = raw.match(/^(\d{4})\/(\d{2})\/(\d{2})-(\d{2}):(\d{2}):(\d{2})$/);
-  if (m) return parseLaDateTime(m[1], m[2], m[3], m[4], m[5], m[6]);
+  m = raw.match(
+    /^(\d{4})\/(\d{2})\/(\d{2})-(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,}))?$/,
+  );
+  if (m) return parseLaDateTime(m[1], m[2], m[3], m[4], m[5], m[6], m[7]);
 
   const ms = Date.parse(raw);
   return Number.isFinite(ms) ? ms : null;

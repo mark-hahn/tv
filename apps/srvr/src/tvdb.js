@@ -29,6 +29,19 @@ const TVDB_TEMPLATE_PATH = path.join(SRVR_DATA_DIR, "tvdbTemplate.json");
 const FAST_UPDATE = false;
 const TVDB_UPDATE_DELAY_MS = FAST_UPDATE ? 5 * 1000 : 5 * 60 * 1000;
 const moviedb = new MovieDb("327192a334da700f65b882c7a69cb927");
+const TVDB_TIMESTAMP_RESOLUTION = {
+  date: "ms",
+  dateCreated: "ms",
+  firstAired: "day",
+  lastAired: "day",
+  lastGapCheck: "ms",
+  lastPlayedDate: "ms",
+  leftEmby: "ms",
+  nextAired: "day",
+  premiereDate: "day",
+  saved: "ms",
+  "last-downloaded": "sec",
+};
 
 // TVDB API Credentials
 const TVDB_APIKEY = "d7fa8c90-36e3-4335-a7c0-6cbb7b0320df";
@@ -92,6 +105,93 @@ function buildTvdbUrl(tvdbPath, query) {
     url.searchParams.set(k, String(v));
   }
   return url;
+}
+
+function formatTimestampByResolution(dateIn, resolution) {
+  if (resolution === "day") return util.toPstDateOnly(dateIn);
+  if (resolution === "sec") return util.toPstDateTimeSec(dateIn);
+  return util.toPstDateTimeMs(dateIn);
+}
+
+function formatTimestampParts(parts, resolution) {
+  const datePart = `${parts.year}/${parts.month}/${parts.day}`;
+  if (resolution === "day") return datePart;
+  const timePart = `${parts.hour || "00"}:${parts.minute || "00"}:${parts.second || "00"}`;
+  if (resolution === "sec") return `${datePart} ${timePart}`;
+  return `${datePart} ${timePart}.${parts.ms || "000"}`;
+}
+
+function normalizeTvdbTimestampValue(field, value) {
+  const resolution = TVDB_TIMESTAMP_RESOLUTION[field];
+  if (!resolution || value === null || value === undefined || value === "") {
+    return value;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const epochMs = value > 0 && value < 100000000000 ? value * 1000 : value;
+    return formatTimestampByResolution(new Date(epochMs), resolution) ?? value;
+  }
+
+  const raw = String(value).trim();
+  if (!raw) return raw;
+
+  if (/^\d+$/.test(raw)) {
+    return normalizeTvdbTimestampValue(field, Number(raw));
+  }
+
+  let m = raw.match(/^(\d{4})[-/](\d{2})[-/](\d{2})$/);
+  if (m) {
+    return formatTimestampParts(
+      { year: m[1], month: m[2], day: m[3] },
+      resolution,
+    );
+  }
+
+  m = raw.match(
+    /^(\d{4})[-/](\d{2})[-/](\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,}))?$/,
+  );
+  if (m) {
+    return formatTimestampParts(
+      {
+        year: m[1],
+        month: m[2],
+        day: m[3],
+        hour: m[4] === "24" ? "00" : m[4],
+        minute: m[5],
+        second: m[6],
+        ms: (m[7] || "000").slice(0, 3).padEnd(3, "0"),
+      },
+      resolution,
+    );
+  }
+
+  const parsedMs = Date.parse(raw);
+  if (Number.isFinite(parsedMs)) {
+    return formatTimestampByResolution(new Date(parsedMs), resolution) ?? value;
+  }
+
+  return value;
+}
+
+function normalizeTvdbTimestampFields(record) {
+  if (!record || typeof record !== "object") return record;
+  for (const field of Object.keys(TVDB_TIMESTAMP_RESOLUTION)) {
+    if (Object.prototype.hasOwnProperty.call(record, field)) {
+      record[field] = normalizeTvdbTimestampValue(field, record[field]);
+    }
+  }
+  return record;
+}
+
+function normalizeAllTvdbTimestampFields(records) {
+  for (const record of Object.values(records || {})) {
+    normalizeTvdbTimestampFields(record);
+  }
+  return records;
+}
+
+function nowTvdbTimestamp(field) {
+  return formatTimestampByResolution(new Date(), TVDB_TIMESTAMP_RESOLUTION[field]);
 }
 
 function setImdbId(tvdb) {
@@ -508,7 +608,9 @@ const UPDATE_DATA = true;
 let allTvdb = {};
 try {
   allTvdb = loadAllShows();
-  stripDeadFields(stripLegacyLastWatched(migrateRemotesToFlatProps(allTvdb)));
+  normalizeAllTvdbTimestampFields(
+    stripDeadFields(stripLegacyLastWatched(migrateRemotesToFlatProps(allTvdb))),
+  );
   saveAllShows(allTvdb);
 } catch (e) {
   throw new Error(
@@ -518,6 +620,7 @@ try {
 
 const runTvdbSweep = () => {
   try {
+    normalizeAllTvdbTimestampFields(allTvdb);
     saveAllShows(allTvdb);
   } catch (e) {
     unilog(1525, `tvdb sweep failed: ${e.message}`);
@@ -1884,7 +1987,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
       fetchedUrls.imdbUrl = `https://www.imdb.com/title/${imdbRemoteId.id}`;
     }
   }
-  const saved = Date.now();
+  const saved = nowTvdbTimestamp("saved");
   const trailersRaw = trailersIn || allTvdb[name]?.trailers;
 
   const isEnglishTrailer = (t) => {
@@ -2123,7 +2226,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   tvdbData.quality = existing.quality ?? null;
   tvdbData.seasonPremiereDates = existing.seasonPremiereDates ?? null;
 
-  // leftEmby timestamp (yyyy-mm-dd format) - set when show is removed from Emby
+  // leftEmby timestamp - set when show is removed from Emby
   tvdbData.leftEmby =
     paramObj.leftEmby || existing.leftEmby || existing.emby?.leftEmby || null;
 
@@ -2290,7 +2393,7 @@ const chkTvdbQueue = () => {
       let finalData = null;
       try {
         if (tvdbData && typeof tvdbData === "object") {
-          finalData = tvdbData;
+          finalData = normalizeTvdbTimestampFields(tvdbData);
           if (!paramObj.transient) {
             const keyName =
               String(finalData.name || showName || "").trim() || null;
@@ -2362,7 +2465,8 @@ const chkTvdbQueue = () => {
       }
 
       if (finalData && !paramObj.transient) {
-        finalData.saved = Date.now();
+        finalData.saved = nowTvdbTimestamp("saved");
+        normalizeTvdbTimestampFields(finalData);
         // Strip the transient flag before saving so it never reaches the db
         const hasChanges = finalData._hasChanges ?? false;
         delete finalData._hasChanges;
@@ -2647,7 +2751,7 @@ const updateTvdbLocal = async () => {
       updateCycleCount++;
       const wantInEmby = updateCycleCount % 10 !== 0;
       let stalest = null;
-      let minSaved = Math.min();
+      let minSaved = "";
       try {
         for (const tvdb of Object.values(allTvdb)) {
           if (!!tvdb.inEmby !== wantInEmby) continue;
@@ -2656,8 +2760,9 @@ const updateTvdbLocal = async () => {
             stalest = tvdb;
             break;
           }
-          if (saved < minSaved) {
-            minSaved = saved;
+          const savedStr = normalizeTvdbTimestampValue("saved", saved);
+          if (savedStr && (!minSaved || savedStr < minSaved)) {
+            minSaved = savedStr;
             stalest = tvdb;
           }
         }
@@ -2960,6 +3065,7 @@ export const getAllTvdbSync = () => allTvdb;
 
 export const saveTvdbSync = async () => {
   try {
+    normalizeAllTvdbTimestampFields(allTvdb);
     saveAllShows(allTvdb);
   } catch (err) {
     unilog(767, "saveTvdbSync error:", err.message);
@@ -3188,7 +3294,9 @@ export const setTvdbFields = async (params) => {
         }
 
         // Handle direct assignment for top-level fields and nested objects
-        tvdb[key] = value;
+        tvdb[key] = key === "saved" && value === 0
+          ? 0
+          : normalizeTvdbTimestampValue(key, value);
       }
 
       if (wasInEmby && tvdb.inEmby === false) {
@@ -3257,9 +3365,11 @@ export const setTvdbFields = async (params) => {
     if (paramObj.$delTvdb) {
       deleteShow(name);
     } else if (paramObj.$rename) {
+      normalizeTvdbTimestampFields(renamedTvdbRecord);
       deleteShow(name);
       saveShow(renamedTvdbName, renamedTvdbRecord);
     } else {
+      normalizeTvdbTimestampFields(allTvdb[name]);
       saveShow(name, allTvdb[name]);
     }
     if (notifyCallback && name && !paramObj.$delTvdb && !paramObj.dontNotify)
@@ -3419,7 +3529,7 @@ export const updateTvdbWithGapData = async (gapData) => {
     const gaps = gapData[showId];
     if (!gaps) continue;
 
-    tvdbRecord.lastGapCheck = Date.now();
+    tvdbRecord.lastGapCheck = nowTvdbTimestamp("lastGapCheck");
     processedCount++;
 
     const changed =

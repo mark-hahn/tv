@@ -30,32 +30,70 @@ function normalizePstTime(timePart) {
     : timePart;
 }
 
-// Convert an ISO/UTC date string to PST YYYY-MM-DD HH:mm:ss
-export function toPstDateTime(isoStr) {
-  if (!isoStr) return null;
-  const d = new Date(isoStr);
+function getPstParts(dateIn) {
+  const d = dateIn instanceof Date ? dateIn : new Date(dateIn);
   if (isNaN(d)) return null;
-  const datePart = d.toLocaleDateString("en-CA", {
+  const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Los_Angeles",
-  });
-  const timePart = d.toLocaleTimeString("en-GB", {
-    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
     hour12: false,
-  });
-  return datePart + " " + normalizePstTime(timePart);
+  }).formatToParts(d);
+  const map = {};
+  for (const part of parts) {
+    if (part && part.type && part.value) map[part.type] = part.value;
+  }
+  if (
+    !map.year ||
+    !map.month ||
+    !map.day ||
+    !map.hour ||
+    !map.minute ||
+    !map.second
+  ) {
+    return null;
+  }
+  return {
+    year: map.year,
+    month: map.month,
+    day: map.day,
+    hour: map.hour === "24" ? "00" : map.hour,
+    minute: map.minute,
+    second: map.second,
+    ms: String(d.getMilliseconds()).padStart(3, "0"),
+  };
 }
 
-// Get current date/time in PST timezone as YYYY-MM-DD HH:mm:ss string
+export function toPstDateOnly(dateIn) {
+  const parts = getPstParts(dateIn);
+  if (!parts) return null;
+  return `${parts.year}/${parts.month}/${parts.day}`;
+}
+
+export function toPstDateTimeSec(dateIn) {
+  const parts = getPstParts(dateIn);
+  if (!parts) return null;
+  return `${parts.year}/${parts.month}/${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
+}
+
+export function toPstDateTimeMs(dateIn) {
+  const parts = getPstParts(dateIn);
+  if (!parts) return null;
+  return `${parts.year}/${parts.month}/${parts.day} ${parts.hour}:${parts.minute}:${parts.second}.${parts.ms}`;
+}
+
+// Convert an ISO/UTC date string to PST YYYY/MM/DD HH:mm:ss
+export function toPstDateTime(isoStr) {
+  return toPstDateTimeSec(isoStr);
+}
+
+// Get current date/time in PST timezone as YYYY/MM/DD HH:mm:ss string
 export function getPstDate() {
-  const d = new Date();
-  const date = d.toLocaleDateString("en-CA", {
-    timeZone: "America/Los_Angeles",
-  });
-  const time = d.toLocaleTimeString("en-GB", {
-    timeZone: "America/Los_Angeles",
-    hour12: false,
-  });
-  return date + " " + normalizePstTime(time);
+  return toPstDateTimeSec(new Date());
 }
 
 let lastMsg = null;

@@ -65,7 +65,14 @@ function getLaDateTimeParts(dateIn = new Date()) {
     hour: map.hour === "24" ? "00" : map.hour,
     minute: map.minute,
     second: map.second,
+    ms: String(date.getMilliseconds()).padStart(3, "0"),
   };
+}
+
+export function getPstDateTimeMs(dateIn = new Date()) {
+  const parts = getLaDateTimeParts(dateIn);
+  if (!parts) return "";
+  return `${parts.year}/${parts.month}/${parts.day} ${parts.hour}:${parts.minute}:${parts.second}.${parts.ms}`;
 }
 
 export function fmtLaDateTime(dateIn = new Date()) {
@@ -74,31 +81,52 @@ export function fmtLaDateTime(dateIn = new Date()) {
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
 }
 
-export function normalizePlayedDate(value) {
+export function normalizeTimestamp(value) {
   if (value === undefined || value === null || value === "") return "";
   if (typeof value === "number" && Number.isFinite(value)) {
-    return fmtLaDateTime(value);
+    const ms = value > 0 && value < 100000000000 ? value * 1000 : value;
+    return getPstDateTimeMs(ms);
   }
 
   const raw = String(value).trim();
   if (!raw) return "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return `${raw}T00:00:00`;
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(raw)) return raw;
-  if (/^\d+$/.test(raw)) return fmtLaDateTime(Number(raw));
-  return fmtLaDateTime(raw);
+  if (/^\d+$/.test(raw)) return normalizeTimestamp(Number(raw));
+
+  let m = raw.match(/^(\d{4})[-/](\d{2})[-/](\d{2})$/);
+  if (m) return `${m[1]}/${m[2]}/${m[3]} 00:00:00.000`;
+
+  m = raw.match(
+    /^(\d{4})[-/](\d{2})[-/](\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,}))?$/,
+  );
+  if (m) {
+    const ms = (m[7] || "000").slice(0, 3).padEnd(3, "0");
+    const hour = m[4] === "24" ? "00" : m[4];
+    return `${m[1]}/${m[2]}/${m[3]} ${hour}:${m[5]}:${m[6]}.${ms}`;
+  }
+
+  return getPstDateTimeMs(raw);
+}
+
+export function normalizePlayedDate(value) {
+  return normalizeTimestamp(value);
 }
 
 export function fmtPlayedDate(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw.replace(/-/g, "/");
+  if (/^\d{4}[-/]\d{2}[-/]\d{2}$/.test(raw)) return raw.replace(/-/g, "/");
   const normalized = normalizePlayedDate(raw);
   if (!normalized) return "";
-  const [datePart, timePart] = normalized.split("T");
+  const [datePart, timePart] = normalized.split(/[ T]/);
   if (!datePart) return "";
   return timePart
     ? `${datePart.replace(/-/g, "/")} ${timePart}`
     : datePart.replace(/-/g, "/");
+}
+
+export function fmtDbDate(value) {
+  const normalized = normalizeTimestamp(value);
+  return normalized ? normalized.slice(0, 10) : "";
 }
 
 export const normalizeLastWatched = normalizePlayedDate;

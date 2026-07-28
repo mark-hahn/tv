@@ -931,7 +931,7 @@ export default {
     setDeleted(tvdbData) {
       this.notInEmby = this.show.inEmby === false;
       if (this.notInEmby && tvdbData?.leftEmby) {
-        this.deletedTxt = "Deleted " + tvdbData.leftEmby;
+        this.deletedTxt = "Deleted " + util.fmtDbDate(tvdbData.leftEmby);
       } else {
         this.deletedTxt = "";
       }

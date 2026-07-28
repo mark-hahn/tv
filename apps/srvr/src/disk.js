@@ -19,6 +19,7 @@ import * as epd from "@tv/share";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
 import * as tvdb from "./tvdb.js";
 import * as emby from "./emby.js";
+import * as util from "./util.js";
 import { videoFileExtensions } from "./videoFiles.js";
 
 const tvDir = "/mnt/media/tv";
@@ -81,6 +82,7 @@ export function buildTvShowNfo(showName, tvdbId) {
 }
 
 function fmtDateWithTZ(date, utcOut = false) {
+  if (!utcOut) return util.toPstDateTimeMs(date);
   let year, month, day;
   if (utcOut) {
     year = date.getUTCFullYear();

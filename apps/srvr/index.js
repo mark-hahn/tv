@@ -786,7 +786,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
             gapChanges.push(`${f}:${tvdbRecord[f]}->${gapData[f]}`);
         }
         Object.assign(tvdbRecord, gapData);
-        tvdbRecord.lastGapCheck = Date.now();
+        tvdbRecord.lastGapCheck = util.toPstDateTimeMs(new Date());
         delete tvdbRecord.allAiredHaveFile;
         delete tvdbRecord.allAiredWatched;
         delete tvdbRecord.allWatchedOrHaveFile;
@@ -3403,8 +3403,8 @@ async function runEmbyFullSweep(caller = "unknown") {
           embyPath,
           "emby.genres": embyShow.Genres || [],
           "emby.overview": embyShow.Overview || "",
-          dateCreated: util.toPstDateTime(embyShow.DateCreated),
-          premiereDate: embyShow.PremiereDate?.substring(0, 10),
+          dateCreated: util.toPstDateTimeMs(embyShow.DateCreated),
+          premiereDate: embyShow.PremiereDate?.substring(0, 10).replace(/-/g, "/"),
           fromEmbySync: true,
           isPlayed: embyShow.UserData?.Played || false,
           playCount: embyShow.UserData?.PlayCount || 0,
@@ -3478,8 +3478,8 @@ async function runEmbyFullSweep(caller = "unknown") {
       tvdbRecord.path = embyPath;
       tvdbRecord.genres = embyShow.Genres || [];
       tvdbRecord.overview = embyShow.Overview || "";
-      tvdbRecord.dateCreated = util.toPstDateTime(embyShow.DateCreated);
-      tvdbRecord.premiereDate = embyShow.PremiereDate?.substring(0, 10);
+      tvdbRecord.dateCreated = util.toPstDateTimeMs(embyShow.DateCreated);
+      tvdbRecord.premiereDate = embyShow.PremiereDate?.substring(0, 10).replace(/-/g, "/");
       tvdbRecord.played = embyShow.UserData?.Played || false;
       tvdbRecord.playCount = embyShow.UserData?.PlayCount || 0;
       tvdbRecord.inToTry = toTryIds.has(showId);
@@ -3702,10 +3702,11 @@ async function runGapCheckBatch() {
         showName,
         tvdbRecord,
       }))
-      .sort(
-        (a, b) =>
-          (a.tvdbRecord.lastGapCheck ?? 0) - (b.tvdbRecord.lastGapCheck ?? 0),
-      );
+      .sort((a, b) => {
+        const aLast = a.tvdbRecord.lastGapCheck || "";
+        const bLast = b.tvdbRecord.lastGapCheck || "";
+        return aLast < bLast ? -1 : aLast > bLast ? 1 : 0;
+      });
 
     if (showsToCheck.length === 0) return;
 
@@ -3748,7 +3749,7 @@ async function fetchLatestPlayedInfo(showId) {
   const utcStr = epData.Items?.[0]?.UserData?.LastPlayedDate;
   if (!utcStr) return null;
   return {
-    lastPlayedDate: utcStr,
+    lastPlayedDate: util.toPstDateTimeMs(utcStr),
   };
 }
 

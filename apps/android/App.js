@@ -96,19 +96,29 @@ function formatLaDateTime(dateIn) {
     return "";
   }
   const hour = map.hour === "24" ? "00" : map.hour;
-  return `${map.year}-${map.month}-${map.day}T${hour}:${map.minute}:${map.second}`;
+  const ms = String(date.getMilliseconds()).padStart(3, "0");
+  return `${map.year}/${map.month}/${map.day} ${hour}:${map.minute}:${map.second}.${ms}`;
 }
 
 function normalizePlayedDate(value) {
   if (value === undefined || value === null || value === "") return "";
   if (typeof value === "number" && Number.isFinite(value)) {
-    return formatLaDateTime(value);
+    const ms = value > 0 && value < 100000000000 ? value * 1000 : value;
+    return formatLaDateTime(ms);
   }
   const raw = String(value).trim();
   if (!raw) return "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return `${raw}T00:00:00`;
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(raw)) return raw;
-  if (/^\d+$/.test(raw)) return formatLaDateTime(Number(raw));
+  if (/^\d+$/.test(raw)) return normalizePlayedDate(Number(raw));
+  let m = raw.match(/^(\d{4})[-/](\d{2})[-/](\d{2})$/);
+  if (m) return `${m[1]}/${m[2]}/${m[3]} 00:00:00.000`;
+  m = raw.match(
+    /^(\d{4})[-/](\d{2})[-/](\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,}))?$/,
+  );
+  if (m) {
+    const hour = m[4] === "24" ? "00" : m[4];
+    const ms = (m[7] || "000").slice(0, 3).padEnd(3, "0");
+    return `${m[1]}/${m[2]}/${m[3]} ${hour}:${m[5]}:${m[6]}.${ms}`;
+  }
   return formatLaDateTime(raw);
 }
 
@@ -1614,8 +1624,8 @@ export default function App() {
           const dateA = a.dateCreated || "";
           const dateB = b.dateCreated || "";
           // Pad short dates for proper comparison
-          const paddedA = dateA.length > 10 ? dateA : dateA + " 00:00:00";
-          const paddedB = dateB.length > 10 ? dateB : dateB + " 00:00:00";
+          const paddedA = dateA.length > 10 ? dateA : dateA + " 00:00:00.000";
+          const paddedB = dateB.length > 10 ? dateB : dateB + " 00:00:00.000";
           return paddedB > paddedA ? 1 : paddedB < paddedA ? -1 : 0; // Most recent first
         }
         return 0;

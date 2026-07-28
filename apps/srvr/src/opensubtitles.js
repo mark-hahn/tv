@@ -354,8 +354,7 @@ export const subsCountEpisodes = async (params) => {
     );
   };
 
-  const results = [];
-  for (const request of requests) {
+  const processRequest = async (request) => {
     const key = String(request?.key || "");
     try {
       const query = String(request?.query || "").trim();
@@ -404,14 +403,17 @@ export const subsCountEpisodes = async (params) => {
       }
       const countedItems = [...dedupedMap.values()];
 
-      results.push({ key, count: countedItems.length, error: null });
+      return { key, count: countedItems.length, error: null };
     } catch (e) {
-      results.push({
-        key,
-        count: 0,
-        error: e?.message || String(e),
-      });
+      return { key, count: 0, error: e?.message || String(e) };
     }
+  };
+
+  const OPN_CONCURRENCY = 3;
+  const results = [];
+  for (let i = 0; i < requests.length; i += OPN_CONCURRENCY) {
+    const batch = requests.slice(i, i + OPN_CONCURRENCY);
+    results.push(...(await Promise.all(batch.map(processRequest))));
   }
 
   return { results };

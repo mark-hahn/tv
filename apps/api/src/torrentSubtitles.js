@@ -403,7 +403,10 @@ function analyzePageText(html, { torrent = null } = {}) {
   };
 }
 
-export async function detectTorrentSubtitlesByUrl(detailUrl, { torrent = null } = {}) {
+export async function detectTorrentSubtitlesByUrl(
+  detailUrl,
+  { torrent = null, knownFiles = null } = {},
+) {
   const url = String(detailUrl || "").trim();
   if (!url) return failStatus("missing detail URL");
 
@@ -414,42 +417,56 @@ export async function detectTorrentSubtitlesByUrl(detailUrl, { torrent = null } 
     return failStatus(e?.message || String(e));
   }
 
-  let packedArchiveMaybe = false;
-  try {
-    const torrentFile = await fetchTorrentFileListFromPage(
-      url,
-      page.html,
-      page.profile,
-    );
-    if (torrentFile.files) {
-      const fileResult = classifyTorrentSubtitleFiles(torrentFile.files);
-      if (fileResult.status === "yes") {
-        return {
-          ...fileResult,
-          downloadUrl: torrentFile.downloadUrl || undefined,
-        };
-      }
-      packedArchiveMaybe = hasPackedArchiveFiles(torrentFile.files);
-    }
-  } catch {
-    // The page-text pass is still useful when the .torrent link is unavailable.
+  // Page text analysis is synchronous — run it immediately.
+  const pageResult = analyzePageText(page.html, { torrent });
+
+  // High-confidence from page text — skip the torrent download entirely.
+  if (pageResult.status === "yes" && pageResult.confidence === "high") {
+    return pageResult;
   }
 
-  const pageResult = analyzePageText(page.html, { torrent });
-  if (pageResult.status === "no" && packedArchiveMaybe) {
-    return {
-      status: "maybe",
-      confidence: "low",
-      source: "torrent-file",
-      reason: "torrent metadata is packed archives, so embedded subtitles cannot be verified without unpacking",
-      evidence: pageResult.evidence,
-    };
+  // Use caller-supplied file list to avoid a redundant torrent download.
+  let torrentFiles = Array.isArray(knownFiles) ? knownFiles : null;
+  let downloadUrl;
+
+  if (!torrentFiles) {
+    try {
+      const torrentFile = await fetchTorrentFileListFromPage(
+        url,
+        page.html,
+        page.profile,
+      );
+      if (torrentFile.files) {
+        torrentFiles = torrentFile.files;
+        downloadUrl = torrentFile.downloadUrl;
+      }
+    } catch {
+      // page text result is still useful
+    }
   }
+
+  if (torrentFiles) {
+    const fileResult = classifyTorrentSubtitleFiles(torrentFiles);
+    if (fileResult.status === "yes") {
+      return { ...fileResult, ...(downloadUrl ? { downloadUrl } : {}) };
+    }
+    if (hasPackedArchiveFiles(torrentFiles) && pageResult.status === "no") {
+      return {
+        status: "maybe",
+        confidence: "low",
+        source: "torrent-file",
+        reason:
+          "torrent metadata is packed archives, so embedded subtitles cannot be verified without unpacking",
+        evidence: pageResult.evidence,
+      };
+    }
+  }
+
   return pageResult;
 }
 
 export async function detectTorrentSubtitlesForTorrent(torrent, { files = null } = {}) {
-  const packedArchiveMaybe = hasPackedArchiveFiles(files);
+  // Fast path: .srt already in the known file list.
   if (Array.isArray(files)) {
     const fileResult = classifyTorrentSubtitleFiles(files);
     if (fileResult.status === "yes") return fileResult;
@@ -463,15 +480,6 @@ export async function detectTorrentSubtitlesForTorrent(torrent, { files = null }
     return failStatus(`unsupported provider: ${provider || "unknown"}`);
   }
 
-  const result = await detectTorrentSubtitlesByUrl(detailUrl, { torrent });
-  if (result.status === "no" && packedArchiveMaybe) {
-    return {
-      status: "maybe",
-      confidence: "low",
-      source: "torrent-file",
-      reason: "torrent metadata is packed archives, so embedded subtitles cannot be verified without unpacking",
-      evidence: result.evidence,
-    };
-  }
-  return result;
+  // Pass known files so the URL-level check skips the torrent re-download.
+  return await detectTorrentSubtitlesByUrl(detailUrl, { torrent, knownFiles: files });
 }

@@ -2099,122 +2099,128 @@ app.post("/api/tor/chk-subs", async (req, res) => {
       .json({ success: false, error: "items array required" });
   }
 
-  try {
-    const results = [];
-    for (const item of items) {
-      const key = String(item?.key || "").trim();
-      const torrent = item?.torrent;
-      if (!torrent || typeof torrent !== "object") {
-        results.push({
-          key,
-          count: 0,
-          message: "",
-          error: "torrent object required",
-        });
-        continue;
-      }
+  const year = getYearFromShowContext(showContext);
+  const imdbId = String(showContext?.imdbId || "").trim();
 
-      let files;
-      try {
-        const fetched = await download.fetchTorrentFile(torrent);
-        if (!fetched?.success) {
-          results.push({
-            key,
-            count: 0,
-            message: "",
-            error: fetched?.error || "Failed to fetch torrent",
-          });
-          continue;
-        }
-
-        files = download.extractTorrentFileDetails(fetched.torrentData);
-      } catch (e) {
-        results.push({
-          key,
-          count: 0,
-          message: "",
-          error: e?.message || String(e),
-        });
-        continue;
-      }
-
-      const providerSubs = await detectTorrentSubtitlesForTorrent(torrent, {
-        files,
-      });
-
-      let videoFiles = files.filter((file) => isVideoPath(file?.path));
-      const packedArchiveFiles = files.filter((file) =>
-        isPackedArchivePath(file?.path),
-      );
-
-      const packedArchiveRepresentatives =
-        videoFiles.length === 0 && packedArchiveFiles.length > 0
-          ? getPackedArchiveRepresentatives(packedArchiveFiles).map(
-              (filePath) => ({
-                path: filePath,
-                size:
-                  files.find((file) => String(file?.path || "") === filePath)
-                    ?.size ?? null,
-                packedArchive: true,
-              }),
-            )
-          : [];
-
-      if (videoFiles.length === 0 && packedArchiveRepresentatives.length > 0) {
-        videoFiles = packedArchiveRepresentatives;
-      }
-
-      if (videoFiles.length === 0) {
-        const message =
-          packedArchiveFiles.length > 0 ? "Packed archive" : "No video files";
-        results.push({
-          key,
-          count: 0,
-          message,
-          error: null,
-          providerSubs,
-        });
-        continue;
-      }
-
-      const opnRequests = [];
-      const year = getYearFromShowContext(showContext);
-      const imdbId = String(showContext?.imdbId || "").trim();
-
-      for (const file of videoFiles) {
-        const videoPath = String(file?.path || "");
-        const seasonEpisode = getSeasonEpisodeForTorrentPath(videoPath);
-        const showName = deriveTorrentShowName(showContext, torrent, videoPath);
-        if (
-          showName &&
-          Number.isInteger(seasonEpisode?.season) &&
-          Number.isInteger(seasonEpisode?.episode)
-        ) {
-          const request = {
-            key: `${key}|${videoPath}`,
-            season: seasonEpisode.season,
-            episode: seasonEpisode.episode,
-          };
-          if (imdbId) request.imdb_id = imdbId;
-          else request.query = showName;
-          if (!imdbId && year) request.year = year;
-          opnRequests.push(request);
-        }
-      }
-
-      if (opnRequests.length > 0) {
-        const opnResults = await fetchEpisodeSubtitleCounts(opnRequests);
-        const counts = opnResults
-          .map((entry) => Number(entry?.count))
-          .filter((count) => Number.isFinite(count));
-        const count = counts.length > 0 ? Math.min(...counts) : 0;
-        results.push({ key, count, message: "", error: null, providerSubs });
-        continue;
-      }
-
-      results.push({ key, count: 0, message: "", error: null, providerSubs });
+  const processItem = async (item) => {
+    const key = String(item?.key || "").trim();
+    const torrent = item?.torrent;
+    if (!torrent || typeof torrent !== "object") {
+      return { key, count: 0, message: "", error: "torrent object required" };
     }
 
+    let files;
+    try {
+      const fetched = await download.fetchTorrentFile(torrent);
+      if (!fetched?.success) {
+        return {
+          key,
+          count: 0,
+          message: "",
+          error: fetched?.error || "Failed to fetch torrent",
+        };
+      }
+      files = download.extractTorrentFileDetails(fetched.torrentData);
+    } catch (e) {
+      return { key, count: 0, message: "", error: e?.message || String(e) };
+    }
+
+    // Run provider subs check and OpenSubtitles count in parallel.
+    const [providerSubs, opnResult] = await Promise.all([
+      detectTorrentSubtitlesForTorrent(torrent, { files }),
+      (async () => {
+        let videoFiles = files.filter((file) => isVideoPath(file?.path));
+        const packedArchiveFiles = files.filter((file) =>
+          isPackedArchivePath(file?.path),
+        );
+        const packedArchiveRepresentatives =
+          videoFiles.length === 0 && packedArchiveFiles.length > 0
+            ? getPackedArchiveRepresentatives(packedArchiveFiles).map(
+                (filePath) => ({
+                  path: filePath,
+                  size:
+                    files.find(
+                      (file) => String(file?.path || "") === filePath,
+                    )?.size ?? null,
+                  packedArchive: true,
+                }),
+              )
+            : [];
+
+        if (
+          videoFiles.length === 0 &&
+          packedArchiveRepresentatives.length > 0
+        ) {
+          videoFiles = packedArchiveRepresentatives;
+        }
+
+        if (videoFiles.length === 0) {
+          return {
+            count: 0,
+            message:
+              packedArchiveFiles.length > 0
+                ? "Packed archive"
+                : "No video files",
+          };
+        }
+
+        const opnRequests = [];
+        for (const file of videoFiles) {
+          const videoPath = String(file?.path || "");
+          const seasonEpisode = getSeasonEpisodeForTorrentPath(videoPath);
+          const showName = deriveTorrentShowName(showContext, torrent, videoPath);
+          if (
+            showName &&
+            Number.isInteger(seasonEpisode?.season) &&
+            Number.isInteger(seasonEpisode?.episode)
+          ) {
+            const request = {
+              key: `${key}|${videoPath}`,
+              season: seasonEpisode.season,
+              episode: seasonEpisode.episode,
+            };
+            if (imdbId) request.imdb_id = imdbId;
+            else request.query = showName;
+            if (!imdbId && year) request.year = year;
+            opnRequests.push(request);
+          }
+        }
+
+        if (opnRequests.length > 0) {
+          const opnResults = await fetchEpisodeSubtitleCounts(opnRequests);
+          const counts = opnResults
+            .map((entry) => Number(entry?.count))
+            .filter((count) => Number.isFinite(count));
+          return {
+            count: counts.length > 0 ? Math.min(...counts) : 0,
+            message: "",
+          };
+        }
+
+        return { count: 0, message: "" };
+      })(),
+    ]);
+
+    const result = {
+      key,
+      count: opnResult.count,
+      message: opnResult.message || "",
+      error: null,
+      providerSubs,
+    };
+    qbtChannelPeer?.publishDelta("chkSubsResult", [result]);
+    return result;
+  };
+
+  try {
+    // Process up to 3 items concurrently. Each item runs 2 checks in parallel:
+    // the provider page/torrent-file check and the OpenSubtitles count.
+    const CHK_SUBS_CONCURRENCY = 3;
+    const results = [];
+    for (let i = 0; i < items.length; i += CHK_SUBS_CONCURRENCY) {
+      const batch = items.slice(i, i + CHK_SUBS_CONCURRENCY);
+      results.push(...(await Promise.all(batch.map(processItem))));
+    }
     return res.json({ success: true, results });
   } catch (e) {
     return res
@@ -2663,6 +2669,9 @@ https.createServer(httpsOptions, app).listen(API_PORT, () => {
         snapshot: getBrowseHasMoreChannelSnapshot,
         onFirstSubscriber: startBrowseHasMoreChannelPolling,
         onLastUnsubscriber: stopBrowseHasMoreChannelPolling,
+      },
+      chkSubsResult: {
+        snapshot: () => null,
       },
     },
     log: (message) => unilog(1501, `${message}`),

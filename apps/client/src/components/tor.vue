@@ -4644,6 +4644,24 @@ export default {
       }
 
       this.torSubCountBusy = true;
+      const pendingKeys = new Set(pending.map((p) => p.key));
+      const chkSubsChannel = srvr.openChannel("chkSubsResult", {
+        onDelta: (results) => {
+          for (const result of Array.isArray(results) ? results : []) {
+            const key = String(result?.key || "").trim();
+            if (!key || !pendingKeys.has(key)) continue;
+            this.torSubCountCache = {
+              ...this.torSubCountCache,
+              [key]: result,
+            };
+            this.torSubCountVisibleKeys = {
+              ...(this.torSubCountVisibleKeys || {}),
+              [key]: true,
+            };
+            this.torSubCountsVisible = true;
+          }
+        },
+      });
       try {
         const show = this.currentShow || this.activeShow || {};
         const response = await this.fetchWithTimeout(
@@ -4667,7 +4685,8 @@ export default {
           throw new Error(data?.error || `HTTP ${response.status}`);
         }
 
-        const nextCache = { ...cache };
+        // Merge any results not yet received via the channel.
+        const nextCache = { ...this.torSubCountCache };
         for (const result of data?.results || []) {
           const key = String(result?.key || "").trim();
           if (!key) continue;
@@ -4683,6 +4702,7 @@ export default {
       } catch (e) {
         this.showError(this.getErrorMessage(e));
       } finally {
+        chkSubsChannel.close();
         this.torSubCountBusy = false;
       }
     },

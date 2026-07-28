@@ -4055,7 +4055,7 @@ const embyRefreshManager = (() => {
       );
       if (res.ok) {
         taskId = await getLibraryTaskId();
-        unilog(76, `taskId: ${taskId || "none"}`);
+        unilog(76, `lib scan taskId: ${taskId || "none"}`);
       } else {
         unilog(669, `Library/Refresh failed: ${res.status} ${res.statusText}`);
       }
@@ -4083,16 +4083,16 @@ const embyRefreshManager = (() => {
               });
             }
             if (task.State !== "Running") {
-              unilog(77, `scan finished (State=${task.State})`);
+              unilog(77, `lib scan finished (State=${task.State})`);
               break;
             }
           }
         } catch (e) {
-          unilog(671, `poll error:`, e.message);
+          unilog(671, `lib scan poll error:`, e.message);
         }
       }
     } else {
-      unilog(78, `no taskId, waiting 90s`);
+      unilog(78, `lib scan, no taskId, waiting 90s`);
       await new Promise((r) => setTimeout(r, 90 * 1000));
     }
 
@@ -4104,7 +4104,7 @@ const embyRefreshManager = (() => {
     const showNames = [...myShowNames];
     unilog(
       672,
-      `done, notifying clients (shows: ${showNames.join(", ") || "manual"})`,
+      `lib scan done, notifying clients (shows: ${showNames.join(", ") || "manual"})`,
     );
     notifyClients("libraryRefreshDone", { showNames });
     publishChannelDelta("libraryRefresh", { type: "done", showNames });
@@ -4118,12 +4118,12 @@ const embyRefreshManager = (() => {
       pendingWaiters = [];
       unilog(
         673,
-        `pending shows: ${[...nextShowNames].join(", ")}, re-running`,
+        `lib scan pending shows: ${[...nextShowNames].join(", ")}, re-running`,
       );
       setTimeout(
         () =>
           run(nextShowNames, nextWaiters).catch((e) =>
-            unilog(674, "run error:", e.message),
+            unilog(674, "lib scan run error:", e.message),
           ),
         MIN_GAP_MS,
       );
@@ -4139,7 +4139,7 @@ const embyRefreshManager = (() => {
           pendingWaiters.push({ resolve });
           unilog(
             675,
-            `${caller}: refresh in flight, queued${showName ? ` ${showName}` : ""}`,
+            `lib scan ${caller}: refresh in flight, queued${showName ? ` ${showName}` : ""}`,
           );
         } else {
           // Start a new scan immediately with this request as the first in its generation
@@ -4150,7 +4150,7 @@ const embyRefreshManager = (() => {
           pendingShowNames = new Set();
           pendingWaiters = [];
           run(myShowNames, myWaiters).catch((e) =>
-            unilog(676, "run error:", e.message),
+            unilog(676, "lib scan run error:", e.message),
           );
         }
       });

@@ -28,6 +28,7 @@ Native video controls for play/pause/seek`,
 Ctrl+click torrent — enqueue download`,
 
   browse: `Click gallery item — select or preview a show
+Alt+click title — copy show name to clipboard
 Click external link — open IMDB, RT, Google, etc.
 Enter in search — manual search`,
 

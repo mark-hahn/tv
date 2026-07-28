@@ -543,7 +543,7 @@
         <div
           v-for="(item, idx) in parsedTitles"
           :key="idx"
-          @click="selectTitle(idx, true)"
+          @click="handleTitleCardClick($event, idx)"
           :style="getTitleCardStyle(idx)"
         >
           <template v-if="item.rejectStatus === 'msg'">
@@ -1809,6 +1809,25 @@ export default {
       evtBus.emit("selectShowFromCardTitle", name);
     };
 
+    const flashingTitleIdx = ref(-1);
+
+    // Alt-click: copy show name to clipboard instead of selecting the title
+    const handleTitleCardClick = (event, idx) => {
+      const item = parsedTitles.value[idx];
+      if (item?.rejectStatus === "msg") return;
+      if (event?.altKey) {
+        const name = String(item?.titleString || "").trim();
+        if (!name) return;
+        navigator.clipboard.writeText(name).catch(() => {});
+        flashingTitleIdx.value = idx;
+        setTimeout(() => {
+          flashingTitleIdx.value = -1;
+        }, 300);
+        return;
+      }
+      selectTitle(idx, true);
+    };
+
     // Get style for title card
     const getTitleCardStyle = (idx) => {
       const item = parsedTitles.value[idx];
@@ -1822,6 +1841,10 @@ export default {
         cursor = "default";
       } else if (item.rejectStatus === "ok") {
         backgroundColor = "#90ee90"; // light-green
+      }
+
+      if (idx === flashingTitleIdx.value) {
+        backgroundColor = "#ffcccc"; // pink flash on alt-click copy
       }
 
       return {
@@ -2055,6 +2078,7 @@ export default {
       handleBackgroundClick,
       handleScaledWheel,
       getTitleCardStyle,
+      handleTitleCardClick,
       handleGallerySelect,
       handleSearchComplete,
       handleGalleryPreview,

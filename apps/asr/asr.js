@@ -25,11 +25,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const SRVR_LOG_URL = "http://127.0.0.1:8739/api/log";
-setUnilogSink(({ logId, message }) => {
+setUnilogSink(({ logId, ts, message }) => {
   fetch(SRVR_LOG_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ logId, pid: "tv-asr", message }),
+    body: JSON.stringify({ logId, pid: "tv-asr", ts, message }),
   }).catch(() => {});
 });
 let tmpDir = process.env.ASR_TMPDIR

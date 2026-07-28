@@ -5,7 +5,7 @@ SQLite database at `/root/dev/apps/tv/unilog/unilog.sqlite` (remote server only)
 - **Single writer:** `tv-srvr` process via [apps/srvr/src/unilogDb.js](../../apps/srvr/src/unilogDb.js).
 - **Other processes** emit logs via `POST /api/log` to tv-srvr — never open the DB directly.
 - **WAL mode** with 5 s busy-timeout.
-- **Timestamps** are PST `YYYY/MM/DD HH:MM:SS` (hour 24 normalized to 00).
+- **Timestamps** are PST `YYYY/MM/DD HH:MM:SS.SSS` (hour 24 normalized to 00).
 
 ---
 
@@ -121,9 +121,9 @@ one-off shapes. It runs against the same read-only connection, so there is never
 a reason to reach for the DB directly:
 
 ```bash
-node unilog/query.js --sql "SELECT s.project, s.level, COUNT(*) n
+node unilog/query.js --sql "SELECT substr(e.ts,1,10) day, s.project, COUNT(*) n
   FROM log_events e JOIN log_sites s ON s.log_id = e.log_id
-  WHERE e.ts >= datetime('now','-1 day') GROUP BY 1,2 ORDER BY n DESC"
+  GROUP BY 1,2 ORDER BY day DESC, n DESC LIMIT 20"
 ```
 
 Writes fail with `attempt to write a readonly database`. Field changes go through
@@ -157,7 +157,7 @@ makes them the reliable way in when you don't know what to filter on yet.
 
 | Mode       | Format                                                                          |
 | ---------- | ------------------------------------------------------------------------------- |
-| events     | `YYYY/MM/DD HH:MM:SS  pid  file:line [level] [hidden\|dup]  message`            |
+| events     | `YYYY/MM/DD HH:MM:SS.SSS  pid  file:line [level] [hidden\|dup]  message`        |
 | `--sites`  | `id=N  project  n=events  file:line  [level] [{groups}] [REMOVED]  description` |
 | `--groups` | `id  name  sites=N  events=N  [HIDE]`                                           |
 | `--sql`    | pipe-joined column header, then one pipe-joined row per result                  |

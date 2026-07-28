@@ -94,7 +94,7 @@ try {
 }
 
 // Migration: add log_sites.blocked_until. tv-watchdog stamps a PST
-// "yyyy/mm/dd hh:mm:ss" here when an error burst blocks a site; events from a
+// "yyyy/mm/dd hh:mm:ss.SSS" here when an error burst blocks a site; events from a
 // blocked site are dropped on insert until the stamp expires.
 try {
   const scols = db.pragma("table_info(log_sites)");
@@ -106,7 +106,7 @@ try {
   console.error("[unilogDb] blocked_until migration failed:", err); // no-unilog
 }
 
-// PST 'yyyy/mm/dd hh:mm:ss' for a given Date; hour 24 normalized to 00.
+// PST 'yyyy/mm/dd hh:mm:ss.SSS' for a given Date; hour 24 normalized to 00.
 function pstStr(d = new Date()) {
   const date = d
     .toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" })
@@ -116,14 +116,16 @@ function pstStr(d = new Date()) {
     hour12: false,
   });
   if (time.startsWith("24:")) time = "00:" + time.slice(3);
-  return `${date} ${time}`;
+  const ms = String(d.getMilliseconds()).padStart(3, "0");
+  return `${date} ${time}.${ms}`;
 }
 
 // An emitter-supplied ts is only honored in this exact shape; anything else
 // falls back to nowPst() at insert time.
-const TS_RE = /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/;
+const TS_WITH_MS_RE = /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/;
+const TS_WITHOUT_MS_RE = /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/;
 
-// PST 'yyyy/mm/dd hh:mm:ss' for now (repo convention).
+// PST 'yyyy/mm/dd hh:mm:ss.SSS' for now (repo convention).
 export function nowPst() {
   return pstStr();
 }
@@ -255,13 +257,10 @@ const getBlockedUntil = db.prepare(
   "SELECT blocked_until FROM log_sites WHERE log_id = ?",
 );
 
-// Exact-repeat guard: ts only has 1-second resolution (see TS_RE), so a burst
-// of events from one site fired within the same second — e.g. a main-thread
-// stall delaying several queued browser events, all reported with the same
-// name+duration — reads as identical rows. Look back over just that site's
-// last RECENT_DUP_WINDOW rows (not a global scan) for an exact message+ts
-// match and drop the insert entirely when found, rather than storing every
-// copy of what is really one moment.
+// Exact-repeat guard: look back over just this site's last RECENT_DUP_WINDOW
+// rows (not a global scan) for an exact message+ts match and drop the insert
+// entirely when found, rather than storing every copy of what is really one
+// moment.
 const RECENT_DUP_CHECK_ENABLED = false;
 const RECENT_DUP_WINDOW = 40;
 const checkRecentDup = db.prepare(
@@ -271,7 +270,10 @@ const checkRecentDup = db.prepare(
 );
 
 function resolveTs(ts) {
-  return TS_RE.test(String(ts ?? "")) ? String(ts) : nowPst();
+  const value = String(ts ?? "");
+  if (TS_WITH_MS_RE.test(value)) return value;
+  if (TS_WITHOUT_MS_RE.test(value)) return `${value}.000`;
+  return nowPst();
 }
 
 // Dedup wrapper used by BOTH the in-process srvr sink and POST /api/log, so

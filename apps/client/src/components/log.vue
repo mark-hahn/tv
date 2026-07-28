@@ -389,13 +389,22 @@ const PAGE = 500;
 const TRIM_MARGIN = 250;
 const WARN_RATE_POLL_MS = 10 * 60 * 1000;
 
-// "2026/07/01 11:44:43" -> epoch ms (local).
+// "2026/07/01 11:44:43.987" -> epoch ms (local).
 function tsToMs(s) {
   if (!s) return 0;
   const [d, t] = String(s).split(" ");
   const [Y, Mo, Da] = d.split("/").map(Number);
-  const [H = 0, Mi = 0, Se = 0] = (t || "").split(":").map(Number);
-  return new Date(Y, (Mo || 1) - 1, Da || 1, H, Mi, Se).getTime();
+  const [h = "0", mi = "0", secMs = "0"] = (t || "").split(":");
+  const [se = "0", ms = "0"] = secMs.split(".");
+  return new Date(
+    Y,
+    (Mo || 1) - 1,
+    Da || 1,
+    Number(h),
+    Number(mi),
+    Number(se),
+    Number(ms.padEnd(3, "0").slice(0, 3)),
+  ).getTime();
 }
 // pickerToMs from individual dropdown values (year=2026, sec=0).
 // Any blank field falls back to the corresponding value from `now`.
@@ -648,7 +657,10 @@ export default {
           field: "ts",
           width: 105,
           hozAlign: "center",
-          formatter: (cell) => (cell.getValue() || "").replace(/^\d{4}\//, ""),
+          formatter: (cell) =>
+            (cell.getValue() || "")
+              .replace(/^\d{4}\//, "")
+              .replace(/\.\d{3}$/, ""),
         },
         {
           title: "Message",
@@ -879,8 +891,10 @@ export default {
       try {
         const res = await srvr.getUnilogOldestTs();
         const ts = res.ts || "";
-        // "2026/MM/DD HH:mm:ss" -> "MM/DD HH:mm"
-        const label = ts.replace(/^\d{4}\//, "").replace(/:\d{2}$/, "");
+        // "2026/MM/DD HH:mm:ss.SSS" -> "MM/DD HH:mm"
+        const label = ts
+          .replace(/^\d{4}\//, "")
+          .replace(/:\d{2}(?:\.\d{3})?$/, "");
         const el = this.$refs.tableEl?.querySelector(".tsClock");
         if (el) el.textContent = label;
       } catch (e) {

@@ -65,11 +65,11 @@ const INTERNAL_SRVR_LOG_URL = "http://127.0.0.1:8739/api/log";
 const QBT_CHANNEL_POLL_MS = 5000;
 const BROWSE_HAS_MORE_CHANNEL_POLL_MS = 60000;
 
-setUnilogSink(({ logId, message }) => {
+setUnilogSink(({ logId, ts, message }) => {
   fetch(INTERNAL_SRVR_LOG_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ logId, pid: "tv-api", message }),
+    body: JSON.stringify({ logId, pid: "tv-api", ts, message }),
   }).catch(() => {});
 });
 const VIDEO_EXTENSIONS = new Set([

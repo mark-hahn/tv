@@ -137,7 +137,7 @@ cross-process locking.
   `unilog.sqlite` directly over ssh with `SELECT COALESCE(MAX(id),0)+1` allocation.
   srvr restarts on deploy anyway.
 
-Timestamps (`ts`, `created_at`) use PST `yyyy/mm/dd hh:mm:ss` with hour `24`
+Timestamps (`ts`, `created_at`) use PST `yyyy/mm/dd hh:mm:ss.SSS` with hour `24`
 normalized to `00`, matching `apps/srvr/src/unilogDb.js` so all tables agree.
 
 ---

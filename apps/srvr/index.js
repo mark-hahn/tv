@@ -1273,9 +1273,9 @@ app.use((req, res, next) => {
 
 // tv-srvr is the single DB writer. Register the in-process sink so unilog()
 // calls inside srvr write directly; other processes/clients use POST /api/log.
-epd.setUnilogSink(({ logId, message }) =>
+epd.setUnilogSink(({ logId, ts, message }) =>
   broadcastUnilog(
-    unilogDb.insertEventDedup({ logId, pid: "tv-srvr", message }),
+    unilogDb.insertEventDedup({ logId, pid: "tv-srvr", ts, message }),
   ),
 );
 registerUnilogRoutes(app);

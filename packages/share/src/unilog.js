@@ -11,6 +11,20 @@ export function setUnilogSink(fn) {
   _sink = typeof fn === "function" ? fn : null;
 }
 
+function pstNow() {
+  const d = new Date();
+  const date = d
+    .toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" })
+    .replace(/-/g, "/");
+  let time = d.toLocaleTimeString("en-GB", {
+    timeZone: "America/Los_Angeles",
+    hour12: false,
+  });
+  if (time.startsWith("24:")) time = "00:" + time.slice(3);
+  const ms = String(d.getMilliseconds()).padStart(3, "0");
+  return `${date} ${time}.${ms}`;
+}
+
 // Join multiple args the way console.* does: strings as-is, objects as JSON,
 // separated by spaces. So `unilog(5, "a", obj, n)` -> one message string.
 export function unilogJoin(parts) {
@@ -33,7 +47,7 @@ export function unilogJoin(parts) {
 export function unilog(logId, ...parts) {
   if (!_sink) return;
   try {
-    _sink({ logId, message: unilogJoin(parts) });
+    _sink({ logId, ts: pstNow(), message: unilogJoin(parts) });
   } catch {
     // best-effort: never break the app because logging failed
   }

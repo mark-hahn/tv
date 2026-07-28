@@ -16,7 +16,7 @@
 //   --project P     project column: srvr | down | api | asr | client | tv
 //   --group G       group name, partial + case-insensitive (repeatable)
 //   --msg TXT       message contains TXT (case-insensitive)
-//   --since TS      'YYYY/MM/DD HH:MM:SS' or a sqlite modifier like '-1 hour'
+//   --since TS      'YYYY/MM/DD HH:MM:SS[.SSS]' or a modifier like '-1 hour'
 //
 // Output / mode:
 //   --last N        max rows (default 50). Always the NEWEST N matches.
@@ -68,7 +68,7 @@ function q(s) {
   return String(s).replace(/'/g, "''");
 }
 
-// e.ts is stamped as PST 'YYYY/MM/DD HH:MM:SS' (see unilog/docs/unilog-db.md).
+// e.ts is stamped as PST 'YYYY/MM/DD HH:MM:SS.SSS' (see unilog/docs/unilog-db.md).
 // sqlite's datetime('now', modifier) is UTC and uses '-' separators, so
 // comparing it directly against e.ts was both wrong timezone AND a string
 // format mismatch ('/' > '-' in ASCII, so the WHERE clause always matched).
@@ -82,7 +82,8 @@ function pstTimestamp(d) {
     hour12: false,
   });
   if (time.startsWith("24:")) time = "00:" + time.slice(3);
-  return `${date} ${time}`;
+  const ms = String(d.getMilliseconds()).padStart(3, "0");
+  return `${date} ${time}.${ms}`;
 }
 
 function resolveSince(since) {

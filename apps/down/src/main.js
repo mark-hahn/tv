@@ -149,7 +149,7 @@ function rotateCycleLogDedup() {
   curCycleLogKeys = new Set();
 }
 
-setUnilogSink(({ logId, message }) => {
+setUnilogSink(({ logId, ts, message }) => {
   if (CYCLE_LOG_IDS.has(logId)) {
     const key = `${logId}\0${message}`;
     const dup = prevCycleLogKeys.has(key) || curCycleLogKeys.has(key);
@@ -159,7 +159,7 @@ setUnilogSink(({ logId, message }) => {
   fetch(SRVR_LOG_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ logId, pid: "tv-down", message }),
+    body: JSON.stringify({ logId, pid: "tv-down", ts, message }),
   }).catch(() => {});
 });
 

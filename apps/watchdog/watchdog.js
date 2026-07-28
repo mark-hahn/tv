@@ -57,7 +57,7 @@ const ASR_STUCK_BEATS = 20; // ~40m: asrQ>0 & asrDone flat => stuck
 const SWEEP_STUCK_BEATS = 12; // ~24m: sweep=1 the whole time => stuck
 const HB_CADENCE_MIN = 2; // tv-srvr emits one heartbeat every 2 minutes
 
-// ---- PST timestamp helpers (match unilogDb ts "yyyy/mm/dd hh:mm:ss") ----
+// ---- PST timestamp helpers (match unilogDb ts "yyyy/mm/dd hh:mm:ss.SSS") ----
 function pstStr(d = new Date()) {
   const date = d
     .toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" })
@@ -67,7 +67,8 @@ function pstStr(d = new Date()) {
     hour12: false,
   });
   if (time.startsWith("24:")) time = "00:" + time.slice(3);
-  return `${date} ${time}`;
+  const ms = String(d.getMilliseconds()).padStart(3, "0");
+  return `${date} ${time}.${ms}`;
 }
 function pstCutoff(msAgo) {
   return pstStr(new Date(Date.now() - msAgo));
@@ -292,7 +293,7 @@ let lastEmailMs = 0; // last email send time (1/hour throttle)
 let lastWarnCheckMs = 0; // last time the rolling warn rate was re-measured
 let lastWarnEmailMs = 0; // last warn-rate email (own 1/hour throttle)
 
-// Epoch ms from a PST "yyyy/mm/dd hh:mm:ss" string. Parsed with a fixed UTC
+// Epoch ms from a PST "yyyy/mm/dd hh:mm:ss.SSS" string. Parsed with a fixed UTC
 // suffix — absolute value is offset, but diffs between two stamps are correct.
 function tsToMs(ts) {
   return Date.parse(ts.replace(/\//g, "-").replace(" ", "T") + "Z");

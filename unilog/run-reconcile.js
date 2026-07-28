@@ -80,8 +80,8 @@ function ensureSrvrStopped() {
 }
 
 function nowPst() {
-  // Identical format to apps/srvr/src/unilogDb.js nowPst(): yyyy/mm/dd hh:mm:ss,
-  // hour 24 -> 00, so all ts/created_at fields match across tables.
+  // Identical format to apps/srvr/src/unilogDb.js nowPst(): yyyy/mm/dd hh:mm:ss.SSS,
+  // hour 24 -> 00, so ts/created_at fields match across tables.
   const d = new Date();
   const date = d
     .toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" })
@@ -91,7 +91,8 @@ function nowPst() {
     hour12: false,
   });
   if (time.startsWith("24:")) time = "00:" + time.slice(3);
-  return `${date} ${time}`;
+  const ms = String(d.getMilliseconds()).padStart(3, "0");
+  return `${date} ${time}.${ms}`;
 }
 
 // ---- named groups (from logHere `grp`) ------------------------------------

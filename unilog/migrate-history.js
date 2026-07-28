@@ -71,7 +71,8 @@ function nowPst() {
     hour12: false,
   });
   if (time.startsWith("24:")) time = "00:" + time.slice(3);
-  return `${date} ${time}`;
+  const ms = String(d.getMilliseconds()).padStart(3, "0");
+  return `${date} ${time}.${ms}`;
 }
 
 // ---- create 'history' group --------------------------------------------

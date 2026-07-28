@@ -12,11 +12,11 @@ import fs from "node:fs";
 import { logHere, setUnilogSink, unilog } from "@tv/share";
 
 const SRVR_LOG_URL = "http://127.0.0.1:8739/api/log";
-setUnilogSink(({ logId, message }) => {
+setUnilogSink(({ logId, ts, message }) => {
   fetch(SRVR_LOG_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ logId, pid: "tv-down-worker", message }),
+    body: JSON.stringify({ logId, pid: "tv-down-worker", ts, message }),
   }).catch(() => {});
 });
 

@@ -30,7 +30,7 @@ function generateGuid() {
 const CLIENT_HASH = generateGuid();
 export const loggingDisabled = ref(false);
 
-// PST 'yyyy/mm/dd hh:mm:ss', the shape tv-srvr stores in log_events.ts. Stamped
+// PST 'yyyy/mm/dd hh:mm:ss.SSS', the shape tv-srvr stores in log_events.ts. Stamped
 // at call time: batching (and a blocking window.confirm, which stalls the flush
 // timer) would otherwise date an event to whenever the server received it.
 function pstNow() {
@@ -43,7 +43,8 @@ function pstNow() {
     hour12: false,
   });
   if (time.startsWith("24:")) time = "00:" + time.slice(3);
-  return `${date} ${time}`;
+  const ms = String(d.getMilliseconds()).padStart(3, "0");
+  return `${date} ${time}.${ms}`;
 }
 
 let queue = [];

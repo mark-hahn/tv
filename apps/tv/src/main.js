@@ -19,11 +19,11 @@ let tvPictureChannelPollTimer = null;
 let tvPictureChannelLastJson = "";
 let embyPlayingChannelPollTimer = null;
 let embyPlayingChannelLastJson = "";
-setUnilogSink(({ logId, message }) => {
+setUnilogSink(({ logId, ts, message }) => {
   fetch(SRVR_LOG_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ logId, pid: "tv-tv", message }),
+    body: JSON.stringify({ logId, pid: "tv-tv", ts, message }),
   }).catch(() => {});
 });
 mkdirSync(join(__dirname, "../data"), { recursive: true });

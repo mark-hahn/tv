@@ -1443,7 +1443,7 @@ export default {
       // bottom. This is the same position the working scrollPageDown uses.
       this.$nextTick(() => {
         if (!this.table) return;
-        const rows = this.table.getRows();
+        const rows = this.table.getRows("active");
         if (!rows.length) return;
         this.table.scrollToRow(rows[rows.length - 1], "top", true);
       });
@@ -1467,7 +1467,7 @@ export default {
     },
     scrollPageUp() {
       if (!this.holder || !this.table) return;
-      const rows = this.table.getRows();
+      const rows = this.table.getRows("active");
       if (!rows.length) return;
       const { rowH, step } = this.pageStep();
       const topIdx = Math.round(this.holder.scrollTop / rowH);
@@ -1479,7 +1479,7 @@ export default {
     },
     scrollPageDown() {
       if (!this.holder || !this.table) return;
-      const rows = this.table.getRows();
+      const rows = this.table.getRows("active");
       if (!rows.length) return;
       const { rowH, step } = this.pageStep();
       const topIdx = Math.round(this.holder.scrollTop / rowH);

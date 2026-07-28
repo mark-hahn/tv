@@ -3653,7 +3653,7 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
     }
     if (lastPlayedChanged > 0) {
       await tvdb.saveTvdbSync();
-      unilog(74, `Updated ${lastPlayedChanged} shows`);
+      unilog(74, `Gapcheck updated ${lastPlayedChanged} shows`);
     }
 
     // Now run gap check with fresh emby and disk data

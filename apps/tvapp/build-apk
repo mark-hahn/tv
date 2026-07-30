@@ -1,0 +1,48 @@
+#!/bin/bash
+# Build the TVAPP APK on hahnca.com and install it on the Android TV.
+# Usage: ./build-apk [device-serial]
+# With no argument the device is found by ./connect-tv.
+set -e
+
+REMOTE=hahnca.com
+BUILD_DIR=/tmp/tvapp-build
+APK_PATH=$BUILD_DIR/app/build/outputs/apk/release/app-release.apk
+PACKAGE=com.hahnca.tvapp
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+DEVICE=$1
+if [[ -z "$DEVICE" ]]; then
+  DEVICE=$("$SCRIPT_DIR/connect-tv")
+fi
+
+echo "==> Syncing project to $REMOTE..."
+rsync -a --delete \
+  --exclude build \
+  --exclude .gradle \
+  --exclude .device \
+  "$SCRIPT_DIR/" $REMOTE:$BUILD_DIR/
+
+echo "==> Building APK..."
+ssh $REMOTE "
+  export ANDROID_HOME=/opt/android-sdk
+  export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+  cd $BUILD_DIR
+  ./gradlew assembleRelease --console=plain 2>&1 | grep --line-buffered -E 'Task :app:|BUILD|FAIL|error'
+"
+
+echo "==> Installing on $DEVICE..."
+ssh $REMOTE "
+  adb -s $DEVICE install -r $APK_PATH || {
+    adb -s $DEVICE uninstall $PACKAGE >/dev/null 2>&1 || true
+    adb -s $DEVICE install $APK_PATH
+  }
+  # Lets the app turn wireless debugging back on after a reboot (see AdbWifi).
+  # Idempotent, and a fresh install is the only time it can be missing.
+  adb -s $DEVICE shell pm grant $PACKAGE android.permission.WRITE_SECURE_SETTINGS
+  # The launch also matters: an app that has never been started gets no
+  # BOOT_COMPLETED, so the boot receiver would never run.
+  adb -s $DEVICE shell monkey -p $PACKAGE -c android.intent.category.LEANBACK_LAUNCHER 1 >/dev/null 2>&1 ||
+    adb -s $DEVICE shell monkey -p $PACKAGE -c android.intent.category.LAUNCHER 1
+"
+
+echo "==> Done."

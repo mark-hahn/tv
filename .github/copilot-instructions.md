@@ -106,6 +106,40 @@ After installing, set up the adb reverse tunnel so Expo Go can reach Metro if ne
 adb -s <device-serial> reverse tcp:8081 tcp:8081
 ```
 
+## tvapp — Android TV app (`apps/tvapp`)
+
+Separate from `apps/android`, which is the phone remote. `tvapp` is a plain
+native Java app (no React Native, no Expo, no `node_modules`) sideloaded onto
+the Sony Bravia, package `com.hahnca.tvapp`. Currently a placeholder that shows
+"TVAPP TEST" and exits on BACK.
+
+```bash
+cd apps/tvapp
+./build-apk        # find TV, build on hahnca.com, install, launch
+./connect-tv       # just connect; prints the adb serial
+```
+
+- Gradle builds run on hahnca.com (`/tmp/tvapp-build`), never locally. Release
+  APKs are signed with the checked-in debug keystore.
+- All adb runs on hahnca.com. **This WSL workspace cannot reach the TV at
+  all** — `adb connect` to it fails from here and succeeds from hahnca.com,
+  which shares the TV's LAN. So connect, install, grant, launch, and the
+  mDNS lookup are all remote, and the build is too, to save a hop.
+- The TV's IP **and** its wireless debugging port both change on every reboot,
+  so neither is hard-wired. `connect-tv` resolves them over mDNS
+  (`_adb-tls-connect._tcp`) and caches the result in `.device`; a stale cache
+  self-corrects. Never hard-code the TV address.
+- Android turns wireless debugging off at each boot. `BootReceiver` +
+  `AdbWifi.java` turn it back on, which works because `build-apk` grants
+  `WRITE_SECURE_SETTINGS` and launches the app on every install — an app that
+  has never been opened gets no `BOOT_COMPLETED`. Keep both steps in `build-apk`.
+- `fix.md` in that directory is the recovery procedure for factory reset,
+  revoked pairings, and reboots that do not heal. Read it before touching
+  anything connection-related.
+- Do not reboot the TV or run `adb pair` without asking — pairing may need the
+  user to read a code off the TV screen.
+- unilog does not apply here; this is Java, use `android.util.Log`.
+
 - never do a `find / ...`, it is too slow
 
 when a copilot chat is in ask mode instead of agent mode and i give you instructions that include writing or changing something that means i made a mistake -- stop and tell me to use agent mode

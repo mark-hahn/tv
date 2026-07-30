@@ -61,6 +61,8 @@
   :style="{ '--btn-bg': isActive ? 'lightgray' : 'whitesmoke' }"
   ```
 - when any change is made to web client tv pane ui or the android app ui then the same change should be made to the other
+  - exception: the tvappctrl code in `apps/android` has no web client
+    counterpart and is never mirrored — see the tvapp section
 - when modifying files use local changes and don't replace entire files because another copilot conversation might be changing the same file
 - you only need to check if a change affects android when change is in tv-pane or android
 - to develop on android use expo go and metro and always use usb cable with usbipd and set ipv4 not ipv6
@@ -139,6 +141,27 @@ cd apps/tvapp
 - Do not reboot the TV or run `adb pair` without asking — pairing may need the
   user to read a code off the TV screen.
 - unilog does not apply here; this is Java, use `android.util.Log`.
+
+### tvappctrl — the phone side (**not yet implemented**)
+
+Nothing is written yet; this records the decisions so they are not re-litigated.
+Delete this notice and describe the real code once it exists.
+
+- The phone app that controls tvapp lives in **`apps/android`** — a new screen
+  in its own module, not more of `App.js`. It is not a separate app: a second
+  phone app for the same TV means a second icon, build, and Metro setup.
+- Name the code `tvappctrl` so it greps apart from the TV-remote features that
+  already fill `App.js`.
+- It is **exempt from the android/web-client UI parity rule**. There is no tv
+  pane counterpart and there is not meant to be one.
+- It talks **phone → TV direct over the LAN**, not through tv-srvr like every
+  other network call in `App.js`. A finger drag at 60 Hz must not round-trip
+  through hahnca.com. The phone has to be on the TV's LAN for this, and finding
+  the TV means mDNS again, since its address moves.
+- The wire protocol is the only real dependency between `apps/android` and
+  `apps/tvapp` — a protocol change means editing both in one session. tvapp is
+  Java and cannot import `@tv/share`, so the constants get hand-mirrored; keep
+  the protocol small for that reason.
 
 - never do a `find / ...`, it is too slow
 

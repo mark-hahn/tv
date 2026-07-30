@@ -976,6 +976,8 @@ export default {
     if (this._onAppWindowResize)
       window.removeEventListener("resize", this._onAppWindowResize);
     if (this._onDelKey) window.removeEventListener("keydown", this._onDelKey);
+    if (this._onArrowKey)
+      window.removeEventListener("keydown", this._onArrowKey);
     this.stopQbtPolling();
     this.cancelDownInactiveTimer();
     this.stopChksrtPolling();
@@ -2217,6 +2219,49 @@ export default {
       }
     };
     window.addEventListener("keydown", this._onDelKey);
+
+    // Left/right arrow keys: meaning depends on which tab pane is showing.
+    this._onArrowKey = (e) => {
+      const isLeft = e.key === "ArrowLeft";
+      const isRight = e.key === "ArrowRight";
+      if (!isLeft && !isRight) return;
+      if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      if (document.activeElement?.isContentEditable) return;
+      if (this.videoPlayerPath) return;
+      const dir = isLeft ? "left" : "right";
+      switch (this.currentPane) {
+        case "info":
+        case "map": {
+          const target = isLeft ? "info" : "map";
+          if (target !== this.currentPane) this.selectTab(target);
+          break;
+        }
+        case "remote":
+          evtBus.emit("tvArrowKey", dir);
+          break;
+        case "tor":
+          if (isRight) evtBus.emit("torArrowKey", dir);
+          break;
+        case "usb":
+          if (isRight) evtBus.emit("usbArrowKey", dir);
+          break;
+        case "local":
+          if (isRight) evtBus.emit("localArrowKey", dir);
+          break;
+        case "log":
+          evtBus.emit("logArrowKey", dir);
+          break;
+        case "plot":
+          evtBus.emit("plotArrowKey", dir);
+          break;
+        default:
+          return;
+      }
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", this._onArrowKey);
 
     this.loadSplitPrefs();
     this.$nextTick(() => {

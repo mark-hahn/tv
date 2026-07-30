@@ -520,10 +520,12 @@ export default {
   },
   mounted() {
     evtBus.on("unilog-pruned", this.onUnilogPruned);
+    evtBus.on("logArrowKey", this.onLogArrowKey);
     if (this.active) this.activate();
   },
   beforeUnmount() {
     evtBus.off("unilog-pruned", this.onUnilogPruned);
+    evtBus.off("logArrowKey", this.onLogArrowKey);
     this.stopChannelsDebug();
     this.deactivate();
     this.unwireMessageHeaderFilter();
@@ -1447,6 +1449,11 @@ export default {
         if (!rows.length) return;
         this.table.scrollToRow(rows[rows.length - 1], "top", true);
       });
+    },
+    // Keyboard left/right arrow — same as the ← / → buttons.
+    onLogArrowKey(dir) {
+      if (dir === "left") this.scrollLeft();
+      else this.scrollRight();
     },
     scrollLeft() {
       if (this.holder) this.holder.scrollLeft = 0;

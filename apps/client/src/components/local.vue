@@ -1591,9 +1591,11 @@ export default {
         this.deleteSelected();
     };
     evtBus.on("localDelKey", this._onLocalDelKey);
+    evtBus.on("localArrowKey", this.onLocalArrowKey);
   },
   unmounted() {
     evtBus.off("fix-log", this.onFixLog);
+    evtBus.off("localArrowKey", this.onLocalArrowKey);
     this.stopFixPolling();
     this.stopAsrLogChannel();
     this.stopAsrQueueChannel();
@@ -1936,6 +1938,17 @@ export default {
     },
     setNodeRef(el, name) {
       if (el) this.nodeRefs.set(name, el);
+    },
+    // Keyboard right arrow — open (expand) the first selected folder.
+    onLocalArrowKey() {
+      const firstFolder = [...this.selectedFolders][0];
+      if (!firstFolder) return;
+      const cmp = this.nodeRefs.get(firstFolder);
+      if (!cmp) return;
+      cmp.expand();
+      this.$nextTick(() => {
+        cmp.$el?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
     },
     toShow() {
       // 1. Determine selected top-level folder

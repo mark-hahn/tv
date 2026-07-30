@@ -1710,6 +1710,7 @@ export default {
     evtBus.on("resetTorrentsPane", this.resetPane);
     evtBus.on("refreshSpaceAvail", this.onRefreshSpaceAvail);
     evtBus.on("openStream", this.onOpenStream);
+    evtBus.on("torArrowKey", this.onTorArrowKey);
 
     void this.loadDownloadedHistory();
     srvr
@@ -1732,10 +1733,16 @@ export default {
     evtBus.off("resetTorrentsPane", this.resetPane);
     evtBus.off("refreshSpaceAvail", this.onRefreshSpaceAvail);
     evtBus.off("openStream", this.onOpenStream);
+    evtBus.off("torArrowKey", this.onTorArrowKey);
     this.closeBadGroupsChannel();
   },
 
   methods: {
+    // Keyboard right arrow — same as clicking Send.
+    async onTorArrowKey() {
+      await this.torSendClick();
+    },
+
     toggleDebug() {
       this.showDebug = !this.showDebug;
     },

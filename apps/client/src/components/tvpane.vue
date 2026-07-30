@@ -720,6 +720,7 @@ export default {
     evtBus.on("paneChanged", this._onPaneChanged);
     evtBus.on("tvRemoteLock", this._onTvRemoteLock);
     evtBus.on("tvRemoteUnlock", this._onTvRemoteUnlock);
+    evtBus.on("tvArrowKey", this._onTvArrowKey);
   },
 
   beforeUnmount() {
@@ -727,6 +728,7 @@ export default {
     evtBus.off("paneChanged", this._onPaneChanged);
     evtBus.off("tvRemoteLock", this._onTvRemoteLock);
     evtBus.off("tvRemoteUnlock", this._onTvRemoteUnlock);
+    evtBus.off("tvArrowKey", this._onTvArrowKey);
     this.stopRepeat();
     this.stopHold();
     clearTimeout(this._lpDebounceTimer);
@@ -789,6 +791,11 @@ export default {
     _onTvRemoteUnlock() {
       this.locked = false;
       this.lockInfo = null;
+    },
+
+    // Keyboard left/right arrow — same as a short tap on the arrow button.
+    async _onTvArrowKey(dir) {
+      await this.tvKey(dir);
     },
 
     startUnlockHold() {

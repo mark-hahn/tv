@@ -602,8 +602,26 @@ export default {
       this.fetchFiles();
     }
     this.updateUsbSpaceAvail();
+    evtBus.on("usbArrowKey", this.onUsbArrowKey);
+  },
+  unmounted() {
+    evtBus.off("usbArrowKey", this.onUsbArrowKey);
   },
   methods: {
+    // Keyboard right arrow — open (expand) the first selected folder.
+    onUsbArrowKey() {
+      const firstFolder = [...this.selectedFolders][0];
+      if (!firstFolder || !this.$refs.treeNodes) return;
+      const comp = this.$refs.treeNodes.find((c) => {
+        const n = c.node || c.$props?.node;
+        return n && n.name === firstFolder;
+      });
+      if (!comp) return;
+      comp.expand();
+      this.$nextTick(() => {
+        comp.$el?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    },
     pctAvail(total, used) {
       const t = Number(total);
       const u = Number(used);

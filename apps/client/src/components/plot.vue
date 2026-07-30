@@ -81,6 +81,7 @@ import {
 } from "echarts/components";
 import { CanvasRenderer } from "echarts/renderers";
 import * as srvr from "../srvr.js";
+import evtBus from "../evtBus.js";
 import { logHere, unilog} from "../log.js"
 
 echarts.use([
@@ -176,15 +177,25 @@ export default {
     },
   },
   mounted() {
+    evtBus.on("plotArrowKey", this.onPlotArrowKey);
     if (this.active) this.$nextTick(() => this.loadPlot());
   },
   beforeUnmount() {
+    evtBus.off("plotArrowKey", this.onPlotArrowKey);
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     this.chart?.dispose();
     this.chart = null;
   },
   methods: {
+    // Keyboard left/right arrow — step through the plot radio buttons.
+    onPlotArrowKey(dir) {
+      const idx = this.plots.findIndex((p) => p.key === this.plotSel);
+      if (idx === -1) return;
+      const next = dir === "left" ? idx - 1 : idx + 1;
+      if (next < 0 || next >= this.plots.length) return;
+      this.plotSel = this.plots[next].key;
+    },
     ensureChart() {
       if (this.chart || !this.$refs.chartEl) return;
       this.chart = echarts.init(this.$refs.chartEl);

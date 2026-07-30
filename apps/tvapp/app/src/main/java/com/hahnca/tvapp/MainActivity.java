@@ -15,13 +15,11 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
-import android.widget.TextView;
 
 public class MainActivity extends Activity implements CtrlServer.Listener {
 
-  private static final float TEXT_SIZE_SP = 72f;
-  private static final float CLOSE_TEXT_SIZE_SP = 20f;
-  private static final float CLOSE_MARGIN_DP = 24f;
+  private static final float EXIT_TEXT_SIZE_SP = 20f;
+  private static final float EXIT_MARGIN_DP = 24f;
 
   private final Handler ui = new Handler(Looper.getMainLooper());
 
@@ -57,25 +55,18 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     FrameLayout root = new FrameLayout(this);
     root.setBackgroundColor(Color.BLACK);
 
-    TextView text = new TextView(this);
-    text.setText("TVAPP TEST");
-    text.setTextSize(TypedValue.COMPLEX_UNIT_SP, TEXT_SIZE_SP);
-    text.setTextColor(Color.WHITE);
-    text.setGravity(Gravity.CENTER);
-    root.addView(text, matchParent());
-
-    Button close = new Button(this);
-    close.setText("Close");
-    close.setTextSize(TypedValue.COMPLEX_UNIT_SP, CLOSE_TEXT_SIZE_SP);
-    close.setOnClickListener(v -> finishAndRemoveTask());
-    FrameLayout.LayoutParams closeParams =
+    Button exit = new Button(this);
+    exit.setText("Exit");
+    exit.setTextSize(TypedValue.COMPLEX_UNIT_SP, EXIT_TEXT_SIZE_SP);
+    exit.setOnClickListener(v -> finishAndRemoveTask());
+    FrameLayout.LayoutParams exitParams =
         new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT,
             ViewGroup.LayoutParams.WRAP_CONTENT,
             Gravity.TOP | Gravity.END);
-    int margin = (int) dp(CLOSE_MARGIN_DP);
-    closeParams.setMargins(margin, margin, margin, margin);
-    root.addView(close, closeParams);
+    int margin = (int) dp(EXIT_MARGIN_DP);
+    exitParams.setMargins(margin, margin, margin, margin);
+    root.addView(exit, exitParams);
 
     // Added last so the arrow draws over everything else.
     cursor = new CursorView(this);
@@ -127,6 +118,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   @Override
   public void onClick() {
     ui.post(this::clickAtCursor);
+  }
+
+  // Closing tvappctrl on the phone closes tvapp here. The reverse direction needs
+  // nothing: the relay notices this activity's socket dropping.
+  @Override
+  public void onExit() {
+    ui.post(this::finishAndRemoveTask);
   }
 
   /**

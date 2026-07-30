@@ -19,7 +19,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import allServices from "./services.json";
 import { keyLabels } from "./keyLabels.js";
-import TvAppCtrl from "./tvappctrl.js";
+import TvAppCtrl, { useTvappLink } from "./tvappctrl.js";
 
 // Normalize font sizes so system font scale doesn't affect the app
 const fs = (size) => size / PixelRatio.getFontScale();
@@ -143,6 +143,13 @@ export default function App() {
   const [cellDims, setCellDims] = useState({ w: 0, h: 0 });
   const [showStreamers, setShowStreamers] = useState(false);
   const [showTvAppCtrl, setShowTvAppCtrl] = useState(false);
+  // Held for the life of the app, not just while the tvappctrl screen is up: the
+  // tv opening tvapp is what opens that screen, so something has to be listening
+  // while the remote is what is on display.
+  const tvappLink = useTvappLink({
+    onTvappUp: () => setShowTvAppCtrl(true),
+    onTvappDown: () => setShowTvAppCtrl(false),
+  });
   const [flashSvc, setFlashSvc] = useState(null);
   const [showSubCtrl, setShowSubCtrl] = useState(false);
   const [subPlayers, setSubPlayers] = useState([]);
@@ -974,12 +981,19 @@ export default function App() {
 
   // Long-press Back swaps the whole phone ui over to tvappctrl. Longer than the
   // usual hold: Back is pressed constantly and must not fall into it by accident.
+  // Long-pressing Back asks the tv to open tvapp as well as switching this ui —
+  // the two are kept in step, so one is never opened without the other.
+  const openTvAppCtrl = () => {
+    tvappLink.openTvapp();
+    setShowTvAppCtrl(true);
+  };
+
   const startBackHold = () =>
     lpStart(
       () => tvKey("back"),
       () => {
         flash("back");
-        setShowTvAppCtrl(true);
+        openTvAppCtrl();
       },
       TVAPPCTRL_HOLD_MS,
     );
@@ -1399,7 +1413,12 @@ export default function App() {
   // Replaces the remote outright rather than overlaying it, so no remote button
   // can be reached while the tv is being pointed at.
   if (showTvAppCtrl) {
-    return <TvAppCtrl onExit={() => setShowTvAppCtrl(false)} />;
+    return (
+      <TvAppCtrl
+        send={tvappLink.send}
+        onExit={() => setShowTvAppCtrl(false)}
+      />
+    );
   }
 
   if (showSubCtrl) {

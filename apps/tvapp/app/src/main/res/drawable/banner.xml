@@ -1,6 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
-  <solid android:color="#1E3A8A" />
-  <size android:width="320dp" android:height="180dp" />
-</shape>
+<!-- The tile the Google TV launcher shows for tvapp, and the app icon too.
+     320x180 is the banner size Android TV asks for, and the viewport matches it,
+     so a 100-unit home glyph sits centered on the blue. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+
+  <path
+      android:fillColor="#1E3A8A"
+      android:pathData="M0,0 h320 v180 h-320 z" />
+
+  <!-- The standard home outline: up one side of the door, across the walls, up
+       the right eave to the apex, then down the left eave. -->
+  <path
+      android:fillColor="#FFFFFF"
+      android:pathData="M151.67,123.33 v-25 h16.67 v25 h20.83 v-33.33 h12.5 L160,52.5 L118.33,90 h12.5 v33.33 z" />
+</vector>

@@ -83,6 +83,17 @@ const BRAVIA_PSK = "qwerty";
 // not a trip out to the public hahnca.com endpoint.
 const TVAPPCTRL_RELAY_PORT = 8098;
 const TVAPP_CTRL_URL = "ws://192.168.1.86:8099";
+const TVAPP_DIAL_RETRY_MS = 2000;
+// Sideloaded, but still in the tv's own application list, so opening tvapp needs
+// no adb — which matters, because the tv's adb port moves on every reboot.
+const BRAVIA_APP_CONTROL_URL = "http://192.168.1.86/sony/appControl";
+const TVAPP_BRAVIA_URI =
+  "com.sony.dtv.com.hahnca.tvapp.com.hahnca.tvapp.MainActivity";
+// Relay control messages, hand-mirrored in apps/android/tvappctrl.js. Distinct
+// from the phone-to-tvapp protocol, which the relay forwards without reading.
+const MSG_OPEN_TVAPP = "o"; // phone -> relay: open tvapp on the tv
+const MSG_TVAPP_UP = "u"; // relay -> phone: tvapp is open
+const MSG_TVAPP_DOWN = "d"; // relay -> phone: tvapp has closed
 
 const PIC_TARGETS = [
   "pictureMode",
@@ -2366,47 +2377,89 @@ async function checkSubtitleMismatch(sessions) {
   }
 }
 
-// Pipes one phone's cursor stream through to tvapp, byte for byte. It stays
-// deliberately dumb about the protocol: the wire format is agreed between
-// apps/android/tvappctrl.js and apps/tvapp's CtrlServer, and a relay that
-// understood it would be a third place to edit on every change.
+// Pipes one phone's cursor stream through to tvapp and keeps the two ends in
+// step: tvapp opening or closing on the tv is what opens or closes the phone's
+// tvappctrl screen, and vice versa. Apart from its own three control messages it
+// stays dumb about the protocol — the cursor format is agreed between
+// apps/android/tvappctrl.js and apps/tvapp's CtrlServer, and a relay that read it
+// would be a third place to edit on every change.
 function startTvappctrlRelay() {
   const relay = new WebSocketServer({ port: TVAPPCTRL_RELAY_PORT });
-  // The phone redials every couple of seconds for as long as its screen is up,
-  // so a dial failure logged every time would be thousands of identical warns an
-  // hour whenever tvapp simply is not open. Only the first of a run is logged.
-  let dialFailQuiet = false;
 
   relay.on("connection", (phone, req) => {
     const from = req.socket.remoteAddress;
-    const tv = new WebSocket(TVAPP_CTRL_URL);
-    let up = false;
+    // The phone stays connected for as long as its app is running, not just while
+    // its tvappctrl screen is up, because being told tvapp just opened is how that
+    // screen gets opened in the first place. So the tv leg is redialled on a timer
+    // instead of once: a dial that starts succeeding *is* the "tvapp opened"
+    // event, and a socket that drops *is* the "tvapp closed" event.
+    let tv = null;
+    let dialTimer = null;
+    let quietDialFail = false; // one warn per run of failures, not one per dial
+    let closed = false;
 
-    // The phone's own retry loop and its "no tvapp" message are the only status
-    // display there is, so a relay that cannot reach the tv has to drop the
-    // phone rather than sit there looking connected.
-    tv.on("open", () => {
-      up = true;
-      dialFailQuiet = false;
-      unilog(1839, `phone ${from} relaying to tvapp`);
-    });
-    tv.on("close", () => phone.close());
-    tv.on("error", (e) => {
-      if (!dialFailQuiet) {
-        dialFailQuiet = true;
-        unilog(1840, `tvapp dial failed, quiet until it answers: ${e.message}`);
-      }
-      phone.close();
-    });
+    const dial = () => {
+      if (closed) return;
+      const sock = new WebSocket(TVAPP_CTRL_URL);
+      tv = sock;
+      let wasOpen = false;
 
-    // Motion that arrives before the tv socket opens is dropped, not queued —
-    // these are relative deltas a few ms old, and stale cursor jumps are worse
-    // than a cursor that starts moving a frame late.
+      sock.on("open", () => {
+        wasOpen = true;
+        quietDialFail = false;
+        unilog(1839, `phone ${from} relaying to tvapp`);
+        sendPhone(MSG_TVAPP_UP);
+      });
+      // Only a socket that had actually been open reports "down". Otherwise the
+      // steady drip of refused dials while tvapp is simply not open would keep
+      // slamming the phone's screen shut.
+      sock.on("close", () => {
+        if (wasOpen) sendPhone(MSG_TVAPP_DOWN);
+        redial();
+      });
+      sock.on("error", (e) => {
+        if (!quietDialFail) {
+          quietDialFail = true;
+          unilog(1840, `tvapp dial failed, quiet until it answers: ${e.message}`);
+        }
+      });
+    };
+
+    const redial = () => {
+      if (closed || dialTimer) return;
+      dialTimer = setTimeout(() => {
+        dialTimer = null;
+        dial();
+      }, TVAPP_DIAL_RETRY_MS);
+    };
+
+    const sendPhone = (msg) => {
+      if (phone.readyState === WebSocket.OPEN) phone.send(msg);
+    };
+
     phone.on("message", (data) => {
-      if (up && tv.readyState === WebSocket.OPEN) tv.send(data.toString());
+      const msg = data.toString();
+      // Two messages are the relay's own; everything else is between the phone and
+      // tvapp and is forwarded without being understood.
+      if (msg === MSG_OPEN_TVAPP) {
+        launchTvapp();
+        return;
+      }
+      // Motion that arrives before the tv leg is up is dropped, not queued —
+      // these are relative deltas a few ms old, and a stale cursor jump is worse
+      // than a cursor that starts moving a frame late.
+      if (tv?.readyState === WebSocket.OPEN) tv.send(msg);
     });
-    phone.on("close", () => tv.close());
-    phone.on("error", () => tv.close());
+
+    const shutdown = () => {
+      closed = true;
+      clearTimeout(dialTimer);
+      tv?.close();
+    };
+    phone.on("close", shutdown);
+    phone.on("error", shutdown);
+
+    dial();
   });
 
   relay.on("listening", () =>
@@ -2415,6 +2468,32 @@ function startTvappctrlRelay() {
   relay.on("error", (e) =>
     unilog(1837, `relay socket error: ${e.message}`),
   );
+}
+
+// Opens tvapp on the tv so that opening tvappctrl on the phone opens it here too.
+// Sideloaded as it is, tvapp still shows up in the tv's own application list, so
+// this needs no adb — which matters, because the tv's adb port moves on reboot.
+async function launchTvapp() {
+  try {
+    const res = await fetch(BRAVIA_APP_CONTROL_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Auth-PSK": BRAVIA_PSK },
+      body: JSON.stringify({
+        method: "setActiveApp",
+        version: "1.0",
+        id: 1,
+        params: [{ uri: TVAPP_BRAVIA_URI }],
+      }),
+    });
+    const body = await res.json();
+    if (body.error) {
+      unilog(1842, `tv refused to open tvapp: ${JSON.stringify(body.error)}`);
+      return;
+    }
+    unilog(1843, "asked the tv to open tvapp");
+  } catch (e) {
+    unilog(1844, `could not ask the tv to open tvapp: ${e.message}`);
+  }
 }
 
 app.listen(TV_PORT, () => {

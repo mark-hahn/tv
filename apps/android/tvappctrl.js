@@ -1,19 +1,29 @@
 // tvappctrl — the phone side of apps/tvapp, the app sideloaded on the tv.
 //
-// Reached from the tv remote by long-pressing Back, and left again with the
-// Remote button. While it is up the tv remote is not on screen and nothing here
-// touches it.
+// Two exports, because the two have different lifetimes:
 //
-// This is the one screen that talks phone -> tv direct over the LAN instead of
-// through tv-srvr: a finger drag sends motion at 60 Hz and must not round-trip
-// through hahnca.com. There is no discovery — the tv's ip is pinned by a DHCP
-// reservation on the router and the port is ours. If the phone is not on the
-// tv's LAN, or the reservation is lost, the socket simply never opens.
+//   useTvappLink  the socket, held for as long as the app runs. It has to outlive
+//                 the screen: being told tvapp just opened on the tv is what opens
+//                 the screen, so something must be listening while the remote is
+//                 the thing on display.
+//   TvAppCtrl     the screen itself — blank but for an Exit button, and a drag
+//                 surface for the tv's cursor.
 //
-// The wire protocol is hand-mirrored in
+// The two ends stay in step in all four directions: tvapp opening or closing on
+// the tv opens or closes this screen, and opening or closing this screen opens or
+// closes tvapp.
+//
+// It talks over the LAN rather than through tv-srvr, because a finger drag sends
+// motion at 60 Hz and must not round-trip through the public endpoint. It cannot
+// reach the tv directly though — the tv answers no wireless host here — so
+// tv-tv's relay bridges the last hop. See startTvappctrlRelay in
+// apps/tv/src/main.js. There is no discovery: every address is a constant.
+//
+// The cursor protocol is hand-mirrored in
 // apps/tvapp/app/src/main/java/com/hahnca/tvapp/CtrlServer.java — tvapp is Java
 // and cannot import from here, so a change on one side is a change on both, in
-// the same session.
+// the same session. The relay's own control messages are mirrored in
+// apps/tv/src/main.js.
 //
 // Deliberately not mirrored into the web client's tv pane: there is no tv pane
 // counterpart to this screen and there is not meant to be one.
@@ -26,13 +36,15 @@ import {
   StatusBar,
   StyleSheet,
   TouchableOpacity,
+  useWindowDimensions,
 } from "react-native";
+import * as ScreenOrientation from "expo-screen-orientation";
+import * as NavigationBar from "expo-navigation-bar";
 
-// Not the tv itself: the ap isolates wireless clients from each other, and the
-// phone and the tv are both on wifi, so there is no path between them. This is
-// hahnca.com's *lan* address, which is wired, and tv-tv relays the cursor stream
-// the rest of the way (see startTvappctrlRelay in apps/tv/src/main.js). Both
-// legs are single lan hops — nothing goes out to the public endpoint.
+// Not the tv itself: the tv answers no wireless host on this LAN, and the phone
+// is on wifi. This is hahnca.com's *lan* address, which is wired, and tv-tv
+// relays the rest of the way (see startTvappctrlRelay in apps/tv/src/main.js).
+// Both legs are single lan hops — nothing goes out to the public endpoint.
 const TVAPP_HOST = "192.168.1.103";
 const TVAPP_PORT = 8098;
 const RECONNECT_MS = 2000;
@@ -47,9 +59,16 @@ const TAP_MAX_MOVE = 8;
 const TAP_MAX_MS = 300;
 // Motion is coalesced to one message per frame instead of one per touch event.
 const SEND_INTERVAL_MS = 16;
-// Keeps the Remote button clear of the status bar and the camera cutout, which
-// hiding the status bar does not free up.
-const HEADER_TOP = (StatusBar.currentHeight ?? 0) + 8;
+// Where the Exit button sits, per orientation. Portrait keeps clear of the camera
+// cutout row, which hiding the status bar does not free up. Landscape is inset from
+// both bezels instead: the cutout is centred on a side edge there, and with the
+// status and navigation bars hidden the window runs edge to edge, so without an
+// inset of its own the button ends up jammed into the corner.
+const STATUS_BAR_HEIGHT = StatusBar.currentHeight ?? 0;
+const EXIT_TOP = STATUS_BAR_HEIGHT + 8;
+const EXIT_TOP_LANDSCAPE = 24;
+const EXIT_RIGHT = 10;
+const EXIT_RIGHT_LANDSCAPE = 56;
 
 // Android 16 and up refuse a connection to a LAN address unless the app holds
 // this, declared in android/app/src/main/AndroidManifest.xml and granted at
@@ -57,16 +76,27 @@ const HEADER_TOP = (StatusBar.currentHeight ?? 0) + 8;
 // works anyway, so the result is never acted on.
 const LOCAL_NETWORK_PERMISSION = "android.permission.ACCESS_LOCAL_NETWORK";
 
+// Forwarded through the relay to tvapp, which reads them (CtrlServer.java).
 const CMD_MOVE = "m";
 const CMD_CLICK = "c";
+const CMD_EXIT = "x";
+// Handled by the relay itself (apps/tv/src/main.js), not by tvapp.
+const MSG_OPEN_TVAPP = "o";
+const MSG_TVAPP_UP = "u";
+const MSG_TVAPP_DOWN = "d";
 
-export default function TvAppCtrl({ onExit }) {
+/**
+ * The relay socket, held open for as long as the app runs — not just while the
+ * tvappctrl screen is up, because `onTvappUp` is what opens that screen.
+ * Returns a send function; App.js owns the result and hands it to TvAppCtrl.
+ */
+export function useTvappLink({ onTvappUp, onTvappDown }) {
   const wsRef = useRef(null);
-  const pendingRef = useRef({ dx: 0, dy: 0 });
-  const touchRef = useRef(null);
+  // Read through a ref so the socket effect can stay mounted for the life of the
+  // app while the callbacks it calls are re-created on every render.
+  const handlersRef = useRef(null);
+  handlersRef.current = { onTvappUp, onTvappDown };
 
-  // One socket for the life of the screen, reopened until it sticks. The retry
-  // loop is what makes waking the tv or walking back onto the LAN just work.
   useEffect(() => {
     let done = false;
     let retryTimer = null;
@@ -90,6 +120,10 @@ export default function TvAppCtrl({ onExit }) {
       ws.onopen = () => clearTimeout(openTimer);
       ws.onerror = scheduleRetry;
       ws.onclose = scheduleRetry;
+      ws.onmessage = (e) => {
+        if (e.data === MSG_TVAPP_UP) handlersRef.current.onTvappUp();
+        else if (e.data === MSG_TVAPP_DOWN) handlersRef.current.onTvappDown();
+      };
       openTimer = setTimeout(() => {
         if (ws.readyState !== WebSocket.OPEN) ws.close(); // onclose retries
       }, CONNECT_TIMEOUT_MS);
@@ -116,6 +150,62 @@ export default function TvAppCtrl({ onExit }) {
   const send = (msg) => {
     const ws = wsRef.current;
     if (ws?.readyState === WebSocket.OPEN) ws.send(msg);
+  };
+
+  // A fresh identity each render is harmless: both only dereference a ref. Naming
+  // the one action App.js needs keeps the wire protocol inside this module.
+  return { send, openTvapp: () => send(MSG_OPEN_TVAPP) };
+}
+
+export default function TvAppCtrl({ send, onExit }) {
+  const pendingRef = useRef({ dx: 0, dy: 0 });
+  const touchRef = useRef(null);
+  const { width, height } = useWindowDimensions();
+
+  // Rotation is unlocked for this screen alone, and re-locked on the way out. It
+  // is what makes the phone's orientation work at all: the layout turns with the
+  // device, so the Exit button lands in the corner that is really the upper right,
+  // and touch deltas arrive already in the rotated frame — a drag towards the top
+  // of the phone as held is a drag towards the top of the tv, with no correction
+  // to apply. Correcting the motion by hand instead would leave the button and
+  // the status bar inset in the wrong corner.
+  useEffect(() => {
+    ScreenOrientation.unlockAsync().catch(() => {});
+    return () => {
+      ScreenOrientation.lockAsync(
+        ScreenOrientation.OrientationLock.PORTRAIT_UP,
+      ).catch(() => {});
+    };
+  }, []);
+
+  // The navigation bar is hidden for this screen too. In landscape it moves to
+  // the right edge and, the window being edge to edge, lays itself over the
+  // content — right on top of the Exit button. Swipe still brings it back
+  // temporarily, and it is restored on the way out.
+  useEffect(() => {
+    NavigationBar.setBehaviorAsync("overlay-swipe").catch(() => {});
+    return () => {
+      NavigationBar.setVisibilityAsync("visible").catch(() => {});
+    };
+  }, []);
+
+  // Both bars are re-asserted on every rotation, because a configuration change
+  // brings them back — the status bar with the clock and battery included, and the
+  // declarative <StatusBar hidden /> below does not survive it either. Separate
+  // from the effect above so the restore does not run on each rotation and flash
+  // the navigation bar into view.
+  useEffect(() => {
+    NavigationBar.setVisibilityAsync("hidden").catch(() => {});
+    StatusBar.setHidden(true);
+  }, [width, height]);
+
+  const landscape = width > height;
+  const exitTop = landscape ? EXIT_TOP_LANDSCAPE : EXIT_TOP;
+  const exitRight = landscape ? EXIT_RIGHT_LANDSCAPE : EXIT_RIGHT;
+
+  const exit = () => {
+    send(CMD_EXIT); // closes tvapp on the tv too
+    onExit();
   };
 
   // Flushes whatever the drag accumulated since the last frame. Sending per
@@ -174,7 +264,7 @@ export default function TvAppCtrl({ onExit }) {
     <View
       style={styles.container}
       // Claiming the touch on start only. onMoveShouldSetResponder would let a
-      // press that starts on the Remote button be stolen the instant the finger
+      // press that starts on the Exit button be stolen the instant the finger
       // twitches, so the button would flash and never fire.
       onStartShouldSetResponder={() => true}
       onResponderTerminationRequest={() => false}
@@ -185,11 +275,11 @@ export default function TvAppCtrl({ onExit }) {
     >
       <StatusBar hidden />
       <TouchableOpacity
-        onPress={onExit}
-        style={styles.remoteBtn}
+        onPress={exit}
+        style={[styles.exitBtn, { top: exitTop, right: exitRight }]}
         activeOpacity={0.7}
       >
-        <Text style={styles.remoteBtnText}>Remote</Text>
+        <Text style={styles.exitBtnText}>Exit</Text>
       </TouchableOpacity>
     </View>
   );
@@ -200,16 +290,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#000",
   },
-  remoteBtn: {
+  // top and right come from the render: both depend on the orientation.
+  exitBtn: {
     position: "absolute",
-    top: HEADER_TOP,
-    right: 10,
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 4,
     backgroundColor: "whitesmoke",
   },
-  remoteBtnText: {
+  exitBtnText: {
     fontSize: 14,
     color: "#000",
   },

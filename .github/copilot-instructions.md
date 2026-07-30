@@ -112,10 +112,9 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
 
 Separate from `apps/android`, which is the phone remote. `tvapp` is a plain
 native Java app (no React Native, no Expo, no `node_modules`) sideloaded onto
-the Sony Bravia, package `com.hahnca.tvapp`. The ui is still a placeholder
-"TVAPP TEST" screen; what is real is a `Close` button in the upper right, a
-mouse cursor (`CursorView`) driven by tvappctrl, and the socket it is driven
-over (`CtrlServer`). BACK and `Close` both exit.
+the Sony Bravia, package `com.hahnca.tvapp`. The screen is blank apart from an
+`Exit` button in the upper right and a mouse cursor (`CursorView`) driven by
+tvappctrl over `CtrlServer`. BACK, `Exit`, and an `x` from the phone all exit.
 
 ```bash
 cd apps/tvapp
@@ -151,16 +150,45 @@ cd apps/tvapp
 - The activity holds `FLAG_KEEP_SCREEN_ON`. The tv's screensaver otherwise takes
   the screen out from under a cursor mid-drag, and a dream deep enough to stop
   the activity would take the ctrl socket with it.
-- The cursor is a white arrow with a fat black outline drawn under the fill. It
-  starts centered, which on the placeholder screen is on top of the big white
-  text, and a thin outline there makes it look like there is no cursor at all.
+- The cursor is a white arrow with a fat black outline drawn under the fill. A
+  thin outline is invisible the moment the arrow crosses anything white, and it
+  starts centered, so that used to read as "there is no cursor".
+- `res/drawable/banner.xml` is the launcher tile and the app icon: a vector whose
+  viewport is the 320x180 banner size, holding a blue field and a white home
+  glyph. Editing the path means checking the geometry — nothing renders it for you
+  and the TV serves no icon for a sideloaded app, so rasterize the path data
+  yourself rather than eyeballing the numbers.
 
 ### tvappctrl — the phone side
 
-`apps/android/tvappctrl.js`, one screen that `App.js` returns early instead of
-the remote. Reached by long-pressing the remote's Back button
-(`TVAPPCTRL_HOLD_MS`), left again with its `Remote` button. It replaces the
+`apps/android/tvappctrl.js` exports two things, because they have different
+lifetimes: `TvAppCtrl`, the screen `App.js` returns early instead of the remote,
+and `useTvappLink`, the relay socket. Reached by long-pressing the remote's Back
+button (`TVAPPCTRL_HOLD_MS`), left again with its `Exit` button. It replaces the
 remote rather than overlaying it, which is what keeps the two from interacting.
+
+- **The socket lives in `App.js`, not in the screen**, and stays open for the life
+  of the app. It has to: being told tvapp just opened on the TV is what opens the
+  screen, so something must be listening while the remote is what is on display.
+  Do not move it back into the component.
+- **tvapp and tvappctrl are kept in step in all four directions**, and each
+  direction is a different mechanism:
+
+  | trigger | how |
+  | --- | --- |
+  | tvappctrl opens on phone | phone sends `o`; relay opens tvapp on the TV |
+  | tvappctrl closes on phone | phone sends `x`; tvapp exits itself |
+  | tvapp opens on TV | relay's redial starts succeeding → sends `u` |
+  | tvapp closes on TV | relay's TV socket drops → sends `d` |
+
+  The TV-initiated pair costs up to `TVAPP_DIAL_RETRY_MS` (2 s) to notice, because
+  the relay learns about tvapp only by redialling it. Only a socket that had
+  actually been open reports `d` — otherwise the steady drip of refused dials
+  while tvapp is closed would keep slamming the phone's screen shut.
+- Opening tvapp uses the TV's **own application list** over Sony's `appControl`
+  (`setActiveApp` with `TVAPP_BRAVIA_URI`), not adb. Sideloaded apps still appear
+  there, which matters because the TV's adb port moves on every reboot. Confirm a
+  uri with `getApplicationList` against the same endpoint if it ever changes.
 
 - It lives in **`apps/android`**, not in an app of its own: a second phone app
   for the same TV would mean a second icon, build, and Metro setup. Keep it out
@@ -200,12 +228,15 @@ remote rather than overlaying it, which is what keeps the two from interacting.
   ```
   m,<dx>,<dy>   move the cursor by a relative amount, in tv pixels
   c             click whatever the cursor is over
+  x             exit tvapp
   ```
 
   Only relative motion is sent — where on the phone the finger is has no
   bearing on where the cursor is — coalesced to one message per frame rather
   than one per touch event. A press that barely moves and is released quickly
-  is a tap, and sends `c`.
+  is a tap, and sends `c`. The relay's own three messages (`o`, `u`, `d`) are a
+  separate set it does read, mirrored between `tvappctrl.js` and
+  `apps/tv/src/main.js`; tvapp never sees them.
 - A WebSocket because RN JS has no raw sockets and http per motion event at
   60 Hz is not viable. tvapp's server side is `org.java-websocket`.
 - The release APK needs `android:usesCleartextTraffic="true"` on
@@ -240,6 +271,27 @@ remote rather than overlaying it, which is what keeps the two from interacting.
   socket will not open:
   `ping -c 3 192.168.1.86 && ip neigh show 192.168.1.86`. Only if the TV becomes
   reachable from wireless (or moves to Ethernet) does the relay become optional.
+- **Orientation is handled by unlocking rotation for this screen alone** (via
+  `expo-screen-orientation`, re-locked to portrait on unmount — the rest of the app
+  stays portrait). Letting the layout turn with the device is what makes both
+  requirements fall out for free: the `Exit` button lands in the corner that really
+  is the upper right, and touch deltas arrive already in the rotated frame, so a
+  drag towards the top of the phone as held is a drag towards the top of the TV
+  with **no correction to apply**. Rotating the motion vector by hand instead would
+  leave the button and the status-bar inset in the wrong corner. The status bar
+  inset is only added in portrait: in landscape the camera cutout sits centred on a
+  side edge, so that corner is already clear.
+- **Both system bars are hidden on this screen** — the navigation bar via
+  `expo-navigation-bar` (restored on unmount) and the status bar. In landscape the
+  navigation bar moves to the right edge and, the window being edge to edge, lays
+  itself straight over the `Exit` button. Hiding **either** has to be re-asserted on
+  every rotation: a configuration change brings both back, and the declarative
+  `<StatusBar hidden />` does not survive it. That pair of calls sits in its own
+  effect keyed on the window dimensions, separate from the one that restores the
+  navigation bar, or the restore would flash it into view on each rotation.
+- The `Exit` button's inset is per-orientation (`EXIT_TOP`/`EXIT_RIGHT` and their
+  `_LANDSCAPE` counterparts). Portrait clears the camera cutout row; landscape has
+  no bars left to hide behind, so it needs an inset from both bezels of its own.
 - The drag surface claims the touch with `onStartShouldSetResponder` only.
   Adding `onMoveShouldSetResponder` lets it steal a press that started on the
   `Remote` button the instant the finger twitches, and the symptom is a button

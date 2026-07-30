@@ -20,6 +20,7 @@ import org.java_websocket.server.WebSocketServer;
  *
  *   m,&lt;dx&gt;,&lt;dy&gt;   move the cursor by a relative amount, in tv pixels
  *   c              click whatever the cursor is over
+ *   x              exit, so closing tvappctrl on the phone closes tvapp here
  */
 class CtrlServer extends WebSocketServer {
 
@@ -28,12 +29,15 @@ class CtrlServer extends WebSocketServer {
   private static final String TAG = "tvapp";
   private static final String CMD_MOVE = "m";
   private static final String CMD_CLICK = "c";
+  private static final String CMD_EXIT = "x";
   private static final int STOP_TIMEOUT_MS = 500;
 
   interface Listener {
     void onMove(float dx, float dy);
 
     void onClick();
+
+    void onExit();
   }
 
   private final Listener listener;
@@ -77,6 +81,8 @@ class CtrlServer extends WebSocketServer {
       listener.onMove(Float.parseFloat(parts[1]), Float.parseFloat(parts[2]));
     } else if (CMD_CLICK.equals(parts[0])) {
       listener.onClick();
+    } else if (CMD_EXIT.equals(parts[0])) {
+      listener.onExit();
     } else {
       Log.w(TAG, "unknown ctrl command: " + message);
     }

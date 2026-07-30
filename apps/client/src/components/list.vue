@@ -3610,6 +3610,9 @@ export default {
 
       if (!isUp && !isDown) return;
 
+      // Skip while the tv remote is open — there up/down are remote buttons.
+      if (this.currentPane === "remote") return;
+
       // Skip if actors list mode is active
       if (this.actorsListMode) return;
 

@@ -721,6 +721,8 @@ export default {
     evtBus.on("tvRemoteLock", this._onTvRemoteLock);
     evtBus.on("tvRemoteUnlock", this._onTvRemoteUnlock);
     evtBus.on("tvArrowKey", this._onTvArrowKey);
+    evtBus.on("tvOkKey", this._onTvOkKey);
+    evtBus.on("tvBackKey", this._onTvBackKey);
   },
 
   beforeUnmount() {
@@ -729,6 +731,8 @@ export default {
     evtBus.off("tvRemoteLock", this._onTvRemoteLock);
     evtBus.off("tvRemoteUnlock", this._onTvRemoteUnlock);
     evtBus.off("tvArrowKey", this._onTvArrowKey);
+    evtBus.off("tvOkKey", this._onTvOkKey);
+    evtBus.off("tvBackKey", this._onTvBackKey);
     this.stopRepeat();
     this.stopHold();
     clearTimeout(this._lpDebounceTimer);
@@ -796,6 +800,17 @@ export default {
     // Keyboard left/right arrow — same as a short tap on the arrow button.
     async _onTvArrowKey(dir) {
       await this.tvKey(dir);
+    },
+
+    // Keyboard enter — same as a short tap on the OK button.
+    async _onTvOkKey() {
+      this.stopRepeat();
+      await this.tvKey("ok");
+    },
+
+    // Keyboard escape — same as a short tap on the Back button.
+    async _onTvBackKey() {
+      await this.tvKey("back");
     },
 
     startUnlockHold() {

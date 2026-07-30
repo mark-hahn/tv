@@ -124,7 +124,7 @@ one-off scripts referencing tvdb.json (`scripts/*.js`, `apps/srvr/scripts/fix-pi
 
 in the map pane call the first child of the maphdr2 div the "map pane info bar"
 
-- never do git commits unless i tell you to
+- never do git commit, push, pop, or anything else that modifies git repo unless i tell you to
 - you can do git reads without permission
 
 ## Unilog Debugging

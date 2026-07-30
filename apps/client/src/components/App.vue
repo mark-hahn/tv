@@ -2220,16 +2220,43 @@ export default {
     };
     window.addEventListener("keydown", this._onDelKey);
 
-    // Left/right arrow keys: meaning depends on which tab pane is showing.
+    // Arrow and enter keys: meaning depends on which tab pane is showing.
     this._onArrowKey = (e) => {
       const isLeft = e.key === "ArrowLeft";
       const isRight = e.key === "ArrowRight";
-      if (!isLeft && !isRight) return;
+      const isEnter = e.key === "Enter";
+      const isUp = e.key === "ArrowUp";
+      const isDown = e.key === "ArrowDown";
+      const isEsc = e.key === "Escape";
+      if (!isLeft && !isRight && !isEnter && !isUp && !isDown && !isEsc) return;
       if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
       const tag = document.activeElement?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select") return;
       if (document.activeElement?.isContentEditable) return;
       if (this.videoPlayerPath) return;
+      if (isEnter) {
+        // Enter presses OK on the remote; everywhere else it keeps its
+        // existing meaning (dismissing the missing-episode warning, etc).
+        if (this.currentPane !== "remote" || this.missingEpWarning) return;
+        evtBus.emit("tvOkKey");
+        e.preventDefault();
+        return;
+      }
+      if (isUp || isDown) {
+        // Up/down press the remote's up/down buttons. In every other pane
+        // they stay with the show list (handled in list.vue).
+        if (this.currentPane !== "remote") return;
+        evtBus.emit("tvArrowKey", isUp ? "up" : "down");
+        e.preventDefault();
+        return;
+      }
+      if (isEsc) {
+        // Escape presses Back on the remote and is left alone elsewhere.
+        if (this.currentPane !== "remote") return;
+        evtBus.emit("tvBackKey");
+        e.preventDefault();
+        return;
+      }
       const dir = isLeft ? "left" : "right";
       switch (this.currentPane) {
         case "info":

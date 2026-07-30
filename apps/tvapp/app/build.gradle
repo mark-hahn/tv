@@ -33,3 +33,10 @@ android {
     targetCompatibility JavaVersion.VERSION_17
   }
 }
+
+dependencies {
+  // Server side of the tvappctrl socket. React Native JS has no raw sockets, so
+  // the phone can only reach us over http or a WebSocket, and a drag at 60 Hz
+  // rules out http.
+  implementation 'org.java-websocket:Java-WebSocket:1.5.7'
+}

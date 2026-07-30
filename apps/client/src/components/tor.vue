@@ -263,6 +263,23 @@
               Group
             </button>
             <button
+              @click.stop="torShowFilterClick"
+              :disabled="selectedItems.size === 0 && showFilter === null"
+              :class="{
+                'btn-disabled': selectedItems.size === 0 && showFilter === null,
+              }"
+              :style="{
+                fontSize: '13px',
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px 8px',
+                border: '1px solid #bbb',
+                '--btn-bg': showFilter !== null ? 'lightgray' : 'whitesmoke',
+              }"
+            >
+              Show
+            </button>
+            <button
               @click.stop="torFirstClick"
               :disabled="selectedItems.size === 0"
               :class="{ 'btn-disabled': selectedItems.size === 0 }"
@@ -1504,6 +1521,8 @@ export default {
 
       groupFilter: null, // non-null = group name filter is active
       groupFilterFlash: false, // true = flash button highlight for 500ms
+
+      showFilter: null, // non-null = show name filter is active
     };
   },
 
@@ -1619,6 +1638,15 @@ export default {
         list = list.filter(
           (t) => String(t.parsed?.group || "").toLowerCase() === gf,
         );
+      }
+
+      if (this.showFilter) {
+        const candidates = [{ name: this.showFilter }];
+        list = list.filter((t) => {
+          const name = this.torExtractShowName(t);
+          if (!name) return false;
+          return !!util.smartTitleMatch(name, candidates, null, false);
+        });
       }
 
       return list.slice().sort((a, b) => {
@@ -1838,6 +1866,7 @@ export default {
       this.loading = false;
       this.lastNeeded = null;
       this.groupFilter = null;
+      this.showFilter = null;
       this.providerStats = null;
       this.lastRawProviderCounts = null;
       this.lastReturnedProviderCounts = null;
@@ -4551,6 +4580,7 @@ export default {
 
     // Group: toggle a filter that shows only cards with the same group as the first selected card with a group
     torGroupClick() {
+      this.showFilter = null;
       if (this.groupFilter !== null) {
         // Toggle off - keep current selectedItems (selected while filtering)
         this.groupFilter = null;
@@ -4590,6 +4620,31 @@ export default {
           this.groupFilterFlash = false;
         }, 500);
       }
+    },
+
+    // Show: toggle a filter that shows only cards for the same show as the first selected card
+    torShowFilterClick() {
+      if (this.showFilter !== null) {
+        // Toggle off - keep current selectedItems (selected while filtering)
+        this.showFilter = null;
+        return;
+      }
+
+      const first = [...this.selectedItems][0];
+      if (!first) return;
+      const name = this.torExtractShowName(first);
+      if (!name) return;
+
+      // Keep only selected items that match the show so pre-filter selections
+      // of non-matching cards don't reappear when filter is turned off
+      const candidates = [{ name }];
+      const newSel = new Set();
+      for (const t of this.selectedItems) {
+        const n = this.torExtractShowName(t);
+        if (n && util.smartTitleMatch(n, candidates, null, false)) newSel.add(t);
+      }
+      this.selectedItems = newSel;
+      this.showFilter = name;
     },
 
     // First: scroll to first selected item

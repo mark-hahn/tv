@@ -3,14 +3,36 @@ package com.hahnca.tvapp;
 import android.app.Activity;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.TextView;
 
-public class MainActivity extends Activity {
+public class MainActivity extends Activity implements CtrlServer.Listener {
 
   private static final float TEXT_SIZE_SP = 72f;
+  private static final float CLOSE_TEXT_SIZE_SP = 20f;
+  private static final float CLOSE_MARGIN_DP = 24f;
+
+  private final Handler ui = new Handler(Looper.getMainLooper());
+
+  private CursorView cursor;
+  private CtrlServer ctrlServer;
+
+  // A drag sends motion at ~60 Hz from the socket thread. Deltas are summed and
+  // applied by one posted runnable rather than posting one per packet.
+  private float pendingDx;
+  private float pendingDy;
+  private boolean movePending;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -20,14 +42,111 @@ public class MainActivity extends Activity {
     // opening the app puts wireless debugging back.
     AdbWifi.enable(this);
 
+    // The tv's screensaver takes the screen out from under a cursor that is
+    // being dragged, and a dream deep enough to stop the activity would take the
+    // ctrl socket with it.
+    getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+    setContentView(buildUi());
+
+    ctrlServer = new CtrlServer(this);
+    ctrlServer.start();
+  }
+
+  private View buildUi() {
+    FrameLayout root = new FrameLayout(this);
+    root.setBackgroundColor(Color.BLACK);
+
     TextView text = new TextView(this);
     text.setText("TVAPP TEST");
     text.setTextSize(TypedValue.COMPLEX_UNIT_SP, TEXT_SIZE_SP);
     text.setTextColor(Color.WHITE);
-    text.setBackgroundColor(Color.BLACK);
     text.setGravity(Gravity.CENTER);
+    root.addView(text, matchParent());
 
-    setContentView(text);
+    Button close = new Button(this);
+    close.setText("Close");
+    close.setTextSize(TypedValue.COMPLEX_UNIT_SP, CLOSE_TEXT_SIZE_SP);
+    close.setOnClickListener(v -> finishAndRemoveTask());
+    FrameLayout.LayoutParams closeParams =
+        new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            Gravity.TOP | Gravity.END);
+    int margin = (int) dp(CLOSE_MARGIN_DP);
+    closeParams.setMargins(margin, margin, margin, margin);
+    root.addView(close, closeParams);
+
+    // Added last so the arrow draws over everything else.
+    cursor = new CursorView(this);
+    root.addView(cursor, matchParent());
+
+    return root;
+  }
+
+  private FrameLayout.LayoutParams matchParent() {
+    return new FrameLayout.LayoutParams(
+        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+  }
+
+  private float dp(float value) {
+    return TypedValue.applyDimension(
+        TypedValue.COMPLEX_UNIT_DIP, value, getResources().getDisplayMetrics());
+  }
+
+  @Override
+  protected void onDestroy() {
+    ctrlServer.shutdown();
+    super.onDestroy();
+  }
+
+  @Override
+  public void onMove(float dx, float dy) {
+    synchronized (this) {
+      pendingDx += dx;
+      pendingDy += dy;
+      if (movePending) return;
+      movePending = true;
+    }
+    ui.post(this::applyMove);
+  }
+
+  private void applyMove() {
+    float dx;
+    float dy;
+    synchronized (this) {
+      dx = pendingDx;
+      dy = pendingDy;
+      pendingDx = 0;
+      pendingDy = 0;
+      movePending = false;
+    }
+    cursor.moveBy(dx, dy);
+  }
+
+  @Override
+  public void onClick() {
+    ui.post(this::clickAtCursor);
+  }
+
+  /**
+   * Clicks whatever is under the arrow by synthesizing a touch at the cursor
+   * hotspot. Dispatching into the view hierarchy instead of calling a listener
+   * directly means any widget this ui grows is clickable with no more plumbing.
+   */
+  private void clickAtCursor() {
+    float x = cursor.getPosX();
+    float y = cursor.getPosY();
+    View root = getWindow().getDecorView();
+    long now = SystemClock.uptimeMillis();
+    dispatchTouch(root, MotionEvent.ACTION_DOWN, now, x, y);
+    dispatchTouch(root, MotionEvent.ACTION_UP, now, x, y);
+  }
+
+  private void dispatchTouch(View root, int action, long downTime, float x, float y) {
+    MotionEvent event = MotionEvent.obtain(downTime, downTime, action, x, y, 0);
+    root.dispatchTouchEvent(event);
+    event.recycle();
   }
 
   @Override

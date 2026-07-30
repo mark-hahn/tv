@@ -112,8 +112,10 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
 
 Separate from `apps/android`, which is the phone remote. `tvapp` is a plain
 native Java app (no React Native, no Expo, no `node_modules`) sideloaded onto
-the Sony Bravia, package `com.hahnca.tvapp`. Currently a placeholder that shows
-"TVAPP TEST" and exits on BACK.
+the Sony Bravia, package `com.hahnca.tvapp`. The ui is still a placeholder
+"TVAPP TEST" screen; what is real is a `Close` button in the upper right, a
+mouse cursor (`CursorView`) driven by tvappctrl, and the socket it is driven
+over (`CtrlServer`). BACK and `Close` both exit.
 
 ```bash
 cd apps/tvapp
@@ -141,27 +143,121 @@ cd apps/tvapp
 - Do not reboot the TV or run `adb pair` without asking — pairing may need the
   user to read a code off the TV screen.
 - unilog does not apply here; this is Java, use `android.util.Log`.
+- A click command is applied by synthesizing a touch at the cursor hotspot and
+  dispatching it into the view hierarchy, so any widget the ui grows is
+  clickable with no extra plumbing. `CursorView` is therefore never clickable —
+  the event has to fall through it — and it carries a large elevation, because
+  being the last child is not enough to draw over a `Button`.
+- The activity holds `FLAG_KEEP_SCREEN_ON`. The tv's screensaver otherwise takes
+  the screen out from under a cursor mid-drag, and a dream deep enough to stop
+  the activity would take the ctrl socket with it.
+- The cursor is a white arrow with a fat black outline drawn under the fill. It
+  starts centered, which on the placeholder screen is on top of the big white
+  text, and a thin outline there makes it look like there is no cursor at all.
 
-### tvappctrl — the phone side (**not yet implemented**)
+### tvappctrl — the phone side
 
-Nothing is written yet; this records the decisions so they are not re-litigated.
-Delete this notice and describe the real code once it exists.
+`apps/android/tvappctrl.js`, one screen that `App.js` returns early instead of
+the remote. Reached by long-pressing the remote's Back button
+(`TVAPPCTRL_HOLD_MS`), left again with its `Remote` button. It replaces the
+remote rather than overlaying it, which is what keeps the two from interacting.
 
-- The phone app that controls tvapp lives in **`apps/android`** — a new screen
-  in its own module, not more of `App.js`. It is not a separate app: a second
-  phone app for the same TV means a second icon, build, and Metro setup.
-- Name the code `tvappctrl` so it greps apart from the TV-remote features that
-  already fill `App.js`.
+- It lives in **`apps/android`**, not in an app of its own: a second phone app
+  for the same TV would mean a second icon, build, and Metro setup. Keep it out
+  of `App.js` proper, which the TV-remote features already fill.
 - It is **exempt from the android/web-client UI parity rule**. There is no tv
   pane counterpart and there is not meant to be one.
-- It talks **phone → TV direct over the LAN**, not through tv-srvr like every
-  other network call in `App.js`. A finger drag at 60 Hz must not round-trip
-  through hahnca.com. The phone has to be on the TV's LAN for this, and finding
-  the TV means mDNS again, since its address moves.
+- It goes **phone → relay → TV, all on the LAN**. It cannot go direct: the TV is
+  unreachable from any wireless host here, and the phone is on wifi (see the entry
+  below for the measurements). `startTvappctrlRelay` in `apps/tv/src/main.js`
+  bridges the gap, because that host is **wired**, which is the one thing that
+  does reach the TV. The relay is byte-transparent and
+  deliberately knows nothing about the protocol — understanding it would make it
+  a third place to edit on every change.
+- The relay is a **raw LAN port on tv-tv, not the public `https://hahnca.com`
+  endpoint**. That distinction is the whole point: two lan hops of a few ms each,
+  no tls, no nginx, no hairpin out to the public ip and back. A finger drag at
+  60 Hz still must not round-trip through the internet, and does not.
+- There is **no discovery**: every address is a hard-wired constant.
+  `TVAPP_HOST` / `TVAPP_PORT` in `tvappctrl.js` point at the relay
+  (192.168.1.103:8098); `TVAPPCTRL_RELAY_PORT` and `TVAPP_CTRL_URL` in
+  `apps/tv/src/main.js` are the relay's own port and the TV it dials;
+  `CTRL_PORT` in `CtrlServer.java` is the TV's. Ports are ours to pick, unlike
+  the random one adb uses. RN JS cannot do mDNS in Expo Go, and this avoids
+  needing it. **Both** ips want a DHCP reservation now — the TV's and
+  hahnca.com's, which is currently a dynamic lease. If a reservation is lost the
+  app just stops reaching the TV; fix the router, not the code.
+- Motion that arrives at the relay before its TV leg has opened is **dropped,
+  not queued** — relative deltas a few ms stale would land as a cursor jump.
+  Costs the first frame or two after the screen opens, before a finger is down.
 - The wire protocol is the only real dependency between `apps/android` and
   `apps/tvapp` — a protocol change means editing both in one session. tvapp is
   Java and cannot import `@tv/share`, so the constants get hand-mirrored; keep
-  the protocol small for that reason.
+  the protocol small for that reason. The relay in the middle does not count: it
+  forwards frames without parsing them, which is exactly why it does not become a
+  third place to edit. All of it, phone to TV:
+
+  ```
+  m,<dx>,<dy>   move the cursor by a relative amount, in tv pixels
+  c             click whatever the cursor is over
+  ```
+
+  Only relative motion is sent — where on the phone the finger is has no
+  bearing on where the cursor is — coalesced to one message per frame rather
+  than one per touch event. A press that barely moves and is released quickly
+  is a tap, and sends `c`.
+- A WebSocket because RN JS has no raw sockets and http per motion event at
+  60 Hz is not viable. tvapp's server side is `org.java-websocket`.
+- The release APK needs `android:usesCleartextTraffic="true"` on
+  `<application>` in `apps/android/android/app/src/main/AndroidManifest.xml`:
+  the TV has no tls, and without it the release build blocks `ws://` while Expo
+  Go (whose own manifest allows cleartext) works fine. That `android/`
+  directory is a gitignored prebuild output, so the edit is untracked — if it
+  is ever regenerated, put the attribute back.
+- Every js file has to be in `build-apk`'s checksum list, `tvappctrl.js`
+  included, or changing it silently reinstalls the cached APK.
+- Android 16 and up gate LAN addresses behind `ACCESS_LOCAL_NETWORK` — that
+  name, not `LOCAL_NETWORK_ACCESS`, and not the "Nearby devices" permission
+  (`NEARBY_WIFI_DEVICES`). It has to be declared in the manifest to be grantable
+  and then requested at runtime; tvappctrl does both. Expo Go declares it and has
+  it granted, so Expo Go is a fine way to test this.
+- **The TV is unreachable from every wireless host on this LAN, and that is why
+  the relay exists** — do not "simplify" it away by pointing the phone at the TV.
+  Measured, all on 192.168.1.0/24:
+
+  | from | to TV (.86) |
+  | --- | --- |
+  | phone .172, wifi | arp `FAILED`, `No route to host` |
+  | this workspace .62, wifi | arp `FAILED`, `No route to host` |
+  | hahnca.com .103, **wired** | works |
+
+  It is not blanket ap client isolation — the phone and the workspace reach each
+  other and hahnca.com fine over wifi. It is the TV specifically, so the thing to
+  look at is **how the TV is attached**: its own SSID, band, or an extender that
+  bridges to the wired segment but not to other wireless clients. Not
+  port-specific or app-specific either: `ping` fails the same as 8099 and as
+  adb's own port. The signature is a `FAILED` arp entry. Check it first when the
+  socket will not open:
+  `ping -c 3 192.168.1.86 && ip neigh show 192.168.1.86`. Only if the TV becomes
+  reachable from wireless (or moves to Ethernet) does the relay become optional.
+- The drag surface claims the touch with `onStartShouldSetResponder` only.
+  Adding `onMoveShouldSetResponder` lets it steal a press that started on the
+  `Remote` button the instant the finger twitches, and the symptom is a button
+  that flashes and never fires.
+- The screen shows **nothing but the `Remote` button** — no status, no error. A
+  failed socket is silent and the only symptom is that dragging does nothing, so
+  diagnose from the relay instead:
+  `node unilog/query.js --group tvappctrl --last 20`. It logs each phone that
+  starts relaying and the first dial failure of a run. Causes when the phone
+  cannot connect: tv-tv is down, tvapp is not open on the TV, or the phone is not
+  on the Wi-Fi at all (the usbipd + `adb reverse` dev setup gets Metro to the
+  phone over USB and does **not** put it on the LAN). The relay drops a phone it
+  cannot forward for, rather than sit there looking connected, so the phone's
+  retry loop keeps redialing on its own.
+- RN's WebSocket `error` event carries **no message** — `WebSocket.js` dispatches
+  a bare `Event`. The reason shows up on the `close` event right behind it, as
+  `reason` with code 1006. So report from `onclose`, and do not let an
+  error-triggered retry guard swallow the close that follows it.
 
 - never do a `find / ...`, it is too slow
 

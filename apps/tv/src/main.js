@@ -1,4 +1,4 @@
-import { WebSocket } from "ws";
+import { WebSocket, WebSocketServer } from "ws";
 import { exec, spawn } from "child_process";
 import { createWriteStream, mkdirSync } from "fs";
 import { join, dirname } from "path";
@@ -75,6 +75,14 @@ const FIRE_KEY_TIMEOUT_MS = 5000;
 const BRAVIA_TV_IP = "192.168.1.86:34047";
 const BRAVIA_PICTURE_URL = `http://192.168.1.86/sony/video`;
 const BRAVIA_PSK = "qwerty";
+
+// tvappctrl relay. The phone cannot reach the tv directly: the ap isolates
+// wireless clients from each other, and both the phone and the tv are on wifi.
+// This host is wired, and wireless->wired and wired->wireless both work, so it
+// forwards the cursor stream across the gap. Still a single lan hop each way,
+// not a trip out to the public hahnca.com endpoint.
+const TVAPPCTRL_RELAY_PORT = 8098;
+const TVAPP_CTRL_URL = "ws://192.168.1.86:8099";
 
 const PIC_TARGETS = [
   "pictureMode",
@@ -2358,9 +2366,61 @@ async function checkSubtitleMismatch(sessions) {
   }
 }
 
+// Pipes one phone's cursor stream through to tvapp, byte for byte. It stays
+// deliberately dumb about the protocol: the wire format is agreed between
+// apps/android/tvappctrl.js and apps/tvapp's CtrlServer, and a relay that
+// understood it would be a third place to edit on every change.
+function startTvappctrlRelay() {
+  const relay = new WebSocketServer({ port: TVAPPCTRL_RELAY_PORT });
+  // The phone redials every couple of seconds for as long as its screen is up,
+  // so a dial failure logged every time would be thousands of identical warns an
+  // hour whenever tvapp simply is not open. Only the first of a run is logged.
+  let dialFailQuiet = false;
+
+  relay.on("connection", (phone, req) => {
+    const from = req.socket.remoteAddress;
+    const tv = new WebSocket(TVAPP_CTRL_URL);
+    let up = false;
+
+    // The phone's own retry loop and its "no tvapp" message are the only status
+    // display there is, so a relay that cannot reach the tv has to drop the
+    // phone rather than sit there looking connected.
+    tv.on("open", () => {
+      up = true;
+      dialFailQuiet = false;
+      unilog(1839, `phone ${from} relaying to tvapp`);
+    });
+    tv.on("close", () => phone.close());
+    tv.on("error", (e) => {
+      if (!dialFailQuiet) {
+        dialFailQuiet = true;
+        unilog(1840, `tvapp dial failed, quiet until it answers: ${e.message}`);
+      }
+      phone.close();
+    });
+
+    // Motion that arrives before the tv socket opens is dropped, not queued —
+    // these are relative deltas a few ms old, and stale cursor jumps are worse
+    // than a cursor that starts moving a frame late.
+    phone.on("message", (data) => {
+      if (up && tv.readyState === WebSocket.OPEN) tv.send(data.toString());
+    });
+    phone.on("close", () => tv.close());
+    phone.on("error", () => tv.close());
+  });
+
+  relay.on("listening", () =>
+    unilog(1836, `relay listening on port ${TVAPPCTRL_RELAY_PORT}`),
+  );
+  relay.on("error", (e) =>
+    unilog(1837, `relay socket error: ${e.message}`),
+  );
+}
+
 app.listen(TV_PORT, () => {
   unilog(456, `listening on port ${TV_PORT}`);
   startTvChannelPeer();
+  startTvappctrlRelay();
 });
 
 setInterval(pushTvState, 2000);

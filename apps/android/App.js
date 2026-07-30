@@ -19,6 +19,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import allServices from "./services.json";
 import { keyLabels } from "./keyLabels.js";
+import TvAppCtrl from "./tvappctrl.js";
 
 // Normalize font sizes so system font scale doesn't affect the app
 const fs = (size) => size / PixelRatio.getFontScale();
@@ -42,6 +43,7 @@ const SCRUB_PING_INTERVAL_MS = 500;
 const VOL_STEP = 1;
 const PIC_VAL_MAX_CHARS = 20;
 const PIC_VAL_EDGE_CHARS = 8;
+const TVAPPCTRL_HOLD_MS = 700;
 
 function buildSeriesMap(seriesMapIn) {
   if (!seriesMapIn || seriesMapIn.length === 0) return null;
@@ -140,6 +142,7 @@ const CLIENT_ID = Math.random().toString(36).slice(2);
 export default function App() {
   const [cellDims, setCellDims] = useState({ w: 0, h: 0 });
   const [showStreamers, setShowStreamers] = useState(false);
+  const [showTvAppCtrl, setShowTvAppCtrl] = useState(false);
   const [flashSvc, setFlashSvc] = useState(null);
   const [showSubCtrl, setShowSubCtrl] = useState(false);
   const [subPlayers, setSubPlayers] = useState([]);
@@ -969,9 +972,19 @@ export default function App() {
     schedulePicCommit(setting);
   };
 
-  const startBackHold = () => dbStart(() => tvKey("back"));
+  // Long-press Back swaps the whole phone ui over to tvappctrl. Longer than the
+  // usual hold: Back is pressed constantly and must not fall into it by accident.
+  const startBackHold = () =>
+    lpStart(
+      () => tvKey("back"),
+      () => {
+        flash("back");
+        setShowTvAppCtrl(true);
+      },
+      TVAPPCTRL_HOLD_MS,
+    );
 
-  const stopBackHold = () => dbStop();
+  const stopBackHold = () => lpStop();
 
   const showsHoldRef = useRef(null);
   const showsHoldFiredRef = useRef(false);
@@ -1382,6 +1395,12 @@ export default function App() {
       onPressOut: stopHold,
     },
   ];
+
+  // Replaces the remote outright rather than overlaying it, so no remote button
+  // can be reached while the tv is being pointed at.
+  if (showTvAppCtrl) {
+    return <TvAppCtrl onExit={() => setShowTvAppCtrl(false)} />;
+  }
 
   if (showSubCtrl) {
     const currentPlayer =

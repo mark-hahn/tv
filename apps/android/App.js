@@ -145,12 +145,16 @@ export default function App() {
   // Held for the life of the app, not just while the tvappctrl screen is up: the
   // tv opening tvapp is what opens that screen, so something has to be listening
   // while the remote is what is on display.
+  // Set while another phone is the one driving tvapp: this screen still opens
+  // and closes with tvapp, but everything on it is inert until tvapp closes.
+  const [tvAppCtrlBlocked, setTvAppCtrlBlocked] = useState(false);
   const tvappLink = useTvappLink({
     onTvappUp: () => setShowTvAppCtrl(true),
-    onTvappDown: () => setShowTvAppCtrl(false),
-    // Another phone pressed Shows and claimed the cursor. tvapp itself stays
-    // open -- this just backs this phone out to its own remote.
-    onTaken: () => setShowTvAppCtrl(false),
+    onTvappDown: () => {
+      setShowTvAppCtrl(false);
+      setTvAppCtrlBlocked(false);
+    },
+    onBlockedChange: setTvAppCtrlBlocked,
   });
   const [flashSvc, setFlashSvc] = useState(null);
   const [showSubCtrl, setShowSubCtrl] = useState(false);
@@ -983,12 +987,12 @@ export default function App() {
 
   // Opening tvappctrl swaps the whole phone ui over to it, and asks the tv to
   // open tvapp as well — the two are kept in step, so one is never opened
-  // without the other. It also claims the cursor: any other phone that had
-  // tvappctrl up closes it, and tvapp's filter is cleared so this phone starts
-  // from a clean show list rather than the one it took over.
+  // without the other.
   const openTvAppCtrl = () => {
     tvappLink.openTvapp();
-    tvappLink.clearShowFilter();
+    // Opening tvapp claims the cursor, so this phone is the one driving — said
+    // here as well as by the relay, which has a round trip to answer in.
+    setTvAppCtrlBlocked(false);
     setShowTvAppCtrl(true);
   };
 
@@ -1423,6 +1427,7 @@ export default function App() {
         send={tvappLink.send}
         onClearFilter={tvappLink.onClearFilter}
         onExit={() => setShowTvAppCtrl(false)}
+        blocked={tvAppCtrlBlocked}
       />
     );
   }

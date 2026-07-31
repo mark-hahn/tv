@@ -63,6 +63,10 @@ const CURSOR_SPEED = 3;
 // moves is a drag either way, and is neither.
 const TAP_MAX_MOVE = 8;
 const TAP_MAX_MS = 300;
+// How long the blocked dialog is held to close tvapp. Longer than a hold on the
+// drag surface: it is the one thing a blocked phone can do and undoes what
+// another phone is in the middle of, so it should not happen by brushing it.
+const BLOCKED_CLOSE_HOLD_MS = 600;
 // Motion is coalesced to one message per frame instead of one per touch event.
 const SEND_INTERVAL_MS = 16;
 // Where the top row (filter box, Clear, Exit) sits, per orientation. Portrait
@@ -105,22 +109,27 @@ const MSG_CLEAR_FILTER = "z";
 const MSG_OPEN_TVAPP = "o";
 const MSG_TVAPP_UP = "u";
 const MSG_TVAPP_DOWN = "d";
-// Another phone pressed its Shows button and claimed the cursor. Same effect on
-// this screen as tvapp closing, but tvapp itself stays open -- it is only this
-// phone that is no longer the one driving it.
-const MSG_TAKEN = "k";
+// Only one phone drives the cursor. The rest still open this screen — it mirrors
+// whether tvapp is up and may not disagree with the tv — but come up blocked,
+// with everything on it inert behind a dialog saying so.
+const MSG_BLOCKED = "b";
+const MSG_ALLOWED = "a";
+// The one action left to a blocked phone, so a tv left open by a phone that has
+// since been put down is not stuck that way. The relay takes it from a blocked
+// phone where it drops everything else.
+const MSG_CLOSE_TVAPP = "q";
 
 /**
  * The relay socket, held open for as long as the app runs — not just while the
  * tvappctrl screen is up, because `onTvappUp` is what opens that screen.
  * Returns a send function; App.js owns the result and hands it to TvAppCtrl.
  */
-export function useTvappLink({ onTvappUp, onTvappDown, onTaken }) {
+export function useTvappLink({ onTvappUp, onTvappDown, onBlockedChange }) {
   const wsRef = useRef(null);
   // Read through a ref so the socket effect can stay mounted for the life of the
   // app while the callbacks it calls are re-created on every render.
   const handlersRef = useRef(null);
-  handlersRef.current = { onTvappUp, onTvappDown, onTaken };
+  handlersRef.current = { onTvappUp, onTvappDown, onBlockedChange };
   // MSG_CLEAR_FILTER only means anything to the tvappctrl screen, so that
   // screen registers for it while it is mounted rather than App.js routing it
   // through: the remote has nothing to do with a filter box on the tv.
@@ -152,7 +161,8 @@ export function useTvappLink({ onTvappUp, onTvappDown, onTaken }) {
       ws.onmessage = (e) => {
         if (e.data === MSG_TVAPP_UP) handlersRef.current.onTvappUp();
         else if (e.data === MSG_TVAPP_DOWN) handlersRef.current.onTvappDown();
-        else if (e.data === MSG_TAKEN) handlersRef.current.onTaken();
+        else if (e.data === MSG_BLOCKED) handlersRef.current.onBlockedChange(true);
+        else if (e.data === MSG_ALLOWED) handlersRef.current.onBlockedChange(false);
         else if (e.data === MSG_CLEAR_FILTER) clearFilterRef.current?.();
       };
       openTimer = setTimeout(() => {
@@ -189,20 +199,17 @@ export function useTvappLink({ onTvappUp, onTvappDown, onTaken }) {
   return {
     send,
     openTvapp: () => send(MSG_OPEN_TVAPP),
-    // Same wire message the Clear button sends, exposed for App.js to fire when
-    // this phone claims tvappctrl -- it starts on a clean show list, not on
-    // whatever the phone it took over from had left filtered.
-    clearShowFilter: () => send(`${CMD_FILTER},`),
     onClearFilter: (fn) => {
       clearFilterRef.current = fn;
     },
   };
 }
 
-export default function TvAppCtrl({ send, onClearFilter, onExit }) {
+export default function TvAppCtrl({ send, onClearFilter, onExit, blocked }) {
   const pendingRef = useRef({ dx: 0, dy: 0 });
   const touchRef = useRef(null);
   const holdRef = useRef(null);
+  const blockedHoldRef = useRef(null);
   const { width, height } = useWindowDimensions();
   // The tv's show-list filter, typed here because the tv has no keyboard. Kept
   // regardless of whether the keyboard is currently up — closing the keyboard
@@ -219,6 +226,32 @@ export default function TvAppCtrl({ send, onClearFilter, onExit }) {
     });
     return () => onClearFilterRef.current(null);
   }, []);
+
+  // The overlay below is what actually stops touches reaching anything, but a
+  // keyboard already up sits above it, and a drag already under way holds the
+  // responder and would go on feeding the cursor. Both are dropped here.
+  useEffect(() => {
+    if (!blocked) return;
+    Keyboard.dismiss();
+    clearTimeout(holdRef.current);
+    touchRef.current = null;
+    pendingRef.current.dx = 0;
+    pendingRef.current.dy = 0;
+    return () => clearTimeout(blockedHoldRef.current);
+  }, [blocked]);
+
+  // Holding the blocked dialog closes tvapp, which closes this screen and every
+  // other phone's along with it — the same end as the Exit button, reached the
+  // one way still open to a phone that is blocked.
+  const startBlockedHold = () => {
+    clearTimeout(blockedHoldRef.current);
+    blockedHoldRef.current = setTimeout(() => {
+      send(MSG_CLOSE_TVAPP);
+      onExit();
+    }, BLOCKED_CLOSE_HOLD_MS);
+  };
+
+  const stopBlockedHold = () => clearTimeout(blockedHoldRef.current);
 
   // Rotation is unlocked for this screen alone, and re-locked on the way out. It
   // is what makes the phone's orientation work at all: the layout turns with the
@@ -313,6 +346,7 @@ export default function TvAppCtrl({ send, onClearFilter, onExit }) {
   // so dismissing the keyboard here is exactly "clicked or dragged outside the
   // box", and never clears the filter text itself.
   const onGrant = (e) => {
+    if (blocked) return;
     Keyboard.dismiss();
     const { pageX, pageY } = e.nativeEvent;
     const touch = { x: pageX, y: pageY, moved: 0, at: Date.now(), held: false };
@@ -375,6 +409,7 @@ export default function TvAppCtrl({ send, onClearFilter, onExit }) {
           autoCorrect={false}
           autoCapitalize="none"
           returnKeyType="done"
+          editable={!blocked}
           placeholder="Filter..."
           placeholderTextColor="#888"
           style={styles.filterInput}
@@ -386,6 +421,26 @@ export default function TvAppCtrl({ send, onClearFilter, onExit }) {
           <Text style={styles.actionBtnText}>Exit</Text>
         </TouchableOpacity>
       </View>
+      {/* Last, so it covers the row above as well as the drag surface. Claiming
+          every touch that starts on it is what blocks the ui: the views beneath
+          are only ever offered a touch this one has turned down. The hold it
+          takes for itself is the only thing that still gets through. */}
+      {blocked && (
+        <View
+          style={styles.blockOverlay}
+          onStartShouldSetResponder={() => true}
+          onResponderTerminationRequest={() => false}
+          onResponderGrant={startBlockedHold}
+          onResponderRelease={stopBlockedHold}
+          onResponderTerminate={stopBlockedHold}
+        >
+          <View style={styles.blockDialog}>
+            <Text style={styles.blockDialogText}>
+              {"TV control blocked.\nClick and hold to close."}
+            </Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -427,5 +482,25 @@ const styles = StyleSheet.create({
   actionBtnText: {
     fontSize: ACTION_FONT_SIZE,
     color: "#fff",
+  },
+  blockOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.75)",
+  },
+  blockDialog: {
+    paddingVertical: 24,
+    paddingHorizontal: 32,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#555",
+    backgroundColor: "#303030",
+  },
+  blockDialogText: {
+    fontSize: 26,
+    fontWeight: "bold",
+    color: "#fff",
+    textAlign: "center",
   },
 });

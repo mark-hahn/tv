@@ -94,7 +94,9 @@ const TVAPP_BRAVIA_URI =
 const MSG_OPEN_TVAPP = "o"; // phone -> relay: open tvapp on the tv
 const MSG_TVAPP_UP = "u"; // relay -> phone: tvapp is open
 const MSG_TVAPP_DOWN = "d"; // relay -> phone: tvapp has closed
-const MSG_TAKEN = "k"; // relay -> phone: another phone claimed tvappctrl, close it
+const MSG_BLOCKED = "b"; // relay -> phone: another phone is driving, block the ui
+const MSG_ALLOWED = "a"; // relay -> phone: this phone is the one driving
+const MSG_CLOSE_TVAPP = "q"; // phone -> relay: close tvapp, allowed even blocked
 // tvapp's own protocol (apps/tvapp's CtrlServer.java), used directly below --
 // not relayed -- so the web client's Shows button works with no phone
 // connected at all.
@@ -2387,21 +2389,48 @@ async function checkSubtitleMismatch(sessions) {
 
 // Pipes one phone's cursor stream through to tvapp and keeps the two ends in
 // step: tvapp opening or closing on the tv is what opens or closes the phone's
-// tvappctrl screen, and vice versa. Apart from its own four control messages it
+// tvappctrl screen, and vice versa. Apart from its own five control messages it
 // stays dumb about the protocol — the cursor format is agreed between
 // apps/android/tvappctrl.js and apps/tvapp's CtrlServer, and a relay that read it
 // would be a third place to edit on every change.
 //
-// Only one phone drives the cursor at a time. Every phone has its own connection
-// and its own dial loop, all of them watching the one tvapp, so without the
-// ownership below they would all open together and drag the same cursor at once.
+// Every phone opens tvappctrl when tvapp does, because that screen mirrors
+// whether tvapp is up and must not contradict the tv. Only one of them may drive
+// the cursor, so the others are told to block their ui rather than closed.
 function startTvappctrlRelay() {
   const relay = new WebSocketServer({ port: TVAPPCTRL_RELAY_PORT });
-  // The phone whose Shows button opened tvappctrl, and the only one allowed to
-  // have it up. Null when no phone claimed it, which is how a launch from the
-  // web client's Shows button leaves it: that one has no phone to prefer, and
-  // opens tvappctrl on all of them.
-  let ownerPhone = null;
+  // Every connected phone, and whether its leg to tvapp is up — which is the
+  // same thing as whether its tvappctrl screen is showing.
+  const legs = new Map(); // phone -> { up, send }
+  // The phone allowed to drive, null whenever tvapp is down.
+  let controller = null;
+  // The phone last used, which is who gets the cursor when tvapp is opened by
+  // something that is not a phone — the web client's Shows button.
+  let lastActive = null;
+
+  const upCount = () => {
+    let n = 0;
+    for (const leg of legs.values()) if (leg.up) n++;
+    return n;
+  };
+
+  // Still being connected is enough to be picked: a phone whose dial has not
+  // come up yet is told it has the cursor when it does, a retry later.
+  const pickController = () => {
+    if (lastActive && legs.has(lastActive)) return lastActive;
+    for (const [phone, leg] of legs) if (leg.up) return phone;
+    return null;
+  };
+
+  const sendControlState = (phone) => {
+    const leg = legs.get(phone);
+    if (!leg?.up) return;
+    leg.send(phone === controller ? MSG_ALLOWED : MSG_BLOCKED);
+  };
+
+  const broadcastControlState = () => {
+    for (const phone of legs.keys()) sendControlState(phone);
+  };
 
   relay.on("connection", (phone, req) => {
     const from = req.socket.remoteAddress;
@@ -2415,6 +2444,12 @@ function startTvappctrlRelay() {
     let quietDialFail = false; // one warn per run of failures, not one per dial
     let closed = false;
 
+    const sendPhone = (msg) => {
+      if (phone.readyState === WebSocket.OPEN) phone.send(msg);
+    };
+
+    legs.set(phone, { up: false, send: sendPhone });
+
     const dial = () => {
       if (closed) return;
       const sock = new WebSocket(TVAPP_CTRL_URL);
@@ -2425,21 +2460,35 @@ function startTvappctrlRelay() {
         wasOpen = true;
         quietDialFail = false;
         unilog(1839, `phone ${from} relaying to tvapp`);
-        // tvapp merely being up does not open a phone that has not claimed it.
-        // Every phone dials the same tvapp, so without this the claiming
-        // phone's own launch would reopen all the others a second or two later,
-        // as their dials started succeeding, and undo the claim it just made.
-        if (!ownerPhone || ownerPhone === phone) sendPhone(MSG_TVAPP_UP);
+        // The phone can go away while its dial is still in flight, and this
+        // fires anyway — there is no leg left to bring up.
+        const leg = legs.get(phone);
+        if (!leg) return;
+        leg.up = true;
+        sendPhone(MSG_TVAPP_UP);
+        // A launch nobody claimed — the web client's Shows button — leaves the
+        // cursor unassigned until the first screen comes up on it, and it goes
+        // to the phone last used. A launch a phone claimed has already set this.
+        if (!controller) {
+          controller = pickController();
+          unilog(1859, `tvapp up unclaimed, cursor to last phone used`);
+          broadcastControlState();
+        } else {
+          sendControlState(phone);
+        }
       });
       // Only a socket that had actually been open reports "down". Otherwise the
       // steady drip of refused dials while tvapp is simply not open would keep
       // slamming the phone's screen shut.
       sock.on("close", () => {
         if (wasOpen) {
+          const leg = legs.get(phone);
+          if (leg) leg.up = false;
           sendPhone(MSG_TVAPP_DOWN);
-          // tvapp is gone, so the claim on it goes too — the next launch, from
-          // whatever source, starts over with nobody owning it.
-          if (ownerPhone === phone) ownerPhone = null;
+          // tvapp is gone once no leg is left on it, and the cursor goes with
+          // it: the next launch starts over with nobody driving. The phones
+          // clear their own blocking when their screen closes.
+          if (upCount() === 0) controller = null;
         }
         redial();
       });
@@ -2463,28 +2512,33 @@ function startTvappctrlRelay() {
       }, TVAPP_DIAL_RETRY_MS);
     };
 
-    const sendPhone = (msg) => {
-      if (phone.readyState === WebSocket.OPEN) phone.send(msg);
-    };
-
     phone.on("message", (data) => {
       const msg = data.toString();
       // Two messages are the relay's own; everything else is between the phone and
       // tvapp and is forwarded without being understood.
       if (msg === MSG_OPEN_TVAPP) {
-        // This phone claims tvappctrl. Every other phone closes it now if it
-        // has it up, and the gate in the dial above is what keeps them from
-        // opening again when tvapp answers this launch.
-        ownerPhone = phone;
-        unilog(1856, `phone ${from} claimed tvappctrl`);
-        for (const other of relay.clients) {
-          if (other !== phone && other.readyState === WebSocket.OPEN) {
-            other.send(MSG_TAKEN);
-          }
-        }
+        // Opening tvapp is a claim on the cursor, so the phone that pressed
+        // Shows drives it and every other screen comes up blocked.
+        controller = phone;
+        lastActive = phone;
+        unilog(1860, `phone ${from} opened tvapp and has the cursor`);
         launchTvapp();
+        broadcastControlState();
         return;
       }
+      // The one thing a blocked phone may still do, which is why this comes
+      // before the check below: its dialog says to hold to close. Sent as
+      // tvapp's own exit, so every phone's leg drops and they all close with it.
+      if (msg === MSG_CLOSE_TVAPP) {
+        unilog(1862, `phone ${from} closed tvapp`);
+        if (tv?.readyState === WebSocket.OPEN) tv.send(CMD_EXIT_TVAPP);
+        return;
+      }
+      // A blocked phone's ui sends nothing, and the relay does not take its word
+      // for that: anything already in flight when the block landed must not
+      // reach the cursor, nor count as this phone having been the one in use.
+      if (controller && phone !== controller) return;
+      lastActive = phone;
       // Motion that arrives before the tv leg is up is dropped, not queued —
       // these are relative deltas a few ms old, and a stale cursor jump is worse
       // than a cursor that starts moving a frame late.
@@ -2493,9 +2547,14 @@ function startTvappctrlRelay() {
 
     const shutdown = () => {
       closed = true;
-      // A phone that has gone away cannot go on owning tvappctrl, or no other
-      // phone's dial would ever be allowed to open it again.
-      if (ownerPhone === phone) ownerPhone = null;
+      legs.delete(phone);
+      if (lastActive === phone) lastActive = null;
+      // A phone that has gone away cannot go on driving, or every phone still
+      // on tvapp would sit blocked with nobody able to move the cursor.
+      if (controller === phone) {
+        controller = pickController();
+        broadcastControlState();
+      }
       clearTimeout(dialTimer);
       tv?.close();
     };

@@ -1,0 +1,26 @@
+package com.hahnca.tvapp;
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/** What both the trailer card and the player need to know about a trailer url. */
+class Trailers {
+
+  private static final Pattern YOUTUBE_ID =
+      Pattern.compile("(?:[?&]v=|youtu\\.be/|/embed/)([A-Za-z0-9_-]{6,})");
+  // YouTube's own still for a video. hqdefault is 4:3 with the picture letter-
+  // boxed inside it, which a 16:9 card crops back off.
+  private static final String THUMBNAIL_URL = "https://img.youtube.com/vi/%s/hqdefault.jpg";
+
+  /** The video id, or null when the url is not a YouTube one. */
+  static String youtubeId(String url) {
+    Matcher matcher = YOUTUBE_ID.matcher(url);
+    return matcher.find() ? matcher.group(1) : null;
+  }
+
+  /** The still to show on the card, or "" when there is none to be had. */
+  static String thumbnail(String url) {
+    String videoId = youtubeId(url);
+    return videoId == null ? "" : String.format(THUMBNAIL_URL, videoId);
+  }
+}

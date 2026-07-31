@@ -112,9 +112,115 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
 
 Separate from `apps/android`, which is the phone remote. `tvapp` is a plain
 native Java app (no React Native, no Expo, no `node_modules`) sideloaded onto
-the Sony Bravia, package `com.hahnca.tvapp`. The screen is blank apart from an
-`Exit` button in the upper right and a mouse cursor (`CursorView`) driven by
-tvappctrl over `CtrlServer`. BACK, `Exit`, and an `x` from the phone all exit.
+the Sony Bravia, package `com.hahnca.tvapp`. The left 40% of the screen is a
+card per show (`ShowListView`, fed by `Shows`), the rest is the selected show's
+pane under a row of tabs with `Emby` at its left end and `Exit` at its right, and
+over all of it is a mouse cursor (`CursorView`) driven by tvappctrl over `CtrlServer`. BACK, `Exit`, and
+an `x` from the phone all exit; `Exit` opens Emby on the way out, since leaving
+otherwise lands on the launcher.
+
+- The card list is the web client's show list in miniature: name and `waitStr`,
+  one card always selected (the top one at startup), clicked to select. It is
+  loaded once from tv-srvr's `getAllTvdb?hasEmby=1` — the same call and filter
+  the phone remote's list uses, so the two agree — over public https, since a
+  one-shot 2 MB load has no latency budget worth the relay's tricks.
+- Every card is built up front instead of recycled. A few hundred shows that
+  never change while the app is open do not need a `ListView`, and a plain
+  `ScrollView` is what lets the cursor's edge scrolling just call `scrollBy`.
+- Holding the cursor in the top or bottom quarter over the list column scrolls
+  it — with only a pointer there is no other way to reach show 200. Speed ramps
+  linearly from a standstill at the quarter line to full against the edge, so
+  one gesture covers both a nudge of a row or two and a run to the end. The
+  scroll runs off its own repeating post rather than off arriving motion,
+  because "held" means no motion is arriving, and it carries the sub-pixel
+  remainder so the slow end of the ramp still moves.
+- The selected show is remembered in `SharedPreferences` and written through on
+  every click, so the app reopens where it was left instead of at the top of a
+  couple hundred cards. A remembered show that is gone falls back to the top.
+- To the right of the list is the web client's info pane: the show name, the
+  poster, the same one-per-line field list the phone remote's Info tab shows, in
+  the same order, and the overview under them. It starts below the buttons,
+  which share that half of the screen with it. Poster loads are sequenced so a
+  quick run down the list cannot land an older image on a newer show.
+- On the Info pane only the description scrolls; the title, poster and fields
+  stay put. Panes scroll at one constant crawl in either direction, with none of
+  the list's speed ramp — a description or a cast is not a list of two hundred —
+  and clicking the description is a shortcut back to its top. Both halves reach
+  `MainActivity`'s one scroll loop through `Scroller`, which is why the loop
+  needs to know about neither view.
+- The cursor is accelerated the way a desktop mouse is: slow motion passes
+  through untouched so a card can be aimed at, fast motion is multiplied up to
+  `ACCEL_MAX_GAIN` so the far corner of a 4K screen is one flick of a
+  phone-sized surface away. Speed is measured over the gap between batches, and
+  a gap long enough to be a new stroke is clamped so the stroke starts
+  unaccelerated.
+- Clicking the poster does the same as `Emby` — it is the pane's biggest target,
+  and loading the show it shows is the only thing this screen does.
+- The right half is tabbed, with the web client's simple-mode tabs in its order:
+  **Info, Map, Actor, Review, Trailer** — singular, because a tv reads at a
+  glance — each holding what that pane holds there. Only the tabs are weighted,
+  so they spread across the pane while `Emby` at the left of the row and `Exit`
+  at the right keep their own width. `Pane` is the whole contract:
+  every pane is told the selected show whether or not it is showing, and loads
+  on the next `onShown()`, because two of them fetch and running a fetch per
+  card while someone scrolls the list would be for nothing.
+  - **Map** is the season by episode grid, from `getSeriesMapFromEmby` with
+    `stale: true` — the server's cached episodeData, no Emby or disk access, and
+    this pane only reads. Same letters and same two cell colours as the client.
+    Rows are weighted, not measured, so twenty seasons narrow the columns rather
+    than run off a pane that cannot scroll sideways.
+  - **Actors** is the cast grid out of the record's own `characters`. Nothing is
+    clickable: the other uis open an IMDb page, and there is no browser worth
+    opening on a tv.
+  - **Reviews** is tv-api's `getImdbReviews`, which does the filtering and the
+    star conversion. IMDb answers 403 often enough that the error is shown
+    rather than an empty pane — the web client is getting the same 403 today.
+  - **Trailer** is a card per trailer in the record, holding the video's own
+    still and nothing else, clicked to play. The still is YouTube's
+    `hqdefault.jpg`, which is
+    4:3 with the picture letterboxed inside it — the 16:9 card crops that back
+    off. It stands in for the embedded player the web client shows before you
+    press play.
+  - Playing happens **inside tvapp**, full screen, in `TrailerPlayer`'s WebView,
+    not by handing the url to the YouTube app. Handing it over worked, but the
+    tv app never says when a video ended and backing out of it lands on whatever
+    task was underneath rather than here. The iframe api both plays the video and
+    reports `ENDED`, which is what puts the pane back; a plain video file url gets
+    a `<video>` element and its `ended` event instead. A click or BACK closes the
+    player early.
+    - The page is loaded with **our own domain as the base url**, not
+      `youtube.com`: the iframe api checks the embedding origin, and youtube.com
+      embedding itself is refused with *"This video is unavailable, error code
+      152"* on a screen that otherwise looks like a broken app. `about:blank`
+      fails the same way. Same string goes in the player's `origin` var.
+- **A click that arrives while something else has the screen brings tvapp back**
+  instead of being aimed at a cursor nobody can see, so whatever took the screen
+  — Emby, the launcher — is one tap on the phone away from the app again, with
+  no trip through the remote and back. The ctrl socket outlives being
+  backgrounded, which is what makes this reachable at all.
+  - It goes out as a GET to tv-tv's `/tv/opentvapp`, **not** `startActivity`.
+    Android blocks an activity start from an app that is in the background and
+    no permission a sideloaded app can grant itself lifts that — `appops set
+    SYSTEM_ALERT_WINDOW allow` does not, the log line to look for is
+    `Background activity launch blocked`. The endpoint calls the same
+    `launchTvapp` opening tvappctrl on the phone already calls, and the set
+    launching its own app is not a background start.
+  - The wire protocol does not change: the phone still just sends `c`. tvapp
+    tracks `onResume`/`onPause` and decides which of the two a click means.
+  - Being brought back this way does not restart the activity, so the tab, the
+    show and the scroll position are all where they were left.
+- Whichever pane is showing is what the cursor scrolls, and its top zone starts
+  at the pane's own top so that reaching up for a tab does not scroll the pane
+  out from under the cursor on the way.
+- Tab buttons carry their own `GradientDrawable` background rather than the
+  platform's: tinting a platform `Button` blue for the active tab and then
+  clearing the tint does not give the platform look back, it gives a white
+  button with a white label.
+- `Emby` is the web client info pane's TV button, verbatim: a GET to tv-tv's
+  `/tv/viewshow`, which powers the set on, brings Emby to the front and hands it
+  the selected show. tvapp finishes only once that request is away — finishing
+  can take the process with it. `Exit` instead launches Emby locally by intent,
+  which is enough when nothing has to be loaded into it.
 
 ```bash
 cd apps/tvapp
@@ -163,9 +269,14 @@ cd apps/tvapp
 
 `apps/android/tvappctrl.js` exports two things, because they have different
 lifetimes: `TvAppCtrl`, the screen `App.js` returns early instead of the remote,
-and `useTvappLink`, the relay socket. Reached by long-pressing the remote's Back
-button (`TVAPPCTRL_HOLD_MS`), left again with its `Exit` button. It replaces the
-remote rather than overlaying it, which is what keeps the two from interacting.
+and `useTvappLink`, the relay socket. Reached by pressing the remote's Shows
+button, left again with its `Exit` button. It replaces the remote rather than
+overlaying it, which is what keeps the two from interacting. Shows carries both
+screens: the press opens tvappctrl and a hold opens the shows pane, the hold
+going to the one with somewhere to go back to. Back has no long press at all —
+it is pressed constantly and anything hidden behind a hold there gets hit by
+accident. The web tv pane keeps Shows on a plain click, since tvappctrl has no
+counterpart there to give the click to.
 
 - **The socket lives in `App.js`, not in the screen**, and stays open for the life
   of the app. It has to: being told tvapp just opened on the TV is what opens the

@@ -1,0 +1,163 @@
+package com.hahnca.tvapp;
+
+import android.util.Log;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+/**
+ * The show list, read from tv-srvr's getAllTvdb — the same call and the same
+ * hasEmby=1 filter the phone remote's show list uses, so the two lists agree.
+ *
+ * The reply is the whole tvdb dataset (a couple of megabytes), of which this ui
+ * keeps only what the list and the panes show. It is fetched once, at startup,
+ * on its own thread.
+ */
+class Shows {
+
+  // Public https rather than a LAN port: tv-srvr listens on https only, and a
+  // one-shot load has no latency budget worth the tvappctrl relay's tricks.
+  private static final String SHOWS_URL =
+      "https://hahnca.com/tv-srvr/api/getAllTvdb?hasEmby=1";
+  private static final String TAG = "tvapp";
+
+  /** One of the show's cast, for the Actors pane. */
+  static class Actor {
+    final String name;
+    final String character;
+    final String image;
+
+    Actor(JSONObject rec) {
+      name = str(rec, "actor");
+      character = str(rec, "character");
+      image = str(rec, "image");
+    }
+  }
+
+  /** One of the show's trailers, for the Trailers pane. */
+  static class Trailer {
+    final String name;
+    final String url;
+
+    Trailer(JSONObject rec) {
+      String label = str(rec, "name");
+      name = label.isEmpty() ? "Trailer" : label;
+      url = str(rec, "url");
+    }
+  }
+
+  /** The fields the list and the panes show, and nothing else. */
+  static class Show {
+    final String name;
+    final String id;
+    final String waitStr;
+    final String image;
+    final String firstAired;
+    final String lastAired;
+    final String status;
+    final String countryLang;
+    final String network;
+    final String genres;
+    final int averageRuntime;
+    final int seasonCount;
+    final int episodeCount;
+    final int watchedCount; // -1 when the record has none
+    final String overview;
+    final String imdbId;
+    final List<Actor> characters;
+    final List<Trailer> trailers;
+
+    Show(String name, JSONObject rec) {
+      this.name = name;
+      id = str(rec, "id");
+      waitStr = str(rec, "waitStr");
+      image = str(rec, "image");
+      firstAired = str(rec, "firstAired");
+      lastAired = str(rec, "lastAired");
+      status = str(rec, "status");
+      countryLang = join(" / ", str(rec, "originalCountry"), str(rec, "originalLanguage"));
+      network = str(rec, "originalNetwork");
+      genres = joinArray(rec.optJSONArray("genres"));
+      averageRuntime = rec.optInt("averageRuntime", 0);
+      seasonCount = rec.optInt("seasonCount", 0);
+      episodeCount = rec.optInt("episodeCount", 0);
+      watchedCount = rec.isNull("watchedCount") ? -1 : rec.optInt("watchedCount", -1);
+      overview = str(rec, "overview");
+      imdbId = str(rec, "imdbId");
+      characters = new ArrayList<>();
+      JSONArray castNodes = rec.optJSONArray("characters");
+      for (int i = 0; castNodes != null && i < castNodes.length(); i++) {
+        JSONObject node = castNodes.optJSONObject(i);
+        if (node != null) characters.add(new Actor(node));
+      }
+      trailers = new ArrayList<>();
+      JSONArray trailerNodes = rec.optJSONArray("trailers");
+      for (int i = 0; trailerNodes != null && i < trailerNodes.length(); i++) {
+        JSONObject node = trailerNodes.optJSONObject(i);
+        if (node != null) trailers.add(new Trailer(node));
+      }
+    }
+  }
+
+  interface Callback {
+    /** Called on the loader thread, so post to the ui yourself. */
+    void onShows(List<Show> shows);
+  }
+
+  static void load(Callback callback) {
+    new Thread(
+            () -> {
+              try {
+                callback.onShows(parse(Http.get(SHOWS_URL)));
+              } catch (Exception e) {
+                Log.e(TAG, "show list load failed: " + e);
+              }
+            },
+            "shows-load")
+        .start();
+  }
+
+  private static List<Show> parse(String body) throws Exception {
+    JSONObject all = new JSONObject(body);
+    List<Show> shows = new ArrayList<>();
+    for (Iterator<String> it = all.keys(); it.hasNext(); ) {
+      String name = it.next();
+      shows.add(new Show(name, all.getJSONObject(name)));
+    }
+    // Same order as the phone's list: leading "the" ignored, case ignored.
+    Collections.sort(shows, (a, b) -> sortKey(a.name).compareTo(sortKey(b.name)));
+    Log.i(TAG, "loaded " + shows.size() + " shows");
+    return shows;
+  }
+
+  private static String str(JSONObject rec, String key) {
+    return rec.isNull(key) ? "" : rec.optString(key, "");
+  }
+
+  private static String join(String sep, String... parts) {
+    StringBuilder out = new StringBuilder();
+    for (String part : parts) {
+      if (part.isEmpty()) continue;
+      if (out.length() > 0) out.append(sep);
+      out.append(part);
+    }
+    return out.toString();
+  }
+
+  private static String joinArray(JSONArray array) {
+    if (array == null) return "";
+    String[] parts = new String[array.length()];
+    for (int i = 0; i < array.length(); i++) {
+      parts[i] = array.optString(i, "");
+    }
+    return join(", ", parts);
+  }
+
+  private static String sortKey(String name) {
+    String key = name.toLowerCase();
+    return key.startsWith("the ") ? key.substring(4) : key;
+  }
+}

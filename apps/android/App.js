@@ -43,7 +43,6 @@ const SCRUB_PING_INTERVAL_MS = 500;
 const VOL_STEP = 1;
 const PIC_VAL_MAX_CHARS = 20;
 const PIC_VAL_EDGE_CHARS = 8;
-const TVAPPCTRL_HOLD_MS = 700;
 
 function buildSeriesMap(seriesMapIn) {
   if (!seriesMapIn || seriesMapIn.length === 0) return null;
@@ -979,41 +978,41 @@ export default function App() {
     schedulePicCommit(setting);
   };
 
-  // Long-press Back swaps the whole phone ui over to tvappctrl. Longer than the
-  // usual hold: Back is pressed constantly and must not fall into it by accident.
-  // Long-pressing Back asks the tv to open tvapp as well as switching this ui —
-  // the two are kept in step, so one is never opened without the other.
+  // Opening tvappctrl swaps the whole phone ui over to it, and asks the tv to
+  // open tvapp as well — the two are kept in step, so one is never opened
+  // without the other.
   const openTvAppCtrl = () => {
     tvappLink.openTvapp();
     setShowTvAppCtrl(true);
   };
 
-  const startBackHold = () =>
-    lpStart(
-      () => tvKey("back"),
-      () => {
-        flash("back");
-        openTvAppCtrl();
-      },
-      TVAPPCTRL_HOLD_MS,
-    );
+  const startBackPress = () => dbStart(() => tvKey("back"));
 
-  const stopBackHold = () => lpStop();
+  const stopBackPress = () => dbStop();
 
   const showsHoldRef = useRef(null);
   const showsHoldFiredRef = useRef(false);
 
+  // Shows carries both screens: a press opens tvappctrl, a hold opens the shows
+  // pane. The hold is the one with somewhere to go back to, which is why the
+  // press is the one that swaps the ui out.
   const startShowsHold = () =>
-    dbStart(() => {
-      flash("shows");
-      setActiveTab("List");
-      setSortOrder("viewed");
-      setFollowPlaying(true);
-      setScrollToTopOnOpen(true);
-      setShowShows(true);
-    });
+    lpStart(
+      () => {
+        flash("shows");
+        openTvAppCtrl();
+      },
+      () => {
+        flash("shows");
+        setActiveTab("List");
+        setSortOrder("viewed");
+        setFollowPlaying(true);
+        setScrollToTopOnOpen(true);
+        setShowShows(true);
+      },
+    );
 
-  const stopShowsHold = () => dbStop();
+  const stopShowsHold = () => lpStop();
 
   // Long-press skip toggles the playing episode between 2160 and 1080.
   const toggleResolution = async () => {
@@ -1280,8 +1279,8 @@ export default function App() {
       largeText: true,
       bg: () => cellBg("white", "back"),
       onPress: () => {},
-      onPressIn: () => startBackHold(),
-      onPressOut: () => stopBackHold(),
+      onPressIn: () => startBackPress(),
+      onPressOut: () => stopBackPress(),
     },
     {
       key: "up",

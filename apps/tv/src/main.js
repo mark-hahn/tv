@@ -2496,6 +2496,18 @@ async function launchTvapp() {
   }
 }
 
+// tvapp asks for this when a click arrives on the tvappctrl screen while
+// something else — a trailer playing in YouTube, say — has the tv's screen. It
+// cannot come back to the front by itself: Android blocks an activity start
+// from an app that is in the background, and no permission a sideloaded app can
+// grant itself lifts that. The set launching its own app is not a background
+// start, which is the same reason opening tvappctrl on the phone goes this way.
+app.get("/tv/opentvapp", async (req, res) => {
+  unilog(1846, `opentvapp from ${client(req)}`);
+  await launchTvapp();
+  res.json({ ok: true });
+});
+
 app.listen(TV_PORT, () => {
   unilog(456, `listening on port ${TV_PORT}`);
   startTvChannelPeer();

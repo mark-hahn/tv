@@ -20,28 +20,28 @@ import org.java_websocket.server.WebSocketServer;
  *
  *   m,&lt;dx&gt;,&lt;dy&gt;   move the cursor by a relative amount, in tv pixels
  *   c              click whatever the cursor is over
+ *   p              the finger has been down long enough to be a hold, not a tap
+ *   r              and is now up again
  *   x              exit, so closing tvappctrl on the phone closes tvapp here
- *   f,&lt;text&gt;    the show list's filter, as the phone's keyboard has it
- *   e              that keyboard was accepted and is gone; clear the filter
+ *   f,&lt;text&gt;    the show list's filter, as the phone's own filter box has it
  *
  * and back to the phone, which is what the relay's other direction is for:
  *
- *   s              show the keyboard: the filter box was clicked here
- *   h              hide it again, the filter box having been clicked a second time
+ *   z              a show was clicked here: clear the phone's filter box too
  */
 class CtrlServer extends WebSocketServer {
 
   static final int CTRL_PORT = 8099;
 
-  static final String MSG_KEYBOARD_ON = "s";
-  static final String MSG_KEYBOARD_OFF = "h";
+  static final String MSG_CLEAR_FILTER = "z";
 
   private static final String TAG = "tvapp";
   private static final String CMD_MOVE = "m";
   private static final String CMD_CLICK = "c";
+  private static final String CMD_PRESS = "p";
+  private static final String CMD_RELEASE = "r";
   private static final String CMD_EXIT = "x";
   private static final String CMD_FILTER = "f";
-  private static final String CMD_KEYBOARD_CLOSED = "e";
   private static final int STOP_TIMEOUT_MS = 500;
 
   interface Listener {
@@ -49,11 +49,14 @@ class CtrlServer extends WebSocketServer {
 
     void onClick();
 
+    /** A press held past the phone's tap window, and the release ending it. */
+    void onPress();
+
+    void onRelease();
+
     void onExit();
 
     void onFilter(String text);
-
-    void onKeyboardClosed();
   }
 
   private final Listener listener;
@@ -108,10 +111,12 @@ class CtrlServer extends WebSocketServer {
       listener.onMove(Float.parseFloat(parts[1]), Float.parseFloat(parts[2]));
     } else if (CMD_CLICK.equals(parts[0])) {
       listener.onClick();
+    } else if (CMD_PRESS.equals(parts[0])) {
+      listener.onPress();
+    } else if (CMD_RELEASE.equals(parts[0])) {
+      listener.onRelease();
     } else if (CMD_EXIT.equals(parts[0])) {
       listener.onExit();
-    } else if (CMD_KEYBOARD_CLOSED.equals(parts[0])) {
-      listener.onKeyboardClosed();
     } else {
       Log.w(TAG, "unknown ctrl command: " + message);
     }

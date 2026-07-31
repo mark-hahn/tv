@@ -6,10 +6,10 @@
 //                 the screen: being told tvapp just opened on the tv is what opens
 //                 the screen, so something must be listening while the remote is
 //                 the thing on display.
-//   TvAppCtrl     the screen itself — blank but for an Exit button, and a drag
-//                 surface for the tv's cursor. A keyboard joins them while the
-//                 tv's filter box is in use, that box having no keyboard of its
-//                 own to be typed into.
+//   TvAppCtrl     the screen itself — a filter box, a Clear button and an Exit
+//                 button along the top, and a drag surface for the tv's cursor
+//                 underneath. The filter box lives here rather than on the tv:
+//                 a tv has no keyboard, and the phone always does.
 //
 // The two ends stay in step in all four directions: tvapp opening or closing on
 // the tv opens or closes this screen, and opening or closing this screen opens or
@@ -34,6 +34,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
+  Keyboard,
   PermissionsAndroid,
   StatusBar,
   StyleSheet,
@@ -57,25 +58,32 @@ const CONNECT_TIMEOUT_MS = 5000;
 // Phone drag units to tv pixels. tvapp's window is 1920x1080, so 3 puts a
 // full-width swipe a bit past halfway across the tv.
 const CURSOR_SPEED = 3;
-// A press is a tap, not a drag, only if it barely moved and was let go quickly.
+// A press that barely moves is a tap if it is let go inside TAP_MAX_MS and a
+// hold if it is not — the tv's scroll buttons are worked by holding. One that
+// moves is a drag either way, and is neither.
 const TAP_MAX_MOVE = 8;
 const TAP_MAX_MS = 300;
 // Motion is coalesced to one message per frame instead of one per touch event.
 const SEND_INTERVAL_MS = 16;
-// Where the Exit button sits, per orientation. Portrait keeps clear of the camera
-// cutout row, which hiding the status bar does not free up. Landscape is inset from
-// both bezels instead: the cutout is centred on a side edge there, and with the
-// status and navigation bars hidden the window runs edge to edge, so without an
-// inset of its own the button ends up jammed into the corner.
+// Where the top row (filter box, Clear, Exit) sits, per orientation. Portrait
+// keeps clear of the camera cutout row, which hiding the status bar does not
+// free up. Landscape is inset from both bezels instead: the cutout is centred
+// on a side edge there, and with the status and navigation bars hidden the
+// window runs edge to edge, so without an inset of its own the row ends up
+// jammed into the corner.
 const STATUS_BAR_HEIGHT = StatusBar.currentHeight ?? 0;
-const EXIT_TOP = STATUS_BAR_HEIGHT + 8;
-const EXIT_TOP_LANDSCAPE = 24;
-const EXIT_RIGHT = 10;
-const EXIT_RIGHT_LANDSCAPE = 56;
-// The filter field shares that row, taking the rest of it: it is only up while
-// the tv asks for it, and the Exit button has to stay reachable underneath.
-const FILTER_LEFT = 10;
-const FILTER_EXIT_GAP = 60;
+const ROW_TOP = STATUS_BAR_HEIGHT + 8;
+const ROW_TOP_LANDSCAPE = 24;
+const ROW_LEFT = 10;
+const ROW_RIGHT = 10;
+const ROW_RIGHT_LANDSCAPE = 56;
+// Space between the filter box, Clear and Exit within the row.
+const ROW_GAP = 10;
+// Exit is twice its old size; Clear and the filter box match its height and
+// font so the row reads as one control. Shrunk 20% from that doubled size.
+const ACTION_PAD_V = 9.6;
+const ACTION_PAD_H = 19.2;
+const ACTION_FONT_SIZE = 22.4;
 
 // Android 16 and up refuse a connection to a LAN address unless the app holds
 // this, declared in android/app/src/main/AndroidManifest.xml and granted at
@@ -86,13 +94,13 @@ const LOCAL_NETWORK_PERMISSION = "android.permission.ACCESS_LOCAL_NETWORK";
 // Forwarded through the relay to tvapp, which reads them (CtrlServer.java).
 const CMD_MOVE = "m";
 const CMD_CLICK = "c";
+const CMD_PRESS = "p";
+const CMD_RELEASE = "r";
 const CMD_EXIT = "x";
 const CMD_FILTER = "f";
-const CMD_KEYBOARD_CLOSED = "e";
-// From tvapp, forwarded back the same way: its filter box was clicked, so the
-// keyboard this screen has no other reason to show has to come up, or go away.
-const MSG_KEYBOARD_ON = "s";
-const MSG_KEYBOARD_OFF = "h";
+// From tvapp, forwarded back the same way: a show was clicked there, which is
+// one of the ways the filter clears — the box here has to follow.
+const MSG_CLEAR_FILTER = "z";
 // Handled by the relay itself (apps/tv/src/main.js), not by tvapp.
 const MSG_OPEN_TVAPP = "o";
 const MSG_TVAPP_UP = "u";
@@ -109,10 +117,10 @@ export function useTvappLink({ onTvappUp, onTvappDown }) {
   // app while the callbacks it calls are re-created on every render.
   const handlersRef = useRef(null);
   handlersRef.current = { onTvappUp, onTvappDown };
-  // The keyboard messages only mean anything to the tvappctrl screen, so that
-  // screen registers for them while it is mounted rather than App.js routing
-  // them through: the remote has nothing to do with a filter box on the tv.
-  const keyboardRef = useRef(null);
+  // MSG_CLEAR_FILTER only means anything to the tvappctrl screen, so that
+  // screen registers for it while it is mounted rather than App.js routing it
+  // through: the remote has nothing to do with a filter box on the tv.
+  const clearFilterRef = useRef(null);
 
   useEffect(() => {
     let done = false;
@@ -140,8 +148,7 @@ export function useTvappLink({ onTvappUp, onTvappDown }) {
       ws.onmessage = (e) => {
         if (e.data === MSG_TVAPP_UP) handlersRef.current.onTvappUp();
         else if (e.data === MSG_TVAPP_DOWN) handlersRef.current.onTvappDown();
-        else if (e.data === MSG_KEYBOARD_ON) keyboardRef.current?.(true);
-        else if (e.data === MSG_KEYBOARD_OFF) keyboardRef.current?.(false);
+        else if (e.data === MSG_CLEAR_FILTER) clearFilterRef.current?.();
       };
       openTimer = setTimeout(() => {
         if (ws.readyState !== WebSocket.OPEN) ws.close(); // onclose retries
@@ -177,30 +184,31 @@ export function useTvappLink({ onTvappUp, onTvappDown }) {
   return {
     send,
     openTvapp: () => send(MSG_OPEN_TVAPP),
-    onKeyboard: (fn) => {
-      keyboardRef.current = fn;
+    onClearFilter: (fn) => {
+      clearFilterRef.current = fn;
     },
   };
 }
 
-export default function TvAppCtrl({ send, onKeyboard, onExit }) {
+export default function TvAppCtrl({ send, onClearFilter, onExit }) {
   const pendingRef = useRef({ dx: 0, dy: 0 });
   const touchRef = useRef(null);
+  const holdRef = useRef(null);
   const { width, height } = useWindowDimensions();
-  // The tv's show-list filter, typed here because the tv has no keyboard. Shown
-  // only while tvapp asks for it — there is nothing else on this screen to type
-  // into — and empty whenever it is not, filtering nothing.
-  const [keyboard, setKeyboard] = useState(false);
+  // The tv's show-list filter, typed here because the tv has no keyboard. Kept
+  // regardless of whether the keyboard is currently up — closing the keyboard
+  // is not one of the ways this clears, only Clear, tvapp closing, and picking
+  // a show are.
   const [filter, setFilter] = useState("");
-  const onKeyboardRef = useRef(onKeyboard);
-  onKeyboardRef.current = onKeyboard;
+  const onClearFilterRef = useRef(onClearFilter);
+  onClearFilterRef.current = onClearFilter;
 
   useEffect(() => {
-    onKeyboardRef.current((show) => {
-      setKeyboard(show);
-      if (!show) setFilter("");
+    onClearFilterRef.current(() => {
+      setFilter("");
+      Keyboard.dismiss();
     });
-    return () => onKeyboardRef.current(null);
+    return () => onClearFilterRef.current(null);
   }, []);
 
   // Rotation is unlocked for this screen alone, and re-locked on the way out. It
@@ -241,21 +249,12 @@ export default function TvAppCtrl({ send, onKeyboard, onExit }) {
   }, [width, height]);
 
   const landscape = width > height;
-  const exitTop = landscape ? EXIT_TOP_LANDSCAPE : EXIT_TOP;
-  const exitRight = landscape ? EXIT_RIGHT_LANDSCAPE : EXIT_RIGHT;
+  const rowTop = landscape ? ROW_TOP_LANDSCAPE : ROW_TOP;
+  const rowRight = landscape ? ROW_RIGHT_LANDSCAPE : ROW_RIGHT;
 
   const exit = () => {
     send(CMD_EXIT); // closes tvapp on the tv too
     onExit();
-  };
-
-  // The keyboard's own accept key. The filter is cleared rather than kept —
-  // there is no way back to this field except through the tv's filter box, so a
-  // filter left in force with the keyboard gone would be the tv's problem alone.
-  const acceptFilter = () => {
-    setKeyboard(false);
-    setFilter("");
-    send(CMD_KEYBOARD_CLOSED);
   };
 
   // The whole string every keystroke rather than the key: tvapp then cannot end
@@ -263,6 +262,12 @@ export default function TvAppCtrl({ send, onKeyboard, onExit }) {
   const changeFilter = (text) => {
     setFilter(text);
     send(`${CMD_FILTER},${text}`);
+  };
+
+  const clearFilter = () => {
+    setFilter("");
+    send(`${CMD_FILTER},`);
+    Keyboard.dismiss();
   };
 
   // Flushes whatever the drag accumulated since the last frame. Sending per
@@ -289,9 +294,26 @@ export default function TvAppCtrl({ send, onKeyboard, onExit }) {
     return () => clearInterval(timer);
   }, []);
 
+  // A press that outlives the tap window without going anywhere is a hold, and
+  // is reported as one so the tv's scroll buttons can stay down under it. The
+  // timer is the same TAP_MAX_MS a tap is judged by, so a press is one or the
+  // other and never both.
+  //
+  // Also the container's own responder grant: it only fires for a touch that
+  // starts outside the filter box, Clear and Exit, which claim it themselves —
+  // so dismissing the keyboard here is exactly "clicked or dragged outside the
+  // box", and never clears the filter text itself.
   const onGrant = (e) => {
+    Keyboard.dismiss();
     const { pageX, pageY } = e.nativeEvent;
-    touchRef.current = { x: pageX, y: pageY, moved: 0, at: Date.now() };
+    const touch = { x: pageX, y: pageY, moved: 0, at: Date.now(), held: false };
+    touchRef.current = touch;
+    clearTimeout(holdRef.current);
+    holdRef.current = setTimeout(() => {
+      if (touchRef.current !== touch || touch.moved > TAP_MAX_MOVE) return;
+      touch.held = true;
+      send(CMD_PRESS);
+    }, TAP_MAX_MS);
   };
 
   // Only relative motion is sent — where on the phone the finger is has no
@@ -310,9 +332,14 @@ export default function TvAppCtrl({ send, onKeyboard, onExit }) {
   };
 
   const onRelease = () => {
+    clearTimeout(holdRef.current);
     const touch = touchRef.current;
     touchRef.current = null;
     if (!touch) return;
+    if (touch.held) {
+      send(CMD_RELEASE);
+      return;
+    }
     const quick = Date.now() - touch.at <= TAP_MAX_MS;
     if (touch.moved <= TAP_MAX_MOVE && quick) send(CMD_CLICK);
   };
@@ -331,36 +358,25 @@ export default function TvAppCtrl({ send, onKeyboard, onExit }) {
       onResponderTerminate={onRelease}
     >
       <StatusBar hidden />
-      {keyboard && (
+      <View style={[styles.topRow, { top: rowTop, left: ROW_LEFT, right: rowRight }]}>
         <TextInput
           value={filter}
           onChangeText={changeFilter}
-          onSubmitEditing={acceptFilter}
-          // Mounted only while the tv wants it, so focusing on mount is what
-          // brings the soft keyboard up without anything to tap here.
-          autoFocus
+          onSubmitEditing={() => Keyboard.dismiss()}
           autoCorrect={false}
           autoCapitalize="none"
           returnKeyType="done"
           placeholder="Filter..."
           placeholderTextColor="#888"
-          style={[
-            styles.filterInput,
-            {
-              top: exitTop,
-              left: FILTER_LEFT,
-              right: exitRight + FILTER_EXIT_GAP,
-            },
-          ]}
+          style={styles.filterInput}
         />
-      )}
-      <TouchableOpacity
-        onPress={exit}
-        style={[styles.exitBtn, { top: exitTop, right: exitRight }]}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.exitBtnText}>Exit</Text>
-      </TouchableOpacity>
+        <TouchableOpacity onPress={clearFilter} style={styles.clearBtn} activeOpacity={0.7}>
+          <Text style={styles.actionBtnText}>Clear</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={exit} style={styles.exitBtn} activeOpacity={0.7}>
+          <Text style={styles.actionBtnText}>Exit</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -370,26 +386,37 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#000",
   },
-  // top and right come from the render: both depend on the orientation.
-  exitBtn: {
+  // top, left and right come from the render: all three depend on the orientation.
+  topRow: {
     position: "absolute",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 4,
-    backgroundColor: "whitesmoke",
+    flexDirection: "row",
+    alignItems: "center",
   },
-  exitBtnText: {
-    fontSize: 14,
-    color: "#000",
-  },
-  // top, left and right come from the render: they follow the Exit button's row.
   filterInput: {
-    position: "absolute",
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+    flex: 1,
+    marginRight: ROW_GAP,
+    paddingVertical: ACTION_PAD_V,
+    paddingHorizontal: 6.4,
     borderRadius: 4,
-    backgroundColor: "whitesmoke",
-    color: "#000",
-    fontSize: 16,
+    backgroundColor: "#404040",
+    color: "#fff",
+    fontSize: ACTION_FONT_SIZE,
+  },
+  clearBtn: {
+    marginRight: ROW_GAP,
+    paddingVertical: ACTION_PAD_V,
+    paddingHorizontal: ACTION_PAD_H,
+    borderRadius: 4,
+    backgroundColor: "#404040",
+  },
+  exitBtn: {
+    paddingVertical: ACTION_PAD_V,
+    paddingHorizontal: ACTION_PAD_H,
+    borderRadius: 4,
+    backgroundColor: "#404040",
+  },
+  actionBtnText: {
+    fontSize: ACTION_FONT_SIZE,
+    color: "#fff",
   },
 });

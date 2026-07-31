@@ -1415,7 +1415,7 @@ export default function App() {
     return (
       <TvAppCtrl
         send={tvappLink.send}
-        onKeyboard={tvappLink.onKeyboard}
+        onClearFilter={tvappLink.onClearFilter}
         onExit={() => setShowTvAppCtrl(false)}
       />
     );

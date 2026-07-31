@@ -43,6 +43,13 @@ class ShowListView extends ScrollView implements Scroller {
 
   interface SelectionListener {
     void onShowSelected(Shows.Show show);
+
+    /**
+     * A card was clicked directly, as against being auto-picked because a
+     * filter or sort change left the old selection off the list. Only this
+     * fires when a filter typed on the phone should be cleared.
+     */
+    void onShowClicked();
   }
 
   private final LinearLayout column;
@@ -81,7 +88,11 @@ class ShowListView extends ScrollView implements Scroller {
     column.removeAllViews();
     for (Shows.Show show : shows) {
       View card = buildCard(show);
-      card.setOnClickListener(v -> select(show));
+      card.setOnClickListener(
+          v -> {
+            select(show);
+            if (listener != null) listener.onShowClicked();
+          });
       cards.put(show, card);
     }
     selected = null;
@@ -99,9 +110,14 @@ class ShowListView extends ScrollView implements Scroller {
     apply();
   }
 
+  /**
+   * A new order puts the selected show somewhere unpredictable in it, so the
+   * list goes back to the top and takes whichever show lands there.
+   */
   void setSort(Shows.Sort sort) {
     if (this.sort == sort) return;
     this.sort = sort;
+    clearSelection();
     apply();
   }
 
@@ -112,6 +128,15 @@ class ShowListView extends ScrollView implements Scroller {
   @Override
   public void scrollStep(int px) {
     scrollBy(0, px);
+  }
+
+  /** What a tap on Up or Down does, as against holding it. */
+  void scrollToTop() {
+    scrollTo(0, 0);
+  }
+
+  void scrollToBottom() {
+    scrollTo(0, Math.max(0, column.getHeight() - getHeight()));
   }
 
   /**
@@ -136,16 +161,21 @@ class ShowListView extends ScrollView implements Scroller {
     }
     // A selection the filter has just hidden falls to the top of what is left,
     // so the panes are never showing a show the list no longer offers.
-    if (selected != null && !visible.contains(selected)) {
-      paint(cards.get(selected), CARD_BG);
-      selected = null;
-    }
+    if (selected != null && !visible.contains(selected)) clearSelection();
     if (selected == null && !visible.isEmpty()) select(visible.get(0));
     if (selected == null) return;
     // scrollTo only means anything once the column has been laid out, and the
-    // selected card can be hundreds of rows down.
+    // selected card can be hundreds of rows down. The top card is scrolled to
+    // zero rather than to itself, or the list's own top padding is cut off.
     final View card = cards.get(selected);
-    post(() -> scrollTo(0, card.getTop()));
+    final boolean atTop = visible.get(0) == selected;
+    post(() -> scrollTo(0, atTop ? 0 : card.getTop()));
+  }
+
+  private void clearSelection() {
+    if (selected == null) return;
+    paint(cards.get(selected), CARD_BG);
+    selected = null;
   }
 
   private void select(Shows.Show show) {

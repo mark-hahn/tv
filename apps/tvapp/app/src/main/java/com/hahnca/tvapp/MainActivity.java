@@ -38,7 +38,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   // The web client's simple-mode tabs, in its order. Each has a pane of the
   // same name holding what that pane holds there.
-  private static final String[] TAB_LABELS = {"Info", "Map", "Actor", "Trailer"};
+  private static final String[] TAB_LABELS = {"Info", "Map", "Actors", "Trailer"};
   private static final float TAB_TEXT_SIZE_SP = 14.3f;
   private static final float TAB_PAD_DP = 2f;
   private static final float TAB_GAP_DP = 6f;
@@ -67,13 +67,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // Asks the set to bring tvapp back to the front, see bringToFront.
   private static final String OPEN_TVAPP_URL = "https://hahnca.com/tv-tv/tv/opentvapp";
 
-  // The cursor held in the top or bottom quarter of a list scrolls it — there
-  // is no other way to reach show 200 with a pointer. Speed ramps linearly from
-  // a standstill at the quarter line to SCROLL_STEP_DP a tick hard against the
-  // edge, so one gesture covers both a nudge of a row or two and a run to the
-  // end of the list. Every pane holding a list of its own — the description,
-  // the map, the cast — scrolls by these same numbers, so the whole screen
-  // behaves the one way.
+  // The cursor held in the top or bottom quarter of a pane that is a list of its
+  // own — the description, the map, the cast — scrolls it. Speed ramps linearly
+  // from a standstill at the quarter line to SCROLL_STEP_DP a tick hard against
+  // the edge, so one gesture covers both a nudge of a row or two and a run to
+  // the end. The show list is deliberately not one of these: it has the Up and
+  // Down buttons below its header instead.
   private static final float SCROLL_ZONE_FRACTION = 0.25f;
   private static final float SCROLL_STEP_DP = 12f;
   private static final long SCROLL_INTERVAL_MS = 16;
@@ -100,17 +99,34 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // A flick is a dozen batches, so a sixth of the screen each still crosses it.
   private static final float MOVE_MAX_STEP_DP = 160f;
 
+  // The show list scrolls by the two buttons below its header and by nothing else.
+  // Held, they ramp from a crawl a card at a time to a run down the whole list;
+  // tapped, they go straight to one end of it. The 300 ms a hold takes to start
+  // is the phone's own tap window, so a press is a tap or a hold and never both.
+  private static final float SCROLL_BTN_HEIGHT_DP = 35.2f;
+  private static final float SCROLL_BTN_TEXT_SIZE_SP = 16f;
+  private static final float SCROLL_BTN_CORNER_DP = 6f;
+  private static final int SCROLL_BTN_BG = 0xFF404040;
+  // Separates the Up/Down pair from Watching/Added in the header row, so the
+  // two groups still read apart now that they share one row.
+  private static final float SCROLL_BTN_GROUP_GAP_DP = 24f;
+  private static final float HOLD_SCROLL_START_DP = 1f; // initial scroll speed, dp per tick
+  private static final float HOLD_SCROLL_MAX_DP = 36f; // scroll speed cap once fully sped up
+  private static final float HOLD_SCROLL_ACCEL_DP_PER_S2 = 17.5f; // dp/tick gained per second
+  private static final long HOLD_SCROLL_DELAY_MS = 750; // holds at start speed this long first
+
   private final Handler ui = new Handler(Looper.getMainLooper());
 
   private CursorView cursor;
   private CtrlServer ctrlServer;
   private ShowListView showList;
   private ListHeader listHeader;
+  private Button scrollUp;
+  private Button scrollDown;
+  private int holdDirection; // -1 up, +1 down, 0 for no button being held
+  private long holdStartedAt;
+  private float holdRemainder; // sub-pixel carry, so the slow start still moves
   private Shows.Sort sort = Shows.Sort.ALPHA;
-  // Whether the filter box is the thing the phone's keyboard is typing into.
-  // A click on the box means "open that keyboard" or "clear this and close it"
-  // depending on it.
-  private boolean filtering;
   private InfoView info;
   private final List<Pane> panes = new ArrayList<>();
   private final List<Button> tabs = new ArrayList<>();
@@ -150,7 +166,18 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     cursor.startAt(
         prefs().getFloat(KEY_CURSOR_X, Float.NaN), prefs().getFloat(KEY_CURSOR_Y, Float.NaN));
 
-    showList.setSelectionListener(this::onShowSelected);
+    showList.setSelectionListener(
+        new ShowListView.SelectionListener() {
+          @Override
+          public void onShowSelected(Shows.Show show) {
+            MainActivity.this.onShowSelected(show);
+          }
+
+          @Override
+          public void onShowClicked() {
+            MainActivity.this.onShowClicked();
+          }
+        });
     sort = Shows.Sort.of(prefs().getString(KEY_SORT, null));
     listHeader.setSort(sort);
     showList.setSort(sort);
@@ -194,24 +221,24 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     return root;
   }
 
-  /** The filter and sort header over the show list, both the list's own width. */
+  /**
+   * The sort and scroll header over the show list, the list's own width:
+   * Watching and Added on the left, Up and Down after them — the same row now
+   * that there is no filter box left to give the row its own line.
+   */
   private View buildList() {
     LinearLayout left = new LinearLayout(this);
     left.setOrientation(LinearLayout.VERTICAL);
-    listHeader =
-        new ListHeader(
-            this,
-            new ListHeader.Listener() {
-              @Override
-              public void onFilterClick() {
-                filterClick();
-              }
-
-              @Override
-              public void onSortClick(Shows.Sort clicked) {
-                sortClick(clicked);
-              }
-            });
+    listHeader = new ListHeader(this, this::sortClick);
+    // Up and Down are how the list scrolls, a pointer having nowhere else to
+    // push: tapped they go to one end of it, held they scroll, and a held
+    // button ramps up so the same gesture serves both a nudge of a card or two
+    // and a run past two hundred. A wide gap ahead of Up keeps the two groups
+    // reading apart despite sharing a row.
+    scrollUp = scrollButton("Up", v -> showList.scrollToTop());
+    scrollDown = scrollButton("Down", v -> showList.scrollToBottom());
+    listHeader.addView(scrollUp, scrollButtonParams((int) dp(SCROLL_BTN_GROUP_GAP_DP)));
+    listHeader.addView(scrollDown, scrollButtonParams((int) dp(ListHeader.GAP_DP)));
     left.addView(
         listHeader,
         new LinearLayout.LayoutParams(
@@ -220,6 +247,32 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     left.addView(
         showList, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
     return left;
+  }
+
+  private Button scrollButton(String label, View.OnClickListener onClick) {
+    Button button = new Button(this);
+    button.setText(label);
+    button.setTextSize(TypedValue.COMPLEX_UNIT_SP, SCROLL_BTN_TEXT_SIZE_SP);
+    button.setTextColor(Color.WHITE);
+    button.setSingleLine(true);
+    button.setMinWidth(0);
+    button.setMinimumWidth(0);
+    button.setPadding(0, 0, 0, 0);
+    // Its own background rather than the theme's, for the reason the tabs have
+    // one: a platform Button cannot be tinted and untinted back again.
+    GradientDrawable bg = new GradientDrawable();
+    bg.setCornerRadius(dp(SCROLL_BTN_CORNER_DP));
+    bg.setColor(SCROLL_BTN_BG);
+    button.setBackground(bg);
+    button.setOnClickListener(onClick);
+    return button;
+  }
+
+  private LinearLayout.LayoutParams scrollButtonParams(int leftMargin) {
+    LinearLayout.LayoutParams params =
+        new LinearLayout.LayoutParams(0, (int) dp(SCROLL_BTN_HEIGHT_DP), 1f);
+    params.leftMargin = leftMargin;
+    return params;
   }
 
   /**
@@ -314,23 +367,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     return params;
   }
 
-  /**
-   * The filter box clicked. There being no keyboard on a tv, the box is only a
-   * display: clicking it asks tvappctrl to put a keyboard up on the phone, and
-   * clicking it a second time is one of the three things that takes that
-   * keyboard away again and leaves nothing filtered.
-   */
-  private void filterClick() {
-    filtering = !filtering;
-    if (!filtering) setFilter("");
-    ctrlServer.send(filtering ? CtrlServer.MSG_KEYBOARD_ON : CtrlServer.MSG_KEYBOARD_OFF);
-  }
-
-  private void setFilter(String text) {
-    listHeader.setFilterText(text);
-    showList.setFilter(text);
-  }
-
   /** Clicking the sort already in force turns it off, leaving alphabetical. */
   private void sortClick(Shows.Sort clicked) {
     sort = clicked == sort ? Shows.Sort.ALPHA : clicked;
@@ -343,6 +379,17 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private void onShowSelected(Shows.Show show) {
     for (Pane pane : panes) pane.setShow(show);
     prefs().edit().putString(KEY_SELECTED_SHOW, show.name).apply();
+  }
+
+  /**
+   * A card was clicked directly, as against auto-picked by a filter or sort
+   * change. The filter — typed on the phone, since a tv has no keyboard — is
+   * one of the things that gets cleared by picking a show, so both ends are
+   * told: the list here, and the box on the phone.
+   */
+  private void onShowClicked() {
+    showList.setFilter("");
+    ctrlServer.send(CtrlServer.MSG_CLEAR_FILTER);
   }
 
   private SharedPreferences prefs() {
@@ -433,6 +480,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   @Override
   protected void onDestroy() {
     ui.removeCallbacks(autoScroll);
+    ui.removeCallbacks(holdScroll);
     ctrlServer.shutdown();
     super.onDestroy();
   }
@@ -490,13 +538,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   /**
-   * Picks what the arrow's position scrolls and how fast. The show list and
-   * every pane that is a list of its own scroll the same way: the top and
-   * bottom quarters move them at a speed that ramps up towards the edge. What
-   * is not a list keeps the older constant crawl out of a fixed band. The
-   * scrolling has to keep going while the cursor is simply held there, so it
-   * runs off its own repeating post rather than off arriving motion — which is
-   * also why the target and step are fields and not arguments.
+   * Picks what the arrow's position scrolls and how fast. Every pane that is a
+   * list of its own scrolls the same way: the top and bottom quarters move it
+   * at a speed that ramps up towards the edge. What is not a list keeps the
+   * older constant crawl out of a fixed band. The scrolling has to keep going
+   * while the cursor is simply held there, so it runs off its own repeating
+   * post rather than off arriving motion — which is also why the target and
+   * step are fields and not arguments.
    */
   private void updateAutoScroll() {
     float x = cursor.getPosX();
@@ -511,13 +559,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     float stepDp = 0;
     float stepDpX = 0;
     if (x < listWidth) {
-      // From the list's own top, not the screen's, so that holding the cursor
-      // over the header to reach the filter box does not scroll the list.
-      float speed = rampSpeed(y, showList.getTop(), height);
-      if (speed != 0) {
-        target = showList;
-        stepDp = speed * SCROLL_STEP_DP;
-      }
+      // Nothing: the show list scrolls by its Up and Down buttons alone, so the
+      // whole column is somewhere the cursor can rest without it moving.
+      target = null;
     } else if (activePane.rampScroll()) {
       stepDp = rampSpeed(y, paneTop, height) * SCROLL_STEP_DP;
       if (activePane.scrollsHorizontally()) {
@@ -599,6 +643,76 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   /**
+   * The finger has been down on the phone long enough to be a hold rather than
+   * a tap. The only thing a hold does is work the scroll buttons, so it is
+   * answered by hit-testing them rather than by synthesizing a touch: a real
+   * ACTION_DOWN would fire the button's own click on the way back up, and that
+   * is the tap behaviour — a jump to one end of the list.
+   */
+  @Override
+  public void onPress() {
+    ui.post(
+        () -> {
+          if (!foreground || player.isPlaying()) return;
+          float x = cursor.getPosX();
+          float y = cursor.getPosY();
+          if (hits(scrollUp, x, y)) startHold(-1);
+          else if (hits(scrollDown, x, y)) startHold(+1);
+        });
+  }
+
+  @Override
+  public void onRelease() {
+    ui.post(this::stopHold);
+  }
+
+  private void startHold(int direction) {
+    holdDirection = direction;
+    holdStartedAt = SystemClock.uptimeMillis();
+    holdRemainder = 0;
+    ui.post(holdScroll);
+  }
+
+  private void stopHold() {
+    holdDirection = 0;
+    ui.removeCallbacks(holdScroll);
+  }
+
+  /** Whether the cursor hotspot is inside a view, both in the root's own frame. */
+  private boolean hits(View view, float x, float y) {
+    int[] pos = new int[2];
+    view.getLocationInWindow(pos);
+    // The cursor spans the root, so its own origin is what the hotspot is
+    // relative to and is what makes the two comparable.
+    int[] origin = new int[2];
+    cursor.getLocationInWindow(origin);
+    float left = pos[0] - origin[0];
+    float top = pos[1] - origin[1];
+    return x >= left && x < left + view.getWidth() && y >= top && y < top + view.getHeight();
+  }
+
+  /**
+   * Scrolls the list for as long as a button is held, starting slow enough to
+   * land on a particular card, holding that speed for HOLD_SCROLL_DELAY_MS, and
+   * only then ramping up to fast enough to cross the list.
+   */
+  private final Runnable holdScroll =
+      new Runnable() {
+        @Override
+        public void run() {
+          if (holdDirection == 0) return;
+          long sinceDelay = SystemClock.uptimeMillis() - holdStartedAt - HOLD_SCROLL_DELAY_MS;
+          float sped = Math.max(0f, sinceDelay) / 1000f * HOLD_SCROLL_ACCEL_DP_PER_S2;
+          float stepDp = Math.min(HOLD_SCROLL_START_DP + sped, HOLD_SCROLL_MAX_DP);
+          float px = dp(stepDp) * holdDirection + holdRemainder;
+          int whole = (int) px;
+          holdRemainder = px - whole;
+          if (whole != 0) showList.scrollStep(whole);
+          ui.postDelayed(this, SCROLL_INTERVAL_MS);
+        }
+      };
+
+  /**
    * A click that arrives while something else owns the screen — a trailer
    * playing in YouTube, say — brings tvapp back instead of being aimed at a
    * cursor nobody can see. The ctrl socket outlives being backgrounded, so the
@@ -632,6 +746,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   @Override
   protected void onPause() {
     foreground = false;
+    // A release that never arrives — the phone's app gone, its socket dropped —
+    // would otherwise leave the list scrolling on its own.
+    stopHold();
     // Here rather than on every move: the arrow moves at 60 Hz, and this is the
     // one thing that runs before either being backgrounded or being finished.
     prefs()
@@ -652,17 +769,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   /** Every keystroke, as the whole string: a dropped frame cannot desync it. */
   @Override
   public void onFilter(String text) {
-    ui.post(() -> setFilter(text));
-  }
-
-  /** Accepted on the phone, which is the second of the three ways to clear it. */
-  @Override
-  public void onKeyboardClosed() {
-    ui.post(
-        () -> {
-          filtering = false;
-          setFilter("");
-        });
+    ui.post(() -> showList.setFilter(text));
   }
 
   /**

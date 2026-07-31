@@ -56,10 +56,14 @@ class ShowListView extends ScrollView implements Scroller {
   private final List<Shows.Show> shows = new ArrayList<>(); // everything loaded
   private final List<Shows.Show> visible = new ArrayList<>(); // after filter and sort
   private final Map<Shows.Show, View> cards = new HashMap<>();
+  private final Map<String, Shows.Show> byName = new HashMap<>();
   private SelectionListener listener;
   private Shows.Show selected;
   private String filter = "";
   private Shows.Sort sort = Shows.Sort.ALPHA;
+  // The list tv-srvr worked out from the shared settings, names in its order,
+  // or null when this view is filtering and sorting for itself.
+  private List<String> customOrder;
 
   ShowListView(Context context) {
     super(context);
@@ -85,7 +89,9 @@ class ShowListView extends ScrollView implements Scroller {
     shows.clear();
     shows.addAll(list);
     cards.clear();
+    byName.clear();
     column.removeAllViews();
+    for (Shows.Show show : shows) byName.put(show.name, show);
     for (Shows.Show show : shows) {
       View card = buildCard(show);
       card.setOnClickListener(
@@ -105,7 +111,12 @@ class ShowListView extends ScrollView implements Scroller {
 
   /** Substring of the name, case ignored — the web client's filter box exactly. */
   void setFilter(String text) {
-    if (filter.equals(text)) return;
+    // Typing a filter replaces whatever the server ordered for us. Clearing
+    // one does not: clicking a show clears the filter, and that must not throw
+    // away the custom list underneath it.
+    boolean dropCustom = !text.isEmpty() && customOrder != null;
+    if (filter.equals(text) && !dropCustom) return;
+    if (dropCustom) customOrder = null;
     filter = text;
     apply();
   }
@@ -115,8 +126,20 @@ class ShowListView extends ScrollView implements Scroller {
    * list goes back to the top and takes whichever show lands there.
    */
   void setSort(Shows.Sort sort) {
-    if (this.sort == sort) return;
+    if (this.sort == sort && customOrder == null) return;
+    customOrder = null;
     this.sort = sort;
+    clearSelection();
+    apply();
+  }
+
+  /**
+   * Show exactly these shows, in exactly this order — tv-srvr's answer for the
+   * shared settings, which are richer than this list's own filter and sort can
+   * express. Null hands the list back to those.
+   */
+  void setCustomOrder(List<String> names) {
+    customOrder = names;
     clearSelection();
     apply();
   }
@@ -146,11 +169,20 @@ class ShowListView extends ScrollView implements Scroller {
    */
   private void apply() {
     visible.clear();
-    String needle = filter.toLowerCase();
-    for (Shows.Show show : shows) {
-      if (needle.isEmpty() || show.name.toLowerCase().contains(needle)) visible.add(show);
+    if (customOrder != null) {
+      // Already filtered and ordered by the server; a name we do not know is
+      // one this list never loaded, so it is simply skipped.
+      for (String name : customOrder) {
+        Shows.Show show = byName.get(name);
+        if (show != null) visible.add(show);
+      }
+    } else {
+      String needle = filter.toLowerCase();
+      for (Shows.Show show : shows) {
+        if (needle.isEmpty() || show.name.toLowerCase().contains(needle)) visible.add(show);
+      }
+      Collections.sort(visible, Shows.order(sort));
     }
-    Collections.sort(visible, Shows.order(sort));
     column.removeAllViews();
     for (Shows.Show show : visible) {
       LinearLayout.LayoutParams params =

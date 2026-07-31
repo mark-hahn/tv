@@ -42,10 +42,19 @@ class ListHeader extends LinearLayout {
 
   interface Listener {
     void onSortClick(Shows.Sort sort);
+
+    /** The Added button, relabelled Custom, was clicked while settings are shared. */
+    void onCustomClick();
   }
 
   private final Button watching;
   private final Button added;
+  private Shows.Sort currentSort = Shows.Sort.ALPHA;
+  // Whether tv-srvr currently has filter/sort settings shared (the web
+  // client's hdrtop Send button) — while true, Added is Custom instead.
+  private boolean customActive;
+  // Whether those settings are the ones the list is showing right now.
+  private boolean customOn;
 
   ListHeader(Context context, Listener listener) {
     super(context);
@@ -56,6 +65,11 @@ class ListHeader extends LinearLayout {
 
     watching = sortButton(context, "Watching", listener, Shows.Sort.WATCHING, 0);
     added = sortButton(context, "Added", listener, Shows.Sort.ADDED, (int) dp(GAP_DP));
+    added.setOnClickListener(
+        v -> {
+          if (customActive) listener.onCustomClick();
+          else listener.onSortClick(Shows.Sort.ADDED);
+        });
     setSort(Shows.Sort.ALPHA);
   }
 
@@ -88,8 +102,37 @@ class ListHeader extends LinearLayout {
 
   /** Blue for the sort in force; both plain when the list is back in alpha order. */
   void setSort(Shows.Sort sort) {
-    paint(watching, sort == Shows.Sort.WATCHING ? BTN_ACTIVE_BG : BTN_BG);
-    paint(added, sort == Shows.Sort.ADDED ? BTN_ACTIVE_BG : BTN_BG);
+    currentSort = sort;
+    repaint();
+  }
+
+  /**
+   * Live from tv-srvr: while the web client has filter/sort settings shared,
+   * Added relabels to Custom and its click restores them instead of sorting —
+   * exactly what hdrtop's own Custom button does there.
+   */
+  void setSharedFilters(boolean has) {
+    if (customActive == has) return;
+    customActive = has;
+    added.setText(has ? "Custom" : "Added");
+    repaint();
+  }
+
+  /**
+   * Whether the shared settings are what the list is showing. While they are,
+   * Custom is the lit button and no sort button is, however the settings
+   * happen to have ordered the list.
+   */
+  void setCustomOn(boolean on) {
+    if (customOn == on) return;
+    customOn = on;
+    repaint();
+  }
+
+  private void repaint() {
+    paint(watching, !customOn && currentSort == Shows.Sort.WATCHING ? BTN_ACTIVE_BG : BTN_BG);
+    boolean addedLit = customActive ? customOn : currentSort == Shows.Sort.ADDED;
+    paint(added, addedLit ? BTN_ACTIVE_BG : BTN_BG);
   }
 
   private void paint(Button button, int color) {

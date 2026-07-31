@@ -25,6 +25,8 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 public class MainActivity extends Activity implements CtrlServer.Listener {
 
@@ -119,6 +121,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   private CursorView cursor;
   private CtrlServer ctrlServer;
+  private SharedFilters sharedFilters;
   private ShowListView showList;
   private ListHeader listHeader;
   private Button scrollUp;
@@ -127,6 +130,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private long holdStartedAt;
   private float holdRemainder; // sub-pixel carry, so the slow start still moves
   private Shows.Sort sort = Shows.Sort.ALPHA;
+  private boolean customOn; // the shared settings are what the list is showing
   private InfoView info;
   private final List<Pane> panes = new ArrayList<>();
   private final List<Button> tabs = new ArrayList<>();
@@ -186,6 +190,22 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
     ctrlServer = new CtrlServer(this);
     ctrlServer.start();
+
+    sharedFilters =
+        new SharedFilters(
+            has ->
+                ui.post(
+                    () -> {
+                      // Nothing shared any more: there is no custom mode to be
+                      // in, and leaving its list up under a button that no
+                      // longer says Custom is just a list nothing explains.
+                      if (!has) {
+                        setCustomOn(false);
+                        showList.setCustomOrder(null);
+                      }
+                      listHeader.setSharedFilters(has);
+                    }));
+    sharedFilters.start();
   }
 
   private View buildUi() {
@@ -229,7 +249,20 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private View buildList() {
     LinearLayout left = new LinearLayout(this);
     left.setOrientation(LinearLayout.VERTICAL);
-    listHeader = new ListHeader(this, this::sortClick);
+    listHeader =
+        new ListHeader(
+            this,
+            new ListHeader.Listener() {
+              @Override
+              public void onSortClick(Shows.Sort sort) {
+                sortClick(sort);
+              }
+
+              @Override
+              public void onCustomClick() {
+                customClick();
+              }
+            });
     // Up and Down are how the list scrolls, a pointer having nowhere else to
     // push: tapped they go to one end of it, held they scroll, and a held
     // button ramps up so the same gesture serves both a nudge of a card or two
@@ -369,10 +402,64 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   /** Clicking the sort already in force turns it off, leaving alphabetical. */
   private void sortClick(Shows.Sort clicked) {
-    sort = clicked == sort ? Shows.Sort.ALPHA : clicked;
+    // In custom mode no sort button is lit, so the first click on one turns it
+    // on rather than toggling the sort hidden underneath it back off.
+    Shows.Sort next = !customOn && clicked == sort ? Shows.Sort.ALPHA : clicked;
+    // Picking a sort by hand is no longer showing the shared settings.
+    setCustomOn(false);
+    applySort(next);
+  }
+
+  private void applySort(Shows.Sort newSort) {
+    sort = newSort;
     listHeader.setSort(sort);
     showList.setSort(sort);
     prefs().edit().putString(KEY_SORT, sort.name()).apply();
+  }
+
+  private void setCustomOn(boolean on) {
+    customOn = on;
+    listHeader.setCustomOn(on);
+  }
+
+  /**
+   * The web client's Custom button. The shared settings are far richer than
+   * this list's own filter and sort — a dozen tri-state condition toggles and
+   * eleven sort orders — so rather than reimplement any of that here, tv-srvr
+   * applies them with the same @tv/share code the web client uses and hands
+   * back the finished list.
+   */
+  private void customClick() {
+    // Already showing it: this click is the way back out, to the whole list in
+    // its plain alphabetical order.
+    if (customOn) {
+      setCustomOn(false);
+      showList.setCustomOrder(null);
+      showList.setFilter("");
+      ctrlServer.send(CtrlServer.MSG_CLEAR_FILTER);
+      applySort(Shows.Sort.ALPHA);
+      return;
+    }
+    new Thread(
+            () -> {
+              try {
+                JSONObject res = new JSONObject(Http.get(SharedFilters.SHOWS_URL));
+                JSONArray arr = res.optJSONArray("names");
+                List<String> names = new ArrayList<>();
+                for (int i = 0; arr != null && i < arr.length(); i++) {
+                  names.add(arr.optString(i, ""));
+                }
+                ui.post(
+                    () -> {
+                      showList.setCustomOrder(names);
+                      setCustomOn(true);
+                    });
+              } catch (Exception e) {
+                Log.e(TAG, "custom click show list fetch failed: " + e);
+              }
+            },
+            "custom-click")
+        .start();
   }
 
   /** Selection outlives the app: it is written through to disk on every click. */
@@ -482,6 +569,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     ui.removeCallbacks(autoScroll);
     ui.removeCallbacks(holdScroll);
     ctrlServer.shutdown();
+    sharedFilters.stop();
     super.onDestroy();
   }
 
@@ -769,7 +857,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   /** Every keystroke, as the whole string: a dropped frame cannot desync it. */
   @Override
   public void onFilter(String text) {
-    ui.post(() -> showList.setFilter(text));
+    ui.post(
+        () -> {
+          // Typing over the custom list is leaving it, so its button goes out
+          // with it. Clearing the box is not: that is what clicking a show does.
+          if (!text.isEmpty()) setCustomOn(false);
+          showList.setFilter(text);
+        });
   }
 
   /**

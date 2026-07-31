@@ -24,6 +24,9 @@ import {
   normalizeVideoHeightToQuality,
   getResolution,
   STANDARD_RESOLUTIONS,
+  applyComputedProps,
+  filterShowList,
+  sortShowList,
 } from "@tv/share";
 import * as epd from "@tv/share";
 import { unilog, logHere } from "@tv/share";
@@ -1202,6 +1205,48 @@ const getSharedFilters = async (_params) => {
   return sharedFilters;
 };
 
+/**
+ * The show list under a set of filter/sort settings, ordered, as bare names.
+ * The settings come in the request, or are the shared ones when none are —
+ * which is how tvapp's Custom button asks, having none of its own.
+ *
+ * This runs the very same @tv/share filter and sort the web client runs
+ * locally, so a client that cannot do it itself still gets the identical
+ * list. Only names go back: every caller already holds the show records.
+ */
+const getSharedFilterShows = async (params) => {
+  const settings =
+    params && Object.keys(params).length > 0 ? params : sharedFilters;
+  if (!settings) return { names: [] };
+  // Shallow copies: applyComputedProps derives its props in place, and the
+  // dataset it would otherwise write them into is the one tv-srvr saves back
+  // to tvdb.db.
+  const derived = {};
+  const shows = [];
+  for (const [name, rec] of Object.entries(tvdb.getAllTvdbSync())) {
+    const copy = applyComputedProps({ ...rec, name: rec.name || name });
+    derived[name] = copy;
+    shows.push(copy);
+  }
+  const filtered = filterShowList(
+    shows,
+    {
+      fltrChoice: settings.fltrChoice,
+      filterStr: settings.filterStr,
+      descrSearchStr: settings.descrSearchStr,
+      condFilters: settings.condFilters,
+    },
+    derived,
+  );
+  const sorted = sortShowList(
+    filtered,
+    settings.sortChoice || "Alpha",
+    derived,
+    !!settings.reversed,
+  );
+  return { names: sorted.map((show) => show.name) };
+};
+
 const sendEmailHandler = async (params) => {
   const { body } = params;
   unilog(567, "sendEmailHandler", body);
@@ -1349,6 +1394,9 @@ app.post(
 );
 app.get("/api/getLastViewed", apiWrapper(view.getLastViewed));
 app.get("/api/getSharedFilters", apiWrapper(getSharedFilters));
+// GET with no params uses the shared settings; POST carries its own.
+app.get("/api/getSharedFilterShows", apiWrapper(getSharedFilterShows));
+app.post("/api/getSharedFilterShows", apiWrapper(getSharedFilterShows));
 app.post("/api/local/history", apiWrapper(localHistory.getLocalHistory));
 
 // Endpoints with parameters

@@ -311,6 +311,14 @@ import * as tvdb from "../tvdb.js";
 import * as srvr from "../srvr.js";
 import * as util from "../util.js";
 import * as epd from "@tv/share";
+// The filter and sort semantics themselves, shared with tv-srvr so the list
+// this client shows and the one tvapp gets back are ordered by one same code.
+import {
+  COND_PREDS,
+  getSortKey,
+  sortShowList,
+  filterShowList,
+} from "@tv/share";
 import { unilog, logHere } from "../log.js";
 import { config } from "../config.js";
 
@@ -654,9 +662,7 @@ export default {
           color: "#0cf",
           filter: 0,
           icon: ["fas", "plus"],
-          cond(show) {
-            return show.notReady === false;
-          },
+          cond: COND_PREDS.unplayed,
           click() {},
           name: "unplayed",
         },
@@ -664,9 +670,7 @@ export default {
           color: "lime",
           filter: 0,
           icon: ["far", "clock"],
-          cond(show) {
-            return !!show.waitStr?.length;
-          },
+          cond: COND_PREDS.waiting,
           click() {},
           name: "waiting",
         },
@@ -675,9 +679,7 @@ export default {
           filter: 0,
           icon: ["fas", "film"],
           hideIcon: true,
-          cond(show) {
-            return !!show.needsIntro;
-          },
+          cond: COND_PREDS.needsIntro,
           click() {},
           name: "needsIntro",
         },
@@ -685,9 +687,7 @@ export default {
           color: "#f88",
           filter: 0,
           icon: ["fas", "minus"],
-          cond(show) {
-            return show.fileGap || show.watchGap;
-          },
+          cond: COND_PREDS.gap,
           click() {},
           name: "gap",
         },
@@ -695,9 +695,7 @@ export default {
           color: "#faa",
           filter: 0,
           icon: ["fas", "traffic-light"],
-          cond(show) {
-            return show.ended;
-          },
+          cond: COND_PREDS.ended,
           click() {},
           name: "ended",
         },
@@ -705,9 +703,7 @@ export default {
           color: "#88f",
           filter: 0,
           icon: ["far", "sad-cry"],
-          cond(show) {
-            return !show.genres?.includes("Comedy");
-          },
+          cond: COND_PREDS.drama,
           click() {},
           name: "drama",
         },
@@ -715,9 +711,7 @@ export default {
           color: "lime",
           filter: 0,
           icon: ["far", "laugh-beam"],
-          cond(show) {
-            return !!show.sitcom;
-          },
+          cond: COND_PREDS.sitcom,
           async click(show) {
             await toggleSitcom(show);
           },
@@ -727,9 +721,7 @@ export default {
           color: "#88f",
           filter: 0,
           icon: ["fas", "globe"],
-          cond(show) {
-            return show?.originalCountry?.toUpperCase() != "USA";
-          },
+          cond: COND_PREDS.foreign,
           click() {},
           name: "foreign",
         },
@@ -737,9 +729,7 @@ export default {
           color: "lime",
           filter: 0,
           icon: ["fas", "question"],
-          cond(show) {
-            return show.inToTry;
-          },
+          cond: COND_PREDS.totry,
           async click(show) {
             await toggleToTry(show);
           },
@@ -749,9 +739,7 @@ export default {
           color: "#c8925a",
           filter: 0,
           icon: ["fas", "exclamation"],
-          cond(show) {
-            return !!show.anticipating;
-          },
+          cond: COND_PREDS.anticipating,
           async click(show) {
             await toggleAnticipating(show);
           },
@@ -761,9 +749,7 @@ export default {
           color: "lime",
           filter: 0,
           icon: ["fas", "arrow-right"],
-          cond(show) {
-            return show.inContinue;
-          },
+          cond: COND_PREDS.continue,
           async click(show) {
             await toggleContinue(show);
           },
@@ -773,9 +759,7 @@ export default {
           color: "lime",
           filter: 0,
           icon: ["fas", "mars"],
-          cond(show) {
-            return show.inMark;
-          },
+          cond: COND_PREDS.mark,
           async click(show) {
             await toggleMark(show);
           },
@@ -785,9 +769,7 @@ export default {
           color: "lime",
           filter: 0,
           icon: ["fas", "venus"],
-          cond(show) {
-            return show.inLinda;
-          },
+          cond: COND_PREDS.linda,
           async click(show) {
             await toggleLinda(show);
           },
@@ -797,9 +779,7 @@ export default {
           color: "#a66",
           filter: +1,
           icon: ["fas", "tv"],
-          cond(show) {
-            return show.inEmby !== false;
-          },
+          cond: COND_PREDS.hasemby,
           async click(show) {
             await deleteShow(show);
           },
@@ -1302,26 +1282,20 @@ export default {
     },
 
     getValBySortChoice(show, forSort = false) {
+      // The sort key is shared with tv-srvr; what each row *displays* is this
+      // client's own business, so only that is still worked out here.
+      if (forSort) return getSortKey(show, this.sortChoice, allTvdb);
       let lastDownloaded, lastViewed, ratings;
       switch (this.sortChoice) {
         case "Alpha":
-          if (!forSort) return "";
-          return show.name
-            .replace(/^the\s*/i, "")
-            .replace(/[^a-z0-9\s]/gi, "")
-            .toLowerCase();
+          return "";
         case "Added":
-          if (forSort) {
-            const a = show.dateCreated || "";
-            return a.length > 10 ? a : a + " 00:00:00.000";
-          }
           return (show.dateCreated || "").slice(0, 10);
         case "Ended":
           return show.lastAired || "";
         case "Length":
           return show.averageRuntime || 0;
         case "Size":
-          if (forSort) return show.size;
           return util.fmtSize(show);
         case "Safe start": {
           const ws = show.waitStr || "";
@@ -1341,10 +1315,6 @@ export default {
         }
         case "Ratings":
           ratings = show?.ratings;
-          if (forSort)
-            return ratings !== undefined && ratings !== null && ratings !== 0
-              ? +ratings
-              : 0;
           return ratings !== undefined && ratings !== null && ratings !== 0
             ? String(ratings)
             : "";
@@ -1363,27 +1333,20 @@ export default {
             best = crewArr.find((c) => c.type === type);
             if (best) break;
           }
-          const val = best ? best.name : "";
-          return forSort ? val.toLowerCase() : val;
+          return best ? best.name : "";
         }
         case "Viewed":
           lastViewed = util.normalizePlayedDate(
             show.lastPlayedDate || allTvdb?.[show.name]?.lastPlayedDate || "",
           );
-          if (forSort) {
-            return lastViewed || "";
-          }
           if (lastViewed)
             return util.fmtPlayedDate(lastViewed).split(" ")[0] || "";
           return "";
         case "Down":
           lastDownloaded = allTvdb?.[show.name]?.["last-downloaded"] || "";
-          if (forSort)
-            return lastDownloaded ? util.normalizeTimestamp(lastDownloaded) : "";
           return util.fmtDbDate(lastDownloaded);
         case "Quality": {
           const q = show.quality ?? null;
-          if (forSort) return q !== null ? q : -1;
           return q !== null ? String(q) : "";
         }
       }
@@ -2864,34 +2827,12 @@ export default {
     },
 
     sortShows() {
-      this.shows = [...this.shows].sort((a, b) => {
-        const va = this.getValBySortChoice(a, true);
-        const vb = this.getValBySortChoice(b, true);
-        if (va !== vb) {
-          let result;
-          if (
-            ["Alpha", "Length", "Creator", "Safe start"].includes(
-              this.sortChoice,
-            )
-          ) {
-            if (this.sortChoice === "Creator") {
-              if (va === "" && vb !== "") return 1;
-              if (vb === "" && va !== "") return -1;
-            }
-            result = va > vb ? +1 : -1;
-          } else {
-            result = va > vb ? -1 : +1;
-          }
-          return this.reversed ? -result : result;
-        }
-        // Tie-break: first aired date descending (most recent first)
-        const fa = a.firstAired || "";
-        const fb = b.firstAired || "";
-        if (fa === "" && fb === "") return 0;
-        if (fa === "") return 1; // no date goes to end
-        if (fb === "") return -1; // no date goes to end
-        return fa > fb ? -1 : fa < fb ? 1 : 0; // descending
-      });
+      this.shows = sortShowList(
+        this.shows,
+        this.sortChoice,
+        allTvdb,
+        this.reversed,
+      );
     },
 
     condColor(show, cond) {
@@ -3019,34 +2960,18 @@ export default {
         ? this.shows.findIndex((s) => s.name === this.highlightName)
         : -1;
 
-      const filteredShows = [];
-      fltrLoop: for (const show of allShows) {
-        if (this.fltrChoice === "Finished") {
-          const tvdbData = localAllTvdb?.[show.name];
-          if (!tvdbData) continue;
-          const { status, episodeCount, watchedCount } = tvdbData;
-          const watchedAll = episodeCount > 0 && watchedCount == episodeCount;
-          const finished =
-            status == "Ended" && watchedAll && show.inEmby !== false;
-          if (finished) filteredShows.push(show);
-          continue;
-        }
-        if (srchStrLc && !show.name.toLowerCase().includes(srchStrLc)) continue;
-        if (descrSrchLc) {
-          const overview = String(
-            localAllTvdb?.[show.name]?.overview ?? "",
-          ).toLowerCase();
-          if (!overview.includes(descrSrchLc)) continue;
-        }
-        for (let cond of this.conds) {
-          const effectiveFilter = cond.filter;
-          if (effectiveFilter === 0) continue;
-          if ((effectiveFilter === +1) != !!cond.cond(show)) {
-            continue fltrLoop;
-          }
-        }
-        filteredShows.push(show);
-      }
+      const condFilters = {};
+      for (const cond of this.conds) condFilters[cond.name] = cond.filter;
+      const filteredShows = filterShowList(
+        allShows,
+        {
+          fltrChoice: this.fltrChoice,
+          filterStr: srchStrLc ? this.filterStr : "",
+          descrSearchStr: this.descrSearchStr,
+          condFilters,
+        },
+        localAllTvdb,
+      );
 
       this.shows = filteredShows;
       if (this.shows.length === 1) this.saveVisShow(this.shows[0]);

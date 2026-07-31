@@ -31,85 +31,17 @@ export function getPstDate() {
     .slice(0, 10);
 }
 
-function getLaDateTimeParts(dateIn = new Date()) {
-  const date = dateIn instanceof Date ? dateIn : new Date(dateIn);
-  if (Number.isNaN(date.getTime())) return null;
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).formatToParts(date);
-  const map = {};
-  for (const part of parts) {
-    if (part && part.type && part.value) map[part.type] = part.value;
-  }
-  if (
-    !map.year ||
-    !map.month ||
-    !map.day ||
-    !map.hour ||
-    !map.minute ||
-    !map.second
-  ) {
-    return null;
-  }
-  return {
-    year: map.year,
-    month: map.month,
-    day: map.day,
-    hour: map.hour === "24" ? "00" : map.hour,
-    minute: map.minute,
-    second: map.second,
-    ms: String(date.getMilliseconds()).padStart(3, "0"),
-  };
-}
+// Moved to @tv/share so tv-srvr sorts the list by exactly the same dates the
+// client does; re-exported here because most of the client reaches for them
+// through util.
+import {
+  getPstDateTimeMs,
+  fmtLaDateTime,
+  normalizeTimestamp,
+  normalizePlayedDate,
+} from "@tv/share";
 
-export function getPstDateTimeMs(dateIn = new Date()) {
-  const parts = getLaDateTimeParts(dateIn);
-  if (!parts) return "";
-  return `${parts.year}/${parts.month}/${parts.day} ${parts.hour}:${parts.minute}:${parts.second}.${parts.ms}`;
-}
-
-export function fmtLaDateTime(dateIn = new Date()) {
-  const parts = getLaDateTimeParts(dateIn);
-  if (!parts) return "";
-  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
-}
-
-export function normalizeTimestamp(value) {
-  if (value === undefined || value === null || value === "") return "";
-  if (typeof value === "number" && Number.isFinite(value)) {
-    const ms = value > 0 && value < 100000000000 ? value * 1000 : value;
-    return getPstDateTimeMs(ms);
-  }
-
-  const raw = String(value).trim();
-  if (!raw) return "";
-  if (/^\d+$/.test(raw)) return normalizeTimestamp(Number(raw));
-
-  let m = raw.match(/^(\d{4})[-/](\d{2})[-/](\d{2})$/);
-  if (m) return `${m[1]}/${m[2]}/${m[3]} 00:00:00.000`;
-
-  m = raw.match(
-    /^(\d{4})[-/](\d{2})[-/](\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,}))?$/,
-  );
-  if (m) {
-    const ms = (m[7] || "000").slice(0, 3).padEnd(3, "0");
-    const hour = m[4] === "24" ? "00" : m[4];
-    return `${m[1]}/${m[2]}/${m[3]} ${hour}:${m[5]}:${m[6]}.${ms}`;
-  }
-
-  return getPstDateTimeMs(raw);
-}
-
-export function normalizePlayedDate(value) {
-  return normalizeTimestamp(value);
-}
+export { getPstDateTimeMs, fmtLaDateTime, normalizeTimestamp, normalizePlayedDate };
 
 export function fmtPlayedDate(value) {
   const raw = String(value || "").trim();

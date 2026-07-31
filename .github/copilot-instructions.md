@@ -8,7 +8,7 @@
 
 ## Documentation
 
-- Detailed description of code logic belongs only in comments in the code itself, not in CLAUDE.md or .github/copilot-instructions.md.
+- never modify CLAUDE.md or .github/copilot-instructions.md unless told to modify
 
 ## Remote server
 

@@ -105,18 +105,22 @@ const MSG_CLEAR_FILTER = "z";
 const MSG_OPEN_TVAPP = "o";
 const MSG_TVAPP_UP = "u";
 const MSG_TVAPP_DOWN = "d";
+// Another phone pressed its Shows button and claimed the cursor. Same effect on
+// this screen as tvapp closing, but tvapp itself stays open -- it is only this
+// phone that is no longer the one driving it.
+const MSG_TAKEN = "k";
 
 /**
  * The relay socket, held open for as long as the app runs — not just while the
  * tvappctrl screen is up, because `onTvappUp` is what opens that screen.
  * Returns a send function; App.js owns the result and hands it to TvAppCtrl.
  */
-export function useTvappLink({ onTvappUp, onTvappDown }) {
+export function useTvappLink({ onTvappUp, onTvappDown, onTaken }) {
   const wsRef = useRef(null);
   // Read through a ref so the socket effect can stay mounted for the life of the
   // app while the callbacks it calls are re-created on every render.
   const handlersRef = useRef(null);
-  handlersRef.current = { onTvappUp, onTvappDown };
+  handlersRef.current = { onTvappUp, onTvappDown, onTaken };
   // MSG_CLEAR_FILTER only means anything to the tvappctrl screen, so that
   // screen registers for it while it is mounted rather than App.js routing it
   // through: the remote has nothing to do with a filter box on the tv.
@@ -148,6 +152,7 @@ export function useTvappLink({ onTvappUp, onTvappDown }) {
       ws.onmessage = (e) => {
         if (e.data === MSG_TVAPP_UP) handlersRef.current.onTvappUp();
         else if (e.data === MSG_TVAPP_DOWN) handlersRef.current.onTvappDown();
+        else if (e.data === MSG_TAKEN) handlersRef.current.onTaken();
         else if (e.data === MSG_CLEAR_FILTER) clearFilterRef.current?.();
       };
       openTimer = setTimeout(() => {
@@ -184,6 +189,10 @@ export function useTvappLink({ onTvappUp, onTvappDown }) {
   return {
     send,
     openTvapp: () => send(MSG_OPEN_TVAPP),
+    // Same wire message the Clear button sends, exposed for App.js to fire when
+    // this phone claims tvappctrl -- it starts on a clean show list, not on
+    // whatever the phone it took over from had left filtered.
+    clearShowFilter: () => send(`${CMD_FILTER},`),
     onClearFilter: (fn) => {
       clearFilterRef.current = fn;
     },

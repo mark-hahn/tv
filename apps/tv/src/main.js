@@ -94,6 +94,14 @@ const TVAPP_BRAVIA_URI =
 const MSG_OPEN_TVAPP = "o"; // phone -> relay: open tvapp on the tv
 const MSG_TVAPP_UP = "u"; // relay -> phone: tvapp is open
 const MSG_TVAPP_DOWN = "d"; // relay -> phone: tvapp has closed
+const MSG_TAKEN = "k"; // relay -> phone: another phone claimed tvappctrl, close it
+// tvapp's own protocol (apps/tvapp's CtrlServer.java), used directly below --
+// not relayed -- so the web client's Shows button works with no phone
+// connected at all.
+const CMD_EXIT_TVAPP = "x"; // close tvapp
+const CMD_SELECT_SHOW = "s"; // select a show by name
+const TVAPP_PROBE_TIMEOUT_MS = 800;
+const TVAPP_SELECT_DIAL_TIMEOUT_MS = 8000;
 
 const PIC_TARGETS = [
   "pictureMode",
@@ -2379,12 +2387,21 @@ async function checkSubtitleMismatch(sessions) {
 
 // Pipes one phone's cursor stream through to tvapp and keeps the two ends in
 // step: tvapp opening or closing on the tv is what opens or closes the phone's
-// tvappctrl screen, and vice versa. Apart from its own three control messages it
+// tvappctrl screen, and vice versa. Apart from its own four control messages it
 // stays dumb about the protocol — the cursor format is agreed between
 // apps/android/tvappctrl.js and apps/tvapp's CtrlServer, and a relay that read it
 // would be a third place to edit on every change.
+//
+// Only one phone drives the cursor at a time. Every phone has its own connection
+// and its own dial loop, all of them watching the one tvapp, so without the
+// ownership below they would all open together and drag the same cursor at once.
 function startTvappctrlRelay() {
   const relay = new WebSocketServer({ port: TVAPPCTRL_RELAY_PORT });
+  // The phone whose Shows button opened tvappctrl, and the only one allowed to
+  // have it up. Null when no phone claimed it, which is how a launch from the
+  // web client's Shows button leaves it: that one has no phone to prefer, and
+  // opens tvappctrl on all of them.
+  let ownerPhone = null;
 
   relay.on("connection", (phone, req) => {
     const from = req.socket.remoteAddress;
@@ -2408,13 +2425,22 @@ function startTvappctrlRelay() {
         wasOpen = true;
         quietDialFail = false;
         unilog(1839, `phone ${from} relaying to tvapp`);
-        sendPhone(MSG_TVAPP_UP);
+        // tvapp merely being up does not open a phone that has not claimed it.
+        // Every phone dials the same tvapp, so without this the claiming
+        // phone's own launch would reopen all the others a second or two later,
+        // as their dials started succeeding, and undo the claim it just made.
+        if (!ownerPhone || ownerPhone === phone) sendPhone(MSG_TVAPP_UP);
       });
       // Only a socket that had actually been open reports "down". Otherwise the
       // steady drip of refused dials while tvapp is simply not open would keep
       // slamming the phone's screen shut.
       sock.on("close", () => {
-        if (wasOpen) sendPhone(MSG_TVAPP_DOWN);
+        if (wasOpen) {
+          sendPhone(MSG_TVAPP_DOWN);
+          // tvapp is gone, so the claim on it goes too — the next launch, from
+          // whatever source, starts over with nobody owning it.
+          if (ownerPhone === phone) ownerPhone = null;
+        }
         redial();
       });
       sock.on("error", (e) => {
@@ -2446,6 +2472,16 @@ function startTvappctrlRelay() {
       // Two messages are the relay's own; everything else is between the phone and
       // tvapp and is forwarded without being understood.
       if (msg === MSG_OPEN_TVAPP) {
+        // This phone claims tvappctrl. Every other phone closes it now if it
+        // has it up, and the gate in the dial above is what keeps them from
+        // opening again when tvapp answers this launch.
+        ownerPhone = phone;
+        unilog(1856, `phone ${from} claimed tvappctrl`);
+        for (const other of relay.clients) {
+          if (other !== phone && other.readyState === WebSocket.OPEN) {
+            other.send(MSG_TAKEN);
+          }
+        }
         launchTvapp();
         return;
       }
@@ -2457,6 +2493,9 @@ function startTvappctrlRelay() {
 
     const shutdown = () => {
       closed = true;
+      // A phone that has gone away cannot go on owning tvappctrl, or no other
+      // phone's dial would ever be allowed to open it again.
+      if (ownerPhone === phone) ownerPhone = null;
       clearTimeout(dialTimer);
       tv?.close();
     };
@@ -2499,6 +2538,73 @@ async function launchTvapp() {
     unilog(1844, `could not ask the tv to open tvapp: ${e.message}`);
   }
 }
+
+// A quick dial to tvapp's ctrl socket: open within TVAPP_PROBE_TIMEOUT_MS
+// means tvapp is already up. Same signal the relay uses to flip a phone's
+// tvappctrl screen on, asked here without any phone in the loop.
+function probeTvappOpen() {
+  return new Promise((resolve) => {
+    const sock = new WebSocket(TVAPP_CTRL_URL);
+    const timer = setTimeout(() => {
+      sock.terminate();
+      resolve(null);
+    }, TVAPP_PROBE_TIMEOUT_MS);
+    sock.on("open", () => {
+      clearTimeout(timer);
+      resolve(sock);
+    });
+    sock.on("error", () => {
+      clearTimeout(timer);
+      resolve(null);
+    });
+  });
+}
+
+// Redials until tvapp's ctrl socket comes up -- it takes a beat to launch --
+// or gives up after timeoutMs.
+function dialTvappUntilOpen(timeoutMs) {
+  return new Promise((resolve) => {
+    const deadline = Date.now() + timeoutMs;
+    const attempt = () => {
+      const sock = new WebSocket(TVAPP_CTRL_URL);
+      sock.on("open", () => resolve(sock));
+      sock.on("error", () => {
+        if (Date.now() >= deadline) {
+          resolve(null);
+          return;
+        }
+        setTimeout(attempt, TVAPP_DIAL_RETRY_MS);
+      });
+    };
+    attempt();
+  });
+}
+
+// The web remote's Shows button: closes tvapp if it's open, otherwise opens
+// it and selects whichever show the web client has up. Every connected
+// phone follows along for free -- tvapp opening or closing is what flips its
+// tvappctrl screen on and off already.
+app.post("/tv/toggletvapp", async (req, res) => {
+  const { show } = req.body ?? {};
+  const openSock = await probeTvappOpen();
+  if (openSock) {
+    unilog(1851, `toggletvapp closing tvapp`);
+    openSock.send(CMD_EXIT_TVAPP);
+    openSock.close();
+    res.json({ ok: true, action: "closed" });
+    return;
+  }
+  await launchTvapp();
+  const sock = await dialTvappUntilOpen(TVAPP_SELECT_DIAL_TIMEOUT_MS);
+  if (!sock) {
+    unilog(1852, `toggletvapp: tvapp never came up`);
+    res.json({ ok: false, error: "tvapp did not come up" });
+    return;
+  }
+  if (show) sock.send(`${CMD_SELECT_SHOW},${show}`);
+  sock.close();
+  res.json({ ok: true, action: "opened" });
+});
 
 // tvapp asks for this when a click arrives on the tvappctrl screen while
 // something else — a trailer playing in YouTube, say — has the tv's screen. It

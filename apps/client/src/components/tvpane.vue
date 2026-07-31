@@ -647,6 +647,10 @@ const CELL_BASE = {
 export default {
   name: "TvPane",
 
+  props: {
+    show: { type: Object, default: null },
+  },
+
   data() {
     return {
       flashBtn: null,
@@ -774,6 +778,20 @@ export default {
       } catch (_) {
         return { blocked: false, result: null };
       }
+    },
+
+    // Shows: opens tvapp on the tv with whatever show is up in the client, or
+    // closes it if it's already open. Goes straight to tv-tv, not through the
+    // collision gate -- there's no other remote whose keypress this could
+    // step on.
+    async toggleTvapp() {
+      try {
+        await fetch(`${config.tvTvUrl}/tv/toggletvapp`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ show: this.show?.name ?? null }),
+        });
+      } catch (_) {}
     },
 
     // Human-readable label for the lockout message. openapp:/subtitle: keys
@@ -1035,7 +1053,7 @@ export default {
     startShowsHold() {
       this._dbStart(() => {
         this.flash("shows");
-        evtBus.emit("showsButtonClicked");
+        this.toggleTvapp();
       });
     },
     stopShowsHold() {

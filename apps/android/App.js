@@ -148,6 +148,9 @@ export default function App() {
   const tvappLink = useTvappLink({
     onTvappUp: () => setShowTvAppCtrl(true),
     onTvappDown: () => setShowTvAppCtrl(false),
+    // Another phone pressed Shows and claimed the cursor. tvapp itself stays
+    // open -- this just backs this phone out to its own remote.
+    onTaken: () => setShowTvAppCtrl(false),
   });
   const [flashSvc, setFlashSvc] = useState(null);
   const [showSubCtrl, setShowSubCtrl] = useState(false);
@@ -980,9 +983,12 @@ export default function App() {
 
   // Opening tvappctrl swaps the whole phone ui over to it, and asks the tv to
   // open tvapp as well — the two are kept in step, so one is never opened
-  // without the other.
+  // without the other. It also claims the cursor: any other phone that had
+  // tvappctrl up closes it, and tvapp's filter is cleared so this phone starts
+  // from a clean show list rather than the one it took over.
   const openTvAppCtrl = () => {
     tvappLink.openTvapp();
+    tvappLink.clearShowFilter();
     setShowTvAppCtrl(true);
   };
 

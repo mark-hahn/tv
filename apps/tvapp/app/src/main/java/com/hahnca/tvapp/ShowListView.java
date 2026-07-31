@@ -179,6 +179,12 @@ class ShowListView extends ScrollView implements Scroller {
     return selected;
   }
 
+  /** Driven straight by tv-tv, not a click -- no filter, sort, or order to touch. */
+  void selectByName(String name) {
+    Shows.Show show = byName.get(name);
+    if (show != null) select(show);
+  }
+
   @Override
   public void scrollStep(int px) {
     scrollBy(0, px);

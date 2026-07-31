@@ -24,6 +24,8 @@ import org.java_websocket.server.WebSocketServer;
  *   r              and is now up again
  *   x              exit, so closing tvappctrl on the phone closes tvapp here
  *   f,&lt;text&gt;    the show list's filter, as the phone's own filter box has it
+ *   s,&lt;name&gt;    select this show, exact name match -- sent by tv-tv itself,
+ *                  straight over this same socket, not by the phone
  *
  * and back to the phone, which is what the relay's other direction is for:
  *
@@ -42,6 +44,7 @@ class CtrlServer extends WebSocketServer {
   private static final String CMD_RELEASE = "r";
   private static final String CMD_EXIT = "x";
   private static final String CMD_FILTER = "f";
+  private static final String CMD_SELECT = "s";
   private static final int STOP_TIMEOUT_MS = 500;
 
   interface Listener {
@@ -57,6 +60,8 @@ class CtrlServer extends WebSocketServer {
     void onExit();
 
     void onFilter(String text);
+
+    void onSelectShow(String name);
   }
 
   private final Listener listener;
@@ -100,10 +105,14 @@ class CtrlServer extends WebSocketServer {
 
   @Override
   public void onMessage(WebSocket conn, String message) {
-    // Filter text is everything after the first comma, commas and all, so it is
-    // taken apart before the fixed-arity commands are.
+    // Filter text and a show name are everything after the first comma, commas
+    // and all, so both are taken apart before the fixed-arity commands are.
     if (message.startsWith(CMD_FILTER + ",")) {
       listener.onFilter(message.substring(CMD_FILTER.length() + 1));
+      return;
+    }
+    if (message.startsWith(CMD_SELECT + ",")) {
+      listener.onSelectShow(message.substring(CMD_SELECT.length() + 1));
       return;
     }
     String[] parts = message.split(",");

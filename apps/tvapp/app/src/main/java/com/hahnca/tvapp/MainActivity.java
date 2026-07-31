@@ -921,6 +921,15 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   /**
+   * tv-tv asks for this right after opening tvapp on the tv, so the show
+   * that's up on the web client is the one already selected here.
+   */
+  @Override
+  public void onSelectShow(String name) {
+    ui.post(() -> showList.selectByName(name));
+  }
+
+  /**
    * Clicks whatever is under the arrow by synthesizing a touch at the cursor
    * hotspot. Dispatching into the view hierarchy instead of calling a listener
    * directly means any widget this ui grows is clickable with no more plumbing.

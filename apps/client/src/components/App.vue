@@ -323,6 +323,7 @@
           <TvPane
             v-show="currentPane === 'remote'"
             style="width: 100%; height: 100%"
+            :show="currentShow"
           ></TvPane>
         </div>
       </div>

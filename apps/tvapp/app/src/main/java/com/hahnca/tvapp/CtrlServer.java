@@ -16,20 +16,32 @@ import org.java_websocket.server.WebSocketServer;
  *
  * The wire protocol is hand-mirrored in apps/android/tvappctrl.js — tvapp is
  * Java and cannot import the phone's constants, so a change here is a change
- * there, in the same session. Keep it small:
+ * there, in the same session. Keep it small. From the phone:
  *
  *   m,&lt;dx&gt;,&lt;dy&gt;   move the cursor by a relative amount, in tv pixels
  *   c              click whatever the cursor is over
  *   x              exit, so closing tvappctrl on the phone closes tvapp here
+ *   f,&lt;text&gt;    the show list's filter, as the phone's keyboard has it
+ *   e              that keyboard was accepted and is gone; clear the filter
+ *
+ * and back to the phone, which is what the relay's other direction is for:
+ *
+ *   s              show the keyboard: the filter box was clicked here
+ *   h              hide it again, the filter box having been clicked a second time
  */
 class CtrlServer extends WebSocketServer {
 
   static final int CTRL_PORT = 8099;
 
+  static final String MSG_KEYBOARD_ON = "s";
+  static final String MSG_KEYBOARD_OFF = "h";
+
   private static final String TAG = "tvapp";
   private static final String CMD_MOVE = "m";
   private static final String CMD_CLICK = "c";
   private static final String CMD_EXIT = "x";
+  private static final String CMD_FILTER = "f";
+  private static final String CMD_KEYBOARD_CLOSED = "e";
   private static final int STOP_TIMEOUT_MS = 500;
 
   interface Listener {
@@ -38,6 +50,10 @@ class CtrlServer extends WebSocketServer {
     void onClick();
 
     void onExit();
+
+    void onFilter(String text);
+
+    void onKeyboardClosed();
   }
 
   private final Listener listener;
@@ -74,8 +90,19 @@ class CtrlServer extends WebSocketServer {
     Log.i(TAG, "tvappctrl disconnected, code " + code + " " + reason);
   }
 
+  /** To the phone. There is only ever the one connection, so broadcast is it. */
+  void send(String message) {
+    broadcast(message);
+  }
+
   @Override
   public void onMessage(WebSocket conn, String message) {
+    // Filter text is everything after the first comma, commas and all, so it is
+    // taken apart before the fixed-arity commands are.
+    if (message.startsWith(CMD_FILTER + ",")) {
+      listener.onFilter(message.substring(CMD_FILTER.length() + 1));
+      return;
+    }
     String[] parts = message.split(",");
     if (CMD_MOVE.equals(parts[0]) && parts.length == 3) {
       listener.onMove(Float.parseFloat(parts[1]), Float.parseFloat(parts[2]));
@@ -83,6 +110,8 @@ class CtrlServer extends WebSocketServer {
       listener.onClick();
     } else if (CMD_EXIT.equals(parts[0])) {
       listener.onExit();
+    } else if (CMD_KEYBOARD_CLOSED.equals(parts[0])) {
+      listener.onKeyboardClosed();
     } else {
       Log.w(TAG, "unknown ctrl command: " + message);
     }

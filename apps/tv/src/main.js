@@ -2423,6 +2423,10 @@ function startTvappctrlRelay() {
           unilog(1840, `tvapp dial failed, quiet until it answers: ${e.message}`);
         }
       });
+      // tvapp answers back — its filter box asks for the phone's keyboard — so
+      // the relay is transparent in this direction too, and understands this one
+      // no better than the other.
+      sock.on("message", (data) => sendPhone(data.toString()));
     };
 
     const redial = () => {

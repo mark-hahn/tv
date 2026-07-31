@@ -1415,6 +1415,7 @@ export default function App() {
     return (
       <TvAppCtrl
         send={tvappLink.send}
+        onKeyboard={tvappLink.onKeyboard}
         onExit={() => setShowTvAppCtrl(false)}
       />
     );

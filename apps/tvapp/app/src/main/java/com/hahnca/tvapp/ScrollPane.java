@@ -6,6 +6,8 @@ import android.os.Looper;
 import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -23,20 +25,51 @@ abstract class ScrollPane extends ScrollView implements Pane {
 
   protected final Handler ui = new Handler(Looper.getMainLooper());
   protected final LinearLayout column;
+  /** Null unless this pane goes sideways as well; only Map does. */
+  private final HorizontalScrollView across;
 
   private Shows.Show show;
   private Shows.Show filled;
 
   ScrollPane(Context context) {
+    this(context, false);
+  }
+
+  ScrollPane(Context context, boolean horizontal) {
     super(context);
     column = new LinearLayout(context);
     column.setOrientation(LinearLayout.VERTICAL);
     int pad = (int) dp(PAD_DP);
     column.setPadding(pad, pad, pad, pad);
-    addView(
-        column,
-        new ScrollView.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+    if (horizontal) {
+      // fillViewport so content narrower than the pane still spreads across it:
+      // weighted columns only have spare width to share out when the row is
+      // measured against the viewport rather than against its own content.
+      across = new HorizontalScrollView(context);
+      across.setFillViewport(true);
+      across.addView(
+          column,
+          new FrameLayout.LayoutParams(
+              ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+      addView(
+          across,
+          new ScrollView.LayoutParams(
+              ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+    } else {
+      across = null;
+      addView(
+          column,
+          new ScrollView.LayoutParams(
+              ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+    }
+    // On the column, not on the ScrollView: a ScrollView eats the touch itself
+    // and never gets as far as performClick. Guarded rather than only installed
+    // for a list pane, because rampScroll is a subclass's answer and this runs
+    // before the subclass exists.
+    column.setOnClickListener(
+        v -> {
+          if (rampScroll()) scrollToStart();
+        });
   }
 
   @Override
@@ -56,8 +89,27 @@ abstract class ScrollPane extends ScrollView implements Pane {
   }
 
   @Override
+  public void scrollStepX(int px) {
+    if (across != null) across.scrollBy(px, 0);
+  }
+
+  @Override
+  public boolean scrollsHorizontally() {
+    return across != null;
+  }
+
+  @Override
   public View asView() {
     return this;
+  }
+
+  /**
+   * Back to the top, and to the far left of anything that went sideways. The
+   * cursor only ever scrolls a pane forwards, so this is the way back.
+   */
+  void scrollToStart() {
+    smoothScrollTo(0, 0);
+    if (across != null) across.smoothScrollTo(0, 0);
   }
 
   /** True while the given show is still the one this pane is filled with. */
@@ -72,6 +124,7 @@ abstract class ScrollPane extends ScrollView implements Pane {
     filled = show;
     column.removeAllViews();
     scrollTo(0, 0);
+    if (across != null) across.scrollTo(0, 0);
     if (show != null) fill(show);
   }
 

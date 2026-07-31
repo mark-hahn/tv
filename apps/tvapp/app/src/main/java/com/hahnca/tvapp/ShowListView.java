@@ -11,7 +11,10 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The card list down the left half of the screen: one card per show, holding
@@ -20,7 +23,9 @@ import java.util.List;
  *
  * Every card is built up front rather than recycled — the list is a couple of
  * hundred shows and never changes while the app is open, and a plain ScrollView
- * is what lets the cursor's edge-of-screen scrolling just call scrollBy.
+ * is what lets the cursor's edge-of-screen scrolling just call scrollBy. The
+ * header's filter and sort therefore only ever re-order cards that already
+ * exist, which is what lets the list keep up with a filter being typed.
  */
 class ShowListView extends ScrollView implements Scroller {
 
@@ -41,10 +46,13 @@ class ShowListView extends ScrollView implements Scroller {
   }
 
   private final LinearLayout column;
-  private final List<Shows.Show> shows = new ArrayList<>();
-  private final List<View> cards = new ArrayList<>();
+  private final List<Shows.Show> shows = new ArrayList<>(); // everything loaded
+  private final List<Shows.Show> visible = new ArrayList<>(); // after filter and sort
+  private final Map<Shows.Show, View> cards = new HashMap<>();
   private SelectionListener listener;
-  private int selected = -1;
+  private Shows.Show selected;
+  private String filter = "";
+  private Shows.Sort sort = Shows.Sort.ALPHA;
 
   ShowListView(Context context) {
     super(context);
@@ -71,38 +79,34 @@ class ShowListView extends ScrollView implements Scroller {
     shows.addAll(list);
     cards.clear();
     column.removeAllViews();
-    for (int i = 0; i < shows.size(); i++) {
-      final int index = i;
-      View card = buildCard(shows.get(i));
-      card.setOnClickListener(v -> select(index));
-      LinearLayout.LayoutParams params =
-          new LinearLayout.LayoutParams(
-              ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-      params.bottomMargin = (int) dp(CARD_GAP_DP);
-      column.addView(card, params);
-      cards.add(card);
+    for (Shows.Show show : shows) {
+      View card = buildCard(show);
+      card.setOnClickListener(v -> select(show));
+      cards.put(show, card);
     }
-    selected = -1;
-    if (shows.isEmpty()) return;
-    int index = indexOfName(selectedName);
-    select(index);
-    // The selected card can be hundreds of rows down, and scrollTo only works
-    // once the column has been laid out.
-    final View card = cards.get(index);
-    post(() -> scrollTo(0, card.getTop()));
+    selected = null;
+    for (Shows.Show show : shows) {
+      if (show.name.equals(selectedName)) select(show);
+    }
+    // Picks the top card when nothing was remembered, and lays the list out.
+    apply();
   }
 
-  private int indexOfName(String name) {
-    if (name != null) {
-      for (int i = 0; i < shows.size(); i++) {
-        if (shows.get(i).name.equals(name)) return i;
-      }
-    }
-    return 0;
+  /** Substring of the name, case ignored — the web client's filter box exactly. */
+  void setFilter(String text) {
+    if (filter.equals(text)) return;
+    filter = text;
+    apply();
+  }
+
+  void setSort(Shows.Sort sort) {
+    if (this.sort == sort) return;
+    this.sort = sort;
+    apply();
   }
 
   Shows.Show getSelected() {
-    return selected < 0 ? null : shows.get(selected);
+    return selected;
   }
 
   @Override
@@ -110,12 +114,46 @@ class ShowListView extends ScrollView implements Scroller {
     scrollBy(0, px);
   }
 
-  private void select(int index) {
-    if (index == selected) return;
-    if (selected >= 0) paint(cards.get(selected), CARD_BG);
-    selected = index;
-    paint(cards.get(selected), CARD_BG_SELECTED);
-    if (listener != null) listener.onShowSelected(shows.get(selected));
+  /**
+   * Rebuilds the column from the current filter and sort. The cards themselves
+   * are built once and only ever re-ordered here, so this costs a layout pass
+   * and nothing else even while a filter is being typed.
+   */
+  private void apply() {
+    visible.clear();
+    String needle = filter.toLowerCase();
+    for (Shows.Show show : shows) {
+      if (needle.isEmpty() || show.name.toLowerCase().contains(needle)) visible.add(show);
+    }
+    Collections.sort(visible, Shows.order(sort));
+    column.removeAllViews();
+    for (Shows.Show show : visible) {
+      LinearLayout.LayoutParams params =
+          new LinearLayout.LayoutParams(
+              ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+      params.bottomMargin = (int) dp(CARD_GAP_DP);
+      column.addView(cards.get(show), params);
+    }
+    // A selection the filter has just hidden falls to the top of what is left,
+    // so the panes are never showing a show the list no longer offers.
+    if (selected != null && !visible.contains(selected)) {
+      paint(cards.get(selected), CARD_BG);
+      selected = null;
+    }
+    if (selected == null && !visible.isEmpty()) select(visible.get(0));
+    if (selected == null) return;
+    // scrollTo only means anything once the column has been laid out, and the
+    // selected card can be hundreds of rows down.
+    final View card = cards.get(selected);
+    post(() -> scrollTo(0, card.getTop()));
+  }
+
+  private void select(Shows.Show show) {
+    if (show == selected) return;
+    if (selected != null) paint(cards.get(selected), CARD_BG);
+    selected = show;
+    paint(cards.get(show), CARD_BG_SELECTED);
+    if (listener != null) listener.onShowSelected(show);
   }
 
   private void paint(View card, int color) {

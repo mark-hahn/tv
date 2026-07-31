@@ -19,9 +19,9 @@ import org.json.JSONObject;
  * quality — the web client's map and the phone remote's, with the same letters
  * and the same two cell colours.
  *
- * The rows are weighted rather than measured, so a show with twenty seasons
- * just gets narrower columns instead of running off the side of a pane that
- * cannot scroll sideways.
+ * Season columns are weighted above a floor: a handful of seasons spread across
+ * the pane, and past the dozen that fit at a legible width the grid runs off
+ * the side and the pane scrolls sideways to reach the rest.
  */
 class MapView extends ScrollPane {
 
@@ -30,6 +30,8 @@ class MapView extends ScrollPane {
   private static final String TAG = "tvapp";
   private static final float ROW_HEIGHT_DP = 34f;
   private static final float EPISODE_COL_WIDTH_DP = 40f;
+  // A season column never narrows past this; beyond that the grid scrolls.
+  private static final float MIN_SEASON_COL_WIDTH_DP = 44f;
   private static final float CELL_TEXT_SIZE_SP = 15f;
   private static final int CELL_AVAIL_BG = 0xFFFFFFFF;
   private static final int CELL_MISSING_BG = 0xFFFFCCCC;
@@ -53,7 +55,12 @@ class MapView extends ScrollPane {
   }
 
   MapView(Context context) {
-    super(context);
+    super(context, true);
+  }
+
+  @Override
+  public boolean rampScroll() {
+    return true;
   }
 
   @Override
@@ -125,7 +132,10 @@ class MapView extends ScrollPane {
   }
 
   private LinearLayout.LayoutParams cellColumn() {
-    return new LinearLayout.LayoutParams(0, (int) dp(ROW_HEIGHT_DP), 1f);
+    // The floor is the base width and the weight shares out whatever the pane
+    // has left over, so few seasons spread and many overflow instead of shrink.
+    return new LinearLayout.LayoutParams(
+        (int) dp(MIN_SEASON_COL_WIDTH_DP), (int) dp(ROW_HEIGHT_DP), 1f);
   }
 
   private TextView label(String value, int color) {

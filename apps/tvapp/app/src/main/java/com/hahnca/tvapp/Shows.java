@@ -3,6 +3,7 @@ package com.hahnca.tvapp;
 import android.util.Log;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import org.json.JSONArray;
@@ -67,6 +68,10 @@ class Shows {
     final int watchedCount; // -1 when the record has none
     final String overview;
     final String imdbId;
+    // What the header's two sort buttons order by. Both are already
+    // "yyyy/MM/dd HH:mm:ss.SSS" in the record, so they sort as plain text.
+    final String lastPlayedDate;
+    final String dateCreated;
     final List<Actor> characters;
     final List<Trailer> trailers;
 
@@ -87,6 +92,8 @@ class Shows {
       watchedCount = rec.isNull("watchedCount") ? -1 : rec.optInt("watchedCount", -1);
       overview = str(rec, "overview");
       imdbId = str(rec, "imdbId");
+      lastPlayedDate = str(rec, "lastPlayedDate");
+      dateCreated = str(rec, "dateCreated");
       characters = new ArrayList<>();
       JSONArray castNodes = rec.optJSONArray("characters");
       for (int i = 0; castNodes != null && i < castNodes.length(); i++) {
@@ -100,6 +107,50 @@ class Shows {
         if (node != null) trailers.add(new Trailer(node));
       }
     }
+  }
+
+  /**
+   * The orders the list header's two buttons offer, plus the alphabetical one
+   * that is what neither of them being on means. They are the web client's
+   * sort selector choices — WATCHING is the one it shows as "Watched".
+   */
+  enum Sort {
+    ALPHA,
+    WATCHING,
+    ADDED;
+
+    /** Reading back what was remembered, which may name a sort we dropped. */
+    static Sort of(String name) {
+      for (Sort sort : values()) {
+        if (sort.name().equals(name)) return sort;
+      }
+      return ALPHA;
+    }
+  }
+
+  /**
+   * The client's own ordering: alphabetically ascending, every other sort by
+   * its date with the most recent first and no date at all at the end, and
+   * ties broken by first-aired, most recent first.
+   */
+  static Comparator<Show> order(Sort sort) {
+    return (a, b) -> {
+      int result;
+      if (sort == Sort.ALPHA) {
+        result = sortKey(a.name).compareTo(sortKey(b.name));
+      } else if (sort == Sort.WATCHING) {
+        result = newestFirst(a.lastPlayedDate, b.lastPlayedDate);
+      } else {
+        result = newestFirst(a.dateCreated, b.dateCreated);
+      }
+      return result != 0 ? result : newestFirst(a.firstAired, b.firstAired);
+    };
+  }
+
+  /** Descending, but an empty date is undated rather than ancient: it goes last. */
+  private static int newestFirst(String a, String b) {
+    if (a.isEmpty() || b.isEmpty()) return a.isEmpty() ? (b.isEmpty() ? 0 : 1) : -1;
+    return b.compareTo(a);
   }
 
   interface Callback {
@@ -128,7 +179,7 @@ class Shows {
       shows.add(new Show(name, all.getJSONObject(name)));
     }
     // Same order as the phone's list: leading "the" ignored, case ignored.
-    Collections.sort(shows, (a, b) -> sortKey(a.name).compareTo(sortKey(b.name)));
+    Collections.sort(shows, order(Sort.ALPHA));
     Log.i(TAG, "loaded " + shows.size() + " shows");
     return shows;
   }

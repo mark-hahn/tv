@@ -28,8 +28,14 @@ class TrailerPlayer extends FrameLayout {
   private static final String BASE_URL = "https://hahnca.com";
   private static final String BRIDGE = "TvApp";
 
+  /** Told whenever the player takes the screen or gives it back. */
+  interface OpenListener {
+    void onPlayerOpen(boolean open);
+  }
+
   private final Handler ui = new Handler(Looper.getMainLooper());
   private final WebView web;
+  private OpenListener openListener;
 
   @SuppressLint("SetJavaScriptEnabled")
   TrailerPlayer(Context context) {
@@ -48,12 +54,16 @@ class TrailerPlayer extends FrameLayout {
     addView(web, new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
   }
 
+  void setOpenListener(OpenListener listener) {
+    openListener = listener;
+  }
+
   boolean isPlaying() {
     return getVisibility() == VISIBLE;
   }
 
   void play(String url) {
-    setVisibility(VISIBLE);
+    setOpen(true);
     web.loadDataWithBaseURL(BASE_URL, page(url), "text/html", "utf-8", null);
   }
 
@@ -61,7 +71,16 @@ class TrailerPlayer extends FrameLayout {
     if (!isPlaying()) return;
     // Blank first: a WebView left holding a playing video keeps its audio.
     web.loadUrl("about:blank");
-    setVisibility(GONE);
+    setOpen(false);
+  }
+
+  /**
+   * The one place the player's visibility changes, so the listener hears about
+   * a video that ended by itself as well as one a click closed.
+   */
+  private void setOpen(boolean open) {
+    setVisibility(open ? VISIBLE : GONE);
+    if (openListener != null) openListener.onPlayerOpen(open);
   }
 
   private class Bridge {
@@ -71,14 +90,19 @@ class TrailerPlayer extends FrameLayout {
     }
   }
 
-  /** The iframe api for a YouTube url, a plain video element for anything else. */
+  /**
+   * The iframe api for a YouTube url, a plain video element for anything else.
+   * Nothing is drawn over the picture in either case: there is no pointer on
+   * this screen to work a control bar with — a click closes the player — so a
+   * scrub bar, a title card or an annotation would only ever be in the way.
+   */
   private static String page(String url) {
     String videoId = Trailers.youtubeId(url);
     String body =
         videoId == null
             ? "<video id='v' src='"
                 + url
-                + "' autoplay controls playsinline"
+                + "' autoplay playsinline"
                 + " style='width:100%;height:100%' onended='"
                 + BRIDGE
                 + ".onEnded()'></video>"
@@ -88,7 +112,8 @@ class TrailerPlayer extends FrameLayout {
                 + "videoId:'"
                 + videoId
                 + "',width:'100%',height:'100%',"
-                + "playerVars:{autoplay:1,controls:1,rel:0,playsinline:1,origin:'"
+                + "playerVars:{autoplay:1,controls:0,rel:0,playsinline:1,"
+                + "disablekb:1,fs:0,iv_load_policy:3,modestbranding:1,origin:'"
                 + BASE_URL
                 + "'},"
                 + "events:{onStateChange:function(e){if(e.data===YT.PlayerState.ENDED)"

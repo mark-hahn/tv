@@ -78,8 +78,9 @@ class InfoView extends LinearLayout implements Pane {
     overview.setTextColor(OVERVIEW_COLOR);
     overview.setTextSize(TypedValue.COMPLEX_UNIT_SP, OVERVIEW_TEXT_SIZE_SP);
     overviewScroll = new ScrollView(context);
-    // Clicking the description puts it back at the top — the cursor only ever
-    // scrolls it down, so this is the way back up.
+    // Clicking the description puts it back at the top, the same shortcut the
+    // other list panes have. On the TextView, not just the ScrollView: a
+    // ScrollView eats the touch itself and never gets as far as performClick.
     overview.setOnClickListener(v -> overviewScroll.smoothScrollTo(0, 0));
     overviewScroll.setOnClickListener(v -> overviewScroll.smoothScrollTo(0, 0));
     overviewScroll.addView(
@@ -100,6 +101,12 @@ class InfoView extends LinearLayout implements Pane {
   @Override
   public void scrollStep(int px) {
     overviewScroll.scrollBy(0, px);
+  }
+
+  /** The description is a list like any other as far as the cursor cares. */
+  @Override
+  public boolean rampScroll() {
+    return true;
   }
 
   @Override

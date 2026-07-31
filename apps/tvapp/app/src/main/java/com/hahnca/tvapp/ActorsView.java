@@ -30,6 +30,11 @@ class ActorsView extends ScrollPane {
   }
 
   @Override
+  public boolean rampScroll() {
+    return true;
+  }
+
+  @Override
   protected void fill(Shows.Show show) {
     List<Shows.Actor> cast = show.characters;
     if (cast.isEmpty()) {

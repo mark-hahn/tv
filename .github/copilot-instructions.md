@@ -124,6 +124,34 @@ otherwise lands on the launcher.
   loaded once from tv-srvr's `getAllTvdb?hasEmby=1` — the same call and filter
   the phone remote's list uses, so the two agree — over public https, since a
   one-shot 2 MB load has no latency budget worth the relay's tricks.
+- Above the list, its own width, is a header: the filter box on the left taking
+  whatever width is left over, and the `Watching` and `Added` sort buttons hard
+  against the right. Holding the cursor over it scrolls nothing — the list's
+  scroll zone starts at the list's own top, so reaching up for the filter box
+  does not pull the list out from under the cursor on the way, the same bargain
+  the panes make with the tab row.
+  - The filter box is a `TextView`, not an `EditText`: a tv has no keyboard. It
+    displays what the phone is typing and is clicked to open and to close the
+    keyboard tvappctrl puts up for it. Filtering is the web client's own — a
+    case-insensitive substring of the name — applied live on every keystroke, and
+    an empty box filters nothing. A selected show the filter has just hidden
+    falls to the top of what is left, so the panes never show a show the list no
+    longer offers. Everything else on the screen works while a filter is up.
+  - Three things clear it and take the keyboard away, all ending in the same
+    state: clicking the box a second time, the keyboard's own accept key, and
+    closing the tvappctrl screen (which closes tvapp). The filter is therefore
+    deliberately *not* persisted, unlike the sort, the selected show and the
+    cursor.
+  - `Watching` and `Added` are the web client's sort selector choices of the same
+    names — `Watching` is the one it displays as "Watched", `lastPlayedDate`
+    descending; `Added` is `dateCreated` descending. Both dates are already
+    `yyyy/MM/dd HH:mm:ss.SSS` in the record, so they sort as plain text, with no
+    date at all falling to the end and ties broken by first-aired, most recent
+    first. The one in force is blue; clicking it again turns it off and leaves
+    the list alphabetical, which is what neither being on means. The sort is
+    remembered across runs.
+  - Filtering and sorting only ever re-order cards that were built at load, so
+    both keep up with a filter being typed at phone-keyboard speed.
 - Every card is built up front instead of recycled. A few hundred shows that
   never change while the app is open do not need a `ListView`, and a plain
   `ScrollView` is what lets the cursor's edge scrolling just call `scrollBy`.
@@ -133,48 +161,71 @@ otherwise lands on the launcher.
   one gesture covers both a nudge of a row or two and a run to the end. The
   scroll runs off its own repeating post rather than off arriving motion,
   because "held" means no motion is arriving, and it carries the sub-pixel
-  remainder so the slow end of the ramp still moves.
+  remainder so the slow end of the ramp still moves. Nothing scrolls at all
+  while motion is still arriving — that is a cursor being aimed, and pulling the
+  content out from under it makes the target impossible to hit.
 - The selected show is remembered in `SharedPreferences` and written through on
   every click, so the app reopens where it was left instead of at the top of a
   couple hundred cards. A remembered show that is gone falls back to the top.
+- The cursor is remembered in the same place, and comes back where it was left
+  rather than in the middle of the screen. Saved in `onPause` rather than on
+  each move, which happens 60 times a second, and `onPause` is the one thing
+  that runs before both being backgrounded and being finished. It is handed to
+  `CursorView` before there is a window to clamp it against, so the view holds
+  it until its first layout; absent, it centers as it always did.
 - To the right of the list is the web client's info pane: the show name, the
   poster, the same one-per-line field list the phone remote's Info tab shows, in
   the same order, and the overview under them. It starts below the buttons,
   which share that half of the screen with it. Poster loads are sequenced so a
   quick run down the list cannot land an older image on a newer show.
 - On the Info pane only the description scrolls; the title, poster and fields
-  stay put. Panes scroll at one constant crawl in either direction, with none of
-  the list's speed ramp — a description or a cast is not a list of two hundred —
-  and clicking the description is a shortcut back to its top. Both halves reach
-  `MainActivity`'s one scroll loop through `Scroller`, which is why the loop
-  needs to know about neither view.
+  stay put. Every pane that is a list of its own — the description, the map, the
+  cast — scrolls by the show list's own numbers, ramp and all, so the whole
+  screen behaves the one way; `rampScroll()` is a pane saying it is one of
+  those, and Trailer is the only one that is not and keeps the older constant
+  crawl out of a fixed band. A click anywhere in a ramped pane is the shortcut
+  back to its start, the cursor only ever having taken it forwards. That
+  listener goes on the pane's content, never on the `ScrollView` around it: a
+  `ScrollView` consumes the touch itself and never reaches `performClick`. All
+  of them reach `MainActivity`'s one scroll loop through `Scroller`, which is
+  why the loop needs to know about none of the views.
 - The cursor is accelerated the way a desktop mouse is: slow motion passes
   through untouched so a card can be aimed at, fast motion is multiplied up to
   `ACCEL_MAX_GAIN` so the far corner of a 4K screen is one flick of a
   phone-sized surface away. Speed is measured over the gap between batches, and
   a gap long enough to be a new stroke is clamped so the stroke starts
   unaccelerated.
+- **One batch can never move the arrow more than `MOVE_MAX_STEP_DP`**, whatever
+  the acceleration worked out to. Every frame of motion that arrives while the
+  ui thread is busy elsewhere — a pane filling, an image decoding — is summed
+  into the one batch that follows, and multiplying that pile-up by the gain is
+  what threw the cursor into a corner. Both components are scaled by the same
+  factor so a clamped batch still goes where the finger went, and a flick is a
+  dozen batches, so the cap costs nothing on a real stroke.
 - Clicking the poster does the same as `Emby` — it is the pane's biggest target,
   and loading the show it shows is the only thing this screen does.
 - The right half is tabbed, with the web client's simple-mode tabs in its order:
-  **Info, Map, Actor, Review, Trailer** — singular, because a tv reads at a
+  **Info, Map, Actor, Trailer** — singular, because a tv reads at a
   glance — each holding what that pane holds there. Only the tabs are weighted,
   so they spread across the pane while `Emby` at the left of the row and `Exit`
   at the right keep their own width. `Pane` is the whole contract:
   every pane is told the selected show whether or not it is showing, and loads
-  on the next `onShown()`, because two of them fetch and running a fetch per
+  on the next `onShown()`, because Map fetches and running a fetch per
   card while someone scrolls the list would be for nothing.
   - **Map** is the season by episode grid, from `getSeriesMapFromEmby` with
     `stale: true` — the server's cached episodeData, no Emby or disk access, and
     this pane only reads. Same letters and same two cell colours as the client.
-    Rows are weighted, not measured, so twenty seasons narrow the columns rather
-    than run off a pane that cannot scroll sideways.
+    Season columns are weighted above a floor width, so a handful of seasons
+    still spread across the pane while a dozen or more run off the side of it
+    instead of shrinking past reading. The overflow is reached by holding the
+    cursor against the right edge of the screen — rightwards only, since the
+    click that puts a pane back at its top puts the map back at its far left
+    too. The horizontal `ScrollView` needs `fillViewport`, or the weights have
+    no spare width to share out and a narrow grid measures to its own content
+    instead of spreading.
   - **Actors** is the cast grid out of the record's own `characters`. Nothing is
     clickable: the other uis open an IMDb page, and there is no browser worth
     opening on a tv.
-  - **Reviews** is tv-api's `getImdbReviews`, which does the filtering and the
-    star conversion. IMDb answers 403 often enough that the error is shown
-    rather than an empty pane — the web client is getting the same 403 today.
   - **Trailer** is a card per trailer in the record, holding the video's own
     still and nothing else, clicked to play. The still is YouTube's
     `hqdefault.jpg`, which is
@@ -187,7 +238,14 @@ otherwise lands on the launcher.
     task was underneath rather than here. The iframe api both plays the video and
     reports `ENDED`, which is what puts the pane back; a plain video file url gets
     a `<video>` element and its `ended` event instead. A click or BACK closes the
-    player early.
+    player early. The cursor is hidden for as long as the player is up — there
+    is nothing to aim at and the arrow would sit over the picture — which is why
+    the player's visibility changes in one place and reports itself.
+    - **Nothing at all is drawn over the picture**: no control bar (`controls:0`,
+      and no `controls` attribute on a `<video>`), no annotations
+      (`iv_load_policy:3`), no branding or keyboard handling. There is no pointer
+      on this screen to work a scrub bar with, a click being what closes the
+      player, so every one of them would only be in the way.
     - The page is loaded with **our own domain as the base url**, not
       `youtube.com`: the iframe api checks the embedding origin, and youtube.com
       embedding itself is refused with *"This video is unavailable, error code
@@ -281,7 +339,9 @@ counterpart there to give the click to.
 - **The socket lives in `App.js`, not in the screen**, and stays open for the life
   of the app. It has to: being told tvapp just opened on the TV is what opens the
   screen, so something must be listening while the remote is what is on display.
-  Do not move it back into the component.
+  Do not move it back into the component. The keyboard messages arrive on that
+  same socket but mean nothing to the remote, so the screen registers for them
+  through `onKeyboard` while it is mounted rather than `App.js` routing them.
 - **tvapp and tvappctrl are kept in step in all four directions**, and each
   direction is a different mechanism:
 
@@ -337,16 +397,26 @@ counterpart there to give the click to.
   third place to edit. All of it, phone to TV:
 
   ```
+  phone -> tv
   m,<dx>,<dy>   move the cursor by a relative amount, in tv pixels
   c             click whatever the cursor is over
   x             exit tvapp
+  f,<text>      the show list's filter, as the phone's keyboard has it
+  e             that keyboard was accepted and is gone; clear the filter
+
+  tv -> phone
+  s             show the keyboard: tvapp's filter box was clicked
+  h             hide it again, the box having been clicked a second time
   ```
 
   Only relative motion is sent — where on the phone the finger is has no
   bearing on where the cursor is — coalesced to one message per frame rather
   than one per touch event. A press that barely moves and is released quickly
-  is a tap, and sends `c`. The relay's own three messages (`o`, `u`, `d`) are a
-  separate set it does read, mirrored between `tvappctrl.js` and
+  is a tap, and sends `c`. Filter text is the whole string every keystroke, not
+  the key, so a dropped frame cannot leave the two ends disagreeing; it is also
+  why it is parsed off the first comma rather than split on commas. The relay
+  forwards both directions without reading either. Its own three messages (`o`,
+  `u`, `d`) are a separate set it does read, mirrored between `tvappctrl.js` and
   `apps/tv/src/main.js`; tvapp never sees them.
 - A WebSocket because RN JS has no raw sockets and http per motion event at
   60 Hz is not viable. tvapp's server side is `org.java-websocket`.

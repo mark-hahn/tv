@@ -29,6 +29,10 @@ class TrailersView extends ScrollPane {
   private static final int STILL_PLACEHOLDER_BG = 0xFF303030;
 
   private PlayListener playListener;
+  // Set by fill() to the lone trailer's url when the show has exactly one, so
+  // a tab click that lands here can jump straight to playing it rather than
+  // showing a one-card grid there's no point choosing from.
+  private String soleTrailerUrl;
 
   TrailersView(Context context) {
     super(context);
@@ -39,8 +43,17 @@ class TrailersView extends ScrollPane {
   }
 
   @Override
+  public void onShown() {
+    super.onShown();
+    if (soleTrailerUrl != null && playListener != null) {
+      playListener.onPlayTrailer(soleTrailerUrl);
+    }
+  }
+
+  @Override
   protected void fill(Shows.Show show) {
     List<Shows.Trailer> trailers = show.trailers;
+    soleTrailerUrl = trailers.size() == 1 ? trailers.get(0).url : null;
     if (trailers.isEmpty()) {
       addMessage("No trailers found.");
       return;

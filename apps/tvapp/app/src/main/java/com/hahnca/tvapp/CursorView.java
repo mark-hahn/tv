@@ -39,6 +39,10 @@ class CursorView extends View {
   private float posX;
   private float posY;
   private boolean placed;
+  // Where a restored arrow lands at the first layout. NaN for the middle of the
+  // screen, which is where a first run starts.
+  private float startX = Float.NaN;
+  private float startY = Float.NaN;
 
   CursorView(Context context) {
     super(context);
@@ -70,6 +74,16 @@ class CursorView extends View {
     setPos(posX + dx, posY + dy);
   }
 
+  /**
+   * Where to put the arrow once there is a screen to put it on. Taken now and
+   * applied at the first layout, because there is no size to clamp against
+   * until then. NaN for either leaves that axis centered.
+   */
+  void startAt(float x, float y) {
+    startX = x;
+    startY = y;
+  }
+
   private void setPos(float x, float y) {
     posX = clamp(x, getWidth());
     posY = clamp(y, getHeight());
@@ -87,7 +101,7 @@ class CursorView extends View {
     super.onSizeChanged(w, h, oldW, oldH);
     if (!placed) {
       placed = true;
-      setPos(w / 2f, h / 2f);
+      setPos(Float.isNaN(startX) ? w / 2f : startX, Float.isNaN(startY) ? h / 2f : startY);
     } else {
       setPos(posX, posY); // a size change can leave the arrow off-screen
     }

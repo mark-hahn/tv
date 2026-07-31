@@ -3078,11 +3078,7 @@ export default {
         }
       }
       const actors = Array.from(actorMap.values());
-      actors.sort(
-        (a, b) =>
-          b.showCount - a.showCount ||
-          a.displayName.localeCompare(b.displayName),
-      );
+      actors.sort((a, b) => a.displayName.localeCompare(b.displayName));
       return actors;
     },
 

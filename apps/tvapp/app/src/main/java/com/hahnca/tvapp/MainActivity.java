@@ -132,6 +132,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private Shows.Sort sort = Shows.Sort.ALPHA;
   private boolean customOn; // the shared settings are what the list is showing
   private InfoView info;
+  private ActorsView actorsPane;
   private final List<Pane> panes = new ArrayList<>();
   private final List<Button> tabs = new ArrayList<>();
   private Pane activePane;
@@ -351,7 +352,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     info.setPosterClickListener(v -> embyClick());
     panes.add(info);
     panes.add(new MapView(this));
-    panes.add(new ActorsView(this));
+    actorsPane = new ActorsView(this);
+    actorsPane.setListener(this::actorClick);
+    panes.add(actorsPane);
     TrailersView trailers = new TrailersView(this);
     trailers.setPlayListener(url -> player.play(url));
     panes.add(trailers);
@@ -405,9 +408,41 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     // In custom mode no sort button is lit, so the first click on one turns it
     // on rather than toggling the sort hidden underneath it back off.
     Shows.Sort next = !customOn && clicked == sort ? Shows.Sort.ALPHA : clicked;
-    // Picking a sort by hand is no longer showing the shared settings.
-    setCustomOn(false);
+    // Picking a sort by hand is leaving the shared settings, and their list
+    // goes back to the whole one — filter and all.
+    if (customOn) {
+      setCustomOn(false);
+      showList.setCustomOrder(null);
+      clearFilter();
+    }
     applySort(next);
+  }
+
+  /** The filter, here and in the box on the phone that is its only ui. */
+  private void clearFilter() {
+    showList.setFilter("");
+    ctrlServer.send(CtrlServer.MSG_CLEAR_FILTER);
+  }
+
+  /**
+   * An Actors-pane card, clicked. Highlighting it and narrowing the show list
+   * to its shows is one gesture here, where the web client takes a select and
+   * a separate Shows-button press to reach the same place. Null is the second
+   * click on the same card, undoing both.
+   */
+  private void actorClick(String actorName) {
+    if (actorName == null) {
+      showList.setActorFilter(null);
+      return;
+    }
+    // Picking an actor by hand is leaving the shared settings, same as picking
+    // a sort or typing a filter — setActorFilter below takes the list back off
+    // tv-srvr's order; this is only the button's own label and highlight.
+    if (customOn) setCustomOn(false);
+    // A filter left over from the phone would otherwise reappear, unexplained,
+    // the moment this actor is deselected again.
+    clearFilter();
+    showList.setActorFilter(actorName);
   }
 
   private void applySort(Shows.Sort newSort) {
@@ -435,8 +470,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     if (customOn) {
       setCustomOn(false);
       showList.setCustomOrder(null);
-      showList.setFilter("");
-      ctrlServer.send(CtrlServer.MSG_CLEAR_FILTER);
+      clearFilter();
       applySort(Shows.Sort.ALPHA);
       return;
     }
@@ -451,6 +485,11 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
                 }
                 ui.post(
                     () -> {
+                      // The server's list is the whole answer, so a filter left
+                      // in the phone's box, or an actor still highlighted in
+                      // the cast pane, would only be a lie about it.
+                      clearFilter();
+                      actorsPane.clearSelection();
                       showList.setCustomOrder(names);
                       setCustomOn(true);
                     });
@@ -472,11 +511,16 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    * A card was clicked directly, as against auto-picked by a filter or sort
    * change. The filter — typed on the phone, since a tv has no keyboard — is
    * one of the things that gets cleared by picking a show, so both ends are
-   * told: the list here, and the box on the phone.
+   * told: the list here, and the box on the phone. Picking a show is also
+   * always answered with its Info, and an actor pane that may have narrowed
+   * the list to find it does not carry over to the next one.
    */
   private void onShowClicked() {
     showList.setFilter("");
     ctrlServer.send(CtrlServer.MSG_CLEAR_FILTER);
+    actorsPane.clearSelection();
+    showList.setActorFilter(null);
+    selectTab(0);
   }
 
   private SharedPreferences prefs() {
@@ -859,9 +903,19 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   public void onFilter(String text) {
     ui.post(
         () -> {
-          // Typing over the custom list is leaving it, so its button goes out
-          // with it. Clearing the box is not: that is what clicking a show does.
-          if (!text.isEmpty()) setCustomOn(false);
+          // Any filter traffic from the phone is the user working the list by
+          // hand, so the custom one goes, and so does a highlighted actor:
+          // typing, backspacing it away, and its Clear button all arrive here,
+          // the last of these with an empty string but still meaning it.
+          // Picking a show clears that box the other way round, over
+          // MSG_CLEAR_FILTER, and never comes through here — which is what
+          // keeps a show click inside custom mode or an actor's shows.
+          if (customOn) {
+            setCustomOn(false);
+            showList.setCustomOrder(null);
+          }
+          actorsPane.clearSelection();
+          showList.setActorFilter(null);
           showList.setFilter(text);
         });
   }

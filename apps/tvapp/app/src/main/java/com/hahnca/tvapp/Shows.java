@@ -211,4 +211,9 @@ class Shows {
     String key = name.toLowerCase();
     return key.startsWith("the ") ? key.substring(4) : key;
   }
+
+  /** So the same actor typed or read two different ways still compares equal. */
+  static String normalizeName(String name) {
+    return name == null ? "" : name.trim().toLowerCase().replaceAll("\\s+", " ");
+  }
 }

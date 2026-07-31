@@ -15,6 +15,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * The card list down the left half of the screen: one card per show, holding
@@ -64,6 +65,9 @@ class ShowListView extends ScrollView implements Scroller {
   // The list tv-srvr worked out from the shared settings, names in its order,
   // or null when this view is filtering and sorting for itself.
   private List<String> customOrder;
+  // Normalized actor name to require in the cast, or null — the Actors pane's
+  // own way of narrowing this list, mutually exclusive with the other two.
+  private String actorFilter;
 
   ShowListView(Context context) {
     super(context);
@@ -109,14 +113,15 @@ class ShowListView extends ScrollView implements Scroller {
     apply();
   }
 
-  /** Substring of the name, case ignored — the web client's filter box exactly. */
+  /**
+   * Substring of the name, case ignored — the web client's filter box exactly.
+   * Leaves customOrder and actorFilter alone either way: a show click routes
+   * its own clear here with nothing else meant to change, and everything that
+   * does mean to replace them (typing, the phone's Clear button) already says
+   * so explicitly at the call site before reaching this.
+   */
   void setFilter(String text) {
-    // Typing a filter replaces whatever the server ordered for us. Clearing
-    // one does not: clicking a show clears the filter, and that must not throw
-    // away the custom list underneath it.
-    boolean dropCustom = !text.isEmpty() && customOrder != null;
-    if (filter.equals(text) && !dropCustom) return;
-    if (dropCustom) customOrder = null;
+    if (filter.equals(text)) return;
     filter = text;
     apply();
   }
@@ -140,7 +145,33 @@ class ShowListView extends ScrollView implements Scroller {
    */
   void setCustomOrder(List<String> names) {
     customOrder = names;
+    if (names != null) actorFilter = null;
     clearSelection();
+    apply();
+  }
+
+  /**
+   * Narrows the list to shows this actor is cast in — the Actors pane's card
+   * click, the same end state the web client reaches by selecting an actor and
+   * pressing its Shows button. Null lifts the narrowing back off.
+   */
+  void setActorFilter(String actorName) {
+    // onFilter clears this on every keystroke, most of which are typed with no
+    // actor filter active to begin with, so a no-op guard here is what keeps
+    // typing from reselecting the current show on every character.
+    String normalized = actorName == null ? null : Shows.normalizeName(actorName);
+    if (Objects.equals(actorFilter, normalized)) return;
+    actorFilter = normalized;
+    if (actorFilter != null) {
+      // Narrowing to a new actor drops the old selection, same as a new sort:
+      // it is about to land somewhere unpredictable in a very different list.
+      customOrder = null;
+      clearSelection();
+    }
+    // Lifting the filter does not: a show just clicked out of the narrowed
+    // list is what this is clearing the actor filter *for* — apply() below
+    // already keeps a selection that is still visible, which it always is
+    // once nothing is narrowing the list at all.
     apply();
   }
 
@@ -176,6 +207,11 @@ class ShowListView extends ScrollView implements Scroller {
         Shows.Show show = byName.get(name);
         if (show != null) visible.add(show);
       }
+    } else if (actorFilter != null) {
+      for (Shows.Show show : shows) {
+        if (hasActor(show, actorFilter)) visible.add(show);
+      }
+      Collections.sort(visible, Shows.order(sort));
     } else {
       String needle = filter.toLowerCase();
       for (Shows.Show show : shows) {
@@ -220,6 +256,13 @@ class ShowListView extends ScrollView implements Scroller {
 
   private void paint(View card, int color) {
     ((GradientDrawable) card.getBackground()).setColor(color);
+  }
+
+  private static boolean hasActor(Shows.Show show, String normalizedName) {
+    for (Shows.Actor actor : show.characters) {
+      if (Shows.normalizeName(actor.name).equals(normalizedName)) return true;
+    }
+    return false;
   }
 
   private View buildCard(Shows.Show show) {

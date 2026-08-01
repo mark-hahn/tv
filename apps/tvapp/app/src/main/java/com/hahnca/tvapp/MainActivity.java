@@ -84,6 +84,11 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // SEND_INTERVAL_MS there (16ms), so a gap several times that long means the
   // finger lifted.
   private static final long VOLUME_DRAG_IDLE_MS = 200;
+  // How long FLAG_KEEP_SCREEN_ON stays up after the last real input. Long
+  // enough to survive a pause mid-drag, short enough that the TV's own
+  // inactivity timeout still applies once the phone stops sending anything —
+  // see bumpKeepAwake.
+  private static final long KEEP_AWAKE_IDLE_MS = 5_000;
 
   // Pointer acceleration, the same bargain a desktop mouse makes: a slow drag
   // is passed through untouched so a card can be aimed at, and a fast one is
@@ -157,11 +162,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     // Cheap insurance: if the boot receiver lost the race with Wi-Fi coming up,
     // opening the app puts wireless debugging back.
     AdbWifi.enable(this);
-
-    // The tv's screensaver takes the screen out from under a cursor that is
-    // being dragged, and a dream deep enough to stop the activity would take the
-    // ctrl socket with it.
-    getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
     setContentView(buildUi());
 
@@ -624,10 +624,27 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   protected void onDestroy() {
     ui.removeCallbacks(holdScroll);
     ui.removeCallbacks(volumeDragTick);
+    ui.removeCallbacks(clearKeepAwake);
     ctrlServer.shutdown();
     sharedFilters.stop();
     super.onDestroy();
   }
+
+  // Move/click/scroll arrive over the phone's socket, never as real Android
+  // input events, so the system's own inactivity timer never sees them and
+  // would let the screensaver take the screen out from under a cursor mid-
+  // drag — a dream deep enough to stop the activity would take the ctrl
+  // socket with it. Held only while input keeps coming in; released
+  // KEEP_AWAKE_IDLE_MS after it stops, so idle time still counts toward the
+  // TV's normal auto-off. Must run on the ui thread.
+  private void bumpKeepAwake() {
+    getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+    ui.removeCallbacks(clearKeepAwake);
+    ui.postDelayed(clearKeepAwake, KEEP_AWAKE_IDLE_MS);
+  }
+
+  private final Runnable clearKeepAwake =
+      () -> getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
   @Override
   public void onMove(float dx, float dy) {
@@ -650,6 +667,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       pendingDy = 0;
       movePending = false;
     }
+    bumpKeepAwake();
     if (player.isPlaying()) {
       updateVolumeDrag(dy);
       return;
@@ -688,6 +706,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   public void onScroll(float dx, float dy) {
     ui.post(
         () -> {
+          bumpKeepAwake();
           if (!foreground || player.isPlaying()) return;
           Scroller target = scrollTargetAtCursor();
           int wholeX = Math.round(dx);
@@ -707,6 +726,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   @Override
   public void onClick() {
+    ui.post(this::bumpKeepAwake);
     if (!foreground) {
       ui.post(this::bringToFront);
     } else if (player.isPlaying()) {
@@ -727,6 +747,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   public void onPress() {
     ui.post(
         () -> {
+          bumpKeepAwake();
           if (!foreground || player.isPlaying()) return;
           float x = cursor.getPosX();
           float y = cursor.getPosY();
@@ -835,6 +856,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
         @Override
         public void run() {
           if (holdDirection == 0) return;
+          // No further socket traffic arrives while a hold is in progress (see
+          // CMD_PRESS/CMD_RELEASE in tvappctrl.js), so this tick is what has to
+          // keep the screen up for a hold that outlasts KEEP_AWAKE_IDLE_MS.
+          bumpKeepAwake();
           long sinceDelay = SystemClock.uptimeMillis() - holdStartedAt - HOLD_SCROLL_DELAY_MS;
           float sped = Math.max(0f, sinceDelay) / 1000f * HOLD_SCROLL_ACCEL_DP_PER_S2;
           float stepDp = Math.min(HOLD_SCROLL_START_DP + sped, HOLD_SCROLL_MAX_DP);
@@ -906,6 +931,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   public void onFilter(String text) {
     ui.post(
         () -> {
+          bumpKeepAwake();
           // Any filter traffic from the phone is the user working the list by
           // hand, so the custom one goes, and so does a highlighted actor:
           // typing, backspacing it away, and its Clear button all arrive here,

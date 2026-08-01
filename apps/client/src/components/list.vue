@@ -134,7 +134,10 @@
               :hasSharedFilters="hasSharedFilters"
               :actorsListMode="actorsListMode"
               :tvDisabled="tvDisabled"
+              :getDisabled="getDisabled"
+              :getButtonFlashing="getButtonFlashing"
               @actors-click="startActorsListMode"
+              @get-click="handleGetClick"
               @tv-click="handleTvClick"
             ></HdrTop>
             <HdrBot
@@ -229,7 +232,10 @@
             :hasSharedFilters="hasSharedFilters"
             :actorsListMode="actorsListMode"
             :tvDisabled="tvDisabled"
+            :getDisabled="getDisabled"
+            :getButtonFlashing="getButtonFlashing"
             @actors-click="startActorsListMode"
+            @get-click="handleGetClick"
             @tv-click="handleTvClick"
           ></HdrTop>
           <HdrBot
@@ -604,6 +610,7 @@ export default {
       errMsg: "",
       highlightName: "",
       previewMode: false,
+      getButtonFlashing: false,
       _pendingSetUpSeriesToken: 0,
       _mapActionToken: 0,
       allShowsLength: 0,
@@ -821,6 +828,10 @@ export default {
 
     tvDisabled() {
       return !this.highlightShow || this.highlightShow.inEmby === false;
+    },
+
+    getDisabled() {
+      return !this.highlightShow || this.highlightShow.inEmby !== false;
     },
 
     activeDownloadShowNames() {
@@ -1872,6 +1883,20 @@ export default {
       fetch(
         `${config.tvTvUrl}/tv/viewshow?showId=${encodeURIComponent(show.id)}&showName=${encodeURIComponent(show.name)}`,
       ).catch(() => {});
+    },
+
+    async handleGetClick() {
+      const show = this.highlightShow;
+      if (!show || show.inEmby !== false) return;
+      this.getButtonFlashing = true;
+      setTimeout(() => {
+        this.getButtonFlashing = false;
+      }, 300);
+      try {
+        await srvr.sendEmail(`Get show "${show.name}".`);
+      } catch (err) {
+        unilog(1760, `sendEmail failed for ${show.name}:`, err);
+      }
     },
 
     onSelectShow(show, scroll = false) {

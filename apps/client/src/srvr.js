@@ -1079,3 +1079,7 @@ export async function getImdbReviews(imdbId) {
 export function debugTvdb(params) {
   return httpCall("/api/debugTvdb", params, "POST");
 }
+
+export function sendEmail(body) {
+  return httpCall("/api/sendEmail", { body }, "POST");
+}

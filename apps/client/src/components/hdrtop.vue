@@ -132,6 +132,24 @@
       </button>
       <button
         v-if="simpleMode"
+        @click="$emit('get-click')"
+        :disabled="getDisabled"
+        :style="{
+          height: '24px',
+          width: '60px',
+          backgroundColor: getButtonFlashing ? '#ff4444' : 'white',
+          fontSize: '13px',
+          cursor: getDisabled ? 'default' : 'pointer',
+          borderRadius: '7px',
+          margin: '0 0 0 10px',
+          opacity: getDisabled ? 0.4 : 1,
+          transition: 'background-color 0.3s ease',
+        }"
+      >
+        Get
+      </button>
+      <button
+        v-if="simpleMode"
         @click="$emit('tv-click')"
         :disabled="tvDisabled"
         :style="{
@@ -201,6 +219,14 @@ export default {
       type: Boolean,
       default: true,
     },
+    getDisabled: {
+      type: Boolean,
+      default: true,
+    },
+    getButtonFlashing: {
+      type: Boolean,
+      default: false,
+    },
   },
 
   emits: [
@@ -215,6 +241,7 @@ export default {
     "all-click",
     "custom-click",
     "actors-click",
+    "get-click",
     "tv-click",
   ],
 

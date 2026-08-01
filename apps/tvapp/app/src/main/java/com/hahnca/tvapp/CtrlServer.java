@@ -123,7 +123,7 @@ class CtrlServer extends WebSocketServer {
     if (CMD_MOVE.equals(parts[0]) && parts.length == 3) {
       listener.onMove(Float.parseFloat(parts[1]), Float.parseFloat(parts[2]));
     } else if (CMD_SCROLL.equals(parts[0]) && parts.length == 3) {
-      listener.onScroll(Float.parseFloat(parts[1]), Float.parseFloat(parts[2]));
+      listener.onScroll(-Float.parseFloat(parts[1]), -Float.parseFloat(parts[2]));
     } else if (CMD_CLICK.equals(parts[0])) {
       listener.onClick();
     } else if (CMD_PRESS.equals(parts[0])) {

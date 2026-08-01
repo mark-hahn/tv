@@ -20,7 +20,11 @@ import { unilog, logHere, parseFileSeasonEpisode } from "@tv/share";
 import * as epd from "@tv/share";
 import { SRVR_DATA_DIR } from "./srvrPaths.js";
 import cron from "node-cron";
-import { notifyClients } from "./messaging.js";
+import {
+  notifyClients,
+  registerLocalChannel,
+  publishChannelDelta,
+} from "./messaging.js";
 import { showNameFromFilePath } from "./disk.js";
 import { resFindEpisodeVideos, videoFileExtensions } from "./videoFiles.js";
 import { sanitizeSrt, stripSrtFormatting } from "./srt.js";
@@ -168,12 +172,20 @@ export function getAsrStatus() {
 function persistSubQueue() {
   fs.writeFileSync(SUB_QUEUE_PATH, JSON.stringify(subsState.subQueue), "utf8");
 }
+function getChkSrtQueueSnapshot() {
+  return subsState.subQueueChkSrt.map((e) => ({
+    videoFilePath: e.videoFilePath,
+    showName: showNameFromFilePath(e.videoFilePath),
+  }));
+}
+registerLocalChannel("chksrtQueue", { snapshot: getChkSrtQueueSnapshot });
 function persistSubQueueChkSrt() {
   fs.writeFileSync(
     SUB_QUEUE_CHKSRT_PATH,
     JSON.stringify(subsState.subQueueChkSrt),
     "utf8",
   );
+  publishChannelDelta("chksrtQueue", getChkSrtQueueSnapshot());
 }
 function cleanChkSrtQueue() {
   const before = subsState.subQueueChkSrt.length;

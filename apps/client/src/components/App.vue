@@ -209,7 +209,6 @@
             :simpleMode="simpleMode"
             :sizing="activeSizing"
             :hideButtonsPane="showSideButtons"
-            @play-episode="handlePlayEpisode"
             @open-intro="handleOpenIntro"
           ></Info>
           <Map

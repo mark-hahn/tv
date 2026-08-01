@@ -119,18 +119,18 @@
             Intro
           </button>
           <button
-            @click.stop="playFirstUnwatched"
-            :disabled="!hasVideoFiles"
+            @click.stop="doSubsClick"
+            :disabled="chksrtQueueCountForShow === 0"
             :style="{
               fontSize: '13px',
-              cursor: hasVideoFiles ? 'pointer' : 'default',
+              cursor: chksrtQueueCountForShow > 0 ? 'pointer' : 'default',
               marginTop: '3px',
               maxHeight: '24px',
               borderRadius: '7px',
-              opacity: hasVideoFiles ? 1 : 0.4,
+              opacity: chksrtQueueCountForShow > 0 ? 1 : 0.4,
             }"
           >
-            Play
+            Subs
           </button>
           <button
             @click.stop="embyClick"
@@ -546,7 +546,7 @@ import * as emby from "../emby.js";
 import * as srvr from "../srvr.js";
 import { config } from "../config.js";
 import * as epd from "@tv/share";
-import { unilog } from "../log.js";
+import { unilog, logHere } from "../log.js";
 import * as util from "../util.js";
 import * as urls from "../urls.js";
 
@@ -563,7 +563,7 @@ const remoteSortKey = (name) => {
 export default {
   name: "Series",
 
-  emits: ["open-intro", "play-episode"],
+  emits: ["open-intro"],
 
   props: {
     simpleMode: {
@@ -619,10 +619,18 @@ export default {
       twoLocalFolders: false,
       nowPlayingDevices: [],
       crewLines: [],
+      chksrtQueueEntries: [],
+      _chksrtQueueChannel: null,
     };
   },
 
   computed: {
+    chksrtQueueCountForShow() {
+      const name = this.show?.name;
+      if (!name) return 0;
+      return this.chksrtQueueEntries.filter((e) => e.showName === name)
+        .length;
+    },
     lastWatchedDate() {
       return (
         util.fmtPlayedDate(this.show?.lastPlayedDate).split(" ")[0] || null
@@ -828,38 +836,37 @@ export default {
       }
     },
 
-    buildPlayActionEvent(overrides = {}) {
-      return {
-        stopPropagation() {},
-        preventDefault() {},
-        altKey: false,
-        shiftKey: false,
-        ctrlKey: false,
-        ...overrides,
-      };
+    async doSubsClick() {
+      const count = this.chksrtQueueCountForShow;
+      const showName = this.show?.name;
+      if (count === 0 || !showName) return;
+      if (
+        !window.confirm(
+          `Select embedded subtitle for all ${count} episodes of ${showName}?`,
+        )
+      )
+        return;
+      try {
+        await srvr.chksrtSelectShow(showName);
+      } catch (e) {
+        unilog(1877, `chksrt select-show failed for ${showName}: ${e.message}`);
+      }
     },
 
-    playFirstUnwatched() {
-      const ed = this.show?.episodeData;
-      let season = null;
-      let episode = null;
-      epd.forEachEpisode(ed, (s, e) => {
-        if (season === null && epd.hasFile(ed, s, e)) {
-          season = s;
-          episode = e;
-        }
+    openChksrtQueueChannel() {
+      if (this._chksrtQueueChannel) return;
+      const apply = (entries) => {
+        this.chksrtQueueEntries = Array.isArray(entries) ? entries : [];
+      };
+      this._chksrtQueueChannel = srvr.openChannel("chksrtQueue", {
+        onSnapshot: apply,
+        onDelta: apply,
       });
-      if (season === null || episode === null) {
-        window.alert("No playable episode found.");
-        return;
-      }
-      this.$emit(
-        "play-episode",
-        this.buildPlayActionEvent({ altKey: true }),
-        this.show,
-        season,
-        episode,
-      );
+    },
+
+    closeChksrtQueueChannel() {
+      this._chksrtQueueChannel?.close();
+      this._chksrtQueueChannel = null;
     },
 
     embyClick() {
@@ -1806,6 +1813,7 @@ export default {
     evtBus.on("previewMode", this.onPreviewMode);
     evtBus.on("previewSrchChoice", this.onPreviewSrchChoice);
     evtBus.on("addPreviewShowDone", this.onAddPreviewShowDone);
+    this.openChksrtQueueChannel();
 
     this._onNowPlaying = ({ playing } = {}) => {
       const name = this.show?.name;
@@ -1958,6 +1966,7 @@ export default {
     evtBus.off("localFoldersChanged", this.recheckTwoLocalFolders);
     if (this._onPaneChanged) evtBus.off("paneChanged", this._onPaneChanged);
     if (this._onInfoDelKey) evtBus.off("infoDelKey", this._onInfoDelKey);
+    this.closeChksrtQueueChannel();
   },
 };
 </script>

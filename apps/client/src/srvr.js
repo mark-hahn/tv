@@ -923,6 +923,10 @@ export function chksrtSelect(videoPath, selectedSrtPath) {
   );
 }
 
+export function chksrtSelectShow(showName) {
+  return httpCall("/api/asr/chksrt/select-show", { showName }, "POST");
+}
+
 export function getChksrtHistory() {
   return httpCall("/api/asr/chksrt/history");
 }

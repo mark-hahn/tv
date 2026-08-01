@@ -2418,6 +2418,56 @@ app.post("/api/asr/chksrt/select", (req, res) => {
   res.json({ ok: true });
 });
 
+app.post("/api/asr/chksrt/select-show", (req, res) => {
+  const { showName } = req.body || {};
+  if (!showName) {
+    res.status(400).json({ error: "showName required" });
+    return;
+  }
+  const matches = subsState.subQueueChkSrt.filter(
+    (e) => showNameFromFilePath(e.videoFilePath) === showName,
+  );
+  for (const entry of matches) {
+    const videoPath = entry.videoFilePath;
+    const base = resStripAlt(videoPath).replace(/\.[^.]+$/, "");
+    const dir = path.dirname(videoPath);
+    const basename = path.basename(base);
+    let dirEntries;
+    try {
+      dirEntries = fs.readdirSync(dir);
+    } catch (e) {
+      unilog(1873, `srt scan failed for ${dir}: ${e.message}`);
+      dirEntries = [];
+    }
+    for (const f of dirEntries) {
+      if (!/\.srt$/.test(f)) continue;
+      if (f.endsWith(".chosen")) continue;
+      if (!f.startsWith(basename + ".")) continue;
+      try {
+        fs.unlinkSync(path.join(dir, f));
+      } catch (e) {
+        unilog(1874, `srt delete failed for ${f}: ${e.message}`);
+      }
+    }
+    try {
+      fs.writeFileSync(path.join(dir, basename + ".mb.chosen"), "", "utf8");
+    } catch (e) {
+      unilog(1875, `chosen marker write failed for ${basename}: ${e.message}`);
+    }
+    // result saved — this file no longer needs a seekable mirror
+    mpfour.cancelEncode(videoPath);
+    const idx = subsState.subQueueChkSrt.findIndex(
+      (e) => e.videoFilePath === videoPath,
+    );
+    if (idx !== -1) subsState.subQueueChkSrt.splice(idx, 1);
+  }
+  cleanChkSrtQueue();
+  persistSubQueueChkSrt();
+  publishChksrtState();
+  syncBatchMsgs();
+  res.json({ ok: true, count: matches.length });
+});
+
 app.get("/api/asr/chksrt/history", (req, res) => {
   res.json(subsState.chksrtHistory);
 });

@@ -6,10 +6,10 @@
 //                 the screen: being told tvapp just opened on the tv is what opens
 //                 the screen, so something must be listening while the remote is
 //                 the thing on display.
-//   TvAppCtrl     the screen itself — an Exit button, filter box, and Clear button
-//                 along the bottom, and a drag surface for the tv's cursor above.
-//                 The filter box lives here rather than on the tv: a tv has no
-//                 keyboard, and the phone always does.
+//   TvAppCtrl     the screen itself — a filter box and Clear button along the top,
+//                 an Exit button in the bottom left corner, and a drag surface for
+//                 the tv's cursor between them. The filter box lives here rather
+//                 than on the tv: a tv has no keyboard, and the phone always does.
 //
 // The two ends stay in step in all four directions: tvapp opening or closing on
 // the tv opens or closes this screen, and opening or closing this screen opens or
@@ -40,9 +40,7 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  useWindowDimensions,
 } from "react-native";
-import * as ScreenOrientation from "expo-screen-orientation";
 import * as NavigationBar from "expo-navigation-bar";
 
 // Not the tv itself: the tv answers no wireless host on this LAN, and the phone
@@ -69,18 +67,16 @@ const TAP_MAX_MS = 300;
 const BLOCKED_CLOSE_HOLD_MS = 600;
 // Motion is coalesced to one message per frame instead of one per touch event.
 const SEND_INTERVAL_MS = 16;
-// Where the bottom row (Exit, filter box, Clear) sits, per orientation. Portrait
-// keeps clear of the navigation bar. Landscape is inset from both bezels instead:
-// the cutout is centred on a side edge there, and with the status and navigation
-// bars hidden the window runs edge to edge, so without an inset of its own the row
-// ends up jammed into the corner.
+// Where the top row (filter box, Clear) and the Exit button in the bottom left
+// sit. The screen is portrait only, so these are the only insets there are: clear
+// of the navigation bar below, and of the cutout above — the status bar is hidden
+// here, so its height is the inset that clears it.
 const STATUS_BAR_HEIGHT = StatusBar.currentHeight ?? 0;
+const ROW_TOP = STATUS_BAR_HEIGHT + 8;
 const ROW_BOTTOM = 8;
-const ROW_BOTTOM_LANDSCAPE = 24;
 const ROW_LEFT = 10;
 const ROW_RIGHT = 10;
-const ROW_RIGHT_LANDSCAPE = 56;
-// Space between the filter box, Clear and Exit within the row.
+// Space between the filter box and Clear within the top row.
 const ROW_GAP = 10;
 // Exit is twice its old size; Clear and the filter box match its height and
 // font so the row reads as one control. Shrunk 20% from that doubled size.
@@ -211,7 +207,6 @@ export default function TvAppCtrl({ send, onClearFilter, onExit, blocked, disabl
   const touchRef = useRef(null);
   const holdRef = useRef(null);
   const blockedHoldRef = useRef(null);
-  const { width, height } = useWindowDimensions();
   // The tv's show-list filter, typed here because the tv has no keyboard. Kept
   // regardless of whether the keyboard is currently up — closing the keyboard
   // is not one of the ways this clears, only Clear, tvapp closing, and picking
@@ -256,46 +251,17 @@ export default function TvAppCtrl({ send, onClearFilter, onExit, blocked, disabl
 
   const stopBlockedHold = () => clearTimeout(blockedHoldRef.current);
 
-  // Rotation is unlocked for this screen alone, and re-locked on the way out. It
-  // is what makes the phone's orientation work at all: the layout turns with the
-  // device, so the Exit button lands in the corner that is really the upper right,
-  // and touch deltas arrive already in the rotated frame — a drag towards the top
-  // of the phone as held is a drag towards the top of the tv, with no correction
-  // to apply. Correcting the motion by hand instead would leave the button and
-  // the status bar inset in the wrong corner.
-  useEffect(() => {
-    ScreenOrientation.unlockAsync().catch(() => {});
-    return () => {
-      ScreenOrientation.lockAsync(
-        ScreenOrientation.OrientationLock.PORTRAIT_UP,
-      ).catch(() => {});
-    };
-  }, []);
-
-  // The navigation bar is hidden for this screen too. In landscape it moves to
-  // the right edge and, the window being edge to edge, lays itself over the
-  // content — right on top of the Exit button. Swipe still brings it back
-  // temporarily, and it is restored on the way out.
+  // Both bars are hidden for this screen: the window then runs edge to edge, and
+  // the navigation bar cannot lay itself over the controls. Swipe still brings the
+  // navigation bar back temporarily, and it is restored on the way out.
   useEffect(() => {
     NavigationBar.setBehaviorAsync("overlay-swipe").catch(() => {});
+    NavigationBar.setVisibilityAsync("hidden").catch(() => {});
+    StatusBar.setHidden(true);
     return () => {
       NavigationBar.setVisibilityAsync("visible").catch(() => {});
     };
   }, []);
-
-  // Both bars are re-asserted on every rotation, because a configuration change
-  // brings them back — the status bar with the clock and battery included, and the
-  // declarative <StatusBar hidden /> below does not survive it either. Separate
-  // from the effect above so the restore does not run on each rotation and flash
-  // the navigation bar into view.
-  useEffect(() => {
-    NavigationBar.setVisibilityAsync("hidden").catch(() => {});
-    StatusBar.setHidden(true);
-  }, [width, height]);
-
-  const landscape = width > height;
-  const rowBottom = landscape ? ROW_BOTTOM_LANDSCAPE : ROW_BOTTOM;
-  const rowRight = landscape ? ROW_RIGHT_LANDSCAPE : ROW_RIGHT;
 
   const exit = () => {
     send(CMD_EXIT); // closes tvapp on the tv too
@@ -456,15 +422,7 @@ export default function TvAppCtrl({ send, onClearFilter, onExit, blocked, disabl
       onResponderTerminate={onRelease}
     >
       <StatusBar hidden />
-      <View style={[styles.topRow, { bottom: rowBottom, left: ROW_LEFT, right: rowRight }]}>
-        <TouchableOpacity
-          onPress={exit}
-          disabled={disableExit}
-          style={[styles.exitBtn, disableExit && { opacity: 0.5 }]}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.actionBtnText}>Exit</Text>
-        </TouchableOpacity>
+      <View style={styles.topRow}>
         <TextInput
           value={filter}
           onChangeText={changeFilter}
@@ -481,8 +439,17 @@ export default function TvAppCtrl({ send, onClearFilter, onExit, blocked, disabl
           <Text style={styles.actionBtnText}>Clear</Text>
         </TouchableOpacity>
       </View>
-      {/* Last, so it covers the row above as well as the drag surface. Claiming
-          every touch that starts on it is what blocks the ui: the views beneath
+      <TouchableOpacity
+        onPress={exit}
+        disabled={disableExit}
+        style={[styles.exitBtn, disableExit && { opacity: 0.5 }]}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.actionBtnText}>Exit</Text>
+      </TouchableOpacity>
+      {/* Last, so it covers the row and the Exit button as well as the drag
+          surface. Claiming every touch that starts on it is what blocks the ui:
+          the views beneath
           are only ever offered a touch this one has turned down. The hold it
           takes for itself is the only thing that still gets through. */}
       {blocked && (
@@ -510,9 +477,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#000",
   },
-  // top, left and right come from the render: all three depend on the orientation.
   topRow: {
     position: "absolute",
+    top: ROW_TOP,
+    left: ROW_LEFT,
+    right: ROW_RIGHT,
     flexDirection: "row",
     alignItems: "center",
   },
@@ -533,7 +502,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#404040",
   },
   exitBtn: {
-    marginRight: ROW_GAP,
+    position: "absolute",
+    bottom: ROW_BOTTOM,
+    left: ROW_LEFT,
     paddingVertical: ACTION_PAD_V,
     paddingHorizontal: ACTION_PAD_H,
     borderRadius: 4,

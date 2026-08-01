@@ -39,6 +39,18 @@ class MapView extends ScrollPane {
   private static final int GRID_LINE = 0xFF000000;
   private static final float GRID_LINE_DP = 1f;
 
+  /** An episode cell was clicked: opens the episode subpane in MainActivity. */
+  interface EpisodeClickListener {
+    void onEpisodeClicked(String showName, int season, int episode);
+  }
+
+  private EpisodeClickListener episodeClickListener;
+  private String showName;
+
+  void setEpisodeClickListener(EpisodeClickListener listener) {
+    this.episodeClickListener = listener;
+  }
+
   /** One cell of the grid, or null where a season has no such episode. */
   private static class Cell {
     final boolean played;
@@ -60,6 +72,7 @@ class MapView extends ScrollPane {
 
   @Override
   protected void fill(Shows.Show show) {
+    showName = show.name;
     addMessage("Loading…");
     new Thread(
             () -> {
@@ -127,7 +140,8 @@ class MapView extends ScrollPane {
       LinearLayout line = row();
       line.addView(label(String.valueOf(episode), DIM_COLOR), episodeColumn());
       for (int i = 0; i < seasons.size(); i++) {
-        line.addView(cell(i < cells.size() ? cells.get(i) : null), cellColumn());
+        Cell cell = i < cells.size() ? cells.get(i) : null;
+        line.addView(cell(cell, seasons.get(i), episode), cellColumn());
       }
       addRow(line, 0);
     }
@@ -159,7 +173,7 @@ class MapView extends ScrollPane {
     return view;
   }
 
-  private ViewGroup cell(Cell cell) {
+  private ViewGroup cell(Cell cell, int season, int episode) {
     // A one-pixel margin on a black background is the grid line, which saves
     // giving every cell of a few hundred its own border drawable.
     LinearLayout holder = new LinearLayout(getContext());
@@ -172,6 +186,15 @@ class MapView extends ScrollPane {
     params.setMargins(line, line, line, line);
     holder.setBackgroundColor(GRID_LINE);
     holder.addView(view, params);
+    // Blank cells (a season with no such episode number) have nothing to show.
+    if (cell != null) {
+      holder.setOnClickListener(
+          v -> {
+            if (episodeClickListener != null) {
+              episodeClickListener.onEpisodeClicked(showName, season, episode);
+            }
+          });
+    }
     return holder;
   }
 

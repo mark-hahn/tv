@@ -41,6 +41,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // The web client's simple-mode tabs, in its order. Each has a pane of the
   // same name holding what that pane holds there.
   private static final String[] TAB_LABELS = {"Info", "Map", "Actors", "Trailer"};
+  private static final int MAP_TAB_INDEX = 1;
   private static final float TAB_TEXT_SIZE_SP = 14.3f;
   private static final float TAB_PAD_DP = 2f;
   private static final float TAB_GAP_DP = 6f;
@@ -136,6 +137,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private Shows.Sort sort = Shows.Sort.ALPHA;
   private boolean customOn; // the shared settings are what the list is showing
   private InfoView info;
+  private MapPane mapPane;
   private ActorsView actorsPane;
   private final List<Pane> panes = new ArrayList<>();
   private final List<Button> tabs = new ArrayList<>();
@@ -356,7 +358,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     // the only thing this screen does, so it is a second Emby button.
     info.setPosterClickListener(v -> embyClick());
     panes.add(info);
-    panes.add(new MapView(this));
+    mapPane = new MapPane(this);
+    panes.add(mapPane);
     actorsPane = new ActorsView(this);
     actorsPane.setListener(this::actorClick);
     panes.add(actorsPane);
@@ -386,6 +389,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     paint(tabs.get(index), TAB_ACTIVE_BG);
     activePane = panes.get(index);
     activePane.onShown();
+    // The subpane only makes sense over the Map tab's own grid.
+    if (index != MAP_TAB_INDEX) mapPane.closeEpisode();
   }
 
   private void paint(Button tab, int color) {
@@ -516,6 +521,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   /** Selection outlives the app: it is written through to disk on every click. */
   private void onShowSelected(Shows.Show show) {
     for (Pane pane : panes) pane.setShow(show);
+    // Its S/E data belongs to whichever show was on the Map tab when it opened.
+    mapPane.closeEpisode();
     prefs().edit().putString(KEY_SELECTED_SHOW, show.name).apply();
   }
 
@@ -719,9 +726,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private Scroller scrollTargetAtCursor() {
     float x = cursor.getPosX();
     float y = cursor.getPosY();
-    View paneScroll = activePane.scrollableView();
-    if (hits(paneScroll, x, y)) return activePane;
-    return showList;
+    Scroller target = activePane.scrollerAt(view -> hits(view, x, y));
+    return target != null ? target : showList;
   }
 
   @Override
@@ -981,8 +987,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   @Override
   public boolean onKeyDown(int keyCode, KeyEvent event) {
     if (keyCode == KeyEvent.KEYCODE_BACK) {
-      // A trailer playing is what Back means first; only an idle screen exits.
+      // A trailer playing is what Back means first, then the episode subpane
+      // if it's open; only an idle screen exits.
       if (player.isPlaying()) player.close();
+      else if (mapPane.isEpisodeOpen()) mapPane.closeEpisode();
       else finishAndRemoveTask();
       return true;
     }

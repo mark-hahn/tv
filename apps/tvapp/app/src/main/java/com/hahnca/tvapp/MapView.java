@@ -103,6 +103,23 @@ class MapView extends ScrollPane {
       addMessage(error == null ? "No episodes." : "No map: " + error);
       return;
     }
+
+    // Calculate column width from the available pane width.
+    // Tabs divide equally, so half a tab's width = paneWidth / 8.
+    // Emby and Exit buttons plus gaps take ~200dp, so subtract that first.
+    float paneWidth = getWidth();
+    if (paneWidth <= 0) {
+      // Layout hasn't happened yet; use a post to defer.
+      ui.post(() -> show(seasons, grid, error));
+      return;
+    }
+    float buttonRowWidth = paneWidth;
+    float buttonFixedAndGaps = dp(200f); // rough estimate for Emby, Exit, gaps
+    float availForTabs = Math.max(buttonRowWidth - buttonFixedAndGaps, buttonRowWidth * 0.6f);
+    float perTab = availForTabs / 4;
+    float halfTab = perTab / 2;
+    cellColumnWidth = (int) halfTab;
+
     LinearLayout header = row();
     header.addView(label("", Color.WHITE), episodeColumn());
     for (int season : seasons) {
@@ -121,6 +138,8 @@ class MapView extends ScrollPane {
     }
   }
 
+  private int cellColumnWidth = (int) dp(44f); // default, updated by show()
+
   private LinearLayout row() {
     LinearLayout row = new LinearLayout(getContext());
     row.setOrientation(LinearLayout.HORIZONTAL);
@@ -132,10 +151,8 @@ class MapView extends ScrollPane {
   }
 
   private LinearLayout.LayoutParams cellColumn() {
-    // The floor is the base width and the weight shares out whatever the pane
-    // has left over, so few seasons spread and many overflow instead of shrink.
-    return new LinearLayout.LayoutParams(
-        (int) dp(MIN_SEASON_COL_WIDTH_DP), (int) dp(ROW_HEIGHT_DP), 1f);
+    // Fixed width at half a tab button's width, no weight expansion.
+    return new LinearLayout.LayoutParams(cellColumnWidth, (int) dp(ROW_HEIGHT_DP));
   }
 
   private TextView label(String value, int color) {

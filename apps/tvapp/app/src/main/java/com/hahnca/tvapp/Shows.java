@@ -72,6 +72,10 @@ class Shows {
     // "yyyy/MM/dd HH:mm:ss.SSS" in the record, so they sort as plain text.
     final String lastPlayedDate;
     final String dateCreated;
+    final boolean inToTry;
+    final boolean inContinue;
+    final boolean inMark;
+    final boolean inLinda;
     final List<Actor> characters;
     final List<Trailer> trailers;
 
@@ -94,6 +98,10 @@ class Shows {
       imdbId = str(rec, "imdbId");
       lastPlayedDate = str(rec, "lastPlayedDate");
       dateCreated = str(rec, "dateCreated");
+      inToTry = rec.optBoolean("inToTry", false);
+      inContinue = rec.optBoolean("inContinue", false);
+      inMark = rec.optBoolean("inMark", false);
+      inLinda = rec.optBoolean("inLinda", false);
       characters = new ArrayList<>();
       JSONArray castNodes = rec.optJSONArray("characters");
       for (int i = 0; castNodes != null && i < castNodes.length(); i++) {

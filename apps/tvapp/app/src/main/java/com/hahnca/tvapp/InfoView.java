@@ -136,17 +136,48 @@ class InfoView extends LinearLayout implements Pane {
     overviewScroll.scrollTo(0, 0);
 
     fields.removeAllViews();
-    addField(show.firstAired);
-    addField(show.lastAired);
-    addField(show.status);
-    addField(show.countryLang.toUpperCase());
-    addField(show.network);
+    addField(joinRow(show.firstAired, show.lastAired, show.status));
+    addField(joinRow(seasonsText(show.seasonCount), watchedText(show)));
+    addField(joinRow(show.countryLang.toUpperCase(), show.network));
+    addField(lastWatchedText(show.lastPlayedDate));
     addField(show.genres);
     addField(show.averageRuntime > 0 ? show.averageRuntime + " Mins" : "");
-    addField(seasonsText(show.seasonCount));
-    addField(watchedText(show));
+    addField(collectionsText(show));
 
     Images.into(poster, show.image, show);
+  }
+
+  private static String joinRow(String... parts) {
+    StringBuilder out = new StringBuilder();
+    for (String part : parts) {
+      if (part == null || part.isEmpty()) continue;
+      if (out.length() > 0) out.append(" / ");
+      out.append(part);
+    }
+    return out.toString();
+  }
+
+  private static String lastWatchedText(String lastPlayedDate) {
+    if (lastPlayedDate == null || lastPlayedDate.isEmpty()) return "";
+    String date = lastPlayedDate.split(" ")[0];
+    return date.isEmpty() ? "" : "Last watched: " + date;
+  }
+
+  private static String collectionsText(Shows.Show show) {
+    StringBuilder names = new StringBuilder();
+    int count = 0;
+    if (show.inToTry) count = appendCollection(names, count, "To Try");
+    if (show.inContinue) count = appendCollection(names, count, "Continue");
+    if (show.inMark) count = appendCollection(names, count, "Mark");
+    if (show.inLinda) count = appendCollection(names, count, "Linda");
+    if (count == 0) return "";
+    return (count > 1 ? "Collections: " : "Collection: ") + names;
+  }
+
+  private static int appendCollection(StringBuilder names, int count, String name) {
+    if (count > 0) names.append(", ");
+    names.append(name);
+    return count + 1;
   }
 
   private static String seasonsText(int seasonCount) {

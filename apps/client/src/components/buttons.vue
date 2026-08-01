@@ -176,7 +176,7 @@ export default {
     return {
       hasSharedFilters: false,
       activeButtons: {
-        "Ready To Watch": false,
+        Ready: false,
         Drama: false,
         Comedy: false,
         "To Try": false,
@@ -192,7 +192,7 @@ export default {
         "Ended Order": false,
         "Length Order": false,
       },
-      filters: ["Ready To Watch"],
+      filters: ["Ready"],
       genres: ["Drama", "Comedy"],
       collections: ["To Try", "Continue", "Mark", "Linda"],
       sortOrders: [

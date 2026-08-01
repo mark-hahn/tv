@@ -6,10 +6,10 @@
 //                 the screen: being told tvapp just opened on the tv is what opens
 //                 the screen, so something must be listening while the remote is
 //                 the thing on display.
-//   TvAppCtrl     the screen itself — a filter box, a Clear button and an Exit
-//                 button along the top, and a drag surface for the tv's cursor
-//                 underneath. The filter box lives here rather than on the tv:
-//                 a tv has no keyboard, and the phone always does.
+//   TvAppCtrl     the screen itself — an Exit button, filter box, and Clear button
+//                 along the bottom, and a drag surface for the tv's cursor above.
+//                 The filter box lives here rather than on the tv: a tv has no
+//                 keyboard, and the phone always does.
 //
 // The two ends stay in step in all four directions: tvapp opening or closing on
 // the tv opens or closes this screen, and opening or closing this screen opens or
@@ -69,15 +69,14 @@ const TAP_MAX_MS = 300;
 const BLOCKED_CLOSE_HOLD_MS = 600;
 // Motion is coalesced to one message per frame instead of one per touch event.
 const SEND_INTERVAL_MS = 16;
-// Where the top row (filter box, Clear, Exit) sits, per orientation. Portrait
-// keeps clear of the camera cutout row, which hiding the status bar does not
-// free up. Landscape is inset from both bezels instead: the cutout is centred
-// on a side edge there, and with the status and navigation bars hidden the
-// window runs edge to edge, so without an inset of its own the row ends up
-// jammed into the corner.
+// Where the bottom row (Exit, filter box, Clear) sits, per orientation. Portrait
+// keeps clear of the navigation bar. Landscape is inset from both bezels instead:
+// the cutout is centred on a side edge there, and with the status and navigation
+// bars hidden the window runs edge to edge, so without an inset of its own the row
+// ends up jammed into the corner.
 const STATUS_BAR_HEIGHT = StatusBar.currentHeight ?? 0;
-const ROW_TOP = STATUS_BAR_HEIGHT + 8;
-const ROW_TOP_LANDSCAPE = 24;
+const ROW_BOTTOM = 8;
+const ROW_BOTTOM_LANDSCAPE = 24;
 const ROW_LEFT = 10;
 const ROW_RIGHT = 10;
 const ROW_RIGHT_LANDSCAPE = 56;
@@ -85,7 +84,8 @@ const ROW_RIGHT_LANDSCAPE = 56;
 const ROW_GAP = 10;
 // Exit is twice its old size; Clear and the filter box match its height and
 // font so the row reads as one control. Shrunk 20% from that doubled size.
-const ACTION_PAD_V = 9.6;
+// Increased by 50% to make buttons taller.
+const ACTION_PAD_V = 14.4;
 const ACTION_PAD_H = 19.2;
 const ACTION_FONT_SIZE = 22.4;
 
@@ -205,7 +205,7 @@ export function useTvappLink({ onTvappUp, onTvappDown, onBlockedChange }) {
   };
 }
 
-export default function TvAppCtrl({ send, onClearFilter, onExit, blocked }) {
+export default function TvAppCtrl({ send, onClearFilter, onExit, blocked, disableExit }) {
   const pendingRef = useRef({ dx: 0, dy: 0 });
   const touchRef = useRef(null);
   const holdRef = useRef(null);
@@ -291,7 +291,7 @@ export default function TvAppCtrl({ send, onClearFilter, onExit, blocked }) {
   }, [width, height]);
 
   const landscape = width > height;
-  const rowTop = landscape ? ROW_TOP_LANDSCAPE : ROW_TOP;
+  const rowBottom = landscape ? ROW_BOTTOM_LANDSCAPE : ROW_BOTTOM;
   const rowRight = landscape ? ROW_RIGHT_LANDSCAPE : ROW_RIGHT;
 
   const exit = () => {
@@ -342,9 +342,9 @@ export default function TvAppCtrl({ send, onClearFilter, onExit, blocked }) {
   // other and never both.
   //
   // Also the container's own responder grant: it only fires for a touch that
-  // starts outside the filter box, Clear and Exit, which claim it themselves —
-  // so dismissing the keyboard here is exactly "clicked or dragged outside the
-  // box", and never clears the filter text itself.
+  // starts outside the Exit button, filter box and Clear button, which claim it
+  // themselves — so dismissing the keyboard here is exactly "clicked or dragged
+  // outside the controls", and never clears the filter text itself.
   const onGrant = (e) => {
     if (blocked) return;
     Keyboard.dismiss();
@@ -401,7 +401,15 @@ export default function TvAppCtrl({ send, onClearFilter, onExit, blocked }) {
       onResponderTerminate={onRelease}
     >
       <StatusBar hidden />
-      <View style={[styles.topRow, { top: rowTop, left: ROW_LEFT, right: rowRight }]}>
+      <View style={[styles.topRow, { bottom: rowBottom, left: ROW_LEFT, right: rowRight }]}>
+        <TouchableOpacity
+          onPress={exit}
+          disabled={disableExit}
+          style={[styles.exitBtn, disableExit && { opacity: 0.5 }]}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.actionBtnText}>Exit</Text>
+        </TouchableOpacity>
         <TextInput
           value={filter}
           onChangeText={changeFilter}
@@ -416,9 +424,6 @@ export default function TvAppCtrl({ send, onClearFilter, onExit, blocked }) {
         />
         <TouchableOpacity onPress={clearFilter} style={styles.clearBtn} activeOpacity={0.7}>
           <Text style={styles.actionBtnText}>Clear</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={exit} style={styles.exitBtn} activeOpacity={0.7}>
-          <Text style={styles.actionBtnText}>Exit</Text>
         </TouchableOpacity>
       </View>
       {/* Last, so it covers the row above as well as the drag surface. Claiming
@@ -467,13 +472,13 @@ const styles = StyleSheet.create({
     fontSize: ACTION_FONT_SIZE,
   },
   clearBtn: {
-    marginRight: ROW_GAP,
     paddingVertical: ACTION_PAD_V,
     paddingHorizontal: ACTION_PAD_H,
     borderRadius: 4,
     backgroundColor: "#404040",
   },
   exitBtn: {
+    marginRight: ROW_GAP,
     paddingVertical: ACTION_PAD_V,
     paddingHorizontal: ACTION_PAD_H,
     borderRadius: 4,

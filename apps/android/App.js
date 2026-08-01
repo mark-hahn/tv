@@ -192,6 +192,7 @@ export default function App() {
   const [flashCell, setFlashCell] = useState(null);
   const [mapImageExpanded, setMapImageExpanded] = useState(false);
   const [epiStats, setEpiStats] = useState(null);
+  const [disableExitButton, setDisableExitButton] = useState(false);
 
   const onGridLayout = ({ nativeEvent: { layout } }) => {
     if (layout.width < 10 || layout.height < 10) return;
@@ -240,6 +241,7 @@ export default function App() {
   const showsListLoadedRef = useRef(false);
   const showsFlatListRef = useRef(null);
   const mapHeaderScrollRef = useRef(null);
+  const exitDisableTimerRef = useRef(null);
 
   const debounce = () => {
     const now = Date.now();
@@ -475,6 +477,7 @@ export default function App() {
       closeChannel("embyPlaying");
       closeChannel("tvPicture");
       clearTimeout(unlockHoldTimerRef.current);
+      clearTimeout(exitDisableTimerRef.current);
     };
   }, []);
 
@@ -994,6 +997,12 @@ export default function App() {
     // here as well as by the relay, which has a round trip to answer in.
     setTvAppCtrlBlocked(false);
     setShowTvAppCtrl(true);
+    // Disable exit button for 500ms when shows key is pressed
+    setDisableExitButton(true);
+    clearTimeout(exitDisableTimerRef.current);
+    exitDisableTimerRef.current = setTimeout(() => {
+      setDisableExitButton(false);
+    }, 500);
   };
 
   const startBackPress = () => dbStart(() => tvKey("back"));
@@ -1428,6 +1437,7 @@ export default function App() {
         onClearFilter={tvappLink.onClearFilter}
         onExit={() => setShowTvAppCtrl(false)}
         blocked={tvAppCtrlBlocked}
+        disableExit={disableExitButton}
       />
     );
   }

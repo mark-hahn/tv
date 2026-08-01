@@ -138,7 +138,7 @@ class InfoView extends LinearLayout implements Pane {
     fields.removeAllViews();
     addField(joinRow(show.firstAired, show.lastAired, show.status));
     addField(joinRow(seasonsText(show.seasonCount), watchedText(show)));
-    addField(joinRow(show.countryLang.toUpperCase(), show.network));
+    addField(joinRowWithSlash(show.countryLang.toUpperCase(), show.network));
     addField(lastWatchedText(show.lastPlayedDate));
     addField(show.genres);
     addField(show.averageRuntime > 0 ? show.averageRuntime + " Mins" : "");
@@ -148,6 +148,16 @@ class InfoView extends LinearLayout implements Pane {
   }
 
   private static String joinRow(String... parts) {
+    StringBuilder out = new StringBuilder();
+    for (String part : parts) {
+      if (part == null || part.isEmpty()) continue;
+      if (out.length() > 0) out.append(" - ");
+      out.append(part);
+    }
+    return out.toString();
+  }
+
+  private static String joinRowWithSlash(String... parts) {
     StringBuilder out = new StringBuilder();
     for (String part : parts) {
       if (part == null || part.isEmpty()) continue;

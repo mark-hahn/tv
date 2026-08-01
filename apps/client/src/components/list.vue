@@ -655,7 +655,7 @@ export default {
         "Watching",
         "Finished",
         "Playing",
-        "Position",
+        "Partial",
       ],
       conds: [
         {
@@ -2723,7 +2723,7 @@ export default {
             if (allTvdb?.[show.name]) {
               allTvdb[show.name].episodeData = resp.episodeData;
             }
-            if (this.fltrChoice === "Position") this.refilter();
+            if (this.fltrChoice === "Partial") this.refilter();
           }
         } else if (resp) {
           errorMessage =
@@ -2931,7 +2931,7 @@ export default {
         return;
       }
 
-      if (this.fltrChoice === "Position") {
+      if (this.fltrChoice === "Partial") {
         this.shows = allShows.filter((show) =>
           epd.hasAnyPosition(show.episodeData),
         );
@@ -3499,7 +3499,7 @@ export default {
       }
       const show = allShows.find((s) => s.name === showName);
       if (show) show.episodeData = episodeData;
-      if (this.fltrChoice === "Position") this.refilter();
+      if (this.fltrChoice === "Partial") this.refilter();
     };
     evtBus.on("episodeDataUpdated", this._onEpisodeDataUpdated);
 

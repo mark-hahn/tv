@@ -68,6 +68,22 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final String EMBY_PACKAGE = "com.mb.android";
   // Asks the set to bring tvapp back to the front, see bringToFront.
   private static final String OPEN_TVAPP_URL = "https://hahnca.com/tv-tv/tv/opentvapp";
+  // Same volume control the web client's remote uses, via tv-tv's HA bridge.
+  private static final String VOL_UP_URL = "https://hahnca.com/tv-tv/tv/vol/up";
+  private static final String VOL_DOWN_URL = "https://hahnca.com/tv-tv/tv/vol/down";
+  // Asked every time a trailer starts, so one left muted from dragging never
+  // carries into the next play silently.
+  private static final String UNMUTE_URL = "https://hahnca.com/tv-tv/tv/unmute";
+  // While a trailer plays, dragging up/down repeats a volume step at this
+  // cadence instead of moving a cursor nobody can see. Speed of the drag does
+  // not matter, only its direction, so this is a fixed cadence rather than
+  // anything derived from the motion.
+  private static final long VOLUME_DRAG_INTERVAL_MS = 600;
+  // No explicit end-of-drag message exists for a plain drag (see onMove/CMD_MOVE
+  // in tvappctrl.js — only a held press gets a release). Motion arrives every
+  // SEND_INTERVAL_MS there (16ms), so a gap several times that long means the
+  // finger lifted.
+  private static final long VOLUME_DRAG_IDLE_MS = 200;
 
   // The cursor held in the top or bottom quarter of a pane that is a list of its
   // own — the description, the map, the cast — scrolls it. Speed ramps linearly
@@ -151,6 +167,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private long lastMoveAt; // when the previous batch was applied, for accelGain
   private boolean foreground; // whether this activity is the one on screen
 
+  // -1 while dragging up (volume up), +1 while dragging down (volume down), 0
+  // idle. Ticked by volumeDragTick, not by the moves themselves.
+  private int volumeDragDirection;
+  private boolean volumeDragActive;
+  private long volumeDragLastMoveAt;
+
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
@@ -232,7 +254,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     player = new TrailerPlayer(this);
     // The arrow goes away with it: there is nothing on this screen to aim at,
     // and it would sit over the picture for the length of the trailer.
-    player.setOpenListener(open -> cursor.setVisibility(open ? View.GONE : View.VISIBLE));
+    player.setOpenListener(
+        open -> {
+          cursor.setVisibility(open ? View.GONE : View.VISIBLE);
+          // Closing however it happens — click, Back, or the video ending on
+          // its own — ends any volume drag in progress along with it.
+          if (!open) stopVolumeDrag();
+        });
     root.addView(player, matchParent());
 
     // Added last so the arrow draws over everything else.
@@ -356,7 +384,14 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     actorsPane.setListener(this::actorClick);
     panes.add(actorsPane);
     TrailersView trailers = new TrailersView(this);
-    trailers.setPlayListener(url -> player.play(url));
+    trailers.setPlayListener(
+        url -> {
+          // A trailer dragged down to muted, or the physical remote's mute
+          // still on from something else, must not carry silently into the
+          // next one.
+          sendUnmute();
+          player.play(url);
+        });
     panes.add(trailers);
     for (Pane pane : panes) {
       pane.asView().setVisibility(View.GONE);
@@ -612,6 +647,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   protected void onDestroy() {
     ui.removeCallbacks(autoScroll);
     ui.removeCallbacks(holdScroll);
+    ui.removeCallbacks(volumeDragTick);
     ctrlServer.shutdown();
     sharedFilters.stop();
     super.onDestroy();
@@ -637,6 +673,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       pendingDx = 0;
       pendingDy = 0;
       movePending = false;
+    }
+    if (player.isPlaying()) {
+      updateVolumeDrag(dy);
+      return;
     }
     float gain = accelGain(dx, dy);
     dx *= gain;
@@ -798,6 +838,66 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     ui.post(this::stopHold);
   }
 
+  /** A move batch that arrived while the trailer player owns the screen. */
+  private void updateVolumeDrag(float dy) {
+    volumeDragLastMoveAt = SystemClock.uptimeMillis();
+    if (dy == 0) return;
+    volumeDragDirection = dy < 0 ? -1 : 1;
+    if (!volumeDragActive) {
+      volumeDragActive = true;
+      ui.removeCallbacks(volumeDragTick);
+      ui.post(volumeDragTick);
+    }
+  }
+
+  private void stopVolumeDrag() {
+    volumeDragActive = false;
+    volumeDragDirection = 0;
+    ui.removeCallbacks(volumeDragTick);
+  }
+
+  private final Runnable volumeDragTick =
+      new Runnable() {
+        @Override
+        public void run() {
+          if (!volumeDragActive) return;
+          // No release message arrives for a plain drag — see VOLUME_DRAG_IDLE_MS.
+          if (SystemClock.uptimeMillis() - volumeDragLastMoveAt > VOLUME_DRAG_IDLE_MS) {
+            volumeDragActive = false;
+            return;
+          }
+          sendVolume(volumeDragDirection);
+          ui.postDelayed(this, VOLUME_DRAG_INTERVAL_MS);
+        }
+      };
+
+  private void sendVolume(int direction) {
+    String url = direction < 0 ? VOL_UP_URL : VOL_DOWN_URL;
+    new Thread(
+            () -> {
+              try {
+                Http.get(url);
+              } catch (Exception e) {
+                Log.e(TAG, "vol failed: " + e);
+              }
+            },
+            "vol")
+        .start();
+  }
+
+  private void sendUnmute() {
+    new Thread(
+            () -> {
+              try {
+                Http.get(UNMUTE_URL);
+              } catch (Exception e) {
+                Log.e(TAG, "unmute failed: " + e);
+              }
+            },
+            "unmute")
+        .start();
+  }
+
   private void startHold(int direction) {
     holdDirection = direction;
     holdStartedAt = SystemClock.uptimeMillis();
@@ -881,6 +981,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     // A release that never arrives — the phone's app gone, its socket dropped —
     // would otherwise leave the list scrolling on its own.
     stopHold();
+    stopVolumeDrag();
     // Here rather than on every move: the arrow moves at 60 Hz, and this is the
     // one thing that runs before either being backgrounded or being finished.
     prefs()

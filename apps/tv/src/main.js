@@ -74,6 +74,12 @@ const FIRE_TV_IP = "192.168.1.47";
 const FIRE_KEY_TIMEOUT_MS = 5000;
 const BRAVIA_TV_IP = "192.168.1.86:34047";
 const BRAVIA_PICTURE_URL = `http://192.168.1.86/sony/video`;
+// setAudioMute takes the state it wants rather than toggling, which is the one
+// way to reach a known mute state on this set. Both the HA remote's "Mute"
+// command and HA's own media_player.volume_mute are IRCC toggles -- the braviatv
+// integration throws away the boolean it is handed -- and its is_volume_muted is
+// stuck at false forever, because getVolumeInformation answers 500 on this model.
+const BRAVIA_AUDIO_URL = `http://192.168.1.86/sony/audio`;
 const BRAVIA_PSK = "qwerty";
 
 // tvappctrl relay. The phone cannot reach the tv directly: the ap isolates
@@ -1540,6 +1546,9 @@ app.get("/tv/vol/:dir", (req, res) => {
     res.json({ ok: false, error: "wrong mode" });
     return;
   }
+  // Nothing here has to undo a mute: the set does that itself on any volume
+  // command. Branching on braviaHaMuted would not work anyway — see
+  // BRAVIA_AUDIO_URL for why it is stuck at false.
   callService("remote", "send_command", REMOTE_ENTITY_ID, {
     command: dir === "up" ? "VolumeUp" : "VolumeDown",
   });
@@ -1556,6 +1565,43 @@ app.get("/tv/mute", (req, res) => {
   callService("remote", "send_command", REMOTE_ENTITY_ID, { command: "Mute" });
   unilog(428, `mute sent from ${client(req)}`);
   res.json({ ok: true });
+});
+
+// Asked by tvapp every time a trailer starts, so a mute left over from
+// dragging (or anything else) never carries silently into the next one.
+// Straight to the set rather than through HA: this states the mute it wants
+// instead of toggling, so the result is the same whatever the set was doing,
+// and there is no readable mute state to branch on anyway — see
+// BRAVIA_AUDIO_URL.
+app.get("/tv/unmute", async (req, res) => {
+  if (tvMode !== "google" && tvMode !== "fire" && tvMode !== "tv") {
+    unilog(1868, `unmute ignored — tvMode=${tvMode}`);
+    res.json({ ok: false, error: "wrong mode" });
+    return;
+  }
+  try {
+    const resp = await fetch(BRAVIA_AUDIO_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Auth-PSK": BRAVIA_PSK },
+      body: JSON.stringify({
+        method: "setAudioMute",
+        version: "1.0",
+        id: 1,
+        params: [{ status: false }],
+      }),
+    });
+    const body = await resp.json();
+    if (body.error) {
+      unilog(1869, `unmute refused: ${JSON.stringify(body.error)}`);
+      res.json({ ok: false, error: "tv refused" });
+      return;
+    }
+    unilog(1870, `unmute sent from ${client(req)}`);
+    res.json({ ok: true });
+  } catch (e) {
+    unilog(1871, `unmute failed: ${e.message}`);
+    res.json({ ok: false, error: e.message });
+  }
 });
 
 async function pushTvState() {

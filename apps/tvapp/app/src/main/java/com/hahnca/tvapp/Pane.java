@@ -20,4 +20,9 @@ interface Pane extends Scroller {
   void onShown();
 
   View asView();
+
+  /** The visible region that makes this pane the two-finger scroll target. */
+  default View scrollableView() {
+    return asView();
+  }
 }

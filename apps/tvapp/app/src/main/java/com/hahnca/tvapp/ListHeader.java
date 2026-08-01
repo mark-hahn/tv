@@ -17,9 +17,8 @@ import android.widget.LinearLayout;
  * The filter is no longer typed here — there is no keyboard on a tv — it now
  * lives entirely in tvappctrl on the phone, which has one.
  *
- * Holding the cursor over this bar does not scroll the list: the scroll zone
- * starts at the list's own top, so reaching up for it does not pull the list
- * out from under the cursor on the way.
+ * The list also scrolls from a two-finger drag when the cursor is not over a
+ * scrollable pane, so this row can still be crossed without moving the cursor.
  */
 class ListHeader extends LinearLayout {
 

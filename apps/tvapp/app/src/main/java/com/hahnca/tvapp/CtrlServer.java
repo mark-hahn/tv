@@ -19,6 +19,7 @@ import org.java_websocket.server.WebSocketServer;
  * there, in the same session. Keep it small. From the phone:
  *
  *   m,&lt;dx&gt;,&lt;dy&gt;   move the cursor by a relative amount, in tv pixels
+ *   g,&lt;dx&gt;,&lt;dy&gt;   scroll by a relative amount, in tv pixels
  *   c              click whatever the cursor is over
  *   p              the finger has been down long enough to be a hold, not a tap
  *   r              and is now up again
@@ -39,6 +40,7 @@ class CtrlServer extends WebSocketServer {
 
   private static final String TAG = "tvapp";
   private static final String CMD_MOVE = "m";
+  private static final String CMD_SCROLL = "g";
   private static final String CMD_CLICK = "c";
   private static final String CMD_PRESS = "p";
   private static final String CMD_RELEASE = "r";
@@ -49,6 +51,8 @@ class CtrlServer extends WebSocketServer {
 
   interface Listener {
     void onMove(float dx, float dy);
+
+    void onScroll(float dx, float dy);
 
     void onClick();
 
@@ -118,6 +122,8 @@ class CtrlServer extends WebSocketServer {
     String[] parts = message.split(",");
     if (CMD_MOVE.equals(parts[0]) && parts.length == 3) {
       listener.onMove(Float.parseFloat(parts[1]), Float.parseFloat(parts[2]));
+    } else if (CMD_SCROLL.equals(parts[0]) && parts.length == 3) {
+      listener.onScroll(Float.parseFloat(parts[1]), Float.parseFloat(parts[2]));
     } else if (CMD_CLICK.equals(parts[0])) {
       listener.onClick();
     } else if (CMD_PRESS.equals(parts[0])) {

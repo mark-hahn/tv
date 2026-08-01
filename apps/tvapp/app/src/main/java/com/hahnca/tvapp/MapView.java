@@ -59,11 +59,6 @@ class MapView extends ScrollPane {
   }
 
   @Override
-  public boolean rampScroll() {
-    return true;
-  }
-
-  @Override
   protected void fill(Shows.Show show) {
     addMessage("Loading…");
     new Thread(

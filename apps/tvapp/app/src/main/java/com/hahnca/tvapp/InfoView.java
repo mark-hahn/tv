@@ -103,10 +103,9 @@ class InfoView extends LinearLayout implements Pane {
     overviewScroll.scrollBy(0, px);
   }
 
-  /** The description is a list like any other as far as the cursor cares. */
   @Override
-  public boolean rampScroll() {
-    return true;
+  public View scrollableView() {
+    return overviewScroll;
   }
 
   @Override

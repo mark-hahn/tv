@@ -63,13 +63,8 @@ abstract class ScrollPane extends ScrollView implements Pane {
               ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
     }
     // On the column, not on the ScrollView: a ScrollView eats the touch itself
-    // and never gets as far as performClick. Guarded rather than only installed
-    // for a list pane, because rampScroll is a subclass's answer and this runs
-    // before the subclass exists.
-    column.setOnClickListener(
-        v -> {
-          if (rampScroll()) scrollToStart();
-        });
+    // and never gets as far as performClick.
+    column.setOnClickListener(v -> scrollToStart());
   }
 
   @Override
@@ -94,19 +89,11 @@ abstract class ScrollPane extends ScrollView implements Pane {
   }
 
   @Override
-  public boolean scrollsHorizontally() {
-    return across != null;
-  }
-
-  @Override
   public View asView() {
     return this;
   }
 
-  /**
-   * Back to the top, and to the far left of anything that went sideways. The
-   * cursor only ever scrolls a pane forwards, so this is the way back.
-   */
+  /** Back to the top, and to the far left of anything that went sideways. */
   void scrollToStart() {
     smoothScrollTo(0, 0);
     if (across != null) across.smoothScrollTo(0, 0);

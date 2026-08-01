@@ -24,7 +24,7 @@ import java.util.Objects;
  *
  * Every card is built up front rather than recycled — the list is a couple of
  * hundred shows and never changes while the app is open, and a plain ScrollView
- * is what lets the cursor's edge-of-screen scrolling just call scrollBy. The
+ * is what lets the scroll buttons and two-finger fallback call scrollBy. The
  * header's filter and sort therefore only ever re-order cards that already
  * exist, which is what lets the list keep up with a filter being typed.
  */

@@ -85,24 +85,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // finger lifted.
   private static final long VOLUME_DRAG_IDLE_MS = 200;
 
-  // The cursor held in the top or bottom quarter of a pane that is a list of its
-  // own — the description, the map, the cast — scrolls it. Speed ramps linearly
-  // from a standstill at the quarter line to SCROLL_STEP_DP a tick hard against
-  // the edge, so one gesture covers both a nudge of a row or two and a run to
-  // the end. The show list is deliberately not one of these: it has the Up and
-  // Down buttons below its header instead.
-  private static final float SCROLL_ZONE_FRACTION = 0.25f;
-  private static final float SCROLL_STEP_DP = 12f;
-  private static final long SCROLL_INTERVAL_MS = 16;
-  // What is left of the older behaviour, for the panes that are not lists: a
-  // steady crawl out of a fixed band at either end.
-  private static final float PANE_SCROLL_ZONE_DP = 60f;
-  private static final float PANE_SCROLL_STEP_DP = 2f;
-  // Scrolling is what the cursor does when it is *held* in the zone. While
-  // motion is still arriving it is being aimed instead, and pulling the content
-  // out from under it mid-aim makes the target impossible to hit.
-  private static final long SCROLL_MOVE_PAUSE_MS = 120;
-
   // Pointer acceleration, the same bargain a desktop mouse makes: a slow drag
   // is passed through untouched so a card can be aimed at, and a fast one is
   // multiplied so the far corner of a 4K screen is one flick away instead of
@@ -117,10 +99,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // A flick is a dozen batches, so a sixth of the screen each still crosses it.
   private static final float MOVE_MAX_STEP_DP = 160f;
 
-  // The show list scrolls by the two buttons below its header and by nothing else.
-  // Held, they ramp from a crawl a card at a time to a run down the whole list;
-  // tapped, they go straight to one end of it. The 300 ms a hold takes to start
-  // is the phone's own tap window, so a press is a tap or a hold and never both.
+  // The Up and Down buttons are still the explicit list controls. Held, they
+  // ramp from a crawl a card at a time to a run down the whole list; tapped,
+  // they go straight to one end of it. The 300 ms a hold takes to start is the
+  // phone's own tap window, so a press is a tap or a hold and never both.
   private static final float SCROLL_BTN_HEIGHT_DP = 35.2f;
   private static final float SCROLL_BTN_TEXT_SIZE_SP = 16f;
   private static final float SCROLL_BTN_CORNER_DP = 6f;
@@ -132,6 +114,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final float HOLD_SCROLL_MAX_DP = 36f; // scroll speed cap once fully sped up
   private static final float HOLD_SCROLL_ACCEL_DP_PER_S2 = 17.5f; // dp/tick gained per second
   private static final long HOLD_SCROLL_DELAY_MS = 750; // holds at start speed this long first
+  private static final long HOLD_SCROLL_INTERVAL_MS = 16;
 
   private final Handler ui = new Handler(Looper.getMainLooper());
 
@@ -153,12 +136,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private final List<Button> tabs = new ArrayList<>();
   private Pane activePane;
   private TrailerPlayer player;
-  private Scroller scrollTarget; // what the cursor is scrolling, null for nothing
-  private float scrollStepDp; // signed dp a tick, negative for up
-  private float scrollStepDpX; // the same sideways, for the panes that go that way
-  private float scrollRemainder; // sub-pixel carry, so slow speeds still move
-  private float scrollRemainderX;
-
   // A drag sends motion at ~60 Hz from the socket thread. Deltas are summed and
   // applied by one posted runnable rather than posting one per packet.
   private float pendingDx;
@@ -645,7 +622,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   @Override
   protected void onDestroy() {
-    ui.removeCallbacks(autoScroll);
     ui.removeCallbacks(holdScroll);
     ui.removeCallbacks(volumeDragTick);
     ctrlServer.shutdown();
@@ -690,7 +666,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       dy *= max / distance;
     }
     cursor.moveBy(dx, dy);
-    updateAutoScroll();
   }
 
   /**
@@ -709,99 +684,26 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     return 1 + (ACCEL_MAX_GAIN - 1) * ramp;
   }
 
-  /**
-   * Picks what the arrow's position scrolls and how fast. Every pane that is a
-   * list of its own scrolls the same way: the top and bottom quarters move it
-   * at a speed that ramps up towards the edge. What is not a list keeps the
-   * older constant crawl out of a fixed band. The scrolling has to keep going
-   * while the cursor is simply held there, so it runs off its own repeating
-   * post rather than off arriving motion — which is also why the target and
-   * step are fields and not arguments.
-   */
-  private void updateAutoScroll() {
+  @Override
+  public void onScroll(float dx, float dy) {
+    ui.post(
+        () -> {
+          if (!foreground || player.isPlaying()) return;
+          Scroller target = scrollTargetAtCursor();
+          int wholeX = Math.round(dx);
+          int wholeY = Math.round(dy);
+          if (wholeY != 0) target.scrollStep(wholeY);
+          if (wholeX != 0) target.scrollStepX(wholeX);
+        });
+  }
+
+  private Scroller scrollTargetAtCursor() {
     float x = cursor.getPosX();
     float y = cursor.getPosY();
-    float width = cursor.getWidth();
-    float height = cursor.getHeight();
-    float listWidth = showList.getWidth();
-    // The pane's zone stops at its own top so that reaching up for a tab does
-    // not scroll the pane out from under the cursor on the way.
-    float paneTop = dp(PANE_TOP_MARGIN_DP);
-    Scroller target = null;
-    float stepDp = 0;
-    float stepDpX = 0;
-    if (x < listWidth) {
-      // Nothing: the show list scrolls by its Up and Down buttons alone, so the
-      // whole column is somewhere the cursor can rest without it moving.
-      target = null;
-    } else if (activePane.rampScroll()) {
-      stepDp = rampSpeed(y, paneTop, height) * SCROLL_STEP_DP;
-      if (activePane.scrollsHorizontally()) {
-        // Rightwards only: a click is the way back to the far left, the same
-        // bargain every one of these panes makes with its top.
-        float zone = (width - listWidth) * SCROLL_ZONE_FRACTION;
-        if (zone > 0 && x > width - zone) {
-          stepDpX = Math.min((x - (width - zone)) / zone, 1f) * SCROLL_STEP_DP;
-        }
-      }
-      if (stepDp != 0 || stepDpX != 0) target = activePane;
-    } else {
-      float paneZone = dp(PANE_SCROLL_ZONE_DP);
-      if (y > paneTop && y < paneTop + paneZone) {
-        target = activePane;
-        stepDp = -PANE_SCROLL_STEP_DP;
-      } else if (y > height - paneZone) {
-        target = activePane;
-        stepDp = PANE_SCROLL_STEP_DP;
-      }
-    }
-    boolean wasStopped = scrollTarget == null;
-    if (target != scrollTarget) {
-      scrollRemainder = 0;
-      scrollRemainderX = 0;
-    }
-    scrollTarget = target;
-    scrollStepDp = stepDp;
-    scrollStepDpX = stepDpX;
-    if (target == null) {
-      ui.removeCallbacks(autoScroll);
-    } else if (wasStopped) {
-      ui.post(autoScroll);
-    }
+    View paneScroll = activePane.scrollableView();
+    if (hits(paneScroll, x, y)) return activePane;
+    return showList;
   }
-
-  /**
-   * How fast the cursor at {@code pos} scrolls what it is over: nothing until
-   * it is within a quarter of either end of the region running from {@code top}
-   * to {@code end}, then ramping linearly to full speed hard against the edge.
-   * Negative for backwards.
-   */
-  private float rampSpeed(float pos, float top, float end) {
-    float zone = (end - top) * SCROLL_ZONE_FRACTION;
-    if (zone <= 0 || pos < top) return 0;
-    if (pos < top + zone) return -(top + zone - pos) / zone;
-    if (pos > end - zone) return Math.min((pos - (end - zone)) / zone, 1f);
-    return 0;
-  }
-
-  private final Runnable autoScroll =
-      new Runnable() {
-        @Override
-        public void run() {
-          if (scrollTarget == null) return;
-          if (SystemClock.uptimeMillis() - lastMoveAt >= SCROLL_MOVE_PAUSE_MS) {
-            float py = dp(scrollStepDp) + scrollRemainder;
-            int wholeY = (int) py;
-            scrollRemainder = py - wholeY;
-            if (wholeY != 0) scrollTarget.scrollStep(wholeY);
-            float px = dp(scrollStepDpX) + scrollRemainderX;
-            int wholeX = (int) px;
-            scrollRemainderX = px - wholeX;
-            if (wholeX != 0) scrollTarget.scrollStepX(wholeX);
-          }
-          ui.postDelayed(this, SCROLL_INTERVAL_MS);
-        }
-      };
 
   @Override
   public void onClick() {
@@ -940,7 +842,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
           int whole = (int) px;
           holdRemainder = px - whole;
           if (whole != 0) showList.scrollStep(whole);
-          ui.postDelayed(this, SCROLL_INTERVAL_MS);
+          ui.postDelayed(this, HOLD_SCROLL_INTERVAL_MS);
         }
       };
 

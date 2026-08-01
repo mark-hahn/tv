@@ -97,6 +97,7 @@ const LOCAL_NETWORK_PERMISSION = "android.permission.ACCESS_LOCAL_NETWORK";
 
 // Forwarded through the relay to tvapp, which reads them (CtrlServer.java).
 const CMD_MOVE = "m";
+const CMD_SCROLL = "g";
 const CMD_CLICK = "c";
 const CMD_PRESS = "p";
 const CMD_RELEASE = "r";
@@ -206,7 +207,7 @@ export function useTvappLink({ onTvappUp, onTvappDown, onBlockedChange }) {
 }
 
 export default function TvAppCtrl({ send, onClearFilter, onExit, blocked, disableExit }) {
-  const pendingRef = useRef({ dx: 0, dy: 0 });
+  const pendingRef = useRef({ moveDx: 0, moveDy: 0, scrollDx: 0, scrollDy: 0 });
   const touchRef = useRef(null);
   const holdRef = useRef(null);
   const blockedHoldRef = useRef(null);
@@ -235,8 +236,10 @@ export default function TvAppCtrl({ send, onClearFilter, onExit, blocked, disabl
     Keyboard.dismiss();
     clearTimeout(holdRef.current);
     touchRef.current = null;
-    pendingRef.current.dx = 0;
-    pendingRef.current.dy = 0;
+    pendingRef.current.moveDx = 0;
+    pendingRef.current.moveDy = 0;
+    pendingRef.current.scrollDx = 0;
+    pendingRef.current.scrollDy = 0;
     return () => clearTimeout(blockedHoldRef.current);
   }, [blocked]);
 
@@ -312,29 +315,34 @@ export default function TvAppCtrl({ send, onClearFilter, onExit, blocked, disabl
     Keyboard.dismiss();
   };
 
-  // Flushes whatever the drag accumulated since the last frame. Sending per
+  // Flushes whatever the drags accumulated since the last frame. Sending per
   // touch event would put dozens of tiny messages a second on the wire.
   useEffect(() => {
     const timer = setInterval(() => {
       const pending = pendingRef.current;
-      if (pending.dx === 0 && pending.dy === 0) return;
-      const scaledX = pending.dx * CURSOR_SPEED;
-      const scaledY = pending.dy * CURSOR_SPEED;
-      const dx = Math.round(scaledX);
-      const dy = Math.round(scaledY);
-      if (dx === 0 && dy === 0) {
-        // Too small to be worth a whole tv pixel even added up — drop it.
-        pending.dx = 0;
-        pending.dy = 0;
-        return;
-      }
-      // Carry the rounding remainder, or a slow drag loses most of its motion.
-      pending.dx = (scaledX - dx) / CURSOR_SPEED;
-      pending.dy = (scaledY - dy) / CURSOR_SPEED;
-      send(`${CMD_MOVE},${dx},${dy}`);
+      flushDelta(pending, "moveDx", "moveDy", CMD_MOVE);
+      flushDelta(pending, "scrollDx", "scrollDy", CMD_SCROLL);
     }, SEND_INTERVAL_MS);
     return () => clearInterval(timer);
   }, []);
+
+  const flushDelta = (pending, xKey, yKey, command) => {
+    if (pending[xKey] === 0 && pending[yKey] === 0) return;
+    const scaledX = pending[xKey] * CURSOR_SPEED;
+    const scaledY = pending[yKey] * CURSOR_SPEED;
+    const dx = Math.round(scaledX);
+    const dy = Math.round(scaledY);
+    if (dx === 0 && dy === 0) {
+      // Too small to be worth a whole tv pixel even added up — drop it.
+      pending[xKey] = 0;
+      pending[yKey] = 0;
+      return;
+    }
+    // Carry the rounding remainder, or a slow drag loses most of its motion.
+    pending[xKey] = (scaledX - dx) / CURSOR_SPEED;
+    pending[yKey] = (scaledY - dy) / CURSOR_SPEED;
+    send(`${command},${dx},${dy}`);
+  };
 
   // A press that outlives the tap window without going anywhere is a hold, and
   // is reported as one so the tv's scroll buttons can stay down under it. The
@@ -349,7 +357,16 @@ export default function TvAppCtrl({ send, onClearFilter, onExit, blocked, disabl
     if (blocked) return;
     Keyboard.dismiss();
     const { pageX, pageY } = e.nativeEvent;
-    const touch = { x: pageX, y: pageY, moved: 0, at: Date.now(), held: false };
+    const touch = {
+      x: pageX,
+      y: pageY,
+      moved: 0,
+      at: Date.now(),
+      held: false,
+      scrolling: false,
+      scrollX: 0,
+      scrollY: 0,
+    };
     touchRef.current = touch;
     clearTimeout(holdRef.current);
     holdRef.current = setTimeout(() => {
@@ -359,22 +376,60 @@ export default function TvAppCtrl({ send, onClearFilter, onExit, blocked, disabl
     }, TAP_MAX_MS);
   };
 
+  const centerOf = (touches) => {
+    if (!touches || touches.length < 2) return null;
+    return {
+      x: (touches[0].pageX + touches[1].pageX) / 2,
+      y: (touches[0].pageY + touches[1].pageY) / 2,
+    };
+  };
+
+  const startScroll = (touch, center) => {
+    clearTimeout(holdRef.current);
+    if (touch.held) send(CMD_RELEASE);
+    touch.held = false;
+    touch.scrolling = true;
+    touch.scrollX = center.x;
+    touch.scrollY = center.y;
+    pendingRef.current.moveDx = 0;
+    pendingRef.current.moveDy = 0;
+  };
+
   // Only relative motion is sent — where on the phone the finger is has no
-  // bearing on where the cursor is on the tv.
+  // bearing on where the cursor is on the tv. Two fingers switch that relative
+  // motion to scrolling and leave the cursor parked over the target.
   const onMove = (e) => {
     const touch = touchRef.current;
     if (!touch) return;
+    const center = centerOf(e.nativeEvent.touches);
+    if (center) {
+      if (!touch.scrolling) {
+        startScroll(touch, center);
+        return;
+      }
+      const dx = center.x - touch.scrollX;
+      const dy = center.y - touch.scrollY;
+      touch.scrollX = center.x;
+      touch.scrollY = center.y;
+      touch.moved += Math.abs(dx) + Math.abs(dy);
+      pendingRef.current.scrollDx += dx;
+      pendingRef.current.scrollDy += dy;
+      return;
+    }
+    if (touch.scrolling) return;
     const { pageX, pageY } = e.nativeEvent;
     const dx = pageX - touch.x;
     const dy = pageY - touch.y;
     touch.x = pageX;
     touch.y = pageY;
     touch.moved += Math.abs(dx) + Math.abs(dy);
-    pendingRef.current.dx += dx;
-    pendingRef.current.dy += dy;
+    pendingRef.current.moveDx += dx;
+    pendingRef.current.moveDy += dy;
   };
 
-  const onRelease = () => {
+  const onRelease = (e) => {
+    const remaining = e?.nativeEvent?.touches?.length ?? 0;
+    if (remaining > 0) return;
     clearTimeout(holdRef.current);
     const touch = touchRef.current;
     touchRef.current = null;

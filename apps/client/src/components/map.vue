@@ -1350,13 +1350,8 @@ export default {
     noop() {},
 
     qualityChar(q) {
-      if (q === 2160) return "2";
-      if (q === 1080) return "1";
-      if (q === 720) return "7";
-      if (q === 576) return "5";
-      if (q === 480) return "4";
-      if (q === 384) return "3";
-      return "0";
+      if (!q) return "0";
+      return String(Math.round((Math.log2(q) - 8) * 3));
     },
 
     async handleNotInEmbyClick(event) {

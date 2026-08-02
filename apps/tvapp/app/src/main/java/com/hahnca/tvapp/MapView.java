@@ -207,22 +207,9 @@ class MapView extends ScrollPane {
   }
 
   private static String qualityChar(int quality) {
-    switch (quality) {
-      case 2160:
-        return "2";
-      case 1080:
-        return "1";
-      case 720:
-        return "7";
-      case 576:
-        return "5";
-      case 480:
-        return "4";
-      case 384:
-        return "3";
-      default:
-        return "0";
-    }
+    if (quality <= 0) return "0";
+    double digit = Math.round((Math.log(quality) / Math.log(2) - 8) * 3);
+    return String.valueOf((long) digit);
   }
 
   /**

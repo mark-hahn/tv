@@ -27,6 +27,7 @@ class TrailersView extends ScrollPane {
   private static final float CARD_GAP_DP = 16f;
   private static final float STILL_WIDTH_DP = 300f;
   private static final float STILL_ASPECT = 9f / 16f; // height / width
+  private static final int CARD_BG = 0xFFD3D3D3;
   private static final int STILL_PLACEHOLDER_BG = 0xFF303030;
   private static final int CARD_SELECTED_BORDER = 0xFFFF0000;
   private static final float CARD_SELECTED_BORDER_DP = 3f;
@@ -149,6 +150,7 @@ class TrailersView extends ScrollPane {
 
     GradientDrawable bg = new GradientDrawable();
     bg.setCornerRadius(dp(CARD_CORNER_DP));
+    bg.setColor(CARD_BG);
     card.setBackground(bg);
 
     ImageView still = new ImageView(getContext());

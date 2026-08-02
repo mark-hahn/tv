@@ -547,6 +547,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    */
   private void enterTrailerCards() {
     if (!TAB_LABELS[TRAILER_TAB_INDEX].equals(selectedButton)) return;
+    Shows.Show show = showList.getSelected();
+    if (show == null || show.trailers.isEmpty()) return;
     ui.removeCallbacks(buttonDwellActivate);
     // The cards only exist once the pane has been filled, which is what being
     // shown does; playing is activateButton's job, so this never starts one.
@@ -693,16 +695,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     ui.post(
         () -> {
           bumpKeepAwake();
-          // The player has no controls of its own, so any key closes it rather
-          // than being swallowed -- a key that does nothing at all reads as the
-          // app being wedged, which is what the arrows looked like whenever the
-          // player was still up.
-          if (player.isPlaying()) {
-            player.close();
-            return;
-          }
-          if ("ok".equals(key)) activateSelectedItem();
-          else moveSelection(key);
+          handleRemoteKey(key);
         });
   }
 
@@ -762,19 +755,54 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     super.onDestroy();
   }
 
-  @Override
-  public boolean onKeyDown(int keyCode, KeyEvent event) {
-    if (keyCode == KeyEvent.KEYCODE_BACK) {
-      handleBack();
-      return true;
-    }
-    return super.onKeyDown(keyCode, event);
-  }
-
   private void handleBack() {
     if (player.isPlaying()) player.close();
     else if (mapPane.isEpisodeOpen()) mapPane.closeEpisode();
     else backToEmby();
+  }
+
+  private void handleRemoteKey(String key) {
+    if (player.isPlaying()) {
+      // While the video owns the screen, OK closes it and arrows are swallowed
+      // so they cannot move hidden tvapp focus underneath.
+      if ("ok".equals(key)) player.close();
+      return;
+    }
+    if ("ok".equals(key)) activateSelectedItem();
+    else moveSelection(key);
+  }
+
+  @Override
+  public boolean dispatchKeyEvent(KeyEvent event) {
+    String key = remoteKeyFromKeyCode(event.getKeyCode());
+    if (key == null) return super.dispatchKeyEvent(event);
+    if (event.getAction() == KeyEvent.ACTION_DOWN) {
+      bumpKeepAwake();
+      if ("back".equals(key)) handleBack();
+      else handleRemoteKey(key);
+    }
+    return true;
+  }
+
+  private String remoteKeyFromKeyCode(int keyCode) {
+    switch (keyCode) {
+      case KeyEvent.KEYCODE_DPAD_UP:
+        return "up";
+      case KeyEvent.KEYCODE_DPAD_DOWN:
+        return "down";
+      case KeyEvent.KEYCODE_DPAD_LEFT:
+        return "left";
+      case KeyEvent.KEYCODE_DPAD_RIGHT:
+        return "right";
+      case KeyEvent.KEYCODE_DPAD_CENTER:
+      case KeyEvent.KEYCODE_ENTER:
+      case KeyEvent.KEYCODE_NUMPAD_ENTER:
+        return "ok";
+      case KeyEvent.KEYCODE_BACK:
+        return "back";
+      default:
+        return null;
+    }
   }
 
   private class ButtonItem {

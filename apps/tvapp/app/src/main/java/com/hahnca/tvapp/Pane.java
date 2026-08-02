@@ -4,7 +4,7 @@ import android.view.View;
 
 /**
  * One of the tabs on the right half of the screen. They are the web client's
- * simple-mode tabs — Info, Map, Actors, Trailers — holding the same content it
+ * simple-mode tabs — Info, Map, Actors, Trailer — holding the same content it
  * shows, so all three uis agree on what a show looks like.
  *
  * A pane is told about the selected show whether or not it is on screen, and

@@ -159,6 +159,9 @@ export default function App() {
   const [tvapprcMode, setTvapprcMode] = useState(false);
   const [showTvapprcInput, setShowTvapprcInput] = useState(false);
   const [tvapprcFilter, setTvapprcFilter] = useState("");
+  const [tvapprcShows, setTvapprcShows] = useState([]);
+  const [tvapprcTotalCount, setTvapprcTotalCount] = useState(0);
+  const tvapprcShowsLoadedRef = useRef(false);
   const [flashSvc, setFlashSvc] = useState(null);
   const [showSubCtrl, setShowSubCtrl] = useState(false);
   const [subPlayers, setSubPlayers] = useState([]);
@@ -541,6 +544,27 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!tvapprcMode) {
+      tvapprcShowsLoadedRef.current = false;
+      return;
+    }
+    if (tvapprcShowsLoadedRef.current) return;
+    tvapprcShowsLoadedRef.current = true;
+    (async () => {
+      try {
+        const res = await fetch(`${TV_SRVR_HTTP_URL}/api/getAllTvdb?hasEmby=0`);
+        const data = await res.json();
+        const all = Object.entries(data).map(([name, show]) => ({
+          ...show,
+          name,
+        }));
+        setTvapprcTotalCount(all.length);
+        setTvapprcShows(all.filter((show) => show.inEmby !== false));
+      } catch (_) {}
+    })();
+  }, [tvapprcMode]);
+
+  useEffect(() => {
     console.log("[vol] APP VERSION v23");
     connectWs();
     AsyncStorage.getItem("layoutOption")
@@ -834,7 +858,7 @@ export default function App() {
 
   const updateTvapprcFilter = (text) => {
     setTvapprcFilter(text);
-    sendTvapprc(`${CMD_FILTER},${text}`);
+    sendTvapprc(`${CMD_FILTER},${text.trim()}`);
   };
 
   const openTvapprcInput = () => {
@@ -2902,6 +2926,21 @@ export default function App() {
               <Text style={tvapprcInputStyles.actionText}>Clear</Text>
             </TouchableOpacity>
           </View>
+          {tvapprcTotalCount > 0 && (
+            <View style={tvapprcInputStyles.countRow}>
+              <Text style={tvapprcInputStyles.countText}>
+                {(() => {
+                  const query = tvapprcFilter.trim().toLowerCase();
+                  const listCount = query
+                    ? tvapprcShows.filter((s) =>
+                        s.name.toLowerCase().includes(query),
+                      ).length
+                    : tvapprcShows.length;
+                  return `There are ${listCount} shows in list of ${tvapprcTotalCount} total.`;
+                })()}
+              </Text>
+            </View>
+          )}
           <Pressable style={tvapprcInputStyles.empty} onPress={closeTvapprcInput} />
           <View style={tvapprcInputStyles.bottomRow}>
             <TouchableOpacity
@@ -3063,6 +3102,14 @@ const tvapprcInputStyles = StyleSheet.create({
   },
   empty: {
     flex: 1,
+  },
+  countRow: {
+    marginTop: 12,
+    alignSelf: "flex-start",
+  },
+  countText: {
+    color: "#FFFF00",
+    fontSize: fs(18),
   },
   bottomRow: {
     flexDirection: "row",

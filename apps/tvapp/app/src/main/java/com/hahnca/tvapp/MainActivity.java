@@ -41,16 +41,16 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   private static final String[] TAB_LABELS = {"Info", "Map", "Actors", "Trailers"};
   private static final String[] FILTER_LABELS = {
-    "Ready", "Drama", "Comedy", "To Try", "Continue", "Mark", "Linda"
+    "Ready", "Drama", "Comedy", "To Try", "Continue", "Mark", "Linda", "Trash"
   };
   private static final String SORT_WATCHED = "Watched";
   private static final String SORT_ADDED = "Added";
   private static final String SORT_CUSTOM = "Custom";
   private static final int MAP_TAB_INDEX = 1;
 
-  private static final float BUTTON_TEXT_SIZE_SP = 12.0f;
+  private static final float BUTTON_TEXT_SIZE_SP = 12.5f;
   private static final float BUTTON_HEIGHT_DP = 25.0f;
-  private static final float BUTTON_MARGIN_BOTTOM_DP = 8.0f;
+  private static final float BUTTON_MARGIN_BOTTOM_DP = 6.0f;
   private static final float BUTTON_GROUP_GAP_DP = BUTTON_HEIGHT_DP / 2f;
   private static final float BUTTON_PAD_H_DP = 8f;
   private static final float BUTTON_CORNER_DP = 6f;

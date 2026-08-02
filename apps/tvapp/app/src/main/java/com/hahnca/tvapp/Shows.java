@@ -22,7 +22,7 @@ class Shows {
   // Public https rather than a LAN port: tv-srvr listens on https only, and this
   // one-shot load is not latency-sensitive.
   private static final String SHOWS_URL =
-      "https://hahnca.com/tv-srvr/api/getAllTvdb?hasEmby=1";
+      "https://hahnca.com/tv-srvr/api/getAllTvdb?hasEmby=0";
   private static final String TAG = "tvapp";
 
   /** One of the show's cast, for the Actors pane. */
@@ -77,6 +77,7 @@ class Shows {
     final boolean inContinue;
     final boolean inMark;
     final boolean inLinda;
+    final boolean inEmby;
     final List<Actor> characters;
     final List<Trailer> trailers;
 
@@ -104,6 +105,7 @@ class Shows {
       inContinue = rec.optBoolean("inContinue", false);
       inMark = rec.optBoolean("inMark", false);
       inLinda = rec.optBoolean("inLinda", false);
+      inEmby = rec.optBoolean("inEmby", true);
       characters = new ArrayList<>();
       JSONArray castNodes = rec.optJSONArray("characters");
       for (int i = 0; castNodes != null && i < castNodes.length(); i++) {

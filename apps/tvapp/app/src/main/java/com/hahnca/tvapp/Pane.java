@@ -21,22 +21,21 @@ interface Pane extends Scroller {
 
   View asView();
 
-  /** The visible region that makes this pane the two-finger scroll target. */
+  /** The visible region that scrolls when this pane is given a scroll action. */
   default View scrollableView() {
     return asView();
   }
 
   /**
-   * Which of this pane's scroll regions the cursor is in, or null when it is
-   * in none of them and the show list should take the scroll instead. Only
-   * Map has more than one region — its grid, and the episode subpane below
-   * it — so every other pane is answered by scrollableView alone.
+   * Which of this pane's scroll regions should receive a scroll action. Only
+   * Map has more than one region — its grid, and the episode subpane below it —
+   * so every other pane is answered by scrollableView alone.
    */
   default Scroller scrollerAt(HitTest hit) {
     return hit.hits(scrollableView()) ? this : null;
   }
 
-  /** Whether the cursor is over a view; MainActivity owns the arithmetic. */
+  /** Whether a target point is over a view; MainActivity owns the arithmetic. */
   interface HitTest {
     boolean hits(View view);
   }

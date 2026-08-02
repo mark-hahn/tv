@@ -66,10 +66,9 @@ class MapPane implements Pane {
   }
 
   /**
-   * The grid and the episode subpane scroll separately, so which one a
-   * two-finger scroll works depends on where the arrow is. Anywhere in the
-   * subpane counts, the still included: the description is the only thing in
-   * there that scrolls at all.
+   * The grid and the episode subpane scroll separately. Anywhere in the subpane
+   * counts, the still included: the description is the only thing in there that
+   * scrolls at all.
    */
   @Override
   public Scroller scrollerAt(HitTest hit) {

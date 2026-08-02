@@ -82,12 +82,12 @@ const BRAVIA_PICTURE_URL = `http://192.168.1.86/sony/video`;
 const BRAVIA_AUDIO_URL = `http://192.168.1.86/sony/audio`;
 const BRAVIA_PSK = "qwerty";
 
-// tvappctrl relay. The phone cannot reach the tv directly: the ap isolates
+// tvapprc bridge. The phone cannot reach the tv directly: the ap isolates
 // wireless clients from each other, and both the phone and the tv are on wifi.
 // This host is wired, and wireless->wired and wired->wireless both work, so it
-// forwards the cursor stream across the gap. Still a single lan hop each way,
+// forwards remote commands across the gap. Still a single lan hop each way,
 // not a trip out to the public hahnca.com endpoint.
-const TVAPPCTRL_RELAY_PORT = 8098;
+const TVAPPRC_BRIDGE_PORT = 8098;
 const TVAPP_CTRL_URL = "ws://192.168.1.86:8099";
 const TVAPP_DIAL_RETRY_MS = 2000;
 // Sideloaded, but still in the tv's own application list, so opening tvapp needs
@@ -95,18 +95,16 @@ const TVAPP_DIAL_RETRY_MS = 2000;
 const BRAVIA_APP_CONTROL_URL = "http://192.168.1.86/sony/appControl";
 const TVAPP_BRAVIA_URI =
   "com.sony.dtv.com.hahnca.tvapp.com.hahnca.tvapp.MainActivity";
-// Relay control messages, hand-mirrored in apps/android/tvappctrl.js. Distinct
-// from the phone-to-tvapp protocol, which the relay forwards without reading.
-const MSG_OPEN_TVAPP = "o"; // phone -> relay: open tvapp on the tv
-const MSG_TVAPP_UP = "u"; // relay -> phone: tvapp is open
-const MSG_TVAPP_DOWN = "d"; // relay -> phone: tvapp has closed
-const MSG_BLOCKED = "b"; // relay -> phone: another phone is driving, block the ui
-const MSG_ALLOWED = "a"; // relay -> phone: this phone is the one driving
-const MSG_CLOSE_TVAPP = "q"; // phone -> relay: close tvapp, allowed even blocked
+// Bridge control messages, hand-mirrored in apps/android/App.js. Distinct
+// from the remote-to-tvapp protocol, which the bridge forwards without reading.
+const MSG_OPEN_TVAPP = "o"; // phone -> bridge: open tvapp on the tv
+const MSG_TVAPP_UP = "u"; // bridge -> phone: tvapp is open
+const MSG_TVAPP_DOWN = "d"; // bridge -> phone: tvapp has closed
 // tvapp's own protocol (apps/tvapp's CtrlServer.java), used directly below --
 // not relayed -- so the web client's Shows button works with no phone
 // connected at all.
-const CMD_EXIT_TVAPP = "x"; // close tvapp
+const CMD_BACK_TO_EMBY = "b"; // close tvapp and bring Emby up
+const CMD_EMBY_SELECTED = "e"; // load tvapp's active show into Emby
 const CMD_SELECT_SHOW = "s"; // select a show by name
 const TVAPP_PROBE_TIMEOUT_MS = 800;
 const TVAPP_SELECT_DIAL_TIMEOUT_MS = 8000;
@@ -2433,121 +2431,22 @@ async function checkSubtitleMismatch(sessions) {
   }
 }
 
-// Pipes one phone's cursor stream through to tvapp and keeps the two ends in
-// step: tvapp opening or closing on the tv is what opens or closes the phone's
-// tvappctrl screen, and vice versa. Apart from its own five control messages it
-// stays dumb about the protocol — the cursor format is agreed between
-// apps/android/tvappctrl.js and apps/tvapp's CtrlServer, and a relay that read it
-// would be a third place to edit on every change.
-//
-// Every phone opens tvappctrl when tvapp does, because that screen mirrors
-// whether tvapp is up and must not contradict the tv. Only one of them may drive
-// the cursor, so the others are told to block their ui rather than closed.
-function startTvappctrlRelay() {
-  const relay = new WebSocketServer({ port: TVAPPCTRL_RELAY_PORT });
-  // Every connected phone, and whether its leg to tvapp is up — which is the
-  // same thing as whether its tvappctrl screen is showing.
-  const legs = new Map(); // phone -> { up, send }
-  // The phone allowed to drive, null whenever tvapp is down.
-  let controller = null;
-  // The phone last used, which is who gets the cursor when tvapp is opened by
-  // something that is not a phone — the web client's Shows button.
-  let lastActive = null;
+// Bridges Android tvapprc commands to tvapp and keeps the phone's remote mode in
+// step with whether tvapp's command socket is reachable. Each connected phone
+// has its own leg to tvapp; commands are absolute key/filter state rather than
+// relative pointer motion, so no controller arbitration is needed here.
+function startTvapprcBridge() {
+  const bridge = new WebSocketServer({ port: TVAPPRC_BRIDGE_PORT });
 
-  const upCount = () => {
-    let n = 0;
-    for (const leg of legs.values()) if (leg.up) n++;
-    return n;
-  };
-
-  // Still being connected is enough to be picked: a phone whose dial has not
-  // come up yet is told it has the cursor when it does, a retry later.
-  const pickController = () => {
-    if (lastActive && legs.has(lastActive)) return lastActive;
-    for (const [phone, leg] of legs) if (leg.up) return phone;
-    return null;
-  };
-
-  const sendControlState = (phone) => {
-    const leg = legs.get(phone);
-    if (!leg?.up) return;
-    leg.send(phone === controller ? MSG_ALLOWED : MSG_BLOCKED);
-  };
-
-  const broadcastControlState = () => {
-    for (const phone of legs.keys()) sendControlState(phone);
-  };
-
-  relay.on("connection", (phone, req) => {
+  bridge.on("connection", (phone, req) => {
     const from = req.socket.remoteAddress;
-    // The phone stays connected for as long as its app is running, not just while
-    // its tvappctrl screen is up, because being told tvapp just opened is how that
-    // screen gets opened in the first place. So the tv leg is redialled on a timer
-    // instead of once: a dial that starts succeeding *is* the "tvapp opened"
-    // event, and a socket that drops *is* the "tvapp closed" event.
     let tv = null;
     let dialTimer = null;
-    let quietDialFail = false; // one warn per run of failures, not one per dial
+    let quietDialFail = false;
     let closed = false;
 
     const sendPhone = (msg) => {
       if (phone.readyState === WebSocket.OPEN) phone.send(msg);
-    };
-
-    legs.set(phone, { up: false, send: sendPhone });
-
-    const dial = () => {
-      if (closed) return;
-      const sock = new WebSocket(TVAPP_CTRL_URL);
-      tv = sock;
-      let wasOpen = false;
-
-      sock.on("open", () => {
-        wasOpen = true;
-        quietDialFail = false;
-        unilog(1839, `phone ${from} relaying to tvapp`);
-        // The phone can go away while its dial is still in flight, and this
-        // fires anyway — there is no leg left to bring up.
-        const leg = legs.get(phone);
-        if (!leg) return;
-        leg.up = true;
-        sendPhone(MSG_TVAPP_UP);
-        // A launch nobody claimed — the web client's Shows button — leaves the
-        // cursor unassigned until the first screen comes up on it, and it goes
-        // to the phone last used. A launch a phone claimed has already set this.
-        if (!controller) {
-          controller = pickController();
-          unilog(1859, `tvapp up unclaimed, cursor to last phone used`);
-          broadcastControlState();
-        } else {
-          sendControlState(phone);
-        }
-      });
-      // Only a socket that had actually been open reports "down". Otherwise the
-      // steady drip of refused dials while tvapp is simply not open would keep
-      // slamming the phone's screen shut.
-      sock.on("close", () => {
-        if (wasOpen) {
-          const leg = legs.get(phone);
-          if (leg) leg.up = false;
-          sendPhone(MSG_TVAPP_DOWN);
-          // tvapp is gone once no leg is left on it, and the cursor goes with
-          // it: the next launch starts over with nobody driving. The phones
-          // clear their own blocking when their screen closes.
-          if (upCount() === 0) controller = null;
-        }
-        redial();
-      });
-      sock.on("error", (e) => {
-        if (!quietDialFail) {
-          quietDialFail = true;
-          unilog(1840, `tvapp dial failed, quiet until it answers: ${e.message}`);
-        }
-      });
-      // tvapp answers back — its filter box asks for the phone's keyboard — so
-      // the relay is transparent in this direction too, and understands this one
-      // no better than the other.
-      sock.on("message", (data) => sendPhone(data.toString()));
     };
 
     const redial = () => {
@@ -2558,49 +2457,47 @@ function startTvappctrlRelay() {
       }, TVAPP_DIAL_RETRY_MS);
     };
 
+    const dial = () => {
+      if (closed) return;
+      const sock = new WebSocket(TVAPP_CTRL_URL);
+      tv = sock;
+      let wasOpen = false;
+
+      sock.on("open", () => {
+        wasOpen = true;
+        quietDialFail = false;
+        unilog(1879, `phone ${from} bridged to tvapp`);
+        sendPhone(MSG_TVAPP_UP);
+      });
+      sock.on("close", () => {
+        if (wasOpen) sendPhone(MSG_TVAPP_DOWN);
+        redial();
+      });
+      sock.on("error", (e) => {
+        if (!quietDialFail) {
+          quietDialFail = true;
+          unilog(1880, `tvapp dial failed: ${e.message}`);
+        }
+      });
+      sock.on("message", (data) => sendPhone(data.toString()));
+    };
+
     phone.on("message", (data) => {
       const msg = data.toString();
-      // Two messages are the relay's own; everything else is between the phone and
-      // tvapp and is forwarded without being understood.
       if (msg === MSG_OPEN_TVAPP) {
-        // Opening tvapp is a claim on the cursor, so the phone that pressed
-        // Shows drives it and every other screen comes up blocked.
-        controller = phone;
-        lastActive = phone;
-        unilog(1860, `phone ${from} opened tvapp and has the cursor`);
+        unilog(1881, `phone ${from} opened tvapp`);
         launchTvapp();
-        broadcastControlState();
         return;
       }
-      // The one thing a blocked phone may still do, which is why this comes
-      // before the check below: its dialog says to hold to close. Sent as
-      // tvapp's own exit, so every phone's leg drops and they all close with it.
-      if (msg === MSG_CLOSE_TVAPP) {
-        unilog(1862, `phone ${from} closed tvapp`);
-        if (tv?.readyState === WebSocket.OPEN) tv.send(CMD_EXIT_TVAPP);
-        return;
+      if (tv?.readyState === WebSocket.OPEN) {
+        tv.send(msg);
+      } else if (msg === CMD_BACK_TO_EMBY || msg === CMD_EMBY_SELECTED) {
+        void sendTvappCommand(msg);
       }
-      // A blocked phone's ui sends nothing, and the relay does not take its word
-      // for that: anything already in flight when the block landed must not
-      // reach the cursor, nor count as this phone having been the one in use.
-      if (controller && phone !== controller) return;
-      lastActive = phone;
-      // Motion that arrives before the tv leg is up is dropped, not queued —
-      // these are relative deltas a few ms old, and a stale cursor jump is worse
-      // than a cursor that starts moving a frame late.
-      if (tv?.readyState === WebSocket.OPEN) tv.send(msg);
     });
 
     const shutdown = () => {
       closed = true;
-      legs.delete(phone);
-      if (lastActive === phone) lastActive = null;
-      // A phone that has gone away cannot go on driving, or every phone still
-      // on tvapp would sit blocked with nobody able to move the cursor.
-      if (controller === phone) {
-        controller = pickController();
-        broadcastControlState();
-      }
       clearTimeout(dialTimer);
       tv?.close();
     };
@@ -2610,15 +2507,15 @@ function startTvappctrlRelay() {
     dial();
   });
 
-  relay.on("listening", () =>
-    unilog(1836, `relay listening on port ${TVAPPCTRL_RELAY_PORT}`),
+  bridge.on("listening", () =>
+    unilog(1882, `bridge listening on port ${TVAPPRC_BRIDGE_PORT}`),
   );
-  relay.on("error", (e) =>
-    unilog(1837, `relay socket error: ${e.message}`),
+  bridge.on("error", (e) =>
+    unilog(1883, `bridge socket error: ${e.message}`),
   );
 }
 
-// Opens tvapp on the tv so that opening tvappctrl on the phone opens it here too.
+// Opens tvapp on the tv so Android tvapprc mode has something to control.
 // Sideloaded as it is, tvapp still shows up in the tv's own application list, so
 // this needs no adb — which matters, because the tv's adb port moves on reboot.
 async function launchTvapp() {
@@ -2645,8 +2542,8 @@ async function launchTvapp() {
 }
 
 // A quick dial to tvapp's ctrl socket: open within TVAPP_PROBE_TIMEOUT_MS
-// means tvapp is already up. Same signal the relay uses to flip a phone's
-// tvappctrl screen on, asked here without any phone in the loop.
+// means tvapp is already up. Same signal the bridge uses to flip Android into
+// tvapprc mode, asked here without any phone in the loop.
 function probeTvappOpen() {
   return new Promise((resolve) => {
     const sock = new WebSocket(TVAPP_CTRL_URL);
@@ -2685,16 +2582,24 @@ function dialTvappUntilOpen(timeoutMs) {
   });
 }
 
+async function sendTvappCommand(command) {
+  const sock = await probeTvappOpen();
+  if (!sock) return false;
+  sock.send(command);
+  sock.close();
+  return true;
+}
+
 // The web remote's Shows button: closes tvapp if it's open, otherwise opens
 // it and selects whichever show the web client has up. Every connected
-// phone follows along for free -- tvapp opening or closing is what flips its
-// tvappctrl screen on and off already.
+// Android remotes follow along for free -- tvapp opening or closing is what
+// flips their tvapprc mode on and off already.
 app.post("/tv/toggletvapp", async (req, res) => {
   const { show } = req.body ?? {};
   const openSock = await probeTvappOpen();
   if (openSock) {
     unilog(1851, `toggletvapp closing tvapp`);
-    openSock.send(CMD_EXIT_TVAPP);
+    openSock.send(CMD_BACK_TO_EMBY);
     openSock.close();
     res.json({ ok: true, action: "closed" });
     return;
@@ -2711,12 +2616,19 @@ app.post("/tv/toggletvapp", async (req, res) => {
   res.json({ ok: true, action: "opened" });
 });
 
-// tvapp asks for this when a click arrives on the tvappctrl screen while
-// something else — a trailer playing in YouTube, say — has the tv's screen. It
-// cannot come back to the front by itself: Android blocks an activity start
-// from an app that is in the background, and no permission a sideloaded app can
-// grant itself lifts that. The set launching its own app is not a background
-// start, which is the same reason opening tvappctrl on the phone goes this way.
+app.post("/tv/tvapprc/back", async (req, res) => {
+  const ok = await sendTvappCommand(CMD_BACK_TO_EMBY);
+  res.json(ok ? { ok: true } : { ok: false, error: "tvapp is not open" });
+});
+
+app.post("/tv/tvapprc/emby", async (req, res) => {
+  const ok = await sendTvappCommand(CMD_EMBY_SELECTED);
+  res.json(ok ? { ok: true } : { ok: false, error: "tvapp is not open" });
+});
+
+// tvapp asks for this when it needs the set to bring it to the front. It cannot
+// come back by itself once backgrounded: Android blocks an activity start from a
+// background app, and no permission a sideloaded app can grant itself lifts that.
 app.get("/tv/opentvapp", async (req, res) => {
   unilog(1846, `opentvapp from ${client(req)}`);
   await launchTvapp();
@@ -2726,7 +2638,7 @@ app.get("/tv/opentvapp", async (req, res) => {
 app.listen(TV_PORT, () => {
   unilog(456, `listening on port ${TV_PORT}`);
   startTvChannelPeer();
-  startTvappctrlRelay();
+  startTvapprcBridge();
 });
 
 setInterval(pushTvState, 2000);

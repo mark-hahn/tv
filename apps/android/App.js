@@ -3,6 +3,9 @@ import {
   View,
   Text,
   Alert,
+  Keyboard,
+  PermissionsAndroid,
+  Pressable,
   StyleSheet,
   StatusBar,
   ScrollView,
@@ -19,7 +22,6 @@ import { MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import allServices from "./services.json";
 import { keyLabels } from "./keyLabels.js";
-import TvAppCtrl, { useTvappLink } from "./tvappctrl.js";
 
 // Normalize font sizes so system font scale doesn't affect the app
 const fs = (size) => size / PixelRatio.getFontScale();
@@ -38,6 +40,19 @@ const keyLabel = (key) => {
 const TV_TV_URL = "https://hahnca.com/tv-tv";
 const TV_SRVR_WS_URL = "wss://hahnca.com/tv-srvr";
 const TV_SRVR_HTTP_URL = "https://hahnca.com/tv-srvr";
+const TVAPPRC_HOST = "192.168.1.103";
+const TVAPPRC_PORT = 8098;
+const TVAPPRC_RECONNECT_MS = 2000;
+const TVAPPRC_CONNECT_TIMEOUT_MS = 5000;
+const LOCAL_NETWORK_PERMISSION = "android.permission.ACCESS_LOCAL_NETWORK";
+const MSG_TVAPP_UP = "u";
+const MSG_TVAPP_DOWN = "d";
+const MSG_CLEAR_FILTER = "z";
+const CMD_OPEN_TVAPP = "o";
+const CMD_CLOSE_TO_EMBY = "b";
+const CMD_EMBY_SELECTED = "e";
+const CMD_KEY = "k";
+const CMD_FILTER = "f";
 const SCRUB_HOLD_DELAY_MS = 400;
 const SCRUB_PING_INTERVAL_MS = 500;
 const VOL_STEP = 1;
@@ -141,21 +156,9 @@ const CLIENT_ID = Math.random().toString(36).slice(2);
 export default function App() {
   const [cellDims, setCellDims] = useState({ w: 0, h: 0 });
   const [showStreamers, setShowStreamers] = useState(false);
-  const [showTvAppCtrl, setShowTvAppCtrl] = useState(false);
-  // Held for the life of the app, not just while the tvappctrl screen is up: the
-  // tv opening tvapp is what opens that screen, so something has to be listening
-  // while the remote is what is on display.
-  // Set while another phone is the one driving tvapp: this screen still opens
-  // and closes with tvapp, but everything on it is inert until tvapp closes.
-  const [tvAppCtrlBlocked, setTvAppCtrlBlocked] = useState(false);
-  const tvappLink = useTvappLink({
-    onTvappUp: () => setShowTvAppCtrl(true),
-    onTvappDown: () => {
-      setShowTvAppCtrl(false);
-      setTvAppCtrlBlocked(false);
-    },
-    onBlockedChange: setTvAppCtrlBlocked,
-  });
+  const [tvapprcMode, setTvapprcMode] = useState(false);
+  const [showTvapprcInput, setShowTvapprcInput] = useState(false);
+  const [tvapprcFilter, setTvapprcFilter] = useState("");
   const [flashSvc, setFlashSvc] = useState(null);
   const [showSubCtrl, setShowSubCtrl] = useState(false);
   const [subPlayers, setSubPlayers] = useState([]);
@@ -192,8 +195,6 @@ export default function App() {
   const [flashCell, setFlashCell] = useState(null);
   const [mapImageExpanded, setMapImageExpanded] = useState(false);
   const [epiStats, setEpiStats] = useState(null);
-  const [disableExitButton, setDisableExitButton] = useState(false);
-
   const onGridLayout = ({ nativeEvent: { layout } }) => {
     if (layout.width < 10 || layout.height < 10) return;
     setCellDims({
@@ -241,7 +242,7 @@ export default function App() {
   const showsListLoadedRef = useRef(false);
   const showsFlatListRef = useRef(null);
   const mapHeaderScrollRef = useRef(null);
-  const exitDisableTimerRef = useRef(null);
+  const tvapprcWsRef = useRef(null);
 
   const debounce = () => {
     const now = Date.now();
@@ -251,6 +252,24 @@ export default function App() {
   };
 
   const startRepeat = (key) => {
+    if (tvapprcMode) {
+      flash(key);
+      repeatActiveRef.current = true;
+      pendingLRKeyRef.current = null;
+      sendTvapprc(`${CMD_KEY},${key}`);
+      (async () => {
+        await new Promise((r) => {
+          repeatDelayRef.current = setTimeout(r, SCRUB_HOLD_DELAY_MS);
+        });
+        while (repeatActiveRef.current) {
+          sendTvapprc(`${CMD_KEY},${key}`);
+          await new Promise((r) => {
+            repeatTimeoutRef.current = setTimeout(r, 120);
+          });
+        }
+      })();
+      return;
+    }
     if (isOff || isOther) return;
     if (!debounce()) return;
     flash(key);
@@ -334,6 +353,7 @@ export default function App() {
     clearTimeout(repeatTimeoutRef.current);
     const pendingLRKey = pendingLRKeyRef.current;
     pendingLRKeyRef.current = null;
+    if (tvapprcMode) return;
     // Stop server-side scrubbing. This is a gesture-end cleanup, not a
     // keypress, and must fire even when locked (else the tv keeps scrubbing),
     // so it goes direct rather than through the collision gate.
@@ -451,6 +471,75 @@ export default function App() {
     };
   };
 
+  const sendTvapprc = (message) => {
+    const ws = tvapprcWsRef.current;
+    if (ws?.readyState !== WebSocket.OPEN) return false;
+    ws.send(message);
+    return true;
+  };
+
+  useEffect(() => {
+    let done = false;
+    let retryTimer = null;
+    let openTimer = null;
+
+    const closeTvapprcInput = () => {
+      setShowTvapprcInput(false);
+      Keyboard.dismiss();
+    };
+
+    const clearTvapprcFilter = () => {
+      setTvapprcFilter("");
+      Keyboard.dismiss();
+    };
+
+    const scheduleRetry = () => {
+      if (done || retryTimer) return;
+      clearTimeout(openTimer);
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        connect();
+      }, TVAPPRC_RECONNECT_MS);
+    };
+
+    const connect = () => {
+      if (done) return;
+      const ws = new WebSocket(`ws://${TVAPPRC_HOST}:${TVAPPRC_PORT}`);
+      tvapprcWsRef.current = ws;
+      ws.onopen = () => clearTimeout(openTimer);
+      ws.onerror = scheduleRetry;
+      ws.onclose = scheduleRetry;
+      ws.onmessage = (e) => {
+        if (e.data === MSG_TVAPP_UP) {
+          setTvapprcMode(true);
+        } else if (e.data === MSG_TVAPP_DOWN) {
+          setTvapprcMode(false);
+          closeTvapprcInput();
+          clearTvapprcFilter();
+        } else if (e.data === MSG_CLEAR_FILTER) {
+          clearTvapprcFilter();
+        }
+      };
+      openTimer = setTimeout(() => {
+        if (ws.readyState !== WebSocket.OPEN) ws.close();
+      }, TVAPPRC_CONNECT_TIMEOUT_MS);
+    };
+
+    PermissionsAndroid.request(LOCAL_NETWORK_PERMISSION)
+      .catch((e) => console.warn("tvapprc network permission failed", e))
+      .finally(() => {
+        if (!done) connect();
+      });
+
+    return () => {
+      done = true;
+      clearTimeout(retryTimer);
+      clearTimeout(openTimer);
+      tvapprcWsRef.current?.close();
+      tvapprcWsRef.current = null;
+    };
+  }, []);
+
   useEffect(() => {
     console.log("[vol] APP VERSION v23");
     connectWs();
@@ -477,7 +566,6 @@ export default function App() {
       closeChannel("embyPlaying");
       closeChannel("tvPicture");
       clearTimeout(unlockHoldTimerRef.current);
-      clearTimeout(exitDisableTimerRef.current);
     };
   }, []);
 
@@ -728,10 +816,67 @@ export default function App() {
   };
 
   const tvKey = async (key) => {
+    if (tvapprcMode) {
+      flash(key);
+      sendTvapprc(`${CMD_KEY},${key}`);
+      return;
+    }
     if (isOff || isOther) return;
     if (!debounce()) return;
     flash(key);
     await sendKeyThrough(key, `/tv/key/${key}`);
+  };
+
+  const closeTvapprcInput = () => {
+    setShowTvapprcInput(false);
+    Keyboard.dismiss();
+  };
+
+  const updateTvapprcFilter = (text) => {
+    setTvapprcFilter(text);
+    sendTvapprc(`${CMD_FILTER},${text}`);
+  };
+
+  const openTvapprcInput = () => {
+    flash("filter");
+    setShowTvapprcInput(true);
+  };
+
+  const openTvapp = () => {
+    flash("shows");
+    if (!sendTvapprc(CMD_OPEN_TVAPP)) {
+      fetch(`${TV_TV_URL}/tv/opentvapp`).catch((e) =>
+        console.warn("opentvapp failed", e),
+      );
+    }
+    setTvapprcMode(true);
+  };
+
+  const closeTvappToEmby = (flashKey = "back") => {
+    flash(flashKey);
+    if (!sendTvapprc(CMD_CLOSE_TO_EMBY)) {
+      fetch(`${TV_TV_URL}/tv/tvapprc/back`, { method: "POST" }).catch((e) =>
+        console.warn("tvapprc back failed", e),
+      );
+    }
+    setTvapprcMode(false);
+    closeTvapprcInput();
+  };
+
+  const embySelectedFromTvapp = () => {
+    flash("emby");
+    if (!sendTvapprc(CMD_EMBY_SELECTED)) {
+      fetch(`${TV_TV_URL}/tv/tvapprc/emby`, { method: "POST" }).catch((e) =>
+        console.warn("tvapprc emby failed", e),
+      );
+    }
+    setTvapprcMode(false);
+    closeTvapprcInput();
+  };
+
+  const toggleTvapprcMode = () => {
+    if (tvapprcMode) closeTvappToEmby("shows");
+    else openTvapp();
   };
 
   const startHold = (action) => {
@@ -802,18 +947,6 @@ export default function App() {
       sendKeyThrough("firebtn", `/tv/firebtn`);
     }
   };
-
-  const startEmbyHold = () => {
-    lpStart(
-      () => tvCmd("emby"),
-      () => {
-        flash("emby");
-        setShowStreamers(true);
-      },
-    );
-  };
-
-  const stopEmbyHold = () => lpStop();
 
   const startAppsHold = () => {
     lpStart(
@@ -988,50 +1121,38 @@ export default function App() {
     schedulePicCommit(setting);
   };
 
-  // Opening tvappctrl swaps the whole phone ui over to it, and asks the tv to
-  // open tvapp as well — the two are kept in step, so one is never opened
-  // without the other.
-  const openTvAppCtrl = () => {
-    tvappLink.openTvapp();
-    // Opening tvapp claims the cursor, so this phone is the one driving — said
-    // here as well as by the relay, which has a round trip to answer in.
-    setTvAppCtrlBlocked(false);
-    setShowTvAppCtrl(true);
-    // Disable exit button for 500ms when shows key is pressed
-    setDisableExitButton(true);
-    clearTimeout(exitDisableTimerRef.current);
-    exitDisableTimerRef.current = setTimeout(() => {
-      setDisableExitButton(false);
-    }, 500);
-  };
-
-  const startBackPress = () => dbStart(() => tvKey("back"));
+  const startBackPress = () =>
+    dbStart(() => {
+      if (tvapprcMode) closeTvappToEmby();
+      else tvKey("back");
+    });
 
   const stopBackPress = () => dbStop();
 
   const showsHoldRef = useRef(null);
   const showsHoldFiredRef = useRef(false);
 
-  // Shows carries both screens: a press opens tvappctrl, a hold opens the shows
-  // pane. The hold is the one with somewhere to go back to, which is why the
-  // press is the one that swaps the ui out.
-  const startShowsHold = () =>
-    lpStart(
-      () => {
-        flash("shows");
-        openTvAppCtrl();
-      },
-      () => {
-        flash("shows");
-        setActiveTab("List");
-        setSortOrder("viewed");
-        setFollowPlaying(true);
-        setScrollToTopOnOpen(true);
-        setShowShows(true);
-      },
-    );
+  const openShowsPane = () => {
+    flash("shows");
+    setActiveTab("List");
+    setSortOrder("viewed");
+    setFollowPlaying(true);
+    setScrollToTopOnOpen(true);
+    setShowShows(true);
+  };
 
-  const stopShowsHold = () => lpStop();
+  const startShowsHold = () => {
+    if (tvapprcMode) {
+      dbStart(toggleTvapprcMode);
+      return;
+    }
+    lpStart(toggleTvapprcMode, openShowsPane);
+  };
+
+  const stopShowsHold = () => {
+    dbStop();
+    lpStop();
+  };
 
   // Long-press skip toggles the playing episode between 2160 and 1080.
   const toggleResolution = async () => {
@@ -1045,6 +1166,10 @@ export default function App() {
   };
 
   const startSkipHold = () => {
+    if (tvapprcMode) {
+      dbStart(openTvapprcInput);
+      return;
+    }
     const pressedAt = Date.now();
     lpStart(
       () => {
@@ -1063,7 +1188,10 @@ export default function App() {
     );
   };
 
-  const stopSkipHold = () => lpStop();
+  const stopSkipHold = () => {
+    dbStop();
+    lpStop();
+  };
 
   const toggleLayoutOption = async () => {
     const next = layoutOption === "mark" ? "linda" : "mark";
@@ -1135,6 +1263,25 @@ export default function App() {
       onSnapshot: applySubPlayers,
       onDelta: applySubPlayers,
     });
+  };
+
+  const startEmbyHold = () => {
+    if (tvapprcMode) {
+      dbStart(embySelectedFromTvapp);
+      return;
+    }
+    lpStart(
+      () => tvCmd("emby"),
+      () => {
+        flash("emby");
+        setShowStreamers(true);
+      },
+    );
+  };
+
+  const stopEmbyHold = () => {
+    dbStop();
+    lpStop();
   };
 
   const subTypeChar = (type) => {
@@ -1260,12 +1407,14 @@ export default function App() {
   };
 
   const isOff =
-    !haState ||
-    haState === "off" ||
-    haState === "unavailable" ||
-    haState === "unknown";
+    !tvapprcMode &&
+    (!haState ||
+      haState === "off" ||
+      haState === "unavailable" ||
+      haState === "unknown");
 
   const mode = (() => {
+    if (tvapprcMode) return "tvapprc";
     if (isOff) return "off";
     if (mediaTitle === "Smart TV") return "google";
     if (mediaTitle === "TV") return "tv";
@@ -1362,10 +1511,10 @@ export default function App() {
       onPressOut: stopRepeat,
     },
     {
-      key: "skip",
-      label: "Skip",
+      key: tvapprcMode ? "filter" : "skip",
+      label: tvapprcMode ? "Filter" : "Skip",
       smallText: true,
-      bg: () => cellBg("white", "skip"),
+      bg: () => cellBg("white", tvapprcMode ? "filter" : "skip"),
       onPress: () => {},
       onPressIn: () => startSkipHold(),
       onPressOut: () => stopSkipHold(),
@@ -1403,7 +1552,8 @@ export default function App() {
       key: "shows",
       label: "Shows",
       smallText: true,
-      bg: () => cellBg("white", "shows"),
+      bg: () =>
+        flashBtn === "shows" ? "orange" : tvapprcMode ? "lightblue" : "white",
       onPress: () => {},
       onPressIn: () => startShowsHold(),
       onPressOut: () => stopShowsHold(),
@@ -1427,20 +1577,6 @@ export default function App() {
       onPressOut: stopHold,
     },
   ];
-
-  // Replaces the remote outright rather than overlaying it, so no remote button
-  // can be reached while the tv is being pointed at.
-  if (showTvAppCtrl) {
-    return (
-      <TvAppCtrl
-        send={tvappLink.send}
-        onClearFilter={tvappLink.onClearFilter}
-        onExit={() => setShowTvAppCtrl(false)}
-        blocked={tvAppCtrlBlocked}
-        disableExit={disableExitButton}
-      />
-    );
-  }
 
   if (showSubCtrl) {
     const currentPlayer =
@@ -2745,6 +2881,39 @@ export default function App() {
             </View>
           ))}
       </View>
+      {tvapprcMode && showTvapprcInput && (
+        <View style={tvapprcInputStyles.overlay}>
+          <View style={tvapprcInputStyles.topRow}>
+            <TextInput
+              style={tvapprcInputStyles.input}
+              value={tvapprcFilter}
+              onChangeText={updateTvapprcFilter}
+              autoFocus
+              autoCorrect={false}
+              autoCapitalize="none"
+              returnKeyType="done"
+              onSubmitEditing={closeTvapprcInput}
+            />
+            <TouchableOpacity
+              onPress={() => updateTvapprcFilter("")}
+              style={tvapprcInputStyles.actionBtn}
+              activeOpacity={0.7}
+            >
+              <Text style={tvapprcInputStyles.actionText}>Clear</Text>
+            </TouchableOpacity>
+          </View>
+          <Pressable style={tvapprcInputStyles.empty} onPress={closeTvapprcInput} />
+          <View style={tvapprcInputStyles.bottomRow}>
+            <TouchableOpacity
+              onPress={closeTvapprcInput}
+              style={tvapprcInputStyles.actionBtn}
+              activeOpacity={0.7}
+            >
+              <Text style={tvapprcInputStyles.actionText}>Exit</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
       {locked && (
         <View style={lockStyles.overlay}>
           <Text style={lockStyles.title}>Remote Collision</Text>
@@ -2849,6 +3018,55 @@ const styles = StyleSheet.create({
   },
   cellTextLarge: {
     fontSize: fs(84),
+  },
+});
+
+const tvapprcInputStyles = StyleSheet.create({
+  overlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 30,
+    backgroundColor: "#000",
+    paddingTop: SCREEN_MARGIN * 2,
+    paddingBottom: SCREEN_MARGIN,
+    paddingHorizontal: SCREEN_MARGIN,
+  },
+  topRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  input: {
+    flex: 1,
+    backgroundColor: "#fff",
+    color: "#000",
+    fontSize: fs(22),
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 6,
+  },
+  actionBtn: {
+    backgroundColor: "#fff",
+    paddingVertical: 14,
+    paddingHorizontal: 19,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionText: {
+    color: "#000",
+    fontSize: fs(22),
+    fontWeight: "bold",
+  },
+  empty: {
+    flex: 1,
+  },
+  bottomRow: {
+    flexDirection: "row",
+    justifyContent: "flex-start",
   },
 });
 

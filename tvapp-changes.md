@@ -1,0 +1,172 @@
+
+# major changes to tvapp and tvappctrl
+- in these instructions the text will be written as if changes are already made
+  - this is the present tense
+  - e.g "The shows button selects the remote mode"
+
+- tvappctrl is completely removed
+  - all code for tvappctrl is removed
+  - apps/android/tvappctrl.js is removed
+  - comments and claude.md have no mention of tvappctrl
+  - remember the old tvappctrl because it will be referenced below
+
+- the tv remote controls the tvapp
+  - the old tv remote that controls emby also controls tvapp
+    - this is the remote in web client and android phone app
+  - there is a new mode in tv remote called tvapprc mode
+    - when the remote is in the tvapprc mode the tvapp is open in the tv 
+    - when the tvapp is open in the tv the remote is in the tvapprc mode
+      - this is the same as before with tvappctrl matching tvapp
+    - in the rest of these instructions we refer to "the tvapprc"
+      - "the tvapprc" refers to a virtual new remote control device
+        - e.g. we will say "tvapprc sends this key to tvapp"
+      - the tvapprc device is actually just the existing tv remote in tvapprc mode
+  - the tvapprc ui is almost the same as the old tv remote
+    - the buttons have identical labels/icons except:
+      - a button `Filter` replaces the old skip button
+  - there is a new overlay screen for filter text input
+    - it is only in the android phone and not in the web client
+    - it is called the "input screen"
+    - it completely covers the tvapprc screen
+    - it looks exactly like the old tvappctrl screen
+      - the background is black
+      - it has a text input box and a button `Clear` at the top
+      - it has an `Exit` button at the bottom left
+    - the input screen opens when the filter button is pressed
+    - the input screen closes when:
+      - the input screen exit key is pressed
+      - there is a press in the empty part of the input screen
+      - the accept button in the keyboard is pressed
+
+- tvapprc actions
+  - tvapprc button actions are the same as old actions except for these:
+    - the shows button toggles between tv remote mode and tvapprc mode 
+      - this also toggles the emby and tvapp android apps on the tv
+    - the back button switches the android app from tvapp to emby
+      - it also switches the remote from tvapprc mode to tv mode
+      - it does nothing else
+    - the emby button does everything the back button does but also loads the selected show into emby
+      - this is the same action as the tv button in the web client info pane tv button
+    - the filter button opens the input screen for filter text input
+      - it works exactly the same as the old input box in tvappctrl
+        - text typed into the input box filters the show list in tvapp
+        - the clear button removes all text from the input box
+        - the exit button closes the input screen and reveals the tvapprc screen underneath
+
+- changes to android app tvapp
+  - the cursor pointer arrow that was in the tvapp is removed
+    - there is no click, long-press or 2 finger scrolling
+    - there is no hovering
+    - the cursor pointer arrow is replaced by an item selection in the ui 
+      - the selection changes by tvapprc arrow key presses
+      - clicking on an item is replaced with a tvapprc ok button press
+  - the tvapp screen does not rotate when phone rotates
+    - it is always in portait mode
+  - there are ui sections the same as the old tvapp
+    - each section is the full height of the phone screen except margins
+      - there is a margin at top and bottom to not interfere with on-screen phone ui
+    - they are side by side filling the full width of the phone screen
+  - the 3 ui sections from left to right are:
+    - shows list
+      - the up/down buttons are gone
+      - it is a list of cards with show names and waitstr
+        - it is the same as the shows list in the web client ui
+        - the list scrolls
+      - each card can be selected and/or active
+        - that is like a button
+    - buttons
+      - buttons are in a "buttons" column between the shows list and the tab panes
+        - this is similar to the buttons column in the left of the web client simple mode
+        - the button actions are identical to those in the web client simple mode column
+        - every button can be active or inactive
+          - multiple buttons can be active
+          - active buttons have a blue background
+          - inactive buttons have a white background
+      - what we call buttons in these instructions are not buttons in the normal sense
+        - there is no way to click/push a button
+        - each button is just an active state indicator
+      - the buttons are in groups
+        - each group has a title above its buttons
+        - these are the groups in order from top to bottom, shown as `title`:["button 1", "button 2", ...]:
+          - `Tabs`: ["Info", "Map", "Actors", "Trailers"]
+            - these are called the tab pane buttons
+            - these act like radio buttons and only one can be active
+            - there is always one active
+            - these control which tab pane on the right is visible
+            - there is no Reviews tab
+          - `Filters`: ["Ready", "Drama", "Comedy", "To Try", "Continue", "Mark", "Linda"],
+            - each of these buttons has an active state on or off
+            - none or some or all can be active
+            - each provides a condition that must be met for a show to be in the shows list
+          - `Sorting`: ["Watched", "Added", "Custom"]
+            - these control the order of the shows in the shows list
+            - they match the "Watched" and "Added" buttons in the old tvapp
+            - custom button is only present when custom settings are available
+              - the availability condition is the same that changed the ready label to custom in the old tvapp
+    - tab panes
+      - the panes are the same as in the old tvapp with the same contents
+      - only one is visible at a time
+        - it is the one matching the active tab pane radio button
+      - they all occupy the same rightmost area in the screen
+      - they are the Info, Map, Actors, and Trailers panes
+      - each pane has the code they had before in old tvapp
+        - except for things removed above like cursor hovering
+
+- arrow and ok remote button actions
+  - we call show cards and buttons "items" in these instructions
+  - one and only one item is selected at a time
+  - the selected item has a light-red border
+  - the arrow keys change the selected item in the ui by arrow directions
+    - this is standard for android tv apps
+  - there is a virtual graph of item nodes 
+    - each node is connected to up to four other nodes
+      - the connected nodes are up, right, down, or left of the node
+    - the arrow keys traverse the nodes in the graph
+      - the show card items are an exception to the graph traversal
+        - connections between show cards and buttons are based on Y position in the screen
+        - when a button in the button column is selected and the left arrow is pressed:
+          - the card whose vertical center is closest to the button center is selected
+        - when a card is selected and the right arrow is pressed:
+          - the button whose vertical center is closest to the card center is selected
+  - the ok key toggles the active state of the selected item
+    - except the tab pane buttons are radio buttons not toggles
+    - the ok button doesn't "push" a button, see above
+    - items in the tab panes cannot be active or selected for now
+
+- item graph
+  - we call show cards and buttons "items" in these instructions
+  - each item has a unique name
+    - a show card has the name `card`
+    - a button has the label as the name, see buttons above
+    - non-existant items have the name `nil`
+  - this is a graph of item connectivity
+  - each `<name>: [<above item>, <right item>, <below item>, <left item>]` below specifies four connections
+  - the graph is described by this list:
+    - `card:     [<card above>, <column button>, <card below>, nil]`
+    - `Info:     [nil, nil, <Map>, <card>]`
+    - `Map:      [<Info>, nil, <Actors>, <card>]`
+    - `Actors:   [<Map>, nil, <Trailers>, <card>]`
+    - `Trailers: [<Actors>, nil, <Ready>, <card>]`
+    - `Ready: [<Trailers>, nil, <Drama>, <card>]`
+    - `Drama: [<Ready>, nil, <Comedy>, <card>]`
+    - `Comedy: [<Drama>, nil, <To Try>, <card>]`
+    - `To Try: [<Comedy>, nil, <Continue>, <card>]`
+    - `Continue: [<To Try>, nil, <Mark>, <card>]`
+    - `Mark: [<Continue>, nil, <Linda>, <card>]`
+    - `Linda: [<Mark>, nil, <Watched>, <card>]`
+    - `Watched: [<Linda>, nil, <Added>, <card>]`
+    - `Added: [<Watched>, nil, <Custom>, <card>]`
+    - `Custom: [<Added>, nil, nil, <card>]`
+  - this graph is trivial but we will add the connections to the items in tab panes later
+
+- if there are any ambiguities, contradictions, or impossibilities with these instructions:
+  - describe the problem in ./tvapp-changes-problems.md
+  - make no changes other than writing to tvapp-changes-problems.md
+  - stop so i can help with problems
+  
+- if there are no ambiguities, contradictions, or impossibilities then implement the instructions above:
+  - be thorough when looking for locations to add or change code
+  - don't stop working until all code has been written or updated
+    - use your own judgement when decisions are needed, don't stop to ask me
+  - don't worry about LLM token costs
+  - take as long as you need

@@ -65,8 +65,8 @@
   :style="{ '--btn-bg': isActive ? 'lightgray' : 'whitesmoke' }"
   ```
 - when any change is made to web client tv pane ui or the android app ui then the same change should be made to the other
-  - exception: the tvappctrl code in `apps/android` has no web client
-    counterpart and is never mirrored
+  - exception: Android-only control overlays that have no web client counterpart
+    are never mirrored
 - when modifying files use local changes and don't replace entire files because another copilot conversation might be changing the same file
 - you only need to check if a change affects android when change is in tv-pane or android
 - to develop on android use expo go and metro and always use usb cable with usbipd and set ipv4 not ipv6
@@ -112,27 +112,21 @@ After installing, set up the adb reverse tunnel so Expo Go can reach Metro if ne
 adb -s <device-serial> reverse tcp:8081 tcp:8081
 ```
 
-## tvapp and tvappctrl
+## tvapp and tvapprc
 
 - `apps/tvapp` is a native Java Android TV app (package `com.hahnca.tvapp`,
   no React Native/Expo) sideloaded on the Sony Bravia. It is modeled on the
-  web client's tv pane — a show list on the left, and Info/Map/Actors/Trailer
-  panes on the right under a row of tabs with `Emby` and `Exit` at its ends.
-  Everything is worked by a mouse-style cursor the phone drives; the TV's own
-  remote only does BACK.
+  web client's tv pane — a show list on the left, a state-button column in the
+  middle, and Info/Map/Actors/Trailers panes on the right. The existing Android
+  phone remote enters tvapprc mode while this app is open; arrows move the
+  selected item, OK activates it, Back returns to Emby, and Filter opens the
+  Android-only text input overlay for the tvapp show-list filter.
 - Build/install with `cd apps/tvapp && ./build-apk`. Gradle and adb both run
   on hahnca.com, never here — this workspace cannot reach the TV at all. Do
   this after every tvapp change; there is no hot reload for it.
-- `apps/android/tvappctrl.js` is the phone-side screen that drives that
-  cursor, reached by pressing the phone remote's Shows button (a hold opens
-  the shows pane instead). It also carries the show-list filter box, since a
-  TV has no keyboard of its own. It hot reloads via Metro like the rest of
-  `apps/android`.
-- The two talk over the LAN through `startTvappctrlRelay` in
-  `apps/tv/src/main.js`, because the TV is unreachable from any wireless host
-  on this network and tv-tv's host is wired.
-- tvappctrl is exempt from the web-client/android UI parity rule above —
-  there is no tv pane counterpart to it.
+- Android tvapprc mode and tvapp talk over the LAN through `startTvapprcBridge`
+  in `apps/tv/src/main.js`, because the TV is unreachable from any wireless
+  host on this network and tv-tv's host is wired.
 
 - never do a `find / ...`, it is too slow
 

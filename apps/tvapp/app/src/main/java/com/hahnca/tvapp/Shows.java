@@ -19,8 +19,8 @@ import org.json.JSONObject;
  */
 class Shows {
 
-  // Public https rather than a LAN port: tv-srvr listens on https only, and a
-  // one-shot load has no latency budget worth the tvappctrl relay's tricks.
+  // Public https rather than a LAN port: tv-srvr listens on https only, and this
+  // one-shot load is not latency-sensitive.
   private static final String SHOWS_URL =
       "https://hahnca.com/tv-srvr/api/getAllTvdb?hasEmby=1";
   private static final String TAG = "tvapp";
@@ -62,6 +62,7 @@ class Shows {
     final String countryLang;
     final String network;
     final String genres;
+    final boolean notReady;
     final int averageRuntime;
     final int seasonCount;
     final int episodeCount;
@@ -90,6 +91,7 @@ class Shows {
       countryLang = join(" / ", str(rec, "originalCountry"), str(rec, "originalLanguage"));
       network = str(rec, "originalNetwork");
       genres = joinArray(rec.optJSONArray("genres"));
+      notReady = rec.optBoolean("notReady", !rec.optBoolean("inEmby", true));
       averageRuntime = rec.optInt("averageRuntime", 0);
       seasonCount = rec.optInt("seasonCount", 0);
       episodeCount = rec.optInt("episodeCount", 0);
@@ -114,6 +116,14 @@ class Shows {
         JSONObject node = trailerNodes.optJSONObject(i);
         if (node != null) trailers.add(new Trailer(node));
       }
+    }
+
+    boolean isComedy() {
+      return genres.contains("Comedy");
+    }
+
+    boolean isDrama() {
+      return !isComedy();
     }
   }
 

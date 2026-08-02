@@ -70,6 +70,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final String EMBY_PACKAGE = "com.mb.android";
   private static final String UNMUTE_URL = "https://hahnca.com/tv-tv/tv/unmute";
   private static final long KEEP_AWAKE_IDLE_MS = 5_000;
+  // Coming back from Emby reuses the list already in memory, which is the point
+  // of staying resident, but a list loaded long enough ago has stale waitStrs.
+  private static final long SHOWS_REFRESH_AFTER_MS = 10 * 60_000;
 
   private final Handler ui = new Handler(Looper.getMainLooper());
   private final List<Pane> panes = new ArrayList<>();
@@ -91,6 +94,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private int activeTabIndex;
   private boolean selectedCard = true;
   private String selectedButton;
+  private long showsLoadedAt;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -115,18 +119,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     showList.setSort(sort);
     String remembered = prefs().getString(KEY_SELECTED_SHOW, null);
 
-    ctrlServer = new CtrlServer(this);
-    ctrlServer.start();
     showList.setCountsListener(
-        count -> ctrlServer.send(CtrlServer.MSG_COUNTS + "," + count));
+        count -> {
+          if (ctrlServer != null) ctrlServer.send(CtrlServer.MSG_COUNTS + "," + count);
+        });
 
-    Shows.load(
-        shows ->
-            ui.post(
-                () -> {
-                  showList.setShows(shows, remembered);
-                  if (selectedCard) showList.focusActive();
-                }));
+    loadShows(remembered);
 
     sharedFilters =
         new SharedFilters(
@@ -140,6 +138,44 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
                       }
                     }));
     sharedFilters.start();
+  }
+
+  private void loadShows(String selectedName) {
+    Shows.load(
+        shows ->
+            ui.post(
+                () -> {
+                  showsLoadedAt = System.currentTimeMillis();
+                  showList.setShows(shows, selectedName);
+                  if (selectedCard) showList.focusActive();
+                }));
+  }
+
+  /**
+   * The ctrl socket is bound only while tvapp is on screen: everything upstream
+   * -- the bridge's tvapp up/down, toggletvapp, the phone's tvapprc mode --
+   * reads "port 8099 answers" as "tvapp is the foreground app", and that has to
+   * keep being true now that the activity outlives being switched away from.
+   * WebSocketServer cannot be restarted once stopped, so each foreground turn
+   * gets its own.
+   */
+  @Override
+  protected void onStart() {
+    super.onStart();
+    ctrlServer = new CtrlServer(this);
+    ctrlServer.start();
+    if (showsLoadedAt != 0
+        && System.currentTimeMillis() - showsLoadedAt > SHOWS_REFRESH_AFTER_MS) {
+      Shows.Show selected = showList.getSelected();
+      loadShows(selected == null ? null : selected.name);
+    }
+  }
+
+  @Override
+  protected void onStop() {
+    ctrlServer.shutdown();
+    ctrlServer = null;
+    super.onStop();
   }
 
   private View buildUi() {
@@ -515,15 +551,20 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
               } catch (Exception e) {
                 Log.e(TAG, "viewshow failed for " + show.name + ": " + e);
               }
-              ui.post(this::finishAndRemoveTask);
+              ui.post(() -> moveTaskToBack(true));
             },
             "viewshow")
         .start();
   }
 
+  /**
+   * Steps aside rather than exiting. Starting Emby is what puts it on screen;
+   * going to the back as well is what keeps tvapp from being the next task up.
+   * The show list stays parsed in memory, so coming back is immediate.
+   */
   private void backToEmby() {
     openEmby();
-    finishAndRemoveTask();
+    moveTaskToBack(true);
   }
 
   private void openEmby() {
@@ -623,7 +664,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   @Override
   protected void onDestroy() {
     ui.removeCallbacks(clearKeepAwake);
-    ctrlServer.shutdown();
     sharedFilters.stop();
     super.onDestroy();
   }

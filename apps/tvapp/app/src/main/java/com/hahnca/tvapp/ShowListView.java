@@ -33,15 +33,15 @@ class ShowListView extends ScrollView implements Scroller {
 
   private static final int CARD_BG = 0xFF202020;
   private static final int CARD_BG_ACTIVE = 0xFF0A4A8A;
-  private static final int CARD_SELECTED_BORDER = 0xFFFF9999;
+  private static final int CARD_SELECTED_BORDER = 0xFFFF0000;
   private static final float CARD_CORNER_DP = 8f;
   private static final float CARD_SELECTED_BORDER_DP = 3f;
   private static final float CARD_PAD_H_DP = 14f;
   private static final float CARD_PAD_V_DP = 10f;
   private static final float CARD_GAP_DP = 6f;
   private static final float LIST_PAD_DP = 12f;
-  private static final float NAME_TEXT_SIZE_SP = 18f;
-  private static final float WAIT_TEXT_SIZE_SP = 16f;
+  private static final float NAME_TEXT_SIZE_SP = 16.2f;
+  private static final float WAIT_TEXT_SIZE_SP = 14.4f;
   private static final float WAIT_GAP_DP = 12f;
   private static final int WAIT_COLOR = 0xFFB0B0B0;
 
@@ -56,7 +56,10 @@ class ShowListView extends ScrollView implements Scroller {
     void onShowClicked();
   }
 
+  private static final String EMPTY_LABEL = "No Shows.";
+
   private final LinearLayout column;
+  private final TextView emptyView;
   private final List<Shows.Show> shows = new ArrayList<>(); // everything loaded
   private final List<Shows.Show> visible = new ArrayList<>(); // after filter and sort
   private final Map<Shows.Show, View> cards = new HashMap<>();
@@ -85,6 +88,12 @@ class ShowListView extends ScrollView implements Scroller {
         column,
         new ScrollView.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+    emptyView = new TextView(context);
+    emptyView.setText(EMPTY_LABEL);
+    emptyView.setTextColor(Color.WHITE);
+    emptyView.setTextSize(TypedValue.COMPLEX_UNIT_SP, NAME_TEXT_SIZE_SP);
+    emptyView.setGravity(Gravity.CENTER_HORIZONTAL);
   }
 
   void setSelectionListener(SelectionListener listener) {
@@ -292,6 +301,15 @@ class ShowListView extends ScrollView implements Scroller {
       Collections.sort(visible, Shows.order(sort));
     }
     column.removeAllViews();
+    if (visible.isEmpty()) {
+      LinearLayout.LayoutParams params =
+          new LinearLayout.LayoutParams(
+              ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+      column.addView(emptyView, params);
+      if (active != null) clearActive();
+      focused = null;
+      return;
+    }
     for (Shows.Show show : visible) {
       LinearLayout.LayoutParams params =
           new LinearLayout.LayoutParams(

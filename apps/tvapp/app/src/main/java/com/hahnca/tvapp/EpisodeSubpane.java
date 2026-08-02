@@ -39,8 +39,8 @@ class EpisodeSubpane extends LinearLayout implements Scroller {
   private static final int PLACEHOLDER_ASPECT_W = 16;
   private static final int PLACEHOLDER_ASPECT_H = 9;
   private static final float TEXT_PAD_DP = 8f;
-  private static final float AIRED_TEXT_SIZE_SP = 16f;
-  private static final float OVERVIEW_TEXT_SIZE_SP = 16f;
+  private static final float AIRED_TEXT_SIZE_SP = 14.4f;
+  private static final float OVERVIEW_TEXT_SIZE_SP = 14.4f;
   private static final int TEXT_COLOR = 0xFF333333;
 
   private final ImageView image;

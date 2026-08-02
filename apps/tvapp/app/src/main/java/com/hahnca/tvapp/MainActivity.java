@@ -48,11 +48,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final String SORT_CUSTOM = "Custom";
   private static final int MAP_TAB_INDEX = 1;
 
-  private static final float BUTTON_TEXT_SIZE_SP = 16f;
-  private static final float BUTTON_TITLE_TEXT_SIZE_SP = 15f;
-  private static final float BUTTON_HEIGHT_DP = 38f;
-  private static final float BUTTON_MARGIN_BOTTOM_DP = 7f;
-  private static final float BUTTON_GROUP_GAP_DP = 12f;
+  private static final float BUTTON_TEXT_SIZE_SP = 12.0f;
+  private static final float BUTTON_HEIGHT_DP = 25.0f;
+  private static final float BUTTON_MARGIN_BOTTOM_DP = 3.5f;
+  private static final float BUTTON_GROUP_GAP_DP = 40.0f;
   private static final float BUTTON_PAD_H_DP = 8f;
   private static final float BUTTON_CORNER_DP = 6f;
   private static final float BUTTON_SELECTED_BORDER_DP = 3f;
@@ -60,7 +59,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final int BUTTON_INACTIVE_BG = 0xFFFFFFFF;
   private static final int BUTTON_ACTIVE_TEXT = 0xFFFFFFFF;
   private static final int BUTTON_INACTIVE_TEXT = 0xFF000000;
-  private static final int BUTTON_SELECTED_BORDER = 0xFFFF9999;
+  private static final int BUTTON_SELECTED_BORDER = 0xFFFF0000;
 
   private static final String PREFS_NAME = "tvapp";
   private static final String KEY_SELECTED_SHOW = "selectedShow";
@@ -167,31 +166,22 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     column.setOrientation(LinearLayout.VERTICAL);
     column.setPadding((int) dp(BUTTON_PAD_H_DP), 0, (int) dp(BUTTON_PAD_H_DP), 0);
 
-    addGroup(column, "Tabs", TAB_LABELS);
-    addGroup(column, "Filters", FILTER_LABELS);
-    addGroup(column, "Sorting", new String[] {SORT_WATCHED, SORT_ADDED, SORT_CUSTOM});
+    addGroup(column, TAB_LABELS);
+    addGroup(column, FILTER_LABELS);
+    addGroup(column, new String[] {SORT_WATCHED, SORT_ADDED, SORT_CUSTOM});
     buttonItems.get(SORT_CUSTOM).view.setVisibility(View.GONE);
     repaintButtons();
     return column;
   }
 
-  private void addGroup(LinearLayout column, String title, String[] labels) {
-    TextView titleView = new TextView(this);
-    titleView.setText(title);
-    titleView.setTextColor(Color.WHITE);
-    titleView.setTextSize(TypedValue.COMPLEX_UNIT_SP, BUTTON_TITLE_TEXT_SIZE_SP);
-    titleView.setGravity(Gravity.CENTER_HORIZONTAL);
-    LinearLayout.LayoutParams titleParams =
-        new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-    titleParams.topMargin = buttonOrder.isEmpty() ? 0 : (int) dp(BUTTON_GROUP_GAP_DP);
-    titleParams.bottomMargin = (int) dp(4f);
-    column.addView(titleView, titleParams);
-
-    for (String label : labels) addButtonItem(column, label);
+  private void addGroup(LinearLayout column, String[] labels) {
+    boolean firstGroup = buttonOrder.isEmpty();
+    for (int i = 0; i < labels.length; i++) {
+      addButtonItem(column, labels[i], firstGroup && i == 0 ? 0 : BUTTON_GROUP_GAP_DP);
+    }
   }
 
-  private void addButtonItem(LinearLayout column, String label) {
+  private void addButtonItem(LinearLayout column, String label, float topMarginDp) {
     TextView view = new TextView(this);
     view.setText(label);
     view.setGravity(Gravity.CENTER);
@@ -209,6 +199,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
     LinearLayout.LayoutParams params =
         new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (int) dp(BUTTON_HEIGHT_DP));
+    params.topMargin = (int) dp(topMarginDp);
     params.bottomMargin = (int) dp(BUTTON_MARGIN_BOTTOM_DP);
     column.addView(view, params);
   }

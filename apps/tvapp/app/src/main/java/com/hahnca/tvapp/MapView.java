@@ -32,7 +32,7 @@ class MapView extends ScrollPane {
   private static final float EPISODE_COL_WIDTH_DP = 40f;
   // A season column never narrows past this; beyond that the grid scrolls.
   private static final float MIN_SEASON_COL_WIDTH_DP = 44f;
-  private static final float CELL_TEXT_SIZE_SP = 15f;
+  private static final float CELL_TEXT_SIZE_SP = 13.5f;
   private static final int CELL_AVAIL_BG = 0xFFFFFFFF;
   private static final int CELL_MISSING_BG = 0xFFFFCCCC;
   private static final int CELL_TEXT_COLOR = 0xFF000000;

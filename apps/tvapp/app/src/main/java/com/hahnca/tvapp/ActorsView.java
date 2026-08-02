@@ -29,8 +29,8 @@ class ActorsView extends ScrollPane {
   private static final int COLUMNS = 4;
   private static final float CARD_GAP_DP = 12f;
   private static final float PHOTO_HEIGHT_DP = 150f;
-  private static final float NAME_TEXT_SIZE_SP = 15f;
-  private static final float CHARACTER_TEXT_SIZE_SP = 13f;
+  private static final float NAME_TEXT_SIZE_SP = 13.5f;
+  private static final float CHARACTER_TEXT_SIZE_SP = 11.7f;
   private static final int PHOTO_PLACEHOLDER_BG = 0xFF303030;
   // The web client's actor.vue: a red border is the whole of its selected
   // style, over an otherwise plain card.

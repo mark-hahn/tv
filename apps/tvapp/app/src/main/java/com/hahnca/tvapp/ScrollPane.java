@@ -19,7 +19,7 @@ import android.widget.TextView;
 abstract class ScrollPane extends ScrollView implements Pane {
 
   static final float PAD_DP = 24f;
-  static final float TEXT_SIZE_SP = 17f;
+  static final float TEXT_SIZE_SP = 15.3f;
   static final int TEXT_COLOR = 0xFFE0E0E0;
   static final int DIM_COLOR = 0xFF9A9A9A;
 

@@ -24,9 +24,9 @@ class InfoView extends LinearLayout implements Pane {
   private static final float POSTER_WIDTH_DP = 137f;
   private static final float POSTER_ASPECT = 3f / 2f; // height / width
   private static final float FIELD_GAP_DP = 20f;
-  private static final float TITLE_TEXT_SIZE_SP = 28f;
-  private static final float FIELD_TEXT_SIZE_SP = 17f;
-  private static final float OVERVIEW_TEXT_SIZE_SP = 18f;
+  private static final float TITLE_TEXT_SIZE_SP = 25.2f;
+  private static final float FIELD_TEXT_SIZE_SP = 15.3f;
+  private static final float OVERVIEW_TEXT_SIZE_SP = 16.2f;
   private static final int FIELD_COLOR = 0xFFC8C8C8;
   private static final int OVERVIEW_COLOR = 0xFFE0E0E0;
   private static final int POSTER_PLACEHOLDER_BG = 0xFF303030;

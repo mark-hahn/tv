@@ -36,8 +36,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final float SCREEN_V_MARGIN_DP = 24f;
   private static final float COLUMN_GAP_DP = 12f;
   private static final float LIST_WIDTH_FRACTION = 0.36f;
-  private static final float BUTTONS_WIDTH_FRACTION = 0.18f;
-  private static final float PANE_WIDTH_FRACTION = 0.46f;
+  private static final float BUTTONS_WIDTH_FRACTION = 0.09f;
+  private static final float PANE_WIDTH_FRACTION = 0.55f;
 
   private static final String[] TAB_LABELS = {"Info", "Map", "Actors", "Trailers"};
   private static final String[] FILTER_LABELS = {
@@ -50,8 +50,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   private static final float BUTTON_TEXT_SIZE_SP = 12.0f;
   private static final float BUTTON_HEIGHT_DP = 25.0f;
-  private static final float BUTTON_MARGIN_BOTTOM_DP = 3.5f;
-  private static final float BUTTON_GROUP_GAP_DP = 40.0f;
+  private static final float BUTTON_MARGIN_BOTTOM_DP = 8.0f;
+  private static final float BUTTON_GROUP_GAP_DP = BUTTON_HEIGHT_DP / 2f;
   private static final float BUTTON_PAD_H_DP = 8f;
   private static final float BUTTON_CORNER_DP = 6f;
   private static final float BUTTON_SELECTED_BORDER_DP = 3f;
@@ -177,7 +177,15 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private void addGroup(LinearLayout column, String[] labels) {
     boolean firstGroup = buttonOrder.isEmpty();
     for (int i = 0; i < labels.length; i++) {
-      addButtonItem(column, labels[i], firstGroup && i == 0 ? 0 : BUTTON_GROUP_GAP_DP);
+      float topMargin;
+      if (firstGroup && i == 0) {
+        topMargin = 0;
+      } else if (i == 0) {
+        topMargin = BUTTON_GROUP_GAP_DP;
+      } else {
+        topMargin = 0;
+      }
+      addButtonItem(column, labels[i], topMargin);
     }
   }
 

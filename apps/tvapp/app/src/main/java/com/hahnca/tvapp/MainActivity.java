@@ -39,7 +39,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final float BUTTONS_WIDTH_FRACTION = 0.09f;
   private static final float PANE_WIDTH_FRACTION = 0.55f;
 
-  private static final String[] TAB_LABELS = {"Info", "Map", "Actors", "Trailers"};
+  private static final String[] TAB_LABELS = {"Info", "Map", "Actors", "Trailer"};
   private static final String[] FILTER_LABELS = {
     "Ready", "Drama", "Comedy", "To Try", "Continue", "Mark", "Linda", "Trash"
   };
@@ -47,6 +47,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final String SORT_ADDED = "Added";
   private static final String SORT_CUSTOM = "Custom";
   private static final int MAP_TAB_INDEX = 1;
+  private static final int TRAILER_TAB_INDEX = 3;
 
   private static final float BUTTON_TEXT_SIZE_SP = 12.5f;
   private static final float BUTTON_HEIGHT_DP = 25.0f;
@@ -86,15 +87,29 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private InfoView info;
   private MapPane mapPane;
   private ActorsView actorsPane;
+  private TrailersView trailersView;
   private Pane activePane;
   private TrailerPlayer player;
   private Shows.Sort sort = Shows.Sort.ALPHA;
   private boolean customOn;
   private boolean customAvailable;
   private int activeTabIndex;
-  private boolean selectedCard = true;
+  private Cursor cursor = Cursor.SHOW;
   private String selectedButton;
   private long showsLoadedAt;
+
+  /**
+   * The one place the cursor is. It used to be two booleans that had to be kept
+   * agreeing with each other, and every arrow-key bug in the trailer column came
+   * from a path that set one and not the other -- the cursor reading as being on
+   * a trailer card while it was drawn on the trailer button, where up/down/right
+   * then did nothing. One field cannot disagree with itself.
+   */
+  private enum Cursor {
+    SHOW,
+    BUTTON,
+    TRAILER_CARD
+  }
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -103,18 +118,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     AdbWifi.enable(this);
     setContentView(buildUi());
 
-    showList.setSelectionListener(
-        new ShowListView.SelectionListener() {
-          @Override
-          public void onShowSelected(Shows.Show show) {
-            MainActivity.this.onShowSelected(show);
-          }
-
-          @Override
-          public void onShowClicked() {
-            MainActivity.this.onShowActivated();
-          }
-        });
+    showList.setSelectionListener(this::onShowSelected);
     sort = Shows.Sort.of(prefs().getString(KEY_SORT, null));
     showList.setSort(sort);
     String remembered = prefs().getString(KEY_SELECTED_SHOW, null);
@@ -122,6 +126,15 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     showList.setCountsListener(
         count -> {
           if (ctrlServer != null) ctrlServer.send(CtrlServer.MSG_COUNTS + "," + count);
+        });
+    // A filter/sort change that empties the list leaves nothing in the show
+    // column for the cursor to sit on, so it moves over to the button column
+    // -- back to whichever button was selected last, or Info if none yet.
+    showList.setEmptyListener(
+        () -> {
+          if (cursor == Cursor.SHOW) {
+            selectButton(selectedButton != null ? selectedButton : TAB_LABELS[0]);
+          }
         });
 
     loadShows(remembered);
@@ -147,7 +160,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
                 () -> {
                   showsLoadedAt = System.currentTimeMillis();
                   showList.setShows(shows, selectedName);
-                  if (selectedCard) showList.focusActive();
+                  if (cursor == Cursor.SHOW) showList.focusActive();
                 }));
   }
 
@@ -260,13 +273,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     actorsPane = new ActorsView(this);
     actorsPane.setListener(this::actorClick);
     panes.add(actorsPane);
-    TrailersView trailers = new TrailersView(this);
-    trailers.setPlayListener(
+    trailersView = new TrailersView(this);
+    trailersView.setPlayListener(
         url -> {
           sendUnmute();
           player.play(url);
         });
-    panes.add(trailers);
+    panes.add(trailersView);
     for (Pane pane : panes) {
       pane.asView().setVisibility(View.GONE);
       holder.addView(pane.asView(), matchParent());
@@ -283,13 +296,21 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     activePane = panes.get(index);
     activePane.onShown();
     if (index != MAP_TAB_INDEX) mapPane.closeEpisode();
+    if (index != TRAILER_TAB_INDEX) {
+      trailersView.clearCardFocus();
+      if (cursor == Cursor.TRAILER_CARD) cursor = Cursor.BUTTON;
+    }
     repaintButtons();
   }
 
   private void repaintButtons() {
     for (String label : buttonOrder) {
       ButtonItem item = buttonItems.get(label);
-      if (item != null) item.paint(isButtonActive(label), !selectedCard && label.equals(selectedButton));
+      if (item != null) {
+        item.paint(
+            isButtonActive(label),
+            cursor == Cursor.BUTTON && label.equals(selectedButton));
+      }
     }
   }
 
@@ -402,13 +423,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     prefs().edit().putString(KEY_SELECTED_SHOW, show.name).apply();
   }
 
-  private void onShowActivated() {
-    clearTextFilter();
-    actorsPane.clearSelection();
-    showList.setActorFilter(null);
-    selectTab(0);
-  }
-
   private SharedPreferences prefs() {
     return getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
   }
@@ -430,53 +444,116 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
         TypedValue.COMPLEX_UNIT_DIP, value, getResources().getDisplayMetrics());
   }
 
+  /**
+   * Mirrors the show list's dwell-select: the cursor landing on a button does
+   * not activate it immediately -- only sitting still on it for
+   * ShowListView.DWELL_SELECT_MS does, so arrow-key repeat while scrubbing
+   * through the button column does not fire every button it passes over.
+   */
   private void selectButton(String label) {
+    selectButton(label, true);
+  }
+
+  /**
+   * dwell false just parks the cursor on the button. That is the way back from
+   * the trailer cards: the trailer button is already the active tab, and
+   * re-activating it would start the lone trailer playing all over again.
+   */
+  private void selectButton(String label, boolean dwell) {
     ButtonItem item = buttonItems.get(label);
     if (item == null || item.view.getVisibility() != View.VISIBLE) return;
-    selectedCard = false;
+    cursor = Cursor.BUTTON;
+    trailersView.clearCardFocus();
     selectedButton = label;
     showList.setCardFocusShown(false);
     repaintButtons();
+    ui.removeCallbacks(buttonDwellActivate);
+    if (dwell) ui.postDelayed(buttonDwellActivate, ShowListView.DWELL_SELECT_MS);
   }
 
-  private void selectCard() {
-    selectedCard = true;
-    selectedButton = null;
+  private final Runnable buttonDwellActivate =
+      () -> {
+        if (cursor == Cursor.BUTTON && selectedButton != null) activateButton(selectedButton);
+      };
+
+  private void selectShow() {
+    cursor = Cursor.SHOW;
+    trailersView.clearCardFocus();
+    ui.removeCallbacks(buttonDwellActivate);
     showList.setCardFocusShown(true);
     repaintButtons();
   }
 
+  /**
+   * Every arrow key, in one place, keyed on where the cursor is. Each state
+   * answers all four directions or deliberately ignores one; nothing falls
+   * through to another state's handling.
+   */
   private void moveSelection(String direction) {
-    if (selectedCard) {
-      if ("up".equals(direction)) {
-        showList.moveFocus(-1);
-      } else if ("down".equals(direction)) {
-        showList.moveFocus(+1);
-      } else if ("right".equals(direction)) {
-        int y = showList.focusedCenterOnScreen();
-        if (y < 0) {
+    boolean up = "up".equals(direction);
+    boolean down = "down".equals(direction);
+    boolean left = "left".equals(direction);
+    boolean right = "right".equals(direction);
+    if (!up && !down && !left && !right) return;
+
+    // A show change rebuilds the trailer cards out from under the cursor, so
+    // the card state is only believed while a card is really focused.
+    if (cursor == Cursor.TRAILER_CARD && !trailersView.hasFocusedCard()) {
+      selectButton(TAB_LABELS[TRAILER_TAB_INDEX], false);
+    }
+
+    switch (cursor) {
+      case SHOW:
+        if (up) showList.moveFocus(-1);
+        else if (down) showList.moveFocus(+1);
+        else if (left) embyClick();
+        else selectButton(selectedButton != null ? selectedButton : TAB_LABELS[0]);
+        return;
+
+      case BUTTON:
+        if (left) {
           showList.focusActive();
-          y = showList.focusedCenterOnScreen();
+          selectShow();
+        } else if (right) {
+          enterTrailerCards();
+        } else {
+          moveButton(up ? -1 : +1);
         }
-        String label = closestButtonToY(y);
-        if (label != null) selectButton(label);
-      }
-      return;
-    }
+        return;
 
-    if ("left".equals(direction)) {
-      ButtonItem item = buttonItems.get(selectedButton);
-      if (item != null && showList.focusClosestToScreenY(item.centerYOnScreen())) selectCard();
-      return;
+      case TRAILER_CARD:
+        // Right is the way in and left the way out; a card grid one column wide
+        // has nothing further right to reach.
+        if (up) trailersView.moveCardFocus(-1);
+        else if (down) trailersView.moveCardFocus(+1);
+        else if (left) selectButton(TAB_LABELS[TRAILER_TAB_INDEX], false);
+        return;
     }
-    if (!"up".equals(direction) && !"down".equals(direction)) return;
+  }
 
+  private void moveButton(int step) {
     List<String> visible = visibleButtonLabels();
     int index = visible.indexOf(selectedButton);
     if (index < 0) return;
-    int next = index + ("up".equals(direction) ? -1 : +1);
+    int next = index + step;
     if (next < 0 || next >= visible.size()) return;
     selectButton(visible.get(next));
+  }
+
+  /**
+   * Right from the trailer button, the only button with anywhere to go right
+   * to. Any other button ignores right, and so does the trailer button when
+   * the show has no trailers to put a cursor on.
+   */
+  private void enterTrailerCards() {
+    if (!TAB_LABELS[TRAILER_TAB_INDEX].equals(selectedButton)) return;
+    ui.removeCallbacks(buttonDwellActivate);
+    // The cards only exist once the pane has been filled, which is what being
+    // shown does; playing is activateButton's job, so this never starts one.
+    if (activeTabIndex != TRAILER_TAB_INDEX) selectTab(TRAILER_TAB_INDEX);
+    if (!trailersView.focusTopCard()) return;
+    cursor = Cursor.TRAILER_CARD;
+    repaintButtons();
   }
 
   private List<String> visibleButtonLabels() {
@@ -488,32 +565,44 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     return labels;
   }
 
-  private String closestButtonToY(int screenY) {
-    String best = null;
-    int bestDistance = Integer.MAX_VALUE;
-    for (String label : visibleButtonLabels()) {
-      ButtonItem item = buttonItems.get(label);
-      int distance = Math.abs(item.centerYOnScreen() - screenY);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        best = label;
-      }
-    }
-    return best;
-  }
-
   private void activateSelectedItem() {
-    if (selectedCard) {
-      showList.activateFocused();
-      return;
+    if (cursor == Cursor.TRAILER_CARD && !trailersView.hasFocusedCard()) {
+      selectButton(TAB_LABELS[TRAILER_TAB_INDEX], false);
     }
-    activateButton(selectedButton);
+    switch (cursor) {
+      case SHOW:
+        embyClick();
+        return;
+      case TRAILER_CARD:
+        trailersView.activateFocusedCard();
+        return;
+      case BUTTON:
+        ui.removeCallbacks(buttonDwellActivate);
+        activateButton(selectedButton, true);
+        return;
+    }
   }
 
   private void activateButton(String label) {
+    activateButton(label, false);
+  }
+
+  /**
+   * fromOk separates a real ok press from the dwell that fires whenever the
+   * cursor rests on a button. It only matters to the trailer button: a show
+   * with one trailer plays it on activation, and the dwell re-activating the
+   * tab the cursor is already sitting on would restart that video every time,
+   * leaving the player up to swallow the arrow keys. So the dwell plays only
+   * when it is what made the tab active -- ok always replays.
+   */
+  private void activateButton(String label, boolean fromOk) {
     for (int i = 0; i < TAB_LABELS.length; i++) {
       if (TAB_LABELS[i].equals(label)) {
+        boolean wasActive = activeTabIndex == i;
         selectTab(i);
+        // A show with one trailer has nothing to choose between, so activating
+        // the button plays it outright; none or several leaves the cards up.
+        if (i == TRAILER_TAB_INDEX && (fromOk || !wasActive)) trailersView.playSoleTrailer();
         return;
       }
     }
@@ -604,8 +693,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     ui.post(
         () -> {
           bumpKeepAwake();
+          // The player has no controls of its own, so any key closes it rather
+          // than being swallowed -- a key that does nothing at all reads as the
+          // app being wedged, which is what the arrows looked like whenever the
+          // player was still up.
           if (player.isPlaying()) {
-            if ("ok".equals(key)) player.close();
+            player.close();
             return;
           }
           if ("ok".equals(key)) activateSelectedItem();
@@ -618,7 +711,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     ui.post(
         () -> {
           bumpKeepAwake();
-          backToEmby();
+          handleBack();
         });
   }
 
@@ -648,7 +741,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
           actorsPane.clearSelection();
           showList.setActorFilter(null);
           showList.setFilter(text);
-          if (selectedCard) showList.focusActive();
+          if (cursor == Cursor.SHOW) showList.focusActive();
         });
   }
 
@@ -657,13 +750,14 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     ui.post(
         () -> {
           showList.selectByName(name);
-          if (selectedCard) showList.focusActive();
+          if (cursor == Cursor.SHOW) showList.focusActive();
         });
   }
 
   @Override
   protected void onDestroy() {
     ui.removeCallbacks(clearKeepAwake);
+    ui.removeCallbacks(buttonDwellActivate);
     sharedFilters.stop();
     super.onDestroy();
   }
@@ -671,12 +765,16 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   @Override
   public boolean onKeyDown(int keyCode, KeyEvent event) {
     if (keyCode == KeyEvent.KEYCODE_BACK) {
-      if (player.isPlaying()) player.close();
-      else if (mapPane.isEpisodeOpen()) mapPane.closeEpisode();
-      else backToEmby();
+      handleBack();
       return true;
     }
     return super.onKeyDown(keyCode, event);
+  }
+
+  private void handleBack() {
+    if (player.isPlaying()) player.close();
+    else if (mapPane.isEpisodeOpen()) mapPane.closeEpisode();
+    else backToEmby();
   }
 
   private class ButtonItem {
@@ -694,12 +792,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       bg.setStroke(
           selected ? (int) dp(BUTTON_SELECTED_BORDER_DP) : 0, BUTTON_SELECTED_BORDER);
       view.setTextColor(active ? BUTTON_ACTIVE_TEXT : BUTTON_INACTIVE_TEXT);
-    }
-
-    int centerYOnScreen() {
-      int[] pos = new int[2];
-      view.getLocationOnScreen(pos);
-      return pos[1] + view.getHeight() / 2;
     }
   }
 }

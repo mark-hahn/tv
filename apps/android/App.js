@@ -23,6 +23,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import allServices from "./services.json";
 import { keyLabels } from "./keyLabels.js";
 
+const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get("window");
+
 // Normalize font sizes so system font scale doesn't affect the app
 const fs = (size) => size / PixelRatio.getFontScale();
 
@@ -2941,15 +2943,20 @@ export default function App() {
               </Text>
             </View>
           )}
-          <Pressable style={tvapprcInputStyles.empty} onPress={closeTvapprcInput} />
-          <View style={tvapprcInputStyles.bottomRow}>
-            <TouchableOpacity
-              onPress={closeTvapprcInput}
-              style={tvapprcInputStyles.actionBtn}
-              activeOpacity={0.7}
-            >
-              <Text style={tvapprcInputStyles.actionText}>Exit</Text>
-            </TouchableOpacity>
+          <View style={tvapprcInputStyles.centerPane}>
+            <Pressable style={tvapprcInputStyles.emptyFill} onPress={closeTvapprcInput} />
+            <View style={tvapprcInputStyles.exitCenter} pointerEvents="box-none">
+              <TouchableOpacity
+                onPress={closeTvapprcInput}
+                style={[
+                  tvapprcInputStyles.actionBtn,
+                  tvapprcInputStyles.exitBtn,
+                ]}
+                activeOpacity={0.7}
+              >
+                <Text style={tvapprcInputStyles.actionText}>Done</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       )}
@@ -3100,8 +3107,29 @@ const tvapprcInputStyles = StyleSheet.create({
     fontSize: fs(22),
     fontWeight: "bold",
   },
-  empty: {
+  centerPane: {
     flex: 1,
+    position: "relative",
+  },
+  emptyFill: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  exitCenter: {
+    position: "absolute",
+    top: WINDOW_HEIGHT * 0.15,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "flex-start",
+    alignItems: "center",
+  },
+  exitBtn: {
+    width: WINDOW_WIDTH * 0.8,
+    paddingVertical: 28,
   },
   countRow: {
     marginTop: 12,
@@ -3110,10 +3138,6 @@ const tvapprcInputStyles = StyleSheet.create({
   countText: {
     color: "#FFFF00",
     fontSize: fs(18),
-  },
-  bottomRow: {
-    flexDirection: "row",
-    justifyContent: "flex-start",
   },
 });
 

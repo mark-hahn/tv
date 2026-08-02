@@ -1,5 +1,10 @@
 # tvapp and tvapprc — Architecture Summary
 
+- the documentation that follows for tvapp and tvapprc is not up-to-date
+  - it is accurate on 2026/8/1
+  - there are probably new ui elements 
+  - dimensions are probably out-of-date
+
 ## Overview
 
 Two cooperating components let the Sony Bravia Android TV show the same media library the web client and phone remote work with, and let the phone remote control that TV-side app without a keyboard or pointer.
@@ -20,6 +25,7 @@ The web client (`apps/client`) is **not involved** in tvapp/tvapprc at runtime. 
 - No hot reload — a full APK build is required after every change
 
 ### Layout (portrait, three columns side by side)
+- these dimensions vary
 ```
 ┌─────────────────┬──────────┬──────────────────────┐
 │   Show cards    │ Buttons  │   Tab pane           │

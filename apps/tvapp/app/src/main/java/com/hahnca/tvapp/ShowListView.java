@@ -56,6 +56,10 @@ class ShowListView extends ScrollView implements Scroller {
     void onShowClicked();
   }
 
+  interface CountsListener {
+    void onCounts(int visibleCount);
+  }
+
   private static final String EMPTY_LABEL = "No Shows.";
 
   private final LinearLayout column;
@@ -65,6 +69,8 @@ class ShowListView extends ScrollView implements Scroller {
   private final Map<Shows.Show, View> cards = new HashMap<>();
   private final Map<String, Shows.Show> byName = new HashMap<>();
   private SelectionListener listener;
+  private CountsListener countsListener;
+  private int lastVisibleCount = -1;
   private Shows.Show active;
   private Shows.Show focused;
   private boolean focusShown;
@@ -98,6 +104,10 @@ class ShowListView extends ScrollView implements Scroller {
 
   void setSelectionListener(SelectionListener listener) {
     this.listener = listener;
+  }
+
+  void setCountsListener(CountsListener listener) {
+    this.countsListener = listener;
   }
 
   /**
@@ -308,6 +318,7 @@ class ShowListView extends ScrollView implements Scroller {
       column.addView(emptyView, params);
       if (active != null) clearActive();
       focused = null;
+      dispatchCounts();
       return;
     }
     for (Shows.Show show : visible) {
@@ -330,6 +341,13 @@ class ShowListView extends ScrollView implements Scroller {
     final View card = cards.get(active);
     final boolean atTop = visible.get(0) == active;
     post(() -> scrollTo(0, atTop ? 0 : card.getTop()));
+    dispatchCounts();
+  }
+
+  private void dispatchCounts() {
+    if (visible.size() == lastVisibleCount) return;
+    lastVisibleCount = visible.size();
+    if (countsListener != null) countsListener.onCounts(lastVisibleCount);
   }
 
   private boolean matchesActiveFilters(Shows.Show show) {

@@ -50,6 +50,7 @@ const LOCAL_NETWORK_PERMISSION = "android.permission.ACCESS_LOCAL_NETWORK";
 const MSG_TVAPP_UP = "u";
 const MSG_TVAPP_DOWN = "d";
 const MSG_CLEAR_FILTER = "z";
+const MSG_COUNTS = "c";
 const CMD_OPEN_TVAPP = "o";
 const CMD_CLOSE_TO_EMBY = "b";
 const CMD_EMBY_SELECTED = "e";
@@ -163,6 +164,7 @@ export default function App() {
   const [tvapprcFilter, setTvapprcFilter] = useState("");
   const [tvapprcShows, setTvapprcShows] = useState([]);
   const [tvapprcTotalCount, setTvapprcTotalCount] = useState(0);
+  const [tvapprcListCount, setTvapprcListCount] = useState(null);
   const tvapprcShowsLoadedRef = useRef(false);
   const [flashSvc, setFlashSvc] = useState(null);
   const [showSubCtrl, setShowSubCtrl] = useState(false);
@@ -521,8 +523,12 @@ export default function App() {
           setTvapprcMode(false);
           closeTvapprcInput();
           clearTvapprcFilter();
+          setTvapprcListCount(null);
         } else if (e.data === MSG_CLEAR_FILTER) {
           clearTvapprcFilter();
+        } else if (typeof e.data === "string" && e.data.startsWith(`${MSG_COUNTS},`)) {
+          const n = parseInt(e.data.slice(MSG_COUNTS.length + 1), 10);
+          if (!Number.isNaN(n)) setTvapprcListCount(n);
         }
       };
       openTimer = setTimeout(() => {
@@ -2909,54 +2915,56 @@ export default function App() {
       </View>
       {tvapprcMode && showTvapprcInput && (
         <View style={tvapprcInputStyles.overlay}>
-          <View style={tvapprcInputStyles.topRow}>
-            <TextInput
-              style={tvapprcInputStyles.input}
-              value={tvapprcFilter}
-              onChangeText={updateTvapprcFilter}
-              autoFocus
-              autoCorrect={false}
-              autoCapitalize="none"
-              returnKeyType="done"
-              onSubmitEditing={closeTvapprcInput}
-            />
+          <Pressable style={tvapprcInputStyles.emptyFill} onPress={closeTvapprcInput} />
+          <View style={tvapprcInputStyles.doneBtnContainer} pointerEvents="box-none">
             <TouchableOpacity
-              onPress={() => updateTvapprcFilter("")}
-              style={tvapprcInputStyles.actionBtn}
+              onPress={closeTvapprcInput}
+              style={[
+                tvapprcInputStyles.actionBtn,
+                tvapprcInputStyles.doneBtn,
+              ]}
               activeOpacity={0.7}
             >
-              <Text style={tvapprcInputStyles.actionText}>Clear</Text>
+              <Text style={tvapprcInputStyles.actionText}>Done</Text>
             </TouchableOpacity>
           </View>
-          {tvapprcTotalCount > 0 && (
-            <View style={tvapprcInputStyles.countRow}>
-              <Text style={tvapprcInputStyles.countText}>
-                {(() => {
-                  const query = tvapprcFilter.trim().toLowerCase();
-                  const listCount = query
-                    ? tvapprcShows.filter((s) =>
-                        s.name.toLowerCase().includes(query),
-                      ).length
-                    : tvapprcShows.length;
-                  return `There are ${listCount} shows in list of ${tvapprcTotalCount} total.`;
-                })()}
-              </Text>
-            </View>
-          )}
-          <View style={tvapprcInputStyles.centerPane}>
-            <Pressable style={tvapprcInputStyles.emptyFill} onPress={closeTvapprcInput} />
-            <View style={tvapprcInputStyles.exitCenter} pointerEvents="box-none">
+          <View style={tvapprcInputStyles.inputGroup} pointerEvents="box-none">
+            <View style={tvapprcInputStyles.topRow}>
+              <TextInput
+                style={tvapprcInputStyles.input}
+                value={tvapprcFilter}
+                onChangeText={updateTvapprcFilter}
+                autoFocus
+                autoCorrect={false}
+                autoCapitalize="none"
+                returnKeyType="done"
+                onSubmitEditing={closeTvapprcInput}
+              />
               <TouchableOpacity
-                onPress={closeTvapprcInput}
-                style={[
-                  tvapprcInputStyles.actionBtn,
-                  tvapprcInputStyles.exitBtn,
-                ]}
+                onPress={() => updateTvapprcFilter("")}
+                style={tvapprcInputStyles.actionBtn}
                 activeOpacity={0.7}
               >
-                <Text style={tvapprcInputStyles.actionText}>Done</Text>
+                <Text style={tvapprcInputStyles.actionText}>Clear</Text>
               </TouchableOpacity>
             </View>
+            {tvapprcTotalCount > 0 && (
+              <View style={tvapprcInputStyles.countRow}>
+                <Text style={tvapprcInputStyles.countText}>
+                {(() => {
+                  const query = tvapprcFilter.trim().toLowerCase();
+                  const listCount =
+                    tvapprcListCount ??
+                    (query
+                      ? tvapprcShows.filter((s) =>
+                          s.name.toLowerCase().includes(query),
+                        ).length
+                      : tvapprcShows.length);
+                  return `There are ${listCount} shows in list of ${tvapprcTotalCount} total.`;
+                })()}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       )}
@@ -3076,7 +3084,7 @@ const tvapprcInputStyles = StyleSheet.create({
     bottom: 0,
     zIndex: 30,
     backgroundColor: "#000",
-    paddingTop: SCREEN_MARGIN * 2,
+    paddingTop: SCREEN_MARGIN,
     paddingBottom: SCREEN_MARGIN,
     paddingHorizontal: SCREEN_MARGIN,
   },
@@ -3107,10 +3115,6 @@ const tvapprcInputStyles = StyleSheet.create({
     fontSize: fs(22),
     fontWeight: "bold",
   },
-  centerPane: {
-    flex: 1,
-    position: "relative",
-  },
   emptyFill: {
     position: "absolute",
     top: 0,
@@ -3118,18 +3122,24 @@ const tvapprcInputStyles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
-  exitCenter: {
+  doneBtnContainer: {
     position: "absolute",
-    top: WINDOW_HEIGHT * 0.15,
+    top: WINDOW_HEIGHT * 0.30,
     left: 0,
     right: 0,
-    bottom: 0,
     justifyContent: "flex-start",
     alignItems: "center",
   },
-  exitBtn: {
+  doneBtn: {
     width: WINDOW_WIDTH * 0.8,
     paddingVertical: 28,
+  },
+  inputGroup: {
+    position: "absolute",
+    top: WINDOW_HEIGHT * 0.45,
+    left: 0,
+    right: 0,
+    paddingHorizontal: SCREEN_MARGIN,
   },
   countRow: {
     marginTop: 12,

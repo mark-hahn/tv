@@ -114,6 +114,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     sort = Shows.Sort.of(prefs().getString(KEY_SORT, null));
     showList.setSort(sort);
     String remembered = prefs().getString(KEY_SELECTED_SHOW, null);
+
+    ctrlServer = new CtrlServer(this);
+    ctrlServer.start();
+    showList.setCountsListener(
+        count -> ctrlServer.send(CtrlServer.MSG_COUNTS + "," + count));
+
     Shows.load(
         shows ->
             ui.post(
@@ -121,9 +127,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
                   showList.setShows(shows, remembered);
                   if (selectedCard) showList.focusActive();
                 }));
-
-    ctrlServer = new CtrlServer(this);
-    ctrlServer.start();
 
     sharedFilters =
         new SharedFilters(

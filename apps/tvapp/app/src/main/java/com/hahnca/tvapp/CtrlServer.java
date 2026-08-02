@@ -22,12 +22,14 @@ import org.java_websocket.server.WebSocketServer;
  * Back to Android:
  *
  *   z              a show was activated here: clear Android's filter box too
+ *   c,<count>      the number of shows currently visible in the list
  */
 class CtrlServer extends WebSocketServer {
 
   static final int CTRL_PORT = 8099;
 
   static final String MSG_CLEAR_FILTER = "z";
+  static final String MSG_COUNTS = "c";
 
   private static final String TAG = "tvapp";
   private static final String CMD_KEY = "k";

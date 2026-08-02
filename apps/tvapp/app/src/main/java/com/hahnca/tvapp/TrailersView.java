@@ -37,6 +37,10 @@ class TrailersView extends ScrollPane {
   // a tab click that lands here can jump straight to playing it rather than
   // showing a one-card grid there's no point choosing from.
   private String soleTrailerUrl;
+  // The show the cards belong to, and a play the imdb answer is holding up:
+  // until it lands a show with one tvdb trailer may still turn out to have two.
+  private Shows.Show filledShow;
+  private boolean playWhenChecked;
   // Parallel to cardViews -- a card is never "active", only cursor-selected
   // (a red border), so playing one is always this list plus a focused index,
   // never a click-remembered show/card pairing the way ShowListView keeps one.
@@ -59,15 +63,42 @@ class TrailersView extends ScrollPane {
    * moves the cursor onto the cards shows this pane too and must not play.
    */
   void playSoleTrailer() {
+    if (filledShow != null && !filledShow.imdbChecked) {
+      playWhenChecked = true; // the answer decides whether the trailer is alone
+      return;
+    }
     if (soleTrailerUrl != null && playListener != null) {
       playListener.onPlayTrailer(soleTrailerUrl);
     }
   }
 
+  /** The imdb answer has landed: the cards, and any play it was holding up. */
+  void onImdbChecked(Shows.Show show, boolean changed) {
+    boolean play = playWhenChecked;
+    playWhenChecked = false;
+    if (!isCurrent(show)) return; // a later fill picks the new list up
+    if (changed) {
+      column.removeAllViews();
+      fill(show);
+    } else {
+      setSole(show);
+    }
+    if (play) playSoleTrailer();
+  }
+
+  /** Only once the imdb video has been asked about is one trailer the only one. */
+  private void setSole(Shows.Show show) {
+    List<Shows.Trailer> trailers = show.trailers;
+    soleTrailerUrl =
+        show.imdbChecked && trailers.size() == 1 ? trailers.get(0).url : null;
+  }
+
   @Override
   protected void fill(Shows.Show show) {
     List<Shows.Trailer> trailers = show.trailers;
-    soleTrailerUrl = trailers.size() == 1 ? trailers.get(0).url : null;
+    filledShow = show;
+    playWhenChecked = false;
+    setSole(show);
     trailerList.clear();
     trailerList.addAll(trailers);
     cardViews.clear();
@@ -92,6 +123,9 @@ class TrailersView extends ScrollPane {
 
   /** Cursor leaves the grid -- back to the trailer button, or a show/tab change. */
   void clearCardFocus() {
+    // The cursor has moved off the trailer button as well, so a play the imdb
+    // answer is still holding up is one nobody is waiting for any more.
+    playWhenChecked = false;
     setFocusedIndex(-1);
   }
 
@@ -160,7 +194,11 @@ class TrailersView extends ScrollPane {
         new LinearLayout.LayoutParams(
             (int) dp(STILL_WIDTH_DP), (int) dp(STILL_WIDTH_DP * STILL_ASPECT));
     card.addView(still, stillParams);
-    Images.into(still, Trailers.thumbnail(trailer.url), show);
+    // YouTube publishes a still; the imdb video does not, so its own first
+    // frame stands in -- what the web client's video element shows there.
+    String thumbnail = Trailers.thumbnail(trailer.url);
+    if (thumbnail.isEmpty()) Images.frameInto(still, trailer.url, show);
+    else Images.into(still, thumbnail, show);
 
     card.setOnClickListener(
         v -> {

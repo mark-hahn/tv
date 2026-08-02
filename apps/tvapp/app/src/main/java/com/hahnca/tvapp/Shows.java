@@ -48,6 +48,12 @@ class Shows {
       name = label.isEmpty() ? "Trailer" : label;
       url = str(rec, "url");
     }
+
+    /** The imdb video, which is made here rather than read from the record. */
+    Trailer(String name, String url) {
+      this.name = name;
+      this.url = url;
+    }
   }
 
   /** The fields the list and the panes show, and nothing else. */
@@ -79,7 +85,13 @@ class Shows {
     final boolean inLinda;
     final boolean inEmby;
     final List<Actor> characters;
+    // Grows by one when ImdbTrailer finds the show a video, which is why it is
+    // the one list here that is not left as the record wrote it.
     final List<Trailer> trailers;
+    // What getRemotes wants to be told about the show, and whether it has been
+    // asked yet -- see ImdbTrailer.
+    final JSONArray remoteIds;
+    boolean imdbChecked;
 
     Show(String name, JSONObject rec) {
       this.name = name;
@@ -118,6 +130,7 @@ class Shows {
         JSONObject node = trailerNodes.optJSONObject(i);
         if (node != null) trailers.add(new Trailer(node));
       }
+      remoteIds = rec.optJSONArray("remote_ids");
     }
 
     boolean isComedy() {

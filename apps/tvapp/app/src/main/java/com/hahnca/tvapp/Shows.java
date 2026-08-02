@@ -85,13 +85,13 @@ class Shows {
     final boolean inLinda;
     final boolean inEmby;
     final List<Actor> characters;
-    // Grows by one when ImdbTrailer finds the show a video, which is why it is
-    // the one list here that is not left as the record wrote it.
+    // The one list here that is not left as the record wrote it: TrailerList
+    // adds the imdb video to it and takes the unplayable ones back out.
     final List<Trailer> trailers;
-    // What getRemotes wants to be told about the show, and whether it has been
-    // asked yet -- see ImdbTrailer.
+    // What getRemotes wants to be told about the show, and whether the list
+    // above has been through TrailerList yet.
     final JSONArray remoteIds;
-    boolean imdbChecked;
+    boolean trailersReady;
 
     Show(String name, JSONObject rec) {
       this.name = name;

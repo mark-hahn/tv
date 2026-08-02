@@ -49,7 +49,7 @@
       ></div>
       <!-- content wrapper to allow refresh-->
       <div
-        v-if="(!trailers || trailers.length === 0) && !loadingImdb"
+        v-if="shownTrailers.length === 0 && !loadingImdb"
         style="padding: 20px; text-align: center; color: #666"
       >
         No trailers found.
@@ -59,7 +59,7 @@
         style="display: flex; flex-direction: column; gap: 20px"
       >
         <div
-          v-for="(t, idx) in trailers"
+          v-for="(t, idx) in shownTrailers"
           :key="t.id || t.url"
           style="
             background: white;
@@ -98,16 +98,6 @@
               >
                 TV
               </button>
-            </div>
-          </template>
-          <template v-else-if="isHlsFile(t.url)">
-            <div style="margin-top: 8px; color: #666">
-              Video cannot be played
-            </div>
-          </template>
-          <template v-else-if="isFailedVideo(t.url)">
-            <div style="margin-top: 8px; color: #666">
-              Video cannot be played
             </div>
           </template>
           <template v-else-if="isVideoFile(t.url)">
@@ -208,6 +198,19 @@ export default {
   },
   openExternalTrailerUrl(url) {
     util.openExternalPage(url);
+  },
+  computed: {
+    /**
+     * The trailers that get a card. One that cannot be played is not shown at
+     * all and does not count: an HLS file, which no browser here plays, or one
+     * whose video element has already failed to load — imdb hands out signed
+     * urls its own CDN then answers 403 for.
+     */
+    shownTrailers() {
+      return (this.trailers || []).filter(
+        (t) => !this.isHlsFile(t?.url) && !this.isFailedVideo(t?.url),
+      );
+    },
   },
   watch: {
     active(val) {
@@ -346,7 +349,7 @@ export default {
     initPlayers() {
       if (!window.YT || !window.YT.Player) return; // Wait for API
 
-      this.trailers.forEach((t, idx) => {
+      this.shownTrailers.forEach((t, idx) => {
         const ytid = this.getYoutubeId(t.url);
         if (ytid) {
           const divId = "yt-player-" + idx;

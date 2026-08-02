@@ -1,5 +1,6 @@
 package com.hahnca.tvapp;
 
+import android.util.Log;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -14,6 +15,7 @@ import java.nio.charset.StandardCharsets;
  */
 class Http {
 
+  private static final String TAG = "tvapp";
   private static final int CONNECT_TIMEOUT_MS = 10000;
   private static final int READ_TIMEOUT_MS = 30000;
   private static final int READ_BUF_BYTES = 32768;
@@ -31,6 +33,26 @@ class Http {
       out.write(body.getBytes(StandardCharsets.UTF_8));
     }
     return read(conn);
+  }
+
+  /**
+   * Whether the url hands out anything when asked -- one byte of it is enough
+   * to tell. Imdb's video urls are signed, and its cdn answers 403 for the ones
+   * whose signature it no longer likes; nothing but asking says which.
+   */
+  static boolean loads(String url) {
+    HttpURLConnection conn = null;
+    try {
+      conn = open(url);
+      conn.setRequestProperty("Range", "bytes=0-0");
+      int code = conn.getResponseCode();
+      return code == HttpURLConnection.HTTP_OK || code == HttpURLConnection.HTTP_PARTIAL;
+    } catch (Exception e) {
+      Log.e(TAG, "video url probe failed: " + e);
+      return false;
+    } finally {
+      if (conn != null) conn.disconnect();
+    }
   }
 
   private static HttpURLConnection open(String url) throws Exception {

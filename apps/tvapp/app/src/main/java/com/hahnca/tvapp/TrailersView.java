@@ -37,10 +37,11 @@ class TrailersView extends ScrollPane {
   // a tab click that lands here can jump straight to playing it rather than
   // showing a one-card grid there's no point choosing from.
   private String soleTrailerUrl;
-  // The show the cards belong to, and a play the imdb answer is holding up:
-  // until it lands a show with one tvdb trailer may still turn out to have two.
+  // The show the cards belong to, and a play the settling is holding up: until
+  // it lands, a show with one trailer in the record may still turn out to have
+  // two, or none of them playable.
   private Shows.Show filledShow;
-  private boolean playWhenChecked;
+  private boolean playWhenReady;
   // Parallel to cardViews -- a card is never "active", only cursor-selected
   // (a red border), so playing one is always this list plus a focused index,
   // never a click-remembered show/card pairing the way ShowListView keeps one.
@@ -63,8 +64,8 @@ class TrailersView extends ScrollPane {
    * moves the cursor onto the cards shows this pane too and must not play.
    */
   void playSoleTrailer() {
-    if (filledShow != null && !filledShow.imdbChecked) {
-      playWhenChecked = true; // the answer decides whether the trailer is alone
+    if (filledShow != null && !filledShow.trailersReady) {
+      playWhenReady = true; // the settled list decides whether the trailer is alone
       return;
     }
     if (soleTrailerUrl != null && playListener != null) {
@@ -72,37 +73,33 @@ class TrailersView extends ScrollPane {
     }
   }
 
-  /** The imdb answer has landed: the cards, and any play it was holding up. */
-  void onImdbChecked(Shows.Show show, boolean changed) {
-    boolean play = playWhenChecked;
-    playWhenChecked = false;
-    if (!isCurrent(show)) return; // a later fill picks the new list up
-    if (changed) {
-      column.removeAllViews();
-      fill(show);
-    } else {
-      setSole(show);
-    }
+  /** The list has settled: the cards, and any play it was holding up. */
+  void onTrailersReady(Shows.Show show) {
+    boolean play = playWhenReady;
+    playWhenReady = false;
+    if (!isCurrent(show)) return; // a later fill picks the settled list up
+    column.removeAllViews();
+    fill(show);
     if (play) playSoleTrailer();
-  }
-
-  /** Only once the imdb video has been asked about is one trailer the only one. */
-  private void setSole(Shows.Show show) {
-    List<Shows.Trailer> trailers = show.trailers;
-    soleTrailerUrl =
-        show.imdbChecked && trailers.size() == 1 ? trailers.get(0).url : null;
   }
 
   @Override
   protected void fill(Shows.Show show) {
     List<Shows.Trailer> trailers = show.trailers;
     filledShow = show;
-    playWhenChecked = false;
-    setSole(show);
+    playWhenReady = false;
     trailerList.clear();
-    trailerList.addAll(trailers);
     cardViews.clear();
     focusedIndex = -1;
+    soleTrailerUrl = null;
+    // Nothing until the list has settled -- what the record came with can hold
+    // a video that will not play, and a card for it is a card too many.
+    if (!show.trailersReady) {
+      addMessage("Loading…");
+      return;
+    }
+    soleTrailerUrl = trailers.size() == 1 ? trailers.get(0).url : null;
+    trailerList.addAll(trailers);
     if (trailers.isEmpty()) {
       addMessage("No trailers found.");
       return;
@@ -123,9 +120,9 @@ class TrailersView extends ScrollPane {
 
   /** Cursor leaves the grid -- back to the trailer button, or a show/tab change. */
   void clearCardFocus() {
-    // The cursor has moved off the trailer button as well, so a play the imdb
-    // answer is still holding up is one nobody is waiting for any more.
-    playWhenChecked = false;
+    // The cursor has moved off the trailer button as well, so a play the
+    // settling is still holding up is one nobody is waiting for any more.
+    playWhenReady = false;
     setFocusedIndex(-1);
   }
 

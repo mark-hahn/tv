@@ -97,9 +97,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private Cursor cursor = Cursor.SHOW;
   private String selectedButton;
   private long showsLoadedAt;
-  // A trailer-button dwell that fired before the show's imdb video had been
-  // answered for, and so does not know yet whether there are cards to go to.
-  private boolean enterCardsWhenChecked;
+  // A trailer-button dwell that fired before the show's trailer list had
+  // settled, and so does not know yet whether there are cards to go to.
+  private boolean enterCardsWhenReady;
 
   /**
    * The one place the cursor is. It used to be two booleans that had to be kept
@@ -423,14 +423,14 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private void onShowSelected(Shows.Show show) {
     for (Pane pane : panes) pane.setShow(show);
     mapPane.closeEpisode();
-    // Asked for as soon as the show is picked, so the trailer pane is usually
+    // Started as soon as the show is picked, so the trailer pane is usually
     // done waiting by the time the cursor has walked over to its button.
-    ImdbTrailer.ensure(
+    TrailerList.settle(
         show,
-        changed -> {
-          trailersView.onImdbChecked(show, changed);
-          if (!enterCardsWhenChecked) return;
-          enterCardsWhenChecked = false;
+        () -> {
+          trailersView.onTrailersReady(show);
+          if (!enterCardsWhenReady) return;
+          enterCardsWhenReady = false;
           enterTrailerCardsFromDwell();
         });
     prefs().edit().putString(KEY_SELECTED_SHOW, show.name).apply();
@@ -477,7 +477,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     if (item == null || item.view.getVisibility() != View.VISIBLE) return;
     cursor = Cursor.BUTTON;
     trailersView.clearCardFocus();
-    enterCardsWhenChecked = false;
+    enterCardsWhenReady = false;
     selectedButton = label;
     showList.setCardFocusShown(false);
     repaintButtons();
@@ -497,15 +497,14 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   /**
    * Onto the cards, once there is more than one to choose between -- one
-   * trailer has already been played by the activation above. A show whose imdb
-   * video has not been answered for yet may be either, so the answer is what
-   * this waits for.
+   * trailer has already been played by the activation above. A show whose list
+   * has not settled yet may be either, so that is what this waits for.
    */
   private void enterTrailerCardsFromDwell() {
     Shows.Show show = showList.getSelected();
     if (show == null) return;
-    if (!show.imdbChecked) {
-      enterCardsWhenChecked = true;
+    if (!show.trailersReady) {
+      enterCardsWhenReady = true;
       return;
     }
     if (show.trailers.size() > 1) enterTrailerCards();
@@ -514,7 +513,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private void selectShow() {
     cursor = Cursor.SHOW;
     trailersView.clearCardFocus();
-    enterCardsWhenChecked = false;
+    enterCardsWhenReady = false;
     ui.removeCallbacks(buttonDwellActivate);
     showList.setCardFocusShown(true);
     repaintButtons();

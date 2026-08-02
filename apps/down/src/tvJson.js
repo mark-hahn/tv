@@ -44,6 +44,7 @@ const PENDING_TVDB_FIELDS_PATH = path.join(
   "pending-tvdb-fields.json",
 );
 const PENDING_TVDB_FIELDS_RETRY_MS = 60 * 1000;
+const TV_RESYNC_INTERVAL_MS = 60 * 60 * 1000;
 
 const TV_DB_BACKUP_PATH = path.join(DATA_DIR, "tv.sqlite.backup");
 
@@ -1388,6 +1389,11 @@ loadOnStart();
 try {
   tvResync();
 } catch {}
+setInterval(() => {
+  try {
+    tvResync();
+  } catch {}
+}, TV_RESYNC_INTERVAL_MS);
 try {
   startBackupScheduler();
 } catch {}

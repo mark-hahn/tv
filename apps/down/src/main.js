@@ -1416,7 +1416,7 @@ async function main() {
   // delete old files in usb/files
   delOldFiles = () => {
     var PRUNE_DAYS, PRUNE_INTERVAL_MS;
-    PRUNE_INTERVAL_MS = 60 * 60 * 1000;
+    PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
     if (Date.now() - lastPruneAt >= PRUNE_INTERVAL_MS) {
       // Inline prune.sh behavior: delete files older than 60 days on the USB host.
       // Run async so it doesn't block the cycle — proceed to checkFiles immediately.

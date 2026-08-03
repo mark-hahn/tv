@@ -266,6 +266,13 @@ class ShowListView extends ScrollView implements Scroller {
     if (focused != null) paint(cards.get(focused));
   }
 
+  /** Left arrow from the list: jump the cursor straight to the top show. */
+  void focusTop() {
+    if (visible.isEmpty()) return;
+    focus(visible.get(0), true, true);
+    scrollToFocused();
+  }
+
   /** Cursor moves to the selected show -- the left-arrow, button-to-list transition. */
   void focusActive() {
     Shows.Show target = active != null ? active : (visible.isEmpty() ? null : visible.get(0));

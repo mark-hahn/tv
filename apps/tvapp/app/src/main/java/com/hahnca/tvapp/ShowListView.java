@@ -98,6 +98,7 @@ class ShowListView extends ScrollView implements Scroller {
   // Normalized actor name to require in the cast, or null — the Actors pane's
   // own way of narrowing this list, mutually exclusive with the other two.
   private String actorFilter;
+  private final EdgeFade edgeFade = EdgeFade.vertical(this);
 
   ShowListView(Context context) {
     super(context);
@@ -291,6 +292,24 @@ class ShowListView extends ScrollView implements Scroller {
     scrollBy(0, px);
   }
 
+  @Override
+  protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+    super.onSizeChanged(w, h, oldw, oldh);
+    edgeFade.resize(h);
+  }
+
+  @Override
+  protected void onScrollChanged(int l, int t, int oldl, int oldt) {
+    super.onScrollChanged(l, t, oldl, oldt);
+    invalidate();
+  }
+
+  @Override
+  protected void dispatchDraw(Canvas canvas) {
+    super.dispatchDraw(canvas);
+    edgeFade.draw(canvas);
+  }
+
   /** What a tap on Up or Down does, as against holding it. */
   void scrollToTop() {
     scrollTo(0, 0);
@@ -449,7 +468,9 @@ class ShowListView extends ScrollView implements Scroller {
   /**
    * Scrolls only as far as needed to bring the cursor card into view -- not
    * on every move, only when it has gone above the top or below the bottom
-   * of what is currently showing.
+   * of what is currently showing. The edge fade is counted as out of view, or
+   * stepping the cursor to the edge would leave it sitting under the fade
+   * with its own text dimmed.
    */
   private void scrollToFocused() {
     if (focused == null) return;
@@ -466,12 +487,13 @@ class ShowListView extends ScrollView implements Scroller {
             scrollTo(0, Math.max(0, column.getHeight() - getHeight()));
             return;
           }
+          int fade = (int) edgeFade.size();
           int viewTop = getScrollY();
           int viewBottom = viewTop + getHeight();
           int cardTop = card.getTop();
           int cardBottom = cardTop + card.getHeight();
-          if (cardTop < viewTop) scrollTo(0, cardTop);
-          else if (cardBottom > viewBottom) scrollTo(0, cardBottom - getHeight());
+          if (cardTop - fade < viewTop) scrollTo(0, cardTop - fade);
+          else if (cardBottom + fade > viewBottom) scrollTo(0, cardBottom + fade - getHeight());
         });
   }
 

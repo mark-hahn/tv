@@ -948,7 +948,17 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       return;
     }
     if ("ok".equals(key)) activateSelectedItem();
+    else if ("list".equals(key)) focusShowList();
     else moveSelection(key);
+  }
+
+  /**
+   * Jumps the cursor straight to the show list from wherever it is -- same as
+   * pressing left from the button column, but reachable from a pane too.
+   */
+  private void focusShowList() {
+    showList.focusActive();
+    selectShow();
   }
 
   @Override

@@ -58,6 +58,7 @@ class ActorsView extends ScrollPane {
 
   ActorsView(Context context) {
     super(context);
+    enableEdgeFade();
   }
 
   void setListener(Listener listener) {

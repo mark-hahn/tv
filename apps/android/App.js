@@ -55,6 +55,8 @@ const CMD_OPEN_TVAPP = "o";
 const CMD_CLOSE_TO_EMBY = "b";
 const CMD_EMBY_SELECTED = "e";
 const CMD_KEY = "k";
+// Not an arrow: jumps tvapp's cursor straight onto the show list.
+const CMD_KEY_LIST = "list";
 const CMD_FILTER = "f";
 const SCRUB_HOLD_DELAY_MS = 400;
 const SCRUB_PING_INTERVAL_MS = 500;
@@ -1234,10 +1236,21 @@ export default function App() {
     } catch (_) {}
   };
 
-  const startHomeHold = () =>
+  const startHomeHold = () => {
+    if (tvapprcMode) {
+      dbStart(() => {
+        flash("home");
+        sendTvapprc(`${CMD_KEY},${CMD_KEY_LIST}`);
+      });
+      return;
+    }
     lpStart(() => tvKey("home"), toggleLayoutOption, 2000);
+  };
 
-  const stopHomeHold = () => lpStop();
+  const stopHomeHold = () => {
+    dbStop();
+    lpStop();
+  };
 
   const startOkHold = () => {
     stopRepeat();

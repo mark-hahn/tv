@@ -1,6 +1,7 @@
 package com.hahnca.tvapp;
 
 import android.content.Context;
+import android.graphics.Canvas;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.TypedValue;
@@ -31,6 +32,8 @@ abstract class ScrollPane extends ScrollView implements Pane {
 
   private Shows.Show show;
   private Shows.Show filled;
+  /** Null until a subclass asks for the edge fade; not every pane wants one. */
+  private EdgeFade edgeFade;
 
   ScrollPane(Context context) {
     this(context, false);
@@ -66,6 +69,29 @@ abstract class ScrollPane extends ScrollView implements Pane {
     // On the column, not on the ScrollView: a ScrollView eats the touch itself
     // and never gets as far as performClick.
     column.setOnClickListener(v -> scrollToStart());
+  }
+
+  /** Turns on the top/bottom "more this way" fade; call from the constructor. */
+  protected void enableEdgeFade() {
+    edgeFade = EdgeFade.vertical(this);
+  }
+
+  @Override
+  protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+    super.onSizeChanged(w, h, oldw, oldh);
+    if (edgeFade != null) edgeFade.resize(h);
+  }
+
+  @Override
+  protected void onScrollChanged(int l, int t, int oldl, int oldt) {
+    super.onScrollChanged(l, t, oldl, oldt);
+    if (edgeFade != null) invalidate();
+  }
+
+  @Override
+  protected void dispatchDraw(Canvas canvas) {
+    super.dispatchDraw(canvas);
+    if (edgeFade != null) edgeFade.draw(canvas);
   }
 
   @Override
@@ -122,8 +148,13 @@ abstract class ScrollPane extends ScrollView implements Pane {
             view = parent instanceof View ? (View) parent : null;
           }
           int bottom = top + child.getHeight();
-          if (top < getScrollY()) scrollTo(0, top);
-          else if (bottom > getScrollY() + getHeight()) scrollTo(0, bottom - getHeight());
+          // The edge fade counts as out of view, or the cursor could stop under
+          // it and have its own card dimmed.
+          int fade = edgeFade == null ? 0 : (int) edgeFade.size();
+          if (top - fade < getScrollY()) scrollTo(0, top - fade);
+          else if (bottom + fade > getScrollY() + getHeight()) {
+            scrollTo(0, bottom + fade - getHeight());
+          }
           if (across == null) return;
           int right = left + child.getWidth();
           if (left < across.getScrollX()) across.scrollTo(left, 0);

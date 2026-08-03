@@ -12,7 +12,7 @@ import org.java_websocket.server.WebSocketServer;
  *
  * From the remote:
  *
- *   k,&lt;key&gt;     one of up/down/left/right/ok
+ *   k,&lt;key&gt;     one of up/down/left/right/ok/list
  *   b              switch from tvapp to Emby
  *   e              load the active show into Emby
  *   x              close tvapp

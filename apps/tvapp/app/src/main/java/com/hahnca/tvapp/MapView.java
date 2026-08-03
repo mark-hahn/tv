@@ -1,6 +1,7 @@
 package com.hahnca.tvapp;
 
 import android.content.Context;
+import android.graphics.Canvas;
 import android.graphics.Color;
 import android.os.Handler;
 import android.os.Looper;
@@ -56,6 +57,12 @@ class MapView extends LinearLayout implements Pane {
   private static final int CELL_TEXT_COLOR = 0xFF000000;
   private static final int GRID_LINE = 0xFF000000;
   private static final float GRID_LINE_DP = 1f;
+  // Shallower than the show list's, so the tighter grid rows lose less of
+  // themselves to the fade.
+  private static final float MAP_FADE_V_DP = EdgeFade.HEIGHT_DP * 0.5f;
+  // Narrower again sideways: a season column is much narrower than a row is
+  // tall, so the same depth would swallow more of the grid going across.
+  private static final float MAP_FADE_H_DP = MAP_FADE_V_DP * 0.8f;
 
   /** An episode cell was clicked: opens the episode subpane in MainActivity. */
   interface EpisodeClickListener {
@@ -165,7 +172,7 @@ class MapView extends LinearLayout implements Pane {
 
     gridColumn = new LinearLayout(context);
     gridColumn.setOrientation(VERTICAL);
-    gridAcross = new HorizontalScrollView(context);
+    gridAcross = new GridHorizontalScrollView(context);
     gridAcross.setHorizontalScrollBarEnabled(false);
     gridAcross.addView(
         gridColumn,
@@ -202,8 +209,14 @@ class MapView extends LinearLayout implements Pane {
     gridColumn.setOnClickListener(v -> scrollToStart());
   }
 
-  /** The grid's scroll is the one the user drives; the headers follow it. */
+  /**
+   * The grid's scroll is the one the user drives; the headers follow it. The
+   * edge fade is drawn here only, so it covers the table without touching the
+   * episode numbers scrolling alongside it.
+   */
   private class GridScrollView extends ScrollView {
+    private final EdgeFade edgeFade = EdgeFade.vertical(this, MAP_FADE_V_DP);
+
     GridScrollView(Context context) {
       super(context);
     }
@@ -212,10 +225,27 @@ class MapView extends LinearLayout implements Pane {
     protected void onScrollChanged(int l, int t, int oldl, int oldt) {
       super.onScrollChanged(l, t, oldl, oldt);
       episodeDown.scrollTo(0, t);
+      invalidate();
+    }
+
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+      super.onSizeChanged(w, h, oldw, oldh);
+      edgeFade.resize(h);
+    }
+
+    @Override
+    protected void dispatchDraw(Canvas canvas) {
+      super.dispatchDraw(canvas);
+      edgeFade.draw(canvas);
     }
   }
 
-  /** A header scroll view: driven only by the grid, never by touch. */
+  /**
+   * A header scroll view: driven only by the grid, never by touch. Carries no
+   * edge fade -- the episode and season numbers are how you read the grid, so
+   * they stay legible while the table they label is what fades away.
+   */
   private class SlaveScrollView extends ScrollView {
     SlaveScrollView(Context context) {
       super(context);
@@ -247,6 +277,36 @@ class MapView extends LinearLayout implements Pane {
     @Override
     public boolean onInterceptTouchEvent(MotionEvent event) {
       return false;
+    }
+  }
+
+  /**
+   * The grid's sideways scroll: the one the user drives, fading at both its
+   * left and right edges where seasons run off past the table.
+   */
+  private class GridHorizontalScrollView extends HorizontalScrollView {
+    private final EdgeFade edgeFade = EdgeFade.horizontal(this, MAP_FADE_H_DP);
+
+    GridHorizontalScrollView(Context context) {
+      super(context);
+    }
+
+    @Override
+    protected void onScrollChanged(int l, int t, int oldl, int oldt) {
+      super.onScrollChanged(l, t, oldl, oldt);
+      invalidate();
+    }
+
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+      super.onSizeChanged(w, h, oldw, oldh);
+      edgeFade.resize(w);
+    }
+
+    @Override
+    protected void dispatchDraw(Canvas canvas) {
+      super.dispatchDraw(canvas);
+      edgeFade.draw(canvas);
     }
   }
 
@@ -539,14 +599,18 @@ class MapView extends LinearLayout implements Pane {
             view = parent instanceof View ? (View) parent : null;
           }
           int bottom = top + child.getHeight();
-          if (top < gridDown.getScrollY()) gridDown.scrollTo(0, top);
-          else if (bottom > gridDown.getScrollY() + gridDown.getHeight()) {
-            gridDown.scrollTo(0, bottom - gridDown.getHeight());
+          // The edge fade counts as out of view, or the cursor could stop under
+          // it and have its own cell dimmed.
+          int fadeV = (int) dp(MAP_FADE_V_DP);
+          if (top - fadeV < gridDown.getScrollY()) gridDown.scrollTo(0, top - fadeV);
+          else if (bottom + fadeV > gridDown.getScrollY() + gridDown.getHeight()) {
+            gridDown.scrollTo(0, bottom + fadeV - gridDown.getHeight());
           }
           int right = left + child.getWidth();
-          if (left < gridAcross.getScrollX()) gridAcross.scrollTo(left, 0);
-          else if (right > gridAcross.getScrollX() + gridAcross.getWidth()) {
-            gridAcross.scrollTo(right - gridAcross.getWidth(), 0);
+          int fadeH = (int) dp(MAP_FADE_H_DP);
+          if (left - fadeH < gridAcross.getScrollX()) gridAcross.scrollTo(left - fadeH, 0);
+          else if (right + fadeH > gridAcross.getScrollX() + gridAcross.getWidth()) {
+            gridAcross.scrollTo(right + fadeH - gridAcross.getWidth(), 0);
           }
           headerAcross.scrollTo(gridAcross.getScrollX(), 0);
         });

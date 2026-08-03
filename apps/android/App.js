@@ -23,8 +23,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import allServices from "./services.json";
 import { keyLabels } from "./keyLabels.js";
 
-const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get("window");
-
 // Normalize font sizes so system font scale doesn't affect the app
 const fs = (size) => size / PixelRatio.getFontScale();
 
@@ -3139,21 +3137,24 @@ const tvapprcInputStyles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
+  // Percentages, not the module-load Dimensions snapshot: that snapshot is
+  // whatever orientation the bundle happened to load in, and a landscape one
+  // pulls this whole group up into the Done button.
   doneBtnContainer: {
     position: "absolute",
-    top: WINDOW_HEIGHT * 0.30,
+    top: "30%",
     left: 0,
     right: 0,
     justifyContent: "flex-start",
     alignItems: "center",
   },
   doneBtn: {
-    width: WINDOW_WIDTH * 0.8,
+    width: "80%",
     paddingVertical: 28,
   },
   inputGroup: {
     position: "absolute",
-    top: WINDOW_HEIGHT * 0.45,
+    top: "45%",
     left: 0,
     right: 0,
     paddingHorizontal: SCREEN_MARGIN,

@@ -35,6 +35,10 @@ class MapView extends ScrollPane {
   private static final float CELL_TEXT_SIZE_SP = 13.5f;
   private static final int CELL_AVAIL_BG = 0xFFFFFFFF;
   private static final int CELL_MISSING_BG = 0xFFFFCCCC;
+  // A cell is far too small to carry the red border the cursor is everywhere
+  // else, so it takes a background instead — the web client's own colour for a
+  // selected cell, which the missing-file pink above cannot be confused with.
+  private static final int CELL_FOCUS_BG = 0xFF90EE90;
   private static final int CELL_TEXT_COLOR = 0xFF000000;
   private static final int GRID_LINE = 0xFF000000;
   private static final float GRID_LINE_DP = 1f;
@@ -44,11 +48,37 @@ class MapView extends ScrollPane {
     void onEpisodeClicked(String showName, int season, int episode);
   }
 
+  /**
+   * A cell took the cursor after the grid it belongs to had to be waited for.
+   * The grid is fetched, so the right-arrow that moves the cursor in here can
+   * land before there is anything to land on.
+   */
+  interface CellFocusListener {
+    void onCellFocused();
+  }
+
   private EpisodeClickListener episodeClickListener;
+  private CellFocusListener cellFocusListener;
   private String showName;
+
+  // The grid as built, so the cursor can be moved around it and the focused
+  // episode named: cell views and cell data indexed the same way, [episode -
+  // 1][season across]. Every row holds one view per season, blank where that
+  // season has no such episode number.
+  private final List<List<TextView>> cellViews = new ArrayList<>();
+  private final List<List<Cell>> cellGrid = new ArrayList<>();
+  private final List<Integer> cellSeasons = new ArrayList<>();
+  private int focusRow = -1;
+  private int focusCol = -1;
+  private boolean gridBuilt;
+  private boolean focusFirstWhenReady;
 
   void setEpisodeClickListener(EpisodeClickListener listener) {
     this.episodeClickListener = listener;
+  }
+
+  void setCellFocusListener(CellFocusListener listener) {
+    this.cellFocusListener = listener;
   }
 
   /** One cell of the grid, or null where a season has no such episode. */
@@ -57,12 +87,16 @@ class MapView extends ScrollPane {
     final boolean avail;
     final boolean unaired;
     final int quality;
+    final boolean noFile;
+    final String id; // Emby's, for loading this very episode rather than the show
 
     Cell(JSONObject node) {
       played = node.optBoolean("played", false);
       avail = node.optBoolean("avail", false);
       unaired = node.optBoolean("unaired", false);
       quality = node.optInt("quality", 0);
+      noFile = node.optBoolean("noFile", false);
+      id = node.isNull("id") ? null : node.optString("id", null);
     }
   }
 
@@ -73,6 +107,8 @@ class MapView extends ScrollPane {
   @Override
   protected void fill(Shows.Show show) {
     showName = show.name;
+    gridBuilt = false;
+    clearGrid();
     addMessage("Loading…");
     new Thread(
             () -> {
@@ -107,7 +143,10 @@ class MapView extends ScrollPane {
 
   private void show(List<Integer> seasons, List<List<Cell>> grid, String error) {
     column.removeAllViews();
+    clearGrid();
     if (seasons.isEmpty()) {
+      gridBuilt = true;
+      focusFirstWhenReady = false;
       addMessage(error == null ? "No episodes." : "No map: " + error);
       return;
     }
@@ -135,16 +174,141 @@ class MapView extends ScrollPane {
     }
     addRow(header, 0);
 
+    cellSeasons.addAll(seasons);
     for (int episode = 1; episode <= grid.size(); episode++) {
       List<Cell> cells = grid.get(episode - 1);
       LinearLayout line = row();
       line.addView(label(String.valueOf(episode), DIM_COLOR), episodeColumn());
+      List<TextView> rowViews = new ArrayList<>();
       for (int i = 0; i < seasons.size(); i++) {
         Cell cell = i < cells.size() ? cells.get(i) : null;
-        line.addView(cell(cell, seasons.get(i), episode), cellColumn());
+        ViewGroup holder = cell(cell, seasons.get(i), episode);
+        rowViews.add((TextView) holder.getChildAt(0));
+        line.addView(holder, cellColumn());
       }
+      cellViews.add(rowViews);
+      cellGrid.add(cells);
       addRow(line, 0);
     }
+    gridBuilt = true;
+    // The cursor was moved in here while this was still being fetched.
+    if (focusFirstWhenReady) {
+      focusFirstWhenReady = false;
+      if (focusFirstCell() && cellFocusListener != null) cellFocusListener.onCellFocused();
+    }
+  }
+
+  /**
+   * Puts the cursor on the first episode, now if the grid is up and as soon as
+   * it lands if it is not. False either way means the cursor has not moved --
+   * on a grid still loading the listener says when it has.
+   */
+  boolean requestFocusFirstCell() {
+    if (focusFirstCell()) return true;
+    focusFirstWhenReady = !gridBuilt;
+    return false;
+  }
+
+  void clearCellFocus() {
+    focusFirstWhenReady = false;
+    if (focusRow < 0) return;
+    int row = focusRow;
+    int col = focusCol;
+    focusRow = -1;
+    focusCol = -1;
+    paintCell(row, col);
+  }
+
+  boolean hasFocusedCell() {
+    return focusRow >= 0 && focusRow < cellViews.size();
+  }
+
+  /**
+   * One step through the grid, over any blank cell in the way -- a season with
+   * no such episode number is not an episode and cannot hold the cursor. False
+   * when that direction runs off the edge, which leaves the cursor put: the
+   * grid's way out is the back key, not an arrow.
+   */
+  boolean moveCellFocus(int rowStep, int colStep) {
+    if (!hasFocusedCell()) return false;
+    int row = focusRow;
+    int col = focusCol;
+    while (true) {
+      row += rowStep;
+      col += colStep;
+      if (row < 0 || row >= cellViews.size()) return false;
+      if (col < 0 || col >= cellViews.get(row).size()) return false;
+      if (cellAt(row, col) != null) {
+        setCellFocus(row, col);
+        return true;
+      }
+    }
+  }
+
+  String focusedShowName() {
+    return showName;
+  }
+
+  int focusedSeason() {
+    return hasFocusedCell() ? cellSeasons.get(focusCol) : -1;
+  }
+
+  int focusedEpisode() {
+    return hasFocusedCell() ? focusRow + 1 : -1;
+  }
+
+  /** Null when the focused episode has no file, so there is nothing to load. */
+  String focusedEpisodeId() {
+    if (!hasFocusedCell()) return null;
+    Cell cell = cellAt(focusRow, focusCol);
+    if (cell == null || cell.noFile || !cell.avail) return null;
+    return cell.id;
+  }
+
+  private boolean focusFirstCell() {
+    for (int row = 0; row < cellViews.size(); row++) {
+      for (int col = 0; col < cellViews.get(row).size(); col++) {
+        if (cellAt(row, col) != null) {
+          setCellFocus(row, col);
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private void setCellFocus(int row, int col) {
+    int oldRow = focusRow;
+    int oldCol = focusCol;
+    focusRow = row;
+    focusCol = col;
+    if (oldRow >= 0) paintCell(oldRow, oldCol);
+    paintCell(row, col);
+    ensureVisible(cellViews.get(row).get(col));
+  }
+
+  private void paintCell(int row, int col) {
+    if (row >= cellViews.size() || col >= cellViews.get(row).size()) return;
+    Cell cell = cellAt(row, col);
+    boolean focused = row == focusRow && col == focusCol;
+    cellViews
+        .get(row)
+        .get(col)
+        .setBackgroundColor(
+            focused ? CELL_FOCUS_BG : (cell == null || cell.avail ? CELL_AVAIL_BG : CELL_MISSING_BG));
+  }
+
+  private Cell cellAt(int row, int col) {
+    List<Cell> cells = cellGrid.get(row);
+    return col < cells.size() ? cells.get(col) : null;
+  }
+
+  private void clearGrid() {
+    cellViews.clear();
+    cellGrid.clear();
+    cellSeasons.clear();
+    focusRow = -1;
+    focusCol = -1;
   }
 
   private int cellColumnWidth = (int) dp(44f); // default, updated by show()

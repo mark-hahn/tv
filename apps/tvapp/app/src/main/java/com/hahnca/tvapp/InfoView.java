@@ -2,6 +2,7 @@ package com.hahnca.tvapp;
 
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
@@ -30,12 +31,17 @@ class InfoView extends LinearLayout implements Pane {
   private static final int FIELD_COLOR = 0xFFC8C8C8;
   private static final int OVERVIEW_COLOR = 0xFFE0E0E0;
   private static final int POSTER_PLACEHOLDER_BG = 0xFF303030;
+  private static final int TEXT_FOCUS_BORDER = 0xFFFF0000;
+  private static final float TEXT_FOCUS_BORDER_DP = 3f;
 
   private final TextView title;
   private final ImageView poster;
   private final LinearLayout fields;
   private final TextView overview;
   private final ScrollView overviewScroll;
+  // The description is this pane's one focusable item, so the cursor border
+  // goes on its own background rather than on the pane's.
+  private final GradientDrawable overviewBg = new GradientDrawable();
 
   private Shows.Show show;
   private Shows.Show filled;
@@ -78,6 +84,12 @@ class InfoView extends LinearLayout implements Pane {
     overview.setTextColor(OVERVIEW_COLOR);
     overview.setTextSize(TypedValue.COMPLEX_UNIT_SP, OVERVIEW_TEXT_SIZE_SP);
     overviewScroll = new ScrollView(context);
+    // Padded by the width of the cursor border whether it is showing or not,
+    // so focus does not shift the text sideways as it comes and goes.
+    int border = (int) dp(TEXT_FOCUS_BORDER_DP);
+    overviewScroll.setPadding(border, border, border, border);
+    overviewBg.setColor(Color.TRANSPARENT);
+    overviewScroll.setBackground(overviewBg);
     // Clicking the description puts it back at the top, the same shortcut the
     // other list panes have. On the TextView, not just the ScrollView: a
     // ScrollView eats the touch itself and never gets as far as performClick.
@@ -101,6 +113,15 @@ class InfoView extends LinearLayout implements Pane {
   @Override
   public void scrollStep(int px) {
     overviewScroll.scrollBy(0, px);
+  }
+
+  /** The cursor is on the description — this pane's only focusable item. */
+  void setTextFocused(boolean focused) {
+    overviewBg.setStroke(focused ? (int) dp(TEXT_FOCUS_BORDER_DP) : 0, TEXT_FOCUS_BORDER);
+  }
+
+  void scrollTextToTop() {
+    overviewScroll.smoothScrollTo(0, 0);
   }
 
   @Override

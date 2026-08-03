@@ -46,8 +46,14 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final String SORT_WATCHED = "Watched";
   private static final String SORT_ADDED = "Added";
   private static final String SORT_CUSTOM = "Custom";
+  private static final int INFO_TAB_INDEX = 0;
   private static final int MAP_TAB_INDEX = 1;
+  private static final int ACTORS_TAB_INDEX = 2;
   private static final int TRAILER_TAB_INDEX = 3;
+  // One arrow-key press worth of description, in either of the two panes that
+  // have one: a few lines, so holding the key runs the text past at a readable
+  // speed rather than a page at a time.
+  private static final float TEXT_SCROLL_STEP_DP = 60f;
 
   private static final float BUTTON_TEXT_SIZE_SP = 12.5f;
   private static final float BUTTON_HEIGHT_DP = 25.0f;
@@ -110,10 +116,19 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    * from a path that set one and not the other -- the cursor reading as being on
    * a trailer card while it was drawn on the trailer button, where up/down/right
    * then did nothing. One field cannot disagree with itself.
+   *
+   * Past the two columns, each pane holds the cursor on an item of its own:
+   * the description in Info, a cell in Map's grid and then the description in
+   * the episode subpane that cell opens, a card in Actors, a card in Trailer.
+   * Right from a tab button is the way in and the back key is the way out.
    */
   private enum Cursor {
     SHOW,
     BUTTON,
+    INFO_TEXT,
+    MAP_CELL,
+    EPISODE_TEXT,
+    ACTOR_CARD,
     TRAILER_CARD
   }
 
@@ -275,6 +290,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     info = new InfoView(this);
     panes.add(info);
     mapPane = new MapPane(this);
+    // The grid is fetched, so a right-arrow into the Map pane can land before
+    // there is a cell to land on; this is the grid saying it got there.
+    mapPane.setCellFocusListener(
+        () -> {
+          cursor = Cursor.MAP_CELL;
+          repaintButtons();
+        });
     panes.add(mapPane);
     actorsPane = new ActorsView(this);
     actorsPane.setListener(this::actorClick);
@@ -302,11 +324,21 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     activePane = panes.get(index);
     activePane.onShown();
     if (index != MAP_TAB_INDEX) mapPane.closeEpisode();
-    if (index != TRAILER_TAB_INDEX) {
-      trailersView.clearCardFocus();
-      if (cursor == Cursor.TRAILER_CARD) cursor = Cursor.BUTTON;
-    }
+    // The cursor cannot stay on an item of a pane that has just stopped being
+    // the one on screen, so it falls back to the button column. Whatever is
+    // moving it into the new pane sets it again after this.
+    clearPaneFocus();
+    if (cursor != Cursor.SHOW && cursor != Cursor.BUTTON) cursor = Cursor.BUTTON;
     repaintButtons();
+  }
+
+  /** Every pane's cursor at once -- whichever one the cursor is leaving. */
+  private void clearPaneFocus() {
+    info.setTextFocused(false);
+    mapPane.clearCellFocus();
+    mapPane.setEpisodeTextFocused(false);
+    actorsPane.clearCardFocus();
+    trailersView.clearCardFocus();
   }
 
   private void repaintButtons() {
@@ -479,7 +511,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     ButtonItem item = buttonItems.get(label);
     if (item == null || item.view.getVisibility() != View.VISIBLE) return;
     cursor = Cursor.BUTTON;
-    trailersView.clearCardFocus();
+    clearPaneFocus();
     enterCardsWhenReady = false;
     selectedButton = label;
     showList.setCardFocusShown(false);
@@ -517,7 +549,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   private void selectShow() {
     cursor = Cursor.SHOW;
-    trailersView.clearCardFocus();
+    clearPaneFocus();
     enterCardsWhenReady = false;
     ui.removeCallbacks(buttonDwellActivate);
     showList.setCardFocusShown(true);
@@ -536,11 +568,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     boolean right = "right".equals(direction);
     if (!up && !down && !left && !right) return;
 
-    // A show change rebuilds the trailer cards out from under the cursor, so
-    // the card state is only believed while a card is really focused.
-    if (cursor == Cursor.TRAILER_CARD && !trailersView.hasFocusedCard()) {
-      selectButton(TAB_LABELS[TRAILER_TAB_INDEX], false);
-    }
+    syncCursorToPane();
 
     switch (cursor) {
       case SHOW:
@@ -555,9 +583,42 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
           showList.focusActive();
           selectShow();
         } else if (right) {
-          enterTrailerCards();
+          enterPane();
         } else {
           moveButton(up ? -1 : +1);
+        }
+        return;
+
+      case INFO_TEXT:
+        if (up) info.scrollStep(-textScrollStep());
+        else if (down) info.scrollStep(textScrollStep());
+        else if (right) info.scrollTextToTop();
+        else selectButton(TAB_LABELS[INFO_TAB_INDEX], false);
+        return;
+
+      case MAP_CELL:
+        // All four move around the grid -- the way out of it is the back key,
+        // there being no edge to fall off into the button column.
+        if (up) mapPane.moveCellFocus(-1, 0);
+        else if (down) mapPane.moveCellFocus(+1, 0);
+        else if (left) mapPane.moveCellFocus(0, -1);
+        else mapPane.moveCellFocus(0, +1);
+        return;
+
+      case EPISODE_TEXT:
+        if (up) mapPane.scrollEpisodeText(-textScrollStep());
+        else if (down) mapPane.scrollEpisodeText(textScrollStep());
+        else if (right) mapPane.scrollEpisodeTextToTop();
+        else closeEpisodeToCell();
+        return;
+
+      case ACTOR_CARD:
+        if (up) actorsPane.moveCardFocus(-1, 0);
+        else if (down) actorsPane.moveCardFocus(+1, 0);
+        else if (right) actorsPane.moveCardFocus(0, +1);
+        // Off the leftmost card of a row the cursor leaves the grid.
+        else if (!actorsPane.moveCardFocus(0, -1)) {
+          selectButton(TAB_LABELS[ACTORS_TAB_INDEX], false);
         }
         return;
 
@@ -571,6 +632,75 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     }
   }
 
+  /**
+   * A show change rebuilds the cards and cells out from under the cursor, so a
+   * pane cursor is only believed while its pane really has something focused;
+   * otherwise the cursor goes back to the button that pane belongs to.
+   */
+  private void syncCursorToPane() {
+    if (cursor == Cursor.TRAILER_CARD && !trailersView.hasFocusedCard()) {
+      selectButton(TAB_LABELS[TRAILER_TAB_INDEX], false);
+    } else if (cursor == Cursor.ACTOR_CARD && !actorsPane.hasFocusedCard()) {
+      selectButton(TAB_LABELS[ACTORS_TAB_INDEX], false);
+    } else if (cursor == Cursor.EPISODE_TEXT && !mapPane.isEpisodeOpen()) {
+      selectButton(TAB_LABELS[MAP_TAB_INDEX], false);
+    } else if (cursor == Cursor.MAP_CELL && !mapPane.hasFocusedCell()) {
+      selectButton(TAB_LABELS[MAP_TAB_INDEX], false);
+    }
+  }
+
+  private int textScrollStep() {
+    return (int) dp(TEXT_SCROLL_STEP_DP);
+  }
+
+  /** Out of the episode subpane, back onto the cell that opened it. */
+  private void closeEpisodeToCell() {
+    mapPane.closeEpisode();
+    cursor = Cursor.MAP_CELL;
+  }
+
+  /**
+   * Right from a tab button: the cursor moves onto the first item of the pane
+   * already on screen. Which tab button it happens to be on does not matter and
+   * is not changed -- selecting a tab is what ok is for, and a right arrow that
+   * swapped the pane out would move the cursor into something the button column
+   * had given no warning of. Every other button ignores the key.
+   *
+   * The way back out lands on the tab button of the pane the cursor is in, so
+   * it is not necessarily the button the cursor came in from.
+   */
+  private void enterPane() {
+    if (tabIndex(selectedButton) < 0) return;
+    int index = activeTabIndex;
+    if (index == TRAILER_TAB_INDEX) {
+      enterTrailerCards();
+      return;
+    }
+    ui.removeCallbacks(buttonDwellActivate);
+    switch (index) {
+      case INFO_TAB_INDEX:
+        info.setTextFocused(true);
+        cursor = Cursor.INFO_TEXT;
+        break;
+      case MAP_TAB_INDEX:
+        // A grid still being fetched has nowhere to put the cursor yet; the
+        // cell focus listener moves it as soon as the grid lands.
+        if (mapPane.requestFocusFirstCell()) cursor = Cursor.MAP_CELL;
+        break;
+      case ACTORS_TAB_INDEX:
+        if (actorsPane.focusFirstCard()) cursor = Cursor.ACTOR_CARD;
+        break;
+    }
+    repaintButtons();
+  }
+
+  private int tabIndex(String label) {
+    for (int i = 0; i < TAB_LABELS.length; i++) {
+      if (TAB_LABELS[i].equals(label)) return i;
+    }
+    return -1;
+  }
+
   private void moveButton(int step) {
     List<String> visible = visibleButtonLabels();
     int index = visible.indexOf(selectedButton);
@@ -581,18 +711,16 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   /**
-   * Right from the trailer button, the only button with anywhere to go right
-   * to. Any other button ignores right, and so does the trailer button when
-   * the show has no trailers to put a cursor on.
+   * The way onto the trailer cards, whether the cursor walked in with a right
+   * arrow or the trailer button's dwell brought it. Only ever with the trailer
+   * pane already up: playing is activateButton's job, and this must never
+   * start one. A show with no trailers has no card to put the cursor on.
    */
   private void enterTrailerCards() {
-    if (!TAB_LABELS[TRAILER_TAB_INDEX].equals(selectedButton)) return;
+    if (activeTabIndex != TRAILER_TAB_INDEX) return;
     Shows.Show show = showList.getSelected();
     if (show == null || show.trailers.isEmpty()) return;
     ui.removeCallbacks(buttonDwellActivate);
-    // The cards only exist once the pane has been filled, which is what being
-    // shown does; playing is activateButton's job, so this never starts one.
-    if (activeTabIndex != TRAILER_TAB_INDEX) selectTab(TRAILER_TAB_INDEX);
     if (!trailersView.focusTopCard()) return;
     cursor = Cursor.TRAILER_CARD;
     repaintButtons();
@@ -608,19 +736,32 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   private void activateSelectedItem() {
-    if (cursor == Cursor.TRAILER_CARD && !trailersView.hasFocusedCard()) {
-      selectButton(TAB_LABELS[TRAILER_TAB_INDEX], false);
-    }
+    syncCursorToPane();
     switch (cursor) {
       case SHOW:
         embyClick();
         return;
-      case TRAILER_CARD:
-        trailersView.activateFocusedCard();
-        return;
       case BUTTON:
         ui.removeCallbacks(buttonDwellActivate);
         activateButton(selectedButton, true);
+        return;
+      case INFO_TEXT:
+        // Nothing to activate in a block of text, so ok is a second way out.
+        selectButton(TAB_LABELS[INFO_TAB_INDEX], false);
+        return;
+      case MAP_CELL:
+        mapPane.openFocusedEpisode();
+        mapPane.setEpisodeTextFocused(true);
+        cursor = Cursor.EPISODE_TEXT;
+        return;
+      case EPISODE_TEXT:
+        closeEpisodeToCell();
+        return;
+      case ACTOR_CARD:
+        actorsPane.activateFocusedCard();
+        return;
+      case TRAILER_CARD:
+        trailersView.activateFocusedCard();
         return;
     }
   }
@@ -665,6 +806,17 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       backToEmby();
       return;
     }
+    // A cursor in the Map pane names an episode as well as a show, so that is
+    // the one Emby opens on -- with or without the episode subpane up, which
+    // goes away either way. A cell with no file has nothing to load, and falls
+    // back to what this button does everywhere else: the show alone.
+    String focusedEpisodeId = null;
+    if (cursor == Cursor.MAP_CELL || cursor == Cursor.EPISODE_TEXT) {
+      focusedEpisodeId = mapPane.focusedEpisodeId();
+      if (cursor == Cursor.EPISODE_TEXT) closeEpisodeToCell();
+      else mapPane.closeEpisode();
+    }
+    final String episodeId = focusedEpisodeId;
     new Thread(
             () -> {
               try {
@@ -673,7 +825,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
                         + "?showId="
                         + URLEncoder.encode(show.id, "UTF-8")
                         + "&showName="
-                        + URLEncoder.encode(show.name, "UTF-8");
+                        + URLEncoder.encode(show.name, "UTF-8")
+                        + (episodeId == null
+                            ? ""
+                            : "&episodeId=" + URLEncoder.encode(episodeId, "UTF-8"));
                 HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
                 conn.setConnectTimeout(VIEWSHOW_TIMEOUT_MS);
                 conn.setReadTimeout(VIEWSHOW_TIMEOUT_MS);
@@ -795,10 +950,41 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     super.onDestroy();
   }
 
+  /**
+   * One level out: a playing trailer, then a cursor in a pane back to the tab
+   * button that pane belongs to, and only from the two columns does back leave
+   * for Emby. The episode subpane goes the whole way out with the cursor
+   * rather than handing it to the cell it came from -- that is what ok and
+   * left are for.
+   *
+   * The web client's Shows button closes tvapp with this same message, so
+   * while the cursor is in a pane it now takes the second press to close --
+   * which is how a playing trailer and an open episode subpane already
+   * behaved.
+   */
   private void handleBack() {
-    if (player.isPlaying()) player.close();
-    else if (mapPane.isEpisodeOpen()) mapPane.closeEpisode();
-    else backToEmby();
+    if (player.isPlaying()) {
+      player.close();
+      return;
+    }
+    switch (cursor) {
+      case INFO_TEXT:
+        selectButton(TAB_LABELS[INFO_TAB_INDEX], false);
+        return;
+      case MAP_CELL:
+      case EPISODE_TEXT:
+        mapPane.closeEpisode();
+        selectButton(TAB_LABELS[MAP_TAB_INDEX], false);
+        return;
+      case ACTOR_CARD:
+        selectButton(TAB_LABELS[ACTORS_TAB_INDEX], false);
+        return;
+      case TRAILER_CARD:
+        selectButton(TAB_LABELS[TRAILER_TAB_INDEX], false);
+        return;
+      default:
+        backToEmby();
+    }
   }
 
   private void handleRemoteKey(String key) {

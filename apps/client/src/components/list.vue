@@ -1895,7 +1895,7 @@ export default {
       try {
         await srvr.sendEmail(`Get show "${show.name}".`);
       } catch (err) {
-        unilog(1760, `sendEmail failed for ${show.name}:`, err);
+        unilog(1887, `sendEmail failed for ${show.name}:`, err);
       }
     },
 

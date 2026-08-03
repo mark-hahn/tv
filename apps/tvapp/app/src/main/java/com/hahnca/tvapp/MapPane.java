@@ -45,6 +45,53 @@ class MapPane implements Pane {
     return episodeSubpane.isOpen();
   }
 
+  // The grid's cursor. MainActivity drives all of it by remote key; the
+  // episode subpane below has a cursor of its own, on its description.
+
+  void setCellFocusListener(MapView.CellFocusListener listener) {
+    mapView.setCellFocusListener(listener);
+  }
+
+  boolean requestFocusFirstCell() {
+    return mapView.requestFocusFirstCell();
+  }
+
+  void clearCellFocus() {
+    mapView.clearCellFocus();
+  }
+
+  boolean hasFocusedCell() {
+    return mapView.hasFocusedCell();
+  }
+
+  boolean moveCellFocus(int rowStep, int colStep) {
+    return mapView.moveCellFocus(rowStep, colStep);
+  }
+
+  /** Null when the focused episode has no file for Emby to load. */
+  String focusedEpisodeId() {
+    return mapView.focusedEpisodeId();
+  }
+
+  /** Opens the subpane on the focused cell; ok never closes it, only opens. */
+  void openFocusedEpisode() {
+    if (!mapView.hasFocusedCell()) return;
+    episodeSubpane.open(
+        mapView.focusedShowName(), mapView.focusedSeason(), mapView.focusedEpisode());
+  }
+
+  void setEpisodeTextFocused(boolean focused) {
+    episodeSubpane.setTextFocused(focused);
+  }
+
+  void scrollEpisodeText(int px) {
+    episodeSubpane.scrollStep(px);
+  }
+
+  void scrollEpisodeTextToTop() {
+    episodeSubpane.scrollTextToTop();
+  }
+
   @Override
   public void setShow(Shows.Show show) {
     mapView.setShow(show);

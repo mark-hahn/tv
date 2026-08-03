@@ -6,6 +6,7 @@ import android.os.Looper;
 import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
@@ -97,6 +98,39 @@ abstract class ScrollPane extends ScrollView implements Pane {
   void scrollToStart() {
     smoothScrollTo(0, 0);
     if (across != null) across.smoothScrollTo(0, 0);
+  }
+
+  /**
+   * Scrolls only as far as needed to bring a descendant fully into view — how
+   * the arrow-key cursor follows itself around a grid taller, and in Map's case
+   * wider, than the pane showing it. Posted, because the row the cursor just
+   * moved to may not have been laid out yet.
+   */
+  protected void ensureVisible(View child) {
+    post(
+        () -> {
+          // Layout positions are relative to the parent and unaffected by
+          // scrolling, so adding them up to this ScrollView gives the content
+          // coordinates that getScrollY/getScrollX are measured in.
+          int top = 0;
+          int left = 0;
+          View view = child;
+          while (view != null && view != this) {
+            top += view.getTop();
+            left += view.getLeft();
+            ViewParent parent = view.getParent();
+            view = parent instanceof View ? (View) parent : null;
+          }
+          int bottom = top + child.getHeight();
+          if (top < getScrollY()) scrollTo(0, top);
+          else if (bottom > getScrollY() + getHeight()) scrollTo(0, bottom - getHeight());
+          if (across == null) return;
+          int right = left + child.getWidth();
+          if (left < across.getScrollX()) across.scrollTo(left, 0);
+          else if (right > across.getScrollX() + across.getWidth()) {
+            across.scrollTo(right - across.getWidth(), 0);
+          }
+        });
   }
 
   /** True while the given show is still the one this pane is filled with. */

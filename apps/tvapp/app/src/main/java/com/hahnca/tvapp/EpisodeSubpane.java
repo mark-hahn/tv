@@ -3,6 +3,7 @@ package com.hahnca.tvapp;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.ShapeDrawable;
 import android.graphics.drawable.shapes.RectShape;
 import android.os.Handler;
@@ -42,11 +43,16 @@ class EpisodeSubpane extends LinearLayout implements Scroller {
   private static final float AIRED_TEXT_SIZE_SP = 14.4f;
   private static final float OVERVIEW_TEXT_SIZE_SP = 14.4f;
   private static final int TEXT_COLOR = 0xFF333333;
+  private static final int TEXT_FOCUS_BORDER = 0xFFFF0000;
+  private static final float TEXT_FOCUS_BORDER_DP = 3f;
 
   private final ImageView image;
   private final TextView aired;
   private final TextView overview;
   private final ScrollView overviewScroll;
+  // The description is the one thing in here the cursor can be on, so the
+  // cursor border goes on its background rather than on the subpane's.
+  private final GradientDrawable overviewBg = new GradientDrawable();
   private final Handler ui = new Handler(Looper.getMainLooper());
 
   // Stamped fresh on every load(); a reply whose token no longer matches lost
@@ -107,6 +113,12 @@ class EpisodeSubpane extends LinearLayout implements Scroller {
     overview.setTextColor(TEXT_COLOR);
     overview.setTextSize(TypedValue.COMPLEX_UNIT_SP, OVERVIEW_TEXT_SIZE_SP);
     overviewScroll = new ScrollView(context);
+    // Padded by the width of the cursor border whether it is showing or not,
+    // so focus does not shift the text sideways as it comes and goes.
+    int border = (int) dp(TEXT_FOCUS_BORDER_DP);
+    overviewScroll.setPadding(border, border, border, border);
+    overviewBg.setColor(BG_COLOR);
+    overviewScroll.setBackground(overviewBg);
     overviewScroll.addView(
         overview,
         new ScrollView.LayoutParams(
@@ -140,8 +152,18 @@ class EpisodeSubpane extends LinearLayout implements Scroller {
     overviewScroll.scrollBy(0, px);
   }
 
+  /** The cursor is on the description — the only focusable item in here. */
+  void setTextFocused(boolean focused) {
+    overviewBg.setStroke(focused ? (int) dp(TEXT_FOCUS_BORDER_DP) : 0, TEXT_FOCUS_BORDER);
+  }
+
+  void scrollTextToTop() {
+    overviewScroll.smoothScrollTo(0, 0);
+  }
+
   void close() {
     setVisibility(GONE);
+    setTextFocused(false);
     token = null;
     openShowName = null;
     openSeason = -1;
@@ -161,6 +183,15 @@ class EpisodeSubpane extends LinearLayout implements Scroller {
       close();
       return;
     }
+    open(showName, season, episode);
+  }
+
+  /**
+   * Straight to this episode, open or not. What the remote's ok key does on a
+   * focused cell: ok inside the subpane is what closes it again, so opening
+   * never has to double as closing the way a second click does.
+   */
+  void open(String showName, int season, int episode) {
     openShowName = showName;
     openSeason = season;
     openEpisode = episode;

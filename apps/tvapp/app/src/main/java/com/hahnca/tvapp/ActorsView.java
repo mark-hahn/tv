@@ -10,9 +10,8 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
  * The Actors tab: the cast as a grid of photo cards, name over character, out
@@ -21,8 +20,14 @@ import java.util.Map;
  *
  * Clicking a card is the web client's actors-pane click-then-Shows-button
  * rolled into one gesture, there being no second button worth adding on a tv:
- * it highlights the card and narrows the show list to that actor's shows.
- * Clicking the highlighted card again undoes both.
+ * it narrows the show list to that actor's shows. Clicking the same card again
+ * lifts the narrowing back off.
+ *
+ * Which card that was is remembered here and not drawn anywhere: the cursor
+ * border is the only red border on a card, so it always means the cursor. The
+ * narrowing outlives the cursor going anywhere at all — another show, another
+ * tab, the button column — and only the things MainActivity clears it for
+ * (a filter button, filter text, another actor, closing tvapp) take it off.
  */
 class ActorsView extends ScrollPane {
 
@@ -32,10 +37,8 @@ class ActorsView extends ScrollPane {
   private static final float NAME_TEXT_SIZE_SP = 13.5f;
   private static final float CHARACTER_TEXT_SIZE_SP = 11.7f;
   private static final int PHOTO_PLACEHOLDER_BG = 0xFF303030;
-  // The web client's actor.vue: a red border is the whole of its selected
-  // style, over an otherwise plain card.
-  private static final int SELECTED_BORDER = 0xFFFF0000;
-  private static final float SELECTED_BORDER_DP = 3f;
+  private static final int FOCUS_BORDER = 0xFFFF0000;
+  private static final float FOCUS_BORDER_DP = 3f;
   private static final float CARD_CORNER_DP = 6f;
   private static final float CARD_PAD_DP = 4f;
 
@@ -44,9 +47,14 @@ class ActorsView extends ScrollPane {
     void onActorClick(String actorName);
   }
 
-  private final Map<String, View> cardsByName = new HashMap<>(); // normalized name -> card
+  // Parallel: the cards as laid out, row-major across COLUMNS, and the actor
+  // each one is for. Only real cards are in here — the last row's empty
+  // spacers are not somewhere the cursor can go.
+  private final List<View> cardViews = new ArrayList<>();
+  private final List<Shows.Actor> cardActors = new ArrayList<>();
+  private int focusedIndex = -1;
   private Listener listener;
-  private String selectedName; // normalized, or null
+  private String selectedName; // normalized, or null; never drawn
 
   ActorsView(Context context) {
     super(context);
@@ -58,15 +66,51 @@ class ActorsView extends ScrollPane {
 
   /** From outside: something else just took over narrowing the show list. */
   void clearSelection() {
-    if (selectedName == null) return;
-    View card = cardsByName.get(selectedName);
-    if (card != null) paintSelected(card, false);
     selectedName = null;
+  }
+
+  /** The actors button's right-arrow, button-to-grid transition. */
+  boolean focusFirstCard() {
+    if (cardViews.isEmpty()) return false;
+    setFocusedIndex(0);
+    return true;
+  }
+
+  /** Cursor leaves the grid — back to the actors button, or a show/tab change. */
+  void clearCardFocus() {
+    setFocusedIndex(-1);
+  }
+
+  boolean hasFocusedCard() {
+    return focusedIndex >= 0 && focusedIndex < cardViews.size();
+  }
+
+  /**
+   * One step through the grid. False when that direction runs off the edge --
+   * off the left edge the cursor leaves the pane, which is MainActivity's to
+   * do; every other edge simply leaves it where it is.
+   */
+  boolean moveCardFocus(int rowStep, int colStep) {
+    if (!hasFocusedCard()) return false;
+    int col = focusedIndex % COLUMNS;
+    if (col + colStep < 0 || col + colStep >= COLUMNS) return false; // no row wrapping
+    int next = focusedIndex + rowStep * COLUMNS + colStep;
+    if (next < 0 || next >= cardViews.size()) return false;
+    setFocusedIndex(next);
+    return true;
+  }
+
+  /** Ok on a focused card: narrows the show list to that actor, or lifts it. */
+  void activateFocusedCard() {
+    if (!hasFocusedCard()) return;
+    handleClick(cardActors.get(focusedIndex).name);
   }
 
   @Override
   protected void fill(Shows.Show show) {
-    cardsByName.clear();
+    cardViews.clear();
+    cardActors.clear();
+    focusedIndex = -1;
     List<Shows.Actor> cast = show.characters;
     if (cast.isEmpty()) {
       addMessage("No cast.");
@@ -103,9 +147,8 @@ class ActorsView extends ScrollPane {
     bg.setCornerRadius(dp(CARD_CORNER_DP));
     card.setBackground(bg);
 
-    String normalized = Shows.normalizeName(actor.name);
-    cardsByName.put(normalized, card);
-    paintSelected(card, normalized.equals(selectedName));
+    cardViews.add(card);
+    cardActors.add(actor);
     card.setOnClickListener(v -> handleClick(actor.name));
 
     ImageView photo = new ImageView(getContext());
@@ -126,22 +169,27 @@ class ActorsView extends ScrollPane {
 
   private void handleClick(String actorName) {
     String normalized = Shows.normalizeName(actorName);
+    // The same actor again, whichever of this show's cards it came from, is
+    // the click that lifts the narrowing rather than replacing it.
     boolean deselecting = normalized.equals(selectedName);
-    if (selectedName != null) {
-      View prev = cardsByName.get(selectedName);
-      if (prev != null) paintSelected(prev, false);
-    }
     selectedName = deselecting ? null : normalized;
-    if (!deselecting) {
-      View current = cardsByName.get(normalized);
-      if (current != null) paintSelected(current, true);
-    }
     if (listener != null) listener.onActorClick(deselecting ? null : actorName);
   }
 
-  private void paintSelected(View card, boolean selected) {
-    ((GradientDrawable) card.getBackground())
-        .setStroke(selected ? (int) dp(SELECTED_BORDER_DP) : 0, SELECTED_BORDER);
+  private void setFocusedIndex(int index) {
+    if (focusedIndex == index) return;
+    int old = focusedIndex;
+    focusedIndex = index;
+    if (old >= 0 && old < cardViews.size()) paintFocus(old);
+    if (index >= 0 && index < cardViews.size()) {
+      paintFocus(index);
+      ensureVisible(cardViews.get(index));
+    }
+  }
+
+  private void paintFocus(int index) {
+    ((GradientDrawable) cardViews.get(index).getBackground())
+        .setStroke(index == focusedIndex ? (int) dp(FOCUS_BORDER_DP) : 0, FOCUS_BORDER);
   }
 
   private TextView label(String value, float sizeSp, int color) {

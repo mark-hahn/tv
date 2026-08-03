@@ -542,7 +542,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
         if (up) showList.moveFocus(-1);
         else if (down) showList.moveFocus(+1);
         else if (left) showList.focusTop();
-        else selectButton(selectedButton != null ? selectedButton : TAB_LABELS[0]);
+        else selectButton(selectedButton != null ? selectedButton : TAB_LABELS[0], false);
         return;
 
       case BUTTON:

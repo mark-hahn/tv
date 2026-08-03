@@ -2,11 +2,19 @@ package com.hahnca.tvapp;
 
 import android.content.Context;
 import android.graphics.Color;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
+import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,26 +27,32 @@ import org.json.JSONObject;
  * quality — the web client's map and the phone remote's, with the same letters
  * and the same two cell colours.
  *
- * Season columns are weighted above a floor: a handful of seasons spread across
- * the pane, and past the dozen that fit at a legible width the grid runs off
- * the side and the pane scrolls sideways to reach the rest.
+ * Both headers stay put: the season row is fixed to the top of the pane and the
+ * episode-number column to its left edge, so a grid scrolled far down or far
+ * across can still be read. That is what the four nested scroll views are for —
+ * the grid is the only one the user drives, and its scroll position is copied
+ * to the header row (sideways) and the episode column (down).
+ *
+ * Season columns are a fixed width, so past the dozen that fit at a legible
+ * width the grid runs off the side and the pane scrolls sideways to reach the
+ * rest.
  */
-class MapView extends ScrollPane {
+class MapView extends LinearLayout implements Pane {
 
   private static final String SERIES_MAP_URL =
       "https://hahnca.com/tv-srvr/api/getSeriesMapFromEmby";
   private static final String TAG = "tvapp";
   private static final float ROW_HEIGHT_DP = 34f;
   private static final float EPISODE_COL_WIDTH_DP = 40f;
-  // A season column never narrows past this; beyond that the grid scrolls.
-  private static final float MIN_SEASON_COL_WIDTH_DP = 44f;
   private static final float CELL_TEXT_SIZE_SP = 13.5f;
   private static final int CELL_AVAIL_BG = 0xFFFFFFFF;
   private static final int CELL_MISSING_BG = 0xFFFFCCCC;
-  // A cell is far too small to carry the red border the cursor is everywhere
-  // else, so it takes a background instead — the web client's own colour for a
-  // selected cell, which the missing-file pink above cannot be confused with.
-  private static final int CELL_FOCUS_BG = 0xFF90EE90;
+  // The cursor is the red border it is on every other item in tvapp, drawn by
+  // widening the cell's own margin over a red holder instead of the black one
+  // that makes the grid lines. The cell keeps its size either way, so nothing
+  // in the grid moves as the cursor passes through.
+  private static final int CELL_FOCUS_BORDER = 0xFFFF0000;
+  private static final float CELL_FOCUS_BORDER_DP = 3f;
   private static final int CELL_TEXT_COLOR = 0xFF000000;
   private static final int GRID_LINE = 0xFF000000;
   private static final float GRID_LINE_DP = 1f;
@@ -57,9 +71,24 @@ class MapView extends ScrollPane {
     void onCellFocused();
   }
 
+  private final Handler ui = new Handler(Looper.getMainLooper());
+
+  private final LinearLayout headerBar;
+  private final LinearLayout headerRow;
+  private final HorizontalScrollView headerAcross;
+  private final LinearLayout body;
+  private final LinearLayout episodeColumn;
+  private final ScrollView episodeDown;
+  private final LinearLayout gridColumn;
+  private final HorizontalScrollView gridAcross;
+  private final ScrollView gridDown;
+  private final TextView message;
+
   private EpisodeClickListener episodeClickListener;
   private CellFocusListener cellFocusListener;
   private String showName;
+  private Shows.Show show;
+  private Shows.Show filled;
 
   // The grid as built, so the cursor can be moved around it and the focused
   // episode named: cell views and cell data indexed the same way, [episode -
@@ -72,6 +101,7 @@ class MapView extends ScrollPane {
   private int focusCol = -1;
   private boolean gridBuilt;
   private boolean focusFirstWhenReady;
+  private int cellColumnWidth = (int) dp(44f); // default, updated by show()
 
   void setEpisodeClickListener(EpisodeClickListener listener) {
     this.episodeClickListener = listener;
@@ -101,11 +131,176 @@ class MapView extends ScrollPane {
   }
 
   MapView(Context context) {
-    super(context, true);
+    super(context);
+    setOrientation(VERTICAL);
+    int pad = (int) dp(ScrollPane.PAD_DP);
+    setPadding(pad, pad, pad, pad);
+
+    headerRow = new LinearLayout(context);
+    headerRow.setOrientation(HORIZONTAL);
+    headerAcross = new SlaveHorizontalScrollView(context);
+    headerAcross.addView(
+        headerRow,
+        new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+    headerBar = new LinearLayout(context);
+    headerBar.setOrientation(HORIZONTAL);
+    headerBar.addView(label("", Color.WHITE), episodeColumnParams());
+    headerBar.addView(
+        headerAcross,
+        new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+    addView(
+        headerBar,
+        new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, (int) dp(ROW_HEIGHT_DP)));
+
+    episodeColumn = new LinearLayout(context);
+    episodeColumn.setOrientation(VERTICAL);
+    episodeDown = new SlaveScrollView(context);
+    episodeDown.addView(
+        episodeColumn,
+        new ScrollView.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+    gridColumn = new LinearLayout(context);
+    gridColumn.setOrientation(VERTICAL);
+    gridAcross = new HorizontalScrollView(context);
+    gridAcross.setHorizontalScrollBarEnabled(false);
+    gridAcross.addView(
+        gridColumn,
+        new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+    gridDown = new GridScrollView(context);
+    gridDown.setVerticalScrollBarEnabled(false);
+    gridDown.addView(
+        gridAcross,
+        new ScrollView.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+    body = new LinearLayout(context);
+    body.setOrientation(HORIZONTAL);
+    body.addView(
+        episodeDown,
+        new LinearLayout.LayoutParams(
+            (int) dp(EPISODE_COL_WIDTH_DP), ViewGroup.LayoutParams.MATCH_PARENT));
+    body.addView(
+        gridDown, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+    addView(
+        body,
+        new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+
+    message = text("", ScrollPane.TEXT_SIZE_SP, ScrollPane.DIM_COLOR);
+    message.setVisibility(GONE);
+    addView(
+        message,
+        new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+    // On the column, not on the ScrollView: a ScrollView eats the touch itself
+    // and never gets as far as performClick.
+    gridColumn.setOnClickListener(v -> scrollToStart());
+  }
+
+  /** The grid's scroll is the one the user drives; the headers follow it. */
+  private class GridScrollView extends ScrollView {
+    GridScrollView(Context context) {
+      super(context);
+    }
+
+    @Override
+    protected void onScrollChanged(int l, int t, int oldl, int oldt) {
+      super.onScrollChanged(l, t, oldl, oldt);
+      episodeDown.scrollTo(0, t);
+    }
+  }
+
+  /** A header scroll view: driven only by the grid, never by touch. */
+  private class SlaveScrollView extends ScrollView {
+    SlaveScrollView(Context context) {
+      super(context);
+      setVerticalScrollBarEnabled(false);
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+      return false;
+    }
+
+    @Override
+    public boolean onInterceptTouchEvent(MotionEvent event) {
+      return false;
+    }
+  }
+
+  private class SlaveHorizontalScrollView extends HorizontalScrollView {
+    SlaveHorizontalScrollView(Context context) {
+      super(context);
+      setHorizontalScrollBarEnabled(false);
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+      return false;
+    }
+
+    @Override
+    public boolean onInterceptTouchEvent(MotionEvent event) {
+      return false;
+    }
   }
 
   @Override
-  protected void fill(Shows.Show show) {
+  public void setShow(Shows.Show show) {
+    this.show = show;
+    if (getVisibility() == VISIBLE) refill();
+  }
+
+  @Override
+  public void onShown() {
+    refill();
+  }
+
+  @Override
+  public View asView() {
+    return this;
+  }
+
+  @Override
+  public void scrollStep(int px) {
+    gridDown.scrollBy(0, px);
+  }
+
+  @Override
+  public void scrollStepX(int px) {
+    gridAcross.scrollBy(px, 0);
+    headerAcross.scrollTo(gridAcross.getScrollX(), 0);
+  }
+
+  /** Back to the top, and to the far left. */
+  void scrollToStart() {
+    gridDown.smoothScrollTo(0, 0);
+    gridAcross.smoothScrollTo(0, 0);
+    headerAcross.scrollTo(0, 0);
+  }
+
+  private void refill() {
+    if (show == filled) return;
+    filled = show;
+    clearGrid();
+    clearRows();
+    gridDown.scrollTo(0, 0);
+    gridAcross.scrollTo(0, 0);
+    headerAcross.scrollTo(0, 0);
+    if (show != null) fill(show);
+  }
+
+  /** True while the given show is still the one this pane is filled with. */
+  private boolean isCurrent(Shows.Show show) {
+    return show == filled;
+  }
+
+  private void fill(Shows.Show show) {
     showName = show.name;
     gridBuilt = false;
     clearGrid();
@@ -142,7 +337,7 @@ class MapView extends ScrollPane {
   }
 
   private void show(List<Integer> seasons, List<List<Cell>> grid, String error) {
-    column.removeAllViews();
+    clearRows();
     clearGrid();
     if (seasons.isEmpty()) {
       gridBuilt = true;
@@ -167,28 +362,30 @@ class MapView extends ScrollPane {
     float halfTab = perTab / 2;
     cellColumnWidth = (int) halfTab;
 
-    LinearLayout header = row();
-    header.addView(label("", Color.WHITE), episodeColumn());
+    showGrid();
     for (int season : seasons) {
-      header.addView(label("S" + season, Color.WHITE), cellColumn());
+      headerRow.addView(label("S" + season, Color.WHITE), cellColumnParams());
     }
-    addRow(header, 0);
 
     cellSeasons.addAll(seasons);
     for (int episode = 1; episode <= grid.size(); episode++) {
       List<Cell> cells = grid.get(episode - 1);
+      episodeColumn.addView(
+          label(String.valueOf(episode), ScrollPane.DIM_COLOR), episodeColumnParams());
       LinearLayout line = row();
-      line.addView(label(String.valueOf(episode), DIM_COLOR), episodeColumn());
       List<TextView> rowViews = new ArrayList<>();
       for (int i = 0; i < seasons.size(); i++) {
         Cell cell = i < cells.size() ? cells.get(i) : null;
         ViewGroup holder = cell(cell, seasons.get(i), episode);
         rowViews.add((TextView) holder.getChildAt(0));
-        line.addView(holder, cellColumn());
+        line.addView(holder, cellColumnParams());
       }
       cellViews.add(rowViews);
       cellGrid.add(cells);
-      addRow(line, 0);
+      gridColumn.addView(
+          line,
+          new LinearLayout.LayoutParams(
+              ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
     }
     gridBuilt = true;
     // The cursor was moved in here while this was still being fetched.
@@ -226,8 +423,7 @@ class MapView extends ScrollPane {
   /**
    * One step through the grid, over any blank cell in the way -- a season with
    * no such episode number is not an episode and cannot hold the cursor. False
-   * when that direction runs off the edge, which leaves the cursor put: the
-   * grid's way out is the back key, not an arrow.
+   * when that direction runs off the edge, which leaves the cursor put.
    */
   boolean moveCellFocus(int rowStep, int colStep) {
     if (!hasFocusedCell()) return false;
@@ -291,11 +487,14 @@ class MapView extends ScrollPane {
     if (row >= cellViews.size() || col >= cellViews.get(row).size()) return;
     Cell cell = cellAt(row, col);
     boolean focused = row == focusRow && col == focusCol;
-    cellViews
-        .get(row)
-        .get(col)
-        .setBackgroundColor(
-            focused ? CELL_FOCUS_BG : (cell == null || cell.avail ? CELL_AVAIL_BG : CELL_MISSING_BG));
+    TextView view = cellViews.get(row).get(col);
+    view.setBackgroundColor(cell == null || cell.avail ? CELL_AVAIL_BG : CELL_MISSING_BG);
+    View holder = (View) view.getParent();
+    holder.setBackgroundColor(focused ? CELL_FOCUS_BORDER : GRID_LINE);
+    int inset = (int) dp(focused ? CELL_FOCUS_BORDER_DP : GRID_LINE_DP);
+    LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) view.getLayoutParams();
+    params.setMargins(inset, inset, inset, inset);
+    view.setLayoutParams(params);
   }
 
   private Cell cellAt(int row, int col) {
@@ -311,7 +510,62 @@ class MapView extends ScrollPane {
     focusCol = -1;
   }
 
-  private int cellColumnWidth = (int) dp(44f); // default, updated by show()
+  /** Everything the grid is drawn out of, headers included. */
+  private void clearRows() {
+    headerRow.removeAllViews();
+    episodeColumn.removeAllViews();
+    gridColumn.removeAllViews();
+  }
+
+  /**
+   * Scrolls only as far as needed to bring a cell fully into view -- how the
+   * arrow-key cursor follows itself around a grid taller, and wider, than the
+   * pane showing it. Posted, because the row the cursor just moved to may not
+   * have been laid out yet.
+   */
+  private void ensureVisible(View child) {
+    post(
+        () -> {
+          // Layout positions are relative to the parent and unaffected by
+          // scrolling, so adding them up to the grid column gives the content
+          // coordinates that getScrollY/getScrollX are measured in.
+          int top = 0;
+          int left = 0;
+          View view = child;
+          while (view != null && view != gridColumn) {
+            top += view.getTop();
+            left += view.getLeft();
+            ViewParent parent = view.getParent();
+            view = parent instanceof View ? (View) parent : null;
+          }
+          int bottom = top + child.getHeight();
+          if (top < gridDown.getScrollY()) gridDown.scrollTo(0, top);
+          else if (bottom > gridDown.getScrollY() + gridDown.getHeight()) {
+            gridDown.scrollTo(0, bottom - gridDown.getHeight());
+          }
+          int right = left + child.getWidth();
+          if (left < gridAcross.getScrollX()) gridAcross.scrollTo(left, 0);
+          else if (right > gridAcross.getScrollX() + gridAcross.getWidth()) {
+            gridAcross.scrollTo(right - gridAcross.getWidth(), 0);
+          }
+          headerAcross.scrollTo(gridAcross.getScrollX(), 0);
+        });
+  }
+
+  /** The message replaces the whole grid, headers and all. */
+  private void addMessage(String text) {
+    clearRows();
+    message.setText(text);
+    message.setVisibility(VISIBLE);
+    headerBar.setVisibility(GONE);
+    body.setVisibility(GONE);
+  }
+
+  private void showGrid() {
+    message.setVisibility(GONE);
+    headerBar.setVisibility(VISIBLE);
+    body.setVisibility(VISIBLE);
+  }
 
   private LinearLayout row() {
     LinearLayout row = new LinearLayout(getContext());
@@ -319,11 +573,12 @@ class MapView extends ScrollPane {
     return row;
   }
 
-  private LinearLayout.LayoutParams episodeColumn() {
-    return new LinearLayout.LayoutParams((int) dp(EPISODE_COL_WIDTH_DP), (int) dp(ROW_HEIGHT_DP));
+  private LinearLayout.LayoutParams episodeColumnParams() {
+    return new LinearLayout.LayoutParams(
+        (int) dp(EPISODE_COL_WIDTH_DP), (int) dp(ROW_HEIGHT_DP));
   }
 
-  private LinearLayout.LayoutParams cellColumn() {
+  private LinearLayout.LayoutParams cellColumnParams() {
     // Fixed width at half a tab button's width, no weight expansion.
     return new LinearLayout.LayoutParams(cellColumnWidth, (int) dp(ROW_HEIGHT_DP));
   }
@@ -337,9 +592,18 @@ class MapView extends ScrollPane {
     return view;
   }
 
+  private TextView text(String value, float sizeSp, int color) {
+    TextView view = new TextView(getContext());
+    view.setText(value);
+    view.setTextColor(color);
+    view.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp);
+    return view;
+  }
+
   private ViewGroup cell(Cell cell, int season, int episode) {
     // A one-pixel margin on a black background is the grid line, which saves
-    // giving every cell of a few hundred its own border drawable.
+    // giving every cell of a few hundred its own border drawable -- and the
+    // cursor is the same margin widened over red.
     LinearLayout holder = new LinearLayout(getContext());
     TextView view = label(cellText(cell), CELL_TEXT_COLOR);
     view.setBackgroundColor(cell == null || cell.avail ? CELL_AVAIL_BG : CELL_MISSING_BG);
@@ -403,5 +667,10 @@ class MapView extends ScrollPane {
       }
     }
     return null;
+  }
+
+  private float dp(float value) {
+    return TypedValue.applyDimension(
+        TypedValue.COMPLEX_UNIT_DIP, value, getResources().getDisplayMetrics());
   }
 }

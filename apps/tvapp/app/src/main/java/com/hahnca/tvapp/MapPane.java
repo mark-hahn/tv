@@ -45,8 +45,8 @@ class MapPane implements Pane {
     return episodeSubpane.isOpen();
   }
 
-  // The grid's cursor. MainActivity drives all of it by remote key; the
-  // episode subpane below has a cursor of its own, on its description.
+  // The grid's cursor, which MainActivity drives by remote key. The episode
+  // subpane below never takes it -- there is nothing in there to focus.
 
   void setCellFocusListener(MapView.CellFocusListener listener) {
     mapView.setCellFocusListener(listener);
@@ -64,8 +64,18 @@ class MapPane implements Pane {
     return mapView.hasFocusedCell();
   }
 
+  /**
+   * The cursor's step through the grid, with the episode subpane -- if it is
+   * open -- following it onto whatever cell it lands on. Closed, it stays
+   * closed: opening it is what ok is for.
+   */
   boolean moveCellFocus(int rowStep, int colStep) {
-    return mapView.moveCellFocus(rowStep, colStep);
+    if (!mapView.moveCellFocus(rowStep, colStep)) return false;
+    if (episodeSubpane.isOpen()) {
+      episodeSubpane.showEpisode(
+          mapView.focusedShowName(), mapView.focusedSeason(), mapView.focusedEpisode());
+    }
+    return true;
   }
 
   /** Null when the focused episode has no file for Emby to load. */
@@ -73,23 +83,15 @@ class MapPane implements Pane {
     return mapView.focusedEpisodeId();
   }
 
-  /** Opens the subpane on the focused cell; ok never closes it, only opens. */
-  void openFocusedEpisode() {
+  /**
+   * Ok on the focused cell: the subpane opens on that episode, or closes if it
+   * is the one already showing. Nothing in the subpane takes the cursor, which
+   * stays on the cell throughout.
+   */
+  void toggleFocusedEpisode() {
     if (!mapView.hasFocusedCell()) return;
-    episodeSubpane.open(
+    episodeSubpane.toggle(
         mapView.focusedShowName(), mapView.focusedSeason(), mapView.focusedEpisode());
-  }
-
-  void setEpisodeTextFocused(boolean focused) {
-    episodeSubpane.setTextFocused(focused);
-  }
-
-  void scrollEpisodeText(int px) {
-    episodeSubpane.scrollStep(px);
-  }
-
-  void scrollEpisodeTextToTop() {
-    episodeSubpane.scrollTextToTop();
   }
 
   @Override

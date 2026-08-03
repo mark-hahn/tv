@@ -1,7 +1,10 @@
 package com.hahnca.tvapp;
 
 import android.content.Context;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
 import android.os.Looper;
@@ -35,11 +38,9 @@ class ShowListView extends ScrollView implements Scroller {
 
   private static final int CARD_BG_SELECTED = 0xFF0A4A8A;
   private static final int CARD_BG_EMBY = 0xFF000000;
-  // Same #fee the web client's show list uses for a not-in-Emby row.
-  private static final int CARD_BG_NOT_EMBY = 0xFFFFEEEE;
+  // Same black as an in-Emby row; square corners are what mark it not-in-Emby.
+  private static final int CARD_BG_NOT_EMBY = CARD_BG_EMBY;
   private static final int CARD_TEXT_LIGHT = 0xFFFFFFFF;
-  private static final int CARD_TEXT_DARK = 0xFF000000;
-  private static final int CARD_WAIT_DARK = 0xFF606060;
   private static final int CARD_SELECTED_BORDER = 0xFFFF0000;
   private static final float CARD_CORNER_DP = 8f;
   private static final float CARD_SELECTED_BORDER_DP = 3f;
@@ -51,6 +52,9 @@ class ShowListView extends ScrollView implements Scroller {
   private static final float WAIT_TEXT_SIZE_SP = 14.4f;
   private static final float WAIT_GAP_DP = 12f;
   private static final int WAIT_COLOR = 0xFFB0B0B0;
+  private static final int TRASH_ICON_COLOR = 0xFFB0B0B0;
+  private static final float TRASH_ICON_SIZE_DP = 16f;
+  private static final float TRASH_ICON_STROKE_DP = 1.2f;
 
   interface SelectionListener {
     void onShowSelected(Shows.Show show);
@@ -482,15 +486,18 @@ class ShowListView extends ScrollView implements Scroller {
     }
     boolean isActive = show != null && show == active;
     boolean inEmby = show == null || show.inEmby;
-    boolean light = isActive || inEmby; // white text on blue (selected) or black (in Emby)
+    // Square corners mark the one style that isn't Emby-active or Emby-normal:
+    // a not-in-Emby row sitting unselected in the list.
+    boolean square = !isActive && !inEmby;
     GradientDrawable bg = (GradientDrawable) card.getBackground();
     bg.setColor(isActive ? CARD_BG_SELECTED : (inEmby ? CARD_BG_EMBY : CARD_BG_NOT_EMBY));
+    bg.setCornerRadius(square ? 0f : dp(CARD_CORNER_DP));
     bg.setStroke(
         show == focused && focusShown ? (int) dp(CARD_SELECTED_BORDER_DP) : 0,
         CARD_SELECTED_BORDER);
     LinearLayout row = (LinearLayout) card;
-    ((TextView) row.getChildAt(0)).setTextColor(light ? CARD_TEXT_LIGHT : CARD_TEXT_DARK);
-    ((TextView) row.getChildAt(1)).setTextColor(light ? WAIT_COLOR : CARD_WAIT_DARK);
+    ((TextView) row.getChildAt(0)).setTextColor(CARD_TEXT_LIGHT);
+    ((TextView) row.getChildAt(1)).setTextColor(WAIT_COLOR);
   }
 
   private static boolean hasActor(Shows.Show show, String normalizedName) {
@@ -511,13 +518,15 @@ class ShowListView extends ScrollView implements Scroller {
         (int) dp(CARD_PAD_V_DP));
 
     GradientDrawable bg = new GradientDrawable();
-    bg.setCornerRadius(dp(CARD_CORNER_DP));
+    // Not yet active (nothing is, at build time), so a not-in-Emby show starts
+    // in its square-corner rest style; paint() re-rounds it if it becomes active.
+    bg.setCornerRadius(show.inEmby ? dp(CARD_CORNER_DP) : 0f);
     bg.setColor(show.inEmby ? CARD_BG_EMBY : CARD_BG_NOT_EMBY);
     card.setBackground(bg);
 
     TextView name = new TextView(getContext());
     name.setText(show.name);
-    name.setTextColor(show.inEmby ? CARD_TEXT_LIGHT : CARD_TEXT_DARK);
+    name.setTextColor(CARD_TEXT_LIGHT);
     name.setTextSize(TypedValue.COMPLEX_UNIT_SP, NAME_TEXT_SIZE_SP);
     name.setSingleLine(true);
     name.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -527,7 +536,7 @@ class ShowListView extends ScrollView implements Scroller {
 
     TextView wait = new TextView(getContext());
     wait.setText(show.waitStr);
-    wait.setTextColor(show.inEmby ? WAIT_COLOR : CARD_WAIT_DARK);
+    wait.setTextColor(WAIT_COLOR);
     wait.setTextSize(TypedValue.COMPLEX_UNIT_SP, WAIT_TEXT_SIZE_SP);
     wait.setSingleLine(true);
     LinearLayout.LayoutParams waitParams =
@@ -536,7 +545,49 @@ class ShowListView extends ScrollView implements Scroller {
     waitParams.leftMargin = (int) dp(WAIT_GAP_DP);
     card.addView(wait, waitParams);
 
+    if (!show.inEmby) {
+      int size = (int) dp(TRASH_ICON_SIZE_DP);
+      LinearLayout.LayoutParams trashParams = new LinearLayout.LayoutParams(size, size);
+      trashParams.leftMargin = (int) dp(WAIT_GAP_DP);
+      card.addView(buildTrashIcon(), trashParams);
+    }
+
     return card;
+  }
+
+  /** Small drawn trash-can glyph, not-in-Emby rows only, far right of the row. */
+  private View buildTrashIcon() {
+    return new View(getContext()) {
+      private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+      {
+        paint.setColor(TRASH_ICON_COLOR);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(dp(TRASH_ICON_STROKE_DP));
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setStrokeJoin(Paint.Join.ROUND);
+      }
+
+      @Override
+      protected void onDraw(Canvas canvas) {
+        super.onDraw(canvas);
+        float w = getWidth();
+        float h = getHeight();
+        float lidY = h * 0.28f;
+        canvas.drawLine(w * 0.12f, lidY, w * 0.88f, lidY, paint);
+        canvas.drawLine(w * 0.38f, lidY, w * 0.38f, h * 0.08f, paint);
+        canvas.drawLine(w * 0.62f, lidY, w * 0.62f, h * 0.08f, paint);
+        canvas.drawLine(w * 0.38f, h * 0.08f, w * 0.62f, h * 0.08f, paint);
+        Path body = new Path();
+        body.moveTo(w * 0.22f, lidY);
+        body.lineTo(w * 0.28f, h * 0.92f);
+        body.lineTo(w * 0.72f, h * 0.92f);
+        body.lineTo(w * 0.78f, lidY);
+        canvas.drawPath(body, paint);
+        canvas.drawLine(w * 0.4f, lidY + h * 0.1f, w * 0.42f, h * 0.82f, paint);
+        canvas.drawLine(w * 0.6f, lidY + h * 0.1f, w * 0.58f, h * 0.82f, paint);
+      }
+    };
   }
 
   private float dp(float value) {

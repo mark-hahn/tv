@@ -1493,7 +1493,11 @@ export default function App() {
     {
       key: "home",
       label: null,
-      icon: <MaterialIcons name="home" size={42} color="black" />,
+      icon: tvapprcMode ? (
+        <MaterialIcons name="reorder" size={50} color="black" />
+      ) : (
+        <MaterialIcons name="home" size={42} color="black" />
+      ),
       bg: () => cellBg("white", "home"),
       onPress: () => {},
       onPressIn: () => startHomeHold(),

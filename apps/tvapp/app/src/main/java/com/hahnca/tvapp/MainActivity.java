@@ -61,6 +61,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final int BUTTON_ACTIVE_TEXT = 0xFFFFFFFF;
   private static final int BUTTON_INACTIVE_TEXT = 0xFF000000;
   private static final int BUTTON_SELECTED_BORDER = 0xFFFF0000;
+  // Off: a button only ever activates on ok. The dwell made landing on the
+  // right button hard, since scrubbing past one could still fire it.
+  private static final boolean ENABLE_BUTTON_DWELL = false;
 
   private static final String PREFS_NAME = "tvapp";
   private static final String KEY_SELECTED_SHOW = "selectedShow";
@@ -482,7 +485,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     showList.setCardFocusShown(false);
     repaintButtons();
     ui.removeCallbacks(buttonDwellActivate);
-    if (dwell) ui.postDelayed(buttonDwellActivate, ShowListView.DWELL_SELECT_MS);
+    if (dwell && ENABLE_BUTTON_DWELL) {
+      ui.postDelayed(buttonDwellActivate, ShowListView.DWELL_SELECT_MS);
+    }
   }
 
   private final Runnable buttonDwellActivate =

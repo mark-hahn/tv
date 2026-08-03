@@ -237,8 +237,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     column.setPadding((int) dp(BUTTON_PAD_H_DP), 0, (int) dp(BUTTON_PAD_H_DP), 0);
 
     addGroup(column, TAB_LABELS);
-    addGroup(column, FILTER_LABELS);
     addGroup(column, new String[] {SORT_WATCHED, SORT_ADDED, SORT_CUSTOM});
+    addGroup(column, FILTER_LABELS);
     buttonItems.get(SORT_CUSTOM).view.setVisibility(View.GONE);
     repaintButtons();
     return column;

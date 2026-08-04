@@ -55,6 +55,15 @@ class ActorsView extends ScrollPane {
   private int focusedIndex = -1;
   private Listener listener;
   private String selectedName; // normalized, or null; never drawn
+  private Shows.Show currentShow;
+  // The show and actor the cursor was on the last time it left this pane's
+  // grid, so coming back to the same show puts the cursor back on the same
+  // actor instead of always resetting to the first card. Survives the show
+  // changing away and back before the grid is re-entered -- only fill() and
+  // clearCardFocus() touch these, never anything that merely rebuilds the
+  // grid for a different show.
+  private String rememberedShowName;
+  private String rememberedActorName; // normalized
 
   ActorsView(Context context) {
     super(context);
@@ -70,15 +79,35 @@ class ActorsView extends ScrollPane {
     selectedName = null;
   }
 
-  /** The actors button's right-arrow, button-to-grid transition. */
+  /**
+   * The actors button's right-arrow, button-to-grid transition. Lands back on
+   * the actor the cursor was last on, if the grid is still showing the same
+   * show it was on then; otherwise the first card, as before.
+   */
   boolean focusFirstCard() {
     if (cardViews.isEmpty()) return false;
-    setFocusedIndex(0);
+    setFocusedIndex(rememberedIndex());
     return true;
+  }
+
+  private int rememberedIndex() {
+    if (rememberedActorName == null
+        || currentShow == null
+        || !currentShow.name.equals(rememberedShowName)) {
+      return 0;
+    }
+    for (int i = 0; i < cardActors.size(); i++) {
+      if (Shows.normalizeName(cardActors.get(i).name).equals(rememberedActorName)) return i;
+    }
+    return 0;
   }
 
   /** Cursor leaves the grid — back to the actors button, or a show/tab change. */
   void clearCardFocus() {
+    if (hasFocusedCard() && currentShow != null) {
+      rememberedShowName = currentShow.name;
+      rememberedActorName = Shows.normalizeName(cardActors.get(focusedIndex).name);
+    }
     setFocusedIndex(-1);
   }
 
@@ -109,6 +138,7 @@ class ActorsView extends ScrollPane {
 
   @Override
   protected void fill(Shows.Show show) {
+    currentShow = show;
     cardViews.clear();
     cardActors.clear();
     focusedIndex = -1;

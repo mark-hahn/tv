@@ -230,21 +230,18 @@ class ShowListView extends ScrollView implements Scroller {
    * Narrows the list to shows this actor is cast in — the Actors pane's card
    * click, the same end state the web client reaches by selecting an actor and
    * pressing its Shows button. Null lifts the narrowing back off.
+   *
+   * The active show is left alone either way: the actor clicked always comes
+   * from the active show's own cast, so it is always in the narrowed list, and
+   * apply() below keeps a selection that is still visible. Landing anywhere
+   * else would swap the show whose data the Actors pane (and every other pane)
+   * is showing out from under the click that was just made on it.
    */
   void setActorFilter(String actorName) {
     String normalized = actorName == null ? null : Shows.normalizeName(actorName);
     if (Objects.equals(actorFilter, normalized)) return;
     actorFilter = normalized;
-    if (actorFilter != null) {
-      // Narrowing to a new actor drops the old selection, same as a new sort:
-      // it is about to land somewhere unpredictable in a very different list.
-      customOrder = null;
-      clearActive();
-    }
-    // Lifting the filter does not: a show just clicked out of the narrowed
-    // list is what this is clearing the actor filter *for* — apply() below
-    // already keeps a selection that is still visible, which it always is
-    // once nothing is narrowing the list at all.
+    if (actorFilter != null) customOrder = null;
     apply();
   }
 

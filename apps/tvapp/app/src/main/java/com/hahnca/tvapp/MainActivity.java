@@ -139,8 +139,18 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // across restarts, so the filter group is re-entered where it was left.
   private String focusedFilter;
   // Whether filter text is narrowing the show list, which is exactly when the
-  // filter label above the list is showing that text.
+  // Text button shows active -- independent of the actor filter below, which
+  // narrows the list its own way and never lights that button.
   private boolean filterTextActive;
+  // The typed filter text, kept even while the actor filter is the one
+  // actually showing in filterLabel, so clearing the actor filter can put the
+  // typed text straight back up without re-deriving it.
+  private String typedFilterText = "";
+  // Name of the actor narrowing the list -- the Actors pane's card click --
+  // or null. Mutually exclusive with typed filter text in practice: whatever
+  // sets one clears the other first. Shown in filterLabel in its place while
+  // set.
+  private String actorFilterName;
   private String activeShowName;
   private long showsLoadedAt;
 
@@ -252,6 +262,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     filterLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, FILTER_LABEL_TEXT_SIZE_SP);
     filterLabel.setSingleLine(true);
     filterLabel.setEllipsize(android.text.TextUtils.TruncateAt.END);
+    filterLabel.setGravity(Gravity.CENTER_HORIZONTAL);
     filterLabel.setPadding(
         (int) dp(FILTER_LABEL_PAD_H_DP), (int) dp(FILTER_LABEL_PAD_BOTTOM_DP),
         (int) dp(FILTER_LABEL_PAD_H_DP), (int) dp(FILTER_LABEL_PAD_BOTTOM_DP));
@@ -276,9 +287,21 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   private void updateFilterLabel(String text) {
-    filterTextActive = text != null && !text.isEmpty();
+    typedFilterText = text == null ? "" : text;
+    filterTextActive = !typedFilterText.isEmpty();
     repaintButtons();
-    if (text == null || text.isEmpty()) {
+    refreshFilterLabel();
+  }
+
+  /**
+   * What filterLabel shows: the actor name while the actor filter is set, else
+   * the typed filter text, else nothing. The actor filter takes precedence
+   * because everything that sets it clears the typed text first, so the two
+   * are never both meant to show at once.
+   */
+  private void refreshFilterLabel() {
+    String text = actorFilterName != null ? actorFilterName : typedFilterText;
+    if (text.isEmpty()) {
       filterLabel.setVisibility(View.GONE);
       filterLabel.setText("");
     } else {
@@ -562,7 +585,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
                     () -> {
                       clearTextFilter();
                       actorsPane.clearSelection();
-                      showList.setActorFilter(null);
+                      applyActorFilter(null);
                       showList.setCustomOrder(names);
                       setCustomOn(true);
                     });
@@ -580,7 +603,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       showList.setCustomOrder(null);
     }
     actorsPane.clearSelection();
-    showList.setActorFilter(null);
+    applyActorFilter(null);
     if (activeFilters.contains(label)) activeFilters.remove(label);
     else activeFilters.add(label);
     showList.setActiveFilters(activeFilters);
@@ -594,7 +617,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       showList.setCustomOrder(null);
     }
     actorsPane.clearSelection();
-    showList.setActorFilter(null);
+    applyActorFilter(null);
     activeFilters.clear();
     showList.setActiveFilters(activeFilters);
     clearTextFilter();
@@ -628,12 +651,19 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   private void actorClick(String actorName) {
     if (actorName == null) {
-      showList.setActorFilter(null);
+      applyActorFilter(null);
       return;
     }
     if (customOn) setCustomOn(false);
     clearTextFilter();
+    applyActorFilter(actorName);
+  }
+
+  /** Sets the actor filter on the show list and keeps filterLabel in step. */
+  private void applyActorFilter(String actorName) {
     showList.setActorFilter(actorName);
+    actorFilterName = actorName;
+    refreshFilterLabel();
   }
 
   private void onShowSelected(Shows.Show show) {
@@ -1004,7 +1034,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
             showList.setCustomOrder(null);
           }
           actorsPane.clearSelection();
-          showList.setActorFilter(null);
+          applyActorFilter(null);
           showList.setFilter(text);
         });
   }

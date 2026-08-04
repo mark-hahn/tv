@@ -9,7 +9,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.util.TypedValue;
-import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -109,17 +108,16 @@ class EpisodeSubpane extends LinearLayout implements Scroller {
     episodeNumber.setTextSize(TypedValue.COMPLEX_UNIT_SP, AIRED_TEXT_SIZE_SP);
     episodeNumber.setTypeface(Typeface.DEFAULT_BOLD);
     header.addView(
-        episodeNumber,
-        new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        episodeNumber, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
     aired = new TextView(context);
     aired.setTextColor(TEXT_COLOR);
     aired.setTextSize(TypedValue.COMPLEX_UNIT_SP, AIRED_TEXT_SIZE_SP);
     aired.setTypeface(Typeface.DEFAULT_BOLD);
-    aired.setGravity(Gravity.END);
     header.addView(
-        aired, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        aired,
+        new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
     overview = new TextView(context);
     overview.setTextColor(TEXT_COLOR);

@@ -1633,7 +1633,16 @@ export default function App() {
   })();
 
   const isOther = mode === "other";
-  const services = allServices[mode] ?? [];
+  // Streaming-app list is keyed by the TV's actual input, so it must ignore
+  // the tvapprcMode collapse above -- otherwise it looks up "tvapprc" in
+  // services.json (which only has "google"/"fire") and comes back empty.
+  const servicesMode =
+    mediaTitle === "Smart TV"
+      ? "google"
+      : mediaTitle === "Fire TV Stick" || mediaTitle === "HDMI 2"
+        ? "fire"
+        : mode;
+  const services = allServices[servicesMode] ?? [];
   // Background color helpers (mirror Vue cellStyle / computed props)
   const cellBg = (defaultBg, key) => (flashBtn === key ? "orange" : defaultBg);
 

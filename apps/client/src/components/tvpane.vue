@@ -474,14 +474,16 @@
         ▲
       </div>
       <div
-        :style="cellStyle('white', 'home')"
+        :style="cellStyle('white', tvapprcMode ? 'info' : 'home')"
         @mousedown="startHomeHold"
         @mouseup="stopHomeHold"
         @mouseleave="stopHomeHold"
         @touchstart.prevent="startHomeHold"
         @touchend="stopHomeHold"
       >
+        <template v-if="tvapprcMode">Info</template>
         <svg
+          v-else
           width="1em"
           height="1em"
           viewBox="0 0 24 24"
@@ -543,14 +545,14 @@
         ▼
       </div>
       <div
-        :style="cellStyle('white', 'skip')"
+        :style="cellStyle('white', tvapprcMode ? 'sort' : 'skip')"
         @mousedown="startSkipHold"
         @mouseup="stopSkipHold"
         @mouseleave="stopSkipHold"
         @touchstart.prevent="startSkipHold"
         @touchend="stopSkipHold"
       >
-        Skip
+        {{ tvapprcMode ? "Sort" : "Skip" }}
       </div>
       <!-- Row 4: vol-, vol+, mute -->
       <div
@@ -585,7 +587,7 @@
       </div>
       <!-- Row 5: shows, apps, google -->
       <div
-        :style="cellStyle('white', 'shows')"
+        :style="cellStyle(tvapprcMode ? 'lightblue' : 'white', 'shows')"
         @mousedown="startShowsHold"
         @mouseup="stopShowsHold"
         @mouseleave="stopShowsHold"
@@ -632,6 +634,21 @@ const PIC_VAL_MAX_CHARS = 20;
 const PIC_VAL_EDGE_CHARS = 8;
 const TVPANE_VERSION = 2;
 
+// tvapprc bridge (mirrors apps/android/App.js) -- lets this remote follow
+// tvapp's open/closed state and, while it's open, drive it directly instead
+// of the tv.
+const TVAPPRC_HOST = "192.168.1.103";
+const TVAPPRC_PORT = 8098;
+const TVAPPRC_RECONNECT_MS = 2000;
+const TVAPPRC_CONNECT_TIMEOUT_MS = 5000;
+const MSG_TVAPP_UP = "u";
+const MSG_TVAPP_DOWN = "d";
+const CMD_CLOSE_TO_EMBY = "b";
+const CMD_EMBY_SELECTED = "e";
+const CMD_KEY = "k";
+const CMD_KEY_INFO = "info";
+const CMD_KEY_SORT = "sort";
+
 const CELL_BASE = {
   borderRight: "3px solid #000",
   borderBottom: "3px solid #000",
@@ -668,6 +685,7 @@ export default {
       picInputs: {}, // target -> { typing: bool, raw: string }
       _picChannel: null,
       _subChannel: null,
+      tvapprcMode: false,
     };
   },
 
@@ -727,9 +745,15 @@ export default {
     evtBus.on("tvArrowKey", this._onTvArrowKey);
     evtBus.on("tvOkKey", this._onTvOkKey);
     evtBus.on("tvBackKey", this._onTvBackKey);
+    this._connectTvapprc();
   },
 
   beforeUnmount() {
+    this._tvapprcDone = true;
+    clearTimeout(this._tvapprcRetryTimer);
+    clearTimeout(this._tvapprcOpenTimer);
+    this._tvapprcWs?.close();
+    this._tvapprcWs = null;
     evtBus.off("tvMuteState", this._onTvMuteState);
     evtBus.off("paneChanged", this._onPaneChanged);
     evtBus.off("tvRemoteLock", this._onTvRemoteLock);
@@ -780,6 +804,65 @@ export default {
       }
     },
 
+    // tvapprc bridge (mirrors apps/android/App.js) -- connects directly to
+    // hahnca.com's LAN-only bridge port so this remote learns when tvapp is
+    // open and can drive it directly (CMD_KEY etc.) instead of the tv.
+    _connectTvapprc() {
+      if (this._tvapprcDone) return;
+      const ws = new WebSocket(`ws://${TVAPPRC_HOST}:${TVAPPRC_PORT}`);
+      this._tvapprcWs = ws;
+      ws.onopen = () => clearTimeout(this._tvapprcOpenTimer);
+      ws.onerror = () => this._scheduleTvapprcRetry();
+      ws.onclose = () => this._scheduleTvapprcRetry();
+      ws.onmessage = (e) => {
+        if (e.data === MSG_TVAPP_UP) this.tvapprcMode = true;
+        else if (e.data === MSG_TVAPP_DOWN) this.tvapprcMode = false;
+      };
+      this._tvapprcOpenTimer = setTimeout(() => {
+        if (ws.readyState !== WebSocket.OPEN) ws.close();
+      }, TVAPPRC_CONNECT_TIMEOUT_MS);
+    },
+
+    _scheduleTvapprcRetry() {
+      if (this._tvapprcDone || this._tvapprcRetryTimer) return;
+      clearTimeout(this._tvapprcOpenTimer);
+      this._tvapprcRetryTimer = setTimeout(() => {
+        this._tvapprcRetryTimer = null;
+        this._connectTvapprc();
+      }, TVAPPRC_RECONNECT_MS);
+    },
+
+    sendTvapprc(message) {
+      const ws = this._tvapprcWs;
+      if (ws?.readyState !== WebSocket.OPEN) return false;
+      ws.send(message);
+      return true;
+    },
+
+    // Back button while tvapp is open: drops one level of tvapp's own focus
+    // rather than sending the tv's back key.
+    async closeTvappToEmby() {
+      this.flash("back");
+      if ((await this.sendKeyThrough("back", null)).blocked) return;
+      if (!this.sendTvapprc(CMD_CLOSE_TO_EMBY)) {
+        fetch(`${config.tvTvUrl}/tv/tvapprc/back`, { method: "POST" }).catch(
+          () => {},
+        );
+      }
+    },
+
+    // Emby button while tvapp is open: loads tvapp's active show into Emby.
+    async embySelectedFromTvapp() {
+      this.flash("emby");
+      if ((await this.sendKeyThrough("emby", null)).blocked) return;
+      if (!this.sendTvapprc(CMD_EMBY_SELECTED)) {
+        fetch(`${config.tvTvUrl}/tv/tvapprc/emby`, { method: "POST" }).catch(
+          () => {},
+        );
+      }
+      this.tvapprcMode = false;
+    },
+
     // Shows: opens tvapp on the tv with whatever show is up in the client, or
     // closes it if it's already open. Goes straight to tv-tv, not through the
     // collision gate -- there's no other remote whose keypress this could
@@ -828,6 +911,10 @@ export default {
 
     // Keyboard escape — same as a short tap on the Back button.
     async _onTvBackKey() {
+      if (this.tvapprcMode) {
+        await this.closeTvappToEmby();
+        return;
+      }
       await this.tvKey("back");
     },
 
@@ -844,6 +931,30 @@ export default {
     },
 
     startRepeat(key) {
+      if (this.tvapprcMode) {
+        this.flash(key);
+        this._repeatActive = true;
+        this._pendingLRKey = null;
+        (async () => {
+          const r = await this.sendKeyThrough(key, null);
+          if (r.blocked) return this.stopRepeat();
+          this.sendTvapprc(`${CMD_KEY},${key}`);
+          await new Promise((r) => {
+            this._repeatTimer = setTimeout(r, SCRUB_HOLD_DELAY_MS);
+          });
+          while (this._repeatActive) {
+            const rr = await this.sendKeyThrough(key, null, {
+              repeating: true,
+            });
+            if (rr.blocked) return this.stopRepeat();
+            this.sendTvapprc(`${CMD_KEY},${key}`);
+            await new Promise((r) => {
+              this._repeatTimer = setTimeout(r, 120);
+            });
+          }
+        })();
+        return;
+      }
       if (this.isOff || this.isOther) return;
       if (!this._debounce()) return;
       this.flash(key);
@@ -937,6 +1048,7 @@ export default {
       clearTimeout(this._repeatTimer);
       const pendingLRKey = this._pendingLRKey;
       this._pendingLRKey = null;
+      if (this.tvapprcMode) return;
       // Stop server-side scrubbing. This is a gesture-end cleanup, not a
       // keypress, and must fire even when locked (else the tv keeps scrubbing),
       // so it goes direct rather than through the collision gate.
@@ -1024,6 +1136,10 @@ export default {
     },
 
     startBackHold() {
+      if (this.tvapprcMode) {
+        this._dbStart(() => this.closeTvappToEmby());
+        return;
+      }
       this._dbStart(() => this.tvKey("back"));
     },
     stopBackHold() {
@@ -1031,6 +1147,14 @@ export default {
     },
 
     startHomeHold() {
+      if (this.tvapprcMode) {
+        this._dbStart(async () => {
+          this.flash("info");
+          const r = await this.sendKeyThrough(CMD_KEY_INFO, null);
+          if (!r.blocked) this.sendTvapprc(`${CMD_KEY},${CMD_KEY_INFO}`);
+        });
+        return;
+      }
       this._dbStart(() => this.tvKey("home"));
     },
     stopHomeHold() {
@@ -1046,6 +1170,10 @@ export default {
     },
 
     startEmbyHold() {
+      if (this.tvapprcMode) {
+        this._dbStart(() => this.embySelectedFromTvapp());
+        return;
+      }
       this._armHold("emby", () =>
         this._lpStart(
           () => this.tvCmd("emby"),
@@ -1057,6 +1185,7 @@ export default {
       );
     },
     stopEmbyHold() {
+      this._dbStop();
       this._lpStop();
     },
 
@@ -1321,6 +1450,14 @@ export default {
     },
 
     startSkipHold() {
+      if (this.tvapprcMode) {
+        this._dbStart(async () => {
+          this.flash("sort");
+          const r = await this.sendKeyThrough(CMD_KEY_SORT, null);
+          if (!r.blocked) this.sendTvapprc(`${CMD_KEY},${CMD_KEY_SORT}`);
+        });
+        return;
+      }
       const pressedAt = Date.now();
       this._armHold("skip", () =>
         this._lpStart(
@@ -1342,6 +1479,7 @@ export default {
     },
 
     stopSkipHold() {
+      this._dbStop();
       this._lpStop();
     },
 
@@ -1519,6 +1657,12 @@ export default {
     },
 
     async tvKey(key) {
+      if (this.tvapprcMode) {
+        this.flash(key);
+        const r = await this.sendKeyThrough(key, null);
+        if (!r.blocked) this.sendTvapprc(`${CMD_KEY},${key}`);
+        return;
+      }
       if (this.isOff || this.isOther) return;
       if (!this._debounce()) return;
       this.flash(key);

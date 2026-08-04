@@ -392,6 +392,7 @@ let activeDevice = null;
 let lastOffAt = 0;
 let lastOnAt = 0;
 let pendingGoogleHome = false;
+let pendingGoogleTvapp = false;
 let pendingFireEmby = false;
 let pendingViewShow = null; // { showId, showName } — queued for after Emby launches
 let currentShowName = null;
@@ -505,7 +506,7 @@ function handleMsg(raw) {
         const attrs = event.data?.new_state?.attributes;
         unilog(
           385,
-          `BRAVIA attrs: title=${attrs?.media_title ?? "null"} mediaType=${attrs?.media_content_type ?? "null"} muted=${attrs?.is_volume_muted ?? "null"} pendingGoogleHome=${pendingGoogleHome} pendingFireEmby=${pendingFireEmby}`,
+          `BRAVIA attrs: title=${attrs?.media_title ?? "null"} mediaType=${attrs?.media_content_type ?? "null"} muted=${attrs?.is_volume_muted ?? "null"} pendingGoogleHome=${pendingGoogleHome} pendingGoogleTvapp=${pendingGoogleTvapp} pendingFireEmby=${pendingFireEmby}`,
         );
         const prevPower = braviaHaPower;
         braviaHaPower = state;
@@ -513,6 +514,13 @@ function handleMsg(raw) {
           braviaHaMuted = attrs.is_volume_muted ?? null;
           braviaMediaContentType = attrs.media_content_type ?? null;
           braviaMediaTitle = attrs.media_title ?? null;
+        }
+        // TV just turned on from a googlebtn press — open tvapp
+        const wasGoogleTvappPending = pendingGoogleTvapp;
+        if (pendingGoogleTvapp && prevPower !== "on" && state === "on") {
+          pendingGoogleTvapp = false;
+          unilog(1902, "googlebtn: TV on — launching tvapp");
+          launchTvapp();
         }
         // TV just turned on with pendingGoogleHome flag set
         const wasGooglePending = pendingGoogleHome;
@@ -553,11 +561,12 @@ function handleMsg(raw) {
           );
         }
         // HDMI 2 selected but no CEC signal → Fire Stick is in standby; wake it
-        // Skip if wasGooglePending — we don't want Fire Stick CEC hijacking the input
+        // Skip if wasGooglePending/wasGoogleTvappPending — we don't want Fire Stick CEC hijacking the input
         if (
           braviaMediaTitle === "HDMI 2" &&
           braviaMediaContentType === null &&
-          !wasGooglePending
+          !wasGooglePending &&
+          !wasGoogleTvappPending
         ) {
           unilog(389, "HDMI 2 with no signal — waking Fire Stick");
           callService("media_player", "turn_on", FIRE_TV_ENTITY_ID);
@@ -630,25 +639,13 @@ app.get("/tv/googlebtn", (req, res) => {
   );
   callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
   if (braviaHaPower === "on") {
-    // TV already on — send home immediately
-    unilog(395, "googlebtn: TV already on, sending Home now");
-    callService("remote", "send_command", REMOTE_ENTITY_ID, {
-      command: "Home",
-    });
-    setTimeout(() => {
-      unilog(396, "googlebtn: +10s launching Emby via play_media");
-      callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
-        media_content_type: "app",
-        media_content_id: EMBY_APP_URI,
-      });
-    }, GOOGLE_EMBY_DELAY_MS);
+    // TV already on — launch tvapp immediately
+    unilog(1903, "googlebtn: TV already on, launching tvapp");
+    launchTvapp();
   } else {
     // TV off — wait for state_changed on transition to "on"
-    pendingGoogleHome = true;
-    unilog(
-      397,
-      `googlebtn: TV not on (${braviaHaPower}), set pendingGoogleHome=true`,
-    );
+    pendingGoogleTvapp = true;
+    unilog(1904, `googlebtn: TV not on (${braviaHaPower}), set pendingGoogleTvapp=true`);
   }
   res.json({ ok: true });
 });

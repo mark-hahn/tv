@@ -855,11 +855,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     int next = (activeTabIndex + 1) % TAB_LABELS.length;
     selectTab(next);
     focusShows();
-    // A show with one trailer has nothing to choose between, so landing on the
-    // trailer tab plays it outright; none or several leaves the cards up. After
-    // the focus has moved, since dropping the focus out of the trailer pane is
-    // also what cancels a play its list has not settled for yet.
-    if (next == TRAILER_TAB_INDEX) trailersView.playSoleTrailer();
   }
 
   private void embyClick() {

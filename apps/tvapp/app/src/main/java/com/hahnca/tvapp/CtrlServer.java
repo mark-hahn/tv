@@ -22,6 +22,8 @@ import org.java_websocket.server.WebSocketServer;
  *   x              close tvapp
  *   f,&lt;text&gt;    show-list filter text
  *   s,&lt;name&gt;    select this show, exact name match -- sent by tv-tv itself
+ *   c              the shared filter settings changed: re-fetch the Custom
+ *                  list -- sent by tv-tv itself, on tv-srvr's behalf
  *
  * Back to Android:
  *
@@ -50,6 +52,7 @@ class CtrlServer extends WebSocketServer {
   private static final String CMD_EXIT = "x";
   private static final String CMD_FILTER = "f";
   private static final String CMD_SELECT = "s";
+  private static final String CMD_CUSTOM_CHANGED = "c";
   private static final int STOP_TIMEOUT_MS = 500;
 
   interface Listener {
@@ -68,6 +71,8 @@ class CtrlServer extends WebSocketServer {
     void onFilter(String text);
 
     void onSelectShow(String name);
+
+    void onCustomChanged();
 
     void onPhoneConnected();
   }
@@ -140,6 +145,8 @@ class CtrlServer extends WebSocketServer {
       listener.onEmbySelected();
     } else if (CMD_EXIT.equals(message)) {
       listener.onExit();
+    } else if (CMD_CUSTOM_CHANGED.equals(message)) {
+      listener.onCustomChanged();
     } else {
       Log.w(TAG, "unknown ctrl command: " + message);
     }

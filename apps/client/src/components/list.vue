@@ -1018,10 +1018,12 @@ export default {
       await this.select();
       this.sortShows();
       this.$nextTick(() => {
-        const container = document.querySelector("#shows");
-        if (container) container.scrollTop = 0;
         if (Array.isArray(this.shows) && this.shows.length > 0) {
-          this.saveVisShow(this.shows[0], false);
+          const selectedName = shared && shared.selectedShow;
+          const target =
+            (selectedName && this.shows.find((s) => s.name === selectedName)) ||
+            this.shows[0];
+          this.saveVisShow(target, true);
         }
       });
     },
@@ -1065,10 +1067,13 @@ export default {
           this.sortShows();
 
           this.$nextTick(() => {
-            const container = document.querySelector("#shows");
-            if (container) container.scrollTop = 0;
             if (Array.isArray(this.shows) && this.shows.length > 0) {
-              this.saveVisShow(this.shows[0], false);
+              const selectedName = shared && shared.selectedShow;
+              const target =
+                (selectedName &&
+                  this.shows.find((s) => s.name === selectedName)) ||
+                this.shows[0];
+              this.saveVisShow(target, true);
             }
           });
           return;
@@ -1086,6 +1091,7 @@ export default {
           condFilters,
           sortChoice: this.sortChoice,
           reversed: this.reversed,
+          selectedShow: this.highlightName,
         };
 
         await srvr.setSharedFilters(payload);
@@ -1171,12 +1177,15 @@ export default {
         await this.select();
         this.sortShows();
 
-        // When clicking Custom, scroll to top and select first show.
+        // When clicking Custom, select the show saved with the settings.
         this.$nextTick(() => {
-          const container = document.querySelector("#shows");
-          if (container) container.scrollTop = 0;
           if (Array.isArray(this.shows) && this.shows.length > 0) {
-            this.saveVisShow(this.shows[0], false);
+            const selectedName = shared && shared.selectedShow;
+            const target =
+              (selectedName &&
+                this.shows.find((s) => s.name === selectedName)) ||
+              this.shows[0];
+            this.saveVisShow(target, true);
           }
         });
         return;

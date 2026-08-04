@@ -118,13 +118,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // Coming back from Emby reuses the list already in memory, which is the point
   // of staying resident, but a list loaded long enough ago has stale waitStrs.
   private static final long SHOWS_REFRESH_AFTER_MS = 10 * 60_000;
-  // While the Custom sort is on, how often to re-fetch it -- the web client's
-  // Send button can change the shared settings at any time, and the Custom
-  // list is supposed to track them live.
-  private static final long CUSTOM_POLL_MS = 5_000;
 
   private final Handler ui = new Handler(Looper.getMainLooper());
-  private final Runnable customPoll = this::pollCustomOrder;
   private final List<Pane> panes = new ArrayList<>();
   private final Map<String, ButtonItem> buttonItems = new HashMap<>();
   private final List<String> buttonOrder = new ArrayList<>();
@@ -553,10 +548,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    */
   private void cycleSort() {
     if (customOn) {
-      setCustomOn(false);
-      showList.setCustomOrder(null);
+      dropCustom(false);
       clearTextFilter();
-      applySort(Shows.Sort.ALPHA);
     } else if (sort == Shows.Sort.WATCHING) {
       applySort(Shows.Sort.ADDED);
     } else if (sort == Shows.Sort.ADDED) {
@@ -567,16 +560,30 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   private void applySort(Shows.Sort newSort) {
+    applySort(newSort, false);
+  }
+
+  private void applySort(Shows.Sort newSort, boolean keepSelection) {
     sort = newSort;
-    showList.setSort(sort);
+    showList.setSort(sort, keepSelection);
     prefs().edit().putString(KEY_SORT, sort.name()).apply();
     repaintButtons();
   }
 
   private void setCustomOn(boolean on) {
     customOn = on;
-    if (!on) ui.removeCallbacks(customPoll);
     repaintButtons();
+  }
+
+  /**
+   * Off the Custom list, because something else is narrowing the list now. The
+   * settings it came from carried their own sort, so there is no sort of this
+   * app's own to fall back to: it goes alphabetical, the sort with no button.
+   */
+  private void dropCustom(boolean keepSelection) {
+    if (!customOn) return;
+    setCustomOn(false);
+    applySort(Shows.Sort.ALPHA, keepSelection);
   }
 
   /**
@@ -585,33 +592,31 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    */
   private void customClick() {
     fetchCustomOrder(
-        names -> {
+        (names, selectedShow) -> {
           clearTextFilter();
           actorsPane.clearSelection();
           applyActorFilter(null);
-          showList.setCustomOrder(names);
+          showList.setCustomOrder(names, selectedShow);
           setCustomOn(true);
-          ui.postDelayed(customPoll, CUSTOM_POLL_MS);
         });
   }
 
   /**
-   * Re-fetches the Custom order while it is still on and reschedules itself --
-   * the web client's Send button can change the shared settings at any time,
-   * so this is what keeps the list matching them live.
+   * tv-srvr's push, sent the moment the web client's Send button saves new
+   * shared settings -- the only thing that can change them, so nothing here
+   * polls for it. Ignored unless Custom is the sort in force.
    */
-  private void pollCustomOrder() {
+  private void customChanged() {
     if (!customOn) return;
     fetchCustomOrder(
-        names -> {
+        (names, selectedShow) -> {
           if (!customOn) return;
-          showList.setCustomOrder(names);
-          ui.postDelayed(customPoll, CUSTOM_POLL_MS);
+          showList.setCustomOrder(names, selectedShow);
         });
   }
 
   private interface CustomOrderCallback {
-    void onNames(List<String> names);
+    void onNames(List<String> names, String selectedShow);
   }
 
   private void fetchCustomOrder(CustomOrderCallback callback) {
@@ -624,7 +629,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
                 for (int i = 0; arr != null && i < arr.length(); i++) {
                   names.add(arr.optString(i, ""));
                 }
-                ui.post(() -> callback.onNames(names));
+                Object rawSelected = res.opt("selectedShow");
+                String selectedShow = (rawSelected instanceof String) ? (String) rawSelected : null;
+                ui.post(() -> callback.onNames(names, selectedShow));
               } catch (Exception e) {
                 Log.e(TAG, "custom show list fetch failed: " + e);
               }
@@ -634,10 +641,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   private void toggleFilter(String label) {
-    if (customOn) {
-      setCustomOn(false);
-      showList.setCustomOrder(null);
-    }
+    dropCustom(false);
     actorsPane.clearSelection();
     applyActorFilter(null);
     if (activeFilters.contains(label)) activeFilters.remove(label);
@@ -648,10 +652,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   /** The Clear button: every way the show list can be narrowed, all at once. */
   private void clearAllFilters() {
-    if (customOn) {
-      setCustomOn(false);
-      showList.setCustomOrder(null);
-    }
+    dropCustom(false);
     actorsPane.clearSelection();
     applyActorFilter(null);
     activeFilters.clear();
@@ -690,7 +691,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       applyActorFilter(null);
       return;
     }
-    if (customOn) setCustomOn(false);
+    // Keeping the selection: the actor clicked comes from the selected show's
+    // own cast, so that show is in the narrowed list and stays the one every
+    // pane -- the Actors pane the click was made in above all -- is showing.
+    dropCustom(true);
     clearTextFilter();
     applyActorFilter(actorName);
   }
@@ -1097,10 +1101,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     ui.post(
         () -> {
           bumpKeepAwake();
-          if (customOn) {
-            setCustomOn(false);
-            showList.setCustomOrder(null);
-          }
+          dropCustom(false);
           actorsPane.clearSelection();
           applyActorFilter(null);
           showList.setFilter(text);
@@ -1113,6 +1114,11 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   @Override
+  public void onCustomChanged() {
+    ui.post(this::customChanged);
+  }
+
+  @Override
   public void onPhoneConnected() {
     ui.post(this::sendActiveShow);
   }
@@ -1120,7 +1126,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   @Override
   protected void onDestroy() {
     ui.removeCallbacks(clearKeepAwake);
-    ui.removeCallbacks(customPoll);
     super.onDestroy();
   }
 

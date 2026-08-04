@@ -107,6 +107,7 @@ const CMD_BACK_TO_EMBY = "b"; // close tvapp and bring Emby up
 const CMD_FORCE_CLOSE_TO_EMBY = "g"; // same, but ignoring tvapp's focus
 const CMD_EMBY_SELECTED = "e"; // load tvapp's active show into Emby
 const CMD_SELECT_SHOW = "s"; // select a show by name
+const CMD_CUSTOM_CHANGED = "c"; // the shared filter settings changed
 const TVAPP_PROBE_TIMEOUT_MS = 800;
 const TVAPP_SELECT_DIAL_TIMEOUT_MS = 8000;
 
@@ -2661,6 +2662,15 @@ app.post("/tv/tvapprc/forceback", async (req, res) => {
 app.post("/tv/tvapprc/emby", async (req, res) => {
   const ok = await sendTvappCommand(CMD_EMBY_SELECTED);
   res.json(ok ? { ok: true } : { ok: false, error: "tvapp is not open" });
+});
+
+// tv-srvr calls this when the web client's Send button saves new shared filter
+// settings. tvapp re-fetches its Custom list on it, which is why nothing there
+// polls for the change: the Send button is the only thing that can make one.
+// Not open, or not on the Custom sort, and it simply comes to nothing.
+app.get("/tv/tvappcustom", async (req, res) => {
+  const ok = await sendTvappCommand(CMD_CUSTOM_CHANGED);
+  res.json({ ok });
 });
 
 // tvapp asks for this when it needs the set to bring it to the front. It cannot

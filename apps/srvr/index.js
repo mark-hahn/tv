@@ -1216,6 +1216,10 @@ const setSharedFilters = async (params) => {
   sharedFilters = params;
   fs.writeFileSync(CUSTOM_SETTINGS_FILE, JSON.stringify(sharedFilters), "utf8");
   notifyClients("sharedFiltersChanged", sharedFilters);
+  // tvapp cannot be notified: it holds no socket here. tv-tv is the one thing
+  // that can reach it, so the push goes out through there -- the Send button
+  // being the only source of a change is what lets tvapp do without a poll.
+  tvTvGet("/tv/tvappcustom");
   return { ok: true };
 };
 
@@ -1261,7 +1265,10 @@ const getSharedFilterShows = async (params) => {
     derived,
     !!settings.reversed,
   );
-  return { names: sorted.map((show) => show.name) };
+  return {
+    names: sorted.map((show) => show.name),
+    selectedShow: settings.selectedShow || null,
+  };
 };
 
 const sendEmailHandler = async (params) => {

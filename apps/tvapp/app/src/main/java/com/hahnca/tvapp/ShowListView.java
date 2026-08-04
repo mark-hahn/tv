@@ -207,10 +207,19 @@ class ShowListView extends ScrollView implements Scroller {
    * list goes back to the top and takes whichever show lands there.
    */
   void setSort(Shows.Sort sort) {
+    setSort(sort, false);
+  }
+
+  /**
+   * keepSelection is for the callers that are re-sorting only as a side effect
+   * of narrowing the list some other way, and are narrowing it around the show
+   * that is selected -- the actor filter. The selection is theirs to keep.
+   */
+  void setSort(Shows.Sort sort, boolean keepSelection) {
     if (this.sort == sort && customOrder == null) return;
     customOrder = null;
     this.sort = sort;
-    clearActive();
+    if (!keepSelection) clearActive();
     apply();
   }
 
@@ -218,11 +227,21 @@ class ShowListView extends ScrollView implements Scroller {
    * Show exactly these shows, in exactly this order — tv-srvr's answer for the
    * shared settings, which are richer than this list's own filter and sort can
    * express. Null hands the list back to those.
+   *
+   * selectedName is the show that was selected where the settings were sent
+   * from; null, or a name this order does not hold, leaves the top card
+   * selected. It is made active before the cards are laid out so apply() keeps
+   * it, rather than taking the top card and handing the panes a show that is
+   * replaced a moment later.
    */
-  void setCustomOrder(List<String> names) {
+  void setCustomOrder(List<String> names, String selectedName) {
     customOrder = names;
     if (names != null) actorFilter = null;
     clearActive();
+    if (names != null && selectedName != null && names.contains(selectedName)) {
+      Shows.Show wanted = byName.get(selectedName);
+      if (wanted != null) setActive(wanted);
+    }
     apply();
   }
 

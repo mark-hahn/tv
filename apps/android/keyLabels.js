@@ -11,6 +11,7 @@ export const keyLabels = {
   ok: "OK",
   back: "Back",
   home: "Home",
+  info: "Info",
   mute: "Mute",
   off: "Off",
   on: "On",
@@ -20,5 +21,7 @@ export const keyLabels = {
   googlebtn: "Google TV",
   firebtn: "Fire TV",
   skip: "Skip",
+  sort: "Sort",
+  filter: "Filter",
   resToggle: "Resolution Toggle",
 };

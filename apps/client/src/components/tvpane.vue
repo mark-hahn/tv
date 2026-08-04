@@ -973,6 +973,14 @@ export default {
       }, 400);
     },
 
+    // Drops a hold in flight without running either of its actions.
+    _lpCancel() {
+      if (!this._lp) return;
+      clearTimeout(this._lpDebounceTimer);
+      clearTimeout(this._lpLongTimer);
+      this._lp = null;
+    },
+
     _lpStop() {
       if (!this._lp) return;
       const lp = this._lp;
@@ -981,6 +989,20 @@ export default {
       this._lp = null;
       if (lp.phase === 0) return;
       if (lp.phase === 1) lp.shortAction?.();
+    },
+
+    // A hold button does not send its key until it is released, which can be a
+    // long time after the press, so on its own it would reach the collision
+    // gate well after another remote's simultaneous press had left the window
+    // -- and not at all when the press is held past its long-press. This arms
+    // the window on the press instead, and drops the hold if that press
+    // already lost to another remote. Buttons with no long action (back, home,
+    // ok) send on the press already and need none of this.
+    _armHold(key, start) {
+      start();
+      this.sendKeyThrough(key, null).then((r) => {
+        if (r.blocked) this._lpCancel();
+      });
     },
 
     // Shared simple debounce helper: immediate action, no long-press
@@ -1024,12 +1046,14 @@ export default {
     },
 
     startEmbyHold() {
-      this._lpStart(
-        () => this.tvCmd("emby"),
-        () => {
-          this.flash("emby");
-          this.showStreamers = true;
-        },
+      this._armHold("emby", () =>
+        this._lpStart(
+          () => this.tvCmd("emby"),
+          () => {
+            this.flash("emby");
+            this.showStreamers = true;
+          },
+        ),
       );
     },
     stopEmbyHold() {
@@ -1068,12 +1092,14 @@ export default {
     },
 
     startVolDownHold() {
-      this._lpStart(
-        () => this.tvVolCmd("down"),
-        () => {
-          this.flash("vold");
-          this.openPicCtrl();
-        },
+      this._armHold("vold", () =>
+        this._lpStart(
+          () => this.tvVolCmd("down"),
+          () => {
+            this.flash("vold");
+            this.openPicCtrl();
+          },
+        ),
       );
     },
 
@@ -1082,12 +1108,14 @@ export default {
     },
 
     startVolUpHold() {
-      this._lpStart(
-        () => this.tvVolCmd("up"),
-        () => {
-          this.flash("volu");
-          this.openSubCtrl();
-        },
+      this._armHold("volu", () =>
+        this._lpStart(
+          () => this.tvVolCmd("up"),
+          () => {
+            this.flash("volu");
+            this.openSubCtrl();
+          },
+        ),
       );
     },
 
@@ -1294,20 +1322,22 @@ export default {
 
     startSkipHold() {
       const pressedAt = Date.now();
-      this._lpStart(
-        () => {
-          // short press → skip intro (a srvr feature, not a tv/ha command)
-          this.flash("skip");
-          this.sendKeyThrough("skip", `/api/skipIntro`, {
-            method: "POST",
-            body: { pressedAt },
-            base: "srvr",
-          });
-        },
-        () => {
-          // long press → toggle resolution
-          this.toggleResolution();
-        },
+      this._armHold("skip", () =>
+        this._lpStart(
+          () => {
+            // short press → skip intro (a srvr feature, not a tv/ha command)
+            this.flash("skip");
+            this.sendKeyThrough("skip", `/api/skipIntro`, {
+              method: "POST",
+              body: { pressedAt },
+              base: "srvr",
+            });
+          },
+          () => {
+            // long press → toggle resolution
+            this.toggleResolution();
+          },
+        ),
       );
     },
 

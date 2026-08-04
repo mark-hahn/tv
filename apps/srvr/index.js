@@ -88,7 +88,12 @@ import {
   setGlobalMessage,
   unsubscribeAllChannels,
 } from "./src/messaging.js";
-import { keySendWithChk, tvRemoteUnlock, tvTvGet } from "./src/tvRemoteKey.js";
+import {
+  keySendWithChk,
+  tvRemoteFilterOpen,
+  tvRemoteUnlock,
+  tvTvGet,
+} from "./src/tvRemoteKey.js";
 import { BATCH_SCHED, ffmpegQueue } from "./src/batchQueue.js";
 import * as bifQueue from "./src/bifQueue.js";
 import * as subsQueue from "./src/subsQueue.js";
@@ -1531,6 +1536,7 @@ app.post("/api/accessTvdb", apiWrapper(tvdb.accessTvdb));
 app.post("/api/getTvmazeCrew", apiWrapper(tvdb.getTvmazeCrew_cmd));
 app.post("/api/migrateWatchedCount", apiWrapper(tvdb.migrateWatchedCount));
 app.post("/api/tvRemoteKey", apiWrapper(keySendWithChk));
+app.post("/api/tvRemoteFilterOpen", apiWrapper(tvRemoteFilterOpen));
 app.get("/api/getGroupCounts", apiWrapper(groupCounts.getGroupCounts));
 app.get("/api/getBadGroups", (_req, res) => {
   try {

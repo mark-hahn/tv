@@ -272,12 +272,16 @@ export default function App() {
       flash(key);
       repeatActiveRef.current = true;
       pendingLRKeyRef.current = null;
-      sendTvapprc(`${CMD_KEY},${key}`);
       (async () => {
+        const r = await sendKeyThrough(key, null);
+        if (r.blocked) return stopRepeat();
+        sendTvapprc(`${CMD_KEY},${key}`);
         await new Promise((r) => {
           repeatDelayRef.current = setTimeout(r, SCRUB_HOLD_DELAY_MS);
         });
         while (repeatActiveRef.current) {
+          const rr = await sendKeyThrough(key, null, { repeating: true });
+          if (rr.blocked) return stopRepeat();
           sendTvapprc(`${CMD_KEY},${key}`);
           await new Promise((r) => {
             repeatTimeoutRef.current = setTimeout(r, 120);
@@ -423,6 +427,10 @@ export default function App() {
         if (msg.id === 0 && msg.notification === "tvMuteState") {
           applyTvState(msg.data);
         } else if (msg.id === 0 && msg.notification === "tvRemoteLock") {
+          // The filter text screen is one of the things that can lose a
+          // collision, and it sits above the lockout, so it goes away first.
+          setShowTvapprcInput(false);
+          Keyboard.dismiss();
           setLocked(true);
           setLockInfo(msg.data ?? null);
         } else if (msg.id === 0 && msg.notification === "tvRemoteUnlock") {
@@ -573,6 +581,19 @@ export default function App() {
       tvapprcWsRef.current = null;
     };
   }, []);
+
+  // The filter text screen holds the collision floor for as long as it is up,
+  // so srvr is told every time it opens or closes. Sitting on the state rather
+  // than on each call site catches every way it closes, and the false this
+  // fires on startup clears any entry left behind by an app that died with the
+  // screen up.
+  useEffect(() => {
+    fetch(`${TV_SRVR_HTTP_URL}/api/tvRemoteFilterOpen`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ senderId: CLIENT_ID, open: showTvapprcInput }),
+    }).catch(() => {});
+  }, [showTvapprcInput]);
 
   useEffect(() => {
     if (!tvapprcMode) {
@@ -888,7 +909,8 @@ export default function App() {
   const tvKey = async (key) => {
     if (tvapprcMode) {
       flash(key);
-      sendTvapprc(`${CMD_KEY},${key}`);
+      const r = await sendKeyThrough(key, null);
+      if (!r.blocked) sendTvapprc(`${CMD_KEY},${key}`);
       return;
     }
     if (isOff || isOther) return;
@@ -924,8 +946,9 @@ export default function App() {
    * and lets the bridge's tvapp-down message end it, which is the only thing
    * that knows tvapp really left.
    */
-  const closeTvappToEmby = (flashKey = "back") => {
+  const closeTvappToEmby = async (flashKey = "back") => {
     flash(flashKey);
+    if ((await sendKeyThrough("back", null)).blocked) return;
     if (!sendTvapprc(CMD_CLOSE_TO_EMBY)) {
       fetch(`${TV_TV_URL}/tv/tvapprc/back`, { method: "POST" }).catch((e) =>
         console.warn("tvapprc back failed", e),
@@ -946,8 +969,9 @@ export default function App() {
     }
   };
 
-  const embySelectedFromTvapp = () => {
+  const embySelectedFromTvapp = async () => {
     flash("emby");
+    if ((await sendKeyThrough("emby", null)).blocked) return;
     if (!sendTvapprc(CMD_EMBY_SELECTED)) {
       fetch(`${TV_TV_URL}/tv/tvapprc/emby`, { method: "POST" }).catch((e) =>
         console.warn("tvapprc emby failed", e),
@@ -984,6 +1008,15 @@ export default function App() {
     }, holdMs);
   };
 
+  // Drops a hold in flight without running either of its actions.
+  const lpCancel = () => {
+    const lp = lpRef.current;
+    if (!lp) return;
+    clearTimeout(lp.debounceTimer);
+    clearTimeout(lp.longTimer);
+    lpRef.current = null;
+  };
+
   const lpStop = () => {
     const lp = lpRef.current;
     if (!lp) return;
@@ -992,6 +1025,19 @@ export default function App() {
     lpRef.current = null;
     if (lp.phase === 0) return;
     if (lp.phase === 1) lp.shortAction?.();
+  };
+
+  // A hold button does not send its key until it is released, which can be a
+  // couple of seconds after the press, so on its own it would reach the
+  // collision gate long after another remote's simultaneous press had left the
+  // window -- and not at all when the press is held past its long-press. This
+  // arms the window on the press instead, and drops the hold if that press
+  // already lost to another remote.
+  const armHold = (key, start) => {
+    start();
+    sendKeyThrough(key, null).then((r) => {
+      if (r.blocked) lpCancel();
+    });
   };
 
   // Shared simple debounce: debounce → action, no long-press
@@ -1051,16 +1097,18 @@ export default function App() {
   const stopAppsHold = () => lpStop();
 
   const startVolDownHold = () => {
-    lpStart(
-      async () => {
-        if (isOff || isOther) return;
-        flash("vold");
-        await sendKeyThrough("vold", `/tv/vol/down`);
-      },
-      () => {
-        flash("vold");
-        openPicCtrl();
-      },
+    armHold("vold", () =>
+      lpStart(
+        async () => {
+          if (isOff || isOther) return;
+          flash("vold");
+          await sendKeyThrough("vold", `/tv/vol/down`);
+        },
+        () => {
+          flash("vold");
+          openPicCtrl();
+        },
+      ),
     );
   };
 
@@ -1076,16 +1124,18 @@ export default function App() {
   };
 
   const startVolUpHold = () => {
-    lpStart(
-      async () => {
-        if (isOff || isOther) return;
-        flash("volu");
-        await sendKeyThrough("volu", `/tv/vol/up`);
-      },
-      () => {
-        flash("volu");
-        openSubCtrl();
-      },
+    armHold("volu", () =>
+      lpStart(
+        async () => {
+          if (isOff || isOther) return;
+          flash("volu");
+          await sendKeyThrough("volu", `/tv/vol/up`);
+        },
+        () => {
+          flash("volu");
+          openSubCtrl();
+        },
+      ),
     );
   };
 
@@ -1304,27 +1354,30 @@ export default function App() {
 
   const startSkipHold = () => {
     if (tvapprcMode) {
-      dbStart(() => {
+      dbStart(async () => {
         flash("sort");
-        sendTvapprc(`${CMD_KEY},${CMD_KEY_SORT}`);
+        const r = await sendKeyThrough(CMD_KEY_SORT, null);
+        if (!r.blocked) sendTvapprc(`${CMD_KEY},${CMD_KEY_SORT}`);
       });
       return;
     }
     const pressedAt = Date.now();
-    lpStart(
-      () => {
-        // short press → skip intro (a srvr feature, not a tv/ha command)
-        flash("skip");
-        sendKeyThrough("skip", `/api/skipIntro`, {
-          method: "POST",
-          body: { pressedAt },
-          base: "srvr",
-        });
-      },
-      () => {
-        // long press → toggle resolution
-        toggleResolution();
-      },
+    armHold("skip", () =>
+      lpStart(
+        () => {
+          // short press → skip intro (a srvr feature, not a tv/ha command)
+          flash("skip");
+          sendKeyThrough("skip", `/api/skipIntro`, {
+            method: "POST",
+            body: { pressedAt },
+            base: "srvr",
+          });
+        },
+        () => {
+          // long press → toggle resolution
+          toggleResolution();
+        },
+      ),
     );
   };
 
@@ -1344,13 +1397,16 @@ export default function App() {
 
   const startHomeHold = () => {
     if (tvapprcMode) {
-      dbStart(() => {
+      dbStart(async () => {
         flash("info");
-        sendTvapprc(`${CMD_KEY},${CMD_KEY_INFO}`);
+        const r = await sendKeyThrough(CMD_KEY_INFO, null);
+        if (!r.blocked) sendTvapprc(`${CMD_KEY},${CMD_KEY_INFO}`);
       });
       return;
     }
-    lpStart(() => tvKey("home"), toggleLayoutOption, 2000);
+    armHold("home", () =>
+      lpStart(() => tvKey("home"), toggleLayoutOption, 2000),
+    );
   };
 
   const stopHomeHold = () => {
@@ -1421,12 +1477,14 @@ export default function App() {
       dbStart(embySelectedFromTvapp);
       return;
     }
-    lpStart(
-      () => tvCmd("emby"),
-      () => {
-        flash("emby");
-        setShowStreamers(true);
-      },
+    armHold("emby", () =>
+      lpStart(
+        () => tvCmd("emby"),
+        () => {
+          flash("emby");
+          setShowStreamers(true);
+        },
+      ),
     );
   };
 

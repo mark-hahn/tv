@@ -59,6 +59,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final int ACTORS_TAB_INDEX = 2;
   private static final int TRAILER_TAB_INDEX = 3;
 
+  // Shown above the show list only while a filter is active, mirroring the
+  // text as the phone's filter input screen types it.
+  private static final float FILTER_LABEL_TEXT_SIZE_SP = 15f;
+  private static final float FILTER_LABEL_PAD_H_DP = 14f;
+  private static final float FILTER_LABEL_PAD_BOTTOM_DP = 6f;
+  private static final int FILTER_LABEL_BG = 0xFF3A3A3A;
+
   private static final float BUTTON_TEXT_SIZE_SP = 12.5f;
   // The tab buttons' height. The sort and filter buttons no longer have one of
   // their own: they divide up whatever height the button column has.
@@ -79,7 +86,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // The focused area's own border, twice the width of a focused button's, drawn
   // around the whole group. It sits in the padding the group already had, so
   // nothing inside it moves when it comes and goes.
-  private static final float AREA_BORDER_DP = BUTTON_SELECTED_BORDER_DP * 2f;
+  private static final float AREA_BORDER_DP = BUTTON_SELECTED_BORDER_DP * 2f * 0.7f * 0.7f;
 
   private static final String PREFS_NAME = "tvapp";
   private static final String KEY_SELECTED_SHOW = "selectedShow";
@@ -103,6 +110,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   private CtrlServer ctrlServer;
   private ShowListView showList;
+  private TextView filterLabel;
   private InfoView info;
   private MapPane mapPane;
   private ActorsView actorsPane;
@@ -214,9 +222,51 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     return root;
   }
 
+  /**
+   * The filter label sits above the list rather than over it, so it only ever
+   * takes the height its text needs; the list gets the rest by weight. Hidden
+   * entirely while there is no filter text, so it costs the list no space then.
+   */
   private View buildList() {
+    LinearLayout column = new LinearLayout(this);
+    column.setOrientation(LinearLayout.VERTICAL);
+
+    filterLabel = new TextView(this);
+    filterLabel.setTextColor(Color.WHITE);
+    filterLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, FILTER_LABEL_TEXT_SIZE_SP);
+    filterLabel.setSingleLine(true);
+    filterLabel.setEllipsize(android.text.TextUtils.TruncateAt.END);
+    filterLabel.setPadding(
+        (int) dp(FILTER_LABEL_PAD_H_DP), (int) dp(FILTER_LABEL_PAD_BOTTOM_DP),
+        (int) dp(FILTER_LABEL_PAD_H_DP), (int) dp(FILTER_LABEL_PAD_BOTTOM_DP));
+    GradientDrawable filterLabelBg = new GradientDrawable();
+    filterLabelBg.setCornerRadius(dp(BUTTON_CORNER_DP));
+    filterLabelBg.setColor(FILTER_LABEL_BG);
+    filterLabel.setBackground(filterLabelBg);
+    filterLabel.setVisibility(View.GONE);
+    LinearLayout.LayoutParams filterLabelParams =
+        new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+    // Same left margin as sits between the Info and Map tab buttons.
+    filterLabelParams.leftMargin = (int) dp(TAB_GAP_DP);
+    filterLabelParams.bottomMargin = (int) dp(FILTER_LABEL_PAD_BOTTOM_DP);
+    column.addView(filterLabel, filterLabelParams);
+
     showList = new ShowListView(this);
-    return showList;
+    showList.setFilterTextListener(this::updateFilterLabel);
+    column.addView(
+        showList, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+    return column;
+  }
+
+  private void updateFilterLabel(String text) {
+    if (text == null || text.isEmpty()) {
+      filterLabel.setVisibility(View.GONE);
+      filterLabel.setText("");
+    } else {
+      filterLabel.setText(text);
+      filterLabel.setVisibility(View.VISIBLE);
+    }
   }
 
   /**
@@ -926,11 +976,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   /**
-   * One level out: a playing trailer, then an open episode subpane, then the
-   * tab pane back to the filter group and the filter group back to the show
-   * list, and only from the show list does back leave for Emby. The subpane
-   * closing is all a back press does -- the focus stays on the cell it was
-   * opened from.
+   * One level out: a playing trailer, then an open episode subpane, then
+   * whichever area has the focus straight back to the show list, and only from
+   * the show list does back leave for Emby. The subpane closing is all a back
+   * press does -- the focus stays on the cell it was opened from.
    *
    * The web client's Shows button closes tvapp with this same message, so
    * while an area other than the show list has the focus it takes a second
@@ -948,8 +997,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     }
     switch (area) {
       case PANE:
-        focusFilters();
-        return;
       case FILTERS:
         focusShows();
         return;

@@ -916,6 +916,13 @@ export default function App() {
     setTvapprcMode(true);
   };
 
+  /**
+   * One level out over there, which is not always a close: tvapp takes this
+   * same message for its own back key, and while one of its areas has the
+   * focus the press only drops that focus. So this leaves tvapprc mode alone
+   * and lets the bridge's tvapp-down message end it, which is the only thing
+   * that knows tvapp really left.
+   */
   const closeTvappToEmby = (flashKey = "back") => {
     flash(flashKey);
     if (!sendTvapprc(CMD_CLOSE_TO_EMBY)) {
@@ -923,8 +930,6 @@ export default function App() {
         console.warn("tvapprc back failed", e),
       );
     }
-    setTvapprcMode(false);
-    closeTvapprcInput();
   };
 
   const embySelectedFromTvapp = () => {

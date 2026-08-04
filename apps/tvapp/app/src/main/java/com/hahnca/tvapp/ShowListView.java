@@ -62,6 +62,10 @@ class ShowListView extends ScrollView implements Scroller {
     void onCounts(int visibleCount);
   }
 
+  interface FilterTextListener {
+    void onFilterText(String text);
+  }
+
   // The panes only follow the selection once it has stopped moving for this
   // long: arrow-key repeat down the list should not fetch and redraw every
   // show it passes over.
@@ -77,6 +81,7 @@ class ShowListView extends ScrollView implements Scroller {
   private final Map<String, Shows.Show> byName = new HashMap<>();
   private SelectionListener listener;
   private CountsListener countsListener;
+  private FilterTextListener filterTextListener;
   private int lastVisibleCount = -1;
   private Shows.Show active;
   private final Handler dwellHandler = new Handler(Looper.getMainLooper());
@@ -121,6 +126,10 @@ class ShowListView extends ScrollView implements Scroller {
     this.countsListener = listener;
   }
 
+  void setFilterTextListener(FilterTextListener listener) {
+    this.filterTextListener = listener;
+  }
+
   /**
    * Substring of the name, case ignored -- what the phone's filter input screen
    * types. Leaves customOrder and actorFilter alone either way: everything that
@@ -130,6 +139,7 @@ class ShowListView extends ScrollView implements Scroller {
   void setFilter(String text) {
     if (filter.equals(text)) return;
     filter = text;
+    if (filterTextListener != null) filterTextListener.onFilterText(filter);
     apply();
   }
 

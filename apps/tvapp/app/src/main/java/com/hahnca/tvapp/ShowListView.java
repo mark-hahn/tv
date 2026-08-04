@@ -255,13 +255,6 @@ class ShowListView extends ScrollView implements Scroller {
     return true;
   }
 
-  /** Left arrow from the list: jump the selection straight to the top show. */
-  void selectTop() {
-    if (visible.isEmpty()) return;
-    setActive(visible.get(0));
-    scrollToActive();
-  }
-
   @Override
   public void scrollStep(int px) {
     scrollBy(0, px);

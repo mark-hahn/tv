@@ -40,12 +40,18 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final float PANE_WIDTH_FRACTION = 0.55f;
 
   private static final String[] TAB_LABELS = {"Info", "Map", "Actors", "Trailer"};
-  // Not a filter of its own: clicking it opens the phone's filter input screen,
+  // Not a toggle of its own: clicking it opens the phone's filter input screen,
   // which is the only way that screen opens now that the remote has no Filter
-  // button. It is focused and clicked like the rest of the group.
-  private static final String FILTER_INPUT_LABEL = "Filter";
+  // button. It is focused and clicked like the rest of the group, and shows
+  // active while filter text is narrowing the list.
+  private static final String FILTER_INPUT_LABEL = "Text";
+  // Sits directly above the text-input button and resets every way the show
+  // list can be narrowed: filter text, the toggle filters below it, the actor
+  // filter, and custom sort.
+  private static final String CLEAR_FILTER_LABEL = "Clear";
   private static final String[] FILTER_LABELS = {
-    FILTER_INPUT_LABEL, "Ready", "Drama", "Comedy", "To Try", "Continue", "Mark", "Linda", "Trash"
+    CLEAR_FILTER_LABEL, FILTER_INPUT_LABEL, "Ready", "Drama", "Comedy", "To Try", "Continue",
+    "Mark", "Linda", "Trash"
   };
   private static final String SORT_WATCHED = "Watched";
   private static final String SORT_ADDED = "Added";
@@ -71,6 +77,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // their own: they divide up whatever height the button column has.
   private static final float BUTTON_HEIGHT_DP = 25.0f;
   private static final float BUTTON_MARGIN_BOTTOM_DP = 6.0f;
+  // Gap between the stacked sort/filter buttons in the button column, kept
+  // smaller than BUTTON_MARGIN_BOTTOM_DP so all of them -- Sort's 3 plus the
+  // filter group's 10 -- fit the column's height without crowding it.
+  private static final float COLUMN_BUTTON_GAP_DP = 4.0f;
   // Across the tab row, where the buttons are read left to right and want more
   // air between them than the stacked groups do.
   private static final float TAB_GAP_DP = BUTTON_MARGIN_BOTTOM_DP * 2f;
@@ -127,6 +137,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // The filter button the focus is on, kept while the focus is elsewhere and
   // across restarts, so the filter group is re-entered where it was left.
   private String focusedFilter;
+  // Whether filter text is narrowing the show list, which is exactly when the
+  // filter label above the list is showing that text.
   private boolean filterTextActive;
   private String activeShowName;
   private long showsLoadedAt;
@@ -212,8 +224,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     LinearLayout columns = new LinearLayout(this);
     columns.setOrientation(LinearLayout.HORIZONTAL);
     columns.setPadding(0, (int) dp(SCREEN_V_MARGIN_DP), 0, (int) dp(SCREEN_V_MARGIN_DP));
-    columns.addView(buildList(), column(LIST_WIDTH_FRACTION, 0));
-    columns.addView(buildButtonColumn(), column(BUTTONS_WIDTH_FRACTION, dp(COLUMN_GAP_DP)));
+    columns.addView(buildButtonColumn(), column(BUTTONS_WIDTH_FRACTION, 0));
+    columns.addView(buildList(), column(LIST_WIDTH_FRACTION, dp(COLUMN_GAP_DP)));
     columns.addView(buildPaneColumn(), column(PANE_WIDTH_FRACTION, dp(COLUMN_GAP_DP)));
     root.addView(columns, matchParent());
 
@@ -293,7 +305,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       LinearLayout.LayoutParams params = shareOfColumn(1f);
       params.leftMargin = (int) dp(BUTTON_PAD_H_DP);
       params.rightMargin = (int) dp(BUTTON_PAD_H_DP);
-      params.bottomMargin = (int) dp(BUTTON_MARGIN_BOTTOM_DP);
+      params.bottomMargin = (int) dp(COLUMN_BUTTON_GAP_DP);
       addButton(buttonColumn, label, params);
     }
     buttonColumn.addView(buildFilterGroup(), filterGroupParams());
@@ -326,7 +338,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       LinearLayout.LayoutParams params = shareOfColumn(1f);
       // Between the buttons only: below the last one is the container's own
       // padding, which is what the border sits in.
-      if (i < FILTER_LABELS.length - 1) params.bottomMargin = (int) dp(BUTTON_MARGIN_BOTTOM_DP);
+      if (i < FILTER_LABELS.length - 1) params.bottomMargin = (int) dp(COLUMN_BUTTON_GAP_DP);
       addButton(group, FILTER_LABELS[i], params);
     }
     return group;
@@ -488,20 +500,11 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     for (int i = 0; i < TAB_LABELS.length; i++) {
       if (TAB_LABELS[i].equals(label)) return activeTabIndex == i;
     }
-    if (FILTER_INPUT_LABEL.equals(label)) return isAnyShowFilterActive();
+    if (FILTER_INPUT_LABEL.equals(label)) return filterTextActive;
     if (activeFilters.contains(label)) return true;
     if (SORT_WATCHED.equals(label)) return !customOn && sort == Shows.Sort.WATCHING;
     if (SORT_ADDED.equals(label)) return !customOn && sort == Shows.Sort.ADDED;
     if (SORT_CUSTOM.equals(label)) return customOn;
-    return false;
-  }
-
-  /** Whether anything is narrowing the show list, ignoring the Trash filter. */
-  private boolean isAnyShowFilterActive() {
-    if (filterTextActive) return true;
-    for (String f : activeFilters) {
-      if (!"Trash".equals(f)) return true;
-    }
     return false;
   }
 
@@ -577,6 +580,20 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     if (activeFilters.contains(label)) activeFilters.remove(label);
     else activeFilters.add(label);
     showList.setActiveFilters(activeFilters);
+    repaintButtons();
+  }
+
+  /** The Clear button: every way the show list can be narrowed, all at once. */
+  private void clearAllFilters() {
+    if (customOn) {
+      setCustomOn(false);
+      showList.setCustomOrder(null);
+    }
+    actorsPane.clearSelection();
+    showList.setActorFilter(null);
+    activeFilters.clear();
+    showList.setActiveFilters(activeFilters);
+    clearTextFilter();
     repaintButtons();
   }
 
@@ -717,16 +734,19 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     switch (area) {
       case SHOWS:
         // Nothing is focused here, so up and down move the selected show
-        // itself; the panes catch up once it stops moving.
+        // itself; the panes catch up once it stops moving. The button column
+        // sits to the left of the list and the tab pane to its right.
         if (up) showList.moveSelection(-1);
         else if (down) showList.moveSelection(+1);
-        else if (left) showList.selectTop();
-        else focusFilters();
+        else if (left) focusFilters();
+        else focusPane();
         return;
 
       case FILTERS:
-        if (left) focusShows();
-        else if (right) focusPane();
+        // The button column is now the leftmost column, so there is nothing
+        // further left to go to.
+        if (left) return;
+        if (right) focusShows();
         else moveFilterFocus(up ? -1 : +1);
         return;
 
@@ -748,7 +768,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
         else if (right) mapPane.moveCellFocus(0, +1);
         else if (!mapPane.moveCellFocus(0, -1)) {
           mapPane.closeEpisode();
-          focusFilters();
+          focusShows();
         }
         return;
 
@@ -757,7 +777,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
         else if (down) actorsPane.moveCardFocus(+1, 0);
         else if (right) actorsPane.moveCardFocus(0, +1);
         // Off the leftmost card of a row the focus leaves the grid.
-        else if (!actorsPane.moveCardFocus(0, -1)) focusFilters();
+        else if (!actorsPane.moveCardFocus(0, -1)) focusShows();
         return;
 
       case TRAILER_TAB_INDEX:
@@ -765,7 +785,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
         // has nothing further right to reach.
         if (up) trailersView.moveCardFocus(-1);
         else if (down) trailersView.moveCardFocus(+1);
-        else if (left) focusFilters();
+        else if (left) focusShows();
         return;
     }
   }
@@ -773,7 +793,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   /**
    * A show change rebuilds the cards and cells out from under the focus, so the
    * pane area is only believed while its pane really has something focused;
-   * otherwise the focus falls back to the filter group.
+   * otherwise the focus falls back to the show list, the pane's left neighbor.
    */
   private void syncAreaToPane() {
     if (area != Area.PANE) return;
@@ -791,7 +811,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       default:
         lost = true;
     }
-    if (lost) focusFilters();
+    if (lost) focusShows();
   }
 
   private void activateSelectedItem() {
@@ -801,7 +821,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
         embyClick();
         return;
       case FILTERS:
-        if (FILTER_INPUT_LABEL.equals(focusedFilter)) sendToPhone(CtrlServer.MSG_OPEN_FILTER);
+        if (CLEAR_FILTER_LABEL.equals(focusedFilter)) clearAllFilters();
+        else if (FILTER_INPUT_LABEL.equals(focusedFilter)) sendToPhone(CtrlServer.MSG_OPEN_FILTER);
         else toggleFilter(focusedFilter);
         return;
       case PANE:

@@ -737,6 +737,20 @@ export default {
     },
   },
 
+  watch: {
+    // tv-tv keeps a "most relevant show" of its own -- this and Emby actually
+    // starting playback both feed it -- so tvapp starting fresh can select
+    // that instead of whatever the client happens to have open right now.
+    "show.name"(name) {
+      if (!name) return;
+      fetch(`${config.tvTvUrl}/tv/clientShow`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ show: name }),
+      }).catch(() => {});
+    },
+  },
+
   mounted() {
     evtBus.on("tvMuteState", this._onTvMuteState);
     evtBus.on("paneChanged", this._onPaneChanged);
@@ -863,17 +877,13 @@ export default {
       this.tvapprcMode = false;
     },
 
-    // Shows: opens tvapp on the tv with whatever show is up in the client, or
+    // Shows: opens tvapp on the tv, selecting tv-tv's most relevant show, or
     // closes it if it's already open. Goes straight to tv-tv, not through the
     // collision gate -- there's no other remote whose keypress this could
     // step on.
     async toggleTvapp() {
       try {
-        await fetch(`${config.tvTvUrl}/tv/toggletvapp`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ show: this.show?.name ?? null }),
-        });
+        await fetch(`${config.tvTvUrl}/tv/toggletvapp`, { method: "POST" });
       } catch (_) {}
     },
 

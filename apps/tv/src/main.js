@@ -336,6 +336,7 @@ function updateNowPlaying(sessions) {
   currentShowName = key;
 
   const showName = playing[0]?.showName ?? null;
+  if (showName) lastRelevantShow = showName;
   fetch(`${SRVR_INTERNAL_URL}/internal/nowPlaying`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -396,6 +397,12 @@ let pendingGoogleTvapp = false;
 let pendingFireEmby = false;
 let pendingViewShow = null; // { showId, showName } — queued for after Emby launches
 let currentShowName = null;
+// Whichever show is most relevant right now — the client's own browsing
+// selection, or whatever Emby actually started playing, last write wins.
+// tvapp is told to select this whenever it starts fresh, so opening it while
+// a show it started itself is mid-playback doesn't override its own correct
+// selection with some unrelated show the client happens to have open.
+let lastRelevantShow = null;
 const prevSessions = {};
 const lastShowItem = {}; // last real (non-null) NowPlayingItem id per device
 const lastPaused = {}; // last pause state of the real playback session per device
@@ -520,7 +527,7 @@ function handleMsg(raw) {
         if (pendingGoogleTvapp && prevPower !== "on" && state === "on") {
           pendingGoogleTvapp = false;
           unilog(1902, "googlebtn: TV on — launching tvapp");
-          launchTvapp();
+          openTvappSelectingShow();
         }
         // TV just turned on with pendingGoogleHome flag set
         const wasGooglePending = pendingGoogleHome;
@@ -641,7 +648,7 @@ app.get("/tv/googlebtn", (req, res) => {
   if (braviaHaPower === "on") {
     // TV already on — launch tvapp immediately
     unilog(1903, "googlebtn: TV already on, launching tvapp");
-    launchTvapp();
+    openTvappSelectingShow();
   } else {
     // TV off — wait for state_changed on transition to "on"
     pendingGoogleTvapp = true;
@@ -2487,7 +2494,7 @@ function startTvapprcBridge() {
       const msg = data.toString();
       if (msg === MSG_OPEN_TVAPP) {
         unilog(1881, `phone ${from} opened tvapp`);
-        launchTvapp();
+        openTvappSelectingShow();
         return;
       }
       if (tv?.readyState === WebSocket.OPEN) {
@@ -2595,12 +2602,36 @@ async function sendTvappCommand(command) {
   return true;
 }
 
-// The web remote's Shows button: closes tvapp if it's open, otherwise opens
-// it and selects whichever show the web client has up. Every connected
-// Android remotes follow along for free -- tvapp opening or closing is what
-// flips their tvapprc mode on and off already.
-app.post("/tv/toggletvapp", async (req, res) => {
+// Every place that starts tvapp fresh (as against tvapp already being up and
+// just wanting the focus back, see /tv/opentvapp) funnels through here so it
+// always comes up on lastRelevantShow rather than whatever it last happened
+// to have selected before it was closed. Resolves false if tvapp never came up.
+async function openTvappSelectingShow() {
+  await launchTvapp();
+  const sock = await dialTvappUntilOpen(TVAPP_SELECT_DIAL_TIMEOUT_MS);
+  if (!sock) {
+    unilog(1907, `tvapp never came up`);
+    return false;
+  }
+  if (lastRelevantShow) sock.send(`${CMD_SELECT_SHOW},${lastRelevantShow}`);
+  sock.close();
+  return true;
+}
+
+// The client's own browsing selection -- one more source (besides Emby
+// actually playing something) for lastRelevantShow, so a Shows-button open of
+// tvapp can favor it when nothing is currently playing.
+app.post("/tv/clientShow", (req, res) => {
   const { show } = req.body ?? {};
+  if (show) lastRelevantShow = show;
+  res.json({ ok: true });
+});
+
+// The web remote's Shows button: closes tvapp if it's open, otherwise opens
+// it and selects lastRelevantShow. Every connected Android remote follows
+// along for free -- tvapp opening or closing is what flips their tvapprc
+// mode on and off already.
+app.post("/tv/toggletvapp", async (req, res) => {
   const openSock = await probeTvappOpen();
   if (openSock) {
     unilog(1851, `toggletvapp closing tvapp`);
@@ -2609,15 +2640,11 @@ app.post("/tv/toggletvapp", async (req, res) => {
     res.json({ ok: true, action: "closed" });
     return;
   }
-  await launchTvapp();
-  const sock = await dialTvappUntilOpen(TVAPP_SELECT_DIAL_TIMEOUT_MS);
-  if (!sock) {
-    unilog(1852, `toggletvapp: tvapp never came up`);
+  const opened = await openTvappSelectingShow();
+  if (!opened) {
     res.json({ ok: false, error: "tvapp did not come up" });
     return;
   }
-  if (show) sock.send(`${CMD_SELECT_SHOW},${show}`);
-  sock.close();
   res.json({ ok: true, action: "opened" });
 });
 

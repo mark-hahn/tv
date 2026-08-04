@@ -952,6 +952,15 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   @Override
+  public void onRemoteKeyLetter(String key) {
+    ui.post(
+        () -> {
+          bumpKeepAwake();
+          handleRemoteKeyLetter(key);
+        });
+  }
+
+  @Override
   public void onBackToEmby() {
     ui.post(
         () -> {
@@ -1066,6 +1075,23 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     else if ("info".equals(key)) cycleTab();
     else if ("sort".equals(key)) cycleSort();
     else moveSelection(key);
+  }
+
+  /**
+   * Letter-skip variant of up/down, sent once a held key has been
+   * auto-repeating fast long enough to enter letter-skip mode. Only means
+   * anything with the show list focused; everywhere else it is just a
+   * regular move.
+   */
+  private void handleRemoteKeyLetter(String key) {
+    if (player.isPlaying()) return;
+    boolean up = "up".equals(key);
+    boolean down = "down".equals(key);
+    if (area == Area.SHOWS && (up || down)) {
+      showList.moveSelectionByLetter(up ? -1 : +1);
+    } else {
+      moveSelection(key);
+    }
   }
 
   @Override

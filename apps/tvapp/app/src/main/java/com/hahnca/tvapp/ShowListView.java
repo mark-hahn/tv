@@ -5,6 +5,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
 import android.os.Looper;
@@ -12,6 +13,7 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -78,6 +80,9 @@ class ShowListView extends ScrollView implements Scroller {
   private final List<Shows.Show> shows = new ArrayList<>(); // everything loaded
   private final List<Shows.Show> visible = new ArrayList<>(); // after filter and sort
   private final Map<Shows.Show, View> cards = new HashMap<>();
+  // The big letter overlay on the right of each row, shown only on the active
+  // card while an up/down hold is in letter-skip mode.
+  private final Map<Shows.Show, TextView> letterBadges = new HashMap<>();
   private final Map<String, Shows.Show> byName = new HashMap<>();
   private SelectionListener listener;
   private CountsListener countsListener;
@@ -157,6 +162,7 @@ class ShowListView extends ScrollView implements Scroller {
     shows.clear();
     shows.addAll(list);
     cards.clear();
+    letterBadges.clear();
     byName.clear();
     column.removeAllViews();
     for (Shows.Show show : shows) byName.put(show.name, show);
@@ -268,6 +274,50 @@ class ShowListView extends ScrollView implements Scroller {
     setActive(visible.get(next), false);
     scrollToActive();
     return true;
+  }
+
+  /**
+   * Letter-skip mode: jumps to the nearest show in the given direction whose
+   * starting letter (leading "the" ignored, same as the alpha sort) differs
+   * from the current one, and shows that letter in the row. Entered after an
+   * up/down hold has been auto-repeating fast for a while -- see
+   * MainActivity.handleRemoteKeyLetter.
+   */
+  boolean moveSelectionByLetter(int direction) {
+    if (visible.isEmpty()) return false;
+    int index = active == null ? 0 : visible.indexOf(active);
+    if (index < 0) index = 0;
+    String startKey = firstLetterKey(visible.get(index));
+    int next = index;
+    while (next + direction >= 0 && next + direction < visible.size()) {
+      next += direction;
+      if (!firstLetterKey(visible.get(next)).equals(startKey)) break;
+    }
+    if (next == index) return false;
+    setActive(visible.get(next), false);
+    scrollToActive();
+    showLetterBadge(visible.get(next));
+    return true;
+  }
+
+  private static String firstLetterKey(Shows.Show show) {
+    String key = Shows.sortKey(show.name);
+    return key.isEmpty() ? "" : key.substring(0, 1);
+  }
+
+  private void showLetterBadge(Shows.Show show) {
+    TextView badge = letterBadges.get(show);
+    View row = cards.get(show);
+    if (badge == null || row == null) return;
+    badge.setText(firstLetterKey(show).toUpperCase());
+    int h = row.getHeight();
+    if (h > 0) badge.setTextSize(TypedValue.COMPLEX_UNIT_PX, h * 0.85f);
+    badge.setVisibility(View.VISIBLE);
+  }
+
+  private void hideLetterBadge(Shows.Show show) {
+    TextView badge = show == null ? null : letterBadges.get(show);
+    if (badge != null) badge.setVisibility(View.GONE);
   }
 
   @Override
@@ -408,6 +458,7 @@ class ShowListView extends ScrollView implements Scroller {
     Shows.Show old = active;
     active = null;
     dwellHandler.removeCallbacks(notifySelection);
+    hideLetterBadge(old);
     paint(cards.get(old));
   }
 
@@ -427,7 +478,10 @@ class ShowListView extends ScrollView implements Scroller {
     if (show != pinned) pinned = null;
     Shows.Show old = active;
     active = show;
-    if (old != null) paint(cards.get(old));
+    if (old != null) {
+      hideLetterBadge(old);
+      paint(cards.get(old));
+    }
     paint(cards.get(show));
     dwellHandler.removeCallbacks(notifySelection);
     if (notifyNow) notifySelection.run();
@@ -483,7 +537,7 @@ class ShowListView extends ScrollView implements Scroller {
     GradientDrawable bg = (GradientDrawable) card.getBackground();
     bg.setColor(isActive ? CARD_BG_SELECTED : (inEmby ? CARD_BG_EMBY : CARD_BG_NOT_EMBY));
     bg.setCornerRadius(square ? 0f : dp(CARD_CORNER_DP));
-    LinearLayout row = (LinearLayout) card;
+    LinearLayout row = (LinearLayout) ((FrameLayout) card).getChildAt(0);
     ((TextView) row.getChildAt(0)).setTextColor(CARD_TEXT_LIGHT);
     ((TextView) row.getChildAt(1)).setTextColor(WAIT_COLOR);
   }
@@ -496,21 +550,14 @@ class ShowListView extends ScrollView implements Scroller {
   }
 
   private View buildCard(Shows.Show show) {
-    LinearLayout card = new LinearLayout(getContext());
-    card.setOrientation(LinearLayout.HORIZONTAL);
-    card.setGravity(Gravity.CENTER_VERTICAL);
-    card.setPadding(
+    LinearLayout row = new LinearLayout(getContext());
+    row.setOrientation(LinearLayout.HORIZONTAL);
+    row.setGravity(Gravity.CENTER_VERTICAL);
+    row.setPadding(
         (int) dp(CARD_PAD_H_DP),
         (int) dp(CARD_PAD_V_DP),
         (int) dp(CARD_PAD_H_DP),
         (int) dp(CARD_PAD_V_DP));
-
-    GradientDrawable bg = new GradientDrawable();
-    // Not yet active (nothing is, at build time), so a not-in-Emby show starts
-    // in its square-corner rest style; paint() re-rounds it if it becomes active.
-    bg.setCornerRadius(show.inEmby ? dp(CARD_CORNER_DP) : 0f);
-    bg.setColor(show.inEmby ? CARD_BG_EMBY : CARD_BG_NOT_EMBY);
-    card.setBackground(bg);
 
     TextView name = new TextView(getContext());
     name.setText(show.name);
@@ -520,7 +567,7 @@ class ShowListView extends ScrollView implements Scroller {
     name.setEllipsize(android.text.TextUtils.TruncateAt.END);
     LinearLayout.LayoutParams nameParams =
         new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-    card.addView(name, nameParams);
+    row.addView(name, nameParams);
 
     TextView wait = new TextView(getContext());
     wait.setText(show.waitStr);
@@ -531,14 +578,42 @@ class ShowListView extends ScrollView implements Scroller {
         new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
     waitParams.leftMargin = (int) dp(WAIT_GAP_DP);
-    card.addView(wait, waitParams);
+    row.addView(wait, waitParams);
 
     if (!show.inEmby) {
       int size = (int) dp(TRASH_ICON_SIZE_DP);
       LinearLayout.LayoutParams trashParams = new LinearLayout.LayoutParams(size, size);
       trashParams.leftMargin = (int) dp(WAIT_GAP_DP);
-      card.addView(buildTrashIcon(), trashParams);
+      row.addView(buildTrashIcon(), trashParams);
     }
+
+    // A FrameLayout wrapper, not just the row itself, so the letter-skip
+    // badge below can sit on top of the row without disturbing its layout.
+    FrameLayout card = new FrameLayout(getContext());
+    GradientDrawable bg = new GradientDrawable();
+    // Not yet active (nothing is, at build time), so a not-in-Emby show starts
+    // in its square-corner rest style; paint() re-rounds it if it becomes active.
+    bg.setCornerRadius(show.inEmby ? dp(CARD_CORNER_DP) : 0f);
+    bg.setColor(show.inEmby ? CARD_BG_EMBY : CARD_BG_NOT_EMBY);
+    card.setBackground(bg);
+    card.addView(
+        row,
+        new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+    TextView letter = new TextView(getContext());
+    letter.setTextColor(CARD_TEXT_LIGHT);
+    letter.setTypeface(Typeface.DEFAULT_BOLD);
+    letter.setGravity(Gravity.CENTER);
+    letter.setVisibility(View.GONE);
+    FrameLayout.LayoutParams letterParams =
+        new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            Gravity.END | Gravity.CENTER_VERTICAL);
+    letterParams.rightMargin = (int) dp(CARD_PAD_H_DP);
+    card.addView(letter, letterParams);
+    letterBadges.put(show, letter);
 
     return card;
   }

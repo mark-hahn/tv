@@ -240,7 +240,7 @@ class Shows {
     return join(", ", parts);
   }
 
-  private static String sortKey(String name) {
+  static String sortKey(String name) {
     String key = name.toLowerCase();
     return key.startsWith("the ") ? key.substring(4) : key;
   }

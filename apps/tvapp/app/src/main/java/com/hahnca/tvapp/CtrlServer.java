@@ -13,6 +13,9 @@ import org.java_websocket.server.WebSocketServer;
  * From the remote:
  *
  *   k,&lt;key&gt;     one of up/down/left/right/ok/info/sort
+ *   j,&lt;key&gt;     letter-skip variant of up/down -- sent instead of k while a
+ *                  hold has been auto-repeating fast long enough to enter
+ *                  letter-skip mode
  *   b              switch from tvapp to Emby, one level out at a time
  *   g              switch from tvapp to Emby right now, regardless of focus
  *   e              load the active show into Emby
@@ -40,6 +43,7 @@ class CtrlServer extends WebSocketServer {
 
   private static final String TAG = "tvapp";
   private static final String CMD_KEY = "k";
+  private static final String CMD_KEY_LETTER = "j";
   private static final String CMD_BACK_TO_EMBY = "b";
   private static final String CMD_FORCE_CLOSE_TO_EMBY = "g";
   private static final String CMD_EMBY_SELECTED = "e";
@@ -50,6 +54,8 @@ class CtrlServer extends WebSocketServer {
 
   interface Listener {
     void onRemoteKey(String key);
+
+    void onRemoteKeyLetter(String key);
 
     void onBackToEmby();
 
@@ -116,6 +122,10 @@ class CtrlServer extends WebSocketServer {
     }
     if (message.startsWith(CMD_SELECT + ",")) {
       listener.onSelectShow(message.substring(CMD_SELECT.length() + 1));
+      return;
+    }
+    if (message.startsWith(CMD_KEY_LETTER + ",")) {
+      listener.onRemoteKeyLetter(message.substring(CMD_KEY_LETTER.length() + 1));
       return;
     }
     if (message.startsWith(CMD_KEY + ",")) {

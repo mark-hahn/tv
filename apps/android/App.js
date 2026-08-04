@@ -56,12 +56,21 @@ const CMD_CLOSE_TO_EMBY = "b";
 const CMD_FORCE_CLOSE_TO_EMBY = "g";
 const CMD_EMBY_SELECTED = "e";
 const CMD_KEY = "k";
+// Letter-skip variant of CMD_KEY, up/down only -- sent instead of CMD_KEY
+// once a held key has been auto-repeating fast long enough that tvapp's show
+// list starts jumping by starting letter instead of by row.
+const CMD_KEY_LETTER = "j";
 // Not arrows: these step tvapp's tab and sort buttons, which the arrow keys
 // cannot reach -- neither group can be focused.
 const CMD_KEY_INFO = "info";
 const CMD_KEY_SORT = "sort";
 const CMD_FILTER = "f";
 const SCRUB_HOLD_DELAY_MS = 400;
+// tvapp arrow-key repeat: fast cadence once a hold clears the initial
+// SCRUB_HOLD_DELAY_MS. After another SCRUB_HOLD_DELAY_MS of fast repeats,
+// up/down switch to letter-skip mode, which repeats at SCRUB_HOLD_DELAY_MS
+// again -- the same "slow" pace, reused rather than a new constant.
+const TVAPP_FAST_REPEAT_MS = 120;
 const SCRUB_PING_INTERVAL_MS = 500;
 const VOL_STEP = 1;
 const PIC_VAL_MAX_CHARS = 20;
@@ -272,6 +281,7 @@ export default function App() {
       flash(key);
       repeatActiveRef.current = true;
       pendingLRKeyRef.current = null;
+      const isUpDown = key === "up" || key === "down";
       (async () => {
         const r = await sendKeyThrough(key, null);
         if (r.blocked) return stopRepeat();
@@ -279,13 +289,24 @@ export default function App() {
         await new Promise((r) => {
           repeatDelayRef.current = setTimeout(r, SCRUB_HOLD_DELAY_MS);
         });
+        // Fast phase, repeating every TVAPP_FAST_REPEAT_MS. Once up/down have
+        // held through another SCRUB_HOLD_DELAY_MS of it -- the same delay
+        // that got us here -- switch to letter-skip mode: back to the slow
+        // SCRUB_HOLD_DELAY_MS cadence, but each repeat jumps a letter.
+        let fastElapsedMs = 0;
+        let letterMode = false;
         while (repeatActiveRef.current) {
           const rr = await sendKeyThrough(key, null, { repeating: true });
           if (rr.blocked) return stopRepeat();
-          sendTvapprc(`${CMD_KEY},${key}`);
+          sendTvapprc(`${letterMode ? CMD_KEY_LETTER : CMD_KEY},${key}`);
+          const delay = letterMode ? SCRUB_HOLD_DELAY_MS : TVAPP_FAST_REPEAT_MS;
           await new Promise((r) => {
-            repeatTimeoutRef.current = setTimeout(r, 120);
+            repeatTimeoutRef.current = setTimeout(r, delay);
           });
+          if (!letterMode && isUpDown) {
+            fastElapsedMs += TVAPP_FAST_REPEAT_MS;
+            if (fastElapsedMs >= SCRUB_HOLD_DELAY_MS) letterMode = true;
+          }
         }
       })();
       return;

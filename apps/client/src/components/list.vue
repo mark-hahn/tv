@@ -1028,7 +1028,6 @@ export default {
 
     async sendSharedFilters(e) {
       // Save current filter settings (for simple-mode Custom button).
-      // If we're effectively in "All" mode, clear sharedFilters instead.
       try {
         // Ctrl-click: load sharedFilters into internal state (like simple-mode Custom).
         if (e && e.ctrlKey) {
@@ -1086,22 +1085,10 @@ export default {
           filterStr: this.filterStr,
           condFilters,
           sortChoice: this.sortChoice,
+          reversed: this.reversed,
         };
 
-        const isAllMode =
-          this.fltrChoice === "All" &&
-          (!this.filterStr || String(this.filterStr).length === 0) &&
-          (this.conds || []).every((c) => {
-            if (!c?.name) return true;
-            if (c.name === "hasemby") return c.filter === 1; // default hasemby behavior
-            return c.filter === 0;
-          });
-
-        if (isAllMode) {
-          await srvr.setSharedFilters(null);
-        } else {
-          await srvr.setSharedFilters(payload);
-        }
+        await srvr.setSharedFilters(payload);
       } catch (e) {
         unilog(959, "sendSharedFilters failed:", e);
       }

@@ -1234,8 +1234,7 @@ const getSharedFilters = async (_params) => {
  */
 const getSharedFilterShows = async (params) => {
   const settings =
-    params && Object.keys(params).length > 0 ? params : sharedFilters;
-  if (!settings) return { names: [] };
+    (params && Object.keys(params).length > 0 ? params : sharedFilters) || {};
   // Shallow copies: applyComputedProps derives its props in place, and the
   // dataset it would otherwise write them into is the one tv-srvr saves back
   // to tvdb.db.

@@ -112,8 +112,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // Coming back from Emby reuses the list already in memory, which is the point
   // of staying resident, but a list loaded long enough ago has stale waitStrs.
   private static final long SHOWS_REFRESH_AFTER_MS = 10 * 60_000;
+  // While the Custom sort is on, how often to re-fetch it -- the web client's
+  // Send button can change the shared settings at any time, and the Custom
+  // list is supposed to track them live.
+  private static final long CUSTOM_POLL_MS = 5_000;
 
   private final Handler ui = new Handler(Looper.getMainLooper());
+  private final Runnable customPoll = this::pollCustomOrder;
   private final List<Pane> panes = new ArrayList<>();
   private final Map<String, ButtonItem> buttonItems = new HashMap<>();
   private final List<String> buttonOrder = new ArrayList<>();
@@ -564,6 +569,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   private void setCustomOn(boolean on) {
     customOn = on;
+    if (!on) ui.removeCallbacks(customPoll);
     repaintButtons();
   }
 
@@ -572,6 +578,37 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    * it keeps on disk, so the button is always there to be turned on.
    */
   private void customClick() {
+    fetchCustomOrder(
+        names -> {
+          clearTextFilter();
+          actorsPane.clearSelection();
+          applyActorFilter(null);
+          showList.setCustomOrder(names);
+          setCustomOn(true);
+          ui.postDelayed(customPoll, CUSTOM_POLL_MS);
+        });
+  }
+
+  /**
+   * Re-fetches the Custom order while it is still on and reschedules itself --
+   * the web client's Send button can change the shared settings at any time,
+   * so this is what keeps the list matching them live.
+   */
+  private void pollCustomOrder() {
+    if (!customOn) return;
+    fetchCustomOrder(
+        names -> {
+          if (!customOn) return;
+          showList.setCustomOrder(names);
+          ui.postDelayed(customPoll, CUSTOM_POLL_MS);
+        });
+  }
+
+  private interface CustomOrderCallback {
+    void onNames(List<String> names);
+  }
+
+  private void fetchCustomOrder(CustomOrderCallback callback) {
     new Thread(
             () -> {
               try {
@@ -581,19 +618,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
                 for (int i = 0; arr != null && i < arr.length(); i++) {
                   names.add(arr.optString(i, ""));
                 }
-                ui.post(
-                    () -> {
-                      clearTextFilter();
-                      actorsPane.clearSelection();
-                      applyActorFilter(null);
-                      showList.setCustomOrder(names);
-                      setCustomOn(true);
-                    });
+                ui.post(() -> callback.onNames(names));
               } catch (Exception e) {
                 Log.e(TAG, "custom show list fetch failed: " + e);
               }
             },
-            "custom-click")
+            "custom-fetch")
         .start();
   }
 
@@ -709,6 +739,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     area = Area.FILTERS;
     clearPaneFocus();
     if (buttonItems.get(focusedFilter) == null) focusedFilter = FILTER_LABELS[0];
+    if (!activeFilters.isEmpty() || filterTextActive || actorFilterName != null) {
+      focusedFilter = CLEAR_FILTER_LABEL;
+    }
     repaintFocus();
   }
 
@@ -1052,6 +1085,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   @Override
   protected void onDestroy() {
     ui.removeCallbacks(clearKeepAwake);
+    ui.removeCallbacks(customPoll);
     super.onDestroy();
   }
 

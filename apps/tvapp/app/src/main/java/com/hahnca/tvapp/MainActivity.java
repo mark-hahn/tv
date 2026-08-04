@@ -791,10 +791,11 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
       default:
         // Info has nothing to focus, but an open poster answers every
-        // direction the same way: shrink back down, staying on the pane.
+        // direction by shrinking back down -- left keeps going, out to the
+        // show list, the same as it would with the poster already closed.
         if (info.isPosterOpen()) {
           info.closePoster();
-          return;
+          if (!left) return;
         }
         if (left) focusShows();
         return;
@@ -1016,10 +1017,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   /**
-   * One level out: a playing trailer, then an open episode subpane or blown-up
-   * poster, then whichever area has the focus straight back to the show list,
-   * and only from the show list does back leave for Emby. Closing one of those
-   * is all a back press does -- the focus stays where it was opened from.
+   * One level out: a playing trailer, then an open episode subpane, then
+   * whichever area has the focus straight back to the show list, and only
+   * from the show list does back leave for Emby. Closing the subpane is all
+   * that press does -- the focus stays on the cell it was opened from. A
+   * blown-up poster instead goes the rest of the way to the show list in the
+   * one press, the same as left already does on it.
    *
    * The web client's Shows button closes tvapp with this same message, so
    * while an area other than the show list has the focus it takes a second
@@ -1037,6 +1040,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     }
     if (info.isPosterOpen()) {
       info.closePoster();
+      focusShows();
       return;
     }
     switch (area) {

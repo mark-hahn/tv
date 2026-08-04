@@ -18,6 +18,7 @@ import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -865,8 +866,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     }
     // A focused Map cell names an episode as well as a show, so that is the one
     // Emby opens on -- with or without the episode subpane up, which goes away
-    // either way. A cell with no file has nothing to load, and falls back to
-    // what this button does everywhere else: the show alone.
+    // either way. A cell with no file has nothing to load; rather than silently
+    // falling back to next-up (surprising -- looks like the wrong episode played),
+    // this just says so and does nothing else.
+    if (area == Area.PANE && activeTabIndex == MAP_TAB_INDEX && mapPane.focusedCellHasNoFile()) {
+      Toast.makeText(this, "No file.", Toast.LENGTH_SHORT).show();
+      return;
+    }
     String focusedEpisodeId = null;
     if (area == Area.PANE && activeTabIndex == MAP_TAB_INDEX) {
       focusedEpisodeId = mapPane.focusedEpisodeId();

@@ -534,6 +534,13 @@ class MapView extends LinearLayout implements Pane {
     return cell.id;
   }
 
+  /** True when a cell is focused but that episode has no file to load. */
+  boolean focusedCellHasNoFile() {
+    if (!hasFocusedCell()) return false;
+    Cell cell = cellAt(focusRow, focusCol);
+    return cell == null || cell.noFile || !cell.avail;
+  }
+
   private boolean focusFirstCell() {
     for (int row = 0; row < cellViews.size(); row++) {
       for (int col = 0; col < cellViews.get(row).size(); col++) {

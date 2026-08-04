@@ -98,6 +98,12 @@ class ShowListView extends ScrollView implements Scroller {
   // Normalized actor name to require in the cast, or null — the Actors pane's
   // own way of narrowing this list, mutually exclusive with the other two.
   private String actorFilter;
+  // The show setShows was told to keep selected, kept in the list even when the
+  // freshly loaded data no longer matches the active filters. Watching an
+  // episode is exactly what makes a show stop being Ready, so the reload on
+  // coming back from Emby must not slide the selection onto a neighbor. Cleared
+  // as soon as the selection moves off it, or the user changes the filters.
+  private Shows.Show pinned;
   private final EdgeFade edgeFade = EdgeFade.vertical(this);
 
   ShowListView(Context context) {
@@ -160,8 +166,14 @@ class ShowListView extends ScrollView implements Scroller {
     }
     dwellHandler.removeCallbacks(notifySelection);
     active = null;
+    pinned = null;
     for (Shows.Show show : shows) {
-      if (show.name.equals(selectedName)) setActive(show);
+      if (show.name.equals(selectedName)) {
+        // Pinned before it is made active, so setActive below leaves the pin
+        // alone and apply() keeps the card whatever the new data says.
+        pinned = show;
+        setActive(show);
+      }
     }
     // Picks the top card when nothing was remembered, and lays the list out.
     apply();
@@ -178,6 +190,9 @@ class ShowListView extends ScrollView implements Scroller {
     if (activeFilters.equals(labels)) return;
     activeFilters.clear();
     activeFilters.addAll(labels);
+    // A filter the user just changed applies to every show, the pinned one
+    // included -- the pin is only there to survive a data reload.
+    pinned = null;
     apply();
   }
 
@@ -373,6 +388,7 @@ class ShowListView extends ScrollView implements Scroller {
 
   private boolean matchesActiveFilters(Shows.Show show) {
     // Non-Emby ("trash") shows are hidden unless the Trash filter is active.
+    if (show == pinned) return true;
     if (!activeFilters.contains("Trash") && !show.inEmby) return false;
     for (String label : activeFilters) {
       if ("Ready".equals(label) && (show.notReady || !show.waitStr.isEmpty())) return false;
@@ -387,6 +403,7 @@ class ShowListView extends ScrollView implements Scroller {
   }
 
   private void clearActive() {
+    pinned = null;
     if (active == null) return;
     Shows.Show old = active;
     active = null;
@@ -406,6 +423,8 @@ class ShowListView extends ScrollView implements Scroller {
    */
   private void setActive(Shows.Show show, boolean notifyNow) {
     if (show == active) return;
+    // The pin belongs to one show, and only while it is the selected one.
+    if (show != pinned) pinned = null;
     Shows.Show old = active;
     active = show;
     if (old != null) paint(cards.get(old));

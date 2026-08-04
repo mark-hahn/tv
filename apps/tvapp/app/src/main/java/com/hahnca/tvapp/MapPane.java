@@ -88,6 +88,11 @@ class MapPane implements Pane {
     return mapView.focusedEpisodeId();
   }
 
+  /** True when a cell is focused but that episode has no file for Emby to load. */
+  boolean focusedCellHasNoFile() {
+    return mapView.focusedCellHasNoFile();
+  }
+
   /**
    * Ok on the focused cell: the subpane opens on that episode, or closes if it
    * is the one already showing. Nothing in the subpane takes the cursor, which

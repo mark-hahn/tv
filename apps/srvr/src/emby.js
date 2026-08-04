@@ -70,10 +70,50 @@ export const getDevices = async () => {
   return await getOnDevices();
 };
 
+// Emby's remote play command needs one episode. A Map cell names one outright;
+// otherwise it is the show's next-up episode -- the first one that is unwatched
+// and has a file, the same one the info pane calls Next Up. The record comes
+// from the series map either way so playback can resume where it left off.
+const playTargetEpisode = async (showId, episodeId) => {
+  const seriesMap = await getSeriesMap({ id: showId });
+  if (!seriesMap) return episodeId ? { id: episodeId, pos: 0 } : null;
+  const seasons = [...seriesMap].sort((a, b) => a[0] - b[0]);
+  for (const [seasonNumber, episodes] of seasons) {
+    if (seasonNumber <= 0) continue;
+    for (const [, episode] of [...episodes].sort((a, b) => a[0] - b[0])) {
+      if (episodeId) {
+        if (episode.id === episodeId) return episode;
+        continue;
+      }
+      if (episode.played || episode.noFile || !episode.avail || episode.unaired)
+        continue;
+      return episode;
+    }
+  }
+  return episodeId ? { id: episodeId, pos: 0 } : null;
+};
+
+const playOnSession = async (sessionId, showId, showName, episodeId) => {
+  const episode = await playTargetEpisode(showId, episodeId);
+  if (!episode) {
+    unilog(1894, `no episode to play for ${showName}`);
+    return;
+  }
+  const { url, body } = urls.playingUrl(sessionId, episode.id, episode.pos);
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok)
+    unilog(1895, `play rejected for ${showName} episode ${episode.id}: ${resp.status}`);
+};
+
 export const viewShowOnLivingRoomTv = async ({
   showId,
   showName,
   episodeId,
+  play,
 }) => {
   const url = urls.watchingUrl();
   let resp = await fetch(url);
@@ -88,7 +128,10 @@ export const viewShowOnLivingRoomTv = async ({
   for (const session of candidates) {
     const viewUrl = urls.viewingUrl(session.Id, showId, showName, episodeId);
     const viewResp = await fetch(viewUrl, { method: "POST" });
-    if (viewResp.ok) return { found: true, client: session.Client };
+    if (viewResp.ok) {
+      if (play) await playOnSession(session.Id, showId, showName, episodeId);
+      return { found: true, client: session.Client };
+    }
     unilog(
       1388,
       `Viewing rejected by ${session.Client} session ${session.Id}: ${viewResp.status}`,

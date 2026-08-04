@@ -31,6 +31,23 @@ export function viewingUrl(sessionId, showId, showName, episodeId) {
   return `${hahnca}Sessions/${sessionId}/Viewing?ItemType=Series&ItemId=${showId}&ItemName=${name}&api_key=${apiKey}`;
 }
 
+export function playingUrl(sessionId, episodeId, startPositionTicks = 0) {
+  const start = startPositionTicks
+    ? `&StartPositionTicks=${startPositionTicks}`
+    : "";
+  return {
+    url:
+      `${hahnca}Sessions/${sessionId}/Playing` +
+      `?ItemIds=${episodeId}&PlayCommand=PlayNow${start}&api_key=${apiKey}`,
+    body: {
+      ControllingUserId: markUsrId,
+      SubtitleStreamIndex: 0,
+      AudioStreamIndex: 0,
+      StartIndex: 0,
+    },
+  };
+}
+
 export function childrenUrl(parentId = "", unAired = false) {
   if (!parentId) return "";
   return `${hahnca} Users

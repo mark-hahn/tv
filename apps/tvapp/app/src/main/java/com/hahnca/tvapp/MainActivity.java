@@ -855,7 +855,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
                         + URLEncoder.encode(show.name, "UTF-8")
                         + (episodeId == null
                             ? ""
-                            : "&episodeId=" + URLEncoder.encode(episodeId, "UTF-8"));
+                            : "&episodeId=" + URLEncoder.encode(episodeId, "UTF-8"))
+                        // Emby opens on the show, then starts it playing -- the
+                        // focused episode when the Map named one, next up otherwise.
+                        + "&play=1";
                 HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
                 conn.setConnectTimeout(VIEWSHOW_TIMEOUT_MS);
                 conn.setReadTimeout(VIEWSHOW_TIMEOUT_MS);

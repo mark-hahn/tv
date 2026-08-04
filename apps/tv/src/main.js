@@ -682,7 +682,7 @@ async function embyTvLastActivity() {
 // (like the TV-off fallback timer) can try again.
 async function firePendingViewShow(label) {
   if (!pendingViewShow) return false;
-  const { showId, showName, episodeId, at } = pendingViewShow;
+  const { showId, showName, episodeId, play, at } = pendingViewShow;
   if (Date.now() - at > PENDING_VIEW_SHOW_MAX_AGE_MS) {
     pendingViewShow = null;
     unilog(1390, `${label}: pending viewshow ${showId} too old, dropped`);
@@ -693,7 +693,7 @@ async function firePendingViewShow(label) {
     const resp = await fetch(`${SRVR_INTERNAL_URL}/api/embyViewShow`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ showId, showName, episodeId }),
+      body: JSON.stringify({ showId, showName, episodeId, play }),
     });
     const result = await resp.json();
     unilog(399, `${label}: viewshow result=${JSON.stringify(result)}`);
@@ -710,12 +710,15 @@ let viewShowSeq = 0; // invalidates older button presses still resending
 
 app.get("/tv/viewshow", async (req, res) => {
   const { showId, showName, episodeId } = req.query;
+  // tvapp's Emby button and its show-list OK key ask for playback as well as
+  // the show page; every other caller just opens the page.
+  const play = req.query.play === "1";
   const seq = ++viewShowSeq;
   unilog(
     401,
-    `viewshow from ${client(req)} showId=${showId} showName=${showName} braviaHaPower=${braviaHaPower}`,
+    `viewshow from ${client(req)} showId=${showId} showName=${showName} play=${play} braviaHaPower=${braviaHaPower}`,
   );
-  pendingViewShow = { showId, showName, episodeId, at: Date.now() };
+  pendingViewShow = { showId, showName, episodeId, play, at: Date.now() };
   callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
   res.json({ ok: true });
 
@@ -754,7 +757,7 @@ app.get("/tv/viewshow", async (req, res) => {
   while (Date.now() < deadline) {
     await sleep(VIEW_SHOW_RESEND_MS);
     if (seq !== viewShowSeq) return; // a newer press owns the tv now
-    pendingViewShow = { showId, showName, episodeId, at: Date.now() };
+    pendingViewShow = { showId, showName, episodeId, play, at: Date.now() };
     await firePendingViewShow("viewshow(booting)");
   }
 });

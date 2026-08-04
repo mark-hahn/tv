@@ -13,7 +13,8 @@ import org.java_websocket.server.WebSocketServer;
  * From the remote:
  *
  *   k,&lt;key&gt;     one of up/down/left/right/ok/info/sort
- *   b              switch from tvapp to Emby
+ *   b              switch from tvapp to Emby, one level out at a time
+ *   g              switch from tvapp to Emby right now, regardless of focus
  *   e              load the active show into Emby
  *   x              close tvapp
  *   f,&lt;text&gt;    show-list filter text
@@ -40,6 +41,7 @@ class CtrlServer extends WebSocketServer {
   private static final String TAG = "tvapp";
   private static final String CMD_KEY = "k";
   private static final String CMD_BACK_TO_EMBY = "b";
+  private static final String CMD_FORCE_CLOSE_TO_EMBY = "g";
   private static final String CMD_EMBY_SELECTED = "e";
   private static final String CMD_EXIT = "x";
   private static final String CMD_FILTER = "f";
@@ -50,6 +52,8 @@ class CtrlServer extends WebSocketServer {
     void onRemoteKey(String key);
 
     void onBackToEmby();
+
+    void onForceCloseToEmby();
 
     void onEmbySelected();
 
@@ -120,6 +124,8 @@ class CtrlServer extends WebSocketServer {
     }
     if (CMD_BACK_TO_EMBY.equals(message)) {
       listener.onBackToEmby();
+    } else if (CMD_FORCE_CLOSE_TO_EMBY.equals(message)) {
+      listener.onForceCloseToEmby();
     } else if (CMD_EMBY_SELECTED.equals(message)) {
       listener.onEmbySelected();
     } else if (CMD_EXIT.equals(message)) {

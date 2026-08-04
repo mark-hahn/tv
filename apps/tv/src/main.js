@@ -104,6 +104,7 @@ const MSG_TVAPP_DOWN = "d"; // bridge -> phone: tvapp has closed
 // not relayed -- so the web client's Shows button works with no phone
 // connected at all.
 const CMD_BACK_TO_EMBY = "b"; // close tvapp and bring Emby up
+const CMD_FORCE_CLOSE_TO_EMBY = "g"; // same, but ignoring tvapp's focus
 const CMD_EMBY_SELECTED = "e"; // load tvapp's active show into Emby
 const CMD_SELECT_SHOW = "s"; // select a show by name
 const TVAPP_PROBE_TIMEOUT_MS = 800;
@@ -2494,7 +2495,11 @@ function startTvapprcBridge() {
       }
       if (tv?.readyState === WebSocket.OPEN) {
         tv.send(msg);
-      } else if (msg === CMD_BACK_TO_EMBY || msg === CMD_EMBY_SELECTED) {
+      } else if (
+        msg === CMD_BACK_TO_EMBY ||
+        msg === CMD_FORCE_CLOSE_TO_EMBY ||
+        msg === CMD_EMBY_SELECTED
+      ) {
         void sendTvappCommand(msg);
       }
     });
@@ -2621,6 +2626,11 @@ app.post("/tv/toggletvapp", async (req, res) => {
 
 app.post("/tv/tvapprc/back", async (req, res) => {
   const ok = await sendTvappCommand(CMD_BACK_TO_EMBY);
+  res.json(ok ? { ok: true } : { ok: false, error: "tvapp is not open" });
+});
+
+app.post("/tv/tvapprc/forceback", async (req, res) => {
+  const ok = await sendTvappCommand(CMD_FORCE_CLOSE_TO_EMBY);
   res.json(ok ? { ok: true } : { ok: false, error: "tvapp is not open" });
 });
 

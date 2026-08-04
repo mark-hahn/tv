@@ -363,9 +363,12 @@ class ShowListView extends ScrollView implements Scroller {
     // scrollTo only means anything once the column has been laid out, and the
     // selected card can be hundreds of rows down. The top card is scrolled to
     // zero rather than to itself, or the list's own top padding is cut off.
+    // Every other card stops a fade's height short of the top edge, the same
+    // allowance scrollToActive makes, or the selected card lands under the
+    // fade with its own text dimmed.
     final View card = cards.get(active);
     final boolean atTop = visible.get(0) == active;
-    post(() -> scrollTo(0, atTop ? 0 : card.getTop()));
+    post(() -> scrollTo(0, atTop ? 0 : card.getTop() - (int) edgeFade.size()));
     dispatchCounts();
   }
 

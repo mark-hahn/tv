@@ -127,6 +127,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // The filter button the focus is on, kept while the focus is elsewhere and
   // across restarts, so the filter group is re-entered where it was left.
   private String focusedFilter;
+  private boolean filterTextActive;
   private String activeShowName;
   private long showsLoadedAt;
 
@@ -260,6 +261,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   private void updateFilterLabel(String text) {
+    filterTextActive = text != null && !text.isEmpty();
+    repaintButtons();
     if (text == null || text.isEmpty()) {
       filterLabel.setVisibility(View.GONE);
       filterLabel.setText("");
@@ -485,10 +488,20 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     for (int i = 0; i < TAB_LABELS.length; i++) {
       if (TAB_LABELS[i].equals(label)) return activeTabIndex == i;
     }
+    if (FILTER_INPUT_LABEL.equals(label)) return isAnyShowFilterActive();
     if (activeFilters.contains(label)) return true;
     if (SORT_WATCHED.equals(label)) return !customOn && sort == Shows.Sort.WATCHING;
     if (SORT_ADDED.equals(label)) return !customOn && sort == Shows.Sort.ADDED;
     if (SORT_CUSTOM.equals(label)) return customOn;
+    return false;
+  }
+
+  /** Whether anything is narrowing the show list, ignoring the Trash filter. */
+  private boolean isAnyShowFilterActive() {
+    if (filterTextActive) return true;
+    for (String f : activeFilters) {
+      if (!"Trash".equals(f)) return true;
+    }
     return false;
   }
 
@@ -930,6 +943,17 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
         () -> {
           bumpKeepAwake();
           handleBack();
+        });
+  }
+
+  // The phone's Shows button: unlike handleBack's one level out at a time,
+  // this always leaves for Emby immediately no matter what has the focus.
+  @Override
+  public void onForceCloseToEmby() {
+    ui.post(
+        () -> {
+          bumpKeepAwake();
+          backToEmby();
         });
   }
 

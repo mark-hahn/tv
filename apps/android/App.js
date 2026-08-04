@@ -53,6 +53,7 @@ const MSG_COUNTS = "c";
 const MSG_ACTIVE_SHOW = "a";
 const CMD_OPEN_TVAPP = "o";
 const CMD_CLOSE_TO_EMBY = "b";
+const CMD_FORCE_CLOSE_TO_EMBY = "g";
 const CMD_EMBY_SELECTED = "e";
 const CMD_KEY = "k";
 // Not arrows: these step tvapp's tab and sort buttons, which the arrow keys
@@ -932,6 +933,19 @@ export default function App() {
     }
   };
 
+  // The Shows button: unlike closeTvappToEmby, this always leaves tvapp for
+  // Emby right away regardless of which area has the focus there. Same as
+  // closeTvappToEmby, tvapprc mode itself still only ends on the bridge's
+  // tvapp-down message, the one thing that knows tvapp really left.
+  const forceCloseTvappToEmby = (flashKey = "shows") => {
+    flash(flashKey);
+    if (!sendTvapprc(CMD_FORCE_CLOSE_TO_EMBY)) {
+      fetch(`${TV_TV_URL}/tv/tvapprc/forceback`, { method: "POST" }).catch(
+        (e) => console.warn("tvapprc forceback failed", e),
+      );
+    }
+  };
+
   const embySelectedFromTvapp = () => {
     flash("emby");
     if (!sendTvapprc(CMD_EMBY_SELECTED)) {
@@ -944,7 +958,7 @@ export default function App() {
   };
 
   const toggleTvapprcMode = () => {
-    if (tvapprcMode) closeTvappToEmby("shows");
+    if (tvapprcMode) forceCloseTvappToEmby("shows");
     else openTvapp();
   };
 

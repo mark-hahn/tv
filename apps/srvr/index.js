@@ -2961,6 +2961,10 @@ async function refreshPlayedDatesForShow(showName) {
   if (!lastPlayedChanged) return false;
 
   tvdbRecord.lastPlayedDate = latestPlayed.lastPlayedDate;
+  if (tvdbRecord.hiddenFromRow) {
+    tvdbRecord.hiddenFromRow = false;
+    unilog(1909, `clearing hiddenFromRow for ${showName}: show was played`);
+  }
   await tvdb.saveTvdbSync();
   notifyClients("tvdbUpdated", {
     name: tvdbRecord.name || showName,

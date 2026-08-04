@@ -8,6 +8,8 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.SpannableString;
+import android.text.style.RelativeSizeSpan;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -106,6 +108,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   private static final String VIEWSHOW_URL = "https://hahnca.com/tv-tv/tv/viewshow";
   private static final int VIEWSHOW_TIMEOUT_MS = 10000;
+  private static final String NO_FILE_TOAST = "No file.";
+  private static final String NOT_READY_TOAST =
+      "Show not ready to watch. Use map to play an episode.";
+  private static final float TOAST_TEXT_SCALE = 2f;
   private static final String EMBY_PACKAGE = "com.mb.android";
   private static final String UNMUTE_URL = "https://hahnca.com/tv-tv/tv/unmute";
   private static final long KEEP_AWAKE_IDLE_MS = 5_000;
@@ -925,13 +931,28 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     // falling back to next-up (surprising -- looks like the wrong episode played),
     // this just says so and does nothing else.
     if (area == Area.PANE && activeTabIndex == MAP_TAB_INDEX && mapPane.focusedCellHasNoFile()) {
-      Toast.makeText(this, "No file.", Toast.LENGTH_SHORT).show();
+      showBigCenterToast(NO_FILE_TOAST);
       return;
     }
     String focusedEpisodeId = null;
     if (area == Area.PANE && activeTabIndex == MAP_TAB_INDEX) {
       focusedEpisodeId = mapPane.focusedEpisodeId();
       mapPane.closeEpisode();
+    }
+    // No episode named by a focused Map cell: Emby would pick its own next-up
+    // episode, so check the show itself before asking it to play one. With no
+    // file anywhere there is nothing to play at all; with files but not ready
+    // -- everything already watched, say -- the Map is where a rewatch is
+    // picked, since only a named episode gets past Emby's next-up choice.
+    if (focusedEpisodeId == null) {
+      if (!show.hasFile) {
+        showBigCenterToast(NO_FILE_TOAST);
+        return;
+      }
+      if (show.notReady) {
+        showBigCenterToast(NOT_READY_TOAST);
+        return;
+      }
     }
     final String episodeId = focusedEpisodeId;
     new Thread(
@@ -961,6 +982,20 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
             },
             "viewshow")
         .start();
+  }
+
+  /**
+   * A toast that stands out more than the ordinary small one in the corner --
+   * these name a show state, not just a missed key press, and are read across
+   * a room. Text size doubles via a span rather than a custom view, which
+   * Android restricts for background apps; tvapp is always foreground.
+   */
+  private void showBigCenterToast(String message) {
+    SpannableString text = new SpannableString(message);
+    text.setSpan(new RelativeSizeSpan(TOAST_TEXT_SCALE), 0, text.length(), 0);
+    Toast toast = Toast.makeText(this, text, Toast.LENGTH_LONG);
+    toast.setGravity(Gravity.CENTER, 0, 0);
+    toast.show();
   }
 
   /**

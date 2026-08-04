@@ -69,6 +69,10 @@ class Shows {
     final String network;
     final String genres;
     final boolean notReady;
+    // Whether any episode at all has a file on disk. The record's own noFiles
+    // flag is not this -- it can still read false for a show whose episodes
+    // are every one of them fileless -- so this counts the files itself.
+    final boolean hasFile;
     final int averageRuntime;
     final int seasonCount;
     final int episodeCount;
@@ -105,6 +109,7 @@ class Shows {
       network = str(rec, "originalNetwork");
       genres = joinArray(rec.optJSONArray("genres"));
       notReady = rec.optBoolean("notReady", !rec.optBoolean("inEmby", true));
+      hasFile = anyFile(rec.optJSONArray("episodeData"));
       averageRuntime = rec.optInt("averageRuntime", 0);
       seasonCount = rec.optInt("seasonCount", 0);
       episodeCount = rec.optInt("episodeCount", 0);
@@ -219,6 +224,25 @@ class Shows {
 
   private static String str(JSONObject rec, String key) {
     return rec.isNull(key) ? "" : rec.optString(key, "");
+  }
+
+  // episodeData is [season][episode] of [aired, watched, embyId, file, res],
+  // seasons and episodes alike left null where there is none. A non-empty file
+  // slot anywhere is what "this show has something to play" means.
+  private static final int EPISODE_FILE_SLOT = 3;
+
+  private static boolean anyFile(JSONArray episodeData) {
+    if (episodeData == null) return false;
+    for (int season = 0; season < episodeData.length(); season++) {
+      JSONArray episodes = episodeData.optJSONArray(season);
+      if (episodes == null) continue;
+      for (int episode = 0; episode < episodes.length(); episode++) {
+        JSONArray fields = episodes.optJSONArray(episode);
+        if (fields == null || fields.isNull(EPISODE_FILE_SLOT)) continue;
+        if (!fields.optString(EPISODE_FILE_SLOT, "").isEmpty()) return true;
+      }
+    }
+    return false;
   }
 
   private static String join(String sep, String... parts) {

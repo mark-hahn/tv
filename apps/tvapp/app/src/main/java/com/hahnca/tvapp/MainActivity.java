@@ -152,9 +152,11 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    *
    * The filter group focuses one of its buttons. The tab pane focuses an item
    * of the pane on screen -- a cell in Map's grid, a card in Actors, a card in
-   * Trailer -- and Info, having nothing to focus, cannot be entered at all.
-   * The tab and sort buttons are never focused; the remote's Info and Sort keys
-   * are what change them.
+   * Trailer. Info, and a Map/Actors/Trailer pane with nothing in it, has
+   * nothing to focus, but the area is entered anyway: ok and up/down/right are
+   * no-ops there, and left is the only way back to the show list. The tab and
+   * sort buttons are never focused; the remote's Info and Sort keys are what
+   * change them.
    */
   private enum Area {
     SHOWS,
@@ -477,6 +479,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     mapPane.clearCellFocus();
     actorsPane.clearCardFocus();
     trailersView.clearCardFocus();
+    info.closePoster();
   }
 
   /** The focused area's border, and the focused button inside it. */
@@ -680,27 +683,26 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   /**
-   * Into the tab pane, onto the first item of the pane already on screen. A
-   * pane with nothing to focus cannot be entered at all, so the key does
-   * nothing: Info never has anything, and neither has a show with no cast, no
-   * trailers, or no episodes.
+   * Into the tab pane, onto the first item of the pane already on screen.
+   * Entered unconditionally, even when the pane has nothing to focus -- Info
+   * never has anything, and neither has a show with no cast, no trailers, or
+   * no episodes. movePaneFocus and activatePaneItem are what turn that into a
+   * no-op for everything but left.
    */
   private void focusPane() {
-    boolean entered = false;
     switch (activeTabIndex) {
       case MAP_TAB_INDEX:
         // A grid still being fetched has nowhere to put the focus yet; the cell
         // focus listener takes the focus in as soon as the grid lands.
-        entered = mapPane.requestFocusFirstCell();
+        mapPane.requestFocusFirstCell();
         break;
       case ACTORS_TAB_INDEX:
-        entered = actorsPane.focusFirstCard();
+        actorsPane.focusFirstCard();
         break;
       case TRAILER_TAB_INDEX:
-        entered = trailersView.focusTopCard();
+        trailersView.focusTopCard();
         break;
     }
-    if (!entered) return;
     area = Area.PANE;
     repaintFocus();
   }
@@ -729,8 +731,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     boolean left = "left".equals(direction);
     boolean right = "right".equals(direction);
     if (!up && !down && !left && !right) return;
-
-    syncAreaToPane();
 
     switch (area) {
       case SHOWS:
@@ -788,35 +788,20 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
         else if (down) trailersView.moveCardFocus(+1);
         else if (left) focusShows();
         return;
-    }
-  }
 
-  /**
-   * A show change rebuilds the cards and cells out from under the focus, so the
-   * pane area is only believed while its pane really has something focused;
-   * otherwise the focus falls back to the show list, the pane's left neighbor.
-   */
-  private void syncAreaToPane() {
-    if (area != Area.PANE) return;
-    boolean lost;
-    switch (activeTabIndex) {
-      case MAP_TAB_INDEX:
-        lost = !mapPane.hasFocusedCell();
-        break;
-      case ACTORS_TAB_INDEX:
-        lost = !actorsPane.hasFocusedCard();
-        break;
-      case TRAILER_TAB_INDEX:
-        lost = !trailersView.hasFocusedCard();
-        break;
       default:
-        lost = true;
+        // Info has nothing to focus, but an open poster answers every
+        // direction the same way: shrink back down, staying on the pane.
+        if (info.isPosterOpen()) {
+          info.closePoster();
+          return;
+        }
+        if (left) focusShows();
+        return;
     }
-    if (lost) focusShows();
   }
 
   private void activateSelectedItem() {
-    syncAreaToPane();
     switch (area) {
       case SHOWS:
         embyClick();
@@ -842,6 +827,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
         return;
       case TRAILER_TAB_INDEX:
         trailersView.activateFocusedCard();
+        return;
+      default:
+        // Info has nothing else to focus, so its ok is the poster's own --
+        // open it blown up, or close it if it is already open.
+        if (info.isPosterOpen()) info.closePoster();
+        else info.openPoster();
         return;
     }
   }
@@ -1025,10 +1016,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   /**
-   * One level out: a playing trailer, then an open episode subpane, then
-   * whichever area has the focus straight back to the show list, and only from
-   * the show list does back leave for Emby. The subpane closing is all a back
-   * press does -- the focus stays on the cell it was opened from.
+   * One level out: a playing trailer, then an open episode subpane or blown-up
+   * poster, then whichever area has the focus straight back to the show list,
+   * and only from the show list does back leave for Emby. Closing one of those
+   * is all a back press does -- the focus stays where it was opened from.
    *
    * The web client's Shows button closes tvapp with this same message, so
    * while an area other than the show list has the focus it takes a second
@@ -1042,6 +1033,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     }
     if (mapPane.isEpisodeOpen()) {
       mapPane.closeEpisode();
+      return;
+    }
+    if (info.isPosterOpen()) {
+      info.closePoster();
       return;
     }
     switch (area) {

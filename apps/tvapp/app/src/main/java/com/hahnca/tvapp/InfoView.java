@@ -5,6 +5,7 @@ import android.graphics.Color;
 import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -16,9 +17,11 @@ import android.widget.TextView;
  * Info tab shows, and the overview under them. The fields and their order are
  * mirrored from there, so the three uis read alike.
  *
- * No buttons — the pane's actions live on this screen's own Emby button.
+ * No buttons — the pane's actions live on this screen's own Emby button. Ok
+ * on the pane blows the poster up to fill it (aspect kept, letterboxed); ok,
+ * any arrow, or back shrinks it back down.
  */
-class InfoView extends LinearLayout implements Pane {
+class InfoView extends FrameLayout implements Pane {
 
   private static final float PAD_DP = 24f;
   private static final float POSTER_WIDTH_DP = 137f;
@@ -31,33 +34,39 @@ class InfoView extends LinearLayout implements Pane {
   private static final int OVERVIEW_COLOR = 0xFFE0E0E0;
   private static final int POSTER_PLACEHOLDER_BG = 0xFF303030;
 
+  private final LinearLayout content;
   private final TextView title;
   private final ImageView poster;
+  private final ImageView bigPoster;
   private final LinearLayout fields;
   private final TextView overview;
   private final ScrollView overviewScroll;
 
   private Shows.Show show;
   private Shows.Show filled;
+  private boolean posterOpen;
 
   InfoView(Context context) {
     super(context);
-    setOrientation(VERTICAL);
+
+    content = new LinearLayout(context);
+    content.setOrientation(LinearLayout.VERTICAL);
     int pad = (int) dp(PAD_DP);
-    setPadding(pad, (int) dp(ScrollPane.PAD_TOP_DP), pad, pad);
+    content.setPadding(pad, (int) dp(ScrollPane.PAD_TOP_DP), pad, pad);
+    addView(content, matchParent());
 
     title = new TextView(context);
     title.setTextColor(Color.WHITE);
     title.setTextSize(TypedValue.COMPLEX_UNIT_SP, TITLE_TEXT_SIZE_SP);
     title.setSingleLine(true);
     title.setEllipsize(android.text.TextUtils.TruncateAt.END);
-    addView(title, wrap());
+    content.addView(title, wrap());
 
     LinearLayout top = new LinearLayout(context);
-    top.setOrientation(HORIZONTAL);
+    top.setOrientation(LinearLayout.HORIZONTAL);
     LinearLayout.LayoutParams topParams = wrap();
     topParams.topMargin = (int) dp(PAD_DP / 2);
-    addView(top, topParams);
+    content.addView(top, topParams);
 
     poster = new ImageView(context);
     poster.setScaleType(ImageView.ScaleType.CENTER_CROP);
@@ -68,7 +77,7 @@ class InfoView extends LinearLayout implements Pane {
             (int) dp(POSTER_WIDTH_DP), (int) dp(POSTER_WIDTH_DP * POSTER_ASPECT)));
 
     fields = new LinearLayout(context);
-    fields.setOrientation(VERTICAL);
+    fields.setOrientation(LinearLayout.VERTICAL);
     LinearLayout.LayoutParams fieldsParams =
         new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
     fieldsParams.leftMargin = (int) dp(FIELD_GAP_DP);
@@ -90,11 +99,36 @@ class InfoView extends LinearLayout implements Pane {
     LinearLayout.LayoutParams overviewParams =
         new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
     overviewParams.topMargin = (int) dp(PAD_DP / 2);
-    addView(overviewScroll, overviewParams);
+    content.addView(overviewScroll, overviewParams);
+
+    // On top of everything, hidden until ok opens it. FIT_CENTER letterboxes
+    // it inside the pane rather than cropping, unlike the small poster above.
+    bigPoster = new ImageView(context);
+    bigPoster.setScaleType(ImageView.ScaleType.FIT_CENTER);
+    bigPoster.setBackgroundColor(POSTER_PLACEHOLDER_BG);
+    bigPoster.setVisibility(View.GONE);
+    addView(bigPoster, matchParent());
   }
 
   void setPosterClickListener(OnClickListener listener) {
     poster.setOnClickListener(listener);
+  }
+
+  boolean isPosterOpen() {
+    return posterOpen;
+  }
+
+  void openPoster() {
+    if (show == null) return;
+    posterOpen = true;
+    content.setVisibility(View.INVISIBLE);
+    bigPoster.setVisibility(View.VISIBLE);
+  }
+
+  void closePoster() {
+    posterOpen = false;
+    bigPoster.setVisibility(View.GONE);
+    content.setVisibility(View.VISIBLE);
   }
 
   /** Scrolls the description; the rest of the pane stays put. */
@@ -127,6 +161,7 @@ class InfoView extends LinearLayout implements Pane {
   private void refill() {
     if (show == filled) return;
     filled = show;
+    closePoster();
     if (show != null) apply(show);
   }
 
@@ -146,6 +181,7 @@ class InfoView extends LinearLayout implements Pane {
     addField(show.inEmby ? "" : "Not In Emby");
 
     Images.into(poster, show.image, show);
+    Images.into(bigPoster, show.image, show);
   }
 
   private static String joinRow(String... parts) {
@@ -216,6 +252,11 @@ class InfoView extends LinearLayout implements Pane {
   private LinearLayout.LayoutParams wrap() {
     return new LinearLayout.LayoutParams(
         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+  }
+
+  private FrameLayout.LayoutParams matchParent() {
+    return new FrameLayout.LayoutParams(
+        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
   }
 
   private float dp(float value) {

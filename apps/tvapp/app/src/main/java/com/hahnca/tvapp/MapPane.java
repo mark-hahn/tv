@@ -70,7 +70,12 @@ class MapPane implements Pane {
    * closed: opening it is what ok is for.
    */
   boolean moveCellFocus(int rowStep, int colStep) {
-    if (!mapView.moveCellFocus(rowStep, colStep)) return false;
+    if (!mapView.moveCellFocus(rowStep, colStep)) {
+      // The cursor's own column ran dry, not necessarily the whole table --
+      // scroll on so the rest of it, from other seasons, still shows.
+      if (rowStep > 0 && colStep == 0) mapView.scrollToBottom();
+      return false;
+    }
     if (episodeSubpane.isOpen()) {
       episodeSubpane.showEpisode(
           mapView.focusedShowName(), mapView.focusedSeason(), mapView.focusedEpisode());

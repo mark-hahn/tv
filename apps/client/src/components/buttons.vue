@@ -114,7 +114,6 @@
       Trash
     </button>
     <button
-      v-if="hasSharedFilters"
       :class="{ active: activeButtons['Custom'] }"
       @click="handleButtonClick('Custom')"
       :style="{
@@ -174,7 +173,6 @@ export default {
 
   data() {
     return {
-      hasSharedFilters: false,
       activeButtons: {
         Ready: false,
         Drama: false,
@@ -209,7 +207,6 @@ export default {
   emits: ["button-click", "top-click"],
 
   mounted() {
-    void this.refreshHasSharedFilters();
     this.startSharedFiltersPolling();
     evtBus.on("clearFilterButtons", this.onClearFilterButtons);
   },
@@ -224,9 +221,9 @@ export default {
 
   methods: {
     startSharedFiltersPolling() {
-      // Poll tv-srvr sharedFilters so Custom button appears/disappears across computers.
-      // When it changes, reset internal filters by emitting current button state
-      // (with Custom turned off) so List recomputes from visible buttons.
+      // The Custom settings are shared across computers, so when they change
+      // reset internal filters by emitting current button state (with Custom
+      // turned off) so List recomputes from visible buttons.
       this._lastSharedFiltersRaw = "";
 
       // Load initial state
@@ -234,41 +231,21 @@ export default {
         try {
           const shared = await srvr.getSharedFilters();
           this._lastSharedFiltersRaw = shared ? JSON.stringify(shared) : "";
-          await this.refreshHasSharedFilters(shared);
         } catch {}
       })();
 
       // Listen for WebSocket notifications instead of polling
       if (!this._onSharedFiltersChanged) {
-        this._onSharedFiltersChanged = async (shared) => {
+        this._onSharedFiltersChanged = (shared) => {
           const raw = shared ? JSON.stringify(shared) : "";
           if (raw === this._lastSharedFiltersRaw) return;
           this._lastSharedFiltersRaw = raw;
 
-          await this.refreshHasSharedFilters(shared);
           this.activeButtons["Custom"] = false;
           this.$emit("button-click", this.activeButtons);
         };
         evtBus.on("sharedFiltersChanged", this._onSharedFiltersChanged);
       }
-    },
-
-    async refreshHasSharedFilters(sharedFiltersIn = undefined) {
-      let shared = sharedFiltersIn;
-      if (shared === undefined) {
-        try {
-          shared = await srvr.getSharedFilters();
-        } catch {
-          shared = null;
-        }
-      }
-
-      const has =
-        !!shared &&
-        typeof shared === "object" &&
-        Object.keys(shared).length > 0;
-      this.hasSharedFilters = has;
-      if (!has) this.activeButtons["Custom"] = false;
     },
 
     onClearFilterButtons() {
@@ -278,8 +255,6 @@ export default {
     },
 
     handleButtonClick(label) {
-      void this.refreshHasSharedFilters();
-
       // Custom: turn off highlights above it (filters/genres/collections), keep order buttons unchanged.
       if (label === "Custom") {
         const nextVal = !this.activeButtons["Custom"];

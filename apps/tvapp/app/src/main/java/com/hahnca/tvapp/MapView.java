@@ -344,6 +344,16 @@ class MapView extends LinearLayout implements Pane {
     headerAcross.scrollTo(0, 0);
   }
 
+  /**
+   * Called when the cursor can no longer step down within its own column --
+   * its season has run out of episodes -- but the table can still run on
+   * beneath it for other, longer seasons. Scrolls all the way to the bottom
+   * so the rest of the table is visible even though the cursor stays put.
+   */
+  void scrollToBottom() {
+    gridDown.fullScroll(View.FOCUS_DOWN);
+  }
+
   private void refill() {
     if (show == filled) return;
     filled = show;

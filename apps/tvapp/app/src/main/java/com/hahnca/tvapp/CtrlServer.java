@@ -12,7 +12,7 @@ import org.java_websocket.server.WebSocketServer;
  *
  * From the remote:
  *
- *   k,&lt;key&gt;     one of up/down/left/right/ok/list
+ *   k,&lt;key&gt;     one of up/down/left/right/ok/info/sort
  *   b              switch from tvapp to Emby
  *   e              load the active show into Emby
  *   x              close tvapp
@@ -21,15 +21,21 @@ import org.java_websocket.server.WebSocketServer;
  *
  * Back to Android:
  *
- *   z              a show was activated here: clear Android's filter box too
+ *   i              the Filter button was clicked: open the filter input screen,
+ *                  which is the only way it opens now that the remote has no
+ *                  Filter button of its own
+ *   z              the filter was cleared here: clear Android's filter box too
  *   c,<count>      the number of shows currently visible in the list
+ *   a,&lt;name&gt;    the active show, so the phone's own show pane can open on it
  */
 class CtrlServer extends WebSocketServer {
 
   static final int CTRL_PORT = 8099;
 
+  static final String MSG_OPEN_FILTER = "i";
   static final String MSG_CLEAR_FILTER = "z";
   static final String MSG_COUNTS = "c";
+  static final String MSG_ACTIVE_SHOW = "a";
 
   private static final String TAG = "tvapp";
   private static final String CMD_KEY = "k";
@@ -52,6 +58,8 @@ class CtrlServer extends WebSocketServer {
     void onFilter(String text);
 
     void onSelectShow(String name);
+
+    void onPhoneConnected();
   }
 
   private final Listener listener;
@@ -81,6 +89,7 @@ class CtrlServer extends WebSocketServer {
   @Override
   public void onOpen(WebSocket conn, ClientHandshake handshake) {
     Log.i(TAG, "tvapprc connected from " + conn.getRemoteSocketAddress());
+    listener.onPhoneConnected();
   }
 
   @Override

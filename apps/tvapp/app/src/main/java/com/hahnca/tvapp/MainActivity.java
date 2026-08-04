@@ -40,35 +40,51 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final float PANE_WIDTH_FRACTION = 0.55f;
 
   private static final String[] TAB_LABELS = {"Info", "Map", "Actors", "Trailer"};
+  // Not a filter of its own: clicking it opens the phone's filter input screen,
+  // which is the only way that screen opens now that the remote has no Filter
+  // button. It is focused and clicked like the rest of the group.
+  private static final String FILTER_INPUT_LABEL = "Filter";
   private static final String[] FILTER_LABELS = {
-    "Ready", "Drama", "Comedy", "To Try", "Continue", "Mark", "Linda", "Trash"
+    FILTER_INPUT_LABEL, "Ready", "Drama", "Comedy", "To Try", "Continue", "Mark", "Linda", "Trash"
   };
   private static final String SORT_WATCHED = "Watched";
   private static final String SORT_ADDED = "Added";
   private static final String SORT_CUSTOM = "Custom";
+  private static final String[] SORT_LABELS = {SORT_WATCHED, SORT_ADDED, SORT_CUSTOM};
+  // The shared settings already filtered and sorted into a show list, by the
+  // same @tv/share code the web client runs on its own copy of the data.
+  private static final String SHARED_FILTER_SHOWS_URL =
+      "https://hahnca.com/tv-srvr/api/getSharedFilterShows";
   private static final int MAP_TAB_INDEX = 1;
   private static final int ACTORS_TAB_INDEX = 2;
   private static final int TRAILER_TAB_INDEX = 3;
 
   private static final float BUTTON_TEXT_SIZE_SP = 12.5f;
+  // The tab buttons' height. The sort and filter buttons no longer have one of
+  // their own: they divide up whatever height the button column has.
   private static final float BUTTON_HEIGHT_DP = 25.0f;
   private static final float BUTTON_MARGIN_BOTTOM_DP = 6.0f;
+  // Across the tab row, where the buttons are read left to right and want more
+  // air between them than the stacked groups do.
+  private static final float TAB_GAP_DP = BUTTON_MARGIN_BOTTOM_DP * 2f;
   private static final float BUTTON_GROUP_GAP_DP = BUTTON_HEIGHT_DP / 2f;
   private static final float BUTTON_PAD_H_DP = 8f;
   private static final float BUTTON_CORNER_DP = 6f;
   private static final float BUTTON_SELECTED_BORDER_DP = 3f;
   private static final int BUTTON_ACTIVE_BG = 0xFF0A4A8A;
-  private static final int BUTTON_INACTIVE_BG = 0xFFFFFFFF;
+  private static final int BUTTON_INACTIVE_BG = 0xFF808080;
   private static final int BUTTON_ACTIVE_TEXT = 0xFFFFFFFF;
   private static final int BUTTON_INACTIVE_TEXT = 0xFF000000;
   private static final int BUTTON_SELECTED_BORDER = 0xFFFF0000;
-  // Off: a button only ever activates on ok. The dwell made landing on the
-  // right button hard, since scrubbing past one could still fire it.
-  private static final boolean ENABLE_BUTTON_DWELL = false;
+  // The focused area's own border, twice the width of a focused button's, drawn
+  // around the whole group. It sits in the padding the group already had, so
+  // nothing inside it moves when it comes and goes.
+  private static final float AREA_BORDER_DP = BUTTON_SELECTED_BORDER_DP * 2f;
 
   private static final String PREFS_NAME = "tvapp";
   private static final String KEY_SELECTED_SHOW = "selectedShow";
   private static final String KEY_SORT = "sort";
+  private static final String KEY_FOCUSED_FILTER = "focusedFilter";
 
   private static final String VIEWSHOW_URL = "https://hahnca.com/tv-tv/tv/viewshow";
   private static final int VIEWSHOW_TIMEOUT_MS = 10000;
@@ -86,7 +102,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private final Set<String> activeFilters = new HashSet<>();
 
   private CtrlServer ctrlServer;
-  private SharedFilters sharedFilters;
   private ShowListView showList;
   private InfoView info;
   private MapPane mapPane;
@@ -94,39 +109,35 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private TrailersView trailersView;
   private Pane activePane;
   private TrailerPlayer player;
+  private LinearLayout buttonColumn;
+  private GradientDrawable filterGroupBg;
+  private GradientDrawable paneAreaBg;
   private Shows.Sort sort = Shows.Sort.ALPHA;
   private boolean customOn;
-  private boolean customAvailable;
   private int activeTabIndex;
-  private Cursor cursor = Cursor.SHOW;
-  private String selectedButton;
-  // The button the cursor was on when it went right into a pane, so leaving
-  // the pane can put it back there.
-  private String paneEntryButton;
+  private Area area = Area.SHOWS;
+  // The filter button the focus is on, kept while the focus is elsewhere and
+  // across restarts, so the filter group is re-entered where it was left.
+  private String focusedFilter;
+  private String activeShowName;
   private long showsLoadedAt;
-  // A trailer-button dwell that fired before the show's trailer list had
-  // settled, and so does not know yet whether there are cards to go to.
-  private boolean enterCardsWhenReady;
 
   /**
-   * The one place the cursor is. It used to be two booleans that had to be kept
-   * agreeing with each other, and every arrow-key bug in the trailer column came
-   * from a path that set one and not the other -- the cursor reading as being on
-   * a trailer card while it was drawn on the trailer button, where up/down/right
-   * then did nothing. One field cannot disagree with itself.
+   * The one area of the screen that can hold a focused item. The show list is
+   * an area like the other two, but nothing in it is ever focused: it is simply
+   * where the arrow keys go when neither of the other two has the focus, and
+   * there its up and down move the selected show itself.
    *
-   * Past the two columns, three of the panes hold the cursor on an item of
-   * their own: a cell in Map's grid, a card in Actors, a card in Trailer.
-   * Right from anywhere in the button column is the way in and the back key is
-   * the way out. Info has nothing to focus, and neither has the episode
-   * subpane a Map cell opens -- both are only ever read.
+   * The filter group focuses one of its buttons. The tab pane focuses an item
+   * of the pane on screen -- a cell in Map's grid, a card in Actors, a card in
+   * Trailer -- and Info, having nothing to focus, cannot be entered at all.
+   * The tab and sort buttons are never focused; the remote's Info and Sort keys
+   * are what change them.
    */
-  private enum Cursor {
-    SHOW,
-    BUTTON,
-    MAP_CELL,
-    ACTOR_CARD,
-    TRAILER_CARD
+  private enum Area {
+    SHOWS,
+    FILTERS,
+    PANE
   }
 
   @Override
@@ -139,36 +150,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     showList.setSelectionListener(this::onShowSelected);
     sort = Shows.Sort.of(prefs().getString(KEY_SORT, null));
     showList.setSort(sort);
+    focusedFilter = prefs().getString(KEY_FOCUSED_FILTER, FILTER_LABELS[0]);
     String remembered = prefs().getString(KEY_SELECTED_SHOW, null);
 
     showList.setCountsListener(
-        count -> {
-          if (ctrlServer != null) ctrlServer.send(CtrlServer.MSG_COUNTS + "," + count);
-        });
-    // A filter/sort change that empties the list leaves nothing in the show
-    // column for the cursor to sit on, so it moves over to the button column
-    // -- back to whichever button was selected last, or Info if none yet.
-    showList.setEmptyListener(
-        () -> {
-          if (cursor == Cursor.SHOW) {
-            selectButton(selectedButton != null ? selectedButton : TAB_LABELS[0]);
-          }
-        });
+        count -> sendToPhone(CtrlServer.MSG_COUNTS + "," + count));
 
     loadShows(remembered);
-
-    sharedFilters =
-        new SharedFilters(
-            has ->
-                ui.post(
-                    () -> {
-                      setCustomAvailable(has);
-                      if (!has) {
-                        setCustomOn(false);
-                        showList.setCustomOrder(null);
-                      }
-                    }));
-    sharedFilters.start();
   }
 
   private void loadShows(String selectedName) {
@@ -178,7 +166,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
                 () -> {
                   showsLoadedAt = System.currentTimeMillis();
                   showList.setShows(shows, selectedName);
-                  if (cursor == Cursor.SHOW) showList.focusActive();
                 }));
   }
 
@@ -218,11 +205,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     columns.setPadding(0, (int) dp(SCREEN_V_MARGIN_DP), 0, (int) dp(SCREEN_V_MARGIN_DP));
     columns.addView(buildList(), column(LIST_WIDTH_FRACTION, 0));
     columns.addView(buildButtonColumn(), column(BUTTONS_WIDTH_FRACTION, dp(COLUMN_GAP_DP)));
-    columns.addView(buildPanes(), column(PANE_WIDTH_FRACTION, dp(COLUMN_GAP_DP)));
+    columns.addView(buildPaneColumn(), column(PANE_WIDTH_FRACTION, dp(COLUMN_GAP_DP)));
     root.addView(columns, matchParent());
 
     player = new TrailerPlayer(this);
     root.addView(player, matchParent());
+    buttonColumn.post(this::sizeTabButtons);
     return root;
   }
 
@@ -231,35 +219,108 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     return showList;
   }
 
+  /**
+   * What is left in the column once the tabs have moved over the tab pane: the
+   * sort group and the filter group, sharing the whole height of the column
+   * between them by weight rather than standing at a fixed height. Every button
+   * is one share, the filter group as many shares as it holds buttons, so the
+   * two groups keep their proportions while the fixed spacing -- the gap
+   * between the groups and the room for the filter group's focus border --
+   * comes off the top first.
+   *
+   * The column's own horizontal padding is the filter group container's, so
+   * that border has room without the buttons inside it moving; the sort buttons
+   * carry the same inset as margins instead.
+   */
   private View buildButtonColumn() {
-    LinearLayout column = new LinearLayout(this);
-    column.setOrientation(LinearLayout.VERTICAL);
-    column.setPadding((int) dp(BUTTON_PAD_H_DP), 0, (int) dp(BUTTON_PAD_H_DP), 0);
+    buttonColumn = new LinearLayout(this);
+    buttonColumn.setOrientation(LinearLayout.VERTICAL);
 
-    addGroup(column, TAB_LABELS);
-    addGroup(column, new String[] {SORT_WATCHED, SORT_ADDED, SORT_CUSTOM});
-    addGroup(column, FILTER_LABELS);
-    buttonItems.get(SORT_CUSTOM).view.setVisibility(View.GONE);
+    for (String label : SORT_LABELS) {
+      LinearLayout.LayoutParams params = shareOfColumn(1f);
+      params.leftMargin = (int) dp(BUTTON_PAD_H_DP);
+      params.rightMargin = (int) dp(BUTTON_PAD_H_DP);
+      params.bottomMargin = (int) dp(BUTTON_MARGIN_BOTTOM_DP);
+      addButton(buttonColumn, label, params);
+    }
+    buttonColumn.addView(buildFilterGroup(), filterGroupParams());
     repaintButtons();
-    return column;
+    return buttonColumn;
   }
 
-  private void addGroup(LinearLayout column, String[] labels) {
-    boolean firstGroup = buttonOrder.isEmpty();
-    for (int i = 0; i < labels.length; i++) {
-      float topMargin;
-      if (firstGroup && i == 0) {
-        topMargin = 0;
-      } else if (i == 0) {
-        topMargin = BUTTON_GROUP_GAP_DP;
-      } else {
-        topMargin = 0;
-      }
-      addButtonItem(column, labels[i], topMargin);
+  private LinearLayout.LayoutParams shareOfColumn(float shares) {
+    return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, shares);
+  }
+
+  /**
+   * The one focusable group of buttons, in a container of its own so the focus
+   * border can be drawn around all of it at once. The container's padding is
+   * what the column used to hold, so the border lands in space the layout
+   * already had.
+   */
+  private View buildFilterGroup() {
+    LinearLayout group = new LinearLayout(this);
+    group.setOrientation(LinearLayout.VERTICAL);
+    group.setPadding(
+        (int) dp(BUTTON_PAD_H_DP),
+        (int) dp(AREA_BORDER_DP),
+        (int) dp(BUTTON_PAD_H_DP),
+        (int) dp(AREA_BORDER_DP));
+    filterGroupBg = new GradientDrawable();
+    filterGroupBg.setCornerRadius(dp(BUTTON_CORNER_DP));
+    group.setBackground(filterGroupBg);
+    for (int i = 0; i < FILTER_LABELS.length; i++) {
+      LinearLayout.LayoutParams params = shareOfColumn(1f);
+      // Between the buttons only: below the last one is the container's own
+      // padding, which is what the border sits in.
+      if (i < FILTER_LABELS.length - 1) params.bottomMargin = (int) dp(BUTTON_MARGIN_BOTTOM_DP);
+      addButton(group, FILTER_LABELS[i], params);
+    }
+    return group;
+  }
+
+  private LinearLayout.LayoutParams filterGroupParams() {
+    LinearLayout.LayoutParams params = shareOfColumn(FILTER_LABELS.length);
+    // The container's own top padding is part of the gap between the groups.
+    params.topMargin = (int) dp(BUTTON_GROUP_GAP_DP - AREA_BORDER_DP);
+    return params;
+  }
+
+  /**
+   * The tab buttons, in a row across the top of the tab pane they switch. They
+   * are the one group that is read left to right, so they are sized rather than
+   * stretched: each keeps the width it had while it was in the button column.
+   */
+  private View buildTabRow() {
+    LinearLayout row = new LinearLayout(this);
+    row.setOrientation(LinearLayout.HORIZONTAL);
+    for (int i = 0; i < TAB_LABELS.length; i++) {
+      LinearLayout.LayoutParams params =
+          new LinearLayout.LayoutParams(
+              ViewGroup.LayoutParams.WRAP_CONTENT, (int) dp(BUTTON_HEIGHT_DP));
+      if (i > 0) params.leftMargin = (int) dp(TAB_GAP_DP);
+      addButton(row, TAB_LABELS[i], params);
+    }
+    return row;
+  }
+
+  /** The width the tab buttons had in the button column, which is that column
+   * inside its buttons' margins. Known only once the column has been laid out. */
+  private void sizeTabButtons() {
+    int width = buttonColumn.getWidth() - 2 * (int) dp(BUTTON_PAD_H_DP);
+    if (width <= 0) return;
+    for (int i = 0; i < TAB_LABELS.length; i++) {
+      View view = buttonItems.get(TAB_LABELS[i]).view;
+      LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) view.getLayoutParams();
+      params.width = width;
+      // The row starts half a button in from the edge of the pane, which is a
+      // width only known here.
+      if (i == 0) params.leftMargin = width / 2;
+      view.setLayoutParams(params);
     }
   }
 
-  private void addButtonItem(LinearLayout column, String label, float topMarginDp) {
+  private void addButton(LinearLayout parent, String label, LinearLayout.LayoutParams params) {
     TextView view = new TextView(this);
     view.setText(label);
     view.setGravity(Gravity.CENTER);
@@ -271,19 +332,37 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     bg.setCornerRadius(dp(BUTTON_CORNER_DP));
     view.setBackground(bg);
 
-    ButtonItem item = new ButtonItem(label, view);
-    buttonItems.put(label, item);
+    buttonItems.put(label, new ButtonItem(label, view));
     buttonOrder.add(label);
+    parent.addView(view, params);
+  }
 
-    LinearLayout.LayoutParams params =
-        new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (int) dp(BUTTON_HEIGHT_DP));
-    params.topMargin = (int) dp(topMarginDp);
-    params.bottomMargin = (int) dp(BUTTON_MARGIN_BOTTOM_DP);
-    column.addView(view, params);
+  /** The tab row above the tab pane it switches, and the pane below it. */
+  private View buildPaneColumn() {
+    LinearLayout paneColumn = new LinearLayout(this);
+    paneColumn.setOrientation(LinearLayout.VERTICAL);
+    LinearLayout.LayoutParams rowParams =
+        new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+    rowParams.bottomMargin = (int) dp(BUTTON_MARGIN_BOTTOM_DP);
+    paneColumn.addView(buildTabRow(), rowParams);
+    paneColumn.addView(
+        buildPanes(), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+    return paneColumn;
   }
 
   private View buildPanes() {
     FrameLayout holder = new FrameLayout(this);
+    // Room for the focus border around the whole tab pane; the panes inside
+    // shrink by that much rather than the border overlapping them.
+    holder.setPadding(
+        (int) dp(AREA_BORDER_DP),
+        (int) dp(AREA_BORDER_DP),
+        (int) dp(AREA_BORDER_DP),
+        (int) dp(AREA_BORDER_DP));
+    paneAreaBg = new GradientDrawable();
+    paneAreaBg.setCornerRadius(dp(BUTTON_CORNER_DP));
+    holder.setBackground(paneAreaBg);
     info = new InfoView(this);
     panes.add(info);
     mapPane = new MapPane(this);
@@ -291,8 +370,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     // there is a cell to land on; this is the grid saying it got there.
     mapPane.setCellFocusListener(
         () -> {
-          cursor = Cursor.MAP_CELL;
-          repaintButtons();
+          area = Area.PANE;
+          repaintFocus();
         });
     panes.add(mapPane);
     actorsPane = new ActorsView(this);
@@ -321,28 +400,33 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     activePane = panes.get(index);
     activePane.onShown();
     if (index != MAP_TAB_INDEX) mapPane.closeEpisode();
-    // The cursor cannot stay on an item of a pane that has just stopped being
-    // the one on screen, so it falls back to the button column. Whatever is
-    // moving it into the new pane sets it again after this.
+    // Nothing can stay focused in a pane that has just stopped being the one on
+    // screen. Whatever is moving the focus into the new pane sets it after this.
     clearPaneFocus();
-    if (cursor != Cursor.SHOW && cursor != Cursor.BUTTON) cursor = Cursor.BUTTON;
     repaintButtons();
   }
 
-  /** Every pane's cursor at once -- whichever one the cursor is leaving. */
+  /** Every pane's focused item at once -- whichever one the focus is leaving. */
   private void clearPaneFocus() {
     mapPane.clearCellFocus();
     actorsPane.clearCardFocus();
     trailersView.clearCardFocus();
   }
 
+  /** The focused area's border, and the focused button inside it. */
+  private void repaintFocus() {
+    repaintButtons();
+    filterGroupBg.setStroke(
+        area == Area.FILTERS ? (int) dp(AREA_BORDER_DP) : 0, BUTTON_SELECTED_BORDER);
+    paneAreaBg.setStroke(
+        area == Area.PANE ? (int) dp(AREA_BORDER_DP) : 0, BUTTON_SELECTED_BORDER);
+  }
+
   private void repaintButtons() {
     for (String label : buttonOrder) {
       ButtonItem item = buttonItems.get(label);
       if (item != null) {
-        item.paint(
-            isButtonActive(label),
-            cursor == Cursor.BUTTON && label.equals(selectedButton));
+        item.paint(isButtonActive(label), area == Area.FILTERS && label.equals(focusedFilter));
       }
     }
   }
@@ -358,22 +442,24 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     return false;
   }
 
-  private void setCustomAvailable(boolean available) {
-    customAvailable = available;
-    ButtonItem custom = buttonItems.get(SORT_CUSTOM);
-    if (custom != null) custom.view.setVisibility(available ? View.VISIBLE : View.GONE);
-    if (!available && SORT_CUSTOM.equals(selectedButton)) selectButton(SORT_ADDED);
-    repaintButtons();
-  }
-
-  private void sortClick(Shows.Sort clicked) {
-    Shows.Sort next = !customOn && clicked == sort ? Shows.Sort.ALPHA : clicked;
+  /**
+   * The remote's Sort key: one step down the sort group, none of it active
+   * being the step past the bottom. No button active is the alphabetical sort,
+   * which is why the cycle has one more stop than the group has buttons.
+   */
+  private void cycleSort() {
     if (customOn) {
       setCustomOn(false);
       showList.setCustomOrder(null);
       clearTextFilter();
+      applySort(Shows.Sort.ALPHA);
+    } else if (sort == Shows.Sort.WATCHING) {
+      applySort(Shows.Sort.ADDED);
+    } else if (sort == Shows.Sort.ADDED) {
+      customClick();
+    } else {
+      applySort(Shows.Sort.WATCHING);
     }
-    applySort(next);
   }
 
   private void applySort(Shows.Sort newSort) {
@@ -388,19 +474,15 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     repaintButtons();
   }
 
+  /**
+   * Custom on: the show list tv-srvr worked out from the shared settings, which
+   * it keeps on disk, so the button is always there to be turned on.
+   */
   private void customClick() {
-    if (!customAvailable) return;
-    if (customOn) {
-      setCustomOn(false);
-      showList.setCustomOrder(null);
-      clearTextFilter();
-      applySort(Shows.Sort.ALPHA);
-      return;
-    }
     new Thread(
             () -> {
               try {
-                JSONObject res = new JSONObject(Http.get(SharedFilters.SHOWS_URL));
+                JSONObject res = new JSONObject(Http.get(SHARED_FILTER_SHOWS_URL));
                 JSONArray arr = res.optJSONArray("names");
                 List<String> names = new ArrayList<>();
                 for (int i = 0; arr != null && i < arr.length(); i++) {
@@ -435,9 +517,29 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     repaintButtons();
   }
 
+  /**
+   * The filter text goes with the list it was narrowing, so anything that
+   * replaces that list clears it -- on the phone's input screen as well, which
+   * is holding the same string.
+   */
   private void clearTextFilter() {
     showList.setFilter("");
-    ctrlServer.send(CtrlServer.MSG_CLEAR_FILTER);
+    sendToPhone(CtrlServer.MSG_CLEAR_FILTER);
+  }
+
+  /** Silent while tvapp is off screen: the ctrl socket is bound only in front. */
+  private void sendToPhone(String message) {
+    if (ctrlServer != null) ctrlServer.send(message);
+  }
+
+  /**
+   * The phone's Shows button, held, opens its own show pane on whatever show is
+   * active here, so the phone is told the name on every change and again as
+   * soon as it connects.
+   */
+  private void sendActiveShow() {
+    if (activeShowName == null) return;
+    sendToPhone(CtrlServer.MSG_ACTIVE_SHOW + "," + activeShowName);
   }
 
   private void actorClick(String actorName) {
@@ -451,18 +553,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   private void onShowSelected(Shows.Show show) {
+    activeShowName = show.name;
+    sendActiveShow();
     for (Pane pane : panes) pane.setShow(show);
     mapPane.closeEpisode();
     // Started as soon as the show is picked, so the trailer pane is usually
-    // done waiting by the time the cursor has walked over to its button.
-    TrailerList.settle(
-        show,
-        () -> {
-          trailersView.onTrailersReady(show);
-          if (!enterCardsWhenReady) return;
-          enterCardsWhenReady = false;
-          enterTrailerCardsFromDwell();
-        });
+    // done waiting by the time the trailer tab is asked for.
+    TrailerList.settle(show, () -> trailersView.onTrailersReady(show));
     prefs().edit().putString(KEY_SELECTED_SHOW, show.name).apply();
   }
 
@@ -487,74 +584,63 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
         TypedValue.COMPLEX_UNIT_DIP, value, getResources().getDisplayMetrics());
   }
 
-  /**
-   * Mirrors the show list's dwell-select: the cursor landing on a button does
-   * not activate it immediately -- only sitting still on it for
-   * ShowListView.DWELL_SELECT_MS does, so arrow-key repeat while scrubbing
-   * through the button column does not fire every button it passes over.
-   */
-  private void selectButton(String label) {
-    selectButton(label, true);
-  }
-
-  /**
-   * dwell false just parks the cursor on the button. That is the way back from
-   * the trailer cards: the trailer button is already the active tab, and
-   * re-activating it would start the lone trailer playing all over again.
-   */
-  private void selectButton(String label, boolean dwell) {
-    ButtonItem item = buttonItems.get(label);
-    if (item == null || item.view.getVisibility() != View.VISIBLE) return;
-    cursor = Cursor.BUTTON;
+  /** Nothing is focused anywhere; the arrow keys drive the show list itself. */
+  private void focusShows() {
+    area = Area.SHOWS;
     clearPaneFocus();
-    enterCardsWhenReady = false;
-    selectedButton = label;
-    showList.setCardFocusShown(false);
-    repaintButtons();
-    ui.removeCallbacks(buttonDwellActivate);
-    if (dwell && ENABLE_BUTTON_DWELL) {
-      ui.postDelayed(buttonDwellActivate, ShowListView.DWELL_SELECT_MS);
-    }
+    repaintFocus();
   }
 
-  private final Runnable buttonDwellActivate =
-      () -> {
-        if (cursor != Cursor.BUTTON || selectedButton == null) return;
-        activateButton(selectedButton);
-        // The trailer button's dwell goes one step further than the other tabs':
-        // the cards are what a cursor that stopped here was heading for. The
-        // dwell itself stays, so scrubbing past the button still passes it by.
-        if (TAB_LABELS[TRAILER_TAB_INDEX].equals(selectedButton)) enterTrailerCardsFromDwell();
-      };
+  private void focusFilters() {
+    area = Area.FILTERS;
+    clearPaneFocus();
+    if (buttonItems.get(focusedFilter) == null) focusedFilter = FILTER_LABELS[0];
+    repaintFocus();
+  }
 
   /**
-   * Onto the cards, once there is more than one to choose between -- one
-   * trailer has already been played by the activation above. A show whose list
-   * has not settled yet may be either, so that is what this waits for.
+   * Into the tab pane, onto the first item of the pane already on screen. A
+   * pane with nothing to focus cannot be entered at all, so the key does
+   * nothing: Info never has anything, and neither has a show with no cast, no
+   * trailers, or no episodes.
    */
-  private void enterTrailerCardsFromDwell() {
-    Shows.Show show = showList.getSelected();
-    if (show == null) return;
-    if (!show.trailersReady) {
-      enterCardsWhenReady = true;
-      return;
+  private void focusPane() {
+    boolean entered = false;
+    switch (activeTabIndex) {
+      case MAP_TAB_INDEX:
+        // A grid still being fetched has nowhere to put the focus yet; the cell
+        // focus listener takes the focus in as soon as the grid lands.
+        entered = mapPane.requestFocusFirstCell();
+        break;
+      case ACTORS_TAB_INDEX:
+        entered = actorsPane.focusFirstCard();
+        break;
+      case TRAILER_TAB_INDEX:
+        entered = trailersView.focusTopCard();
+        break;
     }
-    if (show.trailers.size() > 1) enterTrailerCards();
+    if (!entered) return;
+    area = Area.PANE;
+    repaintFocus();
   }
 
-  private void selectShow() {
-    cursor = Cursor.SHOW;
-    clearPaneFocus();
-    enterCardsWhenReady = false;
-    ui.removeCallbacks(buttonDwellActivate);
-    showList.setCardFocusShown(true);
+  private void moveFilterFocus(int step) {
+    int index = -1;
+    for (int i = 0; i < FILTER_LABELS.length; i++) {
+      if (FILTER_LABELS[i].equals(focusedFilter)) index = i;
+    }
+    if (index < 0) index = 0;
+    // The focus wraps: left and right are the only ways out of the group.
+    int next = (index + step + FILTER_LABELS.length) % FILTER_LABELS.length;
+    focusedFilter = FILTER_LABELS[next];
+    prefs().edit().putString(KEY_FOCUSED_FILTER, focusedFilter).apply();
     repaintButtons();
   }
 
   /**
-   * Every arrow key, in one place, keyed on where the cursor is. Each state
-   * answers all four directions or deliberately ignores one; nothing falls
-   * through to another state's handling.
+   * Every arrow key, in one place, keyed on the focused area. Each area answers
+   * all four directions or deliberately ignores one; nothing falls through to
+   * another area's handling.
    */
   private void moveSelection(String direction) {
     boolean up = "up".equals(direction);
@@ -563,29 +649,35 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     boolean right = "right".equals(direction);
     if (!up && !down && !left && !right) return;
 
-    syncCursorToPane();
+    syncAreaToPane();
 
-    switch (cursor) {
-      case SHOW:
-        if (up) showList.moveFocus(-1);
-        else if (down) showList.moveFocus(+1);
-        else if (left) showList.focusTop();
-        else selectButton(selectedButton != null ? selectedButton : TAB_LABELS[0], false);
+    switch (area) {
+      case SHOWS:
+        // Nothing is focused here, so up and down move the selected show
+        // itself; the panes catch up once it stops moving.
+        if (up) showList.moveSelection(-1);
+        else if (down) showList.moveSelection(+1);
+        else if (left) showList.selectTop();
+        else focusFilters();
         return;
 
-      case BUTTON:
-        if (left) {
-          showList.focusActive();
-          selectShow();
-        } else if (right) {
-          enterPane();
-        } else {
-          moveButton(up ? -1 : +1);
-        }
+      case FILTERS:
+        if (left) focusShows();
+        else if (right) focusPane();
+        else moveFilterFocus(up ? -1 : +1);
         return;
 
-      case MAP_CELL:
-        // Off the leftmost season column the cursor leaves the grid, the way it
+      case PANE:
+        movePaneFocus(up, down, left, right);
+        return;
+    }
+  }
+
+  /** The focused item's step inside whichever pane is on screen. */
+  private void movePaneFocus(boolean up, boolean down, boolean left, boolean right) {
+    switch (activeTabIndex) {
+      case MAP_TAB_INDEX:
+        // Off the leftmost season column the focus leaves the grid, the way it
         // does off the leftmost actor card; up, down and right only ever move
         // around inside it.
         if (up) mapPane.moveCellFocus(-1, 0);
@@ -593,171 +685,97 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
         else if (right) mapPane.moveCellFocus(0, +1);
         else if (!mapPane.moveCellFocus(0, -1)) {
           mapPane.closeEpisode();
-          leavePane();
+          focusFilters();
         }
         return;
 
-      case ACTOR_CARD:
+      case ACTORS_TAB_INDEX:
         if (up) actorsPane.moveCardFocus(-1, 0);
         else if (down) actorsPane.moveCardFocus(+1, 0);
         else if (right) actorsPane.moveCardFocus(0, +1);
-        // Off the leftmost card of a row the cursor leaves the grid.
-        else if (!actorsPane.moveCardFocus(0, -1)) leavePane();
+        // Off the leftmost card of a row the focus leaves the grid.
+        else if (!actorsPane.moveCardFocus(0, -1)) focusFilters();
         return;
 
-      case TRAILER_CARD:
+      case TRAILER_TAB_INDEX:
         // Right is the way in and left the way out; a card grid one column wide
         // has nothing further right to reach.
         if (up) trailersView.moveCardFocus(-1);
         else if (down) trailersView.moveCardFocus(+1);
-        else if (left) leavePane();
+        else if (left) focusFilters();
         return;
     }
   }
 
   /**
-   * A show change rebuilds the cards and cells out from under the cursor, so a
-   * pane cursor is only believed while its pane really has something focused;
-   * otherwise the cursor goes back to the button that pane belongs to.
+   * A show change rebuilds the cards and cells out from under the focus, so the
+   * pane area is only believed while its pane really has something focused;
+   * otherwise the focus falls back to the filter group.
    */
-  private void syncCursorToPane() {
-    boolean lost =
-        (cursor == Cursor.TRAILER_CARD && !trailersView.hasFocusedCard())
-            || (cursor == Cursor.ACTOR_CARD && !actorsPane.hasFocusedCard())
-            || (cursor == Cursor.MAP_CELL && !mapPane.hasFocusedCell());
-    if (lost) leavePane();
-  }
-
-  /**
-   * Right from any button in the column: the cursor moves onto the first item
-   * of the pane already on screen. Which button it came from does not matter
-   * and is not changed -- selecting a tab is what ok is for, and a right arrow
-   * that swapped the pane out would move the cursor into something the button
-   * column had given no warning of. A pane with nothing to focus leaves the
-   * cursor where it is: Info never has anything, and neither has a show with
-   * no cast, no trailers, or no episodes.
-   */
-  private void enterPane() {
-    paneEntryButton = selectedButton;
-    ui.removeCallbacks(buttonDwellActivate);
+  private void syncAreaToPane() {
+    if (area != Area.PANE) return;
+    boolean lost;
     switch (activeTabIndex) {
       case MAP_TAB_INDEX:
-        // A grid still being fetched has nowhere to put the cursor yet; the
-        // cell focus listener moves it as soon as the grid lands.
-        if (mapPane.requestFocusFirstCell()) cursor = Cursor.MAP_CELL;
+        lost = !mapPane.hasFocusedCell();
         break;
       case ACTORS_TAB_INDEX:
-        if (actorsPane.focusFirstCard()) cursor = Cursor.ACTOR_CARD;
+        lost = !actorsPane.hasFocusedCard();
         break;
       case TRAILER_TAB_INDEX:
-        enterTrailerCards();
+        lost = !trailersView.hasFocusedCard();
         break;
+      default:
+        lost = true;
     }
-    repaintButtons();
-  }
-
-  /**
-   * Out of a pane and back onto the button the cursor went right from, which
-   * is any button in the column and not necessarily this pane's own tab. That
-   * button can have gone away in the meantime -- Custom hides itself when the
-   * shared settings do -- and the pane's tab is where the cursor lands then.
-   */
-  private void leavePane() {
-    ButtonItem entry = paneEntryButton == null ? null : buttonItems.get(paneEntryButton);
-    boolean usable = entry != null && entry.view.getVisibility() == View.VISIBLE;
-    selectButton(usable ? paneEntryButton : TAB_LABELS[activeTabIndex], false);
-  }
-
-  private void moveButton(int step) {
-    List<String> visible = visibleButtonLabels();
-    int index = visible.indexOf(selectedButton);
-    if (index < 0) return;
-    int next = index + step;
-    if (next < 0 || next >= visible.size()) return;
-    selectButton(visible.get(next));
-  }
-
-  /**
-   * The way onto the trailer cards, whether the cursor walked in with a right
-   * arrow or the trailer button's dwell brought it. Only ever with the trailer
-   * pane already up: playing is activateButton's job, and this must never
-   * start one. A show with no trailers has no card to put the cursor on.
-   */
-  private void enterTrailerCards() {
-    if (activeTabIndex != TRAILER_TAB_INDEX) return;
-    Shows.Show show = showList.getSelected();
-    if (show == null || show.trailers.isEmpty()) return;
-    // Set here as well as in enterPane, for the dwell's way in.
-    paneEntryButton = selectedButton;
-    ui.removeCallbacks(buttonDwellActivate);
-    if (!trailersView.focusTopCard()) return;
-    cursor = Cursor.TRAILER_CARD;
-    repaintButtons();
-  }
-
-  private List<String> visibleButtonLabels() {
-    List<String> labels = new ArrayList<>();
-    for (String label : buttonOrder) {
-      ButtonItem item = buttonItems.get(label);
-      if (item != null && item.view.getVisibility() == View.VISIBLE) labels.add(label);
-    }
-    return labels;
+    if (lost) focusFilters();
   }
 
   private void activateSelectedItem() {
-    syncCursorToPane();
-    switch (cursor) {
-      case SHOW:
+    syncAreaToPane();
+    switch (area) {
+      case SHOWS:
         embyClick();
         return;
-      case BUTTON:
-        ui.removeCallbacks(buttonDwellActivate);
-        activateButton(selectedButton, true);
+      case FILTERS:
+        if (FILTER_INPUT_LABEL.equals(focusedFilter)) sendToPhone(CtrlServer.MSG_OPEN_FILTER);
+        else toggleFilter(focusedFilter);
         return;
-      case MAP_CELL:
+      case PANE:
+        activatePaneItem();
+        return;
+    }
+  }
+
+  private void activatePaneItem() {
+    switch (activeTabIndex) {
+      case MAP_TAB_INDEX:
         mapPane.toggleFocusedEpisode();
         return;
-      case ACTOR_CARD:
+      case ACTORS_TAB_INDEX:
         actorsPane.activateFocusedCard();
         return;
-      case TRAILER_CARD:
+      case TRAILER_TAB_INDEX:
         trailersView.activateFocusedCard();
         return;
     }
   }
 
-  private void activateButton(String label) {
-    activateButton(label, false);
-  }
-
   /**
-   * fromOk separates a real ok press from the dwell that fires whenever the
-   * cursor rests on a button. It only matters to the trailer button: a show
-   * with one trailer plays it on activation, and the dwell re-activating the
-   * tab the cursor is already sitting on would restart that video every time,
-   * leaving the player up to swallow the arrow keys. So the dwell plays only
-   * when it is what made the tab active -- ok always replays.
+   * The remote's Info key: one step down the tab group, wrapping. The tab
+   * buttons cannot be focused, so this is the only thing that moves them.
+   * Whatever was focused loses the focus, since the pane it was in is on its
+   * way out, and the show list is what the arrow keys drive after that.
    */
-  private void activateButton(String label, boolean fromOk) {
-    for (int i = 0; i < TAB_LABELS.length; i++) {
-      if (TAB_LABELS[i].equals(label)) {
-        boolean wasActive = activeTabIndex == i;
-        selectTab(i);
-        // A show with one trailer has nothing to choose between, so activating
-        // the button plays it outright; none or several leaves the cards up.
-        if (i == TRAILER_TAB_INDEX && (fromOk || !wasActive)) trailersView.playSoleTrailer();
-        return;
-      }
-    }
-    for (String filter : FILTER_LABELS) {
-      if (filter.equals(label)) {
-        toggleFilter(label);
-        return;
-      }
-    }
-    if (SORT_WATCHED.equals(label)) sortClick(Shows.Sort.WATCHING);
-    else if (SORT_ADDED.equals(label)) sortClick(Shows.Sort.ADDED);
-    else if (SORT_CUSTOM.equals(label)) customClick();
+  private void cycleTab() {
+    int next = (activeTabIndex + 1) % TAB_LABELS.length;
+    selectTab(next);
+    focusShows();
+    // A show with one trailer has nothing to choose between, so landing on the
+    // trailer tab plays it outright; none or several leaves the cards up. After
+    // the focus has moved, since dropping the focus out of the trailer pane is
+    // also what cancels a play its list has not settled for yet.
+    if (next == TRAILER_TAB_INDEX) trailersView.playSoleTrailer();
   }
 
   private void embyClick() {
@@ -766,12 +784,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       backToEmby();
       return;
     }
-    // A cursor in the Map pane names an episode as well as a show, so that is
-    // the one Emby opens on -- with or without the episode subpane up, which
-    // goes away either way. A cell with no file has nothing to load, and falls
-    // back to what this button does everywhere else: the show alone.
+    // A focused Map cell names an episode as well as a show, so that is the one
+    // Emby opens on -- with or without the episode subpane up, which goes away
+    // either way. A cell with no file has nothing to load, and falls back to
+    // what this button does everywhere else: the show alone.
     String focusedEpisodeId = null;
-    if (cursor == Cursor.MAP_CELL) {
+    if (area == Area.PANE && activeTabIndex == MAP_TAB_INDEX) {
       focusedEpisodeId = mapPane.focusedEpisodeId();
       mapPane.closeEpisode();
     }
@@ -888,37 +906,36 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
           actorsPane.clearSelection();
           showList.setActorFilter(null);
           showList.setFilter(text);
-          if (cursor == Cursor.SHOW) showList.focusActive();
         });
   }
 
   @Override
   public void onSelectShow(String name) {
-    ui.post(
-        () -> {
-          showList.selectByName(name);
-          if (cursor == Cursor.SHOW) showList.focusActive();
-        });
+    ui.post(() -> showList.selectByName(name));
+  }
+
+  @Override
+  public void onPhoneConnected() {
+    ui.post(this::sendActiveShow);
   }
 
   @Override
   protected void onDestroy() {
     ui.removeCallbacks(clearKeepAwake);
-    ui.removeCallbacks(buttonDwellActivate);
-    sharedFilters.stop();
     super.onDestroy();
   }
 
   /**
-   * One level out: a playing trailer, then an open episode subpane, then a
-   * cursor in a pane back to the button it went right from, and only from the
-   * two columns does back leave for Emby. The subpane closing is all a back
-   * press does -- the cursor stays on the cell it was opened from.
+   * One level out: a playing trailer, then an open episode subpane, then the
+   * tab pane back to the filter group and the filter group back to the show
+   * list, and only from the show list does back leave for Emby. The subpane
+   * closing is all a back press does -- the focus stays on the cell it was
+   * opened from.
    *
    * The web client's Shows button closes tvapp with this same message, so
-   * while the cursor is in a pane it now takes the second press to close --
-   * which is how a playing trailer and an open episode subpane already
-   * behaved.
+   * while an area other than the show list has the focus it takes a second
+   * press to close -- which is how a playing trailer and an open episode
+   * subpane already behaved.
    */
   private void handleBack() {
     if (player.isPlaying()) {
@@ -929,11 +946,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       mapPane.closeEpisode();
       return;
     }
-    switch (cursor) {
-      case MAP_CELL:
-      case ACTOR_CARD:
-      case TRAILER_CARD:
-        leavePane();
+    switch (area) {
+      case PANE:
+        focusFilters();
+        return;
+      case FILTERS:
+        focusShows();
         return;
       default:
         backToEmby();
@@ -948,17 +966,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       return;
     }
     if ("ok".equals(key)) activateSelectedItem();
-    else if ("list".equals(key)) focusShowList();
+    else if ("info".equals(key)) cycleTab();
+    else if ("sort".equals(key)) cycleSort();
     else moveSelection(key);
-  }
-
-  /**
-   * Jumps the cursor straight to the show list from wherever it is -- same as
-   * pressing left from the button column, but reachable from a pane too.
-   */
-  private void focusShowList() {
-    showList.focusActive();
-    selectShow();
   }
 
   @Override

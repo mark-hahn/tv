@@ -47,14 +47,18 @@ const TVAPPRC_CONNECT_TIMEOUT_MS = 5000;
 const LOCAL_NETWORK_PERMISSION = "android.permission.ACCESS_LOCAL_NETWORK";
 const MSG_TVAPP_UP = "u";
 const MSG_TVAPP_DOWN = "d";
+const MSG_OPEN_FILTER = "i";
 const MSG_CLEAR_FILTER = "z";
 const MSG_COUNTS = "c";
+const MSG_ACTIVE_SHOW = "a";
 const CMD_OPEN_TVAPP = "o";
 const CMD_CLOSE_TO_EMBY = "b";
 const CMD_EMBY_SELECTED = "e";
 const CMD_KEY = "k";
-// Not an arrow: jumps tvapp's cursor straight onto the show list.
-const CMD_KEY_LIST = "list";
+// Not arrows: these step tvapp's tab and sort buttons, which the arrow keys
+// cannot reach -- neither group can be focused.
+const CMD_KEY_INFO = "info";
+const CMD_KEY_SORT = "sort";
 const CMD_FILTER = "f";
 const SCRUB_HOLD_DELAY_MS = 400;
 const SCRUB_PING_INTERVAL_MS = 500;
@@ -250,6 +254,10 @@ export default function App() {
   const showsFlatListRef = useRef(null);
   const mapHeaderScrollRef = useRef(null);
   const tvapprcWsRef = useRef(null);
+  // The show tvapp has active, sent by tvapp on every change and on connect.
+  const tvapprcActiveShowRef = useRef(null);
+  // A show name the shows pane selects as soon as its list is loaded.
+  const pendingShowSelectRef = useRef(null);
 
   const debounce = () => {
     const now = Date.now();
@@ -524,11 +532,25 @@ export default function App() {
           closeTvapprcInput();
           clearTvapprcFilter();
           setTvapprcListCount(null);
+          tvapprcActiveShowRef.current = null;
+        } else if (e.data === MSG_OPEN_FILTER) {
+          // tvapp's Filter button was clicked -- the only way this screen opens.
+          setShowTvapprcInput(true);
         } else if (e.data === MSG_CLEAR_FILTER) {
           clearTvapprcFilter();
-        } else if (typeof e.data === "string" && e.data.startsWith(`${MSG_COUNTS},`)) {
+        } else if (
+          typeof e.data === "string" &&
+          e.data.startsWith(`${MSG_COUNTS},`)
+        ) {
           const n = parseInt(e.data.slice(MSG_COUNTS.length + 1), 10);
           if (!Number.isNaN(n)) setTvapprcListCount(n);
+        } else if (
+          typeof e.data === "string" &&
+          e.data.startsWith(`${MSG_ACTIVE_SHOW},`)
+        ) {
+          tvapprcActiveShowRef.current = e.data.slice(
+            MSG_ACTIVE_SHOW.length + 1,
+          );
         }
       };
       openTimer = setTimeout(() => {
@@ -632,7 +654,11 @@ export default function App() {
             : null;
           showSelectedRef.current = { name: (persisted ?? list[0]).name };
           const lp = showPlayingRef.current;
-          const playingShow = lp ? list.find((s) => s.name === lp.name) : null;
+          // A pending select (from tvapp) picks the show instead of Emby's.
+          const playingShow =
+            lp && !pendingShowSelectRef.current
+              ? list.find((s) => s.name === lp.name)
+              : null;
           if (playingShow) {
             setFollowPlaying(true);
             setSelectedShow(playingShow);
@@ -647,6 +673,17 @@ export default function App() {
       } catch (_) {}
     })();
   }, [showShows]);
+
+  // The shows pane was opened on a named show (tvapp's active one), which can
+  // only be selected once the list it belongs to has arrived.
+  useEffect(() => {
+    const name = pendingShowSelectRef.current;
+    if (!showShows || !name || showsList.length === 0) return;
+    pendingShowSelectRef.current = null;
+    const found = showsList.find((s) => s.name === name);
+    // The list tab, the same place the Shows button's hold lands normally.
+    if (found) selectShowFromList(found, "List");
+  }, [showShows, showsList.length]);
 
   useEffect(() => {
     if (!selectedSE || !selectedShow) {
@@ -867,11 +904,6 @@ export default function App() {
   const updateTvapprcFilter = (text) => {
     setTvapprcFilter(text);
     sendTvapprc(`${CMD_FILTER},${text.trim()}`);
-  };
-
-  const openTvapprcInput = () => {
-    flash("filter");
-    setShowTvapprcInput(true);
   };
 
   const openTvapp = () => {
@@ -1164,6 +1196,40 @@ export default function App() {
   const showsHoldRef = useRef(null);
   const showsHoldFiredRef = useRef(false);
 
+  // Picking a show in the shows pane: the list row's tap and the tvapp
+  // selection both land here, on the show's first unwatched episode.
+  const selectShowFromList = async (item, tab = "Info") => {
+    showSelectedRef.current = { name: item.name };
+    setShowSearch("");
+    setSelectedShow(item);
+    followPlayingRef.current = false;
+    setFollowPlaying(false);
+    try {
+      const res = await fetch(`${TV_SRVR_HTTP_URL}/api/getSeriesMapFromEmby`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ showName: item.name }),
+      });
+      const data = await res.json();
+      let firstUnwatched = null;
+      if (data.success && data.seriesMap) {
+        for (const [seasonNum, episodes] of data.seriesMap) {
+          for (const [episodeNum, epiObj] of episodes) {
+            if (!epiObj.played && !epiObj.unaired) {
+              firstUnwatched = { s: seasonNum, e: episodeNum };
+              break;
+            }
+          }
+          if (firstUnwatched) break;
+        }
+      }
+      setSelectedSE(firstUnwatched);
+    } catch (_) {
+      setSelectedSE(null);
+    }
+    setActiveTab(tab);
+  };
+
   const openShowsPane = () => {
     flash("shows");
     setActiveTab("List");
@@ -1173,9 +1239,25 @@ export default function App() {
     setShowShows(true);
   };
 
+  // Same pane, but on the show tvapp has active instead of the playing one.
+  const openShowsPaneForTvapp = () => {
+    const name = tvapprcActiveShowRef.current;
+    if (!name) return;
+    flash("shows");
+    setActiveTab("List");
+    setSortOrder("viewed");
+    setScrollToTopOnOpen(false);
+    // Selected before the pane opens when the list is already in hand, so the
+    // list opens scrolled to the show; otherwise it waits for the load.
+    const loaded = showsListRef.current.find((s) => s.name === name);
+    if (loaded) selectShowFromList(loaded, "List");
+    else pendingShowSelectRef.current = name;
+    setShowShows(true);
+  };
+
   const startShowsHold = () => {
     if (tvapprcMode) {
-      dbStart(toggleTvapprcMode);
+      lpStart(toggleTvapprcMode, openShowsPaneForTvapp);
       return;
     }
     lpStart(toggleTvapprcMode, openShowsPane);
@@ -1199,7 +1281,10 @@ export default function App() {
 
   const startSkipHold = () => {
     if (tvapprcMode) {
-      dbStart(openTvapprcInput);
+      dbStart(() => {
+        flash("sort");
+        sendTvapprc(`${CMD_KEY},${CMD_KEY_SORT}`);
+      });
       return;
     }
     const pressedAt = Date.now();
@@ -1237,8 +1322,8 @@ export default function App() {
   const startHomeHold = () => {
     if (tvapprcMode) {
       dbStart(() => {
-        flash("home");
-        sendTvapprc(`${CMD_KEY},${CMD_KEY_LIST}`);
+        flash("info");
+        sendTvapprc(`${CMD_KEY},${CMD_KEY_INFO}`);
       });
       return;
     }
@@ -1502,14 +1587,13 @@ export default function App() {
       onPressOut: stopRepeat,
     },
     {
-      key: "home",
-      label: null,
-      icon: tvapprcMode ? (
-        <MaterialIcons name="reorder" size={50} color="black" />
-      ) : (
+      key: tvapprcMode ? "info" : "home",
+      label: tvapprcMode ? "Info" : null,
+      smallText: tvapprcMode,
+      icon: tvapprcMode ? null : (
         <MaterialIcons name="home" size={42} color="black" />
       ),
-      bg: () => cellBg("white", "home"),
+      bg: () => cellBg("white", tvapprcMode ? "info" : "home"),
       onPress: () => {},
       onPressIn: () => startHomeHold(),
       onPressOut: () => stopHomeHold(),
@@ -1558,10 +1642,10 @@ export default function App() {
       onPressOut: stopRepeat,
     },
     {
-      key: tvapprcMode ? "filter" : "skip",
-      label: tvapprcMode ? "Filter" : "Skip",
+      key: tvapprcMode ? "sort" : "skip",
+      label: tvapprcMode ? "Sort" : "Skip",
       smallText: true,
-      bg: () => cellBg("white", tvapprcMode ? "filter" : "skip"),
+      bg: () => cellBg("white", tvapprcMode ? "sort" : "skip"),
       onPress: () => {},
       onPressIn: () => startSkipHold(),
       onPressOut: () => stopSkipHold(),
@@ -1824,13 +1908,8 @@ export default function App() {
     };
 
     const qualityChar = (q) => {
-      if (q === 2160) return "2";
-      if (q === 1080) return "1";
-      if (q === 720) return "7";
-      if (q === 576) return "5";
-      if (q === 480) return "4";
-      if (q === 384) return "3";
-      return "0";
+      if (!q) return "0";
+      return String(Math.round((Math.log2(q) - 8) * 3));
     };
 
     const getCellBg = (cell) => {
@@ -1901,47 +1980,7 @@ export default function App() {
           onScrollToIndexFailed={() => {}}
           renderItem={({ item }) => (
             <TouchableOpacity
-              onPress={async () => {
-                showSelectedRef.current = { name: item.name };
-                setShowSearch("");
-                setSelectedShow(item);
-                followPlayingRef.current = false;
-                setFollowPlaying(false);
-
-                // Find first unwatched episode
-                try {
-                  const res = await fetch(
-                    `${TV_SRVR_HTTP_URL}/api/getSeriesMapFromEmby`,
-                    {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ showName: item.name }),
-                    },
-                  );
-                  const data = await res.json();
-
-                  if (data.success && data.seriesMap) {
-                    // Find first unwatched episode
-                    let firstUnwatched = null;
-                    for (const [seasonNum, episodes] of data.seriesMap) {
-                      for (const [episodeNum, epiObj] of episodes) {
-                        if (!epiObj.played && !epiObj.unaired) {
-                          firstUnwatched = { s: seasonNum, e: episodeNum };
-                          break;
-                        }
-                      }
-                      if (firstUnwatched) break;
-                    }
-                    setSelectedSE(firstUnwatched);
-                  } else {
-                    setSelectedSE(null);
-                  }
-                } catch (_) {
-                  setSelectedSE(null);
-                }
-
-                setActiveTab("Info");
-              }}
+              onPress={() => selectShowFromList(item)}
               style={[
                 showsStyles.listRow,
                 item.name === show?.name && showsStyles.listRowSelected,

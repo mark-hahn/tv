@@ -103,21 +103,22 @@
       </button>
       <button
         v-if="!simpleMode"
-        @click="$emit('send-filters', $event)"
-        style="
-          height: 24px;
-          background-color: white;
-          font-size: 13px;
-          cursor: pointer;
-          border-radius: 7px;
-          margin: 0 0 0 10px;
-        "
+        @click="handleSendClick"
+        :style="{
+          height: '24px',
+          backgroundColor: sendButtonFlashing ? '#ff4444' : 'white',
+          fontSize: '13px',
+          cursor: 'pointer',
+          borderRadius: '7px',
+          margin: '0 0 0 10px',
+          transition: 'background-color 0.3s ease',
+        }"
       >
         Send
       </button>
       <button
         v-if="!simpleMode"
-        @click="hasSharedFilters && $emit('custom-click')"
+        @click="$emit('custom-click')"
         style="
           height: 24px;
           background-color: white;
@@ -126,7 +127,6 @@
           border-radius: 7px;
           margin: 0 0 0 10px;
         "
-        :style="!hasSharedFilters ? { opacity: '0.4' } : {}"
       >
         Custom
       </button>
@@ -211,10 +211,6 @@ export default {
       type: Boolean,
       default: false,
     },
-    hasSharedFilters: {
-      type: Boolean,
-      default: false,
-    },
     tvDisabled: {
       type: Boolean,
       default: true,
@@ -245,7 +241,20 @@ export default {
     "tv-click",
   ],
 
+  data() {
+    return {
+      sendButtonFlashing: false,
+    };
+  },
+
   methods: {
+    handleSendClick(event) {
+      this.sendButtonFlashing = true;
+      this.$emit("send-filters", event);
+      setTimeout(() => {
+        this.sendButtonFlashing = false;
+      }, 300);
+    },
     handleFilterInput(event) {
       this.$emit("update:filterStr", event.target.value);
       this.$emit("filter-input");

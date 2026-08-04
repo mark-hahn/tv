@@ -131,7 +131,6 @@
               @opn-lib-click="opnLibClick"
               @all-click="allClick"
               @custom-click="customClick"
-              :hasSharedFilters="hasSharedFilters"
               :actorsListMode="actorsListMode"
               :tvDisabled="tvDisabled"
               :getDisabled="getDisabled"
@@ -229,7 +228,6 @@
             @opn-lib-click="opnLibClick"
             @all-click="allClick"
             @custom-click="customClick"
-            :hasSharedFilters="hasSharedFilters"
             :actorsListMode="actorsListMode"
             :tvDisabled="tvDisabled"
             :getDisabled="getDisabled"
@@ -642,7 +640,6 @@ export default {
       qbtActiveShowNames: [],
       downActiveShowNames: [],
       hasLoadedAllShows: false,
-      hasSharedFilters: false,
       sortChoices: [
         "Alpha",
         "Viewed",
@@ -1102,10 +1099,8 @@ export default {
 
         if (isAllMode) {
           await srvr.setSharedFilters(null);
-          this.hasSharedFilters = false;
         } else {
           await srvr.setSharedFilters(payload);
-          this.hasSharedFilters = true;
         }
       } catch (e) {
         unilog(959, "sendSharedFilters failed:", e);
@@ -3497,27 +3492,6 @@ export default {
     window.addEventListener("resize", this._onResizeWideLandscape);
     window.addEventListener("orientationchange", this._onResizeWideLandscape);
 
-    void (async () => {
-      try {
-        const shared = await srvr.getSharedFilters();
-        this.hasSharedFilters =
-          !!shared &&
-          typeof shared === "object" &&
-          Object.keys(shared).length > 0;
-      } catch {
-        this.hasSharedFilters = false;
-      }
-    })();
-
-    // Listen for WebSocket notifications instead of polling
-    this._onSharedFiltersChanged = (shared) => {
-      this.hasSharedFilters =
-        !!shared &&
-        typeof shared === "object" &&
-        Object.keys(shared).length > 0;
-    };
-    evtBus.on("sharedFiltersChanged", this._onSharedFiltersChanged);
-
     this._onEpisodeDataUpdated = ({ showName, episodeData }) => {
       if (showName && allTvdb?.[showName]) {
         allTvdb[showName].episodeData = episodeData;
@@ -3930,11 +3904,6 @@ export default {
   },
 
   beforeUnmount() {
-    if (this._onSharedFiltersChanged) {
-      evtBus.off("sharedFiltersChanged", this._onSharedFiltersChanged);
-      this._onSharedFiltersChanged = null;
-    }
-
     if (this._onEpisodeDataUpdated) {
       evtBus.off("episodeDataUpdated", this._onEpisodeDataUpdated);
       this._onEpisodeDataUpdated = null;
@@ -3964,11 +3933,6 @@ export default {
         this._onResizeWideLandscape,
       );
       this._onResizeWideLandscape = null;
-    }
-
-    if (this._sharedFiltersPollList) {
-      clearInterval(this._sharedFiltersPollList);
-      this._sharedFiltersPollList = null;
     }
   },
 };

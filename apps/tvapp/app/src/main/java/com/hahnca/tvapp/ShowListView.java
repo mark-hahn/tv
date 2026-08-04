@@ -26,8 +26,8 @@ import java.util.Set;
 
 /**
  * The card list down the left half of the screen: one card per show, holding
- * the name and its waitStr. One card is active at any time and may be different
- * from the card currently selected by the remote's arrow-key focus.
+ * the name and its waitStr. One card is selected at any time; nothing in this
+ * list is ever focused, so the arrow keys move the selection itself.
  *
  * Every card is built up front rather than recycled — the list is a couple of
  * hundred shows and never changes while the app is open. Filtering and sorting
@@ -41,9 +41,7 @@ class ShowListView extends ScrollView implements Scroller {
   // Same black as an in-Emby row; square corners are what mark it not-in-Emby.
   private static final int CARD_BG_NOT_EMBY = CARD_BG_EMBY;
   private static final int CARD_TEXT_LIGHT = 0xFFFFFFFF;
-  private static final int CARD_SELECTED_BORDER = 0xFFFF0000;
   private static final float CARD_CORNER_DP = 8f;
-  private static final float CARD_SELECTED_BORDER_DP = 3f;
   private static final float CARD_PAD_H_DP = 14f;
   private static final float CARD_PAD_V_DP = 2f;
   private static final float CARD_GAP_DP = 1f;
@@ -64,13 +62,10 @@ class ShowListView extends ScrollView implements Scroller {
     void onCounts(int visibleCount);
   }
 
-  /** Fired when a filter/sort change leaves no shows visible at all. */
-  interface EmptyListener {
-    void onListEmptied();
-  }
-
-  // Package-visible: MainActivity's button column dwell-activates on the same delay.
-  static final long DWELL_SELECT_MS = 600;
+  // The panes only follow the selection once it has stopped moving for this
+  // long: arrow-key repeat down the list should not fetch and redraw every
+  // show it passes over.
+  private static final long PANE_DWELL_MS = 600;
 
   private static final String EMPTY_LABEL = "No Shows.";
 
@@ -82,13 +77,13 @@ class ShowListView extends ScrollView implements Scroller {
   private final Map<String, Shows.Show> byName = new HashMap<>();
   private SelectionListener listener;
   private CountsListener countsListener;
-  private EmptyListener emptyListener;
   private int lastVisibleCount = -1;
   private Shows.Show active;
-  private Shows.Show focused;
-  private boolean focusShown;
   private final Handler dwellHandler = new Handler(Looper.getMainLooper());
-  private final Runnable dwellSelect = () -> { if (focused != null) setActive(focused); };
+  private final Runnable notifySelection =
+      () -> {
+        if (listener != null && active != null) listener.onShowSelected(active);
+      };
   private String filter = "";
   private Shows.Sort sort = Shows.Sort.ALPHA;
   private final Set<String> activeFilters = new HashSet<>();
@@ -126,8 +121,16 @@ class ShowListView extends ScrollView implements Scroller {
     this.countsListener = listener;
   }
 
-  void setEmptyListener(EmptyListener listener) {
-    this.emptyListener = listener;
+  /**
+   * Substring of the name, case ignored -- what the phone's filter input screen
+   * types. Leaves customOrder and actorFilter alone either way: everything that
+   * does mean to replace them already says so explicitly at the call site
+   * before reaching this.
+   */
+  void setFilter(String text) {
+    if (filter.equals(text)) return;
+    filter = text;
+    apply();
   }
 
   /**
@@ -145,26 +148,12 @@ class ShowListView extends ScrollView implements Scroller {
       View card = buildCard(show);
       cards.put(show, card);
     }
-    dwellHandler.removeCallbacks(dwellSelect);
+    dwellHandler.removeCallbacks(notifySelection);
     active = null;
-    focused = null;
     for (Shows.Show show : shows) {
       if (show.name.equals(selectedName)) setActive(show);
     }
     // Picks the top card when nothing was remembered, and lays the list out.
-    apply();
-  }
-
-  /**
-   * Substring of the name, case ignored — the web client's filter box exactly.
-   * Leaves customOrder and actorFilter alone either way: a show click routes
-   * its own clear here with nothing else meant to change, and everything that
-   * does mean to replace them (typing, the phone's Clear button) already says
-   * so explicitly at the call site before reaching this.
-   */
-  void setFilter(String text) {
-    if (filter.equals(text)) return;
-    filter = text;
     apply();
   }
 
@@ -212,9 +201,6 @@ class ShowListView extends ScrollView implements Scroller {
    * pressing its Shows button. Null lifts the narrowing back off.
    */
   void setActorFilter(String actorName) {
-    // onFilter clears this on every keystroke, most of which are typed with no
-    // actor filter active to begin with, so a no-op guard here is what keeps
-    // typing from reselecting the current show on every character.
     String normalized = actorName == null ? null : Shows.normalizeName(actorName);
     if (Objects.equals(actorFilter, normalized)) return;
     actorFilter = normalized;
@@ -235,56 +221,35 @@ class ShowListView extends ScrollView implements Scroller {
     return active;
   }
 
-  /** Driven straight by tv-tv, not a click -- no filter, sort, or order to touch. */
+  /** Driven straight by tv-tv, not a click -- no sort or order to touch. */
   void selectByName(String name) {
     Shows.Show show = byName.get(name);
     if (show != null) {
       setActive(show);
-      focus(show, focusShown);
-      scrollToFocused();
+      scrollToActive();
     }
   }
 
-  Shows.Show getFocused() {
-    return focused;
-  }
-
-  boolean moveFocus(int direction) {
+  /**
+   * One show up or down. The selection moves at once -- there is no cursor to
+   * move ahead of it -- while the panes wait out the dwell in setActive.
+   */
+  boolean moveSelection(int direction) {
     if (visible.isEmpty()) return false;
-    Shows.Show base = focused != null && visible.contains(focused) ? focused : active;
-    int index = base == null ? 0 : visible.indexOf(base);
+    int index = active == null ? 0 : visible.indexOf(active);
     if (index < 0) index = 0;
     int next = index + direction;
     if (next < 0 || next >= visible.size()) return false;
-    // The top and bottom shows are the ends of the line -- there is nothing
-    // further to dwell toward, so landing on either selects it right away
-    // instead of waiting out DWELL_SELECT_MS.
-    boolean atEnd = next == 0 || next == visible.size() - 1;
-    focus(visible.get(next), true, atEnd);
-    scrollToFocused();
+    setActive(visible.get(next), false);
+    scrollToActive();
     return true;
   }
 
-  void setCardFocusShown(boolean shown) {
-    if (focusShown == shown) return;
-    focusShown = shown;
-    if (focused != null) paint(cards.get(focused));
-  }
-
-  /** Left arrow from the list: jump the cursor straight to the top show. */
-  void focusTop() {
+  /** Left arrow from the list: jump the selection straight to the top show. */
+  void selectTop() {
     if (visible.isEmpty()) return;
-    focus(visible.get(0), true, true);
-    scrollToFocused();
-  }
-
-  /** Cursor moves to the selected show -- the left-arrow, button-to-list transition. */
-  void focusActive() {
-    Shows.Show target = active != null ? active : (visible.isEmpty() ? null : visible.get(0));
-    if (target != null) {
-      focus(target, true);
-      scrollToFocused();
-    }
+    setActive(visible.get(0));
+    scrollToActive();
   }
 
   @Override
@@ -356,9 +321,7 @@ class ShowListView extends ScrollView implements Scroller {
               ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
       column.addView(emptyView, params);
       if (active != null) clearActive();
-      focused = null;
       dispatchCounts();
-      if (emptyListener != null) emptyListener.onListEmptied();
       return;
     }
     for (Shows.Show show : visible) {
@@ -371,36 +334,27 @@ class ShowListView extends ScrollView implements Scroller {
     // A selected show the filter has just hidden lands on the nearest remaining
     // show above where it was -- not simply the new top of the list -- so a
     // filter typed while browsing does not fling the selection to the far end.
-    // If the cursor itself is still visible it wins over that recovery, since
-    // that is where the user is already looking.
     if (active != null && !visible.contains(active)) {
       Shows.Show recovered = null;
-      if (focused != null && visible.contains(focused)) {
-        recovered = focused;
-      } else {
-        int base = previousVisible.indexOf(active);
-        if (base < 0) base = previousVisible.size();
-        for (int i = base - 1; i >= 0; i--) {
-          Shows.Show candidate = previousVisible.get(i);
-          if (visible.contains(candidate)) {
-            recovered = candidate;
-            break;
-          }
+      int base = previousVisible.indexOf(active);
+      if (base < 0) base = previousVisible.size();
+      for (int i = base - 1; i >= 0; i--) {
+        Shows.Show candidate = previousVisible.get(i);
+        if (visible.contains(candidate)) {
+          recovered = candidate;
+          break;
         }
-        if (recovered == null) recovered = visible.get(0);
       }
+      if (recovered == null) recovered = visible.get(0);
       setActive(recovered);
-      focused = recovered;
     } else if (active == null) {
       setActive(visible.get(0));
-      focused = active;
     }
-    if (focused == null || !visible.contains(focused)) focused = active;
     // scrollTo only means anything once the column has been laid out, and the
-    // cursor card can be hundreds of rows down. The top card is scrolled to
+    // selected card can be hundreds of rows down. The top card is scrolled to
     // zero rather than to itself, or the list's own top padding is cut off.
-    final View card = cards.get(focused);
-    final boolean atTop = visible.get(0) == focused;
+    final View card = cards.get(active);
+    final boolean atTop = visible.get(0) == active;
     post(() -> scrollTo(0, atTop ? 0 : card.getTop()));
     dispatchCounts();
   }
@@ -430,53 +384,43 @@ class ShowListView extends ScrollView implements Scroller {
     if (active == null) return;
     Shows.Show old = active;
     active = null;
+    dwellHandler.removeCallbacks(notifySelection);
     paint(cards.get(old));
   }
 
   private void setActive(Shows.Show show) {
+    setActive(show, true);
+  }
+
+  /**
+   * The selected card, painted at once either way. dwell holds the panes back
+   * until the selection has stopped moving for PANE_DWELL_MS -- arrow-key
+   * repeat down the list should not load every show it passes over -- while
+   * everything that jumps straight to one show tells them right away.
+   */
+  private void setActive(Shows.Show show, boolean notifyNow) {
     if (show == active) return;
     Shows.Show old = active;
     active = show;
     if (old != null) paint(cards.get(old));
     paint(cards.get(show));
-    if (listener != null) listener.onShowSelected(show);
+    dwellHandler.removeCallbacks(notifySelection);
+    if (notifyNow) notifySelection.run();
+    else dwellHandler.postDelayed(notifySelection, PANE_DWELL_MS);
   }
 
   /**
-   * Moves the cursor. The show it lands on only becomes the selected
-   * (active) show once the cursor has sat still on it for DWELL_SELECT_MS --
-   * arrow-key repeat while scrubbing through the list should not select
-   * every show it passes over.
-   */
-  private void focus(Shows.Show show, boolean showFocus) {
-    focus(show, showFocus, false);
-  }
-
-  /** immediate selects right away instead of arming the dwell timer. */
-  private void focus(Shows.Show show, boolean showFocus, boolean immediate) {
-    Shows.Show old = focused;
-    focused = show;
-    focusShown = showFocus;
-    if (old != null) paint(cards.get(old));
-    if (show != null) paint(cards.get(show));
-    dwellHandler.removeCallbacks(dwellSelect);
-    if (show == null || !showFocus) return;
-    if (immediate) setActive(show);
-    else dwellHandler.postDelayed(dwellSelect, DWELL_SELECT_MS);
-  }
-
-  /**
-   * Scrolls only as far as needed to bring the cursor card into view -- not
+   * Scrolls only as far as needed to bring the selected card into view -- not
    * on every move, only when it has gone above the top or below the bottom
    * of what is currently showing. The edge fade is counted as out of view, or
-   * stepping the cursor to the edge would leave it sitting under the fade
+   * stepping the selection to the edge would leave it sitting under the fade
    * with its own text dimmed.
    */
-  private void scrollToFocused() {
-    if (focused == null) return;
-    final View card = cards.get(focused);
-    final boolean atTop = !visible.isEmpty() && visible.get(0) == focused;
-    final boolean atBottom = !visible.isEmpty() && visible.get(visible.size() - 1) == focused;
+  private void scrollToActive() {
+    if (active == null) return;
+    final View card = cards.get(active);
+    final boolean atTop = !visible.isEmpty() && visible.get(0) == active;
+    final boolean atBottom = !visible.isEmpty() && visible.get(visible.size() - 1) == active;
     post(
         () -> {
           if (atTop) {
@@ -514,9 +458,6 @@ class ShowListView extends ScrollView implements Scroller {
     GradientDrawable bg = (GradientDrawable) card.getBackground();
     bg.setColor(isActive ? CARD_BG_SELECTED : (inEmby ? CARD_BG_EMBY : CARD_BG_NOT_EMBY));
     bg.setCornerRadius(square ? 0f : dp(CARD_CORNER_DP));
-    bg.setStroke(
-        show == focused && focusShown ? (int) dp(CARD_SELECTED_BORDER_DP) : 0,
-        CARD_SELECTED_BORDER);
     LinearLayout row = (LinearLayout) card;
     ((TextView) row.getChildAt(0)).setTextColor(CARD_TEXT_LIGHT);
     ((TextView) row.getChildAt(1)).setTextColor(WAIT_COLOR);

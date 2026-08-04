@@ -1186,17 +1186,30 @@ const delGap = async (params) => {
   return "ok";
 };
 
-let sharedFilters = null;
+// The Custom button's settings, sent here by the web client's hdrtop Send
+// button and handed back to the web client and tvapp. The button is permanent
+// in both, so the settings outlive a restart on disk rather than living only
+// in memory.
+const CUSTOM_SETTINGS_FILE = path.join(SRVR_DATA_DIR, "custom-settings.json");
+
+const readCustomSettings = () => {
+  if (!fs.existsSync(CUSTOM_SETTINGS_FILE)) return null;
+  return JSON.parse(fs.readFileSync(CUSTOM_SETTINGS_FILE, "utf8"));
+};
+
+let sharedFilters = readCustomSettings();
 
 const setSharedFilters = async (params) => {
   if (params === undefined || params === null || params === "") {
     sharedFilters = null;
+    fs.rmSync(CUSTOM_SETTINGS_FILE, { force: true });
     notifyClients("sharedFiltersChanged", null);
     return { ok: true };
   }
 
   // No need to jParse, we expect it to be a JS object already
   sharedFilters = params;
+  fs.writeFileSync(CUSTOM_SETTINGS_FILE, JSON.stringify(sharedFilters), "utf8");
   notifyClients("sharedFiltersChanged", sharedFilters);
   return { ok: true };
 };

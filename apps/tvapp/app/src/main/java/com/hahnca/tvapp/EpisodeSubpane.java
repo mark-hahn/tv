@@ -9,6 +9,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -95,20 +96,13 @@ class EpisodeSubpane extends LinearLayout implements Scroller {
         textColumn,
         new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
 
-    // The header line: air date on the left, SxxEyy on the right.
+    // The header line: SxxEyy on the left, air date on the right.
     LinearLayout header = new LinearLayout(context);
     header.setOrientation(HORIZONTAL);
     textColumn.addView(
         header,
         new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-    aired = new TextView(context);
-    aired.setTextColor(TEXT_COLOR);
-    aired.setTextSize(TypedValue.COMPLEX_UNIT_SP, AIRED_TEXT_SIZE_SP);
-    aired.setTypeface(Typeface.DEFAULT_BOLD);
-    header.addView(
-        aired, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
     episodeNumber = new TextView(context);
     episodeNumber.setTextColor(TEXT_COLOR);
@@ -118,6 +112,14 @@ class EpisodeSubpane extends LinearLayout implements Scroller {
         episodeNumber,
         new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+    aired = new TextView(context);
+    aired.setTextColor(TEXT_COLOR);
+    aired.setTextSize(TypedValue.COMPLEX_UNIT_SP, AIRED_TEXT_SIZE_SP);
+    aired.setTypeface(Typeface.DEFAULT_BOLD);
+    aired.setGravity(Gravity.END);
+    header.addView(
+        aired, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
     overview = new TextView(context);
     overview.setTextColor(TEXT_COLOR);

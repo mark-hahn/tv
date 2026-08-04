@@ -680,8 +680,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       if (FILTER_LABELS[i].equals(focusedFilter)) index = i;
     }
     if (index < 0) index = 0;
-    // The focus wraps: left and right are the only ways out of the group.
-    int next = (index + step + FILTER_LABELS.length) % FILTER_LABELS.length;
+    // Up/down does not wrap: left and right are the only ways out of the group.
+    int next = Math.max(0, Math.min(FILTER_LABELS.length - 1, index + step));
     focusedFilter = FILTER_LABELS[next];
     prefs().edit().putString(KEY_FOCUSED_FILTER, focusedFilter).apply();
     repaintButtons();
@@ -1010,9 +1010,11 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   private void handleRemoteKey(String key) {
     if (player.isPlaying()) {
-      // While the video owns the screen, OK closes it and arrows are swallowed
-      // so they cannot move hidden tvapp focus underneath.
-      if ("ok".equals(key)) player.close();
+      // While the video owns the screen the keys are the video's, the way they
+      // are in Emby: ok pauses and resumes, left and right seek. The rest are
+      // swallowed so they cannot move hidden tvapp focus underneath, and back
+      // is what closes the player.
+      player.key(key);
       return;
     }
     if ("ok".equals(key)) activateSelectedItem();

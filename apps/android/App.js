@@ -999,8 +999,12 @@ export default function App() {
     dbRef.current = null;
   };
 
+  // Checks the TV's actual current input (mediaTitle) rather than the
+  // derived `mode`, because `mode` collapses to "tvapprc" whenever tvapprc
+  // mode is active — that would otherwise make these buttons always run the
+  // power-on sequence instead of recognizing the TV is already on that input.
   const googleBtn = async () => {
-    if (mode === "google") {
+    if (mediaTitle === "Smart TV") {
       tvCmd("off");
     } else {
       flash("google");
@@ -1009,7 +1013,7 @@ export default function App() {
   };
 
   const fireBtn = async () => {
-    if (mode === "fire") {
+    if (mediaTitle === "Fire TV Stick" || mediaTitle === "HDMI 2") {
       tvCmd("off");
     } else {
       flash("fire");

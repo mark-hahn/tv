@@ -379,7 +379,7 @@ class ShowListView extends ScrollView implements Scroller {
     // Non-Emby ("trash") shows are hidden unless the Trash filter is active.
     if (!activeFilters.contains("Trash") && !show.inEmby) return false;
     for (String label : activeFilters) {
-      if ("Ready".equals(label) && show.notReady) return false;
+      if ("Ready".equals(label) && (show.notReady || !show.waitStr.isEmpty())) return false;
       if ("Drama".equals(label) && !show.isDrama()) return false;
       if ("Comedy".equals(label) && !show.isComedy()) return false;
       if ("To Try".equals(label) && !show.inToTry) return false;

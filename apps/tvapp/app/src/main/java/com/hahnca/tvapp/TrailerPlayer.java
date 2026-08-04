@@ -27,6 +27,9 @@ class TrailerPlayer extends FrameLayout {
   // as an embedder ("This video is unavailable, error 152").
   private static final String BASE_URL = "https://hahnca.com";
   private static final String BRIDGE = "TvApp";
+  // What one press of left or right moves, the same ten seconds Emby's d-pad
+  // seek uses.
+  private static final int SEEK_SECONDS = 10;
 
   /** Told whenever the player takes the screen or gives it back. */
   interface OpenListener {
@@ -67,6 +70,17 @@ class TrailerPlayer extends FrameLayout {
     web.loadDataWithBaseURL(BASE_URL, page(url), "text/html", "utf-8", null);
   }
 
+  /**
+   * A remote key while the video owns the screen: ok pauses and resumes, left
+   * and right seek. Anything else is not the player's, and back is the
+   * activity's -- it closes.
+   */
+  void key(String remoteKey) {
+    if (!isPlaying()) return;
+    if (!"ok".equals(remoteKey) && !"left".equals(remoteKey) && !"right".equals(remoteKey)) return;
+    web.evaluateJavascript("window.tvKey&&tvKey('" + remoteKey + "'," + SEEK_SECONDS + ")", null);
+  }
+
   void close() {
     if (!isPlaying()) return;
     // Blank first: a WebView left holding a playing video keeps its audio.
@@ -92,9 +106,10 @@ class TrailerPlayer extends FrameLayout {
 
   /**
    * The iframe api for a YouTube url, a plain video element for anything else.
-   * Nothing is drawn over the picture in either case: there is no pointer on
-   * this screen to work a control bar with — a click closes the player — so a
-   * scrub bar, a title card or an annotation would only ever be in the way.
+   * Either way the page ends up with one controller object the remote keys
+   * drive, and its own scrub bar: YouTube's controls are off, and there is no
+   * pointer on this screen to work them with anyway, so the only feedback a
+   * seek or a pause gets is the one drawn here.
    */
   private static String page(String url) {
     String videoId = Trailers.youtubeId(url);
@@ -102,11 +117,17 @@ class TrailerPlayer extends FrameLayout {
         videoId == null
             ? "<video id='v' src='"
                 + url
-                + "' autoplay playsinline"
-                + " style='width:100%;height:100%' onended='"
+                + "' autoplay playsinline class='fill' onended='"
                 + BRIDGE
                 + ".onEnded()'></video>"
-            : "<div id='p' style='width:100%;height:100%'></div>"
+                + "<script>var v=document.getElementById('v');ctrl({"
+                + "pos:function(){return v.currentTime;},"
+                + "dur:function(){return v.duration;},"
+                + "paused:function(){return v.paused;},"
+                + "seek:function(t){v.currentTime=t;},"
+                + "toggle:function(){if(v.paused)v.play();else v.pause();}});"
+                + "v.addEventListener('pause',osd);v.addEventListener('play',osd);</script>"
+            : "<div id='p' class='fill'></div>"
                 + "<script src='https://www.youtube.com/iframe_api'></script>"
                 + "<script>function onYouTubeIframeAPIReady(){new YT.Player('p',{"
                 + "videoId:'"
@@ -116,13 +137,60 @@ class TrailerPlayer extends FrameLayout {
                 + "disablekb:1,fs:0,iv_load_policy:3,modestbranding:1,origin:'"
                 + BASE_URL
                 + "'},"
-                + "events:{onStateChange:function(e){if(e.data===YT.PlayerState.ENDED)"
+                + "events:{onReady:function(e){var y=e.target;ctrl({"
+                + "pos:function(){return y.getCurrentTime();},"
+                + "dur:function(){return y.getDuration();},"
+                + "paused:function(){return y.getPlayerState()===YT.PlayerState.PAUSED;},"
+                + "seek:function(t){y.seekTo(t,true);},"
+                + "toggle:function(){if(y.getPlayerState()===YT.PlayerState.PLAYING)"
+                + "y.pauseVideo();else y.playVideo();}});},"
+                + "onStateChange:function(e){if(e.data===YT.PlayerState.ENDED)"
                 + BRIDGE
-                + ".onEnded();}}});}</script>";
+                + ".onEnded();else osd();}}});}</script>";
     return "<html><head><meta name='viewport' content='width=device-width,initial-scale=1'>"
-        + "<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}</style>"
-        + "</head><body>"
+        + "<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}"
+        + "body{position:relative}"
+        + ".fill{position:absolute;top:0;left:0;width:100%;height:100%}"
+        + "#osd{position:absolute;left:0;right:0;bottom:0;padding:24px 40px 32px;"
+        + "background:linear-gradient(transparent,rgba(0,0,0,.75));color:#fff;"
+        + "font:400 28px sans-serif;opacity:0;transition:opacity .2s}"
+        + "#bar{height:6px;border-radius:3px;background:rgba(255,255,255,.35)}"
+        + "#fill{height:100%;width:0;border-radius:3px;background:#fff}"
+        + "#txt{margin-top:12px}"
+        + "</style></head><body>"
+        + "<div id='osd'><div id='bar'><div id='fill'></div></div><div id='txt'></div></div>"
+        + "<script>"
+        + CONTROLLER_JS
+        + "</script>"
         + body
         + "</body></html>";
   }
+
+  /**
+   * The half of the page both sources share: whichever one loaded hands its
+   * controller to `ctrl`, and from there the remote keys and the scrub bar work
+   * the same for a YouTube video and a file.
+   */
+  private static final String CONTROLLER_JS =
+      "var C=null,hideT=null;"
+          + "function ctrl(c){C=c;osd();}"
+          + "function fmt(s){s=Math.max(0,Math.floor(s||0));var m=Math.floor(s/60),x=s%60;"
+          + "return m+':'+(x<10?'0':'')+x;}"
+          + "function osd(){if(!C)return;var t=C.pos()||0,d=C.dur()||0;"
+          + "document.getElementById('fill').style.width=(d?100*t/d:0)+'%';"
+          + "document.getElementById('txt').textContent="
+          + "(C.paused()?'⏸':'▶')+'  '+fmt(t)+' / '+fmt(d);"
+          + "document.getElementById('osd').style.opacity=1;"
+          + "clearTimeout(hideT);"
+          // A paused video keeps its bar up; a playing one is only interrupted
+          // for as long as it takes to read where the seek landed.
+          + "if(!C.paused())hideT=setTimeout(function(){"
+          + "document.getElementById('osd').style.opacity=0;},2500);}"
+          + "window.tvKey=function(k,step){if(!C)return;"
+          + "if(k==='ok')C.toggle();"
+          + "else C.seek(Math.max(0,(C.pos()||0)+(k==='right'?step:-step)));"
+          // The position a pause or a seek reports only settles a moment after
+          // the call, so the bar is drawn from what took effect, not what was
+          // asked for.
+          + "setTimeout(osd,80);};";
 }

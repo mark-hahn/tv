@@ -143,6 +143,7 @@ class InfoView extends LinearLayout implements Pane {
     addField(show.genres);
     addField(show.averageRuntime > 0 ? show.averageRuntime + " Mins" : "");
     addField(collectionsText(show));
+    addField(show.inEmby ? "" : "Not In Emby");
 
     Images.into(poster, show.image, show);
   }

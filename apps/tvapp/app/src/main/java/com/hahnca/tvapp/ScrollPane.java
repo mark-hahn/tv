@@ -21,6 +21,9 @@ import android.widget.TextView;
 abstract class ScrollPane extends ScrollView implements Pane {
 
   static final float PAD_DP = 24f;
+  /** Above the pane's content, where the tab row is already standing off it, so
+   * far less room is needed than the pane's other three sides want. */
+  static final float PAD_TOP_DP = 6f;
   static final float TEXT_SIZE_SP = 15.3f;
   static final int TEXT_COLOR = 0xFFE0E0E0;
   static final int DIM_COLOR = 0xFF9A9A9A;
@@ -44,7 +47,7 @@ abstract class ScrollPane extends ScrollView implements Pane {
     column = new LinearLayout(context);
     column.setOrientation(LinearLayout.VERTICAL);
     int pad = (int) dp(PAD_DP);
-    column.setPadding(pad, pad, pad, pad);
+    column.setPadding(pad, (int) dp(PAD_TOP_DP), pad, pad);
     if (horizontal) {
       // fillViewport so content narrower than the pane still spreads across it:
       // weighted columns only have spare width to share out when the row is

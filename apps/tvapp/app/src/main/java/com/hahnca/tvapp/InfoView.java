@@ -44,7 +44,7 @@ class InfoView extends LinearLayout implements Pane {
     super(context);
     setOrientation(VERTICAL);
     int pad = (int) dp(PAD_DP);
-    setPadding(pad, pad, pad, pad);
+    setPadding(pad, (int) dp(ScrollPane.PAD_TOP_DP), pad, pad);
 
     title = new TextView(context);
     title.setTextColor(Color.WHITE);

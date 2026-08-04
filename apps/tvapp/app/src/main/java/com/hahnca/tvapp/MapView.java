@@ -63,6 +63,9 @@ class MapView extends LinearLayout implements Pane {
   // Narrower again sideways: a season column is much narrower than a row is
   // tall, so the same depth would swallow more of the grid going across.
   private static final float MAP_FADE_H_DP = MAP_FADE_V_DP * 0.8f;
+  // Narrower than the pane's other sides: the grid is wide and wants the room
+  // more than the left edge does.
+  private static final float PAD_LEFT_DP = 6f;
 
   /** An episode cell was clicked: opens the episode subpane in MainActivity. */
   interface EpisodeClickListener {
@@ -141,7 +144,7 @@ class MapView extends LinearLayout implements Pane {
     super(context);
     setOrientation(VERTICAL);
     int pad = (int) dp(ScrollPane.PAD_DP);
-    setPadding(pad, pad, pad, pad);
+    setPadding((int) dp(PAD_LEFT_DP), (int) dp(ScrollPane.PAD_TOP_DP), pad, pad);
 
     headerRow = new LinearLayout(context);
     headerRow.setOrientation(HORIZONTAL);

@@ -582,6 +582,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    */
   private void dropCustom(boolean keepSelection) {
     if (!customOn) return;
+    Log.i(TAG, "custom off");
     setCustomOn(false);
     applySort(Shows.Sort.ALPHA, keepSelection);
   }
@@ -598,6 +599,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
           applyActorFilter(null);
           showList.setCustomOrder(names, selectedShow);
           setCustomOn(true);
+          Log.i(TAG, "custom on: " + names.size() + " shows, selected " + selectedShow);
         });
   }
 
@@ -607,11 +609,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    * polls for it. Ignored unless Custom is the sort in force.
    */
   private void customChanged() {
+    Log.i(TAG, "shared settings push, customOn=" + customOn);
     if (!customOn) return;
     fetchCustomOrder(
         (names, selectedShow) -> {
           if (!customOn) return;
           showList.setCustomOrder(names, selectedShow);
+          Log.i(TAG, "custom re-applied: " + names.size() + " shows, selected " + selectedShow);
         });
   }
 

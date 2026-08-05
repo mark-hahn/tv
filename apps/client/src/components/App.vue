@@ -561,7 +561,7 @@ import * as emby from "../emby.js";
 import * as srvr from "../srvr.js";
 import { setGlobalMessage } from "../globalMessages.js";
 import * as epd from "@tv/share";
-import { unilog } from "../log.js";
+import { unilog, logHere } from "../log.js";
 import { config } from "../config.js";
 import paneHelp from "../paneHelp.js";
 import * as urls from "../urls.js";
@@ -1189,7 +1189,6 @@ export default {
           season: result.season ?? null,
           episode: result.episode ?? null,
           embyId: result.embyId ?? null,
-          hasBif: result.hasBif,
         });
       } catch (e) {
         unilog(895, "clickIntro error:", e);
@@ -1203,26 +1202,22 @@ export default {
       season,
       episode,
       embyId,
-      hasBif,
     }) {
-      // If hasBif is explicitly provided (from selectIntroFile), use it directly.
-      // Otherwise fall back to checking via API (for backwards compatibility).
-      let useBif = hasBif;
-      if (useBif === undefined && path) {
+      if (show?.name) {
+        show.needsIntro = true;
         try {
-          const res = await srvr.hasBif(path);
-          useBif = !!res?.hasBif;
+          await srvr.setTvdbFields({ name: show.name, needsIntro: true });
         } catch (e) {
-          unilog(896, "hasBif check failed:", e);
-          useBif = false;
+          logHere(
+            { lvl: "error" },
+            `setTvdbFields needsIntro failed for ${show.name}: ${e.message}`,
+          );
         }
       }
-      if (useBif) {
-        if (!embyId) {
-          unilog(897, "no Emby item id for", show?.name);
-          window.alert("No Emby episode found for Intro.");
-          return;
-        }
+      // Emby's player is used whenever the episode is in Emby — its intro
+      // overlay has the same controls and supports high-speed scanning.
+      // Our own player is the fallback for files with no Emby item.
+      if (embyId) {
         util.openExternalPage(urls.embyPageUrl(embyId, "intro"));
         return;
       }
@@ -1293,8 +1288,8 @@ export default {
         try {
           const result = this.selectIntroFile(s);
           if (!result.error && result.path) {
-            // If opening with bif in Emby, route through handleOpenIntro
-            if (result.hasBif && result.embyId) {
+            // In Emby, route through handleOpenIntro so it opens there
+            if (result.embyId) {
               await this.handleOpenIntro({
                 show: s,
                 path: result.path,
@@ -1302,7 +1297,6 @@ export default {
                 season: result.season ?? null,
                 episode: result.episode ?? null,
                 embyId: result.embyId,
-                hasBif: true,
               });
             } else {
               this.videoPlayerIntroShow = s;

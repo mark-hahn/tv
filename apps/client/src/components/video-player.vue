@@ -778,13 +778,35 @@
       >
         Audio
       </div>
+      <!-- Playback speed (click cycles 1x / 2x / 5x / 10x) -->
+      <div
+        @click.stop="cyclePlaybackRate"
+        title="playback speed"
+        :style="{
+          marginLeft: 'auto',
+          color: 'white',
+          fontSize: '13px',
+          padding: '2px 8px',
+          borderRadius: '4px',
+          border: '1px solid #666',
+          cursor: 'pointer',
+          userSelect: 'none',
+          background:
+            playbackRate === 1 ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 100, 0.9)',
+          marginRight: '8px',
+          whiteSpace: 'nowrap',
+          flexShrink: 0,
+          textShadow: '0 0 3px #000',
+        }"
+      >
+        {{ playbackRate }}x
+      </div>
       <!-- Intro mode: None (checked, no intro) — sits just left of the X -->
       <div
         v-if="mode === 'intro'"
         @click.stop="clickIntroNone"
         title="checked, no intro"
         style="
-          margin-left: auto;
           color: white;
           font-size: 13px;
           padding: 2px 8px;
@@ -809,7 +831,6 @@
       <div
         @click.stop="close"
         :style="{
-          marginLeft: mode === 'intro' ? '0' : 'auto',
           color: 'white',
           fontSize: '28px',
           lineHeight: '1',
@@ -874,6 +895,7 @@ import { fmtPos, getSeasonIntro, logHere, unilog } from "@tv/share";
 const TV_SRVR_URL = config.tvSrvrUrl;
 const PLAYER_MUTE_STORAGE_KEY = "tvPlayerMuted";
 const PLAYER_VOLUME_STORAGE_KEY = "tvPlayerVolume";
+const SPEED_RATES = [1, 2, 5, 10];
 const offsetCache = new Map(); // in-memory per-file subtitle offset
 
 function fmtTime(ms) {
@@ -938,6 +960,7 @@ export default {
       waitingForVideoTarget: null,
       pendingSourceResumeTime: null,
       pendingSourceResumePlay: false,
+      playbackRate: 1,
     };
   },
   computed: {
@@ -1125,6 +1148,7 @@ export default {
       this.errorRetries = 0;
       this.pendingSourceResumeTime = null;
       this.pendingSourceResumePlay = false;
+      this.playbackRate = 1;
       this.vidSrc = newVal ? this._buildStreamUrl() : "";
       if (newVal && this.mode === "intro") this._seekOnLoad = true;
       this.subtitleOffset = offsetCache.get(newVal) ?? 0;
@@ -1434,9 +1458,17 @@ export default {
         srtFile: choice && choice.type === "srt" ? (choice.file ?? null) : null,
       }).catch((e) => unilog(1052, "addChksrtHistory error:", e));
     },
+    cyclePlaybackRate() {
+      const idx = SPEED_RATES.indexOf(this.playbackRate);
+      const rate = SPEED_RATES[(idx + 1) % SPEED_RATES.length];
+      this.playbackRate = rate;
+      const vid = this.$refs.vid;
+      if (vid) vid.playbackRate = rate;
+    },
     onVideoLoadedMetadata() {
       this._applyIntroAudioState();
       const vid = this.$refs.vid;
+      if (vid) vid.playbackRate = this.playbackRate;
       if (this.pendingSourceResumeTime !== null) {
         const resumeTime = this.pendingSourceResumeTime;
         const shouldPlay = this.pendingSourceResumePlay;

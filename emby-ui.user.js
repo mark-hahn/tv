@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Emby Intro UI Overlay
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  Intro editing overlay for the Emby web player (thin client; all logic on tv-srvr)
 // @author       You
 // @match        http://hahnca.com:8920/*
@@ -13,6 +13,7 @@
   "use strict";
 
   const WS_URL = "wss://hahnca.com/tv-srvr";
+  const SPEED_RATES = [1, 2, 5, 10];
 
   // Only activate the intro overlay when the page was opened with tvui=intro.
   const uiId = new URLSearchParams(location.search).get("tvui");
@@ -50,6 +51,7 @@
   }
 
   let ws = null;
+  let speedRate = 1; // playback speed, applied to the page's own <video>
   const slots = {}; // textId -> element
 
   function send(fname, param) {
@@ -92,7 +94,8 @@
     `;
     el.addEventListener("click", (e) => {
       e.stopPropagation();
-      press(btnId);
+      if (opts.onClick) opts.onClick();
+      else press(btnId);
     });
     return el;
   }
@@ -194,6 +197,11 @@
       makeBtn("Clr", "skipClr", { bg: "rgba(100,40,0,0.7)", gap: 20 }),
     );
 
+    // Playback speed — local to this page, cycles 1x/2x/5x/10x
+    overlay.appendChild(
+      makeBtn("1x", null, { slot: "speed", width: 44, onClick: cycleSpeed }),
+    );
+
     // Anticipating toggle
     overlay.appendChild(makeBtn("Ant", "ant", { slot: "ant" }));
 
@@ -206,6 +214,20 @@
     overlay.appendChild(makeBtn("None", "none", { slot: "none", gap: 0 }));
 
     document.body.appendChild(overlay);
+  }
+
+  // ---- Playback speed -------------------------------------------------------
+  function cycleSpeed() {
+    const idx = SPEED_RATES.indexOf(speedRate);
+    speedRate = SPEED_RATES[(idx + 1) % SPEED_RATES.length];
+    const el = slots.speed;
+    if (el) {
+      el.textContent = `${speedRate}x`;
+      el.style.background =
+        speedRate === 1 ? "rgba(0,0,0,0.5)" : "rgba(0,0,100,0.9)";
+    }
+    const video = document.querySelector("video");
+    if (video) video.playbackRate = speedRate;
   }
 
   // ---- Server text pushes ---------------------------------------------------
@@ -236,6 +258,10 @@
     const el = slots.curTime;
     if (video && el && !isNaN(video.currentTime)) {
       el.textContent = fmtTime(video.currentTime);
+    }
+    // Emby resets the rate when it swaps media elements; keep ours applied.
+    if (video && video.playbackRate !== speedRate) {
+      video.playbackRate = speedRate;
     }
     requestAnimationFrame(tickCurrentTime);
   }

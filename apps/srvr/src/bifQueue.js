@@ -13,6 +13,13 @@ import * as epd from "@tv/share";
 import { SRVR_ROOT_DIR, SRVR_DATA_DIR } from "./srvrPaths.js";
 import { BATCH_SCHED, ffmpegQueue } from "./batchQueue.js";
 
+// Master switch for all .bif sidecar generation. Intro checking now runs in
+// Emby's player at high playback speed instead of scrubbing bif thumbnails,
+// so nothing consumes new .bif files. Set back to true to resume generating
+// them; no other change is needed. Existing .bif files on disk are untouched
+// and are still detected and used by the disk scan and /api/hasBif.
+const BIF_ENABLED = false;
+
 const BIF_NEEDED_QUEUE_PATH = path.join(SRVR_DATA_DIR, "bifNeededQueue.json");
 const BIF_CREATING_PATH = path.join(SRVR_DATA_DIR, "bifCreatingData.json");
 const RUN_BIF_PATH = path.join(SRVR_ROOT_DIR, "scripts", "run-bif.js");
@@ -52,6 +59,7 @@ export function loadBifNeededQueue() {
 // Startup: clear any stale creating-lock (no worker survives a restart),
 // restore the persisted queue, and resume processing.
 export function resumeOnStartup() {
+  if (!BIF_ENABLED) return;
   try {
     fs.unlinkSync(BIF_CREATING_PATH);
   } catch {}
@@ -102,6 +110,7 @@ function scheduleBifCheck(ms) {
 // Pull the next bif spec off the queue and start generating it, with CPU
 // backoff and one-at-a-time serialization.
 export function checkBifNeededQueue() {
+  if (!BIF_ENABLED) return;
   if (bifNeededQueue.length === 0) return;
   const started = startBifCreate(bifNeededQueue[0]);
   if (!started) {
@@ -185,6 +194,7 @@ function startBifCreate(bifNeededObj) {
 // already queued, in-flight, or already have a .bif on disk. Returns the count
 // actually added.
 export async function enqueueBif(showName, paths) {
+  if (!BIF_ENABLED) return 0;
   const lock = readBifCreating();
   const inFlightPath = lock && pidAlive(lock.pid) ? lock.bifPath : null;
   let added = 0;
@@ -241,6 +251,7 @@ export function cancelBifCreate(showName) {
 // React to a show's needsIntro flipping. On true: maybe queue a bif. On false:
 // cancel any in-flight/queued bif for the show.
 export function handleNeedsIntroChange(showName, rec, needsIntro) {
+  if (!BIF_ENABLED) return;
   if (needsIntro) {
     // A .bif already exists somewhere in the show folder.
     if (epd.getBifEpisode(rec.episodeData) !== null) return;

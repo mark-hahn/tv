@@ -30,11 +30,16 @@ class Shows {
     final String name;
     final String character;
     final String image;
+    // tvdb's own mark for a regular of the show, as against a guest. Crew never
+    // reaches this list -- tv-srvr keeps only peopleType "Actor" -- so this is
+    // the whole of the difference between a regular and everyone else.
+    final boolean featured;
 
     Actor(JSONObject rec) {
       name = str(rec, "actor");
       character = str(rec, "character");
       image = str(rec, "image");
+      featured = rec.optBoolean("isFeatured", false);
     }
   }
 
@@ -65,6 +70,7 @@ class Shows {
     final String firstAired;
     final String lastAired;
     final String status;
+    final String originalCountry;
     final String countryLang;
     final String network;
     final String genres;
@@ -79,6 +85,9 @@ class Shows {
     final int watchedCount; // -1 when the record has none
     final String overview;
     final String imdbId;
+    // TMDB's own id for the show, out of remote_ids, or empty for the few the
+    // record has none for -- what the card's landscape image is looked up by.
+    final String tmdbId;
     // What the header's two sort buttons order by. Both are already
     // "yyyy/MM/dd HH:mm:ss.SSS" in the record, so they sort as plain text.
     final String lastPlayedDate;
@@ -92,6 +101,7 @@ class Shows {
     // The one list here that is not left as the record wrote it: TrailerList
     // adds the imdb video to it and takes the unplayable ones back out.
     final List<Trailer> trailers;
+    final JSONArray episodeData;
     // What getRemotes wants to be told about the show, and whether the list
     // above has been through TrailerList yet.
     final JSONArray remoteIds;
@@ -105,11 +115,13 @@ class Shows {
       firstAired = str(rec, "firstAired");
       lastAired = str(rec, "lastAired");
       status = str(rec, "status");
-      countryLang = join(" / ", str(rec, "originalCountry"), str(rec, "originalLanguage"));
+      originalCountry = str(rec, "originalCountry");
+      countryLang = join(" / ", originalCountry, str(rec, "originalLanguage"));
       network = str(rec, "originalNetwork");
       genres = joinArray(rec.optJSONArray("genres"));
       notReady = rec.optBoolean("notReady", !rec.optBoolean("inEmby", true));
-      hasFile = anyFile(rec.optJSONArray("episodeData"));
+      episodeData = rec.optJSONArray("episodeData");
+      hasFile = anyFile(episodeData);
       averageRuntime = rec.optInt("averageRuntime", 0);
       seasonCount = rec.optInt("seasonCount", 0);
       episodeCount = rec.optInt("episodeCount", 0);
@@ -136,6 +148,7 @@ class Shows {
         if (node != null) trailers.add(new Trailer(node));
       }
       remoteIds = rec.optJSONArray("remote_ids");
+      tmdbId = remoteId(remoteIds, "TheMovieDB.com");
     }
 
     boolean isComedy() {
@@ -224,6 +237,17 @@ class Shows {
 
   private static String str(JSONObject rec, String key) {
     return rec.isNull(key) ? "" : rec.optString(key, "");
+  }
+
+  /** The id one of the other databases knows this show by, or empty. */
+  private static String remoteId(JSONArray remoteIds, String sourceName) {
+    for (int i = 0; remoteIds != null && i < remoteIds.length(); i++) {
+      JSONObject node = remoteIds.optJSONObject(i);
+      if (node != null && sourceName.equals(node.optString("sourceName"))) {
+        return str(node, "id");
+      }
+    }
+    return "";
   }
 
   // episodeData is [season][episode] of [aired, watched, embyId, file, res],

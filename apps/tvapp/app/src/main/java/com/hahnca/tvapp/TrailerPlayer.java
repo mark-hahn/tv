@@ -36,9 +36,14 @@ class TrailerPlayer extends FrameLayout {
     void onPlayerOpen(boolean open);
   }
 
+  interface EndListener {
+    void onTrailerEnded();
+  }
+
   private final Handler ui = new Handler(Looper.getMainLooper());
   private final WebView web;
   private OpenListener openListener;
+  private EndListener endListener;
 
   @SuppressLint("SetJavaScriptEnabled")
   TrailerPlayer(Context context) {
@@ -59,6 +64,10 @@ class TrailerPlayer extends FrameLayout {
 
   void setOpenListener(OpenListener listener) {
     openListener = listener;
+  }
+
+  void setEndListener(EndListener listener) {
+    endListener = listener;
   }
 
   boolean isPlaying() {
@@ -100,7 +109,11 @@ class TrailerPlayer extends FrameLayout {
   private class Bridge {
     @JavascriptInterface
     public void onEnded() {
-      ui.post(TrailerPlayer.this::close);
+      ui.post(
+          () -> {
+            if (endListener != null) endListener.onTrailerEnded();
+            TrailerPlayer.this.close();
+          });
     }
   }
 

@@ -3,55 +3,120 @@ package com.hahnca.tvapp;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.Layout;
+import android.text.TextPaint;
+import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import org.json.JSONArray;
 
 /**
  * The card list down the left half of the screen: one card per show, holding
- * the name and its waitStr. One card is selected at any time; nothing in this
- * list is ever focused, so the arrow keys move the selection itself.
+ * its poster, name and waitStr. One card is selected at any time; nothing in
+ * this list is ever focused, so the arrow keys move the selection itself.
  *
  * Every card is built up front rather than recycled — the list is a couple of
  * hundred shows and never changes while the app is open. Filtering and sorting
  * therefore only ever re-order cards that already exist, which is what lets the
  * list keep up with a filter being typed.
  */
-class ShowListView extends ScrollView implements Scroller {
+class ShowListView extends ScrollView {
 
-  private static final int CARD_BG_SELECTED = 0xFF0A4A8A;
-  private static final int CARD_BG_EMBY = 0xFF000000;
-  // Same black as an in-Emby row; square corners are what mark it not-in-Emby.
-  private static final int CARD_BG_NOT_EMBY = CARD_BG_EMBY;
+  private static final int CARD_BG = 0xFF2B2B2B;
+  private static final int CARD_SELECTED_BORDER = 0xFF0A4A8A;
   private static final int CARD_TEXT_LIGHT = 0xFFFFFFFF;
   private static final float CARD_CORNER_DP = 8f;
   private static final float CARD_PAD_H_DP = 14f;
-  private static final float CARD_PAD_V_DP = 2f;
-  private static final float CARD_GAP_DP = 1f;
+  private static final float CARD_PAD_V_DP = 8f;
+  // Both halved off CARD_PAD_V_DP: the name line starts nearer the top of the
+  // card and cardMisc runs nearer its bottom, neither changing its own height.
+  private static final float CARD_PAD_TOP_DP = CARD_PAD_V_DP / 2f;
+  private static final float CARD_PAD_BOTTOM_DP = CARD_PAD_V_DP / 2f;
+  private static final float CARD_GAP_DP = 3f;
+  private static final float CARD_SELECTED_BORDER_DP = CARD_GAP_DP;
+  private static final float CARD_BODY_GAP_DP = 8f;
   private static final float LIST_PAD_DP = 12f;
   private static final float NAME_TEXT_SIZE_SP = 16.2f;
-  private static final float WAIT_TEXT_SIZE_SP = 14.4f;
-  private static final float WAIT_GAP_DP = 12f;
-  private static final int WAIT_COLOR = 0xFFB0B0B0;
+  private static final float FIELD_TEXT_SIZE_SP = 15.3f;
+  // The metadata, which now rides on the end of the name row. Smaller than the
+  // name beside it, and its own constant because FIELD_TEXT_SIZE_SP is what the
+  // map labels and the empty-state messages use.
+  private static final float INFO_TEXT_SIZE_SP = 12.24f;
+  private static final float DESC_TEXT_SIZE_SP = 12.24f;
+  // The band the description dissolves into the card over when it has more text
+  // than cardMisc has room for.
+  private static final float DESC_FADE_DP = 22f;
+  private static final int MAX_GENRES = 3;
+  // The name row's metadata, which stays as bright as the name beside it.
+  private static final int FIELD_COLOR = 0xFFFFFFFF;
+  // Everything in cardMisc below that row -- description, actor names, map
+  // labels, empty-state messages -- at 80% white, so the top row leads.
+  private static final int MISC_TEXT_COLOR = 0xCCFFFFFF;
+  private static final int CARD_ROWS = 3;
+  private static final float CARD_HEIGHT_PAD_V_DP = 2f;
+  private static final float CARD_HEIGHT_GAP_DP = 1f;
+  private static final float CARD_HEIGHT_FACTOR = 1.44f;
+  private static final float CARD_IMAGE_ASPECT = 9f / 16f;
+  // How far outside the viewport a card's media is still worth fetching, as a
+  // fraction of the viewport height -- a screen either way, so a scroll lands
+  // on cards that already have their images.
+  private static final float MEDIA_PRELOAD = 1f;
+  private static final int MEDIA_PLACEHOLDER_BG = 0xFF303030;
+  private static final float MEDIA_GAP_DP = 10f;
+  private static final float ACTOR_CARD_ASPECT = 0.62f; // width / height
+  private static final float TRAILER_CARD_ASPECT = 16f / 9f; // width / height
+  private static final float MEDIA_CARD_PAD_DP = 4f;
+  private static final int TRAILER_CARD_BG = 0xFFD3D3D3;
+  // Imdb's own video has no still to fetch, and no frame to pull out of it
+  // either: the tv's decoder hands back a black frame from every point in it,
+  // the same black the web client's video element shows. So the card says what
+  // it is rather than sitting there as an empty box.
+  private static final int TRAILER_IMDB_BG = 0xFF000000;
+  private static final String TRAILER_IMDB_LABEL = "IMDB";
+  private static final int TRAILER_HIGHLIGHT_BORDER = 0xFFFF0000;
+  private static final float TRAILER_HIGHLIGHT_BORDER_DP = 3f;
+  private static final float ACTOR_NAME_TEXT_SIZE_SP = 10.8f;
+  private static final float ACTOR_NAME_GAP_DP = 6f;
+  private static final float MAP_SEASON_WIDTH_DP = 26f;
+  private static final float MAP_ROW_GAP_DP = 4f;
+  private static final float MAP_CELL_WIDTH_DP = 30f;
+  private static final float MAP_CELL_HEIGHT_DP = 22f;
+  private static final float MAP_CELL_GAP_DP = 2f;
+  private static final float MAP_CELL_TEXT_SIZE_SP = 12f;
+  private static final int MAP_CELL_TEXT_COLOR = 0xFF000000;
+  private static final int MAP_CELL_BORDER = 0xFFCCCCCC;
+  private static final int ED_AIRED = 0;
+  private static final int ED_WATCHED = 1;
+  private static final int ED_FILE = 3;
+  private static final int ED_RES = 4;
+  private static final int ED_POS = 6;
   private static final int TRASH_ICON_COLOR = 0xFFB0B0B0;
   private static final float TRASH_ICON_SIZE_DP = 16f;
   private static final float TRASH_ICON_STROKE_DP = 1.2f;
@@ -80,6 +145,12 @@ class ShowListView extends ScrollView implements Scroller {
   private final List<Shows.Show> shows = new ArrayList<>(); // everything loaded
   private final List<Shows.Show> visible = new ArrayList<>(); // after filter and sort
   private final Map<Shows.Show, View> cards = new HashMap<>();
+  private final Map<Shows.Show, FrameLayout> miscViews = new HashMap<>();
+  private final Map<Shows.Show, List<MediaRequest>> mediaRequests = new HashMap<>();
+  private final Set<MediaRequest> requestedMedia = new HashSet<>();
+  private final Map<Shows.Show, List<View>> trailerCardViews = new HashMap<>();
+  private final Map<Shows.Show, ImageView> posters = new HashMap<>();
+  private final Set<Shows.Show> requestedPosters = new HashSet<>();
   // The big letter overlay on the right of each row, shown only on the active
   // card while an up/down hold is in letter-skip mode.
   private final Map<Shows.Show, TextView> letterBadges = new HashMap<>();
@@ -110,13 +181,31 @@ class ShowListView extends ScrollView implements Scroller {
   // as soon as the selection moves off it, or the user changes the filters.
   private Shows.Show pinned;
   private final EdgeFade edgeFade = EdgeFade.vertical(this);
+  private final int cardHeightPx;
+  private final int posterWidthPx;
+  // What the name row stands at, which is what cardMisc starts below.
+  private final int nameLineHeightPx;
+  private MiscMode miscMode = MiscMode.DESC;
+  private int trailerHighlightIndex = -1;
+  private int trailerLastPlayedIndex = -1;
+  private String todayKey = todayKey();
 
   ShowListView(Context context) {
     super(context);
+    TextView probe = new TextView(context);
+    probe.setTextSize(TypedValue.COMPLEX_UNIT_SP, NAME_TEXT_SIZE_SP);
+    nameLineHeightPx = probe.getLineHeight();
+    int rowHeight = probe.getLineHeight() + 2 * (int) dp(CARD_HEIGHT_PAD_V_DP);
+    int textHeight = CARD_ROWS * rowHeight + (CARD_ROWS - 1) * (int) dp(CARD_HEIGHT_GAP_DP);
+    cardHeightPx = Math.round(textHeight * CARD_HEIGHT_FACTOR);
+    posterWidthPx = Math.round(cardHeightPx / CARD_IMAGE_ASPECT);
+
     column = new LinearLayout(context);
     column.setOrientation(LinearLayout.VERTICAL);
     int pad = (int) dp(LIST_PAD_DP);
-    column.setPadding(pad, pad, pad, pad);
+    // Nothing on the right: a card reaches its column's own edge, so the only
+    // thing between it and the pane beside it is MainActivity's column gap.
+    column.setPadding(pad, pad, 0, pad);
     addView(
         column,
         new ScrollView.LayoutParams(
@@ -162,6 +251,12 @@ class ShowListView extends ScrollView implements Scroller {
     shows.clear();
     shows.addAll(list);
     cards.clear();
+    miscViews.clear();
+    mediaRequests.clear();
+    requestedMedia.clear();
+    trailerCardViews.clear();
+    posters.clear();
+    requestedPosters.clear();
     letterBadges.clear();
     byName.clear();
     column.removeAllViews();
@@ -173,6 +268,8 @@ class ShowListView extends ScrollView implements Scroller {
     dwellHandler.removeCallbacks(notifySelection);
     active = null;
     pinned = null;
+    trailerHighlightIndex = -1;
+    trailerLastPlayedIndex = -1;
     for (Shows.Show show : shows) {
       if (show.name.equals(selectedName)) {
         // Pinned before it is made active, so setActive below leaves the pin
@@ -268,6 +365,49 @@ class ShowListView extends ScrollView implements Scroller {
     return active;
   }
 
+  /**
+   * The next mode, for the selected show alone -- every other card stays on its
+   * description. A show with no trailers has no trailer step: the mode is
+   * stepped past it rather than landing on an empty strip.
+   */
+  void rotateCardMisc() {
+    if (active == null) return;
+    MiscMode[] modes = MiscMode.values();
+    miscMode = modes[(miscMode.ordinal() + 1) % modes.length];
+    if (miscMode == MiscMode.TRAILERS && !hasTrailers(active)) {
+      miscMode = modes[(miscMode.ordinal() + 1) % modes.length];
+    }
+    renderMisc(active);
+    loadVisibleMedia();
+  }
+
+  /** Whether the trailer step is worth stopping on for this show. */
+  private static boolean hasTrailers(Shows.Show show) {
+    return !show.trailersReady || !show.trailers.isEmpty();
+  }
+
+  String playActiveTrailer() {
+    if (miscMode != MiscMode.TRAILERS || active == null || active.trailers.isEmpty()) return null;
+    int index =
+        trailerHighlightIndex >= 0 && trailerHighlightIndex < active.trailers.size()
+            ? trailerHighlightIndex
+            : 0;
+    trailerLastPlayedIndex = index;
+    return active.trailers.get(index).url;
+  }
+
+  void highlightNextTrailerAfterPlayed() {
+    if (active == null || active.trailers.size() <= 1 || trailerLastPlayedIndex < 0) return;
+    trailerHighlightIndex = (trailerLastPlayedIndex + 1) % active.trailers.size();
+    trailerLastPlayedIndex = -1;
+    paintTrailerCards(active);
+  }
+
+  void onTrailersReady(Shows.Show show) {
+    renderMisc(show);
+    loadVisibleMedia();
+  }
+
   /** Driven straight by tv-tv, not a click -- no sort or order to touch. */
   void selectByName(String name) {
     Shows.Show show = byName.get(name);
@@ -327,7 +467,9 @@ class ShowListView extends ScrollView implements Scroller {
     if (badge == null || row == null) return;
     badge.setText(firstLetterKey(show).toUpperCase());
     int h = row.getHeight();
-    if (h > 0) badge.setTextSize(TypedValue.COMPLEX_UNIT_PX, h * 0.85f);
+    // Well short of the card's own height: at 0.85 the line box of a card this
+    // tall no longer fits inside it and the letter is clipped.
+    if (h > 0) badge.setTextSize(TypedValue.COMPLEX_UNIT_PX, h * 0.6f);
     badge.setVisibility(View.VISIBLE);
   }
 
@@ -337,20 +479,59 @@ class ShowListView extends ScrollView implements Scroller {
   }
 
   @Override
-  public void scrollStep(int px) {
-    scrollBy(0, px);
-  }
-
-  @Override
   protected void onSizeChanged(int w, int h, int oldw, int oldh) {
     super.onSizeChanged(w, h, oldw, oldh);
     edgeFade.resize(h);
+    if (w != oldw) renderAllMisc();
+    loadVisibleMedia();
   }
 
   @Override
   protected void onScrollChanged(int l, int t, int oldl, int oldt) {
     super.onScrollChanged(l, t, oldl, oldt);
     invalidate();
+    loadVisibleMedia();
+  }
+
+  /**
+   * Fetches the cardMisc images on screen, and of the screenful either side of
+   * them. Hundreds of cards exist at once, so they cannot all have their images
+   * asked for up front; requestedMedia keeps a view from asking twice, while
+   * Images' own tag keeps stale loads from landing after cardMisc rotates.
+   */
+  private void loadVisibleMedia() {
+    if (getHeight() == 0 || visible.isEmpty()) return;
+    int margin = (int) (getHeight() * MEDIA_PRELOAD);
+    int top = getScrollY() - margin;
+    int bottom = getScrollY() + getHeight() + margin;
+    for (Shows.Show show : visible) {
+      View card = cards.get(show);
+      if (card.getBottom() < top || card.getTop() > bottom) continue;
+      if (requestedPosters.add(show)) {
+        ImageView poster = posters.get(show);
+        if (poster != null) {
+          // The width the card actually draws it at, both times: Emby resizes
+          // server-side, so the image arrives at exactly that and is decoded and
+          // drawn 1:1 with nothing left to rescale on this end.
+          Backdrops.get(
+              show,
+              posterWidthPx,
+              candidates -> {
+                ImageView current = posters.get(show);
+                if (current == null) return;
+                String[] urls = Arrays.copyOf(candidates, candidates.length + 1);
+                urls[candidates.length] = show.image;
+                Images.intoThumb(current, urls, posterWidthPx, show);
+              });
+        }
+      }
+      List<MediaRequest> requests = mediaRequests.get(show);
+      if (requests == null) continue;
+      for (MediaRequest request : requests) {
+        if (!requestedMedia.add(request)) continue;
+        Images.into(request.view, request.url, request);
+      }
+    }
   }
 
   @Override
@@ -442,7 +623,13 @@ class ShowListView extends ScrollView implements Scroller {
     // fade with its own text dimmed.
     final View card = cards.get(active);
     final boolean atTop = visible.get(0) == active;
-    post(() -> scrollTo(0, atTop ? 0 : card.getTop() - (int) edgeFade.size()));
+    post(
+        () -> {
+          scrollTo(0, atTop ? 0 : card.getTop() - (int) edgeFade.size());
+          // Explicitly, since a re-order that leaves the scroll position alone
+          // still puts different cards on screen.
+          loadVisibleMedia();
+        });
     dispatchCounts();
   }
 
@@ -472,6 +659,7 @@ class ShowListView extends ScrollView implements Scroller {
     pinned = null;
     if (active == null) return;
     Shows.Show old = active;
+    clearTrailerHighlight(old);
     active = null;
     dwellHandler.removeCallbacks(notifySelection);
     hideLetterBadge(old);
@@ -493,12 +681,20 @@ class ShowListView extends ScrollView implements Scroller {
     // The pin belongs to one show, and only while it is the selected one.
     if (show != pinned) pinned = null;
     Shows.Show old = active;
+    clearTrailerHighlight(old);
     active = show;
     if (old != null) {
       hideLetterBadge(old);
       paint(cards.get(old));
     }
     paint(cards.get(show));
+    // Moving the selection puts the rotation back to the start, so every card
+    // is on its description again: the one being left is redrawn to drop the
+    // mode it was showing, and the one arrived at is already there.
+    if (miscMode != MiscMode.DESC) {
+      miscMode = MiscMode.DESC;
+      if (old != null) renderMisc(old);
+    }
     dwellHandler.removeCallbacks(notifySelection);
     if (notifyNow) notifySelection.run();
     else dwellHandler.postDelayed(notifySelection, PANE_DWELL_MS);
@@ -546,16 +742,10 @@ class ShowListView extends ScrollView implements Scroller {
       }
     }
     boolean isActive = show != null && show == active;
-    boolean inEmby = show == null || show.inEmby;
-    // Square corners mark the one style that isn't Emby-active or Emby-normal:
-    // a not-in-Emby row sitting unselected in the list.
-    boolean square = !isActive && !inEmby;
     GradientDrawable bg = (GradientDrawable) card.getBackground();
-    bg.setColor(isActive ? CARD_BG_SELECTED : (inEmby ? CARD_BG_EMBY : CARD_BG_NOT_EMBY));
-    bg.setCornerRadius(square ? 0f : dp(CARD_CORNER_DP));
-    LinearLayout row = (LinearLayout) ((FrameLayout) card).getChildAt(0);
-    ((TextView) row.getChildAt(0)).setTextColor(CARD_TEXT_LIGHT);
-    ((TextView) row.getChildAt(1)).setTextColor(WAIT_COLOR);
+    bg.setColor(CARD_BG);
+    bg.setCornerRadius(dp(CARD_CORNER_DP));
+    bg.setStroke(isActive ? (int) dp(CARD_SELECTED_BORDER_DP) : 0, CARD_SELECTED_BORDER);
   }
 
   private static boolean hasActor(Shows.Show show, String normalizedName) {
@@ -566,14 +756,13 @@ class ShowListView extends ScrollView implements Scroller {
   }
 
   private View buildCard(Shows.Show show) {
-    LinearLayout row = new LinearLayout(getContext());
-    row.setOrientation(LinearLayout.HORIZONTAL);
-    row.setGravity(Gravity.CENTER_VERTICAL);
-    row.setPadding(
-        (int) dp(CARD_PAD_H_DP),
-        (int) dp(CARD_PAD_V_DP),
-        (int) dp(CARD_PAD_H_DP),
-        (int) dp(CARD_PAD_V_DP));
+    // Everything on one line: the name, then the trash can for a show that is
+    // not in Emby, then the metadata run together with dashes. Baselines rather
+    // than box edges, so the smaller metadata sits on the name's own bottom.
+    LinearLayout nameRow = new LinearLayout(getContext());
+    nameRow.setOrientation(LinearLayout.HORIZONTAL);
+    nameRow.setGravity(Gravity.BOTTOM);
+    nameRow.setBaselineAligned(true);
 
     TextView name = new TextView(getContext());
     name.setText(show.name);
@@ -581,41 +770,81 @@ class ShowListView extends ScrollView implements Scroller {
     name.setTextSize(TypedValue.COMPLEX_UNIT_SP, NAME_TEXT_SIZE_SP);
     name.setSingleLine(true);
     name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+    // Zero width plus the row's only weight: the metadata and the trash can are
+    // measured at what they need and the name takes whatever is left, so a name
+    // too long for the rest of the row is the thing that gets its end trimmed.
     LinearLayout.LayoutParams nameParams =
         new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-    row.addView(name, nameParams);
-
-    TextView wait = new TextView(getContext());
-    wait.setText(show.waitStr);
-    wait.setTextColor(WAIT_COLOR);
-    wait.setTextSize(TypedValue.COMPLEX_UNIT_SP, WAIT_TEXT_SIZE_SP);
-    wait.setSingleLine(true);
-    LinearLayout.LayoutParams waitParams =
-        new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-    waitParams.leftMargin = (int) dp(WAIT_GAP_DP);
-    row.addView(wait, waitParams);
+    nameRow.addView(name, nameParams);
 
     if (!show.inEmby) {
       int size = (int) dp(TRASH_ICON_SIZE_DP);
       LinearLayout.LayoutParams trashParams = new LinearLayout.LayoutParams(size, size);
-      trashParams.leftMargin = (int) dp(WAIT_GAP_DP);
-      row.addView(buildTrashIcon(), trashParams);
+      trashParams.leftMargin = (int) dp(CARD_BODY_GAP_DP);
+      trashParams.gravity = Gravity.BOTTOM;
+      nameRow.addView(buildTrashIcon(), trashParams);
     }
+
+    TextView info = new TextView(getContext());
+    info.setText(
+      joinDash(
+        year(show.firstAired),
+        show.status,
+        watchedText(show),
+        show.originalCountry.toUpperCase(Locale.US),
+        show.averageRuntime > 0 ? show.averageRuntime + " Mins" : "",
+        firstGenres(show.genres)));
+    info.setTextColor(FIELD_COLOR);
+    info.setTextSize(TypedValue.COMPLEX_UNIT_SP, INFO_TEXT_SIZE_SP);
+    info.setSingleLine(true);
+    LinearLayout.LayoutParams infoParams =
+      new LinearLayout.LayoutParams(
+        ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+    infoParams.leftMargin = (int) dp(CARD_BODY_GAP_DP);
+    nameRow.addView(info, infoParams);
+
+    // Under the name row and full width, running from there to the bottom of
+    // the card -- which is the height its actor and trailer cards take.
+    FrameLayout misc = new FrameLayout(getContext());
+    LinearLayout.LayoutParams miscParams =
+      new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
+    miscParams.topMargin = (int) dp(CARD_BODY_GAP_DP);
+    miscViews.put(show, misc);
 
     // A FrameLayout wrapper, not just the row itself, so the letter-skip
     // badge below can sit on top of the row without disturbing its layout.
     FrameLayout card = new FrameLayout(getContext());
+    int border = (int) dp(CARD_SELECTED_BORDER_DP);
+    card.setPadding(border, border, border, border);
     GradientDrawable bg = new GradientDrawable();
-    // Not yet active (nothing is, at build time), so a not-in-Emby show starts
-    // in its square-corner rest style; paint() re-rounds it if it becomes active.
-    bg.setCornerRadius(show.inEmby ? dp(CARD_CORNER_DP) : 0f);
-    bg.setColor(show.inEmby ? CARD_BG_EMBY : CARD_BG_NOT_EMBY);
+    bg.setCornerRadius(dp(CARD_CORNER_DP));
+    bg.setColor(CARD_BG);
     card.setBackground(bg);
+    card.setClipToOutline(true);
+
+    ImageView poster = new ImageView(getContext());
+    poster.setScaleType(ImageView.ScaleType.CENTER_CROP);
+    poster.setBackgroundColor(MEDIA_PLACEHOLDER_BG);
+    posters.put(show, poster);
+
+    LinearLayout content = new LinearLayout(getContext());
+    content.setOrientation(LinearLayout.VERTICAL);
+    content.setPadding(
+      (int) dp(CARD_PAD_H_DP),
+      (int) dp(CARD_PAD_TOP_DP),
+      (int) dp(CARD_PAD_H_DP),
+      (int) dp(CARD_PAD_BOTTOM_DP));
+    content.addView(nameRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+    content.addView(misc, miscParams);
+
+    LinearLayout outerRow = new LinearLayout(getContext());
+    outerRow.setOrientation(LinearLayout.HORIZONTAL);
+    outerRow.addView(poster, new LinearLayout.LayoutParams(posterWidthPx, ViewGroup.LayoutParams.MATCH_PARENT));
+    outerRow.addView(content, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
     card.addView(
-        row,
-        new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+      outerRow,
+      new FrameLayout.LayoutParams(
+        ViewGroup.LayoutParams.MATCH_PARENT, cardHeightPx - 2 * border));
 
     TextView letter = new TextView(getContext());
     letter.setTextColor(CARD_TEXT_LIGHT);
@@ -631,7 +860,585 @@ class ShowListView extends ScrollView implements Scroller {
     card.addView(letter, letterParams);
     letterBadges.put(show, letter);
 
+    renderMisc(show);
+
     return card;
+  }
+
+  private static String joinDash(String... parts) {
+    StringBuilder out = new StringBuilder();
+    for (String part : parts) {
+      if (part == null || part.isEmpty()) continue;
+      if (out.length() > 0) out.append(" - ");
+      out.append(part);
+    }
+    return out.toString();
+  }
+
+  private static String watchedText(Shows.Show show) {
+    if (show.episodeCount <= 0 || show.watchedCount < 0) return "";
+    if (show.watchedCount == show.episodeCount) {
+      return "Viewed all";
+    }
+    return "Viewed " + show.watchedCount;
+  }
+
+  /** The year out of a "yyyy/MM/dd" date, or whatever was there if it is not one. */
+  private static String year(String date) {
+    return date.length() >= 4 ? date.substring(0, 4) : date;
+  }
+
+  /** The first few genres of a ", "-joined list, the rest being more than a line wants. */
+  private static String firstGenres(String genres) {
+    if (genres.isEmpty()) return genres;
+    String[] parts = genres.split(", ");
+    if (parts.length <= MAX_GENRES) return genres;
+    StringBuilder out = new StringBuilder();
+    for (int i = 0; i < MAX_GENRES; i++) {
+      if (i > 0) out.append(", ");
+      out.append(parts[i]);
+    }
+    return out.toString();
+  }
+
+  private void renderAllMisc() {
+    mediaRequests.clear();
+    requestedMedia.clear();
+    trailerCardViews.clear();
+    for (Shows.Show show : shows) renderMisc(show);
+  }
+
+  /**
+   * Only the selected card follows the rotated mode; the rest stay on their
+   * description, which is what makes rotating a thing that happens to one show
+   * rather than to the whole list.
+   */
+  private void renderMisc(Shows.Show show) {
+    FrameLayout misc = miscViews.get(show);
+    if (misc == null) return;
+    misc.removeAllViews();
+    // The old requests go out of the dedup set with them, or this card's new
+    // views would be left waiting on requests that have already been made.
+    List<MediaRequest> old = mediaRequests.remove(show);
+    if (old != null) requestedMedia.removeAll(old);
+    trailerCardViews.remove(show);
+    MiscMode mode = show == active ? miscMode : MiscMode.DESC;
+    if (mode == MiscMode.DESC) renderDescMisc(show, misc);
+    else if (mode == MiscMode.MAP) renderMapMisc(show, misc);
+    else if (mode == MiscMode.ACTORS) renderActorsMisc(show, misc);
+    else renderTrailersMisc(show, misc);
+  }
+
+  private void renderDescMisc(Shows.Show show, FrameLayout misc) {
+    TextView desc = new TextView(getContext());
+    desc.setText(show.overview.isEmpty() ? "No description." : show.overview);
+    desc.setTextColor(MISC_TEXT_COLOR);
+    desc.setTextSize(TypedValue.COMPLEX_UNIT_SP, DESC_TEXT_SIZE_SP);
+    // No line cap and no ellipsis: whatever runs past the bottom of cardMisc is
+    // cut off there, under the fade the box below paints over it.
+    FadingBox box = new FadingBox(getContext());
+    box.addView(
+        desc,
+        new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            Gravity.TOP));
+    misc.addView(
+        box,
+        new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+  }
+
+  /**
+   * Holds the description and, when there is more of it than will fit, fades
+   * its last visible lines into the card so the cut does not land mid-letter.
+   * The text view is the height of the box, so how much text there really is
+   * has to come from the layout it built rather than from its own height.
+   */
+  private class FadingBox extends FrameLayout {
+
+    private final Paint fadePaint = new Paint();
+    private int fadeHeight;
+
+    FadingBox(Context context) {
+      super(context);
+      setWillNotDraw(false);
+    }
+
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+      super.onSizeChanged(w, h, oldw, oldh);
+      fadeHeight = Math.min(h, (int) dp(DESC_FADE_DP));
+      fadePaint.setShader(
+          new LinearGradient(
+              0, h - fadeHeight, 0, h, CARD_BG & 0x00FFFFFF, CARD_BG, Shader.TileMode.CLAMP));
+    }
+
+    @Override
+    protected void dispatchDraw(Canvas canvas) {
+      super.dispatchDraw(canvas);
+      if (getChildCount() == 0 || fadeHeight <= 0) return;
+      View child = getChildAt(0);
+      if (!(child instanceof TextView)) return;
+      TextView text = (TextView) child;
+      Layout layout = text.getLayout();
+      if (layout == null) return;
+      int needed = layout.getHeight() + text.getPaddingTop() + text.getPaddingBottom();
+      if (needed <= text.getHeight()) return;
+      canvas.drawRect(0, getHeight() - fadeHeight, getWidth(), getHeight(), fadePaint);
+    }
+  }
+
+  private void renderMapMisc(Shows.Show show, FrameLayout misc) {
+    LinearLayout rows = new LinearLayout(getContext());
+    rows.setOrientation(LinearLayout.VERTICAL);
+    List<Integer> seasons = mapSeasons(show);
+    if (seasons.isEmpty()) {
+      misc.addView(message("No episodes."), centerWrap());
+      return;
+    }
+    for (int i = 0; i < seasons.size(); i++) {
+      LinearLayout.LayoutParams params =
+          new LinearLayout.LayoutParams(
+              ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+      if (i > 0) params.topMargin = (int) dp(MAP_ROW_GAP_DP);
+      rows.addView(mapSeasonRow(show, seasons.get(i)), params);
+    }
+    misc.addView(rows, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+  }
+
+  private LinearLayout mapSeasonRow(Shows.Show show, int season) {
+    LinearLayout row = new LinearLayout(getContext());
+    row.setOrientation(LinearLayout.HORIZONTAL);
+    row.setGravity(Gravity.TOP);
+    TextView label = message(String.valueOf(season));
+    label.setGravity(Gravity.CENTER);
+    row.addView(label, new LinearLayout.LayoutParams((int) dp(MAP_SEASON_WIDTH_DP), (int) dp(MAP_CELL_HEIGHT_DP)));
+
+    FlowLayout cells = new FlowLayout(getContext());
+    JSONArray episodes = show.episodeData == null ? null : show.episodeData.optJSONArray(season);
+    for (int i = 0; episodes != null && i < episodes.length(); i++) {
+      cells.addView(mapCell(show, episodes.optJSONArray(i)), mapCellParams());
+    }
+    row.addView(cells, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+    return row;
+  }
+
+  private View mapCell(Shows.Show show, JSONArray tuple) {
+    boolean played = tuple != null && tuple.optInt(ED_WATCHED, 0) == 1;
+    boolean hasFile = tuple != null && !tuple.optString(ED_FILE, "").isEmpty() && !"0".equals(tuple.optString(ED_FILE, ""));
+    boolean noFile = tuple != null && !hasFile;
+    String aired = tuple == null ? "" : tuple.optString(ED_AIRED, "");
+    boolean unaired = noFile && isFutureDate(aired);
+    int quality = tuple == null ? 0 : tuple.optInt(ED_RES, 0);
+    long pos = tuple == null ? 0 : tuple.optLong(ED_POS, 0);
+
+    TextView view = new TextView(getContext());
+    view.setText(
+        tuple == null
+            ? ""
+            : MapCells.text(played, hasFile, noFile, unaired, quality, pos, show.inEmby));
+    view.setTextColor(MAP_CELL_TEXT_COLOR);
+    view.setTextSize(TypedValue.COMPLEX_UNIT_SP, MAP_CELL_TEXT_SIZE_SP);
+    view.setGravity(Gravity.CENTER);
+    view.setSingleLine(true);
+    GradientDrawable bg = new GradientDrawable();
+    bg.setColor(tuple == null ? MapCells.BG_NORMAL : MapCells.background(false, noFile));
+    bg.setStroke((int) dp(1f), MAP_CELL_BORDER);
+    view.setBackground(bg);
+    return view;
+  }
+
+  private ViewGroup.MarginLayoutParams mapCellParams() {
+    ViewGroup.MarginLayoutParams params =
+        new ViewGroup.MarginLayoutParams((int) dp(MAP_CELL_WIDTH_DP), (int) dp(MAP_CELL_HEIGHT_DP));
+    params.rightMargin = (int) dp(MAP_CELL_GAP_DP);
+    params.bottomMargin = (int) dp(MAP_CELL_GAP_DP);
+    return params;
+  }
+
+  private List<Integer> mapSeasons(Shows.Show show) {
+    List<Integer> seasons = seasonsPresent(show.episodeData);
+    List<Integer> picked = new ArrayList<>();
+    if (seasons.isEmpty()) return picked;
+    int first = seasonWithWatchedTransition(show.episodeData, seasons);
+    if (first < 0) first = lastSeasonWithWatched(show.episodeData, seasons);
+    if (first < 0) first = firstSeasonWithFile(show.episodeData, seasons);
+    if (first < 0) first = seasons.get(0);
+    picked.add(first);
+    return picked;
+  }
+
+  private List<Integer> seasonsPresent(JSONArray episodeData) {
+    List<Integer> seasons = new ArrayList<>();
+    for (int season = 0; episodeData != null && season < episodeData.length(); season++) {
+      JSONArray episodes = episodeData.optJSONArray(season);
+      if (hasAnyEpisode(episodes)) seasons.add(season);
+    }
+    return seasons;
+  }
+
+  private boolean hasAnyEpisode(JSONArray episodes) {
+    for (int i = 0; episodes != null && i < episodes.length(); i++) {
+      if (episodes.optJSONArray(i) != null) return true;
+    }
+    return false;
+  }
+
+  private int seasonWithWatchedTransition(JSONArray episodeData, List<Integer> seasons) {
+    for (int season : seasons) {
+      JSONArray episodes = episodeData.optJSONArray(season);
+      boolean sawWatched = false;
+      for (int i = 0; episodes != null && i < episodes.length(); i++) {
+        JSONArray tuple = episodes.optJSONArray(i);
+        if (tuple == null) continue;
+        boolean watched = tuple.optInt(ED_WATCHED, 0) == 1;
+        if (sawWatched && !watched) return season;
+        if (watched) sawWatched = true;
+      }
+    }
+    return -1;
+  }
+
+  private int lastSeasonWithWatched(JSONArray episodeData, List<Integer> seasons) {
+    for (int i = seasons.size() - 1; i >= 0; i--) {
+      int season = seasons.get(i);
+      JSONArray episodes = episodeData.optJSONArray(season);
+      for (int e = 0; episodes != null && e < episodes.length(); e++) {
+        JSONArray tuple = episodes.optJSONArray(e);
+        if (tuple != null && tuple.optInt(ED_WATCHED, 0) == 1) return season;
+      }
+    }
+    return -1;
+  }
+
+  private int firstSeasonWithFile(JSONArray episodeData, List<Integer> seasons) {
+    for (int season : seasons) {
+      JSONArray episodes = episodeData.optJSONArray(season);
+      for (int e = 0; episodes != null && e < episodes.length(); e++) {
+        JSONArray tuple = episodes.optJSONArray(e);
+        if (tuple != null && !tuple.optString(ED_FILE, "").isEmpty() && !"0".equals(tuple.optString(ED_FILE, ""))) return season;
+      }
+    }
+    return -1;
+  }
+
+  /**
+   * Cards are not all one width here -- each is its photo plus a name column
+   * only as wide as that name's longest word -- so they are packed by adding up
+   * their real widths rather than dividing the room by a fixed card width.
+   */
+  private void renderActorsMisc(Shows.Show show, FrameLayout misc) {
+    // Regulars with a photo and nothing else: a guest is not what this strip is
+    // for, and an actor with no photo is a caption beside an empty grey box.
+    List<Shows.Actor> cast = new ArrayList<>();
+    for (Shows.Actor actor : show.characters) {
+      if (actor.featured && !actor.image.isEmpty()) cast.add(actor);
+    }
+    if (cast.isEmpty()) {
+      misc.addView(message("No cast."), centerWrap());
+      return;
+    }
+    LinearLayout strip = mediaStrip();
+    int height = mediaCardHeight();
+    int photoWidth = Math.max(1, Math.round(height * ACTOR_CARD_ASPECT));
+    int gap = (int) dp(MEDIA_GAP_DP);
+    int available = estimatedMiscWidth();
+    int used = 0;
+    for (Shows.Actor actor : cast) {
+      int nameWidth = longestWordWidth(actor.name, ACTOR_NAME_TEXT_SIZE_SP);
+      int cardWidth = photoWidth + (int) dp(ACTOR_NAME_GAP_DP) + nameWidth;
+      int next = used == 0 ? cardWidth : used + gap + cardWidth;
+      if (next > available && strip.getChildCount() > 0) break;
+      used = next;
+      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(cardWidth, height);
+      if (strip.getChildCount() > 0) params.leftMargin = gap;
+      strip.addView(actorCard(actor, show, photoWidth, nameWidth), params);
+    }
+    misc.addView(strip, centerMatchHeight(height));
+  }
+
+  private View actorCard(Shows.Actor actor, Shows.Show show, int photoWidth, int nameWidth) {
+    LinearLayout card = new LinearLayout(getContext());
+    card.setOrientation(LinearLayout.HORIZONTAL);
+    card.setGravity(Gravity.CENTER_VERTICAL);
+
+    ImageView photo = new ImageView(getContext());
+    photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
+    photo.setBackgroundColor(MEDIA_PLACEHOLDER_BG);
+    card.addView(photo, new LinearLayout.LayoutParams(photoWidth, ViewGroup.LayoutParams.MATCH_PARENT));
+    addMediaRequest(show, photo, actor.image);
+
+    // Held to the longest word's width, and then left to wrap on its own: the
+    // longest word takes a line to itself and shorter ones pair up where two
+    // of them fit, which is what makes the column as narrow as it can be.
+    TextView caption = message(actor.name);
+    caption.setTextSize(TypedValue.COMPLEX_UNIT_SP, ACTOR_NAME_TEXT_SIZE_SP);
+    LinearLayout.LayoutParams captionParams =
+        new LinearLayout.LayoutParams(nameWidth, ViewGroup.LayoutParams.WRAP_CONTENT);
+    captionParams.leftMargin = (int) dp(ACTOR_NAME_GAP_DP);
+    card.addView(caption, captionParams);
+    return card;
+  }
+
+  /** What a name needs to never have to break a word across lines. */
+  private int longestWordWidth(String text, float textSizeSp) {
+    TextPaint paint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+    paint.setTextSize(
+        TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_SP, textSizeSp, getResources().getDisplayMetrics()));
+    float widest = 0f;
+    for (String word : text.trim().split("\\s+")) {
+      if (!word.isEmpty()) widest = Math.max(widest, paint.measureText(word));
+    }
+    return (int) Math.ceil(widest);
+  }
+
+  private void renderTrailersMisc(Shows.Show show, FrameLayout misc) {
+    // Nothing at all until the list has settled: a card that says it is loading
+    // is a card that has to be redrawn to stop saying it.
+    if (!show.trailersReady) return;
+    if (show.trailers.isEmpty()) {
+      misc.addView(message("No trailers found."), centerWrap());
+      return;
+    }
+    LinearLayout strip = mediaStrip();
+    int height = mediaCardHeight();
+    int width = Math.max(1, Math.round(height * TRAILER_CARD_ASPECT));
+    int count = Math.min(show.trailers.size(), maxMediaCards(width));
+    List<View> cardsForShow = new ArrayList<>();
+    for (int i = 0; i < count; i++) {
+      View card = trailerCard(show.trailers.get(i), show);
+      cardsForShow.add(card);
+      strip.addView(card, mediaParams(width, height, i));
+    }
+    trailerCardViews.put(show, cardsForShow);
+    misc.addView(strip, centerMatchHeight(height));
+    paintTrailerCards(show);
+  }
+
+  private View trailerCard(Shows.Trailer trailer, Shows.Show show) {
+    FrameLayout card = new FrameLayout(getContext());
+    int pad = (int) dp(MEDIA_CARD_PAD_DP);
+    card.setPadding(pad, pad, pad, pad);
+    GradientDrawable bg = new GradientDrawable();
+    bg.setCornerRadius(dp(CARD_CORNER_DP));
+    bg.setColor(TRAILER_CARD_BG);
+    card.setBackground(bg);
+
+    String thumbnail = Trailers.thumbnail(trailer.url);
+    if (thumbnail.isEmpty()) {
+      TextView label = new TextView(getContext());
+      label.setText(TRAILER_IMDB_LABEL);
+      label.setTextColor(MISC_TEXT_COLOR);
+      label.setTextSize(TypedValue.COMPLEX_UNIT_SP, ACTOR_NAME_TEXT_SIZE_SP);
+      label.setTypeface(Typeface.DEFAULT_BOLD);
+      label.setGravity(Gravity.CENTER);
+      label.setBackgroundColor(TRAILER_IMDB_BG);
+      card.addView(
+          label,
+          new FrameLayout.LayoutParams(
+              ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+      return card;
+    }
+
+    ImageView still = new ImageView(getContext());
+    still.setScaleType(ImageView.ScaleType.CENTER_CROP);
+    still.setBackgroundColor(MEDIA_PLACEHOLDER_BG);
+    card.addView(still, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    addMediaRequest(show, still, thumbnail);
+    return card;
+  }
+
+  private LinearLayout mediaStrip() {
+    LinearLayout strip = new LinearLayout(getContext());
+    strip.setOrientation(LinearLayout.HORIZONTAL);
+    strip.setGravity(Gravity.CENTER_VERTICAL);
+    return strip;
+  }
+
+  private LinearLayout.LayoutParams mediaParams(int width, int height, int index) {
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(width, height);
+    if (index > 0) params.leftMargin = (int) dp(MEDIA_GAP_DP);
+    return params;
+  }
+
+  private int maxMediaCards(int cardWidth) {
+    int gap = (int) dp(MEDIA_GAP_DP);
+    int available = estimatedMiscWidth();
+    return Math.max(1, (available + gap) / Math.max(1, cardWidth + gap));
+  }
+
+  /** cardMisc is the whole card less the backdrop and the card's own chrome. */
+  private int estimatedMiscWidth() {
+    int width = getWidth();
+    if (width <= 0) width = getResources().getDisplayMetrics().widthPixels;
+    int listPad = (int) dp(LIST_PAD_DP);
+    int cardChrome = 2 * (int) dp(CARD_SELECTED_BORDER_DP) + 2 * (int) dp(CARD_PAD_H_DP);
+    return Math.max(0, width - listPad - cardChrome - posterWidthPx);
+  }
+
+  /** From the bottom of the name row to the bottom of the card. */
+  private int mediaCardHeight() {
+    int chrome =
+        2 * (int) dp(CARD_SELECTED_BORDER_DP)
+            + (int) dp(CARD_PAD_TOP_DP)
+            + (int) dp(CARD_PAD_BOTTOM_DP)
+            + (int) dp(CARD_BODY_GAP_DP);
+    return Math.max(1, cardHeightPx - chrome - nameLineHeightPx);
+  }
+
+  private FrameLayout.LayoutParams centerMatchHeight(int height) {
+    return new FrameLayout.LayoutParams(
+        ViewGroup.LayoutParams.MATCH_PARENT, height, Gravity.CENTER_VERTICAL);
+  }
+
+  private FrameLayout.LayoutParams centerWrap() {
+    return new FrameLayout.LayoutParams(
+        ViewGroup.LayoutParams.WRAP_CONTENT,
+        ViewGroup.LayoutParams.WRAP_CONTENT,
+        Gravity.CENTER_VERTICAL);
+  }
+
+  private TextView message(String value) {
+    TextView view = new TextView(getContext());
+    view.setText(value);
+    view.setTextColor(MISC_TEXT_COLOR);
+    view.setTextSize(TypedValue.COMPLEX_UNIT_SP, FIELD_TEXT_SIZE_SP);
+    return view;
+  }
+
+  private void addMediaRequest(Shows.Show show, ImageView view, String url) {
+    if (url == null || url.isEmpty()) return;
+    MediaRequest request = new MediaRequest(view, url);
+    List<MediaRequest> requests = mediaRequests.get(show);
+    if (requests == null) {
+      requests = new ArrayList<>();
+      mediaRequests.put(show, requests);
+    }
+    requests.add(request);
+  }
+
+  private boolean isFutureDate(String date) {
+    if (date == null || date.length() < 10 || "0".equals(date)) return false;
+    return date.substring(0, 10).compareTo(todayKey) > 0;
+  }
+
+  private static String todayKey() {
+    return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+  }
+
+  private void clearTrailerHighlight(Shows.Show show) {
+    if (show == null) return;
+    trailerHighlightIndex = -1;
+    trailerLastPlayedIndex = -1;
+    paintTrailerCards(show);
+  }
+
+  private void paintTrailerCards(Shows.Show show) {
+    List<View> cardsForShow = trailerCardViews.get(show);
+    if (cardsForShow == null) return;
+    for (int i = 0; i < cardsForShow.size(); i++) {
+      GradientDrawable bg = (GradientDrawable) cardsForShow.get(i).getBackground();
+      bg.setStroke(
+          i == trailerHighlightIndex ? (int) dp(TRAILER_HIGHLIGHT_BORDER_DP) : 0,
+          TRAILER_HIGHLIGHT_BORDER);
+    }
+  }
+
+  private enum MiscMode {
+    DESC,
+    MAP,
+    ACTORS,
+    TRAILERS
+  }
+
+  private static class MediaRequest {
+    final ImageView view;
+    final String url;
+
+    MediaRequest(ImageView view, String url) {
+      this.view = view;
+      this.url = url;
+    }
+  }
+
+  private class FlowLayout extends ViewGroup {
+    FlowLayout(Context context) {
+      super(context);
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+      int maxWidth = Math.max(0, MeasureSpec.getSize(widthMeasureSpec));
+      int lineWidth = 0;
+      int lineHeight = 0;
+      int totalHeight = 0;
+      int widest = 0;
+      for (int i = 0; i < getChildCount(); i++) {
+        View child = getChildAt(i);
+        measureChildWithMargins(child, widthMeasureSpec, 0, heightMeasureSpec, 0);
+        MarginLayoutParams params = (MarginLayoutParams) child.getLayoutParams();
+        int childWidth = child.getMeasuredWidth() + params.leftMargin + params.rightMargin;
+        int childHeight = child.getMeasuredHeight() + params.topMargin + params.bottomMargin;
+        if (lineWidth > 0 && lineWidth + childWidth > maxWidth) {
+          widest = Math.max(widest, lineWidth);
+          totalHeight += lineHeight;
+          lineWidth = 0;
+          lineHeight = 0;
+        }
+        lineWidth += childWidth;
+        lineHeight = Math.max(lineHeight, childHeight);
+      }
+      widest = Math.max(widest, lineWidth);
+      totalHeight += lineHeight;
+      setMeasuredDimension(resolveSize(widest, widthMeasureSpec), resolveSize(totalHeight, heightMeasureSpec));
+    }
+
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+      int maxWidth = right - left;
+      int x = 0;
+      int y = 0;
+      int lineHeight = 0;
+      for (int i = 0; i < getChildCount(); i++) {
+        View child = getChildAt(i);
+        MarginLayoutParams params = (MarginLayoutParams) child.getLayoutParams();
+        int childWidth = child.getMeasuredWidth() + params.leftMargin + params.rightMargin;
+        int childHeight = child.getMeasuredHeight() + params.topMargin + params.bottomMargin;
+        if (x > 0 && x + childWidth > maxWidth) {
+          x = 0;
+          y += lineHeight;
+          lineHeight = 0;
+        }
+        int childLeft = x + params.leftMargin;
+        int childTop = y + params.topMargin;
+        child.layout(childLeft, childTop, childLeft + child.getMeasuredWidth(), childTop + child.getMeasuredHeight());
+        x += childWidth;
+        lineHeight = Math.max(lineHeight, childHeight);
+      }
+    }
+
+    @Override
+    protected boolean checkLayoutParams(ViewGroup.LayoutParams params) {
+      return params instanceof MarginLayoutParams;
+    }
+
+    @Override
+    protected ViewGroup.LayoutParams generateDefaultLayoutParams() {
+      return new MarginLayoutParams(
+          ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+    }
+
+    @Override
+    public ViewGroup.LayoutParams generateLayoutParams(android.util.AttributeSet attrs) {
+      return new MarginLayoutParams(getContext(), attrs);
+    }
+
+    @Override
+    protected ViewGroup.LayoutParams generateLayoutParams(ViewGroup.LayoutParams params) {
+      return new MarginLayoutParams(params);
+    }
   }
 
   /** Small drawn trash-can glyph, not-in-Emby rows only, far right of the row. */

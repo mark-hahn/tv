@@ -37,12 +37,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   private static final String TAG = "tvapp";
   private static final float SCREEN_V_MARGIN_DP = 24f;
-  private static final float COLUMN_GAP_DP = 12f;
-  private static final float LIST_WIDTH_FRACTION = 0.36f;
+  // Only what keeps the columns from touching: the cards run to the edge of
+  // their own column, so this is the whole of the space between a card and the
+  // button column beside it. It is a margin, not part of the width fractions.
+  private static final float COLUMN_GAP_DP = 3f;
   private static final float BUTTONS_WIDTH_FRACTION = 0.09f;
-  private static final float PANE_WIDTH_FRACTION = 0.55f;
-
-  private static final String[] TAB_LABELS = {"Info", "Map", "Actors", "Trailer"};
+  private static final float LIST_WIDTH_FRACTION = 1f - BUTTONS_WIDTH_FRACTION;
   // Not a toggle of its own: clicking it opens the phone's filter input screen,
   // which is the only way that screen opens now that the remote has no Filter
   // button. It is focused and clicked like the rest of the group, and shows
@@ -64,10 +64,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // same @tv/share code the web client runs on its own copy of the data.
   private static final String SHARED_FILTER_SHOWS_URL =
       "https://hahnca.com/tv-srvr/api/getSharedFilterShows";
-  private static final int MAP_TAB_INDEX = 1;
-  private static final int ACTORS_TAB_INDEX = 2;
-  private static final int TRAILER_TAB_INDEX = 3;
-
   // Shown above the show list only while a filter is active, mirroring the
   // text as the phone's filter input screen types it.
   private static final float FILTER_LABEL_TEXT_SIZE_SP = 15f;
@@ -120,7 +116,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final long SHOWS_REFRESH_AFTER_MS = 10 * 60_000;
 
   private final Handler ui = new Handler(Looper.getMainLooper());
-  private final List<Pane> panes = new ArrayList<>();
   private final Map<String, ButtonItem> buttonItems = new HashMap<>();
   private final List<String> buttonOrder = new ArrayList<>();
   private final Set<String> activeFilters = new HashSet<>();
@@ -128,18 +123,11 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private CtrlServer ctrlServer;
   private ShowListView showList;
   private TextView filterLabel;
-  private InfoView info;
-  private MapPane mapPane;
-  private ActorsView actorsPane;
-  private TrailersView trailersView;
-  private Pane activePane;
   private TrailerPlayer player;
   private LinearLayout buttonColumn;
   private GradientDrawable filterGroupBg;
-  private GradientDrawable paneAreaBg;
   private Shows.Sort sort = Shows.Sort.ALPHA;
   private boolean customOn;
-  private int activeTabIndex;
   private Area area = Area.SHOWS;
   // The filter button the focus is on, kept while the focus is elsewhere and
   // across restarts, so the filter group is re-entered where it was left.
@@ -161,23 +149,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private long showsLoadedAt;
 
   /**
-   * The one area of the screen that can hold a focused item. The show list is
-   * an area like the other two, but nothing in it is ever focused: it is simply
-   * where the arrow keys go when neither of the other two has the focus, and
-   * there its up and down move the selected show itself.
-   *
-   * The filter group focuses one of its buttons. The tab pane focuses an item
-   * of the pane on screen -- a cell in Map's grid, a card in Actors, a card in
-   * Trailer. Info, and a Map/Actors/Trailer pane with nothing in it, has
-   * nothing to focus, but the area is entered anyway: ok and up/down/right are
-   * no-ops there, and left is the only way back to the show list. The tab and
-   * sort buttons are never focused; the remote's Info and Sort keys are what
-   * change them.
+   * The one area of the screen that can hold focus. The show list itself has no
+   * focused child: up/down move the selected show, ok rotates its cardMisc, and
+   * right plays a trailer when cardMisc is showing trailers.
    */
   private enum Area {
     SHOWS,
-    FILTERS,
-    PANE
+    FILTERS
   }
 
   @Override
@@ -245,12 +223,11 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     columns.setPadding(0, (int) dp(SCREEN_V_MARGIN_DP), 0, (int) dp(SCREEN_V_MARGIN_DP));
     columns.addView(buildButtonColumn(), column(BUTTONS_WIDTH_FRACTION, 0));
     columns.addView(buildList(), column(LIST_WIDTH_FRACTION, dp(COLUMN_GAP_DP)));
-    columns.addView(buildPaneColumn(), column(PANE_WIDTH_FRACTION, dp(COLUMN_GAP_DP)));
     root.addView(columns, matchParent());
 
     player = new TrailerPlayer(this);
+    player.setEndListener(() -> showList.highlightNextTrailerAfterPlayed());
     root.addView(player, matchParent());
-    buttonColumn.post(this::sizeTabButtons);
     return root;
   }
 
@@ -383,40 +360,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     return params;
   }
 
-  /**
-   * The tab buttons, in a row across the top of the tab pane they switch. They
-   * are the one group that is read left to right, so they are sized rather than
-   * stretched: each keeps the width it had while it was in the button column.
-   */
-  private View buildTabRow() {
-    LinearLayout row = new LinearLayout(this);
-    row.setOrientation(LinearLayout.HORIZONTAL);
-    for (int i = 0; i < TAB_LABELS.length; i++) {
-      LinearLayout.LayoutParams params =
-          new LinearLayout.LayoutParams(
-              ViewGroup.LayoutParams.WRAP_CONTENT, (int) dp(BUTTON_HEIGHT_DP));
-      if (i > 0) params.leftMargin = (int) dp(TAB_GAP_DP);
-      addButton(row, TAB_LABELS[i], params);
-    }
-    return row;
-  }
-
-  /** The width the tab buttons had in the button column, which is that column
-   * inside its buttons' margins. Known only once the column has been laid out. */
-  private void sizeTabButtons() {
-    int width = buttonColumn.getWidth() - 2 * (int) dp(BUTTON_PAD_H_DP);
-    if (width <= 0) return;
-    for (int i = 0; i < TAB_LABELS.length; i++) {
-      View view = buttonItems.get(TAB_LABELS[i]).view;
-      LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) view.getLayoutParams();
-      params.width = width;
-      // The row starts half a button in from the edge of the pane, which is a
-      // width only known here.
-      if (i == 0) params.leftMargin = width / 2;
-      view.setLayoutParams(params);
-    }
-  }
-
   private void addButton(LinearLayout parent, String label, LinearLayout.LayoutParams params) {
     TextView view = new TextView(this);
     view.setText(label);
@@ -434,90 +377,11 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     parent.addView(view, params);
   }
 
-  /** The tab row above the tab pane it switches, and the pane below it. */
-  private View buildPaneColumn() {
-    LinearLayout paneColumn = new LinearLayout(this);
-    paneColumn.setOrientation(LinearLayout.VERTICAL);
-    LinearLayout.LayoutParams rowParams =
-        new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-    rowParams.bottomMargin = (int) dp(BUTTON_MARGIN_BOTTOM_DP);
-    paneColumn.addView(buildTabRow(), rowParams);
-    paneColumn.addView(
-        buildPanes(), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-    return paneColumn;
-  }
-
-  private View buildPanes() {
-    FrameLayout holder = new FrameLayout(this);
-    // Room for the focus border around the whole tab pane; the panes inside
-    // shrink by that much rather than the border overlapping them.
-    holder.setPadding(
-        (int) dp(AREA_BORDER_DP),
-        (int) dp(AREA_BORDER_DP),
-        (int) dp(AREA_BORDER_DP),
-        (int) dp(AREA_BORDER_DP));
-    paneAreaBg = new GradientDrawable();
-    paneAreaBg.setCornerRadius(dp(BUTTON_CORNER_DP));
-    holder.setBackground(paneAreaBg);
-    info = new InfoView(this);
-    panes.add(info);
-    mapPane = new MapPane(this);
-    // The grid is fetched, so a right-arrow into the Map pane can land before
-    // there is a cell to land on; this is the grid saying it got there.
-    mapPane.setCellFocusListener(
-        () -> {
-          area = Area.PANE;
-          repaintFocus();
-        });
-    panes.add(mapPane);
-    actorsPane = new ActorsView(this);
-    actorsPane.setListener(this::actorClick);
-    panes.add(actorsPane);
-    trailersView = new TrailersView(this);
-    trailersView.setPlayListener(
-        url -> {
-          sendUnmute();
-          player.play(url);
-        });
-    panes.add(trailersView);
-    for (Pane pane : panes) {
-      pane.asView().setVisibility(View.GONE);
-      holder.addView(pane.asView(), matchParent());
-    }
-    selectTab(0);
-    return holder;
-  }
-
-  private void selectTab(int index) {
-    activeTabIndex = index;
-    for (int i = 0; i < panes.size(); i++) {
-      panes.get(i).asView().setVisibility(i == index ? View.VISIBLE : View.GONE);
-    }
-    activePane = panes.get(index);
-    activePane.onShown();
-    if (index != MAP_TAB_INDEX) mapPane.closeEpisode();
-    // Nothing can stay focused in a pane that has just stopped being the one on
-    // screen. Whatever is moving the focus into the new pane sets it after this.
-    clearPaneFocus();
-    repaintButtons();
-  }
-
-  /** Every pane's focused item at once -- whichever one the focus is leaving. */
-  private void clearPaneFocus() {
-    mapPane.clearCellFocus();
-    actorsPane.clearCardFocus();
-    trailersView.clearCardFocus();
-    info.closePoster();
-  }
-
   /** The focused area's border, and the focused button inside it. */
   private void repaintFocus() {
     repaintButtons();
     filterGroupBg.setStroke(
         area == Area.FILTERS ? (int) dp(AREA_BORDER_DP) : 0, BUTTON_SELECTED_BORDER);
-    paneAreaBg.setStroke(
-        area == Area.PANE ? (int) dp(AREA_BORDER_DP) : 0, BUTTON_SELECTED_BORDER);
   }
 
   private void repaintButtons() {
@@ -530,9 +394,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   private boolean isButtonActive(String label) {
-    for (int i = 0; i < TAB_LABELS.length; i++) {
-      if (TAB_LABELS[i].equals(label)) return activeTabIndex == i;
-    }
     if (FILTER_INPUT_LABEL.equals(label)) return filterTextActive;
     if (activeFilters.contains(label)) return true;
     if (SORT_WATCHED.equals(label)) return !customOn && sort == Shows.Sort.WATCHING;
@@ -595,7 +456,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     fetchCustomOrder(
         (names, selectedShow) -> {
           clearTextFilter();
-          actorsPane.clearSelection();
           applyActorFilter(null);
           showList.setCustomOrder(names, selectedShow);
           setCustomOn(true);
@@ -646,7 +506,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   private void toggleFilter(String label) {
     dropCustom(false);
-    actorsPane.clearSelection();
     applyActorFilter(null);
     if (activeFilters.contains(label)) activeFilters.remove(label);
     else activeFilters.add(label);
@@ -657,7 +516,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   /** The Clear button: every way the show list can be narrowed, all at once. */
   private void clearAllFilters() {
     dropCustom(false);
-    actorsPane.clearSelection();
     applyActorFilter(null);
     activeFilters.clear();
     showList.setActiveFilters(activeFilters);
@@ -713,11 +571,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private void onShowSelected(Shows.Show show) {
     activeShowName = show.name;
     sendActiveShow();
-    for (Pane pane : panes) pane.setShow(show);
-    mapPane.closeEpisode();
-    // Started as soon as the show is picked, so the trailer pane is usually
-    // done waiting by the time the trailer tab is asked for.
-    TrailerList.settle(show, () -> trailersView.onTrailersReady(show));
+    TrailerList.settle(show, () -> showList.onTrailersReady(show));
     prefs().edit().putString(KEY_SELECTED_SHOW, show.name).apply();
   }
 
@@ -745,42 +599,15 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   /** Nothing is focused anywhere; the arrow keys drive the show list itself. */
   private void focusShows() {
     area = Area.SHOWS;
-    clearPaneFocus();
     repaintFocus();
   }
 
   private void focusFilters() {
     area = Area.FILTERS;
-    clearPaneFocus();
     if (buttonItems.get(focusedFilter) == null) focusedFilter = FILTER_LABELS[0];
     if (!activeFilters.isEmpty() || filterTextActive || actorFilterName != null) {
       focusedFilter = CLEAR_FILTER_LABEL;
     }
-    repaintFocus();
-  }
-
-  /**
-   * Into the tab pane, onto the first item of the pane already on screen.
-   * Entered unconditionally, even when the pane has nothing to focus -- Info
-   * never has anything, and neither has a show with no cast, no trailers, or
-   * no episodes. movePaneFocus and activatePaneItem are what turn that into a
-   * no-op for everything but left.
-   */
-  private void focusPane() {
-    switch (activeTabIndex) {
-      case MAP_TAB_INDEX:
-        // A grid still being fetched has nowhere to put the focus yet; the cell
-        // focus listener takes the focus in as soon as the grid lands.
-        mapPane.requestFocusFirstCell();
-        break;
-      case ACTORS_TAB_INDEX:
-        actorsPane.focusFirstCard();
-        break;
-      case TRAILER_TAB_INDEX:
-        trailersView.focusTopCard();
-        break;
-    }
-    area = Area.PANE;
     repaintFocus();
   }
 
@@ -812,12 +639,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     switch (area) {
       case SHOWS:
         // Nothing is focused here, so up and down move the selected show
-        // itself; the panes catch up once it stops moving. The button column
-        // sits to the left of the list and the tab pane to its right.
+        // itself. The button column sits to the left; right plays a trailer
+        // only when cardMisc is showing trailers.
         if (up) showList.moveSelection(-1);
         else if (down) showList.moveSelection(+1);
         else if (left) focusFilters();
-        else focusPane();
+        else playCardTrailer();
         return;
 
       case FILTERS:
@@ -828,103 +655,27 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
         else moveFilterFocus(up ? -1 : +1);
         return;
 
-      case PANE:
-        movePaneFocus(up, down, left, right);
-        return;
     }
   }
 
-  /** The focused item's step inside whichever pane is on screen. */
-  private void movePaneFocus(boolean up, boolean down, boolean left, boolean right) {
-    switch (activeTabIndex) {
-      case MAP_TAB_INDEX:
-        // Off the leftmost season column the focus leaves the grid, the way it
-        // does off the leftmost actor card; up, down and right only ever move
-        // around inside it.
-        if (up) mapPane.moveCellFocus(-1, 0);
-        else if (down) mapPane.moveCellFocus(+1, 0);
-        else if (right) mapPane.moveCellFocus(0, +1);
-        else if (!mapPane.moveCellFocus(0, -1)) {
-          mapPane.closeEpisode();
-          focusShows();
-        }
-        return;
-
-      case ACTORS_TAB_INDEX:
-        if (up) actorsPane.moveCardFocus(-1, 0);
-        else if (down) actorsPane.moveCardFocus(+1, 0);
-        else if (right) actorsPane.moveCardFocus(0, +1);
-        // Off the leftmost card of a row the focus leaves the grid.
-        else if (!actorsPane.moveCardFocus(0, -1)) focusShows();
-        return;
-
-      case TRAILER_TAB_INDEX:
-        // Right is the way in and left the way out; a card grid one column wide
-        // has nothing further right to reach.
-        if (up) trailersView.moveCardFocus(-1);
-        else if (down) trailersView.moveCardFocus(+1);
-        else if (left) focusShows();
-        return;
-
-      default:
-        // Info has nothing to focus, but an open poster answers every
-        // direction by shrinking back down -- left keeps going, out to the
-        // show list, the same as it would with the poster already closed.
-        if (info.isPosterOpen()) {
-          info.closePoster();
-          if (!left) return;
-        }
-        if (left) focusShows();
-        return;
-    }
+  private void playCardTrailer() {
+    String url = showList.playActiveTrailer();
+    if (url == null) return;
+    sendUnmute();
+    player.play(url);
   }
 
   private void activateSelectedItem() {
     switch (area) {
       case SHOWS:
-        embyClick();
+        showList.rotateCardMisc();
         return;
       case FILTERS:
         if (CLEAR_FILTER_LABEL.equals(focusedFilter)) clearAllFilters();
         else if (FILTER_INPUT_LABEL.equals(focusedFilter)) sendToPhone(CtrlServer.MSG_OPEN_FILTER);
         else toggleFilter(focusedFilter);
         return;
-      case PANE:
-        activatePaneItem();
-        return;
     }
-  }
-
-  private void activatePaneItem() {
-    switch (activeTabIndex) {
-      case MAP_TAB_INDEX:
-        mapPane.toggleFocusedEpisode();
-        return;
-      case ACTORS_TAB_INDEX:
-        actorsPane.activateFocusedCard();
-        return;
-      case TRAILER_TAB_INDEX:
-        trailersView.activateFocusedCard();
-        return;
-      default:
-        // Info has nothing else to focus, so its ok is the poster's own --
-        // open it blown up, or close it if it is already open.
-        if (info.isPosterOpen()) info.closePoster();
-        else info.openPoster();
-        return;
-    }
-  }
-
-  /**
-   * The remote's Info key: one step down the tab group, wrapping. The tab
-   * buttons cannot be focused, so this is the only thing that moves them.
-   * Whatever was focused loses the focus, since the pane it was in is on its
-   * way out, and the show list is what the arrow keys drive after that.
-   */
-  private void cycleTab() {
-    int next = (activeTabIndex + 1) % TAB_LABELS.length;
-    selectTab(next);
-    focusShows();
   }
 
   private void embyClick() {
@@ -933,36 +684,14 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       backToEmby();
       return;
     }
-    // A focused Map cell names an episode as well as a show, so that is the one
-    // Emby opens on -- with or without the episode subpane up, which goes away
-    // either way. A cell with no file has nothing to load; rather than silently
-    // falling back to next-up (surprising -- looks like the wrong episode played),
-    // this just says so and does nothing else.
-    if (area == Area.PANE && activeTabIndex == MAP_TAB_INDEX && mapPane.focusedCellHasNoFile()) {
+    if (!show.hasFile) {
       showBigCenterToast(NO_FILE_TOAST);
       return;
     }
-    String focusedEpisodeId = null;
-    if (area == Area.PANE && activeTabIndex == MAP_TAB_INDEX) {
-      focusedEpisodeId = mapPane.focusedEpisodeId();
-      mapPane.closeEpisode();
+    if (show.notReady) {
+      showBigCenterToast(NOT_READY_TOAST);
+      return;
     }
-    // No episode named by a focused Map cell: Emby would pick its own next-up
-    // episode, so check the show itself before asking it to play one. With no
-    // file anywhere there is nothing to play at all; with files but not ready
-    // -- everything already watched, say -- the Map is where a rewatch is
-    // picked, since only a named episode gets past Emby's next-up choice.
-    if (focusedEpisodeId == null) {
-      if (!show.hasFile) {
-        showBigCenterToast(NO_FILE_TOAST);
-        return;
-      }
-      if (show.notReady) {
-        showBigCenterToast(NOT_READY_TOAST);
-        return;
-      }
-    }
-    final String episodeId = focusedEpisodeId;
     new Thread(
             () -> {
               try {
@@ -972,11 +701,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
                         + URLEncoder.encode(show.id, "UTF-8")
                         + "&showName="
                         + URLEncoder.encode(show.name, "UTF-8")
-                        + (episodeId == null
-                            ? ""
-                            : "&episodeId=" + URLEncoder.encode(episodeId, "UTF-8"))
-                        // Emby opens on the show, then starts it playing -- the
-                        // focused episode when the Map named one, next up otherwise.
                         + "&play=1";
                 HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
                 conn.setConnectTimeout(VIEWSHOW_TIMEOUT_MS);
@@ -1106,7 +830,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
         () -> {
           bumpKeepAwake();
           dropCustom(false);
-          actorsPane.clearSelection();
           applyActorFilter(null);
           showList.setFilter(text);
         });
@@ -1133,35 +856,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     super.onDestroy();
   }
 
-  /**
-   * One level out: a playing trailer, then an open episode subpane, then
-   * whichever area has the focus straight back to the show list, and only
-   * from the show list does back leave for Emby. Closing the subpane is all
-   * that press does -- the focus stays on the cell it was opened from. A
-   * blown-up poster instead goes the rest of the way to the show list in the
-   * one press, the same as left already does on it.
-   *
-   * The web client's Shows button closes tvapp with this same message, so
-   * while an area other than the show list has the focus it takes a second
-   * press to close -- which is how a playing trailer and an open episode
-   * subpane already behaved.
-   */
+  /** One level out: close a playing trailer, leave filters, then leave tvapp. */
   private void handleBack() {
     if (player.isPlaying()) {
       player.close();
       return;
     }
-    if (mapPane.isEpisodeOpen()) {
-      mapPane.closeEpisode();
-      return;
-    }
-    if (info.isPosterOpen()) {
-      info.closePoster();
-      focusShows();
-      return;
-    }
     switch (area) {
-      case PANE:
       case FILTERS:
         focusShows();
         return;
@@ -1180,7 +881,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       return;
     }
     if ("ok".equals(key)) activateSelectedItem();
-    else if ("info".equals(key)) cycleTab();
     else if ("sort".equals(key)) cycleSort();
     else moveSelection(key);
   }

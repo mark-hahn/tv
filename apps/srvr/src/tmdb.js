@@ -117,6 +117,71 @@ export async function getTmdb(params) {
   }
 }
 
+// The tv app's show-list cards want a landscape image, which a poster is not.
+// TMDB's backdrops are 16:9; w780 is wider than any card and small enough that
+// a screenful of them decodes without trouble on the tv.
+const BACKDROP_BASE = "https://image.tmdb.org/t/p/w780";
+// The answer never changes and there are a couple of thousand shows to scroll
+// past, so each is looked up once per srvr run. Misses are cached too -- a show
+// TMDB has no backdrop for must not be asked about again on every scroll.
+const backdropCache = new Map();
+
+/**
+ * The landscape image for one show: by TMDB id when the record carries one in
+ * its remote_ids, by name search when it does not. url is empty when TMDB has
+ * nothing, which is the caller's cue to go on showing the poster.
+ */
+export async function getBackdrop(params) {
+  const { tmdbId, showName } = params;
+  const id = String(tmdbId || "").trim();
+  const key = id || `name:${String(showName || "").toLowerCase()}`;
+  if (backdropCache.has(key)) return { url: backdropCache.get(key) };
+  let url = "";
+  try {
+    url = await findBackdrop(id, showName);
+  } catch (e) {
+    unilog(1916, `backdrop lookup failed for ${showName}: ${e.message}`);
+  }
+  backdropCache.set(key, url);
+  return { url };
+}
+
+async function findBackdrop(tmdbId, showName) {
+  let id = tmdbId;
+  if (!id) {
+    if (!showName) return "";
+    // A trailing (YYYY) is this library's way of telling two shows of the same
+    // name apart; TMDB has never heard of it, and takes the year separately.
+    // Same handling as getStreamProviders below.
+    let query = showName;
+    let year = null;
+    const yearMatch = query.match(/\s*\((\d{4})\)$/);
+    if (yearMatch) {
+      year = yearMatch[1];
+      query = query.slice(0, query.length - yearMatch[0].length).trim();
+    }
+    const res = await moviedb.searchTv({ query });
+    const results = res.results || [];
+    const title = smartTitleMatch(query, results, year, false);
+    const match = title
+      ? results.find((s) => s.name === title || s.original_name === title)
+      : null;
+    if (!match?.id) return "";
+    id = match.id;
+  }
+  const images = await moviedb.tvImages({ id });
+  const backdrops = images.backdrops || [];
+  if (backdrops.length === 0) return "";
+  // A textless backdrop first -- one with a language on it carries the show's
+  // own title art, which the card already has in its name beside the image --
+  // and the most voted of whichever set that leaves.
+  const textless = backdrops.filter((b) => !b.iso_639_1);
+  const pick = (textless.length ? textless : backdrops).reduce((best, b) =>
+    (b.vote_average || 0) > (best.vote_average || 0) ? b : best,
+  );
+  return pick.file_path ? BACKDROP_BASE + pick.file_path : "";
+}
+
 export async function searchPerson(params) {
   const { name } = params;
   if (!name) return null;

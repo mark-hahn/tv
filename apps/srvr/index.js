@@ -1536,6 +1536,9 @@ app.post("/api/searchActorsInNonEmby", apiWrapper(tvdb.searchActorsInNonEmby));
 app.post("/api/getTmdb", apiWrapper(tmdb.getTmdb));
 app.post("/api/searchTmdbPerson", apiWrapper(tmdb.searchPerson));
 app.post("/api/getStreamProviders", apiWrapper(tmdb.getStreamProviders));
+// A GET, unlike the other tmdb calls: the tv app asks for one card's image at
+// a time as the list is scrolled.
+app.get("/api/getBackdrop", apiWrapper(tmdb.getBackdrop));
 app.post("/api/getFile", apiWrapper(getFile));
 app.post("/api/getSubFileIds", apiWrapper(getSubFileIds));
 app.post("/api/accessTvdb", apiWrapper(tvdb.accessTvdb));

@@ -237,7 +237,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     root.addView(columns, matchParent());
 
     player = new TrailerPlayer(this);
-    player.setEndListener(() -> showList.highlightNextTrailerAfterPlayed());
+    // However the video came down -- played out, right, or back -- the strip
+    // moves the cursor on to the next trailer.
+    player.setOpenListener(
+        open -> {
+          if (!open) showList.highlightNextTrailerAfterPlayed();
+        });
     root.addView(player, matchParent());
     return root;
   }
@@ -868,10 +873,11 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private void handleRemoteKey(String key) {
     if (player.isPlaying()) {
       // While the video owns the screen the keys are the video's, the way they
-      // are in Emby: ok pauses and resumes, left and right seek. The rest are
-      // swallowed so they cannot move hidden tvapp focus underneath, and back
-      // is what closes the player.
-      player.key(key);
+      // are in Emby: ok pauses and resumes, left seeks. Right is the way back
+      // out, the same key that started the video. The rest are swallowed so
+      // they cannot move hidden tvapp focus underneath.
+      if ("right".equals(key)) player.close();
+      else player.key(key);
       return;
     }
     if ("ok".equals(key)) showList.rotateCardMisc();

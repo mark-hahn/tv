@@ -152,6 +152,10 @@ class ShowListView extends ScrollView {
   // show it passes over.
   private static final long PANE_DWELL_MS = 600;
 
+  // The letter is there to steer a run of skips by, so it goes once the list
+  // has come to rest and there is nothing left to steer.
+  private static final long LETTER_BADGE_LINGER_MS = 1000;
+
   private static final String EMPTY_LABEL = "No Shows.";
 
   // One jump of the page-skip mode, which stands in for letter-skip in the
@@ -183,6 +187,9 @@ class ShowListView extends ScrollView {
       () -> {
         if (listener != null && active != null) listener.onShowSelected(active);
       };
+  // The card the letter is drawn on, so the timer that takes it away again
+  // knows which one it belongs to even after the selection has moved on.
+  private Shows.Show letterBadgeShow;
   private String filter = "";
   private Shows.Sort sort = Shows.Sort.ALPHA;
   private final Set<String> activeFilters = new HashSet<>();
@@ -399,6 +406,11 @@ class ShowListView extends ScrollView {
     if (miscMode == MiscMode.TRAILERS && !hasTrailers(active)) {
       miscMode = modes[(miscMode.ordinal() + 1) % modes.length];
     }
+    // The trailers come up with the first one already under the cursor, so
+    // right plays it with no step in between. Nothing is under the cursor in
+    // any other mode.
+    trailerHighlightIndex = miscMode == MiscMode.TRAILERS ? 0 : -1;
+    trailerLastPlayedIndex = -1;
     renderMisc(active);
     loadVisibleMedia();
   }
@@ -423,11 +435,25 @@ class ShowListView extends ScrollView {
     return active.trailers.get(index).url;
   }
 
+  /**
+   * The cursor moves on once a trailer has come down, however it came down --
+   * played out, or closed with right or back. It wraps at the end of the strip
+   * rather than stopping there.
+   */
   void highlightNextTrailerAfterPlayed() {
-    if (active == null || active.trailers.size() <= 1 || trailerLastPlayedIndex < 0) return;
-    trailerHighlightIndex = (trailerLastPlayedIndex + 1) % active.trailers.size();
+    if (active == null || trailerLastPlayedIndex < 0) return;
+    int played = trailerLastPlayedIndex;
     trailerLastPlayedIndex = -1;
+    int count = trailerCount(active);
+    if (count <= 1) return;
+    trailerHighlightIndex = (played + 1) % count;
     paintTrailerCards(active);
+  }
+
+  /** The trailers on the strip, which is what the cursor has to move over. */
+  private int trailerCount(Shows.Show show) {
+    List<View> cardsForShow = trailerCardViews.get(show);
+    return cardsForShow != null ? cardsForShow.size() : show.trailers.size();
   }
 
   void onTrailersReady(Shows.Show show) {
@@ -509,10 +535,17 @@ class ShowListView extends ScrollView {
     return key.isEmpty() ? "" : key.substring(0, 1);
   }
 
+  private final Runnable hideLetterBadgeSoon = () -> hideLetterBadge(letterBadgeShow);
+
   private void showLetterBadge(Shows.Show show) {
     TextView badge = letterBadges.get(show);
     View row = cards.get(show);
     if (badge == null || row == null) return;
+    letterBadgeShow = show;
+    // Restarted by every skip, so the letter stands for the whole run and only
+    // the last one is timed.
+    dwellHandler.removeCallbacks(hideLetterBadgeSoon);
+    dwellHandler.postDelayed(hideLetterBadgeSoon, LETTER_BADGE_LINGER_MS);
     badge.setText(firstLetterKey(show).toUpperCase());
     int h = row.getHeight();
     // Well short of the card's own height: at 0.85 the line box of a card this
@@ -524,6 +557,10 @@ class ShowListView extends ScrollView {
   private void hideLetterBadge(Shows.Show show) {
     TextView badge = show == null ? null : letterBadges.get(show);
     if (badge != null) badge.setVisibility(View.GONE);
+    if (show != null && show == letterBadgeShow) {
+      letterBadgeShow = null;
+      dwellHandler.removeCallbacks(hideLetterBadgeSoon);
+    }
   }
 
   @Override

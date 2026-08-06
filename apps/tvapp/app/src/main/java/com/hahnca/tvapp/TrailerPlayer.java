@@ -36,14 +36,9 @@ class TrailerPlayer extends FrameLayout {
     void onPlayerOpen(boolean open);
   }
 
-  interface EndListener {
-    void onTrailerEnded();
-  }
-
   private final Handler ui = new Handler(Looper.getMainLooper());
   private final WebView web;
   private OpenListener openListener;
-  private EndListener endListener;
 
   @SuppressLint("SetJavaScriptEnabled")
   TrailerPlayer(Context context) {
@@ -66,10 +61,6 @@ class TrailerPlayer extends FrameLayout {
     openListener = listener;
   }
 
-  void setEndListener(EndListener listener) {
-    endListener = listener;
-  }
-
   boolean isPlaying() {
     return getVisibility() == VISIBLE;
   }
@@ -81,12 +72,12 @@ class TrailerPlayer extends FrameLayout {
 
   /**
    * A remote key while the video owns the screen: ok pauses and resumes, left
-   * and right seek. Anything else is not the player's, and back is the
-   * activity's -- it closes.
+   * seeks. Anything else is not the player's; right and back are the
+   * activity's -- both close.
    */
   void key(String remoteKey) {
     if (!isPlaying()) return;
-    if (!"ok".equals(remoteKey) && !"left".equals(remoteKey) && !"right".equals(remoteKey)) return;
+    if (!"ok".equals(remoteKey) && !"left".equals(remoteKey)) return;
     web.evaluateJavascript("window.tvKey&&tvKey('" + remoteKey + "'," + SEEK_SECONDS + ")", null);
   }
 
@@ -109,11 +100,9 @@ class TrailerPlayer extends FrameLayout {
   private class Bridge {
     @JavascriptInterface
     public void onEnded() {
-      ui.post(
-          () -> {
-            if (endListener != null) endListener.onTrailerEnded();
-            TrailerPlayer.this.close();
-          });
+      // close() is what tells the activity, so a video that ended by itself and
+      // one a key closed leave by the same door.
+      ui.post(TrailerPlayer.this::close);
     }
   }
 
@@ -133,7 +122,12 @@ class TrailerPlayer extends FrameLayout {
                 + "' autoplay playsinline class='fill' onended='"
                 + BRIDGE
                 + ".onEnded()'></video>"
-                + "<script>var v=document.getElementById('v');ctrl({"
+                + "<script>var v=document.getElementById('v');"
+                // No captions on a trailer: any the file carries are off, and
+                // stay off through the load that can add them late.
+                + "function nocc(){var t=v.textTracks;"
+                + "for(var i=0;i<t.length;i++)t[i].mode='disabled';}"
+                + "nocc();v.addEventListener('loadedmetadata',nocc);ctrl({"
                 + "pos:function(){return v.currentTime;},"
                 + "dur:function(){return v.duration;},"
                 + "paused:function(){return v.paused;},"
@@ -141,23 +135,30 @@ class TrailerPlayer extends FrameLayout {
                 + "toggle:function(){if(v.paused)v.play();else v.pause();}});"
                 + "v.addEventListener('pause',osd);v.addEventListener('play',osd);</script>"
             : "<div id='p' class='fill'></div>"
+                + "<script>function nocc(y){try{y.unloadModule('captions');"
+                + "y.unloadModule('cc');y.setOption('captions','track',{});}catch(e){}}</script>"
                 + "<script src='https://www.youtube.com/iframe_api'></script>"
                 + "<script>function onYouTubeIframeAPIReady(){new YT.Player('p',{"
                 + "videoId:'"
                 + videoId
                 + "',width:'100%',height:'100%',"
                 + "playerVars:{autoplay:1,controls:0,rel:0,playsinline:1,"
-                + "disablekb:1,fs:0,iv_load_policy:3,modestbranding:1,origin:'"
+                + "disablekb:1,fs:0,iv_load_policy:3,cc_load_policy:0,modestbranding:1,origin:'"
                 + BASE_URL
                 + "'},"
-                + "events:{onReady:function(e){var y=e.target;ctrl({"
+                // cc_load_policy alone leaves captions on for an account that
+                // asks for them everywhere, so the module goes as well. It is
+                // not loaded yet at onReady and comes back with the video, so
+                // nocc runs again on every state change the player reports.
+                + "events:{onReady:function(e){var y=e.target;nocc(y);ctrl({"
                 + "pos:function(){return y.getCurrentTime();},"
                 + "dur:function(){return y.getDuration();},"
                 + "paused:function(){return y.getPlayerState()===YT.PlayerState.PAUSED;},"
                 + "seek:function(t){y.seekTo(t,true);},"
                 + "toggle:function(){if(y.getPlayerState()===YT.PlayerState.PLAYING)"
                 + "y.pauseVideo();else y.playVideo();}});},"
-                + "onStateChange:function(e){if(e.data===YT.PlayerState.ENDED)"
+                + "onStateChange:function(e){nocc(e.target);"
+                + "if(e.data===YT.PlayerState.ENDED)"
                 + BRIDGE
                 + ".onEnded();else osd();}}});}</script>";
     return "<html><head><meta name='viewport' content='width=device-width,initial-scale=1'>"

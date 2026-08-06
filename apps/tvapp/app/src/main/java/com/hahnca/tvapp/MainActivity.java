@@ -640,11 +640,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       case SHOWS:
         // Nothing is focused here, so up and down move the selected show
         // itself. The button column sits to the left; right plays a trailer
-        // only when cardMisc is showing trailers.
+        // when cardMisc is showing trailers, and is the way back to the head
+        // of the list when it is showing anything else.
         if (up) showList.moveSelection(-1);
         else if (down) showList.moveSelection(+1);
         else if (left) focusFilters();
-        else playCardTrailer();
+        else if (showList.isTrailerMode()) playCardTrailer();
+        else showList.scrollToTop();
         return;
 
       case FILTERS:

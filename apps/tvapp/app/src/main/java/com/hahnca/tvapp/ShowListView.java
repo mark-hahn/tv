@@ -386,6 +386,11 @@ class ShowListView extends ScrollView {
     return !show.trailersReady || !show.trailers.isEmpty();
   }
 
+  /** Whether the selected card is showing its trailers, which is what right acts on. */
+  boolean isTrailerMode() {
+    return miscMode == MiscMode.TRAILERS;
+  }
+
   String playActiveTrailer() {
     if (miscMode != MiscMode.TRAILERS || active == null || active.trailers.isEmpty()) return null;
     int index =
@@ -540,13 +545,9 @@ class ShowListView extends ScrollView {
     edgeFade.draw(canvas);
   }
 
-  /** What a tap on Up or Down does, as against holding it. */
+  /** Back to the head of the list, leaving the selection where it is. */
   void scrollToTop() {
     scrollTo(0, 0);
-  }
-
-  void scrollToBottom() {
-    scrollTo(0, Math.max(0, column.getHeight() - getHeight()));
   }
 
   /**

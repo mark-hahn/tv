@@ -3,12 +3,15 @@ package com.hahnca.tvapp;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Outline;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Shader;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.LayerDrawable;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.Layout;
@@ -18,6 +21,7 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -60,7 +64,17 @@ class ShowListView extends ScrollView {
   private static final float CARD_PAD_TOP_DP = CARD_PAD_V_DP / 2f;
   private static final float CARD_PAD_BOTTOM_DP = CARD_PAD_V_DP / 2f;
   private static final float CARD_GAP_DP = 3f;
-  private static final float CARD_SELECTED_BORDER_DP = CARD_GAP_DP;
+  // How far the card's own content sits inside the card body.
+  private static final float CARD_CONTENT_INSET_DP = 3f;
+  // The selection border is outside the content, and thick enough to fill the
+  // whole run from this card's content to the next card's: this card's inset,
+  // the gap between the two, and the next card's inset.
+  private static final float CARD_SELECTED_BORDER_DP =
+      2 * CARD_CONTENT_INSET_DP + CARD_GAP_DP;
+  // Which is more room than the card has, so the border draws this much past
+  // its edges.
+  private static final float CARD_BORDER_OVERHANG_DP =
+      CARD_SELECTED_BORDER_DP - CARD_CONTENT_INSET_DP;
   private static final float CARD_BODY_GAP_DP = 8f;
   private static final float LIST_PAD_DP = 12f;
   private static final float NAME_TEXT_SIZE_SP = 16.2f;
@@ -140,6 +154,10 @@ class ShowListView extends ScrollView {
 
   private static final String EMPTY_LABEL = "No Shows.";
 
+  // One jump of the page-skip mode, which stands in for letter-skip in the
+  // sorts where a show's first letter says nothing about where it sits.
+  private static final int PAGE_CARDS = 4;
+
   private final LinearLayout column;
   private final TextView emptyView;
   private final List<Shows.Show> shows = new ArrayList<>(); // everything loaded
@@ -206,6 +224,10 @@ class ShowListView extends ScrollView {
     // Nothing on the right: a card reaches its column's own edge, so the only
     // thing between it and the pane beside it is MainActivity's column gap.
     column.setPadding(pad, pad, 0, pad);
+    // The selected card's border draws past the card, over its neighbours and
+    // into the list's own padding at the two ends.
+    column.setClipChildren(false);
+    column.setClipToPadding(false);
     addView(
         column,
         new ScrollView.LayoutParams(
@@ -461,6 +483,27 @@ class ShowListView extends ScrollView {
     return true;
   }
 
+  /**
+   * Page-skip mode: the same held-key jump as letter-skip, for the sorts where
+   * the first letter is not what the list is in order of. Stops at the ends
+   * rather than refusing a jump that would run past them.
+   */
+  boolean moveSelectionByPage(int direction) {
+    if (visible.isEmpty()) return false;
+    int index = active == null ? 0 : visible.indexOf(active);
+    if (index < 0) index = 0;
+    int next = Math.max(0, Math.min(visible.size() - 1, index + direction * PAGE_CARDS));
+    if (next == index) return false;
+    setActive(visible.get(next), false);
+    scrollToActive();
+    return true;
+  }
+
+  /** Whether the list is in the one order a show's first letter can be skipped by. */
+  boolean isAlphaOrder() {
+    return customOrder == null && sort == Shows.Sort.ALPHA;
+  }
+
   private static String firstLetterKey(Shows.Show show) {
     String key = Shows.sortKey(show.name);
     return key.isEmpty() ? "" : key.substring(0, 1);
@@ -550,6 +593,13 @@ class ShowListView extends ScrollView {
     if (visible.isEmpty()) return;
     setActive(visible.get(0));
     scrollTo(0, 0);
+  }
+
+  /** The foot of the list, selection and all -- the mirror of selectFirst. */
+  void selectLast() {
+    if (visible.isEmpty()) return;
+    setActive(visible.get(visible.size() - 1));
+    scrollToActive();
   }
 
   /**
@@ -753,10 +803,31 @@ class ShowListView extends ScrollView {
       }
     }
     boolean isActive = show != null && show == active;
-    GradientDrawable bg = (GradientDrawable) card.getBackground();
-    bg.setColor(CARD_BG);
-    bg.setCornerRadius(dp(CARD_CORNER_DP));
-    bg.setStroke(isActive ? (int) dp(CARD_SELECTED_BORDER_DP) : 0, CARD_SELECTED_BORDER);
+    LayerDrawable bg = (LayerDrawable) card.getBackground();
+    GradientDrawable border = (GradientDrawable) bg.getDrawable(1);
+    border.setStroke(isActive ? (int) dp(CARD_SELECTED_BORDER_DP) : 0, CARD_SELECTED_BORDER);
+    // The border reaches over the card below, and that one is drawn after this
+    // one, so the selected card is lifted above its neighbours to stay whole.
+    card.setTranslationZ(isActive ? 1f : 0f);
+  }
+
+  /**
+   * The card body, and the selection border outside it. The border layer is
+   * inset negatively so it can draw past the card's own edges, which is the
+   * only way it reaches the content of the cards above and below. Its stroke
+   * is set by paint(); the body is layer 0, so the outline -- and with it the
+   * card's corner clipping -- still comes from the body alone.
+   */
+  private LayerDrawable newCardBackground() {
+    GradientDrawable body = new GradientDrawable();
+    body.setCornerRadius(dp(CARD_CORNER_DP));
+    body.setColor(CARD_BG);
+    GradientDrawable border = new GradientDrawable();
+    border.setCornerRadius(dp(CARD_CORNER_DP) + dp(CARD_BORDER_OVERHANG_DP));
+    LayerDrawable bg = new LayerDrawable(new Drawable[] {body, border});
+    int overhang = -(int) dp(CARD_BORDER_OVERHANG_DP);
+    bg.setLayerInset(1, overhang, overhang, overhang, overhang);
+    return bg;
   }
 
   private static boolean hasActor(Shows.Show show, String normalizedName) {
@@ -825,13 +896,22 @@ class ShowListView extends ScrollView {
     // A FrameLayout wrapper, not just the row itself, so the letter-skip
     // badge below can sit on top of the row without disturbing its layout.
     FrameLayout card = new FrameLayout(getContext());
-    int border = (int) dp(CARD_SELECTED_BORDER_DP);
-    card.setPadding(border, border, border, border);
-    GradientDrawable bg = new GradientDrawable();
-    bg.setCornerRadius(dp(CARD_CORNER_DP));
-    bg.setColor(CARD_BG);
-    card.setBackground(bg);
-    card.setClipToOutline(true);
+    int inset = (int) dp(CARD_CONTENT_INSET_DP);
+    card.setPadding(inset, inset, inset, inset);
+    card.setBackground(newCardBackground());
+    // Deliberately not clipped to its own outline: that clip would take the
+    // selection border back off at the card's edge, which is the one place it
+    // has to get past. The corner clipping the card used to do for the poster
+    // is outerRow's own now, and the outline is left as shape for the shadow
+    // alone -- transparent, so the lift in paint() casts none.
+    card.setOutlineProvider(
+        new ViewOutlineProvider() {
+          @Override
+          public void getOutline(View view, Outline outline) {
+            outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), dp(CARD_CORNER_DP));
+            outline.setAlpha(0f);
+          }
+        });
 
     ImageView poster = new ImageView(getContext());
     poster.setScaleType(ImageView.ScaleType.CENTER_CROP);
@@ -850,12 +930,19 @@ class ShowListView extends ScrollView {
 
     LinearLayout outerRow = new LinearLayout(getContext());
     outerRow.setOrientation(LinearLayout.HORIZONTAL);
+    // The body's corners, at the radius left of the card's own once the card's
+    // inset is taken off it, and what rounds the backdrop's outer corners.
+    GradientDrawable bodyBg = new GradientDrawable();
+    bodyBg.setCornerRadius(Math.max(0f, dp(CARD_CORNER_DP) - dp(CARD_CONTENT_INSET_DP)));
+    bodyBg.setColor(CARD_BG);
+    outerRow.setBackground(bodyBg);
+    outerRow.setClipToOutline(true);
     outerRow.addView(poster, new LinearLayout.LayoutParams(posterWidthPx, ViewGroup.LayoutParams.MATCH_PARENT));
     outerRow.addView(content, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
     card.addView(
       outerRow,
       new FrameLayout.LayoutParams(
-        ViewGroup.LayoutParams.MATCH_PARENT, cardHeightPx - 2 * border));
+        ViewGroup.LayoutParams.MATCH_PARENT, cardHeightPx - 2 * inset));
 
     TextView letter = new TextView(getContext());
     letter.setTextColor(CARD_TEXT_LIGHT);
@@ -891,7 +978,7 @@ class ShowListView extends ScrollView {
     if (show.watchedCount == show.episodeCount) {
       return "Viewed all";
     }
-    return "Viewed " + show.watchedCount;
+    return "Viewed " + show.watchedCount + " of " + show.episodeCount;
   }
 
   /** The year out of a "yyyy/MM/dd" date, or whatever was there if it is not one. */
@@ -1285,14 +1372,14 @@ class ShowListView extends ScrollView {
     int width = getWidth();
     if (width <= 0) width = getResources().getDisplayMetrics().widthPixels;
     int listPad = (int) dp(LIST_PAD_DP);
-    int cardChrome = 2 * (int) dp(CARD_SELECTED_BORDER_DP) + 2 * (int) dp(CARD_PAD_H_DP);
+    int cardChrome = 2 * (int) dp(CARD_CONTENT_INSET_DP) + 2 * (int) dp(CARD_PAD_H_DP);
     return Math.max(0, width - listPad - cardChrome - posterWidthPx);
   }
 
   /** From the bottom of the name row to the bottom of the card. */
   private int mediaCardHeight() {
     int chrome =
-        2 * (int) dp(CARD_SELECTED_BORDER_DP)
+        2 * (int) dp(CARD_CONTENT_INSET_DP)
             + (int) dp(CARD_PAD_TOP_DP)
             + (int) dp(CARD_PAD_BOTTOM_DP)
             + (int) dp(CARD_BODY_GAP_DP);

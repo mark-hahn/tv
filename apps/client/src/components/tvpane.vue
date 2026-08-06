@@ -474,14 +474,14 @@
         ▲
       </div>
       <div
-        :style="cellStyle('white', tvapprcMode ? 'info' : 'home')"
+        :style="cellStyle('white', tvapprcMode ? 'sort' : 'home')"
         @mousedown="startHomeHold"
         @mouseup="stopHomeHold"
         @mouseleave="stopHomeHold"
         @touchstart.prevent="startHomeHold"
         @touchend="stopHomeHold"
       >
-        <template v-if="tvapprcMode">Info</template>
+        <template v-if="tvapprcMode">Sort</template>
         <svg
           v-else
           width="1em"
@@ -545,14 +545,14 @@
         ▼
       </div>
       <div
-        :style="cellStyle('white', tvapprcMode ? 'sort' : 'skip')"
+        :style="cellStyle('white', tvapprcMode ? 'filter' : 'skip')"
         @mousedown="startSkipHold"
         @mouseup="stopSkipHold"
         @mouseleave="stopSkipHold"
         @touchstart.prevent="startSkipHold"
         @touchend="stopSkipHold"
       >
-        {{ tvapprcMode ? "Sort" : "Skip" }}
+        {{ tvapprcMode ? "Filter" : "Skip" }}
       </div>
       <!-- Row 4: vol-, vol+, mute -->
       <div
@@ -646,8 +646,8 @@ const MSG_TVAPP_DOWN = "d";
 const CMD_CLOSE_TO_EMBY = "b";
 const CMD_EMBY_SELECTED = "e";
 const CMD_KEY = "k";
-const CMD_KEY_INFO = "info";
 const CMD_KEY_SORT = "sort";
+const CMD_KEY_FILTER = "filter";
 
 const CELL_BASE = {
   borderRight: "3px solid #000",
@@ -1159,9 +1159,9 @@ export default {
     startHomeHold() {
       if (this.tvapprcMode) {
         this._dbStart(async () => {
-          this.flash("info");
-          const r = await this.sendKeyThrough(CMD_KEY_INFO, null);
-          if (!r.blocked) this.sendTvapprc(`${CMD_KEY},${CMD_KEY_INFO}`);
+          this.flash("sort");
+          const r = await this.sendKeyThrough(CMD_KEY_SORT, null);
+          if (!r.blocked) this.sendTvapprc(`${CMD_KEY},${CMD_KEY_SORT}`);
         });
         return;
       }
@@ -1461,10 +1461,12 @@ export default {
 
     startSkipHold() {
       if (this.tvapprcMode) {
+        // One message per click, no repeat: tvapp steps its own filter cursor
+        // on each one and activates the button it stops on.
         this._dbStart(async () => {
-          this.flash("sort");
-          const r = await this.sendKeyThrough(CMD_KEY_SORT, null);
-          if (!r.blocked) this.sendTvapprc(`${CMD_KEY},${CMD_KEY_SORT}`);
+          this.flash("filter");
+          const r = await this.sendKeyThrough(CMD_KEY_FILTER, null);
+          if (!r.blocked) this.sendTvapprc(`${CMD_KEY},${CMD_KEY_FILTER}`);
         });
         return;
       }

@@ -12,10 +12,9 @@ import org.java_websocket.server.WebSocketServer;
  *
  * From the remote:
  *
- *   k,&lt;key&gt;     one of up/down/left/right/ok/info/sort
- *   j,&lt;key&gt;     letter-skip variant of up/down -- sent instead of k while a
- *                  hold has been auto-repeating fast long enough to enter
- *                  letter-skip mode
+ *   k,&lt;key&gt;     one of up/down/left/right/ok/sort/filter
+ *   j,&lt;key&gt;     skip variant of up/down -- sent instead of k while a hold has
+ *                  been auto-repeating fast long enough to enter skip mode
  *   b              switch from tvapp to Emby, one level out at a time
  *   g              switch from tvapp to Emby right now, regardless of focus
  *   e              load the active show into Emby
@@ -27,9 +26,6 @@ import org.java_websocket.server.WebSocketServer;
  *
  * Back to Android:
  *
- *   i              the Filter button was clicked: open the filter input screen,
- *                  which is the only way it opens now that the remote has no
- *                  Filter button of its own
  *   z              the filter was cleared here: clear Android's filter box too
  *   c,<count>      the number of shows currently visible in the list
  *   a,&lt;name&gt;    the active show, so the phone's own show pane can open on it
@@ -38,7 +34,6 @@ class CtrlServer extends WebSocketServer {
 
   static final int CTRL_PORT = 8099;
 
-  static final String MSG_OPEN_FILTER = "i";
   static final String MSG_CLEAR_FILTER = "z";
   static final String MSG_COUNTS = "c";
   static final String MSG_ACTIVE_SHOW = "a";

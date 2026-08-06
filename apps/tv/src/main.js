@@ -2603,11 +2603,70 @@ async function sendTvappCommand(command) {
   return true;
 }
 
+// How long Emby is given to report the playback really over. Asking rather
+// than waiting a set time is the whole point: the stop takes as long as it
+// takes, and a back key sent while the player is still up is one the player
+// swallows -- the show is then left open, which is exactly the "sometimes"
+// this replaced.
+const EMBY_STOP_POLL_MS = 150;
+const EMBY_STOP_WAIT_MS = 4000;
+// On top of that, what the player's own exit off the screen takes after the
+// session it was playing has gone.
+const EMBY_STOP_SETTLE_MS = 700;
+// And then long enough for that key to have been delivered before tvapp is
+// launched over the top of it. A back key still in flight when tvapp takes the
+// screen is a back press tvapp answers, and it leaves for Emby again the
+// moment it arrives -- the show still open behind it, and the remote dropped
+// back out of tvapprc mode.
+const EMBY_BACK_SETTLE_MS = 1000;
+
+/** Resolves once Emby has no playback session left, or the wait runs out. */
+async function waitForEmbyStopped() {
+  const until = Date.now() + EMBY_STOP_WAIT_MS;
+  while (Date.now() < until) {
+    await sleep(EMBY_STOP_POLL_MS);
+    try {
+      if (!(await getEmbyPlaybackSession())) return true;
+    } catch (e) {
+      unilog(1923, `waiting on emby stop: ${e.message}`);
+    }
+  }
+  unilog(1924, `emby still playing ${EMBY_STOP_WAIT_MS}ms after stop`);
+  return false;
+}
+
+/**
+ * Emby keeps playing behind whatever comes up over it, so switching to tvapp
+ * means stopping the video first -- not pausing it: the Shows key is a move
+ * between the two apps, not a look away from a show still running. Stopping
+ * only drops Emby back onto the show it was playing, so a back key follows to
+ * close that too and leave Emby off the show entirely.
+ */
+async function closeEmbyShow() {
+  try {
+    const live = await getEmbyPlaybackSession();
+    if (!live?.Id) return;
+    await fetch(
+      `${EMBY_BASE_URL}/Sessions/${live.ControlSessionId}/Playing/Stop?api_key=${EMBY_API_KEY}`,
+      { method: "POST", headers: { Accept: "application/json" } },
+    );
+    await waitForEmbyStopped();
+    await sleep(EMBY_STOP_SETTLE_MS);
+    callService("remote", "send_command", REMOTE_ENTITY_ID, {
+      command: GOOGLE_KEY_MAP.back,
+    });
+    await sleep(EMBY_BACK_SETTLE_MS);
+  } catch (e) {
+    unilog(1919, `stop before tvapp open failed: ${e.message}`);
+  }
+}
+
 // Every place that starts tvapp fresh (as against tvapp already being up and
 // just wanting the focus back, see /tv/opentvapp) funnels through here so it
 // always comes up on lastRelevantShow rather than whatever it last happened
 // to have selected before it was closed. Resolves false if tvapp never came up.
 async function openTvappSelectingShow() {
+  await closeEmbyShow();
   await launchTvapp();
   const sock = await dialTvappUntilOpen(TVAPP_SELECT_DIAL_TIMEOUT_MS);
   if (!sock) {
@@ -2628,15 +2687,16 @@ app.post("/tv/clientShow", (req, res) => {
   res.json({ ok: true });
 });
 
-// The web remote's Shows button: closes tvapp if it's open, otherwise opens
-// it and selects lastRelevantShow. Every connected Android remote follows
-// along for free -- tvapp opening or closing is what flips their tvapprc
-// mode on and off already.
+// The web remote's Shows button: straight across between the two apps. From
+// tvapp it leaves for Emby playing the show tvapp was sitting on; from Emby it
+// stops what is playing and opens tvapp on lastRelevantShow. Every connected
+// Android remote follows along for free -- tvapp opening or closing is what
+// flips their tvapprc mode on and off already.
 app.post("/tv/toggletvapp", async (req, res) => {
   const openSock = await probeTvappOpen();
   if (openSock) {
     unilog(1851, `toggletvapp closing tvapp`);
-    openSock.send(CMD_BACK_TO_EMBY);
+    openSock.send(CMD_EMBY_SELECTED);
     openSock.close();
     res.json({ ok: true, action: "closed" });
     return;

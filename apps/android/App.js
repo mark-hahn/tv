@@ -47,23 +47,21 @@ const TVAPPRC_CONNECT_TIMEOUT_MS = 5000;
 const LOCAL_NETWORK_PERMISSION = "android.permission.ACCESS_LOCAL_NETWORK";
 const MSG_TVAPP_UP = "u";
 const MSG_TVAPP_DOWN = "d";
-const MSG_OPEN_FILTER = "i";
 const MSG_CLEAR_FILTER = "z";
 const MSG_COUNTS = "c";
 const MSG_ACTIVE_SHOW = "a";
 const CMD_OPEN_TVAPP = "o";
 const CMD_CLOSE_TO_EMBY = "b";
-const CMD_FORCE_CLOSE_TO_EMBY = "g";
 const CMD_EMBY_SELECTED = "e";
 const CMD_KEY = "k";
 // Letter-skip variant of CMD_KEY, up/down only -- sent instead of CMD_KEY
 // once a held key has been auto-repeating fast long enough that tvapp's show
 // list starts jumping by starting letter instead of by row.
 const CMD_KEY_LETTER = "j";
-// Not arrows: these step tvapp's tab and sort buttons, which the arrow keys
+// Not arrows: these step tvapp's sort and filter buttons, which the arrow keys
 // cannot reach -- neither group can be focused.
-const CMD_KEY_INFO = "info";
 const CMD_KEY_SORT = "sort";
+const CMD_KEY_FILTER = "filter";
 const CMD_FILTER = "f";
 const SCRUB_HOLD_DELAY_MS = 400;
 // tvapp arrow-key repeat: fast cadence once a hold clears the initial
@@ -563,9 +561,6 @@ export default function App() {
           clearTvapprcFilter();
           setTvapprcListCount(null);
           tvapprcActiveShowRef.current = null;
-        } else if (e.data === MSG_OPEN_FILTER) {
-          // tvapp's Filter button was clicked -- the only way this screen opens.
-          setShowTvapprcInput(true);
         } else if (e.data === MSG_CLEAR_FILTER) {
           clearTvapprcFilter();
         } else if (
@@ -977,21 +972,8 @@ export default function App() {
     }
   };
 
-  // The Shows button: unlike closeTvappToEmby, this always leaves tvapp for
-  // Emby right away regardless of which area has the focus there. Same as
-  // closeTvappToEmby, tvapprc mode itself still only ends on the bridge's
-  // tvapp-down message, the one thing that knows tvapp really left.
-  const forceCloseTvappToEmby = (flashKey = "shows") => {
-    flash(flashKey);
-    if (!sendTvapprc(CMD_FORCE_CLOSE_TO_EMBY)) {
-      fetch(`${TV_TV_URL}/tv/tvapprc/forceback`, { method: "POST" }).catch(
-        (e) => console.warn("tvapprc forceback failed", e),
-      );
-    }
-  };
-
   const embySelectedFromTvapp = async () => {
-    flash("emby");
+    flash("shows");
     if ((await sendKeyThrough("emby", null)).blocked) return;
     if (!sendTvapprc(CMD_EMBY_SELECTED)) {
       fetch(`${TV_TV_URL}/tv/tvapprc/emby`, { method: "POST" }).catch((e) =>
@@ -1002,8 +984,13 @@ export default function App() {
     closeTvapprcInput();
   };
 
+  /**
+   * The Shows key, straight across between the two apps: from tvapp it leaves
+   * for Emby playing the show it was sitting on, and from Emby it stops
+   * whatever is playing (tv-tv does that as part of opening) and comes back.
+   */
   const toggleTvapprcMode = () => {
-    if (tvapprcMode) forceCloseTvappToEmby("shows");
+    if (tvapprcMode) embySelectedFromTvapp();
     else openTvapp();
   };
 
@@ -1375,10 +1362,12 @@ export default function App() {
 
   const startSkipHold = () => {
     if (tvapprcMode) {
+      // One message per click, no repeat: tvapp steps its own filter cursor on
+      // each one and activates the button it stops on.
       dbStart(async () => {
-        flash("sort");
-        const r = await sendKeyThrough(CMD_KEY_SORT, null);
-        if (!r.blocked) sendTvapprc(`${CMD_KEY},${CMD_KEY_SORT}`);
+        flash("filter");
+        const r = await sendKeyThrough(CMD_KEY_FILTER, null);
+        if (!r.blocked) sendTvapprc(`${CMD_KEY},${CMD_KEY_FILTER}`);
       });
       return;
     }
@@ -1419,9 +1408,9 @@ export default function App() {
   const startHomeHold = () => {
     if (tvapprcMode) {
       dbStart(async () => {
-        flash("info");
-        const r = await sendKeyThrough(CMD_KEY_INFO, null);
-        if (!r.blocked) sendTvapprc(`${CMD_KEY},${CMD_KEY_INFO}`);
+        flash("sort");
+        const r = await sendKeyThrough(CMD_KEY_SORT, null);
+        if (!r.blocked) sendTvapprc(`${CMD_KEY},${CMD_KEY_SORT}`);
       });
       return;
     }
@@ -1495,7 +1484,12 @@ export default function App() {
 
   const startEmbyHold = () => {
     if (tvapprcMode) {
-      dbStart(embySelectedFromTvapp);
+      // The Text key: the filter input screen is this remote's own, so it just
+      // opens here. tvapp hears about it only as the text typed into it.
+      dbStart(() => {
+        flash("text");
+        setShowTvapprcInput(true);
+      });
       return;
     }
     armHold("emby", () =>
@@ -1698,13 +1692,13 @@ export default function App() {
       onPressOut: stopRepeat,
     },
     {
-      key: tvapprcMode ? "info" : "home",
-      label: tvapprcMode ? "Info" : null,
+      key: tvapprcMode ? "sort" : "home",
+      label: tvapprcMode ? "Sort" : null,
       smallText: tvapprcMode,
       icon: tvapprcMode ? null : (
         <MaterialIcons name="home" size={42} color="black" />
       ),
-      bg: () => cellBg("white", tvapprcMode ? "info" : "home"),
+      bg: () => cellBg("white", tvapprcMode ? "sort" : "home"),
       onPress: () => {},
       onPressIn: () => startHomeHold(),
       onPressOut: () => stopHomeHold(),
@@ -1736,10 +1730,10 @@ export default function App() {
     },
     // Row 3: emby, down, skip
     {
-      key: "emby",
-      label: "Emby",
+      key: tvapprcMode ? "text" : "emby",
+      label: tvapprcMode ? "Text" : "Emby",
       smallText: true,
-      bg: () => cellBg("white", "emby"),
+      bg: () => cellBg("white", tvapprcMode ? "text" : "emby"),
       onPress: () => {},
       onPressIn: () => startEmbyHold(),
       onPressOut: () => stopEmbyHold(),
@@ -1753,10 +1747,10 @@ export default function App() {
       onPressOut: stopRepeat,
     },
     {
-      key: tvapprcMode ? "sort" : "skip",
-      label: tvapprcMode ? "Sort" : "Skip",
+      key: tvapprcMode ? "filter" : "skip",
+      label: tvapprcMode ? "Filter" : "Skip",
       smallText: true,
-      bg: () => cellBg("white", tvapprcMode ? "sort" : "skip"),
+      bg: () => cellBg("white", tvapprcMode ? "filter" : "skip"),
       onPress: () => {},
       onPressIn: () => startSkipHold(),
       onPressOut: () => stopSkipHold(),

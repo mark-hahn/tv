@@ -121,6 +121,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private final Set<String> activeFilters = new HashSet<>();
 
   private CtrlServer ctrlServer;
+  private Updates updates;
   private ShowListView showList;
   private TextView filterLabel;
   private TrailerPlayer player;
@@ -202,16 +203,27 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     ctrlServer.start();
     if (showsLoadedAt != 0
         && System.currentTimeMillis() - showsLoadedAt > SHOWS_REFRESH_AFTER_MS) {
-      Shows.Show selected = showList.getSelected();
-      loadShows(selected == null ? null : selected.name);
+      reloadShows();
     }
+    // Only while on screen: a socket held open behind Emby would reload a list
+    // nobody is looking at, and tv-srvr would keep a client it cannot reach.
+    updates = new Updates(this::reloadShows);
+    updates.start();
   }
 
   @Override
   protected void onStop() {
     ctrlServer.shutdown();
     ctrlServer = null;
+    updates.stop();
+    updates = null;
     super.onStop();
+  }
+
+  /** Re-reads the list, keeping the selection on whatever show it is on. */
+  private void reloadShows() {
+    Shows.Show selected = showList.getSelected();
+    loadShows(selected == null ? null : selected.name);
   }
 
   private View buildUi() {
@@ -640,13 +652,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       case SHOWS:
         // Nothing is focused here, so up and down move the selected show
         // itself. The button column sits to the left; right plays a trailer
-        // when cardMisc is showing trailers, and is the way back to the head
-        // of the list when it is showing anything else.
+        // when cardMisc is showing trailers, and otherwise selects the first
+        // show and takes the list back to the top.
         if (up) showList.moveSelection(-1);
         else if (down) showList.moveSelection(+1);
         else if (left) focusFilters();
         else if (showList.isTrailerMode()) playCardTrailer();
-        else showList.scrollToTop();
+        else showList.selectFirst();
         return;
 
       case FILTERS:

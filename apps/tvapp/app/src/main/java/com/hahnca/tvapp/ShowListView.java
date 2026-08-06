@@ -545,8 +545,10 @@ class ShowListView extends ScrollView {
     edgeFade.draw(canvas);
   }
 
-  /** Back to the head of the list, leaving the selection where it is. */
-  void scrollToTop() {
+  /** Back to the head of the list, selection and all. */
+  void selectFirst() {
+    if (visible.isEmpty()) return;
+    setActive(visible.get(0));
     scrollTo(0, 0);
   }
 
@@ -665,6 +667,14 @@ class ShowListView extends ScrollView {
     dwellHandler.removeCallbacks(notifySelection);
     hideLetterBadge(old);
     paint(cards.get(old));
+    // The rotation belongs to the selected card, and there is none now. Without
+    // this the card just deselected keeps drawing whatever mode it was on --
+    // setActive cannot put it right afterwards, because by then it is not the
+    // old active any more. This is the path a sort change takes.
+    if (miscMode != MiscMode.DESC) {
+      miscMode = MiscMode.DESC;
+      renderMisc(old);
+    }
   }
 
   private void setActive(Shows.Show show) {

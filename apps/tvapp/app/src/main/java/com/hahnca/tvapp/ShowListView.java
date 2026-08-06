@@ -54,7 +54,7 @@ import org.json.JSONArray;
 class ShowListView extends ScrollView {
 
   private static final int CARD_BG = 0xFF2B2B2B;
-  private static final int CARD_SELECTED_BORDER = 0xFF0A4A8A;
+  private static final int CARD_SELECTED_BORDER = 0xFF4444cc;
   private static final int CARD_TEXT_LIGHT = 0xFFFFFFFF;
   private static final float CARD_CORNER_DP = 8f;
   private static final float CARD_PAD_H_DP = 14f;
@@ -131,7 +131,7 @@ class ShowListView extends ScrollView {
   private static final int ED_FILE = 3;
   private static final int ED_RES = 4;
   private static final int ED_POS = 6;
-  private static final int TRASH_ICON_COLOR = 0xFFB0B0B0;
+  private static final int TRASH_ICON_COLOR = 0xFFFF0000;
   private static final float TRASH_ICON_SIZE_DP = 16f;
   private static final float TRASH_ICON_STROKE_DP = 1.2f;
 
@@ -318,6 +318,8 @@ class ShowListView extends ScrollView {
    * unlike setSort/setCustomOrder/setActorFilter below which scramble the
    * order and so always drop back to the top.
    */
+  private long applyAt;
+
   void setActiveFilters(Set<String> labels) {
     if (activeFilters.equals(labels)) return;
     activeFilters.clear();
@@ -586,6 +588,7 @@ class ShowListView extends ScrollView {
    */
   private void loadVisibleMedia() {
     if (getHeight() == 0 || visible.isEmpty()) return;
+    android.util.Log.i("tvapp", "trash timing: loadVisibleMedia");
     int margin = (int) (getHeight() * MEDIA_PRELOAD);
     int top = getScrollY() - margin;
     int bottom = getScrollY() + getHeight() + margin;
@@ -669,6 +672,8 @@ class ShowListView extends ScrollView {
       }
       Collections.sort(visible, Shows.order(sort));
     }
+    applyAt = android.os.SystemClock.uptimeMillis();
+    android.util.Log.i("tvapp", "trash timing: apply visible=" + visible.size());
     column.removeAllViews();
     if (visible.isEmpty()) {
       LinearLayout.LayoutParams params =
@@ -686,6 +691,11 @@ class ShowListView extends ScrollView {
       params.bottomMargin = (int) dp(CARD_GAP_DP);
       column.addView(cards.get(show), params);
     }
+    android.util.Log.i(
+        "tvapp",
+        "trash timing: addView done in "
+            + (android.os.SystemClock.uptimeMillis() - applyAt)
+            + "ms");
     // A selected show the filter has just hidden lands on the nearest remaining
     // show above where it was -- not simply the new top of the list -- so a
     // filter typed while browsing does not fling the selection to the far end.

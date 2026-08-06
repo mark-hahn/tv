@@ -17,6 +17,7 @@ import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -48,8 +49,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // of clicks. It resets every way the show list can be narrowed: filter text,
   // the toggle filters below it, the actor filter, and custom sort.
   private static final String CLEAR_FILTER_LABEL = "Clear";
+  // The one filter that grows the list rather than narrowing it: every show
+  // that is not in Emby comes in with it, which is a rebuild long enough to be
+  // waited on rather than sat through.
+  private static final String TRASH_FILTER_LABEL = "Trash";
   private static final String[] FILTER_LABELS = {
-    CLEAR_FILTER_LABEL, "Ready", "Drama", "Comedy", "To Try", "Continue", "Mark", "Linda", "Trash"
+    CLEAR_FILTER_LABEL, "Ready", "Drama", "Comedy", "To Try", "Continue", "Mark", "Linda",
+    TRASH_FILTER_LABEL
   };
   private static final String SORT_WATCHED = "Watched";
   private static final String SORT_ADDED = "Added";
@@ -108,6 +114,17 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final String VIEWSHOW_URL = "https://hahnca.com/tv-tv/tv/viewshow";
   private static final int VIEWSHOW_TIMEOUT_MS = 10000;
   private static final String NO_FILE_TOAST = "No file.";
+  // Not a Toast: the wait is ten seconds and the longest toast is three and a
+  // half, so it went out well before the shows came in. This is a view of the
+  // app's own, up until it is taken down.
+  private static final String TRASH_WAIT_LABEL = "Waiting for trash";
+  private static final float LOADING_TEXT_SIZE_SP = 30f;
+  private static final int LOADING_BG = 0xE6000000;
+  private static final float LOADING_PAD_H_DP = 32f;
+  private static final float LOADING_PAD_V_DP = 20f;
+  // Drawn by this process, so the rebuild has to give way for a moment or the
+  // message the wait is for would not be up until the wait was over.
+  private static final long LOADING_HEAD_START_MS = 150;
   private static final String NOT_READY_TOAST =
       "Show not ready to watch. Use map to play an episode.";
   private static final float TOAST_TEXT_SCALE = 2f;
@@ -145,6 +162,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // Clear's brief lit-up confirmation that it ran, since it has no state of its
   // own to show.
   private boolean clearFlashing;
+  // Set off the ui thread as well as on it: keys are read on the socket thread,
+  // which is where one arriving mid-rebuild has to be dropped -- the ui thread
+  // is busy, and anything posted to it would only be answered afterwards, all
+  // at once.
+  private volatile boolean showsLoading;
+  private TextView loadingLabel;
   // The typed filter text, kept even while the actor filter is the one
   // actually showing in filterLabel, so clearing the actor filter can put the
   // typed text straight back up without re-deriving it.
@@ -157,6 +180,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private String activeShowName;
   private long showsLoadedAt;
   private long frontSince;
+  private long trashAt;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -235,6 +259,27 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     columns.addView(buildButtonColumn(), column(BUTTONS_WIDTH_FRACTION, 0));
     columns.addView(buildList(), column(LIST_WIDTH_FRACTION, dp(COLUMN_GAP_DP)));
     root.addView(columns, matchParent());
+
+    loadingLabel = new TextView(this);
+    loadingLabel.setText(TRASH_WAIT_LABEL);
+    loadingLabel.setTextColor(Color.WHITE);
+    loadingLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, LOADING_TEXT_SIZE_SP);
+    loadingLabel.setPadding(
+        (int) dp(LOADING_PAD_H_DP),
+        (int) dp(LOADING_PAD_V_DP),
+        (int) dp(LOADING_PAD_H_DP),
+        (int) dp(LOADING_PAD_V_DP));
+    GradientDrawable loadingBg = new GradientDrawable();
+    loadingBg.setCornerRadius(dp(BUTTON_CORNER_DP));
+    loadingBg.setColor(LOADING_BG);
+    loadingLabel.setBackground(loadingBg);
+    loadingLabel.setVisibility(View.GONE);
+    root.addView(
+        loadingLabel,
+        new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            Gravity.CENTER));
 
     player = new TrailerPlayer(this);
     // However the video came down -- played out, right, or back -- the strip
@@ -507,13 +552,78 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
         .start();
   }
 
+  /**
+   * The button answers on this frame and the list follows on the next one.
+   * Re-filtering is a rebuild of a column of hundreds of cards -- Trash worst
+   * of all, since it brings in every show that is not in Emby -- and doing it
+   * first holds up the very frame the button would have turned blue on.
+   */
   private void toggleFilter(String label) {
-    dropCustom(false);
-    applyActorFilter(null);
     if (activeFilters.contains(label)) activeFilters.remove(label);
     else activeFilters.add(label);
-    showList.setActiveFilters(activeFilters);
     repaintButtons();
+    boolean slow = TRASH_FILTER_LABEL.equals(label);
+    if (slow) { trashAt = SystemClock.uptimeMillis(); Log.i(TAG, "trash timing: activated"); }
+    if (slow) startShowsLoading();
+    ui.postDelayed(
+        () -> {
+          dropCustom(false);
+          applyActorFilter(null);
+          if (slow) Log.i(TAG, "trash timing: setActiveFilters in +" + since());
+          showList.setActiveFilters(activeFilters);
+          if (slow) Log.i(TAG, "trash timing: setActiveFilters out +" + since());
+          if (slow) endShowsLoadingWhenDrawn();
+        },
+        slow ? LOADING_HEAD_START_MS : 0);
+  }
+
+  /** The list is being rebuilt: say so, and let no key through until it is not. */
+  private void startShowsLoading() {
+    showsLoading = true;
+    loadingLabel.setVisibility(View.VISIBLE);
+  }
+
+  /**
+   * The shows are not up when setActiveFilters returns. The column has its new
+   * children by then, but measuring and laying out hundreds of cards is the
+   * pass after this one, and drawing them the pass after that -- so this waits
+   * for the pre-draw, which is the end of the layout, and then posts, which is
+   * the end of the draw that follows it. Ending any earlier left the toast
+   * gone a second before the list it was standing in for arrived.
+   */
+  private void endShowsLoadingWhenDrawn() {
+    ViewTreeObserver observer = showList.getViewTreeObserver();
+    observer.addOnPreDrawListener(
+        new ViewTreeObserver.OnPreDrawListener() {
+          @Override
+          public boolean onPreDraw() {
+            showList.getViewTreeObserver().removeOnPreDrawListener(this);
+            Log.i(TAG, "trash timing: preDraw +" + since());
+            showList.post(
+                () -> {
+                  Log.i(TAG, "trash timing: afterDraw +" + since());
+                  endShowsLoading();
+                });
+            return true;
+          }
+        });
+  }
+
+  private void endShowsLoading() {
+    showsLoading = false;
+    loadingLabel.setVisibility(View.GONE);
+  }
+
+  /**
+   * Whether this key is one the show list answers, and so one there is no
+   * answering while the list is being rebuilt. Back and the rest still work.
+   */
+  private static boolean blockedWhileLoading(String key) {
+    return "ok".equals(key)
+        || "up".equals(key)
+        || "down".equals(key)
+        || "left".equals(key)
+        || "right".equals(key);
   }
 
   /** The Clear button: every way the show list can be narrowed, all at once. */
@@ -576,6 +686,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     sendActiveShow();
     TrailerList.settle(show, () -> showList.onTrailersReady(show));
     prefs().edit().putString(KEY_SELECTED_SHOW, show.name).apply();
+  }
+
+  private String since() {
+    return (SystemClock.uptimeMillis() - trashAt) + "ms";
   }
 
   private SharedPreferences prefs() {
@@ -777,6 +891,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   @Override
   public void onRemoteKey(String key) {
+    if (showsLoading && blockedWhileLoading(key)) return;
     ui.post(
         () -> {
           bumpKeepAwake();
@@ -786,6 +901,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   @Override
   public void onRemoteKeyLetter(String key) {
+    if (showsLoading && blockedWhileLoading(key)) return;
     ui.post(
         () -> {
           bumpKeepAwake();
@@ -914,7 +1030,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       if ("back".equals(key)) {
         if (SystemClock.uptimeMillis() - frontSince < BACK_DEAF_ON_FRONT_MS) return true;
         handleBack();
-      } else handleRemoteKey(key);
+      } else if (!showsLoading || !blockedWhileLoading(key)) handleRemoteKey(key);
     }
     return true;
   }

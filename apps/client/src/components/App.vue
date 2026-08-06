@@ -1208,10 +1208,7 @@ export default {
         try {
           await srvr.setTvdbFields({ name: show.name, needsIntro: true });
         } catch (e) {
-          logHere(
-            { lvl: "error" },
-            `setTvdbFields needsIntro failed for ${show.name}: ${e.message}`,
-          );
+          unilog(1928, `setTvdbFields needsIntro failed for ${show.name}: ${e.message}`);
         }
       }
       // Emby's player is used whenever the episode is in Emby — its intro

@@ -1735,7 +1735,7 @@ export default function App() {
     // Row 3: emby, down, skip
     {
       key: tvapprcMode ? "text" : "emby",
-      label: tvapprcMode ? "Text" : "Emby",
+      label: tvapprcMode ? "Search" : "Emby",
       smallText: true,
       bg: () => cellBg("white", tvapprcMode ? "text" : "emby"),
       onPress: () => {},
@@ -1790,7 +1790,7 @@ export default function App() {
     // Row 5: shows, apps, google
     {
       key: "shows",
-      label: "Shows",
+      label: tvapprcMode ? "Play" : "Shows",
       smallText: true,
       bg: () =>
         flashBtn === "shows" ? "orange" : tvapprcMode ? "lightblue" : "white",

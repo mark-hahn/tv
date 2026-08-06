@@ -282,12 +282,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
             Gravity.CENTER));
 
     player = new TrailerPlayer(this);
-    // However the video came down -- played out, right, or back -- the strip
-    // moves the cursor on to the next trailer.
-    player.setOpenListener(
-        open -> {
-          if (!open) showList.highlightNextTrailerAfterPlayed();
-        });
     root.addView(player, matchParent());
     return root;
   }
@@ -325,6 +319,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
     showList = new ShowListView(this);
     showList.setFilterTextListener(this::updateFilterLabel);
+    showList.setActorFilterListener(this::chooseActorFilter);
     column.addView(
         showList, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
     return column;
@@ -620,6 +615,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    */
   private static boolean blockedWhileLoading(String key) {
     return "ok".equals(key)
+        || "oklong".equals(key)
         || "up".equals(key)
         || "down".equals(key)
         || "left".equals(key)
@@ -661,17 +657,27 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     sendToPhone(CtrlServer.MSG_ACTIVE_SHOW + "," + activeShowName);
   }
 
-  private void actorClick(String actorName) {
+  /**
+   * The Actors cardMisc picking an actor: every other way the list was narrowed
+   * comes off first, exactly as the Clear button takes them off, and the actor
+   * name goes up over the list in their place. Null is that filter coming back
+   * off again, which the ok key does on its way to the next cardMisc.
+   *
+   * The selection is kept: the actor chosen comes from the selected show's own
+   * cast, so that show is in the narrowed list and stays the one cardMisc is
+   * showing.
+   */
+  private void chooseActorFilter(String actorName) {
     if (actorName == null) {
       applyActorFilter(null);
       return;
     }
-    // Keeping the selection: the actor clicked comes from the selected show's
-    // own cast, so that show is in the narrowed list and stays the one every
-    // pane -- the Actors pane the click was made in above all -- is showing.
     dropCustom(true);
+    activeFilters.clear();
+    showList.setActiveFilters(activeFilters);
     clearTextFilter();
     applyActorFilter(actorName);
+    repaintButtons();
   }
 
   /** Sets the actor filter on the show list and keeps filterLabel in step. */
@@ -773,32 +779,44 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   /**
-   * Every arrow key, in one place. Nothing is focused: up and down move the
-   * selected show itself, left and right jump the list to its two ends, and
-   * right gives way to the trailer it would play when cardMisc is showing
-   * trailers.
+   * Every arrow key, in one place. Up and down move the selected show itself;
+   * left and right belong to cardMisc, whatever it is showing, and reach
+   * nothing else.
    */
   private void moveSelection(String direction) {
     if ("up".equals(direction)) showList.moveSelection(-1);
     else if ("down".equals(direction)) showList.moveSelection(+1);
-    else if ("left".equals(direction)) showList.selectLast();
-    else if ("right".equals(direction)) {
-      if (showList.isTrailerMode()) playCardTrailer();
-      else showList.selectFirst();
-    }
+    else if ("left".equals(direction)) showList.moveInCardMisc(-1);
+    else if ("right".equals(direction)) showList.moveInCardMisc(+1);
   }
 
-  private void playCardTrailer() {
-    String url = showList.playActiveTrailer();
-    if (url == null) return;
-    sendUnmute();
-    player.play(url);
-  }
-
+  /**
+   * The phone's Play key, which plays whatever cardMisc has stepped down to: a
+   * trailer under the cursor, the episode under it, or -- with cardMisc at none
+   * of those -- the selected show itself, from wherever Emby left off.
+   */
   private void embyClick() {
+    String trailerUrl = showList.focusedTrailerUrl();
+    if (trailerUrl != null) {
+      sendUnmute();
+      player.play(trailerUrl);
+      return;
+    }
     Shows.Show show = showList.getSelected();
     if (show == null) {
       backToEmby();
+      return;
+    }
+    if (showList.hasEpisodeFocus()) {
+      // A named episode gets past Emby's own next-up choice, so the show's
+      // readiness does not come into it -- but an episode with no file has
+      // nothing at all to play.
+      String episodeId = showList.focusedEpisodeId();
+      if (episodeId == null) {
+        showBigCenterToast(NO_FILE_TOAST);
+        return;
+      }
+      playInEmby(show, episodeId);
       return;
     }
     if (!show.hasFile) {
@@ -809,6 +827,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       showBigCenterToast(NOT_READY_TOAST);
       return;
     }
+    playInEmby(show, null);
+  }
+
+  private void playInEmby(Shows.Show show, String episodeId) {
     new Thread(
             () -> {
               try {
@@ -818,6 +840,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
                         + URLEncoder.encode(show.id, "UTF-8")
                         + "&showName="
                         + URLEncoder.encode(show.name, "UTF-8")
+                        + (episodeId == null
+                            ? ""
+                            : "&episodeId=" + URLEncoder.encode(episodeId, "UTF-8"))
                         + "&play=1";
                 HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
                 conn.setConnectTimeout(VIEWSHOW_TIMEOUT_MS);
@@ -997,6 +1022,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       return;
     }
     if ("ok".equals(key)) showList.rotateCardMisc();
+    else if ("oklong".equals(key)) showList.okLongPress();
     else if ("sort".equals(key)) cycleSort();
     else if ("filter".equals(key)) filterKeyClick();
     else moveSelection(key);

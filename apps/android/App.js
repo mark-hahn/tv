@@ -935,6 +935,14 @@ export default function App() {
     await sendKeyThrough(key, `/tv/key/${key}`);
   };
 
+  // A tvapp key that is not one of this remote's own button names, so the
+  // button to flash and the collision gate's key have to be named separately.
+  const tvapprcKey = async (key, flashKey) => {
+    flash(flashKey);
+    const r = await sendKeyThrough(flashKey, null);
+    if (!r.blocked) sendTvapprc(`${CMD_KEY},${key}`);
+  };
+
   const closeTvapprcInput = () => {
     setShowTvapprcInput(false);
     Keyboard.dismiss();
@@ -1428,11 +1436,23 @@ export default function App() {
     lpStop();
   };
 
+  // In tvapprc mode the ok key has two meanings: clicked it rotates tvapp's
+  // cardMisc, held it steps one level down into whatever cardMisc is showing.
   const startOkHold = () => {
     stopRepeat();
+    if (tvapprcMode) {
+      lpStart(
+        () => tvKey("ok"),
+        () => tvapprcKey("oklong", "ok"),
+      );
+      return;
+    }
     dbStart(() => tvKey("ok"));
   };
-  const stopOkHold = () => dbStop();
+  const stopOkHold = () => {
+    dbStop();
+    lpStop();
+  };
 
   const startMuteHold = () => dbStart(() => tvCmd("mute"));
   const stopMuteHold = () => dbStop();

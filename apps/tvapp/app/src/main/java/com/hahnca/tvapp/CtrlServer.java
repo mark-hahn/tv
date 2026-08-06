@@ -12,7 +12,8 @@ import org.java_websocket.server.WebSocketServer;
  *
  * From the remote:
  *
- *   k,&lt;key&gt;     one of up/down/left/right/ok/sort/filter
+ *   k,&lt;key&gt;     one of up/down/left/right/ok/oklong/sort/filter --
+ *                  oklong being the ok key held rather than clicked
  *   j,&lt;key&gt;     skip variant of up/down -- sent instead of k while a hold has
  *                  been auto-repeating fast long enough to enter skip mode
  *   b              switch from tvapp to Emby, one level out at a time

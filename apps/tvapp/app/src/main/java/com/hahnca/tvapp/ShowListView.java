@@ -15,8 +15,11 @@ import android.graphics.drawable.LayerDrawable;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.Layout;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
 import android.text.TextPaint;
 import android.text.TextUtils;
+import android.text.style.StyleSpan;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -114,8 +117,10 @@ class ShowListView extends ScrollView {
   // it is rather than sitting there as an empty box.
   private static final int TRAILER_IMDB_BG = 0xFF000000;
   private static final String TRAILER_IMDB_LABEL = "IMDB";
-  private static final int TRAILER_HIGHLIGHT_BORDER = 0xFFFF0000;
-  private static final float TRAILER_HIGHLIGHT_BORDER_DP = 3f;
+  // The cursor inside cardMisc -- the focused episode cell, actor card or
+  // trailer card. Red, so it is never mistaken for the selected card's blue.
+  private static final int FOCUS_BORDER = 0xFFFF0000;
+  private static final float FOCUS_BORDER_DP = 3f;
   private static final float ACTOR_NAME_TEXT_SIZE_SP = 10.8f;
   private static final float ACTOR_NAME_GAP_DP = 6f;
   private static final float MAP_SEASON_WIDTH_DP = 26f;
@@ -128,9 +133,16 @@ class ShowListView extends ScrollView {
   private static final int MAP_CELL_BORDER = 0xFFCCCCCC;
   private static final int ED_AIRED = 0;
   private static final int ED_WATCHED = 1;
+  private static final int ED_ID = 2;
   private static final int ED_FILE = 3;
   private static final int ED_RES = 4;
   private static final int ED_POS = 6;
+  // One left/right press of the description, which has no cursor to move: a
+  // couple of lines, so a held key runs down it at a readable rate.
+  private static final int DESC_SCROLL_LINES = 2;
+  // One left/right press of an actor or trailer strip in its plain sub-mode,
+  // where again there is no cursor -- about a card and its gap.
+  private static final float STRIP_SCROLL_DP = 120f;
   private static final int TRASH_ICON_COLOR = 0xFFFF0000;
   private static final float TRASH_ICON_SIZE_DP = 16f;
   private static final float TRASH_ICON_STROKE_DP = 1.2f;
@@ -145,6 +157,15 @@ class ShowListView extends ScrollView {
 
   interface FilterTextListener {
     void onFilterText(String text);
+  }
+
+  /**
+   * The Actors cardMisc narrowing the show list to one actor's shows, and every
+   * later thing that widens it again -- both of which are the activity's to do,
+   * since the filter buttons and the label above the list are its.
+   */
+  interface ActorFilterListener {
+    void onActorFilter(String actorName);
   }
 
   // The panes only follow the selection once it has stopped moving for this
@@ -170,7 +191,6 @@ class ShowListView extends ScrollView {
   private final Map<Shows.Show, FrameLayout> miscViews = new HashMap<>();
   private final Map<Shows.Show, List<MediaRequest>> mediaRequests = new HashMap<>();
   private final Set<MediaRequest> requestedMedia = new HashSet<>();
-  private final Map<Shows.Show, List<View>> trailerCardViews = new HashMap<>();
   private final Map<Shows.Show, ImageView> posters = new HashMap<>();
   private final Set<Shows.Show> requestedPosters = new HashSet<>();
   // The big letter overlay on the right of each row, shown only on the active
@@ -180,6 +200,7 @@ class ShowListView extends ScrollView {
   private SelectionListener listener;
   private CountsListener countsListener;
   private FilterTextListener filterTextListener;
+  private ActorFilterListener actorFilterListener;
   private int lastVisibleCount = -1;
   private Shows.Show active;
   private final Handler dwellHandler = new Handler(Looper.getMainLooper());
@@ -211,8 +232,26 @@ class ShowListView extends ScrollView {
   // What the name row stands at, which is what cardMisc starts below.
   private final int nameLineHeightPx;
   private MiscMode miscMode = MiscMode.DESC;
-  private int trailerHighlightIndex = -1;
-  private int trailerLastPlayedIndex = -1;
+  // How far into the mode cardMisc is: every mode starts at NONE, and the ok
+  // key held steps it one deeper. Only the selected card ever leaves NONE.
+  private SubMode subMode = SubMode.NONE;
+  // The description of the selected card, which left and right scroll.
+  private TextView descView;
+  // The actor or trailer strip of the selected card, which left and right
+  // scroll while its mode is at SubMode.NONE.
+  private android.widget.HorizontalScrollView strip;
+  // The strip's cards, and which of them the cursor is on -- actors or
+  // trailers, whichever cardMisc is showing -- or -1 while there is no cursor.
+  private final List<View> stripCards = new ArrayList<>();
+  private int focusIndex = -1;
+  // Which season row the Map mode is showing, as an index into the show's own
+  // seasons rather than a season number, and which episode of it the cursor is
+  // on once the mode is past SubMode.NONE.
+  private int mapSeasonIndex;
+  private int mapEpisodeIndex;
+  // The episode card, which covers the selected show's card while Map is at
+  // SubMode.CARD.
+  private View episodeCard;
   private String todayKey = todayKey();
 
   ShowListView(Context context) {
@@ -259,6 +298,10 @@ class ShowListView extends ScrollView {
     this.filterTextListener = listener;
   }
 
+  void setActorFilterListener(ActorFilterListener listener) {
+    this.actorFilterListener = listener;
+  }
+
   /**
    * Substring of the name, case ignored -- what the phone's filter input screen
    * types. Leaves customOrder and actorFilter alone either way: everything that
@@ -283,11 +326,11 @@ class ShowListView extends ScrollView {
     miscViews.clear();
     mediaRequests.clear();
     requestedMedia.clear();
-    trailerCardViews.clear();
     posters.clear();
     requestedPosters.clear();
     letterBadges.clear();
     byName.clear();
+    hideEpisodeCard();
     column.removeAllViews();
     for (Shows.Show show : shows) byName.put(show.name, show);
     for (Shows.Show show : shows) {
@@ -297,8 +340,7 @@ class ShowListView extends ScrollView {
     dwellHandler.removeCallbacks(notifySelection);
     active = null;
     pinned = null;
-    trailerHighlightIndex = -1;
-    trailerLastPlayedIndex = -1;
+    resetSubMode();
     for (Shows.Show show : shows) {
       if (show.name.equals(selectedName)) {
         // Pinned before it is made active, so setActive below leaves the pin
@@ -397,24 +439,90 @@ class ShowListView extends ScrollView {
   }
 
   /**
-   * The next mode, for the selected show alone -- every other card stays on its
-   * description. A show with no trailers has no trailer step: the mode is
-   * stepped past it rather than landing on an empty strip.
+   * The ok key: the next cardMisc mode for the selected show alone -- every
+   * other card stays on its description -- back at the shallow end of it,
+   * whatever sub-mode the one being left had been stepped into. A show with no
+   * trailers has no trailer step: the mode is stepped past it rather than
+   * landing on an empty strip.
+   *
+   * Rotating is also the way out of the actor filter, which is one of the
+   * things a sub-mode can leave behind on the whole show list.
    */
   void rotateCardMisc() {
     if (active == null) return;
+    if (actorFilter != null && actorFilterListener != null) {
+      actorFilterListener.onActorFilter(null);
+      if (active == null) return;
+    }
+    resetSubMode();
     MiscMode[] modes = MiscMode.values();
     miscMode = modes[(miscMode.ordinal() + 1) % modes.length];
     if (miscMode == MiscMode.TRAILERS && !hasTrailers(active)) {
       miscMode = modes[(miscMode.ordinal() + 1) % modes.length];
     }
-    // The trailers come up with the first one already under the cursor, so
-    // right plays it with no step in between. Nothing is under the cursor in
-    // any other mode.
-    trailerHighlightIndex = miscMode == MiscMode.TRAILERS ? 0 : -1;
-    trailerLastPlayedIndex = -1;
+    if (miscMode == MiscMode.MAP) mapSeasonIndex = defaultSeasonIndex(active);
     renderMisc(active);
     loadVisibleMedia();
+  }
+
+  /**
+   * The ok key held: one step deeper into the mode cardMisc is already showing.
+   * Each mode has its own steps, and the deepest step of each simply stays put.
+   */
+  void okLongPress() {
+    if (active == null) return;
+    if (miscMode == MiscMode.MAP) {
+      if (subMode == SubMode.NONE) {
+        subMode = SubMode.FOCUS;
+        mapEpisodeIndex = 0;
+      } else if (subMode == SubMode.FOCUS) {
+        subMode = SubMode.CARD;
+      } else {
+        return;
+      }
+      renderMisc(active);
+      loadVisibleMedia();
+      return;
+    }
+    if (miscMode == MiscMode.ACTORS) {
+      if (subMode == SubMode.NONE) {
+        subMode = SubMode.FOCUS;
+        focusIndex = stripCards.isEmpty() ? -1 : 0;
+        paintStripFocus();
+        scrollFocusIntoView();
+        return;
+      }
+      // The focused actor's own shows, which is a filter over the whole list
+      // rather than anything cardMisc can do by itself.
+      String name = focusedActorName();
+      if (name != null && actorFilterListener != null) actorFilterListener.onActorFilter(name);
+      return;
+    }
+    if (miscMode == MiscMode.TRAILERS && subMode == SubMode.NONE) {
+      subMode = SubMode.FOCUS;
+      focusIndex = stripCards.isEmpty() ? -1 : 0;
+      paintStripFocus();
+      scrollFocusIntoView();
+    }
+  }
+
+  /**
+   * The left and right keys, which reach cardMisc and nothing else: what they
+   * do is whatever the mode showing has to move through. direction is -1 for
+   * left and +1 for right, back and forward through all of them.
+   */
+  void moveInCardMisc(int direction) {
+    if (active == null) return;
+    if (miscMode == MiscMode.DESC) {
+      scrollDesc(direction);
+    } else if (miscMode == MiscMode.MAP) {
+      if (subMode == SubMode.NONE) stepSeason(direction);
+      else stepEpisode(direction);
+    } else if (subMode == SubMode.NONE) {
+      scrollStrip(direction);
+    } else {
+      stepStripFocus(direction);
+    }
   }
 
   /** Whether the trailer step is worth stopping on for this show. */
@@ -422,40 +530,24 @@ class ShowListView extends ScrollView {
     return !show.trailersReady || !show.trailers.isEmpty();
   }
 
-  /** Whether the selected card is showing its trailers, which is what right acts on. */
-  boolean isTrailerMode() {
-    return miscMode == MiscMode.TRAILERS;
+  /** The trailer under the cursor, which is the only one the play key plays. */
+  String focusedTrailerUrl() {
+    if (miscMode != MiscMode.TRAILERS || subMode == SubMode.NONE || active == null) return null;
+    if (focusIndex < 0 || focusIndex >= active.trailers.size()) return null;
+    return active.trailers.get(focusIndex).url;
   }
 
-  String playActiveTrailer() {
-    if (miscMode != MiscMode.TRAILERS || active == null || active.trailers.isEmpty()) return null;
-    int index =
-        trailerHighlightIndex >= 0 && trailerHighlightIndex < active.trailers.size()
-            ? trailerHighlightIndex
-            : 0;
-    trailerLastPlayedIndex = index;
-    return active.trailers.get(index).url;
+  /** Whether an episode of the selected show is the thing the play key plays. */
+  boolean hasEpisodeFocus() {
+    return miscMode == MiscMode.MAP && subMode != SubMode.NONE && active != null;
   }
 
-  /**
-   * The cursor moves on once a trailer has come down, however it came down --
-   * played out, or closed with right or back. It wraps at the end of the strip
-   * rather than stopping there.
-   */
-  void highlightNextTrailerAfterPlayed() {
-    if (active == null || trailerLastPlayedIndex < 0) return;
-    int played = trailerLastPlayedIndex;
-    trailerLastPlayedIndex = -1;
-    int count = trailerCount(active);
-    if (count <= 1) return;
-    trailerHighlightIndex = (played + 1) % count;
-    paintTrailerCards(active);
-  }
-
-  /** The trailers on the strip, which is what the cursor has to move over. */
-  private int trailerCount(Shows.Show show) {
-    List<View> cardsForShow = trailerCardViews.get(show);
-    return cardsForShow != null ? cardsForShow.size() : show.trailers.size();
+  /** Emby's own id for the episode under the cursor, or null when it has none. */
+  String focusedEpisodeId() {
+    JSONArray tuple = focusedEpisodeTuple();
+    if (tuple == null) return null;
+    String id = tuple.optString(ED_ID, "");
+    return id.isEmpty() || "0".equals(id) ? null : id;
   }
 
   void onTrailersReady(Shows.Show show) {
@@ -628,20 +720,6 @@ class ShowListView extends ScrollView {
     edgeFade.draw(canvas);
   }
 
-  /** Back to the head of the list, selection and all. */
-  void selectFirst() {
-    if (visible.isEmpty()) return;
-    setActive(visible.get(0));
-    scrollTo(0, 0);
-  }
-
-  /** The foot of the list, selection and all -- the mirror of selectFirst. */
-  void selectLast() {
-    if (visible.isEmpty()) return;
-    setActive(visible.get(visible.size() - 1));
-    scrollToActive();
-  }
-
   /**
    * Rebuilds the column from the current filter and sort. The cards themselves
    * are built once and only ever re-ordered here, so this costs a layout pass
@@ -759,7 +837,6 @@ class ShowListView extends ScrollView {
     pinned = null;
     if (active == null) return;
     Shows.Show old = active;
-    clearTrailerHighlight(old);
     active = null;
     dwellHandler.removeCallbacks(notifySelection);
     hideLetterBadge(old);
@@ -768,6 +845,7 @@ class ShowListView extends ScrollView {
     // this the card just deselected keeps drawing whatever mode it was on --
     // setActive cannot put it right afterwards, because by then it is not the
     // old active any more. This is the path a sort change takes.
+    resetSubMode();
     if (miscMode != MiscMode.DESC) {
       miscMode = MiscMode.DESC;
       renderMisc(old);
@@ -789,7 +867,6 @@ class ShowListView extends ScrollView {
     // The pin belongs to one show, and only while it is the selected one.
     if (show != pinned) pinned = null;
     Shows.Show old = active;
-    clearTrailerHighlight(old);
     active = show;
     if (old != null) {
       hideLetterBadge(old);
@@ -798,11 +875,14 @@ class ShowListView extends ScrollView {
     paint(cards.get(show));
     // Moving the selection puts the rotation back to the start, so every card
     // is on its description again: the one being left is redrawn to drop the
-    // mode it was showing, and the one arrived at is already there.
-    if (miscMode != MiscMode.DESC) {
-      miscMode = MiscMode.DESC;
-      if (old != null) renderMisc(old);
-    }
+    // mode it was showing. The one arrived at is redrawn too, even though its
+    // description is already what it is showing -- that is what hands the left
+    // and right keys the description they are to scroll.
+    resetSubMode();
+    boolean wasRotated = miscMode != MiscMode.DESC;
+    miscMode = MiscMode.DESC;
+    if (old != null && wasRotated) renderMisc(old);
+    renderMisc(show);
     dwellHandler.removeCallbacks(notifySelection);
     if (notifyNow) notifySelection.run();
     else dwellHandler.postDelayed(notifySelection, PANE_DWELL_MS);
@@ -1049,7 +1129,6 @@ class ShowListView extends ScrollView {
   private void renderAllMisc() {
     mediaRequests.clear();
     requestedMedia.clear();
-    trailerCardViews.clear();
     for (Shows.Show show : shows) renderMisc(show);
   }
 
@@ -1066,12 +1145,162 @@ class ShowListView extends ScrollView {
     // views would be left waiting on requests that have already been made.
     List<MediaRequest> old = mediaRequests.remove(show);
     if (old != null) requestedMedia.removeAll(old);
-    trailerCardViews.remove(show);
     MiscMode mode = show == active ? miscMode : MiscMode.DESC;
+    // The views left and right act on belong to the selected card alone, and
+    // are gone the moment that card is drawn again.
+    if (show == active) {
+      descView = null;
+      strip = null;
+      stripCards.clear();
+      hideEpisodeCard();
+    }
     if (mode == MiscMode.DESC) renderDescMisc(show, misc);
     else if (mode == MiscMode.MAP) renderMapMisc(show, misc);
     else if (mode == MiscMode.ACTORS) renderActorsMisc(show, misc);
     else renderTrailersMisc(show, misc);
+    if (show == active && mode == MiscMode.MAP && subMode == SubMode.CARD) showEpisodeCard();
+  }
+
+  /**
+   * Back to the shallow end of whatever mode cardMisc is on, and with it the
+   * views the left and right keys were acting on -- whatever is drawn next puts
+   * back the ones it has.
+   */
+  private void resetSubMode() {
+    subMode = SubMode.NONE;
+    focusIndex = -1;
+    mapEpisodeIndex = 0;
+    descView = null;
+    strip = null;
+    stripCards.clear();
+    hideEpisodeCard();
+  }
+
+  /**
+   * The focused episode's own card, which covers the selected show's card
+   * exactly -- same size, same place -- rather than taking room of its own.
+   * Rebuilt from scratch on every move, since a move is a different episode.
+   */
+  private void showEpisodeCard() {
+    hideEpisodeCard();
+    if (active == null) return;
+    int season = focusedSeason();
+    if (season < 0) return;
+    View card = cards.get(active);
+    if (!(card instanceof FrameLayout)) return;
+    episodeCard = buildEpisodeCard(active, season, mapEpisodeIndex + 1);
+    int inset = (int) dp(CARD_CONTENT_INSET_DP);
+    ((FrameLayout) card)
+        .addView(
+            episodeCard,
+            new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, cardHeightPx - 2 * inset));
+  }
+
+  private void hideEpisodeCard() {
+    if (episodeCard == null) return;
+    ViewGroup parent = (ViewGroup) episodeCard.getParent();
+    if (parent != null) parent.removeView(episodeCard);
+    episodeCard = null;
+  }
+
+  /**
+   * The same parts as the web client's episode pane under its map -- the still,
+   * the aired date, the description -- laid out as the show card it replaces:
+   * the still where the backdrop was, and a header line where the name was.
+   */
+  private View buildEpisodeCard(Shows.Show show, int season, int episode) {
+    LinearLayout outerRow = new LinearLayout(getContext());
+    outerRow.setOrientation(LinearLayout.HORIZONTAL);
+    GradientDrawable bodyBg = new GradientDrawable();
+    bodyBg.setCornerRadius(Math.max(0f, dp(CARD_CORNER_DP) - dp(CARD_CONTENT_INSET_DP)));
+    bodyBg.setColor(CARD_BG);
+    outerRow.setBackground(bodyBg);
+    outerRow.setClipToOutline(true);
+
+    ImageView still = new ImageView(getContext());
+    still.setScaleType(ImageView.ScaleType.CENTER_CROP);
+    still.setBackgroundColor(MEDIA_PLACEHOLDER_BG);
+    outerRow.addView(
+        still,
+        new LinearLayout.LayoutParams(posterWidthPx, ViewGroup.LayoutParams.MATCH_PARENT));
+
+    LinearLayout content = new LinearLayout(getContext());
+    content.setOrientation(LinearLayout.VERTICAL);
+    content.setPadding(
+        (int) dp(CARD_PAD_H_DP),
+        (int) dp(CARD_PAD_TOP_DP),
+        (int) dp(CARD_PAD_H_DP),
+        (int) dp(CARD_PAD_BOTTOM_DP));
+
+    TextView header = new TextView(getContext());
+    header.setText(show.name + ", Season " + season + ", Episode " + episode);
+    header.setTextColor(CARD_TEXT_LIGHT);
+    header.setTextSize(TypedValue.COMPLEX_UNIT_SP, NAME_TEXT_SIZE_SP);
+    header.setSingleLine(true);
+    header.setEllipsize(android.text.TextUtils.TruncateAt.END);
+    content.addView(
+        header,
+        new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+    TextView desc = new TextView(getContext());
+    desc.setTextColor(MISC_TEXT_COLOR);
+    desc.setTextSize(TypedValue.COMPLEX_UNIT_SP, DESC_TEXT_SIZE_SP);
+    // The date is in hand from the show's own record, so the card is never
+    // blank while TMDB is being asked for the still and the description.
+    String localAired = airedOf(show, season, episode);
+    desc.setText(episodeText(localAired, ""));
+    FadingBox box = new FadingBox(getContext());
+    box.addView(
+        desc,
+        new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            Gravity.TOP));
+    LinearLayout.LayoutParams boxParams =
+        new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
+    boxParams.topMargin = (int) dp(CARD_BODY_GAP_DP);
+    content.addView(box, boxParams);
+
+    outerRow.addView(
+        content, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+
+    Episodes.get(
+        show,
+        season,
+        episode,
+        info -> {
+          // The cursor may have moved on while TMDB was answering, and this
+          // card is thrown away and rebuilt on every move.
+          if (episodeCard != outerRow) return;
+          desc.setText(
+              episodeText(
+                  info.aired.isEmpty() ? localAired : info.aired, info.overview));
+          if (!info.image.isEmpty()) Images.into(still, info.image, outerRow);
+        });
+    return outerRow;
+  }
+
+  /** The aired date the show's own record holds for this episode, or empty. */
+  private static String airedOf(Shows.Show show, int season, int episode) {
+    if (show.episodeData == null) return "";
+    JSONArray episodes = show.episodeData.optJSONArray(season);
+    JSONArray tuple = episodes == null ? null : episodes.optJSONArray(episode - 1);
+    return tuple == null ? "" : tuple.optString(ED_AIRED, "");
+  }
+
+  /** The aired date in bold over the description, the way the web pane has it. */
+  private static CharSequence episodeText(String aired, String overview) {
+    String date = aired.isEmpty() || "0".equals(aired) ? "" : aired.replace('-', '/');
+    SpannableStringBuilder out = new SpannableStringBuilder();
+    if (!date.isEmpty()) {
+      out.append(date);
+      out.setSpan(new StyleSpan(Typeface.BOLD), 0, out.length(), Spanned.SPAN_INCLUSIVE_EXCLUSIVE);
+      if (!overview.isEmpty()) out.append("\n");
+    }
+    out.append(overview);
+    return out;
   }
 
   private void renderDescMisc(Shows.Show show, FrameLayout misc) {
@@ -1079,6 +1308,7 @@ class ShowListView extends ScrollView {
     desc.setText(show.overview.isEmpty() ? "No description." : show.overview);
     desc.setTextColor(MISC_TEXT_COLOR);
     desc.setTextSize(TypedValue.COMPLEX_UNIT_SP, DESC_TEXT_SIZE_SP);
+    if (show == active) descView = desc;
     // No line cap and no ellipsis: whatever runs past the bottom of cardMisc is
     // cut off there, under the fade the box below paints over it.
     FadingBox box = new FadingBox(getContext());
@@ -1134,22 +1364,27 @@ class ShowListView extends ScrollView {
     }
   }
 
+  /**
+   * One season row, which season being the left and right keys' to choose while
+   * Map is at SubMode.NONE. Deeper than that they choose an episode of it
+   * instead, and the row draws a cursor on the one they are on.
+   */
   private void renderMapMisc(Shows.Show show, FrameLayout misc) {
-    LinearLayout rows = new LinearLayout(getContext());
-    rows.setOrientation(LinearLayout.VERTICAL);
-    List<Integer> seasons = mapSeasons(show);
+    List<Integer> seasons = seasonsPresent(show.episodeData);
     if (seasons.isEmpty()) {
       misc.addView(message("No episodes."), centerWrap());
       return;
     }
-    for (int i = 0; i < seasons.size(); i++) {
-      LinearLayout.LayoutParams params =
-          new LinearLayout.LayoutParams(
-              ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-      if (i > 0) params.topMargin = (int) dp(MAP_ROW_GAP_DP);
-      rows.addView(mapSeasonRow(show, seasons.get(i)), params);
-    }
-    misc.addView(rows, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    int index = show == active ? clampSeasonIndex(seasons) : defaultSeasonIndex(show);
+    misc.addView(
+        mapSeasonRow(show, seasons.get(index)),
+        new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+  }
+
+  private int clampSeasonIndex(List<Integer> seasons) {
+    mapSeasonIndex = Math.max(0, Math.min(seasons.size() - 1, mapSeasonIndex));
+    return mapSeasonIndex;
   }
 
   private LinearLayout mapSeasonRow(Shows.Show show, int season) {
@@ -1160,16 +1395,21 @@ class ShowListView extends ScrollView {
     label.setGravity(Gravity.CENTER);
     row.addView(label, new LinearLayout.LayoutParams((int) dp(MAP_SEASON_WIDTH_DP), (int) dp(MAP_CELL_HEIGHT_DP)));
 
-    FlowLayout cells = new FlowLayout(getContext());
+    boolean focusable = show == active && subMode != SubMode.NONE;
     JSONArray episodes = show.episodeData == null ? null : show.episodeData.optJSONArray(season);
-    for (int i = 0; episodes != null && i < episodes.length(); i++) {
-      cells.addView(mapCell(show, episodes.optJSONArray(i)), mapCellParams());
+    int count = episodes == null ? 0 : episodes.length();
+    if (focusable) mapEpisodeIndex = Math.max(0, Math.min(Math.max(0, count - 1), mapEpisodeIndex));
+    FlowLayout cells = new FlowLayout(getContext());
+    for (int i = 0; i < count; i++) {
+      cells.addView(
+          mapCell(show, episodes.optJSONArray(i), focusable && i == mapEpisodeIndex),
+          mapCellParams());
     }
     row.addView(cells, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
     return row;
   }
 
-  private View mapCell(Shows.Show show, JSONArray tuple) {
+  private View mapCell(Shows.Show show, JSONArray tuple, boolean focused) {
     boolean played = tuple != null && tuple.optInt(ED_WATCHED, 0) == 1;
     boolean hasFile = tuple != null && !tuple.optString(ED_FILE, "").isEmpty() && !"0".equals(tuple.optString(ED_FILE, ""));
     boolean noFile = tuple != null && !hasFile;
@@ -1189,7 +1429,8 @@ class ShowListView extends ScrollView {
     view.setSingleLine(true);
     GradientDrawable bg = new GradientDrawable();
     bg.setColor(tuple == null ? MapCells.BG_NORMAL : MapCells.background(false, noFile));
-    bg.setStroke((int) dp(1f), MAP_CELL_BORDER);
+    if (focused) bg.setStroke((int) dp(FOCUS_BORDER_DP), FOCUS_BORDER);
+    else bg.setStroke((int) dp(1f), MAP_CELL_BORDER);
     view.setBackground(bg);
     return view;
   }
@@ -1202,16 +1443,20 @@ class ShowListView extends ScrollView {
     return params;
   }
 
-  private List<Integer> mapSeasons(Shows.Show show) {
+  /**
+   * The season Map opens on: the one being watched through, else the last one
+   * with anything watched in it, else the first with a file, else simply the
+   * first there is. An index into seasonsPresent, which is what the left and
+   * right keys step through.
+   */
+  private int defaultSeasonIndex(Shows.Show show) {
     List<Integer> seasons = seasonsPresent(show.episodeData);
-    List<Integer> picked = new ArrayList<>();
-    if (seasons.isEmpty()) return picked;
-    int first = seasonWithWatchedTransition(show.episodeData, seasons);
-    if (first < 0) first = lastSeasonWithWatched(show.episodeData, seasons);
-    if (first < 0) first = firstSeasonWithFile(show.episodeData, seasons);
-    if (first < 0) first = seasons.get(0);
-    picked.add(first);
-    return picked;
+    if (seasons.isEmpty()) return 0;
+    int season = seasonWithWatchedTransition(show.episodeData, seasons);
+    if (season < 0) season = lastSeasonWithWatched(show.episodeData, seasons);
+    if (season < 0) season = firstSeasonWithFile(show.episodeData, seasons);
+    int index = seasons.indexOf(season);
+    return index < 0 ? 0 : index;
   }
 
   private List<Integer> seasonsPresent(JSONArray episodeData) {
@@ -1269,9 +1514,10 @@ class ShowListView extends ScrollView {
   }
 
   /**
-   * Cards are not all one width here -- each is its photo plus a name column
-   * only as wide as that name's longest word -- so they are packed by adding up
-   * their real widths rather than dividing the room by a fixed card width.
+   * The whole regular cast, however many that is: the strip scrolls sideways
+   * rather than stopping at the edge of cardMisc. Cards are not all one width
+   * -- each is its photo plus a name column only as wide as that name's longest
+   * word -- so the strip is laid out from their real widths.
    */
   private void renderActorsMisc(Shows.Show show, FrameLayout misc) {
     // Regulars with a photo and nothing else: a guest is not what this strip is
@@ -1284,29 +1530,33 @@ class ShowListView extends ScrollView {
       misc.addView(message("No cast."), centerWrap());
       return;
     }
-    LinearLayout strip = mediaStrip();
+    LinearLayout row = mediaStrip();
     int height = mediaCardHeight();
     int photoWidth = Math.max(1, Math.round(height * ACTOR_CARD_ASPECT));
-    int gap = (int) dp(MEDIA_GAP_DP);
-    int available = estimatedMiscWidth();
-    int used = 0;
+    int border = (int) dp(FOCUS_BORDER_DP);
     for (Shows.Actor actor : cast) {
       int nameWidth = longestWordWidth(actor.name, ACTOR_NAME_TEXT_SIZE_SP);
-      int cardWidth = photoWidth + (int) dp(ACTOR_NAME_GAP_DP) + nameWidth;
-      int next = used == 0 ? cardWidth : used + gap + cardWidth;
-      if (next > available && strip.getChildCount() > 0) break;
-      used = next;
-      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(cardWidth, height);
-      if (strip.getChildCount() > 0) params.leftMargin = gap;
-      strip.addView(actorCard(actor, show, photoWidth, nameWidth), params);
+      int cardWidth = photoWidth + (int) dp(ACTOR_NAME_GAP_DP) + nameWidth + 2 * border;
+      View card = actorCard(actor, show, photoWidth, nameWidth);
+      row.addView(card, mediaParams(cardWidth, height, row.getChildCount()));
+      if (show == active) stripCards.add(card);
     }
-    misc.addView(strip, centerMatchHeight(height));
+    misc.addView(scrollingStrip(show, row), centerMatchHeight(height));
+    if (show == active) paintStripFocus();
   }
 
   private View actorCard(Shows.Actor actor, Shows.Show show, int photoWidth, int nameWidth) {
     LinearLayout card = new LinearLayout(getContext());
     card.setOrientation(LinearLayout.HORIZONTAL);
     card.setGravity(Gravity.CENTER_VERTICAL);
+    // Room for the focus border, and something for it to be a stroke on: the
+    // card itself is drawn by its photo and caption, not by any background.
+    int border = (int) dp(FOCUS_BORDER_DP);
+    card.setPadding(border, border, border, border);
+    GradientDrawable bg = new GradientDrawable();
+    bg.setCornerRadius(dp(CARD_CORNER_DP));
+    bg.setColor(Color.TRANSPARENT);
+    card.setBackground(bg);
 
     ImageView photo = new ImageView(getContext());
     photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
@@ -1347,19 +1597,16 @@ class ShowListView extends ScrollView {
       misc.addView(message("No trailers found."), centerWrap());
       return;
     }
-    LinearLayout strip = mediaStrip();
+    LinearLayout row = mediaStrip();
     int height = mediaCardHeight();
     int width = Math.max(1, Math.round(height * TRAILER_CARD_ASPECT));
-    int count = Math.min(show.trailers.size(), maxMediaCards(width));
-    List<View> cardsForShow = new ArrayList<>();
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < show.trailers.size(); i++) {
       View card = trailerCard(show.trailers.get(i), show);
-      cardsForShow.add(card);
-      strip.addView(card, mediaParams(width, height, i));
+      row.addView(card, mediaParams(width, height, i));
+      if (show == active) stripCards.add(card);
     }
-    trailerCardViews.put(show, cardsForShow);
-    misc.addView(strip, centerMatchHeight(height));
-    paintTrailerCards(show);
+    misc.addView(scrollingStrip(show, row), centerMatchHeight(height));
+    if (show == active) paintStripFocus();
   }
 
   private View trailerCard(Shows.Trailer trailer, Shows.Show show) {
@@ -1402,25 +1649,28 @@ class ShowListView extends ScrollView {
     return strip;
   }
 
+  /**
+   * The strip in something that can be scrolled past the edge of cardMisc, so
+   * a cast or a trailer list of any length is all reachable. No scrollbar and
+   * no touch: the only thing that moves it is the left and right keys.
+   */
+  private View scrollingStrip(Shows.Show show, LinearLayout row) {
+    android.widget.HorizontalScrollView scroll =
+        new android.widget.HorizontalScrollView(getContext());
+    scroll.setHorizontalScrollBarEnabled(false);
+    scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+    scroll.addView(
+        row,
+        new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    if (show == active) strip = scroll;
+    return scroll;
+  }
+
   private LinearLayout.LayoutParams mediaParams(int width, int height, int index) {
     LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(width, height);
     if (index > 0) params.leftMargin = (int) dp(MEDIA_GAP_DP);
     return params;
-  }
-
-  private int maxMediaCards(int cardWidth) {
-    int gap = (int) dp(MEDIA_GAP_DP);
-    int available = estimatedMiscWidth();
-    return Math.max(1, (available + gap) / Math.max(1, cardWidth + gap));
-  }
-
-  /** cardMisc is the whole card less the backdrop and the card's own chrome. */
-  private int estimatedMiscWidth() {
-    int width = getWidth();
-    if (width <= 0) width = getResources().getDisplayMetrics().widthPixels;
-    int listPad = (int) dp(LIST_PAD_DP);
-    int cardChrome = 2 * (int) dp(CARD_CONTENT_INSET_DP) + 2 * (int) dp(CARD_PAD_H_DP);
-    return Math.max(0, width - listPad - cardChrome - posterWidthPx);
   }
 
   /** From the bottom of the name row to the bottom of the card. */
@@ -1473,22 +1723,114 @@ class ShowListView extends ScrollView {
     return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
   }
 
-  private void clearTrailerHighlight(Shows.Show show) {
-    if (show == null) return;
-    trailerHighlightIndex = -1;
-    trailerLastPlayedIndex = -1;
-    paintTrailerCards(show);
+  private void paintStripFocus() {
+    for (int i = 0; i < stripCards.size(); i++) {
+      GradientDrawable bg = (GradientDrawable) stripCards.get(i).getBackground();
+      bg.setStroke(i == focusIndex ? (int) dp(FOCUS_BORDER_DP) : 0, FOCUS_BORDER);
+    }
   }
 
-  private void paintTrailerCards(Shows.Show show) {
-    List<View> cardsForShow = trailerCardViews.get(show);
-    if (cardsForShow == null) return;
-    for (int i = 0; i < cardsForShow.size(); i++) {
-      GradientDrawable bg = (GradientDrawable) cardsForShow.get(i).getBackground();
-      bg.setStroke(
-          i == trailerHighlightIndex ? (int) dp(TRAILER_HIGHLIGHT_BORDER_DP) : 0,
-          TRAILER_HIGHLIGHT_BORDER);
+  /** Brings the card the cursor just moved onto into the strip's own window. */
+  private void scrollFocusIntoView() {
+    if (strip == null || focusIndex < 0 || focusIndex >= stripCards.size()) return;
+    final View card = stripCards.get(focusIndex);
+    strip.post(
+        () -> {
+          int left = card.getLeft();
+          int right = card.getRight();
+          int viewLeft = strip.getScrollX();
+          int viewRight = viewLeft + strip.getWidth();
+          if (left < viewLeft) strip.smoothScrollTo(left, 0);
+          else if (right > viewRight) strip.smoothScrollTo(right - strip.getWidth(), 0);
+        });
+  }
+
+  /** One card of the strip either way, stopping at its two ends. */
+  private void stepStripFocus(int direction) {
+    if (stripCards.isEmpty()) return;
+    int next = Math.max(0, Math.min(stripCards.size() - 1, focusIndex + direction));
+    if (next == focusIndex) return;
+    focusIndex = next;
+    paintStripFocus();
+    scrollFocusIntoView();
+  }
+
+  /** The strip with no cursor on it, which left and right simply slide along. */
+  private void scrollStrip(int direction) {
+    if (strip == null) return;
+    strip.smoothScrollBy(direction * (int) dp(STRIP_SCROLL_DP), 0);
+  }
+
+  /**
+   * The description, a couple of lines at a time, stopping where its last line
+   * reaches the bottom of cardMisc rather than scrolling into empty space.
+   */
+  private void scrollDesc(int direction) {
+    if (descView == null) return;
+    Layout layout = descView.getLayout();
+    if (layout == null) return;
+    int max = Math.max(0, layout.getHeight() - descView.getHeight());
+    int step = descView.getLineHeight() * DESC_SCROLL_LINES;
+    descView.setScrollY(Math.max(0, Math.min(max, descView.getScrollY() + direction * step)));
+  }
+
+  /** One season either way, stopping at the show's first and last. */
+  private void stepSeason(int direction) {
+    if (active == null) return;
+    List<Integer> seasons = seasonsPresent(active.episodeData);
+    if (seasons.isEmpty()) return;
+    int next = Math.max(0, Math.min(seasons.size() - 1, mapSeasonIndex + direction));
+    if (next == mapSeasonIndex) return;
+    mapSeasonIndex = next;
+    renderMisc(active);
+    loadVisibleMedia();
+  }
+
+  /**
+   * One episode of the season on show either way, stopping at its two ends. The
+   * episode card, when it is up, is showing whichever episode this lands on.
+   */
+  private void stepEpisode(int direction) {
+    if (active == null) return;
+    int count = focusedSeasonLength();
+    if (count == 0) return;
+    int next = Math.max(0, Math.min(count - 1, mapEpisodeIndex + direction));
+    if (next == mapEpisodeIndex) return;
+    mapEpisodeIndex = next;
+    renderMisc(active);
+    loadVisibleMedia();
+  }
+
+  /** The season number the Map row is showing, or -1 when the show has none. */
+  private int focusedSeason() {
+    if (active == null) return -1;
+    List<Integer> seasons = seasonsPresent(active.episodeData);
+    if (seasons.isEmpty()) return -1;
+    return seasons.get(Math.max(0, Math.min(seasons.size() - 1, mapSeasonIndex)));
+  }
+
+  private int focusedSeasonLength() {
+    int season = focusedSeason();
+    if (season < 0 || active.episodeData == null) return 0;
+    JSONArray episodes = active.episodeData.optJSONArray(season);
+    return episodes == null ? 0 : episodes.length();
+  }
+
+  private JSONArray focusedEpisodeTuple() {
+    if (!hasEpisodeFocus()) return null;
+    int season = focusedSeason();
+    if (season < 0 || active.episodeData == null) return null;
+    JSONArray episodes = active.episodeData.optJSONArray(season);
+    return episodes == null ? null : episodes.optJSONArray(mapEpisodeIndex);
+  }
+
+  private String focusedActorName() {
+    if (active == null || focusIndex < 0) return null;
+    List<Shows.Actor> cast = new ArrayList<>();
+    for (Shows.Actor actor : active.characters) {
+      if (actor.featured && !actor.image.isEmpty()) cast.add(actor);
     }
+    return focusIndex < cast.size() ? cast.get(focusIndex).name : null;
   }
 
   private enum MiscMode {
@@ -1496,6 +1838,18 @@ class ShowListView extends ScrollView {
     MAP,
     ACTORS,
     TRAILERS
+  }
+
+  /**
+   * How deep into its mode cardMisc has been stepped by the ok key held down.
+   * NONE is where every mode starts; FOCUS is a cursor inside it -- an episode
+   * cell, an actor card, a trailer card; CARD is the Map's last step, the
+   * episode's own card over the show's.
+   */
+  private enum SubMode {
+    NONE,
+    FOCUS,
+    CARD
   }
 
   private static class MediaRequest {

@@ -1569,6 +1569,51 @@ function getTvdbCharacters(extResObj) {
     }));
 }
 
+// TVDB's own remote-id type for a TMDB link, and the cast this falls back on.
+const TMDB_REMOTE_TYPE = 12;
+// An anthology's cast runs to hundreds once every episode is counted, so only
+// the ones with the most episodes behind them are kept -- the nearest thing a
+// show without regulars has to them.
+const TMDB_CAST_MAX = 20;
+const TMDB_PROFILE_BASE = "https://image.tmdb.org/t/p/w500";
+
+/**
+ * The cast for a show TVDB has none for. TVDB keeps an anthology's cast on its
+ * episodes rather than on the series, so a show like Black Mirror comes back
+ * with an empty character list however large its cast really is; TMDB's
+ * aggregate credits are that same cast counted across every episode. Shaped
+ * exactly like getTvdbCharacters' rows, and marked featured because a show
+ * with no regulars has nothing else to put in front.
+ */
+async function getTmdbCast(remoteIds, name) {
+  const tmdbId = (remoteIds ?? []).find((r) => r.type === TMDB_REMOTE_TYPE)?.id;
+  if (!tmdbId) return [];
+  try {
+    const credits = await moviedb.tvAggregateCredits({ id: tmdbId });
+    const cast = Array.isArray(credits?.cast) ? credits.cast : [];
+    return cast
+      .filter((actor) => actor.profile_path)
+      .sort(
+        (a, b) =>
+          (b.total_episode_count ?? 0) - (a.total_episode_count ?? 0) ||
+          (a.order ?? 0) - (b.order ?? 0),
+      )
+      .slice(0, TMDB_CAST_MAX)
+      .map((actor, i) => ({
+        character: actor.roles?.[0]?.character ?? "",
+        actor: actor.name,
+        image: `${TMDB_PROFILE_BASE}${actor.profile_path}`,
+        tvdbUrl: null,
+        sortOrder: i,
+        isFeatured: true,
+        source: "tmdb",
+      }));
+  } catch (e) {
+    unilog(1926, `tmdb cast fallback failed for ${name}: ${e.message}`);
+    return [];
+  }
+}
+
 const TVMAZE_CREW_TYPES = [
   "Creator",
   "Executive Producer",
@@ -1932,7 +1977,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     genres: genresIn,
   } = extResObj.data;
   const image = getTvdbImageUrl(extResObj);
-  const characters = getTvdbCharacters(extResObj);
+  let characters = getTvdbCharacters(extResObj);
+  if (!characters.length) characters = await getTmdbCast(remoteIds, name);
   const crew = await getTvmazeCrew(tvdbId);
   let lastAired = lastAiredIn ?? firstAired;
   lastAired = lastAired ?? "";

@@ -874,7 +874,10 @@ export default {
           () => {},
         );
       }
-      this.tvapprcMode = false;
+      // Not out of tvapprc mode here: tvapp turns this down when the show has
+      // no file or is not ready to watch, and stays where it is. The bridge's
+      // tvapp-down message is what ends the mode, and only when tvapp has
+      // really gone.
     },
 
     // Shows: opens tvapp on the tv, selecting tv-tv's most relevant show, or

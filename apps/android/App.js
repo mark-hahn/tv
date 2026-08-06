@@ -945,6 +945,9 @@ export default function App() {
     sendTvapprc(`${CMD_FILTER},${text.trim()}`);
   };
 
+  // tvapprc mode is not set here, only asked for: the bridge's tvapp-up
+  // message is the one thing that knows tvapp really came up, and this remote
+  // has to be in the mode tvapp is in and no other.
   const openTvapp = () => {
     flash("shows");
     if (!sendTvapprc(CMD_OPEN_TVAPP)) {
@@ -952,7 +955,6 @@ export default function App() {
         console.warn("opentvapp failed", e),
       );
     }
-    setTvapprcMode(true);
   };
 
   /**
@@ -980,8 +982,10 @@ export default function App() {
         console.warn("tvapprc emby failed", e),
       );
     }
-    setTvapprcMode(false);
-    closeTvapprcInput();
+    // Not out of tvapprc mode here: tvapp turns this down when the show has no
+    // file or is not ready to watch, and stays where it is. The bridge's
+    // tvapp-down message is what ends the mode, and only when tvapp has really
+    // gone.
   };
 
   /**

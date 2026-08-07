@@ -2989,7 +2989,7 @@ export default function App() {
         </View>
         <ScrollView style={streamerStyles.list}>
           <View style={streamerStyles.pinnedRow}>
-            {["Netflix", "Prime Video", "HBO Max"]
+            {["Emby", "Netflix", "HBO Max"]
               .map((name) => services.find((s) => s.name === name))
               .filter(Boolean)
               .map((svc) => (

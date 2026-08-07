@@ -2719,6 +2719,15 @@ app.post("/tv/tvapprc/forceback", async (req, res) => {
   res.json(ok ? { ok: true } : { ok: false, error: "tvapp is not open" });
 });
 
+// tvapp's back key on its way out to Emby: the show Emby was left playing
+// behind it is closed exactly as opening tvapp over a playing show closes it.
+// tvapp is already stepping aside as this is asked for, so the back key at the
+// end of the close lands on Emby rather than on tvapp.
+app.post("/tv/closeembyshow", async (req, res) => {
+  await closeEmbyShow();
+  res.json({ ok: true });
+});
+
 app.post("/tv/tvapprc/emby", async (req, res) => {
   const ok = await sendTvappCommand(CMD_EMBY_SELECTED);
   res.json(ok ? { ok: true } : { ok: false, error: "tvapp is not open" });

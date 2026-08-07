@@ -45,9 +45,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final float COLUMN_GAP_DP = 3f;
   private static final float BUTTONS_WIDTH_FRACTION = 0.09f;
   private static final float LIST_WIDTH_FRACTION = 1f - BUTTONS_WIDTH_FRACTION;
-  // The top of the group, and where the filter key's cursor rests between runs
-  // of clicks. It resets every way the show list can be narrowed: filter text,
-  // the toggle filters below it, the actor filter, and custom sort.
+  // The top of the group, and where its cursor starts and is put back by a
+  // clear. It resets every way the show list can be narrowed: filter text, the
+  // toggle filters below it, the actor filter, and custom sort.
   private static final String CLEAR_FILTER_LABEL = "Clear";
   // The one filter that grows the list rather than narrowing it: every show
   // that is not in Emby comes in with it, which is a rebuild long enough to be
@@ -95,14 +95,11 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final int BUTTON_SELECTED_BORDER = 0xFFFF0000;
   // The inset the filter group container keeps above and below its buttons.
   private static final float GROUP_INSET_DP = BUTTON_SELECTED_BORDER_DP * 2f * 0.7f * 0.7f;
+  // The whole filter group having the focus, which is a different thing from
+  // the cursor inside it: yellow around the group, red around one button.
+  private static final int GROUP_FOCUS_BORDER = 0xFFFFFF00;
+  private static final float GROUP_FOCUS_BORDER_DP = BUTTON_SELECTED_BORDER_DP;
 
-  // The filter key's cursor: the first click brings it into view on Clear,
-  // each further click steps it one button down, and once the clicking stops
-  // the button it came to rest on is activated and the group falls back to its
-  // idle state -- cursor hidden, back on Clear. The key is deaf for a moment
-  // after that, so the click that ended one run cannot start the next.
-  private static final long FILTER_DWELL_MS = 1000;
-  private static final long FILTER_IGNORE_MS = 300;
   // Clear has no state to stay lit for, so it lights just long enough to say
   // it ran.
   private static final long CLEAR_FLASH_MS = 500;
@@ -130,6 +127,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final float TOAST_TEXT_SCALE = 2f;
   private static final String EMBY_PACKAGE = "com.mb.android";
   private static final String UNMUTE_URL = "https://hahnca.com/tv-tv/tv/unmute";
+  private static final String CLOSE_EMBY_SHOW_URL = "https://hahnca.com/tv-tv/tv/closeembyshow";
   private static final long KEEP_AWAKE_IDLE_MS = 5_000;
   // A back key in the first moment on screen is not the user's: coming here
   // from Emby closes the show that was playing, and that close key can still be
@@ -151,14 +149,16 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private TextView filterLabel;
   private TrailerPlayer player;
   private LinearLayout buttonColumn;
+  private View filterGroup;
   private Shows.Sort sort = Shows.Sort.ALPHA;
   private boolean customOn;
-  // The filter button the filter key's cursor is on. One button is selected at
-  // all times, but the cursor showing which is drawn only during a run of
-  // filter key clicks; the rest of the time the selection sits idle on Clear.
+  // Which of the three the keys are talking to. Only one of them is focused at
+  // a time, and the show list is where the screen starts and comes back to.
+  private Area area = Area.LIST;
+  // The filter button the group's cursor is on, which is drawn at all times --
+  // whether the group has the focus or not -- so ok always has a button to
+  // work.
   private String selectedFilter = CLEAR_FILTER_LABEL;
-  private boolean filterCursorVisible;
-  private long filterIgnoreUntil;
   // Clear's brief lit-up confirmation that it ran, since it has no state of its
   // own to show.
   private boolean clearFlashing;
@@ -376,6 +376,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     }
     buttonColumn.addView(buildFilterGroup(), filterGroupParams());
     repaintButtons();
+    paintFilterGroup();
     return buttonColumn;
   }
 
@@ -386,11 +387,16 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   /**
    * The filter buttons, in a container of its own so the group keeps its
    * spacing from the sort buttons above it whatever the column's height works
-   * out to.
+   * out to, and so the focus border has something of the group's own to be
+   * drawn on.
    */
   private View buildFilterGroup() {
     LinearLayout group = new LinearLayout(this);
     group.setOrientation(LinearLayout.VERTICAL);
+    GradientDrawable groupBg = new GradientDrawable();
+    groupBg.setCornerRadius(dp(BUTTON_CORNER_DP));
+    group.setBackground(groupBg);
+    filterGroup = group;
     group.setPadding(
         (int) dp(BUTTON_PAD_H_DP),
         (int) dp(GROUP_INSET_DP),
@@ -433,10 +439,39 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private void repaintButtons() {
     for (String label : buttonOrder) {
       ButtonItem item = buttonItems.get(label);
-      if (item != null) {
-        item.paint(isButtonActive(label), filterCursorVisible && label.equals(selectedFilter));
-      }
+      if (item != null) item.paint(isButtonActive(label), isCursorOn(label));
     }
+  }
+
+  /**
+   * Whether the group's cursor is drawn on this button. It is drawn wherever it
+   * stands, except on Clear while the group is not focused: Clear is where the
+   * cursor idles, and an outline sitting there would read as a state of its own.
+   */
+  private boolean isCursorOn(String label) {
+    if (!label.equals(selectedFilter)) return false;
+    return area == Area.FILTERS || !CLEAR_FILTER_LABEL.equals(label);
+  }
+
+  /** The border round the whole filter group, which is only there while it has the focus. */
+  private void paintFilterGroup() {
+    GradientDrawable bg = (GradientDrawable) filterGroup.getBackground();
+    bg.setStroke(
+        area == Area.FILTERS ? (int) dp(GROUP_FOCUS_BORDER_DP) : 0, GROUP_FOCUS_BORDER);
+  }
+
+  /**
+   * Hands the focus to one of the three areas. The show list is the one that
+   * draws nothing of its own for it: its selected card is bordered whenever
+   * cardMisc is not.
+   */
+  private void focusArea(Area next) {
+    if (area == next) return;
+    area = next;
+    showList.setMiscFocused(area == Area.MISC);
+    paintFilterGroup();
+    // The cursor on Clear comes and goes with the group's own focus.
+    repaintButtons();
   }
 
   private boolean isButtonActive(String label) {
@@ -618,7 +653,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    */
   private static boolean blockedWhileLoading(String key) {
     return "ok".equals(key)
-        || "oklong".equals(key)
+        || "info".equals(key)
         || "up".equals(key)
         || "down".equals(key)
         || "left".equals(key)
@@ -722,39 +757,17 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
         TypedValue.COMPLEX_UNIT_DIP, value, getResources().getDisplayMetrics());
   }
 
-  /**
-   * The filter key, which is the only thing that reaches the filter buttons --
-   * nothing else selects or activates one. The first click of a run only brings
-   * the cursor into view, on the Clear it is idling on; every click after that
-   * steps it one button down, as far as the last button and no further. The
-   * dwell restarts on each click, so a run of clicks picks a button without
-   * activating any of the ones passed over.
-   */
-  private void filterKeyClick() {
-    if (SystemClock.uptimeMillis() < filterIgnoreUntil) return;
-    ui.removeCallbacks(filterDwell);
-    if (filterCursorVisible) stepSelectedFilter();
-    else filterCursorVisible = true;
-    repaintButtons();
-    // Nothing below the last button for another click to reach, so there is
-    // nothing to wait to find out: it acts without sitting out the dwell.
-    if (FILTER_LABELS[FILTER_LABELS.length - 1].equals(selectedFilter)) {
-      activateSelectedFilter();
-      return;
-    }
-    ui.postDelayed(filterDwell, FILTER_DWELL_MS);
-  }
-
-  /** One button down, stopping at the bottom of the group rather than wrapping. */
-  private void stepSelectedFilter() {
-    int index = -1;
+  /** One button either way, stopping at the ends of the group rather than wrapping. */
+  private void stepSelectedFilter(int direction) {
+    int index = 0;
     for (int i = 0; i < FILTER_LABELS.length; i++) {
       if (FILTER_LABELS[i].equals(selectedFilter)) index = i;
     }
-    selectedFilter = FILTER_LABELS[Math.min(index + 1, FILTER_LABELS.length - 1)];
+    int next = Math.max(0, Math.min(FILTER_LABELS.length - 1, index + direction));
+    if (next == index) return;
+    selectedFilter = FILTER_LABELS[next];
+    repaintButtons();
   }
-
-  private final Runnable filterDwell = this::activateSelectedFilter;
 
   private final Runnable clearFlashEnd =
       () -> {
@@ -763,40 +776,43 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       };
 
   /**
-   * The end of a run of filter key clicks: the button the cursor came to rest
-   * on acts -- Clear resets everything, the rest toggle -- and the group goes
-   * back to idle, waiting on Clear with nothing outlined.
+   * The ok key on the button the group's cursor is on: Clear resets everything
+   * and lights up for a moment, the rest toggle and stay lit while they are on.
    */
   private void activateSelectedFilter() {
     if (CLEAR_FILTER_LABEL.equals(selectedFilter)) {
       clearAllFilters();
       clearFlashing = true;
       ui.postDelayed(clearFlashEnd, CLEAR_FLASH_MS);
+      repaintButtons();
     } else {
       toggleFilter(selectedFilter);
     }
-    selectedFilter = CLEAR_FILTER_LABEL;
-    filterCursorVisible = false;
-    filterIgnoreUntil = SystemClock.uptimeMillis() + FILTER_IGNORE_MS;
+  }
+
+  /**
+   * The Shows key: back to a clean screen. The show list has the focus and
+   * nothing else does, and the selected card is back on its description with
+   * the episode card and any trailer gone.
+   *
+   * The list itself is left as it was found -- the sort, and the filter buttons
+   * with it -- bar the two narrowings that have no button of their own to say
+   * they are on: the typed text and the actor.
+   */
+  private void clearScreenState() {
+    if (player.isPlaying()) player.close();
+    area = Area.LIST;
+    showList.setMiscFocused(false);
+    clearTextFilter();
+    applyActorFilter(null);
+    paintFilterGroup();
     repaintButtons();
   }
 
   /**
-   * Every arrow key, in one place. Up and down move the selected show itself;
-   * left and right belong to cardMisc, whatever it is showing, and reach
-   * nothing else.
-   */
-  private void moveSelection(String direction) {
-    if ("up".equals(direction)) showList.moveSelection(-1);
-    else if ("down".equals(direction)) showList.moveSelection(+1);
-    else if ("left".equals(direction)) showList.moveInCardMisc(-1);
-    else if ("right".equals(direction)) showList.moveInCardMisc(+1);
-  }
-
-  /**
-   * The phone's Play key, which plays whatever cardMisc has stepped down to: a
-   * trailer under the cursor, the episode under it, or -- with cardMisc at none
-   * of those -- the selected show itself, from wherever Emby left off.
+   * The ok key on something to play, and tv-tv's own play command: a trailer
+   * under cardMisc's cursor, the episode under it, or -- with the show list
+   * focused -- the selected show itself, from wherever Emby left off.
    */
   private void embyClick() {
     String trailerUrl = showList.focusedTrailerUrl();
@@ -876,6 +892,33 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   /**
+   * The back key's own way out, which leaves Emby off the show as well as
+   * tvapp: the same close tv-tv does on the way in, when the Shows key opens
+   * tvapp over a show that is playing.
+   *
+   * Asked for first and answered on tv-srvr's own time: the stop takes effect
+   * wherever Emby is, and the back key that follows it is a second or so
+   * behind, by which time Emby is the app on screen to take it.
+   */
+  private void backToEmbyClosingShow() {
+    closeEmbyShow();
+    backToEmby();
+  }
+
+  private void closeEmbyShow() {
+    new Thread(
+            () -> {
+              try {
+                Http.postJson(CLOSE_EMBY_SHOW_URL, "{}");
+              } catch (Exception e) {
+                Log.e(TAG, "close emby show failed: " + e);
+              }
+            },
+            "close-emby-show")
+        .start();
+  }
+
+  /**
    * Steps aside rather than exiting. Starting Emby is what puts it on screen;
    * going to the back as well is what keeps tvapp from being the next task up.
    * The show list stays parsed in memory, so coming back is immediate.
@@ -946,8 +989,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
         });
   }
 
-  // The phone's Shows button: unlike handleBack's one level out at a time,
-  // this always leaves for Emby immediately no matter what has the focus.
+  // tv-tv's force-back: unlike handleBack's one level out at a time, this
+  // always leaves for Emby immediately no matter what has the focus.
   @Override
   public void onForceCloseToEmby() {
     ui.post(
@@ -963,6 +1006,15 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
         () -> {
           bumpKeepAwake();
           embyClick();
+        });
+  }
+
+  @Override
+  public void onClearState() {
+    ui.post(
+        () -> {
+          bumpKeepAwake();
+          clearScreenState();
         });
   }
 
@@ -1000,19 +1052,27 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   @Override
   protected void onDestroy() {
     ui.removeCallbacks(clearKeepAwake);
-    ui.removeCallbacks(filterDwell);
     ui.removeCallbacks(clearFlashEnd);
     super.onDestroy();
   }
 
-  /** One level out: close a playing trailer, drop the episode card, leave tvapp. */
+  /**
+   * One level out: close a playing trailer, drop the episode card, leave tvapp.
+   *
+   * The episode card is the whole of cardMisc's depth as far as this key is
+   * concerned -- closing it hands the focus back to the show list rather than
+   * stopping part way, at a cardMisc with the focus and nothing open in it.
+   */
   private void handleBack() {
     if (player.isPlaying()) {
       player.close();
       return;
     }
-    if (showList.closeEpisodeCard()) return;
-    backToEmby();
+    if (showList.isEpisodeCardOpen()) {
+      focusArea(Area.LIST);
+      return;
+    }
+    backToEmbyClosingShow();
   }
 
   private void handleRemoteKey(String key) {
@@ -1025,11 +1085,61 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       else player.key(key);
       return;
     }
-    if ("ok".equals(key)) showList.rotateCardMisc();
-    else if ("oklong".equals(key)) showList.okLongPress();
-    else if ("sort".equals(key)) cycleSort();
-    else if ("filter".equals(key)) filterKeyClick();
-    else moveSelection(key);
+    // The sort key is the sort group's whole story, so it is answered wherever
+    // the focus happens to be.
+    if ("sort".equals(key)) cycleSort();
+    else if (area == Area.FILTERS) filterAreaKey(key);
+    else if (area == Area.MISC) miscAreaKey(key);
+    else listAreaKey(key);
+  }
+
+  /**
+   * The show list has the focus: up and down move the selection, ok plays the
+   * show it is on, left hands the focus to the filter group beside it, and
+   * right -- like info -- hands it to the selected card's cardMisc.
+   */
+  private void listAreaKey(String key) {
+    if ("up".equals(key)) showList.moveSelection(-1);
+    else if ("down".equals(key)) showList.moveSelection(+1);
+    else if ("left".equals(key)) focusArea(Area.FILTERS);
+    else if ("right".equals(key)) focusArea(Area.MISC);
+    else if ("ok".equals(key)) embyClick();
+    else if ("info".equals(key)) focusArea(Area.MISC);
+  }
+
+  /**
+   * The filter group has the focus: up and down move its cursor, ok works the
+   * button under it, and right hands the focus back to the show list.
+   */
+  private void filterAreaKey(String key) {
+    if ("up".equals(key)) stepSelectedFilter(-1);
+    else if ("down".equals(key)) stepSelectedFilter(+1);
+    else if ("ok".equals(key)) activateSelectedFilter();
+    else if ("right".equals(key)) focusArea(Area.LIST);
+  }
+
+  /**
+   * cardMisc has the focus: info moves it on to the next mode, ok opens
+   * whatever the mode has under its cursor, and the arrow keys move inside it.
+   */
+  private void miscAreaKey(String key) {
+    if ("info".equals(key)) showList.infoInCardMisc();
+    else if ("ok".equals(key)) openInCardMisc();
+    else if ("up".equals(key)) showList.moveInCardMisc(-1, true);
+    else if ("down".equals(key)) showList.moveInCardMisc(+1, true);
+    else if ("left".equals(key)) showList.moveInCardMisc(-1, false);
+    else if ("right".equals(key)) showList.moveInCardMisc(+1, false);
+  }
+
+  /**
+   * The part of opening a cardMisc item that is not cardMisc's own: starting
+   * Emby, and taking the focus back to the show list the actor filter has just
+   * narrowed.
+   */
+  private void openInCardMisc() {
+    ShowListView.OpenResult result = showList.openFocused();
+    if (result == ShowListView.OpenResult.PLAY) embyClick();
+    else if (result == ShowListView.OpenResult.ACTOR) focusArea(Area.LIST);
   }
 
   /**
@@ -1037,13 +1147,16 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    * fast long enough to enter skip mode. Alphabetical is the one order a show's
    * first letter says where it is in, so it is the one order that skips by
    * letter; the rest skip by page instead.
+   *
+   * There is nothing to skip through anywhere but the show list, so a hold
+   * over one of the other areas is just the key held down.
    */
   private void handleRemoteKeyLetter(String key) {
     if (player.isPlaying()) return;
     boolean up = "up".equals(key);
     boolean down = "down".equals(key);
-    if (!up && !down) {
-      moveSelection(key);
+    if (!up && !down || area != Area.LIST) {
+      handleRemoteKey(key);
       return;
     }
     int direction = up ? -1 : +1;
@@ -1084,6 +1197,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       default:
         return null;
     }
+  }
+
+  /** The three things the keys can be talking to, one of them at a time. */
+  private enum Area {
+    LIST,
+    FILTERS,
+    MISC
   }
 
   private class ButtonItem {

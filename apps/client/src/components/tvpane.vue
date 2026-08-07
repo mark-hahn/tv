@@ -473,17 +473,17 @@
       >
         ▲
       </div>
+      <!-- tvapprc disabled: was cellStyle('white', tvapprcMode ? 'sort' : 'home')
+           with a "Sort" label in place of the house while tvapp was up. -->
       <div
-        :style="cellStyle('white', tvapprcMode ? 'sort' : 'home')"
+        :style="cellStyle('white', 'home')"
         @mousedown="startHomeHold"
         @mouseup="stopHomeHold"
         @mouseleave="stopHomeHold"
         @touchstart.prevent="startHomeHold"
         @touchend="stopHomeHold"
       >
-        <template v-if="tvapprcMode">Sort</template>
         <svg
-          v-else
           width="1em"
           height="1em"
           viewBox="0 0 24 24"
@@ -544,15 +544,17 @@
       >
         ▼
       </div>
+      <!-- tvapprc disabled: was cellStyle('white', tvapprcMode ? 'info' : 'skip')
+           and an "Info" label in place of "Skip" while tvapp was up. -->
       <div
-        :style="cellStyle('white', tvapprcMode ? 'filter' : 'skip')"
+        :style="cellStyle('white', 'skip')"
         @mousedown="startSkipHold"
         @mouseup="stopSkipHold"
         @mouseleave="stopSkipHold"
         @touchstart.prevent="startSkipHold"
         @touchend="stopSkipHold"
       >
-        {{ tvapprcMode ? "Filter" : "Skip" }}
+        Skip
       </div>
       <!-- Row 4: vol-, vol+, mute -->
       <div
@@ -586,8 +588,9 @@
         Mute
       </div>
       <!-- Row 5: shows, apps, google -->
+      <!-- tvapprc disabled: was cellStyle(tvapprcMode ? 'lightblue' : 'white', 'shows') -->
       <div
-        :style="cellStyle(tvapprcMode ? 'lightblue' : 'white', 'shows')"
+        :style="cellStyle('white', 'shows')"
         @mousedown="startShowsHold"
         @mouseup="stopShowsHold"
         @mouseleave="stopShowsHold"
@@ -634,20 +637,24 @@ const PIC_VAL_MAX_CHARS = 20;
 const PIC_VAL_EDGE_CHARS = 8;
 const TVPANE_VERSION = 2;
 
+// tvapprc mode is turned off in this remote for now -- the phone remote is the
+// only one that drives tvapp. Everything it used is commented out rather than
+// deleted, marked "tvapprc disabled", so it can be put back.
+//
 // tvapprc bridge (mirrors apps/android/App.js) -- lets this remote follow
 // tvapp's open/closed state and, while it's open, drive it directly instead
 // of the tv.
-const TVAPPRC_HOST = "192.168.1.103";
-const TVAPPRC_PORT = 8098;
-const TVAPPRC_RECONNECT_MS = 2000;
-const TVAPPRC_CONNECT_TIMEOUT_MS = 5000;
-const MSG_TVAPP_UP = "u";
-const MSG_TVAPP_DOWN = "d";
-const CMD_CLOSE_TO_EMBY = "b";
-const CMD_EMBY_SELECTED = "e";
-const CMD_KEY = "k";
-const CMD_KEY_SORT = "sort";
-const CMD_KEY_FILTER = "filter";
+// const TVAPPRC_HOST = "192.168.1.103";
+// const TVAPPRC_PORT = 8098;
+// const TVAPPRC_RECONNECT_MS = 2000;
+// const TVAPPRC_CONNECT_TIMEOUT_MS = 5000;
+// const MSG_TVAPP_UP = "u";
+// const MSG_TVAPP_DOWN = "d";
+// const CMD_CLOSE_TO_EMBY = "b";
+// const CMD_CLEAR_STATE = "r";
+// const CMD_KEY = "k";
+// const CMD_KEY_SORT = "sort";
+// const CMD_KEY_INFO = "info";
 
 const CELL_BASE = {
   borderRight: "3px solid #000",
@@ -685,7 +692,7 @@ export default {
       picInputs: {}, // target -> { typing: bool, raw: string }
       _picChannel: null,
       _subChannel: null,
-      tvapprcMode: false,
+      // tvapprc disabled: tvapprcMode: false,
     };
   },
 
@@ -759,15 +766,16 @@ export default {
     evtBus.on("tvArrowKey", this._onTvArrowKey);
     evtBus.on("tvOkKey", this._onTvOkKey);
     evtBus.on("tvBackKey", this._onTvBackKey);
-    this._connectTvapprc();
+    // tvapprc disabled: this._connectTvapprc();
   },
 
   beforeUnmount() {
-    this._tvapprcDone = true;
-    clearTimeout(this._tvapprcRetryTimer);
-    clearTimeout(this._tvapprcOpenTimer);
-    this._tvapprcWs?.close();
-    this._tvapprcWs = null;
+    // tvapprc disabled:
+    // this._tvapprcDone = true;
+    // clearTimeout(this._tvapprcRetryTimer);
+    // clearTimeout(this._tvapprcOpenTimer);
+    // this._tvapprcWs?.close();
+    // this._tvapprcWs = null;
     evtBus.off("tvMuteState", this._onTvMuteState);
     evtBus.off("paneChanged", this._onPaneChanged);
     evtBus.off("tvRemoteLock", this._onTvRemoteLock);
@@ -818,77 +826,71 @@ export default {
       }
     },
 
-    // tvapprc bridge (mirrors apps/android/App.js) -- connects directly to
-    // hahnca.com's LAN-only bridge port so this remote learns when tvapp is
-    // open and can drive it directly (CMD_KEY etc.) instead of the tv.
-    _connectTvapprc() {
-      if (this._tvapprcDone) return;
-      const ws = new WebSocket(`ws://${TVAPPRC_HOST}:${TVAPPRC_PORT}`);
-      this._tvapprcWs = ws;
-      ws.onopen = () => clearTimeout(this._tvapprcOpenTimer);
-      ws.onerror = () => this._scheduleTvapprcRetry();
-      ws.onclose = () => this._scheduleTvapprcRetry();
-      ws.onmessage = (e) => {
-        if (e.data === MSG_TVAPP_UP) this.tvapprcMode = true;
-        else if (e.data === MSG_TVAPP_DOWN) this.tvapprcMode = false;
-      };
-      this._tvapprcOpenTimer = setTimeout(() => {
-        if (ws.readyState !== WebSocket.OPEN) ws.close();
-      }, TVAPPRC_CONNECT_TIMEOUT_MS);
-    },
-
-    _scheduleTvapprcRetry() {
-      if (this._tvapprcDone || this._tvapprcRetryTimer) return;
-      clearTimeout(this._tvapprcOpenTimer);
-      this._tvapprcRetryTimer = setTimeout(() => {
-        this._tvapprcRetryTimer = null;
-        this._connectTvapprc();
-      }, TVAPPRC_RECONNECT_MS);
-    },
-
-    sendTvapprc(message) {
-      const ws = this._tvapprcWs;
-      if (ws?.readyState !== WebSocket.OPEN) return false;
-      ws.send(message);
-      return true;
-    },
-
-    // Back button while tvapp is open: drops one level of tvapp's own focus
-    // rather than sending the tv's back key.
-    async closeTvappToEmby() {
-      this.flash("back");
-      if ((await this.sendKeyThrough("back", null)).blocked) return;
-      if (!this.sendTvapprc(CMD_CLOSE_TO_EMBY)) {
-        fetch(`${config.tvTvUrl}/tv/tvapprc/back`, { method: "POST" }).catch(
-          () => {},
-        );
-      }
-    },
-
-    // Emby button while tvapp is open: loads tvapp's active show into Emby.
-    async embySelectedFromTvapp() {
-      this.flash("emby");
-      if ((await this.sendKeyThrough("emby", null)).blocked) return;
-      if (!this.sendTvapprc(CMD_EMBY_SELECTED)) {
-        fetch(`${config.tvTvUrl}/tv/tvapprc/emby`, { method: "POST" }).catch(
-          () => {},
-        );
-      }
-      // Not out of tvapprc mode here: tvapp turns this down when the show has
-      // no file or is not ready to watch, and stays where it is. The bridge's
-      // tvapp-down message is what ends the mode, and only when tvapp has
-      // really gone.
-    },
-
-    // Shows: opens tvapp on the tv, selecting tv-tv's most relevant show, or
-    // closes it if it's already open. Goes straight to tv-tv, not through the
-    // collision gate -- there's no other remote whose keypress this could
-    // step on.
-    async toggleTvapp() {
-      try {
-        await fetch(`${config.tvTvUrl}/tv/toggletvapp`, { method: "POST" });
-      } catch (_) {}
-    },
+    // tvapprc disabled -- the bridge, the commands it sent, and the Shows
+    // button's tvapp toggle:
+    //
+    // // tvapprc bridge (mirrors apps/android/App.js) -- connects directly to
+    // // hahnca.com's LAN-only bridge port so this remote learns when tvapp is
+    // // open and can drive it directly (CMD_KEY etc.) instead of the tv.
+    // _connectTvapprc() {
+    //   if (this._tvapprcDone) return;
+    //   const ws = new WebSocket(`ws://${TVAPPRC_HOST}:${TVAPPRC_PORT}`);
+    //   this._tvapprcWs = ws;
+    //   ws.onopen = () => clearTimeout(this._tvapprcOpenTimer);
+    //   ws.onerror = () => this._scheduleTvapprcRetry();
+    //   ws.onclose = () => this._scheduleTvapprcRetry();
+    //   ws.onmessage = (e) => {
+    //     if (e.data === MSG_TVAPP_UP) this.tvapprcMode = true;
+    //     else if (e.data === MSG_TVAPP_DOWN) this.tvapprcMode = false;
+    //   };
+    //   this._tvapprcOpenTimer = setTimeout(() => {
+    //     if (ws.readyState !== WebSocket.OPEN) ws.close();
+    //   }, TVAPPRC_CONNECT_TIMEOUT_MS);
+    // },
+    //
+    // _scheduleTvapprcRetry() {
+    //   if (this._tvapprcDone || this._tvapprcRetryTimer) return;
+    //   clearTimeout(this._tvapprcOpenTimer);
+    //   this._tvapprcRetryTimer = setTimeout(() => {
+    //     this._tvapprcRetryTimer = null;
+    //     this._connectTvapprc();
+    //   }, TVAPPRC_RECONNECT_MS);
+    // },
+    //
+    // sendTvapprc(message) {
+    //   const ws = this._tvapprcWs;
+    //   if (ws?.readyState !== WebSocket.OPEN) return false;
+    //   ws.send(message);
+    //   return true;
+    // },
+    //
+    // // Back button while tvapp is open: drops one level of tvapp's own focus
+    // // rather than sending the tv's back key.
+    // async closeTvappToEmby() {
+    //   this.flash("back");
+    //   if ((await this.sendKeyThrough("back", null)).blocked) return;
+    //   if (!this.sendTvapprc(CMD_CLOSE_TO_EMBY)) {
+    //     fetch(`${config.tvTvUrl}/tv/tvapprc/back`, { method: "POST" }).catch(
+    //       () => {},
+    //     );
+    //   }
+    // },
+    //
+    // // Shows button while tvapp is open: back to a clean tvapp screen.
+    // clearTvappState() {
+    //   this.flash("shows");
+    //   this.sendTvapprc(CMD_CLEAR_STATE);
+    // },
+    //
+    // // Shows: opens tvapp on the tv, selecting tv-tv's most relevant show, or
+    // // closes it if it's already open. Goes straight to tv-tv, not through the
+    // // collision gate -- there's no other remote whose keypress this could
+    // // step on.
+    // async toggleTvapp() {
+    //   try {
+    //     await fetch(`${config.tvTvUrl}/tv/toggletvapp`, { method: "POST" });
+    //   } catch (_) {}
+    // },
 
     // Human-readable label for the lockout message. openapp:/subtitle: keys
     // carry their own readable suffix already, everything else looks up
@@ -924,10 +926,7 @@ export default {
 
     // Keyboard escape — same as a short tap on the Back button.
     async _onTvBackKey() {
-      if (this.tvapprcMode) {
-        await this.closeTvappToEmby();
-        return;
-      }
+      // tvapprc disabled: while tvapp was up this sent closeTvappToEmby().
       await this.tvKey("back");
     },
 
@@ -944,30 +943,32 @@ export default {
     },
 
     startRepeat(key) {
-      if (this.tvapprcMode) {
-        this.flash(key);
-        this._repeatActive = true;
-        this._pendingLRKey = null;
-        (async () => {
-          const r = await this.sendKeyThrough(key, null);
-          if (r.blocked) return this.stopRepeat();
-          this.sendTvapprc(`${CMD_KEY},${key}`);
-          await new Promise((r) => {
-            this._repeatTimer = setTimeout(r, SCRUB_HOLD_DELAY_MS);
-          });
-          while (this._repeatActive) {
-            const rr = await this.sendKeyThrough(key, null, {
-              repeating: true,
-            });
-            if (rr.blocked) return this.stopRepeat();
-            this.sendTvapprc(`${CMD_KEY},${key}`);
-            await new Promise((r) => {
-              this._repeatTimer = setTimeout(r, 120);
-            });
-          }
-        })();
-        return;
-      }
+      // tvapprc disabled -- the arrow keys' own repeat over to tvapp:
+      //
+      // if (this.tvapprcMode) {
+      //   this.flash(key);
+      //   this._repeatActive = true;
+      //   this._pendingLRKey = null;
+      //   (async () => {
+      //     const r = await this.sendKeyThrough(key, null);
+      //     if (r.blocked) return this.stopRepeat();
+      //     this.sendTvapprc(`${CMD_KEY},${key}`);
+      //     await new Promise((r) => {
+      //       this._repeatTimer = setTimeout(r, SCRUB_HOLD_DELAY_MS);
+      //     });
+      //     while (this._repeatActive) {
+      //       const rr = await this.sendKeyThrough(key, null, {
+      //         repeating: true,
+      //       });
+      //       if (rr.blocked) return this.stopRepeat();
+      //       this.sendTvapprc(`${CMD_KEY},${key}`);
+      //       await new Promise((r) => {
+      //         this._repeatTimer = setTimeout(r, 120);
+      //       });
+      //     }
+      //   })();
+      //   return;
+      // }
       if (this.isOff || this.isOther) return;
       if (!this._debounce()) return;
       this.flash(key);
@@ -1061,7 +1062,7 @@ export default {
       clearTimeout(this._repeatTimer);
       const pendingLRKey = this._pendingLRKey;
       this._pendingLRKey = null;
-      if (this.tvapprcMode) return;
+      // tvapprc disabled: if (this.tvapprcMode) return;
       // Stop server-side scrubbing. This is a gesture-end cleanup, not a
       // keypress, and must fire even when locked (else the tv keeps scrubbing),
       // so it goes direct rather than through the collision gate.
@@ -1149,10 +1150,7 @@ export default {
     },
 
     startBackHold() {
-      if (this.tvapprcMode) {
-        this._dbStart(() => this.closeTvappToEmby());
-        return;
-      }
+      // tvapprc disabled: while tvapp was up this sent closeTvappToEmby().
       this._dbStart(() => this.tvKey("back"));
     },
     stopBackHold() {
@@ -1160,14 +1158,16 @@ export default {
     },
 
     startHomeHold() {
-      if (this.tvapprcMode) {
-        this._dbStart(async () => {
-          this.flash("sort");
-          const r = await this.sendKeyThrough(CMD_KEY_SORT, null);
-          if (!r.blocked) this.sendTvapprc(`${CMD_KEY},${CMD_KEY_SORT}`);
-        });
-        return;
-      }
+      // tvapprc disabled -- the Sort key over to tvapp:
+      //
+      // if (this.tvapprcMode) {
+      //   this._dbStart(async () => {
+      //     this.flash("sort");
+      //     const r = await this.sendKeyThrough(CMD_KEY_SORT, null);
+      //     if (!r.blocked) this.sendTvapprc(`${CMD_KEY},${CMD_KEY_SORT}`);
+      //   });
+      //   return;
+      // }
       this._dbStart(() => this.tvKey("home"));
     },
     stopHomeHold() {
@@ -1183,10 +1183,8 @@ export default {
     },
 
     startEmbyHold() {
-      if (this.tvapprcMode) {
-        this._dbStart(() => this.embySelectedFromTvapp());
-        return;
-      }
+      // tvapprc disabled: while tvapp was up this loaded tvapp's active show
+      // into Emby (embySelectedFromTvapp).
       this._armHold("emby", () =>
         this._lpStart(
           () => this.tvCmd("emby"),
@@ -1216,10 +1214,13 @@ export default {
       this._dbStop();
     },
 
+    // tvapprc disabled: this opened or closed tvapp on the tv (toggleTvapp).
+    // With that off, the button is this client's own -- it goes to the Info
+    // pane.
     startShowsHold() {
       this._dbStart(() => {
         this.flash("shows");
-        this.toggleTvapp();
+        evtBus.emit("showInfoPane");
       });
     },
     stopShowsHold() {
@@ -1463,16 +1464,18 @@ export default {
     },
 
     startSkipHold() {
-      if (this.tvapprcMode) {
-        // One message per click, no repeat: tvapp steps its own filter cursor
-        // on each one and activates the button it stops on.
-        this._dbStart(async () => {
-          this.flash("filter");
-          const r = await this.sendKeyThrough(CMD_KEY_FILTER, null);
-          if (!r.blocked) this.sendTvapprc(`${CMD_KEY},${CMD_KEY_FILTER}`);
-        });
-        return;
-      }
+      // tvapprc disabled -- the Info key over to tvapp:
+      //
+      // if (this.tvapprcMode) {
+      //   // One message per click, no repeat: the first hands the focus to the
+      //   // selected card's cardMisc and each one after that rotates it.
+      //   this._dbStart(async () => {
+      //     this.flash("info");
+      //     const r = await this.sendKeyThrough(CMD_KEY_INFO, null);
+      //     if (!r.blocked) this.sendTvapprc(`${CMD_KEY},${CMD_KEY_INFO}`);
+      //   });
+      //   return;
+      // }
       const pressedAt = Date.now();
       this._armHold("skip", () =>
         this._lpStart(
@@ -1672,12 +1675,14 @@ export default {
     },
 
     async tvKey(key) {
-      if (this.tvapprcMode) {
-        this.flash(key);
-        const r = await this.sendKeyThrough(key, null);
-        if (!r.blocked) this.sendTvapprc(`${CMD_KEY},${key}`);
-        return;
-      }
+      // tvapprc disabled -- every plain key over to tvapp:
+      //
+      // if (this.tvapprcMode) {
+      //   this.flash(key);
+      //   const r = await this.sendKeyThrough(key, null);
+      //   if (!r.blocked) this.sendTvapprc(`${CMD_KEY},${key}`);
+      //   return;
+      // }
       if (this.isOff || this.isOther) return;
       if (!this._debounce()) return;
       this.flash(key);

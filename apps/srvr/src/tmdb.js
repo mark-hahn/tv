@@ -6,6 +6,20 @@ const moviedb = new MovieDb("327192a334da700f65b882c7a69cb927");
 // so a slow map/actors pane load names the TMDB call that caused it.
 const SLOW_TMDB_MS = 1000;
 
+// A library name can carry a year to tell it from another show of the same
+// name -- "Save Me (2018)". TMDB's search finds nothing at all for that, so the
+// year comes off the query and stands in as the year to match on instead.
+const TITLE_YEAR_RE = /^(.*?)\s*\((\d{4})\)\s*$/;
+
+function splitTitleYear(showName) {
+  const match = TITLE_YEAR_RE.exec(String(showName ?? ""));
+  return match ? { title: match[1], year: match[2] } : { title: showName, year: null };
+}
+
+function candidateYear(show) {
+  return String(show?.first_air_date ?? "").slice(0, 4);
+}
+
 /**
  * Get TMDB data for a TV show
  * @param {number} id - WebSocket message ID
@@ -45,25 +59,33 @@ export async function getTmdb(params) {
       }
     }
 
+    const { title, year: titleYear } = splitTitleYear(showName);
+    const wantYear = year ?? titleYear;
+
     const startedAt = Date.now();
-    const res = await moviedb.searchTv({ query: showName });
+    const res = await moviedb.searchTv({ query: title });
     const searchMs = Date.now() - startedAt;
 
     // Find show with matching original_name, optionally prioritizing year
     const matchingTitle = smartTitleMatch(
-      showName,
+      title,
       res.results || [],
-      year,
+      wantYear,
       false,
     );
 
-    // Find the actual show object that matches the title
-    const matchingShow = matchingTitle
-      ? res.results.find(
+    // Find the actual show object that matches the title. The title alone is
+    // what came back, so with several shows under it -- which is why the name
+    // carried a year in the first place -- the year picks between them.
+    const named = matchingTitle
+      ? (res.results || []).filter(
           (show) =>
             show.name === matchingTitle || show.original_name === matchingTitle,
         )
-      : null;
+      : [];
+    const matchingShow =
+      (wantYear && named.find((show) => candidateYear(show) === String(wantYear))) ||
+      named[0];
 
     const showId = matchingShow?.id;
 

@@ -52,16 +52,19 @@ const MSG_COUNTS = "c";
 const MSG_ACTIVE_SHOW = "a";
 const CMD_OPEN_TVAPP = "o";
 const CMD_CLOSE_TO_EMBY = "b";
-const CMD_EMBY_SELECTED = "e";
+// Back to a clean tvapp screen: the show list focused and nothing else,
+// cardMisc back to its description, filters off.
+const CMD_CLEAR_STATE = "r";
 const CMD_KEY = "k";
 // Letter-skip variant of CMD_KEY, up/down only -- sent instead of CMD_KEY
 // once a held key has been auto-repeating fast long enough that tvapp's show
 // list starts jumping by starting letter instead of by row.
 const CMD_KEY_LETTER = "j";
-// Not arrows: these step tvapp's sort and filter buttons, which the arrow keys
-// cannot reach -- neither group can be focused.
+// Not arrows: sort cycles tvapp's sort buttons, which the arrow keys cannot
+// reach, and info hands the focus to the selected card's cardMisc and then
+// rotates it.
 const CMD_KEY_SORT = "sort";
-const CMD_KEY_FILTER = "filter";
+const CMD_KEY_INFO = "info";
 const CMD_FILTER = "f";
 const SCRUB_HOLD_DELAY_MS = 400;
 // tvapp arrow-key repeat: fast cadence once a hold clears the initial
@@ -935,14 +938,6 @@ export default function App() {
     await sendKeyThrough(key, `/tv/key/${key}`);
   };
 
-  // A tvapp key that is not one of this remote's own button names, so the
-  // button to flash and the collision gate's key have to be named separately.
-  const tvapprcKey = async (key, flashKey) => {
-    flash(flashKey);
-    const r = await sendKeyThrough(flashKey, null);
-    if (!r.blocked) sendTvapprc(`${CMD_KEY},${key}`);
-  };
-
   const closeTvapprcInput = () => {
     setShowTvapprcInput(false);
     Keyboard.dismiss();
@@ -982,28 +977,14 @@ export default function App() {
     }
   };
 
-  const embySelectedFromTvapp = async () => {
-    flash("shows");
-    if ((await sendKeyThrough("emby", null)).blocked) return;
-    if (!sendTvapprc(CMD_EMBY_SELECTED)) {
-      fetch(`${TV_TV_URL}/tv/tvapprc/emby`, { method: "POST" }).catch((e) =>
-        console.warn("tvapprc emby failed", e),
-      );
-    }
-    // Not out of tvapprc mode here: tvapp turns this down when the show has no
-    // file or is not ready to watch, and stays where it is. The bridge's
-    // tvapp-down message is what ends the mode, and only when tvapp has really
-    // gone.
-  };
-
   /**
-   * The Shows key, straight across between the two apps: from tvapp it leaves
-   * for Emby playing the show it was sitting on, and from Emby it stops
-   * whatever is playing (tv-tv does that as part of opening) and comes back.
+   * The Shows key while tvapp is up: the same thing it does from Emby, which
+   * is to put the tvapp show list up with nothing else in the way -- there it
+   * opens tvapp, here it clears whatever tvapp is showing back to that.
    */
-  const toggleTvapprcMode = () => {
-    if (tvapprcMode) embySelectedFromTvapp();
-    else openTvapp();
+  const clearTvappState = () => {
+    flash("shows");
+    sendTvapprc(CMD_CLEAR_STATE);
   };
 
   const startHold = (action) => {
@@ -1332,28 +1313,14 @@ export default function App() {
     setShowShows(true);
   };
 
-  // Same pane, but on the show tvapp has active instead of the playing one.
-  const openShowsPaneForTvapp = () => {
-    const name = tvapprcActiveShowRef.current;
-    if (!name) return;
-    flash("shows");
-    setActiveTab("List");
-    setSortOrder("viewed");
-    setScrollToTopOnOpen(false);
-    // Selected before the pane opens when the list is already in hand, so the
-    // list opens scrolled to the show; otherwise it waits for the load.
-    const loaded = showsListRef.current.find((s) => s.name === name);
-    if (loaded) selectShowFromList(loaded, "List");
-    else pendingShowSelectRef.current = name;
-    setShowShows(true);
-  };
-
   const startShowsHold = () => {
+    // Nothing on the hold while tvapp is up: the key is the one way back to a
+    // clean tvapp screen, so it answers the same however long it is held.
     if (tvapprcMode) {
-      lpStart(toggleTvapprcMode, openShowsPaneForTvapp);
+      dbStart(clearTvappState);
       return;
     }
-    lpStart(toggleTvapprcMode, openShowsPane);
+    lpStart(openTvapp, openShowsPane);
   };
 
   const stopShowsHold = () => {
@@ -1374,12 +1341,12 @@ export default function App() {
 
   const startSkipHold = () => {
     if (tvapprcMode) {
-      // One message per click, no repeat: tvapp steps its own filter cursor on
-      // each one and activates the button it stops on.
+      // One message per click, no repeat: the first hands the focus to the
+      // selected card's cardMisc and each one after that rotates it.
       dbStart(async () => {
-        flash("filter");
-        const r = await sendKeyThrough(CMD_KEY_FILTER, null);
-        if (!r.blocked) sendTvapprc(`${CMD_KEY},${CMD_KEY_FILTER}`);
+        flash("info");
+        const r = await sendKeyThrough(CMD_KEY_INFO, null);
+        if (!r.blocked) sendTvapprc(`${CMD_KEY},${CMD_KEY_INFO}`);
       });
       return;
     }
@@ -1436,17 +1403,8 @@ export default function App() {
     lpStop();
   };
 
-  // In tvapprc mode the ok key has two meanings: clicked it rotates tvapp's
-  // cardMisc, held it steps one level down into whatever cardMisc is showing.
   const startOkHold = () => {
     stopRepeat();
-    if (tvapprcMode) {
-      lpStart(
-        () => tvKey("ok"),
-        () => tvapprcKey("oklong", "ok"),
-      );
-      return;
-    }
     dbStart(() => tvKey("ok"));
   };
   const stopOkHold = () => {
@@ -1771,10 +1729,10 @@ export default function App() {
       onPressOut: stopRepeat,
     },
     {
-      key: tvapprcMode ? "filter" : "skip",
-      label: tvapprcMode ? "Filter" : "Skip",
+      key: tvapprcMode ? "info" : "skip",
+      label: tvapprcMode ? "Info" : "Skip",
       smallText: true,
-      bg: () => cellBg("white", tvapprcMode ? "filter" : "skip"),
+      bg: () => cellBg("white", tvapprcMode ? "info" : "skip"),
       onPress: () => {},
       onPressIn: () => startSkipHold(),
       onPressOut: () => stopSkipHold(),
@@ -1810,7 +1768,7 @@ export default function App() {
     // Row 5: shows, apps, google
     {
       key: "shows",
-      label: tvapprcMode ? "Play" : "Shows",
+      label: "Shows",
       smallText: true,
       bg: () =>
         flashBtn === "shows" ? "orange" : tvapprcMode ? "lightblue" : "white",

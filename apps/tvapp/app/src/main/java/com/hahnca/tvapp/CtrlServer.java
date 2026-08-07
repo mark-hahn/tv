@@ -12,13 +12,14 @@ import org.java_websocket.server.WebSocketServer;
  *
  * From the remote:
  *
- *   k,&lt;key&gt;     one of up/down/left/right/ok/oklong/sort/filter --
- *                  oklong being the ok key held rather than clicked
+ *   k,&lt;key&gt;     one of up/down/left/right/ok/info/sort
  *   j,&lt;key&gt;     skip variant of up/down -- sent instead of k while a hold has
  *                  been auto-repeating fast long enough to enter skip mode
  *   b              switch from tvapp to Emby, one level out at a time
  *   g              switch from tvapp to Emby right now, regardless of focus
  *   e              load the active show into Emby
+ *   r              clear the screen state: the show list focused and nothing
+ *                  else, cardMisc back to its description, filters off
  *   x              close tvapp
  *   f,&lt;text&gt;    show-list filter text
  *   s,&lt;name&gt;    select this show, exact name match -- sent by tv-tv itself
@@ -45,6 +46,7 @@ class CtrlServer extends WebSocketServer {
   private static final String CMD_BACK_TO_EMBY = "b";
   private static final String CMD_FORCE_CLOSE_TO_EMBY = "g";
   private static final String CMD_EMBY_SELECTED = "e";
+  private static final String CMD_CLEAR_STATE = "r";
   private static final String CMD_EXIT = "x";
   private static final String CMD_FILTER = "f";
   private static final String CMD_SELECT = "s";
@@ -61,6 +63,8 @@ class CtrlServer extends WebSocketServer {
     void onForceCloseToEmby();
 
     void onEmbySelected();
+
+    void onClearState();
 
     void onExit();
 
@@ -139,6 +143,8 @@ class CtrlServer extends WebSocketServer {
       listener.onForceCloseToEmby();
     } else if (CMD_EMBY_SELECTED.equals(message)) {
       listener.onEmbySelected();
+    } else if (CMD_CLEAR_STATE.equals(message)) {
+      listener.onClearState();
     } else if (CMD_EXIT.equals(message)) {
       listener.onExit();
     } else if (CMD_CUSTOM_CHANGED.equals(message)) {

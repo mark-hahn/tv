@@ -551,11 +551,6 @@ class ShowListView extends ScrollView {
     }
   }
 
-  /** Whether the focused episode's own card is up over the selected show's. */
-  boolean isEpisodeCardOpen() {
-    return episodeCardOpen;
-  }
-
   /** Whether the trailer step is worth stopping on for this show. */
   private static boolean hasTrailers(Shows.Show show) {
     return !show.trailersReady || !show.trailers.isEmpty();
@@ -852,8 +847,16 @@ class ShowListView extends ScrollView {
     // Non-Emby ("trash") shows are hidden unless the Trash filter is active.
     if (show == pinned) return true;
     if (!activeFilters.contains("Trash") && !show.inEmby) return false;
-    // Not-ready shows are hidden unless the Ready filter is active.
-    if (!activeFilters.contains("Ready") && (show.notReady || !show.waitStr.isEmpty())) return false;
+    // Not-ready shows are hidden unless the Ready filter is active -- or text
+    // has been typed, which is a search of the list by name and so has no
+    // business skipping a show that is named. Trash is not lifted the same
+    // way: every show that is not in Emby coming in is the long rebuild the
+    // Trash button puts a wait up for.
+    if (filter.isEmpty()
+        && !activeFilters.contains("Ready")
+        && (show.notReady || !show.waitStr.isEmpty())) {
+      return false;
+    }
     for (String label : activeFilters) {
       if ("Drama".equals(label) && !show.isDrama()) return false;
       if ("Comedy".equals(label) && !show.isComedy()) return false;
@@ -1342,7 +1345,7 @@ class ShowListView extends ScrollView {
         (int) dp(CARD_PAD_BOTTOM_DP));
 
     TextView header = new TextView(getContext());
-    header.setText(show.name + ", Season " + season + ", Episode " + episode);
+    header.setText("EPISODE: " + show.name + ", Season " + season + ", Episode " + episode);
     header.setTextColor(EPISODE_HEADER_COLOR);
     header.setTextSize(TypedValue.COMPLEX_UNIT_SP, NAME_TEXT_SIZE_SP);
     header.setSingleLine(true);

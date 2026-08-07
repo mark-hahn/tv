@@ -60,10 +60,11 @@ const CMD_KEY = "k";
 // once a held key has been auto-repeating fast long enough that tvapp's show
 // list starts jumping by starting letter instead of by row.
 const CMD_KEY_LETTER = "j";
-// Not arrows: sort cycles tvapp's sort buttons, which the arrow keys cannot
-// reach, and info hands the focus to the selected card's cardMisc and then
-// rotates it.
+// Not arrows: each of these hands the focus to one of tvapp's areas, which the
+// arrow keys cannot all reach -- the sort group, the filter group, and the
+// selected card's cardMisc. Info also rotates cardMisc once it is focused.
 const CMD_KEY_SORT = "sort";
+const CMD_KEY_FILTER = "filter";
 const CMD_KEY_INFO = "info";
 const CMD_FILTER = "f";
 const SCRUB_HOLD_DELAY_MS = 400;
@@ -163,6 +164,9 @@ function getViewedSortValue(show, lastViewedMap) {
 
 const COLS = 3;
 const ROWS = 5;
+// tvapprc mode adds a row of its own on top -- sort, filter, info -- so the
+// cells there are shorter than the ordinary remote's.
+const TVAPPRC_ROWS = 6;
 const BORDER = 13;
 const SCREEN_MARGIN = 30;
 
@@ -172,7 +176,10 @@ const SCREEN_MARGIN = 30;
 const CLIENT_ID = Math.random().toString(36).slice(2);
 
 export default function App() {
-  const [cellDims, setCellDims] = useState({ w: 0, h: 0 });
+  // The grid's measured size rather than the cell size worked out from it: the
+  // row count changes with tvapprc mode, which is not a layout change, so the
+  // cells have to be derived on every render instead of on measure.
+  const [gridSize, setGridSize] = useState({ w: 0, h: 0 });
   const [showStreamers, setShowStreamers] = useState(false);
   const [tvapprcMode, setTvapprcMode] = useState(false);
   const [showTvapprcInput, setShowTvapprcInput] = useState(false);
@@ -219,10 +226,12 @@ export default function App() {
   const [epiStats, setEpiStats] = useState(null);
   const onGridLayout = ({ nativeEvent: { layout } }) => {
     if (layout.width < 10 || layout.height < 10) return;
-    setCellDims({
-      w: Math.floor((layout.width - BORDER * (COLS - 1)) / COLS),
-      h: Math.floor((layout.height - BORDER * (ROWS - 1)) / ROWS),
-    });
+    setGridSize({ w: layout.width, h: layout.height });
+  };
+  const gridRows = tvapprcMode ? TVAPPRC_ROWS : ROWS;
+  const cellDims = {
+    w: Math.floor((gridSize.w - BORDER * (COLS - 1)) / COLS),
+    h: Math.floor((gridSize.h - BORDER * (gridRows - 1)) / gridRows),
   };
   const [flashBtn, setFlashBtn] = useState(null);
   const [haState, setHaState] = useState(null);
@@ -1340,16 +1349,6 @@ export default function App() {
   };
 
   const startSkipHold = () => {
-    if (tvapprcMode) {
-      // One message per click, no repeat: the first hands the focus to the
-      // selected card's cardMisc and each one after that rotates it.
-      dbStart(async () => {
-        flash("info");
-        const r = await sendKeyThrough(CMD_KEY_INFO, null);
-        if (!r.blocked) sendTvapprc(`${CMD_KEY},${CMD_KEY_INFO}`);
-      });
-      return;
-    }
     const pressedAt = Date.now();
     armHold("skip", () =>
       lpStart(
@@ -1384,15 +1383,21 @@ export default function App() {
     } catch (_) {}
   };
 
+  // The tvapprc row's three focus keys: one message per click and no repeat,
+  // since each one only says which of tvapp's areas the keys talk to next.
+  const startTvapprcFocusHold = (key) => {
+    dbStart(async () => {
+      flash(key);
+      const r = await sendKeyThrough(key, null);
+      if (!r.blocked) sendTvapprc(`${CMD_KEY},${key}`);
+    });
+  };
+
+  const stopTvapprcFocusHold = () => {
+    dbStop();
+  };
+
   const startHomeHold = () => {
-    if (tvapprcMode) {
-      dbStart(async () => {
-        flash("sort");
-        const r = await sendKeyThrough(CMD_KEY_SORT, null);
-        if (!r.blocked) sendTvapprc(`${CMD_KEY},${CMD_KEY_SORT}`);
-      });
-      return;
-    }
     armHold("home", () =>
       lpStart(() => tvKey("home"), toggleLayoutOption, 2000),
     );
@@ -1653,8 +1658,25 @@ export default function App() {
     return mode === m ? "lightblue" : "white";
   };
 
+  // The tvapprc-only top row, which pushes the ordinary five rows down one.
+  // Each key hands the focus to one of tvapp's areas.
+  const tvapprcFocusRow = [
+    { key: CMD_KEY_SORT, label: "Sort" },
+    { key: CMD_KEY_FILTER, label: "Filter" },
+    { key: CMD_KEY_INFO, label: "Info" },
+  ].map(({ key, label }) => ({
+    key,
+    label,
+    smallText: true,
+    bg: () => cellBg("white", key),
+    onPress: () => {},
+    onPressIn: () => startTvapprcFocusHold(key),
+    onPressOut: () => stopTvapprcFocusHold(),
+  }));
+
   // Button definitions — matches tvpane.vue grid order (row-major, 3 cols x 5 rows)
   const buttons = [
+    ...(tvapprcMode ? tvapprcFocusRow : []),
     // Row 1: back, up, home
     {
       key: "back",
@@ -1673,17 +1695,17 @@ export default function App() {
       onPressIn: () => startRepeat("up"),
       onPressOut: stopRepeat,
     },
+    // Blank and dead while tvapp is up: Sort has moved to the row above.
     {
-      key: tvapprcMode ? "sort" : "home",
-      label: tvapprcMode ? "Sort" : null,
-      smallText: tvapprcMode,
+      key: "home",
+      label: null,
       icon: tvapprcMode ? null : (
         <MaterialIcons name="home" size={42} color="black" />
       ),
-      bg: () => cellBg("white", tvapprcMode ? "sort" : "home"),
+      bg: () => cellBg("white", "home"),
       onPress: () => {},
-      onPressIn: () => startHomeHold(),
-      onPressOut: () => stopHomeHold(),
+      onPressIn: tvapprcMode ? undefined : () => startHomeHold(),
+      onPressOut: tvapprcMode ? undefined : () => stopHomeHold(),
     },
     // Row 2: left, ok, right
     {
@@ -1728,14 +1750,15 @@ export default function App() {
       onPressIn: () => startRepeat("down"),
       onPressOut: stopRepeat,
     },
+    // Blank and dead while tvapp is up: Info has moved to the row above.
     {
-      key: tvapprcMode ? "info" : "skip",
-      label: tvapprcMode ? "Info" : "Skip",
+      key: "skip",
+      label: tvapprcMode ? null : "Skip",
       smallText: true,
-      bg: () => cellBg("white", tvapprcMode ? "info" : "skip"),
+      bg: () => cellBg("white", "skip"),
       onPress: () => {},
-      onPressIn: () => startSkipHold(),
-      onPressOut: () => stopSkipHold(),
+      onPressIn: tvapprcMode ? undefined : () => startSkipHold(),
+      onPressOut: tvapprcMode ? undefined : () => stopSkipHold(),
     },
     // Row 4: vol-, vol+, mute
     {

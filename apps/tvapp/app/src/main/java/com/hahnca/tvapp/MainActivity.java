@@ -57,10 +57,11 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     CLEAR_FILTER_LABEL, "Drama", "Comedy", "To Try", "Continue", "Mark", "Linda", "Ready",
     TRASH_FILTER_LABEL
   };
+  private static final String SORT_ALPHA = "Alpha";
   private static final String SORT_WATCHED = "Watched";
   private static final String SORT_ADDED = "Added";
   private static final String SORT_CUSTOM = "Custom";
-  private static final String[] SORT_LABELS = {SORT_WATCHED, SORT_ADDED, SORT_CUSTOM};
+  private static final String[] SORT_LABELS = {SORT_ALPHA, SORT_WATCHED, SORT_ADDED, SORT_CUSTOM};
   // The shared settings already filtered and sorted into a show list, by the
   // same @tv/share code the web client runs on its own copy of the data.
   private static final String SHARED_FILTER_SHOWS_URL =
@@ -93,9 +94,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final int BUTTON_ACTIVE_TEXT = 0xFFFFFFFF;
   private static final int BUTTON_INACTIVE_TEXT = 0xFF000000;
   private static final int BUTTON_SELECTED_BORDER = 0xFFFF0000;
-  // The inset the filter group container keeps above and below its buttons.
+  // The inset a button group container keeps above and below its buttons.
   private static final float GROUP_INSET_DP = BUTTON_SELECTED_BORDER_DP * 2f * 0.7f * 0.7f;
-  // The whole filter group having the focus, which is a different thing from
+  // A whole button group having the focus, which is a different thing from
   // the cursor inside it: yellow around the group, red around one button.
   private static final int GROUP_FOCUS_BORDER = 0xFFFFFF00;
   private static final float GROUP_FOCUS_BORDER_DP = BUTTON_SELECTED_BORDER_DP;
@@ -149,16 +150,22 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private TextView filterLabel;
   private TrailerPlayer player;
   private LinearLayout buttonColumn;
+  private View sortGroup;
   private View filterGroup;
   private Shows.Sort sort = Shows.Sort.ALPHA;
   private boolean customOn;
-  // Which of the three the keys are talking to. Only one of them is focused at
+  // Which of the four the keys are talking to. Only one of them is focused at
   // a time, and the show list is where the screen starts and comes back to.
   private Area area = Area.LIST;
   // The filter button the group's cursor is on, which is drawn at all times --
   // whether the group has the focus or not -- so ok always has a button to
   // work.
   private String selectedFilter = CLEAR_FILTER_LABEL;
+  // The sort button the group's cursor is on. Unlike the filter cursor this is
+  // only drawn while the group has the focus, and it is put back on whichever
+  // sort is in force every time the focus arrives: the buttons are radio
+  // buttons, so the cursor starts on the one that is lit.
+  private String selectedSort = SORT_ALPHA;
   // Clear's brief lit-up confirmation that it ran, since it has no state of its
   // own to show.
   private boolean clearFlashing;
@@ -193,7 +200,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     sort = Shows.Sort.of(prefs().getString(KEY_SORT, null));
     showList.setSort(sort);
     // The column was painted while building the ui, before the remembered sort
-    // was read back, so it is showing ALPHA's no-button-active until now.
+    // was read back, so it is showing Alpha as the lit button until now.
     repaintButtons();
     String remembered = prefs().getString(KEY_SELECTED_SHOW, null);
 
@@ -354,29 +361,23 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    * What is left in the column once the tabs have moved over the tab pane: the
    * sort group and the filter group, sharing the whole height of the column
    * between them by weight rather than standing at a fixed height. Every button
-   * is one share, the filter group as many shares as it holds buttons, so the
-   * two groups keep their proportions while the fixed spacing -- the gap
-   * between the groups and the room for the filter group's focus border --
-   * comes off the top first.
+   * is one share, each group as many shares as it holds buttons, so the two
+   * groups keep their proportions while the fixed spacing -- the gap between
+   * the groups and the room for their focus borders -- comes off the top first.
    *
-   * The column's own horizontal padding is the filter group container's, so
-   * that border has room without the buttons inside it moving; the sort buttons
-   * carry the same inset as margins instead.
+   * Both groups keep their own horizontal padding, so a focus border has room
+   * without the buttons inside it moving.
    */
   private View buildButtonColumn() {
     buttonColumn = new LinearLayout(this);
     buttonColumn.setOrientation(LinearLayout.VERTICAL);
 
-    for (String label : SORT_LABELS) {
-      LinearLayout.LayoutParams params = shareOfColumn(1f);
-      params.leftMargin = (int) dp(BUTTON_PAD_H_DP);
-      params.rightMargin = (int) dp(BUTTON_PAD_H_DP);
-      params.bottomMargin = (int) dp(COLUMN_BUTTON_GAP_DP);
-      addButton(buttonColumn, label, params);
-    }
-    buttonColumn.addView(buildFilterGroup(), filterGroupParams());
+    sortGroup = buildButtonGroup(SORT_LABELS);
+    buttonColumn.addView(sortGroup, shareOfColumn(SORT_LABELS.length));
+    filterGroup = buildButtonGroup(FILTER_LABELS);
+    buttonColumn.addView(filterGroup, filterGroupParams());
     repaintButtons();
-    paintFilterGroup();
+    paintGroups();
     return buttonColumn;
   }
 
@@ -385,29 +386,27 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   /**
-   * The filter buttons, in a container of its own so the group keeps its
-   * spacing from the sort buttons above it whatever the column's height works
-   * out to, and so the focus border has something of the group's own to be
-   * drawn on.
+   * One stack of buttons in a container of its own, so the group keeps its
+   * spacing from the other group whatever the column's height works out to, and
+   * so the focus border has something of the group's own to be drawn on.
    */
-  private View buildFilterGroup() {
+  private View buildButtonGroup(String[] labels) {
     LinearLayout group = new LinearLayout(this);
     group.setOrientation(LinearLayout.VERTICAL);
     GradientDrawable groupBg = new GradientDrawable();
     groupBg.setCornerRadius(dp(BUTTON_CORNER_DP));
     group.setBackground(groupBg);
-    filterGroup = group;
     group.setPadding(
         (int) dp(BUTTON_PAD_H_DP),
         (int) dp(GROUP_INSET_DP),
         (int) dp(BUTTON_PAD_H_DP),
         (int) dp(GROUP_INSET_DP));
-    for (int i = 0; i < FILTER_LABELS.length; i++) {
+    for (int i = 0; i < labels.length; i++) {
       LinearLayout.LayoutParams params = shareOfColumn(1f);
       // Between the buttons only: below the last one is the container's own
       // padding.
-      if (i < FILTER_LABELS.length - 1) params.bottomMargin = (int) dp(COLUMN_BUTTON_GAP_DP);
-      addButton(group, FILTER_LABELS[i], params);
+      if (i < labels.length - 1) params.bottomMargin = (int) dp(COLUMN_BUTTON_GAP_DP);
+      addButton(group, labels[i], params);
     }
     return group;
   }
@@ -444,61 +443,87 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   /**
-   * Whether the group's cursor is drawn on this button. It is drawn wherever it
-   * stands, except on Clear while the group is not focused: Clear is where the
-   * cursor idles, and an outline sitting there would read as a state of its own.
+   * Whether a group's cursor is drawn on this button. The filter cursor is
+   * drawn wherever it stands, except on Clear while the group is not focused:
+   * Clear is where that cursor idles, and an outline sitting there would read
+   * as a state of its own. The sort cursor is only drawn while the sort group
+   * has the focus, since the sort in force is already saying which button it is
+   * on by being lit.
    */
   private boolean isCursorOn(String label) {
+    if (isSortLabel(label)) return area == Area.SORTS && label.equals(selectedSort);
     if (!label.equals(selectedFilter)) return false;
     return area == Area.FILTERS || !CLEAR_FILTER_LABEL.equals(label);
   }
 
-  /** The border round the whole filter group, which is only there while it has the focus. */
-  private void paintFilterGroup() {
-    GradientDrawable bg = (GradientDrawable) filterGroup.getBackground();
-    bg.setStroke(
-        area == Area.FILTERS ? (int) dp(GROUP_FOCUS_BORDER_DP) : 0, GROUP_FOCUS_BORDER);
+  private static boolean isSortLabel(String label) {
+    for (String sortLabel : SORT_LABELS) {
+      if (sortLabel.equals(label)) return true;
+    }
+    return false;
+  }
+
+  /** The border round each group, which is only there while that group has the focus. */
+  private void paintGroups() {
+    paintGroup(sortGroup, area == Area.SORTS);
+    paintGroup(filterGroup, area == Area.FILTERS);
+  }
+
+  private void paintGroup(View group, boolean focused) {
+    GradientDrawable bg = (GradientDrawable) group.getBackground();
+    bg.setStroke(focused ? (int) dp(GROUP_FOCUS_BORDER_DP) : 0, GROUP_FOCUS_BORDER);
   }
 
   /**
-   * Hands the focus to one of the three areas. The show list is the one that
+   * Hands the focus to one of the four areas. The show list is the one that
    * draws nothing of its own for it: its selected card is bordered whenever
    * cardMisc is not.
    */
   private void focusArea(Area next) {
     if (area == next) return;
     area = next;
+    // Radio buttons: the cursor arrives on whichever sort is already in force.
+    if (area == Area.SORTS) selectedSort = activeSortLabel();
     showList.setMiscFocused(area == Area.MISC);
-    paintFilterGroup();
-    // The cursor on Clear comes and goes with the group's own focus.
+    paintGroups();
+    // The cursor on Clear, and the whole sort cursor, come and go with the
+    // group's own focus.
     repaintButtons();
   }
 
   private boolean isButtonActive(String label) {
     if (CLEAR_FILTER_LABEL.equals(label)) return clearFlashing;
     if (activeFilters.contains(label)) return true;
-    if (SORT_WATCHED.equals(label)) return !customOn && sort == Shows.Sort.WATCHING;
-    if (SORT_ADDED.equals(label)) return !customOn && sort == Shows.Sort.ADDED;
-    if (SORT_CUSTOM.equals(label)) return customOn;
+    if (isSortLabel(label)) return label.equals(activeSortLabel());
     return false;
   }
 
-  /**
-   * The remote's Sort key: one step down the sort group, none of it active
-   * being the step past the bottom. No button active is the alphabetical sort,
-   * which is why the cycle has one more stop than the group has buttons.
-   */
-  private void cycleSort() {
-    if (customOn) {
-      dropCustom(false);
-      clearTextFilter();
-    } else if (sort == Shows.Sort.WATCHING) {
-      applySort(Shows.Sort.ADDED);
-    } else if (sort == Shows.Sort.ADDED) {
+  /** The one sort button that is lit: Custom wins, else whichever order is in force. */
+  private String activeSortLabel() {
+    if (customOn) return SORT_CUSTOM;
+    if (sort == Shows.Sort.WATCHING) return SORT_WATCHED;
+    if (sort == Shows.Sort.ADDED) return SORT_ADDED;
+    return SORT_ALPHA;
+  }
+
+  /** The ok key on the button the sort group's cursor is on. */
+  private void activateSelectedSort() {
+    if (SORT_CUSTOM.equals(selectedSort)) {
       customClick();
-    } else {
-      applySort(Shows.Sort.WATCHING);
+      return;
     }
+    if (customOn) {
+      // Off the Custom list, which brought its own filter text with it.
+      setCustomOn(false);
+      clearTextFilter();
+    }
+    applySort(sortForLabel(selectedSort));
+  }
+
+  private static Shows.Sort sortForLabel(String label) {
+    if (SORT_WATCHED.equals(label)) return Shows.Sort.WATCHING;
+    if (SORT_ADDED.equals(label)) return Shows.Sort.ADDED;
+    return Shows.Sort.ALPHA;
   }
 
   private void applySort(Shows.Sort newSort) {
@@ -520,7 +545,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   /**
    * Off the Custom list, because something else is narrowing the list now. The
    * settings it came from carried their own sort, so there is no sort of this
-   * app's own to fall back to: it goes alphabetical, the sort with no button.
+   * app's own to fall back to: it goes alphabetical.
    */
   private void dropCustom(boolean keepSelection) {
     if (!customOn) return;
@@ -759,14 +784,27 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   /** One button either way, stopping at the ends of the group rather than wrapping. */
   private void stepSelectedFilter(int direction) {
-    int index = 0;
-    for (int i = 0; i < FILTER_LABELS.length; i++) {
-      if (FILTER_LABELS[i].equals(selectedFilter)) index = i;
-    }
-    int next = Math.max(0, Math.min(FILTER_LABELS.length - 1, index + direction));
-    if (next == index) return;
-    selectedFilter = FILTER_LABELS[next];
+    String next = stepInGroup(FILTER_LABELS, selectedFilter, direction);
+    if (next == null) return;
+    selectedFilter = next;
     repaintButtons();
+  }
+
+  private void stepSelectedSort(int direction) {
+    String next = stepInGroup(SORT_LABELS, selectedSort, direction);
+    if (next == null) return;
+    selectedSort = next;
+    repaintButtons();
+  }
+
+  /** The label one step either way, or null at the end the step would run off. */
+  private static String stepInGroup(String[] labels, String current, int direction) {
+    int index = 0;
+    for (int i = 0; i < labels.length; i++) {
+      if (labels[i].equals(current)) index = i;
+    }
+    int next = Math.max(0, Math.min(labels.length - 1, index + direction));
+    return next == index ? null : labels[next];
   }
 
   private final Runnable clearFlashEnd =
@@ -805,7 +843,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     showList.setMiscFocused(false);
     clearTextFilter();
     applyActorFilter(null);
-    paintFilterGroup();
+    paintGroups();
     repaintButtons();
   }
 
@@ -1057,18 +1095,19 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   /**
-   * One level out: close a playing trailer, drop the episode card, leave tvapp.
+   * One level out: close a playing trailer, hand the focus back to the show
+   * list, leave tvapp.
    *
-   * The episode card is the whole of cardMisc's depth as far as this key is
-   * concerned -- closing it hands the focus back to the show list rather than
-   * stopping part way, at a cardMisc with the focus and nothing open in it.
+   * cardMisc is one level however deep into it the screen is -- the episode
+   * card included -- so this key comes out of the whole of it at once, back to
+   * the show list.
    */
   private void handleBack() {
     if (player.isPlaying()) {
       player.close();
       return;
     }
-    if (showList.isEpisodeCardOpen()) {
+    if (area == Area.MISC || area == Area.SORTS) {
       focusArea(Area.LIST);
       return;
     }
@@ -1085,9 +1124,23 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       else player.key(key);
       return;
     }
-    // The sort key is the sort group's whole story, so it is answered wherever
-    // the focus happens to be.
-    if ("sort".equals(key)) cycleSort();
+    // The three focus keys, each answered wherever the focus happens to be:
+    // they are the one way into their area, and so also the way out of every
+    // other one. Info is the exception, and only once cardMisc already has the
+    // focus, where it goes on rotating cardMisc's modes.
+    if ("sort".equals(key)) {
+      focusArea(Area.SORTS);
+      return;
+    }
+    if ("filter".equals(key)) {
+      focusArea(Area.FILTERS);
+      return;
+    }
+    if ("info".equals(key) && area != Area.MISC) {
+      focusArea(Area.MISC);
+      return;
+    }
+    if (area == Area.SORTS) sortAreaKey(key);
     else if (area == Area.FILTERS) filterAreaKey(key);
     else if (area == Area.MISC) miscAreaKey(key);
     else listAreaKey(key);
@@ -1096,7 +1149,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   /**
    * The show list has the focus: up and down move the selection, ok plays the
    * show it is on, left hands the focus to the filter group beside it, and
-   * right -- like info -- hands it to the selected card's cardMisc.
+   * right hands it to the selected card's cardMisc.
    */
   private void listAreaKey(String key) {
     if ("up".equals(key)) showList.moveSelection(-1);
@@ -1104,7 +1157,18 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     else if ("left".equals(key)) focusArea(Area.FILTERS);
     else if ("right".equals(key)) focusArea(Area.MISC);
     else if ("ok".equals(key)) embyClick();
-    else if ("info".equals(key)) focusArea(Area.MISC);
+  }
+
+  /**
+   * The sort group has the focus: up and down move its cursor, ok switches the
+   * list to the sort under it, and right hands the focus back to the show list.
+   * Left does nothing -- there is nothing to the left of the button column.
+   */
+  private void sortAreaKey(String key) {
+    if ("up".equals(key)) stepSelectedSort(-1);
+    else if ("down".equals(key)) stepSelectedSort(+1);
+    else if ("ok".equals(key)) activateSelectedSort();
+    else if ("right".equals(key)) focusArea(Area.LIST);
   }
 
   /**
@@ -1199,9 +1263,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     }
   }
 
-  /** The three things the keys can be talking to, one of them at a time. */
+  /** The four things the keys can be talking to, one of them at a time. */
   private enum Area {
     LIST,
+    SORTS,
     FILTERS,
     MISC
   }

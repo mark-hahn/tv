@@ -1359,7 +1359,7 @@ app.post("/api/local/textfile", async (req, res) => {
 });
 
 const TOR_SENT_PATH = path.join(getApiMiscDir(), "tor-sent.json");
-const TOR_SENT_HISTORY_WINDOW_MS = 60 * 24 * 60 * 60 * 1000;
+const TOR_SENT_HISTORY_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
 
 function logRecentSent(action, details = {}) {
   try {

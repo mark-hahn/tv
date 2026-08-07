@@ -964,7 +964,7 @@ export default {
     },
 
     fmtSize(bytesOrHumanString) {
-      return util.fmtBytesSize(bytesOrHumanString);
+      return util.fmtBytesSize(bytesOrHumanString).replace("GB", "Gb");
     },
 
     calcRateMb(t) {

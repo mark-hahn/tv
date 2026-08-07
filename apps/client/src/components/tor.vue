@@ -168,13 +168,14 @@
               @click.stop="torSendClick"
               :disabled="selectedItems.size === 0"
               :class="{ 'btn-disabled': selectedItems.size === 0 }"
-              style="
-                font-size: 13px;
-                cursor: pointer;
-                border-radius: 7px;
-                padding: 4px 8px;
-                border: 1px solid #bbb;
-              "
+              :style="{
+                fontSize: '13px',
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px 8px',
+                border: '1px solid #bbb',
+                '--btn-bg': sendFlash ? 'lightgray' : 'whitesmoke',
+              }"
             >
               Send
             </button>
@@ -1521,6 +1522,7 @@ export default {
 
       groupFilter: null, // non-null = group name filter is active
       groupFilterFlash: false, // true = flash button highlight for 500ms
+      sendFlash: false, // true = flash Send button highlight for 500ms
 
       showFilter: null, // non-null = show name filter is active
     };
@@ -2159,7 +2161,7 @@ export default {
       el.scrollTop = el.scrollHeight;
     },
     downloadHistoryWindowMs() {
-      return 60 * 24 * 60 * 60 * 1000;
+      return 365 * 24 * 60 * 60 * 1000;
     },
 
     async loadDownloadedHistory() {
@@ -2196,7 +2198,7 @@ export default {
         const removed = Object.keys(map).length - Object.keys(next).length;
         unilog(
           1037,
-          `pruneDownloadedHistory: removed ${removed} old entries (older than 60 days)`,
+          `pruneDownloadedHistory: removed ${removed} old entries (older than 1 year)`,
         );
         this.downloadedByHash = next;
       }
@@ -4825,6 +4827,11 @@ export default {
 
     // Send: enqueue download for each selected torrent
     async torSendClick() {
+      this.sendFlash = true;
+      window.clearTimeout(this._sendFlashTimer);
+      this._sendFlashTimer = window.setTimeout(() => {
+        this.sendFlash = false;
+      }, 500);
       for (const t of this.selectedItems) {
         void this.enqueueDownload(t, { forceDownload: false });
       }

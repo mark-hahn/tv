@@ -127,7 +127,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       "Show not ready to watch. Use map to play an episode.";
   private static final float TOAST_TEXT_SCALE = 2f;
   private static final String EMBY_PACKAGE = "com.mb.android";
-  private static final String UNMUTE_URL = "https://hahnca.com/tv-tv/tv/unmute";
   private static final String CLOSE_EMBY_SHOW_URL = "https://hahnca.com/tv-tv/tv/closeembyshow";
   private static final long KEEP_AWAKE_IDLE_MS = 5_000;
   // A back key in the first moment on screen is not the user's: coming here
@@ -161,11 +160,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // whether the group has the focus or not -- so ok always has a button to
   // work.
   private String selectedFilter = CLEAR_FILTER_LABEL;
-  // The sort button the group's cursor is on. Unlike the filter cursor this is
-  // only drawn while the group has the focus, and it is put back on whichever
-  // sort is in force every time the focus arrives: the buttons are radio
-  // buttons, so the cursor starts on the one that is lit.
-  private String selectedSort = SORT_ALPHA;
   // Clear's brief lit-up confirmation that it ran, since it has no state of its
   // own to show.
   private boolean clearFlashing;
@@ -443,15 +437,15 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   /**
-   * Whether a group's cursor is drawn on this button. The filter cursor is
-   * drawn wherever it stands, except on Clear while the group is not focused:
-   * Clear is where that cursor idles, and an outline sitting there would read
-   * as a state of its own. The sort cursor is only drawn while the sort group
-   * has the focus, since the sort in force is already saying which button it is
-   * on by being lit.
+   * Whether a group's cursor is drawn on this button. Only the filter group has
+   * one -- the sort buttons are one-of, so the lit button is already saying
+   * where up and down are working from and a second outline on it would say
+   * nothing more. It is drawn wherever it stands, except on Clear while the
+   * group is not focused: Clear is where that cursor idles, and an outline
+   * sitting there would read as a state of its own.
    */
   private boolean isCursorOn(String label) {
-    if (isSortLabel(label)) return area == Area.SORTS && label.equals(selectedSort);
+    if (isSortLabel(label)) return false;
     if (!label.equals(selectedFilter)) return false;
     return area == Area.FILTERS || !CLEAR_FILTER_LABEL.equals(label);
   }
@@ -482,12 +476,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private void focusArea(Area next) {
     if (area == next) return;
     area = next;
-    // Radio buttons: the cursor arrives on whichever sort is already in force.
-    if (area == Area.SORTS) selectedSort = activeSortLabel();
     showList.setMiscFocused(area == Area.MISC);
     paintGroups();
-    // The cursor on Clear, and the whole sort cursor, come and go with the
-    // group's own focus.
+    // The cursor on Clear comes and goes with the group's own focus.
     repaintButtons();
   }
 
@@ -506,9 +497,16 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     return SORT_ALPHA;
   }
 
-  /** The ok key on the button the sort group's cursor is on. */
-  private void activateSelectedSort() {
-    if (SORT_CUSTOM.equals(selectedSort)) {
+  /**
+   * Up or down in the focused sort group: one button either way from the one
+   * that is lit, stopping at the ends rather than wrapping, and switching the
+   * list as it goes. There is nothing to confirm afterwards -- only one sort
+   * can be on, so landing on a button is choosing it.
+   */
+  private void stepSort(int direction) {
+    String next = stepInGroup(SORT_LABELS, activeSortLabel(), direction);
+    if (next == null) return;
+    if (SORT_CUSTOM.equals(next)) {
       customClick();
       return;
     }
@@ -517,7 +515,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       setCustomOn(false);
       clearTextFilter();
     }
-    applySort(sortForLabel(selectedSort));
+    applySort(sortForLabel(next));
   }
 
   private static Shows.Sort sortForLabel(String label) {
@@ -790,13 +788,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     repaintButtons();
   }
 
-  private void stepSelectedSort(int direction) {
-    String next = stepInGroup(SORT_LABELS, selectedSort, direction);
-    if (next == null) return;
-    selectedSort = next;
-    repaintButtons();
-  }
-
   /** The label one step either way, or null at the end the step would run off. */
   private static String stepInGroup(String[] labels, String current, int direction) {
     int index = 0;
@@ -855,7 +846,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private void embyClick() {
     String trailerUrl = showList.focusedTrailerUrl();
     if (trailerUrl != null) {
-      sendUnmute();
       player.play(trailerUrl);
       return;
     }
@@ -985,19 +975,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private final Runnable clearKeepAwake =
       () -> getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
-  private void sendUnmute() {
-    new Thread(
-            () -> {
-              try {
-                Http.get(UNMUTE_URL);
-              } catch (Exception e) {
-                Log.e(TAG, "unmute failed: " + e);
-              }
-            },
-            "unmute")
-        .start();
-  }
-
   @Override
   public void onRemoteKey(String key) {
     if (showsLoading && blockedWhileLoading(key)) return;
@@ -1107,7 +1084,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       player.close();
       return;
     }
-    if (area == Area.MISC || area == Area.SORTS) {
+    if (area != Area.LIST) {
       focusArea(Area.LIST);
       return;
     }
@@ -1148,26 +1125,25 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   /**
    * The show list has the focus: up and down move the selection, ok plays the
-   * show it is on, left hands the focus to the filter group beside it, and
-   * right hands it to the selected card's cardMisc.
+   * show it is on, and right hands the focus to the selected card's cardMisc.
+   * Left does nothing -- the button groups have their own keys to reach them
+   * with.
    */
   private void listAreaKey(String key) {
     if ("up".equals(key)) showList.moveSelection(-1);
     else if ("down".equals(key)) showList.moveSelection(+1);
-    else if ("left".equals(key)) focusArea(Area.FILTERS);
     else if ("right".equals(key)) focusArea(Area.MISC);
     else if ("ok".equals(key)) embyClick();
   }
 
   /**
-   * The sort group has the focus: up and down move its cursor, ok switches the
-   * list to the sort under it, and right hands the focus back to the show list.
-   * Left does nothing -- there is nothing to the left of the button column.
+   * The sort group has the focus: up and down switch the sort, and right hands
+   * the focus back to the show list. Left does nothing -- there is nothing to
+   * the left of the button column.
    */
   private void sortAreaKey(String key) {
-    if ("up".equals(key)) stepSelectedSort(-1);
-    else if ("down".equals(key)) stepSelectedSort(+1);
-    else if ("ok".equals(key)) activateSelectedSort();
+    if ("up".equals(key)) stepSort(-1);
+    else if ("down".equals(key)) stepSort(+1);
     else if ("right".equals(key)) focusArea(Area.LIST);
   }
 

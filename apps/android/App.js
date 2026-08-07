@@ -991,8 +991,8 @@ export default function App() {
    * is to put the tvapp show list up with nothing else in the way -- there it
    * opens tvapp, here it clears whatever tvapp is showing back to that.
    */
-  const clearTvappState = () => {
-    flash("shows");
+  const clearTvappState = (flashKey) => {
+    flash(flashKey);
     sendTvapprc(CMD_CLEAR_STATE);
   };
 
@@ -1322,11 +1322,13 @@ export default function App() {
     setShowShows(true);
   };
 
-  const startShowsHold = () => {
+  // flashKey is which of the two Shows cells was the one pressed, so only that
+  // one lights up while tvapp is up.
+  const startShowsHold = (flashKey) => {
     // Nothing on the hold while tvapp is up: the key is the one way back to a
     // clean tvapp screen, so it answers the same however long it is held.
     if (tvapprcMode) {
-      dbStart(clearTvappState);
+      dbStart(() => clearTvappState(flashKey));
       return;
     }
     lpStart(openTvapp, openShowsPane);
@@ -1695,18 +1697,31 @@ export default function App() {
       onPressIn: () => startRepeat("up"),
       onPressOut: stopRepeat,
     },
-    // Blank and dead while tvapp is up: Sort has moved to the row above.
-    {
-      key: "home",
-      label: null,
-      icon: tvapprcMode ? null : (
-        <MaterialIcons name="home" size={42} color="black" />
-      ),
-      bg: () => cellBg("white", "home"),
-      onPress: () => {},
-      onPressIn: tvapprcMode ? undefined : () => startHomeHold(),
-      onPressOut: tvapprcMode ? undefined : () => stopHomeHold(),
-    },
+    // A second Shows key while tvapp is up -- the same button as the one in the
+    // bottom row, within reach of the thumb that is on the arrows. Sort, which
+    // used to be here, has moved to the row above.
+    tvapprcMode
+      ? {
+          key: "shows2",
+          label: "Shows",
+          smallText: true,
+          // Plain white, unlike the bottom row's, which is lit to say tvapprc
+          // mode is on: one such lamp on the screen is enough. It flashes under
+          // its own name so pressing it does not light the other one too.
+          bg: () => cellBg("white", "shows2"),
+          onPress: () => {},
+          onPressIn: () => startShowsHold("shows2"),
+          onPressOut: () => stopShowsHold(),
+        }
+      : {
+          key: "home",
+          label: null,
+          icon: <MaterialIcons name="home" size={42} color="black" />,
+          bg: () => cellBg("white", "home"),
+          onPress: () => {},
+          onPressIn: () => startHomeHold(),
+          onPressOut: () => stopHomeHold(),
+        },
     // Row 2: left, ok, right
     {
       key: "left",
@@ -1796,7 +1811,7 @@ export default function App() {
       bg: () =>
         flashBtn === "shows" ? "orange" : tvapprcMode ? "lightblue" : "white",
       onPress: () => {},
-      onPressIn: () => startShowsHold(),
+      onPressIn: () => startShowsHold("shows"),
       onPressOut: () => stopShowsHold(),
     },
     {

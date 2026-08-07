@@ -86,7 +86,7 @@ class ShowListView extends ScrollView {
   private static final float DESC_TEXT_SIZE_SP = 12.24f;
   // The band the description dissolves into the card over when it has more text
   // than cardMisc has room for.
-  private static final float DESC_FADE_DP = 22f;
+  private static final float DESC_FADE_DP = 11f;
   private static final int MAX_GENRES = 3;
   // The name row's metadata, which stays as bright as the name beside it.
   private static final int FIELD_COLOR = 0xFFFFFFFF;

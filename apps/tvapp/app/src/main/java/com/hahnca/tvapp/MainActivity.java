@@ -192,6 +192,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     showList.setSelectionListener(this::onShowSelected);
     sort = Shows.Sort.of(prefs().getString(KEY_SORT, null));
     showList.setSort(sort);
+    // The column was painted while building the ui, before the remembered sort
+    // was read back, so it is showing ALPHA's no-button-active until now.
+    repaintButtons();
     String remembered = prefs().getString(KEY_SELECTED_SHOW, null);
 
     showList.setCountsListener(

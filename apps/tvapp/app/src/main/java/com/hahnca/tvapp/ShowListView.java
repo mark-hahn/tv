@@ -15,11 +15,8 @@ import android.graphics.drawable.LayerDrawable;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.Layout;
-import android.text.SpannableStringBuilder;
-import android.text.Spanned;
 import android.text.TextPaint;
 import android.text.TextUtils;
-import android.text.style.StyleSpan;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -121,6 +118,9 @@ class ShowListView extends ScrollView {
   // trailer card. Red, so it is never mistaken for the selected card's blue.
   private static final int FOCUS_BORDER = 0xFFFF0000;
   private static final float FOCUS_BORDER_DP = 3f;
+  // The episode card's header, in the same red, so the card standing in for the
+  // show's is never taken for the show's own.
+  private static final int EPISODE_HEADER_COLOR = FOCUS_BORDER;
   private static final float ACTOR_NAME_TEXT_SIZE_SP = 10.8f;
   private static final float ACTOR_NAME_GAP_DP = 6f;
   private static final float MAP_SEASON_WIDTH_DP = 26f;
@@ -143,6 +143,9 @@ class ShowListView extends ScrollView {
   // One left/right press of an actor or trailer strip in its plain sub-mode,
   // where again there is no cursor -- about a card and its gap.
   private static final float STRIP_SCROLL_DP = 120f;
+  // The band an actor strip dissolves its two ends into, which is about a whole
+  // actor card -- enough to read as more cards past it rather than as a shadow.
+  private static final float STRIP_FADE_DP = 56f;
   private static final int TRASH_ICON_COLOR = 0xFFFF0000;
   private static final float TRASH_ICON_SIZE_DP = 16f;
   private static final float TRASH_ICON_STROKE_DP = 1.2f;
@@ -181,7 +184,7 @@ class ShowListView extends ScrollView {
 
   // One jump of the page-skip mode, which stands in for letter-skip in the
   // sorts where a show's first letter says nothing about where it sits.
-  private static final int PAGE_CARDS = 4;
+  private static final int PAGE_CARDS = 20;
 
   private final LinearLayout column;
   private final TextView emptyView;
@@ -250,8 +253,10 @@ class ShowListView extends ScrollView {
   private int mapSeasonIndex;
   private int mapEpisodeIndex;
   // The episode card, which covers the selected show's card while Map is at
-  // SubMode.CARD.
+  // SubMode.CARD, and the two views on it that tv-srvr's answer fills in.
   private View episodeCard;
+  private ImageView episodeStill;
+  private TextView episodeDesc;
   private String todayKey = todayKey();
 
   ShowListView(Context context) {
@@ -445,15 +450,12 @@ class ShowListView extends ScrollView {
    * trailers has no trailer step: the mode is stepped past it rather than
    * landing on an empty strip.
    *
-   * Rotating is also the way out of the actor filter, which is one of the
-   * things a sub-mode can leave behind on the whole show list.
+   * The actor filter is left alone. Rotating while it is up is rotating the
+   * cardMisc of a card in the narrowed list, which is a list to browse like any
+   * other; the filter buttons and the filter text are what lift it back off.
    */
   void rotateCardMisc() {
     if (active == null) return;
-    if (actorFilter != null && actorFilterListener != null) {
-      actorFilterListener.onActorFilter(null);
-      if (active == null) return;
-    }
     resetSubMode();
     MiscMode[] modes = MiscMode.values();
     miscMode = modes[(miscMode.ordinal() + 1) % modes.length];
@@ -474,7 +476,7 @@ class ShowListView extends ScrollView {
     if (miscMode == MiscMode.MAP) {
       if (subMode == SubMode.NONE) {
         subMode = SubMode.FOCUS;
-        mapEpisodeIndex = 0;
+        mapEpisodeIndex = defaultEpisodeIndex();
       } else if (subMode == SubMode.FOCUS) {
         subMode = SubMode.CARD;
       } else {
@@ -1188,13 +1190,24 @@ class ShowListView extends ScrollView {
     if (season < 0) return;
     View card = cards.get(active);
     if (!(card instanceof FrameLayout)) return;
-    episodeCard = buildEpisodeCard(active, season, mapEpisodeIndex + 1);
+    int episode = mapEpisodeIndex + 1;
+    episodeCard = buildEpisodeCard(active, season, episode);
     int inset = (int) dp(CARD_CONTENT_INSET_DP);
     ((FrameLayout) card)
         .addView(
             episodeCard,
             new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, cardHeightPx - 2 * inset));
+    fillEpisodeCard(active, season, episode);
+  }
+
+  /** The back key one level out of the episode card, back to its season row. */
+  boolean closeEpisodeCard() {
+    if (miscMode != MiscMode.MAP || subMode != SubMode.CARD) return false;
+    subMode = SubMode.FOCUS;
+    renderMisc(active);
+    loadVisibleMedia();
+    return true;
   }
 
   private void hideEpisodeCard() {
@@ -1205,9 +1218,10 @@ class ShowListView extends ScrollView {
   }
 
   /**
-   * The same parts as the web client's episode pane under its map -- the still,
-   * the aired date, the description -- laid out as the show card it replaces:
-   * the still where the backdrop was, and a header line where the name was.
+   * The same parts as the web client's episode pane under its map -- the still
+   * and the description -- laid out as the show card it replaces: the still
+   * where the backdrop was, and a header line where the name was. The header is
+   * red, so an episode card is never taken for the show card at a glance.
    */
   private View buildEpisodeCard(Shows.Show show, int season, int episode) {
     LinearLayout outerRow = new LinearLayout(getContext());
@@ -1235,7 +1249,7 @@ class ShowListView extends ScrollView {
 
     TextView header = new TextView(getContext());
     header.setText(show.name + ", Season " + season + ", Episode " + episode);
-    header.setTextColor(CARD_TEXT_LIGHT);
+    header.setTextColor(EPISODE_HEADER_COLOR);
     header.setTextSize(TypedValue.COMPLEX_UNIT_SP, NAME_TEXT_SIZE_SP);
     header.setSingleLine(true);
     header.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -1247,10 +1261,6 @@ class ShowListView extends ScrollView {
     TextView desc = new TextView(getContext());
     desc.setTextColor(MISC_TEXT_COLOR);
     desc.setTextSize(TypedValue.COMPLEX_UNIT_SP, DESC_TEXT_SIZE_SP);
-    // The date is in hand from the show's own record, so the card is never
-    // blank while TMDB is being asked for the still and the description.
-    String localAired = airedOf(show, season, episode);
-    desc.setText(episodeText(localAired, ""));
     FadingBox box = new FadingBox(getContext());
     box.addView(
         desc,
@@ -1265,42 +1275,32 @@ class ShowListView extends ScrollView {
 
     outerRow.addView(
         content, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+    episodeStill = still;
+    episodeDesc = desc;
+    return outerRow;
+  }
 
+  /**
+   * The still and the description, which are a tv-srvr call away. Asked for
+   * only once the card is the one on screen: an episode already looked up
+   * answers on this same call, and a card that has not been taken as the
+   * current one yet would throw that answer away as stale.
+   */
+  private void fillEpisodeCard(Shows.Show show, int season, int episode) {
+    final View card = episodeCard;
+    final ImageView still = episodeStill;
+    final TextView desc = episodeDesc;
     Episodes.get(
         show,
         season,
         episode,
         info -> {
-          // The cursor may have moved on while TMDB was answering, and this
+          // The cursor may have moved on while tv-srvr was answering, and this
           // card is thrown away and rebuilt on every move.
-          if (episodeCard != outerRow) return;
-          desc.setText(
-              episodeText(
-                  info.aired.isEmpty() ? localAired : info.aired, info.overview));
-          if (!info.image.isEmpty()) Images.into(still, info.image, outerRow);
+          if (episodeCard != card) return;
+          desc.setText(info.overview);
+          if (!info.image.isEmpty()) Images.into(still, info.image, card);
         });
-    return outerRow;
-  }
-
-  /** The aired date the show's own record holds for this episode, or empty. */
-  private static String airedOf(Shows.Show show, int season, int episode) {
-    if (show.episodeData == null) return "";
-    JSONArray episodes = show.episodeData.optJSONArray(season);
-    JSONArray tuple = episodes == null ? null : episodes.optJSONArray(episode - 1);
-    return tuple == null ? "" : tuple.optString(ED_AIRED, "");
-  }
-
-  /** The aired date in bold over the description, the way the web pane has it. */
-  private static CharSequence episodeText(String aired, String overview) {
-    String date = aired.isEmpty() || "0".equals(aired) ? "" : aired.replace('-', '/');
-    SpannableStringBuilder out = new SpannableStringBuilder();
-    if (!date.isEmpty()) {
-      out.append(date);
-      out.setSpan(new StyleSpan(Typeface.BOLD), 0, out.length(), Spanned.SPAN_INCLUSIVE_EXCLUSIVE);
-      if (!overview.isEmpty()) out.append("\n");
-    }
-    out.append(overview);
-    return out;
   }
 
   private void renderDescMisc(Shows.Show show, FrameLayout misc) {
@@ -1325,14 +1325,18 @@ class ShowListView extends ScrollView {
   }
 
   /**
-   * Holds the description and, when there is more of it than will fit, fades
-   * its last visible lines into the card so the cut does not land mid-letter.
+   * Holds the description and fades whichever end of it has more text past it
+   * into the card, so the cut never lands mid-letter. Both ends are scroll
+   * positions, not fixed: the top fades once the text has been scrolled off it,
+   * and the bottom stops fading once the last line has been scrolled to.
+   *
    * The text view is the height of the box, so how much text there really is
    * has to come from the layout it built rather than from its own height.
    */
   private class FadingBox extends FrameLayout {
 
-    private final Paint fadePaint = new Paint();
+    private final Paint topPaint = new Paint();
+    private final Paint bottomPaint = new Paint();
     private int fadeHeight;
 
     FadingBox(Context context) {
@@ -1344,7 +1348,10 @@ class ShowListView extends ScrollView {
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
       super.onSizeChanged(w, h, oldw, oldh);
       fadeHeight = Math.min(h, (int) dp(DESC_FADE_DP));
-      fadePaint.setShader(
+      topPaint.setShader(
+          new LinearGradient(
+              0, 0, 0, fadeHeight, CARD_BG, CARD_BG & 0x00FFFFFF, Shader.TileMode.CLAMP));
+      bottomPaint.setShader(
           new LinearGradient(
               0, h - fadeHeight, 0, h, CARD_BG & 0x00FFFFFF, CARD_BG, Shader.TileMode.CLAMP));
     }
@@ -1358,10 +1365,19 @@ class ShowListView extends ScrollView {
       TextView text = (TextView) child;
       Layout layout = text.getLayout();
       if (layout == null) return;
-      int needed = layout.getHeight() + text.getPaddingTop() + text.getPaddingBottom();
-      if (needed <= text.getHeight()) return;
-      canvas.drawRect(0, getHeight() - fadeHeight, getWidth(), getHeight(), fadePaint);
+      int hidden = overflow(text, layout);
+      int scrolled = text.getScrollY();
+      if (scrolled > 0) canvas.drawRect(0, 0, getWidth(), fadeHeight, topPaint);
+      if (scrolled < hidden) {
+        canvas.drawRect(0, getHeight() - fadeHeight, getWidth(), getHeight(), bottomPaint);
+      }
     }
+  }
+
+  /** How much of the text is past the bottom of the box it is drawn in. */
+  private static int overflow(TextView text, Layout layout) {
+    int needed = layout.getHeight() + text.getPaddingTop() + text.getPaddingBottom();
+    return Math.max(0, needed - text.getHeight());
   }
 
   /**
@@ -1520,12 +1536,7 @@ class ShowListView extends ScrollView {
    * word -- so the strip is laid out from their real widths.
    */
   private void renderActorsMisc(Shows.Show show, FrameLayout misc) {
-    // Regulars with a photo and nothing else: a guest is not what this strip is
-    // for, and an actor with no photo is a caption beside an empty grey box.
-    List<Shows.Actor> cast = new ArrayList<>();
-    for (Shows.Actor actor : show.characters) {
-      if (actor.featured && !actor.image.isEmpty()) cast.add(actor);
-    }
+    List<Shows.Actor> cast = castOf(show);
     if (cast.isEmpty()) {
       misc.addView(message("No cast."), centerWrap());
       return;
@@ -1541,8 +1552,28 @@ class ShowListView extends ScrollView {
       row.addView(card, mediaParams(cardWidth, height, row.getChildCount()));
       if (show == active) stripCards.add(card);
     }
-    misc.addView(scrollingStrip(show, row), centerMatchHeight(height));
+    misc.addView(scrollingStrip(show, row, true), centerMatchHeight(height));
     if (show == active) paintStripFocus();
+  }
+
+  /**
+   * The cast the strip shows, in the order the web client's Actors pane puts it
+   * in: the ones the record has a photo of first, each group by tvdb's billing
+   * order. Everyone in the record is here -- not just the ones tvdb marks as
+   * regulars, and not just the ones it has a photo of, since a missing photo is
+   * looked up rather than a reason to leave the actor out.
+   */
+  private static List<Shows.Actor> castOf(Shows.Show show) {
+    List<Shows.Actor> cast = new ArrayList<>(show.characters);
+    Collections.sort(
+        cast,
+        (a, b) -> {
+          boolean aHas = !a.image.isEmpty();
+          boolean bHas = !b.image.isEmpty();
+          if (aHas != bHas) return aHas ? -1 : 1;
+          return Integer.compare(a.sortOrder, b.sortOrder);
+        });
+    return cast;
   }
 
   private View actorCard(Shows.Actor actor, Shows.Show show, int photoWidth, int nameWidth) {
@@ -1562,7 +1593,19 @@ class ShowListView extends ScrollView {
     photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
     photo.setBackgroundColor(MEDIA_PLACEHOLDER_BG);
     card.addView(photo, new LinearLayout.LayoutParams(photoWidth, ViewGroup.LayoutParams.MATCH_PARENT));
-    addMediaRequest(show, photo, actor.image);
+    if (actor.image.isEmpty()) {
+      // Nothing in the record, so the strip asks TMDB by name, the same way the
+      // web client's Actors pane fills in the ones it is missing. Straight into
+      // the view rather than through mediaRequests: the answer arrives when it
+      // arrives, long after the pass that decides what is worth fetching.
+      ActorPhotos.get(
+          actor.name,
+          url -> {
+            if (!url.isEmpty()) Images.into(photo, url, photo);
+          });
+    } else {
+      addMediaRequest(show, photo, actor.image);
+    }
 
     // Held to the longest word's width, and then left to wrap on its own: the
     // longest word takes a line to itself and shorter ones pair up where two
@@ -1605,7 +1648,7 @@ class ShowListView extends ScrollView {
       row.addView(card, mediaParams(width, height, i));
       if (show == active) stripCards.add(card);
     }
-    misc.addView(scrollingStrip(show, row), centerMatchHeight(height));
+    misc.addView(scrollingStrip(show, row, false), centerMatchHeight(height));
     if (show == active) paintStripFocus();
   }
 
@@ -1653,10 +1696,13 @@ class ShowListView extends ScrollView {
    * The strip in something that can be scrolled past the edge of cardMisc, so
    * a cast or a trailer list of any length is all reachable. No scrollbar and
    * no touch: the only thing that moves it is the left and right keys.
+   *
+   * faded strips wear a band at whichever end still has cards past it, which is
+   * the only sign a strip too long for the card gives that there is more.
    */
-  private View scrollingStrip(Shows.Show show, LinearLayout row) {
+  private View scrollingStrip(Shows.Show show, LinearLayout row, boolean faded) {
     android.widget.HorizontalScrollView scroll =
-        new android.widget.HorizontalScrollView(getContext());
+        faded ? new FadingStrip(getContext()) : new android.widget.HorizontalScrollView(getContext());
     scroll.setHorizontalScrollBarEnabled(false);
     scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
     scroll.addView(
@@ -1665,6 +1711,40 @@ class ShowListView extends ScrollView {
             ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
     if (show == active) strip = scroll;
     return scroll;
+  }
+
+  /**
+   * A strip whose two ends dissolve into the card rather than being cut off at
+   * them. Its own class because the bands are drawn over the cards, which is
+   * after the children have been drawn and so nothing a background can do.
+   */
+  private class FadingStrip extends android.widget.HorizontalScrollView {
+
+    private final EdgeFade fade = EdgeFade.horizontal(this, STRIP_FADE_DP, CARD_BG);
+
+    FadingStrip(Context context) {
+      super(context);
+    }
+
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+      super.onSizeChanged(w, h, oldw, oldh);
+      fade.resize(w);
+    }
+
+    @Override
+    protected void onScrollChanged(int l, int t, int oldl, int oldt) {
+      super.onScrollChanged(l, t, oldl, oldt);
+      // The bands are pinned to the view while the cards move under them, so
+      // the whole of it is redrawn rather than the part that scrolled.
+      invalidate();
+    }
+
+    @Override
+    protected void dispatchDraw(Canvas canvas) {
+      super.dispatchDraw(canvas);
+      fade.draw(canvas);
+    }
   }
 
   private LinearLayout.LayoutParams mediaParams(int width, int height, int index) {
@@ -1745,10 +1825,18 @@ class ShowListView extends ScrollView {
         });
   }
 
-  /** One card of the strip either way, stopping at its two ends. */
+  /**
+   * One card of the strip either way. The trailers wrap round -- there are only
+   * ever a few, and coming back to the first is quicker than turning around --
+   * while the cast, which can run to any length, stops at its two ends.
+   */
   private void stepStripFocus(int direction) {
-    if (stripCards.isEmpty()) return;
-    int next = Math.max(0, Math.min(stripCards.size() - 1, focusIndex + direction));
+    int count = stripCards.size();
+    if (count == 0) return;
+    int next =
+        miscMode == MiscMode.TRAILERS
+            ? ((focusIndex + direction) % count + count) % count
+            : Math.max(0, Math.min(count - 1, focusIndex + direction));
     if (next == focusIndex) return;
     focusIndex = next;
     paintStripFocus();
@@ -1769,9 +1857,12 @@ class ShowListView extends ScrollView {
     if (descView == null) return;
     Layout layout = descView.getLayout();
     if (layout == null) return;
-    int max = Math.max(0, layout.getHeight() - descView.getHeight());
+    int max = overflow(descView, layout);
     int step = descView.getLineHeight() * DESC_SCROLL_LINES;
     descView.setScrollY(Math.max(0, Math.min(max, descView.getScrollY() + direction * step)));
+    // The fades are the box's, drawn over the text rather than by it, so the
+    // text scrolling on its own does not redraw them.
+    if (descView.getParent() instanceof View) ((View) descView.getParent()).invalidate();
   }
 
   /** One season either way, stopping at the show's first and last. */
@@ -1809,6 +1900,22 @@ class ShowListView extends ScrollView {
     return seasons.get(Math.max(0, Math.min(seasons.size() - 1, mapSeasonIndex)));
   }
 
+  /**
+   * The episode the cursor lands on when it first comes up: the last one of the
+   * season on show that has been watched, which is where watching left off, and
+   * the first episode when none of it has been.
+   */
+  private int defaultEpisodeIndex() {
+    int season = focusedSeason();
+    if (season < 0 || active.episodeData == null) return 0;
+    JSONArray episodes = active.episodeData.optJSONArray(season);
+    for (int i = (episodes == null ? 0 : episodes.length()) - 1; i >= 0; i--) {
+      JSONArray tuple = episodes.optJSONArray(i);
+      if (tuple != null && tuple.optInt(ED_WATCHED, 0) == 1) return i;
+    }
+    return 0;
+  }
+
   private int focusedSeasonLength() {
     int season = focusedSeason();
     if (season < 0 || active.episodeData == null) return 0;
@@ -1826,10 +1933,7 @@ class ShowListView extends ScrollView {
 
   private String focusedActorName() {
     if (active == null || focusIndex < 0) return null;
-    List<Shows.Actor> cast = new ArrayList<>();
-    for (Shows.Actor actor : active.characters) {
-      if (actor.featured && !actor.image.isEmpty()) cast.add(actor);
-    }
+    List<Shows.Actor> cast = castOf(active);
     return focusIndex < cast.size() ? cast.get(focusIndex).name : null;
   }
 

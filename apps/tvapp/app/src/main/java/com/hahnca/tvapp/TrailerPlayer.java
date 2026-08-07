@@ -30,6 +30,10 @@ class TrailerPlayer extends FrameLayout {
   // What one press of left or right moves, the same ten seconds Emby's d-pad
   // seek uses.
   private static final int SEEK_SECONDS = 10;
+  // How often the page checks whether the video has run out, and how close to
+  // its duration counts as run out.
+  private static final int END_POLL_MS = 250;
+  private static final String END_SLACK_SECONDS = "0.35";
 
   /** Told whenever the player takes the screen or gives it back. */
   interface OpenListener {
@@ -81,11 +85,17 @@ class TrailerPlayer extends FrameLayout {
     web.evaluateJavascript("window.tvKey&&tvKey('" + remoteKey + "'," + SEEK_SECONDS + ")", null);
   }
 
+  /**
+   * The screen goes back to the show list on this frame; the WebView is blanked
+   * on the next one. Tearing down a video that has just played to its end takes
+   * the WebView long enough that doing it first left the finished video sitting
+   * on screen for seconds -- a close part way through, with less to tear down,
+   * came back at once. A frame of audio past the end is nothing beside that.
+   */
   void close() {
     if (!isPlaying()) return;
-    // Blank first: a WebView left holding a playing video keeps its audio.
-    web.loadUrl("about:blank");
     setOpen(false);
+    ui.post(() -> web.loadUrl("about:blank"));
   }
 
   /**
@@ -119,9 +129,7 @@ class TrailerPlayer extends FrameLayout {
         videoId == null
             ? "<video id='v' src='"
                 + url
-                + "' autoplay playsinline class='fill' onended='"
-                + BRIDGE
-                + ".onEnded()'></video>"
+                + "' autoplay playsinline class='fill' onended='fin()'></video>"
                 + "<script>var v=document.getElementById('v');"
                 // No captions on a trailer: any the file carries are off, and
                 // stay off through the load that can add them late.
@@ -158,9 +166,7 @@ class TrailerPlayer extends FrameLayout {
                 + "toggle:function(){if(y.getPlayerState()===YT.PlayerState.PLAYING)"
                 + "y.pauseVideo();else y.playVideo();}});},"
                 + "onStateChange:function(e){nocc(e.target);"
-                + "if(e.data===YT.PlayerState.ENDED)"
-                + BRIDGE
-                + ".onEnded();else osd();}}});}</script>";
+                + "if(e.data===YT.PlayerState.ENDED)fin();else osd();}}});}</script>";
     return "<html><head><meta name='viewport' content='width=device-width,initial-scale=1'>"
         + "<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}"
         + "body{position:relative}"
@@ -186,7 +192,21 @@ class TrailerPlayer extends FrameLayout {
    * the same for a YouTube video and a file.
    */
   private static final String CONTROLLER_JS =
-      "var C=null,hideT=null;"
+      "var C=null,hideT=null,done=false;"
+          // The one way out, so a video that ran out and one that YouTube took
+          // its time telling us about leave by the same door, and only once.
+          + "function fin(){if(done)return;done=true;"
+          + BRIDGE
+          + ".onEnded();}"
+          // YouTube's own ENDED can be seconds behind the last frame, which is
+          // seconds of a finished video sitting on screen. The position says the
+          // same thing at the moment it happens, so this is what usually fires.
+          + "setInterval(function(){if(!C||done)return;"
+          + "var d=C.dur()||0,t=C.pos()||0;if(d>0&&t>=d-"
+          + END_SLACK_SECONDS
+          + ")fin();},"
+          + END_POLL_MS
+          + ");"
           + "function ctrl(c){C=c;osd();}"
           + "function fmt(s){s=Math.max(0,Math.floor(s||0));var m=Math.floor(s/60),x=s%60;"
           + "return m+':'+(x<10?'0':'')+x;}"

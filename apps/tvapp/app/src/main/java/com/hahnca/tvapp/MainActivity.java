@@ -1002,12 +1002,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     super.onDestroy();
   }
 
-  /** One level out: close a playing trailer, then leave tvapp. */
+  /** One level out: close a playing trailer, drop the episode card, leave tvapp. */
   private void handleBack() {
     if (player.isPlaying()) {
       player.close();
       return;
     }
+    if (showList.closeEpisodeCard()) return;
     backToEmby();
   }
 

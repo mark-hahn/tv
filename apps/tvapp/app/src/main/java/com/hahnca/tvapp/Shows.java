@@ -34,12 +34,16 @@ class Shows {
     // reaches this list -- tv-srvr keeps only peopleType "Actor" -- so this is
     // the whole of the difference between a regular and everyone else.
     final boolean featured;
+    // tvdb's billing order, which is what the web client's Actors pane puts the
+    // cast in. Absent is last, not first.
+    final int sortOrder;
 
     Actor(JSONObject rec) {
       name = str(rec, "actor");
       character = str(rec, "character");
       image = str(rec, "image");
       featured = rec.optBoolean("isFeatured", false);
+      sortOrder = rec.optInt("sortOrder", Integer.MAX_VALUE);
     }
   }
 

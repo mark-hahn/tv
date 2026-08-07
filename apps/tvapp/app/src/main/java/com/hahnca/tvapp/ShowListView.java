@@ -1005,7 +1005,8 @@ class ShowListView extends ScrollView {
         watchedText(show),
         show.originalCountry.toUpperCase(Locale.US),
         show.averageRuntime > 0 ? show.averageRuntime + " Mins" : "",
-        firstGenres(show.genres)));
+        firstGenres(show.genres),
+        show.imdbRatings.isEmpty() ? "" : "IMDB " + show.imdbRatings));
     info.setTextColor(FIELD_COLOR);
     info.setTextSize(TypedValue.COMPLEX_UNIT_SP, INFO_TEXT_SIZE_SP);
     info.setSingleLine(true);

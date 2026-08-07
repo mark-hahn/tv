@@ -89,6 +89,7 @@ class Shows {
     final int watchedCount; // -1 when the record has none
     final String overview;
     final String imdbId;
+    final String imdbRatings;
     // TMDB's own id for the show, out of remote_ids, or empty for the few the
     // record has none for -- what the card's landscape image is looked up by.
     final String tmdbId;
@@ -132,6 +133,7 @@ class Shows {
       watchedCount = rec.isNull("watchedCount") ? -1 : rec.optInt("watchedCount", -1);
       overview = str(rec, "overview");
       imdbId = str(rec, "imdbId");
+      imdbRatings = str(rec, "imdbRatings");
       lastPlayedDate = str(rec, "lastPlayedDate");
       dateCreated = str(rec, "dateCreated");
       inToTry = rec.optBoolean("inToTry", false);

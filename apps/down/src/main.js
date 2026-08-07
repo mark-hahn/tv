@@ -1427,7 +1427,7 @@ async function main() {
         var fileCount = 0;
         try {
           var { stdout: typesOut } = await execAsync(
-            `ssh ${usbHost} "find ~/files -mtime +${PRUNE_DAYS} -printf '%y\\n' 2>/dev/null"`,
+            `ssh ${usbHost} "find ~/files -mindepth 1 -maxdepth 1 -mtime +${PRUNE_DAYS} -printf '%y\\n' 2>/dev/null"`,
             { timeout: 5 * 60 * 1000 },
           );
           var types = typesOut
@@ -1441,7 +1441,7 @@ async function main() {
         }
         try {
           await execAsync(
-            `ssh ${usbHost} "find ~/files -mtime +${PRUNE_DAYS} -exec rm -rf {} \\; >/dev/null 2>&1"`,
+            `ssh ${usbHost} "find ~/files -mindepth 1 -maxdepth 1 -mtime +${PRUNE_DAYS} -exec rm -rf {} + >/dev/null 2>&1"`,
             { timeout: 5 * 60 * 1000 },
           );
           unilog(1779, `usb prune: deleted ${folderCount} folders, ${fileCount} files (older than ${PRUNE_DAYS} days)`);

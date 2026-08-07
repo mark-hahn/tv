@@ -781,12 +781,19 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
       );
       if (gapData) {
         const gapFields = [
+          "notReady",
           "watchGap",
           "watchGapSeason",
           "watchGapEpisode",
           "fileGap",
+          "fileGapSeason",
+          "fileGapEpisode",
           "fileEndError",
+          "fileEndErrorSeason",
+          "fileEndErrorEpisode",
           "seasonWatchedThenNofile",
+          "seasonWatchedThenNofileSeason",
+          "seasonWatchedThenNofileEpisode",
           "anyWatched",
         ];
         for (const f of gapFields) {

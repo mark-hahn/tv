@@ -54,7 +54,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // waited on rather than sat through.
   private static final String TRASH_FILTER_LABEL = "Trash";
   private static final String[] FILTER_LABELS = {
-    CLEAR_FILTER_LABEL, "Ready", "Drama", "Comedy", "To Try", "Continue", "Mark", "Linda",
+    CLEAR_FILTER_LABEL, "Drama", "Comedy", "To Try", "Continue", "Mark", "Linda", "Ready",
     TRASH_FILTER_LABEL
   };
   private static final String SORT_WATCHED = "Watched";

@@ -345,6 +345,17 @@ class ShowListView extends ScrollView {
    * when the remembered show is gone (renamed, or dropped out of Emby).
    */
   void setShows(List<Shows.Show> list, String selectedName) {
+    // A reload is data arriving underneath the user rather than anything the
+    // user did, so cardMisc keeps the mode and the cursor it was on. Everything
+    // below throws the cards away and builds them again, and the setActive that
+    // restores the selection would otherwise put the rotation back to the
+    // description -- a map the user is reading vanishing on its own the next
+    // time tv-srvr says a record changed.
+    MiscMode keptMode = miscFocused ? miscMode : MiscMode.DESC;
+    boolean keptEpisodeCard = episodeCardOpen;
+    int keptFocusIndex = focusIndex;
+    int keptSeasonIndex = mapSeasonIndex;
+    int keptEpisodeIndex = mapEpisodeIndex;
     shows.clear();
     shows.addAll(list);
     cards.clear();
@@ -376,6 +387,19 @@ class ShowListView extends ScrollView {
     }
     // Picks the top card when nothing was remembered, and lays the list out.
     apply();
+    // Only onto the same show: a selection that landed somewhere else is a show
+    // the user was not looking at, and it opens on its description like any
+    // other. The indices are the old show's own, and every mode clamps or
+    // ignores one that its new data no longer reaches.
+    if (keptMode != MiscMode.DESC && active != null && active == pinned) {
+      miscMode = keptMode;
+      episodeCardOpen = keptEpisodeCard;
+      focusIndex = keptFocusIndex;
+      mapSeasonIndex = keptSeasonIndex;
+      mapEpisodeIndex = keptEpisodeIndex;
+      renderMisc(active);
+      loadVisibleMedia();
+    }
   }
 
   /**

@@ -155,6 +155,7 @@ const VIEW_SHOW_DELAY_MS = 1000; // ms after Emby app launch before firing embyV
 const PENDING_VIEW_SHOW_MAX_AGE_MS = 10000; // ms before an unsent pending viewshow is dropped
 const EMBY_LAUNCH_DELAY_MS = 1500; // ms after launching Emby before sending it the show
 const VIEW_SHOW_RESEND_MS = 2000; // ms between show resends while Emby boots
+const EMBY_BOOT_WINDOW_MS = 40000; // ms to keep resending the show while Emby boots
 const FIRE_HOME_DELAY_MS = 0; // ms after Fire TV turns on before sending home key
 const FIRE_EMBY_DELAY_MS = 5000; // ms after Fire TV turns on before launching Emby
 
@@ -712,6 +713,21 @@ async function firePendingViewShow(label) {
   }
 }
 
+// True once the TV's Emby session is actually playing the show that was asked
+// for — the only honest confirmation that a play request survived Emby's boot.
+async function embyPlayingShow(showId, showName, episodeId) {
+  try {
+    const session = await getEmbyPlaybackSession(LIVING_ROOM_DEVICE_NAME);
+    const item = session?.NowPlayingItem;
+    if (!item) return false;
+    if (episodeId) return item.Id === episodeId;
+    return item.SeriesId === showId || item.SeriesName === showName;
+  } catch (e) {
+    unilog(1935, `could not read playback session: ${e.message}`);
+    return false;
+  }
+}
+
 let viewShowSeq = 0; // invalidates older button presses still resending
 
 app.get("/tv/viewshow", async (req, res) => {
@@ -751,21 +767,31 @@ app.get("/tv/viewshow", async (req, res) => {
   // send itself cannot tell us whether Emby is ready. Its api calls can: a
   // restarting ui talks to the server, an already-open one sits silent.
   const starting = (await embyTvLastActivity()) !== activityBefore;
-  if (!starting) {
-    await firePendingViewShow("viewshow(open)");
-    return;
-  }
-  // Emby is starting up. It silently drops anything sent while it boots and
-  // gives no honest ready signal, so resend the show every couple seconds:
-  // boot-time sends are dropped, the first send after the ui is up loads the
-  // show, and later resends just re-open the same page.
-  const deadline = Date.now() + VIEW_SHOW_DELAY_MS;
+  await firePendingViewShow(starting ? "viewshow(booting)" : "viewshow(open)");
+  // A page-open request has nothing to check afterwards, so an Emby that
+  // looked open gets the one send and no more. A play request does have an
+  // honest answer — the show either reaches NowPlayingItem or it does not —
+  // and a cold Emby is silent enough that the probe above can read it as
+  // already open while it is still dropping everything sent to it, so keep
+  // resending until playback really starts.
+  if (!play && !starting) return;
+  // Emby silently drops anything sent while it boots and gives no ready
+  // signal, so resend the show every couple seconds: boot-time sends are
+  // dropped, the first send after the ui is up loads the show, and later
+  // resends just re-open the same page.
+  const deadline = Date.now() + EMBY_BOOT_WINDOW_MS;
   while (Date.now() < deadline) {
     await sleep(VIEW_SHOW_RESEND_MS);
     if (seq !== viewShowSeq) return; // a newer press owns the tv now
+    if (play && (await embyPlayingShow(showId, showName, episodeId))) {
+      unilog(1936, `viewshow: ${showName} is playing`);
+      pendingViewShow = null;
+      return;
+    }
     pendingViewShow = { showId, showName, episodeId, play, at: Date.now() };
     await firePendingViewShow("viewshow(booting)");
   }
+  if (play) unilog(1937, `viewshow: ${showName} never started playing`);
 });
 
 // Toggle the playing/selected episode between its 2160 and 1080 versions, then

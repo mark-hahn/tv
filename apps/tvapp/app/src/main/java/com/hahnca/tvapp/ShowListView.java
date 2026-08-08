@@ -90,17 +90,19 @@ class ShowListView extends ScrollView {
   private static final float DESC_FADE_DP = 11f;
   private static final int MAX_GENRES = 3;
   // The steps NameRow shrinks its line by, in order, each one on top of the
-  // ones before it: clip the channel, drop the viewed count, clip the name,
-  // drop the channel, the status, the imdb rating, the runtime, then one genre
-  // per step from the end, and last of all the year and the country.
-  private static final int CHANNEL_CLIP_STEP = 1;
-  private static final int WATCHED_DROP_STEP = 2;
-  private static final int NAME_CLIP_STEP = 3;
-  private static final int CHANNEL_DROP_STEP = 4;
-  private static final int STATUS_DROP_STEP = 5;
-  private static final int IMDB_DROP_STEP = 6;
-  private static final int MINS_DROP_STEP = 7;
-  private static final int GENRE_STEP = 8;
+  // ones before it: shorten the word "Channel" to "Ch", clip the channel, drop the
+  // viewed count, clip the name, drop the channel, the status, the imdb
+  // rating, the runtime, then one genre per step from the end, and last of all
+  // the year and the country.
+  private static final int CHANNEL_SHORT_STEP = 1;
+  private static final int CHANNEL_CLIP_STEP = 2;
+  private static final int WATCHED_DROP_STEP = 3;
+  private static final int NAME_CLIP_STEP = 4;
+  private static final int CHANNEL_DROP_STEP = 5;
+  private static final int STATUS_DROP_STEP = 6;
+  private static final int IMDB_DROP_STEP = 7;
+  private static final int MINS_DROP_STEP = 8;
+  private static final int GENRE_STEP = 9;
   private static final int CHANNEL_MAX_CHARS = 3;
   private static final int NAME_MAX_CHARS = 25;
   // The name row's metadata, which stays as bright as the name beside it.
@@ -1127,8 +1129,13 @@ class ShowListView extends ScrollView {
       String channel = show.network;
       if (step >= CHANNEL_DROP_STEP) {
         channel = "";
-      } else if (step >= CHANNEL_CLIP_STEP && channel.length() > CHANNEL_MAX_CHARS) {
-        channel = channel.substring(0, CHANNEL_MAX_CHARS);
+      } else {
+        // "Channel 4" is the same channel as "Ch 4" and shorter, which is the
+        // cheapest thing the row can give up.
+        if (step >= CHANNEL_SHORT_STEP) channel = channel.replaceAll("(?i)\\bChannel\\b", "Ch");
+        if (step >= CHANNEL_CLIP_STEP && channel.length() > CHANNEL_MAX_CHARS) {
+          channel = channel.substring(0, CHANNEL_MAX_CHARS).trim();
+        }
       }
       StringBuilder someGenres = new StringBuilder();
       for (int i = 0; i < genres.size() - genresGone; i++) {

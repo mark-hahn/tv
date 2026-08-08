@@ -440,6 +440,14 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
     : (rec.path || rec.emby?.path || showName).split("/").pop();
   const folderDiffers = folder !== showName;
 
+  // Episodes each source vouched for this pass, as "<season>.<episode>" keys,
+  // plus a per-source ok flag. Together they decide which slots are ghosts —
+  // see the prune step below.
+  const seen = new Set();
+  let tvdbOk = false;
+  let embyOk = false;
+  let diskOk = false;
+
   // 1. TVDB aired dates — adds slots for every aired episode.
   let tvdbMap = null;
   if (sources.includes("tvdb") && rec.tvdbId) {
@@ -449,10 +457,15 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
         if (!Number.isInteger(seasonNum)) continue;
         for (const [epNum, epData] of episodes) {
           if (!Number.isInteger(epNum) || epNum < 1) continue;
+          // Vouch for every episode TVDB lists, even undated ones that get no
+          // slot written here — otherwise the prune would treat them as ghosts.
+          seen.add(`${seasonNum}.${epNum}`);
           if (epData?.aired)
             epd.setEpisode(ed, seasonNum, epNum, { aired: epData.aired });
         }
       }
+      tvdbOk =
+        Array.isArray(tvdbMap) && tvdbMap.length > 0 && !tvdbMap.partial;
     } catch (e) {
       unilog(30, `tvdb ${showName}: ${e.message}`);
     }
@@ -472,6 +485,7 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
         if (!Number.isInteger(seasonNum)) continue;
         for (const [epNum, ep] of episodes) {
           if (!Number.isInteger(epNum) || epNum < 1) continue;
+          seen.add(`${seasonNum}.${epNum}`);
           epd.setEpisode(ed, seasonNum, epNum, {
             watched: !!ep.played,
             id: ep.id ? Number(ep.id) : 0,
@@ -479,6 +493,9 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
           });
         }
       }
+      // getSeriesMap returns null on a non-200, which correctly reads as
+      // "Emby data not available" rather than "Emby has no episodes".
+      embyOk = Array.isArray(embyMap);
     } catch (e) {
       unilog(31, `emby ${showName}: ${e.message}`);
     }
@@ -508,6 +525,7 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
             const fileVal = folderDiffers
               ? `${folder}//${info.file}`
               : info.file;
+            seen.add(`${s}.${e}`);
             epd.setEpisode(ed, s, e, {
               file: fileVal,
               res: info.res,
@@ -524,6 +542,9 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
           if (epd.hasFile(ed, s, e)) epd.clearFile(ed, s, e);
         });
       }
+      // A null diskInfo means the folder is genuinely absent, which is just as
+      // authoritative as a successful scan — both vouch for zero extra files.
+      diskOk = true;
     } catch (e) {
       unilog(32, `disk ${showName}: ${e.message}`);
     }
@@ -539,6 +560,26 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
 
   // Shows not in Emby never keep files — drop id/file/res, keep aired/watched.
   if (!rec.inEmby) epd.stripToAiredWatched(ed);
+
+  // Prune ghost episodes: slots left behind by an episode that has since
+  // vanished from Emby (or TVDB), which nothing else ever removed. Only safe
+  // when every source ran and answered — a TVDB outage or an Emby non-200
+  // would leave `seen` short and eat real episodes. Shows out of Emby prune on
+  // TVDB + disk alone, since Emby contributes nothing to them by definition.
+  const allSources = ["tvdb", "emby", "disk"].every((s) => sources.includes(s));
+  const embyVouched = rec.inEmby ? embyOk : true;
+  if (allSources && tvdbOk && embyVouched && diskOk) {
+    const ghosts = epd.pruneGhosts(ed, seen);
+    if (ghosts.length > 0) {
+      const list = ghosts
+        .map(
+          ({ season, episode }) =>
+            `s${String(season).padStart(2, "0")}e${String(episode).padStart(2, "0")}`,
+        )
+        .join(" ");
+      unilog(1939, `pruned ${ghosts.length} ghost episode(s) from ${showName}: ${list}`);
+    }
+  }
 
   // Derived record fields.
   rec.quality = epd.computeQuality(ed) ?? null;

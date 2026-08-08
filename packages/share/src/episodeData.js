@@ -287,6 +287,41 @@ export function clearFile(ed, s, e) {
   setEpisode(ed, s, e, { file: null, res: null, bif: 0 });
 }
 
+// Remove an episode slot entirely, trimming trailing empties so a season (and
+// the whole array) shrinks back when its last episodes go away.
+export function deleteEpisode(ed, s, e) {
+  const season = Array.isArray(ed) ? ed[s] : null;
+  if (!Array.isArray(season)) return;
+  const i = e - 1;
+  if (i < 0 || i >= season.length) return;
+  season[i] = null;
+  while (season.length > 0 && !Array.isArray(season[season.length - 1]))
+    season.length--;
+  if (season.length === 0) {
+    ed[s] = null;
+    while (ed.length > 0 && !Array.isArray(ed[ed.length - 1])) ed.length--;
+  }
+}
+
+// Remove ghost episodes — slots no source vouches for any more. `seen` is a Set
+// of "<season>.<episode>" keys collected from the sources that were refreshed.
+// A purely local watched mark (watched, no emby id, no file) is never a ghost:
+// it is created by /api/setWatchedEpis and no source will ever report it.
+// Returns the removed episodes as [{ season, episode }, ...].
+export function pruneGhosts(ed, seen) {
+  const ghosts = [];
+  // Collect first — deleting inside the walk would skip entries.
+  forEachEpisode(ed, (s, e, ep) => {
+    if (seen.has(`${s}.${e}`)) return;
+    const localWatched =
+      ep[W] === 1 && !ep[ID] && !(typeof ep[F] === "string" && ep[F]);
+    if (localWatched) return;
+    ghosts.push({ season: s, episode: e });
+  });
+  for (const { season, episode } of ghosts) deleteEpisode(ed, season, episode);
+  return ghosts;
+}
+
 // Drop id/file/res/bif/pos for every episode (used when a show leaves Emby).
 export function stripToAiredWatched(ed) {
   forEachEpisode(ed, (s, e) => {

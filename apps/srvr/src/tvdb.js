@@ -404,6 +404,11 @@ async function getSeriesMap(tvdbId, watchedEpis = null) {
   let allEpisodes = [];
   let page = 0;
   let safety = 0;
+  // Set when pagination stopped early, so the map holds only some of the
+  // episodes. Callers that delete data from an absent episode (the ghost prune
+  // in disk.js) must not act on a partial map. JSON.stringify drops the extra
+  // array property, so the /api wire shape is unchanged.
+  let partial = false;
   const seenPages = new Set();
   const missingEpisodeNumBySeason = {};
   const missingEpisodeNumSamples = [];
@@ -435,6 +440,7 @@ async function getSeriesMap(tvdbId, watchedEpis = null) {
           page,
           status: res.status,
         });
+        partial = true;
         break;
       }
     } catch (e) {
@@ -443,6 +449,7 @@ async function getSeriesMap(tvdbId, watchedEpis = null) {
         page,
         error: e.message,
       });
+      partial = true;
       break;
     }
 
@@ -466,8 +473,14 @@ async function getSeriesMap(tvdbId, watchedEpis = null) {
     }
 
     if (nextPage === null) break;
-    if (seenPages.has(nextPage)) break;
-    if (safety++ > 50) break;
+    if (seenPages.has(nextPage)) {
+      partial = true;
+      break;
+    }
+    if (safety++ > 50) {
+      partial = true;
+      break;
+    }
     page = nextPage;
   }
 
@@ -597,9 +610,12 @@ async function getSeriesMap(tvdbId, watchedEpis = null) {
 
   // Apply watchedEpis if provided
   if (watchedEpis && watchedEpis.length > 0) {
-    return applyWatchedEpisToSeriesMap(seriesMap, watchedEpis);
+    const applied = applyWatchedEpisToSeriesMap(seriesMap, watchedEpis);
+    applied.partial = partial;
+    return applied;
   }
 
+  seriesMap.partial = partial;
   return seriesMap;
 }
 

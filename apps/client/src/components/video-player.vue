@@ -677,6 +677,27 @@
       >
         {{ subtitleLabelMap.get(choice.id) ?? choice.label }}
       </div>
+      <!-- All Off: same as off + Save for every queued episode of this show -->
+      <div
+        v-if="mode === 'chksrt'"
+        @click.stop="clickChksrtAllOff"
+        title="leave subs as-is for all queued episodes of this show"
+        style="
+          color: white;
+          font-size: 13px;
+          padding: 2px 8px;
+          border-radius: 4px;
+          border: 1px solid #666;
+          cursor: pointer;
+          user-select: none;
+          background: rgba(90, 0, 90, 0.6);
+          margin-right: 8px;
+          white-space: nowrap;
+          text-shadow: 0 0 3px #000;
+        "
+      >
+        All Off
+      </div>
       <!-- Sel button (chksrt mode only) -->
       <div
         v-if="mode === 'chksrt'"
@@ -880,6 +901,7 @@ import { config } from "../config.js";
 import {
   applySubOffset,
   chksrtOk,
+  chksrtOkShow,
   chksrtGenSrt,
   chksrtUnsnooze,
   chksrtSnooze,
@@ -1864,6 +1886,26 @@ export default {
         await this._submitChksrtSelection();
       } catch (e) {
         unilog(1059, "next error:", e);
+      }
+      this.$emit("chksrt-next", null);
+    },
+    async clickChksrtAllOff() {
+      const showName = this.chksrtShowName;
+      if (!showName) return;
+      if (
+        !window.confirm(
+          `Leave subtitles as they are for all queued episodes of ${showName}?`,
+        )
+      )
+        return;
+      try {
+        await chksrtOkShow(showName);
+      } catch (e) {
+        logHere(
+          { lvl: "error" },
+          `chksrt all off failed for ${showName}: ${e.message}`,
+        );
+        return;
       }
       this.$emit("chksrt-next", null);
     },

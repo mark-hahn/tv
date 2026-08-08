@@ -903,6 +903,10 @@ export function chksrtOk(videoPath) {
   return httpCall("/api/asr/chksrt/ok", { videoPath }, "POST");
 }
 
+export function chksrtOkShow(showName) {
+  return httpCall("/api/asr/chksrt/ok-show", { showName }, "POST");
+}
+
 export function chksrtGenSrt(videoPath) {
   return httpCall("/api/asr/chksrt/gensrt", { videoPath }, "POST");
 }

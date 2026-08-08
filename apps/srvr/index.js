@@ -2309,33 +2309,35 @@ app.post("/api/asr/chksrt/enqueue", (req, res) => {
 });
 
 app.post("/api/asr/chksrt/ok", (req, res) => {
-  const entry = subsState.subQueueChkSrt[0];
+  const { videoPath } = req.body || {};
+  if (!videoPath) {
+    res.status(400).json({ error: "videoPath required" });
+    return;
+  }
   // result saved — this file no longer needs a seekable mirror
-  mpfour.cancelEncode(req.body?.videoPath || entry?.videoFilePath || "");
-  if (entry) {
-    const base = resStripAlt(entry.videoFilePath).replace(/\.[^.]+$/, "");
-    const dir = path.dirname(entry.videoFilePath);
-    const basename = path.basename(base);
-    let hasSrt = false;
+  mpfour.cancelEncode(videoPath);
+  const base = resStripAlt(videoPath).replace(/\.[^.]+$/, "");
+  const dir = path.dirname(videoPath);
+  const basename = path.basename(base);
+  let hasSrt = false;
+  try {
+    hasSrt = fs
+      .readdirSync(dir)
+      .some((f) => f.startsWith(basename) && f.endsWith(".srt"));
+  } catch (e) {
+    unilog(1367, `srt scan failed for ${dir}: ${e.message}`);
+  }
+  if (!hasSrt) {
     try {
-      hasSrt = fs
-        .readdirSync(dir)
-        .some((f) => f.startsWith(basename) && f.endsWith(".srt"));
+      fs.writeFileSync(path.join(dir, basename + ".mb.chosen"), "", "utf8");
     } catch (e) {
-      unilog(1367, `srt scan failed for ${dir}: ${e.message}`);
-    }
-    if (!hasSrt) {
-      try {
-        fs.writeFileSync(path.join(dir, basename + ".mb.chosen"), "", "utf8");
-      } catch (e) {
-        unilog(
-          1368,
-          `chosen marker write failed for ${basename}: ${e.message}`,
-        );
-      }
+      unilog(1368, `chosen marker write failed for ${basename}: ${e.message}`);
     }
   }
-  subsState.subQueueChkSrt.shift();
+  const idx = subsState.subQueueChkSrt.findIndex(
+    (e) => e.videoFilePath === videoPath,
+  );
+  if (idx !== -1) subsState.subQueueChkSrt.splice(idx, 1);
   cleanChkSrtQueue();
   persistSubQueueChkSrt();
   publishChksrtState();
@@ -2343,24 +2345,75 @@ app.post("/api/asr/chksrt/ok", (req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/api/asr/chksrt/gensrt", (req, res) => {
-  const entry = subsState.subQueueChkSrt.shift();
-  if (entry) {
-    const showName = showNameFromFilePath(entry.videoFilePath);
-    const parsed = parseFileSeasonEpisode(entry.videoFilePath);
-    addToAsrQueue([
-      {
-        videoPath: entry.videoFilePath,
-        showName,
-        season: parsed?.season ?? 0,
-        episode: parsed?.episode ?? 0,
-        fromUI: false,
-        lowPriority: false,
-        source: "chksrt player",
-        addedAt: Date.now(),
-      },
-    ]);
+// "All Off" — same handling as /ok, applied to every queued episode of a show:
+// leave the srt files alone, mark files that have none, drop them from the queue.
+app.post("/api/asr/chksrt/ok-show", (req, res) => {
+  const { showName } = req.body || {};
+  if (!showName) {
+    res.status(400).json({ error: "showName required" });
+    return;
   }
+  const matches = subsState.subQueueChkSrt.filter(
+    (e) => showNameFromFilePath(e.videoFilePath) === showName,
+  );
+  for (const entry of matches) {
+    const videoPath = entry.videoFilePath;
+    // result saved — this file no longer needs a seekable mirror
+    mpfour.cancelEncode(videoPath);
+    const base = resStripAlt(videoPath).replace(/\.[^.]+$/, "");
+    const dir = path.dirname(videoPath);
+    const basename = path.basename(base);
+    let hasSrt = false;
+    try {
+      hasSrt = fs
+        .readdirSync(dir)
+        .some((f) => f.startsWith(basename) && f.endsWith(".srt"));
+    } catch (e) {
+      unilog(1958, `srt scan failed for ${dir}: ${e.message}`);
+    }
+    if (!hasSrt) {
+      try {
+        fs.writeFileSync(path.join(dir, basename + ".mb.chosen"), "", "utf8");
+      } catch (e) {
+        unilog(1959, `chosen marker write failed for ${basename}: ${e.message}`);
+      }
+    }
+    const idx = subsState.subQueueChkSrt.findIndex(
+      (e) => e.videoFilePath === videoPath,
+    );
+    if (idx !== -1) subsState.subQueueChkSrt.splice(idx, 1);
+  }
+  cleanChkSrtQueue();
+  persistSubQueueChkSrt();
+  publishChksrtState();
+  syncBatchMsgs();
+  res.json({ ok: true, count: matches.length });
+});
+
+app.post("/api/asr/chksrt/gensrt", (req, res) => {
+  const { videoPath } = req.body || {};
+  if (!videoPath) {
+    res.status(400).json({ error: "videoPath required" });
+    return;
+  }
+  const idx = subsState.subQueueChkSrt.findIndex(
+    (e) => e.videoFilePath === videoPath,
+  );
+  if (idx !== -1) subsState.subQueueChkSrt.splice(idx, 1);
+  const showName = showNameFromFilePath(videoPath);
+  const parsed = parseFileSeasonEpisode(videoPath);
+  addToAsrQueue([
+    {
+      videoPath,
+      showName,
+      season: parsed?.season ?? 0,
+      episode: parsed?.episode ?? 0,
+      fromUI: false,
+      lowPriority: false,
+      source: "chksrt player",
+      addedAt: Date.now(),
+    },
+  ]);
   cleanChkSrtQueue();
   persistSubQueueChkSrt();
   publishChksrtState();

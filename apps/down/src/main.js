@@ -1418,9 +1418,9 @@ async function main() {
     var PRUNE_DAYS, PRUNE_INTERVAL_MS;
     PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
     if (Date.now() - lastPruneAt >= PRUNE_INTERVAL_MS) {
-      // Inline prune.sh behavior: delete files older than 60 days on the USB host.
+      // Inline prune.sh behavior: delete files older than 90 days on the USB host.
       // Run async so it doesn't block the cycle — proceed to checkFiles immediately.
-      PRUNE_DAYS = 60;
+      PRUNE_DAYS = 90;
       lastPruneAt = Date.now();
       (async () => {
         var folderCount = 0;

@@ -2227,6 +2227,15 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     existing.lastPlayedDate ||
     existing.emby?.lastPlayedDate ||
     null;
+  // "S01E02" of the episode lastPlayedDate came from — always the same episode
+  // as that date, so the two are shown together as one "last watched".
+  tvdbData.lastPlayedEpisode =
+    paramObj.lastPlayedEpisode || existing.lastPlayedEpisode || null;
+  // The fabricated lastPlayed timestamp this app itself stamped into Emby to
+  // hide/unhide the show. Kept so a re-read that only echoes it is recognized
+  // as not a viewing and cannot overwrite the two fields above.
+  tvdbData.fakeLastPlayed =
+    paramObj.fakeLastPlayed || existing.fakeLastPlayed || null;
 
   // Flattened Disk/filesystem data (no nested object)
   tvdbData.date =

@@ -1071,7 +1071,8 @@ export default {
 
     setDates(tvdbData) {
       const show = this.show;
-      const { firstAired, lastAired, status, lastPlayedDate } = tvdbData;
+      const { firstAired, lastAired, status, lastPlayedDate, lastPlayedEpisode } =
+        tvdbData;
       const fa = firstAired || "";
       const la = lastAired || "";
       const st = status || "";
@@ -1081,8 +1082,13 @@ export default {
       else if (la) this.dates = `${la}`;
       else this.dates = "";
       this.statusTxt = st ? ` &nbsp; ${st}` : "";
+      // lastPlayedEpisode is the episode lastPlayedDate came from, so the date
+      // and the S00E00 always describe the same viewing.
+      const watchedDate = util.fmtPlayedDate(lastPlayedDate).split(" ")[0] || "";
       this.lastWatchedTxt =
-        util.fmtPlayedDate(lastPlayedDate).split(" ")[0] || "";
+        watchedDate && lastPlayedEpisode
+          ? `${watchedDate}, ${lastPlayedEpisode}`
+          : watchedDate;
     },
 
     async setSeasonsTxt(tvdbData) {

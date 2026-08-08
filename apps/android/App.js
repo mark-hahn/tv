@@ -1378,6 +1378,33 @@ export default function App() {
     dbStop();
   };
 
+  // Hide/unhide the show tvapp has selected -- the same server toggle the web
+  // client's info pane Hide button calls.
+  const startHideHold = () => {
+    dbStart(async () => {
+      const showName = tvapprcActiveShowRef.current;
+      if (!showName) return;
+      flash("hide");
+      try {
+        const res = await fetch(`${TV_SRVR_HTTP_URL}/api/hideShow`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: showName }),
+        });
+        const data = await res.json();
+        // A hidden show is done with, so the selection steps to the show that
+        // was under it. Unhiding leaves the selection where it is.
+        if (data?.action === "hidden") sendTvapprc(`${CMD_KEY},down`);
+      } catch (e) {
+        console.warn(`hide toggle failed for ${showName}: ${e.message}`);
+      }
+    });
+  };
+
+  const stopHideHold = () => {
+    dbStop();
+  };
+
   const startHomeHold = () => {
     armHold("home", () =>
       lpStart(() => tvKey("home"), toggleLayoutOption, 2000),
@@ -1739,16 +1766,27 @@ export default function App() {
       onPressIn: () => startRepeat("down"),
       onPressOut: stopRepeat,
     },
-    // Blank and dead while tvapp is up: Info has moved to the row above.
-    {
-      key: "skip",
-      label: tvapprcMode ? null : "Skip",
-      smallText: true,
-      bg: () => cellBg("white", "skip"),
-      onPress: () => {},
-      onPressIn: tvapprcMode ? undefined : () => startSkipHold(),
-      onPressOut: tvapprcMode ? undefined : () => stopSkipHold(),
-    },
+    // Skip's cell, which Info left when it moved to the row above: while tvapp
+    // is up it hides/unhides the selected show instead.
+    tvapprcMode
+      ? {
+          key: "hide",
+          label: "Hide",
+          smallText: true,
+          bg: () => cellBg("white", "hide"),
+          onPress: () => {},
+          onPressIn: () => startHideHold(),
+          onPressOut: () => stopHideHold(),
+        }
+      : {
+          key: "skip",
+          label: "Skip",
+          smallText: true,
+          bg: () => cellBg("white", "skip"),
+          onPress: () => {},
+          onPressIn: () => startSkipHold(),
+          onPressOut: () => stopSkipHold(),
+        },
     // Row 4: vol-, vol+, mute
     {
       key: "vold",

@@ -596,11 +596,19 @@
       >
         ▼
       </div>
-      <!-- Blank and dead while tvapp is up: Info has moved to the row above. -->
+      <!-- Skip's cell, which Info left when it moved to the row above: while
+           tvapp is up it hides/unhides the selected show instead. -->
       <div
         v-if="tvapprcMode"
-        :style="cellStyle('white')"
-      ></div>
+        :style="cellStyle('white', 'hide')"
+        @mousedown="startHideHold"
+        @mouseup="stopHideHold"
+        @mouseleave="stopHideHold"
+        @touchstart.prevent="startHideHold"
+        @touchend="stopHideHold"
+      >
+        Hide
+      </div>
       <div
         v-else
         :style="cellStyle('white', 'skip')"
@@ -685,9 +693,10 @@
 <script>
 import { config } from "../config.js";
 import evtBus from "../evtBus.js";
-import { wsSend, clientId, openChannel, tvRemoteKey } from "../srvr.js";
+import { wsSend, clientId, openChannel, tvRemoteKey, hideShow } from "../srvr.js";
 import allServices from "../../../tv/services.json";
 import { keyLabels } from "../keyLabels.js";
+import { logHere } from "../log.js";
 
 const SCRUB_HOLD_DELAY_MS = 400;
 const SCRUB_PING_INTERVAL_MS = 500;
@@ -705,6 +714,8 @@ const TVAPPRC_RECONNECT_MS = 2000;
 const TVAPPRC_CONNECT_TIMEOUT_MS = 5000;
 const MSG_TVAPP_UP = "u";
 const MSG_TVAPP_DOWN = "d";
+// tvapp names the show its cursor is on, which is the one Hide acts on.
+const MSG_ACTIVE_SHOW = "a";
 const CMD_OPEN_TVAPP = "o";
 const CMD_CLOSE_TO_EMBY = "b";
 // Back to a clean tvapp screen: the show list focused and nothing else,
@@ -968,11 +979,20 @@ export default {
       ws.onerror = () => this._scheduleTvapprcRetry();
       ws.onclose = () => {
         this.tvapprcMode = false;
+        this._tvapprcActiveShow = null;
         this._scheduleTvapprcRetry();
       };
       ws.onmessage = (e) => {
         if (e.data === MSG_TVAPP_UP) this.tvapprcMode = true;
-        else if (e.data === MSG_TVAPP_DOWN) this.tvapprcMode = false;
+        else if (e.data === MSG_TVAPP_DOWN) {
+          this.tvapprcMode = false;
+          this._tvapprcActiveShow = null;
+        } else if (
+          typeof e.data === "string" &&
+          e.data.startsWith(`${MSG_ACTIVE_SHOW},`)
+        ) {
+          this._tvapprcActiveShow = e.data.slice(MSG_ACTIVE_SHOW.length + 1);
+        }
       };
       this._tvapprcOpenTimer = setTimeout(() => {
         if (ws.readyState !== WebSocket.OPEN) ws.close();
@@ -1334,6 +1354,28 @@ export default {
     },
 
     stopTvapprcFocusHold() {
+      this._dbStop();
+    },
+
+    // Hide/unhide the show tvapp has selected -- the same server toggle the
+    // info pane's Hide button calls.
+    startHideHold() {
+      this._dbStart(async () => {
+        const showName = this._tvapprcActiveShow;
+        if (!showName) return;
+        this.flash("hide");
+        try {
+          const data = await hideShow(showName);
+          // A hidden show is done with, so the selection steps to the show that
+          // was under it. Unhiding leaves the selection where it is.
+          if (data?.action === "hidden") this.sendTvapprc(`${CMD_KEY},down`);
+        } catch (e) {
+          logHere({ lvl: "warn" }, `hide toggle failed for ${showName}: ${e.message}`);
+        }
+      });
+    },
+
+    stopHideHold() {
       this._dbStop();
     },
 

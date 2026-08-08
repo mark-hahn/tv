@@ -617,7 +617,11 @@
         @touchstart.prevent="startGoogleHold"
         @touchend="stopGoogleHold"
       >
-        Google
+        <span :style="powerIconStyle">
+          <span :style="powerRingStyle"></span>
+          <span :style="powerGapStyle"></span>
+          <span :style="powerBarStyle"></span>
+        </span>
       </div>
     </div>
   </div>
@@ -668,6 +672,39 @@ const CELL_BASE = {
   userSelect: "none",
 };
 
+// The power toggle on the google key, drawn rather than typed: U+23FB is
+// missing from the fonts here and on the phone and comes out as a tofu box.
+// A ring, a patch of the key's own background across the top of it, and the
+// bar standing in that gap, half way between the black the lettering is drawn
+// in and the white the key is painted.
+const POWER_GRAY = "#808080";
+const POWER_ICON = { position: "relative", width: "40px", height: "40px" };
+const POWER_RING = {
+  position: "absolute",
+  top: "3px",
+  left: "3px",
+  width: "34px",
+  height: "34px",
+  boxSizing: "border-box",
+  border: `4px solid ${POWER_GRAY}`,
+  borderRadius: "50%",
+};
+const POWER_GAP = {
+  position: "absolute",
+  top: "1px",
+  left: "13px",
+  width: "14px",
+  height: "8px",
+};
+const POWER_BAR = {
+  position: "absolute",
+  top: "0",
+  left: "18px",
+  width: "4px",
+  height: "22px",
+  backgroundColor: POWER_GRAY,
+};
+
 export default {
   name: "TvPane",
 
@@ -697,6 +734,18 @@ export default {
   },
 
   computed: {
+    powerIconStyle() {
+      return POWER_ICON;
+    },
+    powerRingStyle() {
+      return POWER_RING;
+    },
+    powerGapStyle() {
+      return { ...POWER_GAP, backgroundColor: this.modeBg("google") };
+    },
+    powerBarStyle() {
+      return POWER_BAR;
+    },
     subCurrentPlayer() {
       return (
         this.subPlayers.find(
@@ -1578,13 +1627,15 @@ export default {
       await this.fetchSubPlayers();
     },
 
+    modeBg(m) {
+      if (this.flashBtn === m) return "orange";
+      if (this.mode === m) return "lightblue";
+      if (m === "google" && this.mode === "tv") return "#ffb3c1";
+      return "white";
+    },
+
     modeBtnStyle(m) {
-      let bg;
-      if (this.flashBtn === m) bg = "orange";
-      else if (this.mode === m) bg = "lightblue";
-      else if (m === "google" && this.mode === "tv") bg = "#ffb3c1";
-      else bg = "white";
-      return { ...CELL_BASE, backgroundColor: bg };
+      return { ...CELL_BASE, backgroundColor: this.modeBg(m) };
     },
 
     cellStyle(bg, key = null) {

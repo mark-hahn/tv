@@ -412,10 +412,13 @@ class ShowListView extends ScrollView {
    * selected. It is made active before the cards are laid out so apply() keeps
    * it, rather than taking the top card and handing the panes a show that is
    * replaced a moment later.
+   *
+   * An actor filter is left standing rather than thrown away: apply() gives the
+   * custom order the list outright while it is on, so the actor narrows nothing
+   * meanwhile, and it is there again the moment the custom order comes off.
    */
   void setCustomOrder(List<String> names, String selectedName) {
     customOrder = names;
-    if (names != null) actorFilter = null;
     clearActive();
     if (names != null && selectedName != null && names.contains(selectedName)) {
       Shows.Show wanted = byName.get(selectedName);

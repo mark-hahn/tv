@@ -26,6 +26,10 @@ import { keyLabels } from "./keyLabels.js";
 // Normalize font sizes so system font scale doesn't affect the app
 const fs = (size) => size / PixelRatio.getFontScale();
 
+// The power toggle drawn on the google key -- half way between the black the
+// lettering is drawn in and the white the key is painted.
+const POWER_GRAY = "#808080";
+
 // Human-readable label for the lockout message. openapp:/subtitle: keys
 // carry their own readable suffix already, everything else looks up
 // ./keyLabels.json (see that file to change wording).
@@ -168,7 +172,10 @@ const ROWS = 5;
 // cells there are shorter than the ordinary remote's.
 const TVAPPRC_ROWS = 6;
 const BORDER = 13;
-const SCREEN_MARGIN = 30;
+// The black band around the whole remote: the part of the screen a hand
+// holding the phone lands on, so the keys are kept out of it. The grid is
+// flex:1 inside it, so widening this shrinks the keys to match.
+const SCREEN_MARGIN = 45;
 
 // Stable per-instance client id, used to ignore our own echoed remote actions
 // (a live duplicate socket would otherwise make this UI collide with itself on
@@ -1825,8 +1832,19 @@ export default function App() {
     },
     {
       key: "google",
-      label: "Google",
-      tinyText: true,
+      // Power toggle: the bar over the broken ring. Same key as ever -- it
+      // turns the TV on and opens tvapp -- just no longer named after the
+      // Google TV it lands on. Drawn rather than typed: U+23FB is in none of
+      // the fonts on this phone and comes out as a tofu box. The break in the
+      // ring is a patch of the key's own background, so it takes the color
+      // the key is currently painted.
+      icon: (
+        <View style={styles.powerIcon}>
+          <View style={styles.powerRing} />
+          <View style={[styles.powerGap, { backgroundColor: modeBg("google") }]} />
+          <View style={styles.powerBar} />
+        </View>
+      ),
       bg: () => modeBg("google"),
       onPress: () => {},
       onPressIn: () => startHold(() => googleBtn()),
@@ -3251,6 +3269,37 @@ const styles = StyleSheet.create({
   },
   cellTextLarge: {
     fontSize: fs(84),
+  },
+  // The power toggle on the google key: a ring, a patch of background across
+  // the top of it, and the bar standing in that gap.
+  powerIcon: {
+    width: 56,
+    height: 56,
+  },
+  powerRing: {
+    position: "absolute",
+    top: 5,
+    left: 5,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 5,
+    borderColor: POWER_GRAY,
+  },
+  powerGap: {
+    position: "absolute",
+    top: 3,
+    left: 20,
+    width: 16,
+    height: 9,
+  },
+  powerBar: {
+    position: "absolute",
+    top: 0,
+    left: 25,
+    width: 6,
+    height: 30,
+    backgroundColor: POWER_GRAY,
   },
 });
 

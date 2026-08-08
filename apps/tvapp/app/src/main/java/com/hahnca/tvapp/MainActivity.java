@@ -156,9 +156,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // Which of the four the keys are talking to. Only one of them is focused at
   // a time, and the show list is where the screen starts and comes back to.
   private Area area = Area.LIST;
-  // The filter button the group's cursor is on, which is drawn at all times --
-  // whether the group has the focus or not -- so ok always has a button to
-  // work.
+  // The filter button the group's cursor is on. Remembered whether the group
+  // has the focus or not, so coming back to it picks up where it left off, but
+  // only drawn while it does.
   private String selectedFilter = CLEAR_FILTER_LABEL;
   // Clear's brief lit-up confirmation that it ran, since it has no state of its
   // own to show.
@@ -440,14 +440,14 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    * Whether a group's cursor is drawn on this button. Only the filter group has
    * one -- the sort buttons are one-of, so the lit button is already saying
    * where up and down are working from and a second outline on it would say
-   * nothing more. It is drawn wherever it stands, except on Clear while the
-   * group is not focused: Clear is where that cursor idles, and an outline
-   * sitting there would read as a state of its own.
+   * nothing more. It is drawn only while the filter group has the focus: where
+   * the cursor stands is remembered either way, but an outline on a group that
+   * is not taking keys would read as a state of its own.
    */
   private boolean isCursorOn(String label) {
     if (isSortLabel(label)) return false;
-    if (!label.equals(selectedFilter)) return false;
-    return area == Area.FILTERS || !CLEAR_FILTER_LABEL.equals(label);
+    if (area != Area.FILTERS) return false;
+    return label.equals(selectedFilter);
   }
 
   private static boolean isSortLabel(String label) {
@@ -478,7 +478,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     area = next;
     showList.setMiscFocused(area == Area.MISC);
     paintGroups();
-    // The cursor on Clear comes and goes with the group's own focus.
+    // The filter cursor comes and goes with the group's own focus.
     repaintButtons();
   }
 
@@ -510,11 +510,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       customClick();
       return;
     }
-    if (customOn) {
-      // Off the Custom list, which brought its own filter text with it.
-      setCustomOn(false);
-      clearTextFilter();
-    }
+    // Off the Custom list. Whatever else is narrowing the list -- the filter
+    // buttons, the typed text, an actor -- stays exactly as it was: leaving
+    // Custom is a sort choice and nothing more.
+    if (customOn) setCustomOn(false);
     applySort(sortForLabel(next));
   }
 
@@ -559,8 +558,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private void customClick() {
     fetchCustomOrder(
         (names, selectedShow) -> {
-          clearTextFilter();
-          applyActorFilter(null);
+          // Nothing else is turned off to make room for it: the custom order is
+          // the whole list while it is on, so the filter buttons, the typed text
+          // and any actor sit inert until it comes off again.
           showList.setCustomOrder(names, selectedShow);
           setCustomOn(true);
           Log.i(TAG, "custom on: " + names.size() + " shows, selected " + selectedShow);
@@ -613,6 +613,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    * Re-filtering is a rebuild of a column of hundreds of cards -- Trash worst
    * of all, since it brings in every show that is not in Emby -- and doing it
    * first holds up the very frame the button would have turned blue on.
+   *
+   * Nothing else is turned off to let the button through: while Custom or an
+   * actor is on, that is the list, and the button lights up but narrows
+   * nothing until whichever of them it is comes off.
    */
   private void toggleFilter(String label) {
     if (activeFilters.contains(label)) activeFilters.remove(label);
@@ -623,8 +627,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     if (slow) startShowsLoading();
     ui.postDelayed(
         () -> {
-          dropCustom(false);
-          applyActorFilter(null);
           if (slow) Log.i(TAG, "trash timing: setActiveFilters in +" + since());
           showList.setActiveFilters(activeFilters);
           if (slow) Log.i(TAG, "trash timing: setActiveFilters out +" + since());
@@ -683,9 +685,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
         || "right".equals(key);
   }
 
-  /** The Clear button: every way the show list can be narrowed, all at once. */
+  /**
+   * The Clear button: every way the show list can be narrowed, all at once.
+   * The sort is not one of them -- Custom included, which stays on and stays
+   * the list being shown.
+   */
   private void clearAllFilters() {
-    dropCustom(false);
     applyActorFilter(null);
     activeFilters.clear();
     showList.setActiveFilters(activeFilters);
@@ -824,16 +829,15 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    * nothing else does, and the selected card is back on its description with
    * the episode card and any trailer gone.
    *
-   * The list itself is left as it was found -- the sort, and the filter buttons
-   * with it -- bar the two narrowings that have no button of their own to say
-   * they are on: the typed text and the actor.
+   * The list itself is left exactly as it was found -- the sort, the filter
+   * buttons, the typed text and any actor. This key is about what is on the
+   * screen, not about what is in the list; the Clear button is the one that
+   * takes narrowings off.
    */
   private void clearScreenState() {
     if (player.isPlaying()) player.close();
     area = Area.LIST;
     showList.setMiscFocused(false);
-    clearTextFilter();
-    applyActorFilter(null);
     paintGroups();
     repaintButtons();
   }

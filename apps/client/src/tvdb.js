@@ -44,12 +44,18 @@ async function tvdbFetch(pathStr, _init, retryCount = 0) {
     // Retry on network errors
     if (retryCount < MAX_RETRIES) {
       const delay = RETRY_DELAYS[retryCount];
-      unilog(1765, `tvdbFetch: network error, retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES}): ${pathStr}: ${e?.message || String(e)}`);
+      unilog(
+        1765,
+        `tvdbFetch: network error, retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES}): ${pathStr}: ${e?.message || String(e)}`,
+      );
       await new Promise((resolve) => setTimeout(resolve, delay));
       return tvdbFetch(pathStr, _init, retryCount + 1);
     }
     // Max retries exceeded
-    unilog(1766, `tvdbFetch: network error, gave up after ${MAX_RETRIES + 1} attempts: ${pathStr}: ${e?.message || String(e)}`);
+    unilog(
+      1766,
+      `tvdbFetch: network error, gave up after ${MAX_RETRIES + 1} attempts: ${pathStr}: ${e?.message || String(e)}`,
+    );
     throw e;
   }
 }
@@ -68,12 +74,18 @@ const fetchAllTvdbWithRetry = async (hasEmby = 0) => {
     } catch (err) {
       lastErr = err;
       if (attempt === retryDelays.length) break;
-      unilog(1767, `getAllTvdb failed, retrying in ${retryDelays[attempt]}ms (attempt ${attempt + 1}/${retryDelays.length + 1}): ${err?.message || String(err)}`);
+      unilog(
+        1767,
+        `getAllTvdb failed, retrying in ${retryDelays[attempt]}ms (attempt ${attempt + 1}/${retryDelays.length + 1}): ${err?.message || String(err)}`,
+      );
       await delay(retryDelays[attempt]);
     }
   }
 
-  unilog(1768, `getAllTvdb gave up after ${retryDelays.length + 1} attempts: ${lastErr?.message || String(lastErr)}`);
+  unilog(
+    1768,
+    `getAllTvdb gave up after ${retryDelays.length + 1} attempts: ${lastErr?.message || String(lastErr)}`,
+  );
   throw lastErr;
 };
 
@@ -389,6 +401,21 @@ export const getGenresByTvdbId = async (tvdbId) => {
     return obj?.data?.genres?.map((g) => g.name).filter(Boolean) || [];
   } catch (e) {
     return [];
+  }
+};
+
+// TVDB search results often carry the missing-image placeholder as image_url
+// even when the series record itself has a real poster.  This fetches the
+// poster from the series record.
+export const getImageByTvdbId = async (tvdbId) => {
+  if (!tvdbId) return null;
+  try {
+    const res = await tvdbFetch(`series/${encodeURIComponent(tvdbId)}`);
+    const obj = await res.json();
+    return obj?.data?.image || null;
+  } catch (e) {
+    unilog(1945, `getImageByTvdbId failed for ${tvdbId}: ${e?.message || String(e)}`);
+    return null;
   }
 };
 

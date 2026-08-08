@@ -64,8 +64,8 @@
 </template>
 
 <script>
-import { ref, watch, onMounted, nextTick } from "vue";
-import { srchTvdbData } from "../tvdb.js";
+import { ref, watch, onMounted, nextTick, toRaw } from "vue";
+import { srchTvdbData, getImageByTvdbId } from "../tvdb.js";
 import { unilog } from "../log.js";
 
 export default {
@@ -214,6 +214,27 @@ export default {
       }
     };
 
+    // Search results can hold the missing-image placeholder even when the
+    // series record has a real poster (that is why the info pane can show one
+    // while the card says "No Image").  Fill those in from the series record.
+    // `items` is the raw array behind tvdbList; tvdbList.value hands back a
+    // reactive proxy of it, so compare against toRaw to tell whether the list
+    // has since been replaced.
+    const fillMissingImages = async (items) => {
+      for (let i = 0; i < items.length; i++) {
+        if (toRaw(tvdbList.value) !== items) return; // list replaced under us
+        const item = tvdbList.value[i];
+        if (!item || getImageUrl(item)) continue;
+        const tvdbId = String(item.tvdb_id || item.tvdbId || "").trim();
+        if (!tvdbId) continue;
+        const image = await getImageByTvdbId(tvdbId);
+        if (toRaw(tvdbList.value) !== items) return;
+        if (!image) continue;
+        if (tvdbList.value[i] !== item) continue; // replaced by checkImages
+        tvdbList.value.splice(i, 1, { ...item, image });
+      }
+    };
+
     const loadTvdbData = async () => {
       const currentSrch = props.srchStr;
       if (!currentSrch) return;
@@ -247,6 +268,7 @@ export default {
           }
           tvdbList.value = sorted;
           void checkImages(sorted);
+          void fillMissingImages(sorted);
           await nextTick();
           if (galleryPane.value) {
             galleryPane.value.scrollTop = 0;
@@ -286,6 +308,7 @@ export default {
       async (val) => {
         if (val !== null) {
           tvdbList.value = val || [];
+          void fillMissingImages(toRaw(tvdbList.value));
           await nextTick();
           if (galleryPane.value) galleryPane.value.scrollTop = 0;
           selectedIdx.value = 0;
@@ -306,6 +329,7 @@ export default {
     onMounted(() => {
       if (props.explicitList !== null) {
         tvdbList.value = props.explicitList || [];
+        void fillMissingImages(toRaw(tvdbList.value));
         selectedIdx.value = 0;
         if (props.explicitList && props.explicitList.length > 0) {
           emit("select", props.explicitList[0]);

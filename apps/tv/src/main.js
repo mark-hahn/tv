@@ -151,6 +151,12 @@ const EMBY_LAUNCH_DELAY_MS = 1500; // ms after launching Emby before sending it 
 const VIEW_SHOW_RESEND_MS = 2000; // ms between show resends while Emby boots
 const EMBY_BOOT_WINDOW_MS = 40000; // ms to keep resending the show while Emby boots
 
+// Power-key power-on sequence: Google TV input -> Emby -> tvapp
+const POWERON_HOME_SETTLE_MS = 1500; // ms after Home before launching Emby
+const POWERON_EMBY_POLL_MS = 250; // ms between checks that Emby has started talking
+const POWERON_EMBY_WAIT_MS = 10000; // ms to wait for Emby to show any activity
+const POWERON_EMBY_SETTLE_MS = 2000; // ms after Emby is up before tvapp goes over it
+
 // Scrub control
 const SCRUB_START_COUNT = 4; // number of slow keys before speeding up
 const SCRUB_RATE_FWD_SLOW = 750; // ms between right keys for first N
@@ -509,8 +515,8 @@ function handleMsg(raw) {
         // TV just turned on from a googlebtn press — open tvapp
         if (pendingGoogleTvapp && prevPower !== "on" && state === "on") {
           pendingGoogleTvapp = false;
-          unilog(1902, "googlebtn: TV on — launching tvapp");
-          openTvappSelectingShow();
+          unilog(1952, `googlebtn: TV on — running power-on sequence`);
+          googlePowerOnSequence();
         }
         // TV just turned on with pendingGoogleHome flag set
         if (pendingGoogleHome && prevPower !== "on" && state === "on") {
@@ -598,9 +604,10 @@ app.get("/tv/googlebtn", (req, res) => {
   );
   callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
   if (braviaHaPower === "on") {
-    // TV already on — launch tvapp immediately
-    unilog(1903, "googlebtn: TV already on, launching tvapp");
-    openTvappSelectingShow();
+    // TV already on — the input may still be the tuner, so run the same
+    // sequence rather than dropping tvapp onto whatever is up
+    unilog(1953, `googlebtn: TV already on, running power-on sequence`);
+    googlePowerOnSequence();
   } else {
     // TV off — wait for state_changed on transition to "on"
     pendingGoogleTvapp = true;
@@ -2370,6 +2377,42 @@ async function closeEmbyShow() {
 // just wanting the focus back, see /tv/opentvapp) funnels through here so it
 // always comes up on lastRelevantShow rather than whatever it last happened
 // to have selected before it was closed. Resolves false if tvapp never came up.
+// Emby gives no ready signal, but a booting ui talks to the server on its way
+// up, so a change in the tv session's LastActivityDate is the closest thing to
+// one. An Emby that was already open sits silent and the wait just runs out --
+// which is the right answer for it too, it is already up.
+async function waitForEmbyActivity(before) {
+  const until = Date.now() + POWERON_EMBY_WAIT_MS;
+  while (Date.now() < until) {
+    await sleep(POWERON_EMBY_POLL_MS);
+    if ((await embyTvLastActivity()) !== before) return true;
+  }
+  return false;
+}
+
+// The power key brings the whole stack up in order. The set can come back on
+// the broadcast tuner, so the input is put on Google Android TV first; then
+// Emby is started, because tvapp backs out into it and plays through it; and
+// only once Emby is really up does tvapp go over the top of it.
+async function googlePowerOnSequence() {
+  if (tvMode !== "google") {
+    unilog(1954, `power-on: tvMode=${tvMode}, sending Home for Google TV input`);
+    callService("remote", "send_command", REMOTE_ENTITY_ID, {
+      command: "Home",
+    });
+    await sleep(POWERON_HOME_SETTLE_MS);
+  }
+  const activityBefore = await embyTvLastActivity();
+  callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
+    media_content_type: "app",
+    media_content_id: EMBY_APP_URI,
+  });
+  const started = await waitForEmbyActivity(activityBefore);
+  unilog(1955, `power-on: emby ${started ? "started" : "showed no activity"}`);
+  await sleep(POWERON_EMBY_SETTLE_MS);
+  await openTvappSelectingShow();
+}
+
 async function openTvappSelectingShow() {
   await closeEmbyShow();
   await launchTvapp();

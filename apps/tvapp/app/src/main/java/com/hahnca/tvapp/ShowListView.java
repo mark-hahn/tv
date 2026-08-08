@@ -89,6 +89,20 @@ class ShowListView extends ScrollView {
   // than cardMisc has room for.
   private static final float DESC_FADE_DP = 11f;
   private static final int MAX_GENRES = 3;
+  // The steps NameRow shrinks its line by, in order, each one on top of the
+  // ones before it: clip the channel, drop the viewed count, clip the name,
+  // drop the channel, the status, the imdb rating, the runtime, then one genre
+  // per step from the end, and last of all the year and the country.
+  private static final int CHANNEL_CLIP_STEP = 1;
+  private static final int WATCHED_DROP_STEP = 2;
+  private static final int NAME_CLIP_STEP = 3;
+  private static final int CHANNEL_DROP_STEP = 4;
+  private static final int STATUS_DROP_STEP = 5;
+  private static final int IMDB_DROP_STEP = 6;
+  private static final int MINS_DROP_STEP = 7;
+  private static final int GENRE_STEP = 8;
+  private static final int CHANNEL_MAX_CHARS = 3;
+  private static final int NAME_MAX_CHARS = 25;
   // The name row's metadata, which stays as bright as the name beside it.
   private static final int FIELD_COLOR = 0xFFFFFFFF;
   // Everything in cardMisc below that row -- description, actor names, map
@@ -1066,11 +1080,113 @@ class ShowListView extends ScrollView {
     return false;
   }
 
+  /**
+   * The card's one-line header, which fits itself to the width it is given:
+   * when the name and its metadata are wider than the row, fields are clipped
+   * and then dropped a step at a time, in the fixed order below, until what is
+   * left fits. The order of what survives never changes, only how much of it
+   * there is.
+   */
+  private class NameRow extends LinearLayout {
+
+    private final Shows.Show show;
+    private final List<String> genres = new ArrayList<>();
+    private TextView nameView;
+    private TextView infoView;
+
+    NameRow(Context context, Shows.Show show) {
+      super(context);
+      this.show = show;
+      String kept = firstGenres(show.genres);
+      if (!kept.isEmpty()) genres.addAll(Arrays.asList(kept.split(", ")));
+    }
+
+    void setNameView(TextView view) {
+      nameView = view;
+    }
+
+    void setInfoView(TextView view) {
+      infoView = view;
+    }
+
+    /** One step past the last one, which is the most stripped the row gets. */
+    private int stepCount() {
+      return GENRE_STEP + genres.size() + 2;
+    }
+
+    private String nameFor(int step) {
+      // Clip the name -- the one step that touches it -- and mark the clip,
+      // unlike the channel's silent one.
+      if (step < NAME_CLIP_STEP || show.name.length() <= NAME_MAX_CHARS) return show.name;
+      return show.name.substring(0, NAME_MAX_CHARS) + "...";
+    }
+
+    String infoFor(int step) {
+      int genresGone = Math.min(genres.size(), Math.max(0, step - GENRE_STEP + 1));
+      int yearStep = GENRE_STEP + genres.size();
+      String channel = show.network;
+      if (step >= CHANNEL_DROP_STEP) {
+        channel = "";
+      } else if (step >= CHANNEL_CLIP_STEP && channel.length() > CHANNEL_MAX_CHARS) {
+        channel = channel.substring(0, CHANNEL_MAX_CHARS);
+      }
+      StringBuilder someGenres = new StringBuilder();
+      for (int i = 0; i < genres.size() - genresGone; i++) {
+        if (i > 0) someGenres.append(", ");
+        someGenres.append(genres.get(i));
+      }
+      return joinDash(
+        step >= yearStep + 1 ? "" : year(show.firstAired),
+        step >= STATUS_DROP_STEP ? "" : show.status,
+        step >= WATCHED_DROP_STEP ? "" : watchedText(show),
+        step >= yearStep + 2 ? "" : show.originalCountry.toUpperCase(Locale.US),
+        channel,
+        step >= MINS_DROP_STEP || show.averageRuntime <= 0
+          ? "" : show.averageRuntime + " Mins",
+        someGenres.toString(),
+        step >= IMDB_DROP_STEP || show.imdbRatings.isEmpty()
+          ? "" : "IMDB " + show.imdbRatings);
+    }
+
+    @Override
+    protected void onMeasure(int widthSpec, int heightSpec) {
+      if (nameView != null && infoView != null) {
+        // What is left for the two texts once the row's padding, the trash
+        // can, and every child's margins have been taken off it.
+        int avail = MeasureSpec.getSize(widthSpec) - getPaddingLeft() - getPaddingRight();
+        for (int i = 0; i < getChildCount(); i++) {
+          View child = getChildAt(i);
+          LayoutParams lp = (LayoutParams) child.getLayoutParams();
+          avail -= lp.leftMargin + lp.rightMargin;
+          if (child != nameView && child != infoView && lp.width > 0) avail -= lp.width;
+        }
+        int last = stepCount() - 1;
+        for (int step = 0; step <= last; step++) {
+          String nameText = nameFor(step);
+          String infoText = infoFor(step);
+          float wide =
+            nameView.getPaint().measureText(nameText) + infoView.getPaint().measureText(infoText);
+          if (step == last || Math.ceil(wide) <= avail) {
+            setTextIfNew(nameView, nameText);
+            setTextIfNew(infoView, infoText);
+            break;
+          }
+        }
+      }
+      super.onMeasure(widthSpec, heightSpec);
+    }
+
+    /** Only a real change, so a settled row does not ask for another layout. */
+    private void setTextIfNew(TextView view, String text) {
+      if (!text.contentEquals(view.getText())) view.setText(text);
+    }
+  }
+
   private View buildCard(Shows.Show show) {
     // Everything on one line: the name, then the trash can for a show that is
     // not in Emby, then the metadata run together with dashes. Baselines rather
     // than box edges, so the smaller metadata sits on the name's own bottom.
-    LinearLayout nameRow = new LinearLayout(getContext());
+    NameRow nameRow = new NameRow(getContext(), show);
     nameRow.setOrientation(LinearLayout.HORIZONTAL);
     nameRow.setGravity(Gravity.BOTTOM);
     nameRow.setBaselineAligned(true);
@@ -1078,6 +1194,7 @@ class ShowListView extends ScrollView {
     TextView name = new TextView(getContext());
     name.setText(show.name);
     name.setTextColor(CARD_TEXT_LIGHT);
+    nameRow.setNameView(name);
     name.setTextSize(TypedValue.COMPLEX_UNIT_SP, NAME_TEXT_SIZE_SP);
     name.setSingleLine(true);
     name.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -1097,15 +1214,8 @@ class ShowListView extends ScrollView {
     }
 
     TextView info = new TextView(getContext());
-    info.setText(
-      joinDash(
-        year(show.firstAired),
-        show.status,
-        watchedText(show),
-        show.originalCountry.toUpperCase(Locale.US),
-        show.averageRuntime > 0 ? show.averageRuntime + " Mins" : "",
-        firstGenres(show.genres),
-        show.imdbRatings.isEmpty() ? "" : "IMDB " + show.imdbRatings));
+    info.setText(nameRow.infoFor(0));
+    nameRow.setInfoView(info);
     info.setTextColor(FIELD_COLOR);
     info.setTextSize(TypedValue.COMPLEX_UNIT_SP, INFO_TEXT_SIZE_SP);
     info.setSingleLine(true);

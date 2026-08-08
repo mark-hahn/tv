@@ -216,12 +216,16 @@ export function getSortKey(show, sortChoice, allTvdb = null) {
       }
       return (best ? best.name : "").toLowerCase();
     }
-    case "Viewed":
-      return (
-        normalizePlayedDate(
-          show.lastPlayedDate || allTvdb?.[show.name]?.lastPlayedDate || "",
-        ) || ""
-      );
+    case "Viewed": {
+      // Sorts by the date Emby currently holds, so a hidden show sinks here
+      // exactly as it does in Emby's own rows. That date is fakeLastPlayed
+      // whenever hiding or unhiding stamped one; lastPlayedDate is the real
+      // viewing, kept untouched for display.
+      const rec = allTvdb?.[show.name];
+      const stamped = show.fakeLastPlayed || rec?.fakeLastPlayed || "";
+      const played = show.lastPlayedDate || rec?.lastPlayedDate || "";
+      return normalizePlayedDate(stamped || played) || "";
+    }
     case "Down": {
       const lastDownloaded = allTvdb?.[show.name]?.["last-downloaded"] || "";
       return lastDownloaded ? normalizeTimestamp(lastDownloaded) : "";

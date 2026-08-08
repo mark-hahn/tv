@@ -12,7 +12,7 @@ import org.json.JSONObject;
  * Word from tv-srvr that a show record has changed, so this app does not go on
  * showing what was true when it started. The list is loaded once and held in
  * memory, and nothing in it changes by itself -- hiding a show from the web
- * client rewrites its lastPlayedDate, and without this the Watched sort here
+ * client rewrites its fakeLastPlayed, and without this the Watched sort here
  * would still be ordering on the old one.
  *
  * The same socket and the same notifications the web client listens to: nginx

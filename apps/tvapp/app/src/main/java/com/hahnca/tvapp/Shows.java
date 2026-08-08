@@ -97,6 +97,10 @@ class Shows {
     // "yyyy/MM/dd HH:mm:ss.SSS" in the record, so they sort as plain text.
     final String lastPlayedDate;
     final String dateCreated;
+    // The backdated date tv-srvr stamped into Emby to hide the show, empty
+    // when it never hid it. Watched sorts on this instead so a hidden show
+    // sinks here as it does in Emby, leaving lastPlayedDate the real viewing.
+    final String fakeLastPlayed;
     final boolean inToTry;
     final boolean inContinue;
     final boolean inMark;
@@ -136,6 +140,7 @@ class Shows {
       imdbRatings = str(rec, "imdbRatings");
       lastPlayedDate = str(rec, "lastPlayedDate");
       dateCreated = str(rec, "dateCreated");
+      fakeLastPlayed = str(rec, "fakeLastPlayed");
       inToTry = rec.optBoolean("inToTry", false);
       inContinue = rec.optBoolean("inContinue", false);
       inMark = rec.optBoolean("inMark", false);
@@ -196,12 +201,17 @@ class Shows {
       if (sort == Sort.ALPHA) {
         result = sortKey(a.name).compareTo(sortKey(b.name));
       } else if (sort == Sort.WATCHING) {
-        result = newestFirst(a.lastPlayedDate, b.lastPlayedDate);
+        result = newestFirst(watchedKey(a), watchedKey(b));
       } else {
         result = newestFirst(a.dateCreated, b.dateCreated);
       }
       return result != 0 ? result : newestFirst(a.firstAired, b.firstAired);
     };
+  }
+
+  /** The date Emby holds for the show, which is the stamped one once hidden. */
+  private static String watchedKey(Show show) {
+    return show.fakeLastPlayed.isEmpty() ? show.lastPlayedDate : show.fakeLastPlayed;
   }
 
   /** Descending, but an empty date is undated rather than ancient: it goes last. */

@@ -19,7 +19,6 @@ export const keyLabels = {
   vold: "Volume Down",
   volu: "Volume Up",
   googlebtn: "Google TV",
-  firebtn: "Fire TV",
   skip: "Skip",
   sort: "Sort",
   filter: "Filter",

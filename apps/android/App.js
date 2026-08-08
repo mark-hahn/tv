@@ -377,27 +377,13 @@ export default function App() {
       // Non-LR keys: standard repeat logic
       let count = 0;
       while (repeatActiveRef.current) {
-        const isFast = count >= 4;
-        const n =
-          mode === "fire" && key === "right"
-            ? isFast
-              ? 18
-              : 1
-            : mode === "fire" && key === "left"
-              ? isFast
-                ? 6
-                : 1
-              : isFast && mode === "fire"
-                ? 3
-                : 1;
-        const path =
-          n > 1 ? `/tv/key/${key}?n=${n}` : `/tv/key/${key}`;
-        const r = await sendKeyThrough(key, path, { repeating: true });
+        const r = await sendKeyThrough(key, `/tv/key/${key}`, {
+          repeating: true,
+        });
         if (r.blocked) return stopRepeat();
         if (!repeatActiveRef.current) break;
         const FAST_REPEAT_MS = 100;
-        const delay =
-          mode === "fire" ? (count++, 0) : count++ < 4 ? 500 : FAST_REPEAT_MS;
+        const delay = count++ < 4 ? 500 : FAST_REPEAT_MS;
         await new Promise((r) => {
           repeatTimeoutRef.current = setTimeout(r, delay);
         });
@@ -1089,29 +1075,14 @@ export default function App() {
     }
   };
 
-  const fireBtn = async () => {
-    if (mediaTitle === "Fire TV Stick" || mediaTitle === "HDMI 2") {
-      tvCmd("off");
-    } else {
-      flash("fire");
-      sendKeyThrough("firebtn", `/tv/firebtn`);
-    }
-  };
-
   const startAppsHold = () => {
-    lpStart(
-      () => {
-        flash("fire");
-        setShowStreamers(true);
-      },
-      () => {
-        flash("fire");
-        fireBtn();
-      },
-    );
+    dbStart(() => {
+      flash("stream");
+      setShowStreamers(true);
+    });
   };
 
-  const stopAppsHold = () => lpStop();
+  const stopAppsHold = () => dbStop();
 
   const startVolDownHold = () => {
     armHold("vold", () =>
@@ -1470,7 +1441,7 @@ export default function App() {
   };
 
   const openSubCtrl = async () => {
-    if (!tvapprcMode && mode !== "google" && mode !== "fire") return;
+    if (!tvapprcMode && mode !== "google") return;
     if (layoutOptionRef.current === "linda") return;
     setShowSubCtrl(true);
     openChannel("embyPlaying", {
@@ -1639,21 +1610,14 @@ export default function App() {
     if (isOff) return "off";
     if (mediaTitle === "Smart TV") return "google";
     if (mediaTitle === "TV") return "tv";
-    if (mediaTitle === "Fire TV Stick" || mediaTitle === "HDMI 2")
-      return "fire";
     return "other";
   })();
 
   const isOther = mode === "other";
   // Streaming-app list is keyed by the TV's actual input, so it must ignore
   // the tvapprcMode collapse above -- otherwise it looks up "tvapprc" in
-  // services.json (which only has "google"/"fire") and comes back empty.
-  const servicesMode =
-    mediaTitle === "Smart TV"
-      ? "google"
-      : mediaTitle === "Fire TV Stick" || mediaTitle === "HDMI 2"
-        ? "fire"
-        : mode;
+  // services.json (which only has "google") and comes back empty.
+  const servicesMode = mediaTitle === "Smart TV" ? "google" : mode;
   const services = allServices[servicesMode] ?? [];
   // Background color helpers (mirror Vue cellStyle / computed props)
   const cellBg = (defaultBg, key) => (flashBtn === key ? "orange" : defaultBg);
@@ -1662,10 +1626,12 @@ export default function App() {
 
   const offBg = flashBtn === "off" ? "orange" : isOff ? "lightblue" : "white";
 
+  // Only the power key is painted this way now. Blue whenever the set is on --
+  // the same lightblue the Shows key wears in tvapprc mode -- pink on live TV.
   const modeBg = (m) => {
     if (flashBtn === m) return "orange";
     if (m === "google" && mode === "tv") return "#ffb3c1";
-    return mode === m ? "lightblue" : "white";
+    return isOff ? "white" : "lightblue";
   };
 
   // The tvapprc-only top row, which pushes the ordinary five rows down one.
@@ -1826,7 +1792,7 @@ export default function App() {
       key: "stream",
       label: "Apps",
       smallText: true,
-      bg: () => modeBg("fire"),
+      bg: () => cellBg("white", "stream"),
       onPress: () => {},
       onPressIn: () => startAppsHold(),
       onPressOut: () => stopAppsHold(),
@@ -3082,7 +3048,11 @@ export default function App() {
                   height: cellDims.h,
                 },
               ]}
-              onStartShouldSetResponder={() => true}
+              // While the set is off the power key is the only live one. Refusing
+              // to become the responder is what makes the rest inert: the cell
+              // then gets no grant/release at all, so a press cannot start a hold
+              // it would never be told to stop.
+              onStartShouldSetResponder={() => !isOff || btn.key === "google"}
               onResponderTerminationRequest={() => false}
               onResponderGrant={() => {
                 if (btn.onPressIn) btn.onPressIn();

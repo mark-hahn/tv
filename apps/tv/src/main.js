@@ -1,5 +1,5 @@
 import { WebSocket, WebSocketServer } from "ws";
-import { exec, spawn } from "child_process";
+import { exec } from "child_process";
 import { createWriteStream, mkdirSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -68,10 +68,6 @@ const HA_ACCESS_TOKEN =
 const TV_PORT = 3004;
 const BRAVIA_ENTITY_ID = "media_player.bravia_k_65xr70";
 const REMOTE_ENTITY_ID = "remote.bravia_k_65xr70";
-const FIRE_TV_ENTITY_ID = "media_player.fire_tv_192_168_1_47";
-const FIRE_TV_REMOTE_ID = "remote.fire_tv_192_168_1_47";
-const FIRE_TV_IP = "192.168.1.47";
-const FIRE_KEY_TIMEOUT_MS = 5000;
 const BRAVIA_TV_IP = "192.168.1.86:34047";
 const BRAVIA_PICTURE_URL = `http://192.168.1.86/sony/video`;
 // setAudioMute takes the state it wants rather than toggling, which is the one
@@ -142,10 +138,8 @@ const EMBY_USER_ID = "894c752d448f45a3a1260ccaabd0adff";
 const EMBY_BASE_URL = "http://127.0.0.1:8096/emby";
 // Emby app launch id on the Bravia Google-TV (Sony appControl uri for com.mb.android)
 const EMBY_APP_URI = "com.sony.dtv.com.mb.android.com.mb.android.MainActivity";
-// Emby app launch activity on the Fire TV (adb am start -n)
-const EMBY_FIRE_ACTIVITY = "com.mb.android/.MainActivity";
 // Emby DeviceNames reported by the Emby app on each TV
-const TV_DEVICE_NAMES = ["Living Room TV", "Mark's Fire TV"];
+const TV_DEVICE_NAMES = ["Living Room TV"];
 const LIVING_ROOM_DEVICE_NAME = "Living Room TV";
 const SRVR_INTERNAL_URL = "http://127.0.0.1:8739";
 
@@ -156,8 +150,6 @@ const PENDING_VIEW_SHOW_MAX_AGE_MS = 10000; // ms before an unsent pending views
 const EMBY_LAUNCH_DELAY_MS = 1500; // ms after launching Emby before sending it the show
 const VIEW_SHOW_RESEND_MS = 2000; // ms between show resends while Emby boots
 const EMBY_BOOT_WINDOW_MS = 40000; // ms to keep resending the show while Emby boots
-const FIRE_HOME_DELAY_MS = 0; // ms after Fire TV turns on before sending home key
-const FIRE_EMBY_DELAY_MS = 5000; // ms after Fire TV turns on before launching Emby
 
 // Scrub control
 const SCRUB_START_COUNT = 4; // number of slow keys before speeding up
@@ -385,18 +377,16 @@ function connectEmby() {
 let ws = null;
 let cmdId = 0;
 let authenticated = false;
-let fireTvState = "unknown";
 let braviaHaMuted = null;
 let braviaHaPower = "unknown";
 let braviaMediaContentType = null;
 let braviaMediaTitle = null;
-let tvMode = "off"; // "google" | "fire" | "off" | "other" — set only from HA push
+let tvMode = "off"; // "google" | "tv" | "off" | "other" — set only from HA push
 let activeDevice = null;
 let lastOffAt = 0;
 let lastOnAt = 0;
 let pendingGoogleHome = false;
 let pendingGoogleTvapp = false;
-let pendingFireEmby = false;
 let pendingViewShow = null; // { showId, showName } — queued for after Emby launches
 let currentShowName = null;
 // Whichever show is most relevant right now — the client's own browsing
@@ -473,11 +463,6 @@ function handleMsg(raw) {
           tvMode = "off";
         else if (braviaMediaTitle === "Smart TV") tvMode = "google";
         else if (braviaMediaTitle === "TV") tvMode = "tv";
-        else if (
-          braviaMediaTitle === "Fire TV Stick" ||
-          braviaMediaTitle === "HDMI 2"
-        )
-          tvMode = "fire";
         else tvMode = "other";
         unilog(
           383,
@@ -503,19 +488,16 @@ function handleMsg(raw) {
       const prev = event.data?.old_state?.state;
       const WATCHED = new Set([
         REMOTE_ENTITY_ID,
-        FIRE_TV_ENTITY_ID,
-        FIRE_TV_REMOTE_ID,
         BRAVIA_ENTITY_ID,
       ]);
       if (WATCHED.has(id) && state !== prev) {
         unilog(384, `HA state: ${id} ${prev} -> ${state}`);
       }
-      if (id === FIRE_TV_ENTITY_ID) fireTvState = state;
       if (id === BRAVIA_ENTITY_ID) {
         const attrs = event.data?.new_state?.attributes;
         unilog(
           385,
-          `BRAVIA attrs: title=${attrs?.media_title ?? "null"} mediaType=${attrs?.media_content_type ?? "null"} muted=${attrs?.is_volume_muted ?? "null"} pendingGoogleHome=${pendingGoogleHome} pendingGoogleTvapp=${pendingGoogleTvapp} pendingFireEmby=${pendingFireEmby}`,
+          `BRAVIA attrs: title=${attrs?.media_title ?? "null"} mediaType=${attrs?.media_content_type ?? "null"} muted=${attrs?.is_volume_muted ?? "null"} pendingGoogleHome=${pendingGoogleHome} pendingGoogleTvapp=${pendingGoogleTvapp}`,
         );
         const prevPower = braviaHaPower;
         braviaHaPower = state;
@@ -525,14 +507,12 @@ function handleMsg(raw) {
           braviaMediaTitle = attrs.media_title ?? null;
         }
         // TV just turned on from a googlebtn press — open tvapp
-        const wasGoogleTvappPending = pendingGoogleTvapp;
         if (pendingGoogleTvapp && prevPower !== "on" && state === "on") {
           pendingGoogleTvapp = false;
           unilog(1902, "googlebtn: TV on — launching tvapp");
           openTvappSelectingShow();
         }
         // TV just turned on with pendingGoogleHome flag set
-        const wasGooglePending = pendingGoogleHome;
         if (pendingGoogleHome && prevPower !== "on" && state === "on") {
           pendingGoogleHome = false;
           unilog(386, "googlebtn: TV on — sending Home in 5s");
@@ -554,31 +534,6 @@ function handleMsg(raw) {
             () => firePendingViewShow("viewshow(tv-on)"),
             GOOGLE_EMBY_DELAY_MS + VIEW_SHOW_DELAY_MS,
           );
-        }
-        // pendingFireEmby: launch Emby once FireTV is the active input
-        if (
-          pendingFireEmby &&
-          (braviaMediaTitle === "Fire TV Stick" ||
-            braviaMediaTitle === "HDMI 2")
-        ) {
-          pendingFireEmby = false;
-          unilog(388, "firebtn: FireTV active — launching Emby");
-          setTimeout(
-            () =>
-              adbExec(`shell am start -n ${EMBY_FIRE_ACTIVITY}`, "emby launch"),
-            FIRE_EMBY_DELAY_MS,
-          );
-        }
-        // HDMI 2 selected but no CEC signal → Fire Stick is in standby; wake it
-        // Skip if wasGooglePending/wasGoogleTvappPending — we don't want Fire Stick CEC hijacking the input
-        if (
-          braviaMediaTitle === "HDMI 2" &&
-          braviaMediaContentType === null &&
-          !wasGooglePending &&
-          !wasGoogleTvappPending
-        ) {
-          unilog(389, "HDMI 2 with no signal — waking Fire Stick");
-          callService("media_player", "turn_on", FIRE_TV_ENTITY_ID);
         }
         // Drive ADB connect from HA power state — disabled (see startup block above for re-enable notes)
         // if (
@@ -606,11 +561,6 @@ function handleMsg(raw) {
           tvMode = "off";
         else if (braviaMediaTitle === "Smart TV") tvMode = "google";
         else if (braviaMediaTitle === "TV") tvMode = "tv";
-        else if (
-          braviaMediaTitle === "Fire TV Stick" ||
-          braviaMediaTitle === "HDMI 2"
-        )
-          tvMode = "fire";
         else tvMode = "other";
         pushTvState().catch(() => {});
       }
@@ -878,169 +828,6 @@ async function runToggleResSequence(toggleArg, knownEpisodeId) {
   }
 }
 
-// ─── Persistent adb shell ────────────────────────────────────────────────────
-let fireShell = null;
-let fireShellReady = false;
-let fireShellStdoutBuf = "";
-let fireShellPending = null; // { marker, resolve } — at most one in-flight
-let fireShellUnauthorized = false; // stop fast-retry loop when device hasn't authorized
-
-function spawnFireShell() {
-  if (fireShell) {
-    fireShell.removeAllListeners();
-    fireShell.stdin.destroy();
-    fireShell.kill();
-  }
-  fireShellReady = false;
-  fireShellUnauthorized = false;
-  fireShell = spawn("adb", ["-s", `${FIRE_TV_IP}:5555`, "shell"]);
-  fireShellStdoutBuf = "";
-  let fireShellStderrBuf = "";
-  fireShell.stdout.on("data", (chunk) => {
-    fireShellStdoutBuf += chunk.toString();
-    if (
-      fireShellPending &&
-      fireShellStdoutBuf.includes(fireShellPending.marker)
-    ) {
-      const { resolve } = fireShellPending;
-      fireShellPending = null;
-      fireShellStdoutBuf = "";
-      resolve();
-    }
-  });
-  fireShell.stderr.on("data", (chunk) => {
-    fireShellStderrBuf += chunk.toString();
-    if (fireShellStderrBuf.includes("unauthorized")) {
-      fireShellUnauthorized = true;
-    }
-  });
-  fireShell.on("spawn", () => {
-    unilog(403, "adb shell spawned");
-    fireShellReady = true;
-  });
-  fireShell.on("error", (err) => {
-    unilog(404, `adb shell error: ${err.message}`);
-    fireShellReady = false;
-  });
-  fireShell.on("close", (code) => {
-    fireShellReady = false;
-    fireShell = null;
-    if (fireShellUnauthorized) {
-      unilog(
-        405,
-        `adb shell closed (${code}) — device unauthorized, NOT retrying (accept USB debug dialog on FireTV then restart tv-tv)`,
-      );
-    } else {
-      unilog(1744, `adb shell closed (${code}), reconnecting in 2s`);
-      setTimeout(connectFireShell, 2000);
-    }
-  });
-}
-
-function connectFireShell() {
-  exec(`adb connect ${FIRE_TV_IP}:5555`, (err, stdout) => {
-    if (err) {
-      unilog(1745, `adb connect failed: ${err.message}, retrying in 5s`);
-      setTimeout(connectFireShell, 5000);
-    } else {
-      unilog(408, `adb connect: ${stdout.trim()}`);
-      spawnFireShell();
-    }
-  });
-}
-
-let fireKeySeq = 0;
-let fireKeyChain = Promise.resolve();
-
-function fireKeyeventOnce(keycode) {
-  return new Promise((resolve, reject) => {
-    if (!fireShellReady || !fireShell) {
-      reject(new Error("fire shell not ready"));
-      return;
-    }
-    const marker = `__K${++fireKeySeq}__`;
-    const clearPending = () => {
-      if (fireShellPending && fireShellPending.marker === marker) {
-        fireShellPending = null;
-      }
-    };
-
-    // The device can stop echoing markers while staying connected (e.g. waking
-    // up, or launching an app), and that leaves the shell alive so 'close'
-    // never fires. Without this the request would hang forever.
-    const timer = setTimeout(() => {
-      clearPending();
-      unilog(
-        1424,
-        `adb shell did not echo ${marker} within ${FIRE_KEY_TIMEOUT_MS}ms — respawning shell`,
-      );
-      fireShellReady = false;
-      spawnFireShell();
-      reject(new Error("fire shell timeout"));
-    }, FIRE_KEY_TIMEOUT_MS);
-
-    fireShellPending = {
-      marker,
-      resolve: () => {
-        clearTimeout(timer);
-        resolve();
-      },
-    };
-    fireShell.stdin.write(
-      `input keyevent ${keycode} && echo ${marker}\n`,
-      (err) => {
-        if (err) {
-          clearTimeout(timer);
-          clearPending();
-          reject(err);
-        }
-      },
-    );
-  });
-}
-
-// The shell tracks one marker at a time, so overlapping presses must be
-// serialized — otherwise a later press overwrites fireShellPending and the
-// earlier promise is never settled, hanging that request until nginx gives up.
-function fireKeyevent(keycode) {
-  const run = fireKeyChain.then(
-    () => fireKeyeventOnce(keycode),
-    () => fireKeyeventOnce(keycode),
-  );
-  fireKeyChain = run.catch(() => {});
-  return run;
-}
-
-function adbExecP(cmd, label) {
-  return new Promise((resolve) => {
-    exec(`adb -s ${FIRE_TV_IP}:5555 ${cmd}`, (err, stdout, stderr) => {
-      if (err && stderr && stderr.includes("not found")) {
-        unilog(409, `adb ${label}: device not found, connecting...`);
-        exec(`adb connect ${FIRE_TV_IP}:5555`, () => {
-          exec(`adb -s ${FIRE_TV_IP}:5555 ${cmd}`, (err2) => {
-            if (err2)
-              unilog(410, `adb ${label} error after connect: ${err2.message}`);
-            else unilog(411, `adb ${label} ok (after connect)`);
-            resolve();
-          });
-        });
-      } else if (err) {
-        unilog(412, `adb ${label} error: ${err.message}`);
-        resolve();
-      } else {
-        unilog(413, `adb ${label} ok`);
-        resolve();
-      }
-    });
-  });
-}
-
-function adbExec(cmd, label) {
-  adbExecP(cmd, label);
-}
-
-connectFireShell();
-
 // ─── Persistent adb shell for Bravia (text/keyboard input) ──────────────────
 // DISABLED: Bravia ADB not needed for normal operation. Re-enable by uncommenting
 // all sections marked with "Bravia ADB disabled" / "see startup block above".
@@ -1217,31 +1004,6 @@ connectFireShell();
 //   }
 // });
 
-app.get("/tv/firebtn", (req, res) => {
-  unilog(414, `firebtn from ${client(req)} braviaHaPower=${braviaHaPower}`);
-  callService("media_player", "turn_on", FIRE_TV_ENTITY_ID);
-  if (braviaHaPower !== "on") {
-    // TV display is off — turn it on and wait for FireTV CEC before launching Emby
-    callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
-    pendingFireEmby = true;
-    unilog(
-      415,
-      "firebtn: TV off — turning on Bravia, set pendingFireEmby=true",
-    );
-  } else {
-    // TV already on — send home and launch Emby with fixed delays
-    setTimeout(
-      () => adbExec("shell input keyevent 3", "home"),
-      FIRE_HOME_DELAY_MS,
-    );
-    setTimeout(
-      () => adbExec(`shell am start -n ${EMBY_FIRE_ACTIVITY}`, "emby launch"),
-      FIRE_EMBY_DELAY_MS,
-    );
-  }
-  res.json({ ok: true });
-});
-
 app.get("/tv/on", (req, res) => {
   unilog(416, `on from ${client(req)}`);
   callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
@@ -1250,36 +1012,27 @@ app.get("/tv/on", (req, res) => {
 
 app.get("/tv/mode/:mode", (req, res) => {
   const mode = req.params.mode;
-  if (mode !== "google" && mode !== "fire") {
+  if (mode !== "google") {
     res.status(400).json({ ok: false, error: "unknown mode" });
     return;
   }
   unilog(417, `mode set to ${mode} from ${client(req)} (legacy route)`);
-  if (mode === "fire") {
-    callService("media_player", "turn_on", FIRE_TV_ENTITY_ID);
-    setTimeout(
-      () => adbExec(`shell am start -n ${EMBY_FIRE_ACTIVITY}`, "emby launch"),
-      5000,
-    );
-  } else {
-    // google
-    callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
-    setTimeout(
-      () =>
-        callService("remote", "send_command", REMOTE_ENTITY_ID, {
-          command: "Home",
-        }),
-      GOOGLE_HOME_DELAY_MS,
-    );
-    setTimeout(
-      () =>
-        callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
-          media_content_type: "app",
-          media_content_id: EMBY_APP_URI,
-        }),
-      GOOGLE_EMBY_DELAY_MS,
-    );
-  }
+  callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
+  setTimeout(
+    () =>
+      callService("remote", "send_command", REMOTE_ENTITY_ID, {
+        command: "Home",
+      }),
+    GOOGLE_HOME_DELAY_MS,
+  );
+  setTimeout(
+    () =>
+      callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
+        media_content_type: "app",
+        media_content_id: EMBY_APP_URI,
+      }),
+    GOOGLE_EMBY_DELAY_MS,
+  );
   lastOnAt = Date.now();
   res.json({ ok: true, mode });
   fetch(`${SRVR_INTERNAL_URL}/internal/tv-state`, {
@@ -1290,9 +1043,7 @@ app.get("/tv/mode/:mode", (req, res) => {
 });
 
 app.get("/tv/emby", (req, res) => {
-  if (tvMode === "fire") {
-    adbExec(`shell am start -n ${EMBY_FIRE_ACTIVITY}`, "emby");
-  } else if (tvMode === "google") {
+  if (tvMode === "google") {
     callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
       media_content_type: "app",
       media_content_id: EMBY_APP_URI,
@@ -1333,18 +1084,9 @@ const GOOGLE_KEY_MAP = {
   back: "Return",
   captions: "ClosedCaption",
 };
-const FIRE_KEY_MAP = {
-  ok: "23", // KEYCODE_DPAD_CENTER
-  up: "19", // KEYCODE_DPAD_UP
-  down: "20", // KEYCODE_DPAD_DOWN
-  left: "21", // KEYCODE_DPAD_LEFT
-  right: "22", // KEYCODE_DPAD_RIGHT
-  home: "3", // KEYCODE_HOME
-  back: "4", // KEYCODE_BACK
-};
 
 app.get("/tv/key/:key", async (req, res) => {
-  const keyMap = tvMode === "fire" ? FIRE_KEY_MAP : GOOGLE_KEY_MAP;
+  const keyMap = GOOGLE_KEY_MAP;
   const remoteId = REMOTE_ENTITY_ID;
   const command = keyMap[req.params.key];
   if (!command) {
@@ -1352,33 +1094,9 @@ app.get("/tv/key/:key", async (req, res) => {
     return;
   }
 
-  if (tvMode !== "fire" && tvMode !== "google" && tvMode !== "tv") {
+  if (tvMode !== "google" && tvMode !== "tv") {
     unilog(420, `key ignored — tvMode=${tvMode}`);
     res.json({ ok: false, error: "wrong mode" });
-    return;
-  }
-
-  if (tvMode === "fire") {
-    const n = Math.min(parseInt(req.query.n) || 1, 20);
-    const keys = Array(n).fill(command).join(" ");
-    let sentViaShell = false;
-    if (fireShellReady) {
-      try {
-        await fireKeyevent(keys);
-        unilog(421, `keyevent ${command}×${n} via shell from ${client(req)}`);
-        sentViaShell = true;
-      } catch (e) {
-        unilog(
-          1425,
-          `shell keyevent ${keys} failed (${e.message}) — falling back to adb exec`,
-        );
-      }
-    }
-    if (!sentViaShell) {
-      await adbExecP(`shell input keyevent ${keys}`, `keyevent ${keys}`);
-      unilog(422, `adb keyevent ${keys} from ${client(req)}`);
-    }
-    res.json({ ok: true, command, mode: tvMode });
     return;
   }
 
@@ -1416,27 +1134,9 @@ const SHOW_SEL_PREFIX_TAIL = ["right"];
 
 let showSelRunning = false;
 
-// One key through whichever transport the current tvMode uses, then wait.
+// One key to the set, then wait.
 async function sendSelKey(key, delayAfterMs) {
-  if (tvMode !== "fire") {
-    await sendIrcc(GOOGLE_KEY_MAP[key], delayAfterMs);
-    return;
-  }
-  const code = FIRE_KEY_MAP[key];
-  let sent = false;
-  if (fireShellReady) {
-    try {
-      await fireKeyevent(code);
-      sent = true;
-    } catch (e) {
-      unilog(
-        1605,
-        `shell keyevent ${key} failed (${e.message}) — falling back to adb exec`,
-      );
-    }
-  }
-  if (!sent) await adbExecP(`shell input keyevent ${code}`, `showsel ${key}`);
-  await sleep(delayAfterMs);
+  await sendIrcc(GOOGLE_KEY_MAP[key], delayAfterMs);
 }
 
 // Shows ranked by when they were last played, most recent first. Emby keeps
@@ -1502,7 +1202,7 @@ async function runShowSelect(offset) {
 // ?offset=N forces the right-key count (skips the Emby lookup); ?dry reports
 // the target and sends no keys. Both are for ./sel testing.
 app.get("/tv/selectshow", async (req, res) => {
-  if (tvMode !== "fire" && tvMode !== "google" && tvMode !== "tv") {
+  if (tvMode !== "google" && tvMode !== "tv") {
     unilog(1606, `select ignored — tvMode=${tvMode}`);
     res.json({ ok: false, error: "wrong mode" });
     return;
@@ -1574,7 +1274,7 @@ app.get("/tv/vol/:dir", (req, res) => {
     res.status(400).json({ ok: false, error: "unknown dir" });
     return;
   }
-  if (tvMode !== "google" && tvMode !== "fire" && tvMode !== "tv") {
+  if (tvMode !== "google" && tvMode !== "tv") {
     unilog(425, `vol ignored — tvMode=${tvMode}`);
     res.json({ ok: false, error: "wrong mode" });
     return;
@@ -1590,7 +1290,7 @@ app.get("/tv/vol/:dir", (req, res) => {
 });
 
 app.get("/tv/mute", (req, res) => {
-  if (tvMode !== "google" && tvMode !== "fire" && tvMode !== "tv") {
+  if (tvMode !== "google" && tvMode !== "tv") {
     unilog(427, `mute ignored — tvMode=${tvMode}`);
     res.json({ ok: false, error: "wrong mode" });
     return;
@@ -1607,7 +1307,7 @@ app.get("/tv/mute", (req, res) => {
 // and there is no readable mute state to branch on anyway — see
 // BRAVIA_AUDIO_URL.
 app.get("/tv/unmute", async (req, res) => {
-  if (tvMode !== "google" && tvMode !== "fire" && tvMode !== "tv") {
+  if (tvMode !== "google" && tvMode !== "tv") {
     unilog(1868, `unmute ignored — tvMode=${tvMode}`);
     res.json({ ok: false, error: "wrong mode" });
     return;
@@ -1645,16 +1345,6 @@ async function pushTvState() {
     power = "off";
   } else if (recentlyOff) {
     power = "off";
-  } else if (tvMode === "fire") {
-    const fireOn =
-      fireTvState !== "off" &&
-      fireTvState !== "unavailable" &&
-      fireTvState !== "unknown";
-    const braviaOn =
-      braviaHaPower !== "off" &&
-      braviaHaPower !== "unavailable" &&
-      braviaHaPower !== "unknown";
-    power = fireOn || braviaOn ? "on" : "off";
   } else {
     const braviaOn =
       braviaHaPower !== "off" &&
@@ -1688,10 +1378,6 @@ app.get("/tv/openapp", (req, res) => {
       media_content_type: "app",
       media_content_id: uri,
     });
-    res.json({ ok: true });
-  } else if (tvMode === "fire") {
-    unilog(430, `openapp fire uri=${uri} from ${client(req)}`);
-    adbExecP(`shell am start -n ${uri}`, "openapp");
     res.json({ ok: true });
   } else {
     unilog(431, `openapp ignored — tvMode=${tvMode}`);
@@ -1729,13 +1415,6 @@ app.get("/tv/playvideo", (req, res) => {
       if (stderr) unilog(437, `playvideo adb stderr: ${stderr}`);
       if (stdout) unilog(438, `playvideo adb stdout: ${stdout}`);
     });
-    res.json({ ok: true });
-  } else if (tvMode === "fire") {
-    unilog(439, `playvideo fire url=${url} from ${client(req)}`);
-    adbExecP(
-      `shell am start -a android.intent.action.VIEW -d "${url}"`,
-      "playvideo",
-    );
     res.json({ ok: true });
   } else {
     unilog(440, `playvideo ignored — tvMode=${tvMode}`);

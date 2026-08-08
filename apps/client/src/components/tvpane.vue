@@ -655,7 +655,7 @@
         Shows
       </div>
       <div
-        :style="modeBtnStyle('fire')"
+        :style="cellStyle('white', 'stream')"
         @mousedown="startAppsHold"
         @mouseup="stopAppsHold"
         @mouseleave="stopAppsHold"
@@ -851,17 +851,13 @@ export default {
       if (!on) return "off";
       if (this.mediaTitle === "Smart TV") return "google";
       if (this.mediaTitle === "TV") return "tv";
-      if (this.mediaTitle === "Fire TV Stick" || this.mediaTitle === "HDMI 2")
-        return "fire";
       return "other";
     },
     // Streaming-app list is keyed by the TV's actual input, so it must ignore
     // the tvapprc collapse above -- otherwise it looks up "tvapprc" in
-    // services.json (which only has "google"/"fire") and comes back empty.
+    // services.json (which only has "google") and comes back empty.
     servicesMode() {
       if (this.mediaTitle === "Smart TV") return "google";
-      if (this.mediaTitle === "Fire TV Stick" || this.mediaTitle === "HDMI 2")
-        return "fire";
       return this.mode;
     },
     services() {
@@ -1087,7 +1083,12 @@ export default {
       clearTimeout(this._unlockHoldTimer);
     },
 
+    // Every grid key except the power one reaches the set through startRepeat
+    // or one of the _lpStart/_armHold/_dbStart primitives below, so the
+    // set-is-off gate lives on those four. startGoogleHold runs its own timer
+    // and so stays live -- it is the only way back on.
     startRepeat(key) {
+      if (this.isOff) return;
       if (this.tvapprcMode) {
         this.flash(key);
         this._repeatActive = true;
@@ -1177,27 +1178,13 @@ export default {
         // Non-LR keys: standard repeat logic
         let count = 0;
         while (this._repeatActive) {
-          const isFast = count >= 2;
-          const n =
-            this.mode === "fire" && key === "left"
-              ? isFast
-                ? 9
-                : 1
-              : isFast && this.mode === "fire"
-                ? 3
-                : 1;
-          const path =
-            n > 1 ? `/tv/key/${key}?n=${n}` : `/tv/key/${key}`;
-          const r = await this.sendKeyThrough(key, path, { repeating: true });
+          const r = await this.sendKeyThrough(key, `/tv/key/${key}`, {
+            repeating: true,
+          });
           if (r.blocked) return this.stopRepeat();
           if (!this._repeatActive) break;
           const FAST_REPEAT_MS = 100;
-          const delay =
-            this.mode === "fire"
-              ? (count++, 0)
-              : count++ < 2
-                ? 500
-                : FAST_REPEAT_MS;
+          const delay = count++ < 2 ? 500 : FAST_REPEAT_MS;
           await new Promise((r) => {
             this._repeatTimer = setTimeout(r, delay);
           });
@@ -1244,6 +1231,7 @@ export default {
 
     // Shared long-press helper: immediate short action registration, 400ms then long
     _lpStart(shortAction, longAction) {
+      if (this.isOff) return;
       clearTimeout(this._lpDebounceTimer);
       clearTimeout(this._lpLongTimer);
       this._lp = { shortAction, longAction, phase: 0 };
@@ -1284,6 +1272,7 @@ export default {
     // already lost to another remote. Buttons with no long action (back, home,
     // ok) send on the press already and need none of this.
     _armHold(key, start) {
+      if (this.isOff) return;
       start();
       this.sendKeyThrough(key, null).then((r) => {
         if (r.blocked) this._lpCancel();
@@ -1292,6 +1281,7 @@ export default {
 
     // Shared simple debounce helper: immediate action, no long-press
     _dbStart(action) {
+      if (this.isOff) return;
       clearTimeout(this._dbTimer);
       this._db = { action };
       this._dbTimer = setTimeout(() => {
@@ -1610,20 +1600,14 @@ export default {
     },
 
     startAppsHold() {
-      this._lpStart(
-        () => {
-          this.flash("fire");
-          this.showStreamers = true;
-        },
-        () => {
-          this.flash("fire");
-          this.fireBtn();
-        },
-      );
+      this._dbStart(() => {
+        this.flash("stream");
+        this.showStreamers = true;
+      });
     },
 
     stopAppsHold() {
-      this._lpStop();
+      this._dbStop();
     },
 
     // Long-press skip toggles the playing episode between 2160 and 1080.
@@ -1739,11 +1723,12 @@ export default {
       await this.fetchSubPlayers();
     },
 
+    // Only the power key is painted this way now. Blue whenever the set is on --
+    // the same lightblue the Shows key wears in tvapprc mode -- pink on live TV.
     modeBg(m) {
       if (this.flashBtn === m) return "orange";
-      if (this.mode === m) return "lightblue";
       if (m === "google" && this.mode === "tv") return "#ffb3c1";
-      return "white";
+      return this.isOff ? "white" : "lightblue";
     },
 
     modeBtnStyle(m) {
@@ -1768,15 +1753,6 @@ export default {
       } else {
         this.flash("google");
         this.sendKeyThrough("googlebtn", `/tv/googlebtn`);
-      }
-    },
-
-    async fireBtn() {
-      if (this.mode === "fire") {
-        this.tvCmd("off");
-      } else {
-        this.flash("fire");
-        this.sendKeyThrough("firebtn", `/tv/firebtn`);
       }
     },
 

@@ -50,7 +50,7 @@ function controlSessionId(sessions, playSession) {
 
 // Emby DeviceNames reported by the Emby app on each TV. With no explicit
 // deviceName, skip/trim act on whichever TV is currently playing.
-const TV_DEVICE_NAMES = ["Living Room TV", "Mark's Fire TV"];
+const TV_DEVICE_NAMES = ["Living Room TV"];
 
 function findTvPlaySession(sessions, deviceName) {
   const matches = sessions.filter(

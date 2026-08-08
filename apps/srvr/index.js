@@ -545,7 +545,7 @@ function stripGapTransientFields(gap) {
 }
 
 // Emby DeviceNames reported by the Emby app on each TV
-const TV_DEVICE_NAMES = ["Living Room TV", "Mark's Fire TV"];
+const TV_DEVICE_NAMES = ["Living Room TV"];
 
 // Delay before the auto-skip trim seek. Kept short so none of the intro plays;
 // the player often isn't ready to seek this early, which doTrimIntro handles by

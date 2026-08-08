@@ -1338,7 +1338,8 @@ export default function App() {
       dbStart(() => clearTvappState(flashKey));
       return;
     }
-    lpStart(openTvapp, openShowsPane);
+    // Long-press does nothing here -- it opens the shows pane from Mute instead.
+    dbStart(openTvapp);
   };
 
   const stopShowsHold = () => {
@@ -1426,8 +1427,8 @@ export default function App() {
     lpStop();
   };
 
-  const startMuteHold = () => dbStart(() => tvCmd("mute"));
-  const stopMuteHold = () => dbStop();
+  const startMuteHold = () => lpStart(() => tvCmd("mute"), openShowsPane);
+  const stopMuteHold = () => lpStop();
 
   const fetchSubPlayers = async () => {
     try {
@@ -1469,7 +1470,7 @@ export default function App() {
   };
 
   const openSubCtrl = async () => {
-    if (mode !== "google" && mode !== "fire") return;
+    if (!tvapprcMode && mode !== "google" && mode !== "fire") return;
     if (layoutOptionRef.current === "linda") return;
     setShowSubCtrl(true);
     openChannel("embyPlaying", {

@@ -147,6 +147,9 @@ class ShowListView extends ScrollView {
   private static final float MAP_ROW_GAP_DP = 4f;
   private static final float MAP_CELL_WIDTH_DP = 30f;
   private static final float MAP_CELL_HEIGHT_DP = 22f;
+  // How many season rows the map is sized to hold: the cells shrink until that
+  // many of them fit, counting one line per season.
+  private static final int MAP_SEASONS_SHOWN = 3;
   private static final float MAP_CELL_GAP_DP = 2f;
   private static final float MAP_CELL_TEXT_SIZE_SP = 12f;
   private static final int MAP_CELL_TEXT_COLOR = 0xFF000000;
@@ -209,6 +212,9 @@ class ShowListView extends ScrollView {
   private final List<Shows.Show> visible = new ArrayList<>(); // after filter and sort
   private final Map<Shows.Show, View> cards = new HashMap<>();
   private final Map<Shows.Show, FrameLayout> miscViews = new HashMap<>();
+  // The name row of each card, which every mode but the description takes down
+  // so cardMisc has the whole card.
+  private final Map<Shows.Show, View> nameRows = new HashMap<>();
   private final Map<Shows.Show, List<MediaRequest>> mediaRequests = new HashMap<>();
   private final Set<MediaRequest> requestedMedia = new HashSet<>();
   private final Map<Shows.Show, ImageView> posters = new HashMap<>();
@@ -249,8 +255,6 @@ class ShowListView extends ScrollView {
   private final EdgeFade edgeFade = EdgeFade.vertical(this);
   private final int cardHeightPx;
   private final int posterWidthPx;
-  // What the name row stands at, which is what cardMisc starts below.
-  private final int nameLineHeightPx;
   private MiscMode miscMode = MiscMode.DESC;
   // Whether cardMisc is the thing with the focus rather than the show list.
   // Only then does the selected card leave its description, so every other
@@ -283,7 +287,6 @@ class ShowListView extends ScrollView {
     super(context);
     TextView probe = new TextView(context);
     probe.setTextSize(TypedValue.COMPLEX_UNIT_SP, NAME_TEXT_SIZE_SP);
-    nameLineHeightPx = probe.getLineHeight();
     int rowHeight = probe.getLineHeight() + 2 * (int) dp(CARD_HEIGHT_PAD_V_DP);
     int textHeight = CARD_ROWS * rowHeight + (CARD_ROWS - 1) * (int) dp(CARD_HEIGHT_GAP_DP);
     cardHeightPx = Math.round(textHeight * CARD_HEIGHT_FACTOR);
@@ -360,6 +363,7 @@ class ShowListView extends ScrollView {
     shows.addAll(list);
     cards.clear();
     miscViews.clear();
+    nameRows.clear();
     mediaRequests.clear();
     requestedMedia.clear();
     posters.clear();
@@ -1257,12 +1261,15 @@ class ShowListView extends ScrollView {
     nameRow.addView(info, infoParams);
 
     // Under the name row and full width, running from there to the bottom of
-    // the card -- which is the height its actor and trailer cards take.
+    // the card -- which is the height its actor and trailer cards take. Every
+    // mode but the description takes the name row down, and renderMisc drops
+    // this margin with it, so cardMisc runs from the top of the card instead.
     FrameLayout misc = new FrameLayout(getContext());
     LinearLayout.LayoutParams miscParams =
       new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
     miscParams.topMargin = (int) dp(CARD_BODY_GAP_DP);
     miscViews.put(show, misc);
+    nameRows.put(show, nameRow);
 
     // A FrameLayout wrapper, not just the row itself, so the letter-skip
     // badge below can sit on top of the row without disturbing its layout.
@@ -1390,6 +1397,10 @@ class ShowListView extends ScrollView {
     List<MediaRequest> old = mediaRequests.remove(show);
     if (old != null) requestedMedia.removeAll(old);
     MiscMode mode = show == active ? miscMode : MiscMode.DESC;
+    // Only the description shares the card with the name row. The other three
+    // want every pixel of it, so the row -- and the margin that held cardMisc
+    // clear of it -- goes, and cardMisc starts at the top of the card.
+    setNameRowShown(show, misc, mode == MiscMode.DESC);
     // The views the arrow keys act on belong to the selected card alone, and
     // are gone the moment that card is drawn again.
     if (show == active) {
@@ -1403,6 +1414,19 @@ class ShowListView extends ScrollView {
     else if (mode == MiscMode.ACTORS) renderActorsMisc(show, misc);
     else renderTrailersMisc(show, misc);
     if (show == active && mode == MiscMode.MAP && episodeCardOpen) showEpisodeCard();
+  }
+
+  private void setNameRowShown(Shows.Show show, FrameLayout misc, boolean shown) {
+    View nameRow = nameRows.get(show);
+    if (nameRow == null) return;
+    int want = shown ? View.VISIBLE : View.GONE;
+    if (nameRow.getVisibility() != want) nameRow.setVisibility(want);
+    LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) misc.getLayoutParams();
+    int margin = shown ? (int) dp(CARD_BODY_GAP_DP) : 0;
+    if (params.topMargin != margin) {
+      params.topMargin = margin;
+      misc.setLayoutParams(params);
+    }
   }
 
   /**
@@ -1622,9 +1646,9 @@ class ShowListView extends ScrollView {
   }
 
   /**
-   * One season row, which season being the up and down keys' to choose. Left
-   * and right choose an episode of it, and the row draws a cursor on the one
-   * they are on.
+   * As many season rows as cardMisc has room for, one of which is the selected
+   * one -- the up and down keys' to choose -- while left and right choose an
+   * episode of that one, and its row draws a cursor on the one they are on.
    */
   private void renderMapMisc(Shows.Show show, FrameLayout misc) {
     List<Integer> seasons = seasonsPresent(show.episodeData);
@@ -1633,10 +1657,75 @@ class ShowListView extends ScrollView {
       return;
     }
     int index = show == active ? clampSeasonIndex(seasons) : defaultSeasonIndex(show);
+    MapMetrics metrics = mapMetrics();
+    int first = mapFirstSeason(show, seasons, index, metrics);
+    LinearLayout rows = new LinearLayout(getContext());
+    rows.setOrientation(LinearLayout.VERTICAL);
+    int used = 0;
+    for (int i = first; i < seasons.size(); i++) {
+      int height = mapRowHeight(show, seasons.get(i), metrics);
+      if (i > first && used + height > metrics.avail) break;
+      used += height;
+      rows.addView(
+          mapSeasonRow(show, seasons.get(i), i == index, metrics),
+          new LinearLayout.LayoutParams(
+              ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+    }
     misc.addView(
-        mapSeasonRow(show, seasons.get(index)),
+        rows,
         new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+  }
+
+  /**
+   * What the cells are drawn at: their full size, or as much smaller as it
+   * takes for MAP_SEASONS_SHOWN rows of them to fit in the height cardMisc has.
+   * Everything else on a row -- the season label, the text in the cells --
+   * comes down by the same factor, so the row only ever changes size.
+   */
+  private class MapMetrics {
+    final int avail = mediaCardHeight();
+    final int gap = (int) dp(MAP_CELL_GAP_DP);
+    final int cellH =
+        Math.max(1, Math.min((int) dp(MAP_CELL_HEIGHT_DP), avail / MAP_SEASONS_SHOWN - gap));
+    final float scale = cellH / dp(MAP_CELL_HEIGHT_DP);
+    final int cellW = Math.max(1, Math.round(dp(MAP_CELL_WIDTH_DP) * scale));
+    final int labelW = Math.max(1, Math.round(dp(MAP_SEASON_WIDTH_DP) * scale));
+    // How many cells a season fits on one line, which is what says whether it
+    // wraps and so how much of cardMisc it takes.
+    final int perLine = Math.max(1, (miscWidth() - labelW) / (cellW + gap));
+    final float cellSp = MAP_CELL_TEXT_SIZE_SP * scale;
+    final float labelSp = FIELD_TEXT_SIZE_SP * scale;
+  }
+
+  private MapMetrics mapMetrics() {
+    return new MapMetrics();
+  }
+
+  /** What a season takes once its episodes have wrapped onto as many lines as they need. */
+  private int mapRowHeight(Shows.Show show, int season, MapMetrics metrics) {
+    JSONArray episodes = show.episodeData == null ? null : show.episodeData.optJSONArray(season);
+    int count = episodes == null ? 0 : episodes.length();
+    int lines = Math.max(1, (count + metrics.perLine - 1) / metrics.perLine);
+    return lines * (metrics.cellH + metrics.gap);
+  }
+
+  /**
+   * The earliest season the map can start at and still be showing the selected
+   * one -- so the selected season comes with as much of what leads up to it as
+   * there is room for, rather than sitting alone at the top.
+   */
+  private int mapFirstSeason(
+      Shows.Show show, List<Integer> seasons, int index, MapMetrics metrics) {
+    int first = index;
+    int used = mapRowHeight(show, seasons.get(index), metrics);
+    while (first > 0) {
+      int height = mapRowHeight(show, seasons.get(first - 1), metrics);
+      if (used + height > metrics.avail) break;
+      used += height;
+      first--;
+    }
+    return first;
   }
 
   private int clampSeasonIndex(List<Integer> seasons) {
@@ -1644,29 +1733,33 @@ class ShowListView extends ScrollView {
     return mapSeasonIndex;
   }
 
-  private LinearLayout mapSeasonRow(Shows.Show show, int season) {
+  private LinearLayout mapSeasonRow(
+      Shows.Show show, int season, boolean selected, MapMetrics metrics) {
     LinearLayout row = new LinearLayout(getContext());
     row.setOrientation(LinearLayout.HORIZONTAL);
     row.setGravity(Gravity.TOP);
     TextView label = message(String.valueOf(season));
+    label.setTextSize(TypedValue.COMPLEX_UNIT_SP, metrics.labelSp);
     label.setGravity(Gravity.CENTER);
-    row.addView(label, new LinearLayout.LayoutParams((int) dp(MAP_SEASON_WIDTH_DP), (int) dp(MAP_CELL_HEIGHT_DP)));
+    row.addView(label, new LinearLayout.LayoutParams(metrics.labelW, metrics.cellH));
 
-    boolean focusable = show == active && miscFocused;
+    // The episode cursor belongs to the selected season alone; the rows above
+    // and below it are there to be read.
+    boolean focusable = selected && show == active && miscFocused;
     JSONArray episodes = show.episodeData == null ? null : show.episodeData.optJSONArray(season);
     int count = episodes == null ? 0 : episodes.length();
     if (focusable) mapEpisodeIndex = Math.max(0, Math.min(Math.max(0, count - 1), mapEpisodeIndex));
     FlowLayout cells = new FlowLayout(getContext());
     for (int i = 0; i < count; i++) {
       cells.addView(
-          mapCell(show, episodes.optJSONArray(i), focusable && i == mapEpisodeIndex),
-          mapCellParams());
+          mapCell(show, episodes.optJSONArray(i), focusable && i == mapEpisodeIndex, metrics),
+          mapCellParams(metrics));
     }
     row.addView(cells, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
     return row;
   }
 
-  private View mapCell(Shows.Show show, JSONArray tuple, boolean focused) {
+  private View mapCell(Shows.Show show, JSONArray tuple, boolean focused, MapMetrics metrics) {
     boolean played = tuple != null && tuple.optInt(ED_WATCHED, 0) == 1;
     boolean hasFile = tuple != null && !tuple.optString(ED_FILE, "").isEmpty() && !"0".equals(tuple.optString(ED_FILE, ""));
     boolean noFile = tuple != null && !hasFile;
@@ -1681,7 +1774,7 @@ class ShowListView extends ScrollView {
             ? ""
             : MapCells.text(played, hasFile, noFile, unaired, quality, pos, show.inEmby));
     view.setTextColor(MAP_CELL_TEXT_COLOR);
-    view.setTextSize(TypedValue.COMPLEX_UNIT_SP, MAP_CELL_TEXT_SIZE_SP);
+    view.setTextSize(TypedValue.COMPLEX_UNIT_SP, metrics.cellSp);
     view.setGravity(Gravity.CENTER);
     view.setSingleLine(true);
     GradientDrawable bg = new GradientDrawable();
@@ -1692,11 +1785,11 @@ class ShowListView extends ScrollView {
     return view;
   }
 
-  private ViewGroup.MarginLayoutParams mapCellParams() {
+  private ViewGroup.MarginLayoutParams mapCellParams(MapMetrics metrics) {
     ViewGroup.MarginLayoutParams params =
-        new ViewGroup.MarginLayoutParams((int) dp(MAP_CELL_WIDTH_DP), (int) dp(MAP_CELL_HEIGHT_DP));
-    params.rightMargin = (int) dp(MAP_CELL_GAP_DP);
-    params.bottomMargin = (int) dp(MAP_CELL_GAP_DP);
+        new ViewGroup.MarginLayoutParams(metrics.cellW, metrics.cellH);
+    params.rightMargin = metrics.gap;
+    params.bottomMargin = metrics.gap;
     return params;
   }
 
@@ -1994,14 +2087,32 @@ class ShowListView extends ScrollView {
     return params;
   }
 
-  /** From the bottom of the name row to the bottom of the card. */
+  /**
+   * The whole of cardMisc, top to bottom: the modes that use this are the ones
+   * that took the name row down, so what is left of the card is all theirs.
+   */
   private int mediaCardHeight() {
     int chrome =
         2 * (int) dp(CARD_CONTENT_INSET_DP)
             + (int) dp(CARD_PAD_TOP_DP)
-            + (int) dp(CARD_PAD_BOTTOM_DP)
-            + (int) dp(CARD_BODY_GAP_DP);
-    return Math.max(1, cardHeightPx - chrome - nameLineHeightPx);
+            + (int) dp(CARD_PAD_BOTTOM_DP);
+    return Math.max(1, cardHeightPx - chrome);
+  }
+
+  /**
+   * How wide cardMisc is, worked out from the list's own width rather than
+   * measured: the map has to size its cells before it has been laid out even
+   * once. Card width less the list padding, the card inset, the backdrop and
+   * the content padding, which is everything between the list and cardMisc.
+   */
+  private int miscWidth() {
+    return Math.max(
+        1,
+        getWidth()
+            - (int) dp(LIST_PAD_DP)
+            - 2 * (int) dp(CARD_CONTENT_INSET_DP)
+            - posterWidthPx
+            - 2 * (int) dp(CARD_PAD_H_DP));
   }
 
   private FrameLayout.LayoutParams centerMatchHeight(int height) {

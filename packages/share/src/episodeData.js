@@ -381,3 +381,64 @@ export function toSeriesMap(ed, folder, today, tvDir = TV_DIR) {
   }
   return out;
 }
+
+// Pick the episode intro marking should open for a show: the first episode with
+// a .bif sidecar, else the first unwatched episode with a file, else the first
+// episode with a file. Shared so tv-srvr can pre-build the mp4 mirror for
+// exactly the episode the client will open — if the two disagreed the mirror
+// would be useless. Returns { path, season, episode, embyId, hasBif } or
+// { error }.
+export function selectIntroFile(show) {
+  const ed = show?.episodeData;
+  if (!ed) return { error: "No episode data" };
+  const folder = show.path?.split("/").pop() || show.name;
+
+  // Priority 1: first episode with a bif file
+  const bifResult = getBifEpisode(ed);
+  if (bifResult) {
+    const { season, episode } = bifResult;
+    const filePath = getFullPath(ed, folder, season, episode);
+    const embyId = getEmbyId(ed, season, episode);
+    if (!filePath) return { error: "No path for bif episode" };
+    if (!embyId) return { error: "No Emby ID for bif episode" };
+    return { path: filePath, season, episode, embyId, hasBif: true };
+  }
+
+  // Priority 2 & 3: first unwatched with a file, else first file
+  let fallbackPath = null;
+  let fallbackSeason = null;
+  let fallbackEpisode = null;
+  let fallbackEmbyId = null;
+  let foundUnwatched = false;
+  forEachEpisode(ed, (s, e) => {
+    if (foundUnwatched) return;
+    if (!hasFile(ed, s, e)) return;
+    if (!fallbackPath) {
+      fallbackPath = getFullPath(ed, folder, s, e);
+      fallbackSeason = s;
+      fallbackEpisode = e;
+      fallbackEmbyId = getEmbyId(ed, s, e);
+    }
+    if (!isWatched(ed, s, e)) {
+      const filePath = getFullPath(ed, folder, s, e);
+      if (filePath) {
+        foundUnwatched = true;
+        fallbackPath = filePath;
+        fallbackSeason = s;
+        fallbackEpisode = e;
+        fallbackEmbyId = getEmbyId(ed, s, e);
+      }
+    }
+  });
+
+  if (fallbackPath) {
+    return {
+      path: fallbackPath,
+      season: fallbackSeason,
+      episode: fallbackEpisode,
+      embyId: fallbackEmbyId,
+      hasBif: false,
+    };
+  }
+  return { error: "No playable episode found" };
+}

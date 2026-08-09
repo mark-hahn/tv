@@ -573,11 +573,6 @@ import * as util from "../util.js";
 const SIMPLE_LANDSCAPE_SPLIT = 50;
 const SIMPLE_PORTRAIT_SPLIT = 35;
 
-// Set this localStorage key to "1" to make Intro always use the built-in
-// video player instead of handing off to Emby, even when the episode has an
-// Emby item. Toggle from the browser console; no rebuild needed.
-const INTRO_FORCE_BUILTIN_KEY = "introForceBuiltin";
-
 export default {
   name: "App",
   components: {
@@ -1113,69 +1108,14 @@ export default {
       }
     },
 
-    // Select intro file using client-side episodeData (see intro-file-selection.md).
-    // Priority: 1) first episode with bif → Emby, 2) first unwatched with file → built-in,
-    // 3) first file (any watched status) → built-in, 4) error.
+    // Select intro file using episodeData (see intro-file-selection.md).
+    // Priority: 1) first episode with bif, 2) first unwatched with file,
+    // 3) first file (any watched status), 4) error. Always the built-in player.
+    // Delegates to @tv/share so tv-srvr picks the same episode when it
+    // pre-builds the mp4 mirror; if the two disagreed the mirror would be
+    // built for an episode the player never opens.
     selectIntroFile(show) {
-      const ed = show?.episodeData;
-      if (!ed) return { error: "No episode data" };
-      const folder = show.path?.split("/").pop() || show.name;
-
-      // Priority 1: First episode with bif file (open in Emby)
-      const bifResult = epd.getBifEpisode(ed);
-      if (bifResult) {
-        const { season, episode } = bifResult;
-        const path = epd.getFullPath(ed, folder, season, episode);
-        const embyId = epd.getEmbyId(ed, season, episode);
-        if (!path) return { error: "No path for bif episode" };
-        if (!embyId) return { error: "No Emby ID for bif episode" };
-        return { path, season, episode, embyId, hasBif: true };
-      }
-
-      // Priority 2 & 3: First unwatched with file, or fallback to first file
-      let fallbackPath = null;
-      let fallbackSeason = null;
-      let fallbackEpisode = null;
-      let fallbackEmbyId = null;
-
-      let foundUnwatched = false;
-      epd.forEachEpisode(ed, (s, e) => {
-        if (foundUnwatched) return; // already found, skip rest
-        if (!epd.hasFile(ed, s, e)) return; // no file, skip
-
-        // Track first file as fallback
-        if (!fallbackPath) {
-          fallbackPath = epd.getFullPath(ed, folder, s, e);
-          fallbackSeason = s;
-          fallbackEpisode = e;
-          fallbackEmbyId = epd.getEmbyId(ed, s, e);
-        }
-
-        // Look for first unwatched with file
-        if (!epd.isWatched(ed, s, e)) {
-          const path = epd.getFullPath(ed, folder, s, e);
-          const embyId = epd.getEmbyId(ed, s, e);
-          if (path) {
-            foundUnwatched = true;
-            fallbackPath = path;
-            fallbackSeason = s;
-            fallbackEpisode = e;
-            fallbackEmbyId = embyId;
-          }
-        }
-      });
-
-      if (fallbackPath) {
-        return {
-          path: fallbackPath,
-          season: fallbackSeason,
-          episode: fallbackEpisode,
-          embyId: fallbackEmbyId,
-          hasBif: false,
-        };
-      }
-
-      return { error: "No playable episode found" };
+      return epd.selectIntroFile(show);
     },
 
     async clickIntro() {
@@ -1200,14 +1140,7 @@ export default {
       }
     },
 
-    async handleOpenIntro({
-      show,
-      path,
-      source,
-      season,
-      episode,
-      embyId,
-    }) {
+    async handleOpenIntro({ show, path, source, season, episode }) {
       if (show?.name) {
         show.needsIntro = true;
         try {
@@ -1216,15 +1149,11 @@ export default {
           unilog(1928, `setTvdbFields needsIntro failed for ${show.name}: ${e.message}`);
         }
       }
-      // Emby's player is used whenever the episode is in Emby — its intro
-      // overlay has the same controls and supports high-speed scanning.
-      // Our own player is the fallback for files with no Emby item.
-      const forceBuiltin =
-        window.localStorage.getItem(INTRO_FORCE_BUILTIN_KEY) === "1";
-      if (embyId && !forceBuiltin) {
-        util.openExternalPage(urls.embyPageUrl(embyId, "intro"));
-        return;
-      }
+      // Always our own player. Emby's HLS copy path repeats the first segment
+      // whenever a 6s segment window has no keyframe, which freezes playback a
+      // few seconds in on ~half the library; /api/stream has no segments so it
+      // cannot happen. tv-srvr pre-builds an mp4 mirror for this episode, which
+      // is what makes seeking and 10x scanning fast here.
       this.videoPlayerIntroShow = show;
       this.videoPlayerPath = path;
       this.videoPlayerMode = "intro";
@@ -1292,24 +1221,13 @@ export default {
         try {
           const result = this.selectIntroFile(s);
           if (!result.error && result.path) {
-            // In Emby, route through handleOpenIntro so it opens there
-            if (result.embyId) {
-              await this.handleOpenIntro({
-                show: s,
-                path: result.path,
-                source: "info",
-                season: result.season ?? null,
-                episode: result.episode ?? null,
-                embyId: result.embyId,
-              });
-            } else {
-              this.videoPlayerIntroShow = s;
-              this.videoPlayerPath = result.path;
-              this.videoPlayerMapSeason =
-                result.season != null ? result.season : null;
-              this.videoPlayerMapEpisode =
-                result.episode != null ? result.episode : null;
-            }
+            await this.handleOpenIntro({
+              show: s,
+              path: result.path,
+              source: "info",
+              season: result.season ?? null,
+              episode: result.episode ?? null,
+            });
             return;
           }
         } catch {

@@ -1901,10 +1901,7 @@ export default {
       try {
         await chksrtOkShow(showName);
       } catch (e) {
-        logHere(
-          { lvl: "error" },
-          `chksrt all off failed for ${showName}: ${e.message}`,
-        );
+        unilog(1970, `chksrt all off failed for ${showName}: ${e.message}`);
         return;
       }
       this.$emit("chksrt-next", null);

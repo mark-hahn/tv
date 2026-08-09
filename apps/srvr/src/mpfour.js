@@ -33,8 +33,18 @@ const MIRROR_MAX_SECS = 600;
 
 let busy = false;
 let reordering = false;
-// videoFilePaths in subQueueChkSrt still awaiting a mirror, in queue order.
+// videoFilePaths still awaiting a mirror, in encode order.
 let mp4Pending = [];
+// Episodes the intro flow opens, newest first. Encoded ahead of the chksrt
+// queue: intro is interactive (someone is watching a "Waiting for video"
+// overlay) while chksrt is batch work nobody waits on. Kept as a separate list
+// rather than reordering subQueueChkSrt so it cannot fight reorderChkSrtQueue's
+// hevc-to-tail policy — which would otherwise push exactly the slow encodes
+// intro cares about most to the back.
+let introPriority = [];
+// Supplies the intro episode of every chksrt-queued show, so one mirror serves
+// both features. Injected by index.js, which owns the tvdb records.
+let introEpisodePaths = () => [];
 let currentTmpPath = null;
 // { videoFilePath, child, aborted } while an encode is running, else null
 let currentEncode = null;
@@ -170,17 +180,39 @@ function runFfmpeg(args, onSpawn) {
   });
 }
 
-// Called when a chksrt result is saved: the mirror for that file is no longer
-// needed, so kill its ffmpeg if it happens to be the one running. A pending
-// (not yet started) file needs nothing — the save already removed it from
-// subQueueChkSrt, which is the only thing the encode loop draws from.
-export function cancelEncode(videoFilePath) {
-  const resolved = path.resolve(videoFilePath);
+function wantedByChkSrt(resolved) {
+  return subsState.subQueueChkSrt.some(
+    (e) => e?.videoFilePath && path.resolve(e.videoFilePath) === resolved,
+  );
+}
+
+// Kill the running encode only when neither consumer still wants the mirror.
+// Two features share one mirror now, so either dropping its claim must leave
+// the other's alone. A pending (not yet started) file needs nothing — it simply
+// stops appearing in candidatePaths().
+function abortIfUnwanted(resolved, reason) {
   if (!currentEncode || currentEncode.videoFilePath !== resolved) return false;
+  if (wantedByChkSrt(resolved) || introPriority.includes(resolved)) return false;
   currentEncode.aborted = true;
   currentEncode.child?.kill("SIGKILL");
-  unilog(1416, `aborted encode, chksrt result saved: ${path.basename(resolved)}`);
+  unilog(1416, `aborted encode, ${reason}: ${path.basename(resolved)}`);
   return true;
+}
+
+// Called when a chksrt result is saved. The save has already removed the entry
+// from subQueueChkSrt, so chksrt no longer wants it; intro may still.
+export function cancelEncode(videoFilePath) {
+  return abortIfUnwanted(path.resolve(videoFilePath), "chksrt result saved");
+}
+
+// Called when a show's intro is configured, so intro no longer wants a mirror
+// for this episode. Drops the claim and stops the encode if chksrt has none.
+export function dropIntro(videoFilePath) {
+  if (!videoFilePath) return false;
+  const resolved = path.resolve(videoFilePath);
+  const at = introPriority.indexOf(resolved);
+  if (at >= 0) introPriority.splice(at, 1);
+  return abortIfUnwanted(resolved, "intro configured");
 }
 
 async function encodeOne(videoFilePath) {
@@ -246,6 +278,12 @@ async function encodeOne(videoFilePath) {
         src: path.resolve(videoFilePath),
         mtimeMs: srcStat.mtimeMs,
         size: srcStat.size,
+        // How much of the source this mirror covers. Not validated today (every
+        // consumer uses MIRROR_MAX_SECS), but without it a mirror's length is
+        // unknowable without probing — so raising the cap later would silently
+        // keep serving short mirrors. Mirrors written before this field exist
+        // have no maxSecs and are a mix of 600s and full-length.
+        maxSecs: MIRROR_MAX_SECS,
       }),
       "utf8",
     );
@@ -272,9 +310,79 @@ async function needsEncode(videoFilePath) {
   return true;
 }
 
-async function nextNeedingEncode() {
+// Move an episode to the head of the intro priority list — someone just opened
+// it for intro marking, so it outranks anything queued ahead of it. Called on
+// the needsIntro flip, which is a real event, so the log is not chatty.
+export function prioritizeIntro(videoFilePath) {
+  if (!videoFilePath) return;
+  const resolved = path.resolve(videoFilePath);
+  if (!mpfourPathFor(resolved)) return; // outside the tv tree, never mirrored
+  const at = introPriority.indexOf(resolved);
+  if (at === 0) return;
+  if (at > 0) introPriority.splice(at, 1);
+  introPriority.unshift(resolved);
+  unilog(1963, `intro priority head: ${path.basename(resolved)}`);
+}
+
+// Candidate paths in encode order: intro episodes first, then the chksrt queue,
+// deduped so a file in both is only considered once.
+function candidatePaths() {
+  const seen = new Set();
+  const out = [];
+  for (const p of introPriority) {
+    if (seen.has(p)) continue;
+    seen.add(p);
+    out.push(p);
+  }
   for (const entry of subsState.subQueueChkSrt) {
-    if (await needsEncode(entry?.videoFilePath)) return entry.videoFilePath;
+    if (!entry?.videoFilePath) continue;
+    const resolved = path.resolve(entry.videoFilePath);
+    if (seen.has(resolved)) continue;
+    seen.add(resolved);
+    out.push(resolved);
+  }
+  return out;
+}
+
+// Pull the intro episode of every chksrt-queued show into the priority list, so
+// the mirror that gets built first is the one both features will use. Appends
+// in chksrt-queue order and never reorders what is already there — this runs
+// every 5s, so moving entries would churn the list (and the log) forever, and
+// would also undo any head position set by prioritizeIntro.
+async function refreshIntroPriority() {
+  let paths;
+  try {
+    paths = introEpisodePaths() || [];
+  } catch (e) {
+    unilog(1964, `intro episode lookup failed: ${e.message}`);
+    return;
+  }
+  for (const p of paths) {
+    if (!p) continue;
+    const resolved = path.resolve(p);
+    if (!mpfourPathFor(resolved)) continue;
+    if (introPriority.includes(resolved)) continue;
+    // Skip already-mirrored files, else prune drops them and the next sweep
+    // re-adds them, logging on every tick.
+    if (!(await needsEncode(resolved))) continue;
+    introPriority.push(resolved);
+    unilog(1967, `intro mirror queued: ${path.basename(resolved)}`);
+  }
+}
+
+// Drop entries that no longer need an encode (mirrored, gone, or in failure
+// cooldown) so the list cannot grow without bound.
+async function pruneIntroPriority() {
+  const kept = [];
+  for (const p of introPriority) {
+    if (await needsEncode(p)) kept.push(p);
+  }
+  introPriority = kept;
+}
+
+async function nextNeedingEncode() {
+  for (const p of candidatePaths()) {
+    if (await needsEncode(p)) return p;
   }
   return null;
 }
@@ -284,8 +392,8 @@ async function nextNeedingEncode() {
 // hdrMsg — [0] is the head show, length is the count.
 async function computePending() {
   const pending = [];
-  for (const entry of subsState.subQueueChkSrt) {
-    if (await needsEncode(entry?.videoFilePath)) pending.push(entry.videoFilePath);
+  for (const p of candidatePaths()) {
+    if (await needsEncode(p)) pending.push(p);
   }
   return pending;
 }
@@ -319,6 +427,8 @@ async function scanPass() {
       reordering = false;
     }
   }
+  await refreshIntroPriority();
+  await pruneIntroPriority();
   // Refresh every tick, even while an encode from a prior tick is running, so
   // the count drops promptly when the user clears chksrt entries mid-encode.
   await refreshMp4Count();
@@ -369,6 +479,7 @@ async function removeStaleTmpFiles() {
 
 export function start(deps) {
   if (deps?.syncBatchMsgs) syncBatchMsgs = deps.syncBatchMsgs;
+  if (deps?.introEpisodePaths) introEpisodePaths = deps.introEpisodePaths;
   fs.mkdirSync(MPFOUR_DIR, { recursive: true });
   removeStaleTmpFiles().catch((e) => {
     unilog(1408, `tmp cleanup error: ${e.message}`);

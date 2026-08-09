@@ -865,6 +865,21 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
       } catch (e) {
         unilog(541, "needsIntro change error:", showName, e.message);
       }
+      // The client sets needsIntro immediately before opening the intro player,
+      // so this is the only advance warning we get — push that episode to the
+      // head of the mirror queue. Too late to beat the first seek on a slow
+      // hevc transcode, but it beats every later one.
+      // On the way back down the intro has been configured, so release the
+      // claim and stop the encode unless chksrt still wants it.
+      try {
+        const introFile = epd.selectIntroFile(tvdbRecord);
+        if (introFile?.path) {
+          if (nowNeedsIntro) mpfour.prioritizeIntro(introFile.path);
+          else mpfour.dropIntro(introFile.path);
+        }
+      } catch (e) {
+        unilog(1965, `intro mirror priority failed for ${showName}: ${e.message}`);
+      }
     }
     const push2Changes = [...diskChanges, ...playedDateChanges, ...gapChanges];
     if (push2Changes.length) {
@@ -2942,9 +2957,38 @@ https.createServer(httpsOptions, app).listen(HTTP_PORT, () => {
   startAsrQueueLoop();
   // .bif generation: clear any stale lock, restore queue, resume work.
   bifQueue.resumeOnStartup();
-  // seekable-mp4 mirrors for the chksrt queue (own loop, not ffmpegQueue)
-  mpfour.start({ syncBatchMsgs });
+  // seekable-mp4 mirrors for the chksrt queue + intro episodes (own loop, not
+  // ffmpegQueue)
+  mpfour.start({ syncBatchMsgs, introEpisodePaths });
 });
+
+// The episode intro marking will open, for every show with an entry in the
+// chksrt queue — in queue order. mpfour mirrors these ahead of the rest of the
+// queue so one mirror serves both features: chksrt needs the file seekable to
+// check subtitle sync, intro needs it seekable to scan for the intro.
+// selectIntroFile lives in @tv/share so this picks exactly the episode the
+// client will open.
+function introEpisodePaths() {
+  const allTvdb = tvdb.getAllTvdbSync() || {};
+  const out = [];
+  const seenShow = new Set();
+  for (const entry of subsState.subQueueChkSrt) {
+    const videoFilePath = entry?.videoFilePath;
+    if (!videoFilePath) continue;
+    const showName = showNameFromFilePath(videoFilePath);
+    if (!showName || seenShow.has(showName)) continue;
+    seenShow.add(showName);
+    const record = allTvdb[showName];
+    if (!record) continue;
+    // Already-marked shows will never be opened for intro editing, so mirroring
+    // their intro episode is wasted work. This also makes dropIntro() stick —
+    // without it the next sweep would re-add what the needsIntro clear removed.
+    if (intro.hasConfiguredIntro(record)) continue;
+    const result = epd.selectIntroFile(record);
+    if (result?.path) out.push(result.path);
+  }
+  return out;
+}
 
 app.post("/internal/tv-state", (req, res) => {
   notifyClients("tvMuteState", req.body);

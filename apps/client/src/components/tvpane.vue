@@ -696,7 +696,7 @@ import evtBus from "../evtBus.js";
 import { wsSend, clientId, openChannel, tvRemoteKey, hideShow } from "../srvr.js";
 import allServices from "../../../tv/services.json";
 import { keyLabels } from "../keyLabels.js";
-import { logHere } from "../log.js";
+import { logHere, unilog} from "../log.js"
 
 const SCRUB_HOLD_DELAY_MS = 400;
 const SCRUB_PING_INTERVAL_MS = 500;
@@ -1370,7 +1370,7 @@ export default {
           // was under it. Unhiding leaves the selection where it is.
           if (data?.action === "hidden") this.sendTvapprc(`${CMD_KEY},down`);
         } catch (e) {
-          logHere({ lvl: "warn" }, `hide toggle failed for ${showName}: ${e.message}`);
+          unilog(1969, `hide toggle failed for ${showName}: ${e.message}`);
         }
       });
     },

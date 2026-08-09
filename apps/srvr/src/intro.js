@@ -240,15 +240,21 @@ export function pushIntroState(ws, record, showName, season, episode) {
 // job. Called from every save path (client endpoint + emby overlay press) so
 // the flag never lingers. One-directional (only clears); the background update
 // re-sets needsIntro when a show becomes unconfigured again.
+// A show is "configured" once any season carries a trim, a skip, or an explicit
+// "none" — meaning it will not be opened for intro marking again.
+export function hasConfiguredIntro(rec) {
+  return (
+    rec?.seasonIntros != null &&
+    Object.values(rec.seasonIntros).some(
+      (si) => si?.trimPos != null || si?.skipDur != null || si?.none === true,
+    )
+  );
+}
+
 export async function reconcileNeedsIntro(name) {
   const rec = name && tvdb.getAllTvdbSync()?.[name];
   if (!rec) return;
-  const hasConfiguredIntro =
-    rec.seasonIntros != null &&
-    Object.values(rec.seasonIntros).some(
-      (si) => si?.trimPos != null || si?.skipDur != null || si?.none === true,
-    );
-  if (hasConfiguredIntro && rec.needsIntro) {
+  if (hasConfiguredIntro(rec) && rec.needsIntro) {
     await tvdb.setTvdbFields({ name, needsIntro: false });
     try {
       bifQueue.handleNeedsIntroChange(name, rec, false);

@@ -573,6 +573,11 @@ import * as util from "../util.js";
 const SIMPLE_LANDSCAPE_SPLIT = 50;
 const SIMPLE_PORTRAIT_SPLIT = 35;
 
+// Set this localStorage key to "1" to make Intro always use the built-in
+// video player instead of handing off to Emby, even when the episode has an
+// Emby item. Toggle from the browser console; no rebuild needed.
+const INTRO_FORCE_BUILTIN_KEY = "introForceBuiltin";
+
 export default {
   name: "App",
   components: {
@@ -1214,7 +1219,9 @@ export default {
       // Emby's player is used whenever the episode is in Emby — its intro
       // overlay has the same controls and supports high-speed scanning.
       // Our own player is the fallback for files with no Emby item.
-      if (embyId) {
+      const forceBuiltin =
+        window.localStorage.getItem(INTRO_FORCE_BUILTIN_KEY) === "1";
+      if (embyId && !forceBuiltin) {
         util.openExternalPage(urls.embyPageUrl(embyId, "intro"));
         return;
       }

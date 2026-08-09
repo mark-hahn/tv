@@ -567,7 +567,11 @@ export async function fetchTorrentFileFromSearchResult(torrent) {
   }
 
   const profile = tryLoadBrowserCurlProfile();
-  const headers = profile?.headers || {};
+  // Send cookies only.  The browser headers captured in curl-tl.txt (notably a
+  // Firefox User-Agent) do not match curl's TLS fingerprint, so Cloudflare
+  // answers with a 403 challenge page.  The search path sends cookies with no
+  // headers at all and is never challenged.
+  const headers = {};
   let cookieHeader = profile?.cookieHeader || "";
 
   const localCf = await loadLocalCfClearance(provider);

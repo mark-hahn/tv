@@ -179,6 +179,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // set.
   private String actorFilterName;
   private String activeShowName;
+  // A select that arrived before the show list did, and the play waiting on it.
+  // The ctrl socket is bound in onStart, well before the first Shows.load comes
+  // back, so tv-tv's select-then-play burst can land on an empty list -- where
+  // the select finds nothing and the play, seeing no selected show, would take
+  // tvapp straight out to Emby.
+  private String pendingSelectName;
+  private boolean pendingPlay;
   private long showsLoadedAt;
   private long frontSince;
   private long trashAt;
@@ -211,7 +218,19 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
                 () -> {
                   showsLoadedAt = System.currentTimeMillis();
                   showList.setShows(shows, selectedName);
+                  runPendingSelect();
                 }));
+  }
+
+  /** The select, and any play behind it, that came in before the list did. */
+  private void runPendingSelect() {
+    if (pendingSelectName == null) return;
+    showList.selectByName(pendingSelectName);
+    pendingSelectName = null;
+    if (pendingPlay) {
+      pendingPlay = false;
+      embyClick();
+    }
   }
 
   /**
@@ -1024,6 +1043,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     ui.post(
         () -> {
           bumpKeepAwake();
+          // Waits its turn behind a select the list has not arrived for yet,
+          // rather than playing whatever (if anything) is selected now.
+          if (pendingSelectName != null) {
+            pendingPlay = true;
+            return;
+          }
           embyClick();
         });
   }
@@ -1055,7 +1080,14 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   @Override
   public void onSelectShow(String name) {
-    ui.post(() -> showList.selectByName(name));
+    ui.post(
+        () -> {
+          if (showsLoadedAt == 0) {
+            pendingSelectName = name;
+            return;
+          }
+          showList.selectByName(name);
+        });
   }
 
   @Override

@@ -840,9 +840,12 @@ export default {
       util.openExternalPage(urls.embyPageUrl(embyId));
     },
 
+    // Same as the tvapprc remote's Shows button and then a click on this show
+    // over there: tvapp comes up (or is cleared back to a bare show list if it
+    // is already up) sitting on this show.
     async tvClick() {
       fetch(
-        `${config.tvTvUrl}/tv/viewshow?showId=${encodeURIComponent(this.show.id)}&showName=${encodeURIComponent(this.show.name)}`,
+        `${config.tvTvUrl}/tv/showintvapp?showName=${encodeURIComponent(this.show.name)}`,
       ).catch(() => {});
     },
 

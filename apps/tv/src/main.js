@@ -103,6 +103,7 @@ const CMD_BACK_TO_EMBY = "b"; // close tvapp and bring Emby up
 const CMD_FORCE_CLOSE_TO_EMBY = "g"; // same, but ignoring tvapp's focus
 const CMD_EMBY_SELECTED = "e"; // load tvapp's active show into Emby
 const CMD_SELECT_SHOW = "s"; // select a show by name
+const CMD_CLEAR_STATE = "r"; // back to a bare show list
 const CMD_CUSTOM_CHANGED = "c"; // the shared filter settings changed
 const TVAPP_PROBE_TIMEOUT_MS = 800;
 const TVAPP_SELECT_DIAL_TIMEOUT_MS = 8000;
@@ -537,7 +538,7 @@ function handleMsg(raw) {
             GOOGLE_EMBY_DELAY_MS,
           );
           setTimeout(
-            () => firePendingViewShow("viewshow(tv-on)"),
+            () => firePendingViewShowUntilPlaying("viewshow(tv-on)"),
             GOOGLE_EMBY_DELAY_MS + VIEW_SHOW_DELAY_MS,
           );
         }
@@ -668,6 +669,31 @@ async function firePendingViewShow(label) {
     unilog(400, `${label}: viewshow failed: ${e.message}`);
     return false;
   }
+}
+
+// The tv-was-off path's send. One send is enough to open a show page, but an
+// Emby that is still booting drops everything sent to it and answers 204 all
+// the same, so a play keeps resending until the show really reaches
+// NowPlayingItem -- the same thing /tv/viewshow does when the tv was already on.
+async function firePendingViewShowUntilPlaying(label) {
+  const wanted = pendingViewShow;
+  const seq = viewShowSeq;
+  await firePendingViewShow(label);
+  if (!wanted?.play) return;
+  const { showId, showName, episodeId } = wanted;
+  const deadline = Date.now() + EMBY_BOOT_WINDOW_MS;
+  while (Date.now() < deadline) {
+    await sleep(VIEW_SHOW_RESEND_MS);
+    if (seq !== viewShowSeq) return; // a newer press owns the tv now
+    if (await embyPlayingShow(showId, showName, episodeId)) {
+      unilog(1976, `${showName} is playing`);
+      pendingViewShow = null;
+      return;
+    }
+    pendingViewShow = { ...wanted, at: Date.now() };
+    await firePendingViewShow(label);
+  }
+  unilog(1977, `${showName} never started playing`);
 }
 
 // True once the TV's Emby session is actually playing the show that was asked
@@ -2413,7 +2439,10 @@ async function googlePowerOnSequence() {
   await openTvappSelectingShow();
 }
 
-async function openTvappSelectingShow() {
+// playIt adds the two commands that turn a bare open into the info pane's TV
+// button: the Shows button's clear first, so nothing inside cardMisc is focused
+// and the play lands on the show itself, and the play once the show is selected.
+async function openTvappSelectingShow(showName = null, playIt = false) {
   await closeEmbyShow();
   await launchTvapp();
   const sock = await dialTvappUntilOpen(TVAPP_SELECT_DIAL_TIMEOUT_MS);
@@ -2421,7 +2450,10 @@ async function openTvappSelectingShow() {
     unilog(1907, `tvapp never came up`);
     return false;
   }
-  if (lastRelevantShow) sock.send(`${CMD_SELECT_SHOW},${lastRelevantShow}`);
+  const wanted = showName ?? lastRelevantShow;
+  if (playIt) sock.send(CMD_CLEAR_STATE);
+  if (wanted) sock.send(`${CMD_SELECT_SHOW},${wanted}`);
+  if (playIt) sock.send(CMD_EMBY_SELECTED);
   sock.close();
   return true;
 }
@@ -2455,6 +2487,33 @@ app.post("/tv/toggletvapp", async (req, res) => {
     return;
   }
   res.json({ ok: true, action: "opened" });
+});
+
+// The info pane's TV button: the tvapprc remote's Shows button followed by a
+// click on this show. tvapp already up means the Shows button's clear -- back
+// to a bare show list -- and then the named show is selected and played; tvapp
+// down means the Shows button's open, with that show selected and played on its
+// way up instead of just landing on lastRelevantShow.
+app.get("/tv/showintvapp", async (req, res) => {
+  const showName = req.query.showName;
+  if (!showName) {
+    res.json({ ok: false, error: "no showName" });
+    return;
+  }
+  lastRelevantShow = showName;
+  const openSock = await probeTvappOpen();
+  if (openSock) {
+    openSock.send(CMD_CLEAR_STATE);
+    openSock.send(`${CMD_SELECT_SHOW},${showName}`);
+    openSock.send(CMD_EMBY_SELECTED);
+    openSock.close();
+    res.json({ ok: true, action: "played" });
+    return;
+  }
+  const opened = await openTvappSelectingShow(showName, true);
+  res.json(
+    opened ? { ok: true, action: "opened" } : { ok: false, error: "tvapp did not come up" },
+  );
 });
 
 app.post("/tv/tvapprc/back", async (req, res) => {

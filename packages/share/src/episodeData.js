@@ -386,7 +386,8 @@ export function toSeriesMap(ed, folder, today, tvDir = TV_DIR) {
 // a .bif sidecar, else the first unwatched episode with a file, else the first
 // episode with a file. Shared so tv-srvr can pre-build the mp4 mirror for
 // exactly the episode the client will open — if the two disagreed the mirror
-// would be useless. Returns { path, season, episode, embyId, hasBif } or
+// would be useless. Intro marking plays through /api/stream, never Emby, so an
+// episode needs only a file. Returns { path, season, episode, hasBif } or
 // { error }.
 export function selectIntroFile(show) {
   const ed = show?.episodeData;
@@ -398,17 +399,14 @@ export function selectIntroFile(show) {
   if (bifResult) {
     const { season, episode } = bifResult;
     const filePath = getFullPath(ed, folder, season, episode);
-    const embyId = getEmbyId(ed, season, episode);
     if (!filePath) return { error: "No path for bif episode" };
-    if (!embyId) return { error: "No Emby ID for bif episode" };
-    return { path: filePath, season, episode, embyId, hasBif: true };
+    return { path: filePath, season, episode, hasBif: true };
   }
 
   // Priority 2 & 3: first unwatched with a file, else first file
   let fallbackPath = null;
   let fallbackSeason = null;
   let fallbackEpisode = null;
-  let fallbackEmbyId = null;
   let foundUnwatched = false;
   forEachEpisode(ed, (s, e) => {
     if (foundUnwatched) return;
@@ -417,7 +415,6 @@ export function selectIntroFile(show) {
       fallbackPath = getFullPath(ed, folder, s, e);
       fallbackSeason = s;
       fallbackEpisode = e;
-      fallbackEmbyId = getEmbyId(ed, s, e);
     }
     if (!isWatched(ed, s, e)) {
       const filePath = getFullPath(ed, folder, s, e);
@@ -426,7 +423,6 @@ export function selectIntroFile(show) {
         fallbackPath = filePath;
         fallbackSeason = s;
         fallbackEpisode = e;
-        fallbackEmbyId = getEmbyId(ed, s, e);
       }
     }
   });
@@ -436,7 +432,6 @@ export function selectIntroFile(show) {
       path: fallbackPath,
       season: fallbackSeason,
       episode: fallbackEpisode,
-      embyId: fallbackEmbyId,
       hasBif: false,
     };
   }

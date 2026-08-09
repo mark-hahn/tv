@@ -13,10 +13,6 @@
 (function () {
   "use strict";
 
-  // When opened with the intro UI (tvui=intro), the emby-ui.user.js overlay
-  // owns the page — don't add the skip button on top of it.
-  if (new URLSearchParams(location.search).get("tvui") === "intro") return;
-
   const TV_SRVR_URL = "https://hahnca.com/tv-srvr";
   let skipButton = null;
   let currentDeviceName = null;

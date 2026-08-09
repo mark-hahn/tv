@@ -745,68 +745,10 @@ export default {
     },
 
     // Select intro file using client-side episodeData (see intro-file-selection.md).
-    // Priority: 1) first episode with bif → Emby, 2) first unwatched with file → built-in,
-    // 3) first file (any watched status) → built-in, 4) error.
+    // Delegates to @tv/share — tv-srvr uses the same function to pre-build the
+    // mp4 mirror, so both must pick the same episode.
     selectIntroFile(show) {
-      const ed = show?.episodeData;
-      if (!ed) return { error: "No episode data" };
-      const folder = show.path?.split("/").pop() || show.name;
-
-      // Priority 1: First episode with bif file (open in Emby)
-      const bifResult = epd.getBifEpisode(ed);
-      if (bifResult) {
-        const { season, episode } = bifResult;
-        const path = epd.getFullPath(ed, folder, season, episode);
-        const embyId = epd.getEmbyId(ed, season, episode);
-        if (!path) return { error: "No path for bif episode" };
-        if (!embyId) return { error: "No Emby ID for bif episode" };
-        return { path, season, episode, embyId, hasBif: true };
-      }
-
-      // Priority 2 & 3: First unwatched with file, or fallback to first file
-      let fallbackPath = null;
-      let fallbackSeason = null;
-      let fallbackEpisode = null;
-      let fallbackEmbyId = null;
-
-      let foundUnwatched = false;
-      epd.forEachEpisode(ed, (s, e) => {
-        if (foundUnwatched) return; // already found, skip rest
-        if (!epd.hasFile(ed, s, e)) return; // no file, skip
-
-        // Track first file as fallback
-        if (!fallbackPath) {
-          fallbackPath = epd.getFullPath(ed, folder, s, e);
-          fallbackSeason = s;
-          fallbackEpisode = e;
-          fallbackEmbyId = epd.getEmbyId(ed, s, e);
-        }
-
-        // Look for first unwatched with file
-        if (!epd.isWatched(ed, s, e)) {
-          const path = epd.getFullPath(ed, folder, s, e);
-          const embyId = epd.getEmbyId(ed, s, e);
-          if (path) {
-            foundUnwatched = true;
-            fallbackPath = path;
-            fallbackSeason = s;
-            fallbackEpisode = e;
-            fallbackEmbyId = embyId;
-          }
-        }
-      });
-
-      if (fallbackPath) {
-        return {
-          path: fallbackPath,
-          season: fallbackSeason,
-          episode: fallbackEpisode,
-          embyId: fallbackEmbyId,
-          hasBif: false,
-        };
-      }
-
-      return { error: "No playable episode found" };
+      return epd.selectIntroFile(show);
     },
 
     async introClick() {
@@ -827,8 +769,6 @@ export default {
           source: "info",
           season: result.season,
           episode: result.episode,
-          embyId: result.embyId,
-          hasBif: result.hasBif,
         });
       } catch (e) {
         unilog(922, `introClick error for ${this.show.name}:`, e);

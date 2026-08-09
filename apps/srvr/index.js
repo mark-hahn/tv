@@ -3119,17 +3119,6 @@ app.post("/internal/nowPlaying", (req, res) => {
   view.recordNowPlaying(lastNowPlayingShowName);
   res.json({ ok: true });
 
-  // Refresh intro-overlay labels for any intro UI tab whose device is now playing
-  for (const ws of connectedClients) {
-    const ui = ws._embyUi;
-    if (!ui || ui.uiId !== "intro" || ws.readyState !== 1) continue;
-    const item = lastNowPlayingList.find((p) => p.device === ui.deviceName);
-    if (!item) continue;
-    // Only push to tabs viewing the same item
-    if (ui.embyItemId && item.id && ui.embyItemId !== item.id) continue;
-    const record = tvdb.getAllTvdbSync()?.[item.showName];
-    intro.pushIntroState(ws, record, item.showName, item.season, item.episode);
-  }
 
   // Auto-skip: fire when an episode is near its start (either TV). Keyed on the
   // episode rather than a not-playing -> playing edge: the TV session keeps its
@@ -3382,28 +3371,6 @@ wss.on("connection", (ws) => {
       intro
         .doSkipIntro(pressedAt)
         .catch((err) => unilog(619, "error:", err.message));
-    } else if (fname === "embyHello") {
-      ws._embyUi = {
-        uiId: param?.uiId ?? null,
-        deviceName: param?.deviceName ?? null,
-        embyItemId: param?.embyItemId ?? null,
-      };
-      if (param?.uiId === "intro") {
-        intro
-          .pushIntroStateFromItem(ws, param?.embyItemId)
-          .catch((e) => unilog(620, "error:", e.message));
-      }
-    } else if (fname === "embyPress") {
-      if (ws._embyUi?.uiId === "intro") {
-        intro
-          .handleEmbyIntroPress(
-            ws,
-            param?.btnId,
-            param?.pressedAt,
-            param?.videoTimeSec,
-          )
-          .catch((e) => unilog(621, "error:", e.message));
-      }
     } else if (fname === "unilogSubscribe") {
       unilogRoutes.addUnilogSubscriber(ws);
     } else if (fname === "unilogUnsubscribe") {

@@ -2032,7 +2032,6 @@ export default {
         source: "map",
         season,
         episode,
-        embyId: cell?.id || null,
       });
     },
     async handleMapChksrtClick() {

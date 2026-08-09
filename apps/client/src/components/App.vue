@@ -1133,7 +1133,6 @@ export default {
           source: "info",
           season: result.season ?? null,
           episode: result.episode ?? null,
-          embyId: result.embyId ?? null,
         });
       } catch (e) {
         unilog(895, "clickIntro error:", e);

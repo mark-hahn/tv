@@ -124,7 +124,9 @@
       :style="{
         display: 'flex',
         justifyContent: 'flex-start',
-        margin: '5px 0 0 0',
+        // right margin matches the shows scroller's reserved scrollbar width
+        // so these icons line up with the cond icons in the show rows
+        margin: '5px 16px 0 0',
         width: visibleConds.length * 22 + 'px',
       }"
     >

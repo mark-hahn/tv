@@ -38,6 +38,28 @@ function readJsonBody(req) {
   });
 }
 
+// The VS Code remote CLI only reaches a window through the IPC socket named by
+// VSCODE_IPC_HOOK_CLI. Vite inherits whatever socket its terminal was born
+// with, and that window is usually long gone by the time the log pane asks for
+// an editor, in which case `code` silently does nothing and still exits 0. So
+// pick the most recently used socket at request time instead.
+const VSCODE_IPC_DIR = "/run/user/0";
+const VSCODE_IPC_PREFIX = "vscode-ipc-";
+const OPEN_EDITOR_TIMEOUT_MS = 10000;
+
+function newestVscodeIpcSock() {
+  const names = fs
+    .readdirSync(VSCODE_IPC_DIR)
+    .filter((n) => n.startsWith(VSCODE_IPC_PREFIX) && n.endsWith(".sock"));
+  let newest = null;
+  for (const name of names) {
+    const full = path.join(VSCODE_IPC_DIR, name);
+    const mtime = fs.statSync(full).mtimeMs;
+    if (!newest || mtime > newest.mtime) newest = { full, mtime };
+  }
+  return newest?.full ?? null;
+}
+
 // Dev-only endpoint behind the log viewer's Delete Sites action. Edits the
 // local source tree (source of truth) by removing unilog() calls.
 function unilogSitesEndpoint() {
@@ -72,16 +94,43 @@ function unilogSitesEndpoint() {
             const { spawn } = await import("node:child_process");
             const filePath = `/root/apps/tv/${file}`;
 
+            const sock = newestVscodeIpcSock();
+            if (!sock) {
+              res.setHeader("content-type", "application/json");
+              res.end(
+                JSON.stringify({
+                  ok: false,
+                  error: "no VS Code IPC socket found",
+                }),
+              );
+              return;
+            }
+
             // Use VS Code CLI: code --goto file:line
             const proc = spawn("code", ["--goto", `${filePath}:${line}`], {
-              stdio: "ignore",
-              detached: true,
+              stdio: ["ignore", "pipe", "pipe"],
+              env: { ...process.env, VSCODE_IPC_HOOK_CLI: sock },
             });
-
-            proc.unref(); // Don't wait for VS Code to exit
+            let out = "";
+            proc.stdout.on("data", (d) => (out += d));
+            proc.stderr.on("data", (d) => (out += d));
+            const timer = setTimeout(() => proc.kill(), OPEN_EDITOR_TIMEOUT_MS);
+            // `code` exits 0 even when it cannot reach a window, so any output
+            // at all is the only signal that the open did not happen.
+            const error = await new Promise((resolve) => {
+              proc.on("error", (e) => resolve(e.message));
+              proc.on("close", () =>
+                resolve(out.trim() ? out.trim() : null),
+              );
+            });
+            clearTimeout(timer);
 
             res.setHeader("content-type", "application/json");
-            res.end(JSON.stringify({ ok: true }));
+            res.end(
+              error
+                ? JSON.stringify({ ok: false, error })
+                : JSON.stringify({ ok: true }),
+            );
           } catch (err) {
             res.statusCode = 500;
             res.setHeader("content-type", "application/json");

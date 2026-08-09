@@ -382,19 +382,16 @@
             </div>
             <div
               id="genres"
-              v-if="genresTxt &amp;&amp; genresTxt.length > 0"
-              style="
-                min-height: 20px;
-                white-space: normal;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                display: -webkit-box;
-                -webkit-box-orient: vertical;
-                -webkit-line-clamp: 2;
-                line-clamp: 2;
-              "
+              v-if="genresLines.length > 0"
+              style="min-height: 20px"
             >
-              {{ genresTxt }}
+              <div
+                v-for="(line, idx) in genresLines"
+                :key="idx"
+                style="white-space: nowrap"
+              >
+                {{ line }}
+              </div>
             </div>
             <div
               id="crew"
@@ -554,6 +551,7 @@ let allTvdb = null;
 let cachedDiskShows = null;
 
 // Remote button display order; unlisted buttons sort just before "Official Website".
+const GENRES_MAX_LINE_LEN = 30;
 const REMOTE_BUTTON_ORDER = ["Emby", "IMDB", "Rotten", "Google", "Wikipedia"];
 const remoteSortKey = (name) => {
   if (name === "Official Website") return REMOTE_BUTTON_ORDER.length + 1;
@@ -625,6 +623,24 @@ export default {
   },
 
   computed: {
+    genresLines() {
+      const txt = (this.genresTxt || "").trim();
+      if (!txt) return [];
+      const parts = txt.split(/,\s*/).filter((p) => p.length > 0);
+      const lines = [];
+      let cur = "";
+      for (const part of parts) {
+        const cand = cur ? `${cur}, ${part}` : part;
+        if (cur && cand.length >= GENRES_MAX_LINE_LEN) {
+          lines.push(cur);
+          cur = part;
+        } else {
+          cur = cand;
+        }
+      }
+      if (cur) lines.push(cur);
+      return lines;
+    },
     chksrtQueueCountForShow() {
       const name = this.show?.name;
       if (!name) return 0;

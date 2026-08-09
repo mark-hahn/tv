@@ -644,6 +644,7 @@ import {
   srchTvdbData,
   getGenresByTvdbId,
 } from "../tvdb.js";
+import { pickTvdbSeries } from "@tv/share";
 import { unilog } from "../log.js";
 
 export default {
@@ -1873,7 +1874,10 @@ export default {
                     String(r.id) === tvdbId || String(r.tvdb_id) === tvdbId,
                 )
               : null;
-            curTvdb.value = match || results[0];
+            // Without the id, fall back on a year-aware pick rather than
+            // results[0] — TVDB puts the oldest series of a reused name first.
+            curTvdb.value =
+              match || pickTvdbSeries(results, tvdb.name, tvdb.year) || tvdb;
           } else {
             curTvdb.value = tvdb;
           }

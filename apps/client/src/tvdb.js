@@ -1,7 +1,7 @@
 import * as srvr from "./srvr.js";
 import * as util from "./util.js";
 import { config } from "./config.js";
-import { episodeDataToWatchedEpis } from "@tv/share";
+import { episodeDataToWatchedEpis, pickTvdbSeries } from "@tv/share";
 import { logHere, unilog } from "./log.js";
 
 // Route TVDB calls through the local torrents server proxy via WebSocket.
@@ -414,7 +414,10 @@ export const getImageByTvdbId = async (tvdbId) => {
     const obj = await res.json();
     return obj?.data?.image || null;
   } catch (e) {
-    unilog(1945, `getImageByTvdbId failed for ${tvdbId}: ${e?.message || String(e)}`);
+    unilog(
+      1945,
+      `getImageByTvdbId failed for ${tvdbId}: ${e?.message || String(e)}`,
+    );
     return null;
   }
 };
@@ -583,88 +586,37 @@ export const getEpisodeGuests = async (showName, seasonNum, episodeNum) => {
 //////////// get series map from tvdb //////////////
 
 /**
- * Match a show name using the same logic as normalize
- * Cleans both names and compares multiple variations
+ * First four digits of whatever year-ish prop the show carries, so a TVDB
+ * search can be narrowed to the right series of a reused name.
  */
-function cleanVariations(title) {
-  const applyBase = (t) => {
-    return t
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "") // Remove diacritics
-      .trim() // Trim whitespace
-      .replace(/\s+/g, " ") // Collapse whitespace to single space
-      .replace(/\b(and|the)\b/gi, "") // Remove words "and" and "the"
-      .replace(/\s+/g, " ") // Collapse whitespace again
-      .trim() // Trim again
-      .toUpperCase(); // Convert to uppercase
-  };
-
-  return [
-    // 1) Just base changes
-    applyBase(title),
-
-    // 2) Remove paren chars at end leaving contents
-    applyBase(title.replace(/\(([^)]+)\)\s*$/, "$1")),
-
-    // 3) Remove paren chars at end including contents
-    applyBase(title.replace(/\([^)]+\)\s*$/, "")),
-
-    // 4) Remove any non alphanum chars
-    applyBase(title.replace(/[^a-zA-Z0-9\s]/g, "")),
-
-    // 5) Change 2 and remove any non alphanum chars
-    applyBase(
-      title.replace(/\(([^)]+)\)\s*$/, "$1").replace(/[^a-zA-Z0-9\s]/g, ""),
-    ),
-
-    // 6) Change 3 and remove any non alphanum chars
-    applyBase(
-      title.replace(/\([^)]+\)\s*$/, "").replace(/[^a-zA-Z0-9\s]/g, ""),
-    ),
-  ];
-}
-
-/**
- * Check if two show names match using normalize-style logic
- */
-function showNamesMatch(tvdbShowName, searchShowName) {
-  const tvdbVariations = cleanVariations(tvdbShowName);
-  const searchVariations = cleanVariations(searchShowName);
-
-  for (const tvdbVar of tvdbVariations) {
-    for (const searchVar of searchVariations) {
-      if (tvdbVar === searchVar) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
+export const showYear = (show) => {
+  const raw = String(
+    show?.year ||
+      show?.premiereDate ||
+      show?.firstAired ||
+      show?.ProductionYear ||
+      "",
+  ).trim();
+  const y = raw.slice(0, 4);
+  return /^\d{4}$/.test(y) ? y : "";
+};
 
 export const getSeriesMap = async (show) => {
   const showNameStr = show.name || show.name;
-  // Search for the show on tvdb
+
+  // The show's own tvdbId is the only thing that identifies the series without
+  // ambiguity — a name search can never tell "Poldark" (1975) from the 2015
+  // remake, which TVDB lists as "Poldark (2015)".
+  const knownTvdbId = String(show?.tvdbId || show?.tvdb_id || "").trim();
+  if (knownTvdbId) return getSeriesMapByTvdbId(knownTvdbId);
+
   const searchResults = await srchTvdbData(showNameStr);
   if (!searchResults || searchResults.length === 0) {
     unilog(888, "getSeriesMap: no results found for:", showNameStr);
     return [];
   }
 
-  // Find best matching show using matching logic
-  let bestMatch = null;
-
-  for (const result of searchResults) {
-    if (showNamesMatch(result.name, showNameStr)) {
-      // If multiple matches, prefer exact case or first match
-      const resultName = result.name.toUpperCase();
-      const targetName = showNameStr.toUpperCase();
-
-      if (!bestMatch || resultName === targetName) {
-        bestMatch = result;
-        if (resultName === targetName) break; // Stop if exact match found
-      }
-    }
-  }
+  const bestMatch = pickTvdbSeries(searchResults, showNameStr, showYear(show));
 
   if (!bestMatch) {
     unilog(889, "getSeriesMap: no matching show found for:", showNameStr);

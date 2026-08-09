@@ -1196,26 +1196,38 @@
     >
       <div
         id="modal-content"
-        @click.stop
         style="
           background: white;
           padding: 24px;
           border-radius: 10px;
           width: min(720px, calc(100vw - 40px));
           max-height: calc(100vh - 40px);
-          overflow-y: auto;
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
           box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         "
       >
-        <div style="font-size: 20px; font-weight: 600; margin-bottom: 18px">
+        <div
+          style="
+            flex: 0 0 auto;
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 18px;
+          "
+        >
           Torrent Info
         </div>
         <div
           v-if="torrentInfoData && torrentInfoData.info"
           style="
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
             display: grid;
             grid-template-columns: 130px 1fr;
             gap: 10px 14px;
+            align-content: start;
           "
         >
           <div style="font-weight: 600">Name</div>
@@ -1258,38 +1270,17 @@
           </div>
 
           <div style="font-weight: 600">Trackers</div>
-          <div
-            style="
-              white-space: pre-wrap;
-              word-break: break-word;
-              max-height: 160px;
-              overflow-y: auto;
-            "
-          >
+          <div style="white-space: pre-wrap; word-break: break-word">
             {{ (torrentInfoData.info.trackers || []).join("\n") || "--" }}
           </div>
 
           <div style="font-weight: 600">Web Seeds</div>
-          <div
-            style="
-              white-space: pre-wrap;
-              word-break: break-word;
-              max-height: 120px;
-              overflow-y: auto;
-            "
-          >
+          <div style="white-space: pre-wrap; word-break: break-word">
             {{ (torrentInfoData.info.webSeeds || []).join("\n") || "--" }}
           </div>
 
           <div style="font-weight: 600">Files</div>
-          <div
-            style="
-              white-space: pre-wrap;
-              word-break: break-word;
-              max-height: 240px;
-              overflow-y: auto;
-            "
-          >
+          <div style="white-space: pre-wrap; word-break: break-word">
             <div
               v-for="file in torrentInfoData.info.files || []"
               :key="`${file.path}-${file.size}`"
@@ -1312,6 +1303,7 @@
         </div>
         <div
           style="
+            flex: 0 0 auto;
             display: flex;
             gap: 10px;
             justify-content: flex-end;

@@ -555,7 +555,9 @@ const GENRES_MAX_LINE_LEN = 30;
 const REMOTE_BUTTON_ORDER = ["Emby", "IMDB", "Rotten", "Google", "Wikipedia"];
 const remoteSortKey = (name) => {
   if (name === "Official Website") return REMOTE_BUTTON_ORDER.length + 1;
-  const idx = REMOTE_BUTTON_ORDER.findIndex((prefix) => name?.startsWith(prefix));
+  const idx = REMOTE_BUTTON_ORDER.findIndex((prefix) =>
+    name?.startsWith(prefix),
+  );
   return idx === -1 ? REMOTE_BUTTON_ORDER.length : idx;
 };
 export default {
@@ -644,8 +646,7 @@ export default {
     chksrtQueueCountForShow() {
       const name = this.show?.name;
       if (!name) return 0;
-      return this.chksrtQueueEntries.filter((e) => e.showName === name)
-        .length;
+      return this.chksrtQueueEntries.filter((e) => e.showName === name).length;
     },
     lastWatchedDate() {
       return (
@@ -1030,8 +1031,13 @@ export default {
 
     setDates(tvdbData) {
       const show = this.show;
-      const { firstAired, lastAired, status, lastPlayedDate, lastPlayedEpisode } =
-        tvdbData;
+      const {
+        firstAired,
+        lastAired,
+        status,
+        lastPlayedDate,
+        lastPlayedEpisode,
+      } = tvdbData;
       const fa = firstAired || "";
       const la = lastAired || "";
       const st = status || "";
@@ -1043,7 +1049,8 @@ export default {
       this.statusTxt = st ? ` &nbsp; ${st}` : "";
       // lastPlayedEpisode is the episode lastPlayedDate came from, so the date
       // and the S00E00 always describe the same viewing.
-      const watchedDate = util.fmtPlayedDate(lastPlayedDate).split(" ")[0] || "";
+      const watchedDate =
+        util.fmtPlayedDate(lastPlayedDate).split(" ")[0] || "";
       this.lastWatchedTxt =
         watchedDate && lastPlayedEpisode
           ? `${watchedDate}, ${lastPlayedEpisode}`
@@ -1347,11 +1354,11 @@ export default {
         try {
           const results = await tvdb.srchTvdbData(name);
           if (Array.isArray(results) && results.length > 0) {
-            const nameUpper = name.toUpperCase();
-            const match =
-              results.find(
-                (r) => String(r.name || "").toUpperCase() === nameUpper,
-              ) || results[0];
+            const match = epd.pickTvdbSeries(
+              results,
+              name,
+              tvdb.showYear(show),
+            );
             const candidate = String(match?.tvdb_id || match?.id || "").trim();
             if (candidate) {
               tvdbId = candidate;
@@ -1359,6 +1366,8 @@ export default {
                 932,
                 `loadIntoEmby: resolved tvdbId ${tvdbId} from TVDB search for "${name}"`,
               );
+            } else {
+              unilog(1981, `loadIntoEmby: TVDB search for "${name}" matched no single series — several series share that name and no year is known`);
             }
           }
         } catch (e) {

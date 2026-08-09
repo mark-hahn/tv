@@ -881,7 +881,14 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         unilog(1965, `intro mirror priority failed for ${showName}: ${e.message}`);
       }
     }
-    const push2Changes = [...diskChanges, ...playedDateChanges, ...gapChanges];
+    // Auto collection updates (run after the gap check, which sets anyWatched)
+    const collectionChanges = await applyAutoCollections(showName, tvdbRecord);
+    const push2Changes = [
+      ...diskChanges,
+      ...playedDateChanges,
+      ...gapChanges,
+      ...collectionChanges,
+    ];
     if (push2Changes.length) {
       await tvdb.saveTvdbSync();
       if (!options?.suppressNotify) {
@@ -3924,6 +3931,83 @@ const COLLECTION_IDS = {
   linda: "4706186",
 };
 
+// Auto collection rules (applied in the background tvdb update, per show).
+const CONTINUE_IDLE_DAYS = 30;
+
+// Add/remove one show in one Emby collection. Emby owns collection membership
+// -- the sweep reads it back -- so the record field is only updated after Emby
+// accepts the change.
+async function setEmbyCollection(collId, showId, member) {
+  const url =
+    `${EMBY_BASE_URL}/Collections/${collId}/Items` +
+    `?Ids=${showId}&api_key=${EMBY_API_KEY}`;
+  const resp = await fetch(url, { method: member ? "POST" : "DELETE" });
+  return resp.ok;
+}
+
+// True when any episode that has aired (or already has a file) is unwatched.
+function hasUnwatchedEpisodes(rec) {
+  const today = new Date().toISOString().slice(0, 10);
+  let found = false;
+  epd.forEachEpisode(rec.episodeData, (s, e, ep) => {
+    if (found) return;
+    if (epd.isWatched(rec.episodeData, s, e)) return;
+    if (epd.isUnaired(rec.episodeData, s, e, today)) return;
+    found = true;
+  });
+  return found;
+}
+
+// Whole days between lastPlayedDate ("YYYY/MM/DD ...", PST) and today (PST).
+// Compared as calendar dates so the server's own timezone never matters.
+function daysSinceLastPlayed(rec) {
+  const played = String(rec.lastPlayedDate || "").slice(0, 10).split("/");
+  if (played.length !== 3) return null;
+  const today = util.toPstDateOnly(new Date())?.split("/");
+  if (!today || today.length !== 3) return null;
+  const ms = (p) => Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  return Math.floor((ms(today) - ms(played)) / (24 * 60 * 60 * 1000));
+}
+
+// Once a show has any watched episode: To Try no longer applies, and a show
+// with episodes left that has sat unwatched for CONTINUE_IDLE_DAYS goes into
+// Continue. Returns the change strings for the push2 log line.
+async function applyAutoCollections(showName, rec) {
+  const changes = [];
+  if (!rec.inEmby || !rec.id || !rec.anyWatched) return changes;
+  if (rec.inToTry) {
+    try {
+      if (await setEmbyCollection(COLLECTION_IDS.toTry, rec.id, false)) {
+        rec.inToTry = false;
+        changes.push("inToTry:true->false(watched)");
+      } else {
+        unilog(1983, `emby toTry remove failed for ${showName}`);
+      }
+    } catch (e) {
+      unilog(1984, `emby toTry remove failed for ${showName}: ${e.message}`);
+    }
+  }
+  const idleDays = daysSinceLastPlayed(rec);
+  if (
+    !rec.inContinue &&
+    idleDays !== null &&
+    idleDays > CONTINUE_IDLE_DAYS &&
+    hasUnwatchedEpisodes(rec)
+  ) {
+    try {
+      if (await setEmbyCollection(COLLECTION_IDS.continue, rec.id, true)) {
+        rec.inContinue = true;
+        changes.push(`inContinue:false->true(idle ${idleDays}d)`);
+      } else {
+        unilog(1985, `emby continue add failed for ${showName}`);
+      }
+    } catch (e) {
+      unilog(1986, `emby continue add failed for ${showName}: ${e.message}`);
+    }
+  }
+  return changes;
+}
+
 const DISK_SYNC_INTERVAL = 60 * 60 * 1000; // 1 hour (full disk check)
 const GAP_CHECK_INTERVAL = 6 * 60 * 1000; // 6 minutes (processes batch of 10 shows, checks disk per-show)
 
@@ -3956,6 +4040,11 @@ async function fetchLatestPlayedInfo(showId) {
   };
 }
 
+// "YYYY/MM/DD HH:mm:ss.mmm" -> "YYYY/MM/DD HH:mm:ss".
+function toSecondPrecision(pstStr) {
+  return String(pstStr || "").split(".")[0];
+}
+
 // Move a freshly fetched last-played onto the record, and say whether anything
 // moved. Hiding and unhiding stamp fabricated LastPlayedDates onto episodes in
 // Emby, so a fetch that only echoes the value we stamped is not a viewing at
@@ -3963,7 +4052,14 @@ async function fetchLatestPlayedInfo(showId) {
 // stands. Any other value is a genuine play and retires the stamp.
 function applyLatestPlayed(rec, latest) {
   if (!latest?.lastPlayedDate) return false;
-  if (rec.fakeLastPlayed && latest.lastPlayedDate === rec.fakeLastPlayed)
+  // Emby keeps LastPlayedDate to the second, so the stamp it hands back has
+  // lost whatever sub-second part the fabricated one carried. Comparing whole
+  // seconds is what makes the echo recognizable.
+  if (
+    rec.fakeLastPlayed &&
+    toSecondPrecision(latest.lastPlayedDate) ===
+      toSecondPrecision(rec.fakeLastPlayed)
+  )
     return false;
   const episode = latest.lastPlayedEpisode || null;
   if (
@@ -3993,8 +4089,12 @@ const HIDE_BACKDATE_MS = 2 * 365 * 24 * 60 * 60 * 1000;
 
 // Emby stores dates with 7 fractional-second digits. The UserData endpoint
 // silently ignores a plain toISOString() (3 digits), so pad it out to 7.
+// Emby keeps only whole seconds of what is posted, so the stamp is floored
+// first -- what goes in then matches what comes back out, which is what lets
+// fakeLastPlayed recognize its own echo.
 function toEmbyDate(ms) {
-  return new Date(ms).toISOString().replace("Z", "0000Z");
+  const whole = Math.floor(ms / 1000) * 1000;
+  return new Date(whole).toISOString().replace("Z", "0000Z");
 }
 
 // Emby's item update overwrites every field from the posted body, so the item

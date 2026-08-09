@@ -3,7 +3,7 @@ import path from "node:path";
 import process from "node:process";
 import Database from "better-sqlite3";
 import { getApiDataDir, getApiMiscDir } from "./tvPaths.js";
-import { logHere, unilog } from "@tv/share";
+import { logHere, pickTvdbSeries, unilog } from "@tv/share";
 
 const LOG_APPS_API_DATA_MISC_TVMAZE_SYNC_LOG = false;
 
@@ -119,10 +119,7 @@ async function fetchTvdbOverview(tvdbId, name) {
     const json = await res.json();
     const results = json?.data;
     if (!results?.length) return "";
-    const sanName = sanitizeForTvdbMatch(name);
-    const match =
-      results.find((r) => sanitizeForTvdbMatch(r.name) === sanName) ||
-      results[0];
+    const match = pickTvdbSeries(results, name, null);
     return String(match?.overview || "");
   } catch (e) {
     unilog(1803, `tvdb overview lookup failed for ${name}: ${e.message}`);
@@ -142,14 +139,8 @@ async function fillPremieredFromTvdb(db, tvmazeId, name) {
     const results = json?.data;
     if (!results?.length) return;
     const sanName = sanitizeForTvdbMatch(name);
-    const match =
-      results.find((r) => sanitizeForTvdbMatch(r.name) === sanName) ||
-      results.find(
-        (r) =>
-          sanitizeForTvdbMatch(r.name).startsWith(sanName) ||
-          sanName.startsWith(sanitizeForTvdbMatch(r.name)),
-      ) ||
-      results[0];
+    const match = pickTvdbSeries(results, name, null);
+    if (!match) return;
     if (sanitizeForTvdbMatch(match.name).slice(0, 3) !== sanName.slice(0, 3))
       return;
     const firstAired = match?.first_air_time;
@@ -438,23 +429,35 @@ async function fetchJsonWithBackoff(url) {
         const waitSeconds =
           Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 10;
         if (attempt >= TVMAZE_FETCH_MAX_ATTEMPTS) {
-          unilog(1720, `TVmaze fetch gave up with HTTP 429 for ${url} after ${attempt} attempts`);
+          unilog(
+            1720,
+            `TVmaze fetch gave up with HTTP 429 for ${url} after ${attempt} attempts`,
+          );
           throw new Error(`TVmaze HTTP 429 for ${url}`);
         }
-        unilog(1721, `TVmaze fetch HTTP 429 for ${url} (attempt ${attempt}/${TVMAZE_FETCH_MAX_ATTEMPTS}), retrying in ${waitSeconds}s`);
+        unilog(
+          1721,
+          `TVmaze fetch HTTP 429 for ${url} (attempt ${attempt}/${TVMAZE_FETCH_MAX_ATTEMPTS}), retrying in ${waitSeconds}s`,
+        );
         await sleep(waitSeconds * 1000);
         continue;
       }
 
       if (res.status >= 500 && attempt < TVMAZE_FETCH_MAX_ATTEMPTS) {
-        unilog(1722, `TVmaze fetch HTTP ${res.status} for ${url} (attempt ${attempt}/${TVMAZE_FETCH_MAX_ATTEMPTS}), retrying`);
+        unilog(
+          1722,
+          `TVmaze fetch HTTP ${res.status} for ${url} (attempt ${attempt}/${TVMAZE_FETCH_MAX_ATTEMPTS}), retrying`,
+        );
         await sleep(TVMAZE_FETCH_RETRY_BASE_MS * attempt);
         continue;
       }
 
       if (!res.ok) {
         const bodyText = await res.text().catch(() => "");
-        unilog(1723, `TVmaze fetch gave up with HTTP ${res.status} for ${url}: ${bodyText.slice(0, 200)}`);
+        unilog(
+          1723,
+          `TVmaze fetch gave up with HTTP ${res.status} for ${url}: ${bodyText.slice(0, 200)}`,
+        );
         throw new Error(
           `TVmaze HTTP ${res.status} for ${url}. ${bodyText.slice(0, 200)}`,
         );
@@ -469,11 +472,17 @@ async function fetchJsonWithBackoff(url) {
         /fetch failed|timed out|etimedout/i.test(String(err?.message || err));
       if (!isNetworkError || attempt >= TVMAZE_FETCH_MAX_ATTEMPTS) {
         if (isNetworkError) {
-          unilog(1724, `TVmaze fetch gave up for ${url} after ${attempt} attempts: ${err?.message || String(err)}`);
+          unilog(
+            1724,
+            `TVmaze fetch gave up for ${url} after ${attempt} attempts: ${err?.message || String(err)}`,
+          );
         }
         throw err;
       }
-      unilog(1725, `TVmaze fetch failed for ${url} (attempt ${attempt}/${TVMAZE_FETCH_MAX_ATTEMPTS}): ${err?.message || String(err)}, retrying`);
+      unilog(
+        1725,
+        `TVmaze fetch failed for ${url} (attempt ${attempt}/${TVMAZE_FETCH_MAX_ATTEMPTS}): ${err?.message || String(err)}, retrying`,
+      );
       await sleep(TVMAZE_FETCH_RETRY_BASE_MS * attempt);
     } finally {
       clearTimeout(timeoutId);

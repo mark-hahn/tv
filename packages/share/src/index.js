@@ -295,6 +295,70 @@ export function smartTitleMatch(title, titleArray, year, forceChoice) {
   return resultTitle(bestCand);
 }
 
+// pickTvdbSeries(results, name, year) => chosen TVDB search result | null
+//
+// TVDB lists the oldest series of a given name under the bare name and gives
+// every later series of that name a "(YYYY)" suffix — "Poldark" is the 1975
+// series, "Poldark (2015)" is the remake.  So an exact name match is no
+// evidence that the right series was found, and taking results[0] always binds
+// the show to the oldest one.
+//
+// Fold each result's own year into its title so smartTitleMatch can weigh the
+// year, and when no year is known and more than one result carries the wanted
+// name, return null rather than guessing.
+export function pickTvdbSeries(results, name, year) {
+  const list = Array.isArray(results) ? results : [];
+  if (list.length === 0) return null;
+
+  const yearOf = (r) => {
+    const raw =
+      String(r?.year ?? "") ||
+      String(r?.firstAired ?? "") ||
+      String(r?.first_air_time ?? "") ||
+      String(r?.first_air_date ?? "");
+    const y = raw.slice(0, 4);
+    return /^\d{4}$/.test(y) ? y : null;
+  };
+
+  const titled = [];
+  for (const rec of list) {
+    const nm = String(rec?.name || "").trim();
+    if (!nm) continue;
+    const y = yearOf(rec);
+    const alreadyHasYear = y && new RegExp(`\\(${y}\\)\\s*$`).test(nm);
+    titled.push({ rec, title: y && !alreadyHasYear ? `${nm} (${y})` : nm });
+  }
+  if (titled.length === 0) return null;
+
+  const wantYearRaw = year != null ? String(year).trim() : "";
+  // A trailing "(YYYY)" on the wanted name is the caller naming the series it
+  // means, same as TVDB's own disambiguation.  Only the parenthesized form
+  // counts — a bare four digits can be the whole name ("1883").
+  const wantYear = /^\d{4}$/.test(wantYearRaw)
+    ? wantYearRaw
+    : String(name || "").match(/\((\d{4})\)\s*$/)?.[1] || null;
+
+  // Without a year the only honest answer for two same-named series is "don't
+  // know" — either pick would silently bind the show to the wrong series.
+  if (!wantYear) {
+    const wantAgg = normalizeAggressive(name);
+    let sameName = 0;
+    for (const t of titled) {
+      if (normalizeAggressive(t.title) === wantAgg) sameName += 1;
+    }
+    if (sameName > 1) return null;
+  }
+
+  const chosen = smartTitleMatch(
+    name,
+    titled.map((t) => t.title),
+    wantYear,
+    false,
+  );
+  if (!chosen) return null;
+  return titled.find((t) => t.title === chosen)?.rec || null;
+}
+
 // parseFileSeasonEpisode(fname, folderName, parsedPtt, parsedPttFolder) => { season, episode } | null
 //
 // Shared cascade for extracting season/episode from a video filename.

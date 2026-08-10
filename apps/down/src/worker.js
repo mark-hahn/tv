@@ -12,13 +12,26 @@ import fs from "node:fs";
 import { logHere, setUnilogSink, unilog } from "@tv/share";
 
 const SRVR_LOG_URL = "http://127.0.0.1:8739/api/log";
+const PARTIAL_DIR_PREFIX = ".rsync-tmp-";
+// The worker exits as soon as it finishes, so in-flight log POSTs have to be
+// awaited before process.exit or they never reach tv-srvr.
+const pendingLogPosts = new Set();
 setUnilogSink(({ logId, ts, message }) => {
-  fetch(SRVR_LOG_URL, {
+  const post = fetch(SRVR_LOG_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ logId, pid: "tv-down-worker", ts, message }),
-  }).catch(() => {});
+  })
+    .catch(() => {})
+    .finally(() => pendingLogPosts.delete(post));
+  pendingLogPosts.add(post);
 });
+
+const flushLogs = async () => {
+  while (pendingLogPosts.size) {
+    await Promise.all([...pendingLogPosts]);
+  }
+};
 
 const unixNow = () => Math.floor(Date.now() / 1000);
 
@@ -28,11 +41,28 @@ let entry = entry0 && typeof entry0 === "object" ? { ...entry0 } : null;
 // Track active rsync process so abort messages can kill it.
 let rsyncProc = null;
 
+// The per-transfer partial dir is resumable across retries of this same entry,
+// but nothing will ever resume it once the entry is aborted or has failed for
+// good, so remove it then instead of leaving a multi-GB orphan behind.
+const removePartialDir = () => {
+  if (!entry || !entry.localPath || entry.procId == null) return;
+  const dir = path.join(
+    entry.localPath,
+    `${PARTIAL_DIR_PREFIX}${entry.procId}`,
+  );
+  try {
+    fs.rmSync(dir, { recursive: true, force: true });
+  } catch (e) {
+    unilog(2033, `could not remove partial dir ${dir}: ${e.message}`);
+  }
+};
+
 parentPort.on("message", (msg) => {
   if (msg && msg.type === "abort") {
     try {
       if (rsyncProc) rsyncProc.kill("SIGKILL");
     } catch {}
+    removePartialDir();
     try {
       process.exit(0);
     } catch {}
@@ -143,9 +173,11 @@ const finish = (statusText) => {
         },
       });
     } catch {}
-    try {
-      process.exit(0);
-    } catch {}
+    flushLogs().finally(() => {
+      try {
+        process.exit(0);
+      } catch {}
+    });
     return;
   }
 
@@ -153,9 +185,11 @@ const finish = (statusText) => {
   entry.eta = null;
   entry.dateEnded = unixNow();
   postUpdate("finished");
-  try {
-    process.exit(0);
-  } catch {}
+  flushLogs().finally(() => {
+    try {
+      process.exit(0);
+    } catch {}
+  });
 };
 
 const main = () => {
@@ -189,6 +223,39 @@ const main = () => {
     const src = `${usbHost}:${usbPath2}${title}`;
     const dst = `${localPath2}${entry.destTitle || title}`;
     return { src, dst, usbPath2, localPath2 };
+  };
+
+  // rsync can exit non-zero after the file has in fact landed intact (e.g. a
+  // partial-dir cleanup error at the very end). Returns the byte size when the
+  // local file exists and matches the remote size, else null.
+  const verifyLandedIntact = async () => {
+    const { src, dst } = makeSrcDst();
+    if (!fs.existsSync(dst)) return null;
+    let localSize = 0;
+    try {
+      const st = fs.statSync(dst);
+      if (!st.isFile()) return null;
+      localSize = st.size;
+    } catch (e) {
+      unilog(2028, `could not stat local file for ${title}: ${e.message}`);
+      return null;
+    }
+    if (localSize <= 0) return null;
+    const remotePath = src.slice(src.indexOf(":") + 1);
+    let remoteSize = 0;
+    try {
+      const res = await sshExec(
+        usbHost,
+        `stat -c %s "${escapeForDoubleQuotes(remotePath)}" 2>/dev/null`,
+        20000,
+      );
+      remoteSize = Number(String(res.stdout || "").trim());
+    } catch (e) {
+      unilog(2029, `could not stat remote file for ${title}: ${e.message}`);
+      return null;
+    }
+    if (!Number.isFinite(remoteSize) || remoteSize <= 0) return null;
+    return localSize === remoteSize ? localSize : null;
   };
 
   // Ensure our status starts as downloading
@@ -239,12 +306,21 @@ const main = () => {
     }
   }
 
+  // Terminal failure: no retry will resume this entry, so drop its partial dir.
+  const failFinish = (statusText) => {
+    removePartialDir();
+    finish(statusText);
+  };
+
   const startRsync = (attempt) => {
     const { src, dst, usbPath2 } = makeSrcDst();
     const rsyncArgs = [
       "-av",
       "--protect-args",
-      "--partial-dir=.rsync-tmp",
+      // Per-transfer partial dir. A shared ".rsync-tmp" is deleted by whichever
+      // transfer into this season dir finishes first, which made concurrent
+      // transfers fail their final stat/rename after the data had landed.
+      `--partial-dir=${PARTIAL_DIR_PREFIX}${entry.procId}`,
       "-e",
       "ssh",
       "--timeout=20",
@@ -350,6 +426,18 @@ const main = () => {
       if (code !== 0) {
         const stderrSummary = summarizeStderr(stderrBuf);
 
+        // Before reporting any failure, check whether the file actually made
+        // it. If it did, report the error detail but finish as a success so
+        // the down card shows no error.
+        const landedBytes = await verifyLandedIntact();
+        if (landedBytes) {
+          unilog(2030, `rsync exit code ${code} for ${title}: ${stderrSummary || "no stderr"}`);
+          unilog(2031, `rsync for ${title} actually succeeded: local file is complete at ${landedBytes} bytes, matching the remote`);
+          entry.progress = 100;
+          finish("finished");
+          return;
+        }
+
         if (code === 23) {
           const missingDir = parseMissingChangeDir(stderrBuf);
           if (missingDir && attempt === 1) {
@@ -372,7 +460,7 @@ const main = () => {
             }
 
             unilog(1753, `rsync gave up for ${title} after ${attempt} attempts: remote folder not found: ${missingDir}`);
-            finish(`Missing: remote folder not found: ${missingDir}`);
+            failFinish(`Missing: remote folder not found: ${missingDir}`);
             return;
           }
 
@@ -380,23 +468,23 @@ const main = () => {
           const { src: srcNow } = makeSrcDst();
           if (missingDir) {
             unilog(1754, `rsync gave up for ${title} after ${attempt} attempts: remote folder not found: ${missingDir}`);
-            finish(`Missing: remote folder not found: ${missingDir}`);
+            failFinish(`Missing: remote folder not found: ${missingDir}`);
             return;
           }
           if (/No such file or directory/i.test(stderrBuf)) {
             unilog(1755, `rsync gave up for ${title} after ${attempt} attempts: remote file not found: ${srcNow}`);
-            finish(`Missing: remote file not found: ${srcNow}`);
+            failFinish(`Missing: remote file not found: ${srcNow}`);
             return;
           }
           unilog(1756, `rsync gave up for ${title} after ${attempt} attempts: ${stderrSummary || "Missing"}`);
-          finish(stderrSummary ? `Missing: ${stderrSummary}` : "Missing");
+          failFinish(stderrSummary ? `Missing: ${stderrSummary}` : "Missing");
           return;
         }
 
         const msg = stderrSummary
           ? `rsync exit code ${code}: ${stderrSummary}`
           : `rsync exit code ${code}`;
-        finish(msg);
+        failFinish(msg);
         return;
       }
       entry.progress = 100;
@@ -404,7 +492,7 @@ const main = () => {
     });
 
     p.on("error", (err) => {
-      finish(err && err.message ? err.message : "rsync spawn error");
+      failFinish(err && err.message ? err.message : "rsync spawn error");
     });
   };
 

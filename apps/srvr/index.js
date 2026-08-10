@@ -27,6 +27,8 @@ import {
   applyComputedProps,
   filterShowList,
   sortShowList,
+  cropName,
+  batchLabel,
 } from "@tv/share";
 import * as epd from "@tv/share";
 import { unilog, logHere } from "@tv/share";
@@ -307,23 +309,6 @@ ensureDir(CONFIG_DIR);
 
 process.setMaxListeners(50);
 const tvDir = "/mnt/media/tv";
-// GLOBAL-MSG: Bif — show name cropped to 10 chars, append "..." when cropped.
-const cropName = (name) => {
-  const s = String(name || "");
-  return s.length > 20 ? s.slice(0, 20) + "..." : s;
-};
-
-// Total batch jobs pending across all three queues combined.
-// Format a batch hdrMsg label: code + (N) when queue > 1 + show name. The label
-// names only the head job, so "++" is appended when the queue spans more than
-// one show — otherwise the count reads as if it were all for that one show.
-function batchLabel(code, showName, n, queueShowNames) {
-  const prefix = n > 1 ? `${code}(${n})` : code;
-  const shows = new Set((queueShowNames || []).filter(Boolean));
-  const more = shows.size > 1 ? "++" : "";
-  return `${prefix}: ${cropName(showName)}${more}`;
-}
-
 // Refresh all four batch hdrMsg entries from live queue state.
 // Call this whenever any batch queue changes so every pending type is visible.
 function syncBatchMsgs() {
@@ -3242,7 +3227,7 @@ http.createServer(app).listen(SRVR_INTERNAL_PORT, "127.0.0.1", () => {
 
 const appSocketName = "web app websocket";
 
-// GLOBAL-MSG: Down + CPU — periodic producers pushed to all clients.
+// GLOBAL-MSG: CPU — periodic producer pushed to all clients.
 const DOWN_INPROGRESS_PATH = path.join(
   path.dirname(SRVR_ROOT_DIR),
   "down",
@@ -3277,20 +3262,12 @@ const pollGlobalMessages = () => {
   } catch (e) {
     unilog(616, "cpu psi error:", e.message);
   }
-  // GLOBAL-MSG: Down
-  try {
-    syncBatchMsgs(); // safety refresh in case any queue update was missed
-    let count = 0;
-    if (fs.existsSync(DOWN_INPROGRESS_PATH)) {
-      const map = JSON.parse(fs.readFileSync(DOWN_INPROGRESS_PATH, "utf8"));
-      count = map && typeof map === "object" ? Object.keys(map).length : 0;
-    }
-    if (count > 0)
-      setGlobalMessage({ id: "Down", text: `Dwn:${count}`, position: 11 });
-    else setGlobalMessage({ id: "Down", action: "hide" });
-  } catch (e) {
-    unilog(617, "down poll error:", e.message);
-  }
+  // The Dwn hdrMsg belongs to the client, which counts the down pane's whole
+  // active set (downloading + waiting + future + encoding) from tv-down's own
+  // channel. This poll used to set it too, from tv-inProgress.json, which holds
+  // only the files actually in flight — two different numbers on one message
+  // id, so the header alternated between them every few seconds.
+  syncBatchMsgs(); // safety refresh in case any queue update was missed
 };
 setInterval(pollGlobalMessages, GLOBAL_MSG_POLL_MS);
 

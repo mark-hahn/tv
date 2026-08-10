@@ -1501,6 +1501,15 @@ async function main() {
           } catch (e) {
             unilog(2016, `usb prune: oldest-date scan failed: ${e.message}`);
           }
+          // Never delete anything younger than the window, however new the
+          // oldest entry is.
+          var minAgeCutoffSecs = Math.floor(
+            Date.now() / 1000 - PRUNE_WINDOW_DAYS * 24 * 60 * 60,
+          );
+          if (cutoffSecs !== null && cutoffSecs > minAgeCutoffSecs) {
+            unilog(2039, `usb prune cutoff would have deleted files newer than ${PRUNE_WINDOW_DAYS} days: held back to the ${PRUNE_WINDOW_DAYS} day age floor`);
+            cutoffSecs = minAgeCutoffSecs;
+          }
           if (cutoffSecs === null) {
             unilog(2017, `usb prune skipped: no dated entries found in usb files`);
           } else {

@@ -45,7 +45,21 @@ function readJsonBody(req) {
 // pick the most recently used socket at request time instead.
 const VSCODE_IPC_DIR = "/run/user/0";
 const VSCODE_IPC_PREFIX = "vscode-ipc-";
+const VSCODE_SERVER_BIN_DIR = "/root/.vscode-server/bin";
 const OPEN_EDITOR_TIMEOUT_MS = 10000;
+
+// vite's PATH does not carry the remote-cli dir, so locate the CLI itself.
+// One dir per installed VS Code commit; the newest is the running one.
+function vscodeCliPath() {
+  let newest = null;
+  for (const commit of fs.readdirSync(VSCODE_SERVER_BIN_DIR)) {
+    const full = path.join(VSCODE_SERVER_BIN_DIR, commit, "bin/remote-cli/code");
+    if (!fs.existsSync(full)) continue;
+    const mtime = fs.statSync(full).mtimeMs;
+    if (!newest || mtime > newest.mtime) newest = { full, mtime };
+  }
+  return newest?.full ?? null;
+}
 
 function newestVscodeIpcSock() {
   const names = fs
@@ -95,19 +109,20 @@ function unilogSitesEndpoint() {
             const filePath = `/root/apps/tv/${file}`;
 
             const sock = newestVscodeIpcSock();
-            if (!sock) {
+            const cli = vscodeCliPath();
+            if (!sock || !cli) {
               res.setHeader("content-type", "application/json");
               res.end(
                 JSON.stringify({
                   ok: false,
-                  error: "no VS Code IPC socket found",
+                  error: sock ? "no VS Code CLI found" : "no VS Code IPC socket found",
                 }),
               );
               return;
             }
 
             // Use VS Code CLI: code --goto file:line
-            const proc = spawn("code", ["--goto", `${filePath}:${line}`], {
+            const proc = spawn(cli, ["--goto", `${filePath}:${line}`], {
               stdio: ["ignore", "pipe", "pipe"],
               env: { ...process.env, VSCODE_IPC_HOOK_CLI: sock },
             });

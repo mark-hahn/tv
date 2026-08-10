@@ -1145,11 +1145,12 @@ async function main() {
     movieRsync.startCycling();
   })();
 
-  findUsb =
-    `ssh ${usbHost} \"find files -ignore_readdir_race -type f -printf '%CY-%Cm-%Cd-%P-%s\\\\n' 2>/dev/null\" ` +
-    "| grep -Ev .r[0-9]+-[0-9]+$ | grep -Ev .rar-[0-9]+$ " +
-    "| grep -Ev screen[0-9]+.png-[0-9]+$" +
-    "| grep -Evi '\\.(srr|sfv|nfo|nzb|jpg|jpeg|png|txt|sub|idx|srt|bup|ifo|vob)-[0-9]+$'";
+  // Unfiltered on purpose: this one scan feeds both the per-file pass (which
+  // drops the excluded extensions locally via shouldSkipUsbLineByScanRules)
+  // and the DVD pass (which wants exactly the VOB/IFO/BUP lines the per-file
+  // pass drops).  Walking the USB tree twice per cycle cost more than the
+  // extra lines do.
+  findUsb = `ssh ${usbHost} \"find files -ignore_readdir_race -type f -printf '%CY-%Cm-%Cd-%P-%s\\\\n' 2>/dev/null\"`;
 
   var FORCE_SCAN_EXCLUDED_EXTENSIONS = new Set([
     "srr",
@@ -1491,12 +1492,16 @@ async function main() {
   tvDbErrCount = 0;
   skipPaths = null;
 
+  // VOB/IFO/BUP entries pulled out of the cycle's USB scan, [{relPath, fileBytes}].
+  var dvdScanFiles = [];
+
   // DVD staging directory on local server.
   const DVD_STAGE_DIR = "/mnt/media/tmp-dvd";
 
   // ---------------------------------------------------------------------------
   // DVD folder processing:
-  //  1. Scan USB for every VOB/IFO/BUP file under VIDEO_TS directories.
+  //  1. Take the VOB/IFO/BUP files the cycle's USB scan already found and keep
+  //     the ones under VIDEO_TS directories.
   //  2. Queue each file as an individual download via tvJson.addEntry so the
   //     existing worker infrastructure handles it (one card per file).
   //  3. On each cycle, check whether all files for a given VIDEO_TS disc are
@@ -1505,33 +1510,15 @@ async function main() {
   //     clean up.
   // ---------------------------------------------------------------------------
   const processDvdFolders = async () => {
-    // Scan USB for all VOB, IFO, and BUP files inside VIDEO_TS dirs.
-    let dvdFileScanLines;
-    try {
-      const { stdout } = await execAsync(
-        `ssh ${usbHost} "find files -ignore_readdir_race -type f \\( -iname '*.VOB' -o -iname '*.IFO' -o -iname '*.BUP' \\) -printf '%P\\t%s\\n' 2>/dev/null | sort"`,
-        { timeout: 60000 },
-      );
-      dvdFileScanLines = stdout
-        .split("\n")
-        .map((s) => s.trim())
-        .filter(Boolean);
-    } catch (e) {
-      return; // SSH failed — skip DVD processing this cycle
-    }
-
-    if (dvdFileScanLines.length === 0) return;
+    // dvdScanFiles is the VOB/IFO/BUP slice of this cycle's USB scan.
+    if (!dvdScanFiles || dvdScanFiles.length === 0) return;
 
     // Group files by disc (VIDEO_TS dir) and resolve each torrent folder against Emby.
     // discMap key = vtsDirRelative (e.g. "The Norm Show - Complete/NORMS1/Disc 1/VIDEO_TS")
     // value = { torrentFolder, vtsDirRelative, files: [{relPath, fileBytes}], totalSize }
     const discMap = new Map();
     const torrentFolderOrder = [];
-    for (const line of dvdFileScanLines) {
-      const tabIdx = line.indexOf("\t");
-      if (tabIdx < 0) continue;
-      const relPath = line.slice(0, tabIdx); // relative to files/
-      const fileBytes = parseInt(line.slice(tabIdx + 1), 10) || 0;
+    for (const { relPath, fileBytes } of dvdScanFiles) {
       const parts = relPath.split("/");
       if (parts.length < 2) continue;
       const torrentFolder = parts[0];
@@ -1721,6 +1708,39 @@ async function main() {
       } else {
         // All files staged — run makemkv if not already done.
         await processDvdDisc(vtsDirRelative, disc, meta);
+      }
+    }
+
+    // A torrent folder whose every disc is finished is done with — delete it
+    // from the USB host and drop its local staging skeleton, so the per-cycle
+    // DVD scan stops finding (and re-resolving) it forever.
+    for (const torrentFolder of dvdTorrentFolders) {
+      let allFinished = true;
+      for (const [vtsDirRelative, disc] of discMap) {
+        if (disc.torrentFolder !== torrentFolder) continue;
+        const card = tvJson.getEntryByTitle(`DVD:makemkv:${vtsDirRelative}`);
+        if (!card || card.status !== "finished") {
+          allFinished = false;
+          break;
+        }
+      }
+      if (!allFinished) continue;
+      const remotePath = `files/${torrentFolder}`.replace(/'/g, `'\\''`);
+      try {
+        await execAsync(`ssh ${usbHost} "rm -rf '${remotePath}'"`, {
+          timeout: 300000,
+        });
+        unilog(1993, `DVD: deleted finished usb folder "${torrentFolder}"`);
+      } catch (e) {
+        unilog(1994, `DVD: failed deleting usb folder "${torrentFolder}": ${e.message}`);
+        continue;
+      }
+      try {
+        await execAsync(`rm -rf "${path.join(DVD_STAGE_DIR, torrentFolder)}"`, {
+          timeout: 60000,
+        });
+      } catch (e) {
+        unilog(1995, `DVD: failed removing staging dir for "${torrentFolder}": ${e.message}`);
       }
     }
 
@@ -2127,15 +2147,33 @@ async function main() {
         (l) => l && l.trim().length && !shouldSkipUsbLineByScanRules(l),
       );
       forcedFiles = null;
+      // A forced cycle has no full USB scan, so there is nothing for the DVD
+      // pass to look at; the next normal cycle picks discs up.
+      dvdScanFiles = [];
     } else {
       processingForced = false;
+      var findLines = [];
       try {
         var { stdout: findOut } = await execAsync(findUsb, { timeout: 300000 });
-        usbFiles = findOut.split("\n");
+        findLines = findOut.split("\n");
       } catch (e) {
         err("findUsb failed:", e.message || e);
-        usbFiles = [];
+        findLines = [];
       }
+      // Split the single scan: DVD files for the DVD pass, everything the scan
+      // rules allow for the per-file pass.
+      dvdScanFiles = [];
+      for (var fi = 0; fi < findLines.length; fi++) {
+        var fLine = String(findLines[fi] || "").trim();
+        if (!fLine) continue;
+        var fParts = fLine.split("-");
+        var fBytes = parseInt(fParts.pop(), 10) || 0;
+        var fRelPath = fParts.join("-").slice(11);
+        if (!fRelPath || !/\.(vob|ifo|bup)$/i.test(fRelPath)) continue;
+        dvdScanFiles.push({ relPath: fRelPath, fileBytes: fBytes });
+      }
+      dvdScanFiles.sort((a, b) => (a.relPath < b.relPath ? -1 : 1));
+      usbFiles = findLines.filter((l) => !shouldSkipUsbLineByScanRules(l));
       if (_cycleTiming) _cycleTiming.afterFind = Date.now();
     }
 

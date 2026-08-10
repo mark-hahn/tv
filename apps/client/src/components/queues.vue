@@ -82,8 +82,10 @@
           {{ inflight.file }}
         </div>
       </div>
+      <!-- ChkSrt is a review queue with nothing ever running on the server, so
+           the idle line would be noise there. -->
       <div
-        v-else
+        v-else-if="selected !== 'chksrt'"
         style="margin: 6px 0 10px 0; font-size: 15.6px; color: #666"
       >
         nothing running
@@ -93,14 +95,14 @@
       <div
         v-for="e in entries"
         :key="e.n + ':' + e.path"
-        style="
-          display: flex;
-          gap: 10px;
-          align-items: baseline;
-          padding: 2px 0;
-          font-size: 15.6px;
-          border-bottom: 1px solid #eee;
-        "
+        :style="{
+          display: 'flex',
+          gap: '10px',
+          alignItems: 'baseline',
+          padding: '2px 0',
+          fontSize: selected === 'chksrt' ? '18.7px' : '15.6px',
+          borderBottom: '1px solid #eee',
+        }"
       >
         <span
           style="

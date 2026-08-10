@@ -216,6 +216,20 @@
           First
         </button>
         <button
+          @click.stop="qbtInfoClick"
+          :disabled="selectedItems.size === 0"
+          :class="{ 'btn-disabled': selectedItems.size === 0 }"
+          style="
+            font-size: 13px;
+            cursor: pointer;
+            border-radius: 7px;
+            padding: 4px 10px;
+            border: 1px solid #bbb;
+          "
+        >
+          Info
+        </button>
+        <button
           @click.stop="qbtBadGrpClick"
           :disabled="selectedItems.size === 0 || qbtBadGrpBusy"
           :class="{ 'btn-disabled': selectedItems.size === 0 || qbtBadGrpBusy }"
@@ -344,6 +358,122 @@
         </div>
       </div>
     </div>
+
+    <div
+      id="qbt-info-modal"
+      v-if="showQbtInfoModal"
+      @click.stop="closeQbtInfoModal"
+      style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+      "
+    >
+      <div
+        id="modal-content"
+        style="
+          background: white;
+          padding: 24px;
+          border-radius: 10px;
+          width: min(820px, calc(100vw - 40px));
+          max-height: calc(100vh - 40px);
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+          font-weight: normal;
+        "
+      >
+        <div
+          style="
+            flex: 0 0 auto;
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 18px;
+          "
+        >
+          qBittorrent Info
+        </div>
+        <div
+          v-if="infoTorrent"
+          style="
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            gap: 8px 14px;
+            align-content: start;
+            font-size: 17px;
+          "
+        >
+          <div style="font-weight: 600">Name</div>
+          <div style="word-break: break-word">
+            {{ infoTorrent.name || "--" }}
+          </div>
+
+          <div style="font-weight: 600">Size</div>
+          <div>{{ fmtSizeDash(infoTorrent.size) }}</div>
+
+          <div style="font-weight: 600">Added</div>
+          <div>{{ fmtCompletionMmDd_HhMm(infoTorrent.added_on) }}</div>
+
+          <div style="font-weight: 600">Files</div>
+          <div style="word-break: break-word">
+            <div
+              v-if="infoFilesError"
+              style="color: #b00"
+            >
+              {{ infoFilesError }}
+            </div>
+            <div v-else-if="!infoFiles">Loading ...</div>
+            <div v-else-if="infoFiles.length === 0">--</div>
+            <div v-else>
+              <div
+                v-for="(f, i) in infoFiles"
+                :key="`${f.name}-${i}`"
+                style="margin-bottom: 6px"
+              >
+                {{ f.name }}
+                <span style="color: #666">
+                  ({{ fmtSizeDash(f.size) }}, {{ fmtFilePc(f.progress) }}%)
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          style="
+            flex: 0 0 auto;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+          "
+        >
+          <button
+            @click.stop="closeQbtInfoModal"
+            :style="{
+              padding: '8px 20px',
+              fontSize: '17px',
+              cursor: 'pointer',
+              borderRadius: '5px',
+              border: '1px solid #ccc',
+              '--btn-bg': 'white',
+            }"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -400,6 +530,10 @@ export default {
       selectedItems: new Set(), // Multi-select for new button group
       lastSelectedIndex: null,
       flashingHash: null,
+      showQbtInfoModal: false,
+      infoHash: "",
+      infoFiles: null,
+      infoFilesError: "",
     };
   },
 
@@ -455,6 +589,16 @@ export default {
         const st = String(t?.state || "").trim();
         return st === "stoppedDL" || st === "stoppedUP";
       }).length;
+    },
+
+    // Looked up live by hash so the popup keeps updating while polling.
+    infoTorrent() {
+      if (!this.infoHash) return null;
+      return (
+        (this.torrents || []).find(
+          (t) => String(t?.hash || "").trim() === this.infoHash,
+        ) || null
+      );
     },
 
     emptyStateText() {
@@ -965,6 +1109,47 @@ export default {
 
     fmtSize(bytesOrHumanString) {
       return util.fmtBytesSize(bytesOrHumanString).replace("GB", "Gb");
+    },
+
+    fmtSizeDash(bytesOrHumanString) {
+      return this.fmtSize(bytesOrHumanString) || "--";
+    },
+
+    fmtFilePc(progress) {
+      const n = Number(progress);
+      if (!Number.isFinite(n)) return "0";
+      return String(Math.round(n * 100));
+    },
+
+    async qbtInfoClick() {
+      const first = [...this.selectedItems][0];
+      const hash = String(first?.hash || "").trim();
+      if (!hash) return;
+
+      this.infoHash = hash;
+      this.infoFiles = null;
+      this.infoFilesError = "";
+      this.showQbtInfoModal = true;
+
+      try {
+        const url = new URL(`${config.torrentsApiUrl}/api/qbt/files`);
+        url.searchParams.set("hash", hash);
+        const res = await fetch(url.toString());
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+        if (this.infoHash !== hash) return;
+        this.infoFiles = Array.isArray(data) ? data : [];
+      } catch (err) {
+        if (this.infoHash !== hash) return;
+        this.infoFilesError = `File list failed: ${err?.message || String(err)}`;
+      }
+    },
+
+    closeQbtInfoModal() {
+      this.showQbtInfoModal = false;
+      this.infoHash = "";
+      this.infoFiles = null;
+      this.infoFilesError = "";
     },
 
     calcRateMb(t) {

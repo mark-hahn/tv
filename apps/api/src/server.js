@@ -18,6 +18,7 @@ import {
 } from "./tvmaze.js";
 import {
   getQbtInfo,
+  getQbtFiles,
   delQbtTorrent,
   recheckQbtTorrent,
   spaceAvail,
@@ -917,6 +918,20 @@ app.get("/api/qbt/info", async (req, res) => {
     res.json(await getQbtInfoPayload(req.query || {}));
   } catch (error) {
     unilog(218, "qbt info error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/qbt/files", async (req, res) => {
+  try {
+    const hash = String(req.query?.hash ?? "").trim();
+    if (!hash) {
+      res.status(400).json({ error: "hash required" });
+      return;
+    }
+    res.json(await getQbtFiles({ hash }));
+  } catch (error) {
+    unilog(2049, `qbt files error: ${error.message}`);
     res.status(500).json({ error: error.message });
   }
 });

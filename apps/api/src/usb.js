@@ -784,6 +784,40 @@ export async function recheckQbtTorrent(input) {
   return { ok: true, hashes };
 }
 
+/**
+ * List the files inside one torrent via qBittorrent WebUI `/api/v2/torrents/files`.
+ *
+ * @param {{ hash: string }} input
+ * @returns {Promise<any[]>} array of file objects (name, size, progress, priority, ...)
+ */
+export async function getQbtFiles(input) {
+  const hash = String(input?.hash ?? "").trim();
+  if (!hash) throw new Error("getQbtFiles requires hash");
+
+  const res = await qbtRequest((baseUrl, cookie) => {
+    const url = new URL("api/v2/torrents/files", baseUrl);
+    url.searchParams.set("hash", hash);
+    return fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Cookie: cookie,
+        Origin: baseUrl,
+        Referer: `${baseUrl}/`,
+      },
+    });
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `qBittorrent files failed: HTTP ${res.status}${text ? `: ${text}` : ""}`,
+    );
+  }
+
+  return res.json();
+}
+
 // Fetch a file tree from a USB-server directory.
 // find -printf: %y type (f/d), %P relative path, %s size, %CY-%Cm-%Cd date.
 async function getUsbTree(root, label) {

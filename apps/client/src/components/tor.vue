@@ -1143,11 +1143,6 @@
             {{ torrentInfoData.info.comment || "--" }}
           </div>
 
-          <div style="font-weight: 600">Trackers</div>
-          <div style="white-space: pre-wrap; word-break: break-word">
-            {{ (torrentInfoData.info.trackers || []).join("\n") || "--" }}
-          </div>
-
           <div style="font-weight: 600">Web Seeds</div>
           <div style="white-space: pre-wrap; word-break: break-word">
             {{ (torrentInfoData.info.webSeeds || []).join("\n") || "--" }}

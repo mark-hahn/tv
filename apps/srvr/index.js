@@ -28,8 +28,6 @@ import {
   filterShowList,
   sortShowList,
   compareShowNames,
-  cropName,
-  batchLabel,
 } from "@tv/share";
 import * as epd from "@tv/share";
 import { unilog, logHere } from "@tv/share";
@@ -315,16 +313,9 @@ const tvDir = "/mnt/media/tv";
 function syncBatchMsgs() {
   // Reencode (Rec)
   if (reencodeQueue.length > 0) {
-    const e = reencodeQueue[0];
-    const se = `S${String(e.season).padStart(2, "0")}E${String(e.episode).padStart(2, "0")}`;
     setGlobalMessage({
       id: "Reencode",
-      text: batchLabel(
-        "Rec",
-        `${cropName(e.showName)} ${se}`,
-        reencodeQueue.length,
-        reencodeQueue.map((r) => r.showName),
-      ),
+      text: `Rec:${reencodeQueue.length}`,
       position: 2003,
     });
   } else {
@@ -333,13 +324,9 @@ function syncBatchMsgs() {
   // EmbSub (Sub)
   const embCount = subsState.subQueue.length;
   if (embCount > 0) {
-    const embNames = subsState.subQueue.map((e) =>
-      showNameFromFilePath(e.videoFilePath),
-    );
-    const name = embNames[0] || "";
     setGlobalMessage({
       id: "EmbSub",
-      text: batchLabel("Sub", name, embCount, embNames),
+      text: `Sub:${embCount}`,
       position: 2004,
     });
   } else {
@@ -348,10 +335,9 @@ function syncBatchMsgs() {
   // BIF (Bif)
   const bifCount = bifQueue.getBifCount();
   if (bifCount > 0) {
-    const name = bifQueue.getBifHeadName();
     setGlobalMessage({
       id: "Bif",
-      text: batchLabel("Bif", name, bifCount, bifQueue.getBifShowNames()),
+      text: `Bif:${bifCount}`,
       position: 2002,
     });
   } else {
@@ -359,15 +345,9 @@ function syncBatchMsgs() {
   }
   // ASR (Asr)
   if (subsState.asrQueue.length > 0) {
-    const name = showNameFromFilePath(subsState.asrQueue[0]?.videoPath || "");
     setGlobalMessage({
       id: "Asr",
-      text: batchLabel(
-        "Asr",
-        name,
-        subsState.asrQueue.length,
-        subsState.asrQueue.map((e) => showNameFromFilePath(e.videoPath)),
-      ),
+      text: `Asr:${subsState.asrQueue.length}`,
       position: 2005,
     });
   } else {
@@ -375,19 +355,9 @@ function syncBatchMsgs() {
   }
   // ChkSrt (Chk) — files awaiting human srt review
   if (subsState.subQueueChkSrt.length > 0) {
-    const name = showNameFromFilePath(
-      subsState.subQueueChkSrt[0]?.videoFilePath || "",
-    );
     setGlobalMessage({
       id: "ChkSrt",
-      text: batchLabel(
-        "Chk",
-        name,
-        subsState.subQueueChkSrt.length,
-        subsState.subQueueChkSrt.map((e) =>
-          showNameFromFilePath(e.videoFilePath),
-        ),
-      ),
+      text: `Chk:${subsState.subQueueChkSrt.length}`,
       position: 2006,
     });
   } else {
@@ -396,15 +366,9 @@ function syncBatchMsgs() {
   // Mp4 — mpfour seekable-mirror encode backlog
   const mp4Pending = mpfour.getMp4Pending();
   if (mp4Pending.length > 0) {
-    const name = showNameFromFilePath(mp4Pending[0] || "");
     setGlobalMessage({
       id: "Mp4",
-      text: batchLabel(
-        "Mp4",
-        name,
-        mp4Pending.length,
-        mp4Pending.map((p) => showNameFromFilePath(p)),
-      ),
+      text: `Mp4:${mp4Pending.length}`,
       position: 2007,
     });
   } else {

@@ -756,21 +756,3 @@ export function getSeasonIntro(seasonIntros, season) {
   }
   return { ...EMPTY_SEASON_INTRO };
 }
-
-// GLOBAL-MSG: hdrMsg show name, cropped with "..." when long.
-export const cropName = (name) => {
-  const s = String(name || "");
-  return s.length > 15 ? s.slice(0, 15) + "..." : s;
-};
-
-// Format an hdrMsg label: code + (N) when the count is over 1 + show name. The
-// label names only the head item, so "++" is appended when the set spans more
-// than one show — otherwise the count reads as if it were all for that one
-// show. Lives here so tv-srvr's queue labels and the client's Qbt/Dwn labels
-// are formatted identically.
-export function batchLabel(code, showName, n, allShowNames) {
-  const prefix = n > 1 ? `${code}(${n})` : code;
-  const shows = new Set((allShowNames || []).filter(Boolean));
-  const more = shows.size > 1 ? "++" : "";
-  return `${prefix}: ${cropName(showName)}${more}`;
-}

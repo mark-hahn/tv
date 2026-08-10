@@ -322,7 +322,6 @@ import {
   getSortKey,
   sortShowList,
   filterShowList,
-  batchLabel,
 } from "@tv/share";
 import { unilog, logHere } from "../log.js";
 import { config } from "../config.js";
@@ -2020,17 +2019,6 @@ export default {
       if (source === "down") {
         this.downActiveShowNames = next;
       }
-    },
-
-    // GLOBAL-MSG: Qbt/Dwn label, formatted by the same @tv/share helper the
-    // server uses for its queue labels. An unmatched title falls back to its
-    // raw text so the head item is always named.
-    activeTitlesLabel(code, rawTitles) {
-      const list = Array.isArray(rawTitles) ? rawTitles : [];
-      const names = list.map(
-        (t) => this.findShowFromActiveRawTitle(t)?.name || String(t || ""),
-      );
-      return batchLabel(code, names[0], list.length, names);
     },
 
     async selectShowFromCardTitle(rawTitle) {
@@ -3814,11 +3802,7 @@ export default {
       // GLOBAL-MSG: Qbt
       const count = Array.isArray(titles) ? titles.length : 0;
       if (count > 0)
-        setGlobalMessage({
-          id: "Qbt",
-          text: this.activeTitlesLabel("Qbt", titles),
-          position: 10,
-        });
+        setGlobalMessage({ id: "Qbt", text: `Qbt:${count}`, position: 10 });
       else setGlobalMessage({ id: "Qbt", action: "hide" });
     });
 
@@ -3827,11 +3811,7 @@ export default {
       // GLOBAL-MSG: Down
       const count = Array.isArray(titles) ? titles.length : 0;
       if (count > 0)
-        setGlobalMessage({
-          id: "Down",
-          text: this.activeTitlesLabel("Dwn", titles),
-          position: 11,
-        });
+        setGlobalMessage({ id: "Down", text: `Dwn:${count}`, position: 11 });
       else setGlobalMessage({ id: "Down", action: "hide" });
     });
 

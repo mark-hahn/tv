@@ -29,22 +29,15 @@ let bifCheckTimer = null; // single backoff timer handle
 // Track current BIF show name since the entry is shifted before onDone fires.
 let currentBifShowName = null;
 
-// Injected by index.js (syncBatchMsgs reads getBifCount/getBifHeadName).
+// Injected by index.js (syncBatchMsgs reads getBifCount).
 let syncBatchMsgs = () => {};
 export function init(deps) {
   syncBatchMsgs = deps.syncBatchMsgs;
 }
 
-// Batch-status getters read by index.js syncBatchMsgs.
+// Batch-status getter read by index.js syncBatchMsgs.
 export function getBifCount() {
   return bifNeededQueue.length + (currentBifShowName ? 1 : 0);
-}
-export function getBifHeadName() {
-  return currentBifShowName || bifNeededQueue[0]?.showName || "";
-}
-// Every show represented in the queue — the label appends "++" when >1.
-export function getBifShowNames() {
-  return [currentBifShowName, ...bifNeededQueue.map((e) => e.showName)];
 }
 
 export function loadBifNeededQueue() {

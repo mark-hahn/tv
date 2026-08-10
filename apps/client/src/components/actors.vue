@@ -597,12 +597,7 @@ import { unilog, logHere } from "../log.js";
 
 const theMan = atob("bXJza2lu");
 
-const CREW_TYPE_ORDER = [
-  "Creator",
-  "Producer",
-  "Executive Producer",
-  "Writer",
-];
+const CREW_TYPE_ORDER = ["Creator", "Producer", "Executive Producer", "Writer"];
 
 export default {
   name: "Actors",
@@ -1078,22 +1073,19 @@ export default {
           const tHasImage = this.hasAnyImage(t0);
           const vHasImage = this.hasAnyImage(v0);
 
-          if (tHasImage !== vHasImage) {
-            if (tHasImage) {
-              tvdbUnique.shift();
-              const actor = tmdbUnique.shift();
-              actor.source = actor.source || "tmdb";
-              output.push(actor);
-            } else {
-              tmdbUnique.shift();
-              const actor = tvdbUnique.shift();
-              actor.source = actor.source || "tvdb";
-              actor.actorSort = actor.sort;
-              output.push(actor);
-            }
+          // Only one of the two rows survives, so the character name is taken
+          // from the other one when the winner has none -- TVDB often knows
+          // who acted in a show but not who they played.
+          if (tHasImage !== vHasImage && tHasImage) {
+            tvdbUnique.shift();
+            const actor = tmdbUnique.shift();
+            actor.name = actor.name || v0.name;
+            actor.source = actor.source || "tmdb";
+            output.push(actor);
           } else {
             tmdbUnique.shift();
             const actor = tvdbUnique.shift();
+            actor.name = actor.name || t0.name;
             actor.source = actor.source || "tvdb";
             actor.actorSort = actor.sort;
             output.push(actor);
@@ -1263,7 +1255,10 @@ export default {
       let tmdbList = [];
       const tmdbGuests = tmdbRes.value?.guests;
       if (tmdbRes.status === "rejected") {
-        unilog(1444, `guests getTmdb failed for ${this.showName} S${season}E${episode}: ${tmdbRes.reason?.message || tmdbRes.reason}`);
+        unilog(
+          1444,
+          `guests getTmdb failed for ${this.showName} S${season}E${episode}: ${tmdbRes.reason?.message || tmdbRes.reason}`,
+        );
       } else if (Array.isArray(tmdbGuests) && tmdbGuests.length) {
         tmdbList = tmdbGuests.map((actor) => {
           const imageUrl = actor.profile_path
@@ -1284,7 +1279,10 @@ export default {
 
       let tvdbList = [];
       if (tvdbRes.status === "rejected") {
-        unilog(1445, `guests getEpisodeGuests failed for ${this.showName} S${season}E${episode}: ${tvdbRes.reason?.message || tvdbRes.reason}`);
+        unilog(
+          1445,
+          `guests getEpisodeGuests failed for ${this.showName} S${season}E${episode}: ${tvdbRes.reason?.message || tvdbRes.reason}`,
+        );
       } else if (Array.isArray(tvdbRes.value) && tvdbRes.value.length) {
         tvdbList = tvdbRes.value;
       }
@@ -1331,7 +1329,10 @@ export default {
       const tmdbAfter = this.actors.filter((a) => a.source === "tmdb").length;
       const seasonStr = String(season).padStart(2, "0");
       const episodeStr = String(episode).padStart(2, "0");
-      unilog(909, `${this.showName} S${seasonStr}E${episodeStr} | TVDB: ${mergeResult.tvdbBefore}, ${tvdbAfter} | TMDB: ${mergeResult.tmdbBefore}, ${tmdbAfter} | guests fetch ${guestsMs}ms`);
+      unilog(
+        909,
+        `${this.showName} S${seasonStr}E${episodeStr} | TVDB: ${mergeResult.tvdbBefore}, ${tvdbAfter} | TMDB: ${mergeResult.tmdbBefore}, ${tmdbAfter} | guests fetch ${guestsMs}ms`,
+      );
     },
 
     handleRegularClick() {

@@ -191,7 +191,10 @@ function normalizeAllTvdbTimestampFields(records) {
 }
 
 function nowTvdbTimestamp(field) {
-  return formatTimestampByResolution(new Date(), TVDB_TIMESTAMP_RESOLUTION[field]);
+  return formatTimestampByResolution(
+    new Date(),
+    TVDB_TIMESTAMP_RESOLUTION[field],
+  );
 }
 
 function setImdbId(tvdb) {
@@ -998,10 +1001,7 @@ const getUrlAndRatings = async (type, url, name) => {
       if (!result || result.challenge) {
         if (result?.challenge) {
           const until = await gateImdbFetches();
-          unilog(
-            723,
-            `imdb trailer fetches gated until ${until}`,
-          );
+          unilog(723, `imdb trailer fetches gated until ${until}`);
         }
         return { ratings: null, reviewers: null, video: null };
       }
@@ -1601,12 +1601,54 @@ const TMDB_PROFILE_BASE = "https://image.tmdb.org/t/p/w500";
  * exactly like getTvdbCharacters' rows, and marked featured because a show
  * with no regulars has nothing else to put in front.
  */
-async function getTmdbCast(remoteIds, name) {
+async function getTmdbAggregateCast(remoteIds) {
   const tmdbId = (remoteIds ?? []).find((r) => r.type === TMDB_REMOTE_TYPE)?.id;
   if (!tmdbId) return [];
+  const credits = await moviedb.tvAggregateCredits({ id: tmdbId });
+  return Array.isArray(credits?.cast) ? credits.cast : [];
+}
+
+// Actor names as they compare across the two sources: case, punctuation and
+// runs of whitespace all differ between TVDB and TMDB spellings.
+function normActorName(name) {
+  return String(name ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * TVDB knows who acted in a show but often not who they played -- a series
+ * like Bob and Rose comes back with a full character list whose every `name`
+ * is null. TMDB's aggregate credits carry the role, so any character left
+ * without one is filled in by matching on the actor's name. Mutates and
+ * returns the list it was given.
+ */
+async function fillMissingCharacterNames(characters, remoteIds, name) {
+  if (!characters.some((char) => !char.character)) return characters;
   try {
-    const credits = await moviedb.tvAggregateCredits({ id: tmdbId });
-    const cast = Array.isArray(credits?.cast) ? credits.cast : [];
+    const cast = await getTmdbAggregateCast(remoteIds);
+    if (!cast.length) return characters;
+    const rolesByActor = new Map(
+      cast.map((actor) => [
+        normActorName(actor.name),
+        actor.roles?.[0]?.character ?? "",
+      ]),
+    );
+    for (const char of characters) {
+      if (char.character) continue;
+      const role = rolesByActor.get(normActorName(char.actor));
+      if (role) char.character = role;
+    }
+  } catch (e) {
+    unilog(2045, `tmdb character name fill failed for ${name}: ${e.message}`);
+  }
+  return characters;
+}
+
+async function getTmdbCast(remoteIds, name) {
+  try {
+    const cast = await getTmdbAggregateCast(remoteIds);
     return cast
       .filter((actor) => actor.profile_path)
       .sort(
@@ -1995,6 +2037,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   const image = getTvdbImageUrl(extResObj);
   let characters = getTvdbCharacters(extResObj);
   if (!characters.length) characters = await getTmdbCast(remoteIds, name);
+  else
+    characters = await fillMissingCharacterNames(characters, remoteIds, name);
   const crew = await getTvmazeCrew(tvdbId);
   let lastAired = lastAiredIn ?? firstAired;
   lastAired = lastAired ?? "";
@@ -3241,7 +3285,11 @@ export const searchTvdbByImdbId = async (params) => {
 
     // Build a tvdb-like object from the API response
     const image = getTvdbImageUrl(extResObj);
-    const characters = getTvdbCharacters(extResObj);
+    const characters = await fillMissingCharacterNames(
+      getTvdbCharacters(extResObj),
+      extData.remoteIds,
+      extData.name || series.name || "",
+    );
     const crew = await getTvmazeCrew(tvdbId);
     const firstAired = extData.firstAired || "";
     const lastAired = extData.lastAired || firstAired || "";
@@ -3365,9 +3413,10 @@ export const setTvdbFields = async (params) => {
         }
 
         // Handle direct assignment for top-level fields and nested objects
-        tvdb[key] = key === "saved" && value === 0
-          ? 0
-          : normalizeTvdbTimestampValue(key, value);
+        tvdb[key] =
+          key === "saved" && value === 0
+            ? 0
+            : normalizeTvdbTimestampValue(key, value);
       }
 
       if (wasInEmby && tvdb.inEmby === false) {

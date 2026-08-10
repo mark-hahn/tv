@@ -629,19 +629,22 @@ export default {
       const txt = (this.genresTxt || "").trim();
       if (!txt) return [];
       const parts = txt.split(/,\s*/).filter((p) => p.length > 0);
-      const lines = [];
-      let cur = "";
-      for (const part of parts) {
-        const cand = cur ? `${cur}, ${part}` : part;
-        if (cur && cand.length >= GENRES_MAX_LINE_LEN) {
-          lines.push(cur);
-          cur = part;
-        } else {
-          cur = cand;
+      if (parts.length === 0) return [];
+      // fewest lines that all fit, with the genres spread evenly over them
+      for (let cnt = 1; cnt <= parts.length; cnt++) {
+        const base = Math.floor(parts.length / cnt);
+        const extra = parts.length % cnt;
+        const lines = [];
+        let pos = 0;
+        for (let i = 0; i < cnt; i++) {
+          const size = base + (i < extra ? 1 : 0);
+          lines.push(parts.slice(pos, pos + size).join(", "));
+          pos += size;
         }
+        const fits = lines.every((l) => l.length < GENRES_MAX_LINE_LEN);
+        if (fits || cnt === parts.length) return lines;
       }
-      if (cur) lines.push(cur);
-      return lines;
+      return [txt];
     },
     chksrtQueueCountForShow() {
       const name = this.show?.name;

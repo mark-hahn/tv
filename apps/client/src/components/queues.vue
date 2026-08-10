@@ -33,14 +33,13 @@
         @click="toggle(q.key)"
         :style="{
           padding: '2px 10px',
-          fontSize: '16.8px',
+          fontFamily: 'sans-serif',
           cursor: countOf(q.key) === 0 ? 'default' : 'pointer',
           opacity: countOf(q.key) === 0 ? 0.4 : 1,
           border:
             selected === q.key ? '2px solid #333' : '1px solid #999',
           borderRadius: '4px',
           backgroundColor: selected === q.key ? 'lightgray' : 'whitesmoke',
-          fontWeight: selected === q.key ? 'bold' : 'normal',
         }"
       >
         {{ q.label }} {{ countOf(q.key) }}
@@ -212,6 +211,11 @@ export default {
         if (this.selected && this.countOf(this.selected) === 0) {
           this.selected = null;
         }
+        // With only one queue non-empty there is nothing to choose, so show it.
+        const live = this.queueDefs
+          .map((q) => q.key)
+          .filter((k) => this.countOf(k) > 0);
+        if (live.length === 1) this.selected = live[0];
       } catch (e) {
         this.error = e?.message || "fetch failed";
       }

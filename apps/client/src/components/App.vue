@@ -939,10 +939,10 @@ export default {
         { label: "Qbt", key: "qbt" },
         { label: "Usb", key: "usb" },
         { label: "Down", key: "down" },
+        { label: "Queues", key: "queues" },
         { label: "Local", key: "local" },
         { label: "Log", key: "log" },
         { label: "Plot", key: "plot" },
-        { label: "Queues", key: "queues" },
       ];
     },
 

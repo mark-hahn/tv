@@ -3036,7 +3036,8 @@ async function main() {
     // Disk check first: if the file is already on disk, mark finished and skip.
     // This must run before the tvJsonTitles guard so files that were previously
     // queued as 'waiting' (before disk-check was added) also get caught.
-    // Skip this check for forced downloads — the worker will delete and re-fetch.
+    // Skip this check for forced downloads — the worker renames the existing
+    // file to .old and re-fetches.
     if (
       !processingForced &&
       (fs.existsSync(`${tvSeasonPath}/${destTitle || fname}`) ||

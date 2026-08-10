@@ -2,12 +2,17 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { rename } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { buildFileTree } from "./fileTree.js";
 import { unilog } from "@tv/share";
 
 const execFileAsync = promisify(execFile);
 
 const TV_ROOT = "/mnt/media/tv";
+const MOVIE_ROOT = "/mnt/media/movies";
+
+// trailing chain of `.old` / `.alt` markers, e.g. ".old", ".old.old", ".alt"
+const OLD_SUFFIX_RE = /^(.+?)((?:\.(?:old|alt))+)$/i;
 
 function resolveUnderRoot(root, relPath) {
   const rel = String(relPath || "").trim();
@@ -88,4 +93,38 @@ export async function renameLocalFile(oldPath, newName) {
 
   await rename(fullOldPath, fullNewPath);
   return { success: true };
+}
+
+/**
+ * Make the `.old`/`.alt` sidecar at relPath the active file: the sidecar takes
+ * the base name and the file that held it is demoted with a `.old` suffix
+ * (`.old.old`, ... if that name is taken).
+ */
+export async function swapLocalOld(relPath, movieMode) {
+  const root = movieMode ? MOVIE_ROOT : TV_ROOT;
+  const fullSidecar = resolveUnderRoot(root, relPath);
+  const dir = path.dirname(fullSidecar);
+  const sidecarName = path.basename(fullSidecar);
+
+  const m = OLD_SUFFIX_RE.exec(sidecarName);
+  if (!m) throw new Error(`${sidecarName} has no .old/.alt suffix`);
+  const baseName = m[1];
+  const fullBase = path.join(dir, baseName);
+
+  if (!existsSync(fullSidecar)) throw new Error(`${sidecarName} is missing`);
+  if (!existsSync(fullBase)) throw new Error(`${baseName} is missing`);
+
+  const tmpPath = path.join(dir, `${baseName}.swaptmp-${Date.now()}`);
+  await rename(fullBase, tmpPath);
+  await rename(fullSidecar, fullBase);
+
+  let demoted = `${fullBase}.old`;
+  while (existsSync(demoted)) demoted += ".old";
+  await rename(tmpPath, demoted);
+
+  return {
+    success: true,
+    activeName: baseName,
+    oldName: path.basename(demoted),
+  };
 }

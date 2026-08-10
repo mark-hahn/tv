@@ -34,7 +34,7 @@ import {
   deleteUsbMovies,
   usbCpToken,
 } from "./usb.js";
-import { getLocalFiles, renameLocalFile } from "./local.js";
+import { getLocalFiles, renameLocalFile, swapLocalOld } from "./local.js";
 import { enrichQbtStats } from "./qbt-stats.js";
 import {
   getBrowseShow,
@@ -1220,6 +1220,22 @@ app.post("/api/local/rename", async (req, res) => {
       231,
       `local rename error for ${oldName} -> ${newName}: ${err?.message || String(err)}`,
     );
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/local/swap", async (req, res) => {
+  const { relPath, movieMode } = req.body || {};
+  try {
+    if (!relPath) return res.status(400).json({ error: "Missing relPath" });
+    const result = await swapLocalOld(relPath, !!movieMode);
+    res.json(result);
+  } catch (err) {
+    const name =
+      String(relPath || "")
+        .split("/")
+        .pop() || String(relPath);
+    unilog(2052, `local swap error for ${name}: ${err?.message || String(err)}`);
     res.status(500).json({ error: err.message });
   }
 });

@@ -200,6 +200,22 @@
             </button>
 
             <button
+              @click="clickSwap"
+              :disabled="!swapReady || loading"
+              title="Make this .old/.alt file the active one"
+              :style="{
+                cursor: swapReady && !loading ? 'pointer' : 'default',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg': swapReady && !loading ? 'whitesmoke' : '#e8e8e8',
+                color: swapReady && !loading ? 'inherit' : '#aaa',
+              }"
+            >
+              Swap
+            </button>
+
+            <button
               @click="refresh"
               :disabled="loading"
               style="
@@ -509,6 +525,22 @@
               }"
             >
               View
+            </button>
+
+            <button
+              @click="clickSwap"
+              :disabled="!swapReady || loading"
+              title="Make this .old/.alt file the active one"
+              :style="{
+                cursor: swapReady && !loading ? 'pointer' : 'default',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg': swapReady && !loading ? 'whitesmoke' : '#e8e8e8',
+                color: swapReady && !loading ? 'inherit' : '#aaa',
+              }"
+            >
+              Swap
             </button>
 
             <button
@@ -1384,6 +1416,9 @@ import parseTorrentTitle from "parse-torrent-title";
 import { unilog, logHere } from "../log.js";
 
 const TEXT_VIEW_MAX_BYTES = 2 * 1024 * 1024;
+const VIDEO_EXT_RE = /\.(mkv|mp4|avi|m4v|mov|wmv|mpg|mpeg|ts|m2ts|webm)$/i;
+// trailing chain of `.old` / `.alt` markers, e.g. ".old", ".old.old", ".alt"
+const OLD_SUFFIX_RE = /^(.+?)((?:\.(?:old|alt))+)$/i;
 
 // --- smartTitleMatch Helpers (copied from packages/share) ---
 
@@ -1619,10 +1654,25 @@ export default {
     },
     historyReady() {
       const relPath = this.singleSelectedFile;
-      return (
-        !!relPath &&
-        /\.(mkv|mp4|avi|m4v|mov|wmv|mpg|mpeg|ts|m2ts|webm)$/i.test(relPath)
-      );
+      return !!relPath && VIDEO_EXT_RE.test(relPath);
+    },
+    // { relPath, basePath } when the one selected file is an .old/.alt sidecar
+    // of a video file sitting beside it, else null
+    swapInfo() {
+      const relPath = this.singleSelectedFile;
+      if (!relPath) return null;
+      const parts = relPath.split("/");
+      const m = OLD_SUFFIX_RE.exec(parts[parts.length - 1]);
+      if (!m) return null;
+      const baseName = m[1];
+      if (!VIDEO_EXT_RE.test(baseName)) return null;
+      const basePath = [...parts.slice(0, -1), baseName].join("/");
+      const baseNode = this.findNodeByPath(basePath);
+      if (!baseNode || baseNode.type !== "file") return null;
+      return { relPath, basePath };
+    },
+    swapReady() {
+      return !!this.swapInfo;
     },
     infoLines() {
       if (!this.infoText) return [];
@@ -1954,6 +2004,38 @@ export default {
           `Rename failed for ${oldName} -> ${newName}: ${e?.message || String(e)}`,
         );
         this.error = e.message || "Rename failed";
+        this.loading = false;
+      }
+    },
+    async clickSwap() {
+      const info = this.swapInfo;
+      if (!info) return;
+      const sidecarName = info.relPath.split("/").pop();
+
+      this.loading = true;
+      try {
+        const url = `${config.torrentsApiUrl}/api/local/swap`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            relPath: info.relPath,
+            movieMode: this.movieMode,
+          }),
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt);
+        }
+        this.selectedFiles.clear();
+        this.lastSelectedFile = null;
+        await this.fetchFiles();
+      } catch (e) {
+        logHere(
+          { lvl: "error" },
+          `swap failed for ${sidecarName}: ${e?.message || String(e)}`,
+        );
+        this.error = e.message || "Swap failed";
         this.loading = false;
       }
     },

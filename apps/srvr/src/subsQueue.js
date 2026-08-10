@@ -153,9 +153,7 @@ export function getSubStatus() {
     busy: subsState.subQueueBusy,
     chkCount: subsState.subQueueChkSrt.length,
     currentPath: subsState.currentlyProcessingSubPath,
-    headName: subsState.subQueueBusy
-      ? showNameFromFilePath(subsState.currentlyProcessingSubPath || "")
-      : showNameFromFilePath(subsState.subQueue[0]?.videoFilePath || ""),
+    headName: showNameFromFilePath(subsState.subQueue[0]?.videoFilePath || ""),
     done: subsState.subDone,
   };
 }
@@ -746,9 +744,20 @@ function doSubQueueNow() {
   }
 }
 async function processSubQueueEntry() {
+  // Only one entry at a time. startSubQueueLoop serializes itself by awaiting,
+  // but doSubQueueNow can fire between ticks, and the entry now stays at the
+  // head while it runs — without this guard both callers would pick up the
+  // same entry and process it twice.
+  if (subsState.subQueueBusy) return;
   if (subsState.subQueue.length === 0) return;
-  const entry = subsState.subQueue.shift();
-  persistSubQueue();
+  // The entry stays in subQueue while it is processed, like asrQueue and
+  // reencodeQueue. It is removed in the finally below, so a run that ends —
+  // even by throwing — still drops it; only an interruption that kills the
+  // process leaves it behind, and then subQueue.json still has it and it is
+  // retried on restart instead of vanishing between queues. Re-running is
+  // safe: generateEmbSrts skips .mb<n>.srt files that already exist and
+  // applyOpenSubSrts skips .opn tags it already downloaded.
+  const entry = subsState.subQueue[0];
   subsState.subQueueBusy = true;
   subsState.currentlyProcessingSubPath = entry.videoFilePath;
   try {
@@ -822,6 +831,15 @@ async function processSubQueueEntry() {
         });
     }
   } finally {
+    // Matched by path, not by index: an enqueue during the run can unshift
+    // ahead of this entry, so the head is not necessarily still it.
+    const idx = subsState.subQueue.findIndex(
+      (e) => e.videoFilePath === entry.videoFilePath,
+    );
+    if (idx !== -1) {
+      subsState.subQueue.splice(idx, 1);
+      persistSubQueue();
+    }
     subsState.subQueueBusy = false;
     subsState.currentlyProcessingSubPath = null;
     subsState.chkSubQueueDelay = 500;

@@ -330,17 +330,12 @@ function syncBatchMsgs() {
     setGlobalMessage({ id: "Reencode", action: "hide" });
   }
   // EmbSub (Sub)
-  const embCount = subsState.subQueue.length + (subsState.subQueueBusy ? 1 : 0);
+  const embCount = subsState.subQueue.length;
   if (embCount > 0) {
-    const embNames = [
-      ...(subsState.subQueueBusy
-        ? [showNameFromFilePath(subsState.currentlyProcessingSubPath || "")]
-        : []),
-      ...subsState.subQueue.map((e) => showNameFromFilePath(e.videoFilePath)),
-    ];
-    const name = subsState.subQueueBusy
-      ? showNameFromFilePath(subsState.currentlyProcessingSubPath || "")
-      : showNameFromFilePath(subsState.subQueue[0]?.videoFilePath || "");
+    const embNames = subsState.subQueue.map((e) =>
+      showNameFromFilePath(e.videoFilePath),
+    );
+    const name = embNames[0] || "";
     setGlobalMessage({
       id: "EmbSub",
       text: batchLabel("Sub", name, embCount, embNames),

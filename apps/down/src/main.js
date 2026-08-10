@@ -32,6 +32,10 @@ const __filename = urlNode.fileURLToPath(import.meta.url);
 const __dirname = pathNode.dirname(__filename);
 
 const SRVR_LOG_URL = "http://127.0.0.1:8739/api/log";
+// usb prune: only check once a day; prune only when free space is low
+const PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const PRUNE_FREE_PCT = 20; // prune when usb free space falls below this percent
+const PRUNE_WINDOW_DAYS = 10; // delete everything within this many days of the oldest file
 const DOWNLOADS_CHANNEL_POLL_MS = 1000;
 const MOVIE_DOWNLOADS_CHANNEL_POLL_MS = 2000;
 
@@ -1416,38 +1420,94 @@ async function main() {
   //#####################################################
   // delete old files in usb/files
   delOldFiles = () => {
-    var PRUNE_DAYS, PRUNE_INTERVAL_MS;
-    PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
     if (Date.now() - lastPruneAt >= PRUNE_INTERVAL_MS) {
-      // Inline prune.sh behavior: delete files older than 90 days on the USB host.
+      // Once a day: if usb free space is below PRUNE_FREE_PCT, delete everything
+      // dated within PRUNE_WINDOW_DAYS of the oldest entry in ~/files.
       // Run async so it doesn't block the cycle — proceed to checkFiles immediately.
-      PRUNE_DAYS = 90;
       lastPruneAt = Date.now();
       (async () => {
-        var folderCount = 0;
-        var fileCount = 0;
+        var freePct = null;
         try {
-          var { stdout: typesOut } = await execAsync(
-            `ssh ${usbHost} "find ~/files -mindepth 1 -maxdepth 1 -mtime +${PRUNE_DAYS} -printf '%y\\n' 2>/dev/null"`,
-            { timeout: 5 * 60 * 1000 },
+          // Same measurement the tor pane uses: per-user `quota` in 1K blocks,
+          // hard limit (col 3) is the total, blocks (col 1) is used.
+          var { stdout: quotaOut } = await execAsync(
+            `ssh ${usbHost} "quota 2>/dev/null"`,
+            { timeout: 60 * 1000 },
           );
-          var types = typesOut
-            .split("\n")
-            .map((s) => s.trim())
-            .filter(Boolean);
-          folderCount = types.filter((t) => t === "d").length;
-          fileCount = types.filter((t) => t === "f").length;
+          for (const line of String(quotaOut).split("\n")) {
+            var trimmed = line.trim();
+            if (!trimmed.startsWith("/")) continue;
+            var cols = trimmed.split(/\s+/);
+            var usedK = Number(cols[1]);
+            var limitK = Number(cols[3]);
+            if (
+              Number.isFinite(usedK) &&
+              usedK >= 0 &&
+              Number.isFinite(limitK) &&
+              limitK > 0
+            ) {
+              freePct = (Math.max(0, limitK - usedK) / limitK) * 100;
+              break;
+            }
+          }
         } catch (e) {
-          // Non-fatal; counts stay 0.
+          unilog(2013, `usb prune: quota check failed: ${e.message}`);
         }
-        try {
-          await execAsync(
-            `ssh ${usbHost} "find ~/files -mindepth 1 -maxdepth 1 -mtime +${PRUNE_DAYS} -exec rm -rf {} + >/dev/null 2>&1"`,
-            { timeout: 5 * 60 * 1000 },
-          );
-          unilog(1779, `usb prune: deleted ${folderCount} folders, ${fileCount} files (older than ${PRUNE_DAYS} days)`);
-        } catch (e) {
-          unilog(1590, `usb prune failed: ${e.message}`);
+        if (freePct === null) {
+          unilog(2014, `usb prune skipped: could not measure usb free space`);
+        } else if (freePct >= PRUNE_FREE_PCT) {
+          unilog(2015, `usb prune not needed: ${Math.floor(freePct)}% free (min ${PRUNE_FREE_PCT}%)`);
+        } else {
+          var folderCount = 0;
+          var fileCount = 0;
+          var cutoffSecs = null;
+          try {
+            var { stdout: timesOut } = await execAsync(
+              `ssh ${usbHost} "find ~/files -mindepth 1 -maxdepth 1 -printf '%T@\\n' 2>/dev/null"`,
+              { timeout: 5 * 60 * 1000 },
+            );
+            var times = timesOut
+              .split("\n")
+              .map((s) => Number(s.trim()))
+              .filter((n) => Number.isFinite(n) && n > 0);
+            if (times.length) {
+              // Cutoff is 10 days newer than the oldest entry, so the oldest
+              // 10-day window of files is what gets deleted.
+              cutoffSecs = Math.floor(
+                Math.min(...times) + PRUNE_WINDOW_DAYS * 24 * 60 * 60,
+              );
+            }
+          } catch (e) {
+            unilog(2016, `usb prune: oldest-date scan failed: ${e.message}`);
+          }
+          if (cutoffSecs === null) {
+            unilog(2017, `usb prune skipped: no dated entries found in usb files`);
+          } else {
+            var oldTest = `! -newermt @${cutoffSecs}`;
+            try {
+              var { stdout: typesOut } = await execAsync(
+                `ssh ${usbHost} "find ~/files -mindepth 1 -maxdepth 1 ${oldTest} -printf '%y\\n' 2>/dev/null"`,
+                { timeout: 5 * 60 * 1000 },
+              );
+              var types = typesOut
+                .split("\n")
+                .map((s) => s.trim())
+                .filter(Boolean);
+              folderCount = types.filter((t) => t === "d").length;
+              fileCount = types.filter((t) => t === "f").length;
+            } catch (e) {
+              // Non-fatal; counts stay 0.
+            }
+            try {
+              await execAsync(
+                `ssh ${usbHost} "find ~/files -mindepth 1 -maxdepth 1 ${oldTest} -exec rm -rf {} + >/dev/null 2>&1"`,
+                { timeout: 5 * 60 * 1000 },
+              );
+              unilog(2025, `usb prune at ${Math.floor(freePct)}% free: deleted ${folderCount} folders, ${fileCount} files dated within ${PRUNE_WINDOW_DAYS} days of the oldest`);
+            } catch (e) {
+              unilog(2026, `usb prune failed: ${e.message}`);
+            }
+          }
         }
         // After prune completes, scan dirs and prune DB entries.
         try {

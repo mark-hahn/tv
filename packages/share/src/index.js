@@ -760,7 +760,7 @@ export function getSeasonIntro(seasonIntros, season) {
 // GLOBAL-MSG: hdrMsg show name, cropped with "..." when long.
 export const cropName = (name) => {
   const s = String(name || "");
-  return s.length > 20 ? s.slice(0, 20) + "..." : s;
+  return s.length > 15 ? s.slice(0, 15) + "..." : s;
 };
 
 // Format an hdrMsg label: code + (N) when the count is over 1 + show name. The

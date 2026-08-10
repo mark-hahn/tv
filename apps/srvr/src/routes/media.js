@@ -1,19 +1,25 @@
 // Media serving routes: /api/stream (ffmpeg remux/transcode to fragmented MP4,
 // with nginx redirect fast-path for already-compatible mp4s), audio/subtitle
 // track listing, per-episode subtitle discovery, episode ffprobe stats, and
-// subtitle serving (embedded stream → WebVTT, or sidecar .srt → VTT). Owns the
-// active real-time stream counters shown in the header status message.
+// subtitle serving (embedded stream → WebVTT, or sidecar .srt → VTT).
 
 import fs from "fs";
+import * as crypto from "node:crypto";
 import * as cp from "child_process";
 import * as path from "node:path";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
 import { unilog, logHere } from "@tv/share";
-import { setGlobalMessage } from "../messaging.js";
 import { resStripAlt } from "../videoFiles.js";
 import { mpfourValid } from "../mpfour.js";
+import { SRVR_DATA_DIR, ensureDir } from "../srvrPaths.js";
 
 const tvDir = "/mnt/media/tv";
+
+// Extracting an embedded subtitle stream demuxes the whole video file — ten
+// minutes for a 2160p mkv — and the result never changes for a given file, so
+// each (file, stream) is extracted once and replayed from here after that. Kept
+// out of the media tree so nothing in the disk scan or Emby sees it.
+const VTT_CACHE_DIR = path.join(SRVR_DATA_DIR, "vtt-cache");
 
 function runFfprobe(args, maxBuffer = 2 * 1024 * 1024) {
   return cp.execFileSync("ffprobe", args, {
@@ -22,24 +28,73 @@ function runFfprobe(args, maxBuffer = 2 * 1024 * 1024) {
   });
 }
 
-// Counters for active real-time streaming ffmpegs — shown in hdrMsg.
-let _activeVideoStreams = 0;
-let _activeSubStreams = 0;
-function _updateStreamMsg() {
-  if (_activeVideoStreams > 0)
-    setGlobalMessage({
-      id: "Stream",
-      text: _activeVideoStreams > 1 ? `V(${_activeVideoStreams})` : "V",
-      position: 2000,
+// Cache key covers file identity (path + size + mtime), so a replaced or
+// re-encoded file can never serve a stale vtt.
+function vttCachePath(resolved, idx) {
+  const st = fs.statSync(resolved);
+  const key = `${resolved}|${idx}|${st.size}|${st.mtimeMs}`;
+  const hash = crypto.createHash("sha1").update(key).digest("hex");
+  return path.join(VTT_CACHE_DIR, `${hash}.vtt`);
+}
+
+// Serve one embedded subtitle stream as WebVTT. Owns the ffmpeg lifetime and
+// the cache write for both /api/subtitle paths that need it.
+function serveEmbeddedVtt(req, res, resolved, idx) {
+  res.setHeader("Content-Type", "text/vtt");
+  res.setHeader("Cache-Control", "no-cache");
+
+  const cachePath = vttCachePath(resolved, idx);
+  if (fs.existsSync(cachePath)) {
+    res.send(fs.readFileSync(cachePath, "utf8"));
+    return;
+  }
+
+  ensureDir(VTT_CACHE_DIR);
+  const tmpPath = `${cachePath}.${crypto.randomBytes(4).toString("hex")}.tmp`;
+  const cacheOut = fs.createWriteStream(tmpPath);
+
+  const ff = cp.spawn("ffmpeg", [
+    "-i",
+    resolved,
+    "-map",
+    `0:${idx}`,
+    "-f",
+    "webvtt",
+    "pipe:1",
+  ]);
+  ff.stdout.pipe(res);
+  ff.stdout.pipe(cacheOut);
+  ff.stderr.on("data", () => {});
+
+  const killFf = () => {
+    if (!ff.killed) ff.kill("SIGKILL");
+  };
+  // Every way the client can go away. req close alone is not enough: when the
+  // response is proxy-buffered nobody closes the request, and a dead output
+  // pipe only surfaces as a stdout error — either way the extraction would
+  // keep demuxing a multi-GB file for nobody.
+  req.on("close", killFf);
+  res.on("close", killFf);
+  ff.stdout.on("error", (e) => {
+    unilog(2004, `subtitle stdout error: ${e.message}`);
+    killFf();
+  });
+  ff.on("error", (e) => {
+    unilog(2005, `subtitle ffmpeg spawn failed: ${e.message}`);
+  });
+  ff.on("exit", (code) => {
+    // Only a clean full extraction is worth keeping — a killed or failed run
+    // leaves a truncated vtt that would then be served forever.
+    cacheOut.end(() => {
+      try {
+        if (code === 0) fs.renameSync(tmpPath, cachePath);
+        else fs.unlinkSync(tmpPath);
+      } catch (e) {
+        unilog(2006, `vtt cache write failed: ${e.message}`);
+      }
     });
-  else setGlobalMessage({ id: "Stream", action: "hide" });
-  if (_activeSubStreams > 0)
-    setGlobalMessage({
-      id: "SubStream",
-      text: _activeSubStreams > 1 ? `S(${_activeSubStreams})` : "S",
-      position: 2001,
-    });
-  else setGlobalMessage({ id: "SubStream", action: "hide" });
+    if (!res.writableEnded) res.end();
+  });
 }
 
 function shiftVttTimestamp(ts, offsetSec) {
@@ -266,20 +321,10 @@ export function registerMediaRoutes(app) {
       res.setHeader("Cache-Control", "no-cache");
 
       const ffmpeg = cp.spawn("ffmpeg", ffmpegArgs);
-      _activeVideoStreams++;
-      _updateStreamMsg();
       ffmpeg.stdout.pipe(res);
       ffmpeg.stderr.on("data", () => {});
-      let videoDone = false;
-      const decVideoStream = () => {
-        if (videoDone) return;
-        videoDone = true;
-        _activeVideoStreams--;
-        _updateStreamMsg();
-      };
       ffmpeg.on("error", (err) => {
         unilog(589, "ffmpeg spawn error:", err.message);
-        decVideoStream();
       });
       const killFfmpeg = () => {
         if (ffmpeg.killed) return;
@@ -292,7 +337,6 @@ export function registerMediaRoutes(app) {
       req.on("close", killFfmpeg);
       res.on("close", killFfmpeg);
       ffmpeg.on("exit", (code) => {
-        decVideoStream();
         if (code !== 0 && code !== null) unilog(46, `ffmpeg exit code ${code}`);
         if (!res.writableEnded) res.end();
       });
@@ -712,35 +756,7 @@ export function registerMediaRoutes(app) {
     // Explicit embedded stream by index
     if (req.query.index !== undefined) {
       const idx = parseInt(req.query.index, 10);
-      res.setHeader("Content-Type", "text/vtt");
-      res.setHeader("Cache-Control", "no-cache");
-      const ff = cp.spawn("ffmpeg", [
-        "-i",
-        resolved,
-        "-map",
-        `0:${idx}`,
-        "-f",
-        "webvtt",
-        "pipe:1",
-      ]);
-      _activeSubStreams++;
-      _updateStreamMsg();
-      ff.stdout.pipe(res);
-      ff.stderr.on("data", () => {});
-      let _subDone1 = false;
-      const _subDec1 = () => {
-        if (!_subDone1) {
-          _subDone1 = true;
-          _activeSubStreams--;
-          _updateStreamMsg();
-        }
-      };
-      req.on("close", () => ff.kill("SIGKILL"));
-      ff.on("error", _subDec1);
-      ff.on("exit", () => {
-        _subDec1();
-        if (!res.writableEnded) res.end();
-      });
+      serveEmbeddedVtt(req, res, resolved, idx);
       return;
     }
 
@@ -789,36 +805,7 @@ export function registerMediaRoutes(app) {
       const streams = JSON.parse(probeOut).streams || [];
       const subStream = streams.find((s) => s.codec_type === "subtitle");
       if (subStream) {
-        const idx = subStream.index;
-        res.setHeader("Content-Type", "text/vtt");
-        res.setHeader("Cache-Control", "no-cache");
-        const ff = cp.spawn("ffmpeg", [
-          "-i",
-          resolved,
-          "-map",
-          `0:${idx}`,
-          "-f",
-          "webvtt",
-          "pipe:1",
-        ]);
-        _activeSubStreams++;
-        _updateStreamMsg();
-        ff.stdout.pipe(res);
-        ff.stderr.on("data", () => {});
-        let _subDone2 = false;
-        const _subDec2 = () => {
-          if (!_subDone2) {
-            _subDone2 = true;
-            _activeSubStreams--;
-            _updateStreamMsg();
-          }
-        };
-        req.on("close", () => ff.kill("SIGKILL"));
-        ff.on("error", _subDec2);
-        ff.on("exit", () => {
-          _subDec2();
-          if (!res.writableEnded) res.end();
-        });
+        serveEmbeddedVtt(req, res, resolved, subStream.index);
         return;
       }
     } catch (e) {

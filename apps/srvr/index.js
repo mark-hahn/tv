@@ -327,14 +327,14 @@ function batchLabel(code, showName, n, queueShowNames) {
 // Refresh all four batch hdrMsg entries from live queue state.
 // Call this whenever any batch queue changes so every pending type is visible.
 function syncBatchMsgs() {
-  // Reencode (E)
+  // Reencode (Rec)
   if (reencodeQueue.length > 0) {
     const e = reencodeQueue[0];
     const se = `S${String(e.season).padStart(2, "0")}E${String(e.episode).padStart(2, "0")}`;
     setGlobalMessage({
       id: "Reencode",
       text: batchLabel(
-        "E",
+        "Rec",
         `${cropName(e.showName)} ${se}`,
         reencodeQueue.length,
         reencodeQueue.map((r) => r.showName),
@@ -344,7 +344,7 @@ function syncBatchMsgs() {
   } else {
     setGlobalMessage({ id: "Reencode", action: "hide" });
   }
-  // EmbSub (>)
+  // EmbSub (Sub)
   const embCount = subsState.subQueue.length + (subsState.subQueueBusy ? 1 : 0);
   if (embCount > 0) {
     const embNames = [
@@ -358,31 +358,31 @@ function syncBatchMsgs() {
       : showNameFromFilePath(subsState.subQueue[0]?.videoFilePath || "");
     setGlobalMessage({
       id: "EmbSub",
-      text: batchLabel(">", name, embCount, embNames),
+      text: batchLabel("Sub", name, embCount, embNames),
       position: 2004,
     });
   } else {
     setGlobalMessage({ id: "EmbSub", action: "hide" });
   }
-  // BIF (B)
+  // BIF (Bif)
   const bifCount = bifQueue.getBifCount();
   if (bifCount > 0) {
     const name = bifQueue.getBifHeadName();
     setGlobalMessage({
       id: "Bif",
-      text: batchLabel("B", name, bifCount, bifQueue.getBifShowNames()),
+      text: batchLabel("Bif", name, bifCount, bifQueue.getBifShowNames()),
       position: 2002,
     });
   } else {
     setGlobalMessage({ id: "Bif", action: "hide" });
   }
-  // ASR (+)
+  // ASR (Asr)
   if (subsState.asrQueue.length > 0) {
     const name = showNameFromFilePath(subsState.asrQueue[0]?.videoPath || "");
     setGlobalMessage({
       id: "Asr",
       text: batchLabel(
-        "+",
+        "Asr",
         name,
         subsState.asrQueue.length,
         subsState.asrQueue.map((e) => showNameFromFilePath(e.videoPath)),
@@ -3262,11 +3262,18 @@ const pollGlobalMessages = () => {
     const psi = fs.readFileSync("/proc/pressure/cpu", "utf8");
     const m = /full\s+avg10=([\d.]+)/.exec(psi);
     const full10 = m ? parseFloat(m[1]) : 0;
-    setGlobalMessage({
-      id: "CPU",
-      text: `Cpu:${Math.round(full10)}`,
-      position: 1001,
-    });
+    // Sits just right of the show counts (position 0), and only when there is
+    // actual stall to report — "Cpu:0" is noise.
+    const pct = Math.round(full10);
+    if (pct >= CPU_STALL_THRESHOLD) {
+      setGlobalMessage({
+        id: "CPU",
+        text: `Cpu:${pct}`,
+        position: 0.5,
+      });
+    } else {
+      setGlobalMessage({ id: "CPU", action: "hide" });
+    }
   } catch (e) {
     unilog(616, "cpu psi error:", e.message);
   }

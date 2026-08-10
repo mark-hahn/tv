@@ -1340,7 +1340,10 @@ app.use((req, res, next) => {
   const startedAt = Date.now();
   res.on("finish", () => {
     const ms = Date.now() - startedAt;
-    if (ms >= SLOW_API_MS) {
+    // A handler that streams a long-running job's output (embedded subtitle
+    // extraction) is slow by design and the client never waits on it, so it
+    // sets res.locals.slowExempt rather than reporting a false alarm here.
+    if (ms >= SLOW_API_MS && !res.locals.slowExempt) {
       unilog(
         1449,
         `slow ${req.method} ${req.path} took ${ms}ms status=${res.statusCode} loopLag=${maxLoopLagMs}ms`,

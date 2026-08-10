@@ -49,6 +49,12 @@ function serveEmbeddedVtt(req, res, resolved, idx) {
     return;
   }
 
+  // Cache miss: the response lasts as long as ffmpeg takes to demux the whole
+  // file, which is minutes for a big mkv. The browser consumes cues as they
+  // arrive, so nothing is actually waiting — exempt it from the slow-request
+  // warning in index.js.
+  res.locals.slowExempt = true;
+
   ensureDir(VTT_CACHE_DIR);
   const tmpPath = `${cachePath}.${crypto.randomBytes(4).toString("hex")}.tmp`;
   const cacheOut = fs.createWriteStream(tmpPath);

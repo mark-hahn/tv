@@ -4613,7 +4613,6 @@ export default {
 
       try {
         const result = await srvr.toggleBadGroup(group);
-        await this.refreshBadGroups();
         if (result?.action === "added") {
           this.showInfo(`Added bad group: ${group}`);
         } else if (result?.action === "removed") {

@@ -1531,6 +1531,9 @@ export default {
     activeShow() {
       this.showStream = false;
     },
+    "currentShow.name"(newName, oldName) {
+      if (newName !== oldName) this.seasonFilter = "";
+    },
     active(val) {
       if (!val) this.showStream = false;
     },

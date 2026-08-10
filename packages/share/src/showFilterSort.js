@@ -239,8 +239,9 @@ export function getSortKey(show, sortChoice, allTvdb = null) {
 }
 
 /**
- * Orders two shows by one of the SORT_CHOICES, breaking ties by show name
- * ascending.
+ * Orders two shows by one of the SORT_CHOICES, breaking ties by show name.
+ * Reversing the list reverses the tie-break along with the sort itself, so a
+ * run of tied shows reads bottom-to-top exactly as it read top-to-bottom.
  */
 export function compareShows(
   a,
@@ -265,13 +266,13 @@ export function compareShows(
     }
     return reversed ? -result : result;
   }
-  return compareShowNames(a, b);
+  const byName = compareShowNames(a, b);
+  return reversed ? -byName : byName;
 }
 
 /**
  * The tie-break every show sort ends in: the show's name, ascending, by the
  * same key the Alpha sort uses so it reads the way the list's own A-Z does.
- * Never reversed — a tie always comes out in one same order.
  */
 export function compareShowNames(a, b) {
   const na = getSortKey(a, "Alpha");

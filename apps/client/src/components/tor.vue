@@ -89,21 +89,7 @@
               Stream
             </button>
             <button
-              v-if="showFilesPane"
-              @click.stop="showFilesPane = false"
-              style="
-                font-size: 13px;
-                cursor: pointer;
-                border-radius: 7px;
-                padding: 4px;
-                border: 1px solid #bbb;
-                background-color: whitesmoke;
-              "
-            >
-              Close
-            </button>
-            <button
-              v-if="!showFilesPane && !movieMode"
+              v-if="!movieMode"
               @click.stop="
                 showStream = false;
                 toggleCookieInputs();
@@ -402,100 +388,8 @@
         ></div>
       </div>
       <div
-        id="files-pane"
-        v-if="showFilesPane"
-        style="
-          padding: 10px;
-          font-size: 14px;
-          font-family: sans-serif;
-          font-weight: normal;
-        "
-      >
-        <div
-          v-if="filesLoading"
-          style="
-            text-align: center;
-            color: #666;
-            margin-top: 50px;
-            font-size: 15px;
-          "
-        >
-          Loading...
-        </div>
-        <div
-          v-else-if="filesError"
-          style="
-            text-align: center;
-            color: #c00;
-            margin-top: 50px;
-            font-size: 14px;
-            white-space: pre-line;
-          "
-        >
-          {{ filesError }}
-        </div>
-        <div
-          v-else-if="torrentFiles.length === 0"
-          style="
-            text-align: center;
-            color: #999;
-            margin-top: 50px;
-            font-size: 15px;
-          "
-        >
-          No files found.
-        </div>
-        <template v-else>
-          <div
-            style="
-              font-size: 12px;
-              color: #888;
-              margin-bottom: 8px;
-              overflow-wrap: anywhere;
-            "
-          >
-            {{ filesTorrentTitle }}
-          </div>
-          <div
-            v-for="(file, i) in torrentFiles"
-            :key="i"
-            style="
-              padding: 6px 8px;
-              margin-bottom: 6px;
-              background: #fff;
-              border: 1px solid #e0e0e0;
-              border-radius: 5px;
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              gap: 10px;
-            "
-          >
-            <span
-              style="
-                font-size: 13px;
-                color: #333;
-                overflow-wrap: anywhere;
-                word-break: break-word;
-              "
-              >{{ file.path }}</span
-            >
-            <span
-              v-if="file.size != null"
-              style="
-                white-space: nowrap;
-                color: #888;
-                font-size: 12px;
-                flex-shrink: 0;
-              "
-              >{{ fmtSize(file.size) }}</span
-            >
-          </div>
-        </template>
-      </div>
-      <div
         id="unaired"
-        v-if="!showFilesPane && !showStream && unaired"
+        v-if="!showStream && unaired"
         style="
           text-align: center;
           color: #666;
@@ -513,7 +407,6 @@
         id="cookie-inputs"
         @click.stop
         v-if="
-          !showFilesPane &&
           !showStream &&
           !loading &&
           ((isCookieRelatedError && !dismissCookieInputs) || showCookieInputs)
@@ -602,7 +495,7 @@
       <div
         id="debug-panel"
         @click.stop
-        v-if="!showFilesPane && !loading &amp;&amp; showDebug"
+        v-if="!loading &amp;&amp; showDebug"
         style="
           position: sticky;
           top: 120px;
@@ -701,7 +594,7 @@
 
       <div
         id="error"
-        v-if="!showFilesPane && !unaired &amp;&amp; error"
+        v-if="!unaired &amp;&amp; error"
         style="
           text-align: center;
           color: #c00;
@@ -715,7 +608,7 @@
       </div>
       <div
         id="warning"
-        v-if="!showFilesPane && !unaired &amp;&amp; !error &amp;&amp; providerWarning"
+        v-if="!unaired &amp;&amp; !error &amp;&amp; providerWarning"
         style="
           text-align: center;
           color: #b36b00;
@@ -730,7 +623,6 @@
       <div
         id="no-torrents-needed"
         v-if="
-          !showFilesPane &&
           !showStream &&
           !unaired &&
           noTorrentsNeeded &&
@@ -749,7 +641,6 @@
       <div
         id="torrents-list"
         v-if="
-          !showFilesPane &&
           !showStream &&
           !unaired &&
           (!loading || torrents.length > 0) &&
@@ -912,23 +803,6 @@
           >
             Sent recently
           </div>
-          <button
-            @click.stop="filesClick(torrent)"
-            style="
-              position: absolute;
-              bottom: 6px;
-              right: 8px;
-              font-size: 11px;
-              cursor: pointer;
-              border-radius: 5px;
-              padding: 2px 6px;
-              border: 1px solid #bbb;
-              background-color: whitesmoke;
-              color: #555;
-            "
-          >
-            Files
-          </button>
         </div>
       </div>
     </div>
@@ -1496,12 +1370,6 @@ export default {
       // Snapshot of seriesMap JSON from last search (for change detection on pane return)
       _savedSeriesMapJson: null,
 
-      // Files pane
-      showFilesPane: false,
-      filesLoading: false,
-      filesError: null,
-      torrentFiles: [],
-      filesTorrentTitle: "",
 
       torSubCountBusy: false,
       torSubCountsVisible: false,
@@ -1870,11 +1738,6 @@ export default {
       this.lastApiCount = null;
       this.lastWarningSummary = null;
       this.resultsShowId = null;
-      this.showFilesPane = false;
-      this.filesLoading = false;
-      this.filesError = null;
-      this.torrentFiles = [];
-      this.filesTorrentTitle = "";
       this.flashingTorrent = null;
       this.torSubCountBusy = false;
       this.torSubCountsVisible = false;
@@ -2754,31 +2617,6 @@ export default {
       ];
       for (const url of urls) {
         openExternalBlank(url);
-      }
-    },
-
-    async filesClick(torrent) {
-      this.torrentFiles = [];
-      this.filesError = null;
-      this.filesLoading = true;
-      this.filesTorrentTitle = torrent?.title || torrent?.name || "";
-      this.showFilesPane = true;
-      try {
-        const res = await fetch(`${config.torrentsApiUrl}/api/tor/files`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ torrent }),
-        });
-        const data = await res.json();
-        if (data.success) {
-          this.torrentFiles = data.files || [];
-        } else {
-          this.filesError = data.error || "Failed to load files.";
-        }
-      } catch (e) {
-        this.filesError = e?.message || "Failed to load files.";
-      } finally {
-        this.filesLoading = false;
       }
     },
 

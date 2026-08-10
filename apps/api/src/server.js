@@ -2032,29 +2032,6 @@ app.post("/api/download", handleDownloadRequest);
 // Back-compat alias for older clients/nginx rewrites.
 app.post("/downloads", handleDownloadRequest);
 
-// POST /api/tor/files - List files in a torrent without downloading
-app.post("/api/tor/files", async (req, res) => {
-  const torrent = req.body?.torrent;
-  if (!torrent || typeof torrent !== "object") {
-    return res
-      .status(400)
-      .json({ success: false, error: "torrent object required" });
-  }
-  try {
-    const fetched = await download.fetchTorrentFile(torrent);
-    if (!fetched || !fetched.success) {
-      return res.json({
-        success: false,
-        error: fetched?.error || "Failed to fetch torrent",
-      });
-    }
-    const files = download.extractTorrentFileDetails(fetched.torrentData);
-    return res.json({ success: true, files });
-  } catch (e) {
-    return res.json({ success: false, error: e?.message || String(e) });
-  }
-});
-
 app.post("/api/tor/info", async (req, res) => {
   const torrent = req.body?.torrent;
   if (!torrent || typeof torrent !== "object") {

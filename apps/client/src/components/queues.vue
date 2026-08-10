@@ -151,11 +151,12 @@ export default {
     return {
       selected: null,
       error: "",
-      data: { sub: null, asr: null, mp4: null },
+      data: { sub: null, asr: null, mp4: null, chksrt: null },
       queueDefs: [
         { key: "sub", label: "Sub" },
         { key: "asr", label: "Asr" },
         { key: "mp4", label: "Mp4" },
+        { key: "chksrt", label: "ChkSrt" },
       ],
       timer: null,
     };
@@ -189,9 +190,11 @@ export default {
     countOf(key) {
       return this.data[key]?.count || 0;
     },
+    // Select-only: one enabled queue is always the selected one, so there is no
+    // deselect.
     toggle(key) {
       if (this.countOf(key) === 0) return;
-      this.selected = this.selected === key ? null : key;
+      this.selected = key;
     },
     start() {
       this.fetchOnce();
@@ -206,16 +209,16 @@ export default {
         const d = await srvr.getQueues();
         this.data = d;
         this.error = "";
-        // A queue that drains while selected clears the selection, leaving the
-        // pane empty rather than showing a stale list.
+        // A queue that drains while selected drops the selection, and any other
+        // non-empty queue takes over — the pane is never blank while there is
+        // something to show.
         if (this.selected && this.countOf(this.selected) === 0) {
           this.selected = null;
         }
-        // With only one queue non-empty there is nothing to choose, so show it.
         const live = this.queueDefs
           .map((q) => q.key)
           .filter((k) => this.countOf(k) > 0);
-        if (live.length === 1) this.selected = live[0];
+        if (!this.selected && live.length) this.selected = live[0];
       } catch (e) {
         this.error = e?.message || "fetch failed";
       }

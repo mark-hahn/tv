@@ -2198,7 +2198,7 @@ app.post("/api/asr/emb/generate", async (req, res) => {
   }
 });
 
-// Queues pane: contents of the three processing queues, each with the in-flight
+// Queues pane: contents of the processing queues, each with the in-flight
 // entry's live stage and, where the work is predictable enough to be worth a
 // number, an ETA. Polled while the pane is open.
 app.get("/api/queues", async (req, res) => {
@@ -2207,6 +2207,7 @@ app.get("/api/queues", async (req, res) => {
       sub: subsQueue.getSubQueueStatus(),
       asr: subsQueue.getAsrQueueStatus(),
       mp4: await mpfour.getMp4QueueStatus(),
+      chksrt: subsQueue.getChkSrtQueueStatus(),
     });
   } catch (e) {
     unilog(2042, `queues snapshot failed: ${e.message}`);

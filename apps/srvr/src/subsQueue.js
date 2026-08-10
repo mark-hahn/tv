@@ -1293,6 +1293,18 @@ export function getSubQueueStatus() {
   return { count: entries.length, inflight, entries };
 }
 
+// ChkSrt is a human review queue — nothing runs on the server, so it has no
+// in-flight entry and no ETA.
+export function getChkSrtQueueStatus() {
+  const entries = subsState.subQueueChkSrt.map((e, i) => ({
+    n: i + 1,
+    file: path.basename(e.videoFilePath || ""),
+    path: e.videoFilePath,
+    running: false,
+  }));
+  return { count: entries.length, inflight: null, entries };
+}
+
 export function getAsrQueueStatus() {
   let eta = Date.now();
   const entries = [];

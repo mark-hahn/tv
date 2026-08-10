@@ -3969,13 +3969,38 @@ function daysSinceLastPlayed(rec) {
   return Math.floor((ms(today) - ms(played)) / (24 * 60 * 60 * 1000));
 }
 
-// Once a show has any watched episode: To Try no longer applies, and a show
-// with episodes left that has sat unwatched for CONTINUE_IDLE_DAYS goes into
-// Continue. A show already in Mark or Linda is left out of Continue.
+// A ready show nobody has started, with no waitStr and not claimed by Mark or
+// Linda, goes into To Try. Once a show has any watched episode: To Try no
+// longer applies, and a show with episodes left that has sat unwatched for
+// CONTINUE_IDLE_DAYS goes into Continue. A show already in Mark or Linda is
+// left out of Continue.
 // Returns the change strings for the push2 log line.
 async function applyAutoCollections(showName, rec) {
   const changes = [];
-  if (!rec.inEmby || !rec.id || !rec.anyWatched) return changes;
+  if (!rec.inEmby || !rec.id) return changes;
+  if (!rec.anyWatched) {
+    if (
+      !rec.inToTry &&
+      rec.notReady === false &&
+      !rec.watchedCount &&
+      !rec.waitStr &&
+      !rec.inMark &&
+      !rec.inLinda
+    ) {
+      try {
+        if (await setEmbyCollection(COLLECTION_IDS.toTry, rec.id, true)) {
+          rec.inToTry = true;
+          changes.push("inToTry:false->true(ready unwatched)");
+          unilog(1998, `set toTry for ${showName}: ready and never watched`);
+        } else {
+          unilog(1999, `emby toTry add failed for ${showName}`);
+        }
+      } catch (e) {
+        unilog(2000, `emby toTry add failed for ${showName}: ${e.message}`);
+      }
+    }
+    return changes;
+  }
   if (rec.inToTry) {
     try {
       if (await setEmbyCollection(COLLECTION_IDS.toTry, rec.id, false)) {

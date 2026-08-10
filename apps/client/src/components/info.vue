@@ -346,7 +346,7 @@
             </div>
             <div
               id="lastwatched"
-              v-if="!previewMode && lastWatchedTxt"
+              v-if="!previewMode && lastWatchedTxt && lastWatchedCount !== 0"
               style="min-height: 20px; white-space: nowrap"
             >
               Watched: {{ lastWatchedTxt }}
@@ -590,6 +590,7 @@ export default {
       seasonsTxt: "",
       watchedValTxt: "",
       lastWatchedTxt: "",
+      lastWatchedCount: null,
       cntryLangLeftTxt: "",
       cntryLangRightTxt: "",
       genresTxt: "",
@@ -1058,6 +1059,7 @@ export default {
         watchedDate && lastPlayedEpisode
           ? `${watchedDate}, ${lastPlayedEpisode}`
           : watchedDate;
+      this.lastWatchedCount = tvdbData.watchedCount ?? null;
     },
 
     async setSeasonsTxt(tvdbData) {
@@ -1148,6 +1150,7 @@ export default {
       // transition old value -> new value without an empty flash in between.
       this.watchedValTxt = newWatchedValTxt;
       this.seasonsTxt = newSeasonsTxt;
+      this.lastWatchedCount = watchedCount ?? null;
     },
 
     setCntryLangTxt(tvdbData) {

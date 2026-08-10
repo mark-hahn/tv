@@ -33,7 +33,7 @@
         @click="toggle(q.key)"
         :style="{
           padding: '2px 10px',
-          fontSize: '14px',
+          fontSize: '16.8px',
           cursor: countOf(q.key) === 0 ? 'default' : 'pointer',
           opacity: countOf(q.key) === 0 ? 0.4 : 1,
           border:
@@ -48,7 +48,7 @@
       <span
         style="
           margin-left: auto;
-          font-size: 12px;
+          font-size: 14.4px;
           color: #666;
           white-space: nowrap;
         "
@@ -67,7 +67,7 @@
           border: 1px solid #ccc;
           border-radius: 4px;
           background-color: #fff;
-          font-size: 13px;
+          font-size: 15.6px;
         "
       >
         <div style="font-weight: bold">
@@ -85,7 +85,7 @@
       </div>
       <div
         v-else
-        style="margin: 6px 0 10px 0; font-size: 13px; color: #666"
+        style="margin: 6px 0 10px 0; font-size: 15.6px; color: #666"
       >
         nothing running
       </div>
@@ -99,7 +99,7 @@
           gap: 10px;
           align-items: baseline;
           padding: 2px 0;
-          font-size: 13px;
+          font-size: 15.6px;
           border-bottom: 1px solid #eee;
         "
       >
@@ -125,7 +125,10 @@
         <span
           :style="{
             flex: '1 1 auto',
-            wordBreak: 'break-all',
+            minWidth: 0,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
             fontWeight: e.running ? 'bold' : 'normal',
           }"
           >{{ e.file }}</span

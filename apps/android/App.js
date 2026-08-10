@@ -82,6 +82,21 @@ const VOL_STEP = 1;
 const PIC_VAL_MAX_CHARS = 20;
 const PIC_VAL_EDGE_CHARS = 8;
 
+// The last tie-break every show sort ends in: the show's name, ascending, by
+// the same key the alpha sort uses. Never reversed -- a tie always comes out
+// in one same order.
+function showNameKey(show) {
+  return String(show?.name || "")
+    .replace(/^the\s*/i, "")
+    .toLowerCase();
+}
+
+function compareShowNames(a, b) {
+  const ka = showNameKey(a);
+  const kb = showNameKey(b);
+  return ka > kb ? +1 : ka < kb ? -1 : 0;
+}
+
 function buildSeriesMap(seriesMapIn) {
   if (!seriesMapIn || seriesMapIn.length === 0) return null;
   const result = {};
@@ -684,11 +699,7 @@ export default function App() {
         const list = Object.entries(data)
           .map(([name, show]) => ({ ...show, name }))
           .filter((show) => show.inEmby !== false)
-          .sort((a, b) => {
-            const ka = a.name.replace(/^the /i, "").toLowerCase();
-            const kb = b.name.replace(/^the /i, "").toLowerCase();
-            return ka < kb ? -1 : ka > kb ? 1 : 0;
-          });
+          .sort(compareShowNames);
         showsListRef.current = list;
         setShowsList(list);
         if (list.length > 0) {
@@ -882,7 +893,13 @@ export default function App() {
   const sendKeyThrough = async (
     key,
     path,
-    { method = "GET", body, fromSubCtrl = false, repeating = false, base = "tv" } = {},
+    {
+      method = "GET",
+      body,
+      fromSubCtrl = false,
+      repeating = false,
+      base = "tv",
+    } = {},
   ) => {
     try {
       const res = await fetch(`${TV_SRVR_HTTP_URL}/api/tvRemoteKey`, {
@@ -1846,7 +1863,9 @@ export default function App() {
       icon: (
         <View style={styles.powerIcon}>
           <View style={styles.powerRing} />
-          <View style={[styles.powerGap, { backgroundColor: modeBg("google") }]} />
+          <View
+            style={[styles.powerGap, { backgroundColor: modeBg("google") }]}
+          />
           <View style={styles.powerBar} />
         </View>
       ),
@@ -2077,27 +2096,21 @@ export default function App() {
 
     const getSortedShows = (shows) => {
       return [...shows].sort((a, b) => {
-        if (sortOrder === "alpha") {
-          const ka = a.name.replace(/^the\s*/i, "").toLowerCase();
-          const kb = b.name.replace(/^the\s*/i, "").toLowerCase();
-          return ka < kb ? -1 : ka > kb ? 1 : 0;
-        } else if (sortOrder === "viewed") {
+        if (sortOrder === "viewed") {
           const lastViewedA = getViewedSortValue(a, lastViewedRef.current);
           const lastViewedB = getViewedSortValue(b, lastViewedRef.current);
-          return lastViewedB > lastViewedA
-            ? 1
-            : lastViewedB < lastViewedA
-              ? -1
-              : 0;
+          if (lastViewedB !== lastViewedA)
+            return lastViewedB > lastViewedA ? 1 : -1;
         } else if (sortOrder === "added") {
           const dateA = a.dateCreated || "";
           const dateB = b.dateCreated || "";
           // Pad short dates for proper comparison
           const paddedA = dateA.length > 10 ? dateA : dateA + " 00:00:00.000";
           const paddedB = dateB.length > 10 ? dateB : dateB + " 00:00:00.000";
-          return paddedB > paddedA ? 1 : paddedB < paddedA ? -1 : 0; // Most recent first
+          // Most recent first
+          if (paddedB !== paddedA) return paddedB > paddedA ? 1 : -1;
         }
-        return 0;
+        return compareShowNames(a, b);
       });
     };
 
@@ -3121,14 +3134,17 @@ export default function App() {
       </View>
       {tvapprcMode && showTvapprcInput && (
         <View style={tvapprcInputStyles.overlay}>
-          <Pressable style={tvapprcInputStyles.emptyFill} onPress={closeTvapprcInput} />
-          <View style={tvapprcInputStyles.doneBtnContainer} pointerEvents="box-none">
+          <Pressable
+            style={tvapprcInputStyles.emptyFill}
+            onPress={closeTvapprcInput}
+          />
+          <View
+            style={tvapprcInputStyles.doneBtnContainer}
+            pointerEvents="box-none"
+          >
             <TouchableOpacity
               onPress={closeTvapprcInput}
-              style={[
-                tvapprcInputStyles.actionBtn,
-                tvapprcInputStyles.doneBtn,
-              ]}
+              style={[tvapprcInputStyles.actionBtn, tvapprcInputStyles.doneBtn]}
               activeOpacity={0.7}
             >
               <Text style={tvapprcInputStyles.actionText}>Done</Text>
@@ -3157,17 +3173,17 @@ export default function App() {
             {tvapprcTotalCount > 0 && (
               <View style={tvapprcInputStyles.countRow}>
                 <Text style={tvapprcInputStyles.countText}>
-                {(() => {
-                  const query = tvapprcFilter.trim().toLowerCase();
-                  const listCount =
-                    tvapprcListCount ??
-                    (query
-                      ? tvapprcShows.filter((s) =>
-                          s.name.toLowerCase().includes(query),
-                        ).length
-                      : tvapprcShows.length);
-                  return `There are ${listCount} shows in list of ${tvapprcTotalCount} total.`;
-                })()}
+                  {(() => {
+                    const query = tvapprcFilter.trim().toLowerCase();
+                    const listCount =
+                      tvapprcListCount ??
+                      (query
+                        ? tvapprcShows.filter((s) =>
+                            s.name.toLowerCase().includes(query),
+                          ).length
+                        : tvapprcShows.length);
+                    return `There are ${listCount} shows in list of ${tvapprcTotalCount} total.`;
+                  })()}
                 </Text>
               </View>
             )}
@@ -3186,8 +3202,8 @@ export default function App() {
             }}
           >
             <Text style={lockStyles.message}>
-              A remote collision has been detected. The remote has been
-              locked. Press and hold unlock button to continue.
+              A remote collision has been detected. The remote has been locked.
+              Press and hold unlock button to continue.
             </Text>
           </View>
           {lockInfo && (

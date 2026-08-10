@@ -193,7 +193,7 @@ class Shows {
   /**
    * The client's own ordering: alphabetically ascending, every other sort by
    * its date with the most recent first and no date at all at the end, and
-   * ties broken by first-aired, most recent first.
+   * ties broken by show name ascending.
    */
   static Comparator<Show> order(Sort sort) {
     return (a, b) -> {
@@ -205,7 +205,7 @@ class Shows {
       } else {
         result = newestFirst(a.dateCreated, b.dateCreated);
       }
-      return result != 0 ? result : newestFirst(a.firstAired, b.firstAired);
+      return result != 0 ? result : sortKey(a.name).compareTo(sortKey(b.name));
     };
   }
 

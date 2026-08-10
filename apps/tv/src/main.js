@@ -7,7 +7,7 @@ import { fileURLToPath } from "url";
 import express from "express";
 import cors from "cors";
 import { ChannelPeer } from "@tv/share/channelPeer";
-import { unilog, logHere, setUnilogSink } from "@tv/share";
+import { unilog, logHere, setUnilogSink, compareShowNames } from "@tv/share";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -493,10 +493,7 @@ function handleMsg(raw) {
       const id = event.data?.new_state?.entity_id;
       const state = event.data?.new_state?.state;
       const prev = event.data?.old_state?.state;
-      const WATCHED = new Set([
-        REMOTE_ENTITY_ID,
-        BRAVIA_ENTITY_ID,
-      ]);
+      const WATCHED = new Set([REMOTE_ENTITY_ID, BRAVIA_ENTITY_ID]);
       if (WATCHED.has(id) && state !== prev) {
         unilog(384, `HA state: ${id} ${prev} -> ${state}`);
       }
@@ -612,7 +609,10 @@ app.get("/tv/googlebtn", (req, res) => {
   } else {
     // TV off — wait for state_changed on transition to "on"
     pendingGoogleTvapp = true;
-    unilog(1904, `googlebtn: TV not on (${braviaHaPower}), set pendingGoogleTvapp=true`);
+    unilog(
+      1904,
+      `googlebtn: TV not on (${braviaHaPower}), set pendingGoogleTvapp=true`,
+    );
   }
   res.json({ ok: true });
 });
@@ -1194,7 +1194,7 @@ async function showsByLastPlayed() {
   }
   return [...newest.entries()]
     .map(([name, played]) => ({ name, played }))
-    .sort((a, b) => b.played.localeCompare(a.played));
+    .sort((a, b) => b.played.localeCompare(a.played) || compareShowNames(a, b));
 }
 
 // "YYYY-MM-DD" in SHOW_SEL_TZ, so comparing days is a plain string compare.
@@ -2261,9 +2261,7 @@ function startTvapprcBridge() {
   bridge.on("listening", () =>
     unilog(1882, `bridge listening on port ${TVAPPRC_BRIDGE_PORT}`),
   );
-  bridge.on("error", (e) =>
-    unilog(1883, `bridge socket error: ${e.message}`),
-  );
+  bridge.on("error", (e) => unilog(1883, `bridge socket error: ${e.message}`));
 }
 
 // Opens tvapp on the tv so Android tvapprc mode has something to control.
@@ -2422,7 +2420,10 @@ async function waitForEmbyActivity(before) {
 // only once Emby is really up does tvapp go over the top of it.
 async function googlePowerOnSequence() {
   if (tvMode !== "google") {
-    unilog(1954, `power-on: tvMode=${tvMode}, sending Home for Google TV input`);
+    unilog(
+      1954,
+      `power-on: tvMode=${tvMode}, sending Home for Google TV input`,
+    );
     callService("remote", "send_command", REMOTE_ENTITY_ID, {
       command: "Home",
     });
@@ -2512,7 +2513,9 @@ app.get("/tv/showintvapp", async (req, res) => {
   }
   const opened = await openTvappSelectingShow(showName, true);
   res.json(
-    opened ? { ok: true, action: "opened" } : { ok: false, error: "tvapp did not come up" },
+    opened
+      ? { ok: true, action: "opened" }
+      : { ok: false, error: "tvapp did not come up" },
   );
 });
 

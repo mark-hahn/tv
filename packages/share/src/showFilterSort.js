@@ -239,10 +239,16 @@ export function getSortKey(show, sortChoice, allTvdb = null) {
 }
 
 /**
- * Orders two shows by one of the SORT_CHOICES, breaking ties by first-aired
- * with the most recent first.
+ * Orders two shows by one of the SORT_CHOICES, breaking ties by show name
+ * ascending.
  */
-export function compareShows(a, b, sortChoice, allTvdb = null, reversed = false) {
+export function compareShows(
+  a,
+  b,
+  sortChoice,
+  allTvdb = null,
+  reversed = false,
+) {
   const va = getSortKey(a, sortChoice, allTvdb);
   const vb = getSortKey(b, sortChoice, allTvdb);
   if (va !== vb) {
@@ -259,16 +265,27 @@ export function compareShows(a, b, sortChoice, allTvdb = null, reversed = false)
     }
     return reversed ? -result : result;
   }
-  const fa = a.firstAired || "";
-  const fb = b.firstAired || "";
-  if (fa === "" && fb === "") return 0;
-  if (fa === "") return 1;
-  if (fb === "") return -1;
-  return fa > fb ? -1 : fa < fb ? 1 : 0;
+  return compareShowNames(a, b);
+}
+
+/**
+ * The tie-break every show sort ends in: the show's name, ascending, by the
+ * same key the Alpha sort uses so it reads the way the list's own A-Z does.
+ * Never reversed — a tie always comes out in one same order.
+ */
+export function compareShowNames(a, b) {
+  const na = getSortKey(a, "Alpha");
+  const nb = getSortKey(b, "Alpha");
+  return na > nb ? +1 : na < nb ? -1 : 0;
 }
 
 /** A sorted copy; the input array is left alone. */
-export function sortShowList(shows, sortChoice, allTvdb = null, reversed = false) {
+export function sortShowList(
+  shows,
+  sortChoice,
+  allTvdb = null,
+  reversed = false,
+) {
   return [...shows].sort((a, b) =>
     compareShows(a, b, sortChoice, allTvdb, reversed),
   );
@@ -321,7 +338,9 @@ export function filterShowList(shows, settings = {}, allTvdb = null) {
     }
     if (srchStrLc && !show.name.toLowerCase().includes(srchStrLc)) continue;
     if (descrSrchLc) {
-      const overview = String(allTvdb?.[show.name]?.overview ?? "").toLowerCase();
+      const overview = String(
+        allTvdb?.[show.name]?.overview ?? "",
+      ).toLowerCase();
       if (!overview.includes(descrSrchLc)) continue;
     }
     for (const name in condFilters) {

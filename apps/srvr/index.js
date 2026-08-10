@@ -27,6 +27,7 @@ import {
   applyComputedProps,
   filterShowList,
   sortShowList,
+  compareShowNames,
   cropName,
   batchLabel,
 } from "@tv/share";
@@ -858,7 +859,10 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
           else mpfour.dropIntro(introFile.path);
         }
       } catch (e) {
-        unilog(1965, `intro mirror priority failed for ${showName}: ${e.message}`);
+        unilog(
+          1965,
+          `intro mirror priority failed for ${showName}: ${e.message}`,
+        );
       }
     }
     // Auto collection updates (run after the gap check, which sets anyWatched)
@@ -908,17 +912,19 @@ tvdb.setRefreshEpisodeDataCallback(disk.refreshEpisodeData);
 
 // waitStr transitions drive automatic hiding/unhiding (shows with no episodes
 // on disk are ignored entirely — see hideShowIfNeeded/unhideLatestTvIfNeeded).
-tvdb.setWaitStrChangedCallback(async (showName, tvdbRecord, { before, after }) => {
-  if (!tvdbRecord?.inEmby || !tvdbRecord?.id) return;
-  if (!hasEpisodesOnDisk(tvdbRecord)) return;
-  if (!before && after) {
-    // waitStr newly set: hide the show unless it is already hidden.
-    await hideShowIfNeeded(showName, tvdbRecord, `waitStrHide:${showName}`);
-  } else if (before && !after) {
-    // waitStr cleared: bring it back to the latest tv row.
-    await unhideLatestTvIfNeeded(showName, tvdbRecord);
-  }
-});
+tvdb.setWaitStrChangedCallback(
+  async (showName, tvdbRecord, { before, after }) => {
+    if (!tvdbRecord?.inEmby || !tvdbRecord?.id) return;
+    if (!hasEpisodesOnDisk(tvdbRecord)) return;
+    if (!before && after) {
+      // waitStr newly set: hide the show unless it is already hidden.
+      await hideShowIfNeeded(showName, tvdbRecord, `waitStrHide:${showName}`);
+    } else if (before && !after) {
+      // waitStr cleared: bring it back to the latest tv row.
+      await unhideLatestTvIfNeeded(showName, tvdbRecord);
+    }
+  },
+);
 
 function rpcParamToString(param) {
   // Param is usually a raw string, but tolerate JSON-stringified strings.
@@ -958,11 +964,7 @@ let saving = false;
 const trySaveConfigYml = async (id, result, resolve, reject) => {
   if (saving) return ["busy", id, result, resolve, reject];
   saving = true;
-  pickups.sort((a, b) => {
-    const aname = a.replace(/The\s/i, "");
-    const bname = b.replace(/The\s/i, "");
-    return aname.toLowerCase() > bname.toLowerCase() ? +1 : -1;
-  });
+  pickups.sort((a, b) => compareShowNames({ name: a }, { name: b }));
   await util.writeFile(configWritePath("config4-pickups.json"), pickups);
 
   let errResult = null;
@@ -1660,7 +1662,10 @@ app.post(
       await setHiddenFromRow(showName, false);
       action = "unhidden";
     }
-    unilog(1661, `${action} ${showName}: ${changed.length ? changed.join(", ") : "no date change"}`);
+    unilog(
+      1661,
+      `${action} ${showName}: ${changed.length ? changed.join(", ") : "no date change"}`,
+    );
     if (changed.length > 0) {
       embyRefreshManager
         .request(`hideShow:${showName}`, showName)
@@ -2396,7 +2401,10 @@ app.post("/api/asr/chksrt/ok-show", (req, res) => {
       try {
         fs.writeFileSync(path.join(dir, basename + ".mb.chosen"), "", "utf8");
       } catch (e) {
-        unilog(1959, `chosen marker write failed for ${basename}: ${e.message}`);
+        unilog(
+          1959,
+          `chosen marker write failed for ${basename}: ${e.message}`,
+        );
       }
     }
     const idx = subsState.subQueueChkSrt.findIndex(
@@ -3125,7 +3133,6 @@ app.post("/internal/nowPlaying", (req, res) => {
   view.recordNowPlaying(lastNowPlayingShowName);
   res.json({ ok: true });
 
-
   // Auto-skip: fire when an episode is near its start (either TV). Keyed on the
   // episode rather than a not-playing -> playing edge: the TV session keeps its
   // NowPlayingItem across show changes and while paused at the Emby home screen,
@@ -3604,7 +3611,10 @@ async function runEmbyFullSweep(caller = "unknown") {
           "emby.genres": embyShow.Genres || [],
           "emby.overview": embyShow.Overview || "",
           dateCreated: util.toPstDateTimeMs(embyShow.DateCreated),
-          premiereDate: embyShow.PremiereDate?.substring(0, 10).replace(/-/g, "/"),
+          premiereDate: embyShow.PremiereDate?.substring(0, 10).replace(
+            /-/g,
+            "/",
+          ),
           fromEmbySync: true,
           isPlayed: embyShow.UserData?.Played || false,
           playCount: embyShow.UserData?.PlayCount || 0,
@@ -3679,7 +3689,10 @@ async function runEmbyFullSweep(caller = "unknown") {
       tvdbRecord.genres = embyShow.Genres || [];
       tvdbRecord.overview = embyShow.Overview || "";
       tvdbRecord.dateCreated = util.toPstDateTimeMs(embyShow.DateCreated);
-      tvdbRecord.premiereDate = embyShow.PremiereDate?.substring(0, 10).replace(/-/g, "/");
+      tvdbRecord.premiereDate = embyShow.PremiereDate?.substring(0, 10).replace(
+        /-/g,
+        "/",
+      );
       tvdbRecord.played = embyShow.UserData?.Played || false;
       tvdbRecord.playCount = embyShow.UserData?.PlayCount || 0;
       tvdbRecord.inToTry = toTryIds.has(showId);
@@ -3902,7 +3915,8 @@ async function runGapCheckBatch() {
       .sort((a, b) => {
         const aLast = a.tvdbRecord.lastGapCheck || "";
         const bLast = b.tvdbRecord.lastGapCheck || "";
-        return aLast < bLast ? -1 : aLast > bLast ? 1 : 0;
+        if (aLast !== bLast) return aLast < bLast ? -1 : 1;
+        return compareShowNames({ name: a.showName }, { name: b.showName });
       });
 
     if (showsToCheck.length === 0) return;
@@ -3959,7 +3973,9 @@ function hasUnwatchedEpisodes(rec) {
 // Whole days between lastPlayedDate ("YYYY/MM/DD ...", PST) and today (PST).
 // Compared as calendar dates so the server's own timezone never matters.
 function daysSinceLastPlayed(rec) {
-  const played = String(rec.lastPlayedDate || "").slice(0, 10).split("/");
+  const played = String(rec.lastPlayedDate || "")
+    .slice(0, 10)
+    .split("/");
   if (played.length !== 3) return null;
   const today = util.toPstDateOnly(new Date())?.split("/");
   if (!today || today.length !== 3) return null;
@@ -4004,7 +4020,10 @@ async function applyAutoCollections(showName, rec) {
       if (await setEmbyCollection(COLLECTION_IDS.toTry, rec.id, false)) {
         rec.inToTry = false;
         changes.push("inToTry:true->false(watched)");
-        unilog(1989, `cleared toTry for ${showName}: ${rec.watchedCount} episodes watched`);
+        unilog(
+          1989,
+          `cleared toTry for ${showName}: ${rec.watchedCount} episodes watched`,
+        );
       } else {
         unilog(1983, `emby toTry remove failed for ${showName}`);
       }
@@ -4025,7 +4044,10 @@ async function applyAutoCollections(showName, rec) {
       if (await setEmbyCollection(COLLECTION_IDS.continue, rec.id, true)) {
         rec.inContinue = true;
         changes.push(`inContinue:false->true(idle ${idleDays}d)`);
-        unilog(1990, `set continue for ${showName}: unwatched episodes left, idle ${idleDays} days`);
+        unilog(
+          1990,
+          `set continue for ${showName}: unwatched episodes left, idle ${idleDays} days`,
+        );
       } else {
         unilog(1985, `emby continue add failed for ${showName}`);
       }
@@ -4064,7 +4086,10 @@ async function fetchLatestPlayedInfo(showId) {
   // the same viewing.
   return {
     lastPlayedDate: util.toPstDateTimeMs(utcStr),
-    lastPlayedEpisode: fmtSeasonEpisode(item.ParentIndexNumber, item.IndexNumber),
+    lastPlayedEpisode: fmtSeasonEpisode(
+      item.ParentIndexNumber,
+      item.IndexNumber,
+    ),
   };
 }
 
@@ -4244,7 +4269,11 @@ async function setEmbyShowDates(showId, targetIso, skipOlderThanMs = null) {
     unilog(1649, `lastPlayed set failed: ${e.message}`);
   }
   try {
-    const dcCount = await setEmbyDateCreated(showId, targetIso, skipOlderThanMs);
+    const dcCount = await setEmbyDateCreated(
+      showId,
+      targetIso,
+      skipOlderThanMs,
+    );
     if (dcCount > 0) changed.push(`dateCreated(${dcCount} epis)`);
   } catch (e) {
     unilog(1650, `dateCreated set failed: ${e.message}`);
@@ -4324,7 +4353,10 @@ async function hideShowIfNeeded(showName, rec, refreshCaller) {
   if (rec.hiddenFromRow) return;
   const changed = await hideShowInEmby(showName, rec);
   await setHiddenFromRow(showName, true);
-  unilog(1663, `hiding ${showName}: ${changed.length ? changed.join(", ") : "no date change"}`);
+  unilog(
+    1663,
+    `hiding ${showName}: ${changed.length ? changed.join(", ") : "no date change"}`,
+  );
   if (changed.length > 0) {
     embyRefreshManager
       .request(refreshCaller, showName)
@@ -4341,7 +4373,10 @@ async function hideShowIfNeeded(showName, rec, refreshCaller) {
 async function reapplyHideIfAlreadyHidden(showName, rec) {
   if (!rec.hiddenFromRow) return;
   const changed = await hideShowInEmby(showName, rec);
-  unilog(1667, `re-hiding new episode(s) for ${showName}: ${changed.length ? changed.join(", ") : "no date change"}`);
+  unilog(
+    1667,
+    `re-hiding new episode(s) for ${showName}: ${changed.length ? changed.join(", ") : "no date change"}`,
+  );
   if (changed.length > 0) {
     embyRefreshManager
       .request(`chokidarRehide:${showName}`, showName)
@@ -4661,17 +4696,23 @@ async function handleShowDiskChange(showName) {
       const waitStrAfter = tvdbRecord.waitStr;
       const hasEpisodesNow = hasEpisodesOnDisk(tvdbRecord);
       const waitStrJustSet = !waitStrBefore && waitStrAfter;
-      const firstEpisodesJustLanded = !hadEpisodesOnDiskBefore && hasEpisodesNow;
+      const firstEpisodesJustLanded =
+        !hadEpisodesOnDiskBefore && hasEpisodesNow;
       if (tvdbRecord.hiddenFromRow) {
         // Already hidden: this new episode needs the same backdating, or it
         // would show up fresh at the left of "latest tv" on its own.
-        if (hasEpisodesNow) await reapplyHideIfAlreadyHidden(showName, tvdbRecord);
+        if (hasEpisodesNow)
+          await reapplyHideIfAlreadyHidden(showName, tvdbRecord);
       } else if (
         hasEpisodesNow &&
         waitStrAfter &&
         (waitStrJustSet || firstEpisodesJustLanded)
       ) {
-        await hideShowIfNeeded(showName, tvdbRecord, `chokidarHide:${showName}`);
+        await hideShowIfNeeded(
+          showName,
+          tvdbRecord,
+          `chokidarHide:${showName}`,
+        );
       }
     } catch (err) {
       unilog(679, `Post-download refresh error for ${showName}:`, err.message);

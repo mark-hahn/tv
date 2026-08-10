@@ -258,7 +258,7 @@ function watchedEventsAfter(afterId, siteIds) {
 }
 
 // The most recent `limit` heartbeats, newest first, each parsed into a
-// { subQ, chkQ, asrQ, bif, renc, flex, sweep, clients, subDone, asrDone } map.
+// { subQ, chkQ, asrQ, flex, sweep, clients, subDone, asrDone } map.
 function recentHeartbeats(limit) {
   const d = getDb();
   if (!d) return [];

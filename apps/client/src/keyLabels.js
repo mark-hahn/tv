@@ -22,5 +22,4 @@ export const keyLabels = {
   skip: "Skip",
   sort: "Sort",
   filter: "Filter",
-  resToggle: "Resolution Toggle",
 };

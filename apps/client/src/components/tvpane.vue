@@ -1652,40 +1652,21 @@ export default {
       this._dbStop();
     },
 
-    // Long-press skip toggles the playing episode between 2160 and 1080.
-    async toggleResolution() {
-      if (this.isOff || this.isOther) return;
-      this.flash("skip");
-      await this.sendKeyThrough("resToggle", `/tv/toggleres`, {
-        method: "POST",
-        body: {},
-      });
-    },
-
     startSkipHold() {
       const pressedAt = Date.now();
-      this._armHold("skip", () =>
-        this._lpStart(
-          () => {
-            // short press → skip intro (a srvr feature, not a tv/ha command)
-            this.flash("skip");
-            this.sendKeyThrough("skip", `/api/skipIntro`, {
-              method: "POST",
-              body: { pressedAt },
-              base: "srvr",
-            });
-          },
-          () => {
-            // long press → toggle resolution
-            this.toggleResolution();
-          },
-        ),
-      );
+      // skip intro is a srvr feature, not a tv/ha command
+      this._dbStart(() => {
+        this.flash("skip");
+        this.sendKeyThrough("skip", `/api/skipIntro`, {
+          method: "POST",
+          body: { pressedAt },
+          base: "srvr",
+        });
+      });
     },
 
     stopSkipHold() {
       this._dbStop();
-      this._lpStop();
     },
 
     async fetchSubPlayers() {

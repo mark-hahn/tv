@@ -10,7 +10,7 @@
 // handlers (which reassign e.g. chksrtHistory and mutate arrays in place) and
 // this module share one authoritative reference. The messaging "batch header"
 // hub (syncBatchMsgs) is injected via init() to avoid a circular import with
-// index.js (index owns the hub because it also reads reencode/bif state).
+// index.js (index owns the hub because it also reads the other queues' state).
 
 import fs from "fs";
 import * as path from "node:path";
@@ -26,7 +26,7 @@ import {
   publishChannelDelta,
 } from "./messaging.js";
 import { showNameFromFilePath } from "./disk.js";
-import { resFindEpisodeVideos, videoFileExtensions } from "./videoFiles.js";
+import { videoFileExtensions } from "./videoFiles.js";
 import { sanitizeSrt, stripSrtFormatting } from "./srt.js";
 import {
   getSubsToken,
@@ -464,19 +464,6 @@ async function fileNeedsSubChecked(videoFilePath, showName) {
     )
   )
     return false;
-  // A 1080 resolution-fallback file inherits the 2160's subtitles (they are
-  // copied at generation), so it is never sub-checked / extracted on its own.
-  if (/1080p/i.test(path.basename(videoFilePath))) {
-    const parsedRes = parseFileSeasonEpisode(videoFilePath);
-    if (parsedRes?.season != null && parsedRes?.episode != null) {
-      const sibs = resFindEpisodeVideos(
-        path.dirname(videoFilePath),
-        parsedRes.season,
-        parsedRes.episode,
-      );
-      if (sibs.some((v) => v.res === 2160)) return false;
-    }
-  }
   const base = videoFilePath.replace(/\.[^.]+$/, "");
   const dir = path.dirname(videoFilePath);
   let entries;
@@ -819,8 +806,8 @@ async function processSubQueueEntry() {
   // same entry and process it twice.
   if (subsState.subQueueBusy) return;
   if (subsState.subQueue.length === 0) return;
-  // The entry stays in subQueue while it is processed, like asrQueue and
-  // reencodeQueue. It is removed in the finally below, so a run that ends —
+  // The entry stays in subQueue while it is processed, like asrQueue. It is
+  // removed in the finally below, so a run that ends —
   // even by throwing — still drops it; only an interruption that kills the
   // process leaves it behind, and then subQueue.json still has it and it is
   // retried on restart instead of vanishing between queues. Re-running is
@@ -832,8 +819,8 @@ async function processSubQueueEntry() {
   subsState.subStartedAt = Date.now();
   subsState.subStage = "starting";
   try {
-    // The file can vanish between enqueue and now — most often a 1080 demoted to
-    // a hidden `.mkv.alt` fallback, which already inherits the 2160's subtitles.
+    // The file can vanish between enqueue and now — most often a duplicate
+    // lower-resolution download demoted to `.old`.
     if (!fs.existsSync(entry.videoFilePath)) {
       unilog(
         1401,

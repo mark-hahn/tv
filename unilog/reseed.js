@@ -28,7 +28,6 @@ const ALL_FILES = {
   srvr: [
     "apps/srvr/index.js",
     "apps/srvr/src/asr.js",
-    "apps/srvr/src/bif.js",
     "apps/srvr/src/email.js",
     "apps/srvr/src/emb.js",
     "apps/srvr/src/emby.js",

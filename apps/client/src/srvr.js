@@ -979,18 +979,6 @@ export function introFirstFile(showName) {
   );
 }
 
-export function hasBif(videoPath) {
-  return httpCall(
-    `/api/hasBif?path=${encodeURIComponent(videoPath)}`,
-    null,
-    "GET",
-  );
-}
-
-export function enqueueBif(showName, paths) {
-  return httpCall("/api/bif/enqueue", { showName, paths }, "POST");
-}
-
 export function saveSeasonIntro(name, season, field, value) {
   return httpCall(
     "/api/saveSeasonIntro",

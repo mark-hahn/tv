@@ -1335,41 +1335,21 @@ export default function App() {
     lpStop();
   };
 
-  // Long-press skip toggles the playing episode between 2160 and 1080.
-  const toggleResolution = async () => {
-    if (isOff || isOther) return;
-    if (!showPlayingRef.current) return; // only while a video is playing
-    flash("skip");
-    await sendKeyThrough("resToggle", `/tv/toggleres`, {
-      method: "POST",
-      body: {},
-    });
-  };
-
   const startSkipHold = () => {
     const pressedAt = Date.now();
-    armHold("skip", () =>
-      lpStart(
-        () => {
-          // short press → skip intro (a srvr feature, not a tv/ha command)
-          flash("skip");
-          sendKeyThrough("skip", `/api/skipIntro`, {
-            method: "POST",
-            body: { pressedAt },
-            base: "srvr",
-          });
-        },
-        () => {
-          // long press → toggle resolution
-          toggleResolution();
-        },
-      ),
-    );
+    // skip intro is a srvr feature, not a tv/ha command
+    dbStart(() => {
+      flash("skip");
+      sendKeyThrough("skip", `/api/skipIntro`, {
+        method: "POST",
+        body: { pressedAt },
+        base: "srvr",
+      });
+    });
   };
 
   const stopSkipHold = () => {
     dbStop();
-    lpStop();
   };
 
   const toggleLayoutOption = async () => {

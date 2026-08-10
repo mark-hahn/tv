@@ -12,9 +12,9 @@
 // re-encodes.
 //
 // This runs on its own loop, deliberately NOT on the shared serialized
-// ffmpegQueue (batchQueue.js) — chksrt playback is needed before other recoding
-// work and must not sit behind long re-encode/BIF jobs. The same loop keeps
-// hevc (slow-transcode) entries at the tail of subQueueChkSrt.
+// subExtractQueue (batchQueue.js) — chksrt playback is needed before other
+// batch ffmpeg work and must not sit behind it. The same loop keeps hevc
+// (slow-transcode) entries at the tail of subQueueChkSrt.
 
 import fs from "fs";
 import fsp from "fs/promises";

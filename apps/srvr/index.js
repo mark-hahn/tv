@@ -52,11 +52,7 @@ import {
 import {
   videoFileExtensions,
   resStripAlt,
-  resOfName,
-  resIsVideoName,
   resFindEpisodeVideos,
-  res2160FileName,
-  res1080OldFileName,
 } from "./src/videoFiles.js";
 import {
   syncBadGroupsFromDisk,
@@ -95,8 +91,6 @@ import {
   tvRemoteUnlock,
   tvTvGet,
 } from "./src/tvRemoteKey.js";
-import { BATCH_SCHED, ffmpegQueue } from "./src/batchQueue.js";
-import * as bifQueue from "./src/bifQueue.js";
 import * as subsQueue from "./src/subsQueue.js";
 import * as mpfour from "./src/mpfour.js";
 
@@ -241,7 +235,6 @@ const safeShowFolderName = disk.safeShowFolderName;
 const seasonFolderName = disk.seasonFolderName;
 const buildTvShowNfo = disk.buildTvShowNfo;
 import { EMBY_BASE_URL, EMBY_USER_ID, EMBY_API_KEY } from "./src/embyConfig.js";
-bifQueue.init({ syncBatchMsgs });
 subsQueue.init({ syncBatchMsgs });
 // Local aliases keep existing call sites terse (subsQueue domain lives in
 // src/subsQueue.js). State lives on the shared subsState object.
@@ -311,16 +304,6 @@ const tvDir = "/mnt/media/tv";
 // Refresh all four batch hdrMsg entries from live queue state.
 // Call this whenever any batch queue changes so every pending type is visible.
 function syncBatchMsgs() {
-  // Reencode (Rec)
-  if (reencodeQueue.length > 0) {
-    setGlobalMessage({
-      id: "Reencode",
-      text: `Rec:${reencodeQueue.length}`,
-      position: 2003,
-    });
-  } else {
-    setGlobalMessage({ id: "Reencode", action: "hide" });
-  }
   // EmbSub (Sub)
   const embCount = subsState.subQueue.length;
   if (embCount > 0) {
@@ -331,17 +314,6 @@ function syncBatchMsgs() {
     });
   } else {
     setGlobalMessage({ id: "EmbSub", action: "hide" });
-  }
-  // BIF (Bif)
-  const bifCount = bifQueue.getBifCount();
-  if (bifCount > 0) {
-    setGlobalMessage({
-      id: "Bif",
-      text: `Bif:${bifCount}`,
-      position: 2002,
-    });
-  } else {
-    setGlobalMessage({ id: "Bif", action: "hide" });
   }
   // ASR (Asr)
   if (subsState.asrQueue.length > 0) {
@@ -679,12 +651,6 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
       } catch (e) {
         unilog(539, `subtitle scan error for ${showName}: ${e.message}`);
       }
-      // Resolution fallback: keep a hidden 1080 .alt next to unwatched 2160s.
-      try {
-        await scanShowForResFallback(showName, tvdbRecord);
-      } catch (e) {
-        unilog(1100, `res fallback scan failed for ${showName}: ${e.message}`);
-      }
     }
     // Disk check, date/size/noFiles, filesOnDisk/fileQuality/quality and
     // episodeData are all refreshed by refreshEpisodeData (called from the tvdb
@@ -802,14 +768,8 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         }
       }
     }
-    // React to needsIntro flips: queue or cancel .bif generation.
     const nowNeedsIntro = !!tvdbRecord.needsIntro;
     if (nowNeedsIntro !== prevNeedsIntro) {
-      try {
-        bifQueue.handleNeedsIntroChange(showName, tvdbRecord, nowNeedsIntro);
-      } catch (e) {
-        unilog(541, "needsIntro change error:", showName, e.message);
-      }
       // The client sets needsIntro immediately before opening the intro player,
       // so this is the only advance warning we get — push that episode to the
       // head of the mirror queue. Too late to beat the first seek on a slow
@@ -1374,24 +1334,6 @@ app.get("/api/getGaps", apiWrapper(getGaps));
 app.get("/api/getNoEmbys", apiWrapper(getNoEmbys));
 app.get("/api/getDevices", apiWrapper(emby.getDevices));
 app.post("/api/embyViewShow", apiWrapper(emby.viewShowOnLivingRoomTv));
-app.post("/api/toggleResolution", apiWrapper(handleToggleResolution));
-app.post(
-  "/api/resFallbackScanAll",
-  apiWrapper(async () => {
-    const all = tvdb.getAllTvdbSync();
-    let scanned = 0;
-    for (const [showName, rec] of Object.entries(all)) {
-      if (!rec?.inEmby) continue;
-      try {
-        await scanShowForResFallback(showName, rec);
-        scanned++;
-      } catch (e) {
-        unilog(1101, `resFallbackScanAll failed for ${showName}: ${e.message}`);
-      }
-    }
-    return { ok: true, scanned, reencodeQueued: reencodeQueue.length };
-  }),
-);
 app.get("/api/getLastViewed", apiWrapper(view.getLastViewed));
 app.get("/api/getSharedFilters", apiWrapper(getSharedFilters));
 // GET with no params uses the shared settings; POST carries its own.
@@ -2657,42 +2599,6 @@ app.get("/api/introFirstFile", async (req, res) => {
   }
 });
 
-// Check whether a video file has a BIF trickplay sidecar (name-320-10.bif).
-app.get("/api/hasBif", async (req, res) => {
-  const videoPath = req.query.path;
-  if (!videoPath) {
-    res.status(400).json({ ok: false, error: "path required" });
-    return;
-  }
-  try {
-    const parsed = path.parse(videoPath);
-    const bifPath = path.join(parsed.dir, `${parsed.name}-320-10.bif`);
-    let hasBif = false;
-    try {
-      await fsp.access(bifPath);
-      hasBif = true;
-    } catch {
-      hasBif = false;
-    }
-    res.json({ ok: true, hasBif });
-  } catch (err) {
-    unilog(600, "error:", err.message);
-    res.json({ ok: false, error: err.message });
-  }
-});
-
-// Enqueue one or more video files for BIF generation.
-// Body: { showName: string, paths: string[] }
-app.post("/api/bif/enqueue", async (req, res) => {
-  const { showName, paths } = req.body || {};
-  if (!showName || !Array.isArray(paths) || paths.length === 0) {
-    res.status(400).json({ ok: false, error: "showName and paths[] required" });
-    return;
-  }
-  const added = await bifQueue.enqueueBif(showName, paths);
-  res.json({ ok: true, added });
-});
-
 // Save a single intro field (startMark, skipDur, trimPos) for a season.
 app.post("/api/saveSeasonIntro", async (req, res) => {
   const { name, season, field, value } = req.body;
@@ -2709,8 +2615,8 @@ app.post("/api/saveSeasonIntro", async (req, res) => {
   try {
     await tvdb.saveSeasonIntro(record, season, field, value);
     // Once the show has a configured intro (trimPos, skipDur, or an explicit
-    // "none"), it no longer needsIntro. Clear the flag and cancel any pending
-    // .bif job immediately instead of waiting for the next background update.
+    // "none"), it no longer needsIntro. Clear the flag immediately instead of
+    // waiting for the next background update.
     await intro.reconcileNeedsIntro(name);
     res.json({ ok: true });
   } catch (err) {
@@ -2933,8 +2839,6 @@ https.createServer(httpsOptions, app).listen(HTTP_PORT, () => {
   loadOpnCheckHistory();
   startSubQueueLoop();
   startAsrQueueLoop();
-  // .bif generation: clear any stale lock, restore queue, resume work.
-  bifQueue.resumeOnStartup();
   // seekable-mp4 mirrors for the chksrt queue + intro episodes (own loop, not
   // ffmpegQueue)
   mpfour.start({ syncBatchMsgs, introEpisodePaths });
@@ -3213,12 +3117,6 @@ http.createServer(app).listen(SRVR_INTERNAL_PORT, "127.0.0.1", () => {
 const appSocketName = "web app websocket";
 
 // GLOBAL-MSG: CPU — periodic producer pushed to all clients.
-const DOWN_INPROGRESS_PATH = path.join(
-  path.dirname(SRVR_ROOT_DIR),
-  "down",
-  "data",
-  "tv-inProgress.json",
-);
 const GLOBAL_MSG_POLL_MS = 5000;
 const CPU_STALL_THRESHOLD = 1; // percent; below this, nothing important is starved
 
@@ -4709,14 +4607,12 @@ const watcher = chokidar.watch(tvDir, {
 watcher
   .on("add", async (filePath) => {
     const ext = filePath.split(".").pop();
-    const isVideo = videoFileExtensions.includes(ext);
-    const isBif = ext === "bif";
-    if (!isVideo && !isBif) return;
+    if (!videoFileExtensions.includes(ext)) return;
 
     const showName = extractShowNameFromPath(filePath);
     if (!showName) return;
 
-    unilog(88, `${isBif ? "bif" : "video"} added: ${showName}`);
+    unilog(88, `video added: ${showName}`);
 
     // Update only the affected show in cache instead of invalidating everything
     await disk.updateDiskCacheForShow(showName);
@@ -4776,9 +4672,6 @@ watcher
             doSubQueueNow();
           }
         }
-        if (tvdbRec && tvdbRec.inEmby) {
-          await scanShowForResFallback(showName, tvdbRec);
-        }
       } catch (err) {
         unilog(683, `sub check error for ${showName}:`, err.message);
       }
@@ -4786,35 +4679,20 @@ watcher
     }, DISK_CHANGE_DEBOUNCE_MS);
   })
   .on("unlink", (filePath) => {
-    // Strip a trailing `.alt` so hidden 1080 fallbacks (…​.mkv.alt) are seen as
-    // video deletions rather than extension "alt" (which would be ignored).
-    const ext = resStripAlt(filePath).split(".").pop();
-    if (!videoFileExtensions.includes(ext) && ext !== "bif") return;
+    const ext = filePath.split(".").pop();
+    if (!videoFileExtensions.includes(ext)) return;
 
     const showName = extractShowNameFromPath(filePath);
     if (!showName) return;
 
-    unilog(684, `${ext === "bif" ? "bif" : "video"} deleted: ${showName}`);
+    unilog(684, `video deleted: ${showName}`);
 
     // Debounce: clear existing timeout and set new one
     const unlinkEntry = changedShows.get(showName);
     if (unlinkEntry) clearTimeout(unlinkEntry.timeout);
 
-    const unlinkTimeout = setTimeout(async () => {
+    const unlinkTimeout = setTimeout(() => {
       changedShows.delete(showName);
-      // Deleting a video (e.g. a 1080 .alt fallback) can leave an unwatched
-      // 2160 without its fallback — re-scan so it gets regenerated.
-      try {
-        const tvdbRec = tvdb.getAllTvdbSync?.()?.[showName];
-        if (tvdbRec && tvdbRec.inEmby) {
-          await scanShowForResFallback(showName, tvdbRec);
-        }
-      } catch (err) {
-        unilog(
-          1124,
-          `res scan on delete failed for ${showName}: ${err.message}`,
-        );
-      }
       handleShowDiskChange(showName);
     }, DISK_CHANGE_DEBOUNCE_MS);
 
@@ -4831,367 +4709,13 @@ watcher
 
 unilog(91, `Watching ${tvDir} for file changes...`);
 
-//////////////////  RESOLUTION FALLBACK (2160 ↔ 1080)  //////////////////
-// Keep a hidden 1080 ".alt" fallback next to each unwatched 2160 episode so
-// playback can switch resolution (slow wifi can't stream 2160). See
-// toggle-resolution-instr.md / toggle-resolution-plan.md.
-//
-// File convention (Emby ignores any name whose final extension is not a video
-// extension, so ".alt" hides a file):
-//   active 2160:  Show.S01E01.2160p.mkv
-//   hidden 1080:  Show.S01E01.1080p.mkv.alt
-// Toggling swaps which member carries the ".alt" suffix.
-
-// When false, block new ffmpeg 2160->1080 re-encodes; kept-aside 1080 .old
-// files are still renamed to .alt (no ffmpeg involved). 1080 alt files
-// already on disk keep working for resolution switching either way. Off by
-// default: the 2160 player-overload problem this was built for hasn't
-// recurred recently.
-const RECODE_TO_1080 = false;
-const RES_SUBTITLE_EXTS = new Set([
-  ".srt",
-  ".ass",
-  ".ssa",
-  ".sub",
-  ".idx",
-  ".sup",
-  ".vtt",
-  ".smi",
-]);
-const REENCODE_QUEUE_PATH = path.join(
-  SRVR_ROOT_DIR,
-  "data",
-  "reencode-queue.json",
-);
-
-// Best-effort cross-app guard: is the downloader already fetching a 1080 for
-// this episode? Optional — if the map can't be read, assume not in progress.
-function res1080DownloadInProgress(season, episode) {
-  let map;
-  try {
-    map = JSON.parse(fs.readFileSync(DOWN_INPROGRESS_PATH, "utf8"));
-  } catch {
-    return false;
-  }
-  const sKey = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
-  const re = new RegExp(sKey, "i");
-  for (const key of Object.keys(map || {})) {
-    if (/1080p/i.test(key) && re.test(key)) return true;
-  }
-  return false;
-}
-
-// Duplicate every 2160 sidecar subtitle under the 1080 basename, then enqueue
-// the new 1080 video for a subtitle check (chksrt).
-// Copy the 2160 episode's subtitle sidecars AND its chksrt result (the
-// `.mb.chosen` marker) onto the generated 1080 basename. The 1080 has identical
-// tracks, so the subtitles and the subtitle-check outcome are reused directly —
-// no extraction and no re-check are needed.
-function res1080CopySubtitles(seasonDir, src2160Name, dst1080Name) {
-  const src2160Base = src2160Name.replace(/\.[^.]+$/, "");
-  const dst1080Base = dst1080Name.replace(/\.[^.]+$/, "");
-  let files;
-  try {
-    files = fs.readdirSync(seasonDir);
-  } catch (e) {
-    unilog(1381, `sub copy scan failed for ${seasonDir}: ${e.message}`);
-    files = [];
-  }
-  for (const name of files) {
-    if (!name.startsWith(src2160Base)) continue;
-    const ext = path.extname(name).toLowerCase();
-    const isSub = RES_SUBTITLE_EXTS.has(ext);
-    const isChosen = name.endsWith(".mb.chosen"); // chksrt result marker
-    if (!isSub && !isChosen) continue;
-    const suffix = name.slice(src2160Base.length); // e.g. ".en.srt" or ".mb.chosen"
-    const dstName = dst1080Base + suffix;
-    const dstPath = path.join(seasonDir, dstName);
-    if (fs.existsSync(dstPath)) continue;
-    try {
-      fs.copyFileSync(path.join(seasonDir, name), dstPath);
-    } catch (e) {
-      unilog(1102, `sub copy failed for ${dstName}: ${e.message}`);
-    }
-  }
-}
-
-//////  re-encode queue (single ffmpeg worker)  //////
-let reencodeQueue = [];
-let reencodeRunning = false;
-
-function loadReencodeQueue() {
-  try {
-    reencodeQueue = JSON.parse(fs.readFileSync(REENCODE_QUEUE_PATH, "utf8"));
-    if (!Array.isArray(reencodeQueue)) reencodeQueue = [];
-  } catch (e) {
-    // Missing file is normal on first run; anything else is data loss.
-    if (e.code !== "ENOENT")
-      unilog(1382, `reencode queue load failed: ${e.message}`);
-    reencodeQueue = [];
-  }
-}
-function persistReencodeQueue() {
-  try {
-    fs.writeFileSync(
-      REENCODE_QUEUE_PATH,
-      JSON.stringify(reencodeQueue),
-      "utf8",
-    );
-  } catch (e) {
-    unilog(1103, `reencode queue persist failed: ${e.message}`);
-  }
-}
-function enqueueReencode(entry) {
-  // entry: { srcPath, showName, season, episode }
-  if (reencodeQueue.some((e) => e.srcPath === entry.srcPath)) return;
-  reencodeQueue.push(entry);
-  persistReencodeQueue();
-  unilog(1104, `reencode queued: ${path.basename(entry.srcPath)}`);
-  syncBatchMsgs();
-  setTimeout(processReencodeQueue, 0);
-}
-
-async function reencodeOneTo1080(entry) {
-  const { srcPath, season, episode } = entry;
-  if (!fs.existsSync(srcPath)) {
-    unilog(1105, `reencode skip — source gone: ${srcPath}`);
-    return;
-  }
-  const seasonDir = path.dirname(srcPath);
-  const srcName = path.basename(srcPath);
-  // Re-check: a 1080 may have appeared since this was queued.
-  if (
-    resFindEpisodeVideos(seasonDir, season, episode).some((f) => f.res === 1080)
-  ) {
-    unilog(1106, `reencode skip — 1080 already present: ${srcName}`);
-    return;
-  }
-  const dst1080Name = srcName.replace(/2160/g, "1080"); // e.g. Show.S01E01.1080p.mkv
-  // tmpPath: hidden dotfile so chokidar/Emby ignore it while encoding.
-  // vidTmpPath: intermediate video-only MP4. Re-encoding through a separate
-  // container and remuxing strips the DoVi configuration record that ffmpeg
-  // would otherwise copy from the source into the MKV video track (which makes
-  // Emby/Bravia spin on playback). MP4 is used rather than a raw elementary
-  // stream because raw video carries no timing, so it would be read back at
-  // ffmpeg's default 25 fps and desync the audio on non-25fps sources.
-  const tmpPath = path.join(seasonDir, ".restmp-" + dst1080Name);
-  const vidTmpPath = tmpPath.replace(/\.mkv$/i, ".mp4");
-  const dstPath = path.join(seasonDir, dst1080Name + ".alt");
-  try {
-    if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-  } catch (e) {
-    unilog(1107, `could not remove stale temp ${tmpPath}: ${e.message}`);
-  }
-  try {
-    if (fs.existsSync(vidTmpPath)) fs.unlinkSync(vidTmpPath);
-  } catch (e) {
-    unilog(1121, `could not remove stale vid temp: ${e.message}`);
-  }
-  unilog(1108, `start reencode 2160->1080: ${srcName}`);
-  await ffmpegQueue.run(
-    () =>
-      new Promise((resolve, reject) => {
-        const REENCODE_TIMEOUT_MS = 3 * 60 * 60 * 1000; // 3 hours max (SW encode ~1x realtime)
-        // Step 1: encode video only to a video-only MP4 (preserves timing).
-        // HEVC Main 10 keeps the source's 10-bit depth + HDR; the Bravia
-        // hardware-decodes it just like the 4K HEVC sources, so it direct-plays.
-        // SW encode (libx265) is used instead of VAAPI: the GPU encoder pads
-        // surfaces to a 16-pixel alignment boundary, causing a right-edge
-        // stretching artifact on non-standard-aspect sources (e.g. 1.85:1
-        // 3840x2076). libx265 accepts any even dimension cleanly.
-        // scale=-2:1080 produces the mathematically correct width (e.g. 1998px
-        // for 1.85:1) with no padding or edge replication.
-        const args1 = [
-          "-y",
-          "-i",
-          srcPath,
-          "-map",
-          "0:v:0",
-          "-vf",
-          "scale=-2:1080,crop=iw:1072",
-          "-c:v",
-          "libx265",
-          "-pix_fmt",
-          "yuv420p10le",
-          "-profile:v",
-          "main10",
-          "-preset",
-          "medium",
-          "-b:v",
-          "8M",
-          "-maxrate",
-          "10M",
-          "-bufsize",
-          "16M",
-          "-tag:v",
-          "hvc1",
-          vidTmpPath,
-        ];
-        const ff1 = cp.spawn(BATCH_SCHED[0], [
-          ...BATCH_SCHED.slice(1),
-          "ffmpeg",
-          ...args1,
-        ]);
-        const killTimer = setTimeout(() => {
-          ff1.kill("SIGKILL");
-        }, REENCODE_TIMEOUT_MS);
-        ff1.stderr.on("data", () => {});
-        ff1.on("error", (err) => {
-          clearTimeout(killTimer);
-          reject(err);
-        });
-        ff1.on("close", (code) => {
-          clearTimeout(killTimer);
-          if (code !== 0) {
-            reject(new Error(`ffmpeg step1 exit ${code}`));
-            return;
-          }
-          // Step 2: remux MP4 video + all non-video streams from source into MKV.
-          // -map 0:v:0  = re-encoded H.264 video from step 1
-          // -map 1      = everything from source (audio, subs, attachments)
-          // -map -1:v   = remove source video (we already have it from step 1)
-          const args2 = [
-            "-y",
-            "-i",
-            vidTmpPath,
-            "-i",
-            srcPath,
-            "-map",
-            "0:v:0",
-            "-map",
-            "1",
-            "-map",
-            "-1:v",
-            "-c",
-            "copy",
-            tmpPath,
-          ];
-          const ff2 = cp.spawn("ffmpeg", args2);
-          ff2.stderr.on("data", () => {});
-          ff2.on("error", (err) => {
-            try {
-              fs.unlinkSync(vidTmpPath);
-            } catch (e) {
-              if (e.code !== "ENOENT")
-                unilog(1383, `temp cleanup failed: ${e.message}`);
-            }
-            reject(err);
-          });
-          ff2.on("close", (code2) => {
-            try {
-              fs.unlinkSync(vidTmpPath);
-            } catch (e) {
-              if (e.code !== "ENOENT")
-                unilog(1384, `temp cleanup failed: ${e.message}`);
-            }
-            if (code2 === 0) resolve();
-            else reject(new Error(`ffmpeg step2 exit ${code2}`));
-          });
-        });
-      }),
-  );
-  fs.renameSync(tmpPath, dstPath);
-  unilog(1109, `reencode done 2160->1080: ${dst1080Name}.alt`);
-  res1080CopySubtitles(seasonDir, srcName, dst1080Name);
-}
-
-async function processReencodeQueue() {
-  if (!RECODE_TO_1080) return; // also blocks any stale entries persisted before this was disabled
-  if (reencodeRunning) return;
-  const entry = reencodeQueue[0];
-  if (!entry) return;
-  reencodeRunning = true;
-  syncBatchMsgs();
-  let encodeSucceeded = false;
-  try {
-    await reencodeOneTo1080(entry);
-    encodeSucceeded = true;
-  } catch (e) {
-    unilog(1110, `reencode failed for ${entry.srcPath}: ${e.message}`);
-    // Clean up stale temp files so they don't fool the scanner.
-    const tmpPath = path.join(
-      path.dirname(entry.srcPath),
-      ".restmp-" + path.basename(entry.srcPath).replace(/2160/g, "1080"),
-    );
-    try {
-      if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-    } catch (e) {
-      unilog(1385, `stale temp cleanup failed for ${tmpPath}: ${e.message}`);
-    }
-    const vidTmpPath = tmpPath.replace(/\.mkv$/i, ".mp4");
-    try {
-      if (fs.existsSync(vidTmpPath)) fs.unlinkSync(vidTmpPath);
-    } catch (e) {
-      unilog(1386, `stale temp cleanup failed for ${vidTmpPath}: ${e.message}`);
-    }
-  } finally {
-    if (reencodeQueue[0]?.srcPath === entry.srcPath) {
-      reencodeQueue.shift();
-      persistReencodeQueue();
-    }
-    reencodeRunning = false;
-    syncBatchMsgs();
-    if (reencodeQueue.length > 0) setTimeout(processReencodeQueue, 1000);
-  }
-}
-
-// Evaluate one episode and, if a 1080 fallback is needed, rename a kept .old
-// copy to .alt (preferred) or queue an ffmpeg re-encode of the 2160 file.
-async function res1080NeededAndAcquire(
-  showName,
-  tvdbRecord,
-  season,
-  episode,
-  seasonDir,
-) {
-  if (!tvdbRecord?.inEmby) return;
-  if (epd.isWatched(tvdbRecord.episodeData, season, episode)) return;
-  const vids = resFindEpisodeVideos(seasonDir, season, episode);
-  if (!vids.some((f) => f.res === 2160)) return;
-  if (vids.some((f) => f.res === 1080)) return;
-  if (res1080DownloadInProgress(season, episode)) return;
-
-  // Preferred: reuse a kept-aside 1080 .old → rename to .alt.
-  const oldName = res1080OldFileName(seasonDir, season, episode);
-  if (oldName) {
-    const altName = oldName.replace(/\.old$/i, ".alt");
-    try {
-      fs.renameSync(
-        path.join(seasonDir, oldName),
-        path.join(seasonDir, altName),
-      );
-      unilog(1111, `reused kept 1080 .old->.alt: ${altName}`);
-      const src2160 = res2160FileName(seasonDir, season, episode);
-      if (src2160) {
-        res1080CopySubtitles(seasonDir, src2160, resStripAlt(altName));
-      }
-    } catch (e) {
-      unilog(1112, `.old->.alt rename failed for ${altName}: ${e.message}`);
-    }
-    return;
-  }
-
-  // Otherwise re-encode from the 2160 file.
-  if (!RECODE_TO_1080) return;
-  const src2160 = res2160FileName(seasonDir, season, episode);
-  if (!src2160) return;
-  enqueueReencode({
-    srcPath: path.join(seasonDir, src2160),
-    showName,
-    season,
-    episode,
-  });
-}
-
-// Scan every season of a show for episodes that need a 1080 fallback.
-// Enforce one active (non-.alt, non-.old) video file per episode. A replacement
-// download that races the file it replaces can leave two active videos: worker.js
+// Enforce one active (non-.old) video file per episode. A replacement download
+// that races the file it replaces can leave two active videos: worker.js
 // renames the pre-existing SxxExx file to .old only once, at rsync start, so a
 // same-episode file that lands mid-download is never demoted. When that happens the
-// lower-resolution active file is demoted to .old (matching the fallback convention
-// res1080NeededAndAcquire expects) and its chksrt entry / mp4 mirror are dropped, so
-// chksrt only ever resolves against the surviving active file. Returns the Set of
-// absolute paths that were demoted. See down-coll-plan.md.
+// lower-resolution active file is demoted to .old and its chksrt entry / mp4
+// mirror are dropped, so chksrt only ever resolves against the surviving active
+// file. Returns the Set of absolute paths that were demoted. See down-coll-plan.md.
 function reconcileDuplicateEpisodeVideos(seasonDir, season, episode) {
   const demoted = new Set();
   const actives = resFindEpisodeVideos(seasonDir, season, episode).filter(
@@ -5237,141 +4761,6 @@ function reconcileDuplicateEpisodeVideos(seasonDir, season, episode) {
   return demoted;
 }
 
-async function scanShowForResFallback(showName, tvdbRecord) {
-  if (!tvdbRecord?.inEmby) return;
-  const showFolderName = showName.includes("/")
-    ? showName
-    : (tvdbRecord.path || tvdbRecord.emby?.path || showName).split("/").pop();
-  const showFolder = path.join(tvDir, showFolderName);
-  let seasonDirs;
-  try {
-    seasonDirs = fs.readdirSync(showFolder);
-  } catch {
-    return;
-  }
-  for (const seasonDirName of seasonDirs) {
-    const seasonDir = path.join(showFolder, seasonDirName);
-    try {
-      if (!fs.statSync(seasonDir).isDirectory()) continue;
-    } catch {
-      continue;
-    }
-    let files;
-    try {
-      files = fs.readdirSync(seasonDir);
-    } catch {
-      continue;
-    }
-    const seen = new Set();
-    for (const name of files) {
-      if (!resIsVideoName(name)) continue;
-      if (resOfName(name) !== 2160) continue;
-      const parsed = parseFileSeasonEpisode(resStripAlt(name), seasonDirName);
-      if (parsed?.season == null || parsed?.episode == null) continue;
-      const key = `${parsed.season}E${parsed.episode}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      await res1080NeededAndAcquire(
-        showName,
-        tvdbRecord,
-        parsed.season,
-        parsed.episode,
-        seasonDir,
-      );
-    }
-  }
-}
-
-// Swap the ".alt" marker between the active and hidden video for an episode.
-function resToggleFiles(seasonDir, season, episode) {
-  const vids = resFindEpisodeVideos(seasonDir, season, episode);
-  const active = vids.find((v) => !v.alt && (v.res === 2160 || v.res === 1080));
-  const alt = vids.find((v) => v.alt && (v.res === 2160 || v.res === 1080));
-  if (!active || !alt) {
-    throw new Error(
-      `resToggle needs one active + one alt (active=${active?.name}, alt=${alt?.name})`,
-    );
-  }
-  const newAltPath = path.join(seasonDir, active.name) + ".alt";
-  const newActivePath = path.join(seasonDir, resStripAlt(alt.name));
-  fs.renameSync(path.join(seasonDir, active.name), newAltPath);
-  fs.renameSync(path.join(seasonDir, alt.name), newActivePath);
-  return { newActiveRes: alt.res, newActiveName: resStripAlt(alt.name) };
-}
-
-// POST /api/toggleResolution — swap .alt, refresh Emby (await), return episode.
-async function handleToggleResolution(params) {
-  let { relPath, showName, season, episode, episodeId } = params || {};
-  let seasonDir = null;
-  if (relPath) {
-    const abs = path.join(tvDir, relPath);
-    seasonDir = path.dirname(abs);
-    showName = showNameFromFilePath(abs);
-    const parsed = parseFileSeasonEpisode(
-      resStripAlt(path.basename(abs)),
-      path.basename(seasonDir),
-    );
-    season = parsed?.season;
-    episode = parsed?.episode;
-  } else if (showName != null && season != null && episode != null) {
-    season = Number(season);
-    episode = Number(episode);
-    const rec = tvdb.getAllTvdbSync()[showName];
-    const showFolderName = showName.includes("/")
-      ? showName
-      : (rec?.path || rec?.emby?.path || showName).split("/").pop();
-    seasonDir = path.join(tvDir, showFolderName, `Season ${season}`);
-  } else {
-    return { ok: false, error: "missing relPath or show/season/episode" };
-  }
-  if (season == null || episode == null) {
-    return { ok: false, error: "could not determine season/episode" };
-  }
-  season = Number(season);
-  episode = Number(episode);
-  const tvdbRecord = tvdb.getAllTvdbSync()[showName];
-
-  const { newActiveRes } = resToggleFiles(seasonDir, season, episode);
-  unilog(1113, `toggled ${showName} S${season}E${episode} -> ${newActiveRes}p`);
-
-  // Trigger an Emby library refresh and wait for it to finish.
-  await embyRefreshManager.request(`resToggle:${showName}`, showName);
-
-  // Resolve the Emby episode id if the caller didn't supply one.
-  if (!episodeId && tvdbRecord?.id) {
-    try {
-      const seriesMap = await emby.getSeriesMap({ id: tvdbRecord.id });
-      const seasonEntry = (seriesMap || []).find(([s]) => s === season);
-      const epEntry = seasonEntry?.[1]?.find(([e]) => e === episode);
-      episodeId = epEntry?.[1]?.id || null;
-    } catch (e) {
-      unilog(1114, `resolve episodeId failed for ${showName}: ${e.message}`);
-    }
-  }
-
-  return {
-    ok: true,
-    showId: tvdbRecord?.id || null,
-    showName,
-    episodeId: episodeId || null,
-    resolution: newActiveRes,
-  };
-}
-
-loadReencodeQueue();
-if (!RECODE_TO_1080 && reencodeQueue.length > 0) {
-  // Drain entries persisted before RECODE_TO_1080 was turned off — otherwise
-  // processReencodeQueue's early return leaves them stuck forever, showing a
-  // permanent "pending" hdrMsg for jobs that will never run.
-  unilog(
-    1435,
-    `dropped ${reencodeQueue.length} stale reencode queue entries (RECODE_TO_1080 is off)`,
-  );
-  reencodeQueue = [];
-  persistReencodeQueue();
-}
-if (reencodeQueue.length > 0) setTimeout(processReencodeQueue, 5000);
-
 // Watchdog heartbeat: a periodic status beat (queue depths + running flags) so
 // the external tv-watchdog monitor (apps/watchdog) can detect a dead/stuck
 // server and spot stuck queues. Read from the unilog DB by matching "hb ".
@@ -5380,8 +4769,8 @@ setInterval(() => {
   unilog(
     1206,
     `hb subQ=${subsState.subQueue.length} chkQ=${subsState.subQueueChkSrt.length} ` +
-      `asrQ=${subsState.asrQueue.length} bif=${bifQueue.getBifCount()} ` +
-      `renc=${reencodeQueue.length} flex=${flexget.isFlexgetRunning() ? 1 : 0} ` +
+      `asrQ=${subsState.asrQueue.length} ` +
+      `flex=${flexget.isFlexgetRunning() ? 1 : 0} ` +
       `sweep=${embyFullSweepRunning ? 1 : 0} clients=${connectedClients.size} ` +
       `subDone=${subsState.subDone} asrDone=${subsState.asrDone} ` +
       `maxLoopLag=${maxLoopLagMs}ms`,

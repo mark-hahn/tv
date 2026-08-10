@@ -1117,8 +1117,8 @@ export default {
     },
 
     // Select intro file using episodeData (see intro-file-selection.md).
-    // Priority: 1) first episode with bif, 2) first unwatched with file,
-    // 3) first file (any watched status), 4) error. Always the built-in player.
+    // Priority: 1) first unwatched with file, 2) first file (any watched
+    // status), 3) error. Always the built-in player.
     // Delegates to @tv/share so tv-srvr picks the same episode when it
     // pre-builds the mp4 mirror; if the two disagreed the mirror would be
     // built for an episode the player never opens.

@@ -6,7 +6,6 @@ import {
   getFileName,
   getFullPath,
   getPos,
-  hasBif,
   isWatched,
   parseFileSeasonEpisode,
   parseTitleFromFilename,
@@ -298,12 +297,6 @@ function addTvdbEvents(add, ctx) {
         "tvdb",
         `${showName} ${episodeLabel(ctx.season, ctx.episode)} watched`,
       );
-    if (hasBif(ed, ctx.season, ctx.episode))
-      add(
-        rec["last-downloaded"],
-        "tvdb",
-        `${showName} ${episodeLabel(ctx.season, ctx.episode)} has BIF sidecar`,
-      );
     const pos = getPos(ed, ctx.season, ctx.episode);
     if (pos > 0)
       add(
@@ -564,11 +557,6 @@ function addSidecarEvents(add, ctx) {
       text: `subtitle choice marker written: ${path.basename(base)}.mb.chosen`,
     },
   ];
-  const parsed = path.parse(ctx.fullPath);
-  candidates.push({
-    file: path.join(parsed.dir, `${parsed.name}-320-10.bif`),
-    text: `BIF file generated: ${parsed.name}-320-10.bif`,
-  });
 
   const mp4Rel = ctx.fullPath.startsWith(TV_ROOT + "/")
     ? ctx.fullPath.slice(TV_ROOT.length + 1)
@@ -674,7 +662,6 @@ function addUnilogEvents(add, ctx) {
         lower.includes("opensubs") ||
         lower.includes("asr") ||
         lower.includes("chksrt") ||
-        lower.includes("bif") ||
         lower.includes("mp4") ||
         lower.includes("intro") ||
         lower.includes("created tvdb") ||

@@ -1,5 +1,5 @@
-// Disk domain: scans the tv media tree for shows/episodes (files, resolution,
-// .bif sidecars), builds Emby tvshow.nfo, and performs the authoritative
+// Disk domain: scans the tv media tree for shows/episodes (files, resolution),
+// builds Emby tvshow.nfo, and performs the authoritative
 // refresh of a record's episodeData from TVDB + Emby + disk. Owns the
 // whole-library disk cache (invalidated by the file watcher) and the
 // ffprobe-height cache.
@@ -304,7 +304,7 @@ export const showNameFromFilePath = (filePath) => {
  * Check disk for a single show folder
  * @param {string} showFolderName - The show folder name (e.g., "Breaking Bad")
  * @returns {Promise<[number, number, Array, Object, Object]|null>} - [maxDate, totalSize, filesOnDisk, fileQuality, diskByEp] or null if not found
- *   diskByEp: { [season]: { [episode]: { file, res, bif } } } — per-episode file name + resolution + bif-sidecar flag
+ *   diskByEp: { [season]: { [episode]: { file, res } } } — per-episode file name + resolution
  */
 export const getShowDiskInfo = async (showFolderName) => {
   if (!showFolderName) return null;
@@ -317,8 +317,6 @@ export const getShowDiskInfo = async (showFolderName) => {
   const fileQuality = {};
   // Per-episode file name + resolution: { [season]: { [episode]: { file, res } } }
   const diskByEp = {};
-  // All .bif sidecar file names found (matched to video bases after the scan).
-  const bifFiles = [];
   // Read before the caller overwrites it, so already-probed files keep their res.
   const showEpisodeData =
     folderToRecord().get(showFolderName)?.episodeData ?? null;
@@ -335,10 +333,6 @@ export const getShowDiskInfo = async (showFolderName) => {
         return;
       }
       const sfx = dirPath.split(".").pop();
-      if (sfx === "bif") {
-        bifFiles.push(path.basename(dirPath));
-        return;
-      }
       if (videoFileExtensions.includes(sfx)) {
         const date = fmtDateWithTZ(fstat.mtime);
         if (!maxDate || date > maxDate) maxDate = date;
@@ -397,19 +391,6 @@ export const getShowDiskInfo = async (showFolderName) => {
     if (errFlg) {
       unilog(545, `Error for ${showFolderName}:`, errFlg.message);
       return null;
-    }
-
-    // Match .bif sidecars to episodes: a bif belongs to a video when its name
-    // starts with the video file's base name (name without the final extension).
-    if (bifFiles.length > 0) {
-      for (const eps of Object.values(diskByEp)) {
-        for (const info of Object.values(eps)) {
-          const base = info.file.replace(/\.[^.]+$/, "");
-          if (base && bifFiles.some((bn) => bn.startsWith(base))) {
-            info.bif = 1;
-          }
-        }
-      }
     }
 
     // Encode filesOnDisk in same format as watchedEpis: [[season, ep1, ep2, ...], ...]
@@ -529,7 +510,6 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
             epd.setEpisode(ed, s, e, {
               file: fileVal,
               res: info.res,
-              bif: info.bif ? 1 : 0,
             });
           }
         }

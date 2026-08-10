@@ -31,6 +31,18 @@ const FAIL_RETRY_MS = 60 * 60 * 1000;
 // is plenty to check sync — cutting encodes short here saves real time on hevc.
 const MIRROR_MAX_SECS = 600;
 
+// Wall-clock estimates for entries that have not started yet, taken from the
+// medians of the completion log (site 1405, 86 samples): remux ran 0-9s, 1080p
+// transcodes 38-45s, 2160p transcodes 196-411s. `-t MIRROR_MAX_SECS` fixes the
+// content length, so the only things that move the number are copy-vs-encode
+// and pixel count. Resolution is read from the filename, which is how those
+// samples were bucketed. The entry actually encoding ignores all of this and
+// reports ffmpeg's own progress instead.
+const EST_REMUX_SECS = 5;
+const EST_TRANSCODE_1080_SECS = 40;
+const EST_TRANSCODE_2160_SECS = 271;
+const EST_TRANSCODE_OTHER_SECS = 120;
+
 let busy = false;
 let reordering = false;
 // videoFilePaths still awaiting a mirror, in encode order.
@@ -164,13 +176,22 @@ async function reorderChkSrtQueue() {
   unilog(1414, `reordered chksrt queue: ${fast.length} ready/fast ahead of ${slow.length} needing transcode`);
 }
 
-function runFfmpeg(args, onSpawn) {
+function runFfmpeg(args, onSpawn, onProgress) {
   return new Promise((resolve, reject) => {
     const ffmpeg = cp.spawn("ffmpeg", args);
     onSpawn?.(ffmpeg);
     let lastErr = "";
     ffmpeg.stderr.on("data", (d) => {
       lastErr = d.toString();
+      // ffmpeg's status line carries `time=HH:MM:SS.xx` — how much content it
+      // has written so far. Against the known MIRROR_MAX_SECS target that is a
+      // real measurement of how far along this encode is, which beats any
+      // a-priori estimate and stays right when SCHED_IDLE starves the job.
+      const m = lastErr.match(/time=(\d+):(\d\d):(\d\d(?:\.\d+)?)/g);
+      if (m && onProgress) {
+        const last = m[m.length - 1].match(/time=(\d+):(\d\d):(\d\d(?:\.\d+)?)/);
+        onProgress(+last[1] * 3600 + +last[2] * 60 + parseFloat(last[3]));
+      }
     });
     ffmpeg.on("error", reject);
     ffmpeg.on("exit", (code) => {
@@ -259,12 +280,21 @@ async function encodeOne(videoFilePath) {
     videoFilePath: path.resolve(videoFilePath),
     child: null,
     aborted: false,
+    startedAt,
+    mode: videoCodec === "h264" ? "remux" : "transcode",
+    progressSecs: 0,
   };
   try {
     try {
-      await runFfmpeg(args, (child) => {
-        currentEncode.child = child;
-      });
+      await runFfmpeg(
+        args,
+        (child) => {
+          currentEncode.child = child;
+        },
+        (secs) => {
+          if (currentEncode) currentEncode.progressSecs = secs;
+        },
+      );
     } catch (e) {
       // A kill from cancelEncode() is an intentional abort, not a failure —
       // rethrowing would mark the file failed and skip it for FAIL_RETRY_MS.
@@ -401,6 +431,81 @@ async function computePending() {
 // Live encode backlog (videoFilePaths, queue order) for the header.
 export function getMp4Pending() {
   return mp4Pending;
+}
+
+// Seconds this file is expected to take once it starts. h264 is a byte copy;
+// everything else is a real encode whose cost is driven by pixel count.
+async function estimateEncodeSecs(videoFilePath) {
+  let videoCodec = codecCache.get(videoFilePath)?.videoCodec;
+  if (videoCodec === undefined) {
+    try {
+      ({ videoCodec } = await getCodecs(videoFilePath));
+    } catch {
+      videoCodec = null; // unprobeable — assume the slow path
+    }
+  }
+  if (videoCodec === "h264") return EST_REMUX_SECS;
+  const name = path.basename(videoFilePath);
+  if (/2160p|\buhd\b|\b4k\b/i.test(name)) return EST_TRANSCODE_2160_SECS;
+  if (/1080p/i.test(name)) return EST_TRANSCODE_1080_SECS;
+  return EST_TRANSCODE_OTHER_SECS;
+}
+
+// Seconds left on the running encode. Once ffmpeg has reported any progress
+// this is measured, not estimated: content-seconds written per wall-second
+// projected out to the MIRROR_MAX_SECS target.
+function encodeRemainingSecs() {
+  if (!currentEncode) return 0;
+  const elapsed = (Date.now() - currentEncode.startedAt) / 1000;
+  const done = currentEncode.progressSecs;
+  if (done > 0 && elapsed > 0) {
+    const rate = done / elapsed;
+    return Math.max(0, Math.round((MIRROR_MAX_SECS - done) / rate));
+  }
+  // Nothing reported yet (still probing, or a remux that finishes before the
+  // first status line) — fall back to the static estimate less time served.
+  const est =
+    currentEncode.mode === "remux" ? EST_REMUX_SECS : EST_TRANSCODE_OTHER_SECS;
+  return Math.max(0, Math.round(est - elapsed));
+}
+
+// Queue contents for the Queues pane: every pending mirror in encode order,
+// each with the wall-clock time it is expected to finish, plus live detail on
+// the one running. mp4Pending includes the encoding file, so entry 1 is it.
+export async function getMp4QueueStatus() {
+  const running = currentEncode;
+  let eta = Date.now();
+  const entries = [];
+  for (let i = 0; i < mp4Pending.length; i++) {
+    const p = mp4Pending[i];
+    const isRunning = !!running && running.videoFilePath === p;
+    const secs = isRunning
+      ? encodeRemainingSecs()
+      : await estimateEncodeSecs(p);
+    eta += secs * 1000;
+    entries.push({
+      n: i + 1,
+      file: path.basename(p),
+      path: p,
+      etaMs: eta,
+      running: isRunning,
+    });
+  }
+  const inflight = running
+    ? {
+        file: path.basename(running.videoFilePath),
+        stage:
+          running.progressSecs > 0
+            ? `${running.mode === "remux" ? "remuxing" : "transcoding"} ${Math.min(
+                100,
+                Math.round((running.progressSecs / MIRROR_MAX_SECS) * 100),
+              )}% of ${MIRROR_MAX_SECS}s mirror`
+            : `${running.mode === "remux" ? "remuxing" : "transcoding"}, starting`,
+        remainingSecs: encodeRemainingSecs(),
+        elapsedSecs: Math.round((Date.now() - running.startedAt) / 1000),
+      }
+    : null;
+  return { count: entries.length, inflight, entries };
 }
 
 // Recompute the backlog and, when it changes, refresh the hdrMsgs so the "Mp4"

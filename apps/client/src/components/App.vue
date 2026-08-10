@@ -303,6 +303,11 @@
             style="width: 100%; height: 100%"
             :active="currentPane === 'plot'"
           ></Plot>
+          <Queues
+            v-show="!simpleMode && currentPane === 'queues'"
+            style="width: 100%; height: 100%"
+            :active="currentPane === 'queues'"
+          ></Queues>
           <Usb
             v-show="!simpleMode && currentPane === 'usb'"
             style="width: 100%; height: 100%"
@@ -553,6 +558,7 @@ import Usb from "./usb.vue";
 import Local from "./local.vue";
 import Log from "./log.vue";
 import Plot from "./plot.vue";
+import Queues from "./queues.vue";
 import Trailer from "./trailer.vue";
 import TvPane from "./tvpane.vue";
 import evtBus from "../evtBus.js";
@@ -591,6 +597,7 @@ export default {
     Local,
     Log,
     Plot,
+    Queues,
     Trailer,
     TvPane,
     VideoPlayer,
@@ -935,6 +942,7 @@ export default {
         { label: "Local", key: "local" },
         { label: "Log", key: "log" },
         { label: "Plot", key: "plot" },
+        { label: "Queues", key: "queues" },
       ];
     },
 

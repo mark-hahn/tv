@@ -895,6 +895,10 @@ export function getChksrtList() {
   return httpCall("/api/asr/chksrt/list");
 }
 
+export function getQueues() {
+  return httpCall("/api/queues");
+}
+
 export function enqueueChksrt(videoPaths) {
   return httpCall("/api/asr/chksrt/enqueue", { videoPaths }, "POST");
 }

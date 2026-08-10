@@ -72,6 +72,17 @@ export const subsState = {
   chkSubQueueDelay: 10_000,
   asrQueueDelay: 10_000,
   currentlyProcessingSubPath: null,
+  // What the in-flight sub entry is doing right now, for the Queues pane. Sub
+  // gets no time estimate: its cost is mostly fixed overhead plus an external
+  // API with retries, so there is nothing about the file to predict from.
+  subStage: null,
+  subStartedAt: 0,
+  // asr.js progress, scraped from the child's own log lines as they arrive.
+  // posSecs/totalDur are audio seconds, which is what makes a real ETA possible.
+  asrStage: null,
+  asrStartedAt: 0,
+  asrTotalDur: 0,
+  asrPosSecs: 0,
   genSrtRunning: false,
   genSrtChild: null,
   subQueuePendingNow: false,
@@ -205,7 +216,42 @@ function persistAsrQueue() {
 // normal Queued/Starting/Done output; detail:true is the per-chunk asr.js
 // progress that the pane's Tail toggle shows/hides. Both live in one buffer so
 // they stay interleaved in true arrival order.
+// asr.js reports its own stage as it goes — "Preprocessing audio...",
+// "Duration: Ns, VAD chunking", then one "Chunk N: Xs-Ys" per chunk before it
+// uploads. Those lines are the only channel out of the child process, so the
+// pane's stage text and ETA are scraped from them here as they land.
+function trackAsrProgress(text) {
+  for (const line of String(text).split("\n")) {
+    if (line.includes("Processing: ")) {
+      subsState.asrStage = "extracting audio";
+      subsState.asrTotalDur = 0;
+      subsState.asrPosSecs = 0;
+      continue;
+    }
+    if (line.includes("Preprocessing audio")) {
+      subsState.asrStage = "preprocessing audio";
+      continue;
+    }
+    const dur = line.match(/Duration: ([\d.]+)s/);
+    if (dur) {
+      subsState.asrTotalDur = parseFloat(dur[1]);
+      subsState.asrStage = "splitting on silence";
+      continue;
+    }
+    const over = line.match(/Chunk (\d+) oversize/);
+    if (over) {
+      subsState.asrStage = `chunk ${Number(over[1]) + 1} oversize, retrying`;
+      continue;
+    }
+    const chunk = line.match(/Chunk (\d+): [\d.]+s-([\d.]+)s/);
+    if (chunk) {
+      subsState.asrPosSecs = parseFloat(chunk[2]);
+      subsState.asrStage = `transcribing chunk ${Number(chunk[1]) + 1}`;
+    }
+  }
+}
 function appendAsrLog(text, detail = false) {
+  trackAsrProgress(text);
   const entry = { text, detail };
   subsState.asrLogBuffer.push(entry);
   if (subsState.asrLogBuffer.length > ASR_LOG_BUFFER_MAX) {
@@ -399,6 +445,12 @@ function persistOpnCheckHistory() {
     unilog(515, "persist error:", e.message);
   }
 }
+// Stage text for the in-flight sub entry. Only tracked while the queue loop is
+// the caller — generateEmbSrts/applyOpenSubSrts are also reachable from the UI
+// endpoints, and that work is not what the pane is reporting on.
+function setSubStage(stage) {
+  if (subsState.subQueueBusy) subsState.subStage = stage;
+}
 async function fileNeedsSubChecked(videoFilePath, showName) {
   if (subsState.subQueue.some((e) => e.videoFilePath === videoFilePath))
     return false;
@@ -466,6 +518,7 @@ async function generateEmbSrts(
 ) {
   const base = videoFilePath.replace(/\.[^.]+$/, "");
   syncBatchMsgs();
+  setSubStage("probing subtitle streams");
   // A failed probe must never look like "this video has no subtitle streams" —
   // that would route a file with embedded subs straight to ASR. Throw instead;
   // processSubQueueEntry drops the entry and the next show scan re-queues it.
@@ -511,12 +564,19 @@ async function generateEmbSrts(
       textCodecs.includes(s.codec_name)
     );
   });
+  let extracted = 0;
   for (const s of textStreams) {
     const outPath = `${base}.mb${s.index}.srt`;
+    extracted++;
     if (fs.existsSync(outPath)) {
       if (fromUI) publishEmbLog(`exists: ${path.basename(outPath)}`);
       continue;
     }
+    // subExtractQueue is shared, so this can sit behind an unrelated file's
+    // extraction — say so rather than looking stalled.
+    setSubStage(
+      `extracting embedded subs ${extracted}/${textStreams.length}`,
+    );
     await subExtractQueue.run(
       () =>
         new Promise((resolve) => {
@@ -562,6 +622,7 @@ async function generateEmbSrts(
   return { pgsOnly, hasEmbText };
 }
 async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
+  setSubStage("searching opensubtitles");
   const moviesDir = "/mnt/media/movies";
   const isMovie = videoFilePath.startsWith(moviesDir + "/");
   let results;
@@ -628,6 +689,9 @@ async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
     const tag = "opn" + encodeFileIdBase32(fid).slice(1);
     const outPath = `${base}.${tag}.srt`;
     if (fs.existsSync(outPath)) continue;
+    setSubStage(
+      `downloading opensubtitles ${existingOpnCount + dlCount + 1}/5`,
+    );
     try {
       const login = loadSubsLogin();
       let dl = await openSubtitlesDownloadWithRetry({
@@ -674,6 +738,10 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
   appendAsrLog(`=== Queued: ${path.basename(videoFilePath)} ===`);
   unilog(14, `asr start: ${videoFilePath}`);
   subsState.genSrtRunning = true;
+  subsState.asrStartedAt = Date.now();
+  subsState.asrStage = "starting";
+  subsState.asrTotalDur = 0;
+  subsState.asrPosSecs = 0;
   publishAsrQueueUpdate({ running: true });
   syncBatchMsgs();
   // Not on ffmpegQueue: transcription is a remote API call and the local ffmpeg
@@ -722,6 +790,7 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
   } finally {
     subsState.genSrtRunning = false;
     subsState.genSrtChild = null;
+    subsState.asrStage = null;
     syncBatchMsgs();
     publishAsrQueueUpdate({ running: false });
   }
@@ -760,6 +829,8 @@ async function processSubQueueEntry() {
   const entry = subsState.subQueue[0];
   subsState.subQueueBusy = true;
   subsState.currentlyProcessingSubPath = entry.videoFilePath;
+  subsState.subStartedAt = Date.now();
+  subsState.subStage = "starting";
   try {
     // The file can vanish between enqueue and now — most often a 1080 demoted to
     // a hidden `.mkv.alt` fallback, which already inherits the 2160's subtitles.
@@ -797,6 +868,7 @@ async function processSubQueueEntry() {
     } catch {
       dirEntries = [];
     }
+    setSubStage("choosing next queue");
     const hasSidecar = dirEntries.some(
       (f) =>
         f === basename + ".mb.chosen" ||
@@ -842,6 +914,7 @@ async function processSubQueueEntry() {
     }
     subsState.subQueueBusy = false;
     subsState.currentlyProcessingSubPath = null;
+    subsState.subStage = null;
     subsState.chkSubQueueDelay = 500;
     subsState.subDone++;
   }
@@ -1189,6 +1262,78 @@ function sleep(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+// ---- Queues pane ----------------------------------------------------------
+
+// Median of 15 completed runs (log sites 14/15): 14 of them took 62-76s, one
+// retried its way to 438s. Episode audio is a near-constant length and the
+// remote API dominates, so a flat number is as good as anything until the run
+// starts reporting chunk positions.
+const ASR_RUN_SECS = 74;
+
+// Seconds left on the running ASR job. Once asr.js has reported a chunk end,
+// this is measured — audio seconds done per wall second, projected to the end.
+function asrRemainingSecs() {
+  if (!subsState.genSrtRunning) return 0;
+  const elapsed = (Date.now() - subsState.asrStartedAt) / 1000;
+  const { asrTotalDur: total, asrPosSecs: pos } = subsState;
+  if (total > 0 && pos > 0 && elapsed > 0) {
+    const frac = Math.min(pos / total, 0.999);
+    return Math.max(0, Math.round((elapsed * (1 - frac)) / frac));
+  }
+  return Math.max(0, Math.round(ASR_RUN_SECS - elapsed));
+}
+
+// Sub carries no ETA — see the note on subStage in subsState.
+export function getSubQueueStatus() {
+  const entries = subsState.subQueue.map((e, i) => ({
+    n: i + 1,
+    file: path.basename(e.videoFilePath),
+    path: e.videoFilePath,
+    running: i === 0 && subsState.subQueueBusy,
+  }));
+  const inflight =
+    subsState.subQueueBusy && subsState.currentlyProcessingSubPath
+      ? {
+          file: path.basename(subsState.currentlyProcessingSubPath),
+          stage: subsState.subStage || "working",
+          elapsedSecs: Math.round(
+            (Date.now() - subsState.subStartedAt) / 1000,
+          ),
+        }
+      : null;
+  return { count: entries.length, inflight, entries };
+}
+
+export function getAsrQueueStatus() {
+  let eta = Date.now();
+  const entries = [];
+  for (let i = 0; i < subsState.asrQueue.length; i++) {
+    const e = subsState.asrQueue[i];
+    const running = i === 0 && subsState.genSrtRunning;
+    eta += (running ? asrRemainingSecs() : ASR_RUN_SECS) * 1000;
+    entries.push({
+      n: i + 1,
+      file: path.basename(e.videoPath || ""),
+      path: e.videoPath,
+      etaMs: eta,
+      running,
+    });
+  }
+  const head = subsState.asrQueue[0];
+  const inflight =
+    subsState.genSrtRunning && head
+      ? {
+          file: path.basename(head.videoPath || ""),
+          stage: subsState.asrStage || "starting",
+          remainingSecs: asrRemainingSecs(),
+          elapsedSecs: Math.round(
+            (Date.now() - subsState.asrStartedAt) / 1000,
+          ),
+        }
+      : null;
+  return { count: entries.length, inflight, entries };
 }
 
 export {

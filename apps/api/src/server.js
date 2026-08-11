@@ -1516,6 +1516,9 @@ app.get("/api/search", async (req, res) => {
   const more = req.query.more === "true";
   const staged = req.query.staged === "true";
   const category = req.query.category || "tv";
+  const seasonParsed = parseInt(req.query.season, 10);
+  const season =
+    !Number.isNaN(seasonParsed) && seasonParsed >= 0 ? seasonParsed : null;
   let needed = [];
 
   // Parse needed array if provided
@@ -1551,6 +1554,7 @@ app.get("/api/search", async (req, res) => {
       more,
       staged,
       category,
+      season,
     });
     res.json(result);
   } catch (error) {

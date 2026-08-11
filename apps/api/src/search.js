@@ -116,18 +116,22 @@ const DATA_DIR = getApiDataDir();
 // combine them with the extra-provider results without re-searching IPT/TL.
 const IPTL_CACHE_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
 
-function iptTlCacheFilePath(showName) {
+function iptTlCacheFilePath(showName, season = null) {
   const safe = String(showName || "")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "_")
     .slice(0, 80);
-  return path.join(os.tmpdir(), `tor-iptl-cache-${safe}.json`);
+  const seasonPart =
+    season === null || season === undefined
+      ? ""
+      : `-s${String(season).padStart(2, "0")}`;
+  return path.join(os.tmpdir(), `tor-iptl-cache-${safe}${seasonPart}.json`);
 }
 
-function writeIptTlCache(showName, results) {
+function writeIptTlCache(showName, results, season = null) {
   try {
     fs.writeFileSync(
-      iptTlCacheFilePath(showName),
+      iptTlCacheFilePath(showName, season),
       JSON.stringify(results),
       "utf8",
     );
@@ -136,9 +140,9 @@ function writeIptTlCache(showName, results) {
   }
 }
 
-function readIptTlCache(showName) {
+function readIptTlCache(showName, season = null) {
   try {
-    const p = iptTlCacheFilePath(showName);
+    const p = iptTlCacheFilePath(showName, season);
     if (Date.now() - fs.statSync(p).mtimeMs > IPTL_CACHE_MAX_AGE_MS) return [];
     const parsed = JSON.parse(fs.readFileSync(p, "utf8"));
     return Array.isArray(parsed) ? parsed : [];
@@ -405,6 +409,8 @@ export function initializeProviders() {
  * @param {string} params.tlCf - Optional TorrentLeech cf_clearance override
  * @param {Array} params.needed - Optional array of needed episodes (e.g., ["S01", "S02E03"])
  * @param {boolean} params.more - If true, add TPB/LIM/EZT results on top of cached IPT/TL results
+ * @param {number|string} params.season - Optional season number; restricts the provider
+ *   queries to that season (TV only) and disables the `needed` filtering
  * @returns {Object} Search results with torrents array
  */
 export async function searchTorrents({
@@ -416,6 +422,7 @@ export async function searchTorrents({
   more = false,
   staged = false,
   category = "tv",
+  season = null,
 }) {
   const activeProvidersRaw = TorrentSearchApi.getActiveProviders();
   const activeProviders = formatActiveProviders(activeProvidersRaw);
@@ -505,7 +512,24 @@ export async function searchTorrents({
     ? sanitizeForProviderSearch(nameWithoutParens)
     : "";
 
-  const queries = [sanitized, sanitizedWithoutParens].filter(Boolean);
+  // Season restriction: search providers for "<name> S03" and "<name> Season 3"
+  // instead of the bare show name. TV only.
+  const seasonParsed = parseInt(season, 10);
+  const seasonNum =
+    category !== "movie" && !Number.isNaN(seasonParsed) && seasonParsed >= 0
+      ? seasonParsed
+      : null;
+  const seasonQueries = (name) => {
+    if (seasonNum === null) return [name];
+    return [
+      `${name} S${String(seasonNum).padStart(2, "0")}`,
+      `${name} Season ${seasonNum}`,
+    ];
+  };
+
+  const queries = [sanitized, sanitizedWithoutParens]
+    .filter(Boolean)
+    .flatMap(seasonQueries);
   const seenQuery = new Set();
   const uniqueQueries = [];
   for (const q of queries) {
@@ -584,7 +608,7 @@ export async function searchTorrents({
     rawCombined = resultsArrays.flat();
   } else {
     // more=true: combine cached IPT/TL results + fresh TPB/LIM/EZT searches
-    const cachedIptTl = readIptTlCache(showName);
+    const cachedIptTl = readIptTlCache(showName, seasonNum);
 
     // Detect a year in the show name (e.g. "Show (2004)" or "Show 2004")
     const yearMatch =
@@ -630,13 +654,12 @@ export async function searchTorrents({
         .replace(/\s+\d{4}\s*$/, "")
         .trim();
       const sanitizedNoYear = sanitizeForProviderSearch(nameNoYear);
-      const noYearQueries =
-        sanitizedNoYear &&
-        !uniqueQueries.some(
-          (q) => q.toUpperCase() === sanitizedNoYear.toUpperCase(),
-        )
-          ? [sanitizedNoYear]
-          : [];
+      const noYearQueries = sanitizedNoYear
+        ? seasonQueries(sanitizedNoYear).filter(
+            (q) =>
+              !uniqueQueries.some((u) => u.toUpperCase() === q.toUpperCase()),
+          )
+        : [];
       // Run year and no-year searches in parallel; dedupe handles overlaps
       const [withYearResults, withoutYearResults] = await Promise.all([
         searchTpbLimEzt(uniqueQueries),
@@ -664,7 +687,7 @@ export async function searchTorrents({
 
   // Cache IPT/TL-only results for subsequent more=true calls (only on more=false TV)
   if (!more && category !== "movie") {
-    writeIptTlCache(showName, deduped);
+    writeIptTlCache(showName, deduped, seasonNum);
   }
 
   // Count by provider in raw results (before normalization/filtering).
@@ -858,7 +881,7 @@ export async function searchTorrents({
   let filtered = filtered2;
   const isLoadAll = needed && needed.includes("loadall");
   const isNoEmby = needed && needed.includes("noemby");
-  const isForce = needed && needed.includes("force");
+  const isForce = (needed && needed.includes("force")) || seasonNum !== null;
 
   if (isNoEmby || isLoadAll) {
     // Return all season torrents, and episode torrents only for seasons

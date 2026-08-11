@@ -300,6 +300,7 @@
               v-if="!movieMode"
               v-model="seasonFilter"
               @keydown.stop
+              @keydown.enter.stop="handleSearchButtonClick()"
               @click.stop
               placeholder="Season"
               style="
@@ -1414,6 +1415,14 @@ export default {
     "currentShow.name"(newName, oldName) {
       if (newName !== oldName) this.seasonFilter = "";
     },
+    seasonFilter(newVal, oldVal) {
+      // The season is part of the provider query, so changing it makes any
+      // previous results stale -- start the search sequence over on next click.
+      if (newVal !== oldVal && this.torSearchPhase !== "idle") {
+        this.lastNeeded = null;
+        this.setTorSearchPhase("idle");
+      }
+    },
     active(val) {
       if (!val) this.showStream = false;
     },
@@ -1443,6 +1452,14 @@ export default {
           .join("  |  ");
       }
       return "";
+    },
+    // Season typed in the Season box, as a number, or null when empty/invalid.
+    // Used both to restrict the provider search and to filter results.
+    seasonSearchNum() {
+      if (this.movieMode) return null;
+      if (String(this.seasonFilter).trim() === "") return null;
+      const n = parseInt(this.seasonFilter, 10);
+      return !isNaN(n) && n >= 0 ? n : null;
     },
     filteredTorrents() {
       // Use season filter if present
@@ -1802,8 +1819,10 @@ export default {
       this.showName = show?.name || "";
       this.lastAutoSearchedShowId = show?.id || show?.name || null;
 
-      // Auto-search when show is set with empty card list
+      // No auto-search: the user clicks Search after optionally typing a season.
+      // Preview mode has no Search button, so it still searches on its own.
       if (
+        this.previewMode &&
         this.filteredTorrents.length === 0 &&
         !this.loading &&
         this.currentShow
@@ -1817,10 +1836,12 @@ export default {
         // Keep space info fresh whenever Tor pane is shown.
         void this.updateSpaceAvail();
 
-        // Auto-search when tor pane is selected with empty card list and no search in progress
+        // No auto-search on pane entry -- wait for the Search button so a season
+        // can be typed first. Preview mode has no Search button, so it still runs.
         // Use $nextTick to ensure currentShow is set (in case setTorShow is called after paneChanged)
         this.$nextTick(() => {
           if (
+            this.previewMode &&
             this.filteredTorrents.length === 0 &&
             !this.loading &&
             this.currentShow
@@ -2537,6 +2558,16 @@ export default {
 
       this.providerWarning = "";
 
+      // With a season typed the search is for that season, not for what's
+      // needed, so search even when nothing is needed.
+      if (this.seasonSearchNum !== null) {
+        const seasonResult = await this.loadTorrents(["force"], false, {
+          phaseOverride: "needed-results",
+        });
+        if (seasonResult) this.setTorSearchPhase("needed-results");
+        return;
+      }
+
       if (!Array.isArray(this.lastNeeded)) {
         try {
           this.lastNeeded = await this.calculateNeeded(currentShow);
@@ -2833,6 +2864,9 @@ export default {
         }
         if (needed.length > 0) {
           url += `&needed=${encodeURIComponent(JSON.stringify(needed))}`;
+        }
+        if (this.seasonSearchNum !== null) {
+          url += `&season=${this.seasonSearchNum}`;
         }
         if (more) {
           url += `&more=true`;

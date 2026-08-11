@@ -216,17 +216,20 @@ resultTitles = loadResultTitles();
 
 // show.premiered comes from the raw TVMaze record (data_json) where it is a
 // date string like "2013-06-24"; older callers passed epoch seconds.
+function showPremiereYear(show) {
+  if (!show.premiered) return null;
+  const ms =
+    typeof show.premiered === "number"
+      ? show.premiered * 1000
+      : Date.parse(show.premiered);
+  const y = new Date(ms).getUTCFullYear();
+  return Number.isNaN(y) ? null : String(y);
+}
+
 export function buildShowTitle(show) {
-  let title = (show.name || "Unknown").trim();
-  if (show.premiered) {
-    const ms =
-      typeof show.premiered === "number"
-        ? show.premiered * 1000
-        : Date.parse(show.premiered);
-    const y = new Date(ms).getUTCFullYear();
-    if (!Number.isNaN(y)) title = `${title} (${y})`;
-  }
-  return title;
+  const title = (show.name || "Unknown").trim();
+  const year = showPremiereYear(show);
+  return year ? `${title} (${year})` : title;
 }
 
 /**
@@ -290,6 +293,7 @@ async function getTvdbDescRejection(show) {
     show.tvmaze_id,
     show.externals?.thetvdb,
     show.name,
+    showPremiereYear(show),
   );
   return isNonEnglishText(overview) ? "desc-language" : null;
 }

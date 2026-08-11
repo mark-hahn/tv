@@ -73,7 +73,7 @@ function sanitizeForTvdbMatch(name) {
  * re-hit TVDB. A NULL column means "never looked up"; an empty string means
  * "looked up, TVDB had no overview" and is not retried.
  */
-export async function getTvdbOverview(tvmazeId, tvdbId, name) {
+export async function getTvdbOverview(tvmazeId, tvdbId, name, year) {
   if (!_db) openDb();
   if (tvmazeId) {
     const row = _db
@@ -81,7 +81,7 @@ export async function getTvdbOverview(tvmazeId, tvdbId, name) {
       .get(tvmazeId);
     if (row?.tvdb_overview != null) return row.tvdb_overview;
   }
-  const overview = await fetchTvdbOverview(tvdbId, name);
+  const overview = await fetchTvdbOverview(tvdbId, name, year);
   // null means the lookup itself failed — leave the column NULL so it is
   // retried, rather than caching "no overview" and never testing again.
   if (overview === null) return "";
@@ -97,7 +97,7 @@ export async function getTvdbOverview(tvmazeId, tvdbId, name) {
  * Returns the overview text, "" when TVDB answered but has no overview for
  * the show, or null when the lookup failed and should be retried later.
  */
-async function fetchTvdbOverview(tvdbId, name) {
+async function fetchTvdbOverview(tvdbId, name, year) {
   try {
     const token = await getTvdbToken();
     const headers = { Authorization: `Bearer ${token}` };
@@ -111,15 +111,18 @@ async function fetchTvdbOverview(tvdbId, name) {
       return String(json?.data?.overview || "");
     }
     if (!name) return "";
-    const res = await fetch(
-      `https://api4.thetvdb.com/v4/search?query=${encodeURIComponent(name)}&type=series&limit=5`,
-      { headers },
-    );
+    // Mirror the browse gallery's search (name + year) so the text tested is
+    // the text the pane will show.
+    let url = `https://api4.thetvdb.com/v4/search?query=${encodeURIComponent(name)}&type=series&limit=5`;
+    if (year) url += `&year=${encodeURIComponent(year)}`;
+    const res = await fetch(url, { headers });
     if (!res.ok) return null;
     const json = await res.json();
     const results = json?.data;
     if (!results?.length) return "";
-    const match = pickTvdbSeries(results, name, null);
+    // The gallery falls back to the first hit when nothing matches the name,
+    // so an unmatched search still has to be language-tested.
+    const match = pickTvdbSeries(results, name, year || null) || results[0];
     return String(match?.overview || "");
   } catch (e) {
     unilog(1803, `tvdb overview lookup failed for ${name}: ${e.message}`);

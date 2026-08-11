@@ -21,11 +21,93 @@ const tvDir = "/mnt/media/tv";
 // out of the media tree so nothing in the disk scan or Emby sees it.
 const VTT_CACHE_DIR = path.join(SRVR_DATA_DIR, "vtt-cache");
 
+// Window the first-cue probe covers. Reading the first cue out of an extracted
+// vtt would pay that same whole-file demux (50s on a 2160p mkv), so the packet
+// timestamps are probed directly instead, bounded to the ten minutes the chksrt
+// mpfour mirror holds — a subtitle that has not started by then is past what
+// the reviewer can see anyway.
+const FIRST_CUE_PROBE_SECS = 600;
+// Only reached by a stream that has no cue at all in that window, which means
+// reading the whole ten minutes before giving up.
+const FIRST_CUE_PROBE_TIMEOUT_MS = 30_000;
+// Probing costs real disk reads, and chksrt lists the same episode every time
+// it is opened, so the answer is kept for the life of the process. Keyed on
+// file identity, so a replaced file is probed again.
+const firstCueCache = new Map();
+
 function runFfprobe(args, maxBuffer = 2 * 1024 * 1024) {
   return cp.execFileSync("ffprobe", args, {
     maxBuffer,
     encoding: "utf8",
   });
+}
+
+// Start time of the first cue of an embedded subtitle stream, in seconds, or
+// null when the stream has no cue inside the probe window.
+//
+// ffprobe prints the first subtitle packet the moment it demuxes it, so it is
+// killed right there rather than reading the whole window — on a 2160p file
+// that is the difference between twenty seconds of video and ten minutes of
+// it. It is also spawned async: tv-srvr serves /api/stream on this same event
+// loop, and a sync probe stalls the video the reviewer is waiting for.
+function firstCueSecEmbedded(resolved, idx) {
+  const st = fs.statSync(resolved);
+  const cacheKey = `${resolved}|${st.size}|${st.mtimeMs}|${idx}`;
+  if (firstCueCache.has(cacheKey))
+    return Promise.resolve(firstCueCache.get(cacheKey));
+  return new Promise((resolve) => {
+    const ff = cp.spawn("ffprobe", [
+      "-v",
+      "error",
+      "-select_streams",
+      String(idx),
+      "-read_intervals",
+      `%+${FIRST_CUE_PROBE_SECS}`,
+      "-show_entries",
+      "packet=pts_time",
+      "-of",
+      "csv=p=0",
+      resolved,
+    ]);
+    let done = false;
+    let buf = "";
+    const finish = (sec) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (!ff.killed) ff.kill("SIGKILL");
+      firstCueCache.set(cacheKey, sec);
+      resolve(sec);
+    };
+    const timer = setTimeout(() => finish(null), FIRST_CUE_PROBE_TIMEOUT_MS);
+    ff.stdout.on("data", (chunk) => {
+      buf += chunk;
+      // Only whole lines: a chunk can split "24.232" into "24.2" + "32".
+      const lines = buf.split("\n");
+      buf = lines.pop();
+      for (const line of lines) {
+        const sec = parseFloat(line);
+        if (Number.isFinite(sec)) {
+          finish(sec);
+          return;
+        }
+      }
+    });
+    ff.stderr.on("data", () => {});
+    ff.on("error", () => finish(null));
+    ff.on("exit", () => finish(null));
+  });
+}
+
+// Same for a sidecar .srt, whose first timestamp is right at the top of it.
+function firstCueSecSrt(srtPath) {
+  const m = fs
+    .readFileSync(srtPath, "utf8")
+    .match(/(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*-->/);
+  if (!m) return null;
+  return (
+    Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) + Number(m[4]) / 1000
+  );
 }
 
 // Cache key covers file identity (path + size + mtime), so a replaced or
@@ -470,6 +552,11 @@ export function registerMediaRoutes(app) {
           index: s.index,
         });
       }
+      await Promise.all(
+        tracks.map(async (t) => {
+          t.firstCue = await firstCueSecEmbedded(resolved, t.index);
+        }),
+      );
     } catch (e) {
       unilog(592, "probe error:", e.message);
     }
@@ -485,6 +572,7 @@ export function registerMediaRoutes(app) {
           label: suffix || f,
           type: "srt",
           file: f,
+          firstCue: firstCueSecSrt(path.join(dir, f)),
         });
       }
     } catch (e) {

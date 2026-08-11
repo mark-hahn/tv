@@ -912,12 +912,23 @@ import {
   saveSeasonIntro,
 } from "../srvr.js";
 
-import { fmtPos, getSeasonIntro, logHere, unilog } from "@tv/share";
+import { fmtPos, getSeasonIntro } from "@tv/share";
+import { logHere, unilog } from "../log.js";
 
 const TV_SRVR_URL = config.tvSrvrUrl;
 const PLAYER_MUTE_STORAGE_KEY = "tvPlayerMuted";
 const PLAYER_VOLUME_STORAGE_KEY = "tvPlayerVolume";
 const SPEED_RATES = [1, 2, 5, 10];
+const FIRST_CUE_LEAD_SEC = 1;
+// The chksrt stream is a ten minute mirror of the episode; a first cue past
+// that is not reviewable, so it never sets the jump point.
+const FIRST_CUE_MAX_SEC = 600;
+// Never land on the last seconds of the mirror — there would be nothing left
+// to watch.
+const FIRST_CUE_TAIL_SEC = 5;
+const FIRST_CUE_SEEK_POLL_MS = 400;
+const FIRST_CUE_SEEK_TRIES = 8;
+const FIRST_CUE_SEEK_SLOP_SEC = 2;
 const offsetCache = new Map(); // in-memory per-file subtitle offset
 
 function fmtTime(ms) {
@@ -965,6 +976,7 @@ export default {
       activeAudioIndex: null,
       subtitleTracks: [],
       firstCueSec: null,
+      chksrtFirstCueSec: null,
       activeTrackId: null,
       subtitleOffset: 0,
       vidSrc: "",
@@ -1166,6 +1178,8 @@ export default {
       this.subtitleTracks = [];
       this.activeTrackId = null;
       this.firstCueSec = null;
+      this.chksrtFirstCueSec = null;
+      this._clearFirstCueSeek();
       this.chksrtMatch = null;
       this.errorRetries = 0;
       this.pendingSourceResumeTime = null;
@@ -1234,10 +1248,75 @@ export default {
             this.vidSrc = this._buildStreamUrl(tracks[0].index);
           }
         }
-        if (this.mode === "chksrt")
+        if (this.mode === "chksrt") {
+          this._setChksrtFirstCue(tracks);
           await this._loadChksrtHistoryAndCompare(filePath);
+        }
       } catch (e) {
         unilog(1048, "fetch error:", e);
+      }
+    },
+    // chksrt: take the first cue time of any text subtitle (embedded or srt)
+    // so the video can jump straight to where subtitles start. pgs is bitmap
+    // and forced covers only foreign dialog, so neither says where subs begin.
+    _setChksrtFirstCue(tracks) {
+      // Every track's cue time arrives with the list, so take the latest of
+      // them: by then every track has text, so whichever subtitle the reviewer
+      // switches to is showing something.
+      let best = null;
+      for (const t of tracks) {
+        if (t.type !== "embedded" && t.type !== "sdh" && t.type !== "srt")
+          continue;
+        if (typeof t.firstCue !== "number") continue;
+        // A track that starts past the mirror is junk for this purpose — it
+        // would drag the jump to the end of the ten minutes on offer.
+        if (t.firstCue > FIRST_CUE_MAX_SEC) continue;
+        if (best === null || t.firstCue > best.firstCue) best = t;
+      }
+      if (best === null) return;
+      this.chksrtFirstCueSec = best.firstCue;
+      this._maybeJumpToFirstCue();
+    },
+    _maybeJumpToFirstCue() {
+      if (this.mode !== "chksrt") return;
+      const forPath = this.path;
+      if (!forPath || this._firstCueJumpPath === forPath) return;
+      const sec = this.chksrtFirstCueSec;
+      if (sec === null) return;
+      const target = sec - FIRST_CUE_LEAD_SEC;
+      if (target < 1) return;
+      const vid = this.$refs.vid;
+      if (!vid || vid.readyState < 1) return; // no metadata yet
+      if (
+        Number.isFinite(vid.duration) &&
+        target > vid.duration - FIRST_CUE_TAIL_SEC
+      ) {
+        return;
+      }
+      this._firstCueJumpPath = forPath;
+      this._clearFirstCueSeek();
+      vid.currentTime = target;
+      // A fresh stream can silently drop the seek while it is still
+      // buffering, so keep re-applying it until it takes.
+      let tries = 0;
+      this._firstCueSeekTimer = setInterval(() => {
+        const v = this.$refs.vid;
+        if (
+          !v ||
+          this.path !== forPath ||
+          v.currentTime >= target - FIRST_CUE_SEEK_SLOP_SEC ||
+          ++tries >= FIRST_CUE_SEEK_TRIES
+        ) {
+          this._clearFirstCueSeek();
+          return;
+        }
+        v.currentTime = target;
+      }, FIRST_CUE_SEEK_POLL_MS);
+    },
+    _clearFirstCueSeek() {
+      if (this._firstCueSeekTimer) {
+        clearInterval(this._firstCueSeekTimer);
+        this._firstCueSeekTimer = null;
       }
     },
     _swapStream(subIndex = null, audioIndex = this.activeAudioIndex) {
@@ -1506,7 +1585,10 @@ export default {
       }
       if (this.mode !== "intro") {
         if (vid) vid.play().catch(() => {});
-        if (this.mode === "chksrt") return;
+        if (this.mode === "chksrt") {
+          this._maybeJumpToFirstCue();
+          return;
+        }
       }
       if (!this._seekOnLoad) return;
       this._seekOnLoad = false;
@@ -1930,6 +2012,7 @@ export default {
     },
     close() {
       this._mseStop();
+      this._clearFirstCueSeek();
       const vid = this.$refs.vid;
       if (vid) {
         vid.pause();
@@ -1967,6 +2050,7 @@ export default {
     }
     this.vidSrc = this.path ? this._buildStreamUrl() : "";
     this.subtitleOffset = offsetCache.get(this.path) ?? 0;
+    this.chksrtFirstCueSec = null;
     if (this.path) {
       this._fetchSubtitleList(this.path);
       this._fetchAudioList(this.path);
@@ -1977,6 +2061,7 @@ export default {
   },
   beforeUnmount() {
     window.removeEventListener("keydown", this.onKeyDown);
+    this._clearFirstCueSeek();
   },
 };
 </script>

@@ -765,11 +765,13 @@ export default {
       evtBus.emit("openMap", show);
     },
 
-    // Select intro file using client-side episodeData (see intro-file-selection.md).
-    // Delegates to @tv/share — tv-srvr uses the same function to pre-build the
-    // mp4 mirror, so both must pick the same episode.
-    selectIntroFile(show) {
-      return epd.selectIntroFile(show);
+    // Select intro file (see intro-file-selection.md). tv-srvr owns the pick —
+    // it is the only side that can see which mp4 mirrors are finished, and an
+    // already-mirrored episode opens instantly.
+    async selectIntroFile(show) {
+      const res = await srvr.introFile(show?.name);
+      if (!res?.ok) return { error: res?.error || "no playable episode found" };
+      return { path: res.path, season: res.season, episode: res.episode };
     },
 
     async introClick() {
@@ -779,7 +781,7 @@ export default {
         return;
       }
       try {
-        const result = this.selectIntroFile(this.show);
+        const result = await this.selectIntroFile(this.show);
         if (result.error) {
           window.alert("No playable episode found for Intro.");
           return;

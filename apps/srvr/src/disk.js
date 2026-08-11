@@ -24,6 +24,14 @@ import { videoFileExtensions } from "./videoFiles.js";
 
 const tvDir = "/mnt/media/tv";
 
+// Dot-directories in the media tree hold work in progress, not library files:
+// rsync's .rsync-tmp-<pid> staging dirs hold partial copies under their final
+// names, and a scan that walked into one recorded the episode as if the file
+// already sat in its Season folder — a path that 404s until the copy lands.
+function isHiddenName(name) {
+  return name.startsWith(".");
+}
+
 function runFfprobe(args, maxBuffer = 2 * 1024 * 1024) {
   return cp.execFileSync("ffprobe", args, {
     maxBuffer,
@@ -216,7 +224,10 @@ export const getShowsFromDisk = async (_params) => {
       const fstat = await fsp.stat(path);
       if (fstat.isDirectory()) {
         const dir = await fsp.readdir(path);
-        for (const dirent of dir) await recurs(path + "/" + dirent);
+        for (const dirent of dir) {
+          if (isHiddenName(dirent)) continue;
+          await recurs(path + "/" + dirent);
+        }
         return;
       }
       const sfx = path.split(".").pop();
@@ -257,6 +268,7 @@ export const getShowsFromDisk = async (_params) => {
   const folderIndex = folderToRecord();
   const dir = await fsp.readdir(tvDir);
   for (const dirent of dir) {
+    if (isHiddenName(dirent)) continue;
     const showPath = tvDir + "/" + dirent;
     const fstat = await fsp.stat(showPath);
     const maxDate = fmtDateWithTZ(fstat.mtime);
@@ -328,8 +340,10 @@ export const getShowDiskInfo = async (showFolderName) => {
       if (fstat.isDirectory()) {
         const dir = fs.readdirSync(dirPath);
         const folderName = path.basename(dirPath);
-        for (const dirent of dir)
+        for (const dirent of dir) {
+          if (isHiddenName(dirent)) continue;
           await recurs(dirPath + "/" + dirent, folderName);
+        }
         return;
       }
       const sfx = dirPath.split(".").pop();

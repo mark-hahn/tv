@@ -128,6 +128,16 @@
                 : 'transparent',
         }"
       >
+        <!-- Star marks the file intro marking will open for its show. -->
+        <span
+          style="
+            flex: 0 0 auto;
+            width: 10px;
+            font-weight: bold;
+            color: #036;
+          "
+          >{{ introPaths.has(e.path) ? "*" : "" }}</span
+        >
         <span
           style="
             flex: 0 0 auto;
@@ -171,11 +181,13 @@ import { logHere } from "../log.js";
 
 const POLL_MS = 1000;
 const FLASH_MS = 300;
+const INTRO_REFRESH_MS = 10000;
 
 export default {
   name: "Queues",
   props: {
     active: { type: Boolean, default: false },
+    allShows: { type: Array, default: () => [] },
   },
   data() {
     return {
@@ -192,6 +204,9 @@ export default {
         { key: "chksrt", label: "ChkSrt" },
       ],
       timer: null,
+      introPaths: new Set(),
+      introKey: "",
+      introFetchedAt: 0,
     };
   },
   computed: {
@@ -199,6 +214,22 @@ export default {
     // retries, so there is nothing about the file to predict from.
     hasEta() {
       return this.selected === "asr" || this.selected === "mp4";
+    },
+    // Shows with a line in any queue that the Intro button would still open.
+    // Only these need an intro-file lookup — a starred line is always one of
+    // them.
+    introShowNames() {
+      const needsIntro = new Set(
+        this.allShows.filter((s) => s?.needsIntro).map((s) => s.name),
+      );
+      const names = new Set();
+      for (const q of Object.values(this.data)) {
+        for (const e of q?.entries || []) {
+          const name = this.showNameOfPath(e.path);
+          if (needsIntro.has(name)) names.add(name);
+        }
+      }
+      return [...names].sort();
     },
     entries() {
       return this.data[this.selected]?.entries || [];
@@ -268,6 +299,25 @@ export default {
       const name = this.showNameOfPath(this.selectedPath);
       if (name) evtBus.emit("selectShowFromCardTitle", name);
     },
+    // tv-srvr owns the intro pick because it alone knows which mp4 mirrors are
+    // finished, and that answer moves on the timescale of an encode — so this
+    // does not ride the 1s queue poll. It refetches when the queues bring in a
+    // different set of shows, and otherwise on INTRO_REFRESH_MS.
+    async refreshIntroPaths() {
+      const names = this.introShowNames;
+      if (!names.length) {
+        this.introPaths = new Set();
+        this.introKey = "";
+        return;
+      }
+      const key = names.join("|");
+      const stale = Date.now() - this.introFetchedAt > INTRO_REFRESH_MS;
+      if (key === this.introKey && !stale) return;
+      const res = await srvr.introFiles(names);
+      this.introPaths = new Set(res?.paths || []);
+      this.introKey = key;
+      this.introFetchedAt = Date.now();
+    },
     start() {
       this.fetchOnce();
       if (!this.timer) this.timer = setInterval(this.fetchOnce, POLL_MS);
@@ -298,6 +348,7 @@ export default {
         ) {
           this.selectedPath = null;
         }
+        await this.refreshIntroPaths();
       } catch (e) {
         this.error = e?.message || "fetch failed";
       }

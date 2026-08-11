@@ -307,6 +307,7 @@
             v-show="!simpleMode && currentPane === 'queues'"
             style="width: 100%; height: 100%"
             :active="currentPane === 'queues'"
+            :allShows="allShows"
           ></Queues>
           <Usb
             v-show="!simpleMode && currentPane === 'usb'"
@@ -1116,21 +1117,21 @@ export default {
       }
     },
 
-    // Select intro file using episodeData (see intro-file-selection.md).
-    // Priority: 1) first unwatched with file, 2) first file (any watched
-    // status), 3) error. Always the built-in player.
-    // Delegates to @tv/share so tv-srvr picks the same episode when it
-    // pre-builds the mp4 mirror; if the two disagreed the mirror would be
-    // built for an episode the player never opens.
-    selectIntroFile(show) {
-      return epd.selectIntroFile(show);
+    // Select intro file (see intro-file-selection.md). tv-srvr owns the pick
+    // because only it can see which mp4 mirrors are finished: an episode with a
+    // mirror plays and seeks instantly, so it wins over the nominal
+    // first-unwatched-with-file choice. Always the built-in player.
+    async selectIntroFile(show) {
+      const res = await srvr.introFile(show?.name);
+      if (!res?.ok) return { error: res?.error || "no playable episode found" };
+      return { path: res.path, season: res.season, episode: res.episode };
     },
 
     async clickIntro() {
       const show = this.filteredShows.find((s) => s.needsIntro);
       if (!show) return;
       try {
-        const result = this.selectIntroFile(show);
+        const result = await this.selectIntroFile(show);
         if (result.error) {
           unilog(894, `clickIntro error for ${show.name}:`, result.error);
           return;
@@ -1226,7 +1227,7 @@ export default {
           continue;
         }
         try {
-          const result = this.selectIntroFile(s);
+          const result = await this.selectIntroFile(s);
           if (!result.error && result.path) {
             await this.handleOpenIntro({
               show: s,

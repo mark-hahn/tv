@@ -783,8 +783,12 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
       try {
         const introFile = epd.selectIntroFile(tvdbRecord);
         if (introFile?.path) {
-          if (nowNeedsIntro) mpfour.prioritizeIntro(introFile.path);
-          else mpfour.dropIntro(introFile.path);
+          // Nothing to build when an episode is already mirrored — that is what
+          // /api/introFile hands the player.
+          if (nowNeedsIntro) {
+            if (!(await mirroredIntroFile(tvdbRecord)))
+              mpfour.prioritizeIntro(introFile.path);
+          } else mpfour.dropIntro(introFile.path);
         }
       } catch (e) {
         unilog(
@@ -2862,7 +2866,7 @@ https.createServer(httpsOptions, app).listen(HTTP_PORT, () => {
 // check subtitle sync, intro needs it seekable to scan for the intro.
 // selectIntroFile lives in @tv/share so this picks exactly the episode the
 // client will open.
-function introEpisodePaths() {
+async function introEpisodePaths() {
   const allTvdb = tvdb.getAllTvdbSync() || {};
   const out = [];
   const seenShow = new Set();
@@ -2878,11 +2882,108 @@ function introEpisodePaths() {
     // their intro episode is wasted work. This also makes dropIntro() stick —
     // without it the next sweep would re-add what the needsIntro clear removed.
     if (intro.hasConfiguredIntro(record)) continue;
+    // A show with any episode already mirrored needs no encode at all — that is
+    // the episode /api/introFile hands the player.
+    if (await mirroredIntroFile(record)) continue;
     const result = epd.selectIntroFile(record);
     if (result?.path) out.push(result.path);
   }
   return out;
 }
+
+// The show's episodes that intro marking could open, in the order it would
+// prefer them: unwatched (as selectIntroFile does) ahead of already watched.
+function introCandidates(record) {
+  const ed = record?.episodeData;
+  if (!ed) return [];
+  const folder = record.path?.split("/").pop() || record.name;
+  const unwatched = [];
+  const watched = [];
+  epd.forEachEpisode(ed, (s, e) => {
+    if (!epd.hasFile(ed, s, e)) return;
+    const filePath = epd.getFullPath(ed, folder, s, e);
+    if (!filePath) return;
+    const cand = { path: filePath, season: s, episode: e };
+    if (epd.isWatched(ed, s, e)) watched.push(cand);
+    else unwatched.push(cand);
+  });
+  return [...unwatched, ...watched];
+}
+
+// The first candidate whose mp4 mirror is already built, or null. Any episode
+// carries the intro, so a finished mirror beats the nominal pick: it plays and
+// seeks instantly through nginx, while an unmirrored 2160p hevc source has to
+// be transcoded live and can barely stay ahead of the player.
+async function mirroredIntroFile(record) {
+  for (const cand of introCandidates(record)) {
+    if (await mpfour.mpfourValid(cand.path)) return cand;
+  }
+  return null;
+}
+
+// The episode the intro player opens for a show — selectIntroFile's pick unless
+// some other episode is already mirrored.
+async function introFileFor(record) {
+  const mirrored = await mirroredIntroFile(record);
+  if (mirrored) return { ...mirrored, mirrored: true };
+  const pick = epd.selectIntroFile(record);
+  if (!pick?.path) return null;
+  return {
+    path: pick.path,
+    season: pick.season,
+    episode: pick.episode,
+    mirrored: false,
+  };
+}
+
+app.get("/api/introFile", async (req, res) => {
+  const showName = req.query.showName;
+  if (!showName) {
+    res.status(400).json({ ok: false, error: "showName required" });
+    return;
+  }
+  const record = tvdb.getAllTvdbSync()[showName];
+  if (!record) {
+    res.json({ ok: false, error: "show not found" });
+    return;
+  }
+  try {
+    const pick = await introFileFor(record);
+    if (!pick) {
+      res.json({ ok: false, error: "no playable episode" });
+      return;
+    }
+    res.json({ ok: true, ...pick });
+  } catch (e) {
+    unilog(2127, `introFile failed for ${showName}: ${e.message}`);
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// Same pick for a batch of shows, as a flat path list. The Queues pane marks
+// its lines with it, so it asks about only the shows its queues actually
+// contain rather than the whole library.
+app.post("/api/introFiles", async (req, res) => {
+  const showNames = req.body?.showNames;
+  if (!Array.isArray(showNames)) {
+    res.status(400).json({ ok: false, error: "showNames required" });
+    return;
+  }
+  try {
+    const allTvdb = tvdb.getAllTvdbSync();
+    const paths = [];
+    for (const showName of showNames) {
+      const record = allTvdb[showName];
+      if (!record) continue;
+      const pick = await introFileFor(record);
+      if (pick?.path) paths.push(pick.path);
+    }
+    res.json({ ok: true, paths });
+  } catch (e) {
+    unilog(2129, `introFiles failed: ${e.message}`);
+    res.json({ ok: false, error: e.message });
+  }
+});
 
 app.post("/internal/tv-state", (req, res) => {
   notifyClients("tvMuteState", req.body);

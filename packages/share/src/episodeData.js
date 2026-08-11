@@ -373,10 +373,11 @@ export function markGapErrors(seriesMap, rec) {
 }
 
 // Pick the episode intro marking should open for a show: the first unwatched
-// episode with a file, else the first episode with a file. Shared so tv-srvr can
-// pre-build the mp4 mirror for exactly the episode the client will open — if the
-// two disagreed the mirror would be useless. Intro marking plays through
-// /api/stream, never Emby, so an episode needs only a file.
+// episode with a file, else the first episode with a file. Intro marking plays
+// through /api/stream, never Emby, so an episode needs only a file.
+// This is the pick when nothing is mirrored yet — it is what tv-srvr pre-builds
+// the mp4 mirror for. The episode actually opened comes from /api/introFile,
+// which upgrades to any episode whose mirror is already finished.
 // Returns { path, season, episode } or { error }.
 export function selectIntroFile(show) {
   const ed = show?.episodeData;

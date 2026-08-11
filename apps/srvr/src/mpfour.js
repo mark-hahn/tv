@@ -56,7 +56,7 @@ let mp4Pending = [];
 let introPriority = [];
 // Supplies the intro episode of every chksrt-queued show, so one mirror serves
 // both features. Injected by index.js, which owns the tvdb records.
-let introEpisodePaths = () => [];
+let introEpisodePaths = async () => [];
 let currentTmpPath = null;
 // { videoFilePath, child, aborted } while an encode is running, else null
 let currentEncode = null;
@@ -176,9 +176,15 @@ async function reorderChkSrtQueue() {
   unilog(1414, `reordered chksrt queue: ${fast.length} ready/fast ahead of ${slow.length} needing transcode`);
 }
 
+// Mirror encodes run under SCHED_IDLE: a 2160p transcode saturates ~10 of the
+// box's 16 cores, and at normal priority it starves the live /api/stream
+// transcode a person is sitting in front of — the intro pane could only buffer
+// a few seconds while a mirror nobody is waiting on ran flat out. chrt execs
+// ffmpeg in place, so the child pid (and SIGKILL from abortIfUnwanted) still
+// lands on ffmpeg itself.
 function runFfmpeg(args, onSpawn, onProgress) {
   return new Promise((resolve, reject) => {
-    const ffmpeg = cp.spawn("ffmpeg", args);
+    const ffmpeg = cp.spawn("chrt", ["--idle", "0", "ffmpeg", ...args]);
     onSpawn?.(ffmpeg);
     let lastErr = "";
     ffmpeg.stderr.on("data", (d) => {
@@ -382,7 +388,7 @@ function candidatePaths() {
 async function refreshIntroPriority() {
   let paths;
   try {
-    paths = introEpisodePaths() || [];
+    paths = (await introEpisodePaths()) || [];
   } catch (e) {
     unilog(1964, `intro episode lookup failed: ${e.message}`);
     return;

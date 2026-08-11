@@ -227,13 +227,15 @@ const main = () => {
 
   // rsync can exit non-zero after the file has in fact landed intact (e.g. a
   // partial-dir cleanup error at the very end). Returns the byte size when the
-  // local file exists and matches the remote size, else null.
-  const verifyLandedIntact = async () => {
+  // local file exists and matches the remote size, else null. checkPath is the
+  // partial file on a resumed transfer, which writes there instead of to dst.
+  const verifyLandedIntact = async (checkPath) => {
     const { src, dst } = makeSrcDst();
-    if (!fs.existsSync(dst)) return null;
+    const local = checkPath || dst;
+    if (!fs.existsSync(local)) return null;
     let localSize = 0;
     try {
-      const st = fs.statSync(dst);
+      const st = fs.statSync(local);
       if (!st.isFile()) return null;
       localSize = st.size;
     } catch (e) {
@@ -312,21 +314,103 @@ const main = () => {
     finish(statusText);
   };
 
-  const startRsync = (attempt) => {
+  // rsync writes into the per-transfer partial dir for the whole transfer and
+  // only moves the file to its final name at the very end.
+  const partialFilePath = () => {
+    const { dst } = makeSrcDst();
+    return path.join(
+      path.dirname(dst),
+      `${PARTIAL_DIR_PREFIX}${entry.procId}`,
+      path.basename(dst),
+    );
+  };
+
+  const fileBytes = (p) => {
+    const st = fs.statSync(p, { throwIfNoEntry: false });
+    return st && st.isFile() ? st.size : 0;
+  };
+
+  // Bytes of this transfer that are on disk right now, wherever rsync is
+  // currently putting them.
+  const bytesOnDisk = () => {
+    const { dst } = makeSrcDst();
+    return Math.max(fileBytes(partialFilePath()), fileBytes(dst));
+  };
+
+  // A transfer that wrote into the partial dir still has to be moved to its
+  // real name. Returns false when the move failed and the entry has already
+  // been finished with the error.
+  const promoteFile = (fromPath) => {
+    const { dst } = makeSrcDst();
+    if (fromPath === dst) return true;
+    try {
+      fs.renameSync(fromPath, dst);
+    } catch (e) {
+      unilog(2131, `could not move finished ${title} into place: ${e.message}`);
+      failFinish(`could not move finished file into place: ${e.message}`);
+      return false;
+    }
+    removePartialDir();
+    return true;
+  };
+
+  const startRsync = async (attempt) => {
     const { src, dst, usbPath2 } = makeSrcDst();
+
+    // fileSize is the exact remote byte count, so bytes-on-disk gives a true
+    // percentage. Without it there is nothing to divide by and rsync's own
+    // progress output is the only source.
+    const totalBytes = Number(entry.fileSize) > 0 ? Number(entry.fileSize) : 0;
+
+    // A restarted tv-down kills the rsyncs it left behind and starts them over
+    // against a multi-GB partial. Plain rsync then runs its delta-transfer
+    // search across both copies before it sends a byte — on these files that
+    // takes longer than the gap between restarts, so the transfer never
+    // advanced and the card sat at 0% the whole time. --append-verify sends
+    // only the missing tail and checksums the whole file at the end, resending
+    // it if the part already here turns out not to match.
+    //
+    // rsync rejects --append with --partial-dir, so a resume writes straight
+    // into the partial file (still hidden from the library scanner inside the
+    // partial dir) and the close handler moves it into place.
+    const partialPath = partialFilePath();
+    const partialBytes = fileBytes(partialPath);
+
+    // The restart can also land on a partial that is already whole: rsync had
+    // written every byte and was killed before it could move the file into
+    // place. Running rsync again would only rescan a file that is already
+    // finished, so confirm the size against the remote and promote it here.
+    if (totalBytes > 0 && partialBytes >= totalBytes) {
+      const landedBytes = await verifyLandedIntact(partialPath);
+      if (landedBytes) {
+        unilog(2132, `${title} was already complete in the partial dir at ${landedBytes} bytes — moved into place without re-running rsync`);
+        if (!promoteFile(partialPath)) return;
+        entry.progress = 100;
+        finish("finished");
+        return;
+      }
+    }
+
+    const resuming =
+      totalBytes > 0 && partialBytes > 0 && partialBytes < totalBytes;
+    const rsyncDst = resuming ? partialPath : dst;
+
     const rsyncArgs = [
       "-av",
       "--protect-args",
-      // Per-transfer partial dir. A shared ".rsync-tmp" is deleted by whichever
-      // transfer into this season dir finishes first, which made concurrent
-      // transfers fail their final stat/rename after the data had landed.
-      `--partial-dir=${PARTIAL_DIR_PREFIX}${entry.procId}`,
+      ...(resuming
+        ? ["--append-verify", "--partial"]
+        : // Per-transfer partial dir. A shared ".rsync-tmp" is deleted by
+          // whichever transfer into this season dir finishes first, which made
+          // concurrent transfers fail their final stat/rename after the data
+          // had landed.
+          [`--partial-dir=${PARTIAL_DIR_PREFIX}${entry.procId}`]),
       "-e",
       "ssh",
       "--timeout=20",
       "--info=progress2",
       src,
-      dst,
+      rsyncDst,
     ];
     const p = spawn("rsync", rsyncArgs, { stdio: ["ignore", "pipe", "pipe"] });
     rsyncProc = p;
@@ -340,10 +424,69 @@ const main = () => {
     let lastProgressUpdateTime = 0;
     const progressUpdateInterval = 500;
 
-    // Speed estimate based on rsync progress2 byte counter deltas.
+    // Speed estimate based on byte counter deltas.
     let lastBytes = null;
     let lastBytesTimeMs = null;
     const speedSamples = [];
+
+    const sampleSpeed = (bytes, nowMs) => {
+      if (lastBytes != null && lastBytesTimeMs != null && bytes >= lastBytes) {
+        const dtSec = (nowMs - lastBytesTimeMs) / 1000;
+        if (dtSec > 0) {
+          const instBitsPerSec = Math.round(((bytes - lastBytes) * 8) / dtSec);
+          speedSamples.push(
+            Number.isFinite(instBitsPerSec) && instBitsPerSec >= 0
+              ? instBitsPerSec
+              : 0,
+          );
+          while (speedSamples.length > 3) speedSamples.shift();
+          const sum = speedSamples.reduce((a, b) => a + b, 0);
+          entry.speed = speedSamples.length
+            ? Math.round(sum / speedSamples.length)
+            : 0;
+        }
+      }
+      lastBytes = bytes;
+      lastBytesTimeMs = nowMs;
+    };
+
+    // rsync prints nothing on stdout while it is checksumming a resumed
+    // partial, which used to leave the card at 0% for the whole scan even
+    // though most of the file was already here. Poll the bytes on disk so the
+    // card shows the real position from the first tick.
+    const DISK_POLL_MS = 1000;
+    let diskPollTimer = null;
+    let lastPostedBytes = null;
+    let lastPostedSpeed = null;
+
+    const pollDisk = () => {
+      const bytes = bytesOnDisk();
+      sampleSpeed(bytes, Date.now());
+      const pct = Math.min(99, Math.floor((bytes / totalBytes) * 100));
+      if (pct > lastProgress) {
+        lastProgress = pct;
+        entry.progress = pct;
+      }
+      const remaining = totalBytes - bytes;
+      entry.eta =
+        entry.speed > 0 && remaining > 0
+          ? unixNow() + Math.round((remaining * 8) / entry.speed)
+          : null;
+      if (bytes === lastPostedBytes && entry.speed === lastPostedSpeed) return;
+      lastPostedBytes = bytes;
+      lastPostedSpeed = entry.speed;
+      postUpdate("update");
+    };
+
+    const stopDiskPoll = () => {
+      if (diskPollTimer) clearInterval(diskPollTimer);
+      diskPollTimer = null;
+    };
+
+    if (totalBytes) {
+      pollDisk();
+      diskPollTimer = setInterval(pollDisk, DISK_POLL_MS);
+    }
 
     const parseTransferredBytes = (chunk) => {
       // Typical progress2 lines contain: "   123,456,789  12% ..."
@@ -356,6 +499,10 @@ const main = () => {
     };
 
     p.stdout.on("data", (data) => {
+      // With a known total the disk poll is the sole source of progress; the
+      // stdout stream still has to be drained so the pipe cannot fill up.
+      if (totalBytes) return;
+
       const chunk = data.toString();
       const pm = chunk.match(/(\d+)%/);
       if (!pm) return;
@@ -371,38 +518,10 @@ const main = () => {
         lastProgressUpdateTime = Date.now();
         entry.progress = pct;
 
-        const nowMs = Date.now();
         const bytes = parseTransferredBytes(chunk);
-        let etaSec = null;
+        if (bytes != null) sampleSpeed(bytes, Date.now());
 
-        if (bytes != null) {
-          if (
-            lastBytes != null &&
-            lastBytesTimeMs != null &&
-            bytes >= lastBytes
-          ) {
-            const dtSec = (nowMs - lastBytesTimeMs) / 1000;
-            if (dtSec > 0) {
-              const dBytes = bytes - lastBytes;
-              const instBitsPerSec = Math.round((dBytes * 8) / dtSec);
-              const inst =
-                Number.isFinite(instBitsPerSec) && instBitsPerSec >= 0
-                  ? instBitsPerSec
-                  : 0;
-
-              speedSamples.push(inst);
-              while (speedSamples.length > 3) speedSamples.shift();
-              const sum = speedSamples.reduce((a, b) => a + b, 0);
-              entry.speed = speedSamples.length
-                ? Math.round(sum / speedSamples.length)
-                : 0;
-            }
-          }
-          lastBytes = bytes;
-          lastBytesTimeMs = nowMs;
-        }
-
-        etaSec = parseEtaSeconds(chunk);
+        const etaSec = parseEtaSeconds(chunk);
         if (etaSec != null) {
           entry.eta = unixNow() + etaSec;
         }
@@ -423,14 +542,18 @@ const main = () => {
     });
 
     p.on("close", async (code) => {
+      stopDiskPoll();
       if (code !== 0) {
         const stderrSummary = summarizeStderr(stderrBuf);
 
         // Before reporting any failure, check whether the file actually made
         // it. If it did, report the error detail but finish as a success so
         // the down card shows no error.
-        const landedBytes = await verifyLandedIntact();
+        const landedBytes = await verifyLandedIntact(
+          resuming ? rsyncDst : null,
+        );
         if (landedBytes) {
+          if (!promoteFile(rsyncDst)) return;
           unilog(2030, `rsync exit code ${code} for ${title}: ${stderrSummary || "no stderr"}`);
           unilog(2031, `rsync for ${title} actually succeeded: local file is complete at ${landedBytes} bytes, matching the remote`);
           entry.progress = 100;
@@ -452,7 +575,7 @@ const main = () => {
                 entry.eta = null;
                 entry.speed = 0;
                 postUpdate("update");
-                startRsync(2);
+                runRsync(2);
                 return;
               }
             } catch {
@@ -487,16 +610,27 @@ const main = () => {
         failFinish(msg);
         return;
       }
+      if (!promoteFile(rsyncDst)) return;
       entry.progress = 100;
       finish("finished");
     });
 
     p.on("error", (err) => {
+      stopDiskPoll();
       failFinish(err && err.message ? err.message : "rsync spawn error");
     });
   };
 
-  startRsync(1);
+  // startRsync stats the remote before it decides how to run, so nothing may
+  // throw past it unnoticed and leave the entry stuck as downloading forever.
+  const runRsync = (attempt) => {
+    startRsync(attempt).catch((e) => {
+      unilog(2133, `could not start rsync for ${title}: ${e.message}`);
+      failFinish(e && e.message ? e.message : "rsync start error");
+    });
+  };
+
+  runRsync(1);
 };
 
 main();

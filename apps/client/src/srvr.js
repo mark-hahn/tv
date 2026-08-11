@@ -987,6 +987,21 @@ export function saveSeasonIntro(name, season, field, value) {
   );
 }
 
+// The episode to open for intro marking — tv-srvr's pick, which prefers an
+// episode whose mp4 mirror is already built.
+export function introFile(showName) {
+  return httpCall(
+    `/api/introFile?showName=${encodeURIComponent(showName)}`,
+    null,
+    "GET",
+  );
+}
+
+// The same pick for several shows at once, as a flat list of file paths.
+export function introFiles(showNames) {
+  return httpCall("/api/introFiles", { showNames }, "POST");
+}
+
 export function introNextFile(showName, season, episode) {
   return httpCall(
     `/api/introNextFile?showName=${encodeURIComponent(showName)}&season=${season}&episode=${episode}`,

@@ -1179,6 +1179,7 @@ export default {
       this.activeTrackId = null;
       this.firstCueSec = null;
       this.chksrtFirstCueSec = null;
+      this._firstCueJumpPath = null;
       this._clearFirstCueSeek();
       this.chksrtMatch = null;
       this.errorRetries = 0;

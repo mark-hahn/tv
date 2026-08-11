@@ -50,6 +50,10 @@
         }"
         >{{ wrapName(node.name) }}</span
       ><span
+        v-if="node.held"
+        style="white-space: nowrap"
+        >{{ " (held)" }}</span
+      ><span
         v-if="node.parseError"
         style="
           color: #b00;

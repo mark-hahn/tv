@@ -2031,10 +2031,7 @@ export default {
         this.lastSelectedFile = null;
         await this.fetchFiles();
       } catch (e) {
-        logHere(
-          { lvl: "error" },
-          `swap failed for ${sidecarName}: ${e?.message || String(e)}`,
-        );
+        unilog(2084, `swap failed for ${sidecarName}: ${e?.message || String(e)}`);
         this.error = e.message || "Swap failed";
         this.loading = false;
       }

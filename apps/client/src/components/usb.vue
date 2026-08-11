@@ -199,6 +199,35 @@
             </button>
 
             <button
+              @click.stop="heldFilter = !heldFilter"
+              title="Show only held folders/files"
+              :style="{
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg': heldFilter ? '#ddd' : 'whitesmoke',
+              }"
+            >
+              Held
+            </button>
+
+            <button
+              @click.stop="usbUnholdClick"
+              :disabled="!hasSelection"
+              :class="{ 'btn-disabled': !hasSelection }"
+              title="Release selected held folders/files for download"
+              style="
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px 10px;
+                border: 1px solid #bbb;
+              "
+            >
+              Unhold
+            </button>
+
+            <button
               @click.stop="clickInfo"
               :style="{
                 cursor: 'pointer',
@@ -341,7 +370,7 @@
           {{ error }}
         </div>
         <tree-node
-          v-for="node in tree"
+          v-for="node in visibleTree"
           :key="node.name"
           ref="treeNodes"
           :node="node"
@@ -492,7 +521,7 @@ import {
   parseFileSeasonEpisode,
   parseTitleFromFilename,
 } from "../util.js";
-import { unilog } from "../log.js";
+import { unilog, logHere } from "../log.js";
 
 export default {
   name: "Usb",
@@ -527,9 +556,17 @@ export default {
       infoMultiTitle: "",
       infoMultiMeta: "",
       _infoRefreshTimer: null,
+      heldNames: [], // torrent names in tv-down's heldTorrents list
+      heldFilter: false, // true = show only held top-level entries
     };
   },
   computed: {
+    // Tree actually rendered — the whole tree, or only held entries when the
+    // Held button is toggled on.
+    visibleTree() {
+      if (!this.heldFilter || this.movieMode) return this.tree;
+      return this.tree.filter((n) => n.held);
+    },
     hasSelection() {
       const hasName = this.selectedFolders.size > 0;
       const hasFiles = this.selectedFiles.size > 0;
@@ -873,6 +910,7 @@ export default {
         // API returns { tree, oldestShowDate } or just an array for backwards compat
         const rootTree = Array.isArray(data) ? data : data.tree || [];
         this.tree = this.processTree(rootTree);
+        if (!this.movieMode) await this.fetchHeldTorrents();
         this.hasLoaded = true;
         await this.updateUsbSpaceAvail();
 
@@ -887,6 +925,69 @@ export default {
         this.loading = false;
       }
     },
+    // Load tv-down's held torrent-name list and flag the matching top-level
+    // tree entries so they render with a " (held)" suffix.
+    async fetchHeldTorrents() {
+      try {
+        const res = await fetch(`${config.tvDownUrl}/heldTorrents`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        this.heldNames = Array.isArray(data?.held) ? data.held : [];
+      } catch (e) {
+        this.heldNames = [];
+        unilog(2085, `usb: failed to load heldTorrents: ${e?.message || String(e)}`);
+      }
+      this.markHeldNodes();
+    },
+
+    // A usb top-level entry matches a held torrent by its own name, or by that
+    // name with the extension stripped (single-file torrents land on usb as
+    // "<torrent name>.mkv").
+    markHeldNodes() {
+      const held = new Set(this.heldNames.map((n) => String(n).toLowerCase()));
+      for (const node of this.tree) {
+        const lower = String(node.name || "").toLowerCase();
+        const noExt = lower.replace(/\.[a-z0-9]{2,4}$/i, "");
+        node.held = held.has(lower) || held.has(noExt);
+      }
+      if (this.heldFilter && this.visibleTree.length === 0) {
+        this.heldFilter = false;
+      }
+    },
+
+    // Unhold: drop every selected top-level folder/file from heldTorrents,
+    // then force their download the way the Force Down button does.
+    async usbUnholdClick() {
+      const names = [
+        ...this.selectedFolders,
+        ...[...this.selectedFiles].filter((p) => !String(p).includes("/")),
+      ];
+      if (names.length === 0) return;
+
+      this.loading = true;
+      try {
+        const res = await fetch(`${config.tvDownUrl}/unhold`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ names }),
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(`HTTP ${res.status}: ${txt}`);
+        }
+        const data = await res.json();
+        this.heldNames = Array.isArray(data?.held) ? data.held : [];
+        this.markHeldNodes();
+      } catch (e) {
+        this.error = e.message || "Unhold failed";
+        return;
+      } finally {
+        this.loading = false;
+      }
+      // The gate is gone now, so the released files can be forced through.
+      await this.forceDown({ skipConfirm: true });
+    },
+
     processTree(nodes, parentFolderName = "") {
       if (!nodes) return [];
 
@@ -1533,7 +1634,10 @@ export default {
         alert("Usb CP error: " + (e?.message || e));
       }
     },
-    async forceDown() {
+    // opts is the click event when the Force Down button fires it, so only an
+    // explicit { skipConfirm: true } from a caller skips the confirm prompt.
+    async forceDown(opts) {
+      const skipConfirm = opts?.skipConfirm === true;
       if (this.selectedFolders.size === 0 && this.selectedFiles.size === 0)
         return;
 
@@ -1710,7 +1814,7 @@ export default {
         }
       }
 
-      if (!confirm(`Force download ${label}?`)) return;
+      if (!skipConfirm && !confirm(`Force download ${label}?`)) return;
 
       this.loading = true;
       try {

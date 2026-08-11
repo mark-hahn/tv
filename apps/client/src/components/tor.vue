@@ -165,6 +165,22 @@
             >
               Send
             </button>
+            <button
+              @click.stop="torHoldClick"
+              :disabled="selectedItems.size === 0"
+              :class="{ 'btn-disabled': selectedItems.size === 0 }"
+              title="Send to qbt but hold the files on usb for preview"
+              :style="{
+                fontSize: '13px',
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px 8px',
+                border: '1px solid #bbb',
+                '--btn-bg': holdFlash ? 'lightgray' : 'whitesmoke',
+              }"
+            >
+              Hold
+            </button>
             <span
               v-if="loading"
               style="font-size: 13px; color: #666; align-self: center"
@@ -1378,6 +1394,7 @@ export default {
       groupFilter: null, // non-null = group name filter is active
       groupFilterFlash: false, // true = flash button highlight for 500ms
       sendFlash: false, // true = flash Send button highlight for 500ms
+      holdFlash: false, // true = flash Hold button highlight for 500ms
 
       showFilter: null, // non-null = show name filter is active
     };
@@ -3320,6 +3337,7 @@ export default {
 
       const opts = options && typeof options === "object" ? options : {};
       const forceDownload = Boolean(opts.forceDownload);
+      const hold = Boolean(opts.hold);
 
       const key = this.statusKeyForTorrent(torrent);
       if (!key) return;
@@ -3327,7 +3345,7 @@ export default {
       const existing = this.downloadStatus?.[key]?.status;
       if (existing === "queued" || existing === "sending") return;
 
-      this.downloadQueue.push({ torrent, key, forceDownload });
+      this.downloadQueue.push({ torrent, key, forceDownload, hold });
       this.setDownloadStatus(torrent, "queued", "");
 
       // Track group choice immediately on send
@@ -3458,6 +3476,7 @@ export default {
           const item = this.downloadQueue.shift();
           const torrent = item?.torrent;
           const forceDownload = Boolean(item?.forceDownload);
+          const hold = Boolean(item?.hold);
           if (!torrent) continue;
 
           this.setDownloadStatus(torrent, "sending", "");
@@ -3481,6 +3500,10 @@ export default {
               // Only persist history when the torrent was actually sent.
               if (shouldRememberDownload) {
                 this.rememberDownloadedTorrent(torrent);
+              }
+              // Hold only after the send to qbt succeeded.
+              if (hold) {
+                await this.holdTorrentName(torrent);
               }
             } else {
               const msg = result?.message || `Failed to add: ${torrentTitle}`;
@@ -4661,6 +4684,36 @@ export default {
       }, 500);
       for (const t of this.selectedItems) {
         void this.enqueueDownload(t, { forceDownload: false });
+      }
+    },
+
+    // Hold: send to qbt like Send, but also add the torrent name to the
+    // persistent heldTorrents list so tv-down leaves the usb files alone until
+    // the user previews them in the usb pane and unholds them.
+    async torHoldClick() {
+      this.holdFlash = true;
+      window.clearTimeout(this._holdFlashTimer);
+      this._holdFlashTimer = window.setTimeout(() => {
+        this.holdFlash = false;
+      }, 500);
+      for (const t of this.selectedItems) {
+        void this.enqueueDownload(t, { forceDownload: false, hold: true });
+      }
+    },
+
+    // Add a torrent name to the persistent held list (after a successful send).
+    async holdTorrentName(torrent) {
+      const name = String(torrent?.raw?.title || torrent?.title || "").trim();
+      if (!name) return;
+      try {
+        const res = await fetch(`${config.tvDownUrl}/hold`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ names: [name] }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      } catch (e) {
+        this.showError(`Hold failed for ${name}: ${this.getErrorMessage(e)}`);
       }
     },
 

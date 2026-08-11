@@ -423,6 +423,49 @@ async function main() {
 
   // State is stored under apps/down/data.
 
+  //#####################################################
+  // heldTorrents: torrent names the tor pane sent to qbt with "Hold".
+  // Their usb folders/files are downloaded to usb as usual but gated out of
+  // every down cycle so the user can preview them in the usb pane first.
+  var HELD_TORRENTS_PATH = dataPath("heldTorrents.json");
+  var heldTorrents = new Set();
+
+  var loadHeldTorrents = function () {
+    heldTorrents = new Set(
+      JSON.parse(fs.readFileSync(HELD_TORRENTS_PATH, "utf8")).map(function (n) {
+        return String(n);
+      }),
+    );
+  };
+
+  var saveHeldTorrents = function () {
+    fs.writeFileSync(
+      HELD_TORRENTS_PATH,
+      JSON.stringify([...heldTorrents], null, 2),
+    );
+  };
+
+  // A usb top-level entry matches a held torrent by its own name, or by that
+  // name with the extension stripped (single-file torrents land on usb as
+  // "<torrent name>.mkv").
+  var heldNameOf = function (entryName) {
+    var name = String(entryName || "");
+    if (!name) return null;
+    var lower = name.toLowerCase();
+    var noExt = name.replace(/\.[a-z0-9]{2,4}$/i, "").toLowerCase();
+    for (var held of heldTorrents) {
+      var h = held.toLowerCase();
+      if (h === lower || h === noExt) return held;
+    }
+    return null;
+  };
+
+  // True when a usb relative path sits under a held top-level folder/file.
+  var isHeldUsbPath = function (relPath) {
+    if (heldTorrents.size === 0) return false;
+    return !!heldNameOf(String(relPath || "").split("/")[0]);
+  };
+
   var writeRejectLog = function (rejectFname, reason) {
     try {
       var ts = dateStr(Date.now());
@@ -438,10 +481,14 @@ async function main() {
       if (!fs.existsSync(TV_INPROGRESS_PATH)) {
         fs.writeFileSync(TV_INPROGRESS_PATH, "{}");
       }
+      if (!fs.existsSync(HELD_TORRENTS_PATH)) {
+        fs.writeFileSync(HELD_TORRENTS_PATH, "[]");
+      }
     } catch (e) {
       // Non-fatal.
     }
   })();
+  loadHeldTorrents();
 
   // tvJson.js owns tv.json cache and all worker lifecycle.
   const tvJson = tvJsonMod;
@@ -1062,6 +1109,129 @@ async function main() {
           });
         }
 
+        // Handle /heldTorrents endpoint — the held torrent-name list
+        if (pathname === "/heldTorrents") {
+          if (req.method === "GET") {
+            return json(res, 200, { held: [...heldTorrents] });
+          }
+          return json(res, 405, {
+            status: "error",
+            error: "method not allowed",
+          });
+        }
+
+        // Handle /hold endpoint — add torrent names to heldTorrents
+        // POST body: { names: ["..."] }
+        if (pathname === "/hold") {
+          if (req.method === "POST") {
+            return readBody(req, (err1, body) => {
+              if (err1) {
+                return json(res, 400, {
+                  status: "error",
+                  error: String(err1 && err1.message ? err1.message : err1),
+                });
+              }
+              try {
+                var holdPayload = body ? JSON.parse(body) : {};
+                var holdNames = Array.isArray(holdPayload.names)
+                  ? holdPayload.names
+                  : holdPayload.name
+                    ? [holdPayload.name]
+                    : [];
+                holdNames = holdNames
+                  .map((n) => String(n || "").trim())
+                  .filter(Boolean);
+                if (holdNames.length === 0) {
+                  return json(res, 400, {
+                    status: "error",
+                    error: "names must be a non-empty array",
+                  });
+                }
+                for (var hi = 0; hi < holdNames.length; hi++) {
+                  heldTorrents.add(holdNames[hi]);
+                }
+                saveHeldTorrents();
+                unilog(2078, `held ${holdNames.length} torrent(s): ${holdNames.join(", ")}`);
+                return json(res, 200, {
+                  status: "ok",
+                  held: [...heldTorrents],
+                });
+              } catch (e) {
+                return json(res, 400, {
+                  status: "error",
+                  error: String(e && e.message ? e.message : e),
+                });
+              }
+            });
+          }
+          return json(res, 405, {
+            status: "error",
+            error: "method not allowed",
+          });
+        }
+
+        // Handle /unhold endpoint — drop torrent names from heldTorrents and
+        // restart the cycle so the released files start downloading right away.
+        // POST body: { names: ["..."] }
+        if (pathname === "/unhold") {
+          if (req.method === "POST") {
+            return readBody(req, (err1, body) => {
+              if (err1) {
+                return json(res, 400, {
+                  status: "error",
+                  error: String(err1 && err1.message ? err1.message : err1),
+                });
+              }
+              try {
+                var unholdPayload = body ? JSON.parse(body) : {};
+                var unholdNames = Array.isArray(unholdPayload.names)
+                  ? unholdPayload.names
+                  : unholdPayload.name
+                    ? [unholdPayload.name]
+                    : [];
+                unholdNames = unholdNames
+                  .map((n) => String(n || "").trim())
+                  .filter(Boolean);
+                if (unholdNames.length === 0) {
+                  return json(res, 400, {
+                    status: "error",
+                    error: "names must be a non-empty array",
+                  });
+                }
+                var removed = [];
+                for (var ui = 0; ui < unholdNames.length; ui++) {
+                  // Accept either the held name itself or the usb entry name
+                  // it was matched against.
+                  var match = heldTorrents.has(unholdNames[ui])
+                    ? unholdNames[ui]
+                    : heldNameOf(unholdNames[ui]);
+                  if (match && heldTorrents.delete(match)) removed.push(match);
+                }
+                // The usb pane follows an unhold with a /forceDown for the same
+                // entries, which is what gives them cycle priority.
+                if (removed.length > 0) {
+                  saveHeldTorrents();
+                  unilog(2079, `unheld ${removed.length} torrent(s): ${removed.join(", ")}`);
+                }
+                return json(res, 200, {
+                  status: "ok",
+                  removed,
+                  held: [...heldTorrents],
+                });
+              } catch (e) {
+                return json(res, 400, {
+                  status: "error",
+                  error: String(e && e.message ? e.message : e),
+                });
+              }
+            });
+          }
+          return json(res, 405, {
+            status: "error",
+            error: "method not allowed",
+          });
+        }
+
         // Handle /delItems endpoint – deletes download records and their files
         if (pathname === "/delItems") {
           if (req.method === "POST") {
@@ -1514,15 +1684,22 @@ async function main() {
             unilog(2017, `usb prune skipped: no dated entries found in usb files`);
           } else {
             var oldTest = `! -newermt @${cutoffSecs}`;
+            var prunedNames = [];
             try {
               var { stdout: typesOut } = await execAsync(
-                `ssh ${usbHost} "find ~/files -mindepth 1 -maxdepth 1 ${oldTest} -printf '%y\\n' 2>/dev/null"`,
+                `ssh ${usbHost} "find ~/files -mindepth 1 -maxdepth 1 ${oldTest} -printf '%y|%f\\n' 2>/dev/null"`,
                 { timeout: 5 * 60 * 1000 },
               );
-              var types = typesOut
-                .split("\n")
-                .map((s) => s.trim())
-                .filter(Boolean);
+              var types = [];
+              for (const entLine of String(typesOut).split("\n")) {
+                var ent = entLine.trim();
+                if (!ent) continue;
+                var bar = ent.indexOf("|");
+                if (bar < 0) continue;
+                types.push(ent.slice(0, bar));
+                var entName = ent.slice(bar + 1);
+                if (entName) prunedNames.push(entName);
+              }
               folderCount = types.filter((t) => t === "d").length;
               fileCount = types.filter((t) => t === "f").length;
             } catch (e) {
@@ -1534,6 +1711,18 @@ async function main() {
                 { timeout: 5 * 60 * 1000 },
               );
               unilog(2025, `usb prune at ${Math.floor(freePct)}% free: deleted ${folderCount} folders, ${fileCount} files dated within ${PRUNE_WINDOW_DAYS} days of the oldest`);
+              // heldTorrents tracks usb entries, so drop the pruned ones.
+              var unheldByPrune = [];
+              for (var pi = 0; pi < prunedNames.length; pi++) {
+                var prunedHeld = heldNameOf(prunedNames[pi]);
+                if (prunedHeld && heldTorrents.delete(prunedHeld)) {
+                  unheldByPrune.push(prunedHeld);
+                }
+              }
+              if (unheldByPrune.length > 0) {
+                saveHeldTorrents();
+                unilog(2080, `usb prune removed ${unheldByPrune.length} held torrent(s): ${unheldByPrune.join(", ")}`);
+              }
             } catch (e) {
               unilog(2026, `usb prune failed: ${e.message}`);
             }
@@ -2265,6 +2454,27 @@ async function main() {
       dvdScanFiles.sort((a, b) => (a.relPath < b.relPath ? -1 : 1));
       usbFiles = findLines.filter((l) => !shouldSkipUsbLineByScanRules(l));
       if (_cycleTiming) _cycleTiming.afterFind = Date.now();
+    }
+
+    // Gate held torrents out of the cycle before anything else looks at the
+    // list, so no metadata is ever recorded for them. They stay on usb for the
+    // user to preview in the usb pane and download once unheld.
+    if (heldTorrents.size > 0) {
+      var heldLineCount = 0;
+      usbFiles = usbFiles.filter((line) => {
+        var heldRelPath = String(line)
+          .split("-")
+          .slice(0, -1)
+          .join("-")
+          .slice(11);
+        if (!isHeldUsbPath(heldRelPath)) return true;
+        heldLineCount++;
+        return false;
+      });
+      dvdScanFiles = dvdScanFiles.filter((f) => !isHeldUsbPath(f.relPath));
+      if (heldLineCount > 0) {
+        unilog(2081, `held torrents gated ${heldLineCount} usb files out of this cycle`);
+      }
     }
 
     // Load inProgress map once per cycle, immediately after

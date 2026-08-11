@@ -117,7 +117,7 @@
           gap: '10px',
           alignItems: 'baseline',
           padding: '2px 0',
-          fontSize: selected === 'chksrt' ? '18.7px' : '15.6px',
+          fontSize: '18.72px',
           borderBottom: '1px solid #eee',
           cursor: 'pointer',
           backgroundColor:

@@ -760,6 +760,7 @@ async function _oldLoadAllShows() {
     tvdb.watchGap = tvdb.watchGap || false;
     tvdb.fileGap =
       tvdb.fileGap || tvdb.fileEndError || tvdb.seasonWatchedThenNofile;
+    tvdb.resDrop = tvdb.resDrop || false;
 
     // Ensure default values for missing properties
     if (tvdb.inToTry === undefined) tvdb.inToTry = false;
@@ -1104,6 +1105,9 @@ export const getSeriesMap = async (show, prune = false) => {
         (seasonNumber == show.fileGapSeason &&
           episodeNumber == show.fileGapEpisode &&
           show.fileGap) ||
+        (seasonNumber == show.resDropSeason &&
+          episodeNumber == show.resDropEpisode &&
+          show.resDrop) ||
         (seasonNumber == show.fileEndErrorSeason &&
           episodeNumber == show.fileEndErrorEpisode &&
           show.fileEndError) ||

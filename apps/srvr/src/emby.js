@@ -262,6 +262,10 @@ const getShowState = (showName, showMeta) => {
   let fileEndError = false;
   let fileEndErrorSeason = null;
   let fileEndErrorEpisode = null;
+  let resDrop = false;
+  let resDropSeason = null;
+  let resDropEpisode = null;
+  let bestResSoFar = null;
   let lastSeasonWatched = false;
   let seasonWatchedThenNofile = false;
   let seasonWatchedThenNofileSeason = null;
@@ -295,6 +299,9 @@ const getShowState = (showName, showMeta) => {
         fileGap: false,
         fileGapSeason: null,
         fileGapEpisode: null,
+        resDrop: false,
+        resDropSeason: null,
+        resDropEpisode: null,
       };
     }
 
@@ -327,6 +334,20 @@ const getShowState = (showName, showMeta) => {
 
         // A file on disk overrides unaired — it clearly aired if we have it
         if (haveFile) fileCount++;
+
+        // Resolution drop: any episode file lower res than an earlier one.
+        if (haveFile) {
+          const res = epd.getRes(ed, seasonNumber, episodeNumber);
+          if (res) {
+            if (bestResSoFar !== null && res < bestResSoFar && !resDrop) {
+              resDropSeason = seasonNumber;
+              resDropEpisode = episodeNumber;
+              resDrop = true;
+              unilog(2054, `resDrop set for ${showName} S${seasonNumber}E${episodeNumber}: ${res} < ${bestResSoFar}`);
+            }
+            if (bestResSoFar === null || res > bestResSoFar) bestResSoFar = res;
+          }
+        }
         if (firstEpisode && haveFile && !watched) {
           firstEpisodeFileUnwatched = true;
         }
@@ -525,6 +546,9 @@ const getShowState = (showName, showMeta) => {
     fileGap,
     fileGapSeason,
     fileGapEpisode,
+    resDrop,
+    resDropSeason,
+    resDropEpisode,
     allAiredHaveFile: sawAnyEpisode && !anyEpisodeNoFile,
     allAiredWatched: sawAnyEpisode && !anyAiredEpisodeNotWatched,
     allWatchedOrHaveFile: sawAnyEpisode && !anyEpisodeNeitherWatchedNorFile,
@@ -560,6 +584,9 @@ export const gapCheckOne = async (showId, showName, tvdbRecord) => {
     fileGap,
     fileGapSeason,
     fileGapEpisode,
+    resDrop,
+    resDropSeason,
+    resDropEpisode,
     seasonWatchedThenNofile,
     seasonWatchedThenNofileSeason,
     seasonWatchedThenNofileEpisode,
@@ -577,6 +604,9 @@ export const gapCheckOne = async (showId, showName, tvdbRecord) => {
     fileGap,
     fileGapSeason,
     fileGapEpisode,
+    resDrop,
+    resDropSeason,
+    resDropEpisode,
     fileEndError,
     fileEndErrorSeason,
     fileEndErrorEpisode,

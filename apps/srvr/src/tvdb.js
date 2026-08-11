@@ -2307,6 +2307,9 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     "fileGap",
     "fileGapSeason",
     "fileGapEpisode",
+    "resDrop",
+    "resDropSeason",
+    "resDropEpisode",
     "fileEndError",
     "fileEndErrorSeason",
     "fileEndErrorEpisode",
@@ -3661,6 +3664,9 @@ export const updateTvdbWithGapData = async (gapData) => {
       tvdbRecord.fileGap !== gaps.fileGap ||
       tvdbRecord.fileGapSeason !== gaps.fileGapSeason ||
       tvdbRecord.fileGapEpisode !== gaps.fileGapEpisode ||
+      tvdbRecord.resDrop !== gaps.resDrop ||
+      tvdbRecord.resDropSeason !== gaps.resDropSeason ||
+      tvdbRecord.resDropEpisode !== gaps.resDropEpisode ||
       tvdbRecord.fileEndError !== gaps.fileEndError ||
       tvdbRecord.fileEndErrorSeason !== gaps.fileEndErrorSeason ||
       tvdbRecord.fileEndErrorEpisode !== gaps.fileEndErrorEpisode ||
@@ -3679,6 +3685,9 @@ export const updateTvdbWithGapData = async (gapData) => {
       tvdbRecord.fileGap = gaps.fileGap;
       tvdbRecord.fileGapSeason = gaps.fileGapSeason;
       tvdbRecord.fileGapEpisode = gaps.fileGapEpisode;
+      tvdbRecord.resDrop = gaps.resDrop;
+      tvdbRecord.resDropSeason = gaps.resDropSeason;
+      tvdbRecord.resDropEpisode = gaps.resDropEpisode;
       tvdbRecord.fileEndError = gaps.fileEndError;
       tvdbRecord.fileEndErrorSeason = gaps.fileEndErrorSeason;
       tvdbRecord.fileEndErrorEpisode = gaps.fileEndErrorEpisode;

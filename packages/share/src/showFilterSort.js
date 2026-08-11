@@ -131,6 +131,7 @@ export const applyComputedProps = (rec) => {
   if (rec.notReady === undefined) rec.notReady = rec.inEmby === false;
   rec.watchGap = rec.watchGap || false;
   rec.fileGap = rec.fileGap || rec.fileEndError || rec.seasonWatchedThenNofile;
+  rec.resDrop = rec.resDrop || false;
   if (rec.inToTry === undefined) rec.inToTry = false;
   if (rec.inContinue === undefined) rec.inContinue = false;
   if (rec.inMark === undefined) rec.inMark = false;
@@ -153,7 +154,7 @@ export const COND_PREDS = {
   unplayed: (show) => show.notReady === false,
   waiting: (show) => !!show.waitStr?.length,
   needsIntro: (show) => !!show.needsIntro,
-  gap: (show) => show.fileGap || show.watchGap,
+  gap: (show) => show.fileGap || show.watchGap || show.resDrop,
   ended: (show) => show.ended,
   drama: (show) => !show.genres?.includes("Comedy"),
   sitcom: (show) => !!show.sitcom,

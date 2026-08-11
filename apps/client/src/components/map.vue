@@ -1134,6 +1134,7 @@ export default {
 
       if (this.mapShow?.watchGap) parts.push("Watch Gap");
       if (this.mapShow?.fileGap) parts.push("Missing File");
+      if (this.mapShow?.resDrop) parts.push("Resolution Drop");
       if (this.mapShow?.waitStr?.length)
         parts.push("Waiting " + this.mapShow.waitStr);
 

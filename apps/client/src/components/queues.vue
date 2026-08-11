@@ -111,7 +111,7 @@
       <div
         v-for="e in entries"
         :key="e.n + ':' + e.path"
-        @click="toggleLine(e)"
+        @click="lineClick($event, e)"
         :style="{
           display: 'flex',
           gap: '10px',
@@ -120,7 +120,12 @@
           fontSize: selected === 'chksrt' ? '18.7px' : '15.6px',
           borderBottom: '1px solid #eee',
           cursor: 'pointer',
-          backgroundColor: e.path === selectedPath ? '#fffacd' : 'transparent',
+          backgroundColor:
+            e.path === copyFlashPath
+              ? 'orange'
+              : e.path === selectedPath
+                ? '#fffacd'
+                : 'transparent',
         }"
       >
         <span
@@ -160,7 +165,9 @@
 
 <script>
 import * as srvr from "../srvr.js";
+import * as util from "../util.js";
 import evtBus from "../evtBus.js";
+import { logHere } from "../log.js";
 
 const POLL_MS = 1000;
 const FLASH_MS = 300;
@@ -175,6 +182,7 @@ export default {
       selected: null,
       selectedPath: null,
       selFlash: false,
+      copyFlashPath: null,
       error: "",
       data: { sub: null, asr: null, mp4: null, chksrt: null },
       queueDefs: [
@@ -221,6 +229,21 @@ export default {
       if (this.countOf(key) === 0) return;
       if (key !== this.selected) this.selectedPath = null;
       this.selected = key;
+    },
+    // Alt-click copies the line's path, like the other panes; plain click
+    // selects.
+    lineClick(event, e) {
+      if (event?.altKey) {
+        navigator.clipboard
+          .writeText(util.shellQuote(e.path))
+          .catch((err) => logHere({ lvl: "error" }, `copy failed: ${err}`));
+        this.copyFlashPath = e.path;
+        setTimeout(() => {
+          this.copyFlashPath = null;
+        }, FLASH_MS);
+        return;
+      }
+      this.toggleLine(e);
     },
     // One line at a time, click toggles it off again.
     toggleLine(e) {

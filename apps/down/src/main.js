@@ -2458,8 +2458,10 @@ async function main() {
 
     // Gate held torrents out of the cycle before anything else looks at the
     // list, so no metadata is ever recorded for them. They stay on usb for the
-    // user to preview in the usb pane and download once unheld.
-    if (heldTorrents.size > 0) {
+    // user to preview in the usb pane and download once unheld. A forced cycle
+    // is an explicit user request for those exact files, so it overrides the
+    // hold and is never gated.
+    if (heldTorrents.size > 0 && !processingForced) {
       var heldLineCount = 0;
       usbFiles = usbFiles.filter((line) => {
         var heldRelPath = String(line)

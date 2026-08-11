@@ -523,6 +523,9 @@ import {
 } from "../util.js";
 import { unilog, logHere } from "../log.js";
 
+// info pane shows only the head of a text file
+const TEXT_INFO_MAX_CHARS = 2048;
+
 export default {
   name: "Usb",
   components: { TreeNode },
@@ -1393,8 +1396,32 @@ export default {
           const dateStr = (node.date || "").replace(/:\d+\.\d+$|:\d+$/, "");
           this.infoFileMeta = dateStr ? `${sizeStr} | ${dateStr}` : sizeStr;
         }
+        // non-video file: show the head of its text, if it is text
         if (!VIDEO_EXTS.has(getExt(fileName))) {
-          this.infoLoading = false;
+          try {
+            const res = await fetch(
+              `${config.torrentsApiUrl}/api/usb/textfile`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  relPath,
+                  movieMode: this.movieMode,
+                  maxChars: TEXT_INFO_MAX_CHARS,
+                }),
+              },
+            );
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+            this.infoText =
+              data.isText && data.content != null
+                ? data.content
+                : "Not a text file";
+          } catch (e) {
+            this.infoText = `Error: ${e.message}`;
+          } finally {
+            this.infoLoading = false;
+          }
           return;
         }
         try {

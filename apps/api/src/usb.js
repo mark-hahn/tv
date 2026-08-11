@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 import { parseKeyValueFile } from "./qb-cred.js";
 import { getApiSecretsDir, getApiDataDir } from "./tvPaths.js";
 import { buildFileTree } from "./fileTree.js";
+import { isTextBuffer } from "./textProbe.js";
 import { logHere, unilog } from "@tv/share";
 
 const execFileAsync = promisify(execFile);
@@ -991,6 +992,23 @@ export async function renameUsbFile(oldPath, newName) {
 
   await runUsbSsh(`mv ${shellQuote(fullOldPath)} ${shellQuote(fullNewPath)}`);
   return { success: true };
+}
+
+// Read the first maxChars bytes of a file on the USB server and decide
+// whether it is text. Returns { isText, content } (content only when text).
+export async function readUsbTextFile(relPath, movieMode, maxChars) {
+  const root = movieMode ? USB_MOVIES_ROOT : USB_FILES_ROOT;
+  const fullPath = remotePathUnderRoot(root, relPath);
+  const quoted = shellQuote(fullPath);
+  const bytes = Math.max(1, Math.floor(Number(maxChars) || 0));
+  // `test -f` makes a missing file an ssh failure instead of empty output
+  const b64 = await runUsbSsh(
+    `test -f ${quoted} && head -c ${bytes} -- ${quoted} | base64 -w0`,
+    { timeout: 60000, maxBuffer: 4 * bytes + 4096 },
+  );
+  const buf = Buffer.from(b64.trim(), "base64");
+  if (!isTextBuffer(buf)) return { isText: false };
+  return { isText: true, content: buf.toString("utf8") };
 }
 
 // Recursively delete paths (relative to root) on the USB server.

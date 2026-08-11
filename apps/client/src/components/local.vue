@@ -1416,6 +1416,8 @@ import parseTorrentTitle from "parse-torrent-title";
 import { unilog, logHere } from "../log.js";
 
 const TEXT_VIEW_MAX_BYTES = 2 * 1024 * 1024;
+// info pane shows only the head of a text file
+const TEXT_INFO_MAX_CHARS = 2048;
 const VIDEO_EXT_RE = /\.(mkv|mp4|avi|m4v|mov|wmv|mpg|mpeg|ts|m2ts|webm)$/i;
 // trailing chain of `.old` / `.alt` markers, e.g. ".old", ".old.old", ".alt"
 const OLD_SUFFIX_RE = /^(.+?)((?:\.(?:old|alt))+)$/i;
@@ -2963,7 +2965,8 @@ export default {
       }
     },
     // probe:true asks only whether the file is viewable text
-    async fetchTextFile(relPath, probe) {
+    // maxChars (optional) limits the content to the head of the file
+    async fetchTextFile(relPath, probe, maxChars) {
       try {
         const url = `${config.torrentsApiUrl}/api/local/textfile`;
         const res = await fetch(url, {
@@ -2973,6 +2976,7 @@ export default {
             relPath,
             movieMode: this.movieMode,
             probe: !!probe,
+            maxChars: maxChars || 0,
           }),
         });
         const data = await res.json();
@@ -3093,6 +3097,19 @@ export default {
           sizeStr = this.formatFileSize(node.size);
           dateStr = (node.date || "").replace(/:\d+\.\d+$|:\d+$/, "");
           this.infoFileMeta = dateStr ? `${sizeStr} | ${dateStr}` : sizeStr;
+        }
+        // non-video file: show the head of its text, if it is text
+        if (!VIDEO_EXTS.has(getExt(fileName))) {
+          const textData = await this.fetchTextFile(
+            relPath,
+            false,
+            TEXT_INFO_MAX_CHARS,
+          );
+          if (textData && textData.isText && textData.content != null) {
+            this.infoText = textData.content;
+            this.infoLoading = false;
+            return;
+          }
         }
         try {
           const url = `${config.torrentsApiUrl}/api/local/mediainfo`;

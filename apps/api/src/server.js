@@ -33,8 +33,10 @@ import {
   getUsbMovies,
   deleteUsbMovies,
   usbCpToken,
+  readUsbTextFile,
 } from "./usb.js";
 import { getLocalFiles, renameLocalFile, swapLocalOld } from "./local.js";
+import { isTextBuffer } from "./textProbe.js";
 import { enrichQbtStats } from "./qbt-stats.js";
 import {
   getBrowseShow,
@@ -1194,6 +1196,18 @@ app.post("/api/usb/mediainfo", async (req, res) => {
   }
 });
 
+app.post("/api/usb/textfile", async (req, res) => {
+  try {
+    const { relPath, movieMode, maxChars } = req.body;
+    if (!relPath) return res.status(400).json({ error: "Missing relPath" });
+    const data = await readUsbTextFile(relPath, !!movieMode, maxChars);
+    res.json(data);
+  } catch (err) {
+    unilog(2114, `usb textfile error: ${err.message}`);
+    res.status(500).json({ error: err?.message || String(err) });
+  }
+});
+
 app.get("/api/usb/cp-token", async (req, res) => {
   try {
     const token = await usbCpToken();
@@ -1327,13 +1341,7 @@ app.post("/api/local/mediainfo", async (req, res) => {
 });
 
 const TEXT_PROBE_BYTES = 100;
-const TEXT_PROBE_MAX_NON_ASCII = 10;
 const TEXT_VIEW_MAX_BYTES = 2 * 1024 * 1024;
-
-// printable ascii plus tab, cr and lf
-function isAsciiByte(b) {
-  return (b >= 0x20 && b <= 0x7e) || b === 9 || b === 10 || b === 13;
-}
 
 // probe:true returns only size/isText, used to enable the View button
 app.post("/api/local/textfile", async (req, res) => {
@@ -1342,6 +1350,10 @@ app.post("/api/local/textfile", async (req, res) => {
     if (!relPath) {
       return res.status(400).json({ error: "Missing relPath" });
     }
+    // maxChars caps the read to the head of the file, so oversized text
+    // files can still be previewed
+    const maxChars =
+      Number(req.body.maxChars) > 0 ? Math.floor(Number(req.body.maxChars)) : 0;
     const relPathStr = String(relPath).trim();
     if (
       !relPathStr ||
@@ -1371,15 +1383,27 @@ app.post("/api/local/textfile", async (req, res) => {
     } finally {
       await fh.close();
     }
-    let nonAscii = 0;
-    for (const b of buf.subarray(0, bytesRead)) {
-      if (!isAsciiByte(b)) nonAscii++;
-    }
-    const isText = nonAscii <= TEXT_PROBE_MAX_NON_ASCII;
+    const isText = isTextBuffer(buf.subarray(0, bytesRead));
     const tooBig = st.size > TEXT_VIEW_MAX_BYTES;
 
-    if (probe || !isText || tooBig) {
+    if (probe || !isText || (tooBig && !maxChars)) {
       return res.json({ size: st.size, isText, tooBig });
+    }
+    if (maxChars) {
+      const head = Buffer.alloc(maxChars);
+      const fh2 = await open(fullPath, "r");
+      let headRead = 0;
+      try {
+        ({ bytesRead: headRead } = await fh2.read(head, 0, maxChars, 0));
+      } finally {
+        await fh2.close();
+      }
+      return res.json({
+        size: st.size,
+        isText,
+        tooBig,
+        content: head.subarray(0, headRead).toString("utf8"),
+      });
     }
     const content = await readFile(fullPath, "utf8");
     res.json({ size: st.size, isText, tooBig, content });

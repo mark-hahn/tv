@@ -40,6 +40,7 @@ import * as tvdb from "./tvdb.js";
 
 // ---- hard-wired constants (no env vars per repo convention) ----
 const tvDir = "/mnt/media/tv";
+const moviesDir = "/mnt/media/movies";
 const SUB_QUEUE_PATH = "/root/dev/apps/tv/apps/asr/data/subQueue.json";
 const SUB_QUEUE_CHKSRT_PATH =
   "/root/dev/apps/tv/apps/asr/data/subQueueChkSrt.json";
@@ -610,7 +611,6 @@ async function generateEmbSrts(
 }
 async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
   setSubStage("searching opensubtitles");
-  const moviesDir = "/mnt/media/movies";
   const isMovie = videoFilePath.startsWith(moviesDir + "/");
   let results;
   if (isMovie) {
@@ -676,6 +676,20 @@ async function applyOpenSubSrts(videoFilePath, showname, season, episode) {
     const tag = "opn" + encodeFileIdBase32(fid).slice(1);
     const outPath = `${base}.${tag}.srt`;
     if (fs.existsSync(outPath)) continue;
+    // Another rip of this episode already holds this exact OpenSubtitles
+    // file — copy its bytes rather than download the same content twice.
+    const sibling = findSiblingOpnSrt(videoFilePath, fid);
+    if (sibling) {
+      setSubStage(`copying opensubtitles ${existingOpnCount + dlCount + 1}/5`);
+      try {
+        await fs.promises.copyFile(sibling.path, outPath);
+        dlCount++;
+        unilog(2057, `copied ${tag} from sibling rip: ${path.basename(sibling.path)}`);
+        continue;
+      } catch (e) {
+        unilog(2058, `sibling copy failed for ${path.basename(outPath)}: ${e.message}`);
+      }
+    }
     setSubStage(
       `downloading opensubtitles ${existingOpnCount + dlCount + 1}/5`,
     );
@@ -998,6 +1012,57 @@ function hasOpnSidecar(videoFilePath) {
   );
 }
 
+const OPN_TAG_RE = /\.(opn[A-Z2-7]{5})\.srt$/i;
+
+// Rips of one episode sit side by side in a single season folder, so an
+// existing `*.opn<tag>.srt` there already holds exactly what a download for
+// this episode would return. Find one so the bytes can be copied instead of
+// spending a second OpenSubtitles download on identical content. `fileId`
+// narrows the search to one OpenSubtitles file; omit it to take any sibling.
+// Returns { path, tag, fileId } or null.
+function findSiblingOpnSrt(videoFilePath, fileId) {
+  const dir = path.dirname(videoFilePath);
+  const ownName = path.basename(videoFilePath);
+  const ownBase = ownName.replace(/\.[^.]+$/, "");
+  const wantTag =
+    fileId === undefined
+      ? null
+      : ("opn" + encodeFileIdBase32(fileId).slice(1)).toLowerCase();
+
+  // Movies have no season/episode to agree on; one movie folder is the scope.
+  const isMovie = videoFilePath.startsWith(moviesDir + "/");
+  const own = isMovie ? null : parseFileSeasonEpisode(ownBase);
+  if (
+    !isMovie &&
+    (!Number.isInteger(own?.season) || !Number.isInteger(own?.episode))
+  ) {
+    return null;
+  }
+
+  let entries;
+  try {
+    entries = fs.readdirSync(dir);
+  } catch {
+    return null;
+  }
+
+  for (const entry of entries) {
+    if (entry.startsWith(".")) continue; // .restmp- and other temp leftovers
+    const m = OPN_TAG_RE.exec(entry);
+    if (!m) continue;
+    const tag = m[1];
+    if (wantTag && tag.toLowerCase() !== wantTag) continue;
+    const srcBase = entry.slice(0, entry.length - m[0].length);
+    if (srcBase === ownBase) continue; // this video's own sidecar
+    if (!isMovie) {
+      const sib = parseFileSeasonEpisode(srcBase);
+      if (sib?.season !== own.season || sib?.episode !== own.episode) continue;
+    }
+    return { path: path.join(dir, entry), tag, srcBase };
+  }
+  return null;
+}
+
 // A saved chksrt decision (`<base>.mb.chosen`) means no sidecar srt is
 // wanted for this video — never download opn srts once it exists.
 function hasChosenMarker(videoFilePath) {
@@ -1018,6 +1083,23 @@ async function tryDownloadOpnSrtForVideo({
   if (hasChosenMarker(videoFilePath)) return { attempted: false, chosen: true };
   if (hasOpnSidecar(videoFilePath)) {
     return { attempted: true, downloaded: false, alreadyPresent: true };
+  }
+
+  // Another rip of this episode already carries an opn srt — copy it rather
+  // than search and download the same content again. Checked before the
+  // search because result order is not stable, so searching again could hand
+  // back a different file_id and download content we already have.
+  const sibling = findSiblingOpnSrt(videoFilePath);
+  if (sibling) {
+    const base = videoFilePath.replace(/\.[^.]+$/, "");
+    const outPath = `${base}.${sibling.tag}.srt`;
+    try {
+      await fs.promises.copyFile(sibling.path, outPath);
+      unilog(2059, `${logPrefix} copied ${sibling.tag} from sibling rip for ${showName} ${key}: ${path.basename(sibling.path)}`);
+      return { attempted: true, downloaded: true, outPath, copied: true };
+    } catch (e) {
+      unilog(2060, `${logPrefix} sibling copy failed for ${showName} ${key}: ${e.message}`);
+    }
   }
 
   resetOpnDailyCountIfNeeded();

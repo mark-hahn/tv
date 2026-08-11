@@ -339,7 +339,7 @@ const getShowState = (showName, showMeta) => {
         if (haveFile) {
           const res = epd.getRes(ed, seasonNumber, episodeNumber);
           if (res) {
-            if (bestResSoFar !== null && res < bestResSoFar && !resDrop) {
+            if (bestResSoFar !== null && res < bestResSoFar && !resDrop && !watched) {
               resDropSeason = seasonNumber;
               resDropEpisode = episodeNumber;
               resDrop = true;

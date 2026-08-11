@@ -219,6 +219,7 @@ import * as flexget from "./src/flexget.js";
 import * as disk from "./src/disk.js";
 import * as fileOps from "./src/fileOps.js";
 import * as localHistory from "./src/localHistory.js";
+import { startOldFileCleanup } from "./src/oldFiles.js";
 const { getFile, deletePath, deletePaths, delSeasonFiles, createShowFolder } =
   fileOps;
 import { registerMediaRoutes } from "./src/routes/media.js";
@@ -2852,6 +2853,7 @@ https.createServer(httpsOptions, app).listen(HTTP_PORT, () => {
   // seekable-mp4 mirrors for the chksrt queue + intro episodes (own loop, not
   // ffmpegQueue)
   mpfour.start({ syncBatchMsgs, introEpisodePaths });
+  startOldFileCleanup();
 });
 
 // The episode intro marking will open, for every show with an entry in the

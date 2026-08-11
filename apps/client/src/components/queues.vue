@@ -44,6 +44,22 @@
       >
         {{ q.label }} {{ countOf(q.key) }}
       </button>
+      <button
+        @click="selClick"
+        :disabled="!selectedPath"
+        :style="{
+          marginLeft: '20px',
+          padding: '2px 10px',
+          fontFamily: 'sans-serif',
+          cursor: selectedPath ? 'pointer' : 'default',
+          opacity: selectedPath ? 1 : 0.4,
+          border: '1px solid #999',
+          borderRadius: '4px',
+          backgroundColor: selFlash ? 'orange' : 'whitesmoke',
+        }"
+      >
+        Sel
+      </button>
       <span
         style="
           margin-left: auto;
@@ -95,6 +111,7 @@
       <div
         v-for="e in entries"
         :key="e.n + ':' + e.path"
+        @click="toggleLine(e)"
         :style="{
           display: 'flex',
           gap: '10px',
@@ -102,6 +119,8 @@
           padding: '2px 0',
           fontSize: selected === 'chksrt' ? '18.7px' : '15.6px',
           borderBottom: '1px solid #eee',
+          cursor: 'pointer',
+          backgroundColor: e.path === selectedPath ? '#fffacd' : 'transparent',
         }"
       >
         <span
@@ -141,8 +160,10 @@
 
 <script>
 import * as srvr from "../srvr.js";
+import evtBus from "../evtBus.js";
 
 const POLL_MS = 1000;
+const FLASH_MS = 300;
 
 export default {
   name: "Queues",
@@ -152,6 +173,8 @@ export default {
   data() {
     return {
       selected: null,
+      selectedPath: null,
+      selFlash: false,
       error: "",
       data: { sub: null, asr: null, mp4: null, chksrt: null },
       queueDefs: [
@@ -196,7 +219,31 @@ export default {
     // deselect.
     toggle(key) {
       if (this.countOf(key) === 0) return;
+      if (key !== this.selected) this.selectedPath = null;
       this.selected = key;
+    },
+    // One line at a time, click toggles it off again.
+    toggleLine(e) {
+      this.selectedPath = this.selectedPath === e.path ? null : e.path;
+    },
+    // Queue paths are <media root>/<Show Name>/Season N/<file>, so the show is
+    // the directory above the season one. Anything that doesn't fit falls back
+    // to the file name, which selectShowFromCardTitle parses as a torrent title.
+    showNameOfPath(p) {
+      const parts = String(p || "").split("/");
+      const file = parts.pop() || "";
+      const parent = parts.pop() || "";
+      if (/^season\b/i.test(parent)) return parts.pop() || file;
+      return parent || file;
+    },
+    selClick() {
+      if (!this.selectedPath) return;
+      this.selFlash = true;
+      setTimeout(() => {
+        this.selFlash = false;
+      }, FLASH_MS);
+      const name = this.showNameOfPath(this.selectedPath);
+      if (name) evtBus.emit("selectShowFromCardTitle", name);
     },
     start() {
       this.fetchOnce();
@@ -221,6 +268,13 @@ export default {
           .map((q) => q.key)
           .filter((k) => this.countOf(k) > 0);
         if (!this.selected && live.length) this.selected = live[0];
+        // A line that leaves the queue takes its selection with it.
+        if (
+          this.selectedPath &&
+          !this.entries.some((e) => e.path === this.selectedPath)
+        ) {
+          this.selectedPath = null;
+        }
       } catch (e) {
         this.error = e?.message || "fetch failed";
       }

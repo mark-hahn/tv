@@ -347,6 +347,31 @@ export function toSeriesMap(ed, folder, today, tvDir = TV_DIR) {
   return out;
 }
 
+// The gap-check flags that point at one episode, by field-name prefix. Each
+// has a matching `<prefix>Season` / `<prefix>Episode` on the show record.
+const GAP_MARK_PREFIXES = [
+  "watchGap",
+  "fileGap",
+  "fileEndError",
+  "seasonWatchedThenNofile",
+  "resDrop",
+];
+
+// Flag the seriesMap cells the gap check landed on so the map paints them.
+export function markGapErrors(seriesMap, rec) {
+  if (!Array.isArray(seriesMap) || !rec) return seriesMap;
+  for (const prefix of GAP_MARK_PREFIXES) {
+    if (!rec[prefix]) continue;
+    const s = rec[`${prefix}Season`];
+    const e = rec[`${prefix}Episode`];
+    if (s == null || e == null) continue;
+    const season = seriesMap.find(([num]) => num === s);
+    const ep = season?.[1]?.find(([num]) => num === e);
+    if (ep) ep[1].error = true;
+  }
+  return seriesMap;
+}
+
 // Pick the episode intro marking should open for a show: the first unwatched
 // episode with a file, else the first episode with a file. Shared so tv-srvr can
 // pre-build the mp4 mirror for exactly the episode the client will open — if the

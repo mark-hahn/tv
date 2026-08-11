@@ -1386,7 +1386,10 @@ app.post(
       // live refresh (stale omitted) in the background to catch any changes
       // made in Emby since the last sweep.
       if (stale) {
-        const seriesMap = epd.toSeriesMap(rec.episodeData, folder, today);
+        const seriesMap = epd.markGapErrors(
+          epd.toSeriesMap(rec.episodeData, folder, today),
+          rec,
+        );
         return {
           success: true,
           seriesMap,
@@ -1402,7 +1405,10 @@ app.post(
       const tRefresh = Date.now();
       await tvdb.saveTvdbSync();
       const tSave = Date.now();
-      const seriesMap = epd.toSeriesMap(rec.episodeData, folder, today);
+      const seriesMap = epd.markGapErrors(
+        epd.toSeriesMap(rec.episodeData, folder, today),
+        rec,
+      );
       const total = Date.now() - t0;
       if (total > 3000) {
         unilog(

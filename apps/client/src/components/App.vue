@@ -362,7 +362,7 @@
       :chksrtCount="chksrtCount"
       :introCount="introCount"
       :introShow="videoPlayerIntroShow"
-      :introShows="filteredShows"
+      :introShows="allShows"
       :introSeason="videoPlayerMapSeason"
       :introEpisode="videoPlayerMapEpisode"
       :introSource="videoPlayerSource"
@@ -1128,7 +1128,9 @@ export default {
     },
 
     async clickIntro() {
-      const show = this.filteredShows.find((s) => s.needsIntro);
+      // introCount counts needsIntro over allShows, so the queue does too —
+      // the list filter has nothing to do with which shows need marking.
+      const show = this.allShows.find((s) => s.needsIntro);
       if (!show) return;
       try {
         const result = await this.selectIntroFile(show);
@@ -1202,9 +1204,10 @@ export default {
         }
         return;
       }
-      // info pane: find next show in filtered list order that still needs intro
+      // info pane: find next show that still needs intro. Always allShows —
+      // the list filter has nothing to do with which shows need marking.
       const current = this.videoPlayerIntroShow;
-      const shows = this.filteredShows;
+      const shows = this.allShows;
       if (!current || !Array.isArray(shows)) {
         this.videoPlayerPath = null;
         this.videoPlayerMode = null;

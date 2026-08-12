@@ -1459,11 +1459,11 @@ const addEntry = (entry) => {
 
   upsertEntry(e);
 
-  // Add a tv.log line for every newly-added tv.json entry.
+  // Add a tv.log line for every newly-added db entry.
   if (!wasExisting) {
     const isError = !!e.error;
     const errorMsg = isError ? e.reason || e.status || "error" : null;
-    logTvEntryAdded(title, errorMsg);
+    logTvEntryAdded(`Added to down db: ${title}`, errorMsg);
   }
 
   if (workerCount < MAX_WORKERS) {

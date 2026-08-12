@@ -1359,14 +1359,20 @@ export default {
   },
 
   methods: {
-    // Clear the lasting stray note first, then re-run the gap check: the note
-    // only comes back if the non-aired files are still there, so the button
-    // doubles as the way to confirm a stray was really dealt with.
+    // Everything that will not happen on its own, in the order that lets each
+    // step feed the next: quarantine the non-aired files first, which can
+    // leave a duplicate folder holding nothing but artwork, which the folder
+    // merge can then remove. Then drop the lasting note and re-run the gap
+    // check last, so the note is rewritten only if something is still wrong.
+    // Both fixes act on files, so this is a deliberate button press -- check
+    // the situation before clicking it.
     async onGapchkClick() {
       const show = this.mapShow;
       if (!show?.id) return;
       this.gapchkFlash = true;
       try {
+        await srvr.strayEpisodeQuarantine(show.name);
+        await srvr.dupeFolderMerge(show.name);
         if (show.strayNote) await srvr.clearStrayNote(show.name);
         await srvr.triggerShowGapCheck(show.id, show.name);
       } finally {

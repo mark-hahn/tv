@@ -4,32 +4,21 @@
 
 import fs from "fs";
 import * as path from "node:path";
-import { parseFileSeasonEpisode } from "@tv/share";
+import {
+  parseFileSeasonEpisode,
+  vidHasAlt,
+  vidStripAlt,
+  vidIsVideoName,
+  vidIsSampleName,
+} from "@tv/share";
 
-export const videoFileExtensions = [
-  "mp4",
-  "mkv",
-  "avi",
-  "mov",
-  "wmv",
-  "flv",
-  "mpeg",
-  "3gp",
-  "m4v",
-  "ts",
-  "rm",
-  "vob",
-  "ogv",
-  "divx",
-];
+// The list and the name tests live in @tv/share so down shares them; these
+// re-exports keep every existing srvr call site working unchanged.
+export { videoFileExtensions, vidDemoteToOld } from "@tv/share";
 
-export function resHasAlt(name) {
-  return name.toLowerCase().endsWith(".alt");
-}
-
-export function resStripAlt(name) {
-  return resHasAlt(name) ? name.slice(0, -4) : name;
-}
+export const resHasAlt = vidHasAlt;
+export const resStripAlt = vidStripAlt;
+export const resIsSampleName = vidIsSampleName;
 
 // Resolution implied by a filename substring (0 = unknown).
 export function resOfName(name) {
@@ -38,11 +27,7 @@ export function resOfName(name) {
   return 0;
 }
 
-// True when name (after stripping a trailing .alt) is a real video file.
-export function resIsVideoName(name) {
-  const ext = resStripAlt(name).split(".").pop().toLowerCase();
-  return videoFileExtensions.includes(ext);
-}
+export const resIsVideoName = vidIsVideoName;
 
 // All episode video files in a season dir (includes hidden .alt copies).
 export function resFindEpisodeVideos(seasonDir, season, episode) {

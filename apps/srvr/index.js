@@ -53,6 +53,7 @@ import {
   videoFileExtensions,
   resStripAlt,
   resFindEpisodeVideos,
+  vidDemoteToOld,
 } from "./src/videoFiles.js";
 import {
   syncBadGroupsFromDisk,
@@ -1433,10 +1434,12 @@ function planDupeFolderGroups(embySeries) {
 // Fold every duplicate show folder that can be proven safe into the folder
 // holding the show, then have Emby rescan so the series it no longer has files
 // for goes away. Refusals are logged and left alone.
-async function mergeDuplicateShowFolders(caller) {
+async function mergeDuplicateShowFolders(caller, onlyShow = null) {
   const embySeries = await fetchEmbySeriesUnfiltered();
   if (!embySeries) return { merged: 0, refused: 0, results: [] };
-  const groups = planDupeFolderGroups(embySeries);
+  const groups = planDupeFolderGroups(embySeries).filter(
+    (g) => !onlyShow || g.showName === onlyShow,
+  );
   const results = [];
   let merged = 0;
   let refused = 0;
@@ -1570,13 +1573,13 @@ app.post(
   }),
 );
 
-// Runs the merge now instead of waiting for the next emby sweep. Server-side
-// only -- nothing in the UI calls this.
+// Runs the merge now instead of waiting for the next emby sweep. `showName`
+// limits it to one show, which is what the map pane's Gapchk button sends.
 app.post(
   "/api/dupeFolderMerge",
-  apiWrapper(async () => ({
+  apiWrapper(async (params) => ({
     success: true,
-    ...(await mergeDuplicateShowFolders("api")),
+    ...(await mergeDuplicateShowFolders("api", params?.showName || null)),
   })),
 );
 
@@ -5076,10 +5079,10 @@ function reconcileDuplicateEpisodeVideos(seasonDir, season, episode) {
   if (losers.length === 0) return demoted;
   for (const loser of losers) {
     const src = path.join(seasonDir, loser.name);
-    let dst = src + ".old";
-    while (fs.existsSync(dst)) dst += ".old";
     try {
-      fs.renameSync(src, dst);
+      // Takes the loser's sidecars with it, so the surviving file is not left
+      // beside another release's subtitles.
+      if (!vidDemoteToOld(src)) throw new Error("rename produced no file");
     } catch (e) {
       unilog(
         1537,

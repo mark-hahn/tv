@@ -26,6 +26,7 @@ import {
   setUnilogSink,
   logHere,
   resolveShowFolderName,
+  vidDemoteToOld,
 } from "@tv/share";
 
 const __filename = urlNode.fileURLToPath(import.meta.url);
@@ -1151,7 +1152,10 @@ async function main() {
                   heldTorrents.add(holdNames[hi]);
                 }
                 saveHeldTorrents();
-                unilog(2078, `held ${holdNames.length} torrent(s): ${holdNames.join(", ")}`);
+                unilog(
+                  2078,
+                  `held ${holdNames.length} torrent(s): ${holdNames.join(", ")}`,
+                );
                 return json(res, 200, {
                   status: "ok",
                   held: [...heldTorrents],
@@ -1211,7 +1215,10 @@ async function main() {
                 // entries, which is what gives them cycle priority.
                 if (removed.length > 0) {
                   saveHeldTorrents();
-                  unilog(2079, `unheld ${removed.length} torrent(s): ${removed.join(", ")}`);
+                  unilog(
+                    2079,
+                    `unheld ${removed.length} torrent(s): ${removed.join(", ")}`,
+                  );
                 }
                 return json(res, 200, {
                   status: "ok",
@@ -1591,10 +1598,16 @@ async function main() {
           const message = error?.message || String(error || `HTTP ${status}`);
 
           if (retryCount < MAX_RETRIES) {
-            unilog(1746, `theTvDb login failed (attempt ${retryCount + 1}/${MAX_RETRIES + 1}): ${message}; status=${status}; retrying in ${RETRY_DELAY_MS}ms`);
+            unilog(
+              1746,
+              `theTvDb login failed (attempt ${retryCount + 1}/${MAX_RETRIES + 1}): ${message}; status=${status}; retrying in ${RETRY_DELAY_MS}ms`,
+            );
             setTimeout(() => loginToTvDb(retryCount + 1), RETRY_DELAY_MS);
           } else {
-            unilog(1747, `theTvDb login gave up after ${retryCount + 1} attempts: ${message}; status=${status}; calling process.exit()`);
+            unilog(
+              1747,
+              `theTvDb login gave up after ${retryCount + 1} attempts: ${message}; status=${status}; calling process.exit()`,
+            );
             return process.exit(1);
           }
         } else {
@@ -1647,7 +1660,10 @@ async function main() {
         if (freePct === null) {
           unilog(2014, `usb prune skipped: could not measure usb free space`);
         } else if (freePct >= PRUNE_FREE_PCT) {
-          unilog(2015, `usb prune not needed: ${Math.floor(freePct)}% free (min ${PRUNE_FREE_PCT}%)`);
+          unilog(
+            2015,
+            `usb prune not needed: ${Math.floor(freePct)}% free (min ${PRUNE_FREE_PCT}%)`,
+          );
         } else {
           var folderCount = 0;
           var fileCount = 0;
@@ -1677,11 +1693,17 @@ async function main() {
             Date.now() / 1000 - PRUNE_WINDOW_DAYS * 24 * 60 * 60,
           );
           if (cutoffSecs !== null && cutoffSecs > minAgeCutoffSecs) {
-            unilog(2039, `usb prune cutoff would have deleted files newer than ${PRUNE_WINDOW_DAYS} days: held back to the ${PRUNE_WINDOW_DAYS} day age floor`);
+            unilog(
+              2039,
+              `usb prune cutoff would have deleted files newer than ${PRUNE_WINDOW_DAYS} days: held back to the ${PRUNE_WINDOW_DAYS} day age floor`,
+            );
             cutoffSecs = minAgeCutoffSecs;
           }
           if (cutoffSecs === null) {
-            unilog(2017, `usb prune skipped: no dated entries found in usb files`);
+            unilog(
+              2017,
+              `usb prune skipped: no dated entries found in usb files`,
+            );
           } else {
             var oldTest = `! -newermt @${cutoffSecs}`;
             var prunedNames = [];
@@ -1710,7 +1732,10 @@ async function main() {
                 `ssh ${usbHost} "find ~/files -mindepth 1 -maxdepth 1 ${oldTest} -exec rm -rf {} + >/dev/null 2>&1"`,
                 { timeout: 5 * 60 * 1000 },
               );
-              unilog(2025, `usb prune at ${Math.floor(freePct)}% free: deleted ${folderCount} folders, ${fileCount} files dated within ${PRUNE_WINDOW_DAYS} days of the oldest`);
+              unilog(
+                2025,
+                `usb prune at ${Math.floor(freePct)}% free: deleted ${folderCount} folders, ${fileCount} files dated within ${PRUNE_WINDOW_DAYS} days of the oldest`,
+              );
               // heldTorrents tracks usb entries, so drop the pruned ones.
               var unheldByPrune = [];
               for (var pi = 0; pi < prunedNames.length; pi++) {
@@ -1721,7 +1746,10 @@ async function main() {
               }
               if (unheldByPrune.length > 0) {
                 saveHeldTorrents();
-                unilog(2080, `usb prune removed ${unheldByPrune.length} held torrent(s): ${unheldByPrune.join(", ")}`);
+                unilog(
+                  2080,
+                  `usb prune removed ${unheldByPrune.length} held torrent(s): ${unheldByPrune.join(", ")}`,
+                );
               }
             } catch (e) {
               unilog(2026, `usb prune failed: ${e.message}`);
@@ -2011,7 +2039,10 @@ async function main() {
         });
         unilog(1993, `DVD: deleted finished usb folder "${torrentFolder}"`);
       } catch (e) {
-        unilog(1994, `DVD: failed deleting usb folder "${torrentFolder}": ${e.message}`);
+        unilog(
+          1994,
+          `DVD: failed deleting usb folder "${torrentFolder}": ${e.message}`,
+        );
         continue;
       }
       try {
@@ -2019,7 +2050,10 @@ async function main() {
           timeout: 60000,
         });
       } catch (e) {
-        unilog(1995, `DVD: failed removing staging dir for "${torrentFolder}": ${e.message}`);
+        unilog(
+          1995,
+          `DVD: failed removing staging dir for "${torrentFolder}": ${e.message}`,
+        );
       }
     }
 
@@ -2475,7 +2509,10 @@ async function main() {
       });
       dvdScanFiles = dvdScanFiles.filter((f) => !isHeldUsbPath(f.relPath));
       if (heldLineCount > 0) {
-        unilog(2081, `held torrents gated ${heldLineCount} usb files out of this cycle`);
+        unilog(
+          2081,
+          `held torrents gated ${heldLineCount} usb files out of this cycle`,
+        );
       }
     }
 
@@ -3033,10 +3070,16 @@ async function main() {
               const message = error && error.message ? error.message : error;
               const status = response && response.statusCode;
               if (++tvDbErrCount >= 15) {
-                unilog(1748, `tvdb search gave up for ${fname} after ${tvDbErrCount} failures: ${message} | status: ${status} | downloaded=${downloadCount}`);
+                unilog(
+                  1748,
+                  `tvdb search gave up for ${fname} after ${tvDbErrCount} failures: ${message} | status: ${status} | downloaded=${downloadCount}`,
+                );
                 return process.nextTick(checkFile);
               }
-              unilog(1749, `tvdb search failed for ${fname}: ${message} | status: ${status}; retrying in ${rsyncDelay}ms (failure ${tvDbErrCount}/15)`);
+              unilog(
+                1749,
+                `tvdb search failed for ${fname}: ${message} | status: ${status}; retrying in ${rsyncDelay}ms (failure ${tvDbErrCount}/15)`,
+              );
               return setTimeout(chkTvDB, rsyncDelay);
             } else {
               err(`tvdb no results: fname: ${fname} | url: ${tvdburl}`);
@@ -3490,12 +3533,14 @@ async function main() {
             );
             return process.nextTick(checkFile);
           }
-          // USB is better than disk — rename disk file to .old before downloading.
+          // USB is better than disk — rename disk file to .old before
+          // downloading. Its sidecars go with it: they name the old release,
+          // so left behind they belong to nothing while the incoming file
+          // starts with no subtitles at all.
           try {
             var _oldPath = path.join(tvSeasonPath, _diskFile);
-            var _oldDst = _oldPath + ".old";
-            while (fs.existsSync(_oldDst)) _oldDst = _oldDst + ".old";
-            fs.renameSync(_oldPath, _oldDst);
+            var _oldDst = vidDemoteToOld(_oldPath);
+            if (!_oldDst) throw new Error("rename produced no file");
             unilog(
               334,
               "renamed worse disk file to .old:",
@@ -3568,12 +3613,12 @@ async function main() {
             );
             return process.nextTick(checkFile);
           }
-          // USB is better — rename the worse disk file to .old before downloading.
+          // USB is better — rename the worse disk file to .old before
+          // downloading, sidecars included (see the note on the other branch).
           try {
             var oldPath = path.join(tvSeasonPath, diskFile);
-            var oldDst = oldPath + ".old";
-            while (fs.existsSync(oldDst)) oldDst = oldDst + ".old";
-            fs.renameSync(oldPath, oldDst);
+            var oldDst = vidDemoteToOld(oldPath);
+            if (!oldDst) throw new Error("rename produced no file");
             unilog(
               337,
               "renamed worse disk file to .old:",

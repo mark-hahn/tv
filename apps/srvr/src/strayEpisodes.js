@@ -34,7 +34,7 @@ import * as path from "node:path";
 import * as epd from "@tv/share";
 import * as tvdb from "./tvdb.js";
 import { showFolderFor } from "./showPaths.js";
-import { resIsVideoName } from "./videoFiles.js";
+import { resIsVideoName, resIsSampleName } from "./videoFiles.js";
 
 const TV_DIR = "/mnt/media/tv";
 const TV_ERRORS_DIR = "/mnt/media/tv-errors";
@@ -92,7 +92,9 @@ function videosIn(dir) {
   try {
     return fs
       .readdirSync(dir)
-      .filter((n) => !n.startsWith(".") && resIsVideoName(n));
+      .filter(
+        (n) => !n.startsWith(".") && resIsVideoName(n) && !resIsSampleName(n),
+      );
   } catch {
     return [];
   }

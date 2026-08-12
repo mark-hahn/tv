@@ -39,6 +39,8 @@ import {
   resIsVideoName,
   resStripAlt,
   resFindEpisodeVideos,
+  resIsSampleName,
+  vidDemoteToOld,
 } from "./videoFiles.js";
 import { flexgetIsBetterSameRun } from "./flexgetScore.js";
 
@@ -72,18 +74,12 @@ const subDirs = (dir) => {
 const hasWorkInProgress = (showDir) =>
   subDirs(showDir).some((n) => n.startsWith("."));
 
-// A scene "sample" clip sits next to the episode it was cut from and parses to
-// the same season/episode, so counting one would both inflate a folder's size
-// and make the episode look like it is already there twice.
-const isSampleName = (name) =>
-  /(^|[.\-_ ])sample([.\-_ ]|$)/i.test(name.replace(/\.[^.]+$/, ""));
-
 const videosIn = (dir) => {
   try {
     return fs
       .readdirSync(dir)
       .filter(
-        (n) => !n.startsWith(".") && resIsVideoName(n) && !isSampleName(n),
+        (n) => !n.startsWith(".") && resIsVideoName(n) && !resIsSampleName(n),
       );
   } catch {
     return [];
@@ -200,7 +196,7 @@ export function planFolderMerge(showName, winnerAudit, loserAudit) {
       // file loses becomes `.old`, so exactly one stays active and neither is
       // thrown away.
       const rivals = resFindEpisodeVideos(dstSeason, season, episode).filter(
-        (v) => !v.alt && !isSampleName(v.name),
+        (v) => !v.alt && !resIsSampleName(v.name),
       );
       if (rivals.length) {
         let best = rivals[0];
@@ -248,14 +244,9 @@ export function planFolderMerge(showName, winnerAudit, loserAudit) {
   };
 }
 
-// Demoting never overwrites: `.old` is added until the name is free, which is
-// the same rule down follows when a better release lands on top of a file.
-function renameToOld(filePath) {
-  let dst = filePath + ".old";
-  while (fs.existsSync(dst)) dst += ".old";
-  fs.renameSync(filePath, dst);
-  return dst;
-}
+// Demoting takes the video's sidecars with it, so the file that stays active
+// is not left sitting next to another release's subtitles.
+const renameToOld = (filePath) => vidDemoteToOld(filePath) || filePath;
 
 /**
  * Carry out a plan that came back ok.

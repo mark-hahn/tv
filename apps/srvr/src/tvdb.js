@@ -2361,6 +2361,13 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   if (existing.seasonIntros != null)
     tvdbData.seasonIntros = existing.seasonIntros;
 
+  // A refresh builds tvdbData from scratch, so anything not copied here is
+  // lost. strayOk is a decision the user made about specific files and can
+  // never be recomputed; strayNote is the lasting record that a non-aired file
+  // was once seen, which is the whole point of it.
+  if (existing.strayOk != null) tvdbData.strayOk = existing.strayOk;
+  if (existing.strayNote != null) tvdbData.strayNote = existing.strayNote;
+
   // Calculate waitStr from existing episodeData (fresh series map data hasn't
   // been fetched yet at this stage).
   const calculatedWaitStr = calculateWaitStr(existing.episodeData);
@@ -3695,7 +3702,10 @@ export const updateTvdbWithGapData = async (gapData) => {
       // Files for episodes this show never aired. Logged only as it turns on,
       // so a standing condition does not repeat every gap check.
       if (!tvdbRecord.stray && gaps.stray) {
-        unilog(2150, `${tvdbRecord.name}: ${gaps.strayCount} file(s) for episodes it never aired, from S${gaps.straySeason}E${gaps.strayEpisode}: ${(gaps.strayFiles || []).join(", ")}`);
+        unilog(
+          2150,
+          `${tvdbRecord.name}: ${gaps.strayCount} file(s) for episodes it never aired, from S${gaps.straySeason}E${gaps.strayEpisode}: ${(gaps.strayFiles || []).join(", ")}`,
+        );
       }
       tvdbRecord.stray = gaps.stray;
       tvdbRecord.strayCount = gaps.strayCount;

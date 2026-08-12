@@ -1558,6 +1558,103 @@ app.post(
   }),
 );
 
+// Exactly what the map pane's Gapchk button would do to one show, as a list
+// the confirmation dialog can show before anything happens. Reads only.
+app.post(
+  "/api/gapchkPreview",
+  apiWrapper(async (params) => {
+    const showName = params?.showName;
+    if (!showName) return { success: false, error: "showName required" };
+    const rec = tvdb.getAllTvdbSync()?.[showName];
+    if (!rec) return { success: false, error: "show not found" };
+    const actions = [];
+
+    for (const plan of strayEpisodes.planAllStrayQuarantines(showName)) {
+      if (plan.ok) {
+        const videos = plan.files.filter((f) =>
+          videoFileExtensions.includes(f.name.split(".").pop()),
+        );
+        actions.push({
+          kind: "quarantine",
+          title: `Move ${videos.length} video(s) + ${plan.files.length - videos.length} sidecar(s) to tv-errors`,
+          detail: plan.reason,
+          items: videos.map((f) => `Season ${f.season}/${f.name}`),
+        });
+      } else if (plan.reason) {
+        actions.push({
+          kind: "quarantine-skip",
+          title: "No files quarantined",
+          detail: plan.reason,
+          items: [],
+        });
+      }
+    }
+
+    const embySeries = await fetchEmbySeriesUnfiltered();
+    for (const g of embySeries ? planDupeFolderGroups(embySeries) : []) {
+      if (g.showName !== showName) continue;
+      for (const plan of g.plans) {
+        actions.push({
+          kind: plan.ok ? "merge" : "merge-skip",
+          title: plan.ok
+            ? `Merge folder "${plan.loserFolder}" into "${plan.winnerFolder}"`
+            : `Will NOT merge folder "${plan.loserFolder}"`,
+          detail: plan.reason,
+          items: plan.moves.map((m) => m.seasonDir),
+        });
+      }
+    }
+
+    const accepting = strayEpisodes.straysToAccept(showName, rec);
+    if (accepting.length) {
+      actions.push({
+        kind: "accept",
+        title: `Accept ${accepting.length} stray file(s) as this show's episodes`,
+        detail:
+          "they stop counting as strays; replacing any of them with a different release flags it again",
+        items: accepting.map((a) => `${a.key}  (${a.min ?? "?"} min)`),
+      });
+    }
+
+    if (rec.strayNote) {
+      actions.push({
+        kind: "clearNote",
+        title: "Clear the stray note",
+        detail: rec.strayNote,
+        items: [],
+      });
+    }
+    actions.push({
+      kind: "gapcheck",
+      title: "Re-run the gap check",
+      detail: "rewrites the note only if something is still wrong",
+      items: [],
+    });
+    return { success: true, showName, actions };
+  }),
+);
+
+// Mark the strays the quarantine left behind as reviewed and fine, so a show
+// that has been fully triaged can go quiet. Keyed by episode + filename, so a
+// later replacement of any of them raises the flag again.
+app.post(
+  "/api/acceptStrays",
+  apiWrapper(async (params) => {
+    const showName = params?.showName;
+    if (!showName) return { success: false, error: "showName required" };
+    const rec = tvdb.getAllTvdbSync()?.[showName];
+    if (!rec) return { success: false, error: "show not found" };
+    const accepting = strayEpisodes.straysToAccept(showName, rec);
+    if (!accepting.length) return { success: true, accepted: 0 };
+    const set = new Set(Array.isArray(rec.strayOk) ? rec.strayOk : []);
+    for (const a of accepting) set.add(a.key);
+    rec.strayOk = [...set];
+    await tvdb.saveTvdbSync();
+    unilog(2170, `${showName}: accepted ${accepting.length} stray file(s) as this show's episodes: ${accepting.map((a) => a.key).join(", ")}`);
+    return { success: true, accepted: accepting.length };
+  }),
+);
+
 // strayNote is never cleared on its own -- this is the only thing that clears
 // it, once the note has been read and the show checked.
 app.post(
@@ -5057,6 +5154,85 @@ watcher
   });
 
 unilog(91, `Watching ${tvDir} for file changes...`);
+
+//////////////////  SUBTITLE BACKSTOP SWEEP  //////////////////
+//
+// The file watcher is what normally puts a new download in front of chksrt,
+// and for months it silently did not: it took the show name from the folder,
+// missed every show whose folder differs from its tvdb name, and dropped those
+// files without a trace. That specific bug is fixed, but the shape of it --
+// one gate on the only path to the sub queue -- is worth a second route that
+// does not depend on any lookup being right.
+//
+// So this walks the library and enqueues any active video with no subtitle
+// sidecar at all. fileNeedsSubChecked does the real work: it already skips
+// files that are queued, snoozed, or have an .srt / .mb.chosen next to them,
+// so a settled library adds nothing and the sweep is just a directory walk.
+const SUB_BACKSTOP_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const SUB_BACKSTOP_START_DELAY_MS = 10 * 60 * 1000;
+
+async function runSubBackstopSweep() {
+  let scanned = 0;
+  let queued = 0;
+  try {
+    for (const showFolder of fs.readdirSync(tvDir)) {
+      if (showFolder.startsWith(".")) continue;
+      const showDir = path.join(tvDir, showFolder);
+      let seasonDirs;
+      try {
+        if (!fs.statSync(showDir).isDirectory()) continue;
+        seasonDirs = fs.readdirSync(showDir);
+      } catch {
+        continue;
+      }
+      for (const seasonDir of seasonDirs) {
+        if (seasonDir.startsWith(".")) continue;
+        const seasonPath = path.join(showDir, seasonDir);
+        let files;
+        try {
+          if (!fs.statSync(seasonPath).isDirectory()) continue;
+          files = fs.readdirSync(seasonPath);
+        } catch {
+          continue;
+        }
+        for (const f of files) {
+          if (f.startsWith(".")) continue;
+          if (!videoFileExtensions.includes(f.split(".").pop())) continue;
+          const fp = path.join(seasonPath, f);
+          scanned++;
+          const showName = showNameFromFilePath(fp);
+          const rec = tvdb.getAllTvdbSync?.()?.[showName];
+          if (!rec?.inEmby) continue;
+          if (!(await fileNeedsSubChecked(fp, showName))) continue;
+          enqueueSubQueue(
+            { videoFilePath: fp, fromUI: false, lowPriority: true },
+            false,
+          );
+          queued++;
+          unilog(
+            2165,
+            `${showName}: ${f} had no subtitles and was never queued — the watcher missed it`,
+          );
+        }
+      }
+    }
+    if (queued) {
+      persistSubQueue();
+      doSubQueueNow();
+    }
+    unilog(
+      2166,
+      `subtitle backstop swept ${scanned} video(s), queued ${queued}`,
+    );
+  } catch (e) {
+    unilog(2167, `subtitle backstop: ${e.message}`);
+  }
+}
+
+setTimeout(() => {
+  runSubBackstopSweep();
+  setInterval(runSubBackstopSweep, SUB_BACKSTOP_INTERVAL_MS);
+}, SUB_BACKSTOP_START_DELAY_MS);
 
 // Enforce one active (non-.old) video file per episode. A replacement download
 // that races the file it replaces can leave two active videos: worker.js

@@ -249,6 +249,13 @@ const safeGet = async (url, retries = 3) => {
   }
 };
 
+// How an accepted stray is remembered: the episode it claims plus the exact
+// file that was reviewed. A different file on the same episode is not covered.
+export const strayOkKey = (season, episode, fileName) =>
+  `S${season}E${episode}|${String(fileName || "")
+    .split("/")
+    .pop()}`;
+
 const getShowState = (showName, showMeta) => {
   // active rows have watched with no watched at end
   // or last epi in last row watched
@@ -278,6 +285,14 @@ const getShowState = (showName, showMeta) => {
   let strayFiles = [];
   let straySeason = null;
   let strayEpisode = null;
+  const strayOkSet = new Set(
+    Array.isArray(showMeta?.strayOk) ? showMeta.strayOk : [],
+  );
+  const strayAccepted = (s, e) => {
+    if (strayOkSet.size === 0) return false;
+    const name = epd.getFileName(showMeta?.episodeData, s, e);
+    return strayOkSet.has(strayOkKey(s, e, name));
+  };
   let bestResSoFar = null;
   let lastSeasonWatched = false;
   let seasonWatchedThenNofile = false;
@@ -359,7 +374,12 @@ const getShowState = (showName, showMeta) => {
         // this show's folder, which is what let a 10-episode DVDRip pose as
         // Guilt (2019)'s 4-episode season 1. Recorded here rather than acted
         // on, because the two cases look identical from episodeData alone.
-        if (haveFile && !aired) {
+        //
+        // Unless it has been looked at and accepted: strayOk holds the ones
+        // already reviewed, keyed by episode AND filename, so replacing the
+        // file with a different release makes it a stray again rather than
+        // inheriting an acceptance it was never given.
+        if (haveFile && !aired && !strayAccepted(seasonNumber, episodeNumber)) {
           strayCount++;
           if (straySeason === null) {
             straySeason = seasonNumber;

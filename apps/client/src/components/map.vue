@@ -991,6 +991,106 @@
         </div>
       </div>
     </div>
+
+    <!-- Gapchk confirmation: the complete list of what the button would do.
+         Two of the steps move files, so nothing runs until this is accepted. -->
+    <div
+      v-if="gapchkConfirmShow"
+      @click.self="gapchkConfirmShow = null"
+      style="
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      "
+    >
+      <div
+        style="
+          background: white;
+          color: black;
+          border-radius: 9px;
+          padding: 14px 18px;
+          max-width: 720px;
+          max-height: 74vh;
+          overflow: auto;
+          box-shadow: 0 6px 28px rgba(0, 0, 0, 0.4);
+        "
+      >
+        <div style="font-weight: bold; font-size: 15px; margin-bottom: 8px">
+          Gapchk — {{ gapchkConfirmShow }}
+        </div>
+        <div
+          v-for="(a, i) in gapchkActions"
+          :key="i"
+          style="margin-bottom: 10px; font-size: 13px"
+        >
+          <div
+            :style="{
+              fontWeight: 'bold',
+              color:
+                a.kind === 'quarantine' || a.kind === 'merge' ? '#b00' : '#333',
+            }"
+          >
+            {{
+              a.kind === "quarantine" || a.kind === "merge"
+                ? "WILL CHANGE FILES: "
+                : ""
+            }}{{ a.title }}
+          </div>
+          <div
+            v-if="a.detail"
+            style="color: #555; margin-left: 10px"
+          >
+            {{ a.detail }}
+          </div>
+          <div
+            v-for="(it, j) in a.items"
+            :key="j"
+            style="margin-left: 20px; font-family: monospace; font-size: 12px"
+          >
+            {{ it }}
+          </div>
+        </div>
+        <div style="margin-top: 12px; text-align: right">
+          <button
+            @click="gapchkConfirmShow = null"
+            style="
+              font-size: 13.5px;
+              margin-right: 8px;
+              border-radius: 7px;
+              padding: 3px 12px;
+            "
+          >
+            Cancel
+          </button>
+          <button
+            @click="runGapchkActions"
+            style="font-size: 13.5px; border-radius: 7px; padding: 3px 12px"
+          >
+            Do it
+          </button>
+        </div>
+      </div>
+    </div>
+    <div
+      v-if="gapchkResult"
+      style="
+        position: fixed;
+        bottom: 14px;
+        right: 14px;
+        background: #333;
+        color: white;
+        padding: 7px 12px;
+        border-radius: 7px;
+        font-size: 13px;
+        z-index: 9999;
+      "
+    >
+      {{ gapchkResult }}
+    </div>
   </div>
 </template>
 
@@ -1080,6 +1180,9 @@ export default {
       mapUpdateKey: 0,
       pruneFlash: false,
       gapchkFlash: false,
+      gapchkConfirmShow: null,
+      gapchkActions: [],
+      gapchkResult: "",
       posFlash: false,
       selectedSeasons: new Set(),
       selectedCells: new Set(),
@@ -1157,7 +1260,9 @@ export default {
       if (this.mapShow?.stray) {
         const n = this.mapShow.strayCount || 1;
         const at = `S${this.mapShow.straySeason}E${this.mapShow.strayEpisode}`;
-        parts.push(n > 1 ? `Stray Files (${n}) from ${at}` : `Stray File ${at}`);
+        parts.push(
+          n > 1 ? `Stray Files (${n}) from ${at}` : `Stray File ${at}`,
+        );
       } else if (this.mapShow?.strayNote) {
         // The files are gone -- moved out, deleted, or TVDB finally published
         // the air date -- but the note stays until it is explicitly cleared,
@@ -1193,11 +1298,7 @@ export default {
           if (dates.length > 0) {
             let endDate = dates[dates.length - 1];
             const lastAired = this.tvdbData?.lastAired?.replace(/\//g, "-");
-            if (
-              season === lastSeason &&
-              lastAired &&
-              lastAired > endDate
-            ) {
+            if (season === lastSeason && lastAired && lastAired > endDate) {
               endDate = lastAired;
             }
             result[season] = {
@@ -1359,27 +1460,58 @@ export default {
   },
 
   methods: {
-    // Everything that will not happen on its own, in the order that lets each
-    // step feed the next: quarantine the non-aired files first, which can
-    // leave a duplicate folder holding nothing but artwork, which the folder
-    // merge can then remove. Then drop the lasting note and re-run the gap
-    // check last, so the note is rewritten only if something is still wrong.
-    // Both fixes act on files, so this is a deliberate button press -- check
-    // the situation before clicking it.
+    // Ask the server exactly what it would do, show the whole list, and only
+    // act once it is confirmed. Two of the four steps move files, so nothing
+    // here runs on the click alone.
     async onGapchkClick() {
       const show = this.mapShow;
       if (!show?.id) return;
       this.gapchkFlash = true;
       try {
-        await srvr.strayEpisodeQuarantine(show.name);
-        await srvr.dupeFolderMerge(show.name);
-        if (show.strayNote) await srvr.clearStrayNote(show.name);
-        await srvr.triggerShowGapCheck(show.id, show.name);
+        const preview = await srvr.gapchkPreview(show.name);
+        if (!preview?.success) {
+          this.gapchkResult = `Could not read the plan: ${preview?.error || "unknown error"}`;
+          return;
+        }
+        this.gapchkActions = preview.actions || [];
+        this.gapchkConfirmShow = show.name;
       } finally {
         setTimeout(() => {
           this.gapchkFlash = false;
         }, 750);
       }
+    },
+
+    // Everything that will not happen on its own, in the order that lets each
+    // step feed the next: quarantine the non-aired files first, which can
+    // leave a duplicate folder holding nothing but artwork, which the folder
+    // merge can then remove. Then drop the lasting note and re-run the gap
+    // check last, so the note is rewritten only if something is still wrong.
+    async runGapchkActions() {
+      const showName = this.gapchkConfirmShow;
+      const show = this.mapShow;
+      this.gapchkConfirmShow = null;
+      if (!showName || !show?.id) return;
+      try {
+        const q = await srvr.strayEpisodeQuarantine(showName);
+        const m = await srvr.dupeFolderMerge(showName);
+        // After the quarantine, so only the files it chose to leave behind
+        // are the ones being accepted.
+        const a = await srvr.acceptStrays(showName);
+        if (show.strayNote) await srvr.clearStrayNote(showName);
+        await srvr.triggerShowGapCheck(show.id, showName);
+        const movedVideos = (q?.results || [])
+          .filter((r) => r.ok)
+          .reduce((n, r) => n + (r.videos || 0), 0);
+        this.gapchkResult =
+          `quarantined ${movedVideos} video(s), merged ${m?.merged || 0} folder(s),` +
+          ` accepted ${a?.accepted || 0} stray(s) — gap check re-running`;
+      } catch (e) {
+        this.gapchkResult = `failed: ${e.message}`;
+      }
+      setTimeout(() => {
+        this.gapchkResult = "";
+      }, 8000);
     },
 
     onPruneClick() {

@@ -825,6 +825,12 @@ export function triggerShowGapCheck(showId, showName) {
 export function clearStrayNote(showName) {
   return httpCall("/api/clearStrayNote", { showName }, "POST");
 }
+export function acceptStrays(showName) {
+  return httpCall("/api/acceptStrays", { showName }, "POST");
+}
+export function gapchkPreview(showName) {
+  return httpCall("/api/gapchkPreview", { showName }, "POST");
+}
 export function strayEpisodeQuarantine(showName) {
   return httpCall("/api/strayEpisodeQuarantine", { showName }, "POST");
 }

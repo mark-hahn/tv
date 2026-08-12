@@ -116,22 +116,21 @@ const DATA_DIR = getApiDataDir();
 // combine them with the extra-provider results without re-searching IPT/TL.
 const IPTL_CACHE_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
 
-function iptTlCacheFilePath(showName, season = null) {
+function iptTlCacheFilePath(showName, seasons = []) {
   const safe = String(showName || "")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "_")
     .slice(0, 80);
-  const seasonPart =
-    season === null || season === undefined
-      ? ""
-      : `-s${String(season).padStart(2, "0")}`;
+  const seasonPart = seasons.length
+    ? `-s${seasons.map((s) => String(s).padStart(2, "0")).join("_")}`
+    : "";
   return path.join(os.tmpdir(), `tor-iptl-cache-${safe}${seasonPart}.json`);
 }
 
-function writeIptTlCache(showName, results, season = null) {
+function writeIptTlCache(showName, results, seasons = []) {
   try {
     fs.writeFileSync(
-      iptTlCacheFilePath(showName, season),
+      iptTlCacheFilePath(showName, seasons),
       JSON.stringify(results),
       "utf8",
     );
@@ -140,9 +139,9 @@ function writeIptTlCache(showName, results, season = null) {
   }
 }
 
-function readIptTlCache(showName, season = null) {
+function readIptTlCache(showName, seasons = []) {
   try {
-    const p = iptTlCacheFilePath(showName, season);
+    const p = iptTlCacheFilePath(showName, seasons);
     if (Date.now() - fs.statSync(p).mtimeMs > IPTL_CACHE_MAX_AGE_MS) return [];
     const parsed = JSON.parse(fs.readFileSync(p, "utf8"));
     return Array.isArray(parsed) ? parsed : [];
@@ -422,7 +421,7 @@ export async function searchTorrents({
   more = false,
   staged = false,
   category = "tv",
-  season = null,
+  seasons = [],
 }) {
   const activeProvidersRaw = TorrentSearchApi.getActiveProviders();
   const activeProviders = formatActiveProviders(activeProvidersRaw);
@@ -513,18 +512,24 @@ export async function searchTorrents({
     : "";
 
   // Season restriction: search providers for "<name> S03" and "<name> Season 3"
-  // instead of the bare show name. TV only.
-  const seasonParsed = parseInt(season, 10);
-  const seasonNum =
-    category !== "movie" && !Number.isNaN(seasonParsed) && seasonParsed >= 0
-      ? seasonParsed
-      : null;
+  // instead of the bare show name. TV only. More than one season (a map-pane
+  // episode list can span seasons) adds a query pair per season.
+  const seasonNums =
+    category === "movie"
+      ? []
+      : [
+          ...new Set(
+            (Array.isArray(seasons) ? seasons : [seasons])
+              .map((s) => parseInt(s, 10))
+              .filter((n) => !Number.isNaN(n) && n >= 0),
+          ),
+        ].sort((a, b) => a - b);
   const seasonQueries = (name) => {
-    if (seasonNum === null) return [name];
-    return [
-      `${name} S${String(seasonNum).padStart(2, "0")}`,
-      `${name} Season ${seasonNum}`,
-    ];
+    if (seasonNums.length === 0) return [name];
+    return seasonNums.flatMap((n) => [
+      `${name} S${String(n).padStart(2, "0")}`,
+      `${name} Season ${n}`,
+    ]);
   };
 
   const queries = [sanitized, sanitizedWithoutParens]
@@ -608,7 +613,7 @@ export async function searchTorrents({
     rawCombined = resultsArrays.flat();
   } else {
     // more=true: combine cached IPT/TL results + fresh TPB/LIM/EZT searches
-    const cachedIptTl = readIptTlCache(showName, seasonNum);
+    const cachedIptTl = readIptTlCache(showName, seasonNums);
 
     // Detect a year in the show name (e.g. "Show (2004)" or "Show 2004")
     const yearMatch =
@@ -687,7 +692,7 @@ export async function searchTorrents({
 
   // Cache IPT/TL-only results for subsequent more=true calls (only on more=false TV)
   if (!more && category !== "movie") {
-    writeIptTlCache(showName, deduped, seasonNum);
+    writeIptTlCache(showName, deduped, seasonNums);
   }
 
   // Count by provider in raw results (before normalization/filtering).
@@ -881,7 +886,14 @@ export async function searchTorrents({
   let filtered = filtered2;
   const isLoadAll = needed && needed.includes("loadall");
   const isNoEmby = needed && needed.includes("noemby");
-  const isForce = (needed && needed.includes("force")) || seasonNum !== null;
+  // A season-restricted search is unfiltered unless the caller also gave an
+  // explicit season/episode list (the map pane Tor button), which must still
+  // be applied to the results.
+  const hasExplicitNeeded =
+    Array.isArray(needed) && needed.some((n) => /^S\d/i.test(String(n)));
+  const isForce =
+    (needed && needed.includes("force")) ||
+    (seasonNums.length > 0 && !hasExplicitNeeded);
 
   if (isNoEmby || isLoadAll) {
     // Return all season torrents, and episode torrents only for seasons

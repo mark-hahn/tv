@@ -441,6 +441,23 @@
             Prune
           </button>
           <button
+            @click.stop="handleMapTorClick"
+            :disabled="!hasSelectedCell"
+            :style="{
+              opacity: hasSelectedCell ? 1 : 0.35,
+              cursor: hasSelectedCell ? 'pointer' : 'default',
+            }"
+            style="
+              font-size: 13.5px;
+              cursor: pointer;
+              margin: 4.5px 0 4.5px 4.5px;
+              max-height: 21.5px;
+              border-radius: 7px;
+            "
+          >
+            Tor
+          </button>
+          <button
             @click.stop="handleSelectedDelete"
             :disabled="!hasMapSelection"
             :style="{
@@ -2215,6 +2232,25 @@ export default {
         season,
         episode,
       });
+    },
+    // Open the tor pane and search only for the episodes selected here. The
+    // seasons of those episodes restrict the provider query; the episode list
+    // itself filters the results.
+    handleMapTorClick() {
+      if (this.selectedCells.size === 0) return;
+      const episodes = Array.from(this.selectedCells)
+        .map((key) => this.parseCellKey(key))
+        .filter(
+          ({ season, episode }) =>
+            Number.isFinite(season) && Number.isFinite(episode),
+        )
+        .sort((a, b) => a.season - b.season || a.episode - b.episode)
+        .map(
+          ({ season, episode }) =>
+            `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`,
+        );
+      if (episodes.length === 0) return;
+      evtBus.emit("torSearchEpisodes", { show: this.mapShow, episodes });
     },
     async handleMapChksrtClick() {
       if (this.selectedCells.size === 0) return;

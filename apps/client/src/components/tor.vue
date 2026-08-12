@@ -639,13 +639,7 @@
       </div>
       <div
         id="no-torrents-needed"
-        v-if="
-          !showStream &&
-          !unaired &&
-          noTorrentsNeeded &&
-          !loading &&
-          !error
-        "
+        v-if="!showStream && !unaired && noTorrentsNeeded && !loading && !error"
         style="
           text-align: center;
           color: #666;
@@ -1335,6 +1329,9 @@ export default {
 
       lastNeeded: null,
 
+      // Episode list (SxxExx) sent from the map pane Tor button; null otherwise.
+      mapEpisodes: null,
+
       downloadedByHash: {},
 
       // Space display cells (2x2): rows USB/SRVR, cols GB/%.
@@ -1381,7 +1378,6 @@ export default {
 
       // Snapshot of seriesMap JSON from last search (for change detection on pane return)
       _savedSeriesMapJson: null,
-
 
       torSubCountBusy: false,
       torSubCountsVisible: false,
@@ -1460,6 +1456,21 @@ export default {
       if (String(this.seasonFilter).trim() === "") return null;
       const n = parseInt(this.seasonFilter, 10);
       return !isNaN(n) && n >= 0 ? n : null;
+    },
+    // Comma-separated unique seasons of the map-pane episode list, used to
+    // restrict the provider query. Null when no map episode search is active.
+    mapSeasonsParam() {
+      if (!Array.isArray(this.mapEpisodes) || this.mapEpisodes.length === 0)
+        return null;
+      const seasons = new Set();
+      for (const ep of this.mapEpisodes) {
+        const m = /^S(\d+)E\d+$/i.exec(String(ep));
+        if (m) seasons.add(parseInt(m[1], 10));
+      }
+      if (seasons.size === 0) return null;
+      return Array.from(seasons)
+        .sort((a, b) => a - b)
+        .join(",");
     },
     filteredTorrents() {
       // Use season filter if present
@@ -1629,6 +1640,7 @@ export default {
     evtBus.on("paneChanged", this.onPaneChanged);
     evtBus.on("showTorrents", this.searchTorrents);
     evtBus.on("setTorShow", this.setTorShow);
+    evtBus.on("torSearchEpisodes", this.searchMapEpisodes);
     evtBus.on("resetTorrentsPane", this.resetPane);
     evtBus.on("refreshSpaceAvail", this.onRefreshSpaceAvail);
     evtBus.on("openStream", this.onOpenStream);
@@ -1651,6 +1663,7 @@ export default {
   unmounted() {
     evtBus.off("paneChanged", this.onPaneChanged);
     evtBus.off("setTorShow", this.setTorShow);
+    evtBus.off("torSearchEpisodes", this.searchMapEpisodes);
     evtBus.off("showTorrents", this.searchTorrents);
     evtBus.off("resetTorrentsPane", this.resetPane);
     evtBus.off("refreshSpaceAvail", this.onRefreshSpaceAvail);
@@ -1752,6 +1765,7 @@ export default {
 
     resetTorResultsState() {
       this.torrents = [];
+      this.mapEpisodes = null;
       this.error = null;
       this.selectedItems = new Set();
       this.lastSelectedIndex = null;
@@ -1810,6 +1824,36 @@ export default {
         default:
           return;
       }
+    },
+
+    // Map pane Tor button: search only the episodes selected there. Their
+    // seasons restrict the provider query and the list filters the results.
+    async searchMapEpisodes({ show, episodes }) {
+      if (this.movieMode) return;
+      if (!Array.isArray(episodes) || episodes.length === 0) return;
+      this.showStream = false;
+      this.resetTorResultsState();
+      this.unaired = !!show?.S1E1Unaired;
+      this.currentShow = show || this.currentShow;
+      this.showName = show?.name || this.showName;
+      this.lastAutoSearchedShowId = show?.id || show?.name || null;
+      this.seasonFilter = "";
+      this.mapEpisodes = episodes.slice();
+      if (this.unaired) return;
+
+      // Skip the needed check and land in the all-providers state directly.
+      // The IPT/TL pass has to run first because the all-providers pass reads
+      // its results from the cache that pass writes.
+      const iptTlResult = await this.loadTorrents(this.mapEpisodes, false, {
+        phaseOverride: "all-results",
+      });
+      if (!iptTlResult) return;
+      const result = await this.loadTorrents(this.mapEpisodes, true, {
+        stagedResponse: true,
+        preserveVisible: true,
+        phaseOverride: "all-results",
+      });
+      if (result) this.setTorSearchPhase("all-results");
     },
 
     setTorShow(show) {
@@ -2543,6 +2587,7 @@ export default {
     },
 
     async runInitialNeededSearch() {
+      this.mapEpisodes = null;
       const currentShow = this.resolveCurrentShow();
       if (!currentShow) {
         this.error = "No show selected";
@@ -2588,6 +2633,7 @@ export default {
     },
 
     async runForcedIptTlSearch() {
+      this.mapEpisodes = null;
       const currentShow = this.resolveCurrentShow();
       if (!currentShow) {
         this.error = "No show selected";
@@ -2603,6 +2649,7 @@ export default {
     },
 
     async runFullProviderSearch() {
+      this.mapEpisodes = null;
       const currentShow = this.resolveCurrentShow();
       if (!currentShow) {
         this.error = "No show selected";
@@ -2626,11 +2673,15 @@ export default {
       if (this.unaired) return;
 
       this.providerWarning = "";
-      const result = await this.loadTorrents(["force"], true, {
-        stagedResponse: true,
-        preserveVisible: true,
-        phaseOverride: "all-results",
-      });
+      const result = await this.loadTorrents(
+        this.mapEpisodes || ["force"],
+        true,
+        {
+          stagedResponse: true,
+          preserveVisible: true,
+          phaseOverride: "all-results",
+        },
+      );
       if (result) this.setTorSearchPhase("all-results");
     },
 
@@ -2865,7 +2916,9 @@ export default {
         if (needed.length > 0) {
           url += `&needed=${encodeURIComponent(JSON.stringify(needed))}`;
         }
-        if (this.seasonSearchNum !== null) {
+        if (this.mapSeasonsParam !== null) {
+          url += `&season=${this.mapSeasonsParam}`;
+        } else if (this.seasonSearchNum !== null) {
           url += `&season=${this.seasonSearchNum}`;
         }
         if (more) {
@@ -4528,7 +4581,8 @@ export default {
       const newSel = new Set();
       for (const t of this.selectedItems) {
         const n = this.torExtractShowName(t);
-        if (n && util.smartTitleMatch(n, candidates, null, false)) newSel.add(t);
+        if (n && util.smartTitleMatch(n, candidates, null, false))
+          newSel.add(t);
       }
       this.selectedItems = newSel;
       this.showFilter = name;

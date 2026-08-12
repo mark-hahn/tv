@@ -65,7 +65,7 @@
 
 <script>
 import { ref, watch, onMounted, nextTick, toRaw } from "vue";
-import { srchTvdbData, getImageByTvdbId } from "../tvdb.js";
+import { srchTvdbData, getPosterByTvdbId } from "../tvdb.js";
 import { unilog } from "../log.js";
 
 export default {
@@ -214,9 +214,9 @@ export default {
       }
     };
 
-    // Search results can hold the missing-image placeholder even when the
-    // series record has a real poster (that is why the info pane can show one
-    // while the card says "No Image").  Fill those in from the series record.
+    // Search results can hold the missing-image placeholder even when a poster
+    // exists in the extended artwork or TMDB (that is why the info pane can
+    // show one while the card says "No Image").  Ask tv-srvr for those.
     // `items` is the raw array behind tvdbList; tvdbList.value hands back a
     // reactive proxy of it, so compare against toRaw to tell whether the list
     // has since been replaced.
@@ -226,8 +226,9 @@ export default {
         const item = tvdbList.value[i];
         if (!item || getImageUrl(item)) continue;
         const tvdbId = String(item.tvdb_id || item.tvdbId || "").trim();
-        if (!tvdbId) continue;
-        const image = await getImageByTvdbId(tvdbId);
+        const name = String(item.name || "").trim();
+        if (!tvdbId && !name) continue;
+        const image = await getPosterByTvdbId(tvdbId, name);
         if (toRaw(tvdbList.value) !== items) return;
         if (!image) continue;
         if (tvdbList.value[i] !== item) continue; // replaced by checkImages

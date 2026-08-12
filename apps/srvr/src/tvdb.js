@@ -3566,6 +3566,55 @@ export const getTvmazeCrew_cmd = async (params) => {
   return getTvmazeCrew(tvdbId);
 };
 
+// The poster for a show, for callers that only have a TVDB search result.
+// Search results carry the missing-image placeholder for plenty of shows whose
+// poster is really there in the extended artwork, in TMDB, or in the search
+// thumbnail -- so walk the same chain getTvdbData does when it fills in
+// tvdbData.image, which is what the info pane ends up showing.
+export const getPoster = async (params) => {
+  const tvdbId = String(params?.tvdbId || "").trim();
+  const nameIn = String(params?.name || "").trim();
+  if (!tvdbId && !nameIn) return { image: "" };
+
+  let extResObj = null;
+  if (tvdbId) {
+    try {
+      const token = await getToken();
+      const res = await fetch(
+        `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+          },
+        },
+      );
+      if (res.ok) extResObj = await res.json();
+    } catch (e) {
+      unilog(2174, `getPoster extended fetch failed for ${nameIn || tvdbId}: ${e.message}`);
+    }
+  }
+
+  const tvdbImage = getTvdbImageUrl(extResObj);
+  if (tvdbImage && !tvdbImage.includes("/images/missing/")) {
+    return { image: tvdbImage };
+  }
+
+  const name = nameIn || extResObj?.data?.name || "";
+  if (!name) return { image: "" };
+
+  const tmdbData = await getTmdbFallback(name);
+  if (tmdbData?.image) return { image: tmdbData.image };
+
+  if (tvdbId) {
+    const token = await getToken();
+    const thumb = await getTvdbSearchThumbnail(name, tvdbId, token);
+    if (thumb) return { image: thumb };
+  }
+
+  return { image: "" };
+};
+
 export const accessTvdb = async (params) => {
   let url = "unknown";
   try {

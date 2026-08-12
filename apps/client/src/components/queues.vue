@@ -177,7 +177,7 @@
 import * as srvr from "../srvr.js";
 import * as util from "../util.js";
 import evtBus from "../evtBus.js";
-import { logHere } from "../log.js";
+import { logHere, unilog} from "../log.js"
 
 const POLL_MS = 1000;
 const FLASH_MS = 300;
@@ -267,7 +267,7 @@ export default {
       if (event?.altKey) {
         navigator.clipboard
           .writeText(util.shellQuote(e.path))
-          .catch((err) => logHere({ lvl: "error" }, `copy failed: ${err}`));
+          .catch((err) => unilog(2176, `copy failed: ${err}`));
         this.copyFlashPath = e.path;
         setTimeout(() => {
           this.copyFlashPath = null;

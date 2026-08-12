@@ -405,19 +405,17 @@ export const getGenresByTvdbId = async (tvdbId) => {
 };
 
 // TVDB search results often carry the missing-image placeholder as image_url
-// even when the series record itself has a real poster.  This fetches the
-// poster from the series record.
-export const getImageByTvdbId = async (tvdbId) => {
-  if (!tvdbId) return null;
+// even when a poster is there in the extended artwork, in TMDB, or in the
+// search thumbnail. tv-srvr walks that whole chain -- the same one that fills
+// in the tvdbData.image the info pane shows -- so ask it rather than guessing
+// from the search result.
+export const getPosterByTvdbId = async (tvdbId, name) => {
+  if (!tvdbId && !name) return null;
   try {
-    const res = await tvdbFetch(`series/${encodeURIComponent(tvdbId)}`);
-    const obj = await res.json();
-    return obj?.data?.image || null;
+    const res = await srvr.getPoster({ tvdbId, name });
+    return res?.image || null;
   } catch (e) {
-    unilog(
-      1945,
-      `getImageByTvdbId failed for ${tvdbId}: ${e?.message || String(e)}`,
-    );
+    unilog(2177, `getPosterByTvdbId failed for ${name || tvdbId}: ${e?.message || String(e)}`);
     return null;
   }
 };

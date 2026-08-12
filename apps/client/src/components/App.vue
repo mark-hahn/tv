@@ -519,8 +519,7 @@
             white-space: pre-wrap;
             word-break: break-word;
           "
-          >{{ tvdbMismatchText }}</pre
-        >
+          >{{ tvdbMismatchText }}</pre>
         <div style="display: flex; justify-content: flex-end; margin-top: 12px">
           <button
             @click.stop.prevent="closeTvdbMismatch"
@@ -1156,7 +1155,10 @@ export default {
         try {
           await srvr.setTvdbFields({ name: show.name, needsIntro: true });
         } catch (e) {
-          unilog(1928, `setTvdbFields needsIntro failed for ${show.name}: ${e.message}`);
+          unilog(
+            1928,
+            `setTvdbFields needsIntro failed for ${show.name}: ${e.message}`,
+          );
         }
       }
       // Always our own player. Emby's HLS copy path repeats the first segment
@@ -2418,6 +2420,15 @@ export default {
       this.currentPane = "tor";
       evtBus.emit("paneChanged", this.currentPane);
       evtBus.emit("openStream", show);
+    });
+
+    // Map pane Tor button: switch to tor; tor.vue runs the episode search.
+    evtBus.on("torSearchEpisodes", ({ show }) => {
+      if (this.simpleMode) return;
+      this._torrentsInitialized = true;
+      this._torrentsShowKey = show?.id || show?.name || null;
+      this.currentPane = "tor";
+      evtBus.emit("paneChanged", this.currentPane);
     });
 
     // show-selected: fired when the user picks a new show from the list.

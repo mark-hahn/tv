@@ -1808,6 +1808,7 @@ app.get("/api/getBackdrop", apiWrapper(tmdb.getBackdrop));
 app.post("/api/getFile", apiWrapper(getFile));
 app.post("/api/getSubFileIds", apiWrapper(getSubFileIds));
 app.post("/api/accessTvdb", apiWrapper(tvdb.accessTvdb));
+app.post("/api/getPoster", apiWrapper(tvdb.getPoster));
 app.post("/api/getTvmazeCrew", apiWrapper(tvdb.getTvmazeCrew_cmd));
 app.post("/api/migrateWatchedCount", apiWrapper(tvdb.migrateWatchedCount));
 app.post("/api/tvRemoteKey", apiWrapper(keySendWithChk));

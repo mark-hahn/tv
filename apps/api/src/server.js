@@ -1516,9 +1516,11 @@ app.get("/api/search", async (req, res) => {
   const more = req.query.more === "true";
   const staged = req.query.staged === "true";
   const category = req.query.category || "tv";
-  const seasonParsed = parseInt(req.query.season, 10);
-  const season =
-    !Number.isNaN(seasonParsed) && seasonParsed >= 0 ? seasonParsed : null;
+  // season may be a single number or a comma-separated list of seasons
+  const seasons = String(req.query.season ?? "")
+    .split(",")
+    .map((s) => parseInt(s, 10))
+    .filter((n) => !Number.isNaN(n) && n >= 0);
   let needed = [];
 
   // Parse needed array if provided
@@ -1554,7 +1556,7 @@ app.get("/api/search", async (req, res) => {
       more,
       staged,
       category,
-      season,
+      seasons,
     });
     res.json(result);
   } catch (error) {

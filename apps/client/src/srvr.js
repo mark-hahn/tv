@@ -683,6 +683,10 @@ export function accessTvdb(params) {
   return httpCall("/api/accessTvdb", params, "POST");
 }
 
+export function getPoster(params) {
+  return httpCall("/api/getPoster", params, "POST");
+}
+
 export function getTvmazeCrew(params) {
   return httpCall("/api/getTvmazeCrew", params, "POST");
 }

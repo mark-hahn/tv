@@ -1,3 +1,8 @@
 #!/usr/bin/env bash
 
-exec node unilog/reconcile.js "$@"
+# No project given -> reconcile the client.
+if [ $# -eq 0 ]; then
+  set -- client
+fi
+
+exec node unilog/run-reconcile.js "$@"

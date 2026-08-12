@@ -106,7 +106,10 @@ const playOnSession = async (sessionId, showId, showName, episodeId) => {
     body: JSON.stringify(body),
   });
   if (!resp.ok)
-    unilog(1895, `play rejected for ${showName} episode ${episode.id}: ${resp.status}`);
+    unilog(
+      1895,
+      `play rejected for ${showName} episode ${episode.id}: ${resp.status}`,
+    );
 };
 
 export const viewShowOnLivingRoomTv = async ({
@@ -231,10 +234,16 @@ const safeGet = async (url, retries = 3) => {
       if (error.message && error.message.includes("404")) throw error;
 
       if (i === retries - 1) {
-        unilog(1728, `safeGet gave up for ${url} after ${retries} attempts: ${msg}`);
+        unilog(
+          1728,
+          `safeGet gave up for ${url} after ${retries} attempts: ${msg}`,
+        );
         throw error;
       }
-      unilog(1729, `safeGet failed for ${url} (attempt ${i + 1}/${retries}): ${msg}, retrying`);
+      unilog(
+        1729,
+        `safeGet failed for ${url} (attempt ${i + 1}/${retries}): ${msg}, retrying`,
+      );
       await new Promise((r) => setTimeout(r, 500 * (i + 1)));
     }
   }
@@ -265,6 +274,10 @@ const getShowState = (showName, showMeta) => {
   let resDrop = false;
   let resDropSeason = null;
   let resDropEpisode = null;
+  let strayCount = 0;
+  let strayFiles = [];
+  let straySeason = null;
+  let strayEpisode = null;
   let bestResSoFar = null;
   let lastSeasonWatched = false;
   let seasonWatchedThenNofile = false;
@@ -302,6 +315,11 @@ const getShowState = (showName, showMeta) => {
         resDrop: false,
         resDropSeason: null,
         resDropEpisode: null,
+        stray: false,
+        strayCount: 0,
+        strayFiles: [],
+        straySeason: null,
+        strayEpisode: null,
       };
     }
 
@@ -335,15 +353,39 @@ const getShowState = (showName, showMeta) => {
         // A file on disk overrides unaired — it clearly aired if we have it
         if (haveFile) fileCount++;
 
+        // A file for an episode TVDB never gave an air date. One of these is
+        // usually TVDB lagging behind a just-aired episode; a cluster of them
+        // in one season is the signature of a different show misfiled into
+        // this show's folder, which is what let a 10-episode DVDRip pose as
+        // Guilt (2019)'s 4-episode season 1. Recorded here rather than acted
+        // on, because the two cases look identical from episodeData alone.
+        if (haveFile && !aired) {
+          strayCount++;
+          if (straySeason === null) {
+            straySeason = seasonNumber;
+            strayEpisode = episodeNumber;
+          }
+          const strayName = epd.getFileName(ed, seasonNumber, episodeNumber);
+          if (strayName) strayFiles.push(strayName);
+        }
+
         // Resolution drop: any episode file lower res than an earlier one.
         if (haveFile) {
           const res = epd.getRes(ed, seasonNumber, episodeNumber);
           if (res) {
-            if (bestResSoFar !== null && res < bestResSoFar && !resDrop && !watched) {
+            if (
+              bestResSoFar !== null &&
+              res < bestResSoFar &&
+              !resDrop &&
+              !watched
+            ) {
               resDropSeason = seasonNumber;
               resDropEpisode = episodeNumber;
               resDrop = true;
-              unilog(2054, `resDrop set for ${showName} S${seasonNumber}E${episodeNumber}: ${res} < ${bestResSoFar}`);
+              unilog(
+                2054,
+                `resDrop set for ${showName} S${seasonNumber}E${episodeNumber}: ${res} < ${bestResSoFar}`,
+              );
             }
             if (bestResSoFar === null || res > bestResSoFar) bestResSoFar = res;
           }
@@ -531,6 +573,7 @@ const getShowState = (showName, showMeta) => {
     unilog(694, `getShowState error for ${showName}:`, error.message);
     return null;
   }
+  const stray = strayCount > 0;
   return {
     notReady: !ready,
     anyWatched,
@@ -549,6 +592,11 @@ const getShowState = (showName, showMeta) => {
     resDrop,
     resDropSeason,
     resDropEpisode,
+    stray,
+    strayCount,
+    strayFiles,
+    straySeason,
+    strayEpisode,
     allAiredHaveFile: sawAnyEpisode && !anyEpisodeNoFile,
     allAiredWatched: sawAnyEpisode && !anyAiredEpisodeNotWatched,
     allWatchedOrHaveFile: sawAnyEpisode && !anyEpisodeNeitherWatchedNorFile,
@@ -587,6 +635,11 @@ export const gapCheckOne = async (showId, showName, tvdbRecord) => {
     resDrop,
     resDropSeason,
     resDropEpisode,
+    stray,
+    strayCount,
+    strayFiles,
+    straySeason,
+    strayEpisode,
     seasonWatchedThenNofile,
     seasonWatchedThenNofileSeason,
     seasonWatchedThenNofileEpisode,
@@ -607,6 +660,11 @@ export const gapCheckOne = async (showId, showName, tvdbRecord) => {
     resDrop,
     resDropSeason,
     resDropEpisode,
+    stray,
+    strayCount,
+    strayFiles,
+    straySeason,
+    strayEpisode,
     fileEndError,
     fileEndErrorSeason,
     fileEndErrorEpisode,

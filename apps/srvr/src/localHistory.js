@@ -14,6 +14,7 @@ import {
 import { SRVR_DATA_DIR, SRVR_ROOT_DIR } from "./srvrPaths.js";
 import * as flexget from "./flexget.js";
 import * as tvdb from "./tvdb.js";
+import { showFolderFor, showNameForFolder } from "./showPaths.js";
 import * as unilogDb from "./unilogDb.js";
 import * as view from "./lastViewed.js";
 
@@ -203,18 +204,18 @@ function outputLines(events) {
     .map((e) => `${fmtTs(e.ms)} ${e.text}`);
 }
 
-function showFolderFromRec(showName, rec) {
-  return String(rec?.path || rec?.emby?.path || showName || "")
-    .split("/")
-    .pop();
-}
-
 function findShow(relPath, parsed, movieMode) {
   if (movieMode) return { showName: "", rec: null, folderName: "" };
   const folderName = relPath.split("/")[0] || "";
   const all = tvdb.getAllTvdbSync() || {};
   if (all[folderName])
     return { showName: folderName, rec: all[folderName], folderName };
+
+  // A show whose folder was renamed out from under its record is an exact
+  // match, so it has to be tried before the fuzzy title matching below.
+  const byFolder = showNameForFolder(folderName);
+  if (byFolder !== folderName && all[byFolder])
+    return { showName: byFolder, rec: all[byFolder], folderName };
 
   const records = Object.values(all).filter((r) => r && typeof r === "object");
   const match = smartTitleMatch(folderName, records, null, false);
@@ -305,7 +306,7 @@ function addTvdbEvents(add, ctx) {
         `${showName} ${episodeLabel(ctx.season, ctx.episode)} has playback position`,
       );
 
-    const folder = showFolderFromRec(showName, rec);
+    const folder = showFolderFor(showName, rec);
     const full = getFullPath(ed, folder, ctx.season, ctx.episode);
     if (full && full !== ctx.fullPath) {
       add(

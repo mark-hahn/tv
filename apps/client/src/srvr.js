@@ -822,6 +822,9 @@ export function refreshEmbyItem(showId, showName) {
 export function triggerShowGapCheck(showId, showName) {
   return httpCall("/api/triggerShowGapCheck", { showId, showName }, "POST");
 }
+export function clearStrayNote(showName) {
+  return httpCall("/api/clearStrayNote", { showName }, "POST");
+}
 export function triggerShowSelect(showName) {
   return httpCall("/api/triggerShowSelect", { showName }, "POST");
 }

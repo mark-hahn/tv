@@ -217,6 +217,9 @@ subsQueue.onSubsProgress((payload) => {
 import * as intro from "./src/intro.js";
 import * as flexget from "./src/flexget.js";
 import * as disk from "./src/disk.js";
+import * as showPaths from "./src/showPaths.js";
+import * as dupeFolders from "./src/dupeFolders.js";
+import * as strayEpisodes from "./src/strayEpisodes.js";
 import * as fileOps from "./src/fileOps.js";
 import * as localHistory from "./src/localHistory.js";
 import { startOldFileCleanup } from "./src/oldFiles.js";
@@ -228,7 +231,7 @@ import * as unilogRoutes from "./src/routes/unilog.js";
 const { broadcastUnilog } = unilogRoutes;
 const registerUnilogRoutes = unilogRoutes.registerUnilogRoutes;
 // Local aliases keep existing call sites terse (disk domain lives in src/disk.js).
-const showNameFromFilePath = disk.showNameFromFilePath;
+const showNameFromFilePath = showPaths.showNameFromFilePath;
 const refreshEpisodeData = disk.refreshEpisodeData;
 const getShowsFromDisk = disk.getShowsFromDisk;
 const getShowDiskInfo = disk.getShowDiskInfo;
@@ -621,11 +624,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
     }
     // Subtitle scan for inEmby shows
     if (tvdbRecord.inEmby) {
-      const showFolderName = showName.includes("/")
-        ? showName
-        : (tvdbRecord.path || tvdbRecord.emby?.path || showName)
-            .split("/")
-            .pop();
+      const showFolderName = showPaths.showFolderFor(showName, tvdbRecord);
       const showFolder = path.join(tvDir, showFolderName);
       try {
         const seasonDirs = fs.readdirSync(showFolder);
@@ -708,12 +707,32 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
           "seasonWatchedThenNofileSeason",
           "seasonWatchedThenNofileEpisode",
           "anyWatched",
+          "stray",
+          "strayCount",
         ];
         for (const f of gapFields) {
           if (tvdbRecord[f] !== gapData[f])
             gapChanges.push(`${f}:${tvdbRecord[f]}->${gapData[f]}`);
         }
+        // Files for episodes this show never aired. Logged as it turns on, so
+        // a standing condition does not repeat every gap check.
+        const strayIsNew = !tvdbRecord.stray && gapData.stray;
+        if (strayIsNew) {
+          unilog(
+            2156,
+            `${showName}: ${gapData.strayCount} file(s) for episodes it never aired, from S${gapData.straySeason}E${gapData.strayEpisode}: ${(gapData.strayFiles || []).join(", ")}`,
+          );
+        }
         Object.assign(tvdbRecord, gapData);
+        // The live flag clears the moment the files go -- moved out, deleted,
+        // or TVDB finally publishing the air date. strayNote is the record
+        // that it happened at all, and is never cleared automatically, so a
+        // single non-aired file always leaves something to verify against.
+        // Written whenever the flag is up and no note exists yet, not only on
+        // the transition, so a show already flagged still gets one.
+        if (gapData.stray && !tvdbRecord.strayNote) {
+          tvdbRecord.strayNote = `${gapData.strayCount} non-aired file(s) from S${gapData.straySeason}E${gapData.strayEpisode} seen ${strayEpisodes.strayStamp()}`;
+        }
         tvdbRecord.lastGapCheck = util.toPstDateTimeMs(new Date());
         delete tvdbRecord.allAiredHaveFile;
         delete tvdbRecord.allAiredWatched;
@@ -1370,6 +1389,223 @@ app.post(
     }
   }),
 );
+// Every Series item Emby holds, including the ones a user's view collapses.
+// A user-scoped query returns one item per show, so a second Series pointing
+// at a second folder for the same show is invisible there -- and that second
+// folder is exactly what the duplicate-folder merge exists to find.
+async function fetchEmbySeriesUnfiltered() {
+  try {
+    const res = await fetch(
+      `${EMBY_BASE_URL}/Items?api_key=${EMBY_API_KEY}` +
+        `&IncludeItemTypes=Series&Recursive=true&Fields=Name,Id,Path,ProviderIds` +
+        `&StartIndex=0&Limit=10000`,
+    );
+    if (!res.ok) {
+      unilog(2142, `emby fetch ${res.status}`);
+      return null;
+    }
+    return (await res.json()).Items || [];
+  } catch (e) {
+    unilog(2143, `emby fetch: ${e.message}`);
+    return null;
+  }
+}
+
+// Group the Emby series by the tvdb record they resolve to. Shared by the
+// merge and its dry-run report so both judge the same way.
+function planDupeFolderGroups(embySeries) {
+  const allTvdb = tvdb.getAllTvdbSync() || {};
+  const findId = (id) => {
+    const want = String(id || "").trim();
+    if (!want) return null;
+    for (const [key, rec] of Object.entries(allTvdb)) {
+      if (String(rec?.tvdbId || "").trim() === want) return { key, rec };
+    }
+    return null;
+  };
+  return dupeFolders.planDuplicateFolders(embySeries, (show) => {
+    const name = show?.Name;
+    if (allTvdb[name]) return { key: name, rec: allTvdb[name] };
+    return findId(show?.ProviderIds?.Tvdb || show?.TvdbId);
+  });
+}
+
+// Fold every duplicate show folder that can be proven safe into the folder
+// holding the show, then have Emby rescan so the series it no longer has files
+// for goes away. Refusals are logged and left alone.
+async function mergeDuplicateShowFolders(caller) {
+  const embySeries = await fetchEmbySeriesUnfiltered();
+  if (!embySeries) return { merged: 0, refused: 0, results: [] };
+  const groups = planDupeFolderGroups(embySeries);
+  const results = [];
+  let merged = 0;
+  let refused = 0;
+
+  for (const group of groups) {
+    for (const plan of group.plans) {
+      if (!plan.ok) {
+        refused++;
+        results.push({
+          showName: group.showName,
+          loserFolder: plan.loserFolder,
+          ok: false,
+          reason: plan.reason,
+        });
+        unilog(
+          2146,
+          `${group.showName}: not merging "${plan.loserFolder}" — ${plan.reason}`,
+        );
+        continue;
+      }
+      try {
+        const r = dupeFolders.executeFolderMerge(plan);
+        merged++;
+        results.push({
+          showName: group.showName,
+          loserFolder: plan.loserFolder,
+          winnerFolder: plan.winnerFolder,
+          ok: true,
+          ...r,
+        });
+        unilog(
+          2147,
+          `${group.showName}: merged "${plan.loserFolder}" into "${plan.winnerFolder}" — ${r.moved} video(s) moved, ${r.demoted.length} demoted to .old, folder ${r.removed ? "removed" : `kept (${r.leftBehind.length} video(s) left)`}`,
+        );
+      } catch (e) {
+        results.push({
+          showName: group.showName,
+          loserFolder: plan.loserFolder,
+          ok: false,
+          reason: e.message,
+        });
+        unilog(
+          2148,
+          `${group.showName}: merging "${plan.loserFolder}" into "${plan.winnerFolder}" failed: ${e.message}`,
+        );
+      }
+    }
+    // The record's path was last-write-wins across the duplicates; point it at
+    // the folder that actually holds the show. Only meaningful once the group
+    // has a winner, which a refused group does not.
+    if (group.rec && group.winner) group.rec.path = group.winner;
+  }
+
+  if (merged) {
+    await tvdb.saveTvdbSync();
+    await embyRefreshManager.request(`dupeFolders:${caller}`, null);
+  }
+  return { merged, refused, results };
+}
+
+// Shows carrying files for episodes they never aired, and what quarantining
+// them would move. Reads only. `showName` limits it to one show.
+app.post(
+  "/api/strayEpisodeReport",
+  apiWrapper(async (params) =>
+    strayEpisodes.planAllStrayQuarantines(params?.showName || null),
+  ),
+);
+
+// Moves those files to /mnt/media/tv-errors/. Server-side only; deliberately
+// not automatic -- see the note at the top of strayEpisodes.js.
+app.post(
+  "/api/strayEpisodeQuarantine",
+  apiWrapper(async (params) => {
+    const plans = strayEpisodes.planAllStrayQuarantines(
+      params?.showName || null,
+    );
+    const results = [];
+    let movedAny = false;
+    for (const plan of plans) {
+      if (!plan.ok) {
+        results.push({
+          showName: plan.showName,
+          ok: false,
+          reason: plan.reason,
+        });
+        continue;
+      }
+      try {
+        const r = strayEpisodes.executeStrayQuarantine(plan);
+        movedAny = true;
+        results.push({ showName: plan.showName, ok: true, ...r });
+        const seasons = [
+          ...new Set(plan.releases.filter((x) => x.move).map((x) => x.season)),
+        ];
+        // Keep the outcome on the record: once the files are gone the live
+        // flag clears, and this note is all that is left to check against.
+        const rec = tvdb.getAllTvdbSync()?.[plan.showName];
+        if (rec) {
+          rec.strayNote = `${r.videos} file(s) from S${seasons.join("/")} quarantined to tv-errors ${strayEpisodes.strayStamp()}`;
+        }
+        unilog(
+          2157,
+          `${plan.showName}: quarantined ${r.videos} stray episode(s) (${r.moved.length} file(s)) to tv-errors from season(s) ${seasons.join(", ")}`,
+        );
+      } catch (e) {
+        results.push({ showName: plan.showName, ok: false, reason: e.message });
+        unilog(2152, `${plan.showName}: quarantine failed: ${e.message}`);
+      }
+    }
+    if (movedAny) {
+      await tvdb.saveTvdbSync();
+      await embyRefreshManager.request("strayEpisodes", null);
+    }
+    return { success: true, results };
+  }),
+);
+
+// strayNote is never cleared on its own -- this is the only thing that clears
+// it, once the note has been read and the show checked.
+app.post(
+  "/api/clearStrayNote",
+  apiWrapper(async (params) => {
+    const showName = params?.showName;
+    if (!showName) return { success: false, error: "showName required" };
+    const rec = tvdb.getAllTvdbSync()?.[showName];
+    if (!rec) return { success: false, error: "show not found" };
+    delete rec.strayNote;
+    await tvdb.saveTvdbSync();
+    return { success: true };
+  }),
+);
+
+// Runs the merge now instead of waiting for the next emby sweep. Server-side
+// only -- nothing in the UI calls this.
+app.post(
+  "/api/dupeFolderMerge",
+  apiWrapper(async () => ({
+    success: true,
+    ...(await mergeDuplicateShowFolders("api")),
+  })),
+);
+
+// Dry run of the duplicate-folder merge the emby sweep performs: reports what
+// would move and, for the pairs it refuses, why. Reads only.
+app.post(
+  "/api/dupeFolderReport",
+  apiWrapper(async () => {
+    const embySeries = await fetchEmbySeriesUnfiltered();
+    if (!embySeries) return { success: false, error: "Emby fetch failed" };
+    const groups = planDupeFolderGroups(embySeries);
+    return {
+      success: true,
+      groups: groups.map((g) => ({
+        showName: g.showName,
+        winner: g.winner,
+        counts: g.counts,
+        plans: g.plans.map((p) => ({
+          loserFolder: p.loserFolder,
+          ok: p.ok,
+          reason: p.reason,
+          seasons: p.moves.map((m) => m.seasonDir),
+          arriveAsOld: p.moves.flatMap((m) => m.arriveAsOld),
+          demotions: p.demotions.map((d) => path.basename(d)),
+        })),
+      })),
+    };
+  }),
+);
 app.post("/api/getActorPage", apiWrapper(tvdb.getActorPage));
 app.post(
   "/api/getSeriesMapFromEmby",
@@ -1380,9 +1616,7 @@ app.post(
     const rec = allTvdb?.[showName];
     if (!rec) return { success: false, error: "Show not found" };
     try {
-      const folder = showName.includes("/")
-        ? showName
-        : (rec.path || rec.emby?.path || showName).split("/").pop();
+      const folder = showPaths.showFolderFor(showName, rec);
       const today = new Date().toISOString().slice(0, 10);
 
       // Fast path: build the map from the already-cached episodeData in
@@ -2896,7 +3130,7 @@ async function introEpisodePaths() {
 function introCandidates(record) {
   const ed = record?.episodeData;
   if (!ed) return [];
-  const folder = record.path?.split("/").pop() || record.name;
+  const folder = showPaths.showFolderFor(record?.name, record);
   const unwatched = [];
   const watched = [];
   epd.forEachEpisode(ed, (s, e) => {
@@ -3683,6 +3917,12 @@ async function runEmbyFullSweep(caller = "unknown") {
         handlePickupChange(name, true, tvdbRecord.status);
       }
     }
+
+    // Step 2b: One record claimed by two Emby folders. Fold the extras into
+    // the folder holding the show, so everything working from the record can
+    // see the whole show again, then let Emby drop the series it no longer has
+    // files for. Merges that cannot be proven safe are logged and skipped.
+    await mergeDuplicateShowFolders("embyFullSweep");
 
     // Step 3: Detect disappeared shows → mark inEmby=false
     const embyNameSet = new Set(embyShows.map((s) => s.Name));
@@ -4566,19 +4806,6 @@ registerLocalChannel("libraryRefresh", {
 const changedShows = new Map(); // showName -> { timeout, files: Set<string> }
 const DISK_CHANGE_DEBOUNCE_MS = 3000; // 3 seconds
 
-/**
- * Extract show name from file path
- * Path format: /mnt/media/tv/ShowName/Season 01/episode.mkv
- */
-function extractShowNameFromPath(filePath) {
-  const relativePath = filePath.replace(tvDir + "/", "");
-  const parts = relativePath.split("/");
-  if (parts.length > 0) {
-    return parts[0]; // First part is show name
-  }
-  return null;
-}
-
 // Tracks shows currently being processed to prevent parallel calls
 const inFlightDiskChanges = new Set();
 const pendingDiskChanges = new Set();
@@ -4722,7 +4949,7 @@ watcher
     const ext = filePath.split(".").pop();
     if (!videoFileExtensions.includes(ext)) return;
 
-    const showName = extractShowNameFromPath(filePath);
+    const showName = showNameFromFilePath(filePath);
     if (!showName) return;
 
     unilog(88, `video added: ${showName}`);
@@ -4750,6 +4977,12 @@ watcher
         if (videoFiles.length === 0) {
           handleShowDiskChange(showName);
           return;
+        }
+        if (!tvdbRec) {
+          unilog(
+            2136,
+            `no tvdb record for ${showName} — ${videoFiles.length} new file(s) skipped the sub queue`,
+          );
         }
         if (tvdbRec && tvdbRec.inEmby) {
           let queued = false;
@@ -4795,7 +5028,7 @@ watcher
     const ext = filePath.split(".").pop();
     if (!videoFileExtensions.includes(ext)) return;
 
-    const showName = extractShowNameFromPath(filePath);
+    const showName = showNameFromFilePath(filePath);
     if (!showName) return;
 
     unilog(684, `video deleted: ${showName}`);

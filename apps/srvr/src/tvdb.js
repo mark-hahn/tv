@@ -3667,6 +3667,10 @@ export const updateTvdbWithGapData = async (gapData) => {
       tvdbRecord.resDrop !== gaps.resDrop ||
       tvdbRecord.resDropSeason !== gaps.resDropSeason ||
       tvdbRecord.resDropEpisode !== gaps.resDropEpisode ||
+      tvdbRecord.stray !== gaps.stray ||
+      tvdbRecord.strayCount !== gaps.strayCount ||
+      tvdbRecord.straySeason !== gaps.straySeason ||
+      tvdbRecord.strayEpisode !== gaps.strayEpisode ||
       tvdbRecord.fileEndError !== gaps.fileEndError ||
       tvdbRecord.fileEndErrorSeason !== gaps.fileEndErrorSeason ||
       tvdbRecord.fileEndErrorEpisode !== gaps.fileEndErrorEpisode ||
@@ -3688,6 +3692,16 @@ export const updateTvdbWithGapData = async (gapData) => {
       tvdbRecord.resDrop = gaps.resDrop;
       tvdbRecord.resDropSeason = gaps.resDropSeason;
       tvdbRecord.resDropEpisode = gaps.resDropEpisode;
+      // Files for episodes this show never aired. Logged only as it turns on,
+      // so a standing condition does not repeat every gap check.
+      if (!tvdbRecord.stray && gaps.stray) {
+        unilog(2150, `${tvdbRecord.name}: ${gaps.strayCount} file(s) for episodes it never aired, from S${gaps.straySeason}E${gaps.strayEpisode}: ${(gaps.strayFiles || []).join(", ")}`);
+      }
+      tvdbRecord.stray = gaps.stray;
+      tvdbRecord.strayCount = gaps.strayCount;
+      tvdbRecord.strayFiles = gaps.strayFiles;
+      tvdbRecord.straySeason = gaps.straySeason;
+      tvdbRecord.strayEpisode = gaps.strayEpisode;
       tvdbRecord.fileEndError = gaps.fileEndError;
       tvdbRecord.fileEndErrorSeason = gaps.fileEndErrorSeason;
       tvdbRecord.fileEndErrorEpisode = gaps.fileEndErrorEpisode;

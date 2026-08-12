@@ -25,7 +25,7 @@ import {
   registerLocalChannel,
   publishChannelDelta,
 } from "./messaging.js";
-import { showNameFromFilePath } from "./disk.js";
+import { showNameFromFilePath } from "./showPaths.js";
 import { videoFileExtensions } from "./videoFiles.js";
 import { sanitizeSrt, stripSrtFormatting } from "./srt.js";
 import {

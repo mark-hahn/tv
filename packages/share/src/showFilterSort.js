@@ -154,7 +154,15 @@ export const COND_PREDS = {
   unplayed: (show) => show.notReady === false,
   waiting: (show) => !!show.waitStr?.length,
   needsIntro: (show) => !!show.needsIntro,
-  gap: (show) => show.fileGap || show.watchGap || show.resDrop,
+  // strayNote is included alongside the live stray flag so a show stays marked
+  // after its non-aired files are gone: the note is the only record left that
+  // it happened, and the map pane's Gapchk button is what clears both.
+  gap: (show) =>
+    show.fileGap ||
+    show.watchGap ||
+    show.resDrop ||
+    show.stray ||
+    !!show.strayNote,
   ended: (show) => show.ended,
   drama: (show) => !show.genres?.includes("Comedy"),
   sitcom: (show) => !!show.sitcom,

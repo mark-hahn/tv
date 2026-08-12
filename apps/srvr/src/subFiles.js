@@ -6,8 +6,20 @@
 import fs from "fs";
 import * as path from "node:path";
 import { srtTimeToMs, msToSrtTime } from "./srt.js";
+import { showFolderFor } from "./showPaths.js";
 
 const tvDir = "/mnt/media/tv";
+
+// The folder a show lives in can differ from its record name, so resolve it
+// rather than joining the name straight onto tvDir. The traversal guard moves
+// to the resolved folder, where it still rejects anything with a separator.
+function showDirFor(showName, label) {
+  const folder = showFolderFor(showName);
+  if (!folder || folder.includes("/") || folder.includes("\\")) {
+    throw new Error(`${label}: invalid showName`);
+  }
+  return path.join(tvDir, folder);
+}
 
 export function encodeFileIdBase32(fileId) {
   // base-32 using RFC4648 alphabet: A-Z then 2-7.
@@ -79,16 +91,13 @@ export const deleteSubFiles = async (params) => {
   if (!showName || showName.trim() === "") {
     throw new Error("deleteSubFiles: missing showName");
   }
-  if (showName.includes("/") || showName.includes("\\")) {
-    throw new Error("deleteSubFiles: invalid showName");
-  }
   for (const entry of fileIdObjs) {
     if (typeof entry?.showName !== "string" || entry.showName !== showName) {
       throw new Error("deleteSubFiles: all entries must have same showName");
     }
   }
 
-  const localShowPath = path.join(tvDir, showName);
+  const localShowPath = showDirFor(showName, "deleteSubFiles");
   try {
     const st = fs.statSync(localShowPath);
     if (!st.isDirectory()) {
@@ -189,11 +198,7 @@ export const getSubFileIds = async (params) => {
   if (!showName) {
     throw new Error("getSubFileIds: missing showName");
   }
-  if (showName.includes("/") || showName.includes("\\")) {
-    throw new Error("getSubFileIds: invalid showName");
-  }
-
-  const localShowPath = path.join(tvDir, showName);
+  const localShowPath = showDirFor(showName, "getSubFileIds");
   try {
     const st = fs.statSync(localShowPath);
     if (!st.isDirectory()) {
@@ -249,16 +254,13 @@ export const offsetSubFiles = async (fileIdObjs) => {
   if (!showName || showName.trim() === "") {
     throw new Error("offsetSubFiles: missing showName");
   }
-  if (showName.includes("/") || showName.includes("\\")) {
-    throw new Error("offsetSubFiles: invalid showName");
-  }
   for (const entry of fileIdObjs) {
     if (typeof entry?.showName !== "string" || entry.showName !== showName) {
       throw new Error("offsetSubFiles: all entries must have same showName");
     }
   }
 
-  const localShowPath = path.join(tvDir, showName);
+  const localShowPath = showDirFor(showName, "offsetSubFiles");
   try {
     const st = fs.statSync(localShowPath);
     if (!st.isDirectory()) {

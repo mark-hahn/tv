@@ -404,6 +404,24 @@
             Chksrt
           </button>
           <button
+            @click.stop="onGapchkClick"
+            :disabled="!mapShow?.id"
+            :style="{
+              '--btn-bg': gapchkFlash ? 'lightgray' : 'whitesmoke',
+              opacity: mapShow?.id ? 1 : 0.35,
+              cursor: mapShow?.id ? 'pointer' : 'default',
+            }"
+            style="
+              font-size: 13.5px;
+              cursor: pointer;
+              margin: 4.5px 0 4.5px 4.5px;
+              max-height: 21.5px;
+              border-radius: 7px;
+            "
+          >
+            Gapchk
+          </button>
+          <button
             v-if="mapShow?.inEmby !== false"
             @click.stop="onPruneClick"
             :disabled="!hasWatchedFile"
@@ -1061,6 +1079,7 @@ export default {
       mapTouchSuppressClickUntil: 0,
       mapUpdateKey: 0,
       pruneFlash: false,
+      gapchkFlash: false,
       posFlash: false,
       selectedSeasons: new Set(),
       selectedCells: new Set(),
@@ -1135,6 +1154,16 @@ export default {
       if (this.mapShow?.watchGap) parts.push("Watch Gap");
       if (this.mapShow?.fileGap) parts.push("Missing File");
       if (this.mapShow?.resDrop) parts.push("Resolution Drop");
+      if (this.mapShow?.stray) {
+        const n = this.mapShow.strayCount || 1;
+        const at = `S${this.mapShow.straySeason}E${this.mapShow.strayEpisode}`;
+        parts.push(n > 1 ? `Stray Files (${n}) from ${at}` : `Stray File ${at}`);
+      } else if (this.mapShow?.strayNote) {
+        // The files are gone -- moved out, deleted, or TVDB finally published
+        // the air date -- but the note stays until it is explicitly cleared,
+        // so a non-aired file is never silently forgotten.
+        parts.push(`Stray: ${this.mapShow.strayNote}`);
+      }
       if (this.mapShow?.waitStr?.length)
         parts.push("Waiting " + this.mapShow.waitStr);
 
@@ -1330,6 +1359,23 @@ export default {
   },
 
   methods: {
+    // Clear the lasting stray note first, then re-run the gap check: the note
+    // only comes back if the non-aired files are still there, so the button
+    // doubles as the way to confirm a stray was really dealt with.
+    async onGapchkClick() {
+      const show = this.mapShow;
+      if (!show?.id) return;
+      this.gapchkFlash = true;
+      try {
+        if (show.strayNote) await srvr.clearStrayNote(show.name);
+        await srvr.triggerShowGapCheck(show.id, show.name);
+      } finally {
+        setTimeout(() => {
+          this.gapchkFlash = false;
+        }, 750);
+      }
+    },
+
     onPruneClick() {
       this.pruneFlash = true;
       this.$emit("prune", this.mapShow);

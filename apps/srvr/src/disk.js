@@ -18,6 +18,7 @@ import {
 import * as epd from "@tv/share";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
 import * as tvdb from "./tvdb.js";
+import { showFolderFor, folderToRecord } from "./showPaths.js";
 import * as emby from "./emby.js";
 import * as util from "./util.js";
 import { videoFileExtensions } from "./videoFiles.js";
@@ -143,19 +144,6 @@ function probeRawHeight(filePath) {
   return h;
 }
 
-// Index the tvdb records by the media folder they live in. The folder is the
-// last segment of the record's path, which can differ from the record's name.
-const folderToRecord = () => {
-  const index = new Map();
-  for (const [name, rec] of Object.entries(tvdb.getAllTvdbSync() || {})) {
-    const folder = name.includes("/")
-      ? name
-      : (rec.path || rec.emby?.path || name).split("/").pop();
-    if (folder) index.set(folder, rec);
-  }
-  return index;
-};
-
 // A probed height is already persisted in the record's episodeData (res slot)
 // next to the file it came from, so reuse it instead of running ffprobe again.
 // probedRawHeightByPath is empty after a restart; without this, every file whose
@@ -276,7 +264,7 @@ export const getShowsFromDisk = async (_params) => {
     episodesBySeason = new Map();
     fileQuality = {};
     showFolderName = dirent;
-    showEpisodeData = folderIndex.get(dirent)?.episodeData ?? null;
+    showEpisodeData = folderIndex.get(dirent)?.rec?.episodeData ?? null;
 
     await recurs(showPath);
 
@@ -298,21 +286,6 @@ export const getShowsFromDisk = async (_params) => {
 };
 
 /**
- * Extract the show name from an absolute video file path under tvDir.
- * Handles shows whose name contains a "/" (e.g. "Good Cop/Bad Cop") by
- * checking whether the two-segment prefix matches a known tvdb entry.
- */
-export const showNameFromFilePath = (filePath) => {
-  const rel = filePath.replace(tvDir + "/", "");
-  const parts = rel.split("/");
-  if (parts.length >= 2) {
-    const twoSeg = parts[0] + "/" + parts[1];
-    if (tvdb.getAllTvdbSync()[twoSeg]) return twoSeg;
-  }
-  return parts[0];
-};
-
-/**
  * Check disk for a single show folder
  * @param {string} showFolderName - The show folder name (e.g., "Breaking Bad")
  * @returns {Promise<[number, number, Array, Object, Object]|null>} - [maxDate, totalSize, filesOnDisk, fileQuality, diskByEp] or null if not found
@@ -331,7 +304,7 @@ export const getShowDiskInfo = async (showFolderName) => {
   const diskByEp = {};
   // Read before the caller overwrites it, so already-probed files keep their res.
   const showEpisodeData =
-    folderToRecord().get(showFolderName)?.episodeData ?? null;
+    folderToRecord().get(showFolderName)?.rec?.episodeData ?? null;
 
   const recurs = async (dirPath) => {
     if (errFlg || dirPath == tvDir + "/.stfolder") return;
@@ -430,9 +403,7 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
   if (!Array.isArray(rec.episodeData)) rec.episodeData = [];
   const ed = rec.episodeData;
 
-  const folder = showName.includes("/")
-    ? showName
-    : (rec.path || rec.emby?.path || showName).split("/").pop();
+  const folder = showFolderFor(showName, rec);
   const folderDiffers = folder !== showName;
 
   // Episodes each source vouched for this pass, as "<season>.<episode>" keys,

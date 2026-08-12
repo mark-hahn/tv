@@ -314,8 +314,9 @@ const main = () => {
     finish(statusText);
   };
 
-  // rsync writes into the per-transfer partial dir for the whole transfer and
-  // only moves the file to its final name at the very end.
+  // Where an interrupted transfer's bytes are kept. rsync only creates the
+  // partial dir when it is cut off part way through, and the file it leaves
+  // there carries the destination's own name.
   const partialFilePath = () => {
     const { dst } = makeSrcDst();
     return path.join(
@@ -330,11 +331,47 @@ const main = () => {
     return st && st.isFile() ? st.size : 0;
   };
 
+  // A transfer in flight is not at any of the names above: rsync writes it as
+  // ".<destination name>.XXXXXX" in the destination dir and only renames it at
+  // the very end. Remember it once found so this is not a readdir per second.
+  let inFlightTmp = null;
+  const inFlightTmpPath = () => {
+    if (inFlightTmp && fileBytes(inFlightTmp)) return inFlightTmp;
+    const { dst } = makeSrcDst();
+    const dir = path.dirname(dst);
+    const prefix = `.${path.basename(dst)}.`;
+    let names;
+    try {
+      names = fs.readdirSync(dir);
+    } catch {
+      return null;
+    }
+    // A previous rsync killed outright can leave its own temp behind, so take
+    // the largest match rather than the first one read.
+    inFlightTmp = null;
+    let best = 0;
+    for (const name of names) {
+      if (!name.startsWith(prefix)) continue;
+      const candidate = path.join(dir, name);
+      const size = fileBytes(candidate);
+      if (size >= best) {
+        best = size;
+        inFlightTmp = candidate;
+      }
+    }
+    return inFlightTmp;
+  };
+
   // Bytes of this transfer that are on disk right now, wherever rsync is
   // currently putting them.
   const bytesOnDisk = () => {
     const { dst } = makeSrcDst();
-    return Math.max(fileBytes(partialFilePath()), fileBytes(dst));
+    const tmp = inFlightTmpPath();
+    return Math.max(
+      tmp ? fileBytes(tmp) : 0,
+      fileBytes(partialFilePath()),
+      fileBytes(dst),
+    );
   };
 
   // A transfer that wrote into the partial dir still has to be moved to its

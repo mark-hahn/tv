@@ -268,6 +268,7 @@
             :previewMode="previewMode"
             :movieMode="movieMode"
             :active="currentPane === 'tor'"
+            :episodeRequest="torEpisodeRequest"
           ></Tor>
           <Flex
             v-show="!simpleMode && currentPane === 'flex'"
@@ -619,6 +620,7 @@ export default {
       browseTabHasMore: false,
       _browseHasMoreChannel: null,
       currentPane: "info", // 'info', 'map', 'actors', 'reviews', 'trailer', 'tor', 'flex', 'qbt', 'down'
+      torEpisodeRequest: null, // map pane Tor button request passed to tor.vue
       movieMode: false,
       savedPane: null,
       restoringPreviewPane: false,
@@ -2422,13 +2424,17 @@ export default {
       evtBus.emit("openStream", show);
     });
 
-    // Map pane Tor button: switch to tor; tor.vue runs the episode search.
-    evtBus.on("torSearchEpisodes", ({ show }) => {
+    // Map pane Tor button: switch to tor and hand the episode list to tor.vue
+    // as a prop. A bus event was unreliable here -- the pane switch happened
+    // while the search never ran.
+    evtBus.on("torSearchEpisodes", ({ show, episodes }) => {
       if (this.simpleMode) return;
       this._torrentsInitialized = true;
       this._torrentsShowKey = show?.id || show?.name || null;
       this.currentPane = "tor";
       evtBus.emit("paneChanged", this.currentPane);
+      this._torEpisodeSeq = (this._torEpisodeSeq || 0) + 1;
+      this.torEpisodeRequest = { show, episodes, seq: this._torEpisodeSeq };
     });
 
     // show-selected: fired when the user picks a new show from the list.

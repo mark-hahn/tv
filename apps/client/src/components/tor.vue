@@ -1286,6 +1286,12 @@ export default {
       type: Boolean,
       default: false,
     },
+    // Map pane Tor button request: { show, episodes, seq }. A new seq runs a
+    // fresh episode search.
+    episodeRequest: {
+      type: Object,
+      default: null,
+    },
   },
 
   data() {
@@ -1398,6 +1404,9 @@ export default {
   },
 
   watch: {
+    episodeRequest(req) {
+      if (req) void this.searchMapEpisodes(req);
+    },
     movieMode(val) {
       if (!val) {
         this.torrents = [];
@@ -1640,7 +1649,6 @@ export default {
     evtBus.on("paneChanged", this.onPaneChanged);
     evtBus.on("showTorrents", this.searchTorrents);
     evtBus.on("setTorShow", this.setTorShow);
-    evtBus.on("torSearchEpisodes", this.searchMapEpisodes);
     evtBus.on("resetTorrentsPane", this.resetPane);
     evtBus.on("refreshSpaceAvail", this.onRefreshSpaceAvail);
     evtBus.on("openStream", this.onOpenStream);
@@ -1663,7 +1671,6 @@ export default {
   unmounted() {
     evtBus.off("paneChanged", this.onPaneChanged);
     evtBus.off("setTorShow", this.setTorShow);
-    evtBus.off("torSearchEpisodes", this.searchMapEpisodes);
     evtBus.off("showTorrents", this.searchTorrents);
     evtBus.off("resetTorrentsPane", this.resetPane);
     evtBus.off("refreshSpaceAvail", this.onRefreshSpaceAvail);
@@ -1812,6 +1819,14 @@ export default {
 
       switch (this.torSearchPhase) {
         case "idle":
+          // A map pane episode list replaces the needed check entirely.
+          if (this.mapEpisodes) {
+            await this.searchMapEpisodes({
+              show: this.currentShow,
+              episodes: this.mapEpisodes,
+            });
+            return;
+          }
           await this.runInitialNeededSearch();
           return;
         case "needed-none":
@@ -1821,6 +1836,13 @@ export default {
           await this.expandToAllProviders();
           return;
         case "all-results":
+          // After a finished map pane episode search, the next click drops that
+          // episode list and starts the normal needed / IPT+TL search over.
+          if (this.mapEpisodes) {
+            this.resetTorResultsState();
+            await this.runInitialNeededSearch();
+          }
+          return;
         default:
           return;
       }

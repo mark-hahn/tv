@@ -1228,7 +1228,7 @@ class ShowListView extends ScrollView {
 
     TextView name = new TextView(getContext());
     name.setText(show.name);
-    name.setTextColor(CARD_TEXT_LIGHT);
+    name.setTextColor(!show.waitStr.isEmpty() ? TRASH_ICON_COLOR : CARD_TEXT_LIGHT);
     nameRow.setNameView(name);
     name.setTextSize(TypedValue.COMPLEX_UNIT_SP, NAME_TEXT_SIZE_SP);
     name.setSingleLine(true);
@@ -1570,7 +1570,11 @@ class ShowListView extends ScrollView {
 
   private void renderDescMisc(Shows.Show show, FrameLayout misc) {
     TextView desc = new TextView(getContext());
-    desc.setText(show.overview.isEmpty() ? "No description." : show.overview);
+    String text = show.overview.isEmpty() ? "No description." : show.overview;
+    if (!show.waitStr.isEmpty()) {
+      text = show.waitStr + "\n\n" + text;
+    }
+    desc.setText(text);
     desc.setTextColor(MISC_TEXT_COLOR);
     desc.setTextSize(TypedValue.COMPLEX_UNIT_SP, DESC_TEXT_SIZE_SP);
     if (show == active) descView = desc;

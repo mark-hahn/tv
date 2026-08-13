@@ -1,3 +1,4 @@
+import fs from "fs";
 import * as urls from "./urls.js";
 import fetch from "node-fetch";
 import * as epd from "@tv/share";
@@ -249,12 +250,79 @@ const safeGet = async (url, retries = 3) => {
   }
 };
 
-// How an accepted stray is remembered: the episode it claims plus the exact
-// file that was reviewed. A different file on the same episode is not covered.
-export const strayOkKey = (season, episode, fileName) =>
-  `S${season}E${episode}|${String(fileName || "")
+export const ignoreStrayKey = (season, episode) => `S${season}E${episode}`;
+
+const TV_DIR = "/mnt/media/tv";
+
+// Sign a stray result: episode, filename, size and mtime of every stray. An
+// ignore is only good against the exact result it was granted for, and this is
+// what "the same result" means.
+function signStrays(showName, rec, strays) {
+  return strays
+    .map((s) => {
+      let size = "?";
+      let mtime = "?";
+      const full = epd.getFullPath(
+        rec?.episodeData,
+        folderOfRecord(showName, rec),
+        s.season,
+        s.episode,
+        TV_DIR,
+      );
+      if (full) {
+        try {
+          const st = fs.statSync(full);
+          size = st.size;
+          mtime = Math.round(st.mtimeMs);
+        } catch {
+          // Unreadable counts as its own state, and differs from a good stat.
+        }
+      }
+      return `${ignoreStrayKey(s.season, s.episode)}|${s.name}|${size}|${mtime}`;
+    })
+    .sort()
+    .join(";");
+}
+
+// Sign the whole gap-check result: every occurrence of every gap type, plus
+// the stray file identities. Any movement here retires every ignore the show
+// has, because an ignore was a judgement about this exact result.
+function signGaps(showName, rec, hits, strays) {
+  const parts = [];
+  for (const kind of Object.keys(hits).sort()) {
+    const list = hits[kind]
+      .map((h) => ignoreStrayKey(h.season, h.episode))
+      .sort()
+      .join(",");
+    if (list) parts.push(`${kind}:${list}`);
+  }
+  const straySig = signStrays(showName, rec, strays);
+  if (straySig) parts.push(`stray:${straySig}`);
+  return parts.join(";");
+}
+
+/**
+ * The signature of a record's gap result right now, for callers granting an
+ * ignore. Without stamping this at grant time the next gap check compares
+ * against a stale signature and throws the new ignore straight away.
+ *
+ * Derived from the same getShowState pass so the two can never disagree.
+ */
+export function currentGapSig(showName, rec) {
+  const state = getShowState(showName, {
+    ...rec,
+    ignoreGaps: [],
+    gapSig: null,
+  });
+  return state?.gapSig ?? "";
+}
+
+// The folder a record's files live in, without pulling in showPaths (which
+// would import tvdb.js and close a cycle back to here).
+const folderOfRecord = (showName, rec) =>
+  String(rec?.path || rec?.emby?.path || showName || "")
     .split("/")
-    .pop()}`;
+    .pop();
 
 const getShowState = (showName, showMeta) => {
   // active rows have watched with no watched at end
@@ -285,13 +353,21 @@ const getShowState = (showName, showMeta) => {
   let strayFiles = [];
   let straySeason = null;
   let strayEpisode = null;
-  const strayOkSet = new Set(
-    Array.isArray(showMeta?.strayOk) ? showMeta.strayOk : [],
-  );
-  const strayAccepted = (s, e) => {
-    if (strayOkSet.size === 0) return false;
-    const name = epd.getFileName(showMeta?.episodeData, s, e);
-    return strayOkSet.has(strayOkKey(s, e, name));
+  // Every occurrence of every gap, collected during the pass and judged after
+  // it. The flags below still latch on the first hit so the pass itself is
+  // unchanged, but the reported values are re-derived from these lists once
+  // ignoreGaps is known -- an ignored episode must not hide a later one.
+  const rawStrays = [];
+  const hits = {
+    watchGap: [],
+    fileGap: [],
+    resDrop: [],
+    fileEndError: [],
+    seasonWatchedThenNofile: [],
+  };
+  const hit = (kind, season, episode) => {
+    if (season == null || episode == null) return;
+    hits[kind].push({ season, episode });
   };
   let bestResSoFar = null;
   let lastSeasonWatched = false;
@@ -375,24 +451,22 @@ const getShowState = (showName, showMeta) => {
         // Guilt (2019)'s 4-episode season 1. Recorded here rather than acted
         // on, because the two cases look identical from episodeData alone.
         //
-        // Unless it has been looked at and accepted: strayOk holds the ones
-        // already reviewed, keyed by episode AND filename, so replacing the
-        // file with a different release makes it a stray again rather than
-        // inheriting an acceptance it was never given.
-        if (haveFile && !aired && !strayAccepted(seasonNumber, episodeNumber)) {
-          strayCount++;
-          if (straySeason === null) {
-            straySeason = seasonNumber;
-            strayEpisode = episodeNumber;
-          }
-          const strayName = epd.getFileName(ed, seasonNumber, episodeNumber);
-          if (strayName) strayFiles.push(strayName);
+        // Collected raw here; ignoring is applied after the pass, because
+        // whether an ignore still counts depends on the whole result.
+        if (haveFile && !aired) {
+          rawStrays.push({
+            season: seasonNumber,
+            episode: episodeNumber,
+            name: epd.getFileName(ed, seasonNumber, episodeNumber) || "",
+          });
         }
 
         // Resolution drop: any episode file lower res than an earlier one.
         if (haveFile) {
           const res = epd.getRes(ed, seasonNumber, episodeNumber);
           if (res) {
+            if (bestResSoFar !== null && res < bestResSoFar && !watched)
+              hit("resDrop", seasonNumber, episodeNumber);
             if (
               bestResSoFar !== null &&
               res < bestResSoFar &&
@@ -453,6 +527,8 @@ const getShowState = (showName, showMeta) => {
           watchedSeason = true;
         }
         if (watchedShow && !watched) unwatchedAfterWatched = true;
+        if (unwatchedAfterWatched && watched)
+          hit("watchGap", seasonNumber, episodeNumber);
         if (!watchGap && unwatchedAfterWatched && watched) {
           if (watchGapSeason === null) {
             watchGapSeason = seasonNumber;
@@ -473,6 +549,8 @@ const getShowState = (showName, showMeta) => {
         haveFileShow ||= effectiveHaveFile;
         if (haveFileShow && !effectiveHaveFile && !unaired)
           noFileAfterFile = true;
+        if (noFileAfterFile && effectiveHaveFile)
+          hit("fileGap", seasonNumber, episodeNumber);
         if (!fileGap && noFileAfterFile && effectiveHaveFile) {
           if (fileGapSeason === null) {
             fileGapSeason = seasonNumber;
@@ -486,6 +564,7 @@ const getShowState = (showName, showMeta) => {
         }
         if (!watched && !haveFile && !unaired) sawUnwatchedNoFile = true;
         if (!watched && haveFile && !unaired && sawUnwatchedNoFile) {
+          if (!lastWatched) hit("fileGap", seasonNumber, episodeNumber);
           if (!fileGap && !lastWatched) {
             if (fileGapSeason === null) {
               fileGapSeason = seasonNumber;
@@ -503,6 +582,8 @@ const getShowState = (showName, showMeta) => {
 
         lastWatched = watched;
       }
+      if (!seasonNotWatchedNoFiles && fileEndCount > 2)
+        hit("fileEndError", seasonNumber, fileEndStartEpisode);
       if (!seasonNotWatchedNoFiles && fileEndCount > 2) {
         unilog(
           693,
@@ -514,6 +595,8 @@ const getShowState = (showName, showMeta) => {
           fileEndErrorEpisode = fileEndStartEpisode;
         }
       }
+      if (lastSeasonWatched && !allSeasonWatched && seasonNotWatchedNoFiles)
+        hit("seasonWatchedThenNofile", seasonNumber, firstEpisodeOfSeason);
       if (lastSeasonWatched && !allSeasonWatched && seasonNotWatchedNoFiles) {
         if (seasonWatchedThenNofileSeason === null) {
           seasonWatchedThenNofileSeason = seasonNumber;
@@ -593,6 +676,74 @@ const getShowState = (showName, showMeta) => {
     unilog(694, `getShowState error for ${showName}:`, error.message);
     return null;
   }
+  // An ignore says "I looked at this result and it is fine", so it is only
+  // good for the result it was granted against. Rather than tracking what
+  // could invalidate each entry, the WHOLE gap result is signed -- every
+  // occurrence of every gap type, plus filename, size and mtime for strays. If
+  // the signature moves at all, every ignore for the show is dropped and the
+  // lot is put back in front of you to look at again.
+  const gapSig = signGaps(showName, showMeta, hits, rawStrays);
+  const sigHeld = gapSig === (showMeta?.gapSig ?? null);
+
+  // Earlier names for this list, folded in once and cleared as records pass.
+  const legacy = [
+    ...(Array.isArray(showMeta?.ignoreStrays) ? showMeta.ignoreStrays : []),
+    ...(Array.isArray(showMeta?.strayOk) ? showMeta.strayOk : []),
+  ].map((v) => (typeof v === "string" ? v.split("|")[0] : v?.ep));
+  const ignoreGaps = sigHeld
+    ? [
+        ...new Set(
+          [
+            ...(Array.isArray(showMeta?.ignoreGaps) ? showMeta.ignoreGaps : []),
+            ...legacy,
+          ].filter(Boolean),
+        ),
+      ]
+    : [];
+  const strayOk = null;
+  const ignoreStrays = null;
+
+  // Re-derive every reported gap from its full occurrence list, skipping
+  // ignored episodes. Latching on the first hit during the pass would have let
+  // one ignored episode hide every later one of the same kind.
+  const ignoreSet = new Set(ignoreGaps);
+  const kept = (kind) =>
+    hits[kind].filter(
+      (h) => !ignoreSet.has(ignoreStrayKey(h.season, h.episode)),
+    );
+
+  const firstOf = (kind) => kept(kind)[0] || null;
+  const wg = firstOf("watchGap");
+  watchGap = !!wg;
+  watchGapSeason = wg?.season ?? null;
+  watchGapEpisode = wg?.episode ?? null;
+  const fg = firstOf("fileGap");
+  fileGap = !!fg;
+  fileGapSeason = fg?.season ?? null;
+  fileGapEpisode = fg?.episode ?? null;
+  const rd = firstOf("resDrop");
+  resDrop = !!rd;
+  resDropSeason = rd?.season ?? null;
+  resDropEpisode = rd?.episode ?? null;
+  const fe = firstOf("fileEndError");
+  fileEndError = !!fe;
+  fileEndErrorSeason = fe?.season ?? null;
+  fileEndErrorEpisode = fe?.episode ?? null;
+  const sw = firstOf("seasonWatchedThenNofile");
+  seasonWatchedThenNofile = !!sw;
+  seasonWatchedThenNofileSeason = sw?.season ?? null;
+  seasonWatchedThenNofileEpisode = sw?.episode ?? null;
+
+  for (const s of rawStrays) {
+    if (ignoreSet.has(ignoreStrayKey(s.season, s.episode))) continue;
+    strayCount++;
+    if (straySeason === null) {
+      straySeason = s.season;
+      strayEpisode = s.episode;
+    }
+    if (s.name) strayFiles.push(s.name);
+  }
+
   const stray = strayCount > 0;
   return {
     notReady: !ready,
@@ -617,6 +768,10 @@ const getShowState = (showName, showMeta) => {
     strayFiles,
     straySeason,
     strayEpisode,
+    ignoreGaps,
+    gapSig,
+    ignoreStrays,
+    strayOk,
     allAiredHaveFile: sawAnyEpisode && !anyEpisodeNoFile,
     allAiredWatched: sawAnyEpisode && !anyAiredEpisodeNotWatched,
     allWatchedOrHaveFile: sawAnyEpisode && !anyEpisodeNeitherWatchedNorFile,
@@ -660,6 +815,10 @@ export const gapCheckOne = async (showId, showName, tvdbRecord) => {
     strayFiles,
     straySeason,
     strayEpisode,
+    ignoreGaps,
+    gapSig,
+    ignoreStrays,
+    strayOk,
     seasonWatchedThenNofile,
     seasonWatchedThenNofileSeason,
     seasonWatchedThenNofileEpisode,
@@ -685,6 +844,10 @@ export const gapCheckOne = async (showId, showName, tvdbRecord) => {
     strayFiles,
     straySeason,
     strayEpisode,
+    ignoreGaps,
+    gapSig,
+    ignoreStrays,
+    strayOk,
     fileEndError,
     fileEndErrorSeason,
     fileEndErrorEpisode,

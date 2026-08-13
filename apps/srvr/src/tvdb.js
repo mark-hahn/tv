@@ -2362,11 +2362,13 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     tvdbData.seasonIntros = existing.seasonIntros;
 
   // A refresh builds tvdbData from scratch, so anything not copied here is
-  // lost. strayOk is a decision the user made about specific files and can
-  // never be recomputed; strayNote is the lasting record that a non-aired file
-  // was once seen, which is the whole point of it.
-  if (existing.strayOk != null) tvdbData.strayOk = existing.strayOk;
+  // lost. ignoreGaps is a decision the user made about specific episodes
+  // lost. ignoreGaps is a decision the user made about specific episodes and
+  // can never be recomputed; strayNote is the lasting record that a
+  // non-aired file was once seen, which is the whole point of it.
   if (existing.strayNote != null) tvdbData.strayNote = existing.strayNote;
+  if (existing.ignoreGaps != null) tvdbData.ignoreGaps = existing.ignoreGaps;
+  if (existing.gapSig != null) tvdbData.gapSig = existing.gapSig;
 
   // Calculate waitStr from existing episodeData (fresh series map data hasn't
   // been fetched yet at this stage).
@@ -3591,7 +3593,10 @@ export const getPoster = async (params) => {
       );
       if (res.ok) extResObj = await res.json();
     } catch (e) {
-      unilog(2174, `getPoster extended fetch failed for ${nameIn || tvdbId}: ${e.message}`);
+      unilog(
+        2174,
+        `getPoster extended fetch failed for ${nameIn || tvdbId}: ${e.message}`,
+      );
     }
   }
 

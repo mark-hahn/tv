@@ -151,7 +151,9 @@ export default {
       if (this.node.type === "folder") {
         if (!event.ctrlKey && !event.shiftKey) {
           this.expanded = !this.expanded;
-          return;
+          // A top-level folder also becomes the selection so the pane buttons
+          // (Sel, Del, ...) act on the folder that was just clicked.
+          if (this.depth > 0) return;
         }
       }
 

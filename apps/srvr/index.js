@@ -1630,13 +1630,105 @@ app.post(
       detail: "rewrites the note only if something is still wrong",
       items: [],
     });
-    return { success: true, showName, actions };
+    // Every stray this show currently has, so the dialog's Ignore button knows
+    // which episodes it would be silencing.
+    const strays = [];
+    for (const plan of strayEpisodes.planAllStrayQuarantines(showName)) {
+      for (const release of plan.releases || []) {
+        for (const r of release.runtimes || []) {
+          strays.push({
+            season: r.season,
+            episode: r.episode,
+            name: r.name,
+            min: r.min,
+          });
+        }
+      }
+    }
+    return { success: true, showName, actions, strays };
+  }),
+);
+
+// Episodes whose gap-check errors are suppressed for this show -- missing
+// file, resolution drop, watch gap, stray, all of them. The list is only good
+// for the gap result it was granted against: the check signs the whole result
+// into gapSig and throws the entire list away the moment that signature moves,
+// so any change at all puts every episode back in front of the user.
+const asEpKeys = (list) =>
+  (Array.isArray(list) ? list : [])
+    .map((v) => (typeof v === "string" ? v.split("|")[0] : v?.ep))
+    .filter(Boolean);
+
+function addIgnoreGaps(rec, episodes) {
+  const set = new Set(asEpKeys(rec.ignoreGaps));
+  const before = set.size;
+  for (const ep of episodes) {
+    const s = Number(ep?.season);
+    const e = Number(ep?.episode);
+    if (!Number.isInteger(s) || !Number.isInteger(e)) continue;
+    set.add(emby.ignoreStrayKey(s, e));
+  }
+  rec.ignoreGaps = [...set].sort();
+  const added = set.size - before;
+  if (added) {
+    // Stamp the result this ignore was granted against, or the next gap check
+    // compares it to a stale signature and discards it immediately.
+    rec.gapSig = emby.currentGapSig(rec?.name, rec);
+    // Ignoring an episode settles it, so the lasting note about it goes too.
+    // If other strays are still outstanding the next gap check writes a fresh
+    // note naming those instead of the ones just dealt with.
+    delete rec.strayNote;
+  }
+  return added;
+}
+
+function removeIgnoreGaps(rec, episodes) {
+  const drop = new Set();
+  for (const ep of episodes) {
+    const s = Number(ep?.season);
+    const e = Number(ep?.episode);
+    if (Number.isInteger(s) && Number.isInteger(e))
+      drop.add(emby.ignoreStrayKey(s, e));
+  }
+  const before = (rec.ignoreGaps || []).length;
+  rec.ignoreGaps = asEpKeys(rec.ignoreGaps).filter((v) => !drop.has(v));
+  return before - rec.ignoreGaps.length;
+}
+
+app.post(
+  "/api/ignoreGaps",
+  apiWrapper(async (params) => {
+    const showName = params?.showName;
+    const episodes = Array.isArray(params?.episodes) ? params.episodes : [];
+    if (!showName) return { success: false, error: "showName required" };
+    const rec = tvdb.getAllTvdbSync()?.[showName];
+    if (!rec) return { success: false, error: "show not found" };
+    const before = (rec.ignoreGaps || []).length;
+    // The list is permanent and the button acts on whatever cells happen to be
+    // selected, so there has to be a way back out of a mis-click.
+    const removing = params?.remove === true;
+    if (removing) removeIgnoreGaps(rec, episodes);
+    else addIgnoreGaps(rec, episodes);
+    await tvdb.saveTvdbSync();
+    const changed = Math.abs((rec.ignoreGaps || []).length - before);
+    if (changed) {
+      unilog(
+        2182,
+        `${showName}: ${removing ? "un-ignoring" : "ignoring"} ${changed} episode(s) for gap checks — list is now ${rec.ignoreGaps.join(", ") || "empty"}`,
+      );
+    }
+    return {
+      success: true,
+      added: removing ? 0 : changed,
+      removed: removing ? changed : 0,
+      ignoreGaps: rec.ignoreGaps,
+    };
   }),
 );
 
 // Mark the strays the quarantine left behind as reviewed and fine, so a show
-// that has been fully triaged can go quiet. Keyed by episode + filename, so a
-// later replacement of any of them raises the flag again.
+// that has been fully triaged can go quiet. Writes the same ignoreGaps list
+// the Ignore buttons use -- there is only one list.
 app.post(
   "/api/acceptStrays",
   apiWrapper(async (params) => {
@@ -1646,12 +1738,16 @@ app.post(
     if (!rec) return { success: false, error: "show not found" };
     const accepting = strayEpisodes.straysToAccept(showName, rec);
     if (!accepting.length) return { success: true, accepted: 0 };
-    const set = new Set(Array.isArray(rec.strayOk) ? rec.strayOk : []);
-    for (const a of accepting) set.add(a.key);
-    rec.strayOk = [...set];
+    const added = addIgnoreGaps(
+      rec,
+      accepting.map((a) => ({ season: a.season, episode: a.episode })),
+    );
     await tvdb.saveTvdbSync();
-    unilog(2170, `${showName}: accepted ${accepting.length} stray file(s) as this show's episodes: ${accepting.map((a) => a.key).join(", ")}`);
-    return { success: true, accepted: accepting.length };
+    unilog(
+      2183,
+      `${showName}: accepted ${added} stray file(s) as this show's episodes: ${accepting.map((a) => a.key).join(", ")}`,
+    );
+    return { success: true, accepted: added };
   }),
 );
 

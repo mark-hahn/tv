@@ -43,7 +43,6 @@ import { parseFileSeasonEpisode } from "@tv/share";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
 import * as tvdb from "./tvdb.js";
 import { showFolderFor } from "./showPaths.js";
-import { strayOkKey } from "./emby.js";
 import { resIsVideoName, resIsSampleName } from "./videoFiles.js";
 
 const TV_DIR = "/mnt/media/tv";
@@ -405,7 +404,7 @@ export function straysToAccept(showName, rec) {
     for (const r of release.runtimes || []) {
       if (r.move) continue;
       out.push({
-        key: strayOkKey(r.season, r.episode, r.name),
+        key: `S${r.season}E${r.episode}`,
         season: r.season,
         episode: r.episode,
         name: r.name,

@@ -829,6 +829,9 @@ export function triggerShowGapCheck(showId, showName) {
 export function clearStrayNote(showName) {
   return httpCall("/api/clearStrayNote", { showName }, "POST");
 }
+export function ignoreGaps(showName, episodes) {
+  return httpCall("/api/ignoreGaps", { showName, episodes }, "POST");
+}
 export function acceptStrays(showName) {
   return httpCall("/api/acceptStrays", { showName }, "POST");
 }

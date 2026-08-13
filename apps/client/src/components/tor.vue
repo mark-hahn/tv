@@ -1481,6 +1481,20 @@ export default {
         .sort((a, b) => a - b)
         .join(",");
     },
+    // The needed list sent for a map-pane episode search: the selected
+    // episodes plus a season marker per season they span. Without the markers
+    // the server drops every season pack and season-range pack, which are
+    // often the only torrents that contain the selected episodes.
+    mapNeeded() {
+      if (!Array.isArray(this.mapEpisodes) || this.mapEpisodes.length === 0)
+        return null;
+      const seasons = new Set();
+      for (const ep of this.mapEpisodes) {
+        const m = /^S(\d+)E\d+$/i.exec(String(ep));
+        if (m) seasons.add(`S${m[1].padStart(2, "0")}`);
+      }
+      return [...seasons, ...this.mapEpisodes];
+    },
     filteredTorrents() {
       // Use season filter if present
       const sVal = parseInt(this.seasonFilter, 10);
@@ -1866,11 +1880,11 @@ export default {
       // Skip the needed check and land in the all-providers state directly.
       // The IPT/TL pass has to run first because the all-providers pass reads
       // its results from the cache that pass writes.
-      const iptTlResult = await this.loadTorrents(this.mapEpisodes, false, {
+      const iptTlResult = await this.loadTorrents(this.mapNeeded, false, {
         phaseOverride: "all-results",
       });
       if (!iptTlResult) return;
-      const result = await this.loadTorrents(this.mapEpisodes, true, {
+      const result = await this.loadTorrents(this.mapNeeded, true, {
         stagedResponse: true,
         preserveVisible: true,
         phaseOverride: "all-results",
@@ -2696,7 +2710,7 @@ export default {
 
       this.providerWarning = "";
       const result = await this.loadTorrents(
-        this.mapEpisodes || ["force"],
+        this.mapNeeded || ["force"],
         true,
         {
           stagedResponse: true,

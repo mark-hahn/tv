@@ -422,6 +422,24 @@
             Gapchk
           </button>
           <button
+            @click.stop="onIgnoreGapsClick"
+            :disabled="!hasMapSelection"
+            :style="{
+              '--btn-bg': ignoreGapsFlash ? 'lightgray' : 'whitesmoke',
+              opacity: hasMapSelection ? 1 : 0.35,
+              cursor: hasMapSelection ? 'pointer' : 'default',
+            }"
+            style="
+              font-size: 13.5px;
+              cursor: pointer;
+              margin: 4.5px 0 4.5px 4.5px;
+              max-height: 21.5px;
+              border-radius: 7px;
+            "
+          >
+            Ignore gaps
+          </button>
+          <button
             v-if="mapShow?.inEmby !== false"
             @click.stop="onPruneClick"
             :disabled="!hasWatchedFile"
@@ -1084,6 +1102,22 @@
             Cancel
           </button>
           <button
+            @click="ignoreGapsFromDialog"
+            :disabled="gapchkStrays.length === 0"
+            :style="{
+              opacity: gapchkStrays.length ? 1 : 0.35,
+              cursor: gapchkStrays.length ? 'pointer' : 'default',
+            }"
+            style="
+              font-size: 13.5px;
+              margin-right: 8px;
+              border-radius: 7px;
+              padding: 3px 12px;
+            "
+          >
+            Ignore
+          </button>
+          <button
             @click="runGapchkActions"
             style="font-size: 13.5px; border-radius: 7px; padding: 3px 12px"
           >
@@ -1199,7 +1233,9 @@ export default {
       gapchkFlash: false,
       gapchkConfirmShow: null,
       gapchkActions: [],
+      gapchkStrays: [],
       gapchkResult: "",
+      ignoreGapsFlash: false,
       posFlash: false,
       selectedSeasons: new Set(),
       selectedCells: new Set(),
@@ -1491,11 +1527,64 @@ export default {
           return;
         }
         this.gapchkActions = preview.actions || [];
+        this.gapchkStrays = preview.strays || [];
         this.gapchkConfirmShow = show.name;
       } finally {
         setTimeout(() => {
           this.gapchkFlash = false;
         }, 750);
+      }
+    },
+
+    // Silence every gap-check error on the selected episodes -- missing file,
+    // resolution drop, watch gap, stray. Held only until the show's gap result
+    // changes at all, at which point the whole list is dropped.
+    async onIgnoreGapsClick() {
+      const show = this.mapShow;
+      if (!show?.name || !this.hasMapSelection) return;
+      const episodes = [];
+      for (const key of this.selectedCells) {
+        const { season, episode } = this.parseCellKey(key);
+        if (season == null || episode == null) continue;
+        episodes.push({ season, episode });
+      }
+      if (episodes.length === 0) return;
+      this.ignoreGapsFlash = true;
+      setTimeout(() => {
+        this.ignoreGapsFlash = false;
+      }, 750);
+      const r = await srvr.ignoreGaps(show.name, episodes);
+      this.gapchkResult = r?.success
+        ? `ignoring ${r.added} more episode(s) for gap checks`
+        : `ignore failed: ${r?.error || "unknown error"}`;
+      setTimeout(() => {
+        this.gapchkResult = "";
+      }, 8000);
+      if (r?.success && show.id) {
+        await srvr.triggerShowGapCheck(show.id, show.name);
+      }
+    },
+
+    // Dialog's Ignore: silence every stray this show has and close without
+    // running any of the actions.
+    async ignoreGapsFromDialog() {
+      const showName = this.gapchkConfirmShow;
+      const show = this.mapShow;
+      const episodes = this.gapchkStrays.map((s) => ({
+        season: s.season,
+        episode: s.episode,
+      }));
+      this.gapchkConfirmShow = null;
+      if (!showName || episodes.length === 0) return;
+      const r = await srvr.ignoreGaps(showName, episodes);
+      this.gapchkResult = r?.success
+        ? `ignoring ${r.added} more episode(s) for gap checks — nothing else was done`
+        : `ignore failed: ${r?.error || "unknown error"}`;
+      setTimeout(() => {
+        this.gapchkResult = "";
+      }, 8000);
+      if (r?.success && show?.id) {
+        await srvr.triggerShowGapCheck(show.id, showName);
       }
     },
 
@@ -2412,7 +2501,10 @@ export default {
         this.selectedSeasons = new Set();
       }
 
+      // ctrl-click adds cells from any season; only shift-ranges are limited
+      // to a single season, so only they reset a cross-season selection.
       if (
+        !event?.ctrlKey &&
         this.selectionSeason &&
         this.selectionSeason !== seasonKey &&
         !this.selectedCells.has(key)
@@ -2461,6 +2553,7 @@ export default {
           if (next.size === 0) this.selectionSeason = null;
         } else {
           next.add(key);
+          this.selectionSeason = seasonKey;
         }
         this.selectedCells = next;
         this.lastSelectedCell = key;

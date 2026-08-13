@@ -1130,10 +1130,11 @@
       v-if="gapchkResult"
       style="
         position: fixed;
-        bottom: 14px;
-        right: 14px;
-        background: #333;
-        color: white;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        color: black;
         padding: 7px 12px;
         border-radius: 7px;
         font-size: 13px;

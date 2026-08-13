@@ -1723,10 +1723,14 @@ export default {
         return;
       }
 
-      // Filter out files the server would skip (same logic as checkFile in main.js).
+      // Files the server can't use are dropped here instead of blocking the
+      // whole force down; they are listed in the confirm so it can be cancelled.
+      const skipped = [];
+      const nameOf = (fe) =>
+        fe.split("-").slice(0, -1).join("-").slice(11).split("/").pop() || "";
+
       const shouldSkipExt = (ext) =>
         ext.length === 6 ||
-        ext === "nfo" ||
         ext === "idx" ||
         ext === "sub" ||
         ext === "txt" ||
@@ -1734,23 +1738,13 @@ export default {
         ext === "gif" ||
         ext === "jpeg" ||
         ext === "part";
-      const skippedFiles = files.filter((fe) => {
-        const fn =
-          fe.split("-").slice(0, -1).join("-").slice(11).split("/").pop() || "";
-        return shouldSkipExt((fn.split(".").pop() || "").toLowerCase());
-      });
       files = files.filter((fe) => {
-        const fn =
-          fe.split("-").slice(0, -1).join("-").slice(11).split("/").pop() || "";
-        return !shouldSkipExt((fn.split(".").pop() || "").toLowerCase());
+        const fn = nameOf(fe);
+        if (!shouldSkipExt((fn.split(".").pop() || "").toLowerCase()))
+          return true;
+        skipped.push(`${fn} (ignored file type)`);
+        return false;
       });
-      if (skippedFiles.length > 0) {
-        const skippedNames = skippedFiles.map((fe) =>
-          fe.split("-").slice(0, -1).join("-").slice(11).split("/").pop(),
-        );
-        alert("These files ignored:\n\n" + skippedNames.join("\n"));
-      }
-      if (files.length === 0) return;
 
       // Separate DVD files (inside VIDEO_TS folders) from regular files.
       const extractPath = (fe) =>
@@ -1758,27 +1752,28 @@ export default {
       const dvdFiles = files.filter((fe) =>
         extractPath(fe).includes("/VIDEO_TS/"),
       );
-      const regularFiles = files.filter(
-        (fe) => !extractPath(fe).includes("/VIDEO_TS/"),
-      );
+      // Drop regular files that can't be parsed (title + season + episode);
+      // the server rejects those no matter how the cycle was started.
+      const regularFiles = files
+        .filter((fe) => !extractPath(fe).includes("/VIDEO_TS/"))
+        .filter((fileEntry) => {
+          const pathParts = extractPath(fileEntry).split("/");
+          const fname = pathParts[pathParts.length - 1];
+          const folderName =
+            pathParts.length >= 2 ? pathParts[pathParts.length - 2] : "";
+          const err = this.computeFileError(fname, folderName);
+          if (!err) return true;
+          skipped.push(`${fname} (${err})`);
+          return false;
+        });
+      files = [...dvdFiles, ...regularFiles];
 
-      // Validate regular files can be parsed (title + season + episode).
-      const parseErrors = [];
-      for (const fileEntry of regularFiles) {
-        const filePath = extractPath(fileEntry);
-        const pathParts = filePath.split("/");
-        const fname = pathParts[pathParts.length - 1];
-        const folderName =
-          pathParts.length >= 2 ? pathParts[pathParts.length - 2] : "";
-        const err = this.computeFileError(fname, folderName);
-        if (err) parseErrors.push(`${fname} (${err})`);
-      }
-      if (parseErrors.length > 0) {
-        alert(
-          "Cannot force download — parse error:\n\n" + parseErrors.join("\n"),
-        );
+      if (files.length === 0) {
+        alert("No files can be force downloaded:\n\n" + skipped.join("\n"));
         return;
       }
+      if (this.selectedFolders.size === 0)
+        label = `${files.length} selected files`;
 
       // Emby check: all files must belong to a show that is in Emby.
       if (Array.isArray(this.allShows) && this.allShows.length > 0) {
@@ -1841,7 +1836,10 @@ export default {
         }
       }
 
-      if (!skipConfirm && !confirm(`Force download ${label}?`)) return;
+      let confirmMsg = `Force download ${label}?`;
+      if (skipped.length > 0)
+        confirmMsg += `\n\nThese files will be skipped:\n\n${skipped.join("\n")}`;
+      if (!skipConfirm && !confirm(confirmMsg)) return;
 
       this.loading = true;
       try {

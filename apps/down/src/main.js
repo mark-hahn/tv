@@ -1354,7 +1354,7 @@ async function main() {
   // extra lines do.
   findUsb = `ssh ${usbHost} \"find files -ignore_readdir_race -type f -printf '%CY-%Cm-%Cd-%P-%s\\\\n' 2>/dev/null\"`;
 
-  var FORCE_SCAN_EXCLUDED_EXTENSIONS = new Set([
+  var DVD_EXCLUDED_EXTENSIONS = new Set([
     "srr",
     "sfv",
     "nfo",
@@ -1371,7 +1371,7 @@ async function main() {
     "vob",
   ]);
 
-  var shouldSkipUsbLineByScanRules = function (line) {
+  var shouldSkipUsbLineByScanRules = function (line, force) {
     var text = String(line || "").trim();
     if (!text) return true;
     var lineNoSize = text.split("-").slice(0, -1).join("-");
@@ -1379,8 +1379,9 @@ async function main() {
     if (!relPath) return true;
     if (/\.r\d\d$/i.test(relPath) || /\.rar$/i.test(relPath)) return true;
     if (/screen\d+\.png$/i.test(relPath)) return true;
+    if (force) return false;
     var ext = path.extname(relPath).toLowerCase().replace(/^\./, "");
-    return FORCE_SCAN_EXCLUDED_EXTENSIONS.has(ext);
+    return DVD_EXCLUDED_EXTENSIONS.has(ext);
   };
 
   // Timestamps in tv-finished.json must be PST timezone.
@@ -2457,7 +2458,7 @@ async function main() {
       unilog(316, "checking forced files...", forcedFiles.length);
       processingForced = true;
       usbFiles = forcedFiles.filter(
-        (l) => l && l.trim().length && !shouldSkipUsbLineByScanRules(l),
+        (l) => l && l.trim().length && !shouldSkipUsbLineByScanRules(l, true),
       );
       forcedFiles = null;
       // A forced cycle has no full USB scan, so there is nothing for the DVD
@@ -3602,15 +3603,7 @@ async function main() {
               !usbIsBad);
           if (!usbIsBetter) {
             existsCount++;
-            unilog(
-              336,
-              downloadCount,
-              "/",
-              chkCount,
-              "SKIP (disk file same/better quality):",
-              fname,
-              flexSeStr,
-            );
+            unilog(2189, `${downloadCount}/${chkCount} SKIP (disk file same/better quality): ${fname} ${flexSeStr} disk=${diskRes}p usb=${usbRes}p`);
             return process.nextTick(checkFile);
           }
           // USB is better — rename the worse disk file to .old before

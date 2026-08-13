@@ -357,6 +357,8 @@ const getShowState = (showName, showMeta) => {
   // it. The flags below still latch on the first hit so the pass itself is
   // unchanged, but the reported values are re-derived from these lists once
   // ignoreGaps is known -- an ignored episode must not hide a later one.
+  let gapSig = "";
+  let ignoreGaps = [];
   const rawStrays = [];
   const hits = {
     watchGap: [],
@@ -607,6 +609,69 @@ const getShowState = (showName, showMeta) => {
       lastSeasonWatched = allSeasonWatched;
     }
 
+    // Re-derive every reported gap from its full occurrence list, skipping
+    // ignored episodes. This has to happen here, before the corrections below:
+    // those suppress file-missing signals for "trying" and skip-marked shows
+    // and add a fileGap of their own, and they must have the last word.
+    // Latching on the first hit during the pass would have let one ignored
+    // episode hide every later one of the same kind, which is why the pass
+    // collects them all instead.
+    gapSig = signGaps(showName, showMeta, hits, rawStrays);
+    const sigHeld = gapSig === (showMeta?.gapSig ?? null);
+    // Earlier names for this list, folded in once and cleared as records pass.
+    const legacy = [
+      ...(Array.isArray(showMeta?.ignoreStrays) ? showMeta.ignoreStrays : []),
+      ...(Array.isArray(showMeta?.strayOk) ? showMeta.strayOk : []),
+    ].map((v) => (typeof v === "string" ? v.split("|")[0] : v?.ep));
+    ignoreGaps = sigHeld
+      ? [
+          ...new Set(
+            [
+              ...(Array.isArray(showMeta?.ignoreGaps)
+                ? showMeta.ignoreGaps
+                : []),
+              ...legacy,
+            ].filter(Boolean),
+          ),
+        ]
+      : [];
+
+    const ignoreSet = new Set(ignoreGaps);
+    const firstOf = (kind) =>
+      hits[kind].filter(
+        (h) => !ignoreSet.has(ignoreStrayKey(h.season, h.episode)),
+      )[0] || null;
+    const wg = firstOf("watchGap");
+    watchGap = !!wg;
+    watchGapSeason = wg?.season ?? null;
+    watchGapEpisode = wg?.episode ?? null;
+    const fg = firstOf("fileGap");
+    fileGap = !!fg;
+    fileGapSeason = fg?.season ?? null;
+    fileGapEpisode = fg?.episode ?? null;
+    const rd = firstOf("resDrop");
+    resDrop = !!rd;
+    resDropSeason = rd?.season ?? null;
+    resDropEpisode = rd?.episode ?? null;
+    const fe = firstOf("fileEndError");
+    fileEndError = !!fe;
+    fileEndErrorSeason = fe?.season ?? null;
+    fileEndErrorEpisode = fe?.episode ?? null;
+    const sw = firstOf("seasonWatchedThenNofile");
+    seasonWatchedThenNofile = !!sw;
+    seasonWatchedThenNofileSeason = sw?.season ?? null;
+    seasonWatchedThenNofileEpisode = sw?.episode ?? null;
+
+    for (const s of rawStrays) {
+      if (ignoreSet.has(ignoreStrayKey(s.season, s.episode))) continue;
+      strayCount++;
+      if (straySeason === null) {
+        straySeason = s.season;
+        strayEpisode = s.episode;
+      }
+      if (s.name) strayFiles.push(s.name);
+    }
+
     const tryingShow =
       !anyWatched && firstEpisodeFileUnwatched && onlyFirstEpisodeHasFile;
 
@@ -676,73 +741,8 @@ const getShowState = (showName, showMeta) => {
     unilog(694, `getShowState error for ${showName}:`, error.message);
     return null;
   }
-  // An ignore says "I looked at this result and it is fine", so it is only
-  // good for the result it was granted against. Rather than tracking what
-  // could invalidate each entry, the WHOLE gap result is signed -- every
-  // occurrence of every gap type, plus filename, size and mtime for strays. If
-  // the signature moves at all, every ignore for the show is dropped and the
-  // lot is put back in front of you to look at again.
-  const gapSig = signGaps(showName, showMeta, hits, rawStrays);
-  const sigHeld = gapSig === (showMeta?.gapSig ?? null);
-
-  // Earlier names for this list, folded in once and cleared as records pass.
-  const legacy = [
-    ...(Array.isArray(showMeta?.ignoreStrays) ? showMeta.ignoreStrays : []),
-    ...(Array.isArray(showMeta?.strayOk) ? showMeta.strayOk : []),
-  ].map((v) => (typeof v === "string" ? v.split("|")[0] : v?.ep));
-  const ignoreGaps = sigHeld
-    ? [
-        ...new Set(
-          [
-            ...(Array.isArray(showMeta?.ignoreGaps) ? showMeta.ignoreGaps : []),
-            ...legacy,
-          ].filter(Boolean),
-        ),
-      ]
-    : [];
   const strayOk = null;
   const ignoreStrays = null;
-
-  // Re-derive every reported gap from its full occurrence list, skipping
-  // ignored episodes. Latching on the first hit during the pass would have let
-  // one ignored episode hide every later one of the same kind.
-  const ignoreSet = new Set(ignoreGaps);
-  const kept = (kind) =>
-    hits[kind].filter(
-      (h) => !ignoreSet.has(ignoreStrayKey(h.season, h.episode)),
-    );
-
-  const firstOf = (kind) => kept(kind)[0] || null;
-  const wg = firstOf("watchGap");
-  watchGap = !!wg;
-  watchGapSeason = wg?.season ?? null;
-  watchGapEpisode = wg?.episode ?? null;
-  const fg = firstOf("fileGap");
-  fileGap = !!fg;
-  fileGapSeason = fg?.season ?? null;
-  fileGapEpisode = fg?.episode ?? null;
-  const rd = firstOf("resDrop");
-  resDrop = !!rd;
-  resDropSeason = rd?.season ?? null;
-  resDropEpisode = rd?.episode ?? null;
-  const fe = firstOf("fileEndError");
-  fileEndError = !!fe;
-  fileEndErrorSeason = fe?.season ?? null;
-  fileEndErrorEpisode = fe?.episode ?? null;
-  const sw = firstOf("seasonWatchedThenNofile");
-  seasonWatchedThenNofile = !!sw;
-  seasonWatchedThenNofileSeason = sw?.season ?? null;
-  seasonWatchedThenNofileEpisode = sw?.episode ?? null;
-
-  for (const s of rawStrays) {
-    if (ignoreSet.has(ignoreStrayKey(s.season, s.episode))) continue;
-    strayCount++;
-    if (straySeason === null) {
-      straySeason = s.season;
-      strayEpisode = s.episode;
-    }
-    if (s.name) strayFiles.push(s.name);
-  }
 
   const stray = strayCount > 0;
   return {

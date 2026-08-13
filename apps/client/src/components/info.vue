@@ -43,6 +43,85 @@
     </div>
 
     <div
+      id="commentModal"
+      v-if="showCommentDialog"
+      @click.stop
+      style="
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        padding: 30px 40px;
+        border: 2px solid black;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        z-index: 10000;
+        text-align: center;
+        min-width: 400px;
+      "
+    >
+      <div style="font-size: 18px; font-weight: bold; margin-bottom: 15px">
+        Comment for {{ show.name }}
+      </div>
+      <textarea
+        v-model="commentText"
+        style="
+          width: 100%;
+          min-height: 150px;
+          font-size: 14px;
+          padding: 10px;
+          box-sizing: border-box;
+          border: 1px solid #ccc;
+          border-radius: 5px;
+          resize: vertical;
+        "
+        placeholder="Enter your comment..."
+      ></textarea>
+      <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center">
+        <button
+          @click="removeComment"
+          style="
+            font-size: 14px;
+            cursor: pointer;
+            padding: 8px 20px;
+            border-radius: 7px;
+            background-color: #dc3545;
+            color: white;
+            border: none;
+          "
+        >
+          Remove
+        </button>
+        <button
+          @click="saveComment"
+          style="
+            font-size: 14px;
+            cursor: pointer;
+            padding: 8px 20px;
+            border-radius: 7px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+          "
+        >
+          Save
+        </button>
+        <button
+          @click="closeCommentDialog"
+          style="
+            font-size: 14px;
+            cursor: pointer;
+            padding: 8px 20px;
+            border-radius: 7px;
+          "
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+
+    <div
       id="hdr"
       v-if="showHdr"
       class="pane-header-title"
@@ -187,6 +266,18 @@
             }"
           >
             {{ show?.hiddenFromRow ? "Unhide" : "Hide" }}
+          </button>
+          <button
+            @click.stop="commentClick"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              margin-top: 3px;
+              max-height: 24px;
+              border-radius: 7px;
+            "
+          >
+            Comment
           </button>
           <button
             @click.stop="deleteClick"
@@ -530,7 +621,7 @@
           padding: '10px',
         }"
       >
-        {{ show.overview }}
+        {{ displayOverview }}
       </div>
     </div>
   </div>
@@ -622,10 +713,20 @@ export default {
       crewLines: [],
       chksrtQueueEntries: [],
       _chksrtQueueChannel: null,
+      showCommentDialog: false,
+      commentText: '',
     };
   },
 
   computed: {
+    displayOverview() {
+      const comment = this.show?.comment || this.currentTvdbData?.comment;
+      const overview = this.show?.overview || '';
+      if (comment && comment.trim()) {
+        return `*** COMMENT: ${comment.trim()} ${overview}`;
+      }
+      return overview;
+    },
     genresLines() {
       const txt = (this.genresTxt || "").trim();
       if (!txt) return [];
@@ -867,6 +968,59 @@ export default {
       } catch (e) {
         unilog(1644, `hide toggle failed for ${showName}: ${e.message}`);
         this.show.hiddenFromRow = original;
+      }
+    },
+
+    commentClick() {
+      const comment = this.show?.comment || this.currentTvdbData?.comment || '';
+      this.commentText = comment;
+      this.showCommentDialog = true;
+    },
+
+    closeCommentDialog() {
+      this.showCommentDialog = false;
+      this.commentText = '';
+    },
+
+    async saveComment() {
+      const showName = this.show?.name;
+      if (!showName) return;
+      
+      let text = this.commentText.trim();
+      // Append period if text doesn't end with one
+      if (text && !text.endsWith('.')) {
+        text = text + '.';
+      }
+      
+      try {
+        await srvr.setTvdbFields({ name: showName, comment: text, dontEnqueue: true });
+        // Update local show data
+        this.show.comment = text;
+        if (this.currentTvdbData) {
+          this.currentTvdbData.comment = text;
+        }
+        this.closeCommentDialog();
+      } catch (e) {
+        unilog(2193, `save comment failed for ${showName}: ${e.message}`);
+        window.alert('Failed to save comment');
+      }
+    },
+
+    async removeComment() {
+      const showName = this.show?.name;
+      if (!showName) return;
+      
+      try {
+        await srvr.setTvdbFields({ name: showName, $delete: ["comment"], dontEnqueue: true });
+        // Update local show data
+        delete this.show.comment;
+        if (this.currentTvdbData) {
+          delete this.currentTvdbData.comment;
+        }
+        this.closeCommentDialog();
+      } catch (e) {
+        unilog(2194, `remove comment failed for ${showName}: ${e.message}`);
+        window.alert('Failed to remove comment');
       }
     },
 

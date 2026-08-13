@@ -485,7 +485,7 @@
             >
               Snoozed
             </div>
-            {{ curTvdb.overview }}
+            {{ curDisplayOverview }}
           </div>
           <div v-else-if="curTitle && !isLoadingNext">
             <div style="color: red; margin-bottom: 4px">
@@ -1252,6 +1252,15 @@ export default {
           (curName && curName === String(s.name || "").trim())
         );
       });
+    });
+
+    const curDisplayOverview = computed(() => {
+      const comment = curTvdb.value?.comment;
+      const overview = curTvdb.value?.overview || '';
+      if (comment && comment.trim()) {
+        return `*** COMMENT: ${comment.trim()} ${overview}`;
+      }
+      return overview;
     });
 
     const googleResult = computed(() => {

@@ -2172,7 +2172,11 @@ export default function App() {
       const cntryLang = [show.originalCountry, show.originalLanguage]
         .filter(Boolean)
         .join(" / ");
-      const overview = show.overview ?? show.description ?? "";
+      const comment = show.comment;
+      const baseOverview = show.overview ?? show.description ?? "";
+      const overview = comment && comment.trim()
+        ? `*** COMMENT: ${comment.trim()} ${baseOverview}`
+        : baseOverview;
       return (
         <View style={{ flex: 1 }}>
           <View style={showsStyles.infoTop}>

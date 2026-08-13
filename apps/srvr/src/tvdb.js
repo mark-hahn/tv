@@ -2355,6 +2355,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   // Row-hidden state must survive a rebuild or auto/toggle hiding breaks.
   tvdbData.hiddenFromRow =
     paramObj.hiddenFromRow ?? existing.hiddenFromRow ?? false;
+  if (existing.comment != null) tvdbData.comment = existing.comment;
   if (existing["last-downloaded"] !== undefined) {
     tvdbData["last-downloaded"] = existing["last-downloaded"];
   }

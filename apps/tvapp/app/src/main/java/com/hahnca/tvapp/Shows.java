@@ -135,7 +135,11 @@ class Shows {
       seasonCount = rec.optInt("seasonCount", 0);
       episodeCount = rec.optInt("episodeCount", 0);
       watchedCount = rec.isNull("watchedCount") ? -1 : rec.optInt("watchedCount", -1);
-      overview = str(rec, "overview");
+      String comment = str(rec, "comment");
+      String baseOverview = str(rec, "overview");
+      overview = (comment != null && !comment.trim().isEmpty())
+        ? "*** COMMENT: " + comment.trim() + " " + baseOverview
+        : baseOverview;
       imdbId = str(rec, "imdbId");
       imdbRatings = str(rec, "imdbRatings");
       lastPlayedDate = str(rec, "lastPlayedDate");

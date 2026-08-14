@@ -1770,8 +1770,12 @@ export default {
       }, 300);
     },
 
+    // Checks the TV's actual current input (mediaTitle) rather than the
+    // derived `mode`, because `mode` collapses to "tvapprc" whenever tvapprc
+    // mode is active — that would otherwise run the power-on sequence while
+    // tvapp is up, which sends Home and so closes tvapp and leaves the set on.
     async googleBtn() {
-      if (this.mode === "google") {
+      if (this.mediaTitle === "Smart TV") {
         this.tvCmd("off");
       } else {
         this.flash("google");

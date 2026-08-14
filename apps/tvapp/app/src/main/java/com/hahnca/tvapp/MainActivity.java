@@ -134,6 +134,11 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // in flight when tvapp takes the screen. Answering it would send tvapp
   // straight back out again.
   private static final long BACK_DEAF_ON_FRONT_MS = 1_500;
+  // How long after stepping off a played show a select naming that same show is
+  // taken to be tv-tv's own -- the lastRelevantShow it selects on every open --
+  // rather than the user asking for it. Long enough to cover the launch and
+  // dial tv-tv does before sending it.
+  private static final long SELECT_DEAF_AFTER_PLAY_MS = 15_000;
   // Coming back from Emby reuses the list already in memory, which is the point
   // of staying resident, but a list loaded long enough ago has stale waitStrs.
   private static final long SHOWS_REFRESH_AFTER_MS = 10 * 60_000;
@@ -189,6 +194,14 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private long showsLoadedAt;
   private long frontSince;
   private long trashAt;
+  // Set when tvapp steps aside for a play in Emby, so the next foreground turn
+  // knows it is coming back from having watched something.
+  private boolean playedInEmby;
+  // The show the selection was just stepped off of on coming back from a play,
+  // and when that was, so tv-tv's select of it on the way back in does not put
+  // the selection right back where it was.
+  private String steppedOffShowName;
+  private long steppedOffAt;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -245,6 +258,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   protected void onStart() {
     super.onStart();
     frontSince = SystemClock.uptimeMillis();
+    stepOffPlayedShow();
     ctrlServer = new CtrlServer(this);
     ctrlServer.start();
     if (showsLoadedAt != 0
@@ -264,6 +278,22 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     updates.stop();
     updates = null;
     super.onStop();
+  }
+
+  /**
+   * Coming back from a play in Emby, in the Watched sort only: the show just
+   * watched is done with, so the selection steps to the next one down at once,
+   * without waiting for the reload that will re-sort the list. On the last show
+   * there is no next one, so it steps up instead.
+   */
+  private void stepOffPlayedShow() {
+    if (!playedInEmby) return;
+    playedInEmby = false;
+    if (sort != Shows.Sort.WATCHING) return;
+    Shows.Show played = showList.getSelected();
+    if (!showList.moveSelection(+1) && !showList.moveSelection(-1)) return;
+    steppedOffShowName = played == null ? null : played.name;
+    steppedOffAt = SystemClock.uptimeMillis();
   }
 
   /** Re-reads the list, keeping the selection on whatever show it is on. */
@@ -922,7 +952,11 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
               } catch (Exception e) {
                 Log.e(TAG, "viewshow failed for " + show.name + ": " + e);
               }
-              ui.post(() -> moveTaskToBack(true));
+              ui.post(
+                  () -> {
+                    playedInEmby = true;
+                    moveTaskToBack(true);
+                  });
             },
             "viewshow")
         .start();
@@ -1082,6 +1116,16 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   public void onSelectShow(String name) {
     ui.post(
         () -> {
+          // tv-tv selects lastRelevantShow on every open, which right after a
+          // play is the show just watched -- the one the selection has already
+          // been stepped off of on purpose.
+          if (name != null && name.equals(steppedOffShowName)) {
+            if (SystemClock.uptimeMillis() - steppedOffAt < SELECT_DEAF_AFTER_PLAY_MS) {
+              steppedOffShowName = null;
+              return;
+            }
+            steppedOffShowName = null;
+          }
           if (showsLoadedAt == 0) {
             pendingSelectName = name;
             return;
@@ -1128,6 +1172,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   private void handleRemoteKey(String key) {
+    // Once the user has worked the remote, a select of the show just stepped
+    // off is theirs and is answered normally.
+    steppedOffShowName = null;
     if (player.isPlaying()) {
       // While the video owns the screen the keys are the video's, the way they
       // are in Emby: ok pauses and resumes, left seeks. Right is the way back

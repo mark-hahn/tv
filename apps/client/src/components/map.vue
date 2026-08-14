@@ -1136,7 +1136,9 @@
         background: white;
         color: black;
         padding: 7px 12px;
+        border: 1px solid #ccc;
         border-radius: 7px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
         font-size: 13px;
         z-index: 9999;
       "

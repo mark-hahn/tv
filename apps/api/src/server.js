@@ -48,7 +48,7 @@ import {
 } from "./browse.js";
 import * as reviews from "./reviews.js";
 import { checkFiles as tvProcCheckFiles } from "./tv-proc.js";
-import { getActorCredits } from "./imdb-credits.js";
+import { getActorCredits } from "./actor-credits.js";
 import {
   parseFileSeasonEpisode,
   parseTitleFromFilename,
@@ -2538,45 +2538,11 @@ app.post("/api/getActorPage", async (req, res) => {
   }
 });
 
-// Browser operation queue to prevent concurrent Playwright instances
-class BrowserQueue {
-  constructor() {
-    this.queue = [];
-    this.running = false;
-  }
-
-  async enqueue(task) {
-    return new Promise((resolve, reject) => {
-      this.queue.push({ task, resolve, reject });
-      this.processQueue();
-    });
-  }
-
-  async processQueue() {
-    if (this.running || this.queue.length === 0) return;
-
-    this.running = true;
-    const { task, resolve, reject } = this.queue.shift();
-
-    try {
-      const result = await task();
-      resolve(result);
-    } catch (error) {
-      reject(error);
-    } finally {
-      this.running = false;
-      this.processQueue(); // Process next item
-    }
-  }
-}
-
-const browserQueue = new BrowserQueue();
-
 // Server-side cache for actor credits (in-memory)
 const actorCreditsCache = new Map();
 const ACTOR_CREDITS_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-// In-flight request tracking to prevent concurrent browser launches
+// In-flight request tracking so one actor is only looked up once at a time
 const inFlightRequests = new Map();
 
 app.post("/api/getActorCredits", async (req, res) => {
@@ -2606,14 +2572,7 @@ app.post("/api/getActorCredits", async (req, res) => {
 
     // Create promise for this request to allow others to wait
     unilog(265, `Fetching credits for actor: ${actorName}`);
-    const fetchPromise = browserQueue
-      .enqueue(() =>
-        getActorCredits(actorName, {
-          // Headed reduces IMDb bot detection. Only works because pm2 runs
-          // tv-api under xvfb-run (see the pm2 config on the remote server).
-          headless: false,
-        }),
-      )
+    const fetchPromise = getActorCredits(actorName)
       .then((result) => {
         // Cache the result
         actorCreditsCache.set(cacheKey, {

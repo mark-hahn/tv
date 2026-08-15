@@ -385,8 +385,9 @@
       v-else-if="showingCredits"
       id="credits-list"
       style="
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+        align-content: start;
         gap: 12px;
         padding: 5px;
         overflow-y: auto;
@@ -398,6 +399,7 @@
       <div
         v-if="creditsLoading"
         style="
+          grid-column: 1 / -1;
           text-align: center;
           color: #666;
           margin-top: 50px;
@@ -409,6 +411,7 @@
       <div
         v-else-if="creditsError"
         style="
+          grid-column: 1 / -1;
           text-align: center;
           color: red;
           margin-top: 50px;
@@ -417,10 +420,19 @@
       >
         {{ creditsError }}
       </div>
+      <template v-else>
+      <template
+        v-for="(group, groupIndex) in creditGroups"
+        :key="group.label"
+      >
+        <!-- a rule between the tv shows above and the movies below -->
+        <div
+          v-if="groupIndex > 0"
+          style="grid-column: 1 / -1; border-top: 1px solid #bbb; margin: 6px 0"
+        ></div>
       <div
-        v-else
-        v-for="credit in credits"
-        :key="credit.imdbId"
+        v-for="credit in group.credits"
+        :key="credit.mediaType + ':' + credit.tmdbId"
         @click.stop="handleCreditCardClick(credit)"
         style="
           display: flex;
@@ -455,12 +467,12 @@
             {{ unescapeHtml(credit.title) }}
           </div>
 
-          <!-- Line 2: year -->
+          <!-- Line 2: year and movie/tv -->
           <div
             v-if="credit.year"
             style="font-size: 14px; color: #666"
           >
-            {{ credit.year }}
+            {{ credit.year }} · {{ mediaTypeLabel(credit) }}
           </div>
 
           <!-- Line 3: episodeCount -->
@@ -482,9 +494,12 @@
           </div>
         </div>
       </div>
+      </template>
+      </template>
       <div
         v-if="!creditsLoading && !creditsError && credits.length === 0"
         style="
+          grid-column: 1 / -1;
           text-align: center;
           color: #999;
           margin-top: 50px;
@@ -647,6 +662,17 @@ export default {
       noCastMessageTimer: null, // Timer ID for the no cast message delay
       crew: [], // Crew from TVDB (Creator, Executive Producer, Producer, Writer)
     };
+  },
+
+  computed: {
+    // tv shows first, movies below the rule; an empty half draws no rule
+    creditGroups() {
+      const groups = [
+        { label: "tv", credits: this.credits.filter((c) => c.mediaType !== "movie") },
+        { label: "movie", credits: this.credits.filter((c) => c.mediaType === "movie") },
+      ];
+      return groups.filter((g) => g.credits.length > 0);
+    },
   },
 
   methods: {
@@ -949,22 +975,20 @@ export default {
       this.actorPageUrl = null;
     },
 
+    mediaTypeLabel(credit) {
+      return credit.mediaType === "movie" ? "Movie" : "TV Show";
+    },
+
     async handleCreditCardClick(credit) {
       if (!credit || !credit.title) return;
 
-      let tvdbItem = null;
-      if (credit.imdbId) {
-        tvdbItem = await tvdb.getTvdbSearchByImdbId(credit.imdbId);
-      }
-
+      // credits come from TMDB, which says whether the title is a movie; the
+      // browse pane finds it by name from there
       evtBus.emit("showBrowsePane");
-      if (tvdbItem && !tvdbItem.isMovie) {
-        evtBus.emit("browseShowByTvdbId", tvdbItem);
-      } else {
-        const isMovie = !!(tvdbItem && tvdbItem.isMovie);
-        const title = (tvdbItem && tvdbItem.name) || credit.title;
-        evtBus.emit("browseSearchTitle", { title, isMovie });
-      }
+      evtBus.emit("browseSearchTitle", {
+        title: credit.title,
+        isMovie: credit.mediaType === "movie",
+      });
     },
 
     hasAnyImage(actor) {

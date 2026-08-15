@@ -20,6 +20,7 @@ import { parse as parseTorrentTitle } from "parse-torrent-title";
 import * as tvdb from "./tvdb.js";
 import { showFolderFor, folderToRecord } from "./showPaths.js";
 import * as emby from "./emby.js";
+import * as embyWatched from "./embyWatched.js";
 import * as util from "./util.js";
 import { videoFileExtensions } from "./videoFiles.js";
 
@@ -447,16 +448,38 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
         name: showName,
         tvdbId: rec.tvdbId,
       });
+      // Emby is the only source of watched for a show still in the library, so
+      // a sweep that reports every previously-watched episode as unplayed
+      // cannot be told apart from Emby having lost its user data — the failure
+      // that erased the watch history of every show that left the library
+      // before episodeData existed. Keep the stored flags in that case.
+      // Unmarking episodes one at a time leaves others watched so it still
+      // applies, and /api/setWatchedEpis clears a show deliberately.
+      let wasWatched = 0;
+      let nowUnplayed = 0;
+      for (const [seasonNum, episodes] of embyMap || []) {
+        if (!Number.isInteger(seasonNum)) continue;
+        for (const [epNum, ep] of episodes) {
+          if (!Number.isInteger(epNum) || epNum < 1) continue;
+          if (!epd.isWatched(ed, seasonNum, epNum)) continue;
+          wasWatched++;
+          if (!ep.played) nowUnplayed++;
+        }
+      }
+      const wipesWatched = wasWatched >= 2 && nowUnplayed === wasWatched;
+      if (wipesWatched)
+        unilog(2205, `Emby reported all ${wasWatched} watched episodes of ${showName} as unplayed — keeping the stored watched flags`);
       for (const [seasonNum, episodes] of embyMap || []) {
         if (!Number.isInteger(seasonNum)) continue;
         for (const [epNum, ep] of episodes) {
           if (!Number.isInteger(epNum) || epNum < 1) continue;
           seen.add(`${seasonNum}.${epNum}`);
-          epd.setEpisode(ed, seasonNum, epNum, {
-            watched: !!ep.played,
+          const fields = {
             id: ep.id ? Number(ep.id) : 0,
             pos: ep.pos || 0,
-          });
+          };
+          if (!wipesWatched) fields.watched = !!ep.played;
+          epd.setEpisode(ed, seasonNum, epNum, fields);
         }
       }
       // getSeriesMap returns null on a non-200, which correctly reads as
@@ -466,6 +489,37 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
       unilog(31, `emby ${showName}: ${e.message}`);
     }
     embyMs = Date.now() - embyStart;
+  }
+
+  // 2b. Watched fallback for shows no longer in Emby. Emby's user data is keyed
+  // by tvdbId + season + episode rather than by item id, so it survives the
+  // show's removal and can still say what was watched — including for the
+  // shows whose flags were lost before episodeData gave them a home. Only ever
+  // adds a watched mark; clearing one stays a deliberate act.
+  if (sources.includes("emby") && !rec.inEmby && rec.tvdbId) {
+    try {
+      const watched = embyWatched.getWatchedEpisodes(rec.tvdbId);
+      let added = 0;
+      for (const [key] of watched) {
+        const [season, episode] = key.split(".").map(Number);
+        if (epd.isWatched(ed, season, episode)) continue;
+        epd.setEpisode(ed, season, episode, { watched: true });
+        added++;
+      }
+      // The viewing date comes back the same way — only when the record has
+      // none, and always with its episode, since the two name one viewing.
+      const latest = rec.lastPlayedDate
+        ? null
+        : embyWatched.latestPlayed(watched);
+      if (latest) {
+        rec.lastPlayedDate = latest.lastPlayedDate;
+        rec.lastPlayedEpisode = latest.lastPlayedEpisode;
+      }
+      if (added > 0 || latest)
+        unilog(2212, `restored ${added} watched episode(s) of ${showName} from emby user data${latest ? `, last viewed ${latest.lastPlayedEpisode} ${latest.lastPlayedDate}` : ""}`);
+    } catch (e) {
+      unilog(2208, `emby user data lookup failed for ${showName}: ${e.message}`);
+    }
   }
 
   // 3. Disk scan — authoritative file name + resolution, plus date/size/noFiles.

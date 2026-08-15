@@ -666,9 +666,15 @@ async function _oldLoadAllShows() {
         831,
         `loadAllShows: marking ${name} as not in Emby (no show found)`,
       );
+      // Stamp leftEmby the same way the explicit delete in list.vue does, so a
+      // show that vanished from Emby on its own is dated like a deliberate
+      // deletion instead of leaving no record of when it went.
+      const leftEmby = tvdbRecord.leftEmby || util.getPstDateTimeMs();
+      tvdbRecord.leftEmby = leftEmby;
       const updatedRecord = await srvr.setTvdbFields({
         name,
         inEmby: false,
+        leftEmby,
         dontSave: true,
       });
       if (isTvdbShowRecord(updatedRecord)) {

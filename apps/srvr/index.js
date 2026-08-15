@@ -10,6 +10,7 @@ import { rimraf } from "rimraf";
 import * as view from "./src/lastViewed.js";
 import * as utilNode from "util";
 import * as emby from "./src/emby.js";
+import * as embyWatched from "./src/embyWatched.js";
 import * as tvdb from "./src/tvdb.js";
 import * as util from "./src/util.js";
 import * as email from "./src/email.js";
@@ -2291,6 +2292,58 @@ app.post(
     rec.watchedCount = epd.countWatched(ed);
     await tvdb.saveTvdbSync();
     return { ok: true };
+  }),
+);
+
+// Restore watched flags for shows that have left Emby from Emby's own user
+// data, which is keyed by tvdbId and survives the show's removal. The same
+// lookup runs per-show during refreshEpisodeData; this does the whole library
+// in one pass so the shows wiped before episodeData existed don't have to wait
+// for the sweep to reach them. Adds marks only, so it is safe to re-run.
+app.post(
+  "/api/backfillWatchedFromEmby",
+  apiWrapper(async (params) => {
+    const dryRun = !!params?.dryRun;
+    const allTvdb = tvdb.getAllTvdbSync();
+    const changed = [];
+    let episodes = 0;
+    let dates = 0;
+    for (const [name, rec] of Object.entries(allTvdb || {})) {
+      if (!rec || rec.inEmby !== false || !rec.tvdbId) continue;
+      if (!Array.isArray(rec.episodeData)) rec.episodeData = [];
+      const ed = rec.episodeData;
+      const watched = embyWatched.getWatchedEpisodes(rec.tvdbId);
+      let added = 0;
+      for (const [key] of watched) {
+        const [season, episode] = key.split(".").map(Number);
+        if (epd.isWatched(ed, season, episode)) continue;
+        if (!dryRun) epd.setEpisode(ed, season, episode, { watched: true });
+        added++;
+      }
+      const latest = rec.lastPlayedDate
+        ? null
+        : embyWatched.latestPlayed(watched);
+      if (added === 0 && !latest) continue;
+      if (!dryRun) {
+        if (added > 0) rec.watchedCount = epd.countWatched(ed);
+        if (latest) {
+          rec.lastPlayedDate = latest.lastPlayedDate;
+          rec.lastPlayedEpisode = latest.lastPlayedEpisode;
+        }
+      }
+      changed.push({
+        name,
+        added,
+        watchedCount: rec.watchedCount,
+        lastPlayedDate: latest?.lastPlayedDate ?? null,
+        lastPlayedEpisode: latest?.lastPlayedEpisode ?? null,
+      });
+      episodes += added;
+      if (latest) dates++;
+    }
+    if (!dryRun && changed.length > 0) await tvdb.saveTvdbSync();
+    unilog(2213, `backfill from emby user data${dryRun ? " (dry run)" : ""}: ${changed.length} shows, ${episodes} episodes, ${dates} viewing dates`);
+    return { ok: true, dryRun, shows: changed.length, episodes, dates, changed };
   }),
 );
 app.post("/api/setSharedFilters", apiWrapper(setSharedFilters));

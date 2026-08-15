@@ -2072,6 +2072,12 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     existingCount: existing.episodeCount,
     apiCount: apiCounts.episodeCount,
   });
+  // watchedCount needs the same protection the two counts above get: several
+  // callers pass 0 only because they don't know the real value, and a raw
+  // assignment there wipes a genuine watch history that Emby can no longer
+  // supply once the show has left the library.
+  const finalWatchedCount =
+    toPositiveInt(watchedCount) ?? toPositiveInt(existing.watchedCount) ?? 0;
 
   // get remote data, e.g. IMDB for tvdb record
   // remoteIds come from tvdb
@@ -2159,7 +2165,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     ),
     seasonCount: finalSeasonCount,
     episodeCount: finalEpisodeCount,
-    watchedCount,
+    watchedCount: finalWatchedCount,
     image: preserve(image, existing.image, tmdbData?.image || searchThumb),
     overview: preserve(overview, existing.overview, tmdbData?.overview),
     firstAired: preserve(firstAired, existing.firstAired, tmdbData?.firstAired),

@@ -2127,6 +2127,7 @@ export default {
       curTvmazeMeta,
       snoozeList,
       isCurrentSnoozed,
+      curDisplayOverview,
       unSnoozeMode,
       snoozeFlash,
       handleSnooze,

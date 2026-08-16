@@ -145,6 +145,17 @@
               Shows
             </button>
             <button
+              @click.stop="handleKevinButton"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 5px;
+                padding: 4px 10px;
+              "
+            >
+              Kevin
+            </button>
+            <button
               @click.stop="handleAllCreditsButton"
               :disabled="creditsLoading"
               style="
@@ -251,6 +262,17 @@
             "
           >
             Shows
+          </button>
+          <button
+            @click.stop="handleKevinButton"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 5px;
+              padding: 4px 10px;
+            "
+          >
+            Kevin
           </button>
           <button
             @click.stop="handleAllCreditsButton"
@@ -378,6 +400,113 @@
       style="text-align: center; color: red; margin-top: 50px; font-size: 16px"
     >
       <div>{{ errorMessage }}</div>
+    </div>
+
+    <!-- Related actors ("Kevin"): everyone who has been in more than one show
+         with the selected actor, a row per count and two cards to a line -->
+    <div
+      v-else-if="showingRelated"
+      id="related-actors"
+      style="
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 5px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        flex: 1;
+        min-height: 0;
+      "
+    >
+      <div
+        v-if="relatedLoading"
+        style="text-align: center; color: #666; margin-top: 50px; font-size: 16px"
+      >
+        Loading related actors...
+      </div>
+      <div
+        v-for="row in relatedRows"
+        :key="row.key"
+        style="display: flex; align-items: flex-start; gap: 8px"
+      >
+        <!-- The count belongs to the whole row, so it is drawn once, at its
+             left, rather than against each of the cards in it -->
+        <div
+          style="
+            flex: 0 0 auto;
+            font-weight: bold;
+            font-size: 16px;
+            padding-top: 10px;
+          "
+        >
+          {{ row.count }}:
+        </div>
+        <div
+          style="
+            flex: 1 1 auto;
+            min-width: 0;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            align-content: start;
+            gap: 10px;
+          "
+        >
+          <!-- A card grows down to hold however many shows the two share -->
+          <div
+            v-for="related in row.actors"
+            :key="related.personName"
+            style="
+              min-width: 0;
+              display: flex;
+              background-color: #f5f5f5;
+              border: 1px solid #ddd;
+              border-radius: 6px;
+              padding: 10px;
+            "
+          >
+            <img
+              v-if="related.image || related.personImgURL"
+              :src="related.image || related.personImgURL"
+              :alt="related.personName"
+              style="
+                width: 102px;
+                height: 133px;
+                object-fit: cover;
+                border-radius: 4px;
+                margin-right: 15px;
+                flex-shrink: 0;
+              "
+            />
+            <div
+              style="
+                flex: 1;
+                min-width: 0;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+              "
+            >
+              <div style="font-weight: bold; font-size: 21.6px">
+                {{ related.personName }}
+              </div>
+              <div
+                v-for="showName in related.shows"
+                :key="showName"
+                style="font-size: 16.8px; color: #666"
+              >
+                {{ showName }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Below the selected actor's own row, which is always there -->
+      <div
+        v-if="!relatedLoading && relatedRows.length <= 1"
+        style="text-align: center; color: #999; margin-top: 50px; font-size: 16px"
+      >
+        No related actors found
+      </div>
     </div>
 
     <!-- Credits list -->
@@ -531,7 +660,12 @@
 
     <!-- Separator between actors and crew -->
     <hr
-      v-if="!showingCredits && actors.length > 0 && crew.length > 0"
+      v-if="
+        !showingCredits &&
+        !showingRelated &&
+        actors.length > 0 &&
+        crew.length > 0
+      "
       style="
         border: none;
         border-top: 2px solid #ccc;
@@ -542,7 +676,7 @@
 
     <!-- Crew section (Creator, Executive Producer, Producer, Writer) -->
     <div
-      v-if="!showingCredits && crew.length > 0"
+      v-if="!showingCredits && !showingRelated && crew.length > 0"
       id="crew-section"
       style="
         display: grid;
@@ -593,7 +727,7 @@
     </div>
     <div
       id="no-actors"
-      v-if="!errorMessage &amp;&amp; !isGuestMode &amp;&amp; showName &amp;&amp; actors.length === 0 &amp;&amp; showNoCastMessage"
+      v-if="!errorMessage &amp;&amp; !isGuestMode &amp;&amp; !showingRelated &amp;&amp; showName &amp;&amp; actors.length === 0 &amp;&amp; showNoCastMessage"
       style="text-align: center; color: #999; margin-top: 50px; font-size: 16px"
     >
       <div style="margin-bottom: 20px">No cast information available</div>
@@ -653,6 +787,9 @@ export default {
       _onResetActorsPane: null,
       selectedActor: null, // Currently selected actor
       showingCredits: false, // Whether we're showing credits list
+      showingRelated: false, // Whether the Kevin related-actors pane is up
+      relatedRows: [], // [{ count, actors }] rows of the related-actors pane
+      relatedLoading: false, // Loading state while all shows are scanned
       credits: [], // Actor's filmography credits
       creditsLoading: false, // Loading state for credits
       creditsError: null, // Error message for credits
@@ -672,6 +809,16 @@ export default {
         { label: "movie", credits: this.credits.filter((c) => c.mediaType === "movie") },
       ];
       return groups.filter((g) => g.credits.length > 0);
+    },
+  },
+
+  watch: {
+    // The Kevin pane belongs to the actor it was opened on, so every way the
+    // selection changes -- deselect, another actor, another show -- takes it
+    // down with it rather than leaving one actor's related list over another's.
+    selectedActor() {
+      this.showingRelated = false;
+      this.relatedRows = [];
     },
   },
 
@@ -853,9 +1000,128 @@ export default {
       evtBus.emit("filterByActor", { actorName: name });
     },
 
+    /**
+     * The Kevin button: everyone who has been in more than one show with the
+     * selected actor. Pressed again it closes the pane it opened.
+     */
+    async handleKevinButton() {
+      if (this.showingRelated) {
+        this.showingRelated = false;
+        return;
+      }
+      if (!this.selectedActor) return;
+      const name = String(
+        this.selectedActor?.personName || this.selectedActor?.name || "",
+      ).trim();
+      if (!name) return;
+
+      this.showingRelated = true;
+      this.relatedLoading = true;
+      this.relatedRows = [];
+      const rows = await this.buildRelatedRows(name);
+      this.relatedLoading = false;
+      // The pane may have been closed, or the actor changed, while the scan ran.
+      if (!this.showingRelated) return;
+      this.relatedRows = rows;
+    },
+
+    /**
+     * Every show this actor is in, gathering for each of the rest of their
+     * casts the shows that person shares with them -- a row each, biggest
+     * share first. Sharing a single show is no relation at all, so those are
+     * left out: it is just the cast of that show.
+     *
+     * The actor the rows are about leads them off in a row of their own,
+     * counting every show they are in.
+     */
+    async buildRelatedRows(actorName) {
+      const target = this.normPersonName(actorName);
+      const allTvdb = await tvdb.getAllTvdb();
+      const related = new Map();
+      const ownShows = [];
+      for (const [showName, record] of Object.entries(allTvdb || {})) {
+        const actualData = record?.response?.data || record;
+        const characters = actualData?.characters;
+        if (!Array.isArray(characters)) continue;
+        const crew = actualData?.crew;
+        const inShow =
+          characters.some(
+            (char) =>
+              this.normPersonName(char?.personName || char?.actor) === target,
+          ) ||
+          (Array.isArray(crew) &&
+            crew.some((member) => this.normPersonName(member?.name) === target));
+        if (!inShow) continue;
+        ownShows.push(showName);
+        // One entry per show, however many roles the actor has in it.
+        const counted = new Set();
+        for (const char of characters) {
+          const personName = String(
+            char?.personName || char?.actor || "",
+          ).trim();
+          const key = this.normPersonName(personName);
+          if (!key || key === target || counted.has(key)) continue;
+          counted.add(key);
+          const entry = related.get(key);
+          if (entry) {
+            entry.shows.push(showName);
+            if (!entry.actor.image) {
+              entry.actor.image = char?.image || "";
+              entry.actor.personImgURL = char?.image || "";
+            }
+          } else {
+            related.set(key, {
+              actor: {
+                personName,
+                image: char?.image || "",
+                personImgURL: char?.image || "",
+              },
+              shows: [showName],
+            });
+          }
+        }
+      }
+
+      // A row per count, so the cards break onto a new row wherever the number
+      // of shared shows changes.
+      const byCount = new Map();
+      for (const entry of related.values()) {
+        const count = entry.shows.length;
+        if (count < 2) continue;
+        entry.actor.shows = entry.shows.sort((a, b) => a.localeCompare(b));
+        if (!byCount.has(count)) byCount.set(count, []);
+        byCount.get(count).push(entry.actor);
+      }
+      const rows = [...byCount.entries()]
+        .sort((rowA, rowB) => rowB[0] - rowA[0])
+        .map(([count, actors]) => ({
+          key: `count-${count}`,
+          count,
+          actors: actors.sort((a, b) =>
+            a.personName.localeCompare(b.personName),
+          ),
+        }));
+      rows.unshift({
+        key: "selected",
+        count: ownShows.length,
+        actors: [
+          {
+            personName: actorName,
+            image: this.selectedActor?.image || "",
+            personImgURL: this.selectedActor?.personImgURL || "",
+            shows: ownShows.sort((a, b) => a.localeCompare(b)),
+          },
+        ],
+      });
+      await this.fillMissingImages(rows.flatMap((row) => row.actors));
+      return rows;
+    },
+
     async handleAllCreditsButton() {
       unilog(905, "handleAllCreditsButton called");
       if (!this.selectedActor) return;
+      // Credits go where the related pane is, so that pane comes off first.
+      this.showingRelated = false;
 
       // Toggle off if already showing
       if (this.showingCredits) {

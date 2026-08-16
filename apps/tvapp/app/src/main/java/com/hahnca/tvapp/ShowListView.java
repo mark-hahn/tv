@@ -494,6 +494,16 @@ class ShowListView extends ScrollView {
     return active;
   }
 
+  /** Everything loaded, whatever the list is currently narrowed to. */
+  List<Shows.Show> getShows() {
+    return shows;
+  }
+
+  /** Whether cardMisc is showing the cast with one of them under its cursor. */
+  boolean isActorFocused() {
+    return miscFocused && miscMode == MiscMode.ACTORS && active != null && focusIndex >= 0;
+  }
+
   /**
    * Whether cardMisc has the focus. Coming off it is a clean break: the mode
    * goes back to the description, the episode card goes with it, and the
@@ -2283,7 +2293,8 @@ class ShowListView extends ScrollView {
     return episodes == null ? null : episodes.optJSONArray(mapEpisodeIndex);
   }
 
-  private String focusedActorName() {
+  /** The actor under the cast strip's cursor, or null when there is none. */
+  String focusedActorName() {
     if (active == null || focusIndex < 0) return null;
     List<Shows.Actor> cast = castOf(active);
     return focusIndex < cast.size() ? cast.get(focusIndex).name : null;

@@ -151,6 +151,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private CtrlServer ctrlServer;
   private Updates updates;
   private ShowListView showList;
+  private RelatedActors relatedActors;
   private TextView filterLabel;
   private TrailerPlayer player;
   private LinearLayout buttonColumn;
@@ -383,8 +384,14 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     showList = new ShowListView(this);
     showList.setFilterTextListener(this::updateFilterLabel);
     showList.setActorFilterListener(this::chooseActorFilter);
+    // The related-actors display covers the list rather than taking room of its
+    // own, so the two share a frame.
+    FrameLayout listArea = new FrameLayout(this);
+    listArea.addView(showList, matchParent());
+    relatedActors = new RelatedActors(this);
+    listArea.addView(relatedActors, matchParent());
     column.addView(
-        showList, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        listArea, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
     return column;
   }
 
@@ -895,6 +902,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    */
   private void clearScreenState() {
     if (player.isPlaying()) player.close();
+    relatedActors.close();
     area = Area.LIST;
     showList.setMiscFocused(false);
     paintGroups();
@@ -1204,6 +1212,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       player.close();
       return;
     }
+    if (relatedActors.isOpen()) {
+      relatedActors.close();
+      return;
+    }
     if (actorFilterName != null) {
       applyActorFilter(null);
       return;
@@ -1227,6 +1239,22 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       if ("right".equals(key)) player.close();
       else player.key(key);
       return;
+    }
+    // The related-actors display covers the list, so while it is up the keys
+    // are its own: up walks down its rows, and the rest either take it away --
+    // down, the key that opened it, and the three focus keys, which go on to
+    // their own area once it has gone -- or do nothing at all. Back is not
+    // here: it comes in as its own message, and handleBack closes this the
+    // same way.
+    if (relatedActors.isOpen()) {
+      if ("up".equals(key)) {
+        relatedActors.scrollPage();
+        return;
+      }
+      boolean focusKey = "sort".equals(key) || "filter".equals(key) || "info".equals(key);
+      if (!focusKey && !"down".equals(key)) return;
+      relatedActors.close();
+      if (!focusKey) return;
     }
     // The three focus keys, each answered wherever the focus happens to be:
     // they are the one way into their area, and so also the way out of every
@@ -1290,12 +1318,25 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    * whatever the mode has under its cursor, and the arrow keys move inside it.
    */
   private void miscAreaKey(String key) {
+    // Down over the cast strip, which has nothing else to move: everyone the
+    // actor under the cursor keeps turning up with, over the list.
+    if ("down".equals(key) && showList.isActorFocused()) {
+      openRelatedActors();
+      return;
+    }
     if ("info".equals(key)) showList.infoInCardMisc();
     else if ("ok".equals(key)) openInCardMisc();
     else if ("up".equals(key)) showList.moveInCardMisc(-1, true);
     else if ("down".equals(key)) showList.moveInCardMisc(+1, true);
     else if ("left".equals(key)) showList.moveInCardMisc(-1, false);
     else if ("right".equals(key)) showList.moveInCardMisc(+1, false);
+  }
+
+  /** Every actor who shares more than one show with the one under the cursor. */
+  private void openRelatedActors() {
+    String name = showList.focusedActorName();
+    if (name == null) return;
+    relatedActors.open(showList.getShows(), name);
   }
 
   /**

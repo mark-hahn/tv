@@ -568,13 +568,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   /**
    * Up or down in the focused sort group: one button either way from the one
-   * that is lit, stopping at the ends rather than wrapping, and switching the
-   * list as it goes. There is nothing to confirm afterwards -- only one sort
-   * can be on, so landing on a button is choosing it.
+   * that is lit, wrapping around at the ends, and switching the list as it
+   * goes. There is nothing to confirm afterwards -- only one sort can be on,
+   * so landing on a button is choosing it.
    */
   private void stepSort(int direction) {
     String next = stepInGroup(SORT_LABELS, activeSortLabel(), direction);
-    if (next == null) return;
     if (SORT_CUSTOM.equals(next)) {
       customClick();
       return;
@@ -854,22 +853,20 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
         TypedValue.COMPLEX_UNIT_DIP, value, getResources().getDisplayMetrics());
   }
 
-  /** One button either way, stopping at the ends of the group rather than wrapping. */
+  /** One button either way, wrapping around at the ends of the group. */
   private void stepSelectedFilter(int direction) {
-    String next = stepInGroup(FILTER_LABELS, selectedFilter, direction);
-    if (next == null) return;
-    selectedFilter = next;
+    selectedFilter = stepInGroup(FILTER_LABELS, selectedFilter, direction);
     repaintButtons();
   }
 
-  /** The label one step either way, or null at the end the step would run off. */
+  /** The label one step either way, wrapping around at the ends of the group. */
   private static String stepInGroup(String[] labels, String current, int direction) {
     int index = 0;
     for (int i = 0; i < labels.length; i++) {
       if (labels[i].equals(current)) index = i;
     }
-    int next = Math.max(0, Math.min(labels.length - 1, index + direction));
-    return next == index ? null : labels[next];
+    int next = ((index + direction) % labels.length + labels.length) % labels.length;
+    return labels[next];
   }
 
   private final Runnable clearFlashEnd =
@@ -1270,13 +1267,16 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     // The three focus keys, each answered wherever the focus happens to be:
     // they are the one way into their area, and so also the way out of every
     // other one. Info is the exception, and only once cardMisc already has the
-    // focus, where it goes on rotating cardMisc's modes.
+    // focus, where it goes on rotating cardMisc's modes. Once already in the
+    // sort/filter area, clicking that same key again steps it, same as down.
     if ("sort".equals(key)) {
-      focusArea(Area.SORTS);
+      if (area == Area.SORTS) sortAreaKey("down");
+      else focusArea(Area.SORTS);
       return;
     }
     if ("filter".equals(key)) {
-      focusArea(Area.FILTERS);
+      if (area == Area.FILTERS) filterAreaKey("down");
+      else focusArea(Area.FILTERS);
       return;
     }
     if ("info".equals(key) && area != Area.MISC) {

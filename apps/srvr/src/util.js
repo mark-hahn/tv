@@ -74,6 +74,13 @@ export function toPstDateOnly(dateIn) {
   return `${parts.year}/${parts.month}/${parts.day}`;
 }
 
+// "YYYY-MM-DD" in PST, matching the dash format aired-date strings use.
+export function toPstDateIso(dateIn) {
+  const parts = getPstParts(dateIn);
+  if (!parts) return null;
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
 export function toPstDateTimeSec(dateIn) {
   const parts = getPstParts(dateIn);
   if (!parts) return null;

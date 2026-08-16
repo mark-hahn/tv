@@ -1814,7 +1814,7 @@ app.post(
     if (!rec) return { success: false, error: "Show not found" };
     try {
       const folder = showPaths.showFolderFor(showName, rec);
-      const today = new Date().toISOString().slice(0, 10);
+      const today = util.toPstDateIso(new Date());
 
       // Fast path: build the map from the already-cached episodeData in
       // tvdb.json (populated by the periodic full refresh) with no live Emby
@@ -4424,7 +4424,7 @@ async function setEmbyCollection(collId, showId, member) {
 
 // True when any episode that has aired (or already has a file) is unwatched.
 function hasUnwatchedEpisodes(rec) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = util.toPstDateIso(new Date());
   let found = false;
   epd.forEachEpisode(rec.episodeData, (s, e, ep) => {
     if (found) return;

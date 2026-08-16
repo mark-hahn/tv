@@ -1786,7 +1786,7 @@ const calculateWaitStr = (episodeData) => {
   try {
     if (!Array.isArray(episodeData)) return null;
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = util.toPstDateIso(new Date());
     const FILE_AVAILABLE_DATE = "2000-01-01";
 
     // Build per-season episode map: season -> Map(episodeNum -> airDate).

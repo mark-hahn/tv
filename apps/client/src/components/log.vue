@@ -356,25 +356,6 @@
           </div>
 
           <div
-            class="groupsRow"
-            :class="{ groupsDisabled: selectedGroupIds.length !== 1 }"
-          >
-            Level
-            <select
-              v-model="groupLevel"
-              class="logInput groupsInput"
-              :disabled="selectedGroupIds.length !== 1"
-              @change="applyGroupLevel"
-            >
-              <option value="">--</option>
-              <option value="debug">debug</option>
-              <option value="info">info</option>
-              <option value="warn">warn</option>
-              <option value="error">error</option>
-            </select>
-          </div>
-
-          <div
             v-if="groupStats"
             class="groupsRow"
           >
@@ -501,7 +482,6 @@ export default {
       selectedSiteCount: 0,
       newGroupName: "",
       setGroupName: "",
-      groupLevel: "",
       filterByGroups: false,
       groupFilterIds: new Set(),
       groupFilterFn: null,
@@ -561,7 +541,6 @@ export default {
     },
     selectedGroupIds() {
       if (!this.selectedGroupIds.length) this.filterByGroups = false;
-      this.groupLevel = "";
       this.applyGroupFilter();
       this.refreshGroupStats();
     },
@@ -2078,37 +2057,6 @@ export default {
         this.flash("failed to rename");
       }
     },
-    // Set the level of every site in the one selected group.
-    async applyGroupLevel() {
-      const level = this.groupLevel;
-      if (!level || this.selectedGroupIds.length !== 1) return;
-      const gid = this.selectedGroupIds[0];
-      try {
-        const idRes = await srvr.getUnilogGroupSiteIds([gid]);
-        const ids = idRes?.logIds || [];
-        if (!ids.length) {
-          this.flash("group has no sites");
-          return;
-        }
-        const res = await srvr.setUnilogSiteLevel(ids, level);
-        // Cached searches were matched against the old levels.
-        this.filterCache.clear();
-        if (!res?.ok) {
-          this.flash(`failed: ${res?.error ?? "unknown error"}`);
-          return;
-        }
-        // Update level field in loaded rows so coloring reflects the change.
-        for (const r of this.table.getRows()) {
-          if (ids.includes(r.getData().log_id)) r.update({ level });
-        }
-        this.flash(
-          `set ${res.changed} site${res.changed === 1 ? "" : "s"} to ${level}`,
-        );
-      } catch (e) {
-        logHere({ lvl: "error" }, `applyGroupLevel failed: ${e.message}`);
-        this.flash("failed to set level");
-      }
-    },
     // Distinct log_ids among all currently loaded rows.
     allLoadedSiteIds() {
       if (!this.table) return [];
@@ -2282,7 +2230,6 @@ export default {
   color: #aaa;
 }
 .groupsPane .logBtn:disabled,
-.groupsPane select:disabled,
 .groupsPane input:disabled {
   opacity: 0.5;
   cursor: default;

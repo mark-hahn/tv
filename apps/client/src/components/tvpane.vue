@@ -568,13 +568,20 @@
         ▶
       </div>
       <!-- Row 3: emby, down, skip -->
-      <!-- Blank and dead while tvapp is up. This is where the phone's Search
-           key is, and the filter input screen behind it is the phone's own --
-           there is nothing here to open. -->
+      <!-- This is where the phone's Search key is. The web client has no
+           filter input screen, so instead it selects tvapp's active show in
+           the shows list. -->
       <div
         v-if="tvapprcMode"
-        :style="cellStyle('white')"
-      ></div>
+        :style="cellStyle('white', 'sel')"
+        @mousedown="startSelHold"
+        @mouseup="stopSelHold"
+        @mouseleave="stopSelHold"
+        @touchstart.prevent="startSelHold"
+        @touchend="stopSelHold"
+      >
+        Sel
+      </div>
       <div
         v-else
         :style="cellStyle('white', 'emby')"
@@ -1376,6 +1383,20 @@ export default {
     },
 
     stopHideHold() {
+      this._dbStop();
+    },
+
+    // Select the show tvapp has selected in the web client's own shows list.
+    startSelHold() {
+      this._dbStart(() => {
+        if (!this.tvapprcMode) return;
+        const showName = this._tvapprcActiveShow;
+        if (!showName) return;
+        this.flash("sel");
+        evtBus.emit("selectShowFromCardTitle", showName);
+      });
+    },
+    stopSelHold() {
       this._dbStop();
     },
 

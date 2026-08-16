@@ -70,6 +70,7 @@ const INTERNAL_SRVR_SUBS_COUNT_URL =
   "http://127.0.0.1:8739/api/subsCountEpisodes";
 const INTERNAL_SRVR_LOG_URL = "http://127.0.0.1:8739/api/log";
 const QBT_CHANNEL_POLL_MS = 5000;
+const QBT_CHANNEL_POLL_DOWNLOADING_MS = 2000;
 const BROWSE_HAS_MORE_CHANNEL_POLL_MS = 60000;
 
 setUnilogSink(({ logId, ts, message }) => {
@@ -857,26 +858,40 @@ const pollQbtChannel = async () => {
   try {
     const info = await getQbtInfoPayload();
     const json = JSON.stringify(info);
-    if (json === qbtChannelLastJson) return;
-    qbtChannelLastJson = json;
-    qbtChannelPeer?.publishDelta("qbtInfo", info);
+    if (json !== qbtChannelLastJson) {
+      qbtChannelLastJson = json;
+      qbtChannelPeer?.publishDelta("qbtInfo", info);
+    }
+    const isDownloading = (Array.isArray(info) ? info : []).some(
+      (t) => String(t?.state || "").trim() === "downloading",
+    );
+    return isDownloading
+      ? QBT_CHANNEL_POLL_DOWNLOADING_MS
+      : QBT_CHANNEL_POLL_MS;
   } catch (e) {
     unilog(1498, `qbtInfo poll failed: ${e.message}`);
+    return QBT_CHANNEL_POLL_MS;
   }
 };
 
 const startQbtChannelPolling = () => {
   if (qbtChannelPollTimer) return;
-  qbtChannelPollTimer = setInterval(() => {
-    pollQbtChannel().catch((e) => {
-      unilog(1499, `qbtInfo poll crashed: ${e.message}`);
-    });
-  }, QBT_CHANNEL_POLL_MS);
+  const scheduleNext = (delayMs) => {
+    qbtChannelPollTimer = setTimeout(() => {
+      pollQbtChannel()
+        .then(scheduleNext)
+        .catch((e) => {
+          unilog(1499, `qbtInfo poll crashed: ${e.message}`);
+          scheduleNext(QBT_CHANNEL_POLL_MS);
+        });
+    }, delayMs);
+  };
+  scheduleNext(QBT_CHANNEL_POLL_MS);
 };
 
 const stopQbtChannelPolling = () => {
   if (!qbtChannelPollTimer) return;
-  clearInterval(qbtChannelPollTimer);
+  clearTimeout(qbtChannelPollTimer);
   qbtChannelPollTimer = null;
   qbtChannelLastJson = "";
 };

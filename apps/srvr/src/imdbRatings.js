@@ -23,7 +23,7 @@ import { SRVR_DATA_DIR } from "./srvrPaths.js";
 const IMDB_RATINGS_URL = "https://datasets.imdbws.com/title.ratings.tsv.gz";
 const IMDB_RATINGS_PATH = path.join(SRVR_DATA_DIR, "title.ratings.tsv.gz");
 const IMDB_RATINGS_TMP = IMDB_RATINGS_PATH + ".tmp";
-const REFRESH_MS = 24 * 60 * 60 * 1000;
+const REFRESH_MS = 6 * 60 * 60 * 1000;
 const DOWNLOAD_TIMEOUT_MS = 120 * 1000;
 // a partial download would silently answer misses for most titles
 const MIN_VALID_BYTES = 4 * 1024 * 1024;

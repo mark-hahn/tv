@@ -1152,16 +1152,23 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   /**
-   * One level out: close a playing trailer, hand the focus back to the show
-   * list, leave tvapp.
+   * One level out: close a playing trailer, drop an actor filter, hand the
+   * focus back to the show list, leave tvapp.
    *
    * cardMisc is one level however deep into it the screen is -- the episode
    * card included -- so this key comes out of the whole of it at once, back to
    * the show list.
+   *
+   * An actor filter is its own level: it comes off on its own, leaving every
+   * other selected filter in place, and nothing else about the screen changes.
    */
   private void handleBack() {
     if (player.isPlaying()) {
       player.close();
+      return;
+    }
+    if (actorFilterName != null) {
+      applyActorFilter(null);
       return;
     }
     if (area != Area.LIST) {

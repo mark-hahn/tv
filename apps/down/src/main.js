@@ -576,6 +576,16 @@ async function main() {
   cycleSeq = 0;
   currentSeq = null;
 
+  // Files that stay on the usb are re-scanned every cycle, so a per-file skip
+  // would be logged again on every pass. Log each file's skip only once.
+  // Lives outside the per-cycle state so it survives resetCycleState.
+  const skipLoggedFiles = new Set();
+  const skipLoggedOnce = (file) => {
+    if (skipLoggedFiles.has(file)) return false;
+    skipLoggedFiles.add(file);
+    return true;
+  };
+
   resetCycleState = function () {
     startTime = time = Date.now();
     downloadTime = Date.now();
@@ -3349,7 +3359,8 @@ async function main() {
         if (epIsWatched) {
           const seStr = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
           existsCount++;
-          unilog(331, "SKIP (episode watched):", fname, seStr);
+          if (skipLoggedOnce(usbFilePath))
+            unilog(331, "SKIP (episode watched):", fname, seStr);
           return process.nextTick(checkFile);
         }
       }
@@ -3603,7 +3614,8 @@ async function main() {
               !usbIsBad);
           if (!usbIsBetter) {
             existsCount++;
-            unilog(2189, `${downloadCount}/${chkCount} SKIP (disk file same/better quality): ${fname} ${flexSeStr} disk=${diskRes}p usb=${usbRes}p`);
+            if (skipLoggedOnce(usbFilePath))
+              unilog(2189, `${downloadCount}/${chkCount} SKIP (disk file same/better quality): ${fname} ${flexSeStr} disk=${diskRes}p usb=${usbRes}p`);
             return process.nextTick(checkFile);
           }
           // USB is better — rename the worse disk file to .old before

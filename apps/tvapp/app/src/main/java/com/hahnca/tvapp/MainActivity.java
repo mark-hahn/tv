@@ -1241,20 +1241,22 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       return;
     }
     // The related-actors display covers the list, so while it is up the keys
-    // are its own: up walks down its rows, and the rest either take it away --
-    // down, the key that opened it, and the three focus keys, which go on to
-    // their own area once it has gone -- or do nothing at all. Back is not
+    // are its own: up and down walk its rows, the three focus keys take it
+    // away and go on to their own area, and the rest do nothing at all. Down
+    // opened it, but scrolling is what that key does from here on. Back is not
     // here: it comes in as its own message, and handleBack closes this the
     // same way.
     if (relatedActors.isOpen()) {
       if ("up".equals(key)) {
-        relatedActors.scrollPage();
+        relatedActors.scrollPage(-1);
         return;
       }
-      boolean focusKey = "sort".equals(key) || "filter".equals(key) || "info".equals(key);
-      if (!focusKey && !"down".equals(key)) return;
+      if ("down".equals(key)) {
+        relatedActors.scrollPage(+1);
+        return;
+      }
+      if (!"sort".equals(key) && !"filter".equals(key) && !"info".equals(key)) return;
       relatedActors.close();
-      if (!focusKey) return;
     }
     // The three focus keys, each answered wherever the focus happens to be:
     // they are the one way into their area, and so also the way out of every

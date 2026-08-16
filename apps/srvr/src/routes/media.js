@@ -241,7 +241,7 @@ export function registerMediaRoutes(app) {
             .split("/")
             .map((seg) => encodeURIComponent(seg))
             .join("/");
-        unilog(1411, `redirect to mpfour: ${url}`);
+        unilog(1411, `mpfour fast path: ${url}`);
         res.redirect(302, url);
         return;
       }

@@ -407,6 +407,28 @@ const PAGE = 500;
 // that stream right back into this same table.
 const TRIM_MARGIN = 250;
 const WARN_RATE_POLL_MS = 10 * 60 * 1000;
+// A column header filter searches the whole DB, not just the loaded rows: the
+// newest FILTER_PAGE matching events are pulled from the server and shown.
+const FILTER_PAGE = 100;
+// Header filters fire per keystroke; wait for a pause before hitting the DB.
+const FILTER_DEBOUNCE_MS = 300;
+// Filtered results are cached by filter signature so toggling a filter back on
+// is instant. A hit older than this is still shown at once, then replaced by a
+// background refetch. Oldest entries drop once the cache passes CACHE_MAX.
+const CACHE_STALE_MS = 15 * 1000;
+const CACHE_MAX = 40;
+
+// Header filter field -> server query param for whole-DB filtered searches.
+const FILTER_FIELD_PARAM = {
+  message: "msg",
+  level: "level",
+  pid: "pid",
+  groups: "groups",
+  src_file: "file",
+  src_line: "line",
+  id: "id",
+  log_id: "logId",
+};
 
 // "2026/07/01 11:44:43.987" -> epoch ms (local).
 function tsToMs(s) {
@@ -495,6 +517,11 @@ export default {
       globalMsgSearch: "",
       messageFilterInput: null,
       messageFilterHandlers: null,
+      filterParams: null,
+      filterSig: "",
+      filterCache: markRaw(new Map()),
+      filterTimer: null,
+      filterSeq: 0,
     };
   },
   computed: {
@@ -635,6 +662,10 @@ export default {
       if (this.flushTimer) {
         clearTimeout(this.flushTimer);
         this.flushTimer = null;
+      }
+      if (this.filterTimer) {
+        clearTimeout(this.filterTimer);
+        this.filterTimer = null;
       }
       if (this.flashTimer) {
         clearTimeout(this.flashTimer);
@@ -806,6 +837,9 @@ export default {
       this.table.on("cellClick", this.onCellClick);
       this.table.on("dataFiltered", (filters, rows) => {
         this.displayedCount = rows.length;
+        // Header filters filter the loaded rows; they must also re-search the
+        // whole DB so matches older than the loaded window still show up.
+        this.scheduleFilterSearch();
       });
       this.table.on("tableBuilt", () => {
         this.holder = this.$refs.tableEl.querySelector(
@@ -1059,12 +1093,81 @@ export default {
       }
     },
     eventQueryParams(extra = {}) {
-      const params = { ...extra };
+      const params = { ...this.filterParams, ...extra };
       if (this.globalMsgSearchMode) {
         params.includeHidden = 1;
         if (this.globalMsgSearch) params.msg = this.globalMsgSearch;
       }
       return params;
+    },
+    // How many events a load pulls: a filtered search wants only the newest
+    // FILTER_PAGE matches, an unfiltered tail wants a full page.
+    pageLimit() {
+      return this.filterParams ? FILTER_PAGE : PAGE;
+    },
+    // The current header filters (plus the groups pane's Filter checkbox) as
+    // server query params, or null when nothing is filtered.
+    currentFilterParams() {
+      if (!this.table || this.globalMsgSearchMode) return null;
+      const params = {};
+      for (const f of this.table.getHeaderFilters()) {
+        const key = FILTER_FIELD_PARAM[f.field];
+        if (!key) continue;
+        const val = String(f.value ?? "").trim();
+        // "+" in Message is the separate global-search mode, not a filter.
+        if (!val || val.startsWith("+")) continue;
+        params[key] = val;
+      }
+      if (this.groupFilterOn())
+        params.groupIds = this.selectedGroupIds.join(",");
+      return Object.keys(params).length ? params : null;
+    },
+    filterSigOf(params) {
+      if (!params) return "";
+      return JSON.stringify(
+        Object.keys(params)
+          .sort()
+          .map((k) => [k, params[k]]),
+      );
+    },
+    scheduleFilterSearch() {
+      if (!this.active || this.globalMsgSearchMode) return;
+      if (this.filterSigOf(this.currentFilterParams()) === this.filterSig)
+        return;
+      if (this.filterTimer) clearTimeout(this.filterTimer);
+      this.filterTimer = setTimeout(() => {
+        this.filterTimer = null;
+        this.runFilterSearch().catch((err) => {
+          this.error = err?.message || String(err);
+        });
+      }, FILTER_DEBOUNCE_MS);
+    },
+    async runFilterSearch() {
+      const params = this.currentFilterParams();
+      const sig = this.filterSigOf(params);
+      if (sig === this.filterSig) return;
+      this.filterSig = sig;
+      this.filterParams = params;
+      const hit = sig ? this.filterCache.get(sig) : null;
+      if (hit) {
+        this.exhausted = hit.exhausted;
+        await this.applyEvents(hit.events);
+        // Shown from cache, so the pane is already usable; only refetch when
+        // the snapshot is old enough to be missing recent matches.
+        if (Date.now() - hit.at > CACHE_STALE_MS) await this.loadLogs();
+        return;
+      }
+      await this.loadLogs();
+    },
+    cacheEvents(sig, events, exhausted) {
+      if (!sig) return;
+      this.filterCache.delete(sig);
+      this.filterCache.set(sig, { events, exhausted, at: Date.now() });
+      // Map iterates in insertion order, so the first key is the oldest.
+      while (this.filterCache.size > CACHE_MAX) {
+        const oldest = this.filterCache.keys().next().value;
+        this.filterCache.delete(oldest);
+      }
     },
     async clearLogRowsForReload() {
       this.pendingRows = [];
@@ -1082,6 +1185,9 @@ export default {
     async enterGlobalMsgSearch(searchText) {
       this.globalMsgSearchMode = true;
       this.globalMsgSearch = searchText;
+      // Global search owns the query on its own; drop any column filter.
+      this.filterParams = null;
+      this.filterSig = "";
       this.filterByGroups = false;
       this.showGroupsPane = false;
       await this.applyGroupFilter();
@@ -1237,8 +1343,10 @@ export default {
       const act = this.actionSel;
       this.actionSel = ""; // reset selector back to "Actions"
       if (!act || !this.table) return;
-      if (act === "refresh") await this.loadLogs();
-      else if (act === "goto") this.gotoSelection();
+      if (act === "refresh") {
+        this.filterCache.clear();
+        await this.loadLogs();
+      } else if (act === "goto") this.gotoSelection();
       else if (act === "copyIds") await this.copySelectedIds();
       else if (act === "selectSites") this.selectSites();
       else if (act === "channels") this.openChannelsPane();
@@ -1304,6 +1412,7 @@ export default {
         const res = await srvr.showUnilogEvents(this.selectedGroupIds);
         if (res?.ok) {
           this.flash(`showed ${res.changed || 0} events`);
+          this.filterCache.clear();
           await Promise.all([this.loadLogs(), this.loadGroups()]);
         } else {
           this.flash("failed to show events");
@@ -1322,6 +1431,7 @@ export default {
         const res = await srvr.unshowUnilogEvents(this.selectedGroupIds);
         if (res?.ok) {
           this.flash(`unshowed ${res.changed || 0} events`);
+          this.filterCache.clear();
           await Promise.all([this.loadLogs(), this.loadGroups()]);
         } else {
           this.flash("failed to unshow events");
@@ -1340,6 +1450,8 @@ export default {
       const ids = sites.map((s) => s.id);
       try {
         const res = await srvr.setUnilogSiteLevel(ids, level);
+        // Cached searches were matched against the old levels.
+        this.filterCache.clear();
         if (res?.ok) {
           this.flash(
             `set ${res.changed} site${res.changed === 1 ? "" : "s"} to ${level}`,
@@ -1415,7 +1527,7 @@ export default {
       const rowH = this.pageRowHeight();
       this.loadingOlder = true;
       try {
-        const pageLimit = Math.min(PAGE, room);
+        const pageLimit = Math.min(this.pageLimit(), room);
         const params = this.eventQueryParams({
           limit: pageLimit,
           beforeId: this.oldestId,
@@ -1592,6 +1704,7 @@ export default {
     // Server pruned the log_events table while pane was closed; mark so
     // activate() will flush stale rows and do a fresh load.
     onUnilogPruned() {
+      this.filterCache.clear();
       if (!this.active) this.prunedWhileClosed = true;
     },
     async loadMissed() {
@@ -1692,13 +1805,16 @@ export default {
     async loadLogs() {
       this.loading = true;
       this.error = "";
+      const seq = ++this.filterSeq;
+      const sig = this.filterSig;
       try {
-        const params = this.eventQueryParams({ limit: PAGE });
+        const limit = this.pageLimit();
+        const params = this.eventQueryParams({ limit });
         const res = await srvr.getUnilogEvents(params);
+        // A later filter change already owns the pane — drop this result.
+        if (seq !== this.filterSeq) return;
         // server returns newest-first; display oldest-first (ascending).
         const events = (res?.events || []).slice().reverse();
-        this.rowCount = events.length;
-        this.displayedCount = events.length;
         this.dbTotal = res?.total ?? 0;
         if (Array.isArray(res?.levels)) this.filterLevels = ["", ...res.levels];
         if (Array.isArray(res?.pids))
@@ -1709,10 +1825,9 @@ export default {
               value: p,
             })),
           ];
-        this.oldestId = events.length ? events[0].id : null;
-        this.newestId = events.length ? events[events.length - 1].id : null;
-        this.exhausted = events.length < PAGE;
+        this.exhausted = events.length < limit;
         this.loadedOnce = true;
+        this.cacheEvents(sig, events, this.exhausted);
 
         this.ensureTable();
         if (this.table) {
@@ -1726,18 +1841,29 @@ export default {
             headerFilterParams: { values: this.filterPids, clearable: true },
           });
           this.applyGlobalSearchHeaderUi();
-          await this.table.replaceData(events);
-          this.rowCount = this.table.getDataCount();
-          this.displayedCount = this.table.getDataCount("active");
-          this.updateOldestTs();
         }
-        this.scrollToBottom(true);
+        await this.applyEvents(events);
       } catch (err) {
         this.error = err?.message || String(err);
         unilog(1122, `log pane load failed: ${err?.message || err}`);
       } finally {
         this.loading = false;
       }
+    },
+    // Put a loaded/cached page of events (oldest-first) into the table.
+    async applyEvents(events) {
+      this.rowCount = events.length;
+      this.displayedCount = events.length;
+      this.oldestId = events.length ? events[0].id : null;
+      this.newestId = events.length ? events[events.length - 1].id : null;
+      this.ensureTable();
+      if (this.table) {
+        await this.table.replaceData(events);
+        this.rowCount = this.table.getDataCount();
+        this.displayedCount = this.table.getDataCount("active");
+        this.updateOldestTs();
+      }
+      this.scrollToBottom(true);
     },
     // ---- Groups pane ------------------------------------------------------
     groupLabel(g) {
@@ -1965,6 +2091,8 @@ export default {
           return;
         }
         const res = await srvr.setUnilogSiteLevel(ids, level);
+        // Cached searches were matched against the old levels.
+        this.filterCache.clear();
         if (!res?.ok) {
           this.flash(`failed: ${res?.error ?? "unknown error"}`);
           return;
@@ -1994,6 +2122,9 @@ export default {
     // Update the Groups column for the given sites after a mutation.
     async refreshRowGroups(logIds) {
       if (!this.table || !logIds.length) return;
+      // Every group mutation lands here, and all of them can change what a
+      // cached groups search would have matched.
+      this.filterCache.clear();
       try {
         const map = await srvr.getUnilogGroupsForSites(logIds);
         for (const r of this.table.getRows()) {
@@ -2006,15 +2137,20 @@ export default {
         console.error("[log.vue]", `refreshRowGroups failed: ${e.message}`); // no-unilog
       }
     },
-    // Layered group filter (in addition to header/string filters). Active only
-    // while the pane is open, Filter is checked, and groups are selected.
-    async applyGroupFilter() {
-      if (!this.table) return;
-      const on =
+    // The groups pane's Filter checkbox is only in force while that pane is
+    // open, Filter is checked, and at least one group is selected.
+    groupFilterOn() {
+      return (
         !this.globalMsgSearchMode &&
         this.showGroupsPane &&
         this.filterByGroups &&
-        this.selectedGroupIds.length > 0;
+        this.selectedGroupIds.length > 0
+      );
+    },
+    // Layered group filter (in addition to header/string filters).
+    async applyGroupFilter() {
+      if (!this.table) return;
+      const on = this.groupFilterOn();
       if (!on) {
         if (this.groupFilterFn) {
           this.table.removeFilter(this.groupFilterFn);

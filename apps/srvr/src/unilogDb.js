@@ -452,9 +452,22 @@ export function dbInfo() {
   return { path: UNILOG_DB_PATH, counts };
 }
 
+// Group names of a site, as one comma-joined string. Used both as the Groups
+// column of the read-back and as the thing the groups filter matches against.
+const GROUPS_EXPR = `(SELECT GROUP_CONCAT(lg.description, ', ')
+                        FROM site_groups sg JOIN log_groups lg
+                          ON sg.group_id = lg.group_id
+                       WHERE sg.log_id = s.log_id
+                         AND lg.description IS NOT NULL)`;
+
 // Read-back for the web client log viewer. Returns recent events joined with
-// their sites, newest first. Optional filters: pid, level, file (partial),
-// msg (partial). beforeId returns only events older than that event id (for
+// their sites, newest first. Optional filters: pid (exact), level (exact),
+// file (partial), msg (partial), groups (partial, against the group-name
+// list), line (partial), id (exact event id), logId (exact site id), and
+// groupIds (comma list — only sites linked to one of those groups). These
+// mirror the log pane's column header filters, including its rule that a
+// filter value of "-" alone matches only blank values.
+// beforeId returns only events older than that event id (for
 // upward paging). afterId returns events newer than that id (for gap-fill after
 // reconnect), returned oldest-first. limit is clamped to a sane range.
 // includeHidden skips the normal log-pane hide filter for whole-DB searches.
@@ -465,6 +478,11 @@ export function queryEvents({
   level,
   file,
   msg,
+  groups,
+  line,
+  id,
+  logId,
+  groupIds,
   limit,
   beforeId,
   afterId,
@@ -473,6 +491,20 @@ export function queryEvents({
 } = {}) {
   const where = [];
   const params = [];
+  // "-" alone matches only blank values, as in the pane's header filters.
+  const blank = (expr) => where.push(`(${expr} IS NULL OR ${expr} = '')`);
+  const like = (expr, val) => {
+    const v = String(val).trim();
+    if (v === "-") return blank(expr);
+    where.push(`${expr} LIKE ?`);
+    params.push(`%${v}%`);
+  };
+  const exact = (expr, val) => {
+    const v = String(val).trim();
+    if (v === "-") return blank(expr);
+    where.push(`${expr} = ?`);
+    params.push(v);
+  };
   if (errors) {
     where.push("s.level = 'error'");
     where.push("e.ts >= ?");
@@ -488,21 +520,24 @@ export function queryEvents({
     where.push("e.id > ?");
     params.push(Number(afterId));
   }
-  if (pid) {
-    where.push("e.pid = ?");
-    params.push(String(pid));
-  }
-  if (level) {
-    where.push("s.level = ?");
-    params.push(String(level));
-  }
-  if (file) {
-    where.push("s.src_file LIKE ?");
-    params.push(`%${String(file)}%`);
-  }
-  if (msg) {
-    where.push("e.message LIKE ?");
-    params.push(`%${String(msg)}%`);
+  if (pid) exact("e.pid", pid);
+  if (level) exact("s.level", level);
+  if (file) like("s.src_file", file);
+  if (msg) like("e.message", msg);
+  if (groups) like(GROUPS_EXPR, groups);
+  if (line) like("s.src_line", line);
+  if (id) exact("e.id", id);
+  if (logId) exact("s.log_id", logId);
+  const gids = String(groupIds ?? "")
+    .split(",")
+    .map((g) => Number(g))
+    .filter((g) => Number.isFinite(g) && g > 0);
+  if (gids.length) {
+    where.push(
+      `s.log_id IN (SELECT log_id FROM site_groups
+                     WHERE group_id IN (${gids.map(() => "?").join(",")}))`,
+    );
+    params.push(...gids);
   }
   const w = where.length ? `WHERE ${where.join(" AND ")}` : "";
   const lim = Math.min(Math.max(Number(limit) || 500, 1), 5000);
@@ -510,12 +545,7 @@ export function queryEvents({
   return db
     .prepare(
       `SELECT e.id, e.ts, e.pid, s.log_id, s.src_file, s.src_line,
-              s.tag, s.level, e.message,
-              (SELECT GROUP_CONCAT(lg.description, ', ')
-                 FROM site_groups sg JOIN log_groups lg
-                   ON sg.group_id = lg.group_id
-                WHERE sg.log_id = s.log_id
-                  AND lg.description IS NOT NULL) AS groups
+              s.tag, s.level, e.message, ${GROUPS_EXPR} AS groups
          FROM log_events e JOIN log_sites s ON e.log_id = s.log_id
          ${w} ORDER BY e.id ${order} LIMIT ${lim}`,
     )

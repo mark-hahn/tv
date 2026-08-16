@@ -383,6 +383,18 @@
               margin-left: 5px;
             "
           />
+          <button
+            @click.stop="handleCountButton"
+            style="
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 5px;
+              padding: 4px 10px;
+              margin-left: 5px;
+            "
+          >
+            Count
+          </button>
         </div>
       </div>
       <div
@@ -400,6 +412,80 @@
       style="text-align: center; color: red; margin-top: 50px; font-size: 16px"
     >
       <div>{{ errorMessage }}</div>
+    </div>
+
+    <!-- Show counts ("Count"): the actors in the most shows, four to a row -->
+    <div
+      v-else-if="showingCounts"
+      id="actor-counts"
+      style="
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        align-content: start;
+        gap: 10px;
+        padding: 5px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        flex: 1;
+        min-height: 0;
+      "
+    >
+      <div
+        v-if="countsLoading"
+        style="
+          grid-column: 1 / -1;
+          text-align: center;
+          color: #666;
+          margin-top: 50px;
+          font-size: 16px;
+        "
+      >
+        Loading show counts...
+      </div>
+      <div
+        v-for="counted in countActors"
+        :key="counted.personName"
+        @click.stop="handleCountCardClick(counted)"
+        style="
+          min-width: 0;
+          display: flex;
+          background-color: #f5f5f5;
+          border: 1px solid #ddd;
+          border-radius: 6px;
+          padding: 10px;
+          cursor: pointer;
+        "
+      >
+        <img
+          v-if="counted.image || counted.personImgURL"
+          :src="counted.image || counted.personImgURL"
+          :alt="counted.personName"
+          style="
+            width: 102px;
+            height: 133px;
+            object-fit: cover;
+            border-radius: 4px;
+            margin-right: 15px;
+            flex-shrink: 0;
+          "
+        />
+        <div
+          style="
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+          "
+        >
+          <div style="font-weight: bold; font-size: 21.6px">
+            {{ counted.personName }}
+          </div>
+          <div style="font-size: 16.8px; color: #666">
+            {{ counted.count }} show{{ counted.count !== 1 ? "s" : "" }}
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Related actors ("Kevin"): everyone who has been in more than one show
@@ -663,6 +749,7 @@
       v-if="
         !showingCredits &&
         !showingRelated &&
+        !showingCounts &&
         actors.length > 0 &&
         crew.length > 0
       "
@@ -676,7 +763,7 @@
 
     <!-- Crew section (Creator, Executive Producer, Producer, Writer) -->
     <div
-      v-if="!showingCredits && !showingRelated && crew.length > 0"
+      v-if="!showingCredits && !showingRelated && !showingCounts && crew.length > 0"
       id="crew-section"
       style="
         display: grid;
@@ -727,7 +814,7 @@
     </div>
     <div
       id="no-actors"
-      v-if="!errorMessage &amp;&amp; !isGuestMode &amp;&amp; !showingRelated &amp;&amp; showName &amp;&amp; actors.length === 0 &amp;&amp; showNoCastMessage"
+      v-if="!errorMessage &amp;&amp; !isGuestMode &amp;&amp; !showingRelated &amp;&amp; !showingCounts &amp;&amp; showName &amp;&amp; actors.length === 0 &amp;&amp; showNoCastMessage"
       style="text-align: center; color: #999; margin-top: 50px; font-size: 16px"
     >
       <div style="margin-bottom: 20px">No cast information available</div>
@@ -747,6 +834,10 @@ import { unilog, logHere } from "../log.js";
 const theMan = atob("bXJza2lu");
 
 const CREW_TYPE_ORDER = ["Creator", "Producer", "Executive Producer", "Writer"];
+
+// How far down the show-count ranking is worth drawing. The far end of it is
+// actors in one or two shows, of which there are thousands.
+const COUNT_ACTOR_LIMIT = 100;
 
 export default {
   name: "Actors",
@@ -790,6 +881,9 @@ export default {
       showingRelated: false, // Whether the Kevin related-actors pane is up
       relatedRows: [], // [{ count, actors }] rows of the related-actors pane
       relatedLoading: false, // Loading state while all shows are scanned
+      showingCounts: false, // Whether the Count show-count pane is up
+      countActors: [], // [{ personName, image, count }] of the show-count pane
+      countsLoading: false, // Loading state while all shows are counted
       credits: [], // Actor's filmography credits
       creditsLoading: false, // Loading state for credits
       creditsError: null, // Error message for credits
@@ -816,9 +910,11 @@ export default {
     // The Kevin pane belongs to the actor it was opened on, so every way the
     // selection changes -- deselect, another actor, another show -- takes it
     // down with it rather than leaving one actor's related list over another's.
-    selectedActor() {
+    selectedActor(actor) {
       this.showingRelated = false;
       this.relatedRows = [];
+      // The show counts are what there is to see when no actor is selected.
+      if (actor) this.showingCounts = false;
     },
   },
 
@@ -1115,6 +1211,85 @@ export default {
       });
       await this.fillMissingImages(rows.flatMap((row) => row.actors));
       return rows;
+    },
+
+    /**
+     * The Count button: the actors in the most shows. It is about the whole
+     * dataset rather than about one actor, so a selection comes off with it,
+     * and pressing it again closes the pane it opened.
+     */
+    async handleCountButton() {
+      if (this.showingCounts) {
+        this.showingCounts = false;
+        return;
+      }
+      if (this.selectedActor) this.handleDoneButton();
+
+      this.showingCounts = true;
+      this.countsLoading = true;
+      this.countActors = [];
+      const actors = await this.buildShowCounts();
+      this.countsLoading = false;
+      // The pane may have been closed while the scan ran.
+      if (!this.showingCounts) return;
+      this.countActors = actors;
+    },
+
+    /**
+     * A card of the show-count pane: the show list narrowed to that actor,
+     * which is what the Shows button does with a selected one.
+     */
+    handleCountCardClick(counted) {
+      const name = String(counted?.personName || "").trim();
+      if (!name) return;
+      evtBus.emit("filterByActor", { actorName: name });
+    },
+
+    /**
+     * Every actor in the whole dataset by how many shows they are in, most
+     * first, and only as far down that list as is worth drawing. An actor with
+     * two roles in one show is still one show, so each show counts each of its
+     * cast once.
+     */
+    async buildShowCounts() {
+      const allTvdb = await tvdb.getAllTvdb();
+      const counts = new Map();
+      for (const record of Object.values(allTvdb || {})) {
+        const actualData = record?.response?.data || record;
+        const characters = actualData?.characters;
+        if (!Array.isArray(characters)) continue;
+        const counted = new Set();
+        for (const char of characters) {
+          const personName = String(
+            char?.personName || char?.actor || "",
+          ).trim();
+          const key = this.normPersonName(personName);
+          if (!key || counted.has(key)) continue;
+          counted.add(key);
+          const entry = counts.get(key);
+          if (entry) {
+            entry.count++;
+            if (!entry.image) {
+              entry.image = char?.image || "";
+              entry.personImgURL = char?.image || "";
+            }
+          } else {
+            counts.set(key, {
+              personName,
+              image: char?.image || "",
+              personImgURL: char?.image || "",
+              count: 1,
+            });
+          }
+        }
+      }
+      const actors = [...counts.values()]
+        .sort(
+          (a, b) => b.count - a.count || a.personName.localeCompare(b.personName),
+        )
+        .slice(0, COUNT_ACTOR_LIMIT);
+      await this.fillMissingImages(actors);
+      return actors;
     },
 
     async handleAllCreditsButton() {

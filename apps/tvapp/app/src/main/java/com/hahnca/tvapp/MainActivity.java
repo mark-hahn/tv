@@ -152,6 +152,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private Updates updates;
   private ShowListView showList;
   private RelatedActors relatedActors;
+  private ShowCounts showCounts;
   private TextView filterLabel;
   private TrailerPlayer player;
   private LinearLayout buttonColumn;
@@ -384,12 +385,14 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     showList = new ShowListView(this);
     showList.setFilterTextListener(this::updateFilterLabel);
     showList.setActorFilterListener(this::chooseActorFilter);
-    // The related-actors display covers the list rather than taking room of its
-    // own, so the two share a frame.
+    // The two actor displays cover the list rather than taking room of their
+    // own, so all three share a frame.
     FrameLayout listArea = new FrameLayout(this);
     listArea.addView(showList, matchParent());
     relatedActors = new RelatedActors(this);
     listArea.addView(relatedActors, matchParent());
+    showCounts = new ShowCounts(this);
+    listArea.addView(showCounts, matchParent());
     column.addView(
         listArea, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
     return column;
@@ -903,6 +906,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private void clearScreenState() {
     if (player.isPlaying()) player.close();
     relatedActors.close();
+    showCounts.close();
+    // The actor filter is a list to browse like any other, and this key is the
+    // way back to the plain one, so it comes off here as it does on back.
+    applyActorFilter(null);
     area = Area.LIST;
     showList.setMiscFocused(false);
     paintGroups();
@@ -1212,8 +1219,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       player.close();
       return;
     }
-    if (relatedActors.isOpen()) {
-      relatedActors.close();
+    ActorOverlay overlay = openOverlay();
+    if (overlay != null) {
+      overlay.close();
       return;
     }
     if (actorFilterName != null) {
@@ -1240,23 +1248,24 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       else player.key(key);
       return;
     }
-    // The related-actors display covers the list, so while it is up the keys
-    // are its own: up and down walk its rows, the three focus keys take it
-    // away and go on to their own area, and the rest do nothing at all. Down
-    // opened it, but scrolling is what that key does from here on. Back is not
-    // here: it comes in as its own message, and handleBack closes this the
-    // same way.
-    if (relatedActors.isOpen()) {
-      if ("up".equals(key)) {
-        relatedActors.scrollPage(-1);
+    // An actor display covers the list, so while one is up the keys are its
+    // own: the arrows walk it, ok narrows the list to the actor under its
+    // cursor if it has one, the three focus keys take it away and go on to
+    // their own area, and the rest do nothing at all. The key that opened it
+    // is one of the arrows from here on. Back is not here: it comes in as its
+    // own message, and handleBack closes these the same way.
+    ActorOverlay overlay = openOverlay();
+    if (overlay != null) {
+      if (isArrowKey(key)) {
+        overlay.arrowKey(key);
         return;
       }
-      if ("down".equals(key)) {
-        relatedActors.scrollPage(+1);
+      if ("ok".equals(key)) {
+        chooseOverlayActor(overlay);
         return;
       }
       if (!"sort".equals(key) && !"filter".equals(key) && !"info".equals(key)) return;
-      relatedActors.close();
+      overlay.close();
     }
     // The three focus keys, each answered wherever the focus happens to be:
     // they are the one way into their area, and so also the way out of every
@@ -1326,6 +1335,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       openRelatedActors();
       return;
     }
+    // Up over the same strip: who is in the most shows, over the list. Not
+    // while the list is already narrowed to one actor -- that is a list to
+    // browse, and this would cover it with a ranking of everyone.
+    if ("up".equals(key) && showList.isActorFocused() && actorFilterName == null) {
+      showCounts.open(showList.getShows());
+      return;
+    }
     if ("info".equals(key)) showList.infoInCardMisc();
     else if ("ok".equals(key)) openInCardMisc();
     else if ("up".equals(key)) showList.moveInCardMisc(-1, true);
@@ -1339,6 +1355,31 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     String name = showList.focusedActorName();
     if (name == null) return;
     relatedActors.open(showList.getShows(), name);
+  }
+
+  /** Whichever of the two actor displays is over the list, or null for neither. */
+  private ActorOverlay openOverlay() {
+    if (relatedActors.isOpen()) return relatedActors;
+    if (showCounts.isOpen()) return showCounts;
+    return null;
+  }
+
+  /**
+   * The ok key on a display that has a cursor: the list narrowed to the actor
+   * under it, which is the same filter the cast strip in cardMisc puts on, and
+   * behaves the same way from here on. The display has served its purpose, so
+   * it comes off to leave the narrowed list on screen.
+   */
+  private void chooseOverlayActor(ActorOverlay overlay) {
+    String name = overlay.focusedActorName();
+    if (name == null) return;
+    overlay.close();
+    chooseActorFilter(name);
+    focusArea(Area.LIST);
+  }
+
+  private static boolean isArrowKey(String key) {
+    return "up".equals(key) || "down".equals(key) || "left".equals(key) || "right".equals(key);
   }
 
   /**

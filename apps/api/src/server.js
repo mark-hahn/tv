@@ -336,13 +336,19 @@ async function handoffForcedTorrentToTvDown({
       });
       return;
     } catch (error) {
-      unilog(1716, `forced handoff poll failed for ${infoHash || addTag || torrentTitle}: ${error?.message || String(error)}`);
+      unilog(
+        1716,
+        `forced handoff poll failed for ${infoHash || addTag || torrentTitle}: ${error?.message || String(error)}`,
+      );
     }
 
     await new Promise((resolve) => setTimeout(resolve, FORCE_DOWN_POLL_MS));
   }
 
-  unilog(1717, `forced handoff timed out for ${infoHash || addTag || torrentTitle}`);
+  unilog(
+    1717,
+    `forced handoff timed out for ${infoHash || addTag || torrentTitle}`,
+  );
 }
 
 function getYearFromShowContext(showContext) {
@@ -1264,7 +1270,10 @@ app.post("/api/local/swap", async (req, res) => {
       String(relPath || "")
         .split("/")
         .pop() || String(relPath);
-    unilog(2052, `local swap error for ${name}: ${err?.message || String(err)}`);
+    unilog(
+      2052,
+      `local swap error for ${name}: ${err?.message || String(err)}`,
+    );
     res.status(500).json({ error: err.message });
   }
 });
@@ -1523,12 +1532,42 @@ app.post("/api/tor/sent", (req, res) => {
   res.json({ ok: true });
 });
 
+// LIM/EZT and TPB are searched in the background as soon as the IPT/TL search
+// for a show starts, in two separate prefetches: LIM/EZT answer in seconds
+// while apibay (TPB) always takes 60-90s. Each worker caches what it finds, so
+// by the time the user clicks through to those views the results are already
+// there. A request that arrives while its prefetch is still running waits for
+// that prefetch instead of starting a second search for the same providers.
+const limEztPrefetch = new Map();
+const tpbPrefetch = new Map();
+
+function prefetchKey(showName, seasons) {
+  return `${String(showName || "").toLowerCase()}|${seasons.join(",")}`;
+}
+
+function startPrefetch(map, extraParams, params) {
+  const key = prefetchKey(params.showName, params.seasons);
+  if (map.has(key)) return;
+  const p = searchTorrentsInChild({
+    ...params,
+    ...extraParams,
+    more: true,
+    staged: false,
+  })
+    .catch((e) => {
+      unilog(2223, `prefetch failed for ${params.showName}: ${e.message}`);
+    })
+    .finally(() => map.delete(key));
+  map.set(key, p);
+}
+
 app.get("/api/search", async (req, res) => {
   const showName = req.query.show;
   const limit = parseInt(req.query.limit) || 100;
   const iptCfRaw = req.query.ipt_cf;
   const tlCfRaw = req.query.tl_cf;
   const more = req.query.more === "true";
+  const tpb = req.query.tpb === "true";
   const staged = req.query.staged === "true";
   const category = req.query.category || "tv";
   // season may be a single number or a comma-separated list of seasons
@@ -1562,6 +1601,31 @@ app.get("/api/search", async (req, res) => {
       typeof tlCfRaw === "string" && tlCfRaw.trim()
         ? tlCfRaw.trim()
         : await loadLocalCfClearance("torrentleech");
+    // A prefetch already running for this show is the same search this
+    // request would run, so wait for its cache instead of duplicating it.
+    if (more && category !== "movie") {
+      const pending = (tpb ? tpbPrefetch : limEztPrefetch).get(
+        prefetchKey(showName, seasons),
+      );
+      if (pending) await pending;
+    }
+
+    // Start the other providers before the IPT/TL search rather than after it,
+    // so apibay's 60s wait overlaps that search too.
+    if (!more && category !== "movie") {
+      const prefetchParams = {
+        showName,
+        limit,
+        iptCf,
+        tlCf,
+        needed,
+        category,
+        seasons,
+      };
+      startPrefetch(limEztPrefetch, {}, prefetchParams);
+      startPrefetch(tpbPrefetch, { tpb: true, tpbOnly: true }, prefetchParams);
+    }
+
     const result = await searchTorrentsInChild({
       showName,
       limit,
@@ -1569,6 +1633,7 @@ app.get("/api/search", async (req, res) => {
       tlCf,
       needed,
       more,
+      tpb,
       staged,
       category,
       seasons,
@@ -1629,7 +1694,10 @@ app.get("/api/subs/search", async (req, res) => {
         if (last.ok) return last;
         if (!transientStatuses.has(last.status)) return last;
         if (attempt === 4) return last;
-        unilog(1718, `OpenSubtitles subtitles request failed with HTTP ${last.status} for ${qRaw || imdbIdDigits} (attempt ${attempt + 1}/5), retrying`);
+        unilog(
+          1718,
+          `OpenSubtitles subtitles request failed with HTTP ${last.status} for ${qRaw || imdbIdDigits} (attempt ${attempt + 1}/5), retrying`,
+        );
         await sleep(300 * (attempt + 1) * (attempt + 1));
       }
       return last;
@@ -1645,7 +1713,10 @@ app.get("/api/subs/search", async (req, res) => {
     }
 
     if (!resp.ok) {
-      unilog(1719, `OpenSubtitles subtitles request gave up with HTTP ${resp.status} for ${qRaw || imdbIdDigits}`);
+      unilog(
+        1719,
+        `OpenSubtitles subtitles request gave up with HTTP ${resp.status} for ${qRaw || imdbIdDigits}`,
+      );
       let detail = resp.data || resp.text;
       if (typeof detail === "string") {
         const s = detail.trim();
@@ -2192,9 +2263,8 @@ app.post("/api/tor/chk-subs", async (req, res) => {
                 (filePath) => ({
                   path: filePath,
                   size:
-                    files.find(
-                      (file) => String(file?.path || "") === filePath,
-                    )?.size ?? null,
+                    files.find((file) => String(file?.path || "") === filePath)
+                      ?.size ?? null,
                   packedArchive: true,
                 }),
               )
@@ -2221,7 +2291,11 @@ app.post("/api/tor/chk-subs", async (req, res) => {
         for (const file of videoFiles) {
           const videoPath = String(file?.path || "");
           const seasonEpisode = getSeasonEpisodeForTorrentPath(videoPath);
-          const showName = deriveTorrentShowName(showContext, torrent, videoPath);
+          const showName = deriveTorrentShowName(
+            showContext,
+            torrent,
+            videoPath,
+          );
           if (
             showName &&
             Number.isInteger(seasonEpisode?.season) &&
@@ -2285,7 +2359,9 @@ app.post("/api/tor/chk-subs", async (req, res) => {
 app.get("/api/tor/subs", async (req, res) => {
   const detailUrl = String(req.query.url || "").trim();
   if (!detailUrl) {
-    return res.status(400).json({ success: false, error: "url query required" });
+    return res
+      .status(400)
+      .json({ success: false, error: "url query required" });
   }
 
   try {

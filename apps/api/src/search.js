@@ -7,7 +7,7 @@ import { patchProviderWithSshTunnel } from "./sshTunnel.js";
 
 import TorrentSearchApi from "torrent-search-api";
 import os from "os";
-import { unilog } from "@tv/share";
+import { unilog, logHere } from "@tv/share";
 
 // When true and the show name contains a year, TPB/LIM/EZT are first searched with the
 // year included. If that yields >20 results the no-year search is skipped; otherwise
@@ -149,6 +149,50 @@ function readIptTlCache(showName, seasons = []) {
     return [];
   }
 }
+
+// LIM/EZT and TPB results are cached the same way, in separate files because
+// they are separate searches: LIM/EZT answer in seconds while apibay (TPB)
+// takes 60-90s no matter where the request comes from. A search that can reuse
+// a recent result returns immediately instead of waiting on the provider.
+// null means "no usable cache" (missing/stale), which an empty result set is
+// not — hence these readers rather than the IPT/TL one.
+function providerCacheFilePath(prefix, showName, seasons = []) {
+  const safe = String(showName || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "_")
+    .slice(0, 80);
+  const seasonPart = seasons.length
+    ? `-s${seasons.map((s) => String(s).padStart(2, "0")).join("_")}`
+    : "";
+  return path.join(os.tmpdir(), `${prefix}-${safe}${seasonPart}.json`);
+}
+
+function writeProviderCache(prefix, showName, results, seasons = []) {
+  try {
+    fs.writeFileSync(
+      providerCacheFilePath(prefix, showName, seasons),
+      JSON.stringify(results),
+      "utf8",
+    );
+  } catch {
+    // ignore
+  }
+}
+
+function readProviderCache(prefix, showName, seasons = []) {
+  try {
+    const p = providerCacheFilePath(prefix, showName, seasons);
+    if (Date.now() - fs.statSync(p).mtimeMs > IPTL_CACHE_MAX_AGE_MS)
+      return null;
+    const parsed = JSON.parse(fs.readFileSync(p, "utf8"));
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+const LIM_EZT_CACHE_PREFIX = "tor-extras-cache";
+const TPB_CACHE_PREFIX = "tor-tpb-cache";
 
 const COOKIES_DIR = DATA_DIR;
 const IPTORRENTS_CUSTOM_PATH = path.join(DATA_DIR, "iptorrents-custom.json");
@@ -407,7 +451,11 @@ export function initializeProviders() {
  * @param {string} params.iptCf - Optional IPTorrents cf_clearance override
  * @param {string} params.tlCf - Optional TorrentLeech cf_clearance override
  * @param {Array} params.needed - Optional array of needed episodes (e.g., ["S01", "S02E03"])
- * @param {boolean} params.more - If true, add TPB/LIM/EZT results on top of cached IPT/TL results
+ * @param {boolean} params.more - If true, add LIM/EZT results on top of cached IPT/TL results
+ * @param {boolean} params.tpb - If true (with more), also add TPB results. TPB is its
+ *   own search because apibay takes 60-90s to answer while LIM/EZT take seconds
+ * @param {boolean} params.tpbOnly - Prefetch mode: search TPB alone and cache it,
+ *   without re-running LIM/EZT
  * @param {number|string} params.season - Optional season number; restricts the provider
  *   queries to that season (TV only) and disables the `needed` filtering
  * @returns {Object} Search results with torrents array
@@ -419,6 +467,8 @@ export async function searchTorrents({
   tlCf,
   needed = [],
   more = false,
+  tpb = false,
+  tpbOnly = false,
   staged = false,
   category = "tv",
   seasons = [],
@@ -612,25 +662,42 @@ export async function searchTorrents({
     );
     rawCombined = resultsArrays.flat();
   } else {
-    // more=true: combine cached IPT/TL results + fresh TPB/LIM/EZT searches
-    const cachedIptTl = readIptTlCache(showName, seasonNums);
+    // more=true: cached IPT/TL results + LIM/EZT, and TPB only when asked for
+    // (tpb=true) since apibay answers in 60-90s and LIM/EZT in seconds.
+    const cachedIptTl = tpbOnly ? [] : readIptTlCache(showName, seasonNums);
 
     // Detect a year in the show name (e.g. "Show (2004)" or "Show 2004")
     const yearMatch =
       ALWAYS_DO_BOTH_SEARCHES &&
       baseName.match(/\s*\(\d{4}\)\s*$|\s+\d{4}\s*$/);
 
-    const searchTpbLimEzt = async (queries) =>
+    // Build no-year queries up front so both phases can run in parallel
+    const nameNoYear = baseName
+      .replace(/\s*\(\d{4}\)\s*$/, "")
+      .replace(/\s+\d{4}\s*$/, "")
+      .trim();
+    const sanitizedNoYear = sanitizeForProviderSearch(nameNoYear);
+    const noYearQueries =
+      yearMatch && sanitizedNoYear
+        ? seasonQueries(sanitizedNoYear).filter(
+            (q) =>
+              !uniqueQueries.some((u) => u.toUpperCase() === q.toUpperCase()),
+          )
+        : [];
+
+    // Run the year and no-year query sets in parallel; dedupe handles overlaps
+    const withYearVariants = async (searchFn) => {
+      const [withYear, withoutYear] = await Promise.all([
+        searchFn(uniqueQueries),
+        noYearQueries.length ? searchFn(noYearQueries) : Promise.resolve([]),
+      ]);
+      return [...withYear, ...withoutYear];
+    };
+
+    const searchLimEzt = async (queries) =>
       (
         await Promise.all(
           queries.flatMap((q) => [
-            searchTpbApibay(q, limit).then((r) => {
-              if (r === null) {
-                tpbFailed = true;
-                return [];
-              }
-              return r;
-            }),
             withTimeout(
               TorrentSearchApi.search(["Limetorrents"], q, "TV", limit),
               PROVIDER_TIMEOUT_MS,
@@ -651,33 +718,84 @@ export async function searchTorrents({
         )
       ).flat();
 
-    let tpbLimEztResults;
-    if (yearMatch) {
-      // Build no-year queries up front so both phases can run in parallel
-      const nameNoYear = baseName
-        .replace(/\s*\(\d{4}\)\s*$/, "")
-        .replace(/\s+\d{4}\s*$/, "")
-        .trim();
-      const sanitizedNoYear = sanitizeForProviderSearch(nameNoYear);
-      const noYearQueries = sanitizedNoYear
-        ? seasonQueries(sanitizedNoYear).filter(
-            (q) =>
-              !uniqueQueries.some((u) => u.toUpperCase() === q.toUpperCase()),
-          )
-        : [];
-      // Run year and no-year searches in parallel; dedupe handles overlaps
-      const [withYearResults, withoutYearResults] = await Promise.all([
-        searchTpbLimEzt(uniqueQueries),
-        noYearQueries.length
-          ? searchTpbLimEzt(noYearQueries)
-          : Promise.resolve([]),
-      ]);
-      tpbLimEztResults = [...withYearResults, ...withoutYearResults];
-    } else {
-      tpbLimEztResults = await searchTpbLimEzt(uniqueQueries);
-    }
+    const searchTpb = async (queries) =>
+      (
+        await Promise.all(
+          queries.map((q) =>
+            searchTpbApibay(q, limit).then((r) => {
+              if (r === null) {
+                tpbFailed = true;
+                return [];
+              }
+              return r;
+            }),
+          ),
+        )
+      ).flat();
 
-    rawCombined = [...cachedIptTl, ...tpbLimEztResults];
+    // The LIM/EZT and TPB halves are independent, so a request that needs both
+    // (a tpb=true search with no cached LIM/EZT) runs them at the same time.
+    const limEztPromise = tpbOnly
+      ? Promise.resolve([])
+      : (async () => {
+          const cached = readProviderCache(
+            LIM_EZT_CACHE_PREFIX,
+            showName,
+            seasonNums,
+          );
+          if (cached) {
+            unilog(
+              2221,
+              `using cached LIM/EZT results for ${showName} (${cached.length})`,
+            );
+            return cached;
+          }
+          const results = await withYearVariants(searchLimEzt);
+          writeProviderCache(
+            LIM_EZT_CACHE_PREFIX,
+            showName,
+            results,
+            seasonNums,
+          );
+          return results;
+        })();
+
+    const tpbPromise =
+      tpb || tpbOnly
+        ? (async () => {
+            const cached = readProviderCache(
+              TPB_CACHE_PREFIX,
+              showName,
+              seasonNums,
+            );
+            if (cached) {
+              unilog(
+                2222,
+                `using cached TPB results for ${showName} (${cached.length})`,
+              );
+              return cached;
+            }
+            const results = await withYearVariants(searchTpb);
+            // Only cache a complete result -- a TPB outage must not be frozen
+            // in for an hour, the next search has to retry it.
+            if (!tpbFailed) {
+              writeProviderCache(
+                TPB_CACHE_PREFIX,
+                showName,
+                results,
+                seasonNums,
+              );
+            }
+            return results;
+          })()
+        : Promise.resolve([]);
+
+    const [limEztResults, tpbResults] = await Promise.all([
+      limEztPromise,
+      tpbPromise,
+    ]);
+
+    rawCombined = [...cachedIptTl, ...limEztResults, ...tpbResults];
   }
 
   const seen = new Set();
@@ -714,7 +832,9 @@ export async function searchTorrents({
     category === "movie"
       ? ["IPT", "TL", "TPB", "LIM"]
       : more
-        ? ["IPT", "TL", "TPB", "LIM", "EZT"]
+        ? tpb
+          ? ["IPT", "TL", "TPB", "LIM", "EZT"]
+          : ["IPT", "TL", "LIM", "EZT"]
         : ["IPT", "TL"];
   for (const code of expectedProviderCodes) {
     if (!(code in rawProviderCodeCounts)) rawProviderCodeCounts[code] = 0;
@@ -1119,7 +1239,7 @@ export async function searchTorrents({
       warningSummary,
       providerStats,
       hasMoreProviders: more,
-      tpbError: more && tpbFailed ? true : undefined,
+      tpbError: tpbFailed ? true : undefined,
     };
   }
 
@@ -1131,7 +1251,7 @@ export async function searchTorrents({
     warningSummary,
     providerStats,
     hasMoreProviders: more,
-    tpbError: more && tpbFailed ? true : undefined,
+    tpbError: tpbFailed ? true : undefined,
   };
 }
 

@@ -6,6 +6,14 @@ import { spawn } from "child_process";
 
 const USB_SSH_TARGET = "xobtlu@xobtlu.baron.usbx.me";
 
+// Connection multiplexing: a full SSH handshake to the USB server costs ~2s,
+// and a provider search does one exec per result page, so without a shared
+// master connection the handshakes dominate the search time. The master is
+// kept alive between searches (each search runs in its own forked worker), so
+// every page after the first reuses it for ~0.3s instead of ~2s.
+const SSH_CONTROL_PATH = "/tmp/tv-api-sshtun-%r@%h:%p";
+const SSH_CONTROL_PERSIST = "10m";
+
 function shellEsc(s) {
   return "'" + String(s).replace(/'/g, "'\\''") + "'";
 }
@@ -69,6 +77,12 @@ export async function sshCurlFetch(
       "ConnectTimeout=30",
       "-o",
       "StrictHostKeyChecking=accept-new",
+      "-o",
+      "ControlMaster=auto",
+      "-o",
+      `ControlPath=${SSH_CONTROL_PATH}`,
+      "-o",
+      `ControlPersist=${SSH_CONTROL_PERSIST}`,
       USB_SSH_TARGET,
       curlCmd,
     ]);

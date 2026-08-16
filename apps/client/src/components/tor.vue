@@ -1781,7 +1781,8 @@ export default {
       this.torSearchPhase = phase;
       this.hasSearched = phase !== "idle";
       this.noTorrentsNeeded = phase === "needed-none";
-      this.hasMoreProviders = phase === "all-results";
+      this.hasMoreProviders =
+        phase === "all-results" || phase === "tpb-results";
     },
 
     resetTorResultsState() {
@@ -1850,6 +1851,9 @@ export default {
           await this.expandToAllProviders();
           return;
         case "all-results":
+          await this.expandToTpb();
+          return;
+        case "tpb-results":
           // After a finished map pane episode search, the next click drops that
           // episode list and starts the normal needed / IPT+TL search over.
           if (this.mapEpisodes) {
@@ -2694,10 +2698,13 @@ export default {
       if (this.unaired) return;
 
       this.providerWarning = "";
+      // Preview mode has no Search button to click through the phases, so this
+      // one search takes every provider, TPB included.
       const result = await this.loadTorrents(["force"], true, {
-        phaseOverride: "all-results",
+        tpb: true,
+        phaseOverride: "tpb-results",
       });
-      if (result) this.setTorSearchPhase("all-results");
+      if (result) this.setTorSearchPhase("tpb-results");
     },
 
     async expandToAllProviders() {
@@ -2719,6 +2726,30 @@ export default {
         },
       );
       if (result) this.setTorSearchPhase("all-results");
+    },
+
+    // TPB is a search of its own -- apibay takes ~60s to answer while the
+    // other providers take seconds, so it must not hold them up.
+    async expandToTpb() {
+      const currentShow = this.resolveCurrentShow();
+      if (!currentShow) {
+        this.error = "No show selected";
+        return;
+      }
+      if (this.unaired) return;
+
+      this.providerWarning = "";
+      const result = await this.loadTorrents(
+        this.mapNeeded || ["force"],
+        true,
+        {
+          tpb: true,
+          stagedResponse: true,
+          preserveVisible: true,
+          phaseOverride: "tpb-results",
+        },
+      );
+      if (result) this.setTorSearchPhase("tpb-results");
     },
 
     async searchClick() {
@@ -2915,6 +2946,7 @@ export default {
         stagedResponse = false,
         preserveVisible = false,
         phaseOverride = null,
+        tpb = false,
       } = options;
 
       this.loading = true;
@@ -2959,6 +2991,9 @@ export default {
         }
         if (more) {
           url += `&more=true`;
+        }
+        if (tpb) {
+          url += `&tpb=true`;
         }
         if (stagedResponse) {
           url += `&staged=true`;

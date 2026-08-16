@@ -191,6 +191,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // tvapp straight out to Emby.
   private String pendingSelectName;
   private boolean pendingPlay;
+  // Set alongside pendingPlay when the play behind a not-yet-loaded select is
+  // for one specific episode (tv-tv's map-pane TV button) rather than the
+  // show's own next-up episode (its info-pane TV button).
+  private String pendingPlayEpisodeId;
   private long showsLoadedAt;
   private long frontSince;
   private long trashAt;
@@ -242,7 +246,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     pendingSelectName = null;
     if (pendingPlay) {
       pendingPlay = false;
-      embyClick();
+      if (pendingPlayEpisodeId != null) {
+        String embyId = pendingPlayEpisodeId;
+        pendingPlayEpisodeId = null;
+        playSelectedEpisode(embyId);
+      } else {
+        embyClick();
+      }
     }
   }
 
@@ -930,6 +940,17 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     playInEmby(show, null);
   }
 
+  // Same as embyClick's episode-focused branch, but the episode comes from
+  // tv-tv (the map pane's TV button) instead of an on-screen cursor.
+  private void playSelectedEpisode(String embyId) {
+    Shows.Show show = showList.getSelected();
+    if (show == null) {
+      backToEmby();
+      return;
+    }
+    playInEmby(show, embyId);
+  }
+
   private void playInEmby(Shows.Show show, String episodeId) {
     new Thread(
             () -> {
@@ -1131,6 +1152,22 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
             return;
           }
           showList.selectByName(name);
+        });
+  }
+
+  // tv-tv's map-pane TV button: sent right after an onSelectShow, so it plays
+  // that one episode instead of the show's own next-up pick.
+  @Override
+  public void onPlayEpisode(String embyId) {
+    ui.post(
+        () -> {
+          bumpKeepAwake();
+          if (pendingSelectName != null) {
+            pendingPlayEpisodeId = embyId;
+            pendingPlay = true;
+            return;
+          }
+          playSelectedEpisode(embyId);
         });
   }
 

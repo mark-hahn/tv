@@ -103,6 +103,7 @@ const CMD_BACK_TO_EMBY = "b"; // close tvapp and bring Emby up
 const CMD_FORCE_CLOSE_TO_EMBY = "g"; // same, but ignoring tvapp's focus
 const CMD_EMBY_SELECTED = "e"; // load tvapp's active show into Emby
 const CMD_SELECT_SHOW = "s"; // select a show by name
+const CMD_PLAY_EPISODE = "p"; // play one specific episode of the selected show, by Emby id
 const CMD_CLEAR_STATE = "r"; // back to a bare show list
 const CMD_CUSTOM_CHANGED = "c"; // the shared filter settings changed
 const TVAPP_PROBE_TIMEOUT_MS = 800;
@@ -2356,10 +2357,16 @@ async function googlePowerOnSequence() {
   await openTvappSelectingShow();
 }
 
-// playIt adds the two commands that turn a bare open into the info pane's TV
-// button: the Shows button's clear first, so nothing inside cardMisc is focused
-// and the play lands on the show itself, and the play once the show is selected.
-async function openTvappSelectingShow(showName = null, playIt = false) {
+// playIt adds the commands that turn a bare open into the info/map panes' TV
+// button: the Shows button's clear first, so nothing inside cardMisc is
+// focused, then the play once the show is selected -- the show's own next-up
+// episode, or, with episodeId, that one specific episode (the map pane's
+// selection).
+async function openTvappSelectingShow(
+  showName = null,
+  playIt = false,
+  episodeId = null,
+) {
   await closeEmbyShow();
   await launchTvapp();
   const sock = await dialTvappUntilOpen(TVAPP_SELECT_DIAL_TIMEOUT_MS);
@@ -2370,7 +2377,9 @@ async function openTvappSelectingShow(showName = null, playIt = false) {
   const wanted = showName ?? lastRelevantShow;
   if (playIt) sock.send(CMD_CLEAR_STATE);
   if (wanted) sock.send(`${CMD_SELECT_SHOW},${wanted}`);
-  if (playIt) sock.send(CMD_EMBY_SELECTED);
+  if (playIt) {
+    sock.send(episodeId ? `${CMD_PLAY_EPISODE},${episodeId}` : CMD_EMBY_SELECTED);
+  }
   sock.close();
   return true;
 }
@@ -2406,13 +2415,16 @@ app.post("/tv/toggletvapp", async (req, res) => {
   res.json({ ok: true, action: "opened" });
 });
 
-// The info pane's TV button: the tvapprc remote's Shows button followed by a
-// click on this show. tvapp already up means the Shows button's clear -- back
-// to a bare show list -- and then the named show is selected and played; tvapp
-// down means the Shows button's open, with that show selected and played on its
-// way up instead of just landing on lastRelevantShow.
+// The info and map panes' TV button: the tvapprc remote's Shows button
+// followed by a click on this show. tvapp already up means the Shows button's
+// clear -- back to a bare show list -- and then the named show is selected and
+// played; tvapp down means the Shows button's open, with that show selected
+// and played on its way up instead of just landing on lastRelevantShow. An
+// episodeId (the map pane's selection) plays that one episode instead of the
+// show's own next-up pick.
 app.get("/tv/showintvapp", async (req, res) => {
   const showName = req.query.showName;
+  const episodeId = req.query.episodeId || null;
   if (!showName) {
     res.json({ ok: false, error: "no showName" });
     return;
@@ -2422,12 +2434,14 @@ app.get("/tv/showintvapp", async (req, res) => {
   if (openSock) {
     openSock.send(CMD_CLEAR_STATE);
     openSock.send(`${CMD_SELECT_SHOW},${showName}`);
-    openSock.send(CMD_EMBY_SELECTED);
+    openSock.send(
+      episodeId ? `${CMD_PLAY_EPISODE},${episodeId}` : CMD_EMBY_SELECTED,
+    );
     openSock.close();
     res.json({ ok: true, action: "played" });
     return;
   }
-  const opened = await openTvappSelectingShow(showName, true);
+  const opened = await openTvappSelectingShow(showName, true, episodeId);
   res.json(
     opened
       ? { ok: true, action: "opened" }

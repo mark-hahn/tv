@@ -195,10 +195,10 @@
             <button
               v-if="mapShow?.inEmby !== false"
               @click.stop="handleSelectedTv"
-              :disabled="!hasMapSelection"
+              :disabled="!firstSelectedEmbyId"
               :style="{
-                opacity: hasMapSelection ? 1 : 0.35,
-                cursor: hasMapSelection ? 'pointer' : 'default',
+                opacity: firstSelectedEmbyId ? 1 : 0.35,
+                cursor: firstSelectedEmbyId ? 'pointer' : 'default',
               }"
               style="
                 font-size: 13.5px;
@@ -271,10 +271,10 @@
             <button
               v-if="mapShow?.inEmby !== false"
               @click.stop="handleSelectedTv"
-              :disabled="!hasMapSelection"
+              :disabled="!firstSelectedEmbyId"
               :style="{
-                opacity: hasMapSelection ? 1 : 0.35,
-                cursor: hasMapSelection ? 'pointer' : 'default',
+                opacity: firstSelectedEmbyId ? 1 : 0.35,
+                cursor: firstSelectedEmbyId ? 'pointer' : 'default',
               }"
               style="
                 font-size: 13.5px;
@@ -2473,11 +2473,15 @@ export default {
       if (!id) return;
       util.openExternalPage(urls.embyPageUrl(id));
     },
+    // Same as the info pane's TV button -- the tvapprc remote's Shows button
+    // and a click on this show over there -- but naming the map's selected
+    // episode so tvapp plays it instead of the show's own next-up pick.
     async handleSelectedTv() {
       const id = this.firstSelectedEmbyId;
-      if (!id) return;
+      const showName = this.mapShow?.name;
+      if (!id || !showName) return;
       fetch(
-        `${config.tvTvUrl}/tv/viewshow?showId=${encodeURIComponent(id)}&showName=${encodeURIComponent(this.mapShow?.name ?? "")}`,
+        `${config.tvTvUrl}/tv/showintvapp?showName=${encodeURIComponent(showName)}&episodeId=${encodeURIComponent(id)}`,
       ).catch(() => {});
     },
     handleEpisodePlainClick(event, mapShow, season, episode) {

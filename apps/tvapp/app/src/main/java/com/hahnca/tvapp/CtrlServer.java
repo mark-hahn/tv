@@ -24,6 +24,8 @@ import org.java_websocket.server.WebSocketServer;
  *   x              close tvapp
  *   f,&lt;text&gt;    show-list filter text
  *   s,&lt;name&gt;    select this show, exact name match -- sent by tv-tv itself
+ *   p,&lt;embyId&gt; play this specific episode of the selected show, by its Emby
+ *                  id -- sent by tv-tv itself, right after an s,&lt;name&gt;
  *   c              the shared filter settings changed: re-fetch the Custom
  *                  list -- sent by tv-tv itself, on tv-srvr's behalf
  *
@@ -51,6 +53,7 @@ class CtrlServer extends WebSocketServer {
   private static final String CMD_EXIT = "x";
   private static final String CMD_FILTER = "f";
   private static final String CMD_SELECT = "s";
+  private static final String CMD_PLAY_EPISODE = "p";
   private static final String CMD_CUSTOM_CHANGED = "c";
   private static final int STOP_TIMEOUT_MS = 500;
 
@@ -72,6 +75,8 @@ class CtrlServer extends WebSocketServer {
     void onFilter(String text);
 
     void onSelectShow(String name);
+
+    void onPlayEpisode(String embyId);
 
     void onCustomChanged();
 
@@ -128,6 +133,10 @@ class CtrlServer extends WebSocketServer {
     }
     if (message.startsWith(CMD_SELECT + ",")) {
       listener.onSelectShow(message.substring(CMD_SELECT.length() + 1));
+      return;
+    }
+    if (message.startsWith(CMD_PLAY_EPISODE + ",")) {
+      listener.onPlayEpisode(message.substring(CMD_PLAY_EPISODE.length() + 1));
       return;
     }
     if (message.startsWith(CMD_KEY_LETTER + ",")) {

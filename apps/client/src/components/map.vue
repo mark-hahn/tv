@@ -423,11 +423,11 @@
           </button>
           <button
             @click.stop="onIgnoreGapsClick"
-            :disabled="!hasMapSelection"
+            :disabled="!canIgnoreGaps"
             :style="{
               '--btn-bg': ignoreGapsFlash ? 'lightgray' : 'whitesmoke',
-              opacity: hasMapSelection ? 1 : 0.35,
-              cursor: hasMapSelection ? 'pointer' : 'default',
+              opacity: canIgnoreGaps ? 1 : 0.35,
+              cursor: canIgnoreGaps ? 'pointer' : 'default',
             }"
             style="
               font-size: 13.5px;
@@ -745,7 +745,11 @@
                                 : 'white',
                     }"
                   >
-                    <span v-if="seriesMap?.[season]?.[episode]?.pos > 0">p</span
+                    <span
+                      v-if="ignoredGapSet.has(cellKey(season, episode))"
+                      title="gap ignored"
+                      >i</span
+                    ><span v-if="seriesMap?.[season]?.[episode]?.pos > 0">p</span
                     ><span v-if="seriesMap?.[season]?.[episode]?.played">
                       w</span
                     ><span
@@ -1390,6 +1394,28 @@ export default {
     hasMapSelection() {
       return this.selectedSeasons.size > 0 || this.selectedCells.size > 0;
     },
+    // The show's ignoreGaps entries ("S2E2") as map cell keys ("2.2").
+    ignoredGapSet() {
+      const set = new Set();
+      const list = Array.isArray(this.mapShow?.ignoreGaps)
+        ? this.mapShow.ignoreGaps
+        : [];
+      for (const entry of list) {
+        const m = /^S(\d+)E(\d+)$/.exec(String(entry));
+        if (m) set.add(this.cellKey(Number(m[1]), Number(m[2])));
+      }
+      return set;
+    },
+    // Ignoring is only offered when at least one selected episode is not
+    // already in the show's ignoreGaps list -- re-ignoring an ignored
+    // episode does nothing.
+    canIgnoreGaps() {
+      if (this.selectedCells.size === 0) return false;
+      for (const key of this.selectedCells) {
+        if (!this.ignoredGapSet.has(key)) return true;
+      }
+      return false;
+    },
     hasWatchedFile() {
       for (const season of this.seriesMapSeasons || []) {
         const seasonCells = this.seriesMap?.[season];
@@ -1544,7 +1570,7 @@ export default {
     // changes at all, at which point the whole list is dropped.
     async onIgnoreGapsClick() {
       const show = this.mapShow;
-      if (!show?.name || !this.hasMapSelection) return;
+      if (!show?.name || !this.canIgnoreGaps) return;
       const episodes = [];
       for (const key of this.selectedCells) {
         const { season, episode } = this.parseCellKey(key);

@@ -1244,9 +1244,15 @@ export default {
         const tracks = await resp.json();
         this.subtitleTracks = tracks;
         if (tracks.length > 0) {
-          this.activeTrackId = tracks[0].id;
-          if (tracks[0].type === "pgs") {
-            this.vidSrc = this._buildStreamUrl(tracks[0].index);
+          // Prefer a text track for the opening pick. pgs is bitmap, so showing
+          // it means burning it in with ffmpeg on the original — that gives up
+          // the seekable mp4 mirror and its known duration, leaving the timeline
+          // with only the seconds ffmpeg has piped so far. Selecting pgs by hand
+          // still switches to the burn-in stream.
+          const first = tracks.find((t) => t.type !== "pgs") || tracks[0];
+          this.activeTrackId = first.id;
+          if (first.type === "pgs") {
+            this.vidSrc = this._buildStreamUrl(first.index);
           }
         }
         if (this.mode === "chksrt") {

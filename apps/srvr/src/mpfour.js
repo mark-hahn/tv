@@ -147,33 +147,36 @@ async function needsTranscode(videoFilePath) {
   return videoCodec !== "h264";
 }
 
-// Keep files that need a slow transcode at the tail of subQueueChkSrt, so the
-// files you review first are the ones already mirrored (or quick to mirror) and
-// the hevc encodes get more time to finish before you reach them. Stable within
-// each group, so a newly-added hevc file still lands behind the fast ones.
+// Order subQueueChkSrt by how soon each entry can be played: files whose mp4
+// mirror is already built and valid come first (instant seeking, no waiting),
+// then files still needing a mirror but only a quick remux (h264), then the hevc
+// transcodes, which get the most time to finish before you reach them. Stable
+// within each group, so a newly-added entry lands behind its peers.
 async function reorderChkSrtQueue() {
   const queue = subsState.subQueueChkSrt;
   if (queue.length < 2) return;
+  const mirrored = [];
   const fast = [];
   const slow = [];
   for (const entry of queue) {
     const videoFilePath = entry?.videoFilePath;
-    let slowOne = false;
+    let group = fast;
     if (videoFilePath && fs.existsSync(videoFilePath)) {
       try {
-        slowOne = await needsTranscode(videoFilePath);
+        if (await mpfourValid(videoFilePath)) group = mirrored;
+        else if (await needsTranscode(videoFilePath)) group = slow;
       } catch (e) {
         unilog(1413, `probe failed for ${path.basename(videoFilePath)}: ${e.message}`);
       }
     }
-    (slowOne ? slow : fast).push(entry);
+    group.push(entry);
   }
-  const next = [...fast, ...slow];
+  const next = [...mirrored, ...fast, ...slow];
   if (next.every((entry, i) => entry === queue[i])) return; // already ordered
   subsState.subQueueChkSrt = next;
   persistSubQueueChkSrt();
   syncBatchMsgs();
-  unilog(1414, `reordered chksrt queue: ${fast.length} ready/fast ahead of ${slow.length} needing transcode`);
+  unilog(2231, `reordered chksrt queue: ${mirrored.length} mirrored, ${fast.length} fast, ${slow.length} needing transcode`);
 }
 
 // Mirror encodes run under SCHED_IDLE: a 2160p transcode saturates ~10 of the

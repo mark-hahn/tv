@@ -1646,6 +1646,24 @@ async function fillMissingCharacterNames(characters, remoteIds, name) {
   return characters;
 }
 
+/**
+ * A refresh rebuilds `characters` from TVDB alone, and TVDB usually lists only
+ * the handful of featured actors. The actors pane fills the rest of the cast
+ * from TMDB and writes those back tagged `source: "tmdb"`, so they are carried
+ * across the refresh here -- without this the pane's Shows button finds no show
+ * for an actor TVDB never listed. Only actors TVDB itself doesn't have are
+ * kept, so the list can't accumulate.
+ */
+function keepTmdbCharacters(characters, existingCharacters) {
+  if (!Array.isArray(existingCharacters)) return characters;
+  const tvdbActors = new Set(characters.map((char) => normActorName(char.actor)));
+  const kept = existingCharacters.filter(
+    (char) =>
+      char?.source === "tmdb" && !tvdbActors.has(normActorName(char.actor)),
+  );
+  return kept.length ? [...characters, ...kept] : characters;
+}
+
 async function getTmdbCast(remoteIds, name) {
   try {
     const cast = await getTmdbAggregateCast(remoteIds);
@@ -2039,6 +2057,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   if (!characters.length) characters = await getTmdbCast(remoteIds, name);
   else
     characters = await fillMissingCharacterNames(characters, remoteIds, name);
+  characters = keepTmdbCharacters(characters, allTvdb[name]?.characters);
   const crew = await getTvmazeCrew(tvdbId);
   let lastAired = lastAiredIn ?? firstAired;
   lastAired = lastAired ?? "";

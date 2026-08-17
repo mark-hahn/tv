@@ -873,12 +873,6 @@ async function processOneVideo(videoPath) {
       const measuredBPS = uploadInfo.size / actualDur;
       const prevBPS = adaptiveBPS;
       adaptiveBPS = adaptiveBPS * 0.5 + measuredBPS * 0.5;
-      unilog(
-        361,
-        `[${ts()}] Chunk ${chunkIndex}: ${chunkStart.toFixed(0)}s-${chunkEnd.toFixed(0)}s ` +
-          `${(uploadInfo.size / 1e6).toFixed(2)}MB, ${measuredBPS.toFixed(0)}B/s ` +
-          `(est ${prevBPS.toFixed(0)}→${adaptiveBPS.toFixed(0)})`,
-      );
       // No trim/overlap needed — cuts are at silence midpoints
       const chunkInfo = {
         wavPath,
@@ -926,15 +920,6 @@ async function processOneVideo(videoPath) {
         await fsp.unlink(processedWavFile);
     } catch (_) {}
   }
-
-  const elapsed = Date.now() - fileStart;
-  const eSecTotal = Math.floor(elapsed / 1000);
-  const eMin = Math.floor(eSecTotal / 60);
-  const eSec = eSecTotal % 60;
-  unilog(
-    366,
-    `Elapsed: ${String(eMin).padStart(2, "0")}:${String(eSec).padStart(2, "0")}`,
-  );
 }
 
 /* ---------------- Entry point ---------------- */

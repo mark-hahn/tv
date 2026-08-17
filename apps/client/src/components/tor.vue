@@ -3643,9 +3643,14 @@ export default {
           );
 
           try {
-            const result = await this.downloadTorrentInternal(torrent, {
+            let result = await this.downloadTorrentInternal(torrent, {
               forceDownload,
             });
+            if (result?.retryForce) {
+              result = await this.downloadTorrentInternal(torrent, {
+                forceDownload: true,
+              });
+            }
             if (result?.ok) {
               this.setDownloadStatus(torrent, "ok", result?.message || "");
 
@@ -4183,10 +4188,13 @@ export default {
                 const confirmed = await this.showConfirmDialog(
                   `Torrent is blocked: ${payload.error || errorMsg}\n\nSend to qBittorrent anyway?`,
                 );
-                if (confirmed) {
-                  void this.enqueueDownload(torrent, { forceDownload: true });
-                }
-                return { ok: false, message: String(errorMsg) };
+                // Re-queueing here would be dropped by enqueueDownload because
+                // this torrent is still "sending" — let the queue loop retry.
+                return {
+                  ok: false,
+                  message: String(errorMsg),
+                  retryForce: confirmed && !forceDownload,
+                };
               }
 
               if (isAlreadyInQbtMessage(errorMsg)) {

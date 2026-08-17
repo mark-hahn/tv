@@ -1346,6 +1346,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     else if ("ok".equals(key)) openInCardMisc();
     else if ("up".equals(key)) showList.moveInCardMisc(-1, true);
     else if ("down".equals(key)) showList.moveInCardMisc(+1, true);
+    else if ("left".equals(key) && showList.isMiscDescMode()) focusArea(Area.LIST);
     else if ("left".equals(key)) showList.moveInCardMisc(-1, false);
     else if ("right".equals(key)) showList.moveInCardMisc(+1, false);
   }

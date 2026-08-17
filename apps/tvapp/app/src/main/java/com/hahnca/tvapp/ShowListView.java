@@ -504,6 +504,11 @@ class ShowListView extends ScrollView {
     return miscFocused && miscMode == MiscMode.ACTORS && active != null && focusIndex >= 0;
   }
 
+  /** Whether cardMisc is showing the plain description, rather than a rotated mode. */
+  boolean isMiscDescMode() {
+    return miscMode == MiscMode.DESC;
+  }
+
   /**
    * Whether cardMisc has the focus. Coming off it is a clean break: the mode
    * goes back to the description, the episode card goes with it, and the

@@ -231,6 +231,23 @@
               >Sel: {{ selectedItems.size }}</span
             >
             <button
+              v-for="seed in seedNeeded"
+              :key="seed.key"
+              @click.stop="seedClick(seed)"
+              :title="`${seed.count ?? ''} torrent(s) need seeding`"
+              :style="{
+                fontSize: '13px',
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px 8px',
+                border: '1px solid #c88',
+                color: 'black',
+                '--btn-bg': '#faa',
+              }"
+            >
+              {{ seed.label }}
+            </button>
+            <button
               @click.stop="torAllClick"
               :disabled="selectedItems.size === 0"
               :class="{ 'btn-disabled': selectedItems.size === 0 }"
@@ -1302,6 +1319,7 @@ export default {
       error: null,
       hasSearched: false,
       providerWarning: "",
+      seedNeeded: [], // trackers asking for seeding: {key,label,url,count}
       maxResults: 500, // Constant for maximum results to fetch
       seasonFilter: "",
       iptCfClearance: "",
@@ -1669,6 +1687,7 @@ export default {
     evtBus.on("torArrowKey", this.onTorArrowKey);
 
     void this.loadDownloadedHistory();
+    void this.loadSeedCheck(true);
     srvr
       .getGroupCounts()
       .then((counts) => {
@@ -1919,6 +1938,7 @@ export default {
       if (pane === "tor") {
         // Keep space info fresh whenever Tor pane is shown.
         void this.updateSpaceAvail();
+        void this.loadSeedCheck();
 
         // No auto-search on pane entry -- wait for the Search button so a season
         // can be typed first. Preview mode has no Search button, so it still runs.
@@ -1933,6 +1953,41 @@ export default {
             void this.handleSearchButtonClick();
           }
         });
+      }
+    },
+
+    // Ask the API whether IPT/TL are showing a seeding reminder on their home
+    // page. App load forces a fresh scrape and restarts the API's 24-hour
+    // timer; pane entry just reads whatever that scrape found.
+    async loadSeedCheck(force = false) {
+      try {
+        const res = await fetch(
+          `${config.torrentsApiUrl}/api/tor/seedCheck${force ? "?force=1" : ""}`,
+        );
+        if (!res.ok) throw new Error(`http ${res.status}`);
+        const data = await res.json();
+        this.seedNeeded = ["tl", "ipt"]
+          .filter((key) => data?.[key]?.needed)
+          .map((key) => ({ key, ...data[key] }));
+      } catch (e) {
+        unilog(2236, `seed check failed: ${e.message}`);
+      }
+    },
+
+    // Open the tracker's seeding-required page in a new tab and drop the
+    // button. It only returns if the next scrape, a day later, still sees the
+    // reminder.
+    async seedClick(seed) {
+      openExternalBlank(seed.url);
+      this.seedNeeded = this.seedNeeded.filter((s) => s.key !== seed.key);
+      try {
+        await fetch(`${config.torrentsApiUrl}/api/tor/seedDismiss`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: seed.key }),
+        });
+      } catch (e) {
+        unilog(2240, `seed dismiss failed: ${e.message}`);
       }
     },
 

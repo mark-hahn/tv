@@ -38,6 +38,7 @@ import {
 import { getLocalFiles, renameLocalFile, swapLocalOld } from "./local.js";
 import { isTextBuffer } from "./textProbe.js";
 import { enrichQbtStats } from "./qbt-stats.js";
+import { checkSeedingNeeded, dismissSeeding } from "./seedCheck.js";
 import {
   getBrowseShow,
   getAllBrowse,
@@ -1481,6 +1482,23 @@ function loadTorSent() {
   }
   return {};
 }
+
+app.get("/api/tor/seedCheck", async (req, res) => {
+  try {
+    res.json(await checkSeedingNeeded({ force: req.query.force === "1" }));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/tor/seedDismiss", (req, res) => {
+  try {
+    dismissSeeding(req.body?.key);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
 
 app.get("/api/tor/sent", (req, res) => {
   const data = loadTorSent();

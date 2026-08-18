@@ -1329,6 +1329,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    * whatever the mode has under its cursor, and the arrow keys move inside it.
    */
   private void miscAreaKey(String key) {
+    // Left out of the episode card: the card is the deepest cardMisc goes, so
+    // the key that comes out of it is answered before the one underneath it
+    // that would step the episode.
+    if ("left".equals(key) && showList.closeEpisodeCard()) return;
     // Down over the cast strip, which has nothing else to move: everyone the
     // actor under the cursor keeps turning up with, over the list.
     if ("down".equals(key) && showList.isActorFocused()) {

@@ -3414,8 +3414,15 @@ async function main() {
       if (!embyEntry || !embyEntry.inEmby) {
         unilog(
           332,
-          downloadCount, "/", chkCount,
-          "not in emby, skipping:", fname
+          "------",
+          downloadCount,
+          "/",
+          chkCount,
+          "NOT IN EMBY, SKIPPING:",
+          fname,
+          "(",
+          seriesName,
+          ")",
         );
         return process.nextTick(checkFile);
       }

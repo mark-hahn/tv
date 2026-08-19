@@ -903,31 +903,38 @@ const stopQbtChannelPolling = () => {
   qbtChannelLastJson = "";
 };
 
-const getBrowseHasMorePayload = () => ({ available: hasBrowseShow() });
+const getBrowseHasMorePayload = async () => ({
+  available: await hasBrowseShow(),
+});
 
-const getBrowseHasMoreChannelSnapshot = () => {
-  const payload = getBrowseHasMorePayload();
+const getBrowseHasMoreChannelSnapshot = async () => {
+  const payload = await getBrowseHasMorePayload();
   browseHasMoreChannelLastJson = JSON.stringify(payload);
   return payload;
 };
 
-const publishBrowseHasMoreChannel = () => {
-  const payload = getBrowseHasMorePayload();
+const publishBrowseHasMoreChannel = async () => {
+  const payload = await getBrowseHasMorePayload();
   const json = JSON.stringify(payload);
   if (json === browseHasMoreChannelLastJson) return;
   browseHasMoreChannelLastJson = json;
   qbtChannelPeer?.publishDelta("browseHasMore", payload);
 };
 
+// hasBrowseShow() now does async TVDB lookups, so the fire-and-forget
+// publishers go through here to keep rejections from going unhandled.
+const publishBrowseHasMoreInBackground = () => {
+  publishBrowseHasMoreChannel().catch((e) => {
+    unilog(2244, `browseHasMore publish failed: ${e.message}`);
+  });
+};
+
 const startBrowseHasMoreChannelPolling = () => {
   if (browseHasMoreChannelPollTimer) return;
-  browseHasMoreChannelPollTimer = setInterval(() => {
-    try {
-      publishBrowseHasMoreChannel();
-    } catch (e) {
-      unilog(1500, `browseHasMore poll failed: ${e.message}`);
-    }
-  }, BROWSE_HAS_MORE_CHANNEL_POLL_MS);
+  browseHasMoreChannelPollTimer = setInterval(
+    publishBrowseHasMoreInBackground,
+    BROWSE_HAS_MORE_CHANNEL_POLL_MS,
+  );
 };
 
 const stopBrowseHasMoreChannelPolling = () => {
@@ -2517,8 +2524,8 @@ app.get("/api/getAllBrowse", async (req, res) => {
 });
 
 // GET /api/hasBrowseShow — lightweight check whether a candidate show exists
-app.get("/api/hasBrowseShow", (req, res) => {
-  res.json(getBrowseHasMorePayload());
+app.get("/api/hasBrowseShow", async (req, res) => {
+  res.json(await getBrowseHasMorePayload());
 });
 
 // GET /api/browseSearch?q=text — search tvmaze.sqlite by name (ignores browsed status)
@@ -2570,7 +2577,7 @@ app.post("/api/ackBrowsed", (req, res) => {
   if (!Number.isFinite(tvmazeId))
     return res.status(400).json({ error: "invalid tvmazeId" });
   ackBrowsed(tvmazeId);
-  publishBrowseHasMoreChannel();
+  publishBrowseHasMoreInBackground();
   res.json({ ok: true });
 });
 
@@ -2580,7 +2587,7 @@ app.post("/api/removeBrowseCard", (req, res) => {
   if (!tvdbId && !name)
     return res.status(400).json({ error: "missing tvdbId or name" });
   removeResultTitleByTvdbId(tvdbId || null, name || null);
-  publishBrowseHasMoreChannel();
+  publishBrowseHasMoreInBackground();
   res.json({ ok: true });
 });
 
@@ -2590,7 +2597,7 @@ app.post("/api/unackBrowsed", (req, res) => {
   if (!tvdbId) return res.status(400).json({ error: "missing tvdbId" });
   unmarkShowBrowsed(tvdbId);
   removeResultTitleByTvdbId(tvdbId);
-  publishBrowseHasMoreChannel();
+  publishBrowseHasMoreInBackground();
   res.json({ ok: true });
 });
 

@@ -354,11 +354,16 @@ export async function getBrowseShow() {
   return { titles: resultTitles, pendingBrowsedId };
 }
 
-export function hasBrowseShow() {
+export async function hasBrowseShow() {
   const candidates = getCandidateShows(100);
   for (const show of candidates) {
     const title = buildShowTitle(show);
-    if (getShowRejectionReason(show, title) === null) return true;
+    if (getShowRejectionReason(show, title) !== null) continue;
+    // Same async description-language test getBrowseShow() applies, so the
+    // browse-button highlight can never promise a show that getBrowseShow
+    // then rejects.
+    if ((await getTvdbDescRejection(show)) !== null) continue;
+    return true;
   }
   return false;
 }

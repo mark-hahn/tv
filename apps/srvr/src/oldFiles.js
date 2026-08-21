@@ -1,7 +1,9 @@
-// Weekly cleanup under the tv show folders of files that can never be needed
-// again: Emby trickplay indexes (`.bif` / `.bifx`, plus any `.old` copies), and
-// orphaned sidecars -- subtitle, metadata, artwork and marker files whose video
-// file is no longer on disk.
+// Weekly cleanup of files that can never be needed again. Under the tv show
+// folders: Emby trickplay indexes (`.bif` / `.bifx`, plus any `.old` copies),
+// and orphaned sidecars -- subtitle, metadata, artwork and marker files whose
+// video file is no longer on disk. Outside them, two trees that only ever grow:
+// the mpfour mp4 mirrors and the originals recode.js moves aside, both expired
+// a month after they were written.
 //
 // Only files carrying a known sidecar extension are ever considered, so a video
 // with an odd or missing extension is never at risk. Every delete is appended to
@@ -18,8 +20,19 @@ import { SRVR_DATA_DIR } from "./srvrPaths.js";
 import { videoFileExtensions } from "./videoFiles.js";
 
 const TV_DIR = "/mnt/media/tv";
+// Repeated from mpfour.js and recode.js rather than imported: this file is also
+// a standalone report runner (`node apps/srvr/src/oldFiles.js`), and mpfour.js
+// pulls in tvdb.js, whose save machinery keeps the process alive forever.
+const MPFOUR_DIR = "/mnt/media/mpfour";
+const MPFOUR_SIDECAR_SUFFIX = ".src.json";
+const RECODE_ORIGINALS_DIR = "/mnt/media/tv-recode-originals";
+const RECODE_SIDECAR_SUFFIX = ".recode.json";
 const DELETE_LOG_PATH = path.join(SRVR_DATA_DIR, "auto-deleted-files.log");
 const CLEANUP_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+// How long a mirror or a moved-aside original is kept. Long enough that a show
+// watched today can still be re-checked in chksrt or rolled back to its original
+// file weeks later, short enough that neither tree grows without bound.
+const PURGE_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 // The only extensions this cleanup will ever delete. A file is a deletion
 // candidate solely because it is one of these and its video is gone -- nothing
@@ -47,6 +60,8 @@ const TRICKPLAY_SUFFIXES = new Set(["bif", "bifx"]);
 
 const RULE_ORPHAN = "orphan-sidecar";
 const RULE_BIF = "trickplay-index";
+const RULE_MPFOUR = "mpfour-expired";
+const RULE_RECODE_ORIGINAL = "recode-original-expired";
 
 // Emby library artwork/metadata belongs to the show or the season, not to any
 // one video, so it must never count as orphaned.
@@ -180,6 +195,99 @@ function planDir(dir, files) {
   return deletes;
 }
 
+// Every file under a tree, flat. Used for the two purge trees, which are small
+// and have no per-directory rules -- unlike the show folders, where planDir
+// needs each directory's video stems.
+function collectFiles(root) {
+  const out = [];
+  const walk = (dir) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch (e) {
+      unilog(2252, `cannot read ${dir}: ${e.message}`);
+      return;
+    }
+    for (const ent of entries) {
+      const full = path.join(dir, ent.name);
+      if (ent.isDirectory()) {
+        walk(full);
+        continue;
+      }
+      if (!ent.isFile()) continue;
+      let size = 0;
+      try {
+        size = fs.statSync(full).size;
+      } catch {
+        size = 0;
+      }
+      out.push({ name: ent.name, path: full, size });
+    }
+  };
+  walk(root);
+  return out;
+}
+
+// mpfour mirrors older than PURGE_AGE_MS, each with its .src.json. The mirror
+// is written when the encode finishes, so its own mtime is the age -- no
+// sidecar read needed, and a mirror rebuilt for a replaced release restarts
+// the clock on its own.
+function planMpfour(files) {
+  const cutoff = Date.now() - PURGE_AGE_MS;
+  const deletes = [];
+  for (const f of files) {
+    if (!f.name.endsWith(".mp4")) continue;
+    let mtimeMs;
+    try {
+      mtimeMs = fs.statSync(f.path).mtimeMs;
+    } catch {
+      continue;
+    }
+    if (mtimeMs >= cutoff) continue;
+    deletes.push({ ...f, dir: path.dirname(f.path), rule: RULE_MPFOUR });
+    const sidecar = f.path + MPFOUR_SIDECAR_SUFFIX;
+    const sidecarEntry = files.find((x) => x.path === sidecar);
+    if (sidecarEntry)
+      deletes.push({
+        ...sidecarEntry,
+        dir: path.dirname(sidecar),
+        rule: RULE_MPFOUR,
+      });
+  }
+  return deletes;
+}
+
+// Originals recode.js moved aside, older than PURGE_AGE_MS, each with its
+// .recode.json. The age comes from the sidecar rather than the file, whose
+// mtime is still the original download's. An original whose sidecar is missing
+// or unreadable has no establishable age and is left alone -- it is the only
+// copy of that file, so guessing is not an option.
+function planRecodeOriginals(files) {
+  const cutoff = Date.now() - PURGE_AGE_MS;
+  const deletes = [];
+  for (const f of files) {
+    if (f.name.endsWith(RECODE_SIDECAR_SUFFIX)) continue;
+    const sidecarPath = f.path + RECODE_SIDECAR_SUFFIX;
+    let recodedAt;
+    try {
+      recodedAt = JSON.parse(fs.readFileSync(sidecarPath, "utf8")).recodedAt;
+    } catch (e) {
+      unilog(2253, `keeping ${f.name}: no readable recode sidecar (${e.message})`);
+      continue;
+    }
+    if (!(recodedAt < cutoff)) continue;
+    deletes.push({ ...f, dir: path.dirname(f.path), rule: RULE_RECODE_ORIGINAL });
+    const sidecarEntry = files.find((x) => x.path === sidecarPath);
+    if (sidecarEntry)
+      deletes.push({
+        ...sidecarEntry,
+        dir: path.dirname(sidecarPath),
+        rule: RULE_RECODE_ORIGINAL,
+      });
+  }
+  return deletes;
+}
+
 function buildPlan() {
   let showDirs;
   try {
@@ -200,6 +308,15 @@ function buildPlan() {
       deletes.push(...planDir(dir, files));
     }
   }
+
+  const mpfourFiles = collectFiles(MPFOUR_DIR);
+  scanned += mpfourFiles.length;
+  deletes.push(...planMpfour(mpfourFiles));
+
+  const originalFiles = collectFiles(RECODE_ORIGINALS_DIR);
+  scanned += originalFiles.length;
+  deletes.push(...planRecodeOriginals(originalFiles));
+
   return { showCount: showDirs.length, scanned, deletes };
 }
 

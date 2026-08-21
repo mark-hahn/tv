@@ -95,6 +95,7 @@ import {
 } from "./src/tvRemoteKey.js";
 import * as subsQueue from "./src/subsQueue.js";
 import * as mpfour from "./src/mpfour.js";
+import * as recode from "./src/recode.js";
 
 const FIX_LOG_CHANNEL_POLL_MS = 1000;
 
@@ -351,6 +352,17 @@ function syncBatchMsgs() {
     });
   } else {
     setGlobalMessage({ id: "Mp4", action: "hide" });
+  }
+  // Recode — library files being replaced with h264 the tv can play
+  const recodePending = recode.getRecodePending();
+  if (recodePending.length > 0) {
+    setGlobalMessage({
+      id: "Recode",
+      text: `Recode:${recodePending.length}`,
+      position: 2008,
+    });
+  } else {
+    setGlobalMessage({ id: "Recode", action: "hide" });
   }
 }
 
@@ -2705,6 +2717,7 @@ app.get("/api/queues", async (req, res) => {
       sub: subsQueue.getSubQueueStatus(),
       asr: subsQueue.getAsrQueueStatus(),
       mp4: await mpfour.getMp4QueueStatus(),
+      recode: await recode.getRecodeQueueStatus(),
       chksrt: subsQueue.getChkSrtQueueStatus(),
     });
   } catch (e) {
@@ -3341,6 +3354,7 @@ https.createServer(httpsOptions, app).listen(HTTP_PORT, () => {
   // seekable-mp4 mirrors for the chksrt queue + intro episodes (own loop, not
   // ffmpegQueue)
   mpfour.start({ syncBatchMsgs, introEpisodePaths });
+  recode.start();
   startOldFileCleanup();
 });
 
@@ -5253,6 +5267,11 @@ watcher
               );
               if (demoted.has(fp)) continue;
             }
+            // A file the tv's player stalls on is replaced before anything else
+            // looks at it: the subs and the chksrt mirror belong to the recoded
+            // file, not to the one about to be moved aside. The recode's own
+            // output lands back here as a fresh add and takes this path then.
+            if (await recode.enqueueRecode(fp)) continue;
             const needs = await fileNeedsSubChecked(fp, showName);
             unilog(682, `fileNeedsSubChecked(${path.basename(fp)}) = ${needs}`);
             if (needs) {

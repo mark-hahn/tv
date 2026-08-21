@@ -89,6 +89,7 @@ const TVAPP_DIAL_RETRY_MS = 2000;
 // Sideloaded, but still in the tv's own application list, so opening tvapp needs
 // no adb — which matters, because the tv's adb port moves on every reboot.
 const BRAVIA_APP_CONTROL_URL = "http://192.168.1.86/sony/appControl";
+const BRAVIA_SYSTEM_URL = "http://192.168.1.86/sony/system";
 const TVAPP_BRAVIA_URI =
   "com.sony.dtv.com.hahnca.tvapp.com.hahnca.tvapp.MainActivity";
 // Bridge control messages, hand-mirrored in apps/android/App.js. Distinct
@@ -150,10 +151,21 @@ const GOOGLE_EMBY_DELAY_MS = 250; // ms after TV turns on before launching Emby
 const VIEW_SHOW_DELAY_MS = 1000; // ms after Emby app launch before firing embyViewShow (fallback)
 const PENDING_VIEW_SHOW_MAX_AGE_MS = 10000; // ms before an unsent pending viewshow is dropped
 const EMBY_LAUNCH_DELAY_MS = 1500; // ms after launching Emby before sending it the show
-const VIEW_SHOW_RESEND_MS = 2000; // ms between show resends while Emby boots
+// A resend posts Viewing, which walks the Emby ui back to the show page, so a
+// resend that lands while Emby is opening the episode cancels the very start
+// it is waiting for. It has to be longer than the time Emby needs to get from
+// the play command to NowPlayingItem, or the loop starves itself for the whole
+// boot window and the show only starts once the resends stop.
+const VIEW_SHOW_RESEND_MS = 6000; // ms between show resends while Emby boots
+const VIEW_SHOW_POLL_MS = 500; // ms between checks that playback has started
 const EMBY_BOOT_WINDOW_MS = 40000; // ms to keep resending the show while Emby boots
 
-// Power-key power-on sequence: Google TV input -> Emby -> tvapp
+// Power-key power-on sequence: wait for the set -> Google TV input -> Emby -> tvapp
+// HA reports the set "on" the moment its network processor answers, which is
+// well before the ui can take a key. The set is asked for its own power status
+// until it says "active", so nothing is sent into a tv that is still coming up.
+const POWERON_AWAKE_POLL_MS = 500; // ms between power-status probes after HA says on
+const POWERON_AWAKE_WAIT_MS = 15000; // ms to wait for the set to report active
 const POWERON_HOME_SETTLE_MS = 1500; // ms after Home before launching Emby
 const POWERON_EMBY_POLL_MS = 250; // ms between checks that Emby has started talking
 const POWERON_EMBY_WAIT_MS = 10000; // ms to wait for Emby to show any activity
@@ -681,20 +693,32 @@ async function firePendingViewShowUntilPlaying(label) {
   const seq = viewShowSeq;
   await firePendingViewShow(label);
   if (!wanted?.play) return;
-  const { showId, showName, episodeId } = wanted;
+  await resendViewShowUntilPlaying(wanted, label, seq);
+}
+
+// The resend loop both callers share. Playback is polled far more often than
+// the show is resent: a start has to be noticed the moment it happens so the
+// next resend does not undo it, while the resends themselves stay far enough
+// apart to leave Emby room to get there.
+async function resendViewShowUntilPlaying(wanted, label, seq) {
+  const { showId, showName, episodeId, play } = wanted;
   const deadline = Date.now() + EMBY_BOOT_WINDOW_MS;
+  let nextSendAt = Date.now() + VIEW_SHOW_RESEND_MS;
   while (Date.now() < deadline) {
-    await sleep(VIEW_SHOW_RESEND_MS);
+    await sleep(VIEW_SHOW_POLL_MS);
     if (seq !== viewShowSeq) return; // a newer press owns the tv now
-    if (await embyPlayingShow(showId, showName, episodeId)) {
-      unilog(1976, `${showName} is playing`);
+    if (play && (await embyPlayingShow(showId, showName, episodeId))) {
+      unilog(2246, `${label}: ${showName} is playing`);
       pendingViewShow = null;
       return;
     }
+    if (Date.now() < nextSendAt) continue;
+    nextSendAt = Date.now() + VIEW_SHOW_RESEND_MS;
     pendingViewShow = { ...wanted, at: Date.now() };
     await firePendingViewShow(label);
   }
-  unilog(1977, `${showName} never started playing`);
+  if (play)
+    unilog(2247, `${label}: ${showName} never started playing`);
 }
 
 // True once the TV's Emby session is actually playing the show that was asked
@@ -760,22 +784,14 @@ app.get("/tv/viewshow", async (req, res) => {
   // resending until playback really starts.
   if (!play && !starting) return;
   // Emby silently drops anything sent while it boots and gives no ready
-  // signal, so resend the show every couple seconds: boot-time sends are
-  // dropped, the first send after the ui is up loads the show, and later
-  // resends just re-open the same page.
-  const deadline = Date.now() + EMBY_BOOT_WINDOW_MS;
-  while (Date.now() < deadline) {
-    await sleep(VIEW_SHOW_RESEND_MS);
-    if (seq !== viewShowSeq) return; // a newer press owns the tv now
-    if (play && (await embyPlayingShow(showId, showName, episodeId))) {
-      unilog(1936, `viewshow: ${showName} is playing`);
-      pendingViewShow = null;
-      return;
-    }
-    pendingViewShow = { showId, showName, episodeId, play, at: Date.now() };
-    await firePendingViewShow("viewshow(booting)");
-  }
-  if (play) unilog(1937, `viewshow: ${showName} never started playing`);
+  // signal, so resend the show: boot-time sends are dropped, the first send
+  // after the ui is up loads the show, and later resends just re-open the
+  // same page.
+  await resendViewShowUntilPlaying(
+    { showId, showName, episodeId, play },
+    "viewshow(booting)",
+    seq,
+  );
 });
 
 // ─── Persistent adb shell for Bravia (text/keyboard input) ──────────────────
@@ -2335,7 +2351,45 @@ async function waitForEmbyActivity(before) {
 // the broadcast tuner, so the input is put on Google Android TV first; then
 // Emby is started, because tvapp backs out into it and plays through it; and
 // only once Emby is really up does tvapp go over the top of it.
+// The set's own answer to "are you up?", straight from its REST api rather
+// than HA's cached view of it. Null while it is unreachable, which is what a
+// tv that has only just been woken looks like from here.
+async function braviaPowerStatus() {
+  try {
+    const resp = await fetch(BRAVIA_SYSTEM_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Auth-PSK": BRAVIA_PSK },
+      body: JSON.stringify({
+        method: "getPowerStatus",
+        params: [],
+        id: 1,
+        version: "1.0",
+      }),
+    });
+    const body = await resp.json();
+    return body.result?.[0]?.status ?? null;
+  } catch (e) {
+    unilog(2249, `power status probe failed: ${e.message}`);
+    return null;
+  }
+}
+
+// Resolves true once the set answers "active". Resolves false on timeout, and
+// the sequence runs anyway — a tv that is up but not answering its api is
+// still better served by the keys than by nothing.
+async function waitForBraviaAwake() {
+  const until = Date.now() + POWERON_AWAKE_WAIT_MS;
+  while (Date.now() < until) {
+    if ((await braviaPowerStatus()) === "active") return true;
+    await sleep(POWERON_AWAKE_POLL_MS);
+  }
+  return false;
+}
+
 async function googlePowerOnSequence() {
+  const startedAt = Date.now();
+  const awake = await waitForBraviaAwake();
+  unilog(2250, `power-on: tv ${awake ? "active" : "never reported active"} after ${Date.now() - startedAt}ms`);
   if (tvMode !== "google") {
     unilog(
       1954,

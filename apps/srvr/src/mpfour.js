@@ -6,10 +6,11 @@
 // h264/aac +faststart mp4 under /mnt/media/mpfour — a tree mirroring
 // /mnt/media/tv that emby never scans and nginx serves with Range support —
 // letting the player jump anywhere instantly. h264 sources are remuxed
-// (-c:v copy, lossless); hevc is transcoded. Mirrors are kept forever — even
-// after the original is deleted — so chksrt can be re-run at any time; a
-// sidecar .src.json records the original's mtime/size so a replaced release
-// re-encodes.
+// (-c:v copy, lossless); hevc is transcoded. Mirrors outlive the original, so
+// chksrt can be re-run after the video is deleted; a sidecar .src.json records
+// the original's mtime/size so a replaced release re-encodes. They are not kept
+// forever — oldFiles.js expires a mirror a month after it was written, and a
+// mirror still wanted after that is simply rebuilt.
 //
 // This runs on its own loop, deliberately NOT on the shared serialized
 // subExtractQueue (batchQueue.js) — chksrt playback is needed before other
@@ -566,10 +567,10 @@ async function scanPass() {
   }
 }
 
-// Mirrors are never removed — they persist so chksrt can be re-run at any time,
-// even after the original is deleted. The only cleanup is .tmp.mp4 left behind
-// by an encode that was killed mid-write (e.g. a pm2 restart), done once at
-// startup while nothing of ours is running.
+// Expiring old mirrors belongs to oldFiles.js, which owns every scheduled
+// delete and its log. The only cleanup here is .tmp.mp4 left behind by an
+// encode that was killed mid-write (e.g. a pm2 restart), done once at startup
+// while nothing of ours is running.
 async function removeStaleTmpFiles() {
   let entries;
   try {

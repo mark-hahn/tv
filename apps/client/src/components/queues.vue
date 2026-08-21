@@ -196,11 +196,12 @@ export default {
       selFlash: false,
       copyFlashPath: null,
       error: "",
-      data: { sub: null, asr: null, mp4: null, chksrt: null },
+      data: { sub: null, asr: null, mp4: null, recode: null, chksrt: null },
       queueDefs: [
         { key: "sub", label: "Sub" },
         { key: "asr", label: "Asr" },
         { key: "mp4", label: "Mp4" },
+        { key: "recode", label: "Recode" },
         { key: "chksrt", label: "ChkSrt" },
       ],
       timer: null,
@@ -213,7 +214,11 @@ export default {
     // Sub has no ETA — its cost is fixed overhead plus an external API with
     // retries, so there is nothing about the file to predict from.
     hasEta() {
-      return this.selected === "asr" || this.selected === "mp4";
+      return (
+        this.selected === "asr" ||
+        this.selected === "mp4" ||
+        this.selected === "recode"
+      );
     },
     // Shows with a line in any queue that the Intro button would still open.
     // Only these need an intro-file lookup — a starred line is always one of

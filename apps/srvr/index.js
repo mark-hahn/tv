@@ -2039,6 +2039,33 @@ app.post(
   }),
 );
 
+// Show button: unconditionally bump the newest played episode's LastPlayedDate
+// to now, putting the show at the left of "continue watching". Never hides.
+app.post(
+  "/api/showShow",
+  apiWrapper(async (params) => {
+    const showName = params?.name;
+    if (!showName) return { ok: false, error: "Missing name" };
+    const rec = tvdb.getAllTvdbSync()?.[showName];
+    if (!rec?.id) return { ok: false, error: "Show not in emby" };
+    if (!hasEpisodesOnDisk(rec))
+      return { ok: false, error: "No episodes on disk" };
+
+    const cw = await unhideContinueWatching(showName, rec);
+    const changed = cw > 0 ? [`lastPlayed(${cw} epis)`] : [];
+    if (rec.hiddenFromRow) await setHiddenFromRow(showName, false);
+    unilog(2268, `shown ${showName}: ${cw > 0 ? changed[0] : "no date change"}`);
+    if (cw > 0) {
+      embyRefreshManager
+        .request(`showShow:${showName}`, showName)
+        .catch((e) =>
+          unilog(2269, `refresh failed for ${showName}: ${e.message}`),
+        );
+    }
+    return { ok: true, action: "shown", changed };
+  }),
+);
+
 app.get(
   "/api/embyLibraryRefreshStatus",
   apiWrapper(async () => {
@@ -2354,8 +2381,18 @@ app.post(
       if (latest) dates++;
     }
     if (!dryRun && changed.length > 0) await tvdb.saveTvdbSync();
-    unilog(2213, `backfill from emby user data${dryRun ? " (dry run)" : ""}: ${changed.length} shows, ${episodes} episodes, ${dates} viewing dates`);
-    return { ok: true, dryRun, shows: changed.length, episodes, dates, changed };
+    unilog(
+      2213,
+      `backfill from emby user data${dryRun ? " (dry run)" : ""}: ${changed.length} shows, ${episodes} episodes, ${dates} viewing dates`,
+    );
+    return {
+      ok: true,
+      dryRun,
+      shows: changed.length,
+      episodes,
+      dates,
+      changed,
+    };
   }),
 );
 app.post("/api/setSharedFilters", apiWrapper(setSharedFilters));

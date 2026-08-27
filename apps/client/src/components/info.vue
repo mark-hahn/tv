@@ -78,7 +78,14 @@
         "
         placeholder="Enter your comment..."
       ></textarea>
-      <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center">
+      <div
+        style="
+          margin-top: 20px;
+          display: flex;
+          gap: 10px;
+          justify-content: center;
+        "
+      >
         <button
           @click="removeComment"
           style="
@@ -212,20 +219,6 @@
             Subs
           </button>
           <button
-            @click.stop="embyClick"
-            :disabled="!hasFirstUnwatchedEmbyId"
-            :style="{
-              fontSize: '13px',
-              cursor: hasFirstUnwatchedEmbyId ? 'pointer' : 'default',
-              marginTop: '3px',
-              maxHeight: '24px',
-              borderRadius: '7px',
-              opacity: hasFirstUnwatchedEmbyId ? 1 : 0.4,
-            }"
-          >
-            Emby
-          </button>
-          <button
             @click.stop="tvClick"
             :disabled="show?.inEmby === false"
             :style="{
@@ -251,6 +244,21 @@
             }"
           >
             Load
+          </button>
+          <button
+            @click.stop="showClick"
+            :disabled="show?.inEmby === false || !hasVideoFiles"
+            :style="{
+              fontSize: '13px',
+              cursor:
+                show?.inEmby !== false && hasVideoFiles ? 'pointer' : 'default',
+              marginTop: '3px',
+              maxHeight: '24px',
+              borderRadius: '7px',
+              opacity: show?.inEmby !== false && hasVideoFiles ? 1 : 0.4,
+            }"
+          >
+            Show
           </button>
           <button
             @click.stop="hideClick"
@@ -636,7 +644,6 @@ import { config } from "../config.js";
 import * as epd from "@tv/share";
 import { unilog, logHere } from "../log.js";
 import * as util from "../util.js";
-import * as urls from "../urls.js";
 
 let allTvdb = null;
 let cachedDiskShows = null;
@@ -714,14 +721,14 @@ export default {
       chksrtQueueEntries: [],
       _chksrtQueueChannel: null,
       showCommentDialog: false,
-      commentText: '',
+      commentText: "",
     };
   },
 
   computed: {
     displayOverview() {
       const comment = this.show?.comment || this.currentTvdbData?.comment;
-      const overview = this.show?.overview || '';
+      const overview = this.show?.overview || "";
       if (comment && comment.trim()) {
         return `*** COMMENT: ${comment.trim()} ${overview}`;
       }
@@ -760,21 +767,6 @@ export default {
     },
     hasVideoFiles() {
       return epd.seasonsWithFile(this.show?.episodeData).length > 0;
-    },
-    hasFirstUnwatchedEmbyId() {
-      if (this.show?.inEmby === false) return false;
-      const ed = this.show?.episodeData;
-      if (!ed) return false;
-      let found = false;
-      epd.forEachEpisode(ed, (s, e) => {
-        if (!found && epd.hasFile(ed, s, e)) {
-          const embyId = epd.getEmbyId(ed, s, e);
-          if (embyId) {
-            found = true;
-          }
-        }
-      });
-      return found;
     },
   },
 
@@ -933,21 +925,6 @@ export default {
       this._chksrtQueueChannel = null;
     },
 
-    embyClick() {
-      const ed = this.show?.episodeData;
-      let embyId = null;
-      epd.forEachEpisode(ed, (s, e) => {
-        if (embyId === null && epd.hasFile(ed, s, e)) {
-          embyId = epd.getEmbyId(ed, s, e);
-        }
-      });
-      if (!embyId) {
-        window.alert("No Emby episode found.");
-        return;
-      }
-      util.openExternalPage(urls.embyPageUrl(embyId));
-    },
-
     // Same as the tvapprc remote's Shows button and then a click on this show
     // over there: tvapp comes up (or is cleared back to a bare show list if it
     // is already up) sitting on this show.
@@ -955,6 +932,19 @@ export default {
       fetch(
         `${config.tvTvUrl}/tv/showintvapp?showName=${encodeURIComponent(this.show.name)}`,
       ).catch(() => {});
+    },
+
+    // Bring the show back to the left of emby's "continue watching" row by
+    // stamping the newest played episode's LastPlayedDate with right now.
+    async showClick() {
+      const showName = this.show?.name;
+      if (!showName) return;
+      try {
+        await srvr.showShow(showName);
+        this.show.hiddenFromRow = false;
+      } catch (e) {
+        unilog(2271, `show failed for ${showName}: ${e.message}`);
+      }
     },
 
     async hideClick() {
@@ -972,28 +962,32 @@ export default {
     },
 
     commentClick() {
-      const comment = this.show?.comment || this.currentTvdbData?.comment || '';
+      const comment = this.show?.comment || this.currentTvdbData?.comment || "";
       this.commentText = comment;
       this.showCommentDialog = true;
     },
 
     closeCommentDialog() {
       this.showCommentDialog = false;
-      this.commentText = '';
+      this.commentText = "";
     },
 
     async saveComment() {
       const showName = this.show?.name;
       if (!showName) return;
-      
+
       let text = this.commentText.trim();
       // Append period if text doesn't end with one
-      if (text && !text.endsWith('.')) {
-        text = text + '.';
+      if (text && !text.endsWith(".")) {
+        text = text + ".";
       }
-      
+
       try {
-        await srvr.setTvdbFields({ name: showName, comment: text, dontEnqueue: true });
+        await srvr.setTvdbFields({
+          name: showName,
+          comment: text,
+          dontEnqueue: true,
+        });
         // Update local show data
         this.show.comment = text;
         if (this.currentTvdbData) {
@@ -1002,16 +996,20 @@ export default {
         this.closeCommentDialog();
       } catch (e) {
         unilog(2193, `save comment failed for ${showName}: ${e.message}`);
-        window.alert('Failed to save comment');
+        window.alert("Failed to save comment");
       }
     },
 
     async removeComment() {
       const showName = this.show?.name;
       if (!showName) return;
-      
+
       try {
-        await srvr.setTvdbFields({ name: showName, $delete: ["comment"], dontEnqueue: true });
+        await srvr.setTvdbFields({
+          name: showName,
+          $delete: ["comment"],
+          dontEnqueue: true,
+        });
         // Update local show data
         delete this.show.comment;
         if (this.currentTvdbData) {
@@ -1020,7 +1018,7 @@ export default {
         this.closeCommentDialog();
       } catch (e) {
         unilog(2194, `remove comment failed for ${showName}: ${e.message}`);
-        window.alert('Failed to remove comment');
+        window.alert("Failed to remove comment");
       }
     },
 
@@ -1529,7 +1527,10 @@ export default {
                 `loadIntoEmby: resolved tvdbId ${tvdbId} from TVDB search for "${name}"`,
               );
             } else {
-              unilog(1981, `loadIntoEmby: TVDB search for "${name}" matched no single series — several series share that name and no year is known`);
+              unilog(
+                1981,
+                `loadIntoEmby: TVDB search for "${name}" matched no single series — several series share that name and no year is known`,
+              );
             }
           }
         } catch (e) {

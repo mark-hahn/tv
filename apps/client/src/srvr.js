@@ -993,6 +993,10 @@ export function hideShow(name) {
   return httpCall("/api/hideShow", { name }, "POST");
 }
 
+export function showShow(name) {
+  return httpCall("/api/showShow", { name }, "POST");
+}
+
 export function introFirstFile(showName) {
   return httpCall(
     `/api/introFirstFile?showName=${encodeURIComponent(showName)}`,

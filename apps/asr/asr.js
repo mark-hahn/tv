@@ -18,7 +18,7 @@ import { fileURLToPath } from "url";
 import { setTimeout as sleep } from "timers/promises";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
-import { logHere, unilog, setUnilogSink } from "@tv/share";
+import { unilog, setUnilogSink } from "@tv/share";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -59,14 +59,9 @@ try {
 }
 
 
-// Audio quality settings
-const AUDIO_CONFIGS = {
-  low: { rate: 16000, bitrate: "64k" },
-  medium: { rate: 22050, bitrate: "128k" },
-  high: { rate: 44100, bitrate: "192k" },
-  max: { rate: 48000, bitrate: "256k" },
-};
-const audioConfig = AUDIO_CONFIGS["max"];
+// Audio extracted for transcription
+const AUDIO_RATE = "48000";
+const AUDIO_BITRATE = "256k";
 
 /* ---------------- API Key and setup ---------------- */
 const keyPath = path.join(__dirname, "secrets/gemini-api-key.txt");
@@ -79,10 +74,8 @@ try {
 }
 
 const GEMINI_MODEL = "gemini-3.6-flash";
-const allowedExt = new Set([".mp4", ".mkv", ".avi", ".mov", ".webm", ".m4v"]);
 const AUDIO_MIME = "audio/flac";
-// Gemini processes the whole track in one call, so the flac goes through the
-// Files API rather than inline base64 (which caps out around 20MB).
+// Uploads go through the Files API, which has no practical size limit.
 const FILE_POLL_MS = 2000;
 const FILE_POLL_MAX = 150;
 // Cues come back as a JSON array matching this schema.
@@ -99,10 +92,9 @@ const CAPTION_SCHEMA = {
   },
 };
 
-// What bounds a single call is the model's 65,536 output-token cap, not the
-// documented 9.5-hour audio cap: a measured run produced 28.7 output tokens per
-// second of audio, so 65536 * 0.5 (safety factor) / 28.7 is about 1140s. Longer
-// audio is split into parts, each transcribed on its own.
+// A single call is bounded by the model's 65,536 output-token cap: audio costs
+// about 28.7 output tokens per second, so 65536 * 0.5 (safety factor) / 28.7 is
+// about 1140s. Longer audio is split into parts, each transcribed on its own.
 const MAX_PART_SEC = 1140;
 // Silence shorter than this is not a candidate cut point.
 const SILENCE_MIN_DUR = 0.3;
@@ -117,6 +109,30 @@ const SILENCE_SEARCH_ITERS = 8;
 const CUT_SNAP_SEC = 90;
 // Cues the model places outside the part it was handed are dropped.
 const PART_EDGE_TOLERANCE_SEC = 1;
+
+// Cue timings come from forced alignment against the audio (ctcalign.py),
+// not from the model.
+const ALIGNER_PYTHON = "/root/dev/aligner-venv/bin/python";
+const ALIGNER_SCRIPT = path.join(__dirname, "ctcalign.py");
+const ALIGN_RATE = "16000";
+// Guard on the aligner's output. Real drift is smooth, so a cue whose shift
+// disagrees sharply with its neighbours' is a local alignment failure; it gets
+// the neighbourhood's shift instead.
+const GUARD_WINDOW = 11;
+const GUARD_MAX_DEVIATION = 2.5;
+const GUARD_MIN_DUR = 0.35;
+const GUARD_MAX_DUR = 12.0;
+const GUARD_CHARS_PER_SEC = 16;
+// A cue may outlast the speech a little, but not by multiples — anything past
+// this is the aligner stretching a line across a silence.
+const displayCap = (chars) => {
+  const spoken = Math.min(GUARD_MAX_DUR, Math.max(GUARD_MIN_DUR, chars / GUARD_CHARS_PER_SEC));
+  return { spoken, max: Math.min(GUARD_MAX_DUR, spoken * 2.5 + 1) };
+};
+// Every cue clears the screen before the next appears.
+const CUE_GAP_SEC = 0.08;
+// Cues longer than this are split on word boundaries from the aligner.
+const MAX_CUE_CHARS = 42;
 
 // gemini-3.6-flash paid-tier rates, US dollars per million tokens. Thinking
 // tokens bill as output. Both rates double on 2027-01-01.
@@ -163,33 +179,6 @@ function getSrtPath(videoPath) {
   return path.join(dir, `${baseName}.asr.srt`);
 }
 
-function getStubPath(videoPath) {
-  const dir = path.dirname(videoPath);
-  const baseName = path.basename(videoPath, path.extname(videoPath));
-  return path.join(dir, `${baseName}.mb.chosen`);
-}
-
-function hasEmbSidecar(videoPath) {
-  const dir = path.dirname(videoPath);
-  const baseName = path.basename(videoPath, path.extname(videoPath));
-  const prefix = `${baseName}.mb`;
-  try {
-    return fs
-      .readdirSync(dir)
-      .some(
-        (f) =>
-          f.startsWith(prefix) &&
-          /^mb\d+\.srt$/.test(f.slice(baseName.length + 1)),
-      );
-  } catch {
-    return false;
-  }
-}
-
-function isVideoFile(p) {
-  return allowedExt.has(path.extname(p).toLowerCase());
-}
-
 function run(cmd, args, opts = {}) {
   return new Promise((resolve, reject) => {
     const p = spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"], ...opts });
@@ -206,88 +195,6 @@ function run(cmd, args, opts = {}) {
       }
     });
   });
-}
-
-const ENGLISH_LANG_TAGS = new Set(["eng", "en", "english"]);
-
-// Returns array of subtitle stream objects (english or unknown language only), or null on ffprobe error.
-async function getSubtitleStreams(videoPath) {
-  try {
-    const { out } = await run("ffprobe", [
-      "-v",
-      "quiet",
-      "-print_format",
-      "json",
-      "-show_streams",
-      videoPath,
-    ]);
-    const streams = JSON.parse(out).streams || [];
-    return streams.filter((s) => {
-      if (s.codec_type !== "subtitle") return false;
-      const lang = (s.tags?.language || "").toLowerCase().trim();
-      // Keep stream if language is unknown/unset or is English
-      return lang === "" || ENGLISH_LANG_TAGS.has(lang);
-    });
-  } catch (e) {
-    unilog(
-      345,
-      `Warning: could not probe ${path.basename(videoPath)} for subtitles: ${e.message}`,
-    );
-    return null;
-  }
-}
-
-const TEXT_SUB_CODECS = new Set([
-  "ass",
-  "ssa",
-  "subrip",
-  "webvtt",
-  "mov_text",
-  "text",
-]);
-
-// Extract each text subtitle stream to an emb<n>.srt sidecar, stripping ASS/font tags.
-async function extractTextSubtitles(videoPath, subtitleStreams) {
-  const dir = path.dirname(videoPath);
-  const baseName = path.basename(videoPath, path.extname(videoPath));
-  const textStreams = subtitleStreams.filter((s) =>
-    TEXT_SUB_CODECS.has(s.codec_name),
-  );
-  let n = 1;
-  for (const stream of textStreams) {
-    const srtPath = path.join(dir, `${baseName}.mb${n}.srt`);
-    n++;
-    if (await pathExists(srtPath)) continue;
-    try {
-      await run("ffmpeg", [
-        "-y",
-        "-i",
-        videoPath,
-        "-map",
-        `0:${stream.index}`,
-        "-c:s",
-        "srt",
-        "-f",
-        "srt",
-        srtPath,
-      ]);
-      let text = await fsp.readFile(srtPath, "utf8");
-      text = text.replace(/\{[^}]*\}/g, "");
-      text = text.replace(/<font[^>]*>/gi, "");
-      text = text.replace(/<\/font>/gi, "");
-      text = text.replace(/<\/?(b|i|u)>/gi, "");
-      await fsp.writeFile(srtPath, text, "utf8");
-      unilog(
-        346,
-        `extracted text sub stream ${stream.index} → ${path.basename(srtPath)}`,
-      );
-    } catch (e) {
-      unilog(
-        347,
-        `failed to extract stream ${stream.index} from ${path.basename(videoPath)}: ${e.message}`,
-      );
-    }
-  }
 }
 
 async function getDurationSec(file) {
@@ -318,61 +225,14 @@ async function extractAudio(inputVideo, outWav) {
     "-ac",
     "1",
     "-ar",
-    String(audioConfig.rate),
+    AUDIO_RATE,
     "-b:a",
-    audioConfig.bitrate,
+    AUDIO_BITRATE,
     "-vn",
   ];
   args.push(outWav);
   await run("ffmpeg", args);
 }
-
-/*
-  filters that change energy floor, spectral content, and dynamic range 
-  are what most ASR/VADs use to decide “speech vs. noise.”
-
-   agate=threshold=0.001:ratio=2:attack=10:release=100"
-
-1) agate (noise gate) — biggest lever on VAD
-    Why: Directly alters the noise floor and tail of words; 
-         too aggressive makes VAD think speech is silence.
-    Sweep: threshold: 0.0005 → 0.001 → 0.003 → 0.01 (linear amp; 
-           ≈ -66 → -60 → -50.5 → -40 dBFS)  ratio: 2 → 4 → 8
-    attack/release: attack=5–20, release=80–300 ms 
-          (short attack/release can chop syllables, confusing VAD)
-    Baseline on/off test: run once without agate, once with your chosen settings.
-
-0) Baseline:  ffmpeg -i in.wav -ac 1 -ar 16000 -c:a pcm_s16le out-baseline.wav
-
-2) Bandlimit only: 
-     ffmpeg -i in.wav -ac 1 -ar 16000 -af "highpass=f=80,lowpass=f=8000" 
-            -c:a pcm_s16le out-bandlimit.wav
-
-3) + Gentle compression:
-     ffmpeg -i in.wav -ac 1 -ar 16000 
-            -af "highpass=f=80,lowpass=f=8000,acompressor=threshold=0.003:ratio=3:attack=20:release=400" 
-           -c:a pcm_s16le out-comp.wav
-
-4) + Mild gate:
-      ffmpeg -i in.wav -ac 1 -ar 16000 -
-      af "highpass=f=80,lowpass=f=8000,acompressor=threshold=0.003:ratio=3:attack=20:release=400,agate=threshold=0.001:ratio=2:attack=10:release=120" 
-      -c:a pcm_s16le out-gate.wav
-
-6) Add RNNoise:
-    ffmpeg -i in.wav -ac 1 -ar 16000 
-    -af "highpass=f=80,lowpass=f=8000,acompressor=threshold=0.003:ratio=3:attack=20:release=400,arnndn=m=./arnndn-models/std.rnnn" 
-    -c:a pcm_s16le out-denoise.wav
-
-    # A) arnndn with standard model
-    ffmpeg -i in.wav -ac 1 -ar 16000 -af "arnndn=m=./arnndn-models/std.rnnn" out-arnndn.wav
-    
-    # B) afftdn only
-    ffmpeg -i in.wav -ac 1 -ar 16000 -af "afftdn=nf=-25" out-afftdn.wav
-    
-    # C) baseline (no denoise)
-    ffmpeg -i in.wav -ac 1 -ar 16000 -c:a pcm_s16le out-baseline.wav
-                        
-*/
 
 const AUDIO_FILTER =
   "highpass=f=80,lowpass=f=8000,loudnorm=I=-16:TP=-1.5:LRA=11";
@@ -387,9 +247,9 @@ async function preprocessAudio(inputWav, outputWav) {
     "-ac",
     "1",
     "-ar",
-    String(audioConfig.rate),
+    AUDIO_RATE,
     "-b:a",
-    audioConfig.bitrate,
+    AUDIO_BITRATE,
     "-f",
     "wav",
     outputWav,
@@ -449,7 +309,6 @@ Each cue needs a start time, an end time, and the words that were said.
 
 Rules for the cues:
 - Times use HH:MM:SS,mmm and must line up with the audio.
-- the times must be accurate to 100ms.
 - Keep each cue to a single short line or two of dialogue; split long speeches
   into several consecutive cues rather than one long block.
 - Cover all audible dialogue, including background and overlapping speech.
@@ -631,10 +490,8 @@ function maxSpan(midpoints, totalDur) {
   return longest;
 }
 
-// Ideal part boundaries: equal-length targets. Splitting evenly beats greedily
-// filling parts, which leaves a runt final part whose per-call thinking tokens
-// are wasted. Boundaries depend only on duration, so they are known before any
-// silence is detected.
+// Ideal part boundaries: equal-length targets, known before any silence is
+// detected because they depend only on duration.
 function partTargets(totalDur) {
   const nParts = Math.ceil(totalDur / MAX_PART_SEC);
   const targets = [];
@@ -651,9 +508,7 @@ function coveredTargets(midpoints, targets) {
 
 // Find the strictest silence threshold that puts a cut candidate near every
 // target boundary. Strictest is preferred because a loose threshold calls soft
-// speech "silence" and cuts through a word — but strict alone is not enough:
-// maxSpan only asks whether some legal partition exists, which is satisfied
-// trivially and would settle on a threshold with too few candidates to snap to.
+// speech "silence" and cuts through a word.
 async function findCutCandidates(wavPath, totalDur, targets) {
   let lo = SILENCE_DB_STRICT;
   let hi = SILENCE_DB_LOOSE;
@@ -758,8 +613,8 @@ async function transcribePart(wavPath, part, index, count) {
   pane(`Transcribing ${label}with ${GEMINI_MODEL}`);
   const { text, usage } = await callApi(fileData);
 
-  // Cues are relative to the part, so shift them; drop anything the model
-  // placed outside the audio it was actually given.
+  // Cues are relative to the part, so shift them; drop anything placed outside
+  // the audio the part covered.
   const partDur = part.end - part.start;
   const segments = [];
   for (const seg of processSegments(text)) {
@@ -773,6 +628,202 @@ async function transcribePart(wavPath, part, index, count) {
     });
   }
   return { segments, usage, flacPath };
+}
+
+/* ---------------- Forced alignment ---------------- */
+
+// 16 kHz mono is what the acoustic model wants, and reading a plain PCM wav
+// keeps the python side free of audio-decoding dependencies.
+async function extractAlignAudio(videoPath, outWav) {
+  await run("ffmpeg", [
+    "-y",
+    "-i",
+    videoPath,
+    "-ac",
+    "1",
+    "-ar",
+    ALIGN_RATE,
+    "-vn",
+    outWav,
+  ]);
+}
+
+async function alignSegments(videoPath, segments) {
+  const wavPath = path.join(tmpDir, "align.wav");
+  const cuesPath = path.join(tmpDir, "align-cues.json");
+  const timesPath = path.join(tmpDir, "align-times.json");
+  try {
+    await extractAlignAudio(videoPath, wavPath);
+    await fsp.writeFile(
+      cuesPath,
+      JSON.stringify(segments.map((s) => s.text)),
+      "utf8",
+    );
+    const { out } = await run(ALIGNER_PYTHON, [
+      ALIGNER_SCRIPT,
+      cuesPath,
+      wavPath,
+      timesPath,
+    ]);
+    pane(out.trim() || "aligner returned no summary");
+    return JSON.parse(await fsp.readFile(timesPath, "utf8"));
+  } finally {
+    for (const f of [wavPath, cuesPath, timesPath]) {
+      if (await pathExists(f)) await fsp.unlink(f);
+    }
+  }
+}
+
+const median = (a) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
+
+// Replace gemini's timings with the aligner's, rejecting isolated failures.
+function guardAlignment(segments, times) {
+  const shift = segments.map((seg, i) =>
+    times[i] ? times[i].start - seg.start : null,
+  );
+  const known = shift.filter((x) => x !== null);
+  if (known.length === 0) {
+    pane("alignment produced nothing usable, keeping gemini timings");
+    return segments;
+  }
+
+  let jumps = 0;
+  let clamped = 0;
+  let kept = 0;
+  const out = segments.map((seg, i) => {
+    const lo = Math.max(0, i - (GUARD_WINDOW >> 1));
+    const hi = Math.min(segments.length, i + (GUARD_WINDOW >> 1) + 1);
+    const near = shift.slice(lo, hi).filter((x) => x !== null);
+    const consensus = near.length ? median(near) : median(known);
+
+    let start;
+    let end;
+    if (!times[i]) {
+      kept++;
+      start = seg.start + consensus;
+      end = start + (seg.end - seg.start);
+    } else if (Math.abs(shift[i] - consensus) > GUARD_MAX_DEVIATION) {
+      jumps++;
+      const dur = times[i].end - times[i].start;
+      start = seg.start + consensus;
+      end =
+        start + (dur > 0 && dur < GUARD_MAX_DUR ? dur : seg.end - seg.start);
+    } else {
+      start = times[i].start;
+      end = times[i].end;
+    }
+
+    // a two-word line must never sit on screen for seconds
+    const cap = displayCap(seg.text.length);
+    const dur = end - start;
+    if (dur < GUARD_MIN_DUR || dur > cap.max) {
+      clamped++;
+      end = start + Math.max(GUARD_MIN_DUR, cap.spoken * 1.6 + 0.4);
+    }
+    return { ...seg, start, end, words: times[i]?.words ?? null };
+  });
+
+  // keep order, then clear each cue before the next one starts
+  for (let i = 1; i < out.length; i++) {
+    if (out[i].start < out[i - 1].start) out[i].start = out[i - 1].start;
+  }
+  for (let i = 0; i < out.length - 1; i++) {
+    const limit = out[i + 1].start - CUE_GAP_SEC;
+    if (out[i].end > limit) {
+      out[i].end = Math.max(out[i].start + GUARD_MIN_DUR, limit);
+    }
+  }
+
+  pane(
+    `alignment: ${jumps} isolated jumps rejected, ${clamped} durations ` +
+      `clamped, ${kept} cues the aligner could not place`,
+  );
+  return out;
+}
+
+// Split words into n chunks of similar length, none over MAX_CUE_CHARS.
+function balancedChunks(words, n) {
+  if (n <= 1) return [words];
+  const chunks = [];
+  let offset = 0;
+  for (let c = 0; c < n; c++) {
+    if (c === n - 1) {
+      chunks.push(words.slice(offset));
+      break;
+    }
+    const remaining = words.slice(offset);
+    const target = remaining.join(" ").length / (n - c);
+    let len = 0;
+    let best = 1;
+    let bestDiff = Infinity;
+    for (let i = 0; i < remaining.length - 1; i++) {
+      len += i === 0 ? remaining[i].length : 1 + remaining[i].length;
+      if (len > MAX_CUE_CHARS) break;
+      const diff = Math.abs(len - target);
+      if (diff <= bestDiff) {
+        bestDiff = diff;
+        best = i + 1;
+      }
+    }
+    chunks.push(remaining.slice(0, best));
+    offset += best;
+  }
+  return chunks;
+}
+
+// A long cue becomes several, cut at word boundaries the aligner measured, so
+// each piece gets a real start and end.
+function splitLongCues(segments) {
+  const out = [];
+  let split = 0;
+  for (const seg of segments) {
+    const text = seg.text.replace(/\s+/g, " ").trim();
+    if (text.length <= MAX_CUE_CHARS) {
+      out.push({ start: seg.start, end: seg.end, text });
+      continue;
+    }
+    const parts = balancedChunks(text.split(" "), Math.ceil(text.length / MAX_CUE_CHARS));
+    const spoken = seg.words ?? [];
+    let wordAt = 0;
+    let cursor = seg.start;
+    const span = seg.end - seg.start;
+    const total = text.split(" ").length;
+    let done = 0;
+    for (const part of parts) {
+      if (!part.length) continue;
+      const timed = spoken.slice(wordAt, wordAt + part.length);
+      let start;
+      let end;
+      if (timed.length === part.length) {
+        start = timed[0].start;
+        end = timed[timed.length - 1].end;
+      } else {
+        // aligner had no words here — fall back to interpolating the cue
+        start = seg.start + (done / total) * span;
+        end = seg.start + ((done + part.length) / total) * span;
+      }
+      if (start < cursor) start = cursor;
+      if (end <= start) end = start + GUARD_MIN_DUR;
+      const chunkText = part.join(" ");
+      const cap = displayCap(chunkText.length);
+      if (end - start > cap.max) {
+        end = start + Math.max(GUARD_MIN_DUR, cap.spoken * 1.6 + 0.4);
+      }
+      out.push({ start, end, text: chunkText });
+      cursor = start;
+      wordAt += part.length;
+      done += part.length;
+    }
+    split++;
+  }
+  for (let i = 0; i < out.length - 1; i++) {
+    const limit = out[i + 1].start - CUE_GAP_SEC;
+    if (out[i].end > limit) {
+      out[i].end = Math.max(out[i].start + GUARD_MIN_DUR, limit);
+    }
+  }
+  if (split > 0) pane(`split ${split} cues longer than ${MAX_CUE_CHARS} chars`);
+  return out;
 }
 
 /* ---------------- SRT generation ---------------- */
@@ -857,8 +908,14 @@ async function processOneVideo(videoPath) {
     pane(`Transcribed ${segments.length} cues`);
     reportGaps(segments);
 
+    pane(`Aligning ${segments.length} cues against the audio`);
+    const aligned = guardAlignment(
+      segments,
+      await alignSegments(videoPath, segments),
+    );
+
     const outputPath = getSrtPath(videoPath);
-    writeSRT(segments, outputPath);
+    writeSRT(splitLongCues(aligned), outputPath);
     const usageText = formatUsage(usage);
     pane(`Usage: ${parts.length} call(s), ${usageText}`);
     unilog(2287, `ASR: finished, ${usageText}`);

@@ -929,20 +929,6 @@
             Start
           </button>
           <button
-            @click="toggleAsrTail"
-            title="Tail detailed ASR progress into the output above"
-            :style="{
-              cursor: 'pointer',
-              borderRadius: '4px',
-              padding: '2px 8px',
-              border: '1px solid #bbb',
-              '--btn-bg': asrTailOn ? 'lightgray' : 'whitesmoke',
-              marginRight: '5px',
-            }"
-          >
-            Tail
-          </button>
-          <button
             @click="clearAsrLog"
             :style="{
               cursor: 'pointer',
@@ -1458,7 +1444,6 @@ export default {
       asrQueueLen: 0,
       asrLogChannel: null,
       asrQueueChannel: null,
-      asrTailOn: false,
 
       // Emb
       showEmb: false,
@@ -1625,11 +1610,9 @@ export default {
     if (this._onLocalDelKey) evtBus.off("localDelKey", this._onLocalDelKey);
   },
   computed: {
-    // Rendered ASR output. Detail lines (the Tail progress) are kept in
-    // asrLineObjs at all times but only shown while asrTailOn is on.
+    // Rendered ASR output.
     asrDisplay() {
       return this.asrLineObjs
-        .filter((e) => this.asrTailOn || !e?.detail)
         .map((e) => (typeof e === "string" ? e : (e?.text ?? "")))
         .join("\n");
     },
@@ -2443,8 +2426,7 @@ export default {
         this.activeAsrPath = match[1].trim();
       }
 
-      // Only scroll if this line is actually visible in the current view.
-      if (atBottom && (this.asrTailOn || !line.detail)) {
+      if (atBottom) {
         this.$nextTick(() => {
           if (el) el.scrollTop = el.scrollHeight;
         });
@@ -2493,11 +2475,6 @@ export default {
     stopAsrQueueChannel() {
       this.asrQueueChannel?.close();
       this.asrQueueChannel = null;
-    },
-    toggleAsrTail() {
-      // Detail lines are always received and stored; toggling only controls
-      // whether asrDisplay includes them.
-      this.asrTailOn = !this.asrTailOn;
     },
     async clickQueue() {
       this.asrQueueMode = !this.asrQueueMode;

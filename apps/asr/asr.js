@@ -8,8 +8,7 @@ try {
 } catch (_) {}
 // -------------------------------------------
 
-// https://docs.mistral.ai/capabilities/audio/
-// https://console.mistral.ai/usage
+// https://ai.google.dev/gemini-api/docs/audio
 
 import fs from "fs";
 import fsp from "fs/promises";
@@ -17,8 +16,8 @@ import path from "path";
 import { spawn } from "child_process";
 import { fileURLToPath } from "url";
 import { setTimeout as sleep } from "timers/promises";
-import axios from "axios";
-import FormData from "form-data";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
 import { logHere, unilog, setUnilogSink } from "@tv/share";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -32,6 +31,14 @@ setUnilogSink(({ logId, ts, message }) => {
     body: JSON.stringify({ logId, pid: "tv-asr", ts, message }),
   }).catch(() => {});
 });
+// The Queues pane reads this child's stdout (subsQueue.js), so stdout is the
+// channel for everything the pane shows while a run is going. A run writes only
+// three rows to the unilog DB — started, finished, and retries-exhausted — so
+// every other progress line goes here and here only.
+function pane(msg) {
+  process.stdout.write(msg + "\n");
+}
+
 let tmpDir = process.env.ASR_TMPDIR
   ? process.env.ASR_TMPDIR
   : path.join(__dirname, "tmp");
@@ -51,10 +58,6 @@ try {
   }
 }
 
-const timeMatchMgn = 0.3;
-const apiTemperature = 0;
-const apiResponseFormat = "verbose_json";
-const apiPrompt = null;
 
 // Audio quality settings
 const AUDIO_CONFIGS = {
@@ -66,7 +69,7 @@ const AUDIO_CONFIGS = {
 const audioConfig = AUDIO_CONFIGS["max"];
 
 /* ---------------- API Key and setup ---------------- */
-const keyPath = path.join(__dirname, "secrets/mistral-asr-key.txt");
+const keyPath = path.join(__dirname, "secrets/gemini-api-key.txt");
 let apiKey;
 try {
   apiKey = fs.readFileSync(keyPath, "utf8").trim();
@@ -75,12 +78,34 @@ try {
   process.exit(1);
 }
 
-const model = "voxtral-mini-latest";
+const GEMINI_MODEL = "gemini-3.6-flash";
 const allowedExt = new Set([".mp4", ".mkv", ".avi", ".mov", ".webm", ".m4v"]);
-const FILE_LIMIT_BYTES = 24 * 1024 * 1024;
-// Conservative starting estimate of FLAC bytes/sec for processed speech.
-// Will be updated via EMA as chunks are processed.
-const ADAPTIVE_INITIAL_BPS = 45000;
+const AUDIO_MIME = "audio/flac";
+// Gemini processes the whole track in one call, so the flac goes through the
+// Files API rather than inline base64 (which caps out around 20MB).
+const FILE_POLL_MS = 2000;
+const FILE_POLL_MAX = 150;
+// Cues come back as a JSON array matching this schema.
+const CAPTION_SCHEMA = {
+  type: "array",
+  items: {
+    type: "object",
+    properties: {
+      start: { type: "string" },
+      end: { type: "string" },
+      text: { type: "string" },
+    },
+    required: ["start", "end", "text"],
+  },
+};
+
+// Set by processOneVideo so the run's unilog rows can name the file even from
+// inside callApi.
+let currentVideoName = "";
+
+const genAI = new GoogleGenerativeAI(apiKey);
+const geminiModel = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+const fileManager = new GoogleAIFileManager(apiKey);
 
 /* ---------------- format logging timestamp  (HH:MM:SS.t) ---------------- */
 let scriptStart = Date.now();
@@ -255,7 +280,7 @@ async function getDurationSec(file) {
     const sec = parseFloat(out.trim());
     return Number.isFinite(sec) ? Math.floor(sec) : 0;
   } catch (e) {
-    unilog(348, `Warning: Could not get duration for ${file}: ${e.message}`);
+    pane(`Warning: Could not get duration for ${file}: ${e.message}`);
     return 0;
   }
 }
@@ -351,135 +376,144 @@ async function preprocessAudio(inputWav, outputWav) {
 async function getFlac(wavPath) {
   const flacPath = path.join(tmpDir, path.basename(wavPath, ".wav") + ".flac");
   await run("ffmpeg", ["-y", "-i", wavPath, "-c:a", "flac", flacPath]);
-  const statSize = (await fsp.stat(flacPath)).size;
-  if (statSize > FILE_LIMIT_BYTES) {
-    const err = new Error(
-      `FLAC too large: ${(statSize / 1e6).toFixed(1)}MB > ${(FILE_LIMIT_BYTES / 1e6).toFixed(0)}MB`,
-    );
-    err.code = "FLAC_TOO_LARGE";
-    err.size = statSize;
-    throw err;
-  }
-  return {
-    path: flacPath,
-    mime: "audio/flac",
-    filename: path.basename(flacPath),
-    size: statSize,
-  };
+  return flacPath;
 }
 
-async function extractChunkWav(inWav, start, end, outWav) {
-  await run("ffmpeg", [
-    "-y",
-    "-i",
-    inWav,
-    "-ss",
-    start.toFixed(2),
-    "-to",
-    end.toFixed(2),
-    "-c:a",
-    "pcm_s16le",
-    "-avoid_negative_ts",
-    "make_zero",
-    outWav,
-  ]);
+// Upload the flac and wait for Gemini to finish processing it.
+async function uploadAudio(flacPath) {
+  const upload = await fileManager.uploadFile(flacPath, {
+    mimeType: AUDIO_MIME,
+    displayName: path.basename(flacPath),
+  });
+  let file = upload.file;
+  for (let i = 0; file.state === FileState.PROCESSING && i < FILE_POLL_MAX; i++) {
+    await sleep(FILE_POLL_MS);
+    file = await fileManager.getFile(file.name);
+  }
+  if (file.state !== FileState.ACTIVE) {
+    throw new Error(`uploaded audio is ${file.state}, not ACTIVE`);
+  }
+  return { fileData: { mimeType: file.mimeType, fileUri: file.uri } };
 }
 
 const MAX_RETRIES = 5;
 const BASE_DELAY_MS = 5000;
-const API_TIMEOUT = 120000; // 2 mins
+const RETRY_STATUSES = [429, 500, 503];
 
-async function callApi(uploadInfo) {
-  const buf = await fsp.readFile(uploadInfo.path);
+const PROMPT = `Generate accessibility captions (subtitles for the deaf and
+hard of hearing) for this audio track. This is the user's own personal media file and
+the captions are for their private playback use only.
+
+Listen to the recording and produce one caption cue for each utterance you hear.
+Each cue needs a start time, an end time, and the words that were said.
+
+Rules for the cues:
+- Times use HH:MM:SS,mmm and must line up with the audio.
+- Keep each cue to a single short line or two of dialogue; split long speeches
+  into several consecutive cues rather than one long block.
+- Cover all audible dialogue, including background and overlapping speech.
+
+Return a JSON array of objects with the fields "start", "end", and "text",
+and nothing else.`;
+
+async function callApi(fileData) {
   const apiStart = Date.now();
-  let attempt = 0;
-  while (true) {
-    const form = new FormData();
-    form.append("file", buf, {
-      filename: uploadInfo.filename,
-      contentType: uploadInfo.mime,
-    });
-    form.append("model", model);
-    // Timestamps are incompatible with language prediction on the API.
-    // If we're requesting timestamps, omit the `language` field (treat as None)
-    // and explicitly set return_language=false to disable language prediction.
-    form.append("return_language", "false");
-    // The API expects a plain 'segment' value for timestamp_granularities
-    // when submitted via multipart/form-data. Append the plain string.
-    form.append("timestamp_granularities", "segment");
-    form.append("response_format", apiResponseFormat);
-    form.append("temperature", String(apiTemperature));
-    if (apiPrompt) form.append("prompt", apiPrompt);
-    attempt++;
-    let response = null;
+  for (let attempt = 1; ; attempt++) {
     try {
-      response = await axios.post(
-        "https://api.mistral.ai/v1/audio/transcriptions",
-        form,
-        {
-          headers: { Authorization: `Bearer ${apiKey}`, ...form.getHeaders() },
-          timeout: API_TIMEOUT,
+      const result = await geminiModel.generateContent({
+        contents: [{ role: "user", parts: [{ text: PROMPT }, fileData] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: CAPTION_SCHEMA,
         },
+      });
+      const response = result.response;
+      const finish = response.candidates?.[0]?.finishReason ?? "none";
+      const used = response.usageMetadata?.totalTokenCount ?? 0;
+      pane(
+        `Gemini finished: ${finish}, ${used} tokens, ${Date.now() - apiStart}ms`,
       );
-      // Log successful response (trim audio bytes)
+      if (finish !== "STOP") {
+        throw new Error(`Gemini stopped early: ${finish}`);
+      }
+      return response.text();
     } catch (err) {
-      // err may be an AxiosError with response data
-      const status = err?.response?.status || err.message || "unknown";
-      const body = err?.response?.data || err?.toString();
-      if (attempt > MAX_RETRIES) {
-        unilog(1738, `API request gave up after ${attempt} attempts: ${status}${body ? ` body=${JSON.stringify(body)}` : ""}`);
-        throw new Error(`max retries reached after ${attempt} attempts`);
+      const retryable = RETRY_STATUSES.includes(err.status);
+      if (!retryable || attempt > MAX_RETRIES) {
+        pane(`Gemini request failed: ${err.message}`);
+        unilog(2283, `ASR: gemini retries failed "${currentVideoName}"`);
+        throw err;
       }
       const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
-      unilog(1739, `API request failed (attempt ${attempt}/${MAX_RETRIES + 1}): ${status}${body ? ` body=${JSON.stringify(body)}` : ""}, retrying in ${delay}ms`);
+      pane(
+        `Gemini request failed (attempt ${attempt}/${MAX_RETRIES}): ` +
+          `${err.status}, retrying in ${delay}ms`,
+      );
       await sleep(delay);
-      continue;
     }
-    if (response && response.status === 200) {
-      response.data.delay = Date.now() - apiStart;
-      return response.data;
-    }
-    // Non-200 but no exception (unlikely) — log and retry
-    const status = response?.status || "unknown";
-    if (attempt > MAX_RETRIES) {
-      unilog(1740, `API response gave up after ${attempt} attempts: ${status}`);
-      throw new Error(`max retries reached after ${attempt} attempts`);
-    }
-    const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
-    unilog(1741, `API response failed (attempt ${attempt}/${MAX_RETRIES + 1}): ${status}, retrying in ${delay}ms`);
-    await sleep(delay);
-    continue;
   }
 }
-function processSegments(segments, chunkInfo) {
-  if (!segments || segments.length === 0) return [];
-  const processedSegments = [];
-  for (const segment of segments) {
-    if (
-      segment.start === undefined ||
-      segment.end === undefined ||
-      !segment.text?.trim()
-    ) {
-      unilog(
-        354,
-        `skipping invalid segment in chunk ${chunkInfo.chunkIndex}:`,
-        JSON.stringify(segment),
-      );
-      continue;
-    }
-    const start = chunkInfo.chunkStart + segment.start;
-    const end = chunkInfo.chunkStart + segment.end;
 
-    const processedSegment = {
-      start,
-      end,
-      text: segment.text.trim(),
-      chunk: chunkInfo,
-    };
-    if (start > chunkInfo.trimStart && start < chunkInfo.trimEnd)
-      processedSegments.push(processedSegment);
+// Gemini returns "HH:MM:SS,mmm" (or with a period) — convert to seconds.
+function srtTimeToSec(timeStr) {
+  const parts = String(timeStr).replace(",", ".").split(":");
+  if (parts.length !== 3) {
+    throw new Error(`invalid time format: ${timeStr}`);
   }
-  return processedSegments;
+  const hours = parseInt(parts[0], 10);
+  const minutes = parseInt(parts[1], 10);
+  const seconds = parseFloat(parts[2]);
+  if (!Number.isFinite(hours + minutes + seconds)) {
+    throw new Error(`invalid time format: ${timeStr}`);
+  }
+  return hours * 3600 + minutes * 60 + seconds;
+}
+
+// Pull the JSON array of cues out of the response and turn it into segments.
+function processSegments(responseText) {
+  let jsonMatch = responseText.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) jsonMatch = responseText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error("could not find JSON in Gemini response");
+  }
+  let cues;
+  try {
+    cues = JSON.parse(jsonMatch[0]);
+  } catch (e) {
+    throw new Error(`invalid JSON in Gemini response: ${e.message}`);
+  }
+  if (!Array.isArray(cues)) cues = [cues];
+
+  const segments = [];
+  for (const cue of cues) {
+    if (!cue.text?.trim()) continue;
+    try {
+      segments.push({
+        start: srtTimeToSec(cue.start),
+        end: srtTimeToSec(cue.end),
+        text: cue.text.trim(),
+      });
+    } catch (e) {
+      pane(`skipping cue with bad timing: ${e.message}`);
+    }
+  }
+  return segments;
+}
+
+// Warn about stretches the model returned nothing for — usually a sign it
+// skipped part of the track rather than the show actually being silent.
+const GAP_THRESHOLD_SEC = 30;
+function reportGaps(segments) {
+  let prevEnd = 0;
+  for (const seg of segments) {
+    if (seg.start - prevEnd >= GAP_THRESHOLD_SEC) {
+      pane(
+        `gap of ${Math.round(seg.start - prevEnd)}s with no cues: ` +
+          `${toSrtTime(prevEnd)} -> ${toSrtTime(seg.start)}`,
+      );
+    }
+    prevEnd = Math.max(prevEnd, seg.end);
+  }
 }
 
 function toSrtTime(totalSec) {
@@ -496,421 +530,53 @@ function writeSRT(segments, outputPath) {
   if (!segments || segments.length === 0) {
     throw new Error(`Video has no segments to write: ${outputPath}`);
   }
-  const sortedSegments = segments.sort((a, b) => a.start - b.start);
+  const sorted = [...segments].sort((a, b) => a.start - b.start);
 
-  // Helper: normalize text for comparisons (lowercase, remove punctuation,
-  // collapse whitespace). We keep original text for output but use normalized
-  // form to detect duplicates/repeats.
-  function normalizeText(s) {
-    if (!s) return "";
-    // remove most punctuation but keep apostrophes; collapse whitespace
-    const cleaned = s
-      .toLowerCase()
-      .replace(/[^\w\s'’]/g, " ")
-      .replace(/_+/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    return cleaned;
-  }
-
-  // First pass: basic overlap de-dup as before, but preserve original text
-  // and attach normalized text for later merging heuristics.
-  let lastStart = +1e9;
-  let lastEnd = -1e9;
-  let lastText = null;
-  let skipSeg;
-  let hadDuplicate = false;
-  const segOut = [];
-  for (const segment of sortedSegments) {
-    const start = segment.start;
-    const end = segment.end;
-    const text = segment.text.trim();
-    try {
-      skipSeg = true;
-      if (text.length == 0) continue;
-      const leftMatch = Math.abs(start - lastStart) < timeMatchMgn;
-      const rightMatch = Math.abs(end - lastEnd) < timeMatchMgn;
-      if (leftMatch || rightMatch) {
-        hadDuplicate = true;
-        // Always concatenate in start-time order — never discard text
-        const prev = segOut.pop();
-        const mergedStart = Math.min(prev.start, start);
-        const mergedEnd = Math.max(prev.end, end);
-        const mergedText =
-          prev.start <= start ? prev.text + " " + text : text + " " + prev.text;
-        segOut.push({
-          start: mergedStart,
-          end: mergedEnd,
-          text: mergedText,
-          norm: normalizeText(mergedText),
-        });
-        continue;
-      }
-      skipSeg = false;
-    } finally {
-      if (!skipSeg)
-        segOut.push({ start, end, text, norm: normalizeText(text) });
-      if (!hadDuplicate) {
-        lastStart = start;
-        lastEnd = end;
-        lastText = text;
-      } else lastStart = lastEnd = -1;
-      hadDuplicate = false;
-    }
-  }
-
-  // Passes 2 and 3 previously collapsed segments with identical text, but
-  // speakers legitimately repeat words and phrases, so no text is discarded.
-  const finalSegs = segOut;
-
-  // Split segments that are longer than 42 chars into smaller chunks
-  // with linearly interpolated timestamps.
-  const MAX_CHARS = 42;
-
-  const HONORIFICS = new Set([
-    "mr.",
-    "mrs.",
-    "miss",
-    "ms.",
-    "mx.",
-    "dr.",
-    "prof.",
-    "esq.",
-    "rev.",
-    "fr.",
-    "sr.",
-    "br.",
-    "gen.",
-    "col.",
-    "maj.",
-    "capt.",
-    "lt.",
-    "sgt.",
-    "cpl.",
-    "pvt.",
-    "adm.",
-    "gov.",
-    "sen.",
-    "rep.",
-    "pres.",
-    "amb.",
-    "hm",
-    "hrh",
-    "he",
-  ]);
-
-  // Split words into n balanced chunks: minimise variance in character lengths
-  // subject to no chunk > MAX_CHARS and no chunk ending on an honorific.
-  // N=2: exhaustive scan of all valid split points.
-  // N≥3: greedy proportional (target = remaining_chars / remaining_lines).
-  function balancedChunks(ws, n) {
-    if (n === 1) return [ws];
-    if (n === 2) {
-      let bestSplit = Math.ceil(ws.length / 2);
-      let bestDiff = Infinity;
-      let cumLen = 0;
-      for (let i = 0; i < ws.length - 1; i++) {
-        cumLen += i === 0 ? ws[i].length : 1 + ws[i].length;
-        const len2 = ws.slice(i + 1).join(" ").length;
-        if (cumLen > MAX_CHARS || len2 > MAX_CHARS) continue;
-        if (HONORIFICS.has(ws[i].toLowerCase())) continue;
-        const diff = Math.abs(cumLen - len2);
-        if (diff < bestDiff) {
-          bestDiff = diff;
-          bestSplit = i + 1;
-        }
-      }
-      return [ws.slice(0, bestSplit), ws.slice(bestSplit)];
-    }
-    // N >= 3
-    const result = [];
-    let off = 0;
-    for (let c = 0; c < n; c++) {
-      if (c === n - 1) {
-        result.push(ws.slice(off));
-        break;
-      }
-      const rem = ws.slice(off);
-      const target = rem.join(" ").length / (n - c);
-      let cumLen = 0,
-        bestI = 1,
-        bestDiff = Infinity;
-      for (let i = 0; i < rem.length - 1; i++) {
-        cumLen += i === 0 ? rem[i].length : 1 + rem[i].length;
-        if (cumLen > MAX_CHARS) break;
-        if (HONORIFICS.has(rem[i].toLowerCase())) continue;
-        const diff = Math.abs(cumLen - target);
-        if (diff <= bestDiff) {
-          bestDiff = diff;
-          bestI = i + 1;
-        }
-      }
-      result.push(ws.slice(off, off + bestI));
-      off += bestI;
-    }
-    return result;
-  }
-
-  const splitSegs = [];
-  for (const seg of finalSegs) {
-    if (seg.text.length <= MAX_CHARS) {
-      splitSegs.push(seg);
-      continue;
-    }
-    const words = seg.text.trim().split(/\s+/);
-    const totalDur = seg.end - seg.start;
-    const totalWords = words.length;
-    const numChunks = Math.ceil(seg.text.length / MAX_CHARS);
-    const chunks = balancedChunks(words, numChunks);
-    let wordOffset = 0;
-    for (const chunkWords of chunks) {
-      const chunkSize = chunkWords.length;
-      const chunkStart = seg.start + (wordOffset / totalWords) * totalDur;
-      const chunkEnd =
-        seg.start + ((wordOffset + chunkSize) / totalWords) * totalDur;
-      splitSegs.push({
-        start: chunkStart,
-        end: chunkEnd,
-        text: chunkWords.join(" "),
-        splitCreated: true,
-      });
-      wordOffset += chunkSize;
-    }
-  }
-
-  // Cross-entry honorific fix: if a segment's text ends with an honorific,
-  // move it to the start of the next segment so the honorific stays with the
-  // following name. Iterate backwards to avoid index shifting after splices.
-  for (let i = splitSegs.length - 2; i >= 0; i--) {
-    const seg = splitSegs[i];
-    if (!seg.splitCreated) continue;
-    const words = seg.text.trim().split(/\s+/);
-    const lastWord = words[words.length - 1];
-    if (!HONORIFICS.has(lastWord.toLowerCase())) continue;
-    const next = splitSegs[i + 1];
-    next.text = lastWord + " " + next.text;
-    if (words.length === 1) {
-      splitSegs.splice(i, 1);
-    } else {
-      seg.text = words.slice(0, -1).join(" ");
-    }
-  }
-
-  // Pad short segments (< 1s) up to 0.5s on each side,
-  // staying at least 0.2s away from neighboring segments.
-  for (let i = 0; i < splitSegs.length; i++) {
-    const seg = splitSegs[i];
-    if (seg.end - seg.start >= 1.0) continue;
-    const prevEnd = i > 0 ? splitSegs[i - 1].end : 0;
-    const nextStart = i < splitSegs.length - 1 ? splitSegs[i + 1].start : null;
-    const leftPad = Math.max(0, Math.min(0.5, seg.start - prevEnd - 0.2));
-    const rightPad = Math.max(
-      0,
-      Math.min(0.5, nextStart !== null ? nextStart - seg.end - 0.2 : 0.5),
-    );
-    seg.start -= leftPad;
-    seg.end += rightPad;
-  }
-
-  // Write SRT from splitSegs using original (prefer first occurrence) text
   let srtContent = "";
   let index = 0;
-  for (const seg of splitSegs) {
-    const startTime = toSrtTime(seg.start);
-    const endTime = toSrtTime(seg.end);
+  for (const seg of sorted) {
     srtContent += `${++index}\n`;
-    srtContent += `${startTime} --> ${endTime}\n`;
+    srtContent += `${toSrtTime(seg.start)} --> ${toSrtTime(seg.end)}\n`;
     srtContent += `${seg.text}\n\n`;
   }
   fs.writeFileSync(outputPath, srtContent, "utf8");
-  unilog(355, `\n[${ts()}] Wrote: ${path.basename(outputPath)}`);
-}
-
-/* ---------------- VAD-based chunking ---------------- */
-async function detectSilences(wavPath, noiseDb, minDur) {
-  // silencedetect output goes to stderr
-  const { err } = await run("ffmpeg", [
-    "-i",
-    wavPath,
-    "-af",
-    `silencedetect=noise=${noiseDb}dB:duration=${minDur}`,
-    "-f",
-    "null",
-    "-",
-  ]);
-  const starts = [];
-  const ends = [];
-  for (const line of err.split("\n")) {
-    let m = line.match(/silence_start:\s*([\d.]+)/);
-    if (m) {
-      starts.push(parseFloat(m[1]));
-      continue;
-    }
-    m = line.match(/silence_end:\s*([\d.]+)/);
-    if (m) ends.push(parseFloat(m[1]));
-  }
-  const midpoints = [];
-  for (let i = 0; i < Math.min(starts.length, ends.length); i++) {
-    midpoints.push((starts[i] + ends[i]) / 2);
-  }
-  return midpoints;
-}
-
-async function vadChunks(wavPath, initBPS, totalDur) {
-  const TARGET = FILE_LIMIT_BYTES * 0.93;
-  const SILENCE_MIN_DUR = 0.3;
-  // Binary search: lo=-50dB (strict, few cuts), hi=-20dB (loose, many cuts)
-  // Find strictest threshold where every speech span fits in TARGET.
-  let lo = -50,
-    hi = -20;
-  let bestMidpoints = null;
-  let bestThreshold = hi;
-  for (let iter = 0; iter < 8; iter++) {
-    const threshold = (lo + hi) / 2;
-    const midpoints = await detectSilences(
-      wavPath,
-      threshold.toFixed(1),
-      SILENCE_MIN_DUR,
-    );
-    const cuts = [0, ...midpoints, totalDur];
-    let maxSpan = 0;
-    for (let i = 1; i < cuts.length; i++)
-      maxSpan = Math.max(maxSpan, cuts[i] - cuts[i - 1]);
-    if (maxSpan * initBPS > TARGET) {
-      // spans still too big — need more cuts — loosen threshold (raise dB)
-      lo = threshold;
-    } else {
-      // fits — try stricter
-      bestMidpoints = midpoints;
-      bestThreshold = threshold;
-      hi = threshold;
-    }
-  }
-  // Fallback: if no threshold worked, use -20dB (maximum looseness)
-  if (!bestMidpoints) {
-    bestMidpoints = await detectSilences(wavPath, "-20", SILENCE_MIN_DUR);
-    bestThreshold = -20;
-  }
-  // Greedy combine: merge consecutive silence-delimited spans into chunks <= TARGET
-  const cuts = [0, ...bestMidpoints, totalDur];
-  const chunks = [];
-  let segStart = cuts[0];
-  let segEst = 0;
-  for (let i = 1; i < cuts.length; i++) {
-    const spanEst = (cuts[i] - cuts[i - 1]) * initBPS;
-    if (segEst + spanEst > TARGET && segEst > 0) {
-      chunks.push({ start: segStart, end: cuts[i - 1] });
-      segStart = cuts[i - 1];
-      segEst = spanEst;
-    } else {
-      segEst += spanEst;
-    }
-  }
-  chunks.push({ start: segStart, end: totalDur });
-  const maxEst = Math.max(...chunks.map((c) => (c.end - c.start) * initBPS));
-  unilog(
-    356,
-    `[${ts()}] VAD: threshold=${bestThreshold.toFixed(1)}dB, ` +
-      `${bestMidpoints.length} silences → ${chunks.length} chunks ` +
-      `(max est ${(maxEst / 1e6).toFixed(1)}MB)`,
-  );
-  return chunks;
+  pane(`[${ts()}] Wrote: ${path.basename(outputPath)}`);
 }
 
 /* ---------------- Main processing function ---------------- */
 async function processOneVideo(videoPath) {
-  const fileStart = Date.now();
-  unilog(357, `\n[${ts()}] Processing: ${path.basename(videoPath)}`);
-  const videoName = path.basename(videoPath, path.extname(videoPath));
+  currentVideoName = path.basename(videoPath);
+  unilog(2284, `ASR: starting "${currentVideoName}"`);
+  pane(`[${ts()}] Processing: ${currentVideoName}`);
   const rawWavFile = path.join(tmpDir, "audio_raw.wav");
   const processedWavFile = path.join(tmpDir, "audio_processed.wav");
+  let flacFile = null;
   try {
     await extractAudio(videoPath, rawWavFile);
-    unilog(358, `Preprocessing audio...`);
+    pane(`Preprocessing audio...`);
     await preprocessAudio(rawWavFile, processedWavFile);
-    const finalWavFile = processedWavFile;
-    const totalDur = await getDurationSec(finalWavFile);
-    unilog(359, `Duration: ${totalDur.toFixed(0)}s, VAD chunking`);
-    const allSegments = [];
-    let adaptiveBPS = ADAPTIVE_INITIAL_BPS;
-    let retryCount = 0;
-    const vadChunkList = await vadChunks(finalWavFile, adaptiveBPS, totalDur);
-    for (let chunkIndex = 0; chunkIndex < vadChunkList.length; chunkIndex++) {
-      const { start: chunkStart, end: chunkEndVad } = vadChunkList[chunkIndex];
-      const wavPath = path.join(
-        tmpDir,
-        `chunk-${String(chunkIndex).padStart(3, "0")}.wav`,
-      );
-      await extractChunkWav(finalWavFile, chunkStart, chunkEndVad, wavPath);
-      let uploadInfo;
-      let chunkEnd = chunkEndVad;
-      // FLAC_TOO_LARGE retry: BPS estimate was off; shrink end and retry
-      while (true) {
-        try {
-          uploadInfo = await getFlac(wavPath);
-          break;
-        } catch (e) {
-          if (e.code !== "FLAC_TOO_LARGE") throw e;
-          retryCount++;
-          const dur = chunkEnd - chunkStart;
-          const measuredBPS = e.size / dur;
-          const newEnd =
-            chunkStart + Math.floor((FILE_LIMIT_BYTES / measuredBPS) * 0.8);
-          unilog(
-            360,
-            `Chunk ${chunkIndex} oversize: ${(e.size / 1e6).toFixed(2)}MB → retry ${(newEnd - chunkStart).toFixed(0)}s (-20%)`,
-          );
-          adaptiveBPS = adaptiveBPS * 0.5 + measuredBPS * 0.5;
-          chunkEnd = Math.min(newEnd, chunkEndVad);
-          await extractChunkWav(finalWavFile, chunkStart, chunkEnd, wavPath);
-        }
-      }
-      // If this chunk was retried shorter, slide next chunk's start forward to avoid a gap
-      if (chunkEnd < chunkEndVad && chunkIndex + 1 < vadChunkList.length) {
-        vadChunkList[chunkIndex + 1].start = chunkEnd;
-      }
-      const actualDur = chunkEnd - chunkStart;
-      const measuredBPS = uploadInfo.size / actualDur;
-      const prevBPS = adaptiveBPS;
-      adaptiveBPS = adaptiveBPS * 0.5 + measuredBPS * 0.5;
-      // No trim/overlap needed — cuts are at silence midpoints
-      const chunkInfo = {
-        wavPath,
-        chunkIndex,
-        chunkStart,
-        chunkEnd,
-        trimStart: chunkStart - 1,
-        trimEnd: chunkEnd + 1,
-        overlapStart: chunkStart,
-        overlapEnd: chunkEnd,
-      };
-      try {
-        const apiData = await callApi(uploadInfo);
-        if (apiData.segments && apiData.segments.length > 0) {
-          allSegments.push(...processSegments(apiData.segments, chunkInfo));
-        } else {
-          unilog(362, `Chunk ${chunkIndex}: ⚠️ no segments`);
-        }
-      } catch (err) {
-        unilog(
-          363,
-          `Chunk ${chunkIndex}: ${chunkStart.toFixed(0)}s-${chunkEnd.toFixed(0)}s ❌ ${err.message}`,
-        );
-      }
-    }
-    if (allSegments.length === 0) {
+    const totalDur = await getDurationSec(processedWavFile);
+    pane(`Duration: ${totalDur.toFixed(0)}s, encoding flac`);
+
+    flacFile = await getFlac(processedWavFile);
+    const flacMb = fs.statSync(flacFile).size / 1e6;
+    pane(`Uploading ${flacMb.toFixed(1)}MB of audio to Gemini`);
+    const fileData = await uploadAudio(flacFile);
+
+    pane(`Transcribing with ${GEMINI_MODEL}`);
+    const responseText = await callApi(fileData);
+    const segments = processSegments(responseText);
+    if (segments.length === 0) {
       throw new Error("No transcription segments found");
     }
-    if (retryCount > 0) {
-      unilog(364, `VAD chunking: ${retryCount} oversize retries`);
-    }
+    pane(`Transcribed ${segments.length} cues`);
+    reportGaps(segments);
+
     const outputPath = getSrtPath(videoPath);
-    writeSRT(allSegments, outputPath);
+    writeSRT(segments, outputPath);
+    unilog(2285, `ASR: finished "${currentVideoName}"`);
   } catch (err) {
-    unilog(
-      365,
-      `❌ Failed to process: ${path.basename(videoPath)}, ${err.message}`,
-    );
+    pane(`❌ Failed to process: ${currentVideoName}, ${err.message}`);
     throw err;
   } finally {
     // Cleanup
@@ -918,6 +584,7 @@ async function processOneVideo(videoPath) {
       if (await pathExists(rawWavFile)) await fsp.unlink(rawWavFile);
       if (await pathExists(processedWavFile))
         await fsp.unlink(processedWavFile);
+      if (flacFile && (await pathExists(flacFile))) await fsp.unlink(flacFile);
     } catch (_) {}
   }
 }

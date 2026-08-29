@@ -27,3 +27,4 @@ build.apk
 build-phase
 usb-bkup/
 show.jsonc
+apps/asr/gemini-api-key.txt

@@ -143,9 +143,9 @@ export function registerUnilogRoutes(app) {
           ts: e.ts,
         });
         broadcastUnilog(row);
-        // Detailed asr.js progress (unilog-only, never on the child's stdout)
-        // is mirrored into the asr log buffer so the ASR pane's Tail toggle can
-        // show/hide it interleaved with the Queued/Starting/Done lines.
+        // asr.js progress (unilog-only, never on the child's stdout) is
+        // mirrored into the asr log buffer so the ASR pane shows it
+        // interleaved with the Queued/Starting/Done lines.
         if (row && !row.hide && row.pid === "tv-asr") {
           appendAsrTail(row.message);
         }

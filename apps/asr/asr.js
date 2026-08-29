@@ -36,7 +36,7 @@ setUnilogSink(({ logId, ts, message }) => {
 // three rows to the unilog DB — started, finished, and retries-exhausted — so
 // every other progress line goes here and here only.
 function pane(msg) {
-  process.stdout.write(msg + "\n");
+  process.stdout.write(`[${ts()}] ${msg}\n`);
 }
 
 let tmpDir = process.env.ASR_TMPDIR
@@ -98,6 +98,30 @@ const CAPTION_SCHEMA = {
     required: ["start", "end", "text"],
   },
 };
+
+// What bounds a single call is the model's 65,536 output-token cap, not the
+// documented 9.5-hour audio cap: a measured run produced 28.7 output tokens per
+// second of audio, so 65536 * 0.5 (safety factor) / 28.7 is about 1140s. Longer
+// audio is split into parts, each transcribed on its own.
+const MAX_PART_SEC = 1140;
+// Silence shorter than this is not a candidate cut point.
+const SILENCE_MIN_DUR = 0.3;
+// silencedetect noise thresholds the search runs between. Strict finds only
+// near-total silence (few cuts, long spans); loose counts any quiet moment
+// (many cuts, short spans, and a risk of cutting through soft speech).
+const SILENCE_DB_STRICT = -50;
+const SILENCE_DB_LOOSE = -20;
+const SILENCE_SEARCH_ITERS = 8;
+// How far from an ideal part boundary a silence may be and still be used. Past
+// this the boundary is a hard cut, which can split a word.
+const CUT_SNAP_SEC = 90;
+// Cues the model places outside the part it was handed are dropped.
+const PART_EDGE_TOLERANCE_SEC = 1;
+
+// gemini-3.6-flash paid-tier rates, US dollars per million tokens. Thinking
+// tokens bill as output. Both rates double on 2027-01-01.
+const COST_PER_MTOK_IN = 0.75;
+const COST_PER_MTOK_OUT = 3.75;
 
 // Set by processOneVideo so the run's unilog rows can name the file even from
 // inside callApi.
@@ -373,9 +397,21 @@ async function preprocessAudio(inputWav, outputWav) {
 }
 
 /* ---------------- Transcription ---------------- */
-async function getFlac(wavPath) {
-  const flacPath = path.join(tmpDir, path.basename(wavPath, ".wav") + ".flac");
-  await run("ffmpeg", ["-y", "-i", wavPath, "-c:a", "flac", flacPath]);
+// Encode one span of the processed wav to flac. `-ss` goes after `-i` so the
+// seek is accurate — every cue timestamp in the part is relative to this start.
+async function encodePart(wavPath, start, end, flacPath) {
+  await run("ffmpeg", [
+    "-y",
+    "-i",
+    wavPath,
+    "-ss",
+    start.toFixed(3),
+    "-to",
+    end.toFixed(3),
+    "-c:a",
+    "flac",
+    flacPath,
+  ]);
   return flacPath;
 }
 
@@ -389,9 +425,13 @@ async function uploadAudio(flacPath) {
   for (let i = 0; file.state === FileState.PROCESSING && i < FILE_POLL_MAX; i++) {
     await sleep(FILE_POLL_MS);
     file = await fileManager.getFile(file.name);
+    pane(`  upload poll ${i + 1}/${FILE_POLL_MAX}: ${file.state}`);
   }
   if (file.state !== FileState.ACTIVE) {
-    throw new Error(`uploaded audio is ${file.state}, not ACTIVE`);
+    throw new Error(
+      `uploaded audio is ${file.state} after ` +
+        `${(FILE_POLL_MAX * FILE_POLL_MS) / 1000}s, not ACTIVE`,
+    );
   }
   return { fileData: { mimeType: file.mimeType, fileUri: file.uri } };
 }
@@ -409,6 +449,7 @@ Each cue needs a start time, an end time, and the words that were said.
 
 Rules for the cues:
 - Times use HH:MM:SS,mmm and must line up with the audio.
+- the times must be accurate to 100ms.
 - Keep each cue to a single short line or two of dialogue; split long speeches
   into several consecutive cues rather than one long block.
 - Cover all audible dialogue, including background and overlapping speech.
@@ -429,14 +470,15 @@ async function callApi(fileData) {
       });
       const response = result.response;
       const finish = response.candidates?.[0]?.finishReason ?? "none";
-      const used = response.usageMetadata?.totalTokenCount ?? 0;
+      const usage = response.usageMetadata ?? {};
       pane(
-        `Gemini finished: ${finish}, ${used} tokens, ${Date.now() - apiStart}ms`,
+        `Gemini finished: ${finish}, ${usage.totalTokenCount ?? 0} tokens, ` +
+          `${Date.now() - apiStart}ms`,
       );
       if (finish !== "STOP") {
         throw new Error(`Gemini stopped early: ${finish}`);
       }
-      return response.text();
+      return { text: response.text(), usage };
     } catch (err) {
       const retryable = RETRY_STATUSES.includes(err.status);
       if (!retryable || attempt > MAX_RETRIES) {
@@ -452,6 +494,26 @@ async function callApi(fileData) {
       await sleep(delay);
     }
   }
+}
+
+// Parts are separate calls, so their usage is summed for the run's one row.
+function addUsage(total, usage) {
+  total.promptTokenCount += usage.promptTokenCount ?? 0;
+  total.candidatesTokenCount += usage.candidatesTokenCount ?? 0;
+  total.thoughtsTokenCount += usage.thoughtsTokenCount ?? 0;
+  return total;
+}
+
+// Token counts and what they cost, as one string both the pane and the run's
+// finished row use: `in 17113, out 19446 (7750 thinking), $0.0858`.
+function formatUsage(usage) {
+  const inTok = usage.promptTokenCount ?? 0;
+  const cueTok = usage.candidatesTokenCount ?? 0;
+  const thinkTok = usage.thoughtsTokenCount ?? 0;
+  const outTok = cueTok + thinkTok;
+  const cost =
+    (inTok * COST_PER_MTOK_IN + outTok * COST_PER_MTOK_OUT) / 1_000_000;
+  return `in ${inTok}, out ${outTok} (${thinkTok} thinking), $${cost.toFixed(4)}`;
 }
 
 // Gemini returns "HH:MM:SS,mmm" (or with a period) — convert to seconds.
@@ -525,6 +587,194 @@ function toSrtTime(totalSec) {
   return `${h}:${m}:${s},${ms3}`;
 }
 
+/* ---------------- Splitting long audio ---------------- */
+
+// Midpoints of every detected silence, which are the only places a part
+// boundary may fall. silencedetect reports on stderr.
+async function detectSilences(wavPath, noiseDb, minDur) {
+  const { err } = await run("ffmpeg", [
+    "-i",
+    wavPath,
+    "-af",
+    `silencedetect=noise=${noiseDb}dB:duration=${minDur}`,
+    "-f",
+    "null",
+    "-",
+  ]);
+  const starts = [];
+  const ends = [];
+  for (const line of err.split("\n")) {
+    let m = line.match(/silence_start:\s*([\d.]+)/);
+    if (m) {
+      starts.push(parseFloat(m[1]));
+      continue;
+    }
+    m = line.match(/silence_end:\s*([\d.]+)/);
+    if (m) ends.push(parseFloat(m[1]));
+  }
+  const midpoints = [];
+  for (let i = 0; i < Math.min(starts.length, ends.length); i++) {
+    midpoints.push((starts[i] + ends[i]) / 2);
+  }
+  return midpoints;
+}
+
+// The longest stretch between adjacent cut candidates. A span is atomic — no
+// grouping can put it in a part shorter than itself — so this is what decides
+// whether a legal split exists at all.
+function maxSpan(midpoints, totalDur) {
+  const cuts = [0, ...midpoints, totalDur];
+  let longest = 0;
+  for (let i = 1; i < cuts.length; i++) {
+    longest = Math.max(longest, cuts[i] - cuts[i - 1]);
+  }
+  return longest;
+}
+
+// Ideal part boundaries: equal-length targets. Splitting evenly beats greedily
+// filling parts, which leaves a runt final part whose per-call thinking tokens
+// are wasted. Boundaries depend only on duration, so they are known before any
+// silence is detected.
+function partTargets(totalDur) {
+  const nParts = Math.ceil(totalDur / MAX_PART_SEC);
+  const targets = [];
+  for (let k = 1; k < nParts; k++) targets.push((k * totalDur) / nParts);
+  return { nParts, targets };
+}
+
+// How many target boundaries have a cut candidate close enough to snap to.
+function coveredTargets(midpoints, targets) {
+  return targets.filter((t) =>
+    midpoints.some((m) => Math.abs(m - t) <= CUT_SNAP_SEC),
+  ).length;
+}
+
+// Find the strictest silence threshold that puts a cut candidate near every
+// target boundary. Strictest is preferred because a loose threshold calls soft
+// speech "silence" and cuts through a word — but strict alone is not enough:
+// maxSpan only asks whether some legal partition exists, which is satisfied
+// trivially and would settle on a threshold with too few candidates to snap to.
+async function findCutCandidates(wavPath, totalDur, targets) {
+  let lo = SILENCE_DB_STRICT;
+  let hi = SILENCE_DB_LOOSE;
+  let best = null;
+  let bestThreshold = hi;
+  for (let i = 0; i < SILENCE_SEARCH_ITERS; i++) {
+    const threshold = (lo + hi) / 2;
+    const midpoints = await detectSilences(
+      wavPath,
+      threshold.toFixed(1),
+      SILENCE_MIN_DUR,
+    );
+    const longest = maxSpan(midpoints, totalDur);
+    const covered = coveredTargets(midpoints, targets);
+    pane(
+      `  silence pass ${i + 1}/${SILENCE_SEARCH_ITERS}: ` +
+        `${threshold.toFixed(1)}dB, ${midpoints.length} silences, ` +
+        `longest span ${longest.toFixed(0)}s, ` +
+        `${covered}/${targets.length} boundaries covered`,
+    );
+    if (longest > MAX_PART_SEC || covered < targets.length) {
+      lo = threshold; // not enough cuts where they are needed — loosen
+    } else {
+      best = midpoints; // keep the candidates that actually passed
+      bestThreshold = threshold;
+      hi = threshold; // try stricter
+    }
+  }
+  if (!best) {
+    best = await detectSilences(
+      wavPath,
+      String(SILENCE_DB_LOOSE),
+      SILENCE_MIN_DUR,
+    );
+    bestThreshold = SILENCE_DB_LOOSE;
+  }
+  pane(
+    `silence: threshold=${bestThreshold.toFixed(1)}dB, ` +
+      `${best.length} cut candidates, longest span ` +
+      `${maxSpan(best, totalDur).toFixed(0)}s, ` +
+      `${coveredTargets(best, targets)}/${targets.length} boundaries covered`,
+  );
+  return best;
+}
+
+// Snap each ideal boundary to the nearest silence, falling back to a hard cut
+// when the search could not find one close enough.
+function planParts(midpoints, totalDur, targets) {
+  if (targets.length === 0) return [{ start: 0, end: totalDur }];
+
+  const bounds = [0];
+  let hardCuts = 0;
+  for (const want of targets) {
+    const prev = bounds[bounds.length - 1];
+    let nearest = null;
+    let nearestDist = Infinity;
+    for (const m of midpoints) {
+      if (m <= prev) continue;
+      const dist = Math.abs(m - want);
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearest = m;
+      }
+    }
+    if (nearest === null || nearestDist > CUT_SNAP_SEC) {
+      hardCuts++;
+      bounds.push(Math.max(want, prev + 1));
+    } else {
+      bounds.push(nearest);
+    }
+  }
+  bounds.push(totalDur);
+
+  if (hardCuts > 0) {
+    pane(
+      `${hardCuts} hard cut(s): no silence near the boundary, a word may split`,
+    );
+  }
+
+  const parts = [];
+  for (let i = 1; i < bounds.length; i++) {
+    parts.push({ start: bounds[i - 1], end: bounds[i] });
+  }
+  return parts;
+}
+
+// Transcribe one part and shift its cues onto the full recording's timeline.
+async function transcribePart(wavPath, part, index, count) {
+  const flacPath = path.join(
+    tmpDir,
+    `part-${String(index).padStart(3, "0")}.flac`,
+  );
+  await encodePart(wavPath, part.start, part.end, flacPath);
+  const flacMb = fs.statSync(flacPath).size / 1e6;
+  const label = count > 1 ? `part ${index + 1}/${count} ` : "";
+  pane(
+    `Uploading ${label}${flacMb.toFixed(1)}MB of audio to Gemini ` +
+      `(${part.start.toFixed(0)}s-${part.end.toFixed(0)}s)`,
+  );
+  const fileData = await uploadAudio(flacPath);
+
+  pane(`Transcribing ${label}with ${GEMINI_MODEL}`);
+  const { text, usage } = await callApi(fileData);
+
+  // Cues are relative to the part, so shift them; drop anything the model
+  // placed outside the audio it was actually given.
+  const partDur = part.end - part.start;
+  const segments = [];
+  for (const seg of processSegments(text)) {
+    if (seg.end <= seg.start) continue;
+    if (seg.start < -PART_EDGE_TOLERANCE_SEC) continue;
+    if (seg.start > partDur + PART_EDGE_TOLERANCE_SEC) continue;
+    segments.push({
+      start: part.start + seg.start,
+      end: part.start + seg.end,
+      text: seg.text,
+    });
+  }
+  return { segments, usage, flacPath };
+}
+
 /* ---------------- SRT generation ---------------- */
 function writeSRT(segments, outputPath) {
   if (!segments || segments.length === 0) {
@@ -540,32 +790,67 @@ function writeSRT(segments, outputPath) {
     srtContent += `${seg.text}\n\n`;
   }
   fs.writeFileSync(outputPath, srtContent, "utf8");
-  pane(`[${ts()}] Wrote: ${path.basename(outputPath)}`);
+  pane(`Wrote: ${path.basename(outputPath)}`);
 }
 
 /* ---------------- Main processing function ---------------- */
 async function processOneVideo(videoPath) {
   currentVideoName = path.basename(videoPath);
   unilog(2284, `ASR: starting "${currentVideoName}"`);
-  pane(`[${ts()}] Processing: ${currentVideoName}`);
+  pane(`Processing: ${currentVideoName}`);
   const rawWavFile = path.join(tmpDir, "audio_raw.wav");
   const processedWavFile = path.join(tmpDir, "audio_processed.wav");
-  let flacFile = null;
+  const partFiles = [];
   try {
     await extractAudio(videoPath, rawWavFile);
     pane(`Preprocessing audio...`);
     await preprocessAudio(rawWavFile, processedWavFile);
     const totalDur = await getDurationSec(processedWavFile);
-    pane(`Duration: ${totalDur.toFixed(0)}s, encoding flac`);
+    pane(`Duration: ${totalDur.toFixed(0)}s`);
 
-    flacFile = await getFlac(processedWavFile);
-    const flacMb = fs.statSync(flacFile).size / 1e6;
-    pane(`Uploading ${flacMb.toFixed(1)}MB of audio to Gemini`);
-    const fileData = await uploadAudio(flacFile);
+    // One call per part. Anything inside the output-token budget stays a
+    // single call and never runs the silence search.
+    let parts;
+    const { nParts, targets } = partTargets(totalDur);
+    if (nParts <= 1) {
+      parts = [{ start: 0, end: totalDur }];
+    } else {
+      pane(`Longer than ${MAX_PART_SEC}s, splitting on silence`);
+      const midpoints = await findCutCandidates(
+        processedWavFile,
+        totalDur,
+        targets,
+      );
+      parts = planParts(midpoints, totalDur, targets);
+      pane(
+        `split into ${parts.length} parts: ` +
+          parts
+            .map((p) => `${p.start.toFixed(0)}-${p.end.toFixed(0)}s`)
+            .join(", "),
+      );
+    }
 
-    pane(`Transcribing with ${GEMINI_MODEL}`);
-    const responseText = await callApi(fileData);
-    const segments = processSegments(responseText);
+    const segments = [];
+    const usage = {
+      promptTokenCount: 0,
+      candidatesTokenCount: 0,
+      thoughtsTokenCount: 0,
+    };
+    for (let i = 0; i < parts.length; i++) {
+      const part = await transcribePart(
+        processedWavFile,
+        parts[i],
+        i,
+        parts.length,
+      );
+      partFiles.push(part.flacPath);
+      segments.push(...part.segments);
+      addUsage(usage, part.usage);
+      if (parts.length > 1) {
+        pane(`part ${i + 1}/${parts.length}: ${part.segments.length} cues`);
+      }
+    }
+
     if (segments.length === 0) {
       throw new Error("No transcription segments found");
     }
@@ -574,7 +859,9 @@ async function processOneVideo(videoPath) {
 
     const outputPath = getSrtPath(videoPath);
     writeSRT(segments, outputPath);
-    unilog(2285, `ASR: finished "${currentVideoName}"`);
+    const usageText = formatUsage(usage);
+    pane(`Usage: ${parts.length} call(s), ${usageText}`);
+    unilog(2287, `ASR: finished, ${usageText}`);
   } catch (err) {
     pane(`❌ Failed to process: ${currentVideoName}, ${err.message}`);
     throw err;
@@ -584,7 +871,9 @@ async function processOneVideo(videoPath) {
       if (await pathExists(rawWavFile)) await fsp.unlink(rawWavFile);
       if (await pathExists(processedWavFile))
         await fsp.unlink(processedWavFile);
-      if (flacFile && (await pathExists(flacFile))) await fsp.unlink(flacFile);
+      for (const f of partFiles) {
+        if (await pathExists(f)) await fsp.unlink(f);
+      }
     } catch (_) {}
   }
 }

@@ -1409,7 +1409,6 @@ import {
   abortAsr,
   openChannel,
   removeFromAsrQueue,
-  killAsrProcess,
   searchOpn,
   toggleBadGroup,
 } from "../srvr.js";
@@ -2409,14 +2408,6 @@ export default {
         if (!res?.ok) this.pushAsrLine(`Abort: ${res?.error || "failed"}`);
       } catch (e) {
         this.pushAsrLine(`Error: ${e.message}`);
-      }
-    },
-    async killAsr() {
-      try {
-        await killAsrProcess();
-        this.pushAsrLine(`[Kill command sent]`);
-      } catch (e) {
-        this.pushAsrLine(`Error killing ASR: ${e.message}`);
       }
     },
     onAsrLog(entry) {

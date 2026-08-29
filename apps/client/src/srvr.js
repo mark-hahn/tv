@@ -902,11 +902,11 @@ export function enqueueSubs(videoPaths, fromUI) {
 }
 
 export function enqueueGenSrt(videoPaths, fromUI) {
-  return httpCall("/api/asr/gensrt/enqueue", { videoPaths, fromUI }
+  return httpCall("/api/asr/gensrt/enqueue", { videoPaths, fromUI }, "POST");
+}
 
 export function abortAsr() {
   return httpCall("/api/asr/gensrt/abort", {}, "POST");
-}, "POST");
 }
 
 export function generateEmb(videoPaths) {
@@ -983,10 +983,6 @@ export function addToAsrQueue(videoPaths) {
 
 export function removeFromAsrQueue(videoPath) {
   return httpCall("/api/asr/queue/remove", { videoPath }, "POST");
-}
-
-export function killAsrProcess() {
-  return httpCall("/api/asr/kill", {}, "POST");
 }
 
 export function setTvdbFields(params) {

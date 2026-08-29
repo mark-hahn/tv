@@ -3357,15 +3357,6 @@ app.get("/api/asr/log", (req, res) => {
   res.json({ lines: subsState.asrLogBuffer });
 });
 
-app.post("/api/asr/kill", (req, res) => {
-  if (subsState.genSrtChild) {
-    subsState.genSrtChild.kill("SIGTERM");
-    res.json({ ok: true, killed: true });
-  } else {
-    res.json({ ok: true, killed: false });
-  }
-});
-
 // Background operations
 app.post(
   "/api/updateTvdb",

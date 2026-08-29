@@ -902,7 +902,11 @@ export function enqueueSubs(videoPaths, fromUI) {
 }
 
 export function enqueueGenSrt(videoPaths, fromUI) {
-  return httpCall("/api/asr/gensrt/enqueue", { videoPaths, fromUI }, "POST");
+  return httpCall("/api/asr/gensrt/enqueue", { videoPaths, fromUI }
+
+export function abortAsr() {
+  return httpCall("/api/asr/gensrt/abort", {}, "POST");
+}, "POST");
 }
 
 export function generateEmb(videoPaths) {

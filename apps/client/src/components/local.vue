@@ -929,6 +929,22 @@
             Start
           </button>
           <button
+            @click="abortAsrRun"
+            :disabled="!asrBusy"
+            title="Stop the running ASR job"
+            :style="{
+              cursor: asrBusy ? 'pointer' : 'default',
+              borderRadius: '4px',
+              padding: '2px 8px',
+              border: '1px solid #bbb',
+              opacity: asrBusy ? 1 : 0.5,
+              backgroundColor: 'whitesmoke',
+              marginRight: '5px',
+            }"
+          >
+            Abort
+          </button>
+          <button
             @click="clearAsrLog"
             :style="{
               cursor: 'pointer',
@@ -1390,6 +1406,7 @@ import {
   getAsrQueue,
   getLocalHistory,
   addToAsrQueue,
+  abortAsr,
   openChannel,
   removeFromAsrQueue,
   killAsrProcess,
@@ -2382,6 +2399,14 @@ export default {
       try {
         await addToAsrQueue(videoPaths);
         this.pushAsrLine(`Queued ${videoPaths.length} file(s) for ASR.`);
+      } catch (e) {
+        this.pushAsrLine(`Error: ${e.message}`);
+      }
+    },
+    async abortAsrRun() {
+      try {
+        const res = await abortAsr();
+        if (!res?.ok) this.pushAsrLine(`Abort: ${res?.error || "failed"}`);
       } catch (e) {
         this.pushAsrLine(`Error: ${e.message}`);
       }

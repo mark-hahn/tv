@@ -131,8 +131,13 @@ const displayCap = (chars) => {
 };
 // Every cue clears the screen before the next appears.
 const CUE_GAP_SEC = 0.08;
-// Cues longer than this are split on word boundaries from the aligner.
-const MAX_CUE_CHARS = 42;
+// Subtitle geometry: a cue is at most two lines of this width. Splitting is
+// done at sentence, then clause, then word boundaries so a cue rarely ends
+// mid-phrase.
+const MAX_LINE_CHARS = 42;
+const MAX_CUE_CHARS = MAX_LINE_CHARS * 2;
+// Break early at a sentence end once a cue is at least this full.
+const SENTENCE_BREAK_MIN = 28;
 
 // gemini-3.6-flash paid-tier rates, US dollars per million tokens. Thinking
 // tokens bill as output. Both rates double on 2027-01-01.
@@ -179,15 +184,34 @@ function getSrtPath(videoPath) {
   return path.join(dir, `${baseName}.asr.srt`);
 }
 
+// tv-srvr aborts a run by sending SIGTERM here. ffmpeg and the aligner are
+// children of this process, so they are killed explicitly — otherwise a long
+// alignment would keep running after the job is gone.
+const children = new Set();
+let aborting = false;
+for (const sig of ["SIGTERM", "SIGINT"]) {
+  process.on(sig, () => {
+    aborting = true;
+    for (const child of children) child.kill("SIGKILL");
+    process.exit(1);
+  });
+}
+
 function run(cmd, args, opts = {}) {
+  if (aborting) return Promise.reject(new Error("aborted"));
   return new Promise((resolve, reject) => {
     const p = spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"], ...opts });
+    children.add(p);
     let out = "",
       err = "";
     p.stdout.on("data", (d) => (out += d.toString()));
     p.stderr.on("data", (d) => (err += d.toString()));
-    p.on("error", reject);
+    p.on("error", (e) => {
+      children.delete(p);
+      reject(e);
+    });
     p.on("close", (code) => {
+      children.delete(p);
       if (code === 0) {
         resolve({ out, err });
       } else {
@@ -375,15 +399,17 @@ function formatUsage(usage) {
   return `in ${inTok}, out ${outTok} (${thinkTok} thinking), $${cost.toFixed(4)}`;
 }
 
-// Gemini returns "HH:MM:SS,mmm" (or with a period) — convert to seconds.
+// Timestamps come back as "HH:MM:SS,mmm", but the hour field is dropped when
+// the audio is under an hour, so "MM:SS,mmm" and even "SS,mmm" turn up. Read
+// the fields from the right: seconds, then minutes, then hours.
 function srtTimeToSec(timeStr) {
-  const parts = String(timeStr).replace(",", ".").split(":");
-  if (parts.length !== 3) {
+  const fields = String(timeStr).trim().replace(",", ".").split(":");
+  if (fields.length < 1 || fields.length > 3) {
     throw new Error(`invalid time format: ${timeStr}`);
   }
-  const hours = parseInt(parts[0], 10);
-  const minutes = parseInt(parts[1], 10);
-  const seconds = parseFloat(parts[2]);
+  const seconds = parseFloat(fields[fields.length - 1]);
+  const minutes = fields.length > 1 ? parseInt(fields[fields.length - 2], 10) : 0;
+  const hours = fields.length > 2 ? parseInt(fields[0], 10) : 0;
   if (!Number.isFinite(hours + minutes + seconds)) {
     throw new Error(`invalid time format: ${timeStr}`);
   }
@@ -720,7 +746,11 @@ function guardAlignment(segments, times) {
       clamped++;
       end = start + Math.max(GUARD_MIN_DUR, cap.spoken * 1.6 + 0.4);
     }
-    return { ...seg, start, end, words: times[i]?.words ?? null };
+    // a rejected or unplaceable cue keeps no word times; its split pieces are
+    // interpolated across the corrected span instead
+    const trusted =
+      times[i] && Math.abs(shift[i] - consensus) <= GUARD_MAX_DEVIATION;
+    return { ...seg, start, end, words: trusted ? times[i].words : null };
   });
 
   // keep order, then clear each cue before the next one starts
@@ -741,34 +771,60 @@ function guardAlignment(segments, times) {
   return out;
 }
 
-// Split words into n chunks of similar length, none over MAX_CUE_CHARS.
-function balancedChunks(words, n) {
-  if (n <= 1) return [words];
-  const chunks = [];
-  let offset = 0;
-  for (let c = 0; c < n; c++) {
-    if (c === n - 1) {
-      chunks.push(words.slice(offset));
-      break;
+const SENTENCE_END = /[.!?]["\')\]]?$/;
+const CLAUSE_END = /[,;:]["\')\]]?$/;
+
+// Group words into cues that fit MAX_CUE_CHARS, breaking at the end of a
+// sentence where possible and at a clause otherwise.
+function groupWords(words) {
+  const groups = [];
+  let current = [];
+  let len = 0;
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    const added = len === 0 ? word.length : len + 1 + word.length;
+    if (len > 0 && added > MAX_CUE_CHARS) {
+      groups.push(current);
+      current = [word];
+      len = word.length;
+      continue;
     }
-    const remaining = words.slice(offset);
-    const target = remaining.join(" ").length / (n - c);
-    let len = 0;
-    let best = 1;
-    let bestDiff = Infinity;
-    for (let i = 0; i < remaining.length - 1; i++) {
-      len += i === 0 ? remaining[i].length : 1 + remaining[i].length;
-      if (len > MAX_CUE_CHARS) break;
-      const diff = Math.abs(len - target);
-      if (diff <= bestDiff) {
-        bestDiff = diff;
-        best = i + 1;
-      }
+    current.push(word);
+    len = added;
+    const last = i === words.length - 1;
+    if (last) break;
+    if (len >= SENTENCE_BREAK_MIN && SENTENCE_END.test(word)) {
+      groups.push(current);
+      current = [];
+      len = 0;
     }
-    chunks.push(remaining.slice(0, best));
-    offset += best;
   }
-  return chunks;
+  if (current.length) groups.push(current);
+  return groups;
+}
+
+// Wrap a cue onto two lines, preferring a break after punctuation and
+// otherwise the most even split.
+function wrapLines(words) {
+  const text = words.join(" ");
+  if (text.length <= MAX_LINE_CHARS || words.length < 2) return text;
+  let best = -1;
+  let bestScore = Infinity;
+  let len = 0;
+  for (let i = 0; i < words.length - 1; i++) {
+    len = len === 0 ? words[i].length : len + 1 + words[i].length;
+    const rest = words.slice(i + 1).join(" ").length;
+    if (len > MAX_LINE_CHARS || rest > MAX_LINE_CHARS) continue;
+    let score = Math.abs(len - rest);
+    if (SENTENCE_END.test(words[i])) score -= 40;
+    else if (CLAUSE_END.test(words[i])) score -= 20;
+    if (score < bestScore) {
+      bestScore = score;
+      best = i + 1;
+    }
+  }
+  if (best < 0) return text;
+  return `${words.slice(0, best).join(" ")}\n${words.slice(best).join(" ")}`;
 }
 
 // A long cue becomes several, cut at word boundaries the aligner measured, so
@@ -777,44 +833,36 @@ function splitLongCues(segments) {
   const out = [];
   let split = 0;
   for (const seg of segments) {
-    const text = seg.text.replace(/\s+/g, " ").trim();
-    if (text.length <= MAX_CUE_CHARS) {
-      out.push({ start: seg.start, end: seg.end, text });
-      continue;
-    }
-    const parts = balancedChunks(text.split(" "), Math.ceil(text.length / MAX_CUE_CHARS));
+    const words = seg.text.replace(/\s+/g, " ").trim().split(" ");
+    const groups = groupWords(words);
+    if (groups.length > 1) split++;
     const spoken = seg.words ?? [];
+    const span = seg.end - seg.start;
     let wordAt = 0;
     let cursor = seg.start;
-    const span = seg.end - seg.start;
-    const total = text.split(" ").length;
-    let done = 0;
-    for (const part of parts) {
-      if (!part.length) continue;
-      const timed = spoken.slice(wordAt, wordAt + part.length);
+    for (const group of groups) {
+      if (!group.length) continue;
+      const timed = spoken.slice(wordAt, wordAt + group.length);
       let start;
       let end;
-      if (timed.length === part.length) {
+      if (timed.length === group.length) {
         start = timed[0].start;
         end = timed[timed.length - 1].end;
       } else {
-        // aligner had no words here — fall back to interpolating the cue
-        start = seg.start + (done / total) * span;
-        end = seg.start + ((done + part.length) / total) * span;
+        start = seg.start + (wordAt / words.length) * span;
+        end = seg.start + ((wordAt + group.length) / words.length) * span;
       }
       if (start < cursor) start = cursor;
       if (end <= start) end = start + GUARD_MIN_DUR;
-      const chunkText = part.join(" ");
-      const cap = displayCap(chunkText.length);
+      const text = wrapLines(group);
+      const cap = displayCap(text.length);
       if (end - start > cap.max) {
         end = start + Math.max(GUARD_MIN_DUR, cap.spoken * 1.6 + 0.4);
       }
-      out.push({ start, end, text: chunkText });
+      out.push({ start, end, text });
       cursor = start;
-      wordAt += part.length;
-      done += part.length;
+      wordAt += group.length;
     }
-    split++;
   }
   for (let i = 0; i < out.length - 1; i++) {
     const limit = out[i + 1].start - CUE_GAP_SEC;
@@ -822,7 +870,7 @@ function splitLongCues(segments) {
       out[i].end = Math.max(out[i].start + GUARD_MIN_DUR, limit);
     }
   }
-  if (split > 0) pane(`split ${split} cues longer than ${MAX_CUE_CHARS} chars`);
+  if (split > 0) pane(`split ${split} cues over ${MAX_CUE_CHARS} chars`);
   return out;
 }
 

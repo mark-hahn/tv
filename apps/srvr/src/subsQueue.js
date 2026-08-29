@@ -85,6 +85,9 @@ export const subsState = {
   asrTotalDur: 0,
   genSrtRunning: false,
   genSrtChild: null,
+  // set while an abort is in flight so the child's exit reads as cancelled
+  // rather than as a failure, whatever code the signal produces
+  genSrtAborting: false,
   subQueuePendingNow: false,
   asrLogBuffer: [],
   embLogBuffer: [],
@@ -741,6 +744,7 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
   appendAsrLog(`=== Queued: ${path.basename(videoFilePath)} ===`);
   unilog(14, `asr start: ${videoFilePath}`);
   subsState.genSrtRunning = true;
+  subsState.genSrtAborting = false;
   subsState.asrStartedAt = Date.now();
   subsState.asrStage = "starting";
   subsState.asrTotalDur = 0;
@@ -768,7 +772,8 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
       });
       child.on("close", (code) => {
         subsState.genSrtChild = null;
-        if (code === 0) resolve();
+        if (subsState.genSrtAborting) reject(new Error(`__cancelled__`));
+        else if (code === 0) resolve();
         else if (code === null) reject(new Error(`__cancelled__`));
         else reject(new Error(`asr.js exited ${code}`));
       });
@@ -792,11 +797,26 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
   } finally {
     subsState.genSrtRunning = false;
     subsState.genSrtChild = null;
+    subsState.genSrtAborting = false;
     subsState.asrStage = null;
     syncBatchMsgs();
     publishAsrQueueUpdate({ running: false });
   }
 }
+// Stop the running asr.js. It kills its own ffmpeg/aligner children on SIGTERM,
+// so the whole tree goes down; the queue then moves on to the next entry.
+function abortAsr() {
+  const child = subsState.genSrtChild;
+  if (!subsState.genSrtRunning || !child) {
+    return { ok: false, error: "no ASR job is running" };
+  }
+  subsState.genSrtAborting = true;
+  appendAsrLog("=== Abort requested ===");
+  child.kill("SIGTERM");
+  unilog(2289, `asr abort requested for ${path.basename(subsState.asrQueue[0]?.videoPath || "unknown")}`);
+  return { ok: true };
+}
+
 function doSubQueueNow() {
   subsState.chkSubQueueDelay = 500;
   if (!subsState.subQueueBusy) {
@@ -1438,6 +1458,7 @@ export {
   generateEmbSrts,
   applyOpenSubSrts,
   generateSrtWithAsr,
+  abortAsr,
   doSubQueueNow,
   processSubQueueEntry,
   startSubQueueLoop,

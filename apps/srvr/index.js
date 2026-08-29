@@ -253,6 +253,7 @@ const {
   persistAsrQueue,
   appendAsrLog,
   addToAsrQueue,
+  abortAsr,
   enqueueSubQueue,
   enqueueSubQueueChkSrt,
   loadQueues,
@@ -2729,6 +2730,10 @@ app.post("/api/asr/gensrt/enqueue", (req, res) => {
   });
   addToAsrQueue(entries);
   res.json({ ok: true, queued: videoPaths.length });
+});
+
+app.post("/api/asr/gensrt/abort", (req, res) => {
+  res.json(abortAsr());
 });
 
 app.post("/api/asr/emb/generate", async (req, res) => {

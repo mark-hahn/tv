@@ -257,17 +257,20 @@ async function smFetch(url, opts, label) {
 // Submit the flac, poll the job to completion, and return the measured word
 // timings. Punctuation comes back as separate results and glues onto the
 // word before it.
-async function transcribeAudio(flacPath) {
+async function transcribeAudio(flacPath, vocab) {
   const form = new FormData();
+  const transcription_config = {
+    language: "en",
+    operating_point: SM_OPERATING_POINT,
+  };
+  if (vocab.length) {
+    transcription_config.additional_vocab = vocab.map((content) => ({
+      content,
+    }));
+  }
   form.append(
     "config",
-    JSON.stringify({
-      type: "transcription",
-      transcription_config: {
-        language: "en",
-        operating_point: SM_OPERATING_POINT,
-      },
-    }),
+    JSON.stringify({ type: "transcription", transcription_config }),
   );
   form.append(
     "data_file",
@@ -280,7 +283,9 @@ async function transcribeAudio(flacPath) {
     "speechmatics submit",
   );
   const { id } = await sub.json();
-  pane(`Submitted job ${id} (${SM_OPERATING_POINT})`);
+  pane(
+    `Submitted job ${id} (${SM_OPERATING_POINT}, ${vocab.length} vocab terms)`,
+  );
 
   for (let i = 0; ; i++) {
     if (i >= SM_POLL_MAX) {
@@ -557,7 +562,7 @@ async function processOneVideo(videoPath) {
     const flacMb = fs.statSync(flacFile).size / 1e6;
     pane(`Duration: ${totalDur}s, uploading ${flacMb.toFixed(1)}MB of audio`);
 
-    const words = await transcribeAudio(flacFile);
+    const words = await transcribeAudio(flacFile, vocab);
     if (words.length === 0) {
       throw new Error("no words transcribed");
     }
@@ -587,6 +592,9 @@ if (!inputPath) {
   unilog(367, "No input file");
   process.exit(1);
 }
+// Optional JSON array of names (characters etc.) sent to Speechmatics as
+// additional_vocab so it recognizes them instead of near-homophones.
+const vocab = process.argv[3] ? JSON.parse(process.argv[3]) : [];
 (async () => {
   await run("ffmpeg", ["-version"]);
   await run("ffprobe", ["-version"]);

@@ -750,7 +750,13 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
       appendAsrLog(`=== Starting: ${path.basename(videoFilePath)} ===`);
       const child = cp.spawn(
         BATCH_SCHED[0],
-        [...BATCH_SCHED.slice(1), "node", ASR_JS_PATH, videoFilePath],
+        [
+          ...BATCH_SCHED.slice(1),
+          "node",
+          ASR_JS_PATH,
+          videoFilePath,
+          JSON.stringify(asrVocabForShow(showNameFromFilePath(videoFilePath))),
+        ],
         {
           stdio: ["ignore", "pipe", "pipe"],
         },
@@ -795,6 +801,27 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
     publishAsrQueueUpdate({ running: false });
   }
 }
+// Character names from the show's tvdb record, for Speechmatics
+// additional_vocab. "Dr. Owen Maestro / Rob Huebel" yields the full names
+// plus each name word, so both "Owen" and "Maestro" are boosted.
+const VOCAB_TITLES = new Set(["dr", "nurse", "lt", "mr", "mrs", "ms"]);
+function asrVocabForShow(showName) {
+  const rec = tvdb.getAllTvdbSync?.()?.[showName];
+  const terms = new Set();
+  for (const char of rec?.characters || []) {
+    for (const name of (char.character || "").split("/")) {
+      const words = name
+        .trim()
+        .split(/\s+/)
+        .filter((w) => w && !VOCAB_TITLES.has(w.toLowerCase().replace(".", "")));
+      if (!words.length) continue;
+      terms.add(words.join(" "));
+      for (const w of words) if (w.length > 2) terms.add(w);
+    }
+  }
+  return [...terms];
+}
+
 // Stop the running asr.js. It kills its own ffmpeg children on SIGTERM,
 // so the whole tree goes down; the queue then moves on to the next entry.
 function abortAsr() {

@@ -7,12 +7,17 @@ transcription**; cue timings are the engine's measured word timings.
 
 ## 1. What the pipeline does
 
-`apps/asr/asr.js`, invoked as `node asr.js <video>` by tv-srvr's queue
-(`apps/srvr/src/subsQueue.js`), which also scrapes the stage lines it prints.
+`apps/asr/asr.js`, invoked as `node asr.js <video> [vocabJson]` by tv-srvr's
+queue (`apps/srvr/src/subsQueue.js`), which also scrapes the stage lines it
+prints. `vocabJson` is a JSON array of terms; `asrVocabForShow()` in
+subsQueue.js builds it from the show's tvdb `characters` (each `/`-separated
+name with Dr./Nurse/Lt. stripped, plus every name word of 3+ letters).
 
-1. Extract audio → 16 kHz mono flac (`-map 0:a:0`), whole video, no splitting
-2. One Speechmatics batch job (`enhanced` operating point), polled to
-   completion; transient HTTP failures retry with backoff
+1. Extract audio → 16 kHz mono flac (`-map 0:a:0 -ac 1`), whole video, no
+   splitting, no filters (see §4 — filters were measured and rejected)
+2. One Speechmatics batch job (`enhanced` operating point, cast names as
+   `additional_vocab`), polled to completion; transient HTTP failures retry
+   with backoff
 3. The json-v2 transcript's measured word timings become cues directly
    (`wordsToSegments`: new cue on a >1s speech gap, cue overflow, or a
    sentence end past 28 chars)
@@ -86,6 +91,32 @@ Reading the numbers:
   as lost dialogue.
 
 ## 4. Approaches evaluated and rejected — do not re-derive
+
+Word-error measurements below are against the CC track after normalizing
+`gonna`/`dr`/`-in'` spellings and dropping sound effects and speaker labels.
+The engine is nondeterministic: the same flac submitted twice differs by ±3
+errors, so anything inside that is noise.
+
+- **`additional_vocab` from the cast list** — adopted (2026-08-29). Childrens
+  Hospital S06E01: 176 → 168 errors, all from substitutions (Owen, Cat, Dori
+  no longer misheard as near-homophones). First-names-only (31 terms) scored
+  169 — it avoids one surname false-positive (`plaque` → `Black`) but loses
+  `Owen` and `Childrens` fixes, so the full list is used. Vocab does nothing
+  for deletions.
+- **Audio preprocessing** — 28 runs over Childrens Hospital S06E01 (5.1 AAC
+  broadcast mix) and A Thousand Blows S02E01 (5.1 eac3 DSNP), single-variable
+  changes to the ffmpeg extraction, all with the vocab list:
+  - Neutral (within noise): 48 kHz instead of 16 kHz, center-weighted downmix
+    at any weight 0.1–0.7, `loudnorm`, `dynaudnorm`, `acompressor` at ratio
+    2/4/8, `highpass=80,lowpass=8000`.
+  - Harmful: center channel only (+24 errors, dialogue is not all in FC),
+    `arnndn` RNNoise (+42).
+  - `afftdn` FFT denoise: a swept optimum at the default `nr=12` gave −9
+    errors on Childrens Hospital (fewer substitutions, more deletions) but
+    +15 on A Thousand Blows (only the extra deletions remain on a clean
+    mix). Not adopted — it doesn't generalize.
+  - Deletions (dropped shouted names, overlapping lines, credits songs) were
+    untouched by every variant; they are not an audio-front-end problem.
 
 - **Punctuation sensitivity tuning** — see §2; measured, default kept.
 - **LLM re-punctuation pass** (text-only, words locked, timings untouched):

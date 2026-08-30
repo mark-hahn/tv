@@ -74,6 +74,17 @@ try {
 }
 
 const GEMINI_MODEL = "gemini-3.6-flash";
+// The model defaults to temperature 1, i.e. sampling, which makes every run
+// return different words and a different number of cues. Transcription wants
+// the single most likely reading, so decode greedily. Temperature alone is not
+// enough — the reasoning the model does before answering is sampled too — so a
+// fixed seed pins that as well. Together they make a run reproducible.
+const GEMINI_TEMPERATURE = 0;
+const GEMINI_SEED = 42;
+// The model reasons before answering by default. On transcription that reasoning
+// costs ~30% of the bill and ~30% more wall time while scoring slightly worse
+// against the broadcast captions, so keep it minimal.
+const GEMINI_THINKING_LEVEL = "LOW";
 const AUDIO_MIME = "audio/flac";
 // Uploads go through the Files API, which has no practical size limit.
 const FILE_POLL_MS = 2000;
@@ -131,6 +142,9 @@ const displayCap = (chars) => {
 };
 // Every cue clears the screen before the next appears.
 const CUE_GAP_SEC = 0.08;
+// A cue must stay up long enough to read even when the words it covers were
+// spoken in a fraction of a second ("No.", "4%.").
+const MIN_CUE_SEC = 0.9;
 // Subtitle geometry: a cue is at most two lines of this width. Splitting is
 // done at sentence, then clause, then word boundaries so a cue rarely ends
 // mid-phrase.
@@ -347,6 +361,9 @@ async function callApi(fileData) {
       const result = await geminiModel.generateContent({
         contents: [{ role: "user", parts: [{ text: PROMPT }, fileData] }],
         generationConfig: {
+          temperature: GEMINI_TEMPERATURE,
+          seed: GEMINI_SEED,
+          thinkingConfig: { thinkingLevel: GEMINI_THINKING_LEVEL },
           responseMimeType: "application/json",
           responseSchema: CAPTION_SCHEMA,
         },
@@ -753,22 +770,37 @@ function guardAlignment(segments, times) {
     return { ...seg, start, end, words: trusted ? times[i].words : null };
   });
 
-  // keep order, then clear each cue before the next one starts
-  for (let i = 1; i < out.length; i++) {
-    if (out[i].start < out[i - 1].start) out[i].start = out[i - 1].start;
-  }
-  for (let i = 0; i < out.length - 1; i++) {
-    const limit = out[i + 1].start - CUE_GAP_SEC;
-    if (out[i].end > limit) {
-      out[i].end = Math.max(out[i].start + GUARD_MIN_DUR, limit);
-    }
-  }
-
   pane(
     `alignment: ${jumps} isolated jumps rejected, ${clamped} durations ` +
       `clamped, ${kept} cues the aligner could not place`,
   );
   return out;
+}
+
+// Order the cues, hold each one long enough to read, and clear it before the
+// next appears. Applied last, so nothing downstream can reintroduce a flash.
+function normalizeCues(cues) {
+  cues.sort((a, b) => a.start - b.start);
+  for (let i = 1; i < cues.length; i++) {
+    if (cues[i].start < cues[i - 1].start) cues[i].start = cues[i - 1].start;
+  }
+  for (let i = 0; i < cues.length; i++) {
+    const cue = cues[i];
+    const cap = displayCap(cue.text.length);
+    const room = i + 1 < cues.length
+      ? cues[i + 1].start - CUE_GAP_SEC
+      : Infinity;
+    const wanted = Math.max(
+      cue.end,
+      cue.start + Math.min(MIN_CUE_SEC, cap.max),
+    );
+    // never run past the next cue, but never flash either
+    cue.end = Math.max(
+      cue.start + GUARD_MIN_DUR,
+      Math.min(wanted, room === Infinity ? wanted : room),
+    );
+  }
+  return cues;
 }
 
 const SENTENCE_END = /[.!?]["\')\]]?$/;
@@ -864,14 +896,8 @@ function splitLongCues(segments) {
       wordAt += group.length;
     }
   }
-  for (let i = 0; i < out.length - 1; i++) {
-    const limit = out[i + 1].start - CUE_GAP_SEC;
-    if (out[i].end > limit) {
-      out[i].end = Math.max(out[i].start + GUARD_MIN_DUR, limit);
-    }
-  }
   if (split > 0) pane(`split ${split} cues over ${MAX_CUE_CHARS} chars`);
-  return out;
+  return normalizeCues(out);
 }
 
 /* ---------------- SRT generation ---------------- */

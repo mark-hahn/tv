@@ -1,7 +1,7 @@
 // §4 evaluation from asr-timing-handoff.md: word streams from each SRT,
 // Levenshtein-aligned, reporting WER and per-word timing error.
-// out() not console.log: the deploy reconciler rewrites console.* into
-// unilog DB calls, which silenced these result lines once already.
+// out() not console.log: the deploy reconciler rewrites console.* calls
+// into unilog DB rows, and these result lines must reach stdout.
 const out = (s) => process.stdout.write(s + "\n");
 //   node eval-timing.js <reference.srt> <candidate.srt>
 import fs from "fs";

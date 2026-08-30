@@ -218,12 +218,12 @@ function persistAsrQueue() {
 // The asr log buffer holds entries { text } — the Queued/Starting/Done lines
 // plus asr.js's own progress, in one buffer so they stay interleaved in true
 // arrival order. The pane shows all of them.
-// asr.js reports its own stage as it goes — "Preprocessing audio...",
-// "Duration: Ns, encoding flac", "Uploading NMB", "Transcribing with <model>",
-// "Transcribed N cues". Those lines are the only channel out of the child
-// process, so the pane's stage text is scraped from them here as they land.
-// Gemini transcribes the whole track in one call, so nothing reports position
-// within the audio — see asrRemainingSecs for what that costs the ETA.
+// asr.js reports its own stage as it goes — "Processing: <name>",
+// "Duration: Ns, uploading NMB of audio", "Submitted job <id>",
+// "Transcribed N words into N cues". Those lines are the only channel out of
+// the child process, so the pane's stage text is scraped from them here as
+// they land. The transcription job is opaque while it runs — see
+// asrRemainingSecs for what that costs the ETA.
 function trackAsrProgress(text) {
   for (const line of String(text).split("\n")) {
     if (line.includes("Processing: ")) {
@@ -231,25 +231,17 @@ function trackAsrProgress(text) {
       subsState.asrTotalDur = 0;
       continue;
     }
-    if (line.includes("Preprocessing audio")) {
-      subsState.asrStage = "preprocessing audio";
-      continue;
-    }
     const dur = line.match(/Duration: ([\d.]+)s/);
     if (dur) {
       subsState.asrTotalDur = parseFloat(dur[1]);
-      subsState.asrStage = "encoding flac";
-      continue;
-    }
-    if (line.includes("Uploading ")) {
       subsState.asrStage = "uploading audio";
       continue;
     }
-    if (line.includes("Transcribing with ")) {
+    if (line.includes("Submitted job ")) {
       subsState.asrStage = "transcribing";
       continue;
     }
-    if (line.includes("retrying in ")) {
+    if (line.includes("(attempt ")) {
       subsState.asrStage = "transcribing, retrying";
       continue;
     }
@@ -803,7 +795,7 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
     publishAsrQueueUpdate({ running: false });
   }
 }
-// Stop the running asr.js. It kills its own ffmpeg/aligner children on SIGTERM,
+// Stop the running asr.js. It kills its own ffmpeg children on SIGTERM,
 // so the whole tree goes down; the queue then moves on to the next entry.
 function abortAsr() {
   const child = subsState.genSrtChild;
@@ -1356,15 +1348,14 @@ function sleep(ms) {
 
 // ---- Queues pane ----------------------------------------------------------
 
-// Median of 15 completed runs (log sites 14/15): 14 of them took 62-76s, one
-// retried its way to 438s. Those were measured on the chunked Mistral run and
-// have not been re-measured for Gemini, which sends the whole track in one
-// call — treat this as a placeholder until the new runs have a median.
-const ASR_RUN_SECS = 74;
+// Flat whole-run estimate: a run is dominated by the upload plus the remote
+// batch job, together roughly 20s for a 20-minute episode and ~2 min for a
+// 45-minute one.
+const ASR_RUN_SECS = 60;
 
-// Seconds left on the running ASR job. The Gemini call is opaque — nothing
-// reports position within the audio while it runs — so this is a flat estimate
-// counting down from the start, not measured progress.
+// Seconds left on the running ASR job. The transcription job is opaque —
+// nothing reports position within the audio while it runs — so this is a
+// flat estimate counting down from the start, not measured progress.
 function asrRemainingSecs() {
   if (!subsState.genSrtRunning) return 0;
   const elapsed = (Date.now() - subsState.asrStartedAt) / 1000;

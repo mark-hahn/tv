@@ -1,7 +1,7 @@
 // Invariant checks from asr-timing-handoff.md §4 — all three must be zero.
 import fs from "fs";
-// out() not console.log: the deploy reconciler rewrites console.* into
-// unilog DB calls, which silenced these result lines once already.
+// out() not console.log: the deploy reconciler rewrites console.* calls
+// into unilog DB rows, and these result lines must reach stdout.
 const out = (s) => process.stdout.write(s + "\n");
 
 const MIN_CUE_SEC = 0.9;

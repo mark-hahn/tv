@@ -145,6 +145,12 @@ const CUE_GAP_SEC = 0.08;
 // A cue must stay up long enough to read even when the words it covers were
 // spoken in a fraction of a second ("No.", "4%.").
 const MIN_CUE_SEC = 0.9;
+// Cues starting closer together than this are effectively simultaneous — the
+// aligner cannot separate overlapping dialogue. Merge them when the text fits,
+// otherwise force them apart, so no cue is ever crammed into a flash.
+const CUE_MERGE_SEC = 0.45;
+// enough that the earlier cue can always reach MIN_CUE_SEC
+const MIN_CUE_SPACING = MIN_CUE_SEC + CUE_GAP_SEC;
 // Subtitle geometry: a cue is at most two lines of this width. Splitting is
 // done at sentence, then clause, then word boundaries so a cue rarely ends
 // mid-phrase.
@@ -781,26 +787,46 @@ function guardAlignment(segments, times) {
 // next appears. Applied last, so nothing downstream can reintroduce a flash.
 function normalizeCues(cues) {
   cues.sort((a, b) => a.start - b.start);
-  for (let i = 1; i < cues.length; i++) {
-    if (cues[i].start < cues[i - 1].start) cues[i].start = cues[i - 1].start;
+
+  const flat = (t) => t.replace(/\n/g, " ");
+  const merged = [];
+  for (const cue of cues) {
+    const prev = merged[merged.length - 1];
+    const joined = prev ? `${flat(prev.text)} ${flat(cue.text)}` : "";
+    if (
+      prev &&
+      cue.start - prev.start < CUE_MERGE_SEC &&
+      joined.length <= MAX_CUE_CHARS
+    ) {
+      prev.text = wrapLines(joined.split(" "));
+      prev.end = Math.max(prev.end, cue.end);
+      continue;
+    }
+    merged.push({ ...cue });
   }
-  for (let i = 0; i < cues.length; i++) {
-    const cue = cues[i];
-    const cap = displayCap(cue.text.length);
-    const room = i + 1 < cues.length
-      ? cues[i + 1].start - CUE_GAP_SEC
-      : Infinity;
+
+  // give every cue room to be read; this also guarantees the end below can
+  // always reach its minimum without running into the next cue
+  for (let i = 1; i < merged.length; i++) {
+    const floor = merged[i - 1].start + MIN_CUE_SPACING;
+    if (merged[i].start < floor) merged[i].start = floor;
+  }
+
+  for (let i = 0; i < merged.length; i++) {
+    const cue = merged[i];
+    const cap = displayCap(flat(cue.text).length);
+    const room =
+      i + 1 < merged.length ? merged[i + 1].start - CUE_GAP_SEC : Infinity;
     const wanted = Math.max(
       cue.end,
       cue.start + Math.min(MIN_CUE_SEC, cap.max),
     );
-    // never run past the next cue, but never flash either
     cue.end = Math.max(
       cue.start + GUARD_MIN_DUR,
-      Math.min(wanted, room === Infinity ? wanted : room),
+      Math.min(wanted, room),
     );
   }
-  return cues;
+  return merged;
 }
 
 const SENTENCE_END = /[.!?]["\')\]]?$/;

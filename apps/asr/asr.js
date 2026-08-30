@@ -134,6 +134,10 @@ const GUARD_MAX_DEVIATION = 2.5;
 const GUARD_MIN_DUR = 0.35;
 const GUARD_MAX_DUR = 12.0;
 const GUARD_CHARS_PER_SEC = 16;
+// Nobody speaks faster than this. A cue the aligner squeezed into less time
+// than its words could possibly take was mis-aligned, however plausible its
+// start looks next to its neighbours.
+const MAX_CHARS_PER_SEC = 28;
 // A cue may outlast the speech a little, but not by multiples — anything past
 // this is the aligner stretching a line across a silence.
 const displayCap = (chars) => {
@@ -751,7 +755,11 @@ function guardAlignment(segments, times) {
       kept++;
       start = seg.start + consensus;
       end = start + (seg.end - seg.start);
-    } else if (Math.abs(shift[i] - consensus) > GUARD_MAX_DEVIATION) {
+    } else if (
+      Math.abs(shift[i] - consensus) > GUARD_MAX_DEVIATION ||
+      seg.text.length / Math.max(0.01, times[i].end - times[i].start) >
+        MAX_CHARS_PER_SEC
+    ) {
       jumps++;
       const dur = times[i].end - times[i].start;
       start = seg.start + consensus;
@@ -772,7 +780,10 @@ function guardAlignment(segments, times) {
     // a rejected or unplaceable cue keeps no word times; its split pieces are
     // interpolated across the corrected span instead
     const trusted =
-      times[i] && Math.abs(shift[i] - consensus) <= GUARD_MAX_DEVIATION;
+      times[i] &&
+      Math.abs(shift[i] - consensus) <= GUARD_MAX_DEVIATION &&
+      seg.text.length / Math.max(0.01, times[i].end - times[i].start) <=
+        MAX_CHARS_PER_SEC;
     return { ...seg, start, end, words: trusted ? times[i].words : null };
   });
 
@@ -881,7 +892,22 @@ function wrapLines(words) {
       best = i + 1;
     }
   }
-  if (best < 0) return text;
+  if (best < 0) {
+    // no split leaves both lines within the limit, so take the most even one
+    // rather than emitting one over-long line
+    let even = Math.ceil(words.length / 2);
+    let evenDiff = Infinity;
+    let run = 0;
+    for (let i = 0; i < words.length - 1; i++) {
+      run = run === 0 ? words[i].length : run + 1 + words[i].length;
+      const diff = Math.abs(run - (text.length - run));
+      if (diff < evenDiff) {
+        evenDiff = diff;
+        even = i + 1;
+      }
+    }
+    best = even;
+  }
   return `${words.slice(0, best).join(" ")}\n${words.slice(best).join(" ")}`;
 }
 

@@ -372,7 +372,9 @@ async function callApi(fileData) {
         contents: [{ role: "user", parts: [{ text: PROMPT }, fileData] }],
         generationConfig: {
           temperature: GEMINI_TEMPERATURE,
-          seed: GEMINI_SEED,
+          // a RECITATION abort is non-deterministic, so retries bump the seed
+          // to nudge the model onto a different decode path
+          seed: GEMINI_SEED + attempt - 1,
           thinkingConfig: { thinkingLevel: GEMINI_THINKING_LEVEL },
           responseMimeType: "application/json",
           responseSchema: CAPTION_SCHEMA,
@@ -386,11 +388,14 @@ async function callApi(fileData) {
           `${Date.now() - apiStart}ms`,
       );
       if (finish !== "STOP") {
-        throw new Error(`Gemini stopped early: ${finish}`);
+        const err = new Error(`Gemini stopped early: ${finish}`);
+        err.finish = finish;
+        throw err;
       }
       return { text: response.text(), usage };
     } catch (err) {
-      const retryable = RETRY_STATUSES.includes(err.status);
+      const retryable =
+        RETRY_STATUSES.includes(err.status) || err.finish === "RECITATION";
       if (!retryable || attempt > MAX_RETRIES) {
         pane(`Gemini request failed: ${err.message}`);
         unilog(2283, `ASR: gemini retries failed "${currentVideoName}"`);
@@ -399,7 +404,7 @@ async function callApi(fileData) {
       const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
       pane(
         `Gemini request failed (attempt ${attempt}/${MAX_RETRIES}): ` +
-          `${err.status}, retrying in ${delay}ms`,
+          `${err.status ?? err.finish}, retrying in ${delay}ms`,
       );
       await sleep(delay);
     }
@@ -707,9 +712,12 @@ async function alignSegments(videoPath, segments) {
   const timesPath = path.join(tmpDir, "align-times.json");
   try {
     await extractAlignAudio(videoPath, wavPath);
+    // rough gemini times ride along so the aligner can window the alignment
     await fsp.writeFile(
       cuesPath,
-      JSON.stringify(segments.map((s) => s.text)),
+      JSON.stringify(
+        segments.map((s) => ({ text: s.text, start: s.start, end: s.end })),
+      ),
       "utf8",
     );
     const { out } = await run(ALIGNER_PYTHON, [
@@ -761,10 +769,15 @@ function guardAlignment(segments, times) {
         MAX_CHARS_PER_SEC
     ) {
       jumps++;
+      // a duration that fails the rate test is itself the lie — a rejected
+      // cue keeps gemini's duration instead
       const dur = times[i].end - times[i].start;
+      const durOk =
+        dur > 0 &&
+        dur < GUARD_MAX_DUR &&
+        seg.text.length / dur <= MAX_CHARS_PER_SEC;
       start = seg.start + consensus;
-      end =
-        start + (dur > 0 && dur < GUARD_MAX_DUR ? dur : seg.end - seg.start);
+      end = start + (durOk ? dur : seg.end - seg.start);
     } else {
       start = times[i].start;
       end = times[i].end;
@@ -773,7 +786,11 @@ function guardAlignment(segments, times) {
     // a two-word line must never sit on screen for seconds
     const cap = displayCap(seg.text.length);
     const dur = end - start;
-    if (dur < GUARD_MIN_DUR || dur > cap.max) {
+    if (
+      dur < GUARD_MIN_DUR ||
+      dur > cap.max ||
+      seg.text.length / Math.max(0.01, dur) > MAX_CHARS_PER_SEC
+    ) {
       clamped++;
       end = start + Math.max(GUARD_MIN_DUR, cap.spoken * 1.6 + 0.4);
     }

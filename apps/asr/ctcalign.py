@@ -8,7 +8,8 @@ guards the result before using it.
 
   ctcalign.py <cues.json> <audio.wav> <times.json>
 
-cues.json  : ["cue text", ...]
+cues.json  : [{"text", "start", "end"}, ...]  (start/end are gemini's rough
+             times, used only to place alignment windows)
 audio.wav  : 16 kHz mono 16-bit PCM
 times.json : [{"start", "end", "words": [{"w", "start", "end"}, ...]} | null,
              ...]  (one per cue; word spans let asr.js split long cues on
@@ -24,6 +25,15 @@ import torch
 import torchaudio
 
 CHUNK_SEC = 60  # forward-pass chunk; emissions are concatenated afterwards
+
+# The aligner's trellis is frames x tokens, so aligning a whole 43-minute
+# episode in one call needs tens of GB and dies. Instead consecutive cues are
+# grouped into windows of at most WINDOW_SEC of audio and each window is
+# aligned against just its slice of the emission. Gemini's rough times only
+# place the windows; MARGIN_SEC on each side absorbs their drift, which is
+# far smaller than the margin.
+WINDOW_SEC = 300
+MARGIN_SEC = 20
 
 ONES = ("zero one two three four five six seven eight nine ten eleven twelve "
         "thirteen fourteen fifteen sixteen seventeen eighteen nineteen").split()
@@ -68,7 +78,7 @@ def main():
     # one flat word list, remembering which cue each word came from
     words, owner = [], []
     for i, cue in enumerate(cues):
-        text = re.sub(r"\d+", lambda m: " " + spell(m.group()) + " ", cue)
+        text = re.sub(r"\d+", lambda m: " " + spell(m.group()) + " ", cue["text"])
         for word in re.sub(r"[^a-zA-Z' ]", " ", text).lower().split():
             word = "".join(c for c in word if c in allowed)
             if word:
@@ -90,17 +100,34 @@ def main():
             emission, _ = model(wav[:, i:i + step])
             parts.append(emission)
     emission = torch.cat(parts, dim=1)
-    secs_per_frame = wav.shape[1] / emission.shape[1] / rate
+    frames = emission.shape[1]
+    secs_per_frame = wav.shape[1] / frames / rate
 
-    with torch.inference_mode():
-        spans = aligner(emission[0], tokenizer(words))
+    # windows of consecutive cues, each spanning at most WINDOW_SEC of audio
+    ranges = []
+    i = 0
+    while i < len(cues):
+        j = i + 1
+        while j < len(cues) and cues[j]["end"] - cues[i]["start"] <= WINDOW_SEC:
+            j += 1
+        ranges.append((i, j))
+        i = j
 
     per_cue = {}
-    for i, span in enumerate(spans):
-        start = span[0].start * secs_per_frame
-        end = span[-1].end * secs_per_frame
-        per_cue.setdefault(owner[i], []).append(
-            {"w": words[i], "start": start, "end": end})
+    for lo, hi in ranges:
+        sub = [k for k in range(len(words)) if lo <= owner[k] < hi]
+        if not sub:
+            continue
+        f0 = max(0, int((cues[lo]["start"] - MARGIN_SEC) / secs_per_frame))
+        f1 = min(frames, int((cues[hi - 1]["end"] + MARGIN_SEC) / secs_per_frame) + 1)
+        with torch.inference_mode():
+            spans = aligner(emission[0, f0:f1],
+                            tokenizer([words[k] for k in sub]))
+        for k, span in zip(sub, spans):
+            per_cue.setdefault(owner[k], []).append(
+                {"w": words[k],
+                 "start": (span[0].start + f0) * secs_per_frame,
+                 "end": (span[-1].end + f0) * secs_per_frame})
 
     out = []
     for i in range(len(cues)):

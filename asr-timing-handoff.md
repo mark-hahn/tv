@@ -5,6 +5,10 @@ conversation grew long and started losing track of which code produced which
 output. **The negative results below are the expensive part — they cost several
 hours and ~$3 of API calls to establish. Do not re-derive them.**
 
+Updated later on 2026-08-29 (second session): the long path is now verified
+end-to-end, the alignment is windowed, RECITATION aborts retry, and two guard
+bugs found by CC-scored validation are fixed. See §2 and §6.
+
 ---
 
 ## 1. What the pipeline does now
@@ -18,7 +22,9 @@ hours and ~$3 of API calls to establish. Do not re-derive them.**
 4. Each part → flac → Files API → Gemini `gemini-3.6-flash`
 5. Merge cues onto one timeline
 6. **Forced alignment** (`apps/asr/ctcalign.py`, torchaudio MMS_FA) replaces
-   every Gemini timestamp with a measured one
+   every Gemini timestamp with a measured one. Alignment runs in windows of
+   ≤300s of consecutive cues (placed by Gemini's rough times, ±20s margin) —
+   one whole-episode trellis is frames × tokens and dies on a 43-min episode
 7. `guardAlignment` rejects bad alignments, `splitLongCues` splits on sentence
    boundaries, `normalizeCues` merges/spaces/durations
 8. `writeSRT` → `<video>.asr.srt` (last step; a failure leaves the old file)
@@ -41,31 +47,38 @@ python3 -m venv /root/dev/aligner-venv
 
 ## 2. Deployed vs pending
 
-All deployed and checksum-verified as of 18:15 on 2026-08-29:
-`apps/asr/asr.js`, `apps/asr/ctcalign.py`, `apps/srvr/src/subsQueue.js`,
-`apps/srvr/index.js`, `apps/client/src/srvr.js`,
-`apps/client/src/components/local.vue`.
+**Everything is deployed and checksum-verified as of the evening of
+2026-08-29**, including all of the below. Deploy with `./srvr asr`.
 
-**NOT DEPLOYED — in the working tree only:**
+Landed in the second session (all verified end-to-end, see §6):
 
 - **Speech-rate guard** (`MAX_CHARS_PER_SEC = 28`). A cue whose aligned
   duration implies impossible speech was mis-aligned. Catches the reported
-  failure at 1:00 in Childrens Hospital S06E01, where 70 characters were
-  squeezed into 1.09s (64 ch/s) and dragged the next cue 2.2s early. The
-  existing guard missed it because the cue's *start* looked fine next to its
-  neighbours — only the duration was impossible.
-- **`wrapLines` fallback** — was emitting a single 79-char line when no split
-  kept both halves under 42; now takes the most balanced split.
+  failure at 1:00 in Childrens Hospital S06E01 (70 chars in 1.09s).
+- **`wrapLines` fallback** — when no split keeps both lines under 42 chars,
+  takes the most balanced split instead of one over-long line. A >42-char
+  line in output is this fallback working, not a bug (e.g. an 80-char cue
+  with no word boundary in the 37–42 range).
+- **RECITATION retry** — Gemini sometimes aborts a part with finishReason
+  RECITATION (it recognizes the episode's dialogue). It is transient: retries
+  with a bumped seed (`GEMINI_SEED + attempt - 1`) recover. Madam Secretary
+  S06E09 part 3 needed 1 retry on one run and 2 on another.
+- **Windowed alignment** — `ctcalign.py` aligns cues in windows of ≤300s
+  (`WINDOW_SEC`, `MARGIN_SEC = 20` in ctcalign.py) instead of one call over
+  the whole episode; the single-call trellis killed the aligner (signal, empty
+  stderr) on a 43-min episode. asr.js now passes `{text, start, end}` per cue
+  so the aligner can place windows. CC-scored validation on an 11-min episode:
+  median 0.55s — identical to the pre-window reference.
+- **Guard duration fixes** — a rate-rejected cue kept the rejected alignment's
+  impossible duration (80 chars shown for 0.9s); it now falls back to Gemini's
+  duration, and the duration clamp also fires on >28 ch/s.
 
-Both verified against the real failing data but **never run end-to-end**.
-Deploy with `./srvr asr`.
-
-Nothing is committed. `git status` shows `apps/asr/asr.js` modified and
-`apps/asr/ctcalign.py` untracked, plus the srvr/client abort changes.
+`asr.js` (modified) and `ctcalign.py` (untracked) are uncommitted in the
+working tree; `check-srt.js` / `eval-timing.js` (§4) are new and untracked.
 
 ---
 
-## 3. Key constants (all in asr.js)
+## 3. Key constants (asr.js unless noted)
 
 | constant | value | why |
 |---|---|---|
@@ -77,6 +90,7 @@ Nothing is committed. `git status` shows `apps/asr/asr.js` modified and
 | `MAX_CHARS_PER_SEC` | 28 | pending; CC's fastest real line is 24.1, so only ~15% headroom |
 | `MIN_CUE_SEC` | 0.9 | minimum readable display |
 | `MAX_LINE_CHARS` / `MAX_CUE_CHARS` | 42 / 84 | two lines per cue |
+| `WINDOW_SEC` / `MARGIN_SEC` (ctcalign.py) | 300 / 20 | alignment window size; margin absorbs gemini drift (p90 ~2.5s) |
 
 ---
 
@@ -88,9 +102,30 @@ Compare against the **embedded CC track**, which is ground truth for the encode:
 ffmpeg -i <video>.mp4 -map 0:s:0 -c:s srt -f srt /tmp/cc.srt
 ```
 
-Not every episode has one (Madam Secretary does not; Childrens Hospital does).
-Build a word stream from each side, align with Levenshtein, and report WER plus
-per-word timing error (median / p90 / max / count over 1s).
+Not every episode has one (Madam Secretary does not; Childrens Hospital and
+Kid Sister do). **Never test with a file that has no CC track** — without
+ground truth a run only proves it didn't crash. Long CC-bearing files are
+plentiful: the library is mostly `.mkv` (~2450 files vs ~225 `.mp4`) and many
+mkvs carry English subrip tracks — e.g. A Thousand Blows S02E01 (2784s).
+Don't scan only `*.mp4` when looking for test files.
+
+Build a word stream from each side, align with Levenshtein, and report WER
+plus per-word timing error (median / p90 / max / count over 1s) — this is
+`apps/asr/eval-timing.js <reference.srt> <candidate.srt>`. The invariant
+checks below are `apps/asr/check-srt.js <srt>`. On an SDH-style CC track
+(all-caps sound effects, condensed dialogue) the WER number is meaningless —
+only the matched-word timing stats count. Two more caveats:
+
+- The ~0.75s floor belongs to *burned-in broadcast* CC tracks. A professional
+  streaming subrip track (e.g. DSNP mkvs) is frame-accurate: A Thousand Blows
+  S02E01 scored **median 0.18s / p90 1.03s**, so on such files the eval can
+  resolve far finer errors.
+- Repeated dialogue (crowd shouting) makes the word matcher pair a CC line
+  with a later repetition, producing fake 60s+ "errors". Check the worst-5
+  list against the gap log before believing a large max.
+- These two scripts must print with `out()` (process.stdout.write), never
+  console.log — the deploy reconciler rewrites console.* in apps/asr into
+  unilog DB calls, which silenced all their output once already.
 
 **Reference points measured on Childrens Hospital S06E01:**
 
@@ -153,12 +188,34 @@ deletions.
 
 ## 6. Known gaps and risks
 
-- **The long path has never completed end-to-end.** No 45-minute episode has
-  finished with current code. Two attempts died to ssh drops, one before the
-  write. The split, three sequential calls and cue merging were observed
-  working (267/200/171 cues on a 43-minute episode); the alignment pass at that
-  length and the final write are unverified. A 43-minute alignment is ~4–5 min
-  of CPU and much more memory than an 11-minute one.
+- **The long path is verified end-to-end (2026-08-29).** Madam Secretary
+  S06E09 (43.4 min, 3 parts, 968 cues) completed in ~13 min for $0.25:
+  RECITATION on part 3 recovered by retry, 968/968 cues aligned by the
+  windowed aligner, all §4 invariants zero, `.asr.srt` written. Before the
+  windowing fix the aligner died at this length (killed by a signal, empty
+  stderr — the whole-episode trellis needs tens of GB).
+- **The split path is CC-verified (2026-08-29).** Kid Sister S02E03 (24.3 min,
+  2 parts, 492 cues, $0.13): invariants zero, timing vs its SDH CC track
+  median 0.67s / p90 1.79s / 514 words >1s — statistically identical to the
+  July 18 `.asr.srt` it replaced (0.66 / 1.73 / 517), both at the measurement
+  floor.
+- **Full length is CC-verified too (2026-08-29).** A Thousand Blows S02E01
+  (46.4 min mkv, 3 parts, 517 cues, $0.16, ~9 min runtime): invariants zero,
+  and against its frame-accurate DSNP subrip track **median 0.18s /
+  p90 1.03s** over 2372 matched words — the strongest accuracy evidence so
+  far. Its worst "errors" (~72s) were eval mispairings of repeated crowd
+  shouting across a montage gap that the CC also leaves empty, not pipeline
+  errors.
+- **Part boundaries are a timing weak spot.** In that run the only bad cluster
+  (~10 words, ~9s early) sat right at the 702s part boundary: Gemini garbled
+  the dialogue crossing the boundary and compressed the surrounding cue times,
+  and the aligner can't rescue cues whose text doesn't match the audio. One
+  cluster per boundary at worst; revisit only if it shows up user-visibly
+  (a fix would be overlapping the parts slightly and deduping cues).
+- **Final display rate can still exceed 28 ch/s** in dense dialogue — the cue
+  can only stay up until the next cue starts, so this is a display constraint,
+  not a timing bug. After the guard fixes the worst observed is ~37 ch/s
+  (was 88).
 - **`MAX_CHARS_PER_SEC = 28` is barely above observed real speech (24.1).** If
   legitimate fast lines start falling back to Gemini timings, raise it.
 - **The queue silently skips files that already have `.asr.srt`**
@@ -176,7 +233,8 @@ deletions.
   `.asr.srt` was destroyed by an `rm -f` in a test harness whose run then failed
   to start. `/mnt/media` is not in the restic system backup. **Never `rm` a
   media-folder file before a run** — write to a temp path and move on success,
-  as `asr.js` does. That episode currently has no subtitle.
+  as `asr.js` does. Regenerated 2026-08-29 by the long-path verification run,
+  so the episode has a subtitle again.
 - Childrens Hospital S06E01's `.asr.srt` is generated output; the earlier
   variants (`.srt1`, `.srt2`, `.srtn`) were deleted during cleanup, including
   the Gemini response behind the best-rated run — so that run can no longer be

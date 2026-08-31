@@ -2068,6 +2068,11 @@ export default {
       canvas.height = 32;
       const ctx = canvas.getContext("2d");
 
+      // Scale the drawing 20% larger about the canvas center
+      ctx.translate(16, 16);
+      ctx.scale(1.2, 1.2);
+      ctx.translate(-16, -16);
+
       if (shouldShowBadge) {
         // Draw background circle
         ctx.fillStyle = "#1a73e8"; // Blue background

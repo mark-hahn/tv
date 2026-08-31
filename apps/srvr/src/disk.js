@@ -401,6 +401,9 @@ export const getShowDiskInfo = async (showFolderName) => {
 // `opts.sources` limits which sources run.
 export async function refreshEpisodeData(showName, rec, opts = {}) {
   const sources = opts.sources || ["tvdb", "emby", "disk"];
+  // Set by a refresh that follows a watched edit this app just made in Emby,
+  // so the anti-wipe guard below doesn't undo a deliberate unmark.
+  const trustWatched = opts.trustWatched === true;
   if (!Array.isArray(rec.episodeData)) rec.episodeData = [];
   const ed = rec.episodeData;
 
@@ -454,7 +457,8 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
       // that erased the watch history of every show that left the library
       // before episodeData existed. Keep the stored flags in that case.
       // Unmarking episodes one at a time leaves others watched so it still
-      // applies, and /api/setWatchedEpis clears a show deliberately.
+      // applies, /api/setWatchedEpis clears a show deliberately, and a refresh
+      // that follows this app's own watched edit passes trustWatched.
       let wasWatched = 0;
       let nowUnplayed = 0;
       for (const [seasonNum, episodes] of embyMap || []) {
@@ -466,7 +470,8 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
           if (!ep.played) nowUnplayed++;
         }
       }
-      const wipesWatched = wasWatched >= 2 && nowUnplayed === wasWatched;
+      const wipesWatched =
+        !trustWatched && wasWatched >= 2 && nowUnplayed === wasWatched;
       if (wipesWatched)
         unilog(2205, `Emby reported all ${wasWatched} watched episodes of ${showName} as unplayed — keeping the stored watched flags`);
       for (const [seasonNum, episodes] of embyMap || []) {

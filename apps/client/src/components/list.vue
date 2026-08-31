@@ -2487,7 +2487,7 @@ export default {
             setWatched,
             show.name,
           );
-          await this.seriesMapAction("refresh", show);
+          await this.seriesMapAction("refresh", show, { trustWatched: true });
         }
       }
     },
@@ -2728,6 +2728,11 @@ export default {
           resp = await srvr.getSeriesMapFromEmby({
             showName: show.name,
             stale: useStale,
+            // A refresh right after we changed watched in Emby: tell the server
+            // to trust Emby's watched flags even if every watched episode of
+            // the show just went unplayed (its anti-wipe guard would otherwise
+            // restore the stored flags).
+            trustWatched: options.trustWatched === true,
           });
         }
         if (resp?.success && Array.isArray(resp.seriesMap)) {

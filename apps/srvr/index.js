@@ -1820,7 +1820,7 @@ app.post("/api/getActorPage", apiWrapper(tvdb.getActorPage));
 app.post(
   "/api/getSeriesMapFromEmby",
   apiWrapper(async (params) => {
-    const { showName, stale } = params;
+    const { showName, stale, trustWatched } = params;
     if (!showName) return { success: false, error: "Missing showName" };
     const allTvdb = tvdb.getAllTvdbSync();
     const rec = allTvdb?.[showName];
@@ -1850,7 +1850,10 @@ app.post(
       // Refresh watched/id (Emby) and file/res (disk) so the map is live-fresh.
       // aired dates come from the periodic full refresh; skip the TVDB call here.
       const t0 = Date.now();
-      await refreshEpisodeData(showName, rec, { sources: ["emby", "disk"] });
+      await refreshEpisodeData(showName, rec, {
+        sources: ["emby", "disk"],
+        trustWatched: trustWatched === true,
+      });
       const tRefresh = Date.now();
       await tvdb.saveTvdbSync();
       const tSave = Date.now();

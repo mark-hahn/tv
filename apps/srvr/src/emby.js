@@ -478,10 +478,15 @@ const getShowState = (showName, showMeta) => {
               resDropSeason = seasonNumber;
               resDropEpisode = episodeNumber;
               resDrop = true;
-              unilog(
-                2054,
-                `resDrop set for ${showName} S${seasonNumber}E${episodeNumber}: ${res} < ${bestResSoFar}`,
-              );
+              // Logged only as it turns on or moves to another episode, so a
+              // standing drop does not repeat every gap check.
+              const resDropIsNew =
+                !showMeta?.resDrop ||
+                showMeta.resDropSeason !== seasonNumber ||
+                showMeta.resDropEpisode !== episodeNumber;
+              if (resDropIsNew) {
+                unilog(2323, `resDrop set for ${showName} S${seasonNumber}E${episodeNumber}: ${res} < ${bestResSoFar}`);
+              }
             }
             if (bestResSoFar === null || res > bestResSoFar) bestResSoFar = res;
           }

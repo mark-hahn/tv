@@ -144,6 +144,7 @@
             >
               {{ t.label }}
             </button>
+            <!-- light red: next item has its mp4 mirror; yellow: still encoding -->
             <button
               v-if="chksrtCount > 0"
               @click.stop="clickChksrt"
@@ -153,8 +154,8 @@
                 borderRadius: '7px',
                 padding: '4px 10px',
                 marginLeft: '4px',
-                border: '1px solid #c88',
-                backgroundColor: '#faa',
+                border: chksrtMirrored ? '1px solid #c88' : '1px solid #cc8',
+                backgroundColor: chksrtMirrored ? '#faa' : 'yellow',
                 color: 'black',
               }"
             >
@@ -169,8 +170,8 @@
                 borderRadius: '7px',
                 padding: '4px 10px',
                 marginLeft: '4px',
-                border: '1px solid #c88',
-                backgroundColor: '#faa',
+                border: introReady ? '1px solid #c88' : '1px solid #cc8',
+                backgroundColor: introReady ? '#faa' : 'yellow',
                 color: 'black',
               }"
             >
@@ -615,8 +616,13 @@ export default {
       videoPlayerMapSeason: null,
       videoPlayerMapEpisode: null,
       chksrtCount: 0,
+      // head of the chksrt queue already has its mp4 mirror (button red, not yellow)
+      chksrtMirrored: false,
       _chksrtChannel: null,
       introCount: 0,
+      // needsIntro shows whose intro episode already has an mp4 mirror
+      introReadyShows: [],
+      _introReadyChannel: null,
       browseTabHasMore: false,
       _browseHasMoreChannel: null,
       currentPane: "info", // 'info', 'map', 'actors', 'reviews', 'trailer', 'tor', 'flex', 'qbt', 'down'
@@ -739,6 +745,11 @@ export default {
   computed: {
     isPortrait() {
       return Number(this.windowH) > Number(this.windowW);
+    },
+    // Some show still needing an intro has a mirrored episode ready to open.
+    introReady() {
+      const ready = new Set(this.introReadyShows);
+      return this.allShows.some((s) => s.needsIntro && ready.has(s.name));
     },
 
     showSideButtons() {
@@ -991,6 +1002,7 @@ export default {
     this.stopQbtPolling();
     this.cancelDownInactiveTimer();
     this.stopChksrtPolling();
+    this.stopIntroReadyPolling();
     this.stopBrowseTabPolling();
   },
   methods: {
@@ -1037,6 +1049,7 @@ export default {
       try {
         const list = await srvr.getChksrtList();
         this.chksrtCount = list?.count ?? 0;
+        this.chksrtMirrored = !!list?.mirrored;
         if (list?.path) {
           this.videoPlayerMode = "chksrt";
           this.videoPlayerPath = list.path;
@@ -1072,6 +1085,7 @@ export default {
       try {
         const list = await srvr.getChksrtList();
         this.chksrtCount = list?.count ?? 0;
+        this.chksrtMirrored = !!list?.mirrored;
       } catch (e) {
         this.chksrtCount = 0;
       }
@@ -1094,6 +1108,7 @@ export default {
       if (this._chksrtChannel) return;
       const applyChksrt = (payload) => {
         this.chksrtCount = payload?.count ?? 0;
+        this.chksrtMirrored = !!payload?.mirrored;
       };
       this._chksrtChannel = srvr.openChannel("chksrt", {
         onSnapshot: applyChksrt,
@@ -1104,11 +1119,41 @@ export default {
       this._chksrtChannel?.close();
       this._chksrtChannel = null;
     },
+    startIntroReadyPolling() {
+      if (this._introReadyChannel) return;
+      const applyIntroReady = (payload) => {
+        this.introReadyShows = Array.isArray(payload?.shows)
+          ? payload.shows
+          : [];
+      };
+      this._introReadyChannel = srvr.openChannel("introReady", {
+        onSnapshot: applyIntroReady,
+        onDelta: applyIntroReady,
+      });
+    },
+    stopIntroReadyPolling() {
+      this._introReadyChannel?.close();
+      this._introReadyChannel = null;
+    },
+    // needsIntro shows in list order, the ones with a mirrored intro episode
+    // first so they open instantly while the rest are still encoding.
+    introQueue(from = null) {
+      const ready = new Set(this.introReadyShows);
+      const shows = this.allShows;
+      if (!Array.isArray(shows)) return [];
+      const start = from ? shows.findIndex((s) => s.name === from.name) + 1 : 0;
+      const rest = shows.slice(start).filter((s) => s?.needsIntro);
+      return [
+        ...rest.filter((s) => ready.has(s.name)),
+        ...rest.filter((s) => !ready.has(s.name)),
+      ];
+    },
     async clickChksrt() {
       if (this.chksrtCount === 0) return;
       try {
         const list = await srvr.getChksrtList();
         this.chksrtCount = list?.count ?? 0;
+        this.chksrtMirrored = !!list?.mirrored;
         if (list?.path) {
           this.videoPlayerMode = "chksrt";
           this.videoPlayerPath = list.path;
@@ -1131,7 +1176,7 @@ export default {
     async clickIntro() {
       // introCount counts needsIntro over allShows, so the queue does too —
       // the list filter has nothing to do with which shows need marking.
-      const show = this.allShows.find((s) => s.needsIntro);
+      const show = this.introQueue()[0];
       if (!show) return;
       try {
         const result = await this.selectIntroFile(show);
@@ -1211,22 +1256,19 @@ export default {
       // info pane: find next show that still needs intro. Always allShows —
       // the list filter has nothing to do with which shows need marking.
       const current = this.videoPlayerIntroShow;
-      const shows = this.allShows;
-      if (!current || !Array.isArray(shows)) {
+      if (!current || !Array.isArray(this.allShows)) {
         this.videoPlayerPath = null;
         this.videoPlayerMode = null;
         this.videoPlayerIntroShow = null;
         return;
       }
-      const idx = shows.findIndex((s) => s.name === current.name);
-      for (let i = idx + 1; i < shows.length; i++) {
-        const s = shows[i];
+      // Shows after the current one, mirrored ones first.
+      for (const s of this.introQueue(current)) {
         const hasPlayableIntroFile =
           epd.seasonsWithFile(s?.episodeData).length > 0;
         const hasNoPlayableIntroFile = !hasPlayableIntroFile;
         if (
           s.seasonIntros != null ||
-          !s.needsIntro ||
           s.inEmby === false ||
           s.inLinda ||
           hasNoPlayableIntroFile
@@ -2277,6 +2319,7 @@ export default {
     };
     evtBus.on("intro-count", this._onIntroCount);
     this.startChksrtPolling();
+    this.startIntroReadyPolling();
     this.startQbtPolling();
 
     this._onBrowseHasMoreChanged = (val) => {

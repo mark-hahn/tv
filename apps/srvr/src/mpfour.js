@@ -5,12 +5,15 @@
 // buffer. This module pre-encodes every file in subQueueChkSrt into an
 // h264/aac +faststart mp4 under /mnt/media/mpfour — a tree mirroring
 // /mnt/media/tv that emby never scans and nginx serves with Range support —
-// letting the player jump anywhere instantly. h264 sources are remuxed
-// (-c:v copy, lossless); hevc is transcoded. Mirrors outlive the original, so
-// chksrt can be re-run after the video is deleted; a sidecar .src.json records
-// the original's mtime/size so a replaced release re-encodes. They are not kept
-// forever — oldFiles.js expires a mirror a month after it was written, and a
-// mirror still wanted after that is simply rebuilt.
+// letting the player jump anywhere instantly. Every source is downscaled to
+// MIRROR_HEIGHT: the mirrors only back subtitle sync review and intro marking,
+// where 480p is plenty, and a small file is what keeps the player from
+// saturating the client's downlink (and starving its API calls) each time an
+// episode opens. Mirrors outlive the original, so chksrt can be re-run after
+// the video is deleted; a sidecar .src.json records the original's mtime/size
+// and the mirror height so a replaced release or a changed height re-encodes.
+// They are not kept forever — oldFiles.js expires a mirror a month after it
+// was written, and a mirror still wanted after that is simply rebuilt.
 //
 // This runs on its own loop, deliberately NOT on the shared serialized
 // subExtractQueue (batchQueue.js) — chksrt playback is needed before other
@@ -31,18 +34,24 @@ const FAIL_RETRY_MS = 60 * 60 * 1000;
 // Mirrors only back chksrt subtitle review, never full playback, so 10 minutes
 // is plenty to check sync — cutting encodes short here saves real time on hevc.
 const MIRROR_MAX_SECS = 600;
+// Mirror frame height. Width follows the source aspect (-2 keeps it even).
+const MIRROR_HEIGHT = 480;
+// The box's Radeon 780M decodes h264/hevc (incl. main10) through VAAPI, and
+// scaling on the GPU before the download means only 480p frames cross to the
+// libx264 encode: a 2160p hevc source ran 5.4s per 60s of content this way vs
+// 8.8s decoding in software. The software pipeline is the retry when VAAPI
+// rejects a source (unsupported codec/profile).
+const VAAPI_DEVICE = "/dev/dri/renderD128";
 
-// Wall-clock estimates for entries that have not started yet, taken from the
-// medians of the completion log (site 1405, 86 samples): remux ran 0-9s, 1080p
-// transcodes 38-45s, 2160p transcodes 196-411s. `-t MIRROR_MAX_SECS` fixes the
-// content length, so the only things that move the number are copy-vs-encode
-// and pixel count. Resolution is read from the filename, which is how those
-// samples were bucketed. The entry actually encoding ignores all of this and
+// Wall-clock estimates for entries that have not started yet, from a 60s
+// benchmark scaled to MIRROR_MAX_SECS (2160p hevc 54s, 1080p h264 31s), rounded
+// up for the SCHED_IDLE slowdown. Every mirror is a real encode now, so the
+// cost is driven by decode work: pixel count and codec. Resolution is read
+// from the filename. The entry actually encoding ignores all of this and
 // reports ffmpeg's own progress instead.
-const EST_REMUX_SECS = 5;
-const EST_TRANSCODE_1080_SECS = 40;
-const EST_TRANSCODE_2160_SECS = 271;
-const EST_TRANSCODE_OTHER_SECS = 120;
+const EST_ENCODE_1080_SECS = 40;
+const EST_ENCODE_2160_SECS = 75;
+const EST_ENCODE_OTHER_SECS = 50;
 
 let busy = false;
 let reordering = false;
@@ -62,7 +71,15 @@ let currentTmpPath = null;
 // { videoFilePath, child, aborted } while an encode is running, else null
 let currentEncode = null;
 let syncBatchMsgs = () => {};
+// Fired when a mirror finishes or the chksrt queue is reordered around one, so
+// index.js can push the head-of-queue/intro readiness to clients at once
+// instead of on the next poll.
+let onMirrorsChanged = () => {};
 const failedAt = new Map(); // videoFilePath -> last failure timestamp
+// resolved videoFilePath -> true, for every path mpfourValid last found valid.
+// The channel snapshots are synchronous, so they read this instead of
+// stat'ing; the 5s scan re-validates every queued entry, keeping it fresh.
+const validMirrors = new Set();
 // videoFilePath -> { mtimeMs, size, videoCodec, audioCodec } — avoids
 // re-probing every entry on every 5s scan.
 const codecCache = new Map();
@@ -81,23 +98,38 @@ function sidecarPathFor(mirrorPath) {
 }
 
 // Returns the mirror path when it exists and its sidecar still matches the
-// original's mtime+size; null otherwise (missing, stale, or non-tv path).
+// original's mtime+size and the current MIRROR_HEIGHT; null otherwise
+// (missing, stale, full-size from before downscaling, or non-tv path).
 export async function mpfourValid(videoFilePath) {
   const mirror = mpfourPathFor(videoFilePath);
   if (!mirror) return null;
+  const resolved = path.resolve(videoFilePath);
   try {
     const [srcStat, sidecarRaw] = await Promise.all([
-      fsp.stat(path.resolve(videoFilePath)),
+      fsp.stat(resolved),
       fsp.readFile(sidecarPathFor(mirror), "utf8"),
     ]);
     const sidecar = JSON.parse(sidecarRaw);
-    if (sidecar.mtimeMs !== srcStat.mtimeMs || sidecar.size !== srcStat.size)
-      return null;
+    if (
+      sidecar.mtimeMs !== srcStat.mtimeMs ||
+      sidecar.size !== srcStat.size ||
+      sidecar.height !== MIRROR_HEIGHT
+    )
+      throw new Error("stale");
     await fsp.access(mirror);
+    validMirrors.add(resolved);
     return mirror;
   } catch {
+    validMirrors.delete(resolved);
     return null;
   }
+}
+
+// Synchronous read of the last mpfourValid() verdict for this path — for the
+// channel snapshots, which cannot await.
+export function mpfourValidCached(videoFilePath) {
+  if (!videoFilePath) return false;
+  return validMirrors.has(path.resolve(videoFilePath));
 }
 
 function ffprobeCodecs(videoFilePath) {
@@ -141,17 +173,17 @@ async function getCodecs(videoFilePath) {
   return entry;
 }
 
-// h264 sources are remuxed (seconds); anything else (hevc) needs a full
-// transcode (many minutes).
-async function needsTranscode(videoFilePath) {
+// Every mirror is an encode now, so the source's decode cost is what separates
+// a quick one (h264, well under a minute) from a slow one (hevc, usually 2160p).
+async function slowDecode(videoFilePath) {
   const { videoCodec } = await getCodecs(videoFilePath);
   return videoCodec !== "h264";
 }
 
 // Order subQueueChkSrt by how soon each entry can be played: files whose mp4
 // mirror is already built and valid come first (instant seeking, no waiting),
-// then files still needing a mirror but only a quick remux (h264), then the hevc
-// transcodes, which get the most time to finish before you reach them. Stable
+// then files still needing a mirror but only a quick encode (h264), then the
+// hevc sources, which get the most time to finish before you reach them. Stable
 // within each group, so a newly-added entry lands behind its peers.
 async function reorderChkSrtQueue() {
   const queue = subsState.subQueueChkSrt;
@@ -165,7 +197,7 @@ async function reorderChkSrtQueue() {
     if (videoFilePath && fs.existsSync(videoFilePath)) {
       try {
         if (await mpfourValid(videoFilePath)) group = mirrored;
-        else if (await needsTranscode(videoFilePath)) group = slow;
+        else if (await slowDecode(videoFilePath)) group = slow;
       } catch (e) {
         unilog(1413, `probe failed for ${path.basename(videoFilePath)}: ${e.message}`);
       }
@@ -177,7 +209,19 @@ async function reorderChkSrtQueue() {
   subsState.subQueueChkSrt = next;
   persistSubQueueChkSrt();
   syncBatchMsgs();
-  unilog(2231, `reordered chksrt queue: ${mirrored.length} mirrored, ${fast.length} fast, ${slow.length} needing transcode`);
+  onMirrorsChanged();
+  unilog(2327, `reordered chksrt queue: ${mirrored.length} mirrored, ${fast.length} fast, ${slow.length} slow to decode`);
+}
+
+// Reorder unless a reorder from another tick is still running.
+async function reorderChkSrtQueueOnce() {
+  if (reordering) return;
+  reordering = true;
+  try {
+    await reorderChkSrtQueue();
+  } finally {
+    reordering = false;
+  }
 }
 
 // Mirror encodes run under SCHED_IDLE: a 2160p transcode saturates ~10 of the
@@ -251,31 +295,54 @@ async function encodeOne(videoFilePath) {
   const tmp = mirror.replace(/\.mp4$/, ".tmp.mp4");
   const startedAt = Date.now();
   const srcStat = await fsp.stat(videoFilePath);
-  const { videoCodec, audioCodec } = await getCodecs(videoFilePath);
-  const args = ["-y", "-i", videoFilePath, "-map", "0:v:0", "-map", "0:a:0?"];
-  if (videoCodec === "h264") {
-    args.push("-c:v", "copy");
-  } else {
-    args.push(
-      "-c:v",
-      "libx264",
-      "-preset",
-      "veryfast",
-      "-crf",
-      "23",
-      "-pix_fmt",
-      "yuv420p",
-    );
-  }
+  const { audioCodec } = await getCodecs(videoFilePath);
+  const inputArgs = (vaapi) =>
+    vaapi
+      ? [
+          "-hwaccel",
+          "vaapi",
+          "-hwaccel_device",
+          VAAPI_DEVICE,
+          "-hwaccel_output_format",
+          "vaapi",
+          "-i",
+          videoFilePath,
+          "-vf",
+          `scale_vaapi=w=-2:h=${MIRROR_HEIGHT}:format=nv12,hwdownload,format=nv12`,
+        ]
+      : ["-i", videoFilePath, "-vf", `scale=-2:${MIRROR_HEIGHT}`];
+  const outputArgs = [
+    "-map",
+    "0:v:0",
+    "-map",
+    "0:a:0?",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "veryfast",
+    "-crf",
+    "23",
+    "-pix_fmt",
+    "yuv420p",
+  ];
   if (audioCodec === "aac") {
-    args.push("-c:a", "copy");
+    outputArgs.push("-c:a", "copy");
   } else {
     // -ac 2: downmix to stereo — browsers require stereo AAC.
-    // -aac_coder fast: ~2x faster than the default twoloop and the audio encode
-    // is nearly the whole job here; quality is moot for a throwaway review mirror.
-    args.push("-c:a", "aac", "-aac_coder", "fast", "-b:a", "128k", "-ac", "2");
+    // -aac_coder fast: ~2x faster than the default twoloop; quality is moot
+    // for a throwaway review mirror.
+    outputArgs.push(
+      "-c:a",
+      "aac",
+      "-aac_coder",
+      "fast",
+      "-b:a",
+      "128k",
+      "-ac",
+      "2",
+    );
   }
-  args.push(
+  outputArgs.push(
     "-sn",
     "-dn",
     "-t",
@@ -291,25 +358,36 @@ async function encodeOne(videoFilePath) {
     child: null,
     aborted: false,
     startedAt,
-    mode: videoCodec === "h264" ? "remux" : "transcode",
     progressSecs: 0,
   };
+  const run = (vaapi) =>
+    runFfmpeg(
+      ["-y", ...inputArgs(vaapi), ...outputArgs],
+      (child) => {
+        currentEncode.child = child;
+      },
+      (secs) => {
+        if (currentEncode) currentEncode.progressSecs = secs;
+      },
+    );
+  let decode = "vaapi";
   try {
     try {
-      await runFfmpeg(
-        args,
-        (child) => {
-          currentEncode.child = child;
-        },
-        (secs) => {
-          if (currentEncode) currentEncode.progressSecs = secs;
-        },
-      );
+      await run(true);
     } catch (e) {
       // A kill from cancelEncode() is an intentional abort, not a failure —
       // rethrowing would mark the file failed and skip it for FAIL_RETRY_MS.
       if (currentEncode.aborted) return "aborted";
-      throw e;
+      // VAAPI refused the source — decode in software instead.
+      unilog(2328, `vaapi decode failed, retrying in software: ${path.basename(videoFilePath)}: ${e.message.slice(-200)}`);
+      decode = "software";
+      currentEncode.progressSecs = 0;
+      try {
+        await run(false);
+      } catch (e2) {
+        if (currentEncode.aborted) return "aborted";
+        throw e2;
+      }
     }
     await fsp.rename(tmp, mirror);
     await fsp.writeFile(
@@ -324,6 +402,9 @@ async function encodeOne(videoFilePath) {
         // keep serving short mirrors. Mirrors written before this field exist
         // have no maxSecs and are a mix of 600s and full-length.
         maxSecs: MIRROR_MAX_SECS,
+        // Frame height the mirror was scaled to; a different MIRROR_HEIGHT
+        // invalidates it so old full-size mirrors get rebuilt.
+        height: MIRROR_HEIGHT,
       }),
       "utf8",
     );
@@ -332,9 +413,9 @@ async function encodeOne(videoFilePath) {
     currentEncode = null;
     await fsp.rm(tmp, { force: true });
   }
+  validMirrors.add(path.resolve(videoFilePath));
   const secs = Math.round((Date.now() - startedAt) / 1000);
-  const mode = videoCodec === "h264" ? "remux" : "transcode";
-  unilog(1405, `${mode} done in ${secs}s: ${path.basename(mirror)}`);
+  unilog(2329, `encode (${decode} decode) done in ${secs}s: ${path.basename(mirror)}`);
   return "done";
 }
 
@@ -443,22 +524,13 @@ export function getMp4Pending() {
   return mp4Pending;
 }
 
-// Seconds this file is expected to take once it starts. h264 is a byte copy;
-// everything else is a real encode whose cost is driven by pixel count.
-async function estimateEncodeSecs(videoFilePath) {
-  let videoCodec = codecCache.get(videoFilePath)?.videoCodec;
-  if (videoCodec === undefined) {
-    try {
-      ({ videoCodec } = await getCodecs(videoFilePath));
-    } catch {
-      videoCodec = null; // unprobeable — assume the slow path
-    }
-  }
-  if (videoCodec === "h264") return EST_REMUX_SECS;
+// Seconds this file is expected to take once it starts, driven by how much
+// decoding the source needs.
+function estimateEncodeSecs(videoFilePath) {
   const name = path.basename(videoFilePath);
-  if (/2160p|\buhd\b|\b4k\b/i.test(name)) return EST_TRANSCODE_2160_SECS;
-  if (/1080p/i.test(name)) return EST_TRANSCODE_1080_SECS;
-  return EST_TRANSCODE_OTHER_SECS;
+  if (/2160p|\buhd\b|\b4k\b/i.test(name)) return EST_ENCODE_2160_SECS;
+  if (/1080p/i.test(name)) return EST_ENCODE_1080_SECS;
+  return EST_ENCODE_OTHER_SECS;
 }
 
 // Seconds left on the running encode. Once ffmpeg has reported any progress
@@ -472,10 +544,9 @@ function encodeRemainingSecs() {
     const rate = done / elapsed;
     return Math.max(0, Math.round((MIRROR_MAX_SECS - done) / rate));
   }
-  // Nothing reported yet (still probing, or a remux that finishes before the
-  // first status line) — fall back to the static estimate less time served.
-  const est =
-    currentEncode.mode === "remux" ? EST_REMUX_SECS : EST_TRANSCODE_OTHER_SECS;
+  // Nothing reported yet (still probing) — fall back to the static estimate
+  // less time served.
+  const est = estimateEncodeSecs(currentEncode.videoFilePath);
   return Math.max(0, Math.round(est - elapsed));
 }
 
@@ -489,9 +560,7 @@ export async function getMp4QueueStatus() {
   for (let i = 0; i < mp4Pending.length; i++) {
     const p = mp4Pending[i];
     const isRunning = !!running && running.videoFilePath === p;
-    const secs = isRunning
-      ? encodeRemainingSecs()
-      : await estimateEncodeSecs(p);
+    const secs = isRunning ? encodeRemainingSecs() : estimateEncodeSecs(p);
     eta += secs * 1000;
     entries.push({
       n: i + 1,
@@ -506,11 +575,11 @@ export async function getMp4QueueStatus() {
         file: path.basename(running.videoFilePath),
         stage:
           running.progressSecs > 0
-            ? `${running.mode === "remux" ? "remuxing" : "transcoding"} ${Math.min(
+            ? `encoding ${Math.min(
                 100,
                 Math.round((running.progressSecs / MIRROR_MAX_SECS) * 100),
-              )}% of ${MIRROR_MAX_SECS}s mirror`
-            : `${running.mode === "remux" ? "remuxing" : "transcoding"}, starting`,
+              )}% of ${MIRROR_MAX_SECS}s ${MIRROR_HEIGHT}p mirror`
+            : "encoding, starting",
         remainingSecs: encodeRemainingSecs(),
         elapsedSecs: Math.round((Date.now() - running.startedAt) / 1000),
       }
@@ -534,14 +603,7 @@ async function refreshMp4Count() {
 async function scanPass() {
   // Reorder on every tick, even while an encode is running — a file added
   // during a long transcode must still be sorted into place promptly.
-  if (!reordering) {
-    reordering = true;
-    try {
-      await reorderChkSrtQueue();
-    } finally {
-      reordering = false;
-    }
-  }
+  await reorderChkSrtQueueOnce();
   await refreshIntroPriority();
   await pruneIntroPriority();
   // Refresh every tick, even while an encode from a prior tick is running, so
@@ -554,8 +616,14 @@ async function scanPass() {
       const videoFilePath = await nextNeedingEncode();
       if (!videoFilePath) break;
       try {
-        await encodeOne(videoFilePath);
+        const result = await encodeOne(videoFilePath);
         failedAt.delete(videoFilePath);
+        if (result === "done") {
+          // Move the fresh mirror to the front of the chksrt queue now rather
+          // than on the next tick, then tell the clients.
+          await reorderChkSrtQueueOnce();
+          onMirrorsChanged();
+        }
       } catch (e) {
         failedAt.set(videoFilePath, Date.now());
         unilog(1406, `encode failed for ${path.basename(videoFilePath)}: ${e.message}`);
@@ -595,6 +663,7 @@ async function removeStaleTmpFiles() {
 export function start(deps) {
   if (deps?.syncBatchMsgs) syncBatchMsgs = deps.syncBatchMsgs;
   if (deps?.introEpisodePaths) introEpisodePaths = deps.introEpisodePaths;
+  if (deps?.onMirrorsChanged) onMirrorsChanged = deps.onMirrorsChanged;
   fs.mkdirSync(MPFOUR_DIR, { recursive: true });
   removeStaleTmpFiles().catch((e) => {
     unilog(1408, `tmp cleanup error: ${e.message}`);

@@ -110,9 +110,13 @@ view.onLastViewedChange((lastViewed) => {
   publishChannelDelta("lastViewed", lastViewed);
 });
 
+// `mirrored`: the head entry (the one the Chksrt button opens) already has its
+// 480p mp4 mirror. mpfour keeps mirrored entries at the front, so this is also
+// "some queued file is ready to view"; the button turns yellow when it is false.
 const getChksrtSnapshot = () => ({
   count: subsState.subQueueChkSrt.length,
   path: subsState.subQueueChkSrt[0]?.videoFilePath,
+  mirrored: mpfour.mpfourValidCached(subsState.subQueueChkSrt[0]?.videoFilePath),
 });
 
 const publishChksrtState = () => {
@@ -125,6 +129,51 @@ const publishChksrtState = () => {
 registerLocalChannel("chksrt", {
   snapshot: getChksrtSnapshot,
 });
+
+// introReady — names of needsIntro shows whose intro episode already has an mp4
+// mirror. The Intro button opens these first and shows yellow when there are
+// none. Recomputed when a mirror lands or the queue reorders, plus on a timer
+// for needsIntro flips (the gap check) and mirror expiry.
+const INTRO_READY_REFRESH_MS = 30_000;
+let introReadyShows = [];
+let introReadyRefreshing = false;
+
+const getIntroReadySnapshot = () => ({ shows: introReadyShows });
+
+registerLocalChannel("introReady", {
+  snapshot: getIntroReadySnapshot,
+});
+
+async function refreshIntroReady() {
+  if (introReadyRefreshing) return;
+  introReadyRefreshing = true;
+  try {
+    const allTvdb = tvdb.getAllTvdbSync() || {};
+    const ready = [];
+    for (const record of Object.values(allTvdb)) {
+      if (!record?.needsIntro || intro.hasConfiguredIntro(record)) continue;
+      if (await mirroredIntroFile(record)) ready.push(record.name);
+    }
+    ready.sort();
+    const changed =
+      ready.length !== introReadyShows.length ||
+      ready.some((name, i) => name !== introReadyShows[i]);
+    if (!changed) return;
+    introReadyShows = ready;
+    publishChannelDelta("introReady", getIntroReadySnapshot());
+  } catch (e) {
+    unilog(2330, `intro readiness refresh failed: ${e.message}`);
+  } finally {
+    introReadyRefreshing = false;
+  }
+}
+
+// A mirror finished or the chksrt queue was reordered around one: push the new
+// head-of-queue and intro readiness to every client right away.
+function onMirrorsChanged() {
+  publishChksrtState();
+  refreshIntroReady();
+}
 
 const getFlexgetSnapshot = () => ({
   history: flexget.getSentHistoryRows(),
@@ -3389,38 +3438,45 @@ https.createServer(httpsOptions, app).listen(HTTP_PORT, () => {
   startAsrQueueLoop();
   // seekable-mp4 mirrors for the chksrt queue + intro episodes (own loop, not
   // ffmpegQueue)
-  mpfour.start({ syncBatchMsgs, introEpisodePaths });
+  mpfour.start({ syncBatchMsgs, introEpisodePaths, onMirrorsChanged });
+  refreshIntroReady();
+  setInterval(refreshIntroReady, INTRO_READY_REFRESH_MS);
   recode.start();
   startOldFileCleanup();
 });
 
 // The episode intro marking will open, for every show with an entry in the
-// chksrt queue — in queue order. mpfour mirrors these ahead of the rest of the
-// queue so one mirror serves both features: chksrt needs the file seekable to
-// check subtitle sync, intro needs it seekable to scan for the intro.
-// selectIntroFile lives in @tv/share so this picks exactly the episode the
-// client will open.
+// chksrt queue — in queue order — followed by every other show flagged
+// needsIntro, so the Intro button always has a mirrored show to open first.
+// mpfour mirrors the chksrt ones ahead of the rest of the queue so one mirror
+// serves both features: chksrt needs the file seekable to check subtitle sync,
+// intro needs it seekable to scan for the intro. selectIntroFile lives in
+// @tv/share so this picks exactly the episode the client will open.
 async function introEpisodePaths() {
   const allTvdb = tvdb.getAllTvdbSync() || {};
   const out = [];
   const seenShow = new Set();
+  const consider = async (record) => {
+    if (!record || seenShow.has(record.name)) return;
+    seenShow.add(record.name);
+    // Already-marked shows will never be opened for intro editing, so mirroring
+    // their intro episode is wasted work. This also makes dropIntro() stick —
+    // without it the next sweep would re-add what the needsIntro clear removed.
+    if (intro.hasConfiguredIntro(record)) return;
+    // A show with any episode already mirrored needs no encode at all — that is
+    // the episode /api/introFile hands the player.
+    if (await mirroredIntroFile(record)) return;
+    const result = epd.selectIntroFile(record);
+    if (result?.path) out.push(result.path);
+  };
   for (const entry of subsState.subQueueChkSrt) {
     const videoFilePath = entry?.videoFilePath;
     if (!videoFilePath) continue;
     const showName = showNameFromFilePath(videoFilePath);
-    if (!showName || seenShow.has(showName)) continue;
-    seenShow.add(showName);
-    const record = allTvdb[showName];
-    if (!record) continue;
-    // Already-marked shows will never be opened for intro editing, so mirroring
-    // their intro episode is wasted work. This also makes dropIntro() stick —
-    // without it the next sweep would re-add what the needsIntro clear removed.
-    if (intro.hasConfiguredIntro(record)) continue;
-    // A show with any episode already mirrored needs no encode at all — that is
-    // the episode /api/introFile hands the player.
-    if (await mirroredIntroFile(record)) continue;
-    const result = epd.selectIntroFile(record);
-    if (result?.path) out.push(result.path);
+    if (showName) await consider(allTvdb[showName]);
+  }
+  for (const record of Object.values(allTvdb)) {
+    if (record?.needsIntro) await consider(record);
   }
   return out;
 }

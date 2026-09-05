@@ -104,6 +104,17 @@ export async function mpfourValid(videoFilePath) {
   const mirror = mpfourPathFor(videoFilePath);
   if (!mirror) return null;
   const resolved = path.resolve(videoFilePath);
+  const wasValid = validMirrors.has(resolved);
+  const verdict = await mpfourValidUncached(resolved, mirror);
+  // The cache starts empty on every srvr restart, so the first chksrt snapshot
+  // after one reports the head as unmirrored (yellow) even when its mp4 is
+  // fine; the scan then fills the cache but nothing republished. Push a fresh
+  // snapshot whenever a verdict flips.
+  if (validMirrors.has(resolved) !== wasValid) onMirrorsChanged();
+  return verdict;
+}
+
+async function mpfourValidUncached(resolved, mirror) {
   try {
     const [srcStat, sidecarRaw] = await Promise.all([
       fsp.stat(resolved),

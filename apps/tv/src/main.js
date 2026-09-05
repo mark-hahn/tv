@@ -350,7 +350,13 @@ function updateNowPlaying(sessions) {
   currentShowName = key;
 
   const showName = playing[0]?.showName ?? null;
-  if (showName) lastRelevantShow = showName;
+  // Only the tv's own session feeds lastRelevantShow: a show playing in Emby
+  // on some other computer is not what tvapp should come up on.
+  const tvShowName =
+    sessions.find(
+      (s) => s.NowPlayingItem?.SeriesName && TV_DEVICE_NAMES.includes(s.DeviceName),
+    )?.NowPlayingItem.SeriesName ?? null;
+  if (tvShowName) lastRelevantShow = tvShowName;
   fetch(`${SRVR_INTERNAL_URL}/internal/nowPlaying`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

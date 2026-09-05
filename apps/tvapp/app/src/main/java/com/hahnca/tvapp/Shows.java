@@ -115,9 +115,13 @@ class Shows {
     // above has been through TrailerList yet.
     final JSONArray remoteIds;
     boolean trailersReady;
+    // The record as it came, so a reload can tell a show that has not changed
+    // and keep the card it already has instead of building it again.
+    final String raw;
 
     Show(String name, JSONObject rec) {
       this.name = name;
+      raw = rec.toString();
       id = str(rec, "id");
       waitStr = str(rec, "waitStr");
       image = str(rec, "image");

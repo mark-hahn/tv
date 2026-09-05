@@ -348,6 +348,10 @@ class ShowListView extends ScrollView {
    * when the remembered show is gone (renamed, or dropped out of Emby).
    */
   void setShows(List<Shows.Show> list, String selectedName) {
+    android.util.Log.i(
+        "tvapp",
+        "sel trace: setShows selectedName=" + selectedName
+            + " active=" + (active == null ? null : active.name));
     // A reload is data arriving underneath the user rather than anything the
     // user did, so cardMisc keeps the mode and the cursor it was on. Everything
     // below throws the cards away and builds them again, and the setActive that
@@ -359,25 +363,31 @@ class ShowListView extends ScrollView {
     int keptFocusIndex = focusIndex;
     int keptSeasonIndex = mapSeasonIndex;
     int keptEpisodeIndex = mapEpisodeIndex;
+    // Building a card is the expensive part of a reload -- all of them at once
+    // holds the ui thread for a couple of seconds -- and most records come
+    // back exactly as they were, so those keep their Show and its card, and
+    // only the changed and the new ones are built.
+    Map<String, Shows.Show> before = new HashMap<>(byName);
     shows.clear();
-    shows.addAll(list);
-    cards.clear();
-    miscViews.clear();
-    nameRows.clear();
-    mediaRequests.clear();
-    requestedMedia.clear();
-    posters.clear();
-    requestedPosters.clear();
-    letterBadges.clear();
+    for (Shows.Show show : list) {
+      Shows.Show kept = before.remove(show.name);
+      if (kept != null && kept.raw.equals(show.raw)) {
+        shows.add(kept);
+      } else {
+        if (kept != null) dropCard(kept);
+        shows.add(show);
+      }
+    }
+    for (Shows.Show gone : before.values()) dropCard(gone);
     byName.clear();
     hideEpisodeCard();
     column.removeAllViews();
     for (Shows.Show show : shows) byName.put(show.name, show);
     for (Shows.Show show : shows) {
-      View card = buildCard(show);
-      cards.put(show, card);
+      if (!cards.containsKey(show)) cards.put(show, buildCard(show));
     }
     dwellHandler.removeCallbacks(notifySelection);
+    Shows.Show wasActive = active;
     active = null;
     pinned = null;
     resetMisc();
@@ -389,8 +399,21 @@ class ShowListView extends ScrollView {
         setActive(show);
       }
     }
+    // A kept card that was the selected one and is not any more is still
+    // drawn as it was: border on, and on whatever mode it had rotated to.
+    if (wasActive != null && wasActive != active && cards.containsKey(wasActive)) {
+      hideLetterBadge(wasActive);
+      paint(cards.get(wasActive));
+      if (keptMode != MiscMode.DESC) renderMisc(wasActive);
+    }
     // Picks the top card when nothing was remembered, and lays the list out.
     apply();
+    android.util.Log.i(
+        "tvapp",
+        "sel trace: setShows done active=" + (active == null ? null : active.name)
+            + " pinned=" + (pinned == null ? null : pinned.name)
+            + " index=" + visible.indexOf(active)
+            + " top=" + (visible.isEmpty() ? null : visible.get(0).name));
     // Only onto the same show: a selection that landed somewhere else is a show
     // the user was not looking at, and it opens on its description like any
     // other. The indices are the old show's own, and every mode clamps or
@@ -404,6 +427,18 @@ class ShowListView extends ScrollView {
       renderMisc(active);
       loadVisibleMedia();
     }
+  }
+
+  /** Everything this view holds for a show whose record is gone or changed. */
+  private void dropCard(Shows.Show show) {
+    cards.remove(show);
+    miscViews.remove(show);
+    nameRows.remove(show);
+    List<MediaRequest> requests = mediaRequests.remove(show);
+    if (requests != null) requestedMedia.removeAll(requests);
+    posters.remove(show);
+    requestedPosters.remove(show);
+    letterBadges.remove(show);
   }
 
   /**
@@ -492,6 +527,33 @@ class ShowListView extends ScrollView {
 
   Shows.Show getSelected() {
     return active;
+  }
+
+  /**
+   * Puts one show at the top of the list as it stands, ahead of the reload
+   * that will sort it there: the show just played, in the Watched sort. A
+   * custom order is the server's and is left as it is.
+   */
+  void moveToTop(Shows.Show show) {
+    if (customOrder != null) return;
+    int index = visible.indexOf(show);
+    if (index <= 0) return;
+    visible.remove(index);
+    visible.add(0, show);
+    View card = cards.get(show);
+    column.removeView(card);
+    LinearLayout.LayoutParams params =
+        new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+    params.bottomMargin = (int) dp(CARD_GAP_DP);
+    column.addView(card, 0, params);
+    if (show == active) {
+      post(
+          () -> {
+            scrollTo(0, 0);
+            loadVisibleMedia();
+          });
+    }
   }
 
   /** Everything loaded, whatever the list is currently narrowed to. */
@@ -877,6 +939,8 @@ class ShowListView extends ScrollView {
         }
       }
       if (recovered == null) recovered = visible.get(0);
+      android.util.Log.i(
+          "tvapp", "sel trace: apply recovered " + active.name + " -> " + recovered.name);
       setActive(recovered);
     } else if (active == null) {
       setActive(visible.get(0));
@@ -961,6 +1025,10 @@ class ShowListView extends ScrollView {
    */
   private void setActive(Shows.Show show, boolean notifyNow) {
     if (show == active) return;
+    android.util.Log.i(
+        "tvapp",
+        "sel trace: setActive " + show.name + " from " + (active == null ? null : active.name),
+        new Throwable());
     // The pin belongs to one show, and only while it is the selected one.
     if (show != pinned) pinned = null;
     Shows.Show old = active;

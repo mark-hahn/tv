@@ -20,8 +20,16 @@ const FILTER_KEY = "filter";
 // Last press seen from any remote. A repeating/held key keeps re-recording this
 // (same senderId falls straight through), so while one remote holds a key it
 // owns the floor and any different key from another remote loses.
-let lastPress = null; // { key, senderId, at, fromSubCtrl, repeating }
+let lastPress = null; // { key, senderId, who, at, fromSubCtrl, repeating }
 let locked = false;
+// What the lock in force is about, so a remote that connects while it stands
+// (a reopened phone app, a fresh browser tab) can be shown the same overlay
+// the others got instead of silently having every key dropped.
+let lockInfo = null; // { sentKey, blockedKey }
+
+export function tvRemoteLockInfo() {
+  return locked ? lockInfo : null;
+}
 
 // Remotes that currently have the tvapprc filter text screen open. That screen
 // stays up for as long as someone is typing, so it holds the floor by identity
@@ -39,14 +47,16 @@ export function tvRemoteFilterOpen({ senderId, open }) {
 
 export function tvRemoteUnlock() {
   locked = false;
+  lockInfo = null;
 }
 
 // Locks every remote and tells them why. The remotes close their filter screen
 // on this too, so the set is dropped here to match.
 function lock(sentKey, blockedKey) {
   locked = true;
+  lockInfo = { sentKey, blockedKey };
   filterOpen.clear();
-  notifyClients("tvRemoteLock", { sentKey, blockedKey });
+  notifyClients("tvRemoteLock", lockInfo);
   return { blocked: true, sentKey, blockedKey };
 }
 
@@ -80,6 +90,7 @@ export function tvTvGet(path) {
 export async function keySendWithChk({
   key,
   senderId,
+  from = "unknown",
   fromSubCtrl = false,
   repeating = false,
   base = "tv",
@@ -89,10 +100,13 @@ export async function keySendWithChk({
 }) {
   if (locked) return { blocked: true };
 
+  const who = `${senderId}@${from}`;
+
   // Another remote is sitting in the filter text screen — it owns the floor
   // until it closes, so this key loses no matter how the press window stands.
-  if ([...filterOpen].some((id) => id !== senderId)) {
-    unilog(1900, `collision: filter screen open, blocked=${key}`);
+  const filterOwner = [...filterOpen].find((id) => id !== senderId);
+  if (filterOwner) {
+    unilog(2336, `collision: filter screen open on ${filterOwner}, blocked=${key} from ${who}`);
     return lock(FILTER_KEY, key);
   }
 
@@ -120,12 +134,12 @@ export async function keySendWithChk({
     } else {
       // Two discrete presses of different keys within the window — a real
       // collision. First key already went out; lock every remote.
-      unilog(1601, `collision: sent=${prev.key} blocked=${key}`);
+      unilog(2337, `collision: sent=${prev.key} from ${prev.who} ${now - prev.at}ms ago, blocked=${key} from ${who}`);
       return lock(prev.key, key);
     }
   }
 
-  lastPress = { key, senderId, at: now, fromSubCtrl, repeating };
+  lastPress = { key, senderId, who, at: now, fromSubCtrl, repeating };
 
   if (!path) return { blocked: false };
   const result = await forward(base, method, path, body);

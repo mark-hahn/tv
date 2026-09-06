@@ -90,6 +90,7 @@ import {
 import {
   keySendWithChk,
   tvRemoteFilterOpen,
+  tvRemoteLockInfo,
   tvRemoteUnlock,
   tvTvGet,
 } from "./src/tvRemoteKey.js";
@@ -1973,7 +1974,18 @@ app.post("/api/accessTvdb", apiWrapper(tvdb.accessTvdb));
 app.post("/api/getPoster", apiWrapper(tvdb.getPoster));
 app.post("/api/getTvmazeCrew", apiWrapper(tvdb.getTvmazeCrew_cmd));
 app.post("/api/migrateWatchedCount", apiWrapper(tvdb.migrateWatchedCount));
-app.post("/api/tvRemoteKey", apiWrapper(keySendWithChk));
+// The remote's address rides along so a collision log can name the device
+// behind a sender id. Browsers arrive through nginx, hence the forwarded
+// header; the phone app hits the port directly.
+app.post(
+  "/api/tvRemoteKey",
+  (req, _res, next) => {
+    req.body.from =
+      req.headers["x-real-ip"] ?? req.socket.remoteAddress ?? "unknown";
+    next();
+  },
+  apiWrapper(keySendWithChk),
+);
 app.post("/api/tvRemoteFilterOpen", apiWrapper(tvRemoteFilterOpen));
 app.get("/api/getGroupCounts", apiWrapper(groupCounts.getGroupCounts));
 app.get("/api/getBadGroups", (_req, res) => {
@@ -3877,6 +3889,15 @@ wss.on("connection", (ws) => {
         notification: "missingEpisodeWarning",
         data: lastMissingEpWarning,
       }),
+    );
+  }
+  // A remote lock in force is replayed too: the lock only ever went out to the
+  // remotes connected at the time, and a remote that connects afterwards would
+  // otherwise have every key silently dropped with no overlay to say why.
+  const remoteLock = tvRemoteLockInfo();
+  if (remoteLock) {
+    ws.send(
+      JSON.stringify({ id: 0, notification: "tvRemoteLock", data: remoteLock }),
     );
   }
 

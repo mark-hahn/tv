@@ -1,5 +1,7 @@
 # Workspace Instructions (Read First)
 
+- do not open or read gpt.md even if in attached file to prompt
+
 ## Response style
 
 - When asked to do a simple one-off action (generate a file, run a command), just do it and report completion in 1-2 lines.
@@ -26,6 +28,19 @@
 
 - **All server apps run on the remote server**.
 - The only things that run locally are **Vite** and **Metro** (Android bundler).
+
+## System backups (restic, on hahnca.com)
+
+- Full details: `docs/restic-debug.md`.
+- Read-only restic backups of `/` exist on hahnca.com, snapshotted 3×/day.
+  Browse the latest via the FUSE mount: `/mnt/bkupall-bkup/tags/sys/latest/<path>`
+  (mount if needed: `/root/dev/apps/bkupall/restore/mount`). Older snapshots are
+  sibling dirs under `tags/sys/`.
+- For metadata/diffs use the restic CLI (repo `/mnt/media/backup/sys-bkup-restic`,
+  password file `/root/dev/apps/bkupall/restic-cred.txt`, always pass `--no-lock`).
+- Never run backup/forget/prune/init/rewrite/tag/key/migrate against these repos,
+  never unmount `/mnt/bkupall-bkup`, and restore to a scratch path — don't overwrite
+  live files without asking.
 
 ## Nginx
 

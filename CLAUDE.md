@@ -1,5 +1,7 @@
 # Workspace Instructions (Read First)
 
+- do not open or read gpt.md even if in attached file to prompt
+
 ## Response style
 
 - When asked to do a simple one-off action (generate a file, run a command), just do it and report completion in 1-2 lines.

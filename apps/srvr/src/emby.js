@@ -94,23 +94,17 @@ const playTargetEpisode = async (showId, episodeId) => {
   return episodeId ? { id: episodeId, pos: 0 } : null;
 };
 
-const playOnSession = async (sessionId, showId, showName, episodeId) => {
-  const episode = await playTargetEpisode(showId, episodeId);
-  if (!episode) {
-    unilog(1894, `no episode to play for ${showName}`);
-    return;
-  }
+// True when the session accepted the play. A dead session answers with a
+// 500, the same way it answers the Viewing report, so this doubles as the
+// live-session probe for plays.
+const playOnSession = async (sessionId, episode) => {
   const { url, body } = urls.playingUrl(sessionId, episode.id, episode.pos);
   const resp = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!resp.ok)
-    unilog(
-      1895,
-      `play rejected for ${showName} episode ${episode.id}: ${resp.status}`,
-    );
+  return resp.ok;
 };
 
 export const viewShowOnLivingRoomTv = async ({
@@ -129,13 +123,28 @@ export const viewShowOnLivingRoomTv = async ({
   // "NotFound". So try each in turn and keep the first that actually accepts it.
   const candidates = sessions.filter((s) => s.DeviceName === "Living Room TV");
   if (candidates.length === 0) return { found: false };
+  // A play goes straight to the Playing command. The Viewing report a plain
+  // view sends puts the show's page up under the player, and every play from
+  // tvapp then left one more page on Emby's back stack. With nothing reported
+  // the player opens over whatever Emby was on -- home, once tv-tv has sent
+  // it there -- and stopping drops back onto that.
+  if (play) {
+    const episode = await playTargetEpisode(showId, episodeId);
+    if (!episode) {
+      unilog(2340, `no episode to play for ${showName}`);
+      return { found: false };
+    }
+    for (const session of candidates) {
+      if (await playOnSession(session.Id, episode))
+        return { found: true, client: session.Client };
+    }
+    unilog(2341, `play rejected by every Living Room TV session for ${showName} episode ${episode.id}`);
+    return { found: false };
+  }
   for (const session of candidates) {
     const viewUrl = urls.viewingUrl(session.Id, showId, showName, episodeId);
     const viewResp = await fetch(viewUrl, { method: "POST" });
-    if (viewResp.ok) {
-      if (play) await playOnSession(session.Id, showId, showName, episodeId);
-      return { found: true, client: session.Client };
-    }
+    if (viewResp.ok) return { found: true, client: session.Client };
     unilog(
       1388,
       `Viewing rejected by ${session.Client} session ${session.Id}: ${viewResp.status}`,

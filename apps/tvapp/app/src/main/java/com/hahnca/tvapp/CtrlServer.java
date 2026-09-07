@@ -55,6 +55,8 @@ class CtrlServer extends WebSocketServer {
   private static final String CMD_SELECT = "s";
   private static final String CMD_PLAY_EPISODE = "p";
   private static final String CMD_CUSTOM_CHANGED = "c";
+  // The phone hid the selected show through tv-srvr and is saying so.
+  private static final String CMD_SHOW_HIDDEN = "h";
   private static final int STOP_TIMEOUT_MS = 500;
 
   interface Listener {
@@ -79,6 +81,8 @@ class CtrlServer extends WebSocketServer {
     void onPlayEpisode(String embyId);
 
     void onCustomChanged();
+
+    void onShowHidden();
 
     void onPhoneConnected();
   }
@@ -159,6 +163,8 @@ class CtrlServer extends WebSocketServer {
       listener.onExit();
     } else if (CMD_CUSTOM_CHANGED.equals(message)) {
       listener.onCustomChanged();
+    } else if (CMD_SHOW_HIDDEN.equals(message)) {
+      listener.onShowHidden();
     } else {
       Log.w(TAG, "unknown ctrl command: " + message);
     }

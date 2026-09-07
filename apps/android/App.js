@@ -48,6 +48,13 @@ const TVAPPRC_HOST = "192.168.1.103";
 const TVAPPRC_PORT = 8098;
 const TVAPPRC_RECONNECT_MS = 2000;
 const TVAPPRC_CONNECT_TIMEOUT_MS = 5000;
+// Entering or leaving tvapprc mode redraws the whole grid one row taller or
+// shorter, so every cell moves. A press this soon after the switch was aimed at
+// the old layout: it is dropped and the cell flashes DENIED_BG instead.
+const MODE_SWITCH_LOCKOUT_MS = 800;
+// Hide fires only after the cell has been held this long; a tap is refused.
+const HIDE_HOLD_MS = 300;
+const DENIED_BG = "lightcoral";
 const LOCAL_NETWORK_PERMISSION = "android.permission.ACCESS_LOCAL_NETWORK";
 const MSG_TVAPP_UP = "u";
 const MSG_TVAPP_DOWN = "d";
@@ -69,6 +76,7 @@ const CMD_KEY_LETTER = "j";
 // selected card's cardMisc. Info also rotates cardMisc once it is focused.
 const CMD_KEY_SORT = "sort";
 const CMD_KEY_FILTER = "filter";
+const CMD_SHOW_HIDDEN = "h"; // the selected show was just hidden
 const CMD_KEY_INFO = "info";
 const CMD_FILTER = "f";
 const SCRUB_HOLD_DELAY_MS = 400;
@@ -298,6 +306,9 @@ export default function App() {
   const tvapprcWsRef = useRef(null);
   // The show tvapp has active, sent by tvapp on every change and on connect.
   const tvapprcActiveShowRef = useRef(null);
+  // tvapprcMode as a ref, for the bridge socket's close handler, which lives in
+  // a mount-time effect and never sees the state.
+  const tvapprcModeRef = useRef(false);
   // A show name the shows pane selects as soon as its list is loaded.
   const pendingShowSelectRef = useRef(null);
 
@@ -556,6 +567,19 @@ export default function App() {
       Keyboard.dismiss();
     };
 
+    // tvapprc mode means this remote can drive tvapp, which it cannot without
+    // the bridge socket, so the socket dropping leaves the mode the same way
+    // the bridge's own down message does. The reconnect brings it back: the
+    // bridge sends up as soon as its leg reaches tvapp, and tvapp re-announces
+    // the selected show to every phone that connects.
+    const leaveTvapprcMode = () => {
+      setTvapprcMode(false);
+      closeTvapprcInput();
+      clearTvapprcFilter();
+      setTvapprcListCount(null);
+      tvapprcActiveShowRef.current = null;
+    };
+
     const scheduleRetry = () => {
       if (done || retryTimer) return;
       clearTimeout(openTimer);
@@ -571,16 +595,17 @@ export default function App() {
       tvapprcWsRef.current = ws;
       ws.onopen = () => clearTimeout(openTimer);
       ws.onerror = scheduleRetry;
-      ws.onclose = scheduleRetry;
+      ws.onclose = () => {
+        // Only when the mode was on: off the lan every retry ends here, and
+        // leaving the mode dismisses the keyboard.
+        if (tvapprcModeRef.current) leaveTvapprcMode();
+        scheduleRetry();
+      };
       ws.onmessage = (e) => {
         if (e.data === MSG_TVAPP_UP) {
           setTvapprcMode(true);
         } else if (e.data === MSG_TVAPP_DOWN) {
-          setTvapprcMode(false);
-          closeTvapprcInput();
-          clearTvapprcFilter();
-          setTvapprcListCount(null);
-          tvapprcActiveShowRef.current = null;
+          leaveTvapprcMode();
         } else if (e.data === MSG_CLEAR_FILTER) {
           clearTvapprcFilter();
         } else if (
@@ -882,6 +907,27 @@ export default function App() {
     setFlashBtn(btn);
     setTimeout(() => setFlashBtn(null), 300);
   };
+
+  // A press that was refused: painted DENIED_BG for as long as flash paints
+  // orange, so the person sees it was swallowed rather than lost.
+  const [deniedBtn, setDeniedBtn] = useState(null);
+  const deny = (btn) => {
+    setDeniedBtn(btn);
+    setTimeout(() => setDeniedBtn(null), 300);
+  };
+
+  // When the grid last changed shape, for the post-switch lockout. The effect
+  // runs once on mount too, which only locks a grid that is not measured yet.
+  const modeSwitchAtRef = useRef(0);
+  useEffect(() => {
+    modeSwitchAtRef.current = Date.now();
+    tvapprcModeRef.current = tvapprcMode;
+  }, [tvapprcMode]);
+  const inModeSwitchLockout = () =>
+    Date.now() - modeSwitchAtRef.current < MODE_SWITCH_LOCKOUT_MS;
+  // Set while the press in flight was refused, so its release is not handed to
+  // a stop handler that never got the matching start.
+  const deniedPressRef = useRef(false);
 
   // Single choke point for every key/command this app sends — the server's
   // keySendWithChk checks it against the other remote's last press before
@@ -1377,29 +1423,35 @@ export default function App() {
 
   // Hide/unhide the show tvapp has selected -- the same server toggle the web
   // client's info pane Hide button calls.
+  const hideSelectedShow = async () => {
+    const showName = tvapprcActiveShowRef.current;
+    if (!showName) return;
+    flash("hide");
+    try {
+      const res = await fetch(`${TV_SRVR_HTTP_URL}/api/hideShow`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: showName }),
+      });
+      const data = await res.json();
+      // A hidden show is done with: tvapp moves on from it -- in the Watched
+      // sort back to the top of the list, otherwise to the show under it.
+      // Unhiding leaves the selection where it is.
+      if (data?.action === "hidden") sendTvapprc(CMD_SHOW_HIDDEN);
+    } catch (e) {
+      console.warn(`hide toggle failed for ${showName}: ${e.message}`);
+    }
+  };
+
+  // Hide sits where Skip and Mute are in the ordinary layout and a tap there
+  // was hiding shows nobody meant to hide, so it takes a hold of HIDE_HOLD_MS.
+  // A tap is refused and says so.
   const startHideHold = () => {
-    dbStart(async () => {
-      const showName = tvapprcActiveShowRef.current;
-      if (!showName) return;
-      flash("hide");
-      try {
-        const res = await fetch(`${TV_SRVR_HTTP_URL}/api/hideShow`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: showName }),
-        });
-        const data = await res.json();
-        // A hidden show is done with, so the selection steps to the show that
-        // was under it. Unhiding leaves the selection where it is.
-        if (data?.action === "hidden") sendTvapprc(`${CMD_KEY},down`);
-      } catch (e) {
-        console.warn(`hide toggle failed for ${showName}: ${e.message}`);
-      }
-    });
+    lpStart(() => deny("hide"), hideSelectedShow, HIDE_HOLD_MS);
   };
 
   const stopHideHold = () => {
-    dbStop();
+    lpStop();
   };
 
   const startHomeHold = () => {
@@ -1644,16 +1696,18 @@ export default function App() {
   const servicesMode = mediaTitle === "Smart TV" ? "google" : mode;
   const services = allServices[servicesMode] ?? [];
   // Background color helpers (mirror Vue cellStyle / computed props)
-  const cellBg = (defaultBg, key) => (flashBtn === key ? "orange" : defaultBg);
+  const cellBg = (defaultBg, key) =>
+    flashBtn === key ? "orange" : deniedBtn === key ? DENIED_BG : defaultBg;
 
-  const muteBg = flashBtn === "mute" ? "orange" : "lightgreen";
+  const muteBg = cellBg("lightgreen", "mute");
 
-  const offBg = flashBtn === "off" ? "orange" : isOff ? "lightblue" : "white";
+  const offBg = cellBg(isOff ? "lightblue" : "white", "off");
 
   // Only the power key is painted this way now. Blue whenever the set is on --
   // the same lightblue the Shows key wears in tvapprc mode -- pink on live TV.
   const modeBg = (m) => {
     if (flashBtn === m) return "orange";
+    if (deniedBtn === m) return DENIED_BG;
     if (m === "google" && mode === "tv") return "#ffb3c1";
     return isOff ? "white" : "lightblue";
   };
@@ -3090,12 +3144,25 @@ export default function App() {
               onStartShouldSetResponder={() => !isOff || btn.key === "google"}
               onResponderTerminationRequest={() => false}
               onResponderGrant={() => {
+                if (inModeSwitchLockout()) {
+                  deniedPressRef.current = true;
+                  deny(btn.key);
+                  return;
+                }
                 if (btn.onPressIn) btn.onPressIn();
               }}
               onResponderRelease={() => {
+                if (deniedPressRef.current) {
+                  deniedPressRef.current = false;
+                  return;
+                }
                 if (btn.onPressOut) btn.onPressOut();
               }}
               onResponderTerminate={() => {
+                if (deniedPressRef.current) {
+                  deniedPressRef.current = false;
+                  return;
+                }
                 if (btn.onPressOut) btn.onPressOut();
               }}
             >

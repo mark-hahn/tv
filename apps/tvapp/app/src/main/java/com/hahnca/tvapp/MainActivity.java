@@ -1109,6 +1109,15 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   @Override
+  public void onShowHidden() {
+    ui.post(
+        () -> {
+          bumpKeepAwake();
+          showList.onShowHidden();
+        });
+  }
+
+  @Override
   public void onClearState() {
     ui.post(
         () -> {

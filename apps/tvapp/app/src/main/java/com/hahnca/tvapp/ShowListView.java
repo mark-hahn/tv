@@ -556,6 +556,39 @@ class ShowListView extends ScrollView {
     }
   }
 
+  /**
+   * The selected show was just hidden. In the Watched sort a hidden show sinks
+   * to the bottom once the reload lands, so it goes there now and the list
+   * starts over from the top with the top show selected. Any other order --
+   * a custom one included, which is the server's -- leaves the hidden show
+   * where it is and steps the selection to the show under it.
+   */
+  void onShowHidden() {
+    if (sort != Shows.Sort.WATCHING || customOrder != null || active == null) {
+      moveSelection(1);
+      return;
+    }
+    int index = visible.indexOf(active);
+    if (index >= 0 && index < visible.size() - 1) {
+      Shows.Show hidden = active;
+      visible.remove(index);
+      visible.add(hidden);
+      View card = cards.get(hidden);
+      column.removeView(card);
+      LinearLayout.LayoutParams params =
+          new LinearLayout.LayoutParams(
+              ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+      params.bottomMargin = (int) dp(CARD_GAP_DP);
+      column.addView(card, params);
+    }
+    setActive(visible.get(0));
+    post(
+        () -> {
+          scrollTo(0, 0);
+          loadVisibleMedia();
+        });
+  }
+
   /** Everything loaded, whatever the list is currently narrowed to. */
   List<Shows.Show> getShows() {
     return shows;

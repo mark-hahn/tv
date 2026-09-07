@@ -19,7 +19,8 @@
     "owner": "mark-hahn",
     "plugins": [
       "expo-asset",
-      "expo-font"
+      "expo-font",
+      "expo-status-bar"
     ],
     "runtimeVersion": {
       "policy": "appVersion"

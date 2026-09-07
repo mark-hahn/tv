@@ -150,7 +150,7 @@ const GOOGLE_HOME_DELAY_MS = 0; // ms after TV turns on before sending Home key
 const GOOGLE_EMBY_DELAY_MS = 250; // ms after TV turns on before launching Emby
 const VIEW_SHOW_DELAY_MS = 1000; // ms after Emby app launch before firing embyViewShow (fallback)
 const PENDING_VIEW_SHOW_MAX_AGE_MS = 10000; // ms before an unsent pending viewshow is dropped
-const EMBY_LAUNCH_DELAY_MS = 1500; // ms after launching Emby before sending it the show
+const EMBY_LAUNCH_DELAY_MS = 300; // ms after launching Emby before sending it the show
 // A resend posts Viewing, which walks the Emby ui back to the show page, so a
 // resend that lands while Emby is opening the episode cancels the very start
 // it is waiting for. It has to be longer than the time Emby needs to get from
@@ -167,9 +167,6 @@ const EMBY_BOOT_WINDOW_MS = 40000; // ms to keep resending the show while Emby b
 const POWERON_AWAKE_POLL_MS = 500; // ms between power-status probes after HA says on
 const POWERON_AWAKE_WAIT_MS = 15000; // ms to wait for the set to report active
 const POWERON_HOME_SETTLE_MS = 1500; // ms after Home before launching Emby
-const POWERON_EMBY_POLL_MS = 250; // ms between checks that Emby has started talking
-const POWERON_EMBY_WAIT_MS = 10000; // ms to wait for Emby to show any activity
-const POWERON_EMBY_SETTLE_MS = 2000; // ms after Emby is up before tvapp goes over it
 
 // Scrub control
 const SCRUB_START_COUNT = 4; // number of slow keys before speeding up
@@ -2163,6 +2160,10 @@ function startTvapprcBridge() {
         if (!quietDialFail) {
           quietDialFail = true;
           unilog(1880, `tvapp dial failed: ${e.message}`);
+          // Down is otherwise only sent when an open leg closes. A phone that
+          // reconnects after tvapp has already gone gets a leg that never
+          // opens, so it is told here that there is nothing to drive.
+          if (!wasOpen) sendPhone(MSG_TVAPP_DOWN);
         }
       });
       sock.on("message", (data) => sendPhone(data.toString()));
@@ -2206,7 +2207,10 @@ function startTvapprcBridge() {
 // Opens tvapp on the tv so Android tvapprc mode has something to control.
 // Sideloaded as it is, tvapp still shows up in the tv's own application list, so
 // this needs no adb — which matters, because the tv's adb port moves on reboot.
-async function launchTvapp() {
+// Puts one of the tv's own apps on screen through the set's app api. Resolves
+// once the set has answered, so two launches in a row land in that order --
+// which is what the power-on sequence relies on to get tvapp over Emby.
+async function launchBraviaApp(uri, name) {
   try {
     const res = await fetch(BRAVIA_APP_CONTROL_URL, {
       method: "POST",
@@ -2215,18 +2219,22 @@ async function launchTvapp() {
         method: "setActiveApp",
         version: "1.0",
         id: 1,
-        params: [{ uri: TVAPP_BRAVIA_URI }],
+        params: [{ uri }],
       }),
     });
     const body = await res.json();
     if (body.error) {
-      unilog(1842, `tv refused to open tvapp: ${JSON.stringify(body.error)}`);
+      unilog(2351, `tv refused to open ${name}: ${JSON.stringify(body.error)}`);
       return;
     }
-    unilog(1843, "asked the tv to open tvapp");
+    unilog(2352, `asked the tv to open ${name}`);
   } catch (e) {
-    unilog(1844, `could not ask the tv to open tvapp: ${e.message}`);
+    unilog(2353, `could not ask the tv to open ${name}: ${e.message}`);
   }
+}
+
+async function launchTvapp() {
+  await launchBraviaApp(TVAPP_BRAVIA_URI, "tvapp");
 }
 
 // A quick dial to tvapp's ctrl socket: open within TVAPP_PROBE_TIMEOUT_MS
@@ -2287,13 +2295,10 @@ const EMBY_STOP_POLL_MS = 150;
 const EMBY_STOP_WAIT_MS = 4000;
 // On top of that, what the player's own exit off the screen takes after the
 // session it was playing has gone.
-const EMBY_STOP_SETTLE_MS = 700;
-// And then long enough for that key to have been delivered before tvapp is
-// launched over the top of it. A back key still in flight when tvapp takes the
-// screen is a back press tvapp answers, and it leaves for Emby again the
-// moment it arrives -- the show still open behind it, and the remote dropped
-// back out of tvapprc mode.
-const EMBY_BACK_SETTLE_MS = 1000;
+const EMBY_STOP_SETTLE_MS = 0;
+// And then long enough for Emby to have drawn its home page before tvapp is
+// launched over the top of it, so home is what shows in the moment between.
+const EMBY_HOME_SETTLE_MS = 0;
 
 /** Resolves once Emby has no playback session left, or the wait runs out. */
 async function waitForEmbyStopped() {
@@ -2314,26 +2319,52 @@ async function waitForEmbyStopped() {
  * Emby keeps playing behind whatever comes up over it, so switching to tvapp
  * means stopping the video first -- not pausing it: the Shows key is a move
  * between the two apps, not a look away from a show still running. Stopping
- * only drops Emby back onto the show it was playing, so a back key follows to
- * close that too and leave Emby off the show entirely.
+ * only drops Emby back onto whatever page was under the player, so a GoHome
+ * follows: it empties Emby's back stack outright, which also clears any show
+ * pages left over from browsing in Emby itself, and it goes over Emby's own
+ * connection rather than the tv's input, so it can never land on tvapp. It is
+ * sent whether or not anything was playing, for the same clean-up.
  */
 async function closeEmbyShow() {
   try {
     const live = await getEmbyPlaybackSession();
-    if (!live?.Id) return;
-    await fetch(
-      `${EMBY_BASE_URL}/Sessions/${live.ControlSessionId}/Playing/Stop?api_key=${EMBY_API_KEY}`,
-      { method: "POST", headers: { Accept: "application/json" } },
-    );
-    await waitForEmbyStopped();
-    await sleep(EMBY_STOP_SETTLE_MS);
-    callService("remote", "send_command", REMOTE_ENTITY_ID, {
-      command: GOOGLE_KEY_MAP.back,
-    });
-    await sleep(EMBY_BACK_SETTLE_MS);
+    if (live?.Id) {
+      await fetch(
+        `${EMBY_BASE_URL}/Sessions/${live.ControlSessionId}/Playing/Stop?api_key=${EMBY_API_KEY}`,
+        { method: "POST", headers: { Accept: "application/json" } },
+      );
+      await waitForEmbyStopped();
+      await sleep(EMBY_STOP_SETTLE_MS);
+    }
+    if (!(await embyGoHome()))
+      unilog(2348, `no Living Room TV session accepted GoHome`);
+    await sleep(EMBY_HOME_SETTLE_MS);
   } catch (e) {
     unilog(1919, `stop before tvapp open failed: ${e.message}`);
   }
+}
+
+// The Emby app registers more than one "Living Room TV" session, and only the
+// live one takes commands -- the dead ones answer with a 500 -- so each is
+// tried until one accepts. False when none does, which is also what an Emby
+// that is not running looks like.
+async function embyGoHome() {
+  const resp = await fetch(`${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!resp.ok) throw new Error(`sessions ${resp.status}`);
+  const sessions = await resp.json();
+  const candidates = sessions.filter(
+    (s) => s.DeviceName === LIVING_ROOM_DEVICE_NAME,
+  );
+  for (const s of candidates) {
+    const cmd = await fetch(
+      `${EMBY_BASE_URL}/Sessions/${s.Id}/Command/GoHome?api_key=${EMBY_API_KEY}`,
+      { method: "POST", headers: { Accept: "application/json" } },
+    );
+    if (cmd.ok) return true;
+  }
+  return false;
 }
 
 // Every place that starts tvapp fresh (as against tvapp already being up and
@@ -2344,19 +2375,10 @@ async function closeEmbyShow() {
 // up, so a change in the tv session's LastActivityDate is the closest thing to
 // one. An Emby that was already open sits silent and the wait just runs out --
 // which is the right answer for it too, it is already up.
-async function waitForEmbyActivity(before) {
-  const until = Date.now() + POWERON_EMBY_WAIT_MS;
-  while (Date.now() < until) {
-    await sleep(POWERON_EMBY_POLL_MS);
-    if ((await embyTvLastActivity()) !== before) return true;
-  }
-  return false;
-}
-
 // The power key brings the whole stack up in order. The set can come back on
 // the broadcast tuner, so the input is put on Google Android TV first; then
 // Emby is started, because tvapp backs out into it and plays through it; and
-// only once Emby is really up does tvapp go over the top of it.
+// then tvapp goes over the top of it.
 // The set's own answer to "are you up?", straight from its REST api rather
 // than HA's cached view of it. Null while it is unreachable, which is what a
 // tv that has only just been woken looks like from here.
@@ -2406,14 +2428,10 @@ async function googlePowerOnSequence() {
     });
     await sleep(POWERON_HOME_SETTLE_MS);
   }
-  const activityBefore = await embyTvLastActivity();
-  callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
-    media_content_type: "app",
-    media_content_id: EMBY_APP_URI,
-  });
-  const started = await waitForEmbyActivity(activityBefore);
-  unilog(1955, `power-on: emby ${started ? "started" : "showed no activity"}`);
-  await sleep(POWERON_EMBY_SETTLE_MS);
+  // Emby need only have been started, not be up: an Emby still loading its
+  // ui behind tvapp finishes there and stays there. Going through the set's
+  // own app api, awaited, is what puts tvapp's launch after Emby's.
+  await launchBraviaApp(EMBY_APP_URI, "emby");
   await openTvappSelectingShow();
 }
 
@@ -2520,9 +2538,8 @@ app.post("/tv/tvapprc/forceback", async (req, res) => {
 });
 
 // tvapp's back key on its way out to Emby: the show Emby was left playing
-// behind it is closed exactly as opening tvapp over a playing show closes it.
-// tvapp is already stepping aside as this is asked for, so the back key at the
-// end of the close lands on Emby rather than on tvapp.
+// behind it is closed exactly as opening tvapp over a playing show closes it,
+// and Emby is sent home so it comes up on its home page.
 app.post("/tv/closeembyshow", async (req, res) => {
   await closeEmbyShow();
   res.json({ ok: true });

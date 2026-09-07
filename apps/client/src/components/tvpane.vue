@@ -444,6 +444,8 @@
     <div
       v-else
       :style="gridStyle"
+      @mousedown.capture="gateGridPress"
+      @touchstart.capture="gateGridPress"
     >
       <!-- Row 0 (tvapprc only): sort, filter, info. Each one hands tvapp's
            focus to one of its own areas, which the arrow keys cannot all
@@ -729,6 +731,7 @@ const CMD_CLOSE_TO_EMBY = "b";
 // cardMisc back to its description, filters off.
 const CMD_CLEAR_STATE = "r";
 const CMD_KEY = "k";
+const CMD_SHOW_HIDDEN = "h"; // the selected show was just hidden
 // Letter-skip variant of CMD_KEY, up/down only -- sent instead of CMD_KEY
 // once a held key has been auto-repeating fast long enough that tvapp's show
 // list starts jumping by starting letter instead of by row.
@@ -740,6 +743,14 @@ const CMD_KEY_LETTER = "j";
 const TVAPP_FAST_REPEAT_MS = 120;
 const TVAPPRC_ROWS = 6;
 const REMOTE_ROWS = 5;
+// Entering or leaving tvapprc mode redraws the grid one row taller or shorter,
+// so every cell moves. A press this soon after the switch was aimed at the old
+// layout: it is dropped and the grid dims for a moment to say so (mirrors
+// apps/android/App.js, which flashes the cell).
+const MODE_SWITCH_LOCKOUT_MS = 800;
+// Hide fires only after the cell has been held this long; a tap is refused.
+const HIDE_HOLD_MS = 300;
+const DENIED_BG = "lightcoral";
 
 const CELL_BASE = {
   borderRight: "3px solid #000",
@@ -811,6 +822,8 @@ export default {
       _picChannel: null,
       _subChannel: null,
       tvapprcMode: false,
+      deniedBtn: null, // cell whose press was refused, painted DENIED_BG
+      deniedGrid: false, // a press was refused during the post-switch lockout
     };
   },
 
@@ -827,6 +840,7 @@ export default {
         borderTop: "3px solid #000",
         borderLeft: "3px solid #000",
         height: "100%",
+        filter: this.deniedGrid ? "brightness(0.5)" : "none",
       };
     },
     powerIconStyle() {
@@ -895,6 +909,10 @@ export default {
   },
 
   watch: {
+    tvapprcMode() {
+      this._modeSwitchAt = Date.now();
+    },
+
     // tv-tv keeps a "most relevant show" of its own -- this and Emby actually
     // starting playback both feed it -- so tvapp starting fresh can select
     // that instead of whatever the client happens to have open right now.
@@ -1257,7 +1275,7 @@ export default {
     },
 
     // Shared long-press helper: immediate short action registration, 400ms then long
-    _lpStart(shortAction, longAction) {
+    _lpStart(shortAction, longAction, holdMs = 400) {
       if (this.isOff) return;
       clearTimeout(this._lpDebounceTimer);
       clearTimeout(this._lpLongTimer);
@@ -1270,7 +1288,7 @@ export default {
         const lp = this._lp;
         this._lp = null;
         lp.longAction?.();
-      }, 400);
+      }, holdMs);
     },
 
     // Drops a hold in flight without running either of its actions.
@@ -1366,24 +1384,34 @@ export default {
 
     // Hide/unhide the show tvapp has selected -- the same server toggle the
     // info pane's Hide button calls.
+    async hideSelectedShow() {
+      const showName = this._tvapprcActiveShow;
+      if (!showName) return;
+      this.flash("hide");
+      try {
+        const data = await hideShow(showName);
+        // A hidden show is done with: tvapp moves on from it -- in the Watched
+        // sort back to the top of the list, otherwise to the show under it.
+        // Unhiding leaves the selection where it is.
+        if (data?.action === "hidden") this.sendTvapprc(CMD_SHOW_HIDDEN);
+      } catch (e) {
+        unilog(1969, `hide toggle failed for ${showName}: ${e.message}`);
+      }
+    },
+
+    // Hide sits where Skip and Mute are in the ordinary layout and a tap there
+    // was hiding shows nobody meant to hide, so it takes a hold of
+    // HIDE_HOLD_MS. A tap is refused and says so.
     startHideHold() {
-      this._dbStart(async () => {
-        const showName = this._tvapprcActiveShow;
-        if (!showName) return;
-        this.flash("hide");
-        try {
-          const data = await hideShow(showName);
-          // A hidden show is done with, so the selection steps to the show that
-          // was under it. Unhiding leaves the selection where it is.
-          if (data?.action === "hidden") this.sendTvapprc(`${CMD_KEY},down`);
-        } catch (e) {
-          unilog(1969, `hide toggle failed for ${showName}: ${e.message}`);
-        }
-      });
+      this._lpStart(
+        () => this.deny("hide"),
+        this.hideSelectedShow,
+        HIDE_HOLD_MS,
+      );
     },
 
     stopHideHold() {
-      this._dbStop();
+      this._lpStop();
     },
 
     // Select the show tvapp has selected in the web client's own shows list.
@@ -1781,13 +1809,39 @@ export default {
 
     cellStyle(bg, key = null) {
       const flashActive = key && this.flashBtn === key;
-      return { ...CELL_BASE, backgroundColor: flashActive ? "orange" : bg };
+      const denied = key && this.deniedBtn === key;
+      return {
+        ...CELL_BASE,
+        backgroundColor: flashActive ? "orange" : denied ? DENIED_BG : bg,
+      };
     },
 
     flash(btn) {
       this.flashBtn = btn;
       setTimeout(() => {
         this.flashBtn = null;
+      }, 300);
+    },
+
+    // A press that was refused, shown for as long as flash shows orange.
+    deny(btn) {
+      this.deniedBtn = btn;
+      setTimeout(() => {
+        this.deniedBtn = null;
+      }, 300);
+    },
+
+    // Capture-phase gate on the whole grid: inside the post-switch lockout the
+    // press never reaches its cell. preventDefault on the touch also stops the
+    // browser synthesizing a mouse press for it after the lockout has ended.
+    gateGridPress(e) {
+      if (Date.now() - (this._modeSwitchAt || 0) >= MODE_SWITCH_LOCKOUT_MS)
+        return;
+      e.stopPropagation();
+      e.preventDefault();
+      this.deniedGrid = true;
+      setTimeout(() => {
+        this.deniedGrid = false;
       }, 300);
     },
 

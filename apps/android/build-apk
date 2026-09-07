@@ -69,15 +69,36 @@ rsync -a --delete \
   /root/apps/tv/apps/android/ $REMOTE:$BUILD_DIR/
 
 echo "npm" > "$PHASE_FILE"
-echo "==> Installing npm deps..."
-ssh $REMOTE "cd $BUILD_DIR && npm install --legacy-peer-deps 2>&1 | tail -3"
+# A dependency change gets a clean install from the lock file: a plain npm
+# install has left packages half-present after a major upgrade, and the
+# native modules' build intermediates live in node_modules, so the clean
+# install (and the full native recompile it forces) is saved for when the
+# lock file actually changed. Its checksum is kept on the server next to the
+# tree it was installed into.
+LOCK_SUM=$(md5sum "$SCRIPT_DIR/package-lock.json" | cut -d' ' -f1)
+ssh $REMOTE "
+  cd $BUILD_DIR
+  if [[ \"\$(cat .lock-sum 2>/dev/null)\" == \"$LOCK_SUM\" ]]; then
+    echo '==> Installing npm deps...'
+    npm install --legacy-peer-deps 2>&1 | tail -3
+  else
+    echo '==> Lock file changed -- clean npm install...'
+    rm -rf node_modules
+    npm ci --legacy-peer-deps 2>&1 | tail -3 && echo '$LOCK_SUM' > .lock-sum
+  fi
+"
 
 echo "building" > "$PHASE_FILE"
 echo "==> Building APK..."
+# Expo caches the autolinked native-module list under these two directories
+# and reuses it across builds, so a list generated against a broken or older
+# node_modules would silently leave modules out of the app. Regenerating it
+# costs seconds.
 ssh $REMOTE "
   export ANDROID_HOME=/opt/android-sdk
   export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
   cd $BUILD_DIR/android
+  rm -rf build/generated/autolinking app/build/generated/autolinking
   ./gradlew assembleRelease --console=plain 2>&1 | grep --line-buffered -E 'Task :app:|BUILD|FAIL|error'
 "
 

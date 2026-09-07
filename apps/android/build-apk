@@ -7,33 +7,80 @@ DEVICE=${1:-56221JEBF01987}
 REMOTE=hahnca.com
 BUILD_DIR=/tmp/android-build
 APK_PATH=$BUILD_DIR/android/app/build/outputs/apk/release/app-release.apk
-LOCAL_APK=/root/apps/tv/build.apk
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CACHE_FILE="$SCRIPT_DIR/.build-cache"
+# The apk goes to the phone over wifi from the server, never over the usb
+# cable: the usb/ip link into wsl stalls on anything bigger than a few hundred
+# KB, while small adb commands over it are fine. So usb is used only to read
+# the phone's address and switch its adb onto tcp; the server, which is wired,
+# connects to that and streams the install. The server's adb trusts the phone
+# with this wsl's own adb key, kept there as a vendor key, so the phone never
+# has to be re-authorized for it.
+WIFI_ADB_PORT=5555
+REMOTE_VENDOR_KEY=/root/.android/wsl-adbkey
+PACKAGE=com.hahnca.tvremote
+USB_REAPPEAR_WAIT_S=20
 
 PHASE_FILE=/root/apps/tv/build-phase
+
+# Puts the phone's adb back on usb and waits for it to show up here again.
+# Re-enumerating on the phone's side drops the usb/ip attachment, so if it
+# has not come back by itself it is re-attached.
+restore_usb() {
+  local device=$1
+  local wifi=$2
+  ssh $REMOTE "adb -s $wifi usb >/dev/null 2>&1; sleep 2; adb disconnect $wifi >/dev/null 2>&1" || true
+  local until=$((SECONDS + USB_REAPPEAR_WAIT_S))
+  while (( SECONDS < until )); do
+    if adb devices | grep -q "^$device[[:space:]]*device"; then return 0; fi
+    sleep 2
+  done
+  echo "==> $device did not come back on usb -- re-attaching via usbipd..."
+  local busid
+  busid=$(powershell.exe -Command "usbipd list" 2>/dev/null | tr -d '\r' | awk '/Shared/{print $1; exit}')
+  if [[ -n "$busid" ]]; then
+    powershell.exe -Command "usbipd attach --wsl --busid $busid" >/dev/null 2>&1 || true
+    sleep 5
+  fi
+  adb devices | grep -q "^$device[[:space:]]*device" || echo "==> $device is still not on usb"
+}
 
 do_install() {
   local device=$1
   local apk=$2
-  local remote_apk=/data/local/tmp/tv-remote.apk
-  echo "==> Pushing APK to device $device..."
-  if ! adb -s "$device" push "$apk" "$remote_apk" 2>&1; then
-    echo "==> Push failed."
+  local ip
+  ip=$(adb -s "$device" shell ip -4 addr show wlan0 2>/dev/null | grep -o 'inet [0-9.]*' | cut -d' ' -f2)
+  if [[ -z "$ip" ]]; then
+    echo "==> Could not read the wifi address of $device."
     return 1
   fi
-  echo "==> Installing on device $device..."
-  if ! adb -s "$device" shell pm install -r "$remote_apk" 2>&1; then
-    echo "==> Install failed — uninstalling old version and retrying..."
-    adb -s "$device" uninstall com.hahnca.tvremote 2>/dev/null || true
-    sleep 2
-    adb -s "$device" shell pm install "$remote_apk" 2>&1 || {
-      echo "==> Install failed after uninstall+reinstall."
-      adb -s "$device" shell rm -f "$remote_apk"
-      return 1
-    }
-  fi
-  adb -s "$device" shell rm -f "$remote_apk"
+  local wifi=$ip:$WIFI_ADB_PORT
+  echo "==> Switching $device to adb over wifi at $wifi..."
+  adb -s "$device" tcpip $WIFI_ADB_PORT >/dev/null 2>&1
+  sleep 3
+  echo "==> Installing from server over wifi..."
+  local ok=0
+  ssh $REMOTE "
+    ADB_VENDOR_KEYS=$REMOTE_VENDOR_KEY adb start-server >/dev/null 2>&1
+    adb connect $wifi >/dev/null 2>&1; sleep 2
+    if ! adb devices | grep -q '^$wifi[[:space:]]*device'; then
+      # a server started without the vendor key cannot authenticate to the phone
+      adb kill-server >/dev/null 2>&1
+      ADB_VENDOR_KEYS=$REMOTE_VENDOR_KEY adb start-server >/dev/null 2>&1
+      adb connect $wifi >/dev/null 2>&1; sleep 2
+    fi
+    if ! adb devices | grep -q '^$wifi[[:space:]]*device'; then
+      echo '==> Server could not connect to the phone over wifi:'; adb devices; exit 1
+    fi
+    if ! adb -s $wifi install -r $apk 2>&1; then
+      echo '==> Install failed -- uninstalling old version and retrying...'
+      adb -s $wifi uninstall $PACKAGE >/dev/null 2>&1 || true
+      sleep 2
+      adb -s $wifi install $apk 2>&1 || { echo '==> Install failed after uninstall+reinstall.'; exit 1; }
+    fi
+  " && ok=1
+  restore_usb "$device" "$wifi"
+  (( ok )) || return 1
   return 0
 }
 
@@ -43,16 +90,12 @@ CACHED_APK=$(cut -d' ' -f2 "$CACHE_FILE" 2>/dev/null || echo "")
 
 if [[ "$CHECKSUM" == "$CACHED_CHECKSUM" && -n "$CACHED_APK" ]]; then
   echo "==> Checksum matches cache — skipping build."
-  echo "downloading" > "$PHASE_FILE"
-  if [[ "$CACHED_APK" == gradle:* ]]; then
-    echo "==> Downloading cached APK from server..."
-    scp "$REMOTE:${CACHED_APK#gradle:}" "$LOCAL_APK"
-  else
-    echo "==> Downloading cached APK from URL..."
-    curl -L "$CACHED_APK" -o "$LOCAL_APK"
+  if [[ "$CACHED_APK" != gradle:* ]]; then
+    echo "==> Cached apk is not a server build ($CACHED_APK); delete $CACHE_FILE and rebuild."
+    exit 1
   fi
   echo "installing" > "$PHASE_FILE"
-  do_install "$DEVICE" "$LOCAL_APK" || exit 1
+  do_install "$DEVICE" "${CACHED_APK#gradle:}" || exit 1
   rm -f "$PHASE_FILE"
   echo "==> Done (from cache)."
   exit 0
@@ -102,15 +145,11 @@ ssh $REMOTE "
   ./gradlew assembleRelease --console=plain 2>&1 | grep --line-buffered -E 'Task :app:|BUILD|FAIL|error'
 "
 
-echo "downloading" > "$PHASE_FILE"
-echo "==> Downloading APK..."
-scp $REMOTE:$APK_PATH $LOCAL_APK
-
-# cache the build before installing, so a failed push doesn't force a rebuild
+# cache the build before installing, so a failed install doesn't force a rebuild
 echo "$CHECKSUM gradle:$APK_PATH" > "$CACHE_FILE"
 
 echo "installing" > "$PHASE_FILE"
-do_install "$DEVICE" "$LOCAL_APK" || exit 1
+do_install "$DEVICE" "$APK_PATH" || exit 1
 
 rm -f "$PHASE_FILE"
 echo "==> Done."

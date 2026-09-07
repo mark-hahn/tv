@@ -38,9 +38,12 @@ DEVICE=$(ssh $REMOTE bash -s <<EOF || true
     { grep -m1 "^$TV_GUID " <<<"\$out" || head -1 <<<"\$out"; } | cut -d' ' -f2
   }
 
+  # The cached address can be reassigned to some other device on the LAN (a
+  # phone took the TV's old address once, and got the apk), so the device at
+  # it has to be the TV before it is used.
   connect() {
     adb connect "\$1" >/dev/null 2>&1 || true
-    if adb -s "\$1" shell true >/dev/null 2>&1; then
+    if adb -s "\$1" shell getprop ro.product.model 2>/dev/null | grep -q BRAVIA; then
       echo "\$1" >&3
       return 0
     fi

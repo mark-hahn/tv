@@ -223,6 +223,11 @@ class ShowListView extends ScrollView {
   // card while an up/down hold is in letter-skip mode.
   private final Map<Shows.Show, TextView> letterBadges = new HashMap<>();
   private final Map<String, Shows.Show> byName = new HashMap<>();
+  // The show just played, held at the top of the Watched sort across reloads
+  // until tv-srvr's own order puts it there: its lastPlayedDate only moves on
+  // the next Emby sweep, minutes after the play, and every reload before that
+  // would sort it straight back to where it was.
+  private String pinnedTop;
   private SelectionListener listener;
   private CountsListener countsListener;
   private FilterTextListener filterTextListener;
@@ -477,6 +482,7 @@ class ShowListView extends ScrollView {
     if (this.sort == sort && customOrder == null) return;
     customOrder = null;
     this.sort = sort;
+    pinnedTop = null;
     if (!keepSelection) clearActive();
     apply();
   }
@@ -536,6 +542,7 @@ class ShowListView extends ScrollView {
    */
   void moveToTop(Shows.Show show) {
     if (customOrder != null) return;
+    pinnedTop = show.name;
     int index = visible.indexOf(show);
     if (index <= 0) return;
     visible.remove(index);
@@ -933,6 +940,7 @@ class ShowListView extends ScrollView {
       }
       Collections.sort(visible, Shows.order(sort));
     }
+    applyPinnedTop();
     applyAt = android.os.SystemClock.uptimeMillis();
     android.util.Log.i("tvapp", "trash timing: apply visible=" + visible.size());
     column.removeAllViews();
@@ -994,6 +1002,28 @@ class ShowListView extends ScrollView {
           loadVisibleMedia();
         });
     dispatchCounts();
+  }
+
+  /**
+   * Keeps the pinned show at the top of a freshly sorted Watched list. Once the
+   * sort itself lands it there the server has caught up and the pin is done;
+   * a show narrowed out of view is left pinned for when the filter comes off.
+   */
+  private void applyPinnedTop() {
+    if (pinnedTop == null || sort != Shows.Sort.WATCHING || customOrder != null) return;
+    Shows.Show show = byName.get(pinnedTop);
+    if (show == null) {
+      pinnedTop = null;
+      return;
+    }
+    int index = visible.indexOf(show);
+    if (index < 0) return;
+    if (index == 0) {
+      pinnedTop = null;
+      return;
+    }
+    visible.remove(index);
+    visible.add(0, show);
   }
 
   private void dispatchCounts() {

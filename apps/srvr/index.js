@@ -2399,6 +2399,46 @@ app.post(
   }),
 );
 
+// Set the watched mark on one episode, in Emby and in episodeData both. The
+// web client's map does this from the browser, straight to Emby; tvapp's map
+// has no Emby credentials of its own and comes here instead.
+app.post(
+  "/api/setEpisodeWatched",
+  apiWrapper(async (params) => {
+    const { name, season, episode, watched } = params || {};
+    if (!name || !Number.isInteger(season) || !Number.isInteger(episode))
+      return { ok: false, error: "Missing params" };
+    const rec = tvdb.getAllTvdbSync()?.[name];
+    if (!rec) return { ok: false, error: "Show not found" };
+    if (!Array.isArray(rec.episodeData))
+      return { ok: false, error: "No episodeData" };
+    if (!epd.getEp(rec.episodeData, season, episode))
+      return { ok: false, error: "Episode not found" };
+
+    const id = epd.getEmbyId(rec.episodeData, season, episode);
+    if (id) {
+      // Position goes with the mark either way: watched has nothing left to
+      // resume, and unwatched is being put back to the start.
+      const res = await fetch(urls.updateUserDataUrl(String(id)), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ Played: !!watched, PlaybackPositionTicks: 0 }),
+      });
+      if (!res.ok && res.status !== 204)
+        return { ok: false, error: `Emby HTTP ${res.status}` };
+    }
+    epd.setEpisode(rec.episodeData, season, episode, {
+      watched: !!watched,
+      pos: 0,
+    });
+    rec.watchedCount = epd.countWatched(rec.episodeData);
+    await tvdb.saveTvdbSync();
+    debouncedTvdbPush(name);
+    unilog(2357, `${name} S${season}E${episode} watched=${!!watched}${id ? "" : " (no emby id)"}`);
+    return { ok: true, watched: !!watched };
+  }),
+);
+
 // Restore watched flags for shows that have left Emby from Emby's own user
 // data, which is keyed by tvdbId and survives the show's removal. The same
 // lookup runs per-show during refreshEpisodeData; this does the whole library

@@ -29,6 +29,9 @@ import org.java_websocket.server.WebSocketServer;
  *                  id -- sent by tv-tv itself, right after an s,&lt;name&gt;
  *   c              the shared filter settings changed: re-fetch the Custom
  *                  list -- sent by tv-tv itself, on tv-srvr's behalf
+ *   h              the hide key: the watched mark on the focused episode when
+ *                  the map has one under its cursor, else hide/unhide the
+ *                  selected show
  *
  * Back to Android:
  *
@@ -56,8 +59,10 @@ class CtrlServer extends WebSocketServer {
   private static final String CMD_SELECT = "s";
   private static final String CMD_PLAY_EPISODE = "p";
   private static final String CMD_CUSTOM_CHANGED = "c";
-  // The phone hid the selected show through tv-srvr and is saying so.
-  private static final String CMD_SHOW_HIDDEN = "h";
+  // The hide key was pressed on the remote. What it acts on is this app's to
+  // say -- it is the only one that knows whether the map has an episode under
+  // its cursor -- so the remote sends the press and nothing more.
+  private static final String CMD_HIDE = "h";
   private static final int STOP_TIMEOUT_MS = 500;
 
   interface Listener {
@@ -83,7 +88,7 @@ class CtrlServer extends WebSocketServer {
 
     void onCustomChanged();
 
-    void onShowHidden();
+    void onHideKey();
 
     void onPhoneConnected();
   }
@@ -182,8 +187,8 @@ class CtrlServer extends WebSocketServer {
       listener.onExit();
     } else if (CMD_CUSTOM_CHANGED.equals(message)) {
       listener.onCustomChanged();
-    } else if (CMD_SHOW_HIDDEN.equals(message)) {
-      listener.onShowHidden();
+    } else if (CMD_HIDE.equals(message)) {
+      listener.onHideKey();
     } else {
       Log.w(TAG, "unknown ctrl command: " + message);
     }

@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 public class MainActivity extends Activity implements CtrlServer.Listener {
@@ -131,6 +132,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final float TOAST_TEXT_SCALE = 2f;
   private static final String EMBY_PACKAGE = "com.mb.android";
   private static final String CLOSE_EMBY_SHOW_URL = "https://hahnca.com/tv-tv/tv/closeembyshow";
+  private static final String HIDE_SHOW_URL = "https://hahnca.com/tv-srvr/api/hideShow";
+  private static final String SET_EPISODE_WATCHED_URL =
+      "https://hahnca.com/tv-srvr/api/setEpisodeWatched";
   private static final long KEEP_AWAKE_IDLE_MS = 5_000;
   // A back key in the first moment on screen is not the user's: coming here
   // from Emby closes the show that was playing, and that close key can still be
@@ -1108,13 +1112,87 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
         });
   }
 
+  /**
+   * The remote's hide key, which acts on whatever the screen is on: the episode
+   * under the map's cursor, else the selected show. The remote cannot tell
+   * which, so it sends the press and this decides.
+   */
   @Override
-  public void onShowHidden() {
+  public void onHideKey() {
     ui.post(
         () -> {
           bumpKeepAwake();
-          showList.onShowHidden();
+          if (showList.hasEpisodeFocus()) toggleFocusedEpisodeWatched();
+          else hideSelectedShow();
         });
+  }
+
+  /**
+   * The map's watched key. The cell is redrawn from this app's own copy of the
+   * record first and tv-srvr told after, so the mark lands under the key; the
+   * reload that tv-srvr's notification brings a moment later then confirms it.
+   */
+  private void toggleFocusedEpisodeWatched() {
+    Shows.Show show = showList.getSelected();
+    int season = showList.focusedSeasonNumber();
+    int episode = showList.focusedEpisodeNumber();
+    if (show == null || season < 0 || episode < 1) return;
+    Boolean watched = showList.toggleFocusedEpisodeWatched();
+    if (watched == null) return;
+    String body;
+    try {
+      body =
+          new JSONObject()
+              .put("name", show.name)
+              .put("season", season)
+              .put("episode", episode)
+              .put("watched", watched.booleanValue())
+              .toString();
+    } catch (JSONException e) {
+      Log.e(TAG, "watched body failed for " + show.name + ": " + e);
+      return;
+    }
+    new Thread(
+            () -> {
+              try {
+                Http.postJson(SET_EPISODE_WATCHED_URL, body);
+              } catch (Exception e) {
+                Log.e(TAG, "set watched failed for " + show.name + ": " + e);
+              }
+            },
+            "set-watched")
+        .start();
+  }
+
+  /**
+   * Hide or unhide the selected show, the toggle the web client's info pane
+   * Hide button calls. A hidden show is done with, so the list moves on from
+   * it; unhiding leaves the selection where it is.
+   */
+  private void hideSelectedShow() {
+    Shows.Show show = showList.getSelected();
+    if (show == null) return;
+    String body;
+    try {
+      body = new JSONObject().put("name", show.name).toString();
+    } catch (JSONException e) {
+      Log.e(TAG, "hide body failed for " + show.name + ": " + e);
+      return;
+    }
+    new Thread(
+            () -> {
+              String action = "";
+              try {
+                action = new JSONObject(Http.postJson(HIDE_SHOW_URL, body)).optString("action", "");
+              } catch (Exception e) {
+                Log.e(TAG, "hide failed for " + show.name + ": " + e);
+                return;
+              }
+              if (!"hidden".equals(action)) return;
+              ui.post(showList::onShowHidden);
+            },
+            "hide-show")
+        .start();
   }
 
   @Override

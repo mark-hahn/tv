@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.json.JSONArray;
+import org.json.JSONException;
 
 /**
  * The card list down the left half of the screen: one card per show, holding
@@ -730,6 +731,47 @@ class ShowListView extends ScrollView {
   /** Whether an episode of the selected show is the thing the play key plays. */
   boolean hasEpisodeFocus() {
     return miscMode == MiscMode.MAP && miscFocused && active != null;
+  }
+
+  /** The season number the map cursor is in, or -1 when no episode is focused. */
+  int focusedSeasonNumber() {
+    return hasEpisodeFocus() ? focusedSeason() : -1;
+  }
+
+  /**
+   * The episode number the map cursor is on, or -1 when none is focused. The
+   * cells of a season are drawn from its episodeData row in order, so the one
+   * the cursor is on is that many episodes in.
+   */
+  int focusedEpisodeNumber() {
+    return focusedEpisodeTuple() == null ? -1 : mapEpisodeIndex + 1;
+  }
+
+  /**
+   * Flips the watched mark on the episode the map cursor is on and redraws the
+   * map with it, so the cell changes under the key rather than waiting out the
+   * round trip to tv-srvr and the reload that follows it. Answers the state it
+   * left the episode in, which is what the server is then told to write; null
+   * when there is no episode under the cursor to flip.
+   */
+  Boolean toggleFocusedEpisodeWatched() {
+    JSONArray tuple = focusedEpisodeTuple();
+    if (tuple == null) return null;
+    boolean watched = tuple.optInt(ED_WATCHED, 0) != 1;
+    try {
+      tuple.put(ED_WATCHED, watched ? 1 : 0);
+      // Only when the slot is already there: putting it on a tuple whose
+      // trailing slots were dropped would pad the ones between with nulls.
+      if (tuple.length() > ED_POS) tuple.put(ED_POS, 0);
+    } catch (JSONException e) {
+      android.util.Log.e("tvapp", "watched mark failed for " + active.name + ": " + e);
+      return null;
+    }
+    if (active.watchedCount >= 0) {
+      active.watchedCount = Math.max(0, active.watchedCount + (watched ? 1 : -1));
+    }
+    renderMisc(active);
+    return watched;
   }
 
   /** Emby's own id for the episode under the cursor, or null when it has none. */

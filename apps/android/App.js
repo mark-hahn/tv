@@ -76,7 +76,9 @@ const CMD_KEY_LETTER = "j";
 // selected card's cardMisc. Info also rotates cardMisc once it is focused.
 const CMD_KEY_SORT = "sort";
 const CMD_KEY_FILTER = "filter";
-const CMD_SHOW_HIDDEN = "h"; // the selected show was just hidden
+// The hide key. What it acts on -- the episode under the map's cursor, else
+// the selected show -- is tvapp's to decide, so the press is all that is sent.
+const CMD_HIDE = "h";
 const CMD_KEY_INFO = "info";
 const CMD_FILTER = "f";
 const SCRUB_HOLD_DELAY_MS = 400;
@@ -1421,26 +1423,13 @@ export default function App() {
     dbStop();
   };
 
-  // Hide/unhide the show tvapp has selected -- the same server toggle the web
-  // client's info pane Hide button calls.
-  const hideSelectedShow = async () => {
-    const showName = tvapprcActiveShowRef.current;
-    if (!showName) return;
+  // The hide key, which tvapp reads as either of two things: the watched mark
+  // on the episode its map has under the cursor, or hide/unhide of the show it
+  // has selected. Only tvapp knows which of those the screen is on, so it is
+  // told the key went down and does the rest itself.
+  const hideSelectedShow = () => {
     flash("hide");
-    try {
-      const res = await fetch(`${TV_SRVR_HTTP_URL}/api/hideShow`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: showName }),
-      });
-      const data = await res.json();
-      // A hidden show is done with: tvapp moves on from it -- in the Watched
-      // sort back to the top of the list, otherwise to the show under it.
-      // Unhiding leaves the selection where it is.
-      if (data?.action === "hidden") sendTvapprc(CMD_SHOW_HIDDEN);
-    } catch (e) {
-      console.warn(`hide toggle failed for ${showName}: ${e.message}`);
-    }
+    sendTvapprc(CMD_HIDE);
   };
 
   // Hide sits where Skip and Mute are in the ordinary layout and a tap there

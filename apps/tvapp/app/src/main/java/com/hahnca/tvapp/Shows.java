@@ -86,7 +86,9 @@ class Shows {
     final int averageRuntime;
     final int seasonCount;
     final int episodeCount;
-    final int watchedCount; // -1 when the record has none
+    // -1 when the record has none. Not final: the map's watched key moves it
+    // ahead of the reload, so the name row's count agrees with the cells.
+    int watchedCount;
     final String overview;
     final String imdbId;
     final String imdbRatings;

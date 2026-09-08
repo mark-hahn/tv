@@ -32,5 +32,11 @@
   "[jsonc]": {
     "editor.formatOnSave": false
   },
-  "window.title": "tv wsl"
+  "window.title": "tv wsl",
+  "favorites.resources": [
+    {
+      "filePath": "gpt.md",
+      "group": "Default"
+    }
+  ]
 }

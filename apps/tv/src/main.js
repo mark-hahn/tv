@@ -2584,13 +2584,14 @@ app.get("/tv/tvappcustom", async (req, res) => {
   res.json({ ok });
 });
 
-// tvapp asks for this when it needs the set to bring it to the front. It cannot
-// come back by itself once backgrounded: Android blocks an activity start from a
-// background app, and no permission a sideloaded app can grant itself lifts that.
+// The phone's Shows key when its bridge socket is down, which it is whenever
+// the phone has sat idle for a while. It has to do all that the bridge's open
+// message does: launching tvapp alone leaves Emby's player paused under it,
+// with every page it had open still there.
 app.get("/tv/opentvapp", async (req, res) => {
   unilog(1846, `opentvapp from ${client(req)}`);
-  await launchTvapp();
-  res.json({ ok: true });
+  const opened = await openTvappSelectingShow();
+  res.json(opened ? { ok: true } : { ok: false, error: "tvapp did not come up" });
 });
 
 app.listen(TV_PORT, () => {

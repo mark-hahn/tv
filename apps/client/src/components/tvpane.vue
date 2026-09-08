@@ -702,7 +702,7 @@
 <script>
 import { config } from "../config.js";
 import evtBus from "../evtBus.js";
-import { wsSend, clientId, openChannel, tvRemoteKey, hideShow } from "../srvr.js";
+import { wsSend, clientId, openChannel, tvRemoteKey } from "../srvr.js";
 import allServices from "../../../tv/services.json";
 import { keyLabels } from "../keyLabels.js";
 import { logHere, unilog} from "../log.js"
@@ -731,7 +731,9 @@ const CMD_CLOSE_TO_EMBY = "b";
 // cardMisc back to its description, filters off.
 const CMD_CLEAR_STATE = "r";
 const CMD_KEY = "k";
-const CMD_SHOW_HIDDEN = "h"; // the selected show was just hidden
+// The hide key. What it acts on -- the episode under the map's cursor, else
+// the selected show -- is tvapp's to decide, so the press is all that is sent.
+const CMD_HIDE = "h";
 // Letter-skip variant of CMD_KEY, up/down only -- sent instead of CMD_KEY
 // once a held key has been auto-repeating fast long enough that tvapp's show
 // list starts jumping by starting letter instead of by row.
@@ -1382,21 +1384,13 @@ export default {
       this._dbStop();
     },
 
-    // Hide/unhide the show tvapp has selected -- the same server toggle the
-    // info pane's Hide button calls.
-    async hideSelectedShow() {
-      const showName = this._tvapprcActiveShow;
-      if (!showName) return;
+    // The hide key, which tvapp reads as either of two things: the watched mark
+    // on the episode its map has under the cursor, or hide/unhide of the show
+    // it has selected. Only tvapp knows which of those the screen is on, so it
+    // is told the key went down and does the rest itself.
+    hideSelectedShow() {
       this.flash("hide");
-      try {
-        const data = await hideShow(showName);
-        // A hidden show is done with: tvapp moves on from it -- in the Watched
-        // sort back to the top of the list, otherwise to the show under it.
-        // Unhiding leaves the selection where it is.
-        if (data?.action === "hidden") this.sendTvapprc(CMD_SHOW_HIDDEN);
-      } catch (e) {
-        unilog(1969, `hide toggle failed for ${showName}: ${e.message}`);
-      }
+      this.sendTvapprc(CMD_HIDE);
     },
 
     // Hide sits where Skip and Mute are in the ordinary layout and a tap there

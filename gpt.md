@@ -1,9 +1,6 @@
 
-show snoozed chksrt list in queues
+when in tvapp and the info key is used to show a map and an episode is selected in the map then the hide key should toggle the watched state for that episode and update the map immediately
 
 i want to tell another single page app llm chat how to show a badge
-
-The Responder: 1 file(s) for episodes it never aired, from S1E6:
-tvapp show starting is flakey
 
 =================

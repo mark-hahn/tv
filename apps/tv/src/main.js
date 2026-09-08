@@ -86,6 +86,12 @@ const BRAVIA_PSK = "qwerty";
 const TVAPPRC_BRIDGE_PORT = 8098;
 const TVAPP_CTRL_URL = "ws://192.168.1.86:8099";
 const TVAPP_DIAL_RETRY_MS = 2000;
+// tvapp's ctrl socket does not always send a close when it goes away -- the
+// activity stopping behind Emby can leave the tcp connection established with
+// nothing on the far end, and the leg then looks open forever, so the phone is
+// never told tvapp is down and its keys go nowhere. A ping every interval with
+// no pong by the next one is what catches that.
+const TVAPP_PING_MS = 2000;
 // Sideloaded, but still in the tv's own application list, so opening tvapp needs
 // no adb — which matters, because the tv's adb port moves on every reboot.
 const BRAVIA_APP_CONTROL_URL = "http://192.168.1.86/sony/appControl";
@@ -2145,14 +2151,33 @@ function startTvapprcBridge() {
       const sock = new WebSocket(TVAPP_CTRL_URL);
       tv = sock;
       let wasOpen = false;
+      let alive = false;
+      let pingTimer = null;
 
       sock.on("open", () => {
         wasOpen = true;
         quietDialFail = false;
         unilog(1879, `phone ${from} bridged to tvapp`);
         sendPhone(MSG_TVAPP_UP);
+        alive = true;
+        pingTimer = setInterval(() => {
+          // Nothing answered the last ping, so this is one of the dead legs:
+          // terminating it runs the close path below, which tells the phone
+          // tvapp is down and starts dialling again.
+          if (!alive) {
+            unilog(2355, `tvapp leg for phone ${from} went quiet`);
+            sock.terminate();
+            return;
+          }
+          alive = false;
+          sock.ping();
+        }, TVAPP_PING_MS);
+      });
+      sock.on("pong", () => {
+        alive = true;
       });
       sock.on("close", () => {
+        clearInterval(pingTimer);
         if (wasOpen) sendPhone(MSG_TVAPP_DOWN);
         redial();
       });

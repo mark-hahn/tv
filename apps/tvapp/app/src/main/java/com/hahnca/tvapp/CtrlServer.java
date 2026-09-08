@@ -3,6 +3,7 @@ package com.hahnca.tvapp;
 import android.util.Log;
 import java.net.InetSocketAddress;
 import org.java_websocket.WebSocket;
+import org.java_websocket.framing.CloseFrame;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
 
@@ -97,7 +98,25 @@ class CtrlServer extends WebSocketServer {
     setReuseAddr(true);
   }
 
+  /**
+   * Every connection is dropped outright before the server is stopped, rather
+   * than left to stop()'s polite close.
+   *
+   * stop() only queues a close frame per connection and gives the selector
+   * thread STOP_TIMEOUT_MS to write it, read the peer's echo back, and close
+   * the channel; then it closes the selector and the listening socket and
+   * leaves any connection that did not finish in time with its socket still
+   * open. Nothing ever closes those -- the activity is on its way to the
+   * background, and Android freezes the process a few tens of seconds later --
+   * so the far end goes on seeing an established connection with tvapp at the
+   * other end of it, and the remote stays in tvapprc mode driving keys into a
+   * socket nobody reads. closeConnection closes the channel there and then, on
+   * this thread, which puts a fin on the wire and tells tv-tv immediately.
+   */
   void shutdown() {
+    for (WebSocket conn : getConnections()) {
+      conn.closeConnection(CloseFrame.GOING_AWAY, "tvapp backgrounded");
+    }
     try {
       stop(STOP_TIMEOUT_MS);
     } catch (InterruptedException e) {

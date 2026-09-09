@@ -3395,14 +3395,12 @@ export default {
           this.clickedTorrents.add(this.filteredTorrents[i]);
         }
       } else if (isCtrlClick) {
-        // Toggle clicked item
-        if (this.selectedItems.has(torrent)) {
-          this.selectedItems.delete(torrent);
-        } else {
-          this.selectedItems.add(torrent);
-          this.clickedTorrents.add(torrent);
-        }
+        // Ctrl-click: select just this row and open its detail page (like Tab).
+        this.selectedItems.clear();
+        this.selectedItems.add(torrent);
+        this.clickedTorrents.add(torrent);
         this.lastSelectedIndex = idx;
+        if (torrent.detailUrl) util.openExternalPage(torrent.detailUrl);
       } else {
         // Plain click: single-select
         this.selectedItems.clear();

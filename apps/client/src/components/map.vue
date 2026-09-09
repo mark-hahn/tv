@@ -1019,10 +1019,19 @@
           "
         >
           <div
-            v-if="selectedEpisodeAired"
-            style="font-weight: bold"
+            v-if="selectedEpisodeAired || episodeInfo.runtime"
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: baseline;
+              gap: 8px;
+              font-weight: bold;
+            "
           >
-            {{ selectedEpisodeAired }}
+            <span>{{ selectedEpisodeAired }}</span>
+            <span v-if="episodeInfo.runtime">
+              {{ episodeInfo.runtime }} mins
+            </span>
           </div>
           <div v-if="episodeInfo.overview">
             {{ episodeInfo.overview }}
@@ -2277,6 +2286,7 @@ export default {
           overview: data?.overview ?? null,
           name: data?.name ?? null,
           aired: data?.aired ?? null,
+          runtime: data?.runtime ?? null,
         };
       } catch (err) {
         if (reqId !== this.episodeInfoRequestId) return;
@@ -2290,6 +2300,7 @@ export default {
           overview: null,
           name: null,
           aired: null,
+          runtime: null,
         };
       }
     },

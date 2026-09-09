@@ -126,6 +126,7 @@ export async function getTmdb(params) {
       overview: episodeInfo.overview ?? null,
       name: episodeInfo.name ?? null,
       aired: episodeInfo.air_date ?? null,
+      runtime: episodeInfo.runtime ?? null,
     };
   } catch (error) {
     if (error.status === 404) {

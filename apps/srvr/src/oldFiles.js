@@ -25,6 +25,9 @@ const TV_DIR = "/mnt/media/tv";
 // pulls in tvdb.js, whose save machinery keeps the process alive forever.
 const MPFOUR_DIR = "/mnt/media/mpfour";
 const MPFOUR_SIDECAR_SUFFIX = ".src.json";
+// Film-strip stills live in <mirror>.stills/ beside the mirror (mpfour.js),
+// and a killed build leaves a <mirror>.stills.tmp/ — the prefix covers both.
+const MPFOUR_STILLS_SUFFIX = ".stills";
 const RECODE_ORIGINALS_DIR = "/mnt/media/tv-recode-originals";
 const RECODE_SIDECAR_SUFFIX = ".recode.json";
 const DELETE_LOG_PATH = path.join(SRVR_DATA_DIR, "auto-deleted-files.log");
@@ -253,6 +256,15 @@ function planMpfour(files) {
         dir: path.dirname(sidecar),
         rule: RULE_MPFOUR,
       });
+    const stillsPrefix = f.path.replace(/\.mp4$/, MPFOUR_STILLS_SUFFIX);
+    for (const still of files) {
+      if (!still.path.startsWith(stillsPrefix)) continue;
+      deletes.push({
+        ...still,
+        dir: path.dirname(still.path),
+        rule: RULE_MPFOUR,
+      });
+    }
   }
   return deletes;
 }
@@ -352,6 +364,22 @@ export function runOldFileCleanup({ dryRun = false } = {}) {
     }
     done.push(entry);
     bytes += entry.size;
+  }
+
+  // The stills dirs are now empty; unlink leaves the dirs themselves behind.
+  if (!dryRun) {
+    const stillsDirs = new Set(
+      done
+        .map((e) => e.dir)
+        .filter((d) => path.basename(d).includes(MPFOUR_STILLS_SUFFIX)),
+    );
+    for (const dir of stillsDirs) {
+      try {
+        fs.rmdirSync(dir);
+      } catch (e) {
+        unilog(2363, `stills dir not removed ${dir}: ${e.message}`);
+      }
+    }
   }
 
   if (!dryRun) appendDeleteLog(done);

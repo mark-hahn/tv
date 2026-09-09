@@ -43,6 +43,19 @@ const MIRROR_HEIGHT = 480;
 // rejects a source (unsupported codec/profile).
 const VAAPI_DEVICE = "/dev/dri/renderD128";
 
+// Film-strip stills. Scrubbing the intro pane to find the skip region means
+// dragging past it as often as onto it, so the Strip pane lays the episode out
+// as a wall of thumbnails instead. Taken on a flat interval rather than on the
+// mirror's keyframes: keyframes are cheaper to decode, but they fall where
+// x264 put them, which on a real episode left gaps of up to 19s — twice the
+// spacing, and wide enough to hide the whole region being looked for.
+const STILL_GAP_SECS = 5;
+// Twice the 200px the strip renders them at, so they stay sharp on hidpi.
+const STILL_WIDTH = 400;
+const STILL_QUALITY = 4;
+// Host nginx serves the mirror tree from, as /mpfour (see /api/stream).
+const NGINX_ORIGIN = "https://hahnca.com";
+
 // Wall-clock estimates for entries that have not started yet, from a 60s
 // benchmark scaled to MIRROR_MAX_SECS (2160p hevc 54s, 1080p h264 31s), rounded
 // up for the SCHED_IDLE slowdown. Every mirror is a real encode now, so the
@@ -91,6 +104,24 @@ export function mpfourPathFor(videoFilePath) {
   if (!resolved.startsWith(TV_DIR + "/")) return null;
   const rel = resolved.slice(TV_DIR.length + 1);
   return path.join(MPFOUR_DIR, rel.replace(/\.[^.]+$/, "") + ".mp4");
+}
+
+// Stills directory for a mirror: <name>.mp4 -> <name>.stills/
+function stillsDirFor(mirrorPath) {
+  return mirrorPath.replace(/\.mp4$/, ".stills");
+}
+
+// Public URL of a file in the mirror tree — the same /mpfour mapping
+// /api/stream redirects to.
+function mpfourUrl(absPath) {
+  return (
+    NGINX_ORIGIN +
+    absPath
+      .replace("/mnt/media", "")
+      .split("/")
+      .map((seg) => encodeURIComponent(seg))
+      .join("/")
+  );
 }
 
 function sidecarPathFor(mirrorPath) {
@@ -266,6 +297,95 @@ function runFfmpeg(args, onSpawn, onProgress) {
   });
 }
 
+// Write one jpg every STILL_GAP_SECS, named for its millisecond position, into
+// a tmp dir swapped into place at the end — so a dir that exists is always a
+// complete set, and a killed run leaves nothing half-built for the next reader
+// to trust.
+//
+// One ffmpeg pass. fps=1/N emits the frame at every multiple of N seconds from
+// zero, so an image's position is arithmetic on its index — no probe pass, and
+// no mapping that could drift out of step with what ffmpeg actually wrote. It
+// decodes every frame of the mirror to do that, but the mirror is 480p and a
+// 600s one costs about a second.
+async function writeStills(mirrorPath, dir) {
+  const tmp = dir + ".tmp";
+  await fsp.rm(tmp, { recursive: true, force: true });
+  await fsp.mkdir(tmp, { recursive: true });
+  await runFfmpeg([
+    "-y",
+    "-i",
+    mirrorPath,
+    "-an",
+    "-sn",
+    "-vf",
+    `fps=1/${STILL_GAP_SECS},scale=${STILL_WIDTH}:-2`,
+    "-q:v",
+    String(STILL_QUALITY),
+    path.join(tmp, "%05d.jpg"),
+  ]);
+  const written = (await fsp.readdir(tmp)).sort();
+  for (let i = 0; i < written.length; i++) {
+    await fsp.rename(
+      path.join(tmp, written[i]),
+      path.join(tmp, `${i * STILL_GAP_SECS * 1000}.jpg`),
+    );
+  }
+  await fsp.rm(dir, { recursive: true, force: true });
+  await fsp.rename(tmp, dir);
+  return written.length;
+}
+
+// stills dir -> in-flight build, so two readers asking at once share one run.
+const stillsInFlight = new Map();
+
+// Build a mirror's stills unless they are already there. Called after every
+// encode, and again from /api/stills for the mirrors written before stills
+// existed — those are still valid and must not be re-encoded just for this.
+async function ensureStills(mirrorPath) {
+  const dir = stillsDirFor(mirrorPath);
+  let names;
+  try {
+    names = await fsp.readdir(dir);
+  } catch {
+    names = [];
+  }
+  // A dir written under a different STILL_GAP_SECS holds the wrong set, so the
+  // test is that the second still sits where this gap puts it, not merely that
+  // the dir has images in it. A mirror too short for a second still is
+  // whatever one image it has.
+  const jpgs = names.filter((n) => n.endsWith(".jpg"));
+  if (jpgs.length === 1 || jpgs.includes(`${STILL_GAP_SECS * 1000}.jpg`)) return;
+  const running = stillsInFlight.get(dir);
+  if (running) {
+    await running;
+    return;
+  }
+  const startedAt = Date.now();
+  const job = writeStills(mirrorPath, dir);
+  stillsInFlight.set(dir, job);
+  try {
+    const n = await job;
+    const secs = Math.round((Date.now() - startedAt) / 1000);
+    unilog(2361, `wrote ${n} stills in ${secs}s: ${path.basename(mirrorPath)}`);
+  } finally {
+    stillsInFlight.delete(dir);
+  }
+}
+
+// Film-strip stills for an episode, [{ ms, url }] in time order. Empty when
+// the mirror has not been built yet — the Strip pane has nothing to show until
+// the intro pane itself has a video.
+export async function getStills(videoFilePath) {
+  const mirror = await mpfourValid(videoFilePath);
+  if (!mirror) return [];
+  await ensureStills(mirror);
+  const dir = stillsDirFor(mirror);
+  return (await fsp.readdir(dir))
+    .filter((n) => n.endsWith(".jpg"))
+    .map((n) => ({ ms: parseInt(n, 10), url: mpfourUrl(path.join(dir, n)) }))
+    .sort((a, b) => a.ms - b.ms);
+}
+
 function wantedByChkSrt(resolved) {
   return subsState.subQueueChkSrt.some(
     (e) => e?.videoFilePath && path.resolve(e.videoFilePath) === resolved,
@@ -425,6 +545,13 @@ async function encodeOne(videoFilePath) {
     await fsp.rm(tmp, { force: true });
   }
   validMirrors.add(path.resolve(videoFilePath));
+  // Stills are a nicety on top of a finished mirror, so a failure here must
+  // not mark the encode failed and send it round again.
+  try {
+    await ensureStills(mirror);
+  } catch (e) {
+    unilog(2362, `stills failed for ${path.basename(mirror)}: ${e.message}`);
+  }
   const secs = Math.round((Date.now() - startedAt) / 1000);
   unilog(2329, `encode (${decode} decode) done in ${secs}s: ${path.basename(mirror)}`);
   return "done";

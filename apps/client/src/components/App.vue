@@ -177,6 +177,80 @@
             >
               Intro {{ introCount }}
             </button>
+            <!-- Intro test side door (tv-srvr src/stills.js). Load = "the
+                 download just finished" for the selected show; its label
+                 counts the stills up and shows the build time when done
+                 (shift-click = cold rerun). Test-intro opens the windowed
+                 intro pane for the selected show, loading first if nothing
+                 has. Saves from that pane are real. Test-chksrt is next. -->
+            <button
+              v-if="currentShow"
+              @click.stop="clickLoad($event)"
+              title="simulate download finished for the selected show (shift = cold rerun)"
+              :style="{
+                fontSize: '13px',
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                marginLeft: '4px',
+                border: '1px solid #bbb',
+                backgroundColor: loadDone ? '#cfc' : 'whitesmoke',
+                color: 'black',
+              }"
+            >
+              {{ loadLabel }}
+            </button>
+            <button
+              v-if="currentShow"
+              @click.stop="clickTestIntro"
+              title="open the windowed intro pane for the selected show (saves are real)"
+              :style="{
+                fontSize: '13px',
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                marginLeft: '4px',
+                border: '1px solid #bbb',
+                backgroundColor: 'whitesmoke',
+                color: 'black',
+              }"
+            >
+              Test-intro
+            </button>
+            <button
+              v-if="currentShow"
+              @click.stop="clickQueueChksrt"
+              title="put the selected show's episode at the head of the chksrt queue"
+              :style="{
+                fontSize: '13px',
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                marginLeft: '4px',
+                border: '1px solid #bbb',
+                backgroundColor: 'whitesmoke',
+                color: 'black',
+              }"
+            >
+              Q-chksrt
+            </button>
+            <button
+              v-if="chksrtCount > 0"
+              @click.stop="clickTestChksrt"
+              title="open the chksrt queue head in the windowed player (saves are real)"
+              :style="{
+                fontSize: '13px',
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                marginLeft: '4px',
+                border: '1px solid #bbb',
+                backgroundColor: 'whitesmoke',
+                color: 'black',
+              }"
+            >
+              Test-chksrt
+            </button>
             <div style="flex: 1"></div>
             <button
               @click.stop="movieMode = !movieMode"
@@ -368,6 +442,7 @@
       :introSeason="videoPlayerMapSeason"
       :introEpisode="videoPlayerMapEpisode"
       :introSource="videoPlayerSource"
+      :windowed="videoPlayerWindowed"
       @close="handleVideoPlayerClose"
       @chksrt-next="handleChksrtNext"
       @chksrt-sel="handleChksrtSel"
@@ -613,6 +688,12 @@ export default {
       videoPlayerMode: null,
       videoPlayerIntroShow: null,
       videoPlayerSource: null,
+      videoPlayerWindowed: false,
+      // Intro test: the show Load was pressed for and its stills progress.
+      loadShowName: null,
+      loadPath: null,
+      loadPick: null,
+      loadStatus: null,
       videoPlayerMapSeason: null,
       videoPlayerMapEpisode: null,
       chksrtCount: 0,
@@ -747,6 +828,21 @@ export default {
       return Number(this.windowH) > Number(this.windowW);
     },
     // Some show still needing an intro has a mirrored episode ready to open.
+    loadDone() {
+      return (
+        this.loadShowName === this.currentShow?.name &&
+        !!this.loadStatus?.done &&
+        !this.loadStatus?.error
+      );
+    },
+    loadLabel() {
+      const st = this.loadStatus;
+      if (!st || this.loadShowName !== this.currentShow?.name) return "Load";
+      if (st.error) return "Load ✗";
+      if (!st.done) return `Load ${st.count}/${st.total || "?"}`;
+      const secs = st.elapsedMs != null ? (st.elapsedMs / 1000).toFixed(1) : "";
+      return `Load ✓ ${st.decode === "cached" ? "cached" : secs + "s"}`;
+    },
     introReady() {
       const ready = new Set(this.introReadyShows);
       return this.allShows.some((s) => s.needsIntro && ready.has(s.name));
@@ -1008,6 +1104,7 @@ export default {
   methods: {
     handleVideoPlayerClose() {
       const closingIntro = this.videoPlayerMode === "intro";
+      this.videoPlayerWindowed = false;
       const introShow = this.videoPlayerIntroShow;
       this.videoPlayerPath = null;
       this.videoPlayerMode = null;
@@ -1171,6 +1268,113 @@ export default {
       const res = await srvr.introFile(show?.name);
       if (!res?.ok) return { error: res?.error || "no playable episode found" };
       return { path: res.path, season: res.season, episode: res.episode };
+    },
+
+    // Intro test: "the download just finished" for the selected show. Starts
+    // (or, on shift, wipes and restarts) its stills and polls their progress
+    // into the Load label. Never touches needsIntro or the intro queue.
+    async clickLoad(e) {
+      const show = this.currentShow;
+      if (!show?.name) return;
+      this._stopLoadPoll();
+      this.loadShowName = show.name;
+      this.loadPick = null;
+      this.loadStatus = null;
+      try {
+        if (e?.shiftKey) await srvr.introReset(show.name);
+        const res = await srvr.introStart(show.name);
+        if (!res?.ok) {
+          this.loadStatus = { error: res?.error || "failed", done: true };
+          unilog(2378, `introStart failed for ${show.name}: ${res?.error}`);
+          return null;
+        }
+        this.loadPath = res.path;
+        this.loadPick = {
+          path: res.path,
+          season: res.season ?? null,
+          episode: res.episode ?? null,
+        };
+        this.loadStatus = res;
+        if (!res.done) this._loadPollTimer = setTimeout(() => this._pollLoad(), 500);
+        return res;
+      } catch (err) {
+        this.loadStatus = { error: err.message, done: true };
+        unilog(2379, `introStart error for ${show.name}: ${err.message}`);
+        return null;
+      }
+    },
+    async _pollLoad() {
+      this._loadPollTimer = null;
+      const forPath = this.loadPath;
+      if (!forPath) return;
+      try {
+        const st = await srvr.introStills(forPath);
+        if (this.loadPath !== forPath) return;
+        this.loadStatus = st;
+        if (!st.done && !st.error)
+          this._loadPollTimer = setTimeout(() => this._pollLoad(), 500);
+      } catch (err) {
+        unilog(2380, `introStills poll error: ${err.message}`);
+      }
+    },
+    _stopLoadPoll() {
+      if (this._loadPollTimer) clearTimeout(this._loadPollTimer);
+      this._loadPollTimer = null;
+    },
+    // Intro test: open the windowed intro pane for the selected show. Loads
+    // first if nothing has, so clicking early just shows the strip filling in.
+    async clickTestIntro() {
+      const show = this.currentShow;
+      if (!show?.name) return;
+      const loaded =
+        this.loadShowName === show.name &&
+        this.loadPick &&
+        !this.loadStatus?.error;
+      if (!loaded) await this.clickLoad(null);
+      const pick = this.loadShowName === show.name ? this.loadPick : null;
+      if (!pick?.path) return;
+      this.videoPlayerIntroShow = show;
+      this.videoPlayerPath = pick.path;
+      this.videoPlayerMode = "intro";
+      this.videoPlayerWindowed = true;
+      this.videoPlayerSource = "info";
+      this.videoPlayerMapSeason = pick.season;
+      this.videoPlayerMapEpisode = pick.episode;
+    },
+
+    // Chksrt test setup: queue the selected show's episode at the head of the
+    // real chksrt queue so Chksrt and Test-chksrt have the same file to open.
+    async clickQueueChksrt() {
+      const show = this.currentShow;
+      if (!show?.name) return;
+      try {
+        const res = await srvr.introQueueChksrt(show.name);
+        if (!res?.ok) {
+          unilog(2387, `introQueueChksrt failed for ${show.name}: ${res?.error}`);
+          return;
+        }
+        this.chksrtCount = res.count ?? this.chksrtCount;
+      } catch (e) {
+        unilog(2388, `introQueueChksrt error for ${show.name}: ${e.message}`);
+      }
+    },
+    // Chksrt test: exactly what the Chksrt button opens — the queue head, and
+    // Save walks the queue the same way — but through the windowed player, so
+    // the only difference from the Chksrt button is where the video comes from.
+    async clickTestChksrt() {
+      if (this.chksrtCount === 0) return;
+      try {
+        const list = await srvr.getChksrtList();
+        this.chksrtCount = list?.count ?? 0;
+        this.chksrtMirrored = !!list?.mirrored;
+        if (list?.path) {
+          this.videoPlayerWindowed = true;
+          this.videoPlayerMode = "chksrt";
+          this.videoPlayerPath = list.path;
+        }
+      } catch (e) {
+        unilog(2389, `clickTestChksrt error: ${e.message}`);
+      }
     },
 
     async clickIntro() {

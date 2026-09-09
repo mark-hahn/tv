@@ -113,6 +113,19 @@
           }}{{ introShow ? introShow.name : ""
           }}{{ introSeasonEpisodeLabel }}</span
         >
+        <span
+          v-if="windowed"
+          style="
+            color: yellow;
+            font-size: 13px;
+            margin-left: 10px;
+            white-space: nowrap;
+            user-select: none;
+            text-shadow: 0 0 3px #000;
+            flex-shrink: 0;
+          "
+          >{{ testTelemetry }}</span
+        >
       </div>
       <!-- Intro mode: mark controls (right, next to X) -->
       <template v-if="mode === 'intro'">
@@ -822,6 +835,28 @@
       >
         {{ playbackRate }}x
       </div>
+      <!-- Intro mode: Strip (film strip of stills) — left of None -->
+      <div
+        v-if="mode === 'intro'"
+        @click.stop="clickStrip"
+        title="film strip of stills"
+        style="
+          color: white;
+          font-size: 13px;
+          padding: 2px 8px;
+          border-radius: 4px;
+          border: 1px solid #666;
+          cursor: pointer;
+          user-select: none;
+          white-space: nowrap;
+          flex-shrink: 0;
+          margin-right: 8px;
+          background: rgba(0, 0, 0, 0.5);
+          text-shadow: 0 0 3px #000;
+        "
+      >
+        Strip
+      </div>
       <!-- Intro mode: None (checked, no intro) — sits just left of the X -->
       <div
         v-if="mode === 'intro'"
@@ -867,18 +902,19 @@
     <video
       ref="vid"
       controls
-      autoplay
+      :autoplay="!windowed"
       :muted="playerMuted"
       crossorigin="anonymous"
       :src="vidSrc"
       style="max-width: 100%; max-height: 100%; outline: none; display: block"
       @dblclick="toggleFullscreen"
       @error="onVideoError"
-      @timeupdate="currentTimeSec = $refs.vid ? $refs.vid.currentTime : 0"
+      @timeupdate="onVideoTimeUpdate"
       @loadedmetadata="onVideoLoadedMetadata"
       @volumechange="onVideoVolumeChange"
       @durationchange="onVideoDurationChange"
       @seeked="onVideoSeeked"
+      @seeking="onVideoSeeking"
       @play="onVideoPlay"
       @pause="onVideoPause"
     >
@@ -893,6 +929,72 @@
         @load="onSubTrackLoad"
       />
     </video>
+    <!-- Film strip: every still of the episode, wrapped, clicked to cue -->
+    <div
+      v-if="stripOpen"
+      ref="strip"
+      @scroll="onStripScroll"
+      @click.self="stripOpen = false"
+      style="
+        position: fixed;
+        inset: 0;
+        z-index: 5100;
+        background: #000;
+        overflow-y: auto;
+        display: flex;
+        flex-wrap: wrap;
+        align-content: flex-start;
+        gap: 4px;
+        padding: 4px;
+      "
+    >
+      <div
+        v-if="windowed"
+        style="
+          flex-basis: 100%;
+          color: yellow;
+          font-size: 13px;
+          user-select: none;
+          padding: 4px 8px;
+        "
+      >
+        {{ stripStatusText }}
+      </div>
+      <div
+        v-if="stripLoading"
+        style="color: white; font-size: 13px; user-select: none; padding: 8px"
+      >
+        Building stills
+      </div>
+      <div
+        v-else-if="!windowed && stills.length === 0"
+        style="color: yellow; font-size: 13px; user-select: none; padding: 8px"
+      >
+        No stills — waiting for the mp4 mirror
+      </div>
+      <div
+        v-for="still in stills.slice(0, stripShown)"
+        :key="still.ms"
+        @click.stop="clickStill(still)"
+        style="width: 200px; cursor: pointer; flex: 0 0 auto"
+      >
+        <img
+          :src="still.url"
+          loading="lazy"
+          style="width: 200px; display: block"
+        />
+        <div
+          style="
+            color: #999;
+            font-size: 10px;
+            text-align: center;
+            user-select: none;
+          "
+        >
+          {{ fmtTime(still.ms) }}
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -912,6 +1014,7 @@ import {
   saveSeasonIntro,
 } from "../srvr.js";
 
+import { introStills } from "../srvr.js";
 import { fmtPos, getSeasonIntro } from "@tv/share";
 import { logHere, unilog } from "../log.js";
 
@@ -919,6 +1022,20 @@ const TV_SRVR_URL = config.tvSrvrUrl;
 const PLAYER_MUTE_STORAGE_KEY = "tvPlayerMuted";
 const PLAYER_VOLUME_STORAGE_KEY = "tvPlayerVolume";
 const SPEED_RATES = [1, 2, 5, 10];
+// Film strip stills are rendered as they come into reach rather than all at
+// once — a full episode is a few hundred images and the pane must open now.
+const STRIP_PAGE = 60;
+const STRIP_SCROLL_SLOP_PX = 400;
+// Windowed (test) intro pane: no mirror. Stills come from tv-srvr's stills.js
+// and the video is a short window transcoded from the original when a still
+// is clicked, starting WINDOW_LEAD_SECS before it. WINDOW_SECS must match the
+// server's; a seek outside the current window fetches a new one.
+const WINDOW_LEAD_SECS = 20;
+const WINDOW_SECS = 140;
+// While playing, the next window is appended to the same buffer this many
+// seconds before the current one runs out, so playback never stalls.
+const WINDOW_EXTEND_AT_SECS = 30;
+const STILLS_POLL_MS = 500;
 const FIRST_CUE_LEAD_SEC = 1;
 // The chksrt stream is a ten minute mirror of the episode; a first cue past
 // that is not reviewable, so it never sets the jump point.
@@ -968,6 +1085,7 @@ export default {
     introSeason: { type: Number, default: null },
     introEpisode: { type: Number, default: null },
     introSource: { type: String, default: null },
+    windowed: { type: Boolean, default: false },
   },
   emits: ["close", "chksrt-next", "chksrt-sel", "intro-next", "intro-sel"],
   data() {
@@ -995,6 +1113,16 @@ export default {
       pendingSourceResumeTime: null,
       pendingSourceResumePlay: false,
       playbackRate: 1,
+      stripOpen: false,
+      stripLoading: false,
+      stripShown: STRIP_PAGE,
+      stills: [],
+      // windowed mode: stills progress from the server, the current window's
+      // start, and how long the picture took after the last still click.
+      stillsStatus: null,
+      windowStart: null,
+      windowEnd: null,
+      pictureMs: null,
     };
   },
   computed: {
@@ -1151,6 +1279,30 @@ export default {
     introRemainingCount() {
       return this.introCount;
     },
+    stripStatusText() {
+      const st = this.stillsStatus;
+      if (!st) return "stills: waiting for load";
+      if (st.error) return `stills failed: ${st.error}`;
+      const since =
+        st.elapsedMs != null ? ` · ${(st.elapsedMs / 1000).toFixed(1)} s after load` : "";
+      const how = st.dense == null ? "" : ` · ${st.dense ? "nokey" : "noref"} ${st.decode ?? ""}`;
+      if (!st.done) return `stills ${st.count}/${st.total || "?"}${since}${how}`;
+      return `ready · ${st.count} stills${since}${how}`;
+    },
+    testTelemetry() {
+      const parts = ["windowed"];
+      const st = this.stillsStatus;
+      if (st?.done && st.elapsedMs != null)
+        parts.push(`strip ${(st.elapsedMs / 1000).toFixed(1)}s`);
+      else if (st && !st.done) parts.push(`strip ${st.count}/${st.total || "?"}`);
+      if (this.windowStart !== null)
+        parts.push(
+          `window ${fmtTime(this.windowStart * 1000)}–${fmtTime(this.windowEnd * 1000)}`,
+        );
+      if (this.pictureMs !== null)
+        parts.push(`picture ${(this.pictureMs / 1000).toFixed(2)}s`);
+      return parts.join(" · ");
+    },
   },
   watch: {
     introShow(newVal) {
@@ -1171,6 +1323,7 @@ export default {
     },
     path(newVal) {
       this._mseStop();
+      this._stopStillsPoll();
       this._chksrtSelectedSrtPath = undefined;
       this._chksrtSelectedChoice = undefined;
       this.audioTracks = [];
@@ -1186,15 +1339,34 @@ export default {
       this.pendingSourceResumeTime = null;
       this.pendingSourceResumePlay = false;
       this.playbackRate = 1;
-      this.vidSrc = newVal ? this._buildStreamUrl() : "";
-      if (newVal && this.mode === "intro") this._seekOnLoad = true;
+      // Windowed: nothing loads until a still is clicked.
+      this.vidSrc = newVal && !this.windowed ? this._buildStreamUrl() : "";
+      if (newVal && this.mode === "intro" && !this.windowed)
+        this._seekOnLoad = true;
       this.subtitleOffset = offsetCache.get(newVal) ?? 0;
-      if (newVal) {
+      if (newVal && !this.windowed) {
         this._fetchSubtitleList(newVal);
+        this._fetchAudioList(newVal);
+      } else if (newVal && this.mode === "chksrt") {
+        // Windowed chksrt: the track list decides where the window opens (the
+        // first cue, via _maybeJumpToFirstCue); with no text track, the start.
+        this._fetchSubtitleList(newVal).then(() => {
+          if (this.path === newVal && this.windowStart === null)
+            this._openWindow(0, { play: true, lead: 0 });
+        });
         this._fetchAudioList(newVal);
       }
       this.waitingForVideo = false;
       this.waitingForVideoTarget = null;
+      this.stripOpen = false;
+      this.stills = [];
+      this.stripShown = STRIP_PAGE;
+      this.stillsStatus = null;
+      this.windowStart = null;
+      this.windowEnd = null;
+      this.pictureMs = null;
+      this._win = null;
+      if (newVal && this.windowed && this.mode === "intro") this.clickStrip();
     },
     activeTrackUrl(newVal) {
       this.firstCueSec = null;
@@ -1249,9 +1421,17 @@ export default {
           // the seekable mp4 mirror and its known duration, leaving the timeline
           // with only the seconds ffmpeg has piped so far. Selecting pgs by hand
           // still switches to the burn-in stream.
-          const first = tracks.find((t) => t.type !== "pgs") || tracks[0];
+          // An .mbN.srt sidecar is the embedded track already extracted by
+          // the sub pipeline, so it shows at once where the embedded track
+          // would first demux the whole file (30-50s cold on a 2160p mkv).
+          const first =
+            tracks.find(
+              (t) => t.type === "srt" && /\.mb\d+\.srt$/.test(t.file || ""),
+            ) ||
+            tracks.find((t) => t.type !== "pgs") ||
+            tracks[0];
           this.activeTrackId = first.id;
-          if (first.type === "pgs") {
+          if (first.type === "pgs" && !this.windowed) {
             this.vidSrc = this._buildStreamUrl(first.index);
           }
         }
@@ -1291,6 +1471,12 @@ export default {
       const sec = this.chksrtFirstCueSec;
       if (sec === null) return;
       const target = sec - FIRST_CUE_LEAD_SEC;
+      if (this.windowed) {
+        // No seek to confirm: the window simply starts at the first cue.
+        this._firstCueJumpPath = forPath;
+        this._openWindow(Math.max(0, target), { play: true, lead: 0 });
+        return;
+      }
       if (target < 1) return;
       const vid = this.$refs.vid;
       if (!vid || vid.readyState < 1) return; // no metadata yet
@@ -1328,6 +1514,13 @@ export default {
     },
     _swapStream(subIndex = null, audioIndex = this.activeAudioIndex) {
       const vid = this.$refs.vid;
+      if (this.windowed) {
+        this._openWindow(vid?.currentTime || 0, {
+          play: vid ? !vid.paused : true,
+          lead: 0,
+        });
+        return;
+      }
       this.pendingSourceResumeTime =
         vid && Number.isFinite(vid.currentTime) ? vid.currentTime : 0;
       this.pendingSourceResumePlay = vid ? !vid.paused : false;
@@ -1364,7 +1557,10 @@ export default {
       const newTrack = this.subtitleTracks.find((t) => t.id === id) || null;
       const wasPgs = prevTrack?.type === "pgs";
       const isPgs = newTrack?.type === "pgs";
-      if (isPgs) {
+      if (this.windowed) {
+        // PGS burn-in needs the ffmpeg overlay path; the window has none yet.
+        if (isPgs) unilog(2390, `pgs subtitle not shown in windowed mode`);
+      } else if (isPgs) {
         this.vidSrc = this._buildStreamUrl(newTrack.index);
       } else if (wasPgs) {
         this.vidSrc = this.streamUrl;
@@ -1402,6 +1598,21 @@ export default {
       window.addEventListener("touchend", onEnd);
     },
     onVideoError(e) {
+      if (this.windowed) {
+        // Opening clears src to "", and Chrome reports an empty src as a
+        // media error. Nothing was loaded, so there is nothing to recover.
+        if (!this.vidSrc) return;
+        if (++this.errorRetries > 3) {
+          unilog(2391, `windowed video error, giving up: ${e?.target?.error?.message}`);
+          return;
+        }
+        const vid = this.$refs.vid;
+        this._openWindow(vid?.currentTime || this.windowStart || 0, {
+          play: this.mode === "chksrt",
+          lead: 0,
+        });
+        return;
+      }
       const vid = this.$refs.vid;
       if (!vid) return;
       if (!this.vidSrc) return;
@@ -1767,6 +1978,204 @@ export default {
       this.skipDur = this.skipDur === 0 ? null : 0;
       this._persistField("skipDur", this.skipDur);
     },
+    // Strip: the wall of stills. Scanning it finds the skip region by eye,
+    // where scrubbing the video passes over it as often as it lands on it.
+    async clickStrip() {
+      this.stripOpen = true;
+      this.stripShown = STRIP_PAGE;
+      // The video is behind the strip and nobody is watching it.
+      const vid = this.$refs.vid;
+      if (vid) vid.pause();
+      if (this.windowed) {
+        this._stopStillsPoll();
+        this._pollStills();
+        return;
+      }
+      if (this.stills.length > 0 || this.stripLoading) return;
+      const filePath = this.path;
+      this.stripLoading = true;
+      try {
+        const resp = await fetch(
+          `${TV_SRVR_URL}/api/stills?path=${encodeURIComponent(filePath)}`,
+        );
+        const body = await resp.json();
+        if (this.path !== filePath) return;
+        this.stills = body.stills || [];
+      } catch (e) {
+        unilog(2368, `stills fetch failed: ${e.message}`);
+      } finally {
+        this.stripLoading = false;
+      }
+    },
+    onStripScroll() {
+      const el = this.$refs.strip;
+      if (!el || this.stripShown >= this.stills.length) return;
+      if (
+        el.scrollTop + el.clientHeight >=
+        el.scrollHeight - STRIP_SCROLL_SLOP_PX
+      ) {
+        this.stripShown += STRIP_PAGE;
+      }
+    },
+    // Cue the video to the clicked still and hold it there.
+    clickStill(still) {
+      this.stripOpen = false;
+      if (this.waitingForVideo) this._exitWaitingForVideo();
+      this._cancelSeek();
+      if (this.windowed) {
+        this._openWindow(still.ms / 1000);
+        return;
+      }
+      const vid = this.$refs.vid;
+      if (!vid) return;
+      vid.currentTime = still.ms / 1000;
+      vid.pause();
+    },
+    // Windowed: poll the server's stills progress and grow the strip as the
+    // images land. The Nth image is grid mark (N-1)*gap, so a count is a list.
+    async _pollStills() {
+      const forPath = this.path;
+      if (!forPath) return;
+      let st;
+      try {
+        st = await introStills(forPath);
+      } catch (e) {
+        unilog(2381, `introStills failed: ${e.message}`);
+        return;
+      }
+      if (this.path !== forPath) return;
+      this.stillsStatus = st;
+      if (st.count !== this.stills.length) {
+        this.stills = Array.from({ length: st.count }, (_, i) => ({
+          ms: i * st.gapMs,
+          url: `${st.urlBase}/${String(i + 1).padStart(5, "0")}.jpg`,
+        }));
+      }
+      if (st.done || st.error) return;
+      this._stillsPollTimer = setTimeout(() => this._pollStills(), STILLS_POLL_MS);
+    },
+    _stopStillsPoll() {
+      if (this._stillsPollTimer) clearTimeout(this._stillsPollTimer);
+      this._stillsPollTimer = null;
+    },
+    // Windowed: a fresh MediaSource holding WINDOW_SECS of video from `lead`
+    // seconds before seekSec, placed at its absolute position, then cued to
+    // seekSec (paused for a still click, playing for chksrt). The MediaSource
+    // keeps the episode's full duration so the scrub bar spans the whole
+    // episode; endOfStream is never called because it would shrink that to
+    // the window. While playing, _appendWindow adds the next WINDOW_SECS to
+    // the same buffer before this one runs out.
+    _openWindow(seekSec, { play = false, lead = WINDOW_LEAD_SECS } = {}) {
+      const vid = this.$refs.vid;
+      if (!vid || !this.path) return;
+      this._mseStop();
+      this._cancelSeek();
+      const start = Math.max(0, seekSec - lead);
+      this.windowStart = start;
+      this.windowEnd = start + WINDOW_SECS;
+      this.pictureMs = null;
+      this._windowClickAt = performance.now();
+      const mimeType = 'video/mp4; codecs="avc1.640028,mp4a.40.2"';
+      if (!window.MediaSource || !MediaSource.isTypeSupported(mimeType)) {
+        unilog(2392, `MediaSource unsupported for ${mimeType}`);
+        return;
+      }
+      const abort = new AbortController();
+      this._mseAbort = abort;
+      const ms = new MediaSource();
+      const blobUrl = URL.createObjectURL(ms);
+      const win = { ms, sb: null, abort, fetching: false, end: start + WINDOW_SECS };
+      this._win = win;
+      ms.addEventListener(
+        "sourceopen",
+        () => {
+          URL.revokeObjectURL(blobUrl);
+          try {
+            win.sb = ms.addSourceBuffer(mimeType);
+          } catch (e) {
+            unilog(2393, `addSourceBuffer failed: ${e.message}`);
+            return;
+          }
+          this._appendWindow(win, start, { seekSec, play });
+        },
+        { once: true },
+      );
+      this.vidSrc = blobUrl;
+    },
+    // Fetch one window from `start` into win's buffer at its absolute position.
+    // On the first chunk of an opening window, cue the video; an extension
+    // just lands behind the playhead.
+    async _appendWindow(win, start, cue = null) {
+      const vid = this.$refs.vid;
+      const { ms, sb, abort } = win;
+      if (!vid || !sb || abort.signal.aborted) return;
+      win.fetching = true;
+      win.end = start + WINDOW_SECS;
+      this.windowEnd = win.end;
+      let url = `${TV_SRVR_URL}/api/window?path=${encodeURIComponent(this.path)}&start=${start.toFixed(2)}`;
+      if (this.activeAudioIndex != null) url += `&audio=${this.activeAudioIndex}`;
+      try {
+        sb.timestampOffset = start;
+        const res = await fetch(url, { signal: abort.signal });
+        if (!res.ok) throw new Error(String(res.status));
+        const reader = res.body.getReader();
+        let cued = false;
+        while (!abort.signal.aborted) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          sb.appendBuffer(value);
+          await new Promise((ok, fail) => {
+            sb.addEventListener("updateend", ok, { once: true });
+            sb.addEventListener("error", fail, { once: true });
+          });
+          // Cue only once real media is buffered — the first chunk is usually
+          // just the moov header. And never cue earlier than the buffered
+          // start: the first video frame lands a B-frame delay (~0.08s) after
+          // the window start, and a seek to the exact start would sit just
+          // before it, waiting for data that never comes.
+          if (cue && !cued && sb.buffered.length > 0) {
+            cued = true;
+            const dur = this.stillsStatus?.durationSec;
+            if (dur > 0 && ms.readyState === "open") ms.duration = dur;
+            vid.currentTime = Math.max(cue.seekSec, sb.buffered.start(0) + 0.01);
+            if (cue.play) vid.play().catch(() => {});
+            else vid.pause();
+          }
+        }
+        if (abort.signal.aborted) reader.cancel().catch(() => {});
+      } catch (e) {
+        if (!abort.signal.aborted)
+          unilog(2394, `window fetch/append failed at ${start}s: ${e.message}`);
+      } finally {
+        win.fetching = false;
+      }
+    },
+    onVideoTimeUpdate() {
+      const vid = this.$refs.vid;
+      this.currentTimeSec = vid ? vid.currentTime : 0;
+      const win = this._win;
+      if (!this.windowed || !vid || !win || win.fetching || vid.paused) return;
+      if (vid.currentTime > win.end - WINDOW_EXTEND_AT_SECS) {
+        const dur = this.stillsStatus?.durationSec;
+        if (dur > 0 && win.end >= dur) return;
+        this._appendWindow(win, win.end);
+      }
+    },
+    // Windowed: a seek that lands outside the current window (scrub bar,
+    // ±30, Trim Jump, Skip Test) fetches a window there instead of stalling.
+    onVideoSeeking() {
+      if (!this.windowed) return;
+      const vid = this.$refs.vid;
+      if (!vid) return;
+      const t = vid.currentTime;
+      if (
+        this.windowStart !== null &&
+        t >= this.windowStart &&
+        t < (this._win?.end ?? this.windowEnd) - 1
+      )
+        return;
+      this._openWindow(t, { play: !vid.paused });
+    },
     // None: toggle "checked, no intro" so needsIntro stays false with no
     // trim/skip configured.
     clickIntroNone() {
@@ -1865,6 +2274,9 @@ export default {
     onVideoSeeked() {
       if (this.waitingForVideo && !this._waitingForVideoSetup) {
         this._exitWaitingForVideo();
+      }
+      if (this.windowed && this.pictureMs === null && this._windowClickAt) {
+        this.pictureMs = performance.now() - this._windowClickAt;
       }
     },
     onVideoPlay() {
@@ -2019,6 +2431,7 @@ export default {
     },
     close() {
       this._mseStop();
+      this._stopStillsPoll();
       this._clearFirstCueSeek();
       const vid = this.$refs.vid;
       if (vid) {

@@ -279,6 +279,7 @@ import { startOldFileCleanup } from "./src/oldFiles.js";
 const { getFile, deletePath, deletePaths, delSeasonFiles, createShowFolder } =
   fileOps;
 import { registerMediaRoutes } from "./src/routes/media.js";
+import { registerIntroTestRoutes } from "./src/routes/introTest.js";
 import { registerUsbRoutes } from "./src/routes/usb.js";
 import * as unilogRoutes from "./src/routes/unilog.js";
 const { broadcastUnilog } = unilogRoutes;
@@ -2626,6 +2627,14 @@ app.get("/api/qbt-open", async (req, res) => {
 
 // Video streaming with codec-aware ffmpeg transcoding (see src/routes/media.js)
 registerMediaRoutes(app);
+// Intro test side door: stills from the original plus on-click windows, no
+// mirror (see src/stills.js). Additive; these lines are the whole hookup.
+registerIntroTestRoutes(app, {
+  getRecord: (name) => tvdb.getAllTvdbSync()[name],
+  pickIntroFile: epd.selectIntroFile,
+  publishChksrtState,
+  syncBatchMsgs,
+});
 
 // File operations
 app.post("/api/deletePath", apiWrapper(deletePath));

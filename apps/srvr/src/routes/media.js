@@ -10,7 +10,6 @@ import * as path from "node:path";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
 import { unilog, logHere } from "@tv/share";
 import { resStripAlt } from "../videoFiles.js";
-import { mpfourValid, getStills } from "../mpfour.js";
 import { SRVR_DATA_DIR, ensureDir } from "../srvrPaths.js";
 
 const tvDir = "/mnt/media/tv";
@@ -223,30 +222,6 @@ export function registerMediaRoutes(app) {
       return;
     }
 
-    // mpfour fast path: a pre-encoded seekable mirror exists — redirect to
-    // nginx for Range-request seeking. Only for the plain stream (PGS burn-in,
-    // alternate audio, and mid-stream MSE recovery still need ffmpeg on the
-    // original).
-    if (
-      req.query.sub === undefined &&
-      req.query.audio === undefined &&
-      !(parseInt(req.query.start) > 0)
-    ) {
-      const mirror = await mpfourValid(resolved);
-      if (mirror) {
-        const url =
-          "https://hahnca.com" +
-          mirror
-            .replace("/mnt/media", "")
-            .split("/")
-            .map((seg) => encodeURIComponent(seg))
-            .join("/");
-        unilog(1411, `mpfour fast path: ${url}`);
-        res.redirect(302, url);
-        return;
-      }
-    }
-
     try {
       const probeResult = cp.spawnSync(
         "ffprobe",
@@ -431,28 +406,6 @@ export function registerMediaRoutes(app) {
     } catch (err) {
       unilog(590, "error:", err.message);
       if (!res.headersSent) res.status(500).json({ error: err.message });
-    }
-  });
-
-  // Film-strip stills of an episode's mp4 mirror, for the intro pane's Strip
-  // pane. Built on the first ask for a mirror written before stills existed,
-  // so that request can take a few seconds; every one after is a readdir.
-  app.get("/api/stills", async (req, res) => {
-    const filePath = req.query.path;
-    if (!filePath) {
-      res.status(400).json({ error: "path required" });
-      return;
-    }
-    const resolved = path.resolve(filePath);
-    if (!resolved.startsWith(tvDir + "/")) {
-      res.status(403).json({ error: "forbidden" });
-      return;
-    }
-    try {
-      res.json({ stills: await getStills(resolved) });
-    } catch (e) {
-      unilog(2364, `stills failed for ${path.basename(resolved)}: ${e.message}`);
-      res.status(500).json({ error: e.message });
     }
   });
 

@@ -95,7 +95,7 @@ import {
   tvTvGet,
 } from "./src/tvRemoteKey.js";
 import * as subsQueue from "./src/subsQueue.js";
-import * as mpfour from "./src/mpfour.js";
+import * as stills from "./src/stills.js";
 import * as recode from "./src/recode.js";
 
 const FIX_LOG_CHANNEL_POLL_MS = 1000;
@@ -111,13 +111,9 @@ view.onLastViewedChange((lastViewed) => {
   publishChannelDelta("lastViewed", lastViewed);
 });
 
-// `mirrored`: the head entry (the one the Chksrt button opens) already has its
-// 480p mp4 mirror. mpfour keeps mirrored entries at the front, so this is also
-// "some queued file is ready to view"; the button turns yellow when it is false.
 const getChksrtSnapshot = () => ({
   count: subsState.subQueueChkSrt.length,
   path: subsState.subQueueChkSrt[0]?.videoFilePath,
-  mirrored: mpfour.mpfourValidCached(subsState.subQueueChkSrt[0]?.videoFilePath),
 });
 
 const publishChksrtState = () => {
@@ -130,51 +126,6 @@ const publishChksrtState = () => {
 registerLocalChannel("chksrt", {
   snapshot: getChksrtSnapshot,
 });
-
-// introReady — names of needsIntro shows whose intro episode already has an mp4
-// mirror. The Intro button opens these first and shows yellow when there are
-// none. Recomputed when a mirror lands or the queue reorders, plus on a timer
-// for needsIntro flips (the gap check) and mirror expiry.
-const INTRO_READY_REFRESH_MS = 30_000;
-let introReadyShows = [];
-let introReadyRefreshing = false;
-
-const getIntroReadySnapshot = () => ({ shows: introReadyShows });
-
-registerLocalChannel("introReady", {
-  snapshot: getIntroReadySnapshot,
-});
-
-async function refreshIntroReady() {
-  if (introReadyRefreshing) return;
-  introReadyRefreshing = true;
-  try {
-    const allTvdb = tvdb.getAllTvdbSync() || {};
-    const ready = [];
-    for (const record of Object.values(allTvdb)) {
-      if (!record?.needsIntro || intro.hasConfiguredIntro(record)) continue;
-      if (await mirroredIntroFile(record)) ready.push(record.name);
-    }
-    ready.sort();
-    const changed =
-      ready.length !== introReadyShows.length ||
-      ready.some((name, i) => name !== introReadyShows[i]);
-    if (!changed) return;
-    introReadyShows = ready;
-    publishChannelDelta("introReady", getIntroReadySnapshot());
-  } catch (e) {
-    unilog(2330, `intro readiness refresh failed: ${e.message}`);
-  } finally {
-    introReadyRefreshing = false;
-  }
-}
-
-// A mirror finished or the chksrt queue was reordered around one: push the new
-// head-of-queue and intro readiness to every client right away.
-function onMirrorsChanged() {
-  publishChksrtState();
-  refreshIntroReady();
-}
 
 const getFlexgetSnapshot = () => ({
   history: flexget.getSentHistoryRows(),
@@ -279,7 +230,7 @@ import { startOldFileCleanup } from "./src/oldFiles.js";
 const { getFile, deletePath, deletePaths, delSeasonFiles, createShowFolder } =
   fileOps;
 import { registerMediaRoutes } from "./src/routes/media.js";
-import { registerIntroTestRoutes } from "./src/routes/introTest.js";
+import { registerStillsRoutes } from "./src/routes/stills.js";
 import { registerUsbRoutes } from "./src/routes/usb.js";
 import * as unilogRoutes from "./src/routes/unilog.js";
 const { broadcastUnilog } = unilogRoutes;
@@ -393,17 +344,6 @@ function syncBatchMsgs() {
     });
   } else {
     setGlobalMessage({ id: "ChkSrt", action: "hide" });
-  }
-  // Mp4 — mpfour seekable-mirror encode backlog
-  const mp4Pending = mpfour.getMp4Pending();
-  if (mp4Pending.length > 0) {
-    setGlobalMessage({
-      id: "Mp4",
-      text: `Mp4:${mp4Pending.length}`,
-      position: 2007,
-    });
-  } else {
-    setGlobalMessage({ id: "Mp4", action: "hide" });
   }
   // Recode — library files being replaced with h264 the tv can play
   const recodePending = recode.getRecodePending();
@@ -860,26 +800,16 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
     const nowNeedsIntro = !!tvdbRecord.needsIntro;
     if (nowNeedsIntro !== prevNeedsIntro) {
       // The client sets needsIntro immediately before opening the intro player,
-      // so this is the only advance warning we get — push that episode to the
-      // head of the mirror queue. Too late to beat the first seek on a slow
-      // hevc transcode, but it beats every later one.
-      // On the way back down the intro has been configured, so release the
-      // claim and stop the encode unless chksrt still wants it.
-      try {
-        const introFile = epd.selectIntroFile(tvdbRecord);
-        if (introFile?.path) {
-          // Nothing to build when an episode is already mirrored — that is what
-          // /api/introFile hands the player.
-          if (nowNeedsIntro) {
-            if (!(await mirroredIntroFile(tvdbRecord)))
-              mpfour.prioritizeIntro(introFile.path);
-          } else mpfour.dropIntro(introFile.path);
+      // so this is the earliest warning that its stills are wanted — jump them
+      // to the front of the build queue.
+      if (nowNeedsIntro) {
+        try {
+          const introFile = epd.selectIntroFile(tvdbRecord);
+          if (introFile?.path)
+            await stills.startStills(introFile.path, { urgent: true });
+        } catch (e) {
+          unilog(2402, `intro stills start failed for ${showName}: ${e.message}`);
         }
-      } catch (e) {
-        unilog(
-          1965,
-          `intro mirror priority failed for ${showName}: ${e.message}`,
-        );
       }
     }
     // Auto collection updates (run after the gap check, which sets anyWatched)
@@ -2627,14 +2557,8 @@ app.get("/api/qbt-open", async (req, res) => {
 
 // Video streaming with codec-aware ffmpeg transcoding (see src/routes/media.js)
 registerMediaRoutes(app);
-// Intro test side door: stills from the original plus on-click windows, no
-// mirror (see src/stills.js). Additive; these lines are the whole hookup.
-registerIntroTestRoutes(app, {
-  getRecord: (name) => tvdb.getAllTvdbSync()[name],
-  pickIntroFile: epd.selectIntroFile,
-  publishChksrtState,
-  syncBatchMsgs,
-});
+// Film-strip stills and on-click video windows for intro/chksrt (see src/stills.js)
+registerStillsRoutes(app);
 
 // File operations
 app.post("/api/deletePath", apiWrapper(deletePath));
@@ -2871,7 +2795,6 @@ app.get("/api/queues", async (req, res) => {
     res.json({
       sub: subsQueue.getSubQueueStatus(),
       asr: subsQueue.getAsrQueueStatus(),
-      mp4: await mpfour.getMp4QueueStatus(),
       recode: await recode.getRecodeQueueStatus(),
       chksrt: subsQueue.getChkSrtQueueStatus(),
     });
@@ -2913,8 +2836,6 @@ app.post("/api/asr/chksrt/ok", (req, res) => {
     res.status(400).json({ error: "videoPath required" });
     return;
   }
-  // result saved — this file no longer needs a seekable mirror
-  mpfour.cancelEncode(videoPath);
   const base = resStripAlt(videoPath).replace(/\.[^.]+$/, "");
   const dir = path.dirname(videoPath);
   const basename = path.basename(base);
@@ -2957,8 +2878,6 @@ app.post("/api/asr/chksrt/ok-show", (req, res) => {
   );
   for (const entry of matches) {
     const videoPath = entry.videoFilePath;
-    // result saved — this file no longer needs a seekable mirror
-    mpfour.cancelEncode(videoPath);
     const base = resStripAlt(videoPath).replace(/\.[^.]+$/, "");
     const dir = path.dirname(videoPath);
     const basename = path.basename(base);
@@ -3097,8 +3016,6 @@ app.post("/api/asr/chksrt/select", (req, res) => {
     (e) => e.videoFilePath === videoPath,
   );
   if (idx !== -1) subsState.subQueueChkSrt.splice(idx, 1);
-  // result saved — this file no longer needs a seekable mirror
-  mpfour.cancelEncode(videoPath);
   cleanChkSrtQueue();
   persistSubQueueChkSrt();
   publishChksrtState();
@@ -3142,8 +3059,6 @@ app.post("/api/asr/chksrt/select-show", (req, res) => {
     } catch (e) {
       unilog(1875, `chosen marker write failed for ${basename}: ${e.message}`);
     }
-    // result saved — this file no longer needs a seekable mirror
-    mpfour.cancelEncode(videoPath);
     const idx = subsState.subQueueChkSrt.findIndex(
       (e) => e.videoFilePath === videoPath,
     );
@@ -3497,22 +3412,25 @@ https.createServer(httpsOptions, app).listen(HTTP_PORT, () => {
   loadOpnCheckHistory();
   startSubQueueLoop();
   startAsrQueueLoop();
-  // seekable-mp4 mirrors for the chksrt queue + intro episodes (own loop, not
-  // ffmpegQueue)
-  mpfour.start({ syncBatchMsgs, introEpisodePaths, onMirrorsChanged });
-  refreshIntroReady();
-  setInterval(refreshIntroReady, INTRO_READY_REFRESH_MS);
+  // Build film-strip stills ahead of time for every episode intro marking
+  // will open (see introEpisodePaths). startStills is a no-op once a set
+  // exists, so sweeping every few seconds costs a stat per show.
+  setInterval(() => {
+    sweepIntroStills().catch((e) => {
+      unilog(2403, `intro stills sweep failed: ${e.message}`);
+    });
+  }, INTRO_STILLS_SWEEP_MS);
   recode.start();
   startOldFileCleanup();
 });
 
+const INTRO_STILLS_SWEEP_MS = 5_000;
+
 // The episode intro marking will open, for every show with an entry in the
 // chksrt queue — in queue order — followed by every other show flagged
-// needsIntro, so the Intro button always has a mirrored show to open first.
-// mpfour mirrors the chksrt ones ahead of the rest of the queue so one mirror
-// serves both features: chksrt needs the file seekable to check subtitle sync,
-// intro needs it seekable to scan for the intro. selectIntroFile lives in
-// @tv/share so this picks exactly the episode the client will open.
+// needsIntro. Their stills are built ahead of time so the strip is already up
+// when the Intro button is pressed. selectIntroFile lives in @tv/share so this
+// picks exactly the episode the client will open.
 async function introEpisodePaths() {
   const allTvdb = tvdb.getAllTvdbSync() || {};
   const out = [];
@@ -3520,13 +3438,9 @@ async function introEpisodePaths() {
   const consider = async (record) => {
     if (!record || seenShow.has(record.name)) return;
     seenShow.add(record.name);
-    // Already-marked shows will never be opened for intro editing, so mirroring
-    // their intro episode is wasted work. This also makes dropIntro() stick —
-    // without it the next sweep would re-add what the needsIntro clear removed.
+    // Already-marked shows will never be opened for intro editing, so their
+    // stills would be wasted work.
     if (intro.hasConfiguredIntro(record)) return;
-    // A show with any episode already mirrored needs no encode at all — that is
-    // the episode /api/introFile hands the player.
-    if (await mirroredIntroFile(record)) return;
     const result = epd.selectIntroFile(record);
     if (result?.path) out.push(result.path);
   };
@@ -3542,49 +3456,21 @@ async function introEpisodePaths() {
   return out;
 }
 
-// The show's episodes that intro marking could open, in the order it would
-// prefer them: unwatched (as selectIntroFile does) ahead of already watched.
-function introCandidates(record) {
-  const ed = record?.episodeData;
-  if (!ed) return [];
-  const folder = showPaths.showFolderFor(record?.name, record);
-  const unwatched = [];
-  const watched = [];
-  epd.forEachEpisode(ed, (s, e) => {
-    if (!epd.hasFile(ed, s, e)) return;
-    const filePath = epd.getFullPath(ed, folder, s, e);
-    if (!filePath) return;
-    const cand = { path: filePath, season: s, episode: e };
-    if (epd.isWatched(ed, s, e)) watched.push(cand);
-    else unwatched.push(cand);
-  });
-  return [...unwatched, ...watched];
-}
-
-// The first candidate whose mp4 mirror is already built, or null. Any episode
-// carries the intro, so a finished mirror beats the nominal pick: it plays and
-// seeks instantly through nginx, while an unmirrored 2160p hevc source has to
-// be transcoded live and can barely stay ahead of the player.
-async function mirroredIntroFile(record) {
-  for (const cand of introCandidates(record)) {
-    if (await mpfour.mpfourValid(cand.path)) return cand;
+async function sweepIntroStills() {
+  for (const p of await introEpisodePaths()) {
+    try {
+      await stills.startStills(p);
+    } catch (e) {
+      unilog(2404, `intro stills queue failed for ${path.basename(p)}: ${e.message}`);
+    }
   }
-  return null;
 }
 
-// The episode the intro player opens for a show — selectIntroFile's pick unless
-// some other episode is already mirrored.
-async function introFileFor(record) {
-  const mirrored = await mirroredIntroFile(record);
-  if (mirrored) return { ...mirrored, mirrored: true };
+// The episode the intro player opens for a show.
+function introFileFor(record) {
   const pick = epd.selectIntroFile(record);
   if (!pick?.path) return null;
-  return {
-    path: pick.path,
-    season: pick.season,
-    episode: pick.episode,
-    mirrored: false,
-  };
+  return { path: pick.path, season: pick.season, episode: pick.episode };
 }
 
 app.get("/api/introFile", async (req, res) => {
@@ -3599,7 +3485,7 @@ app.get("/api/introFile", async (req, res) => {
     return;
   }
   try {
-    const pick = await introFileFor(record);
+    const pick = introFileFor(record);
     if (!pick) {
       res.json({ ok: false, error: "no playable episode" });
       return;
@@ -3626,7 +3512,7 @@ app.post("/api/introFiles", async (req, res) => {
     for (const showName of showNames) {
       const record = allTvdb[showName];
       if (!record) continue;
-      const pick = await introFileFor(record);
+      const pick = introFileFor(record);
       if (pick?.path) paths.push(pick.path);
     }
     res.json({ ok: true, paths });
@@ -5606,7 +5492,6 @@ function reconcileDuplicateEpisodeVideos(seasonDir, season, episode) {
       (e) => e.videoFilePath === src,
     );
     if (idx !== -1) subsState.subQueueChkSrt.splice(idx, 1);
-    mpfour.cancelEncode(src);
   }
   if (demoted.size > 0) {
     cleanChkSrtQueue();

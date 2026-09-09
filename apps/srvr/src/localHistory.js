@@ -559,16 +559,6 @@ function addSidecarEvents(add, ctx) {
     },
   ];
 
-  const mp4Rel = ctx.fullPath.startsWith(TV_ROOT + "/")
-    ? ctx.fullPath.slice(TV_ROOT.length + 1)
-    : "";
-  if (mp4Rel) {
-    candidates.push({
-      file: path.join("/mnt/media/mpfour", mp4Rel.replace(/\.[^.]+$/, ".mp4")),
-      text: `mp4 file generated: ${path.basename(mp4Rel).replace(/\.[^.]+$/, ".mp4")}`,
-    });
-  }
-
   try {
     const dir = path.dirname(ctx.fullPath);
     const prefix = path.basename(base);

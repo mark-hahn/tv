@@ -1,4 +1,6 @@
 
+=================
+
 # intro search
 - currently i have to open the intro video pane and scrub to find the skip region
   - this is hard to do without passing over the skip region
@@ -16,7 +18,5 @@
       - pause the video
 
 as a test prepare stills from a `Kiss Me Kate` and `Peacemaker` s01e01 episode
-
-=================
 
 when in tvapp and the info key is used to show a map and an episode is selected in the map then the hide key should toggle the watched state for that episode and update the map immediately

@@ -1023,28 +1023,10 @@ export function introFile(showName) {
   );
 }
 
-// Intro test side door (tv-srvr src/stills.js). introStart is "the download
-// just finished" for a show; introStills is the stills progress for the
-// episode it named; introReset makes the next start a cold run.
-export function introStart(showName) {
-  return httpCall("/api/introStart", { showName }, "POST");
-}
-
-export function introReset(showName) {
-  return httpCall("/api/introReset", { showName }, "POST");
-}
-
-// Q-chksrt: queue the show's intro-pick episode at the head of the chksrt queue.
-export function introQueueChksrt(showName) {
-  return httpCall("/api/introQueueChksrt", { showName }, "POST");
-}
-
-export function introStills(path) {
-  return httpCall(
-    `/api/introStills?path=${encodeURIComponent(path)}`,
-    null,
-    "GET",
-  );
+// Film-strip stills for an episode (tv-srvr src/stills.js): starts the build
+// if none exists and reports progress; the pane polls it until `done`.
+export function getStills(path) {
+  return httpCall(`/api/stills?path=${encodeURIComponent(path)}`, null, "GET");
 }
 
 // The same pick for several shows at once, as a flat list of file paths.

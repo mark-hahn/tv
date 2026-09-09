@@ -144,7 +144,6 @@
             >
               {{ t.label }}
             </button>
-            <!-- light red: next item has its mp4 mirror; yellow: still encoding -->
             <button
               v-if="chksrtCount > 0"
               @click.stop="clickChksrt"
@@ -154,8 +153,8 @@
                 borderRadius: '7px',
                 padding: '4px 10px',
                 marginLeft: '4px',
-                border: chksrtMirrored ? '1px solid #c88' : '1px solid #cc8',
-                backgroundColor: chksrtMirrored ? '#faa' : 'yellow',
+                border: '1px solid #c88',
+                backgroundColor: '#faa',
                 color: 'black',
               }"
             >
@@ -170,86 +169,12 @@
                 borderRadius: '7px',
                 padding: '4px 10px',
                 marginLeft: '4px',
-                border: introReady ? '1px solid #c88' : '1px solid #cc8',
-                backgroundColor: introReady ? '#faa' : 'yellow',
+                border: '1px solid #c88',
+                backgroundColor: '#faa',
                 color: 'black',
               }"
             >
               Intro {{ introCount }}
-            </button>
-            <!-- Intro test side door (tv-srvr src/stills.js). Load = "the
-                 download just finished" for the selected show; its label
-                 counts the stills up and shows the build time when done
-                 (shift-click = cold rerun). Test-intro opens the windowed
-                 intro pane for the selected show, loading first if nothing
-                 has. Saves from that pane are real. Test-chksrt is next. -->
-            <button
-              v-if="currentShow"
-              @click.stop="clickLoad($event)"
-              title="simulate download finished for the selected show (shift = cold rerun)"
-              :style="{
-                fontSize: '13px',
-                cursor: 'pointer',
-                borderRadius: '7px',
-                padding: '4px 10px',
-                marginLeft: '4px',
-                border: '1px solid #bbb',
-                backgroundColor: loadDone ? '#cfc' : 'whitesmoke',
-                color: 'black',
-              }"
-            >
-              {{ loadLabel }}
-            </button>
-            <button
-              v-if="currentShow"
-              @click.stop="clickTestIntro"
-              title="open the windowed intro pane for the selected show (saves are real)"
-              :style="{
-                fontSize: '13px',
-                cursor: 'pointer',
-                borderRadius: '7px',
-                padding: '4px 10px',
-                marginLeft: '4px',
-                border: '1px solid #bbb',
-                backgroundColor: 'whitesmoke',
-                color: 'black',
-              }"
-            >
-              Test-intro
-            </button>
-            <button
-              v-if="currentShow"
-              @click.stop="clickQueueChksrt"
-              title="put the selected show's episode at the head of the chksrt queue"
-              :style="{
-                fontSize: '13px',
-                cursor: 'pointer',
-                borderRadius: '7px',
-                padding: '4px 10px',
-                marginLeft: '4px',
-                border: '1px solid #bbb',
-                backgroundColor: 'whitesmoke',
-                color: 'black',
-              }"
-            >
-              Q-chksrt
-            </button>
-            <button
-              v-if="chksrtCount > 0"
-              @click.stop="clickTestChksrt"
-              title="open the chksrt queue head in the windowed player (saves are real)"
-              :style="{
-                fontSize: '13px',
-                cursor: 'pointer',
-                borderRadius: '7px',
-                padding: '4px 10px',
-                marginLeft: '4px',
-                border: '1px solid #bbb',
-                backgroundColor: 'whitesmoke',
-                color: 'black',
-              }"
-            >
-              Test-chksrt
             </button>
             <div style="flex: 1"></div>
             <button
@@ -442,7 +367,6 @@
       :introSeason="videoPlayerMapSeason"
       :introEpisode="videoPlayerMapEpisode"
       :introSource="videoPlayerSource"
-      :windowed="videoPlayerWindowed"
       @close="handleVideoPlayerClose"
       @chksrt-next="handleChksrtNext"
       @chksrt-sel="handleChksrtSel"
@@ -688,22 +612,11 @@ export default {
       videoPlayerMode: null,
       videoPlayerIntroShow: null,
       videoPlayerSource: null,
-      videoPlayerWindowed: false,
-      // Intro test: the show Load was pressed for and its stills progress.
-      loadShowName: null,
-      loadPath: null,
-      loadPick: null,
-      loadStatus: null,
       videoPlayerMapSeason: null,
       videoPlayerMapEpisode: null,
       chksrtCount: 0,
-      // head of the chksrt queue already has its mp4 mirror (button red, not yellow)
-      chksrtMirrored: false,
       _chksrtChannel: null,
       introCount: 0,
-      // needsIntro shows whose intro episode already has an mp4 mirror
-      introReadyShows: [],
-      _introReadyChannel: null,
       browseTabHasMore: false,
       _browseHasMoreChannel: null,
       currentPane: "info", // 'info', 'map', 'actors', 'reviews', 'trailer', 'tor', 'flex', 'qbt', 'down'
@@ -828,25 +741,6 @@ export default {
       return Number(this.windowH) > Number(this.windowW);
     },
     // Some show still needing an intro has a mirrored episode ready to open.
-    loadDone() {
-      return (
-        this.loadShowName === this.currentShow?.name &&
-        !!this.loadStatus?.done &&
-        !this.loadStatus?.error
-      );
-    },
-    loadLabel() {
-      const st = this.loadStatus;
-      if (!st || this.loadShowName !== this.currentShow?.name) return "Load";
-      if (st.error) return "Load ✗";
-      if (!st.done) return `Load ${st.count}/${st.total || "?"}`;
-      const secs = st.elapsedMs != null ? (st.elapsedMs / 1000).toFixed(1) : "";
-      return `Load ✓ ${st.decode === "cached" ? "cached" : secs + "s"}`;
-    },
-    introReady() {
-      const ready = new Set(this.introReadyShows);
-      return this.allShows.some((s) => s.needsIntro && ready.has(s.name));
-    },
 
     showSideButtons() {
       return !!(this.simpleMode && this.isPortrait);
@@ -1098,13 +992,11 @@ export default {
     this.stopQbtPolling();
     this.cancelDownInactiveTimer();
     this.stopChksrtPolling();
-    this.stopIntroReadyPolling();
     this.stopBrowseTabPolling();
   },
   methods: {
     handleVideoPlayerClose() {
       const closingIntro = this.videoPlayerMode === "intro";
-      this.videoPlayerWindowed = false;
       const introShow = this.videoPlayerIntroShow;
       this.videoPlayerPath = null;
       this.videoPlayerMode = null;
@@ -1146,7 +1038,6 @@ export default {
       try {
         const list = await srvr.getChksrtList();
         this.chksrtCount = list?.count ?? 0;
-        this.chksrtMirrored = !!list?.mirrored;
         if (list?.path) {
           this.videoPlayerMode = "chksrt";
           this.videoPlayerPath = list.path;
@@ -1182,7 +1073,6 @@ export default {
       try {
         const list = await srvr.getChksrtList();
         this.chksrtCount = list?.count ?? 0;
-        this.chksrtMirrored = !!list?.mirrored;
       } catch (e) {
         this.chksrtCount = 0;
       }
@@ -1205,7 +1095,6 @@ export default {
       if (this._chksrtChannel) return;
       const applyChksrt = (payload) => {
         this.chksrtCount = payload?.count ?? 0;
-        this.chksrtMirrored = !!payload?.mirrored;
       };
       this._chksrtChannel = srvr.openChannel("chksrt", {
         onSnapshot: applyChksrt,
@@ -1216,41 +1105,18 @@ export default {
       this._chksrtChannel?.close();
       this._chksrtChannel = null;
     },
-    startIntroReadyPolling() {
-      if (this._introReadyChannel) return;
-      const applyIntroReady = (payload) => {
-        this.introReadyShows = Array.isArray(payload?.shows)
-          ? payload.shows
-          : [];
-      };
-      this._introReadyChannel = srvr.openChannel("introReady", {
-        onSnapshot: applyIntroReady,
-        onDelta: applyIntroReady,
-      });
-    },
-    stopIntroReadyPolling() {
-      this._introReadyChannel?.close();
-      this._introReadyChannel = null;
-    },
-    // needsIntro shows in list order, the ones with a mirrored intro episode
-    // first so they open instantly while the rest are still encoding.
+    // needsIntro shows in list order.
     introQueue(from = null) {
-      const ready = new Set(this.introReadyShows);
       const shows = this.allShows;
       if (!Array.isArray(shows)) return [];
       const start = from ? shows.findIndex((s) => s.name === from.name) + 1 : 0;
-      const rest = shows.slice(start).filter((s) => s?.needsIntro);
-      return [
-        ...rest.filter((s) => ready.has(s.name)),
-        ...rest.filter((s) => !ready.has(s.name)),
-      ];
+      return shows.slice(start).filter((s) => s?.needsIntro);
     },
     async clickChksrt() {
       if (this.chksrtCount === 0) return;
       try {
         const list = await srvr.getChksrtList();
         this.chksrtCount = list?.count ?? 0;
-        this.chksrtMirrored = !!list?.mirrored;
         if (list?.path) {
           this.videoPlayerMode = "chksrt";
           this.videoPlayerPath = list.path;
@@ -1260,121 +1126,12 @@ export default {
       }
     },
 
-    // Select intro file (see intro-file-selection.md). tv-srvr owns the pick
-    // because only it can see which mp4 mirrors are finished: an episode with a
-    // mirror plays and seeks instantly, so it wins over the nominal
-    // first-unwatched-with-file choice. Always the built-in player.
+    // Select intro file (see intro-file-selection.md). Always the built-in
+    // player.
     async selectIntroFile(show) {
       const res = await srvr.introFile(show?.name);
       if (!res?.ok) return { error: res?.error || "no playable episode found" };
       return { path: res.path, season: res.season, episode: res.episode };
-    },
-
-    // Intro test: "the download just finished" for the selected show. Starts
-    // (or, on shift, wipes and restarts) its stills and polls their progress
-    // into the Load label. Never touches needsIntro or the intro queue.
-    async clickLoad(e) {
-      const show = this.currentShow;
-      if (!show?.name) return;
-      this._stopLoadPoll();
-      this.loadShowName = show.name;
-      this.loadPick = null;
-      this.loadStatus = null;
-      try {
-        if (e?.shiftKey) await srvr.introReset(show.name);
-        const res = await srvr.introStart(show.name);
-        if (!res?.ok) {
-          this.loadStatus = { error: res?.error || "failed", done: true };
-          unilog(2378, `introStart failed for ${show.name}: ${res?.error}`);
-          return null;
-        }
-        this.loadPath = res.path;
-        this.loadPick = {
-          path: res.path,
-          season: res.season ?? null,
-          episode: res.episode ?? null,
-        };
-        this.loadStatus = res;
-        if (!res.done) this._loadPollTimer = setTimeout(() => this._pollLoad(), 500);
-        return res;
-      } catch (err) {
-        this.loadStatus = { error: err.message, done: true };
-        unilog(2379, `introStart error for ${show.name}: ${err.message}`);
-        return null;
-      }
-    },
-    async _pollLoad() {
-      this._loadPollTimer = null;
-      const forPath = this.loadPath;
-      if (!forPath) return;
-      try {
-        const st = await srvr.introStills(forPath);
-        if (this.loadPath !== forPath) return;
-        this.loadStatus = st;
-        if (!st.done && !st.error)
-          this._loadPollTimer = setTimeout(() => this._pollLoad(), 500);
-      } catch (err) {
-        unilog(2380, `introStills poll error: ${err.message}`);
-      }
-    },
-    _stopLoadPoll() {
-      if (this._loadPollTimer) clearTimeout(this._loadPollTimer);
-      this._loadPollTimer = null;
-    },
-    // Intro test: open the windowed intro pane for the selected show. Loads
-    // first if nothing has, so clicking early just shows the strip filling in.
-    async clickTestIntro() {
-      const show = this.currentShow;
-      if (!show?.name) return;
-      const loaded =
-        this.loadShowName === show.name &&
-        this.loadPick &&
-        !this.loadStatus?.error;
-      if (!loaded) await this.clickLoad(null);
-      const pick = this.loadShowName === show.name ? this.loadPick : null;
-      if (!pick?.path) return;
-      this.videoPlayerIntroShow = show;
-      this.videoPlayerPath = pick.path;
-      this.videoPlayerMode = "intro";
-      this.videoPlayerWindowed = true;
-      this.videoPlayerSource = "info";
-      this.videoPlayerMapSeason = pick.season;
-      this.videoPlayerMapEpisode = pick.episode;
-    },
-
-    // Chksrt test setup: queue the selected show's episode at the head of the
-    // real chksrt queue so Chksrt and Test-chksrt have the same file to open.
-    async clickQueueChksrt() {
-      const show = this.currentShow;
-      if (!show?.name) return;
-      try {
-        const res = await srvr.introQueueChksrt(show.name);
-        if (!res?.ok) {
-          unilog(2387, `introQueueChksrt failed for ${show.name}: ${res?.error}`);
-          return;
-        }
-        this.chksrtCount = res.count ?? this.chksrtCount;
-      } catch (e) {
-        unilog(2388, `introQueueChksrt error for ${show.name}: ${e.message}`);
-      }
-    },
-    // Chksrt test: exactly what the Chksrt button opens — the queue head, and
-    // Save walks the queue the same way — but through the windowed player, so
-    // the only difference from the Chksrt button is where the video comes from.
-    async clickTestChksrt() {
-      if (this.chksrtCount === 0) return;
-      try {
-        const list = await srvr.getChksrtList();
-        this.chksrtCount = list?.count ?? 0;
-        this.chksrtMirrored = !!list?.mirrored;
-        if (list?.path) {
-          this.videoPlayerWindowed = true;
-          this.videoPlayerMode = "chksrt";
-          this.videoPlayerPath = list.path;
-        }
-      } catch (e) {
-        unilog(2389, `clickTestChksrt error: ${e.message}`);
-      }
     },
 
     async clickIntro() {
@@ -1412,11 +1169,8 @@ export default {
           );
         }
       }
-      // Always our own player. Emby's HLS copy path repeats the first segment
-      // whenever a 6s segment window has no keyframe, which freezes playback a
-      // few seconds in on ~half the library; /api/stream has no segments so it
-      // cannot happen. tv-srvr pre-builds an mp4 mirror for this episode, which
-      // is what makes seeking and 10x scanning fast here.
+      // Always our own player: the intro pane opens on a film strip of stills
+      // and streams a short window of the episode from the still you click.
       this.videoPlayerIntroShow = show;
       this.videoPlayerPath = path;
       this.videoPlayerMode = "intro";
@@ -2523,7 +2277,6 @@ export default {
     };
     evtBus.on("intro-count", this._onIntroCount);
     this.startChksrtPolling();
-    this.startIntroReadyPolling();
     this.startQbtPolling();
 
     this._onBrowseHasMoreChanged = (val) => {

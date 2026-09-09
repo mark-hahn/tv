@@ -28,6 +28,10 @@ const MPFOUR_SIDECAR_SUFFIX = ".src.json";
 // Film-strip stills live in <mirror>.stills/ beside the mirror (mpfour.js),
 // and a killed build leaves a <mirror>.stills.tmp/ — the prefix covers both.
 const MPFOUR_STILLS_SUFFIX = ".stills";
+// Film-strip stills built from the originals (stills.js): one dir per episode
+// holding the jpgs and a src.json written when the set completed.
+const STILLS_DIR = "/mnt/media/stills";
+const STILLS_SIDECAR_NAME = "src.json";
 const RECODE_ORIGINALS_DIR = "/mnt/media/tv-recode-originals";
 const RECODE_SIDECAR_SUFFIX = ".recode.json";
 const DELETE_LOG_PATH = path.join(SRVR_DATA_DIR, "auto-deleted-files.log");
@@ -64,6 +68,7 @@ const TRICKPLAY_SUFFIXES = new Set(["bif", "bifx"]);
 const RULE_ORPHAN = "orphan-sidecar";
 const RULE_BIF = "trickplay-index";
 const RULE_MPFOUR = "mpfour-expired";
+const RULE_STILLS = "stills-expired";
 const RULE_RECODE_ORIGINAL = "recode-original-expired";
 
 // Emby library artwork/metadata belongs to the show or the season, not to any
@@ -269,6 +274,27 @@ function planMpfour(files) {
   return deletes;
 }
 
+// Stills sets older than PURGE_AGE_MS: every file in a dir whose src.json is
+// that old. The sidecar is written last, so its mtime is when the set finished;
+// a dir with no sidecar is a build in progress and is left alone.
+function planStills(files) {
+  const cutoff = Date.now() - PURGE_AGE_MS;
+  const expiredDirs = new Set();
+  for (const f of files) {
+    if (f.name !== STILLS_SIDECAR_NAME) continue;
+    let mtimeMs;
+    try {
+      mtimeMs = fs.statSync(f.path).mtimeMs;
+    } catch {
+      continue;
+    }
+    if (mtimeMs < cutoff) expiredDirs.add(path.dirname(f.path));
+  }
+  return files
+    .filter((f) => expiredDirs.has(path.dirname(f.path)))
+    .map((f) => ({ ...f, dir: path.dirname(f.path), rule: RULE_STILLS }));
+}
+
 // Originals recode.js moved aside, older than PURGE_AGE_MS, each with its
 // .recode.json. The age comes from the sidecar rather than the file, whose
 // mtime is still the original download's. An original whose sidecar is missing
@@ -325,6 +351,10 @@ function buildPlan() {
   scanned += mpfourFiles.length;
   deletes.push(...planMpfour(mpfourFiles));
 
+  const stillsFiles = collectFiles(STILLS_DIR);
+  scanned += stillsFiles.length;
+  deletes.push(...planStills(stillsFiles));
+
   const originalFiles = collectFiles(RECODE_ORIGINALS_DIR);
   scanned += originalFiles.length;
   deletes.push(...planRecodeOriginals(originalFiles));
@@ -371,7 +401,11 @@ export function runOldFileCleanup({ dryRun = false } = {}) {
     const stillsDirs = new Set(
       done
         .map((e) => e.dir)
-        .filter((d) => path.basename(d).includes(MPFOUR_STILLS_SUFFIX)),
+        .filter(
+          (d) =>
+            path.basename(d).includes(MPFOUR_STILLS_SUFFIX) ||
+            d.startsWith(STILLS_DIR + "/"),
+        ),
     );
     for (const dir of stillsDirs) {
       try {

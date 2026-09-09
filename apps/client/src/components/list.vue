@@ -171,6 +171,8 @@
                 :key="actor.name"
                 @click="actorsListItemClick(actor.name)"
                 style="
+                  display: flex;
+                  align-items: center;
                   padding: 8px 12px;
                   cursor: pointer;
                   border-bottom: 1px solid #eee;
@@ -178,7 +180,22 @@
                   font-weight: bold;
                 "
               >
-                {{ actor.displayName }} ({{ actor.showCount }})
+                <div
+                  style="
+                    width: 40px;
+                    flex-shrink: 0;
+                    text-align: center;
+                    font-size: 14px;
+                    font-weight: normal;
+                  "
+                >
+                  {{ actor.actorCount }}
+                </div>
+                <div
+                  style="min-width: 0; overflow: hidden; text-overflow: ellipsis"
+                >
+                  {{ actor.displayName }}
+                </div>
               </div>
             </div>
             <Shows
@@ -275,6 +292,8 @@
               :key="actor.name"
               @click="actorsListItemClick(actor.name)"
               style="
+                display: flex;
+                align-items: center;
                 padding: 8px 12px;
                 cursor: pointer;
                 border-bottom: 1px solid #eee;
@@ -282,7 +301,20 @@
                 font-weight: bold;
               "
             >
-              {{ actor.displayName }} ({{ actor.showCount }})
+              <div
+                style="
+                  width: 40px;
+                  flex-shrink: 0;
+                  text-align: center;
+                  font-size: 14px;
+                  font-weight: normal;
+                "
+              >
+                {{ actor.actorCount }}
+              </div>
+              <div style="min-width: 0; overflow: hidden; text-overflow: ellipsis">
+                {{ actor.displayName }}
+              </div>
             </div>
           </div>
           <Shows
@@ -3073,7 +3105,7 @@ export default {
           .trim()
           .toLowerCase()
           .replace(/\s+/g, " ");
-      const actorMap = new Map(); // normKey -> { name, displayName, showCount }
+      const actorMap = new Map(); // normKey -> { name, displayName, actorCount }
       for (const show of allShows) {
         const tvdbData = allTvdb?.[show.name];
         if (!tvdbData) continue;
@@ -3088,18 +3120,23 @@ export default {
           if (seenInShow.has(key)) continue;
           seenInShow.add(key);
           if (actorMap.has(key)) {
-            actorMap.get(key).showCount++;
+            actorMap.get(key).actorCount++;
           } else {
             actorMap.set(key, {
               name,
               displayName: this.formatLastFirst(name),
-              showCount: 1,
+              actorCount: 1,
             });
           }
         }
       }
       const actors = Array.from(actorMap.values());
-      actors.sort((a, b) => a.displayName.localeCompare(b.displayName));
+      // Most shows first; ties fall back to alpha so the order is stable.
+      actors.sort(
+        (a, b) =>
+          b.actorCount - a.actorCount ||
+          a.displayName.localeCompare(b.displayName),
+      );
       return actors;
     },
 

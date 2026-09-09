@@ -1,4 +1,10 @@
 
+- in the actors pane remove the count button 
+- call the number of shows an actor is in actorCount
+  - the count button in the actors pane used to show actors by actorCount
+- when actors button in hdrtop is clicked sort actors by actorCount 
+  - show actorCount in the info field at the left of each show row
+
 =================
 
 # intro search

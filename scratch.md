@@ -1,12 +1,5 @@
 
-One of the 2 projects is this /root/apps/tv wsl project. The other is /root/dev/apps/hvac2 on hahnca.com server.
-
-the tv project should accept a command to show a video stream on the tv.  The hvac2 project should issue the command and provide the video stream from the ring doorbell camera.
-
-The ui for hvac2 has not been designed yet. The architecture in the tv has not been designed yet.
-
-i need a feature that requires two projects to call each other. each project needs to understand how the other works.
-how do i get llm conversations in different projects to talk to each other.
+replace the emby and sel buttons on the remote with `Door` -- do this in tvapprc mode and normal mode -- do it on the phone and in the web page remote -- it should toggle showing the door video on the tv just as ctrl-clicking does on /ring page 
 
 premiered sort 
 
@@ -15,6 +8,15 @@ the show `Monster: The Lizzie Borden Story (2026)` is browsed but and is missing
 find shows just safe start
 
 =================
+
+i need a feature that requires two projects to call each other. each project needs to understand how the other works.
+how do i get llm conversations in different projects to talk to each other.
+
+One of the 2 projects is this /root/apps/tv wsl project. The other is /root/dev/apps/hvac2 on hahnca.com server.
+
+the tv project should accept a command to show a video stream on the tv.  The hvac2 project should issue the command and provide the video stream from the ring doorbell camera.
+
+The ui for hvac2 has not been designed yet. The architecture in the tv has not been designed yet.
 
 - in the actors pane remove the count button 
 - call the number of shows an actor is in actorCount

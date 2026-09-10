@@ -569,31 +569,19 @@
       >
         ▶
       </div>
-      <!-- Row 3: emby, down, skip -->
-      <!-- This is where the phone's Search key is. The web client has no
-           filter input screen, so instead it selects tvapp's active show in
-           the shows list. -->
+      <!-- Row 3: door, down, skip -->
+      <!-- Door is the same key in both modes -- the camera goes over whatever
+           the television is showing, tvapp included, so there is nothing here
+           for tvapprc mode to change. -->
       <div
-        v-if="tvapprcMode"
-        :style="cellStyle('white', 'sel')"
-        @mousedown="startSelHold"
-        @mouseup="stopSelHold"
-        @mouseleave="stopSelHold"
-        @touchstart.prevent="startSelHold"
-        @touchend="stopSelHold"
+        :style="cellStyle('white', 'door')"
+        @mousedown="startDoorPress"
+        @mouseup="stopDoorPress"
+        @mouseleave="stopDoorPress"
+        @touchstart.prevent="startDoorPress"
+        @touchend="stopDoorPress"
       >
-        Sel
-      </div>
-      <div
-        v-else
-        :style="cellStyle('white', 'emby')"
-        @mousedown="startEmbyHold"
-        @mouseup="stopEmbyHold"
-        @mouseleave="stopEmbyHold"
-        @touchstart.prevent="startEmbyHold"
-        @touchend="stopEmbyHold"
-      >
-        Emby
+        Door
       </div>
       <div
         :style="cellStyle('#f5e642', 'down')"
@@ -606,17 +594,20 @@
         ▼
       </div>
       <!-- Skip's cell, which Info left when it moved to the row above: while
-           tvapp is up it hides/unhides the selected show instead. -->
+           tvapp is up it selects tvapp's active show in the shows list
+           instead. This is where the phone's Search key is; the web client has
+           no filter input screen, so it does that instead. Both sat on the
+           Emby cell until Door took it. -->
       <div
         v-if="tvapprcMode"
-        :style="cellStyle('white', 'hide')"
-        @mousedown="startHideHold"
-        @mouseup="stopHideHold"
-        @mouseleave="stopHideHold"
-        @touchstart.prevent="startHideHold"
-        @touchend="stopHideHold"
+        :style="cellStyle('white', 'sel')"
+        @mousedown="startSelHold"
+        @mouseup="stopSelHold"
+        @mouseleave="stopSelHold"
+        @touchstart.prevent="startSelHold"
+        @touchend="stopSelHold"
       >
-        Hide
+        Sel
       </div>
       <div
         v-else
@@ -731,9 +722,6 @@ const CMD_CLOSE_TO_EMBY = "b";
 // cardMisc back to its description, filters off.
 const CMD_CLEAR_STATE = "r";
 const CMD_KEY = "k";
-// The hide key. What it acts on -- the episode under the map's cursor, else
-// the selected show -- is tvapp's to decide, so the press is all that is sent.
-const CMD_HIDE = "h";
 // Letter-skip variant of CMD_KEY, up/down only -- sent instead of CMD_KEY
 // once a held key has been auto-repeating fast long enough that tvapp's show
 // list starts jumping by starting letter instead of by row.
@@ -750,8 +738,6 @@ const REMOTE_ROWS = 5;
 // layout: it is dropped and the grid dims for a moment to say so (mirrors
 // apps/android/App.js, which flashes the cell).
 const MODE_SWITCH_LOCKOUT_MS = 800;
-// Hide fires only after the cell has been held this long; a tap is refused.
-const HIDE_HOLD_MS = 300;
 const DENIED_BG = "lightcoral";
 
 const CELL_BASE = {
@@ -1384,28 +1370,28 @@ export default {
       this._dbStop();
     },
 
-    // The hide key, which tvapp reads as either of two things: the watched mark
-    // on the episode its map has under the cursor, or hide/unhide of the show
-    // it has selected. Only tvapp knows which of those the screen is on, so it
-    // is told the key went down and does the rest itself.
-    hideSelectedShow() {
-      this.flash("hide");
-      this.sendTvapprc(CMD_HIDE);
+    // The Door key: put the doorbell camera on the television, or take it back
+    // off. The same toggle ctrl-clicking /ring's View button does, and it works
+    // the same in both modes -- tvapp is what the camera appears over, so there
+    // is nothing for tvapprc mode to change.
+    //
+    // 'toggle' rather than reading a state and deciding here: hvac2 is the only
+    // one that knows whether a view is up, so asking first would race this
+    // button against its own second press.
+    startDoorPress() {
+      this._dbStart(async () => {
+        this.flash("door");
+        try {
+          await fetch(`${config.ringUrl}/tvcam?action=toggle`, {
+            cache: "no-store",
+          });
+        } catch (e) {
+          unilog(2418, `door toggle failed: ${e.message}`);
+        }
+      });
     },
-
-    // Hide sits where Skip and Mute are in the ordinary layout and a tap there
-    // was hiding shows nobody meant to hide, so it takes a hold of
-    // HIDE_HOLD_MS. A tap is refused and says so.
-    startHideHold() {
-      this._lpStart(
-        () => this.deny("hide"),
-        this.hideSelectedShow,
-        HIDE_HOLD_MS,
-      );
-    },
-
-    stopHideHold() {
-      this._lpStop();
+    stopDoorPress() {
+      this._dbStop();
     },
 
     // Select the show tvapp has selected in the web client's own shows list.
@@ -1420,22 +1406,6 @@ export default {
     },
     stopSelHold() {
       this._dbStop();
-    },
-
-    startEmbyHold() {
-      this._armHold("emby", () =>
-        this._lpStart(
-          () => this.tvCmd("emby"),
-          () => {
-            this.flash("emby");
-            this.showStreamers = true;
-          },
-        ),
-      );
-    },
-    stopEmbyHold() {
-      this._dbStop();
-      this._lpStop();
     },
 
     startMuteHold() {

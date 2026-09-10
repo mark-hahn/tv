@@ -41,6 +41,11 @@ const keyLabel = (key) => {
 };
 
 const TV_TV_URL = "https://hahnca.com/tv-tv";
+// hvac2, which owns the doorbell camera. The Door key is one request to this
+// and no state of its own: hvac2 knows whether a view is up, and it owns the
+// rule that the camera never shows on the wall tablet and the television at
+// the same time. See docs/tv-videostream-contract.md in the tv repo.
+const RING_TVCAM_URL = "https://hahnca.com/ring/tvcam";
 const TV_SRVR_WS_URL = "wss://hahnca.com/tv-srvr";
 const TV_SRVR_HTTP_URL = "https://hahnca.com/tv-srvr";
 // The bridge listens on plain ws:8098 on the lan, but a raw lan address is
@@ -53,8 +58,6 @@ const TVAPPRC_CONNECT_TIMEOUT_MS = 5000;
 // shorter, so every cell moves. A press this soon after the switch was aimed at
 // the old layout: it is dropped and the cell flashes DENIED_BG instead.
 const MODE_SWITCH_LOCKOUT_MS = 800;
-// Hide fires only after the cell has been held this long; a tap is refused.
-const HIDE_HOLD_MS = 300;
 const DENIED_BG = "lightcoral";
 const MSG_TVAPP_UP = "u";
 const MSG_TVAPP_DOWN = "d";
@@ -76,9 +79,6 @@ const CMD_KEY_LETTER = "j";
 // selected card's cardMisc. Info also rotates cardMisc once it is focused.
 const CMD_KEY_SORT = "sort";
 const CMD_KEY_FILTER = "filter";
-// The hide key. What it acts on -- the episode under the map's cursor, else
-// the selected show -- is tvapp's to decide, so the press is all that is sent.
-const CMD_HIDE = "h";
 const CMD_KEY_INFO = "info";
 const CMD_FILTER = "f";
 const SCRUB_HOLD_DELAY_MS = 400;
@@ -1419,26 +1419,6 @@ export default function App() {
     dbStop();
   };
 
-  // The hide key, which tvapp reads as either of two things: the watched mark
-  // on the episode its map has under the cursor, or hide/unhide of the show it
-  // has selected. Only tvapp knows which of those the screen is on, so it is
-  // told the key went down and does the rest itself.
-  const hideSelectedShow = () => {
-    flash("hide");
-    sendTvapprc(CMD_HIDE);
-  };
-
-  // Hide sits where Skip and Mute are in the ordinary layout and a tap there
-  // was hiding shows nobody meant to hide, so it takes a hold of HIDE_HOLD_MS.
-  // A tap is refused and says so.
-  const startHideHold = () => {
-    lpStart(() => deny("hide"), hideSelectedShow, HIDE_HOLD_MS);
-  };
-
-  const stopHideHold = () => {
-    lpStop();
-  };
-
   const startHomeHold = () => {
     armHold("home", () =>
       lpStart(() => tvKey("home"), toggleLayoutOption, 2000),
@@ -1511,31 +1491,38 @@ export default function App() {
     });
   };
 
-  const startEmbyHold = () => {
-    if (tvapprcMode) {
-      // The Text key: the filter input screen is this remote's own, so it just
-      // opens here. tvapp hears about it only as the text typed into it.
-      dbStart(() => {
-        flash("text");
-        setShowTvapprcInput(true);
-      });
-      return;
-    }
-    armHold("emby", () =>
-      lpStart(
-        () => tvCmd("emby"),
-        () => {
-          flash("emby");
-          setShowStreamers(true);
-        },
-      ),
-    );
+  // The Door key: put the doorbell camera on the television, or take it back
+  // off. The same toggle ctrl-clicking /ring's View button does, and it works
+  // the same in both modes -- tvapp is what the camera appears over, so there
+  // is nothing for tvapprc mode to change.
+  //
+  // 'toggle' rather than reading a state and deciding here: hvac2 is the only
+  // one that knows whether a view is up, so asking first would race this
+  // button against its own second press.
+  const startDoorPress = () => {
+    dbStart(async () => {
+      flash("door");
+      try {
+        await fetch(`${RING_TVCAM_URL}?action=toggle`, { cache: "no-store" });
+      } catch (e) {
+        console.warn("door toggle failed", e);
+      }
+    });
   };
 
-  const stopEmbyHold = () => {
-    dbStop();
-    lpStop();
+  const stopDoorPress = () => dbStop();
+
+  // The Search key: the filter input screen is this remote's own, so it just
+  // opens here. tvapp hears about it only as the text typed into it. It sat on
+  // the Emby cell until Door took that, and is tvapprc-only either way.
+  const startSearchPress = () => {
+    dbStart(() => {
+      flash("text");
+      setShowTvapprcInput(true);
+    });
   };
+
+  const stopSearchPress = () => dbStop();
 
   const subTypeChar = (type) => {
     if (type === "pgs") return "*";
@@ -1784,15 +1771,18 @@ export default function App() {
       onPressIn: () => startRepeat("right"),
       onPressOut: stopRepeat,
     },
-    // Row 3: emby, down, skip
+    // Row 3: door, down, skip
+    // Door is the same key in both modes -- the camera goes over whatever the
+    // television is showing, tvapp included, so there is nothing here for
+    // tvapprc mode to change.
     {
-      key: tvapprcMode ? "text" : "emby",
-      label: tvapprcMode ? "Search" : "Emby",
+      key: "door",
+      label: "Door",
       smallText: true,
-      bg: () => cellBg("white", tvapprcMode ? "text" : "emby"),
+      bg: () => cellBg("white", "door"),
       onPress: () => {},
-      onPressIn: () => startEmbyHold(),
-      onPressOut: () => stopEmbyHold(),
+      onPressIn: () => startDoorPress(),
+      onPressOut: () => stopDoorPress(),
     },
     {
       key: "down",
@@ -1803,16 +1793,17 @@ export default function App() {
       onPressOut: stopRepeat,
     },
     // Skip's cell, which Info left when it moved to the row above: while tvapp
-    // is up it hides/unhides the selected show instead.
+    // is up it opens this remote's own filter input screen instead. Search
+    // lived on the Emby cell until Door took it.
     tvapprcMode
       ? {
-          key: "hide",
-          label: "Hide",
+          key: "text",
+          label: "Search",
           smallText: true,
-          bg: () => cellBg("white", "hide"),
+          bg: () => cellBg("white", "text"),
           onPress: () => {},
-          onPressIn: () => startHideHold(),
-          onPressOut: () => stopHideHold(),
+          onPressIn: () => startSearchPress(),
+          onPressOut: () => stopSearchPress(),
         }
       : {
           key: "skip",

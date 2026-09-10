@@ -41,6 +41,25 @@ hard invariant, not a preference, and it is enforced on both sides:
 - The television path (`/ring/view?tv=1`) clears the tablet before the
   television comes up, in case a real event has it.
 
+## The Door key on the remotes
+
+Both remotes — the phone (`apps/android/App.js`) and the web tv pane
+(`apps/client/src/components/tvpane.vue`) — carry a `Door` key in row 3, in
+normal *and* tvapprc mode. It is one request and no local state:
+
+```
+GET https://hahnca.com/ring/tvcam?action=toggle
+```
+
+`toggle` exists so the remotes never decide: only hvac2 knows whether a view is
+up, and a remote that read the state first would race its own second press.
+The endpoint answers with `Access-Control-Allow-Origin: *`, because the tv pane
+calls it from the browser and that is cross-origin under vite dev.
+
+Door replaced the Emby/Sel cell, and Search (phone) / Sel (web) moved onto what
+was the Hide cell. Two things lost their key in the process: the normal-mode
+Emby app switch, and Hide (the watched mark / hide-show press to tvapp).
+
 ## The /ring button
 
 One control, three behaviours:

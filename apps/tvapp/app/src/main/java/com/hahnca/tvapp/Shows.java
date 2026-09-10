@@ -233,16 +233,44 @@ class Shows {
   interface Callback {
     /** Called on the loader thread, so post to the ui yourself. */
     void onShows(List<Show> shows);
+
+    /** Every try failed and there will be no list. Also on the loader thread. */
+    void onLoadFailed(String reason);
   }
+
+  // This is a ten-megabyte response over the television's wifi, and it used to
+  // be given exactly one chance: a failure was logged and forgotten, and
+  // nothing called load again until Updates came round ten minutes later. An
+  // empty show list looks precisely like a working app with no shows in it, so
+  // that failure was silent for ten minutes at a time. Hence: retry, and if
+  // the retries run out, say so on the screen rather than showing an empty
+  // list.
+  private static final int LOAD_TRIES = 4;
+  // Multiplied by the try number, so 2s, 4s, 6s -- about twelve seconds all
+  // told, which is inside the ten-minute Updates cycle by a wide margin.
+  private static final int LOAD_RETRY_MS = 2000;
 
   static void load(Callback callback) {
     new Thread(
             () -> {
-              try {
-                callback.onShows(parse(Http.get(SHOWS_URL)));
-              } catch (Exception e) {
-                Log.e(TAG, "show list load failed: " + e);
+              String last = "";
+              for (int tryNo = 1; tryNo <= LOAD_TRIES; tryNo++) {
+                try {
+                  callback.onShows(parse(Http.get(SHOWS_URL)));
+                  return;
+                } catch (Exception e) {
+                  last = e.toString();
+                  Log.e(TAG, "show list load failed, try " + tryNo + " of " + LOAD_TRIES + ": " + e);
+                }
+                if (tryNo == LOAD_TRIES) break;
+                try {
+                  Thread.sleep((long) LOAD_RETRY_MS * tryNo);
+                } catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
+                  return;
+                }
               }
+              callback.onLoadFailed(last);
             },
             "shows-load")
         .start();

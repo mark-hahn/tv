@@ -113,6 +113,12 @@ const CMD_SELECT_SHOW = "s"; // select a show by name
 const CMD_PLAY_EPISODE = "p"; // play one specific episode of the selected show, by Emby id
 const CMD_CLEAR_STATE = "r"; // back to a bare show list
 const CMD_CUSTOM_CHANGED = "c"; // the shared filter settings changed
+// A live camera over the whole screen, hand-mirrored in CtrlServer.java. The
+// argument is a page url that plays it, or CAM_OFF to take it back off; what
+// the page does is no business of this file's. See
+// docs/tv-videostream-contract.md.
+const CMD_SHOW_CAM = "v";
+const CAM_OFF = "off";
 const TVAPP_PROBE_TIMEOUT_MS = 800;
 const TVAPP_SELECT_DIAL_TIMEOUT_MS = 8000;
 
@@ -2592,6 +2598,213 @@ app.get("/tv/opentvapp", async (req, res) => {
   unilog(1846, `opentvapp from ${client(req)}`);
   const opened = await openTvappSelectingShow();
   res.json(opened ? { ok: true } : { ok: false, error: "tvapp did not come up" });
+});
+
+// ---- a live video stream on the screen -----------------------------------
+//
+// hvac2 asks for this over localhost (both run on hahnca.com under pm2) and
+// hands over a url and nothing else. This file owns the television: its power,
+// whatever Emby was playing, and the overlay. It does not know what the url
+// serves, and hvac2 does not know any of the above. The interface is fixed by
+// docs/tv-videostream-contract.md.
+//
+// Deliberately generic -- "videostream", not "doorbell". That the camera on
+// the far end happens to be a Ring doorbell is hvac2's business.
+
+// Default hold, and the ceiling on one a caller asks for.
+const VIDEOSTREAM_DEFAULT_HOLD_MS = 90 * 1000;
+const VIDEOSTREAM_MAX_HOLD_MS = 300 * 1000;
+const VIDEOSTREAM_MIN_HOLD_MS = 5 * 1000;
+// The only urls that will be handed to the WebView. Not a security boundary --
+// the route is localhost-only -- but a typo that reaches the television shows
+// as a black screen with no other explanation.
+const VIDEOSTREAM_URL_PREFIX = "https://hahnca.com/";
+// After Emby is brought back to the front, before it is unpaused: the player
+// has to be on the screen to resume into, or the show restarts behind tvapp
+// with nobody looking at it.
+const VIDEOSTREAM_EMBY_SETTLE_MS = 1200;
+// Long enough for a television that was off to be listening.
+const VIDEOSTREAM_TV_ON_MS = 2500;
+
+// {url, label, since, expiresAt, holdMs, timer, interrupted, embySessionId}
+let videoStream = null;
+
+/**
+ * Emby's Pause route is a toggle when it is called the way seek2 calls it, so
+ * the two states are named explicitly here instead: a view that is put up and
+ * taken down has to leave the show in the state it found it in, and a toggle
+ * cannot promise that.
+ */
+async function embySetPaused(sessionId, paused) {
+  const cmd = paused ? "Pause" : "Unpause";
+  try {
+    const res = await fetch(
+      `${EMBY_BASE_URL}/Sessions/${sessionId}/Playing/${cmd}?api_key=${EMBY_API_KEY}`,
+      { method: "POST" },
+    );
+    return res.ok;
+  } catch (e) {
+    unilog(2410, `emby ${cmd} failed: ${e.message}`);
+    return false;
+  }
+}
+
+/**
+ * The dead-man's switch. hvac2 pings for as long as it wants the view up, so a
+ * crash there -- or a pm2 restart mid-view -- cannot leave a camera on the
+ * television with the show underneath paused indefinitely.
+ */
+function armVideoStreamHold(holdMs) {
+  if (!videoStream) return;
+  const hold = Math.min(
+    Math.max(Number(holdMs) || VIDEOSTREAM_DEFAULT_HOLD_MS, VIDEOSTREAM_MIN_HOLD_MS),
+    VIDEOSTREAM_MAX_HOLD_MS,
+  );
+  clearTimeout(videoStream.timer);
+  videoStream.holdMs = hold;
+  videoStream.expiresAt = Date.now() + hold;
+  videoStream.timer = setTimeout(() => {
+    unilog(2411, `hold lapsed after ${hold}ms`);
+    void stopVideoStream("hold lapsed");
+  }, hold);
+}
+
+async function showVideoStream(url, label, holdMs) {
+  // The same url again: re-arm and say yes. A caller retrying is not an error,
+  // and it must not tear down a working view to put the same one back.
+  if (videoStream && videoStream.url === url) {
+    armVideoStreamHold(holdMs);
+    return {
+      ok: true,
+      expiresAt: videoStream.expiresAt,
+      interrupted: videoStream.interrupted,
+    };
+  }
+  if (videoStream) return { ok: false, reason: "busy" };
+
+  // Pause before anything appears, so the show does not run on behind the
+  // overlay while the television is waking up and tvapp is launching.
+  let embySessionId = null;
+  let interrupted = null;
+  try {
+    const session = await getEmbyPlaybackSession();
+    if (session && !session.PlayState?.IsPaused) {
+      embySessionId = session.ControlSessionId;
+      await embySetPaused(embySessionId, true);
+      interrupted = "emby";
+    }
+  } catch (e) {
+    unilog(2412, `could not read the emby session: ${e.message}`);
+  }
+
+  if (tvMode === "off") {
+    callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
+    await sleep(VIDEOSTREAM_TV_ON_MS);
+  }
+
+  // The camera variant of opening tvapp: no closeEmbyShow, because the show is
+  // paused and being kept for later, and no show selection, because the list
+  // is not what anyone is about to look at.
+  let sock = await probeTvappOpen();
+  if (sock) {
+    if (!interrupted) interrupted = "tvapp";
+  } else {
+    await launchTvapp();
+    sock = await dialTvappUntilOpen(TVAPP_SELECT_DIAL_TIMEOUT_MS);
+  }
+  if (!sock) {
+    if (embySessionId) await embySetPaused(embySessionId, false);
+    unilog(2413, `tvapp never came up`);
+    return { ok: false, reason: "tvappDown" };
+  }
+
+  sock.send(`${CMD_SHOW_CAM},${url}`);
+  sock.close();
+  videoStream = {
+    url,
+    label,
+    since: Date.now(),
+    expiresAt: 0,
+    holdMs: VIDEOSTREAM_DEFAULT_HOLD_MS,
+    timer: null,
+    interrupted,
+    embySessionId,
+  };
+  armVideoStreamHold(holdMs);
+  unilog(2414, `showing ${label ?? url}${interrupted ? ` over ${interrupted}` : ""}`);
+  return { ok: true, expiresAt: videoStream.expiresAt, interrupted };
+}
+
+/**
+ * One way out for all three ways a view can end -- hvac2 asking, the hold
+ * lapsing, and the remote's Back key (which tvapp reports by calling the stop
+ * route itself). One restore path means the show cannot be left paused by the
+ * one case nobody tested.
+ */
+async function stopVideoStream(why) {
+  const was = videoStream;
+  videoStream = null;
+  // Stopping when nothing is up is a success, not an error: our idea of the
+  // state can be the stale one.
+  if (!was) return { ok: true, restored: null };
+  clearTimeout(was.timer);
+  await sendTvappCommand(`${CMD_SHOW_CAM},${CAM_OFF}`);
+
+  let restored = null;
+  if (was.embySessionId) {
+    callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
+      media_content_type: "app",
+      media_content_id: EMBY_APP_URI,
+    });
+    await sleep(VIDEOSTREAM_EMBY_SETTLE_MS);
+    await embySetPaused(was.embySessionId, false);
+    restored = "emby";
+  } else if (was.interrupted === "tvapp") {
+    // tvapp was already up and is still up; hiding the overlay is the restore.
+    restored = "tvapp";
+  }
+  unilog(2415, `stopped ${was.label ?? was.url} (${why}) restored=${restored ?? "none"}`);
+  return { ok: true, restored };
+}
+
+app.post("/tv/videostream", async (req, res) => {
+  const { url, label, holdMs } = req.body ?? {};
+  if (typeof url !== "string" || !url.startsWith(VIDEOSTREAM_URL_PREFIX)) {
+    unilog(2416, `refused url ${url}`);
+    res.json({ ok: false, reason: "badUrl" });
+    return;
+  }
+  res.json(
+    await showVideoStream(url, typeof label === "string" ? label : null, holdMs),
+  );
+});
+
+app.post("/tv/videostream/ping", (req, res) => {
+  if (!videoStream) {
+    res.json({ ok: false, reason: "notShowing" });
+    return;
+  }
+  armVideoStreamHold(videoStream.holdMs);
+  res.json({ ok: true, expiresAt: videoStream.expiresAt });
+});
+
+app.post("/tv/videostream/stop", async (req, res) => {
+  res.json(await stopVideoStream(`stop from ${client(req)}`));
+});
+
+app.get("/tv/videostream/status", (req, res) => {
+  if (!videoStream) {
+    res.json({ showing: false });
+    return;
+  }
+  res.json({
+    showing: true,
+    url: videoStream.url,
+    label: videoStream.label,
+    since: videoStream.since,
+    expiresAt: videoStream.expiresAt,
+    interrupted: videoStream.interrupted,
+  });
 });
 
 app.listen(TV_PORT, () => {

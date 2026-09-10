@@ -32,6 +32,10 @@ import org.java_websocket.server.WebSocketServer;
  *   h              the hide key: the watched mark on the focused episode when
  *                  the map has one under its cursor, else hide/unhide the
  *                  selected show
+ *   v,&lt;url&gt;  put a live camera on the screen, over everything, by
+ *                  loading that url in a WebView; v,off takes it back off.
+ *                  Sent by tv-tv on hvac2's behalf -- see
+ *                  docs/tv-videostream-contract.md
  *
  * Back to Android:
  *
@@ -63,6 +67,10 @@ class CtrlServer extends WebSocketServer {
   // say -- it is the only one that knows whether the map has an episode under
   // its cursor -- so the remote sends the press and nothing more.
   private static final String CMD_HIDE = "h";
+  // A live camera over the whole screen. The argument is a page url, or "off".
+  // Everything about the video is that page's business; see CamOverlay.
+  private static final String CMD_CAM = "v";
+  private static final String CAM_OFF = "off";
   private static final int STOP_TIMEOUT_MS = 500;
 
   interface Listener {
@@ -89,6 +97,10 @@ class CtrlServer extends WebSocketServer {
     void onCustomChanged();
 
     void onHideKey();
+
+    void onShowCam(String url);
+
+    void onHideCam();
 
     void onPhoneConnected();
   }
@@ -165,6 +177,12 @@ class CtrlServer extends WebSocketServer {
     }
     if (message.startsWith(CMD_PLAY_EPISODE + ",")) {
       listener.onPlayEpisode(message.substring(CMD_PLAY_EPISODE.length() + 1));
+      return;
+    }
+    if (message.startsWith(CMD_CAM + ",")) {
+      String arg = message.substring(CMD_CAM.length() + 1);
+      if (CAM_OFF.equals(arg)) listener.onHideCam();
+      else listener.onShowCam(arg);
       return;
     }
     if (message.startsWith(CMD_KEY_LETTER + ",")) {

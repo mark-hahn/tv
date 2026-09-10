@@ -209,6 +209,10 @@ class ShowListView extends ScrollView {
 
   private final LinearLayout column;
   private final TextView emptyView;
+  // Whether setShows has ever run. Before it has, an empty list means the
+  // shows have not arrived yet, not that none matched -- and "No Shows." over
+  // a list that is still loading is the one message that is certainly wrong.
+  private boolean everLoaded;
   private final List<Shows.Show> shows = new ArrayList<>(); // everything loaded
   private final List<Shows.Show> visible = new ArrayList<>(); // after filter and sort
   private final Map<Shows.Show, View> cards = new HashMap<>();
@@ -354,6 +358,7 @@ class ShowListView extends ScrollView {
    * when the remembered show is gone (renamed, or dropped out of Emby).
    */
   void setShows(List<Shows.Show> list, String selectedName) {
+    everLoaded = true;
     android.util.Log.i(
         "tvapp",
         "sel trace: setShows selectedName=" + selectedName
@@ -987,10 +992,12 @@ class ShowListView extends ScrollView {
     android.util.Log.i("tvapp", "trash timing: apply visible=" + visible.size());
     column.removeAllViews();
     if (visible.isEmpty()) {
-      LinearLayout.LayoutParams params =
-          new LinearLayout.LayoutParams(
-              ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-      column.addView(emptyView, params);
+      if (everLoaded) {
+        LinearLayout.LayoutParams params =
+            new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        column.addView(emptyView, params);
+      }
       if (active != null) clearActive();
       dispatchCounts();
       return;

@@ -120,6 +120,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // half, so it went out well before the shows came in. This is a view of the
   // app's own, up until it is taken down.
   private static final String TRASH_WAIT_LABEL = "Waiting for trash";
+  // The first load, for the same reason: the list is drawn empty before the
+  // shows arrive, and ten megabytes over the television's wifi takes about
+  // four seconds -- long enough to read as an app with nothing in it.
+  private static final String SHOWS_WAIT_LABEL = "Loading shows";
+  // And when the retries in Shows.load have run out. Left up, because there is
+  // nothing else coming until Updates comes round.
+  private static final String SHOWS_FAILED_LABEL = "Show list unavailable";
   private static final float LOADING_TEXT_SIZE_SP = 30f;
   private static final int LOADING_BG = 0xE6000000;
   private static final float LOADING_PAD_H_DP = 32f;
@@ -132,6 +139,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final float TOAST_TEXT_SCALE = 2f;
   private static final String EMBY_PACKAGE = "com.mb.android";
   private static final String CLOSE_EMBY_SHOW_URL = "https://hahnca.com/tv-tv/tv/closeembyshow";
+  // Told when the remote's Back key takes the camera overlay off, because that
+  // is the one way the view can end that tv-tv did not ask for -- and it has a
+  // paused show to put back. Its own route, over http, rather than a message
+  // up the ctrl socket: that socket only exists while the phone has a bridge
+  // leg open, and Back works whether or not the phone is anywhere near.
+  private static final String CAM_STOP_URL = "https://hahnca.com/tv-tv/tv/videostream/stop";
   private static final String HIDE_SHOW_URL = "https://hahnca.com/tv-srvr/api/hideShow";
   private static final String SET_EPISODE_WATCHED_URL =
       "https://hahnca.com/tv-srvr/api/setEpisodeWatched";
@@ -163,6 +176,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private ShowCounts showCounts;
   private TextView filterLabel;
   private TrailerPlayer player;
+  private CamOverlay cam;
   private LinearLayout buttonColumn;
   private View sortGroup;
   private View filterGroup;
@@ -231,18 +245,40 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     showList.setCountsListener(
         count -> sendToPhone(CtrlServer.MSG_COUNTS + "," + count));
 
-    loadShows(remembered);
+    loadShows(remembered, true);
   }
 
-  private void loadShows(String selectedName) {
+  /**
+   * `showWait` is for the first load only. Updates' ten-minute refresh comes
+   * through here too, and putting a label over a list that is already on the
+   * screen -- and blocking its keys while it reloads -- would turn a background
+   * refresh into an interruption.
+   */
+  private void loadShows(String selectedName, boolean showWait) {
+    if (showWait) startShowsLoading(SHOWS_WAIT_LABEL);
     Shows.load(
-        shows ->
+        new Shows.Callback() {
+          @Override
+          public void onShows(List<Shows.Show> shows) {
             ui.post(
                 () -> {
                   showsLoadedAt = System.currentTimeMillis();
                   showList.setShows(shows, selectedName);
                   runPendingSelect();
-                }));
+                  if (showWait) endShowsLoadingWhenDrawn();
+                });
+          }
+
+          @Override
+          public void onLoadFailed(String reason) {
+            Log.e(TAG, "show list gave up: " + reason);
+            // Only the first load says so on the screen. A failed refresh
+            // leaves the list that is already up, which is the better of the
+            // two things to be looking at.
+            if (!showWait) return;
+            ui.post(() -> startShowsLoading(SHOWS_FAILED_LABEL));
+          }
+        });
   }
 
   /** The select, and any play behind it, that came in before the list did. */
@@ -292,6 +328,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   @Override
   protected void onStop() {
+    // Backgrounded with a camera up. Close it so the stream ends rather than
+    // running behind whatever came forward, and report it exactly as Back
+    // does: tv-tv is holding a paused show either way.
+    if (cam.isShowing()) cam.close(true);
     ctrlServer.shutdown();
     ctrlServer = null;
     updates.stop();
@@ -303,7 +343,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private void reloadShows() {
     Shows.Show selected = showList.getSelected();
     Log.i(TAG, "sel trace: reloadShows keeping " + (selected == null ? null : selected.name));
-    loadShows(selected == null ? null : selected.name);
+    loadShows(selected == null ? null : selected.name, false);
   }
 
   private View buildUi() {
@@ -340,6 +380,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
     player = new TrailerPlayer(this);
     root.addView(player, matchParent());
+
+    // Added last, so it is over the trailer player as well as the list: a
+    // camera going up is an interruption, and an interruption that appears
+    // behind something is not one.
+    cam = new CamOverlay(this);
+    cam.setCloseListener(this::reportCamDismissed);
+    root.addView(cam, matchParent());
     return root;
   }
 
@@ -684,7 +731,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     repaintButtons();
     boolean slow = TRASH_FILTER_LABEL.equals(label);
     if (slow) { trashAt = SystemClock.uptimeMillis(); Log.i(TAG, "trash timing: activated"); }
-    if (slow) startShowsLoading();
+    if (slow) startShowsLoading(TRASH_WAIT_LABEL);
     ui.postDelayed(
         () -> {
           if (slow) Log.i(TAG, "trash timing: setActiveFilters in +" + since());
@@ -696,8 +743,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   /** The list is being rebuilt: say so, and let no key through until it is not. */
-  private void startShowsLoading() {
+  private void startShowsLoading(String label) {
     showsLoading = true;
+    loadingLabel.setText(label);
     loadingLabel.setVisibility(View.VISIBLE);
   }
 
@@ -1254,6 +1302,45 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     ui.post(this::customChanged);
   }
 
+  /**
+   * A live camera over the whole screen, on tv-tv's instruction. Nothing about
+   * the video is this app's business — the url is a page that plays it, picks
+   * its own codec, and reports its own health to the server that served it.
+   * See CamOverlay and docs/tv-videostream-contract.md.
+   */
+  @Override
+  public void onShowCam(String url) {
+    ui.post(
+        () -> {
+          bumpKeepAwake();
+          cam.show(url);
+        });
+  }
+
+  /** tv-tv taking the camera back off, so nothing here needs to report it. */
+  @Override
+  public void onHideCam() {
+    ui.post(() -> cam.close(false));
+  }
+
+  /**
+   * The remote's Back key took the camera off. tv-tv does not know that yet and
+   * is holding a paused show, so it is told; its stop route is the same one
+   * hvac2 calls, which means one restore path rather than two.
+   */
+  private void reportCamDismissed() {
+    new Thread(
+            () -> {
+              try {
+                Http.postJson(CAM_STOP_URL, "{}");
+              } catch (Exception e) {
+                Log.e(TAG, "cam dismissed report failed: " + e);
+              }
+            },
+            "cam-dismissed")
+        .start();
+  }
+
   @Override
   public void onPhoneConnected() {
     ui.post(this::sendActiveShow);
@@ -1279,6 +1366,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    * other selected filter in place, and nothing else about the screen changes.
    */
   private void handleBack() {
+    // First, and unconditionally: while a camera is up it is the only thing on
+    // the screen, so Back means "take it off" and nothing else.
+    if (cam.isShowing()) {
+      cam.close(true);
+      return;
+    }
     if (player.isPlaying()) {
       player.close();
       return;
@@ -1300,6 +1393,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   private void handleRemoteKey(String key) {
+    // A camera has nothing to steer, so every key is swallowed rather than
+    // moving a list nobody can see underneath it. Back is not here: it comes
+    // in on its own path, and handleBack closes the overlay.
+    if (cam.isShowing()) return;
     if (player.isPlaying()) {
       // While the video owns the screen the keys are the video's, the way they
       // are in Emby: ok pauses and resumes, left seeks. Right is the way back

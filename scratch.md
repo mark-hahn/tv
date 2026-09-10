@@ -1,5 +1,12 @@
 
-# DO NOT READ THIS FILE -- IT IS FOR SCRATCH NOTES ONLY
+One of the 2 projects is this /root/apps/tv wsl project. The other is /root/dev/apps/hvac2 on hahnca.com server.
+
+the tv project should accept a command to show a video stream on the tv.  The hvac2 project should issue the command and provide the video stream from the ring doorbell camera.
+
+The ui for hvac2 has not been designed yet. The architecture in the tv has not been designed yet.
+
+i need a feature that requires two projects to call each other. each project needs to understand how the other works.
+how do i get llm conversations in different projects to talk to each other.
 
 premiered sort 
 

@@ -2476,6 +2476,11 @@ async function openTvappSelectingShow(
   playIt = false,
   episodeId = null,
 ) {
+  // The Shows key means a clean tvapp screen, so a camera view ends here too.
+  // Reached when the phone's bridge leg is down, so tvapp never saw the key
+  // and could not take its own overlay off. No restore: this is about to stop
+  // Emby and put tvapp up itself.
+  if (videoStream) await stopVideoStream("shows key", false);
   await closeEmbyShow();
   await launchTvapp();
   const sock = await dialTvappUntilOpen(TVAPP_SELECT_DIAL_TIMEOUT_MS);
@@ -2741,7 +2746,7 @@ async function showVideoStream(url, label, holdMs) {
  * route itself). One restore path means the show cannot be left paused by the
  * one case nobody tested.
  */
-async function stopVideoStream(why) {
+async function stopVideoStream(why, restore = true) {
   const was = videoStream;
   videoStream = null;
   // Stopping when nothing is up is a success, not an error: our idea of the
@@ -2751,6 +2756,14 @@ async function stopVideoStream(why) {
   await sendTvappCommand(`${CMD_SHOW_CAM},${CAM_OFF}`);
 
   let restored = null;
+  if (!restore) {
+    // The Shows key, and the tvapp open behind it. The caller wants tvapp on
+    // the screen, so putting a paused show back would be undone a moment
+    // later -- and would flash Emby up on the way. The view is still cleared,
+    // which is what stops the hold timer and frees the next Door press.
+    unilog(2419, `stopped ${was.label ?? was.url} (${why}) without restoring`);
+    return { ok: true, restored: null };
+  }
   if (was.embySessionId) {
     callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
       media_content_type: "app",
@@ -2789,7 +2802,11 @@ app.post("/tv/videostream/ping", (req, res) => {
 });
 
 app.post("/tv/videostream/stop", async (req, res) => {
-  res.json(await stopVideoStream(`stop from ${client(req)}`));
+  // restore:false is tvapp saying the Shows key ended the view. Everything
+  // else -- hvac2, the hold lapsing, the Back key -- wants what the view
+  // interrupted put back.
+  const restore = req.body?.restore !== false;
+  res.json(await stopVideoStream(`stop from ${client(req)}`, restore));
 });
 
 app.get("/tv/videostream/status", (req, res) => {

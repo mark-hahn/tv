@@ -24,9 +24,27 @@ import android.widget.FrameLayout;
  */
 class CamOverlay extends FrameLayout {
 
-  /** Told when the overlay closes itself, so what was paused can be put back. */
+  /**
+   * Why the overlay came off, which is the whole of what tv-tv needs to know:
+   * whether it was told already, and whether to put back what the view
+   * interrupted.
+   */
+  enum CloseReason {
+    /** tv-tv asked for it. It knows, and there is nothing to report. */
+    TOLD,
+    /** Back, or tvapp going to the background: put back what was interrupted. */
+    BACK,
+    /**
+     * The Shows key, which means a clean tvapp screen. The view is over, but
+     * restoring would bring a paused show forward over the list the key just
+     * asked for.
+     */
+    SHOWS,
+  }
+
+  /** Told when the overlay closes for any reason but TOLD. */
   interface CloseListener {
-    void onCamDismissed();
+    void onCamDismissed(CloseReason reason);
   }
 
   private final WebView web;
@@ -71,15 +89,16 @@ class CamOverlay extends FrameLayout {
    * session at the far end. A hidden WebView still sitting on the page would
    * leave the camera live with nobody watching it.
    *
-   * `dismissed` is true when this was the remote's Back key rather than an
-   * instruction from tv-tv — the one case where the far end does not already
-   * know the view is over and has a paused show to put back.
+   * Anything but TOLD is a close the far end does not know about yet, so it is
+   * reported; the reason says what it should do about the show underneath.
    */
-  void close(boolean dismissed) {
+  void close(CloseReason reason) {
     if (!showing) return;
     showing = false;
     web.loadUrl("about:blank");
     setVisibility(GONE);
-    if (dismissed && closeListener != null) closeListener.onCamDismissed();
+    if (reason != CloseReason.TOLD && closeListener != null) {
+      closeListener.onCamDismissed(reason);
+    }
   }
 }

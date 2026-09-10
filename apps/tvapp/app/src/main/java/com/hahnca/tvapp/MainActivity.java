@@ -331,7 +331,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     // Backgrounded with a camera up. Close it so the stream ends rather than
     // running behind whatever came forward, and report it exactly as Back
     // does: tv-tv is holding a paused show either way.
-    if (cam.isShowing()) cam.close(true);
+    if (cam.isShowing()) cam.close(CamOverlay.CloseReason.BACK);
     ctrlServer.shutdown();
     ctrlServer = null;
     updates.stop();
@@ -1248,6 +1248,11 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     ui.post(
         () -> {
           bumpKeepAwake();
+          // Shows means a clean tvapp screen, so the camera comes off on the
+          // way -- the same as it does from Emby, where this key opens tvapp.
+          // SHOWS rather than BACK so tv-tv clears the view without putting a
+          // paused show up over the list.
+          if (cam.isShowing()) cam.close(CamOverlay.CloseReason.SHOWS);
           clearScreenState();
         });
   }
@@ -1320,19 +1325,25 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   /** tv-tv taking the camera back off, so nothing here needs to report it. */
   @Override
   public void onHideCam() {
-    ui.post(() -> cam.close(false));
+    ui.post(() -> cam.close(CamOverlay.CloseReason.TOLD));
   }
 
   /**
-   * The remote's Back key took the camera off. tv-tv does not know that yet and
-   * is holding a paused show, so it is told; its stop route is the same one
-   * hvac2 calls, which means one restore path rather than two.
+   * The camera came off here rather than on tv-tv's instruction, so tv-tv is
+   * told: it is holding the view, and possibly a paused show. Its stop route is
+   * the same one hvac2 calls, which means one teardown path rather than two.
+   *
+   * restore:false for the Shows key. Shows means a clean tvapp screen, and
+   * restoring would bring the paused show forward over the list the key just
+   * asked for.
    */
-  private void reportCamDismissed() {
+  private void reportCamDismissed(CamOverlay.CloseReason reason) {
+    final String body =
+        reason == CamOverlay.CloseReason.SHOWS ? "{\"restore\":false}" : "{}";
     new Thread(
             () -> {
               try {
-                Http.postJson(CAM_STOP_URL, "{}");
+                Http.postJson(CAM_STOP_URL, body);
               } catch (Exception e) {
                 Log.e(TAG, "cam dismissed report failed: " + e);
               }
@@ -1369,7 +1380,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     // First, and unconditionally: while a camera is up it is the only thing on
     // the screen, so Back means "take it off" and nothing else.
     if (cam.isShowing()) {
-      cam.close(true);
+      cam.close(CamOverlay.CloseReason.BACK);
       return;
     }
     if (player.isPlaying()) {

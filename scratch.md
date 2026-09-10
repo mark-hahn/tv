@@ -1,5 +1,4 @@
 
-replace the emby and sel buttons on the remote with `Door` -- do this in tvapprc mode and normal mode -- do it on the phone and in the web page remote -- it should toggle showing the door video on the tv just as ctrl-clicking does on /ring page 
 
 premiered sort 
 
@@ -8,6 +7,8 @@ the show `Monster: The Lizzie Borden Story (2026)` is browsed but and is missing
 find shows just safe start
 
 =================
+
+replace the emby and sel buttons on the remote with `Door` -- do this in tvapprc mode and normal mode -- do it on the phone and in the web page remote -- it should toggle showing the door video on the tv just as ctrl-clicking does on /ring page 
 
 i need a feature that requires two projects to call each other. each project needs to understand how the other works.
 how do i get llm conversations in different projects to talk to each other.

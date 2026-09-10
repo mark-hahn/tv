@@ -3113,11 +3113,15 @@ export default function App() {
                   height: cellDims.h,
                 },
               ]}
-              // While the set is off the power key is the only live one. Refusing
-              // to become the responder is what makes the rest inert: the cell
-              // then gets no grant/release at all, so a press cannot start a hold
-              // it would never be told to stop.
-              onStartShouldSetResponder={() => !isOff || btn.key === "google"}
+              // While the set is off the power key is the only live one --
+              // apart from Door, which has to work precisely then: somebody is
+              // at the door, and tv-tv turns the set on for a view anyway.
+              // Refusing to become the responder is what makes the rest inert:
+              // the cell then gets no grant/release at all, so a press cannot
+              // start a hold it would never be told to stop.
+              onStartShouldSetResponder={() =>
+                !isOff || btn.key === "google" || btn.key === "door"
+              }
               onResponderTerminationRequest={() => false}
               onResponderGrant={() => {
                 if (inModeSwitchLockout()) {

@@ -1,4 +1,6 @@
 
+# DO NOT READ THIS FILE -- IT IS FOR SCRATCH NOTES ONLY
+
 premiered sort 
 
 the show `Monster: The Lizzie Borden Story (2026)` is browsed but and is missing data -- check all sources of data for it -- why doesn't it have a snooze button

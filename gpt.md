@@ -1,11 +1,17 @@
 
+premiered sort 
+
+the show `Monster: The Lizzie Borden Story (2026)` is browsed but and is missing data -- check all sources of data for it -- why doesn't it have a snooze button
+
+find shows just safe start
+
+=================
+
 - in the actors pane remove the count button 
 - call the number of shows an actor is in actorCount
   - the count button in the actors pane used to show actors by actorCount
 - when actors button in hdrtop is clicked sort actors by actorCount 
   - show actorCount in the info field at the left of each show row
-
-=================
 
 # intro search
 - currently i have to open the intro video pane and scrub to find the skip region

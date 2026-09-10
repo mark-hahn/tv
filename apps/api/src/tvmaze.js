@@ -17,6 +17,9 @@ const TVMAZE_FETCH_TIMEOUT_MS = 20_000;
 const TVMAZE_FETCH_MAX_ATTEMPTS = 4;
 const TVMAZE_FETCH_RETRY_BASE_MS = 1_500;
 
+// Browse candidates need a known premiere date that is not too far out.
+const BROWSE_MAX_FUTURE_DAYS = 60;
+
 const DAILY_SYNC_HOUR_LOCAL = 3;
 const DAILY_SYNC_MINUTE_LOCAL = 0;
 
@@ -1118,18 +1121,22 @@ export async function runTvmazeSyncNow() {
 export function getCandidateShows(limit = 100) {
   if (!_db) openDb();
   // We use the new premiered column (integer timestamp) to sort by premiered date descending
+  const futureCutoff =
+    Math.floor(Date.now() / 1000) + BROWSE_MAX_FUTURE_DAYS * 24 * 60 * 60;
   const rows = _db
     .prepare(
       `
     SELECT tvmaze_id, data_json
     FROM shows
     WHERE (browsed IS NULL OR browsed = 0)
-      AND (status IS NULL OR status != 'In Development')
+      AND premiered IS NOT NULL
+      AND premiered != ''
+      AND premiered <= ?
     ORDER BY premiered DESC
     LIMIT ?
   `,
     )
-    .all(limit);
+    .all(futureCutoff, limit);
 
   return rows
     .map((r) => {

@@ -4,7 +4,6 @@ import {
   Text,
   Alert,
   Keyboard,
-  PermissionsAndroid,
   Pressable,
   StyleSheet,
   StatusBar,
@@ -44,8 +43,10 @@ const keyLabel = (key) => {
 const TV_TV_URL = "https://hahnca.com/tv-tv";
 const TV_SRVR_WS_URL = "wss://hahnca.com/tv-srvr";
 const TV_SRVR_HTTP_URL = "https://hahnca.com/tv-srvr";
-const TVAPPRC_HOST = "192.168.1.103";
-const TVAPPRC_PORT = 8098;
+// The bridge listens on plain ws:8098 on the lan, but a raw lan address is
+// exactly what android 16 shuts an app out of, so this goes the same way the
+// web client does: nginx's wss route on hahnca.com, proxied to that port.
+const TVAPPRC_WS_URL = "wss://hahnca.com/tv-tvapprc";
 const TVAPPRC_RECONNECT_MS = 2000;
 const TVAPPRC_CONNECT_TIMEOUT_MS = 5000;
 // Entering or leaving tvapprc mode redraws the whole grid one row taller or
@@ -55,7 +56,6 @@ const MODE_SWITCH_LOCKOUT_MS = 800;
 // Hide fires only after the cell has been held this long; a tap is refused.
 const HIDE_HOLD_MS = 300;
 const DENIED_BG = "lightcoral";
-const LOCAL_NETWORK_PERMISSION = "android.permission.ACCESS_LOCAL_NETWORK";
 const MSG_TVAPP_UP = "u";
 const MSG_TVAPP_DOWN = "d";
 const MSG_CLEAR_FILTER = "z";
@@ -593,7 +593,7 @@ export default function App() {
 
     const connect = () => {
       if (done) return;
-      const ws = new WebSocket(`ws://${TVAPPRC_HOST}:${TVAPPRC_PORT}`);
+      const ws = new WebSocket(TVAPPRC_WS_URL);
       tvapprcWsRef.current = ws;
       ws.onopen = () => clearTimeout(openTimer);
       ws.onerror = scheduleRetry;
@@ -630,11 +630,7 @@ export default function App() {
       }, TVAPPRC_CONNECT_TIMEOUT_MS);
     };
 
-    PermissionsAndroid.request(LOCAL_NETWORK_PERMISSION)
-      .catch((e) => console.warn("tvapprc network permission failed", e))
-      .finally(() => {
-        if (!done) connect();
-      });
+    connect();
 
     return () => {
       done = true;

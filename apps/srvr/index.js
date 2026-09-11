@@ -861,7 +861,11 @@ tvdb.setRefreshEpisodeDataCallback(disk.refreshEpisodeData);
 // on disk are ignored entirely — see hideShowIfNeeded/unhideLatestTvIfNeeded).
 tvdb.setWaitStrChangedCallback(
   async (showName, tvdbRecord, { before, after }) => {
-    if (!tvdbRecord?.inEmby || !tvdbRecord?.id) return;
+    if (!tvdbRecord) return;
+    // The wait ending is a notification in its own right, so it moves the show
+    // to the head of the watched sort whatever its emby/disk state is.
+    if (before && !after) await markWaitOverViewedNow(showName, tvdbRecord);
+    if (!tvdbRecord.inEmby || !tvdbRecord.id) return;
     if (!hasEpisodesOnDisk(tvdbRecord)) return;
     if (!before && after) {
       // waitStr newly set: hide the show unless it is already hidden.
@@ -4844,8 +4848,15 @@ async function snapshotTruePlayed(showName, rec) {
 
 // Remember the fabricated timestamp just written into Emby, so later reads
 // recognize it as ours and leave the real last viewing on the record alone.
+// A show nothing has been played on has no Emby date for the stamp to land
+// on, so its stamp lives on the record alone (see markWaitOverViewedNow); it
+// is told apart by having no real last viewing, and every hide/unhide moves
+// it too, or the watched sort would not follow the button. A played show's
+// stamp is only moved when Emby's was, so the two keep matching for the echo.
 async function markFakeLastPlayed(rec, targetIso, changed) {
-  if (!changed.some((c) => c.startsWith("lastPlayed"))) return;
+  const stampedEmby = changed.some((c) => c.startsWith("lastPlayed"));
+  const recordOnly = rec.fakeLastPlayed && !rec.lastPlayedDate;
+  if (!stampedEmby && !recordOnly) return;
   rec.fakeLastPlayed = util.toPstDateTimeMs(targetIso);
   await tvdb.saveTvdbSync();
 }
@@ -4909,6 +4920,23 @@ async function reapplyHideIfAlreadyHidden(showName, rec) {
       .request(`chokidarRehide:${showName}`, showName)
       .catch((e) => unilog(1668, `refresh failed: ${e.message}`));
   }
+}
+
+// The wait on a show being over is a notification: stamp its last viewing as
+// now so it heads the watched sort. The emby stamp is what makes that stick for
+// a show something has been played on -- the next read of emby would otherwise
+// put the real date back. A show with nothing played has no emby date to move,
+// so the record's own stamp stands on its own.
+async function markWaitOverViewedNow(showName, rec) {
+  const cnt =
+    rec.inEmby !== false && rec.id
+      ? await unhideContinueWatching(showName, rec)
+      : 0;
+  if (cnt === 0) {
+    rec.fakeLastPlayed = util.toPstDateTimeMs(toEmbyDate(Date.now()));
+    await tvdb.saveTvdbSync();
+  }
+  unilog(2421, `wait over for ${showName}: last viewed set to now (${cnt} emby epis stamped)`);
 }
 
 // Bring a hidden show back to the latest tv row and clear hiddenFromRow.

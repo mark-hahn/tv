@@ -186,9 +186,14 @@ function normalizePlayedDate(value) {
   return formatLaDateTime(raw);
 }
 
+// Same key as the web client's getSortKey("Viewed") and tvapp's Watched
+// sort: the date Emby currently holds, which is fakeLastPlayed whenever
+// hiding/unhiding or a wait ending stamped one, else the real last viewing.
 function getViewedSortValue(show, lastViewedMap) {
   void lastViewedMap;
-  return normalizePlayedDate(show?.lastPlayedDate) || "";
+  return (
+    normalizePlayedDate(show?.fakeLastPlayed || show?.lastPlayedDate) || ""
+  );
 }
 
 const COLS = 3;

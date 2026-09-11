@@ -11,6 +11,7 @@
 ## Documentation
 
 - never modify CLAUDE.md or .github/copilot-instructions.md unless told to modify
+  - exception: when i say to save a rule, add it to CLAUDE.md (and mirror it here)
 
 ## Remote server
 
@@ -80,6 +81,11 @@
   :style="{ '--btn-bg': isActive ? 'lightgray' : 'whitesmoke' }"
   ```
 - when any change is made to web client tv pane ui or the android app ui then the same change should be made to the other
+- the watched (Viewed) sort order must always match on the web client, tvapp, and the phone
+  - the key is `fakeLastPlayed || lastPlayedDate` and lives in three places that must be edited together:
+    `getSortKey(show, "Viewed")` in `packages/share/src/showFilterSort.js`, `Shows.java` in tvapp,
+    and `getViewedSortValue()` in `apps/android/App.js`
+  - any change to how srvr stamps `fakeLastPlayed` must be checked against all three
   - exception: Android-only control overlays that have no web client counterpart
     are never mirrored
 - when modifying files use local changes and don't replace entire files because another copilot conversation might be changing the same file

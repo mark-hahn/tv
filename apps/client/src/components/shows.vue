@@ -230,6 +230,7 @@ export default {
         Size: "25px",
         "Safe start": "0",
         Ended: "75px",
+        Premiered: "75px",
         Length: "25px",
         Creator: "0",
       };

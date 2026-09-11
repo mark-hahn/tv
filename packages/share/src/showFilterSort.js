@@ -20,6 +20,7 @@ export const SORT_CHOICES = [
   "Size",
   "Safe start",
   "Ended",
+  "Premiered",
   "Length",
   "Creator",
   "Quality",
@@ -192,6 +193,8 @@ export function getSortKey(show, sortChoice, allTvdb = null) {
     }
     case "Ended":
       return show.lastAired || "";
+    case "Premiered":
+      return show.firstAired || "";
     case "Length":
       return show.averageRuntime || 0;
     case "Size":

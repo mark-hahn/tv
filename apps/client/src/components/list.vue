@@ -681,6 +681,7 @@ export default {
         "Size",
         "Safe start",
         "Ended",
+        "Premiered",
         "Length",
         "Creator",
         "Quality",
@@ -1327,6 +1328,8 @@ export default {
           return (show.dateCreated || "").slice(0, 10);
         case "Ended":
           return show.lastAired || "";
+        case "Premiered":
+          return show.firstAired || "";
         case "Length":
           return show.averageRuntime || 0;
         case "Size":

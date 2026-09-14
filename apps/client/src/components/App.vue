@@ -1010,7 +1010,8 @@ export default {
         const hasConfiguredSeasonIntro =
           introShow.seasonIntros != null &&
           Object.values(introShow.seasonIntros).some(
-            (si) => si?.trimPos != null || si?.skipDur != null,
+            (si) =>
+              si?.trimPos != null || si?.skipDur != null || si?.none === true,
           );
         const configured =
           introShow.trimPos != null ||

@@ -1218,7 +1218,6 @@ export default {
     return {
       seasonStates: {}, // Track original state for each season
       tvdbData: null,
-      allTvdb: null,
       nextUpTxt: "",
 
       mapWorking: false,
@@ -2079,13 +2078,12 @@ export default {
 
     async loadTvdbData() {
       try {
-        // Always load all shows (hasEmby=0) to include no-emby shows
-        // The cache from loadAllShows might only have emby shows (hasEmby=1)
-        if (!this.allTvdb) {
-          this.allTvdb = await tvdb.getAllTvdb(0);
-        }
+        // Always load all shows (hasEmby=0) to include no-emby shows.
+        // Go through tvdb.getAllTvdb every time so we track the shared cache
+        // across clearCache() instead of holding a stale private copy.
+        const allTvdb = await tvdb.getAllTvdb(0);
         if (this.mapShow && this.mapShow.name) {
-          this.tvdbData = this.allTvdb[this.mapShow.name];
+          this.tvdbData = allTvdb[this.mapShow.name];
         }
       } catch (err) {
         unilog(1022, `loadTvdbData error for ${this.mapShow?.name}:`, err);

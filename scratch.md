@@ -1,6 +1,22 @@
 
+# row hiding/unhiding logic changes
+- i want to simplify hide/unhide/show logic
+
+- i don't care about what displays in emby
+  - remove code that reads/writes episode-level DateCreated
+    - remove the show button
+    - this means the newly added list in emby will not change by our actions
+  - the currently watching row in emby will still be updated since we update viewed date
+
+- 
+
+lastPlayedDate 
+fakeLastPlayed
+hiddenFromRow 
+
 manage upcoming shows
 
+add a filter to filter selector in hdrbot called `No Intro` -- it should filter out shows that have intro data like trim or skip set and only have shows with intro none set
 
 =================
 

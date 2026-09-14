@@ -4849,13 +4849,14 @@ async function snapshotTruePlayed(showName, rec) {
 // Remember the fabricated timestamp just written into Emby, so later reads
 // recognize it as ours and leave the real last viewing on the record alone.
 // A show nothing has been played on has no Emby date for the stamp to land
-// on, so its stamp lives on the record alone (see markWaitOverViewedNow); it
-// is told apart by having no real last viewing, and every hide/unhide moves
-// it too, or the watched sort would not follow the button. A played show's
-// stamp is only moved when Emby's was, so the two keep matching for the echo.
+// on, so its stamp lives on the record alone, the same way the wait-over
+// path stamps it (see markWaitOverViewedNow); it is told apart by having no
+// real last viewing, and every hide/unhide stamps it, or the watched sort
+// would not follow the button. A played show's stamp is only moved when
+// Emby's was, so the two keep matching for the echo.
 async function markFakeLastPlayed(rec, targetIso, changed) {
   const stampedEmby = changed.some((c) => c.startsWith("lastPlayed"));
-  const recordOnly = rec.fakeLastPlayed && !rec.lastPlayedDate;
+  const recordOnly = !rec.lastPlayedDate;
   if (!stampedEmby && !recordOnly) return;
   rec.fakeLastPlayed = util.toPstDateTimeMs(targetIso);
   await tvdb.saveTvdbSync();

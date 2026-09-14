@@ -858,21 +858,23 @@ tvdb.setPreTvdbTickCallback(async ({ isBackground } = {}) => {
 tvdb.setRefreshEpisodeDataCallback(disk.refreshEpisodeData);
 
 // waitStr transitions drive automatic hiding/unhiding (shows with no episodes
-// on disk are ignored entirely — see hideShowIfNeeded/unhideLatestTvIfNeeded).
+// on disk are ignored by hideShowIfNeeded).
 tvdb.setWaitStrChangedCallback(
   async (showName, tvdbRecord, { before, after }) => {
     if (!tvdbRecord) return;
     // The wait ending is a notification in its own right, so it moves the show
-    // to the head of the watched sort whatever its emby/disk state is.
-    if (before && !after) await markWaitOverViewedNow(showName, tvdbRecord);
+    // to the head of the watched sort whatever its emby/disk state is, and
+    // that stamp is the unhide, so the flag goes with it.
+    if (before && !after) {
+      await markWaitOverViewedNow(showName, tvdbRecord);
+      if (tvdbRecord.hiddenFromRow) await setHiddenFromRow(showName, false);
+      return;
+    }
     if (!tvdbRecord.inEmby || !tvdbRecord.id) return;
     if (!hasEpisodesOnDisk(tvdbRecord)) return;
     if (!before && after) {
       // waitStr newly set: hide the show unless it is already hidden.
       await hideShowIfNeeded(showName, tvdbRecord, `waitStrHide:${showName}`);
-    } else if (before && !after) {
-      // waitStr cleared: bring it back to the latest tv row.
-      await unhideLatestTvIfNeeded(showName, tvdbRecord);
     }
   },
 );
@@ -1997,10 +1999,8 @@ app.post(
   }),
 );
 
-// Push a show to the far right of the emby "continue watching" / "latest tv"
-// lists by backdating its dates two years, effectively hiding it.
 // Hide button: a toggle keyed on hiddenFromRow. When not hidden it hides
-// (both dates back); when hidden it unhides both rows (both dates to today).
+// (lastPlayed back); when hidden it unhides (lastPlayed to today).
 app.post(
   "/api/hideShow",
   apiWrapper(async (params) => {
@@ -2019,10 +2019,7 @@ app.post(
       action = "hidden";
     } else {
       const cw = await unhideContinueWatching(showName, rec);
-      const lt = await unhideLatestTv(rec);
-      changed = [];
-      if (cw > 0) changed.push(`lastPlayed(${cw} epis)`);
-      if (lt > 0) changed.push(`dateCreated(${lt} epis)`);
+      changed = cw > 0 ? [`lastPlayed(${cw} epis)`] : [];
       await setHiddenFromRow(showName, false);
       action = "unhidden";
     }
@@ -2036,33 +2033,6 @@ app.post(
         .catch((e) => unilog(1662, `refresh failed: ${e.message}`));
     }
     return { ok: true, action, changed };
-  }),
-);
-
-// Show button: unconditionally bump the newest played episode's LastPlayedDate
-// to now, putting the show at the left of "continue watching". Never hides.
-app.post(
-  "/api/showShow",
-  apiWrapper(async (params) => {
-    const showName = params?.name;
-    if (!showName) return { ok: false, error: "Missing name" };
-    const rec = tvdb.getAllTvdbSync()?.[showName];
-    if (!rec?.id) return { ok: false, error: "Show not in emby" };
-    if (!hasEpisodesOnDisk(rec))
-      return { ok: false, error: "No episodes on disk" };
-
-    const cw = await unhideContinueWatching(showName, rec);
-    const changed = cw > 0 ? [`lastPlayed(${cw} epis)`] : [];
-    if (rec.hiddenFromRow) await setHiddenFromRow(showName, false);
-    unilog(2268, `shown ${showName}: ${cw > 0 ? changed[0] : "no date change"}`);
-    if (cw > 0) {
-      embyRefreshManager
-        .request(`showShow:${showName}`, showName)
-        .catch((e) =>
-          unilog(2269, `refresh failed for ${showName}: ${e.message}`),
-        );
-    }
-    return { ok: true, action: "shown", changed };
   }),
 );
 
@@ -4659,15 +4629,13 @@ function applyLatestPlayed(rec, latest) {
 }
 
 //////////////////  EMBY SHOW DATE SHIFTING  //////////////////
-// A show is "hidden" by pushing its Emby dates two years into the past so it
-// falls to the far right of the "continue watching" and "latest tv" lists, and
-// is brought back by setting them to now.
+// A show is "hidden" by pushing its Emby last-played date two years into the
+// past so it falls to the far right of the "continue watching" list (and the
+// bottom of our watched sort), and is brought back by setting it to now.
 //
-// Neither date lives on the series item. Emby gives a series no LastPlayedDate
-// at all (its UserData holds only aggregates), and "latest tv" is ordered by
-// episode DateCreated — a series' own DateCreated has no effect on its position.
-// So both dates are written on episodes: lastPlayed on the most recently played
-// one, DateCreated on every episode still inside the recent window.
+// The date does not live on the series item: Emby gives a series no
+// LastPlayedDate at all (its UserData holds only aggregates), so it is written
+// on the most recently played episode.
 
 const HIDE_BACKDATE_MS = 2 * 365 * 24 * 60 * 60 * 1000;
 
@@ -4679,62 +4647,6 @@ const HIDE_BACKDATE_MS = 2 * 365 * 24 * 60 * 60 * 1000;
 function toEmbyDate(ms) {
   const whole = Math.floor(ms / 1000) * 1000;
   return new Date(whole).toISOString().replace("Z", "0000Z");
-}
-
-// Emby's item update overwrites every field from the posted body, so the item
-// must be fetched whole, modified, and posted back whole.
-async function setItemDateCreated(itemId, targetIso) {
-  const itemUrl = `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${itemId}?api_key=${EMBY_API_KEY}`;
-  const itemResp = await fetch(itemUrl);
-  if (!itemResp.ok) return false;
-  const item = await itemResp.json();
-  if (!item?.DateCreated) return false;
-  item.DateCreated = targetIso;
-  const res = await fetch(
-    `${EMBY_BASE_URL}/Items/${itemId}?api_key=${EMBY_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(item),
-    },
-  );
-  return res.ok || res.status === 204;
-}
-
-// "latest tv" ranks a series only by its UNWATCHED episodes — a watched
-// episode's DateCreated is ignored no matter how recent — so only unwatched
-// episodes are touched here (IsPlayed=false). Hiding (skipOlderThanMs set)
-// backdates every unwatched episode still newer than the cutoff; moving only
-// the newest would drop the show onto its second-newest unwatched episode.
-// Un-hiding only needs the newest unwatched episode moved up, since that alone
-// decides where the show lands in "latest tv". A fully-watched show has no
-// unwatched episodes and cannot appear in "latest tv" at all, so this no-ops.
-async function setEmbyDateCreated(showId, targetIso, skipOlderThanMs) {
-  const epUrl =
-    `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items?api_key=${EMBY_API_KEY}` +
-    `&ParentId=${showId}&IncludeItemTypes=Episode&Recursive=true&IsPlayed=false` +
-    `&Fields=DateCreated&SortBy=DateCreated&SortOrder=Descending&Limit=10000`;
-  const resp = await fetch(epUrl);
-  const items = resp.ok ? (await resp.json())?.Items || [] : [];
-
-  const epIds = [];
-  for (const ep of items) {
-    if (!ep?.Id || !ep.DateCreated) continue;
-    if (!skipOlderThanMs) {
-      epIds.push(ep.Id); // newest only — list is sorted descending
-      break;
-    }
-    if (new Date(ep.DateCreated).getTime() < skipOlderThanMs) continue;
-    epIds.push(ep.Id);
-  }
-
-  // Only episodes are touched. The series' own DateCreated is deliberately left
-  // alone so the show list keeps showing when the show was really added.
-  let count = 0;
-  for (const epId of epIds) {
-    if (await setItemDateCreated(epId, targetIso)) count++;
-  }
-  return count;
 }
 
 async function setOneEpisodeLastPlayed(ep, targetIso) {
@@ -4788,38 +4700,12 @@ async function setEmbyLastPlayed(showId, targetIso, skipOlderThanMs) {
   return count;
 }
 
-// Sets both dates to targetIso. Either date is left alone when it doesn't
-// exist in Emby, or when skipOlderThanMs is given and it is already older.
-// Returns the names of the dates that were actually changed.
-async function setEmbyShowDates(showId, targetIso, skipOlderThanMs = null) {
-  const changed = [];
-  try {
-    const lpCount = await setEmbyLastPlayed(showId, targetIso, skipOlderThanMs);
-    if (lpCount > 0) changed.push(`lastPlayed(${lpCount} epis)`);
-  } catch (e) {
-    unilog(1649, `lastPlayed set failed: ${e.message}`);
-  }
-  try {
-    const dcCount = await setEmbyDateCreated(
-      showId,
-      targetIso,
-      skipOlderThanMs,
-    );
-    if (dcCount > 0) changed.push(`dateCreated(${dcCount} epis)`);
-  } catch (e) {
-    unilog(1650, `dateCreated set failed: ${e.message}`);
-  }
-  return changed;
-}
-
 //////////////////  SHOW HIDE / UNHIDE  //////////////////
-// "Hiding" means pushing BOTH dates back so the show drops to the far right of
-// both the "continue watching" and "latest tv" rows. "Unhiding" is always
-// per-row: continue watching by bumping lastPlayed to today, latest tv by
-// bumping DateCreated to today. hiddenFromRow tracks the hidden state; it is
-// set on hide and cleared whenever either row is unhidden (playback also
-// unhides continue watching, but that is not detected so the flag is left as
-// is). Shows with no episodes on disk are ignored by every path below.
+// "Hiding" means pushing lastPlayed back so the show drops to the far right of
+// the "continue watching" row; "unhiding" bumps it to today. hiddenFromRow
+// tracks the hidden state; it is set on hide and cleared on unhide, when a
+// wait ends, and when a real play is read back from Emby. Shows with no
+// episodes on disk are ignored by every path below.
 
 function hasEpisodesOnDisk(rec) {
   return epd.seasonsWithFile(rec?.episodeData).length > 0;
@@ -4862,13 +4748,20 @@ async function markFakeLastPlayed(rec, targetIso, changed) {
   await tvdb.saveTvdbSync();
 }
 
-// Hide: both dates back. Every played/created episode still newer than the
-// cutoff is moved so the show's newest date on each axis is two years old.
+// Hide: every played episode still newer than the cutoff is moved so the
+// show's newest last-played date is two years old. Returns the names of the
+// dates actually changed.
 async function hideShowInEmby(showName, rec) {
   await snapshotTruePlayed(showName, rec);
   const cutoffMs = Date.now() - HIDE_BACKDATE_MS;
   const targetIso = toEmbyDate(cutoffMs);
-  const changed = await setEmbyShowDates(rec.id, targetIso, cutoffMs);
+  const changed = [];
+  try {
+    const lpCount = await setEmbyLastPlayed(rec.id, targetIso, cutoffMs);
+    if (lpCount > 0) changed.push(`lastPlayed(${lpCount} epis)`);
+  } catch (e) {
+    unilog(1649, `lastPlayed set failed: ${e.message}`);
+  }
   await markFakeLastPlayed(rec, targetIso, changed);
   return changed;
 }
@@ -4880,11 +4773,6 @@ async function unhideContinueWatching(showName, rec) {
   const count = await setEmbyLastPlayed(rec.id, targetIso, null);
   await markFakeLastPlayed(rec, targetIso, count > 0 ? ["lastPlayed"] : []);
   return count;
-}
-
-// Unhide latest tv: newest episode's DateCreated -> today.
-async function unhideLatestTv(rec) {
-  return setEmbyDateCreated(rec.id, toEmbyDate(Date.now()), null);
 }
 
 // Hide a show unless it is already hidden, then mark it hidden.
@@ -4903,26 +4791,6 @@ async function hideShowIfNeeded(showName, rec, refreshCaller) {
   }
 }
 
-// Re-apply backdating to a show that is already hidden. A newly downloaded
-// episode enters Emby with DateCreated=now regardless of hiddenFromRow, so a
-// still-hidden show needs this every time a new episode lands or the new
-// episode alone would surface it at the left of "latest tv". hideShowInEmby
-// only touches episodes still newer than the cutoff, so this is a no-op for
-// episodes already backdated by a previous hide.
-async function reapplyHideIfAlreadyHidden(showName, rec) {
-  if (!rec.hiddenFromRow) return;
-  const changed = await hideShowInEmby(showName, rec);
-  unilog(
-    1667,
-    `re-hiding new episode(s) for ${showName}: ${changed.length ? changed.join(", ") : "no date change"}`,
-  );
-  if (changed.length > 0) {
-    embyRefreshManager
-      .request(`chokidarRehide:${showName}`, showName)
-      .catch((e) => unilog(1668, `refresh failed: ${e.message}`));
-  }
-}
-
 // The wait on a show being over is a notification: stamp its last viewing as
 // now so it heads the watched sort. The emby stamp is what makes that stick for
 // a show something has been played on -- the next read of emby would otherwise
@@ -4938,19 +4806,6 @@ async function markWaitOverViewedNow(showName, rec) {
     await tvdb.saveTvdbSync();
   }
   unilog(2421, `wait over for ${showName}: last viewed set to now (${cnt} emby epis stamped)`);
-}
-
-// Bring a hidden show back to the latest tv row and clear hiddenFromRow.
-async function unhideLatestTvIfNeeded(showName, rec) {
-  if (!rec.hiddenFromRow) return;
-  const cnt = await unhideLatestTv(rec);
-  await setHiddenFromRow(showName, false);
-  unilog(1665, `unhiding latest tv ${showName}: dateCreated(${cnt} epis)`);
-  if (cnt > 0) {
-    embyRefreshManager
-      .request(`waitStrUnhide:${showName}`, showName)
-      .catch((e) => unilog(1666, `refresh failed: ${e.message}`));
-  }
 }
 
 // NOTE: syncEmbyUserData periodic sync removed - now using immediate triggers from client
@@ -5233,20 +5088,15 @@ async function handleShowDiskChange(showName) {
       // disk/emby, never re-scrapes TVDB, so a newly-downloaded episode can
       // make waitStr transiently read as cleared even though TVDB simply
       // hasn't announced the next episode's air date yet. Trusting that here
-      // would flip a show back into "latest tv" every time an episode lands,
-      // undoing a hide the moment it was set. Unhiding on a real waitStr clear
-      // is left entirely to the background loop, which re-scrapes TVDB first.
+      // would unhide a show every time an episode lands, undoing a hide the
+      // moment it was set. Unhiding on a real waitStr clear is left entirely
+      // to the background loop, which re-scrapes TVDB first.
       const waitStrAfter = tvdbRecord.waitStr;
       const hasEpisodesNow = hasEpisodesOnDisk(tvdbRecord);
       const waitStrJustSet = !waitStrBefore && waitStrAfter;
       const firstEpisodesJustLanded =
         !hadEpisodesOnDiskBefore && hasEpisodesNow;
-      if (tvdbRecord.hiddenFromRow) {
-        // Already hidden: this new episode needs the same backdating, or it
-        // would show up fresh at the left of "latest tv" on its own.
-        if (hasEpisodesNow)
-          await reapplyHideIfAlreadyHidden(showName, tvdbRecord);
-      } else if (
+      if (
         hasEpisodesNow &&
         waitStrAfter &&
         (waitStrJustSet || firstEpisodesJustLanded)

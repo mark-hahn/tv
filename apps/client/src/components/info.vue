@@ -246,21 +246,6 @@
             Load
           </button>
           <button
-            @click.stop="showClick"
-            :disabled="show?.inEmby === false || !hasVideoFiles"
-            :style="{
-              fontSize: '13px',
-              cursor:
-                show?.inEmby !== false && hasVideoFiles ? 'pointer' : 'default',
-              marginTop: '3px',
-              maxHeight: '24px',
-              borderRadius: '7px',
-              opacity: show?.inEmby !== false && hasVideoFiles ? 1 : 0.4,
-            }"
-          >
-            Show
-          </button>
-          <button
             @click.stop="hideClick"
             :disabled="show?.inEmby === false || !hasVideoFiles"
             :style="{
@@ -934,23 +919,10 @@ export default {
       ).catch(() => {});
     },
 
-    // Bring the show back to the left of emby's "continue watching" row by
-    // stamping the newest played episode's LastPlayedDate with right now.
-    async showClick() {
-      const showName = this.show?.name;
-      if (!showName) return;
-      try {
-        await srvr.showShow(showName);
-        this.show.hiddenFromRow = false;
-      } catch (e) {
-        unilog(2271, `show failed for ${showName}: ${e.message}`);
-      }
-    },
-
     async hideClick() {
       const showName = this.show?.name;
       if (!showName) return;
-      // Toggle: server hides when not hidden, unhides both rows when hidden.
+      // Toggle: server hides when not hidden, unhides when hidden.
       const original = !!this.show.hiddenFromRow;
       this.show.hiddenFromRow = !original;
       try {

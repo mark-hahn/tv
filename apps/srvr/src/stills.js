@@ -34,7 +34,7 @@ const STILLS_DIR = "/mnt/media/stills";
 const NGINX_ORIGIN = "https://hahnca.com";
 const VAAPI_DEVICE = "/dev/dri/renderD128";
 const STILL_GAP_SECS = 5;
-const STILL_SPAN_SECS = 600;
+const STILL_SPAN_SECS = 1200;
 // Twice the 200px the strip renders them at, for hidpi.
 const STILL_WIDTH = 400;
 const STILL_QUALITY = 4;

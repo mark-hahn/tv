@@ -616,7 +616,7 @@
         @touchstart.prevent="startHideHold"
         @touchend="stopHideHold"
       >
-        Hide
+        {{ tvapprcHidden ? "Unhide" : "Hide" }}
       </div>
       <div
         v-else
@@ -725,6 +725,8 @@ const MSG_TVAPP_UP = "u";
 const MSG_TVAPP_DOWN = "d";
 // tvapp names the show its cursor is on, which is the one Hide acts on.
 const MSG_ACTIVE_SHOW = "a";
+// Whether that show is hidden, which is what the hide key reads Unhide for.
+const MSG_ACTIVE_HIDDEN = "i";
 const CMD_OPEN_TVAPP = "o";
 const CMD_CLOSE_TO_EMBY = "b";
 // Back to a clean tvapp screen: the show list focused and nothing else,
@@ -753,8 +755,6 @@ const MODE_SWITCH_LOCKOUT_MS = 800;
 // How long a Shows key is held, while the set is off, before it toggles the
 // doorbell camera; the same 400ms _lpStart uses when the set is on.
 const SHOWS_OFF_HOLD_MS = 400;
-// Hide fires only after the cell has been held this long; a tap is refused.
-const HIDE_HOLD_MS = 300;
 const DENIED_BG = "lightcoral";
 
 const CELL_BASE = {
@@ -827,6 +827,7 @@ export default {
       _picChannel: null,
       _subChannel: null,
       tvapprcMode: false,
+      tvapprcHidden: false,
       deniedBtn: null, // cell whose press was refused, painted DENIED_BG
       deniedGrid: false, // a press was refused during the post-switch lockout
     };
@@ -1009,6 +1010,7 @@ export default {
       ws.onerror = () => this._scheduleTvapprcRetry();
       ws.onclose = () => {
         this.tvapprcMode = false;
+        this.tvapprcHidden = false;
         this._tvapprcActiveShow = null;
         this._scheduleTvapprcRetry();
       };
@@ -1016,12 +1018,19 @@ export default {
         if (e.data === MSG_TVAPP_UP) this.tvapprcMode = true;
         else if (e.data === MSG_TVAPP_DOWN) {
           this.tvapprcMode = false;
+          this.tvapprcHidden = false;
           this._tvapprcActiveShow = null;
         } else if (
           typeof e.data === "string" &&
           e.data.startsWith(`${MSG_ACTIVE_SHOW},`)
         ) {
           this._tvapprcActiveShow = e.data.slice(MSG_ACTIVE_SHOW.length + 1);
+        } else if (
+          typeof e.data === "string" &&
+          e.data.startsWith(`${MSG_ACTIVE_HIDDEN},`)
+        ) {
+          this.tvapprcHidden =
+            e.data.slice(MSG_ACTIVE_HIDDEN.length + 1) === "1";
         }
       };
       this._tvapprcOpenTimer = setTimeout(() => {
@@ -1396,19 +1405,12 @@ export default {
       this.sendTvapprc(CMD_HIDE);
     },
 
-    // Hide sits where Skip and Mute are in the ordinary layout and a tap there
-    // was hiding shows nobody meant to hide, so it takes a hold of
-    // HIDE_HOLD_MS. A tap is refused and says so.
     startHideHold() {
-      this._lpStart(
-        () => this.deny("hide"),
-        this.hideSelectedShow,
-        HIDE_HOLD_MS,
-      );
+      this._dbStart(this.hideSelectedShow);
     },
 
     stopHideHold() {
-      this._lpStop();
+      this._dbStop();
     },
 
     // Put the doorbell camera on the television, or take it back off: the same

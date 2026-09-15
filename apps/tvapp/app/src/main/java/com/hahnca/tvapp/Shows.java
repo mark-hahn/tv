@@ -103,6 +103,9 @@ class Shows {
     // when it never hid it. Watched sorts on this instead so a hidden show
     // sinks here as it does in Emby, leaving lastPlayedDate the real viewing.
     final String fakeLastPlayed;
+    // Whether tv-srvr has the show hidden. Not final: the hide key flips it
+    // ahead of the reload, so the remote's Hide/Unhide label agrees at once.
+    boolean hiddenFromRow;
     final boolean inToTry;
     final boolean inContinue;
     final boolean inMark;
@@ -151,6 +154,7 @@ class Shows {
       lastPlayedDate = str(rec, "lastPlayedDate");
       dateCreated = str(rec, "dateCreated");
       fakeLastPlayed = str(rec, "fakeLastPlayed");
+      hiddenFromRow = rec.optBoolean("hiddenFromRow", false);
       inToTry = rec.optBoolean("inToTry", false);
       inContinue = rec.optBoolean("inContinue", false);
       inMark = rec.optBoolean("inMark", false);

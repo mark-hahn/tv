@@ -58,14 +58,14 @@ const TVAPPRC_CONNECT_TIMEOUT_MS = 5000;
 // shorter, so every cell moves. A press this soon after the switch was aimed at
 // the old layout: it is dropped and the cell flashes DENIED_BG instead.
 const MODE_SWITCH_LOCKOUT_MS = 800;
-// Hide fires only after the cell has been held this long; a tap is refused.
-const HIDE_HOLD_MS = 300;
 const DENIED_BG = "lightcoral";
 const MSG_TVAPP_UP = "u";
 const MSG_TVAPP_DOWN = "d";
 const MSG_CLEAR_FILTER = "z";
 const MSG_COUNTS = "c";
 const MSG_ACTIVE_SHOW = "a";
+// Whether that show is hidden, which is what the hide key reads Unhide for.
+const MSG_ACTIVE_HIDDEN = "i";
 const CMD_OPEN_TVAPP = "o";
 const CMD_CLOSE_TO_EMBY = "b";
 // Back to a clean tvapp screen: the show list focused and nothing else,
@@ -229,6 +229,7 @@ export default function App() {
   const [tvapprcShows, setTvapprcShows] = useState([]);
   const [tvapprcTotalCount, setTvapprcTotalCount] = useState(0);
   const [tvapprcListCount, setTvapprcListCount] = useState(null);
+  const [tvapprcHidden, setTvapprcHidden] = useState(false);
   const tvapprcShowsLoadedRef = useRef(false);
   const [flashSvc, setFlashSvc] = useState(null);
   const [showSubCtrl, setShowSubCtrl] = useState(false);
@@ -589,6 +590,7 @@ export default function App() {
       closeTvapprcInput();
       clearTvapprcFilter();
       setTvapprcListCount(null);
+      setTvapprcHidden(false);
       tvapprcActiveShowRef.current = null;
     };
 
@@ -633,6 +635,11 @@ export default function App() {
           tvapprcActiveShowRef.current = e.data.slice(
             MSG_ACTIVE_SHOW.length + 1,
           );
+        } else if (
+          typeof e.data === "string" &&
+          e.data.startsWith(`${MSG_ACTIVE_HIDDEN},`)
+        ) {
+          setTvapprcHidden(e.data.slice(MSG_ACTIVE_HIDDEN.length + 1) === "1");
         }
       };
       openTimer = setTimeout(() => {
@@ -1460,15 +1467,12 @@ export default function App() {
     sendTvapprc(CMD_HIDE);
   };
 
-  // Hide sits where Skip and Mute are in the ordinary layout and a tap there
-  // was hiding shows nobody meant to hide, so it takes a hold of HIDE_HOLD_MS.
-  // A tap is refused and says so.
   const startHideHold = () => {
-    lpStart(() => deny("hide"), hideSelectedShow, HIDE_HOLD_MS);
+    dbStart(hideSelectedShow);
   };
 
   const stopHideHold = () => {
-    lpStop();
+    dbStop();
   };
 
   const startHomeHold = () => {
@@ -1839,7 +1843,7 @@ export default function App() {
     tvapprcMode
       ? {
           key: "hide",
-          label: "Hide",
+          label: tvapprcHidden ? "Unhide" : "Hide",
           smallText: true,
           bg: () => cellBg("white", "hide"),
           onPress: () => {},

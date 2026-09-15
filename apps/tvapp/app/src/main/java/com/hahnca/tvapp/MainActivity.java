@@ -208,6 +208,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // set.
   private String actorFilterName;
   private String activeShowName;
+  private boolean activeShowHidden;
   // A select that arrived before the show list did, and the play waiting on it.
   // The ctrl socket is bound in onStart, well before the first Shows.load comes
   // back, so tv-tv's select-then-play burst can land on an empty list -- where
@@ -829,6 +830,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private void sendActiveShow() {
     if (activeShowName == null) return;
     sendToPhone(CtrlServer.MSG_ACTIVE_SHOW + "," + activeShowName);
+    sendToPhone(CtrlServer.MSG_ACTIVE_HIDDEN + "," + (activeShowHidden ? "1" : "0"));
   }
 
   /**
@@ -863,6 +865,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   private void onShowSelected(Shows.Show show) {
     activeShowName = show.name;
+    activeShowHidden = show.hiddenFromRow;
     sendActiveShow();
     TrailerList.settle(show, () -> showList.onTrailersReady(show));
     prefs().edit().putString(KEY_SELECTED_SHOW, show.name).apply();
@@ -1236,8 +1239,17 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
                 Log.e(TAG, "hide failed for " + show.name + ": " + e);
                 return;
               }
-              if (!"hidden".equals(action)) return;
-              ui.post(showList::onShowHidden);
+              boolean hidden = "hidden".equals(action);
+              if (!hidden && !"unhidden".equals(action)) return;
+              ui.post(
+                  () -> {
+                    show.hiddenFromRow = hidden;
+                    if (show.name.equals(activeShowName)) {
+                      activeShowHidden = hidden;
+                      sendActiveShow();
+                    }
+                    if (hidden) showList.onShowHidden();
+                  });
             },
             "hide-show")
         .start();

@@ -42,6 +42,8 @@ import org.java_websocket.server.WebSocketServer;
  *   z              the filter was cleared here: clear Android's filter box too
  *   c,<count>      the number of shows currently visible in the list
  *   a,&lt;name&gt;    the active show, so the phone's own show pane can open on it
+ *   i,&lt;0|1&gt;     whether the active show is hidden, so the remote's hide key
+ *                  can read Hide or Unhide
  */
 class CtrlServer extends WebSocketServer {
 
@@ -50,6 +52,7 @@ class CtrlServer extends WebSocketServer {
   static final String MSG_CLEAR_FILTER = "z";
   static final String MSG_COUNTS = "c";
   static final String MSG_ACTIVE_SHOW = "a";
+  static final String MSG_ACTIVE_HIDDEN = "i";
 
   private static final String TAG = "tvapp";
   private static final String CMD_KEY = "k";

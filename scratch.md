@@ -1,5 +1,4 @@
 
-when tvapp has a selected show that is hidden change the hide button label in all remotes to `Unhide` -- this is the same behaviour the hide button in the info pane
 
 
 manage upcoming shows
@@ -7,6 +6,8 @@ manage upcoming shows
 add a filter to filter selector in hdrbot called `No Intro` -- it should filter out shows that have intro data like trim or skip set and only have shows with intro none set
 
 =================
+
+when tvapp has a selected show that is hidden change the hide button label in all remotes to `Unhide` -- this is the same behaviour the hide button in the info pane
 
 restore the remote controls to their state before these changes: put back the Emby key, its streamers hold, and the Hide key.  restore any logic they use. then do the old door button action when the shows button in row 2 in tvapprc mode is long-pressed -- so the remote still has a way to trigger every action it has now
 

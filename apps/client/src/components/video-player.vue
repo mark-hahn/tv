@@ -948,17 +948,63 @@
         padding: 4px;
       "
     >
+      <!-- Header row: build status, then Offset selector and Close on the right -->
       <div
-        v-if="windowed"
+        @click.stop
         style="
           flex-basis: 100%;
-          color: yellow;
-          font-size: 13px;
-          user-select: none;
+          display: flex;
+          align-items: center;
+          gap: 8px;
           padding: 4px 8px;
+          user-select: none;
         "
       >
-        {{ stripStatusText }}
+        <div v-if="windowed" style="color: yellow; font-size: 13px">
+          {{ stripStatusText }}
+        </div>
+        <label
+          style="
+            margin-left: auto;
+            color: white;
+            font-size: 13px;
+            white-space: nowrap;
+            text-shadow: 0 0 3px #000;
+          "
+        >
+          Offset:
+          <select
+            v-model.number="stillOffset"
+            @change="changeStillOffset"
+            style="
+              color: white;
+              background: rgba(0, 0, 0, 0.5);
+              border: 1px solid #666;
+              border-radius: 4px;
+              font-size: 13px;
+              padding: 1px 4px;
+            "
+          >
+            <option v-for="n in STILL_OFFSETS" :key="n" :value="n">{{ n }}</option>
+          </select>
+        </label>
+        <div
+          @click.stop="closeStrip"
+          title="close the film strip"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            white-space: nowrap;
+            background: rgba(0, 0, 0, 0.5);
+            text-shadow: 0 0 3px #000;
+          "
+        >
+          Close
+        </div>
       </div>
       <div
         v-for="still in stills.slice(0, stripShown)"
@@ -1025,6 +1071,8 @@ const WINDOW_SECS = 140;
 // seconds before the current one runs out, so playback never stalls.
 const WINDOW_EXTEND_AT_SECS = 30;
 const STILLS_POLL_MS = 500;
+// Whole-second offsets a stills set can be re-scanned at, between grid marks.
+const STILL_OFFSETS = [0, 1, 2, 3, 4];
 const FIRST_CUE_LEAD_SEC = 1;
 // The chksrt stream is a ten minute mirror of the episode; a first cue past
 // that is not reviewable, so it never sets the jump point.
@@ -1103,9 +1151,14 @@ export default {
       playbackRate: 1,
       stripOpen: false,
       stripShown: STRIP_PAGE,
-      stills: [],
-      // windowed panes: stills progress from the server, the current window's
-      // span, and how long the picture took after the last still click.
+      // Every offset's stills scanned so far for this episode, keyed by the
+      // offset in seconds; the strip shows only the selected offset's set.
+      stillsByOffset: {},
+      stillOffset: 0,
+      STILL_OFFSETS,
+      // windowed panes: stills progress from the server (for the selected
+      // offset), the current window's span, and how long the picture took
+      // after the last still click.
       stillsStatus: null,
       windowStart: null,
       windowEnd: null,
@@ -1271,6 +1324,9 @@ export default {
     windowed() {
       return this.mode === "intro" || this.mode === "chksrt";
     },
+    stills() {
+      return this.stillsByOffset[this.stillOffset] ?? [];
+    },
     stripStatusText() {
       const st = this.stillsStatus;
       if (!st) return "stills: starting";
@@ -1352,7 +1408,8 @@ export default {
       this.waitingForVideo = false;
       this.waitingForVideoTarget = null;
       this.stripOpen = false;
-      this.stills = [];
+      this.stillsByOffset = {};
+      this.stillOffset = 0;
       this.stripShown = STRIP_PAGE;
       this.stillsStatus = null;
       this.windowStart = null;
@@ -1996,6 +2053,21 @@ export default {
       this._stopStillsPoll();
       this._pollStills();
     },
+    // Close only hides the strip. The video behind it is left as it was,
+    // except that a pane that has never opened a window is cued to 0 so the
+    // player is not blank.
+    closeStrip() {
+      this.stripOpen = false;
+      if (this.windowed && !this._win) this._openWindow(0, { lead: 0 });
+    },
+    // Re-scan at the new offset (a set already scanned is adopted from the
+    // stored collection), keeping the strip on the selected offset only.
+    changeStillOffset() {
+      this.stripShown = STRIP_PAGE;
+      this.stillsStatus = null;
+      this._stopStillsPoll();
+      this._pollStills();
+    },
     onStripScroll() {
       const el = this.$refs.strip;
       if (!el || this.stripShown >= this.stills.length) return;
@@ -2013,23 +2085,25 @@ export default {
       this._cancelSeek();
       this._openWindow(still.ms / 1000);
     },
-    // Windowed: poll the server's stills progress and grow the strip as the
-    // images land. The Nth image is grid mark (N-1)*gap, so a count is a list.
+    // Windowed: poll the server's stills progress for the selected offset and
+    // grow the strip as the images land. The Nth image is grid mark
+    // offset+(N-1)*gap, so a count is a list.
     async _pollStills() {
       const forPath = this.path;
+      const forOffset = this.stillOffset;
       if (!forPath) return;
       let st;
       try {
-        st = await getStills(forPath);
+        st = await getStills(forPath, forOffset);
       } catch (e) {
         unilog(2407, `stills status failed: ${e.message}`);
         return;
       }
-      if (this.path !== forPath) return;
+      if (this.path !== forPath || this.stillOffset !== forOffset) return;
       this.stillsStatus = st;
       if (st.count !== this.stills.length) {
-        this.stills = Array.from({ length: st.count }, (_, i) => ({
-          ms: i * st.gapMs,
+        this.stillsByOffset[forOffset] = Array.from({ length: st.count }, (_, i) => ({
+          ms: forOffset * 1000 + i * st.gapMs,
           url: `${st.urlBase}/${String(i + 1).padStart(5, "0")}.jpg`,
         }));
       }

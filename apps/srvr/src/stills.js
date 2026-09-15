@@ -5,7 +5,9 @@
 // and the video in under a second.
 //
 // Stills: one every STILL_GAP_SECS over the first STILL_SPAN_SECS, in a single
-// ffmpeg pass. The decode is chosen by the source's keyframe spacing. A dense
+// ffmpeg pass. A set may be offset by a whole number of seconds (0..MAX_OFFSET_SECS)
+// so the strip can be re-scanned between the grid marks; offset 0 lives in the
+// episode's stills dir and offset N in its off<N> subdir, all kept. The decode is chosen by the source's keyframe spacing. A dense
 // source (modern WEB rips keep a keyframe every 2–4s) decodes only I-frames
 // (-skip_frame nokey) and takes the keyframe nearest each grid mark — about a
 // second for 600s of 2160p hevc, and no picture repeats because the keyframes
@@ -44,8 +46,9 @@ const DENSE_MAX_GAP_SECS = STILL_GAP_SECS;
 const WINDOW_SECS = 140;
 const WINDOW_HEIGHT = 480;
 const SIDECAR_NAME = "src.json";
+export const MAX_OFFSET_SECS = 4;
 
-// resolved videoFilePath -> job, for the life of the process.
+// "<resolved videoFilePath>#<offset>" -> job, for the life of the process.
 const jobs = new Map();
 // Jobs waiting for the one build slot, in run order.
 const pending = [];
@@ -58,6 +61,24 @@ export function stillsDirFor(videoFilePath) {
   if (!resolved.startsWith(TV_DIR + "/")) return null;
   const rel = resolved.slice(TV_DIR.length + 1).replace(/\.[^.]+$/, "");
   return path.join(STILLS_DIR, rel);
+}
+
+// Where one offset's set lives: the stills dir itself for 0, off<N> under it.
+function offsetDir(dir, offset) {
+  return offset === 0 ? dir : path.join(dir, `off${offset}`);
+}
+
+function jobKey(resolved, offset) {
+  return `${resolved}#${offset}`;
+}
+
+// Drop one set's images and sidecar, leaving other offsets' subdirs alone.
+async function clearSet(dir) {
+  await fsp.mkdir(dir, { recursive: true });
+  for (const name of await fsp.readdir(dir)) {
+    if (name.endsWith(".jpg") || name === SIDECAR_NAME)
+      await fsp.rm(path.join(dir, name), { force: true });
+  }
 }
 
 function stillsUrlBase(dir) {
@@ -80,12 +101,13 @@ async function readSidecar(dir) {
 }
 
 // A finished set for this exact source file under the current constants.
-async function validSidecar(dir, srcStat) {
+async function validSidecar(dir, srcStat, offset) {
   const sc = await readSidecar(dir);
   if (
     !sc ||
     sc.mtimeMs !== srcStat.mtimeMs ||
     sc.size !== srcStat.size ||
+    (sc.offsetSecs ?? 0) !== offset ||
     sc.gapSecs !== STILL_GAP_SECS ||
     sc.spanSecs !== STILL_SPAN_SECS ||
     sc.width !== STILL_WIDTH
@@ -162,7 +184,7 @@ const vaapiInputArgs = [
   "vaapi",
 ];
 
-function stillsArgs(videoFilePath, dense, vaapi, dir) {
+function stillsArgs(videoFilePath, dense, vaapi, dir, offset) {
   const scale = vaapi
     ? `scale_vaapi=w=${STILL_WIDTH}:h=-2:format=nv12,hwdownload,format=nv12`
     : `scale=${STILL_WIDTH}:-2`;
@@ -170,6 +192,9 @@ function stillsArgs(videoFilePath, dense, vaapi, dir) {
     ...(vaapi ? vaapiInputArgs : []),
     "-skip_frame",
     dense ? "nokey" : "noref",
+    // Input seek: output time 0 is source time `offset`, so every grid mark
+    // below lands `offset` seconds later than the offset-0 set's.
+    ...(offset > 0 ? ["-ss", String(offset)] : []),
     "-t",
     String(STILL_SPAN_SECS),
     "-i",
@@ -188,27 +213,27 @@ function stillsArgs(videoFilePath, dense, vaapi, dir) {
   ];
 }
 
-// The Nth image is the grid mark (N-1)*STILL_GAP_SECS, so a set is just a
-// count: no rename pass, and the client computes each still's position.
+// The Nth image is the grid mark offset+(N-1)*STILL_GAP_SECS, so a set is
+// just a count: no rename pass, and the client computes each still's position.
 async function buildStills(job) {
   const srcStat = await fsp.stat(job.path);
-  await fsp.rm(job.dir, { recursive: true, force: true });
-  await fsp.mkdir(job.dir, { recursive: true });
+  await clearSet(job.dir);
   const { durationSec, keyframes, maxGap } = await probe(job.path);
   job.durationSec = durationSec;
   job.dense = maxGap <= DENSE_MAX_GAP_SECS;
-  job.total = Math.ceil(Math.min(durationSec, STILL_SPAN_SECS) / STILL_GAP_SECS);
+  job.total = Math.ceil(
+    Math.min(Math.max(durationSec - job.offset, 0), STILL_SPAN_SECS) / STILL_GAP_SECS,
+  );
   const onSpawn = (child) => {
     job.child = child;
   };
   try {
-    await runFfmpeg(stillsArgs(job.path, job.dense, true, job.dir), onSpawn);
+    await runFfmpeg(stillsArgs(job.path, job.dense, true, job.dir, job.offset), onSpawn);
     job.decode = "vaapi";
   } catch (e) {
     unilog(2395, `vaapi stills failed, retrying in software: ${path.basename(job.path)}: ${e.message.slice(-200)}`);
-    await fsp.rm(job.dir, { recursive: true, force: true });
-    await fsp.mkdir(job.dir, { recursive: true });
-    await runFfmpeg(stillsArgs(job.path, job.dense, false, job.dir), onSpawn);
+    await clearSet(job.dir);
+    await runFfmpeg(stillsArgs(job.path, job.dense, false, job.dir, job.offset), onSpawn);
     job.decode = "software";
   }
   const count = (await fsp.readdir(job.dir)).filter((n) => n.endsWith(".jpg")).length;
@@ -219,6 +244,7 @@ async function buildStills(job) {
       src: job.path,
       mtimeMs: srcStat.mtimeMs,
       size: srcStat.size,
+      offsetSecs: job.offset,
       gapSecs: STILL_GAP_SECS,
       spanSecs: STILL_SPAN_SECS,
       width: STILL_WIDTH,
@@ -231,7 +257,7 @@ async function buildStills(job) {
     "utf8",
   );
   const secs = ((Date.now() - job.startedAt) / 1000).toFixed(1);
-  unilog(2396, `${count} stills (${job.dense ? "nokey" : "noref"}, ${job.decode}, keyframe gap ${maxGap.toFixed(1)}s) in ${secs}s: ${path.basename(job.path)}`);
+  unilog(2430, `${count} stills offset ${job.offset}s (${job.dense ? "nokey" : "noref"}, ${job.decode}, keyframe gap ${maxGap.toFixed(1)}s) in ${secs}s: ${path.basename(job.path)}`);
 }
 
 // Start the next queued build if the slot is free.
@@ -254,16 +280,20 @@ function pump() {
     });
 }
 
-// Make sure this episode's stills exist or are on their way. A valid set on
-// disk is adopted without a build; otherwise the build is queued — at the
-// front when `urgent` (someone is opening this episode right now), else at the
-// back (the sweep over shows that will want an intro). Returns at once; poll
-// stillsStatus for progress.
-export async function startStills(videoFilePath, { urgent = false } = {}) {
+// Make sure this episode's stills at `offset` exist or are on their way. A
+// valid set on disk is adopted without a build; otherwise the build is queued
+// — at the front when `urgent` (someone is opening this episode right now),
+// else at the back (the sweep over shows that will want an intro). Returns at
+// once; poll stillsStatus for progress.
+export async function startStills(
+  videoFilePath,
+  { urgent = false, offset = 0 } = {},
+) {
   const resolved = path.resolve(videoFilePath);
-  const dir = stillsDirFor(resolved);
-  if (!dir) throw new Error("outside the tv tree");
-  const existing = jobs.get(resolved);
+  const base = stillsDirFor(resolved);
+  if (!base) throw new Error("outside the tv tree");
+  const dir = offsetDir(base, offset);
+  const existing = jobs.get(jobKey(resolved, offset));
   if (existing) {
     if (urgent && existing.queued) {
       const at = pending.indexOf(existing);
@@ -277,6 +307,7 @@ export async function startStills(videoFilePath, { urgent = false } = {}) {
   const job = {
     path: resolved,
     dir,
+    offset,
     queued: true,
     total: 0,
     startedAt: null,
@@ -287,8 +318,8 @@ export async function startStills(videoFilePath, { urgent = false } = {}) {
     decode: null,
     durationSec: 0,
   };
-  jobs.set(resolved, job);
-  const sc = await validSidecar(dir, await fsp.stat(resolved));
+  jobs.set(jobKey(resolved, offset), job);
+  const sc = await validSidecar(dir, await fsp.stat(resolved), offset);
   if (sc) {
     job.queued = false;
     job.startedAt = job.doneAt = Date.now();
@@ -306,19 +337,21 @@ export async function startStills(videoFilePath, { urgent = false } = {}) {
 
 // Progress for the client: how many stills exist right now, whether the build
 // is finished, and where to fetch them.
-export async function stillsStatus(videoFilePath) {
+export async function stillsStatus(videoFilePath, offset = 0) {
   const resolved = path.resolve(videoFilePath);
-  const dir = stillsDirFor(resolved);
-  if (!dir) throw new Error("outside the tv tree");
+  const base = stillsDirFor(resolved);
+  if (!base) throw new Error("outside the tv tree");
+  const dir = offsetDir(base, offset);
   let count = 0;
   try {
     count = (await fsp.readdir(dir)).filter((n) => n.endsWith(".jpg")).length;
   } catch {
     count = 0;
   }
-  const job = jobs.get(resolved);
+  const job = jobs.get(jobKey(resolved, offset));
   return {
     count,
+    offsetSecs: offset,
     gapMs: STILL_GAP_SECS * 1000,
     urlBase: stillsUrlBase(dir),
     started: !!job,

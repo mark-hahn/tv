@@ -1021,8 +1021,12 @@ export function introFile(showName) {
 
 // Film-strip stills for an episode (tv-srvr src/stills.js): starts the build
 // if none exists and reports progress; the pane polls it until `done`.
-export function getStills(path) {
-  return httpCall(`/api/stills?path=${encodeURIComponent(path)}`, null, "GET");
+export function getStills(path, offset = 0) {
+  return httpCall(
+    `/api/stills?path=${encodeURIComponent(path)}&offset=${offset}`,
+    null,
+    "GET",
+  );
 }
 
 // The same pick for several shows at once, as a flat list of file paths.

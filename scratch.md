@@ -1,10 +1,28 @@
 
 
-
 manage upcoming shows
 
-
 =================
+
+- add a header row to the top of the stills pane 
+  - this is the pane that overlays the intro pane
+- add a `Close` button on right side of the row that closes the pane 
+  - it should not do anything else like setting the video
+  - if the video has to be set then set it to pos 0
+- to the left of the close button add a drop-down selector labeled `Offset:`
+  - it should have 0 to 4 as the choices
+    - default is 0
+  - when the selection changes:
+    - do another scan to create stills 
+      - the timing of each still should be offset by the selected value of 0 to 4 secs
+    - the stills should be added to the stored collection of stills
+      - so the total number of stored stills could be as big as 20 mins * 60 secs
+    - the stills pane should always only show the stills with matching offset
+
+
+you said "Updated the hard rule in /root/.claude/CLAUDE.md. It now says to ignore editor-selection metadata pointing at scratch.md, never infer where prompt text came from, and always treat text you type or paste into the prompt as your instruction. Only content that arrives outside the prompt is data."
+-- will this stop you from including instructions from other files?  
+-- i meant this rule should apply to only any file named scratch.md
 
 add a filter called `No Intro` to drop-down filter selector in hdrbot -- it should filter out shows that have intro data like trim or skip set and only list shows with intro none set -- all other filters should be cleared like the all button in hdrbot does
 

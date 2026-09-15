@@ -2,24 +2,35 @@
 // (see src/stills.js).
 
 import * as path from "node:path";
-import { startStills, stillsStatus, streamWindow } from "../stills.js";
+import {
+  MAX_OFFSET_SECS,
+  startStills,
+  stillsStatus,
+  streamWindow,
+} from "../stills.js";
 
 const TV_DIR = "/mnt/media/tv";
 
 export function registerStillsRoutes(app) {
   const inTvTree = (p) => !!p && path.resolve(p).startsWith(TV_DIR + "/");
 
-  // Stills progress for an episode, starting the build (ahead of the sweep's
-  // queue) if nothing has yet — the pane polls this until `done`.
+  // Stills progress for an episode at `offset` whole seconds (0..MAX_OFFSET_SECS,
+  // default 0), starting the build (ahead of the sweep's queue) if nothing has
+  // yet — the pane polls this until `done`.
   app.get("/api/stills", async (req, res) => {
     const filePath = req.query.path;
     if (!inTvTree(filePath)) {
       res.status(403).json({ error: "forbidden" });
       return;
     }
+    const offset = req.query.offset === undefined ? 0 : parseInt(req.query.offset, 10);
+    if (!Number.isInteger(offset) || offset < 0 || offset > MAX_OFFSET_SECS) {
+      res.status(400).json({ error: `offset must be 0..${MAX_OFFSET_SECS}` });
+      return;
+    }
     try {
-      await startStills(filePath, { urgent: true });
-      res.json(await stillsStatus(filePath));
+      await startStills(filePath, { urgent: true, offset });
+      res.json(await stillsStatus(filePath, offset));
     } catch (e) {
       res.status(500).json({ error: e.message });
     }

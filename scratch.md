@@ -3,9 +3,10 @@
 
 manage upcoming shows
 
-add a filter to filter selector in hdrbot called `No Intro` -- it should filter out shows that have intro data like trim or skip set and only have shows with intro none set
 
 =================
+
+add a filter called `No Intro` to drop-down filter selector in hdrbot -- it should filter out shows that have intro data like trim or skip set and only list shows with intro none set -- all other filters should be cleared like the all button in hdrbot does
 
 when tvapp has a selected show that is hidden change the hide button label in all remotes to `Unhide` -- this is the same behaviour the hide button in the info pane
 

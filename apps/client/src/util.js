@@ -225,6 +225,23 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.anticipating = 0;
       break;
 
+    case "No Intro":
+      tmp.unplayed = 0;
+      tmp.gap = 0;
+      tmp.ended = 0;
+      tmp.waiting = 0;
+      tmp.drama = 0;
+      tmp.sitcom = 0;
+      tmp.foreign = 0;
+      tmp.totry = 0;
+      tmp.continue = 0;
+      tmp.mark = 0;
+      tmp.linda = 0;
+      tmp.hasemby = 0;
+      tmp.needsIntro = 0;
+      tmp.anticipating = 0;
+      break;
+
     case "Finished":
       tmp.unplayed = 0;
       tmp.gap = 0;

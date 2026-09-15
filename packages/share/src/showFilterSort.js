@@ -10,6 +10,17 @@
 
 import { hasAnyPosition } from "./episodeData.js";
 
+// True when seasonIntros says the show has no intro: at least one season has
+// none set and no season has trimPos, startMark or skipDur data.
+export function hasIntroNoneOnly(seasonIntros) {
+  if (!seasonIntros || typeof seasonIntros !== "object") return false;
+  const entries = Object.values(seasonIntros);
+  if (!entries.some((si) => si?.none === true)) return false;
+  return !entries.some(
+    (si) => si?.trimPos != null || si?.startMark != null || si?.skipDur != null,
+  );
+}
+
 // Every sort the header offers, in its order.
 export const SORT_CHOICES = [
   "Alpha",
@@ -327,6 +338,12 @@ export function filterShowList(shows, settings = {}, allTvdb = null) {
 
   if (fltrChoice === "Position") {
     return shows.filter((show) => hasAnyPosition(show.episodeData));
+  }
+
+  if (fltrChoice === "No Intro") {
+    return shows.filter(
+      (show) => show.inEmby !== false && hasIntroNoneOnly(show.seasonIntros),
+    );
   }
 
   const srchStrLc =

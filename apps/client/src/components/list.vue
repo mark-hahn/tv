@@ -693,6 +693,7 @@ export default {
         "Finished",
         "Playing",
         "Partial",
+        "No Intro",
       ],
       conds: [
         {
@@ -2990,6 +2991,16 @@ export default {
       if (this.fltrChoice === "Partial") {
         this.shows = allShows.filter((show) =>
           epd.hasAnyPosition(show.episodeData),
+        );
+        this.sortShows();
+        if (scroll) this.scrollToSavedShow();
+        return;
+      }
+
+      if (this.fltrChoice === "No Intro") {
+        this.shows = allShows.filter(
+          (show) =>
+            show.inEmby !== false && epd.hasIntroNoneOnly(show.seasonIntros),
         );
         this.sortShows();
         if (scroll) this.scrollToSavedShow();

@@ -41,10 +41,10 @@ const keyLabel = (key) => {
 };
 
 const TV_TV_URL = "https://hahnca.com/tv-tv";
-// hvac2, which owns the doorbell camera. The Door key is one request to this
-// and no state of its own: hvac2 knows whether a view is up, and it owns the
-// rule that the camera never shows on the wall tablet and the television at
-// the same time. See docs/tv-videostream-contract.md in the tv repo.
+// hvac2, which owns the doorbell camera. A long press of a Shows key is one
+// request to this and no state of its own: hvac2 knows whether a view is up,
+// and it owns the rule that the camera never shows on the wall tablet and the
+// television at the same time. See docs/tv-videostream-contract.md.
 const RING_TVCAM_URL = "https://hahnca.com/ring/tvcam";
 const TV_SRVR_WS_URL = "wss://hahnca.com/tv-srvr";
 const TV_SRVR_HTTP_URL = "https://hahnca.com/tv-srvr";
@@ -58,6 +58,8 @@ const TVAPPRC_CONNECT_TIMEOUT_MS = 5000;
 // shorter, so every cell moves. A press this soon after the switch was aimed at
 // the old layout: it is dropped and the cell flashes DENIED_BG instead.
 const MODE_SWITCH_LOCKOUT_MS = 800;
+// Hide fires only after the cell has been held this long; a tap is refused.
+const HIDE_HOLD_MS = 300;
 const DENIED_BG = "lightcoral";
 const MSG_TVAPP_UP = "u";
 const MSG_TVAPP_DOWN = "d";
@@ -79,6 +81,9 @@ const CMD_KEY_LETTER = "j";
 // selected card's cardMisc. Info also rotates cardMisc once it is focused.
 const CMD_KEY_SORT = "sort";
 const CMD_KEY_FILTER = "filter";
+// The hide key. What it acts on -- the episode under the map's cursor, else
+// the selected show -- is tvapp's to decide, so the press is all that is sent.
+const CMD_HIDE = "h";
 const CMD_KEY_INFO = "info";
 const CMD_FILTER = "f";
 const SCRUB_HOLD_DELAY_MS = 400;
@@ -1366,17 +1371,39 @@ export default function App() {
     setShowShows(true);
   };
 
+  // Put the doorbell camera on the television, or take it back off: the same
+  // toggle ctrl-clicking /ring's View button does. It lives on the long press
+  // of every Shows key, in both modes -- tvapp is what the camera appears
+  // over, so there is nothing for tvapprc mode to change.
+  //
+  // 'toggle' rather than reading a state and deciding here: hvac2 is the only
+  // one that knows whether a view is up, so asking first would race this
+  // press against its own next one.
+  const toggleDoorCam = (flashKey) => {
+    flash(flashKey);
+    fetch(`${RING_TVCAM_URL}?action=toggle`, { cache: "no-store" }).catch(
+      (e) => console.warn("door toggle failed", e),
+    );
+  };
+
   // flashKey is which of the two Shows cells was the one pressed, so only that
-  // one lights up while tvapp is up.
+  // one lights up while tvapp is up. Tapped, it opens tvapp or, while tvapp is
+  // up, clears it back to a bare show list; held, it toggles the doorbell
+  // camera on the television.
   const startShowsHold = (flashKey) => {
-    // Nothing on the hold while tvapp is up: the key is the one way back to a
-    // clean tvapp screen, so it answers the same however long it is held.
-    if (tvapprcMode) {
-      dbStart(() => clearTvappState(flashKey));
+    // The one key besides power that is live while the set is off, because the
+    // camera has to work precisely then: somebody is at the door, and tv-tv
+    // turns the set on for a view anyway. Only the hold, though -- a tap has
+    // nothing to open on a set that is off, so it is refused and says so.
+    if (isOff) {
+      lpStart(() => deny(flashKey), () => toggleDoorCam(flashKey));
       return;
     }
-    // Long-press does nothing here -- it opens the shows pane from Mute instead.
-    dbStart(openTvapp);
+    if (tvapprcMode) {
+      lpStart(() => clearTvappState(flashKey), () => toggleDoorCam(flashKey));
+      return;
+    }
+    lpStart(openTvapp, () => toggleDoorCam(flashKey));
   };
 
   const stopShowsHold = () => {
@@ -1422,6 +1449,26 @@ export default function App() {
 
   const stopTvapprcFocusHold = () => {
     dbStop();
+  };
+
+  // The hide key, which tvapp reads as either of two things: the watched mark
+  // on the episode its map has under the cursor, or hide/unhide of the show it
+  // has selected. Only tvapp knows which of those the screen is on, so it is
+  // told the key went down and does the rest itself.
+  const hideSelectedShow = () => {
+    flash("hide");
+    sendTvapprc(CMD_HIDE);
+  };
+
+  // Hide sits where Skip and Mute are in the ordinary layout and a tap there
+  // was hiding shows nobody meant to hide, so it takes a hold of HIDE_HOLD_MS.
+  // A tap is refused and says so.
+  const startHideHold = () => {
+    lpStart(() => deny("hide"), hideSelectedShow, HIDE_HOLD_MS);
+  };
+
+  const stopHideHold = () => {
+    lpStop();
   };
 
   const startHomeHold = () => {
@@ -1496,38 +1543,31 @@ export default function App() {
     });
   };
 
-  // The Door key: put the doorbell camera on the television, or take it back
-  // off. The same toggle ctrl-clicking /ring's View button does, and it works
-  // the same in both modes -- tvapp is what the camera appears over, so there
-  // is nothing for tvapprc mode to change.
-  //
-  // 'toggle' rather than reading a state and deciding here: hvac2 is the only
-  // one that knows whether a view is up, so asking first would race this
-  // button against its own second press.
-  const startDoorPress = () => {
-    dbStart(async () => {
-      flash("door");
-      try {
-        await fetch(`${RING_TVCAM_URL}?action=toggle`, { cache: "no-store" });
-      } catch (e) {
-        console.warn("door toggle failed", e);
-      }
-    });
+  const startEmbyHold = () => {
+    if (tvapprcMode) {
+      // The Text key: the filter input screen is this remote's own, so it just
+      // opens here. tvapp hears about it only as the text typed into it.
+      dbStart(() => {
+        flash("text");
+        setShowTvapprcInput(true);
+      });
+      return;
+    }
+    armHold("emby", () =>
+      lpStart(
+        () => tvCmd("emby"),
+        () => {
+          flash("emby");
+          setShowStreamers(true);
+        },
+      ),
+    );
   };
 
-  const stopDoorPress = () => dbStop();
-
-  // The Search key: the filter input screen is this remote's own, so it just
-  // opens here. tvapp hears about it only as the text typed into it. It sat on
-  // the Emby cell until Door took that, and is tvapprc-only either way.
-  const startSearchPress = () => {
-    dbStart(() => {
-      flash("text");
-      setShowTvapprcInput(true);
-    });
+  const stopEmbyHold = () => {
+    dbStop();
+    lpStop();
   };
-
-  const stopSearchPress = () => dbStop();
 
   const subTypeChar = (type) => {
     if (type === "pgs") return "*";
@@ -1776,18 +1816,15 @@ export default function App() {
       onPressIn: () => startRepeat("right"),
       onPressOut: stopRepeat,
     },
-    // Row 3: door, down, skip
-    // Door is the same key in both modes -- the camera goes over whatever the
-    // television is showing, tvapp included, so there is nothing here for
-    // tvapprc mode to change.
+    // Row 3: emby, down, skip
     {
-      key: "door",
-      label: "Door",
+      key: tvapprcMode ? "text" : "emby",
+      label: tvapprcMode ? "Search" : "Emby",
       smallText: true,
-      bg: () => cellBg("white", "door"),
+      bg: () => cellBg("white", tvapprcMode ? "text" : "emby"),
       onPress: () => {},
-      onPressIn: () => startDoorPress(),
-      onPressOut: () => stopDoorPress(),
+      onPressIn: () => startEmbyHold(),
+      onPressOut: () => stopEmbyHold(),
     },
     {
       key: "down",
@@ -1798,17 +1835,16 @@ export default function App() {
       onPressOut: stopRepeat,
     },
     // Skip's cell, which Info left when it moved to the row above: while tvapp
-    // is up it opens this remote's own filter input screen instead. Search
-    // lived on the Emby cell until Door took it.
+    // is up it hides/unhides the selected show instead.
     tvapprcMode
       ? {
-          key: "text",
-          label: "Search",
+          key: "hide",
+          label: "Hide",
           smallText: true,
-          bg: () => cellBg("white", "text"),
+          bg: () => cellBg("white", "hide"),
           onPress: () => {},
-          onPressIn: () => startSearchPress(),
-          onPressOut: () => stopSearchPress(),
+          onPressIn: () => startHideHold(),
+          onPressOut: () => stopHideHold(),
         }
       : {
           key: "skip",
@@ -3119,13 +3155,14 @@ export default function App() {
                 },
               ]}
               // While the set is off the power key is the only live one --
-              // apart from Door, which has to work precisely then: somebody is
-              // at the door, and tv-tv turns the set on for a view anyway.
-              // Refusing to become the responder is what makes the rest inert:
-              // the cell then gets no grant/release at all, so a press cannot
-              // start a hold it would never be told to stop.
+              // apart from Shows, whose hold is the doorbell camera and has to
+              // work precisely then: somebody is at the door, and tv-tv turns
+              // the set on for a view anyway. Refusing to become the responder
+              // is what makes the rest inert: the cell then gets no
+              // grant/release at all, so a press cannot start a hold it would
+              // never be told to stop.
               onStartShouldSetResponder={() =>
-                !isOff || btn.key === "google" || btn.key === "door"
+                !isOff || btn.key === "google" || btn.key === "shows"
               }
               onResponderTerminationRequest={() => false}
               onResponderGrant={() => {

@@ -41,11 +41,13 @@ hard invariant, not a preference, and it is enforced on both sides:
 - The television path (`/ring/view?tv=1`) clears the tablet before the
   television comes up, in case a real event has it.
 
-## The Door key on the remotes
+## The Shows long press on the remotes
 
 Both remotes — the phone (`apps/android/App.js`) and the web tv pane
-(`apps/client/src/components/tvpane.vue`) — carry a `Door` key in row 3, in
-normal *and* tvapprc mode. It is one request and no local state:
+(`apps/client/src/components/tvpane.vue`) — toggle the television camera on a
+long press of any `Shows` key, in normal *and* tvapprc mode. A tap of Shows
+keeps its old meaning (open tvapp, or clear it back to a bare list). It is one
+request and no local state:
 
 ```
 GET https://hahnca.com/ring/tvcam?action=toggle
@@ -56,9 +58,13 @@ up, and a remote that read the state first would race its own second press.
 The endpoint answers with `Access-Control-Allow-Origin: *`, because the tv pane
 calls it from the browser and that is cross-origin under vite dev.
 
-Door replaced the Emby/Sel cell, and Search (phone) / Sel (web) moved onto what
-was the Hide cell. Two things lost their key in the process: the normal-mode
-Emby app switch, and Hide (the watched mark / hide-show press to tvapp).
+The Shows hold is the one key besides power that is live while the set is off,
+because that is exactly when somebody is at the door; tv-tv turns the set on
+for the view. A tap of Shows while the set is off is refused.
+
+A dedicated `Door` key briefly occupied the Emby cell (2026-09-10); it was
+removed in favour of the Shows hold so the Emby key, its streamers hold, and
+Hide could keep their cells.
 
 ## The /ring button
 

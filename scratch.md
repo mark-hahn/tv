@@ -1,24 +1,19 @@
 
-# row hiding/unhiding logic changes
-- i want to simplify hide/unhide/show logic
+ The Emby key, its streamers hold, and the Hide key were all dropped when Door took that cell, and each would have to be deliberately put back. Nothing else on either remote currently sends the tv-tv Emby command, though the streamers screen is still reachable from the Apps key.
 
-- i don't care about what displays in emby
-  - remove code that reads/writes episode-level DateCreated
-    - remove the show button
-    - this means the newly added list in emby will not change by our actions
-  - the currently watching row in emby will still be updated since we update viewed date
-
-- 
-
-lastPlayedDate 
-fakeLastPlayed
-hiddenFromRow 
+restore the remote controls to their state before these changes: put back the Emby key, its streamers hold, and the Hide key.  restore any logic they use. then do the old door button action when the shows button in row 2 in tvapprc mode is long-pressed -- so the remote still has a way to trigger every action it has now
 
 manage upcoming shows
 
 add a filter to filter selector in hdrbot called `No Intro` -- it should filter out shows that have intro data like trim or skip set and only have shows with intro none set
 
 =================
+
+- i don't care about what displays in emby
+  - remove code that reads/writes episode-level DateCreated
+    - remove the show button
+    - this means the newly added list in emby will not change by our actions
+  - the currently watching row in emby will still be updated since we update viewed date
 
 premiered sort 
 

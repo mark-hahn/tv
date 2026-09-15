@@ -623,7 +623,7 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
   }
 
   // waitStr recompute now that aired/watched/files are fresh.
-  const freshWaitStr = tvdb.calculateWaitStr(ed);
+  const freshWaitStr = tvdb.calculateWaitStr(ed, rec.lastPlayedDate);
   if (freshWaitStr !== null) rec.waitStr = freshWaitStr || null;
 
   // episodeData supersedes these legacy per-episode props.

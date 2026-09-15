@@ -1799,12 +1799,26 @@ async function getTmdbFallback(showName) {
 // Episodes with a file on disk are already available — effective airDate = "2000-01-01".
 // safe_start(season) = max over all k of (airDate[k] + 2 - k)
 // waitDate = min(safe_start across all seasons with unwatched episodes).
+// The wait is measured against the next night an episode would be watched:
+// today, or tomorrow when one was already played today (lastPlayedDate is a
+// PST "YYYY/MM/DD ..." string). Otherwise playing tonight's episode makes the
+// remaining ones look one day short until the day rolls over.
 // Returns "{M-DD}" or "{YY-M-DD}" when future, "" when past/today, null when no data.
-const calculateWaitStr = (episodeData) => {
+const calculateWaitStr = (episodeData, lastPlayedDate = null) => {
   try {
     if (!Array.isArray(episodeData)) return null;
 
-    const today = util.toPstDateIso(new Date());
+    const todayIso = util.toPstDateIso(new Date());
+    const lastPlayedDay =
+      typeof lastPlayedDate === "string"
+        ? lastPlayedDate.slice(0, 10).replace(/\//g, "-")
+        : null;
+    const today =
+      lastPlayedDay === todayIso
+        ? new Date(new Date(todayIso).getTime() + 24 * 60 * 60 * 1000)
+            .toISOString()
+            .slice(0, 10)
+        : todayIso;
     const FILE_AVAILABLE_DATE = "2000-01-01";
 
     // Build per-season episode map: season -> Map(episodeNum -> airDate).
@@ -2403,7 +2417,10 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   // Calculate waitStr from existing episodeData (fresh series map data hasn't
   // been fetched yet at this stage).
-  const calculatedWaitStr = calculateWaitStr(existing.episodeData);
+  const calculatedWaitStr = calculateWaitStr(
+    existing.episodeData,
+    existing.lastPlayedDate,
+  );
   tvdbData.waitStr =
     calculatedWaitStr !== null
       ? calculatedWaitStr || null

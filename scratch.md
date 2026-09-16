@@ -1,4 +1,6 @@
 
+show namw in intro strip pane
+
 move sub trim to chksrt
 
 don't match torrents by name only -- use size and anything else

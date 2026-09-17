@@ -1141,7 +1141,7 @@
         <div
           style="
             color: #999;
-            font-size: 10px;
+            font-size: 15px;
             text-align: center;
             user-select: none;
           "

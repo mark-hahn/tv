@@ -55,6 +55,12 @@ export function registerStillsRoutes(app) {
       res.status(400).json({ error: "invalid audio stream index" });
       return;
     }
+    // The response lasts as long as ffmpeg takes to encode the whole window,
+    // ~5s for WINDOW_SECS at 480p. The client's MediaSource consumes fragments
+    // as they arrive (first byte is on the wire in ~150ms), so nothing is
+    // actually waiting — exempt it from the slow-request warning in index.js.
+    res.locals.slowExempt = true;
+
     streamWindow(filePath, startSec, audioIndex, req, res);
   });
 }

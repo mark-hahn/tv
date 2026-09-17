@@ -10,16 +10,17 @@
 
 import { hasAnyPosition, seasonsWithFile } from "./episodeData.js";
 
-// True when the show has no intro info at all: either seasonIntros is missing
-// or empty, or at least one season has none set and no season has trimPos,
-// startMark or skipDur data.
-export function hasIntroNoneOnly(seasonIntros) {
+// True when the show has no intro info at all: seasonIntros missing or empty,
+// or no season carries trimPos, startMark or skipDur. A zero counts as no
+// data -- the Clr button's 0 state (shown as "--") means "no trim/skip here",
+// same as unset. A season marked none is an answer, not a blank, so it is not
+// "no info".
+export function hasNoIntroInfo(seasonIntros) {
   if (!seasonIntros || typeof seasonIntros !== "object") return true;
   const entries = Object.values(seasonIntros);
   if (entries.length === 0) return true;
-  return !entries.some(
-    (si) => si?.trimPos != null || si?.startMark != null || si?.skipDur != null,
-  );
+  if (entries.some((si) => si?.none === true)) return false;
+  return !entries.some((si) => si?.trimPos || si?.startMark || si?.skipDur);
 }
 
 // Every sort the header offers, in its order.
@@ -346,7 +347,7 @@ export function filterShowList(shows, settings = {}, allTvdb = null) {
       (show) =>
         show.inEmby !== false &&
         seasonsWithFile(show.episodeData).length > 0 &&
-        hasIntroNoneOnly(show.seasonIntros),
+        hasNoIntroInfo(show.seasonIntros),
     );
   }
 

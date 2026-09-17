@@ -3004,7 +3004,7 @@ export default {
           (show) =>
             show.inEmby !== false &&
             epd.seasonsWithFile(show.episodeData).length > 0 &&
-            epd.hasIntroNoneOnly(show.seasonIntros),
+            epd.hasNoIntroInfo(show.seasonIntros),
         );
         this.sortShows();
         if (scroll) this.scrollToSavedShow();

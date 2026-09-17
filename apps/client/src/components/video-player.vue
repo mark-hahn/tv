@@ -1081,6 +1081,9 @@ const STRIP_SCROLL_SLOP_PX = 400;
 // must match the server's; a seek outside the current window fetches a new one.
 const WINDOW_LEAD_SECS = 20;
 const WINDOW_SECS = 140;
+// Clicking a still plays from this much before its grid mark, so the cut it
+// shows is watched into rather than joined already in progress.
+const STILL_CLICK_LEAD_SECS = 5;
 // While playing, the next window is appended to the same buffer this many
 // seconds before the current one runs out, so playback never stalls.
 const WINDOW_EXTEND_AT_SECS = 30;
@@ -2095,12 +2098,16 @@ export default {
         this.stripShown += STRIP_PAGE;
       }
     },
-    // Cue the video to the clicked still and hold it there.
+    // Cue the video STILL_CLICK_LEAD_SECS before the clicked still and play
+    // from there once it loads.
     clickStill(still) {
       this.stripOpen = false;
       if (this.waitingForVideo) this._exitWaitingForVideo();
       this._cancelSeek();
-      this._openWindow(still.ms / 1000);
+      this._openWindow(
+        Math.max(0, still.ms / 1000 - STILL_CLICK_LEAD_SECS),
+        { play: true },
+      );
     },
     // Windowed: poll the server's stills progress for the selected offset and
     // grow the strip as the images land. The Nth image is grid mark
@@ -2254,6 +2261,17 @@ export default {
     clickIntroNone() {
       this.introNone = !this.introNone;
       this._persistField("none", this.introNone ? true : null);
+      // "No intro" contradicts any trim/skip — clear them.
+      if (this.introNone) {
+        if (this.trimPos != null) {
+          this.trimPos = null;
+          this._persistField("trimPos", null);
+        }
+        if (this.skipDur != null) {
+          this.skipDur = null;
+          this._persistField("skipDur", null);
+        }
+      }
     },
     _persistField(field, value) {
       if (!this.introShow?.name) return;
@@ -2266,6 +2284,11 @@ export default {
       this.introShow.seasonIntros[season][field] = value;
       if ((field === "trimPos" || field === "skipDur") && value != null) {
         this.introShow.needsIntro = false;
+        // A trim/skip value contradicts "no intro" — drop None.
+        if (this.introNone) {
+          this.introNone = false;
+          this._persistField("none", null);
+        }
       }
       if (field === "none" && value === true) {
         this.introShow.needsIntro = false;

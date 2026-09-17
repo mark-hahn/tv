@@ -8,14 +8,15 @@
 // display strings are built by the web client's own formatters and are its
 // business alone.
 
-import { hasAnyPosition } from "./episodeData.js";
+import { hasAnyPosition, seasonsWithFile } from "./episodeData.js";
 
-// True when seasonIntros says the show has no intro: at least one season has
-// none set and no season has trimPos, startMark or skipDur data.
+// True when the show has no intro info at all: either seasonIntros is missing
+// or empty, or at least one season has none set and no season has trimPos,
+// startMark or skipDur data.
 export function hasIntroNoneOnly(seasonIntros) {
-  if (!seasonIntros || typeof seasonIntros !== "object") return false;
+  if (!seasonIntros || typeof seasonIntros !== "object") return true;
   const entries = Object.values(seasonIntros);
-  if (!entries.some((si) => si?.none === true)) return false;
+  if (entries.length === 0) return true;
   return !entries.some(
     (si) => si?.trimPos != null || si?.startMark != null || si?.skipDur != null,
   );
@@ -342,7 +343,10 @@ export function filterShowList(shows, settings = {}, allTvdb = null) {
 
   if (fltrChoice === "No Intro") {
     return shows.filter(
-      (show) => show.inEmby !== false && hasIntroNoneOnly(show.seasonIntros),
+      (show) =>
+        show.inEmby !== false &&
+        seasonsWithFile(show.episodeData).length > 0 &&
+        hasIntroNoneOnly(show.seasonIntros),
     );
   }
 

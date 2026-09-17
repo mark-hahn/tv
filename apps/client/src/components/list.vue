@@ -3000,7 +3000,9 @@ export default {
       if (this.fltrChoice === "No Intro") {
         this.shows = allShows.filter(
           (show) =>
-            show.inEmby !== false && epd.hasIntroNoneOnly(show.seasonIntros),
+            show.inEmby !== false &&
+            epd.seasonsWithFile(show.episodeData).length > 0 &&
+            epd.hasIntroNoneOnly(show.seasonIntros),
         );
         this.sortShows();
         if (scroll) this.scrollToSavedShow();

@@ -1,13 +1,16 @@
 
-when filter selection `No Intro` is selected in selector in hdrbot then shows with intro set to `none` should not be shown
 
 move sub trim to chksrt
 
-don't match torrents by name only -- use size and anything else
+in tor pane when showing checkmarks don't match torrents by name only -- use size and anything else
 
 manage upcoming shows
 
 =================
+
+when intro strip pane is opened and no stills have been generated then show stills in pane live as they are available
+
+when filter selection `No Intro` is selected in selector in hdrbot then shows with intro set to `none` should not be shown
 
 put file  name in intro strip pane header, far left
 

@@ -16,8 +16,10 @@
 // (-skip_frame noref), 5–20s; skipping B-frames outright (bidir) is not an
 // option because these streams use them as references and the pictures come
 // out corrupt. Builds run one at a time — they share the one GPU decoder and
-// two in parallel finish no sooner than two in sequence — with the episode
-// someone is opening right now jumping the line.
+// two in parallel finish no sooner than two in sequence — and the episode
+// someone is opening right now does not just jump the line, it takes the slot:
+// the sweep build in it is killed and requeued, so an open strip pane never
+// waits out work nobody asked for.
 //
 // Window: WINDOW_SECS of 480p from the requested start as fragmented mp4 on
 // the response, into the client's MediaSource. The first fragment is on the
@@ -43,9 +45,18 @@ const STILL_QUALITY = 4;
 // Keyframes this close together or closer make nearest-keyframe stills exact
 // enough that no grid mark repeats its neighbour's picture.
 const DENSE_MAX_GAP_SECS = STILL_GAP_SECS;
+// Keyframe spacing is measured over this much of the head, not the whole
+// STILL_SPAN_SECS: a single encode's GOP is constant, and reading packet flags
+// for 1200s of cold 2160p takes 15s — a strip that sat empty that whole time
+// and then filled all at once. A 120s sample reads in ~1.4s, so ffmpeg starts
+// almost at once and the images land live from the second the pane opens.
+const PROBE_SPAN_SECS = 120;
 const WINDOW_SECS = 140;
 const WINDOW_HEIGHT = 480;
 const SIDECAR_NAME = "src.json";
+// Message a preempted build rejects with; pump() requeues on job.preempted
+// rather than on this, so it never needs matching.
+const PREEMPTED = "preempted by an urgent build";
 export const MAX_OFFSET_SECS = 4;
 
 // "<resolved videoFilePath>#<offset>" -> job, for the life of the process.
@@ -116,7 +127,7 @@ async function validSidecar(dir, srcStat, offset) {
   return sc;
 }
 
-// Duration plus keyframe spacing over the first STILL_SPAN_SECS, one ffprobe.
+// Duration plus keyframe spacing over the first PROBE_SPAN_SECS, one ffprobe.
 function probe(videoFilePath) {
   return new Promise((resolve, reject) => {
     cp.execFile(
@@ -127,7 +138,7 @@ function probe(videoFilePath) {
         "-select_streams",
         "v:0",
         "-read_intervals",
-        `%+${STILL_SPAN_SECS}`,
+        `%+${PROBE_SPAN_SECS}`,
         "-show_entries",
         "format=duration:packet=pts_time,flags",
         "-print_format",
@@ -224,18 +235,32 @@ async function buildStills(job) {
   job.total = Math.ceil(
     Math.min(Math.max(durationSec - job.offset, 0), STILL_SPAN_SECS) / STILL_GAP_SECS,
   );
+  // Preempted during the probe, where there is no child to kill: bail here
+  // instead, before taking the decoder.
+  if (job.preempted) throw new Error(PREEMPTED);
   const onSpawn = (child) => {
     job.child = child;
+    // Preempted in the gap before the spawn landed.
+    if (job.preempted) child.kill("SIGKILL");
+    // A window opened while this build was still probing: it is suspended on
+    // arrival, the same as one the window found already running.
+    else if (windowsRunning > 0) child.kill("SIGSTOP");
   };
   try {
     await runFfmpeg(stillsArgs(job.path, job.dense, true, job.dir, job.offset), onSpawn);
     job.decode = "vaapi";
   } catch (e) {
+    // A killed build is not a vaapi failure — no software retry, just go.
+    if (job.preempted) throw new Error(PREEMPTED);
     unilog(2395, `vaapi stills failed, retrying in software: ${path.basename(job.path)}: ${e.message.slice(-200)}`);
     await clearSet(job.dir);
     await runFfmpeg(stillsArgs(job.path, job.dense, false, job.dir, job.offset), onSpawn);
     job.decode = "software";
   }
+  // Past the decode, with the whole set on disk: a kill that landed just after
+  // ffmpeg exited cleanly must not throw the set away for a rebuild. Finishing
+  // from here is a sidecar write, and the slot frees either way.
+  job.preempted = false;
   const count = (await fsp.readdir(job.dir)).filter((n) => n.endsWith(".jpg")).length;
   job.total = count;
   await fsp.writeFile(
@@ -260,6 +285,34 @@ async function buildStills(job) {
   unilog(2430, `${count} stills offset ${job.offset}s (${job.dense ? "nokey" : "noref"}, ${job.decode}, keyframe gap ${maxGap.toFixed(1)}s) in ${secs}s: ${path.basename(job.path)}`);
 }
 
+// Take the build slot for an urgent job by killing the sweep build sitting in
+// it: somebody has a strip pane open on their episode right now, and the sweep
+// is only working ahead. Urgent builds are never preempted — two strips opened
+// at once take their turns. A child SIGSTOPped under a streaming window takes
+// the SIGKILL anyway; a build still in its probe has no child and bails on the
+// flag. The kill is asynchronous, so the caller leaves its job at the front of
+// `pending` and pump() starts it when the slot actually clears.
+function preemptForUrgent() {
+  if (!running || running.urgent || running.preempted) return;
+  running.preempted = true;
+  running.child?.kill("SIGKILL");
+  unilog(2436, `preempted sweep stills build for ${path.basename(running.path)}`);
+}
+
+// A preempted build goes back in the queue to start over — its partial set is
+// cleared when it runs again — behind the urgent jobs that took the slot but
+// ahead of the rest of the sweep, since it was next.
+function requeuePreempted(job) {
+  job.preempted = false;
+  job.queued = true;
+  job.startedAt = null;
+  job.total = 0;
+  job.dense = null;
+  job.decode = null;
+  const at = pending.findIndex((j) => !j.urgent);
+  pending.splice(at === -1 ? pending.length : at, 0, job);
+}
+
 // Start the next queued build if the slot is free.
 function pump() {
   if (running || pending.length === 0) return;
@@ -269,13 +322,17 @@ function pump() {
   job.startedAt = Date.now();
   job.promise = buildStills(job)
     .catch((e) => {
+      // A preempted build is not a failed one: it is requeued below and must
+      // leave no error for the pane to show.
+      if (job.preempted) return;
       job.error = e.message;
       unilog(2397, `stills failed for ${path.basename(job.path)}: ${e.message}`);
     })
     .finally(() => {
-      job.doneAt = Date.now();
       job.child = null;
       running = null;
+      if (job.preempted) requeuePreempted(job);
+      else job.doneAt = Date.now();
       pump();
     });
 }
@@ -283,8 +340,9 @@ function pump() {
 // Make sure this episode's stills at `offset` exist or are on their way. A
 // valid set on disk is adopted without a build; otherwise the build is queued
 // — at the front when `urgent` (someone is opening this episode right now),
-// else at the back (the sweep over shows that will want an intro). Returns at
-// once; poll stillsStatus for progress.
+// taking the slot off a sweep build that holds it, else at the back (the sweep
+// over shows that will want an intro). Returns at once; poll stillsStatus for
+// progress.
 export async function startStills(
   videoFilePath,
   { urgent = false, offset = 0 } = {},
@@ -295,11 +353,18 @@ export async function startStills(
   const dir = offsetDir(base, offset);
   const existing = jobs.get(jobKey(resolved, offset));
   if (existing) {
-    if (urgent && existing.queued) {
-      const at = pending.indexOf(existing);
-      if (at > 0) {
-        pending.splice(at, 1);
-        pending.unshift(existing);
+    if (urgent) {
+      // Somebody is waiting on this one now, so it stops being preemptable.
+      // Already running is already what they want; queued goes to the front
+      // and takes the slot.
+      existing.urgent = true;
+      if (existing.queued) {
+        const at = pending.indexOf(existing);
+        if (at > 0) {
+          pending.splice(at, 1);
+          pending.unshift(existing);
+        }
+        preemptForUrgent();
       }
     }
     return existing;
@@ -308,6 +373,8 @@ export async function startStills(
     path: resolved,
     dir,
     offset,
+    urgent,
+    preempted: false,
     queued: true,
     total: 0,
     startedAt: null,
@@ -329,8 +396,12 @@ export async function startStills(
     job.decode = "cached";
     return job;
   }
-  if (urgent) pending.unshift(job);
-  else pending.push(job);
+  if (urgent) {
+    pending.unshift(job);
+    preemptForUrgent();
+  } else {
+    pending.push(job);
+  }
   pump();
   return job;
 }

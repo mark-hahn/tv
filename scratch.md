@@ -1,5 +1,5 @@
 
-
+in tor pane remove ctrl-click on pane action so old ctrl-click for selection action is restored
 
 in tor pane when showing checkmarks don't match torrents by name only -- use size and anything else
 

@@ -1,5 +1,5 @@
 
-show namw in intro strip pane
+when filter selection `No Intro` is selected in selector in hdrbot then shows with intro set to `none` should not be shown
 
 move sub trim to chksrt
 
@@ -8,6 +8,8 @@ don't match torrents by name only -- use size and anything else
 manage upcoming shows
 
 =================
+
+put file  name in intro strip pane header, far left
 
 - add a header row to the top of the stills pane 
   - this is the pane that overlays the intro pane

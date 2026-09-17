@@ -960,6 +960,20 @@
           user-select: none;
         "
       >
+        <div
+          :title="path"
+          style="
+            color: white;
+            font-size: 13px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 40%;
+            text-shadow: 0 0 3px #000;
+          "
+        >
+          {{ stripFileName }}
+        </div>
         <div v-if="windowed" style="color: yellow; font-size: 13px">
           {{ stripStatusText }}
         </div>
@@ -1326,6 +1340,9 @@ export default {
     },
     stills() {
       return this.stillsByOffset[this.stillOffset] ?? [];
+    },
+    stripFileName() {
+      return String(this.path || "").split("/").pop();
     },
     stripStatusText() {
       const st = this.stillsStatus;

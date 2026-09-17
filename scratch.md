@@ -1,13 +1,15 @@
 
-the show `Line of Duty` has no intro trimPos, skipDur, or none but it isn't showing in the list when filter is set to `No Intro`
 
-in prev/next history in hdrbot when adding a show remove dupes
 
 in tor pane when showing checkmarks don't match torrents by name only -- use size and anything else
 
 manage upcoming shows
 
 =================
+
+in prev/next history in hdrbot when adding a show remove dupes
+
+the show `Line of Duty` has no intro trimPos, skipDur, or none but it isn't showing in the list when filter is set to `No Intro`
 
 in the map pane when the show has `none` for the intro show `none` where the trimPos and skipDur are shown
 

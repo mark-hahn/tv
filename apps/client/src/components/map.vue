@@ -158,23 +158,6 @@
               Episode
             </button>
             <button
-              @click.stop="handleSelectedPlay"
-              :disabled="!hasMapSelection"
-              :style="{
-                opacity: hasMapSelection ? 1 : 0.35,
-                cursor: hasMapSelection ? 'pointer' : 'default',
-              }"
-              style="
-                font-size: 13.5px;
-                cursor: pointer;
-                margin: 4.5px 0 4.5px 4.5px;
-                max-height: 21.5px;
-                border-radius: 7px;
-              "
-            >
-              Play
-            </button>
-            <button
               v-if="mapShow?.inEmby !== false"
               @click.stop="handleSelectedEmby"
               :disabled="!firstSelectedEmbyId"
@@ -232,23 +215,6 @@
               "
             >
               Episode
-            </button>
-            <button
-              @click.stop="handleSelectedPlay"
-              :disabled="!hasMapSelection"
-              :style="{
-                opacity: hasMapSelection ? 1 : 0.35,
-                cursor: hasMapSelection ? 'pointer' : 'default',
-              }"
-              style="
-                font-size: 13.5px;
-                cursor: pointer;
-                margin: 4.5px 0 4.5px 4.5px;
-                max-height: 21.5px;
-                border-radius: 7px;
-              "
-            >
-              Play
             </button>
             <button
               v-if="mapShow?.inEmby !== false"
@@ -2323,27 +2289,11 @@ export default {
         ...overrides,
       };
     },
-    performEpisodePlay(event, mapShow, season, episode) {
-      const cell = this.seriesMap?.[season]?.[episode];
-      if (cell?.path && !cell?.noFile) {
-        this.$emit("play-episode", event, mapShow, season, episode);
-      }
-    },
     performEpisodeWatch(event, mapShow, season, episode) {
       this.$emit("episode-click", event, mapShow, season, episode);
     },
     performEpisodeDelete(event, mapShow, season, episode) {
       this.$emit("episode-click", event, mapShow, season, episode);
-    },
-    handleSelectedPlay() {
-      const target = this.getSelectedMapTargets()[0];
-      if (!target) return;
-      this.performEpisodePlay(
-        this.buildSelectedEpisodeActionEvent({ altKey: true }),
-        this.mapShow,
-        target.season,
-        target.episode,
-      );
     },
     handleMapIntroClick() {
       if (this.selectedCells.size === 0) return;

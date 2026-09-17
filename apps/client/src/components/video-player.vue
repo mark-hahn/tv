@@ -20,12 +20,13 @@
         left: 0;
         right: 0;
         z-index: 5001;
-        display: flex;
-        align-items: center;
-        padding: 6px 14px 6px 0;
         background: rgba(0, 0, 0, 0.75);
       "
     >
+      <!-- Row 1 -->
+      <div
+        style="display: flex; align-items: center; padding: 6px 14px 6px 0"
+      >
       <!-- Chksrt filename (chksrt mode only) -->
       <div
         v-if="mode === 'chksrt'"
@@ -484,127 +485,6 @@
           Sel
         </div>
       </template>
-      <!-- Timing slider (srt tracks only, not in chksrt/simple/intro mode) -->
-      <div
-        v-if="
-          showSlider &&
-          mode !== 'chksrt' &&
-          mode !== 'simple' &&
-          mode !== 'intro'
-        "
-        ref="slider"
-        style="
-          flex: 1;
-          margin: 0 30px;
-          position: relative;
-          height: 44px;
-          cursor: pointer;
-          user-select: none;
-        "
-        @mousedown.stop.prevent="sliderMouseDown"
-        @touchstart.stop.prevent="sliderTouchStart"
-      >
-        <!-- Tick marks and labels -->
-        <template
-          v-for="t in ticks"
-          :key="t.val"
-        >
-          <div
-            :style="{
-              position: 'absolute',
-              left: t.pct + '%',
-              top: '8px',
-              width: '1px',
-              height: '10px',
-              background: 'white',
-              transform: 'translateX(-50%)',
-            }"
-          />
-          <div
-            :style="{
-              position: 'absolute',
-              left: t.pct + '%',
-              top: '30px',
-              fontSize: '12px',
-              color: 'white',
-              transform: 'translateX(-50%)',
-              lineHeight: '1',
-            }"
-          >
-            {{ t.val }}
-          </div>
-        </template>
-        <!-- Line -->
-        <div
-          style="
-            position: absolute;
-            top: 22px;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: white;
-          "
-        />
-        <!-- Ball -->
-        <div
-          :style="{
-            position: 'absolute',
-            top: '16px',
-            left: ballPct + '%',
-            width: '14px',
-            height: '14px',
-            borderRadius: '50%',
-            background: 'white',
-            transform: 'translateX(-50%)',
-            boxShadow: '0 0 4px rgba(0,0,0,0.8)',
-          }"
-        />
-      </div>
-      <!-- Offset value -->
-      <div
-        v-if="
-          showSlider &&
-          mode !== 'chksrt' &&
-          mode !== 'simple' &&
-          mode !== 'intro'
-        "
-        style="
-          color: white;
-          font-size: 13px;
-          min-width: 42px;
-          text-align: right;
-          padding-right: 8px;
-          user-select: none;
-          text-shadow: 0 0 3px #000;
-        "
-      >
-        {{ offsetDisplay }}
-      </div>
-      <!-- Apply button (srt only, not in chksrt/simple/intro mode) -->
-      <div
-        v-if="
-          showSlider &&
-          mode !== 'chksrt' &&
-          mode !== 'simple' &&
-          mode !== 'intro'
-        "
-        @click.stop="applySliderOffset"
-        style="
-          color: white;
-          font-size: 13px;
-          padding: 2px 8px;
-          border-radius: 4px;
-          border: 1px solid #666;
-          cursor: pointer;
-          user-select: none;
-          background: rgba(0, 0, 0, 0.5);
-          margin-right: 8px;
-          white-space: nowrap;
-          text-shadow: 0 0 3px #000;
-        "
-      >
-        Apply
-      </div>
       <!-- Waiting for first cue (chksrt mode only) -->
       <div
         v-if="waitingForFirstCue"
@@ -666,7 +546,7 @@
         @click.stop="onChoiceClick(choice, $event)"
         :style="{
           marginLeft:
-            i === 0 && !showSlider && mode !== 'chksrt' ? 'auto' : '0',
+            i === 0 && mode !== 'chksrt' ? 'auto' : '0',
           padding: '2px 8px',
           borderRadius: '4px',
           border:
@@ -897,6 +777,233 @@
         }"
       >
         ✕
+      </div>
+      </div>
+      <!-- Row 2 (chksrt mode): timing slider for a selected srt file. Always
+           present so the video frame never shifts when a track is picked. -->
+      <div
+        v-if="mode === 'chksrt'"
+        style="
+          display: flex;
+          align-items: center;
+          height: 44px;
+          padding: 0 14px;
+        "
+      >
+        <template v-if="showSlider">
+          <!-- Seek buttons, same set as the intro pane -->
+          <div
+            @click.stop="clickIntroZero"
+            style="
+              color: white;
+              font-size: 13px;
+              padding: 2px 0;
+              border-radius: 4px;
+              border: 1px solid #666;
+              cursor: pointer;
+              user-select: none;
+              background: rgba(0, 0, 0, 0.5);
+              white-space: nowrap;
+              flex-shrink: 0;
+              margin-right: 6px;
+              width: 50px;
+              text-align: center;
+            "
+          >
+            0
+          </div>
+          <div
+            @click.stop="clickNavBack30"
+            style="
+              color: white;
+              font-size: 13px;
+              padding: 2px 8px;
+              border-radius: 4px;
+              border: 1px solid #666;
+              cursor: pointer;
+              user-select: none;
+              background: rgba(0, 0, 0, 0.5);
+              white-space: nowrap;
+              flex-shrink: 0;
+              margin-right: 6px;
+            "
+          >
+            &lt;&lt;
+          </div>
+          <div
+            @click.stop="clickNavBack10"
+            style="
+              color: white;
+              font-size: 13px;
+              padding: 2px 8px;
+              border-radius: 4px;
+              border: 1px solid #666;
+              cursor: pointer;
+              user-select: none;
+              background: rgba(0, 0, 0, 0.5);
+              white-space: nowrap;
+              flex-shrink: 0;
+              margin-right: 6px;
+            "
+          >
+            &lt;
+          </div>
+          <div
+            @click.stop="clickNavBack3"
+            style="
+              color: white;
+              font-size: 13px;
+              padding: 2px 8px;
+              border-radius: 4px;
+              border: 1px solid #666;
+              cursor: pointer;
+              user-select: none;
+              background: rgba(0, 0, 0, 0.5);
+              white-space: nowrap;
+              flex-shrink: 0;
+              margin-right: 6px;
+            "
+          >
+            &minus;
+          </div>
+          <div
+            @click.stop="clickNavFwd10"
+            style="
+              color: white;
+              font-size: 13px;
+              padding: 2px 8px;
+              border-radius: 4px;
+              border: 1px solid #666;
+              cursor: pointer;
+              user-select: none;
+              background: rgba(0, 0, 0, 0.5);
+              white-space: nowrap;
+              flex-shrink: 0;
+              margin-right: 6px;
+            "
+          >
+            &gt;
+          </div>
+          <div
+            @click.stop="clickNavFwd30"
+            style="
+              color: white;
+              font-size: 13px;
+              padding: 2px 8px;
+              border-radius: 4px;
+              border: 1px solid #666;
+              cursor: pointer;
+              user-select: none;
+              background: rgba(0, 0, 0, 0.5);
+              white-space: nowrap;
+              flex-shrink: 0;
+              margin-right: 6px;
+            "
+          >
+            &gt;&gt;
+          </div>
+          <div
+            ref="slider"
+            style="
+              flex: 1;
+              margin: 0 30px;
+              position: relative;
+              height: 44px;
+              cursor: pointer;
+              user-select: none;
+            "
+            @mousedown.stop.prevent="sliderMouseDown"
+            @touchstart.stop.prevent="sliderTouchStart"
+          >
+            <!-- Tick marks and labels -->
+            <template
+              v-for="t in ticks"
+              :key="t.val"
+            >
+              <div
+                :style="{
+                  position: 'absolute',
+                  left: t.pct + '%',
+                  top: '8px',
+                  width: '1px',
+                  height: '10px',
+                  background: 'white',
+                  transform: 'translateX(-50%)',
+                }"
+              />
+              <div
+                :style="{
+                  position: 'absolute',
+                  left: t.pct + '%',
+                  top: '30px',
+                  fontSize: '12px',
+                  color: 'white',
+                  transform: 'translateX(-50%)',
+                  lineHeight: '1',
+                }"
+              >
+                {{ t.val }}
+              </div>
+            </template>
+            <!-- Line -->
+            <div
+              style="
+                position: absolute;
+                top: 22px;
+                left: 0;
+                right: 0;
+                height: 2px;
+                background: white;
+              "
+            />
+            <!-- Ball -->
+            <div
+              :style="{
+                position: 'absolute',
+                top: '16px',
+                left: ballPct + '%',
+                width: '14px',
+                height: '14px',
+                borderRadius: '50%',
+                background: 'white',
+                transform: 'translateX(-50%)',
+                boxShadow: '0 0 4px rgba(0,0,0,0.8)',
+              }"
+            />
+          </div>
+          <!-- Offset value -->
+          <div
+            style="
+              color: white;
+              font-size: 13px;
+              min-width: 42px;
+              text-align: right;
+              padding-right: 8px;
+              user-select: none;
+              text-shadow: 0 0 3px #000;
+            "
+          >
+            {{ offsetDisplay }}
+          </div>
+          <!-- Apply button -->
+          <div
+            @click.stop="applySliderOffset"
+            style="
+              color: white;
+              font-size: 13px;
+              padding: 2px 8px;
+              border-radius: 4px;
+              border: 1px solid #666;
+              cursor: pointer;
+              user-select: none;
+              background: rgba(0, 0, 0, 0.5);
+              white-space: nowrap;
+              text-shadow: 0 0 3px #000;
+            "
+          >
+            Apply
+          </div>
+        </template>
       </div>
     </div>
     <video

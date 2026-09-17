@@ -226,7 +226,6 @@
             @prune="handleMapAction('prune', $event)"
             @episode-click="handleEpisodeClick"
             @delete-episodes="handleDeleteEpisodes"
-            @play-episode="handlePlayEpisode"
             @season-watched="handleSeasonWatched"
             @season-delete="handleSeasonDelete"
             @open-intro="handleOpenIntro"
@@ -2044,9 +2043,6 @@ export default {
     },
     handleDeleteEpisodes(show, targets) {
       evtBus.emit("deleteEpisodes", { show, targets });
-    },
-    handlePlayEpisode(e, show, season, episode) {
-      evtBus.emit("playEpisode", { show, season, episode });
     },
     handleSeasonWatched(e, show, season, episodeStates) {
       evtBus.emit("seasonWatched", { e, show, season, episodeStates });

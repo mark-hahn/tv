@@ -1,12 +1,14 @@
 
-
-move sub trim to chksrt
-
 in tor pane when showing checkmarks don't match torrents by name only -- use size and anything else
 
 manage upcoming shows
 
 =================
+
+add navigation jump buttons 0, <<, <, -, >, and >> like thos in intro pane to left of slider in the second row
+
+- the play button in the map pane shows the selected episode in the video pane which allows you to select a subtitle file for that episode and adjust the timing of every title -- remove that button and video mode and move the timing adjustment feature into the chksrt video pane 
+- in chksrt video pane add a second header row below the current one -- when a subtitle file is selected, not an embedded subtitle, then show the timing adjustment slider and apply button in that second row -- when there is no slider keep that row but just show nothing in it -- this will keep the actual video frame from jumping up and down when files are selected
 
 when intro strip pane is opened and no stills have been generated then show stills in pane live as they are available
 

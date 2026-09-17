@@ -1,4 +1,6 @@
 
+in the map pane when the show has `none` for the intro show `none` where the trimPos and skipDur are shown
+
 in tor pane when showing checkmarks don't match torrents by name only -- use size and anything else
 
 manage upcoming shows

@@ -1280,9 +1280,13 @@ export default {
           si &&
           (si[1] ??
             si[Object.keys(si).sort((a, b) => Number(a) - Number(b))[0]]);
-        const trimStr = fmtPos(entry?.trimPos ?? null);
-        const skipStr = fmtPos(entry?.skipDur ?? null);
-        parts.push(`${rt} mins | ${trimStr} | ${skipStr}`);
+        if (entry?.none === true) {
+          parts.push(`${rt} mins | none`);
+        } else {
+          const trimStr = fmtPos(entry?.trimPos ?? null);
+          const skipStr = fmtPos(entry?.skipDur ?? null);
+          parts.push(`${rt} mins | ${trimStr} | ${skipStr}`);
+        }
       }
 
       const status = this.statusVal;

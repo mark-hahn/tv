@@ -2260,7 +2260,9 @@ export default {
           showHistoryPtr++;
         } else {
           // 4. New history branch.
-          showHistory = showHistory.slice(0, showHistoryPtr + 1);
+          showHistory = showHistory
+            .slice(0, showHistoryPtr + 1)
+            .filter((n) => n !== showName);
           showHistory.push(showName);
           if (showHistory.length > 100) {
             showHistory = showHistory.slice(-100);

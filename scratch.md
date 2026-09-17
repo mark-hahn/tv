@@ -1,11 +1,13 @@
 
-in the map pane when the show has `none` for the intro show `none` where the trimPos and skipDur are shown
+in prev/next history in hdrbot when adding a show remove dupes
 
 in tor pane when showing checkmarks don't match torrents by name only -- use size and anything else
 
 manage upcoming shows
 
 =================
+
+in the map pane when the show has `none` for the intro show `none` where the trimPos and skipDur are shown
 
 add navigation jump buttons 0, <<, <, -, >, and >> like thos in intro pane to left of slider in the second row
 

@@ -5009,6 +5009,16 @@ const pendingDiskChanges = new Set();
 /**
  * Handle disk change for a show (debounced)
  */
+// This handler never re-scrapes TVDB, so a waitStr recompute here can read as
+// cleared just because TVDB has not announced the next episode's air date yet.
+// Persisting that clear also eats the set->clear flip the background loop
+// compares against the record, and that flip is the only thing that unhides a
+// show and stamps its wait as over -- so the old value is put back and the
+// clear is left entirely to the loop, which re-scrapes TVDB first.
+function keepWaitStrForLoop(rec, waitStrBefore) {
+  if (waitStrBefore && !rec.waitStr) rec.waitStr = waitStrBefore;
+}
+
 async function handleShowDiskChange(showName) {
   if (inFlightDiskChanges.has(showName)) {
     pendingDiskChanges.add(showName);
@@ -5040,6 +5050,7 @@ async function handleShowDiskChange(showName) {
       if (tvdbRecord) {
         // Refresh episodeData file info (also sets date/size/noFiles/quality).
         await refreshEpisodeData(showName, tvdbRecord, { sources: ["disk"] });
+        keepWaitStrForLoop(tvdbRecord, waitStrBefore);
         await tvdb.saveTvdbSync();
         debouncedTvdbPush(showName);
         unilog(
@@ -5076,6 +5087,7 @@ async function handleShowDiskChange(showName) {
       // Refresh watched/id in episodeData from Emby (also dual-writes
       // watchedEpis/watchedCount).
       await refreshEpisodeData(showName, tvdbRecord, { sources: ["emby"] });
+      keepWaitStrForLoop(tvdbRecord, waitStrBefore);
       await tvdb.saveTvdbSync();
       unilog(86, `watched refreshed for ${showName}`);
 

@@ -1,6 +1,6 @@
 # Workspace Instructions (Read First)
 
-- do not open or read gpt.md even if in attached file to prompt
+- do not open or read gpt.md or scratch.md even if in attached file to prompt
 
 ## Response style
 

@@ -1,23 +1,13 @@
 
-i want the stored resolutions for each file to be the actual ffprobe resolution.  
 
-change map quality codes
-2: 2160
-8: 1920
-6: 1600
-1: 1080
-9: 960
-7: 720
-5: 576
-3: 540
-4: 480
-0: 404
 
 in tor pane when showing checkmarks don't match torrents by name only -- use size and anything else
 
 manage upcoming shows
 
 =================
+
+i want the stored resolutions for each file to be the actual ffprobe resolution.  
 
 in tor pane remove ctrl-click on pane action so old ctrl-click for selection action is restored
 

@@ -115,8 +115,25 @@ The script:
 1. Checks `.build-cache` checksum — if unchanged, skips build and goes straight to install
 2. rsyncs project to `hahnca.com:/tmp/android-build/`
 3. Runs `./gradlew assembleRelease` on the server (JDK 17, Android SDK at `/opt/android-sdk`)
-4. Downloads APK to `/tmp/tv-remote.apk` and installs via adb
+4. Installs from the server over **wifi**, then puts the phone back on usb
 5. Updates `.build-cache` with new checksum
+
+The apk never goes over the usb cable — the usb/ip link into wsl stalls on
+anything bigger than a few hundred KB. Usb is used only to read the phone's
+address and flip its adb to tcp; hahnca.com (wired) streams the install.
+
+The phone must be attached to wsl before running the script:
+
+```bash
+powershell.exe -NoProfile -Command "usbipd list"              # find the busid
+powershell.exe -NoProfile -Command "usbipd attach --wsl --busid <busid>"
+adb devices                                                   # confirm serial
+cd apps/android && ./build-apk <device-serial>
+```
+
+If the phone is listed `Not shared`, run `usbipd bind --busid <busid>` first
+(needs an admin shell). The attachment drops when the phone re-enumerates, so
+re-attach if `adb devices` comes up empty.
 
 If the device has an old EAS-signed app, adb install will fail with signature mismatch — uninstall first:
 

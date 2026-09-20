@@ -39,14 +39,13 @@ class MapCells {
   // Mirrors RESOLUTION_DIGITS / normalizeVideoHeightToQuality in
   // packages/share/src/index.js. Rows are { height, digit }, highest first.
   private static final int[][] RESOLUTION_DIGITS = {
-    {2160, 2}, {1920, 8}, {1600, 6}, {1080, 1}, {960, 9},
-    {720, 7}, {576, 5}, {540, 3}, {480, 4},
+    {2160, 2}, {1080, 1}, {720, 7}, {576, 6}, {540, 5}, {480, 4},
   };
 
   // Midpoints between adjacent rungs; 340 is the floor below which there is
   // no watchable resolution to name.
   private static final int[] RESOLUTION_CUTS = {
-    2040, 1760, 1340, 1020, 840, 648, 558, 510, 340,
+    1620, 900, 648, 558, 510, 340,
   };
 
   private static String qualityChar(int quality) {

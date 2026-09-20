@@ -601,17 +601,27 @@ export function parseTitleFromFilename(fname, folderName, parsedPtt) {
 // scale — keep this the only place they are defined.
 export const RESOLUTION_DIGITS = new Map([
   [2160, 2],
-  [1920, 8],
-  [1600, 6],
   [1080, 1],
-  [960, 9],
   [720, 7],
-  [576, 5],
-  [540, 3],
+  [576, 6],
+  [540, 5],
   [480, 4],
 ]);
 
 export const STANDARD_RESOLUTIONS = new Set(RESOLUTION_DIGITS.keys());
+
+// Letterboxing crops height away while width stays at the container standard
+// (3840x1600 is 4K); pillarbox/4:3 does the reverse (1440x1080 is 1080p).
+// Neither dimension is trustworthy alone, so classify on whichever implies the
+// larger 16:9 frame.
+export function effectiveVideoHeight(width, height) {
+  const w = Number.parseInt(width, 10);
+  const h = Number.parseInt(height, 10);
+  const fromWidth = Number.isFinite(w) && w > 0 ? Math.round((w * 9) / 16) : 0;
+  const fromHeight = Number.isFinite(h) && h > 0 ? h : 0;
+  const eff = Math.max(fromWidth, fromHeight);
+  return eff > 0 ? eff : null;
+}
 
 // Map-pane cell character for a stored resolution. Legacy/off-ladder heights
 // are bucketed first, so old records still render something sane.
@@ -636,11 +646,8 @@ export function normalizeVideoHeightToQuality(height) {
   if (!Number.isFinite(parsedHeight) || parsedHeight <= 0) return null;
   // Each cut is the midpoint between adjacent ladder rungs; 340 is the floor
   // below which a file is too small to call a watchable resolution.
-  if (parsedHeight >= 2040) return 2160;
-  if (parsedHeight >= 1760) return 1920;
-  if (parsedHeight >= 1340) return 1600;
-  if (parsedHeight >= 1020) return 1080;
-  if (parsedHeight >= 840) return 960;
+  if (parsedHeight >= 1620) return 2160;
+  if (parsedHeight >= 900) return 1080;
   if (parsedHeight >= 648) return 720;
   if (parsedHeight >= 558) return 576;
   if (parsedHeight >= 510) return 540;

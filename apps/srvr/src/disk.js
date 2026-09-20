@@ -14,6 +14,7 @@ import {
   parseTitleFromFilename,
   smartTitleMatch,
   getResolution,
+  effectiveVideoHeight,
 } from "@tv/share";
 import * as epd from "@tv/share";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
@@ -124,15 +125,18 @@ function probeRawHeight(filePath) {
         "-select_streams",
         "v:0",
         "-show_entries",
-        "stream=height",
+        "stream=width,height",
         "-of",
         "csv=p=0",
         String(filePath),
       ],
       1024 * 1024,
     ).trim();
-    const parsed = Number.parseInt(out, 10);
-    h = Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    // csv=p=0 gives "<width>,<height>" on the first line (some containers add a
+    // trailing field). A scope release has its letterbox bars cropped off, so
+    // the height alone understates it — take the frame the width implies.
+    const [w, rawH] = out.split("\n")[0].split(",");
+    h = effectiveVideoHeight(w, rawH);
   } catch {
     h = null;
   }

@@ -600,8 +600,8 @@ export function parseTitleFromFilename(fname, folderName, parsedPtt) {
 // one shows in a map-pane episode cell. Digits are arbitrary labels, not a
 // scale — keep this the only place they are defined.
 export const RESOLUTION_DIGITS = new Map([
-  [2160, 2],
-  [1080, 1],
+  [2160, 9],
+  [1080, 8],
   [720, 7],
   [576, 6],
   [540, 5],

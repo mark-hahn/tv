@@ -2132,8 +2132,8 @@ export default function App() {
     // Mirrors RESOLUTION_DIGITS / normalizeVideoHeightToQuality in
     // packages/share/src/index.js — this app can't import the shared package.
     const RESOLUTION_DIGITS = {
-      2160: 2,
-      1080: 1,
+      2160: 9,
+      1080: 8,
       720: 7,
       576: 6,
       540: 5,

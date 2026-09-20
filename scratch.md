@@ -1,4 +1,6 @@
 
+make a note that when preparing to build/install an apk you shouldn't assume what phone is on the usb cable. Phones are usually swapped.
+
 batch chksrt - chooses embedded for every one in queue
   info pane → Subs button   -- deletes all srt files
   chksrt player → All Off   -- leaves srt files alone

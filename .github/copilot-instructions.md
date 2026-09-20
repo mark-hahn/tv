@@ -122,6 +122,11 @@ The apk never goes over the usb cable — the usb/ip link into wsl stalls on
 anything bigger than a few hundred KB. Usb is used only to read the phone's
 address and flip its adb to tcp; hahnca.com (wired) streams the install.
 
+**Never assume which phone is on the cable** — they get swapped often, and
+`build-apk` defaults to the 9a's serial when none is passed, so a guess
+installs on the wrong device or fails on a serial that isn't there. Always read
+the serial off `usbipd list` / `adb devices` first and pass it explicitly.
+
 The phone must be attached to wsl before running the script:
 
 ```bash

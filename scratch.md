@@ -1,4 +1,12 @@
 
+batch chksrt - chooses embedded for every one in queue
+  info pane → Subs button   -- deletes all srt files
+  chksrt player → All Off   -- leaves srt files alone
+
+chksrt jump to prev/next title
+
+accidentally saving without applying trim
+
 scrape ipt/tl for info section and display in pop-up
 
 in tor pane when showing checkmarks don't match torrents by name only -- use size and anything else

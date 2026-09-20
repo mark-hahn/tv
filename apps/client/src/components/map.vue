@@ -1135,7 +1135,7 @@ import { config } from "../config.js";
 import * as urls from "../urls.js";
 import * as util from "../util.js";
 import evtBus from "../evtBus.js";
-import { fmtPos, unilog } from "@tv/share";
+import { fmtPos, resolutionDigit, unilog } from "@tv/share";
 import * as epd from "@tv/share";
 
 const MAP_ARROW_PAN_PX_PER_SEC = 400;
@@ -1646,7 +1646,7 @@ export default {
 
     qualityChar(q) {
       if (!q) return "0";
-      return String(Math.round((Math.log2(q) - 8) * 3));
+      return resolutionDigit(q);
     },
 
     async handleNotInEmbyClick(event) {

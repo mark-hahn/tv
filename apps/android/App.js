@@ -2129,9 +2129,37 @@ export default function App() {
       setActiveTab("Info");
     };
 
+    // Mirrors RESOLUTION_DIGITS / normalizeVideoHeightToQuality in
+    // packages/share/src/index.js — this app can't import the shared package.
+    const RESOLUTION_DIGITS = {
+      2160: 2,
+      1920: 8,
+      1600: 6,
+      1080: 1,
+      960: 9,
+      720: 7,
+      576: 5,
+      540: 3,
+      480: 4,
+    };
+
+    const normalizeHeight = (h) => {
+      if (h >= 2040) return 2160;
+      if (h >= 1760) return 1920;
+      if (h >= 1340) return 1600;
+      if (h >= 1020) return 1080;
+      if (h >= 840) return 960;
+      if (h >= 648) return 720;
+      if (h >= 558) return 576;
+      if (h >= 510) return 540;
+      if (h >= 340) return 480;
+      return null;
+    };
+
     const qualityChar = (q) => {
       if (!q) return "0";
-      return String(Math.round((Math.log2(q) - 8) * 3));
+      const digit = RESOLUTION_DIGITS[q] ?? RESOLUTION_DIGITS[normalizeHeight(q)];
+      return digit == null ? "0" : String(digit);
     };
 
     const getCellBg = (cell) => {

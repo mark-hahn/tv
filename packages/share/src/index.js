@@ -596,7 +596,31 @@ export function parseTitleFromFilename(fname, folderName, parsedPtt) {
   return title || null;
 }
 
-export const STANDARD_RESOLUTIONS = new Set([2160, 1080, 720, 576, 480, 384]);
+// The canonical heights every file is snapped to, and the single digit each
+// one shows in a map-pane episode cell. Digits are arbitrary labels, not a
+// scale — keep this the only place they are defined.
+export const RESOLUTION_DIGITS = new Map([
+  [2160, 2],
+  [1920, 8],
+  [1600, 6],
+  [1080, 1],
+  [960, 9],
+  [720, 7],
+  [576, 5],
+  [540, 3],
+  [480, 4],
+]);
+
+export const STANDARD_RESOLUTIONS = new Set(RESOLUTION_DIGITS.keys());
+
+// Map-pane cell character for a stored resolution. Legacy/off-ladder heights
+// are bucketed first, so old records still render something sane.
+export function resolutionDigit(height) {
+  const digit =
+    RESOLUTION_DIGITS.get(Number(height)) ??
+    RESOLUTION_DIGITS.get(normalizeVideoHeightToQuality(height));
+  return digit == null ? "0" : String(digit);
+}
 
 // True when a title/filename is hevc (x265/h265). Browsers can't play hevc, so
 // chksrt has to fully transcode these to get a seekable mp4 mirror (minutes of
@@ -610,12 +634,17 @@ export function isHevc(nameOrTitle) {
 export function normalizeVideoHeightToQuality(height) {
   const parsedHeight = Number.parseInt(height, 10);
   if (!Number.isFinite(parsedHeight) || parsedHeight <= 0) return null;
-  if (parsedHeight >= 1620) return 2160;
-  if (parsedHeight >= 900) return 1080;
+  // Each cut is the midpoint between adjacent ladder rungs; 340 is the floor
+  // below which a file is too small to call a watchable resolution.
+  if (parsedHeight >= 2040) return 2160;
+  if (parsedHeight >= 1760) return 1920;
+  if (parsedHeight >= 1340) return 1600;
+  if (parsedHeight >= 1020) return 1080;
+  if (parsedHeight >= 840) return 960;
   if (parsedHeight >= 648) return 720;
-  if (parsedHeight >= 528) return 576;
-  if (parsedHeight >= 400) return 480;
-  if (parsedHeight >= 340) return 384;
+  if (parsedHeight >= 558) return 576;
+  if (parsedHeight >= 510) return 540;
+  if (parsedHeight >= 340) return 480;
   return null;
 }
 

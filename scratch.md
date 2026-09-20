@@ -1,5 +1,5 @@
 
-
+scrape ipt/tl for info section and display in pop-up
 
 in tor pane when showing checkmarks don't match torrents by name only -- use size and anything else
 

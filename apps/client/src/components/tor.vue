@@ -2031,7 +2031,7 @@ export default {
       try {
         await fetch(`${config.tvDownUrl}/pruneCheck`, { method: "POST" });
       } catch (e) {
-        logHere({ lvl: "error" }, `usb prune check request failed: ${e.message}`);
+        unilog(2452, `usb prune check request failed: ${e.message}`);
       }
       void this.updateSpaceAvail();
     },

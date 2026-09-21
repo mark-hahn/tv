@@ -171,6 +171,10 @@ const EMBY_LAUNCH_DELAY_MS = 300; // ms after launching Emby before sending it t
 const VIEW_SHOW_RESEND_MS = 6000; // ms between show resends while Emby boots
 const VIEW_SHOW_POLL_MS = 500; // ms between checks that playback has started
 const EMBY_BOOT_WINDOW_MS = 40000; // ms to keep resending the show while Emby boots
+const EMBY_WARM_MS = 60000; // ms since Emby's last api call that still counts as running
+const EMBY_QUIET_MS = 2000; // ms of Emby api silence that means its ui has finished drawing
+const EMBY_QUIET_POLL_MS = 400; // ms between silence probes
+const EMBY_QUIET_MAX_WAIT_MS = 12000; // ms to wait for silence before sending anyway
 
 // Power-key power-on sequence: wait for the set -> Google TV input -> Emby -> tvapp
 // HA reports the set "on" the moment its network processor answers, which is
@@ -670,6 +674,38 @@ async function embyTvLastActivity() {
   }
 }
 
+// Emby's cold start races the show: the play command opens the player, and the
+// home screen that is still loading behind it then draws its rows on top of the
+// running video -- the ui stranded over playback that only a trip back out
+// clears. The api chatter that builds that home screen is the tell, so a cold
+// launch waits for it to stop before the show is sent. An Emby that was already
+// talking to the server is drawn already and waits for nothing.
+async function waitForEmbyQuiet(label, activityBeforeLaunch) {
+  if (
+    activityBeforeLaunch &&
+    Date.now() - Date.parse(activityBeforeLaunch) < EMBY_WARM_MS
+  )
+    return;
+  const startedAt = Date.now();
+  const deadline = startedAt + EMBY_QUIET_MAX_WAIT_MS;
+  let last = await embyTvLastActivity();
+  let quietSince = Date.now();
+  while (Date.now() < deadline) {
+    await sleep(EMBY_QUIET_POLL_MS);
+    const now = await embyTvLastActivity();
+    if (now !== last) {
+      last = now;
+      quietSince = Date.now();
+      continue;
+    }
+    if (Date.now() - quietSince >= EMBY_QUIET_MS) {
+      unilog(2449, `${label}: emby ui settled after ${Date.now() - startedAt}ms`);
+      return;
+    }
+  }
+  unilog(2450, `${label}: emby ui never went quiet, sending the show anyway`);
+}
+
 // Sends the show to Emby's live session on the TV. Returns true when Emby
 // accepted it; the pending show is only cleared on success so a later trigger
 // (like the TV-off fallback timer) can try again.
@@ -706,6 +742,12 @@ async function firePendingViewShow(label) {
 async function firePendingViewShowUntilPlaying(label) {
   const wanted = pendingViewShow;
   const seq = viewShowSeq;
+  if (wanted?.play) {
+    // The tv was off, so Emby is always cold here -- no warm check to make.
+    await waitForEmbyQuiet(label, null);
+    if (seq !== viewShowSeq) return; // a newer press owns the tv now
+    pendingViewShow = { ...wanted, at: Date.now() }; // the wait is not staleness
+  }
   await firePendingViewShow(label);
   if (!wanted?.play) return;
   await resendViewShowUntilPlaying(wanted, label, seq);
@@ -784,6 +826,13 @@ app.get("/tv/viewshow", async (req, res) => {
     media_content_id: EMBY_APP_URI,
   });
   await sleep(EMBY_LAUNCH_DELAY_MS);
+  if (play) {
+    await waitForEmbyQuiet("viewshow", activityBefore);
+    if (seq !== viewShowSeq) return; // a newer press owns the tv now
+    // The wait above is deliberate, not staleness, so the request does not age
+    // out of firePendingViewShow's max age while we sit through a cold boot.
+    pendingViewShow = { showId, showName, episodeId, play, at: Date.now() };
+  }
 
   // Emby's session keeps accepting shows with a 204 even while its ui is
   // restarting (the android process stays alive in the background), so the

@@ -1,11 +1,4 @@
 
-sometimes when clicking ok on a selected show in tvapp it correctly shows the emby ui for ~2s and then the video correctly starts playing but elements of the emby ui are still visible overlaying the video -- using shows button to go back and start over fixes it -- this seems to happen the most when using it the first time in the evening since the day before -- i took a picture of the screen -- it is at "C:\Users\mark\Downloads\PXL_20260921_044949928.MP.jpg"
-
-
-
-batch chksrt - chooses embedded for every one in queue
-  info pane → Subs button   -- deletes all srt files
-  chksrt player → All Off   -- leaves srt files alone
 
 chksrt jump to prev/next title
 
@@ -18,6 +11,8 @@ in tor pane when showing checkmarks don't match torrents by name only -- use siz
 manage upcoming shows
 
 =================
+
+sometimes when clicking ok on a selected show in tvapp it correctly shows the emby ui for ~2s and then the video correctly starts playing but elements of the emby ui are still visible overlaying the video -- using shows button to go back and start over fixes it -- this seems to happen the most when using it the first time in the evening since the day before -- i took a picture of the screen -- it is at "C:\Users\mark\Downloads\PXL_20260921_044949928.MP.jpg"
 
 make a note that when preparing to build/install an apk you shouldn't assume what phone is on the usb cable. Phones are usually swapped.
 

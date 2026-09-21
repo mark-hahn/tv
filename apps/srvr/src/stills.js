@@ -170,6 +170,45 @@ function probe(videoFilePath) {
   });
 }
 
+// HDR sources (PQ or HLG, BT.2020) must be tone-mapped to SDR BT.709 before
+// they go to the browser: an untouched PQ signal squeezed into 8-bit and still
+// tagged bt2020/smpte2084 is colour-managed by Chrome into blown-out cyan.
+const HDR_TRANSFERS = new Set(["smpte2084", "arib-std-b67"]);
+const hdrCache = new Map();
+
+function isHdr(videoFilePath) {
+  const hit = hdrCache.get(videoFilePath);
+  if (hit !== undefined) return hit;
+  const p = new Promise((resolve, reject) => {
+    cp.execFile(
+      "ffprobe",
+      [
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=color_transfer",
+        "-of",
+        "default=nw=1:nk=1",
+        videoFilePath,
+      ],
+      (err, stdout) => {
+        if (err) reject(err);
+        else resolve(HDR_TRANSFERS.has(stdout.trim()));
+      },
+    );
+  });
+  hdrCache.set(videoFilePath, p);
+  return p;
+}
+
+// zscale/tonemap in software: the AMD VAAPI driver has no HDR tone-map VPP,
+// and at WINDOW_HEIGHT the scaled frames are small enough for it to be cheap.
+const TONEMAP =
+  "zscale=t=linear:npl=100,tonemap=hable:desat=0," +
+  "zscale=p=bt709:t=bt709:m=bt709:r=tv,format=yuv420p";
+
 function runFfmpeg(args, onSpawn) {
   return new Promise((resolve, reject) => {
     const child = cp.spawn("ffmpeg", ["-y", "-v", "error", ...args]);
@@ -445,7 +484,14 @@ function signalStillsBuild(sig) {
   if (running?.child) running.child.kill(sig);
 }
 
-function windowArgs(videoFilePath, startSec, audioIndex, vaapi) {
+function windowArgs(videoFilePath, startSec, audioIndex, vaapi, hdr) {
+  const vf = vaapi
+    ? hdr
+      ? `scale_vaapi=w=-2:h=${WINDOW_HEIGHT}:format=p010,hwdownload,format=p010le,${TONEMAP}`
+      : `scale_vaapi=w=-2:h=${WINDOW_HEIGHT}:format=nv12,hwdownload,format=nv12`
+    : hdr
+      ? `scale=-2:${WINDOW_HEIGHT},${TONEMAP}`
+      : `scale=-2:${WINDOW_HEIGHT}`;
   return [
     "-v",
     "error",
@@ -457,9 +503,7 @@ function windowArgs(videoFilePath, startSec, audioIndex, vaapi) {
     "-i",
     videoFilePath,
     "-vf",
-    vaapi
-      ? `scale_vaapi=w=-2:h=${WINDOW_HEIGHT}:format=nv12,hwdownload,format=nv12`
-      : `scale=-2:${WINDOW_HEIGHT}`,
+    vf,
     "-map",
     "0:v:0",
     "-map",
@@ -497,8 +541,9 @@ function windowArgs(videoFilePath, startSec, audioIndex, vaapi) {
 // Stream WINDOW_SECS of 480p from startSec onto res as fragmented mp4. VAAPI
 // first; if it dies before a byte is written the source is one VAAPI cannot
 // decode, so the same window is restarted in software.
-export function streamWindow(videoFilePath, startSec, audioIndex, req, res) {
+export async function streamWindow(videoFilePath, startSec, audioIndex, req, res) {
   const resolved = path.resolve(videoFilePath);
+  const hdr = await isHdr(resolved);
   const startedAt = Date.now();
   let bytes = 0;
   let firstByteMs = null;
@@ -519,7 +564,7 @@ export function streamWindow(videoFilePath, startSec, audioIndex, req, res) {
     unilog(2398, `window from ${startSec}s: first byte ${firstByteMs ?? "never"}ms, ${(bytes / 1e6).toFixed(1)}MB in ${secs}s${closed ? " (client closed)" : ""}: ${path.basename(resolved)}`);
   };
   const start = (vaapi) => {
-    child = cp.spawn("ffmpeg", windowArgs(resolved, startSec, audioIndex, vaapi));
+    child = cp.spawn("ffmpeg", windowArgs(resolved, startSec, audioIndex, vaapi, hdr));
     let lastErr = "";
     child.stdout.on("data", (d) => {
       if (bytes === 0) firstByteMs = Date.now() - startedAt;

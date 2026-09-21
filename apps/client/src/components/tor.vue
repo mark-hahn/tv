@@ -402,6 +402,9 @@
           "
         >
           <span
+            style="cursor: pointer"
+            title="Click to run the usb prune check now"
+            @click="onSpaceClick"
             ><strong>USB</strong>: {{ spaceUsbGb }} GB {{ spaceUsbPct }} |
             <strong>SRVR</strong>: {{ spaceSrvrGb }} GB {{ spaceSrvrPct }}</span
           >
@@ -2022,6 +2025,14 @@ export default {
     },
 
     onRefreshSpaceAvail() {
+      void this.updateSpaceAvail();
+    },
+    async onSpaceClick() {
+      try {
+        await fetch(`${config.tvDownUrl}/pruneCheck`, { method: "POST" });
+      } catch (e) {
+        logHere({ lvl: "error" }, `usb prune check request failed: ${e.message}`);
+      }
       void this.updateSpaceAvail();
     },
     openDetails() {

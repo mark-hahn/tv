@@ -747,6 +747,23 @@ async function main() {
           return json(res, 405, { status: "method not allowed" });
         }
 
+        // Handle /pruneCheck endpoint -- clears the once-a-day gate so the next
+        // cycle actually runs the usb quota check, then kicks off that cycle.
+        if (pathname === "/pruneCheck") {
+          if (req.method === "GET" || req.method === "POST") {
+            try {
+              lastPruneAt = 0;
+              startProc();
+              return json(res, 200, { status: "ok" });
+            } catch (e) {
+              return json(res, 500, {
+                status: String(e && e.message ? e.message : e),
+              });
+            }
+          }
+          return json(res, 405, { status: "method not allowed" });
+        }
+
         // Handle /retry endpoint
         // POST body: { title: "..." }
         if (pathname === "/retry") {

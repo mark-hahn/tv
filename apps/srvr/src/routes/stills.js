@@ -2,6 +2,7 @@
 // (see src/stills.js).
 
 import * as path from "node:path";
+import { logHere, unilog} from "@tv/share"
 import {
   MAX_OFFSET_SECS,
   startStills,
@@ -61,6 +62,9 @@ export function registerStillsRoutes(app) {
     // actually waiting — exempt it from the slow-request warning in index.js.
     res.locals.slowExempt = true;
 
-    streamWindow(filePath, startSec, audioIndex, req, res);
+    streamWindow(filePath, startSec, audioIndex, req, res).catch((e) => {
+      unilog(2447, `window failed for ${filePath}: ${e.message}`);
+      if (!res.writableEnded) res.end();
+    });
   });
 }

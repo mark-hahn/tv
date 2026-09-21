@@ -1,5 +1,7 @@
 
-make a note that when preparing to build/install an apk you shouldn't assume what phone is on the usb cable. Phones are usually swapped.
+when clicking ok on a selected show in tvapp it correctly shows the emby ui for ~2s and then the video starts playing but elements of the emby ui are still visible overlaying the video -- using shows button to go back and start over fixes it -- this seems to happen the most when using it the first time in the evening since the day before
+
+
 
 batch chksrt - chooses embedded for every one in queue
   info pane → Subs button   -- deletes all srt files
@@ -16,6 +18,8 @@ in tor pane when showing checkmarks don't match torrents by name only -- use siz
 manage upcoming shows
 
 =================
+
+make a note that when preparing to build/install an apk you shouldn't assume what phone is on the usb cable. Phones are usually swapped.
 
 i want the stored resolutions for each file to be the actual ffprobe resolution.  
 

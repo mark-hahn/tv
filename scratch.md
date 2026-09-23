@@ -1,4 +1,6 @@
 
+in trailers pane put a link underneath each trailer to view it on the web
+
 
 chksrt jump to prev/next title
 

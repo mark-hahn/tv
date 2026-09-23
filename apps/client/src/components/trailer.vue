@@ -140,6 +140,16 @@
               >{{ t.url }}</a
             >
           </div>
+          <div
+            v-if="getYoutubeId(t.url) || isVideoFile(t.url)"
+            style="margin-top: 4px; font-size: 13px"
+          >
+            <a
+              :href="t.url"
+              @click.prevent="openExternalTrailerUrl(t.url)"
+              >View on web</a
+            >
+          </div>
         </div>
       </div>
       <!-- Loading message for IMDB trailer -->
@@ -195,9 +205,6 @@ export default {
       lastPlayingKey: null, // "yt-idx" or "html-url"
       streamFlash: null, // Track which video is flashing (idx)
     };
-  },
-  openExternalTrailerUrl(url) {
-    util.openExternalPage(url);
   },
   computed: {
     /**
@@ -402,6 +409,9 @@ export default {
       window.onYouTubeIframeAPIReady = this._onYouTubeIframeAPIReady;
     },
 
+    openExternalTrailerUrl(url) {
+      util.openExternalPage(url);
+    },
     getOrigin() {
       return window.location.origin;
     },

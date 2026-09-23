@@ -1,7 +1,5 @@
 
 
-chksrt jump to prev/next title
-
 accidentally saving without applying trim
 
 scrape ipt/tl for info section and display in pop-up
@@ -11,6 +9,10 @@ in tor pane when showing checkmarks don't match torrents by name only -- use siz
 manage upcoming shows
 
 =================
+
+chksrt jump to prev/next title
+
+in the chksrt video pane move the scrub controls to middle of the top row 
 
 in trailers pane put a link underneath each trailer to view it on the web
 

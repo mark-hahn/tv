@@ -128,6 +128,167 @@
           >{{ testTelemetry }}</span
         >
       </div>
+      <!-- Seek buttons (chksrt mode), centered in row 1 -->
+      <div
+        v-if="mode === 'chksrt'"
+        style="display: flex; align-items: center; flex-shrink: 0"
+      >
+        <div
+          @click.stop="clickIntroZero"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 0;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(0, 0, 0, 0.5);
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 6px;
+            width: 50px;
+            text-align: center;
+          "
+        >
+          0
+        </div>
+        <!-- S: seek back to the previous subtitle cue -->
+        <div
+          @click.stop="clickCueBack"
+          title="previous subtitle"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 6px;
+          "
+          :style="{
+            background: cueBackFlash
+              ? 'rgba(255, 128, 128, 0.9)'
+              : 'rgba(0, 0, 0, 0.5)',
+          }"
+        >
+          S
+        </div>
+        <div
+          @click.stop="clickNavBack30"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(0, 0, 0, 0.5);
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 6px;
+          "
+        >
+          &lt;&lt;
+        </div>
+        <div
+          @click.stop="clickNavBack10"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(0, 0, 0, 0.5);
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 6px;
+          "
+        >
+          &lt;
+        </div>
+        <div
+          @click.stop="clickNavBack3"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(0, 0, 0, 0.5);
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 6px;
+          "
+        >
+          &minus;
+        </div>
+        <div
+          @click.stop="clickNavFwd10"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(0, 0, 0, 0.5);
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 6px;
+          "
+        >
+          &gt;
+        </div>
+        <div
+          @click.stop="clickNavFwd30"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(0, 0, 0, 0.5);
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 6px;
+          "
+        >
+          &gt;&gt;
+        </div>
+        <!-- S: seek forward to the next subtitle cue -->
+        <div
+          @click.stop="clickCueFwd"
+          title="next subtitle"
+          style="
+            color: white;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(0, 0, 0, 0.5);
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-right: 6px;
+          "
+        >
+          S
+        </div>
+      </div>
+      <div v-if="mode === 'chksrt'" style="flex: 1" />
       <!-- Intro mode: mark controls (right, next to X) -->
       <template v-if="mode === 'intro'">
         <div
@@ -791,117 +952,6 @@
         "
       >
         <template v-if="showSlider">
-          <!-- Seek buttons, same set as the intro pane -->
-          <div
-            @click.stop="clickIntroZero"
-            style="
-              color: white;
-              font-size: 13px;
-              padding: 2px 0;
-              border-radius: 4px;
-              border: 1px solid #666;
-              cursor: pointer;
-              user-select: none;
-              background: rgba(0, 0, 0, 0.5);
-              white-space: nowrap;
-              flex-shrink: 0;
-              margin-right: 6px;
-              width: 50px;
-              text-align: center;
-            "
-          >
-            0
-          </div>
-          <div
-            @click.stop="clickNavBack30"
-            style="
-              color: white;
-              font-size: 13px;
-              padding: 2px 8px;
-              border-radius: 4px;
-              border: 1px solid #666;
-              cursor: pointer;
-              user-select: none;
-              background: rgba(0, 0, 0, 0.5);
-              white-space: nowrap;
-              flex-shrink: 0;
-              margin-right: 6px;
-            "
-          >
-            &lt;&lt;
-          </div>
-          <div
-            @click.stop="clickNavBack10"
-            style="
-              color: white;
-              font-size: 13px;
-              padding: 2px 8px;
-              border-radius: 4px;
-              border: 1px solid #666;
-              cursor: pointer;
-              user-select: none;
-              background: rgba(0, 0, 0, 0.5);
-              white-space: nowrap;
-              flex-shrink: 0;
-              margin-right: 6px;
-            "
-          >
-            &lt;
-          </div>
-          <div
-            @click.stop="clickNavBack3"
-            style="
-              color: white;
-              font-size: 13px;
-              padding: 2px 8px;
-              border-radius: 4px;
-              border: 1px solid #666;
-              cursor: pointer;
-              user-select: none;
-              background: rgba(0, 0, 0, 0.5);
-              white-space: nowrap;
-              flex-shrink: 0;
-              margin-right: 6px;
-            "
-          >
-            &minus;
-          </div>
-          <div
-            @click.stop="clickNavFwd10"
-            style="
-              color: white;
-              font-size: 13px;
-              padding: 2px 8px;
-              border-radius: 4px;
-              border: 1px solid #666;
-              cursor: pointer;
-              user-select: none;
-              background: rgba(0, 0, 0, 0.5);
-              white-space: nowrap;
-              flex-shrink: 0;
-              margin-right: 6px;
-            "
-          >
-            &gt;
-          </div>
-          <div
-            @click.stop="clickNavFwd30"
-            style="
-              color: white;
-              font-size: 13px;
-              padding: 2px 8px;
-              border-radius: 4px;
-              border: 1px solid #666;
-              cursor: pointer;
-              user-select: none;
-              background: rgba(0, 0, 0, 0.5);
-              white-space: nowrap;
-              flex-shrink: 0;
-              margin-right: 6px;
-            "
-          >
-            &gt;&gt;
-          </div>
           <div
             ref="slider"
             style="
@@ -1027,6 +1077,7 @@
     >
       <track
         v-if="activeTrackUrl"
+        ref="subTrack"
         :key="activeTrackUrl"
         kind="subtitles"
         srclang="en"
@@ -1177,6 +1228,12 @@ const TV_SRVR_URL = config.tvSrvrUrl;
 const PLAYER_MUTE_STORAGE_KEY = "tvPlayerMuted";
 const PLAYER_VOLUME_STORAGE_KEY = "tvPlayerVolume";
 const SPEED_RATES = [1, 2, 5, 10];
+// S buttons (chksrt): back skips cues starting within this much before now,
+// so repeated clicks while playing keep stepping back instead of re-landing.
+const CUE_BACK_SLOP_SEC = 0.5;
+const CUE_FWD_SLOP_SEC = 0.05;
+const CUE_BACK_FLASH_MS = 300;
+const CUE_CLICK_CHAIN_MS = 600;
 // Film strip stills are rendered as they come into reach rather than all at
 // once — a full episode is a few hundred images and the pane must open now.
 const STRIP_PAGE = 60;
@@ -1254,6 +1311,8 @@ export default {
       activeAudioIndex: null,
       subtitleTracks: [],
       firstCueSec: null,
+      noNextCue: false,
+      cueBackFlash: false,
       chksrtFirstCueSec: null,
       activeTrackId: null,
       subtitleOffset: 0,
@@ -1371,8 +1430,9 @@ export default {
     waitingForFirstCue() {
       return (
         this.mode === "chksrt" &&
-        this.firstCueSec !== null &&
-        this.currentTimeSec < this.firstCueSec
+        (this.noNextCue ||
+          (this.firstCueSec !== null &&
+            this.currentTimeSec < this.firstCueSec))
       );
     },
     subtitleLabelMap() {
@@ -1547,6 +1607,7 @@ export default {
     },
     activeTrackUrl(newVal) {
       this.firstCueSec = null;
+      this.noNextCue = false;
       if (newVal) {
         this.$nextTick(() => {
           const vid = this.$refs.vid;
@@ -2099,6 +2160,46 @@ export default {
       const vid = this.$refs.vid;
       if (vid) vid.currentTime += 30;
     },
+    // Reference time for the S buttons: a click soon after the last S seek
+    // steps from that seek's target, so a double-click moves two cues even
+    // before the video reports the new position.
+    _cueRefSec() {
+      const sinceMs = performance.now() - (this._cueSeekAt ?? -Infinity);
+      if (sinceMs < CUE_CLICK_CHAIN_MS) return this._cueSeekSec;
+      return this.$refs.vid?.currentTime ?? 0;
+    },
+    _cueStarts() {
+      const cues = this.$refs.subTrack?.track?.cues;
+      return cues ? Array.from(cues, (c) => c.startTime) : [];
+    },
+    _cueSeek(sec) {
+      if (this.waitingForVideo) this._exitWaitingForVideo();
+      this._cancelSeek();
+      this._cueSeekAt = performance.now();
+      this._cueSeekSec = sec;
+      this.$refs.vid.currentTime = sec;
+    },
+    clickCueBack() {
+      const ref = this._cueRefSec();
+      const prev = this._cueStarts().filter(
+        (t) => t < ref - CUE_BACK_SLOP_SEC,
+      );
+      if (prev.length === 0) {
+        this.cueBackFlash = true;
+        setTimeout(() => (this.cueBackFlash = false), CUE_BACK_FLASH_MS);
+        return;
+      }
+      this._cueSeek(prev[prev.length - 1]);
+    },
+    clickCueFwd() {
+      const ref = this._cueRefSec();
+      const next = this._cueStarts().find((t) => t > ref + CUE_FWD_SLOP_SEC);
+      if (next === undefined) {
+        this.noNextCue = true;
+        return;
+      }
+      this._cueSeek(next);
+    },
     clickIntroZero() {
       if (this.waitingForVideo) this._exitWaitingForVideo();
       this._cancelSeek();
@@ -2475,6 +2576,7 @@ export default {
       }
     },
     onVideoSeeked() {
+      this.noNextCue = false;
       if (this.waitingForVideo && !this._waitingForVideoSetup) {
         this._exitWaitingForVideo();
       }

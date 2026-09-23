@@ -10,6 +10,9 @@
       margin-bottom: 5px;
       padding-right: 5px;
       box-sizing: border-box;
+      overflow: hidden;
+      scrollbar-gutter: stable;
+      scrollbar-width: auto;
     "
   >
     <div
@@ -124,9 +127,9 @@
       :style="{
         display: 'flex',
         justifyContent: 'flex-start',
-        // right margin matches the shows scroller's reserved scrollbar width
+        // #hdrbottom reserves the same scrollbar gutter as the shows scroller
         // so these icons line up with the cond icons in the show rows
-        margin: '5px 16px 0 0',
+        margin: '5px 0 0 0',
         width: visibleConds.length * 22 + 'px',
       }"
     >

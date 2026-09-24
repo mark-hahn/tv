@@ -2683,6 +2683,13 @@ export default {
       }
     },
     async clickChksrtNext() {
+      if (
+        this.subtitleOffset !== 0 &&
+        !window.confirm(
+          "A timing adjustment has not been applied. Are you sure you want to leave?",
+        )
+      )
+        return;
       try {
         await chksrtUnsnooze(this.path);
       } catch (e) {

@@ -2318,6 +2318,18 @@ export default {
       return provider ? `${titleStr}::${provider}` : titleStr;
     },
 
+    getTorrentUniqueKey(torrent) {
+      // Identifies one specific torrent, unlike titles which repeat across cards.
+      const hash = this.getTorrentHash(torrent);
+      if (hash) return hash;
+      const provider = String(torrent?.raw?.provider || "").toLowerCase();
+      if (provider === "torrentleech" && torrent?.raw?.fid)
+        return `torrentleech:${torrent.raw.fid}`;
+      if (provider === "iptorrents" && torrent?.raw?.desc)
+        return `iptorrents:${torrent.raw.desc}`;
+      return "";
+    },
+
     getTorrentHistoryKeys(torrent) {
       const keys = [];
       const add = (k) => {
@@ -2358,7 +2370,8 @@ export default {
     },
 
     getTorrentIdentityKey(torrent) {
-      const historyKey = this.getTorrentHistoryKey(torrent);
+      const historyKey =
+        this.getTorrentUniqueKey(torrent) || this.getTorrentHistoryKey(torrent);
       const detailUrl = String(
         torrent?.detailUrl || torrent?.raw?.desc || "",
       ).trim();
@@ -2385,6 +2398,9 @@ export default {
         const key = this.getTorrentIdentityKey(torrent);
         const current = existingByKey.get(key);
         if (!current) return torrent;
+        // Reuse each existing card object once, or cards with the same key
+        // would share one object and share its clicked/selected state.
+        existingByKey.delete(key);
 
         for (const prop of Object.keys(current)) {
           if (!(prop in torrent)) delete current[prop];
@@ -2421,7 +2437,10 @@ export default {
     },
 
     rememberDownloadedTorrent(torrent) {
-      const keys = this.getTorrentHistoryKeys(torrent);
+      const uniqueKey = this.getTorrentUniqueKey(torrent);
+      const keys = uniqueKey
+        ? [uniqueKey]
+        : this.getTorrentHistoryKeys(torrent);
       if (!keys.length) return;
       const now = Date.now();
       const map =
@@ -2455,7 +2474,13 @@ export default {
     },
 
     isDownloadedBefore(torrent) {
-      const keys = this.getTorrentHistoryKeys(torrent);
+      // Title keys are only written for torrents with no unique key, plus
+      // legacy entries from before unique keys (they age out after a year).
+      const uniqueKey = this.getTorrentUniqueKey(torrent);
+      const keys = [
+        ...(uniqueKey ? [uniqueKey] : []),
+        ...this.getTorrentHistoryKeys(torrent),
+      ];
       if (!keys.length) return false;
       const cutoff = Date.now() - this.downloadHistoryWindowMs();
       for (const k of keys) {

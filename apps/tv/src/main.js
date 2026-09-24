@@ -1,5 +1,5 @@
 import { WebSocket, WebSocketServer } from "ws";
-import { exec } from "child_process";
+import { exec, execFile } from "child_process";
 import { promisify } from "util";
 import { createWriteStream, mkdirSync } from "fs";
 import { join, dirname } from "path";
@@ -1514,7 +1514,7 @@ app.get("/tv/openapp", (req, res) => {
   }
 });
 
-app.get("/tv/playvideo", (req, res) => {
+app.get("/tv/playvideo", async (req, res) => {
   const url = req.query.url;
   if (!url) {
     res.status(400).json({ ok: false, error: "missing url" });
@@ -1522,22 +1522,33 @@ app.get("/tv/playvideo", (req, res) => {
   }
   if (tvMode === "google") {
     unilog(432, `playvideo google url=${url} from ${client(req)}`);
+    // Wireless debugging's port moves on every tv boot, so use whichever
+    // connection hahnca.com's adb currently has.
+    const serial = await braviaAdbSerial();
+    if (!serial) {
+      unilog(2468, `playvideo: no adb connection to the tv`);
+      res.json({ ok: false, error: "no adb connection to the tv" });
+      return;
+    }
+    // The url comes straight off a public query string. execFile keeps it
+    // away from hahnca.com's shell, but adb shell still hands the command to
+    // the tv's own sh, so every value is single-quoted for that.
+    const shq = (v) => `'${v.replaceAll("'", `'\\''`)}'`;
     // Extract YouTube video ID from URL
     const ytMatch = url.match(/[?&]v=([^&]+)/);
-    let cmd;
+    let remoteCmd;
     if (ytMatch) {
       const videoId = ytMatch[1];
       unilog(433, `playvideo launching YouTube video ${videoId} via adb`);
       // Use adb to send intent directly to YouTube app
-      cmd = `adb -s ${BRAVIA_TV_IP} shell am start -a android.intent.action.VIEW -d "https://www.youtube.com/watch?v=${videoId}" com.google.android.youtube.tv`;
+      remoteCmd = `am start -a android.intent.action.VIEW -d ${shq(`https://www.youtube.com/watch?v=${videoId}`)} com.google.android.youtube.tv`;
     } else {
       unilog(434, `playvideo: non-YouTube URL, launching in VLC`);
       // For IMDB or other video URLs, open in VLC
-      // Use single quotes in the shell to prevent & interpretation
-      cmd = `adb -s ${BRAVIA_TV_IP} shell "am start -a android.intent.action.VIEW -d '${url}' -t 'video/*' org.videolan.vlc"`;
+      remoteCmd = `am start -a android.intent.action.VIEW -d ${shq(url)} -t 'video/*' org.videolan.vlc`;
     }
-    unilog(435, `playvideo cmd: ${cmd}`);
-    exec(cmd, (err, stdout, stderr) => {
+    unilog(435, `playvideo cmd: ${remoteCmd}`);
+    execFile("adb", ["-s", serial, "shell", remoteCmd], (err, stdout, stderr) => {
       if (err) {
         unilog(436, `playvideo adb error: ${err.message}`);
       }

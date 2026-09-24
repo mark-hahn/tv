@@ -1,4 +1,6 @@
 
+fixed: the YouTube/VLC launch
+
 manage upcoming shows
 
 =================

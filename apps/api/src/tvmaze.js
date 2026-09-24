@@ -1151,6 +1151,36 @@ export function getCandidateShows(limit = 100) {
     .filter(Boolean);
 }
 
+// Shows premiering after now, browsed or not, earliest first.
+export function getUpcomingCandidates(limit = 200) {
+  if (!_db) openDb();
+  const rows = _db
+    .prepare(
+      `
+    SELECT tvmaze_id, data_json
+    FROM shows
+    WHERE premiered IS NOT NULL
+      AND premiered != ''
+      AND premiered > ?
+    ORDER BY premiered ASC
+    LIMIT ?
+  `,
+    )
+    .all(Math.floor(Date.now() / 1000), limit);
+
+  return rows
+    .map((r) => {
+      try {
+        const d = JSON.parse(r.data_json);
+        d.tvmaze_id = r.tvmaze_id;
+        return d;
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
+
 export function markShowBrowsed(tvmazeId) {
   if (!_db) openDb();
   _db.prepare("UPDATE shows SET browsed = 1 WHERE tvmaze_id = ?").run(tvmazeId);

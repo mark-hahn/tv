@@ -36,7 +36,9 @@
             ? creditShowList
             : unSnoozeMode
               ? snoozeList
-              : null
+              : upcomingMode
+                ? upcomingList
+                : null
         "
         @select="handleGallerySelect"
         @preview="handleGalleryPreview"
@@ -113,6 +115,20 @@
               style="color: red; font-weight: bold; font-size: 13px"
               >Stream not found</span
             >
+            <button
+              @click="upcomingMode ? (upcomingMode = false) : handleUpcoming()"
+              :style="{
+                height: '24px',
+                fontSize: '13px',
+                padding: '2px 8px',
+                border: '1px solid black',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                backgroundColor: upcomingMode ? 'lightblue' : '',
+              }"
+            >
+              Upcoming
+            </button>
             <button
               @click="handleStream"
               :style="{
@@ -645,7 +661,7 @@ import {
   getGenresByTvdbId,
 } from "../tvdb.js";
 import { pickTvdbSeries } from "@tv/share";
-import { unilog } from "../log.js";
+import { unilog, logHere } from "../log.js";
 
 export default {
   name: "BrowsePane",
@@ -712,6 +728,8 @@ export default {
     const loadingShowName = ref("");
     const snoozeList = ref([]);
     const unSnoozeMode = ref(false);
+    const upcomingMode = ref(false);
+    const upcomingList = ref([]);
     const snoozeFlash = ref(false);
     const creditShowList = ref(null);
     const creditIsMovie = ref(false);
@@ -737,6 +755,7 @@ export default {
     evtBus.on("previewMode", onPreviewMode);
 
     const onBrowseTabClicked = () => {
+      upcomingMode.value = false;
       creditIsMovie.value = false;
       creditShowList.value = null;
     };
@@ -981,6 +1000,7 @@ export default {
       if (unSnoozeMode.value) {
         unSnoozeMode.value = false;
       }
+      upcomingMode.value = false;
       creditShowList.value = null;
       creditIsMovie.value = false;
       shouldAutoAdvance.value = false;
@@ -1236,7 +1256,32 @@ export default {
       // Only enters snoozed mode — the Snoozed N button calls this only when not in snoozed mode
       creditShowList.value = null;
       creditIsMovie.value = false;
+      upcomingMode.value = false;
       unSnoozeMode.value = true;
+    };
+
+    // Earliest upcoming shows, browsed or not, from the api server.
+    const handleUpcoming = async () => {
+      creditShowList.value = null;
+      creditIsMovie.value = false;
+      unSnoozeMode.value = false;
+      try {
+        const res = await fetch(
+          `${config.torrentsApiUrl}/api/getUpcomingShows`,
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        upcomingList.value = (await res.json()).map((it) => ({
+          tvdbId: it.tvdbid,
+          name: it.data.name,
+          year: String(it.data.premiered || "").slice(0, 4),
+          image: it.data.image?.medium || it.data.image?.original || "",
+          premiered: it.data.premiered,
+        }));
+      } catch (e) {
+        unilog(2475, `getUpcomingShows failed: ${e.message}`);
+        return;
+      }
+      upcomingMode.value = true;
     };
 
     const isCurrentSnoozed = computed(() => {
@@ -1872,7 +1917,7 @@ export default {
 
     // Handle gallery card selection
     const handleGallerySelect = async (tvdb) => {
-      if (unSnoozeMode.value && tvdb) {
+      if ((unSnoozeMode.value || upcomingMode.value) && tvdb) {
         const tvdbId = String(tvdb.tvdbId || tvdb.tvdb_id || tvdb.id || "");
         try {
           const results = await srchTvdbData(tvdb.name);
@@ -1976,6 +2021,7 @@ export default {
       if (fromUser && unSnoozeMode.value) {
         unSnoozeMode.value = false;
       }
+      if (fromUser) upcomingMode.value = false;
       if (fromUser) {
         justFetchedNext.value = false;
         shouldAutoAdvance.value = false;
@@ -2129,6 +2175,9 @@ export default {
       isCurrentSnoozed,
       curDisplayOverview,
       unSnoozeMode,
+      upcomingMode,
+      upcomingList,
+      handleUpcoming,
       snoozeFlash,
       handleSnooze,
       handleUnSnooze,

@@ -1,9 +1,17 @@
 
-
+instead of limiting to 10 shows show all that have been 
 
 ????????????????
 manage upcoming shows
 =================
+
+- when in browse pane show a button `Upcoming` at the right of the bottom remote keys
+- when clicked it should switch to upcoming mode
+  - in upcoming mode the gallery should show upcoming shows only
+  - they should be showing with the earliest at the top
+  - show a max of 10 shows in gallery
+  - clicking in the gallery should do the same thing as in normal mode and when showing snoozed shows
+- when browse button is clicked it should go back to normal mode
 
 fix the YouTube/VLC launch
 in tor tor pane when a torrent card has isClicked set then a checkmark is shown.  And when it has isDownloadedBefore  it shows a clock.  those icons are shown because the card torrent title matches some title in list.  when that matching is done there may be more than one card with the same title so multiple cards are marked instead of just the one.  the matching needs to be more specific.  is there a torrent hash that can be used to match instead of just the title? if not, then maybe the file size could me included in the stored info for matching?

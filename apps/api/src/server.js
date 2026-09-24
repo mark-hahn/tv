@@ -43,6 +43,7 @@ import {
   getBrowseShow,
   getAllBrowse,
   hasBrowseShow,
+  getUpcomingShows,
   ackBrowsed,
   removeResultTitleByTvdbId,
   buildShowTitle,
@@ -2526,6 +2527,16 @@ app.get("/api/getAllBrowse", async (req, res) => {
 // GET /api/hasBrowseShow — lightweight check whether a candidate show exists
 app.get("/api/hasBrowseShow", async (req, res) => {
   res.json(await getBrowseHasMorePayload());
+});
+
+// GET /api/getUpcomingShows — earliest upcoming shows, browsed or not
+app.get("/api/getUpcomingShows", async (req, res) => {
+  try {
+    res.json(await getUpcomingShows());
+  } catch (error) {
+    unilog(2471, `getUpcomingShows error: ${error.message}`);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // GET /api/browseSearch?q=text — search tvmaze.sqlite by name (ignores browsed status)

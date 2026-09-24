@@ -4,6 +4,7 @@ import { franc } from "franc-min";
 import { getApiDataDir } from "./tvPaths.js";
 import {
   getCandidateShows,
+  getUpcomingCandidates,
   getTvdbOverview,
   markShowBrowsed,
 } from "./tvmaze.js";
@@ -237,11 +238,14 @@ export function buildShowTitle(show) {
  * or null if the show passes all filters.
  * Pure check — no side effects (does not call markShowBrowsed).
  */
-function getShowRejectionReason(show, title) {
+function getShowRejectionReason(show, title, allowSeen = false) {
   if (!show.image || (!show.image.medium && !show.image.original))
     return "no-image";
 
-  if (resultTitles.some((entry) => parseResultTitle(entry) === title))
+  if (
+    !allowSeen &&
+    resultTitles.some((entry) => parseResultTitle(entry) === title)
+  )
     return "already-seen";
 
   if (show.type && IGNORED_TYPES.has(show.type.toLowerCase())) return show.type;
@@ -366,6 +370,29 @@ export async function hasBrowseShow() {
     return true;
   }
   return false;
+}
+
+/**
+ * The earliest upcoming shows, browsed or not, that pass the browse filters.
+ * Nothing is marked browsed — the list is only for display.
+ */
+export async function getUpcomingShows(max = 20) {
+  const upcoming = [];
+  for (const show of getUpcomingCandidates()) {
+    if (!show.externals?.thetvdb) continue;
+    const title = buildShowTitle(show);
+    if (getShowRejectionReason(show, title, true) !== null) continue;
+    if ((await getTvdbDescRejection(show)) !== null) continue;
+    upcoming.push({
+      status: "ok",
+      title,
+      imdbid: show.externals?.imdb,
+      tvdbid: show.externals?.thetvdb,
+      data: show,
+    });
+    if (upcoming.length >= max) break;
+  }
+  return upcoming;
 }
 
 export async function getAllBrowse() {

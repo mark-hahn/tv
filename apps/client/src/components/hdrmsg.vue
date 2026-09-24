@@ -24,13 +24,18 @@
         whiteSpace: 'nowrap',
       }"
     >
-      {{ text }}
+      <span
+        v-for="(m, i) in messages"
+        :key="m.id"
+        :style="{ color: m.color ?? undefined }"
+        >{{ i ? " \u00a0 " : "" }}{{ m.text }}</span
+      >
     </div>
   </div>
 </template>
 
 <script>
-import { globalMessages, globalMessageText } from "../globalMessages.js";
+import { globalMessages, sortedGlobalMessages } from "../globalMessages.js";
 import { loggingDisabled } from "../log.js";
 
 export default {
@@ -40,10 +45,10 @@ export default {
     loggingDisabled() {
       return loggingDisabled.value;
     },
-    text() {
+    messages() {
       // Touch the reactive Map so this computed re-runs on any change.
       void globalMessages.size;
-      return globalMessageText();
+      return sortedGlobalMessages();
     },
   },
 };

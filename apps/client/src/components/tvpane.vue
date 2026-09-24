@@ -439,6 +439,62 @@
             ▲
           </button>
         </div>
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            padding: 10px 16px;
+            border-bottom: 1px solid #eee;
+            gap: 8px;
+          "
+        >
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 2px">
+            <span style="font-size: 18px; font-weight: bold">ADB</span>
+            <span v-if="adbStatus" style="font-size: 16px; color: #000">{{
+              adbStatus
+            }}</span>
+          </div>
+          <input
+            v-model="adbPort"
+            placeholder="port"
+            inputmode="numeric"
+            style="
+              width: 72px;
+              text-align: center;
+              font-size: 18px;
+              font-weight: bold;
+              border: 1px solid #bbb;
+              padding: 4px 2px;
+              background: #fff;
+            "
+          />
+          <input
+            v-model="adbCode"
+            placeholder="code"
+            inputmode="numeric"
+            style="
+              width: 72px;
+              text-align: center;
+              font-size: 18px;
+              font-weight: bold;
+              border: 1px solid #bbb;
+              padding: 4px 2px;
+              background: #fff;
+            "
+          />
+          <button
+            @click="adbConnect"
+            :style="{
+              '--btn-bg': 'whitesmoke',
+              fontSize: '20px',
+              padding: '6px 14px',
+              border: '1px solid #bbb',
+              cursor: 'pointer',
+            }"
+          >
+            Connect
+          </button>
+        </div>
       </div>
     </div>
     <div
@@ -824,6 +880,9 @@ export default {
       showPicCtrl: false,
       picSettings: [],
       picInputs: {}, // target -> { typing: bool, raw: string }
+      adbPort: "",
+      adbCode: "",
+      adbStatus: "",
       _picChannel: null,
       _subChannel: null,
       tvapprcMode: false,
@@ -1560,6 +1619,30 @@ export default {
         onSnapshot: this.applyPicSettings,
         onDelta: this.applyPicSettings,
       });
+    },
+
+    // Reconnects tv-tv's adb to the TV. Port and code come from the TV's
+    // Developer options > Wireless debugging > Pair device with pairing code;
+    // left empty, tv-tv only hunts for the port wireless debugging moved to.
+    async adbConnect() {
+      this.adbStatus = "Connecting...";
+      try {
+        const data = await fetch(`${config.tvTvUrl}/tv/adbconnect`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            port: this.adbPort.trim(),
+            code: this.adbCode.trim(),
+          }),
+        }).then((r) => r.json());
+        this.adbStatus = data.ok ? `Connected ${data.serial}` : data.error;
+        if (data.ok) {
+          this.adbPort = "";
+          this.adbCode = "";
+        }
+      } catch (e) {
+        this.adbStatus = e.message;
+      }
     },
 
     closePicCtrl() {

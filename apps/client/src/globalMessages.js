@@ -7,7 +7,7 @@
 import { reactive } from "vue";
 import { openChannel } from "./srvr.js";
 
-// id -> { id, text, position, duration, timeAdded }
+// id -> { id, text, position, duration, timeAdded, color }
 export const globalMessages = reactive(new Map());
 
 // id -> setTimeout handle (non-reactive bookkeeping)
@@ -23,7 +23,7 @@ const clearExpireTimer = (id) => {
 };
 
 // Add or remove a global message. Same signature on client and server:
-//   { id, action: "show"|"hide", text, position, duration }
+//   { id, action: "show"|"hide", text, position, duration, color }
 export function setGlobalMessage(msg) {
   if (!msg || !msg.id) return;
   const id = String(msg.id);
@@ -52,6 +52,7 @@ export function setGlobalMessage(msg) {
     position,
     duration,
     timeAdded,
+    color: msg.color ?? null,
   });
 
   clearExpireTimer(id);
@@ -83,13 +84,12 @@ function applyServerMessagesSnapshot(payload) {
   for (const msg of messages) applyServerMessage(msg);
 }
 
-// Concatenated "<id>: <text>" for the hdrMsg row, sorted by position then
-// timeAdded (lower position = further left; ties: oldest leftmost).
-export function globalMessageText() {
-  return [...globalMessages.values()]
-    .sort((a, b) => a.position - b.position || a.timeAdded - b.timeAdded)
-    .map((m) => m.text)
-    .join("   ");
+// The hdrMsg row's messages, sorted by position then timeAdded (lower
+// position = further left; ties: oldest leftmost).
+export function sortedGlobalMessages() {
+  return [...globalMessages.values()].sort(
+    (a, b) => a.position - b.position || a.timeAdded - b.timeAdded,
+  );
 }
 
 // Deferred so this runs after the whole module graph has initialized. srvr.js

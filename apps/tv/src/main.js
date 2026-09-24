@@ -1,5 +1,6 @@
 import { WebSocket, WebSocketServer } from "ws";
 import { exec } from "child_process";
+import { promisify } from "util";
 import { createWriteStream, mkdirSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -69,6 +70,14 @@ const TV_PORT = 3004;
 const BRAVIA_ENTITY_ID = "media_player.bravia_k_65xr70";
 const REMOTE_ENTITY_ID = "remote.bravia_k_65xr70";
 const BRAVIA_TV_IP = "192.168.1.86:34047";
+const BRAVIA_TV_HOST = "192.168.1.86";
+// Wireless debugging picks a new random port in here on every TV boot.
+const BRAVIA_ADB_PORT_RANGE = "30000-49999";
+const ADB_CMD_TIMEOUT_MS = 5000; // ms before a single adb command is given up on
+const ADB_HANDSHAKE_MS = 3000; // ms for a just-connected port to come up as a real adb device
+const ADB_PAIR_TIMEOUT_MS = 30000; // ms before adb pair is given up on
+const NMAP_TIMEOUT_MS = 60000; // ms before the adb port scan is given up on
+const ADB_CHECK_MS = 30000; // ms between checks that the tv's adb connection is still up
 const BRAVIA_PICTURE_URL = `http://192.168.1.86/sony/video`;
 // setAudioMute takes the state it wants rather than toggling, which is the one
 // way to reach a known mute state on this set. Both the HA remote's "Mute"
@@ -153,6 +162,7 @@ const EMBY_USER_ID = "894c752d448f45a3a1260ccaabd0adff";
 const EMBY_BASE_URL = "http://127.0.0.1:8096/emby";
 // Emby app launch id on the Bravia Google-TV (Sony appControl uri for com.mb.android)
 const EMBY_APP_URI = "com.sony.dtv.com.mb.android.com.mb.android.MainActivity";
+const EMBY_PACKAGE = "com.mb.android";
 // Emby DeviceNames reported by the Emby app on each TV
 const TV_DEVICE_NAMES = ["Living Room TV"];
 const LIVING_ROOM_DEVICE_NAME = "Living Room TV";
@@ -171,7 +181,6 @@ const EMBY_LAUNCH_DELAY_MS = 300; // ms after launching Emby before sending it t
 const VIEW_SHOW_RESEND_MS = 6000; // ms between show resends while Emby boots
 const VIEW_SHOW_POLL_MS = 500; // ms between checks that playback has started
 const EMBY_BOOT_WINDOW_MS = 40000; // ms to keep resending the show while Emby boots
-const EMBY_WARM_MS = 60000; // ms since Emby's last api call that still counts as running
 const EMBY_QUIET_MS = 2000; // ms of Emby api silence that means its ui has finished drawing
 const EMBY_QUIET_POLL_MS = 400; // ms between silence probes
 const EMBY_QUIET_MAX_WAIT_MS = 12000; // ms to wait for silence before sending anyway
@@ -674,18 +683,105 @@ async function embyTvLastActivity() {
   }
 }
 
+const execAsync = promisify(exec);
+
+// The TV's adb serial (host:port) when hahnca.com's adb server has a live
+// connection to it, else null. Only asks the local adb server, so it is cheap
+// enough for the play path.
+async function braviaAdbSerial() {
+  const { stdout } = await execAsync("adb devices", {
+    timeout: ADB_CMD_TIMEOUT_MS,
+  });
+  for (const line of stdout.split("\n")) {
+    const [serial, state] = line.trim().split("\t");
+    if (state === "device" && serial.startsWith(`${BRAVIA_TV_HOST}:`))
+      return serial;
+  }
+  return null;
+}
+
+// Wireless debugging moves to a new random port on every TV boot, so this
+// scans for it: each open port in the range is tried and the one adb accepts
+// is kept. The others are not adb and never get past "offline", so they are
+// dropped again.
+async function connectBraviaAdb() {
+  const known = await braviaAdbSerial();
+  if (known) return known;
+  // Plain -Pn reports this TV as down; the tcp connect scan sees it.
+  const { stdout } = await execAsync(
+    `nmap -Pn -sT --disable-arp-ping -p ${BRAVIA_ADB_PORT_RANGE} --open -oG - ${BRAVIA_TV_HOST}`,
+    { timeout: NMAP_TIMEOUT_MS },
+  );
+  const ports = [...stdout.matchAll(/(\d+)\/open/g)].map((m) => m[1]);
+  for (const port of ports) {
+    const target = `${BRAVIA_TV_HOST}:${port}`;
+    await execAsync(`adb connect ${target}`, {
+      timeout: ADB_CMD_TIMEOUT_MS,
+    }).catch(() => {});
+    const isAdb = await execAsync(`adb -s ${target} wait-for-device`, {
+      timeout: ADB_HANDSHAKE_MS,
+    }).then(
+      () => true,
+      () => false,
+    );
+    if (isAdb) {
+      unilog(2457, `tv adb connected on ${target}`);
+      return target;
+    }
+    await execAsync(`adb disconnect ${target}`, {
+      timeout: ADB_CMD_TIMEOUT_MS,
+    }).catch(() => {});
+  }
+  unilog(2458, `no open tv port took an adb connection (${ports.length} open) -- pairing needed`);
+  return null;
+}
+
+// Whether the tv's adb connection is up, for the web client's TV ADB error.
+// A tv that is not on has nothing to connect to, so that is not an error.
+let braviaAdbOk = true;
+
+async function checkBraviaAdb() {
+  const ok = braviaHaPower !== "on" || (await braviaAdbSerial()) !== null;
+  if (ok === braviaAdbOk) return;
+  braviaAdbOk = ok;
+  unilog(2465, `tv adb ${ok ? "ok" : "lost"}`);
+  await pushTvState();
+}
+
+setInterval(() => {
+  checkBraviaAdb().catch((e) => {
+    unilog(2466, `tv adb check failed: ${e.message}`);
+  });
+}, ADB_CHECK_MS);
+
+// Whether Emby's process is running on the TV -- the honest cold/warm answer.
+// Null when there is no adb connection to ask over; the caller treats that as
+// cold, which only costs a short wait if Emby was running after all.
+async function embyProcessAlive() {
+  try {
+    const serial = await braviaAdbSerial();
+    if (!serial) {
+      unilog(2459, `no adb connection to the tv, treating Emby as cold`);
+      return null;
+    }
+    const { stdout } = await execAsync(
+      `adb -s ${serial} shell "pidof ${EMBY_PACKAGE} || true"`,
+      { timeout: ADB_CMD_TIMEOUT_MS },
+    );
+    return stdout.trim() !== "";
+  } catch (e) {
+    unilog(2460, `emby process check failed, treating Emby as cold: ${e.message}`);
+    return null;
+  }
+}
+
 // Emby's cold start races the show: the play command opens the player, and the
 // home screen that is still loading behind it then draws its rows on top of the
 // running video -- the ui stranded over playback that only a trip back out
 // clears. The api chatter that builds that home screen is the tell, so a cold
-// launch waits for it to stop before the show is sent. An Emby that was already
-// talking to the server is drawn already and waits for nothing.
-async function waitForEmbyQuiet(label, activityBeforeLaunch) {
-  if (
-    activityBeforeLaunch &&
-    Date.now() - Date.parse(activityBeforeLaunch) < EMBY_WARM_MS
-  )
-    return;
+// launch waits for it to stop before the show is sent. Only called for a cold
+// Emby; a running one is drawn already and waits for nothing.
+async function waitForEmbyQuiet(label) {
   const startedAt = Date.now();
   const deadline = startedAt + EMBY_QUIET_MAX_WAIT_MS;
   let last = await embyTvLastActivity();
@@ -743,8 +839,8 @@ async function firePendingViewShowUntilPlaying(label) {
   const wanted = pendingViewShow;
   const seq = viewShowSeq;
   if (wanted?.play) {
-    // The tv was off, so Emby is always cold here -- no warm check to make.
-    await waitForEmbyQuiet(label, null);
+    // The tv was off, so Emby is always cold here -- no process check to make.
+    await waitForEmbyQuiet(label);
     if (seq !== viewShowSeq) return; // a newer press owns the tv now
     pendingViewShow = { ...wanted, at: Date.now() }; // the wait is not staleness
   }
@@ -821,13 +917,15 @@ app.get("/tv/viewshow", async (req, res) => {
   // nothing at all — no flash — so it is safe to send every time. No Home key:
   // that is what used to make Emby blink out and reload.
   const activityBefore = await embyTvLastActivity();
+  // Asked before the launch below, which is what starts a dead Emby.
+  const embyAlive = play && (await embyProcessAlive());
   callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
     media_content_type: "app",
     media_content_id: EMBY_APP_URI,
   });
   await sleep(EMBY_LAUNCH_DELAY_MS);
-  if (play) {
-    await waitForEmbyQuiet("viewshow", activityBefore);
+  if (play && !embyAlive) {
+    await waitForEmbyQuiet("viewshow");
     if (seq !== viewShowSeq) return; // a newer press owns the tv now
     // The wait above is deliberate, not staleness, so the request does not age
     // out of firePendingViewShow's max age while we sit through a cold boot.
@@ -1392,6 +1490,7 @@ async function pushTvState() {
       state: braviaHaPower,
       mediaContentType: braviaMediaContentType,
       mediaTitle: braviaMediaTitle,
+      adbOk: braviaAdbOk,
     }),
   }).catch(() => {});
 }
@@ -2628,6 +2727,38 @@ app.post("/tv/tvapprc/forceback", async (req, res) => {
 app.post("/tv/closeembyshow", async (req, res) => {
   await closeEmbyShow();
   res.json({ ok: true });
+});
+
+// Picture settings' adb Connect button. With a port and code from the TV
+// (Developer options > Wireless debugging > Pair device with pairing code) it
+// pairs hahnca.com first; with neither it only hunts down the port wireless
+// debugging moved to, which is all a reboot takes while the pairing holds.
+app.post("/tv/adbconnect", async (req, res) => {
+  const { port = "", code = "" } = req.body ?? {};
+  // Both go into a shell command line.
+  if (!/^\d*$/.test(port) || !/^\d*$/.test(code) || !port !== !code) {
+    res.json({ ok: false, error: "port and code must both be digits, or both empty" });
+    return;
+  }
+  try {
+    if (port) {
+      const { stdout } = await execAsync(
+        `adb pair ${BRAVIA_TV_HOST}:${port} ${code}`,
+        { timeout: ADB_PAIR_TIMEOUT_MS },
+      );
+      unilog(2461, `adb pair: ${stdout.trim()}`);
+    }
+    const serial = await connectBraviaAdb();
+    await checkBraviaAdb();
+    res.json(
+      serial
+        ? { ok: true, serial }
+        : { ok: false, error: "no tv port took an adb connection -- pair first" },
+    );
+  } catch (e) {
+    unilog(2462, `adb connect failed: ${e.message}`);
+    res.json({ ok: false, error: e.message });
+  }
 });
 
 app.post("/tv/tvapprc/emby", async (req, res) => {

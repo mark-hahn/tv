@@ -3498,6 +3498,14 @@ app.post("/api/introFiles", async (req, res) => {
 
 app.post("/internal/tv-state", (req, res) => {
   notifyClients("tvMuteState", req.body);
+  if (req.body.adbOk === false)
+    setGlobalMessage({
+      id: "TvAdb",
+      text: "TV ADB error",
+      position: 0,
+      color: "red",
+    });
+  else setGlobalMessage({ id: "TvAdb", action: "hide" });
   res.json({ ok: true });
 });
 

@@ -237,6 +237,9 @@ export default function App() {
   const [subDeviceName, setSubDeviceName] = useState(null);
   const [showPicCtrl, setShowPicCtrl] = useState(false);
   const [picSettings, setPicSettings] = useState([]);
+  const [adbPort, setAdbPort] = useState("");
+  const [adbCode, setAdbCode] = useState("");
+  const [adbStatus, setAdbStatus] = useState("");
   const [picInputs, setPicInputs] = useState({}); // target -> { typing, raw }
   const [locked, setLocked] = useState(false);
   const [lockInfo, setLockInfo] = useState(null);
@@ -1206,6 +1209,27 @@ export default function App() {
   };
 
   const stopVolUpHold = () => lpStop();
+
+  // Reconnects tv-tv's adb to the TV. Port and code come from the TV's
+  // Developer options > Wireless debugging > Pair device with pairing code;
+  // left empty, tv-tv only hunts for the port wireless debugging moved to.
+  const adbConnect = async () => {
+    setAdbStatus("Connecting...");
+    try {
+      const data = await fetch(`${TV_TV_URL}/tv/adbconnect`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ port: adbPort.trim(), code: adbCode.trim() }),
+      }).then((r) => r.json());
+      setAdbStatus(data.ok ? `Connected ${data.serial}` : data.error);
+      if (data.ok) {
+        setAdbPort("");
+        setAdbCode("");
+      }
+    } catch (e) {
+      setAdbStatus(e.message);
+    }
+  };
 
   const closePicCtrl = () => {
     closeChannel("tvPicture");
@@ -3081,6 +3105,36 @@ export default function App() {
               </TouchableOpacity>
             </View>
           ))}
+          <View style={picCtrlStyles.row}>
+            <View style={picCtrlStyles.labelCol}>
+              <Text style={picCtrlStyles.label}>ADB</Text>
+              {adbStatus !== "" && (
+                <Text style={picCtrlStyles.rangeHint}>{adbStatus}</Text>
+              )}
+            </View>
+            <TextInput
+              style={picCtrlStyles.valueInput}
+              value={adbPort}
+              onChangeText={setAdbPort}
+              placeholder="port"
+              placeholderTextColor="#aaa"
+              keyboardType="number-pad"
+            />
+            <TextInput
+              style={picCtrlStyles.valueInput}
+              value={adbCode}
+              onChangeText={setAdbCode}
+              placeholder="code"
+              placeholderTextColor="#aaa"
+              keyboardType="number-pad"
+            />
+            <TouchableOpacity
+              onPress={adbConnect}
+              style={picCtrlStyles.arrowBtn}
+            >
+              <Text style={picCtrlStyles.arrowText}>Connect</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
         <TouchableOpacity
           onPress={closePicCtrl}

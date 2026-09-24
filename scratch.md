@@ -1,11 +1,9 @@
 
-scrape ipt/tl for info section and display in pop-up
-
-in tor tor pane when a torrent card has isClicked set then a checkmark is shown.  And when it has isDownloadedBefore  it shows a clock.  those icons are shown because the card torrent title matches some title in list.  when that matching is done there may be more than one card with the same title so multiple cards are marked instead of just the one.  the matching needs to be more specific.  is there a torrent hash that can be used to match instead of just the title? if not, then maybe the file size could me included in the stored info for matching?
-
 manage upcoming shows
 
 =================
+
+in tor tor pane when a torrent card has isClicked set then a checkmark is shown.  And when it has isDownloadedBefore  it shows a clock.  those icons are shown because the card torrent title matches some title in list.  when that matching is done there may be more than one card with the same title so multiple cards are marked instead of just the one.  the matching needs to be more specific.  is there a torrent hash that can be used to match instead of just the title? if not, then maybe the file size could me included in the stored info for matching?
 
 when in chksrt video and the timing adjustment slider is not at 0 and the save button is clicked then bring up a confirmation dialog `A timing adjustment has not been applied. Are you sure you want to leave?` with ok and cancel.
 

@@ -1,12 +1,12 @@
 
 
 don't browse `In Development`
-
-when in browse pane and we switch to preview mode the info pane is opened and data is correct but a stale image shows briefly -- clear stale image
-
+                                                                                                                              
 ????????????????
 manage upcoming shows
 =================
+
+when in browse pane and we switch to preview mode the info pane is opened and data is correct but a stale image shows briefly -- clear stale image
 
 instead of limiting to 10 shows show all that have been 
 

@@ -1363,7 +1363,8 @@ app.get("/api/getGaps", apiWrapper(getGaps));
 app.get("/api/getNoEmbys", apiWrapper(getNoEmbys));
 app.get("/api/getDevices", apiWrapper(emby.getDevices));
 app.post("/api/embyViewShow", apiWrapper(emby.viewShowOnLivingRoomTv));
-app.get("/api/getPlayUrl", apiWrapper(emby.getPlayUrl));
+app.get("/api/getPlayUrl", apiWrapper(getPlayUrl));
+app.post("/api/playProgress", apiWrapper(playProgress));
 app.get("/api/getLastViewed", apiWrapper(view.getLastViewed));
 app.get("/api/getSharedFilters", apiWrapper(getSharedFilters));
 // GET with no params uses the shared settings; POST carries its own.
@@ -3603,14 +3604,33 @@ async function refreshPlayedDatesForShow(showName) {
   return true;
 }
 
+// tv-tv's Emby sessions and tvapp's own player are two feeds of one list. Each
+// keeps its own part, so neither one's report wipes out the other's.
+let embyNowPlaying = { showName: null, playing: [] };
+let tvappNowPlaying = null;
+
 app.post("/internal/nowPlaying", (req, res) => {
   const { showName, playing } = req.body;
+  embyNowPlaying = {
+    showName: showName ?? null,
+    playing: Array.isArray(playing) ? playing : [],
+  };
+  res.json({ ok: true });
+  publishNowPlaying();
+});
+
+// tvapp is the tv itself, so its play heads the list.
+function publishNowPlaying() {
+  const showName = tvappNowPlaying?.showName ?? embyNowPlaying.showName;
   const prevPlayingShowNames = new Set(
     (Array.isArray(lastNowPlayingList) ? lastNowPlayingList : [])
       .map((item) => item?.showName)
       .filter(Boolean),
   );
-  const nextPlayingList = Array.isArray(playing) ? playing : [];
+  const nextPlayingList = [
+    ...(tvappNowPlaying ? [tvappNowPlaying] : []),
+    ...embyNowPlaying.playing,
+  ];
   const nextPlayingShowNames = new Set(
     nextPlayingList.map((item) => item?.showName).filter(Boolean),
   );
@@ -3635,7 +3655,6 @@ app.post("/internal/nowPlaying", (req, res) => {
     playing: lastNowPlayingList,
   });
   view.recordNowPlaying(lastNowPlayingShowName);
-  res.json({ ok: true });
 
   // Auto-skip: fire when an episode is near its start (either TV). Keyed on the
   // episode rather than a not-playing -> playing edge: the TV session keeps its
@@ -3679,7 +3698,7 @@ app.post("/internal/nowPlaying", (req, res) => {
       );
     });
   }
-});
+}
 
 async function checkMissingEpisodes(playing) {
   const currentKeys = new Set(
@@ -3741,6 +3760,160 @@ async function checkMissingEpisodes(playing) {
       lastMissingEpWarning = warningData;
       notifyClients("missingEpisodeWarning", warningData);
     }
+  }
+}
+
+//////////////////  TVAPP PLAYBACK  //////////////////
+// tvapp plays episode files in its own player straight off nginx, which serves
+// tvDir at TV_URL. getPlayUrl says what to play and where to start;
+// playProgress hears back how far it got.
+
+const TV_URL = "https://hahnca.com/tv";
+const SRVR_PUBLIC_URL = "https://hahnca.com/tv-srvr";
+const TVAPP_DEVICE = "tvapp";
+const TICKS_PER_MS = 10000; // episodeData pos is in Emby's 100-ns ticks
+
+// The LastPlayedDate of tvapp's current play, in Emby's format. Emby is sent
+// the same one on every write so its read-back matches the record's.
+let tvappPlayedIso = null;
+
+// The named episode (by Emby item id, which tvapp's map still carries), else
+// next-up: the first episode past season 0 with a file and not watched.
+function playEpisodeFor(ed, episodeId) {
+  let found = null;
+  epd.forEachEpisode(ed, (season, episode) => {
+    if (found || season <= 0) return;
+    const named =
+      episodeId &&
+      String(epd.getEmbyId(ed, season, episode)) === String(episodeId);
+    const nextUp =
+      !episodeId &&
+      epd.hasFile(ed, season, episode) &&
+      !epd.isWatched(ed, season, episode);
+    if (named || nextUp) found = { season, episode };
+  });
+  return found;
+}
+
+// The subtitle chksrt settled on for the file, else a sidecar .srt beside it.
+// An .srt goes as a url (tv-srvr hands it out as vtt); an embedded track goes
+// as its stream index for the player to pick itself, because extracting one
+// here takes ffmpeg a pass over the whole file. chksrt keys its history by the
+// show's folder name.
+function subsForFile(file, season, episode) {
+  const folder = file.slice(tvDir.length + 1).split("/")[0];
+  const pref = findChksrtPreferred(folder, fmtSeasonEpisode(season, episode));
+  if (pref?.embStreamIndex != null)
+    return { subsUrl: null, subIndex: pref.embStreamIndex };
+  const stem = epd.vidStripAlt(path.basename(file)).replace(/\.[^.]+$/, "");
+  const srt =
+    pref?.srtFile ||
+    fs
+      .readdirSync(path.dirname(file))
+      .find((f) => f.endsWith(".srt") && f.startsWith(stem));
+  if (!srt) return { subsUrl: null, subIndex: null };
+  return {
+    subsUrl:
+      `${SRVR_PUBLIC_URL}/api/subtitle?path=${encodeURIComponent(file)}` +
+      `&file=${encodeURIComponent(srt)}`,
+    subIndex: null,
+  };
+}
+
+async function getPlayUrl({ showName, episodeId }) {
+  const rec = tvdb.getAllTvdbSync()?.[showName];
+  if (!rec) throw new Error(`getPlayUrl: no show ${showName}`);
+  const ed = rec.episodeData;
+  const target = playEpisodeFor(ed, episodeId);
+  if (!target) return { url: null };
+  const { season, episode } = target;
+  const folder = showPaths.showFolderFor(showName, rec);
+  const file = epd.getFullPath(ed, folder, season, episode, tvDir);
+  if (!file) return { url: null };
+  const rel = file.slice(tvDir.length + 1);
+  const intro = tvdb.getSeasonIntro(rec, season);
+  return {
+    url: `${TV_URL}/${rel.split("/").map(encodeURIComponent).join("/")}`,
+    showName,
+    season,
+    episode,
+    posMs: Math.round(epd.getPos(ed, season, episode) / TICKS_PER_MS),
+    trimPosMs: Math.max(0, Math.round(intro.trimPos || 0)),
+    skipDurMs: Math.max(0, Math.round(intro.skipDur || 0)),
+    ...subsForFile(file, season, episode),
+  };
+}
+
+// tvapp's player reports when it starts, every few seconds while it is up, on
+// pause, and when it stops or runs to the end. The record keeps the resume
+// position and, at the end, the watched mark. Emby is written the same until
+// kill-emby phase 3, since its sync would otherwise put its own values back.
+async function playProgress({ showName, season, episode, posMs, durMs, state }) {
+  const rec = tvdb.getAllTvdbSync()?.[showName];
+  if (!rec) throw new Error(`playProgress: no show ${showName}`);
+  const ed = rec.episodeData;
+  const code = fmtSeasonEpisode(season, episode);
+  if (!Number.isInteger(season) || !Number.isInteger(episode) || !epd.getEp(ed, season, episode))
+    throw new Error(`playProgress: no episode ${code} in ${showName}`);
+  const ended = state === "ended";
+  const stopped = ended || state === "stopped";
+  const started =
+    !stopped &&
+    !(
+      tvappNowPlaying?.showName === showName &&
+      tvappNowPlaying.season === season &&
+      tvappNowPlaying.episode === episode
+    );
+  const pos = ended ? 0 : Math.max(0, Math.round(posMs)) * TICKS_PER_MS;
+  epd.setEpisode(ed, season, episode, ended ? { watched: true, pos } : { pos });
+  if (ended) rec.watchedCount = epd.countWatched(ed);
+  if (started || stopped) {
+    tvappPlayedIso = toEmbyDate(Date.now());
+    rec.lastPlayedDate = util.toPstDateTimeMs(tvappPlayedIso);
+    rec.lastPlayedEpisode = code;
+    rec.fakeLastPlayed = null;
+    rec.hiddenFromRow = false;
+    logHere({ grp: "tvapp play" }, `${showName} ${code} ${state} at ${Math.round(posMs / 1000)}s`);
+  }
+  await tvdb.saveTvdbSync();
+  debouncedTvdbPush(showName);
+  tvappNowPlaying = stopped
+    ? null
+    : {
+        showName,
+        device: TVAPP_DEVICE,
+        season,
+        episode,
+        positionTicks: pos,
+        runtimeTicks: durMs > 0 ? Math.round(durMs) * TICKS_PER_MS : null,
+        id: null,
+      };
+  // Emby first: a stop sets off a read of Emby's last-played date (see
+  // publishNowPlaying), which has to find this play's date there.
+  await setEmbyPlayState(showName, ed, season, episode, pos);
+  publishNowPlaying();
+  return { ok: true };
+}
+
+// ponytail: dual write, deleted with the rest of Emby in kill-emby phase 3.
+async function setEmbyPlayState(showName, ed, season, episode, pos) {
+  const id = epd.getEmbyId(ed, season, episode);
+  if (!id || !tvappPlayedIso) return;
+  const code = fmtSeasonEpisode(season, episode);
+  try {
+    const res = await fetch(urls.updateUserDataUrl(String(id)), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        Played: epd.isWatched(ed, season, episode),
+        PlaybackPositionTicks: pos,
+        LastPlayedDate: tvappPlayedIso,
+      }),
+    });
+    if (!res.ok && res.status !== 204)
+      logHere({ lvl: "warn", grp: "tvapp play" }, `emby play state write failed for ${showName} ${code}: HTTP ${res.status}`);
+  } catch (e) {
+    logHere({ lvl: "warn", grp: "tvapp play" }, `emby play state write failed for ${showName} ${code}: ${e.message}`);
   }
 }
 

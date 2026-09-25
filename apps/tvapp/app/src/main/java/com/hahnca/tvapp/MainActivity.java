@@ -112,13 +112,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final String KEY_SORT = "sort";
 
   private static final String PLAY_URL_URL = "https://hahnca.com/tv-srvr/api/getPlayUrl";
-  // Test: ok plays this one episode with these subtitles, whatever is selected.
-  private static final boolean PLAY_TEST_VIDEO = true;
-  private static final String TEST_VIDEO_BASE =
-      "https://hahnca.com/tv/DANG!/Season%201/"
-          + "DANG.S01E03.The.Davenport.School.for.Fancy.Boys.2160p.NF.WEB-DL.DDP5.1.Atmos.H.265-XEBEC";
-  private static final String TEST_VIDEO_URL = TEST_VIDEO_BASE + ".mkv";
-  private static final String TEST_SUBS_URL = TEST_VIDEO_BASE + ".opnMHUDJ.srt";
   private static final String NO_FILE_TOAST = "No file.";
   // Not a Toast: the wait is ten seconds and the longest toast is three and a
   // half, so it went out well before the shows came in. This is a view of the
@@ -393,7 +386,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     player = new TrailerPlayer(this);
     root.addView(player, matchParent());
 
-    video = new VideoPlayer(this);
+    video = new VideoPlayer(this, this::showBigCenterToast);
     root.addView(video, matchParent());
 
     // Added last, so it is over the trailer player as well as the list: a
@@ -977,13 +970,14 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    * focused -- the selected show itself, from wherever Emby left off.
    */
   private void embyClick() {
+    // The Play key over a video pauses and resumes it, as ok does.
+    if (video.isOpen()) {
+      video.key("ok");
+      return;
+    }
     String trailerUrl = showList.focusedTrailerUrl();
     if (trailerUrl != null) {
       player.play(trailerUrl);
-      return;
-    }
-    if (PLAY_TEST_VIDEO) {
-      video.play(TEST_VIDEO_URL, TEST_SUBS_URL);
       return;
     }
     Shows.Show show = showList.getSelected();
@@ -1028,34 +1022,33 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   /**
    * Plays the episode's file in tvapp's own player straight off nginx -- Emby
    * is not asked anything. tv-srvr picks the episode (the named one, else
-   * next-up) and hands back its url, or null when there is no file.
+   * next-up) and hands back its url and where to start, with url null when
+   * there is no file.
    */
   private void playVideo(Shows.Show show, String episodeId) {
     new Thread(
             () -> {
-              String url = null;
+              JSONObject resp;
               try {
                 String query =
-                    "?showId="
-                        + URLEncoder.encode(show.id, "UTF-8")
+                    "?showName="
+                        + URLEncoder.encode(show.name, "UTF-8")
                         + (episodeId == null
                             ? ""
                             : "&episodeId=" + URLEncoder.encode(episodeId, "UTF-8"));
-                JSONObject resp = new JSONObject(Http.get(PLAY_URL_URL + query));
-                if (!resp.isNull("url")) url = resp.getString("url");
+                resp = new JSONObject(Http.get(PLAY_URL_URL + query));
               } catch (Exception e) {
                 Log.e(TAG, "getPlayUrl failed for " + show.name + ": " + e);
                 return;
               }
-              String playUrl = url;
               ui.post(
                   () -> {
-                    if (playUrl == null) {
+                    if (resp.isNull("url")) {
                       showBigCenterToast(NO_FILE_TOAST);
                       return;
                     }
                     playedShow = show;
-                    video.play(playUrl, null);
+                    video.play(resp);
                   });
             },
             "play-url")
@@ -1449,9 +1442,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     // moving a list nobody can see underneath it. Back is not here: it comes
     // in on its own path, and handleBack closes the overlay.
     if (cam.isShowing()) return;
-    // A video has no controls yet; the Shows key is the way out. Every other
-    // key is swallowed so it cannot move the hidden list underneath.
-    if (video.isOpen()) return;
+    // While a video is up the keys are its own (see VideoPlayer.key); Back and
+    // the Shows key come in on their own paths and close it. Keys it has no
+    // use for are swallowed so they cannot move the hidden list underneath.
+    if (video.isOpen()) {
+      video.key(key);
+      return;
+    }
     if (player.isPlaying()) {
       // While the video owns the screen the keys are the video's, the way they
       // are in Emby: ok pauses and resumes, left seeks. Right is the way back

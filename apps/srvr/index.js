@@ -2007,9 +2007,12 @@ app.post(
     const showName = params?.name;
     if (!showName) return { ok: false, error: "Missing name" };
     const rec = tvdb.getAllTvdbSync()?.[showName];
-    if (!rec?.id) return { ok: false, error: "Show not in emby" };
-    if (!hasEpisodesOnDisk(rec))
-      return { ok: false, error: "No episodes on disk" };
+    if (!rec) return { ok: false, error: "Show not found" };
+    const canHide =
+      (rec.inEmby !== false && rec.id && hasEpisodesOnDisk(rec)) ||
+      rec.lastPlayedDate ||
+      rec.fakeLastPlayed;
+    if (!canHide) return { ok: false, error: "Nothing to hide" };
 
     let action;
     let changed;
@@ -4712,8 +4715,9 @@ async function setEmbyLastPlayed(showId, targetIso, skipOlderThanMs) {
 // "Hiding" means pushing lastPlayed back so the show drops to the far right of
 // the "continue watching" row; "unhiding" bumps it to today. hiddenFromRow
 // tracks the hidden state; it is set on hide and cleared on unhide, when a
-// wait ends, and when a real play is read back from Emby. Shows with no
-// episodes on disk are ignored by every path below.
+// wait ends, and when a real play is read back from Emby. The automatic paths
+// ignore shows with no episodes on disk; the button also takes any show with a
+// last viewing, real or fake, and a show not in Emby only moves its record stamp.
 
 function hasEpisodesOnDisk(rec) {
   return epd.seasonsWithFile(rec?.episodeData).length > 0;
@@ -4742,16 +4746,12 @@ async function snapshotTruePlayed(showName, rec) {
 
 // Remember the fabricated timestamp just written into Emby, so later reads
 // recognize it as ours and leave the real last viewing on the record alone.
-// A show nothing has been played on has no Emby date for the stamp to land
-// on, so its stamp lives on the record alone, the same way the wait-over
-// path stamps it (see markWaitOverViewedNow); it is told apart by having no
-// real last viewing, and every hide/unhide stamps it, or the watched sort
-// would not follow the button. A played show's stamp is only moved when
-// Emby's was, so the two keep matching for the echo.
-async function markFakeLastPlayed(rec, targetIso, changed) {
-  const stampedEmby = changed.some((c) => c.startsWith("lastPlayed"));
-  const recordOnly = !rec.lastPlayedDate;
-  if (!stampedEmby && !recordOnly) return;
+// Every hide/unhide stamps it, or the watched sort would not follow the
+// button. When Emby has no played episode for the stamp to land on (nothing
+// played, or the played episodes are gone from Emby) the stamp lives on the
+// record alone, the same way the wait-over path stamps it (see
+// markWaitOverViewedNow); a read of Emby then returns no date to replace it.
+async function markFakeLastPlayed(rec, targetIso) {
   rec.fakeLastPlayed = util.toPstDateTimeMs(targetIso);
   await tvdb.saveTvdbSync();
 }
@@ -4760,26 +4760,32 @@ async function markFakeLastPlayed(rec, targetIso, changed) {
 // show's newest last-played date is two years old. Returns the names of the
 // dates actually changed.
 async function hideShowInEmby(showName, rec) {
-  await snapshotTruePlayed(showName, rec);
   const cutoffMs = Date.now() - HIDE_BACKDATE_MS;
   const targetIso = toEmbyDate(cutoffMs);
   const changed = [];
-  try {
-    const lpCount = await setEmbyLastPlayed(rec.id, targetIso, cutoffMs);
-    if (lpCount > 0) changed.push(`lastPlayed(${lpCount} epis)`);
-  } catch (e) {
-    unilog(1649, `lastPlayed set failed: ${e.message}`);
+  // A show not in emby has only the record stamp to move.
+  if (rec.inEmby !== false && rec.id) {
+    await snapshotTruePlayed(showName, rec);
+    try {
+      const lpCount = await setEmbyLastPlayed(rec.id, targetIso, cutoffMs);
+      if (lpCount > 0) changed.push(`lastPlayed(${lpCount} epis)`);
+    } catch (e) {
+      unilog(1649, `lastPlayed set failed: ${e.message}`);
+    }
   }
-  await markFakeLastPlayed(rec, targetIso, changed);
+  await markFakeLastPlayed(rec, targetIso);
   return changed;
 }
 
 // Unhide continue watching: newest played episode's lastPlayed -> today.
 async function unhideContinueWatching(showName, rec) {
-  await snapshotTruePlayed(showName, rec);
   const targetIso = toEmbyDate(Date.now());
-  const count = await setEmbyLastPlayed(rec.id, targetIso, null);
-  await markFakeLastPlayed(rec, targetIso, count > 0 ? ["lastPlayed"] : []);
+  let count = 0;
+  if (rec.inEmby !== false && rec.id) {
+    await snapshotTruePlayed(showName, rec);
+    count = await setEmbyLastPlayed(rec.id, targetIso, null);
+  }
+  await markFakeLastPlayed(rec, targetIso);
   return count;
 }
 

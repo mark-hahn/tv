@@ -247,15 +247,14 @@
           </button>
           <button
             @click.stop="hideClick"
-            :disabled="show?.inEmby === false || !hasVideoFiles"
+            :disabled="!canHide"
             :style="{
               fontSize: '13px',
-              cursor:
-                show?.inEmby !== false && hasVideoFiles ? 'pointer' : 'default',
+              cursor: canHide ? 'pointer' : 'default',
               marginTop: '3px',
               maxHeight: '24px',
               borderRadius: '7px',
-              opacity: show?.inEmby !== false && hasVideoFiles ? 1 : 0.4,
+              opacity: canHide ? 1 : 0.4,
             }"
           >
             {{ show?.hiddenFromRow ? "Unhide" : "Hide" }}
@@ -752,6 +751,15 @@ export default {
     },
     hasVideoFiles() {
       return epd.seasonsWithFile(this.show?.episodeData).length > 0;
+    },
+    // Any show with a last viewing, real or fake, can be hidden -- a wait-over
+    // stamp puts shows at the head of the watched sort with no emby/disk state.
+    canHide() {
+      return (
+        (this.show?.inEmby !== false && this.hasVideoFiles) ||
+        !!this.show?.lastPlayedDate ||
+        !!this.show?.fakeLastPlayed
+      );
     },
   },
 
@@ -1604,6 +1612,14 @@ export default {
 
       if (this.previewMode) {
         evtBus.emit("previewPanesLoading", true);
+        // Drop the previous show's poster so it doesn't flash while tvdb loads,
+        // leaving a blank spacer of the same height so the layout doesn't collapse.
+        const posterEl = document.getElementById("poster");
+        if (posterEl) {
+          const spacer = document.createElement("div");
+          spacer.style.height = posterEl.offsetHeight + "px";
+          posterEl.replaceChildren(spacer);
+        }
       }
 
       const currentShowName = show.name;

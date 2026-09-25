@@ -2317,8 +2317,13 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   // The fabricated lastPlayed timestamp this app itself stamped into Emby to
   // hide/unhide the show. Kept so a re-read that only echoes it is recognized
   // as not a viewing and cannot overwrite the two fields above.
+  // A brand-new show is stamped as viewed now so it heads the watched sort;
+  // the stamp lives on the record only and the first real play retires it.
+  const isNewRecord = !allTvdb[name] && !paramObj.transient;
   tvdbData.fakeLastPlayed =
-    paramObj.fakeLastPlayed || existing.fakeLastPlayed || null;
+    paramObj.fakeLastPlayed ||
+    existing.fakeLastPlayed ||
+    (isNewRecord ? util.toPstDateTimeMs(new Date()) : null);
 
   // Flattened Disk/filesystem data (no nested object)
   tvdbData.date =

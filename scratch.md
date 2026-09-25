@@ -1,9 +1,10 @@
 
-instead of limiting to 10 shows show all that have been 
 
 ????????????????
 manage upcoming shows
 =================
+
+instead of limiting to 10 shows show all that have been 
 
 - when in browse pane show a button `Upcoming` at the right of the bottom remote keys
 - when clicked it should switch to upcoming mode

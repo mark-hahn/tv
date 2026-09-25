@@ -20,7 +20,6 @@ import androidx.media3.common.Tracks;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.ui.PlayerView;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -57,8 +56,8 @@ class VideoPlayer extends FrameLayout {
   // How long the time bar stays up after a key while playing; paused, it
   // stays until play resumes.
   private static final int BAR_SHOW_MS = 3000;
+  // Each sideloaded .srt's track id is this plus its index in getPlayUrl's subs.
   private static final String SUBS_ID = "tvapp-subs";
-  private static final String SUBS_LABEL = "External";
   private static final String PLAY_FAILED_TOAST = "Video failed.";
 
   private final PlayerView view;
@@ -109,8 +108,9 @@ class VideoPlayer extends FrameLayout {
   /**
    * p is tv-srvr's getPlayUrl answer: url, showName, season, episode, posMs
    * (resume point), trimPosMs (where the show starts past its intro), skipDurMs
-   * (the Skip key's jump), subsUrl (an .srt as vtt) and subIndex (the embedded
-   * subtitle stream chksrt chose).
+   * (the Skip key's jump), subs (the episode's .srt files as vtt, [{url,
+   * label}]), subIndex (the embedded subtitle stream chksrt chose) and subPick
+   * (the index in subs to start on otherwise, -1 for none).
    */
   void play(JSONObject p) {
     close();
@@ -144,7 +144,9 @@ class VideoPlayer extends FrameLayout {
             if (!subsPicked) pickSubs(tracks);
             textGroups.clear();
             for (Tracks.Group g : tracks.getGroups()) {
-              if (g.getType() == C.TRACK_TYPE_TEXT) textGroups.add(g);
+              if (g.getType() != C.TRACK_TYPE_TEXT) continue;
+              Format f = g.getTrackFormat(0);
+              if (isSideloaded(f) || isEnglish(f)) textGroups.add(g);
             }
             events.onSubtitles(subtitleList());
           }
@@ -161,15 +163,18 @@ class VideoPlayer extends FrameLayout {
         });
     view.setPlayer(exo);
     MediaItem.Builder item = new MediaItem.Builder().setUri(url);
-    if (!p.isNull("subsUrl")) {
-      item.setSubtitleConfigurations(
-          Collections.singletonList(
-              new MediaItem.SubtitleConfiguration.Builder(Uri.parse(p.optString("subsUrl")))
-                  .setMimeType(MimeTypes.TEXT_VTT)
-                  .setId(SUBS_ID)
-                  .setLabel(SUBS_LABEL)
-                  .build()));
+    JSONArray subs = p.optJSONArray("subs");
+    List<MediaItem.SubtitleConfiguration> subConfigs = new ArrayList<>();
+    for (int i = 0; subs != null && i < subs.length(); i++) {
+      JSONObject sub = subs.optJSONObject(i);
+      subConfigs.add(
+          new MediaItem.SubtitleConfiguration.Builder(Uri.parse(sub.optString("url")))
+              .setMimeType(MimeTypes.TEXT_VTT)
+              .setId(SUBS_ID + i)
+              .setLabel(sub.optString("label"))
+              .build());
     }
+    item.setSubtitleConfigurations(subConfigs);
     long resumeMs = p.optLong("posMs");
     exo.setMediaItem(item.build(), resumeMs > 0 ? resumeMs : p.optLong("trimPosMs"));
     exo.prepare();
@@ -276,17 +281,28 @@ class VideoPlayer extends FrameLayout {
 
   // The kinds the remote's panel marks each track with.
   private static String trackType(Format f) {
-    if (f.id != null && f.id.endsWith(SUBS_ID)) return "srt";
+    if (isSideloaded(f)) return "srt";
     if (f.sampleMimeType != null && f.sampleMimeType.contains("pgs")) return "pgs";
     if ((f.selectionFlags & C.SELECTION_FLAG_FORCED) != 0) return "forced";
     if ((f.roleFlags & C.ROLE_FLAG_DESCRIBES_MUSIC_AND_SOUND) != 0) return "sdh";
     return "embedded";
   }
 
+  private static boolean isSideloaded(Format f) {
+    return f.id != null && f.id.contains(SUBS_ID);
+  }
+
+  // Embedded tracks in other languages are left off the panel and never
+  // started on, as in Emby's panel. Untagged ones are kept.
+  private static boolean isEnglish(Format f) {
+    String lang = f.language;
+    return lang == null || lang.isEmpty() || "und".equals(lang) || "en".equals(lang) || lang.startsWith("en-");
+  }
+
   /**
    * The text track to show: the embedded one chksrt chose, else the .srt
-   * tv-srvr sent, else the file's first embedded one. Subtitles are always
-   * on, as they were in Emby.
+   * tv-srvr said to start on, else the file's first English embedded one.
+   * Subtitles are always on, as they were in Emby.
    */
   private void pickSubs(Tracks tracks) {
     int subIndex = playing.isNull("subIndex") ? -1 : playing.optInt("subIndex", -1);
@@ -294,17 +310,18 @@ class VideoPlayer extends FrameLayout {
     // is ffprobe's 0-based stream index + 1 in mkvmerge's files. Match on
     // language/codec instead if some other muxer breaks that.
     String embeddedId = String.valueOf(subIndex + 1);
+    String pickId = SUBS_ID + playing.optInt("subPick", -1);
     Tracks.Group chosen = null;
     Tracks.Group sideloaded = null;
     Tracks.Group firstEmbedded = null;
     for (Tracks.Group g : tracks.getGroups()) {
       if (g.getType() != C.TRACK_TYPE_TEXT) continue;
       String id = g.getTrackFormat(0).id;
-      if (id != null && id.endsWith(SUBS_ID)) {
-        sideloaded = g;
+      if (isSideloaded(g.getTrackFormat(0))) {
+        if (id.endsWith(pickId)) sideloaded = g;
         continue;
       }
-      if (firstEmbedded == null) firstEmbedded = g;
+      if (firstEmbedded == null && isEnglish(g.getTrackFormat(0))) firstEmbedded = g;
       if (subIndex >= 0 && id != null && (id.equals(embeddedId) || id.endsWith(":" + embeddedId)))
         chosen = g;
     }

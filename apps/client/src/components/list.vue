@@ -566,19 +566,13 @@ export default {
         this.saveVisShow(show);
         if (
           !window.confirm(
-            `Do you really want to remove ${name} from emby and the disk?`,
+            `Do you really want to remove ${name} from the disk?`,
           )
         )
           return;
-        // Delete files from server first
+        // Emby drops the show itself: tv-srvr sees the folder go and has
+        // Emby rescan.
         await srvr.deleteShowFromSrvr(show);
-        // Now drop it from Emby's library, so no library scan is needed
-        const embyDel = await srvr.deleteShowFromEmby(name);
-        if (!embyDel?.ok) {
-          const msg = `Cannot remove "${name}" from Emby: ${embyDel?.error}`;
-          alert(msg);
-          throw new Error(msg);
-        }
         // Set inEmby to false to mark as deleted and set leftEmby timestamp
         const leftEmby = util.getPstDateTimeMs();
         // Re-fetch allTvdb in case async ops replaced the cached reference

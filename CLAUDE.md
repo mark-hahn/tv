@@ -172,7 +172,8 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   - `playProgress`, `setEpisodeWatched` and `setTvdbFields` (for the
     collection flags) write the same state back to Emby, so the sweep doesn't
     undo it;
-  - `deleteShowFromEmby` drops a deleted show from Emby's library.
+  - when a show folder is deleted it has Emby rescan, and the sweep then
+    clears `inEmby`. Nothing of ours deletes from Emby itself.
 
 ## tvapp and tvapprc
 
@@ -414,8 +415,10 @@ because the TV is unreachable from any wireless host here.
   and plays the file straight off nginx in Media3 ExoPlayer.
 - It starts at the resume point, or past the intro (`trimPosMs`) if there is
   none.
-- Subtitles: the embedded track chksrt picked, else chksrt's `.srt` (served as
-  vtt), else the first embedded track.
+- Subtitles: every `.srt` for the episode is sideloaded (served as vtt),
+  alt releases' included. It starts on the embedded track chksrt picked,
+  else chksrt's `.srt` or the file's own, else the first English embedded
+  track. Embedded tracks in other languages are never listed.
 - It POSTs `/api/playProgress` on start, every 10 s, on pause/resume, on stop
   and at the end. tv-srvr then:
   - stores `pos` and sets watched at the end;

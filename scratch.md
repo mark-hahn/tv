@@ -1,6 +1,21 @@
 
-collision match will send only one key
 
+when i tried to delete the show `Hullraisers` when in info pane i got this: `Do you really want to remove Hullraisers from emby and the disk?` -- it shouldn't metion emby, it should just mention disk.  when i clicked ok it gave me this: `Cannot remove "Hullraisers" from Emby: Emby HTTP 500: Object reference not set to an instance of an object.`.
+
+when i showed the subtitle pane in phone for `'A Man on the Inside/Season 2/A.Man.on.the.Inside.S02E01.Orientation.2160p.NF.WEB-DL.DDP5.1.Atmos.DV.HDR.H.265-FLUX.mkv'` it listed subtitles starting with `T:` and none with `S:`, even though it has the sidecar `'A Man on the Inside/Season 2/A.Man.on.the.Inside.S02E01.Orientation.1080p.NF.WEB-DL.DDP5.1.H.264-STC.mb4.srt'`.
+also it listed all languages even though it is only supposed to list english.
+
+
+
+what does `T:` mean in the subtitles pane in the phone
+remote key collision match should send only the one key
+i suggest when tvapp is not in info, sort, filter mode then the back key should leave tvapp and go to tv home
+
+don't browse `In Development`
+                                                                                                                              
+????????????????
+manage upcoming shows
+=================
 
 Web: toggle To Try, Continue, Mark and Linda.
 Web: toggle watched on a map episode, and run map Prune.
@@ -11,13 +26,6 @@ tvapp: card images, Back at the top, and playing from the map.
 Deleting a show: I could only test the error path, so the real Emby delete call is unproven.
 Vol+ hold during a video with several subtitle tracks.
 A video whose subtitle is a sidecar .srt; it shows as "S: External".
-Emby in the phone's streaming list.
-
-don't browse `In Development`
-                                                                                                                              
-????????????????
-manage upcoming shows
-=================
 
 when in browse pane and we switch to preview mode the info pane is opened and data is correct but a stale image shows briefly -- clear stale image
 

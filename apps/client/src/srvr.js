@@ -893,10 +893,6 @@ export function setEpisodeWatched(params) {
   return httpCall("/api/setEpisodeWatched", params, "POST");
 }
 
-export function deleteShowFromEmby(name) {
-  return httpCall("/api/deleteShowFromEmby", { name }, "POST");
-}
-
 export function handleAsr(params) {
   return fCall("handleAsr", params);
 }

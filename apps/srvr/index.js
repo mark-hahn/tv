@@ -2294,22 +2294,6 @@ app.post(
     return tvdb.setTvdbFields(params);
   }),
 );
-// ponytail: drops a deleted show from Emby's library, so the sweep does not
-// find it still listed and turn inEmby back on. Goes with the sweep in Phase 3.
-app.post(
-  "/api/deleteShowFromEmby",
-  apiWrapper(async ({ name }) => {
-    const rec = tvdb.getAllTvdbSync()?.[name];
-    if (!rec?.id) return { ok: false, error: "Show not found" };
-    const resp = await fetch(
-      `${EMBY_BASE_URL}/Items/${rec.id}?api_key=${EMBY_API_KEY}`,
-      { method: "DELETE" },
-    );
-    if (!resp.ok)
-      return { ok: false, error: `Emby HTTP ${resp.status}: ${await resp.text()}` };
-    return { ok: true };
-  }),
-);
 
 // Persist watched state into episodeData (used by the map for non-Emby / local
 // episodes). `watchedEpis` is the legacy [[season, ep, ...], ...] array built by
@@ -3826,28 +3810,39 @@ function nextUpEpisode(ed) {
   return found;
 }
 
-// The subtitle chksrt settled on for the file, else a sidecar .srt beside it.
-// An .srt goes as a url (tv-srvr hands it out as vtt); an embedded track goes
-// as its stream index for the player to pick itself, because extracting one
-// here takes ffmpeg a pass over the whole file. chksrt keys its history by the
-// show's folder name.
+// The file's subtitles. subs is every .srt in the folder for the episode --
+// the file's own and any an alt release of it left -- as urls (tv-srvr hands
+// them out as vtt), labelled by their tag (mb4, opnXXXXX, ...). The one to
+// start on: chksrt's embedded pick as subIndex, a stream index for the player
+// to pick itself, because extracting one here takes ffmpeg a pass over the
+// whole file; else subPick, the index in subs of chksrt's .srt or the file's
+// own. chksrt keys its history by the show's folder name.
 function subsForFile(file, season, episode) {
   const folder = file.slice(tvDir.length + 1).split("/")[0];
   const pref = findChksrtPreferred(folder, fmtSeasonEpisode(season, episode));
-  if (pref?.embStreamIndex != null)
-    return { subsUrl: null, subIndex: pref.embStreamIndex };
   const stem = epd.vidStripAlt(path.basename(file)).replace(/\.[^.]+$/, "");
-  const srt =
-    pref?.srtFile ||
-    fs
-      .readdirSync(path.dirname(file))
-      .find((f) => f.endsWith(".srt") && f.startsWith(stem));
-  if (!srt) return { subsUrl: null, subIndex: null };
+  const sameEpisode = (f) => {
+    const m = f.match(/[Ss](\d+)[Ee](\d+)/);
+    return !!m && Number(m[1]) === season && Number(m[2]) === episode;
+  };
+  const srts = fs
+    .readdirSync(path.dirname(file))
+    .filter((f) => f.endsWith(".srt") && (f.startsWith(stem) || sameEpisode(f)));
+  const pick =
+    pref?.embStreamIndex != null
+      ? -1
+      : srts.includes(pref?.srtFile)
+        ? srts.indexOf(pref.srtFile)
+        : srts.findIndex((f) => f.startsWith(stem));
   return {
-    subsUrl:
-      `${SRVR_PUBLIC_URL}/api/subtitle?path=${encodeURIComponent(file)}` +
-      `&file=${encodeURIComponent(srt)}`,
-    subIndex: null,
+    subs: srts.map((f) => ({
+      url:
+        `${SRVR_PUBLIC_URL}/api/subtitle?path=${encodeURIComponent(file)}` +
+        `&file=${encodeURIComponent(f)}`,
+      label: f.slice(0, -".srt".length).split(".").pop(),
+    })),
+    subPick: pick,
+    subIndex: pref?.embStreamIndex ?? null,
   };
 }
 

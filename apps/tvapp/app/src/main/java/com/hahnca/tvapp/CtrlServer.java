@@ -15,23 +15,25 @@ import org.java_websocket.server.WebSocketServer;
  *
  *   k,&lt;key&gt;     one of up/down/left/right/ok/sort/filter/info -- the last
  *                  three each hand the focus to their own area
+ *   kr,&lt;key&gt;    an auto-repeat of a held k key, not a fresh press
  *   j,&lt;key&gt;     skip variant of up/down -- sent instead of k while a hold has
  *                  been auto-repeating fast long enough to enter skip mode
- *   b              switch from tvapp to Emby, one level out at a time
- *   g              switch from tvapp to Emby right now, regardless of focus
- *   e              load the active show into Emby
+ *   b              back, one level out at a time; at the top it stays put
+ *   e              play what the cursor is on, else the active show's next-up
  *   r              clear the screen state: the show list focused and nothing
  *                  else, cardMisc back to its description, filters off
  *   x              close tvapp
  *   f,&lt;text&gt;    show-list filter text
  *   s,&lt;name&gt;    select this show, exact name match -- sent by tv-tv itself
- *   p,&lt;embyId&gt; play this specific episode of the selected show, by its Emby
- *                  id -- sent by tv-tv itself, right after an s,&lt;name&gt;
+ *   p,&lt;season&gt;,&lt;episode&gt; play this specific episode of the selected
+ *                  show -- sent by tv-tv itself, right after an s,&lt;name&gt;
  *   c              the shared filter settings changed: re-fetch the Custom
  *                  list -- sent by tv-tv itself, on tv-srvr's behalf
  *   h              the hide key: the watched mark on the focused episode when
  *                  the map has one under its cursor, else hide/unhide the
  *                  selected show
+ *   l              send the subtitle list of the video that is up (l,... below)
+ *   t,&lt;n&gt;       turn on subtitle track n of that list; t,-1 turns them off
  *   v,&lt;url&gt;  put a live camera on the screen, over everything, by
  *                  loading that url in a WebView; v,off takes it back off.
  *                  Sent by tv-tv on hvac2's behalf -- see
@@ -44,7 +46,9 @@ import org.java_websocket.server.WebSocketServer;
  *   a,&lt;name&gt;    the active show, so the phone's own show pane can open on it
  *   i,&lt;0|1&gt;     whether the active show is hidden, so the remote's hide key
  *                  can read Hide or Unhide
- *   v              a video closed by itself: stop repeating a held key
+ *   l,&lt;json&gt;    the video's subtitle tracks, {title, tracks: [{label, type}],
+ *                  selected}, or null once no video is up -- sent on every
+ *                  change and when asked
  */
 class CtrlServer extends WebSocketServer {
 
@@ -54,14 +58,14 @@ class CtrlServer extends WebSocketServer {
   static final String MSG_COUNTS = "c";
   static final String MSG_ACTIVE_SHOW = "a";
   static final String MSG_ACTIVE_HIDDEN = "i";
-  static final String MSG_VIDEO_ENDED = "v";
+  static final String MSG_SUBTITLES = "l";
 
   private static final String TAG = "tvapp";
   private static final String CMD_KEY = "k";
+  private static final String CMD_KEY_REPEAT = "kr";
   private static final String CMD_KEY_LETTER = "j";
-  private static final String CMD_BACK_TO_EMBY = "b";
-  private static final String CMD_FORCE_CLOSE_TO_EMBY = "g";
-  private static final String CMD_EMBY_SELECTED = "e";
+  private static final String CMD_BACK = "b";
+  private static final String CMD_PLAY = "e";
   private static final String CMD_CLEAR_STATE = "r";
   private static final String CMD_EXIT = "x";
   private static final String CMD_FILTER = "f";
@@ -72,6 +76,8 @@ class CtrlServer extends WebSocketServer {
   // say -- it is the only one that knows whether the map has an episode under
   // its cursor -- so the remote sends the press and nothing more.
   private static final String CMD_HIDE = "h";
+  private static final String CMD_SUBTITLES = "l";
+  private static final String CMD_SUBTITLE = "t";
   // A live camera over the whole screen. The argument is a page url, or "off".
   // Everything about the video is that page's business; see CamOverlay.
   private static final String CMD_CAM = "v";
@@ -79,15 +85,13 @@ class CtrlServer extends WebSocketServer {
   private static final int STOP_TIMEOUT_MS = 500;
 
   interface Listener {
-    void onRemoteKey(String key);
+    void onRemoteKey(String key, boolean repeat);
 
     void onRemoteKeyLetter(String key);
 
-    void onBackToEmby();
+    void onBack();
 
-    void onForceCloseToEmby();
-
-    void onEmbySelected();
+    void onPlay();
 
     void onClearState();
 
@@ -97,11 +101,15 @@ class CtrlServer extends WebSocketServer {
 
     void onSelectShow(String name);
 
-    void onPlayEpisode(String embyId);
+    void onPlayEpisode(int season, int episode);
 
     void onCustomChanged();
 
     void onHideKey();
+
+    void onSubtitlesWanted();
+
+    void onSelectSubtitle(int index);
 
     void onShowCam(String url);
 
@@ -181,7 +189,12 @@ class CtrlServer extends WebSocketServer {
       return;
     }
     if (message.startsWith(CMD_PLAY_EPISODE + ",")) {
-      listener.onPlayEpisode(message.substring(CMD_PLAY_EPISODE.length() + 1));
+      String[] se = message.substring(CMD_PLAY_EPISODE.length() + 1).split(",");
+      try {
+        listener.onPlayEpisode(Integer.parseInt(se[0]), Integer.parseInt(se[1]));
+      } catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
+        Log.w(TAG, "bad play-episode command: " + message);
+      }
       return;
     }
     if (message.startsWith(CMD_CAM + ",")) {
@@ -190,20 +203,30 @@ class CtrlServer extends WebSocketServer {
       else listener.onShowCam(arg);
       return;
     }
+    if (message.startsWith(CMD_SUBTITLE + ",")) {
+      try {
+        listener.onSelectSubtitle(Integer.parseInt(message.substring(CMD_SUBTITLE.length() + 1)));
+      } catch (NumberFormatException e) {
+        Log.w(TAG, "bad subtitle command: " + message);
+      }
+      return;
+    }
     if (message.startsWith(CMD_KEY_LETTER + ",")) {
       listener.onRemoteKeyLetter(message.substring(CMD_KEY_LETTER.length() + 1));
       return;
     }
-    if (message.startsWith(CMD_KEY + ",")) {
-      listener.onRemoteKey(message.substring(CMD_KEY.length() + 1));
+    if (message.startsWith(CMD_KEY_REPEAT + ",")) {
+      listener.onRemoteKey(message.substring(CMD_KEY_REPEAT.length() + 1), true);
       return;
     }
-    if (CMD_BACK_TO_EMBY.equals(message)) {
-      listener.onBackToEmby();
-    } else if (CMD_FORCE_CLOSE_TO_EMBY.equals(message)) {
-      listener.onForceCloseToEmby();
-    } else if (CMD_EMBY_SELECTED.equals(message)) {
-      listener.onEmbySelected();
+    if (message.startsWith(CMD_KEY + ",")) {
+      listener.onRemoteKey(message.substring(CMD_KEY.length() + 1), false);
+      return;
+    }
+    if (CMD_BACK.equals(message)) {
+      listener.onBack();
+    } else if (CMD_PLAY.equals(message)) {
+      listener.onPlay();
     } else if (CMD_CLEAR_STATE.equals(message)) {
       listener.onClearState();
     } else if (CMD_EXIT.equals(message)) {
@@ -212,6 +235,8 @@ class CtrlServer extends WebSocketServer {
       listener.onCustomChanged();
     } else if (CMD_HIDE.equals(message)) {
       listener.onHideKey();
+    } else if (CMD_SUBTITLES.equals(message)) {
+      listener.onSubtitlesWanted();
     } else {
       Log.w(TAG, "unknown ctrl command: " + message);
     }

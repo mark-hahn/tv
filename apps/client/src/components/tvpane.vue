@@ -221,7 +221,7 @@
         </div>
       </div>
     </div>
-    <!-- SubCtrl pane -->
+    <!-- Subtitle pane: the tracks of the video tvapp is playing -->
     <div
       v-else-if="showSubCtrl"
       style="
@@ -233,61 +233,24 @@
     >
       <div
         style="
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
           padding: 8px 12px;
           border-bottom: 2px solid #ccc;
+          font-size: 18px;
+          font-weight: bold;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         "
       >
-        <span
-          style="
-            font-size: 18px;
-            font-weight: bold;
-            flex: 1;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            cursor: pointer;
-          "
-          @mousedown.prevent="subCyclePlayer"
-          @touchstart.prevent="subCyclePlayer"
-          >{{ subCurrentLabel }}</span
-        >
+        {{ subList?.title ?? "No video playing" }}
       </div>
       <div style="overflow-y: auto; flex: 1">
-        <div
-          v-if="!subCurrentPlayer"
-          style="padding: 16px; color: #666"
-        >
+        <div v-if="!subList" style="padding: 16px; color: #666">
           No video playing
         </div>
-        <template v-else-if="subCurrentPlayer.deviceName !== 'Living Room TV'">
-          <div style="padding: 16px; color: #666">
-            Only the Living Room TV is supported
-          </div>
-        </template>
         <template v-else>
           <div
-            @mousedown.prevent="subSelectTrack(-1)"
-            @touchstart.prevent="subSelectTrack(-1)"
-            :style="{
-              padding: '10px 14px',
-              borderBottom: '1px solid #eee',
-              cursor: 'pointer',
-              fontSize: '17px',
-              fontWeight:
-                subCurrentPlayer.subtitleStreamIndex === -1 ? 'bold' : 'normal',
-              backgroundColor:
-                subCurrentPlayer.subtitleStreamIndex === -1
-                  ? '#d0e8ff'
-                  : '#fff',
-            }"
-          >
-            None
-          </div>
-          <div
-            v-for="sub in subCurrentPlayer.subtitles"
+            v-for="sub in subRows"
             :key="sub.index"
             @mousedown.prevent="subSelectTrack(sub.index)"
             @touchstart.prevent="subSelectTrack(sub.index)"
@@ -296,14 +259,9 @@
               borderBottom: '1px solid #eee',
               cursor: 'pointer',
               fontSize: '17px',
-              fontWeight:
-                subCurrentPlayer.subtitleStreamIndex === sub.index
-                  ? 'bold'
-                  : 'normal',
+              fontWeight: subList.selected === sub.index ? 'bold' : 'normal',
               backgroundColor:
-                subCurrentPlayer.subtitleStreamIndex === sub.index
-                  ? '#d0e8ff'
-                  : '#fff',
+                subList.selected === sub.index ? '#d0e8ff' : '#fff',
             }"
           >
             {{ sub.label }}
@@ -311,8 +269,8 @@
         </template>
       </div>
       <div
-        @mousedown.prevent="subClose"
-        @touchstart.prevent="subClose"
+        @mousedown.prevent="showSubCtrl = false"
+        @touchstart.prevent="showSubCtrl = false"
         style="
           background: lightgreen;
           display: flex;
@@ -625,7 +583,7 @@
       >
         ▶
       </div>
-      <!-- Row 3: emby, down, skip -->
+      <!-- Row 3: sel, down, skip -->
       <!-- This is where the phone's Search key is. The web client has no
            filter input screen, so instead it selects tvapp's active show in
            the shows list. -->
@@ -640,17 +598,7 @@
       >
         Sel
       </div>
-      <div
-        v-else
-        :style="cellStyle('white', 'emby')"
-        @mousedown="startEmbyHold"
-        @mouseup="stopEmbyHold"
-        @mouseleave="stopEmbyHold"
-        @touchstart.prevent="startEmbyHold"
-        @touchend="stopEmbyHold"
-      >
-        Emby
-      </div>
+      <div v-else :style="cellStyle('white', 'noSearch')"></div>
       <div
         :style="cellStyle('#f5e642', 'down')"
         @mousedown="startRepeat('down')"
@@ -662,7 +610,8 @@
         ▼
       </div>
       <!-- Skip's cell, which Info left when it moved to the row above: while
-           tvapp is up it hides/unhides the selected show instead. -->
+           tvapp is up it hides/unhides the selected show; otherwise it is
+           empty, since nothing of ours is playing to skip an intro in. -->
       <div
         v-if="tvapprcMode"
         :style="cellStyle('white', 'hide')"
@@ -674,17 +623,7 @@
       >
         {{ tvapprcHidden ? "Unhide" : "Hide" }}
       </div>
-      <div
-        v-else
-        :style="cellStyle('white', 'skip')"
-        @mousedown="startSkipHold"
-        @mouseup="stopSkipHold"
-        @mouseleave="stopSkipHold"
-        @touchstart.prevent="startSkipHold"
-        @touchend="stopSkipHold"
-      >
-        Skip
-      </div>
+      <div v-else :style="cellStyle('white', 'noSkip')"></div>
       <!-- Row 4: vol-, vol+, mute -->
       <div
         :style="cellStyle('lightgreen', 'vold')"
@@ -783,15 +722,22 @@ const MSG_TVAPP_DOWN = "d";
 const MSG_ACTIVE_SHOW = "a";
 // Whether that show is hidden, which is what the hide key reads Unhide for.
 const MSG_ACTIVE_HIDDEN = "i";
-// A tvapp video closed by itself. A held seek must stop repeating right there,
-// or the rest of its repeats land on the show list and move its focus.
-const MSG_VIDEO_ENDED = "v";
+// The subtitle tracks of the video tvapp is playing, as JSON {title, tracks:
+// [{label, type}], selected}, or null when none is up. Asked for with
+// CMD_SUBTITLES; CMD_SUBTITLE,<n> turns track n on, -1 turns them off.
+const MSG_SUBTITLES = "l";
+const CMD_SUBTITLES = "l";
+const CMD_SUBTITLE = "t";
 const CMD_OPEN_TVAPP = "o";
-const CMD_CLOSE_TO_EMBY = "b";
+const CMD_BACK = "b";
 // Back to a clean tvapp screen: the show list focused and nothing else,
 // cardMisc back to its description, filters off.
 const CMD_CLEAR_STATE = "r";
 const CMD_KEY = "k";
+// An auto-repeat of a held key, so tvapp can tell a repeat from a press: a
+// hold belongs to whatever it started on, and its repeats are dropped once
+// that is gone (a seek held past the end of a video).
+const CMD_KEY_REPEAT = "kr";
 // The hide key. What it acts on -- the episode under the map's cursor, else
 // the selected show -- is tvapp's to decide, so the press is all that is sent.
 const CMD_HIDE = "h";
@@ -875,19 +821,17 @@ export default {
       mediaTitle: null,
       showStreamers: false,
       flashSvc: null,
-      showSubCtrl: false,
-      subPlayers: [],
-      subDeviceName: null,
       locked: false,
       lockInfo: null,
       showPicCtrl: false,
+      showSubCtrl: false,
+      subList: null,
       picSettings: [],
       picInputs: {}, // target -> { typing: bool, raw: string }
       adbPort: "",
       adbCode: "",
       adbStatus: "",
       _picChannel: null,
-      _subChannel: null,
       tvapprcMode: false,
       tvapprcHidden: false,
       deniedBtn: null, // cell whose press was refused, painted DENIED_BG
@@ -923,19 +867,14 @@ export default {
     powerBarStyle() {
       return POWER_BAR;
     },
-    subCurrentPlayer() {
-      return (
-        this.subPlayers.find(
-          (p) => (p.deviceName || p.sessionId) === this.subDeviceName,
-        ) ?? null
+    subRows() {
+      const typeChar = { pgs: "*", sdh: "H", embedded: "T", forced: "F" };
+      return [{ label: "None", index: -1 }].concat(
+        (this.subList?.tracks ?? []).map((sub, index) => ({
+          label: `${typeChar[sub.type] ?? "S"}: ${(sub.label || "").replace(/\bdefault\b/gi, "Def")}`,
+          index,
+        })),
       );
-    },
-    subCurrentLabel() {
-      const p = this.subCurrentPlayer;
-      if (!p) return this.subDeviceName ? "---" : "No video playing";
-      let base = p.episodeCode ? `${p.showName} ${p.episodeCode}` : p.showName;
-      if (p.deviceName) base += ` (${p.deviceName})`;
-      return base;
     },
     muteCellStyle() {
       const bg = this.flashBtn === "mute" ? "orange" : "lightgreen";
@@ -996,7 +935,6 @@ export default {
 
   mounted() {
     evtBus.on("tvMuteState", this._onTvMuteState);
-    evtBus.on("paneChanged", this._onPaneChanged);
     evtBus.on("tvRemoteLock", this._onTvRemoteLock);
     evtBus.on("tvRemoteUnlock", this._onTvRemoteUnlock);
     evtBus.on("tvArrowKey", this._onTvArrowKey);
@@ -1012,7 +950,6 @@ export default {
     this._tvapprcWs?.close();
     this._tvapprcWs = null;
     evtBus.off("tvMuteState", this._onTvMuteState);
-    evtBus.off("paneChanged", this._onPaneChanged);
     evtBus.off("tvRemoteLock", this._onTvRemoteLock);
     evtBus.off("tvRemoteUnlock", this._onTvRemoteUnlock);
     evtBus.off("tvArrowKey", this._onTvArrowKey);
@@ -1027,9 +964,7 @@ export default {
     this._db = null;
     clearTimeout(this._googleTimer);
     this.closePicCtrl();
-    this.subClose();
     clearTimeout(this._unlockHoldTimer);
-    clearInterval(this._embyPosTimer);
   },
 
   methods: {
@@ -1082,9 +1017,6 @@ export default {
           this.tvapprcMode = false;
           this.tvapprcHidden = false;
           this._tvapprcActiveShow = null;
-        } else if (e.data === MSG_VIDEO_ENDED) {
-          // The repeat loop checks this before every send.
-          this._repeatActive = false;
         } else if (
           typeof e.data === "string" &&
           e.data.startsWith(`${MSG_ACTIVE_SHOW},`)
@@ -1096,6 +1028,11 @@ export default {
         ) {
           this.tvapprcHidden =
             e.data.slice(MSG_ACTIVE_HIDDEN.length + 1) === "1";
+        } else if (
+          typeof e.data === "string" &&
+          e.data.startsWith(`${MSG_SUBTITLES},`)
+        ) {
+          this.subList = JSON.parse(e.data.slice(MSG_SUBTITLES.length + 1));
         }
       };
       this._tvapprcOpenTimer = setTimeout(() => {
@@ -1129,15 +1066,13 @@ export default {
       }
     },
 
-    // Back button while tvapp is open: one level out over there, which is not
-    // always a close -- while one of tvapp's areas has the focus the press only
-    // drops that focus. So this leaves tvapprc mode alone and lets the bridge's
-    // tvapp-down message end it, which is the only thing that knows tvapp has
-    // really gone.
-    async closeTvappToEmby() {
+    // Back button while tvapp is open: one level out over there. tvapp is
+    // home, so it never closes -- at its top level the press does nothing --
+    // and tvapprc mode is left alone.
+    async tvappBack() {
       this.flash("back");
       if ((await this.sendKeyThrough("back", null)).blocked) return;
-      if (!this.sendTvapprc(CMD_CLOSE_TO_EMBY)) {
+      if (!this.sendTvapprc(CMD_BACK)) {
         fetch(`${config.tvTvUrl}/tv/tvapprc/back`, { method: "POST" }).catch(
           () => {},
         );
@@ -1154,14 +1089,12 @@ export default {
       this.sendTvapprc(CMD_CLEAR_STATE);
     },
 
-    // Human-readable label for the lockout message. openapp:/subtitle: keys
-    // carry their own readable suffix already, everything else looks up
+    // Human-readable label for the lockout message. openapp: keys carry their
+    // own readable suffix already, everything else looks up
     // ../../../tv/keyLabels.json (see that file to change wording).
     keyLabel(key) {
       if (!key) return key;
       if (key.startsWith("openapp:")) return key.slice("openapp:".length);
-      if (key.startsWith("subtitle:"))
-        return `Subtitle ${key.slice("subtitle:".length)}`;
       return keyLabels[key] ?? key;
     },
 
@@ -1189,7 +1122,7 @@ export default {
     // Keyboard escape — same as a short tap on the Back button.
     async _onTvBackKey() {
       if (this.tvapprcMode) {
-        await this.closeTvappToEmby();
+        await this.tvappBack();
         return;
       }
       await this.tvKey("back");
@@ -1236,9 +1169,8 @@ export default {
               repeating: true,
             });
             if (rr.blocked) return this.stopRepeat();
-            if (!this._repeatActive) break;
             this.sendTvapprc(
-              `${letterMode ? CMD_KEY_LETTER : CMD_KEY},${key}`,
+              `${letterMode ? CMD_KEY_LETTER : CMD_KEY_REPEAT},${key}`,
             );
             const delay = letterMode
               ? SCRUB_HOLD_DELAY_MS
@@ -1425,7 +1357,7 @@ export default {
 
     startBackHold() {
       this._dbStart(() => {
-        if (this.tvapprcMode) this.closeTvappToEmby();
+        if (this.tvapprcMode) this.tvappBack();
         else this.tvKey("back");
       });
     },
@@ -1510,33 +1442,10 @@ export default {
       this._dbStop();
     },
 
-    startEmbyHold() {
-      this._armHold("emby", () =>
-        this._lpStart(
-          () => this.tvCmd("emby"),
-          () => {
-            this.flash("emby");
-            this.showStreamers = true;
-          },
-        ),
-      );
-    },
-    stopEmbyHold() {
-      this._dbStop();
-      this._lpStop();
-    },
-
     startMuteHold() {
       this._dbStart(() => this.tvCmd("mute"));
     },
     stopMuteHold() {
-      this._dbStop();
-    },
-
-    startSubsHold() {
-      this._dbStart(() => this.openSubCtrl());
-    },
-    stopSubsHold() {
       this._dbStop();
     },
 
@@ -1603,16 +1512,29 @@ export default {
       this._lpStop();
     },
 
+    // Held, Vol+ opens the subtitle panel while tvapp is up; otherwise the
+    // hold is just the key.
     startVolUpHold() {
+      const volUp = () => this.tvVolCmd("up");
       this._armHold("volu", () =>
-        this._lpStart(
-          () => this.tvVolCmd("up"),
-          () => {
-            this.flash("volu");
-            this.openSubCtrl();
-          },
-        ),
+        this._lpStart(volUp, () => {
+          if (!this.tvapprcMode) return volUp();
+          this.flash("volu");
+          this.openSubCtrl();
+        }),
       );
+    },
+
+    // The subtitle panel: fed by tvapp's MSG_SUBTITLES pushes, asked for once
+    // on the way in.
+    openSubCtrl() {
+      this.showSubCtrl = true;
+      this.sendTvapprc(CMD_SUBTITLES);
+    },
+
+    subSelectTrack(index) {
+      if (this.subList) this.subList = { ...this.subList, selected: index };
+      this.sendTvapprc(`${CMD_SUBTITLE},${index}`);
     },
 
     stopVolUpHold() {
@@ -1824,100 +1746,6 @@ export default {
       this._dbStop();
     },
 
-    startSkipHold() {
-      const pressedAt = Date.now();
-      // skip intro is a srvr feature, not a tv/ha command
-      this._dbStart(() => {
-        this.flash("skip");
-        this.sendKeyThrough("skip", `/api/skipIntro`, {
-          method: "POST",
-          body: { pressedAt },
-          base: "srvr",
-        });
-      });
-    },
-
-    stopSkipHold() {
-      this._dbStop();
-    },
-
-    async fetchSubPlayers() {
-      try {
-        const data = await fetch(`${config.tvTvUrl}/tv/emby/playing`).then(
-          (r) => r.json(),
-        );
-        this.applySubPlayers(data);
-      } catch (_) {}
-    },
-
-    applySubPlayers(data) {
-      if (!data?.ok) return;
-      this.subPlayers = data.playing;
-      if (
-        !this.subDeviceName ||
-        !data.playing.find(
-          (p) => (p.deviceName || p.sessionId) === this.subDeviceName,
-        )
-      ) {
-        const lrtv = data.playing.find(
-          (p) => p.deviceName === "Living Room TV",
-        );
-        this.subDeviceName = lrtv
-          ? lrtv.deviceName
-          : (data.playing[0]?.deviceName ?? data.playing[0]?.sessionId ?? null);
-      }
-    },
-
-    async openSubCtrl() {
-      this.showSubCtrl = true;
-      if (this._subChannel) return;
-      this._subChannel = openChannel("embyPlaying", {
-        onSnapshot: this.applySubPlayers,
-        onDelta: this.applySubPlayers,
-      });
-    },
-
-    subClose() {
-      this._subChannel?.close();
-      this._subChannel = null;
-      this.showSubCtrl = false;
-    },
-
-    subCyclePlayer() {
-      if (this.subPlayers.length === 0) return;
-      const cur = this.subPlayers.findIndex(
-        (p) => (p.deviceName || p.sessionId) === this.subDeviceName,
-      );
-      const next = (cur + 1) % this.subPlayers.length;
-      this.subDeviceName =
-        this.subPlayers[next].deviceName || this.subPlayers[next].sessionId;
-    },
-
-    async subSelectTrack(index) {
-      const player = this.subPlayers.find(
-        (p) => (p.deviceName || p.sessionId) === this.subDeviceName,
-      );
-      if (!player) return;
-      // optimistic update
-      this.subPlayers = this.subPlayers.map((p) =>
-        (p.deviceName || p.sessionId) === this.subDeviceName
-          ? { ...p, subtitleStreamIndex: index }
-          : p,
-      );
-      const { blocked, result } = await this.sendKeyThrough(
-        `subtitle:${index}`,
-        `/tv/emby/subtitle`,
-        {
-          method: "POST",
-          body: { sessionId: player.sessionId, index },
-          fromSubCtrl: true,
-        },
-      );
-      const waitMs = blocked ? 0 : (result?.waitMs ?? 5000);
-      if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
-      await this.fetchSubPlayers();
-    },
-
     // Only the power key is painted this way now. Blue whenever the set is on --
     // the same lightblue the Shows key wears in tvapprc mode -- pink on live TV.
     modeBg(m) {
@@ -1978,12 +1806,6 @@ export default {
       } else {
         this.flash("google");
         this.sendKeyThrough("googlebtn", `/tv/googlebtn`);
-      }
-    },
-
-    _onPaneChanged(pane) {
-      if (pane !== "remote") {
-        this.subClose();
       }
     },
 

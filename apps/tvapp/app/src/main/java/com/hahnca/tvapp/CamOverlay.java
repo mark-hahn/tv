@@ -42,7 +42,7 @@ class CamOverlay extends FrameLayout {
     SHOWS,
   }
 
-  /** Told when the overlay closes for any reason but TOLD. */
+  /** Told whenever the overlay closes, TOLD included. */
   interface CloseListener {
     void onCamDismissed(CloseReason reason);
   }
@@ -89,16 +89,14 @@ class CamOverlay extends FrameLayout {
    * session at the far end. A hidden WebView still sitting on the page would
    * leave the camera live with nobody watching it.
    *
-   * Anything but TOLD is a close the far end does not know about yet, so it is
-   * reported; the reason says what it should do about the show underneath.
+   * The listener hears of every close; anything but TOLD is one the far end
+   * does not know about yet.
    */
   void close(CloseReason reason) {
     if (!showing) return;
     showing = false;
     web.loadUrl("about:blank");
     setVisibility(GONE);
-    if (reason != CloseReason.TOLD && closeListener != null) {
-      closeListener.onCamDismissed(reason);
-    }
+    if (closeListener != null) closeListener.onCamDismissed(reason);
   }
 }

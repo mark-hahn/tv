@@ -158,25 +158,32 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
 
 ## Emby
 
-- We no longer use Emby for any purpose. tvapp plays video itself with Media3
-  (`apps/tvapp/.../VideoPlayer.java`). Any Emby mentions elsewhere in these
-  notes are out of date.
+- Emby stays a real app on the TV that is used on its own, and it stays in
+  the streaming apps list (`services.json`, the phone's pinned streamers).
+- Our apps are being separated from it (plan and progress in
+  `kill-emby-plan.md`). No code of ours may call, launch, control or read
+  Emby: not tvapp, tv-tv, the phone, or the web client, and not tv-srvr once
+  kill-emby Phase 3 is done. The only exception is the plain app launcher in
+  the streaming list. Emby keeps its library current with its own scans.
+- tvapp plays video itself with Media3 (`apps/tvapp/.../VideoPlayer.java`),
+  and tv-srvr's `getPlayUrl` and `playProgress` own the play state.
+- Until Phase 3, tv-srvr still talks to Emby:
+  - its sweep reads Emby;
+  - `playProgress`, `setEpisodeWatched` and `setTvdbFields` (for the
+    collection flags) write the same state back to Emby, so the sweep doesn't
+    undo it;
+  - `deleteShowFromEmby` drops a deleted show from Emby's library.
 
 ## tvapp and tvapprc
 
 - `apps/tvapp` is a native Java Android TV app (package `com.hahnca.tvapp`,
-  no React Native/Expo) sideloaded on the Sony Bravia. It is a two-area UI: a
-  narrow sort/filter button column on the left, and full-width show cards on
-  the right. There is no right-side Info/Map/Actors/Trailers pane at runtime,
-  and nothing on screen is ever focused. Each show card owns its backdrop
-  image, a name row that carries the show's metadata on its end, and a
-  rotating `cardMisc` area (Description, Map, Actors, Trailers). The existing
-  Android phone remote enters tvapprc mode while this app is open; up/down
-  move the selected show, left/right move inside `cardMisc`, OK rotates
-  `cardMisc`, OK held steps one level deeper into it (episode cursor, actor
-  cursor, trailer cursor), Play plays whatever that step landed on, the Filter
-  key steps the filter-button cursor, Back backs out one level, and the
-  Android-only filter input screen sends show-list text to tvapp.
+  no React Native/Expo) sideloaded on the Sony Bravia. It has a narrow
+  sort/filter button column on the left and full-width show cards on the
+  right. Each card owns its backdrop, a name row carrying the show's
+  metadata, and a rotating `cardMisc` area (Description, Map, Actors,
+  Trailers). The phone remote and the web tv pane enter tvapprc mode while
+  tvapp is open and drive it with keys, including the video it plays. See the
+  architecture summary at the end of this file.
 - Build/install with `cd apps/tvapp && ./build-apk`. Gradle and adb both run
   on hahnca.com, never here — this workspace cannot reach the TV at all. Do
   this after every tvapp change; there is no hot reload for it.
@@ -347,61 +354,154 @@ node unilog/query.js --sql "SELECT s.project, COUNT(*) n FROM log_events e
 
 # tvapp and tvapprc — Architecture Summary
 
-Current as of **2026-08-06**. tvapp (`apps/tvapp`, native Java, package
-`com.hahnca.tvapp`) runs on the Sony Bravia; tvapprc is a mode of the Android
+Current as of **2026-09-25**. tvapp (`apps/tvapp`, native Java, package
+`com.hahnca.tvapp`) runs on the Sony Bravia. tvapprc is a mode of the Android
 phone remote (`apps/android/App.js`) and of the web tv pane
-(`apps/client/src/components/tvpane.vue`); `startTvapprcBridge()` in
+(`apps/client/src/components/tvpane.vue`). `startTvapprcBridge()` in
 `apps/tv/src/main.js` relays between them (phone ws:8098 ↔ tvapp ws:8099),
 because the TV is unreachable from any wireless host here.
 
-**tvapp layout** — black root, 9% sort/filter button column on the left, show
-cards on the right. Nothing on screen is ever focused; there is no `Area` enum,
-no tab row, and no runtime Info/Map/Actors/Trailers pane (those classes are
-dead code). Each card is backdrop + name row (name, trash icon when
-`!inEmby`, dash-joined metadata) + `cardMisc` below it. Data is
-`getAllTvdb?hasEmby=0`, refreshed after 10 min in the background.
+**tvapp layout**
+- Black root, a 9% sort/filter button column on the left, show cards on the
+  right, no tab row.
+- Focus is one of `Area {LIST, SORTS, FILTERS, MISC}` in MainActivity. The
+  focused group gets a yellow border, and the focused filter button a red
+  cursor.
+- Each card is a backdrop, a name row and `cardMisc` below it. The name row
+  holds the name (red when `waitStr` is set), a trash icon when `!inEmby`, and
+  dash-joined metadata. The backdrop comes from tv-srvr's `getBackdrop`
+  (TMDB) for every show.
+- Full-screen overlays: `VideoPlayer`, `TrailerPlayer`, `CamOverlay`. Over the
+  list: `RelatedActors`, `ShowCounts`.
+- Data comes from `getAllTvdb?hasEmby=0`. It reloads on tv-srvr's
+  `tvdbUpdated` push (debounced 1.5 s) and each time tvapp returns to the
+  front.
 
-**cardMisc** (`ShowListView`) — only the selected card leaves `DESC`. Modes
-rotate `DESC → MAP → ACTORS → TRAILERS` on OK, skipping empty Trailers. Each
-mode has a depth (`SubMode NONE/FOCUS/CARD`) stepped into by holding OK: Map
-gets an episode cursor then the episode card (still + description from
-`/api/getTmdb`, red header, Back closes it), Actors gets an actor cursor then
-that actor's filter, Trailers gets a trailer cursor. Left/right act inside
-cardMisc only: scroll the description, step the season / episode, scroll or
-step the actor/trailer strip. Actors shows the whole cast, photo-bearing
-first by tvdb `sortOrder`, missing photos looked up via
-`/api/searchTmdbPerson`. Trailers never autoplay.
+**cardMisc** (`ShowListView`)
+- A card leaves `DESC` only while `MISC` has the focus. Right from the list
+  gives it the focus.
+- The Info key rotates `DESC → MAP → ACTORS → TRAILERS`, skipping Trailers
+  once they are known to be empty.
+- Description: up/down scroll, left goes back to the list.
+- Map opens with the episode cursor on the last watched episode.
+  - Left/right step the episode, up/down step the season.
+  - OK opens the episode card (still and description from `/api/getTmdb`).
+    OK again plays it; Left or Info closes it.
+- Actors and Trailers: left/right step the strip, starting at item 0.
+  - OK on an actor applies that actor's filter and returns to the list.
+  - In Actors, down opens `RelatedActors` and up opens `ShowCounts`.
+- Actors shows the whole cast, photo-bearing first by tvdb `sortOrder`.
+  Missing photos are looked up via `/api/searchTmdbPerson`.
+- Trailers never autoplay.
 
-**Filter buttons** — `Clear Ready Drama Comedy To Try Continue Mark Linda
-Trash`, reached only by the phone's Filter key: first click shows the cursor on
-`Clear`, each later click steps down, the button under it activates after
-`FILTER_DWELL_MS`. Sort buttons (`Watched Added Custom`) are cycled by the Sort
-key. Turning Trash on puts up a "Waiting for trash" view and drops list keys
-until the rebuild has drawn.
+**Sort/filter buttons**
+- Sorts: `Alpha Watched Added Custom`. Filters: `Clear Drama Comedy To Try
+  Continue Mark Linda Ready Trash`.
+- The first Sort or Filter press focuses its group. Later presses step down
+  it, wrapping; up/down step too.
+- A sort takes effect when the cursor lands on it; a filter takes effect on
+  OK. The filter cursor is remembered. Right returns to the list.
+- Turning Trash on puts up a "Waiting for trash" view and drops list keys
+  until the rebuild has drawn.
 
-**Play key (`e`)** — plays what the cursor is on: focused trailer inline in
-`TrailerPlayer`, else focused episode via
-`/tv/viewshow?showId&showName[&episodeId]&play=1`, else the selected show.
+**Playing** (`playClick`, reached by `e` and by OK on the list)
+- Which one plays:
+  - If a video is up, it pauses or resumes.
+  - Else a focused trailer plays in `TrailerPlayer`.
+  - Else `VideoPlayer` plays the cursor's episode in Map, or the selected
+    show's next-up.
+- `VideoPlayer` gets `/api/getPlayUrl?showName[&season&episode]` from tv-srvr
+  and plays the file straight off nginx in Media3 ExoPlayer.
+- It starts at the resume point, or past the intro (`trimPosMs`) if there is
+  none.
+- Subtitles: the embedded track chksrt picked, else chksrt's `.srt` (served as
+  vtt), else the first embedded track.
+- It POSTs `/api/playProgress` on start, every 10 s, on pause/resume, on stop
+  and at the end. tv-srvr then:
+  - stores `pos` and sets watched at the end;
+  - stamps the last-played fields on start and stop;
+  - feeds now-playing;
+  - writes the same state to Emby too, until kill-emby Phase 3.
 
-**Commands** — to tvapp: `k,<up|down|left|right|ok|oklong|sort|filter>`,
-`j,<up|down>` (letter skip in alpha order, page skip otherwise), `b` back one
-level, `g` force back, `e` play, `x` exit, `f,<text>`, `s,<name>`, `c`. Back to
-the remote: `z`, `c,<count>`, `a,<name>` (plus the bridge's `u`/`d`, which are
-the only things that set or clear tvapprc mode).
+**Video keys** — while a video is up, the tvapprc arrows and OK drive it:
+- OK pauses/resumes, left −10 s, right +30 s, down shows the time bar.
+- Up skips the intro by `skipDurMs`; repeats within 2 s are ignored.
+- Any other key is swallowed. Back, `r`, or tvapp going to the background
+  closes the video.
+- Held keys: the remotes send the first press as `k,<key>` and each
+  auto-repeat as `kr,<key>`. The TV's own remote marks its repeats itself.
+  tvapp drops a repeat once a video has opened or closed since the press, so a
+  seek held past the end never lands on the list.
+- Subtitles: holding Vol+ on the remote in tvapprc mode opens its subtitle
+  panel.
+  - tvapp sends the video's text tracks as `l,<json>` on every change, and
+    when the remote asks with `l`.
+  - A tap sends `t,<n>`; `-1` turns subtitles off.
+  - The switch lasts for the current play only; chksrt's pick is untouched.
+- The camera overlay pauses a playing video. The video resumes when the
+  camera comes off, unless the Shows key took it off, since that closes the
+  video too.
 
-**Phone in tvapprc mode** — Shows→`Play` (`e`), Emby→`Search` (opens the
-phone-only filter input screen, which sends `f,<text>`), Home→`Sort`,
-Skip→`Filter`, OK click `k,ok` / held `k,oklong`. The web tv pane mirrors this
-except it has no filter screen and never sends `oklong`.
+**Back ladder** — camera → video → trailer → actor overlay → actor filter →
+focus. At the top Back does nothing: tvapp is home, and it never switches to
+another app.
 
-**tv-tv** — `/tv/toggletvapp` sends `e` when tvapp is up, otherwise runs
-`closeEmbyShow()` (stop the Emby session, poll until stopped, settle, send
-`back`, settle) and then launches tvapp and selects `lastRelevantShow`. tvapp
-ignores Back for 1.5 s after coming to the front so that key cannot bounce it
-straight out. `/tv/tvapprc/{back,forceback,emby}` remain as direct fallbacks.
+**Commands to tvapp**
 
-**tv-srvr** — `getTmdbCast()` in `apps/srvr/src/tvdb.js` fills the cast for
-shows TVDB has none for (anthologies) from TMDB aggregate credits.
+| Command | What it does |
+| --- | --- |
+| `k,<up\|down\|left\|right\|ok\|sort\|filter\|info>` | a key press |
+| `kr,<key>` | an auto-repeat of a held key |
+| `j,<up\|down>` | skip: by letter in alpha order, by page otherwise; list only |
+| `b` | back one level; nothing at the top |
+| `e` | play |
+| `r` | clear to the plain show list |
+| `x` | exit |
+| `f,<text>` | filter text |
+| `s,<name>` | select that show |
+| `p,<season>,<episode>` | play that episode; sent after an `s` |
+| `c` | the Custom list changed |
+| `h` | hide key: the watched mark on the Map episode, else hide/unhide the show |
+| `v,<url>` / `v,off` | camera on / off |
+| `l` | send the subtitle list (`l,<json>`) |
+| `t,<n>` | turn on subtitle track n; `t,-1` turns them off |
+
+`s` is held until the list has loaded, and `e`/`p` wait behind it.
+
+**Commands back to the remote** — `z`, `c,<count>`, `a,<name>`, `i,<0|1>`,
+`l,<json>` (subtitle tracks `{title, tracks: [{label, type}], selected}`, or
+`null` with no video up).
+The bridge adds `u`/`d` (tvapp up/down). Those two, and the bridge socket
+closing, are the only things that set or clear tvapprc mode. The phone sends
+the bridge `o` to open tvapp.
+
+**Phone in tvapprc mode**
+- A Sort / Filter / Info row sits on top. OK sends `k,ok`.
+- Shows and Home send `r`; holding either toggles the door camera.
+- Emby's cell becomes Search: the phone-only filter input screen, which sends
+  `f,<text>`.
+- Skip's cell becomes Hide/Unhide (`h`). Back sends `b`.
+- Holding Vol+ opens the subtitle panel.
+- No phone key sends `e`.
+- Outside tvapprc mode the Search and Hide cells are empty, and holding Vol+
+  is just Vol+. The Apps key's streaming list launches the TV's other apps,
+  Emby among them.
+- The web tv pane mirrors this, except its Search cell is "Sel", which selects
+  tvapp's active show in the web show list.
+
+**tv-tv**
+- `/tv/showintvapp?showName[&season&episode]` sends `r`, `s`, then
+  `p,<season>,<episode>` or `e`, launching tvapp first if it is down.
+- `/tv/opentvapp` (like the bridge's `o`) opens tvapp on `lastRelevantShow`,
+  the web client's selected show from `/tv/clientShow`.
+- The power key puts the set on the Google TV input, then opens tvapp.
+- `/tv/videostream` (hvac2's camera) puts `v,<url>` up in tvapp.
+- `/tv/tvapprc/back` remains as a direct fallback for `b`.
+- Nothing in tv-tv launches, controls or reads Emby.
+
+**tv-srvr** — `getTmdbCast()` in `apps/srvr/src/tvdb.js` fills the cast from
+TMDB aggregate credits for shows TVDB has none for (anthologies). It keeps only
+actors with photos, sorted by episode count and capped at `TMDB_CAST_MAX`.
 
 Build/install with `cd apps/tvapp && ./build-apk`; gradle and adb run on
 hahnca.com, and there is no hot reload.

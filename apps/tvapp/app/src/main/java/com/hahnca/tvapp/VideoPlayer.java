@@ -9,15 +9,20 @@ import android.os.SystemClock;
 import android.util.Log;
 import android.widget.FrameLayout;
 import androidx.media3.common.C;
+import androidx.media3.common.Format;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.TrackSelectionOverride;
+import androidx.media3.common.TrackSelectionParameters;
 import androidx.media3.common.Tracks;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.ui.PlayerView;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -35,13 +40,10 @@ import org.json.JSONObject;
 class VideoPlayer extends FrameLayout {
 
   interface Events {
-    /**
-     * The video closed by itself: it ran to its end (error null) or it failed
-     * (error is the text to show). The keys that were steering it may still
-     * be coming -- a held seek keeps repeating -- and nothing stops them but
-     * the remote.
-     */
-    void onVideoEnded(String error);
+    void onVideoError(String text);
+
+    /** The subtitle list (see subtitleList) on every change, null once no video is up. */
+    void onSubtitles(JSONObject list);
   }
 
   private static final String TAG = "tvapp";
@@ -56,6 +58,7 @@ class VideoPlayer extends FrameLayout {
   // stays until play resumes.
   private static final int BAR_SHOW_MS = 3000;
   private static final String SUBS_ID = "tvapp-subs";
+  private static final String SUBS_LABEL = "External";
   private static final String PLAY_FAILED_TOAST = "Video failed.";
 
   private final PlayerView view;
@@ -77,6 +80,9 @@ class VideoPlayer extends FrameLayout {
   private boolean ready;
   private boolean subsPicked;
   private long lastSkipAt;
+  // The video's text tracks, in the order the remote's subtitle panel lists
+  // them.
+  private final List<Tracks.Group> textGroups = new ArrayList<>();
 
   VideoPlayer(Context context, Events events) {
     super(context);
@@ -125,7 +131,6 @@ class VideoPlayer extends FrameLayout {
               report("ended");
               ready = false;
               close();
-              events.onVideoEnded(null);
             }
           }
 
@@ -137,6 +142,11 @@ class VideoPlayer extends FrameLayout {
           @Override
           public void onTracksChanged(Tracks tracks) {
             if (!subsPicked) pickSubs(tracks);
+            textGroups.clear();
+            for (Tracks.Group g : tracks.getGroups()) {
+              if (g.getType() == C.TRACK_TYPE_TEXT) textGroups.add(g);
+            }
+            events.onSubtitles(subtitleList());
           }
 
           @Override
@@ -146,7 +156,7 @@ class VideoPlayer extends FrameLayout {
             // last periodic report stands as the resume point.
             ready = false;
             close();
-            events.onVideoEnded(PLAY_FAILED_TOAST);
+            events.onVideoError(PLAY_FAILED_TOAST);
           }
         });
     view.setPlayer(exo);
@@ -157,6 +167,7 @@ class VideoPlayer extends FrameLayout {
               new MediaItem.SubtitleConfiguration.Builder(Uri.parse(p.optString("subsUrl")))
                   .setMimeType(MimeTypes.TEXT_VTT)
                   .setId(SUBS_ID)
+                  .setLabel(SUBS_LABEL)
                   .build()));
     }
     long resumeMs = p.optLong("posMs");
@@ -191,6 +202,17 @@ class VideoPlayer extends FrameLayout {
     view.showController();
   }
 
+  /** Pauses a video that is playing; true when it did. */
+  boolean pause() {
+    if (exo == null || !exo.getPlayWhenReady()) return false;
+    exo.setPlayWhenReady(false);
+    return true;
+  }
+
+  void resume() {
+    if (exo != null) exo.setPlayWhenReady(true);
+  }
+
   void close() {
     if (exo == null) return;
     ui.removeCallbacks(reportTick);
@@ -200,7 +222,65 @@ class VideoPlayer extends FrameLayout {
     exo.release();
     exo = null;
     playing = null;
+    textGroups.clear();
     setVisibility(GONE);
+    events.onSubtitles(null);
+  }
+
+  /**
+   * For the remote's subtitle panel: {title, tracks: [{label, type}], selected},
+   * selected -1 when subtitles are off. Null when no video is up.
+   */
+  JSONObject subtitleList() {
+    if (exo == null || playing == null) return null;
+    JSONObject out = new JSONObject();
+    try {
+      JSONArray tracks = new JSONArray();
+      int selected = -1;
+      for (int i = 0; i < textGroups.size(); i++) {
+        Tracks.Group g = textGroups.get(i);
+        Format f = g.getTrackFormat(0);
+        JSONObject t = new JSONObject();
+        t.put("label", f.label != null ? f.label : f.language != null ? f.language : "Track " + (i + 1));
+        t.put("type", trackType(f));
+        tracks.put(t);
+        if (g.isSelected()) selected = i;
+      }
+      out.put(
+          "title",
+          String.format(
+              "%s S%02dE%02d",
+              playing.optString("showName"), playing.optInt("season"), playing.optInt("episode")));
+      out.put("tracks", tracks);
+      out.put("selected", selected);
+    } catch (JSONException e) {
+      Log.e(TAG, "subtitle list failed: " + e);
+      return null;
+    }
+    return out;
+  }
+
+  /** The remote's pick from subtitleList's tracks; -1 turns subtitles off. */
+  void selectSubtitle(int index) {
+    if (exo == null) return;
+    TrackSelectionParameters.Builder b = exo.getTrackSelectionParameters().buildUpon();
+    if (index < 0 || index >= textGroups.size()) {
+      b.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true);
+    } else {
+      b.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+          .setOverrideForType(
+              new TrackSelectionOverride(textGroups.get(index).getMediaTrackGroup(), 0));
+    }
+    exo.setTrackSelectionParameters(b.build());
+  }
+
+  // The kinds the remote's panel marks each track with.
+  private static String trackType(Format f) {
+    if (f.id != null && f.id.endsWith(SUBS_ID)) return "srt";
+    if (f.sampleMimeType != null && f.sampleMimeType.contains("pgs")) return "pgs";
+    if ((f.selectionFlags & C.SELECTION_FLAG_FORCED) != 0) return "forced";
+    if ((f.roleFlags & C.ROLE_FLAG_DESCRIBES_MUSIC_AND_SOUND) != 0) return "sdh";
+    return "embedded";
   }
 
   /**

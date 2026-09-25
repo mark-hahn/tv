@@ -37,7 +37,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-public class MainActivity extends Activity implements CtrlServer.Listener {
+public class MainActivity extends Activity implements CtrlServer.Listener, VideoPlayer.Events {
 
   private static final String TAG = "tvapp";
   private static final float SCREEN_V_MARGIN_DP = 24f;
@@ -134,8 +134,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final String NOT_READY_TOAST =
       "Show not ready to watch. Use map to play an episode.";
   private static final float TOAST_TEXT_SCALE = 2f;
-  private static final String EMBY_PACKAGE = "com.mb.android";
-  private static final String CLOSE_EMBY_SHOW_URL = "https://hahnca.com/tv-tv/tv/closeembyshow";
   // Told when the remote's Back key takes the camera overlay off, because that
   // is the one way the view can end that tv-tv did not ask for -- and it has a
   // paused show to put back. Its own route, over http, rather than a message
@@ -146,11 +144,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final String SET_EPISODE_WATCHED_URL =
       "https://hahnca.com/tv-srvr/api/setEpisodeWatched";
   private static final long KEEP_AWAKE_IDLE_MS = 5_000;
-  // A back key in the first moment on screen is not the user's: coming here
-  // from Emby closes the show that was playing, and that close key can still be
-  // in flight when tvapp takes the screen. Answering it would send tvapp
-  // straight back out again.
-  private static final long BACK_DEAF_ON_FRONT_MS = 1_500;
 
   private final Handler ui = new Handler(Looper.getMainLooper());
   private final Map<String, ButtonItem> buttonItems = new HashMap<>();
@@ -217,12 +210,14 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // Set alongside pendingPlay when the play behind a not-yet-loaded select is
   // for one specific episode (tv-tv's map-pane TV button) rather than the
   // show's own next-up episode (its info-pane TV button).
-  private String pendingPlayEpisodeId;
+  private int pendingPlaySeason = -1;
+  // A video the camera paused, to be resumed when the camera comes off.
+  private boolean videoPausedForCam;
+  private int pendingPlayEpisode;
   private long showsLoadedAt;
   // The show tvapp stepped aside to play, so the next foreground turn can put
   // it where the Watched sort is about to put it anyway.
   private Shows.Show playedShow;
-  private long frontSince;
   private long trashAt;
 
   @Override
@@ -292,12 +287,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     pendingSelectName = null;
     if (pendingPlay) {
       pendingPlay = false;
-      if (pendingPlayEpisodeId != null) {
-        String embyId = pendingPlayEpisodeId;
-        pendingPlayEpisodeId = null;
-        playSelectedEpisode(embyId);
+      if (pendingPlaySeason >= 0) {
+        int season = pendingPlaySeason;
+        pendingPlaySeason = -1;
+        playSelectedEpisode(season, pendingPlayEpisode);
       } else {
-        embyClick();
+        playClick();
       }
     }
   }
@@ -313,7 +308,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   @Override
   protected void onStart() {
     super.onStart();
-    frontSince = SystemClock.uptimeMillis();
     ctrlServer = new CtrlServer(this);
     ctrlServer.start();
     // The show just watched is the most recently watched one, so in the
@@ -386,22 +380,14 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     player = new TrailerPlayer(this);
     root.addView(player, matchParent());
 
-    // A video that closed by itself leaves the remote maybe still repeating a
-    // held seek, and those repeats would land on the list and move its focus.
-    video =
-        new VideoPlayer(
-            this,
-            error -> {
-              sendToPhone(CtrlServer.MSG_VIDEO_ENDED);
-              if (error != null) showBigCenterToast(error);
-            });
+    video = new VideoPlayer(this, this);
     root.addView(video, matchParent());
 
     // Added last, so it is over the trailer player as well as the list: a
     // camera going up is an interruption, and an interruption that appears
     // behind something is not one.
     cam = new CamOverlay(this);
-    cam.setCloseListener(this::reportCamDismissed);
+    cam.setCloseListener(this::onCamClosed);
     root.addView(cam, matchParent());
     return root;
   }
@@ -837,6 +823,27 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     if (ctrlServer != null) ctrlServer.send(message);
   }
 
+  @Override
+  public void onVideoError(String text) {
+    showBigCenterToast(text);
+  }
+
+  /** The remote's subtitle panel follows the video's tracks as they change. */
+  @Override
+  public void onSubtitles(JSONObject list) {
+    sendToPhone(CtrlServer.MSG_SUBTITLES + "," + list);
+  }
+
+  @Override
+  public void onSubtitlesWanted() {
+    ui.post(() -> sendToPhone(CtrlServer.MSG_SUBTITLES + "," + video.subtitleList()));
+  }
+
+  @Override
+  public void onSelectSubtitle(int index) {
+    ui.post(() -> video.selectSubtitle(index));
+  }
+
   /**
    * The phone's Shows button, held, opens its own show pane on whatever show is
    * active here, so the phone is told the name on every change and again as
@@ -975,9 +982,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   /**
    * The ok key on something to play, and tv-tv's own play command: a trailer
    * under cardMisc's cursor, the episode under it, or -- with the show list
-   * focused -- the selected show itself, from wherever Emby left off.
+   * focused -- the selected show itself, from its next-up episode.
    */
-  private void embyClick() {
+  private void playClick() {
     // The Play key over a video pauses and resumes it, as ok does.
     if (video.isOpen()) {
       video.key("ok");
@@ -989,20 +996,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       return;
     }
     Shows.Show show = showList.getSelected();
-    if (show == null) {
-      backToEmby();
-      return;
-    }
+    if (show == null) return;
     if (showList.hasEpisodeFocus()) {
-      // A named episode gets past Emby's own next-up choice, so the show's
-      // readiness does not come into it -- but an episode with no file has
-      // nothing at all to play.
-      String episodeId = showList.focusedEpisodeId();
-      if (episodeId == null) {
-        showBigCenterToast(NO_FILE_TOAST);
-        return;
-      }
-      playVideo(show, episodeId);
+      // A named episode gets past tv-srvr's own next-up choice, so the show's
+      // readiness does not come into it; one with no file comes back with no
+      // url and says so.
+      playVideo(show, showList.focusedSeasonNumber(), showList.focusedEpisodeNumber());
       return;
     }
     if (!show.hasFile) {
@@ -1013,27 +1012,24 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       showBigCenterToast(NOT_READY_TOAST);
       return;
     }
-    playVideo(show, null);
+    playVideo(show, -1, -1);
   }
 
-  // Same as embyClick's episode-focused branch, but the episode comes from
+  // Same as playClick's episode-focused branch, but the episode comes from
   // tv-tv (the map pane's TV button) instead of an on-screen cursor.
-  private void playSelectedEpisode(String embyId) {
+  private void playSelectedEpisode(int season, int episode) {
     Shows.Show show = showList.getSelected();
-    if (show == null) {
-      backToEmby();
-      return;
-    }
-    playVideo(show, embyId);
+    if (show == null) return;
+    playVideo(show, season, episode);
   }
 
   /**
    * Plays the episode's file in tvapp's own player straight off nginx -- Emby
    * is not asked anything. tv-srvr picks the episode (the named one, else
-   * next-up) and hands back its url and where to start, with url null when
-   * there is no file.
+   * next-up when season is -1) and hands back its url and where to start,
+   * with url null when there is no file.
    */
-  private void playVideo(Shows.Show show, String episodeId) {
+  private void playVideo(Shows.Show show, int season, int episode) {
     new Thread(
             () -> {
               JSONObject resp;
@@ -1041,9 +1037,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
                 String query =
                     "?showName="
                         + URLEncoder.encode(show.name, "UTF-8")
-                        + (episodeId == null
-                            ? ""
-                            : "&episodeId=" + URLEncoder.encode(episodeId, "UTF-8"));
+                        + (season < 0 ? "" : "&season=" + season + "&episode=" + episode);
                 resp = new JSONObject(Http.get(PLAY_URL_URL + query));
               } catch (Exception e) {
                 Log.e(TAG, "getPlayUrl failed for " + show.name + ": " + e);
@@ -1077,53 +1071,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     toast.show();
   }
 
-  /**
-   * The back key's own way out, which leaves Emby off the show as well as
-   * tvapp: the same close tv-tv does on the way in, when the Shows key opens
-   * tvapp over a show that is playing.
-   *
-   * Asked for first and answered on tv-srvr's own time: the stop takes effect
-   * wherever Emby is, and the back key that follows it is a second or so
-   * behind, by which time Emby is the app on screen to take it.
-   */
-  private void backToEmbyClosingShow() {
-    closeEmbyShow();
-    backToEmby();
-  }
-
-  private void closeEmbyShow() {
-    new Thread(
-            () -> {
-              try {
-                Http.postJson(CLOSE_EMBY_SHOW_URL, "{}");
-              } catch (Exception e) {
-                Log.e(TAG, "close emby show failed: " + e);
-              }
-            },
-            "close-emby-show")
-        .start();
-  }
-
-  /**
-   * Steps aside rather than exiting. Starting Emby is what puts it on screen;
-   * going to the back as well is what keeps tvapp from being the next task up.
-   * The show list stays parsed in memory, so coming back is immediate.
-   */
-  private void backToEmby() {
-    openEmby();
-    moveTaskToBack(true);
-  }
-
-  private void openEmby() {
-    Intent intent = getPackageManager().getLeanbackLaunchIntentForPackage(EMBY_PACKAGE);
-    if (intent == null) intent = getPackageManager().getLaunchIntentForPackage(EMBY_PACKAGE);
-    if (intent == null) {
-      Log.e(TAG, "no launch intent for " + EMBY_PACKAGE);
-      return;
-    }
-    startActivity(intent);
-  }
-
   private void bumpKeepAwake() {
     getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     ui.removeCallbacks(clearKeepAwake);
@@ -1133,13 +1080,24 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private final Runnable clearKeepAwake =
       () -> getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
+  // Whether the last fresh press landed on a video. A held key belongs to what
+  // it started on: once a video ends under the hold (a seek held past the end)
+  // or opens under it, its repeats are dropped rather than steering whatever
+  // is on screen now.
+  private boolean holdOnVideo;
+
+  private boolean strayRepeat(boolean repeat) {
+    if (!repeat) holdOnVideo = video.isOpen();
+    return repeat && holdOnVideo != video.isOpen();
+  }
+
   @Override
-  public void onRemoteKey(String key) {
+  public void onRemoteKey(String key, boolean repeat) {
     if (showsLoading && blockedWhileLoading(key)) return;
     ui.post(
         () -> {
           bumpKeepAwake();
-          handleRemoteKey(key);
+          if (!strayRepeat(repeat)) handleRemoteKey(key);
         });
   }
 
@@ -1149,12 +1107,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     ui.post(
         () -> {
           bumpKeepAwake();
-          handleRemoteKeyLetter(key);
+          // Letter skip only ever comes out of a hold.
+          if (!strayRepeat(true)) handleRemoteKeyLetter(key);
         });
   }
 
   @Override
-  public void onBackToEmby() {
+  public void onBack() {
     ui.post(
         () -> {
           bumpKeepAwake();
@@ -1162,19 +1121,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
         });
   }
 
-  // tv-tv's force-back: unlike handleBack's one level out at a time, this
-  // always leaves for Emby immediately no matter what has the focus.
   @Override
-  public void onForceCloseToEmby() {
-    ui.post(
-        () -> {
-          bumpKeepAwake();
-          backToEmby();
-        });
-  }
-
-  @Override
-  public void onEmbySelected() {
+  public void onPlay() {
     ui.post(
         () -> {
           bumpKeepAwake();
@@ -1184,7 +1132,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
             pendingPlay = true;
             return;
           }
-          embyClick();
+          playClick();
         });
   }
 
@@ -1326,16 +1274,17 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   // tv-tv's map-pane TV button: sent right after an onSelectShow, so it plays
   // that one episode instead of the show's own next-up pick.
   @Override
-  public void onPlayEpisode(String embyId) {
+  public void onPlayEpisode(int season, int episode) {
     ui.post(
         () -> {
           bumpKeepAwake();
           if (pendingSelectName != null) {
-            pendingPlayEpisodeId = embyId;
+            pendingPlaySeason = season;
+            pendingPlayEpisode = episode;
             pendingPlay = true;
             return;
           }
-          playSelectedEpisode(embyId);
+          playSelectedEpisode(season, episode);
         });
   }
 
@@ -1355,6 +1304,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     ui.post(
         () -> {
           bumpKeepAwake();
+          // The show does not run on under the camera; it picks up again when
+          // the camera comes off.
+          if (!cam.isShowing()) videoPausedForCam = video.pause();
           cam.show(url);
         });
   }
@@ -1366,13 +1318,21 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   }
 
   /**
+   * Every close of the camera: the video it paused picks up again -- unless the
+   * Shows key closed it, which closes the video too -- and a close tv-tv did not
+   * ask for is reported to it.
+   */
+  private void onCamClosed(CamOverlay.CloseReason reason) {
+    if (videoPausedForCam && reason != CamOverlay.CloseReason.SHOWS) video.resume();
+    videoPausedForCam = false;
+    if (reason != CamOverlay.CloseReason.TOLD) reportCamDismissed(reason);
+  }
+
+  /**
    * The camera came off here rather than on tv-tv's instruction, so tv-tv is
-   * told: it is holding the view, and possibly a paused show. Its stop route is
-   * the same one hvac2 calls, which means one teardown path rather than two.
-   *
-   * restore:false for the Shows key. Shows means a clean tvapp screen, and
-   * restoring would bring the paused show forward over the list the key just
-   * asked for.
+   * told: it is holding the view. Its stop route is the same one hvac2 calls,
+   * which means one teardown path rather than two. restore:false for the Shows
+   * key, which means a clean tvapp screen.
    */
   private void reportCamDismissed(CamOverlay.CloseReason reason) {
     final String body =
@@ -1404,7 +1364,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
   /**
    * One level out: close a playing trailer, drop an actor filter, hand the
-   * focus back to the show list, leave tvapp.
+   * focus back to the show list. tvapp is home, so at the top it stays put.
    *
    * cardMisc is one level however deep into it the screen is -- the episode
    * card included -- so this key comes out of the whole of it at once, back to
@@ -1420,7 +1380,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       cam.close(CamOverlay.CloseReason.BACK);
       return;
     }
-    // A video closes back to the list; it never leaves for Emby.
+    // A video closes back to the list.
     if (video.isOpen()) {
       video.close();
       return;
@@ -1438,11 +1398,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       applyActorFilter(null);
       return;
     }
-    if (area != Area.LIST) {
-      focusArea(Area.LIST);
-      return;
-    }
-    backToEmbyClosingShow();
+    if (area != Area.LIST) focusArea(Area.LIST);
   }
 
   private void handleRemoteKey(String key) {
@@ -1520,7 +1476,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     if ("up".equals(key)) showList.moveSelection(-1);
     else if ("down".equals(key)) showList.moveSelection(+1);
     else if ("right".equals(key)) focusArea(Area.MISC);
-    else if ("ok".equals(key)) embyClick();
+    else if ("ok".equals(key)) playClick();
   }
 
   /**
@@ -1615,7 +1571,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    */
   private void openInCardMisc() {
     ShowListView.OpenResult result = showList.openFocused();
-    if (result == ShowListView.OpenResult.PLAY) embyClick();
+    if (result == ShowListView.OpenResult.PLAY) playClick();
     else if (result == ShowListView.OpenResult.ACTOR) focusArea(Area.LIST);
   }
 
@@ -1647,10 +1603,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     if (key == null) return super.dispatchKeyEvent(event);
     if (event.getAction() == KeyEvent.ACTION_DOWN) {
       bumpKeepAwake();
-      if ("back".equals(key)) {
-        if (SystemClock.uptimeMillis() - frontSince < BACK_DEAF_ON_FRONT_MS) return true;
-        handleBack();
-      } else if (!showsLoading || !blockedWhileLoading(key)) handleRemoteKey(key);
+      if ("back".equals(key)) handleBack();
+      else if ((!showsLoading || !blockedWhileLoading(key))
+          && !strayRepeat(event.getRepeatCount() > 0)) handleRemoteKey(key);
     }
     return true;
   }

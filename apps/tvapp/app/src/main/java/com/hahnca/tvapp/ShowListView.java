@@ -157,7 +157,6 @@ class ShowListView extends ScrollView {
   private static final int MAP_CELL_BORDER = 0xFFCCCCCC;
   private static final int ED_AIRED = 0;
   private static final int ED_WATCHED = 1;
-  private static final int ED_ID = 2;
   private static final int ED_FILE = 3;
   private static final int ED_RES = 4;
   private static final int ED_POS = 6;
@@ -777,14 +776,6 @@ class ShowListView extends ScrollView {
     }
     renderMisc(active);
     return watched;
-  }
-
-  /** Emby's own id for the episode under the cursor, or null when it has none. */
-  String focusedEpisodeId() {
-    JSONArray tuple = focusedEpisodeTuple();
-    if (tuple == null) return null;
-    String id = tuple.optString(ED_ID, "");
-    return id.isEmpty() || "0".equals(id) ? null : id;
   }
 
   void onTrailersReady(Shows.Show show) {

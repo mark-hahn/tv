@@ -2271,7 +2271,45 @@ app.post("/api/addNoEmby", apiWrapper(addNoEmby));
 app.post("/api/delNoEmby", apiWrapper(delNoEmby));
 app.post("/api/addGap", apiWrapper(addGap));
 app.post("/api/delGap", apiWrapper(delGap));
-app.post("/api/setTvdbFields", apiWrapper(tvdb.setTvdbFields));
+// ponytail: the collection flags go to Emby too, because the sweep still reads
+// membership back from Emby's collections and would undo a record-only change.
+// Goes with the sweep in kill-emby Phase 3.
+const COLLECTION_FIELDS = {
+  inToTry: "toTry",
+  inContinue: "continue",
+  inMark: "mark",
+  inLinda: "linda",
+};
+app.post(
+  "/api/setTvdbFields",
+  apiWrapper(async (params) => {
+    const rec = tvdb.getAllTvdbSync()?.[params?.name];
+    if (rec?.inEmby && rec.id) {
+      for (const [field, coll] of Object.entries(COLLECTION_FIELDS)) {
+        if (!(field in params)) continue;
+        if (!(await setEmbyCollection(COLLECTION_IDS[coll], rec.id, !!params[field])))
+          throw new Error(`emby ${coll} collection update failed for ${params.name}`);
+      }
+    }
+    return tvdb.setTvdbFields(params);
+  }),
+);
+// ponytail: drops a deleted show from Emby's library, so the sweep does not
+// find it still listed and turn inEmby back on. Goes with the sweep in Phase 3.
+app.post(
+  "/api/deleteShowFromEmby",
+  apiWrapper(async ({ name }) => {
+    const rec = tvdb.getAllTvdbSync()?.[name];
+    if (!rec?.id) return { ok: false, error: "Show not found" };
+    const resp = await fetch(
+      `${EMBY_BASE_URL}/Items/${rec.id}?api_key=${EMBY_API_KEY}`,
+      { method: "DELETE" },
+    );
+    if (!resp.ok)
+      return { ok: false, error: `Emby HTTP ${resp.status}: ${await resp.text()}` };
+    return { ok: true };
+  }),
+);
 
 // Persist watched state into episodeData (used by the map for non-Emby / local
 // episodes). `watchedEpis` is the legacy [[season, ep, ...], ...] array built by
@@ -2309,9 +2347,8 @@ app.post(
   }),
 );
 
-// Set the watched mark on one episode, in Emby and in episodeData both. The
-// web client's map does this from the browser, straight to Emby; tvapp's map
-// has no Emby credentials of its own and comes here instead.
+// Set the watched mark on one episode, in Emby and in episodeData both, for
+// the web client's map and tvapp's.
 app.post(
   "/api/setEpisodeWatched",
   apiWrapper(async (params) => {
@@ -2349,11 +2386,12 @@ app.post(
   }),
 );
 
-// Restore watched flags for shows that have left Emby from Emby's own user
-// data, which is keyed by tvdbId and survives the show's removal. The same
-// lookup runs per-show during refreshEpisodeData; this does the whole library
-// in one pass so the shows wiped before episodeData existed don't have to wait
-// for the sweep to reach them. Adds marks only, so it is safe to re-run.
+// Restore watched flags from Emby's own user data, which is keyed by tvdbId
+// and survives an episode's or a show's removal from the library. The same
+// lookup runs per-show during refreshEpisodeData for shows that left Emby;
+// this does the whole library in one pass, shows still in Emby included, so
+// episodes whose files went before episodeData existed get their flags too --
+// the kill-emby harvest. Adds marks only, so it is safe to re-run.
 app.post(
   "/api/backfillWatchedFromEmby",
   apiWrapper(async (params) => {
@@ -2363,7 +2401,7 @@ app.post(
     let episodes = 0;
     let dates = 0;
     for (const [name, rec] of Object.entries(allTvdb || {})) {
-      if (!rec || rec.inEmby !== false || !rec.tvdbId) continue;
+      if (!rec || !rec.tvdbId) continue;
       if (!Array.isArray(rec.episodeData)) rec.episodeData = [];
       const ed = rec.episodeData;
       const watched = embyWatched.getWatchedEpisodes(rec.tvdbId);
@@ -3777,20 +3815,13 @@ const TICKS_PER_MS = 10000; // episodeData pos is in Emby's 100-ns ticks
 // the same one on every write so its read-back matches the record's.
 let tvappPlayedIso = null;
 
-// The named episode (by Emby item id, which tvapp's map still carries), else
-// next-up: the first episode past season 0 with a file and not watched.
-function playEpisodeFor(ed, episodeId) {
+// Next-up: the first episode past season 0 with a file and not watched.
+function nextUpEpisode(ed) {
   let found = null;
   epd.forEachEpisode(ed, (season, episode) => {
     if (found || season <= 0) return;
-    const named =
-      episodeId &&
-      String(epd.getEmbyId(ed, season, episode)) === String(episodeId);
-    const nextUp =
-      !episodeId &&
-      epd.hasFile(ed, season, episode) &&
-      !epd.isWatched(ed, season, episode);
-    if (named || nextUp) found = { season, episode };
+    if (epd.hasFile(ed, season, episode) && !epd.isWatched(ed, season, episode))
+      found = { season, episode };
   });
   return found;
 }
@@ -3820,11 +3851,15 @@ function subsForFile(file, season, episode) {
   };
 }
 
-async function getPlayUrl({ showName, episodeId }) {
+// The named episode (season and episode both given), else next-up.
+async function getPlayUrl({ showName, season: s, episode: e }) {
   const rec = tvdb.getAllTvdbSync()?.[showName];
   if (!rec) throw new Error(`getPlayUrl: no show ${showName}`);
   const ed = rec.episodeData;
-  const target = playEpisodeFor(ed, episodeId);
+  const target =
+    s != null && e != null
+      ? { season: Number(s), episode: Number(e) }
+      : nextUpEpisode(ed);
   if (!target) return { url: null };
   const { season, episode } = target;
   const folder = showPaths.showFolderFor(showName, rec);

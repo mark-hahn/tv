@@ -29,14 +29,12 @@ const fs = (size) => size / PixelRatio.getFontScale();
 // lettering is drawn in and the white the key is painted.
 const POWER_GRAY = "#808080";
 
-// Human-readable label for the lockout message. openapp:/subtitle: keys
-// carry their own readable suffix already, everything else looks up
-// ./keyLabels.json (see that file to change wording).
+// Human-readable label for the lockout message. openapp: keys carry their own
+// readable suffix already, everything else looks up ./keyLabels.json (see that
+// file to change wording).
 const keyLabel = (key) => {
   if (!key) return key;
   if (key.startsWith("openapp:")) return key.slice("openapp:".length);
-  if (key.startsWith("subtitle:"))
-    return `Subtitle ${key.slice("subtitle:".length)}`;
   return keyLabels[key] ?? key;
 };
 
@@ -66,15 +64,22 @@ const MSG_COUNTS = "c";
 const MSG_ACTIVE_SHOW = "a";
 // Whether that show is hidden, which is what the hide key reads Unhide for.
 const MSG_ACTIVE_HIDDEN = "i";
-// A tvapp video closed by itself. A held seek must stop repeating right there,
-// or the rest of its repeats land on the show list and move its focus.
-const MSG_VIDEO_ENDED = "v";
+// The subtitle tracks of the video tvapp is playing, as JSON {title, tracks:
+// [{label, type}], selected}, or null when none is up. Asked for with
+// CMD_SUBTITLES; CMD_SUBTITLE,<n> turns track n on, -1 turns them off.
+const MSG_SUBTITLES = "l";
+const CMD_SUBTITLES = "l";
+const CMD_SUBTITLE = "t";
 const CMD_OPEN_TVAPP = "o";
-const CMD_CLOSE_TO_EMBY = "b";
+const CMD_BACK = "b";
 // Back to a clean tvapp screen: the show list focused and nothing else,
 // cardMisc back to its description, filters off.
 const CMD_CLEAR_STATE = "r";
 const CMD_KEY = "k";
+// An auto-repeat of a held key, so tvapp can tell a repeat from a press: a
+// hold belongs to whatever it started on, and its repeats are dropped once
+// that is gone (a seek held past the end of a video).
+const CMD_KEY_REPEAT = "kr";
 // Letter-skip variant of CMD_KEY, up/down only -- sent instead of CMD_KEY
 // once a held key has been auto-repeating fast long enough that tvapp's show
 // list starts jumping by starting letter instead of by row.
@@ -235,10 +240,9 @@ export default function App() {
   const [tvapprcHidden, setTvapprcHidden] = useState(false);
   const tvapprcShowsLoadedRef = useRef(false);
   const [flashSvc, setFlashSvc] = useState(null);
-  const [showSubCtrl, setShowSubCtrl] = useState(false);
-  const [subPlayers, setSubPlayers] = useState([]);
-  const [subDeviceName, setSubDeviceName] = useState(null);
   const [showPicCtrl, setShowPicCtrl] = useState(false);
+  const [showSubCtrl, setShowSubCtrl] = useState(false);
+  const [subList, setSubList] = useState(null);
   const [picSettings, setPicSettings] = useState([]);
   const [adbPort, setAdbPort] = useState("");
   const [adbCode, setAdbCode] = useState("");
@@ -247,7 +251,6 @@ export default function App() {
   const [locked, setLocked] = useState(false);
   const [lockInfo, setLockInfo] = useState(null);
   const [missingEpWarning, setMissingEpWarning] = useState(null);
-  const [subMismatchWarning, setSubMismatchWarning] = useState(false);
   const [layoutOption, setLayoutOption] = useState("mark");
   useEffect(() => {
     layoutOptionRef.current = layoutOption;
@@ -291,13 +294,10 @@ export default function App() {
   const repeatDelayRef = useRef(null);
   const repeatTimeoutRef = useRef(null);
   const repeatActiveRef = useRef(false);
-  const subPlayersRef = useRef([]);
   const lastCmdRef = useRef(0);
   const holdRef = useRef(null);
   const volActiveRef = useRef(false);
   const kybdInputRef = useRef(null);
-  const embyHoldRef = useRef(null);
-  const embyHoldFiredRef = useRef(false);
   const appsHoldRef = useRef(null);
   const appsHoldFiredRef = useRef(false);
   const lpRef = useRef(null);
@@ -305,9 +305,6 @@ export default function App() {
   const volDownHoldFiredRef = useRef(false);
   const picCommitTimersRef = useRef({});
   const picInputsRef = useRef({});
-  const subPendingRef = useRef(null); // { deviceName, index } while optimistic highlight is active
-  const subGenRef = useRef(0);
-  const subNavigatingRef = useRef(false);
   const unlockHoldTimerRef = useRef(null);
   const pendingLRKeyRef = useRef(null);
   const homeHoldRef = useRef(null);
@@ -360,8 +357,7 @@ export default function App() {
         while (repeatActiveRef.current) {
           const rr = await sendKeyThrough(key, null, { repeating: true });
           if (rr.blocked) return stopRepeat();
-          if (!repeatActiveRef.current) break;
-          sendTvapprc(`${letterMode ? CMD_KEY_LETTER : CMD_KEY},${key}`);
+          sendTvapprc(`${letterMode ? CMD_KEY_LETTER : CMD_KEY_REPEAT},${key}`);
           const delay = letterMode ? SCRUB_HOLD_DELAY_MS : TVAPP_FAST_REPEAT_MS;
           await new Promise((r) => {
             repeatTimeoutRef.current = setTimeout(r, delay);
@@ -511,14 +507,6 @@ export default function App() {
           msg.notification === "missingEpisodeWarning"
         ) {
           setMissingEpWarning(msg.data);
-        } else if (msg.id === 0 && msg.notification === "subtitleMismatch") {
-          if (layoutOptionRef.current === "linda") return;
-          setSubMismatchWarning(true);
-          setShowSubCtrl(true);
-          openChannel("embyPlaying", {
-            onSnapshot: applySubPlayers,
-            onDelta: applySubPlayers,
-          });
         } else if (msg.id === 0 && msg.notification === "nowPlaying") {
           const { showName, playing } = msg.data ?? {};
           const s = playing?.[0]?.season ?? null;
@@ -629,9 +617,6 @@ export default function App() {
           leaveTvapprcMode();
         } else if (e.data === MSG_CLEAR_FILTER) {
           clearTvapprcFilter();
-        } else if (e.data === MSG_VIDEO_ENDED) {
-          // The repeat loop checks this before every send.
-          repeatActiveRef.current = false;
         } else if (
           typeof e.data === "string" &&
           e.data.startsWith(`${MSG_COUNTS},`)
@@ -650,6 +635,11 @@ export default function App() {
           e.data.startsWith(`${MSG_ACTIVE_HIDDEN},`)
         ) {
           setTvapprcHidden(e.data.slice(MSG_ACTIVE_HIDDEN.length + 1) === "1");
+        } else if (
+          typeof e.data === "string" &&
+          e.data.startsWith(`${MSG_SUBTITLES},`)
+        ) {
+          setSubList(JSON.parse(e.data.slice(MSG_SUBTITLES.length + 1)));
         }
       };
       openTimer = setTimeout(() => {
@@ -725,7 +715,6 @@ export default function App() {
       lpRef.current = null;
       clearTimeout(dbRef.current?.timer);
       dbRef.current = null;
-      closeChannel("embyPlaying");
       closeChannel("tvPicture");
       clearTimeout(unlockHoldTimerRef.current);
     };
@@ -1051,16 +1040,14 @@ export default function App() {
   };
 
   /**
-   * One level out over there, which is not always a close: tvapp takes this
-   * same message for its own back key, and while one of its areas has the
-   * focus the press only drops that focus. So this leaves tvapprc mode alone
-   * and lets the bridge's tvapp-down message end it, which is the only thing
-   * that knows tvapp really left.
+   * One level out over there: tvapp takes this same message for its own back
+   * key. tvapp is home, so it never closes -- at its top level the press does
+   * nothing -- and tvapprc mode is left alone.
    */
-  const closeTvappToEmby = async (flashKey = "back") => {
+  const tvappBack = async (flashKey = "back") => {
     flash(flashKey);
     if ((await sendKeyThrough("back", null)).blocked) return;
-    if (!sendTvapprc(CMD_CLOSE_TO_EMBY)) {
+    if (!sendTvapprc(CMD_BACK)) {
       fetch(`${TV_TV_URL}/tv/tvapprc/back`, { method: "POST" }).catch((e) =>
         console.warn("tvapprc back failed", e),
       );
@@ -1199,23 +1186,51 @@ export default function App() {
     });
   };
 
+  // Held, Vol+ opens the subtitle panel while tvapp is up; otherwise the hold
+  // is just the key.
   const startVolUpHold = () => {
+    const volUp = async () => {
+      if (isOff || isOther) return;
+      flash("volu");
+      await sendKeyThrough("volu", `/tv/vol/up`);
+    };
     armHold("volu", () =>
-      lpStart(
-        async () => {
-          if (isOff || isOther) return;
-          flash("volu");
-          await sendKeyThrough("volu", `/tv/vol/up`);
-        },
-        () => {
-          flash("volu");
-          openSubCtrl();
-        },
-      ),
+      lpStart(volUp, () => {
+        if (!tvapprcMode) {
+          volUp();
+          return;
+        }
+        flash("volu");
+        openSubCtrl();
+      }),
     );
   };
 
   const stopVolUpHold = () => lpStop();
+
+  // The subtitle panel: the tracks of the video tvapp is playing, fed by
+  // tvapp's MSG_SUBTITLES pushes, asked for once on the way in.
+  const openSubCtrl = () => {
+    if (layoutOptionRef.current === "linda") return;
+    setShowSubCtrl(true);
+    sendTvapprc(CMD_SUBTITLES);
+  };
+
+  const subSelectTrack = (index) => {
+    setSubList((l) => l && { ...l, selected: index });
+    sendTvapprc(`${CMD_SUBTITLE},${index}`);
+  };
+
+  const subTypeChar = (type) => {
+    if (type === "pgs") return "*";
+    if (type === "sdh") return "H";
+    if (type === "embedded") return "T";
+    if (type === "forced") return "F";
+    return "S";
+  };
+
+  const subShortLabel = (label) =>
+    (label || "").replace(/\bdefault\b/gi, "Def");
 
   // Reconnects tv-tv's adb to the TV. Port and code come from the TV's
   // Developer options > Wireless debugging > Pair device with pairing code;
@@ -1357,7 +1372,7 @@ export default function App() {
 
   const startBackPress = () =>
     dbStart(() => {
-      if (tvapprcMode) closeTvappToEmby();
+      if (tvapprcMode) tvappBack();
       else tvKey("back");
     });
 
@@ -1449,23 +1464,6 @@ export default function App() {
     lpStop();
   };
 
-  const startSkipHold = () => {
-    const pressedAt = Date.now();
-    // skip intro is a srvr feature, not a tv/ha command
-    dbStart(() => {
-      flash("skip");
-      sendKeyThrough("skip", `/api/skipIntro`, {
-        method: "POST",
-        body: { pressedAt },
-        base: "srvr",
-      });
-    });
-  };
-
-  const stopSkipHold = () => {
-    dbStop();
-  };
-
   const toggleLayoutOption = async () => {
     const next = layoutOption === "mark" ? "linda" : "mark";
     setLayoutOption(next);
@@ -1529,188 +1527,15 @@ export default function App() {
   const startMuteHold = () => lpStart(() => tvCmd("mute"), openShowsPane);
   const stopMuteHold = () => lpStop();
 
-  const fetchSubPlayers = async () => {
-    try {
-      const data = await fetch(`${TV_TV_URL}/tv/emby/playing`).then((r) =>
-        r.json(),
-      );
-      applySubPlayers(data);
-    } catch (_) {}
-  };
-
-  const applySubPlayers = (data) => {
-    if (data?.ok) {
-      const pending = subPendingRef.current;
-      let players = data.playing;
-      if (pending) {
-        players = players.map((p) => {
-          if ((p.deviceName || p.sessionId) === pending.deviceName) {
-            if (p.subtitleStreamIndex === pending.index) {
-              subPendingRef.current = null; // Emby confirmed
-            } else {
-              return { ...p, subtitleStreamIndex: pending.index }; // keep optimistic
-            }
-          }
-          return p;
-        });
-      }
-      setSubPlayers(players);
-      subPlayersRef.current = players;
-      setSubDeviceName((prev) => {
-        const hasCurrentPlayer =
-          prev && players.find((p) => (p.deviceName || p.sessionId) === prev);
-        if (!hasCurrentPlayer) {
-          const lrtv = players.find((p) => p.deviceName === "Living Room TV");
-          if (lrtv) return "Living Room TV";
-        }
-        return prev;
-      });
-    }
-  };
-
-  const openSubCtrl = async () => {
-    if (!tvapprcMode && mode !== "google") return;
-    if (layoutOptionRef.current === "linda") return;
-    setShowSubCtrl(true);
-    openChannel("embyPlaying", {
-      onSnapshot: applySubPlayers,
-      onDelta: applySubPlayers,
+  // The Search key: the filter input screen is this remote's own, so it just
+  // opens here. tvapp hears about it only as the text typed into it.
+  const startSearchHold = () =>
+    dbStart(() => {
+      flash("text");
+      setShowTvapprcInput(true);
     });
-  };
 
-  const startEmbyHold = () => {
-    if (tvapprcMode) {
-      // The Text key: the filter input screen is this remote's own, so it just
-      // opens here. tvapp hears about it only as the text typed into it.
-      dbStart(() => {
-        flash("text");
-        setShowTvapprcInput(true);
-      });
-      return;
-    }
-    armHold("emby", () =>
-      lpStart(
-        () => tvCmd("emby"),
-        () => {
-          flash("emby");
-          setShowStreamers(true);
-        },
-      ),
-    );
-  };
-
-  const stopEmbyHold = () => {
-    dbStop();
-    lpStop();
-  };
-
-  const subTypeChar = (type) => {
-    if (type === "pgs") return "*";
-    if (type === "sdh") return "H";
-    if (type === "embedded") return "T";
-    if (type === "forced") return "F";
-    if (type === "asr") return "+";
-    if (type === "mbs") return ">";
-    if (type === "opn") return "V";
-    if (type === "srt") return "S";
-    return "S";
-  };
-
-  const subShortLabel = (label) =>
-    (label || "").replace(/\bdefault\b/gi, "Def");
-
-  const subShortDevice = (name) => {
-    if (!name) return name;
-    if (name === "Living Room TV") return "TV";
-    if (name === "Firefox Browser") return "Firefox";
-    if (name === "Firefox Windows") return "Firefox";
-    if (name === "Google Chrome Windows") return "Chrome";
-    if (name === "Galaxy Tab S8") return "Tablet";
-    return name;
-  };
-
-  const subCyclePlayer = () => {
-    if (subPlayers.length === 0) return;
-    const curIdx = subPlayers.findIndex(
-      (p) => (p.deviceName || p.sessionId) === subDeviceName,
-    );
-    const nextIdx = (curIdx + 1) % subPlayers.length;
-    setSubDeviceName(
-      subPlayers[nextIdx].deviceName || subPlayers[nextIdx].sessionId,
-    );
-  };
-
-  const subClose = () => {
-    closeChannel("embyPlaying");
-    setShowSubCtrl(false);
-    setSubMismatchWarning(false);
-  };
-
-  const subChoose = async () => {
-    const player = subPlayers.find(
-      (p) => (p.deviceName || p.sessionId) === subDeviceName,
-    );
-    if (!player || !player.episodeCode) return;
-    try {
-      await fetch(`${TV_SRVR_HTTP_URL}/api/chksrt/set-preferred`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          showName: player.showName,
-          episodeCode: player.episodeCode,
-          embStreamIndex: player.subtitleStreamIndex,
-        }),
-      });
-    } catch (_) {}
-    await fetchSubPlayers();
-  };
-
-  const subSelectTrack = async (index) => {
-    const player = subPlayers.find(
-      (p) => (p.deviceName || p.sessionId) === subDeviceName,
-    );
-    if (!player) return;
-    if (subNavigatingRef.current) return;
-    const gen = ++subGenRef.current;
-    subPendingRef.current = { deviceName: subDeviceName, index };
-    setSubPlayers((prev) => {
-      const idx = prev.findIndex(
-        (p) => (p.deviceName || p.sessionId) === subDeviceName,
-      );
-      if (idx < 0) return prev;
-      const next = [...prev];
-      next[idx] = { ...next[idx], subtitleStreamIndex: index };
-      return next;
-    });
-    const { blocked, result } = await sendKeyThrough(
-      `subtitle:${index}`,
-      `/tv/emby/subtitle`,
-      {
-        method: "POST",
-        body: { sessionId: player.sessionId, index },
-        fromSubCtrl: true,
-      },
-    );
-    const waitMs = blocked ? 0 : (result?.waitMs ?? 4000);
-    const navMs = blocked ? 0 : (result?.navMs ?? waitMs);
-    if (subGenRef.current !== gen) return;
-    if (navMs > 0) {
-      subNavigatingRef.current = true;
-    }
-    await new Promise((r) => setTimeout(r, navMs));
-    subNavigatingRef.current = false;
-    if (subGenRef.current !== gen) return;
-    const deadline = Date.now() + (waitMs - navMs);
-    while (subPendingRef.current && Date.now() < deadline) {
-      await fetchSubPlayers();
-      if (subGenRef.current !== gen) return;
-      if (!subPendingRef.current) break;
-      await new Promise((r) => setTimeout(r, 500));
-      if (subGenRef.current !== gen) return;
-    }
-    subPendingRef.current = null;
-    await fetchSubPlayers();
-  };
+  const stopSearchHold = () => dbStop();
 
   const kybdSendText = async () => {};
   const kybdSendKeyevent = async (code) => {};
@@ -1851,16 +1676,24 @@ export default function App() {
       onPressIn: () => startRepeat("right"),
       onPressOut: stopRepeat,
     },
-    // Row 3: emby, down, skip
-    {
-      key: tvapprcMode ? "text" : "emby",
-      label: tvapprcMode ? "Search" : "Emby",
-      smallText: true,
-      bg: () => cellBg("white", tvapprcMode ? "text" : "emby"),
-      onPress: () => {},
-      onPressIn: () => startEmbyHold(),
-      onPressOut: () => stopEmbyHold(),
-    },
+    // Row 3: search, down, skip. Search is tvapp's alone, so its cell is
+    // empty while tvapp is not up.
+    tvapprcMode
+      ? {
+          key: "text",
+          label: "Search",
+          smallText: true,
+          bg: () => cellBg("white", "text"),
+          onPress: () => {},
+          onPressIn: () => startSearchHold(),
+          onPressOut: () => stopSearchHold(),
+        }
+      : {
+          key: "noSearch",
+          label: "",
+          bg: () => cellBg("white", "noSearch"),
+          onPress: () => {},
+        },
     {
       key: "down",
       label: "▼",
@@ -1870,7 +1703,8 @@ export default function App() {
       onPressOut: stopRepeat,
     },
     // Skip's cell, which Info left when it moved to the row above: while tvapp
-    // is up it hides/unhides the selected show instead.
+    // is up it hides/unhides the selected show; otherwise it is empty, since
+    // nothing of ours is playing to skip an intro in.
     tvapprcMode
       ? {
           key: "hide",
@@ -1882,13 +1716,10 @@ export default function App() {
           onPressOut: () => stopHideHold(),
         }
       : {
-          key: "skip",
-          label: "Skip",
-          smallText: true,
-          bg: () => cellBg("white", "skip"),
+          key: "noSkip",
+          label: "",
+          bg: () => cellBg("white", "noSkip"),
           onPress: () => {},
-          onPressIn: () => startSkipHold(),
-          onPressOut: () => stopSkipHold(),
         },
     // Row 4: vol-, vol+, mute
     {
@@ -1963,130 +1794,57 @@ export default function App() {
   ];
 
   if (showSubCtrl) {
-    const currentPlayer =
-      subPlayers.find((p) => (p.deviceName || p.sessionId) === subDeviceName) ??
-      null;
     return (
       <View style={styles.container}>
         <StatusBar hidden />
         <View style={subCtrlStyles.header}>
-          <TouchableOpacity onPress={subCyclePlayer} style={{ flex: 1 }}>
-            <Text style={subCtrlStyles.showName} numberOfLines={1}>
-              {(() => {
-                if (!currentPlayer)
-                  return subDeviceName ? "---" : "No video playing";
-                let base = currentPlayer.episodeCode
-                  ? `${currentPlayer.showName} ${currentPlayer.episodeCode}`
-                  : currentPlayer.showName;
-                if (currentPlayer.deviceName)
-                  base += ` (${subShortDevice(currentPlayer.deviceName)})`;
-                return base;
-              })()}
-            </Text>
-          </TouchableOpacity>
-        </View>
-        {subMismatchWarning && (
-          <Text
-            style={{
-              color: "red",
-              fontWeight: "bold",
-              textAlign: "center",
-              paddingVertical: 8,
-              fontSize: fs(36),
-              backgroundColor: "#fff",
-            }}
-          >
-            Subtitles don't match
+          <Text style={subCtrlStyles.showName} numberOfLines={1}>
+            {subList?.title ?? "No video playing"}
           </Text>
-        )}
+        </View>
         <ScrollView style={subCtrlStyles.list}>
-          {!currentPlayer ? (
+          {!subList ? (
             <Text style={subCtrlStyles.noVideo}>No video playing</Text>
-          ) : currentPlayer.deviceName !== "Living Room TV" ? (
-            <Text style={subCtrlStyles.noVideo}>
-              Only the Living Room TV is supported
-            </Text>
           ) : (
-            <>
-              <TouchableOpacity
-                onPress={() => subSelectTrack(-1)}
-                style={[
-                  subCtrlStyles.card,
-                  {
-                    backgroundColor:
-                      currentPlayer.subtitleStreamIndex === -1
-                        ? "#d0e8ff"
-                        : "#fff",
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    subCtrlStyles.cardText,
-                    currentPlayer.subtitleStreamIndex === -1 &&
-                      subCtrlStyles.cardTextSelected,
-                  ]}
-                >
-                  None
-                </Text>
-              </TouchableOpacity>
-              {currentPlayer.subtitles.map((sub) => (
+            [{ label: "None", index: -1 }]
+              .concat(
+                subList.tracks.map((sub, index) => ({
+                  label: `${subTypeChar(sub.type)}: ${subShortLabel(sub.label)}`,
+                  index,
+                })),
+              )
+              .map(({ label, index }) => (
                 <TouchableOpacity
-                  key={sub.index}
-                  onPress={() => subSelectTrack(sub.index)}
+                  key={index}
+                  onPress={() => subSelectTrack(index)}
                   style={[
                     subCtrlStyles.card,
                     {
                       backgroundColor:
-                        currentPlayer.subtitleStreamIndex === sub.index
-                          ? "#d0e8ff"
-                          : "#fff",
+                        subList.selected === index ? "#d0e8ff" : "#fff",
                     },
                   ]}
                 >
                   <Text
                     style={[
                       subCtrlStyles.cardText,
-                      currentPlayer.subtitleStreamIndex === sub.index &&
+                      subList.selected === index &&
                         subCtrlStyles.cardTextSelected,
                     ]}
                   >
-                    {subTypeChar(sub.type)}: {subShortLabel(sub.label)}
-                    {sub.index === currentPlayer.chosenSubIndex
-                      ? " (chosen)"
-                      : ""}
+                    {label}
                   </Text>
                 </TouchableOpacity>
-              ))}
-            </>
+              ))
           )}
         </ScrollView>
-        <View style={{ flexDirection: "row" }}>
-          <TouchableOpacity
-            onPress={subChoose}
-            disabled={
-              !currentPlayer || currentPlayer.deviceName !== "Living Room TV"
-            }
-            style={[
-              subCtrlStyles.closeBtn,
-              { flex: 1 },
-              (!currentPlayer ||
-                currentPlayer.deviceName !== "Living Room TV") && {
-                opacity: 0.35,
-              },
-            ]}
-            activeOpacity={0.7}
-          >
-            <Text style={subCtrlStyles.closeBtnText}>Choose</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={subClose}
-            style={[subCtrlStyles.closeBtn, { flex: 1 }]}
-            activeOpacity={0.7}
-          >
-            <Text style={subCtrlStyles.closeBtnText}>Close</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          onPress={() => setShowSubCtrl(false)}
+          style={subCtrlStyles.closeBtn}
+          activeOpacity={0.7}
+        >
+          <Text style={subCtrlStyles.closeBtnText}>Close</Text>
+        </TouchableOpacity>
         {locked && (
           <View style={lockStyles.overlay}>
             <Text style={lockStyles.title}>Remote Collision</Text>
@@ -2955,18 +2713,12 @@ export default function App() {
 
     const handleTvClick = () => {
       if (!show) return;
-      let episodeId = null;
-      if (selectedSE && showSeriesMap) {
-        const sm = buildSeriesMap(showSeriesMap);
-        const episodeData = sm?.[selectedSE.s]?.[selectedSE.e];
-        episodeId = episodeData?.id || null;
+      const params = new URLSearchParams({ showName: show.name });
+      if (selectedSE) {
+        params.set("season", selectedSE.s);
+        params.set("episode", selectedSE.e);
       }
-      const params = new URLSearchParams({
-        showId: show.id,
-        showName: show.name,
-      });
-      if (episodeId) params.set("episodeId", episodeId);
-      fetch(`${TV_TV_URL}/tv/viewshow?${params.toString()}`).catch(() => {});
+      fetch(`${TV_TV_URL}/tv/showintvapp?${params.toString()}`).catch(() => {});
       handleClose();
     };
 

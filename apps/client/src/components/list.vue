@@ -473,8 +473,6 @@ export default {
       const originalValue = show.inToTry;
       show.inToTry = !show.inToTry;
       try {
-        await emby.saveToTry(show.id, show.inToTry, show.name);
-        // Mirror into the tvdb record now so pushes/other tabs agree
         await srvr.setTvdbFields({ name: show.name, inToTry: show.inToTry });
       } catch (err) {
         unilog(952, `toggleToTry error for ${show.name}:`, err);
@@ -519,8 +517,6 @@ export default {
       const originalValue = show.inContinue;
       show.inContinue = !show.inContinue;
       try {
-        await emby.saveContinue(show.id, show.inContinue, show.name);
-        // Mirror into the tvdb record now so pushes/other tabs agree
         await srvr.setTvdbFields({
           name: show.name,
           inContinue: show.inContinue,
@@ -540,8 +536,6 @@ export default {
       const originalValue = show.inMark;
       show.inMark = !show.inMark;
       try {
-        await emby.saveMark(show.id, show.inMark, show.name);
-        // Mirror into the tvdb record now so pushes/other tabs agree
         await srvr.setTvdbFields({ name: show.name, inMark: show.inMark });
       } catch (err) {
         unilog(955, `toggleMark error for ${show.name}:`, err);
@@ -558,8 +552,6 @@ export default {
       const originalValue = show.inLinda;
       show.inLinda = !show.inLinda;
       try {
-        await emby.saveLinda(show.id, show.inLinda, show.name);
-        // Mirror into the tvdb record now so pushes/other tabs agree
         await srvr.setTvdbFields({ name: show.name, inLinda: show.inLinda });
       } catch (err) {
         unilog(956, `toggleLinda error for ${show.name}:`, err);
@@ -580,8 +572,13 @@ export default {
           return;
         // Delete files from server first
         await srvr.deleteShowFromSrvr(show);
-        // Now delete from Emby (DELETE /Items/{id} removes it directly, no library scan needed)
-        await emby.deleteShowFromEmby(show);
+        // Now drop it from Emby's library, so no library scan is needed
+        const embyDel = await srvr.deleteShowFromEmby(name);
+        if (!embyDel?.ok) {
+          const msg = `Cannot remove "${name}" from Emby: ${embyDel?.error}`;
+          alert(msg);
+          throw new Error(msg);
+        }
         // Set inEmby to false to mark as deleted and set leftEmby timestamp
         const leftEmby = util.getPstDateTimeMs();
         // Re-fetch allTvdb in case async ops replaced the cached reference
@@ -1908,7 +1905,7 @@ export default {
       const show = this.highlightShow;
       if (!show || show.inEmby === false) return;
       fetch(
-        `${config.tvTvUrl}/tv/viewshow?showId=${encodeURIComponent(show.id)}&showName=${encodeURIComponent(show.name)}`,
+        `${config.tvTvUrl}/tv/showintvapp?showName=${encodeURIComponent(show.name)}`,
       ).catch(() => {});
     },
 
@@ -2517,14 +2514,17 @@ export default {
             noSwitch: true,
           });
         } else {
-          await emby.editEpisode(
-            show.id,
-            season,
-            episode,
-            false,
-            setWatched,
-            show.name,
-          );
+          const watched = setWatched !== null ? setWatched : !cell?.played;
+          const res = await srvr.setEpisodeWatched({
+            name: show.name,
+            season: Number(season),
+            episode: Number(episode),
+            watched,
+          });
+          if (!res?.ok)
+            throw new Error(
+              `setEpisodeWatched failed for ${show.name} S${season}E${episode}: ${res?.error}`,
+            );
           await this.seriesMapAction("refresh", show, { trustWatched: true });
         }
       }
@@ -3396,8 +3396,6 @@ export default {
     },
 
     async newShows(isInitialLoad = false) {
-      await emby.init();
-
       const result = await emby.loadAllShows();
       allShows = result.allShows;
       allTvdb = result.allTvdb;

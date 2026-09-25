@@ -622,7 +622,6 @@
 <script>
 import evtBus from "../evtBus.js";
 import * as tvdb from "../tvdb.js";
-import * as emby from "../emby.js";
 import * as srvr from "../srvr.js";
 import { config } from "../config.js";
 import * as epd from "@tv/share";
@@ -680,12 +679,6 @@ export default {
       subs: "",
       subsActive: false,
       showRemotes: false,
-      nextUpValTxt: "",
-      nextUpSuffixTxt: "",
-      nextUpSeason: null,
-      nextUpEpisode: null,
-      watchButtonTxtArr: [],
-      episodeId: "",
       deletedTxt: "",
       notInEmby: false,
       collectionName: "",
@@ -1024,15 +1017,6 @@ export default {
       if (url) util.openExternalPage(url);
     },
 
-    playNextEpisode() {
-      if (this.nextUpSeason === null || this.nextUpEpisode === null) return;
-      evtBus.emit("playEpisode", {
-        show: this.show,
-        season: this.nextUpSeason,
-        episode: this.nextUpEpisode,
-      });
-    },
-
     setDeleted(tvdbData) {
       this.notInEmby = this.show.inEmby === false;
       if (this.notInEmby && tvdbData?.leftEmby) {
@@ -1201,10 +1185,8 @@ export default {
         unilog(927, "setSeasonsTxt, tvdbData:", name, { tvdbData });
         return;
       }
-      // Do NOT clear seasonsTxt/watchedValTxt here. There is an await below
-      // (emby.getEpisodeCounts); clearing first would render an empty infobox
-      // row during the await and make the row flicker. Compute the new values
-      // into locals and assign the reactive props once, after the await.
+      // Do NOT clear seasonsTxt/watchedValTxt here. Compute the new values
+      // into locals and assign the reactive props once, at the end.
       const show = this.show;
       const name = show.name;
 
@@ -1223,8 +1205,20 @@ export default {
           watchedCount: watchedCountIsNull ? null : watchedCount,
         };
       } else {
-        // For emby shows, get counts from Emby API and save to tvdb
-        epiCounts = await emby.getEpisodeCounts(show);
+        // For library shows, count from episodeData and save to tvdb:
+        // seasons past the specials, every episode TVDB lists in them
+        // (missing and unaired too), and the watched ones.
+        const ed = tvdbData.episodeData;
+        const seasons = new Set();
+        let episodeCount = 0;
+        let watchedCount = 0;
+        epd.forEachEpisode(ed, (s, e) => {
+          if (s <= 0) return;
+          seasons.add(s);
+          episodeCount++;
+          if (epd.isWatched(ed, s, e)) watchedCount++;
+        });
+        epiCounts = { seasonCount: seasons.size, episodeCount, watchedCount };
 
         // Save the calculated counts back to tvdb only if they changed
         // dontEnqueue: skip triggering a full background refresh just for count updates
@@ -1344,69 +1338,6 @@ export default {
       if (rt) this.runtimeTxt = `${rt} Mins`;
     },
 
-    async setNextWatch() {
-      const afterWatched = await emby.afterLastWatched(this.show);
-      const status = afterWatched.status;
-      const readyToWatch = status === "ok";
-      if (this.show.inEmby !== false && status !== "allWatched") {
-        const { seasonNumber, episodeNumber, episodeId } = afterWatched;
-
-        // Defensive: never render "Eundefined" for malformed Emby items (e.g. Sxx.EXTRA).
-        if (
-          !Number.isFinite(+seasonNumber) ||
-          !Number.isFinite(+episodeNumber)
-        ) {
-          this.nextUpValTxt = "";
-          this.nextUpSuffixTxt = "";
-          this.episodeId = "";
-          // log return but don't forget to timeEnd if we leave?
-          // actually this is just internal function return, but we should clear spinner if it was running (it's not)
-        } else {
-          // wrap rest in else or just let it flow, but if we return early we missed getDevices
-          const seaEpiTxt =
-            `S${("" + seasonNumber).padStart(2, "0")} ` +
-            `E${("" + episodeNumber).padStart(2, "0")}`;
-          if (readyToWatch) {
-            this.episodeId = episodeId;
-            this.nextUpValTxt = seaEpiTxt;
-            this.nextUpSuffixTxt = "";
-            this.nextUpSeason = seasonNumber;
-            this.nextUpEpisode = episodeNumber;
-          } else {
-            const suffix = status === "missing" ? "No File" : "Unaired";
-            this.nextUpValTxt = seaEpiTxt;
-            this.nextUpSuffixTxt = suffix;
-          }
-        }
-      } else {
-        this.nextUpValTxt = "";
-        this.nextUpSuffixTxt = "";
-        this.nextUpSeason = null;
-        this.nextUpEpisode = null;
-      }
-      await this.updateWatchButtons(readyToWatch);
-    },
-
-    async updateWatchButtons(readyToWatch) {
-      const watchButtonTxtArr = [];
-      try {
-        // don't crash on device fetch fail
-        const devices = await srvr.getDevices();
-        for (const device of devices) {
-          if (!device.showName) {
-            if (readyToWatch)
-              watchButtonTxtArr.push(`Play on ${device.deviceName}`);
-          } else watchButtonTxtArr.push(`Stop ${device.deviceName}`);
-        }
-        this.watchButtonTxtArr = watchButtonTxtArr.sort();
-      } catch (e) {
-        unilog(
-          929,
-          `updateWatchButtons Error (${this.show?.name}): ${e.message || e}`,
-        );
-      }
-    },
-
     async setRemotes() {
       this.remoteShowName = this.show.name;
       this.showRemotes = false;
@@ -1469,27 +1400,12 @@ export default {
       }
     },
 
-    async watchButtonClick(show, watchButtonTxt) {
-      await emby.startStop(show, this.episodeId, watchButtonTxt);
-      setTimeout(async () => {
-        await this.setNextWatch();
-      }, 1000);
-    },
-
     async loadIntoEmby() {
       const show = this.show;
       const name = String(show?.name || "").trim();
       if (!name) return;
       unilog(1231, `Load button clicked for ${name}`);
       let tvdbId = String(show?.tvdbId || show?.tvdbId || "").trim();
-      if (!tvdbId && show?.id) {
-        tvdbId = await emby.getTvdbIdFromEmbyItem(show.id);
-        if (tvdbId)
-          unilog(
-            931,
-            `loadIntoEmby: resolved tvdbId ${tvdbId} from Emby for "${name}"`,
-          );
-      }
       if (!tvdbId) {
         try {
           const results = await tvdb.srchTvdbData(name);
@@ -1823,7 +1739,6 @@ export default {
             });
             void this.setRemotes();
           } else {
-            await this.setNextWatch();
             await this.setRemotes();
             // Only show the info box (and email input) once everything is populated.
             this.seriesReady = true;

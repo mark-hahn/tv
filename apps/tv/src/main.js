@@ -8,18 +8,15 @@ import { fileURLToPath } from "url";
 import express from "express";
 import cors from "cors";
 import { ChannelPeer } from "@tv/share/channelPeer";
-import { unilog, logHere, setUnilogSink, compareShowNames } from "@tv/share";
+import { unilog, logHere, setUnilogSink } from "@tv/share";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const SRVR_LOG_URL = "http://127.0.0.1:8739/api/log";
 const TV_PICTURE_CHANNEL_POLL_MS = 3000;
-const EMBY_PLAYING_CHANNEL_POLL_MS = 3000;
 let tvChannelPeer = null;
 let tvPictureChannelPollTimer = null;
 let tvPictureChannelLastJson = "";
-let embyPlayingChannelPollTimer = null;
-let embyPlayingChannelLastJson = "";
 setUnilogSink(({ logId, ts, message }) => {
   fetch(SRVR_LOG_URL, {
     method: "POST",
@@ -96,7 +93,7 @@ const TVAPPRC_BRIDGE_PORT = 8098;
 const TVAPP_CTRL_URL = "ws://192.168.1.86:8099";
 const TVAPP_DIAL_RETRY_MS = 2000;
 // tvapp's ctrl socket does not always send a close when it goes away -- the
-// activity stopping behind Emby can leave the tcp connection established with
+// activity stopping in the background can leave the tcp connection established with
 // nothing on the far end, and the leg then looks open forever, so the phone is
 // never told tvapp is down and its keys go nowhere. A ping every interval with
 // no pong by the next one is what catches that.
@@ -115,11 +112,10 @@ const MSG_TVAPP_DOWN = "d"; // bridge -> phone: tvapp has closed
 // tvapp's own protocol (apps/tvapp's CtrlServer.java), used directly below --
 // not relayed -- so the web client's Shows button works with no phone
 // connected at all.
-const CMD_BACK_TO_EMBY = "b"; // close tvapp and bring Emby up
-const CMD_FORCE_CLOSE_TO_EMBY = "g"; // same, but ignoring tvapp's focus
-const CMD_EMBY_SELECTED = "e"; // load tvapp's active show into Emby
+const CMD_BACK = "b"; // back one level; at tvapp's top level it stays put
+const CMD_PLAY = "e"; // play what tvapp's cursor is on, else its show's next-up
 const CMD_SELECT_SHOW = "s"; // select a show by name
-const CMD_PLAY_EPISODE = "p"; // play one specific episode of the selected show, by Emby id
+const CMD_PLAY_EPISODE = "p"; // play one specific episode of the selected show: p,<season>,<episode>
 const CMD_CLEAR_STATE = "r"; // back to a bare show list
 const CMD_CUSTOM_CHANGED = "c"; // the shared filter settings changed
 // A live camera over the whole screen, hand-mirrored in CtrlServer.java. The
@@ -156,42 +152,15 @@ const PIC_LABELS = {
   hdrMode: "HDR Mode",
 };
 
-const EMBY_HOST = "hahnca.com:8920";
-const EMBY_API_KEY = "1c399bd079d549cba8c916244d3add2b";
-const EMBY_USER_ID = "894c752d448f45a3a1260ccaabd0adff";
-const EMBY_BASE_URL = "http://127.0.0.1:8096/emby";
-// Emby app launch id on the Bravia Google-TV (Sony appControl uri for com.mb.android)
-const EMBY_APP_URI = "com.sony.dtv.com.mb.android.com.mb.android.MainActivity";
-const EMBY_PACKAGE = "com.mb.android";
-// Emby DeviceNames reported by the Emby app on each TV
-const TV_DEVICE_NAMES = ["Living Room TV"];
-const LIVING_ROOM_DEVICE_NAME = "Living Room TV";
 const SRVR_INTERNAL_URL = "http://127.0.0.1:8739";
 
-const GOOGLE_HOME_DELAY_MS = 0; // ms after TV turns on before sending Home key
-const GOOGLE_EMBY_DELAY_MS = 250; // ms after TV turns on before launching Emby
-const VIEW_SHOW_DELAY_MS = 1000; // ms after Emby app launch before firing embyViewShow (fallback)
-const PENDING_VIEW_SHOW_MAX_AGE_MS = 10000; // ms before an unsent pending viewshow is dropped
-const EMBY_LAUNCH_DELAY_MS = 300; // ms after launching Emby before sending it the show
-// A resend posts Viewing, which walks the Emby ui back to the show page, so a
-// resend that lands while Emby is opening the episode cancels the very start
-// it is waiting for. It has to be longer than the time Emby needs to get from
-// the play command to NowPlayingItem, or the loop starves itself for the whole
-// boot window and the show only starts once the resends stop.
-const VIEW_SHOW_RESEND_MS = 6000; // ms between show resends while Emby boots
-const VIEW_SHOW_POLL_MS = 500; // ms between checks that playback has started
-const EMBY_BOOT_WINDOW_MS = 40000; // ms to keep resending the show while Emby boots
-const EMBY_QUIET_MS = 2000; // ms of Emby api silence that means its ui has finished drawing
-const EMBY_QUIET_POLL_MS = 400; // ms between silence probes
-const EMBY_QUIET_MAX_WAIT_MS = 12000; // ms to wait for silence before sending anyway
-
-// Power-key power-on sequence: wait for the set -> Google TV input -> Emby -> tvapp
+// Power-key power-on sequence: wait for the set -> Google TV input -> tvapp
 // HA reports the set "on" the moment its network processor answers, which is
 // well before the ui can take a key. The set is asked for its own power status
 // until it says "active", so nothing is sent into a tv that is still coming up.
 const POWERON_AWAKE_POLL_MS = 500; // ms between power-status probes after HA says on
 const POWERON_AWAKE_WAIT_MS = 15000; // ms to wait for the set to report active
-const POWERON_HOME_SETTLE_MS = 1500; // ms after Home before launching Emby
+const POWERON_HOME_SETTLE_MS = 1500; // ms after Home before launching tvapp
 
 // Scrub control
 const SCRUB_START_COUNT = 4; // number of slow keys before speeding up
@@ -200,16 +169,6 @@ const SCRUB_RATE_FWD_FAST = 100; // ms between right keys after first N
 const SCRUB_RATE_REV_SLOW = 100; // ms between left keys for first N
 const SCRUB_RATE_REV_FAST = 100; // ms between left keys after first N
 const SCRUB_DEADMAN_TIMEOUT = 2000; // ms without ping before auto-stop
-
-// Subtitle nav (IRCC key sequence) delay
-const SUB_KEY_DELAY = 400; // ms between each key send in subtitle nav sequence
-const SUB_NAV_POLL_MS = 10_000; // fast-poll window after nav completes
-
-// Automatic show selection (Emby home-screen key sequence)
-const SHOW_SEL_KEY_DELAY = 50; // ms between keys in the show-select sequence
-const SHOW_SEL_KEY_FAST_DELAY = 50; // ms between keys in the fast runs
-const SHOW_SEL_EPISODE_SCAN = 400; // played episodes fetched when ranking shows
-const SHOW_SEL_TZ = "America/Los_Angeles"; // zone "today" is judged in
 
 // PST LA timestamp  MM-DD HH:mm
 function ts() {
@@ -272,154 +231,6 @@ async function setBraviaSetting(target, value) {
   if (data.error) throw new Error(JSON.stringify(data.error));
 }
 
-// ─── Emby WebSocket ─────────────────────────────────────────────────────────
-
-function handleEmbySession(s) {
-  let device = null;
-  if (s.DeviceName === "Living Room TV") device = "google";
-  if (!device) return;
-  const playing = s.NowPlayingItem?.Name ?? null;
-  // Episodes carry the show in SeriesName; movies only have Name.
-  const showName = s.NowPlayingItem?.SeriesName ?? playing;
-  const itemId = s.NowPlayingItem?.Id ?? null;
-  const remoteCtrl = s.SupportsRemoteControl ?? false;
-  const paused = s.PlayState?.IsPaused ?? null;
-  const prev = prevSessions[device];
-
-  if (prev) {
-    const changed =
-      (prev.playing === null && playing !== null) ||
-      (!prev.remoteCtrl && remoteCtrl) ||
-      prev.paused !== paused;
-    if (changed) activeDevice = device;
-  }
-
-  // Emby broadcasts alternate between full and partial "Living Room TV"
-  // sessions, so itemId toggles real-id <-> null every ~second. Only act on
-  // the real playback session (non-null itemId) and log when the show changes
-  // or it pauses/resumes.
-  if (itemId !== null) {
-    const showChanged = itemId !== lastShowItem[device];
-    const pausedChanged = paused !== lastPaused[device];
-    if (showChanged || pausedChanged) {
-      lastShowItem[device] = itemId;
-      lastPaused[device] = paused;
-      const state = paused ? "paused" : "playing";
-      unilog(371, `activeDevice: ${device} ${state}: ${showName}`);
-    }
-  }
-
-  prevSessions[device] = {
-    playing,
-    itemId,
-    remoteCtrl,
-    paused,
-  };
-}
-
-const DEVICE_PRIORITY = [
-  {
-    match: (s) => s.DeviceName === "Google" && s.Client === "AndroidTv",
-    label: "Google TV",
-    pri: 1,
-  },
-  {
-    match: (s) => s.DeviceName === "Living Room TV",
-    label: "Living Room TV",
-    pri: 2,
-  },
-  {
-    match: (s) => s.Client === "AndroidTv" || s.Client === "Emby for Android",
-    label: (s) => s.DeviceName,
-    pri: 3,
-  },
-];
-
-function deviceLabel(s) {
-  for (const rule of DEVICE_PRIORITY) {
-    if (rule.match(s))
-      return typeof rule.label === "function" ? rule.label(s) : rule.label;
-  }
-  return s.DeviceName;
-}
-
-function devicePriority(s) {
-  for (const rule of DEVICE_PRIORITY) {
-    if (rule.match(s)) return rule.pri;
-  }
-  return 99;
-}
-
-function updateNowPlaying(sessions) {
-  const playing = sessions
-    .filter((s) => s.NowPlayingItem?.SeriesName)
-    .sort((a, b) => devicePriority(a) - devicePriority(b))
-    .map((s) => ({
-      showName: s.NowPlayingItem.SeriesName,
-      device: deviceLabel(s),
-      season: s.NowPlayingItem.ParentIndexNumber ?? null,
-      episode: s.NowPlayingItem.IndexNumber ?? null,
-      positionTicks: s.PlayState?.PositionTicks ?? null,
-      runtimeTicks: s.NowPlayingItem.RunTimeTicks ?? null,
-      id: s.NowPlayingItem.Id ?? null,
-    }));
-
-  // Dedup key excludes position so position-only changes don't suppress the send
-  const key = JSON.stringify(
-    playing.map(({ positionTicks, runtimeTicks, ...p }) => p),
-  );
-  if (key === currentShowName && playing.length === 0) return;
-  currentShowName = key;
-
-  const showName = playing[0]?.showName ?? null;
-  // Only the tv's own session feeds lastRelevantShow: a show playing in Emby
-  // on some other computer is not what tvapp should come up on.
-  const tvShowName =
-    sessions.find(
-      (s) => s.NowPlayingItem?.SeriesName && TV_DEVICE_NAMES.includes(s.DeviceName),
-    )?.NowPlayingItem.SeriesName ?? null;
-  if (tvShowName) lastRelevantShow = tvShowName;
-  fetch(`${SRVR_INTERNAL_URL}/internal/nowPlaying`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ showName, playing }),
-  }).catch(() => {});
-}
-
-function connectEmby() {
-  const deviceId = "tv-server";
-  const url = `ws://127.0.0.1:8096/embywebsocket?api_key=${EMBY_API_KEY}&deviceId=${deviceId}`;
-  unilog(372, "connecting to Emby WebSocket...");
-  const embyWs = new WebSocket(url, { rejectUnauthorized: false });
-
-  embyWs.on("open", () => {
-    unilog(373, "emby ws opened");
-    embyWs.send(
-      JSON.stringify({ MessageType: "SessionsStart", Data: "0,1500" }),
-    );
-  });
-
-  embyWs.on("message", (data) => {
-    let msg;
-    try {
-      msg = JSON.parse(data.toString());
-    } catch (_) {
-      return;
-    }
-    if (msg.MessageType === "Sessions" && Array.isArray(msg.Data)) {
-      for (const s of msg.Data) handleEmbySession(s);
-      updateNowPlaying(msg.Data);
-      checkSubtitleMismatch(msg.Data).catch(() => {});
-    }
-  });
-
-  embyWs.on("error", (err) => unilog(374, "emby ws error:", err.message));
-  embyWs.on("close", () => {
-    unilog(1742, `emby ws closed, reconnecting in 5s`);
-    setTimeout(connectEmby, 5000);
-  });
-}
-
 // ─── HA WebSocket ────────────────────────────────────────────────────────────
 
 let ws = null;
@@ -430,22 +241,15 @@ let braviaHaPower = "unknown";
 let braviaMediaContentType = null;
 let braviaMediaTitle = null;
 let tvMode = "off"; // "google" | "tv" | "off" | "other" — set only from HA push
-let activeDevice = null;
 let lastOffAt = 0;
 let lastOnAt = 0;
-let pendingGoogleHome = false;
 let pendingGoogleTvapp = false;
-let pendingViewShow = null; // { showId, showName } — queued for after Emby launches
-let currentShowName = null;
 // Whichever show is most relevant right now — the client's own browsing
-// selection, or whatever Emby actually started playing, last write wins.
+// selection.
 // tvapp is told to select this whenever it starts fresh, so opening it while
 // a show it started itself is mid-playback doesn't override its own correct
 // selection with some unrelated show the client happens to have open.
 let lastRelevantShow = null;
-const prevSessions = {};
-const lastShowItem = {}; // last real (non-null) NowPlayingItem id per device
-const lastPaused = {}; // last pause state of the real playback session per device
 
 // Scrub state
 let scrubDirection = null; // 'left' or 'right'
@@ -540,10 +344,7 @@ function handleMsg(raw) {
       }
       if (id === BRAVIA_ENTITY_ID) {
         const attrs = event.data?.new_state?.attributes;
-        unilog(
-          385,
-          `BRAVIA attrs: title=${attrs?.media_title ?? "null"} mediaType=${attrs?.media_content_type ?? "null"} muted=${attrs?.is_volume_muted ?? "null"} pendingGoogleHome=${pendingGoogleHome} pendingGoogleTvapp=${pendingGoogleTvapp}`,
-        );
+        unilog(2506, `BRAVIA attrs: title=${attrs?.media_title ?? "null"} mediaType=${attrs?.media_content_type ?? "null"} muted=${attrs?.is_volume_muted ?? "null"} pendingGoogleTvapp=${pendingGoogleTvapp}`);
         const prevPower = braviaHaPower;
         braviaHaPower = state;
         if (attrs) {
@@ -556,29 +357,6 @@ function handleMsg(raw) {
           pendingGoogleTvapp = false;
           unilog(1952, `googlebtn: TV on — running power-on sequence`);
           googlePowerOnSequence();
-        }
-        // TV just turned on with pendingGoogleHome flag set
-        if (pendingGoogleHome && prevPower !== "on" && state === "on") {
-          pendingGoogleHome = false;
-          unilog(386, "googlebtn: TV on — sending Home in 5s");
-          setTimeout(() => {
-            unilog(387, "googlebtn: sending Home");
-            callService("remote", "send_command", REMOTE_ENTITY_ID, {
-              command: "Home",
-            });
-          }, GOOGLE_HOME_DELAY_MS);
-          setTimeout(
-            () =>
-              callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
-                media_content_type: "app",
-                media_content_id: EMBY_APP_URI,
-              }),
-            GOOGLE_EMBY_DELAY_MS,
-          );
-          setTimeout(
-            () => firePendingViewShowUntilPlaying("viewshow(tv-on)"),
-            GOOGLE_EMBY_DELAY_MS + VIEW_SHOW_DELAY_MS,
-          );
         }
         // Drive ADB connect from HA power state — disabled (see startup block above for re-enable notes)
         // if (
@@ -660,29 +438,6 @@ app.get("/tv/googlebtn", (req, res) => {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Newest LastActivityDate across the TV's Emby sessions. Emby stamps it on
-// every api call the app makes, so a change means the app is talking to the
-// server — which is what a restarting Emby ui does and an idle one does not.
-async function embyTvLastActivity() {
-  try {
-    const resp = await fetch(
-      `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
-      {
-        headers: { Accept: "application/json" },
-      },
-    );
-    const sessions = await resp.json();
-    const dates = sessions
-      .filter((s) => s.DeviceName === LIVING_ROOM_DEVICE_NAME)
-      .map((s) => s.LastActivityDate)
-      .sort();
-    return dates.at(-1) ?? null;
-  } catch (e) {
-    unilog(1395, `could not read Emby sessions: ${e.message}`);
-    return null;
-  }
-}
-
 const execAsync = promisify(exec);
 
 // The TV's adb serial (host:port) when hahnca.com's adb server has a live
@@ -753,208 +508,6 @@ setInterval(() => {
     unilog(2466, `tv adb check failed: ${e.message}`);
   });
 }, ADB_CHECK_MS);
-
-// Whether Emby's process is running on the TV -- the honest cold/warm answer.
-// Null when there is no adb connection to ask over; the caller treats that as
-// cold, which only costs a short wait if Emby was running after all.
-async function embyProcessAlive() {
-  try {
-    const serial = await braviaAdbSerial();
-    if (!serial) {
-      unilog(2459, `no adb connection to the tv, treating Emby as cold`);
-      return null;
-    }
-    const { stdout } = await execAsync(
-      `adb -s ${serial} shell "pidof ${EMBY_PACKAGE} || true"`,
-      { timeout: ADB_CMD_TIMEOUT_MS },
-    );
-    return stdout.trim() !== "";
-  } catch (e) {
-    unilog(2460, `emby process check failed, treating Emby as cold: ${e.message}`);
-    return null;
-  }
-}
-
-// Emby's cold start races the show: the play command opens the player, and the
-// home screen that is still loading behind it then draws its rows on top of the
-// running video -- the ui stranded over playback that only a trip back out
-// clears. The api chatter that builds that home screen is the tell, so a cold
-// launch waits for it to stop before the show is sent. Only called for a cold
-// Emby; a running one is drawn already and waits for nothing.
-async function waitForEmbyQuiet(label) {
-  const startedAt = Date.now();
-  const deadline = startedAt + EMBY_QUIET_MAX_WAIT_MS;
-  let last = await embyTvLastActivity();
-  let quietSince = Date.now();
-  while (Date.now() < deadline) {
-    await sleep(EMBY_QUIET_POLL_MS);
-    const now = await embyTvLastActivity();
-    if (now !== last) {
-      last = now;
-      quietSince = Date.now();
-      continue;
-    }
-    if (Date.now() - quietSince >= EMBY_QUIET_MS) {
-      unilog(2449, `${label}: emby ui settled after ${Date.now() - startedAt}ms`);
-      return;
-    }
-  }
-  unilog(2450, `${label}: emby ui never went quiet, sending the show anyway`);
-}
-
-// Sends the show to Emby's live session on the TV. Returns true when Emby
-// accepted it; the pending show is only cleared on success so a later trigger
-// (like the TV-off fallback timer) can try again.
-async function firePendingViewShow(label) {
-  if (!pendingViewShow) return false;
-  const { showId, showName, episodeId, play, at } = pendingViewShow;
-  if (Date.now() - at > PENDING_VIEW_SHOW_MAX_AGE_MS) {
-    pendingViewShow = null;
-    unilog(1390, `${label}: pending viewshow ${showId} too old, dropped`);
-    return false;
-  }
-  unilog(398, `${label}: firing viewshow showId=${showId}`);
-  try {
-    const resp = await fetch(`${SRVR_INTERNAL_URL}/api/embyViewShow`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ showId, showName, episodeId, play }),
-    });
-    const result = await resp.json();
-    unilog(399, `${label}: viewshow result=${JSON.stringify(result)}`);
-    if (!result.found) return false;
-    pendingViewShow = null;
-    return true;
-  } catch (e) {
-    unilog(400, `${label}: viewshow failed: ${e.message}`);
-    return false;
-  }
-}
-
-// The tv-was-off path's send. One send is enough to open a show page, but an
-// Emby that is still booting drops everything sent to it and answers 204 all
-// the same, so a play keeps resending until the show really reaches
-// NowPlayingItem -- the same thing /tv/viewshow does when the tv was already on.
-async function firePendingViewShowUntilPlaying(label) {
-  const wanted = pendingViewShow;
-  const seq = viewShowSeq;
-  if (wanted?.play) {
-    // The tv was off, so Emby is always cold here -- no process check to make.
-    await waitForEmbyQuiet(label);
-    if (seq !== viewShowSeq) return; // a newer press owns the tv now
-    pendingViewShow = { ...wanted, at: Date.now() }; // the wait is not staleness
-  }
-  await firePendingViewShow(label);
-  if (!wanted?.play) return;
-  await resendViewShowUntilPlaying(wanted, label, seq);
-}
-
-// The resend loop both callers share. Playback is polled far more often than
-// the show is resent: a start has to be noticed the moment it happens so the
-// next resend does not undo it, while the resends themselves stay far enough
-// apart to leave Emby room to get there.
-async function resendViewShowUntilPlaying(wanted, label, seq) {
-  const { showId, showName, episodeId, play } = wanted;
-  const deadline = Date.now() + EMBY_BOOT_WINDOW_MS;
-  let nextSendAt = Date.now() + VIEW_SHOW_RESEND_MS;
-  while (Date.now() < deadline) {
-    await sleep(VIEW_SHOW_POLL_MS);
-    if (seq !== viewShowSeq) return; // a newer press owns the tv now
-    if (play && (await embyPlayingShow(showId, showName, episodeId))) {
-      unilog(2246, `${label}: ${showName} is playing`);
-      pendingViewShow = null;
-      return;
-    }
-    if (Date.now() < nextSendAt) continue;
-    nextSendAt = Date.now() + VIEW_SHOW_RESEND_MS;
-    pendingViewShow = { ...wanted, at: Date.now() };
-    await firePendingViewShow(label);
-  }
-  if (play)
-    unilog(2247, `${label}: ${showName} never started playing`);
-}
-
-// True once the TV's Emby session is actually playing the show that was asked
-// for — the only honest confirmation that a play request survived Emby's boot.
-async function embyPlayingShow(showId, showName, episodeId) {
-  try {
-    const session = await getEmbyPlaybackSession(LIVING_ROOM_DEVICE_NAME);
-    const item = session?.NowPlayingItem;
-    if (!item) return false;
-    if (episodeId) return item.Id === episodeId;
-    return item.SeriesId === showId || item.SeriesName === showName;
-  } catch (e) {
-    unilog(1935, `could not read playback session: ${e.message}`);
-    return false;
-  }
-}
-
-let viewShowSeq = 0; // invalidates older button presses still resending
-
-app.get("/tv/viewshow", async (req, res) => {
-  const { showId, showName, episodeId } = req.query;
-  // tvapp's Emby button and its show-list OK key ask for playback as well as
-  // the show page; every other caller just opens the page.
-  const play = req.query.play === "1";
-  const seq = ++viewShowSeq;
-  unilog(
-    401,
-    `viewshow from ${client(req)} showId=${showId} showName=${showName} play=${play} braviaHaPower=${braviaHaPower}`,
-  );
-  pendingViewShow = { showId, showName, episodeId, play, at: Date.now() };
-  callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
-  res.json({ ok: true });
-
-  if (braviaHaPower !== "on") {
-    pendingGoogleHome = true;
-    unilog(
-      402,
-      `viewshow: TV not on (${braviaHaPower}), set pendingGoogleHome=true`,
-    );
-    return;
-  }
-  // Bring Emby to the front. When Emby is already the foreground app this does
-  // nothing at all — no flash — so it is safe to send every time. No Home key:
-  // that is what used to make Emby blink out and reload.
-  const activityBefore = await embyTvLastActivity();
-  // Asked before the launch below, which is what starts a dead Emby.
-  const embyAlive = play && (await embyProcessAlive());
-  callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
-    media_content_type: "app",
-    media_content_id: EMBY_APP_URI,
-  });
-  await sleep(EMBY_LAUNCH_DELAY_MS);
-  if (play && !embyAlive) {
-    await waitForEmbyQuiet("viewshow");
-    if (seq !== viewShowSeq) return; // a newer press owns the tv now
-    // The wait above is deliberate, not staleness, so the request does not age
-    // out of firePendingViewShow's max age while we sit through a cold boot.
-    pendingViewShow = { showId, showName, episodeId, play, at: Date.now() };
-  }
-
-  // Emby's session keeps accepting shows with a 204 even while its ui is
-  // restarting (the android process stays alive in the background), so the
-  // send itself cannot tell us whether Emby is ready. Its api calls can: a
-  // restarting ui talks to the server, an already-open one sits silent.
-  const starting = (await embyTvLastActivity()) !== activityBefore;
-  await firePendingViewShow(starting ? "viewshow(booting)" : "viewshow(open)");
-  // A page-open request has nothing to check afterwards, so an Emby that
-  // looked open gets the one send and no more. A play request does have an
-  // honest answer — the show either reaches NowPlayingItem or it does not —
-  // and a cold Emby is silent enough that the probe above can read it as
-  // already open while it is still dropping everything sent to it, so keep
-  // resending until playback really starts.
-  if (!play && !starting) return;
-  // Emby silently drops anything sent while it boots and gives no ready
-  // signal, so resend the show: boot-time sends are dropped, the first send
-  // after the ui is up loads the show, and later resends just re-open the
-  // same page.
-  await resendViewShowUntilPlaying(
-    { showId, showName, episodeId, play },
-    "viewshow(booting)",
-    seq,
-  );
-});
 
 // ─── Persistent adb shell for Bravia (text/keyboard input) ──────────────────
 // DISABLED: Bravia ADB not needed for normal operation. Re-enable by uncommenting
@@ -1138,52 +691,6 @@ app.get("/tv/on", (req, res) => {
   res.json({ ok: true });
 });
 
-app.get("/tv/mode/:mode", (req, res) => {
-  const mode = req.params.mode;
-  if (mode !== "google") {
-    res.status(400).json({ ok: false, error: "unknown mode" });
-    return;
-  }
-  unilog(417, `mode set to ${mode} from ${client(req)} (legacy route)`);
-  callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
-  setTimeout(
-    () =>
-      callService("remote", "send_command", REMOTE_ENTITY_ID, {
-        command: "Home",
-      }),
-    GOOGLE_HOME_DELAY_MS,
-  );
-  setTimeout(
-    () =>
-      callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
-        media_content_type: "app",
-        media_content_id: EMBY_APP_URI,
-      }),
-    GOOGLE_EMBY_DELAY_MS,
-  );
-  lastOnAt = Date.now();
-  res.json({ ok: true, mode });
-  fetch(`${SRVR_INTERNAL_URL}/internal/tv-state`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ muted: null, power: "on", activeDevice, mode }),
-  }).catch(() => {});
-});
-
-app.get("/tv/emby", (req, res) => {
-  if (tvMode === "google") {
-    callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
-      media_content_type: "app",
-      media_content_id: EMBY_APP_URI,
-    });
-  } else {
-    unilog(418, `emby ignored — tvMode=${tvMode}`);
-    res.json({ ok: false, error: "wrong mode" });
-    return;
-  }
-  res.json({ ok: true });
-});
-
 app.get("/tv/off", (req, res) => {
   unilog(419, `off from ${client(req)} (mode: ${tvMode})`);
   callService("media_player", "turn_off", BRAVIA_ENTITY_ID);
@@ -1196,7 +703,6 @@ app.get("/tv/off", (req, res) => {
     body: JSON.stringify({
       muted: null,
       power: "off",
-      activeDevice,
       mode: null,
     }),
   }).catch(() => {});
@@ -1248,148 +754,6 @@ app.get("/tv/key/:key", async (req, res) => {
   }
   unilog(424, `remote.send_command ${command} from ${client(req)}`);
   res.json({ ok: true, command, mode: tvMode });
-});
-
-// ─── Automatic show selection ───────────────────────────────────────────────
-// Walks the Emby home screen to the show most likely wanted next: the most
-// recently played show from before today. That row is ordered most-recent-first
-// from the left, so the prefix sequence parks focus on the leftmost show and a
-// run of right keys counts over to the target.
-
-const SHOW_SEL_PREFIX_SLOW = ["back", "down", "down", "left", "down"];
-const SHOW_SEL_PREFIX_LEFTS = 6; // sent fast — walks off the left end of the row
-const SHOW_SEL_PREFIX_TAIL = ["right"];
-
-let showSelRunning = false;
-
-// One key to the set, then wait.
-async function sendSelKey(key, delayAfterMs) {
-  await sendIrcc(GOOGLE_KEY_MAP[key], delayAfterMs);
-}
-
-// Shows ranked by when they were last played, most recent first. Emby keeps
-// LastPlayedDate on episodes only — Series items always return null — so rank
-// episodes and keep each show's newest.
-async function showsByLastPlayed() {
-  const url =
-    `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items` +
-    `?IncludeItemTypes=Episode&Recursive=true` +
-    `&SortBy=DatePlayed&SortOrder=Descending&Limit=${SHOW_SEL_EPISODE_SCAN}` +
-    `&Fields=UserDataLastPlayedDate,SeriesName&api_key=${EMBY_API_KEY}`;
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`emby items ${r.status}`);
-  const items = (await r.json()).Items ?? [];
-  const newest = new Map();
-  for (const it of items) {
-    const played = it?.UserData?.LastPlayedDate;
-    const show = it?.SeriesName;
-    if (!played || !show) continue;
-    if (!newest.has(show) || played > newest.get(show))
-      newest.set(show, played);
-  }
-  return [...newest.entries()]
-    .map(([name, played]) => ({ name, played }))
-    .sort((a, b) => b.played.localeCompare(a.played) || compareShowNames(a, b));
-}
-
-// "YYYY-MM-DD" in SHOW_SEL_TZ, so comparing days is a plain string compare.
-function showSelDay(when) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: SHOW_SEL_TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date(when));
-}
-
-// The most recently played show from before today, and its offset from the
-// leftmost (most recently played) show in the row.
-async function findShowToSelect() {
-  const shows = await showsByLastPlayed();
-  const today = showSelDay(Date.now());
-  const offset = shows.findIndex((s) => showSelDay(s.played) < today);
-  if (offset === -1) return null;
-  return { ...shows[offset], offset };
-}
-
-async function runShowSelect(offset) {
-  for (const key of SHOW_SEL_PREFIX_SLOW) {
-    await sendSelKey(key, SHOW_SEL_KEY_DELAY);
-  }
-  for (let i = 0; i < SHOW_SEL_PREFIX_LEFTS; i++) {
-    await sendSelKey("left", SHOW_SEL_KEY_FAST_DELAY);
-  }
-  for (const key of SHOW_SEL_PREFIX_TAIL) {
-    await sendSelKey(key, SHOW_SEL_KEY_DELAY);
-  }
-  for (let i = 0; i < offset; i++) {
-    await sendSelKey("right", SHOW_SEL_KEY_FAST_DELAY);
-  }
-}
-
-// ?offset=N forces the right-key count (skips the Emby lookup); ?dry reports
-// the target and sends no keys. Both are for ./sel testing.
-app.get("/tv/selectshow", async (req, res) => {
-  if (tvMode !== "google" && tvMode !== "tv") {
-    unilog(1606, `select ignored — tvMode=${tvMode}`);
-    res.json({ ok: false, error: "wrong mode" });
-    return;
-  }
-  if (showSelRunning) {
-    unilog(1607, `select already running`);
-    res.json({ ok: false, error: "already running" });
-    return;
-  }
-
-  let target;
-  if (req.query.offset !== undefined) {
-    target = {
-      name: "(forced)",
-      played: null,
-      offset: Number(req.query.offset),
-    };
-  } else {
-    try {
-      target = await findShowToSelect();
-    } catch (e) {
-      unilog(1608, `emby lookup failed: ${e.message}`);
-      res.json({ ok: false, error: e.message });
-      return;
-    }
-  }
-  if (!target || !Number.isInteger(target.offset) || target.offset < 0) {
-    unilog(1609, `no show played before today — nothing to select`);
-    res.json({ ok: false, error: "no target show" });
-    return;
-  }
-
-  const keyCount =
-    SHOW_SEL_PREFIX_SLOW.length +
-    SHOW_SEL_PREFIX_LEFTS +
-    SHOW_SEL_PREFIX_TAIL.length +
-    target.offset;
-  unilog(
-    1610,
-    `selecting ${target.name} offset=${target.offset} keys=${keyCount} mode=${tvMode} from ${client(req)}`,
-  );
-
-  if (req.query.dry !== undefined) {
-    res.json({ ok: true, dry: true, ...target, keyCount });
-    return;
-  }
-
-  // Answer before driving the keys — the sequence outlasts a sane HTTP wait.
-  res.json({ ok: true, ...target, keyCount });
-
-  showSelRunning = true;
-  try {
-    await runShowSelect(target.offset);
-    unilog(1611, `done selecting ${target.name}`);
-  } catch (e) {
-    unilog(1612, `key sequence failed for ${target.name}: ${e.message}`);
-  } finally {
-    showSelRunning = false;
-  }
 });
 
 // ─── Bravia (via HA Sony Bravia integration) ─────────────────────────────────
@@ -1486,7 +850,6 @@ async function pushTvState() {
     body: JSON.stringify({
       power,
       mode: tvMode,
-      activeDevice,
       state: braviaHaPower,
       mediaContentType: braviaMediaContentType,
       mediaTitle: braviaMediaTitle,
@@ -1570,7 +933,6 @@ app.get("/tv/status", (req, res) => {
     muted: braviaHaMuted,
     mediaContentType: braviaMediaContentType,
     mediaTitle: braviaMediaTitle,
-    activeDevice,
   });
 });
 
@@ -1647,397 +1009,6 @@ app.post("/tv/scrub/stop", (req, res) => {
   res.json({ ok: true });
 });
 
-// ─── Emby subtitle control ───────────────────────────────────────────────────
-
-function sendIrcc(command, delayAfterMs) {
-  return new Promise((resolve) => {
-    callService("remote", "send_command", REMOTE_ENTITY_ID, { command });
-    setTimeout(resolve, delayAfterMs);
-  });
-}
-
-function normalizeCodec(codec) {
-  const c = (codec || "").toLowerCase();
-  if (c === "hdmv_pgs_subtitle" || c === "pgssub") return "PGS";
-  if (c === "subrip") return "SRT";
-  if (c === "ass" || c === "ssa") return "ASS";
-  if (c === "webvtt") return "VTT";
-  return (codec || "").toUpperCase();
-}
-
-function subStreamInfo(stream) {
-  const codec = normalizeCodec(stream.Codec || "");
-  if (stream.IsExternal && stream.Path) {
-    const filename = stream.Path.split("/").pop();
-    const noSrt = filename.replace(/\.srt$/i, "");
-    const lastDot = noSrt.lastIndexOf(".");
-    const name = lastDot >= 0 ? noSrt.slice(lastDot + 1) : noSrt;
-    let type;
-    if (/\.asr\.srt$/i.test(filename)) type = "asr";
-    else if (/\.mb\d+\.srt$/i.test(filename)) type = "mbs";
-    else if (/\.opn.{4,5}\.srt$/i.test(filename)) type = "opn";
-    else type = "srt";
-    return { name, type, label: `${name} (${codec})` };
-  }
-  const isPgs =
-    stream.Codec === "hdmv_pgs_subtitle" || stream.Codec === "pgssub";
-  const isForced = !isPgs && !!stream.IsForced;
-  const isSdh =
-    !isPgs &&
-    !isForced &&
-    (!!stream.IsHearingImpaired || /\bsdh\b/i.test(stream.Title || ""));
-  const type = isPgs ? "pgs" : isForced ? "forced" : isSdh ? "sdh" : "embedded";
-  // DisplayTitle already includes codec like "English (ASS)" — use it directly
-  const label =
-    stream.DisplayTitle || `${stream.Language || "Unknown"} (${codec})`;
-  return { name: stream.Language || "Unknown", type, label };
-}
-
-// Cache for /tv/emby/playing — avoids hammering Emby Sessions API on every poll
-let playingCache = { ts: 0, data: null };
-const PLAYING_CACHE_TTL = 3000; // ms
-
-const getEmbyPlayingPayload = async () => {
-  const now = Date.now();
-  if (playingCache.data && now - playingCache.ts < PLAYING_CACHE_TTL) {
-    return playingCache.data;
-  }
-  try {
-    const sessRes = await fetch(
-      `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
-      { headers: { Accept: "application/json" } },
-    );
-    if (!sessRes.ok) {
-      return { ok: false, error: `sessions ${sessRes.status}` };
-    }
-    const sessions = await sessRes.json();
-    const playing = [];
-    for (const s of sessions) {
-      if (!s.NowPlayingItem) continue;
-      const item = s.NowPlayingItem;
-      const sessionId = s.Id;
-      const deviceName = s.DeviceName ?? s.Client ?? "Unknown";
-      const showName = item.SeriesName || item.Name || "Unknown";
-      const subtitleStreamIndex = s.PlayState?.SubtitleStreamIndex ?? -1;
-      const seasonNum = item.ParentIndexNumber;
-      const episodeNum = item.IndexNumber;
-      const episodeCode =
-        seasonNum != null && episodeNum != null
-          ? `S${String(seasonNum).padStart(2, "0")}E${String(episodeNum).padStart(2, "0")}`
-          : null;
-
-      let streams;
-      try {
-        const itemRes = await fetch(
-          `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${item.Id}?Fields=MediaSources&api_key=${EMBY_API_KEY}`,
-          { headers: { Accept: "application/json" } },
-        );
-        if (itemRes.ok) {
-          const itemData = await itemRes.json();
-          streams = itemData.MediaSources?.[0]?.MediaStreams;
-        }
-      } catch (_) {}
-      if (!streams) streams = item.MediaSources?.[0]?.MediaStreams;
-
-      const subtitles = [];
-      for (const stream of streams ?? []) {
-        if (stream.Type !== "Subtitle") continue;
-        if (!stream.IsExternal) {
-          const lang = (stream.Language || "").toLowerCase();
-          if (lang && lang !== "eng" && lang !== "en") continue;
-        }
-        const { label, type } = subStreamInfo(stream);
-        subtitles.push({ index: stream.Index, label, type });
-      }
-
-      let chosenSubIndex = null;
-      if (episodeCode) {
-        try {
-          const prefRes = await fetch(
-            `${SRVR_INTERNAL_URL}/internal/chksrt/preferred?showName=${encodeURIComponent(showName)}&episodeCode=${encodeURIComponent(episodeCode)}`,
-          );
-          if (prefRes.ok) {
-            const pref = await prefRes.json();
-            if (pref) {
-              if (pref.embStreamIndex != null) {
-                const found = (streams ?? []).find(
-                  (s) =>
-                    s.Type === "Subtitle" && s.Index === pref.embStreamIndex,
-                );
-                if (found) chosenSubIndex = found.Index;
-              } else if (pref.srtFile) {
-                const found = (streams ?? []).find(
-                  (s) =>
-                    s.Type === "Subtitle" &&
-                    s.IsExternal &&
-                    s.Path &&
-                    s.Path.endsWith("/" + pref.srtFile),
-                );
-                if (found) chosenSubIndex = found.Index;
-              }
-            }
-          }
-        } catch (_) {}
-      }
-
-      playing.push({
-        sessionId,
-        deviceName,
-        showName,
-        episodeCode,
-        subtitleStreamIndex,
-        subtitles,
-        chosenSubIndex,
-      });
-    }
-    const result = { ok: true, playing };
-    playingCache = { ts: Date.now(), data: result };
-    return result;
-  } catch (err) {
-    unilog(444, "emby/playing error:", err.message);
-    return { ok: false, error: err.message };
-  }
-};
-
-app.get("/tv/emby/playing", async (req, res) => {
-  res.json(await getEmbyPlayingPayload());
-});
-
-app.get("/tv/emby/position", async (req, res) => {
-  try {
-    const session = await getEmbyPlaybackSession();
-    if (!session) {
-      res.json({ ok: false, reason: "notPlaying" });
-      return;
-    }
-    res.json({
-      ok: true,
-      ticks: session.PlayState?.PositionTicks ?? 0,
-      paused: !!session.PlayState?.IsPaused,
-    });
-  } catch (err) {
-    unilog(445, "emby/position error:", err.message);
-    res.json({ ok: false, error: err.message });
-  }
-});
-
-async function getEmbyPlaybackSession(deviceName = null) {
-  const sessRes = await fetch(
-    `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
-    {
-      headers: { Accept: "application/json" },
-    },
-  );
-  if (!sessRes.ok) {
-    const error = new Error(`sessions ${sessRes.status}`);
-    error.status = sessRes.status;
-    throw error;
-  }
-  const sessions = await sessRes.json();
-  const matches = sessions.filter(
-    (s) =>
-      s.NowPlayingItem &&
-      (deviceName
-        ? s.DeviceName === deviceName
-        : TV_DEVICE_NAMES.includes(s.DeviceName)),
-  );
-  const session = matches.find((s) => s.SupportsRemoteControl) ?? matches[0];
-  if (!session) return null;
-  // Commands (seek/pause/stop) must go to the device's remote-controllable
-  // session. The Emby app reports playback on one session but only accepts
-  // commands on a companion session with the same DeviceId, so always prefer a
-  // same-DeviceId sibling; fall back to the playback session for single-session
-  // devices.
-  const sibling = sessions.find(
-    (s) =>
-      s.Id !== session.Id &&
-      s.DeviceId === session.DeviceId &&
-      s.SupportsRemoteControl,
-  );
-  session.ControlSessionId = sibling?.Id ?? session.Id;
-  return session;
-}
-
-function seekEmbySession(sessionId, ticks) {
-  return fetch(
-    `${EMBY_BASE_URL}/Sessions/${sessionId}/Playing/seek?SeekPositionTicks=${ticks}&api_key=${EMBY_API_KEY}`,
-    { method: "POST", headers: { Accept: "application/json" } },
-  );
-}
-
-app.post("/tv/emby/seek", async (req, res) => {
-  const { ticks } = req.body ?? {};
-  if (ticks === undefined || ticks === null) {
-    res.status(400).json({ ok: false, error: "missing ticks" });
-    return;
-  }
-  try {
-    const session = await getEmbyPlaybackSession();
-    if (!session) {
-      res.json({ ok: false, reason: "notPlaying" });
-      return;
-    }
-    if (session.PlayState?.IsPaused) {
-      res.json({ ok: false, reason: "paused" });
-      return;
-    }
-    const seekRes = await seekEmbySession(session.ControlSessionId, ticks);
-    res.json({ ok: seekRes.ok, reason: seekRes.ok ? undefined : "seekFailed" });
-  } catch (err) {
-    unilog(446, "emby/seek error:", err.message);
-    res.json({ ok: false, error: err.message });
-  }
-});
-
-// seek2: pause → seek → pause → [d3ms] → (repeat)
-app.post("/tv/emby/seek2", async (req, res) => {
-  const { ticks, d3ms = 500 } = req.body ?? {};
-  if (ticks === undefined || ticks === null) {
-    res.status(400).json({ ok: false, error: "missing ticks" });
-    return;
-  }
-  try {
-    const session = await getEmbyPlaybackSession();
-    if (!session) {
-      res.json({ ok: false, reason: "notPlaying" });
-      return;
-    }
-    const id = session.ControlSessionId;
-    await fetch(
-      `${EMBY_BASE_URL}/Sessions/${id}/Playing/Pause?api_key=${EMBY_API_KEY}`,
-      { method: "POST" },
-    );
-    const seekRes = await seekEmbySession(id, ticks);
-    await fetch(
-      `${EMBY_BASE_URL}/Sessions/${id}/Playing/Pause?api_key=${EMBY_API_KEY}`,
-      { method: "POST" },
-    );
-    await new Promise((r) => {
-      setTimeout(r, d3ms);
-    });
-    res.json({ ok: seekRes.ok });
-  } catch (err) {
-    unilog(447, "emby/seek error:", err.message);
-    res.json({ ok: false, error: err.message });
-  }
-});
-
-app.post("/tv/emby/subtitle", async (req, res) => {
-  const { sessionId, index } = req.body ?? {};
-  if (!sessionId || index === undefined) {
-    res.status(400).json({ ok: false, error: "missing sessionId or index" });
-    return;
-  }
-
-  // List position: None = 0, then each subtitle in stream order (+1 per track).
-  let oldIndex;
-  let targetIndex;
-  try {
-    const sessRes = await fetch(
-      `${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`,
-      { headers: { Accept: "application/json" } },
-    );
-    if (!sessRes.ok) {
-      res.json({ ok: false, error: `sessions ${sessRes.status}` });
-      return;
-    }
-    const sessions = await sessRes.json();
-    const session = sessions.find((s) => s.Id === sessionId);
-    if (!session?.NowPlayingItem) {
-      res.json({ ok: false, error: "session not found or not playing" });
-      return;
-    }
-    const item = session.NowPlayingItem;
-    let streams;
-    try {
-      const itemRes = await fetch(
-        `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${item.Id}?Fields=MediaSources&api_key=${EMBY_API_KEY}`,
-        { headers: { Accept: "application/json" } },
-      );
-      if (itemRes.ok) {
-        const itemData = await itemRes.json();
-        streams = itemData.MediaSources?.[0]?.MediaStreams;
-      }
-    } catch (_) {}
-    if (!streams) streams = item.MediaSources?.[0]?.MediaStreams ?? [];
-
-    const subStreams = streams.filter((s) => s.Type === "Subtitle");
-    const listPosition = (subIndex) => {
-      if (subIndex === -1) return 0;
-      const pos = subStreams.findIndex((s) => s.Index === subIndex);
-      return pos === -1 ? -1 : pos + 1;
-    };
-
-    const currentSubIndex = session.PlayState?.SubtitleStreamIndex ?? -1;
-    oldIndex = listPosition(currentSubIndex);
-    targetIndex = listPosition(index);
-    if (oldIndex === -1 || targetIndex === -1) {
-      res.json({ ok: false, error: "subtitle index not found in list" });
-      return;
-    }
-  } catch (err) {
-    unilog(448, "emby/subtitle lookup error:", err.message);
-    res.json({ ok: false, error: err.message });
-    return;
-  }
-
-  const count = Math.abs(targetIndex - oldIndex);
-  unilog(
-    449,
-    `subtitle nav: index=${index} oldIndex=${oldIndex} targetIndex=${targetIndex} count=${count}`,
-  );
-
-  if (count === 0) {
-    res.json({ ok: true, waitMs: 0, navMs: 0 });
-    return;
-  }
-
-  const navMs = (6 + count) * SUB_KEY_DELAY;
-  const waitMs = navMs + SUB_NAV_POLL_MS;
-  unilog(450, `subtitle nav waitMs=${waitMs}`);
-  res.json({ ok: true, waitMs, navMs });
-
-  const dir = targetIndex < oldIndex ? "Up" : "Down";
-  await sendIrcc("Confirm", SUB_KEY_DELAY);
-  await sendIrcc("Up", SUB_KEY_DELAY);
-  await sendIrcc("Confirm", SUB_KEY_DELAY);
-  for (let i = 0; i < count; i++) {
-    await sendIrcc(dir, SUB_KEY_DELAY);
-  }
-  await sendIrcc("Confirm", SUB_KEY_DELAY);
-  await sendIrcc("Down", SUB_KEY_DELAY);
-  await sendIrcc("Confirm", SUB_KEY_DELAY);
-});
-
-app.post("/tv/emby/subtitle-offset", async (req, res) => {
-  const { sessionId, offsetMs } = req.body ?? {};
-  if (!sessionId || offsetMs === undefined) {
-    res.status(400).json({ ok: false, error: "missing sessionId or offsetMs" });
-    return;
-  }
-  try {
-    const r = await fetch(
-      `${EMBY_BASE_URL}/Sessions/${sessionId}/Command?api_key=${EMBY_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          Name: "SetSubtitleDelay",
-          Arguments: { Delay: String(offsetMs) },
-        }),
-      },
-    );
-    unilog(
-      451,
-      `SetSubtitleDelay ${offsetMs}ms session=${sessionId} -> ${r.status}`,
-    );
-    res.json({ ok: r.ok });
-  } catch (err) {
-    unilog(452, "emby/subtitle-offset error:", err.message);
-    res.json({ ok: false, error: err.message });
-  }
-});
-
 // ─── Bravia picture quality settings ─────────────────────────────────────────
 
 const getTvPicturePayload = async () => {
@@ -2104,26 +1075,12 @@ const getTvPictureChannelSnapshot = async () => {
   return payload;
 };
 
-const getEmbyPlayingChannelSnapshot = async () => {
-  const payload = await getEmbyPlayingPayload();
-  embyPlayingChannelLastJson = snapshotJson(payload);
-  return payload;
-};
-
 const publishTvPictureChannel = async () => {
   const payload = await getTvPicturePayload();
   const json = snapshotJson(payload);
   if (json === tvPictureChannelLastJson) return;
   tvPictureChannelLastJson = json;
   tvChannelPeer?.publishDelta("tvPicture", payload);
-};
-
-const publishEmbyPlayingChannel = async () => {
-  const payload = await getEmbyPlayingPayload();
-  const json = snapshotJson(payload);
-  if (json === embyPlayingChannelLastJson) return;
-  embyPlayingChannelLastJson = json;
-  tvChannelPeer?.publishDelta("embyPlaying", payload);
 };
 
 const startTvPictureChannelPolling = () => {
@@ -2142,22 +1099,6 @@ const stopTvPictureChannelPolling = () => {
   tvPictureChannelLastJson = "";
 };
 
-const startEmbyPlayingChannelPolling = () => {
-  if (embyPlayingChannelPollTimer) return;
-  embyPlayingChannelPollTimer = setInterval(() => {
-    publishEmbyPlayingChannel().catch((e) => {
-      unilog(1508, `embyPlaying poll failed: ${e.message}`);
-    });
-  }, EMBY_PLAYING_CHANNEL_POLL_MS);
-};
-
-const stopEmbyPlayingChannelPolling = () => {
-  if (!embyPlayingChannelPollTimer) return;
-  clearInterval(embyPlayingChannelPollTimer);
-  embyPlayingChannelPollTimer = null;
-  embyPlayingChannelLastJson = "";
-};
-
 const startTvChannelPeer = () => {
   if (tvChannelPeer) return;
   tvChannelPeer = new ChannelPeer({
@@ -2166,11 +1107,6 @@ const startTvChannelPeer = () => {
         snapshot: getTvPictureChannelSnapshot,
         onFirstSubscriber: startTvPictureChannelPolling,
         onLastUnsubscriber: stopTvPictureChannelPolling,
-      },
-      embyPlaying: {
-        snapshot: getEmbyPlayingChannelSnapshot,
-        onFirstSubscriber: startEmbyPlayingChannelPolling,
-        onLastUnsubscriber: stopEmbyPlayingChannelPolling,
       },
     },
     log: (message) => unilog(1509, `${message}`),
@@ -2213,77 +1149,6 @@ app.post("/tv/picture", async (req, res) => {
 // ─── Start ───────────────────────────────────────────────────────────────────
 
 connectHa();
-connectEmby();
-
-let lastSubMismatchKey = null;
-async function checkSubtitleMismatch(sessions) {
-  const lrtv = sessions.find(
-    (s) => s.NowPlayingItem && s.DeviceName === "Living Room TV",
-  );
-  if (!lrtv) {
-    lastSubMismatchKey = null;
-    return;
-  }
-  const item = lrtv.NowPlayingItem;
-  const seasonNum = item.ParentIndexNumber;
-  const episodeNum = item.IndexNumber;
-  if (seasonNum == null || episodeNum == null) return;
-  const showName = item.SeriesName || item.Name;
-  const episodeCode = `S${String(seasonNum).padStart(2, "0")}E${String(episodeNum).padStart(2, "0")}`;
-  const key = `${showName}|${episodeCode}`;
-  if (key === lastSubMismatchKey) return;
-  const currentSubIndex = lrtv.PlayState?.SubtitleStreamIndex ?? -1;
-  if (currentSubIndex === -1) return; // emby hasn't settled on a subtitle yet
-  lastSubMismatchKey = key;
-  try {
-    const prefRes = await fetch(
-      `${SRVR_INTERNAL_URL}/internal/chksrt/preferred?showName=${encodeURIComponent(showName)}&episodeCode=${encodeURIComponent(episodeCode)}`,
-    );
-    if (!prefRes.ok) return;
-    const pref = await prefRes.json();
-    if (!pref) return;
-    let streams = [];
-    try {
-      const itemRes = await fetch(
-        `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items/${item.Id}?Fields=MediaSources&api_key=${EMBY_API_KEY}`,
-        { headers: { Accept: "application/json" } },
-      );
-      if (itemRes.ok) {
-        const itemData = await itemRes.json();
-        streams = itemData.MediaSources?.[0]?.MediaStreams ?? [];
-      }
-    } catch (_) {}
-    let chosenSubIndex = null;
-    if (pref.embStreamIndex != null) {
-      const found = streams.find(
-        (s) => s.Type === "Subtitle" && s.Index === pref.embStreamIndex,
-      );
-      if (found) chosenSubIndex = found.Index;
-    } else if (pref.srtFile) {
-      const found = streams.find(
-        (s) =>
-          s.Type === "Subtitle" &&
-          s.IsExternal &&
-          s.Path &&
-          s.Path.endsWith("/" + pref.srtFile),
-      );
-      if (found) chosenSubIndex = found.Index;
-    }
-    if (chosenSubIndex === null) return;
-    if (currentSubIndex === chosenSubIndex) return;
-    unilog(
-      454,
-      `${showName} ${episodeCode}: current=${currentSubIndex} chosen=${chosenSubIndex}`,
-    );
-    await fetch(`${SRVR_INTERNAL_URL}/internal/subtitle-mismatch`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ showName, episodeCode }),
-    });
-  } catch (err) {
-    unilog(455, "checkSubtitleMismatch error:", err.message);
-  }
-}
 
 // Bridges Android tvapprc commands to tvapp and keeps the phone's remote mode in
 // step with whether tvapp's command socket is reachable. Each connected phone
@@ -2368,11 +1233,7 @@ function startTvapprcBridge() {
       }
       if (tv?.readyState === WebSocket.OPEN) {
         tv.send(msg);
-      } else if (
-        msg === CMD_BACK_TO_EMBY ||
-        msg === CMD_FORCE_CLOSE_TO_EMBY ||
-        msg === CMD_EMBY_SELECTED
-      ) {
+      } else if (msg === CMD_BACK || msg === CMD_PLAY) {
         void sendTvappCommand(msg);
       }
     });
@@ -2399,7 +1260,7 @@ function startTvapprcBridge() {
 // this needs no adb — which matters, because the tv's adb port moves on reboot.
 // Puts one of the tv's own apps on screen through the set's app api. Resolves
 // once the set has answered, so two launches in a row land in that order --
-// which is what the power-on sequence relies on to get tvapp over Emby.
+// which is what a sequence of launches relies on.
 async function launchBraviaApp(uri, name) {
   try {
     const res = await fetch(BRAVIA_APP_CONTROL_URL, {
@@ -2476,99 +1337,13 @@ async function sendTvappCommand(command) {
   return true;
 }
 
-// How long Emby is given to report the playback really over. Asking rather
-// than waiting a set time is the whole point: the stop takes as long as it
-// takes, and a back key sent while the player is still up is one the player
-// swallows -- the show is then left open, which is exactly the "sometimes"
-// this replaced.
-const EMBY_STOP_POLL_MS = 150;
-const EMBY_STOP_WAIT_MS = 4000;
-// On top of that, what the player's own exit off the screen takes after the
-// session it was playing has gone.
-const EMBY_STOP_SETTLE_MS = 0;
-// And then long enough for Emby to have drawn its home page before tvapp is
-// launched over the top of it, so home is what shows in the moment between.
-const EMBY_HOME_SETTLE_MS = 0;
-
-/** Resolves once Emby has no playback session left, or the wait runs out. */
-async function waitForEmbyStopped() {
-  const until = Date.now() + EMBY_STOP_WAIT_MS;
-  while (Date.now() < until) {
-    await sleep(EMBY_STOP_POLL_MS);
-    try {
-      if (!(await getEmbyPlaybackSession())) return true;
-    } catch (e) {
-      unilog(1923, `waiting on emby stop: ${e.message}`);
-    }
-  }
-  unilog(1924, `emby still playing ${EMBY_STOP_WAIT_MS}ms after stop`);
-  return false;
-}
-
-/**
- * Emby keeps playing behind whatever comes up over it, so switching to tvapp
- * means stopping the video first -- not pausing it: the Shows key is a move
- * between the two apps, not a look away from a show still running. Stopping
- * only drops Emby back onto whatever page was under the player, so a GoHome
- * follows: it empties Emby's back stack outright, which also clears any show
- * pages left over from browsing in Emby itself, and it goes over Emby's own
- * connection rather than the tv's input, so it can never land on tvapp. It is
- * sent whether or not anything was playing, for the same clean-up.
- */
-async function closeEmbyShow() {
-  try {
-    const live = await getEmbyPlaybackSession();
-    if (live?.Id) {
-      await fetch(
-        `${EMBY_BASE_URL}/Sessions/${live.ControlSessionId}/Playing/Stop?api_key=${EMBY_API_KEY}`,
-        { method: "POST", headers: { Accept: "application/json" } },
-      );
-      await waitForEmbyStopped();
-      await sleep(EMBY_STOP_SETTLE_MS);
-    }
-    if (!(await embyGoHome()))
-      unilog(2348, `no Living Room TV session accepted GoHome`);
-    await sleep(EMBY_HOME_SETTLE_MS);
-  } catch (e) {
-    unilog(1919, `stop before tvapp open failed: ${e.message}`);
-  }
-}
-
-// The Emby app registers more than one "Living Room TV" session, and only the
-// live one takes commands -- the dead ones answer with a 500 -- so each is
-// tried until one accepts. False when none does, which is also what an Emby
-// that is not running looks like.
-async function embyGoHome() {
-  const resp = await fetch(`${EMBY_BASE_URL}/Sessions?api_key=${EMBY_API_KEY}`, {
-    headers: { Accept: "application/json" },
-  });
-  if (!resp.ok) throw new Error(`sessions ${resp.status}`);
-  const sessions = await resp.json();
-  const candidates = sessions.filter(
-    (s) => s.DeviceName === LIVING_ROOM_DEVICE_NAME,
-  );
-  for (const s of candidates) {
-    const cmd = await fetch(
-      `${EMBY_BASE_URL}/Sessions/${s.Id}/Command/GoHome?api_key=${EMBY_API_KEY}`,
-      { method: "POST", headers: { Accept: "application/json" } },
-    );
-    if (cmd.ok) return true;
-  }
-  return false;
-}
-
 // Every place that starts tvapp fresh (as against tvapp already being up and
 // just wanting the focus back, see /tv/opentvapp) funnels through here so it
 // always comes up on lastRelevantShow rather than whatever it last happened
 // to have selected before it was closed. Resolves false if tvapp never came up.
-// Emby gives no ready signal, but a booting ui talks to the server on its way
-// up, so a change in the tv session's LastActivityDate is the closest thing to
-// one. An Emby that was already open sits silent and the wait just runs out --
-// which is the right answer for it too, it is already up.
 // The power key brings the whole stack up in order. The set can come back on
-// the broadcast tuner, so the input is put on Google Android TV first; then
-// Emby is started, because tvapp backs out into it and plays through it; and
-// then tvapp goes over the top of it.
+// the broadcast tuner, so the input is put on Google Android TV first, and
+// then tvapp is launched.
 // The set's own answer to "are you up?", straight from its REST api rather
 // than HA's cached view of it. Null while it is unreachable, which is what a
 // tv that has only just been woken looks like from here.
@@ -2618,29 +1393,24 @@ async function googlePowerOnSequence() {
     });
     await sleep(POWERON_HOME_SETTLE_MS);
   }
-  // Emby need only have been started, not be up: an Emby still loading its
-  // ui behind tvapp finishes there and stays there. Going through the set's
-  // own app api, awaited, is what puts tvapp's launch after Emby's.
-  await launchBraviaApp(EMBY_APP_URI, "emby");
   await openTvappSelectingShow();
 }
 
 // playIt adds the commands that turn a bare open into the info/map panes' TV
 // button: the Shows button's clear first, so nothing inside cardMisc is
 // focused, then the play once the show is selected -- the show's own next-up
-// episode, or, with episodeId, that one specific episode (the map pane's
-// selection).
+// episode, or, with seasonEpisode ("<season>,<episode>"), that one specific
+// episode (the map pane's selection).
 async function openTvappSelectingShow(
   showName = null,
   playIt = false,
-  episodeId = null,
+  seasonEpisode = null,
 ) {
   // The Shows key means a clean tvapp screen, so a camera view ends here too.
   // Reached when the phone's bridge leg is down, so tvapp never saw the key
-  // and could not take its own overlay off. No restore: this is about to stop
-  // Emby and put tvapp up itself.
+  // and could not take its own overlay off. No restore: this is about to put
+  // tvapp up itself.
   if (videoStream) await stopVideoStream("shows key", false);
-  await closeEmbyShow();
   await launchTvapp();
   const sock = await dialTvappUntilOpen(TVAPP_SELECT_DIAL_TIMEOUT_MS);
   if (!sock) {
@@ -2651,53 +1421,34 @@ async function openTvappSelectingShow(
   if (playIt) sock.send(CMD_CLEAR_STATE);
   if (wanted) sock.send(`${CMD_SELECT_SHOW},${wanted}`);
   if (playIt) {
-    sock.send(episodeId ? `${CMD_PLAY_EPISODE},${episodeId}` : CMD_EMBY_SELECTED);
+    sock.send(
+      seasonEpisode ? `${CMD_PLAY_EPISODE},${seasonEpisode}` : CMD_PLAY,
+    );
   }
   sock.close();
   return true;
 }
 
-// The client's own browsing selection -- one more source (besides Emby
-// actually playing something) for lastRelevantShow, so a Shows-button open of
-// tvapp can favor it when nothing is currently playing.
+// The client's own browsing selection, which is what lastRelevantShow is, so a
+// Shows-button open of tvapp comes up on it.
 app.post("/tv/clientShow", (req, res) => {
   const { show } = req.body ?? {};
   if (show) lastRelevantShow = show;
   res.json({ ok: true });
 });
 
-// The web remote's Shows button: straight across between the two apps. From
-// tvapp it leaves for Emby playing the show tvapp was sitting on; from Emby it
-// stops what is playing and opens tvapp on lastRelevantShow. Every connected
-// Android remote follows along for free -- tvapp opening or closing is what
-// flips their tvapprc mode on and off already.
-app.post("/tv/toggletvapp", async (req, res) => {
-  const openSock = await probeTvappOpen();
-  if (openSock) {
-    unilog(1851, `toggletvapp closing tvapp`);
-    openSock.send(CMD_EMBY_SELECTED);
-    openSock.close();
-    res.json({ ok: true, action: "closed" });
-    return;
-  }
-  const opened = await openTvappSelectingShow();
-  if (!opened) {
-    res.json({ ok: false, error: "tvapp did not come up" });
-    return;
-  }
-  res.json({ ok: true, action: "opened" });
-});
-
 // The info and map panes' TV button: the tvapprc remote's Shows button
 // followed by a click on this show. tvapp already up means the Shows button's
 // clear -- back to a bare show list -- and then the named show is selected and
 // played; tvapp down means the Shows button's open, with that show selected
-// and played on its way up instead of just landing on lastRelevantShow. An
-// episodeId (the map pane's selection) plays that one episode instead of the
-// show's own next-up pick.
+// and played on its way up instead of just landing on lastRelevantShow. A
+// season and episode (the map pane's selection) play that one episode instead
+// of the show's own next-up pick.
 app.get("/tv/showintvapp", async (req, res) => {
   const showName = req.query.showName;
-  const episodeId = req.query.episodeId || null;
+  const { season, episode } = req.query;
+  const seasonEpisode =
+    season != null && episode != null ? `${season},${episode}` : null;
   if (!showName) {
     res.json({ ok: false, error: "no showName" });
     return;
@@ -2708,13 +1459,13 @@ app.get("/tv/showintvapp", async (req, res) => {
     openSock.send(CMD_CLEAR_STATE);
     openSock.send(`${CMD_SELECT_SHOW},${showName}`);
     openSock.send(
-      episodeId ? `${CMD_PLAY_EPISODE},${episodeId}` : CMD_EMBY_SELECTED,
+      seasonEpisode ? `${CMD_PLAY_EPISODE},${seasonEpisode}` : CMD_PLAY,
     );
     openSock.close();
     res.json({ ok: true, action: "played" });
     return;
   }
-  const opened = await openTvappSelectingShow(showName, true, episodeId);
+  const opened = await openTvappSelectingShow(showName, true, seasonEpisode);
   res.json(
     opened
       ? { ok: true, action: "opened" }
@@ -2723,21 +1474,8 @@ app.get("/tv/showintvapp", async (req, res) => {
 });
 
 app.post("/tv/tvapprc/back", async (req, res) => {
-  const ok = await sendTvappCommand(CMD_BACK_TO_EMBY);
+  const ok = await sendTvappCommand(CMD_BACK);
   res.json(ok ? { ok: true } : { ok: false, error: "tvapp is not open" });
-});
-
-app.post("/tv/tvapprc/forceback", async (req, res) => {
-  const ok = await sendTvappCommand(CMD_FORCE_CLOSE_TO_EMBY);
-  res.json(ok ? { ok: true } : { ok: false, error: "tvapp is not open" });
-});
-
-// tvapp's back key on its way out to Emby: the show Emby was left playing
-// behind it is closed exactly as opening tvapp over a playing show closes it,
-// and Emby is sent home so it comes up on its home page.
-app.post("/tv/closeembyshow", async (req, res) => {
-  await closeEmbyShow();
-  res.json({ ok: true });
 });
 
 // Picture settings' adb Connect button. With a port and code from the TV
@@ -2772,11 +1510,6 @@ app.post("/tv/adbconnect", async (req, res) => {
   }
 });
 
-app.post("/tv/tvapprc/emby", async (req, res) => {
-  const ok = await sendTvappCommand(CMD_EMBY_SELECTED);
-  res.json(ok ? { ok: true } : { ok: false, error: "tvapp is not open" });
-});
-
 // tv-srvr calls this when the web client's Send button saves new shared filter
 // settings. tvapp re-fetches its Custom list on it, which is why nothing there
 // polls for the change: the Send button is the only thing that can make one.
@@ -2787,9 +1520,8 @@ app.get("/tv/tvappcustom", async (req, res) => {
 });
 
 // The phone's Shows key when its bridge socket is down, which it is whenever
-// the phone has sat idle for a while. It has to do all that the bridge's open
-// message does: launching tvapp alone leaves Emby's player paused under it,
-// with every page it had open still there.
+// the phone has sat idle for a while. It does all that the bridge's open
+// message does.
 app.get("/tv/opentvapp", async (req, res) => {
   unilog(1846, `opentvapp from ${client(req)}`);
   const opened = await openTvappSelectingShow();
@@ -2799,8 +1531,8 @@ app.get("/tv/opentvapp", async (req, res) => {
 // ---- a live video stream on the screen -----------------------------------
 //
 // hvac2 asks for this over localhost (both run on hahnca.com under pm2) and
-// hands over a url and nothing else. This file owns the television: its power,
-// whatever Emby was playing, and the overlay. It does not know what the url
+// hands over a url and nothing else. This file owns the television: its power
+// and the overlay; tvapp pauses its own video under the overlay. It does not know what the url
 // serves, and hvac2 does not know any of the above. The interface is fixed by
 // docs/tv-videostream-contract.md.
 //
@@ -2815,35 +1547,11 @@ const VIDEOSTREAM_MIN_HOLD_MS = 5 * 1000;
 // the route is localhost-only -- but a typo that reaches the television shows
 // as a black screen with no other explanation.
 const VIDEOSTREAM_URL_PREFIX = "https://hahnca.com/";
-// After Emby is brought back to the front, before it is unpaused: the player
-// has to be on the screen to resume into, or the show restarts behind tvapp
-// with nobody looking at it.
-const VIDEOSTREAM_EMBY_SETTLE_MS = 1200;
 // Long enough for a television that was off to be listening.
 const VIDEOSTREAM_TV_ON_MS = 2500;
 
-// {url, label, since, expiresAt, holdMs, timer, interrupted, embySessionId}
+// {url, label, since, expiresAt, holdMs, timer, interrupted}
 let videoStream = null;
-
-/**
- * Emby's Pause route is a toggle when it is called the way seek2 calls it, so
- * the two states are named explicitly here instead: a view that is put up and
- * taken down has to leave the show in the state it found it in, and a toggle
- * cannot promise that.
- */
-async function embySetPaused(sessionId, paused) {
-  const cmd = paused ? "Pause" : "Unpause";
-  try {
-    const res = await fetch(
-      `${EMBY_BASE_URL}/Sessions/${sessionId}/Playing/${cmd}?api_key=${EMBY_API_KEY}`,
-      { method: "POST" },
-    );
-    return res.ok;
-  } catch (e) {
-    unilog(2410, `emby ${cmd} failed: ${e.message}`);
-    return false;
-  }
-}
 
 /**
  * The dead-man's switch. hvac2 pings for as long as it wants the view up, so a
@@ -2878,38 +1586,23 @@ async function showVideoStream(url, label, holdMs) {
   }
   if (videoStream) return { ok: false, reason: "busy" };
 
-  // Pause before anything appears, so the show does not run on behind the
-  // overlay while the television is waking up and tvapp is launching.
-  let embySessionId = null;
   let interrupted = null;
-  try {
-    const session = await getEmbyPlaybackSession();
-    if (session && !session.PlayState?.IsPaused) {
-      embySessionId = session.ControlSessionId;
-      await embySetPaused(embySessionId, true);
-      interrupted = "emby";
-    }
-  } catch (e) {
-    unilog(2412, `could not read the emby session: ${e.message}`);
-  }
 
   if (tvMode === "off") {
     callService("media_player", "turn_on", BRAVIA_ENTITY_ID);
     await sleep(VIDEOSTREAM_TV_ON_MS);
   }
 
-  // The camera variant of opening tvapp: no closeEmbyShow, because the show is
-  // paused and being kept for later, and no show selection, because the list
+  // The camera variant of opening tvapp: no show selection, because the list
   // is not what anyone is about to look at.
   let sock = await probeTvappOpen();
   if (sock) {
-    if (!interrupted) interrupted = "tvapp";
+    interrupted = "tvapp";
   } else {
     await launchTvapp();
     sock = await dialTvappUntilOpen(TVAPP_SELECT_DIAL_TIMEOUT_MS);
   }
   if (!sock) {
-    if (embySessionId) await embySetPaused(embySessionId, false);
     unilog(2413, `tvapp never came up`);
     return { ok: false, reason: "tvappDown" };
   }
@@ -2924,7 +1617,6 @@ async function showVideoStream(url, label, holdMs) {
     holdMs: VIDEOSTREAM_DEFAULT_HOLD_MS,
     timer: null,
     interrupted,
-    embySessionId,
   };
   armVideoStreamHold(holdMs);
   unilog(2414, `showing ${label ?? url}${interrupted ? ` over ${interrupted}` : ""}`);
@@ -2949,21 +1641,12 @@ async function stopVideoStream(why, restore = true) {
   let restored = null;
   if (!restore) {
     // The Shows key, and the tvapp open behind it. The caller wants tvapp on
-    // the screen, so putting a paused show back would be undone a moment
-    // later -- and would flash Emby up on the way. The view is still cleared,
-    // which is what stops the hold timer and frees the next Door press.
+    // the screen as it is. The view is still cleared, which is what stops the
+    // hold timer and frees the next Door press.
     unilog(2419, `stopped ${was.label ?? was.url} (${why}) without restoring`);
     return { ok: true, restored: null };
   }
-  if (was.embySessionId) {
-    callService("media_player", "play_media", BRAVIA_ENTITY_ID, {
-      media_content_type: "app",
-      media_content_id: EMBY_APP_URI,
-    });
-    await sleep(VIDEOSTREAM_EMBY_SETTLE_MS);
-    await embySetPaused(was.embySessionId, false);
-    restored = "emby";
-  } else if (was.interrupted === "tvapp") {
+  if (was.interrupted === "tvapp") {
     // tvapp was already up and is still up; hiding the overlay is the restore.
     restored = "tvapp";
   }

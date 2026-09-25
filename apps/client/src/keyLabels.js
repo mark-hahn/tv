@@ -15,11 +15,9 @@ export const keyLabels = {
   mute: "Mute",
   off: "Off",
   on: "On",
-  emby: "Emby",
   vold: "Volume Down",
   volu: "Volume Up",
   googlebtn: "Google TV",
-  skip: "Skip",
   sort: "Sort",
   filter: "Filter",
 };

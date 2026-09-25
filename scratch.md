@@ -1,4 +1,17 @@
 
+collision match will send only one key
+
+
+Web: toggle To Try, Continue, Mark and Linda.
+Web: toggle watched on a map episode, and run map Prune.
+Web: check the season/episode counts in the info pane. They're now counted from the show record.
+Web: the list's TV button, and the map's TV button with an episode selected.
+Phone (Metro): the show pane's TV button with an episode selected, the empty cells, and the streamers list.
+tvapp: card images, Back at the top, and playing from the map.
+Deleting a show: I could only test the error path, so the real Emby delete call is unproven.
+Vol+ hold during a video with several subtitle tracks.
+A video whose subtitle is a sidecar .srt; it shows as "S: External".
+Emby in the phone's streaming list.
 
 don't browse `In Development`
                                                                                                                               

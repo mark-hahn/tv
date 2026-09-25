@@ -570,7 +570,6 @@ import * as epd from "@tv/share";
 import { unilog, logHere } from "../log.js";
 import { config } from "../config.js";
 import paneHelp from "../paneHelp.js";
-import * as urls from "../urls.js";
 import * as util from "../util.js";
 
 // Hardwired split percentages for simple mode.

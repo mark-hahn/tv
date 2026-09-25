@@ -178,10 +178,10 @@
             <button
               v-if="mapShow?.inEmby !== false"
               @click.stop="handleSelectedTv"
-              :disabled="!firstSelectedEmbyId"
+              :disabled="!firstSelectedEpisode"
               :style="{
-                opacity: firstSelectedEmbyId ? 1 : 0.35,
-                cursor: firstSelectedEmbyId ? 'pointer' : 'default',
+                opacity: firstSelectedEpisode ? 1 : 0.35,
+                cursor: firstSelectedEpisode ? 'pointer' : 'default',
               }"
               style="
                 font-size: 13.5px;
@@ -237,10 +237,10 @@
             <button
               v-if="mapShow?.inEmby !== false"
               @click.stop="handleSelectedTv"
-              :disabled="!firstSelectedEmbyId"
+              :disabled="!firstSelectedEpisode"
               :style="{
-                opacity: firstSelectedEmbyId ? 1 : 0.35,
-                cursor: firstSelectedEmbyId ? 'pointer' : 'default',
+                opacity: firstSelectedEpisode ? 1 : 0.35,
+                cursor: firstSelectedEpisode ? 'pointer' : 'default',
               }"
               style="
                 font-size: 13.5px;
@@ -1184,7 +1184,6 @@ export default {
     return {
       seasonStates: {}, // Track original state for each season
       tvdbData: null,
-      nextUpTxt: "",
 
       mapWorking: false,
       mapWorkingTitle: "",
@@ -1414,6 +1413,13 @@ export default {
     hasSelectedCell() {
       return this.selectedCells.size > 0;
     },
+    firstSelectedEpisode() {
+      if (this.selectedCells.size === 0) return null;
+      const { season, episode } = this.parseCellKey(
+        Array.from(this.selectedCells)[0],
+      );
+      return this.seriesMap?.[season]?.[episode] ? { season, episode } : null;
+    },
     firstSelectedEmbyId() {
       if (this.selectedCells.size === 0) return null;
       const firstKey = Array.from(this.selectedCells)[0];
@@ -1463,8 +1469,6 @@ export default {
         this.seasonStates = {}; // Clear season states when show changes
         await this.loadTvdbData();
         if (!this.mapShow) return;
-        await this.setNextWatch();
-        if (!this.mapShow) return;
         this.$nextTick(() => {
           this.updateMapPanBounds();
         });
@@ -1503,7 +1507,6 @@ export default {
   async mounted() {
     if (this.mapShow && this.mapShow.name) {
       await this.loadTvdbData();
-      await this.setNextWatch();
     }
     this.$nextTick(() => {
       this.updateMapPanBounds();
@@ -2466,11 +2469,11 @@ export default {
     // and a click on this show over there -- but naming the map's selected
     // episode so tvapp plays it instead of the show's own next-up pick.
     async handleSelectedTv() {
-      const id = this.firstSelectedEmbyId;
+      const sel = this.firstSelectedEpisode;
       const showName = this.mapShow?.name;
-      if (!id || !showName) return;
+      if (!sel || !showName) return;
       fetch(
-        `${config.tvTvUrl}/tv/showintvapp?showName=${encodeURIComponent(showName)}&episodeId=${encodeURIComponent(id)}`,
+        `${config.tvTvUrl}/tv/showintvapp?showName=${encodeURIComponent(showName)}&season=${sel.season}&episode=${sel.episode}`,
       ).catch(() => {});
     },
     handleEpisodePlainClick(event, mapShow, season, episode) {
@@ -2590,36 +2593,6 @@ export default {
       else next.add(season);
       this.selectedSeasons = next;
       this.syncOpenEpisodePaneToSelection();
-    },
-
-    async setNextWatch() {
-      if (!this.mapShow || !this.mapShow.id) {
-        this.nextUpTxt = "";
-        return;
-      }
-
-      const show = this.mapShow;
-      const afterWatched = await emby.afterLastWatched(show);
-      const status = afterWatched.status;
-      const readyToWatch = status === "ok";
-
-      if (this.mapShow !== show) return;
-
-      if (show.inEmby !== false && status !== "allWatched") {
-        const { seasonNumber, episodeNumber } = afterWatched;
-        const seaEpiTxt =
-          `S${("" + seasonNumber).padStart(2, "0")} ` +
-          `E${("" + episodeNumber).padStart(2, "0")}`;
-        if (readyToWatch) {
-          this.nextUpTxt = ` &nbsp; Next Up: ${seaEpiTxt}`;
-        } else {
-          this.nextUpTxt = ` 
-                &nbsp; Next Up: ${seaEpiTxt} 
-                &nbsp; ${status === "missing" ? "No File" : "Unaired"}`;
-        }
-      } else {
-        this.nextUpTxt = "";
-      }
     },
   },
 };

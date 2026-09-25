@@ -1363,6 +1363,7 @@ app.get("/api/getGaps", apiWrapper(getGaps));
 app.get("/api/getNoEmbys", apiWrapper(getNoEmbys));
 app.get("/api/getDevices", apiWrapper(emby.getDevices));
 app.post("/api/embyViewShow", apiWrapper(emby.viewShowOnLivingRoomTv));
+app.get("/api/getPlayUrl", apiWrapper(emby.getPlayUrl));
 app.get("/api/getLastViewed", apiWrapper(view.getLastViewed));
 app.get("/api/getSharedFilters", apiWrapper(getSharedFilters));
 // GET with no params uses the shared settings; POST carries its own.

@@ -37,4 +37,8 @@ android {
 dependencies {
   // Server side of the tvapprc socket.
   implementation 'org.java-websocket:Java-WebSocket:1.5.7'
+  // In-app playback of episode files (VideoPlayer). 1.8 is the last line that
+  // takes minSdk 21 and compileSdk 35.
+  implementation 'androidx.media3:media3-exoplayer:1.8.1'
+  implementation 'androidx.media3:media3-ui:1.8.1'
 }

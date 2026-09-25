@@ -156,6 +156,12 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
 ```
 - don't read doc files in ./doc unless i tell you to
 
+## Emby
+
+- We no longer use Emby for any purpose. tvapp plays video itself with Media3
+  (`apps/tvapp/.../VideoPlayer.java`). Any Emby mentions elsewhere in these
+  notes are out of date.
+
 ## tvapp and tvapprc
 
 - `apps/tvapp` is a native Java Android TV app (package `com.hahnca.tvapp`,

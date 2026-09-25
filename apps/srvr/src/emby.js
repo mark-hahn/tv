@@ -4,6 +4,8 @@ import fetch from "node-fetch";
 import * as epd from "@tv/share";
 import { unilog, logHere } from "@tv/share";
 
+const TV_URL = "https://hahnca.com/tv";
+
 const deviceNameByDeviceId = {
   "ca632bcd-7279-4fc2-b5b8-6f92ae6ddb08": "mlap2",
   "2095c65339b60175": "chromecast",
@@ -92,6 +94,18 @@ const playTargetEpisode = async (showId, episodeId) => {
     }
   }
   return episodeId ? { id: episodeId, pos: 0 } : null;
+};
+
+// tvapp plays in VLC straight off nginx, which serves TV_DIR at TV_URL. The
+// episode is the same one an Emby play would pick; url is null when that
+// episode has no file.
+export const getPlayUrl = async ({ showId, episodeId }) => {
+  const episode = await playTargetEpisode(showId, episodeId);
+  if (!episode?.path) return { url: null };
+  if (!episode.path.startsWith(`${TV_DIR}/`))
+    throw new Error(`episode path not under ${TV_DIR}: ${episode.path}`);
+  const rel = episode.path.slice(TV_DIR.length + 1);
+  return { url: `${TV_URL}/${rel.split("/").map(encodeURIComponent).join("/")}` };
 };
 
 // True when the session accepted the play. A dead session answers with a

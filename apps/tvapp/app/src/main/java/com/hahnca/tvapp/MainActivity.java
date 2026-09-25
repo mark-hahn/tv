@@ -26,8 +26,6 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -113,8 +111,14 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private static final String KEY_SELECTED_SHOW = "selectedShow";
   private static final String KEY_SORT = "sort";
 
-  private static final String VIEWSHOW_URL = "https://hahnca.com/tv-tv/tv/viewshow";
-  private static final int VIEWSHOW_TIMEOUT_MS = 10000;
+  private static final String PLAY_URL_URL = "https://hahnca.com/tv-srvr/api/getPlayUrl";
+  // Test: ok plays this one episode with these subtitles, whatever is selected.
+  private static final boolean PLAY_TEST_VIDEO = true;
+  private static final String TEST_VIDEO_BASE =
+      "https://hahnca.com/tv/DANG!/Season%201/"
+          + "DANG.S01E03.The.Davenport.School.for.Fancy.Boys.2160p.NF.WEB-DL.DDP5.1.Atmos.H.265-XEBEC";
+  private static final String TEST_VIDEO_URL = TEST_VIDEO_BASE + ".mkv";
+  private static final String TEST_SUBS_URL = TEST_VIDEO_BASE + ".opnMHUDJ.srt";
   private static final String NO_FILE_TOAST = "No file.";
   // Not a Toast: the wait is ten seconds and the longest toast is three and a
   // half, so it went out well before the shows came in. This is a view of the
@@ -176,6 +180,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   private ShowCounts showCounts;
   private TextView filterLabel;
   private TrailerPlayer player;
+  private VideoPlayer video;
   private CamOverlay cam;
   private LinearLayout buttonColumn;
   private View sortGroup;
@@ -264,7 +269,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
             ui.post(
                 () -> {
                   showsLoadedAt = System.currentTimeMillis();
-                  showList.setShows(shows, selectedName);
+                  // A reload keeps whatever is selected when it lands, not
+                  // when it started: tv-tv's select can come in between.
+                  Shows.Show current = showList.getSelected();
+                  showList.setShows(
+                      shows,
+                      showWait ? selectedName : (current == null ? null : current.name));
                   runPendingSelect();
                   if (showWait) endShowsLoadingWhenDrawn();
                 });
@@ -333,6 +343,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     // running behind whatever came forward, and report it exactly as Back
     // does: tv-tv is holding a paused show either way.
     if (cam.isShowing()) cam.close(CamOverlay.CloseReason.BACK);
+    video.close();
     ctrlServer.shutdown();
     ctrlServer = null;
     updates.stop();
@@ -343,8 +354,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
   /** Re-reads the list, keeping the selection on whatever show it is on. */
   private void reloadShows() {
     Shows.Show selected = showList.getSelected();
-    Log.i(TAG, "sel trace: reloadShows keeping " + (selected == null ? null : selected.name));
-    loadShows(selected == null ? null : selected.name, false);
+    Log.i(TAG, "sel trace: reloadShows started on " + (selected == null ? null : selected.name));
+    loadShows(null, false);
   }
 
   private View buildUi() {
@@ -381,6 +392,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
 
     player = new TrailerPlayer(this);
     root.addView(player, matchParent());
+
+    video = new VideoPlayer(this);
+    root.addView(video, matchParent());
 
     // Added last, so it is over the trailer player as well as the list: a
     // camera going up is an interruption, and an interruption that appears
@@ -944,6 +958,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    * takes narrowings off.
    */
   private void clearScreenState() {
+    video.close();
     if (player.isPlaying()) player.close();
     relatedActors.close();
     showCounts.close();
@@ -967,6 +982,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       player.play(trailerUrl);
       return;
     }
+    if (PLAY_TEST_VIDEO) {
+      video.play(TEST_VIDEO_URL, TEST_SUBS_URL);
+      return;
+    }
     Shows.Show show = showList.getSelected();
     if (show == null) {
       backToEmby();
@@ -981,7 +1000,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
         showBigCenterToast(NO_FILE_TOAST);
         return;
       }
-      playInEmby(show, episodeId);
+      playVideo(show, episodeId);
       return;
     }
     if (!show.hasFile) {
@@ -992,7 +1011,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       showBigCenterToast(NOT_READY_TOAST);
       return;
     }
-    playInEmby(show, null);
+    playVideo(show, null);
   }
 
   // Same as embyClick's episode-focused branch, but the episode comes from
@@ -1003,38 +1022,43 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       backToEmby();
       return;
     }
-    playInEmby(show, embyId);
+    playVideo(show, embyId);
   }
 
-  private void playInEmby(Shows.Show show, String episodeId) {
+  /**
+   * Plays the episode's file in tvapp's own player straight off nginx -- Emby
+   * is not asked anything. tv-srvr picks the episode (the named one, else
+   * next-up) and hands back its url, or null when there is no file.
+   */
+  private void playVideo(Shows.Show show, String episodeId) {
     new Thread(
             () -> {
+              String url = null;
               try {
-                String url =
-                    VIEWSHOW_URL
-                        + "?showId="
+                String query =
+                    "?showId="
                         + URLEncoder.encode(show.id, "UTF-8")
-                        + "&showName="
-                        + URLEncoder.encode(show.name, "UTF-8")
                         + (episodeId == null
                             ? ""
-                            : "&episodeId=" + URLEncoder.encode(episodeId, "UTF-8"))
-                        + "&play=1";
-                HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
-                conn.setConnectTimeout(VIEWSHOW_TIMEOUT_MS);
-                conn.setReadTimeout(VIEWSHOW_TIMEOUT_MS);
-                conn.getInputStream().close();
-                conn.disconnect();
+                            : "&episodeId=" + URLEncoder.encode(episodeId, "UTF-8"));
+                JSONObject resp = new JSONObject(Http.get(PLAY_URL_URL + query));
+                if (!resp.isNull("url")) url = resp.getString("url");
               } catch (Exception e) {
-                Log.e(TAG, "viewshow failed for " + show.name + ": " + e);
+                Log.e(TAG, "getPlayUrl failed for " + show.name + ": " + e);
+                return;
               }
+              String playUrl = url;
               ui.post(
                   () -> {
+                    if (playUrl == null) {
+                      showBigCenterToast(NO_FILE_TOAST);
+                      return;
+                    }
                     playedShow = show;
-                    moveTaskToBack(true);
+                    video.play(playUrl, null);
                   });
             },
-            "viewshow")
+            "play-url")
         .start();
   }
 
@@ -1395,6 +1419,11 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
       cam.close(CamOverlay.CloseReason.BACK);
       return;
     }
+    // A video closes back to the list; it never leaves for Emby.
+    if (video.isOpen()) {
+      video.close();
+      return;
+    }
     if (player.isPlaying()) {
       player.close();
       return;
@@ -1420,6 +1449,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     // moving a list nobody can see underneath it. Back is not here: it comes
     // in on its own path, and handleBack closes the overlay.
     if (cam.isShowing()) return;
+    // A video has no controls yet; the Shows key is the way out. Every other
+    // key is swallowed so it cannot move the hidden list underneath.
+    if (video.isOpen()) return;
     if (player.isPlaying()) {
       // While the video owns the screen the keys are the video's, the way they
       // are in Emby: ok pauses and resumes, left seeks. Right is the way back
@@ -1592,7 +1624,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
    * over one of the other areas is just the key held down.
    */
   private void handleRemoteKeyLetter(String key) {
-    if (player.isPlaying()) return;
+    if (player.isPlaying() || video.isOpen()) return;
     boolean up = "up".equals(key);
     boolean down = "down".equals(key);
     if (!up && !down || area != Area.LIST) {

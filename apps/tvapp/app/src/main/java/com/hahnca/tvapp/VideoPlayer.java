@@ -5,6 +5,7 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Log;
 import android.widget.FrameLayout;
 import androidx.media3.common.C;
@@ -34,7 +35,13 @@ import org.json.JSONObject;
 class VideoPlayer extends FrameLayout {
 
   interface Events {
-    void onVideoError(String text);
+    /**
+     * The video closed by itself: it ran to its end (error null) or it failed
+     * (error is the text to show). The keys that were steering it may still
+     * be coming -- a held seek keeps repeating -- and nothing stops them but
+     * the remote.
+     */
+    void onVideoEnded(String error);
   }
 
   private static final String TAG = "tvapp";
@@ -44,6 +51,7 @@ class VideoPlayer extends FrameLayout {
   private static final long REPORT_MS = 10000;
   private static final long SEEK_BACK_MS = 10000;
   private static final long SEEK_FWD_MS = 30000;
+  private static final long SKIP_LOCKOUT_MS = 2000;
   // How long the time bar stays up after a key while playing; paused, it
   // stays until play resumes.
   private static final int BAR_SHOW_MS = 3000;
@@ -68,6 +76,7 @@ class VideoPlayer extends FrameLayout {
   // Past its first STATE_READY: the position is real and worth reporting.
   private boolean ready;
   private boolean subsPicked;
+  private long lastSkipAt;
 
   VideoPlayer(Context context, Events events) {
     super(context);
@@ -116,6 +125,7 @@ class VideoPlayer extends FrameLayout {
               report("ended");
               ready = false;
               close();
+              events.onVideoEnded(null);
             }
           }
 
@@ -136,7 +146,7 @@ class VideoPlayer extends FrameLayout {
             // last periodic report stands as the resume point.
             ready = false;
             close();
-            events.onVideoError(PLAY_FAILED_TOAST);
+            events.onVideoEnded(PLAY_FAILED_TOAST);
           }
         });
     view.setPlayer(exo);
@@ -157,9 +167,10 @@ class VideoPlayer extends FrameLayout {
   }
 
   /**
-   * A remote key while the video is up: ok pauses and resumes, left and right
-   * seek, and the Skip key (tvapprc's filter) jumps over the intro by the
-   * show's skip length.
+   * A remote key while the video is up -- tvapprc mode's arrows and ok, the
+   * same keys that drive the list: ok pauses and resumes, left and right seek,
+   * up jumps over the intro by the show's skip length, and down only puts the
+   * time bar up.
    */
   void key(String key) {
     if (exo == null) return;
@@ -168,8 +179,14 @@ class VideoPlayer extends FrameLayout {
     if ("ok".equals(key)) exo.setPlayWhenReady(!exo.getPlayWhenReady());
     else if ("left".equals(key)) exo.seekTo(Math.max(0, pos - SEEK_BACK_MS));
     else if ("right".equals(key)) exo.seekTo(pos + SEEK_FWD_MS);
-    else if ("filter".equals(key) && skipDurMs > 0) exo.seekTo(pos + skipDurMs);
-    else return;
+    else if ("up".equals(key)) {
+      // A held up repeats, and a second skip would land past the intro into
+      // the show, so repeats inside the lockout are dropped.
+      long now = SystemClock.uptimeMillis();
+      if (skipDurMs <= 0 || now - lastSkipAt < SKIP_LOCKOUT_MS) return;
+      lastSkipAt = now;
+      exo.seekTo(pos + skipDurMs);
+    } else if (!"down".equals(key)) return;
     view.setControllerShowTimeoutMs(exo.getPlayWhenReady() ? BAR_SHOW_MS : 0);
     view.showController();
   }

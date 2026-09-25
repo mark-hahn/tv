@@ -66,6 +66,9 @@ const MSG_COUNTS = "c";
 const MSG_ACTIVE_SHOW = "a";
 // Whether that show is hidden, which is what the hide key reads Unhide for.
 const MSG_ACTIVE_HIDDEN = "i";
+// A tvapp video closed by itself. A held seek must stop repeating right there,
+// or the rest of its repeats land on the show list and move its focus.
+const MSG_VIDEO_ENDED = "v";
 const CMD_OPEN_TVAPP = "o";
 const CMD_CLOSE_TO_EMBY = "b";
 // Back to a clean tvapp screen: the show list focused and nothing else,
@@ -357,6 +360,7 @@ export default function App() {
         while (repeatActiveRef.current) {
           const rr = await sendKeyThrough(key, null, { repeating: true });
           if (rr.blocked) return stopRepeat();
+          if (!repeatActiveRef.current) break;
           sendTvapprc(`${letterMode ? CMD_KEY_LETTER : CMD_KEY},${key}`);
           const delay = letterMode ? SCRUB_HOLD_DELAY_MS : TVAPP_FAST_REPEAT_MS;
           await new Promise((r) => {
@@ -625,6 +629,9 @@ export default function App() {
           leaveTvapprcMode();
         } else if (e.data === MSG_CLEAR_FILTER) {
           clearTvapprcFilter();
+        } else if (e.data === MSG_VIDEO_ENDED) {
+          // The repeat loop checks this before every send.
+          repeatActiveRef.current = false;
         } else if (
           typeof e.data === "string" &&
           e.data.startsWith(`${MSG_COUNTS},`)

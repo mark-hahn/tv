@@ -386,7 +386,15 @@ public class MainActivity extends Activity implements CtrlServer.Listener {
     player = new TrailerPlayer(this);
     root.addView(player, matchParent());
 
-    video = new VideoPlayer(this, this::showBigCenterToast);
+    // A video that closed by itself leaves the remote maybe still repeating a
+    // held seek, and those repeats would land on the list and move its focus.
+    video =
+        new VideoPlayer(
+            this,
+            error -> {
+              sendToPhone(CtrlServer.MSG_VIDEO_ENDED);
+              if (error != null) showBigCenterToast(error);
+            });
     root.addView(video, matchParent());
 
     // Added last, so it is over the trailer player as well as the list: a

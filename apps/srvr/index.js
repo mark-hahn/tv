@@ -3873,10 +3873,13 @@ async function playProgress({ showName, season, episode, posMs, durMs, state }) 
     rec.lastPlayedEpisode = code;
     rec.fakeLastPlayed = null;
     rec.hiddenFromRow = false;
-    logHere({ grp: "tvapp play" }, `${showName} ${code} ${state} at ${Math.round(posMs / 1000)}s`);
+    unilog(2497, `${showName} ${code} ${state} at ${Math.round(posMs / 1000)}s`);
   }
   await tvdb.saveTvdbSync();
-  debouncedTvdbPush(showName);
+  // Only when the list would show it: every push makes tvapp reload all its
+  // shows, and one every report while a 4K video fills tvapp's heap ran it
+  // out of memory.
+  if (started || stopped) debouncedTvdbPush(showName);
   tvappNowPlaying = stopped
     ? null
     : {
@@ -3911,9 +3914,9 @@ async function setEmbyPlayState(showName, ed, season, episode, pos) {
       }),
     });
     if (!res.ok && res.status !== 204)
-      logHere({ lvl: "warn", grp: "tvapp play" }, `emby play state write failed for ${showName} ${code}: HTTP ${res.status}`);
+      unilog(2498, `emby play state write failed for ${showName} ${code}: HTTP ${res.status}`);
   } catch (e) {
-    logHere({ lvl: "warn", grp: "tvapp play" }, `emby play state write failed for ${showName} ${code}: ${e.message}`);
+    unilog(2499, `emby play state write failed for ${showName} ${code}: ${e.message}`);
   }
 }
 

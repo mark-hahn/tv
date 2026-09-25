@@ -180,6 +180,9 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
 - Build/install with `cd apps/tvapp && ./build-apk`. Gradle and adb both run
   on hahnca.com, never here — this workspace cannot reach the TV at all. Do
   this after every tvapp change; there is no hot reload for it.
+  Claude runs the install itself after every tvapp change, without being
+  asked; `./srvr` does not deploy tvapp, so a skipped install leaves the TV
+  on the old build.
 - Android tvapprc mode and tvapp talk over the LAN through `startTvapprcBridge`
   in `apps/tv/src/main.js`, because the TV is unreachable from any wireless
   host on this network and tv-tv's host is wired.

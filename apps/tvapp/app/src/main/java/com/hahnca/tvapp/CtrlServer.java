@@ -44,6 +44,7 @@ import org.java_websocket.server.WebSocketServer;
  *   a,&lt;name&gt;    the active show, so the phone's own show pane can open on it
  *   i,&lt;0|1&gt;     whether the active show is hidden, so the remote's hide key
  *                  can read Hide or Unhide
+ *   v              a video closed by itself: stop repeating a held key
  */
 class CtrlServer extends WebSocketServer {
 
@@ -53,6 +54,7 @@ class CtrlServer extends WebSocketServer {
   static final String MSG_COUNTS = "c";
   static final String MSG_ACTIVE_SHOW = "a";
   static final String MSG_ACTIVE_HIDDEN = "i";
+  static final String MSG_VIDEO_ENDED = "v";
 
   private static final String TAG = "tvapp";
   private static final String CMD_KEY = "k";

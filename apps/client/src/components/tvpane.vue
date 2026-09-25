@@ -783,6 +783,9 @@ const MSG_TVAPP_DOWN = "d";
 const MSG_ACTIVE_SHOW = "a";
 // Whether that show is hidden, which is what the hide key reads Unhide for.
 const MSG_ACTIVE_HIDDEN = "i";
+// A tvapp video closed by itself. A held seek must stop repeating right there,
+// or the rest of its repeats land on the show list and move its focus.
+const MSG_VIDEO_ENDED = "v";
 const CMD_OPEN_TVAPP = "o";
 const CMD_CLOSE_TO_EMBY = "b";
 // Back to a clean tvapp screen: the show list focused and nothing else,
@@ -1079,6 +1082,9 @@ export default {
           this.tvapprcMode = false;
           this.tvapprcHidden = false;
           this._tvapprcActiveShow = null;
+        } else if (e.data === MSG_VIDEO_ENDED) {
+          // The repeat loop checks this before every send.
+          this._repeatActive = false;
         } else if (
           typeof e.data === "string" &&
           e.data.startsWith(`${MSG_ACTIVE_SHOW},`)
@@ -1230,6 +1236,7 @@ export default {
               repeating: true,
             });
             if (rr.blocked) return this.stopRepeat();
+            if (!this._repeatActive) break;
             this.sendTvapprc(
               `${letterMode ? CMD_KEY_LETTER : CMD_KEY},${key}`,
             );

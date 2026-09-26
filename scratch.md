@@ -1,15 +1,16 @@
 
+
+????????????????
+don't browse `In Development`
+manage upcoming shows
+=================
+
 # clearing top filter in tvapp
 - when in tvapp and the show list is filtered by search string or actor name 
   - and string or name is showing at top of list
   - and there is no mode selected like sort, filter, or info
   - then a back-arrow key should clear the string or name filter
     - and not go back to tv home
-
-????????????????
-don't browse `In Development`
-manage upcoming shows
-=================
 
 the tv video text bar year display should show one year with no hyphen when start and end years are the same
 

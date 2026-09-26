@@ -747,6 +747,8 @@ const CMD_KEY_REPEAT = "kr";
 // The hide key. What it acts on -- the episode under the map's cursor, else
 // the selected show -- is tvapp's to decide, so the press is all that is sent.
 const CMD_HIDE = "h";
+// The hide key held: tvapp unhides the show the key last hid.
+const CMD_UNHIDE = "hu";
 // Letter-skip variant of CMD_KEY, up/down only -- sent instead of CMD_KEY
 // once a held key has been auto-repeating fast long enough that tvapp's show
 // list starts jumping by starting letter instead of by row.
@@ -1408,12 +1410,17 @@ export default {
       this.sendTvapprc(CMD_HIDE);
     },
 
+    unhideLastHidden() {
+      this.flash("hide");
+      this.sendTvapprc(CMD_UNHIDE);
+    },
+
     startHideHold() {
-      this._dbStart(this.hideSelectedShow);
+      this._lpStart(this.hideSelectedShow, this.unhideLastHidden);
     },
 
     stopHideHold() {
-      this._dbStop();
+      this._lpStop();
     },
 
     // Put the doorbell camera on the television, or take it back off: the same

@@ -32,7 +32,8 @@ import org.java_websocket.server.WebSocketServer;
  *   h              the hide key: the watched mark on the focused episode when
  *                  the map has one under its cursor, else hide/unhide the
  *                  selected show
- *   l              send the subtitle list of the video that is up (l,... below)
+ *   hu             the hide key held: unhide the show it last hid
+ *   l            send the subtitle list of the video that is up (l,... below)
  *   t,&lt;n&gt;       turn on subtitle track n of that list; t,-1 turns them off
  *   v,&lt;url&gt;  put a live camera on the screen, over everything, by
  *                  loading that url in a WebView; v,off takes it back off.
@@ -75,6 +76,8 @@ class CtrlServer extends WebSocketServer {
   // say -- it is the only one that knows whether the map has an episode under
   // its cursor -- so the remote sends the press and nothing more.
   private static final String CMD_HIDE = "h";
+  // The hide key's long press: unhide the show the key last hid.
+  private static final String CMD_UNHIDE = "hu";
   private static final String CMD_SUBTITLES = "l";
   private static final String CMD_SUBTITLE = "t";
   // A live camera over the whole screen. The argument is a page url, or "off".
@@ -105,6 +108,8 @@ class CtrlServer extends WebSocketServer {
     void onCustomChanged();
 
     void onHideKey();
+
+    void onUnhideKey();
 
     void onSubtitlesWanted();
 
@@ -234,6 +239,8 @@ class CtrlServer extends WebSocketServer {
       listener.onCustomChanged();
     } else if (CMD_HIDE.equals(message)) {
       listener.onHideKey();
+    } else if (CMD_UNHIDE.equals(message)) {
+      listener.onUnhideKey();
     } else if (CMD_SUBTITLES.equals(message)) {
       listener.onSubtitlesWanted();
     } else {

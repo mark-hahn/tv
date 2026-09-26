@@ -93,6 +93,8 @@ const CMD_KEY_FILTER = "filter";
 // The hide key. What it acts on -- the episode under the map's cursor, else
 // the selected show -- is tvapp's to decide, so the press is all that is sent.
 const CMD_HIDE = "h";
+// The hide key held: tvapp unhides the show the key last hid.
+const CMD_UNHIDE = "hu";
 const CMD_KEY_INFO = "info";
 const CMD_FILTER = "f";
 const SCRUB_HOLD_DELAY_MS = 400;
@@ -1505,12 +1507,17 @@ export default function App() {
     sendTvapprc(CMD_HIDE);
   };
 
+  const unhideLastHidden = () => {
+    flash("hide");
+    sendTvapprc(CMD_UNHIDE);
+  };
+
   const startHideHold = () => {
-    dbStart(hideSelectedShow);
+    lpStart(hideSelectedShow, unhideLastHidden);
   };
 
   const stopHideHold = () => {
-    dbStop();
+    lpStop();
   };
 
   const startHomeHold = () => {

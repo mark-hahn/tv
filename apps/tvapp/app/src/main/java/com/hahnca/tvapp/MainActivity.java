@@ -200,6 +200,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
   private String actorFilterName;
   private String activeShowName;
   private boolean activeShowHidden;
+  // The show the hide key last hid, which a long press of it unhides.
+  private Shows.Show lastHidden;
   // A select that arrived before the show list did, and the play waiting on it.
   // The ctrl socket is bound in onStart, well before the first Shows.load comes
   // back, so tv-tv's select-then-play burst can land on an empty list -- where
@@ -1196,7 +1198,23 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
    */
   private void hideSelectedShow() {
     Shows.Show show = showList.getSelected();
-    if (show == null) return;
+    if (show != null) toggleHidden(show);
+  }
+
+  /**
+   * The hide key's long press: unhides the show the key last hid, whatever is
+   * selected now. Nothing when the last thing it did was not a hide.
+   */
+  @Override
+  public void onUnhideKey() {
+    ui.post(
+        () -> {
+          bumpKeepAwake();
+          if (lastHidden != null) toggleHidden(lastHidden);
+        });
+  }
+
+  private void toggleHidden(Shows.Show show) {
     String body;
     try {
       body = new JSONObject().put("name", show.name).toString();
@@ -1218,11 +1236,15 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
               ui.post(
                   () -> {
                     show.hiddenFromRow = hidden;
-                    if (show.name.equals(activeShowName)) {
+                    lastHidden = hidden ? show : null;
+                    if (hidden) showList.onShowHidden();
+                    // The label follows the selection: a hide that moved it on
+                    // leaves the label to the show moved to.
+                    Shows.Show selected = showList.getSelected();
+                    if (selected != null && selected.name.equals(show.name)) {
                       activeShowHidden = hidden;
                       sendActiveShow();
                     }
-                    if (hidden) showList.onShowHidden();
                   });
             },
             "hide-show")

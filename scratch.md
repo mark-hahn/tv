@@ -1,5 +1,18 @@
 
+video player has no audio `At Home with the Braithwaites`
 
+the tv video text bar year display should show one year with no hyphen when start and end years are the same
+
+
+# play video in browser for entertainment
+- in the info and map panes put a button `Play` to the left of the tv button. 
+- when Play is clicked show the video in a video pane like chksrt uses. 
+  - In the info pane it should show the first unwatched episode 
+  - in the map pane it should show the selected episode. 
+- the video should have no overlay except when there is an introdur for the show. 
+  - then show a small button in the upper right labeled `Skip` in an overlay. 
+  - the skip button should jump ahead by introdur amount. 
+- if there is an intropos then automatically jump to that position when the video starts playing at 0
                                                                                                                               
 ????????????????
 don't browse `In Development`

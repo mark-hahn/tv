@@ -219,6 +219,20 @@
             Subs
           </button>
           <button
+            @click.stop="playClick"
+            :disabled="!hasVideoFiles"
+            :style="{
+              fontSize: '13px',
+              cursor: hasVideoFiles ? 'pointer' : 'default',
+              marginTop: '3px',
+              maxHeight: '24px',
+              borderRadius: '7px',
+              opacity: hasVideoFiles ? 1 : 0.4,
+            }"
+          >
+            Play
+          </button>
+          <button
             @click.stop="tvClick"
             :disabled="show?.inLibrary === false"
             :style="{
@@ -909,6 +923,13 @@ export default {
     closeChksrtQueueChannel() {
       this._chksrtQueueChannel?.close();
       this._chksrtQueueChannel = null;
+    },
+
+    // Plays the first unwatched episode (else the first one) in the browser.
+    playClick() {
+      const res = epd.selectIntroFile(this.show);
+      if (res.error) return;
+      srvr.playInTab(this.show, res.path, res.season);
     },
 
     // Same as the tvapprc remote's Shows button and then a click on this show

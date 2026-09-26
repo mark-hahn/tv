@@ -1,6 +1,7 @@
 import { config } from "./config.js";
 import evtBus from "./evtBus.js";
 import { unilog, logHere } from "./log.js";
+import { getSeasonIntro } from "@tv/share";
 
 const HTTP_URL = config.tvSrvrUrl;
 const WS_URL = HTTP_URL.replace(/^https/, "wss");
@@ -878,6 +879,20 @@ export function getQueues() {
 
 export function enqueueChksrt(videoPaths) {
   return httpCall("/api/asr/chksrt/enqueue", { videoPaths }, "POST");
+}
+
+// Play button of the info and map panes: the episode in a tab of its own, in
+// the browser's player on /api/stream at full resolution, started past the
+// intro at the season's trimPos. The hash carries skipDur and trimPos to the
+// Tampermonkey script apps/client/tv-play.user.js, which adds Skip.
+export function playInTab(show, path, season) {
+  const { trimPos, skipDur } = getSeasonIntro(show?.seasonIntros, season);
+  const trim = Math.round(trimPos || 0);
+  const skip = Math.round(skipDur || 0);
+  window.open(
+    `${HTTP_URL}/api/stream?path=${encodeURIComponent(path)}&start=${Math.floor(trim / 1000)}#trim=${trim}&skip=${skip}`,
+    "_blank",
+  );
 }
 
 export function chksrtOk(videoPath) {

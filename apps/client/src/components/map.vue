@@ -159,6 +159,24 @@
             </button>
             <button
               v-if="mapShow?.inLibrary !== false"
+              @click.stop="handleSelectedPlay"
+              :disabled="!selectedPlayPath"
+              :style="{
+                opacity: selectedPlayPath ? 1 : 0.35,
+                cursor: selectedPlayPath ? 'pointer' : 'default',
+              }"
+              style="
+                font-size: 13.5px;
+                cursor: pointer;
+                margin: 4.5px 0 4.5px 4.5px;
+                max-height: 21.5px;
+                border-radius: 7px;
+              "
+            >
+              Play
+            </button>
+            <button
+              v-if="mapShow?.inLibrary !== false"
               @click.stop="handleSelectedTv"
               :disabled="!firstSelectedEpisode"
               :style="{
@@ -197,6 +215,24 @@
               "
             >
               Episode
+            </button>
+            <button
+              v-if="mapShow?.inLibrary !== false"
+              @click.stop="handleSelectedPlay"
+              :disabled="!selectedPlayPath"
+              :style="{
+                opacity: selectedPlayPath ? 1 : 0.35,
+                cursor: selectedPlayPath ? 'pointer' : 'default',
+              }"
+              style="
+                font-size: 13.5px;
+                cursor: pointer;
+                margin: 4.5px 0 4.5px 4.5px;
+                max-height: 21.5px;
+                border-radius: 7px;
+              "
+            >
+              Play
             </button>
             <button
               v-if="mapShow?.inLibrary !== false"
@@ -1383,6 +1419,10 @@ export default {
       );
       return this.seriesMap?.[season]?.[episode] ? { season, episode } : null;
     },
+    selectedPlayPath() {
+      const sel = this.firstSelectedEpisode;
+      return sel ? this.seriesMap[sel.season][sel.episode].path || null : null;
+    },
     firstSelectedPosMs() {
       if (this.selectedCells.size === 0) return 0;
       // Use the lowest-numbered (season then episode) selected cell that has pos > 0.
@@ -2389,6 +2429,12 @@ export default {
       const targets = this.getSelectedMapTargets();
       if (targets.length === 0) return;
       this.$emit("delete-episodes", this.mapShow, targets);
+    },
+    // Plays the selected episode in the browser.
+    handleSelectedPlay() {
+      const path = this.selectedPlayPath;
+      if (!path) return;
+      srvr.playInTab(this.mapShow, path, this.firstSelectedEpisode.season);
     },
     // Same as the info pane's TV button -- the tvapprc remote's Shows button
     // and a click on this show over there -- but naming the map's selected

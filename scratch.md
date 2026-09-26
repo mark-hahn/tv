@@ -1,22 +1,15 @@
 
 
-remote key collision match should send only the one key
-
-vol- doesn't work when muted
-
-do we still have played/playCount in record?
-
-add confirmation to prune
-
-remove door camera from tv
-what does `T:` mean in the subtitles pane in the phone
-
 
 don't browse `In Development`
                                                                                                                               
 ????????????????
 manage upcoming shows
 =================
+
+when keys are pressed on two phone remotes at about the same time this is a collision. there is no collision warning if the keys on the 2 remotes are the same key.  right now both keypresses are sent so there are 2 actions.  only 1 key should be sent on this kind of same key collision.
+
+add confirmation to prune
 
 i played the show `The Knights of Prosperity` s01e03 from tvapp.  the stored position was 0 and the show started at 0 but the show was marked as a partial in map pane immediately when playing started. i left it marked as partial
 

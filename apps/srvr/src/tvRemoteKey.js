@@ -116,10 +116,11 @@ export async function keySendWithChk({
     ? COLLISION_WINDOW_MS_SUBCTRL
     : COLLISION_WINDOW_MS;
   const crossRemote =
-    prev &&
-    prev.senderId !== senderId &&
-    now - prev.at < windowMs &&
-    prev.key !== key;
+    prev && prev.senderId !== senderId && now - prev.at < windowMs;
+
+  // Same key from both remotes — no lockout, but only the first one goes out.
+  // Keep the incumbent so the window still runs from the first press.
+  if (crossRemote && prev.key === key) return { blocked: true, dupKey: true };
 
   if (crossRemote) {
     if (prev.repeating) {

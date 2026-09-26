@@ -1,6 +1,6 @@
 import { smartTitleMatch, unilog, logHere } from "@tv/share"
 import { MovieDb } from "moviedb-promise";
-import { getTvdbBackground } from "./tvdb.js";
+import { getTvdbBackground, getTvdbEpisodeImage } from "./tvdb.js";
 const moviedb = new MovieDb("327192a334da700f65b882c7a69cb927");
 
 // A getTmdb call slower than this gets logged with a per-round-trip breakdown,
@@ -126,11 +126,20 @@ export async function getTmdb(params) {
           `(searchTv ${searchMs}ms, episodeInfo ${episodeMs}ms, ${guestActorList.length} guests)`);
     }
 
+    let image = episodeInfo.still_path
+      ? `https://image.tmdb.org/t/p/w300${episodeInfo.still_path}`
+      : null;
+    if (!image) {
+      try {
+        image = await getTvdbEpisodeImage(showName, season, episode);
+      } catch (e) {
+        unilog(2590, `tvdb episode image lookup failed for ${showName} S${season}E${episode}: ${e.message}`);
+      }
+    }
+
     return {
       guests: guestActorList,
-      image: episodeInfo.still_path
-        ? `https://image.tmdb.org/t/p/w300${episodeInfo.still_path}`
-        : null,
+      image,
       overview: episodeInfo.overview ?? null,
       name: episodeInfo.name ?? null,
       aired: episodeInfo.air_date ?? null,

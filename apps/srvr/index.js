@@ -3294,7 +3294,6 @@ async function getPlayUrl({ showName, season: s, episode: e }) {
     episode,
     posMs: epd.getPos(ed, season, episode),
     res: epd.getRes(ed, season, episode),
-    aired: epd.getAired(ed, season, episode),
     seasonEps: ed[season]?.length ?? 0,
     trimPosMs: Math.max(0, Math.round(intro.trimPos || 0)),
     skipDurMs: Math.max(0, Math.round(intro.skipDur || 0)),

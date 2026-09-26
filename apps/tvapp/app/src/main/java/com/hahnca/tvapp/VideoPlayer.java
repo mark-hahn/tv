@@ -145,7 +145,7 @@ class VideoPlayer extends FrameLayout {
 
   /**
    * p is tv-srvr's getPlayUrl answer: url, showName, season, episode, posMs
-   * (resume point), res (the file's height, null if unknown), aired, seasonEps
+   * (resume point), res (the file's height, null if unknown), seasonEps
    * (the episode count of its season), trimPosMs (where the show starts past its intro), skipDurMs
    * (the Skip key's jump), subs (the episode's .srt files as vtt, [{url,
    * label}]), subIndex (the embedded subtitle stream chksrt chose) and subPick
@@ -160,7 +160,7 @@ class VideoPlayer extends FrameLayout {
     title.setParts(
         p.optString("showName"),
         show.originalCountry.toUpperCase(Locale.US),
-        p.isNull("aired") ? "" : p.optString("aired"),
+        years(show),
         String.format("S%02dE%02d", p.optInt("season"), p.optInt("episode"))
             + (p.optInt("seasonEps") > 0 ? "/" + p.optInt("seasonEps") : ""),
         show.seasonCount <= 0
@@ -410,12 +410,12 @@ class VideoPlayer extends FrameLayout {
   }
 
   /**
-   * The time bar's parts after the time: name, country, aired date, episode,
+   * The time bar's parts after the time: name, country, years, episode,
    * seasons, watched, status and resolution. The ones in DROP_ORDER go,
    * in that order, until the rest fit the bar; empty ones are never shown.
    */
   private static class TitleRow extends LinearLayout {
-    // Watched, seasons, status, aired date, country.
+    // Watched, seasons, status, years, country.
     private static final int[] DROP_ORDER = {5, 4, 6, 2, 1};
     private final TextView[] parts = new TextView[8];
 
@@ -463,6 +463,13 @@ class VideoPlayer extends FrameLayout {
     private float partWidth(int i) {
       return parts[i].getPaddingLeft() + parts[i].getPaint().measureText(parts[i].getText().toString());
     }
+  }
+
+  /** "premiere year-last aired year", or whichever of the two the record has. */
+  private static String years(Shows.Show show) {
+    String first = ShowListView.year(show.firstAired);
+    String last = ShowListView.year(show.lastAired);
+    return first.isEmpty() || last.isEmpty() ? first + last : first + "-" + last;
   }
 
   private void report(String state) {

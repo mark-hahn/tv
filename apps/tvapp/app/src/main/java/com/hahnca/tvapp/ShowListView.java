@@ -1543,7 +1543,7 @@ class ShowListView extends ScrollView {
   }
 
   /** The year out of a "yyyy/MM/dd" date, or whatever was there if it is not one. */
-  private static String year(String date) {
+  static String year(String date) {
     return date.length() >= 4 ? date.substring(0, 4) : date;
   }
 

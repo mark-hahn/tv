@@ -1540,6 +1540,19 @@ export async function getTvdbBackground(tvdbId) {
   return pick.image || "";
 }
 
+// A map episode card's still when TMDB has none: TVDB's own episode image.
+export async function getTvdbEpisodeImage(showName, season, episode) {
+  const tvdbId = allTvdb[showName]?.id;
+  if (!tvdbId) return null;
+  const token = await getToken();
+  const { json } = await fetchJson(
+    `https://api4.thetvdb.com/v4/series/${tvdbId}/episodes/default` +
+      `?page=0&season=${season}&episodeNumber=${episode}`,
+    { headers: { Authorization: "Bearer " + token } },
+  );
+  return json?.data?.episodes?.[0]?.image || null;
+}
+
 function getTvdbImageUrl(extResObj) {
   // Try to find first English poster in artworks array
   const artworks = extResObj?.data?.artworks;

@@ -1409,6 +1409,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
       clearTextFilter();
       return;
     }
+    if (showList.selectTop()) return;
     startActivity(
         new Intent(Intent.ACTION_MAIN)
             .addCategory(Intent.CATEGORY_HOME)

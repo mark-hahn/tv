@@ -791,6 +791,14 @@ class ShowListView extends ScrollView {
     }
   }
 
+  /** Back to the top show; false when it is already selected. */
+  boolean selectTop() {
+    if (visible.isEmpty() || active == visible.get(0)) return false;
+    setActive(visible.get(0));
+    scrollToActive();
+    return true;
+  }
+
   /**
    * One show up or down. The selection moves at once -- there is no cursor to
    * move ahead of it -- while the panes wait out the dwell in setActive.

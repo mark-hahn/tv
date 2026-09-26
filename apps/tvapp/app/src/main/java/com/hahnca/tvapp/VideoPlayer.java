@@ -7,7 +7,10 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
+import android.util.TypedValue;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import androidx.media3.common.C;
 import androidx.media3.common.Format;
 import androidx.media3.common.MediaItem;
@@ -21,6 +24,7 @@ import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.ui.PlayerView;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -53,14 +57,24 @@ class VideoPlayer extends FrameLayout {
   private static final long SEEK_BACK_MS = 10000;
   private static final long SEEK_FWD_MS = 30000;
   private static final long SKIP_LOCKOUT_MS = 2000;
-  // How long the time bar stays up after a key while playing; paused, it
-  // stays until play resumes.
-  private static final int BAR_SHOW_MS = 3000;
+  // A seek has ended once no left/right has come for this long. The remotes
+  // send no key release, and a held key repeats well inside it.
+  // ponytail: ignores buffering after the seek; hold the bar through
+  // STATE_BUFFERING too if it goes down before the new frame shows.
+  private static final long SEEK_END_MS = 1000;
   // Each sideloaded .srt's track id is this plus its index in getPlayUrl's subs.
   private static final String SUBS_ID = "tvapp-subs";
   private static final String PLAY_FAILED_TOAST = "Video failed.";
+  // Gap between the time display and the show/episode title after it.
+  private static final int TITLE_GAP_DP = 24;
+  // Gap between the title's parts.
+  private static final int PART_GAP_DP = 15;
+  // The time bar's row of text, the time included, is dimmed to 60% gray.
+  private static final int BAR_TEXT_COLOR = 0xFF999999;
 
   private final PlayerView view;
+  // The show and episode, right of the time display in the time bar.
+  private final TitleRow title;
   private final Events events;
   private final Handler ui = new Handler(Looper.getMainLooper());
   private final Runnable reportTick =
@@ -79,6 +93,15 @@ class VideoPlayer extends FrameLayout {
   private boolean ready;
   private boolean subsPicked;
   private long lastSkipAt;
+  // Down put the time bar up (see key).
+  private boolean barUp;
+  // A left/right seek has the time bar up until it ends.
+  private boolean seeking;
+  private final Runnable seekEnd =
+      () -> {
+        seeking = false;
+        updateBar();
+      };
   // The video's text tracks, in the order the remote's subtitle panel lists
   // them.
   private final List<Tracks.Group> textGroups = new ArrayList<>();
@@ -96,8 +119,23 @@ class VideoPlayer extends FrameLayout {
     // on this view; the controller is only the time bar a key puts up.
     view.setUseController(true);
     view.setControllerAutoShow(false);
+    view.setControllerShowTimeoutMs(0);
     view.setShowNextButton(false);
     view.setShowPreviousButton(false);
+    // The center buttons and the settings gear can't be reached without focus,
+    // and their 5/15 s labels aren't what left/right do.
+    view.setShowRewindButton(false);
+    view.setShowFastForwardButton(false);
+    view.findViewById(androidx.media3.ui.R.id.exo_play_pause).setVisibility(GONE);
+    view.findViewById(androidx.media3.ui.R.id.exo_settings).setVisibility(GONE);
+    TextView pos = view.findViewById(androidx.media3.ui.R.id.exo_position);
+    LinearLayout time = view.findViewById(androidx.media3.ui.R.id.exo_time);
+    for (int i = 0; i < time.getChildCount(); i++)
+      ((TextView) time.getChildAt(i)).setTextColor(BAR_TEXT_COLOR);
+    float density = getResources().getDisplayMetrics().density;
+    title = new TitleRow(context, pos, (int) (PART_GAP_DP * density));
+    title.setPadding((int) (TITLE_GAP_DP * density), 0, 0, 0);
+    time.addView(title);
     addView(view, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
   }
 
@@ -107,15 +145,32 @@ class VideoPlayer extends FrameLayout {
 
   /**
    * p is tv-srvr's getPlayUrl answer: url, showName, season, episode, posMs
-   * (resume point), trimPosMs (where the show starts past its intro), skipDurMs
+   * (resume point), res (the file's height, null if unknown), aired, seasonEps
+   * (the episode count of its season), trimPosMs (where the show starts past its intro), skipDurMs
    * (the Skip key's jump), subs (the episode's .srt files as vtt, [{url,
    * label}]), subIndex (the embedded subtitle stream chksrt chose) and subPick
-   * (the index in subs to start on otherwise, -1 for none).
+   * (the index in subs to start on otherwise, -1 for none). show is the
+   * list's record of the show, for the time bar's show-wide parts.
    */
-  void play(JSONObject p) {
+  void play(JSONObject p, Shows.Show show) {
     close();
     playing = p;
     ready = false;
+    int res = p.optInt("res");
+    title.setParts(
+        p.optString("showName"),
+        show.originalCountry.toUpperCase(Locale.US),
+        p.isNull("aired") ? "" : p.optString("aired"),
+        String.format("S%02dE%02d", p.optInt("season"), p.optInt("episode"))
+            + (p.optInt("seasonEps") > 0 ? "/" + p.optInt("seasonEps") : ""),
+        show.seasonCount <= 0
+            ? ""
+            : show.seasonCount == 1 ? "1 Season" : show.seasonCount + " Seasons",
+        show.episodeCount <= 0 || show.watchedCount < 0
+            ? ""
+            : "Watched " + show.watchedCount + " of " + show.episodeCount,
+        show.status,
+        res > 0 ? String.valueOf(res) : "");
     subsPicked = false;
     String url = p.optString("url");
     exo = new ExoPlayer.Builder(getContext()).build();
@@ -137,6 +192,7 @@ class VideoPlayer extends FrameLayout {
           @Override
           public void onPlayWhenReadyChanged(boolean playWhenReady, int reason) {
             if (ready) report(playWhenReady ? "playing" : "paused");
+            updateBar();
           }
 
           @Override
@@ -185,11 +241,19 @@ class VideoPlayer extends FrameLayout {
   /**
    * A remote key while the video is up -- tvapprc mode's arrows and ok, the
    * same keys that drive the list: ok pauses and resumes, left and right seek,
-   * up jumps over the intro by the show's skip length, and down only puts the
-   * time bar up.
+   * up jumps over the intro by the show's skip length, and down toggles the
+   * time bar. Down's bar stays until down again, any key but a seek, or the
+   * video closing. A seek's is up only until the seek ends, and the bar is
+   * always up while paused.
    */
   void key(String key) {
     if (exo == null) return;
+    boolean seek = "left".equals(key) || "right".equals(key);
+    if ("down".equals(key)) barUp = !barUp;
+    else if (!seek) barUp = false;
+    seeking = seek;
+    ui.removeCallbacks(seekEnd);
+    if (seek) ui.postDelayed(seekEnd, SEEK_END_MS);
     long pos = exo.getCurrentPosition();
     long skipDurMs = playing.optLong("skipDurMs");
     if ("ok".equals(key)) exo.setPlayWhenReady(!exo.getPlayWhenReady());
@@ -199,12 +263,17 @@ class VideoPlayer extends FrameLayout {
       // A held up repeats, and a second skip would land past the intro into
       // the show, so repeats inside the lockout are dropped.
       long now = SystemClock.uptimeMillis();
-      if (skipDurMs <= 0 || now - lastSkipAt < SKIP_LOCKOUT_MS) return;
-      lastSkipAt = now;
-      exo.seekTo(pos + skipDurMs);
-    } else if (!"down".equals(key)) return;
-    view.setControllerShowTimeoutMs(exo.getPlayWhenReady() ? BAR_SHOW_MS : 0);
-    view.showController();
+      if (skipDurMs > 0 && now - lastSkipAt >= SKIP_LOCKOUT_MS) {
+        lastSkipAt = now;
+        exo.seekTo(pos + skipDurMs);
+      }
+    }
+    updateBar();
+  }
+
+  private void updateBar() {
+    if (exo != null && (barUp || seeking || !exo.getPlayWhenReady())) view.showController();
+    else view.hideController();
   }
 
   /** Pauses a video that is playing; true when it did. */
@@ -221,8 +290,12 @@ class VideoPlayer extends FrameLayout {
   void close() {
     if (exo == null) return;
     ui.removeCallbacks(reportTick);
+    ui.removeCallbacks(seekEnd);
+    seeking = false;
     if (ready) report("stopped");
     ready = false;
+    barUp = false;
+    view.hideController();
     view.setPlayer(null);
     exo.release();
     exo = null;
@@ -334,6 +407,62 @@ class VideoPlayer extends FrameLayout {
             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
             .setOverrideForType(new TrackSelectionOverride(chosen.getMediaTrackGroup(), 0))
             .build());
+  }
+
+  /**
+   * The time bar's parts after the time: name, country, aired date, episode,
+   * seasons, watched, status and resolution. The ones in DROP_ORDER go,
+   * in that order, until the rest fit the bar; empty ones are never shown.
+   */
+  private static class TitleRow extends LinearLayout {
+    // Watched, seasons, status, aired date, country.
+    private static final int[] DROP_ORDER = {5, 4, 6, 2, 1};
+    private final TextView[] parts = new TextView[8];
+
+    TitleRow(Context context, TextView like, int partGap) {
+      super(context);
+      for (int i = 0; i < parts.length; i++) {
+        parts[i] = new TextView(context);
+        parts[i].setTextSize(TypedValue.COMPLEX_UNIT_PX, like.getTextSize());
+        parts[i].setTypeface(like.getTypeface());
+        parts[i].setTextColor(BAR_TEXT_COLOR);
+        if (i > 0) parts[i].setPadding(partGap, 0, 0, 0);
+        addView(parts[i]);
+      }
+    }
+
+    void setParts(String... texts) {
+      for (int i = 0; i < parts.length; i++) parts[i].setText(texts[i]);
+    }
+
+    @Override
+    protected void onMeasure(int widthSpec, int heightSpec) {
+      float avail =
+          MeasureSpec.getMode(widthSpec) == MeasureSpec.UNSPECIFIED
+              ? Float.MAX_VALUE
+              : MeasureSpec.getSize(widthSpec);
+      boolean[] shown = new boolean[parts.length];
+      float wide = getPaddingLeft();
+      for (int i = 0; i < parts.length; i++) {
+        shown[i] = parts[i].length() > 0;
+        if (shown[i]) wide += partWidth(i);
+      }
+      for (int i = 0; i < DROP_ORDER.length && wide > avail; i++) {
+        int d = DROP_ORDER[i];
+        if (shown[d]) wide -= partWidth(d);
+        shown[d] = false;
+      }
+      // Only a real change, so a settled row does not ask for another layout.
+      for (int i = 0; i < parts.length; i++) {
+        int want = shown[i] ? VISIBLE : GONE;
+        if (parts[i].getVisibility() != want) parts[i].setVisibility(want);
+      }
+      super.onMeasure(widthSpec, heightSpec);
+    }
+
+    private float partWidth(int i) {
+      return parts[i].getPaddingLeft() + parts[i].getPaint().measureText(parts[i].getText().toString());
+    }
   }
 
   private void report(String state) {

@@ -1,11 +1,42 @@
 
 
-
-don't browse `In Development`
                                                                                                                               
 ????????????????
+don't browse `In Development`
 manage upcoming shows
 =================
+
+# new time bar order
+- change order to:
+  - `<show name>`
+  - `<country like USA>`
+  - `<episode air date>`
+  - `<S01E01>/<episodes in season>`
+  - `<N> Seasons`
+  - `Watched <epis> of <total epis>`
+  - `<status like continuing, Ended, etc.>`
+  - `<resolution>`
+
+# new time bar text
+- i want a lot of info shown in the time bar text
+all items should be separated by the current margin used
+- after the timing the text should contain:
+  - `<show name>`
+  - `<S01E01>/<episodes in season>`
+  - `<N> Seasons`
+  - `<status like continuing, Ended, etc.>`
+  - `<resolution>`
+  - `<episode air date>`
+  - `Watched <epis> of <total epis>`
+  - `<country like USA>`
+- if they all don't fit then remove these in this order until the text fits:
+  - `Watched <epis> of <total epis>`
+  - `<N> Seasons`
+  - `<status like continuing, Ended, etc.>`
+  - `<episode air date>`
+  - `<country like USA>`
+
+when playing video on the tv and the playing is paused there is an overlay, see the image. The center of the screen has some useless play control icons and the bottom right has a settings gear icon which i can't figure out how to press.  i think this is all just a display and not controls.  can we change what that overlay shows?
 
 when keys are pressed on two phone remotes at about the same time this is a collision. there is no collision warning if the keys on the 2 remotes are the same key.  right now both keypresses are sent so there are 2 actions.  only 1 key should be sent on this kind of same key collision.
 

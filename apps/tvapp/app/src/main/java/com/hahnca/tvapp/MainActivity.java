@@ -1050,7 +1050,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
                       return;
                     }
                     playedShow = show;
-                    video.play(resp);
+                    video.play(resp, show);
                   });
             },
             "play-url")
@@ -1083,12 +1083,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
   // Whether the last fresh press landed on a video. A held key belongs to what
   // it started on: once a video ends under the hold (a seek held past the end)
   // or opens under it, its repeats are dropped rather than steering whatever
-  // is on screen now.
+  // is on screen now. A held down over a video is one press, since down
+  // toggles its time bar.
   private boolean holdOnVideo;
 
-  private boolean strayRepeat(boolean repeat) {
+  private boolean strayRepeat(String key, boolean repeat) {
     if (!repeat) holdOnVideo = video.isOpen();
-    return repeat && holdOnVideo != video.isOpen();
+    return repeat && (holdOnVideo != video.isOpen() || video.isOpen() && "down".equals(key));
   }
 
   @Override
@@ -1097,7 +1098,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
     ui.post(
         () -> {
           bumpKeepAwake();
-          if (!strayRepeat(repeat)) handleRemoteKey(key);
+          if (!strayRepeat(key, repeat)) handleRemoteKey(key);
         });
   }
 
@@ -1108,7 +1109,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
         () -> {
           bumpKeepAwake();
           // Letter skip only ever comes out of a hold.
-          if (!strayRepeat(true)) handleRemoteKeyLetter(key);
+          if (!strayRepeat(key, true)) handleRemoteKeyLetter(key);
         });
   }
 
@@ -1618,7 +1619,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
       bumpKeepAwake();
       if ("back".equals(key)) handleBack();
       else if ((!showsLoading || !blockedWhileLoading(key))
-          && !strayRepeat(event.getRepeatCount() > 0)) handleRemoteKey(key);
+          && !strayRepeat(key, event.getRepeatCount() > 0)) handleRemoteKey(key);
     }
     return true;
   }

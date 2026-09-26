@@ -1,12 +1,14 @@
 
-does a compaction cost money
 
-this type of event 1188520 has been repeating recently
 
 ????????????????
 don't browse `In Development`
 manage upcoming shows
 =================
+
+this type of event 1188520 has been repeating recently
+
+does a compaction cost money
 
 # clearing top filter in tvapp
 - when in tvapp and the show list is filtered by search string or actor name 

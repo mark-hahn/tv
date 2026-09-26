@@ -3305,9 +3305,10 @@ async function main() {
       return process.nextTick(checkFile);
     }
 
-    // Disk check first: if the file is already on disk, mark finished and skip.
-    // This must run before the tvJsonTitles guard so files that were previously
-    // queued as 'waiting' (before disk-check was added) also get caught.
+    // Disk check first: if the file is already on disk, skip it. No db row is
+    // written — nothing was downloaded, so the down history must not say it
+    // was. The file is re-examined every cycle while it stays on usb, so the
+    // skip is logged once per file.
     // Skip this check for forced downloads — the worker renames the existing
     // file to .old and re-fetches.
     if (
@@ -3316,38 +3317,8 @@ async function main() {
         (destTitle && fs.existsSync(`${tvSeasonPath}/${fname}`)))
     ) {
       existsCount++;
-      unilog(
-        1202,
-        `Down: already on disk "${fname}" (${seriesName || "unknown show"})`,
-      );
-      try {
-        // Use the file's mtime on disk as the timestamp so the card shows
-        // the real download date rather than today's date.
-        let diskMtimeSec = 0;
-        try {
-          const diskFilePath = `${tvSeasonPath}/${destTitle || fname}`;
-          const st = fs.statSync(
-            fs.existsSync(diskFilePath)
-              ? diskFilePath
-              : `${tvSeasonPath}/${fname}`,
-          );
-          diskMtimeSec = Math.floor(st.mtimeMs / 1000);
-        } catch (e) {}
-        tvJson.markFinished({
-          title: fname,
-          localPath: tvLocalDir,
-          usbPath: usbPath,
-          seriesName: libraryKeyForFolder || seriesName || undefined,
-          season: season || 0,
-          episode: episode || 0,
-          fileSize: usbFileBytes || 0,
-          destTitle: destTitle || undefined,
-          sequence: currentSeq || 0,
-          dateStarted: diskMtimeSec || undefined,
-          dateEnded: diskMtimeSec || undefined,
-        });
-      } catch (e) {}
-      if (tvJsonTitles) tvJsonTitles[fname] = { error: false };
+      if (skipLoggedOnce(usbFilePath))
+        unilog(2598, `already on disk, skipping "${fname}" (${seriesName || "unknown show"})`);
       return process.nextTick(checkFile);
     }
 

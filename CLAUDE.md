@@ -442,8 +442,8 @@ because the TV is unreachable from any wireless host here.
   camera comes off, unless the Shows key took it off, since that closes the
   video too.
 
-**Back ladder** — camera → video → trailer → actor overlay → actor filter →
-focus. At the top Back goes to the TV's home screen.
+**Back ladder** — camera → video → trailer → actor overlay → focus →
+actor filter → filter text. At the top Back goes to the TV's home screen.
 
 **Commands to tvapp**
 

@@ -1396,12 +1396,17 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
       overlay.close();
       return;
     }
+    if (area != Area.LIST) {
+      focusArea(Area.LIST);
+      return;
+    }
     if (actorFilterName != null) {
       applyActorFilter(null);
       return;
     }
-    if (area != Area.LIST) {
-      focusArea(Area.LIST);
+    // Typed filter text shown over the list comes off before tvapp is left.
+    if (!typedFilterText.isEmpty()) {
+      clearTextFilter();
       return;
     }
     startActivity(

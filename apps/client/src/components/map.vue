@@ -1588,6 +1588,8 @@ export default {
     },
 
     onPruneClick() {
+      if (!window.confirm(`Delete watched files for ${this.mapShow?.name}?`))
+        return;
       this.pruneFlash = true;
       this.$emit("prune", this.mapShow);
       setTimeout(() => {

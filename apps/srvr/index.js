@@ -3222,6 +3222,7 @@ async function checkMissingEpisodes(playing) {
 const TV_URL = "https://hahnca.com/tv";
 const SRVR_PUBLIC_URL = "https://hahnca.com/tv-srvr";
 const TVAPP_DEVICE = "tvapp";
+const EARLY_STOP_MS = 10000;
 
 // Next-up: the first episode past season 0 with a file and not watched.
 function nextUpEpisode(ed) {
@@ -3317,9 +3318,19 @@ async function playProgress({ showName, season, episode, posMs, durMs, state }) 
       tvappNowPlaying.season === season &&
       tvappNowPlaying.episode === episode
     );
-  const pos = ended ? 0 : Math.max(0, Math.round(posMs));
-  epd.setEpisode(ed, season, episode, ended ? { watched: true, pos } : { pos });
-  if (ended) rec.watchedCount = epd.countWatched(ed);
+  // Stopped in the first few seconds: as if never played.
+  const earlyStop = state === "stopped" && posMs < EARLY_STOP_MS;
+  const pos = ended || earlyStop ? 0 : Math.max(0, Math.round(posMs));
+  // The start is where getPlayUrl said to start, so it tells nothing new, and
+  // storing a few ms past 0 there shows the episode as partial at once.
+  if (!started)
+    epd.setEpisode(
+      ed,
+      season,
+      episode,
+      ended ? { watched: true, pos } : earlyStop ? { watched: false, pos } : { pos },
+    );
+  if (ended || earlyStop) rec.watchedCount = epd.countWatched(ed);
   if (started || stopped) {
     rec.lastPlayedDate = util.toPstDateTimeMs(new Date());
     rec.lastPlayedEpisode = code;

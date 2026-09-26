@@ -1523,6 +1523,23 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
   return { remotes, urls: flatUrls };
 };
 
+// A show-list card's landscape image when TMDB has none: TVDB's own series
+// backgrounds, which Emby drew on too. Textless first, then the best scored.
+export async function getTvdbBackground(tvdbId) {
+  const token = await getToken();
+  const { json } = await fetchJson(
+    `https://api4.thetvdb.com/v4/series/${tvdbId}/artworks?type=3`,
+    { headers: { Authorization: "Bearer " + token } },
+  );
+  const arts = json?.data?.artworks || [];
+  if (arts.length === 0) return "";
+  const textless = arts.filter((a) => !a.language);
+  const pick = (textless.length ? textless : arts).reduce((best, a) =>
+    (a.score || 0) > (best.score || 0) ? a : best,
+  );
+  return pick.image || "";
+}
+
 function getTvdbImageUrl(extResObj) {
   // Try to find first English poster in artworks array
   const artworks = extResObj?.data?.artworks;

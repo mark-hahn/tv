@@ -15,9 +15,10 @@ import org.json.JSONObject;
  * have: its own image is a portrait poster, the wrong shape for a card.
  *
  * tv-srvr finds a backdrop in TMDB, by the show's TMDB id where the record
- * carries one and by name where it does not, and caches its own answers
+ * carries one and by its tvdb id or name where it does not, else in TVDB's own
+ * backgrounds, and caches its own answers
  * -- so this asks once per show and remembers what it was told. An empty url is
- * TMDB having nothing, and is cached as readily as a real one: the caller falls
+ * neither having anything, and is cached as readily as a real one: the caller falls
  * back to the poster and must not ask again on every scroll.
  */
 class Backdrops {
@@ -63,9 +64,11 @@ class Backdrops {
   private static String fetch(Shows.Show show) {
     try {
       String query =
-          show.tmdbId.isEmpty()
-              ? "?showName=" + URLEncoder.encode(show.name, "UTF-8")
-              : "?tmdbId=" + URLEncoder.encode(show.tmdbId, "UTF-8");
+          (show.tmdbId.isEmpty()
+                  ? "?showName=" + URLEncoder.encode(show.name, "UTF-8")
+                  : "?tmdbId=" + URLEncoder.encode(show.tmdbId, "UTF-8"))
+              + "&tvdbId="
+              + URLEncoder.encode(show.id, "UTF-8");
       JSONObject rec = new JSONObject(Http.get(BACKDROP_URL + query));
       return rec.isNull("url") ? "" : rec.optString("url", "");
     } catch (Exception e) {

@@ -1,5 +1,6 @@
 import { smartTitleMatch, unilog, logHere } from "@tv/share"
 import { MovieDb } from "moviedb-promise";
+import { getTvdbBackground } from "./tvdb.js";
 const moviedb = new MovieDb("327192a334da700f65b882c7a69cb927");
 
 // A getTmdb call slower than this gets logged with a per-round-trip breakdown,
@@ -18,6 +19,13 @@ function splitTitleYear(showName) {
 
 function candidateYear(show) {
   return String(show?.first_air_date ?? "").slice(0, 4);
+}
+
+// The search result smartTitleMatch's title names -- several shows can share
+// it, which is why the library name carried a year, so the year picks.
+function pickNamed(results, title, year) {
+  const named = results.filter((s) => s.name === title || s.original_name === title);
+  return (year && named.find((s) => candidateYear(s) === String(year))) || named[0];
 }
 
 /**
@@ -151,26 +159,40 @@ const backdropCache = new Map();
 
 /**
  * The landscape image for one show: by TMDB id when the record carries one in
- * its remote_ids, by name search when it does not. url is empty when TMDB has
- * nothing, which is the caller's cue to go on showing the poster.
+ * its remote_ids, else by its tvdb id, else by name search; TVDB's backgrounds
+ * when TMDB has none. url is empty when neither has one, which is the caller's
+ * cue to go on showing the poster.
  */
 export async function getBackdrop(params) {
-  const { tmdbId, showName } = params;
+  const { tmdbId, tvdbId, showName } = params;
   const id = String(tmdbId || "").trim();
   const key = id || `name:${String(showName || "").toLowerCase()}`;
   if (backdropCache.has(key)) return { url: backdropCache.get(key) };
   let url = "";
   try {
-    url = await findBackdrop(id, showName);
+    url = await findBackdrop(id, tvdbId, showName);
   } catch (e) {
     unilog(1916, `backdrop lookup failed for ${showName}: ${e.message}`);
+  }
+  if (!url && tvdbId) {
+    try {
+      url = await getTvdbBackground(tvdbId);
+    } catch (e) {
+      unilog(2583, `tvdb background lookup failed for ${showName}: ${e.message}`);
+    }
   }
   backdropCache.set(key, url);
   return { url };
 }
 
-async function findBackdrop(tmdbId, showName) {
+async function findBackdrop(tmdbId, tvdbId, showName) {
   let id = tmdbId;
+  // The record's own tvdb id names the show exactly, as Emby's match did; the
+  // name search below is only for shows TMDB has no tvdb mapping for.
+  if (!id && tvdbId) {
+    const found = await moviedb.find({ id: tvdbId, external_source: "tvdb_id" });
+    id = found.tv_results?.[0]?.id;
+  }
   if (!id) {
     if (!showName) return "";
     // A trailing (YYYY) is this library's way of telling two shows of the same
@@ -186,9 +208,7 @@ async function findBackdrop(tmdbId, showName) {
     const res = await moviedb.searchTv({ query });
     const results = res.results || [];
     const title = smartTitleMatch(query, results, year, false);
-    const match = title
-      ? results.find((s) => s.name === title || s.original_name === title)
-      : null;
+    const match = title ? pickNamed(results, title, year) : null;
     if (!match?.id) return "";
     id = match.id;
   }
@@ -251,10 +271,7 @@ export async function getStreamProviders(params) {
   }
 
   // Find the actual show object that matches the title
-  const match = searchRes.results.find(
-    (show) =>
-      show.name === matchingTitle || show.original_name === matchingTitle,
-  );
+  const match = pickNamed(searchRes.results, matchingTitle, year);
   if (!match?.id) {
     return { providers: [], error: "show not found" };
   }

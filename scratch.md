@@ -1,13 +1,8 @@
 
+
+remote key collision match should send only the one key
+
 vol- doesn't work when muted
-
-when in tvapprc mode:
-- replace the top shows button with the hide button
-- replace the hide button with the skip button
-  - this should do what the skip button did in the regular mode before
-
-
-nightingales thumb in tvapp
 
 do we still have played/playCount in record?
 
@@ -15,7 +10,6 @@ add confirmation to prune
 
 remove door camera from tv
 what does `T:` mean in the subtitles pane in the phone
-remote key collision match should send only the one key
 
 
 don't browse `In Development`
@@ -23,6 +17,15 @@ don't browse `In Development`
 ????????????????
 manage upcoming shows
 =================
+
+i played the show `The Knights of Prosperity` s01e03 from tvapp.  the stored position was 0 and the show started at 0 but the show was marked as a partial in map pane immediately when playing started. i left it marked as partial
+
+the show `Nightingales (1990)` has what looks like the wrong thumb image in tvapp
+
+when in tvapprc mode:
+- replace the top shows button with the hide button
+- replace the hide button with the skip button
+  - this should do what the skip button did in the regular mode before
 
 when not in tvapprc mode:
 - in 3rd row left side add a button `Emby`

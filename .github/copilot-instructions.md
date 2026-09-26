@@ -424,7 +424,8 @@ because the TV is unreachable from any wireless host here.
 
 **Video keys** — while a video is up, the tvapprc arrows and OK drive it:
 - OK pauses/resumes, left −10 s, right +30 s, down shows the time bar.
-- Up skips the intro by `skipDurMs`; repeats within 2 s are ignored.
+- Up skips the intro by `skipDurMs`; repeats within 2 s are ignored. The
+  remotes' Skip key (`k,skip`) does the same, and nothing with no video up.
 - Any other key is swallowed. Back, `r`, or tvapp going to the background
   closes the video.
 - Held keys: the remotes send the first press as `k,<key>` and each
@@ -448,10 +449,10 @@ focus. At the top Back goes to the TV's home screen.
 
 | Command | What it does |
 | --- | --- |
-| `k,<up\|down\|left\|right\|ok\|sort\|filter\|info>` | a key press |
+| `k,<up\|down\|left\|right\|ok\|sort\|filter\|info\|skip>` | a key press |
 | `kr,<key>` | an auto-repeat of a held key |
 | `j,<up\|down>` | skip: by letter in alpha order, by page otherwise; list only |
-| `b` | back one level; nothing at the top |
+| `b` | back one level; the TV's home screen at the top |
 | `e` | play |
 | `r` | clear to the plain show list |
 | `x` | exit |
@@ -476,14 +477,16 @@ the bridge `o` to open tvapp.
 **Phone in tvapprc mode**
 - A Sort / Filter / Info row sits on top. OK sends `k,ok`.
 - Shows and Home send `r`; holding either toggles the door camera.
-- Emby's cell becomes Search: the phone-only filter input screen, which sends
-  `f,<text>`.
-- Skip's cell becomes Hide/Unhide (`h`). Back sends `b`.
+- The top-right cell is Hide/Unhide (`h`), in place of Home.
+- Row 3's left cell is Search: the phone-only filter input screen, which
+  sends `f,<text>`. Its right cell is Skip (`k,skip`). Back sends `b`.
 - Holding Vol+ opens the subtitle panel.
 - No phone key sends `e`.
-- Outside tvapprc mode the Search and Hide cells are empty, and holding Vol+
-  is just Vol+. The Apps key's streaming list launches the TV's other apps,
-  Emby among them.
+- Outside tvapprc mode row 3's left cell is Emby, which launches the Emby
+  app (Google TV input only), and its right cell is Input, the set's
+  `TvInput` key, which works on an HDMI input too. Holding Vol+ is just
+  Vol+. The Apps key's streaming list launches the TV's other apps, Emby
+  among them.
 - The web tv pane mirrors this, except its Search cell is "Sel", which selects
   tvapp's active show in the web show list.
 

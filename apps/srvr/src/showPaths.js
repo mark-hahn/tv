@@ -1,6 +1,6 @@
 // Show name <-> media folder conversions, in one place.
 //
-// The folder a show lives in belongs to Emby; the tvdb record is keyed by the
+// A show's folder is its record's `path`; the tvdb record is keyed by the
 // show's name. The two are frequently not the same string -- "Guilt (2019)"
 // lives in /mnt/media/tv/Guilt -- so a path can only be walked back to its
 // record through `rec.path`, never by assuming the first path segment is the

@@ -52,7 +52,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
   // toggle filters below it, the actor filter, and custom sort.
   private static final String CLEAR_FILTER_LABEL = "Clear";
   // The one filter that grows the list rather than narrowing it: every show
-  // that is not in Emby comes in with it, which is a rebuild long enough to be
+  // outside the library comes in with it, which is a rebuild long enough to be
   // waited on rather than sat through.
   private static final String TRASH_FILTER_LABEL = "Trash";
   private static final String[] FILTER_LABELS = {
@@ -203,8 +203,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
   // A select that arrived before the show list did, and the play waiting on it.
   // The ctrl socket is bound in onStart, well before the first Shows.load comes
   // back, so tv-tv's select-then-play burst can land on an empty list -- where
-  // the select finds nothing and the play, seeing no selected show, would take
-  // tvapp straight out to Emby.
+  // the select finds nothing and the play, seeing no selected show, would play
+  // nothing.
   private String pendingSelectName;
   private boolean pendingPlay;
   // Set alongside pendingPlay when the play behind a not-yet-loaded select is
@@ -314,11 +314,11 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
     // Watched sort it goes to the top now rather than when the reload lands.
     if (playedShow != null && sort == Shows.Sort.WATCHING) showList.moveToTop(playedShow);
     playedShow = null;
-    // Every return from the background: whatever Emby played meanwhile has
-    // already changed the records, and tv-srvr's word of it went out while
-    // the updates socket below was not listening.
+    // Every return from the background: the records may have changed
+    // meanwhile, and tv-srvr's word of it went out while the updates socket
+    // below was not listening.
     if (showsLoadedAt != 0) reloadShows();
-    // Only while on screen: a socket held open behind Emby would reload a list
+    // Only while on screen: a socket held open behind another app would reload a list
     // nobody is looking at, and tv-srvr would keep a client it cannot reach.
     updates = new Updates(this::reloadShows);
     updates.start();
@@ -720,7 +720,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
   /**
    * The button answers on this frame and the list follows on the next one.
    * Re-filtering is a rebuild of a column of hundreds of cards -- Trash worst
-   * of all, since it brings in every show that is not in Emby -- and doing it
+   * of all, since it brings in every show outside the library -- and doing it
    * first holds up the very frame the button would have turned blue on.
    *
    * Nothing else is turned off to let the button through: while Custom or an
@@ -1024,8 +1024,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
   }
 
   /**
-   * Plays the episode's file in tvapp's own player straight off nginx -- Emby
-   * is not asked anything. tv-srvr picks the episode (the named one, else
+   * Plays the episode's file in tvapp's own player straight off nginx.
+   * tv-srvr picks the episode (the named one, else
    * next-up when season is -1) and hands back its url and where to start,
    * with url null when there is no file.
    */
@@ -1234,7 +1234,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
         () -> {
           bumpKeepAwake();
           // Shows means a clean tvapp screen, so the camera comes off on the
-          // way -- the same as it does from Emby, where this key opens tvapp.
+          // way.
           // SHOWS rather than BACK so tv-tv clears the view without putting a
           // paused show up over the list.
           if (cam.isShowing()) cam.close(CamOverlay.CloseReason.SHOWS);
@@ -1297,7 +1297,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
    * A live camera over the whole screen, on tv-tv's instruction. Nothing about
    * the video is this app's business — the url is a page that plays it, picks
    * its own codec, and reports its own health to the server that served it.
-   * See CamOverlay and docs/tv-videostream-contract.md.
+   * See CamOverlay.
    */
   @Override
   public void onShowCam(String url) {
@@ -1364,7 +1364,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
 
   /**
    * One level out: close a playing trailer, drop an actor filter, hand the
-   * focus back to the show list. tvapp is home, so at the top it stays put.
+   * focus back to the show list. At the top it leaves tvapp for the tv's home
+   * screen.
    *
    * cardMisc is one level however deep into it the screen is -- the episode
    * card included -- so this key comes out of the whole of it at once, back to
@@ -1398,7 +1399,14 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
       applyActorFilter(null);
       return;
     }
-    if (area != Area.LIST) focusArea(Area.LIST);
+    if (area != Area.LIST) {
+      focusArea(Area.LIST);
+      return;
+    }
+    startActivity(
+        new Intent(Intent.ACTION_MAIN)
+            .addCategory(Intent.CATEGORY_HOME)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
   }
 
   private void handleRemoteKey(String key) {
@@ -1406,6 +1414,11 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
     // moving a list nobody can see underneath it. Back is not here: it comes
     // in on its own path, and handleBack closes the overlay.
     if (cam.isShowing()) return;
+    // The remotes' Skip: the intro skip of a playing video, nothing without one.
+    if ("skip".equals(key)) {
+      if (video.isOpen()) video.key("up");
+      return;
+    }
     // While a video is up the keys are its own (see VideoPlayer.key); Back and
     // the Shows key come in on their own paths and close it. Keys it has no
     // use for are swallowed so they cannot move the hidden list underneath.
@@ -1414,8 +1427,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
       return;
     }
     if (player.isPlaying()) {
-      // While the video owns the screen the keys are the video's, the way they
-      // are in Emby: ok pauses and resumes, left seeks. Right is the way back
+      // While the video owns the screen the keys are the video's: ok pauses
+      // and resumes, left seeks. Right is the way back
       // out, the same key that started the video. The rest are swallowed so
       // they cannot move hidden tvapp focus underneath.
       if ("right".equals(key)) player.close();
@@ -1566,7 +1579,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
 
   /**
    * The part of opening a cardMisc item that is not cardMisc's own: starting
-   * Emby, and taking the focus back to the show list the actor filter has just
+   * a player, and taking the focus back to the show list the actor filter has just
    * narrowed.
    */
   private void openInCardMisc() {

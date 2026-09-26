@@ -517,22 +517,17 @@
       >
         ▲
       </div>
-      <!-- A second Shows key while tvapp is up -- the same button as the one in
-           the bottom row, within reach of the hand that is on the arrows. Sort,
-           which used to be here, has moved to the row above. Plain white,
-           unlike the bottom row's, which is lit to say tvapprc mode is on, and
-           it flashes under its own name so pressing it does not light the
-           other one too. -->
+      <!-- While tvapp is up, Hide/Unhide of the selected show. -->
       <div
         v-if="tvapprcMode"
-        :style="cellStyle('white', 'shows2')"
-        @mousedown="startShowsHold('shows2')"
-        @mouseup="stopShowsHold('shows2')"
-        @mouseleave="stopShowsHold('shows2')"
-        @touchstart.prevent="startShowsHold('shows2')"
-        @touchend="stopShowsHold('shows2')"
+        :style="cellStyle('white', 'hide')"
+        @mousedown="startHideHold"
+        @mouseup="stopHideHold"
+        @mouseleave="stopHideHold"
+        @touchstart.prevent="startHideHold"
+        @touchend="stopHideHold"
       >
-        Shows
+        {{ tvapprcHidden ? "Unhide" : "Hide" }}
       </div>
       <div
         v-else
@@ -598,7 +593,14 @@
       >
         Sel
       </div>
-      <div v-else :style="cellStyle('white', 'noSearch')"></div>
+      <div
+        v-else
+        :style="cellStyle('white', 'emby')"
+        @mousedown="openEmby"
+        @touchstart.prevent="openEmby"
+      >
+        Emby
+      </div>
       <div
         :style="cellStyle('#f5e642', 'down')"
         @mousedown="startRepeat('down')"
@@ -609,21 +611,24 @@
       >
         ▼
       </div>
-      <!-- Skip's cell, which Info left when it moved to the row above: while
-           tvapp is up it hides/unhides the selected show; otherwise it is
-           empty, since nothing of ours is playing to skip an intro in. -->
+      <!-- While tvapp is up, Skip skips the intro of the video it is playing;
+           otherwise this is the set's Input key. -->
       <div
         v-if="tvapprcMode"
-        :style="cellStyle('white', 'hide')"
-        @mousedown="startHideHold"
-        @mouseup="stopHideHold"
-        @mouseleave="stopHideHold"
-        @touchstart.prevent="startHideHold"
-        @touchend="stopHideHold"
+        :style="cellStyle('white', 'skip')"
+        @mousedown="tvKey('skip')"
+        @touchstart.prevent="tvKey('skip')"
       >
-        {{ tvapprcHidden ? "Unhide" : "Hide" }}
+        Skip
       </div>
-      <div v-else :style="cellStyle('white', 'noSkip')"></div>
+      <div
+        v-else
+        :style="cellStyle('white', 'input')"
+        @mousedown="inputKey"
+        @touchstart.prevent="inputKey"
+      >
+        Input
+      </div>
       <!-- Row 4: vol-, vol+, mute -->
       <div
         :style="cellStyle('lightgreen', 'vold')"
@@ -702,6 +707,7 @@ import allServices from "../../../tv/services.json";
 import { keyLabels } from "../keyLabels.js";
 import { logHere, unilog} from "../log.js"
 
+const EMBY_SERVICE = allServices.google.find((s) => s.name === "Emby");
 const SCRUB_HOLD_DELAY_MS = 400;
 const SCRUB_PING_INTERVAL_MS = 500;
 const VOL_STEP = 1;
@@ -920,8 +926,8 @@ export default {
       this._modeSwitchAt = Date.now();
     },
 
-    // tv-tv keeps a "most relevant show" of its own -- this and Emby actually
-    // starting playback both feed it -- so tvapp starting fresh can select
+    // tv-tv keeps a "most relevant show" of its own -- this feeds it -- so
+    // tvapp starting fresh can select
     // that instead of whatever the client happens to have open right now.
     "show.name"(name) {
       if (!name) return;
@@ -1079,9 +1085,8 @@ export default {
       }
     },
 
-    // The Shows key while tvapp is up: the same thing it does from Emby, which
-    // is to put the tvapp show list up with nothing else in the way -- there it
-    // opens tvapp, here it clears whatever tvapp is showing back to that.
+    // The Shows key while tvapp is up: put the tvapp show list up with nothing
+    // else in the way, clearing whatever tvapp is showing back to that.
     // flashKey is which of the two Shows cells was pressed, so only that one
     // lights up.
     clearTvappState(flashKey) {
@@ -1858,6 +1863,20 @@ export default {
     async _tvKeyRaw(key) {
       const res = await fetch(`${config.tvTvUrl}/tv/key/${key}`);
       const data = await res.json();
+    },
+
+    openEmby() {
+      this.flash("emby");
+      this.openApp(EMBY_SERVICE);
+    },
+
+    // The set's Input key, which is wanted on an HDMI input too, so unlike the
+    // other keys it only needs the set on.
+    async inputKey() {
+      if (this.isOff) return;
+      if (!this._debounce()) return;
+      this.flash("input");
+      await this.sendKeyThrough("input", "/tv/key/input");
     },
 
     async tvKey(key) {

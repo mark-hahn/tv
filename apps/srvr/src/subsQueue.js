@@ -1118,7 +1118,7 @@ async function tryDownloadOpnSrtForVideo({
   key,
   logPrefix,
 }) {
-  if (!tvdbRecord.inEmby || !tvdbRecord.imdbId) return { attempted: false };
+  if (!tvdbRecord.inLibrary || !tvdbRecord.imdbId) return { attempted: false };
   if (!fs.existsSync(videoFilePath)) return { attempted: false, missing: true };
   if (hasChosenMarker(videoFilePath)) return { attempted: false, chosen: true };
   if (hasOpnSidecar(videoFilePath)) {
@@ -1229,7 +1229,7 @@ async function tryDownloadOpnSrtForVideo({
 }
 
 async function checkAndDownloadOpnSrt(showName, tvdbRecord) {
-  if (!tvdbRecord.inEmby) return;
+  if (!tvdbRecord.inLibrary) return;
   if (!tvdbRecord.imdbId) return;
 
   resetOpnDailyCountIfNeeded();

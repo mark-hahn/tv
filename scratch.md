@@ -1,18 +1,38 @@
 
+vol- doesn't work when muted
+
+when in tvapprc mode:
+- replace the top shows button with the hide button
+- replace the hide button with the skip button
+  - this should do what the skip button did in the regular mode before
 
 
+nightingales thumb in tvapp
+
+do we still have played/playCount in record?
+
+add confirmation to prune
 
 remove door camera from tv
-
 what does `T:` mean in the subtitles pane in the phone
 remote key collision match should send only the one key
-i suggest when tvapp is not in info, sort, filter mode then the back key should leave tvapp and go to tv home
+
 
 don't browse `In Development`
                                                                                                                               
 ????????????????
 manage upcoming shows
 =================
+
+when not in tvapprc mode:
+- in 3rd row left side add a button `Emby`
+  - it should launch the emby app
+- in 3rd row right side add a button `Input`
+  - it should press the sony input key
+
+when tvapp is showing and the show is selected and not in info, sort, filter mode then the back key should leave tvapp and go to tv home
+
+in the phone episode subpane in the map pane the progress bar works but it has 0 on the left side and the right side
 
 Add a new show from the web client. It should show up in the library immediately, with no "Waiting for Emby scan".
 Ctrl-click "Not In Emby" in the map on a show outside the library. It should create the folder and join the library.

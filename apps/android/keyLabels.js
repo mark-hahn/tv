@@ -20,4 +20,5 @@ export const keyLabels = {
   googlebtn: "Google TV",
   sort: "Sort",
   filter: "Filter",
+  input: "Input",
 };

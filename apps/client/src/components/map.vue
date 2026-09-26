@@ -158,7 +158,7 @@
               Episode
             </button>
             <button
-              v-if="mapShow?.inEmby !== false"
+              v-if="mapShow?.inLibrary !== false"
               @click.stop="handleSelectedTv"
               :disabled="!firstSelectedEpisode"
               :style="{
@@ -199,7 +199,7 @@
               Episode
             </button>
             <button
-              v-if="mapShow?.inEmby !== false"
+              v-if="mapShow?.inLibrary !== false"
               @click.stop="handleSelectedTv"
               :disabled="!firstSelectedEpisode"
               :style="{
@@ -248,14 +248,14 @@
               >|</span
             ><span>{{ part }}</span></span
           ><span
-            v-if="mapShow?.inEmby === false"
+            v-if="mapShow?.inLibrary === false"
             style="white-space: nowrap"
             ><span
               v-if="hdr2Parts &amp;&amp; hdr2Parts.length &gt; 0"
               style="padding: 0 6px; font-weight: bold"
               >|</span
             ><span
-              @click.stop.prevent="handleNotInEmbyClick($event)"
+              @click.stop.prevent="handleNotInLibraryClick($event)"
               style="font-weight: bold; cursor: pointer; white-space: nowrap"
               >Not In Library</span
             ></span
@@ -266,7 +266,7 @@
           style="display: flex; flex-shrink: 0; align-items: center"
         >
           <button
-            v-if="firstSelectedPosTicks > 0"
+            v-if="firstSelectedPosMs > 0"
             @click.stop="handleClearPositions"
             :style="{ '--btn-bg': posFlash ? 'lightgray' : 'whitesmoke' }"
             style="
@@ -370,7 +370,7 @@
             Ignore gaps
           </button>
           <button
-            v-if="mapShow?.inEmby !== false"
+            v-if="mapShow?.inLibrary !== false"
             @click.stop="onPruneClick"
             :disabled="!hasWatchedFile"
             :style="{
@@ -686,7 +686,7 @@
                       v-if="
                         seriesMap?.[season]?.[episode]?.avail &&
                         !seriesMap?.[season]?.[episode]?.unaired &&
-                        mapShow?.inEmby !== false
+                        mapShow?.inLibrary !== false
                       "
                     >
                       {{
@@ -1093,11 +1093,12 @@
 
 <script>
 import * as tvdb from "../tvdb.js";
-import * as emby from "../emby.js";
+import * as showData from "../showData.js";
 import * as srvr from "../srvr.js";
 import { config } from "../config.js";
 import evtBus from "../evtBus.js";
 import { fmtPos, resolutionDigit, unilog } from "@tv/share";
+import { logHere } from "../log.js";
 import * as epd from "@tv/share";
 
 const MAP_ARROW_PAN_PX_PER_SEC = 400;
@@ -1382,10 +1383,10 @@ export default {
       );
       return this.seriesMap?.[season]?.[episode] ? { season, episode } : null;
     },
-    firstSelectedPosTicks() {
+    firstSelectedPosMs() {
       if (this.selectedCells.size === 0) return 0;
       // Use the lowest-numbered (season then episode) selected cell that has pos > 0.
-      let bestTicks = 0;
+      let bestMs = 0;
       let bestSeason = Infinity;
       let bestEpisode = Infinity;
       for (const key of this.selectedCells) {
@@ -1398,13 +1399,13 @@ export default {
         ) {
           bestSeason = season;
           bestEpisode = episode;
-          bestTicks = pos;
+          bestMs = pos;
         }
       }
-      return bestTicks;
+      return bestMs;
     },
     firstSelectedPosStr() {
-      return this.fmtPosTicks(this.firstSelectedPosTicks);
+      return this.fmtPosMs(this.firstSelectedPosMs);
     },
   },
 
@@ -1608,7 +1609,7 @@ export default {
       return resolutionDigit(q);
     },
 
-    async handleNotInEmbyClick(event) {
+    async handleNotInLibraryClick(event) {
       // Ctrl-click on "Not In Library": create the show folder, which puts it in the library.
       if (!event?.ctrlKey) return;
 
@@ -1628,14 +1629,7 @@ export default {
 
       if (!showName) return;
       if (!tvdbId) {
-        unilog(
-          1016,
-          `Map: Not In Emby ctrl-click missing tvdbId for ${showName}`,
-          {
-            mapShow: this.mapShow,
-            tvdbData: this.tvdbData,
-          },
-        );
+        unilog(2563, `Map: Not In Library ctrl-click missing tvdbId for ${showName}`);
         window.alert("Missing TvdbId; cannot create show folder.");
         return;
       }
@@ -1651,15 +1645,7 @@ export default {
         typeof this.tvdbData === "object" &&
         Object.keys(this.tvdbData).length > 0;
       if (!hasTvdbData) {
-        unilog(
-          1017,
-          `Map: Not In Emby ctrl-click missing tvdbData for ${showName}`,
-          {
-            showName,
-            tvdbId,
-            tvdbData: this.tvdbData,
-          },
-        );
+        unilog(2564, `Map: Not In Library ctrl-click missing tvdbData for ${showName} tvdbId=${tvdbId}`);
         window.alert("Missing TVDB data; cannot create show folder.");
         return;
       }
@@ -1676,17 +1662,12 @@ export default {
 
       const setStatus = (txt) => {
         this.mapWorkingStatus = String(txt || "");
-        unilog(
-          1018,
-          "Map: Not In Emby progress:",
-          showName,
-          this.mapWorkingStatus,
-        );
+        unilog(2565, `Map: Not In Library progress: ${showName} ${this.mapWorkingStatus}`);
         evtBus.emit("setLibraryProgress", this.mapWorkingStatus);
       };
 
       try {
-        const res = await emby.createShowFolderAndRefreshEmby({
+        const res = await showData.createShowFolder({
           showName,
           tvdbId,
           seriesMapSeasons: seasons,
@@ -1696,11 +1677,7 @@ export default {
         });
 
         if (!res?.createdFolder) {
-          unilog(1019, "Map: createShowFolderAndRefreshEmby failed", {
-            showName,
-            tvdbId,
-            res,
-          });
+          unilog(2566, `Map: createShowFolder failed for ${showName} tvdbId=${tvdbId}: ${JSON.stringify(res)}`);
           window.alert(res?.err || "Failed to create show folder.");
           return;
         }
@@ -2002,7 +1979,7 @@ export default {
 
     async loadTvdbData() {
       try {
-        // Always load all shows (hasEmby=0) to include no-emby shows.
+        // Always load all shows (hasLibrary=0) to include those outside the library.
         // Go through tvdb.getAllTvdb every time so we track the shared cache
         // across clearCache() instead of holding a stale private copy.
         const allTvdb = await tvdb.getAllTvdb(0);
@@ -2102,11 +2079,11 @@ export default {
       if (!selectedEpisode?.s || !selectedEpisode?.e) return "";
       return `(S${String(selectedEpisode.s).padStart(2, "0")}E${String(selectedEpisode.e).padStart(2, "0")})`;
     },
-    // PlaybackPositionTicks (100-ns ticks) -> "mm:ss", suppressing a leading 0,
+    // Resume position in ms -> "mm:ss", suppressing a leading 0,
     // a "0:" minutes part, and the "0:0" leading zero on sub-10-second values.
-    fmtPosTicks(ticks) {
-      if (!ticks || ticks <= 0) return "";
-      const totalSec = Math.floor(ticks / 10000000);
+    fmtPosMs(ms) {
+      if (!ms || ms <= 0) return "";
+      const totalSec = Math.floor(ms / 1000);
       const min = Math.floor(totalSec / 60);
       const sec = totalSec % 60;
       if (min > 0) return `${min}:${String(sec).padStart(2, "0")}`;
@@ -2346,7 +2323,7 @@ export default {
     },
     selectNextEpisodeWithFile(currentSeason, currentEpisode) {
       if (
-        this.mapShow?.inEmby === false ||
+        this.mapShow?.inLibrary === false ||
         this.mapShow?.inLinda ||
         this.mapShow?.seasonIntros != null
       ) {

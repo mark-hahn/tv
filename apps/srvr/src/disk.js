@@ -497,7 +497,7 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
 
   // Shows out of the library never keep files — drop id/file/res, keep
   // aired/watched.
-  if (!rec.inEmby) epd.stripToAiredWatched(ed);
+  if (!rec.inLibrary) epd.stripToAiredWatched(ed);
 
   // Prune ghost episodes: slots left behind by an episode that has since
   // vanished from TVDB and the disk, which nothing else ever removed. Only

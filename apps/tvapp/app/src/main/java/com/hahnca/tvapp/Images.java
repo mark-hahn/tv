@@ -78,7 +78,7 @@ class Images {
    * urls is a preference order, most wanted first -- a show's Thumb, then its
    * Backdrop, then its own poster as the last resort that is the wrong shape
    * but beats an empty card. Each is tried only if the one before it hands out
-   * nothing, whether from a 404 (Emby not having that type for this show) or
+   * nothing, whether from a 404 (no image of that type for this show) or
    * any other fetch failure.
    */
   static void intoThumb(ImageView view, String[] urls, int width, Object token) {

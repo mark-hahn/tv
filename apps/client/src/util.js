@@ -1,4 +1,3 @@
-import * as emby from "./emby.js";
 import * as tvdb from "./tvdb.js";
 import * as srvr from "./srvr.js";
 
@@ -110,7 +109,7 @@ export function fmtDate(dateIn, includeYear = true, utcIn = false) {
 }
 
 export function fmtSize(show) {
-  if (show.inEmby === false) return "";
+  if (show.inLibrary === false) return "";
   const size = show.size;
   if (size < 1e3) return size;
   if (size < 1e6) return Math.round(size / 1e3) + "K";
@@ -185,7 +184,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.continue = 0;
       tmp.mark = 0;
       tmp.linda = 0;
-      tmp.hasemby = 0; // Show both emby and non-emby shows by default
+      tmp.haslibrary = 0; // Show shows both in and outside the library by default
       tmp.needsIntro = 0;
       tmp.anticipating = 0;
       break;
@@ -203,7 +202,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.continue = 0;
       tmp.mark = -1;
       tmp.linda = -1;
-      tmp.hasemby = 1;
+      tmp.haslibrary = 1;
       tmp.needsIntro = 0;
       tmp.anticipating = 0;
       break;
@@ -220,7 +219,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.continue = -1;
       tmp.mark = -1;
       tmp.linda = -1;
-      tmp.hasemby = 0;
+      tmp.haslibrary = 0;
       tmp.needsIntro = 0;
       tmp.anticipating = 0;
       break;
@@ -237,7 +236,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.continue = 0;
       tmp.mark = 0;
       tmp.linda = 0;
-      tmp.hasemby = 0;
+      tmp.haslibrary = 0;
       tmp.needsIntro = 0;
       tmp.anticipating = 0;
       break;
@@ -254,7 +253,7 @@ export function setCondFltr(cond, fltrChoice) {
       tmp.continue = 0;
       tmp.mark = 0;
       tmp.linda = 0;
-      tmp.hasemby = 1;
+      tmp.haslibrary = 1;
       tmp.needsIntro = 0;
       tmp.anticipating = 0;
       break;
@@ -281,17 +280,7 @@ export function openExternalPage(url) {
   const targetUrl = String(url || "").trim();
   if (!targetUrl) return null;
   try {
-    // Emby SPA ignores hash-only changes when reusing the tab.  Add a
-    // cache-bust query param before the # so the browser does a full load.
-    let navUrl = targetUrl;
-    const hashIdx = targetUrl.indexOf("#");
-    if (hashIdx > 0 && targetUrl.includes("#!/")) {
-      const base = targetUrl.slice(0, hashIdx);
-      const hash = targetUrl.slice(hashIdx);
-      const sep = base.includes("?") ? "&" : "?";
-      navUrl = `${base}${sep}_t=${Date.now()}${hash}`;
-    }
-    const win = window.open(navUrl, EXTERNAL_TAB_NAME);
+    const win = window.open(targetUrl, EXTERNAL_TAB_NAME);
     if (!win) return null;
     try {
       win.focus();

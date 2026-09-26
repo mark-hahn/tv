@@ -491,14 +491,14 @@ tvdb.setNotifyCallback((name) => debouncedTvdbPush(name));
 tvdb.setEnqueueCallback((name) => notifyClients("showUpdating", { name }));
 tvdb.setQueueDrainCallback(() => notifyClients("showQueueEmpty", {}));
 
-// Auto-update pickups when inEmby or status changes on a tvdb record
-const handlePickupChange = (name, inEmby, status) => {
-  if (inEmby === true) {
+// Auto-update pickups when inLibrary or status changes on a tvdb record
+const handlePickupChange = (name, inLibrary, status) => {
+  if (inLibrary === true) {
     const allTvdbSync = tvdb.getAllTvdbSync();
     const rec = allTvdbSync[name];
     removeFromSnoozeByShow(name, rec?.tvdbId);
   }
-  if (inEmby === true && status !== "Ended") {
+  if (inLibrary === true && status !== "Ended") {
     // Should be in pickups
     const already = pickups.some((p) => p.toLowerCase() === name.toLowerCase());
     if (!already) {
@@ -520,11 +520,11 @@ tvdb.setPickupChangeCallback(handlePickupChange);
 
 tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
   try {
-    if (tvdbRecord.inEmby) {
+    if (tvdbRecord.inLibrary) {
       removeFromSnoozeByShow(showName, tvdbRecord.tvdbId);
     }
-    // Subtitle scan for inEmby shows
-    if (tvdbRecord.inEmby) {
+    // Subtitle scan for inLibrary shows
+    if (tvdbRecord.inLibrary) {
       const showFolderName = showPaths.showFolderFor(showName, tvdbRecord);
       const showFolder = path.join(tvDir, showFolderName);
       try {
@@ -560,7 +560,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
     // Gap check
     let gapChanges = [];
     const prevNeedsIntro = !!tvdbRecord.needsIntro;
-    if (tvdbRecord.inEmby && tvdbRecord.id) {
+    if (tvdbRecord.inLibrary && tvdbRecord.id) {
       const gapData = await gaps.gapCheckOne(
         tvdbRecord.id,
         showName,
@@ -617,7 +617,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         delete tvdbRecord.allWatchedOrHaveFile;
       }
       // Compute full: every episode is either watched or has a file
-      const newFull = !!(tvdbRecord.inEmby && gapData.allWatchedOrHaveFile);
+      const newFull = !!(tvdbRecord.inLibrary && gapData.allWatchedOrHaveFile);
       if (!!tvdbRecord.full !== newFull) {
         gapChanges.push(`full:${tvdbRecord.full}->${newFull}`);
         tvdbRecord.full = newFull;
@@ -631,7 +631,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
             si?.trimPos != null || si?.skipDur != null || si?.none === true,
         );
       const newNeedsIntro = !!(
-        tvdbRecord.inEmby &&
+        tvdbRecord.inLibrary &&
         !hasConfiguredIntro &&
         Number(tvdbRecord.episodeCount ?? 0) >
           Number(tvdbRecord.watchedCount ?? 0) &&
@@ -643,9 +643,9 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         );
         tvdbRecord.needsIntro = newNeedsIntro;
       }
-    } else if (!tvdbRecord.inEmby) {
-      // For shows not in emby, set error fields to known constants
-      const nonEmbyConstants = [
+    } else if (!tvdbRecord.inLibrary) {
+      // For shows not in the library, set error fields to known constants
+      const nonLibraryConstants = [
         ["fileGap", false],
         ["fileGapSeason", null],
         ["fileGapEpisode", null],
@@ -662,7 +662,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         ["needsIntro", false],
         ["notReady", true],
       ];
-      for (const [f, v] of nonEmbyConstants) {
+      for (const [f, v] of nonLibraryConstants) {
         if (tvdbRecord[f] !== v) {
           gapChanges.push(`${f}:${tvdbRecord[f]}->${v}`);
           tvdbRecord[f] = v;
@@ -734,14 +734,14 @@ tvdb.setWaitStrChangedCallback(
   async (showName, tvdbRecord, { before, after }) => {
     if (!tvdbRecord) return;
     // The wait ending is a notification in its own right, so it moves the show
-    // to the head of the watched sort whatever its emby/disk state is, and
+    // to the head of the watched sort whatever its library/disk state is, and
     // that stamp is the unhide, so the flag goes with it.
     if (before && !after) {
       await markWaitOverViewedNow(showName, tvdbRecord);
       if (tvdbRecord.hiddenFromRow) await setHiddenFromRow(showName, false);
       return;
     }
-    if (!tvdbRecord.inEmby || !tvdbRecord.id) return;
+    if (!tvdbRecord.inLibrary || !tvdbRecord.id) return;
     if (!hasEpisodesOnDisk(tvdbRecord)) return;
     if (!before && after) {
       // waitStr newly set: hide the show unless it is already hidden.
@@ -877,25 +877,11 @@ const delPickup = async (params) => {
   return "ok";
 };
 
-const getNoEmbys = async (_params) => {
-  const allTvdb = tvdb.getAllTvdbSync();
-  const out = [];
-
-  for (const [recordName, record] of Object.entries(allTvdb)) {
-    if (record?.inEmby === false) {
-      if (!record.name) record.name = recordName;
-      out.push(record);
-    }
-  }
-
-  return out;
-};
-
-const addNoEmby = async (params) => {
+const addShowRecord = async (params) => {
   const show = params.show || params;
   const name = String(show?.name || "").trim();
-  unilog(553, "addNoEmby", name);
-  if (!name) throw new Error("addNoEmby: missing show name");
+  unilog(2548, `addShowRecord ${name}`);
+  if (!name) throw new Error("addShowRecord: missing show name");
 
   const allTvdb = tvdb.getAllTvdbSync();
   let existingKey = null;
@@ -913,8 +899,8 @@ const addNoEmby = async (params) => {
     ...(existing || {}),
     ...(show || {}),
     name: name,
-    id: show?.id || existing?.id || `noemby-${Math.random()}`,
-    inEmby: false,
+    id: String(show?.tvdbId || existing?.tvdbId || name),
+    inLibrary: false,
     inToTry: show?.inToTry ?? existing?.inToTry ?? false,
     inContinue: show?.inContinue ?? existing?.inContinue ?? false,
     inMark: show?.inMark ?? existing?.inMark ?? false,
@@ -929,17 +915,17 @@ const addNoEmby = async (params) => {
   return "ok";
 };
 
-const delNoEmby = async (params) => {
+const delShowRecord = async (params) => {
   const name = params?.name;
-  unilog(555, "delNoEmby", name);
-  if (!name) throw new Error("delNoEmby: missing name");
+  unilog(2549, `delShowRecord ${name}`);
+  if (!name) throw new Error("delShowRecord: missing name");
   let deleteKey = null;
 
   const allTvdb = tvdb.getAllTvdbSync();
   for (const [recordName, record] of Object.entries(allTvdb)) {
     if (
       recordName.toLowerCase() === name.toLowerCase() &&
-      record?.inEmby === false
+      record?.inLibrary === false
     ) {
       deleteKey = recordName;
       break;
@@ -947,11 +933,11 @@ const delNoEmby = async (params) => {
   }
 
   if (!deleteKey) {
-    unilog(556, "no noembys deleted, no match:", name);
-    return "delNoEmby no match:" + name;
+    unilog(2550, `no record outside the library deleted, no match: ${name}`);
+    return "delShowRecord no match:" + name;
   }
 
-  unilog(557, "deleting no-emby record:", deleteKey);
+  unilog(2551, `deleting record outside the library: ${deleteKey}`);
   delete allTvdb[deleteKey];
   await tvdb.saveTvdbSync();
   return "ok";
@@ -981,9 +967,8 @@ const addGap = async (params) => {
     const allTvdb = tvdb.getAllTvdbSync();
     let showName = null;
 
-    // Find show by Emby ID
     for (const [name, record] of Object.entries(allTvdb)) {
-      if (record.emby?.id === gapId && record.inEmby) {
+      if (record.id === gapId && record.inLibrary) {
         showName = name;
         break;
       }
@@ -1010,9 +995,8 @@ const delGap = async (params) => {
     // Phase 5: Update tvdb.gap field
     const allTvdb = tvdb.getAllTvdbSync();
 
-    // Find show by Emby ID
     for (const [name, record] of Object.entries(allTvdb)) {
-      if (record.emby?.id === gapId) {
+      if (record.id === gapId) {
         record.gap = null;
         // Only save tvdb when save flag is true
         if (save) await tvdb.saveTvdbSync();
@@ -1225,13 +1209,12 @@ const apiWrapper = (handler) => {
 app.get(
   "/api/getAllTvdb",
   apiWrapper(async (params) => {
-    const hasEmby = params.hasEmby ? parseInt(params.hasEmby) : 0;
-    return await tvdb.getAllTvdb({ hasEmby });
+    const hasLibrary = params.hasLibrary ? parseInt(params.hasLibrary) : 0;
+    return await tvdb.getAllTvdb({ hasLibrary });
   }),
 );
 app.get("/api/getShowsFromDisk", apiWrapper(getShowsFromDisk));
 app.get("/api/getGaps", apiWrapper(getGaps));
-app.get("/api/getNoEmbys", apiWrapper(getNoEmbys));
 app.get("/api/getPlayUrl", apiWrapper(getPlayUrl));
 app.post("/api/playProgress", apiWrapper(playProgress));
 app.get("/api/getLastViewed", apiWrapper(view.getLastViewed));
@@ -1278,11 +1261,11 @@ async function planDupeFolderGroups() {
   const allTvdb = tvdb.getAllTvdbSync() || {};
   const byPath = new Map();
   for (const [key, rec] of Object.entries(allTvdb)) {
-    if (rec?.inEmby && rec.path) byPath.set(rec.path, { key, rec });
+    if (rec?.inLibrary && rec.path) byPath.set(rec.path, { key, rec });
   }
   return dupeFolders.planDuplicateFolders(await showFolders(), (folder) =>
     byPath.get(folder) ||
-    (allTvdb[folder]?.inEmby ? { key: folder, rec: allTvdb[folder] } : null),
+    (allTvdb[folder]?.inLibrary ? { key: folder, rec: allTvdb[folder] } : null),
   );
 }
 
@@ -1647,7 +1630,7 @@ app.post(
 );
 app.post("/api/getActorPage", apiWrapper(tvdb.getActorPage));
 app.post(
-  "/api/getSeriesMapFromEmby",
+  "/api/getSeriesMap",
   apiWrapper(async (params) => {
     const { showName, stale } = params;
     if (!showName) return { success: false, error: "Missing showName" };
@@ -1688,10 +1671,7 @@ app.post(
       );
       const total = Date.now() - t0;
       if (total > 3000) {
-        unilog(
-          1520,
-          `slow getSeriesMapFromEmby ${showName}: refresh=${tRefresh - t0}ms save=${tSave - tRefresh}ms build=${Date.now() - tSave}ms total=${total}ms`,
-        );
+        unilog(2552, `slow getSeriesMap ${showName}: refresh=${tRefresh - t0}ms save=${tSave - tRefresh}ms build=${Date.now() - tSave}ms total=${total}ms`);
       }
       return { success: true, seriesMap, episodeData: rec.episodeData };
     } catch (err) {
@@ -1719,7 +1699,7 @@ app.post(
     return { ok: true, cleared, episodeData: rec.episodeData };
   }),
 );
-app.post("/api/searchActorsInNonEmby", apiWrapper(tvdb.searchActorsInNonEmby));
+app.post("/api/searchActorsOutsideLibrary", apiWrapper(tvdb.searchActorsOutsideLibrary));
 app.post("/api/getTmdb", apiWrapper(tmdb.getTmdb));
 app.post("/api/searchTmdbPerson", apiWrapper(tmdb.searchPerson));
 app.post("/api/getStreamProviders", apiWrapper(tmdb.getStreamProviders));
@@ -1810,7 +1790,7 @@ app.post(
     const rec = tvdb.getAllTvdbSync()?.[showName];
     if (!rec) return { ok: false, error: "Show not found" };
     const canHide =
-      (rec.inEmby !== false && rec.id && hasEpisodesOnDisk(rec)) ||
+      (rec.inLibrary !== false && rec.id && hasEpisodesOnDisk(rec)) ||
       rec.lastPlayedDate ||
       rec.fakeLastPlayed;
     if (!canHide) return { ok: false, error: "Nothing to hide" };
@@ -1951,7 +1931,7 @@ function removeFromSnoozeByShow(showName, tvdbId) {
   if (next.length === list.length) return;
   writeSnoozeList(next);
   notifyClients("snoozeListUpdated", next);
-  unilog(43, `removed "${showName}" from snooze list (inEmby)`);
+  unilog(2553, `removed "${showName}" from snooze list (inLibrary)`);
 }
 
 app.get(
@@ -1981,14 +1961,14 @@ app.post(
 );
 
 // CRUD operations
-app.post("/api/addNoEmby", apiWrapper(addNoEmby));
-app.post("/api/delNoEmby", apiWrapper(delNoEmby));
+app.post("/api/addShowRecord", apiWrapper(addShowRecord));
+app.post("/api/delShowRecord", apiWrapper(delShowRecord));
 app.post("/api/addGap", apiWrapper(addGap));
 app.post("/api/delGap", apiWrapper(delGap));
 app.post("/api/setTvdbFields", apiWrapper(tvdb.setTvdbFields));
 
-// Persist watched state into episodeData (used by the map for non-Emby / local
-// episodes). `watchedEpis` is the legacy [[season, ep, ...], ...] array built by
+// Persist watched state into episodeData (used by the map for shows outside
+// the library). `watchedEpis` is the legacy [[season, ep, ...], ...] array built by
 // the client from the current seriesMap.
 app.post(
   "/api/setWatchedEpis",
@@ -2758,8 +2738,8 @@ app.get("/api/introFirstFile", async (req, res) => {
       res.json({ ok: false, error: "show not found" });
       return;
     }
-    if (record.inEmby === false) {
-      res.json({ ok: false, reason: "notInEmby" });
+    if (record.inLibrary === false) {
+      res.json({ ok: false, reason: "notInLibrary" });
       return;
     }
     const sorted = epd.toSeriesMap(
@@ -2771,7 +2751,6 @@ app.get("/api/introFirstFile", async (req, res) => {
     let fallbackPath = null;
     let fallbackSeason = null;
     let fallbackEpisode = null;
-    let fallbackId = null;
     for (const [season, episodes] of sorted) {
       const sortedEps = [...episodes].sort((a, b) => a[0] - b[0]);
       for (const [episode, ep] of sortedEps) {
@@ -2779,12 +2758,11 @@ app.get("/api/introFirstFile", async (req, res) => {
           fallbackPath = ep.path;
           fallbackSeason = season;
           fallbackEpisode = episode;
-          fallbackId = ep.id;
         }
         if (ep?.played) continue;
         hasUnwatchedEpisode = true;
         if (ep.path && !ep.noFile) {
-          res.json({ ok: true, path: ep.path, season, episode, id: ep.id });
+          res.json({ ok: true, path: ep.path, season, episode });
           return;
         }
       }
@@ -2795,7 +2773,6 @@ app.get("/api/introFirstFile", async (req, res) => {
         path: fallbackPath,
         season: fallbackSeason,
         episode: fallbackEpisode,
-        id: fallbackId,
       });
       return;
     }
@@ -2853,8 +2830,8 @@ app.get("/api/introNextFile", async (req, res) => {
       res.json({ ok: false, error: "show not found" });
       return;
     }
-    if (record.inEmby === false) {
-      res.json({ ok: false, reason: "notInEmby" });
+    if (record.inLibrary === false) {
+      res.json({ ok: false, reason: "notInLibrary" });
       return;
     }
     const sorted = epd.toSeriesMap(
@@ -2872,7 +2849,7 @@ app.get("/api/introNextFile", async (req, res) => {
           continue;
         }
         if (ep?.path && !ep?.noFile) {
-          res.json({ ok: true, path: ep.path, season, episode, id: ep.id });
+          res.json({ ok: true, path: ep.path, season, episode });
           return;
         }
       }
@@ -3245,7 +3222,6 @@ async function checkMissingEpisodes(playing) {
 const TV_URL = "https://hahnca.com/tv";
 const SRVR_PUBLIC_URL = "https://hahnca.com/tv-srvr";
 const TVAPP_DEVICE = "tvapp";
-const TICKS_PER_MS = 10000; // episodeData pos is in 100-ns ticks
 
 // Next-up: the first episode past season 0 with a file and not watched.
 function nextUpEpisode(ed) {
@@ -3315,7 +3291,7 @@ async function getPlayUrl({ showName, season: s, episode: e }) {
     showName,
     season,
     episode,
-    posMs: Math.round(epd.getPos(ed, season, episode) / TICKS_PER_MS),
+    posMs: epd.getPos(ed, season, episode),
     trimPosMs: Math.max(0, Math.round(intro.trimPos || 0)),
     skipDurMs: Math.max(0, Math.round(intro.skipDur || 0)),
     ...subsForFile(file, season, episode),
@@ -3341,7 +3317,7 @@ async function playProgress({ showName, season, episode, posMs, durMs, state }) 
       tvappNowPlaying.season === season &&
       tvappNowPlaying.episode === episode
     );
-  const pos = ended ? 0 : Math.max(0, Math.round(posMs)) * TICKS_PER_MS;
+  const pos = ended ? 0 : Math.max(0, Math.round(posMs));
   epd.setEpisode(ed, season, episode, ended ? { watched: true, pos } : { pos });
   if (ended) rec.watchedCount = epd.countWatched(ed);
   if (started || stopped) {
@@ -3363,9 +3339,8 @@ async function playProgress({ showName, season, episode, posMs, durMs, state }) 
         device: TVAPP_DEVICE,
         season,
         episode,
-        positionTicks: pos,
-        runtimeTicks: durMs > 0 ? Math.round(durMs) * TICKS_PER_MS : null,
-        id: null,
+        positionMs: pos,
+        runtimeMs: durMs > 0 ? Math.round(durMs) : null,
       };
   publishNowPlaying();
   return { ok: true };
@@ -3572,7 +3547,7 @@ wss.on("connection", (ws) => {
 
 /**
  * Background library sweep. The disk says what is in the library: a record
- * is in it (`inEmby`) while its folder is there, and a folder holding videos
+ * is in it (`inLibrary`) while its folder is there, and a folder holding videos
  * that no library record claims comes in under the record named like it.
  */
 let librarySweepRunning = false;
@@ -3635,11 +3610,11 @@ async function runLibrarySweep(caller = "unknown") {
     // Step 2: A library show whose folder is gone leaves the library. A show
     // named with a "/" lives in a nested folder, so each is checked directly.
     for (const [name, rec] of Object.entries(allTvdb)) {
-      if (!isTvdbShow(rec) || !rec.inEmby) continue;
+      if (!isTvdbShow(rec) || !rec.inLibrary) continue;
       const folder = showPaths.showFolderFor(name, rec);
       if (await isDirectory(path.join(tvDir, folder))) continue;
       unilog(2519, `${name} left the library: its folder ${folder} is gone`);
-      rec.inEmby = false;
+      rec.inLibrary = false;
       rec.notReady = true;
       rec.inContinue = false;
       rec.inLinda = false;
@@ -3654,14 +3629,14 @@ async function runLibrarySweep(caller = "unknown") {
     // name living elsewhere it is a duplicate folder, merged below.
     const claimed = new Set();
     for (const [name, rec] of Object.entries(allTvdb)) {
-      if (isTvdbShow(rec) && rec.inEmby)
+      if (isTvdbShow(rec) && rec.inLibrary)
         claimed.add(showPaths.showFolderFor(name, rec).split("/")[0]);
     }
     for (const folder of await showFolders()) {
       if (claimed.has(folder)) continue;
       if (!(await folderHasVideo(path.join(tvDir, folder)))) continue;
       const rec = allTvdb[folder];
-      if (isTvdbShow(rec) && !rec.inEmby) {
+      if (isTvdbShow(rec) && !rec.inLibrary) {
         try {
           addToLibrary(folder, rec, folder);
         } catch (e) {
@@ -3679,10 +3654,10 @@ async function runLibrarySweep(caller = "unknown") {
     // skipped.
     await mergeDuplicateShowFolders("librarySweep");
 
-    // Step 4: Fix any pre-existing inEmby=false records with stale error fields
+    // Step 4: Fix any pre-existing inLibrary=false records with stale error fields
     for (const [name, rec] of Object.entries(allTvdb)) {
-      if (isTvdbShow(rec) && rec.inEmby === false) {
-        const nonEmbyConstants = [
+      if (isTvdbShow(rec) && rec.inLibrary === false) {
+        const nonLibraryConstants = [
           ["fileGap", false],
           ["fileEndError", false],
           ["full", false],
@@ -3692,20 +3667,13 @@ async function runLibrarySweep(caller = "unknown") {
           ["inMark", false],
           ["inToTry", false],
         ];
-        for (const [f, v] of nonEmbyConstants) {
+        for (const [f, v] of nonLibraryConstants) {
           if (rec[f] !== v) {
             unilog(658, `Fixing stale ${f} for ${name}: ${rec[f]}->${v}`);
             rec[f] = v;
           }
         }
       }
-    }
-
-    // ponytail: drops the links to Emby's web pages that records made before
-    // kill-emby Phase 3 still carry; delete once no record has one.
-    for (const rec of Object.values(allTvdb)) {
-      if (Array.isArray(rec?.remotes) && rec.remotes.some((r) => r?.name === "Emby"))
-        rec.remotes = rec.remotes.filter((r) => r?.name !== "Emby");
     }
 
     await tvdb.saveTvdbSync();
@@ -3775,14 +3743,14 @@ async function folderHasVideo(dir) {
 // just re-pointed) is stamped as added now and takes its tvdbId as its id.
 function addToLibrary(name, rec, folder) {
   rec.path = folder;
-  if (rec.inEmby) return;
+  if (rec.inLibrary) return;
   const id = String(rec.tvdbId || "");
   if (!id) throw new Error(`${name} has no tvdbId`);
   const taken = Object.entries(tvdb.getAllTvdbSync()).find(
     ([key, r]) => key !== name && String(r?.id) === id,
   );
   if (taken) throw new Error(`id ${id} is already ${taken[0]}'s`);
-  rec.inEmby = true;
+  rec.inLibrary = true;
   rec.id = id;
   rec.dateCreated = util.toPstDateTimeMs(new Date());
   handlePickupChange(name, true, rec.status);
@@ -3855,7 +3823,7 @@ async function runGapCheckBatch() {
     if (!allTvdb || Object.keys(allTvdb).length === 0) return;
 
     const showsToCheck = Object.entries(allTvdb)
-      .filter(([_, tvdbRecord]) => tvdbRecord?.inEmby && tvdbRecord?.id)
+      .filter(([_, tvdbRecord]) => tvdbRecord?.inLibrary && tvdbRecord?.id)
       .map(([showName, tvdbRecord]) => ({
         showId: tvdbRecord.id,
         showName,
@@ -3921,7 +3889,7 @@ function daysSinceLastPlayed(rec) {
 // Returns the change strings for the push2 log line.
 function applyAutoCollections(showName, rec) {
   const changes = [];
-  if (!rec.inEmby) return changes;
+  if (!rec.inLibrary) return changes;
   if (!rec.anyWatched) {
     if (
       !rec.inToTry &&
@@ -4101,7 +4069,7 @@ async function handleShowDiskChange(showName) {
     try {
       const allTvdb = tvdb.getAllTvdbSync();
       const tvdbRecord = allTvdb[showName];
-      if (!tvdbRecord?.inEmby || !tvdbRecord?.id) return;
+      if (!tvdbRecord?.inLibrary || !tvdbRecord?.id) return;
 
       // Refresh fileGap, watchGap, etc.
       await runGapCheckForShows(
@@ -4202,7 +4170,7 @@ watcher
             `no tvdb record for ${showName} — ${videoFiles.length} new file(s) skipped the sub queue`,
           );
         }
-        if (tvdbRec && tvdbRec.inEmby) {
+        if (tvdbRec && tvdbRec.inLibrary) {
           let queued = false;
           for (const fp of videoFiles) {
             // Enforce one active video per episode before chksrt: a replacement
@@ -4333,7 +4301,7 @@ async function runSubBackstopSweep() {
           scanned++;
           const showName = showNameFromFilePath(fp);
           const rec = tvdb.getAllTvdbSync?.()?.[showName];
-          if (!rec?.inEmby) continue;
+          if (!rec?.inLibrary) continue;
           if (!(await fileNeedsSubChecked(fp, showName))) continue;
           enqueueSubQueue(
             { videoFilePath: fp, fromUI: false, lowPriority: true },

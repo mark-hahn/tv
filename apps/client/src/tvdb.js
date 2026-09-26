@@ -64,13 +64,13 @@ let allTvdb = null;
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const fetchAllTvdbWithRetry = async (hasEmby = 0) => {
+const fetchAllTvdbWithRetry = async (hasLibrary = 0) => {
   const retryDelays = [500, 1500];
   let lastErr = null;
 
   for (let attempt = 0; attempt <= retryDelays.length; attempt += 1) {
     try {
-      return await srvr.getAllTvdb(hasEmby);
+      return await srvr.getAllTvdb(hasLibrary);
     } catch (err) {
       lastErr = err;
       if (attempt === retryDelays.length) break;
@@ -260,16 +260,16 @@ function applyWatchedEpisToSeriesMap(seriesMap, watchedEpis) {
   return updatedMap;
 }
 
-export const getAllTvdb = async (hasEmby = 0) => {
+export const getAllTvdb = async (hasLibrary = 0) => {
   // all data in tvdb.json
   // cached in allTvdb
-  // Only cache if hasEmby === 0 (all shows)
-  if (hasEmby === 0 && allTvdb) return allTvdb;
+  // Only cache if hasLibrary === 0 (all shows)
+  if (hasLibrary === 0 && allTvdb) return allTvdb;
 
-  const result = await fetchAllTvdbWithRetry(hasEmby);
+  const result = await fetchAllTvdbWithRetry(hasLibrary);
 
   // Only update cache if we're loading all shows
-  if (hasEmby === 0) {
+  if (hasLibrary === 0) {
     allTvdb = result;
   }
 
@@ -317,9 +317,9 @@ export const getRemotes = async (
         show: {
           name: showName,
           tvdbId: tvdbId,
-          // Include inEmby and Id from showContext if available
-          ...(showContext?.inEmby !== undefined && {
-            inEmby: showContext.inEmby,
+          // Include inLibrary and Id from showContext if available
+          ...(showContext?.inLibrary !== undefined && {
+            inLibrary: showContext.inLibrary,
           }),
           ...(showContext?.id !== undefined &&
             showContext.id !== null && { id: showContext.id }),

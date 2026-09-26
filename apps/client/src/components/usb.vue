@@ -1777,11 +1777,11 @@ export default {
 
       // Library check: all files must belong to a show that is in the library.
       if (Array.isArray(this.allShows) && this.allShows.length > 0) {
-        const embyShows = this.allShows
-          .filter((s) => s && s.inEmby)
+        const libraryShows = this.allShows
+          .filter((s) => s && s.inLibrary)
           .map((s) => s.name || s.name)
           .filter(Boolean);
-        const notInEmby = [];
+        const notInLibrary = [];
 
         // Check DVD files by top-level folder name (not individual VOBs).
         const dvdFolders = new Set();
@@ -1799,8 +1799,8 @@ export default {
           } catch (e) {}
           const title = parseTitleFromFilename(folder, "", parsedPtt);
           if (title) {
-            const match = smartTitleMatch(title, embyShows, null, false);
-            if (!match) notInEmby.push(title);
+            const match = smartTitleMatch(title, libraryShows, null, false);
+            if (!match) notInLibrary.push(title);
           }
         }
 
@@ -1826,12 +1826,12 @@ export default {
             parsedPtt2,
           );
           if (title2) {
-            const match = smartTitleMatch(title2, embyShows, null, false);
-            if (!match) notInEmby.push(title2);
+            const match = smartTitleMatch(title2, libraryShows, null, false);
+            if (!match) notInLibrary.push(title2);
           }
         }
-        if (notInEmby.length > 0) {
-          alert("Show not in the library:\n\n" + [...new Set(notInEmby)].join("\n"));
+        if (notInLibrary.length > 0) {
+          alert("Show not in the library:\n\n" + [...new Set(notInLibrary)].join("\n"));
           return;
         }
       }

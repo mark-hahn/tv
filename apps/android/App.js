@@ -39,10 +39,11 @@ const keyLabel = (key) => {
 };
 
 const TV_TV_URL = "https://hahnca.com/tv-tv";
+const EMBY_SERVICE = allServices.google.find((s) => s.name === "Emby");
 // hvac2, which owns the doorbell camera. A long press of a Shows key is one
 // request to this and no state of its own: hvac2 knows whether a view is up,
 // and it owns the rule that the camera never shows on the wall tablet and the
-// television at the same time. See docs/tv-videostream-contract.md.
+// television at the same time.
 const RING_TVCAM_URL = "https://hahnca.com/ring/tvcam";
 const TV_SRVR_WS_URL = "wss://hahnca.com/tv-srvr";
 const TV_SRVR_HTTP_URL = "https://hahnca.com/tv-srvr";
@@ -200,8 +201,8 @@ function normalizePlayedDate(value) {
 }
 
 // Same key as the web client's getSortKey("Viewed") and tvapp's Watched
-// sort: the date Emby currently holds, which is fakeLastPlayed whenever
-// hiding/unhiding or a wait ending stamped one, else the real last viewing.
+// sort: fakeLastPlayed whenever hiding/unhiding or a wait ending stamped one,
+// else the real last viewing.
 function getViewedSortValue(show, lastViewedMap) {
   void lastViewedMap;
   return (
@@ -511,8 +512,8 @@ export default function App() {
           const { showName, playing } = msg.data ?? {};
           const s = playing?.[0]?.season ?? null;
           const e = playing?.[0]?.episode ?? null;
-          const positionTicks = playing?.[0]?.positionTicks ?? null;
-          const runtimeTicks = playing?.[0]?.runtimeTicks ?? null;
+          const positionMs = playing?.[0]?.positionMs ?? null;
+          const runtimeMs = playing?.[0]?.runtimeMs ?? null;
           const prev = showPlayingRef.current;
           const episodeChanged =
             prev?.name !== showName || prev?.s !== s || prev?.e !== e;
@@ -520,13 +521,13 @@ export default function App() {
           if (showName) {
             showPlayingRef.current = { name: showName, s, e };
             if (
-              positionTicks != null &&
-              runtimeTicks != null &&
-              runtimeTicks > 0
+              positionMs != null &&
+              runtimeMs != null &&
+              runtimeMs > 0
             ) {
               setPlayProgress({
-                position: positionTicks,
-                duration: runtimeTicks,
+                position: positionMs,
+                duration: runtimeMs,
               });
             }
             if (prev?.name !== showName) {
@@ -680,14 +681,14 @@ export default function App() {
     tvapprcShowsLoadedRef.current = true;
     (async () => {
       try {
-        const res = await fetch(`${TV_SRVR_HTTP_URL}/api/getAllTvdb?hasEmby=0`);
+        const res = await fetch(`${TV_SRVR_HTTP_URL}/api/getAllTvdb?hasLibrary=0`);
         const data = await res.json();
         const all = Object.entries(data).map(([name, show]) => ({
           ...show,
           name,
         }));
         setTvapprcTotalCount(all.length);
-        setTvapprcShows(all.filter((show) => show.inEmby !== false));
+        setTvapprcShows(all.filter((show) => show.inLibrary !== false));
       } catch (_) {}
     })();
   }, [tvapprcMode]);
@@ -726,7 +727,7 @@ export default function App() {
     (async () => {
       try {
         const [res, lastViewedRes, savedName, savedSE] = await Promise.all([
-          fetch(`${TV_SRVR_HTTP_URL}/api/getAllTvdb?hasEmby=1`),
+          fetch(`${TV_SRVR_HTTP_URL}/api/getAllTvdb?hasLibrary=1`),
           fetch(`${TV_SRVR_HTTP_URL}/api/getLastViewed`),
           AsyncStorage.getItem("selectedShowName").catch(() => null),
           AsyncStorage.getItem("selectedSE").catch(() => null),
@@ -737,7 +738,7 @@ export default function App() {
         const persistedSE = savedSE ? JSON.parse(savedSE) : null;
         const list = Object.entries(data)
           .map(([name, show]) => ({ ...show, name }))
-          .filter((show) => show.inEmby !== false)
+          .filter((show) => show.inLibrary !== false)
           .sort(compareShowNames);
         showsListRef.current = list;
         setShowsList(list);
@@ -747,7 +748,7 @@ export default function App() {
             : null;
           showSelectedRef.current = { name: (persisted ?? list[0]).name };
           const lp = showPlayingRef.current;
-          // A pending select (from tvapp) picks the show instead of Emby's.
+          // A pending select (from tvapp) picks the show instead of the playing one.
           const playingShow =
             lp && !pendingShowSelectRef.current
               ? list.find((s) => s.name === lp.name)
@@ -877,7 +878,7 @@ export default function App() {
     (async () => {
       try {
         const res = await fetch(
-          `${TV_SRVR_HTTP_URL}/api/getSeriesMapFromEmby`,
+          `${TV_SRVR_HTTP_URL}/api/getSeriesMap`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1017,6 +1018,15 @@ export default function App() {
     await sendKeyThrough(key, `/tv/key/${key}`);
   };
 
+  // The set's Input key, which is wanted on an HDMI input too, so unlike the
+  // other keys it only needs the set on.
+  const inputKey = async () => {
+    if (isOff) return;
+    if (!debounce()) return;
+    flash("input");
+    await sendKeyThrough("input", "/tv/key/input");
+  };
+
   const closeTvapprcInput = () => {
     setShowTvapprcInput(false);
     Keyboard.dismiss();
@@ -1055,9 +1065,8 @@ export default function App() {
   };
 
   /**
-   * The Shows key while tvapp is up: the same thing it does from Emby, which
-   * is to put the tvapp show list up with nothing else in the way -- there it
-   * opens tvapp, here it clears whatever tvapp is showing back to that.
+   * The Shows key while tvapp is up: put the tvapp show list up with nothing
+   * else in the way, clearing whatever tvapp is showing back to that.
    */
   const clearTvappState = (flashKey) => {
     flash(flashKey);
@@ -1390,7 +1399,7 @@ export default function App() {
     followPlayingRef.current = false;
     setFollowPlaying(false);
     try {
-      const res = await fetch(`${TV_SRVR_HTTP_URL}/api/getSeriesMapFromEmby`, {
+      const res = await fetch(`${TV_SRVR_HTTP_URL}/api/getSeriesMap`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ showName: item.name }),
@@ -1626,21 +1635,16 @@ export default function App() {
       onPressIn: () => startRepeat("up"),
       onPressOut: stopRepeat,
     },
-    // A second Shows key while tvapp is up -- the same button as the one in the
-    // bottom row, within reach of the thumb that is on the arrows. Sort, which
-    // used to be here, has moved to the row above.
+    // While tvapp is up, Hide/Unhide of the selected show.
     tvapprcMode
       ? {
-          key: "shows2",
-          label: "Shows",
+          key: "hide",
+          label: tvapprcHidden ? "Unhide" : "Hide",
           smallText: true,
-          // Plain white, unlike the bottom row's, which is lit to say tvapprc
-          // mode is on: one such lamp on the screen is enough. It flashes under
-          // its own name so pressing it does not light the other one too.
-          bg: () => cellBg("white", "shows2"),
+          bg: () => cellBg("white", "hide"),
           onPress: () => {},
-          onPressIn: () => startShowsHold("shows2"),
-          onPressOut: () => stopShowsHold(),
+          onPressIn: () => startHideHold(),
+          onPressOut: () => stopHideHold(),
         }
       : {
           key: "home",
@@ -1676,8 +1680,8 @@ export default function App() {
       onPressIn: () => startRepeat("right"),
       onPressOut: stopRepeat,
     },
-    // Row 3: search, down, skip. Search is tvapp's alone, so its cell is
-    // empty while tvapp is not up.
+    // Row 3: search, down, skip. Search and Skip are tvapp's alone; while
+    // tvapp is not up their cells launch Emby and press the set's Input key.
     tvapprcMode
       ? {
           key: "text",
@@ -1689,10 +1693,15 @@ export default function App() {
           onPressOut: () => stopSearchHold(),
         }
       : {
-          key: "noSearch",
-          label: "",
-          bg: () => cellBg("white", "noSearch"),
+          key: "emby",
+          label: "Emby",
+          smallText: true,
+          bg: () => cellBg("white", "emby"),
           onPress: () => {},
+          onPressIn: () => {
+            flash("emby");
+            openApp(EMBY_SERVICE);
+          },
         },
     {
       key: "down",
@@ -1702,24 +1711,24 @@ export default function App() {
       onPressIn: () => startRepeat("down"),
       onPressOut: stopRepeat,
     },
-    // Skip's cell, which Info left when it moved to the row above: while tvapp
-    // is up it hides/unhides the selected show; otherwise it is empty, since
-    // nothing of ours is playing to skip an intro in.
+    // While tvapp is up, Skip skips the intro of the video it is playing;
+    // otherwise this is the set's Input key.
     tvapprcMode
       ? {
-          key: "hide",
-          label: tvapprcHidden ? "Unhide" : "Hide",
+          key: "skip",
+          label: "Skip",
           smallText: true,
-          bg: () => cellBg("white", "hide"),
+          bg: () => cellBg("white", "skip"),
           onPress: () => {},
-          onPressIn: () => startHideHold(),
-          onPressOut: () => stopHideHold(),
+          onPressIn: () => tvKey("skip"),
         }
       : {
-          key: "noSkip",
-          label: "",
-          bg: () => cellBg("white", "noSkip"),
+          key: "input",
+          label: "Input",
+          smallText: true,
+          bg: () => cellBg("white", "input"),
           onPress: () => {},
+          onPressIn: () => inputKey(),
         },
     // Row 4: vol-, vol+, mute
     {
@@ -2365,8 +2374,8 @@ export default function App() {
                   {followPlaying &&
                     playProgress &&
                     (() => {
-                      const totalSec = Math.round(playProgress.duration / 1e7);
-                      const posSec = Math.round(playProgress.position / 1e7);
+                      const totalSec = Math.round(playProgress.duration / 1000);
+                      const posSec = Math.round(playProgress.position / 1000);
                       const remSec = Math.max(0, totalSec - posSec);
                       const fmt = (s) => {
                         const h = Math.floor(s / 3600);

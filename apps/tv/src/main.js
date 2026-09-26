@@ -120,8 +120,7 @@ const CMD_CLEAR_STATE = "r"; // back to a bare show list
 const CMD_CUSTOM_CHANGED = "c"; // the shared filter settings changed
 // A live camera over the whole screen, hand-mirrored in CtrlServer.java. The
 // argument is a page url that plays it, or CAM_OFF to take it back off; what
-// the page does is no business of this file's. See
-// docs/tv-videostream-contract.md.
+// the page does is no business of this file's.
 const CMD_SHOW_CAM = "v";
 const CAM_OFF = "off";
 const TVAPP_PROBE_TIMEOUT_MS = 800;
@@ -717,6 +716,7 @@ const GOOGLE_KEY_MAP = {
   home: "Home",
   back: "Return",
   captions: "ClosedCaption",
+  input: "TvInput",
 };
 
 app.get("/tv/key/:key", async (req, res) => {
@@ -728,7 +728,8 @@ app.get("/tv/key/:key", async (req, res) => {
     return;
   }
 
-  if (tvMode !== "google" && tvMode !== "tv") {
+  // Input is wanted on an HDMI input too, so it only needs the set on.
+  if (tvMode === "off" || (tvMode === "other" && req.params.key !== "input")) {
     unilog(420, `key ignored — tvMode=${tvMode}`);
     res.json({ ok: false, error: "wrong mode" });
     return;
@@ -1533,8 +1534,7 @@ app.get("/tv/opentvapp", async (req, res) => {
 // hvac2 asks for this over localhost (both run on hahnca.com under pm2) and
 // hands over a url and nothing else. This file owns the television: its power
 // and the overlay; tvapp pauses its own video under the overlay. It does not know what the url
-// serves, and hvac2 does not know any of the above. The interface is fixed by
-// docs/tv-videostream-contract.md.
+// serves, and hvac2 does not know any of the above.
 //
 // Deliberately generic -- "videostream", not "doorbell". That the camera on
 // the far end happens to be a Ring doorbell is hvac2's business.

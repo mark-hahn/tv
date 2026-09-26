@@ -1228,8 +1228,8 @@
     </div>
 
     <div
-      id="emby-loading-modal"
-      v-if="embyLoadingShow"
+      id="library-loading-modal"
+      v-if="libraryLoadingShow"
       @click.stop
       style="
         position: fixed;
@@ -1259,7 +1259,7 @@
           Loading show into the library
         </div>
         <div style="font-size: 14px; color: #555">
-          {{ embyLoadingStatus }}
+          {{ libraryLoadingStatus }}
         </div>
       </div>
     </div>
@@ -1268,7 +1268,7 @@
 
 <script>
 import evtBus from "../evtBus.js";
-import * as emby from "../emby.js";
+import * as showData from "../showData.js";
 import * as util from "../util.js";
 import { openExternalBlank } from "../util.js";
 import { config } from "../config.js";
@@ -1388,9 +1388,9 @@ export default {
       downloadQueueRunning: false,
       downloadStatus: {},
 
-      // Emby-loading progress dialog
-      embyLoadingShow: false,
-      embyLoadingStatus: "",
+      // Library-loading progress dialog
+      libraryLoadingShow: false,
+      libraryLoadingStatus: "",
 
       // More providers (TPB/LIM/EZT) state
       hasMoreProviders: false,
@@ -2011,9 +2011,9 @@ export default {
     },
 
     async _checkSeriesMapChanged(show) {
-      if (!show || !show.id || show.inEmby === false) return;
+      if (!show || !show.id || show.inLibrary === false) return;
       try {
-        const fresh = await emby.getSeriesMap(show);
+        const fresh = await showData.getSeriesMap(show);
         const freshJson = JSON.stringify(fresh || []);
         if (freshJson !== this._savedSeriesMapJson) {
           this.lastAutoSearchedShowId = null; // allow re-search
@@ -2875,14 +2875,14 @@ export default {
     async calculateNeeded(show) {
       const needed = [];
 
-      // If not in Emby, return special marker
-      if (!show || !show.id || show.inEmby === false) {
-        return ["noemby"];
+      // Not in the library: a special marker
+      if (!show || !show.id || show.inLibrary === false) {
+        return ["notinlibrary"];
       }
 
       try {
         // Get series map (same way as list.vue does)
-        const seriesMapIn = await emby.getSeriesMap(show);
+        const seriesMapIn = await showData.getSeriesMap(show);
         this._savedSeriesMapJson = JSON.stringify(seriesMapIn || []);
         if (!seriesMapIn || seriesMapIn.length === 0) {
           return needed;
@@ -3623,9 +3623,9 @@ export default {
       return s;
     },
 
-    async ensureInEmby() {
+    async ensureInLibrary() {
       const show = this.currentShow;
-      if (!show || show.inEmby !== false) return true;
+      if (!show || show.inLibrary !== false) return true;
 
       const showName = String(show.name || "").trim();
       const showTvdbId = String(show.tvdbId || "").trim();
@@ -3642,12 +3642,12 @@ export default {
       const savedClicked = new Set(this.clickedTorrents);
       const savedDownloaded = new Set(this.downloadedTorrents);
 
-      // Suppress searchTorrents calls during the emby load
+      // Suppress searchTorrents calls during the library load
       const origSearchTorrents = this.searchTorrents;
       this.searchTorrents = () => {};
 
-      this.embyLoadingShow = true;
-      this.embyLoadingStatus = "Starting...";
+      this.libraryLoadingShow = true;
+      this.libraryLoadingStatus = "Starting...";
 
       try {
         const result = await new Promise((resolve) => {
@@ -3656,25 +3656,25 @@ export default {
             action: "add",
             onDone: (res) => resolve(res),
             onStatus: (txt) => {
-              this.embyLoadingStatus = String(txt || "");
+              this.libraryLoadingStatus = String(txt || "");
             },
           });
         });
 
         if (result?.ok) {
-          show.inEmby = true;
+          show.inLibrary = true;
           if (result?.show) {
             this.currentShow = result.show;
           }
-          this.embyLoadingStatus = "Done";
+          this.libraryLoadingStatus = "Done";
           await new Promise((r) => setTimeout(r, 800));
           return true;
         }
-        this.embyLoadingStatus = "Failed to load show into the library";
+        this.libraryLoadingStatus = "Failed to load show into the library";
         await new Promise((r) => setTimeout(r, 2000));
         return false;
       } catch (e) {
-        this.embyLoadingStatus = e?.message || String(e);
+        this.libraryLoadingStatus = e?.message || String(e);
         await new Promise((r) => setTimeout(r, 2000));
         return false;
       } finally {
@@ -3692,8 +3692,8 @@ export default {
         this.clickedTorrents = savedClicked;
         this.downloadedTorrents = savedDownloaded;
 
-        this.embyLoadingShow = false;
-        this.embyLoadingStatus = "";
+        this.libraryLoadingShow = false;
+        this.libraryLoadingStatus = "";
       }
     },
 
@@ -3702,9 +3702,9 @@ export default {
       this.downloadQueueRunning = true;
 
       try {
-        // If current show is not in Emby, load it first before processing any downloads
-        if (this.currentShow?.inEmby === false) {
-          const loaded = await this.ensureInEmby();
+        // If current show is not in the library, load it first before processing any downloads
+        if (this.currentShow?.inLibrary === false) {
+          const loaded = await this.ensureInLibrary();
           if (!loaded) {
             // Fail all queued items
             while (this.downloadQueue.length > 0) {

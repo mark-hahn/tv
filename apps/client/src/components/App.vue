@@ -563,7 +563,6 @@ import Trailer from "./trailer.vue";
 import TvPane from "./tvpane.vue";
 import evtBus from "../evtBus.js";
 import * as tvdb from "../tvdb.js";
-import * as emby from "../emby.js";
 import * as srvr from "../srvr.js";
 import { setGlobalMessage } from "../globalMessages.js";
 import * as epd from "@tv/share";
@@ -1022,7 +1021,7 @@ export default {
             Number(introShow.episodeCount ?? 0) >
             Number(introShow.watchedCount ?? 0);
           introShow.needsIntro = !!(
-            introShow.inEmby &&
+            introShow.inLibrary &&
             !introShow.inLinda &&
             hasFiles &&
             hasUnwatched
@@ -1224,7 +1223,7 @@ export default {
         const hasNoPlayableIntroFile = !hasPlayableIntroFile;
         if (
           s.seasonIntros != null ||
-          s.inEmby === false ||
+          s.inLibrary === false ||
           s.inLinda ||
           hasNoPlayableIntroFile
         ) {
@@ -1354,9 +1353,9 @@ export default {
           payload?.existing?.key != null ? String(payload.existing.key) : "";
         const existingName =
           payload?.existing?.name != null ? String(payload.existing.name) : "";
-        const existingInEmby =
-          payload?.existing?.inEmby != null
-            ? String(payload.existing.inEmby)
+        const existingInLibrary =
+          payload?.existing?.inLibrary != null
+            ? String(payload.existing.inLibrary)
             : "";
         const likelyById =
           payload?.details?.likelyById != null
@@ -1388,7 +1387,7 @@ export default {
           lines.push(`- Cached name: ${existingName}`);
           lines.push(`- Cached showId (tvdb.showId): ${existingShowId}`);
           lines.push(`- Cached tvdbId (tvdb.tvdbId): ${existingTvdbId}`);
-          lines.push(`- Cached inEmby: ${existingInEmby}`);
+          lines.push(`- Cached inLibrary: ${existingInLibrary}`);
           lines.push(`- Matched by TVDB id: ${likelyById}`);
         } else if (
           reason === "cache-mismatch-blocked" &&
@@ -1417,7 +1416,7 @@ export default {
           lines.push(`- Cached name: ${existingName}`);
           lines.push(`- Cached showId (tvdb.showId): ${existingShowId}`);
           lines.push(`- Cached tvdbId (tvdb.tvdbId): ${existingTvdbId}`);
-          lines.push(`- Cached inEmby: ${existingInEmby}`);
+          lines.push(`- Cached inLibrary: ${existingInLibrary}`);
           lines.push(`- Mismatch type: ${mismatchType}`);
         } else if (
           reason === "add-aborted-no-create" &&

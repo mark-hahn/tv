@@ -2,16 +2,13 @@
 //
 // On-disk / in-memory shape (see episodeData-plan.md):
 //   episodeData[season][episode-1] = tuple
-//   tuple = [aired, watched, id, file, res, _, pos]  (trailing absent slots dropped)
+//   tuple = [aired, watched, file, res, pos]  (trailing absent slots dropped)
 //     [0] aired   "YYYY-MM-DD" string (or 0 when unknown)
 //     [1] watched 1 / 0
-//     [2] id      Emby item id integer (0 = none)
-//     [3] file    file name, or "<folder>//<file name>" when the show folder
+//     [2] file    file name, or "<folder>//<file name>" when the show folder
 //                 differs from the record key (marker is the "//")
-//     [4] res     integer resolution (e.g. 1080); 0 = unknown
-//     [5] _       retired slot (was a .bif sidecar flag); always 0
-//     [6] pos     Emby PlaybackPositionTicks (100-ns ticks); only stored when
-//                 > 0, set at the same time as the watched flag.
+//     [3] res     integer resolution (e.g. 1080); 0 = unknown
+//     [4] pos     resume position in ms; only stored when > 0.
 //
 // Season index is 0-based (episodeData[0] = season 0). Episode index is 1-based
 // (episodeData[s][0] = episode 1). Helpers take a 1-based `e`.
@@ -24,11 +21,9 @@ const TV_DIR = "/mnt/media/tv";
 // Tuple slot indices
 const A = 0; // aired
 const W = 1; // watched
-const ID = 2; // emby id
-const F = 3; // file name (possibly "<folder>//<file>")
-const R = 4; // resolution
-// slot 5 is retired (was the bif sidecar flag) and is always written as 0
-const P = 6; // PlaybackPositionTicks (only present when > 0)
+const F = 2; // file name (possibly "<folder>//<file>")
+const R = 3; // resolution
+const P = 4; // resume position in ms (only present when > 0)
 
 export function getEp(ed, s, e) {
   if (!Array.isArray(ed)) return null;
@@ -45,11 +40,6 @@ export function getAired(ed, s, e) {
 
 export function isWatched(ed, s, e) {
   return getEp(ed, s, e)?.[W] === 1;
-}
-
-export function getEmbyId(ed, s, e) {
-  const id = getEp(ed, s, e)?.[ID];
-  return id ? id : null;
 }
 
 // Raw file slot value ("<file>" or "<folder>//<file>"), or null when absent.
@@ -82,7 +72,7 @@ export function getRes(ed, s, e) {
   return typeof r === "number" && r ? r : null;
 }
 
-// Emby playback position in 100-ns ticks, or 0 when none/absent.
+// Resume position in ms, or 0 when none/absent.
 export function getPos(ed, s, e) {
   const p = getEp(ed, s, e)?.[P];
   return typeof p === "number" && p > 0 ? p : 0;
@@ -200,14 +190,12 @@ export function countWatched(ed) {
 }
 
 // Encode named fields into a trimmed positional tuple.
-function encodeTuple(aired, watched, id, file, res, pos) {
+function encodeTuple(aired, watched, file, res, pos) {
   const arr = [
     aired || 0,
     watched ? 1 : 0,
-    id || 0,
     file || 0,
     typeof res === "number" && res ? res : 0,
-    0, // retired slot (was bif)
     typeof pos === "number" && pos > 0 ? pos : 0,
   ];
   let len = arr.length;
@@ -221,7 +209,7 @@ export function ensureSeason(ed, s) {
 }
 
 // Merge the provided fields over an episode's existing tuple, then re-trim.
-// `fields` may contain any of: aired, watched, id, file, res, pos. Omitted keys
+// `fields` may contain any of: aired, watched, file, res, pos. Omitted keys
 // keep their existing value. Pass file:null / res:null to clear.
 export function setEpisode(ed, s, e, fields) {
   const season = ensureSeason(ed, s);
@@ -229,7 +217,6 @@ export function setEpisode(ed, s, e, fields) {
   const existing = Array.isArray(season[i]) ? season[i] : [];
   let aired = typeof existing[A] === "string" && existing[A] ? existing[A] : 0;
   let watched = existing[W] === 1 ? 1 : 0;
-  let id = typeof existing[ID] === "number" && existing[ID] ? existing[ID] : 0;
   let file =
     typeof existing[F] === "string" && existing[F] ? existing[F] : null;
   let res = typeof existing[R] === "number" && existing[R] ? existing[R] : null;
@@ -238,14 +225,13 @@ export function setEpisode(ed, s, e, fields) {
 
   if ("aired" in fields) aired = fields.aired || 0;
   if ("watched" in fields) watched = fields.watched ? 1 : 0;
-  if ("id" in fields) id = fields.id || 0;
   if ("file" in fields) file = fields.file || null;
   if ("res" in fields)
     res = typeof fields.res === "number" && fields.res ? fields.res : null;
   if ("pos" in fields)
     pos = typeof fields.pos === "number" && fields.pos > 0 ? fields.pos : 0;
 
-  season[i] = encodeTuple(aired, watched, id, file, res, pos);
+  season[i] = encodeTuple(aired, watched, file, res, pos);
 }
 
 export function clearFile(ed, s, e) {
@@ -285,10 +271,10 @@ export function pruneGhosts(ed, seen) {
   return ghosts;
 }
 
-// Drop id/file/res/pos for every episode (used when a show leaves the library).
+// Drop file/res/pos for every episode (used when a show leaves the library).
 export function stripToAiredWatched(ed) {
   forEachEpisode(ed, (s, e) => {
-    setEpisode(ed, s, e, { id: 0, file: null, res: null, pos: 0 });
+    setEpisode(ed, s, e, { file: null, res: null, pos: 0 });
   });
 }
 
@@ -311,7 +297,7 @@ export function episodeDataToWatchedEpis(ed) {
 
 // Build the legacy seriesMap wire shape from episodeData:
 //   [[season, [[episode, { error, played, avail, noFile, unaired, deleted,
-//                          path, id, quality, aired }]], ...], ...]
+//                          path, quality, aired, pos }]], ...], ...]
 export function toSeriesMap(ed, folder, today, tvDir = TV_DIR) {
   const out = [];
   if (!Array.isArray(ed)) return out;
@@ -333,7 +319,6 @@ export function toSeriesMap(ed, folder, today, tvDir = TV_DIR) {
           unaired: isUnaired(ed, s, e, today),
           deleted: false,
           path: file ? getFullPath(ed, folder, s, e, tvDir) : null,
-          id: getEmbyId(ed, s, e),
           quality: getRes(ed, s, e),
           aired: getAired(ed, s, e),
           pos: getPos(ed, s, e),
@@ -372,7 +357,7 @@ export function markGapErrors(seriesMap, rec) {
 
 // Pick the episode intro marking should open for a show: the first unwatched
 // episode with a file, else the first episode with a file. Intro marking plays
-// through /api/stream, never Emby, so an episode needs only a file.
+// through /api/stream, so an episode needs only a file.
 // This is the pick when nothing is mirrored yet — it is what tv-srvr pre-builds
 // the mp4 mirror for. The episode actually opened comes from /api/introFile,
 // which upgrades to any episode whose mirror is already finished.

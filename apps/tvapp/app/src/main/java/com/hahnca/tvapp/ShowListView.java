@@ -157,9 +157,9 @@ class ShowListView extends ScrollView {
   private static final int MAP_CELL_BORDER = 0xFFCCCCCC;
   private static final int ED_AIRED = 0;
   private static final int ED_WATCHED = 1;
-  private static final int ED_FILE = 3;
-  private static final int ED_RES = 4;
-  private static final int ED_POS = 6;
+  private static final int ED_FILE = 2;
+  private static final int ED_RES = 3;
+  private static final int ED_POS = 4;
   // One up/down press of the description, which has no cursor to move: a
   // couple of lines, so a held key runs down it at a readable rate.
   private static final int DESC_SCROLL_LINES = 2;
@@ -228,9 +228,8 @@ class ShowListView extends ScrollView {
   private final Map<Shows.Show, TextView> letterBadges = new HashMap<>();
   private final Map<String, Shows.Show> byName = new HashMap<>();
   // The show just played, held at the top of the Watched sort across reloads
-  // until tv-srvr's own order puts it there: its lastPlayedDate only moves on
-  // the next Emby sweep, minutes after the play, and every reload before that
-  // would sort it straight back to where it was.
+  // until tv-srvr's own order puts it there: a reload that lands before
+  // tv-srvr has stamped the play would sort it straight back to where it was.
   private String pinnedTop;
   private SelectionListener listener;
   private CountsListener countsListener;
@@ -257,8 +256,8 @@ class ShowListView extends ScrollView {
   private String actorFilter;
   // The show setShows was told to keep selected, kept in the list even when the
   // freshly loaded data no longer matches the active filters. Watching an
-  // episode is exactly what makes a show stop being Ready, so the reload on
-  // coming back from Emby must not slide the selection onto a neighbor. Cleared
+  // episode is exactly what makes a show stop being Ready, so the reload after
+  // the video closes must not slide the selection onto a neighbor. Cleared
   // as soon as the selection moves off it, or the user changes the filters.
   private Shows.Show pinned;
   private final EdgeFade edgeFade = EdgeFade.vertical(this);
@@ -354,7 +353,7 @@ class ShowListView extends ScrollView {
 
   /**
    * Fills the list and restores the selection, falling back to the top card
-   * when the remembered show is gone (renamed, or dropped out of Emby).
+   * when the remembered show is gone (renamed, or dropped out of the library).
    */
   void setShows(List<Shows.Show> list, String selectedName) {
     everLoaded = true;
@@ -671,8 +670,8 @@ class ShowListView extends ScrollView {
 
   /**
    * The ok key while cardMisc has the focus: what opening the item under the
-   * cursor amounts to is the mode's own, and the two that end in Emby are the
-   * activity's to carry out.
+   * cursor amounts to is the mode's own, and the two that end in a player are
+   * the activity's to carry out.
    */
   OpenResult openFocused() {
     if (active == null || !miscFocused) return OpenResult.NONE;
@@ -918,9 +917,7 @@ class ShowListView extends ScrollView {
       if (requestedPosters.add(show)) {
         ImageView poster = posters.get(show);
         if (poster != null) {
-          // The width the card actually draws it at, both times: Emby resizes
-          // server-side, so the image arrives at exactly that and is decoded and
-          // drawn 1:1 with nothing left to rescale on this end.
+          // The width the card actually draws it at.
           Backdrops.get(
               show,
               posterWidthPx,
@@ -1073,13 +1070,13 @@ class ShowListView extends ScrollView {
   }
 
   private boolean matchesActiveFilters(Shows.Show show) {
-    // Non-Emby ("trash") shows are hidden unless the Trash filter is active.
+    // Shows outside the library ("trash") are hidden unless the Trash filter is active.
     if (show == pinned) return true;
-    if (!activeFilters.contains("Trash") && !show.inEmby) return false;
+    if (!activeFilters.contains("Trash") && !show.inLibrary) return false;
     // Not-ready shows are hidden unless the Ready filter is active -- or text
     // has been typed, which is a search of the list by name and so has no
     // business skipping a show that is named. Trash is not lifted the same
-    // way: every show that is not in Emby coming in is the long rebuild the
+    // way: every show outside the library coming in is the long rebuild the
     // Trash button puts a wait up for.
     if (filter.isEmpty()
         && !activeFilters.contains("Ready")
@@ -1405,7 +1402,7 @@ class ShowListView extends ScrollView {
 
   private View buildCard(Shows.Show show) {
     // Everything on one line: the name, then the trash can for a show that is
-    // not in Emby, then the metadata run together with dashes. Baselines rather
+    // not in the library, then the metadata run together with dashes. Baselines rather
     // than box edges, so the smaller metadata sits on the name's own bottom.
     NameRow nameRow = new NameRow(getContext(), show);
     nameRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -1426,7 +1423,7 @@ class ShowListView extends ScrollView {
         new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
     nameRow.addView(name, nameParams);
 
-    if (!show.inEmby) {
+    if (!show.inLibrary) {
       int size = (int) dp(TRASH_ICON_SIZE_DP);
       LinearLayout.LayoutParams trashParams = new LinearLayout.LayoutParams(size, size);
       trashParams.leftMargin = (int) dp(CARD_BODY_GAP_DP);
@@ -1962,7 +1959,7 @@ class ShowListView extends ScrollView {
     view.setText(
         tuple == null
             ? ""
-            : MapCells.text(played, hasFile, noFile, unaired, quality, pos, show.inEmby));
+            : MapCells.text(played, hasFile, noFile, unaired, quality, pos, show.inLibrary));
     view.setTextColor(MAP_CELL_TEXT_COLOR);
     view.setTextSize(TypedValue.COMPLEX_UNIT_SP, metrics.cellSp);
     view.setGravity(Gravity.CENTER);
@@ -2485,7 +2482,7 @@ class ShowListView extends ScrollView {
 
   /**
    * What the ok key opening the focused item came to. PLAY is the two that end
-   * in Emby -- a trailer, or the episode the card is showing -- which is the
+   * in a player -- a trailer, or the episode the card is showing -- which is the
    * activity's to start; ACTOR is the show list now narrowed to that actor, so
    * the focus belongs back on the list.
    */
@@ -2584,7 +2581,7 @@ class ShowListView extends ScrollView {
     }
   }
 
-  /** Small drawn trash-can glyph, not-in-Emby rows only, far right of the row. */
+  /** Small drawn trash-can glyph, rows outside the library only, far right of the row. */
   private View buildTrashIcon() {
     return new View(getContext()) {
       private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);

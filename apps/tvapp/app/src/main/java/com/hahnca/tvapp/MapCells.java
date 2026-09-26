@@ -20,11 +20,11 @@ class MapCells {
       boolean unaired,
       int quality,
       long pos,
-      boolean inEmby) {
+      boolean inLibrary) {
     StringBuilder out = new StringBuilder();
     if (pos > 0) append(out, "p");
     if (played) append(out, "w");
-    if (avail && !unaired && inEmby) append(out, qualityChar(quality));
+    if (avail && !unaired && inLibrary) append(out, qualityChar(quality));
     if (noFile && !unaired) append(out, "-");
     if (unaired && !played && noFile) append(out, "u");
     return out.toString();

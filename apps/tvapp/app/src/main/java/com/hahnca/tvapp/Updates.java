@@ -21,7 +21,7 @@ import org.json.JSONObject;
  *
  * A record arriving is only ever taken as "something changed" -- the reload
  * that follows re-reads the lot. One show's record is not worth splicing into
- * a sorted list of a couple of thousand, and a burst of them (an Emby refresh
+ * a sorted list of a couple of thousand, and a burst of them (a disk refresh
  * touches every episode of a show) is worth exactly one reload, which is what
  * the debounce below is for.
  */

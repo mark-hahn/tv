@@ -11,7 +11,7 @@ import org.json.JSONObject;
 
 /**
  * The show list, read from tv-srvr's getAllTvdb — the same call and the same
- * hasEmby=1 filter the phone remote's show list uses, so the two lists agree.
+ * hasLibrary=1 filter the phone remote's show list uses, so the two lists agree.
  *
  * The reply is the whole tvdb dataset (a couple of megabytes), of which this ui
  * keeps only what the list and the panes show. It is fetched once, at startup,
@@ -22,7 +22,7 @@ class Shows {
   // Public https rather than a LAN port: tv-srvr listens on https only, and this
   // one-shot load is not latency-sensitive.
   private static final String SHOWS_URL =
-      "https://hahnca.com/tv-srvr/api/getAllTvdb?hasEmby=0";
+      "https://hahnca.com/tv-srvr/api/getAllTvdb?hasLibrary=0";
   private static final String TAG = "tvapp";
 
   /** One of the show's cast, for the Actors pane. */
@@ -99,9 +99,9 @@ class Shows {
     // "yyyy/MM/dd HH:mm:ss.SSS" in the record, so they sort as plain text.
     final String lastPlayedDate;
     final String dateCreated;
-    // The backdated date tv-srvr stamped into Emby to hide the show, empty
-    // when it never hid it. Watched sorts on this instead so a hidden show
-    // sinks here as it does in Emby, leaving lastPlayedDate the real viewing.
+    // The backdated date tv-srvr stamps to hide the show, empty when it never
+    // hid it. Watched sorts on this instead so a hidden show sinks here,
+    // leaving lastPlayedDate the real viewing.
     final String fakeLastPlayed;
     // Whether tv-srvr has the show hidden. Not final: the hide key flips it
     // ahead of the reload, so the remote's Hide/Unhide label agrees at once.
@@ -110,7 +110,7 @@ class Shows {
     final boolean inContinue;
     final boolean inMark;
     final boolean inLinda;
-    final boolean inEmby;
+    final boolean inLibrary;
     final List<Actor> characters;
     // The one list here that is not left as the record wrote it: TrailerList
     // adds the imdb video to it and takes the unplayable ones back out.
@@ -137,7 +137,7 @@ class Shows {
       countryLang = join(" / ", originalCountry, str(rec, "originalLanguage"));
       network = str(rec, "originalNetwork");
       genres = joinArray(rec.optJSONArray("genres"));
-      notReady = rec.optBoolean("notReady", !rec.optBoolean("inEmby", true));
+      notReady = rec.optBoolean("notReady", !rec.optBoolean("inLibrary", true));
       episodeData = rec.optJSONArray("episodeData");
       hasFile = anyFile(episodeData);
       averageRuntime = rec.optInt("averageRuntime", 0);
@@ -159,7 +159,7 @@ class Shows {
       inContinue = rec.optBoolean("inContinue", false);
       inMark = rec.optBoolean("inMark", false);
       inLinda = rec.optBoolean("inLinda", false);
-      inEmby = rec.optBoolean("inEmby", true);
+      inLibrary = rec.optBoolean("inLibrary", true);
       characters = new ArrayList<>();
       JSONArray castNodes = rec.optJSONArray("characters");
       for (int i = 0; castNodes != null && i < castNodes.length(); i++) {
@@ -223,7 +223,7 @@ class Shows {
     };
   }
 
-  /** The date Emby holds for the show, which is the stamped one once hidden. */
+  /** The date Watched sorts the show by, which is the stamped one once hidden. */
   private static String watchedKey(Show show) {
     return show.fakeLastPlayed.isEmpty() ? show.lastPlayedDate : show.fakeLastPlayed;
   }
@@ -308,10 +308,10 @@ class Shows {
     return "";
   }
 
-  // episodeData is [season][episode] of [aired, watched, embyId, file, res],
+  // episodeData is [season][episode] of [aired, watched, file, res, pos],
   // seasons and episodes alike left null where there is none. A non-empty file
   // slot anywhere is what "this show has something to play" means.
-  private static final int EPISODE_FILE_SLOT = 3;
+  private static final int EPISODE_FILE_SLOT = 2;
 
   private static boolean anyFile(JSONArray episodeData) {
     if (episodeData == null) return false;

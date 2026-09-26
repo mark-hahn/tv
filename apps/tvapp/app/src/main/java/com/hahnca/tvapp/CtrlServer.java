@@ -36,8 +36,7 @@ import org.java_websocket.server.WebSocketServer;
  *   t,&lt;n&gt;       turn on subtitle track n of that list; t,-1 turns them off
  *   v,&lt;url&gt;  put a live camera on the screen, over everything, by
  *                  loading that url in a WebView; v,off takes it back off.
- *                  Sent by tv-tv on hvac2's behalf -- see
- *                  docs/tv-videostream-contract.md
+ *                  Sent by tv-tv on hvac2's behalf.
  *
  * Back to Android:
  *

@@ -7,7 +7,7 @@ const TV_TV_URL = "https://hahnca.com/tv-tv";
 // hvac2, which owns the doorbell camera. The tv pane's Door key is one request
 // to this and keeps no state: hvac2 knows whether a view is up, and it owns
 // the rule that the camera never shows on the wall tablet and the television
-// at the same time. See docs/tv-videostream-contract.md.
+// at the same time.
 const RING_URL = "https://hahnca.com/ring";
 
 export const config = {

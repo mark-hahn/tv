@@ -1913,12 +1913,12 @@ async function main() {
         continue;
       }
       const libraryShowNames = Object.keys(tvdbMap).filter(
-        (k) => tvdbMap[k] && tvdbMap[k].inEmby,
+        (k) => tvdbMap[k] && tvdbMap[k].inLibrary,
       );
       const libraryKey =
         smartTitleMatch(showTitle, libraryShowNames, null, false) || showTitle;
       const libraryEntry = tvdbMap[libraryKey];
-      if (!libraryEntry || !libraryEntry.inEmby) {
+      if (!libraryEntry || !libraryEntry.inLibrary) {
         unilog(2536, `DVD: not in the library, skipping: ${torrentFolder} (${showTitle})`);
         continue;
       }
@@ -2585,7 +2585,7 @@ async function main() {
     }
 
     // Load the show records from srvr's tvdb db once per cycle.
-    // Keys are series names; value.inEmby is true if the show is in the library.
+    // Keys are series names; value.inLibrary is true if the show is in the library.
     tvdbMap = null;
     try {
       tvdbMap = loadTvdbMapFromDb();
@@ -2593,7 +2593,7 @@ async function main() {
       unilog(2537, `failed to load tvdbMap from ${TVDB_DB_PATH}: ${e.message}`);
     }
 
-    // Reset TVDB cache each cycle so tvdbMap changes (inEmby toggled) take effect.
+    // Reset TVDB cache each cycle so tvdbMap changes (inLibrary toggled) take effect.
     tvdbCache = {};
 
     // Sort files by parsed title before processing.
@@ -2849,7 +2849,7 @@ async function main() {
         // don't clutter the UI with error entries.
         if (!processingForced && tvdbMap && title) {
           var libraryShowNames = Object.keys(tvdbMap).filter(
-            (k) => tvdbMap[k] && tvdbMap[k].inEmby,
+            (k) => tvdbMap[k] && tvdbMap[k].inLibrary,
           );
           var matchesLibrary = smartTitleMatch(
             title,
@@ -3018,7 +3018,7 @@ async function main() {
     // searching TVDB for "SCTV" could produce a wrong Levenshtein match.
     if (folderTitle && folderTitle !== title && tvdbMap) {
       var libraryShowNamesPrecheck = Object.keys(tvdbMap).filter(
-        (k) => tvdbMap[k] && tvdbMap[k].inEmby,
+        (k) => tvdbMap[k] && tvdbMap[k].inLibrary,
       );
       if (
         libraryShowNamesPrecheck.length > 0 &&
@@ -3106,7 +3106,7 @@ async function main() {
               var libraryShowNamesForTvdb =
                 !processingForced && tvdbMap
                   ? Object.keys(tvdbMap).filter(
-                      (k) => tvdbMap[k] && tvdbMap[k].inEmby,
+                      (k) => tvdbMap[k] && tvdbMap[k].inLibrary,
                     )
                   : [];
               var tvdbMatchesLibrary =
@@ -3414,7 +3414,7 @@ async function main() {
           false,
         ) || seriesName;
       const libraryEntry = tvdbMap[libraryKey];
-      if (!libraryEntry || !libraryEntry.inEmby) {
+      if (!libraryEntry || !libraryEntry.inLibrary) {
         unilog(2540, `show not in the library, skipping: ${seriesName}, file: ${fname}`);
         return process.nextTick(checkFile);
       }

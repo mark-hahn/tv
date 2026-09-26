@@ -234,7 +234,7 @@ function computeWarningSummary(torrents) {
   return summary;
 }
 
-// Season-pack selection shared by the noemby and loadall modes: keep all
+// Season-pack selection shared by the notinlibrary and loadall modes: keep all
 // complete-series torrents and season packs; for seasons without a season
 // pack keep the episode torrents; for season 1 also keep the E01 episodes.
 function selectSeasonPackTorrents(torrents) {
@@ -1005,7 +1005,7 @@ export async function searchTorrents({
   // Filter and sort based on needed array
   let filtered = filtered2;
   const isLoadAll = needed && needed.includes("loadall");
-  const isNoEmby = needed && needed.includes("noemby");
+  const isNotInLibrary = needed && needed.includes("notinlibrary");
   // A season-restricted search is unfiltered unless the caller also gave an
   // explicit season/episode list (the map pane Tor button), which must still
   // be applied to the results.
@@ -1015,7 +1015,7 @@ export async function searchTorrents({
     (needed && needed.includes("force")) ||
     (seasonNums.length > 0 && !hasExplicitNeeded);
 
-  if (isNoEmby || isLoadAll) {
+  if (isNotInLibrary || isLoadAll) {
     // Return all season torrents, and episode torrents only for seasons
     // without a season torrent (plus the S01E01 exception).
     filtered = selectSeasonPackTorrents(filtered2);

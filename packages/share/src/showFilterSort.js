@@ -132,7 +132,7 @@ export function normalizePlayedDate(value) {
 export const applyComputedProps = (rec) => {
   if (!rec.name && rec.Name) rec.name = rec.Name;
   if (!rec.tvdbId && rec.TvdbId) rec.tvdbId = rec.TvdbId;
-  if (!rec.id) rec.id = `noemby-${rec.tvdbId}`;
+  if (!rec.id) rec.id = String(rec.tvdbId || rec.name);
   if (rec.genres && !Array.isArray(rec.genres)) rec.genres = [];
   else if (rec.genres)
     rec.genres = rec.genres.map((g) => (typeof g === "string" ? g : g.name));
@@ -142,7 +142,7 @@ export const applyComputedProps = (rec) => {
       rec.imdbRatings ||
       rec.remotes?.find((r) => r.name?.startsWith("IMDB"))?.ratings ||
       null;
-  if (rec.notReady === undefined) rec.notReady = rec.inEmby === false;
+  if (rec.notReady === undefined) rec.notReady = rec.inLibrary === false;
   rec.watchGap = rec.watchGap || false;
   rec.fileGap = rec.fileGap || rec.fileEndError || rec.seasonWatchedThenNofile;
   rec.resDrop = rec.resDrop || false;
@@ -152,8 +152,6 @@ export const applyComputedProps = (rec) => {
   if (rec.inLinda === undefined) rec.inLinda = false;
   if (rec.anticipating === undefined) rec.anticipating = false;
   if (rec.sitcom === undefined) rec.sitcom = false;
-  if (rec.played === undefined) rec.played = false;
-  if (rec.playCount === undefined) rec.playCount = 0;
   if (rec.date === undefined) rec.date = "2017/12/05 00:00:00.000";
   if (rec.size === undefined) rec.size = 0;
   if (rec.noFiles === undefined) rec.noFiles = false;
@@ -186,7 +184,7 @@ export const COND_PREDS = {
   continue: (show) => show.inContinue,
   mark: (show) => show.inMark,
   linda: (show) => show.inLinda,
-  hasemby: (show) => show.inEmby !== false,
+  haslibrary: (show) => show.inLibrary !== false,
 };
 
 /**
@@ -344,7 +342,7 @@ export function filterShowList(shows, settings = {}, allTvdb = null) {
   if (fltrChoice === "No Intro") {
     return shows.filter(
       (show) =>
-        show.inEmby !== false &&
+        show.inLibrary !== false &&
         seasonsWithFile(show.episodeData).length > 0 &&
         hasNoIntroInfo(show.seasonIntros),
     );
@@ -365,7 +363,7 @@ export function filterShowList(shows, settings = {}, allTvdb = null) {
       if (!tvdbData) continue;
       const { status, episodeCount, watchedCount } = tvdbData;
       const watchedAll = episodeCount > 0 && watchedCount == episodeCount;
-      if (status == "Ended" && watchedAll && show.inEmby !== false) {
+      if (status == "Ended" && watchedAll && show.inLibrary !== false) {
         out.push(show);
       }
       continue;

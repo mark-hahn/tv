@@ -27,8 +27,7 @@ class TrailerPlayer extends FrameLayout {
   // as an embedder ("This video is unavailable, error 152").
   private static final String BASE_URL = "https://hahnca.com";
   private static final String BRIDGE = "TvApp";
-  // What one press of left or right moves, the same ten seconds Emby's d-pad
-  // seek uses.
+  // What one press of left or right moves.
   private static final int SEEK_SECONDS = 10;
   // How often the page checks whether the video has run out, and how close to
   // its duration counts as run out.

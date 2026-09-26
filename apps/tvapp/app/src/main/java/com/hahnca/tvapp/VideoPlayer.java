@@ -26,8 +26,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
- * Plays a show's episode file full screen inside tvapp, straight off nginx --
- * Emby is not involved. PlayerView draws through a SurfaceView, so the frames
+ * Plays a show's episode file full screen inside tvapp, straight off nginx.
+ * PlayerView draws through a SurfaceView, so the frames
  * take the tv's hardware video path and get its picture processing, which a
  * GL-drawn player (mpv) did not. The ExoPlayer is built per play and released
  * on close, so nothing holds a decoder while the list is up.
@@ -293,7 +293,7 @@ class VideoPlayer extends FrameLayout {
   }
 
   // Embedded tracks in other languages are left off the panel and never
-  // started on, as in Emby's panel. Untagged ones are kept.
+  // started on. Untagged ones are kept.
   private static boolean isEnglish(Format f) {
     String lang = f.language;
     return lang == null || lang.isEmpty() || "und".equals(lang) || "en".equals(lang) || lang.startsWith("en-");
@@ -302,7 +302,7 @@ class VideoPlayer extends FrameLayout {
   /**
    * The text track to show: the embedded one chksrt chose, else the .srt
    * tv-srvr said to start on, else the file's first English embedded one.
-   * Subtitles are always on, as they were in Emby.
+   * Subtitles are always on.
    */
   private void pickSubs(Tracks tracks) {
     int subIndex = playing.isNull("subIndex") ? -1 : playing.optInt("subIndex", -1);

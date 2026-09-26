@@ -15,7 +15,7 @@ import android.widget.FrameLayout;
  * its own health to whoever served it — none of which is here, because the
  * stream belongs to another project (hvac2) and the contract between the two is
  * a url and nothing more. Changing the camera, the encoder, or the fallback
- * never touches this file. See docs/tv-videostream-contract.md.
+ * never touches this file.
  *
  * A WebView rather than a player for the same reason TrailerPlayer is one: the
  * page already exists, it already solves the live-edge and buffer-trimming

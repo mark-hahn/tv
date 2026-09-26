@@ -32,7 +32,6 @@
 
 ## System backups (restic, on hahnca.com)
 
-- Full details: `docs/restic-debug.md`.
 - Read-only restic backups of `/` exist on hahnca.com, snapshotted 3×/day.
   Browse the latest via the FUSE mount: `/mnt/bkupall-bkup/tags/sys/latest/<path>`
   (mount if needed: `/root/dev/apps/bkupall/restore/mount`). Older snapshots are
@@ -61,7 +60,7 @@
 - prefer async over sync code -- avoid using void to fix async/await problems
 - don't make changes unrelated to problem being worked on
 - don't make cosmetic changes
-- never test whether show id has `noemby-` prefix -- check show.inEmby instead
+- `show.inLibrary` says whether a show is in the library; a show's `id` is its TVDB id
 - the tvdb record prop `deleted` no longer exists -- it should not be set or used
 - when you've only changed files in one server like srvr, down, asr, or api you should deploy only that server, like `./srsv srvr`
 - with one exception don't build or deploy client -- do not use `./srvr client` -- vite does that
@@ -160,20 +159,18 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
 
 - Emby stays a real app on the TV that is used on its own, and it stays in
   the streaming apps list (`services.json`, the phone's pinned streamers).
-- Our apps are being separated from it (plan and progress in
-  `kill-emby-plan.md`). No code of ours may call, launch, control or read
-  Emby: not tvapp, tv-tv, the phone, or the web client, and not tv-srvr once
-  kill-emby Phase 3 is done. The only exception is the plain app launcher in
-  the streaming list. Emby keeps its library current with its own scans.
+- Our apps are separated from it (`kill-emby-plan.md`). No code of ours may
+  call, launch, control or read Emby: not tvapp, tv-tv, the phone, the web
+  client or tv-srvr. The only exceptions are the plain app launcher in the
+  streaming list, and the `emby` ownership and `tvshow.nfo` of show folders,
+  which let the Emby app scan them. Emby keeps its library current with its
+  own scans.
 - tvapp plays video itself with Media3 (`apps/tvapp/.../VideoPlayer.java`),
   and tv-srvr's `getPlayUrl` and `playProgress` own the play state.
-- Until Phase 3, tv-srvr still talks to Emby:
-  - its sweep reads Emby;
-  - `playProgress`, `setEpisodeWatched` and `setTvdbFields` (for the
-    collection flags) write the same state back to Emby, so the sweep doesn't
-    undo it;
-  - when a show folder is deleted it has Emby rescan, and the sweep then
-    clears `inEmby`. Nothing of ours deletes from Emby itself.
+- The disk decides what is in the library (`inLibrary`). tv-srvr's library
+  sweep takes a show out when its folder goes, and puts a folder holding
+  videos in under the record named like it.
+- episodeData tuples are `[aired, watched, file, res, pos]`, `pos` in ms.
 
 ## tvapp and tvapprc
 
@@ -369,12 +366,12 @@ because the TV is unreachable from any wireless host here.
   focused group gets a yellow border, and the focused filter button a red
   cursor.
 - Each card is a backdrop, a name row and `cardMisc` below it. The name row
-  holds the name (red when `waitStr` is set), a trash icon when `!inEmby`, and
+  holds the name (red when `waitStr` is set), a trash icon when `!inLibrary`, and
   dash-joined metadata. The backdrop comes from tv-srvr's `getBackdrop`
   (TMDB) for every show.
 - Full-screen overlays: `VideoPlayer`, `TrailerPlayer`, `CamOverlay`. Over the
   list: `RelatedActors`, `ShowCounts`.
-- Data comes from `getAllTvdb?hasEmby=0`. It reloads on tv-srvr's
+- Data comes from `getAllTvdb?hasLibrary=0`. It reloads on tv-srvr's
   `tvdbUpdated` push (debounced 1.5 s) and each time tvapp returns to the
   front.
 
@@ -423,8 +420,7 @@ because the TV is unreachable from any wireless host here.
   and at the end. tv-srvr then:
   - stores `pos` and sets watched at the end;
   - stamps the last-played fields on start and stop;
-  - feeds now-playing;
-  - writes the same state to Emby too, until kill-emby Phase 3.
+  - feeds now-playing.
 
 **Video keys** — while a video is up, the tvapprc arrows and OK drive it:
 - OK pauses/resumes, left −10 s, right +30 s, down shows the time bar.
@@ -446,8 +442,7 @@ because the TV is unreachable from any wireless host here.
   video too.
 
 **Back ladder** — camera → video → trailer → actor overlay → actor filter →
-focus. At the top Back does nothing: tvapp is home, and it never switches to
-another app.
+focus. At the top Back goes to the TV's home screen.
 
 **Commands to tvapp**
 

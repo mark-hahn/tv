@@ -278,7 +278,7 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
   );
   if (!matchedName) return;
   const rec = allTvdb[matchedName];
-  if (!rec?.inEmby) return;
+  if (!rec?.inLibrary) return;
 
   const sKey = `S${String(season).padStart(2, "0")}`;
   const eKey = `E${String(episode).padStart(2, "0")}`;

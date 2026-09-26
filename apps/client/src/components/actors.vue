@@ -738,7 +738,7 @@
 <script>
 import Actor from "./actor.vue";
 import evtBus from "../evtBus.js";
-import * as emby from "../emby.js";
+import * as showData from "../showData.js";
 import * as tvdb from "../tvdb.js";
 import * as util from "../util.js";
 import * as srvr from "../srvr.js";
@@ -1638,9 +1638,9 @@ export default {
       if (!show) return [];
       const showKey = show?.id || show?.name || null;
 
-      // Use cached/prefetched TVDB map for noemby.
+      // Use cached/prefetched TVDB map for shows outside the library.
       if (
-        show?.inEmby === false &&
+        show?.inLibrary === false &&
         showKey &&
         this._seriesMapInForArrowsShowKey === showKey
       ) {
@@ -1661,10 +1661,10 @@ export default {
         }
       }
 
-      // Prefer Emby when available, but for noemby (and other failures),
-      // fall back to TVDB (same strategy as map pane).
+      // Prefer the library's map, but for shows outside it (and other
+      // failures), fall back to TVDB (same strategy as map pane).
       try {
-        const in1 = await emby.getSeriesMap(show);
+        const in1 = await showData.getSeriesMap(show);
         if (in1 && in1.length) return in1;
       } catch {
         // ignore
@@ -1830,7 +1830,7 @@ export default {
           return;
         }
 
-        const seriesMapIn = await emby.getSeriesMap(this.currentShow);
+        const seriesMapIn = await showData.getSeriesMap(this.currentShow);
 
         if (!seriesMapIn || seriesMapIn.length === 0) {
           return; // Leave empty (strategy 3)
@@ -2157,7 +2157,7 @@ export default {
         this.actorPageUrl = null;
       }
 
-      // For noemby shows, start loading the series map immediately so
+      // For shows outside the library, start loading the series map immediately so
       // arrow navigation doesn't wait on TVDB later.
       // Allow callers (e.g. ctrl-click preview) to suppress this so the Map pane isn't populated.
       if (!data?.suppressSeriesMapPrefetch) {

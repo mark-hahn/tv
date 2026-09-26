@@ -486,10 +486,10 @@ handleMsg = async (msg) => {
 
 export async function deleteShowFromSrvr(show) {
   await delGap({ gapId: show.id, save: true });
-  await delNoEmby(show.name);
+  await delShowRecord(show.name);
 
   // Delete entire show folder from disk
-  // Extract just the folder name from the Emby path (e.g., "/tv/ShowName" -> "ShowName")
+  // Extract just the folder name from the path (e.g., "/tv/ShowName" -> "ShowName")
   const showFolder = show.path.split("/").pop();
   unilog(
     875,
@@ -762,11 +762,11 @@ export function getSubFileIds(showName) {
 export function tvRemoteKey(params) {
   return httpCall("/api/tvRemoteKey", params, "POST");
 }
-export function addNoEmby(show) {
-  return httpCall("/api/addNoEmby", show, "POST");
+export function addShowRecord(show) {
+  return httpCall("/api/addShowRecord", show, "POST");
 }
-export function delNoEmby(name) {
-  return httpCall("/api/delNoEmby", { name }, "POST");
+export function delShowRecord(name) {
+  return httpCall("/api/delShowRecord", { name }, "POST");
 }
 
 export function getGaps() {
@@ -804,8 +804,8 @@ export function delGap(gapIdSave) {
   return httpCall("/api/delGap", gapIdSave, "POST");
 }
 
-export function getAllTvdb(hasEmby = 0) {
-  return httpCall(`/api/getAllTvdb?hasEmby=${hasEmby}`);
+export function getAllTvdb(hasLibrary = 0) {
+  return httpCall(`/api/getAllTvdb?hasLibrary=${hasLibrary}`);
 }
 export function getNewTvdb(params) {
   return httpCall("/api/getNewTvdb", params, "POST");
@@ -819,15 +819,12 @@ export function getSeriesMapFromTvdb(params) {
   return httpCall("/api/getSeriesMapFromTvdb", params, "POST");
 }
 
-export async function getSeriesMapFromEmby(params) {
+export async function getSeriesMap(params) {
   const t0 = performance.now();
-  const res = await httpCall("/api/getSeriesMapFromEmby", params, "POST");
+  const res = await httpCall("/api/getSeriesMap", params, "POST");
   const ms = Math.round(performance.now() - t0);
   if (ms > 3000)
-    unilog(
-      1533,
-      `slow getSeriesMapFromEmby round-trip ${params?.showName}: ${ms}ms`,
-    );
+    unilog(2574, `slow getSeriesMap round-trip ${params?.showName}: ${ms}ms`);
   return res;
 }
 
@@ -1029,8 +1026,8 @@ export async function getActorCredits(params) {
   return await response.json();
 }
 
-export function searchActorsInNonEmby(params) {
-  return httpCall("/api/searchActorsInNonEmby", params, "POST");
+export function searchActorsOutsideLibrary(params) {
+  return httpCall("/api/searchActorsOutsideLibrary", params, "POST");
 }
 
 export function getTmdb(params) {

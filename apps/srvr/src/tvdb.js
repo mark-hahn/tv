@@ -35,7 +35,7 @@ const TVDB_TIMESTAMP_RESOLUTION = {
   lastAired: "day",
   lastGapCheck: "ms",
   lastPlayedDate: "ms",
-  leftEmby: "ms",
+  leftLibrary: "ms",
   nextAired: "day",
   premiereDate: "day",
   saved: "ms",
@@ -270,7 +270,8 @@ const DEAD_TVDB_FIELDS = [
   "added",
   "allWatchedOrHaveFile",
   "haveSubs",
-  "lastEmbySync",
+  "played",
+  "playCount",
   "type",
   "tagline",
   "homepage",
@@ -1988,7 +1989,6 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
 
   const inputName = show.name;
   // log("getTvdbData: START", { name, fast });
-  const showId = show.id;
   const tvdbId = show.tvdbId;
   if (!tvdbId) {
     unilog(734, "getTvdbData no tvdbId:", show);
@@ -2242,17 +2242,17 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   if (finalTrailers && finalTrailers.length > 0)
     tvdbData.trailers = finalTrailers;
 
-  // Library membership: the show.inEmby value or the existing one. Only the
+  // Library membership: the show.inLibrary value or the existing one. Only the
   // library sweep and the web add flow change it.
-  const newInEmby = show.inEmby ?? existing.inEmby ?? false;
+  const newInLibrary = show.inLibrary ?? existing.inLibrary ?? false;
 
-  if (newInEmby !== existing.inEmby) {
-    unilog(2516, `getNewTvdb inEmby ${existing.inEmby} -> ${newInEmby} for ${name} (show.inEmby=${show.inEmby})`);
+  if (newInLibrary !== existing.inLibrary) {
+    unilog(2543, `getNewTvdb inLibrary ${existing.inLibrary} -> ${newInLibrary} for ${name} (show.inLibrary=${show.inLibrary})`);
   }
 
-  tvdbData.inEmby = newInEmby;
+  tvdbData.inLibrary = newInLibrary;
 
-  tvdbData.id = showId || existing.id || null;
+  tvdbData.id = String(tvdbId);
   tvdbData.path = existing.path || null;
   tvdbData.dateCreated = paramObj.dateCreated || existing.dateCreated || null;
   tvdbData.premiereDate =
@@ -2261,8 +2261,6 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   tvdbData.inContinue = paramObj.inContinue ?? existing.inContinue ?? false;
   tvdbData.inMark = paramObj.inMark ?? existing.inMark ?? false;
   tvdbData.inLinda = paramObj.inLinda ?? existing.inLinda ?? false;
-  tvdbData.played = paramObj.isPlayed ?? existing.played ?? false;
-  tvdbData.playCount = paramObj.playCount ?? existing.playCount ?? 0;
   tvdbData.lastPlayedDate =
     paramObj.lastPlayedDate || existing.lastPlayedDate || null;
   // "S01E02" of the episode lastPlayedDate came from — always the same episode
@@ -2337,8 +2335,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     }
   }
 
-  // Ensure notReady has a value - default to true for inEmby shows until gap check runs
-  if (tvdbData.notReady === undefined && tvdbData.inEmby) {
+  // Ensure notReady has a value - default to true for inLibrary shows until gap check runs
+  if (tvdbData.notReady === undefined && tvdbData.inLibrary) {
     tvdbData.notReady = true;
   }
 
@@ -2347,8 +2345,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   tvdbData.quality = existing.quality ?? null;
   tvdbData.seasonPremiereDates = existing.seasonPremiereDates ?? null;
 
-  // leftEmby timestamp - set when the show is deleted from the library
-  tvdbData.leftEmby = paramObj.leftEmby || existing.leftEmby || null;
+  // leftLibrary timestamp - set when the show is deleted from the library
+  tvdbData.leftLibrary = paramObj.leftLibrary || existing.leftLibrary || null;
 
   // Additional flags
   tvdbData.anticipating =
@@ -2396,12 +2394,12 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
         deleteShow(inputName);
       }
     }
-    // Auto-update pickups when inEmby or status changes
+    // Auto-update pickups when inLibrary or status changes
     if (pickupChangeCallback) {
-      const oldInEmby = existing.inEmby;
+      const oldInLibrary = existing.inLibrary;
       const oldStatus = existing.status;
-      if (oldInEmby !== tvdbData.inEmby || oldStatus !== tvdbData.status) {
-        pickupChangeCallback(name, tvdbData.inEmby, tvdbData.status);
+      if (oldInLibrary !== tvdbData.inLibrary || oldStatus !== tvdbData.status) {
+        pickupChangeCallback(name, tvdbData.inLibrary, tvdbData.status);
       }
     }
   }
@@ -2692,7 +2690,7 @@ const tryLocalGetTvdb = async () => {
   // for background sweeps, which do the full refresh anyway. No db save here —
   // the map's stale rebuild reads the in-memory record, and the full refresh
   // below persists to tvdb db.
-  if (!isBackground && refreshEpisodeDataCallback && minTvdb.inEmby !== false) {
+  if (!isBackground && refreshEpisodeDataCallback && minTvdb.inLibrary !== false) {
     try {
       await refreshEpisodeDataCallback(minTvdb.name, minTvdb, {
         sources: ["disk"],
@@ -2880,12 +2878,12 @@ const updateTvdbLocal = async () => {
     // Enqueue the stalest show if the queue is empty (so everything goes through the queue)
     if (showProcessQueue.length === 0) {
       updateCycleCount++;
-      const wantInEmby = updateCycleCount % 10 !== 0;
+      const wantInLibrary = updateCycleCount % 10 !== 0;
       let stalest = null;
       let minSaved = "";
       try {
         for (const tvdb of Object.values(allTvdb)) {
-          if (!!tvdb.inEmby !== wantInEmby) continue;
+          if (!!tvdb.inLibrary !== wantInLibrary) continue;
           const saved = tvdb.saved;
           if (saved === undefined) {
             stalest = tvdb;
@@ -2900,10 +2898,7 @@ const updateTvdbLocal = async () => {
       } catch (e) {}
       if (stalest?.name) {
         enqueueShowProcess(stalest.name, { isBackground: true });
-        unilog(
-          757,
-          `timer: enqueued stalest ${wantInEmby ? "emby" : "non-emby"} [${stalest.name}]`,
-        );
+        unilog(2544, `timer: enqueued stalest ${wantInLibrary ? "library" : "non-library"} [${stalest.name}]`);
       }
     }
     await tryLocalGetTvdb();
@@ -3106,7 +3101,7 @@ export const getActorPage = async (params) => {
   }
 };
 
-export const searchActorsInNonEmby = async (params) => {
+export const searchActorsOutsideLibrary = async (params) => {
   const searchWords = params?.searchWords || [];
   if (!Array.isArray(searchWords) || searchWords.length === 0) {
     return [];
@@ -3134,9 +3129,9 @@ export const searchActorsInNonEmby = async (params) => {
 
   const matchedShows = [];
 
-  // Search through non-emby shows only
+  // Search through shows outside the library only
   for (const [showName, show] of Object.entries(allTvdb)) {
-    if (show.inEmby !== false) continue; // Only check non-emby shows
+    if (show.inLibrary !== false) continue;
 
     const actualData = show.response?.data || show;
     const characters = actualData?.characters;
@@ -3154,34 +3149,30 @@ export const searchActorsInNonEmby = async (params) => {
     }
   }
 
-  unilog(
-    765,
-    "inf",
-    `searchActorsInNonEmby found ${matchedShows.length} matches`,
-  );
+  unilog(2545, `searchActorsOutsideLibrary found ${matchedShows.length} matches`);
   return matchedShows;
 };
 
 export const getAllTvdb = async (params) => {
-  const hasEmby = params?.hasEmby ?? 0;
-  // Filter based on hasEmby parameter
-  if (hasEmby === 0) {
+  const hasLibrary = params?.hasLibrary ?? 0;
+  // Filter based on hasLibrary parameter
+  if (hasLibrary === 0) {
     // Return all shows
     return allTvdb;
-  } else if (hasEmby === 1) {
-    // Return only shows with inEmby true (or not false)
+  } else if (hasLibrary === 1) {
+    // Return only shows with inLibrary true (or not false)
     const filtered = {};
     for (const [key, show] of Object.entries(allTvdb)) {
-      if (show.inEmby !== false) {
+      if (show.inLibrary !== false) {
         filtered[key] = show;
       }
     }
     return filtered;
-  } else if (hasEmby === -1) {
-    // Return only shows with inEmby false
+  } else if (hasLibrary === -1) {
+    // Return only shows with inLibrary false
     const filtered = {};
     for (const [key, show] of Object.entries(allTvdb)) {
-      if (show.inEmby === false) {
+      if (show.inLibrary === false) {
         filtered[key] = show;
       }
     }
@@ -3331,7 +3322,7 @@ export const searchTvdbByImdbId = async (params) => {
       characters: characters,
       crew: crew,
       remotes: [], // Don't fetch remotes for preview
-      inEmby: false,
+      inLibrary: false,
       WaitStr: null,
     };
 
@@ -3384,7 +3375,7 @@ export const setTvdbFields = async (params) => {
         for (const delName of paramObj.$delete) delete tvdb[delName];
       }
 
-      const wasInEmby = tvdb.inEmby;
+      const wasInLibrary = tvdb.inLibrary;
       const wasStatus = tvdb.status;
 
       // Handle nested field updates for Phase 1 new structure
@@ -3425,24 +3416,18 @@ export const setTvdbFields = async (params) => {
             : normalizeTvdbTimestampValue(key, value);
       }
 
-      if (wasInEmby && tvdb.inEmby === false) {
-        unilog(
-          1227,
-          `setTvdbFields: inEmby changed ${wasInEmby} -> ${tvdb.inEmby} for ${name}`,
-        );
-      } else if (wasInEmby !== tvdb.inEmby) {
-        unilog(
-          1228,
-          `setTvdbFields: inEmby changed ${wasInEmby} -> ${tvdb.inEmby} for ${name}`,
-        );
+      if (wasInLibrary && tvdb.inLibrary === false) {
+        unilog(2546, `setTvdbFields: inLibrary changed ${wasInLibrary} -> ${tvdb.inLibrary} for ${name}`);
+      } else if (wasInLibrary !== tvdb.inLibrary) {
+        unilog(2547, `setTvdbFields: inLibrary changed ${wasInLibrary} -> ${tvdb.inLibrary} for ${name}`);
       }
 
-      // Auto-update pickups when inEmby or status changes
+      // Auto-update pickups when inLibrary or status changes
       if (
         pickupChangeCallback &&
-        (wasInEmby !== tvdb.inEmby || wasStatus !== tvdb.status)
+        (wasInLibrary !== tvdb.inLibrary || wasStatus !== tvdb.status)
       ) {
-        pickupChangeCallback(name, tvdb.inEmby, tvdb.status);
+        pickupChangeCallback(name, tvdb.inLibrary, tvdb.status);
       }
 
       setImdbId(tvdb);

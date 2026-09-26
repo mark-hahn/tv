@@ -220,21 +220,21 @@
           </button>
           <button
             @click.stop="tvClick"
-            :disabled="show?.inEmby === false"
+            :disabled="show?.inLibrary === false"
             :style="{
               fontSize: '13px',
-              cursor: show?.inEmby !== false ? 'pointer' : 'default',
+              cursor: show?.inLibrary !== false ? 'pointer' : 'default',
               marginTop: '3px',
               maxHeight: '24px',
               borderRadius: '7px',
-              opacity: show?.inEmby !== false ? 1 : 0.4,
+              opacity: show?.inLibrary !== false ? 1 : 0.4,
             }"
           >
             TV
           </button>
           <button
-            v-if="notInEmby"
-            @click.stop="loadIntoEmby"
+            v-if="notInLibrary"
+            @click.stop="loadIntoLibrary"
             :style="{
               fontSize: '13px',
               cursor: 'pointer',
@@ -518,7 +518,7 @@
               {{ collectionName }}
             </div>
             <div
-              v-if="!previewMode &amp;&amp; notInEmby"
+              v-if="!previewMode &amp;&amp; notInLibrary"
               style="
                 font-weight: bold;
                 color: red;
@@ -680,7 +680,7 @@ export default {
       subsActive: false,
       showRemotes: false,
       deletedTxt: "",
-      notInEmby: false,
+      notInLibrary: false,
       collectionName: "",
       collectionCount: 0,
       currentTvdbData: null,
@@ -746,10 +746,10 @@ export default {
       return epd.seasonsWithFile(this.show?.episodeData).length > 0;
     },
     // Any show with a last viewing, real or fake, can be hidden -- a wait-over
-    // stamp puts shows at the head of the watched sort with no emby/disk state.
+    // stamp puts shows at the head of the watched sort with no library/disk state.
     canHide() {
       return (
-        (this.show?.inEmby !== false && this.hasVideoFiles) ||
+        (this.show?.inLibrary !== false && this.hasVideoFiles) ||
         !!this.show?.lastPlayedDate ||
         !!this.show?.fakeLastPlayed
       );
@@ -1018,9 +1018,9 @@ export default {
     },
 
     setDeleted(tvdbData) {
-      this.notInEmby = this.show.inEmby === false;
-      if (this.notInEmby && tvdbData?.leftEmby) {
-        this.deletedTxt = "Deleted " + util.fmtDbDate(tvdbData.leftEmby);
+      this.notInLibrary = this.show.inLibrary === false;
+      if (this.notInLibrary && tvdbData?.leftLibrary) {
+        this.deletedTxt = "Deleted " + util.fmtDbDate(tvdbData.leftLibrary);
       } else {
         this.deletedTxt = "";
       }
@@ -1192,9 +1192,8 @@ export default {
 
       let epiCounts;
       let watchedCountIsNull = false;
-      if (show.inEmby === false) {
-        // For non-emby shows, use stored watchedCount from tvdb
-        // (watchedCount should be already populated by migration script or previous Emby calculations)
+      if (show.inLibrary === false) {
+        // For shows outside the library, use stored watchedCount from tvdb
         const watchedCount = tvdbData.watchedCount;
         watchedCountIsNull =
           watchedCount === null || watchedCount === undefined;
@@ -1249,7 +1248,7 @@ export default {
       let newWatchedValTxt = "";
       if (episodeCount > 0) {
         if (watchedCountIsNull) {
-          // Show "?" when watchedCount is null for non-emby shows
+          // Show "?" when watchedCount is null for shows outside the library
           newWatchedValTxt = `? of ${episodeCount}`;
         } else {
           newWatchedValTxt =
@@ -1257,8 +1256,8 @@ export default {
               ? `all ${episodeCount} episodes`
               : `${watchedCount} of ${episodeCount}`;
         }
-      } else if (show.inEmby === false) {
-        // For non-emby shows with no episode count yet, still show watched status
+      } else if (show.inLibrary === false) {
+        // For shows outside the library with no episode count yet, still show watched status
         newWatchedValTxt = watchedCountIsNull ? "?" : "0";
       }
 
@@ -1352,9 +1351,9 @@ export default {
         const tvdbData = this.currentTvdbData || allTvdb?.[this.show.name];
         const remoteIds = tvdbData?.remote_ids || [];
 
-        // Use centralized cache function, passing show context for inEmby/Id
+        // Use centralized cache function, passing show context for inLibrary/Id
         const showContext = {
-          inEmby: this.show.inEmby,
+          inLibrary: this.show.inLibrary,
           id: this.show.id,
         };
         // Use fast mode by default (can be overridden by passing false)
@@ -1400,7 +1399,7 @@ export default {
       }
     },
 
-    async loadIntoEmby() {
+    async loadIntoLibrary() {
       const show = this.show;
       const name = String(show?.name || "").trim();
       if (!name) return;
@@ -1418,19 +1417,13 @@ export default {
             const candidate = String(match?.tvdb_id || match?.id || "").trim();
             if (candidate) {
               tvdbId = candidate;
-              unilog(
-                932,
-                `loadIntoEmby: resolved tvdbId ${tvdbId} from TVDB search for "${name}"`,
-              );
+              unilog(2554, `loadIntoLibrary: resolved tvdbId ${tvdbId} from TVDB search for "${name}"`);
             } else {
-              unilog(
-                1981,
-                `loadIntoEmby: TVDB search for "${name}" matched no single series — several series share that name and no year is known`,
-              );
+              unilog(2555, `loadIntoLibrary: TVDB search for "${name}" matched no single series — several series share that name and no year is known`);
             }
           }
         } catch (e) {
-          unilog(933, `loadIntoEmby: TVDB search failed for "${name}":`, e);
+          unilog(2556, `loadIntoLibrary: TVDB search failed for "${name}": ${e?.message || e}`);
         }
       }
       const srchChoice = {
@@ -1543,8 +1536,8 @@ export default {
         try {
           if (this.show.name !== currentShowName) return;
 
-          // Force load all shows (including no-emby) by passing hasEmby=0
-          // The cache from loadAllShows might only contain emby shows (hasEmby=1)
+          // Force load all shows (including those outside the library) by passing hasLibrary=0
+          // The cache from loadAllShows might only contain library shows (hasLibrary=1)
           allTvdb = await tvdb.getAllTvdb(0);
 
           if (this.show.name !== currentShowName) return;
@@ -1766,7 +1759,7 @@ export default {
     async onSeriesMapUpdated({ show, seriesMap }) {
       if (!show || !seriesMap) return;
       if (!this.show || this.show.name !== show.name) return;
-      if (this.show.inEmby !== false) return;
+      if (this.show.inLibrary !== false) return;
 
       const { seasonCount, episodeCount } = this.getMapCounts(seriesMap);
       if (!episodeCount || !seasonCount) return;
@@ -1868,7 +1861,7 @@ export default {
     evtBus.on("nowPlaying", this._onNowPlaying);
 
     // Keep the Series infobox totals in sync with the actual Map grid.
-    // This matters for noemby shows where tvdb.json counts can be stale / mismatched.
+    // This matters for shows outside the library, whose counts can be stale / mismatched.
     evtBus.on("seriesMapUpdated", this.onSeriesMapUpdated);
 
     // Refresh remotes/buttons when server pushes updated tvdb data (push2 or push3).

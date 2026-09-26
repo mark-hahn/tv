@@ -316,7 +316,7 @@
 </template>
 
 <script>
-import * as emby from "../emby.js";
+import * as showData from "../showData.js";
 import * as tvdb from "../tvdb.js";
 import * as srvr from "../srvr.js";
 import * as util from "../util.js";
@@ -425,22 +425,18 @@ export default {
   },
 
   data() {
-    const toggleNoEmbyFlag = async (show, flagName) => {
+    const toggleRecordFlag = async (show, flagName) => {
       this.saveVisShow(show);
       // If the flag doesn't exist yet, treat it as false and set to true.
       show[flagName] = !show[flagName];
-      await srvr.addNoEmby(show).catch((err) => {
-        unilog(
-          951,
-          `late addNoEmby error for ${show.name} (${flagName}):`,
-          err,
-        );
+      await srvr.addShowRecord(show).catch((err) => {
+        unilog(2557, `late addShowRecord error for ${show.name} (${flagName}): ${err?.message || err}`);
       });
     };
 
     const toggleToTry = async (show) => {
-      if (show.inEmby === false) {
-        await toggleNoEmbyFlag(show, "inToTry");
+      if (show.inLibrary === false) {
+        await toggleRecordFlag(show, "inToTry");
         return;
       }
       this.saveVisShow(show);
@@ -483,8 +479,8 @@ export default {
     };
 
     const toggleContinue = async (show) => {
-      if (show.inEmby === false) {
-        await toggleNoEmbyFlag(show, "inContinue");
+      if (show.inLibrary === false) {
+        await toggleRecordFlag(show, "inContinue");
         return;
       }
       this.saveVisShow(show);
@@ -502,8 +498,8 @@ export default {
     };
 
     const toggleMark = async (show) => {
-      if (show.inEmby === false) {
-        await toggleNoEmbyFlag(show, "inMark");
+      if (show.inLibrary === false) {
+        await toggleRecordFlag(show, "inMark");
         return;
       }
       this.saveVisShow(show);
@@ -518,8 +514,8 @@ export default {
     };
 
     const toggleLinda = async (show) => {
-      if (show.inEmby === false) {
-        await toggleNoEmbyFlag(show, "inLinda");
+      if (show.inLibrary === false) {
+        await toggleRecordFlag(show, "inLinda");
         return;
       }
       this.saveVisShow(show);
@@ -536,7 +532,7 @@ export default {
     const deleteShow = async (show) => {
       allTvdb = await tvdb.getAllTvdb();
       const name = show.name;
-      if (show.inEmby !== false) {
+      if (show.inLibrary !== false) {
         this.saveVisShow(show);
         if (
           !window.confirm(
@@ -544,23 +540,22 @@ export default {
           )
         )
           return;
-        // Emby drops the show itself: tv-srvr sees the folder go and has
-        // Emby rescan.
+        // tv-srvr sees the folder go and takes the show out of the library.
         await srvr.deleteShowFromSrvr(show);
-        // Set inEmby to false to mark as deleted and set leftEmby timestamp
-        const leftEmby = util.getPstDateTimeMs();
+        // Set inLibrary to false to mark as deleted and set leftLibrary timestamp
+        const leftLibrary = util.getPstDateTimeMs();
         // Re-fetch allTvdb in case async ops replaced the cached reference
         allTvdb = await tvdb.getAllTvdb();
         const tvdbData = allTvdb[name];
         if (tvdbData) {
-          tvdbData.inEmby = false;
-          tvdbData.leftEmby = leftEmby;
+          tvdbData.inLibrary = false;
+          tvdbData.leftLibrary = leftLibrary;
           tvdbData.notReady = true;
         }
         const updated = await srvr.setTvdbFields({
           name,
-          inEmby: false,
-          leftEmby,
+          inLibrary: false,
+          leftLibrary,
           notReady: true,
         });
         // Merge in place so the allShows entry (same object) stays current
@@ -574,9 +569,9 @@ export default {
           delIdx >= 0
             ? this.shows[delIdx + 1] || this.shows[delIdx - 1] || null
             : null;
-        // Update the show object so refilter reflects the new inEmby state.
-        // The show stays in allShows so it appears when hasemby condfltr is 0.
-        show.inEmby = false;
+        // Update the show object so refilter reflects the new inLibrary state.
+        // The show stays in allShows so it appears when haslibrary condfltr is 0.
+        show.inLibrary = false;
         await this.refilter(false);
         // Highlight the next show now that the deleted show has been filtered out.
         if (nextShow) this.saveVisShow(nextShow, true);
@@ -781,11 +776,11 @@ export default {
           color: "#a66",
           filter: +1,
           icon: ["fas", "tv"],
-          cond: COND_PREDS.hasemby,
+          cond: COND_PREDS.haslibrary,
           async click(show) {
             await deleteShow(show);
           },
-          name: "hasemby",
+          name: "haslibrary",
         },
       ],
     };
@@ -822,11 +817,11 @@ export default {
     },
 
     tvDisabled() {
-      return !this.highlightShow || this.highlightShow.inEmby === false;
+      return !this.highlightShow || this.highlightShow.inLibrary === false;
     },
 
     getDisabled() {
-      return !this.highlightShow || this.highlightShow.inEmby !== false;
+      return !this.highlightShow || this.highlightShow.inLibrary !== false;
     },
 
     activeDownloadShowNames() {
@@ -1179,11 +1174,11 @@ export default {
         return;
       }
 
-      // Trash button: only update hasemby, leave all other conds unchanged
+      // Trash button: only update haslibrary, leave all other conds unchanged
       if (clickedLabel === "Trash") {
-        const hasembyCond = this.conds.find((c) => c?.name === "hasemby");
-        if (hasembyCond) {
-          hasembyCond.filter = activeButtons["Trash"] ? 0 : 1;
+        const haslibraryCond = this.conds.find((c) => c?.name === "haslibrary");
+        if (haslibraryCond) {
+          haslibraryCond.filter = activeButtons["Trash"] ? 0 : 1;
         }
         if (activeButtons["Trash"] && !this.hasLoadedAllShows) {
           await this.loadAllShowsWithDialog();
@@ -1222,8 +1217,8 @@ export default {
 
       // Pure state-based: Sync conds to match button states
       this.conds.forEach((cond) => {
-        // Special handling for hasemby: default to 1 (hide trash), Trash button sets to 0 (show all)
-        if (cond.name === "hasemby") {
+        // Special handling for haslibrary: default to 1 (hide trash), Trash button sets to 0 (show all)
+        if (cond.name === "haslibrary") {
           const trashActive = activeButtons["Trash"];
           cond.filter = trashActive ? 0 : 1;
           return;
@@ -1441,7 +1436,7 @@ export default {
         name,
         tvdbId,
       });
-      if (matchShow && matchShow.inEmby !== false) {
+      if (matchShow && matchShow.inLibrary !== false) {
         unilog(968, matchShow.name + " already exists.");
         if (!this.shows.some((sh) => sh?.name === matchShow.name)) {
           await this.fltrAction("All");
@@ -1475,10 +1470,10 @@ export default {
         }
       };
 
-      const findShowByTvdbIdOrName = ({ requireInEmby = false } = {}) =>
+      const findShowByTvdbIdOrName = ({ requireInLibrary = false } = {}) =>
         Array.isArray(allShows)
           ? allShows.find((s) => {
-              if (requireInEmby && s?.inEmby === false) return false;
+              if (requireInLibrary && s?.inLibrary === false) return false;
               const sTvdbId = String(
                 s?.tvdbId || s?.tvdbId || s?.tvdb_id || "",
               ).trim();
@@ -1560,11 +1555,8 @@ export default {
           });
           alert(`No map data for new show ${name}`);
         } else {
-          unilog(
-            1232,
-            `Calling createShowFolderAndRefreshEmby for ${name} tvdbId=${tvdbId}`,
-          );
-          const res = await emby.createShowFolderAndRefreshEmby({
+          unilog(2558, `Calling createShowFolder for ${name} tvdbId=${tvdbId}`);
+          const res = await showData.createShowFolder({
             showName: name,
             tvdbId,
             seriesMapSeasons,
@@ -1574,16 +1566,9 @@ export default {
           });
           createResult = res;
           createdFolder = !!res?.createdFolder;
-          unilog(
-            1233,
-            `createShowFolderAndRefreshEmby result for ${name}: createdFolder=${createdFolder} status=${res?.status}`,
-          );
+          unilog(2559, `createShowFolder result for ${name}: createdFolder=${createdFolder} status=${res?.status}`);
           if (!createdFolder) {
-            unilog(971, "web add: createShowFolderAndRefreshEmby failed", {
-              name,
-              tvdbId,
-              res,
-            });
+            unilog(2560, `web add: createShowFolder failed for ${name} tvdbId=${tvdbId}: ${JSON.stringify(res)}`);
           }
         }
 
@@ -1594,7 +1579,7 @@ export default {
             await this.newShows(false);
 
             // Trigger gap check for the newly added show
-            const newShow = findShowByTvdbIdOrName({ requireInEmby: true });
+            const newShow = findShowByTvdbIdOrName({ requireInLibrary: true });
             if (newShow?.id) {
               await srvr
                 .triggerShowGapCheck(newShow.id, name)
@@ -1607,7 +1592,7 @@ export default {
           }
 
           // tv-srvr put the show in the library as it made the folder.
-          show = findShowByTvdbIdOrName({ requireInEmby: true });
+          show = findShowByTvdbIdOrName({ requireInLibrary: true });
           if (!show) {
             unilog(2527, `${name} (tvdbId=${tvdbId}) is not in the library after its folder was made`);
             throw new Error(
@@ -1622,14 +1607,7 @@ export default {
         }
 
         if (!show) {
-          unilog(973, "web add: aborted without creating noemby fallback", {
-            name,
-            tvdbId,
-            createdFolder,
-            hasMapData,
-            createResult,
-            seriesMapSeasons,
-          });
+          unilog(2561, `web add: aborted without creating a fallback record for ${name} tvdbId=${tvdbId} createdFolder=${createdFolder} hasMapData=${hasMapData} seasons=${seriesMapSeasons}: ${JSON.stringify(createResult)}`);
 
           evtBus.emit("tvdb-mismatch", {
             reason: "add-aborted-no-create",
@@ -1642,7 +1620,7 @@ export default {
               name: "",
               tvdbId: "",
               id: "",
-              inEmby: "",
+              inLibrary: "",
             },
             details: {
               hasMapData,
@@ -1702,7 +1680,7 @@ export default {
       if (!showName) return;
 
       // If the show already exists, do nothing but select it.
-      // Do not enter preview mode, regardless of emby/noemby/rejected status.
+      // Do not enter preview mode, whether it is in the library or not.
       const existing = this.findExistingShowForSearchChoice({
         name: showName,
         tvdbId,
@@ -1727,9 +1705,9 @@ export default {
       evtBus.emit("previewSrchChoice", { name: showName, tvdbId, overview });
 
       const show = {
-        // Mark as no-Emby so Series doesn't try to query Emby counts.
-        id: `noemby-preview-${String(tvdbId || imdbId || showName).replace(/\s+/g, "-")}`,
-        inEmby: false,
+        // Outside the library, so Series doesn't query the library's counts.
+        id: `preview-${String(tvdbId || imdbId || showName).replace(/\s+/g, "-")}`,
+        inLibrary: false,
         name: showName,
         tvdbId: tvdbId,
         ImdbId: imdbId,
@@ -1817,14 +1795,14 @@ export default {
       for (let cond of this.conds) {
         util.setCondFltr(cond, "All");
       }
-      // Default hasemby=1 (in-emby only), but if selected show is not in emby use 0
-      const hasembyCond = this.conds.find((c) => c?.name === "hasemby");
-      if (hasembyCond) {
+      // Default haslibrary=1 (library only), but if selected show is not in the library use 0
+      const haslibraryCond = this.conds.find((c) => c?.name === "haslibrary");
+      if (haslibraryCond) {
         const selectedShow = allShows.find(
           (s) => s.name === this.highlightName,
         );
-        const selectedInEmby = !selectedShow || selectedShow.inEmby !== false;
-        hasembyCond.filter = selectedInEmby ? 1 : 0;
+        const selectedInLibrary = !selectedShow || selectedShow.inLibrary !== false;
+        haslibraryCond.filter = selectedInLibrary ? 1 : 0;
       }
       await this.select();
       this.sortPopped = false;
@@ -1832,7 +1810,7 @@ export default {
     },
     async handleTvClick() {
       const show = this.highlightShow;
-      if (!show || show.inEmby === false) return;
+      if (!show || show.inLibrary === false) return;
       fetch(
         `${config.tvTvUrl}/tv/showintvapp?showName=${encodeURIComponent(show.name)}`,
       ).catch(() => {});
@@ -1840,7 +1818,7 @@ export default {
 
     async handleGetClick() {
       const show = this.highlightShow;
-      if (!show || show.inEmby !== false) return;
+      if (!show || show.inLibrary !== false) return;
       this.getButtonFlashing = true;
       setTimeout(() => {
         this.getButtonFlashing = false;
@@ -2087,16 +2065,16 @@ export default {
       if (match) {
         const isVisible = this.shows.some((sh) => sh?.name === match.name);
         if (!isVisible) {
-          const hasembyCond = this.conds.find((c) => c?.name === "hasemby");
-          const showInEmby = match.inEmby !== false;
-          const hiddenByHasemby =
-            !!hasembyCond &&
-            hasembyCond.filter !== 0 &&
-            ((hasembyCond.filter === +1 && !showInEmby) ||
-              (hasembyCond.filter === -1 && showInEmby));
+          const haslibraryCond = this.conds.find((c) => c?.name === "haslibrary");
+          const showInLibrary = match.inLibrary !== false;
+          const hiddenByHaslibrary =
+            !!haslibraryCond &&
+            haslibraryCond.filter !== 0 &&
+            ((haslibraryCond.filter === +1 && !showInLibrary) ||
+              (haslibraryCond.filter === -1 && showInLibrary));
 
-          if (hiddenByHasemby) {
-            hasembyCond.filter = 0;
+          if (hiddenByHaslibrary) {
+            haslibraryCond.filter = 0;
             if (!this.hasLoadedAllShows) {
               await this.loadAllShowsWithDialog();
             }
@@ -2145,23 +2123,23 @@ export default {
         this.highlightName = showName;
       }
 
-      // Check if hasemby filter would hide this show, and reset if needed.
-      // Skip in preview mode — the fake preview record has inEmby:false and should
+      // Check if haslibrary filter would hide this show, and reset if needed.
+      // Skip in preview mode — the fake preview record has inLibrary:false and should
       // never cause the real filter selection to change.
-      const hasembyCond = this.conds.find((c) => c?.name === "hasemby");
+      const haslibraryCond = this.conds.find((c) => c?.name === "haslibrary");
       let needsRefilter = false;
-      if (!this.previewMode && hasembyCond && hasembyCond.filter !== 0) {
-        const showInEmby = show.inEmby !== false;
+      if (!this.previewMode && haslibraryCond && haslibraryCond.filter !== 0) {
+        const showInLibrary = show.inLibrary !== false;
         const filterHidesShow =
-          (hasembyCond.filter === -1 && showInEmby) ||
-          (hasembyCond.filter === +1 && !showInEmby);
+          (haslibraryCond.filter === -1 && showInLibrary) ||
+          (haslibraryCond.filter === +1 && !showInLibrary);
         if (filterHidesShow) {
-          hasembyCond.filter = 0;
+          haslibraryCond.filter = 0;
           needsRefilter = true;
         }
       }
 
-      // Re-apply filters if hasemby was reset (highlightName now points to new show)
+      // Re-apply filters if haslibrary was reset (highlightName now points to new show)
       if (needsRefilter) {
         await this.refilter(false);
       }
@@ -2272,7 +2250,7 @@ export default {
       this.filterStr = "";
       for (let cond of this.conds) {
         util.setCondFltr(cond, this.fltrChoice);
-        if (cond.name === "hasemby" && !this.hasLoadedAllShows) {
+        if (cond.name === "haslibrary" && !this.hasLoadedAllShows) {
           cond.filter = 1;
         }
       }
@@ -2384,8 +2362,8 @@ export default {
       }
 
       // toggle watched or set to specific value
-      if (show.inEmby === false) {
-        // Non-Emby show: toggle played locally and persist watchedEpis
+      if (show.inLibrary === false) {
+        // Show outside the library: toggle played locally and persist watchedEpis
         const cell = this.seriesMap?.[season]?.[episode];
         if (!cell) return;
         cell.played = setWatched !== null ? setWatched : !cell.played;
@@ -2547,7 +2525,7 @@ export default {
     },
 
     async seasonWatched(show, season, episodeStates) {
-      if (show.inEmby !== false) return;
+      if (show.inLibrary !== false) return;
       const seasonMap = this.seriesMap?.[season];
       if (!seasonMap) return;
 
@@ -2622,13 +2600,13 @@ export default {
       const mapToken = ++this._mapActionToken;
 
       const isRefresh = action === "refresh";
-      // Fast first paint: for a plain open of an in-Emby show, load from the
-      // server's cached episodeData (no live Emby/disk access) so the map
+      // Fast first paint: for a plain open of a library show, load from the
+      // server's cached episodeData (no live disk access) so the map
       // renders immediately. Also used for refreshes driven by a tvdbUpdated
       // push, whose record already carries fresh episodeData — no need for a
-      // redundant live Emby/disk scan.
+      // redundant live disk scan.
       const useStale =
-        (action === "open" && show.inEmby !== false && !options.noSwitch) ||
+        (action === "open" && show.inLibrary !== false && !options.noSwitch) ||
         options.stale === true;
 
       this.hideMapBottom = true;
@@ -2638,10 +2616,10 @@ export default {
       const seriesMap = {};
       let errorMessage = "";
 
-      // Prune (destructive): delete watched files via Emby before rebuilding.
+      // Prune (destructive): delete watched files before rebuilding.
       if (action === "prune") {
         try {
-          await emby.getSeriesMap(show, true);
+          await showData.getSeriesMap(show, true);
         } catch (e) {
           unilog(985, `prune failed for ${show.name}:`, e?.message || e);
         }
@@ -2651,11 +2629,11 @@ export default {
       // Build the map from the server's authoritative episodeData. The server
       // refreshes files (disk) and returns the seriesMap in
       // the legacy wire shape: [[season, [[ep, {error, played, avail, noFile,
-      // unaired, path, id, quality}]], ...], ...].
+      // unaired, path, quality}]], ...], ...].
       let seriesMapIn = [];
       try {
         let resp;
-        if (show.inEmby === false) {
+        if (show.inLibrary === false) {
           const tvdbId = show.tvdbId;
           if (!tvdbId) {
             errorMessage = "Preview show has no tvdbId.";
@@ -2663,7 +2641,7 @@ export default {
             resp = await srvr.getSeriesMapFromTvdb({ tvdbId });
           }
         } else {
-          resp = await srvr.getSeriesMapFromEmby({
+          resp = await srvr.getSeriesMap({
             showName: show.name,
             stale: useStale,
           });
@@ -2671,7 +2649,7 @@ export default {
         if (resp?.success && Array.isArray(resp.seriesMap)) {
           seriesMapIn = resp.seriesMap;
           // Sync fresh episodeData into the in-memory cache so the Position
-          // filter reflects Emby changes that happened outside our app.
+          // filter reflects changes made outside the web client.
           if (resp.episodeData) {
             show.episodeData = resp.episodeData;
             if (allTvdb?.[show.name]) {
@@ -2897,7 +2875,7 @@ export default {
       if (this.fltrChoice === "No Intro") {
         this.shows = allShows.filter(
           (show) =>
-            show.inEmby !== false &&
+            show.inLibrary !== false &&
             epd.seasonsWithFile(show.episodeData).length > 0 &&
             epd.hasNoIntroInfo(show.seasonIntros),
         );
@@ -2970,9 +2948,9 @@ export default {
         const noDescrSearch =
           !this.descrSearchStr || this.descrSearchStr.length === 0;
 
-        // Check if all conds are in "All" state (filter === 0, except hasemby which can be 0 or 1)
+        // Check if all conds are in "All" state (filter === 0, except haslibrary which can be 0 or 1)
         const allCondsMatchAll = this.conds.every((cond) => {
-          if (cond.name === "hasemby") {
+          if (cond.name === "haslibrary") {
             return cond.filter === 0 || cond.filter === 1;
           }
           return cond.filter === 0;
@@ -3188,7 +3166,7 @@ export default {
 
       if (!this.hasLoadedAllShows) {
         try {
-          const serverMatches = await srvr.searchActorsInNonEmby({
+          const serverMatches = await srvr.searchActorsOutsideLibrary({
             searchWords: searchWords,
           });
 
@@ -3198,7 +3176,7 @@ export default {
             filteredShows = allShows.filter(checkShowForActorMatch);
           }
         } catch (error) {
-          unilog(990, "Error searching non-emby shows:", error);
+          unilog(2562, `Error searching shows outside the library: ${error?.message || error}`);
         }
       }
 
@@ -3291,7 +3269,7 @@ export default {
     },
 
     async newShows(isInitialLoad = false) {
-      const result = await emby.loadAllShows();
+      const result = await showData.loadAllShows();
       allShows = result.allShows;
       allTvdb = result.allTvdb;
       this.hasLoadedAllShows = true;
@@ -3328,13 +3306,13 @@ export default {
         }
       }
 
-      // If saved show is not in emby, disable the in-emby filter so it's visible
+      // If saved show is not in the library, disable the library filter so it's visible
       const savedName = window.localStorage.getItem("lastVisShow");
       if (savedName) {
         const savedShow = allShows.find((s) => s.name === savedName);
-        if (savedShow && savedShow.inEmby === false) {
-          const embyCond = this.conds.find((c) => c.name === "hasemby");
-          if (embyCond) embyCond.filter = 0;
+        if (savedShow && savedShow.inLibrary === false) {
+          const libraryCond = this.conds.find((c) => c.name === "haslibrary");
+          if (libraryCond) libraryCond.filter = 0;
         }
       }
 
@@ -3383,7 +3361,6 @@ export default {
       // await util.listCountries(allShows);
       // await util.setAllFavs(allShows);
       // await util.setAllTvdbShowIds(allShows);
-      // await util.setAllNoEmbyTvdbIds(allShows);
       // await util.removeNoMatchsFromTvdbJson()
       // await util.removeDontSavesFromTvdbJson()
       // await util.loadAllRemotes(allShows); // takes many hours
@@ -3514,8 +3491,8 @@ export default {
 
         // If this show is currently in the map pane, rebuild the series map.
         // The pushed record already carries fresh episodeData (the server
-        // refreshed emby+disk before pushing), so rebuild from that cached
-        // data rather than issuing a redundant live Emby/disk scan.
+        // refreshed the disk before pushing), so rebuild from that cached
+        // data rather than issuing a redundant live disk scan.
         if (this.mapShow && this.mapShow.name === name && show) {
           await this.seriesMapAction("refresh", show, { stale: true });
         }
@@ -3611,7 +3588,7 @@ export default {
       await this.deleteEpisodes(show, targets);
     });
 
-    // Listen for season watched toggle from App.vue (non-Emby shows)
+    // Listen for season watched toggle from App.vue (shows outside the library)
     on("seasonWatched", async ({ e, show, season, episodeStates }) => {
       await this.seasonWatched(show, season, episodeStates);
     });

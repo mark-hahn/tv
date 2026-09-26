@@ -17,7 +17,7 @@ Output columns per line:
   HH:MM:SS  [initiator]  ShowName  tvdb:<changes>  rotten:<scores>
 
 Initiators:
-  bg-timer       periodic background timer (stalest emby/non-emby)
+  bg-timer       periodic background timer (stalest library/non-library)
   user           user HTTP request via express route
   unknown        could not determine
 

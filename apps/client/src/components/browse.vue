@@ -1529,7 +1529,7 @@ export default {
       try {
         const remoteIds = tvdb.remote_ids || [];
 
-        // Try to find matching show in allShows to get inEmby status and Id
+        // Try to find matching show in allShows to get inLibrary status and Id
         let showContext = null;
         const matchingShow = (props.allShows || []).find((s) => {
           const sTvdb = String(s.tvdbId || s.tvdbId || s.tvdb_id || "").trim();
@@ -1542,7 +1542,7 @@ export default {
 
         if (matchingShow) {
           showContext = {
-            inEmby: matchingShow.inEmby,
+            inLibrary: matchingShow.inLibrary,
             id: matchingShow.id,
           };
         }

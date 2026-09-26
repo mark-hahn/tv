@@ -147,7 +147,7 @@
           ></font-awesome-icon>
         </div>
         <div
-          v-if="simpleMode && show.inEmby === false"
+          v-if="simpleMode && show.inLibrary === false"
           class="show-cell"
           style="width: 22px; flex-shrink: 0"
         >
@@ -311,7 +311,7 @@ export default {
 
     hilite(show) {
       if (this.activeDownloadShowNameSet.has(show?.name)) return "#dff5df";
-      if (!this.simpleMode && show.inEmby === false) return "#fee";
+      if (!this.simpleMode && show.inLibrary === false) return "#fee";
       return "white";
     },
 

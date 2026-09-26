@@ -1,6 +1,7 @@
 import * as tvdb from "./tvdb.js";
 import * as srvr from "./srvr.js";
 import { episodeDataToWatchedEpis } from "@tv/share";
+import { logHere } from "./log.js";
 import { unilog } from "./log.js";
 
 let allShows = null;
@@ -31,10 +32,7 @@ export async function loadAllShows() {
 
   const showRecords = Object.values(allTvdb).filter((r) => isTvdbShowRecord(r));
   const elapsed = Date.now() - loadStart;
-  unilog(
-    1075,
-    `loadAllShows completed in ${elapsed}ms, ${showRecords.length} shows`,
-  );
+  unilog(2567, `loadAllShows completed in ${elapsed}ms, ${showRecords.length} shows`);
   allShows = showRecords;
   return { allShows: showRecords, allTvdb };
 }
@@ -46,11 +44,11 @@ export async function loadAllShows() {
 
 export const getSeriesMap = async (show, prune = false) => {
 
-  // If this is a noemby/preview show, fetch from TVDB API
-  if (show.inEmby === false) {
+  // A show outside the library (or a preview) comes straight from TVDB.
+  if (show.inLibrary === false) {
     const tvdbId = show.tvdbId;
     if (!tvdbId) {
-      unilog(1068, `getSeriesMap: Preview show ${show.name} has no tvdbId`);
+      unilog(2568, `getSeriesMap: Preview show ${show.name} has no tvdbId`);
       return [];
     }
     try {
@@ -64,23 +62,17 @@ export const getSeriesMap = async (show, prune = false) => {
       if (result.success && result.seriesMap) {
         return result.seriesMap;
       }
-      unilog(
-        848,
-        `getSeriesMap: Failed to fetch ${show.name} from TVDB: ${result.error}`,
-      );
+      unilog(2569, `getSeriesMap: Failed to fetch ${show.name} from TVDB: ${result.error}`);
       return [];
     } catch (err) {
-      unilog(
-        849,
-        `getSeriesMap: Error fetching ${show.name} from TVDB: ${err.message || err}`,
-      );
+      unilog(2570, `getSeriesMap: Error fetching ${show.name} from TVDB: ${err.message || err}`);
       return [];
     }
   }
 
   // Library shows come from tv-srvr, which refreshes episodeData from its
   // sources and builds the map from it, TVDB's episodes included.
-  const res = await srvr.getSeriesMapFromEmby({ showName: show.name });
+  const res = await srvr.getSeriesMap({ showName: show.name });
   if (!res?.success || !Array.isArray(res.seriesMap))
     throw new Error(`getSeriesMap failed for ${show.name}: ${res?.error}`);
   const seriesMap = res.seriesMap;
@@ -96,15 +88,12 @@ export const getSeriesMap = async (show, prune = false) => {
       }
     }
     if (pathsToDeleteBatch.length > 0) {
-      unilog(
-        1067,
-        `batch deleting ${pathsToDeleteBatch.length} files for ${show.name}`,
-      );
+      unilog(2571, `batch deleting ${pathsToDeleteBatch.length} files for ${show.name}`);
       try {
         await srvr.deletePaths(pathsToDeleteBatch);
-        unilog(1066, `batch delete ok for ${show.name}`);
+        unilog(2572, `batch delete ok for ${show.name}`);
       } catch (e) {
-        unilog(1065, `batch delete FAILED for ${show.name}: ${e?.message ?? e}`);
+        unilog(2573, `batch delete FAILED for ${show.name}: ${e?.message ?? e}`);
       }
     }
   }
@@ -112,7 +101,7 @@ export const getSeriesMap = async (show, prune = false) => {
   return seriesMap;
 };
 
-export const createShowFolderAndRefreshEmby = async ({
+export const createShowFolder = async ({
   showName,
   tvdbId,
   seriesMapSeasons,

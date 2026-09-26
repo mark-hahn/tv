@@ -3415,7 +3415,8 @@ async function main() {
         ) || seriesName;
       const libraryEntry = tvdbMap[libraryKey];
       if (!libraryEntry || !libraryEntry.inLibrary) {
-        unilog(2540, `show not in the library, skipping: ${seriesName}, file: ${fname}`);
+        if (skipLoggedOnce(usbFilePath))
+          unilog(2540, `show not in the library, skipping: ${seriesName}, file: ${fname}`);
         return process.nextTick(checkFile);
       }
     }

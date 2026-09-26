@@ -1256,7 +1256,7 @@
         "
       >
         <div style="font-size: 16px; font-weight: bold; margin-bottom: 12px">
-          Loading show into Emby
+          Loading show into the library
         </div>
         <div style="font-size: 14px; color: #555">
           {{ embyLoadingStatus }}
@@ -3670,7 +3670,7 @@ export default {
           await new Promise((r) => setTimeout(r, 800));
           return true;
         }
-        this.embyLoadingStatus = "Failed to load show into Emby";
+        this.embyLoadingStatus = "Failed to load show into the library";
         await new Promise((r) => setTimeout(r, 2000));
         return false;
       } catch (e) {
@@ -3713,7 +3713,7 @@ export default {
                 this.setDownloadStatus(
                   item.torrent,
                   "error",
-                  "Failed to load show into Emby",
+                  "Failed to load show into the library",
                 );
               }
             }

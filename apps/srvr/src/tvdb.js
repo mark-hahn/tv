@@ -3,7 +3,6 @@ import * as path from "node:path";
 import fetch from "node-fetch";
 import { chromium } from "playwright";
 import WebSocket from "ws";
-import * as urls from "./urls.js";
 import { rottenSearch } from "./rotten.js";
 import * as util from "./util.js";
 import {
@@ -1233,12 +1232,8 @@ async function verifyRemoteName(showName, url) {
 
 const getRemotes = async (show, tvdbRemotes, fast = false) => {
   const name = show.name;
-  const showId = show.id;
   const remotes = [];
   const flatUrls = {}; // flat url props to persist alongside the computed remotes array
-
-  if (show.inEmby)
-    remotes.push({ name: "Emby", url: urls.embyPageUrl(showId) });
 
   // Rotten Tomatoes: always use cached URL; scraping only happens in push3 of background task
   {
@@ -1937,8 +1932,9 @@ const getApiCounts = (seriesData) => {
 const chooseCount = ({ inputCount, existingCount, apiCount }) => {
   const inputPositive = toPositiveInt(inputCount);
   const apiPositive = toPositiveInt(apiCount);
-  // Use the maximum of Emby and TVDB API counts — TVDB knows about future/unaired
-  // episodes that Emby doesn't have yet, so we must not let Emby's lower count win.
+  // Use the maximum of the caller's and TVDB API counts — TVDB knows about
+  // future/unaired episodes the caller doesn't count yet, so its lower count
+  // must not win.
   if (inputPositive && apiPositive) return Math.max(inputPositive, apiPositive);
   if (inputPositive) return inputPositive;
   if (apiPositive) return apiPositive;
@@ -2107,8 +2103,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   });
   // watchedCount needs the same protection the two counts above get: several
   // callers pass 0 only because they don't know the real value, and a raw
-  // assignment there wipes a genuine watch history that Emby can no longer
-  // supply once the show has left the library.
+  // assignment there wipes a genuine watch history that nothing can supply
+  // again.
   const finalWatchedCount =
     toPositiveInt(watchedCount) ?? toPositiveInt(existing.watchedCount) ?? 0;
 
@@ -2246,77 +2242,35 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   if (finalTrailers && finalTrailers.length > 0)
     tvdbData.trailers = finalTrailers;
 
-  // Determine inEmby status:
-  // - If fromEmbySync is set in params, this is an Emby sync, so inEmby = true
-  // - Otherwise, use show.inEmby value or preserve existing value
-  const isSyncingFromEmby = !!paramObj.fromEmbySync;
-  const newInEmby = isSyncingFromEmby
-    ? true
-    : (show.inEmby ?? existing.inEmby ?? false);
+  // Library membership: the show.inEmby value or the existing one. Only the
+  // library sweep and the web add flow change it.
+  const newInEmby = show.inEmby ?? existing.inEmby ?? false;
 
   if (newInEmby !== existing.inEmby) {
-    unilog(
-      1226,
-      `getNewTvdb inEmby ${existing.inEmby} -> ${newInEmby} for ${name} (fromEmbySync=${isSyncingFromEmby}, show.inEmby=${show.inEmby})`,
-    );
-  }
-
-  // Ensure Emby button is correct in fresh remotes based on inEmby status
-  const embyBtnIdx = tvdbData.remotes.findIndex((r) => r.name === "Emby");
-  const embyUrl = urls.embyPageUrl(showId || tvdbData.id);
-  if (embyBtnIdx >= 0) {
-    if (newInEmby) {
-      tvdbData.remotes[embyBtnIdx] = { name: "Emby", url: embyUrl };
-    } else {
-      tvdbData.remotes.splice(embyBtnIdx, 1);
-    }
-  } else if (newInEmby) {
-    tvdbData.remotes.unshift({ name: "Emby", url: embyUrl });
+    unilog(2516, `getNewTvdb inEmby ${existing.inEmby} -> ${newInEmby} for ${name} (show.inEmby=${show.inEmby})`);
   }
 
   tvdbData.inEmby = newInEmby;
 
-  // Flattened Emby-specific data (no nested object)
-  tvdbData.id = showId || existing.id || existing.emby?.id || null;
-  tvdbData.path =
-    paramObj.embyPath || existing.path || existing.emby?.path || null;
-  tvdbData.dateCreated =
-    paramObj.dateCreated ||
-    existing.dateCreated ||
-    existing.emby?.dateCreated ||
-    null;
+  tvdbData.id = showId || existing.id || null;
+  tvdbData.path = existing.path || null;
+  tvdbData.dateCreated = paramObj.dateCreated || existing.dateCreated || null;
   tvdbData.premiereDate =
-    paramObj.premiereDate ||
-    existing.premiereDate ||
-    existing.emby?.premiereDate ||
-    null;
-  tvdbData.inToTry =
-    paramObj.inToTry ?? existing.inToTry ?? existing.emby?.inToTry ?? false;
-  tvdbData.inContinue =
-    paramObj.inContinue ??
-    existing.inContinue ??
-    existing.emby?.inContinue ??
-    false;
-  tvdbData.inMark =
-    paramObj.inMark ?? existing.inMark ?? existing.emby?.inMark ?? false;
-  tvdbData.inLinda =
-    paramObj.inLinda ?? existing.inLinda ?? existing.emby?.inLinda ?? false;
-  tvdbData.played =
-    paramObj.isPlayed ?? existing.played ?? existing.emby?.isPlayed ?? false;
-  tvdbData.playCount =
-    paramObj.playCount ?? existing.playCount ?? existing.emby?.playCount ?? 0;
+    paramObj.premiereDate || existing.premiereDate || null;
+  tvdbData.inToTry = paramObj.inToTry ?? existing.inToTry ?? false;
+  tvdbData.inContinue = paramObj.inContinue ?? existing.inContinue ?? false;
+  tvdbData.inMark = paramObj.inMark ?? existing.inMark ?? false;
+  tvdbData.inLinda = paramObj.inLinda ?? existing.inLinda ?? false;
+  tvdbData.played = paramObj.isPlayed ?? existing.played ?? false;
+  tvdbData.playCount = paramObj.playCount ?? existing.playCount ?? 0;
   tvdbData.lastPlayedDate =
-    paramObj.lastPlayedDate ||
-    existing.lastPlayedDate ||
-    existing.emby?.lastPlayedDate ||
-    null;
+    paramObj.lastPlayedDate || existing.lastPlayedDate || null;
   // "S01E02" of the episode lastPlayedDate came from — always the same episode
   // as that date, so the two are shown together as one "last watched".
   tvdbData.lastPlayedEpisode =
     paramObj.lastPlayedEpisode || existing.lastPlayedEpisode || null;
-  // The fabricated lastPlayed timestamp this app itself stamped into Emby to
-  // hide/unhide the show. Kept so a re-read that only echoes it is recognized
-  // as not a viewing and cannot overwrite the two fields above.
+  // The fabricated lastPlayed timestamp hide/unhide and a wait ending stamp,
+  // which the watched sort reads ahead of the two fields above.
   // A brand-new show is stamped as viewed now so it heads the watched sort;
   // the stamp lives on the record only and the first real play retires it.
   const isNewRecord = !allTvdb[name] && !paramObj.transient;
@@ -2388,14 +2342,13 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     tvdbData.notReady = true;
   }
 
-  // Runtime-state fields set by disk scan / Emby queries — preserve from existing
+  // Runtime-state fields set by the disk scan — preserve from existing
   tvdbData.episodeData = existing.episodeData ?? null;
   tvdbData.quality = existing.quality ?? null;
   tvdbData.seasonPremiereDates = existing.seasonPremiereDates ?? null;
 
-  // leftEmby timestamp - set when show is removed from Emby
-  tvdbData.leftEmby =
-    paramObj.leftEmby || existing.leftEmby || existing.emby?.leftEmby || null;
+  // leftEmby timestamp - set when the show is deleted from the library
+  tvdbData.leftEmby = paramObj.leftEmby || existing.leftEmby || null;
 
   // Additional flags
   tvdbData.anticipating =
@@ -2689,7 +2642,7 @@ const tryLocalGetTvdb = async () => {
   tryLocalGetTvdbBusy = true;
 
   const nextItem = showProcessQueue[0];
-  // Run pre-tick callback (e.g. full Emby sweep for new/removed shows)
+  // Run pre-tick callback (e.g. the library sweep for new/removed shows)
   if (preTvdbTickCallback) {
     try {
       await preTvdbTickCallback({ isBackground: !!nextItem?.isBackground });
@@ -2725,24 +2678,24 @@ const tryLocalGetTvdb = async () => {
   }
 
   // Captured before any waitStr recalculation below so a show that just became
-  // watchable can be brought back to the top of the emby lists.
+  // watchable can be brought back to the top of the watched sort.
   const waitStrBefore = minTvdb.waitStr;
 
   unilog(122, `processing [${minTvdb.name}]`);
   // Notify clients which show is being processed
   if (enqueueCallback) enqueueCallback(minTvdb.name);
 
-  // Foreground (user-selected) shows: refresh the map-relevant data (Emby
-  // watched/id + disk files) and push it right away, BEFORE the slow TVDB API
-  // scrape below. The open map only needs emby+disk (not Rotten/TVDB/IMDB), so
-  // this lets it update within a moment instead of waiting for the full
-  // refresh. Skipped for background sweeps to avoid doubling Emby load. No db
-  // save here — the map's stale rebuild reads the in-memory record, and the
-  // full refresh below persists to tvdb db.
+  // Foreground (user-selected) shows: refresh the map-relevant data (disk
+  // files) and push it right away, BEFORE the slow TVDB API scrape below. The
+  // open map only needs the disk (not Rotten/TVDB/IMDB), so this lets it
+  // update within a moment instead of waiting for the full refresh. Skipped
+  // for background sweeps, which do the full refresh anyway. No db save here —
+  // the map's stale rebuild reads the in-memory record, and the full refresh
+  // below persists to tvdb db.
   if (!isBackground && refreshEpisodeDataCallback && minTvdb.inEmby !== false) {
     try {
       await refreshEpisodeDataCallback(minTvdb.name, minTvdb, {
-        sources: ["emby", "disk"],
+        sources: ["disk"],
       });
       if (notifyCallback) notifyCallback(minTvdb.name);
     } catch (e) {
@@ -2782,11 +2735,9 @@ const tryLocalGetTvdb = async () => {
     processRecord.name = minTvdb.name;
   }
 
-  // Refresh consolidated episodeData (TVDB aired + Emby watched/id + disk
-  // files). This single call also keeps the legacy watchedEpis/filesOnDisk/
-  // fileQuality/episodeAiredDates props, quality, watchedCount,
-  // seasonPremiereDates, waitStr and date/size/noFiles in sync — replacing the
-  // former separate Emby/TVDB seriesMap fetches here.
+  // Refresh consolidated episodeData (TVDB aired + disk files). This single
+  // call also keeps quality, watchedCount, seasonPremiereDates, waitStr and
+  // date/size/noFiles in sync.
   if (refreshEpisodeDataCallback) {
     try {
       await refreshEpisodeDataCallback(processRecord.name, processRecord);
@@ -3447,16 +3398,6 @@ export const setTvdbFields = async (params) => {
         )
           continue;
 
-        // Handle nested emby fields (e.g., inToTry)
-        if (key.startsWith("emby") && typeof key === "string") {
-          const embyField = key.replace(/^emby\.?/, "");
-          if (embyField && embyField !== "emby") {
-            tvdb.emby = tvdb.emby || {};
-            tvdb.emby[embyField] = value;
-            continue;
-          }
-        }
-
         // Handle nested disk fields
         if (key.startsWith("disk") && typeof key === "string") {
           const diskField = key.replace(/^disk\.?/, "");
@@ -3494,21 +3435,6 @@ export const setTvdbFields = async (params) => {
           1228,
           `setTvdbFields: inEmby changed ${wasInEmby} -> ${tvdb.inEmby} for ${name}`,
         );
-      }
-
-      // Keep Emby button in sync with final inEmby/Id values (after field updates).
-      if (!Array.isArray(tvdb.remotes)) tvdb.remotes = [];
-      const embyIndex = tvdb.remotes.findIndex((r) => r?.name === "Emby");
-      const embyId = tvdb?.id == null ? "" : String(tvdb.id).trim();
-      const freshEmbyUrl = embyId ? urls.embyPageUrl(embyId) : null;
-      if (tvdb.inEmby && freshEmbyUrl) {
-        if (embyIndex >= 0) {
-          tvdb.remotes[embyIndex] = { name: "Emby", url: freshEmbyUrl };
-        } else {
-          tvdb.remotes.unshift({ name: "Emby", url: freshEmbyUrl });
-        }
-      } else if (embyIndex >= 0) {
-        tvdb.remotes.splice(embyIndex, 1);
       }
 
       // Auto-update pickups when inEmby or status changes

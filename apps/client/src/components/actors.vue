@@ -1824,32 +1824,7 @@ export default {
     },
 
     async prefillEpisodeInputs() {
-      // Strategy 1: Check if currently playing show matches selected show
-      try {
-        const devices = await srvr.getDevices();
-
-        // Find a device playing the current show (prioritize chromecast)
-        let playingDevice = devices.find(
-          (d) => d.deviceName === "chromecast" && d.showName === this.showName,
-        );
-        if (!playingDevice) {
-          playingDevice = devices.find((d) => d.showName === this.showName);
-        }
-
-        if (
-          playingDevice &&
-          playingDevice.seasonNumber &&
-          playingDevice.episodeNumber
-        ) {
-          this.seasonNum = String(playingDevice.seasonNumber);
-          this.episodeNum = String(playingDevice.episodeNumber);
-          return;
-        }
-      } catch (error) {
-        // Continue to strategy 2
-      }
-
-      // Strategy 2: Use seriesMap to find first unwatched episode
+      // Use seriesMap to find first unwatched episode
       try {
         if (!this.currentShow) {
           return;

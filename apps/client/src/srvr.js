@@ -650,9 +650,6 @@ export function unilogUnsubscribe() {
 export function createShowFolder(params) {
   return httpCall("/api/createShowFolder", params, "POST");
 }
-export function embySync() {
-  return httpCall("/api/embySync", {}, "POST");
-}
 
 // Shared filters (cross-computer)
 export function getSharedFilters() {
@@ -704,26 +701,6 @@ export function toggleBadGroup(group) {
 
 export function incrementGroupCount(group) {
   return httpCall("/api/incrementGroupCount", { group }, "POST");
-}
-
-export function getDevices() {
-  return httpCall("/api/getDevices");
-}
-
-export function skipIntro(deviceName) {
-  return httpCall(
-    "/api/skipIntro",
-    { pressedAt: Date.now(), deviceName },
-    "POST",
-  );
-}
-
-export function trimIntro(deviceName) {
-  return httpCall("/api/trimIntro", { deviceName }, "POST");
-}
-
-export function embyViewShow(showId, showName) {
-  return httpCall("/api/embyViewShow", { showId, showName }, "POST");
 }
 
 export function getLastViewed() {
@@ -785,9 +762,6 @@ export function getSubFileIds(showName) {
 export function tvRemoteKey(params) {
   return httpCall("/api/tvRemoteKey", params, "POST");
 }
-export function getNoEmbys() {
-  return httpCall("/api/getNoEmbys");
-}
 export function addNoEmby(show) {
   return httpCall("/api/addNoEmby", show, "POST");
 }
@@ -797,30 +771,6 @@ export function delNoEmby(name) {
 
 export function getGaps() {
   return httpCall("/api/getGaps");
-}
-
-export function triggerEmbySync() {
-  return httpCall("/api/triggerEmbySync", {}, "POST");
-}
-
-export function requestEmbyLibraryRefresh() {
-  return httpCall("/api/requestEmbyLibraryRefresh", {}, "POST");
-}
-
-export function getEmbyLibraryRefreshStatus() {
-  return httpCall("/api/embyLibraryRefreshStatus", null, "GET");
-}
-
-export function embyTaskStatus(taskId) {
-  return httpCall(
-    `/api/embyTaskStatus?taskId=${encodeURIComponent(taskId)}`,
-    null,
-    "GET",
-  );
-}
-
-export function refreshEmbyItem(showId, showName) {
-  return httpCall("/api/refreshEmbyItem", { showId, showName }, "POST");
 }
 
 export function triggerShowGapCheck(showId, showName) {

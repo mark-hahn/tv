@@ -1,11 +1,8 @@
 
 
-when i tried to delete the show `Hullraisers` when in info pane i got this: `Do you really want to remove Hullraisers from emby and the disk?` -- it shouldn't metion emby, it should just mention disk.  when i clicked ok it gave me this: `Cannot remove "Hullraisers" from Emby: Emby HTTP 500: Object reference not set to an instance of an object.`.
-
-when i showed the subtitle pane in phone for `'A Man on the Inside/Season 2/A.Man.on.the.Inside.S02E01.Orientation.2160p.NF.WEB-DL.DDP5.1.Atmos.DV.HDR.H.265-FLUX.mkv'` it listed subtitles starting with `T:` and none with `S:`, even though it has the sidecar `'A Man on the Inside/Season 2/A.Man.on.the.Inside.S02E01.Orientation.1080p.NF.WEB-DL.DDP5.1.H.264-STC.mb4.srt'`.
-also it listed all languages even though it is only supposed to list english.
 
 
+remove door camera from tv
 
 what does `T:` mean in the subtitles pane in the phone
 remote key collision match should send only the one key
@@ -16,6 +13,21 @@ don't browse `In Development`
 ????????????????
 manage upcoming shows
 =================
+
+Add a new show from the web client. It should show up in the library immediately, with no "Waiting for Emby scan".
+Ctrl-click "Not In Emby" in the map on a show outside the library. It should create the folder and join the library.
+Delete a show. It should drop out of the library within seconds.
+In the map, delete an episode file or run Prune. The map should refresh.
+Toggle watched in the map, including on a show added in step 1.
+Use the map's clear-position button on an episode with a resume point.
+Hide/Unhide from the info pane and from the tvapp hide key. The show should move in the Watched sort.
+The collection toggles should still stick.
+The Emby app on the TV should still pick up new shows by itself.
+
+when i tried to delete the show `Hullraisers` when in info pane i got this: `Do you really want to remove Hullraisers from emby and the disk?` -- it shouldn't metion emby, it should just mention disk.  when i clicked ok it gave me this: `Cannot remove "Hullraisers" from Emby: Emby HTTP 500: Object reference not set to an instance of an object.`.
+
+when i showed the subtitle pane in phone for `'A Man on the Inside/Season 2/A.Man.on.the.Inside.S02E01.Orientation.2160p.NF.WEB-DL.DDP5.1.Atmos.DV.HDR.H.265-FLUX.mkv'` it listed subtitles starting with `T:` and none with `S:`, even though it has the sidecar `'A Man on the Inside/Season 2/A.Man.on.the.Inside.S02E01.Orientation.1080p.NF.WEB-DL.DDP5.1.H.264-STC.mb4.srt'`.
+also it listed all languages even though it is only supposed to list english.
 
 Web: toggle To Try, Continue, Mark and Linda.
 Web: toggle watched on a map episode, and run map Prune.

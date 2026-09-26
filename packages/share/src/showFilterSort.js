@@ -242,10 +242,9 @@ export function getSortKey(show, sortChoice, allTvdb = null) {
       return (best ? best.name : "").toLowerCase();
     }
     case "Viewed": {
-      // Sorts by the date Emby currently holds, so a hidden show sinks here
-      // exactly as it does in Emby's own rows. That date is fakeLastPlayed
-      // whenever hiding or unhiding stamped one; lastPlayedDate is the real
-      // viewing, kept untouched for display.
+      // Sorts by fakeLastPlayed whenever hiding or unhiding stamped one, so a
+      // hidden show sinks here; lastPlayedDate is the real viewing, kept
+      // untouched for display.
       const rec = allTvdb?.[show.name];
       const stamped = show.fakeLastPlayed || rec?.fakeLastPlayed || "";
       const played = show.lastPlayedDate || rec?.lastPlayedDate || "";

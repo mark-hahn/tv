@@ -1,5 +1,5 @@
 // Stray episode files: files on disk for episodes TVDB never gave an air date
-// to. The gap check flags them per show (see getShowState in emby.js); this
+// to. The gap check flags them per show (see getShowState in gaps.js); this
 // module decides what, if anything, to do about them.
 //
 // The flag alone cannot tell you what is wrong, because several unrelated

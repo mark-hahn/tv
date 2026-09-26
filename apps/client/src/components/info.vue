@@ -527,7 +527,7 @@
                 white-space: nowrap;
               "
             >
-              Not In Emby
+              Not In Library
             </div>
             <div
               v-if="twoLocalFolders"
@@ -633,7 +633,7 @@ let cachedDiskShows = null;
 
 // Remote button display order; unlisted buttons sort just before "Official Website".
 const GENRES_MAX_LINE_LEN = 30;
-const REMOTE_BUTTON_ORDER = ["Emby", "IMDB", "Rotten", "Google", "Wikipedia"];
+const REMOTE_BUTTON_ORDER = ["IMDB", "Rotten", "Google", "Wikipedia"];
 const remoteSortKey = (name) => {
   if (name === "Official Website") return REMOTE_BUTTON_ORDER.length + 1;
   const idx = REMOTE_BUTTON_ORDER.findIndex((prefix) =>

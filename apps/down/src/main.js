@@ -271,7 +271,7 @@ async function main() {
     writeMap,
     forcedFiles,
     processingForced,
-    embyMap,
+    tvdbMap,
     destTitle,
     _cycleTiming;
 
@@ -380,7 +380,7 @@ async function main() {
   var TV_MAP_PATH = dataPath("tv-map");
   var TVDB_DB_PATH = path.join(APP_DIR, "..", "srvr", "data", "tvdb.db");
   var tvdbDb = null;
-  var loadEmbyMapFromDb = function () {
+  var loadTvdbMapFromDb = function () {
     var out = {};
     if (!tvdbDb) {
       tvdbDb = new Database(TVDB_DB_PATH, {
@@ -1848,7 +1848,7 @@ async function main() {
     // dvdScanFiles is the VOB/IFO/BUP slice of this cycle's USB scan.
     if (!dvdScanFiles || dvdScanFiles.length === 0) return;
 
-    // Group files by disc (VIDEO_TS dir) and resolve each torrent folder against Emby.
+    // Group files by disc (VIDEO_TS dir) and resolve each torrent folder against the library.
     // discMap key = vtsDirRelative (e.g. "The Norm Show - Complete/NORMS1/Disc 1/VIDEO_TS")
     // value = { torrentFolder, vtsDirRelative, files: [{relPath, fileBytes}], totalSize }
     const discMap = new Map();
@@ -1878,8 +1878,8 @@ async function main() {
 
     if (discMap.size === 0) return;
 
-    // Resolve each torrent folder against Emby.
-    // Build a map: torrentFolder -> { showTitle, tvdbId, embyFolderName, showDotName }
+    // Resolve each torrent folder against the library.
+    // Build a map: torrentFolder -> { showTitle, tvdbId, showFolderName, showDotName }
     const torrentMeta = new Map();
     const dvdTorrentFolders = new Set();
     for (const torrentFolder of torrentFolderOrder) {
@@ -1908,33 +1908,25 @@ async function main() {
         );
         continue;
       }
-      if (!embyMap) {
-        unilog(307, `DVD: no embyMap loaded, skipping "${torrentFolder}"`);
+      if (!tvdbMap) {
+        unilog(2535, `DVD: no tvdbMap loaded, skipping "${torrentFolder}"`);
         continue;
       }
-      const embyShowNames = Object.keys(embyMap).filter(
-        (k) => embyMap[k] && embyMap[k].inEmby,
+      const libraryShowNames = Object.keys(tvdbMap).filter(
+        (k) => tvdbMap[k] && tvdbMap[k].inEmby,
       );
-      const embyKey =
-        smartTitleMatch(showTitle, embyShowNames, null, false) || showTitle;
-      const embyEntry = embyMap[embyKey];
-      if (!embyEntry || !embyEntry.inEmby) {
-        unilog(
-          308,
-          "------",
-          "DVD: NOT IN EMBY, SKIPPING:",
-          torrentFolder,
-          "(",
-          showTitle,
-          ")",
-        );
+      const libraryKey =
+        smartTitleMatch(showTitle, libraryShowNames, null, false) || showTitle;
+      const libraryEntry = tvdbMap[libraryKey];
+      if (!libraryEntry || !libraryEntry.inEmby) {
+        unilog(2536, `DVD: not in the library, skipping: ${torrentFolder} (${showTitle})`);
         continue;
       }
       dvdTorrentFolders.add(torrentFolder);
       torrentMeta.set(torrentFolder, {
         showTitle,
-        tvdbId: embyEntry.tvdbId || null,
-        embyFolderName: embyEntry.path || embyKey,
+        tvdbId: libraryEntry.tvdbId || null,
+        showFolderName: libraryEntry.path || libraryKey,
         showDotName: torrentFolder.replace(/ /g, "."),
       });
     }
@@ -2098,7 +2090,7 @@ async function main() {
   // to the correct Season directory.
   const processDvdDisc = async (vtsDirRelative, disc, meta) => {
     const { torrentFolder } = disc;
-    const { showTitle, tvdbId, embyFolderName, showDotName } = meta;
+    const { showTitle, tvdbId, showFolderName, showDotName } = meta;
     const localVtsDir = path.join(DVD_STAGE_DIR, vtsDirRelative);
     const unixNow = () => Math.floor(Date.now() / 1000);
 
@@ -2129,11 +2121,11 @@ async function main() {
 
     // Reuse an existing case-variant folder rather than creating a duplicate
     // that differs only by case (ext4 is case-sensitive).
-    const dvdFolderName = resolveShowFolderName(tvPath, embyFolderName);
-    if (dvdFolderName !== embyFolderName) {
+    const dvdFolderName = resolveShowFolderName(tvPath, showFolderName);
+    if (dvdFolderName !== showFolderName) {
       unilog(
         1469,
-        `reusing existing case-variant folder "${dvdFolderName}" instead of "${embyFolderName}"`,
+        `reusing existing case-variant folder "${dvdFolderName}" instead of "${showFolderName}"`,
       );
     }
     const seasonDir = `${tvPath}${dvdFolderName}/Season ${dvdSeason}`;
@@ -2592,16 +2584,16 @@ async function main() {
       inProgressSeIndex = {};
     }
 
-    // Load Emby membership map from srvr's tvdb db once per cycle.
-    // Keys are series names; value.inEmby is true if the show is in Emby.
-    embyMap = null;
+    // Load the show records from srvr's tvdb db once per cycle.
+    // Keys are series names; value.inEmby is true if the show is in the library.
+    tvdbMap = null;
     try {
-      embyMap = loadEmbyMapFromDb();
+      tvdbMap = loadTvdbMapFromDb();
     } catch (e) {
-      unilog(1243, `failed to load embyMap from ${TVDB_DB_PATH}: ${e.message}`);
+      unilog(2537, `failed to load tvdbMap from ${TVDB_DB_PATH}: ${e.message}`);
     }
 
-    // Reset TVDB cache each cycle so embyMap changes (inEmby toggled) take effect.
+    // Reset TVDB cache each cycle so tvdbMap changes (inEmby toggled) take effect.
     tvdbCache = {};
 
     // Sort files by parsed title before processing.
@@ -2679,12 +2671,12 @@ async function main() {
     return process.nextTick(checkFile);
   };
 
-  // Look up tvdbId from embyMap for a given series name.
+  // Look up tvdbId from tvdbMap for a given series name.
   const lookupTvdbId = (name, yearOverride = null) => {
-    if (!embyMap || !name) return null;
+    if (!tvdbMap || !name) return null;
     const key =
-      smartTitleMatch(name, Object.keys(embyMap), yearOverride, false) || name;
-    return embyMap[key]?.tvdbId || null;
+      smartTitleMatch(name, Object.keys(tvdbMap), yearOverride, false) || name;
+    return tvdbMap[key]?.tvdbId || null;
   };
 
   checkFile = () => {
@@ -2851,33 +2843,33 @@ async function main() {
           ? detailParts.join(", ")
           : "no usable fields";
 
-        // If embyMap is loaded, check whether the parsed title matches a known
+        // If tvdbMap is loaded, check whether the parsed title matches a known
         // show before creating an error entry.  Files that don't resemble any
-        // Emby show (music videos, movies, etc.) are silently skipped so they
+        // library show (music videos, movies, etc.) are silently skipped so they
         // don't clutter the UI with error entries.
-        if (!processingForced && embyMap && title) {
-          var embyShowNames = Object.keys(embyMap).filter(
-            (k) => embyMap[k] && embyMap[k].inEmby,
+        if (!processingForced && tvdbMap && title) {
+          var libraryShowNames = Object.keys(tvdbMap).filter(
+            (k) => tvdbMap[k] && tvdbMap[k].inEmby,
           );
-          var matchesEmby = smartTitleMatch(
+          var matchesLibrary = smartTitleMatch(
             title,
-            embyShowNames,
+            libraryShowNames,
             titleYear || folderTitleYear || null,
             false,
           );
-          if (!matchesEmby && folderTitle) {
-            matchesEmby = smartTitleMatch(
+          if (!matchesLibrary && folderTitle) {
+            matchesLibrary = smartTitleMatch(
               folderTitle,
-              embyShowNames,
+              libraryShowNames,
               folderTitleYear || titleYear || null,
               false,
             );
-            if (matchesEmby) {
+            if (matchesLibrary) {
               title = folderTitle;
               titleYear = folderTitleYear;
             }
           }
-          if (!matchesEmby) {
+          if (!matchesLibrary) {
             unilog(
               1197,
               `Down: not a TV show "${fname}" (${title || "unknown show"})`,
@@ -2919,7 +2911,7 @@ async function main() {
         season = 1;
       }
       // If file uses compact NNN naming (e.g. 101-Title.avi or Show.101.Title.avi = S01E01),
-      // rename to SxxExx format so Emby can match it to the correct episode.
+      // rename to SxxExx format so it matches the correct episode.
       destTitle = null;
       {
         const dotIdx = fname.lastIndexOf(".");
@@ -3020,25 +3012,25 @@ async function main() {
       return process.nextTick(checkFileExists);
     }
 
-    // If the file title doesn't match any emby show but the folder title does,
+    // If the file title doesn't match any library show but the folder title does,
     // swap to the folder title before hitting the TVDB API. This handles files
     // like "SCTV - S03E01 - ..." inside "Second.City.Television.S03..." where
     // searching TVDB for "SCTV" could produce a wrong Levenshtein match.
-    if (folderTitle && folderTitle !== title && embyMap) {
-      var embyShowNamesPrecheck = Object.keys(embyMap).filter(
-        (k) => embyMap[k] && embyMap[k].inEmby,
+    if (folderTitle && folderTitle !== title && tvdbMap) {
+      var libraryShowNamesPrecheck = Object.keys(tvdbMap).filter(
+        (k) => tvdbMap[k] && tvdbMap[k].inEmby,
       );
       if (
-        embyShowNamesPrecheck.length > 0 &&
+        libraryShowNamesPrecheck.length > 0 &&
         !smartTitleMatch(
           title,
-          embyShowNamesPrecheck,
+          libraryShowNamesPrecheck,
           titleYear || folderTitleYear || null,
           false,
         ) &&
         smartTitleMatch(
           folderTitle,
-          embyShowNamesPrecheck,
+          libraryShowNamesPrecheck,
           folderTitleYear || titleYear || null,
           false,
         )
@@ -3111,22 +3103,22 @@ async function main() {
               return setTimeout(chkTvDB, rsyncDelay);
             } else {
               err(`tvdb no results: fname: ${fname} | url: ${tvdburl}`);
-              var embyShowNamesForTvdb =
-                !processingForced && embyMap
-                  ? Object.keys(embyMap).filter(
-                      (k) => embyMap[k] && embyMap[k].inEmby,
+              var libraryShowNamesForTvdb =
+                !processingForced && tvdbMap
+                  ? Object.keys(tvdbMap).filter(
+                      (k) => tvdbMap[k] && tvdbMap[k].inEmby,
                     )
                   : [];
-              var tvdbMatchesEmby =
-                embyShowNamesForTvdb.length > 0
+              var tvdbMatchesLibrary =
+                libraryShowNamesForTvdb.length > 0
                   ? smartTitleMatch(
                       title,
-                      embyShowNamesForTvdb,
+                      libraryShowNamesForTvdb,
                       titleYear || folderTitleYear || null,
                       false,
                     )
                   : null;
-              if (!processingForced && !tvdbMatchesEmby) {
+              if (!processingForced && !tvdbMatchesLibrary) {
                 // If the filename gave an abbreviated title (e.g. "tmaws"), retry with
                 // the folder-derived title before giving up.
                 if (folderTitle && folderTitle !== title) {
@@ -3136,10 +3128,7 @@ async function main() {
                   folderTitleYear = undefined;
                   return process.nextTick(chkTvDB);
                 }
-                unilog(
-                  1200,
-                  `Down: no TVDB match, not in Emby "${fname}" (${title || "unknown show"})`,
-                );
+                unilog(2538, `Down: no TVDB match, not in the library "${fname}" (${title || "unknown show"})`);
                 // Cache null so remaining episodes from the same folder skip TVDB this cycle.
                 tvdbCache[title] = null;
                 if (titleBeforeRetry && titleBeforeRetry !== title)
@@ -3255,36 +3244,36 @@ async function main() {
   checkFileExists = () => {
     var e, tvFilePath, tvSeasonPath, usbLongPath, videoPath;
     const seriesMatchYear = titleYear || folderTitleYear || null;
-    const embyKeyForFolder =
-      embyMap && seriesName
+    const libraryKeyForFolder =
+      tvdbMap && seriesName
         ? smartTitleMatch(
             seriesName,
-            Object.keys(embyMap),
+            Object.keys(tvdbMap),
             seriesMatchYear,
             false,
           ) || seriesName
         : seriesName;
-    const embyFolderNameRaw =
-      embyMap && embyKeyForFolder && embyMap[embyKeyForFolder]?.path
-        ? embyMap[embyKeyForFolder].path
-        : embyKeyForFolder || seriesName;
+    const showFolderNameRaw =
+      tvdbMap && libraryKeyForFolder && tvdbMap[libraryKeyForFolder]?.path
+        ? tvdbMap[libraryKeyForFolder].path
+        : libraryKeyForFolder || seriesName;
     // Reuse an existing case-variant folder rather than creating a duplicate
     // that differs only by case (ext4 is case-sensitive).
-    const embyFolderName = resolveShowFolderName(tvPath, embyFolderNameRaw);
-    if (embyFolderName !== embyFolderNameRaw) {
+    const showFolderName = resolveShowFolderName(tvPath, showFolderNameRaw);
+    if (showFolderName !== showFolderNameRaw) {
       unilog(
         1470,
-        `reusing existing case-variant folder "${embyFolderName}" instead of "${embyFolderNameRaw}"`,
+        `reusing existing case-variant folder "${showFolderName}" instead of "${showFolderNameRaw}"`,
       );
     }
-    tvSeasonPath = `${tvPath}${embyFolderName}/Season ${season}`;
+    tvSeasonPath = `${tvPath}${showFolderName}/Season ${season}`;
     tvFilePath = `${tvSeasonPath}/${fname}`;
     videoPath = `files/${usbFilePath}`;
     var tvLocalDir = `${tvSeasonPath}/`;
 
     // 2026-03-18: Canonical rename — if destTitle wasn't already set by the
     // NNN/NxN handler and the filename doesn't already contain SxxExx, rename
-    // to "<EmbyFolderName> SxxExx<ext>" so Emby reliably matches every episode.
+    // to "<showFolderName> SxxExx<ext>" so every episode reliably matches.
     // Original filename is preserved in the SQLite `title` column for rollback.
     if (
       !destTitle &&
@@ -3295,7 +3284,7 @@ async function main() {
       const dotIdx = fname.lastIndexOf(".");
       const fext = dotIdx >= 0 ? fname.slice(dotIdx) : "";
       const seStr = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
-      destTitle = `${embyFolderName} ${seStr}${fext}`;
+      destTitle = `${showFolderName} ${seStr}${fext}`;
     }
 
     // usbPath is the folder containing the file on the USB host.
@@ -3348,7 +3337,7 @@ async function main() {
           title: fname,
           localPath: tvLocalDir,
           usbPath: usbPath,
-          seriesName: embyKeyForFolder || seriesName || undefined,
+          seriesName: libraryKeyForFolder || seriesName || undefined,
           season: season || 0,
           episode: episode || 0,
           fileSize: usbFileBytes || 0,
@@ -3365,12 +3354,12 @@ async function main() {
     // Watched episode filter: skip if this episode has already been watched.
     if (
       !processingForced &&
-      embyMap &&
-      embyKeyForFolder &&
+      tvdbMap &&
+      libraryKeyForFolder &&
       Number.isInteger(season) &&
       Number.isInteger(episode)
     ) {
-      const epData = embyMap[embyKeyForFolder]?.episodeData;
+      const epData = tvdbMap[libraryKeyForFolder]?.episodeData;
       const epIsWatched = edIsWatched(epData, season, episode);
       {
         if (epIsWatched) {
@@ -3408,32 +3397,25 @@ async function main() {
       return process.nextTick(checkFile);
     }
 
-    // Emby filter: only download shows that are in Emby.
-    // Fail closed: if embyMap failed to load this cycle, skip the download
-    // rather than letting it through. A null embyMap previously bypassed this
-    // entire check, so non-Emby shows downloaded anyway.
+    // Library filter: only download shows that are in the library.
+    // Fail closed: if tvdbMap failed to load this cycle, skip the download
+    // rather than letting it through. A null tvdbMap previously bypassed this
+    // entire check, so shows outside the library downloaded anyway.
     if (!processingForced && seriesName) {
-      if (!embyMap) {
-        unilog(
-          1244,
-          `skip: embyMap not loaded, cannot verify Emby membership for ${fname} (${seriesName})`,
-        );
+      if (!tvdbMap) {
+        unilog(2539, `skip: tvdbMap not loaded, cannot verify library membership for ${fname} (${seriesName})`);
         return process.nextTick(checkFile);
       }
-      const embyKey =
+      const libraryKey =
         smartTitleMatch(
           seriesName,
-          Object.keys(embyMap),
+          Object.keys(tvdbMap),
           seriesMatchYear,
           false,
         ) || seriesName;
-      const embyEntry = embyMap[embyKey];
-      if (!embyEntry || !embyEntry.inEmby) {
-        unilog(
-          332,
-          "show not in emby, skipping:", seriesName,
-          ", file:", fname
-        );
+      const libraryEntry = tvdbMap[libraryKey];
+      if (!libraryEntry || !libraryEntry.inEmby) {
+        unilog(2540, `show not in the library, skipping: ${seriesName}, file: ${fname}`);
         return process.nextTick(checkFile);
       }
     }
@@ -3653,9 +3635,9 @@ async function main() {
       }
 
       // Check if the episode is already watched.
-      var embyEntryForWatched = embyMap && embyMap[embyKeyForFolder];
+      var libraryEntryForWatched = tvdbMap && tvdbMap[libraryKeyForFolder];
       var epIsWatched = edIsWatched(
-        embyEntryForWatched && embyEntryForWatched.episodeData,
+        libraryEntryForWatched && libraryEntryForWatched.episodeData,
         season,
         episode,
       );

@@ -24,7 +24,6 @@ import * as cp from "child_process";
 import * as path from "node:path";
 import { logHere, unilog} from "@tv/share"
 import { BATCH_SCHED } from "./batchQueue.js";
-import * as urls from "./urls.js";
 
 const TV_DIR = "/mnt/media/tv";
 const STAGE_DIR = "/mnt/media/recode-stage";
@@ -149,17 +148,16 @@ function originalPathFor(videoFilePath) {
 }
 
 // The tv keeps a file open for the whole episode, so recoding one that is on
-// screen would pull it out from under the player. Emby's session list carries
-// the real path of whatever each device is playing, which is the direct answer.
-async function isPlayingNow(videoFilePath) {
-  const resolved = path.resolve(videoFilePath);
-  const resp = await fetch(urls.watchingUrl());
-  if (resp.status !== 200)
-    throw new Error(`emby sessions ${resp.status} ${resp.statusText}`);
-  const sessions = await resp.json();
-  return (sessions || []).some(
-    (s) => s?.NowPlayingItem?.Path && path.resolve(s.NowPlayingItem.Path) === resolved,
-  );
+// screen would pull it out from under the player. index.js hands in the path
+// of the file tvapp's player has up, from its own now-playing.
+let playingPathGetter = () => null;
+export function setPlayingPathGetter(fn) {
+  playingPathGetter = fn;
+}
+
+function isPlayingNow(videoFilePath) {
+  const playing = playingPathGetter();
+  return !!playing && path.resolve(playing) === path.resolve(videoFilePath);
 }
 
 // ffmpeg under BATCH_SCHED, reporting content-seconds written so the ETA is a
@@ -231,7 +229,7 @@ async function recodeOne(videoFilePath) {
   const { durationSecs } = await getProbe(videoFilePath);
   const showName = path.basename(path.dirname(path.dirname(videoFilePath)));
 
-  if (await isPlayingNow(videoFilePath)) {
+  if (isPlayingNow(videoFilePath)) {
     // The deferral is re-tested every scan tick for as long as the episode is
     // on screen, so it is logged only when the file being deferred changes.
     if (deferredPath !== videoFilePath) {

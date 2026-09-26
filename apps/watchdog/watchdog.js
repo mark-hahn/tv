@@ -636,7 +636,7 @@ async function runChecks() {
     raise(
       "sweep-stuck",
       "warn",
-      `emby full sweep running for > ${SWEEP_STUCK_BEATS * HB_CADENCE_MIN}m`,
+      `library sweep running for > ${SWEEP_STUCK_BEATS * HB_CADENCE_MIN}m`,
     );
   } else {
     clear("sweep-stuck");

@@ -657,7 +657,6 @@ export default {
       _downActive: false,
       _downInactiveTimer: null,
       _qbtChannel: null,
-      _libraryRefreshChannel: null,
       // TABLET SIZING CONFIGURATION - SIMPLE MODE - Tweak these values
       sizing: {
         // List pane
@@ -980,7 +979,6 @@ export default {
     evtBus.off("addPreviewShowDone", this.onAddPreviewShowDone);
     evtBus.off("previewPanesLoading", this.onPreviewPanesLoading);
     evtBus.off("setLibraryProgress", this.handleSetLibraryProgress);
-    this.stopLibraryRefreshChannel();
     evtBus.off("selectMapEpisode");
     if (this._onAppWindowResize)
       window.removeEventListener("resize", this._onAppWindowResize);
@@ -1295,95 +1293,12 @@ export default {
       evtBus.emit("exitPreviewMode");
     },
 
-    startLibraryRefresh() {
-      srvr
-        .requestEmbyLibraryRefresh()
-        .catch((err) => unilog(900, "requestEmbyLibraryRefresh failed:", err));
-    },
-
-    async checkLibraryRefreshStatus() {
-      try {
-        const status = await srvr.getEmbyLibraryRefreshStatus();
-        // GLOBAL-MSG: Lib
-        if (status?.running && status?.progress?.pct != null) {
-          setGlobalMessage({
-            id: "Lib",
-            text: `Scan: ${Number(status.progress.pct).toFixed(0)}%`,
-            position: 1,
-          });
-        }
-      } catch (err) {
-        unilog(901, "checkLibraryRefreshStatus failed:", err);
-      }
-    },
-
     handleSetLibraryProgress(txt) {
       const s = String(txt || "");
       // GLOBAL-MSG: Lib
       if (s.includes("%"))
         setGlobalMessage({ id: "Lib", text: s, position: 1 });
       else if (!s) setGlobalMessage({ id: "Lib", action: "hide" });
-    },
-
-    handleLibraryProgress(data) {
-      // GLOBAL-MSG: Lib
-      if (data?.pct != null) {
-        setGlobalMessage({
-          id: "Lib",
-          text: `Scan: ${Number(data.pct).toFixed(0)}%`,
-          position: 1,
-        });
-      }
-    },
-
-    handleLibraryRefreshChannel(data) {
-      if (data?.type === "done") {
-        this.handleLibraryRefreshDone(data);
-        return;
-      }
-      if (data?.type === "progress") {
-        this.handleLibraryProgress(data);
-        return;
-      }
-      if (data?.running && data?.progress?.pct != null) {
-        this.handleLibraryProgress(data.progress);
-      } else if (data && data.running === false) {
-        setGlobalMessage({ id: "Lib", action: "hide" });
-      }
-    },
-
-    startLibraryRefreshChannel() {
-      if (this._libraryRefreshChannel) return;
-      this._libraryRefreshChannel = srvr.openChannel("libraryRefresh", {
-        onSnapshot: this.handleLibraryRefreshChannel,
-        onDelta: this.handleLibraryRefreshChannel,
-      });
-    },
-
-    stopLibraryRefreshChannel() {
-      this._libraryRefreshChannel?.close();
-      this._libraryRefreshChannel = null;
-    },
-
-    handleLibraryRefreshDone(data) {
-      // GLOBAL-MSG: Lib
-      setGlobalMessage({ id: "Lib", action: "hide" });
-      const showNames = Array.isArray(data?.showNames) ? data.showNames : [];
-
-      srvr
-        .triggerEmbySync()
-        .catch((err) => unilog(902, "triggerEmbySync failed:", err));
-
-      if (showNames.length > 0) {
-        evtBus.emit("library-refresh-complete", {
-          diskChangeShowName: showNames[0],
-        });
-        srvr
-          .triggerShowSelect(showNames[0])
-          .catch((err) => unilog(903, "triggerShowSelect failed:", err));
-      } else {
-        evtBus.emit("library-refresh-complete");
-      }
     },
 
     handleTvdbMismatch(payload) {
@@ -1463,9 +1378,9 @@ export default {
             "- New record creation was blocked to prevent duplicate entries.",
           );
           lines.push("");
-          lines.push("Incoming show (from Emby)");
+          lines.push("Incoming show");
           lines.push(`- Show name key (show.name): ${name}`);
-          lines.push(`- Emby show Id (show.id): ${showId}`);
+          lines.push(`- Show Id (show.id): ${showId}`);
           lines.push(`- TVDB series Id on show (show.tvdbId): ${tvdbId}`);
           lines.push("");
           lines.push("Likely same-show candidate (from server TVDB cache)");
@@ -1486,15 +1401,15 @@ export default {
               : "";
           lines.push("What happened");
           lines.push(
-            "- A cached TVDB record conflicts with the Emby show identity.",
+            "- A cached TVDB record conflicts with the show identity.",
           );
           lines.push(
             "- Creation/update was blocked to prevent duplicate or cross-linked records.",
           );
           lines.push("");
-          lines.push("Current show (from Emby)");
+          lines.push("Current show");
           lines.push(`- Show name key (show.name): ${name}`);
-          lines.push(`- Emby show Id (show.id): ${showId}`);
+          lines.push(`- Show Id (show.id): ${showId}`);
           lines.push(`- TVDB series Id on show (show.tvdbId): ${tvdbId}`);
           lines.push("");
           lines.push("Existing cached record");
@@ -1524,15 +1439,15 @@ export default {
             : "";
           lines.push("What happened");
           lines.push(
-            "- Add flow was blocked because Emby creation/discovery did not complete reliably.",
+            "- Add flow was blocked because the show folder was not created.",
           );
-          lines.push("- No no-emby fallback record was created (by design).");
+          lines.push("- No fallback record was created (by design).");
           lines.push("");
           lines.push("Requested show");
           lines.push(`- Show name: ${name}`);
           lines.push(`- TVDB id: ${tvdbId}`);
           lines.push(`- Has TVDB map data: ${hasMapData}`);
-          lines.push(`- Emby folder created: ${createdFolder}`);
+          lines.push(`- Show folder created: ${createdFolder}`);
           lines.push(`- Seasons from map: ${seriesMapSeasons}`);
           lines.push("");
           lines.push("Create result");
@@ -2299,9 +2214,6 @@ export default {
     // Refresh space display once on app load.
     this.requestSpaceAvailRefresh("app load");
 
-    // Check if library refresh is already running on app load
-    this.checkLibraryRefreshStatus();
-
     if (
       this.simpleMode &&
       !["info", "map", "actors"].includes(this.currentPane)
@@ -2415,9 +2327,7 @@ export default {
     evtBus.on("previewSrchChoice", this.onPreviewSrchChoice);
     evtBus.on("addPreviewShowDone", this.onAddPreviewShowDone);
 
-    evtBus.on("startLibraryRefresh", this.startLibraryRefresh);
     evtBus.on("setLibraryProgress", this.handleSetLibraryProgress);
-    this.startLibraryRefreshChannel();
 
     evtBus.on("showStreamPane", (show) => {
       this.currentPane = "tor";

@@ -1,6 +1,5 @@
 import * as tvdb from "./tvdb.js";
 import * as srvr from "./srvr.js";
-import evtBus from "./evtBus.js";
 import { episodeDataToWatchedEpis } from "@tv/share";
 import { unilog } from "./log.js";
 
@@ -120,10 +119,7 @@ export const createShowFolderAndRefreshEmby = async ({
   tvdbData,
   onStatus,
   createTimeoutMs = 15000,
-  refreshTimeoutMs = 120000,
 } = {}) => {
-  const sleep = (ms) =>
-    new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
   const withTimeout = async (promise, ms, label) => {
     const timeoutMs = Math.max(0, Number(ms) || 0);
     let t;
@@ -160,8 +156,6 @@ export const createShowFolderAndRefreshEmby = async ({
   if (!hasTvdbData)
     return { createdFolder: false, status: "badargs", err: "missing tvdbData" };
 
-  let createdFolder = false;
-
   try {
     if (typeof onStatus === "function") onStatus("Creating folder...");
     await withTimeout(
@@ -174,7 +168,6 @@ export const createShowFolderAndRefreshEmby = async ({
       createTimeoutMs,
       "createShowFolder",
     );
-    createdFolder = true;
   } catch (e) {
     return {
       createdFolder: false,
@@ -183,58 +176,7 @@ export const createShowFolderAndRefreshEmby = async ({
     };
   }
 
-  // Refresh Emby so the new folder gets scanned. Ignore refresh errors, but report them.
-  try {
-    if (typeof onStatus === "function") onStatus("Refreshing Emby...");
-
-    // Register for progress and completion before triggering to avoid race condition
-    const donePromise = new Promise((resolve, reject) => {
-      const timer = setTimeout(
-        () => reject(new Error("timeout waiting for libraryRefreshDone")),
-        refreshTimeoutMs,
-      );
-
-      function onDone() {
-        clearTimeout(timer);
-        evtBus.off("libraryRefreshDone", onDone);
-        evtBus.off("libraryProgress", onProgress);
-        resolve();
-      }
-
-      function onProgress(data) {
-        if (typeof onStatus !== "function") return;
-        if (data?.pct != null)
-          onStatus(`Scan: ${Number(data.pct).toFixed(0)}%`);
-        else if (data?.status) onStatus(String(data.status));
-      }
-
-      evtBus.on("libraryRefreshDone", onDone);
-      evtBus.on("libraryProgress", onProgress);
-    });
-
-    await srvr.requestEmbyLibraryRefresh();
-    await donePromise;
-  } catch (e) {
-    return {
-      createdFolder: true,
-      status: "refreshfailed",
-      err: e?.message || String(e),
-    };
-  }
-
-  // Run server-side Emby sweep and wait for it to finish so inEmby status
-  // is current before the caller reloads the show list.
-  try {
-    if (typeof onStatus === "function") onStatus("Syncing...");
-    await srvr.embySync();
-  } catch (e) {
-    unilog(
-      869,
-      "createShowFolderAndRefreshEmby: embySync failed",
-      e?.message || e,
-    );
-  }
-
+  // tv-srvr puts the show in the library as it creates the folder.
   return { createdFolder: true, status: "ok" };
 };
 

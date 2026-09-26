@@ -15,7 +15,7 @@ export default {
   map: `Ctrl+click episode — delete episode file
 Alt+click episode — play the episode
 Ctrl+click season — delete entire season folder
-Ctrl+click "Not in Emby" — create server folder & refresh Emby`,
+Ctrl+click "Not In Library" — create the show folder & add it to the library`,
 
   actors: `Ctrl+click actor name — open IMDB search for actor`,
 

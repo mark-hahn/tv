@@ -58,28 +58,6 @@
       <div style="font-size: 18px; font-weight: bold">Reloading Shows</div>
     </div>
     <div
-      id="removingFromEmbyModal"
-      v-if="showRemovingFromEmby"
-      @click.stop
-      style="
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background-color: white;
-        padding: 30px 40px;
-        border: 2px solid black;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-        z-index: 10000;
-        text-align: center;
-      "
-    >
-      <div style="font-size: 18px; font-weight: bold">
-        Removing show from emby.
-      </div>
-    </div>
-    <div
       id="center"
       :style="{
         height: '100%',
@@ -127,8 +105,6 @@
               @filter-focus="filterInputFocused = true"
               @filter-blur="onFilterBlur"
               @send-filters="sendSharedFilters"
-              @library-click="libraryClick"
-              @opn-lib-click="opnLibClick"
               @all-click="allClick"
               @custom-click="customClick"
               :actorsListMode="actorsListMode"
@@ -241,8 +217,6 @@
             @filter-focus="filterInputFocused = true"
             @filter-blur="onFilterBlur"
             @send-filters="sendSharedFilters"
-            @library-click="libraryClick"
-            @opn-lib-click="opnLibClick"
             @all-click="allClick"
             @custom-click="customClick"
             :actorsListMode="actorsListMode"
@@ -607,7 +581,7 @@ export default {
         // Highlight the next show now that the deleted show has been filtered out.
         if (nextShow) this.saveVisShow(nextShow, true);
       } else {
-        // Not in Emby: permanently delete with confirmation (no files to delete)
+        // Not in the library: permanently delete with confirmation (no files to delete)
         if (
           !window.confirm(
             `Do you want to PERMANENTLY delete the show "${name}"?`,
@@ -653,7 +627,6 @@ export default {
       searchingShowName: "",
       searchingStatus: "",
       showReloadingShows: false,
-      showRemovingFromEmby: false,
       isWideLandscape: false,
       actorFilter: null,
       actorSearchParams: null, // Store search params for word-based actor search
@@ -1001,16 +974,6 @@ export default {
       } catch {
         this.isWideLandscape = false;
       }
-    },
-
-    libraryClick(evt) {
-      evtBus.emit("startLibraryRefresh");
-    },
-
-    opnLibClick() {
-      util.openExternalPage(
-        "https://hahnca.com:8920/web/index.html#!/librarysetup/libraries",
-      );
     },
 
     async customClick() {
@@ -1608,7 +1571,6 @@ export default {
             tvdbData,
             onStatus: setWebAddStatus,
             createTimeoutMs: 15000,
-            refreshTimeoutMs: 120000,
           });
           createResult = res;
           createdFolder = !!res?.createdFolder;
@@ -1616,11 +1578,7 @@ export default {
             1233,
             `createShowFolderAndRefreshEmby result for ${name}: createdFolder=${createdFolder} status=${res?.status}`,
           );
-          if (res?.status === "refreshfailed") {
-            alert(
-              `The folder for "${name}" was created, but the Emby library refresh timed out.\nThe show should appear after Emby finishes scanning on its own.`,
-            );
-          } else if (!createdFolder) {
+          if (!createdFolder) {
             unilog(971, "web add: createShowFolderAndRefreshEmby failed", {
               name,
               tvdbId,
@@ -1648,35 +1606,12 @@ export default {
             // ignore
           }
 
+          // tv-srvr put the show in the library as it made the folder.
           show = findShowByTvdbIdOrName({ requireInEmby: true });
-
-          // Emby created the folder, but the item may not be visible immediately.
-          // Retry discovery; never create a no-emby duplicate in this branch.
           if (!show) {
-            const noEmbyMatch = findShowByTvdbIdOrName({
-              requireInEmby: false,
-            });
-            setWebAddStatus("Waiting for Emby scan...");
-            for (let attempt = 1; attempt <= 4; attempt++) {
-              await new Promise((resolve) => setTimeout(resolve, 2000));
-              tvdb.clearCache();
-              await this.newShows(false);
-              show = findShowByTvdbIdOrName({ requireInEmby: true });
-              if (show) break;
-              unilog(1757, `Emby scan discovery did not find ${name} (tvdbId=${tvdbId}) on attempt ${attempt}/4${attempt < 4 ? ", retrying" : ""}`);
-              setWebAddStatus(`Waiting for Emby scan... (${attempt}/4)`);
-            }
-          }
-
-          if (!show) {
-            // Folder was created but Emby scan hasn't indexed it yet.
-            // Fall back to the existing record — inEmby will update when Emby finishes scanning.
-            show = findShowByTvdbIdOrName({ requireInEmby: false });
-          }
-          if (!show) {
-            unilog(1758, `Emby scan discovery gave up for ${name} (tvdbId=${tvdbId}) after refresh retries`);
+            unilog(2527, `${name} (tvdbId=${tvdbId}) is not in the library after its folder was made`);
             throw new Error(
-              `Created in Emby but not found after refresh: ${name} (tvdbId=${tvdbId})`,
+              `Folder made but not in the library: ${name} (tvdbId=${tvdbId})`,
             );
           }
 
@@ -2436,15 +2371,14 @@ export default {
           noSwitch: true,
         });
 
-        // Refresh just this show in Emby so the episode is removed from its list
+        // Reprocess just this show now that the episode's file is gone
         this.markShowUpdating(show.name);
         await srvr
-          .refreshEmbyItem(show.id, show.name)
+          .triggerShowSelect(show.name)
           .catch((err) =>
-            unilog(978, `refreshEmbyItem failed for ${show.name}:`, err),
+            unilog(2528, `triggerShowSelect failed for ${show.name}: ${err}`),
           );
 
-        // Refresh the Map grid now that Emby has updated.
         await this.seriesMapAction("refresh", show, null);
         return;
       }
@@ -2481,46 +2415,18 @@ export default {
         });
       } else {
         const cell = this.seriesMap?.[season]?.[episode];
-        if (cell && !cell.id) {
-          // Episode is filesOnDisk-only (not in Emby) — use local path
-          cell.played = setWatched !== null ? setWatched : !cell.played;
-          const seriesMapArr = [];
-          for (const sNum of Object.keys(this.seriesMap).sort(
-            (a, b) => a - b,
-          )) {
-            const episodes = [];
-            for (const eNum of Object.keys(this.seriesMap[sNum]).sort(
-              (a, b) => a - b,
-            )) {
-              episodes.push([+eNum, this.seriesMap[sNum][eNum]]);
-            }
-            seriesMapArr.push([+sNum, episodes]);
-          }
-          const watchedEpis = tvdb.seriesMapToWatchedEpis(seriesMapArr);
-          await srvr.setWatchedEpis({ name: show.name, watchedEpis });
-          this.$emit("show-map", {
-            mapShow: this.mapShow,
-            hideMapBottom: this.hideMapBottom,
-            seriesMapSeasons: this.seriesMapSeasons,
-            seriesMapEpis: this.seriesMapEpis,
-            seriesMap: this.seriesMap,
-            mapError: "",
-            noSwitch: true,
-          });
-        } else {
-          const watched = setWatched !== null ? setWatched : !cell?.played;
-          const res = await srvr.setEpisodeWatched({
-            name: show.name,
-            season: Number(season),
-            episode: Number(episode),
-            watched,
-          });
-          if (!res?.ok)
-            throw new Error(
-              `setEpisodeWatched failed for ${show.name} S${season}E${episode}: ${res?.error}`,
-            );
-          await this.seriesMapAction("refresh", show, { trustWatched: true });
-        }
+        const watched = setWatched !== null ? setWatched : !cell?.played;
+        const res = await srvr.setEpisodeWatched({
+          name: show.name,
+          season: Number(season),
+          episode: Number(episode),
+          watched,
+        });
+        if (!res?.ok)
+          throw new Error(
+            `setEpisodeWatched failed for ${show.name} S${season}E${episode}: ${res?.error}`,
+          );
+        await this.seriesMapAction("refresh", show, null);
       }
     },
 
@@ -2615,9 +2521,9 @@ export default {
       if (deletedCount > 0) {
         this.markShowUpdating(show.name);
         await srvr
-          .refreshEmbyItem(show.id, show.name)
+          .triggerShowSelect(show.name)
           .catch((err) =>
-            unilog(981, `refreshEmbyItem failed for ${show.name}:`, err),
+            unilog(2529, `triggerShowSelect failed for ${show.name}: ${err}`),
           );
 
         await this.seriesMapAction("refresh", show, null);
@@ -2743,7 +2649,7 @@ export default {
       }
 
       // Build the map from the server's authoritative episodeData. The server
-      // refreshes watched (Emby) + files (disk) and returns the seriesMap in
+      // refreshes files (disk) and returns the seriesMap in
       // the legacy wire shape: [[season, [[ep, {error, played, avail, noFile,
       // unaired, path, id, quality}]], ...], ...].
       let seriesMapIn = [];
@@ -2760,11 +2666,6 @@ export default {
           resp = await srvr.getSeriesMapFromEmby({
             showName: show.name,
             stale: useStale,
-            // A refresh right after we changed watched in Emby: tell the server
-            // to trust Emby's watched flags even if every watched episode of
-            // the show just went unplayed (its anti-wipe guard would otherwise
-            // restore the stored flags).
-            trustWatched: options.trustWatched === true,
           });
         }
         if (resp?.success && Array.isArray(resp.seriesMap)) {
@@ -2780,7 +2681,7 @@ export default {
           }
         } else if (resp) {
           errorMessage =
-            resp?.error || "Not in emby and show not found in TVDB.";
+            resp?.error || "Not in the library and show not found in TVDB.";
         }
       } catch (e) {
         errorMessage = e?.message || "Failed to load series map.";
@@ -2790,7 +2691,7 @@ export default {
       if (mapToken !== this._mapActionToken) return;
 
       if (seriesMapIn.length === 0 && !errorMessage && !useStale) {
-        errorMessage = "Not in emby and show not found in TVDB.";
+        errorMessage = "Not in the library and show not found in TVDB.";
       }
 
       for (const season of seriesMapIn) {
@@ -2850,9 +2751,9 @@ export default {
       if (action === "prune") {
         this.markShowUpdating(show.name);
         await srvr
-          .refreshEmbyItem(show.id, show.name)
+          .triggerShowSelect(show.name)
           .catch((err) =>
-            unilog(986, `refreshEmbyItem failed for ${show.name}:`, err),
+            unilog(2530, `triggerShowSelect failed for ${show.name}: ${err}`),
           );
         await this.seriesMapAction("refresh", show);
       }
@@ -3487,50 +3388,6 @@ export default {
       // await util.removeDontSavesFromTvdbJson()
       // await util.loadAllRemotes(allShows); // takes many hours
     },
-
-    async updateShowFromDiskChange(showName) {
-      if (!showName) return;
-
-      try {
-        // Get updated tvdb record for this show
-        const updatedTvdb = await tvdb.getAllTvdb(
-          this.hasLoadedAllShows ? 0 : 1,
-        );
-        const show = allShows.find((s) => s.name === showName);
-        const showTvdbId = String(show?.tvdbId || show?.tvdb_id || "").trim();
-        const tvdbRecord = tvdb.getTvdbRecordByNameOrId(
-          updatedTvdb,
-          showName,
-          showTvdbId,
-        ).record;
-
-        if (!tvdbRecord) {
-          unilog(994, `No tvdb record found for ${showName}`);
-          return;
-        }
-
-        // Merge the full record IN PLACE (see tvdbUpdated handler)
-        if (show) {
-          tvdb.mergeTvdbRecord(show, tvdbRecord);
-          if (allTvdb) allTvdb[show.name] = show;
-          evtBus.emit(
-            "intro-count",
-            allShows.filter((s) => s.needsIntro).length,
-          );
-
-          // If this show is currently displayed on the map, refresh it
-          if (this.mapShow && this.mapShow.name === showName) {
-            unilog(995, `Refreshing map for ${showName}`);
-            await this.seriesMapAction("refresh", show, null);
-          }
-
-          // Refresh UI to show updated data
-          await this.refilter(false);
-        }
-      } catch (err) {
-        unilog(996, `Error updating ${showName}:`, err);
-      }
-    },
   },
 
   /////////////////  MOUNTED  /////////////////
@@ -3684,7 +3541,7 @@ export default {
       const { showName } = data || {};
       if (!showName) return;
       unilog(1082, `Disk changed for: ${showName}`);
-      // Progress and reload driven by libraryProgress/libraryRefreshDone WS events via App.vue
+      // The reload comes from tv-srvr's tvdbUpdated push for the show
     });
 
     // Simple + portrait: Buttons are rendered in App.vue and forward events via evtBus.
@@ -3797,11 +3654,13 @@ export default {
         return;
       }
 
-      // Refresh this show in Emby after content deletion.
+      // Reprocess this show after content deletion.
       this.markShowUpdating(show.name);
       await srvr
-        .refreshEmbyItem(show.id, show.name)
-        .catch((err) => unilog(999, "refreshEmbyItem failed:", err));
+        .triggerShowSelect(show.name)
+        .catch((err) =>
+          unilog(2531, `triggerShowSelect failed for ${show.name}: ${err}`),
+        );
       await this.seriesMapAction("refresh", show, null);
     });
 
@@ -3809,22 +3668,14 @@ export default {
     on("library-refresh-complete", async (payload) => {
       const onDone =
         payload && typeof payload === "object" ? payload.onDone : null;
-      const diskChangeShowName =
-        payload && typeof payload === "object"
-          ? payload.diskChangeShowName
-          : null;
 
       try {
         if (typeof onDone === "function") {
-          // Map "Not in Emby" flow: a new show was just created — full reload needed
+          // Map "Not In Library" flow: a new show was just created — full reload needed
           this.showReloadingShows = true;
           tvdb.clearCache();
           await this.newShows();
-        } else if (diskChangeShowName) {
-          // Disk change: targeted update only — no full reload
-          await this.updateShowFromDiskChange(diskChangeShowName);
         }
-        // Manual scan: triggerEmbySync pushes tvdbUpdated WS events — no reload needed
       } catch (err) {
         unilog(1000, "library-refresh-complete: failed", err);
       } finally {

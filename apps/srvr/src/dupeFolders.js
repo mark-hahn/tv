@@ -1,23 +1,21 @@
 // Merging duplicate show folders.
 //
-// Emby can end up holding two Series items for one show, each pointing at its
-// own folder -- a rename that left the old folder behind, or a release whose
-// folder name drifted from the show's name. Both items carry the same tvdbId,
-// so they collapse onto one tvdb record, and whichever the sweep visits last
-// wins the record's `path`. Half the show is then invisible to everything that
-// works from the record.
+// A show can end up with two folders -- one its record's `path` names and one
+// named after the show itself -- from a rename that left the old folder
+// behind, or a release whose folder name drifted from the show's name. Half
+// the show is then invisible to everything that works from the record.
 //
 // This merges the folders when it can prove they hold one show, and refuses
 // otherwise. Refusing is the safe outcome and is expected to be common: two
-// folders sharing a tvdbId does NOT mean they hold the same show, only that
-// Emby matched both to it -- Emby matches on the folder name, so a misfiled
-// season of an entirely different show inherits its neighbour's identity.
+// folders resolving to one record does NOT mean they hold the same show, only
+// that their names say so -- a misfiled season of an entirely different show
+// inherits its neighbour's identity the same way.
 //
 // The proof required before anything moves:
 //   * every video in the losing folder parses to a season/episode,
 //   * every one of those is an episode TVDB actually aired for this show
-//     (an episode slot with no air date means Emby invented it from the very
-//     files being judged, which is the misfiled-show signature),
+//     (an episode slot with no air date was made up from the very files
+//     being judged, which is the misfiled-show signature),
 //   * nothing under the losing folder is still being written.
 //
 // An episode sitting in both folders is not a refusal: the two files are put
@@ -129,7 +127,7 @@ export function auditShowFolder(folder, ed) {
         continue;
       }
       // An episode slot with no air date was not aired by TVDB for this show:
-      // Emby invented it from this very file. That is the signature of a
+      // the disk scan made it from this very file. That is the signature of a
       // different show sitting in a folder named like this one.
       if (!epd.getAired(ed, season, episode)) {
         problems.push(
@@ -298,31 +296,27 @@ export function executeFolderMerge(plan) {
 }
 
 /**
- * Group Emby series by the tvdb record they resolve to and, for every record
- * claimed by more than one folder, plan the merge of the extras into the
- * folder holding the most videos.
+ * Group the library's show folders by the tvdb record they resolve to and,
+ * for every record claimed by more than one folder, plan the merge of the
+ * extras into the folder holding the most videos.
  *
- * `resolve` maps an Emby series to { key, rec } or null.
+ * `resolve` maps a folder name to { key, rec } or null.
  * Returns one entry per duplicated record, each with its plans.
  */
-export function planDuplicateFolders(embyShows, resolve) {
+export function planDuplicateFolders(showFolders, resolve) {
   const byRecord = new Map();
-  for (const show of embyShows) {
-    const folder = String(show?.Path || "")
-      .split("/")
-      .pop();
-    if (!folder) continue;
-    const hit = resolve(show);
+  for (const folder of showFolders) {
+    const hit = resolve(folder);
     if (!hit?.key) continue;
-    const entry = byRecord.get(hit.key) || { hit, folders: new Map() };
-    entry.folders.set(folder, show);
+    const entry = byRecord.get(hit.key) || { hit, folders: new Set() };
+    entry.folders.add(folder);
     byRecord.set(hit.key, entry);
   }
 
   const out = [];
   for (const [key, entry] of byRecord) {
     if (entry.folders.size < 2) continue;
-    const folders = [...entry.folders.keys()];
+    const folders = [...entry.folders];
     const ed = entry.hit.rec?.episodeData;
     const group = {
       showName: key,
@@ -347,8 +341,8 @@ export function planDuplicateFolders(embyShows, resolve) {
     }
 
     // Audit every folder before choosing between them. One bad folder condemns
-    // the whole group: sharing a tvdbId only means Emby matched both to this
-    // show, and if either is really a different show then no direction of
+    // the whole group: resolving to one record only means both names point at
+    // this show, and if either is really a different show then no direction of
     // merge is safe.
     const audits = folders.map((f) => auditShowFolder(f, ed));
     group.counts = Object.fromEntries(

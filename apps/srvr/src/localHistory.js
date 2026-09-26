@@ -277,9 +277,9 @@ function addTvdbEvents(add, ctx) {
   const rec = ctx.rec;
   if (!rec) return;
   const showName = ctx.showName || rec.name || "show";
-  add(rec.dateCreated, "tvdb", `${showName} added to Emby`);
+  add(rec.dateCreated, "tvdb", `${showName} added to the library`);
   add(rec["last-downloaded"], "tvdb", `${showName} last downloaded`);
-  add(rec.lastPlayedDate, "tvdb", `${showName} last played in Emby`);
+  add(rec.lastPlayedDate, "tvdb", `${showName} last played`);
   const lastViewed = view.getLastViewedSync()?.[showName];
   add(lastViewed, "lastViewed", `${showName} last viewed`);
 

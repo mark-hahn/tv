@@ -1,6 +1,6 @@
 // Disk domain: scans the tv media tree for shows/episodes (files, resolution),
 // builds Emby tvshow.nfo, and performs the authoritative
-// refresh of a record's episodeData from TVDB + Emby + disk. Owns the
+// refresh of a record's episodeData from TVDB + disk. Owns the
 // whole-library disk cache (invalidated by the file watcher) and the
 // ffprobe-height cache.
 
@@ -20,8 +20,6 @@ import * as epd from "@tv/share";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
 import * as tvdb from "./tvdb.js";
 import { showFolderFor, folderToRecord } from "./showPaths.js";
-import * as emby from "./emby.js";
-import * as embyWatched from "./embyWatched.js";
 import * as util from "./util.js";
 import { videoFileExtensions } from "./videoFiles.js";
 
@@ -400,14 +398,12 @@ export const getShowDiskInfo = async (showFolderName) => {
   }
 };
 
-// Single authoritative refresh of rec.episodeData from the three sources:
-// TVDB (aired), Emby (watched + episode id), disk scan (file name + resolution).
-// `opts.sources` limits which sources run.
+// Single authoritative refresh of rec.episodeData from its two sources:
+// TVDB (aired) and the disk scan (file name + resolution). The watched marks
+// and resume points are the record's own, written by setEpisodeWatched and
+// playProgress. `opts.sources` limits which sources run.
 export async function refreshEpisodeData(showName, rec, opts = {}) {
-  const sources = opts.sources || ["tvdb", "emby", "disk"];
-  // Set by a refresh that follows a watched edit this app just made in Emby,
-  // so the anti-wipe guard below doesn't undo a deliberate unmark.
-  const trustWatched = opts.trustWatched === true;
+  const sources = opts.sources || ["tvdb", "disk"];
   if (!Array.isArray(rec.episodeData)) rec.episodeData = [];
   const ed = rec.episodeData;
 
@@ -419,7 +415,6 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
   // see the prune step below.
   const seen = new Set();
   let tvdbOk = false;
-  let embyOk = false;
   let diskOk = false;
 
   // 1. TVDB aired dates — adds slots for every aired episode.
@@ -445,93 +440,7 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
     }
   }
 
-  // 2. Emby watched flag + episode id (in-emby shows only).
-  let embyMs = 0;
-  if (sources.includes("emby") && rec.inEmby && rec.id) {
-    const embyStart = Date.now();
-    try {
-      const embyMap = await emby.getSeriesMap({
-        id: rec.id,
-        name: showName,
-        tvdbId: rec.tvdbId,
-      });
-      // Emby is the only source of watched for a show still in the library, so
-      // a sweep that reports every previously-watched episode as unplayed
-      // cannot be told apart from Emby having lost its user data — the failure
-      // that erased the watch history of every show that left the library
-      // before episodeData existed. Keep the stored flags in that case.
-      // Unmarking episodes one at a time leaves others watched so it still
-      // applies, /api/setWatchedEpis clears a show deliberately, and a refresh
-      // that follows this app's own watched edit passes trustWatched.
-      let wasWatched = 0;
-      let nowUnplayed = 0;
-      for (const [seasonNum, episodes] of embyMap || []) {
-        if (!Number.isInteger(seasonNum)) continue;
-        for (const [epNum, ep] of episodes) {
-          if (!Number.isInteger(epNum) || epNum < 1) continue;
-          if (!epd.isWatched(ed, seasonNum, epNum)) continue;
-          wasWatched++;
-          if (!ep.played) nowUnplayed++;
-        }
-      }
-      const wipesWatched =
-        !trustWatched && wasWatched >= 2 && nowUnplayed === wasWatched;
-      if (wipesWatched)
-        unilog(2205, `Emby reported all ${wasWatched} watched episodes of ${showName} as unplayed — keeping the stored watched flags`);
-      for (const [seasonNum, episodes] of embyMap || []) {
-        if (!Number.isInteger(seasonNum)) continue;
-        for (const [epNum, ep] of episodes) {
-          if (!Number.isInteger(epNum) || epNum < 1) continue;
-          seen.add(`${seasonNum}.${epNum}`);
-          const fields = {
-            id: ep.id ? Number(ep.id) : 0,
-            pos: ep.pos || 0,
-          };
-          if (!wipesWatched) fields.watched = !!ep.played;
-          epd.setEpisode(ed, seasonNum, epNum, fields);
-        }
-      }
-      // getSeriesMap returns null on a non-200, which correctly reads as
-      // "Emby data not available" rather than "Emby has no episodes".
-      embyOk = Array.isArray(embyMap);
-    } catch (e) {
-      unilog(31, `emby ${showName}: ${e.message}`);
-    }
-    embyMs = Date.now() - embyStart;
-  }
-
-  // 2b. Watched fallback for shows no longer in Emby. Emby's user data is keyed
-  // by tvdbId + season + episode rather than by item id, so it survives the
-  // show's removal and can still say what was watched — including for the
-  // shows whose flags were lost before episodeData gave them a home. Only ever
-  // adds a watched mark; clearing one stays a deliberate act.
-  if (sources.includes("emby") && !rec.inEmby && rec.tvdbId) {
-    try {
-      const watched = embyWatched.getWatchedEpisodes(rec.tvdbId);
-      let added = 0;
-      for (const [key] of watched) {
-        const [season, episode] = key.split(".").map(Number);
-        if (epd.isWatched(ed, season, episode)) continue;
-        epd.setEpisode(ed, season, episode, { watched: true });
-        added++;
-      }
-      // The viewing date comes back the same way — only when the record has
-      // none, and always with its episode, since the two name one viewing.
-      const latest = rec.lastPlayedDate
-        ? null
-        : embyWatched.latestPlayed(watched);
-      if (latest) {
-        rec.lastPlayedDate = latest.lastPlayedDate;
-        rec.lastPlayedEpisode = latest.lastPlayedEpisode;
-      }
-      if (added > 0 || latest)
-        unilog(2212, `restored ${added} watched episode(s) of ${showName} from emby user data${latest ? `, last viewed ${latest.lastPlayedEpisode} ${latest.lastPlayedDate}` : ""}`);
-    } catch (e) {
-      unilog(2208, `emby user data lookup failed for ${showName}: ${e.message}`);
-    }
-  }
-
-  // 3. Disk scan — authoritative file name + resolution, plus date/size/noFiles.
+  // 2. Disk scan — authoritative file name + resolution, plus date/size/noFiles.
   let diskMs = 0;
   if (sources.includes("disk")) {
     const diskStart = Date.now();
@@ -579,24 +488,22 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
     diskMs = Date.now() - diskStart;
   }
 
-  // Slow-path diagnostic: the map pane refresh (sources emby+disk) has been
-  // seen taking several seconds; log the breakdown when a single refresh is
-  // slow so the culprit phase is captured without flooding the periodic sweep.
-  if (embyMs + diskMs > 1500) {
-    unilog(1519, `slow refreshEpisodeData ${showName}: emby=${embyMs}ms disk=${diskMs}ms sources=${sources.join("+")}`);
+  // Slow-path diagnostic: the map pane refresh has been seen taking several
+  // seconds; log it when a single refresh is slow so it is captured without
+  // flooding the periodic sweep.
+  if (diskMs > 1500) {
+    unilog(2515, `slow refreshEpisodeData ${showName}: disk=${diskMs}ms sources=${sources.join("+")}`);
   }
 
-  // Shows not in Emby never keep files — drop id/file/res, keep aired/watched.
+  // Shows out of the library never keep files — drop id/file/res, keep
+  // aired/watched.
   if (!rec.inEmby) epd.stripToAiredWatched(ed);
 
   // Prune ghost episodes: slots left behind by an episode that has since
-  // vanished from Emby (or TVDB), which nothing else ever removed. Only safe
-  // when every source ran and answered — a TVDB outage or an Emby non-200
-  // would leave `seen` short and eat real episodes. Shows out of Emby prune on
-  // TVDB + disk alone, since Emby contributes nothing to them by definition.
-  const allSources = ["tvdb", "emby", "disk"].every((s) => sources.includes(s));
-  const embyVouched = rec.inEmby ? embyOk : true;
-  if (allSources && tvdbOk && embyVouched && diskOk) {
+  // vanished from TVDB and the disk, which nothing else ever removed. Only
+  // safe when both sources ran and answered — a TVDB outage would leave `seen`
+  // short and eat real episodes.
+  if (sources.includes("tvdb") && sources.includes("disk") && tvdbOk && diskOk) {
     const ghosts = epd.pruneGhosts(ed, seen);
     if (ghosts.length > 0) {
       const list = ghosts

@@ -302,20 +302,7 @@ export const getRemotes = async (
     const cachedRemotes = Array.isArray(found?.remotes) ? found.remotes : [];
     const hasCachedRemotes = cachedRemotes.length > 0;
 
-    if (hasCachedRemotes) {
-      // If caller provides inEmby context, cached remotes must match it.
-      // This avoids stale cache showing no Emby button right after a show is added.
-      const expectedInEmby =
-        showContext?.inEmby === undefined ? null : showContext.inEmby !== false;
-      const hasEmbyRemote = cachedRemotes.some((r) => r?.name === "Emby");
-      const cacheMatchesInEmby =
-        expectedInEmby === null ||
-        (expectedInEmby ? hasEmbyRemote : !hasEmbyRemote);
-
-      if (cacheMatchesInEmby) {
-        return cachedRemotes;
-      }
-    }
+    if (hasCachedRemotes) return cachedRemotes;
   }
 
   // Check if in-flight request exists

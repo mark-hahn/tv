@@ -21,7 +21,7 @@ export function showFolderFor(showName, rec) {
   const name = String(showName || rec?.name || "");
   if (name.includes("/")) return name;
   const record = rec || (tvdb.getAllTvdbSync() || {})[name];
-  return String(record?.path || record?.emby?.path || name)
+  return String(record?.path || name)
     .split("/")
     .pop();
 }

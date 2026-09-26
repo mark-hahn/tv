@@ -1775,7 +1775,7 @@ export default {
       if (this.selectedFolders.size === 0)
         label = `${files.length} selected files`;
 
-      // Emby check: all files must belong to a show that is in Emby.
+      // Library check: all files must belong to a show that is in the library.
       if (Array.isArray(this.allShows) && this.allShows.length > 0) {
         const embyShows = this.allShows
           .filter((s) => s && s.inEmby)
@@ -1831,7 +1831,7 @@ export default {
           }
         }
         if (notInEmby.length > 0) {
-          alert("Show not in emby:\n\n" + [...new Set(notInEmby)].join("\n"));
+          alert("Show not in the library:\n\n" + [...new Set(notInEmby)].join("\n"));
           return;
         }
       }

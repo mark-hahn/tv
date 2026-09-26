@@ -73,36 +73,6 @@
     >
       <button
         v-if="!simpleMode"
-        @click="$emit('library-click', $event)"
-        style="
-          height: 24px;
-          background-color: white;
-          font-size: 13px;
-          cursor: pointer;
-          border-radius: 7px;
-          margin: 0 0 0 10px;
-          width: 68px;
-        "
-      >
-        Scan Lib
-      </button>
-      <button
-        v-if="!simpleMode"
-        @click="$emit('opn-lib-click')"
-        style="
-          height: 24px;
-          background-color: white;
-          font-size: 13px;
-          cursor: pointer;
-          border-radius: 7px;
-          margin: 0 0 0 10px;
-          width: 65px;
-        "
-      >
-        Open Lib
-      </button>
-      <button
-        v-if="!simpleMode"
         @click="handleSendClick"
         :style="{
           height: '24px',
@@ -232,8 +202,6 @@ export default {
     "filter-focus",
     "filter-blur",
     "send-filters",
-    "library-click",
-    "opn-lib-click",
     "all-click",
     "custom-click",
     "actors-click",

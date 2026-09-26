@@ -270,24 +270,22 @@ export function deleteEpisode(ed, s, e) {
 
 // Remove ghost episodes — slots no source vouches for any more. `seen` is a Set
 // of "<season>.<episode>" keys collected from the sources that were refreshed.
-// A purely local watched mark (watched, no emby id, no file) is never a ghost:
-// it is created by /api/setWatchedEpis and no source will ever report it.
+// A watched mark is never a ghost: the record is the only place it is kept,
+// and no source will ever report it.
 // Returns the removed episodes as [{ season, episode }, ...].
 export function pruneGhosts(ed, seen) {
   const ghosts = [];
   // Collect first — deleting inside the walk would skip entries.
   forEachEpisode(ed, (s, e, ep) => {
     if (seen.has(`${s}.${e}`)) return;
-    const localWatched =
-      ep[W] === 1 && !ep[ID] && !(typeof ep[F] === "string" && ep[F]);
-    if (localWatched) return;
+    if (ep[W] === 1) return;
     ghosts.push({ season: s, episode: e });
   });
   for (const { season, episode } of ghosts) deleteEpisode(ed, season, episode);
   return ghosts;
 }
 
-// Drop id/file/res/pos for every episode (used when a show leaves Emby).
+// Drop id/file/res/pos for every episode (used when a show leaves the library).
 export function stripToAiredWatched(ed) {
   forEachEpisode(ed, (s, e) => {
     setEpisode(ed, s, e, { id: 0, file: null, res: null, pos: 0 });

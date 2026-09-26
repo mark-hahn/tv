@@ -9,14 +9,12 @@ import http from "http";
 import { rimraf } from "rimraf";
 import * as view from "./src/lastViewed.js";
 import * as utilNode from "util";
-import * as emby from "./src/emby.js";
-import * as embyWatched from "./src/embyWatched.js";
+import * as gaps from "./src/gaps.js";
 import * as tvdb from "./src/tvdb.js";
 import * as util from "./src/util.js";
 import * as email from "./src/email.js";
 import * as tmdb from "./src/tmdb.js";
 import { handleFix, readFixState, tailFixLog } from "./src/fix.js";
-import fetch from "node-fetch";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
 import {
   parseFileSeasonEpisode,
@@ -40,7 +38,6 @@ import {
   SRVR_SECRETS_DIR,
 } from "./src/srvrPaths.js";
 import * as groupCounts from "./src/groupCounts.js";
-import * as urls from "./src/urls.js";
 import * as unilogDb from "./src/unilogDb.js";
 import { srtTimeToMs, msToSrtTime } from "./src/srt.js";
 import {
@@ -243,7 +240,6 @@ const getShowDiskInfo = disk.getShowDiskInfo;
 const safeShowFolderName = disk.safeShowFolderName;
 const seasonFolderName = disk.seasonFolderName;
 const buildTvShowNfo = disk.buildTvShowNfo;
-import { EMBY_BASE_URL, EMBY_USER_ID, EMBY_API_KEY } from "./src/embyConfig.js";
 subsQueue.init({ syncBatchMsgs });
 // Local aliases keep existing call sites terse (subsQueue domain lives in
 // src/subsQueue.js). State lives on the shared subsState object.
@@ -471,14 +467,6 @@ function stripGapTransientFields(gap) {
   return changed;
 }
 
-// Emby DeviceNames reported by the Emby app on each TV
-const TV_DEVICE_NAMES = ["Living Room TV"];
-
-// Delay before the auto-skip trim seek. Kept short so none of the intro plays;
-// the player often isn't ready to seek this early, which doTrimIntro handles by
-// verifying the position landed and retrying.
-const AUTO_SKIP_DELAY_MS = 250;
-
 // Debounced per-show push so rapid tvdb changes coalesce into one notification
 const PUSH_DEBOUNCE_MS = 500;
 const pendingPushes = new Map();
@@ -530,99 +518,6 @@ const handlePickupChange = (name, inEmby, status) => {
 };
 tvdb.setPickupChangeCallback(handlePickupChange);
 
-// Detect and fix the "compact NNN" mis-indexing: Emby reads a filename like
-// "101-Title.avi" in Season 1 as episode 101 instead of S1E01. This leaves the
-// real TVDB-sourced virtual stubs (E1-E21) un-linked. We rename the files to
-// SxxExx format so the next Emby scan matches them correctly.
-const fixCompactEpisodeNaming = async (showId, showName) => {
-  let anyFixed = false;
-  try {
-    const seasonsRes = await fetch(
-      `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items?ParentId=${showId}&Fields=MediaSources,Path,LocationType&api_key=${EMBY_API_KEY}`,
-    );
-    if (!seasonsRes.ok) return false;
-    const seasonsData = await seasonsRes.json();
-    const seasons = seasonsData?.Items || [];
-
-    for (const season of seasons) {
-      const seasonId = season.Id;
-      const seasonNumber = season.IndexNumber;
-      if (!Number.isFinite(seasonNumber) || seasonNumber < 1) continue;
-
-      const epsRes = await fetch(
-        `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items?ParentId=${seasonId}&Fields=MediaSources,Path,LocationType&api_key=${EMBY_API_KEY}`,
-      );
-      if (!epsRes.ok) continue;
-      const epsData = await epsRes.json();
-      const episodes = epsData?.Items || [];
-
-      let hasVirtual = false;
-      const compactFileEps = [];
-      for (const ep of episodes) {
-        const epNum = ep.IndexNumber;
-        if (!Number.isFinite(epNum)) continue;
-        const path = ep?.MediaSources?.[0]?.Path || ep?.Path || "";
-        const isVirtual = ep.LocationType === "Virtual" || !path;
-        if (epNum >= 1 && epNum <= 99 && isVirtual) {
-          hasVirtual = true;
-        } else if (epNum >= 100) {
-          // Check compact NNN: first digit(s) = season, last two = episode
-          const compactSeason = Math.floor(epNum / 100);
-          const compactEp = epNum % 100;
-          if (compactSeason === seasonNumber && compactEp >= 1 && path) {
-            compactFileEps.push({ epNum, path, compactEp });
-          }
-        }
-      }
-
-      if (!hasVirtual || compactFileEps.length === 0) continue;
-
-      unilog(
-        530,
-        `${showName} S${seasonNumber}: renaming ${compactFileEps.length} compact-NNN files`,
-      );
-      for (const { path: oldPath, compactEp } of compactFileEps) {
-        const dir = oldPath.substring(0, oldPath.lastIndexOf("/"));
-        const filename = oldPath.substring(oldPath.lastIndexOf("/") + 1);
-        const ext = filename.substring(filename.lastIndexOf("."));
-        // Strip leading NNN- prefix from title
-        const titlePart = filename
-          .replace(/^\d{3}[-\s]/, "")
-          .replace(/\.[^.]+$/, "");
-        const sStr = String(seasonNumber).padStart(2, "0");
-        const eStr = String(compactEp).padStart(2, "0");
-        const newFilename = `S${sStr}E${eStr} - ${titlePart}${ext}`;
-        const newPath = `${dir}/${newFilename}`;
-        if (oldPath === newPath) continue;
-        try {
-          fs.renameSync(oldPath, newPath);
-          unilog(531, `Renamed for ${showName}: ${filename} → ${newFilename}`);
-          anyFixed = true;
-        } catch (e) {
-          unilog(532, `Rename failed for ${showName}: ${oldPath}:`, e.message);
-        }
-      }
-    }
-
-    if (anyFixed) {
-      unilog(533, `Triggering Emby refresh for ${showName}`);
-      try {
-        await fetch(
-          `${EMBY_BASE_URL}/Items/${showId}/Refresh?Recursive=true&MetadataRefreshMode=Default&ImageRefreshMode=Default&api_key=${EMBY_API_KEY}`,
-          { method: "POST" },
-        );
-      } catch (e) {
-        unilog(534, `Emby refresh error for ${showName}:`, e.message);
-      }
-      // Give Emby time to process before gap check reads updated data
-      await new Promise((r) => setTimeout(r, 8000));
-    }
-  } catch (e) {
-    unilog(535, `Error for ${showName}:`, e.message);
-  }
-  return anyFixed;
-};
-
 tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
   try {
     if (tvdbRecord.inEmby) {
@@ -662,34 +557,11 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
     // episodeData are all refreshed by refreshEpisodeData (called from the tvdb
     // loop before this callback), so no separate disk scan is needed here.
     const diskChanges = [];
-    // lastPlayedDate
-    const playedDateChanges = [];
-    if (tvdbRecord.inEmby && tvdbRecord.id) {
-      try {
-        const latestPlayed = await fetchLatestPlayedInfo(tvdbRecord.id);
-        const prevPlayedDate = tvdbRecord.lastPlayedDate;
-        if (applyLatestPlayed(tvdbRecord, latestPlayed)) {
-          playedDateChanges.push(
-            `lastPlayedDate:${prevPlayedDate}->${tvdbRecord.lastPlayedDate}` +
-              ` (${tvdbRecord.lastPlayedEpisode})`,
-          );
-        }
-      } catch (e) {
-        unilog(
-          1362,
-          `lastPlayedDate fetch failed for ${showName}: ${e.message}`,
-        );
-      }
-    }
-    // Fix compact-NNN episode mis-indexing (e.g. "101-Title.avi" parsed as E101)
-    if (tvdbRecord.inEmby && tvdbRecord.id) {
-      await fixCompactEpisodeNaming(tvdbRecord.id, showName);
-    }
     // Gap check
     let gapChanges = [];
     const prevNeedsIntro = !!tvdbRecord.needsIntro;
     if (tvdbRecord.inEmby && tvdbRecord.id) {
-      const gapData = await emby.gapCheckOne(
+      const gapData = await gaps.gapCheckOne(
         tvdbRecord.id,
         showName,
         tvdbRecord,
@@ -813,10 +685,9 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
       }
     }
     // Auto collection updates (run after the gap check, which sets anyWatched)
-    const collectionChanges = await applyAutoCollections(showName, tvdbRecord);
+    const collectionChanges = applyAutoCollections(showName, tvdbRecord);
     const push2Changes = [
       ...diskChanges,
-      ...playedDateChanges,
       ...gapChanges,
       ...collectionChanges,
     ];
@@ -844,13 +715,13 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
     return { hasChanges: false, changes: [] };
   }
 });
-let embyFullSweepTickCount = 0;
+let librarySweepTickCount = 0;
 tvdb.setPreTvdbTickCallback(async ({ isBackground } = {}) => {
-  embyFullSweepTickCount++;
+  librarySweepTickCount++;
   // TEST: skip sweep on foreground (user-triggered) ticks — revert by removing `&& isBackground`
-  if (isBackground && embyFullSweepTickCount % 10 === 1) {
-    const caller = `preTick-bg#${embyFullSweepTickCount}`;
-    await runEmbyFullSweep(caller);
+  if (isBackground && librarySweepTickCount % 10 === 1) {
+    const caller = `preTick-bg#${librarySweepTickCount}`;
+    await runLibrarySweep(caller);
   }
 });
 
@@ -874,7 +745,7 @@ tvdb.setWaitStrChangedCallback(
     if (!hasEpisodesOnDisk(tvdbRecord)) return;
     if (!before && after) {
       // waitStr newly set: hide the show unless it is already hidden.
-      await hideShowIfNeeded(showName, tvdbRecord, `waitStrHide:${showName}`);
+      await hideShowIfNeeded(showName, tvdbRecord);
     }
   },
 );
@@ -1361,8 +1232,6 @@ app.get(
 app.get("/api/getShowsFromDisk", apiWrapper(getShowsFromDisk));
 app.get("/api/getGaps", apiWrapper(getGaps));
 app.get("/api/getNoEmbys", apiWrapper(getNoEmbys));
-app.get("/api/getDevices", apiWrapper(emby.getDevices));
-app.post("/api/embyViewShow", apiWrapper(emby.viewShowOnLivingRoomTv));
 app.get("/api/getPlayUrl", apiWrapper(getPlayUrl));
 app.post("/api/playProgress", apiWrapper(playProgress));
 app.get("/api/getLastViewed", apiWrapper(view.getLastViewed));
@@ -1393,54 +1262,34 @@ app.post(
     }
   }),
 );
-// Every Series item Emby holds, including the ones a user's view collapses.
-// A user-scoped query returns one item per show, so a second Series pointing
-// at a second folder for the same show is invisible there -- and that second
-// folder is exactly what the duplicate-folder merge exists to find.
-async function fetchEmbySeriesUnfiltered() {
-  try {
-    const res = await fetch(
-      `${EMBY_BASE_URL}/Items?api_key=${EMBY_API_KEY}` +
-        `&IncludeItemTypes=Series&Recursive=true&Fields=Name,Id,Path,ProviderIds` +
-        `&StartIndex=0&Limit=10000`,
-    );
-    if (!res.ok) {
-      unilog(2142, `emby fetch ${res.status}`);
-      return null;
-    }
-    return (await res.json()).Items || [];
-  } catch (e) {
-    unilog(2143, `emby fetch: ${e.message}`);
-    return null;
-  }
+// Every show folder in the media tree.
+async function showFolders() {
+  const entries = await fsp.readdir(tvDir, { withFileTypes: true });
+  return entries
+    .filter((d) => d.isDirectory() && !d.name.startsWith("."))
+    .map((d) => d.name);
 }
 
-// Group the Emby series by the tvdb record they resolve to. Shared by the
-// merge and its dry-run report so both judge the same way.
-function planDupeFolderGroups(embySeries) {
+// Group the show folders by the library record they resolve to: the one whose
+// `path` names the folder, else the one named like it. A record claimed both
+// ways by two different folders is a duplicate. Shared by the merge and its
+// dry-run report so both judge the same way.
+async function planDupeFolderGroups() {
   const allTvdb = tvdb.getAllTvdbSync() || {};
-  const findId = (id) => {
-    const want = String(id || "").trim();
-    if (!want) return null;
-    for (const [key, rec] of Object.entries(allTvdb)) {
-      if (String(rec?.tvdbId || "").trim() === want) return { key, rec };
-    }
-    return null;
-  };
-  return dupeFolders.planDuplicateFolders(embySeries, (show) => {
-    const name = show?.Name;
-    if (allTvdb[name]) return { key: name, rec: allTvdb[name] };
-    return findId(show?.ProviderIds?.Tvdb || show?.TvdbId);
-  });
+  const byPath = new Map();
+  for (const [key, rec] of Object.entries(allTvdb)) {
+    if (rec?.inEmby && rec.path) byPath.set(rec.path, { key, rec });
+  }
+  return dupeFolders.planDuplicateFolders(await showFolders(), (folder) =>
+    byPath.get(folder) ||
+    (allTvdb[folder]?.inEmby ? { key: folder, rec: allTvdb[folder] } : null),
+  );
 }
 
 // Fold every duplicate show folder that can be proven safe into the folder
-// holding the show, then have Emby rescan so the series it no longer has files
-// for goes away. Refusals are logged and left alone.
+// holding the show. Refusals are logged and left alone.
 async function mergeDuplicateShowFolders(caller, onlyShow = null) {
-  const embySeries = await fetchEmbySeriesUnfiltered();
-  if (!embySeries) return { merged: 0, refused: 0, results: [] };
-  const groups = planDupeFolderGroups(embySeries).filter(
+  const groups = (await planDupeFolderGroups()).filter(
     (g) => !onlyShow || g.showName === onlyShow,
   );
   const results = [];
@@ -1496,10 +1345,7 @@ async function mergeDuplicateShowFolders(caller, onlyShow = null) {
     if (group.rec && group.winner) group.rec.path = group.winner;
   }
 
-  if (merged) {
-    await tvdb.saveTvdbSync();
-    await embyRefreshManager.request(`dupeFolders:${caller}`, null);
-  }
+  if (merged) await tvdb.saveTvdbSync();
   return { merged, refused, results };
 }
 
@@ -1553,10 +1399,7 @@ app.post(
         unilog(2152, `${plan.showName}: quarantine failed: ${e.message}`);
       }
     }
-    if (movedAny) {
-      await tvdb.saveTvdbSync();
-      await embyRefreshManager.request("strayEpisodes", null);
-    }
+    if (movedAny) await tvdb.saveTvdbSync();
     return { success: true, results };
   }),
 );
@@ -1593,8 +1436,7 @@ app.post(
       }
     }
 
-    const embySeries = await fetchEmbySeriesUnfiltered();
-    for (const g of embySeries ? planDupeFolderGroups(embySeries) : []) {
+    for (const g of await planDupeFolderGroups()) {
       if (g.showName !== showName) continue;
       for (const plan of g.plans) {
         actions.push({
@@ -1669,14 +1511,14 @@ function addIgnoreGaps(rec, episodes) {
     const s = Number(ep?.season);
     const e = Number(ep?.episode);
     if (!Number.isInteger(s) || !Number.isInteger(e)) continue;
-    set.add(emby.ignoreStrayKey(s, e));
+    set.add(gaps.ignoreStrayKey(s, e));
   }
   rec.ignoreGaps = [...set].sort();
   const added = set.size - before;
   if (added) {
     // Stamp the result this ignore was granted against, or the next gap check
     // compares it to a stale signature and discards it immediately.
-    rec.gapSig = emby.currentGapSig(rec?.name, rec);
+    rec.gapSig = gaps.currentGapSig(rec?.name, rec);
     // Ignoring an episode settles it, so the lasting note about it goes too.
     // If other strays are still outstanding the next gap check writes a fresh
     // note naming those instead of the ones just dealt with.
@@ -1691,7 +1533,7 @@ function removeIgnoreGaps(rec, episodes) {
     const s = Number(ep?.season);
     const e = Number(ep?.episode);
     if (Number.isInteger(s) && Number.isInteger(e))
-      drop.add(emby.ignoreStrayKey(s, e));
+      drop.add(gaps.ignoreStrayKey(s, e));
   }
   const before = (rec.ignoreGaps || []).length;
   rec.ignoreGaps = asEpKeys(rec.ignoreGaps).filter((v) => !drop.has(v));
@@ -1769,7 +1611,7 @@ app.post(
   }),
 );
 
-// Runs the merge now instead of waiting for the next emby sweep. `showName`
+// Runs the merge now instead of waiting for the next library sweep. `showName`
 // limits it to one show, which is what the map pane's Gapchk button sends.
 app.post(
   "/api/dupeFolderMerge",
@@ -1779,14 +1621,12 @@ app.post(
   })),
 );
 
-// Dry run of the duplicate-folder merge the emby sweep performs: reports what
-// would move and, for the pairs it refuses, why. Reads only.
+// Dry run of the duplicate-folder merge the library sweep performs: reports
+// what would move and, for the pairs it refuses, why. Reads only.
 app.post(
   "/api/dupeFolderReport",
   apiWrapper(async () => {
-    const embySeries = await fetchEmbySeriesUnfiltered();
-    if (!embySeries) return { success: false, error: "Emby fetch failed" };
-    const groups = planDupeFolderGroups(embySeries);
+    const groups = await planDupeFolderGroups();
     return {
       success: true,
       groups: groups.map((g) => ({
@@ -1809,7 +1649,7 @@ app.post("/api/getActorPage", apiWrapper(tvdb.getActorPage));
 app.post(
   "/api/getSeriesMapFromEmby",
   apiWrapper(async (params) => {
-    const { showName, stale, trustWatched } = params;
+    const { showName, stale } = params;
     if (!showName) return { success: false, error: "Missing showName" };
     const allTvdb = tvdb.getAllTvdbSync();
     const rec = allTvdb?.[showName];
@@ -1818,11 +1658,10 @@ app.post(
       const folder = showPaths.showFolderFor(showName, rec);
       const today = util.toPstDateIso(new Date());
 
-      // Fast path: build the map from the already-cached episodeData in
-      // tvdb.json (populated by the periodic full refresh) with no live Emby
-      // or disk access. The client paints this instantly, then requests a
-      // live refresh (stale omitted) in the background to catch any changes
-      // made in Emby since the last sweep.
+      // Fast path: build the map from the stored episodeData (populated by
+      // the periodic full refresh) with no disk access. The client paints this
+      // instantly, then requests a live refresh (stale omitted) in the
+      // background to catch any file changes since the last sweep.
       if (stale) {
         const seriesMap = epd.markGapErrors(
           epd.toSeriesMap(rec.episodeData, folder, today),
@@ -1836,13 +1675,10 @@ app.post(
         };
       }
 
-      // Refresh watched/id (Emby) and file/res (disk) so the map is live-fresh.
-      // aired dates come from the periodic full refresh; skip the TVDB call here.
+      // Refresh file/res (disk) so the map is live-fresh. aired dates come
+      // from the periodic full refresh; skip the TVDB call here.
       const t0 = Date.now();
-      await refreshEpisodeData(showName, rec, {
-        sources: ["emby", "disk"],
-        trustWatched: trustWatched === true,
-      });
+      await refreshEpisodeData(showName, rec, { sources: ["disk"] });
       const tRefresh = Date.now();
       await tvdb.saveTvdbSync();
       const tSave = Date.now();
@@ -1874,27 +1710,10 @@ app.post(
     const rec = allTvdb?.[showName];
     if (!rec) return { ok: false, error: "Show not found" };
     const cleared = [];
-    for (const { season, episode, id } of cells) {
-      if (!id) continue;
-      try {
-        const isWatched = epd.isWatched(rec.episodeData, season, episode);
-        const url = urls.updateUserDataUrl(String(id));
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ PlaybackPositionTicks: 0, Played: isWatched }),
-        });
-        if (res.ok || res.status === 204) {
-          if (Array.isArray(rec.episodeData)) {
-            epd.setEpisode(rec.episodeData, season, episode, { pos: 0 });
-          }
-          cleared.push({ season, episode });
-        } else {
-          unilog(571, `Emby HTTP ${res.status} for id=${id}`);
-        }
-      } catch (e) {
-        unilog(572, `${showName} S${season}E${episode}:`, e.message);
-      }
+    for (const { season, episode } of cells) {
+      if (!epd.getEp(rec.episodeData, season, episode)) continue;
+      epd.setEpisode(rec.episodeData, season, episode, { pos: 0 });
+      cleared.push({ season, episode });
     }
     if (cleared.length > 0) await tvdb.saveTvdbSync();
     return { ok: true, cleared, episodeData: rec.episodeData };
@@ -1981,26 +1800,6 @@ app.post(
   "/api/incrementGroupCount",
   apiWrapper(groupCounts.incrementGroupCount),
 );
-app.post(
-  "/api/triggerEmbySync",
-  apiWrapper(async () => {
-    unilog(36, "Running full Emby sweep");
-    runEmbyFullSweep("triggerEmbySync").catch((e) =>
-      unilog(575, "sweep error:", e?.message || e),
-    );
-    return { ok: true };
-  }),
-);
-
-app.post(
-  "/api/requestEmbyLibraryRefresh",
-  apiWrapper(async () => {
-    // Fire and forget — manager throttles, dedupes, polls, and pushes WS progress
-    embyRefreshManager.request("api");
-    return { ok: true };
-  }),
-);
-
 // Hide button: a toggle keyed on hiddenFromRow. When not hidden it hides
 // (lastPlayed back); when hidden it unhides (lastPlayed to today).
 app.post(
@@ -2017,34 +1816,17 @@ app.post(
     if (!canHide) return { ok: false, error: "Nothing to hide" };
 
     let action;
-    let changed;
     if (!rec.hiddenFromRow) {
-      changed = await hideShowInEmby(showName, rec);
+      await stampFakeLastPlayed(rec, Date.now() - HIDE_BACKDATE_MS);
       await setHiddenFromRow(showName, true);
       action = "hidden";
     } else {
-      const cw = await unhideContinueWatching(showName, rec);
-      changed = cw > 0 ? [`lastPlayed(${cw} epis)`] : [];
+      await stampFakeLastPlayed(rec, Date.now());
       await setHiddenFromRow(showName, false);
       action = "unhidden";
     }
-    unilog(
-      1661,
-      `${action} ${showName}: ${changed.length ? changed.join(", ") : "no date change"}`,
-    );
-    if (changed.length > 0) {
-      embyRefreshManager
-        .request(`hideShow:${showName}`, showName)
-        .catch((e) => unilog(1662, `refresh failed: ${e.message}`));
-    }
-    return { ok: true, action, changed };
-  }),
-);
-
-app.get(
-  "/api/embyLibraryRefreshStatus",
-  apiWrapper(async () => {
-    return embyRefreshManager.getStatus();
+    unilog(2517, `${action} ${showName}`);
+    return { ok: true, action };
   }),
 );
 
@@ -2108,74 +1890,6 @@ app.post(
     await tvdb.saveTvdbSync();
     unilog(40, `Done: done=${done} errors=${errors}`);
     return { ok: true, done, errors };
-  }),
-);
-
-app.get(
-  "/api/embyTaskStatus",
-  apiWrapper(async (params) => {
-    const { taskId } = params;
-    if (!taskId) return { status: "notask" };
-    const res = await fetch(
-      `${EMBY_BASE_URL}/ScheduledTasks?api_key=${EMBY_API_KEY}`,
-    );
-    if (!res.ok) return { status: "fetchfailed" };
-    const tasks = await res.json();
-    const task = (Array.isArray(tasks) ? tasks : []).find(
-      (t) => String(t?.Id) === String(taskId),
-    );
-    if (!task) return { status: "refreshdone" };
-    const stateRaw = String(task?.State || task?.Status || "").trim();
-    const state = stateRaw.toLowerCase();
-    const progressNum = Number(task?.CurrentProgressPercentage);
-    const hasProgress = Number.isFinite(progressNum);
-    if (hasProgress && progressNum >= 100) return { status: "refreshdone" };
-    if (
-      state === "completed" ||
-      state === "cancelling" ||
-      state === "cancelled"
-    )
-      return { status: "refreshdone" };
-    if (state === "running")
-      return {
-        status: "refreshing",
-        taskStatus: stateRaw,
-        progress: hasProgress ? progressNum : undefined,
-      };
-    if (state === "idle")
-      return { status: "refreshdone", taskStatus: stateRaw };
-    return { status: "refreshing", taskStatus: stateRaw };
-  }),
-);
-
-// Emby's per-item refresh is fire-and-forget — 4.8 exposes no completion signal
-// for it (DateLastRefreshed/DateLastSaved are not returned by any endpoint), so
-// give it a short settle window before reprocessing instead of polling.
-const EMBY_REFRESH_SETTLE_MS = 4000;
-
-app.post(
-  "/api/refreshEmbyItem",
-  apiWrapper(async (params) => {
-    const { showId, showName } = params;
-    if (!showId) return { success: false, error: "missing showId" };
-    unilog(577, `Refreshing Emby item for ${showName} (${showId})`);
-
-    try {
-      const res = await fetch(
-        `${EMBY_BASE_URL}/Items/${showId}/Refresh?Recursive=true&MetadataRefreshMode=Default&api_key=${EMBY_API_KEY}`,
-        { method: "POST" },
-      );
-      if (!res.ok) unilog(579, `Emby returned ${res.status} for ${showName}`);
-    } catch (e) {
-      unilog(580, `fetch error for ${showName}:`, e.message);
-    }
-
-    await new Promise((r) => {
-      setTimeout(r, EMBY_REFRESH_SETTLE_MS);
-    });
-
-    tvdb.enqueueShowProcess(showName);
-    return { success: true };
   }),
 );
 
@@ -2271,29 +1985,7 @@ app.post("/api/addNoEmby", apiWrapper(addNoEmby));
 app.post("/api/delNoEmby", apiWrapper(delNoEmby));
 app.post("/api/addGap", apiWrapper(addGap));
 app.post("/api/delGap", apiWrapper(delGap));
-// ponytail: the collection flags go to Emby too, because the sweep still reads
-// membership back from Emby's collections and would undo a record-only change.
-// Goes with the sweep in kill-emby Phase 3.
-const COLLECTION_FIELDS = {
-  inToTry: "toTry",
-  inContinue: "continue",
-  inMark: "mark",
-  inLinda: "linda",
-};
-app.post(
-  "/api/setTvdbFields",
-  apiWrapper(async (params) => {
-    const rec = tvdb.getAllTvdbSync()?.[params?.name];
-    if (rec?.inEmby && rec.id) {
-      for (const [field, coll] of Object.entries(COLLECTION_FIELDS)) {
-        if (!(field in params)) continue;
-        if (!(await setEmbyCollection(COLLECTION_IDS[coll], rec.id, !!params[field])))
-          throw new Error(`emby ${coll} collection update failed for ${params.name}`);
-      }
-    }
-    return tvdb.setTvdbFields(params);
-  }),
-);
+app.post("/api/setTvdbFields", apiWrapper(tvdb.setTvdbFields));
 
 // Persist watched state into episodeData (used by the map for non-Emby / local
 // episodes). `watchedEpis` is the legacy [[season, ep, ...], ...] array built by
@@ -2331,8 +2023,7 @@ app.post(
   }),
 );
 
-// Set the watched mark on one episode, in Emby and in episodeData both, for
-// the web client's map and tvapp's.
+// Set the watched mark on one episode, for the web client's map and tvapp's.
 app.post(
   "/api/setEpisodeWatched",
   apiWrapper(async (params) => {
@@ -2346,18 +2037,8 @@ app.post(
     if (!epd.getEp(rec.episodeData, season, episode))
       return { ok: false, error: "Episode not found" };
 
-    const id = epd.getEmbyId(rec.episodeData, season, episode);
-    if (id) {
-      // Position goes with the mark either way: watched has nothing left to
-      // resume, and unwatched is being put back to the start.
-      const res = await fetch(urls.updateUserDataUrl(String(id)), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ Played: !!watched, PlaybackPositionTicks: 0 }),
-      });
-      if (!res.ok && res.status !== 204)
-        return { ok: false, error: `Emby HTTP ${res.status}` };
-    }
+    // Position goes with the mark either way: watched has nothing left to
+    // resume, and unwatched is being put back to the start.
     epd.setEpisode(rec.episodeData, season, episode, {
       watched: !!watched,
       pos: 0,
@@ -2365,73 +2046,11 @@ app.post(
     rec.watchedCount = epd.countWatched(rec.episodeData);
     await tvdb.saveTvdbSync();
     debouncedTvdbPush(name);
-    unilog(2357, `${name} S${season}E${episode} watched=${!!watched}${id ? "" : " (no emby id)"}`);
+    unilog(2518, `${name} S${season}E${episode} watched=${!!watched}`);
     return { ok: true, watched: !!watched };
   }),
 );
 
-// Restore watched flags from Emby's own user data, which is keyed by tvdbId
-// and survives an episode's or a show's removal from the library. The same
-// lookup runs per-show during refreshEpisodeData for shows that left Emby;
-// this does the whole library in one pass, shows still in Emby included, so
-// episodes whose files went before episodeData existed get their flags too --
-// the kill-emby harvest. Adds marks only, so it is safe to re-run.
-app.post(
-  "/api/backfillWatchedFromEmby",
-  apiWrapper(async (params) => {
-    const dryRun = !!params?.dryRun;
-    const allTvdb = tvdb.getAllTvdbSync();
-    const changed = [];
-    let episodes = 0;
-    let dates = 0;
-    for (const [name, rec] of Object.entries(allTvdb || {})) {
-      if (!rec || !rec.tvdbId) continue;
-      if (!Array.isArray(rec.episodeData)) rec.episodeData = [];
-      const ed = rec.episodeData;
-      const watched = embyWatched.getWatchedEpisodes(rec.tvdbId);
-      let added = 0;
-      for (const [key] of watched) {
-        const [season, episode] = key.split(".").map(Number);
-        if (epd.isWatched(ed, season, episode)) continue;
-        if (!dryRun) epd.setEpisode(ed, season, episode, { watched: true });
-        added++;
-      }
-      const latest = rec.lastPlayedDate
-        ? null
-        : embyWatched.latestPlayed(watched);
-      if (added === 0 && !latest) continue;
-      if (!dryRun) {
-        if (added > 0) rec.watchedCount = epd.countWatched(ed);
-        if (latest) {
-          rec.lastPlayedDate = latest.lastPlayedDate;
-          rec.lastPlayedEpisode = latest.lastPlayedEpisode;
-        }
-      }
-      changed.push({
-        name,
-        added,
-        watchedCount: rec.watchedCount,
-        lastPlayedDate: latest?.lastPlayedDate ?? null,
-        lastPlayedEpisode: latest?.lastPlayedEpisode ?? null,
-      });
-      episodes += added;
-      if (latest) dates++;
-    }
-    if (!dryRun && changed.length > 0) await tvdb.saveTvdbSync();
-    unilog(
-      2213,
-      `backfill from emby user data${dryRun ? " (dry run)" : ""}: ${changed.length} shows, ${episodes} episodes, ${dates} viewing dates`,
-    );
-    return {
-      ok: true,
-      dryRun,
-      shows: changed.length,
-      episodes,
-      dates,
-      changed,
-    };
-  }),
-);
 app.post("/api/setSharedFilters", apiWrapper(setSharedFilters));
 
 app.get("/api/flexget-history", (req, res) => {
@@ -2565,15 +2184,25 @@ registerStillsRoutes(app);
 app.post("/api/deletePath", apiWrapper(deletePath));
 app.post("/api/deletePaths", apiWrapper(deletePaths));
 app.post("/api/delSeasonFiles", apiWrapper(delSeasonFiles));
-app.post("/api/createShowFolder", apiWrapper(createShowFolder));
+// The web add flow: the folder puts the show in the library, so the record
+// the add just made from TVDB is linked to it here and then, not by a sweep.
 app.post(
-  "/api/embySync",
-  apiWrapper(async () => {
-    await runEmbyFullSweep("embySync");
-    return { ok: true };
+  "/api/createShowFolder",
+  apiWrapper(async (params) => {
+    const res = await createShowFolder(params);
+    const folder = path.basename(res.path);
+    const allTvdb = tvdb.getAllTvdbSync();
+    const tvdbId = String(params?.tvdbId || "").trim();
+    const name = allTvdb[params?.showName]
+      ? params.showName
+      : Object.keys(allTvdb).find((k) => String(allTvdb[k]?.tvdbId) === tvdbId);
+    if (!name) throw new Error(`createShowFolder: no record for ${params?.showName}`);
+    addToLibrary(name, allTvdb[name], folder);
+    await tvdb.saveTvdbSync();
+    debouncedTvdbPush(name);
+    return res;
   }),
 );
-// Note: /api/embySync kept for createShowFolderAndRefreshEmby; /api/triggerEmbySync is the primary client trigger
 
 // Subtitles
 app.post("/api/subsSearch", apiWrapper(subsSearch));
@@ -3133,12 +2762,11 @@ app.get("/api/introFirstFile", async (req, res) => {
       res.json({ ok: false, reason: "notInEmby" });
       return;
     }
-    const seriesMap = await emby.getSeriesMap(record);
-    if (!seriesMap) {
-      res.json({ ok: false });
-      return;
-    }
-    const sorted = [...seriesMap].sort((a, b) => a[0] - b[0]);
+    const sorted = epd.toSeriesMap(
+      record.episodeData,
+      showPaths.showFolderFor(showName, record),
+      util.toPstDateIso(new Date()),
+    );
     let hasUnwatchedEpisode = false;
     let fallbackPath = null;
     let fallbackSeason = null;
@@ -3229,12 +2857,11 @@ app.get("/api/introNextFile", async (req, res) => {
       res.json({ ok: false, reason: "notInEmby" });
       return;
     }
-    const seriesMap = await emby.getSeriesMap(record);
-    if (!seriesMap) {
-      res.json({ ok: false });
-      return;
-    }
-    const sorted = [...seriesMap].sort((a, b) => a[0] - b[0]);
+    const sorted = epd.toSeriesMap(
+      record.episodeData,
+      showPaths.showFolderFor(showName, record),
+      util.toPstDateIso(new Date()),
+    );
     let found = false;
     for (const [season, episodes] of sorted) {
       const sortedEps = [...episodes].sort((a, b) => a[0] - b[0]);
@@ -3254,75 +2881,6 @@ app.get("/api/introNextFile", async (req, res) => {
   } catch (err) {
     unilog(602, "error:", err.message);
     res.json({ ok: false, error: err.message });
-  }
-});
-
-// Intro: skip forward by skipDur on the specified device (see src/intro.js)
-app.post("/api/skipIntro", async (req, res) => {
-  try {
-    const { pressedAt, deviceName } = req.body || {};
-    const result = await intro.doSkipIntro(pressedAt, deviceName);
-    // Nothing playing: the skip key doubles as "select the show to resume".
-    // tv-tv answers as soon as it knows the target, so this does not wait out
-    // the key sequence.
-    if (result?.reason === "notPlaying") tvTvGet("/tv/selectshow");
-    res.json(result);
-  } catch (err) {
-    unilog(605, "error:", err.message);
-    res.json({ ok: false, error: err.message });
-  }
-});
-
-// Intro: trimming — seek to absolute trimPos position (see src/intro.js)
-app.post("/api/trimIntro", async (req, res) => {
-  try {
-    const { deviceName } = req.body || {};
-    const result = await intro.doTrimIntro(deviceName);
-    res.json(result);
-  } catch (err) {
-    unilog(607, "error:", err.message);
-    res.json({ ok: false, error: err.message });
-  }
-});
-
-// Used by emby-skip-intro.user.js (tampermonkey) — only trimPos/skipDur are
-// consumed; introDur is kept at null for response-shape compatibility.
-app.get("/api/introDur", async (req, res) => {
-  try {
-    const { showName, showId, season } = req.query;
-    if (!showName && !showId) {
-      res.json({
-        introDur: null,
-        startMark: null,
-        trimPos: null,
-        skipDur: null,
-      });
-      return;
-    }
-    const allTvdb = tvdb.getAllTvdbSync();
-    let record = allTvdb[showName];
-    if (!record && showId) {
-      record = Object.values(allTvdb).find((r) => r.id === showId);
-    }
-    const si = tvdb.getSeasonIntro(
-      record,
-      season != null ? Number(season) : null,
-    );
-    res.json({
-      introDur: null,
-      startMark: si.startMark,
-      trimPos: si.trimPos,
-      skipDur: si.skipDur,
-    });
-  } catch (e) {
-    unilog(1579, `introDur error: ${e.message}`);
-    res.json({
-      introDur: null,
-      startMark: null,
-      trimPos: null,
-      skipDur: null,
-      error: e.message,
-    });
   }
 });
 
@@ -3585,83 +3143,26 @@ app.post("/internal/chksrt/mark-warned", (req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/internal/subtitle-mismatch", (req, res) => {
-  const { showName, episodeCode } = req.body || {};
-  notifyClients("subtitleMismatch", { showName, episodeCode });
-  res.json({ ok: true });
-});
-
 let lastNowPlayingShowName = null;
 let lastNowPlayingList = [];
 let lastPlayingKeys = new Set(); // "showName|season|episode" of all currently-playing items
 let lastMissingEpWarning = null;
-let lastAutoSkipKey = null; // "showName|season|episode" of last auto-skipped episode
 
-async function refreshPlayedDatesForShow(showName) {
-  if (!showName) return false;
-  const allTvdb = tvdb.getAllTvdbSync?.();
-  if (!allTvdb) return false;
-  const tvdbRecord =
-    allTvdb[showName] ||
-    Object.values(allTvdb).find((record) => record?.name === showName);
-  if (!tvdbRecord?.inEmby || !tvdbRecord?.id) return false;
-
-  const latestPlayed = await fetchLatestPlayedInfo(tvdbRecord.id);
-  if (!applyLatestPlayed(tvdbRecord, latestPlayed)) return false;
-
-  if (tvdbRecord.hiddenFromRow) {
-    tvdbRecord.hiddenFromRow = false;
-    unilog(1909, `clearing hiddenFromRow for ${showName}: show was played`);
-  }
-  await tvdb.saveTvdbSync();
-  notifyClients("tvdbUpdated", {
-    name: tvdbRecord.name || showName,
-    record: tvdbRecord,
-  });
-  unilog(
-    612,
-    `refreshed lastPlayedDate for ${showName} -> ` +
-      `${tvdbRecord.lastPlayedDate} (${tvdbRecord.lastPlayedEpisode})`,
-  );
-  return true;
-}
-
-// tv-tv's Emby sessions and tvapp's own player are two feeds of one list. Each
-// keeps its own part, so neither one's report wipes out the other's.
-let embyNowPlaying = { showName: null, playing: [] };
+// What tvapp's player is playing, from its playProgress reports. It is the
+// only player, so it is the whole now-playing list.
 let tvappNowPlaying = null;
-
-app.post("/internal/nowPlaying", (req, res) => {
-  const { showName, playing } = req.body;
-  embyNowPlaying = {
-    showName: showName ?? null,
-    playing: Array.isArray(playing) ? playing : [],
-  };
-  res.json({ ok: true });
-  publishNowPlaying();
+recode.setPlayingPathGetter(() => {
+  if (!tvappNowPlaying) return null;
+  const { showName, season, episode } = tvappNowPlaying;
+  const rec = tvdb.getAllTvdbSync()?.[showName];
+  if (!rec) return null;
+  const folder = showPaths.showFolderFor(showName, rec);
+  return epd.getFullPath(rec.episodeData, folder, season, episode, tvDir);
 });
 
-// tvapp is the tv itself, so its play heads the list.
 function publishNowPlaying() {
-  const showName = tvappNowPlaying?.showName ?? embyNowPlaying.showName;
-  const prevPlayingShowNames = new Set(
-    (Array.isArray(lastNowPlayingList) ? lastNowPlayingList : [])
-      .map((item) => item?.showName)
-      .filter(Boolean),
-  );
-  const nextPlayingList = [
-    ...(tvappNowPlaying ? [tvappNowPlaying] : []),
-    ...embyNowPlaying.playing,
-  ];
-  const nextPlayingShowNames = new Set(
-    nextPlayingList.map((item) => item?.showName).filter(Boolean),
-  );
-  const stoppedShowNames = [...prevPlayingShowNames].filter(
-    (name) => !nextPlayingShowNames.has(name),
-  );
-
-  lastNowPlayingShowName = showName ?? null;
-  lastNowPlayingList = nextPlayingList;
+  lastNowPlayingShowName = tvappNowPlaying?.showName ?? null;
+  lastNowPlayingList = tvappNowPlaying ? [tvappNowPlaying] : [];
   if (lastNowPlayingList.length === 0) {
     lastMissingEpWarning = null;
   } else if (lastMissingEpWarning) {
@@ -3678,48 +3179,9 @@ function publishNowPlaying() {
   });
   view.recordNowPlaying(lastNowPlayingShowName);
 
-  // Auto-skip: fire when an episode is near its start (either TV). Keyed on the
-  // episode rather than a not-playing -> playing edge: the TV session keeps its
-  // NowPlayingItem across show changes and while paused at the Emby home screen,
-  // so that edge frequently never happens again after the first play.
-  const lrtv = lastNowPlayingList.find((p) =>
-    TV_DEVICE_NAMES.includes(p.device),
-  );
-  const isNowPlaying = !!lrtv;
-  if (isNowPlaying) {
-    const posMs = Math.round((lrtv.positionTicks ?? 0) / 10000);
-    const fresh = (lrtv.positionTicks ?? 0) < 3 * 1000 * 10000;
-    const skipKey = `${lrtv.showName}|${lrtv.season}|${lrtv.episode}`;
-    if (fresh && skipKey !== lastAutoSkipKey) {
-      lastAutoSkipKey = skipKey;
-      const allTvdb = tvdb.getAllTvdbSync();
-      const record = allTvdb?.[lrtv.showName];
-      const trimPos = tvdb.getSeasonIntro(record, lrtv.season).trimPos;
-      unilog(1333, `start ${skipKey} posMs=${posMs} trimPos=${trimPos}`);
-      if (trimPos > 0) {
-        setTimeout(() => {
-          intro
-            .doTrimIntro(lrtv.device)
-            .catch((e) => unilog(613, "error:", e.message));
-        }, AUTO_SKIP_DELAY_MS);
-      }
-    }
-  } else {
-    lastAutoSkipKey = null;
-  }
-
   checkMissingEpisodes(lastNowPlayingList).catch((e) => {
     unilog(1371, `checkMissingEpisodes failed: ${e.message}`);
   });
-  for (const stoppedShowName of stoppedShowNames) {
-    refreshPlayedDatesForShow(stoppedShowName).catch((err) => {
-      unilog(
-        614,
-        `failed to refresh played dates for ${stoppedShowName}:`,
-        err.message,
-      );
-    });
-  }
 }
 
 async function checkMissingEpisodes(playing) {
@@ -3746,29 +3208,19 @@ async function checkMissingEpisodes(playing) {
     const tvdbRecord = allTvdbData?.[showName];
 
     // New episode started — check for unwatched episodes before this one
-    if (!tvdbRecord?.id) continue;
-
-    let seriesMap;
-    try {
-      seriesMap = await emby.getSeriesMap({ id: tvdbRecord.id });
-    } catch (_) {
-      continue;
-    }
-    if (!Array.isArray(seriesMap)) continue;
+    const ed = tvdbRecord?.episodeData;
+    if (!Array.isArray(ed)) continue;
 
     let missingSeason = null;
     let missingEpisode = null;
-    outer: for (const [s, episodes] of seriesMap) {
-      if (s > season) break;
-      for (const [e, data] of episodes) {
-        if (s === season && e >= episode) break outer;
-        if (!data.played) {
-          missingSeason = s;
-          missingEpisode = e;
-          break outer;
-        }
+    epd.forEachEpisode(ed, (s, e) => {
+      if (missingSeason !== null) return;
+      if (s > season || (s === season && e >= episode)) return;
+      if (!epd.isWatched(ed, s, e)) {
+        missingSeason = s;
+        missingEpisode = e;
       }
-    }
+    });
 
     if (missingSeason !== null) {
       const warningData = {
@@ -3793,11 +3245,7 @@ async function checkMissingEpisodes(playing) {
 const TV_URL = "https://hahnca.com/tv";
 const SRVR_PUBLIC_URL = "https://hahnca.com/tv-srvr";
 const TVAPP_DEVICE = "tvapp";
-const TICKS_PER_MS = 10000; // episodeData pos is in Emby's 100-ns ticks
-
-// The LastPlayedDate of tvapp's current play, in Emby's format. Emby is sent
-// the same one on every write so its read-back matches the record's.
-let tvappPlayedIso = null;
+const TICKS_PER_MS = 10000; // episodeData pos is in 100-ns ticks
 
 // Next-up: the first episode past season 0 with a file and not watched.
 function nextUpEpisode(ed) {
@@ -3876,8 +3324,7 @@ async function getPlayUrl({ showName, season: s, episode: e }) {
 
 // tvapp's player reports when it starts, every few seconds while it is up, on
 // pause, and when it stops or runs to the end. The record keeps the resume
-// position and, at the end, the watched mark. Emby is written the same until
-// kill-emby phase 3, since its sync would otherwise put its own values back.
+// position and, at the end, the watched mark.
 async function playProgress({ showName, season, episode, posMs, durMs, state }) {
   const rec = tvdb.getAllTvdbSync()?.[showName];
   if (!rec) throw new Error(`playProgress: no show ${showName}`);
@@ -3898,8 +3345,7 @@ async function playProgress({ showName, season, episode, posMs, durMs, state }) 
   epd.setEpisode(ed, season, episode, ended ? { watched: true, pos } : { pos });
   if (ended) rec.watchedCount = epd.countWatched(ed);
   if (started || stopped) {
-    tvappPlayedIso = toEmbyDate(Date.now());
-    rec.lastPlayedDate = util.toPstDateTimeMs(tvappPlayedIso);
+    rec.lastPlayedDate = util.toPstDateTimeMs(new Date());
     rec.lastPlayedEpisode = code;
     rec.fakeLastPlayed = null;
     rec.hiddenFromRow = false;
@@ -3921,33 +3367,8 @@ async function playProgress({ showName, season, episode, posMs, durMs, state }) 
         runtimeTicks: durMs > 0 ? Math.round(durMs) * TICKS_PER_MS : null,
         id: null,
       };
-  // Emby first: a stop sets off a read of Emby's last-played date (see
-  // publishNowPlaying), which has to find this play's date there.
-  await setEmbyPlayState(showName, ed, season, episode, pos);
   publishNowPlaying();
   return { ok: true };
-}
-
-// ponytail: dual write, deleted with the rest of Emby in kill-emby phase 3.
-async function setEmbyPlayState(showName, ed, season, episode, pos) {
-  const id = epd.getEmbyId(ed, season, episode);
-  if (!id || !tvappPlayedIso) return;
-  const code = fmtSeasonEpisode(season, episode);
-  try {
-    const res = await fetch(urls.updateUserDataUrl(String(id)), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        Played: epd.isWatched(ed, season, episode),
-        PlaybackPositionTicks: pos,
-        LastPlayedDate: tvappPlayedIso,
-      }),
-    });
-    if (!res.ok && res.status !== 204)
-      unilog(2498, `emby play state write failed for ${showName} ${code}: HTTP ${res.status}`);
-  } catch (e) {
-    unilog(2499, `emby play state write failed for ${showName} ${code}: ${e.message}`);
-  }
 }
 
 http.createServer(app).listen(SRVR_INTERNAL_PORT, "127.0.0.1", () => {
@@ -4149,22 +3570,22 @@ wss.on("connection", (ws) => {
   });
 });
 
-// Phase 3: Incremental sync functions
-
 /**
- * Background Emby sweep: detect new/removed shows,
- * sync collections, update metadata. Server-side port of client loadAllShows steps 2-5.
+ * Background library sweep. The disk says what is in the library: a record
+ * is in it (`inEmby`) while its folder is there, and a folder holding videos
+ * that no library record claims comes in under the record named like it.
  */
-let embyFullSweepRunning = false;
-let embyFullSweepQueued = false;
-let embyFullSweepQueuedCaller = null;
-async function runEmbyFullSweep(caller = "unknown") {
-  if (embyFullSweepRunning) {
-    embyFullSweepQueued = true;
-    embyFullSweepQueuedCaller = caller;
+let librarySweepRunning = false;
+let librarySweepQueued = false;
+let librarySweepQueuedCaller = null;
+const unclaimedFoldersLogged = new Set();
+async function runLibrarySweep(caller = "unknown") {
+  if (librarySweepRunning) {
+    librarySweepQueued = true;
+    librarySweepQueuedCaller = caller;
     return;
   }
-  embyFullSweepRunning = true;
+  librarySweepRunning = true;
   try {
     const allTvdb = tvdb.getAllTvdbSync();
     if (!allTvdb || Object.keys(allTvdb).length === 0) return;
@@ -4183,7 +3604,6 @@ async function runEmbyFullSweep(caller = "unknown") {
       }
     }
 
-    const now = Date.now();
     const isTvdbShow = (r) =>
       !!(
         r &&
@@ -4191,80 +3611,6 @@ async function runEmbyFullSweep(caller = "unknown") {
         !Array.isArray(r) &&
         String(r.name || "").trim()
       );
-
-    // Fetch Emby show list + 4 collections in parallel
-    const embyShowUrl =
-      `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items?api_key=${EMBY_API_KEY}` +
-      `&IncludeItemTypes=Series&Recursive=true` +
-      `&Fields=Name,Id,DateCreated,Genres,Overview,Path,PremiereDate,ProviderIds,UserData` +
-      `&StartIndex=0&Limit=10000`;
-    const [embyResp, toTryResp, continueResp, markResp, lindaResp] =
-      await Promise.all([
-        fetch(embyShowUrl),
-        fetch(
-          `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items?ParentId=${COLLECTION_IDS.toTry}&api_key=${EMBY_API_KEY}&Limit=10000`,
-        ),
-        fetch(
-          `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items?ParentId=${COLLECTION_IDS.continue}&api_key=${EMBY_API_KEY}&Limit=10000`,
-        ),
-        fetch(
-          `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items?ParentId=${COLLECTION_IDS.mark}&api_key=${EMBY_API_KEY}&Limit=10000`,
-        ),
-        fetch(
-          `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items?ParentId=${COLLECTION_IDS.linda}&api_key=${EMBY_API_KEY}&Limit=10000`,
-        ),
-      ]);
-    if (!embyResp.ok) {
-      unilog(651, "Emby fetch failed:", embyResp.status);
-      return;
-    }
-    const embyData = await embyResp.json();
-    const embyShows = embyData.Items || [];
-
-    const parseIds = async (resp) =>
-      new Set(
-        (resp.ok ? (await resp.json()).Items || [] : []).map((i) => i.Id),
-      );
-    const [toTryIds, continueIds, markIds, lindaIds] = await Promise.all([
-      parseIds(toTryResp),
-      parseIds(continueResp),
-      parseIds(markResp),
-      parseIds(lindaResp),
-    ]);
-
-    // Helpers (ported from client emby.js)
-    const findByTvdbId = (targetId) => {
-      if (!targetId) return null;
-      const id = String(targetId).trim();
-      for (const [key, rec] of Object.entries(allTvdb)) {
-        if (String(rec?.tvdbId || "").trim() === id)
-          return { key, record: rec };
-      }
-      return null;
-    };
-    const normalizeTitle = (name) => {
-      let out = String(name || "");
-      const idx = out.indexOf("(");
-      if (idx >= 0) out = out.slice(0, idx);
-      return out
-        .toLowerCase()
-        .replace(/\./g, " ")
-        .replace(/[^a-z0-9\s]/g, " ")
-        .trim()
-        .replace(/\s+/g, " ");
-    };
-    const findCandidate = (embyName, embyTvdbId) => {
-      const norm = normalizeTitle(embyName);
-      if (!norm) return null;
-      for (const [key, rec] of Object.entries(allTvdb)) {
-        if (!isTvdbShow(rec)) continue;
-        const candName = String(rec.name || "").trim();
-        if (!candName || candName === embyName) continue;
-        if (normalizeTitle(candName) !== norm) continue;
-        return { key, record: rec };
-      }
-      return null;
-    };
 
     // Step 1: Key/Name mismatch cleanup
     const keysToDelete = [];
@@ -4286,193 +3632,52 @@ async function runEmbyFullSweep(caller = "unknown") {
       }
     }
 
-    // Step 2: Sync Emby shows into tvdb
-    for (const embyShow of embyShows) {
-      const name = embyShow.Name;
-      const tvdbId = embyShow.ProviderIds?.Tvdb || embyShow.TvdbId;
-      if (!tvdbId || tvdbId === "0") {
-        continue;
-      }
-      const embyPath = embyShow.Path?.split("/").pop() || "";
-      const showId = embyShow.Id;
-
-      let tvdbKey = name;
-      let tvdbRecord = allTvdb[tvdbKey];
-      if (!tvdbRecord) {
-        const byId = findByTvdbId(tvdbId);
-        if (byId) {
-          tvdbKey = byId.key;
-          tvdbRecord = byId.record;
-        }
-      }
-
-      if (!tvdbRecord) {
-        // Block creation if a likely-same-show candidate exists
-        if (findCandidate(name, tvdbId)) {
-          unilog(652, `Blocked create for "${name}" — likely candidate exists`);
-          continue;
-        }
-        const param = {
-          show: { name: name, id: showId, tvdbId: tvdbId },
-          seasonCount: 0,
-          episodeCount: 0,
-          watchedCount: 0,
-          name,
-          showId,
-          tvdbId,
-          embyPath,
-          "emby.genres": embyShow.Genres || [],
-          "emby.overview": embyShow.Overview || "",
-          dateCreated: util.toPstDateTimeMs(embyShow.DateCreated),
-          premiereDate: embyShow.PremiereDate?.substring(0, 10).replace(
-            /-/g,
-            "/",
-          ),
-          fromEmbySync: true,
-          isPlayed: embyShow.UserData?.Played || false,
-          playCount: embyShow.UserData?.PlayCount || 0,
-        };
-        try {
-          await tvdb.getNewTvdb(param);
-          unilog(70, `Created tvdb record: ${name}`);
-        } catch (e) {
-          unilog(653, `getNewTvdb failed for "${name}":`, e.message);
-        }
-        continue;
-      }
-
-      // Update existing record
-      tvdbRecord.id = showId;
-      if (!tvdbRecord.name) {
-        unilog(654, `Backfilling missing name for tvdbId=${tvdbId}: "${name}"`);
-        tvdbRecord.name = name;
-        if (tvdbKey !== name) {
-          allTvdb[name] = tvdbRecord;
-          delete allTvdb[tvdbKey];
-          tvdbKey = name;
-        }
-      }
-      if (!tvdbRecord.tvdbId && tvdbId) {
-        unilog(655, `Backfilling missing tvdbId=${tvdbId} for "${name}"`);
-        // If a duplicate record already owns this tvdbId, merge its TVDB metadata
-        // into this Emby-linked record and delete the duplicate.
-        const duplicate = findByTvdbId(tvdbId);
-        if (duplicate && duplicate.key !== name) {
-          unilog(
-            656,
-            `Merging duplicate tvdbId=${tvdbId} record "${duplicate.key}" into "${name}"`,
-          );
-          const dup = duplicate.record;
-          const TVDB_META_FIELDS = [
-            "tvdbId",
-            "image",
-            "status",
-            "overview",
-            "firstAired",
-            "lastAired",
-            "nextAired",
-            "averageRuntime",
-            "originalCountry",
-            "originalLanguage",
-            "originalNetwork",
-            "score",
-            "trailers",
-            "characters",
-            "remotes",
-            "imdbUrl",
-            "imdbId",
-            "imdbRatings",
-            "rottenUrl",
-            "rottenRatings",
-            "wikiUrl",
-            "redditUrl",
-            "saved",
-          ];
-          for (const field of TVDB_META_FIELDS) {
-            if (dup[field] !== undefined && !tvdbRecord[field]) {
-              tvdbRecord[field] = dup[field];
-            }
-          }
-          delete allTvdb[duplicate.key];
-        } else {
-          tvdbRecord.tvdbId = tvdbId;
-        }
-      }
-      tvdbRecord.path = embyPath;
-      tvdbRecord.genres = embyShow.Genres || [];
-      tvdbRecord.overview = embyShow.Overview || "";
-      tvdbRecord.dateCreated = util.toPstDateTimeMs(embyShow.DateCreated);
-      tvdbRecord.premiereDate = embyShow.PremiereDate?.substring(0, 10).replace(
-        /-/g,
-        "/",
-      );
-      tvdbRecord.played = embyShow.UserData?.Played || false;
-      tvdbRecord.playCount = embyShow.UserData?.PlayCount || 0;
-      tvdbRecord.inToTry = toTryIds.has(showId);
-      tvdbRecord.inContinue = continueIds.has(showId);
-      tvdbRecord.inMark = markIds.has(showId);
-      tvdbRecord.inLinda = lindaIds.has(showId);
-      if (!tvdbRecord.inEmby) {
-        unilog(
-          1229,
-          `embyFullSweep setting inEmby=true for ${name} (was ${tvdbRecord.inEmby})`,
-        );
-        tvdbRecord.inEmby = true;
-        handlePickupChange(name, true, tvdbRecord.status);
-      }
-    }
-
-    // Step 2b: One record claimed by two Emby folders. Fold the extras into
-    // the folder holding the show, so everything working from the record can
-    // see the whole show again, then let Emby drop the series it no longer has
-    // files for. Merges that cannot be proven safe are logged and skipped.
-    await mergeDuplicateShowFolders("embyFullSweep");
-
-    // Step 3: Detect disappeared shows → mark inEmby=false
-    const embyNameSet = new Set(embyShows.map((s) => s.Name));
-    const embyTvdbIdSet = new Set(
-      embyShows.map((s) => String(s.ProviderIds?.Tvdb || "")).filter(Boolean),
-    );
+    // Step 2: A library show whose folder is gone leaves the library. A show
+    // named with a "/" lives in a nested folder, so each is checked directly.
     for (const [name, rec] of Object.entries(allTvdb)) {
-      if (!isTvdbShow(rec) || rec.inEmby === false) continue;
-      const stillInEmby =
-        embyNameSet.has(name) ||
-        (rec.tvdbId && embyTvdbIdSet.has(String(rec.tvdbId)));
-      if (!stillInEmby) {
-        unilog(71, `Marking ${name} as not in Emby`);
-        unilog(
-          1230,
-          `embyFullSweep setting inEmby=false for ${name} (was ${rec.inEmby})`,
-        );
-        // Delete show folder from disk so Emby cannot re-add it on next scan
-        const folderName =
-          typeof rec.path === "string" &&
-          rec.path &&
-          !rec.path.includes("/") &&
-          !rec.path.includes("\\")
-            ? rec.path
-            : name;
-        const folderPath = path.join(tvDir, folderName);
+      if (!isTvdbShow(rec) || !rec.inEmby) continue;
+      const folder = showPaths.showFolderFor(name, rec);
+      if (await isDirectory(path.join(tvDir, folder))) continue;
+      unilog(2519, `${name} left the library: its folder ${folder} is gone`);
+      rec.inEmby = false;
+      rec.notReady = true;
+      rec.inContinue = false;
+      rec.inLinda = false;
+      rec.inMark = false;
+      rec.inToTry = false;
+      handlePickupChange(name, false, rec.status);
+    }
+
+    // Step 3: A folder holding videos that no library show claims joins the
+    // library under the record named like it. With no such record it waits
+    // for the web add flow, which makes one; with a library record of that
+    // name living elsewhere it is a duplicate folder, merged below.
+    const claimed = new Set();
+    for (const [name, rec] of Object.entries(allTvdb)) {
+      if (isTvdbShow(rec) && rec.inEmby)
+        claimed.add(showPaths.showFolderFor(name, rec).split("/")[0]);
+    }
+    for (const folder of await showFolders()) {
+      if (claimed.has(folder)) continue;
+      if (!(await folderHasVideo(path.join(tvDir, folder)))) continue;
+      const rec = allTvdb[folder];
+      if (isTvdbShow(rec) && !rec.inEmby) {
         try {
-          const st = fs.statSync(folderPath);
-          if (st.isDirectory()) {
-            fs.rmSync(folderPath, { recursive: true, force: true });
-            unilog(72, `Deleted folder: ${folderPath}`);
-          }
+          addToLibrary(folder, rec, folder);
         } catch (e) {
-          if (e.code !== "ENOENT") {
-            unilog(657, `Failed to delete folder ${folderPath}:`, e.message);
-          }
+          unilog(2520, `${folder} could not join the library: ${e.message}`);
         }
-        rec.inEmby = false;
-        rec.notReady = true;
-        rec.inContinue = false;
-        rec.inLinda = false;
-        rec.inMark = false;
-        rec.inToTry = false;
-        handlePickupChange(name, false, rec.status);
+      } else if (!rec && !unclaimedFoldersLogged.has(folder)) {
+        unclaimedFoldersLogged.add(folder);
+        unilog(2521, `folder ${folder} holds videos but no show record claims it; add the show from the web client`);
       }
     }
+
+    // Step 3b: One record claimed by two folders. Fold the extras into the
+    // folder holding the show, so everything working from the record can see
+    // the whole show again. Merges that cannot be proven safe are logged and
+    // skipped.
+    await mergeDuplicateShowFolders("librarySweep");
 
     // Step 4: Fix any pre-existing inEmby=false records with stale error fields
     for (const [name, rec] of Object.entries(allTvdb)) {
@@ -4494,6 +3699,13 @@ async function runEmbyFullSweep(caller = "unknown") {
           }
         }
       }
+    }
+
+    // ponytail: drops the links to Emby's web pages that records made before
+    // kill-emby Phase 3 still carry; delete once no record has one.
+    for (const rec of Object.values(allTvdb)) {
+      if (Array.isArray(rec?.remotes) && rec.remotes.some((r) => r?.name === "Emby"))
+        rec.remotes = rec.remotes.filter((r) => r?.name !== "Emby");
     }
 
     await tvdb.saveTvdbSync();
@@ -4524,16 +3736,57 @@ async function runEmbyFullSweep(caller = "unknown") {
     if (pushCount > 0)
       unilog(659, `Pushing ${pushCount} changed records to clients`);
   } catch (err) {
-    unilog(660, "error:", err.message);
+    unilog(2522, `library sweep (${caller}) failed: ${err.message}`);
   } finally {
-    embyFullSweepRunning = false;
-    if (embyFullSweepQueued) {
-      embyFullSweepQueued = false;
-      const c = embyFullSweepQueuedCaller || "queued";
-      embyFullSweepQueuedCaller = null;
-      runEmbyFullSweep(c);
+    librarySweepRunning = false;
+    if (librarySweepQueued) {
+      librarySweepQueued = false;
+      const c = librarySweepQueuedCaller || "queued";
+      librarySweepQueuedCaller = null;
+      runLibrarySweep(c);
     }
   }
+}
+
+async function isDirectory(dir) {
+  try {
+    return (await fsp.stat(dir)).isDirectory();
+  } catch (e) {
+    if (e.code === "ENOENT") return false;
+    throw e;
+  }
+}
+
+// True once any video turns up under dir. Dot-directories hold work in
+// progress (rsync staging), not library files.
+async function folderHasVideo(dir) {
+  for (const d of await fsp.readdir(dir, { withFileTypes: true })) {
+    if (d.name.startsWith(".")) continue;
+    if (d.isDirectory()) {
+      if (await folderHasVideo(path.join(dir, d.name))) return true;
+    } else if (videoFileExtensions.includes(d.name.split(".").pop())) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Put a record in the library, living in `folder`. A show coming in (not
+// just re-pointed) is stamped as added now and takes its tvdbId as its id.
+function addToLibrary(name, rec, folder) {
+  rec.path = folder;
+  if (rec.inEmby) return;
+  const id = String(rec.tvdbId || "");
+  if (!id) throw new Error(`${name} has no tvdbId`);
+  const taken = Object.entries(tvdb.getAllTvdbSync()).find(
+    ([key, r]) => key !== name && String(r?.id) === id,
+  );
+  if (taken) throw new Error(`id ${id} is already ${taken[0]}'s`);
+  rec.inEmby = true;
+  rec.id = id;
+  rec.dateCreated = util.toPstDateTimeMs(new Date());
+  handlePickupChange(name, true, rec.status);
+  unilog(2523, `${name} joined the library in folder ${folder}`);
 }
 
 /**
@@ -4562,31 +3815,8 @@ async function runGapCheckForShows(shows, checkDiskFirst = true) {
       }
     }
 
-    // Update lastPlayedDate for each show in batch (2-call Emby fetch per show)
-    let lastPlayedChanged = 0;
-    for (const { showId, showName, tvdbRecord } of shows) {
-      const t0 = Date.now();
-      try {
-        const latestPlayed = await fetchLatestPlayedInfo(showId);
-        const elapsed = Date.now() - t0;
-        if (applyLatestPlayed(tvdbRecord, latestPlayed)) {
-          lastPlayedChanged++;
-          appendWatchgapLog(
-            `  lastPlayedDate updated | ${elapsed}ms | ${showName} -> ` +
-              `${tvdbRecord.lastPlayedDate} (${tvdbRecord.lastPlayedEpisode})`,
-          );
-        }
-      } catch (err) {
-        unilog(73, `${showName}: ${err.message}`);
-      }
-    }
-    if (lastPlayedChanged > 0) {
-      await tvdb.saveTvdbSync();
-      unilog(74, `Gapcheck updated ${lastPlayedChanged} shows`);
-    }
-
-    // Now run gap check with fresh emby and disk data
-    const gapData = await emby.gapCheckBatch(shows);
+    // Now run gap check with fresh disk data
+    const gapData = await gaps.gapCheckBatch(shows);
     for (const { showId, showName } of shows) {
       const g = gapData?.[showId];
       if (g) {
@@ -4654,27 +3884,8 @@ async function runGapCheckBatch() {
   }
 }
 
-// Phase 3: Set up sync timers
-const COLLECTION_IDS = {
-  toTry: "1468316",
-  continue: "4719143",
-  mark: "4697672",
-  linda: "4706186",
-};
-
 // Auto collection rules (applied in the background tvdb update, per show).
 const CONTINUE_IDLE_DAYS = 30;
-
-// Add/remove one show in one Emby collection. Emby owns collection membership
-// -- the sweep reads it back -- so the record field is only updated after Emby
-// accepts the change.
-async function setEmbyCollection(collId, showId, member) {
-  const url =
-    `${EMBY_BASE_URL}/Collections/${collId}/Items` +
-    `?Ids=${showId}&api_key=${EMBY_API_KEY}`;
-  const resp = await fetch(url, { method: member ? "POST" : "DELETE" });
-  return resp.ok;
-}
 
 // True when any episode that has aired (or already has a file) is unwatched.
 function hasUnwatchedEpisodes(rec) {
@@ -4708,9 +3919,9 @@ function daysSinceLastPlayed(rec) {
 // CONTINUE_IDLE_DAYS goes into Continue. A show already in Mark or Linda is
 // left out of Continue.
 // Returns the change strings for the push2 log line.
-async function applyAutoCollections(showName, rec) {
+function applyAutoCollections(showName, rec) {
   const changes = [];
-  if (!rec.inEmby || !rec.id) return changes;
+  if (!rec.inEmby) return changes;
   if (!rec.anyWatched) {
     if (
       !rec.inToTry &&
@@ -4720,35 +3931,19 @@ async function applyAutoCollections(showName, rec) {
       !rec.inMark &&
       !rec.inLinda
     ) {
-      try {
-        if (await setEmbyCollection(COLLECTION_IDS.toTry, rec.id, true)) {
-          rec.inToTry = true;
-          changes.push("inToTry:false->true(ready unwatched)");
-          unilog(1998, `set toTry for ${showName}: ready and never watched`);
-        } else {
-          unilog(1999, `emby toTry add failed for ${showName}`);
-        }
-      } catch (e) {
-        unilog(2000, `emby toTry add failed for ${showName}: ${e.message}`);
-      }
+      rec.inToTry = true;
+      changes.push("inToTry:false->true(ready unwatched)");
+      unilog(1998, `set toTry for ${showName}: ready and never watched`);
     }
     return changes;
   }
   if (rec.inToTry) {
-    try {
-      if (await setEmbyCollection(COLLECTION_IDS.toTry, rec.id, false)) {
-        rec.inToTry = false;
-        changes.push("inToTry:true->false(watched)");
-        unilog(
-          1989,
-          `cleared toTry for ${showName}: ${rec.watchedCount} episodes watched`,
-        );
-      } else {
-        unilog(1983, `emby toTry remove failed for ${showName}`);
-      }
-    } catch (e) {
-      unilog(1984, `emby toTry remove failed for ${showName}: ${e.message}`);
-    }
+    rec.inToTry = false;
+    changes.push("inToTry:true->false(watched)");
+    unilog(
+      1989,
+      `cleared toTry for ${showName}: ${rec.watchedCount} episodes watched`,
+    );
   }
   const idleDays = daysSinceLastPlayed(rec);
   if (
@@ -4759,20 +3954,12 @@ async function applyAutoCollections(showName, rec) {
     idleDays > CONTINUE_IDLE_DAYS &&
     hasUnwatchedEpisodes(rec)
   ) {
-    try {
-      if (await setEmbyCollection(COLLECTION_IDS.continue, rec.id, true)) {
-        rec.inContinue = true;
-        changes.push(`inContinue:false->true(idle ${idleDays}d)`);
-        unilog(
-          1990,
-          `set continue for ${showName}: unwatched episodes left, idle ${idleDays} days`,
-        );
-      } else {
-        unilog(1985, `emby continue add failed for ${showName}`);
-      }
-    } catch (e) {
-      unilog(1986, `emby continue add failed for ${showName}: ${e.message}`);
-    }
+    rec.inContinue = true;
+    changes.push(`inContinue:false->true(idle ${idleDays}d)`);
+    unilog(
+      1990,
+      `set continue for ${showName}: unwatched episodes left, idle ${idleDays} days`,
+    );
   }
   return changes;
 }
@@ -4787,144 +3974,16 @@ function fmtSeasonEpisode(season, episode) {
   return `S${s}E${e}`;
 }
 
-async function fetchLatestPlayedInfo(showId) {
-  // No IsPlayed filter: a partially-watched (resumable) episode is unplayed but
-  // carries the show's newest LastPlayedDate — the same value that drives the
-  // continue-watching row — so it must count as the show's last-played too.
-  const epUrl =
-    `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items?api_key=${EMBY_API_KEY}` +
-    `&ParentId=${showId}&IncludeItemTypes=Episode&Recursive=true` +
-    `&Fields=UserDataLastPlayedDate&SortBy=DatePlayed&SortOrder=Descending&Limit=1`;
-  const epResp = await fetch(epUrl);
-  if (!epResp.ok) return null;
-  const epData = await epResp.json();
-  const item = epData.Items?.[0];
-  const utcStr = item?.UserData?.LastPlayedDate;
-  if (!utcStr) return null;
-  // Date and episode both come off this one item, so the pair always describes
-  // the same viewing.
-  return {
-    lastPlayedDate: util.toPstDateTimeMs(utcStr),
-    lastPlayedEpisode: fmtSeasonEpisode(
-      item.ParentIndexNumber,
-      item.IndexNumber,
-    ),
-  };
-}
-
-// "YYYY/MM/DD HH:mm:ss.mmm" -> "YYYY/MM/DD HH:mm:ss".
-function toSecondPrecision(pstStr) {
-  return String(pstStr || "").split(".")[0];
-}
-
-// Move a freshly fetched last-played onto the record, and say whether anything
-// moved. Hiding and unhiding stamp fabricated LastPlayedDates onto episodes in
-// Emby, so a fetch that only echoes the value we stamped is not a viewing at
-// all — it is dropped here and the real last viewing already on the record
-// stands. Any other value is a genuine play and retires the stamp.
-function applyLatestPlayed(rec, latest) {
-  if (!latest?.lastPlayedDate) return false;
-  // Emby keeps LastPlayedDate to the second, so the stamp it hands back has
-  // lost whatever sub-second part the fabricated one carried. Comparing whole
-  // seconds is what makes the echo recognizable.
-  if (
-    rec.fakeLastPlayed &&
-    toSecondPrecision(latest.lastPlayedDate) ===
-      toSecondPrecision(rec.fakeLastPlayed)
-  )
-    return false;
-  const episode = latest.lastPlayedEpisode || null;
-  if (
-    latest.lastPlayedDate === (rec.lastPlayedDate || null) &&
-    episode === (rec.lastPlayedEpisode || null) &&
-    !rec.fakeLastPlayed
-  )
-    return false;
-  rec.lastPlayedDate = latest.lastPlayedDate;
-  rec.lastPlayedEpisode = episode;
-  rec.fakeLastPlayed = null;
-  return true;
-}
-
-//////////////////  EMBY SHOW DATE SHIFTING  //////////////////
-// A show is "hidden" by pushing its Emby last-played date two years into the
-// past so it falls to the far right of the "continue watching" list (and the
-// bottom of our watched sort), and is brought back by setting it to now.
-//
-// The date does not live on the series item: Emby gives a series no
-// LastPlayedDate at all (its UserData holds only aggregates), so it is written
-// on the most recently played episode.
+//////////////////  SHOW HIDE / UNHIDE  //////////////////
+// "Hiding" means pushing the show's last viewing back two years so it drops to
+// the bottom of the watched sort; "unhiding" bumps it to now. The stamp is
+// fakeLastPlayed, which the sort reads ahead of lastPlayedDate and a real play
+// clears. hiddenFromRow tracks the hidden state; it is set on hide and cleared
+// on unhide, when a wait ends, and when the show is played. The automatic
+// paths ignore shows with no episodes on disk; the button also takes any show
+// with a last viewing, real or fake.
 
 const HIDE_BACKDATE_MS = 2 * 365 * 24 * 60 * 60 * 1000;
-
-// Emby stores dates with 7 fractional-second digits. The UserData endpoint
-// silently ignores a plain toISOString() (3 digits), so pad it out to 7.
-// Emby keeps only whole seconds of what is posted, so the stamp is floored
-// first -- what goes in then matches what comes back out, which is what lets
-// fakeLastPlayed recognize its own echo.
-function toEmbyDate(ms) {
-  const whole = Math.floor(ms / 1000) * 1000;
-  return new Date(whole).toISOString().replace("Z", "0000Z");
-}
-
-async function setOneEpisodeLastPlayed(ep, targetIso) {
-  // Preserve the rest of the play state; only the date moves. LastPlayedDate
-  // needs Emby's 7-digit format (targetIso) or the endpoint silently ignores it.
-  const res = await fetch(urls.updateUserDataUrl(String(ep.Id)), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      Played: ep.UserData?.Played ?? true,
-      PlayCount: ep.UserData?.PlayCount ?? 1,
-      PlaybackPositionTicks: ep.UserData?.PlaybackPositionTicks ?? 0,
-      LastPlayedDate: targetIso,
-    }),
-  });
-  return res.ok || res.status === 204;
-}
-
-// A series' position in "continue watching" / "next up" is decided by the
-// newest LastPlayedDate across all its episodes, so hiding has to backdate
-// every episode still newer than the cutoff — moving only the newest would
-// just leave the second-newest deciding the spot. This deliberately does NOT
-// filter IsPlayed: a half-watched (resumable) episode is unplayed but carries a
-// fresh LastPlayedDate that pins the show to the left, so it must move too.
-// Un-hiding only needs one episode moved up to now to make the newest play now.
-async function setEmbyLastPlayed(showId, targetIso, skipOlderThanMs) {
-  const epUrl =
-    `${EMBY_BASE_URL}/Users/${EMBY_USER_ID}/Items?api_key=${EMBY_API_KEY}` +
-    `&ParentId=${showId}&IncludeItemTypes=Episode&Recursive=true` +
-    `&Fields=UserDataLastPlayedDate,UserDataPlayCount,UserDataPlaybackPositionTicks` +
-    `&SortBy=DatePlayed&SortOrder=Descending&Limit=10000`;
-  const resp = await fetch(epUrl);
-  const items = resp.ok ? (await resp.json())?.Items || [] : [];
-
-  const targets = [];
-  for (const ep of items) {
-    if (!ep?.Id || !ep.UserData?.LastPlayedDate) continue;
-    if (!skipOlderThanMs) {
-      targets.push(ep); // newest only — list is sorted by DatePlayed descending
-      break;
-    }
-    if (new Date(ep.UserData.LastPlayedDate).getTime() < skipOlderThanMs)
-      continue;
-    targets.push(ep);
-  }
-
-  let count = 0;
-  for (const ep of targets) {
-    if (await setOneEpisodeLastPlayed(ep, targetIso)) count++;
-  }
-  return count;
-}
-
-//////////////////  SHOW HIDE / UNHIDE  //////////////////
-// "Hiding" means pushing lastPlayed back so the show drops to the far right of
-// the "continue watching" row; "unhiding" bumps it to today. hiddenFromRow
-// tracks the hidden state; it is set on hide and cleared on unhide, when a
-// wait ends, and when a real play is read back from Emby. The automatic paths
-// ignore shows with no episodes on disk; the button also takes any show with a
-// last viewing, real or fake, and a show not in Emby only moves its record stamp.
 
 function hasEpisodesOnDisk(rec) {
   return epd.seasonsWithFile(rec?.episodeData).length > 0;
@@ -4938,101 +3997,25 @@ async function setHiddenFromRow(showName, value) {
   });
 }
 
-// Read the show's real last viewing off Emby and park it on the record before
-// any stamping moves it out of reach. Emby keeps one date per episode and no
-// history, so once the stamp lands the true viewing is gone from Emby for good
-// — the record becomes its only copy.
-async function snapshotTruePlayed(showName, rec) {
-  try {
-    const latest = await fetchLatestPlayedInfo(rec.id);
-    if (applyLatestPlayed(rec, latest)) await tvdb.saveTvdbSync();
-  } catch (e) {
-    unilog(1941, `last played snapshot failed for ${showName}: ${e.message}`);
-  }
-}
-
-// Remember the fabricated timestamp just written into Emby, so later reads
-// recognize it as ours and leave the real last viewing on the record alone.
-// Every hide/unhide stamps it, or the watched sort would not follow the
-// button. When Emby has no played episode for the stamp to land on (nothing
-// played, or the played episodes are gone from Emby) the stamp lives on the
-// record alone, the same way the wait-over path stamps it (see
-// markWaitOverViewedNow); a read of Emby then returns no date to replace it.
-async function markFakeLastPlayed(rec, targetIso) {
-  rec.fakeLastPlayed = util.toPstDateTimeMs(targetIso);
+async function stampFakeLastPlayed(rec, ms) {
+  rec.fakeLastPlayed = util.toPstDateTimeMs(new Date(ms));
   await tvdb.saveTvdbSync();
 }
 
-// Hide: every played episode still newer than the cutoff is moved so the
-// show's newest last-played date is two years old. Returns the names of the
-// dates actually changed.
-async function hideShowInEmby(showName, rec) {
-  const cutoffMs = Date.now() - HIDE_BACKDATE_MS;
-  const targetIso = toEmbyDate(cutoffMs);
-  const changed = [];
-  // A show not in emby has only the record stamp to move.
-  if (rec.inEmby !== false && rec.id) {
-    await snapshotTruePlayed(showName, rec);
-    try {
-      const lpCount = await setEmbyLastPlayed(rec.id, targetIso, cutoffMs);
-      if (lpCount > 0) changed.push(`lastPlayed(${lpCount} epis)`);
-    } catch (e) {
-      unilog(1649, `lastPlayed set failed: ${e.message}`);
-    }
-  }
-  await markFakeLastPlayed(rec, targetIso);
-  return changed;
-}
-
-// Unhide continue watching: newest played episode's lastPlayed -> today.
-async function unhideContinueWatching(showName, rec) {
-  const targetIso = toEmbyDate(Date.now());
-  let count = 0;
-  if (rec.inEmby !== false && rec.id) {
-    await snapshotTruePlayed(showName, rec);
-    count = await setEmbyLastPlayed(rec.id, targetIso, null);
-  }
-  await markFakeLastPlayed(rec, targetIso);
-  return count;
-}
-
 // Hide a show unless it is already hidden, then mark it hidden.
-async function hideShowIfNeeded(showName, rec, refreshCaller) {
+async function hideShowIfNeeded(showName, rec) {
   if (rec.hiddenFromRow) return;
-  const changed = await hideShowInEmby(showName, rec);
+  await stampFakeLastPlayed(rec, Date.now() - HIDE_BACKDATE_MS);
   await setHiddenFromRow(showName, true);
-  unilog(
-    1663,
-    `hiding ${showName}: ${changed.length ? changed.join(", ") : "no date change"}`,
-  );
-  if (changed.length > 0) {
-    embyRefreshManager
-      .request(refreshCaller, showName)
-      .catch((e) => unilog(1664, `refresh failed: ${e.message}`));
-  }
+  unilog(2524, `hiding ${showName}`);
 }
 
 // The wait on a show being over is a notification: stamp its last viewing as
-// now so it heads the watched sort. The emby stamp is what makes that stick for
-// a show something has been played on -- the next read of emby would otherwise
-// put the real date back. A show with nothing played has no emby date to move,
-// so the record's own stamp stands on its own.
+// now so it heads the watched sort.
 async function markWaitOverViewedNow(showName, rec) {
-  const cnt =
-    rec.inEmby !== false && rec.id
-      ? await unhideContinueWatching(showName, rec)
-      : 0;
-  if (cnt === 0) {
-    rec.fakeLastPlayed = util.toPstDateTimeMs(toEmbyDate(Date.now()));
-    await tvdb.saveTvdbSync();
-  }
-  unilog(2421, `wait over for ${showName}: last viewed set to now (${cnt} emby epis stamped)`);
+  await stampFakeLastPlayed(rec, Date.now());
+  unilog(2525, `wait over for ${showName}: last viewed set to now`);
 }
-
-// NOTE: syncEmbyUserData periodic sync removed - now using immediate triggers from client
-// Collections and user data changes are handled by /api/triggerEmbySync and /api/triggerShowSelect
-// NOTE: syncDiskData and runGapCheckBatch periodic timers removed - now handled by tryLocalGetTvdb
-// per-show tick via perShowCallback (disk + gap) and preTvdbTickCallback (Emby sweep)
 
 // Regenerate config.yml on startup and schedule flexget every 15 minutes.
 upload().catch((e) => unilog(666, "startup upload error:", e.message));
@@ -5040,182 +4023,6 @@ cron.schedule("*/15 * * * *", () => {
   flexget
     .runFlexgetAndProcess()
     .catch((e) => unilog(667, "cron error:", e.message));
-});
-
-//////////////////  EMBY REFRESH MANAGER  //////////////////
-// All Library/Refresh calls go through here: one running + one pending max,
-// minimum 3 s gap between scans, server polls internally and pushes
-// libraryProgress / libraryRefreshDone WS events to all clients.
-
-const embyRefreshManager = (() => {
-  const MIN_GAP_MS = 3000;
-  const POLL_INTERVAL_MS = 2000;
-  const POLL_TIMEOUT_MS = 5 * 60 * 1000;
-
-  let running = false;
-  let lastFinishedAt = 0;
-  let currentProgress = null; // null or { pct: number }
-  // pendingShowNames / pendingWaiters accumulate while a scan is running.
-  // At the start of each run() they are moved into myShowNames / myWaiters so
-  // that new arrivals during this scan queue into the *next* generation and
-  // are not resolved until their own dedicated scan completes.
-  let pendingShowNames = new Set();
-  let pendingWaiters = []; // { resolve }
-
-  async function getLibraryTaskId() {
-    try {
-      const tasksRes = await fetch(
-        `${EMBY_BASE_URL}/ScheduledTasks?api_key=${EMBY_API_KEY}`,
-      );
-      if (!tasksRes.ok) return null;
-      const tasks = await tasksRes.json();
-      const task = (Array.isArray(tasks) ? tasks : []).find((t) => {
-        const n = String(t?.Name || "").toLowerCase();
-        return (
-          n.includes("library") && (n.includes("scan") || n.includes("refresh"))
-        );
-      });
-      return task?.Id || null;
-    } catch (e) {
-      unilog(1380, `emby scheduled tasks fetch failed: ${e.message}`);
-      return null;
-    }
-  }
-
-  async function run(myShowNames, myWaiters) {
-    running = true; // set synchronously before first await
-
-    const gap = MIN_GAP_MS - (Date.now() - lastFinishedAt);
-    if (gap > 0) await new Promise((r) => setTimeout(r, gap));
-
-    let taskId = null;
-    unilog(
-      668,
-      `starting library refresh (shows: ${[...myShowNames].join(", ") || "manual"})`,
-    );
-    currentProgress = { pct: 0 };
-    notifyClients("libraryProgress", { pct: 0 });
-    publishChannelDelta("libraryRefresh", { type: "progress", pct: 0 });
-
-    try {
-      const res = await fetch(
-        `${EMBY_BASE_URL}/Library/Refresh?api_key=${EMBY_API_KEY}`,
-        { method: "POST" },
-      );
-      if (res.ok) {
-        taskId = await getLibraryTaskId();
-        unilog(76, `lib scan taskId: ${taskId || "none"}`);
-      } else {
-        unilog(669, `Library/Refresh failed: ${res.status} ${res.statusText}`);
-      }
-    } catch (e) {
-      unilog(670, `Library/Refresh error:`, e.message);
-    }
-
-    if (taskId) {
-      const pollStart = Date.now();
-      while (Date.now() - pollStart < POLL_TIMEOUT_MS) {
-        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-        try {
-          const taskRes = await fetch(
-            `${EMBY_BASE_URL}/ScheduledTasks/${taskId}?api_key=${EMBY_API_KEY}`,
-          );
-          if (taskRes.ok) {
-            const task = await taskRes.json();
-            const progressNum = Number(task?.CurrentProgressPercentage);
-            if (Number.isFinite(progressNum)) {
-              currentProgress = { pct: progressNum };
-              notifyClients("libraryProgress", { pct: progressNum });
-              publishChannelDelta("libraryRefresh", {
-                type: "progress",
-                pct: progressNum,
-              });
-            }
-            if (task.State !== "Running") {
-              unilog(77, `lib scan finished (State=${task.State})`);
-              break;
-            }
-          }
-        } catch (e) {
-          unilog(671, `lib scan poll error:`, e.message);
-        }
-      }
-    } else {
-      unilog(78, `lib scan, no taskId, waiting 90s`);
-      await new Promise((r) => setTimeout(r, 90 * 1000));
-    }
-
-    running = false;
-    lastFinishedAt = Date.now();
-    currentProgress = null;
-
-    // Resolve this generation's waiters now — they got their scan.
-    const showNames = [...myShowNames];
-    unilog(
-      672,
-      `lib scan done, notifying clients (shows: ${showNames.join(", ") || "manual"})`,
-    );
-    notifyClients("libraryRefreshDone", { showNames });
-    publishChannelDelta("libraryRefresh", { type: "done", showNames });
-    for (const { resolve } of myWaiters) resolve(showNames);
-
-    // If new requests arrived during this scan, start another run for them.
-    if (pendingShowNames.size > 0 || pendingWaiters.length > 0) {
-      const nextShowNames = new Set([...pendingShowNames]);
-      const nextWaiters = [...pendingWaiters];
-      pendingShowNames = new Set();
-      pendingWaiters = [];
-      unilog(
-        673,
-        `lib scan pending shows: ${[...nextShowNames].join(", ")}, re-running`,
-      );
-      setTimeout(
-        () =>
-          run(nextShowNames, nextWaiters).catch((e) =>
-            unilog(674, "lib scan run error:", e.message),
-          ),
-        MIN_GAP_MS,
-      );
-    }
-  }
-
-  return {
-    request(caller = "unknown", showName = null) {
-      const promise = new Promise((resolve) => {
-        if (running) {
-          // Queue for the next generation scan
-          if (showName) pendingShowNames.add(showName);
-          pendingWaiters.push({ resolve });
-          unilog(
-            675,
-            `lib scan ${caller}: refresh in flight, queued${showName ? ` ${showName}` : ""}`,
-          );
-        } else {
-          // Start a new scan immediately with this request as the first in its generation
-          if (showName) pendingShowNames.add(showName);
-          pendingWaiters.push({ resolve });
-          const myShowNames = new Set([...pendingShowNames]);
-          const myWaiters = [...pendingWaiters];
-          pendingShowNames = new Set();
-          pendingWaiters = [];
-          run(myShowNames, myWaiters).catch((e) =>
-            unilog(676, "lib scan run error:", e.message),
-          );
-        }
-      });
-      return promise;
-    },
-    getStatus() {
-      return {
-        running,
-        progress: currentProgress,
-      };
-    },
-  };
-})();
-
-registerLocalChannel("libraryRefresh", {
-  snapshot: () => embyRefreshManager.getStatus(),
 });
 
 //////////////////  CHOKIDAR FILE WATCHER  //////////////////
@@ -5284,14 +4091,12 @@ async function handleShowDiskChange(showName) {
       disk.deleteDiskCacheEntry(showName);
     }
 
-    // Notify clients that disk changed for this show (progress comes from libraryProgress WS events)
+    // Notify clients that disk changed for this show
     notifyClients("showDiskChanged", { showName });
     unilog(678, `Notified clients about disk change for ${showName}`);
 
-    // Trigger Emby library refresh through manager (throttled, deduped, pushes WS progress)
-    unilog(83, `Requesting Emby library refresh for ${showName}`);
-    await embyRefreshManager.request(`chokidar:${showName}`, showName);
-    unilog(84, `Library refresh done for ${showName}`);
+    // A folder that came or went moves the show in or out of the library.
+    await runLibrarySweep(`chokidar:${showName}`);
 
     try {
       const allTvdb = tvdb.getAllTvdbSync();
@@ -5305,20 +4110,13 @@ async function handleShowDiskChange(showName) {
       );
       unilog(85, `Gap check refreshed for ${showName}`);
 
-      // Refresh watched/id in episodeData from Emby (also dual-writes
-      // watchedEpis/watchedCount).
-      await refreshEpisodeData(showName, tvdbRecord, { sources: ["emby"] });
-      keepWaitStrForLoop(tvdbRecord, waitStrBefore);
-      await tvdb.saveTvdbSync();
-      unilog(86, `watched refreshed for ${showName}`);
-
       // Hide immediately when the show newly enters the "waiting, with
       // episodes on disk" state: either waitStr just appeared, or the first
       // episode(s) landed while waitStr was already set (that case has no
       // waitStr flip for the loop to catch). This is deliberately HIDE-only —
       // an early hide is harmless (the next full loop tick corrects it if
-      // wrong) but an early UNHIDE is not: this handler only refreshes
-      // disk/emby, never re-scrapes TVDB, so a newly-downloaded episode can
+      // wrong) but an early UNHIDE is not: this handler only refreshes the
+      // disk, never re-scrapes TVDB, so a newly-downloaded episode can
       // make waitStr transiently read as cleared even though TVDB simply
       // hasn't announced the next episode's air date yet. Trusting that here
       // would unhide a show every time an episode lands, undoing a hide the
@@ -5334,11 +4132,7 @@ async function handleShowDiskChange(showName) {
         waitStrAfter &&
         (waitStrJustSet || firstEpisodesJustLanded)
       ) {
-        await hideShowIfNeeded(
-          showName,
-          tvdbRecord,
-          `chokidarHide:${showName}`,
-        );
+        await hideShowIfNeeded(showName, tvdbRecord);
       }
     } catch (err) {
       unilog(679, `Post-download refresh error for ${showName}:`, err.message);
@@ -5474,6 +4268,14 @@ watcher
     if (unlinkEntry) unlinkEntry.timeout = unlinkTimeout;
     else
       changedShows.set(showName, { timeout: unlinkTimeout, files: new Set() });
+  })
+  // A show folder removed with no video in it (e.g. one just added) fires no
+  // video unlink, so the folder going is what takes it out of the library.
+  .on("unlinkDir", (dirPath) => {
+    if (path.dirname(dirPath) !== tvDir) return;
+    const showName = showNameFromFilePath(dirPath);
+    unilog(2532, `show folder deleted: ${showName}`);
+    handleShowDiskChange(showName);
   })
   .on("error", (error) => {
     unilog(685, "Watcher error:", error);
@@ -5624,7 +4426,7 @@ setInterval(() => {
     `hb subQ=${subsState.subQueue.length} chkQ=${subsState.subQueueChkSrt.length} ` +
       `asrQ=${subsState.asrQueue.length} ` +
       `flex=${flexget.isFlexgetRunning() ? 1 : 0} ` +
-      `sweep=${embyFullSweepRunning ? 1 : 0} clients=${connectedClients.size} ` +
+      `sweep=${librarySweepRunning ? 1 : 0} clients=${connectedClients.size} ` +
       `subDone=${subsState.subDone} asrDone=${subsState.asrDone} ` +
       `maxLoopLag=${maxLoopLagMs}ms`,
   );

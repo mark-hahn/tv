@@ -159,24 +159,6 @@
             </button>
             <button
               v-if="mapShow?.inEmby !== false"
-              @click.stop="handleSelectedEmby"
-              :disabled="!firstSelectedEmbyId"
-              :style="{
-                opacity: firstSelectedEmbyId ? 1 : 0.35,
-                cursor: firstSelectedEmbyId ? 'pointer' : 'default',
-              }"
-              style="
-                font-size: 13.5px;
-                cursor: pointer;
-                margin: 4.5px 0 4.5px 4.5px;
-                max-height: 21.5px;
-                border-radius: 7px;
-              "
-            >
-              Emby
-            </button>
-            <button
-              v-if="mapShow?.inEmby !== false"
               @click.stop="handleSelectedTv"
               :disabled="!firstSelectedEpisode"
               :style="{
@@ -215,24 +197,6 @@
               "
             >
               Episode
-            </button>
-            <button
-              v-if="mapShow?.inEmby !== false"
-              @click.stop="handleSelectedEmby"
-              :disabled="!firstSelectedEmbyId"
-              :style="{
-                opacity: firstSelectedEmbyId ? 1 : 0.35,
-                cursor: firstSelectedEmbyId ? 'pointer' : 'default',
-              }"
-              style="
-                font-size: 13.5px;
-                cursor: pointer;
-                margin: 4.5px 0 4.5px 4.5px;
-                max-height: 21.5px;
-                border-radius: 7px;
-              "
-            >
-              Emby
             </button>
             <button
               v-if="mapShow?.inEmby !== false"
@@ -293,7 +257,7 @@
             ><span
               @click.stop.prevent="handleNotInEmbyClick($event)"
               style="font-weight: bold; cursor: pointer; white-space: nowrap"
-              >Not In Emby</span
+              >Not In Library</span
             ></span
           >
         </div>
@@ -1132,8 +1096,6 @@ import * as tvdb from "../tvdb.js";
 import * as emby from "../emby.js";
 import * as srvr from "../srvr.js";
 import { config } from "../config.js";
-import * as urls from "../urls.js";
-import * as util from "../util.js";
 import evtBus from "../evtBus.js";
 import { fmtPos, resolutionDigit, unilog } from "@tv/share";
 import * as epd from "@tv/share";
@@ -1420,12 +1382,6 @@ export default {
       );
       return this.seriesMap?.[season]?.[episode] ? { season, episode } : null;
     },
-    firstSelectedEmbyId() {
-      if (this.selectedCells.size === 0) return null;
-      const firstKey = Array.from(this.selectedCells)[0];
-      const { season, episode } = this.parseCellKey(firstKey);
-      return this.seriesMap?.[season]?.[episode]?.id || null;
-    },
     firstSelectedPosTicks() {
       if (this.selectedCells.size === 0) return 0;
       // Use the lowest-numbered (season then episode) selected cell that has pos > 0.
@@ -1653,7 +1609,7 @@ export default {
     },
 
     async handleNotInEmbyClick(event) {
-      // Ctrl-click on "Not In Emby": create the server folder and refresh Emby.
+      // Ctrl-click on "Not In Library": create the show folder, which puts it in the library.
       if (!event?.ctrlKey) return;
 
       const showName = String(this.mapShow?.name || "").trim();
@@ -1709,12 +1665,12 @@ export default {
       }
 
       const ok = window.confirm(
-        `Create Emby folder + refresh library for "${showName}"?`,
+        `Create the show folder for "${showName}" and add it to the library?`,
       );
       if (!ok) return;
 
       this.mapWorking = true;
-      this.mapWorkingTitle = "Creating show folder and refreshing Emby:";
+      this.mapWorkingTitle = "Creating show folder:";
       this.mapWorkingShowName = showName;
       this.mapWorkingStatus = "Starting...";
 
@@ -1737,14 +1693,9 @@ export default {
           tvdbData: this.tvdbData,
           onStatus: setStatus,
           createTimeoutMs: 15000,
-          refreshTimeoutMs: 120000,
         });
 
-        if (res?.status === "refreshfailed") {
-          window.alert(
-            `The folder for "${showName}" was created, but the Emby library refresh timed out.\nThe show should appear after Emby finishes scanning on its own.`,
-          );
-        } else if (!res?.createdFolder) {
+        if (!res?.createdFolder) {
           unilog(1019, "Map: createShowFolderAndRefreshEmby failed", {
             showName,
             tvdbId,
@@ -1755,7 +1706,7 @@ export default {
         }
 
         setStatus("Reloading shows...");
-        // Trigger list reload so the show becomes a real Emby item.
+        // Trigger list reload so the show shows up in the library.
         // Wait for List.newShows() to finish (web-add does this inline).
         await new Promise((resolve) => {
           let done = false;
@@ -2361,8 +2312,8 @@ export default {
       for (const key of this.selectedCells) {
         const { season, episode } = this.parseCellKey(key);
         const ep = this.seriesMap?.[season]?.[episode];
-        if (!ep || !ep.pos || !ep.id) continue;
-        cells.push({ season, episode, id: ep.id });
+        if (!ep || !ep.pos) continue;
+        cells.push({ season, episode });
       }
       if (cells.length === 0) return;
       this.posFlash = true;
@@ -2459,11 +2410,6 @@ export default {
       const targets = this.getSelectedMapTargets();
       if (targets.length === 0) return;
       this.$emit("delete-episodes", this.mapShow, targets);
-    },
-    handleSelectedEmby() {
-      const id = this.firstSelectedEmbyId;
-      if (!id) return;
-      util.openExternalPage(urls.embyPageUrl(id));
     },
     // Same as the info pane's TV button -- the tvapprc remote's Shows button
     // and a click on this show over there -- but naming the map's selected

@@ -1,8 +1,12 @@
 
-video player has no audio `At Home with the Braithwaites`
+
+
+????????????????
+don't browse `In Development`
+manage upcoming shows
+=================
 
 the tv video text bar year display should show one year with no hyphen when start and end years are the same
-
 
 # play video in browser for entertainment
 - in the info and map panes put a button `Play` to the left of the tv button. 
@@ -13,13 +17,7 @@ the tv video text bar year display should show one year with no hyphen when star
   - then show a small button in the upper right labeled `Skip` in an overlay. 
   - the skip button should jump ahead by introdur amount. 
 - if there is an intropos then automatically jump to that position when the video starts playing at 0
-                                                                                                                              
-????????????????
-don't browse `In Development`
-manage upcoming shows
-=================
-
-# new time bar order
+                                                                                                                        # new time bar order
 - change order to:
   - `<show name>`
   - `<country like USA>`

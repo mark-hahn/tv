@@ -241,8 +241,9 @@ class VideoPlayer extends FrameLayout {
   /**
    * A remote key while the video is up -- tvapprc mode's arrows and ok, the
    * same keys that drive the list: ok pauses and resumes, left and right seek,
-   * up jumps over the intro by the show's skip length, and down toggles the
-   * time bar. Down's bar stays until down again, any key but a seek, or the
+   * up jumps back to the start (trimPosMs, past the intro, when there is one),
+   * skip (the remotes' Skip key) jumps over the intro by the show's skip
+   * length, and down toggles the time bar. Down's bar stays until down again, any key but a seek, or the
    * video closing. A seek's is up only until the seek ends, and the bar is
    * always up while paused.
    */
@@ -259,8 +260,9 @@ class VideoPlayer extends FrameLayout {
     if ("ok".equals(key)) exo.setPlayWhenReady(!exo.getPlayWhenReady());
     else if ("left".equals(key)) exo.seekTo(Math.max(0, pos - SEEK_BACK_MS));
     else if ("right".equals(key)) exo.seekTo(pos + SEEK_FWD_MS);
-    else if ("up".equals(key)) {
-      // A held up repeats, and a second skip would land past the intro into
+    else if ("up".equals(key)) exo.seekTo(playing.optLong("trimPosMs"));
+    else if ("skip".equals(key)) {
+      // A held Skip repeats, and a second skip would land past the intro into
       // the show, so repeats inside the lockout are dropped.
       long now = SystemClock.uptimeMillis();
       if (skipDurMs > 0 && now - lastSkipAt >= SKIP_LOCKOUT_MS) {
@@ -469,6 +471,7 @@ class VideoPlayer extends FrameLayout {
   private static String years(Shows.Show show) {
     String first = ShowListView.year(show.firstAired);
     String last = ShowListView.year(show.lastAired);
+    if (first.equals(last)) return first;
     return first.isEmpty() || last.isEmpty() ? first + last : first + "-" + last;
   }
 

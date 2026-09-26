@@ -1417,7 +1417,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
     if (cam.isShowing()) return;
     // The remotes' Skip: the intro skip of a playing video, nothing without one.
     if ("skip".equals(key)) {
-      if (video.isOpen()) video.key("up");
+      if (video.isOpen()) video.key("skip");
       return;
     }
     // While a video is up the keys are its own (see VideoPlayer.key); Back and

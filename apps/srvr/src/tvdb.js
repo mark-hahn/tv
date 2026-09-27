@@ -591,6 +591,9 @@ try {
   normalizeAllTvdbTimestampFields(
     stripDeadFields(stripLegacyLastWatched(migrateRemotesToFlatProps(allTvdb))),
   );
+  // Seed the loop's waitSeen so a flip another refresh writes before the loop
+  // first reaches a show is still seen.
+  for (const rec of Object.values(allTvdb)) rec.waitSeen ??= !!rec.waitStr;
   saveAllShows(allTvdb);
 } catch (e) {
   throw new Error(
@@ -1743,12 +1746,7 @@ async function getTmdbFallback(showName, ids) {
 // PST "YYYY/MM/DD ..." string). Otherwise playing tonight's episode makes the
 // remaining ones look one day short until the day rolls over.
 // Returns "{M-DD}" or "{YY-M-DD}" when future, "" when past/today, null when no data.
-// A wait over a year out also returns "" unless capAtOneYear is false.
-const calculateWaitStr = (
-  episodeData,
-  lastPlayedDate = null,
-  capAtOneYear = true,
-) => {
+const calculateWaitStr = (episodeData, lastPlayedDate = null) => {
   try {
     if (!Array.isArray(episodeData)) return null;
 
@@ -1809,12 +1807,6 @@ const calculateWaitStr = (
     if (minWaitDate === null) return null;
 
     if (minWaitDate > today) {
-      const oneYearOut = new Date(
-        new Date(today).getTime() + 365 * 24 * 60 * 60 * 1000,
-      )
-        .toISOString()
-        .slice(0, 10);
-      if (capAtOneYear && minWaitDate > oneYearOut) return "";
       const waitMD = minWaitDate.slice(5).replace(/^0/, " ").trim();
       const todayYear = today.slice(0, 4);
       const waitYear = minWaitDate.slice(0, 4);
@@ -2326,6 +2318,8 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   if (existing.strayNote != null) tvdbData.strayNote = existing.strayNote;
   if (existing.ignoreGaps != null) tvdbData.ignoreGaps = existing.ignoreGaps;
   if (existing.gapSig != null) tvdbData.gapSig = existing.gapSig;
+  // The waiting state the background loop last acted on (see tryLocalGetTvdb).
+  if (existing.waitSeen != null) tvdbData.waitSeen = existing.waitSeen;
 
   // Calculate waitStr from existing episodeData (fresh series map data hasn't
   // been fetched yet at this stage).
@@ -2632,8 +2626,11 @@ const tryLocalGetTvdb = async () => {
   }
 
   // Captured before any waitStr recalculation below so a show that just became
-  // watchable can be brought back to the top of the watched sort.
-  const waitStrBefore = minTvdb.waitStr;
+  // watchable can be brought back to the top of the watched sort. It is the
+  // waiting state this loop last acted on (waitSeen), not the current waitStr:
+  // disk changes, gap checks, the map and getNewTvdb rewrite waitStr too, and
+  // comparing against what they left would lose the flip for good.
+  const waitStrBefore = minTvdb.waitSeen ?? minTvdb.waitStr;
 
   unilog(122, `processing [${minTvdb.name}]`);
   // Notify clients which show is being processed
@@ -2722,6 +2719,8 @@ const tryLocalGetTvdb = async () => {
       );
     }
   }
+  if (allTvdb[processRecord.name])
+    allTvdb[processRecord.name].waitSeen = !!waitStrAfter;
 
   // Run per-show process callback (disk check, gap check) with the up-to-date record
   let push2Result = { hasChanges: false, changes: [] };

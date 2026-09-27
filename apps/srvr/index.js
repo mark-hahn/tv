@@ -1943,9 +1943,8 @@ app.get(
 );
 
 // A snoozed show's waitStr, from TVDB air dates alone (nothing is on disk or
-// watched). Too little data to tell, or a wait over a year out, counts as
-// still waiting. undefined when TVDB could not be read in full, so the old
-// value is kept.
+// watched). Too little data to tell counts as still waiting. undefined when
+// TVDB could not be read in full, so the old value is kept.
 async function snoozeWaitStr({ tvdbId, name }) {
   try {
     const seriesMap = await tvdb.getSeriesMap(tvdbId);
@@ -1955,7 +1954,7 @@ async function snoozeWaitStr({ tvdbId, name }) {
       for (const [e, { aired }] of eps)
         if (aired && Number.isInteger(e) && e >= 1)
           epd.setEpisode(ed, s, e, { aired });
-    return tvdb.calculateWaitStr(ed, null, false) ?? SNOOZE_NO_DATA_WAITSTR;
+    return tvdb.calculateWaitStr(ed) ?? SNOOZE_NO_DATA_WAITSTR;
   } catch (e) {
     unilog(2616, `snooze waitStr failed for ${name}: ${e.message}`);
     return undefined;
@@ -4204,6 +4203,8 @@ async function handleShowDiskChange(showName) {
         (waitStrJustSet || firstEpisodesJustLanded)
       ) {
         await hideShowIfNeeded(showName, tvdbRecord);
+        // Acted on, so the loop does not hide it again after a manual unhide.
+        tvdbRecord.waitSeen = true;
       }
     } catch (err) {
       unilog(679, `Post-download refresh error for ${showName}:`, err.message);

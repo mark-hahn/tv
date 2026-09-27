@@ -1,4 +1,10 @@
 
+
+
+=================
+you said `Far-off premieres: a wait more than a year away returns "", which is the same as "ready now"`.
+i am worried about Far-off premieres being considered ready -- does that mean they will show up in the browse pane?  if so that is unacceptable and they shouldn't be considered for browsing while in that state.
+
 no.
 - when a show is snoozed then calculate a waitstr and save it with the show. 
 - recalculate waitstr for all snoozed shows when the browse pane is opened but never more often than 24 hrs. 
@@ -6,15 +12,6 @@ no.
 - when a show doesn't have enough data to calculate a waitstr then consider it to have a waitstr.
 - when looking at snoozed shows in the gallery and one is selected and it has a waitstr then show the waitstr text between the get button and where the "no more shows" message is shown
 - as a one-time operation backfill snoozed shows with waitstr.
-
-
-i am worried about Far-off premieres being considered ready -- does that mean they will show up in the browse pane?  if so that is unacceptable and they shouldn't be considered for browsing while in that state.
-in browse pane i want to unsnooze shows automatically when they had a waitstr  datef
-
-????????????????
-manage upcoming shows
-
-=================
 
 why are you scoping Actor Photos per show? the actor's name is authoritative and we should treat all the same no matter what show they are in or any other metadata
 

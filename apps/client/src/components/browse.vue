@@ -832,7 +832,7 @@ export default {
         );
         if (res.ok) snoozeList.value = await res.json();
       } catch (e) {
-        logHere({ lvl: "error" }, `refreshSnoozeWaitStrs failed: ${e.message}`);
+        unilog(2625, `refreshSnoozeWaitStrs failed: ${e.message}`);
       }
     };
     watch(browseHasMore, (val) => {

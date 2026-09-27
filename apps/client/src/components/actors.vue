@@ -1287,7 +1287,7 @@ export default {
           if ("personImgURL" in item) item.personImgURL = urls[i];
         });
       } catch (e) {
-        logHere({ lvl: "error" }, `photo lookup failed for ${this.showName}: ${e.message}`);
+        unilog(2624, `photo lookup failed for ${this.showName}: ${e.message}`);
       }
     },
 

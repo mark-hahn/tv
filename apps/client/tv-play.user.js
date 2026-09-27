@@ -48,8 +48,10 @@
   let start = Number(q.get("start") || 0);
   // Clicks are taken by where they land, not off the button: a fullscreen
   // video makes the rest of the page inert (Firefox), so a click on Skip goes
-  // to the video. Stopping it keeps the video from pausing or leaving
-  // fullscreen on a double click.
+  // to the video. Firefox's video controls swallow the downs, ups and clicks
+  // on the video, only moves get through, so in fullscreen the controls are
+  // off while the pointer is over Skip; the click then reaches the page and
+  // doesn't pause the video.
   const onBtn = (e) => {
     const r = btn.getBoundingClientRect();
     return (
@@ -59,16 +61,14 @@
       e.clientY <= r.bottom
     );
   };
-  for (const type of ["mousedown", "mouseup", "dblclick"])
-    addEventListener(
-      type,
-      (e) => {
-        if (!onBtn(e)) return;
-        e.stopPropagation();
-        e.preventDefault();
-      },
-      true,
-    );
+  addEventListener(
+    "pointermove",
+    (e) => {
+      const over = document.fullscreenElement === vid && onBtn(e);
+      if (vid.controls === over) vid.controls = !over;
+    },
+    true,
+  );
   addEventListener("click", (e) => {
     if (!onBtn(e)) return;
     e.stopPropagation();

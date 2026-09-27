@@ -3086,8 +3086,11 @@ async function main() {
             !((ref = body && body.data) != null ? ref[0] : void 0) ||
             (response != null ? response.statusCode : void 0) !== 200
           ) {
-            if (error) {
-              const message = error && error.message ? error.message : error;
+            // A non-200 reply is a TVDB outage, not "no results" — retry it.
+            if (error || response.statusCode !== 200) {
+              const message = error
+                ? error.message || error
+                : `HTTP ${response.statusCode}`;
               const status = response && response.statusCode;
               if (++tvDbErrCount >= 15) {
                 unilog(

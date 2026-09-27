@@ -14,9 +14,8 @@ import org.json.JSONObject;
  * The landscape image a show-list card wants, which the tvdb record does not
  * have: its own image is a portrait poster, the wrong shape for a card.
  *
- * tv-srvr finds a backdrop in TMDB, by the show's TMDB id where the record
- * carries one and by its tvdb id or name where it does not, else in TVDB's own
- * backgrounds, and caches its own answers
+ * tv-srvr finds one in fanart.tv's thumbs, else in TVDB's backgrounds, else in
+ * TMDB's backdrops, and caches its own answers
  * -- so this asks once per show and remembers what it was told. An empty url is
  * neither having anything, and is cached as readily as a real one: the caller falls
  * back to the poster and must not ask again on every scroll.

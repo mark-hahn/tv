@@ -1,11 +1,14 @@
 
-1190797
-error: tvdb no results: fname: BEEF.S01E03.I.Am.Inhabited.by.a.Cry.2160p.NF.WEB-DL.DDP5.1.Atmos.H.265-FLUX.mkv | url: https://api4.thetvdb.com/v4/search?type=series&q=BEEF
+in tvapp the tv show `The Knights of Prosperity` has a thumb image different than what it had before removing emby -- it is not as good -- find all possible sources of images for the show and show all the images to me with where you got each from
+
 
 ????????????????
 don't browse `In Development`
 manage upcoming shows
 =================
+
+1190797
+error: tvdb no results: fname: BEEF.S01E03.I.Am.Inhabited.by.a.Cry.2160p.NF.WEB-DL.DDP5.1.Atmos.H.265-FLUX.mkv | url: https://api4.thetvdb.com/v4/search?type=series&q=BEEF
 
 # torrents history feature
 - keep a history of torrents the tor pane sent to the qbt

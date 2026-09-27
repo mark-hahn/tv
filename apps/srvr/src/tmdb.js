@@ -1,7 +1,10 @@
 import { smartTitleMatch, unilog, logHere } from "@tv/share"
 import { MovieDb } from "moviedb-promise";
 import { getTvdbBackground, getTvdbEpisodeImage } from "./tvdb.js";
+import { readFile } from "fs/promises";
 const moviedb = new MovieDb("327192a334da700f65b882c7a69cb927");
+const FANART_KEY_FILE = "/root/dev/apps/tv/fanart.key";
+const FANART_KEY = (await readFile(FANART_KEY_FILE, "utf8")).trim();
 
 // A getTmdb call slower than this gets logged with a per-round-trip breakdown,
 // so a slow map/actors pane load names the TMDB call that caused it.
@@ -167,10 +170,11 @@ const BACKDROP_BASE = "https://image.tmdb.org/t/p/w780";
 const backdropCache = new Map();
 
 /**
- * The landscape image for one show: by TMDB id when the record carries one in
- * its remote_ids, else by its tvdb id, else by name search; TVDB's backgrounds
- * when TMDB has none. url is empty when neither has one, which is the caller's
- * cue to go on showing the poster.
+ * The landscape image for one show, best source first: fanart.tv's tvthumb (the
+ * title card Emby used to hand out), then TVDB's backgrounds, then TMDB's
+ * backdrops -- by TMDB id when the record carries one in its remote_ids, else by
+ * its tvdb id, else by name search. url is empty when none has one, which is
+ * the caller's cue to go on showing the poster.
  */
 export async function getBackdrop(params) {
   const { tmdbId, tvdbId, showName } = params;
@@ -178,10 +182,12 @@ export async function getBackdrop(params) {
   const key = id || `name:${String(showName || "").toLowerCase()}`;
   if (backdropCache.has(key)) return { url: backdropCache.get(key) };
   let url = "";
-  try {
-    url = await findBackdrop(id, tvdbId, showName);
-  } catch (e) {
-    unilog(1916, `backdrop lookup failed for ${showName}: ${e.message}`);
+  if (tvdbId) {
+    try {
+      url = await getFanartThumb(tvdbId);
+    } catch (e) {
+      unilog(2605, `fanart thumb lookup failed for ${showName}: ${e.message}`);
+    }
   }
   if (!url && tvdbId) {
     try {
@@ -190,8 +196,24 @@ export async function getBackdrop(params) {
       unilog(2583, `tvdb background lookup failed for ${showName}: ${e.message}`);
     }
   }
+  if (!url) {
+    try {
+      url = await findBackdrop(id, tvdbId, showName);
+    } catch (e) {
+      unilog(1916, `backdrop lookup failed for ${showName}: ${e.message}`);
+    }
+  }
   backdropCache.set(key, url);
   return { url };
+}
+
+// fanart.tv lists a show's thumbs most liked first; an English one, since a
+// thumb carries the show's title art.
+async function getFanartThumb(tvdbId) {
+  const res = await fetch(`https://webservice.fanart.tv/v3/tv/${tvdbId}?api_key=${FANART_KEY}`);
+  if (!res.ok) throw new Error(`fanart.tv ${res.status}`);
+  const thumbs = (await res.json()).tvthumb || [];
+  return (thumbs.find((t) => t.lang === "en") || thumbs[0])?.url || "";
 }
 
 async function findBackdrop(tmdbId, tvdbId, showName) {

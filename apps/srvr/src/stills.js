@@ -173,7 +173,7 @@ function probe(videoFilePath) {
 // HDR sources (PQ or HLG, BT.2020) must be tone-mapped to SDR BT.709 before
 // they go to the browser: an untouched PQ signal squeezed into 8-bit and still
 // tagged bt2020/smpte2084 is colour-managed by Chrome into blown-out cyan.
-const HDR_TRANSFERS = new Set(["smpte2084", "arib-std-b67"]);
+export const HDR_TRANSFERS = new Set(["smpte2084", "arib-std-b67"]);
 const hdrCache = new Map();
 
 function isHdr(videoFilePath) {
@@ -205,7 +205,7 @@ function isHdr(videoFilePath) {
 
 // zscale/tonemap in software: the AMD VAAPI driver has no HDR tone-map VPP,
 // and at WINDOW_HEIGHT the scaled frames are small enough for it to be cheap.
-const TONEMAP =
+export const TONEMAP =
   "zscale=t=linear:npl=100,tonemap=hable:desat=0," +
   "zscale=p=bt709:t=bt709:m=bt709:r=tv,format=yuv420p";
 

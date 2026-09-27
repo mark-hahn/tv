@@ -11,6 +11,7 @@ import { parse as parseTorrentTitle } from "parse-torrent-title";
 import { unilog, logHere } from "@tv/share";
 import { resStripAlt } from "../videoFiles.js";
 import { SRVR_DATA_DIR, ensureDir } from "../srvrPaths.js";
+import { HDR_TRANSFERS, TONEMAP } from "../stills.js";
 
 const tvDir = "/mnt/media/tv";
 
@@ -263,6 +264,11 @@ export function registerMediaRoutes(app) {
       const videoCodec = streams.find(
         (s) => s.codec_type === "video",
       )?.codec_name;
+      // An HDR source re-encoded to 8-bit keeps its bt2020/PQ tags and plays
+      // all cyan and white, so the transcodes tone-map it to SDR bt709.
+      const hdr = HDR_TRANSFERS.has(
+        streams.find((s) => s.codec_type === "video")?.color_transfer,
+      );
       const audioCodec = selectedAudioStream?.codec_name;
       const selectedAudioIndex = selectedAudioStream?.index ?? null;
       const audioMap =
@@ -272,7 +278,7 @@ export function registerMediaRoutes(app) {
         defaultAudioStream?.index != null &&
         selectedAudioIndex !== defaultAudioStream.index;
 
-      const vCopy = videoCodec === "h264";
+      const vCopy = videoCodec === "h264" && !hdr;
       const aCopy = audioCodec === "aac";
 
       if (
@@ -308,7 +314,7 @@ export function registerMediaRoutes(app) {
         // Burn PGS bitmap subtitle into video stream via filter_complex overlay
         ffmpegArgs.push(
           "-filter_complex",
-          `[0:v][0:${subIdx}]overlay[v]`,
+          `${hdr ? `[0:v]${TONEMAP}[t];[t]` : "[0:v]"}[0:${subIdx}]overlay[v]`,
           "-map",
           "[v]",
         );
@@ -349,6 +355,7 @@ export function registerMediaRoutes(app) {
           ffmpegArgs.push("-c:a", "aac", "-b:a", "128k", "-ac", "2");
         }
       } else {
+        if (hdr) ffmpegArgs.push("-vf", TONEMAP);
         ffmpegArgs.push(
           "-c:v",
           "libx264",

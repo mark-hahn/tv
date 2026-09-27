@@ -1,4 +1,11 @@
 
+
+
+????????????????
+don't browse `In Development`
+manage upcoming shows
+=================
+
 # torrents history feature
 - keep a history of torrents the tor pane sent to the qbt
   - also store in that history the date/time the torrent was sent
@@ -16,10 +23,6 @@
 
 - as a one-time operation backfill history based on logs if that is possible.
 
-????????????????
-don't browse `In Development`
-manage upcoming shows
-=================
 
 this type of event 1188520 has been repeating recently
 
